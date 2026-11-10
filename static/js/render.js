@@ -1207,7 +1207,7 @@ function renderView0() {
   if (S.ie) inlineEditMount(tinF);
   const sa2 = $('#view .secadd-in'); if (sa2 && S.secAdd) { sa2.value = S.secAdd.v || ''; if (saiF) sa2.focus(); }
   const q2 = $('#qinput'); if (q2 && qi && q2 !== qi) { q2.value = qv; if (qf) { q2.focus(); updateChips(q2); } }
-  const wb = $('#wbody'); if (wb) wb.scrollTop = wbs ?? 7 * weekH() - 12;  // 2.15.1 (#633): the 07:00 label in full, not cut at the top
+  const wb = $('#wbody'); if (wb) cvw_scroll(wb, wbs);  // lazy-ok: #wbody = calview.js drew it; 2.828.0 (#5463): the first entry or 07:00, a new grid starts there
   const tl = $('#tlscroll');
   if (tl && isRoadmap()) { const keep = wasRm && !S.rmScrollReset; S.rmScrollReset = false; rmAfterRender(tl, keep ? tls : undefined, keep ? tlt : undefined); }
   else if (tl) { tl.scrollLeft = tls ?? Math.max(0, diffDays(S.tlStart, today()) - 2) * tlDW(); tlAfterRender(tl); }  // lazy-ok: 2.149.0 F (#2519): #tlscroll = timeline.js drew it

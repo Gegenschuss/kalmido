@@ -3,6 +3,7 @@
 // (the more, the stronger), today ringed. A tap on a day opens the day view, a tap on a month name the month view; the
 // arrows turn the year. One request for the whole year (the same events call the other views use), only counted per day.
 
+const CYR = {y: 0};  // 2.828.0 (#5463): the year drawn last
 // day -> number of events + open tasks (ghosts of repeating tasks included) of the year
 function cyr_counts(lo, hi) {
   const cnt = /** @type {Map<string, number>} */ (new Map());
@@ -32,6 +33,13 @@ function cyr_month(y, m, cnt, t0) {
 function cyr_view() {
   const y = +(S.calSel || today()).slice(0, 4), lo = `${y}-01-01`, hi = `${y}-12-31`, t0 = today();
   const cnt = cyr_counts(lo, hi);
+  // 2.828.0 (#5463): a phone (one or two months a row) shows the chosen month first: scrolled there once when the year opens
+  // or turns, never again on a later drawing of the same year (live updates do not jump)
+  if ((CYR.y !== y || !document.getElementById('cyear')) && matchMedia('(max-width: 767px)').matches) {
+    const mk = (S.calSel || t0).slice(0, 7);
+    requestAnimationFrame(() => { const sec = document.querySelector(`#cyear [data-cym="${mk}"]`)?.closest('.cymon'); if (sec && mk.slice(5) !== '01') sec.scrollIntoView?.({block: 'start'}); });
+  }
+  CYR.y = y;
   return `${calBar(String(y))}<div class="cyear calv" id="cyear">${[...Array(12).keys()].map(m => cyr_month(y, m, cnt, t0)).join('')}</div>`;
 }
 document.addEventListener('click', e => {

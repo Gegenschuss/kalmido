@@ -104,7 +104,40 @@ button.cyd:hover{background:var(--bg2)}
 .cyd.today{box-shadow:inset 0 0 0 2px var(--accent);font-weight:700}
 .cyd.sel:not(.today){box-shadow:inset 0 0 0 1px var(--accent)}
 @media (max-width:767px){ .cyear{grid-template-columns:repeat(2,minmax(0,1fr));gap:.875rem} .cyd{font-size:var(--fs-xs)} }
-@media (max-width:23rem){ .cyear{grid-template-columns:minmax(0,1fr)} }
+/* 2.828.0 (#5463): a computer shows all twelve months at once, compact as on a tablet (six a row, a month at most 13.5rem);
+   a phone keeps two a row (before: one month a screen below 23rem) and opens at the chosen month (calyear.js) */
+@media (min-width:900px){ .cyear{grid-template-columns:repeat(6,minmax(0,13.5rem));justify-content:space-between;gap:1rem} .cym{font-size:var(--fs-b)} }
 /* 2.155.0 B (#2076): public holidays / absences in the month and week views: a quiet outlined chip (calendar.js abcX) */
 .cal .cev.cevx,.week .cev.cevx{background:transparent;border-style:dashed;color:var(--text2)}
 .apb-bsearch{margin:.25rem 0 .5rem}.apb-bsearch input{width:100%;box-sizing:border-box}  /* 2.540.0 (#4349): the booking search */
+/* 2.828.0 (#5463): week / day blocks. A block of two lines or more (w2) shows its time above a one-line title cut with "…",
+   a short one both in one line - no more word stumps; on a phone's week the narrow columns keep their wrapped title */
+@media (min-width:768px){
+  .wcol>.wcev,.wcol>.wev{white-space:nowrap;text-overflow:ellipsis}
+  .wcol>.w2 b{display:block;overflow:hidden;text-overflow:ellipsis}
+  .wcol>.w2 .wct{display:block;overflow:hidden;text-overflow:ellipsis}
+}
+.oneday .wcol>.wcev,.oneday .wcol>.wev{white-space:nowrap;text-overflow:ellipsis}
+.oneday .wcol>.w2 b,.oneday .wcol>.w2 .wct{display:block;overflow:hidden;text-overflow:ellipsis}
+/* the now line runs behind the blocks (a block is opaque), only its dot and the free time show it: no line through a title */
+.wcol>.nowline{z-index:0}
+.wcol>.wev{z-index:1}
+.wcol>.wcev:not(.cgghost){background:linear-gradient(var(--cct),var(--cct)),var(--bg)}
+/* three lanes and more on a phone's week: strips in the calendar's colour without letters, one "+N" over the group opens the day */
+.wmore{display:none}
+@media (max-width:767px){
+  .week:not(.oneday) .wcol>.wn3{font-size:0;color:transparent;padding:0}
+  .week:not(.oneday) .wcol>.wn3 *{display:none}
+  .week:not(.oneday) .wcol>.wcev.wn3{background:var(--ccb)}
+  .week:not(.oneday) .wmore{display:flex;align-items:center;justify-content:center;position:absolute;left:1px;right:1px;z-index:3;min-height:1.75rem;padding:0;
+    border:1px solid var(--line2);border-radius:.3125rem;background:var(--bg2);color:var(--text);font:600 var(--fs-xs) var(--mono);box-shadow:0 1px 2px rgba(0,0,0,.12);cursor:pointer}
+}
+/* "+N more" in a month cell is a target: the day view of that day */
+.cal button.more{display:block;width:100%;min-height:1.25rem;margin:0;padding:0 .3125rem;border:0;border-radius:var(--r-s);background:none;color:var(--muted);font:var(--fs-xs) var(--mono);text-align:left;cursor:pointer}
+.cal button.more:hover,.cal button.more:focus-visible{color:var(--accent);background:var(--bg2)}
+/* the timeline on a phone: a calendar's name in up to three lines instead of cut after a few letters */
+@media (max-width:767px){
+  .tl-cal .tl-name{white-space:normal}
+  .tl-cal .cvxtln .tln,.tl-cal .tl-name>.tln{white-space:normal;overflow-wrap:anywhere;line-height:var(--lh-tight);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;font-size:var(--fs-xs)}
+  .tl-cal .cvxtlm{width:1.25rem;min-width:1.25rem}
+}

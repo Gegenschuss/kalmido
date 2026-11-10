@@ -208,7 +208,7 @@ function viewCal() {
     cells += `<div class="cell ${out ? 'out' : ''} ${d === t0 ? 'today' : ''} ${d === S.calSel ? 'sel' : ''}" data-day="${d}">
       <span class="dn">${pd(d).getDate()}</span>
       ${chips.slice(0, 3).join('')}
-      ${chips.length > 3 ? `<div class="more">+${chips.length - 3}</div>` : ''}
+      ${chips.length > 3 ? `<button type="button" class="more" data-calday="${/*html-ok*/ d /* a date */}">${esc(tr('{0} more', chips.length - 3))}</button>` : ''}
       <div class="dots">${evs.slice(0, 2).map(e => `<i class="ce" style="--cc:${cevColor(e)}"></i>`).join('')}${ts.filter(t => !t.status).slice(0, 4 - Math.min(2, evs.length)).map(t => `<i class="p${t.priority}${isMs(t) ? ' ms' : ''}"></i>`).join('')}</div>
     </div>`;
   }
@@ -236,13 +236,22 @@ function viewWeek() {
   const chip = t => `<div class="ev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}${lp_cls(t)}" data-id="${t.id}"${lp_attr(t) /* 2.53.0 (#1426) */} draggable="${t.status || t.ghost || isTouch() || !canEdit(t) ? 'false' : 'true'}">${msGlyph(t)}${mdTitleNL(t.title)}</div>`;
   const now = new Date(), nowTop = (now.getHours() * 60 + now.getMinutes()) / 60 * H;
   const cols = days.map(d => {
-    const blocks = layoutDay((map.get(d) || []).filter(t => t.due_time), evsOf(d).filter(e => cevTimed(e, d)).map(e => ({c: e, ...cevMin(e, d)}))).map(it => {
-      const t = it.t, top = it.s / 60 * H, h = Math.max((it.e - it.s) / 60 * H, 20);
-      if (it.c) return `<div class="wcev${ap_draftCls(it.c)}${cg_canDrag(it.c) ? ' cgok' : ''}" data-cev="${it.c.id}" style="--cc:${cevColor(it.c)};top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)">${/*html-ok*/ cevSubMark(it.c)}<b>${it.c.d0 === d ? fmtTimeAt(it.c.s) : '…'}</b> ${esc(cevTitle(it.c))}</div>`;  // 2.52.0 (#1016): cgok = may be moved / resized (caldrag.js)
-      return `<div class="wev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}${lp_cls(t)}" data-id="${t.id}" draggable="${t.status || t.ghost || isTouch() || !canEdit(t) ? 'false' : 'true'}" style="${lp_sty(t) ? lp_sty(t) + ';' : '' /* 2.53.0 (#1426) */}top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)">${msGlyph(t)}<b>${esc(fmtTimeLoc(t.due_time))}</b> ${mdTitleNL(t.title)}</div>`;
+    const lay = layoutDay((map.get(d) || []).filter(t => t.due_time), evsOf(d).filter(e => cevTimed(e, d)).map(e => ({c: e, ...cevMin(e, d)})));
+    for (const it of lay) if (!it.c || it.c.d0 === d) first = Math.min(first, it.s);
+    const blocks = lay.map(it => {
+      const t = it.t, top = it.s / 60 * H, h = Math.max((it.e - it.s) / 60 * H, 20), cls = `${h >= two ? ' w2' : ''}${it.n >= 3 ? ' wn3' : ''}`;
+      const more = it.n >= 3 && it.cl[0] === it ? `<button type="button" class="wmore" data-calday="${/*html-ok*/ d /* a date */}" style="top:${Math.round(top)}px" aria-label="${esc(trn('{0} event', '{0} events', it.cl.length))}" title="${esc(trn('{0} event', '{0} events', it.cl.length))}">+${it.cl.length}</button>` : '';
+      if (it.c) return `<div class="wcev${/*html-ok*/ cls /* constant classes */}${ap_draftCls(it.c)}${cg_canDrag(it.c) ? ' cgok' : ''}" data-cev="${it.c.id}" style="--cc:${cevColor(it.c)};top:${top}px;height:${h}px;${/*html-ok*/ lane(it) /* numbers */}">${/*html-ok*/ cevSubMark(it.c)}<b>${it.c.d0 === d ? fmtTimeAt(it.c.s) : '…'}</b> <span class="wct">${esc(cevTitle(it.c))}</span></div>${/*html-ok*/ more /* built above with esc() */}`;  // 2.52.0 (#1016): cgok = may be moved / resized (caldrag.js)
+      return `<div class="wev${/*html-ok*/ cls /* constant classes */} p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}${lp_cls(t)}" data-id="${t.id}" draggable="${t.status || t.ghost || isTouch() || !canEdit(t) ? 'false' : 'true'}" style="${lp_sty(t) ? lp_sty(t) + ';' : '' /* 2.53.0 (#1426) */}top:${top}px;height:${h}px;${/*html-ok*/ lane(it) /* numbers */}">${msGlyph(t)}<b>${esc(fmtTimeLoc(t.due_time))}</b> <span class="wct">${mdTitleNL(t.title)}</span></div>${/*html-ok*/ more /* built above with esc() */}`;
     }).join('');
     return `<div class="wcol ${d === t0 ? 'today' : ''}" data-day="${d}">${blocks}${d === t0 ? `<i class="nowline" style="top:${nowTop}px"></i>` : ''}</div>`;
   }).join('');
+  // 2.828.0 (#5463): where the hours start: the first timed entry of the days shown or 07:00, the earlier one (render.js cvw_scroll)
+  let first = 7 * 60;
+  // 2.828.0 (#5463): a block of two lines or more shows its time above a one-line title (cut with "…", never word stumps); a
+  // short one keeps both in one line. Three lanes and more: on a phone strips without letters and one "+N" over the group
+  // (calendar.css .wn3 / .wmore), a tap on it opens the day
+  const two = Math.round(2.25 * remPx()), lane = it => `left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)`;
   // 2.6.0 (K25): the week's own dates ("28. Sep – 4. Okt · KW 40"), short enough for one line on a phone; the month and
   // year of a week that spans two follow its middle (Thursday) where only one is shown
   const title = day ? fmtDay('long', pd(days[0])) : days.length === 7 && days[0] === weekStartOf(days[0]) ? weekTitle(days[0]) : calRangeTitle(days[0], days[days.length - 1]);
@@ -254,12 +263,33 @@ function viewWeek() {
 // 2.290.0 A (#3144): "28. Sep – 1. Okt" for a grid of other than a week's days (the week number only while it is one week)
 function calRangeTitle(a, b) {
   const x = pd(a), z = pd(b), y = new Date().getFullYear(), other = x.getFullYear() !== y || z.getFullYear() !== y, w = isoWeek(a);
+  CVW.start = {k: `${S.calMode}|${days[0]}|${days.length}`, m: first};
   return `${dayNoWd(x, other && x.getFullYear() !== z.getFullYear())} – ${dayNoWd(z, other)}${w === isoWeek(b) ? ` · ${tr('Week {0}', w)}` : ''}`;
 }
 function layoutDay(evs, extra = []) {  // side-by-side lanes for overlapping timed tasks (+ calendar events: {c, s, e})
   const items = evs.map(t => { const s = hm(t.due_time); return {t, s, e: s + Math.max(15, t.duration || 30)}; }).concat(extra).sort((a, b) => a.s - b.s || b.e - a.e);
   const out = []; let cluster = [], lanes = [], end = -1;
-  const close = () => { cluster.forEach(x => { x.n = lanes.length; }); out.push(...cluster); cluster = []; lanes = []; end = -1; };
+// 2.828.0 (#5463): the hour grid's scroll position after a render (render.js): a new grid (other mode, days or their count)
+// starts at CVW.start (the first entry or 07:00, the earlier); the same grid keeps where the person scrolled to, but follows a
+// new start while nobody scrolled (the events arrive after the first drawing)
+const CVW = {start: /** @type {{k: string, m: number}|null} */ (null), last: /** @type {{k: string, top: number}|null} */ (null), live: false};
+function cvw_scroll(wb, keep) {
+  const st = CVW.start, l = CVW.last, mode = k => k.split('|')[0];
+  // fingers changing the number of days (calgest.js, CAL_LIVE) and the drawing after they let go keep the hours where they are
+  const pinch = !!CAL_LIVE || (CVW.live && !!l && !!st && mode(l.k) === mode(st.k));
+  CVW.live = !!CAL_LIVE;
+  if (!st) { wb.scrollTop = keep ?? 7 * weekH() - 12; return; }
+  if (keep != null && l && (pinch || (l.k === st.k && Math.abs(keep - l.top) > 2))) { wb.scrollTop = keep; if (pinch) CVW.last = {k: st.k, top: -1e9}; return; }
+  wb.scrollTop = Math.max(0, st.m / 60 * weekH() - 12);  // 2.15.1 (#633): the hour's label in full, not cut at the top
+  CVW.last = {k: st.k, top: wb.scrollTop};
+}
+// "+N" in the month and over a group of three lanes and more: the day view of that day (before the cell's / column's own click)
+document.addEventListener('click', e => {
+  const b = e.target instanceof Element ? e.target.closest('#view [data-calday]') : null; if (!b) return;
+  e.stopPropagation(); e.preventDefault();
+  S.calSel = /** @type {HTMLElement} */ (b).dataset.calday; S.calMode = 'day'; LS.set('calMode', 'day'); renderView();
+}, true);
+  const close = () => { const cl = cluster; cl.forEach(x => { x.n = lanes.length; x.cl = cl; }); out.push(...cl); cluster = []; lanes = []; end = -1; };  // 2.828.0 (#5463): + cl = its group
   for (const it of items) {
     if (cluster.length && it.s >= end) close();
     let lane = lanes.findIndex(e => e <= it.s);
