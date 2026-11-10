@@ -340,7 +340,8 @@ check(A.get(B + D + "?kind=reminder").json()["docs"][0]["number"] == "MA-2026-00
 
 # ---------------------------------------------------------------- sending and DATEV without SMTP
 r = A.post(B + f"{D}/{IID}/send", json={"to": "rechnung@beispielkunde.example"})
-check(r.status_code == 409 and "SMTP" in r.json().get("error", ""), "sending without SMTP: 409 with a reason " + r.text[:120])
+# 2.855.0 (#5451): the reason is said in plain words ("E-mail sending is not set up ..."), no longer the word SMTP
+check(r.status_code == 409 and "e-mail" in r.json().get("error", "").lower() and "set up" in r.json().get("error", ""), "sending without SMTP: 409 with a reason " + r.text[:120])
 check(A.post(B + f"{D}/{IID}/datev").status_code == 409, "DATEV without SMTP: 409")
 check(A.post(B + f"{D}/{EMPTY}/send", json={"to": "a@b.example"}).status_code == 409, "sending a draft: 409")
 ms = A.get(B + O + "/mail-status").json()
