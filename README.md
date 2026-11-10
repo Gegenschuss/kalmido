@@ -19,10 +19,8 @@
 
 ## What's new
 
-**2.774.0** (2026-11-09):
-- **Undo**: task changes (edits, completing, trash, sections) are now recorded on the server and can be undone and redone across devices.
-- **Chat**: reactions on task comments, team chat and the agent chat share one core table; deleted messages bring their reactions back on undo.
-- **Files**: Office and file area move onto the shared core.
+**2.847.0** (2026-11-10):
+- **My tasks**: own rules per person (view menu > Rules...) move tasks into your own sections automatically - by due date, priority, project or project tag - without changing the tasks themselves.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
