@@ -84,6 +84,7 @@ function viewAblage() {
   if (typeof dt_abOn !== 'function' && typeof ld_later === 'function') ld_later('tagsel');  // 2.122.0 B (#2099 #2295): tags, Shift ranges
   if (typeof abd_cardsHtml !== 'function' && feat('docs') && typeof ld_later === 'function') ld_later('docs');  // 2.353.0 D (#2759): cards, recognition (abdocs.js)
   const r = S.route;
+  if (r.zle) { AB.selHere = false; return `<div class="abview abovr"><div class="abmain">${spo_recentPage('ablage', ab_spaces().map(s => [s, ab_spaceName(s), ab_spaceIcon(s)]))}</div></div>`; }  // 2.880.0 (#5561): #ablage/recent
   if (ab_ovr()) {  // 2.540.0 (#4575): "All workspaces": the spaces first (also with the panel folded on a tablet); the search spans all of them
     AB.selHere = false;
     const search = typeof ftxtBox === 'function' ? ftxtBox() : '', found = search && ftxtActive();

@@ -20,10 +20,16 @@
 .zleempty p{margin:0}
 .zlepin{margin-bottom:1rem}
 .zlepin .fv2bar{flex-wrap:wrap}
-/* the workspaces where no sidebar lists them: compact chips on top (spo_html / wiki.js wk_spacesHtml) */
-.zlechips .spov{max-width:none}
-.zlechips .spovt{display:none}
-.zlechips .spovl,.zlechips .wkspaces{display:flex;flex-wrap:wrap;gap:.375rem;margin:0 0 .75rem;padding:0;border:0;list-style:none}
-.zlechips .spovr,.zlechips .wkdrow{min-height:2.25rem;height:auto;padding:.125rem .75rem;border:1px solid var(--line);border-radius:99rem}
+/* 2.880.0 (#5561): the overview is one calm list of rows of one kind (spo_html's rows): "Recently edited", the workspaces;
+   the trash set off small below it. The page "Recently edited": the arrow back with the heading, the filter chips over the list */
+.zlerows{max-width:none;margin-bottom:.5rem}
+.zlerows .spovr>span{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zletrash{margin:.25rem 0 0}
+.zletrash .linkbtn{display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem;padding:0 .75rem;font-size:var(--fs-s);color:var(--text2)}
+.zlehead{display:flex;align-items:center;gap:.25rem;margin:0 0 .5rem}
+.zlehead h2{margin:0;font-size:var(--fs-l)}
+.zlefs{display:flex;flex-wrap:wrap;gap:.375rem;margin:0 0 .75rem}
+.zlefc{min-height:2.75rem;padding:0 .875rem;border:1px solid var(--line);border-radius:99rem;background:none;color:var(--text2);font:inherit;font-size:var(--fs-s);cursor:pointer;max-width:14rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zlefc[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 /* a narrow phone: the chip shows its symbol only, the folder of a page stays out */
 @media (max-width:25rem){.zlec>span,.zlep{display:none}.zler{gap:.5rem;padding:0 .5rem}}

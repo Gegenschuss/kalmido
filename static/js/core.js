@@ -1793,7 +1793,7 @@ function parseHash() {
   if (b === 's' && ['ablage', 'reading', 'bookmarks', 'feeds', 'life', 'workload'].includes(a)) return {mod: a, key: a, nid: null, wsp: h.split('/')[2] || ''};  // 2.540.0 (#4575 #4588): <view>/s/<space>, the space open under "All workspaces" (areas.js spo_html)  // 2.543.0 (#4606): + workload/s/<space> (Workload, Absences, Disposition)
   if (a === 'feeds') return {mod: 'feeds', key: 'feeds'};  // 2.85.0 B (#1162)
   if (a === 'bookmarks') return {mod: 'bookmarks', key: 'bookmarks'};  // 2.97.0 A (#1950)
-  if (a === 'reading') return {mod: 'reading', key: 'reading'};  // 2.172.0 B (#2679): read later (readlater.js)
+  if (a === 'reading') return {mod: 'reading', key: 'reading', ...(b === 'recent' ? {zle: true} : {})};  // 2.880.0 (#5561): reading/recent (recent.js zle_pageHtml)  // 2.172.0 B (#2679): read later (readlater.js)
   if (a === 'l') return {mod: 'tasks', key: 'l:' + b};
   if (a === 'tag') return {mod: 'tasks', key: 'tag:' + b};
   if (a === 'who' && +b) return {mod: 'tasks', key: 'who:' + +b};  // 2.7.2 (#418): "Tasks of …"
@@ -1809,9 +1809,11 @@ function parseHash() {
   if (a === 'client' && +b) return {mod: 'clients', key: 'clients', client: +b};  // 2.23.0 (#463)
   if (a === 'mailhub') return {mod: 'clients', key: 'clients', client: 'mailhub', ...(+b ? {mail: +b} : {})};  // 2.84.0 A (#1198): the hub's e-mail inbox (hubmail.js); 2.754.0 (#5268): mailhub/<id> opens that mail
   if (a === 'wiki' && b === 's') { const p = h.split('/'); return {mod: 'wiki', key: 'wiki', wid: null, wsp: p[2] || '', ...(p[3] === 'd' ? {wdir: p.slice(4).join('/')} : p[3] === 't' ? {wtag: p.slice(4).join('/')} : {})}; }  // 2.198.0 A (#2743): wiki/s/<space>[/d/<folder path>] under "All"
+  if (a === 'wiki' && b === 'recent') return {mod: 'wiki', key: 'wiki', wid: null, zle: true};  // 2.880.0 (#5561): the page "Recently edited"
   if (a === 'wiki') return {mod: 'wiki', key: 'wiki', wid: +b || null, ...(b === 'd' ? {wdir: h.split('/').slice(2).join('/')} : b === 't' ? {wtag: h.split('/').slice(2).join('/')} : {})};  // 2.49.0 (#1199): wiki/<page id>; 2.152.3 B (#2620): wiki/d/<folder path>
   if (a === 'sheets') return {mod: 'sheets', key: 'sheets', sh: b === 'l' || b === 'f' ? null : +b || null, shl: b === 'l' ? +(h.split('/')[2]) || null : null, shf: b === 'f' ? +(h.split('/')[2]) || null : null};  // 2.89.0 (#1916): sheets/<id>, sheets/l/<list id>; 2.199.0 C (#2742): sheets/f/<folder id>
   if (a === 'ablage' && (AB_DOCSUB.includes(b) || AB_FILEIDS.has(+b))) return {mod: 'docs', key: 'docs', id: AB_FILEIDS.has(+b) ? +b : null, ...(b === 'review' ? {review: true} : {}), ...(b === 'v' && +h.split('/')[2] ? {dv: +h.split('/')[2]} : {})};  // 2.752.0 (#4887): ablage/docs|review|v/<id>|<file id>  // 2.579.0 (#4802): docs/v/<id> = a saved view (docviews.js)  // 2.48.0 (#1111): documents (docs.js); 2.353.0 D (#2759): docs/review = the saved filter To review
+  if (a === 'ablage' && b === 'recent') return {mod: 'ablage', key: 'ablage', nid: null, zle: true};  // 2.880.0 (#5561): the page "Recently edited"
   if (a === 'ablage') return {mod: 'ablage', key: 'ablage', nid: +b || null, ...(/^aus-[a-z]{2,12}$/.test(b || '') ? {aus: b.slice(4)} : {})};  // 2.48.0 (#1207): ablage/<folder or file id>; 2.429.0 (#3580): ablage/aus-<key> (a collection)
   if (a === 'office' && b === 's') { const p = h.split('/'); return {mod: 'office', key: 'office', wsp: p[2] || '', tab: p[3] || '', id: +p[4] || null}; }  // 2.577.0 (#4638): office/s/<space>[/<tab>[/<id>]] under "All workspaces"
   if (a === 'office' && b && S.route?.mod === 'office' && S.route.wsp && typeof wsCur === 'function' && wsCur() === 'all') {  // 2.577.0 (#4638): a link inside an open area keeps it (the address says it too)

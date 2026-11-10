@@ -377,10 +377,13 @@ const rd_home = (mod, sp = rd_open()) => rd_all() && sp ? mod + '/s/' + sp : mod
 // the overview of a view of Reading and, inside a space under "All", the path back to it
 const rd_ovrHtml = mod => spo_html(mod, rd_spaces().map(w => [w, wsName(w), wsIcon(w)]));
 const rd_crumb = mod => rd_open() ? spo_crumbHtml(mod, wsName(rd_open())) : '';
-// 2.769.0 (#5352): the overview "All workspaces" of Knowledge, Files and Reading is "Recently edited" (recent.js zle_ovrHtml, loaded
-// on demand: the workspaces only where no sidebar lists them, as chips); until it is here a placeholder of the same height
-const spo_recentHtml = (mod, to, rows, o) => typeof zle_ovrHtml === 'function' ? zle_ovrHtml(mod, to, rows, o) : (ld_later('recent'), '<div class="zleov"><div class="zleph" style="--zlen:8" aria-busy="true"></div></div>');
-const rd_recentHtml = mod => spo_recentHtml(mod, mod, rd_spaces().map(w => [w, wsName(w), wsIcon(w)]));
+// 2.769.0 (#5352): the overview "All workspaces" of Knowledge, Files and Reading (recent.js zle_ovrHtml, loaded on demand); until it
+// is here a placeholder of the same height. 2.880.0 (#5561): a calm list of rows ("Recently edited", the workspaces, the trash small);
+// spo_recentPage = the page "Recently edited" (#<mod>/recent, recent.js zle_pageHtml) with the same rows as its filter
+const spo_recentHtml = (mod, to, rows) => typeof zle_ovrHtml === 'function' ? zle_ovrHtml(mod, to, rows) : (ld_later('recent'), `<div class="zleov"><div class="zleph" style="--zlen:${rows.length + 1}" aria-busy="true"></div></div>`);
+const spo_recentPage = (mod, rows) => typeof zle_pageHtml === 'function' ? zle_pageHtml(mod, rows) : (ld_later('recent'), '<div class="zleov zlepage"><div class="zleph" style="--zlen:8" aria-busy="true"></div></div>');
+const rd_rows = () => rd_spaces().map(w => [w, wsName(w), wsIcon(w)]);
+const rd_recentHtml = mod => spo_recentHtml(mod, mod, rd_rows());
 // ---- 2.540.0 (#4575 #4588): the overview of the spaces under "All workspaces", shared by the file store (ablage.js),
 // the views of Reading and later other areas (as Knowledge does it, wiki.js wk_spacesHtml): one row per space, a tap opens
 // it, the address carries it, the path above an open space leads back (spo_crumbHtml). to = where a tap leads: a route

@@ -46,9 +46,10 @@ const wk_locked = sp => typeof wkeLockHtml === 'function' && !!WK.idx[sp]?.pages
 function wk_spacesHtml() {  // the entries per space (phone list, computer overview); 2.200.0 A (#2747, audit B 1): named like the file store's spaces
   return `<ul class="wktree wkdlist wkspaces" aria-label="${esc(tr('Workspaces'))}">${wk_spaces().map(s => `<li><a href="#wiki/s/${esc(s)}" class="wkitem wkdrow" data-wksp="${esc(s)}">${wk_locked(s) ? ic('lock', 's') : wk_spIcon(s)}<span>${esc(wk_spaceName(s))}</span>${typeof wkeMark === 'function' ? wkeMark(s) : ''}</a></li>`).join('')}</ul>`;
 }
-// 2.769.0 (#5352): the overview under "All": "Recently edited" (areas.js spo_recentHtml); the entries per space only where the
-// sidebar does not list them (a phone, the panel hidden), compact on top
-const wk_recentHtml = () => spo_recentHtml('wiki', sp => 'wiki/s/' + sp, [], {chips: `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${wk_spacesHtml()}</nav>`});
+// 2.769.0 (#5352): the overview under "All" (areas.js spo_recentHtml). 2.880.0 (#5561): a calm list of rows - "Recently edited"
+// (the page #wiki/recent), then one row per space with its lock mark (as wk_spacesHtml)
+const wk_rows = () => wk_spaces().map(s => [s, wk_spaceName(s), wk_locked(s) ? ic('lock', 's') : wk_spIcon(s), typeof wkeMark === 'function' ? wkeMark(s) : '']);
+const wk_recentHtml = () => `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${spo_recentHtml('wiki', sp => 'wiki/s/' + sp, wk_rows())}</nav>`;  // #wk-res: the search's hits take its place (the input listener)
 // search under "All": the names in every loaded space (locked ones only after unlocking), each hit with its space's name
 function wk_allHits(q) {
   const out = [];
@@ -165,6 +166,7 @@ const wk_moreHtml = d => d?.more ? `<div class="muted mhint wkcapped" role="stat
 // ---- the view
 function viewWiki() {
   if (typeof wkcm_gone === 'function') wkcm_gone();  // 2.554.0 (#4052): the editor of a page that went (another page, a space locked) lets go of its text
+  if (S.route.zle) { for (const s of wk_spaces()) if (!WK.idx[s]) wk_load(s); return `<div class="ntwrap wkwrap wkdesk"><section class="wkfolder zlefull">${spo_recentPage('wiki', wk_rows())}</section></div>`; }  // 2.880.0 (#5561): #wiki/recent
   const all = wk_all(), op = wk_open(), sp = op || wk_cur(), d = WK.idx[sp];
   if (!d || d.v !== S.v) wk_load(sp);
   if (all && op && S.route.wsp === op && WK.space !== op) { WK.space = op; LS.set('wkSpace', op); }  // 2.198.0 A (#2743): the space used last (New page, older links)

@@ -51,8 +51,10 @@ const ablageNames = d => [...d.querySelectorAll('#view .abrow .abname')].map(x =
   check(w.eval('wsCur()') === 'all' && w.eval('ab_all()'), '#4575: alice shows "All workspaces" with two spaces of her own');
   // 2.769.0 (#5352): a computer with the panel shows "Recently edited" in the view, not a second list of the spaces (the
   // panel lists them); a space opens from the panel / its address, the path leads back to the overview
-  const ovr = () => !!d.querySelector('#view .zleov') && !rows(d).length;
-  check(await until(ovr), '#4575 / #5352: the overview: "Recently edited", no second list of the spaces ' + rows(d).join('|'));
+  // 2.880.0 (#5561): the overview is a calm list of rows again: "Recently edited" (its own page), the spaces, the trash small
+  const ovr = () => !!d.querySelector('#view .zleov') && rows(d).join() === ['private', SP, 'shared'].join() && !d.querySelector('#view .zler');
+  check(await until(ovr), '#4575 / #5561: the overview: the rows of the spaces, no list of items ' + rows(d).join('|'));
+  check(d.querySelector('#view .zletrash [data-spov="trash"]'), '#5561: the trash small below the rows');
   check(JSON.stringify(w.eval(`ab_spaces()`)) === JSON.stringify(['private', SP, 'shared', 'trash']), '#4575: Private, the organisation, Shared with me, the trash (the panel)');
   check(!d.querySelector('#view .abrow') && !d.querySelector('#view .abcrumbs'), '#4575: not silently the remembered space (abSpace = the organisation; 2.769.0 #5352: its file may be listed under "Recently edited")');
   check(!d.querySelector('#side [data-absp][aria-current], #side .on[data-absp]'), '#4575: the panel marks no space on the overview');
@@ -75,12 +77,12 @@ const ablageNames = d => [...d.querySelectorAll('#view .abrow .abname')].map(x =
 
   // the panel folded (a tablet width without the panel): the overview still shows in the view
   w = await boot({user: 'alice', hash: 'ablage', ls: {'tasks.sideFold': 'true'}}); d = w.document;
-  check(await until(() => rows(d).length === 4) && w.eval('sbb_on()'), '#4575: panel folded: the spaces in the view (2.769.0, #5352: as chips above "Recently edited") ' + rows(d).join('|'));
+  check(await until(() => rows(d).length === 3) && w.eval('sbb_on()'), '#4575: panel folded: the spaces in the view (2.880.0, #5561: rows, the trash below) ' + rows(d).join('|'));
   check(!d.querySelector('#view .abspaces'), '#4575: no bar of spaces next to it');
   w.close();
   // the phone: the overview too, no bar of spaces on top of it
   w = await boot({user: 'alice', hash: 'ablage', mobile: true}); d = w.document;
-  check(await until(() => rows(d).length === 4) && !d.querySelector('#view .abspaces'), '#4575: the phone: the overview as the list');
+  check(await until(() => rows(d).length === 3) && !d.querySelector('#view .abspaces'), '#4575: the phone: the overview as the list (2.880.0, #5561: the trash below the rows)');
   w.close();
 
   // one workspace shown above: as before
