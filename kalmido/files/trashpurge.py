@@ -153,6 +153,13 @@ def tp_tick(c, force=False):
                 counts[key + "_err"] = 1
                 continue
             paths += kp
+        try:  # 2.855.0 (#1956, review F1): a call sheet goes with the last booking of its shoot day (no foreign key: job is text)
+            with c.savepoint():
+                w = "FROM hub_callsheets cs WHERE NOT EXISTS (SELECT 1 FROM hub_bookings b WHERE b.org_id=cs.org_id AND b.job=cs.job)"
+                counts["callsheets"] = c.execute(f"DELETE {w}").rowcount if purge else c.execute(f"SELECT COUNT(*) {w}").fetchone()[0]
+        except Exception as e:  # noqa: BLE001 - like the plain areas above: waits for the next run
+            print("trash purge: callsheets", type(e).__name__, flush=True)
+            counts["callsheets_err"] = 1
         ret_report(c, "trash", counts, purge)
     c.commit()
     if paths:

@@ -93,6 +93,12 @@ BK = {}
 for k, d in (("old", OLD), ("new", NEW)):
     BK[k] = sql("INSERT INTO hub_bookings(org_id, title, start, \"end\", resource_kind, resource_id, created_at, updated_at, deleted_at) "
                 "VALUES(?,?,?,?,?,?,?,?,?) RETURNING id", (PO, "Shoot " + k, "2026-11-17", "2026-11-17", "user", FID, NOW, NOW, d))[0][0]
+# 2.855.0 (#1956, review F1): a call sheet per shoot day (job); it goes with the last booking of its job, the young one stays
+CSH = {}
+for k in ("old", "new"):
+    sql("UPDATE hub_bookings SET job=? WHERE id=?", ("p22233a-" + k, BK[k]))
+    CSH[k] = sql("INSERT INTO hub_callsheets(org_id, job, data, created_at, updated_at) VALUES(?,?,?,?,?) RETURNING id",
+                 (PO, "p22233a-" + k, '{"important": "x"}', NOW, NOW))[0][0]
 PL = {}
 for k, d in (("old", OLD), ("new", NEW)):
     PL[k] = sql("INSERT INTO sched_polls(user_id, org_id, title, token, token_hash, created_at, updated_at, deleted_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
@@ -137,6 +143,8 @@ check(len(sql("SELECT 1 FROM sched_poll_votes WHERE poll_id=?", (PL["new"],))) =
 check(sql("SELECT type_id FROM appt_bookings WHERE id=?", (BOOK,))[0][0] is None,
       "#2879 a booking of a deleted appointment type keeps its time (type_id set null)")
 check(alive("fs_nodes", FOLDER), "#2879 the folder of a deleted file request stays")
+check(not alive("hub_callsheets", CSH["old"]) and alive("hub_callsheets", CSH["new"]) and "'callsheets': 1" in out,
+      f"2.855.0 (#1956): the call sheet of the purged shoot day went with it, the young one stays {out[-300:]}")
 check("_err" not in out, f"#2879 no area failed {out[-300:]}")
 r = A.get(B + "/api/admin/retention")
 last = (r.json()["kinds"]["trash"].get("runs") or {}).get("trash") or {}

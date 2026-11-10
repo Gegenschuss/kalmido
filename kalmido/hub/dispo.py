@@ -89,18 +89,27 @@ def _set_items(raw):
 
 
 # ---------------------------------------------------------------- the resources of an area
-def dsp_contacts(c, uid, oid):
-    """[(id, name)] of the individual contacts of the area's address books uid may read (organisation books; a personal
-    area: the person's own books without an organisation)."""
+def dsp_book_ids(c, uid, oid):
+    """2.855.0 (#1956, review F2): the address books of the area uid may read - organisation books of oid; a personal area:
+    the person's own books without an organisation. The disposition and its call sheet read contacts only from these."""
     from ..office.model import pb_personal
     personal = oid == pb_personal(c, uid, create=False)
     bids = [b for b in my_book_ids(c, uid)]
     if not bids:
         return []
     q = ",".join("?" * len(bids))
-    rows = c.execute(f"SELECT c.id, c.fn, c.given, c.family FROM contacts c JOIN books b ON b.id=c.book_id WHERE c.book_id IN ({q}) "
-                     f"AND c.kind='individual' AND c.deleted_at IS NULL AND b.deleted_at IS NULL AND {'b.org_id IS NULL AND b.owner_id=?' if personal else 'b.org_id=?'} "
-                     "ORDER BY lower(c.fn), c.id LIMIT 500", (*bids, uid if personal else oid)).fetchall()
+    return [r[0] for r in c.execute(f"SELECT id FROM books WHERE id IN ({q}) AND deleted_at IS NULL AND "
+                                    f"{'org_id IS NULL AND owner_id=?' if personal else 'org_id=?'}", (*bids, uid if personal else oid))]
+
+
+def dsp_contacts(c, uid, oid):
+    """[(id, name)] of the individual contacts of the area's address books uid may read (dsp_book_ids)."""
+    bids = dsp_book_ids(c, uid, oid)
+    if not bids:
+        return []
+    q = ",".join("?" * len(bids))
+    rows = c.execute(f"SELECT c.id, c.fn, c.given, c.family FROM contacts c WHERE c.book_id IN ({q}) "
+                     "AND c.kind='individual' AND c.deleted_at IS NULL ORDER BY lower(c.fn), c.id LIMIT 500", bids).fetchall()
     return [(r["id"], (r["fn"] or f"{r['given']} {r['family']}").strip() or "?") for r in rows]
 
 

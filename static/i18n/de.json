@@ -2533,6 +2533,7 @@
   "Profile picture": "Profilbild",
   "Use picture": "Bild verwenden",
   "The picture is too large (at most {0} MB)": "Das Bild ist zu groß (höchstens {0} MB)",
+  "The picture has too many pixels (at most {0} megapixels)": "Das Bild hat zu viele Pixel (höchstens {0} Megapixel)",
   "Profile picture saved": "Profilbild gespeichert",
   "Share from your phone": "Teilen vom Handy",
   "Send photos, files, links and text from any app to your basket: each share becomes a task.": "Fotos, Dateien, Links und Text aus jeder App in den Eingang: Jedes Teilen wird eine Aufgabe.",

@@ -2542,6 +2542,7 @@
   "Profile picture": "Photo de profil",
   "Use picture": "Utiliser l'image",
   "The picture is too large (at most {0} MB)": "L'image est trop grande ({0} Mo maximum)",
+  "The picture has too many pixels (at most {0} megapixels)": "L'image a trop de pixels ({0} mégapixels maximum)",
   "Profile picture saved": "Photo de profil enregistrée",
   "Share from your phone": "Partager depuis ton téléphone",
   "Send photos, files, links and text from any app to your basket: each share becomes a task.": "Envoie photos, fichiers, liens et texte depuis n'importe quelle app vers ton panier : chaque partage devient une tâche.",

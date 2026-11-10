@@ -115,7 +115,10 @@ async function cs_open(job, org) {
     try {
       const r = await api('PUT', cs_url(job, org), v);
       cs = r.callsheet; sketch = undefined; err('');
-      const put = x => async () => { try { const cur = (await api('GET', cs_url(job, org))).callsheet; await api('PUT', cs_url(job, org), {...x, expect_updated_at: cur.updated_at}); } catch { /* api() said it */ } };
+      // 2.855.0 (#1956, review F3): back / forward carry the version this save left - a change by someone else since is a
+      // 409 (api() says it) and nothing is overwritten
+      let ver = cs.updated_at;
+      const put = x => async () => { try { ver = (await api('PUT', cs_url(job, org), {...x, expect_updated_at: ver})).callsheet.updated_at; } catch { /* api() said it */ } };
       histAdd({label: tr('Call sheet saved'), undo: put(before), redo: put({data: v.data})});
       toast(tr('Saved'));
       draw();

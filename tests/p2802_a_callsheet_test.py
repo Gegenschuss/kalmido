@@ -10,6 +10,7 @@
  - the PDF: application/pdf, page 1 with location, call times, shoot start, wrap, strike, important, set phone, the link
    "Open in maps" as a URI action, the crew list with the contact's phone, the cast, the transport ("Own arrangement"),
    the shots of the chosen shot list day, the sketch as an image of its own page, the footer "As of" + "Page n of N"
+ - 2.855.0 review: a sketch over 12 megapixels 400; phone / mail never from a shared book outside the area (F2)
  - rights: another person's job 404 (with and without ?org=), an agent 403, the module Disposition off 409, Film & Video
    switched off again 404
 freelancer-matrix: hub (frida has no organisation: her own area, her own office, her own industry)
@@ -174,6 +175,23 @@ r = Fr.get(B + f"/api/team/dispo/callsheet/{JOB2}/pdf?org={PERS}")
 txt2 = pdf_text(r.content)
 check(r.ok and has(txt2, "Totale Kueche") and has(txt2, "Shots of the day") and has(txt2, "Kueche Ost"), "day 2: the shots of the chosen shot list day")
 check(not has(txt2, "Directions sketch") and not has(txt2, "Own arrangement"), "day 2: no sketch, no transport (only what is there)")
+
+# ------------------------------------------------------------ 2.855.0 review F5: a sketch of more than 12 megapixels is refused
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB2}?org={PERS}", json={"data": {"loc_name": "Kueche Ost"}, "sketch": "data:image/png;base64," + base64.b64encode(png(4000, 3001)).decode()})
+check(r.status_code == 400 and "megapixel" in r.text.lower(), f"a sketch of 12.004 megapixels: 400 ({r.status_code} {r.text[:120]})")
+
+# ------------------------------------------------------------ 2.855.0 review F2: phone / mail only from the area's books
+# greta shares her private address book with frida; an entry there with frida's e-mail never brings its number onto the
+# call sheet of frida's area (the person may read it, but it is not a book of that area)
+GB = Gr.post(B + "/api/books", json={"name": "Gretas Buch", "org_id": None}).json()["id"]
+check(Gr.post(B + "/api/contacts", json={"book_id": GB, "fn": "Frida privat", "emails": [{"value": "frida@example.com"}],
+                                         "phones": [{"value": "0170 9990000", "type": ["cell"]}]}).status_code == 201, "an entry in greta's book")
+check(Gr.put(B + f"/api/books/{GB}/members", json={"user_id": FID, "role": "view"}).ok, "greta shares her book with frida")
+check(any(b.get("id") == GB for b in (Fr.get(B + "/api/books").json().get("items") or [])), "frida reads greta's book")
+kt.dbx("UPDATE contacts SET emails='[]' WHERE fn='Frida Selbst'")
+crew = {p["name"]: p for p in Fr.get(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}").json()["callsheet"]["auto"].get("crew", [])}
+check("0170 9990000" not in str(crew), f"the number of greta's shared book is not on frida's call sheet {crew.get('Frida')}")
+kt.dbx("UPDATE contacts SET emails=? WHERE fn='Frida Selbst'", ('[{"value": "frida@example.com"}]',))
 
 # ------------------------------------------------------------ rights
 check(Gr.put(B + "/api/industry", json={"industry": "film"}).ok, "greta chooses Film & Video too")

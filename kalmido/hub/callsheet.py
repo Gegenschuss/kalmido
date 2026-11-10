@@ -42,17 +42,17 @@ from ..accounts.orgroles import need_org_write, org_writes
 from ..accounts.onboarding import ind_of_area  # review 2.802 F3: the asked area's industry
 from ..team.clients import client_rows  # review 2.802 F1
 from ..collab.liste2e import le2e_mode
-from ..contacts.model import my_book_ids
 from ..files.scan import SC_RETRY_TEXT, sc_needs_retry
 from ..files.upsafe import UploadRefused, up_check
 from ..lists.shoot import sht_days
 from ..lists.templates import ptype_ok
 from ..office.pdf import (A4_H, C_INK, C_INK2, C_RULE, C_RULE2, MM, PDF_CW, PDF_L, _Page, pdf_date, pdf_image_object,
                           pdf_text_width, pdf_wrap, pdf_write)
-from .dispo import _area, _gate
+from .dispo import _area, _gate, dsp_book_ids
 
 CS_JOB_RE = re.compile(r"^[0-9A-Za-z_-]{1,64}$")
 CS_IMG_MAX = 4 * 1024 * 1024  # the directions sketch: PNG / JPEG of at most 4 MB (a phone screenshot)
+CS_IMG_PIX = 12_000_000  # 2.855.0 (#1956, review F5): and at most 12 megapixels (every PDF decodes it; a phone photo has 12)
 CS_MAPS = "https://www.google.com/maps/search/?api=1&query="  # opened by the reader's device only (app, else browser)
 CS_OPEN = "– ?? –"  # an open place of the crew (as on the paper call sheets)
 # the editable single fields: key -> max length
@@ -112,10 +112,11 @@ def _first(items, prefer=()):
     return str(v[0]["value"]).strip() if v else ""
 
 
-def cs_people(c, uid, rows):
+def cs_people(c, uid, oid, rows):
     """The crew of the job: [{function, name, mail, phone, open}] in booking order. Mail / phone only from the address books
-    uid may read (a contact booked, or a contact with the e-mail of a member booked); never from somewhere else."""
-    books = list(my_book_ids(c, uid))
+    of the area uid may read (a contact booked, or a contact with the e-mail of a member booked); never from somewhere else
+    (2.855.0 review F2: not from the person's private books or another organisation's, hub/dispo.py dsp_book_ids)."""
+    books = dsp_book_ids(c, uid, oid)
     q = ",".join("?" * len(books))
 
     def contact(cid):
@@ -211,7 +212,7 @@ def cs_auto(c, uid, oid, rows):
     """What the call sheet takes from the app (not stored): day, title, project, client, production, crew, shot list days."""
     d0, t0, t1 = cs_when(rows)
     proj = cs_project(c, uid, rows)
-    crew = cs_people(c, uid, rows)
+    crew = cs_people(c, uid, oid, rows)
     days = cs_shot_days(c, uid, proj)
     return {"date": d0, "start": t0, "end": t1, "title": rows[0]["title"] or "", "project": proj.get("name", ""),
             "client": proj.get("client") or {}, "production": cs_production(c, oid), "crew": crew,
@@ -289,8 +290,11 @@ def cs_sketch_in(c, uid, oid, v):
         raise BadInput(str(e)) from None
     if sc_needs_retry(info.get("scan"), data):
         raise BadInput(tr(SC_RETRY_TEXT))
-    if not pdf_image_object(data):
+    im = pdf_image_object(data)
+    if not im:
         raise BadInput(tr("Please select a PNG or JPEG picture"))
+    if im[0] * im[1] > CS_IMG_PIX:
+        raise BadInput(tr("The picture has too many pixels (at most {0} megapixels)", CS_IMG_PIX // 1_000_000))
     return base64.b64encode(data).decode("ascii"), mime
 
 

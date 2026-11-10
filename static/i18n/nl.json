@@ -2542,6 +2542,7 @@
   "Profile picture": "Profielfoto",
   "Use picture": "Afbeelding gebruiken",
   "The picture is too large (at most {0} MB)": "De afbeelding is te groot (maximaal {0} MB)",
+  "The picture has too many pixels (at most {0} megapixels)": "De afbeelding heeft te veel pixels (maximaal {0} megapixel)",
   "Profile picture saved": "Profielfoto opgeslagen",
   "Share from your phone": "Delen vanaf je telefoon",
   "Send photos, files, links and text from any app to your basket: each share becomes a task.": "Stuur foto's, bestanden, links en tekst vanuit elke app naar je mand: elke deling wordt een taak.",

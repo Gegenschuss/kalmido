@@ -8,6 +8,7 @@ Rows of a person (absences, vacation accounts, time entries, notes encrypted in 
 the preview (others: left out with a warning); into the private space only the importing person's own rows (private stays
 private). Browser ciphertexts (chat messages of locked channels, encrypted / locked notes) are taken over as they are.
 Secrets never come with an export: forms and customer reports get new links, a newsletter connection must be connected again."""
+import base64
 import json
 import os
 import re
@@ -29,6 +30,9 @@ from .acctimport import umz_mentions  # 2.362.4 (#3100)
 from ..core.orgcrypt import FIELDS  # 2.363.4 (#3127)
 from ..hub.hubmail import hbm_seal  # 2.363.4 (#3127)
 from ..hub.hubmail import _index  # 2.369.5 (#2517): pulled up from functions
+from ..core.errors import BadInput  # 2.855.0 (#1956)
+from ..hub.callsheet import cs_clean  # 2.855.0 (#1956)
+from ..office.pdf import pdf_image_object  # 2.855.0 (#1956)
 from .oi_office import _oi_origins  # 2.671.0 (#5097)
 from ..hub.mailbox import mbx_take_values  # 2.369.5 (#2517): pulled up from functions
 from ..team.portal import pt_email_hash, pt_email_norm  # 2.369.5 (#2517): pulled up from functions
@@ -197,6 +201,31 @@ def _booking(c, run, src, d, ctx):
         return False
     d["resource_id"] = new
     _booking_offer(run, src, d, ctx)
+    return d
+
+
+def _callsheet(c, run, src, d, ctx):
+    """2.855.0 (#1956, review F4): a call sheet only for a shoot day this import brought (a booking of the same job in the
+    target area) and only once per job (the unique index); its details through cs_clean like a save, a sketch that is no
+    PNG / JPEG picture is left out (the upload checks of hub/callsheet.py run for new pictures only)."""
+    job = _txt(src.get("job"), 64)
+    if not job or not c.execute("SELECT 1 FROM hub_bookings WHERE org_id=? AND job=? LIMIT 1", (run.org, job)).fetchone():
+        return False
+    if c.execute("SELECT 1 FROM hub_callsheets WHERE org_id=? AND job=?", (run.org, job)).fetchone():
+        return False
+    try:
+        raw = json.loads(src.get("data") or "{}")
+        d["data"] = json.dumps(cs_clean(raw), ensure_ascii=False)
+    except (ValueError, TypeError, BadInput):
+        d["data"] = "{}"
+    sk, mime = str(src.get("sketch") or ""), str(src.get("sketch_mime") or "")
+    try:
+        ok = mime in ("image/png", "image/jpeg") and len(sk) < 6 * 1024 * 1024 and bool(pdf_image_object(base64.b64decode(sk, validate=True)))
+    except (ValueError, TypeError):
+        ok = False
+    if not ok:
+        d["sketch"], d["sketch_mime"] = "", ""
+    d["job"] = job
     return d
 
 
@@ -801,7 +830,8 @@ SPECS = [
         label=N_("Absences and bookings"), prep=_person("user_id", member=True)),
     OiT("hub/bookings.json", "hub_bookings", refs={"list_id": "lists", "event_id": "events"}, people={"created_by": "null"},
         fixed={"resource_id": 0}, private="office", label=N_("Absences and bookings"), prep=_booking),
-    OiT("hub/callsheets.json", "hub_callsheets", people={"created_by": "null"}, private="office", label=N_("Absences and bookings")),  # 2.855.0 (#1956)
+    OiT("hub/callsheets.json", "hub_callsheets", people={"created_by": "null"}, private="office", label=N_("Absences and bookings"),
+        prep=_callsheet),  # 2.855.0 (#1956)
     OiT("hub/leave_quota.json", "hub_leave_quota", people={"user_id": "null", "updated_by": "null"}, private="office", label=N_("Absences and bookings"),
         prep=_person("user_id", member=True)),
     OiT("hub/mails.json", "hub_mails", refs={"client_id": "clients", "list_id": "lists", "eml_id": "fs_nodes", "folder_id": "fs_nodes"},
