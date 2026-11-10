@@ -1019,9 +1019,15 @@ def rt_section(c, ids):
 def rt_e2e_ok(c, lid, name):
     """#5552: may rt_section make a section named name in list lid? An open project: a plain name; a locked one ('on'): a
     ciphertext; while the lock switches: none (the texts go through /e2e/bulk only)."""
-    from ..collab.liste2e import le2a_gen, le2e_is_cipher
-    mode = le2a_gen(c, lid)[0]
-    return (mode is None and not le2e_is_cipher(name)) or (mode == "on" and le2e_is_cipher(name))
+    from ..collab.liste2e import le2a_gen, le2a_reenc_again, le2a_value_ok, le2e_is_cipher, le2e_parse
+    mode, gen = le2a_gen(c, lid)
+    if mode is None:
+        return not le2e_is_cipher(name)
+    if mode != "on" or not le2e_is_cipher(name) or not le2a_value_ok(name, gen):  # review: the shape and generation, as le2e_guard
+        return False
+    if (le2e_parse(name) or {}).get("g", gen) < gen:
+        le2a_reenc_again(c, lid)  # an older key generation: the re-encryption is due again (as le2e_guard)
+    return True
 
 
 # 2.272.0 B (#3045): "my own" done tasks (two ? = me, me); also the batch delete with data.own_only (2.272.0 F, review M7)
