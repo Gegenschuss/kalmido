@@ -23,12 +23,14 @@ GET  /api/team/dispo/callsheet/<job>/pdf?org=  the PDF (?inline=1: shown in the 
 GET  /api/team/dispo/callsheet/<job>/sketch?org=  the stored sketch (the dialog's preview)"""
 import base64
 import binascii
+import io
 import json
 import re
 from datetime import date
 from urllib.parse import quote
 
 from flask import Response, jsonify, request
+from PIL import Image
 
 from ..core.config import app
 from ..core.i18n import LANGS, N_, lang, tr
@@ -290,10 +292,11 @@ def cs_sketch_in(c, uid, oid, v):
         raise BadInput(str(e)) from None
     if sc_needs_retry(info.get("scan"), data):
         raise BadInput(tr(SC_RETRY_TEXT))
-    im = pdf_image_object(data)
-    if not im:
+    if not pdf_image_object(data):
         raise BadInput(tr("Please select a PNG or JPEG picture"))
-    if im[0] * im[1] > CS_IMG_PIX:
+    with Image.open(io.BytesIO(data)) as im:  # the size as stored (pdf_image_object answers the scaled-down one)
+        pix = im.width * im.height
+    if pix > CS_IMG_PIX:
         raise BadInput(tr("The picture has too many pixels (at most {0} megapixels)", CS_IMG_PIX // 1_000_000))
     return base64.b64encode(data).decode("ascii"), mime
 
