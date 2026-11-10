@@ -175,6 +175,8 @@ def f9():
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     try:
         line = p.stdout.readline()
+        while line and not line.startswith("LOCKED"):  # the app's start-up warnings come first
+            line = p.stdout.readline()
         check(line.startswith("LOCKED") and int(line.split()[1]) >= 1, f"F9: setup: the parts are held {line}")
         try:
             r = A.patch(B + OFF + f"/services/{s2['id']}", json={"daily_rate": 320, "expect_updated_at": s2["updated_at"]}, timeout=20)
@@ -222,7 +224,8 @@ def f10():
     gd2 = groups(ids["dora"])
     check(not any(x["org_id"] == ORG for x in gd2), f"F10: her groups in the organisation are gone {gd2}")
     check(not sql("SELECT 1 FROM obj_undo WHERE user_id=? AND org_id=?", (ids["dora"], ORG)), "F10: with their parts")
-    check([x["id"] for x in gd2] == [gp], f"F10: her private group stays {gd2}")
+    priv = [x["id"] for x in gd if x["org_id"] is None]
+    check(gp in priv and [x["id"] for x in gd2] == priv, f"F10: her private groups stay {gd2}")
     check([x["id"] for x in groups(ALICE) if x["org_id"] == ORG] == ga, "F10: alice's groups in the organisation stay")
 
 
