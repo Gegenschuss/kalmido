@@ -18,6 +18,11 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.873.1] - 2026-11-10
+
+### Fixed
+- main: after a zoom in the document view the text of the pages stays markable while the page is drawn anew (CI red of 2.870.0, p2742_c_textlayer_ui).
+
 ## [2.873.0] - 2026-11-10
 
 Package 2.828 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -200,7 +205,8 @@ Package 2.757 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: 
 - Lists and the start page report their width to the header again: the top bar lines up with the content instead of standing 4 px beside it, and the width "Wide" of a note / knowledge page keeps its list + note layout (CI red p2599_b_kopf_ui, #5309).
 - p151_ui says why the hint of the task just tracked is missing (toast, totals on the page and on the server); the Mac red was the sub-second discard fixed in #5186 (#5211).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.873.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.873.1...HEAD
+[2.873.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.1
 [2.873.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.0
 [2.870.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.870.0
 [2.858.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.858.0
