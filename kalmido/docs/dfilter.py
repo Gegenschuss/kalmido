@@ -28,7 +28,7 @@ from werkzeug.datastructures import MultiDict
 
 from ..core.db import local_now
 from ..core.errors import BadInput
-from ..core.filters import COND_MAX, VAL_MAX, kflt_where
+from ..core.filters import COND_MAX, HARD, VAL_MAX, kflt_conds, kflt_where
 from ..core.i18n import tr
 from ..core.pg import st_ids
 from .dsearch import dsr_asn, dsr_filters, dsr_hits, dsr_range
@@ -147,8 +147,9 @@ def dvf_from_query(qs):
     if p.getlist("not_tag"):
         one(f="tag", op="nin", v=p.getlist("not_tag"))
     for k, f, op in (("from", "date", "from"), ("to", "date", "to"), ("added_from", "added", "from"), ("added_to", "added", "to")):
-        if _ISO.fullmatch(p.get(k) or ""):
-            one(f=f, op=op, v=p[k])
+        v = (p.get(k) or "")[:10]  # 2.897.0 (#5547): cut as the search cuts (dsearch.py dsr_filters), not left out
+        if _ISO.fullmatch(v):
+            one(f=f, op=op, v=v)
     if p.get("review") in ("1", "true"):
         one(f="review", op="in", v=["1"])
     for k, f in (("no_tag", "tag"), ("no_sender", "sender"), ("no_type", "type")):
@@ -174,8 +175,10 @@ def dvf_from_query(qs):
         one(f="asn", op="empty")
     for x in p.getlist("cf"):  # every one AND, as the search took them
         ids, _, val = x.partition(":")
-        if ids and val:
-            one(f="cf", op="in", ids=ids, v=[val])
+        # 2.897.0 (#5547): the ids and the value read as the search reads them (dsearch.py dsr_cf: spaces, an empty id off)
+        ids = ",".join([i.strip() for i in ids.split(",") if i.strip().isdecimal()][:20])
+        if ids and val.strip():
+            one(f="cf", op="in", ids=ids, v=[val.strip()])
     out = dvf_clean({"op": "and", "conds": cs, **{k: p[k] for k in DVF_EXTRA if p.get(k)}})
     return out
 
@@ -209,8 +212,9 @@ def _any(parts):
     return "(" + " OR ".join(x[0] for x in parts) + ")", [a for x in parts for a in x[1]]
 
 
-def _pos(c, cnd, base_where, base_params):
-    """The condition as if it were "is one of" / "contains" -> (sql, params) or None (off)."""
+def _pos(c, cnd, base_where, base_params, narrow=None):
+    """The condition as if it were "is one of" / "contains" -> (sql, params) or None (off). narrow (2.897.0, #5547): the
+    conditions that hold anyway (where list, params) -- a text's phrases are looked for only in those documents."""
     f, op, v = cnd["f"], cnd["op"], cnd.get("v")
     one = lambda pairs: _all(*_dsr(c, pairs, base_where, base_params)[:2])  # noqa: E731
     if op == "empty":
@@ -231,7 +235,9 @@ def _pos(c, cnd, base_where, base_params):
         w, p, q, text = _dsr(c, [("q", v)], base_where, base_params)
         if not str(v or "").strip():
             return None
-        hit = dsr_hits(c, f"FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {' AND '.join(base_where + w)}", base_params + p, q, text)
+        nw, np_ = narrow or ([], [])  # 2.897.0 (#5547): the window of opened texts (dsearch.py DSR_TEXT_MAX) after the other conditions
+        hit = dsr_hits(c, f"FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {' AND '.join(base_where + nw + w)}",
+                       base_params + np_ + p, q, text)
         if hit is not None:
             w, p = w + ["d.node_id = ANY(CAST(? AS BIGINT[]))"], p + [st_ids(hit)]
         return _all(w, p)  # nothing searchable in the text (e.g. only "date:foo"): the condition is off
@@ -261,21 +267,28 @@ def _pos(c, cnd, base_where, base_params):
     return None
 
 
-def dvf_where(c, rules, base_where, base_params):
+def dvf_where(c, rules, base_where, base_params, narrow=None):
     """rules -> (one SQL condition or None, params) over doc_meta d / fs_nodes n, inside the person's rows (base_where /
-    base_params: doc_query's, the rights and the workspace). The core's kflt_where combines the conditions."""
+    base_params: doc_query's, the rights and the workspace). The core's kflt_where combines the conditions.
+    2.897.0 (#5547): the text conditions last -- their phrases are looked for (at most DSR_TEXT_MAX texts opened) only in the
+    documents the other conditions that hold anyway leave: narrow (doc_query's own filters), every other one with AND, the
+    "is none of" ones (HARD, on top) with OR; before, the window was taken from all of the person's documents first."""
     r = dvf_clean(rules) if not isinstance(rules, dict) or "conds" not in rules else rules
 
-    def cond(cnd):
+    def one(cnd, nar=None):
         cnd = dvf_cond_clean(cnd)
         if not cnd:
             return None
-        p = _pos(c, cnd, base_where, base_params)
+        p = _pos(c, cnd, base_where, base_params, nar)
         if not p:
             return None
         sql = f"COALESCE({p[0]}, FALSE)"  # TRUE / FALSE, never NULL: "is none of" stays exact (no sender = none of them)
         return (f"NOT {sql}", p[1]) if cnd["op"] in ("nin", "nhas") else (sql, p[1])
-    return kflt_where(r, cond)
+    conds = kflt_conds(r)
+    done = {id(x): one(x) for x in conds if x.get("f") != "text"}
+    hold = [done[id(x)] for x in conds if done.get(id(x)) and (r.get("op") != "or" or x.get("op") in HARD)]
+    nar = (list((narrow or ([], []))[0]) + [p[0] for p in hold], list((narrow or ([], []))[1]) + [a for p in hold for a in p[1]])
+    return kflt_where(r, lambda x: done[id(x)] if id(x) in done else one(x, nar))
 
 
 def dvf_args(rules, extra=None):

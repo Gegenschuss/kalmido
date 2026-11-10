@@ -10,6 +10,9 @@ kflt_where; docs/dviews.py). Own container (start.sh). Invented names and genera
  - hits and counts ALWAYS with the rights of whoever looks: a member counts only his documents (count route, ?view=, a view an
    admin shared with everyone); another's private view: 404 also through ?view=
  - bad rules: conditions that do not fit are left out, no filter at all is 400; the count needs a signed-in person
+ - 2.897.0 (#5547): an agent's GET /api/v1/documents?view= takes the view's workspace and state as well (rueckfall); an older
+   view with field ids "9, " / from/to longer than 10 characters converts as the search reads it (rueckfall); the window of
+   opened texts of a phrase (KALMIDO_DSR_TEXT_MAX, 3 here) comes after the view's other conditions and the list's filters (rueckfall)
 freelancer-matrix: obj (a person without an organisation: her view with rules, its count and hits)
 usage: p2857_a_docfilter_test.py <datadir>"""
 import os
@@ -19,9 +22,9 @@ from urllib.parse import urlencode
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
-from kt import B, check, docker_logs_on_first_fail, done, fresh, sess, until  # noqa: E402
+from kt import B, H, check, docker_logs_on_first_fail, done, fresh, sess, until  # noqa: E402
 
-fresh(prefix="P2857A")
+fresh(env={"KALMIDO_DSR_TEXT_MAX": "3"}, prefix="P2857A")  # 2.897.0 (#5547): a small window of opened texts (the phrase test below)
 docker_logs_on_first_fail()
 K = "docview"
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
@@ -138,7 +141,9 @@ check(hit_ids(A, rules({"f": "asn", "op": "empty"})) == ALL and hit_ids(A, rules
 # ---------------------------------------------------------------- an older view: its query string hits the same documents
 OLD = ["q=Walrus", f"sender={POLAR}&tag={TAX}", f"tag={TAX}&tag={PRIV}&tag_mode=all", f"tag={TAX}&tag={PRIV}", f"not_tag={TAX}",
        f"under={OPEN}", f"folder={OPEN}", "from=2025-01-01&to=2025-12-31", "no_sender=1", "q=tag:Tax Walrus", "ftype=text",
-       "q=-board Walrus", f"type={INV}&no_tag=1", "q=Walrus&sort=title&dir=asc", "added_from=2020-01-01"]
+       "q=-board Walrus", f"type={INV}&no_tag=1", "q=Walrus&sort=title&dir=asc", "added_from=2020-01-01",
+       # 2.897.0 (#5547) rueckfall: a field id with a space / a comma at the end, from / to longer than 10 characters
+       "cf=999999,%20:Yes", "cf=999999,:Yes", "from=2025-01-01T00:00:00Z&to=2025-12-31T23:59:59Z", "added_to=2020-01-01%2000:00"]
 for s, who in ((A, "admin"), (Bo, "member")):
     for q in OLD:
         r = s.post(B + f"/api/obj/{K}", json={"title": "old " + q[:40], "query": q, "ws": WS})
@@ -207,6 +212,53 @@ check(r.status_code == 201, f"a view with an odd folder value is stored ({r.stat
 check(A.get(B + "/api/docs/views", params={"ws": WS}).status_code == 200, "the views' list stays 200 with an odd folder value (no 500)")
 check(A.get(B + "/api/docs", params={"ws": WS, "view": "\u00b2"}).status_code != 500, "?view= with a superscript digit is no 500")
 A.post(B + f"/api/obj/{K}/{r.json()['id']}/trash")
+
+# ---------------------------------------------------------------- 2.897.0 (#5547): the agent's ?view=, the window of opened texts
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
+r = A.post(B + "/api/my/agents", json={"username": "docbot", "display_name": "Docbot", "scopes": ["read", "files:read"], "org_id": ORG})
+check(r.ok, "setup: an agent of the organisation " + r.text[:200])
+AG, AGH = r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
+for f_ in (OPEN, SHUT):
+    check(A.post(B + f"/api/files/nodes/{f_}/shares", json={"agent_id": AG, "role": "view"}).status_code == 201, "setup: the folders shared with the agent")
+
+
+def v1_view(vid, **p):
+    r = sess().get(B + "/api/v1/documents", params={"view": vid, **p}, headers=AGH)
+    return sorted(d["id"] for d in r.json()["data"]) if r.ok else r.status_code
+
+
+def agent_view(title, ws, rl):
+    r = A.post(B + f"/api/obj/{K}", json={"title": title, "rules": rl, "ws": ws})
+    assert r.status_code == 201, r.text
+    vid = r.json()["id"]
+    assert A.post(B + f"/api/obj/{K}/{vid}/shares", json={"agent_id": AG, "role": "view"}).status_code == 201
+    return vid
+
+
+VW = agent_view("Walrus here", WS, rules(T))
+check(v1_view(VW) == sorted([D1, D2, D3]), f"#5547: the agent's list through a view shared with it {v1_view(VW)}")
+VP = agent_view("Walrus private", "private", rules(T))
+check(in_view(A, VP, "private") == [] and v1_view(VP) == [],
+      f"#5547 rueckfall: the view's workspace holds for the agent as in the app (private: none of the organisation's) {v1_view(VP)}")
+VS = agent_view("Failed only", WS, {**rules(T), "state": "failed"})
+check(in_view(A, VS) == [] and v1_view(VS) == [], f"#5547 rueckfall: the view's state holds for the agent as in the app {v1_view(VS)}")
+check(sess().get(B + "/api/v1/documents", params={"view": VS, "state": "done"}, headers=AGH).json()["data"] != [],
+      "#5547: a parameter of the request goes before the view's")
+VN = A.post(B + f"/api/obj/{K}", json={"title": "Not shared", "rules": rules(T), "ws": WS}).json()["id"]
+check(v1_view(VN) == 404, "#5547: a view not shared with the agent stays 404")
+
+# the window (3 texts here): four documents with the phrase, the one with the sender last
+Z = [doc_new(A, f"zebra-{i}.txt", "Zebra stripes paper", WS) for i in range(3)]
+Z4 = doc_new(A, "zebra-4.txt", "Zebra stripes paper", WS, sender="Stripe Co")
+fc = A.get(B + "/api/docs/facets", params={"ws": WS}).json()
+STRIPE = g("senders", "Stripe Co")
+PH = {"f": "text", "op": "has", "v": '"zebra stripes"'}
+check(flat(A, urlencode({"q": '"zebra stripes"', "sender": STRIPE})) == [Z4], "setup: the search finds it (its filters first)")
+check(hit_ids(A, rules({"f": "sender", "op": "in", "v": [STRIPE]}, PH)) == [Z4],
+      "#5547 rueckfall: a view's phrase is looked for after its other conditions (AND), not in the first texts of all")
+VZ = A.post(B + f"/api/obj/{K}", json={"title": "Zebra", "rules": rules(PH), "ws": WS}).json()["id"]
+check(ids_of(A.get(B + "/api/docs", params={"ws": WS, "facets": "0", "view": VZ, "sender": STRIPE})) == [Z4],
+      "#5547 rueckfall: the list's own filters narrow before the view's phrase")
 
 # ---------------------------------------------------------------- freelancer-matrix: obj -- a person without an organisation
 F1 = doc_new(Fr, "wombat.txt", "Wombat receipt", "private", sender="Burrow Shop")

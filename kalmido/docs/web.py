@@ -297,7 +297,7 @@ def doc_query(c, uid, args, vis=None, rules=None):
     q, text = dsr_filters(c, args, where, params, base_where, base_params)
     if rules:  # 2.857.0 (#5518): a saved view's filter (docs/dfilter.py, the shared core's kflt_where) narrows the same rows
         from .dfilter import dvf_where
-        w_, p_ = dvf_where(c, rules, base_where, base_params)
+        w_, p_ = dvf_where(c, rules, base_where, base_params, (where[len(base_where):], params[len(base_params):]))  # 2.897.0 (#5547)
         if w_:
             where.append(w_)
             params += p_

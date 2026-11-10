@@ -10,6 +10,7 @@ name first, else a part of it), only names of the workspaces whose documents the
 they are opened per workspace as in the filters). A name nobody has = no hit. The rest of the words go to the word index
 (docs/store.py search_ids); exact phrases and excluded words / phrases are checked against the opened text and the name.
 Nothing here reads a document the caller does not already filter by visibility (docs/web.py doc_query)."""
+import os
 import re
 from datetime import date, timedelta
 
@@ -22,7 +23,7 @@ DSR_KEYS = {"tag": "tag", "tags": "tag", "absender": "sender", "sender": "sender
             "typ": "type", "type": "type", "art": "type", "datum": "date", "date": "date", "eingang": "added", "added": "added"}
 DSR_FTYPES = ("pdf", "image", "office", "text", "other")
 DSR_TOKEN = re.compile(r'(-?)(?:([A-Za-zÄÖÜäöü]+):(?:"([^"]*)"|(\S+))|"([^"]*)"|(\S+))')
-DSR_TEXT_MAX = 3000   # documents whose text is opened for a phrase / an exclusion
+DSR_TEXT_MAX = int(os.environ.get("KALMIDO_DSR_TEXT_MAX", "3000"))  # documents whose text is opened for a phrase / an exclusion (2.897.0, #5547: settable for the tests)
 _ISO = r"\d{4}-\d{2}-\d{2}"
 
 

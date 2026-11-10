@@ -9,6 +9,7 @@ import binascii
 import re
 
 from flask import g, jsonify, request
+from werkzeug.datastructures import MultiDict
 
 from ..core.config import MAX_FILE_MB, app
 from ..core.db import bump, db
@@ -16,7 +17,7 @@ from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields, v1_limit
-from .dfilter import dvf_rules  # 2.857.0 (#5518): a saved view's filter
+from .dfilter import dvf_args, dvf_rules  # 2.857.0 (#5518): a saved view's filter; 2.897.0 (#5547): + dvf_args
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_json, v1_view
 from ..files.store import download_name, fs_log_add, need_node, safe_fs_name  # 2.750.0 (#4876): + download_name, safe_fs_name
 from . import store as S
@@ -62,19 +63,29 @@ def v1_docs_list():
     """Documents you may see (an agent: shared with it), newest document date first: ?q=&review=1&state=&from=&to=.
     2.122.0 B (#2294): + tag / not_tag / sender / type / folder (ids, "1,7;3" = two), tag_mode, added_from / added_to, no_tag,
     no_sender, no_type, ftype; q takes the search syntax (tag:, sender:, type:, date:, "phrase", -word: docs/dsearch.py).
-    2.857.0 (#5518): view=<id> = the filter of a saved view (kind docview) shared with the caller."""
+    2.857.0 (#5518): view=<id> = the filter of a saved view (kind docview) shared with the caller; 2.897.0 (#5547): with the
+    view's workspace, area, state and unbooked like the app's list (/api/docs)."""
     a = v1_args(("q", "review", "state", "from", "to", "limit", "cursor", "tag", "tag_mode", "not_tag", "sender", "type", "folder",
                  "added_from", "added_to", "no_tag", "no_sender", "no_type", "ftype", "view"))
     c = db()
     limit = v1_limit(a)
     off = cursor_dec("d", a.get("cursor"))
-    rules = None
+    rules, args = None, MultiDict(a)  # 2.897.0 (#5547): a MultiDict like /api/docs (a repeated parameter keeps every value)
     if a.get("view") is not None:  # 2.857.0 (#5518): a saved view shared with the caller: its filter on top (docs/dfilter.py)
         from ..core.objects import obj_need
         if not str(a["view"]).isdecimal():
             raise BadInput(tr("Invalid value: {0}", "view"))
-        rules = dvf_rules(obj_need(c, me(), "docview", int(a["view"]), "view")[0])
-    rows, total, _rev = doc_query(c, me(), {**a, "limit": limit, "offset": off}, rules=rules)
+        row = obj_need(c, me(), "docview", int(a["view"]), "view")[0]
+        rules = dvf_rules(row)
+        # 2.897.0 (#5547): also the view's own workspace, area, state and "new in the office" as /api/docs (docs/web.py
+        # docs_list) takes them; a parameter of the request goes first, the sort stays the API's (newest first)
+        args = dvf_args(rules, {"ws": row["ws"] or "all"})
+        args.pop("sort", None)
+        args.pop("dir", None)
+        for k, vs in a.lists():
+            args.setlist(k, vs)
+    args["limit"], args["offset"] = limit, off
+    rows, total, _rev = doc_query(c, me(), args, rules=rules)
     out = []
     for r in rows:
         node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
