@@ -129,6 +129,24 @@ def f7():
     check(moved_rows(shid) == [], f"F7: its obj_revoked row of the move is gone (no second way back) {moved_rows(shid)}")
 
 
+# ================================================================ F8 a master data save of nothing: no history, no step
+def f8(who, s, uid):
+    sv = service(s, f"Beratung {who}")
+    url = B + OFF + f"/services/{sv['id']}"
+    hist = lambda: [json.loads(x[0]) for x in sql("SELECT vals_after FROM obj_history WHERE kind='office_md_services' AND ref_id=? ORDER BY id", (sv["id"],))]  # noqa: E731
+    h0, g0 = hist(), len(groups(uid))
+    r = s.patch(url, json={"daily_rate": "800", "name_de": f"  Beratung {who} ", "unit": sv["unit"], "no_such_column": 1,
+                           "expect_updated_at": sv["updated_at"]})
+    check(r.ok and r.json()["updated_at"] == sv["updated_at"], f"F8 {who}: the same values as text / with blanks: saved, the version stays {r.status_code} {r.text[:200]}")
+    check(hist() == h0, f"F8 {who}: no history entry of nothing {hist()}")
+    check(len(groups(uid)) == g0, f"F8 {who}: no undo step of nothing {groups(uid)[g0:]}")
+    r = s.patch(url, json={"daily_rate": "850", "name_de": f"Beratung {who}", "no_such_column": 2, "expect_updated_at": sv["updated_at"]})
+    h = hist()
+    check(r.ok and r.json()["daily_rate"] == 850 and len(h) == len(h0) + 1 and list(h[-1]) == ["daily_rate"],
+          f"F8 {who}: a real change: ONE entry with only the field that changed {h[len(h0):]}")
+    check(len(groups(uid)) == g0 + 1, f"F8 {who}: and one undo step")
+
+
 # ================================================================ setup
 kt.fresh({"KALMIDO_INSTANCE_MODE": "workspaces"}, prefix="P2866")
 kt.docker_logs_on_first_fail()
@@ -163,6 +181,8 @@ f5("alice", A)
 f5("frida", Fr)
 f6()
 f7()
+f8("alice", A, ALICE)
+f8("frida", Fr, FID)
 # -- more parts below --
 
 raise SystemExit(kt.done("p2866_pflege"))

@@ -1437,6 +1437,31 @@ def office_create(c, oid, kind, b):
     return office_row(c, oid, kind, cur_id)
 
 
+def office_md_clean(c, oid, kind, b, cur):
+    """2.866.0 (#5302 F8): the body of a master data save as office_update would store it, for the core's change check
+    (office/web.py office_row_patch -> ow_write): only columns of the kind, each through _clean_col ("800" = 800, a name with
+    blanks around it = the name), JSON columns as the row gives them (a list / dict, not their text); an unchanged link stays out
+    (office_update keeps it unchecked). Without it every save counted as a change: history entries and undo steps of nothing.
+    A letter block (texts, kind letter) has its own cleaner (ltx_clean): its body goes on as it came."""
+    if kind == "texts" and cur.get("kind") == LTX_KIND:
+        return {k: v for k, v in b.items() if k != "expect_updated_at"}
+    cols, out = MD[kind]["cols"], {}
+    for k, v in b.items():
+        if k not in cols:
+            continue
+        typ = cols[k][0]
+        if typ in ("fk", "agreement", "receipt") and v not in (None, "") and str(v) == str(cur.get(k)):
+            continue
+        nv = _clean_col(c, oid, kind, k, v)
+        if typ in ("items", "rates", "trans", "maint") and isinstance(nv, str):
+            try:
+                nv = json.loads(nv)
+            except ValueError:
+                pass
+        out[k] = nv
+    return out
+
+
 def office_update(c, oid, kind, rid, b):
     m = MD[kind]
     if isinstance(b, dict) and b.get("expect_updated_at"):  # 2.269.0 C (#3017): a second save with the same base waits, then sees
