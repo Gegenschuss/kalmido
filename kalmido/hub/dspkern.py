@@ -29,15 +29,15 @@ from ..core.db import usettings
 from ..core.i18n import N_, tr
 from ..core.objects import obj_need, obj_reg_node, obj_register
 from ..core.orgcrypt import oc_enc_fields
-from ..core.pg import qi, system_ctx
-from ..core.writes import _purge_rows, obj_restore, obj_trash
+from ..core.pg import qi, system_ctx, write_lock
+from ..core.writes import _purge_rows, obj_restore, obj_trash, undo_skip
 from ..accounts.orgroles import RO_MSG, org_writes
 from .absence import abs_org
 from .callsheet import cs_clean
 
 DSK_DAY, DSK_CS = "shoot_day", "callsheet"
 DSK_TABLES = ("hub_bookings", "hub_callsheets")  # the tables of the two kinds (core/pg.py qi)
-DSK_SKETCH = "picture"  # the history's mark of a sketch (never the picture itself)
+DSK_SKETCH = "picture"  # the history's mark of a sketch (never the picture itself): "picture:<8 hex of its SHA-256>"
 
 
 def _person_area(c, uid, oid):
@@ -102,7 +102,8 @@ obj_register(DSK_DAY, "hub_bookings", label=N_("Shoot day"), fields={}, node=Fal
              base_role=_base_of("hub_bookings"), title=_day_title, open_url=lambda bid: "workload")
 obj_register(DSK_CS, "hub_callsheets", label=N_("Call sheet"), fields={"data": _cs_data}, area="team", routes=False, listed=False,
              fsref=False, space=_space_of("hub_callsheets"), base_role=_base_of("hub_callsheets"), visible=_cs_visible,
-             cap=lambda c, uid, rid: None, list_col="org_id", trash_prune=True, open_url=lambda rid: "workload")
+             cap=lambda c, uid, rid: None, trash_prune=True, open_url=lambda rid: "workload")
+undo_skip("hub_callsheets", "sketch", "sketch_mime")  # the picture (up to 4 MB) never goes into an undo copy (core/writes.py)
 
 
 def dsk_need_day(c, uid, rows, write=True):
@@ -122,6 +123,7 @@ def dsk_need_day(c, uid, rows, write=True):
 def dsk_sync(c, uid, oid, job):
     """After bookings of shoot day (oid, job) went into the trash or came back: its call sheet follows -- no live booking
     left = into the core's trash, a live one again = out of it. uid's rights (the caller checked them on the bookings)."""
+    write_lock(c, f"hub_callsheets-{int(oid)}-{job}")  # review 2.872 F3: the lock of hub/callsheet.py cs_put (a first save)
     r = c.execute("SELECT id, deleted_at FROM hub_callsheets WHERE org_id=? AND job=?", (int(oid), job)).fetchone()
     if r is None:
         return

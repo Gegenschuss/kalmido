@@ -20,6 +20,7 @@ freelancer-matrix: hub (frida has no organisation: her call sheet's history in h
 tenant-matrix: hub (greta, another person's area: frida's call sheet history 404; the other organisation's admin: 404)
 usage: p5532_a_dispokern_test.py <datadir>"""
 import base64
+import os
 import struct
 import zlib
 
@@ -58,11 +59,11 @@ CS = f"/api/team/dispo/callsheet/{JOB}?org={ORG}"
 HIST = f"/api/team/dispo/callsheet/{JOB}/history?org={ORG}"
 
 
-def png():
+def png(w=32, h=20, noise=False):
     def chunk(t, d):
         return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
-    raw = b"".join(b"\x00" + bytes((30, 90, 160)) * 32 for _ in range(20))
-    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 32, 20, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw))
+    raw = b"".join(b"\x00" + (os.urandom(3 * w) if noise else bytes((30, 90, 160)) * w) for _ in range(h))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw))
             + chunk(b"IEND", b""))
 
 
@@ -129,12 +130,22 @@ check(not kt.dbx("SELECT 1 FROM obj_history WHERE kind='callsheet' AND ref_id=? 
                  (CSID, "%" + pic[:40] + "%", "%" + pic[:40] + "%")), "no history row holds the picture")
 
 # ---------------------------------------------------------------- undo across devices (the core's step of the call sheet)
+# review 2.872 F1: a sketch of a phone screenshot (here about 480 KB of base64, over the 256 KB of one step's copy) is in no
+# undo copy (core/writes.py undo_skip), so a later change of the details stays a normal step, not a "too big" barrier
+big = base64.b64encode(png(400, 300, noise=True)).decode()
+r = Bo.put(B + CS, json={"data": {"loc_name": "Halle 2", "set_phone": "0170 1234567", "important": "Bitte leise"},
+                         "sketch": "data:image/png;base64," + big})
+check(r.ok and len(big) > 300_000, f"bob replaces the sketch with a large picture {r.status_code} {r.text[:120]}")
+check(not kt.dbx("SELECT 1 FROM obj_undo WHERE kind='callsheet' AND ref_id=? AND snap LIKE ?", (CSID, "%" + big[:40] + "%")),
+      "no undo copy holds the picture")
 r = Bo.put(B + CS, json={"data": {"loc_name": "Halle 3", "set_phone": "0170 1234567", "important": "Bitte leise"}})
 check(r.ok, "bob changes the location on the laptop")
 g = newest(PHONE)
-check(g.get("kind") == "callsheet", f"the phone lists the step of the call sheet {g}")
+check(g.get("kind") == "callsheet" and g.get("state") != "toobig", f"the phone lists the step of the call sheet (not too big) {g}")
 r = PHONE.post(B + f"/api/undo/to/{g.get('id')}")
-check(r.ok and Bo.get(B + CS).json()["callsheet"]["data"].get("loc_name") == "Halle 2", f"taken back from the phone: the old location {r.status_code} {r.text[:160]}")
+cs = Bo.get(B + CS).json()["callsheet"]
+check(r.ok and cs["data"].get("loc_name") == "Halle 2", f"taken back from the phone: the old location {r.status_code} {r.text[:160]}")
+check(Bo.get(B + cs["sketch_url"]).content == base64.b64decode(big), "... the sketch stays the large picture (undo leaves it as it is)")
 check(hist()[0]["action"] == "undo", f"the history names the undo {hist()[:1]}")
 
 # ---------------------------------------------------------------- rights

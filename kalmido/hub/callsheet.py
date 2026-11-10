@@ -28,6 +28,7 @@ GET  /api/team/dispo/callsheet/<job>/sketch?org=  the stored sketch (the dialog'
 GET  /api/team/dispo/callsheet/<job>/history?org=  2.872.0 (#5532): who changed the call sheet when, and which details"""
 import base64
 import binascii
+import hashlib
 import io
 import json
 import re
@@ -323,8 +324,8 @@ def cs_put(job):
     2.872.0 (#5532): through the shared core (module docstring): the shoot day's write right (obj_need), the details by
     obj_write, the sketch by the core's adapters; a first save makes the row with the core's columns (history "create")."""
     from ..core.objects import obj_need
-    from ..core.writes import obj_history_add, obj_undo_post, obj_undo_pre, obj_write
-    from .dspkern import DSK_CS, DSK_SKETCH, dsk_need_day, dsk_sync
+    from ..core.writes import obj_history_add, obj_write
+    from .dspkern import DSK_CS, dsk_need_day, dsk_sync
     c, uid, oid, rows = cs_gate(job)
     dsk_need_day(c, uid, rows[:1])  # the core's role of the shoot day (was orgroles.need_org_write)
     b = body()
@@ -335,6 +336,9 @@ def cs_put(job):
     if "sketch" in b and b["sketch"] not in (None, False):
         sketch = ("", "") if b["sketch"] == "" else cs_sketch_in(c, uid, oid, b["sketch"])
     write_lock(c, f"hub_callsheets-{oid}-{job}")
+    # review 2.872 F3: the shoot day read again under the lock (a delete of its last booking meanwhile: 404, no live row beside it)
+    if not c.execute(f"SELECT 1 FROM hub_bookings WHERE org_id=? AND job=? AND {live_sql()} LIMIT 1", (oid, job)).fetchone():
+        raise Denied(404)
     dsk_sync(c, uid, oid, job)  # a call sheet an older version left in the trash beside live bookings comes back first
     r = cs_row(c, oid, job)
     ccf_check(b, (r or {}).get("updated_at") or "", "callsheet", lambda: cs_public(c, uid, oid, job, rows, r))
@@ -348,14 +352,13 @@ def cs_put(job):
     rid = r["id"]
     write_lock(c, f"obj-{DSK_CS}-{int(rid)}")  # the core's lock of the object (obj_write takes it again in this transaction)
     if sketch is not None and sketch[0] != (r.get("sketch") or ""):
+        # review 2.872 F1: no undo step for the picture (core/writes.py undo_skip: it is in no copy, a step of megabytes would
+        # make the person's step group too big); the history notes it with a mark of its hash, never the picture
         obj_need(c, uid, DSK_CS, rid, "write")
-        obj_undo_pre(c, uid, DSK_CS, rid, oid)  # the person's step (a copy only while it fits the step group's limits)
         vals = oc_enc_fields(c, oid, "hub_callsheets", {"sketch": sketch[0]})
         c.execute("UPDATE hub_callsheets SET sketch=?, sketch_mime=?, rev=rev+1, updated_at=?, updated_by=? WHERE id=?",
                   (vals["sketch"], sketch[1], iso_ms(now_utc()), uid, rid))
-        obj_history_add(c, uid, DSK_CS, rid, {"sketch": DSK_SKETCH if r.get("sketch") else ""},
-                        {"sketch": DSK_SKETCH if sketch[0] else ""}, org_id=oid)
-        obj_undo_post(c)
+        obj_history_add(c, uid, DSK_CS, rid, {"sketch": _pic_mark(r.get("sketch"))}, {"sketch": _pic_mark(sketch[0])}, org_id=oid)
     if data != cs_data(r):
         obj_write(c, uid, DSK_CS, rid, {"data": data})
     bump(c)
@@ -384,6 +387,13 @@ def cs_history(job):
                 keys.add(k)
         out.append({"at": h["at"], "name": h["name"], "action": h["action"], "fields": sorted(keys)})
     return jsonify(history=out)
+
+
+def _pic_mark(b64):
+    """The history's mark of a sketch: "" (none) or "picture:<8 hex of its SHA-256>" (review 2.872 F5: a replaced picture
+    differs from the one before, so the history's merge of ten minutes never drops it as "changed back")."""
+    from .dspkern import DSK_SKETCH
+    return f"{DSK_SKETCH}:{hashlib.sha256((b64 or '').encode()).hexdigest()[:8]}" if b64 else ""
 
 
 def _hist_plain(c, oid, v):

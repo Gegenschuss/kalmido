@@ -627,11 +627,22 @@ def undo_scope(kind, rid, oid):
     return [(reg["table"], "id=?", (int(rid),), False)]
 
 
+UNDO_SKIP = {}  # 2.872.0 (#5532): table -> {column}: never copied into an undo step (undo_skip)
+
+
+def undo_skip(table, *cols):
+    """2.872.0 (#5532): columns of table that no undo copy holds (a picture of megabytes would make every step of the object
+    too big for its step group, core/undogroups.py ug_fits): they are not in the copy, not in its fingerprint, and taking a
+    step back leaves them as they are now (the area records no step for a change of such a column alone)."""
+    UNDO_SKIP.setdefault(table, set()).update(cols)
+
+
 def _snap(c, sc):
     out = {}
     for t, where, args, _many in sc:
         rows = c.execute(f"SELECT * FROM {t} WHERE {where} ORDER BY id", args).fetchall()
-        out[t] = [{k: _val(r[k]) for k in r.keys()} for r in rows]
+        skip = UNDO_SKIP.get(t, ())
+        out[t] = [{k: _val(r[k]) for k in r.keys() if k not in skip} for r in rows]
     return out
 
 
