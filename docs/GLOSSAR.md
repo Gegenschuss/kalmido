@@ -304,6 +304,7 @@ Documents: upload and ingest, recognition, classification, fields, search, folde
 - `kalmido/docs/batch.py` (`dsr`) - The chosen documents at once
 - `kalmido/docs/classify.py` - A small, locally learning classifier for documents ("learns from your documents")
 - `kalmido/docs/csvx.py` - The documents list as a CSV (";" and decimal comma in German, UTF-8 with BOM, like the other table exports)
+- `kalmido/docs/dfilter.py` (`dvf`) - The filter of the saved views of the documents on the shared core's filter (each condition from the search's own pieces)
 - `kalmido/docs/dsearch.py` (`dsr`) - The documents search, combinable like an archive
 - `kalmido/docs/dups.py` (`dup`) - Duplicates of documents (receipts above all: the same invoice by mail and as a photo, a PDF uploaded twice -- otherwise both go into the DATEV batch)
 - `kalmido/docs/dviews.py` (`dv`) - Saved views of the documents search

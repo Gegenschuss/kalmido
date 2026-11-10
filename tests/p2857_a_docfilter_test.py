@@ -189,7 +189,8 @@ check(r.status_code == 201 and r.json()["rules"] == {"op": "and", "conds": [{"f"
 check(A.post(B + f"/api/obj/{K}", json={"title": "Bad", "ws": WS, "rules": "not json"}).status_code == 400, "rules that are no filter: 400")
 check(A.post(B + f"/api/obj/{K}", json={"title": "Bad", "ws": WS, "rules": [1, 2]}).status_code == 400, "a list is no filter: 400")
 j = count(A, rules={"op": "and", "conds": [{"f": "text", "op": "has", "v": "x" * 30000}]})
-check(isinstance(j, dict) and len(j["rules"]["conds"][0]["v"]) == 500 and j["total"] == 0, "a long text is cut, not an error")
+check(isinstance(j, dict) and len(j["rules"]["conds"][0]["v"]) == 500 and j["total"] == len(flat(A, "q=" + "x" * 500)),
+      f"a long text is cut (500), not an error, and counts as the search with that text {j if not isinstance(j, dict) else j['total']}")
 check(count(A, ws="org:abc", rules=R1) == 400, "the count: a bad workspace is 400")
 check(sess().post(B + "/api/docs/views/count", json={"rules": R1}).status_code in (401, 403), "the count needs a signed-in person")
 

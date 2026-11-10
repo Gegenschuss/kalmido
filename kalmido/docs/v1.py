@@ -16,6 +16,7 @@ from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields, v1_limit
+from .dfilter import dvf_rules  # 2.857.0 (#5518): a saved view's filter
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_json, v1_view
 from ..files.store import download_name, fs_log_add, need_node, safe_fs_name  # 2.750.0 (#4876): + download_name, safe_fs_name
 from . import store as S
@@ -70,7 +71,6 @@ def v1_docs_list():
     rules = None
     if a.get("view") is not None:  # 2.857.0 (#5518): a saved view shared with the caller: its filter on top (docs/dfilter.py)
         from ..core.objects import obj_need
-        from .dfilter import dvf_rules
         if not str(a["view"]).isdigit():
             raise BadInput(tr("Invalid value: {0}", "view"))
         rules = dvf_rules(obj_need(c, me(), "docview", int(a["view"]), "view")[0])

@@ -62,7 +62,8 @@ async function dcv_edit(v, o = {}) {
   const ws = v?.ws || o.ws || (typeof wsCur === 'function' ? wsCur() : 'all');
   let fc = null; try { fc = await rawFetch('GET', '/api/docs/facets?ws=' + encodeURIComponent(ws)); } catch { /* only the chosen values then */ }
   await loadModule('fltdlg');
-  const r0 = o.rules || v?.rules || {op: 'and', conds: []}, extra = dcv_extra(r0);
+  const r0 = o.rules || v?.rules || {op: 'and', conds: []};
+  const extra = o.rules || v ? dcv_extra(r0) : ws === 'all' || ws === 'private' ? {area: 'private'} : {};  // a new one counts as the list does (docs.js dc_params: no office receipts)
   let timer = 0;
   const count = r => new Promise(res => { clearTimeout(timer); timer = setTimeout(async () => { try { const j = await rawFetch('POST', '/api/docs/views/count', {ws, rules: r}); res(trn('{0} document matches', '{0} documents match', j.total)); } catch { res(null); } }, 250); });
   return kflt_dialog({cat: dcv_cat(fc), rules: r0, name: v?.title || '', title: v ? tr('Edit filter') : tr('New filter'), placeholder: tr('Name of the view'),

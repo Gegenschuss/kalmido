@@ -271,27 +271,6 @@ def _sort_value(c, r, key):
         return None
 
 
-def doc_hits(c, sql, params, q, text):
-    """The documents of `FROM ... WHERE ...` (sql, params) that the words q (the word index, an archive number) and the exact /
-    excluded phrases of text (docs/dsearch.py dsr_filters) hit -> a set of node ids, None when there are none to look for.
-    2.857.0 (#5518): out of doc_query, the text condition of a saved view's filter (docs/dfilter.py) uses it too."""
-    from .dsearch import dsr_text
-    if not (q or any(text.values())):
-        return None
-    by_ws = {}
-    for r in c.execute(f"SELECT d.node_id, d.ws {sql}", params):
-        by_ws.setdefault(r[1], []).append(r[0])
-    hit = S.search_ids(c, by_ws, q) if q else None
-    for ws_, ids_ in by_ws.items() if q else ():  # an archive serial number ("ASN00042", "42"): its document as well
-        pre = re.escape(S.cfg_get(c, ws_)["asn_prefix"])
-        n = re.fullmatch(rf"\s*(?:{pre})?\s*[:#-]?\s*0*(\d{{1,9}})\s*", q, re.I)
-        if n:
-            r_ = c.execute("SELECT node_id FROM doc_meta WHERE ws=? AND asn=?", (ws_, int(n.group(1)))).fetchone()
-            if r_ and r_[0] in ids_:
-                hit = (hit or set()) | {r_[0]}
-    return dsr_text(c, by_ws, hit, text)
-
-
 def doc_query(c, uid, args, vis=None, rules=None):
     """The documents account uid sees, filtered by args (ws, q, sender, type, tag, from, to, review, state) -> (rows, total,
     review count). Rows: doc_meta + node columns, sorted by doc_sort (newest document date first by default).
@@ -314,7 +293,7 @@ def doc_query(c, uid, args, vis=None, rules=None):
     base_where, base_params = list(where), list(params)
     # 2.122.0 B (#2294): several tags (every one / one of them / not), several senders and types, both dates, folder, file
     # type, "without ...", and the search syntax of the search field (docs/dsearch.py)
-    from .dsearch import dsr_filters
+    from .dsearch import dsr_filters, dsr_hits
     q, text = dsr_filters(c, args, where, params, base_where, base_params)
     if rules:  # 2.857.0 (#5518): a saved view's filter (docs/dfilter.py, the shared core's kflt_where) narrows the same rows
         from .dfilter import dvf_where
@@ -323,7 +302,7 @@ def doc_query(c, uid, args, vis=None, rules=None):
             where.append(w_)
             params += p_
     sql = f"FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {' AND '.join(where)}"
-    hit = doc_hits(c, sql, params, q, text)
+    hit = dsr_hits(c, sql, params, q, text)
     if hit is not None:
         ids = sorted(hit)[:5000]
         sql += f" AND d.node_id IN ({','.join('?' * len(ids))})" if ids else " AND FALSE"

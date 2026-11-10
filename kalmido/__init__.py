@@ -524,6 +524,7 @@ ORDER = (
     "docs.web",  # 2.48.0 (#1111): the routes of the documents area
     "docs.recog",  # 2.353.0 D (#2759): recognition per folder / file of the file store (one route; after docs.web)
     "docs.dsearch",  # 2.122.0 B (#2294): filters + search syntax of the documents list (no routes)
+    "docs.dfilter",  # 2.857.0 (#5518): the saved views' filter on the shared core's kflt_where (no routes)
     "docs.batch",  # 2.122.0 B (#2294): the chosen documents at once (tags / type / sender) and as one ZIP
     "docs.fields",  # 2.153.0 (#2179): custom fields of documents (definitions + routes; values via docs.web)
     "docs.flows",  # 2.581.0 (#4803): document flows (trigger, filters, actions), their runs and undo (after docs.fields)

@@ -1,7 +1,7 @@
 """2.857.0 (#5518): the filter of the documents' saved views on the shared core's filter (docs/dev/kern.md "Filter",
-core/filters.py kflt_where; the dialog: static/js/docviews.js DCV_FLT on fltdlg.js kflt_dialog). No condition logic of its
+core/filters.py kflt_where; the dialog: static/js/docviews.js dcv_cat on fltdlg.js kflt_dialog). No condition logic of its
 own: kflt_where combines the conditions (AND / OR, "is none of" always on top), every condition is built from the documents
-search's own pieces (docs/dsearch.py dsr_filters with the parameters that condition stands for, docs/web.py doc_hits for
+search's own pieces (docs/dsearch.py dsr_filters with the parameters that condition stands for, dsr_hits for
 the text with its syntax), so a condition means exactly what the same filter of the search means.
 
 rules = {op: and | or, conds: [{f, op, v, ...}], sort?, dir?, area?, unbooked?, state?} -- f, the comparisons, v:
@@ -21,15 +21,17 @@ Every value goes to SQL as a parameter; whatever does not fit is off. The rows a
 (doc_query's own WHERE), a filter only narrows them."""
 import json
 import re
-from datetime import date, timedelta
+from datetime import timedelta
 from urllib.parse import parse_qsl
 
 from werkzeug.datastructures import MultiDict
 
+from ..core.db import local_now
 from ..core.errors import BadInput
 from ..core.filters import COND_MAX, VAL_MAX, kflt_where
 from ..core.i18n import tr
 from ..core.pg import st_ids
+from .dsearch import dsr_asn, dsr_filters, dsr_hits, dsr_range
 
 DVF_OPS = {"sender": ("in", "nin", "empty"), "type": ("in", "nin", "empty"), "tag": ("in", "nin", "empty"), "folder": ("in", "nin"),
            "date": ("in", "nin", "from", "to"), "added": ("in", "nin", "from", "to"), "ftype": ("in", "nin"),
@@ -45,7 +47,7 @@ _EXTRA = re.compile(r"[a-z_]{1,20}|1|0")
 def dvf_preset(v, today=None):
     """A date preset -> (from, to) as ISO: d7 / d30 / d90 = the last days up to today, m0 / m1 = this / last month,
     y0 / y1 = this / last year; None when it is none."""
-    t = today or date.today()
+    t = today or local_now().date()
     if v in ("d7", "d30", "d90"):
         return (t - timedelta(days=int(v[1:]) - 1)).isoformat(), t.isoformat()
     if v == "m0":
@@ -154,7 +156,6 @@ def dvf_from_query(qs):
     ft = [x for x in (p.get("ftype") or "").split(",") if x]
     if ft:
         one(f="ftype", op="in", v=ft)
-    from .dsearch import dsr_asn
     rng = dsr_asn(p.get("asn"))
     if rng:
         if rng[0] == rng[1]:
@@ -187,7 +188,6 @@ def dvf_rules(row):
 # ---- the conditions in SQL (doc_meta d, fs_nodes n), each from the search's own pieces
 def _dsr(c, pairs, base_where, base_params):
     """The search's filters for these parameters -> (where list, params, words, text)."""
-    from .dsearch import dsr_filters
     w, p = [], []
     q, text = dsr_filters(c, MultiDict(pairs), w, p, base_where, base_params)
     return w, p, q, text
@@ -226,8 +226,7 @@ def _pos(c, cnd, base_where, base_params):
         w, p, q, text = _dsr(c, [("q", v)], base_where, base_params)
         if not str(v or "").strip():
             return None
-        from .web import doc_hits
-        hit = doc_hits(c, f"FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {' AND '.join(base_where + w)}", base_params + p, q, text)
+        hit = dsr_hits(c, f"FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {' AND '.join(base_where + w)}", base_params + p, q, text)
         if hit is not None:
             w, p = w + ["d.node_id = ANY(CAST(? AS BIGINT[]))"], p + [st_ids(hit)]
         return _all(w, p) or ("TRUE", [])
@@ -242,7 +241,6 @@ def _pos(c, cnd, base_where, base_params):
     if f in ("date", "added"):
         parts = []
         for x in v:
-            from .dsearch import dsr_range
             rng = dvf_preset(x) or dsr_range(x)
             if rng:
                 key = "" if f == "date" else "added_"

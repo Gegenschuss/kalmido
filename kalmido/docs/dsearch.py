@@ -308,3 +308,23 @@ def dsr_text(c, by_ws, hit, text):
                 ok.add(i)
         hit = ok
     return hit
+
+
+def dsr_hits(c, sql, params, q, text):
+    """The documents of `FROM ... WHERE ...` (sql, params) that the words q (the word index, an archive number) and the exact /
+    excluded phrases of text (docs/dsearch.py dsr_filters) hit -> a set of node ids, None when there are none to look for.
+    2.857.0 (#5518): out of docs/web.py doc_query, the text condition of a saved view's filter (docs/dfilter.py) uses it too."""
+    if not (q or any(text.values())):
+        return None
+    by_ws = {}
+    for r in c.execute(f"SELECT d.node_id, d.ws {sql}", params):
+        by_ws.setdefault(r[1], []).append(r[0])
+    hit = S.search_ids(c, by_ws, q) if q else None
+    for ws_, ids_ in by_ws.items() if q else ():  # an archive serial number ("ASN00042", "42"): its document as well
+        pre = re.escape(S.cfg_get(c, ws_)["asn_prefix"])
+        n = re.fullmatch(rf"\s*(?:{pre})?\s*[:#-]?\s*0*(\d{{1,9}})\s*", q, re.I)
+        if n:
+            r_ = c.execute("SELECT node_id FROM doc_meta WHERE ws=? AND asn=?", (ws_, int(n.group(1)))).fetchone()
+            if r_ and r_[0] in ids_:
+                hit = (hit or set()) | {r_[0]}
+    return dsr_text(c, by_ws, hit, text)
