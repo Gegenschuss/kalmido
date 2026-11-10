@@ -18,6 +18,24 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.848.0] - 2026-11-10
+
+Package 2.823 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- My tasks > "…" > Rules…: every person sets up to 20 own rules for their own view of My tasks. A rule only moves a task into one of the person's own sections, at the top or the end - the task, its project and the project's order never change. Triggers: some days before the due date, due today, due today or overdue, overdue, newly assigned to me, the priority becomes high, from a project, gets a project tag; optional "Only if" (priority, project, project tag). Each rule moves a task once per occasion (a due day, the priority becoming high, ...): what the person moves by hand afterwards stays where it was put. The topmost rule that applies wins (arrow up in the list). Switch, edit, delete with Undo; agents neither read nor propose these rules (#4773).
+
+### Changed
+- My tasks: "due today or overdue -> Now" is no longer fixed in the app but the person's first own rule (switch it off or delete it in Rules…; a deleted one does not come back). Tasks put into a section by hand before stay there (#4773).
+- The Undo of a deleted own section points the rules of that section at it again (#4773).
+
+Package 2.832.0 (Bündel: CI-only rot: p2599_b_kopf_ui (Wiederholung: Fix #5, CI-only rot: p2462_c_ui (Wiederholung: Fix #5301 h, CI-only rot: p2586_a_dragper).
+### Fixed
+- Calendar: Enter in the question for a repeating event no longer picks "Only this date"; the inserted button is a plain button with its own submit, the highlighted "All dates" stays the form's default (#5480)
+- CI red p2599_b_kopf_ui: the suite follows #5309 again - start and list report the page width "seite" (#top on the content's edges), Wide of a note is 96rem; a later test fix had expected the state without #5309 (#5514)
+- CI red p2462_c_ui: the test scrolls up with the wheel like a person, which ends the 2 s "stay at the newest message" phase of a room just opened; on the slower CI runner that phase put the box back to the end (#5515)
+- CI red p2586_a_dragperf_ui: the bar watchers are checked one by one (fewer runs than steps, at most every 200 ms) instead of their sum against the steps (#5516)
+
 ## [2.833.0] - 2026-11-10
 
 Package 2.783 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Spaltenbreite ziehen in großen).
@@ -84,6 +102,7 @@ Package 2.757 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: 
 - Lists and the start page report their width to the header again: the top bar lines up with the content instead of standing 4 px beside it, and the width "Wide" of a note / knowledge page keeps its list + note layout (CI red p2599_b_kopf_ui, #5309).
 - p151_ui says why the hint of the task just tracked is missing (toast, totals on the page and on the server); the Mac red was the sub-second discard fixed in #5186 (#5211).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.833.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.848.0...HEAD
+[2.848.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.848.0
 [2.833.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.833.0
 [2.819.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.819.0

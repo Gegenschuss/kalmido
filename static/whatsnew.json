@@ -1,6 +1,16 @@
 {
  "versions": [
   {
+   "version": "2.848.0",
+   "date": "2026-11-10",
+   "items": [
+    {
+     "de": "In „Meine Aufgaben“ legst du unter „…“ > Regeln eigene Regeln an, die Aufgaben automatisch in deine Abschnitte sortieren, etwa nach Fälligkeit, Priorität oder Projekt.",
+     "en": "In “My tasks” you set up your own rules under “…” > Rules that sort tasks into your sections automatically, e.g. by due date, priority or project."
+    }
+   ]
+  },
+  {
    "version": "2.833.0",
    "date": "2026-11-10",
    "items": [
