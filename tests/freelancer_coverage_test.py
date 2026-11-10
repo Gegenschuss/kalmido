@@ -1562,7 +1562,6 @@ POST /api/tasks/{}/to-shopping
 POST /api/tasks/{}/typing
 POST /api/tasks/{}/wake
 POST /api/team/absences/{}/restore
-POST /api/team/dispo/bookings/restore
 POST /api/team/messages/{}/pin
 POST /api/team/messages/{}/reactions
 POST /api/trash/lists/{}/export.zip

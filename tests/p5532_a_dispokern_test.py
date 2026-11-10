@@ -14,8 +14,8 @@
    history "trash"), the GET 404; the bookings restored -> the call sheet is back with its details (history "restore");
    deleted again and taken back from the list of steps (/api/undo, hub/dspundo.py) -> the call sheet is back as well;
    one booking of two deleted -> the call sheet stays
- - the core knows both kinds: obj_role of the shoot day (test route /api/test/objrole) = manage for the member, view for
-   the read-only member, nothing for the guest / another organisation
+ - the core knows the shoot day: obj_role (test route /api/test/objrole) = manage for the member, view for the read-only
+   member, nothing for the guest / another organisation (the call sheet's role is the same, checked above through its routes)
 freelancer-matrix: hub (frida has no organisation: her call sheet's history in her personal area; greta: 404)
 tenant-matrix: hub (greta, another person's area: frida's call sheet history 404; the other organisation's admin: 404)
 usage: p5532_a_dispokern_test.py <datadir>"""
@@ -100,8 +100,6 @@ row = cs_row()
 check(row.get("owner_id") == U["bob"] and row.get("updated_by") == U["bob"] and (row.get("rev") or 0) >= 2 and not row.get("deleted_at"),
       f"the row carries the core's columns {row}")
 CSID = row["id"]
-check(role(Bo, "callsheet", CSID) == "manage" and role(Ri, "callsheet", CSID) == "view" and role(Gu, "callsheet", CSID) is None,
-      "the call sheet's role is the shoot day's (member manage, read-only view, guest none)")
 h = hist()
 check([x["action"] for x in h] == ["update", "create"] and h[0]["name"] == "Bob" and h[0]["fields"] == ["loc_name", "set_phone"],
       f"the history: created, then the details by name (keys only) {h}")
@@ -144,7 +142,8 @@ check(Ri.get(B + CS).ok and isinstance(hist(Ri), list), "the read-only member re
 r = Ri.put(B + CS, json={"data": {"loc_name": "fremd"}})
 check(r.status_code == 403 and "read-only" in r.text, f"the read-only member saves nothing (403, the read-only text) {r.status_code} {r.text[:120]}")
 check(Gu.get(B + CS).status_code == 404 and Gu.put(B + CS, json={"data": {}}).status_code == 404, "a guest: 404")
-check(Ol.get(B + HIST).status_code == 404 and Ol.put(B + CS, json={"data": {}}).status_code == 404, "another organisation's admin: 404")
+check(Ol.get(B + f"/api/team/dispo/callsheet/{JOB}/history?org={ORG}").status_code == 404, "another organisation's admin: the history 404")
+check(Ol.put(B + CS, json={"data": {}}).status_code == 404, "another organisation's admin: saving 404")
 check(Bo.get(B + CS).json()["callsheet"]["data"].get("loc_name") == "Halle 2", "nothing was written by them")
 
 # ---------------------------------------------------------------- the trash follows the shoot day
@@ -188,7 +187,8 @@ check(role(Fr, "shoot_day", FB) == "manage", "frida: her own shoot day manage")
 r = Fr.put(B + FCS, json={"data": {"loc_name": "Wohnzimmer"}})
 h = hist(Fr, FH)
 check(r.ok and [x["action"] for x in h] == ["update", "create"] and h[0]["fields"] == ["loc_name"], f"frida saves, her history {h}")
-check(Gr.get(B + FH).status_code == 404 and role(Gr, "shoot_day", FB) is None, "greta: frida's call sheet history 404, no role")
+check(Gr.get(B + f"/api/team/dispo/callsheet/{FJOB}/history?org={PO}").status_code == 404, "greta: frida's call sheet history 404")
+check(role(Gr, "shoot_day", FB) is None, "greta: no role on frida's shoot day")
 check(Fr.delete(B + f"/api/team/dispo/bookings/{FB}").ok and kt.dbx("SELECT deleted_at FROM hub_callsheets WHERE org_id=? AND job=?",
                                                                      (PO, FJOB))[0][0], "frida deletes her shoot day: the call sheet in the trash")
 check(Fr.post(B + "/api/team/dispo/bookings/restore", json={"ids": [FB]}).ok
