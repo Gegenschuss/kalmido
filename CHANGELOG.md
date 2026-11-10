@@ -18,6 +18,11 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.873.2] - 2026-11-10
+
+### Fixed
+- main: on a phone with many views the active view tab shows its whole name or only its symbol again, never a half-visible second line; the call sheet dialog's spacing and hint follow the type scale (CI red of 2.873.0: p2320_d_ui, p2380_a_api, p2380_u1_ui, p2419_scale, p2442_c_ui, p2498_a_phone320_ui, p2695_a_rowmenu_coverage).
+
 ## [2.873.1] - 2026-11-10
 
 ### Fixed
@@ -205,7 +210,8 @@ Package 2.757 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: 
 - Lists and the start page report their width to the header again: the top bar lines up with the content instead of standing 4 px beside it, and the width "Wide" of a note / knowledge page keeps its list + note layout (CI red p2599_b_kopf_ui, #5309).
 - p151_ui says why the hint of the task just tracked is missing (toast, totals on the page and on the server); the Mac red was the sub-second discard fixed in #5186 (#5211).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.873.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.873.2...HEAD
+[2.873.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.2
 [2.873.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.1
 [2.873.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.0
 [2.870.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.870.0
