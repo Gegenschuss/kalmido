@@ -192,6 +192,40 @@ def f9():
     check(r.ok and not any(x["id"] == gid for x in groups(ALICE)), f"F9: the next step tidies it: its way forward ends {r.status_code}")
 
 
+# ================================================================ F10 leaving the organisation: the step groups there go
+def task_step(s, name):
+    """A step of s in a private project (org_id NULL): a task made and renamed -> (task id, group id of the rename)."""
+    r = s.post(B + "/api/lists", json={"name": name, "org_id": None})
+    check(r.ok, f"setup: a private project {name} {r.text[:200]}")
+    lid = r.json()["id"]
+    r = s.post(B + "/api/tasks", json={"list_id": lid, "title": f"{name} draft"})
+    check(r.ok, f"setup: a task {r.text[:200]}")
+    tid = r.json()["id"]
+    r = s.patch(B + f"/api/tasks/{tid}", json={"title": f"{name} final"})
+    check(r.ok, f"setup: renamed {r.text[:200]}")
+    gid = sql("SELECT group_id FROM obj_undo WHERE kind='task' AND ref_id=? AND group_id IS NOT NULL ORDER BY id DESC LIMIT 1", (tid,))
+    return tid, gid[0][0] if gid else None
+
+
+def f10():
+    sv = service(Do, "Dora F10", 400)
+    r = Do.patch(B + OFF + f"/services/{sv['id']}", json={"daily_rate": 410, "expect_updated_at": sv["updated_at"]})
+    check(r.ok, f"F10: setup: dora's office step {r.text[:200]}")
+    _, gp = task_step(Do, "Dora private")
+    gd = groups(ids["dora"])
+    check(any(x["org_id"] == ORG for x in gd) and any(x["id"] == gp and x["org_id"] is None for x in gd),
+          f"F10: setup: dora has groups in the organisation and a private one {gd}")
+    ga = [x["id"] for x in groups(ALICE) if x["org_id"] == ORG]
+    check(ga, "F10: setup: alice has groups in the organisation")
+    r = A.delete(B + f"/api/orgs/{ORG}/members/{ids['dora']}")
+    check(r.ok, f"F10: dora leaves (removed by alice) {r.status_code} {r.text[:200]}")
+    gd2 = groups(ids["dora"])
+    check(not any(x["org_id"] == ORG for x in gd2), f"F10: her groups in the organisation are gone {gd2}")
+    check(not sql("SELECT 1 FROM obj_undo WHERE user_id=? AND org_id=?", (ids["dora"], ORG)), "F10: with their parts")
+    check([x["id"] for x in gd2] == [gp], f"F10: her private group stays {gd2}")
+    check([x["id"] for x in groups(ALICE) if x["org_id"] == ORG] == ga, "F10: alice's groups in the organisation stay")
+
+
 # ================================================================ setup
 kt.fresh({"KALMIDO_INSTANCE_MODE": "workspaces"}, prefix="P2866")
 kt.docker_logs_on_first_fail()
@@ -229,6 +263,7 @@ f7()
 f8("alice", A, ALICE)
 f8("frida", Fr, FID)
 f9()
+f10()
 # -- more parts below --
 
 raise SystemExit(kt.done("p2866_pflege"))
