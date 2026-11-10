@@ -18,6 +18,34 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.870.0] - 2026-11-10
+
+Package 2.805 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Settings: on a computer the dialog opens again at the width its content needs (the tabs and one form column, about 57.5rem), also on wide monitors - the 96rem of #4554 are gone; the content goes along with any width (#5357)
+
+### Added
+- Dialogs: a size grip on the right edge and in the bottom right corner of Settings, Edit contact, a mail of the hub, Video review and Set up an agent - drag it to make the dialog wider (the corner also taller), the content goes along; each dialog keeps its size per device, double click (or Enter on the grip) brings back the default size, arrow keys resize, never smaller than the default and at most the window minus 4rem; mouse only, phones and touch keep the sheet without a grip (#5357)
+
+Package 2.836 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Documents: the archive number field and "Next free number" show only for a document that already has a number or is a scan (came through a scan inbox, a picture, or a PDF whose pages are page-filling pictures with at most an invisible OCR layer). Digital PDFs and e-invoices no longer show the field; "Assign archive number" is in every document's Actions menu. Documents from before get the scan mark from the background catch-up (#5390).
+
+Package 2.854 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Spaltenbreite ziehen in großen Listen ruckelt noch, Sammelpaket: Aufgaben ohn).
+
+### Changed
+- Agent chat on a phone: the live interim status under "… is writing" wraps to up to 3 lines instead of being cut to one line; a tap on a cut status shows the whole text, a second tap closes it again. The block keeps its height while the agent works, so the messages above do not jump with every new status; wide screens stay as before (#5508).
+- Tools: the lint step `tools/check_lazy_calls.py` scans identifiers instead of one huge alternation and checks a local shadowing once per file and name - same output, about 3.5 s instead of 90-230 s (#5492).
+
+### Fixed
+- Bank bookings: a long press (phone) or right click (computer) on an open booking opens its "More" menu, like the other rows with "…"; the suite p2695_a_rowmenu_coverage is green again (#5354).
+
+### Fixed
+- main: splitting a stack in the document view keeps its "Split into N documents" message with Undo - a list of flow runs asked just before the split no longer answers afterwards with a "Not found" message in its place (#4887, CI red of 2.833.0, p2154_a_ui); the "Suggest title" button is no "automatic" mark for p2555_a_formnarrow_ui (#4882); the subscribed-calendar mark uses the icon size token (#5468, p2419_scale); every test selection of a changed stylesheet now takes the scale guard p2419_scale along, so a size off the scale is caught before the CI (#5530).
+- main: the list "Recent steps" shows a task change of this browser once - its copy on the server no longer stands beside it, so "Back up to here" takes every change back exactly once (#5251, CI red of 2.848.0, undo_ui).
+
 ## [2.858.0] - 2026-11-10
 
 Package 2.826 (Bündel: Agent-Status: „nicht verbunden“ nur bei echter Stö, Agent-Chat: Pläne (Morgen-Briefing usw.) im ⋯-Menü, Sammelpaket: Aufgaben ohne P).
@@ -139,7 +167,8 @@ Package 2.757 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: 
 - Lists and the start page report their width to the header again: the top bar lines up with the content instead of standing 4 px beside it, and the width "Wide" of a note / knowledge page keeps its list + note layout (CI red p2599_b_kopf_ui, #5309).
 - p151_ui says why the hint of the task just tracked is missing (toast, totals on the page and on the server); the Mac red was the sub-second discard fixed in #5186 (#5211).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.858.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.870.0...HEAD
+[2.870.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.870.0
 [2.858.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.858.0
 [2.848.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.848.0
 [2.833.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.833.0
