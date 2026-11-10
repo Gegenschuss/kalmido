@@ -73,7 +73,7 @@ function bnkRow(t) {
     // 2.809.0 (#5452): one row of buttons -- another receipt / invoice and "More" (private, ignore, no receipt needed, cash box
     // transfer with one line of explanation each, bnkMoreMenu); before five equal buttons in two rows on a phone
     act = `${typeof brl_rowHint === 'function' ? brl_rowHint(t) : ''}${sug}<div class="bnkacts"><button class="btn sm" data-bnk="other" data-id="${t.id}" aria-expanded="${BNK.other === t.id}">${ic('search', 's')}<span>${inn ? tr('Other invoice…') : tr('Other receipt…')}</span></button>
-      <button type="button" class="btn sm ghost bnkmore" data-bnk="more" data-id="${t.id}" aria-haspopup="menu">${ic('dots', 's')}<span>${tr('More')}</span></button></div>
+      <button data-rowmenu="bnkrow" type="button" class="btn sm ghost bnkmore" data-bnk="more" data-id="${t.id}" aria-haspopup="menu">${ic('dots', 's')}<span>${tr('More')}</span></button></div>
       ${BNK.other === t.id ? bnkOtherHtml(t) : ''}`;
   }
   return `<li class="bnkrow ${t.match ? 'done' : ''}" data-tx="${t.id}">${head}${act}</li>`;
@@ -338,3 +338,5 @@ function cfb_prevHtml(bals) {
   if (!ls.length) return '';
   return `<ul class="cfb-prev" role="list">${ls.map(b => `<li>${esc(tr('Account balance according to the bank on {0}: {1}', cfb_day(b.day), ofcMoney(b.amount)))}${ls.length > 1 || /^[A-Z]{2}\d{2}/.test(b.account) ? ` <small class="muted">${esc(cfb_acct(b.account))}</small>` : ''}</li>`).join('')}</ul>`;
 }
+// 2.854.0 (#5354): a long press (phone) / right click (computer) on an open booking opens its More menu, as a tap on "More"
+if (typeof lm_btnMenu === 'function') lm_btnMenu('#view .bnkrow', '[data-bnk="more"]');
