@@ -710,8 +710,17 @@ function fitTop() {
       h1.style.minWidth = Math.ceil(kids.reduce((n, e) => n + e.getBoundingClientRect().width, 0) + gap * kids.length + Math.min(nn.need, nn.full) + 1) + 'px';
     }
   };
+  t.classList.remove('tvc');
   set(0);
   if (!t.clientWidth) return;  // no layout (hidden, jsdom)
+  // 2.828.0 (#5443): the project name before the symbols: when the whole title fits on none of the levels that only make
+  // the pills smaller (tl0 - tl2), the list's view switch shows only the active view first (#top.tvc, a click opens the others)
+  if (nd && !isMobile() && $('.vseg.ttabs', t)) {
+    let whole = false;
+    for (let l = 0; l <= 2 && !whole; l++) { set(l); whole = topFits(t, ht, nd) === 2; }
+    if (!whole) t.classList.add('tvc');
+    set(0);
+  }
   // the lowest level that shows the whole title; otherwise the one that gives the title the most room
   // 2.18.0 (review R3, owner rule: frequently used one-tap actions stay visible, the title shortens instead): the folding
   // levels (tl3 / tl4: view switch, undo / redo, Share, New task into "…") are only taken when nothing fits with the title
@@ -1834,6 +1843,15 @@ function lcBar(l, lc) {
     return `<button type="button" class="lcbn${on ? ' sorted' : ''}" data-k="${esc(k)}" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}"><span>${esc(n)}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>`; }).join('')}</div>${l.virtual ? `<button type="button" class="lcbf" data-act="vcols" aria-haspopup="menu" title="${esc(tr('Shown columns'))}">${ic('columns', 's')}<span>${esc(tr('Columns'))}</span></button>` /* 2.750.0 (#4502) */ : `<button type="button" class="lcbf" data-act="cols" data-id="${l.id}" aria-haspopup="dialog" title="${esc(tr('Shown fields…'))}">${ic('columns', 's')}<span>${esc(tr('Fields'))}</span></button>`}</div>`;
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('.lcbar .lcbn[data-k]'); if (!b) return; e.preventDefault(); lcMenu(b); });
+// 2.828.0 (#5443): the strip scrolls sideways; a fade at each edge where more names wait (classes fl / fr on .lcbs), so a
+// name the edge cuts reads as "more this way" (a phone at 360 px showed "Un|" without any hint)
+function lcbEdge(s) { const m = s.scrollWidth - s.clientWidth; s.classList.toggle('fl', m > 1 && s.scrollLeft > 1); s.classList.toggle('fr', m > 1 && s.scrollLeft < m - 1); }
+document.addEventListener('scroll', e => { if (e.target?.classList?.contains('lcbs')) lcbEdge(e.target); }, true);
+if (typeof ResizeObserver !== 'undefined') domReady(() => {
+  const v = $('#view'); if (!v) return;
+  let q = 0; const all = () => { if (!q) q = requestAnimationFrame(() => { q = 0; v.querySelectorAll('.lcbar .lcbs').forEach(lcbEdge); }); };
+  new MutationObserver(all).observe(v, {childList: true, subtree: true}); new ResizeObserver(all).observe(v);
+});
 // 2.31.0 (#354): first click = the column's natural order, second = reversed, third = the list's sort again
 document.addEventListener('click', e => {
   const b = e.target.closest?.('.lchead [data-colsort]'); if (!b) return;

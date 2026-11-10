@@ -1651,11 +1651,12 @@ body.tdrag .sdrop{display:flex}
 }
 @media (prefers-reduced-motion:no-preference){.hist .hbtn{transition:opacity .12s,color .12s,background-color .12s}}
 /* phones: the list's view switch shows only the current view (a tap opens the others), so ← / → fit next to the title */
+/* 2.828.0 (#5443): not the list's view switch (.ttabs): it has one form on every width (the active view with its name, the others as symbols) */
 @media (max-width:767px){
-  #top .vseg{padding:0;border-color:transparent;background:none}
-  #top .vseg button:not(.on){display:none}
-  #top .vseg button.on{position:relative;padding-right:.875rem}
-  #top .vseg button.on::after{content:"";position:absolute;right:.25rem;top:50%;margin-top:-.0625rem;border:.1875rem solid transparent;border-top-color:currentColor;border-bottom:0}
+  #top .vseg:not(.ttabs){padding:0;border-color:transparent;background:none}
+  #top .vseg:not(.ttabs) button:not(.on){display:none}
+  #top .vseg:not(.ttabs) button.on{position:relative;padding-right:.875rem}
+  #top .vseg:not(.ttabs) button.on::after{content:"";position:absolute;right:.25rem;top:50%;margin-top:-.0625rem;border:.1875rem solid transparent;border-top-color:currentColor;border-bottom:0}
 }
 
 /* ================= UX1 (1.5): header, running indicator, offline, Fold layout, sidebar ================= */
@@ -1884,10 +1885,10 @@ body.tdrag .sdrop{display:flex}
 .tph .tpap{grid-column:1/-1;font:var(--fs-xs) var(--mono);color:var(--muted);padding:.125rem .25rem 0}
 /* touch tablets (Fold, iPad): the list's view switch shows only the current view like on a phone; search is in the rail */
 @media (pointer:coarse),(hover:none){
-  #top .vseg{padding:0;border-color:transparent;background:none}
-  #top .vseg button:not(.on){display:none}
-  #top .vseg button.on{position:relative;padding-right:.875rem}
-  #top .vseg button.on::after{content:"";position:absolute;right:.25rem;top:50%;margin-top:-.0625rem;border:.1875rem solid transparent;border-top-color:currentColor;border-bottom:0}
+  #top .vseg:not(.ttabs){padding:0;border-color:transparent;background:none}
+  #top .vseg:not(.ttabs) button:not(.on){display:none}
+  #top .vseg:not(.ttabs) button.on{position:relative;padding-right:.875rem}
+  #top .vseg:not(.ttabs) button.on::after{content:"";position:absolute;right:.25rem;top:50%;margin-top:-.0625rem;border:.1875rem solid transparent;border-top-color:currentColor;border-bottom:0}
   #top .kbtn{display:none}
 }
 @media (max-width:767px){
@@ -3110,12 +3111,16 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .ttabs button{border-radius:.875rem;padding:.25rem .625rem;font-size:var(--fs-m);color:var(--text2)}
 .ttabs button.on{background:var(--bg2);color:var(--text);font-weight:600;box-shadow:inset 0 0 0 1px var(--line2)}
 .ttabs{flex:none}
-.ttabs button>.i{display:none}
-#top:is(.tl3,.tl4) .ttabs button>.i{display:inline-block}
-#top:is(.tl3,.tl4) .ttabs .vtl{display:none}
-#top:is(.tl3,.tl4) .ttabs button{padding:.25rem .5rem;min-width:2rem;justify-content:center}
-/* 2.40.1: touch screens keep the 44 px view switch (the current view + its arrow) on the narrow header levels too */
-@media (pointer:coarse){ #top:is(.tl3,.tl4) .vseg.ttabs button{min-width:2.75rem;min-height:2.75rem} #top:is(.tl3,.tl4) .vseg.ttabs button.on{padding-right:.875rem} }
+.ttabs button>.i{display:inline-block}
+/* 2.828.0 (#5443): one form on every width: the active view with its symbol and name, the others as symbols (name in the
+   tooltip / aria-label); #top.tvc (fitTop: the project name needs the room) shows only the active one, a click opens the others */
+.ttabs button:not(.on) .vtl{display:none}
+.ttabs button:not(.on){padding:.25rem .5rem;min-width:2rem;justify-content:center}
+#top.tvc .vseg.ttabs button:not(.on){display:none}
+#top.tvc .vseg.ttabs button.on{position:relative;padding-right:.875rem}
+#top.tvc .vseg.ttabs button.on::after{content:"";position:absolute;right:.25rem;top:50%;margin-top:-.0625rem;border:.1875rem solid transparent;border-top-color:currentColor;border-bottom:0}
+/* 2.40.1: touch screens keep the 44 px view switch; 2.828.0 (#5443): on every header level */
+@media (pointer:coarse){ #top .vseg.ttabs button{min-width:2.75rem;min-height:2.75rem} }
 /* the second header line: progress, time, status */
 .lhead{gap:.375rem 1.25rem;margin:0 0 .875rem;color:var(--text2)}
 .lprog .pbar{width:17.5rem;max-width:30vw;height:.25rem;background:var(--line2)}
@@ -3283,7 +3288,11 @@ body.in-chat #top{display:none}
 .vsegm.many{container-type:inline-size}
 .vsegm.many button{flex:1 1 auto;min-width:2.75rem}
 .vsegm button>span{overflow:hidden;text-overflow:ellipsis}
-@container (max-width:36rem){ .vsegm.many button{padding:0 .5rem} .vsegm.many button:not(.on)>span{display:none} }
+/* 2.828.0 (#5443): the same form as the view switch in the header: the active view with its name, the others as symbols
+   (their name in the tooltip / aria-label) - on every width, not only below 36rem; 44 px high on a finger device */
+.vsegm button:not(.on){padding:0 .5rem;min-width:2.75rem}
+.vsegm button:not(.on)>span{display:none}
+@media (pointer:coarse){ .vsegm button{min-height:2.75rem} }
 .vsegm button.on{background:var(--bg);color:var(--text);font-weight:600;box-shadow:0 0 0 1px var(--line2)}
 /* 2.31.0 (#1053): the view switch 36 px high (was 44); a tap target of 24 px at least stays (WCAG 2.5.8) */
 .menu-list .mchk{margin-left:auto;padding-left:.5rem;color:var(--accent);display:inline-flex}

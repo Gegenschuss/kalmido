@@ -34,7 +34,8 @@ function vsegHtml(l) {
   const ch = viewChoices(l); if (ch.length < 2) return '';
   const v = curView(l), short = {overview: N_('Project|view')};
   // 2.49.1 (#1201): four or five views (with the mind map) no longer fit side by side: "many" shows only the active one's name
-  return `<div class="vsegm${ch.length > 3 ? ' many' : ''}" role="group" aria-label="${esc(tr('View'))}">${ch.map(([k, n, i]) => `<button type="button" class="${v === k ? 'on' : ''}" data-act="view-${k}" aria-pressed="${v === k}" title="${esc(tr(n))}">${ic(i, 's')}<span>${esc(tr(short[k] || n))}</span></button>`).join('')}</div>`;
+  // 2.828.0 (#5443): on every width only the active one's name (the header's switch has the same form); each button names its view
+  return `<div class="vsegm${ch.length > 3 ? ' many' : ''}" role="group" aria-label="${esc(tr('View'))}">${ch.map(([k, n, i]) => `<button type="button" class="${v === k ? 'on' : ''}" data-act="view-${k}" aria-pressed="${v === k}" title="${esc(tr(n))}" aria-label="${esc(tr(n))}">${ic(i, 's')}<span>${esc(tr(short[k] || n))}</span></button>`).join('')}</div>`;
 }
 function listHead(l, o = {}) {
   if (!l || l.is_inbox) return vsegHtml(l) + agBandHtml();

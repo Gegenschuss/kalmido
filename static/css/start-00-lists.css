@@ -388,3 +388,7 @@ html.mini-task #detail .dclose,html.mini-task #detail .back,html.mini-task #deta
   #detail .dbot:not(:focus-within):not(.vvpin){position:static}
 }
 @media (prefers-reduced-motion:no-preference){ #view .kcards>.trow.kflip{transition:transform .18s cubic-bezier(.2,.8,.2,1)} }
+/* 2.828.0 (#5443): the column strip of a phone scrolls sideways: the edge with more names fades out (render.js lcbEdge) */
+.lcbar .lcbs.fr{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 2rem),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 2rem),transparent)}
+.lcbar .lcbs.fl{-webkit-mask-image:linear-gradient(270deg,#000 calc(100% - 2rem),transparent);mask-image:linear-gradient(270deg,#000 calc(100% - 2rem),transparent)}
+.lcbar .lcbs.fl.fr{-webkit-mask-image:linear-gradient(90deg,transparent,#000 2rem,#000 calc(100% - 2rem),transparent);mask-image:linear-gradient(90deg,transparent,#000 2rem,#000 calc(100% - 2rem),transparent)}

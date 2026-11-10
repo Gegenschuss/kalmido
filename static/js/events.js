@@ -592,7 +592,8 @@ document.addEventListener('click', async e => {
     case 'view-list': case 'view-kanban': case 'view-timeline': case 'view-overview': case 'view-mindmap': case 'view-calendar': {  // 2.49.0 (#1201); 2.156.0 C (#2071): + calendar
       const l = routeList();
       // phones: only the current view is shown (room for ← / →), a tap on it offers the others
-      if (isTouch() && a.classList.contains('on') && a.closest('.vseg')) {
+      // 2.828.0 (#5443): also a click with the mouse when the header shows only the active view (#top.tvc, fitTop)
+      if ((isTouch() || a.closest('#top.tvc')) && a.classList.contains('on') && a.closest('.vseg')) {
         menu(a, $$('.vseg button', a.closest('.vseg')).map(b => ({label: b.title, icon: b.dataset.ico, on: b === a,
           fn: async () => { if (b === a) return; await setListView(l, b.dataset.act.slice(5)); }})));
         break;
