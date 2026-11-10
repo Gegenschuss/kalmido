@@ -78,7 +78,7 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 20000, ste
       const r = c.getBoundingClientRect(), e = m.querySelector(':scope > .dlgsz-e'), k = m.querySelector(':scope > .dlgsz-c'), vis = g => !!g && getComputedStyle(g).display !== 'none' && g.getBoundingClientRect().width > 0;
       const er = e?.getBoundingClientRect(), kr = k?.getBoundingClientRect();
       return {w: Math.round(r.width), h: Math.round(r.height), sh: c.style.height, right: Math.round(r.right), bottom: Math.round(r.bottom), iw: i ? Math.round(i.getBoundingClientRect().width) : 0, ih: i ? Math.round(i.getBoundingClientRect().height) : 0,
-        e: vis(e), k: vis(k), lbl: !!e?.getAttribute('aria-label') && !!k?.getAttribute('aria-label'),
+        e: vis(e), k: vis(k), lbl: !!e?.getAttribute('aria-label') && !!k?.getAttribute('aria-label') && e.hasAttribute('aria-valuenow') && k.hasAttribute('aria-valuenow'),
         ex: er ? Math.round(er.left + er.width / 2) : 0, ey: er ? Math.round(er.top + er.height / 2) : 0, kx: kr ? Math.round(kr.left + kr.width / 2) : 0, ky: kr ? Math.round(kr.top + kr.height / 2) : 0,
         eon: er ? Math.abs(er.left + er.width / 2 - r.right) <= 4 : false, kon: kr ? Math.abs(kr.right - r.right) <= 2 && Math.abs(kr.bottom - r.bottom) <= 2 : false}; })()`;
     const box = d => ev(BOX(d));

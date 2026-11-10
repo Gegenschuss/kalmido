@@ -88,6 +88,7 @@ function dlg_sizer(m, card, name) {
   const mk = (cls, or) => {
     const g = document.createElement('div'); g.className = 'dlgsz ' + cls; g.tabIndex = 0;
     g.setAttribute('role', 'separator'); g.setAttribute('aria-orientation', or); g.setAttribute('aria-label', lbl); g.title = lbl;
+    g.setAttribute('aria-valuemin', '0'); g.setAttribute('aria-valuemax', '100'); g.setAttribute('aria-valuenow', '0');  // a focusable separator needs a value (axe aria-required-attr)
     m.appendChild(g); return g;
   };
   const edge = mk('dlgsz-e', 'vertical'), corner = mk('dlgsz-c', 'horizontal');
@@ -107,6 +108,8 @@ function dlg_sizer(m, card, name) {
     card.style.width = w ? w + 'px' : ''; card.style.maxWidth = w ? 'none' : '';
     card.style.height = h ? h + 'px' : ''; card.style.maxHeight = h ? 'none' : '';
     card.classList.toggle('dlgsz-w', !!w); card.classList.toggle('dlgsz-h', !!h);
+    const pct = (v, b0, l) => v && l > b0 ? String(Math.round(Math.min(100, (v - b0) * 100 / (l - b0)))) : '0';
+    edge.setAttribute('aria-valuenow', pct(w, base.width, L.w)); corner.setAttribute('aria-valuenow', pct(w, base.width, L.w));
     if (card._dw && typeof dw_set === 'function') dw_set(card, card._dw.x, card._dw.y);  // a moved dialog stays inside the window
     place();
   };
