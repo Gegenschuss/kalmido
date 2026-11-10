@@ -45,7 +45,9 @@ check(hit({"conds": [{"f": "tag", "op": "in", "v": []}, {"f": "nope", "op": "in"
 r_or = {"op": "or", "conds": [{"f": "n", "op": "in", "v": [5]}, {"f": "tag", "op": "in", "v": ["press"]}, {"f": "tag", "op": "isnot", "v": ["vip"]}]}
 check(hit(r_or) == [3], f"OR, but 'is not' holds on top: {hit(r_or)}")
 check(hit({**r_or, "op": "and"}) == [], "AND: n 5 and press is nobody")
-check(hit(r_or, hard_ops=("nin",)) == [1, 3, 4], f"an area with only nin as hard: isnot is one of the OR parts ({hit(r_or, hard_ops=('nin',))})")
+r_or2 = {"op": "or", "conds": [{"f": "tag", "op": "in", "v": ["press"]}, {"f": "tag", "op": "isnot", "v": ["vip"]}]}
+check(hit(r_or2) == [3] and hit(r_or2, hard_ops=("nin",)) == [2, 3, 4],
+      f"an area with only nin as hard: isnot is one of the OR parts ({hit(r_or2)} / {hit(r_or2, hard_ops=('nin',))})")
 check(hit({"conds": [{"f": "tag", "op": "empty"}]}, has=HAS_E, empty=EMPTY) == [4], "empty: the catalog's empty value")
 check(hit({"conds": [{"f": "n", "op": "empty"}]}, has=HAS_E, empty=EMPTY) == [1, 2, 3, 4], "empty without an empty value in the catalog: off")
 old = lambda r: [{"f": "tag", "op": "in", "v": r["tags"]}] if r.get("tags") else []  # noqa: E731
