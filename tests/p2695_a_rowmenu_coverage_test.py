@@ -33,6 +33,8 @@ RM_LEFT = {
     ("calabs.js", 'class="iconbtn abchid"'): (1, "an invisible stand-in (aria-hidden) that keeps the columns of the rows in line, no button"),
     ("calendar.js", 'data-act="section-menu"'): (1, "a kanban column head: its long press drags the column, held still it opens the head menu (dnd.js secHold, secdrag.js)"),
     ("calendar.js", 'data-act="cvx-today-menu"'): (1, "the head menu of the calendars on Today"),
+    # 2.828.0 (#5464, job/3852): the Calendars window folds "Per project" out with a "…" like the rows beside it
+    ("calevents.js", 'data-evc="lists"'): (1, "the fold-out \"Per project\" of the tasks in the Calendars window (aria-expanded), no row menu"),
     ("chat.js", 'data-act="tc-more"'): (1, "the head of a team room (phone only)"),
     ("chat.js", 'data-act="nt-menu"'): (1, "the head of the open note (the note cards have their long press, notesall.js)"),
     ("notesall.js", 'data-act="nt-menu"'): (1, "the head of the quick note (the note cards have their long press)"),
