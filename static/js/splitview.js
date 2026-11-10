@@ -4,8 +4,8 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-// Left the app as always (body, narrowed by --splW), right a second copy of the app in an iframe (/?mini=1&split=1#<route>,
-// miniwin.js MW_SPLIT: any route, writes no UI state of this window). The pane hangs on <html>, outside body: body gets
+// Left the app as always (body, narrowed by --splW), right a second copy of the app in an iframe (/?split=1#<route>,
+// miniwin.js MW_SPLIT: 2.891.0 (#5358) the normal app with its navigation, any route, writes no UI state of this window). The pane hangs on <html>, outside body: body gets
 // "contain: layout" (splitview.css), so the fixed parts of the left app (dialogs, toasts, the buttons in the corner) stay in the
 // left half. innerWidth of this window answers the left half while the pane is up, so the app's own layout (detail.js
 // layNow / panelMax, the popovers) measures the room it really has. The grip in between: drag (applied on release, the view
@@ -58,7 +58,7 @@ function spl_mount(route) {
   spl_iw(true);
   spl_grip(el.querySelector('.splgrip'));
   SPL.fr.addEventListener('load', spl_watch);
-  SPL.fr.src = '/?mini=1&split=1' + r;
+  SPL.fr.src = '/?split=1' + r;
   spl_apply(spl_w());
 }
 function spl_unmount() {
@@ -93,7 +93,7 @@ function spl_show(route) {
   try { if (w && !(w.location.pathname === '/' && /[?&]split=1(?:&|$)/.test(w.location.search))) w = null; } catch { w = null; }
   // replace, no new entry: the iframe shares the tab's history, Back in the left app should not first step through the right one
   try { if (w) { if (w.location.hash !== r) w.location.replace(w.location.pathname + w.location.search + r); w.focus(); return; } } catch { /* reload below */ }  // the copy routes on hashchange (a copy still starting reads it at its start)
-  SPL.fr.src = '/?mini=1&split=1' + r;
+  SPL.fr.src = '/?split=1' + r;
 }
 function spl_grip(g) {
   g.addEventListener('dblclick', () => { spl_set(null); announce(tr('Default width')); });

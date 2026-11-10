@@ -38,9 +38,9 @@ function bootDone() {
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)
   if (LS.get('after2fa', false)) { LS.set('after2fa', false); setTimeout(() => settingsModal('account'), 400); }  // 2.22.0 (#697)
   { const rs = LS.get('rsToast', ''); if (rs) { LS.del('rsToast'); setTimeout(() => loadModule('settings').then(() => rs_after(rs)).catch(() => {}), 600); } }  // 2.593.0 (#4590): after a reset of the settings: the message with Undo (setreset.js)
-  if (!MW_ON) setTimeout(() => { if (document && !document.hidden) wpSweep(); }, 2500);
+  if (!MW_GUARD) setTimeout(() => { if (document && !document.hidden) wpSweep(); }, 2500);  // 2.891.0 (#5358): the main window's chores stay with it (not the split view's right half)
   // 2.280.0 C (#3114): no start sync of the knowledge pages' offline copy any more (2.169.0 #2671): a space syncs when it is opened (wiki.js wk_load)
-  if (!MW_ON) setTimeout(() => { if (!document.hidden && !S.setupPending && !S.me?.kid) lc_favSuggest(); }, 8000);  /* 2.49.0 (#1537): not for a child */  // 2.46.1 (#1361): a favourite suggestion, once  // 2.19.0 (#668): opening the app tidies the shade  // render in the server-side language
+  if (!MW_GUARD) setTimeout(() => { if (!document.hidden && !S.setupPending && !S.me?.kid) lc_favSuggest(); }, 8000);  /* 2.49.0 (#1537): not for a child */  // 2.46.1 (#1361): a favourite suggestion, once  // 2.19.0 (#668): opening the app tidies the shade  // render in the server-side language
   // 2.13.0 (#453 A16): the first-run step 2 ("What do you want to use?") was not finished (tab reloaded / closed after the
   // admin account was created): it comes back until "Start" is pressed
   if (S.setupPending && !$('.authscreen')) { const el = document.createElement('div'); el.className = 'modal authscreen'; document.body.appendChild(el); $('#app')?.setAttribute('inert', ''); setupChoices(el, `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`); }
@@ -145,7 +145,7 @@ function bootDone() {
     st_landing();  // 2.364.0 B (#3031): the start page
     // 2.365.0 (#2802): the very first start of an account opens on Today, where the tour and the "Getting started" tasks are
     // (before: the empty Basket for a moment, then a jump to Today)
-    if (!location.hash && S.settings.tour === 'pending' && !S.setupPending && !S.me?.kid && !MW_ON && LS.get('lastKey', null) === null) history.replaceState(null, '', location.pathname + location.search + '#today');
+    if (!location.hash && S.settings.tour === 'pending' && !S.setupPending && !S.me?.kid && !MW_GUARD && LS.get('lastKey', null) === null) history.replaceState(null, '', location.pathname + location.search + '#today');
     await route();
   }
   bootDone();  // 2.39.1 (#1213): the first view is drawn
@@ -154,7 +154,7 @@ function bootDone() {
     navigator.serviceWorker.addEventListener('message', swMessage);
   }
   // 2.145.0 B (#2424): an own window: the real state behind the first picture; push, onboarding and the tour stay with the main window
-  if (MW_ON) { mw_bootSync(); setTimeout(quipsLoad, 1500); return; }
+  if (MW_GUARD) { if (MW_ON) mw_bootSync(); setTimeout(quipsLoad, 1500); return; }  // 2.891.0 (#5358): the split view's right half too
   setTimeout(wpSync, 3000);
   pwa_boot();  // 2.143.0 C (#2153): the install hint (setcore.js)
   // v1.1: first start of a new account: "Getting started" list (server side, in the user's language), then the tour

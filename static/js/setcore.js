@@ -162,7 +162,7 @@ const pwa_ios = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.p
 const pwa_iosSafari = () => pwa_ios() && /Safari\//.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(navigator.userAgent);
 function pwa_ok() {
   const h = LS.get('pwaHint', null);
-  if (PWA.shown || window.KDEMO || (typeof MW_ON !== 'undefined' && MW_ON) || tch_standalone() || S.setupPending || S.capturePage) return false;
+  if (PWA.shown || window.KDEMO || (typeof MW_GUARD !== 'undefined' && MW_GUARD) /* 2.891.0 (#5358) */ || tch_standalone() || S.setupPending || S.capturePage) return false;
   return !(h && (h.never || (h.later && Date.now() - h.later < 14 * 864e5)));
 }
 function pwa_hint() {

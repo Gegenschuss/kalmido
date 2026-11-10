@@ -550,7 +550,7 @@ function startDrop() { LS.del('cache'); S.lpCache = null; if (typeof oc_drop ===
 // 2.663.0 (#4200): the offline start state (S.lpCache) goes to IndexedDB when the browser is idle (offcache.js, loaded on demand);
 // an own window (miniwin.js) writes none; without IndexedDB or the module localStorage as before
 function startSave() {
-  if (!S.lpCache || (typeof MW_ON !== 'undefined' && MW_ON)) return;
+  if (!S.lpCache || (typeof MW_GUARD !== 'undefined' && MW_GUARD)) return;  // 2.891.0 (#5358): nor the split view's right half
   if (typeof loadModule !== 'function' || !globalThis.indexedDB) { LS.set('cache', S.lpCache); return; }
   if (typeof oc_soon === 'function') { oc_soon(); return; }
   // the start fetches no module (p265_b): the first write waits for the idle preload (lazyload.js, 5 s), it takes the newest state then

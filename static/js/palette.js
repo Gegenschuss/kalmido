@@ -624,7 +624,7 @@ function tourSteps() {
 // whose button the page does not show is left out (tourmods.js tourModSteps).
 const TOUR_AREAS = ['cal', 'office', 'time', 'review', 'life', 'reading', 'ablage', 'wiki', 'sheets', 'habits', 'agents', 'notes', 'team'];  // the steps: tourmods.js, loaded on the first use; 2.670.0 (#4576): + Notes, Chat
 const toursSeen = () => (S.settings.tours_seen || '').split(',').filter(Boolean);
-const tourModBlocked = () => TOUR.on || !S.me || S.me.kid || S.settings.tour === 'pending' || S.settings.tours_more === '0' || MW_ON || S.capturePage || S.sel || S.route?.task || !!$('.modal');
+const tourModBlocked = () => TOUR.on || !S.me || S.me.kid || S.settings.tour === 'pending' || S.settings.tours_more === '0' || MW_GUARD /* 2.891.0 (#5358) */ || S.capturePage || S.sel || S.route?.task || !!$('.modal');
 function tourModAuto() {
   if (tourModBlocked()) return;
   const id = sbb_area();

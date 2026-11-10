@@ -8,12 +8,16 @@
 // list, no sidebar / tab bar / agent chat; the title bar with the list's name, the composer to add, tick off, a task opens
 // in the same window. Live updates come like in any tab. The window does not write the main window's UI state: local
 // preferences (last view, folded groups, widths ...) and settings PATCHes stay in this window.
-const MW_ON = new URLSearchParams(location.search).get('mini') === '1';
-// 2.742.0 (#4858): the right half of the split view (splitview.js) is an own window in an iframe: /?mini=1&split=1#<any route>.
-// It keeps the guards below (no UI state, no settings written back) but is not bound to one list / task / chat / table
-const MW_SPLIT = MW_ON && new URLSearchParams(location.search).get('split') === '1';
+// 2.891.0 (#5358): the split view's right half (/?split=1, an older /?mini=1&split=1 counts too) is the NORMAL app (full load(),
+// sidebar / tab bar / menus, any route), no own window: MW_ON is off there. Of the own window it keeps only the guards below
+// (no UI state, no settings written back: MW_GUARD) and leaves the main window's chores to it (offline start state, push, tour,
+// install hint, "New for you", a split view of its own)
+const MW_ON = new URLSearchParams(location.search).get('mini') === '1' && new URLSearchParams(location.search).get('split') !== '1';
+// 2.742.0 (#4858): the right half of the split view (splitview.js) is a copy of the app in an iframe: /?split=1#<any route>
+const MW_SPLIT = new URLSearchParams(location.search).get('split') === '1';
+const MW_GUARD = MW_ON || MW_SPLIT;
 const mw_lid = () => +(/^#l\/(\d+)/.exec(location.hash) || [])[1] || 0;
-let MW_ID = MW_ON && !MW_SPLIT ? mw_lid() : 0;
+let MW_ID = MW_ON ? mw_lid() : 0;
 const mw_desk = () => { try { return matchMedia('(hover:hover) and (pointer:fine)').matches; } catch { return false; } };
 const mw_ok = () => !MW_ON && mw_desk();  // touch devices: nothing changes
 function mw_open(id) {
@@ -38,17 +42,18 @@ document.addEventListener('auxclick', e => {
   const r = e.button === 1 && e.target.closest?.('#side .srow[data-list]'); if (!r || !mw_ok()) return;
   e.preventDefault(); mw_open(+r.dataset.list);
 });
-if (MW_ON) {
-  document.documentElement.classList.add('mini');
+if (MW_GUARD) {  // 2.891.0 (#5358): the own window and the split view's right half
   // nothing of this window's UI state goes back: only the offline queue and its id map (shared data) are written locally
   const MW_LS = new Set(['outbox', 'idmap', 'conflicts', 'uid']), lsSet = LS.set.bind(LS);
   LS.set = (k, v) => { if (MW_LS.has(k)) lsSet(k, v); };
   const lsDel = LS.del.bind(LS); LS.del = k => { if (MW_LS.has(k)) lsDel(k); };  // 2.742.0 (#4858): nor removes (a grip's double click, a reset)
   const api0 = api;
   api = (method, url, body) => method === 'PATCH' && /^\/api\/settings\b/.test(url) ? Promise.resolve({}) : api0(method, url, body);
+}
+if (MW_ON) {
+  document.documentElement.classList.add('mini');
   // only this list (a task of it opens in the panel): another view's address goes back to the list
   window.addEventListener('hashchange', () => {
-    if (MW_SPLIT) return;  // 2.742.0 (#4858): the split view's right half goes anywhere
     const id = mw_lid(); if (id) { MW_ID = id; return; }
     if (MW_ID && !/^#t\//.test(location.hash)) location.replace('#l/' + MW_ID);
   });
@@ -61,7 +66,7 @@ if (MW_ON) {
 // menu or the button in the properties panel opens /?mini=1#t/<id> (window name kalmido-task-<id>: the same task comes back to its
 // window). The window shows only this task's panel (no sidebar / tabs / chat), live like any tab; a deleted task or one that is no
 // longer shared shows a note. UI state is not written back (the MW_ON guards above).
-let MW_TASK = MW_ON && !MW_SPLIT ? +(/^#t\/(\d+)/.exec(location.hash) || [])[1] || 0 : 0;
+let MW_TASK = MW_ON ? +(/^#t\/(\d+)/.exec(location.hash) || [])[1] || 0 : 0;
 function mw_taskOpen(id) {
   if (!taskById(id)) return null;
   const w = Math.min(520, screen.availWidth || 520), h = Math.min(760, screen.availHeight || 760);
@@ -150,7 +155,7 @@ async function mw_bootSync() {  // main.js, after the first picture: the real st
   td_renderSoon();
 }
 // a booted main window answers (own windows do not: they would serialise the same state once more): its current state, like the offline cache
-if (!MW_ON && typeof BroadcastChannel === 'function' && mw_nonce(true)) {
+if (!MW_GUARD && typeof BroadcastChannel === 'function' && mw_nonce(true)) {  // 2.891.0 (#5358): nor the split view's right half
   try {
     const ch = new BroadcastChannel(MW_SNAP_CH), nonce = mw_nonce(true);
     ch.onmessage = e => {
@@ -166,20 +171,20 @@ if (!MW_ON && typeof BroadcastChannel === 'function' && mw_nonce(true)) {
 }
 
 // ---- 2.742.0 (#4858): the split view on a wide screen (desktop, mouse): left the app as always, right a second copy of the app in
-// an iframe (/?mini=1&split=1, MW_SPLIT above), a grip between them. Switched in Settings > Appearance, offered only from about
-// 160 rem window width; on, width and the right route follow the person (LOOK_KEYS split / splW / splR, dialogs.js). Off (or a
+// an iframe (/?split=1, MW_SPLIT above: the normal app), a grip between them. Switched in Settings > Appearance, offered only from about
+// 90 rem window width (2.891.0, #5358: was 160); on, width and the right route follow the person (LOOK_KEYS split / splW / splR, dialogs.js). Off (or a
 // narrower window): no iframe, splitview.js is not even loaded. "Open on the right" in the menus of a list, task, document,
 // knowledge page and calendar (spl_item) shows only while the split view is on. The offline queue stays one: core.js flush()
 // replays it under the Web Lock "kalmido-outbox", which the iframe (same origin) shares with this window.
-const SPL_MIN_VW = 160;  // rem: from this window width the switch is offered
+const SPL_MIN_VW = 90;  // rem (2.891.0, #5358: 1440 px, was 160; each half keeps its minimum, splitview.js): from this window width the switch is offered
 const spl_rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-const spl_offer = () => !MW_ON && mw_desk() && document.documentElement.clientWidth >= SPL_MIN_VW * spl_rem();  // clientWidth: innerWidth is the left half while it is on
+const spl_offer = () => !MW_GUARD && mw_desk() && document.documentElement.clientWidth >= SPL_MIN_VW * spl_rem();  // clientWidth: innerWidth is the left half while it is on
 const spl_on = () => spl_offer() && LS.get('split', false) === true;
 const spl_item = route => spl_on() && route ? [{label: tr('Open on the right'), icon: 'panel', cls: 'msplit', fn: () => spl_open(route)}] : [];
 function spl_open(route) { return loadModule('splitview').then(() => spl_show(route)).catch(() => {}); }
 // mounts / unmounts the right half to the switch and the window's width (after the start, on resize, after the switch)
 function spl_check() {
-  if (MW_ON) return;
+  if (MW_GUARD) return;
   if (spl_on() || typeof spl_sync === 'function') loadModule('splitview').then(() => spl_sync()).catch(() => {});
 }
-if (!MW_ON) window.addEventListener('resize', debounce(() => spl_check(), 150));  // core.js debounce (perf_budget: no new clearTimeout pairs)
+if (!MW_GUARD) window.addEventListener('resize', debounce(() => spl_check(), 150));  // core.js debounce (perf_budget: no new clearTimeout pairs)

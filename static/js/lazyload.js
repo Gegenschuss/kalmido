@@ -179,7 +179,7 @@ const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewConta
 // all on a server without the feature (no whatsnew_seen), for agents, in a second window or the capture page.
 function wn_boot(tries = 0) {
   const s = S.settings || {};
-  if (s.whatsnew_seen == null || !APP_VER || s.whatsnew_seen === APP_VER || S.me?.kind === 'agent' || MW_ON || S.capturePage) return;
+  if (s.whatsnew_seen == null || !APP_VER || s.whatsnew_seen === APP_VER || S.me?.kind === 'agent' || MW_GUARD /* 2.891.0 (#5358) */ || S.capturePage) return;
   if ((TOUR.on || $('.modal')) && tries < 20) { setTimeout(() => wn_boot(tries + 1), 3000); return; }  // after the tour / an open dialog
   api('GET', '/api/whatsnew').then(j => {
     s.whatsnew_seen = j.seen;
