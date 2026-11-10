@@ -73,7 +73,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return ds(d
     check(lh && lh.h <= 50 && lh.barW >= 40 && lh.over && lh.next && lh.sx <= 390, `${tag}: #1053 progress, overdue and next due in one line (bar left, texts right) ` + JSON.stringify(lh));
     check(lh && !lh.set, `${tag}: #1053 no "Set status" in the list view`);
     const vs = await ev(`(() => { const b = [...document.querySelectorAll('#view .vsegm button')].map(x => x.getBoundingClientRect().height); return b.length ? {min: Math.min(...b), max: Math.max(...b)} : null; })()`);
-    check(vs && vs.min >= 24 && vs.max <= 40, `${tag}: #1053 the view switch about 36 px high (>= 24) ` + JSON.stringify(vs));
+    // 2.828.0 (#5443): on a finger device the view switch is 44 px high again (one form on every width, a whole tap target)
+    check(vs && vs.min >= 24 && vs.max <= 44.5, `${tag}: #1053 #5443 the view switch 24 to 44 px high ` + JSON.stringify(vs));
     // #1053 "Set status" in the list's "…" menu
     await ev(`(() => { listMenu(document.querySelector('#top h1'), ${SW}); return 1; })()`); await sleep(500);
     check(await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].some(x => /Set status/.test(x.textContent))`), `${tag}: #1053 "Set status" in the list's menu`);

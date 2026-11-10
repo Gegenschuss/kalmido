@@ -170,8 +170,11 @@ const DUMP = `(() => { const out = {}, seen = new Set();
         // the short name fits whole beside the whole switch even with the detail open (it was cut beside 7 symbols)
         // a real state: the header measured itself again after the detail slid in (whole name, or the switch gave way)
         await ready(ev, `(t => !!t.querySelector('h1 .ht') && (t.classList.contains('tvc') || t.querySelector('h1 .ht').scrollWidth <= t.querySelector('h1 .ht').clientWidth + 1))(document.querySelector('#top'))`, 20);
-        const sh = await ev(`(() => { const t = document.querySelector('#top'), ht = t.querySelector('h1 .ht'); return {cut: ht.scrollWidth > ht.clientWidth + 1, text: ht.textContent, cls: t.className}; })()`);
-        check(sh && !sh.cut && sh.text === 'Imagefilm Stadtwerke', `${tag}: #5443 the short project name stays whole with the detail open ` + JSON.stringify(sh));
+        // 2.828.0 (#5443, job/3852): 1280 px with the detail open leave the header about 560 px; back, star, Share, "…" and
+        // undo / redo stay visible (owner rule 2.18.0 R3), so even a 20-character name may still be cut there - but only after
+        // the switch gave way (#top.tvc), and never below its first 12 characters
+        const sh = await ev(`(() => { const t = document.querySelector('#top'), ht = t.querySelector('h1 .ht'), nd = topNeed(ht); return {cut: ht.scrollWidth > ht.clientWidth + 1, text: ht.textContent, cls: t.className, tvc: t.classList.contains('tvc'), w: Math.round(ht.getBoundingClientRect().width), need: nd ? Math.floor(nd.need) : 0}; })()`);
+        check(sh && sh.text === 'Imagefilm Stadtwerke' && (!sh.cut || (sh.tvc && sh.w + 1 >= sh.need)), `${tag}: #5443 the short project name stays whole with the detail open, or is cut only after the switch gave way (12 characters at least) ` + JSON.stringify(sh));
         await ev(`(() => { closeDetail(); return 1; })()`);
         await nav(B + '#l/' + L2);
         check(await ready(ev, `!!document.querySelector('#view .trow[data-id="${T2}"]')`), `${tag}: the list with the long name`);
