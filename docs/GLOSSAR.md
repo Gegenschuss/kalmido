@@ -269,6 +269,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/objects.py` (`obj`) - The shared core, stage 1 -- ONE register of object kinds and ONE role function for every new area (docs/dev/kern.md "So baut man einen neuen Bereich")
 - `kalmido/core/objhooks.py` (`obj`) - The two things of the shared core that the layer accounts needs, without importing upward
 - `kalmido/core/objlight.py` (`obj`) - The light kinds of the shared core (task, event, hub_mail, client): kind and role only, no node, no shares, no write path
+- `kalmido/core/objnotify.py` (`obj`) - The one send decision of the shared core: every recipient of a News entry or push is cut with obj_role >= view first (stage Q2)
 - `kalmido/core/objparts.py` (`part`) - The shared core, stage 6b -- the side objects of a project on the core
 - `kalmido/core/objreact.py` (`orx`) - Reactions exist once, in the shared core: one table obj_reactions for comments, team chat and the agent chat
 - `kalmido/core/objweb.py` (`obj`) - The generic routes of the core objects (core/objects.py, core/writes.py)

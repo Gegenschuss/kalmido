@@ -12,8 +12,7 @@ from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..tasks.validation import descendants  # 2.369.5 (#2517): pulled up from functions
-from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
-from ..collab.comments import collab_user, lang_of  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import lang_of  # 2.369.5 (#2517): pulled up from functions
 from ..lists.seckind import sk_first, sk_snap  # 2.577.0 (#3354)
 
 
@@ -142,13 +141,15 @@ def _notify(c, t, rcpt, state, note="", pr=None, actor=None):
                 c, t["id"], rcpt, review={"state": "pending", "reviewer_id": rcpt, "list_id": t["list_id"],
                                           "url": f"{PUBLIC_URL}/#t/{t['id']}", "by": actor}))
         return
-    s = collab_user(c, rcpt, t["list_id"])
-    if not s or not task_visible(c, t["id"], rcpt, full=True):
+    from ..core.objnotify import obj_notify
+    # 2.891.0 (#5270): who may still read the task decides the core's send decision (obj_role >= view), no check of its own
+    got = obj_notify(c, "task", t["id"], [rcpt], row="review", lid=t["list_id"],
+                     news={"kind": "review", "task_id": t["id"], "actor": actor or 0,
+                           "data": {"state": state, **({"note": note[:300]} if note else {}), **({"pr": pr[:200]} if pr else {})}},
+                     gate=lambda u, s: push_reachable(c, u, s))
+    if rcpt not in got:
         return
-    news_add(c, rcpt, "review", task_id=t["id"], actor=actor or 0, data={"state": state, **({"note": note[:300]} if note else {}),
-                                                                         **({"pr": pr[:200]} if pr else {})}, s=s)
-    if not notif_ok(c, rcpt, s, "review", "push", t["list_id"]) or not push_reachable(c, rcpt, s):
-        return
+    s = got[rcpt]
     lg = lang_of(s)
     who = _name(c, actor) if actor else ""
     title = tr("{0} asks you to review: {1}", who, t["title"], lg=lg) if state == "pending" \

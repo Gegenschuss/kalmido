@@ -28,7 +28,6 @@ from ..core.errors import BadInput
 from ..collab.comments import collab_user, lang_of, user_names  # 2.369.5 (#2517): pulled up from functions
 from ..notify.push import push_reachable, push_prio  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import valid_date, log_act  # 2.369.5 (#2517): pulled up from functions
-from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
 
 TBL_LEVELS = ("list", "mute", "urgent")
 TBL_PRIO = "5"  # ntfy 5 = urgent (Web Push: urgency high)
@@ -142,9 +141,11 @@ def tbl_note(c, tid, kind, actor):
     if not t:
         return
     name = user_names(c, [actor]).get(actor, "?") if actor else None
-    for uid in sorted(uids):
-        s = collab_user(c, uid, t["list_id"])
-        if not s or not task_visible(c, tid, uid, full=True) or \
+    from ..core.objnotify import obj_readers
+    # 2.891.0 (#5270): an urgent bell passes the settings, never the right: step 1 of the core's send decision (obj_role >= view)
+    for uid in sorted(obj_readers(c, "task", tid, uids)):
+        s = collab_user(c, uid)
+        if not s or \
                 tbl_level(c, uid, tid, s, done_ok=kind in TBL_DONE_KINDS) != "urgent" or not push_reachable(c, uid, s):
             continue
         if tbl_sent(uid, tid):
@@ -297,13 +298,12 @@ def tbl_news(c, tid, lid, uids, until):
     when their settings want one -- at the highest priority while they accept urgency from others."""
     t = c.execute("SELECT title FROM tasks WHERE id=?", (tid,)).fetchone()
     who = _names(c, [me()]).get(me(), "?")
-    for u in uids:
-        s = collab_user(c, u, lid)
-        if not s:
-            continue
-        news_add(c, u, "tbl_urgent", task_id=tid, row="assign", s=s, data={"until": until} if until else None)
-        if not notif_ok(c, u, s, "assign", "push", lid) or not push_reachable(c, u, s):
-            continue
+    from ..core.objnotify import obj_notify
+    # 2.891.0 (#5270): who may still read the task decides the core's send decision (obj_role >= view)
+    pushes = obj_notify(c, "task", tid, uids, row="assign", lid=lid,
+                        news={"kind": "tbl_urgent", "task_id": tid, "data": {"until": until} if until else None},
+                        gate=lambda u, s: push_reachable(c, u, s))
+    for u, s in pushes.items():
         lg = lang_of(s)
         g.pushes.append((u, tr("Urgent: {0}", t["title"], lg=lg), tr("{0} marked this task urgent for you", who, lg=lg),
                          f"{PUBLIC_URL}/#t/{tid}", TBL_PRIO if s.get("tbl_accept", "1") != "0" else push_prio(s), {"task": tid}))

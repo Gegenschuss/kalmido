@@ -35,12 +35,13 @@ import os
 
 from flask import g, jsonify, request
 
-from .access import _org_list_writes, list_role, pvis
+from .access import _org_list_writes, acx_of, acx_org_ok, list_role, pvis
 from .config import app
 from .db import db
-from .dlock import dl_task_hidden
+from .dlock import dl_of, dl_task_hidden
 from .i18n import N_
 from .objects import OBJ, obj_register, obj_role, obj_space, obj_title
+from .objhooks import NOTIFY_TICK
 from .pg import system_ctx
 from ..files.fsref import _api_way as fsr_api_way
 from ..accounts.orgroles import org_writes
@@ -85,6 +86,56 @@ def _task_space(c, tid):
 def _task_title(c, tid):
     r = _one(c, "SELECT t.title, COALESCE(l.e2e, '') AS e2e FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", tid)
     return "" if r is None or r["e2e"] else (r["title"] or "")
+
+
+def _task_tick(c, uid, tid, memo):
+    """2.891.0 (#5270): obj_role(c, uid, 'task', tid) >= 'view' for a PERSON in a run without a request (the watchdog's task
+    reminders and nags, core/objnotify.py obj_readers): the steps of obj_role for this kind -- the organisation floor of the
+    project's workspace (_gate: no token, no API way, no agent branch outside a request for a person), the project role and a
+    participant's own tasks (_task_base), an agent's data lock, the trash only for 'manage' -- with what depends on the project
+    and the person kept in the tick's memo under the keys notify/push.py _wd_sees / _wd_prefetch fill already
+    (("role", list, uid), ("dl", uid), ("pvis", list, uid)), so a wave of reminders reads each project and person once."""
+    tk = ("task_row", int(tid))
+    if tk not in memo:
+        memo[tk] = _one(c, "SELECT t.id, t.list_id, t.deleted_at, l.org_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", tid)
+    r = memo[tk]
+    if r is None:
+        return False
+    ak = ("acx_agent", uid)  # 2.891.0 (#5270, review): an agent never, whatever obj_readers filtered before (the rule stands alone)
+    if ak not in memo:
+        memo[ak] = acx_of(c, uid).role == "agent"
+    if memo[ak]:
+        return False
+    lid = r["list_id"]
+    ok = ("org_ok", r["org_id"], uid)
+    if ok not in memo:
+        memo[ok] = acx_org_ok(c, uid, r["org_id"])
+    if not memo[ok]:
+        return False
+    k = ("role", lid, uid)
+    if k not in memo:
+        memo[k] = list_role(c, lid, uid)
+    role = memo[k]
+    if not role:
+        return False
+    dk = ("dl", uid)
+    if dk not in memo:
+        memo[dk] = bool(dl_of(c, uid))
+    if memo[dk] and dl_task_hidden(c, r["id"], uid):
+        return False
+    if role == "participant":
+        pk = ("pvis", lid, uid)
+        if pk not in memo:
+            memo[pk] = pvis(c, uid, lid)
+        vis, _wr, ctx = memo[pk]
+        if r["id"] not in vis or r["id"] in ctx:
+            return False
+        base = "view"  # 'edit' or 'view': both read; only 'manage' passes the trash
+    else:
+        base = _LIST_ROLE.get(role)
+    if not base:
+        return False
+    return not r["deleted_at"] or base == "manage"
 
 
 # ---------------------------------------------------------------- event
@@ -156,6 +207,7 @@ def _client_title(c, cid):
 
 obj_register(LT_TASK, "tasks", label=N_("Task"), fields={}, node=False, area="tasks", base_role=_task_base, space=_task_space,
              title=_task_title, open_url=lambda tid: f"t/{int(tid)}")
+NOTIFY_TICK[LT_TASK] = _task_tick  # 2.891.0 (#5270): the watchdog's reminders ask the task's readers with the tick's memo
 obj_register(LT_EVENT, "events", label=N_("Event"), fields={}, node=False, area="calendar", base_role=_ev_base, space=_ev_space,
              title=_ev_title, open_url=lambda eid: f"ev/{int(eid)}")
 obj_register(LT_MAIL, "hub_mails", label=N_("E-mail"), fields={}, node=False, area="other", base_role=_mail_base, space=_mail_space,

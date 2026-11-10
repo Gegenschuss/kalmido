@@ -16,7 +16,6 @@ from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from function
 from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
 from ..core.usertz import hm_text, tz_gap, tz_of_s, user_now
 from ..notify.push import _wd_fail  # 2.369.5 (#2517): pulled up from functions
-from ..collab.news import notif_ok  # 2.369.5 (#2517): pulled up from functions
 
 RAT_MISS_H = 6  # the same grace as the offset reminders
 
@@ -63,7 +62,7 @@ def rat_tick(c, users, S, LG, now):
 
 def rat_fire(c, t, users, S, LG, now):
     from ..family.v1 import reminder_people
-    from ..notify.push import notify, push_prio, reminder_recipient
+    from ..notify.push import notify, push_prio, reminder_recipient, wd_task_notify
     fired = json.loads(t["reminded"] or "[]")
     key = rat_key(t["remind_at"])
     if key in fired:
@@ -79,7 +78,7 @@ def rat_fire(c, t, users, S, LG, now):
         return
     for who in ([rcpt] if rcpt else []) + reminder_people(c, t, users, rcpt):
         sw, lgw = S.get(who, USER_DEFAULTS), LG.get(who, "en")
-        if not notif_ok(c, who, sw, "reminder", "push", t["list_id"], own=who == rcpt):  # 2.266.0 (#2962)
+        if not wd_task_notify(c, t, who, sw, "reminder", rcpt):  # 2.891.0 (#5270): the core's send decision (2.266.0 #2962: own)
             continue  # the same switch as the reminders before the due time
         lname = tr("Basket", lg=lgw) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
         if t["due"]:

@@ -16,7 +16,7 @@ from ..accounts.orgroles import FULL_READ, org_say_refusal, role_known
 from ..accounts.orgs import INSTANCE_ENV
 from ..tasks.validation import as_int
 from ..collab.comments import collab_on, comment_plain, lang_of, MENTION_RE, push_gate, push_gate_due, push_gate_reset, user_names
-from ..collab.news import list_bells, notif_ok
+from ..collab.news import list_bells
 from ..core.errors import reject_unknown, BadInput
 from ..core.conflict import ccf_check, take_version  # 2.564.0 D (#4701); 2.638.0 (#4775): take_version
 from ..notify.push import notify, push_handled, push_prio, push_reachable_many, WD_TICKS
@@ -27,6 +27,7 @@ from ..collab.replies import reply_check, reply_quotes
 from ..collab.comments import mention_names  # 2.369.5 (#2517): pulled up from functions
 from .cmttrash import tcx_trash, tcx_restore
 from ..core.objreact import orx_of, orx_set, orx_toggle  # 2.763.0 (#5269): the reactions of the shared core
+from ..core.objhooks import NOTIFY_READERS  # 2.891.0 (#5270): the reader of a direct message for the send decision
 
 
 # ---------------------------------------------------------------- 2.17.0 (#419): team chat
@@ -696,6 +697,8 @@ def tchat_notify(c, r, m, mentions, replied=None, only=None):
     # eight per person): account state + settings (collab_user), read mark / mute, the list bell, the list's name; the
     # rest (list role, owner's template, devices / channels) only for whoever is still in after those
     pre = tchat_notify_pre(c, r, [u for u in rcpt if u not in ags])
+    from ..core.objnotify import obj_notify
+    cand = []
     for uid in rcpt:
         if uid in ags:
             if r["kind"] == "channel":  # 2.113.1 (#2059): a personal agent in a channel is addressed by its owner only (like agent_usable)
@@ -715,12 +718,11 @@ def tchat_notify(c, r, m, mentions, replied=None, only=None):
                                                                  "thread_of": root},  # 2.139.0 A (#2127)
                                                      "user": {"id": sender, "name": who}})
             continue
-        s = pre["s"].get(uid)  # collab_user without the list role (that one below, for the few still in)
-        if not s:
+        if uid not in pre["s"]:  # collab_user's settings (the rights: obj_notify below)
             continue
         _lr, muted = pre["reads"].get(uid, (0, False))
         bell = pre["bells"].get(uid, ("default", {}))
-        dm, ment = r["kind"] in ("dm", "group"), uid in mentions  # 2.113.1 (#2059): a group pushes like a DM
+        ment = uid in mentions
         if root:  # 2.139.0 A (#2127): a thread answer: only its people (the room's mute / the chat row still apply)
             if uid not in follow and not ment:
                 continue
@@ -730,12 +732,14 @@ def tchat_notify(c, r, m, mentions, replied=None, only=None):
             continue
         if muted and not ment:
             continue
-        if r["list_id"] is not None and not list_role(c, r["list_id"], uid):  # the rest of collab_user
-            continue
-        if not notif_ok(c, uid, s, "mention" if ment else "chat", "push", r["list_id"], bell=bell) or uid not in pre["reach"]:
-            continue
-        if not ment and not push_gate(c, uid, f"r{r['id']}", 1, actor=sender):  # 2.367 (#2967): one per room and minute, then a summary
-            continue
+        cand.append(uid)
+    # 2.891.0 (#5270): who may still read the room decides the core's send decision (obj_role >= view of the project / the
+    # channel or group; a direct message: its pair), then the settings, the list bell and the owner's template, the gates
+    kind, ref = tchat_notify_obj(r)
+    pushes = obj_notify(c, kind, ref, cand, row=lambda u: "mention" if u in mentions else "chat", lid=r["list_id"], S=pre["s"],
+                        bells=pre["bells"], gate=lambda u, s: u in pre["reach"] and (
+                            u in mentions or push_gate(c, u, f"r{r['id']}", 1, actor=sender)))  # 2.367 (#2967): one per room and minute, then a summary
+    for uid, s in pushes.items():
         lg = lang_of(s)
         title = tchat_push_title(c, r, uid, who, lg, pre["lname"])
         msg = tr("New message from {0}", who, lg=lg) if sealed else \
@@ -744,6 +748,25 @@ def tchat_notify(c, r, m, mentions, replied=None, only=None):
         g.pushes.append((uid, title, msg[:300], f"{PUBLIC_URL}/#msg/t/{r['id']}/{m['id']}" if root else f"{PUBLIC_URL}/#team/{r['id']}",
                          push_prio(s),  # 2.139.0 A (#2127): a thread answer opens its thread
                          {"scope": tchat_push_scope(r, sender)}))  # 2.240.0 B2 (#2867)
+
+
+def tchat_notify_obj(r):
+    """2.891.0 (#5270): the object of a room for the send decision -- a project's conversation: the project (kind 'list'); a
+    channel / group: the core's kind 'tchat_room'; a direct message: 'tchat_dm' (its pair, _dm_reader)."""
+    if r["kind"] == "list":
+        return "list", r["list_id"]
+    if r["kind"] == "dm":
+        return "tchat_dm", r["id"]
+    return "tchat_room", r["id"]
+
+
+def _dm_reader(c, uid, rid):
+    """2.891.0 (#5270): a direct message is no object of the core (collab/tcxcore.py): its reader is one of the pair."""
+    r = c.execute("SELECT kind, a, b FROM tchat_rooms WHERE id=?", (int(rid),)).fetchone()
+    return bool(r) and r["kind"] == "dm" and uid in (r["a"], r["b"])
+
+
+NOTIFY_READERS["tchat_dm"] = _dm_reader
 
 
 def tchat_notify_pre(c, r, uids):

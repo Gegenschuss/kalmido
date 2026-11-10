@@ -1252,6 +1252,8 @@ def ev_wd_maybe(r, lo, hi, now, margin=timedelta(0)):
 
 def _wd_events(c, users, S, LG, now):
     from ..notify.push import notify, push_prio
+    from ..core.objnotify import obj_notify, obj_readers
+    memo = {}  # 2.891.0 (#5270): the core's answer per person and event, once per tick
     lo = now.date() - timedelta(days=1)
     hi = now.date() + timedelta(days=8)
     margin = tz_gap(S, now) + timedelta(hours=2)  # 2.368.3 (#2985): an all-day event starts at midnight of each person's clock
@@ -1262,15 +1264,16 @@ def _wd_events(c, users, S, LG, now):
             continue  # 2.191.0 C (#2516): no reminder of this event is due yet -- the lookups below would only read
         try:
             cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (r["cal_id"],)).fetchone()
-            # 2.126.0 C (#1992 K7): members as ev_role sees them: none while the owner is disabled, only inside the organisation
-            # 2.647.0 (#5046): the live members (the core's shares of a calendar with a node), never a row the core took back
-            who = {cal["owner_id"]} | ({m["user_id"] for m in cal_members(c, cal["id"], live=True)
-                                        if ev_att_ok(c, m["user_id"], cal["org_id"])} if collab_all() and cal["owner_id"] in users else set())
-            if collab_all():
-                who |= {a[0] for a in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL "
-                                                "AND partstat!='declined'", (r["id"],)) if ev_att_ok(c, a[0], cal["org_id"])}  # 2.87.0 (#1983)
+            # the candidates: the calendar's owner, its live members (2.647.0, #5046: the core's shares, never an old row) and
+            # the invited people who did not decline (2.87.0, #1983); 2.891.0 (#5270): who of them may still read the event
+            # decides the core's send decision (obj_role >= view of kind 'event': the calendar's role, the invitation inside
+            # the calendar's workspace, the owner active, collaboration on) -- no check of its own here
+            who = {cal["owner_id"]} | {m["user_id"] for m in cal_members(c, cal["id"], live=True)}
+            who |= {a[0] for a in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL "
+                                            "AND partstat!='declined'", (r["id"],))}
             who = [u for u in who if u in users and "events" in (S.get(u, {}).get("features") or "").split(",")
                    and r["cal_id"] not in set(json.loads(S.get(u, {}).get("evcals_hidden") or "[]") or [])]
+            who = sorted(obj_readers(c, "event", r["id"], who, memo))
             if not who:
                 continue
             offs = [int(x) for x in r["reminders"].split(",") if x.strip()]
@@ -1295,7 +1298,7 @@ def _wd_events(c, users, S, LG, now):
                         done.add((u, key))
                         if not n:
                             continue
-                        if now - at > timedelta(hours=6) or not notif_ok(c, u, S[u], "reminder", "push"):
+                        if now - at > timedelta(hours=6) or not obj_notify(c, "event", r["id"], [u], row="reminder", S=S, memo=memo):
                             continue
                         lg = LG.get(u, "en")
                         title = (o["ov"] or {}).get("title") or r["title"]

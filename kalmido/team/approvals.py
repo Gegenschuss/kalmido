@@ -9,8 +9,8 @@ from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_col
 from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
-from ..collab.news import KIND_ROW, news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
-from ..collab.comments import collab_user, lang_of, user_names, task_event  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import KIND_ROW  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import lang_of, user_names, task_event  # 2.369.5 (#2517): pulled up from functions
 from ..notify.channels import evm_note  # 2.369.5 (#2517): pulled up from functions
 from ..notify.push import push_prio, push_reachable  # 2.369.5 (#2517): pulled up from functions
 from ..notify.taskbell import tbl_level  # 2.369.5 (#2517): pulled up from functions
@@ -42,12 +42,14 @@ def approval_request_notify(c, t, ap, note):
     """2.367.2 (#2968): News + push + mail "Approval needed: <title> (from Ben)" to the approver: one event of its own instead of
     the plain assignment, past the burst gate (it waits for the person, row "assign" switches it off)."""
     actor = me()
-    s = collab_user(c, ap, t["list_id"])
-    if not s or not task_visible(c, t["id"], ap, full=True):
+    from ..core.objnotify import obj_notify
+    # 2.891.0 (#5270): who may still read the task decides the core's send decision (obj_role >= view), no check of its own
+    got = obj_notify(c, "task", t["id"], [ap], row=KIND_ROW["aprequest"], lid=t["list_id"],
+                     news={"kind": "aprequest", "task_id": t["id"], "actor": actor, "data": {"note": note[:300]} if note else None},
+                     follow=lambda u, s: tbl_level(c, u, t["id"], s) != "mute")
+    if ap not in got:
         return
-    news_add(c, ap, "aprequest", task_id=t["id"], actor=actor, data={"note": note[:300]} if note else None, s=s)
-    if tbl_level(c, ap, t["id"], s) == "mute" or not notif_ok(c, ap, s, KIND_ROW["aprequest"], "push", t["list_id"]):
-        return
+    s = got[ap]
     evm_note(c, ap, "aprequest", t["id"], actor, s)
     if not push_reachable(c, ap, s):
         return
@@ -63,12 +65,13 @@ def approval_notify(c, t, state, note, rcpt):
     actor = me()
     if not rcpt or rcpt == actor or _is_agent(rcpt, c):
         return
-    s = collab_user(c, rcpt, t["list_id"])
-    if not s or not task_visible(c, t["id"], rcpt, full=True):
+    from ..core.objnotify import obj_notify
+    # 2.891.0 (#5270): who may still read the task decides the core's send decision (obj_role >= view), no check of its own
+    got = obj_notify(c, "task", t["id"], [rcpt], row=KIND_ROW["apdecide"], lid=t["list_id"],
+                     news={"kind": "apdecide", "task_id": t["id"], "actor": actor, "data": {"state": state, "note": note[:300]}})
+    if rcpt not in got:
         return
-    news_add(c, rcpt, "apdecide", task_id=t["id"], actor=actor, data={"state": state, "note": note[:300]}, s=s)
-    if not notif_ok(c, rcpt, s, KIND_ROW["apdecide"], "push", t["list_id"]):
-        return
+    s = got[rcpt]
     evm_note(c, rcpt, "apdecide", t["id"], actor, s)
     if not push_reachable(c, rcpt, s):
         return

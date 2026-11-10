@@ -58,8 +58,9 @@ def _tell(c, users, S, LG, kind, j, tid, data):
     uid = _owner(c, j)
     if not uid or uid not in users:
         return
+    from ..core.objnotify import obj_readers  # 2.891.0 (#5270)
     s, lid = S[uid], row["list_id"] if row else None
-    news_add(c, uid, "job_watch", task_id=tid if row and task_visible(c, tid, uid) else None,
+    news_add(c, uid, "job_watch", task_id=tid if row and obj_readers(c, "task", tid, [uid]) else None,  # 2.891.0 (#5270): the core's read right, as news_add asks
              data={"kind": kind, "job": j["id"], "title": (j["title"] or "")[:200], **{k: v for k, v in data.items() if k in ("minutes", "days")}},
              actor=aid)  # collab_user decides (the collaboration module of the person)
     a = agent_row(c, aid)

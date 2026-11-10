@@ -6,7 +6,8 @@ with delegated: true, the task counts in its queue (agents/workqueue.py) and it 
 task_watchers: everybody who may see a task with its comments can watch it (POST /api/tasks/<id>/watchers); adding or removing
 others is for the list's owner / admins. Watchers get comments like someone who commented (notification row "follow") and status
 changes like a completion (row "complete"): no new kind of push, both are switched off in Settings > Notifications. Who gets it
-is decided when it is sent: a watcher who lost the list or the task hears nothing (collab_user, task_visible), and leaving a
+is decided when it is sent: a watcher who lost the list or the task hears nothing (2.891.0, #5270: the core's send decision
+core/objnotify.py obj_notify, obj_role >= view of the task), and leaving a
 list or a move to a list out of their reach ends the row (dlg_gone, wat_moved). In a list with the lock pushes carry no text."""
 from flask import g, has_request_context, jsonify
 
@@ -19,8 +20,8 @@ from ..core.errors import BadInput, UnknownFields
 from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_collab, need_task, task_visible
 from ..api.common import v1_args, v1_json, v1_view
 from ..accounts.session import me
-from ..collab.comments import burst_gate, collab_user, lang_of, user_names
-from ..collab.news import agent_push_ok, bell_all_users, news_add, notif_ok
+from ..collab.comments import burst_gate, lang_of, user_names
+from ..collab.news import agent_push_ok, bell_all_users
 from ..notify.push import push_prio, push_reachable
 from ..notify.taskbell import _people, TBL_KIND_TXT, tbl_level
 from ..tasks.validation import log_act
@@ -95,16 +96,15 @@ def wat_note(c, tid, kind, actor):
         ids -= {t["created_by"], t["assigned_by"]} | bell_all_users(c, t["list_id"], "complete")
     name = user_names(c, [actor]).get(actor, "?") if actor else None
     lk = le2e_mode(c, t["list_id"])
-    for uid in sorted(ids):
-        s = collab_user(c, uid, t["list_id"])
-        if not s or not task_visible(c, tid, uid, full=True):
-            continue
-        news_add(c, uid, "complete", task_id=tid, actor=actor if actor is not None else 0, s=s, data=None if kind == "complete" else {"st": kind})
-        if tbl_level(c, uid, tid, s, done_ok=kind == "complete"):  # muted: no push; urgent: pushed by tbl_note
-            continue
-        if not notif_ok(c, uid, s, "complete", "push", t["list_id"]) or not push_reachable(c, uid, s) or \
-                not agent_push_ok(c, uid, s, actor) or not burst_gate(c, uid, tid, event=True, kind="complete"):
-            continue
+    from ..core.objnotify import obj_notify
+    # 2.891.0 (#5270): who may still read the task decides the core's send decision (obj_role >= view), no check of its own
+    pushes = obj_notify(c, "task", tid, ids, row="complete", lid=t["list_id"],
+                        news={"kind": "complete", "task_id": tid, "actor": actor if actor is not None else 0,
+                              "data": None if kind == "complete" else {"st": kind}},
+                        follow=lambda uid, s: not tbl_level(c, uid, tid, s, done_ok=kind == "complete"),  # muted: no push; urgent: pushed by tbl_note
+                        gate=lambda uid, s: push_reachable(c, uid, s) and agent_push_ok(c, uid, s, actor) and
+                        burst_gate(c, uid, tid, event=True, kind="complete"))
+    for uid, s in pushes.items():
         lg = lang_of(s)
         who = name or tr("Someone via the public link", lg=lg)
         g.pushes.append((uid, le2e_neutral(lg) if lk else t["title"], tr(TBL_KIND_TXT[kind], who, lg=lg), f"{PUBLIC_URL}/#t/{tid}", push_prio(s), {"kind": "other"}))

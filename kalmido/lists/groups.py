@@ -566,8 +566,9 @@ def grp_assign_events(c, tid, gid):
     """News, 2.367.2 (#2968) push + mail with the rules of a plain assignment for every member of the group the task was just
     assigned to (only the group's name differs in the text)."""
     from ..agents.core import agent_ids
-    from ..collab.comments import burst_gate, collab_user, lang_of, user_names
-    from ..collab.news import KIND_ROW, news_add, notif_ok
+    from ..collab.comments import burst_gate, lang_of, user_names
+    from ..collab.news import KIND_ROW
+    from ..core.objnotify import obj_notify
     from ..notify.channels import evm_note
     from ..notify.push import push_prio, push_reachable
     from ..notify.taskbell import tbl_level
@@ -579,14 +580,15 @@ def grp_assign_events(c, tid, gid):
     bots = agent_ids(c)
     who = user_names(c, [actor]).get(actor, "?") if actor else None
     for uid in grp_members(c, gid):
-        if uid == actor or uid in bots or not task_visible(c, tid, uid, full=True):
+        if uid == actor or uid in bots:
             continue
-        s = collab_user(c, uid, t["list_id"])
-        if not s:
+        # 2.891.0 (#5270): who may still read the task decides the core's send decision (obj_role >= view), no check of its own
+        got = obj_notify(c, "task", tid, [uid], row=KIND_ROW["assign"], lid=t["list_id"],
+                         news={"kind": "assign", "task_id": tid, "actor": actor, "data": {"group": gname, "group_id": gid}},
+                         follow=lambda u, s: bool(actor) and not tbl_level(c, u, tid, s))
+        if uid not in got:
             continue
-        news_add(c, uid, "assign", task_id=tid, actor=actor, data={"group": gname, "group_id": gid}, s=s)
-        if not actor or tbl_level(c, uid, tid, s) or not notif_ok(c, uid, s, KIND_ROW["assign"], "push", t["list_id"]):
-            continue
+        s = got[uid]
         evm_note(c, uid, "assign", tid, actor, s)
         if push_reachable(c, uid, s) and burst_gate(c, uid, tid, event=True):
             lg = lang_of(s)
@@ -610,7 +612,7 @@ def task_take(c, tid, uid):
               (uid, uid, iso(now_utc()), tid))
     log_act(c, tid, "take", {"group": grp_name(c, t["assignee_group_id"])})
     for m in grp_members(c, t["assignee_group_id"]):
-        if m != uid and task_visible(c, tid, m, full=True):
+        if m != uid:  # 2.891.0 (#5270): news_add asks the core's send decision (obj_role >= view of the task)
             news_add(c, m, "take", task_id=tid, data={"group": grp_name(c, t["assignee_group_id"])})
     agent_assign_event(c, tid, "assigned", uid)
     rul_fire(c, tid, rb)

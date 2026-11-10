@@ -647,6 +647,15 @@ def _wd_notif_ok(c, uid, s, lid, memo, own=False):
     return memo[k]
 
 
+def wd_task_notify(c, t, who, s, row, rcpt, memo=None):
+    """2.891.0 (#5270): may a reminder / nag of task t reach who? The core's send decision (core/objnotify.py obj_notify: who
+    reads the task, obj_role >= view, then notif_ok with the list and the owner's template; rcpt's own reminder passes the
+    template). memo: the tick's dict -- the core's tick reader of the task (core/objlight.py _task_tick) shares its keys with
+    _wd_sees / _wd_prefetch, so the roles of a wave are read once per project and person."""
+    from ..core.objnotify import obj_notify
+    return bool(obj_notify(c, "task", t["id"], [who], row=row, lid=t["list_id"], own={rcpt}, S={who: s}, memo=memo))
+
+
 def _wd_fail(c, what, key, e):
     """One broken row / user / section is logged and skipped, never stops the rest of the tick."""
     from ..notify.alerts import aa_count
@@ -1005,8 +1014,10 @@ def _wd_reminder(c, t, users, S, LG, now, memo=None):
         # 2.19.0 (#653): everyone who comes along gets it too (in their language, with their settings)
         for who in ([rcpt] if rcpt else []) + _wd_people(c, t, users, rcpt, memo):  # 2.369.4 (#2516): from the tick's memo
             sw, lgw = S.get(who, USER_DEFAULTS), LG.get(who, "en")
-            if not _wd_notif_ok(c, who, sw, t["list_id"], memo, own=who == rcpt):  # 2.33.0 (#927): + the list (owner's template); 2.266.0 (#2962): not for rcpt's own
-                continue  # 2.1.0 (#317): reminders can be switched off in the notification settings
+            # 2.891.0 (#5270): the core's send decision -- who may still read the task (obj_role >= view), then the settings
+            # (2.1.0 #317: reminders can be switched off), the list (2.33.0 #927: the owner's template; 2.266.0 #2962: not for rcpt's own)
+            if not wd_task_notify(c, t, who, sw, "reminder", rcpt, memo):
+                continue
             when = tr("all day", lg=lgw) if not t["due_time"] else tr("at {0}", hm_text(t["due_time"], sw), lg=lgw)
             day = tr("today", lg=lgw) if t["due"] == user_now(sw, now).date().isoformat() else \
                 short_day(date.fromisoformat(t["due"]), lgw)
@@ -1107,7 +1118,7 @@ def _wd_nag(c, t, users, S, LG, now):
     key, last = nag_key(t), nag_last(t["nag_at"], nag_key(t))
     if last and now < last + timedelta(minutes=mins) - timedelta(seconds=20):
         return
-    if in_quiet(s, now) or not notif_ok(c, rcpt, s, "nag", "push", t["list_id"], own=True):
+    if in_quiet(s, now) or not wd_task_notify(c, t, rcpt, s, "nag", rcpt):  # 2.891.0 (#5270): the core's send decision
         return
     c.execute("UPDATE tasks SET nag_at=? WHERE id=?", (f"{key}|{now.isoformat()}", t["id"]))  # before sending: never twice
     c.commit()

@@ -16,11 +16,10 @@ from ..core.ephem import eph_within  # 2.642.0 (#4975)
 from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, iso_ms, now_utc
 from ..accounts.session import me
-from ..core.access import acx_anon_bind, is_project, list_people, MANAGE_ROLES, need_list, task_visible, list_role, tvis
+from ..core.access import acx_anon_bind, is_project, list_people, MANAGE_ROLES, need_list, list_role, tvis
 from ..core.pages import valid_url
 from ..tasks.validation import CONTENT_MAX, log_act, ticket_template
-from ..collab.comments import collab_user, lang_of
-from ..collab.news import news_add, notif_ok
+from ..collab.comments import lang_of
 from ..core.errors import UnknownFields
 from ..notify.push import push_prio, push_reachable
 from ..notify.alerts import _env_int
@@ -260,17 +259,19 @@ def errreport_events(c, tid, lid, rep):
     """2.18.0: a new error (first ticket of its fingerprint) -> event "errreport" for everyone who sees the whole list
     (people only): one News item and one push per the notification settings (row errreport, on by default; a muted list
     bell stops it). Reports after the hourly limit never get here (only counted), so they never push."""
+    from ..core.objnotify import obj_notify
     lst = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
     ag = agent_ids(c)
     for uid in sorted(list_people(c, lid)):
         if uid in ag:
             continue
-        s = collab_user(c, uid, lid)
-        if not s or not task_visible(c, tid, uid, full=True):
+        # 2.891.0 (#5270): who may still read the task decides the core's send decision (obj_role >= view), no check of its own
+        got = obj_notify(c, "task", tid, [uid], row="errreport", lid=lid,
+                         news={"kind": "errreport", "task_id": tid, "data": {"title": rep["title"][:200], "level": rep["level"]}, "actor": None},
+                         gate=lambda u, s: push_reachable(c, u, s))
+        if uid not in got:
             continue
-        news_add(c, uid, "errreport", task_id=tid, data={"title": rep["title"][:200], "level": rep["level"]}, actor=None, s=s)
-        if not notif_ok(c, uid, s, "errreport", "push", lid) or not push_reachable(c, uid, s):
-            continue
+        s = got[uid]
         lg = lang_of(s)
         g.pushes.append((uid, tr("New error: {0}", rep["title"][:120], lg=lg), lst["name"] if lst else "", f"{PUBLIC_URL}/#t/{tid}",
                          push_prio(s)))

@@ -9,6 +9,10 @@ as core/instance.UPDATE_KICK).
   REVOKE  the functions f(c, uid, org, reason, heir=None, role=None) of what a person loses (core/objects.obj_revoke_person)
   FOLLOW  f(c, kind, rid): the object's reference node follows it into its new workspace (core/objects.obj_node_follow,
           2.566.0 #4712 review F1: accounts/orgretain.py obj_nodes_follow)
+  NOTIFY_READERS  2.891.0 (#5270): kind -> f(c, uid, id) -> bool, the reader rule of an object outside the core that notifies
+          (core/objnotify.py obj_readers: only the team chat's direct message, its pair)
+  NOTIFY_TICK  2.891.0 (#5270): kind -> f(c, uid, id, memo), the same answer as obj_role >= view for a person outside a request,
+          read once per project and person in a watchdog tick (core/objlight.py registers the task)
 """
 from .pg import system_ctx
 
@@ -17,6 +21,9 @@ START = []
 REVOKE = []
 SETTLE = []  # 2.568.0 (#4739): f(c, kind, rid) -- an area's own core rows follow its member table again (lists/lmcore.py)
 FOLLOW = []
+NOTIFY_READERS = {}  # 2.891.0 (#5270): filled by collab/teamchat.py ('tchat_dm')
+NOTIFY_TICK = {}  # 2.891.0 (#5270): kind -> f(c, uid, id, memo) -> bool, obj_role >= view of a person in a run without a request
+#                   with the per-project answers kept in the tick's memo (core/objlight.py: 'task', the watchdog's reminders)
 BOUNDARY = []  # 2.649.0 (#5051): f(c, table, object id, user id) -> rows taken | None (core/objects.obj_boundary_take)
 GONE = {}  # review 2.578 F2: kind -> table of an area's kind outside OBJ whose rows in obj_revoked / obj_history / obj_undo go
 #            with its objects when an account goes (contacts: contacts/ctfolder.py, cascade over their book)

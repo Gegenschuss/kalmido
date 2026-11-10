@@ -513,7 +513,7 @@ def _wd_followups(c, users, S, LG, now):
 
 def _wd_followup(c, t, users, S, LG, now):
     from ..collab.comments import collab_user
-    from ..collab.news import news_add, notif_ok
+    from ..collab.news import news_add
     from ..notify.push import notify, push_prio
     from ..api.v1 import waiting_of
     from ..agents.core import agent_emit, agent_ids, agent_task_data
@@ -528,11 +528,13 @@ def _wd_followup(c, t, users, S, LG, now):
         return  # not yet the day, or today but not yet the time of day
     c.execute("UPDATE tasks SET wait_fired=? WHERE id=?", (t["wait_until"], t["id"]))
     push = None
-    if rcpt and task_visible(c, t["id"], rcpt, full=True):
+    if rcpt:
+        from ..notify.push import wd_task_notify
         cs = collab_user(c, rcpt, None)
-        if cs:
+        if cs:  # 2.891.0 (#5270): news_add asks the core's send decision (obj_role >= view of the task)
             news_add(c, rcpt, "followup", task_id=t["id"], data={"note": t["wait_note"][:200], "until": t["wait_until"]}, s=cs)
-        if notif_ok(c, rcpt, s, "followup", "push", t["list_id"], own=True):  # 2.33.0 (#927): + the list (owner's template)
+        # 2.891.0 (#5270): the core's send decision (rcpt reads the task), then the settings (2.33.0 #927: + the owner's template)
+        if wd_task_notify(c, t, rcpt, s, "followup", rcpt):
             lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
             push = (tr("Follow up: {0}", t["title"], lg=lg),
                     (tr("Waiting on: {0}", t["wait_note"], lg=lg) + " · " if t["wait_note"] else "") + lname)

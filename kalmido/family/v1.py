@@ -7,9 +7,8 @@ from ..core.i18n import tr
 from ..core.db import bump, db, iso, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import task_visible
-from ..collab.news import notif_ok
 from ..core.errors import reject_unknown
-from ..notify.push import _wd_fail, notify, push_prio
+from ..notify.push import _wd_fail, notify, push_prio, wd_task_notify
 from ..api.v1 import _v1_live, v1_one
 from ..api.common import v1_args, v1_call, v1_json, v1_view
 from ..family.family import (
@@ -43,7 +42,8 @@ def _wd_rotations(c, users, S, LG, now):
                 c.execute("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
                           (t["id"], None, "rotation", json.dumps({"to": new}), iso_ms(now_utc())))
                 s = S.get(new)
-                if new in users and s and notif_ok(c, new, s, "assign", "push", t["list_id"]):
+                # 2.891.0 (#5270): the core's send decision -- the next one must read the task (obj_role >= view), then the settings
+                if new in users and s and wd_task_notify(c, t, new, s, "assign", None):
                     lg = LG.get(new, "en")
                     notify(new, t["title"], tr("Your turn this week", lg=lg), push_prio(s), f"{PUBLIC_URL}/#t/{t['id']}", s=s, task=t["id"])
             bump(c)

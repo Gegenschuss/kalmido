@@ -9,7 +9,6 @@ from ..core.access import Denied, list_people, list_role, need_project, need_tas
 from ..tasks.validation import descendants, log_act
 from ..tasks.tasks import one_task
 from ..collab.comments import burst_gate, collab_user, lang_of, user_names
-from ..collab.news import news_add, notif_ok
 from ..personal.timetrack import vis_ids, VisIds
 from ..core.errors import BadInput
 from ..collab.news import agent_push_ok  # 2.369.5 (#2517): pulled up from functions
@@ -163,6 +162,7 @@ def newtask_events(c, tid):
     default; the bell "All" of the list turns it on). Not for the new assignee (they get "assigned"), never for agents."""
     from ..notify.push import push_prio, push_reachable
     from ..agents.core import agent_ids
+    from ..core.objnotify import obj_notify  # 2.891.0 (#5270): the core's send decision
     t = c.execute("""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox FROM tasks t JOIN lists l ON l.id=t.list_id
                      WHERE t.id=?""", (tid,)).fetchone()
     if not t or not c.execute("SELECT 1 FROM list_members WHERE list_id=?", (t["list_id"],)).fetchone():
@@ -173,13 +173,14 @@ def newtask_events(c, tid):
     for uid in sorted(list_people(c, t["list_id"])):
         if uid in (actor, t["assignee_id"]) or uid in ag:
             continue
-        s = collab_user(c, uid, t["list_id"])
-        if not s or not task_visible(c, tid, uid, full=True):
+        # 2.891.0 (#5270): who may still read the task decides the core's send decision (obj_role >= view), no check of its own
+        got = obj_notify(c, "task", tid, [uid], row="newtask", lid=t["list_id"],
+                          news={"kind": "newtask", "task_id": tid, "actor": actor},
+                          gate=lambda u, s: push_reachable(c, u, s) and burst_gate(c, u, tid, event=True) and
+                          agent_push_ok(c, u, s, actor))  # 2.28.0 (#987)
+        if uid not in got:
             continue
-        news_add(c, uid, "newtask", task_id=tid, actor=actor, s=s)
-        if not notif_ok(c, uid, s, "newtask", "push", t["list_id"]) or not push_reachable(c, uid, s) or \
-                not burst_gate(c, uid, tid, event=True) or not agent_push_ok(c, uid, s, actor):  # 2.28.0 (#987)
-            continue
+        s = got[uid]
         lg = lang_of(s)
         lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
         g.pushes.append((uid, tr("{0} added: {1}", who or tr("Someone via the public link", lg=lg), t["title"], lg=lg), lname,
@@ -201,6 +202,7 @@ def unblock_events(c, done_ids):
     """done_ids: tasks just completed (done / won't do, incl. subtasks completed with them). Each open task
     that waited on one of them and has no open blocker left: activity line + News / push (see above)."""
     from ..notify.push import push_prio, push_reachable
+    from ..core.objnotify import obj_notify  # 2.891.0 (#5270): the core's send decision
     done_ids = list(dict.fromkeys(done_ids))
     if not done_ids:
         return
@@ -222,15 +224,15 @@ def unblock_events(c, done_ids):
         for uid in dep_people(c, t):  # 2.367.5 (#2980): a group: its people; an agent: whoever created the task
             if uid == actor:
                 continue
-            s = collab_user(c, uid, t["list_id"])
-            if not s or "deps" not in (s.get("features") or "").split(",") or not task_visible(c, w, uid, full=True):
+            s = collab_user(c, uid)
+            if not s or "deps" not in (s.get("features") or "").split(","):
                 continue  # module "deps" off: no News / push about dependencies (the activity line stays)
-            news_add(c, uid, "unblock", task_id=w, data={"blocker": bl}, actor=actor, s=s)
             from ..notify.taskbell import tbl_level
-            if tbl_level(c, uid, w, s):  # 2.53.0 C (#1424): muted / urgent (pushed by tbl_note of the history line above)
-                continue
-            if not notif_ok(c, uid, s, "unblock", "push", t["list_id"]) or not push_reachable(c, uid, s) or \
-                    not burst_gate(c, uid, w, event=True):
+            # 2.891.0 (#5270): who may still read the task decides the core's send decision (obj_role >= view)
+            if not obj_notify(c, "task", w, [uid], row="unblock", lid=t["list_id"], S={uid: s},
+                              news={"kind": "unblock", "task_id": w, "data": {"blocker": bl}, "actor": actor},
+                              follow=lambda u, s: not tbl_level(c, u, w, s),  # 2.53.0 C (#1424): muted / urgent (pushed by tbl_note of the history line above)
+                              gate=lambda u, s: push_reachable(c, u, s) and burst_gate(c, u, w, event=True)):
                 continue
             lg = lang_of(s)
             who = user_names(c, [actor]).get(actor, "?") if actor else tr("Someone via the public link", lg=lg)

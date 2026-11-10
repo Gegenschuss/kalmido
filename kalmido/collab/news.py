@@ -14,7 +14,7 @@ from ..core.i18n import tr
 from ..core.db import body, db, err, iso, iso_ms, now_utc, usettings
 from ..accounts.session import me
 from ..accounts.pictures import avatar_map
-from ..core.access import acx_task_ok, list_role, plists, pvis
+from ..core.access import list_role, plists, pvis
 from ..core.access import list_roles  # 2.674.0 B (#4194)
 from ..collab.comments import collab_on, collab_user, lang_of, MENTION_RE, user_names
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -429,15 +429,27 @@ def list_push(c, uid, row, lid, title_fn, msg_fn, click=None):
 def news_add(c, uid, kind, task_id=None, list_id=None, comment_id=None, data=None, actor=None, row=None, s=None):
     """Feed entry for uid (caller commits). Skipped for my own actions and for users without collab.
     actor 0 = someone via a public link (stored without an actor, data.via = public_link). 2.1.0: row = the event of the
-    notification settings (default: by kind), checked with notif_ok; a follow-up (kind followup) is my own reminder."""
+    notification settings (default: by kind), checked with notif_ok; a follow-up (kind followup) is my own reminder.
+    2.891.0 (#5270): an entry about a task goes through the core's send decision (core/objnotify.py obj_notify: uid must
+    read the task, obj_role >= view -- a task in the trash only its restorer, a task gone for good nobody); an entry without
+    a task (a share / role / organisation notice about uid's own access) is written by news_put directly."""
+    if task_id:
+        from ..core.objnotify import obj_notify
+        obj_notify(c, "task", task_id, [uid], row=row or KIND_ROW.get(kind, kind), S={uid: s} if s else None, push=False,
+                   news={"kind": kind, "task_id": task_id, "list_id": list_id, "comment_id": comment_id, "data": data, "actor": actor})
+        return
+    news_put(c, uid, kind, list_id=list_id, comment_id=comment_id, data=data, actor=actor, row=row, s=s)
+
+
+def news_put(c, uid, kind, task_id=None, list_id=None, comment_id=None, data=None, actor=None, row=None, s=None):
+    """2.891.0 (#5270): the writer of a News entry under the send decision -- only core/objnotify.py obj_notify (which checked
+    uid's right on the object) and news_add for an entry without an object call it."""
     own = kind == "followup"
     actor = (me() if actor is None else actor) if not own else None
     if not uid or (uid == actor and not own) or c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone():
         return
     s = s or collab_user(c, uid, None)
     if not s:
-        return
-    if task_id and not acx_task_ok(c, task_id, uid):  # 2.36.2 (#1142): requires task visibility
         return
     lid = list_id
     if lid is None and task_id:

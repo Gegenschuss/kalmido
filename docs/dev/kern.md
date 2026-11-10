@@ -461,6 +461,37 @@ Checked against the core's versions and undo steps, the two change tables of the
   no marker column), so it has no line in `tools/core_crosscut_allow.json` (a line of a table that does not look like one
   is red); the reason stands here.
 
+### Notifying (stage Q2, 2.891.0, #5270)
+
+One send decision: `kalmido/core/objnotify.py obj_notify(c, kind, id, recipients, *, row, lid, own, S, bells, news, follow,
+gate, push, memo)`. Its first step is not optional: every recipient is cut with `obj_role(kind, id) >= 'view'` of the core
+(`obj_readers`); agents are never recipients (they get `agent_emit` events). Then the person's settings (`S` or
+`collab_user`), the News entry (`news`: `collab/news.py news_put`), the follow step (`follow(uid, s)`: the task's bell, a
+thread; `obj_follow` of stage Q9 takes this place), `notif_ok` (matrix, list bell, the owner's template `notify/caps.py`),
+the gates (`gate(uid, s)`: device, burst / summary, an agent's push switch). It returns `{uid: settings}` of who gets the
+push; the caller builds the text in their language (an end-to-end list's push carries no words).
+- Kinds: a project's team chat conversation asks kind `list`; a channel / group asks `tchat_room`, whose members the core
+  still reads together with the old `tchat_members` rows until stage 7a (#5069) - no block of its own here.
+- Callers: `news_add` (an entry about a task; notices about one's own access without an object stay `news_put`), the
+  watchers (`tasks/watchers.py wat_note`), the team chat (`collab/teamchat.py tchat_notify`: a project's conversation =
+  kind `list`, a channel / group = `tchat_room`, a direct message = `tchat_dm`, its pair: `objhooks.NOTIFY_READERS`), the
+  calendar reminders (`events/model.py _wd_events`, kind `event`), the task reminders, nags and fixed reminders
+  (`notify/push.py wd_task_notify`, `tasks/remindat.py`), the follow-up and the weekly rotation (`tasks/tasks.py
+  _wd_followup`, `family/v1.py _wd_rotations`), a new task / unblocked (`tasks/dependencies.py`), a review
+  (`tasks/review.py`), approvals (`team/approvals.py`), the urgent bell (`notify/taskbell.py`: its urgent push passes the
+  settings, never step 1: `obj_readers`), a group's assignment (`lists/groups.py`), a new error report
+  (`integrations/errorreports.py`).
+- An unknown kind is a `ValueError`, there is no fallback. A task in the trash reaches only who may restore it.
+  So the urgent bell's "deleted the task" push (sent after the move to the trash) reaches only who may restore it - on
+  purpose. A reader in `NOTIFY_READERS` for a core kind and a `news['task_id']` other than the checked task are a
+  `ValueError` too; the tick's task rule refuses an agent on its own (review of the first build).
+- The watchdog (no request) passes its tick's `memo`; for the task `objhooks.NOTIFY_TICK['task']` (`core/objlight.py
+  _task_tick`) answers like `obj_role` with the per-project reads kept in the memo.
+- Still on their own check (later stages): the comment pushes and task events of `collab/comments.py` (stage Q4a), and the
+  pushes about one's own account / organisation without an object; News with a project or an event but no task
+  (`news_add(list_id=…)`, the event invitations / changes) and the job push of `agents/api.py job_notify` follow in task #5512
+  (stage Q2 rest).
+
 
 ## Filter (2.846.0, #5520)
 
