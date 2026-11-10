@@ -1,6 +1,36 @@
 {
  "versions": [
   {
+   "version": "2.833.0",
+   "date": "2026-11-10",
+   "items": [
+    {
+     "de": "Dokumente bekommen automatisch einen Titel aus Absender, Typ und Datum - das Muster stellst du je Bereich ein, eigene Titel bleiben.",
+     "en": "Documents get a title from sender, type and date automatically - you set the pattern per workspace, your own titles stay."
+    },
+    {
+     "de": "Wissensseiten nutzen am Computer die volle Breite und passen ins Fenster, der Text scrollt innen.",
+     "en": "Knowledge pages use the full width on a computer and fit the window, the text scrolls inside."
+    },
+    {
+     "de": "Büro & Finanzen hat unter Einstellungen > Module den Schalter „Auch privat“: aus, gibt es im Arbeitsbereich Privat kein Büro, die Büros deiner Organisationen bleiben.",
+     "en": "Office & finance has the switch “Also private” under Settings > Modules: off, the workspace Private has no office, your organisations’ offices stay."
+    },
+    {
+     "de": "Termine öffnen sich jetzt immer ganz im Fenster, Zusagen und Bearbeiten sind auch unten am Bildschirm erreichbar.",
+     "en": "Events now always open fully inside the window, so Accept and Edit stay reachable near the bottom of the screen."
+    },
+    {
+     "de": "Im Kalender lassen sich gelöschte Termine, Kalender und entfernte Abos direkt aus der Meldung zurückholen.",
+     "en": "In the calendar, deleted events, calendars and removed subscriptions can be brought back right from the message."
+    },
+    {
+     "de": "Tabellen: auch gelöschte Zeilen, Spalten, Blätter und Diagramm-Änderungen stehen in „Letzte Schritte“ und lassen sich auf jedem Gerät zurücknehmen.",
+     "en": "Tables: deleted rows, columns, sheets and chart changes are in Recent steps too and can be undone on any device."
+    }
+   ]
+  },
+  {
    "version": "2.819.0",
    "date": "2026-11-10",
    "items": [

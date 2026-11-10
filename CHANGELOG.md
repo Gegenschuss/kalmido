@@ -18,6 +18,47 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.833.0] - 2026-11-10
+
+Package 2.783 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Spaltenbreite ziehen in großen).
+
+### Added
+- Documents: a title pattern per workspace in Settings > Documents (default "{Sender} {Type} {Date}", date as DD.MM.YYYY, empty parts drop out with their separator) and a switch "Title automatically" (on by default). Recognition, rules, "Apply learned" and "Recognise again" set the title from it as long as nobody set it by hand; a title set by hand (person or agent) is never replaced, existing documents are not rewritten. The document sheet has "Suggest title" next to the title (with undo), the selection bar "Set title from pattern" under "Edit". New read endpoint `GET /api/docs/<id>/title-suggest`; `doc_json` carries `title_manual` (#4882).
+
+### Changed
+- Trash core stage 6: incoming webhooks, deleted team chat messages, member memos, deleted list fields, "Delete all times" copies and section / sprint copies are cleaned up by the core's one trash run after their retention period; the areas' own clean-up paths are gone. Deleted fields and time copies now live as copies in the core's side-object trash (old rows move over at start); restoring a field also brings back "required" and its organisation field (#5368).
+
+### Fixed
+- Knowledge on a computer: folder, workspace start, tag, search hits and "All workspaces" use the full width under the toolbar instead of a narrow column in the middle (#5375).
+- Knowledge page on a computer: header, search and bar stay where the list has them (no jump when a page opens), the editor card uses the full width and ends at the window edge - the text scrolls inside, "Attach files" and the footer stay visible; only the text column follows the width switch (#5376).
+- Files: in folders with recognition the toolbar stays on one line at 320 px - "New folder" and "Share" show only their icon on narrow screens (#5356).
+
+Package 2.794 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Settings > Modules > Office & finance (parts of the area Office): a switch "Also private" for people in an organisation. Off, the workspace Private shows no office (no entry in the sidebar, no page, not under "All workspaces"), contacts and clients stay; the offices of the organisations stay as they are. The server answers requests to the private office with a clear hint where to switch it on, and the bell items of the private office (payments, overdue invoices) are hidden meanwhile. Nothing is deleted: switched on again, the private office is there with the same data. Stored like a private module card (ws_mods_off), the default stays on (#5392).
+
+Package 2.800 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ).
+
+### Added
+- Undo across devices, stage 5 rest (#5409): deleting rows and columns, column settings, moving and sorting, the chart, colour rules, cell names, frozen values, rows kept in view and the sheets of the bar are steps of Recent steps; a change someone else made since stays and is named, the rest goes back. Taking a table's project back needs the same rights as changing it.
+- Removing a calendar subscription can be undone from its toast for 15 minutes (#5466).
+
+### Changed
+- Calendar (#5466): the "only this / all events" question is a normal dialog, "All events" in warning colour when deleting; a single event or one date of a series is deleted without asking and the toast offers Undo; deleting a calendar shows Undo; the custom repeat says "Apply"; the share dialog has the close button.
+- Calendar (#5468): dated tasks follow the chosen workspace like the events; events of subscribed calendars carry a subscription mark.
+- Calendar wording (#5467): "Termin" throughout, "Abonnierte Kalender" and "Kalender-Link", roles "kann ansehen" / "kann bearbeiten", "belegt", no ICS / iCal in everyday texts.
+- Lists wording (#5441): the sidebar group says "Projekte", the section-less group "Ohne Abschnitt", the board's lanes "Gruppieren nach", taking a task "Selbst übernehmen"; a board card reads "seit 2 Std."; one tone for empty hints; shared word list docs/dev/glossar.md.
+- Tables (#5283, stage Q7c): the cell history follows the logs' retention switch (daily clean-up, index); sheet_changes stays (agents' trail and target of the people's table steps), reason in docs/dev/kern.md.
+
+### Fixed
+- The event window no longer reaches below the window's edge: it is placed again once its details are loaded, scrolls itself when needed and keeps Edit / Accept / Decline in sight; Delete comes last; "Hide on Today" moved to the calendars window (#5460).
+- Undoing a move out of a locked list no longer fails for tasks with subtasks, comments or text fields: that part is kept and named, the other fields go back (#5447).
+
+Package 2.821 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- #5501: CI red p2466_b_api - the suite follows the decided change of #5378 (a team agent is listed for every member of its organisation, reached only through a project opened to her).
+
 ## [2.819.0] - 2026-11-10
 
 Package 2.784 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -43,5 +84,6 @@ Package 2.757 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: 
 - Lists and the start page report their width to the header again: the top bar lines up with the content instead of standing 4 px beside it, and the width "Wide" of a note / knowledge page keeps its list + note layout (CI red p2599_b_kopf_ui, #5309).
 - p151_ui says why the hint of the task just tracked is missing (toast, totals on the page and on the server); the Mac red was the sub-second discard fixed in #5186 (#5211).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.819.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.833.0...HEAD
+[2.833.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.833.0
 [2.819.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.819.0
