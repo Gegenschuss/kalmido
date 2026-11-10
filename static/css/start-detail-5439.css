@@ -8,8 +8,9 @@
 /* the phone's bar holds date, Today / Tomorrow and Complete in one row (the project is in the path on top); the date chip is
    never cut short: a long date with its time moves Complete into a second row instead (the row wraps once) */
 .dthumb .dchip{flex:1 0 auto;min-width:6rem}
-/* a narrow phone (up to 384 px): "-1 day" leaves the bar (the date chip's picker has it), so date, Today / Tomorrow and Complete fit one row */
-@container dthumb (max-width:24rem){ .dthumb .dq[data-d="-1"]{display:none} }
+/* a narrow phone (up to 384 px): "-1 day" leaves the bar (the date chip's picker has it) and the gaps get smaller, so date,
+   Today / Tomorrow and Complete fit one row */
+@container dthumb (max-width:24rem){ .dthumb .dq[data-d="-1"]{display:none} .dthumb{gap:.25rem} .dthumb .dtdone{padding:0 .625rem} .dthumb .dchip{padding:.3125rem .375rem} }
 /* Watch and "N watchers" one element (a joined pair) */
 .dlg-wg{display:inline-flex;align-items:stretch;border:1px solid var(--line);border-radius:var(--radius)}
 .dlg-wg .dlg-w{border:0;border-radius:var(--radius) 0 0 var(--radius)}
