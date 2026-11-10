@@ -552,8 +552,9 @@ def fsm_revoked_back(c, x):
     if not x.get("id"):
         return
     sid = int(x["id"])
-    for r in c.execute("SELECT id, row_json FROM obj_revoked WHERE src='fs_shares' AND reason='move' AND row_json LIKE ?",
-                       (f'{{"id": {sid},%',)).fetchall():
+    # the id inside the stored row, not a text pattern (a column order or JSON spacing must not hide the row, review 2.866)
+    for r in c.execute("SELECT id, row_json FROM obj_revoked WHERE src='fs_shares' AND reason='move' "
+                       "AND (row_json::jsonb->>'id')::bigint=?", (sid,)).fetchall():
         try:
             d = json.loads(r["row_json"])
         except (TypeError, ValueError):
