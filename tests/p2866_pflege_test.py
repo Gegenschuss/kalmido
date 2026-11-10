@@ -263,6 +263,21 @@ def n2(who, s, uid, org):
     check(t == [(f"Moodboard {who} draft",)], f"N2 {who}: the private task has its old title again {t}")
 
 
+# ================================================================ N5 no sealed value becomes a label; label columns not in FIELDS
+def n5():
+    out = in_app("""from kalmido.office.oubar import _plain, oub_label_md, oub_label_client, oub_doc_name
+from kalmido.core.orgcrypt import FIELDS, PREFIX
+from kalmido.office.model import MD
+print('PLAIN', repr([_plain('e2e1:QUJD'), _plain('  e2e1:x '), _plain(PREFIX + 'abc'), _plain('kenc2:abc'), _plain('Beratung'), _plain(None)]))
+print('LABEL', repr([oub_label_md('name')({'id': 7, 'name': 'e2e1:QUJD'}), oub_label_client({'id': 8, 'name': PREFIX + 'x'})]))
+bad = [(k, MD[k]['table'], MD[k]['label']) for k in MD if MD[k]['label'] in FIELDS.get(MD[k]['table'], ())]
+bad += [(t, col) for t, col in (('office_docs', 'number'), ('clients', 'name')) if col in FIELDS.get(t, ())]
+print('BAD', repr(bad), len(MD))""")
+    check("PLAIN ['', '', '', '', 'Beratung', '']" in out, f"N5: _plain: a browser ciphertext (e2e1:), a sealed value: no text {out[-400:]}")
+    check("LABEL [('Changed: {0}', ['#7']), ('Changed: {0}', ['#8'])]" in out, f"N5: the label falls back to the object number {out[-400:]}")
+    check("BAD []" in out, f"N5: no label column (documents, clients, master data) is sealed at rest (orgcrypt FIELDS) {out[-400:]}")
+
+
 # ================================================================ setup
 kt.fresh({"KALMIDO_INSTANCE_MODE": "workspaces"}, prefix="P2866")
 kt.docker_logs_on_first_fail()
@@ -303,6 +318,7 @@ f9()
 f10()
 n2("alice", A, ALICE, ORG)
 n2("frida", Fr, FID, FOFF)
+n5()
 # -- more parts below --
 
 raise SystemExit(kt.done("p2866_pflege"))

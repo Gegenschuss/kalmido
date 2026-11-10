@@ -19,6 +19,7 @@ Interface:
 from flask import g, has_request_context
 
 from ..core.i18n import N_
+from ..core.orgcrypt import oc_is_enc  # 2.866.0 (#5302 N5)
 from ..core.undogroups import UG_LABEL, undo_barrier
 
 OUB_KIND = {"offer": N_("Quotation"), "invoice": N_("Invoice"), "credit": N_("Credit note"), "reminder": N_("Reminder"),
@@ -33,12 +34,15 @@ OUB_DATEV_EXP = N_("DATEV export: {0} to {1}")
 OUB_PERIOD = N_("Months locked up to {0}")
 OUB_LETTER = N_("Letter")
 SEALED = "kenc"  # core/orgcrypt.py PREFIX "kenc1:" (and later versions): a sealed value never goes into a label
+SEALED_E2E = "e2e1:"  # 2.866.0 (#5302 N5): a text the browser encrypted (locked lists / files) neither
 
 
 def _plain(v):
+    """The text of a label value, "" for a sealed one. 2.866.0 (#5302 N5): not only by the prefix convention -- also what
+    core/orgcrypt.py itself takes for sealed (oc_is_enc) and the browser's ciphertext (e2e1:)."""
     v = v if isinstance(v, str) else ("" if v is None else str(v))
     v = v.strip()
-    return "" if not v or v.startswith(SEALED) else v[:80]
+    return "" if not v or v.startswith((SEALED, SEALED_E2E)) or oc_is_enc(v) else v[:80]
 
 
 def _rid(r):
