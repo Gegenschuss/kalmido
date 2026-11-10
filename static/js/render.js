@@ -91,39 +91,40 @@ const tabDefault = () => ['s:inbox', 's:today', 'search', 'lists'];
 // 2.418.0 (#3560): the order of the person (setting nav_menus "tabbar", the same on every phone); before the first change
 // there the device's own (LS tabbar)
 const tabIds = () => { const o = nav_pref('tabbar').order; return mg_tabIds(o.length ? o.filter(x => x !== 'none') : LS.get('tabbar', null)) || tabDefault(); };  // 2.44.0 (#1187): old module tabs -> their area
+// 2.883.0 (#5560): every item carries the name of its icon (ico) - "More" shows the real icon, never the three dots
 function tabItem(id) {
   const [kind, ...rest] = id.split(':'), v = rest.join(':');
   if (kind === 'a') return mg_tabItem(id);  // 2.44.0 (#1187)
   if (kind === 'm') {
     const md = MODS.find(x => x[0] === v);
     if (!md || (v !== 'tasks' && !feat(v))) return null;
-    return {id, go: modHash(v), icon: ic(md[1], 'l'), label: tr(md[2]), mod: v};
+    return {id, go: modHash(v), icon: ic(md[1], 'l'), ico: md[1], label: tr(md[2]), mod: v};
   }
   if (kind === 's' && v === 'assigned' && !collab()) return null;
-  if (kind === 's' && SMART[v]) return {id, go: v, icon: ic(SMART[v].icon, 'l'), label: v === 'week' ? tr('7 days') : tr(SMART[v].name), key: v};
+  if (kind === 's' && SMART[v]) return {id, go: v, icon: ic(SMART[v].icon, 'l'), ico: SMART[v].icon, label: v === 'week' ? tr('7 days') : tr(SMART[v].name), key: v};
   if (kind === 'l') {
     const l = listById(+v); if (!l || l.is_inbox) return null;
     const em = leadEmoji(l.name), name = sbiMode() !== 'emoji' ? lname(l) : em ? l.name.slice(em.length).trim() : l.name;
-    return {id, go: 'l/' + v, icon: `<span class="temoji">${listIconHtml(l, {emoji: true})}</span>`, label: name, key: 'l:' + v};  // 2.38.0 (#1174)
+    return {id, go: 'l/' + v, icon: `<span class="temoji">${listIconHtml(l, {emoji: true})}</span>`, label: name, key: 'l:' + v, lic: l};  // 2.38.0 (#1174); 2.883.0 (#5560): lic = the list's own icon in "More"
   }
-  if (kind === 'f') { const f = S.filters.find(x => x.id === +v); return f ? {id, go: 'f/' + v, icon: ic('filter', 'l'), label: f.name, key: 'f:' + v} : null; }
-  if (kind === 'tag' && v) return {id, go: 'tag/' + encodeURIComponent(v), icon: ic('tag', 'l'), label: v, key: 'tag:' + v};
-  if (kind === 'folder' && v) return {id, go: 'folder/' + encodeURIComponent(v), icon: ic('folder', 'l'), label: fName(v), key: 'folder:' + v};
-  if (id === 'news') return collab() ? {id, go: 'news', icon: ic('bell', 'l'), label: tr('News'), mod: 'news'} : null;
-  if (id === 'agents') return agentsTab() ? {id, go: 'agents', icon: ic('bot', 'l'), label: tr('Agents'), mod: 'agents'} : null;
-  if (id === 'stats') return feat('stats') ? {id, go: 'stats', icon: ic('chart', 'l'), label: tr('Statistics'), mod: 'stats'} : null;
-  if (id === 'time') return timeOn() ? {id, go: 'time', icon: ic('clock', 'l'), label: tr('Time tracking'), mod: 'time'} : null;  // 2.7.0 (#405 S5): one name
-  if (id === 'overview') return overviewOn() ? {id, go: 'overview', icon: ic('pulse', 'l'), label: tr('Project status'), mod: 'overview'} : null;
-  if (id === 'team') return teamOn() ? {id, go: 'team', icon: ic('comment', 'l'), label: tr('Team chat'), mod: 'team', n: S.team?.unread || 0} : null;  // 2.17.0 (#419)
-  if (id === 'office') return officeOn() ? {id, go: 'office', icon: ic('receipt', 'l'), label: tr('Office & finance'), mod: 'office'} : null;  // 2.36.2 (#1146): in "More" like the other modules
-  if (id === 'wiki') return feat('wiki') ? {id, go: 'wiki', icon: ic('book', 'l'), label: tr('Knowledge pages'), mod: 'wiki'} : null;  // 2.49.0 (#1199)
-  if (id === 'sheets') return feat('sheets') ? {id, go: 'sheets', icon: ic('sheet', 'l'), label: tr('Tables'), mod: 'sheets'} : null;  // 2.89.0 (#1916)
-  if (id === 'qnotes') { const l = qn_list(); return l && !S.me?.kid ? {id, go: 'notes/' + l.id, icon: ic('edit', 'l'), label: lname(l), mod: 'notes'} : null; }  // 2.477.0 (#3881): the list Notes
-  if (id === 'favs') return {id, go: 'favorites', icon: ic('star', 'l'), label: tr('Favourites'), key: 'favorites'};  // 2.441.0 (#3592)
-  if (id === 'home') return {id, go: 'home', icon: ic('start', 'l'),  /* 2.364.0 B (#3031) */ label: tr('Start|home'), mod: 'home'};  // 2.17.0 (#475)
-  if (id === 'search') return {id, act: 'palette', icon: ic('search', 'l'), label: tr('Search'), key: 'search'};  // 2.31.0 (#1057): opens the search at once (with the keyboard)
-  if (id === 'lists') return {id, go: sbb_target('tasks'), icon: ic('list', 'l'), label: tr('Projects'), mod: 'tasks', area: 'tasks'};  // 2.417.0 A (#3559): the page kept in Projects, like the other areas (was: the drawer)
-  if (id === 'settings') return {id, act: 'settings', icon: ic('gear', 'l'), label: tr('Settings'), upd: updDot()};
+  if (kind === 'f') { const f = S.filters.find(x => x.id === +v); return f ? {id, go: 'f/' + v, icon: ic('filter', 'l'), ico: 'filter', label: f.name, key: 'f:' + v} : null; }
+  if (kind === 'tag' && v) return {id, go: 'tag/' + encodeURIComponent(v), icon: ic('tag', 'l'), ico: 'tag', label: v, key: 'tag:' + v};
+  if (kind === 'folder' && v) return {id, go: 'folder/' + encodeURIComponent(v), icon: ic('folder', 'l'), ico: 'folder', label: fName(v), key: 'folder:' + v};
+  if (id === 'news') return collab() ? {id, go: 'news', icon: ic('bell', 'l'), ico: 'bell', label: tr('News'), mod: 'news'} : null;
+  if (id === 'agents') return agentsTab() ? {id, go: 'agents', icon: ic('bot', 'l'), ico: 'bot', label: tr('Agents'), mod: 'agents'} : null;
+  if (id === 'stats') return feat('stats') ? {id, go: 'stats', icon: ic('chart', 'l'), ico: 'chart', label: tr('Statistics'), mod: 'stats'} : null;
+  if (id === 'time') return timeOn() ? {id, go: 'time', icon: ic('clock', 'l'), ico: 'clock', label: tr('Time tracking'), mod: 'time'} : null;  // 2.7.0 (#405 S5): one name
+  if (id === 'overview') return overviewOn() ? {id, go: 'overview', icon: ic('pulse', 'l'), ico: 'pulse', label: tr('Project status'), mod: 'overview'} : null;
+  if (id === 'team') return teamOn() ? {id, go: 'team', icon: ic('comment', 'l'), ico: 'comment', label: tr('Team chat'), mod: 'team', n: S.team?.unread || 0} : null;  // 2.17.0 (#419)
+  if (id === 'office') return officeOn() ? {id, go: 'office', icon: ic('receipt', 'l'), ico: 'receipt', label: tr('Office & finance'), mod: 'office'} : null;  // 2.36.2 (#1146): in "More" like the other modules
+  if (id === 'wiki') return feat('wiki') ? {id, go: 'wiki', icon: ic('book', 'l'), ico: 'book', label: tr('Knowledge pages'), mod: 'wiki'} : null;  // 2.49.0 (#1199)
+  if (id === 'sheets') return feat('sheets') ? {id, go: 'sheets', icon: ic('sheet', 'l'), ico: 'sheet', label: tr('Tables'), mod: 'sheets'} : null;  // 2.89.0 (#1916)
+  if (id === 'qnotes') { const l = qn_list(); return l && !S.me?.kid ? {id, go: 'notes/' + l.id, icon: ic('edit', 'l'), ico: 'edit', label: lname(l), mod: 'notes'} : null; }  // 2.477.0 (#3881): the list Notes
+  if (id === 'favs') return {id, go: 'favorites', icon: ic('star', 'l'), ico: 'star', label: tr('Favourites'), key: 'favorites'};  // 2.441.0 (#3592)
+  if (id === 'home') return {id, go: 'home', icon: ic('start', 'l'), ico: 'start',  /* 2.364.0 B (#3031) */ label: tr('Start|home'), mod: 'home'};  // 2.17.0 (#475)
+  if (id === 'search') return {id, act: 'palette', icon: ic('search', 'l'), ico: 'search', label: tr('Search'), key: 'search'};  // 2.31.0 (#1057): opens the search at once (with the keyboard)
+  if (id === 'lists') return {id, go: sbb_target('tasks'), icon: ic('list', 'l'), ico: 'list', label: tr('Projects'), mod: 'tasks', area: 'tasks'};  // 2.417.0 A (#3559): the page kept in Projects, like the other areas (was: the drawer)
+  if (id === 'settings') return {id, act: 'settings', icon: ic('gear', 'l'), ico: 'gear', label: tr('Settings'), upd: updDot()};
   return null;
 }
 const tabItems = () => tabIds().map(tabItem).filter(t => t && !o3a_hidT(t));  // 2.83.0 (#1845): private modules not in an organisation's view
@@ -150,11 +151,13 @@ function tabBtn(t, on, cls = '') {
 const tabAreaItems = () => { const cur = sbb_area(); return sbb_ids().filter(id => sbb_btnHtml(id, cur, sideHidden, 0)).map(id => { const d = sbb_def(id), a = !!mg_area(id); return {id: a ? 'a:' + id : id, go: sbb_target(id), icon: ic(d[1], 'l'), ico: d[1], label: tr(d[2]), mod: id, rail: 1, ...(a ? {area: id} : {})}; }); };  // 2.479.0 (#2814): rail = an area (Chat is one now)
 function tabOverflow() {
   const items = tabItems(), mx = tabMax(), shown = items.length > mx ? items.slice(0, mx - 1) : items;  // 2.477.0 (#3938)
-  const rest = items.slice(shown.length), pinned = k => items.some(t => t.id === k);
-  const areas = tabAreaItems(), conv = ['team', 'news'].filter(k => !pinned(k) && !areas.some(t => t.id === k) /* 2.479.0 (#2814): the team chat is an area */).map(tabItem).filter(t => t && !o3a_hidT(t));
+  const areas = tabAreaItems(), over = items.slice(shown.length), pinned = k => items.some(t => t.id === k);
+  // 2.883.0 (#5560): an overflowing pinned tab whose place is also an area (Calendar, Reading) stands once, in the group Areas
+  const rest = over.filter(t => !areas.some(a => a.id === t.id || (t.mod && a.mod === t.mod)));  // by place, not by go: a list tab can be Projects' kept page
+  const conv = ['team', 'news'].filter(k => !pinned(k) && !areas.some(t => t.id === k) /* 2.479.0 (#2814): the team chat is an area */).map(tabItem).filter(t => t && !o3a_hidT(t));
   const end = ['search', 'settings'].filter(k => !pinned(k)).map(tabItem).filter(Boolean);
   // search + settings are also in the side menu: they alone do not justify a "Mehr" tab
-  return {shown, rest, more: rest.length || areas.some(t => !pinned(t.id)) ? [...rest, ...areas, ...conv, ...end] : []};
+  return {shown, rest, more: over.length || areas.some(t => !pinned(t.id)) ? [...rest, ...areas, ...conv, ...end] : []};
 }
 function renderTabs() {
   const {shown, more} = tabOverflow(), all = tabItems(), on = tabOn(all);
@@ -187,8 +190,9 @@ function tabsMore(anchor) {
   // 2.489.0 (#2664, decision #2636): no heading "Conversations" any more (the team chat is the area Chat, #2814): News after a line
   const head = [{head: tr('Views')}, {head: tr('Areas|nav')}, '-', '-', null];
   const ord = [0, 1, 2, 3, 4].flatMap(g => { const ts = more.filter(t => grp(t) === g); return ts.length || g === 3 ? [...(head[g] ? [head[g]] : []), ...ts, ...(g === 3 ? [{label: tr('Customise tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}] : [])] : []; });
-  menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head || t.fn ? t : ({label: t.id === 'news' && S.news?.unread && bellCount() ? `${t.label} (${bellCount()})` : t.label, icon: t.ico ? t.ico : t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
-    fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.area && t.area === sbb_area() ? sbb_home(t.area) : t.go)}))]);  // 2.417.0 A (#3559)
+  menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head || t.fn ? t : ({label: t.id === 'news' && S.news?.unread && bellCount() ? `${t.label} (${bellCount()})` : t.label, icon: t.ico || 'list', lic: t.lic,  // 2.883.0 (#5560): the item's own icon (was a guess by module, 'dots' for Knowledge, Tables, Office)
+    fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.area && t.area === sbb_area() ? sbb_home(t.area) : t.go)}))]).querySelector('.tch-sh')?.classList.add('tch-sh0');  // 2.417.0 A (#3559)
+  // 2.883.0 (#5560): "More" has no title: no empty head line, its X sits in the grip's line
 }
 // 2.579.0 (#4199): once per draw (td_rc: the sidebar, the top bar, the tiles and the tabs read the same), the open tasks once per call
 function counts() { return td_rc('counts', counts0); }

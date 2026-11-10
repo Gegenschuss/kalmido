@@ -5690,6 +5690,11 @@ svg.i.lbot .d{fill:var(--bot)}
 .tch-sht.sshead{padding:0;font-weight:500}
 .tch-shx{flex:none;width:2.75rem;height:2.75rem}
 #pop:not(.sheet) .tch-sh{display:none}
+/* 2.883.0 (#5560): a sheet without a title ("More") has no empty head line: the head is just the grip's line, its 44 px X
+   on the right reaches down beside the first entry (which keeps its text clear of it) */
+.tch-sh.tch-sh0{height:1.25rem;padding:0;margin-bottom:0;border-bottom:0;justify-content:flex-end;align-items:flex-start;overflow:visible}
+.tch-sh0 .tch-sht{display:none}
+.tch-sh0+.menu-list>button:first-child{padding-right:2.75rem}
 /* 2.38.0 (#1177): the list picker: folders are headings, their lists indented (a subfolder one step deeper) */
 .menu-list .tch-fd .mgh{font-size:var(--fs-s)}
 .menu-list .tch-ws .mgh{font-size:var(--fs-b);font-weight:700;color:var(--text);padding-top:.625rem}  /* 2.455.0 (#3848): a workspace, clearly above a folder */
