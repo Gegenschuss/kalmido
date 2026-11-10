@@ -65,11 +65,13 @@ const day = i => { const d = new Date(); d.setDate(d.getDate() + i); return `${d
     check(await until(`!!document.querySelector('#view button.cyd')`, {timeout: 20000}), 'phone: year days drawn');
     const hit = sel => ev(`(() => { const e = document.querySelector('${sel}'); if (!e) return null; e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
       const ok = (x, y) => { const t = document.elementFromPoint(x, y); return !!t && (t === e || e.contains(t)); };
+      // a later neighbour day paints over the grown area on its side (a dense grid); there the point must still hit a day, never a dead gap
+      const day = (x, y) => { const t = document.elementFromPoint(x, y); return !!t && (t === e || e.contains(t) || !!t.closest?.('button.cyd')); };
       const coarse = matchMedia('(pointer:coarse)').matches;
-      return {coarse, up: ok(cx, cy - 21), down: ok(cx, cy + 21), left: ok(cx - 21, cy), right: ok(cx + 21, cy)}; })()`);
+      return {coarse, up: ok(cx, cy - 21), down: day(cx, cy + 21), left: ok(cx - 21, cy), right: day(cx + 21, cy)}; })()`);
     const yd = await hit('#view button.cyd');
     // the headless browser may not report a coarse pointer; then the rule cannot apply and only the plain size is checked
-    if (yd && yd.coarse) check(yd.up && yd.down && yd.left && yd.right, 'phone/touch: a year day reaches 44 px ' + JSON.stringify(yd));
+    if (yd && yd.coarse) check(yd.up && yd.down && yd.left && yd.right, 'phone/touch: a year day reaches 44 px (up / left its own, down / right a day, no gap) ' + JSON.stringify(yd));
     else check(await ev(`document.querySelector('#view button.cyd').getBoundingClientRect().width > 0`), 'phone: year day has a size (no coarse pointer in this browser)');
     await shot('p2884-d-year-phone.png');
   }, true);
