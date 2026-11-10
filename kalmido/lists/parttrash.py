@@ -99,7 +99,19 @@ def sprint_restore(sid):
     """A removed planned sprint comes back with the same id (a number taken meanwhile: the next free one) and its tasks that
     are in no sprint now -> {sprint, moved, skipped}. 404: not in the trash."""
     c = db()
-    r = part_copy_take(c, LPT_SPRINT, sid, me(), _need_edit)
+    moved, skipped = lpt_sprint_back(c, sid, me())
+    from .sprundo import spu_life  # 2.809.0 (#5476): a step of the person's undo list
+    sp = spr_row(c, sid)
+    spu_life(c, sid, "restore", sp["list_id"], sp["name"])
+    bump(c)
+    c.commit()
+    return jsonify(sprint=spr_dict(c, spr_row(c, sid), me()), moved=moved, skipped=skipped)
+
+
+def lpt_sprint_back(c, sid, uid):
+    """2.809.0 (#5476, from sprint_restore): a removed planned sprint back with its id and the tasks that are in no sprint now
+    -> (moved, skipped). 404: not in the trash; the rights: whoever may change its list. The caller bumps and commits."""
+    r = part_copy_take(c, LPT_SPRINT, sid, uid, _need_edit)
     lid = r["list_id"]
     _, held = part_copy_back(c, LPT_SPRINT, r, f"sprints:{lid}", fix=_spr_fix)  # like starting / closing (sprints.py)
     moved, skipped = [], []
@@ -109,9 +121,7 @@ def sprint_restore(sid):
             moved.append(tid)
         else:
             skipped.append(tid)
-    bump(c)
-    c.commit()
-    return jsonify(sprint=spr_dict(c, spr_row(c, sid), me()), moved=moved, skipped=skipped)
+    return moved, skipped
 
 
 def _spr_fix(c, snap):

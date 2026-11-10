@@ -13,6 +13,8 @@ Invented names only.
    deleted field comes back and goes again on redo
  - rules (lists/ruleundo.py): a change goes back (old name, switched on again); into the trash -> undo -> back, redo -> trash
  - templates (lists/tplundo.py): a rename goes back; into the trash -> undo -> back, redo -> trash
+ - sprints (lists/sprundo.py): planning one -> undo = gone, redo = back with its id; a change of its goal goes back; a removed
+   sprint comes back
  - a project's settings (lists/lpundo.py): a rename + colour on the laptop is listed on the phone (area tasks, kind listset,
    label with the old name, device, the answer names its group) and goes back from there; redo; archiving -> undo -> out of
    the archive; a save of the same values and a save with a folder (side effects) record no step; a new sidebar order since
@@ -304,6 +306,36 @@ res = back(A, g["id"])
 check(res.get("undone") == [g["id"]] and tpl(A, TP) is not None, f"undo: the template is back {res}")
 r = A.post(B + f"/api/undo/{g['id']}/redo")
 check(r.ok and tpl(A, TP) is None, f"redo: in the trash again {r.status_code} {r.text[:120]}")
+
+# ---------------------------------------------------------------- sprints: plan / change / remove
+def spr(s, sid):
+    r = s.get(B + f"/api/sprints/{sid}")
+    return r.json() if r.ok else None
+
+
+r = A.post(B + "/api/lists", json={"name": "Sprint Beispiel"})
+SPL = r.json()["id"]
+check(A.put(B + f"/api/lists/{SPL}/sprint-settings", json={"on": True}).ok, "(setup) sprints on")
+r = A.post(B + f"/api/lists/{SPL}/sprints", json={"goal": "Rohschnitt"}, headers=LAP)
+check(r.ok and r.json().get("undo_group"), f"a sprint planned: a step {r.status_code} {r.text[:120]}")
+SPX = r.json()["id"]
+g = newest(PHONE)
+res = back(PHONE, g["id"])
+check(g.get("kind") == "sprint_life" and res.get("undone") == [g["id"]] and spr(A, SPX) is None, f"taken back: the sprint is gone {res}")
+r = PHONE.post(B + f"/api/undo/{g['id']}/redo")
+check(r.ok and spr(A, SPX) is not None, f"redo: planned again with its id {r.status_code} {r.text[:120]}")
+r = A.patch(B + f"/api/sprints/{SPX}", json={"name": "Schnitt", "goal": "Feinschnitt"})
+check(r.ok and r.json().get("undo_group"), f"the sprint changed: a step {r.status_code} {r.text[:120]}")
+g = newest(A)
+res = back(A, g["id"])
+x = spr(A, SPX) or {}
+check(g.get("kind") == "list_sprint" and res.get("undone") == [g["id"]] and x.get("goal") == "Rohschnitt" and not x.get("name"),
+      f"undo: the old goal, no name {res} {x.get('goal')} {x.get('name')}")
+r = A.delete(B + f"/api/sprints/{SPX}")
+check(r.ok and r.json().get("undo_group") and spr(A, SPX) is None, f"the sprint removed: a step {r.status_code}")
+g = newest(A)
+res = back(A, g["id"])
+check(res.get("undone") == [g["id"]] and spr(A, SPX) is not None, f"undo: the sprint is back {res}")
 
 # freelancer-matrix
 r = Fr.post(B + "/api/lists", json={"name": "Frida Projekt", "color": "#3366cc"})

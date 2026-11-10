@@ -453,9 +453,11 @@ def sprint_create(lid):
     sid = spr_insert(c, lid, date.fromisoformat(f["start"]), date.fromisoformat(f["end_day"]), "planned", me(),
                      f.get("name", ""), f.get("goal", ""))
     moved, skipped = spr_assign_ids(c, lid, tids, sid, only_backlog=True)
+    from .sprundo import spu_life  # 2.809.0 (#5476): a step of the person's undo list
+    ug = spu_life(c, sid, "create", lid)
     bump(c)
     c.commit()
-    return jsonify({**spr_dict(c, spr_row(c, sid), me()), "moved": moved, "skipped": skipped})
+    return jsonify({**spr_dict(c, spr_row(c, sid), me()), "moved": moved, "skipped": skipped, **({"undo_group": ug} if ug else {})})
 
 
 @app.get("/api/sprints/<int:sid>")
@@ -487,12 +489,16 @@ def sprint_update(sid):
     if s["state"] == "closed" and ("start" in b or "end" in b):
         return err(tr("A closed sprint keeps its dates"), 409)
     f = spr_clean_fields(b, s)
+    ug = None
     if f:
+        from .sprundo import spu_post, spu_pre  # 2.809.0 (#5476): a step of the person's undo list
+        spu_pre(c, me(), sid)
         f["updated_at"] = iso_ms(now_utc())
         c.execute(f"UPDATE sprints SET {','.join(k + '=?' for k in f)} WHERE id=?", (*f.values(), sid))
+        ug = spu_post(c)
         bump(c)
     c.commit()
-    return jsonify(spr_dict(c, spr_row(c, sid), me()))
+    return jsonify({**spr_dict(c, spr_row(c, sid), me()), **({"undo_group": ug} if ug else {})})
 
 
 @app.delete("/api/sprints/<int:sid>")
@@ -509,13 +515,21 @@ def sprint_delete(sid):
         return err(tr("Only a planned sprint can be removed"), 409)
     d = spr_dict(c, s, me())
     tids = [r[0] for r in c.execute("SELECT id FROM tasks WHERE sprint_id=?", (sid,))]
-    from .parttrash import lpt_sprint_put  # 2.567.0 A (#4707): a copy into the trash (POST /api/sprints/<id>/restore)
-    lpt_sprint_put(c, sid, me())
-    c.execute("UPDATE tasks SET sprint_id=NULL, sprint_at=NULL WHERE sprint_id=?", (sid,))
-    c.execute("DELETE FROM sprints WHERE id=?", (sid,))
+    spr_trash(c, sid, me())
+    from .sprundo import spu_life  # 2.809.0 (#5476): a step of the person's undo list
+    ug = spu_life(c, sid, "delete", s["list_id"], d.get("title") or s["name"])
     bump(c)
     c.commit()
-    return jsonify(ok=True, sprint=d, tasks=tids, trash=True)
+    return jsonify(ok=True, sprint=d, tasks=tids, trash=True, **({"undo_group": ug} if ug else {}))
+
+
+def spr_trash(c, sid, uid):
+    """2.809.0 (#5476, from sprint_delete): planned sprint sid into the trash (a copy), its tasks back to the backlog. The
+    caller checked the rights and the state and holds the list's sprint lock."""
+    from .parttrash import lpt_sprint_put  # 2.567.0 A (#4707): a copy into the trash (POST /api/sprints/<id>/restore)
+    lpt_sprint_put(c, sid, uid)
+    c.execute("UPDATE tasks SET sprint_id=NULL, sprint_at=NULL WHERE sprint_id=?", (sid,))
+    c.execute("DELETE FROM sprints WHERE id=?", (sid,))
 
 
 @app.post("/api/sprints/<int:sid>/start")

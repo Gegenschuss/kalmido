@@ -72,7 +72,7 @@ function spr_cfgModal(lid) {
 }
 
 // ---- editing, planning, the list of sprints, closing
-async function spr_patch(sid, body) { await api('PATCH', `/api/sprints/${sid}`, body); await load(); render(); }
+async function spr_patch(sid, body) { const j = await api('PATCH', `/api/sprints/${sid}`, body); await load(); render(); return j; }  // 2.809.0 (#5476): the answer (undo_group)
 function spr_editModal(l, s) {
   const md = /** @type {any} */ (modal(`<h3>${esc(tr('Edit {0}', spr_name(s)))}</h3>
     <div class="row"><label for="se-n">${tr('Name')}</label><input id="se-n" maxlength="100" placeholder="${esc(tr('Sprint {0}', s.num))}" value="${esc(s.title === tr('Sprint {0}', s.num) ? '' : s.title || '')}"></div>
@@ -87,12 +87,12 @@ function spr_editModal(l, s) {
     const before = {name: s.title === tr('Sprint {0}', s.num) ? '' : s.title || '', goal: s.goal || '', ...(s.state !== 'closed' ? {start: s.start, end: s.end} : {})};
     const after = {name: $('#se-n', md).value.trim(), goal: $('#se-g', md).value.trim(), ...(s.state !== 'closed' ? {start: $('#se-s', md).value, end: $('#se-e', md).value} : {})};
     // 2.564.0 D (#4701): against the version the dialog opened with; 409 = the reason (api) and the current sprint opens
-    try { await spr_patch(s.id, {...after, ...(s.updated_at ? {expect_updated_at: s.updated_at} : {})}); } catch (x) {
+    let pj; try { pj = await spr_patch(s.id, {...after, ...(s.updated_at ? {expect_updated_at: s.updated_at} : {})}); } catch (x) {
       if (x?.status === 409) { md.remove(); await load(); render(); const n = spr_byId(spr_list(l.id), s.id); if (n) spr_editModal(spr_list(l.id), n); }
       return;
     }
     md.remove();
-    offerUndo(tr('Saved'), histAdd({label: tr('{0} changed', spr_name(s)), undo: () => spr_patch(s.id, before), redo: () => spr_patch(s.id, after)}));
+    offerUndo(tr('Saved'), histAdd({label: tr('{0} changed', spr_name(s)), ...(pj?.undo_group ? {srv: true} : {}), undo: () => spr_patch(s.id, before), redo: () => spr_patch(s.id, after)}));
   });
   setTimeout(() => focusIfKeyboard($('#se-g', md)), 30);  // 2.655.0 (#5081): was !isMobile()
 }
@@ -102,7 +102,7 @@ async function spr_plan(l) {
   let sid = j.id;
   const del = async () => { await api('DELETE', `/api/sprints/${sid}`); await load(); render(); };
   const re = async () => { const k = await api('POST', `/api/lists/${l.id}/sprints`, {start: j.start, end: j.end}); sid = k.id; await load(); render(); };
-  offerUndo(tr('{0} planned: {1}', j.title, spr_range(j)), histAdd({label: tr('{0} planned: {1}', j.title, spr_range(j)), undo: del, redo: re}));
+  offerUndo(tr('{0} planned: {1}', j.title, spr_range(j)), histAdd({label: tr('{0} planned: {1}', j.title, spr_range(j)), ...(j.undo_group ? {srv: true} : {}), undo: del, redo: re}));
 }
 async function spr_delete(l, s) {
   let j; try { j = await api('DELETE', `/api/sprints/${s.id}`); } catch { return; }
@@ -111,7 +111,7 @@ async function spr_delete(l, s) {
   // 2.567.0 A (#4707): the sprint waits in the trash: the undo takes it back out (same id, its tasks), also from another device
   const back = async () => { if (j.trash) { await api('POST', `/api/sprints/${s.id}/restore`); sid = s.id; } else { const k = await api('POST', `/api/lists/${l.id}/sprints`, {name: j.sprint.name, goal: j.sprint.goal, start: j.sprint.start, end: j.sprint.end, tasks: j.tasks}); sid = k.id; } await load(); render(); };
   const again = async () => { if (sid) await api('DELETE', `/api/sprints/${sid}`); await load(); render(); };
-  offerUndo(tr('{0} removed', spr_name(s)), histAdd({label: tr('{0} removed', spr_name(s)), undo: back, redo: again}));
+  offerUndo(tr('{0} removed', spr_name(s)), histAdd({label: tr('{0} removed', spr_name(s)), ...(j.undo_group ? {srv: true} : {}), undo: back, redo: again}));
 }
 async function spr_start(s) {
   try { await api('POST', `/api/sprints/${s.id}/start`); } catch { return; }

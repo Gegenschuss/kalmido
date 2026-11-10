@@ -47,7 +47,7 @@ LPU_ADMIN = frozenset({"name", "color", "archived", "archived_at", "checklist", 
 LPU_E2E = frozenset({"e2e", "e2e_gen", "e2e_rotate", "e2e_reenc"})  # a new key since: the copy's sealed name is old (409)
 
 
-class _AllBut(frozenset):
+class AllBut(frozenset):
     """Every column name except the ones given -- for undo_keep / undo_nofp, which are only asked with `in` (core/writes.py
     _write_back, _fp): the row of a project has some 80 columns and gets new ones, the plain settings are the short list."""
     def __contains__(self, k):
@@ -58,8 +58,8 @@ def lpu_label(r):
     return LPU_LABEL, [ua_plain(r.get("name"), r.get("id"))]
 
 
-obj_track(LPU_KIND, "lists", area="tasks", undo_keep={"lists": _AllBut(LPU_COLS)},
-          undo_nofp={"lists": _AllBut(LPU_COLS | LPU_E2E)}, undo_label=lpu_label)
+obj_track(LPU_KIND, "lists", area="tasks", undo_keep={"lists": AllBut(LPU_COLS)},
+          undo_nofp={"lists": AllBut(LPU_COLS | LPU_E2E)}, undo_label=lpu_label)
 GONE[LPU_KIND] = "lists"  # an account's deletion takes its history / undo rows of the projects that went (core/objhooks.py)
 
 

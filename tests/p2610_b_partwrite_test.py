@@ -35,8 +35,9 @@ ROUTES = {  # file -> {function: the core call it must make}
     "kalmido/lists/sprints.py": {"sprint_update": "part_write"},
     "kalmido/tasks/tasks.py": {"set_waiting": "part_write"},
     "kalmido/tasks/lifecycle.py": {"people_merge": "part_merge"},
-    # 2.809.0 (#5476): the section's way back moved out of the route into lpt_section_back (also the undo list's way, lists/secundo.py)
-    "kalmido/lists/parttrash.py": {"lpt_section_back": "part_copy_back", "sprint_restore": "part_copy_back",
+    # 2.809.0 (#5476): the ways back of a section / sprint moved out of the routes into lpt_section_back / lpt_sprint_back (also
+    # the undo list's ways, lists/secundo.py, lists/sprundo.py)
+    "kalmido/lists/parttrash.py": {"lpt_section_back": "part_copy_back", "lpt_sprint_back": "part_copy_back",
                                    "lpt_section_put": "part_copy", "lpt_sprint_put": "part_copy"},
 }
 
