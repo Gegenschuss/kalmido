@@ -512,7 +512,7 @@ def _trash_plain(r):
 
 def le2b_scrub_tasks(c, ids):
     """The copies of tasks that were just moved into a list with the lock (part A calls it after the move): their history
-    texts, time entry snapshots and pending tidy events. The caller commits."""
+    texts, time entry snapshots and pending tidy events, #5562: their texts in the trash copies of other projects. The caller commits."""
     ids = [int(x) for x in ids or [] if isinstance(x, int)]
     n = {"activity": 0}
     for i in range(0, len(ids), 1000):
@@ -534,4 +534,42 @@ def le2b_scrub_tasks(c, ids):
         c.execute(f"UPDATE task_decisions SET text=? WHERE task_id IN ({q})", (le2e_neutral(), *part))
         c.execute(f"DELETE FROM tidy_pending WHERE task_id IN ({q})", part)
         n["undo_tasks"] = n.get("undo_tasks", 0) + le2b_scrub_undo(c, f"kind='task' AND ref_id IN ({q})", part)  # #5408
+    n.update(_scrub_trash_tasks(c, set(ids)))  # #5562
+    return n
+
+
+def _scrub_trash_tasks(c, ids):
+    """#5562 (finding of the review of #5549): the copies in the trash of OTHER projects (core/objparts.py part_copy) still quote
+    tasks that are now in a locked project: the Undo copy of "Delete all times" (personal/timewipe.py) keeps their title and
+    note -> emptied and sealed again (as le2b_scrub_trash does it), a deleted custom field (lists/fields.py fd_trash) keeps
+    their values (held.vals) -> taken out (fd_back would not give them to a task outside its project anyway). The copy itself
+    stays. Idempotent, the caller commits. Returns {what: rows}."""
+    n = {"trash_task_times": 0, "trash_task_fields": 0}
+    if not ids:
+        return n
+    for r in c.execute("SELECT id, list_id, kind, held FROM list_part_trash WHERE kind IN (?, ?) ORDER BY id",
+                       (FIELD_KIND, TZW_KIND)).fetchall():
+        try:
+            held = json.loads(r["held"] or "null")
+        except ValueError:
+            continue
+        if r["kind"] == TZW_KIND:
+            es = held if isinstance(held, list) else []
+            hit = [e for e in es if isinstance(e, dict) and e.get("task_id") in ids and (e.get("note") or e.get("task_title"))]
+            for e in hit:
+                ok = isinstance(e.get("sig"), str) and hmac.compare_digest(e["sig"], h6b_sig(c, r["list_id"], e))
+                e["note"], e["task_title"] = "", ""
+                if e.get("sig"):  # as le2b_scrub_trash: sealed again only when the old seal held
+                    e["sig"] = h6b_sig(c, r["list_id"], e) if ok else "-"
+            if hit:
+                c.execute("UPDATE list_part_trash SET held=? WHERE id=?", (json.dumps(es, ensure_ascii=False, default=str), r["id"]))
+                n["trash_task_times"] += 1
+            continue
+        if not isinstance(held, dict) or not isinstance(held.get("vals"), list):
+            continue
+        vals = [v for v in held["vals"] if not (isinstance(v, list) and v and v[0] in ids)]
+        if len(vals) != len(held["vals"]):
+            held["vals"], held["n"] = vals, len({v[0] for v in vals if isinstance(v, list) and v})
+            c.execute("UPDATE list_part_trash SET held=? WHERE id=?", (json.dumps(held, ensure_ascii=False), r["id"]))
+            n["trash_task_fields"] += 1
     return n

@@ -448,6 +448,38 @@ check(r.ok and dbx("SELECT section_id FROM tasks WHERE id=?", (TG,))[0][0] is No
       and not dbx("SELECT 1 FROM sections WHERE list_id=? AND name=?", (L, "PlainLeft")),
       f"#5552: a restored task makes no plain-named section in the locked project {r.status_code} {r.text[:200]}")
 
+# ================================================================== 2.898.0 (#5562): a task moved into the locked project
+# leaves copies in the trash of its OLD project: the Undo copy of "Delete all times" (task title + note of its entries) and a
+# deleted text field (its value in held.vals). The move empties / takes them out there; the other tasks' copies stay.
+L3 = A.post(B + "/api/lists", json={"name": "Other open", "org_id": None}).json()["id"]
+dbx("UPDATE lists SET time_tracking=1 WHERE id=?", (L3,), write=True)
+T5 = A.post(B + "/api/tasks", json={"list_id": L3, "title": MK + "MoveTitle"}).json()["id"]
+T6 = A.post(B + "/api/tasks", json={"list_id": L3, "title": "Stays here"}).json()["id"]
+r = A.post(B + f"/api/lists/{L3}/fields", json={"name": "Detail", "type": "text"})
+F3 = r.json().get("id")
+check(r.ok and A.patch(B + f"/api/tasks/{T5}", json={"fields": {str(F3): MK + "MoveValue"}}).ok
+      and A.patch(B + f"/api/tasks/{T6}", json={"fields": {str(F3): "StayValue"}}).ok, f"#5562: text field values {r.text[:200]}")
+check(A.delete(B + f"/api/fields/{F3}").ok, "#5562: the field into the trash of the open project")
+for t_, note_, h_ in ((T5, MK + "MoveNote", 5), (T6, "StayNote", 6)):
+    r = A.post(B + "/api/time/entries", json={"task_id": t_, "start": (datetime.now() - timedelta(hours=h_)).isoformat(timespec="seconds"),
+                                              "minutes": 15, "note": note_})
+    check(r.ok, f"#5562: a time entry with a note {r.text[:200]}")
+r = A.post(B + f"/api/lists/{L3}/time/delete-all", json={"confirm": "Other open"})
+W3 = r.json().get("wipe") if r.ok else None
+check(r.ok and W3, f"#5562: delete all times of the open project {r.status_code} {r.text[:200]}")
+check(len(dbx("SELECT id FROM list_part_trash WHERE list_id=? AND held LIKE ?", (L3, f"%{MK}Move%"))) == 2,
+      "#5562: before the move both copies quote the task")
+r = A.patch(B + f"/api/tasks/{T5}", json={"list_id": L, "title": cipher(40)})
+check(r.ok and dbx("SELECT list_id FROM tasks WHERE id=?", (T5,))[0][0] == L, f"#5562: the task moves into the locked project {r.status_code} {r.text[:200]}")
+left_ = [x[0] for x in dbx("SELECT held FROM list_part_trash WHERE list_id=? AND held LIKE ?", (L3, f"%{MK}%"))]
+check(not left_, f"#5562: no text of the moved task in the trash copies of its old project {left_}")
+check(len(dbx("SELECT id FROM list_part_trash WHERE list_id=? AND (held LIKE '%StayValue%' OR held LIKE '%StayNote%')", (L3,))) == 2,
+      "#5562: the copies keep the other task's value and note")
+r = A.post(B + f"/api/lists/{L3}/time/restore", json={"wipe": W3})
+back = sorted((x[0], x[1]) for x in dbx("SELECT note, task_title FROM time_entries WHERE list_id=?", (L3,)))
+check(r.ok and back == [("", ""), ("StayNote", "Stays here")],
+      f"#5562: Undo of 'delete all times' still works (sealed again), the moved task's entry without its texts {back} {r.text[:200]}")
+
 print(f"\n{OKS[0]} checks ok, {len(FAILS)} failed", flush=True)
 if FAILS:
     print("FAILED:\n - " + "\n - ".join(FAILS))
