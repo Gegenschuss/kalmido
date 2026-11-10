@@ -51,11 +51,11 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
   const ready = async (ev, expr, n = 80) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const open = async (nav, ev, doc) => { await nav(B + 'static/icon.svg'); await nav(B + `#docs/${doc.id}`); return ready(ev, `document.querySelector('.dc-form #dc-name')?.value === ${JSON.stringify(doc.title)} && !!document.querySelector('#rc-cat')`); };  // 2.750.0 (#4876): the field Title shows the title (the file name without its ending)
   // two fields marked "automatic" (as a rule sets them), drawn by the page itself
-  const mark = `(() => { DC.doc.auto = {...(DC.doc.auto || {}), type: 'rule', folder: 'rule'}; dc_mdDraw(document.querySelector('.dc-body').parentElement); return !!document.querySelector('.dc-f .dc-auto'); })()`;
+  const mark = `(() => { DC.doc.auto = {...(DC.doc.auto || {}), type: 'rule', folder: 'rule'}; dc_mdDraw(document.querySelector('.dc-body').parentElement); return !!document.querySelector('.dc-f .dc-auto:not(.dc-tsug)'); })()`;  // 2.833.0 (#4882): the title's "Suggest title" button wears .dc-auto for its place in the label line, it is no mark
   // each visible row with a label: label, field, row and the "automatic" mark
   const ROWS = `(() => { const vis = e => e.getClientRects().length > 0, b = e => { const r = e.getBoundingClientRect(); return {l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom), h: Math.round(r.height)}; };
     const rows = [...document.querySelectorAll('.rc-slot .dc-f, .dc-form .dc-f')].filter(vis).filter(r => r.children[0].tagName === 'LABEL' && !r.closest('details:not([open])'));  // 2.583.0 (#4835): not the folded "More fields" (Firefox gives their rows boxes)
-    return JSON.stringify({w: Math.round(document.querySelector('.dc-props').clientWidth), rows: rows.map(r => { const a = r.querySelector('.dc-auto'); return {f: r.children[0].htmlFor, lab: b(r.children[0]), fld: b(r.children[1]), row: b(r), auto: a ? b(a) : null}; })}); })()`;
+    return JSON.stringify({w: Math.round(document.querySelector('.dc-props').clientWidth), rows: rows.map(r => { const a = r.querySelector('.dc-auto:not(.dc-tsug)'); return {f: r.children[0].htmlFor, lab: b(r.children[0]), fld: b(r.children[1]), row: b(r), auto: a ? b(a) : null}; })}); })()`;
   const oneRight = rows => rows.length > 0 && rows.every(r => Math.abs(r.fld.r - rows[0].fld.r) <= 1);
   const above = rows => rows.every(r => r.lab.b <= r.fld.t + 1 && Math.abs(r.lab.l - r.fld.l) <= 1);
   const full = rows => rows.every(r => r.fld.r - r.fld.l >= r.row.r - r.row.l - 1);
