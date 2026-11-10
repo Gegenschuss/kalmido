@@ -147,6 +147,51 @@ def f8(who, s, uid):
     check(len(groups(uid)) == g0 + 1, f"F8 {who}: and one undo step")
 
 
+# ================================================================ F9 a write does not wait for the parts a "bis hierher" holds
+HOLD = """import sys
+import app
+from kalmido.core.db import connect
+from kalmido.core.pg import system_ctx
+c = connect()
+with system_ctx(c):
+    n = len(c.execute("SELECT id FROM obj_undo WHERE group_id=? ORDER BY id FOR UPDATE", ({0},)).fetchall())
+print("LOCKED", n, flush=True)
+sys.stdin.readline()
+c.rollback()
+c.close()
+print("FREE", flush=True)"""
+
+
+def f9():
+    s1, s2 = service(A, "Schnitt F9", 500), service(A, "Ton F9", 300)
+    r = A.patch(B + OFF + f"/services/{s1['id']}", json={"daily_rate": 550, "expect_updated_at": s1["updated_at"]})
+    check(r.ok, f"F9: setup: a step {r.text[:200]}")
+    gid = groups(ALICE)[-1]["id"]
+    r = A.post(B + f"/api/undo/to/{gid}")
+    check(r.ok and gid in r.json().get("undone", []), f"F9: setup: taken back (its way forward is open) {r.text[:200]}")
+    # a second device's "bis hierher" of the same person holds the parts of that group (as _run_group does while it waits
+    # for the objects): a write must not wait for them (the circle of the deadlock)
+    p = subprocess.Popen(["docker", "exec", "-i", CT, "python", "-u", "-c", HOLD.format(int(gid))], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    try:
+        line = p.stdout.readline()
+        check(line.startswith("LOCKED") and int(line.split()[1]) >= 1, f"F9: setup: the parts are held {line}")
+        try:
+            r = A.patch(B + OFF + f"/services/{s2['id']}", json={"daily_rate": 320, "expect_updated_at": s2["updated_at"]}, timeout=20)
+            ok = r.ok
+        except requests.exceptions.Timeout:
+            ok, r = False, None
+        check(ok, f"F9: a new step answers while the parts are held (no waiting for them) {r.status_code if r is not None else 'timeout'}")
+        check(any(x["id"] == gid and x["state"] == "undone" for x in groups(ALICE)), "F9: the held group stays as it is")
+    finally:
+        p.stdin.write("go\n")
+        p.stdin.flush()
+        p.wait(timeout=60)
+    s2 = A.get(B + OFF + f"/services/{s2['id']}").json()
+    r = A.patch(B + OFF + f"/services/{s2['id']}", json={"daily_rate": 330, "expect_updated_at": s2["updated_at"]})
+    check(r.ok and not any(x["id"] == gid for x in groups(ALICE)), f"F9: the next step tidies it: its way forward ends {r.status_code}")
+
+
 # ================================================================ setup
 kt.fresh({"KALMIDO_INSTANCE_MODE": "workspaces"}, prefix="P2866")
 kt.docker_logs_on_first_fail()
@@ -183,6 +228,7 @@ f6()
 f7()
 f8("alice", A, ALICE)
 f8("frida", Fr, FID)
+f9()
 # -- more parts below --
 
 raise SystemExit(kt.done("p2866_pflege"))

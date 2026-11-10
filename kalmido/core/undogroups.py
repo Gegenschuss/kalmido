@@ -92,10 +92,36 @@ def _q(ids):
     return ",".join("?" * len(ids))
 
 
+class _Busy(Exception):
+    """ug_free: a group another transaction holds (its savepoint is rolled back, which lets go of what it locked)."""
+
+
+def ug_free(c, gids):
+    """2.866.0 (#5302 F9): of the groups gids the ones whose row and parts this transaction locks now without waiting (FOR
+    UPDATE SKIP LOCKED). A write runs ug_new_step / ug_cap while it holds its object's lock; a parallel "bis hierher" of the
+    same person (core/undoweb.py) holds the parts of the group it takes back and waits for the objects -- waiting for those
+    rows here closed the circle (a deadlock, 500 on one device). A group in use is left as it is (the next step tidies it);
+    the locks taken on its other parts go with its savepoint, so the run that holds it never waits for this write."""
+    out = []
+    for gid in sorted({int(x) for x in gids if x}):
+        try:
+            with c.savepoint():
+                if c.execute("SELECT id FROM undo_groups WHERE id=? FOR UPDATE SKIP LOCKED", (gid,)).fetchone() is None:
+                    raise _Busy
+                got = len(c.execute("SELECT id FROM obj_undo WHERE group_id=? ORDER BY id FOR UPDATE SKIP LOCKED", (gid,)).fetchall())
+                if got != c.execute("SELECT COUNT(*) FROM obj_undo WHERE group_id=?", (gid,)).fetchone()[0]:
+                    raise _Busy
+            out.append(gid)
+        except _Busy:
+            pass
+    return out
+
+
 def ug_new_step(c, uid):
     """A new step of uid: the way forward of the undone groups ends (an undone group goes, a partial one keeps the parts
-    that stayed). A part that belongs to an editor session too stays there (unlinked)."""
-    gids = [r[0] for r in c.execute("SELECT id FROM undo_groups WHERE user_id=? AND state IN ('undone','partial')", (int(uid),)).fetchall()]
+    that stayed). A part that belongs to an editor session too stays there (unlinked). 2.866.0 (#5302 F9): only the groups
+    no other transaction holds (ug_free)."""
+    gids = ug_free(c, [r[0] for r in c.execute("SELECT id FROM undo_groups WHERE user_id=? AND state IN ('undone','partial')", (int(uid),)).fetchall()])
     if not gids:
         return
     q = _q(gids)
@@ -122,6 +148,7 @@ def ug_drop(c, where, args=()):
 def ug_cap(c, uid):
     """At most UNDO_GROUPS_MAX groups per person: the oldest go."""
     old = [r[0] for r in c.execute("SELECT id FROM undo_groups WHERE user_id=? ORDER BY id DESC OFFSET ?", (int(uid), UNDO_GROUPS_MAX)).fetchall()]
+    old = ug_free(c, old)  # 2.866.0 (#5302 F9): it runs inside a write too
     if old:
         ug_drop_ids(c, old)
 
