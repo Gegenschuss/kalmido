@@ -61,15 +61,15 @@ const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'ut
     const POS = `(() => { const s = document.querySelector('#side'), R = e => e && e.getBoundingClientRect(), q = x => document.querySelector(x), sr = R(s), se = q('#side .sbmsrch .scmd'), t = q('#side .sg-focus .srow[data-go="today"]'), row = q('#side .sbmr'), d = q('#side .sbdock'), at = se && document.elementFromPoint(R(se).left + 40, R(se).top + R(se).height / 2);
       return {top: s.scrollTop, max: s.scrollHeight - s.clientHeight, se: se && Math.round(R(se).top - sr.top), seH: se && Math.round(R(se).height), onSearch: !!(at && at.closest('.scmd')), today: t && Math.round(R(t).bottom - sr.top), row: row && Math.round(R(row).bottom - sr.top), dock: d && Math.round(sr.bottom - R(d).bottom), set: !!(d && d.querySelector('.sset')), acct: !!(d && d.querySelector('.sbacct'))}; })()`;
     const p0 = await ev(POS);
-    await ev(`(() => { document.querySelector('#side').scrollTop = 400; return 1; })()`); await sleep(100);
+    await ev(`(() => { document.querySelector('#side').scrollTop = 500; return 1; })()`); await sleep(100);  // 2.867.0 (#5540): 500 (was 400) - the grid of 4 has more rows, Today sits lower
     const p1 = await ev(POS);
-    check(p0.max > 200 && p1.top === 400, '#3739: the drawer scrolls ' + JSON.stringify(p1));
+    check(p0.max > 200 && p1.top === 500, '#3739: the drawer scrolls ' + JSON.stringify(p1));
     check(p1.se >= 0 && p1.se < 40 && p1.onSearch, '#3739: the search stays on top, nothing over it ' + JSON.stringify(p1));
     check(p1.today <= p1.se && p1.row <= p1.se, '#3739: Today, Inbox and the areas scrolled away under it ' + JSON.stringify(p1));
     check(p1.dock === 0 && p1.set && p1.acct, '#3739: Settings and the account stay at the bottom ' + JSON.stringify(p1));
     await shot('p2442-drawer-scrolled.png');
     await ev(`(() => { renderSide(); return 1; })()`);
-    check((await ev(POS)).top === 400, '#3739: a redraw keeps the scroll height');
+    check((await ev(POS)).top === 500, '#3739: a redraw keeps the scroll height');
     await ev(`(() => { document.querySelector('#side').scrollTop = 60; document.querySelector('#side .sbmr .srb[data-sbb="tasks"]:not(.on), #side .sbmr .srb[data-sbb="agents"]').click(); return 1; })()`);
     await sleep(500);
     const p2 = await ev(POS);

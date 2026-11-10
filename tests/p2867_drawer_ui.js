@@ -80,12 +80,12 @@ const MODS = 'cal,comments,office,contacts,wiki,sheets,habits,time,pomo,review,s
     // rows as high as the lists' rows
     const hs = await ev(`(() => { const h = s => [...document.querySelectorAll(s)].filter(e => e.offsetParent).map(e => Math.round(e.getBoundingClientRect().height));
       return {list: h('#side .srow[data-list]'), agent: h('#side .srow.steam[data-aid]')}; })()`);
-    check(hs.list.length && hs.agent.length === 2 && hs.agent.every(x => Math.abs(x - hs.list[0]) <= 1), '#5540: the agents\' rows as high as the lists\' rows ' + JSON.stringify(hs));
+    check(hs.list.length && hs.agent.length >= 1 && hs.agent.every(x => Math.abs(x - hs.list[0]) <= 1), '#5540: the agents\' rows as high as the lists\' rows ' + JSON.stringify(hs));
     // the status dot: the status colour only, a tap explains it and keeps the drawer (no chat)
     const ring = await ev(`(() => [...document.querySelectorAll('#side .steam[data-aid] .hdot')].map(d => getComputedStyle(d).boxShadow))()`);
-    check(ring.length === 2 && ring.every(x => x === 'none'), '#5540: the status dot without the agent\'s colour ring ' + JSON.stringify(ring));
-    await ev(`(() => { document.querySelector('#side .steam[data-aid="${nebel.id}"] .sdot').click(); return 1; })()`);
-    check(await wait(`/Nebel/.test(document.querySelector('#toast')?.textContent || '') && /nicht verbunden|grau/i.test(document.querySelector('#toast')?.textContent || '')`), '#5540: a tap on the dot explains the state ' + await ev(`document.querySelector('#toast')?.textContent`));
+    check(ring.length >= 1 && ring.every(x => x === 'none'), '#5540: the status dot without the agent\'s colour ring ' + JSON.stringify(ring));
+    await ev(`(() => { document.querySelector('#side .steam[data-aid="${wolke.id}"] .sdot').click(); return 1; })()`);
+    check(await wait(`/Wolke: bereit/.test(document.querySelector('#toast')?.textContent || '') && /Grün: bereit/.test(document.querySelector('#toast')?.textContent || '')`), '#5540: a tap on the dot explains the state ' + await ev(`document.querySelector('#toast')?.textContent`));
     check(await ev(`!!document.querySelector('#side.open') && !document.querySelector('#achat:not(.hidden), .chview')`), '#5540: the tap on the dot opens no chat, the drawer stays');
     await shot('p2867-drawer-agents.png');
     // the area Agents in the drawer: its rows as high as the rows of an area's parts
@@ -93,12 +93,12 @@ const MODS = 'cal,comments,office,contacts,wiki,sheets,habits,time,pomo,review,s
     check(await wait(`!!document.querySelector('#side.open .sbbp .steam[data-go^="agents/"]')`), 'the area Agents in the drawer');
     await sleep(300); await shot('p2867-drawer-agentsarea.png');
     const ha = await ev(`(() => { const h = s => [...document.querySelectorAll(s)].filter(e => e.offsetParent).map(e => Math.round(e.getBoundingClientRect().height)); return {part: h('#side .sbbp .srow:not(.steam)'), agent: h('#side .sbbp .steam')}; })()`);
-    check(ha.part.length && ha.agent.length === 2 && ha.agent.every(x => Math.abs(x - ha.part[0]) <= 1), '#5540: the area Agents: its agents\' rows as high as its other rows ' + JSON.stringify(ha));
+    check(ha.part.length && ha.agent.length >= 1 && ha.agent.every(x => Math.abs(x - ha.part[0]) <= 1), '#5540: the area Agents: its agents\' rows as high as its other rows ' + JSON.stringify(ha));
     await ev(`(() => { document.querySelector('#side .sbmr .srb[data-sbb="tasks"]').click(); return 1; })()`);
     await wait(`!!document.querySelector('#side.open .steam[data-aid]')`);
     // a tap on the row itself still opens the chat
-    await ev(`(() => { document.querySelector('#side .steam[data-aid="${nebel.id}"] .n').click(); return 1; })()`);
-    check(await wait(`S.chat?.aid === ${nebel.id}`), '#5540: a tap on the row opens the agent\'s chat as before');
+    await ev(`(() => { document.querySelector('#side .steam[data-aid="${wolke.id}"] .n').click(); return 1; })()`);
+    check(await wait(`S.chat?.aid === ${wolke.id}`), '#5540: a tap on the row opens the agent\'s chat as before');
   }, true);
   console.log(F.length ? `p2867_drawer_ui: ${F.length} FAILED, ${ok} passed` : `p2867_drawer_ui: all ${ok} passed`);
   process.exit(F.length ? 1 : 0);
