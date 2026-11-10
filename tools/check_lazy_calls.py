@@ -122,8 +122,10 @@ def blank(src):
 def shadowed(text, n):
     """Is n also a local name of this file (a variable, a parameter)? Then a call of it is most likely the local one."""
     e = re.escape(n)
-    return bool(re.search(r"(?:const|let|var)\s+(?:[\w$]+\s*=[^;]*?,\s*)*[{\[]?[^;=]*?(?<![\w$])" + e + r"\b"
-                          r"|(?<![\w$.])" + e + r"\s*=>|[(,]\s*(?:\.\.\.)?" + e + r"\s*[,)=]|\bcatch\s*\(\s*" + e + r"\b", text))
+    # no alternative spans a `;`: look only at the statements that contain the name at all (#5492)
+    pat = re.compile(r"(?:const|let|var)\s+(?:[\w$]+\s*=[^;]*?,\s*)*[{\[]?[^;=]*?(?<![\w$])" + e + r"\b"
+                     r"|(?<![\w$.])" + e + r"\s*=>|[(,]\s*(?:\.\.\.)?" + e + r"\s*[,)=]|\bcatch\s*\(\s*" + e + r"\b")
+    return any(n in seg and pat.search(seg) for seg in text.split(";"))
 
 
 def lazy_calls(root):
@@ -146,12 +148,15 @@ def lazy_calls(root):
     only = {n: fs for n, fs in owner.items() if n not in start_defs and n not in start_win and n not in prot}
     if not only:
         return [], len(start), len(lazy)
-    call = re.compile(r"(?<![\w$.'\"`])(" + "|".join(sorted(map(re.escape, only), key=len, reverse=True)) + r")\s*\(")
+    # one identifier scan per line instead of one huge alternation over every name (#5492)
+    call = re.compile(r"(?<![\w$.'\"`])([A-Za-z_$][\w$]*)\s*\(")
+    shadow_cache = {}
     hits = []
     for f in start:
         lines = texts[f].split("\n")
         btext = blank(texts[f])  # without comments and string texts (a name in a text is no declaration)
         code = btext.split("\n")
+        flat = re.sub(r"\s+", " ", btext)  # shadowed() never tells one whitespace run from another; blanked texts are long ones
         for mod in OKMOD_RE.findall(texts[f]):
             if mod not in mods:
                 hits.append((f, 0, mod, "-", "lazy-ok-module names a module that LD_MODS does not know"))
@@ -167,9 +172,13 @@ def lazy_calls(root):
                 continue
             for m in call.finditer(code[k]):
                 n = m.group(1)
-                if only[n] <= okf:
+                if n not in only or only[n] <= okf:
                     continue
-                if re.search(r"function\s*\*?\s*" + re.escape(n) + r"\s*\(", line) or shadowed(btext, n):
+                if re.search(r"function\s*\*?\s*" + re.escape(n) + r"\s*\(", line):
+                    continue
+                if (f, n) not in shadow_cache:
+                    shadow_cache[(f, n)] = shadowed(flat, n)
+                if shadow_cache[(f, n)]:
                     continue
                 ctx = "\n".join(lines[max(0, k - 4):k + 1])
                 sib = set().union(*(tops.get(x, set()) for x in only[n])) | {n}
