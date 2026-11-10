@@ -1387,7 +1387,7 @@ def init_db(guard=True, load=None):
                           "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value WHERE user_settings.value=''",  # the start fills in defaults first
                           (",".join(areas), uid))
             gset(c, "migr_tours2466", "1")
-        from ..collab.liste2eguard import le2b_scrub_free, le2b_scrub_trash  # the passes of #4372 and #5549
+        from ..collab.liste2eguard import le2b_scrub_free, le2b_scrub_trash, le2b_scrub_trash_tasks  # the passes of #4372, #5549, #5562
         if gsetting(c, "migr_e2efree4372") != "1":  # 2.538.0 (#4372, review 2646 finding 1): one way -- a project locked before
             # 2.538 loses its time notes, status notes and descriptions as a project locked now does (le2b_scrub). Only 'on': one
             # still 'encrypting' gets the whole scrub at its finish, one 'decrypting' shows its texts again
@@ -1408,6 +1408,16 @@ def init_db(guard=True, load=None):
             gset(c, "migr_e2etrash5549", "1")
             if any(n.values()):
                 print("locked projects: plain trash copies removed " + ", ".join(f"{k} {v}" for k, v in sorted(n.items())), flush=True)
+        if gsetting(c, "migr_e2etrash5562") != "1":  # 2.898.0 (#5562, review 2): one way -- the tasks of a project locked before
+            # lose their title, note and field values in the trash copies of OTHER projects, as tasks moved in now do
+            n = {}
+            for r in c.execute("SELECT id FROM lists WHERE e2e='on' ORDER BY id").fetchall():
+                tids = {x[0] for x in c.execute("SELECT id FROM tasks WHERE list_id=?", (r[0],))}
+                for k, v in le2b_scrub_trash_tasks(c, tids).items():
+                    n[k] = n.get(k, 0) + v
+            gset(c, "migr_e2etrash5562", "1")
+            if any(n.values()):
+                print("locked projects: task texts removed from other projects' trash copies " + ", ".join(f"{k} {v}" for k, v in sorted(n.items())), flush=True)
         if gsetting(c, "migr_offerlist4586") != "1":  # 2.620.0 (#4586, review C M1): the links of tasks moved before the trigger
             # kalmido_offer_link_list (migrations.d/4586_a.py) follow their task's list once
             c.execute("UPDATE task_offer_links l SET list_id=t.list_id FROM tasks t WHERE t.id=l.task_id AND l.list_id<>t.list_id")

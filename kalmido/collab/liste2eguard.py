@@ -501,7 +501,8 @@ def le2b_trash_cipher_purge(c, lid):
     change is done (e2e_reenc), the copies in its trash holding ciphertexts go for good, as le2b_scrub_trash drops the plain
     ones when it is switched on: a deleted custom field with a ciphertext value (held.vals) - nobody re-encrypts or decrypts
     the trash, a restore would bring back what nobody can read. The sections of the trash go in both cases through
-    lists/parttrash.py lpt_section_purge_list (#5552). Idempotent, the caller commits. Returns the copies dropped."""
+    lists/parttrash.py lpt_section_purge_list (#5552). Like the files and comment texts of the trash (atr_purge_list,
+    ctt_purge_list) it looks at no generation: a copy of the new key goes too (review 3, accepted). Idempotent, the caller commits. Returns the copies dropped."""
     k = 0
     for r in c.execute("SELECT id, held FROM list_part_trash WHERE list_id=? AND kind=? ORDER BY id", (lid, FIELD_KIND)).fetchall():
         try:
@@ -553,28 +554,35 @@ def le2b_scrub_tasks(c, ids):
         c.execute(f"UPDATE task_decisions SET text=? WHERE task_id IN ({q})", (le2e_neutral(), *part))
         c.execute(f"DELETE FROM tidy_pending WHERE task_id IN ({q})", part)
         n["undo_tasks"] = n.get("undo_tasks", 0) + le2b_scrub_undo(c, f"kind='task' AND ref_id IN ({q})", part)  # #5408
-    n.update(_scrub_trash_tasks(c, set(ids)))  # #5562
+    n.update(le2b_scrub_trash_tasks(c, set(ids)))  # #5562
     return n
 
 
-def _scrub_trash_tasks(c, ids):
+def le2b_scrub_trash_tasks(c, ids):
     """#5562 (finding of the review of #5549): the copies in the trash of OTHER projects (core/objparts.py part_copy) still quote
     tasks that are now in a locked project: the Undo copy of "Delete all times" (personal/timewipe.py) keeps their title and
     note -> emptied and sealed again (as le2b_scrub_trash does it), a deleted custom field (lists/fields.py fd_trash) keeps
     their values (held.vals) -> taken out (fd_back would not give them to a task outside its project anyway). The copy itself
     stays. Idempotent, the caller commits. Returns {what: rows}."""
     n = {"trash_task_times": 0, "trash_task_fields": 0}
-    if not ids:
-        return n
-    for r in c.execute("SELECT id, list_id, kind, held FROM list_part_trash WHERE kind IN (?, ?) ORDER BY id",
-                       (FIELD_KIND, TZW_KIND)).fetchall():
+    ids = {i for i in ids if isinstance(i, int)}
+    rows, seen = [], set()
+    for ch in [sorted(ids)[i:i + 500] for i in range(0, len(ids), 500)]:  # review 1: the database picks the copies naming them
+        alt = "|".join(str(i) for i in ch)
+        for r in c.execute("SELECT id, list_id, kind, held FROM list_part_trash WHERE kind IN (?, ?) AND held ~ ? ORDER BY id",
+                           (FIELD_KIND, TZW_KIND, rf'"task_id":\s*({alt})\s*[,}}]|\[\s*({alt})\s*,')).fetchall():
+            if r["id"] not in seen:
+                seen.add(r["id"])
+                rows.append(r)
+    for r in rows:
         try:
             held = json.loads(r["held"] or "null")
         except ValueError:
             continue
         if r["kind"] == TZW_KIND:
             es = held if isinstance(held, list) else []
-            hit = [e for e in es if isinstance(e, dict) and e.get("task_id") in ids and (e.get("note") or e.get("task_title"))]
+            hit = [e for e in es if isinstance(e, dict) and isinstance(e.get("task_id"), int) and e["task_id"] in ids
+                   and (e.get("note") or e.get("task_title"))]
             for e in hit:
                 ok = isinstance(e.get("sig"), str) and hmac.compare_digest(e["sig"], h6b_sig(c, r["list_id"], e))
                 e["note"], e["task_title"] = "", ""
@@ -586,9 +594,9 @@ def _scrub_trash_tasks(c, ids):
             continue
         if not isinstance(held, dict) or not isinstance(held.get("vals"), list):
             continue
-        vals = [v for v in held["vals"] if not (isinstance(v, list) and v and v[0] in ids)]
+        vals = [v for v in held["vals"] if not (isinstance(v, list) and v and isinstance(v[0], int) and v[0] in ids)]
         if len(vals) != len(held["vals"]):
-            held["vals"], held["n"] = vals, len({v[0] for v in vals if isinstance(v, list) and v})
+            held["vals"], held["n"] = vals, len({v[0] for v in vals if isinstance(v, list) and v and isinstance(v[0], int)})
             c.execute("UPDATE list_part_trash SET held=? WHERE id=?", (json.dumps(held, ensure_ascii=False), r["id"]))
             n["trash_task_fields"] += 1
     return n
