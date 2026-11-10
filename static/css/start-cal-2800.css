@@ -4,4 +4,4 @@
 #pop.sheet .evpfoot{bottom:calc(-.75rem - var(--safe-b))}
 /* 2.800.0 (#5468): the mark of an event of a subscribed calendar (personal, shown in every workspace) */
 .cevsub{display:inline-flex;vertical-align:-.125em;margin-right:.1875rem;opacity:.75}
-.cevsub svg.i{width:.75rem;height:.75rem}
+.cevsub svg.i{width:var(--ic-s);height:var(--ic-s)}

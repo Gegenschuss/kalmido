@@ -436,6 +436,9 @@ ALWAYS_SUITES = ("parity", "pg_dialect", "rls_static", "tenant_coverage", "freel
                  "launcher_parity", "agent_docs_coverage", "mcp", "usage_hook")
 # the WS_VIEWS guard (p2661_b_ui) needs a container: along when a server / client file changed (the files it scans)
 APP_GUARD_SUITES = ("p2661_b_ui",)
+# #5530 (CI red of 2.833.0 and four times before: #4662 #4730 #5100 #5530): the scale guard reads every stylesheet; a new or
+# changed one names it never, so a size off the tokens showed up only in the full CI. Along with any changed stylesheet (seconds)
+CSS_GUARD_SUITES = ("p2419_scale",)
 APP_PREFIXES = ("kalmido/", "static/")
 # 2.501.0 (#4016): files the push stage sends to the full run, for --touched only (the small runs; select() and the CI stay as they
 # are): 330 einreihen checks ran only a sample because schema.py / db.py / app.css (272 times), translations (194), start files
@@ -619,7 +622,8 @@ def touched(repo, files, base=None, head=None):
                 for s in COVERAGE_SUITES:
                     if s in repo.group_of:
                         why.setdefault(s, f"{f}: route added")
-    for s in ALWAYS_SUITES + (APP_GUARD_SUITES if any(f.startswith(APP_PREFIXES) for f in files) else ()):
+    css = any(f == "static/app.css" or (f.startswith("static/css/") and f.endswith(".css")) for f in files)
+    for s in ALWAYS_SUITES + (APP_GUARD_SUITES if any(f.startswith(APP_PREFIXES) for f in files) else ()) + (CSS_GUARD_SUITES if css else ()):
         if files and s in repo.group_of:  # an unknown name: p2381_a_guards fails
             why.setdefault(s, "guard, always (#2853)")
     # a chosen suite that reads a state file of its group (ids.json, cal_ids.json ...) needs the suites before it that

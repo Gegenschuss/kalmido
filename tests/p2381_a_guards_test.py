@@ -6,7 +6,8 @@ when a changed file mapped to them, so parity / pg_dialect / rls_static / the ag
 - every name is a suite of the list (tests/suites.py) - a renamed suite would silently drop out
 - ALWAYS_SUITES need no container (no data dir, no start.sh / test port) - the list stays a matter of seconds
 - every test script of the CI steps "MCP server + usage hook" and "New agents" is in ALWAYS_SUITES
-- --touched: a docs file brings ALWAYS_SUITES, a server / client file also p2661_b_ui (WS_VIEWS), nothing changed = nothing
+- --touched: a docs file brings ALWAYS_SUITES, a server / client file also p2661_b_ui (WS_VIEWS), a stylesheet also
+  p2419_scale (#5530, CSS_GUARD_SUITES), nothing changed = nothing
 - #3505: a file --touched cannot map (core) comes back as an UNMAPPED line on stderr and in --unmapped-out, not silently"""
 import os
 import re
@@ -21,7 +22,7 @@ import stages  # noqa: E402
 from kt import FAILS, OKS, check  # noqa: E402
 
 rows = {s.name: (s.file, s.line or s.cmd or "") for s in suites.all_suites(N)[0] if s.name}
-for s in stages.ALWAYS_SUITES + stages.APP_GUARD_SUITES:
+for s in stages.ALWAYS_SUITES + stages.APP_GUARD_SUITES + stages.CSS_GUARD_SUITES:
     check(s in rows, f"{s} is a suite of tests/suites.py")
 for s in stages.ALWAYS_SUITES:
     fname, line = rows.get(s, (None, ""))
@@ -43,6 +44,12 @@ check(all(s in order for s in stages.ALWAYS_SUITES) and "p2661_b_ui" not in orde
 order, why, _ = stages.touched(repo, ["static/js/app.js"])
 check(all(s in order for s in stages.ALWAYS_SUITES + stages.APP_GUARD_SUITES), "a client file: + p2661_b_ui")
 check(why.get("parity") == "guard, always (#2853)", f"--why names the reason: {why.get('parity')}")
+check("p2419_scale" not in order, f"#5530: a client script alone: no scale guard {order}")
+# #5530: a changed stylesheet brings the scale guard (it reads every stylesheet, no stylesheet names it)
+order, why, _ = stages.touched(repo, ["static/css/start-cal-2800.css"])
+check("p2419_scale" in order and why.get("p2419_scale") == "guard, always (#2853)", f"#5530: a stylesheet: + p2419_scale {order}")
+order, _, _ = stages.touched(repo, ["static/app.css"])
+check("p2419_scale" in order, f"#5530: app.css: + p2419_scale {order}")
 order, _, _ = stages.touched(repo, [])
 check(order == [], f"nothing changed = nothing to test: {order}")
 # 2.501.0 (#4016): schema.py has its fixed set now; the CI basics stay unmapped
