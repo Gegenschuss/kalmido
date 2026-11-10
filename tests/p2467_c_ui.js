@@ -5,7 +5,7 @@ const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
-const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } return !!c; };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2467C_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
@@ -25,7 +25,12 @@ const until = fn => require('./boot').until(fn, {timeout: 15000, step: 150});
   const w = await boot({hash: 'office/books'}); const d = w.document;
   check(await until(() => d.querySelector('[data-bk-taxforms]')), 'the bookkeeping links the tax forms');
   w.location.hash = 'office/books/taxforms/euer';
-  check(await until(() => d.querySelector('#tf-year') && d.querySelector('.bk-tab')), 'the page with the lines');
+  // 2.826.0 (#5506): CI v2.787.0 red here once (green on the same code at night) without a hint why - say what was on screen
+  if (!check(await until(() => d.querySelector('#tf-year') && d.querySelector('.bk-tab')), 'the page with the lines')) {
+    console.log('p2467_c_ui: no lines - hash', w.location.hash, 'route', JSON.stringify(w.eval('S.route')), 'TF',
+      JSON.stringify(w.eval('({kind: TF.kind, year: TF.year, oid: TF.oid, d: !!TF.d, rows: TF.d && TF.d.rows.length, err: TF.err, t: TF.t, seq: TF.seq, info: !!OFC.info, infoErr: OFC.infoErr})')),
+      'view:', (d.querySelector('#view')?.textContent || '').replace(/\s+/g, ' ').slice(0, 400));
+  }
   w.eval("TF.year = 2026; TF.d = null; ofcDraw()");
   check(await until(() => /Summe Betriebsausgaben/.test(d.querySelector('.bk-tab')?.textContent || '')), 'the wording of the form');
   check(await until(() => [...d.querySelectorAll('.bk-tab tr')].some(t => /^76/.test(t.textContent.trim()))), '2026: line 76');
