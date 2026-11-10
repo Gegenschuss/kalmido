@@ -6,7 +6,8 @@
      - changes still waiting in the outbox that no step of this browser names (on top, "not sent yet")
      - the person's step groups of the server (GET /api/undo, kalmido/core/undoweb.py; every device of the person): time,
        area, device, label; "Undo up to here" (POST /api/undo/to/<id>), "Redo" for an undone group; a barrier (finalised,
-       sent, paid ...) or a group too big for copies is greyed and so is everything older (the server stops there); a group
+       sent, paid ...) greys itself and the older groups of its workspace (org_id; 2.866.0 #5302 N2), a group too big for
+       copies itself and everything older (the server stops there); a group
        nothing of which may be changed any more is greyed with its reason
      - the steps of this browser in areas that are not on the server's history yet (undo.js HIST, label "only this device");
        the entries the server keeps (2.905.0, #5255: undo.js histSrv - their group, or their change on its way) are not shown twice
@@ -45,10 +46,13 @@ function ul_rows() {
   const srv = (UL.items || []).map(g => ({key: 's:' + g.id, kind: 's', g, label: g.label || tr('Change'), at: Date.parse(g.at) || 0, area: g.area, dev: g.device, state: g.state}));
   const rows = [...loc, ...srv].sort((a, b) => b.at - a.at).slice(0, UL_MAX);
   let wall = '';
+  const held = new Set();  // 2.866.0 (#5302 N2): the workspaces (org_id, null = private) a barrier holds from there down
   for (const r of rows) {
     if (wall) { r.off = true; r.why = wall; continue; }
     if (r.kind !== 's') continue;
-    if (r.state === 'barrier') { r.off = true; r.why = tr('Cannot be undone, so older steps stay'); wall = tr('Behind a step that cannot be undone'); }
+    const org = r.g.org_id ?? null;
+    if (held.has(org) && r.state !== 'barrier' && r.state !== 'toobig') { r.off = true; r.why = tr('Behind a step that cannot be undone'); continue; }
+    if (r.state === 'barrier') { r.off = true; r.why = tr('Cannot be undone, so older steps of the same workspace stay'); held.add(org); }
     else if (r.state === 'toobig') { r.off = true; r.why = trn('Too big to undo ({0} object)', 'Too big to undo ({0} objects)', r.g.parts || 0); wall = tr('Behind a step that cannot be undone'); }
     else if (r.state === 'noaccess') { r.off = true; r.why = tr('You may not change it any more, so it cannot be undone'); }
     else if (r.state === 'undone') { r.redo = true; r.why = tr('Undone'); }
@@ -156,7 +160,9 @@ async function ul_go(key) {
       n += (a.undone || []).length + (a.partial || []).length;
       histMark([...(a.undone || []), ...(a.partial || [])], 'undo');  // 2.905.0 (#5255): this window's entries of those groups go to the redo side
       stayed.push(...ul_stayed(a.stayed || [], items));
-      if (a.stopped) { msg.push(tr('Stopped before a step that cannot be undone: {0}', a.stopped.label || '')); break; }
+      if (a.stopped) msg.push(tr('Stopped before a step that cannot be undone: {0}', a.stopped.label || ''));
+      // 2.866.0 (#5302 N2): a barrier holds only its own workspace -- the run goes on unless the target itself stayed behind it
+      if (a.stopped && ![...(a.undone || []), ...(a.partial || [])].includes(todo[todo.length - 1].g.id)) break;
     }
   } catch (x) { console.warn('recent steps', x); /* api() said why */ } finally {
     UL.busy = false;

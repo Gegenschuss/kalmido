@@ -226,6 +226,43 @@ def f10():
     check([x["id"] for x in groups(ALICE) if x["org_id"] == ORG] == ga, "F10: alice's groups in the organisation stay")
 
 
+# ================================================================ N2 a barrier holds only the steps of its own workspace
+def barrier(uid, org):
+    out = in_app(f"""from flask import g
+from kalmido.core.config import app as fa
+from kalmido.core.undogroups import undo_barrier
+with fa.test_request_context('/api/office/docs/1/finalise', method='POST'):
+    g.user = {{"id": {int(uid)}}}
+    print('BARRIER', undo_barrier(c, {int(uid)}, 'office', 'Finalised: {{0}}', ('2026-001',), org_id={int(org)}))
+    c.commit()""")
+    gid = groups(uid)[-1]
+    check("BARRIER" in out and gid["state"] == "barrier" and gid["org_id"] == org, f"N2: setup: a barrier in office {org} {out[-300:]}")
+    return gid["id"]
+
+
+def n2(who, s, uid, org):
+    tid, gp = task_step(s, f"Moodboard {who}")
+    check(gp and next((x for x in groups(uid) if x["id"] == gp), {}).get("org_id") is None, f"N2 {who}: setup: a private step {gp}")
+    sv = service(s, f"Licht {who}", 200)
+    r = s.patch(B + OFF + f"/services/{sv['id']}", json={"daily_rate": 210, "expect_updated_at": sv["updated_at"]})
+    check(r.ok, f"N2 {who}: setup: an office step before the barrier")
+    gb = groups(uid)[-1]["id"]
+    bid = barrier(uid, org)
+    sv = s.get(B + OFF + f"/services/{sv['id']}").json()
+    r = s.patch(B + OFF + f"/services/{sv['id']}", json={"name_de": f"Licht {who} 2", "expect_updated_at": sv["updated_at"]})
+    check(r.ok, f"N2 {who}: setup: an office step after the barrier")
+    gc = groups(uid)[-1]["id"]
+    r = s.post(B + f"/api/undo/to/{gp}")
+    x = r.json() if r.ok else {}
+    check(r.ok and {gc, gp} <= set(x.get("undone", [])) and gb not in x.get("undone", []) and (x.get("stopped") or {}).get("id") == bid,
+          f"N2 {who}: 'bis hierher' over an office barrier: the newer office step and the private step go back, the barrier is named {r.status_code} {x}")
+    st = {g["id"]: g["state"] for g in groups(uid)}
+    check(st.get(gb) == "done" and s.get(B + OFF + f"/services/{sv['id']}").json().get("daily_rate") == 210,
+          f"N2 {who}: the office step behind the barrier (same office) stays {st.get(gb)}")
+    t = sql("SELECT title FROM tasks WHERE id=?", (tid,))
+    check(t == [(f"Moodboard {who} draft",)], f"N2 {who}: the private task has its old title again {t}")
+
+
 # ================================================================ setup
 kt.fresh({"KALMIDO_INSTANCE_MODE": "workspaces"}, prefix="P2866")
 kt.docker_logs_on_first_fail()
@@ -264,6 +301,8 @@ f8("alice", A, ALICE)
 f8("frida", Fr, FID)
 f9()
 f10()
+n2("alice", A, ALICE, ORG)
+n2("frida", Fr, FID, FOFF)
 # -- more parts below --
 
 raise SystemExit(kt.done("p2866_pflege"))

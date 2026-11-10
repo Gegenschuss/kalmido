@@ -5,7 +5,8 @@
 // straight to the server with X-Kalmido-Device-Name: Laptop (Test):
 //  - ← with nothing to undo in this browser is not dead: it is named "Recent steps" and a right-click / a click opens the window
 //  - the window lists the person's step groups of the server, newest first: label, time, area (Office), device; a barrier
-//    (a finalised invoice) is greyed and so is every older row ("Behind a step that cannot be undone"), their buttons off
+//    (a finalised invoice) is greyed and so is every older row of its workspace ("Behind a step that cannot be undone"), their
+//    buttons off; 2.866.0 (#5302 N2): an older private step (another workspace) stays open
 //  - live: a write of the other device appears in the open window (the own "self" counter of the poll), no reopening
 //  - "Back up to here" on the second row takes TWO groups back (the service's rate as before them); both rows say "Undone"
 //    and offer "Redo", which brings one forward again
@@ -48,6 +49,10 @@ const rate = async (ck, sv) => (await call(ck, 'GET', `/api/office/services/${sv
   await call(CA, 'PATCH', '/api/settings', {workspace: `org:${ORG}`});
   const {CL, SV} = await office(CA, 'Alpha');
   const svc = v => call(CA, 'PATCH', `/api/office/services/${SV}`, {daily_rate: v}, DEV);
+  // 2.866.0 (#5302 N2): a private step older than the office barrier (another workspace: the barrier does not hold it)
+  const PL = await call(CA, 'POST', '/api/lists', {name: 'Privat', org_id: null});
+  const PT = await call(CA, 'POST', '/api/tasks', {list_id: PL.id, title: 'Storyboard'});
+  check(PL.id && PT.id, `a private project with a task (${PL.http} ${PT.http})`);
   await svc(810);
   const inv = await call(CA, 'POST', '/api/office/docs', {kind: 'invoice', client_id: CL, service_from: today(), items: [{title: 'Schnitt', qty: 1, rate: 100}]});
   const fin = await call(CA, 'POST', `/api/office/docs/${inv.id}/finalize`, {}, DEV);
@@ -74,6 +79,9 @@ const rate = async (ck, sv) => (await call(ck, 'GET', `/api/office/services/${sv
   check(row(GB.id).classList.contains('uloff') && row(GB.id).querySelector('[data-ul-go]').disabled && /Finalised/.test(row(GB.id).textContent), 'the barrier is greyed, its button off');
   check(row(G0.id).classList.contains('uloff') && row(G0.id).querySelector('[data-ul-go]').disabled && /Behind a step that cannot be undone/.test(row(G0.id).textContent), 'an older step behind the barrier is greyed too');
   check(!row(G1.id).classList.contains('uloff') && !row(G1.id).querySelector('[data-ul-go]').disabled, 'the steps above the barrier can be taken back');
+  const GP = srv.find(g => /Storyboard/.test(g.label || '')) || {};  // 2.866.0 (#5302 N2)
+  check(GP.id && GP.org_id == null && row(GP.id) && !row(GP.id).classList.contains('uloff') && !row(GP.id).querySelector('[data-ul-go]').disabled,
+    `a private step behind the office barrier can be taken back (the barrier holds only its own workspace) ${JSON.stringify(GP)}`);
 
   // ---- live: the other device writes, the open window shows it
   await svc(850);

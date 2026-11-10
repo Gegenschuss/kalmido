@@ -173,7 +173,7 @@ from kalmido.core.config import app as fa
 from kalmido.core.undogroups import undo_barrier
 with fa.test_request_context('/api/office/docs/1/finalise', method='POST'):
     g.user = {{"id": {BOB}}}
-    print('BARRIER', undo_barrier(c, {BOB}, 'office', 'Change', ()))
+    print('BARRIER', undo_barrier(c, {BOB}, 'office', 'Change', (), org_id={ORG}))  # 2.866.0 (#5302 N2): a barrier holds its own workspace's steps (O1 is ORG's)
     c.commit()""")
 check("BARRIER" in out and groups(BOB)[-1]["state"] == "barrier", f"undo_barrier: a row of its own {out[-300:]}")
 GB = groups(BOB)[-1]["id"]

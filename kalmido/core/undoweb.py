@@ -13,7 +13,8 @@ step left it). The rights are checked at the moment of taking back, never the on
 (obj_need), a tracked kind of an old area the check its area registered (undo_need_reg: the office in office/undo.py); a kind
 without one is never written back (noaccess). A part that cannot go back (changed since, moved, no right) stays and is named
 in the answer, the other parts of the group go back anyway (decision of #5249): the group becomes partial (or noaccess when
-nothing of it may be changed). A barrier or a group too big for copies stops the run there. Barriers are per person like the list (decision 2 of
+nothing of it may be changed). A barrier or a group too big for copies stops the run there -- 2.866.0 (#5302 N2): a barrier
+only for the groups of its own workspace (org_id; a finalised invoice does not hold a task step or another office's step). Barriers are per person like the list (decision 2 of
 #5249: only own steps): a barrier of someone else does not stop a person's run; a finalised document is frozen anyway."""
 import json
 
@@ -205,10 +206,17 @@ def undo_group_to(c, uid, gid):
     groups = c.execute("SELECT * FROM undo_groups WHERE user_id=? AND id>=? AND state<>'undone' ORDER BY id DESC", (int(uid), int(gid))).fetchall()
     out = {"undone": [], "partial": [], "stayed": [], "stopped": None}
     total = 0
+    held = set()  # 2.866.0 (#5302 N2): the workspaces (org_id, None = private) a barrier holds from here down
     for grp in groups:
-        if grp["state"] in ("barrier", "toobig"):
-            out["stopped"] = {"id": grp["id"], "state": grp["state"], "label": _label(grp)[0]}
+        if grp["state"] == "barrier":  # it holds only the steps of its own workspace; the others go on (another org, private)
+            out["stopped"] = out["stopped"] or {"id": grp["id"], "state": grp["state"], "label": _label(grp)[0]}
+            held.add(grp["org_id"])
+            continue
+        if grp["state"] == "toobig":  # no copies: nothing older may go back past it
+            out["stopped"] = out["stopped"] or {"id": grp["id"], "state": grp["state"], "label": _label(grp)[0]}
             break
+        if grp["org_id"] in held:
+            continue
         total += 1
         moved, stayed = _run_group(c, uid, grp, False)
         out["stayed"] += stayed
