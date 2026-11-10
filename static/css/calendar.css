@@ -131,7 +131,7 @@ button.cyd:hover{background:var(--bg2)}
 /* three lanes and more on a phone's week: strips in the calendar's colour without letters, one "+N" over the group opens the day */
 .wmore{display:none}
 @media (max-width:767px){
-  .week:not(.oneday) .wcol>.wn3{font-size:0;color:transparent;padding:0}
+  .week:not(.oneday) .wcol>.wn3{color:transparent;padding:0;overflow:hidden}
   .week:not(.oneday) .wcol>.wn3 *{display:none}
   .week:not(.oneday) .wcol>.wcev.wn3{background:var(--ccb)}
   .week:not(.oneday) .wmore{display:flex;align-items:center;justify-content:center;position:absolute;left:1px;right:1px;z-index:3;min-height:1.75rem;padding:0;
