@@ -124,6 +124,8 @@ async function upload(name, pages) {
     // a page without its canvas has no layer (freed together)
     check(await ev(`[...document.querySelectorAll('.dv-pages .dv-pg')].every(p => !p.querySelector('.textLayer') || !!p.querySelector('canvas'))`), 'Firefox: no layer without its page');
     await ev(`(document.querySelector('.dv-view [data-dc="dvz:width"]').click(), 1)`);
+    // the page is drawn anew at the width scale; its text is there (the old layer stays until the new one is drawn)
+    check(await wait(`(() => { const p = ${P0}, b = document.querySelector('.dv-pages'); return !!p.querySelector('canvas') && p.dataset.s === String(b._s) && /Elternhandbuch/.test(p.querySelector('.textLayer')?.textContent || ''); })()`, 80), 'Firefox: back at the width, the page has its text');
     // Ctrl+A in the preview: the pages' text, not the app; the copy has every page
     await ev(`(document.querySelector('.dv-pages').focus(), getSelection().removeAllRanges(), 1)`);
     await cmd('input.performActions', {context: ctx, actions: [{type: 'key', id: 'k1', actions: [{type: 'keyDown', value: ''}, {type: 'keyDown', value: 'a'}, {type: 'keyUp', value: 'a'}, {type: 'keyUp', value: ''}]}]});

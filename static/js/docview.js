@@ -513,7 +513,7 @@ async function dcv_page(pdf, p) {
     cv.setAttribute('aria-label', tr('Page {0}', i + 1));
     await page.render({canvas: cv, canvasContext: cv.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null}).promise;
     if (my !== pdf.gen || pdf.off || p.dataset.s !== String(s)) return;
-    p.replaceChildren(cv);
+    p.replaceChildren(cv, ...[p.querySelector(':scope > .textLayer')].filter(Boolean));  // the layer of the old scale (pv_textScale) stays until the new one is there: no moment without markable text
     // 2.742.0 (#4861): the text layer over the page (pdfview.js pv_text); page 1 without any text = a scan: "Copy text"
     if (typeof pv_text === 'function') await pv_text(typeof pv_libNow === 'undefined' ? null : pv_libNow, page, vp, p, () => my === pdf.gen && DVW.pdf === pdf && p.dataset.s === String(s) && p.isConnected);
     const d = DC.doc;
