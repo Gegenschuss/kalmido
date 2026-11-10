@@ -18,6 +18,43 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.858.0] - 2026-11-10
+
+Package 2.826 (Bündel: Agent-Status: „nicht verbunden“ nur bei echter Stö, Agent-Chat: Pläne (Morgen-Briefing usw.) im ⋯-Menü, Sammelpaket: Aufgaben ohne P).
+
+### Added
+- Agent chat: the "…" menu of the chat header has "Plans" (the same dialog as the card's "Plans" button). The Plans dialog has "Pause all" / "Resume all" on top: all of your own plans with this agent in one step, with undo; other people's plans stay as they are, plans waiting for a project of your own keep waiting, missed runs are not made up. New route `PATCH /api/agents/<id>/schedules` `{enabled, ids?}` (#5510).
+- Private AI on the Kalmido server: each starter routine with its own plan (briefing, tidy up the inbox, follow-ups, billing) has an On / Paused switch instead of the plain "On" text; a paused plan stays and can be switched on again. `GET /api/agents/<id>/server/starter` carries the plan ids (#5510).
+
+### Changed
+- Agent status: "not connected" only for a real problem - the agent never got in touch, or a chat message to it has waited more than 5 minutes without being fetched or answered. An agent that starts on demand (cloud or server agent) and answered its last message shows "ready" with a calm ring and the hint "starts with the next message" (chat header, agent list, sidebar dots); "connected, but no service running" only while a message waits. The agent payload carries `pending_age` (#5509).
+
+### Fixed
+- Tests: p263_c_api keeps its time entries on one day around midnight UTC, p2120_a_ui leaves the app before the second sign-in; both run again in CI (#5507, #5505). setup_ui waits for the login form instead of a fixed 1.5 s and, like p2467_c_ui, logs the screen when it fails (#5504, #5506; both stay skipped until the cause is proven).
+
+Package 2.809 (Neubau von 2.790: iPhone-Tableiste, Papierkorb Stufe 3).
+### Added
+- Recent steps across devices for more areas: custom fields, sections, sprints, project settings, templates, rules, time entries, budget entries, sidebar folders, bookmarks, followed feeds, scheduling polls, appointment types, team absences, dispatch bookings, a project's environments and the pin board's notepads are steps of the person's undo list on the server - taken back from any device (#5476)
+### Changed
+- iPhone home-screen app: the empty strip below the tab bar labels is about halved (one value, --tabs-pb, 11 instead of 22 px on a 34 px home indicator area); everything above the bar moves along. Desktop and Android unchanged (#5437)
+- Files, knowledge pages (with their files) and tables use the one trash of the shared core: delete, restore, delete for good and the hourly retention run go through it; their own purge runs are gone. Receipts kept by law stay locked in the trash (#5365)
+- Bank list in the office: a calmer row - the suggestion, one "Other receipt/invoice" button and a More menu with explained marks; the missing-receipt hint once above the list (#5452)
+- Office kinds on the core check that the office is on and allowed (also in a support session); undoing a DATEV import puts its suppliers away the core's way (#5418)
+### Fixed
+- iPhone home-screen app: headers (lists, agent chat, team chat rooms) looked blurred and dimmed under the clock - iOS blurs the top edge unless the header is a full-width sticky box; on phones they are now sticky at the top (#5437)
+
+Package 2.849.0 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Documents: right after "Split" a late step of the browser history could land on the split stack's address again; the app fetched the gone stack and its "Not found" message took the place of the split's message with Undo. A document split in this window now leaves its address quietly, the Undo stays (CI red p2154_a_ui in 2.786.0 and 2.833.0; regression step in the suite) (#5478).
+
+Package 2.846 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Shared core: one filter building block (#5520) - `static/js/fltkern.js` (matching), `static/js/fltdlg.js` (`kflt_rows` condition rows, `kflt_dialog` saved-filter dialog) and `kalmido/core/filters.py` (`kflt_where` / `kflt_match`) with a field catalog per area; task lists and newsletter segments now use only it, behaviour and stored data unchanged. `docs/dev/kern.md` has a new section "Filter".
+- Core guard (#5522): `tools/check_core_crosscut.py` turns red on new share tables (name ending in `_shares`, or a user/org/group/agent column plus a role/perm column) and on new rights checks (`def need_*`, `*_role`, `*_can`) outside `kalmido/core/`; existing ones are listed with a reason in `tools/core_crosscut_allow.json`.
+### Changed
+- Calendar event editor (#5465): Esc, X, Cancel or a click next to the dialog ask before typed input is lost; the all-day switch keeps your own reminders; "More options" is a visible fold with a city search for the time zone; "Only you so far" is the placeholder of the people field; the hint for guests outside Kalmido is in everyday words; a new event without other people shows no availability bar; the repeat end is labelled "Repeat ends"; existing events focus the title only with a mouse.
+
 ## [2.848.0] - 2026-11-10
 
 Package 2.823 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -102,7 +139,8 @@ Package 2.757 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: 
 - Lists and the start page report their width to the header again: the top bar lines up with the content instead of standing 4 px beside it, and the width "Wide" of a note / knowledge page keeps its list + note layout (CI red p2599_b_kopf_ui, #5309).
 - p151_ui says why the hint of the task just tracked is missing (toast, totals on the page and on the server); the Mac red was the sub-second discard fixed in #5186 (#5211).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.848.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.858.0...HEAD
+[2.858.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.858.0
 [2.848.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.848.0
 [2.833.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.833.0
 [2.819.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.819.0
