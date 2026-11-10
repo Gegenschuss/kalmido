@@ -1045,6 +1045,7 @@ The start-up module.
 - `static/js/review.js` (`rvw`) - The review step of a list
 - `static/js/richcopy.js` (`rcp`) - Copying a chat message with its formatting
 - `static/js/roadmap.js` (`rm`) - The roadmap
+- `static/js/rowswipe.js` (`rsw`) - Swiping a row sideways, one shared helper (shared core) for the task row, the news and the swipe to reply on a message; holds live redraws while a finger is on the row
 - `static/js/rowsym.js` (`rsy`) - Task rows: a level (all | key | calm | custom, default key)
 - `static/js/rules.js` (`rul`) - Rules of a list ("When ... then ...")
 - `static/js/sbnav.js` (`sbp`) - The sidebar's messenger rows

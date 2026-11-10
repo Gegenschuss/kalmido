@@ -464,46 +464,30 @@ document.addEventListener('touchend', secHoldEnd);
 document.addEventListener('touchcancel', secHoldEnd);
 
 // ------------------------------------------------------------------ swipe (touch)
-let swipe = null, swiped = false;
-document.addEventListener('touchstart', e => {
-  const r = e.target.closest('#view .trow'); swiped = false;
-  if (!r || e.target.closest('.chk')) { swipe = null; return; }
-  swipe = {r, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, lock: null};
-}, {passive: true});
-document.addEventListener('touchmove', e => {
-  if (!swipe || (lp && lp.active)) return;
-  const dx = e.touches[0].clientX - swipe.x, dy = e.touches[0].clientY - swipe.y;
-  if (swipe.lock === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) swipe.lock = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-  if (swipe.lock !== 'x') return;
-  swipe.dx = dx;
-  swipe.r.style.transform = `translateX(${dx}px)`;
-  swipe.r.style.background = dx > 60 ? 'color-mix(in srgb,var(--ok) 25%,var(--bg))' : dx < -60 ? 'color-mix(in srgb,var(--danger) 25%,var(--bg))' : 'var(--bg2)';
-}, {passive: true});
-function swipeEnd(e) {
-  if (!swipe) return;
-  const {r, dx, lock} = swipe; swipe = null;
-  // 2.46.1 (#1559): a swipe that completes the task carries the row on out to the right (like a dismissed news item) instead of snapping back
-  const going = lock === 'x' && dx > 90 && e?.type !== 'touchcancel' && isTouch() && ui_motion();  // 2.655.0 (#5085): every touch screen (an_on = phones only)
-  r.style.transition = going ? 'transform .18s ease-in, opacity .18s ease-in' : 'transform .18s'; r.style.transform = going ? 'translateX(110%)' : ''; r.style.background = going ? r.style.background : '';
-  if (going) r.style.opacity = '0';
-  setTimeout(() => { r.style.transition = ''; }, 200);
-  if (lock !== 'x' || e?.type === 'touchcancel') return;  // 2.13.4: a cancelled swipe snaps back and does nothing
-  swiped = true; setTimeout(() => { swiped = false; }, 350);
-  const id = +r.dataset.id;
-  if (dx > 90) {
-    const back = () => { if (going && r.isConnected) { r.style.transition = 'transform .18s, opacity .18s'; r.style.transform = ''; r.style.opacity = ''; r.style.background = ''; setTimeout(() => { r.style.transition = ''; }, 200); } };
-    Promise.resolve(toggleTask(id)).then(back, back);  // the list redraws without the row; if it stayed (cancelled, error) it slides back
-  }
-  // 2.24.0 (UX-09 / UX-14 / UX-37): the short menu names its task, keeps the order of the task menu (date, list, …) and ends
-  // with "All…"; "Move to list…" sorts the inbox
-  else if (dx < -90) {  // 2.25.0 (UX-37): emptying the inbox = putting tasks into lists: there "Move to list…" leads the menu
+// 2.876.0 (#5559): the gesture is the shared row swipe (rowswipe.js); here what a task row does with it. `swiped` stays the
+// mark of a drag that just ended (tdDrop / tdHeld): its click opens nothing
+let swiped = false;
+const SWIPE_BG = dx => dx > 60 ? 'color-mix(in srgb,var(--ok) 25%,var(--bg))' : dx < -60 ? 'color-mix(in srgb,var(--danger) 25%,var(--bg))' : 'var(--bg2)';
+rsw_attach({
+  at: e => (e.target.closest('.chk') ? null : e.target.closest('#view .trow')),
+  can: () => true,
+  min: () => 90,
+  busy: () => !!(lp && lp.active),  // the long press lifted the row: the finger drags it
+  look: (r, dx) => { r.style.background = dx ? SWIPE_BG(dx) : ''; },
+  // 2.46.1 (#1559): a swipe that completes the task carries the row on out to the right (like a dismissed news item) instead
+  // of snapping back; 2.655.0 (#5085): every touch screen (an_on = phones only)
+  out: (r, dir) => dir > 0 && isTouch() && ui_motion(),
+  done: r => { if (!r.style.transform) r.style.background = ''; },
+  go: (r, dir) => {
+    const id = +r.dataset.id;
+    if (dir > 0) { const back = () => { rsw_back(r); if (r.isConnected) r.style.background = ''; }; Promise.resolve(toggleTask(id)).then(back, back); return; }  // the list redraws without the row; if it stayed (cancelled, error) it slides back
+    // 2.24.0 (UX-09 / UX-14 / UX-37): the short menu names its task, keeps the order of the task menu (date, list, …) and ends
+    // with "All…"; "Move to list…" sorts the inbox. 2.25.0 (UX-37): emptying the inbox = putting tasks into lists: there "Move to list…" leads the menu
     const inb = S.tasks.get(id)?.list_id === inbox()?.id;
     // 2.31.0 (#1056): the same entries, in two groups with a small heading (Snooze / Task), delete last and set apart
     snoozeSheet(id, r, [{head: tr('Task')}, ...(inb ? [] : [moveListItem(r, id), moveWsItem(r, id)]), {label: tr('Completed'), icon: 'done', fn: () => toggleTask(id)}, {label: tr('All…'), icon: 'dots', next: 1, fn: () => taskMenu(r, id)}, '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}], true, [...(inb ? [moveListItem(r, id), moveWsItem(r, id)] : []), {head: tr('Snooze')}]);
-  }
-}
-document.addEventListener('touchend', swipeEnd);
-document.addEventListener('touchcancel', swipeEnd);
+  },
+});
 
 // long press (380 ms) on a row / chip, then drag: reorder, other kanban column, quadrant, calendar day
 let lp = null;

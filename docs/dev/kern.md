@@ -524,3 +524,35 @@ Who uses it: the lists' saved filters and shared views (catalog `FLT_TASKS` in v
 (2.857.0, #5518: catalog `dcv_cat` in docviews.js, server `docs/dfilter.py dvf_where` -- every condition built from the
 documents search's own `dsr_filters`, matched on the server only, the dialog's count asks `POST /api/docs/views/count`). Tests:
 `tests/p2846_a_filterkern_test.py` (the core, the lists' API), `tests/p2846_a_filterkern_ui.js` (the dialog with a stand-in catalog).
+
+## Gestures: swiping a row, leafing (2.876.0, #5559)
+
+A row that does something when a finger swipes it sideways (complete, a short menu, remove, reply ...) builds **no touch
+handling of its own**. It hands the shared row swipe what the row does:
+
+- browser, at every start: `static/js/rowswipe.js` -- `rsw_attach({at, can, min, max, go, out, look, lock, done, busy})`,
+  `rsw_back(el)`, `rsw_busy()`, `rsw_later(key, fn, box)`
+
+```js
+rsw_attach({
+  at: e => e.target.closest?.('.myrow') || null,  // the row under the finger, null = no swipe here
+  can: dir => dir > 0,                            // 1 = to the right, -1 = to the left
+  min: el => 90, max: 120,                        // the threshold; max = a rubber band past it (else the row follows)
+  out: (el, dir) => true,                         // past the threshold: the row glides out (else it springs back)
+  look: (el, dx, on) => { /* the area's marks while it moves, dx 0 = cleared */ },
+  go: (el, dir) => { /* the action */ },
+});
+```
+
+The rules are the same for every row: 10 px and clearly sideways before it is a swipe (up / down stays scrolling), 24 px at
+the screen's edges stay the phone's Back gesture, a finger held still (500 ms, the long press) or `busy()` (a drag) is no
+swipe, a light vibration at the threshold, a touchcancel does nothing, the click right after a swipe opens nothing, reduced
+motion = no gliding. A live redraw while the finger is on such a row waits: `rsw_busy()` holds the view (liveparts.js
+`lpHold`), a part of the page that redraws itself asks `rsw_later(key, fn, box)` first and is drawn after the finger is up.
+
+Who uses it: the task row (dnd.js: right = completed, left = the short menu), the news (collab.js: either side removes),
+the swipe to reply on a message (collab.js: chat, team chat, agent chat, comments). Tests: `tests/p2876_a_rowswipe_ui.js`.
+
+Leafing with a swipe (the next / previous document or picture: the full screen of a document, the image viewer, the task
+panel) is the other gesture of the core: `static/js/swipenav.js` -- `swn_attach(root, {area, can, go, peek})`. The calendar's
+gestures (calgest.js) are their own.

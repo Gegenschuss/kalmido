@@ -1033,7 +1033,7 @@ function chatDraw(o = {}) {
 // is and "New message ↓" shows up; older pages above keep the message in view (keep)
 function chatPatch(o = {}) {
   const box = $('#chat-msgs'); if (!box) return;
-  if (typeof rswLater === 'function' && rswLater('a', () => chatPatch(o), '#chat-msgs')) return;  // 2.542.0 (#4614): a swipe to reply is under way (collab.js)
+  if (rsw_later('a', () => chatPatch(o), '#chat-msgs')) return;  // 2.542.0 (#4614): a swipe to reply is under way (rowswipe.js, #5559)
   const a = agentById(S.chat.aid), near = chatNear(box) && !document.hidden, top = box.scrollTop, h = box.scrollHeight, last = +(box.dataset.last || 0);
   // 2.380 F (#3381): a new box or the way back restores the chat's place (chs_restore) instead of jumping to the bottom
   const rs = (!box._cs || S.chat.back) && S.chat.msgs.length > 0 && !o.bottom && !o.keep && !document.hidden;

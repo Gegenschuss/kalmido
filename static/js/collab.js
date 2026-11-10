@@ -450,27 +450,15 @@ async function newsDismiss(i) {
   } catch { S.nf.sig = null; }  // offline: reloaded next time
   render();
 }
-(() => {  // swipe an item sideways (touch)
-  let s = null;
-  document.addEventListener('touchstart', e => { const n = e.target.closest?.('.nitem'); s = n && e.touches.length === 1 ? {n, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, h: false} : null; }, {passive: true});
-  document.addEventListener('touchmove', e => {
-    if (!s) return;
-    const dx = e.touches[0].clientX - s.x, dy = e.touches[0].clientY - s.y;
-    if (!s.h && Math.abs(dy) > Math.abs(dx)) { s = null; return; }
-    if (Math.abs(dx) > 8) s.h = true;
-    if (!s.h) return;
-    s.dx = dx; s.n.style.transition = 'none'; s.n.style.transform = `translateX(${dx}px)`; s.n.style.opacity = String(Math.max(.25, 1 - Math.abs(dx) / 260));
-  }, {passive: true});
-  document.addEventListener('touchend', () => {
-    if (!s) return; const {n, dx, h} = s; s = null; if (!h) return;
-    n.style.transition = 'transform .18s ease, opacity .18s ease';
-    if (Math.abs(dx) > Math.min(120, n.offsetWidth * .35)) {
-      n.style.transform = `translateX(${dx > 0 ? '' : '-'}110%)`; n.style.opacity = '0'; n.dataset.swiped = '1';
-      setTimeout(() => newsDismiss(+n.dataset.i), 170);
-    } else { n.style.transform = ''; n.style.opacity = ''; }
-  }, {passive: true});
-  document.addEventListener('click', e => { const n = e.target.closest?.('.nitem[data-swiped]'); if (n) { e.stopPropagation(); e.preventDefault(); } }, true);
-})();
+// swipe an item sideways (touch): either side removes it; 2.876.0 (#5559): the shared row swipe (rowswipe.js)
+rsw_attach({
+  at: e => e.target.closest?.('.nitem') || null,
+  can: () => true,
+  min: n => Math.min(120, n.offsetWidth * .35),
+  look: (n, dx) => { n.style.opacity = dx ? String(Math.max(.25, 1 - Math.abs(dx) / 260)) : ''; },
+  out: () => true,
+  go: n => setTimeout(() => newsDismiss(+n.dataset.i), 170),
+});
 async function newsOpen(i, opts) {
   const it = (S.nf.items || [])[i]; if (!it) return;
   if (!it.read) { it.read = true; it.keep = true; if (it.to_me && S.news) { S.news.unread_me = Math.max(0, (S.news.unread_me || 0) - 1); renderTop(); } newsRead({ids: it.ids}); }
@@ -884,7 +872,7 @@ function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the bo
 }
 function drawTimeline() {
   if (S.tl.id !== S.sel) return;
-  if (typeof rswLater === 'function' && rswLater('tl', drawTimeline, '#d-tl-items')) return;  // 2.542.0 (#4614): a swipe to reply is under way
+  if (rsw_later('tl', drawTimeline, '#d-tl-items')) return;  // 2.542.0 (#4614): a swipe to reply is under way (rowswipe.js, #5559)
   const sc = cmxScrollGet();  // 2.36.0 (#1120): who reads the newest comments at the end stays there when one arrives
   const box = $('#d-tl-items'), seen = !box?.lastElementChild || cf_visible(box.lastElementChild);
   if (box) { patchKids(box, timelineItems()); cf_comments(box, seen); }  // 2.46.2 (#1660)  // 2.12.2 (#451): only changed / new comments
@@ -1231,65 +1219,27 @@ function rswRowAt(e) {
   for (const m of box.querySelectorAll('.cmsg[data-mid]')) { const r = m.getBoundingClientRect(); if (y >= r.top && y <= r.bottom) return m; }
   return null;
 }
-{
-  const RSW_EDGE = 32, RSW_MIN = 56, RSW_MAX = 88;
-  let sw = null;
-  const swMove = e => {
-    if (!sw) return;
-    const t = e.touches?.[0]; if (!t) return;
-    const dx = t.clientX - sw.x, dy = t.clientY - sw.y;
-    if (!sw.lock) {
-      if (Math.hypot(dx, dy) < 10) return;
-      if (dx > 0 && dx > Math.abs(dy) * 1.6) { sw.lock = true; sw.m.classList.add('rsw'); sw.m.insertAdjacentHTML('afterbegin', `<span class="rswarr" aria-hidden="true">${ic('reply', 's')}</span>`); }
-      else { swEnd(true); return; }
-    }
-    if (e.cancelable) e.preventDefault();
-    sw.dx = Math.max(0, Math.min(RSW_MAX, dx < RSW_MIN ? dx : RSW_MIN + (dx - RSW_MIN) / 3));
-    sw.m.style.transform = `translateX(${sw.dx}px)`;
-    const on = sw.dx >= RSW_MIN, arr = sw.m.querySelector(':scope > .rswarr');
-    if (arr && arr.classList.contains('on') !== on) { arr.classList.toggle('on', on); if (on && navigator.vibrate) navigator.vibrate(8); }
-  };
-  const swEnd = cancel => {
-    const st = sw; sw = null; document.removeEventListener('touchmove', swMove, {passive: false});
-    if (!st) return;
-    // 2.542.0 (#4614): what was held back comes after the finger is up, also after a tap or a scroll that never became a swipe
-    // (before only after a swipe: a tap kept the team chat's update until the next change). The agent chat's and the comments'
-    // redraws (rswLater) and a view redraw the poll held (lpHold)
-    const later = [...rswQ.values()]; rswQ.clear();
-    if (S.rswRedraw) { S.rswRedraw = false; later.unshift(() => { if (S.route.mod === 'team') { if (editingTeam()) tcPatch(); else renderView(); } }); }  // 2.151.1: the live update held back during the swipe
-    if (later.length || S.viewStale) setTimeout(() => { if (sw) { for (const f of later) rswQ.set(f, f); return; } for (const f of later) f(); if (S.viewStale && typeof viewSafeRender === 'function') viewSafeRender(); }, st.lock ? 200 : 0);
-    if (!st.lock) return;
-    const m = st.m, go = !cancel && st.dx >= RSW_MIN;
-    m.style.transition = reducedMotion() ? 'none' : 'transform .16s ease-out'; m.style.transform = '';
-    setTimeout(() => { m.style.transition = ''; m.classList.remove('rsw'); m.querySelector(':scope > .rswarr')?.remove(); }, 180);
-    if (go) { const [art, id] = String(m.dataset.mid).split(':'); replyStart(replyArt(m, art), +id); }
-  };
-  // 2.151.1: a live redraw of the team chat while a finger is on a message replaced the touched node: the swipe died silently
-  // (no touchend reaches the document). teamChanged() waits for the end of the swipe instead.
-  window.rswBusy = () => !!sw;
-  // 2.542.0 (#4614): the same for the agent chat (#chat-msgs, chatPatch) and the comments (#d-tl-items, drawTimeline): a refresh
-  // that came while the finger is on one of box's messages swapped the touched row (a job's steps, a tick, a reaction), the
-  // swipe died on the phone. rswLater(key, fn, box) keeps fn (the last one per key) for the end of the swipe -> true
-  const rswQ = new Map();
-  window.rswLater = (key, fn, box) => { if (!sw || !sw.m.isConnected || (box && !sw.m.closest(box))) return false; rswQ.set(key, fn); return true; };
-  document.addEventListener('touchstart', e => {
-    if (sw) swEnd(true);
-    if (e.touches?.length !== 1) return;
+// 2.876.0 (#5559): the swipe itself (threshold, rubber band, edge, vibration, the held-back redraws rsw_later) is the shared
+// row swipe (rowswipe.js); here only which message counts, the arrow and the reply
+rsw_attach({
+  at: e => {
     // 2.34.0 (#1091): the whole row of a message counts (a short message has a narrow bubble): a touch beside it in the
     // messages box takes the message at that height
     const m = e.target.closest?.('#detail .cm[data-mid], #tc-msgs .cmsg[data-mid], .tthview .cmsg[data-mid], #chat-msgs .cmsg[data-mid]') || rswRowAt(e);
     // 2.542.0 (#4614): code and tables only when they really scroll sideways (a chat bubble's code wraps, see app.css .cbub pre.mdpre):
     // a long answer with a code block or a small table was hardly swipeable anywhere
-    if (!m || m.querySelector('.cedit, .tcedit') || e.target.closest('textarea, input, .rxrow, .catts, .chatts, .cchoices, .cperm, [contenteditable="true"]') || rswSideScroll(e.target, m)) return;
-    const t = e.touches[0]; if (t.clientX < RSW_EDGE || t.clientX > innerWidth - RSW_EDGE) return;
-    const sel = getSelection?.(); if (sel && !sel.isCollapsed && String(sel).trim()) return;
-    const [art0, id] = String(m.dataset.mid).split(':'), art = replyArt(m, art0); if (!replyCtx(art) || !replyMsg(art, +id)) return;
-    sw = {m, x: t.clientX, y: t.clientY, dx: 0, lock: false};
-    document.addEventListener('touchmove', swMove, {passive: false});
-  }, {passive: true});
-  document.addEventListener('touchend', () => swEnd(false), {passive: true});
-  document.addEventListener('touchcancel', () => swEnd(true), {passive: true});
-}
+    if (!m || m.querySelector('.cedit, .tcedit') || e.target.closest('textarea, input, .rxrow, .catts, .chatts, .cchoices, .cperm, [contenteditable="true"]') || rswSideScroll(e.target, m)) return null;
+    const sel = getSelection?.(); if (sel && !sel.isCollapsed && String(sel).trim()) return null;
+    const [art0, id] = String(m.dataset.mid).split(':'), art = replyArt(m, art0);
+    return replyCtx(art) && replyMsg(art, +id) ? m : null;
+  },
+  can: dir => dir > 0,  // only to the right
+  min: () => 56, max: 88,
+  lock: m => { m.classList.add('rsw'); m.insertAdjacentHTML('afterbegin', `<span class="rswarr" aria-hidden="true">${ic('reply', 's')}</span>`); },
+  look: (m, dx, on) => m.querySelector(':scope > .rswarr')?.classList.toggle('on', on),
+  done: m => { m.classList.remove('rsw'); m.querySelector(':scope > .rswarr')?.remove(); },
+  go: m => { const [art, id] = String(m.dataset.mid).split(':'); replyStart(replyArt(m, art), +id); },
+});
 
 // 2.39.1 (#1202): the comment composer stays open from focus until a tap outside it. With :focus-within alone a tap
 // on the paperclip first blurs the field on phones, the bar vanishes and the tap lands in the void.
