@@ -10,6 +10,8 @@ Invented names only.
    ones (the times too); redo; the link switched off -> undo -> on, the same link; into the trash -> undo -> back
  - team absences (hub/absundo.py): days moved on the laptop -> the phone lists it (area team, the old days) and takes it
    back; redo; deleted -> undo -> back; a member takes back the change of their own absence
+ - a project's environments (lists/envundo.py): renamed -> undo -> the old name and switch; the webhook alone is no step;
+   removed -> undo -> back with the webhook off; removed again, the name taken meanwhile -> undo refused (named)
  - only own steps: another person neither lists nor takes back a step (404)
 freelancer-matrix: undo (a person without an organisation: her bookmark step goes back from the list)
 usage: p2809_b_undo_test.py <datadir>"""
@@ -185,6 +187,36 @@ g = newest(Bo)
 res = back(Bo, g["id"])
 check(r.ok and g.get("kind") == "absence" and res.get("undone") == [g["id"]]
       and row("hub_absences", BAB, "end_date")["end_date"] == "2031-06-02", f"bob takes back his own change {res}")
+
+# ---------------------------------------------------------------- a project's environments
+r = A.post(B + "/api/lists", json={"name": "Umgebungen Beispiel"})
+check(r.ok, f"(setup) a project {r.status_code} {r.text[:120]}")
+LID = r.json()["id"]
+r = A.post(B + f"/api/lists/{LID}/envs", json={"name": "Test"})
+check(r.status_code == 201, f"(setup) an environment {r.status_code} {r.text[:120]}")
+EN = r.json()["id"]
+r = A.patch(B + f"/api/envs/{EN}", json={"name": "Abnahme", "auto_close": True}, headers=LAP)
+check(r.ok, f"the environment renamed on the laptop {r.status_code} {r.text[:120]}")
+g = newest(PHONE)
+check(g.get("kind") == "env" and "Test" in (g.get("label") or ""), f"the phone lists the environment's step {g}")
+res = back(PHONE, g["id"])
+x = row("list_envs", EN, "name, auto_close")
+check(res.get("undone") == [g["id"]] and x == {"name": "Test", "auto_close": 0}, f"taken back: the old name and switch {res} {x}")
+r = A.patch(B + f"/api/envs/{EN}", json={"hook": "on"})
+check(r.ok and newest(A).get("id") == g["id"], f"the webhook alone records no step {r.status_code}")
+r = A.delete(B + f"/api/envs/{EN}")
+g = newest(A)
+check(r.ok and g.get("kind") == "env", f"the removal is a step {r.status_code} {g}")
+res = back(A, g["id"])
+x = row("list_envs", EN, "deleted_at, token_hash")
+check(res.get("undone") == [g["id"]] and not x.get("deleted_at") and x.get("token_hash") == "", f"undo: it is back, the webhook stays off {res} {x}")
+r = A.delete(B + f"/api/envs/{EN}")
+g = newest(A)
+r = A.post(B + f"/api/lists/{LID}/envs", json={"name": "Test"})
+check(r.status_code == 201, f"(setup) the name taken by a new environment {r.status_code}")
+res = back(A, g["id"])
+check(not res.get("undone") and res.get("stayed") and res["stayed"][0].get("reason") and row("list_envs", EN, "deleted_at").get("deleted_at"),
+      f"back out of the trash refused: the name is taken meanwhile {res}")
 
 # ---------------------------------------------------------------- only own steps
 g = newest(A)

@@ -14,7 +14,7 @@ import secrets
 from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
-from ..core.pg import insert_id, st_ids, system_ctx
+from ..core.pg import insert_id, st_ids, system_ctx, write_lock
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
@@ -268,6 +268,9 @@ def env_update(eid):
     b = web_fields(body(), {"name", "auto_close", "acceptance_task", "hook"}, "PATCH /api/envs/{id}")
     e = env_row(c, eid, write=True, manage="hook" in b)
     out = {}
+    write_lock(c, f"list_envs-{eid}")  # 2.809.0 (#5476): the lock of its saves around its step (lists/envundo.py)
+    if set(b) - {"hook"}:
+        _env_step(c, eid)
     if "name" in b:
         name = env_clean_name(b["name"])
         if c.execute("SELECT 1 FROM list_envs WHERE list_id=? AND id!=? AND deleted_at IS NULL AND lower(name)=lower(?)", (e["list_id"], eid, name)).fetchone():
@@ -287,6 +290,7 @@ def env_update(eid):
             c.execute("UPDATE list_envs SET token_hash=? WHERE id=?", (hashlib.sha256(tok.encode()).hexdigest(), eid))
             out["url"] = f"{PUBLIC_URL.rstrip('/')}/api/hooks/deploy/{eid}/{tok}"  # the only time it is shown
     bump(c)
+    _env_done(c)
     c.commit()
     r = c.execute("SELECT * FROM list_envs WHERE id=?", (eid,)).fetchone()
     return jsonify({**env_dict(r, env_current(c, [eid]).get(eid), env_may_manage(c, e["list_id"])), **out})
@@ -296,8 +300,11 @@ def env_update(eid):
 def env_delete(eid):
     c = db()
     e = env_row(c, eid, write=True)
+    write_lock(c, f"list_envs-{eid}")  # 2.809.0 (#5476)
+    _env_step(c, eid, "delete")
     c.execute("UPDATE list_envs SET deleted_at=?, token_hash='' WHERE id=?", (iso(now_utc()), eid))  # the webhook stops; Undo restores the rest
     bump(c)
+    _env_done(c)
     c.commit()
     return jsonify(ok=True, list_id=e["list_id"])
 
@@ -309,10 +316,24 @@ def env_restore(eid):
     e = env_row(c, eid, write=True, trashed=True)
     if c.execute("SELECT 1 FROM list_envs WHERE list_id=? AND deleted_at IS NULL AND lower(name)=lower(?)", (e["list_id"], e["name"])).fetchone():
         return err(tr("This name is taken"), 409)
+    write_lock(c, f"list_envs-{eid}")  # 2.809.0 (#5476)
+    _env_step(c, eid, "restore")
     c.execute("UPDATE list_envs SET deleted_at=NULL WHERE id=?", (eid,))
     bump(c)
+    _env_done(c)
     c.commit()
     return jsonify(env_dict(c.execute("SELECT * FROM list_envs WHERE id=?", (eid,)).fetchone(), env_current(c, [eid]).get(eid), True))
+
+
+def _env_step(c, eid, what=None):
+    """2.809.0 (#5476): the undo step of the signed-in person's write of environment eid (lists/envundo.py imports this module)."""
+    from .envundo import enu_pre
+    enu_pre(c, me(), eid, what)
+
+
+def _env_done(c):
+    from .envundo import enu_post
+    enu_post(c)
 
 
 @app.delete("/api/envs/<int:eid>/deploys/<int:did>")

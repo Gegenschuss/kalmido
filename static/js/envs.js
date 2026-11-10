@@ -102,7 +102,7 @@ function env_editModal(l, e, j) {
       if (m === 'copy') { try { await navigator.clipboard.writeText($('#env-urlin', md).value); toast(tr('Copied')); } catch { toast(tr('Copy failed')); } return; }
       if (m === 'del') {
         await api('DELETE', `/api/envs/${e.id}`); md.remove();
-        histAdd({label: tr('Environment removed'), undo: async () => { await api('POST', `/api/envs/${e.id}/restore`); env_load(l.id, true); },
+        histAdd({label: tr('Environment removed'), srv: true, undo: async () => { await api('POST', `/api/envs/${e.id}/restore`); env_load(l.id, true); },
           redo: async () => { await api('DELETE', `/api/envs/${e.id}`); env_load(l.id, true); }});
         env_load(l.id, true); toast(tr('Environment removed')); return;
       }
@@ -112,7 +112,7 @@ function env_editModal(l, e, j) {
         const before = {name: e.name, auto_close: e.auto_close, acceptance_task: e.acceptance_task};
         await api('PATCH', `/api/envs/${e.id}`, {name, auto_close: ac, acceptance_task: at});
         const put = x => async () => { await api('PATCH', `/api/envs/${e.id}`, x); env_load(l.id, true); };
-        histAdd({label: tr('Environment changed'), undo: put(before), redo: put({name, auto_close: ac, acceptance_task: at})});
+        histAdd({label: tr('Environment changed'), srv: true, undo: put(before), redo: put({name, auto_close: ac, acceptance_task: at})});
       } else {
         let r = await api('POST', `/api/lists/${l.id}/envs`, {name, auto_close: ac, acceptance_task: at});
         histAdd({label: tr('Environment added'), undo: async () => { await api('DELETE', `/api/envs/${r.id}`); env_load(l.id, true); },
