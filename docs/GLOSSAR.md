@@ -683,6 +683,7 @@ Tables (spreadsheets): formulas, charts, pivot, printing, sharing, import / expo
 - `kalmido/sheets/shprint.py` (`shp`) - The print view of a table as a PDF
 - `kalmido/sheets/shshare.py` (`shs`) - One table shared with single people or agents (read | write)
 - `kalmido/sheets/shundo.py` - Undo across devices for tables: a person's writes to cells, rows and columns as pointer steps to their batch (sh_undo_batch / shu_redo)
+- `kalmido/sheets/shustep.py` - Undo across devices for tables, stage 5 rest: a person's other table changes (rows / columns deleted, column settings, order, chart, colour rules, cell names, frozen values, rows in view, the sheets of the bar) as steps of their batch
 - `kalmido/sheets/step2.py` (`sh2`) - Step 2 of the tables
 - `kalmido/sheets/v1.py` (`v1`) - Tables for agents and scripts (API v1; scopes sheets:read / sheets:write)
 - `kalmido/sheets/vars.py` (`sh`) - Kalmido variables of table formulas
