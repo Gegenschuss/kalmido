@@ -83,8 +83,11 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       return true;
     };
     const PAGES = [
-      ['start', '#home', '#view .dash', 'voll'],  // 2.583.0 (#4840): --w-seite is none, lists and overviews take the full width: #top as before
-      ['list', '#l/' + L, '#view .lwrap', 'voll'],  // 2.583.0 (#4840), as start
+      // 2.832.0 (#5514): start and list are 'seite' again - #5309 (2.757) tells them by their var(--w-seite) rules, so #top takes
+      // the content's edges (the padding of #view, no --pw); the 'voll' expectation of cb857869c was written without 2.757 and
+      // kept #top 4 px beside the content (the two fixes met in 2.819.0: red on the Mac too)
+      ['start', '#home', '#view .dash', 'seite'],
+      ['list', '#l/' + L, '#view .lwrap', 'seite'],
       ['board', '#l/' + K, '#view .kanban', 'voll'],
       ['wiki', '#wiki/' + WP.id, '#view article.wkpage', 'voll'],  // 2.783.0 (#5376): the page's card takes the full width, #top stays where the list has it (voll)
       ['note', '#note/' + NT.id, '#view .ntview.open', 'eigen'],
@@ -182,12 +185,12 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     check(n1 && Math.abs(n1.l - n1.r) <= 2 && n1.l > 2, '#4808 2560px note: list + note one block in the middle ' + JSON.stringify(n1));
     for (const theme of ['light', 'dark']) { await paint(theme); await shot(`p2599b-note-2560-${theme}.png`); }
     check(await menuPick('[data-act="nt-menu"]', 'm-pgw', 'm-pgw-breit'), '#4808: the note\'s "…" > Page width… > Wide');
-    // 2.583.0 (#4840): --w-seite (Wide) is no limit any more: the note's text takes the sheet's whole inside, #top stays as in the list (voll)
-    const nWide = x => x && x.l <= 2 && x.r <= 2 && x.col > 96 * x.rem;
-    const n2 = await until(`(() => { const x = ${NS}; return x && document.querySelector('.ntwrap.pgw-breit') && x.l <= 2 && x.r <= 2 && x.col > 96 * x.rem ? x : null; })()`, {timeout: 5000}) || await ev(NS);
-    check(nWide(n2), '#4808/#4840 2560px note: Wide = the full width (--w-seite none) ' + JSON.stringify(n2));
-    const tn = await until(`(() => { const x = ${EDGES('#view .ntview.open')}; return x && x.w === 'voll' && Math.abs(x.pl - 2 * x.rem) < 1 ? x : null; })()`, {timeout: 5000}) || await ev(EDGES('#view .ntview.open'));
-    check(tn && tn.w === 'voll' && Math.abs(tn.pl - 2 * tn.rem) < 1, '#4814/#4840 2560px note Wide: #top as in the list ' + JSON.stringify(tn));
+    // 2.832.0 (#5514): Wide = 96rem again (#5309, start-ntblatt-4808.css --ntpw: with --w-seite none, calc(none + ...) dropped the
+    // grid of list + note), so Read / Wide / Full stay three widths; #top has the edges of the block (eigen)
+    const n2 = await until(`(() => { const x = ${NS}; return x && document.querySelector('.ntwrap.pgw-breit') && Math.abs(x.col - 96 * x.rem) <= 2 ? x : null; })()`, {timeout: 5000}) || await ev(NS);
+    check(n2 && Math.abs(n2.col - 96 * n2.rem) <= 2, '#4808/#5309 2560px note: Wide = 96rem ' + JSON.stringify(n2));
+    const tn = await until(`(() => { const x = ${EDGES('#view .ntview.open')}; return x && Math.abs(x.tl - x.el) <= 2 ? x : null; })()`, {timeout: 5000}) || await ev(EDGES('#view .ntview.open'));
+    check(tn && Math.abs(tn.tl - tn.el) <= 2 && Math.abs(tn.tr - tn.er) <= 2, '#4814 2560px note Wide: #top has the edges of the block ' + JSON.stringify(tn));
     check(await menuPick('[data-act="nt-menu"]', 'm-pgw', 'm-pgwd-voll'), '#4808: the note\'s "…" > default Full');
     let lk3 = '';
     for (let i = 0; i < 40 && !/"ntW":"voll"/.test(lk3); i++) { await sleep(250); lk3 = (await call('GET', '/api/state')).settings?.look || ''; }
