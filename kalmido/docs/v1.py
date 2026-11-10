@@ -60,13 +60,21 @@ def _v1_doc(c, m, node, full=False, role=None):
 def v1_docs_list():
     """Documents you may see (an agent: shared with it), newest document date first: ?q=&review=1&state=&from=&to=.
     2.122.0 B (#2294): + tag / not_tag / sender / type / folder (ids, "1,7;3" = two), tag_mode, added_from / added_to, no_tag,
-    no_sender, no_type, ftype; q takes the search syntax (tag:, sender:, type:, date:, "phrase", -word: docs/dsearch.py)."""
+    no_sender, no_type, ftype; q takes the search syntax (tag:, sender:, type:, date:, "phrase", -word: docs/dsearch.py).
+    2.857.0 (#5518): view=<id> = the filter of a saved view (kind docview) shared with the caller."""
     a = v1_args(("q", "review", "state", "from", "to", "limit", "cursor", "tag", "tag_mode", "not_tag", "sender", "type", "folder",
-                 "added_from", "added_to", "no_tag", "no_sender", "no_type", "ftype"))
+                 "added_from", "added_to", "no_tag", "no_sender", "no_type", "ftype", "view"))
     c = db()
     limit = v1_limit(a)
     off = cursor_dec("d", a.get("cursor"))
-    rows, total, _rev = doc_query(c, me(), {**a, "limit": limit, "offset": off})
+    rules = None
+    if a.get("view") is not None:  # 2.857.0 (#5518): a saved view shared with the caller: its filter on top (docs/dfilter.py)
+        from ..core.objects import obj_need
+        from .dfilter import dvf_rules
+        if not str(a["view"]).isdigit():
+            raise BadInput(tr("Invalid value: {0}", "view"))
+        rules = dvf_rules(obj_need(c, me(), "docview", int(a["view"]), "view")[0])
+    rows, total, _rev = doc_query(c, me(), {**a, "limit": limit, "offset": off}, rules=rules)
     out = []
     for r in rows:
         node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()

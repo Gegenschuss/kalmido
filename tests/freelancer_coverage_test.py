@@ -935,6 +935,7 @@ ROUTES = {
     # 2.558.0 (#4709): the core objects (core/objweb.py)
     "GET /api/obj/{}": "obj", "POST /api/obj/{}": "obj", "GET /api/obj/{}/{}": "obj", "PATCH /api/obj/{}/{}": "obj",
     "GET /api/docs/views": "obj", "GET /api/docs/views/{}/hits": "obj", "POST /api/docs/views/{}/share": "obj",  # 2.579.0 (#4802): saved document views (p2579_c_api_test.py)
+    "POST /api/docs/views/count": "obj",  # 2.857.0 (#5518): the live count of the documents filter dialog (p2857_a_docfilter_test.py)
     "POST /api/obj/{}/{}/trash": "obj", "POST /api/obj/{}/{}/restore": "obj", "DELETE /api/obj/{}/{}": "obj",
     "GET /api/obj/{}/{}/history": "obj", "POST /api/obj/{}/{}/undo": "obj", "GET /api/obj/{}/{}/shares": "obj",
     "POST /api/obj/{}/{}/shares": "obj", "DELETE /api/obj/{}/{}/shares/{}": "obj", "POST /api/obj/{}/{}/shares/{}/restore": "obj",

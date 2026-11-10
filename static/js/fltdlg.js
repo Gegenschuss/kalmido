@@ -22,10 +22,13 @@
 //   fresh(key, cs, prev) -> condition     a row switched to key (default {f: key, op: the first of ops, v: []})
 //   add(cs) -> key                        the "what" of "+ Condition" (default the first)  prep(cs) -> ctx  once per drawing
 //   unit(c) -> text after a number        keep(c) -> false = an opened filter leaves the condition out
+//   2.857.0 (#5518): input(c) -> 'date' = a date field instead of a number (op from / to), ph(c) -> the text field's placeholder;
+//   count (kflt_dialog) may answer with a Promise (a count on the server): the newest answer is shown
 const KFLT_OPN = {in: N_('is one of'), nin: N_('is none of'), empty: N_('is empty'), has: N_('contains'), nhas: N_('does not contain'),
   gt: N_('greater than'), lt: N_('less than'), eq: N_('equals'), set: N_('has a value'),
-  is: N_('is'), isnot: N_('is not')};  // 2.625.0 (#4486): is / is not = the comparisons of a newsletter segment's rows (a value list)
-const kflt_isList = c => !['has', 'nhas', 'gt', 'lt', 'eq', 'set', 'empty'].includes(c.op);
+  is: N_('is'), isnot: N_('is not'),  // 2.625.0 (#4486): is / is not = the comparisons of a newsletter segment's rows (a value list)
+  from: N_('from'), to: N_('to')};  // 2.857.0 (#5518): a date / number from / to (the documents' filter)
+const kflt_isList = c => !['has', 'nhas', 'gt', 'lt', 'eq', 'set', 'empty', 'from', 'to'].includes(c.op);  // 2.857.0 (#5518): + from / to
 const kflt_sum = (c, cs, /** @type {any} */ cat) => { const on = new Set((c.v || []).map(String)); const n = cat.vals(c, cs).filter(([v]) => on.has(String(v))).map(x => x[1]); return n.length ? n.join(', ') : ''; };
 function kflt_fresh(key, cs, prev, /** @type {any} */ cat) {
   if (cat.fresh) return cat.fresh(key, cs, prev);
@@ -38,8 +41,8 @@ function kflt_rowHtml(c, i, cs, /** @type {any} */ cat, ctx = null) {
   const ops = `<select class="fc-op" data-i="${i}" aria-label="${esc(tr('Comparison'))}">${cat.ops(c).map(o => `<option value="${o}" ${o === c.op ? 'selected' : ''}>${esc(tr(KFLT_OPN[o]))}</option>`).join('')}</select>`;
   const unit = cat.unit ? cat.unit(c) : null;
   const val = c.op === 'empty' || c.op === 'set' ? '<span class="fc-vn"></span>'
-    : c.op === 'has' || c.op === 'nhas' ? `<input class="fc-t" data-i="${i}" value="${esc(c.v || '')}" placeholder="${esc(tr('Title or notes contain …'))}" aria-label="${esc(tr('Value'))}" autocomplete="off">`
-    : !kflt_isList(c) ? `<span class="fc-num"><input class="fc-n" data-i="${i}" inputmode="decimal" value="${esc(c.v ?? '')}" aria-label="${esc(tr('Value'))}">${unit ? `<span class="muted">${esc(unit)}</span>` : ''}</span>`
+    : c.op === 'has' || c.op === 'nhas' ? `<input class="fc-t" data-i="${i}" value="${esc(c.v || '')}" placeholder="${esc(cat.ph ? cat.ph(c) : tr('Title or notes contain …'))}" aria-label="${esc(tr('Value'))}" autocomplete="off">`
+    : !kflt_isList(c) ? `<span class="fc-num"><input class="fc-n" data-i="${i}" ${cat.input?.(c) === 'date' ? 'type="date"' : 'inputmode="decimal"'} value="${esc(c.v ?? '')}" aria-label="${esc(tr('Value'))}">${unit ? `<span class="muted">${esc(unit)}</span>` : ''}</span>`
     : (s => `<button type="button" class="btn sm fc-v${s ? '' : ' fc-v0'}" data-i="${i}" aria-haspopup="menu" aria-label="${esc(tr('Value'))}: ${esc(s || tr('Select'))}"><span class="fc-vs">${esc(s || tr('Select') + '…')}</span>${ic('chev', 's')}</button>`)(kflt_sum(c, cs, cat));
   return `<div class="fcond" data-i="${i}">${what}${ops}${val}<button type="button" class="iconbtn fc-x" data-i="${i}" aria-label="${esc(tr('Remove condition'))}" title="${esc(tr('Remove condition'))}">${ic('x', 's')}</button></div>`;
 }
@@ -88,7 +91,7 @@ function kflt_rows(/** @type {any} */ host, /** @type {any[]} */ cs, /** @type {
   host.addEventListener('input', e => {
     const el = /** @type {HTMLInputElement} */ (e.target), c = cs[+(el.dataset.i ?? -1)]; if (!c) return;
     if (el.classList.contains('fc-t')) { c.v = el.value; o.changed?.(); }
-    if (el.classList.contains('fc-n')) { const v = el.value.trim(); c.v = v === '' ? '' : numIn(v); o.changed?.(); }
+    if (el.classList.contains('fc-n')) { const v = el.value.trim(); c.v = v === '' || el.type === 'date' ? v : numIn(v); o.changed?.(); }  // 2.857.0 (#5518): a date stays its text
   });
   host.addEventListener('click', e => {
     const b = /** @type {HTMLElement} */ (e.target).closest('button'); if (!b || !host.contains(b)) return;
@@ -122,8 +125,11 @@ function kflt_dialog(/** @type {any} */ o) {
   const count = () => {
     if (!o.count) return;
     const hint = r.op === 'or' && cs.some(c => (cat.hard || KFLT_HARD).includes(c.op) && kflt_cond(c, cat)) ? ' ' + tr('“is none of” always applies on top, also with OR.') : '';
-    $('#f-count', md).textContent = o.count(rules()) + hint;
+    const t = o.count(rules()), n = ++seq;
+    if (t && typeof t.then === 'function') t.then(x => { if (n === seq && x != null) $('#f-count', md).textContent = x + hint; }, () => {});  // 2.857.0 (#5518): a count on the server
+    else $('#f-count', md).textContent = t + hint;
   };
+  let seq = 0;
   const rows = kflt_rows($('#f-conds', md), cs, cat, {changed: count, addBtn: $('[data-m="cond-add"]', md)});
   md.addEventListener('click', async e => {
     const b = /** @type {HTMLElement} */ (e.target).closest('button'); if (!b || b.closest('#f-conds')) return;

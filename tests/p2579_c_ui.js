@@ -2,6 +2,7 @@
 // 2.579.0 UI tests, part C (#4802): saved views of the documents search (static/js/docviews.js). Own container (start.sh).
 // Invented names and generated texts only. jsdom:
 // - "Save view" in the documents' bar keeps the search under a name, #docs/v/<id> opens it; leaving it empties the search
+//   (2.857.0, #5518: "Save view" / "Update view" open the filter dialog of the shared core, the view keeps rules)
 // - the sidebar lists the view under To review with its number of hits; a changed search offers "Update view"
 // - the view's menu: rename, take over, favourite, show on Today, delete (with Undo); "share with everyone" only for an admin of
 //   the organisation the view searches (a member's own view has none)
@@ -21,6 +22,7 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {http: r.status, ...(await r.json().catch(() => ({})))}; };
 const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
+const input = (w, el, v) => { if (!el) return; el.value = v; el.dispatchEvent(new w.Event('input', {bubbles: true})); };
 const docNew = async (name, text, ws = 'private', ck = CK) => {
   const fd = new FormData(); fd.append('ws', ws); fd.append('files', new Blob([text], {type: 'text/plain'}), name);
   const id = (await (await fetch(B + 'api/docs', {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: ck}, body: fd})).json()).ids[0];
@@ -52,14 +54,24 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   await until(() => w.eval(`${listed('Koala')} && DC.total === 1`));
   const save = await until(() => d.querySelector('[data-dcv="save"]'));
   check(save, 'the documents\' bar offers "Save view"');
-  w.prompt = () => 'Koala docs';
+  // 2.857.0 (#5518): "Save view" opens the filter dialog with the search converted (a text condition), the name is typed there
   click(w, save);
+  const md = await until(() => d.querySelector('.modal.fltdlg'), 100);
+  check(md && md.querySelector('.fc-t')?.value === 'Koala' && await until(() => /^1 document matches/.test(md.querySelector('#f-count')?.textContent || '')),
+    'Save view: the filter dialog with the search as a text condition and its count ' + md?.querySelector('#f-count')?.textContent);
+  input(w, md?.querySelector('#f-name'), 'Koala docs');
+  click(w, md?.querySelector('[data-m="save"]'));
   const VID = await until(() => w.eval(`(DCV.items || []).find(v => v.title === 'Koala docs')?.id`), 100);
   check(VID, 'saved: the view is there');
   check(await until(() => w.location.hash === '#ablage/v/' + VID), 'the saved view opens (#docs/v/<id>)');
   const st = () => w.eval(`JSON.stringify({q: DC.q, total: DC.total, loading: DC.loading, dv: DC.dv, route: S.route, applied: DCV.applied, now: typeof dc_params === 'function' ? dcv_queryNow() : '', hash: location.hash})`);
   const v0 = await until(() => w.eval(`(v => v && v.count === 1 ? v : null)(dcv_get(${VID}))`)) || w.eval(`dcv_get(${VID})`);
-  check(v0 && v0.query === 'q=Koala&area=private' && v0.ws === 'private' && v0.count === 1, 'it keeps the search and counts its hits ' + JSON.stringify(v0));
+  // 2.857.0 (#5518): the view keeps its filter as rules (the search's text a condition), not the query string
+  check(v0 && JSON.stringify(v0.rules?.conds) === JSON.stringify([{f: 'text', op: 'has', v: 'Koala'}]) && v0.rules.area === 'private' && v0.ws === 'private' && v0.count === 1,
+    'it keeps the search as its filter and counts its hits ' + JSON.stringify(v0));
+  // 2.857.0 (#5518): the view's filter goes to the server (view=<id>), the search field starts empty
+  const inView = `DC.dv === ${VID} && DCV.applied?.id === ${VID} && DC.q === '' && !DC.loading && new URLSearchParams(DC.key || '').get('view') === '${VID}'`;
+  check(await until(() => w.eval(`${inView} && DC.total === 1`)) && w.eval(`DC.docs.map(x => x.id).join()`) === String(D1), 'the open view lists its document ' + st());
   const side = await until(() => (e => e && e.querySelector('.c')?.textContent === '1' ? e : null)(d.querySelector(`#side [data-sbbpart="docs-view"][data-dcvid="${VID}"]`)))
     || d.querySelector(`#side [data-sbbpart="docs-view"][data-dcvid="${VID}"]`);
   check(side && side.textContent.includes('Koala docs') && side.querySelector('.c')?.textContent === '1', 'the sidebar: the view with its number ' + side?.outerHTML?.slice(0, 200));
@@ -71,19 +83,26 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   check(await until(() => w.eval(`DC.dv === null && DCV.applied === null && !DC.vsort && !DC.f.review && !DC.loading`)), 'back to Documents: the view is left (its sort and filters go) ' + st());
   click(w, d.querySelector(`#side [data-dcvid="${VID}"]`));
   // 2.583.0 (#4835): wait for the view itself (DC.dv), not only the text - viewmem.js brings 'Koala' back before the row's view applies
-  check(await until(() => w.eval(`location.hash === '#ablage/v/${VID}' && DC.dv === ${VID} && DCV.applied?.id === ${VID} && ${listed('Koala')} && DC.total === 1 && !DC.loading`)),
+  check(await until(() => w.eval(`location.hash === '#ablage/v/${VID}' && ${inView} && DC.total === 1`)),
     'the sidebar row applies the view again ' + st());
   // a changed search: "Update view" takes it over
   type('Emu');
   const upd = await until(() => w.eval(`${listed('Emu')} && DCV.applied?.id === ${VID}`) && d.querySelector('[data-dcv="update"]'));
   check(upd && d.querySelector('.dcv-dirty'), 'a changed search: marked, "Update view" offered ' + st());
+  // 2.857.0 (#5518): "Update view" opens the filter dialog: the view's conditions plus the search on top; OR keeps both
   click(w, upd);
-  check(await until(() => w.eval(`dcv_get(${VID})?.query === 'q=Emu&area=private'`)), 'updated: the view keeps the new search');
+  const um = await until(() => d.querySelector('.modal.fltdlg'), 100);
+  check(um && [...um.querySelectorAll('.fc-t')].map(x => x.value).join() === 'Koala,Emu' && um.querySelector('#f-name').value === 'Koala docs',
+    'Update view: the dialog with the view\'s condition and the search on top ' + [...(um?.querySelectorAll('.fc-t') || [])].map(x => x.value));
+  click(w, um?.querySelector('#f-op [data-op="or"]'));
+  check(await until(() => /^2 documents match/.test(um?.querySelector('#f-count')?.textContent || '')), 'OR: both documents count ' + um?.querySelector('#f-count')?.textContent);
+  click(w, um?.querySelector('[data-m="save"]'));
+  check(await until(() => w.eval(`(r => r && r.op === 'or' && r.conds.length === 2)(dcv_get(${VID})?.rules) && ${inView} && DC.total === 2`)), 'updated: the view keeps both, the list shows both ' + st());
   await w.eval(`histStep('undo')`);
-  check(await until(async () => (await call('GET', `/api/obj/docview/${VID}`)).query === 'q=Koala&area=private'), 'undo: the old search again');
+  check(await until(async () => (await call('GET', `/api/obj/docview/${VID}`)).rules?.conds?.length === 1), 'undo: the old filter again');
   // the menu
   const labels = w.eval(`dcv_menuItems(dcv_get(${VID})).filter(x => x !== '-').map(x => x.label)`);
-  check(['Rename…', 'Use the current filters', 'Add to favourites', 'Show on Today', 'Delete view'].every(x => labels.includes(x)) && !labels.includes('Share with everyone of the organisation'),
+  check(['Rename…', 'Edit filter…', 'Use the current filters', 'Add to favourites', 'Show on Today', 'Delete view'].every(x => labels.includes(x)) && !labels.includes('Share with everyone of the organisation'),
     'the menu of a private view (no sharing with an organisation) ' + JSON.stringify(labels));
   w.prompt = () => 'Koala invoices';
   w.eval(`dcv_rename(dcv_get(${VID}))`);

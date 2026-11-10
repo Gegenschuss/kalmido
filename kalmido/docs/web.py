@@ -271,10 +271,32 @@ def _sort_value(c, r, key):
         return None
 
 
-def doc_query(c, uid, args, vis=None):
+def doc_hits(c, sql, params, q, text):
+    """The documents of `FROM ... WHERE ...` (sql, params) that the words q (the word index, an archive number) and the exact /
+    excluded phrases of text (docs/dsearch.py dsr_filters) hit -> a set of node ids, None when there are none to look for.
+    2.857.0 (#5518): out of doc_query, the text condition of a saved view's filter (docs/dfilter.py) uses it too."""
+    from .dsearch import dsr_text
+    if not (q or any(text.values())):
+        return None
+    by_ws = {}
+    for r in c.execute(f"SELECT d.node_id, d.ws {sql}", params):
+        by_ws.setdefault(r[1], []).append(r[0])
+    hit = S.search_ids(c, by_ws, q) if q else None
+    for ws_, ids_ in by_ws.items() if q else ():  # an archive serial number ("ASN00042", "42"): its document as well
+        pre = re.escape(S.cfg_get(c, ws_)["asn_prefix"])
+        n = re.fullmatch(rf"\s*(?:{pre})?\s*[:#-]?\s*0*(\d{{1,9}})\s*", q, re.I)
+        if n:
+            r_ = c.execute("SELECT node_id FROM doc_meta WHERE ws=? AND asn=?", (ws_, int(n.group(1)))).fetchone()
+            if r_ and r_[0] in ids_:
+                hit = (hit or set()) | {r_[0]}
+    return dsr_text(c, by_ws, hit, text)
+
+
+def doc_query(c, uid, args, vis=None, rules=None):
     """The documents account uid sees, filtered by args (ws, q, sender, type, tag, from, to, review, state) -> (rows, total,
     review count). Rows: doc_meta + node columns, sorted by doc_sort (newest document date first by default).
-    vis: doc_visible of the request (2.525.0, #4195; None = worked out here)."""
+    vis: doc_visible of the request (2.525.0, #4195; None = worked out here). rules (2.857.0, #5518): a saved view's filter
+    {op, conds} (docs/dfilter.py) on top of args; the rights stay those of doc_visible, the filter only narrows."""
     vis = vis or doc_visible(c, uid)
     where, params = [f"n.id {vis[0]}", "n.kind='file'"], [vis[1]]
     ws = str(args.get("ws") or "all")
@@ -292,26 +314,20 @@ def doc_query(c, uid, args, vis=None):
     base_where, base_params = list(where), list(params)
     # 2.122.0 B (#2294): several tags (every one / one of them / not), several senders and types, both dates, folder, file
     # type, "without ...", and the search syntax of the search field (docs/dsearch.py)
-    from .dsearch import dsr_filters, dsr_text
+    from .dsearch import dsr_filters
     q, text = dsr_filters(c, args, where, params, base_where, base_params)
+    if rules:  # 2.857.0 (#5518): a saved view's filter (docs/dfilter.py, the shared core's kflt_where) narrows the same rows
+        from .dfilter import dvf_where
+        w_, p_ = dvf_where(c, rules, base_where, base_params)
+        if w_:
+            where.append(w_)
+            params += p_
     sql = f"FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {' AND '.join(where)}"
-    if q or any(text.values()):
-        by_ws = {}
-        for r in c.execute(f"SELECT d.node_id, d.ws {sql}", params):
-            by_ws.setdefault(r[1], []).append(r[0])
-        hit = S.search_ids(c, by_ws, q) if q else None
-        for ws_, ids_ in by_ws.items() if q else ():  # an archive serial number ("ASN00042", "42"): its document as well
-            pre = re.escape(S.cfg_get(c, ws_)["asn_prefix"])
-            n = re.fullmatch(rf"\s*(?:{pre})?\s*[:#-]?\s*0*(\d{{1,9}})\s*", q, re.I)
-            if n:
-                r_ = c.execute("SELECT node_id FROM doc_meta WHERE ws=? AND asn=?", (ws_, int(n.group(1)))).fetchone()
-                if r_ and r_[0] in ids_:
-                    hit = (hit or set()) | {r_[0]}
-        hit = dsr_text(c, by_ws, hit, text)
-        if hit is not None:
-            ids = sorted(hit)[:5000]
-            sql += f" AND d.node_id IN ({','.join('?' * len(ids))})" if ids else " AND FALSE"
-            params += ids
+    hit = doc_hits(c, sql, params, q, text)
+    if hit is not None:
+        ids = sorted(hit)[:5000]
+        sql += f" AND d.node_id IN ({','.join('?' * len(ids))})" if ids else " AND FALSE"
+        params += ids
     total = c.execute(f"SELECT COUNT(*) {sql}", params).fetchone()[0]
     review = c.execute(f"SELECT COUNT(*) FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {' AND '.join(base_where)} AND d.review=1",
                        base_params).fetchone()[0]
@@ -401,11 +417,23 @@ def docs_list():
     """Documents I can see: ?ws=all|private|org:<id>&q=&sender=&type=&tag=&from=&to=&review=1&state=&limit=&offset=&sort=&dir=
     (2.428.0 #3579: sort date|added|sender|amount|due|title, dir asc|desc).
     2.122.0 B (#2294): sender / type / tag / folder repeatable (comma ids = one name), tag_mode=all|any, not_tag=, added_from=,
-    added_to=, no_tag=1, no_sender=1, no_type=1, ftype=pdf,image,office,text,other; q takes the syntax of docs/dsearch.py."""
+    added_to=, no_tag=1, no_sender=1, no_type=1, ftype=pdf,image,office,text,other; q takes the syntax of docs/dsearch.py.
+    2.857.0 (#5518): view=<id> = a saved view's filter on top (docs/dviews.py, docs/dfilter.py)."""
     c = db()
     uid = me()
     vis = doc_visible(c, uid)  # 2.525.0 (#4195): once for the whole answer
-    rows, total, review = doc_query(c, uid, request.args, vis)
+    args, rules = request.args, None
+    if str(request.args.get("view") or "").isdigit():  # 2.857.0 (#5518): ?view=<id> = a saved view's filter (one the caller may see)
+        from ..core.objects import obj_need
+        from .dfilter import dvf_args, dvf_rules
+        row, _ = obj_need(c, uid, "docview", int(request.args["view"]), "view")
+        rules = dvf_rules(row)
+        args = dvf_args(rules)  # its own parameters (area, state, ...) where the list names none; the sort is the list's
+        args.pop("sort", None)
+        args.pop("dir", None)
+        for k, vs in request.args.lists():
+            args.setlist(k, vs)
+    rows, total, review = doc_query(c, uid, args, vis, rules=rules)
     pre = doc_prefetch(c, [r["node_id"] for r in rows])  # 2.525.0 (#4195): the row helpers in three queries, not per row
     out = [doc_json(c, r, pre["nodes"][r["node_id"]], pre=pre) for r in rows if r["node_id"] in pre["nodes"]]
     # 2.768.0 (#4888): the role and owner of each row for the file store's one selection (what one may not change is left out

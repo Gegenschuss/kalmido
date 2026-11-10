@@ -18143,5 +18143,13 @@
   "Only you so far: add a name or e-mail": "Per ora solo tu: aggiungi un nome o un’e-mail",
   "Time zone, status, link": "Fuso orario, stato, link",
   "Search a city": "Cerca una città",
-  "Guests outside Kalmido do not get an invitation by e-mail. Let them know yourself.": "Gli ospiti fuori da Kalmido non ricevono un invito via e-mail. Avvisali tu."
+  "Guests outside Kalmido do not get an invitation by e-mail. Let them know yourself.": "Gli ospiti fuori da Kalmido non ricevono un invito via e-mail. Avvisali tu.",
+  "Added on": "Aggiunto il",
+  "Last 7 days": "Ultimi 7 giorni",
+  "Last 30 days": "Ultimi 30 giorni",
+  "Last 90 days": "Ultimi 90 giorni",
+  "{0} document matches": ["{0} documento corrisponde", "{0} documenti corrispondono"],
+  "Filter “{0}” changed": "Filtro «{0}» modificato",
+  "Edit filter…": "Modifica filtro…",
+  "Words or the search syntax (tag:Name, \"exact text\", -word)": "Parole o sintassi di ricerca (tag:Nome, \"testo esatto\", -parola)"
 }

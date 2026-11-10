@@ -18142,5 +18142,13 @@
   "Only you so far: add a name or e-mail": "Nu alleen jij: voeg een naam of e-mail toe",
   "Time zone, status, link": "Tijdzone, status, link",
   "Search a city": "Zoek een stad",
-  "Guests outside Kalmido do not get an invitation by e-mail. Let them know yourself.": "Gasten buiten Kalmido krijgen geen uitnodiging per e-mail. Laat het ze zelf weten."
+  "Guests outside Kalmido do not get an invitation by e-mail. Let them know yourself.": "Gasten buiten Kalmido krijgen geen uitnodiging per e-mail. Laat het ze zelf weten.",
+  "Added on": "Toegevoegd op",
+  "Last 7 days": "Laatste 7 dagen",
+  "Last 30 days": "Laatste 30 dagen",
+  "Last 90 days": "Laatste 90 dagen",
+  "{0} document matches": ["{0} document past", "{0} documenten passen"],
+  "Filter “{0}” changed": "Filter ‘{0}’ gewijzigd",
+  "Edit filter…": "Filter bewerken…",
+  "Words or the search syntax (tag:Name, \"exact text\", -word)": "Woorden of zoeksyntaxis (tag:Naam, \"exacte tekst\", -woord)"
 }

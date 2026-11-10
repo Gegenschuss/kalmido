@@ -16,12 +16,16 @@ Routes (people; the rest -- create, change with its version, trash / restore / u
 generic routes /api/obj/docview/...):
   GET  /api/docs/views?ws=all|private|org:<id>   the views one sees for that workspace with their number of hits
   GET  /api/docs/views/<id>/hits?limit=5          the first hits (Today's block) and their number
-  POST /api/docs/views/<id>/share {all: bool}     an admin shares the view with everyone of its organisation / takes it back"""
+  POST /api/docs/views/<id>/share {all: bool}     an admin shares the view with everyone of its organisation / takes it back
+  POST /api/docs/views/count {ws, rules | query}   the live count of the filter dialog (and an older search converted)
+
+2.857.0 (#5518): a view keeps its filter as rules {op, conds} of the shared core's filter (docs/dfilter.py; the dialog of
+the lists' saved filters, docviews.js); an older view (only its query string) opens converted and hits the same documents.
+The field rules is the converted one for an older view too (dv_public); its query stays stored as it was."""
 import re
 from urllib.parse import parse_qsl, urlencode
 
 from flask import jsonify, request
-from werkzeug.datastructures import MultiDict
 
 from ..core.access import Denied, acx_of
 from ..core.config import app
@@ -32,6 +36,7 @@ from ..core.objects import f_text, obj_need, obj_public, obj_register, obj_role,
 from ..core.writes import obj_space_set
 from ..accounts.session import me
 from ..core.schema import USER_DEFAULTS
+from .dfilter import dvf_args, dvf_clean, dvf_field, dvf_from_query, dvf_rules
 from .web import _no_agent, doc_json, doc_prefetch, doc_query, doc_visible
 
 DV_KIND = "docview"
@@ -72,18 +77,23 @@ def dv_ws_clean(c, v, row=None):
     return v
 
 
+def dv_public(c, uid, row, role=None):
+    """The view for the client / the API as the core's obj_public, with rules as the filter (an older view's converted)."""
+    out = {k: row[k] for k in ("id", "org_id", "owner_id", "rev", "created_at", "created_by", "updated_at", "updated_by", "deleted_at")}
+    out.update(title=row["title"] or "", query=row["query"], ws=row["ws"], rules=dvf_rules(row),  # 2.857.0 (#5518)
+               kind=DV_KIND, role=role, open=f"docs/v/{int(row['id'])}")
+    return out
+
+
 obj_register(DV_KIND, "doc_views", label=N_("Saved view"), area="other", org_access="view", org_join="admin", listed=False,
-             fields={"title": f_text(120, required=True), "query": dv_query_clean, "ws": dv_ws_clean},
-             open_url=lambda rid: f"docs/v/{int(rid)}")
+             fields={"title": f_text(120, required=True), "query": dv_query_clean, "ws": dv_ws_clean, "rules": dvf_field},  # 2.857.0 (#5518): + rules
+             open_url=lambda rid: f"docs/v/{int(rid)}", public=dv_public)
 
 
 def dv_args(row, extra=None):
-    """The request arguments of the documents search the view stands for (MultiDict, as request.args)."""
-    md = MultiDict(parse_qsl(row["query"] or ""))
-    md["ws"] = row["ws"] or "all"
-    for k, v in (extra or {}).items():
-        md[k] = v
-    return md
+    """The request arguments of the documents search the view stands for (MultiDict, as request.args) -- 2.857.0 (#5518):
+    only its own parameters (sort, area, ...) and ws; its conditions go to doc_query as rules (dvf_rules)."""
+    return dvf_args(dvf_rules(row), {"ws": row["ws"] or "all", **(extra or {})})
 
 
 def dv_count(c, uid, row, vis):
@@ -91,7 +101,7 @@ def dv_count(c, uid, row, vis):
     a = dv_args(row, {"limit": "1"})
     a.pop("sort", None)
     a.pop("dir", None)
-    _, total, _ = doc_query(c, uid, a, vis)
+    _, total, _ = doc_query(c, uid, a, vis, rules=dvf_rules(row))
     return total
 
 
@@ -132,7 +142,7 @@ def dv_hits(vid):
     except ValueError:
         n = 5
     vis = doc_visible(c, uid)
-    rows, total, _ = doc_query(c, uid, dv_args(row, {"limit": str(n), "offset": "0"}), vis)
+    rows, total, _ = doc_query(c, uid, dv_args(row, {"limit": str(n), "offset": "0"}), vis, rules=dvf_rules(row))
     pre = doc_prefetch(c, [r["node_id"] for r in rows])
     docs = [doc_json(c, r, pre["nodes"][r["node_id"]], pre=pre) for r in rows if r["node_id"] in pre["nodes"]]
     return jsonify(view=obj_public(c, uid, DV_KIND, row, role), total=total, docs=docs)
@@ -160,3 +170,20 @@ def dv_share(vid):
     out = obj_public(c, uid, DV_KIND, row, obj_role(c, uid, DV_KIND, vid, row=row))  # None: an admin took back another admin's view
     out["shared_all"] = bool(row["org_id"])
     return jsonify({**out, "moved": moved})
+
+
+@app.post("/api/docs/views/count")
+def dv_count_rules():
+    """2.857.0 (#5518): {ws, rules} -> {total, rules}: the number of documents the filter hits for the person (doc_query with
+    their rights, the filter only narrows); {ws, query} instead of rules: the documents search's parameters (the bar's "Save
+    view") converted into rules first. The live count of the filter dialog (docviews.js)."""
+    _no_agent()
+    c, uid = db(), me()
+    b = body()
+    b = b if isinstance(b, dict) else {}
+    ws = b.get("ws") if isinstance(b.get("ws"), str) else "all"
+    if not DV_WS.fullmatch(ws):
+        raise BadInput(tr("Invalid value: {0}", "ws"))
+    rules = dvf_clean(b["rules"]) if b.get("rules") is not None else dvf_from_query(dv_query_clean(c, b.get("query") or ""))
+    _, total, _ = doc_query(c, uid, dvf_args(rules, {"ws": ws, "limit": "1", "sort": "", "dir": ""}), rules=rules)
+    return jsonify(total=total, rules=rules)

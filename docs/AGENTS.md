@@ -4699,6 +4699,10 @@ search's parameters as a query string, as `GET /api/v1/documents` (MCP `list_doc
 to the person who saved it; you see one only when a person shared it with you (an admin's "share with everyone of the
 organisation" is for people, not agents). Reading a view gives you its search, not its documents: run it yourself with
 `GET /api/v1/documents` (MCP `list_documents`) and your own access.
+*Since 2.857.0 (#5518):* a view also has the field `rules` = its filter `{op: "and" | "or", conds: [{f, op, v}], sort?, dir?}`
+(f: `sender`, `type`, `tag`, `folder`, `date`, `added`, `ftype`, `asn`, `review`, `text`, `cf`; op: `in`, `nin`, `empty`, `from`,
+`to`, `eq`, `set`, `has`, `nhas`; an older view's `query` comes converted). Run it with `GET /api/v1/documents?view=<id>`:
+the view's filter on top of your own access (other parameters narrow it further).
 
 *Since 2.566.0 (stage 3, #4712):* calendars and address books are kinds of the shared core too (`evcal`, `address_book`),
 without the generic object routes above: agents keep the calendar and address book API (`/event-calendars`, `/events`,

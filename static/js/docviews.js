@@ -8,7 +8,10 @@
      filters, favourite, show on Today, share with everyone of the organisation (admins in an organisation's workspace),
      delete (with Undo)
    - Today: a block per view switched on (user setting dv_today) with the first five hits and the number
-   Hits and numbers come from the server with the rights of the person looking. */
+   Hits and numbers come from the server with the rights of the person looking.
+   2.857.0 (#5518): a view is a filter of the shared core (docs/dev/kern.md "Filter"): the dialog of the lists' saved filters
+   (fltdlg.js kflt_dialog) with the documents' catalog DCV_FLT, rules {op, conds} on the server (docs/dfilter.py); "+ New filter"
+   in the sidebar, "Save view" opens the same dialog with the bar's search converted, an older view opens converted. */
 'use strict';
 
 const DCV = {items: null, ws: null, at: 0, loading: null, hits: {}, applied: null};
@@ -19,6 +22,64 @@ const dcv_todayIds = () => (S.settings?.dv_today || '').split(',').filter(Boolea
 const dcv_isToday = id => dcv_todayIds().includes(+id);
 // only an admin of the organisation the view searches shares it with everyone of it (the server decides again)
 const dcv_mayShare = v => !!v && /^org:\d+$/.test(v.ws || '') && (S.me?.workspaces || []).find(w => w.id === +v.ws.slice(4))?.role === 'admin';
+
+// ---- 2.857.0 (#5518): the documents' catalog for the core's filter. The documents are matched on the server only (docs/dfilter.py,
+// the list is paged), so cond here only says which conditions are on; the dialog's live count asks the server.
+const DCV_WHAT = [['sender', N_('Sender')], ['type', N_('Document type')], ['folder', N_('Folder')], ['tag', N_('Tag')], ['date', N_('Document date')],
+  ['added', N_('Added on')], ['ftype', N_('File type')], ['asn', N_('Archive number')], ['review', N_('To review')], ['text', N_('Text')]];
+const DCV_OPS = {sender: ['in', 'nin', 'empty'], type: ['in', 'nin', 'empty'], tag: ['in', 'nin', 'empty'], folder: ['in', 'nin'], date: ['in', 'nin', 'from', 'to'],
+  added: ['in', 'nin', 'from', 'to'], ftype: ['in', 'nin'], asn: ['eq', 'from', 'to', 'set', 'empty'], review: ['in', 'nin'], text: ['has', 'nhas'], cf: ['in', 'nin']};
+const DCV_DATES = [['d7', N_('Last 7 days')], ['d30', N_('Last 30 days')], ['d90', N_('Last 90 days')], ['m0', N_('This month')], ['m1', N_('Last month')], ['y0', N_('This year')], ['y1', N_('Last year')]];
+const DCV_FT = [['pdf', N_('PDF')], ['image', N_('Image')], ['office', N_('Office files')], ['text', N_('Text')], ['other', N_('Other')]];  // docs/dsearch.py DSR_FTYPES
+const DCV_ON = () => true;
+// fc = the documents' facets of the workspace (GET /api/docs/facets): the names to choose from
+function dcv_cat(/** @type {any} */ fc) {
+  const grp = k => (fc?.[{sender: 'senders', type: 'types', tag: 'tags', folder: 'folders'}[k]] || []).map(x => [x.ids.join(','), k === 'tag' ? '#' + x.name : x.name]);
+  const cfOf = ids => (fc?.fields || []).find(x => x.ids.join(',') === ids);
+  return {
+    cond: c => {  // on or off (the server matches)
+      const ops = DCV_OPS[c?.f]; if (!ops || !ops.includes(c.op) || (c.f === 'cf' && !c.ids)) return null;
+      if (c.op === 'empty' || c.op === 'set') return DCV_ON;
+      if (!kflt_isList(c)) return String(c.v ?? '').trim() ? DCV_ON : null;
+      return Array.isArray(c.v) && c.v.length ? DCV_ON : null;
+    },
+    what: () => DCV_WHAT, ops: c => DCV_OPS[c.f] || ['in'], key: c => (c.f === 'cf' ? 'cf|' + c.ids : c.f), add: () => 'sender',
+    extra: c => { const o = (fc?.fields || []).map(x => ['cf|' + x.ids.join(','), x.name]); if (c?.f === 'cf' && !o.some(x => x[0] === 'cf|' + c.ids)) o.push(['cf|' + c.ids, tr('Custom field')]); return o; },
+    fresh: key => (key.startsWith('cf|') ? {f: 'cf', ids: key.slice(3), op: 'in', v: []} : key === 'text' ? {f: 'text', op: 'has', v: ''} : key === 'asn' ? {f: 'asn', op: 'eq', v: ''} : {f: key, op: DCV_OPS[key]?.[0] || 'in', v: []}),
+    vals: c => {
+      const o = ['sender', 'type', 'tag', 'folder'].includes(c.f) ? grp(c.f) : c.f === 'date' || c.f === 'added' ? DCV_DATES.map(([v, n]) => [v, tr(n)])
+        : c.f === 'ftype' ? DCV_FT.map(([v, n]) => [v, tr(n)]) : c.f === 'review' ? [['1', tr('To review')]] : c.f === 'cf' ? (cfOf(c.ids)?.values || []).map(x => [x.value, x.name]) : [];
+      const have = new Set(o.map(x => String(x[0])));
+      for (const v of c.v || []) if (!have.has(String(v))) o.push([v, String(v)]);  // chosen values no document carries now stay (an older view's date "2025")
+      return o;
+    },
+    input: c => (c.f === 'date' || c.f === 'added' ? 'date' : null), ph: () => tr('Words or the search syntax (tag:Name, "exact text", -word)'),
+    keep: c => !!DCV_OPS[c?.f]};
+}
+const dcv_extra = r => Object.fromEntries(Object.entries(r || {}).filter(([k]) => k !== 'op' && k !== 'conds'));
+// the dialog: v = the view to change, else a new one; o.rules = its start (the bar's search converted), o.ws = its workspace
+async function dcv_edit(v, o = {}) {
+  const ws = v?.ws || o.ws || (typeof wsCur === 'function' ? wsCur() : 'all');
+  let fc = null; try { fc = await rawFetch('GET', '/api/docs/facets?ws=' + encodeURIComponent(ws)); } catch { /* only the chosen values then */ }
+  await loadModule('fltdlg');
+  const r0 = o.rules || v?.rules || {op: 'and', conds: []}, extra = dcv_extra(r0);
+  let timer = 0;
+  const count = r => new Promise(res => { clearTimeout(timer); timer = setTimeout(async () => { try { const j = await rawFetch('POST', '/api/docs/views/count', {ws, rules: r}); res(trn('{0} document matches', '{0} documents match', j.total)); } catch { res(null); } }, 250); });
+  return kflt_dialog({cat: dcv_cat(fc), rules: r0, name: v?.title || '', title: v ? tr('Edit filter') : tr('New filter'), placeholder: tr('Name of the view'),
+    moreRules: () => extra, count,
+    save: async (name, rules, md) => {
+      if (v) { if (await dcv_patch(v, {title: name, rules}, tr('Filter “{0}” changed', name))) md.remove(); return; }
+      let j; try { j = await api('POST', '/api/obj/docview', {title: name, rules, ws}); } catch { return; }
+      md.remove(); dcv_stale(); await dcv_load(true);
+      toast(tr('View “{0}” saved', j.title));
+      go('ablage/v/' + j.id);
+    },
+    del: v?.role === 'manage' ? async md => { md.remove(); dcv_delete(v); } : null});
+}
+// the bar's search (the filters, the search field, the sort) converted on the server (docs/dfilter.py dvf_from_query)
+async function dcv_convert(ws) {
+  try { return (await api('POST', '/api/docs/views/count', {ws, query: dcv_queryNow()})).rules; } catch { return null; }
+}
 
 // ---- loading
 async function dcv_load(force) {
@@ -45,31 +106,24 @@ function dcv_sideHtml() {
   if (!DCV.items || DCV.ws !== ws || Date.now() - DCV.at > 60000) setTimeout(() => dcv_load(), 0);
   const r = S.route;
   return (DCV.items || []).map(v => sbb_row('ablage/v/' + v.id, 'filter', v.title, r.mod === 'docs' && r.dv === v.id, `data-sbbpart="docs-view" data-dcvid="${v.id}"`,
-    `${v.shared_all ? `<span class="dcv-all" title="${esc(tr('Shared with everyone of the organisation'))}">${ic('users', 's')}</span>` : ''}${v.count != null ? `<span class="c">${v.count}</span>` : ''}`)).join('');
+    `${v.shared_all ? `<span class="dcv-all" title="${esc(tr('Shared with everyone of the organisation'))}">${ic('users', 's')}</span>` : ''}${v.count != null ? `<span class="c">${v.count}</span>` : ''}`)).join('')
+    + `<button type="button" class="srow smod sbbi dcv-new" data-dcv="new" data-sbbpart="docs-view-new">${ic('plus')}<span class="n">${esc(tr('New filter'))}</span></button>`;  // 2.857.0 (#5518): as the lists' "+"
 }
 
 // ---- the documents list: apply a view, keep the current search
 function dcv_queryNow() {
   const p = dc_params();
-  for (const k of ['ws', 'limit', 'offset', 'facets']) p.delete(k);
+  for (const k of ['ws', 'limit', 'offset', 'facets', 'view']) p.delete(k);  // 2.857.0 (#5518): the view's filter is its own
   return p.toString();
 }
-function dcv_apply(v) {
-  const p = new URLSearchParams(v?.query || ''), f = dc_f0();
-  for (const k of ['sender', 'type', 'folder']) f[k] = p.getAll(k);
-  for (const ids of p.getAll('tag')) f.tg[ids] = 'in';
-  for (const ids of p.getAll('not_tag')) f.tg[ids] = 'not';
-  if (p.get('tag_mode') === 'all') f.tmode = 'all';
-  f.from = p.get('from') || ''; f.to = p.get('to') || ''; f.afrom = p.get('added_from') || ''; f.ato = p.get('added_to') || '';
-  f.notag = p.get('no_tag') === '1'; f.nosender = p.get('no_sender') === '1'; f.review = p.get('review') === '1';
-  f.ftype = (p.get('ftype') || '').split(',').filter(Boolean);
-  f.asn = p.get('asn') || ''; f.asnHas = p.get('has_asn') === '1' ? 'with' : p.get('no_asn') === '1' ? 'without' : ''; f.cf = p.getAll('cf');  // 2.772.0 (#4890)
-  DC.f = f; DC.q = p.get('q') || ''; DC.under = p.get('under') || null;
+function dcv_apply(v) {  // 2.857.0 (#5518): the view's filter goes to the server (docs.js dc_params: view=<id>), the bar starts empty
+  DC.f = dc_f0(); DC.q = ''; DC.under = null;
   const qi = $('#dc-q'); if (qi) qi.value = DC.q;  // the field keeps its text in a redraw (docs.js "Remove filter q"): its next input would bring the old search back
   if (typeof dc_qTimer !== 'undefined') clearTimeout(dc_qTimer);
-  DC.vsort = v && p.get('sort') ? {k: p.get('sort'), d: p.get('dir') === 'asc' ? 'asc' : 'desc'} : v ? {k: 'date', d: 'desc'} : null;
+  const r = v?.rules || {};
+  DC.vsort = v ? {k: r.sort || 'date', d: r.sort && r.dir === 'asc' ? 'asc' : 'desc'} : null;
   DC.more = false; DC.at = 0; DC.facets = null;
-  DCV.applied = v ? {id: v.id, query: v.query} : null;
+  DCV.applied = v ? {id: v.id, sort: {...DC.vsort}} : null;
 }
 // the route changed (docs.js viewDocs): #ablage/v/<id> applies the view, leaving it empties the search again
 function dcv_routeSync() {
@@ -82,7 +136,7 @@ function dcv_routeSync() {
   DC.dv = null;  // not loaded yet: again once the views are there
   dcv_load(true).then(() => { if (S.route.mod === 'docs' && S.route.dv === id) { if (dcv_get(id)) { dcv_routeSync(); dc_draw(); } else { toast(tr('This view does not exist or you cannot see it.')); go('ablage/docs'); } } });
 }
-const dcv_changed = () => !!DC.dv && !!DCV.applied && DCV.applied.id === DC.dv && dcv_queryNow() !== new URLSearchParams(DCV.applied.query || '').toString();
+const dcv_changed = () => !!DC.dv && !!DCV.applied && DCV.applied.id === DC.dv && !!(DC.q.trim() || dc_fEntries().length || DC.vsort?.k !== DCV.applied.sort?.k || DC.vsort?.d !== DCV.applied.sort?.d);  // 2.857.0 (#5518): a search on top of the view, another sort
 // the documents' bar: "Save view"; in a view: its name, a mark when the search differs from what it keeps, its menu
 function dcv_barHtml() {
   const v = DC.dv ? dcv_get(DC.dv) : null;
@@ -92,22 +146,17 @@ function dcv_barHtml() {
 }
 
 // ---- writes (the core's routes: version check, history, trash with undo)
-async function dcv_save() {
-  const name = await askDialog({title: tr('Save view'), body: tr('Keeps the search, the filters and the sort under a name. It shows in the sidebar under Documents.'),
-    input: {value: '', placeholder: tr('Name of the view'), max: 120}, ok: tr('Save'), cancel: undefined, after: undefined});
-  if (!name || !name.trim()) return;
+async function dcv_save() {  // 2.857.0 (#5518): the filter dialog with the bar's search converted
   const ws = typeof wsCur === 'function' ? wsCur() : 'all';
-  let v; try { v = await api('POST', '/api/obj/docview', {title: name.trim(), query: dcv_queryNow(), ws}); } catch { return; }
-  dcv_stale(); await dcv_load(true);
-  toast(tr('View “{0}” saved', v.title));
-  go('ablage/v/' + v.id);
+  const rules = await dcv_convert(ws); if (!rules) return;
+  dcv_edit(null, {rules, ws});
 }
 async function dcv_patch(v, b, label) {
   const old = dcv_get(v.id) || v, back = Object.fromEntries(Object.keys(b).map(k => [k, old[k]]));
   let r; try { r = await api('PATCH', dcv_url(v.id), {...b, expect_updated_at: old.updated_at}); } catch (x) { if (x?.status === 409) { dcv_stale(); dcv_load(true); } return null; }
-  if ('query' in b && DC.dv === v.id) DCV.applied = {id: v.id, query: r.query};
   dcv_stale(); await dcv_load(true);
-  const again = async (vals) => { const cur = dcv_get(v.id); if (!cur) return; try { await api('PATCH', dcv_url(v.id), {...vals, expect_updated_at: cur.updated_at}); } catch { /* shown */ } if ('query' in vals && DC.dv === v.id) { const n = dcv_get(v.id); dcv_stale(); await dcv_load(true); const m = dcv_get(v.id) || n; if (m) { dcv_apply(m); dc_load(); } } else { dcv_stale(); dcv_load(true); } };
+  if (('query' in b || 'rules' in b) && DC.dv === v.id && dcv_get(v.id)) { dcv_apply(dcv_get(v.id)); dc_load(); }  // 2.857.0 (#5518): the list shows the changed filter
+  const again = async (vals) => { const cur = dcv_get(v.id); if (!cur) return; try { await api('PATCH', dcv_url(v.id), {...vals, expect_updated_at: cur.updated_at}); } catch { /* shown */ } if (('query' in vals || 'rules' in vals) && DC.dv === v.id) { const n = dcv_get(v.id); dcv_stale(); await dcv_load(true); const m = dcv_get(v.id) || n; if (m) { dcv_apply(m); dc_load(); } } else { dcv_stale(); dcv_load(true); } };
   offerUndo(label, histAdd({label, undo: () => again(back), redo: () => again(b)}));
   return r;
 }
@@ -116,7 +165,12 @@ async function dcv_rename(v) {
   if (!name || !name.trim() || name.trim() === v.title) return;
   dcv_patch(v, {title: name.trim()}, tr('View renamed'));
 }
-const dcv_update = v => dcv_patch(v, {query: dcv_queryNow()}, tr('View “{0}” now keeps the current filters', v.title));
+// 2.857.0 (#5518): the search on top of the view joins its conditions (and its sort) in the filter dialog, saved there
+async function dcv_update(v) {
+  const add = await dcv_convert(v.ws); if (!add) return;
+  const r = v.rules || {op: 'and', conds: []};
+  dcv_edit(v, {rules: {...r, ...dcv_extra(add), sort: DC.vsort?.k || r.sort, dir: DC.vsort?.d || r.dir, conds: [...(r.conds || []), ...(add.conds || [])]}});
+}
 async function dcv_delete(v) {
   try { await api('POST', dcv_url(v.id) + '/trash'); } catch { return; }
   if (dcv_isToday(v.id)) dcv_todaySet(v.id, false, true);
@@ -141,6 +195,7 @@ function dcv_menuItems(v) {
   const key = 'r:docview:' + v.id, fav = typeof fv2_is === 'function' && fv2_is(key), w = v.role !== 'view';
   return [
     w ? {label: tr('Rename…'), icon: 'edit', fn: () => dcv_rename(v)} : null,
+    w ? {label: tr('Edit filter…'), icon: 'filter', fn: () => dcv_edit(v)} : null,  // 2.857.0 (#5518)
     w ? {label: tr('Use the current filters'), icon: 'filter', fn: () => dcv_update(v)} : null,
     typeof fv2_set === 'function' ? {label: fav ? tr('Remove from favourites') : tr('Add to favourites'), icon: 'star', on: fav, fn: () => fv2_set(key, !fav)} : null,
     {label: tr('Show on Today'), icon: 'sun', on: dcv_isToday(v.id), fn: () => dcv_todaySet(v.id, !dcv_isToday(v.id))},
@@ -178,6 +233,7 @@ document.addEventListener('click', e => {
   e.preventDefault();
   const a = t.dataset.dcv, v = dcv_get(t.dataset.dcvid);
   if (a === 'save') dcv_save();
+  else if (a === 'new') dcv_edit(null);  // 2.857.0 (#5518): the sidebar's "+ New filter"
   else if (a === 'menu') menu(t, dcv_menuItems(v));
   else if (a === 'update' && v) dcv_update(v);
 });

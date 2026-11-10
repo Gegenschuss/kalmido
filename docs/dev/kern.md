@@ -520,5 +520,7 @@ On the server the area passes one function per condition: `kflt_where(rules, cnd
 the same rules.
 
 Who uses it: the lists' saved filters and shared views (catalog `FLT_TASKS` in views.js + `flt_cat` in fltdlg.js, server
-`lists/filterrules.py`), the newsletter segments (newsletter.js `nwl_segEdit`, server `newsletter/sync.py nwl_match`). Tests:
+`lists/filterrules.py`), the newsletter segments (newsletter.js `nwl_segEdit`, server `newsletter/sync.py nwl_match`), the documents' saved views
+(2.857.0, #5518: catalog `dcv_cat` in docviews.js, server `docs/dfilter.py dvf_where` -- every condition built from the
+documents search's own `dsr_filters`, matched on the server only, the dialog's count asks `POST /api/docs/views/count`). Tests:
 `tests/p2846_a_filterkern_test.py` (the core, the lists' API), `tests/p2846_a_filterkern_ui.js` (the dialog with a stand-in catalog).

@@ -80,6 +80,7 @@ function dc_params() {
   else if (dc_ws() === 'all' || dc_ws() === 'private') p.set('area', 'private');  // 2.522.0 (#4433): the file store shows no receipts (no office: no filter)
   if (DC.under && !DC.folder) p.set('under', DC.under);  // 2.199.0 B (#2742): a saved view's folder (with its subfolders); 2.752.0 (#4887): no tree of its own any more
   const so = dc_sort(); if (so.k !== 'date' || so.d !== 'desc') { p.set('sort', so.k); p.set('dir', so.d); }  // 2.428.0 (#3579)
+  if (DC.dv) p.set('view', String(DC.dv));  // 2.857.0 (#5518): a saved view's filter (the server reads it with the person's rights, docviews.js)
   return p;
 }
 async function dc_load() {
