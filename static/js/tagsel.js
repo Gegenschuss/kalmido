@@ -68,7 +68,7 @@ function dt_abBody(sp) {
   const fx = Object.entries(DT_AB.st).map(([name, s]) => `<button type="button" class="tsfx ${s === 'not' ? 'not' : ''}" data-dtabx="${esc(name)}" aria-label="${esc(tr('Remove filter {0}', name))}">${s === 'not' ? `${tr('not')} ` : ''}${esc(name)} ${ic('x', 's')}</button>`).join('');
   const bar = `<div class="tsfbar" role="group" aria-label="${esc(tr('Filter'))}">${fx}${Object.keys(DT_AB.st).length > 1 ? `<span class="tsfn">${DT_AB.mode === 'all' ? tr('every one') : tr('one of them')}</span>` : ''}
     ${items ? `<span class="tsfn" aria-live="polite">${esc(trn('{0} hit', '{0} hits', items.length))}${r.more ? '+' : ''}</span>` : ''}<button type="button" class="linkbtn" data-dtab="clear">${tr('Reset filters')}</button></div>`;
-  if (!items) return bar + `<p class="muted lempty">${tr('Loading…')}</p>`;
+  if (!items) return bar + loadingHtml();
   if (!items.length) return bar + `<div class="empty abempty">${ic('tag')}<span>${tr('No files with these tags')}</span></div>`;
   // 2.521.0 (#4398): a filter never changes the chosen view: a folder / space shown as cards stays cards while tags filter it
   if (typeof abd_cardsOn === 'function' && typeof abd_cardsHtml2 === 'function' && abd_cardsOn(ab_key(S.route))) return bar + abd_cardsHtml2({items});

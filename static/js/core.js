@@ -1867,7 +1867,8 @@ async function route() {
   if (r.mod === 'tasks' && r.key.startsWith('l:')) recentPush('l', +r.key.slice(2));
   S.extra = (r.key === 'done' || r.key === 'trash' || r.mod === 'news' || r.mod === 'time') ? [] : null;
   S.hist.k = null;  // 2.40.0 (#1432): entering Completed / Trash starts with the first page again
-  if (S.extra) await loadExtra().catch(() => { S.extra = []; });
+  S.extraErr = 0;
+  if (S.extra) await loadExtra().catch(() => { S.extra = []; S.extraErr = 1; });  // 2.891.0 (#5440): Completed / Trash show the error, not "empty"
   // 2.26.x (#953): back to an entry that was left from the open drawer (phone / folded sidebar): the drawer opens again
   // and stays; the next Back goes on as before
   if (history.state?.side && !r.task && (isMobile() || $('#app')?.classList.contains('side-rail'))) setTimeout(() => { if (!history.state?.side) return; try { const {side, ...st} = history.state; history.replaceState(Object.keys(st).length ? st : null, '', location.href); } catch { /* old browser */ } if (!$('#side.open')) sideDrawerOpen(); }, 0);  // 2.534.0 (#4344): side is used up once - a later route() without a Back does not reopen the drawer

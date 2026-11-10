@@ -83,7 +83,7 @@ async function statusModal(lid) {
       ${typeof le2eOn === 'function' && le2eOn(lid) ? '' /* 2.538.0 (#4372): not encrypted: no note in a project with the lock */ : `<textarea id="st-note" rows="3" maxlength="500" placeholder="${tr('Short update: what is going on, what is needed?')}">${esc(l.status_note || '')}</textarea>`}
       <div class="shint">${collab() && l.shared ? tr('Everyone in this project gets it as news.') : tr('Shown in the project header, the sidebar and the project status.')}</div>`
     : `<div class="rohint">${ic('eye', 's')}${tr('Read-only')}</div>`}
-    <h4>${tr('History')}</h4><div class="sthist" id="st-hist"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <h4>${tr('History')}</h4><div class="sthist" id="st-hist">${/*html-ok*/ loadingHtml()}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button>${can ? `<button class="btn pri" data-m="save">${tr('Update status')}</button>` : ''}</div>`);
   md.classList.add('stmodal');
   rawFetch('GET', `/api/lists/${lid}/status`).then(j => {
@@ -144,7 +144,7 @@ function viewOverview() {
   const P = {tiles: `<div class="sttiles">${tiles.map(([v, l, s]) => `<div class="${v ? 'hot' : ''}" title="${esc(s)}"><b>${v}</b><span>${esc(l)}</span></div>`).join('')}</div>`};
   let h = `<div class="stats ovw"><div class="nbar"><div class="seg"><button class="${S.ov.only ? '' : 'on'}" data-act="ov-only" data-k="">${tr('All projects')}</button><button class="${S.ov.only ? 'on' : ''}" data-act="ov-only" data-k="1">${tr('Needs attention')}</button></div><span class="spacer"></span>${S.ly.view === 'projects' ? '' : lyCustomBtn('projects')}</div>`;
   if (S.ly.view === 'projects') return h + lyHtml('projects', P) + '</div>';  // 2.35.0 (#1097): the totals as they are
-  if (!shown.length) return h + lyHtml('projects', P) + `<div class="empty">${ic('done')}${tr('Nothing stuck. No overdue or blocked tasks.')}</div></div>`;
+  if (!shown.length) return h + lyHtml('projects', P) + emptyState({icon: 'done', title: tr('Nothing stuck. No overdue or blocked tasks.')}) + '</div>';  // 2.891.0 (#5440)
   P.projects = '';
   // 2.55.0 (#1065): the block's settings (lyopts.js): only active projects, the order, how many
   const pso = n => lyo_get('projects', 'projects', n), psrt = pso('sort'), pmax = pso('n');
@@ -320,7 +320,7 @@ function viewProjOv() {
   P.kpis = fxKpiPart(l);  // 2.43.0 (#1328): key figures (undefined = not offered)
   P.velocity = spt_povPart(l);  // 2.60.0 (#1511): completed points of the last sprints
   // 2.393.2 A (#3374): lead / cycle time, cumulative flow, bug trend; flow.js loads on demand (start budget), a stand-in meanwhile
-  P.flow = typeof flw_povPart === 'function' ? flw_povPart(l) : l.is_inbox ? undefined : (ld_later('flow'), x => povSec('flow', tr('Flow'), `<p class="muted">${esc(tr('Loading…'))}</p>`, x));
+  P.flow = typeof flw_povPart === 'function' ? flw_povPart(l) : l.is_inbox ? undefined : (ld_later('flow'), x => povSec('flow', tr('Flow'), loadingHtml(), x));
   if (timeOn() && j.time) P.time = x => povSec('time', tr('Tracked time'), ts || '', x, emp(!ts, tr('No time tracked yet.')));
   for (const p of j.layout?.pads || []) P['np' + p.id] = () => wgPadHtml(l, p, can);  // 2.43.0 (#1346): the notepads
   const y = j.layout || {}, cust = S.ly.view === 'project';
@@ -489,7 +489,7 @@ function depItem(x, dir, t, ro) {
 function depsHtml(t) {
   const D = S.dp.id === t.id ? S.dp : null, ro = !canEdit(t);
   const head = `<h5>${tr('Dependencies')}${t.blocked && !t.status ? ` <span class="blk">${ic('lock', 's')}${tr('blocked')}</span>` : ''}</h5>`;
-  if (!D) return head + `<div class="muted mhint">${tr('Loading…')}</div>`;
+  if (!D) return head + `${/*html-ok*/ loadingHtml()}`;
   if (D.err) return head + `<div class="muted mhint">${D.err === 'offline' ? tr('Dependencies are only available online.') : esc(D.err)}</div>`;
   // 2.25.0 (UX-43): ONE button "Waiting on…" picks what the task waits on: another task (it is then blocked by it) or
   // someone outside (with a follow-up day); "Blocking…" stays for the other direction
@@ -958,7 +958,7 @@ function rptModal(lid, per) {  // 2.126.1 A (#2124): per = {from, to} (the perio
   const md = modal(`<h3>${esc(tr('Status report'))}: ${esc(lname(l))}</h3>
     <div class="row rptper"><div class="seg" role="group" aria-label="${esc(tr('Period'))}">${[7, 14, 30].map(n => `<button type="button" data-rpt="days" data-n="${n}" aria-pressed="${n === 7}" class="${n === 7 ? 'on' : ''}">${esc(trn('{0} day', '{0} days', n))}</button>`).join('')}</div></div>
     <div class="row rptdates"><label for="rpt-from">${tr('From')}</label>${dateIn('rpt-from', '', {label: tr('From'), clear: false})}<label for="rpt-to">${tr('To')}</label>${dateIn('rpt-to', '', {label: tr('To'), clear: false})}</div>
-    <div class="rptprev md" id="rpt-prev" aria-live="polite"><div class="muted">${tr('Loading…')}</div></div>
+    <div class="rptprev md" id="rpt-prev" aria-live="polite">${/*html-ok*/ loadingHtml()}</div>
     <p class="muted rpthint">${tr('Without comments, descriptions, names. Check before sending.')}</p>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button>${navigator.share ? `<button class="btn" data-rpt="share">${ic('send', 's')} ${tr('Share')}</button>` : ''}<button class="btn pri" data-rpt="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>`);
   md.classList.add('rptmodal');

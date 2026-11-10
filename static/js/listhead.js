@@ -173,7 +173,7 @@ function o3c_tickAfter() {
 }
 // empty pages (an empty list, an empty Today): 2.136.0 (#2193): the bot figure (calm, or happy when Today is done)
 // instead of the Kalmido K line drawing of 2.83.0
-const o3c_empty = (title, sub = '', st = 'ruhig') => `<div class="empty hempty o3c-empty">${botFig(st)}<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
+const o3c_empty = (title, sub = '', st = 'ruhig') => emptyState({bot: st, title, sub, cls: 'o3c-empty'});  // 2.891.0 (#5440): the shared block (render.js)
 // progress rings in the sidebar: done / all of the list's tasks (the numbers the state already brings, list.progress);
 // not where a project shows its progress bar, not for the inbox
 function o3c_ring(l, bar) {

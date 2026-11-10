@@ -365,7 +365,7 @@ function viewProjStart() {
   const rbar = ro ? `<div class="sreobar psreobar" role="group" aria-label="${esc(tr('Sort projects'))}"><span class="sreot"><b>${tr('Sort projects')}</b><small>${esc(tr('Drag by the handle on the left, or use “…”'))}</small></span><button type="button" class="btn sm pri" data-act="lists-reorder">${tr('Done')}</button></div>` : '';
   const lgrp = grp('ps-lists', phead, loose || (ro ? `<div class="muted psempty fempty" data-folder="">${esc(tr('empty: drag a project here'))}</div>` : '')) || `<section class="psg ps-lists"><h2 class="pshead">${phead}</h2></section>`;  // the head (with "Sort") even when every project sits in a folder
   const proj = lists.length || folders.length ? rbar + lgrp + folders.map(f => grp('ps-folder', fhead(f), lists.filter(l => l.folder === f).map(lrow).join('') || pempty(f))).join('')
-    : `<div class="empty">${ic('list')}${esc(tr('No projects yet'))}<br><button type="button" class="btn pri" data-act="list-new">${ic('plus', 's')}<span>${esc(tr('New project'))}</span></button></div>`;
+    : emptyState({icon: 'list', title: tr('No projects yet'), action: `<button type="button" class="btn pri" data-act="list-new">${ic('plus', 's')}<span>${esc(tr('New project'))}</span></button>`});  // 2.891.0 (#5440): the shared block
   const parts = {focus: grp('ps-plan', esc(tr('Plan|nav')), plan), lists: proj, filters: grp('ps-filters', esc(tr('Filters')), fil)};
   return `<div class="pstart">${sideGroupOrder().filter(g => g in parts).map(g => parts[g]).join('')}</div>`;  // the sidebar's order of the groups
 }
@@ -1623,8 +1623,38 @@ const botFig = (st = 'ruhig', cls = '') => {
     + `<path class="b-ant" d="${st === 'wartet' ? 'M58 1V15' : 'M58 6V15'}" stroke-width="7" stroke-linecap="round"/></g></g></svg>`;
 };
 // 2.223.0 B (#2822): the one empty-state pattern (thin symbol, one sentence, hint); the bot figure stays for 'all done' moments
-const symEmpty = (icon, title, sub = '') => `<div class="empty nempty eact">${ic(icon)}<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
-const botEmpty = (st, title, sub = '') => `<div class="empty hempty">${botFig(st)}<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
+// 2.891.0 (#5440): the one building block for "nothing here" and "loading" of the lists (symEmpty, botEmpty and o3c_empty
+// of listhead.js are its short forms). size: 'big' = a page, 'sec' = a part of a page or dialog, 'row' = one line; each size
+// keeps a fixed minimum height (app.css .es-*), so a part that goes from "loading" to "nothing" or to its rows does not jump.
+// o = {icon | bot, title, sub, action (ready HTML, e.g. a button), size, cls}
+function emptyState(o = {}) {
+  const sz = ['row', 'sec'].includes(o.size) ? o.size : 'big', fig = o.bot ? botFig(o.bot) : o.icon ? ic(o.icon, sz === 'row' ? 's' : '') : '';
+  return `<div class="empty ${o.bot ? 'hempty' : 'nempty'} eact es-${esc(sz)}${esc(o.cls ? ' ' + o.cls : '')}">${/*html-ok*/ fig/* the symbol */}<b>${esc(o.title || '')}</b>${o.sub ? `<span>${esc(o.sub)}</span>` : ''}${/*html-ok*/ o.action || ''/* ready HTML of the caller */}</div>`;
+}
+// the same place while it loads: a quiet line of the same minimum height (row keeps .mhint for the dialogs' parts)
+const loadingHtml = (size = 'row') => `<div class="${size === 'row' ? 'muted mhint' : 'empty'} eload es-${esc(['row', 'sec'].includes(size) ? size : 'big')}" role="status">${esc(tr('Loading…'))}</div>`;
+const symEmpty = (icon, title, sub = '') => emptyState({icon, title, sub});
+const botEmpty = (st, title, sub = '') => emptyState({bot: st, title, sub});
+// 2.891.0 (#5440): the same block when loading failed (says so instead of "nothing here", with "Try again") and when the
+// person may not see the thing (lock, no button). For the lists here, the office (#5450) and the calendar (#5461): they
+// only call these. o = {title, sub, size, cls, retry: function run by "Try again" (without it no button)}
+const ES_RETRY = new Map(); let es_n = 0;
+function errorState(o = {}) {
+  let act = '';
+  if (typeof o.retry === 'function') {
+    const k = String(++es_n); ES_RETRY.set(k, o.retry);
+    if (ES_RETRY.size > 40) ES_RETRY.delete(ES_RETRY.keys().next().value);  // old screens' buttons are gone long ago
+    act = `<div class="eacts"><button type="button" class="btn" data-esretry="${esc(k)}">${ic('sync', 's')} ${esc(tr('Try again'))}</button></div>`;
+  }
+  return emptyState({icon: 'alert', title: o.title || tr('Could not be loaded'), size: o.size, cls: 'eerr' + (o.cls ? ' ' + o.cls : ''), action: act,
+    sub: o.sub ?? (navigator.onLine === false ? tr('You are offline') : tr('Check the connection and try again.'))});
+}
+const noAccessState = (o = {}) => emptyState({icon: 'lock', title: o.title || tr('No access'), sub: o.sub ?? tr('Ask the owner to share it with you.'), size: o.size, cls: 'enoacc' + (o.cls ? ' ' + o.cls : '')});
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-esretry]'), f = b && ES_RETRY.get(b.dataset.esretry);
+  if (!f) return;
+  ES_RETRY.delete(b.dataset.esretry); b.disabled = true; f();
+});
 // 2.40.0 (#1191): list columns from 600 px on (tablets, an unfolded Fold); isMobile() (< 900 px) stays for the rest of the app
 const td_colsWide = () => td_rc('colw', () => !isMobile() || matchMedia('(min-width:600px)').matches);
 const fieldCols = lid => td_colsWide() && !!LS.get('fcols.' + lid, false) && fieldsOf(lid).length > 0;
@@ -2101,6 +2131,17 @@ function viewList() {
 // symbol level ("Important"); off with "Calm" or "Custom" without "Project" (Settings > Appearance > Symbols in the row).
 // A row grouped by its project (the group's head names it) gets no second one: showList is off there
 const rsyProjToday = () => rsy_level() === 'key' && (S.route.key === 'today' || S.route.key === 'tomorrow');
+// 2.891.0 (#5440): the filter that hides every task of the view (null = none): its name and the button that leads to it
+function lst_emptyFilter(rl) {
+  const k = S.route.key, chg = tr('Change filter');
+  if (k.startsWith('f:')) { const f = S.filters.find(x => x.id === +k.slice(2)); return f ? {name: f.name, btn: `<button type="button" class="btn" data-act="filter-edit" data-id="${esc(f.id)}">${ic('filter', 's')} ${esc(chg)}</button>`} : null; }
+  if (!rl) return null;
+  const cur = lv_cur(rl.id);
+  if (cur) return {name: cur.name, btn: canEditList(rl.id) ? `<button type="button" class="btn" data-act="filter-edit" data-id="${esc(cur.id)}" data-lid="${esc(rl.id)}">${ic('filter', 's')} ${esc(chg)}</button>` : `<button type="button" class="btn" data-act="lviews" data-id="${esc(rl.id)}" aria-haspopup="menu">${ic('filter', 's')} ${esc(chg)}</button>`};
+  const cf = typeof SG !== 'undefined' && SG.cf?.[rl.id];
+  if (cf) return {name: sgColName(rl, cf.k), btn: `<button type="button" class="btn" data-sgfoff="${esc(rl.id)}">${ic('filter', 's')} ${esc(tr('Show all'))}</button>`};
+  return null;
+}
 function viewListBody() {
   const v = viewTasks();
   FLOW.cyc = false;
@@ -2140,13 +2181,17 @@ function viewListBody() {
     return shown.some(t => t.status === 0 && dFor(t) && (t.blocked || (t.blockers || []).some(b => ids.has(b))));
   })();
   const tin = S.route.key === 'today' && todayInbox() ? todayInboxTasks() : [];  // 2.22.0 (#681)
+  // 2.891.0 (#5440): a filter that hides every task says so and leads to it (saved filter, a project's view, a column filter)
+  const flt = !total && !tin.length ? lst_emptyFilter(rl) : null;
+  const secBtn0 = v.list && !ro && !rl?.is_inbox && (!rl || canEditList(rl.id)), secBtn = !total && !tin.length && !flt && secBtn0 ? `<button type="button" class="btn secnew" data-act="section-new">${ic('plus', 's')} ${tr('Section')}</button>` : '';
   if (!total && !tin.length) {
     // 2.14.0: the heron; 2.83.0 C (#1427): the Kalmido K; 2.136.0 (#2193): the bot figure (o3c_empty, listhead.js), done = erledigt
     h += S.route.key === 'today' ? (v.done.length ? o3c_empty(tr('All done for today.'), tr('Enjoy the rest of the day.'), 'erledigt') : o3c_empty(tr('Nothing left for today.')))
       // CI of 2.223.0 (#2609 #2822): a list whose last open task was just ticked off is an all-done moment = the bot figure
       // (it nods, botNod); a list without tasks gets the symbol pattern
       : v.done.length ? o3c_empty(tr('All done.'), '', 'erledigt')
-      : symEmpty('list', tr('No tasks.'), rl && !ro ? (isMobile() && !tabletDock() ? tr('Add the first one with the + button.') : tr('Add the first one with the field below.')) : '');  // 2.25.0 (UX-27): what this device shows
+      : flt ? emptyState({icon: 'filter', title: tr('No tasks match the filter.'), sub: tr('A filter is active: {0}', flt.name), action: `<div class="eacts">${/*html-ok*/ flt.btn/* lst_emptyFilter */}</div>`, cls: 'efilt'})  // 2.891.0 (#5440)
+      : emptyState({icon: 'list', title: tr('No tasks.'), sub: rl && !ro ? (isMobile() && !tabletDock() ? tr('Add the first one with the + button.') : tr('Add the first one with the field below.')) : '', action: secBtn ? `<div class="eacts">${/*html-ok*/ secBtn/* the button above */}</div>` : ''});  // 2.25.0 (UX-27): what this device shows; 2.891.0 (#5440): "+ Section" right under the text
   }
   let lastSub = '';
   // 2.17.0 (#649): a very long view renders its first ROW_CAP rows, then "Show more" (also by itself when it scrolls into
@@ -2176,7 +2221,7 @@ function viewListBody() {
   if (rl && !ro && !rl.is_inbox && total && canEditList(rl.id)) h += `<div class="sdrop snew" data-newsec="1">${ic('plus', 's')}<span>${tr('New section')}</span></div>`;
   if (cut) h += `<div class="rowmore"><button type="button" class="btn" data-act="rows-more">${ic('down', 's')}${esc(trn('Show {0} more task', 'Show {0} more tasks', Math.min(cut, ROW_CAP)))}</button><span class="muted">${esc(trn('{0} task not shown yet', '{0} tasks not shown yet', cut))}</span></div>`;
   // 2.25.0 (UX-27 / UX-38): never in the inbox; 2.27.0 (#990): also in an empty list (a project may start without sections, #972)
-  if (v.list && !ro && !rl?.is_inbox && (!rl || canEditList(rl.id))) h += `<button class="iconbtn secnew" data-act="section-new" style="margin:.375rem 0 0 -.25rem">${ic('plus', 's')} ${tr('Section')}</button>`;
+  if (secBtn0 && !secBtn) h += `<button class="iconbtn secnew" data-act="section-new" style="margin:.375rem 0 0 -.25rem">${ic('plus', 's')} ${tr('Section')}</button>`;  // 2.891.0 (#5440): an empty list has it in its empty state
   if (ck) {  // 2.7.2 (#414) "Show completed at the bottom" (was the checklist type): done items stay below in "Done" (open by
     // default), one tap puts them back on the list
     const k = 'ckdone:' + rl.id, closed = S.collapsed.has(k), done = v.done.slice().sort((a, b) => mdPlain(a.title).localeCompare(mdPlain(b.title), LOCALE()));
@@ -2199,7 +2244,7 @@ function viewListBody() {
 function viewArchived() {
   const ls = S.lists.filter(l => l.archived && !life_store(l) && inWs(l)).sort((a, b) =>  // 2.380.2 (#3407): the shown workspace; 2.609.0 (#4613): no area's store
     (b.archived_at || '').localeCompare(a.archived_at || '') || cmpText(lname(a), lname(b)));
-  if (!ls.length) return `<div class="archv"><div class="empty">${ic('archive')}${tr('No archived projects.')}<br><span class="muted">${tr('Archive a project from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div></div>`;
+  if (!ls.length) return `<div class="archv">${/*html-ok*/ emptyState({icon: 'archive', title: tr('No archived projects.'), sub: tr('Archive a project from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')})}</div>`;  // 2.891.0 (#5440)
   return `<div class="archv">${ls.map(l => {
     const p = l.progress || {done: 0, total: 0}, own = isOwner(l), em = leadEmoji(l.name), name = em ? l.name.slice(em.length).trim() : listName(l.name);
     const mark = listIconHtml(l, {cls: 'aemo', emoji: true});  // 2.38.0 (#1174)
@@ -2219,7 +2264,9 @@ function hist_body() {
   const trash = S.route.key === 'trash';
   const arr = S.extra || [];
   const otr = trash ? otr_html() + vtr_html() + ptr_html() : '';  // 2.102.0 A (#1988): "Deleted lists" above the tasks; 2.549.0 (#4536): + video sign-offs (trashui.js); 2.567.0 A (#4707): + the other parts
-  if (!arr.length) return otr + (otr ? '' : `<div class="empty">${ic(trash ? 'trash' : 'done')}${trash ? tr('Trash is empty.') : tr('Nothing completed yet.')}</div>`);
+  // 2.891.0 (#5440): a failed load says so (was "Trash is empty." although nothing was known)
+  if (!arr.length && S.extraErr) return otr + errorState({retry: () => loadExtra().then(() => { S.extraErr = 0; }, () => {}).finally(renderView)});
+  if (!arr.length) return otr + (otr ? '' : emptyState({icon: trash ? 'trash' : 'done', title: trash ? tr('Trash is empty.') : tr('Nothing completed yet.')}));  // 2.891.0 (#5440)
   if (trash) {  // 2.0.5: what "Empty" leaves behind (shared lists of other owners) is said up front and marked per row
     const kept = S.hist?.k === 'trash' && S.hist.kept != null ? S.hist.kept : arr.filter(t => t.keep).length;  // 2.40.0 (#1432): the whole trash
     const days = S.hist?.k === 'trash' ? S.hist.days : null;  // 2.116.0 A (#2063): the trash period, from the server
@@ -2298,7 +2345,7 @@ window.msvvCalChips = () => [];
 window.msvvQuick = async () => false;
 window.msvvTitle = () => '?';
 // a list of another server opened straight away (a link, a reload): load and boot (its first answer draws the view)
-window.msvvViewList = () => { if (!S.msvv.ld) { S.msvv.ld = 1; loadModule('msvview').then(() => msvvBoot(), () => { S.msvv.ld = 0; }); } return botEmpty('ruhig', tr('Loading…')); };
+window.msvvViewList = () => { if (!S.msvv.ld) { S.msvv.ld = 1; loadModule('msvview').then(() => msvvBoot(), () => { S.msvv.ld = 0; }); } return loadingHtml('big'); };  // 2.891.0 (#5440)
 const msvv_probe = () => fetch('/api/servers', {headers: {'X-Requested-With': 'kalmido'}, redirect: 'manual', credentials: 'same-origin'})
   .then(r => r.ok ? r.json() : null, () => null)
   .then(j => { if ((Array.isArray(j?.links) && j.links.length) || S.route.mod === 'msv') { S.msvv.pre = j && typeof j === 'object' ? j : null; return loadModule('msvview').then(() => msvvBoot()); } })

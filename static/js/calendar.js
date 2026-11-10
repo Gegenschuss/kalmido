@@ -21,7 +21,9 @@ function viewKanban() {
   const knew = ro ? '' : `<div class="knew"><button class="btn sm" data-act="section-new">${ic('plus', 's')} ${tr('Column')}</button></div>`;
   const swm = swlMode(lid), sht = listById(lid)?.ptype === 'shoot' && indOn('film');  // 2.636.0 (#4565): a shoot = the storyboard (shoot.js)
   if (swm) return `${listHead(listById(lid))}${swlBar(lid)}${swlBoard(lid, swm, cols, tasks, {head, add, knew})}`;
-  return `${listHead(listById(lid))}${swlBar(lid)}${sht ? sht_bar(lid) : ''}<div class="kanban${sht ? ' shtboard' : ''}">${cols.map(c => `
+  // 2.891.0 (#5440): an empty board says so (the shared block) above its columns, which stay as the place to add
+  const kempty = tasks.length ? '' : emptyState({icon: 'kanban', title: tr('No tasks.'), sub: ro ? '' : tr('Add the first one in a column with “+ Task”.'), size: 'sec', cls: 'kempty'});
+  return `${listHead(listById(lid))}${swlBar(lid)}${sht ? sht_bar(lid) : ''}${/*html-ok*/ kempty/* emptyState */}<div class="kanban${sht ? ' shtboard' : ''}">${cols.map(c => `
     <div class="kcol" data-kcol="${c.id ?? ''}">
       ${head(c)}
       <div class="kcards">${c.tasks.map(t => taskRow(t, {compact: true, dwell: lid, ...(sht ? {pic: sht_pic(t)} : {})})).join('')}</div>

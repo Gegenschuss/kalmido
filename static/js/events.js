@@ -670,7 +670,7 @@ document.addEventListener('click', async e => {
     case 'att-purge': attPurge(+a.dataset.att, a.closest('li')?.querySelector('.an')?.textContent || ''); break;  // 2.272.0 F (#3038, E2-H2)
     case 'multi': S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); break;
     case 'filter-new': closeSide(); filterModal(); break;
-    case 'filter-edit': filterModal(id); break;
+    case 'filter-edit': filterModal(id, +(a.dataset.lid || 0)); break;  // 2.891.0 (#5440): + a project's view (empty state)
     case 'cal-done': setShowDone(!showDoneCal(), 'cal'); break;
     case 'cal-more': e.stopPropagation(); calMoreMenu(a); break;  // 2.855.0 (#5462)
     // 2.36.1 (#1127): timeline names hide a calendar, "…" on a name / on "Events today" opens the calendar switches

@@ -34,7 +34,7 @@ function mb_view() {
   const by = moBoardBy(), t0 = today(), tasks = moAll().filter(t => mtCounts(t, t0)), cols = mb_cols(by, tasks);
   const card = t => taskRow(t, {compact: true, showList: by !== 'list'});
   const head = c => `<div class="khead">${c.lic ? licMark(c.lic, 'lsm') : ''}<span class="mbname">${esc(c.name)}</span> <span class="muted mbn">${c.tasks.length}</span>${c.lock && by === 'list' ? `<span class="mblk" title="${esc(tr('Read-only'))}" aria-label="${esc(tr('Read-only'))}">${ic('lock', 's')}</span>` : ''}</div>`;
-  const empty = tasks.length ? '' : `<p class="muted lempty">${esc(tr('Nothing here'))}</p>`;
+  const empty = tasks.length ? '' : emptyState({icon: 'kanban', title: tr('Nothing here'), size: 'sec', cls: 'kempty'});  // 2.891.0 (#5440): the shared block
   return `${moSegHtml()}${empty}<div class="kanban mboard" data-mbby="${by}">${cols.map(c => `
     <div class="kcol mbcol${c.lock ? ' mblock' : ''}" data-mbcol="${esc(c.key)}" role="group" aria-label="${esc(c.name)}">
       ${head(c)}

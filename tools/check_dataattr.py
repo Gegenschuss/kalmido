@@ -56,6 +56,7 @@ KNOWN = {
                        "objprop.js", "office_leads.js", "playbook.js", "rules.js", "sheetprop.js"}),
     "rkf": ("shared", {"office_import.js"}),
     "rx": ("guarded", {"agents.js", "orgexport.js"}),
+    "sgfoff": ("shared", {"render.js"}),  # 2.891.0 (#5440): the empty state of a column filter offers "Show all" too
     "setgo": ("shared", {"office.js", "office_books.js", "office_cashbook.js", "office_import.js", "officeagents.js",
                          "settings.js"}),
     "sv": ("shared", {"favtiles.js"}),
