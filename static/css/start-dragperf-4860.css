@@ -2,4 +2,7 @@
    paint (content-visibility; the height they last had stands in: contain-intrinsic-size auto). Not a row with a caret (it stands
    outside the row and would be clipped) nor the row being edited */
 .trow{contain-intrinsic-size:auto 2.75rem}
-body.pgdrag .trow:not(:has(> .caret)):not(.iedit){content-visibility:auto}
+body.pgdrag:not(.lcwdrag) .trow:not(:has(> .caret)):not(.iedit){content-visibility:auto}
+/* 2.891.0 B (#5360): not while a column's width is dragged (body.lcwdrag): only the column title and the guide move then, the rows
+   stay as they are; switching their drawing off on press and on again on release laid out every row twice (measured in
+   tests/p2891_b_colwidth_perf_ui.js) */

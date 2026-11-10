@@ -1919,7 +1919,8 @@ function lcwApply(lid, w = lcwGet(lid)) {  // 2.87.9 (#1965): w = the widths sho
   // 2.742.0 (#4857): only where the column titles show (from 768 px and a list wider than 48 rem, app.css); never wider than
   // the list minus the title's minimum, should the window have got narrower since the drag
   const css = Object.entries(w).filter(([, v]) => v > 0).map(([k, v]) => `#view .lc[data-k="${window.CSS?.escape ? CSS.escape(k) : k.replace(/["\\]/g, '')}"]{width:min(${+v}rem,max(${LCW_MIN}rem,var(--lw,100cqw) - ${LC_TITLE_MIN + 2}rem));max-width:none}`).join('\n');
-  st.textContent = css ? `@media (min-width:768px){@container lrows (width > 48rem){\n${css}\n}}` : '';
+  const txt = css ? `@media (min-width:768px){@container lrows (width > 48rem){\n${css}\n}}` : '';
+  if (st.textContent !== txt) st.textContent = txt;  // 2.891.0 B (#5360): every list render calls this; the same sheet again restyled the whole page
 }
 function lcwSet(lid, k, v) {
   const w = lcwGet(lid);
