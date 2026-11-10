@@ -41,6 +41,8 @@ const camt = rows => `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn
   const api = (m, u) => `fetch('${u}', {method: '${m}', headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json())`;
   const row = p => `[...document.querySelectorAll('.bnkrow')].find(e => /${p}/.test(e.textContent))`;
   const click = sel => `(() => { const e = ${sel}; if (!e) return 0; e.click(); return 1; })()`;
+  // 2.809.0 (#5452): private / ignore sit in the row's "More" menu
+  const mark = (p, k) => `(async () => { const r = ${row(p)}; if (!r) return 0; r.querySelector('[data-bnk="more"]').click(); for (let i = 0; i < 50 && !document.querySelector('#pop [data-act="bnk-${k}"]'); i++) await new Promise(f => requestAnimationFrame(f)); const b = document.querySelector('#pop [data-act="bnk-${k}"]'); if (!b) return 0; b.click(); return 1; })()`;
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await nav(B + 'static/icon.svg');
@@ -48,10 +50,10 @@ const camt = rows => `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn
     await signIn(ev, 'alice');
     await nav(B + '#office/bank');
     check(await ready(ev, `document.querySelectorAll('.bnklist .bnkrow').length === 6`, 80), 'the bank tab lists six open bookings');
-    await ev(click(`${row('Zeitung 1')}?.querySelector('[data-bnk="match"][data-kind="private"]')`));
+    await ev(mark('Zeitung 1', 'private'));  // 2.809.0 (#5452): from the "More" menu
     check(await ready(ev, `document.querySelectorAll('.bnklist .bnkrow').length === 5`), 'the first "Private"');
     check(!await ev(`!!document.querySelector('.bnkrsug')`), 'the first time asks nothing');
-    await ev(click(`${row('Zeitung 2')}?.querySelector('[data-bnk="match"][data-kind="private"]')`));
+    await ev(mark('Zeitung 2', 'private'));  // 2.809.0 (#5452)
     check(await ready(ev, `!!document.querySelector('.bnkrsug') && /Always like this/.test(document.querySelector('.bnkrsug').textContent) && /Kiosk Beispiel/.test(document.querySelector('.bnkrsug').textContent)`),
       'the second time: the line "Always like this?" with the counterpart');
     check(await ev(`document.querySelector('.bnkrsug [data-brl="sugok"]').getBoundingClientRect().height >= 43`), 'its button is 44 px high');
@@ -65,7 +67,7 @@ const camt = rows => `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn
       '"Matched": by rule on the booking the rule marked, not on the ones by hand');
     await ev(click(`document.querySelector('[data-bnk="state"][data-v="open"]')`));
     check(await ready(ev, `document.querySelectorAll('.bnklist .bnkrow').length === 3 && !!${row('Spende 1')} && !!${row('Spende 2')}`), 'back to the open ones');
-    for (const p of ['Spende 1', 'Spende 2']) { await ev(click(`${row(p)}?.querySelector('[data-bnk="match"][data-kind="ignored"]')`)); await ready(ev, `!${row(p)}`); }
+    for (const p of ['Spende 1', 'Spende 2']) { await ev(mark(p, 'ignored')); await ready(ev, `!${row(p)}`); }  // 2.809.0 (#5452): from "More"
     check(await ready(ev, `!!document.querySelector('.bnkrsug')`), 'a second counterpart: asked again');
     await ev(click(`document.querySelector('.bnkrsug [data-brl="sugno"]')`));
     check(await ready(ev, `!document.querySelector('.bnkrsug')`) && (await ev(api('GET', '/api/office/bank/rules'))).items.length === 1, '"No": no rule, the line goes');

@@ -435,6 +435,7 @@ ul.ofdpick .chkl{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75re
 .ccl{margin-top:.5rem}
 .bnkm{display:inline-flex;align-items:center;gap:.25rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bnkmiss{margin:0;font-size:var(--fs-s)}
+.bnkmiss1{margin:0 0 .5rem}  /* 2.809.0 (#5452): once above the list */
 .bnkother{display:flex;flex-direction:column;gap:.375rem}
 .bnkother .bnkq{width:100%}
 .bnkimps{margin-bottom:.75rem}

@@ -52,7 +52,9 @@ function bnkHtml() {
   const items = d.items || [];
   const list = items.length ? `<ul class="bnklist" role="list">${items.map(bnkRow).join('')}</ul>`
     : `<div class="empty">${ic('bank')}<span>${BNK.state === 'open' && (n.open || 0) + (n.matched || 0) ? tr('Every booking is matched.') : tr('No bookings yet. Import the statement you download from your bank (CSV, CAMT or MT940).')}</span></div>`;
-  return bar + (BNK.showImp ? bnkImpHtml() : '') + (typeof brl_sugHtml === 'function' ? brl_sugHtml() : '') + list + `<div class="muted ofchint">${BNK.fints?.on ? tr('Bank access only when you fetch, with your PIN every time.') : tr('No bank access: only the file you download yourself.')/* 2.616.0 (#2473) */}<div class="shint">${tr('A match with an invoice records a payment; with a receipt it sets its payment day.')}</div></div>`;  // 2.298.0 A2 (#3186): the matching rule behind (i)
+  // 2.809.0 (#5452): the hint for a missing receipt once above the list (was in every row without a suggestion)
+  const miss = items.some(t => !t.match && +t.amount < 0 && !(t.suggestions || []).length) ? `<p class="muted bnkmiss bnkmiss1">${tr('Receipt missing? Upload it in the documents of the office, then match it here.')}</p>` : '';
+  return bar + (BNK.showImp ? bnkImpHtml() : '') + (typeof brl_sugHtml === 'function' ? brl_sugHtml() : '') + miss + list + `<div class="muted ofchint">${BNK.fints?.on ? tr('Bank access only when you fetch, with your PIN every time.') : tr('No bank access: only the file you download yourself.')/* 2.616.0 (#2473) */}<div class="shint">${tr('A match with an invoice records a payment; with a receipt it sets its payment day.')}</div></div>`;  // 2.298.0 A2 (#3186): the matching rule behind (i)
 }
 function bnkRow(t) {
   const inn = +t.amount > 0;
@@ -67,13 +69,23 @@ function bnkRow(t) {
   } else {
     // 2.778.0 (#5383): the suggestions as candidate cards (office_cand.js), the best first, instead of the first one as text
     const sg = t.suggestions || [];
-    const sug = sg.length ? `<div class="bnksug"><small class="muted">${tr('Suggestion')}</small>${/*html-ok*/ ocd_row(sg.map(s => ocd_card({...s, label: s.label || tr(BNK_KIND[s.kind] || 'Receipt')}, {btn: `data-bnk="match" data-id="${t.id}" data-kind="${esc(s.kind)}" data-mid="${s.id}"`})).join(''))}</div>`
-      : !inn ? `<p class="muted bnkmiss">${tr('Receipt missing? Upload it in the documents of the office, then match it here.')}</p>` : '';
+    const sug = sg.length ? `<div class="bnksug"><small class="muted">${tr('Suggestion')}</small>${/*html-ok*/ ocd_row(sg.map(s => ocd_card({...s, label: s.label || tr(BNK_KIND[s.kind] || 'Receipt')}, {btn: `data-bnk="match" data-id="${t.id}" data-kind="${esc(s.kind)}" data-mid="${s.id}"`})).join(''))}</div>` : '';
+    // 2.809.0 (#5452): one row of buttons -- another receipt / invoice and "More" (private, ignore, no receipt needed, cash box
+    // transfer with one line of explanation each, bnkMoreMenu); before five equal buttons in two rows on a phone
     act = `${typeof brl_rowHint === 'function' ? brl_rowHint(t) : ''}${sug}<div class="bnkacts"><button class="btn sm" data-bnk="other" data-id="${t.id}" aria-expanded="${BNK.other === t.id}">${ic('search', 's')}<span>${inn ? tr('Other invoice…') : tr('Other receipt…')}</span></button>
-      <button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="private">${tr('Private')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="ignored">${tr('Ignore')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="noreceipt">${tr('No receipt needed')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="cash" title="${esc(tr('Cash withdrawal or cash paid in: a transfer between the bank and the cash book, no expense'))}">${tr('Cash box transfer')}</button></div>
+      <button type="button" class="btn sm ghost bnkmore" data-bnk="more" data-id="${t.id}" aria-haspopup="menu">${ic('dots', 's')}<span>${tr('More')}</span></button></div>
       ${BNK.other === t.id ? bnkOtherHtml(t) : ''}`;
   }
   return `<li class="bnkrow ${t.match ? 'done' : ''}" data-tx="${t.id}">${head}${act}</li>`;
+}
+// 2.809.0 (#5452): the marks of a booking without a receipt / invoice behind "More" (phone: a sheet), each with what it does
+function bnkMoreMenu(anchor, tid) {
+  const it = (kind, sub) => ({label: tr(BNK_KIND[kind]), sub, act: `bnk-${kind}`, fn: () => bnkMatch(tid, kind)});
+  menu(anchor, [
+    {...it('private', tr('Private withdrawal or deposit: neither expense nor income of the business')), label: tr('Private')},
+    {...it('noreceipt', tr('A business payment without a receipt, e.g. bank fees or tax: it counts in the books')), label: tr('No receipt needed')},
+    {...it('ignored', tr('Left out of the books entirely, e.g. a transfer between your own accounts')), label: tr('Ignore')},
+    it('cash', tr('Cash withdrawal or cash paid in: a transfer between the bank and the cash book, no expense'))], null, null, tr('Mark booking'));
 }
 function bnkOtherHtml(t) {
   const c = BNK.cand;
@@ -296,6 +308,7 @@ document.addEventListener('click', e => {
   else if (a === 'impundo') bnkImpUndo(id);
   else if (a === 'match') bnkMatch(id, b.dataset.kind, b.dataset.mid);
   else if (a === 'unmatch') bnkUnmatch(id);
+  else if (a === 'more') bnkMoreMenu(b, id);  // 2.809.0 (#5452)
   else if (a === 'walk') wlk_open('bnk');  // 2.778.0 (#5383): office_walk.js (lazyload.js LD_CALL)
   else if (a === 'other') { BNK.other = BNK.other === id ? null : id; BNK.cand = null; BNK.candQ = ''; BNK.split = false; BNK.parts = {}; ofcDraw(); if (BNK.other) bnkCand(id); }
   else if (a === 'split') { BNK.split = !BNK.split; BNK.parts = {}; ofcDraw(); }  // 2.355.0 B (#2843)

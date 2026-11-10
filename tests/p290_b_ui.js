@@ -70,7 +70,10 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     check(await ready(ev, `${api('GET', `/api/office/docs/${inv.id}`)}.then(j => j.status !== 'paid' && j.open !== '0.00')`), 'the payment is gone');
     await ev(`(() => { document.querySelector('[data-bnk="state"][data-v="open"]').click(); return 1; })()`);
     await ready(ev, `document.querySelectorAll('.bnklist .bnkrow').length === 3`);
-    await ev(`(() => { [...document.querySelectorAll('.bnkrow')].find(e => /Bäckerei/.test(e.textContent)).querySelector('[data-bnk="match"][data-kind="private"]').click(); return 1; })()`);
+    // 2.809.0 (#5452): "Private" sits in the row's "More" menu
+    await ev(`(() => { [...document.querySelectorAll('.bnkrow')].find(e => /Bäckerei/.test(e.textContent)).querySelector('[data-bnk="more"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('#pop [data-act="bnk-private"]')`), '"More" opens the menu with "Private"');
+    await ev(`(() => { document.querySelector('#pop [data-act="bnk-private"]').click(); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.bnklist .bnkrow').length === 2`), '"Private" marks a booking');
     // "Other invoice…" lists the open invoice
     await ev(`(() => { ${row}.querySelector('[data-bnk="other"]').click(); return 1; })()`);
