@@ -21,8 +21,8 @@ from freelancer_fixture import freelancer  # noqa: E402
 from kt import B, check, dbx, done, fresh, setup  # noqa: E402
 
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-O = "/api/office"
-D = O + "/docs"
+OFFICE = "/api/office"
+D = OFFICE + "/docs"
 HS = "X-Kalmido-Office-Space"
 FEAT = "cal,comments,collab,clients,office,docs,files,contacts"
 COMPANY = {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE",
@@ -49,7 +49,7 @@ def ws(v):
 
 
 def ofs(hd=None, params=None):
-    r = A.get(B + O + "/settings", headers=hd or {}, params=params or {})
+    r = A.get(B + OFFICE + "/settings", headers=hd or {}, params=params or {})
     j = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
     return r.status_code, j.get("org_id"), bool(j.get("personal")), str(j.get("error") or j.get("message") or "")
 
@@ -66,7 +66,7 @@ def priv_off(on_off):
 
 # ---------------------------------------------------------------- the private office with an invoice, and the organisation's
 ws("private")
-assert A.put(B + O + "/settings", json={"lang": "de", "dunning_suggest": 0, "company_fields": COMPANY}).ok
+assert A.put(B + OFFICE + "/settings", json={"lang": "de", "dunning_suggest": 0, "company_fields": COMPANY}).ok
 r = A.post(B + "/api/clients", json={"name": "Privatkunde GmbH", "street": "Marktweg 5", "zip": "50667", "city": "Koeln", "country": "DE"})
 assert r.status_code in (200, 201), r.text
 CL = r.json()["id"]
@@ -82,7 +82,7 @@ check(st[0] == 200 and st[2], f"switch on (default): the private office answers 
 tick()
 check(len(overdue(A)) == 1, f"switch on: the private office rings the bell for its overdue invoice {overdue(A)}")
 ws(f"org:{ORG}")
-check(A.put(B + O + "/settings", json={"company_fields": {"name": "Alpha Studio GmbH", "country": "de"}, "lang": "en", "currency": "EUR"}).ok,
+check(A.put(B + OFFICE + "/settings", json={"company_fields": {"name": "Alpha Studio GmbH", "country": "de"}, "lang": "en", "currency": "EUR"}).ok,
       "setup: the organisation's office")
 
 # ---------------------------------------------------------------- off: no private office, the organisation's stays
@@ -114,7 +114,7 @@ check(len(overdue(A)) == 1, f"on again: the bell item shows again {overdue(A)}")
 
 # ---------------------------------------------------------------- freelancer-matrix: office
 FID, Fr = freelancer(B, A)
-r = Fr.get(B + O + "/settings")
+r = Fr.get(B + OFFICE + "/settings")
 check(r.ok and r.json().get("personal"), f"a person without an organisation: her own office as before {r.status_code}")
 
 sys.exit(done("p5392_a_office_private"))
