@@ -25,6 +25,8 @@ from ..core.undogroups import ug_drop_ids, ug_gids
 from ..core.i18n import N_, tr
 from .liste2e import LE2E_PREFIX, le2e_is_cipher, le2e_modes, le2e_neutral
 from ..api.common import v1_err  # 2.369.5 (#2517): pulled up from functions
+from ..lists.fields import FIELD_KIND  # #5549
+from ..personal.timewipe import TZW_KIND, h6b_sig  # #5549
 
 LE2B_API_MSG = N_("This project is encrypted in the browser. Its texts cannot be read or changed through the API or by agents.")
 LE2B_OFF_MSG = N_("Not available in projects encrypted in the browser.")
@@ -466,8 +468,6 @@ def le2b_scrub_trash(c, lid, plain_only=False):
     plain_only (core/db.py, once for the projects locked before #5549): only copies holding plain text - a section whose
     name is no ciphertext, a text field with a value that is none; a copy deleted under the lock stays.
     Idempotent, the caller commits. Returns {what: rows}."""
-    from ..lists.fields import FIELD_KIND
-    from ..personal.timewipe import TZW_KIND, h6b_sig
     n = {"trash_sections": 0, "trash_fields": 0, "trash_times": 0}
     for r in c.execute("SELECT id, kind, snap, held FROM list_part_trash WHERE list_id=? AND kind IN (?, ?, ?) ORDER BY id",
                        (lid, "section", FIELD_KIND, TZW_KIND)).fetchall():

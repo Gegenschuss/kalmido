@@ -1387,10 +1387,10 @@ def init_db(guard=True, load=None):
                           "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value WHERE user_settings.value=''",  # the start fills in defaults first
                           (",".join(areas), uid))
             gset(c, "migr_tours2466", "1")
+        from ..collab.liste2eguard import le2b_scrub_free, le2b_scrub_trash  # the passes of #4372 and #5549
         if gsetting(c, "migr_e2efree4372") != "1":  # 2.538.0 (#4372, review 2646 finding 1): one way -- a project locked before
             # 2.538 loses its time notes, status notes and descriptions as a project locked now does (le2b_scrub). Only 'on': one
             # still 'encrypting' gets the whole scrub at its finish, one 'decrypting' shows its texts again
-            from ..collab.liste2eguard import le2b_scrub_free
             n = {}
             for r in c.execute("SELECT id FROM lists WHERE e2e='on' ORDER BY id").fetchall():
                 for k, v in le2b_scrub_free(c, r[0]).items():
@@ -1401,7 +1401,6 @@ def init_db(guard=True, load=None):
         if gsetting(c, "migr_e2etrash5549") != "1":  # #5549: one way -- a project locked before loses the trash copies of its
             # sections and custom fields deleted before the lock (plain text) and the notes of its "Delete all times" copies, as
             # a project locked now does (le2b_scrub_trash). Only 'on', as migr_e2efree4372
-            from ..collab.liste2eguard import le2b_scrub_trash
             n = {}
             for r in c.execute("SELECT id FROM lists WHERE e2e='on' ORDER BY id").fetchall():
                 for k, v in le2b_scrub_trash(c, r[0], plain_only=True).items():
