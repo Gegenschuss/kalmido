@@ -87,6 +87,20 @@ def picture_pdf(lines, mode=None):
                   stream(jpg, " /Type /XObject /Subtype /Image /Width 595 /Height 842 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode")])
 
 
+def picture_form_pdf(lines):
+    """2.836.0 (#5390, review): like picture_pdf(lines, 3), but the invisible mode is set on the page and the OCR text is
+    drawn inside a form XObject -- the text render mode is inherited into it, so this is still a scan."""
+    jpg = page_jpeg(lines)
+    form = "BT /F1 12 Tf 60 760 Td 22 TL " + " ".join(f"({esc(x)}) '" for x in lines) + " ET"
+    st = "q 595 0 0 842 0 0 cm /Im0 Do Q 3 Tr /Fm0 Do"
+    return build(["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [4 0 R] /Count 1 >>",
+                  "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+                  "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 5 0 R /Resources << /Font << /F1 3 0 R >> /XObject << /Im0 6 0 R /Fm0 7 0 R >> >> >>",
+                  stream(st),
+                  stream(jpg, " /Type /XObject /Subtype /Image /Width 595 /Height 842 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode"),
+                  stream(form, " /Type /XObject /Subtype /Form /BBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >>")])
+
+
 def pillow_pdf(lines):
     """The PDF Pillow writes of a picture (like the phone scan, files/bulk.py abm_pdf)."""
     buf = io.BytesIO()
@@ -118,6 +132,7 @@ cases = [("(a) a digital PDF with vector text", "digital.pdf", text_pdf(LETTER),
          ("(b) a PDF of one page-filling picture", "picture.pdf", picture_pdf(LETTER), "application/pdf", True),
          ("(b) the PDF Pillow writes (phone scan)", "phonescan.pdf", pillow_pdf(LETTER), "application/pdf", True),
          ("(c) a picture + invisible OCR layer (mode 3)", "scanner-ocr.pdf", picture_pdf(LETTER, 3), "application/pdf", True),
+         ("(c) the OCR layer's mode set on the page, its text in a form", "scanner-form.pdf", picture_form_pdf(LETTER), "application/pdf", True),
          ("(d) a picture + visible text on top", "background.pdf", picture_pdf(LETTER, 0), "application/pdf", False),
          ("(e) a PNG picture", "photo.png", png(LETTER), "image/png", True)]
 D = {}
