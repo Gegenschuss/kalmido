@@ -14,7 +14,7 @@ from ..core.config import APP_NAME, APP_VERSION
 from ..core.i18n import N_, tr
 from ..core.db import connect, iso, now_utc, parse_iso
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
-from ..core.pg import IntegrityError, insert_id
+from ..core.pg import IntegrityError, insert_id, write_lock
 from ..core.access import Denied, task_visible
 from ..accounts.orgs import is_org_admin, user_orgs
 from ..accounts.orgroles import need_org_area, org_writes
@@ -445,12 +445,20 @@ def rss_items_unread(c, uid, f):
     return c.execute("SELECT COUNT(*) FROM rss_items WHERE feed_id=? AND read_at IS NULL", (f["id"],)).fetchone()[0]
 
 
+RSS_STEP = {}  # 2.809.0 (#5476): {pre, post} of the feeds' undo steps (life/rssundo.py fills it; it imports this module)
+
+
 def rss_delete(c, uid, fid):
     """Deleted with its articles hidden; POST .../restore brings it back (purged after RSS_TRASH_DAYS)."""
     rss_need(c, uid)
     f = rss_own(c, uid, fid, manage=True)
     if not f["deleted_at"]:
+        write_lock(c, f"rss_feeds-{int(fid)}")  # 2.809.0 (#5476): the person's step (life/rssundo.py) under its lock
+        if RSS_STEP:
+            RSS_STEP["pre"](c, uid, fid, "delete")
         c.execute("UPDATE rss_feeds SET deleted_at=? WHERE id=?", (iso(now_utc()), fid))
+        if RSS_STEP:
+            RSS_STEP["post"](c)
     return {"ok": True}
 
 
@@ -464,8 +472,13 @@ def rss_restore(c, uid, fid):
             raise BadInput(tr("You already follow this feed"))
         if _count(c, uid, oid) >= RSS_MAX_FEEDS:
             raise BadInput(tr("At most {0} feeds", RSS_MAX_FEEDS))
+        write_lock(c, f"rss_feeds-{int(fid)}")  # 2.809.0 (#5476): the person's step (life/rssundo.py) under its lock
+        if RSS_STEP:
+            RSS_STEP["pre"](c, uid, fid, "restore")
         if not rg4_feed_restore(c, fid):  # 2.122.4 A (#1906): followed again in parallel
             raise BadInput(tr("You already follow this feed"))
+        if RSS_STEP:
+            RSS_STEP["post"](c)
     return {"feed": rss_feed_out(rss_own(c, uid, fid))}
 
 

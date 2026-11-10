@@ -105,7 +105,7 @@ async function rss_del(id) {
   const f = (RSS.feeds || []).find(x => x.id === id); if (!f) return;
   await api('DELETE', `/api/feeds/${id}`);
   if (RSS.feed === id) RSS.feed = 0;
-  offerUndo(tr('Unfollowed: {0}', f.title), histAdd({label: tr('Unfollow feed “{0}”', f.title),
+  offerUndo(tr('Unfollowed: {0}', f.title), histAdd({label: tr('Unfollow feed “{0}”', f.title), srv: true,  // 2.809.0 (#5476): life/rssundo.py
     undo: async () => { await api('POST', `/api/feeds/${id}/restore`, {}); await rss_reload(); },
     redo: async () => { await api('DELETE', `/api/feeds/${id}`); await rss_reload(); }}));
   await rss_reload();

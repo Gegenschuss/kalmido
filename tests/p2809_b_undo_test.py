@@ -16,6 +16,8 @@ Invented names only.
  - dispatch bookings (hub/dspundo.py): a job of two people changed -> one step, two parts -> undo -> both as before; the job
    deleted -> undo -> back; redo -> deleted again
  - notepads of the pin board (lists/padundo.py): renamed -> undo from the phone -> the old title; a text save -> undo
+ - followed feeds (life/rssundo.py): unfollowed -> undo from the phone -> followed again; the same address followed again
+   meanwhile -> undo refused (named), no error
  - only own steps: another person neither lists nor takes back a step (404)
 freelancer-matrix: undo (a person without an organisation: her bookmark step goes back from the list)
 usage: p2809_b_undo_test.py <datadir>"""
@@ -285,6 +287,23 @@ check(r.ok and res.get("undone") == [g["id"]] and row("list_notepads", NP, "body
 r = A.get(B + f"/api/lists/{LID}/overview")
 pads = [x for x in ((r.json().get("layout") or {}).get("pads") or []) if x.get("id") == NP] if r.ok else []
 check(pads and pads[0].get("body") == "erste Zeile" and pads[0].get("title") == "Notizen Beispiel", f"the pin board shows the old title and text {r.status_code} {pads}")
+
+# ---------------------------------------------------------------- followed feeds
+kt.dbx("INSERT INTO rss_feeds(user_id,url,title,created_at) VALUES(?,?,?,?)", (ALICE, "https://feeds.example.com/undo.xml", "Nachrichten Beispiel",
+                                                                             "2031-01-01T00:00:00+00:00"))  # following needs a fetch: a row
+FD = kt.dbx("SELECT id FROM rss_feeds WHERE url=?", ("https://feeds.example.com/undo.xml",))[0]["id"]
+r = A.delete(B + f"/api/feeds/{FD}")
+g = newest(A)
+check(r.ok and g.get("kind") == "feed" and "Nachrichten Beispiel" in (g.get("label") or ""), f"unfollowing is a step with the title {r.status_code} {g}")
+res = back(PHONE, g["id"])
+check(res.get("undone") == [g["id"]] and not row("rss_feeds", FD, "deleted_at").get("deleted_at")
+      and [f for f in A.get(B + "/api/feeds").json().get("feeds", []) if f["id"] == FD], f"taken back from the phone: followed again {res}")
+r = A.delete(B + f"/api/feeds/{FD}")
+g = newest(A)
+kt.dbx("INSERT INTO rss_feeds(user_id,url,created_at) VALUES(?,?,?)", (ALICE, "https://feeds.example.com/undo.xml", "2031-01-02T00:00:00+00:00"))
+res = back(A, g["id"])
+check(not res.get("undone") and res.get("stayed") and res["stayed"][0].get("code") == "conflict" and row("rss_feeds", FD, "deleted_at").get("deleted_at"),
+      f"back refused (named): the same address is followed again meanwhile {res}")
 
 # ---------------------------------------------------------------- only own steps
 g = newest(A)
