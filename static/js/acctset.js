@@ -786,7 +786,7 @@ const sampleDefault = () => depsOn() || fieldsOn() || timeOn() || progressOn(); 
 const sampleRowHtml = () => S.sample ? `<label>${tr('Sample')}</label><button class="btn sm danger" data-m="sample-rm">${ic('trash', 's')} ${tr('Remove sample project')}</button><span class="muted" style="font-size:var(--fs-s)">${esc(S.sample.lists.map(l => l.name).join(', '))}</span>`
   : `<label>${tr('Sample')}</label><button class="btn sm" data-m="sample-add">${ic('plus', 's')} ${tr('Create sample project')}</button>`;
 const sampleHtml = hint => `<h4 id="s-sample-h">${tr('Sample project')}</h4>
-      ${hint(indOn('film') ? tr('An example video production to look around. Private to you, without reminders.') : tr('An example client project to look around. Private to you, without reminders.'))}
+      ${/*html-ok*/ hint(indOn('film') ? tr('An example video production to look around. Private to you, without reminders.') : tr('An example client project to look around. Private to you, without reminders.'))}
       <div class="row" id="s-sample">${sampleRowHtml()}</div>`;
 // ---- 2.578.0 (#4573): the app's industry (Settings > General; also the welcome tour and the first-run setup). One switch for
 // the whole app, stored for the organisation (its admins choose) or for a person without one: the same list as the pack
@@ -795,8 +795,8 @@ const sampleHtml = hint => `<h4 id="s-sample-h">${tr('Sample project')}</h4>
 function ind_setHtml(hint) {
   const d = S.industry; if (!d || !(d.choices || []).length || S.me?.kid) return '';
   return `<h4 id="s-industry-h">${tr('Industry')}</h4>
-      <div class="row"><label id="s-industry-l">${tr('Industry')}</label>${indBoxes(d, indCodes(d), 's-industry', 's-industry-l', !d.can_set)}</div>
-      ${hint(d.can_set ? tr('Adds the functions of the industries ticked to the whole app, several at once, e.g. Film & Video: the shoot calculation in quotations and the image film as sample project. None ticked: everything stays general.') : tr('The admins of your organisation select its industry.'))}`;
+      <div class="row"><label id="s-industry-l">${tr('Industry')}</label>${/*html-ok*/ indBoxes(d, indCodes(d), 's-industry', 's-industry-l', !d.can_set)}</div>
+      ${/*html-ok*/ hint(d.can_set ? tr('Adds the functions of the industries ticked to the whole app, several at once, e.g. Film & Video: the shoot calculation in quotations and the image film as sample project. None ticked: everything stays general.') : tr('The admins of your organisation select its industry.'))}`;
 }
 // 2.828.0 (#5511): a box of #s-industry: the codes ticked go to the server (a tick never switches the others off); one after
 // the other, so a quick second tick sends the version the first one got (no false 409)

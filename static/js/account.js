@@ -1302,7 +1302,7 @@ async function setupChoices(el, logo) {
       <div class="suse-list">${SETUP_MODS.map(row).join('')}</div></details>
       <h3 id="su-start-h">${tr('Start with')}</h3>
       <div class="sustarts ptcards" role="radiogroup" aria-labelledby="su-start-h">${STARTS.map(([k, n, i, d]) => `<button type="button" class="ptcard ${k === start ? 'on' : ''}" role="radio" aria-checked="${k === start}" data-su-start="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${k === 'sample' && industry.includes('film') ? tr('A small video production with dates and a packing list, to look around; remove it any time under Settings > Data') : tr(d)}</small></button>`).join('')}</div>
-      ${st.industry?.choices?.length ? `<h3 id="su-ind-l">${tr('Industry')}</h3>${indBoxes(st.industry, industry, 'su-ind', 'su-ind-l')}<p class="muted">${tr('Adds the functions of the industries ticked to the whole app, several at once, e.g. Film & Video: the shoot calculation in quotations and the image film as sample project. None ticked: everything stays general.')}</p>` : ''}${''/* 2.578.0 (#4573) */}
+      ${st.industry?.choices?.length ? `<h3 id="su-ind-l">${tr('Industry')}</h3>${/*html-ok*/ indBoxes(st.industry, industry, 'su-ind', 'su-ind-l')}<p class="muted">${tr('Adds the functions of the industries ticked to the whole app, several at once, e.g. Film & Video: the shoot calculation in quotations and the image film as sample project. None ticked: everything stays general.')}</p>` : ''}${''/* 2.578.0 (#4573) */}
       <div class="aerr" role="alert" id="su-err"></div>
       <div class="sufoot"><button type="button" class="btn pri" data-su="go">${tr('Start')}</button></div></div>`;
     $('.sucust', el)?.addEventListener('toggle', e => { custOpen = e.target.open; });
