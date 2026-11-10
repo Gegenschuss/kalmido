@@ -1062,6 +1062,9 @@ def le2a_finish(lid):
         # channel messages are of the old key generation; a restore would bring back what nobody can read any more
         from ..tasks.atttrash import atr_purge_list
         gone = atr_purge_list(c, lid) + ctt_purge_list(c, lid)
+        from .liste2eguard import le2b_trash_cipher_purge  # #5563: deleted sections and text fields hold the old key's ciphertexts
+        lpt_section_purge_list(c, lid)
+        le2b_trash_cipher_purge(c, lid)
         bump(c)
         c.commit()
         if gone:
@@ -1084,6 +1087,8 @@ def le2a_finish(lid):
         c.execute("UPDATE lists SET e2e_rotate=0, e2e_reenc=0 WHERE id=?", (lid,))
         c.execute("DELETE FROM list_keys WHERE list_id=?", (lid,))
         c.execute("DELETE FROM list_key_pending WHERE list_id=?", (lid,))
+        from .liste2eguard import le2b_trash_cipher_purge  # #5563: deleted text fields with ciphertext values (no key left)
+        le2b_trash_cipher_purge(c, lid)
     # #5552: deleted sections keep their names of the other state; after le2b_scrub, whose undo clean-up finds a deleted
     # section's steps through its copy in the trash
     lpt_section_purge_list(c, lid)

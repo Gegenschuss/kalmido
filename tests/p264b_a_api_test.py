@@ -232,8 +232,17 @@ r = A.post(B + f"/api/tasks/{T1}/comments", json={"body": ct(2)})
 CT1 = r.json().get("id") if r.ok else None
 check(CT1 and A.delete(B + f"/api/comments/{CT1}").ok and dbx("SELECT 1 FROM comment_trash_text WHERE comment_id=?", (CT1,)),
       "trash: the deleted comment keeps its text until the key change ends " + r.text[:200])
+# 2.898.0 (#5563): a section and a text field deleted before the key change keep ciphertexts of generation 1 in the trash
+# (list_part_trash); a field without a ciphertext value (a select field: values stay readable) stays
+for kind_, ref_, snap_, held_ in (("section", 9905563, {"name": ct(1), "sort": 1}, {}),
+                                  ("list_field", 9905564, {"name": ct(1), "type": "text"}, {"vals": [[T1, ct(1)]], "n": 1, "grouped": 0}),
+                                  ("list_field", 9905565, {"name": ct(1), "type": "select"}, {"vals": [[T1, "a"]], "n": 1, "grouped": 0})):
+    dbx("INSERT INTO list_part_trash(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
+        (L, kind_, ref_, json.dumps(snap_), json.dumps(held_), 1, "2026-11-01T00:00:00Z"))
 r = A.post(B + f"/api/lists/{L}/e2e/finish")
 check(r.ok and r.json()["mode"] == "on" and tuple(dbx("SELECT e2e, e2e_reenc FROM lists WHERE id=?", (L,))[0]) == ("on", 0), "finish: re-encryption done " + r.text[:200])
+check([x[0] for x in dbx("SELECT ref_id FROM list_part_trash WHERE list_id=? AND ref_id IN (9905563, 9905564, 9905565)", (L,))] == [9905565],
+      "#5563: the end of the key change dropped the trash copies with old ciphertexts (section, text field), the select field stays")
 check(not dbx("SELECT 1 FROM comment_trash_text WHERE comment_id=?", (CT1,)), "finish: the kept text of the trash went with the key change")
 check(A.post(B + f"/api/lists/{L}/e2e/finish").status_code == 409, "finish: only once")
 check(A.get(B + f"/api/lists/{L}/e2e").json()["reenc"] == 0, "info: reenc 0")

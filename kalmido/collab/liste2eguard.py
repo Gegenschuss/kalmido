@@ -496,6 +496,25 @@ def le2b_scrub_trash(c, lid, plain_only=False):
     return n
 
 
+def le2b_trash_cipher_purge(c, lid):
+    """#5563 (finding of the review of #5549): when the lock of project lid is switched off (le2a_finish, decrypting) or a key
+    change is done (e2e_reenc), the copies in its trash holding ciphertexts go for good, as le2b_scrub_trash drops the plain
+    ones when it is switched on: a deleted custom field with a ciphertext value (held.vals) - nobody re-encrypts or decrypts
+    the trash, a restore would bring back what nobody can read. The sections of the trash go in both cases through
+    lists/parttrash.py lpt_section_purge_list (#5552). Idempotent, the caller commits. Returns the copies dropped."""
+    k = 0
+    for r in c.execute("SELECT id, held FROM list_part_trash WHERE list_id=? AND kind=? ORDER BY id", (lid, FIELD_KIND)).fetchall():
+        try:
+            held = json.loads(r["held"] or "{}")
+        except ValueError:
+            continue
+        vals = held.get("vals") if isinstance(held, dict) else None
+        if any(isinstance(v, list) and len(v) > 1 and le2e_is_cipher(v[1]) for v in vals or []):
+            c.execute("DELETE FROM list_part_trash WHERE id=?", (r["id"],))
+            k += 1
+    return k
+
+
 def _trash_plain(r):
     """Does copy r (a section or a custom field of list_part_trash) hold plain text of the encrypted fields?"""
     try:

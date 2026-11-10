@@ -407,8 +407,16 @@ for _ in range(10):
     out["fields"] = [{"task_id": x["task_id"], "field_id": x["field_id"], "value": "plain value"} for x in j["fields"]]
     r = A.post(B + f"/api/lists/{L}/e2e/bulk", json=out)
     check(r.ok, "decrypting: bulk " + r.text[:200])
+# 2.898.0 (#5563): a text field deleted under the lock keeps ciphertexts in the trash (list_part_trash.held.vals); a field
+# deleted while decrypting keeps plain values
+for ref_, v_ in ((9905563, ct(1)), (9905564, "plain kept")):
+    dbx("INSERT INTO list_part_trash(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
+        (L, "list_field", ref_, json.dumps({"name": "Gone field", "type": "text"}), json.dumps({"vals": [[T1, v_]], "n": 1, "grouped": 0}),
+         1, "2026-11-01T00:00:00Z"))
 r = A.post(B + f"/api/lists/{L}/e2e/finish")
 check(r.ok and r.json()["mode"] is None, "finish: open again " + r.text[:200])
+check([x[0] for x in dbx("SELECT ref_id FROM list_part_trash WHERE list_id=? AND kind='list_field' AND ref_id IN (9905563, 9905564)", (L,))] == [9905564],
+      "#5563: switching off dropped the field copy with ciphertext values, the plain one stays")
 check(not dbx("SELECT 1 FROM list_keys WHERE list_id=?", (L,)) and not dbx("SELECT 1 FROM list_key_pending WHERE list_id=?", (L,))
       and dbx("SELECT e2e IS NULL AND e2e_rotate=0 FROM lists WHERE id=?", (L,))[0][0] in (True, 1), "way back: no keys, no waiting list, open")
 check(not dbx("SELECT 1 FROM tasks WHERE list_id=? AND (title LIKE 'e2e1:%' OR content LIKE 'e2e1:%')", (L,)), "way back: no ciphertext left")
