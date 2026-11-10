@@ -147,7 +147,9 @@ function dfl_secret(sec) {  // a new webhook secret: shown once
 const DFL_DID = {sender: N_('Sender'), type: N_('Document type'), folder: N_('Folder'), tags: N_('Tags'), fields: N_('Custom fields')};
 async function dfl_runs(md, d, nb) {  // 2.755.0 (#5236): nb = a neighbour drawn ahead ({ctrl}): quietly, its own box
   const box = md.querySelector('.dc-flows'); if (!box || !d) return;
-  let j; try { j = nb ? await rawFetch('GET', `/api/docs/${d.id}/flowruns`) : await api('GET', `/api/docs/${d.id}/flowruns`); } catch { return; }
+  // #4887 (CI red of 2.833.0, p2154_a_ui): every redraw of the view asks again; one asked just before a split / delete is answered
+  // after it with 404 - the document is gone, the box goes with it: no toast (it took the place of the split's Undo). Others are said
+  let j; try { j = await rawFetch('GET', `/api/docs/${d.id}/flowruns`); } catch (x) { if (!nb && x?.status !== 404 && !(x instanceof Offline) && x?.message !== 'auth' && box.isConnected) toast(x.message); return; }
   if (nb?.ctrl.signal.aborted || !j?.runs) return;
   if (!box.isConnected || !j.runs.length) { box.innerHTML = ''; return; }
   box.innerHTML = `<details class="dc-text"><summary><h4>${tr('Flows')} (${j.runs.length})</h4>${ic('chev', 's dc-chev')}</summary><ul class="dc-rules">${j.runs.map(r => {

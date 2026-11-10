@@ -99,9 +99,14 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
       const of = window.fetch; window.fetch = (u, o) => { const p = of(u, o); if (/\\/api\\/(docs|files\\/nodes)\\/${SID}\\b/.test(String(u))) p.then(r => T.push([at(), 'fetch', String(u), r.status, location.hash].join(' '))); return p; };
       return 1; })()`);
     const diag = async () => ' | toast: ' + await ev(`(() => { const t = document.querySelector('#toast'); return JSON.stringify({text: t?.textContent || '', hidden: !!t?.classList.contains('hidden'), page: t?.dataset.page || '', hash: location.hash, gone: typeof DVW === 'object' ? [...(DVW.gone || [])] : null, trace: window.__p2154 || []}); })()`).catch(e => String(e));
+    // #4887 (CI red of 2.833.0): a redraw of the view just before the split asks for the flows' runs; on the slow CI the answer
+    // came after the split (404) and its toast took the place of the split's Undo. Held here until the split is done, as there
+    await ev(`(() => { const of = window.fetch; window.__hold = []; window.fetch = async (u, o) => { if (/\\/flowruns$/.test(String(u)) && !window.__split) await new Promise(ok => window.__hold.push(ok)); const r = await of(u, o); if (/\\/split$/.test(String(u)) && o?.method === 'POST') { window.__split = 1; setTimeout(() => window.__hold.splice(0).forEach(f => f()), 0); } return r; }; dc_mdDraw(document.querySelector('.dv-view')); return 1; })()`);
+    check(await ev(`window.__hold.length`) > 0, 'a redraw just before the split asks for the flows (held)');
     await ev(`(() => { document.querySelector('.dsp-md [data-m="split"]').click(); return 1; })()`);
     check(await ready(ev, `${ids}.then(a => !a.includes(${SID}) && a.length === 3)`, 80), 'split: the stack left the list, two documents came');
     check(await ev(`!document.querySelector('.dsp-md') && !document.querySelector('.dc-md')`), 'the dialogs closed');
+    await ready(ev, `window.__split === 1 && !window.__hold.length`, 20); await sleep(500);  // the held question went out and came back (404)
     check(await ready(ev, `/split into 2 documents/.test(document.querySelector('#toast')?.textContent || '')`, 20), 'the toast names it' + await diag());
     check(await ev(`DVW.gone.has(${SID})`), 'the split stack counts as gone here (docview.js DVW.gone, #5478)');
     await undoToast(ev, /split into 2 documents/);  // 2.312.0 A (#3283)
