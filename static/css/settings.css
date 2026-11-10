@@ -192,6 +192,8 @@
 /* 2.138.3 B (#2407): "Edit organisation": head and foot stay, the member list scrolls; per row a Member and an Admin box */
 .modal.ogmodal .card{display:flex;flex-direction:column}
 .modal.ogmodal .card>*{flex:none}
+/* 2.891.0 (#5353): a flex card does not collapse margins - the grip after the foot nets zero as in .dlg-sized (app.css #5158 -2.25rem let the foot stick out 1.25rem) */
+.modal.ogmodal .card:not(.dlg-sized)>.foot+.dlggrip{margin-top:-1rem}
 .modal.ogmodal .card>.ogml{flex:1 1 auto;min-height:7rem;overflow-y:auto;overscroll-behavior:contain;margin:0 -.25rem .5rem;padding:0 .25rem}
 .ogfld{flex:1;display:flex;flex-direction:column;gap:.25rem;min-width:0}
 .ogfld .muted{font-size:var(--fs-s)}
