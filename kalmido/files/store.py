@@ -729,7 +729,7 @@ def fs_new_version(c, nid, data, mime=None, uid=None):
     from .fslock import fsl_need_unlocked
     fsl_need_unlocked(c, nid)  # 2.353.0 A (#2758): a new plain version in a locked folder: 409
     from ..office.periodlock import pl_receipt_need_open
-    pl_receipt_need_open(c, nid)  # 2.237.0 B (#2864): every new version (upload of the same name, API v1) keeps a locked receipt
+    pl_receipt_need_open(c, nid, uid=uid)  # 2.237.0 B (#2864): every new version (upload of the same name, API v1) keeps a locked receipt; 2.892.0 (#4873): uid of a background run
     data = bytes(data or b"")
     _check_data(n["name"], data)
     uid = uid or _uid()

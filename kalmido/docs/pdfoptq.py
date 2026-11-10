@@ -28,7 +28,9 @@ import calendar
 import json
 import time
 
-from flask import jsonify
+from contextlib import nullcontext
+
+from flask import has_app_context, jsonify
 
 from ..core.config import app
 from ..core.db import OperationalError, body, bump, db, err, now_iso
@@ -36,7 +38,7 @@ from ..core.i18n import N_, lang as _lang, tr
 from ..core.access import Denied, acx_of, live_sql
 from ..core.pg import write_lock
 from ..accounts.session import me
-from ..files.store import fs_log_add, fs_new_version, fs_read, fs_role
+from ..files.store import fs_chain, fs_deleted, fs_log_add, fs_new_version, fs_read, fs_role
 from ..office.periodlock import pl_receipt_need_open
 from . import store as S
 from . import pdfopt as P
@@ -399,7 +401,7 @@ def po_queued(c):
 def _work(c, nid, v, run):
     m = S.meta_row(c, nid)
     n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
-    if not m or not n or n["deleted_at"] or n["kind"] != "file":
+    if not m or not n or n["deleted_at"] or n["kind"] != "file" or fs_deleted(fs_chain(c, nid)):  # 2.892.0 (review): + a folder above in the trash
         return _fail(c, nid, v, "gone") if m else None
     uid = v.get("by")
     if not uid or fs_role(c, nid, uid) not in ("owner", "edit"):
@@ -448,12 +450,16 @@ def _work(c, nid, v, run):
     write_lock(c, f"fs_version:{int(nid)}")  # the lock of the version number: nothing comes between the check and the write
     if int(c.execute("SELECT cur_version FROM fs_nodes WHERE id=?", (nid,)).fetchone()[0] or 0) != ver:
         return _fail(c, nid, done, "changed")
+    if fs_deleted(fs_chain(c, nid)):  # 2.892.0 (review): the file or a folder above went to the trash during the run
+        return _fail(c, nid, done, "gone")
     if fs_role(c, nid, uid) not in ("owner", "edit"):
         return _fail(c, nid, done, "denied")
     if v.get("auto") and po_office(c, S.meta_row(c, nid), guess=True):  # review F1: sorted into the office meanwhile
         return _fail(c, nid, done, "office")
     try:
-        new = fs_new_version(c, nid, pdf, "application/pdf", uid=uid)
+        # 2.892.0 (review): the docs queue runs outside the app; the period lock of an office receipt keeps its cache in g
+        with nullcontext() if has_app_context() else app.app_context():
+            new = fs_new_version(c, nid, pdf, "application/pdf", uid=uid)
     except Denied:
         c.rollback()
         return _fail(c, nid, done, "locked")

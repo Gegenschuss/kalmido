@@ -212,16 +212,17 @@ def pl_sees_books(c, uid, oid):
 PL_TAKEN = N_("The bookkeeping has booked this receipt; only it can change or remove it")
 
 
-def _pl_taken(c, oid, r):
+def _pl_taken(c, oid, r, uid=None):
     """2.356.0 (#3129, review M1): 409 when the signed-in person handed receipt row r in, the bookkeeping has taken it over
     (changed it or noted the payment) and the person does not see the bookkeeping -- a booked receipt stays as booked."""
-    uid = g.user["id"] if getattr(g, "user", None) is not None else 0
+    # 2.892.0 (#4873, review): uid = the person a background step works for (docs/pdfoptq.py, never from request data)
+    uid = uid or (g.user["id"] if getattr(g, "user", None) is not None else 0)
     if (uid and r["submitted_by"] == uid and (r["paid_at"] or (r["set_by"] and r["set_by"] != r["submitted_by"]))
             and not pl_sees_books(c, uid, oid)):
         raise Denied(409, tr(PL_TAKEN))
 
 
-def pl_receipt_need_open(c, nid, *new_days, becoming=False):
+def pl_receipt_need_open(c, nid, *new_days, becoming=False, uid=None):
     """409 when document nid is a receipt (or becomes one: becoming=True) whose document date or payment day - or one of
     new_days - lies in a locked month of its office area. Not a receipt / no office: nothing.
     2.356.0 (#3129): also when its submitter would change a receipt the bookkeeping has taken over (_pl_taken)."""
@@ -233,7 +234,7 @@ def pl_receipt_need_open(c, nid, *new_days, becoming=False):
     if oid:
         period_need_open(c, oid, r["doc_date"], r["paid_at"], *new_days)
         if r["rc"] is not None:
-            _pl_taken(c, oid, r)
+            _pl_taken(c, oid, r, uid)
 
 
 def pl_tree_need_open(c, nid):

@@ -247,5 +247,15 @@ rj = po(Fr, RID)
 check(rj.get("office") is True and rj.get("state") in ("", "skipped") and [v["no"] for v in versions(Fr, RID)] == [1],
       f"the office receipt is never optimised automatically, one version {rj}")
 check(rj.get("can") is True, f"... but the button is there (with the hint) {rj}")
+# 2.892.0 (review of the rebuild): the button at an office receipt makes the new version - the docs queue runs outside the
+# app, the period lock of an office receipt keeps its cache in flask.g (was: RuntimeError -> always "failed")
+check(Fr.put(B + "/api/office/settings", json={"pack": "DE"}).status_code == 200, "frida's office has its country")
+r = Fr.put(B + f"/api/docs/{RID}/receipt", json={"category": "Travel", "vat_pct": "19", "keep": True})
+check(r.status_code == 200, f"the scan is a receipt of the office {r.status_code} {r.text[:200]}")
+check(Fr.post(B + f"/api/docs/{RID}/pdfopt", json={"mode": "bw"}).status_code == 202, "office receipt: run by the button queued")
+j = po_until(Fr, RID, ("done", "same", "failed"))
+check(j and j.get("state") in ("done", "same") and j.get("error") != "failed", f"office receipt by the button: not failed {j}")
+if j and j.get("state") == "done":
+    check([v["no"] for v in versions(Fr, RID)] == [2, 1], "office receipt: a new version, the original kept")
 
 sys.exit(kt.done("p2892_c_pdfopt"))
