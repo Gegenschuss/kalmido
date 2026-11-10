@@ -215,6 +215,9 @@ ffc = Fr.get(B + "/api/docs/facets", params={"ws": "private"}).json()
 BUR = next(",".join(map(str, x["ids"])) for x in ffc["senders"] if x["name"] == "Burrow Shop")
 FR = rules({"f": "sender", "op": "in", "v": [BUR]}, {"f": "text", "op": "has", "v": "Koala"}, op="or")
 check(count(Fr, ws="private", rules=FR)["total"] == 2, "freelancer: the dialog's count")
+# tenant: POST /api/docs/views/count
+check(count(A, rules=R1)["total"] > 0 and count(Fr, rules=R1)["total"] == 0,
+      "#5518: a stranger's count on another organisation's workspace hits none of its documents")
 r = Fr.post(B + f"/api/obj/{K}", json={"title": "Receipts", "rules": FR, "ws": "private"})
 check(r.status_code == 201, f"freelancer: her view with rules ({r.status_code})")
 FV = r.json()["id"]
