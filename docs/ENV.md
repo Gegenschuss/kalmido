@@ -173,6 +173,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_DOCS_THUMB_FILL_S` | `15` | Seconds between two portions of previews. |
 | `KALMIDO_DOCS_ZIP_MAX_FILES` | `2000` | Files per document ZIP download at most. |
 | `KALMIDO_DOCS_ZIP_MAX_MB` | `1024` | Size in MB of a document ZIP download at most. |
+| `KALMIDO_DSR_TEXT_MAX` | `3000` | Documents whose text the search opens at most for an exact phrase or an exclusion. |
 | `KALMIDO_EXT_ZIP_MAX_FILES` | `1000` | Files per ZIP download through a shared link at most. |
 | `KALMIDO_EXT_ZIP_MAX_MB` | `256` | Size in MB of a ZIP download through a shared link at most. |
 | `KALMIDO_FILES_ZIP_MAX_FILES` | `5000` | Files per ZIP download of attachments at most. |
