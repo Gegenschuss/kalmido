@@ -594,7 +594,7 @@ function tdStart(t) {
 // the hold ended: the row lifts
 function tdLift(d) {
   if (lp !== d || !S.tasks.has(d.id)) { drg_cancel(); return; }
-  d.active = true; swipe = null;
+  d.active = true;  // 2.876.0 (#5559): the row swipe ends itself on the next move (rowswipe.js asks busy())
   d.r.classList.add('dragging');
   document.body.classList.add('tdrag');
   // 2.13.4: "Move to list…" at the top while dragging a task row: drop it there and pick the list (the drawer at the

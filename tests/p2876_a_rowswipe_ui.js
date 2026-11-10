@@ -34,7 +34,7 @@ const swipe = async (w, el, row, dx, dy = 0, {x0 = 150, end = 'touchend', hold =
   tc(w, el, 'touchstart', x0, 300);
   if (hold) await passed(w, hold);
   for (const f of [.25, .5, .75, 1]) out.prev = tc(w, el, 'touchmove', x0 + dx * f, 300 + dy * f).defaultPrevented || out.prev;
-  out.mid = row.style.transform;
+  out.mid = row.style.transform; out.op = row.style.opacity;
   tc(w, el, end, x0 + dx, 300 + dy);
   out.end = row.style.transform;
   return out;
@@ -121,7 +121,7 @@ const width = (w, px) => Object.defineProperty(w, 'innerWidth', {configurable: t
   const items = () => [...d.querySelectorAll('#view .nitem')].map(n => (Object.defineProperty(n, 'offsetWidth', {configurable: true, value: 360}), n));
   check(await until(() => items().length >= 3, 60), 'news: the items are shown');
   let it = items()[0]; s = await swipe(w, it, it, -40);
-  check(s.mid === 'translateX(-40px)' && it.style.opacity && +it.style.opacity < 1, 'news: the item follows the finger and fades ' + JSON.stringify(s));
+  check(s.mid === 'translateX(-40px)' && s.op && +s.op < 1, 'news: the item follows the finger and fades ' + JSON.stringify(s));
   check(await until(() => !it.style.transform && !it.style.opacity, 20) && items().length === n0, 'news: a short swipe keeps it');
   it = items()[0]; s = await swipe(w, it, it, 200);
   check(s.end === 'translateX(110%)' && await until(() => items().length === n0 - 1, 40), 'news: a swipe to the right removes the item ' + JSON.stringify(s));
