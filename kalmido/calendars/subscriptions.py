@@ -21,6 +21,7 @@ import xml.etree.ElementTree as ET
 import icalendar
 import recurring_ical_events
 from datetime import date, datetime, timedelta, timezone
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -1279,7 +1280,7 @@ def cal_restore_sub():
     v = eph_take(EPH_CALSUB, f"{uid}:{tok}", uid=uid) if isinstance(tok, str) and 0 < len(tok) <= 64 else None
     try:
         keep = json.loads(unseal(c, f"calsub:{uid}", v)) if v else None
-    except Exception:  # 2.800.0 (#5466, review): a key rotated within the 15 minutes / a damaged row: 409, not 500
+    except (InvalidTag, ValueError, TypeError):  # 2.800.0 (#5466, review): a key rotated within the 15 minutes / a damaged row: 409, not 500
         keep = None
     if not keep or keep.get("user_id") != uid:
         return err(tr("This can no longer be undone"), 409)

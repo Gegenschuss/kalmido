@@ -13,14 +13,14 @@ import subprocess
 import sys
 
 import requests
+from kt import check, dbx, done, me_id, sess  # shared helpers (tests/kt.py)
+from freelancer_fixture import freelancer
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-from kt import check, dbx, done, me_id, sess  # shared helpers (tests/kt.py)
-from freelancer_fixture import freelancer
 
 subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL)
 s0 = requests.Session()
