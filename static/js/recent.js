@@ -51,7 +51,7 @@ function zle_rowHtml(x, chip, o = {}) {
 function zle_listHtml(d, n, chip, empty, o = {}) {
   if (!d || !d.items) return d?.err ? `<p class="muted zleerr">${esc(d.err)}</p>` : `<div class="zleph" style="--zlen:${n}" aria-busy="true" role="status"><span class="sr">${esc(tr('Loading…'))}</span></div>`;
   if (!d.items.length) return empty;
-  return `<ul class="zlel" aria-label="${esc(tr('Recently edited'))}">${d.items.slice(0, n).map(x => zle_rowHtml(x, chip, o)).join('')}</ul>`;
+  return `<ul class="zlel" aria-label="${esc(tr('Recently edited'))}">${/*html-ok*/ d.items.slice(0, n).map(x => zle_rowHtml(x, chip, o)).join('')}</ul>`;
 }
 // the person's favourites of the area as tiles (favtiles.js): knowledge pages, files and documents
 const ZLE_PIN = {wiki: k => k.startsWith('r:wiki:'), ablage: k => k.startsWith('file:') || k.startsWith('doc:'), reading: () => false};
@@ -71,9 +71,9 @@ function zle_emptyHtml(mod) {
 // rows of one kind: "Recently edited" first (opens #<mod>/recent), then the workspaces; the trash small below it
 /** @param {string} mod @param {any} to @param {any[]} rows */
 function zle_ovrHtml(mod, to, rows) {
-  const row = (href, icon, name, attr, after = '') => `<li><a href="${esc(href)}" class="spovr" ${attr}>${icon}<span>${esc(name)}</span>${after}</a></li>`;
+  const row = (href, icon, name, attr, after = '') => `<li><a href="${esc(href)}" class="spovr" ${/*html-ok*/ attr}>${/*html-ok*/ icon}<span>${esc(name)}</span>${/*html-ok*/ after}</a></li>`;
   const trash = rows.find(r => r[0] === 'trash');
-  return `<div class="zleov" data-zlemod="${esc(mod)}"><section class="spov zlerows" aria-label="${esc(tr('All workspaces'))}"><ul class="spovl">${row('#' + mod + '/recent', ic('clock', 's'), tr('Recently edited'), 'data-zlego="1"')}${rows.filter(r => r[0] !== 'trash').map(([sp, name, icon, after]) => row(spo_href(to, sp), icon, name, `data-spov="${esc(sp)}"`, after || '')).join('')}</ul></section>${trash ? `<p class="zletrash"><a href="${esc(spo_href(to, 'trash'))}" class="linkbtn" data-spov="trash">${trash[2]}<span>${esc(trash[1])}</span></a></p>` : ''}</div>`;
+  return `<div class="zleov" data-zlemod="${esc(mod)}"><section class="spov zlerows" aria-label="${esc(tr('All workspaces'))}"><ul class="spovl">${/*html-ok*/ row('#' + mod + '/recent', ic('clock', 's'), tr('Recently edited'), 'data-zlego="1"')}${/*html-ok*/ rows.filter(r => r[0] !== 'trash').map(([sp, name, icon, after]) => row(spo_href(to, sp), icon, name, `data-spov="${esc(sp)}"`, after || '')).join('')}</ul></section>${trash ? `<p class="zletrash"><a href="${esc(spo_href(to, 'trash'))}" class="linkbtn" data-spov="trash">${/*html-ok*/ trash[2]}<span>${esc(trash[1])}</span></a></p>` : ''}</div>`;
 }
 // the page "Recently edited" of an area (#<mod>/recent): the way back, "Pinned", the filter chips, the list. rows as above
 // (the filter offers the workspaces of the overview; 'shared' is filtered here from "All", the server knows no such space)
@@ -83,10 +83,10 @@ function zle_pageHtml(mod, rows) {
   const f = keys.includes(ZLE.f[mod]) ? ZLE.f[mod] : 'all';
   const d0 = zle_data(f === 'shared' ? 'all' : f, f === 'shared' ? 50 : ZLE_N);
   const d = f === 'shared' && d0?.items ? {...d0, items: d0.items.filter(x => x.space === 'shared')} : d0;
-  const chip = (k, name) => `<button type="button" class="zlefc${k === f ? ' on' : ''}" data-zlef="${esc(k)}" data-zlemod="${esc(mod)}" aria-pressed="${k === f}">${esc(name)}</button>`;
-  const chips = sps.length > 1 ? `<div class="zlefs" role="group" aria-label="${esc(tr('Workspaces'))}">${chip('all', tr('All'))}${sps.map(r => chip(r[0], r[1])).join('')}</div>` : '';
+  const chip = (k, name) => `<button type="button" class="zlefc${k === f ? ' on' : ''}" data-zlef="${esc(k)}" data-zlemod="${esc(mod)}" aria-pressed="${/*html-ok*/ k === f}">${esc(name)}</button>`;
+  const chips = sps.length > 1 ? `<div class="zlefs" role="group" aria-label="${esc(tr('Workspaces'))}">${/*html-ok*/ chip('all', tr('All'))}${/*html-ok*/ sps.map(r => chip(r[0], r[1])).join('')}</div>` : '';
   const empty = f === 'all' ? zle_emptyHtml(mod) : `<p class="muted zleempty">${esc(tr('Nothing edited here yet.'))}</p>`;
-  return `<div class="zleov zlepage" data-zlemod="${esc(mod)}"><div class="zlehead"><a href="#${esc(mod)}" class="iconbtn" aria-label="${esc(tr('Back'))}" data-navup>${ic('back')}</a><h2>${esc(tr('Recently edited'))}</h2></div>${zle_pinHtml(mod)}${chips}<section class="zlesec" aria-label="${esc(tr('Recently edited'))}">${zle_listHtml(d, ZLE_N, false, empty, {page: true})}</section></div>`;
+  return `<div class="zleov zlepage" data-zlemod="${esc(mod)}"><div class="zlehead"><a href="#${esc(mod)}" class="iconbtn" aria-label="${esc(tr('Back'))}" data-navup>${ic('back')}</a><h2>${esc(tr('Recently edited'))}</h2></div>${zle_pinHtml(mod)}${chips}<section class="zlesec" aria-label="${esc(tr('Recently edited'))}">${/*html-ok*/ zle_listHtml(d, ZLE_N, false, empty, {page: true})}</section></div>`;
 }
 // the start page's block (dashboard.js dashCard): card / slim as there
 function zle_homeHtml(card, slim) {

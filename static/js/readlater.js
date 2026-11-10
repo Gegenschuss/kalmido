@@ -41,7 +41,7 @@ const rdl_item = id => RDL.items.find(x => x.id === id);
 
 // ---- the view
 function viewReading() {
-  if (S.route.zle) return `<div class="bmview rlview">${spo_recentPage('reading', rd_rows())}</div>`;  // 2.880.0 (#5561): #reading/recent
+  if (S.route.zle) return `<div class="bmview rlview">${/*html-ok*/ spo_recentPage('reading', rd_rows())}</div>`;  // 2.880.0 (#5561): #reading/recent
   if (rd_ovr()) return `<div class="bmview rlview">${rd_recentHtml('reading')}</div>`;  // 2.540.0 (#4588): "All workspaces": the spaces first; 2.769.0 (#5352): "Recently edited"
   if (!RDL.loading && (!RDL.done || Date.now() - RDL.at > 60000 || RDL.sp !== rdl_sp())) setTimeout(rdl_reload, 0);
   const add = `<form class="bmadd" data-rl-form><label class="sr" for="rl-url">${tr('Link')}</label><input id="rl-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('Paste a link to read later'))}" maxlength="2000"><button type="submit" class="btn pri" ${RDL.busy ? 'disabled' : ''}>${ic('plus', 's')}<span>${tr('Add')}</span></button></form>`;
