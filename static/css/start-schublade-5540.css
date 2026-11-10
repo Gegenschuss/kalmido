@@ -1,0 +1,12 @@
+/* 2.867.0 (#5540): the phone's drawer, calm and even (start styles, see start-base.css; sent behind app.css, so these rules
+   come after the drawer's rules there: #side .sbmr in app.css, areas.js sbm_rowHtml / sbb_fit / sbb_btnHtml). */
+/* 2.867.0 (#5540): the drawer is calm. The icons' own dot (the icon set's accent dot) takes the tile's colour: at Projects /
+   Calendar / Time / Files it read as "something new". Only a real mark is a coloured dot (a count as .srdot, areas.js sbb_btnHtml;
+   the numbers stand in the rows). The computer's bar keeps the accent dots */
+#side .sbmr .srb svg.i .d{fill:currentColor}
+#side .sbmr .srb .srbd.srdot{width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--sbbg,var(--bg2));top:.25rem;right:calc(50% - .875rem)}
+/* one count per thing: the header's agent pill leaves its number out while the drawer is open (its rows carry the numbers) */
+@media (max-width:767px){ body:has(#side.open) #top .achip .acn{visibility:hidden} }
+/* the agents' rows: the status colour only (no ring in the agent's own colour beside it); a tap on the dot explains it */
+#side:has(.sbmr) .steam .sdot[data-acol] .hdot{box-shadow:none}
+#side:has(.sbmr) .steam .sdot[data-acol] .hdot.hs-working{box-shadow:0 0 0 .1875rem color-mix(in srgb,var(--st-work) 22%,transparent)}

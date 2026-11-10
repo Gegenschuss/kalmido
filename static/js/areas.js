@@ -497,11 +497,13 @@ document.addEventListener('change', e => {
     on => { if (on) LS.del('railLabels'); else LS.set('railLabels', false); const c = document.getElementById('s-rail-lbl'); if (c) c.checked = on; applyLook(); render(); }, e.target.checked);
 }, true);
 // one area's icon (the computer's bar and the phone's row, 2.196.0 A #2737)
-function sbb_btnHtml(id, cur, hid, aw) {
+// 2.867.0 (#5540): m = the phone's drawer: a count is a plain dot there (the numbers stand in the rows below it - one count per
+// thing; the agents had three: the header pill, the tile, their rows), named for screen readers and on a long look
+function sbb_btnHtml(id, cur, hid, aw, m = false) {
   const d = sbb_def(id), on = id === cur;
   if (!sbb_shown(id) || (!on && id !== 'tasks' && (a => a ? mg_sideHidden(id, hid) : hid('e:' + id))(mg_area(id)))) return '';  // Settings > Appearance > Sidebar per part
   const req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0, n = id === 'agents' ? aw : id === 'team' ? S.team?.unread || 0 : req;  // 2.479.0 (#2814)
-  const dot = id === 'time' && (S.timer || S.pomo) ? '<span class="srbd recdot"></span>' : n ? `<span class="srbd nunread">${n}</span>` : id === 'wiki' && typeof wki_dotHtml === 'function' ? wki_dotHtml() : '';  // 2.350.0 C (#2744): a running import
+  const dot = id === 'time' && (S.timer || S.pomo) ? '<span class="srbd recdot"></span>' : n && m ? `<span class="srbd srdot" role="img" aria-label="${esc(trn('{0} new', '{0} new', n))}" title="${esc(trn('{0} new', '{0} new', n))}"></span>` : n ? `<span class="srbd nunread">${n}</span>` : id === 'wiki' && typeof wki_dotHtml === 'function' ? wki_dotHtml() : '';  // 2.350.0 C (#2744): a running import
   return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(on ? sbb_home(id) : sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}${sbb_on() && !S.me?.kid && !rowd_touch() ? ' draggable="true"' : '' /* 2.575.0 D (#4051); 2.627.0 (#4962): a finger by drag.js */}${sbb_nameAttr(tr(d[2]))}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
 }
 const sbb_aw = () => (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread + (x.approvals_open || 0), 0);
@@ -667,6 +669,10 @@ function sbb_fit() {
       n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent;
     }
   }
+  // 2.867.0 (#5540): the drawer writes every name in ONE size - the smallest any of its names needed ("Gewohnheiten" smaller than
+  // the rest looked uneven); the bar of a computer keeps its own size per name
+  const mn = row ? $$('.srbn', row) : [], one = mn.length ? Math.min(...mn.map(n => parseFloat(n.style.fontSize) || Infinity)) : Infinity;
+  if (one < Infinity) for (const n of mn) n.style.fontSize = `${one}px`;
   if (far) {
     // 2.660.0 (#5103): a column needs its widest name's text plus the tile's padding and border - no longer the box a fitting
     // name fills (its scrollWidth) plus 4 px: that widened every column that already fitted, 11 areas scrolled 5 px at 320 px
@@ -674,7 +680,8 @@ function sbb_fit() {
     const pad = t.offsetWidth - t.clientWidth + parseFloat(ts.paddingLeft) + parseFloat(ts.paddingRight);
     const text = n => { if (n.scrollWidth > n.clientWidth + .5) return wide(n); const rg = document.createRange(); rg.selectNodeContents(n); return rg.getBoundingClientRect?.().width || n.scrollWidth; };
     $$('.srbn', row).forEach((n, i) => { w[i % c] = Math.max(w[i % c] || 0, Math.ceil(text(n) + pad)); });
-    row.style.gridTemplateColumns = w.map(x => `minmax(${x}px,1fr)`).join(' '); row.style.overflow = 'auto hidden';
+    // 2.867.0 (#5540): equal columns here too (the widest name's width for every column; the row scrolls)
+    row.style.gridTemplateColumns = `repeat(${c},minmax(${Math.max(...w)}px,1fr))`; row.style.overflow = 'auto hidden';
     row.closest('#side').scrollTop = y;  // measuring moved the row's height: the drawer stays where it was
   }
   sbb_fitWatch();
@@ -706,8 +713,11 @@ document.fonts?.addEventListener('loadingdone', sbb_fit);
 // one history entry, the next ones replace it, so one Back closes the drawer (route() closes it on that entry)
 const SBM = {keep: false, focus: ''};
 // the row is one tab stop of its own (a scrolling region reachable by keyboard; its icons rove with the sidebar)
-// 2.442.0 (#3739): --sbmc = columns: never more than two rows (with up to 5 areas one row of the usual width)
-const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(), bs = sbb_ids().map(id => sbb_btnHtml(id, cur, hid, aw)).filter(Boolean);  /* 2.575.0 D (#4051): the person's order */ return `<div class="sbmr" style="--sbmc:${Math.max(Math.ceil(bs.length / 2), Math.min(bs.length, 5))}" role="group" tabindex="0" aria-label="${esc(tr('Areas|nav'))}">${bs.join('')}</div>`; };
+// 2.442.0 (#3739): --sbmc = columns (2.867.0 #5540: sbm_cols, a fixed grid of 4 instead of at most two rows)
+// 2.867.0 (#5540): a fixed grid of equal columns: up to 5 areas one row, more = 4 per row (was up to 7 x 2, the columns as wide
+// as their names: Office airy, Projects / Calendar / Notes tight)
+const sbm_cols = n => n <= 5 ? n : 4;
+const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(), bs = sbb_ids().map(id => sbb_btnHtml(id, cur, hid, aw, true)).filter(Boolean);  /* 2.575.0 D (#4051): the person's order */ return `<div class="sbmr" style="--sbmc:${/*html-ok*/ sbm_cols(bs.length)}" role="group" tabindex="0" aria-label="${esc(tr('Areas|nav'))}">${bs.join('')}</div>`; };
 // route() asks once whether this route came from the row (the drawer stays open)
 const sbm_hold = () => { const k = SBM.keep; SBM.keep = false; return k && !!$('#side.open'); };
 function sbm_go(b) {
@@ -723,6 +733,15 @@ function sbm_go(b) {
 document.addEventListener('click', e => {
   const b = e.target.closest?.('#side .sbmr .srb[data-sbb]'); if (!b) return;
   e.preventDefault(); e.stopPropagation(); sbm_go(b);
+}, true);
+// 2.867.0 (#5540): the phone's drawer: a tap on an agent's status dot explains it (name, state, what the colours mean) instead of
+// opening the chat; the rest of the row opens it as before. The computer keeps the dot's title on hover
+document.addEventListener('click', e => {
+  const s = e.target.closest?.('#side .steam .sdot'); if (!s || !sbm_on()) return;
+  const r = s.closest('.steam'), a = agentById(+(r.dataset.aid || String(r.dataset.go || '').split('/')[1]));
+  if (!a) return;
+  e.preventDefault(); e.stopPropagation();
+  toast(`${agentHstLine(a)} · ${tr('Green: ready · Blue: working · Yellow: waiting for you · Grey: off or not connected · Red: error')}`, undefined, 6000);
 }, true);
 // after renderSide: the row keeps its sideways position, the open area's icon in sight; the tapped icon keeps the focus
 function sbm_after(x) {

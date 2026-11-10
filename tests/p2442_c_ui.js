@@ -1,6 +1,6 @@
 // kalmido-suite: fresh
 // 2.442.0 UI tests (own container, start.sh, Firefox, invented names only):
-// - #3739 the phone's drawer: at most two rows of area icons with every area on (also 360 px, also without labels, light and
+// - #3739 the phone's drawer: a grid of 4 columns (2.867.0 #5540, was at most two rows) of area icons with every area on (also 360 px, also without labels, light and
 //   dark), no name cut, nothing sideways; the search stays on top while Today, Inbox and the areas scroll away, Settings and
 //   the account stay at the bottom, the scroll height survives a redraw and a change of area
 // - #2810 a low window (640 x 400): the view switch folds, the head and the tab bar are thinner, the comment box of a task is in
@@ -41,21 +41,21 @@ const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'ut
       await size(w, 740); await drawer(); await sleep(350);
       await ev(`(() => { const n = document.querySelector('#side .sbmr .srb[data-sbb="life"] .srbn, #side .sbmr .srb .srbn'); n.dataset.p2442o ??= n.textContent; n.textContent = 'Reisen & Kontakte'; sbb_fit(); return 1; })()`);  // 2.458.0 (#3880): the app fits a name after each draw; the swapped name too (with Notes, #3405, 11 areas = 6 columns at 320 px)
       const g = await ev(GRID);
-      check(g.n >= 8 && g.rows <= 2 && g.inside && g.side && g.minH >= 43 && !g.cut.length, `#3739 ${w}: two rows at most, nothing cut ` + JSON.stringify(g));
+      check(g.n >= 8 && g.rows === Math.ceil(g.n / 4) && g.inside && g.side && g.minH >= 43 && !g.cut.length, `#3739 ${w}: the grid of 4 columns, nothing cut ` + JSON.stringify(g));  // 2.867.0 (#5540): 4 per row (was at most two rows)
     }
     // 2.651.0 (#5032): the swapped name back - since #4509 renderSide keeps the nodes when its HTML is the same, so a redraw no longer
     // undid the swap: the two-line name made the row 4 px higher and Today ended 1 px under the top of the search after 400 px
     await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn[data-p2442o]'); if (n) { n.textContent = n.dataset.p2442o; delete n.dataset.p2442o; sbb_fit(); } return 1; })()`);
     // 11 areas (the drawer of the report): two copies, the columns sbm_rowHtml sets for 11
     await size(360, 740); await drawer();
-    await ev(`(() => { const r = document.querySelector('#side .sbmr'), bs = r.querySelectorAll('.srb[data-sbb]'); while (r.querySelectorAll('.srb[data-sbb]').length < 11) r.append(bs[2].cloneNode(true)); r.style.setProperty('--sbmc', 6); sbb_fit(); return 1; })()`);
+    await ev(`(() => { const r = document.querySelector('#side .sbmr'), bs = r.querySelectorAll('.srb[data-sbb]'); while (r.querySelectorAll('.srb[data-sbb]').length < 11) r.append(bs[2].cloneNode(true)); r.style.setProperty('--sbmc', sbm_cols(11)); sbb_fit(); return 1; })()`);  // 2.867.0 (#5540): 4 columns (was 6)
     const g11 = await ev(GRID);
-    check(g11.n === 11 && g11.rows === 2 && g11.inside && !g11.cut.length, '#3739 11 areas: two rows ' + JSON.stringify(g11));
-    check(await ev(`document.querySelector('#side .sbmr').style.getPropertyValue('--sbmc') === '6' && Math.max(Math.ceil(11 / 2), Math.min(11, 5)) === 6 && sbm_rowHtml(() => false).includes('--sbmc:')`), '#3739: the row sets its columns');
+    check(g11.n === 11 && g11.rows === 3 && g11.inside && !g11.cut.length, '#5540 11 areas: three rows of 4 ' + JSON.stringify(g11));  // 2.867.0 (#5540): was two rows
+    check(await ev(`document.querySelector('#side .sbmr').style.getPropertyValue('--sbmc') === '4' && sbm_cols(11) === 4 && sbm_cols(5) === 5 && sbm_cols(3) === 3 &&  /* 2.867.0 (#5540) */ sbm_rowHtml(() => false).includes('--sbmc:')`), '#3739: the row sets its columns');
     await drawer(); await shot('p2442-drawer.png');
     await ev(`(() => { document.documentElement.classList.add('rail-nolabel'); renderSide(); return 1; })()`);
     const g2 = await ev(GRID);
-    check(g2.rows <= 2 && g2.inside && g2.side, '#3739: without labels too ' + JSON.stringify(g2));
+    check(g2.rows === Math.ceil(g2.n / 4) && g2.inside && g2.side, '#3739: without labels too '  /* 2.867.0 (#5540): the grid of 4 */ + JSON.stringify(g2));
     await ev(`(() => { document.documentElement.classList.remove('rail-nolabel'); renderSide(); return 1; })()`);
     // scrolling
     const POS = `(() => { const s = document.querySelector('#side'), R = e => e && e.getBoundingClientRect(), q = x => document.querySelector(x), sr = R(s), se = q('#side .sbmsrch .scmd'), t = q('#side .sg-focus .srow[data-go="today"]'), row = q('#side .sbmr'), d = q('#side .sbdock'), at = se && document.elementFromPoint(R(se).left + 40, R(se).top + R(se).height / 2);
