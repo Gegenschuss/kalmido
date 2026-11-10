@@ -1,8 +1,9 @@
 // 2.742.0 A UI test (#4858 split view on a wide screen), own container (start.sh, isolated test database), Firefox with a mouse.
 // kalmido-suite: fresh
 // Invented data only. alice has no organisation (freelancer-matrix: Geteilte Ansicht).
-// - the switch in Settings > Appearance only from about 160 rem window width (not at 1600 px); off = no iframe, splitview.js not loaded
-// - on: the right half is an iframe /?mini=1&split=1 (mini mode, any route), the left app measures only its half (innerWidth);
+// - the switch in Settings > Appearance only from about 90 rem window width (not at 1200 px); off = no iframe, splitview.js not loaded
+// - on: the right half is an iframe /?split=1 (the normal app, any route), the left app measures only its half (innerWidth);
+// 2.891.0 (#5358): from 90 rem (was 160) and the normal app on the right (was /?mini=1&split=1, the mini mode); the use itself: p2891_a_splitview_abnahme_ui.js
 //   only that address may be framed, by the app itself (frame-ancestors 'self' / SAMEORIGIN), "/" stays DENY
 // - "Open on the right" in the menu of a project and of a task shows its route in the right half; off it is not in the menu
 // - the right copy does not overwrite the main window's UI state (lastKey); the right route is remembered (splR)
@@ -29,9 +30,9 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 
   // the server: only the split view's address may be framed, and only by the app itself
   const hs = async u => { const r = await fetch(B + u, {headers: {Cookie: CA}}); return {csp: r.headers.get('content-security-policy') || '', xfo: r.headers.get('x-frame-options') || ''}; };
-  const h0 = await hs(''), h1 = await hs('?mini=1&split=1'), h2 = await hs('?mini=1');
+  const h0 = await hs(''), h1 = await hs('?split=1'), h2 = await hs('?mini=1');  // 2.891.0 (#5358): ?split=1 without mini=1
   check(/frame-ancestors 'none'/.test(h0.csp) && h0.xfo === 'DENY', '"/" stays DENY ' + JSON.stringify(h0));
-  check(/frame-ancestors 'self'/.test(h1.csp) && !/frame-ancestors 'none'/.test(h1.csp) && h1.xfo === 'SAMEORIGIN', '/?mini=1&split=1 may be framed by the app itself ' + JSON.stringify(h1));
+  check(/frame-ancestors 'self'/.test(h1.csp) && !/frame-ancestors 'none'/.test(h1.csp) && h1.xfo === 'SAMEORIGIN', '/?split=1 may be framed by the app itself ' + JSON.stringify(h1));
   check(/frame-ancestors 'none'/.test(h2.csp) && h2.xfo === 'DENY', 'an own window without split stays DENY ' + JSON.stringify(h2));
 
   await firefox(async ({cmd, ev, ctx, nav, until, drag, shot}) => {
@@ -48,11 +49,11 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     const frHash = `(() => { try { return ${FR}.contentWindow.location.hash; } catch { return null; } })()`;
     const frDoc = `(() => { try { return ${FR}.contentDocument; } catch { return null; } })()`;
 
-    // ---- a window of 1600 px: no switch
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1600, height: 1000}});
+    // ---- a window of 1200 px: no switch (2.891.0 (#5358): offered from 90 rem = 1440 px, was 160 rem; 1600 px has it now)
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1200, height: 1000}});
     await load('#today'); await booted();
-    check(await openLook(), '1600 px: Settings > Appearance opens');
-    check(await ev(`!document.querySelector('#s-split') && spl_offer() === false`), '1600 px: no switch for the split view');
+    check(await openLook(), '1200 px: Settings > Appearance opens');
+    check(await ev(`!document.querySelector('#s-split') && spl_offer() === false`), '1200 px: no switch for the split view');
 
     // ---- 2800 px: the switch, off = nothing loaded
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 2800, height: 1100}});
@@ -62,8 +63,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     await openLook();
     check(await until(`!!document.querySelector('#s-split') && !document.querySelector('#s-split').checked`), '2800 px: the switch is offered, off');
     await ev(`document.querySelector('#s-split').click()`);
-    const up = await until(`(() => { const f = ${FR}, d = ${frDoc}; return f && d && d.documentElement.classList.contains('mini') && d.querySelector('#view') ? {src: f.getAttribute('src'), hash: ${frHash}} : null; })()`, {timeout: 30000});
-    check(up && /^\/\?mini=1&split=1#/.test(up.src), 'on: the right half is an iframe /?mini=1&split=1 in mini mode ' + JSON.stringify(up));
+    const up = await until(`(() => { const f = ${FR}, d = ${frDoc}; return f && d && !d.documentElement.classList.contains('mini') && d.querySelector('#view') ? {src: f.getAttribute('src'), hash: ${frHash}} : null; })()`, {timeout: 30000});
+    check(up && /^\/\?split=1#/.test(up.src), 'on: the right half is an iframe /?split=1, the normal app (no mini mode) ' + JSON.stringify(up));  // 2.891.0 (#5358): was /?mini=1&split=1 in mini mode
     const lay = await ev(`(() => { const p = document.querySelector('#splitpane').getBoundingClientRect(), vw = document.documentElement.clientWidth;
       return {vw, iw: innerWidth, pane: Math.round(p.width), left: Math.round(p.left), body: Math.round(document.body.getBoundingClientRect().width), split: document.documentElement.classList.contains('split-on')}; })()`);
     check(lay.split && Math.abs(lay.pane - lay.vw / 2) <= 2 && Math.abs(lay.body + lay.pane - lay.vw) <= 2, 'on: half and half, the left app in the left half ' + JSON.stringify(lay));

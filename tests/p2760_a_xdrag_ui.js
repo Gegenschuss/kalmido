@@ -67,9 +67,9 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     // the right half shows route, ready when sel is there
     const right = async (route, sel, pre = route.replace(/\/.*/, '')) => {
       // a right half that is still starting first comes up whole (spl_show swaps the hash of the running copy)
-      await until(`(() => { const f = ${FR}; if (!f) return true; const d = ${RD}; return !!(d && d.documentElement.classList.contains('mini') && d.querySelector('#view')); })()`, {timeout: 30000});
+      await until(`(() => { const f = ${FR}; if (!f) return true; const d = ${RD}; return !!(d && d.defaultView.eval('typeof S !== "undefined" && S.booted') && d.querySelector('#view')); })()`, {timeout: 30000});  // 2.891.0 (#5358): the right half is the normal app (no html.mini), ready = booted
       await ev(`(LS.set('split', true), spl_open(${JSON.stringify(route)}).then(() => 1))`);
-      return until(`(() => { const d = ${RD}; return !!(d && d.documentElement.classList.contains('mini') && d.defaultView.location.hash.startsWith(${JSON.stringify(pre)}) && d.querySelector(${JSON.stringify(sel)})); })()`, {timeout: 30000});
+      return until(`(() => { const d = ${RD}; return !!(d && /[?&]split=1/.test(d.defaultView.location.search) && d.defaultView.location.hash.startsWith(${JSON.stringify(pre)}) && d.querySelector(${JSON.stringify(sel)})); })()`, {timeout: 30000});
     };
     // one drag from document "from" (L / R) to document "to": dragstart on src, dragover + drop on dst, dragend on src.
     // pay: no dragstart, the DataTransfer carries this payload (a drag from somewhere else)
@@ -104,7 +104,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     await undoIn('R');
     check(await poll(async () => (await task(T1)).list_id === L1), '2: undo puts it back');
     check(await ev(`!document.body.classList.contains('tdrag') && dragId === null`), 'the left half\'s own drag ended (dragend)');
-    // a task of the right half onto a project in the LEFT sidebar (the right copy has no sidebar)
+    // a task of the right half onto a project in the LEFT sidebar (2.891.0 (#5358): the right copy has its own sidebar now)
     await until(`!!document.querySelector('#side .srow[data-drop="l:${L1}"]')`);
     await drag('R', `#view .trow[data-id="${T3}"]`, 'L', `#side .srow[data-drop="l:${L1}"]`);
     check(await poll(async () => (await task(T3)).list_id === L1), '2: a task of the right half dropped on a project of the left sidebar is moved there');

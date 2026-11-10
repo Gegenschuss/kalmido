@@ -159,7 +159,7 @@ const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')
 
       // ---- a document, a knowledge page, the calendar (the routes their menus' "Open on the right" use)
       await ev(`spl_open('#docs/${DOC}'), 1`);
-      check(await seenFr('body', /Pier permit/), tag + 'document on the right: its name is visible ' + JSON.stringify(await inFr(`[w.location.hash, (d.querySelector('#view')?.textContent || '').replace(/\\s+/g, ' ').slice(0, 300)]`)));
+      check(await seenFr('body', /Pier permit/), tag + 'document on the right: its name is visible ' + JSON.stringify(await inFr(`[w.location.hash, w.innerWidth, w.innerHeight, ...[...d.querySelectorAll('body *')].filter(e => /Pier permit/.test(e.textContent || '') && ![...e.children].some(c => /Pier permit/.test(c.textContent || ''))).slice(0, 8).map(e => { const r = e.getBoundingClientRect(); return e.tagName + '.' + e.className + ' ' + [r.left, r.top, r.width, r.height].map(Math.round).join(',') + ' ' + (e.checkVisibility ? e.checkVisibility({visibilityProperty: true, opacityProperty: true}) : '-'); })]`)));
       await ev(`spl_open('#wiki/${PG}'), 1`);
       check(await seenFr('#view h2, #view .wktitle', /Shoot day checklist/) && await seenFr('#view', /Bring the spare batteries/), tag + 'knowledge page on the right: title and text visible ' + JSON.stringify(await frHash()));
       await ev(`spl_open('#cal'), 1`);
