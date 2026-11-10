@@ -1,0 +1,400 @@
+/* 2.828.0 B (#5446): the list rows (.trow), the check mark (.chk) and the task detail (#detail) in one file instead of in
+   about forty version blocks of app.css. A start style file (kalmido/core/strip.py with_start_css): the server sends it
+   right behind app.css, before the other start-*.css (the "00" keeps it first in their name order), so the list renders
+   without a jump and the cascade stays as it was: these rules came from app.css in this order and with their @media. */
+#detail{background:var(--bg2);border-left:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column}
+.trow{display:flex;align-items:flex-start;gap:.625rem;padding:var(--row-py) .5rem var(--row-py) .75rem;position:relative;background:var(--bg);touch-action:pan-y;border-bottom:1px solid var(--line);font-size:var(--row-fs)}
+.trow::before{content:'';position:absolute;left:0;top:.3125rem;bottom:.3125rem;width:2px;border-radius:2px;background:transparent}
+.trow.pr7::before{background:var(--p7)}
+.trow.pr5::before{background:var(--p5)}
+.trow.pr3::before{background:var(--p3)}
+.trow.pr1::before{background:var(--p1)}
+.trow.done::before{opacity:.35}
+.trow:hover{background:var(--bg2)}
+.trow.sel{background:color-mix(in srgb,var(--accent) 7%,var(--bg2))}
+body.prbg-soft .trow.pr7,body.prbg-strong .trow.pr7{--prbgc:var(--p7)}
+body.prbg-soft .trow.pr5,body.prbg-strong .trow.pr5{--prbgc:var(--p5)}
+body.prbg-soft .trow.pr3,body.prbg-strong .trow.pr3{--prbgc:var(--p3)}
+body.prbg-soft .trow.pr1,body.prbg-strong .trow.pr1{--prbgc:var(--p1)}
+body:is(.prbg-soft,.prbg-strong) .trow:is(.pr7,.pr5,.pr3,.pr1):not(.sel):not(.msel):not(.done){background:color-mix(in srgb,var(--prbgc) var(--prbgk),var(--bg))}
+body:is(.prbg-soft,.prbg-strong) .trow:is(.pr7,.pr5,.pr3,.pr1):not(.sel):not(.msel):not(.done):hover{background:color-mix(in srgb,var(--prbgc) calc(var(--prbgk) + 5%),var(--bg))}
+.trow.kfocus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 55%,transparent)}
+.trow.done .ttl{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+.trow.sub{margin-left:1.75rem}
+.trow.dropbefore{box-shadow:inset 0 2px 0 var(--accent)}
+.trow.dragging{opacity:.4}
+.trow .caret{position:absolute;left:-1.125rem;top:calc(var(--row-py) + 1px);color:var(--muted);padding:2px}
+.trow .caret svg{transition:transform .15s}
+.trow .caret.closed svg{transform:rotate(-90deg)}
+/* square thin-stroke checkbox, 2px radius; the priority lives in the bar on the row edge */
+.chk{width:1rem;height:1rem;border-radius:2px;border:1.5px solid var(--faint);flex:none;margin-top:calc((var(--row-fs) * 1.45 - 1rem) / 2);display:grid;place-items:center;color:transparent;position:relative;transition:border-color .12s,background .12s}
+.chk::after{content:'';position:absolute;inset:-.625rem}
+.chk:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);color:color-mix(in srgb,var(--accent) 70%,transparent)}
+.chk:hover:not(.on):not(.wont)::before{content:'';position:absolute;width:.3125rem;height:.5625rem;border:solid var(--accent);border-width:0 1.5px 1.5px 0;transform:translate(0,-1px) rotate(45deg);opacity:.6}
+.chk.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chk.wont{border-style:dashed;color:var(--muted)}
+.chk svg{width:var(--ic-s);height:var(--ic-s);stroke-width:2.6}
+.chk[disabled]:hover{border-color:var(--faint);background:none}
+@media (min-width:768px){
+  .trow.hascols{align-items:center}
+  .trow.hascols .chk{margin-top:0}
+  .trow.hascols .tmain{flex-direction:row;align-items:baseline;gap:.625rem;min-width:0}
+  .trow.hascols .ttl{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .trow.hascols .meta{flex-wrap:nowrap;overflow:hidden;margin-top:0;min-width:0;flex:1 1 0}
+  .trow.hascols .meta .m-col{display:none}
+}
+.dtop .chk{margin:0 .375rem 0 .25rem}
+.subs .trow{padding:.3125rem .25rem .3125rem .625rem;font-size:var(--fs-b);background:transparent}
+.subs .trow:last-child{border-bottom:0}
+.kcards .trow{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);padding:.5rem .5rem .5rem .75rem}
+.kcards .trow:hover{background:var(--bg3)}
+.quad .trow{background:transparent}
+.quad .trow:hover{background:var(--bg3)}
+@media (max-width:767px){
+  #detail{position:fixed;inset:0;z-index:45;border:0;transform:translateX(100%);transition:transform .22s ease;padding-top:var(--safe-t)}
+  #detail:not(.hidden){display:flex!important}
+  #detail.open{transform:none}
+  .trow{padding-left:.75rem;padding-right:.25rem}
+  .trow.sub{margin-left:1.5rem}
+  .trow .caret{left:-1rem}
+}
+@media (hover:none){.trow:hover{background:var(--bg)}.kcards .trow:hover{background:var(--bg)}}
+/* ================= v2: pin, depth, markdown, multi-select, filters, week, timeline ================= */
+.trow{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.trow .ttl{-webkit-user-select:text;user-select:text}
+.trow.d2{margin-left:3.5rem}
+/* 2.156.0 A (#1949): five levels of tasks; on a phone each level indents less so level 5 stays readable */
+.trow.d3{margin-left:5.25rem}
+.trow.d4{margin-left:7rem}
+@media (max-width:767px){.trow.sub.d3{margin-left:5rem}.trow.sub.d4{margin-left:6.75rem}}
+@media (max-width:599px){.trow.sub.d1{margin-left:1.125rem}.trow.sub.d2{margin-left:2.25rem}.trow.sub.d3{margin-left:3.375rem}.trow.sub.d4{margin-left:4.5rem}}
+.trow.msel{background:color-mix(in srgb,var(--accent) 12%,var(--bg))}
+.trow.msel .chk{border-color:var(--accent)}
+.trow .ttl a[href]{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+@media (max-width:767px){
+  .trow.d2{margin-left:3.25rem}
+}
+#detail .subs .trow[draggable="true"]{cursor:grab}
+/* ---------- drop after ---------- */
+.trow.dropafter{box-shadow:inset 0 -2px 0 var(--accent)}
+@media (min-width:768px){.trow.hascols .wcell{display:none}}
+.trow.ro .chk{opacity:.45;cursor:default}
+.ovt .chk{width:.875rem;height:.875rem;border-radius:2px;border-width:1.5px;margin:0}
+.lookpv .trow{padding-left:.625rem;background:transparent}
+.lookpv .trow:hover{background:transparent}
+.trow.ck .meta:empty{display:none}
+.trow .ckback{color:var(--muted);flex:none}
+.trow .ckback:hover{color:var(--accent)}
+@media (pointer:coarse){
+  .chk::after{inset:-.875rem}
+}
+/* 1.7.0: Flow "next" marker, cycle hint, overdue banner on Today */
+.trow.flownext{box-shadow:inset 2px 0 0 var(--accent)}
+body.fab-on #detail .dbot .dcomp:not(.dctop){padding-right:var(--fab-safe)}
+/* 2.31.0 (#344): desktop: the properties on top, the comments in their own area below, a draggable line between them */
+#detail.dsplit{overflow:hidden;overflow:clip}
+#detail.dsplit .dbody{flex:var(--dsT,60) 1 0;min-height:0;overflow-y:auto;padding-bottom:1.25rem}
+#detail.dsplit .dbody>*{flex-shrink:0}
+#detail.dsplit .dcpane{flex:var(--dsC,40) 1 0;min-height:0;overflow-y:auto;padding:0 1.25rem .75rem;overscroll-behavior:contain}
+#detail.dsplit .dcpane #d-tl{border-top:0;padding-top:0}
+#detail.dsplit .dcpane .cmhead{position:sticky;top:0;z-index:1;background:var(--bg2);margin:0;padding:.375rem 0}
+#detail.dsfold .dsfoldb svg{transform:rotate(180deg)}
+#detail.dsplit.dsfold .dbody{flex:1 1 0}
+#detail.dsplit.dsfold .dcpane{flex:0 0 auto;overflow:hidden;padding-bottom:0}
+#detail.dsfold .dcpane #d-tl>:not(.cmhead){display:none}
+/* inline title edit + keyboard focus ring */
+.trow .ttlin{width:100%;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--accent);border-radius:var(--r-s);padding:.0625rem .375rem;margin:0;box-sizing:border-box}
+.trow.iedit .ttl{flex:1 1 auto;overflow:visible;white-space:normal}
+.trow.kfocus{outline:2px solid color-mix(in srgb,var(--accent) 70%,transparent);outline-offset:-2px;border-radius:var(--r-s)}
+#detail{scroll-padding-bottom:9rem}
+#detail:has(.dbot :focus){scroll-padding-bottom:0}
+#detail .dbot:has(.dcomp :focus) .dthumb{display:none}
+#detail{overflow-x:hidden}
+.trow:hover .whob.wnone,.trow.sel .whob.wnone{opacity:1}
+.trow .meta .mlc .whob.wnone{opacity:.5}
+.trow .meta .mlc .whob.wnone:hover{opacity:1}
+.trow.hascols .whob.wnone{opacity:.5}
+.trow.hascols .whob.wnone:hover,.trow.hascols .whob.wnone:focus-visible{opacity:1}
+@media (hover:none),(pointer:coarse){ .trow.hascols .whob.wnone{display:inline-grid} }
+@media (pointer:coarse){
+  .chk::after{inset:-1rem}
+}
+@media (min-width:768px){
+  @container lrows (max-width:48rem){
+    .trow.hascols{align-items:flex-start}
+    .trow.hascols .chk{margin-top:calc((var(--row-fs) * 1.45 - 1rem) / 2)}
+    .trow.hascols .tmain{flex-direction:column;align-items:stretch;gap:0}
+    .trow.hascols .ttl{white-space:normal;overflow:visible}
+    .trow.hascols .meta{flex-wrap:wrap;overflow:visible;margin-top:1px;flex:none}
+    .trow.hascols .meta .m-col{display:inline-flex}
+    .trow.hascols .tcols{display:none}
+    .trow.hascols .wcell{display:flex}
+  }
+}
+.povm .chk{margin:0;border-radius:50%}
+.povm .chk.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+@media (pointer:coarse){
+  .povm .chk{width:1.375rem;height:1.375rem;position:relative}
+  .povm .chk::after{content:"";position:absolute;inset:-.6875rem}
+}
+.chk{--dot:currentColor}
+/* task rows: status glyph + ticket gutter; the selected row gets an accent bar on the left */
+.trow{min-height:var(--row-h);gap:.625rem}
+.trow::before,.trow.pr7::before,.trow.pr5::before,.trow.pr3::before,.trow.pr1::before{background:transparent;top:0;bottom:0;border-radius:0}
+.trow.sel{background:var(--accent-soft)}
+.trow.sel::before{background:var(--accent)}
+.chk{width:.875rem;height:.875rem;border-radius:50%;border:1.6px solid var(--text2);margin-top:calc((var(--row-fs) * 1.45 - .875rem) / 2)}
+.chk.p7{border-color:var(--p7);border-width:2px}
+.chk.p5{border-color:var(--p5)}
+.chk.p3{border-color:var(--p3)}
+.chk.p1{border-color:var(--p1)}
+.chk:hover{background:transparent}
+.chk:hover:not(.on):not(.wont)::before{width:.3125rem;height:.3125rem;border:0;border-radius:50%;background:currentColor;transform:none;opacity:.8;color:var(--accent);inset:0;margin:auto}  /* 2.41.0 (#1477): centred by the box, not by grid rounding */
+.chk.on{background:var(--faint);border-color:var(--faint);color:var(--bg)}
+.chk.on svg{width:var(--ic-xs);height:var(--ic-xs);stroke-width:3}
+.chk.wont{border-style:dashed;border-color:var(--faint)}
+.chk.work{border-color:var(--st-work);border-left-color:transparent;transform:rotate(45deg)}
+.chk.work::before{content:'';position:absolute;width:.3125rem;height:.3125rem;border-radius:50%;background:var(--st-work);inset:0;margin:auto}
+.trow.sel .tgut{color:var(--accent)}
+.trow.done .tgut{opacity:.6}
+@media (min-width:768px){ .trow.hascols .tgut{margin-top:0} .trow.hascols{padding-top:0;padding-bottom:0} }
+@media (max-width:767px){
+  .trow .tgut{display:none}
+  .trow.sel .meta .mid{color:var(--accent)}
+}
+/* 2.31.0 (#1051): the row's pin: on the row only when pinned; a mouse also sees it on hover (and pins with it) */
+.trow > .rpin{display:none}
+@media (min-width:768px) and (hover:hover) and (pointer:fine){
+  .lwrap .trow > .rpin{display:inline-flex;flex:none;align-self:center;margin:-.25rem 0;opacity:0;color:var(--muted);transition:opacity .12s}
+  .lwrap .trow:hover > .rpin,.lwrap .trow > .rpin:focus-visible,.lwrap .trow > .rpin.on{opacity:1}
+  .lwrap .trow > .rpin.on{color:var(--accent)}
+  .lwrap .trow:has(> .rpin) .meta .pinm{display:none}
+}
+@media (max-width:767px){
+  .trow{min-height:max(2.75rem,var(--row-h))}  /* 2.18.0 (review R8): 44 px at least, taller with "Custom" */
+}
+@media (pointer:coarse){
+  .trow{min-height:max(2.75rem,var(--row-h))}  /* 2.18.0 (review R8): task rows 44 px on every touch screen (Compact on a tablet was 40 px), so Custom starts without a jump */
+  .chk::after{inset:-1.0625rem}
+}
+#view .trow:focus-visible{outline-offset:-2px}
+@media (pointer:coarse){
+  .povm .chk{position:relative}
+  .povm .chk::after{content:"";position:absolute;inset:-.6875rem}
+}
+/* P19: done items of a "done at the bottom" list: as tall as the others, the put-back icon level with the text */
+.trow.ck.done{align-items:center}
+.trow.ck.done .meta:empty{display:none}
+.trow.ck .ckback{margin:-.5rem 0;min-width:2.75rem;min-height:2.75rem}
+@media (pointer:coarse){
+  :root.ui-small :is(#top,#tabs,#side,#detail) :is(button,.iconbtn){min-height:calc(2.75rem / var(--ui))}
+  :root.ui-small :is(#top,#detail) .iconbtn{min-width:calc(2.75rem / var(--ui))}
+}
+.chk{aspect-ratio:1}
+@media (pointer:coarse){
+  :root.ui-small .chk{min-height:0!important;min-width:0!important}
+  :root.ui-small .chk::after{inset:calc((.875rem - 2.75rem / var(--ui)) / 2)}
+}
+.kcards .trow,.quad .trow{gap:.5rem}
+.quad .trow .ttl{overflow-wrap:anywhere}
+@media (max-width:767px){
+  #detail{bottom:var(--vvb,0px)}  /* iOS keyboard: the task panel (with its comment box) ends above it */
+  /* 2.152.6 (#2709): the subtask arrow sits right of the circle, in the row's flow (away from the screen edge and the
+     Android back gesture), so the parent's circle lines up with every other task instead of with its subtasks */
+  .trow > .caret{position:relative;left:auto;top:auto;flex:none;margin:1px -.375rem 0 -.375rem}
+  .trow > .caret::before{left:0}  /* its touch area grows rightwards only, never over the circle */
+  :root .trow > .caret::after{left:0}
+  /* CI of 2.307.3: on touch a full 2.75rem target (K10), still only rightwards (was 31 px wide) */
+  @media (pointer:coarse){ :root .trow > .caret::after{content:"";position:absolute;left:0;right:auto;width:2.75rem;top:50%;bottom:auto;height:2.75rem;transform:translateY(-50%)} }
+}
+@media (pointer:coarse){
+  .trow .caret::after{content:'';position:absolute;inset:-.6875rem}
+  .trow .caret::after{inset:-.6875rem -.375rem}
+}
+@media (min-width:768px){ @container lrows (max-width:48rem){ .trow.hascols{padding-top:var(--row-py);padding-bottom:var(--row-py)} } }
+.trow .meta .mlc{display:none;align-items:center;gap:.25rem}
+.trow .meta .mlc.o10{display:inline-flex}
+@media (min-width:768px){
+@container lrows (width < 96rem){
+    .trow .meta .mlc.o7{display:inline-flex}
+}
+@container lrows (max-width:80rem){
+    .trow .meta .mlc.o5{display:inline-flex}
+}
+@container lrows (max-width:64rem){
+    .trow .meta .mlc.o3{display:inline-flex}
+}
+@container lrows (max-width:48rem){
+    .trow .meta .mlc.o2{display:inline-flex}
+}
+}
+@media (max-width:767px){
+  .trow .meta .mlc.o2{display:inline-flex}
+}
+.trow.haslc .lcols{align-self:flex-start;min-height:calc(var(--row-fs) * 1.45)}
+@media (min-width:768px){
+  .trow.hascols.haslc{align-items:flex-start;padding-top:var(--row-py);padding-bottom:var(--row-py)}
+  .trow.hascols.haslc .chk{margin-top:calc((var(--row-fs) * 1.45 - .875rem) / 2)}
+  .trow.hascols.haslc .tgut{margin-top:calc((var(--row-fs) * 1.45 - var(--fs-s) * 1.45) / 2)}
+  .trow.hascols.haslc .tmain{flex-direction:column;align-items:stretch;gap:0}
+  .trow.hascols.haslc .ttl{white-space:normal;overflow:visible}
+  .trow.hascols.haslc .meta{flex-wrap:wrap;overflow:visible;margin-top:1px;flex:none}
+  .trow.hascols.haslc .meta:empty{display:none}
+}
+@media (max-width:767px){
+  .trow.haslc .tmain{flex:1 1 0;min-width:40%}
+  .trow.haslc .lcols{flex:0 1 auto;min-width:0;max-width:48%;overflow:hidden}
+  .trow.haslc .lcols .lc{max-width:4.75rem;flex:0 1 auto;min-width:0}
+  .trow.haslc .lcols .lc-who{max-width:none;flex:none}
+  .trow.haslc .tgut{min-width:2.25rem}
+}
+@media (min-width:600px) and (max-width:767px){
+  .trow.hascols{align-items:center}
+  .trow.hascols .chk{margin-top:0}
+  .trow.hascols .tmain{flex-direction:row;align-items:baseline;gap:.5rem;min-width:10rem}
+  .trow.hascols .ttl{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .trow.hascols .meta{flex-wrap:nowrap;overflow:hidden;margin-top:0;min-width:0;flex:1 1 0}
+  .trow.hascols .meta .m-col,.trow.hascols .meta .mlc,.trow.hascols .wcell{display:none}
+  .trow.haslc .tmain{flex:1 1 0;min-width:10rem}
+  .trow.haslc .lcols{flex:none;max-width:none;gap:.5rem;font-size:var(--fs-xs);overflow:visible}
+  .trow.haslc .lcols .lc{flex:none;max-width:none}
+}
+.trow.done .prm{display:none}
+/* the row title is a focus stop (roving): the focus ring around the title, not the whole row */
+.trow .ttl[data-kt]:focus{outline:none}
+.trow .ttl[data-kt]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-s)}
+.trow:has(.ttl[data-kt]:focus-visible){background:var(--accent-soft)}
+@media (forced-colors: active){
+  .chk{border-color:CanvasText!important;forced-color-adjust:none;background:Canvas}
+  .chk.on{background:Highlight!important;border-color:Highlight!important;color:HighlightText!important}
+  .trow.sel,.trow.kfocus{outline:2px solid Highlight;outline-offset:-2px}
+  #detail{border:1px solid CanvasText}
+}
+#detail:focus{outline:none}
+@media (min-width:768px){
+@container lrows (min-width:48.0625rem){
+    .trow.haslc{overflow-y:clip}
+    .trow.haslc .lcols .lc{position:relative;overflow:visible;clip-path:inset(-100vh 0 -100vh -.5rem)}
+    .trow.haslc .lcols .lc::before{content:"";position:absolute;left:calc(-.375rem - .5px);top:-100vh;bottom:-100vh;width:1px;background:var(--line);pointer-events:none}
+}
+}
+@media (pointer:coarse){
+  .dtl .chk::after{inset:-1.0625rem}
+}
+.chk.ms{border-radius:2px;transform:rotate(45deg) scale(.88)}
+.chk.ms svg{transform:rotate(-45deg)}
+.chk.ms.work{border-left-color:var(--st-work)}
+.povm .chk.ms{border-radius:2px}
+@media (forced-colors:active){
+  .chk.ms{border-color:CanvasText!important}
+}
+.tinrow>.trow{flex:1;min-width:0}
+.trow.iedit,.trow.iedit.kfocus,.trow:has(.ttlin:focus){outline:0!important;box-shadow:none!important}
+.trow .ttlin{border:0;background:transparent;padding:0;line-height:inherit;border-radius:var(--r-s)}
+.trow .ttlin:focus,.trow .ttlin:focus-visible{outline:0;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 9%,transparent)}
+.trow .tgrip{flex:none;display:inline-flex;align-items:center;justify-content:center;width:2.75rem;min-height:2.75rem;margin:-.375rem -.5rem -.375rem 0;color:var(--muted);touch-action:none;cursor:grab}
+@media (max-width:767px){
+  #detail.multi{top:auto;max-height:min(82dvh,calc(var(--vvh,100dvh) - 3rem));border-radius:1rem 1rem 0 0;border-top:1px solid var(--line2);box-shadow:0 -.75rem 2.5rem rgba(0,0,0,.35);transform:translateY(102%);padding-top:0;padding-bottom:var(--safe-b);z-index:46}
+  #detail.multi.open{transform:none}
+  #detail.multi .dtop{border-radius:1rem 1rem 0 0}
+}
+@media (max-width:767px){
+  :root .trow .chk::after{left:auto;right:-.125rem;width:2.75rem}  /* still 44 px wide: it grows to the left instead */
+  .trow > .caret{z-index:1}  /* the subtask arrow right of the circle stays tappable above that area */
+}
+/* 2.32.0 (#1071): phones: swiping the open task sideways to the next / previous one; "3 of 12" for a moment at the top */
+#detail.dswipe{overflow-x:hidden}
+@media (max-width:767px){ #detail.vvfix{top:var(--vvt,0px);bottom:auto;height:var(--vvh,100dvh);transition:none} }
+#detail .dtop .tlkb.on{color:var(--accent)}
+#detail.tlk #d-md{cursor:text}
+@media (hover: none), (pointer: coarse){
+  .trow,.trow .ttl{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+}
+/* 2.40.0 (#1344): My tasks in the own order - the grey subtitle "List › Section" under a task (a tap opens the list) */
+.trow .mosub{display:inline-flex;align-items:center;gap:.25rem;max-width:100%;padding:0;border:0;background:none;font:inherit;font-size:var(--fs-xs);color:var(--muted);cursor:pointer;min-width:0}
+.trow .mosub > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow .mosub:hover{color:var(--text);text-decoration:underline}
+@media (pointer:coarse){ .trow .mosub{min-height:1.75rem} }
+html.mini-task #detail .dclose,html.mini-task #detail .back,html.mini-task #detail [data-mwtask]{display:none!important}
+/* 2.43.0 B (#1330, #1003): dependencies by dragging (Alt + drop, the panel's drop fields), several tasks at once */
+#view .trow.dgdep,#view .trow.dgonto,#view .trow.dgno{position:relative;box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-soft)}
+#view .trow.dgno{box-shadow:inset 0 0 0 2px var(--line2);background:none}
+#view .trow.dgdep::after,#view .trow.dgonto::after,#view .trow.dgno::after{content:attr(data-dg);position:absolute;right:.5rem;top:50%;transform:translateY(-50%);z-index:2;pointer-events:none;
+  padding:.125rem .5rem;border-radius:99rem;background:var(--accent);color:var(--accent-ink);font-size:var(--fs-s);font-weight:600;white-space:nowrap;max-width:70%;overflow:hidden;text-overflow:ellipsis}
+#view .trow.dgno::after{background:var(--bg4);color:var(--text2)}
+#view .trow .tmain .ttl.sgact{outline:none}
+.trow.iedit .ttl{display:block;line-height:var(--lh);min-height:calc(var(--row-fs) * 1.45)}
+.trow.iedit .ttlin{display:block;width:100%;min-height:0;line-height:inherit;margin:0;vertical-align:top;resize:none;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;letter-spacing:inherit;color:inherit;padding:0;border:0;border-radius:2px;background:color-mix(in srgb,var(--accent) 9%,transparent)}  /* 2.497.0 (#4056): the title as it stands: same font and wrapping, height from ttlinFit, a soft tint instead of a frame */
+@media (min-width:600px){
+  .trow.hascols.iedit:not(.haslc) .tmain{align-items:center}
+  .trow.hascols.iedit .ttl{flex:1 1 auto;min-width:0}
+  .trow.hascols.iedit .meta{flex:0 1 auto}
+}
+@media (min-width:768px){
+  .trow.hascols.iedit .ttl{flex:1 1 0;min-width:0}
+  .trow.hascols.iedit .meta{flex:0 1 auto}
+}
+@media (min-width:600px){
+  @container lrows (max-width:48rem){
+    .trow.hascols.iedit .tmain{align-items:stretch}
+    .trow.hascols.iedit .ttl{flex:none;width:100%}
+  }
+}
+.trow.an-rowout{opacity:0;transform:translateX(.75rem);transition:opacity .18s ease-in,transform .18s ease-in;pointer-events:none}
+.trow.an-rowin{animation:an_rowin .3s ease-out}  /* 2.98.0 D (#2163): .2 s -> .3 s */
+@media (min-width:768px) and (prefers-reduced-motion:no-preference){
+  #app.detail-open>#detail:not(.hidden):not(.an-out){animation:an_pin .2s cubic-bezier(.2,.8,.2,1)}
+  #detail.an-out{display:flex!important;position:fixed;z-index:44;margin:0;animation:an_pout .18s ease-in forwards;pointer-events:none}
+  .trow.an-rowin{animation:an_rowin .2s cubic-bezier(.2,.8,.2,1)}
+}
+.trow.ui-strike .ttl{position:relative;color:var(--muted);transition:color .35s}
+.trow.ui-strike .ttl::after{content:'';position:absolute;left:0;right:0;top:55%;height:1.5px;background:var(--faint);transform-origin:left center;animation:ui_strike .35s ease-out forwards;pointer-events:none}
+.trow.ui-strike.ui-now .ttl{transition:none}
+.trow.ui-strike.ui-now .ttl::after{animation:none}
+.trow.ui-gone{height:0!important;min-height:0;opacity:0;overflow:hidden;padding-top:0;padding-bottom:0;margin-top:0;margin-bottom:0;border-width:0;pointer-events:none;transition:height .25s ease-in,opacity .25s ease-in,padding .25s ease-in,margin .25s ease-in}
+#main:not(.lp-one) #view .trow.lpc,#view .kcards .trow.lpc{box-shadow:inset .1875rem 0 0 var(--lpc)}
+#main:not(.lp-one) #view .trow.lpc::before,#view .kcards .trow.lpc::before{left:.375rem}
+/* 2.320.0 (#3289): the field Projects in the task panel; Alt onto a project in the sidebar (the hint while dragging) */
+#detail .dmlp{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;margin:.125rem 0 .5rem;font-size:var(--fs-s);color:var(--text2)}
+#detail .dmlpk{color:var(--muted);margin-right:.125rem}
+#detail .mlp{display:inline-flex;align-items:center;gap:.25rem;max-width:14rem;min-height:1.75rem;padding:0 .5rem;border:1px solid var(--line2);border-radius:99rem;min-width:0}
+#detail .mlp.own{background:var(--bg3)}
+#detail .mlp>span,#detail .mlpn>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#detail .mlp svg.i{flex:0 0 auto;color:var(--muted)}
+#detail .mlp:has(.mlpx){padding-right:0}
+#detail .mlpn{display:inline-flex;align-items:center;gap:.25rem;min-width:0;min-height:1.5rem;color:inherit}
+#detail .mlpn:hover{color:var(--text)}
+#detail .mlpx{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:1.5rem;min-height:1.5rem;border-radius:99rem;color:var(--muted)}
+#detail .mlpx:hover{background:var(--bg3);color:var(--text)}
+#detail .mlpadd{display:inline-flex;align-items:center;gap:.25rem;min-height:1.75rem;min-width:1.75rem;justify-content:center;padding:0 .5rem;border:1px dashed var(--line2);border-radius:99rem;color:var(--accent)}
+#detail .mlpadd:hover{background:var(--accent-soft)}
+@media (pointer:coarse){ #detail .mlpadd{min-height:2.75rem;min-width:2.75rem} }  /* Sammelzug 2.376 (p260): a full touch target */
+.trow.msvrow .meta{flex-wrap:wrap}
+.trow.msvrow .tmain{cursor:pointer}
+@media (max-width:599px){.trow.msvrow .meta .lst{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+:root[data-pack="contrast"] .trow{border-bottom-color:var(--line)}
+.chk.o3c-pop{animation:o3c-pop .35s ease-out}  /* 2.98.0 D (#2163): .2 s -> .35 s (sheetmotion.js UI_POP_MS keeps the row's exit behind it) */
+@media (prefers-reduced-motion: reduce){ .chk.o3c-pop{animation:none} }
+#app.sb-b>#detail{grid-row:2}
+.trow .meta:has(> .mlc.o0):not(:has(> :not(.mlc.o0))){display:none}
+@media (min-width:768px){ @container lrows (max-width:36rem){
+  .trow.haslc .lcols{display:none}
+  .trow.haslc .meta .mlc.o0{display:inline-flex}
+  .trow.haslc .tgut{display:none}  /* the number moves into that line too (like on a phone, .mid) */
+  .trow.haslc .meta .mid{display:inline-flex;font:var(--fs-s) var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+  .trow.haslc.sel .meta .mid{color:var(--accent)}
+  :root .trow.hascols.haslc .meta:has(> .mlc.o0){display:flex}
+} }
+@media (min-width:768px) and (pointer:coarse){
+  #detail .dtop:has(> .dclose){padding-right:calc(.75rem + 2.75rem + .375rem)}
+  #detail .dtop > .dclose{position:absolute;top:.625rem;right:.75rem;min-width:2.75rem;min-height:2.75rem;justify-content:center}
+}
+@media (min-width:768px) and (pointer:coarse){ @container dtop (max-width:27.99rem){ #detail .dtop:has(> .dclose) .dq[data-d="1"]{margin-right:calc(-2.75rem - .375rem)} } }
+@media (hover:none),(max-width:767px){
+  .trow > .caret{position:relative}
+  .trow > .caret::after{content:"";position:absolute;inset:-.625rem -.5rem}
+}
+@media (max-height:500px) and (min-aspect-ratio:1/1){
+  #detail .dbot:not(:focus-within):not(.vvpin){position:static}
+}
+@media (prefers-reduced-motion:no-preference){ #view .kcards>.trow.kflip{transition:transform .18s cubic-bezier(.2,.8,.2,1)} }

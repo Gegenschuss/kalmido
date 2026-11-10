@@ -126,7 +126,6 @@ kbd{display:inline-flex;align-items:center;justify-content:center;min-width:1.12
 #side{background:var(--bg2);border-right:1px solid var(--line);overflow-y:auto;padding:.625rem .5rem 1.5rem}
 #main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
 #view{flex:1;overflow-y:auto;scrollbar-color:var(--bg4) transparent;scrollbar-width:thin;padding:2px 1.75rem 7.5rem;overscroll-behavior:contain}
-#detail{background:var(--bg2);border-left:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column}
 #tabs,#fab{display:none}
 
 /* ---------- sidebar ---------- */
@@ -211,39 +210,11 @@ svg.i.up{transform:rotate(180deg)}
 .ghead.closed svg{transform:rotate(-90deg)}
 .ghead .gact{margin-left:0;opacity:0}
 .ghead:hover .gact{opacity:1}
-.trow{display:flex;align-items:flex-start;gap:.625rem;padding:var(--row-py) .5rem var(--row-py) .75rem;position:relative;background:var(--bg);touch-action:pan-y;border-bottom:1px solid var(--line);font-size:var(--row-fs)}
-.trow::before{content:'';position:absolute;left:0;top:.3125rem;bottom:.3125rem;width:2px;border-radius:2px;background:transparent}
-.trow.pr7::before{background:var(--p7)}.trow.pr5::before{background:var(--p5)}.trow.pr3::before{background:var(--p3)}.trow.pr1::before{background:var(--p1)}
-.trow.done::before{opacity:.35}
-.trow:hover{background:var(--bg2)}
-.trow.sel{background:color-mix(in srgb,var(--accent) 7%,var(--bg2))}
 /* 2.40.0 (#1416): "Priority as background" (Settings > Appearance): a light tint of the priority colour on open tasks in
    lists, Today and board cards; selected / marked rows keep their accent, completed ones stay plain; the edge bar stays.
    Dark: 9 % / 16 %, light: 6 % / 13 % (muted text keeps at least 4.5:1 on the strong tint) */
 :root{--prbg1:9%;--prbg2:16%}  /* light values after the main light theme block (#1416) */
 body.prbg-soft{--prbgk:var(--prbg1)}body.prbg-strong{--prbgk:var(--prbg2)}
-body.prbg-soft .trow.pr7,body.prbg-strong .trow.pr7{--prbgc:var(--p7)}body.prbg-soft .trow.pr5,body.prbg-strong .trow.pr5{--prbgc:var(--p5)}
-body.prbg-soft .trow.pr3,body.prbg-strong .trow.pr3{--prbgc:var(--p3)}
-body.prbg-soft .trow.pr1,body.prbg-strong .trow.pr1{--prbgc:var(--p1)}
-body:is(.prbg-soft,.prbg-strong) .trow:is(.pr7,.pr5,.pr3,.pr1):not(.sel):not(.msel):not(.done){background:color-mix(in srgb,var(--prbgc) var(--prbgk),var(--bg))}
-body:is(.prbg-soft,.prbg-strong) .trow:is(.pr7,.pr5,.pr3,.pr1):not(.sel):not(.msel):not(.done):hover{background:color-mix(in srgb,var(--prbgc) calc(var(--prbgk) + 5%),var(--bg))}
-.trow.kfocus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 55%,transparent)}
-.trow.done .ttl{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
-.trow.sub{margin-left:1.75rem}
-.trow.dropbefore{box-shadow:inset 0 2px 0 var(--accent)}
-.trow.dragging{opacity:.4}
-.trow .caret{position:absolute;left:-1.125rem;top:calc(var(--row-py) + 1px);color:var(--muted);padding:2px}
-.trow .caret svg{transition:transform .15s}
-.trow .caret.closed svg{transform:rotate(-90deg)}
-/* square thin-stroke checkbox, 2px radius; the priority lives in the bar on the row edge */
-.chk{width:1rem;height:1rem;border-radius:2px;border:1.5px solid var(--faint);flex:none;margin-top:calc((var(--row-fs) * 1.45 - 1rem) / 2);display:grid;place-items:center;color:transparent;position:relative;transition:border-color .12s,background .12s}
-.chk::after{content:'';position:absolute;inset:-.625rem}
-.chk:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);color:color-mix(in srgb,var(--accent) 70%,transparent)}
-.chk:hover:not(.on):not(.wont)::before{content:'';position:absolute;width:.3125rem;height:.5625rem;border:solid var(--accent);border-width:0 1.5px 1.5px 0;transform:translate(0,-1px) rotate(45deg);opacity:.6}
-.chk.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.chk.wont{border-style:dashed;color:var(--muted)}
-.chk svg{width:var(--ic-s);height:var(--ic-s);stroke-width:2.6}
-.chk[disabled]:hover{border-color:var(--faint);background:none}
 .tmain{flex:1;min-width:0;cursor:pointer;display:flex;flex-direction:column}
 .ttl{word-break:break-word}
 .meta{display:flex;flex-wrap:wrap;align-items:center;gap:2px .625rem;font-size:var(--meta-fs);color:var(--muted);margin-top:1px}
@@ -257,12 +228,6 @@ body:is(.prbg-soft,.prbg-strong) .trow:is(.pr7,.pr5,.pr3,.pr1):not(.sel):not(.ms
 /* desktop list views: date / list / assignee / time as right-aligned columns */
 .tcols{display:none}
 @media (min-width:768px){
-  .trow.hascols{align-items:center}
-  .trow.hascols .chk{margin-top:0}
-  .trow.hascols .tmain{flex-direction:row;align-items:baseline;gap:.625rem;min-width:0}
-  .trow.hascols .ttl{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .trow.hascols .meta{flex-wrap:nowrap;overflow:hidden;margin-top:0;min-width:0;flex:1 1 0}
-  .trow.hascols .meta .m-col{display:none}
   .tcols{display:flex;align-items:center;gap:.75rem;flex:none;font:var(--fs-s)/var(--lh-tight) var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;cursor:pointer}
   .tcols>span{display:inline-flex;align-items:center;justify-content:flex-end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .tcols .c-time{width:3.25rem}
@@ -282,7 +247,6 @@ body:is(.prbg-soft,.prbg-strong) .trow:is(.pr7,.pr5,.pr3,.pr1):not(.sel):not(.ms
 /* ---------- detail ---------- */
 .dtop{display:flex;align-items:center;gap:.25rem;padding:.625rem .75rem;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg2);z-index:2}
 .dtop .back{display:none}
-.dtop .chk{margin:0 .375rem 0 .25rem}
 .dchip{display:inline-flex;align-items:center;gap:.375rem;padding:.3125rem .5rem;border-radius:var(--radius);color:var(--muted);font:var(--fs-s) var(--mono);white-space:nowrap}
 .dchip:hover{background:var(--bg3);color:var(--text)}
 .dchip.set{color:var(--text)}
@@ -295,8 +259,6 @@ body:is(.prbg-soft,.prbg-strong) .trow:is(.pr7,.pr5,.pr3,.pr1):not(.sel):not(.ms
 .dcontent{width:100%;min-height:6.875rem;background:transparent;border:0;padding:0;resize:none;line-height:var(--lh);overflow:hidden}
 .dsec{border-top:1px solid var(--line);padding-top:.75rem}
 .dsec h5{margin:0 0 .5rem;font-size:var(--fs-s);color:var(--text2);font-weight:600;display:flex;align-items:center;gap:.375rem}
-.subs .trow{padding:.3125rem .25rem .3125rem .625rem;font-size:var(--fs-b);background:transparent}
-.subs .trow:last-child{border-bottom:0}
 .subadd{display:flex;align-items:center;gap:.625rem;padding:.375rem .25rem .375rem .625rem;color:var(--muted)}
 .subadd input{flex:1;background:transparent;border:0;padding:.1875rem 0}
 .tagedit{display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
@@ -413,8 +375,6 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .sctt .n{display:flex;flex-direction:column;gap:.125rem;min-width:0;flex:1}
 .sctt .muted{font-size:var(--fs-xs);overflow:hidden;text-overflow:ellipsis}
 .kcards{display:flex;flex-direction:column;gap:.25rem;overflow-y:auto;min-height:1.875rem}
-.kcards .trow{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);padding:.5rem .5rem .5rem .75rem}
-.kcards .trow:hover{background:var(--bg3)}
 .kadd input{width:100%;margin-top:.375rem;background:transparent;border-style:dashed}
 .knew{flex:0 0 13.75rem;padding:.5rem}
 /* 2.138.0 D (#2060): Kanban swimlanes (swimlanes.js); a mouse shows a lane's "+ Task" on pointing at its cell */
@@ -473,8 +433,6 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .quad h3{margin:.75rem .25rem .375rem;font-size:var(--fs-b);display:flex;align-items:center;gap:.5rem;font-weight:600}
 .quad h3 .c{color:var(--muted);font:400 var(--fs-xs) var(--mono)}
 .quad .qlist{flex:1;overflow-y:auto;max-height:42vh}
-.quad .trow{background:transparent}
-.quad .trow:hover{background:var(--bg3)}
 .quad .kadd input{margin-top:.375rem}
 
 /* ---------- habits ---------- */
@@ -551,9 +509,6 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
   .kbtn{display:none}
   #side{position:fixed;top:0;left:0;bottom:0;width:min(18.75rem,84vw);z-index:55;transform:translateX(-102%);transition:transform .22s ease;padding-top:calc(.75rem + var(--safe-t));border-right:1px solid var(--line2)}
   #side.open{transform:none;box-shadow:.75rem 0 2.5rem rgba(0,0,0,.5)}
-  #detail{position:fixed;inset:0;z-index:45;border:0;transform:translateX(100%);transition:transform .22s ease;padding-top:var(--safe-t)}
-  #detail:not(.hidden){display:flex!important}
-  #detail.open{transform:none}
   .dtop .back{display:inline-flex}
   .dtop{padding:.5rem .5rem}
   .dfoot{padding-bottom:calc(.625rem + var(--safe-b))}
@@ -570,9 +525,6 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
   #fab.gone{display:none}
   .qadd.inline{display:none}
   .qadd.sheet{position:fixed;left:0;right:0;bottom:0;margin:0;z-index:58;background:var(--bg2);border-top:1px solid var(--line2);border-radius:.875rem .875rem 0 0;padding:.875rem .875rem calc(.875rem + var(--safe-b))}
-  .trow{padding-left:.75rem;padding-right:.25rem}
-  .trow.sub{margin-left:1.5rem}
-  .trow .caret{left:-1rem}
   .meta .lst{max-width:7.5rem}
   #pop.sheet{left:0!important;right:0;top:auto!important;bottom:0;width:auto;border-radius:.875rem .875rem 0 0;padding:.75rem .75rem calc(.75rem + var(--safe-b));max-height:86dvh}
   .modal{align-items:end;padding:var(--vvt,0px) 0 var(--vvb,0px)}
@@ -593,19 +545,8 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
   .ghead .gact{opacity:1}
   /* 2.87.9 (#1952): the 16 px floor against the iOS zoom (#1173) moved to --fld-fs in @media (pointer:coarse) */
 }
-@media (hover:none){.trow:hover{background:var(--bg)}.kcards .trow:hover{background:var(--bg)}}
 
 
-/* ================= v2: pin, depth, markdown, multi-select, filters, week, timeline ================= */
-.trow{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
-.trow .ttl{-webkit-user-select:text;user-select:text}
-.trow.d2{margin-left:3.5rem}
-/* 2.156.0 A (#1949): five levels of tasks; on a phone each level indents less so level 5 stays readable */
-.trow.d3{margin-left:5.25rem}.trow.d4{margin-left:7rem}
-@media (max-width:767px){.trow.sub.d3{margin-left:5rem}.trow.sub.d4{margin-left:6.75rem}}
-@media (max-width:599px){.trow.sub.d1{margin-left:1.125rem}.trow.sub.d2{margin-left:2.25rem}.trow.sub.d3{margin-left:3.375rem}.trow.sub.d4{margin-left:4.5rem}}
-.trow.msel{background:color-mix(in srgb,var(--accent) 12%,var(--bg))}
-.trow.msel .chk{border-color:var(--accent)}
 .meta .pinm{color:var(--accent)}
 .ghead.pin{color:var(--accent)}
 .ghost-drag{opacity:.94;box-shadow:var(--shadow);background:var(--bg3)!important;border-radius:var(--radius)}
@@ -623,7 +564,6 @@ fieldset[disabled] .rowgrip{cursor:auto}
 .md{line-height:1.6;cursor:text;min-height:1.5rem;word-break:break-word}
 /* 2.40.0 (#1409): inline Markdown in task titles (rows, calendar, timeline, roadmap, dashboard, briefing) */
 :is(.ttl,.tln,.dtt,.kbttl,.dpn,.ev,.wev,.tl-bar,.rm-tname) code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:0 .25em;border-radius:.25rem}
-.trow .ttl a[href]{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
 /* 2.40.0 (#1203): the pen that opens the description editor (touch screens / "only with the pen") */
 .mdpen{float:right;margin:-.25rem -.25rem .25rem .5rem;color:var(--muted);position:relative;z-index:1}  /* 2.40.2: above the masked (clamped) text, which is its own layer */
 /* 2.40.1: pen + description in one block: the panel body is a flex column, where the float alone took its own row */
@@ -735,7 +675,6 @@ fieldset[disabled] .rowgrip{cursor:auto}
 .smodal .shdr .tmini{margin-right:.25rem}
 
 @media (max-width:767px){
-  .trow.d2{margin-left:3.25rem}
   .qadd.sheet{top:auto;transform:none;width:auto;left:0;right:0;bottom:0;border-radius:1rem 1rem 0 0;box-shadow:none}
   .calbar h2{flex:1 1 100%}
   .calbar .seg{flex:1}
@@ -764,7 +703,6 @@ fieldset[disabled] .rowgrip{cursor:auto}
 .tl-row{overflow:hidden;overflow:clip}  /* clip, not hidden: hidden makes the row a scroll box and the sticky names scroll away */
 #mbar{scrollbar-width:none}
 #mbar::-webkit-scrollbar{display:none}
-#detail .subs .trow[draggable="true"]{cursor:grab}
 
 .fhead{display:flex;align-items:center;gap:.5rem;padding:0 .5rem 0 .625rem;min-height:var(--srow-h);font-size:var(--fs-m);border-radius:var(--radius);color:var(--text);cursor:pointer;user-select:none}
 .fhead:hover{background:var(--bg3)}
@@ -857,8 +795,6 @@ fieldset[disabled] .rowgrip{cursor:auto}
 .cfv span{display:block;font-size:var(--fs-xs);color:var(--muted);margin-bottom:2px}
 .cfb{display:flex;gap:.375rem;justify-content:flex-end}
 
-/* ---------- drop after ---------- */
-.trow.dropafter{box-shadow:inset 0 -2px 0 var(--accent)}
 
 /* ---------- habits: notes + per week ---------- */
 /* 2.140.0 C (#2135): week progress segments + several reminder times */
@@ -927,8 +863,6 @@ button.whob:hover .who,button.whob:focus-visible .who{box-shadow:0 0 0 2px color
 button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--accent)}
 .wcell{display:flex;align-items:center;flex:none;align-self:center;margin-left:.25rem}
 .tcols .c-who{overflow:visible}
-@media (min-width:768px){.trow.hascols .wcell{display:none}}
-.trow.ro .chk{opacity:.45;cursor:default}
 .meta .ctxm{display:inline-flex;align-items:center;gap:.1875rem;color:var(--muted);font-size:var(--fs-xs);border:1px dashed var(--line2);border-radius:var(--r-s);padding:0 .3125rem;line-height:1rem}
 .rohint{display:flex;align-items:center;gap:.375rem;color:var(--muted);font-size:var(--fs-m);padding:.375rem .25rem .625rem}
 .rotag{display:inline-flex;align-items:center;gap:.25rem;min-height:1.125rem;color:var(--muted);font-size:var(--fs-xs);padding:0 .375rem;border-radius:var(--r-s)}
@@ -1341,7 +1275,6 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .ovwho{display:flex;align-items:center;gap:.5rem;font-size:var(--fs-m);margin:.375rem 0 2px;color:var(--text)}
 .ovt{display:flex;align-items:center;gap:.5625rem;width:100%;text-align:left;padding:.375rem .375rem;border-radius:var(--radius);font-size:var(--fs-b);min-width:0}
 .ovt:hover{background:var(--bg3)}
-.ovt .chk{width:.875rem;height:.875rem;border-radius:2px;border-width:1.5px;margin:0}
 .ovt .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ovt > span:last-child:not(.n){font-size:var(--fs-s);white-space:nowrap;max-width:45%;overflow:hidden;text-overflow:ellipsis}
 .ovt .over{color:var(--p5)}
@@ -1525,8 +1458,6 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 /* ---------- settings > Appearance (per device) ---------- */
 .seg.wrap{flex-wrap:wrap;max-width:100%}
 .lookpv{margin:1.125rem 0 .5rem;padding:.625rem .75rem .75rem;background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-l);position:sticky;top:.75rem;z-index:2;box-shadow:0 0 0 .75rem var(--bg2);user-select:none}
-.lookpv .trow{padding-left:.625rem;background:transparent}
-.lookpv .trow:hover{background:transparent}
 .lpv-head{display:flex;align-items:baseline;gap:.5rem;padding:0 .125rem .375rem;font-size:var(--fs-l);letter-spacing:-.01em}
 .lpv-head b{font-weight:600}
 .lpv-n{font:500 var(--fs-s)/1 var(--mono);color:var(--muted)}
@@ -1626,9 +1557,6 @@ div.calerr{font-size:var(--fs-s);padding:.25rem 0}
 .bkrestore label{font-size:var(--fs-m)}
 /* package B: history lines written through the API, checklist mode, API tokens / webhooks / public link settings */
 .via{font:var(--fs-xs) var(--mono);color:var(--muted);border:1px solid var(--line2);border-radius:var(--r-s);padding:0 .25rem;white-space:nowrap}
-.trow.ck .meta:empty{display:none}
-.trow .ckback{color:var(--muted);flex:none}
-.trow .ckback:hover{color:var(--accent)}
 .ckdone>.ghead .gact{margin-left:.375rem;font-weight:400;opacity:1}
 .ckempty{padding:.375rem .25rem}
 /* 2.1.2: lists owned by agents / disabled users (Administration), agent rows in Users, ownership in the list dialog */
@@ -1929,7 +1857,6 @@ body.tdrag .sdrop{display:flex}
   #top .iconbtn,#top .kbtn,#top .tmini,#top .offline,#top .cfpill{min-width:2.75rem;min-height:2.75rem;justify-content:center}
   #top .seg button{min-height:2.75rem;min-width:2.75rem;justify-content:center}  /* 2.18.0 (#652): was 2.5rem (47 x 40 on a Fold) */
   #top .btn.sm{min-height:2.75rem}
-  .chk::after{inset:-.875rem}
   .shead button,.fhead .iconbtn,.srow.reorder .iconbtn{position:relative}
   .shead button::before,.fhead .iconbtn::before,.srow.reorder .iconbtn::before{content:"";position:absolute;inset:calc(50% - 1.375rem) calc(50% - 1.375rem)}
   .shead.stoggle{min-height:2.75rem}
@@ -2152,8 +2079,6 @@ button.tvr-task:hover{color:var(--accent)}
 }
 .calbar .chip.on{border-color:var(--accent);color:var(--accent)}
 
-/* 1.7.0: Flow "next" marker, cycle hint, overdue banner on Today */
-.trow.flownext{box-shadow:inset 2px 0 0 var(--accent)}
 .meta .nxt{display:inline-flex;align-items:center;gap:.1875rem;font:inherit;color:var(--accent);font-weight:600;background:none;border:0;padding:0;margin:0;cursor:help;border-radius:var(--r-s)}
 .meta .nxt:hover{text-decoration:underline dotted;text-underline-offset:2px}
 .meta .nxt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -2335,7 +2260,7 @@ body.pop-open #chatfab,body.modal-open #chatfab{visibility:hidden}
    room than that (#view padding-bottom); a composer docked at the bottom (team chat, its thread, the task panel's comment box)
    keeps the corner free */
 :root{--fab-safe:4.75rem}
-body.fab-on #view .chcomp,body.fab-on #detail .dbot .dcomp:not(.dctop){padding-right:var(--fab-safe)}
+body.fab-on #view .chcomp{padding-right:var(--fab-safe)}
 .dchatb{display:none!important}
 @media (min-width:1000px){body.chat-yield .dchatb{display:inline-flex!important}}
 /* ---- 2.0.2: comments under the description (#242), inline title edit (#182), section "+" (#283), list icons (#245),
@@ -2354,24 +2279,13 @@ body.fab-on #view .chcomp,body.fab-on #detail .dbot .dcomp:not(.dctop){padding-r
 .cmhead .cmmode{color:var(--muted);font-weight:400;font-size:var(--fs-xs)}
 .cmhead .iconbtn{min-width:1.5rem;min-height:1.5rem;padding:.25rem}
 .cmhead .iconbtn svg{width:var(--ic-s);height:var(--ic-s)}
-/* 2.31.0 (#344): desktop: the properties on top, the comments in their own area below, a draggable line between them */
-#detail.dsplit{overflow:hidden;overflow:clip}
-#detail.dsplit .dbody{flex:var(--dsT,60) 1 0;min-height:0;overflow-y:auto;padding-bottom:1.25rem}
-#detail.dsplit .dbody>*{flex-shrink:0}
-#detail.dsplit .dcpane{flex:var(--dsC,40) 1 0;min-height:0;overflow-y:auto;padding:0 1.25rem .75rem;overscroll-behavior:contain}
 .dsgrip{flex:none;position:relative;height:.625rem;margin:0;cursor:row-resize;touch-action:none;z-index:3}
 .dsgrip::after{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px solid var(--line)}
 .dsgrip::before{content:"";position:absolute;left:50%;top:50%;width:2rem;height:.25rem;margin:-.125rem 0 0 -1rem;border-radius:1rem;background:var(--bg4);z-index:1}
 .dsgrip:hover::after,.dsgrip.drag::after,.dsgrip:focus-visible::after{border-top:2px solid var(--accent)}
 .dsgrip:hover::before,.dsgrip.drag::before,.dsgrip:focus-visible::before{background:var(--accent)}
 .dsgrip:focus-visible{outline:none}
-#detail.dsplit .dcpane #d-tl{border-top:0;padding-top:0}
-#detail.dsplit .dcpane .cmhead{position:sticky;top:0;z-index:1;background:var(--bg2);margin:0;padding:.375rem 0}
 .dsfoldb svg{transition:transform .15s}
-#detail.dsfold .dsfoldb svg{transform:rotate(180deg)}
-#detail.dsplit.dsfold .dbody{flex:1 1 0}
-#detail.dsplit.dsfold .dcpane{flex:0 0 auto;overflow:hidden;padding-bottom:0}
-#detail.dsfold .dcpane #d-tl>:not(.cmhead){display:none}
 .atyping{display:flex;align-items:center;gap:.5rem;padding:.375rem .25rem;font-size:var(--fs-s);color:var(--text2)}
 .atyping .ttx{min-width:0;overflow-wrap:anywhere}
 .atdots{display:inline-flex;gap:.1875rem;flex:none;padding:.3125rem .4375rem;border-radius:.75rem;background:var(--bg3)}
@@ -2400,10 +2314,6 @@ body.fab-on #view .chcomp,body.fab-on #detail .dbot .dcomp:not(.dctop){padding-r
 .rbtn.await::after{top:.25rem;right:.25rem}
 #tabs .await::after{top:.375rem;left:calc(50% + .5rem)}
 #pop .minfo .ml{white-space:normal;color:var(--text2)}
-/* inline title edit + keyboard focus ring */
-.trow .ttlin{width:100%;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--accent);border-radius:var(--r-s);padding:.0625rem .375rem;margin:0;box-sizing:border-box}
-.trow.iedit .ttl{flex:1 1 auto;overflow:visible;white-space:normal}
-.trow.kfocus{outline:2px solid color-mix(in srgb,var(--accent) 70%,transparent);outline-offset:-2px;border-radius:var(--r-s)}
 /* "+" on section headers + the input in the section */
 .ghead .gadd{margin-left:auto}
 .ghead .gadd + .gact{margin-left:0}
@@ -2436,10 +2346,8 @@ body.fab-on #view .chcomp,body.fab-on #detail .dbot .dcomp:not(.dctop){padding-r
 .dcomp .ccomp{padding:.375rem .625rem}
 .dcomp .ccomp:not(:focus-within):not(.used):not(.open) .cbar,.dcomp .ccomp:not(:focus-within):not(.used):not(.open) .cfiles:empty{display:none}  /* 2.39.1 (#1202): .open = stays until a tap outside */
 .dcomp .ccomp textarea{max-height:10rem}
-#detail{scroll-padding-bottom:9rem}
 /* 2.32.0 (#1074): with the focus in the sticky comment box the padding above made each typed letter scroll the panel
    (Chrome reveals the caret 9rem above the bottom edge, the sticky box moves along, the next letter scrolls again) */
-#detail:has(.dbot :focus){scroll-padding-bottom:0}
 /* 2.365.0 (#2824) phone: the task's bottom bar above the comment field (detail.js thumb): date + Today / Tomorrow, project,
    Complete on the right edge (thumb reach); it steps aside while a comment is typed (the keyboard needs the room) */
 .dthumb{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;padding:.375rem .75rem;border-top:1px solid var(--line);background:var(--bg2);container:dthumb / inline-size}
@@ -2456,7 +2364,6 @@ body.fab-on #view .chcomp,body.fab-on #detail .dbot .dcomp:not(.dctop){padding-r
 /* a narrow phone: two rows - the date with its quick buttons, then the project and Complete (the date is never cut short) */
 @container dthumb (max-width:35.99rem){ .dthumb .dtbr{display:block;flex:0 0 100%;height:0} }
 @container dthumb (min-width:36rem){ .dthumb .dtproj{flex:0 1 auto;max-width:14rem} .dthumb .dq[data-d="0"] .dql{display:inline;font-size:var(--fs-s);white-space:nowrap} .dthumb .dq[data-d="0"]{padding:0 .625rem} }
-#detail .dbot:has(.dcomp :focus) .dthumb{display:none}
 .meta .crd{opacity:.75}
 /* 2.0.8 (#321) Settings > AI colleague: lists at a glance */
 .aitbl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden}
@@ -2770,7 +2677,6 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
     .dtop .dq[data-d="-1"] .dql{display:none}
   }
 }
-#detail{overflow-x:hidden}
 .mdsub{max-width:100%;white-space:normal;text-align:start;height:auto;min-height:1.75rem}
 /* K15: own file button */
 /* K20: "Ready to start" stays on one line */
@@ -2814,15 +2720,13 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 @media (prefers-reduced-motion:no-preference){ .stchip .rec{animation:recpulse 1.6s ease-in-out infinite} }
 /* K11: the "nobody assigned" circle is quiet: hover / focus only (desktop), gone on touch screens */
 .whob.wnone{opacity:0;transition:opacity .12s}
-.trow:hover .whob.wnone,.whob.wnone:focus-visible,.trow.sel .whob.wnone{opacity:1}
+.whob.wnone:focus-visible{opacity:1}
 /* 2.27.0 (#1002): in a list with its own columns the empty assignee cell is always visible (faint), so it reads as clickable */
-.lcols .whob.wnone,.trow .meta .mlc .whob.wnone{opacity:.5}
-.lcols .whob.wnone:hover,.trow .meta .mlc .whob.wnone:hover{opacity:1}
+.lcols .whob.wnone{opacity:.5}
+.lcols .whob.wnone:hover{opacity:1}
 @media (hover:none),(pointer:coarse){ .whob.wnone{display:none} }
 /* 2.29.0 (#1002): in a list with an assignee column the empty cell is the only way to assign there: always there (faint),
    also where the browser reports no hover (some desktop web apps, headless browsers, touch laptops) */
-.trow.hascols .whob.wnone{opacity:.5}.trow.hascols .whob.wnone:hover,.trow.hascols .whob.wnone:focus-visible{opacity:1}
-@media (hover:none),(pointer:coarse){ .trow.hascols .whob.wnone{display:inline-grid} }
 .aimodoff{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .aimodoff>span{flex:1 1 14rem}
 /* K07: the date column: one sans format like everywhere else, cut on the right (never on the left), a range = a small
@@ -2849,7 +2753,6 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
   .iconbtn{min-width:2.75rem;min-height:2.75rem;justify-content:center}
   .pprow .dpbtn{min-height:2.75rem}
   .ppcl{width:2.75rem;height:2.75rem;margin:-.625rem -.5rem -.625rem -.75rem}
-  .chk::after{inset:-1rem}
   .chkl{min-height:2.75rem;display:flex;align-items:center;gap:.5rem}
   .ghead[data-act="collapse"],.hname,.tvl{min-height:2.75rem}
   .drun,.dep .dt,.runtask,.tvr-task,.stpill,.caret,.whob{position:relative}
@@ -3001,16 +2904,6 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
    a desktop with the task panel open) gets the phone rows (title, then date / list / assignee in the second line) */
 @media (min-width:768px){
   .lwrap{container:lrows / inline-size}
-  @container lrows (max-width:48rem){
-    .trow.hascols{align-items:flex-start}
-    .trow.hascols .chk{margin-top:calc((var(--row-fs) * 1.45 - 1rem) / 2)}
-    .trow.hascols .tmain{flex-direction:column;align-items:stretch;gap:0}
-    .trow.hascols .ttl{white-space:normal;overflow:visible}
-    .trow.hascols .meta{flex-wrap:wrap;overflow:visible;margin-top:1px;flex:none}
-    .trow.hascols .meta .m-col{display:inline-flex}
-    .trow.hascols .tcols{display:none}
-    .trow.hascols .wcell{display:flex}
-  }
 }
 /* K14: timeline names cut with "…", a short bar's label left of it near the end, readable weekdays */
 .tl-name .tln{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3057,8 +2950,6 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 @media (max-width:899px){ .povbar.povedit{bottom:var(--tabs-bot)} }  /* above the bottom bar */
 .povm{display:flex;align-items:center;gap:.625rem;min-height:2.25rem;border-top:1px solid var(--line);font-size:var(--fs-b)}
 .povm:first-of-type{border-top:0}
-.povm .chk{margin:0;border-radius:50%}
-.povm .chk.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .povm .pmn{flex:1;min-width:0;display:flex;align-items:center;gap:.375rem}
 .povm .pmn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .povm .pmn .i{color:var(--accent);flex:none}
@@ -3100,8 +2991,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 @media (pointer:coarse){
   .povh .btn,.povbar .btn{min-height:2.75rem;padding:0 .875rem}
   .povm,.povf,.povl{min-height:2.75rem}
-  .povm .chk{width:1.375rem;height:1.375rem;position:relative}
-  .povm .chk::after,.povx::after{content:"";position:absolute;inset:-.6875rem}
+  .povx::after{content:"";position:absolute;inset:-.6875rem}
   .povm .iconbtn,.povl .iconbtn,.povx{min-width:2.75rem;min-height:2.75rem;position:relative}
   .povt{min-height:2.75rem}
   .povtf summary{min-height:2.75rem;display:flex;align-items:center}
@@ -3152,7 +3042,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 /* ================= 2.8.0 "Leitstand" (#434): one sidebar instead of rail + sidebar, command bar, agent band, ticket
    gutter rows, the "Punkt" icons. Later than everything above on purpose: these rules restyle the shell. */
 /* the dot of an icon takes the text colour in dense places; the accent stays where an icon stands alone or is active */
-.meta,.tcols,.btn,.chk,.menu-list,.seg button:not(.on),#side .srow:not(.on),#side .shead,#tabs button:not(.on),.iconbtn:disabled,.ghead,.qadd,.lhead,.dtop,.agband,.kbtn,.cmdbar{--dot:currentColor}
+.meta,.tcols,.btn,.menu-list,.seg button:not(.on),#side .srow:not(.on),#side .shead,#tabs button:not(.on),.iconbtn:disabled,.ghead,.qadd,.lhead,.dtop,.agband,.kbtn,.cmdbar{--dot:currentColor}
 .btn.pri svg.i .d,#fab svg.i .d{fill:currentColor}
 /* shell: sidebar 15rem + list (+ task panel) */
 #app{grid-template-columns:var(--sideW,15rem) minmax(0,1fr)}
@@ -3233,39 +3123,12 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .lprog .pbar{width:17.5rem;max-width:30vw;height:.25rem;background:var(--line2)}
 .lprog span{color:var(--text2)}
 /* the agent band */
-/* task rows: status glyph + ticket gutter; the selected row gets an accent bar on the left */
-.trow{min-height:var(--row-h);gap:.625rem}
-.trow::before,.trow.pr7::before,.trow.pr5::before,.trow.pr3::before,.trow.pr1::before{background:transparent;top:0;bottom:0;border-radius:0}
-.trow.sel{background:var(--accent-soft)}
-.trow.sel::before{background:var(--accent)}
-.chk{width:.875rem;height:.875rem;border-radius:50%;border:1.6px solid var(--text2);margin-top:calc((var(--row-fs) * 1.45 - .875rem) / 2)}
-.chk.p7{border-color:var(--p7);border-width:2px}.chk.p5{border-color:var(--p5)}.chk.p3{border-color:var(--p3)}.chk.p1{border-color:var(--p1)}
-.chk:hover{background:transparent}
-.chk:hover:not(.on):not(.wont)::before{width:.3125rem;height:.3125rem;border:0;border-radius:50%;background:currentColor;transform:none;opacity:.8;color:var(--accent);inset:0;margin:auto}  /* 2.41.0 (#1477): centred by the box, not by grid rounding */
-.chk.on{background:var(--faint);border-color:var(--faint);color:var(--bg)}
-.chk.on svg{width:var(--ic-xs);height:var(--ic-xs);stroke-width:3}
-.chk.wont{border-style:dashed;border-color:var(--faint)}
-.chk.work{border-color:var(--st-work);border-left-color:transparent;transform:rotate(45deg)}
-.chk.work::before{content:'';position:absolute;width:.3125rem;height:.3125rem;border-radius:50%;background:var(--st-work);inset:0;margin:auto}
 .tgut{flex:none;min-width:3rem;font:var(--fs-s)/var(--lh) var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;margin-top:calc((var(--row-fs) * 1.45 - var(--fs-s) * 1.45) / 2)}
-.trow.sel .tgut{color:var(--accent)}
-.trow.done .tgut{opacity:.6}
-@media (min-width:768px){ .trow.hascols .tgut{margin-top:0} .trow.hascols{padding-top:0;padding-bottom:0} }
 /* 2.31.0 (#1051): phones: the task number moves into the meta line (.mid), so titles with and without one start at the same x;
    the whole row right of the circle opens the task */
 .meta .mid{display:none}
 @media (max-width:767px){
-  .trow .tgut{display:none}
   .meta .mid{display:inline-flex;font:var(--fs-s) var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
-  .trow.sel .meta .mid{color:var(--accent)}
-}
-/* 2.31.0 (#1051): the row's pin: on the row only when pinned; a mouse also sees it on hover (and pins with it) */
-.trow > .rpin{display:none}
-@media (min-width:768px) and (hover:hover) and (pointer:fine){
-  .lwrap .trow > .rpin{display:inline-flex;flex:none;align-self:center;margin:-.25rem 0;opacity:0;color:var(--muted);transition:opacity .12s}
-  .lwrap .trow:hover > .rpin,.lwrap .trow > .rpin:focus-visible,.lwrap .trow > .rpin.on{opacity:1}
-  .lwrap .trow > .rpin.on{color:var(--accent)}
-  .lwrap .trow:has(> .rpin) .meta .pinm{display:none}
 }
 /* rows, columns: calm mono metadata */
 .tcols{color:var(--text2)}
@@ -3279,17 +3142,14 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
   #top{padding:calc(.625rem + var(--safe-t)) .5rem .375rem .25rem}
   #top h1{font-size:var(--fs-page-m);gap:.5rem}
   #top{gap:.25rem}
-  .trow{min-height:max(2.75rem,var(--row-h))}  /* 2.18.0 (review R8): 44 px at least, taller with "Custom" */
 }
 /* touch: 44 px targets in the sidebar / drawer and the header's new buttons */
 @media (pointer:coarse){
   #side .srow,#side .fhead,.scmd{min-height:2.75rem}
   #side .srow,#side .fhead{min-height:max(2.75rem,var(--srow-h))}  /* 2.18.0 (review R8): the "Custom" sidebar slider may make them taller */
-  .trow{min-height:max(2.75rem,var(--row-h))}  /* 2.18.0 (review R8): task rows 44 px on every touch screen (Compact on a tablet was 40 px), so Custom starts without a jump */
   #side .shead button,.sgh .sgt{min-height:2.75rem;min-width:2.75rem}
   #top .cmdbar,#top .tnew{min-height:2.75rem}
   .ttabs button{min-height:2.75rem}
-  .chk::after{inset:-1.0625rem}
 }
 /* the Agents row while one works / waits for me (was the rail's ring) */
 #side .srow.aspin>svg{color:var(--st-work)}
@@ -3384,7 +3244,7 @@ body.in-chat #top{display:none}
 .kanban.kbscroll{scroll-snap-type:none}
 /* A9: keyboard: a visible focus ring everywhere (inside the sidebar and lists drawn inside so nothing clips it), the skip link */
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-#side :focus-visible,#view .trow:focus-visible,.menu-list :focus-visible,#tabs :focus-visible{outline-offset:-2px}
+#side :focus-visible,.menu-list :focus-visible,#tabs :focus-visible{outline-offset:-2px}
 #view:focus{outline:none}
 .skip{position:fixed;left:.75rem;top:.75rem;z-index:300;padding:.625rem 1rem;min-height:2.75rem;border-radius:var(--radius);border:2px solid var(--accent);background:var(--bg2);color:var(--text);font:inherit;font-weight:600;transform:translateY(-300%);transition:transform .12s}
 .skip:focus{transform:none}
@@ -3488,8 +3348,8 @@ body.qsheet-open #fab{display:none}
 #tabs button:not(.on) svg{opacity:.85}
 /* P14: touch targets of at least 44 px: milestone "Reached", small avatars (a larger invisible hit area), event rows */
 @media (pointer:coarse){
-  .povm .chk,.pov .avb,.agb-a .avb{position:relative}
-  .povm .chk::after,.pov .avb::after{content:"";position:absolute;inset:-.6875rem}
+  .pov .avb,.agb-a .avb{position:relative}
+  .pov .avb::after{content:"";position:absolute;inset:-.6875rem}
   .cevrow{min-height:2.75rem}
 }
 /* P15: the calendar's week / day view: only the hour grid scrolls */
@@ -3514,10 +3374,6 @@ svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEE
   .ssearch{order:3;flex:1 1 100%}
   .snav{-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}
 }
-/* P19: done items of a "done at the bottom" list: as tall as the others, the put-back icon level with the text */
-.trow.ck.done{align-items:center}
-.trow.ck.done .meta:empty{display:none}
-.trow.ck .ckback{margin:-.5rem 0;min-width:2.75rem;min-height:2.75rem}
 @media (pointer:coarse){ .nchip{min-width:2.75rem;justify-content:center} }
 .nmhit{display:inline-grid;place-items:center;cursor:pointer}
 @media (pointer:coarse){ .nmhit{min-width:2.75rem;min-height:2.75rem} .nmh,.nmr{grid-template-columns:minmax(0,1fr) 3.25rem 3.25rem;padding-top:.125rem;padding-bottom:.125rem} }
@@ -3545,8 +3401,6 @@ svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEE
 @media (pointer:coarse){
   :root.ui-small :is(button,select,summary,[role=button],.srow,.fhead,.iconbtn){min-height:calc(2.75rem / var(--ui))}
   :root.ui-small :is(.iconbtn,.rx){min-width:calc(2.75rem / var(--ui))}
-  :root.ui-small :is(#top,#tabs,#side,#detail) :is(button,.iconbtn){min-height:calc(2.75rem / var(--ui))}
-  :root.ui-small :is(#top,#detail) .iconbtn{min-width:calc(2.75rem / var(--ui))}
 }
 /* small avatars (assignee, people) get a 44 px hit area on touch screens */
 @media (pointer:coarse){ .avb{position:relative} .avb::after{content:"";position:absolute;inset:-.625rem} }
@@ -3601,22 +3455,15 @@ svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEE
 .md.mdc li.cb input[type=checkbox]{cursor:default}
 /* 2.13.2 (#478 N5): smaller font sizes (75 % and up) never bend the done circles: fixed square, the 44 px hit area comes
    from ::after; the smallest labels keep at least ~90 % of their normal size */
-.chk{aspect-ratio:1}
-@media (pointer:coarse){
-  :root.ui-small .chk{min-height:0!important;min-width:0!important}
-  :root.ui-small .chk::after{inset:calc((.875rem - 2.75rem / var(--ui)) / 2)}
-}
 :root.ui-small{--fs-xs:max(.6875rem, calc(.6875rem * .9 / var(--ui)));--fs-s:max(.75rem, calc(.75rem * .9 / var(--ui)))}
 /* 2.13.2 (#478 F1): long Kanban columns: the cards never shrink below their content (two-line titles ran into the next
    card); F2: the task number in cards (Kanban, matrix) is a compact label, no 3rem column; F3: the matrix quadrants share
    the width (long titles / French headers pushed the right ones out of view) */
 .kcards>*{flex-shrink:0}
 .kcards .tgut,.quad .tgut{min-width:0}
-.kcards .trow,.quad .trow{gap:.5rem}
 .matrix{grid-template-columns:repeat(2,minmax(0,1fr))}
 .quad{min-width:0}
 .quad h3{flex-wrap:wrap}
-.quad .trow .ttl{overflow-wrap:anywhere}
 /* 2.445.0 (#3011): a tablet keeps the 2x2 matrix and the 18 rem Kanban columns; the 84vw columns only on a phone */
 @media (max-width:699px){ .matrix{grid-template-columns:minmax(0,1fr)} }
 @media (max-width:599px){ .kcol{flex-basis:84vw} }
@@ -3669,24 +3516,12 @@ svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEE
   .chview .chcomp{overscroll-behavior:contain}
 }
 /* 2.13.4 (phone round, independent review) */
-@media (max-width:767px){
-  #detail{bottom:var(--vvb,0px)}  /* iOS keyboard: the task panel (with its comment box) ends above it */
-  /* 2.152.6 (#2709): the subtask arrow sits right of the circle, in the row's flow (away from the screen edge and the
-     Android back gesture), so the parent's circle lines up with every other task instead of with its subtasks */
-  .trow > .caret{position:relative;left:auto;top:auto;flex:none;margin:1px -.375rem 0 -.375rem}
-  .trow > .caret::before{left:0}  /* its touch area grows rightwards only, never over the circle */
-  :root .trow > .caret::after{left:0}
-  /* CI of 2.307.3: on touch a full 2.75rem target (K10), still only rightwards (was 31 px wide) */
-  @media (pointer:coarse){ :root .trow > .caret::after{content:"";position:absolute;left:0;right:auto;width:2.75rem;top:50%;bottom:auto;height:2.75rem;transform:translateY(-50%)} }
-}
 @media (pointer:coarse){
-  .trow .caret::after,.qchip::after,.ib::after{content:'';position:absolute;inset:-.6875rem}
-  .trow .caret::after{inset:-.6875rem -.375rem}
+  .qchip::after,.ib::after{content:'';position:absolute;inset:-.6875rem}
   .qchip{position:relative}
 }
 pre.mdpre{margin:.375rem 0;padding:.5rem .625rem;background:var(--bg3);border:1px solid var(--line);border-radius:var(--r-s);overflow-x:auto;font:var(--fs-s)/var(--lh) var(--mono);white-space:pre;max-width:100%}
 pre.mdpre code{font:inherit;background:none;padding:0;border:0}
-@media (min-width:768px){ @container lrows (max-width:48rem){ .trow.hascols{padding-top:var(--row-py);padding-bottom:var(--row-py)} } }
 /* 2.14.0 (#425): list columns (the same for every member). Wide: a column per key with a title row; the cells a width has
    no room for move into the second line (.mlc, classes o2…o10 = needs at least that many columns); narrow list columns
    and phones: two compact cells at the end of the row, the rest in the second line. */
@@ -3730,14 +3565,14 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 .lchead .lcsa{display:inline-flex;flex:none;color:var(--accent)}
 .lchead .lcsa .cup{transform:rotate(180deg)}
 @media (pointer:coarse){ .lchead .lcs{min-height:2.75rem} }  /* fix 2.31: touch tablets: 44 px column titles */
-.mlc,.trow .meta .mlc{display:none;align-items:center;gap:.25rem}
-.lc.o10{display:none}.trow .meta .mlc.o10{display:inline-flex}
+.mlc{display:none;align-items:center;gap:.25rem}
+.lc.o10{display:none}
 @media (min-width:768px){
-  @container lrows (width < 96rem){ .lc.o7{display:none} .trow .meta .mlc.o7{display:inline-flex} }  /* 2.534.0 A (#4551): a list is at most --w-seite = 96rem wide; at that width the o7 columns show (max-width:96rem hid them for good) */
-  @container lrows (max-width:80rem){ .lc.o5{display:none} .trow .meta .mlc.o5{display:inline-flex} }
-  @container lrows (max-width:64rem){ .lc.o3{display:none} .trow .meta .mlc.o3{display:inline-flex} }
+  @container lrows (width < 96rem){ .lc.o7{display:none}  }  /* 2.534.0 A (#4551): a list is at most --w-seite = 96rem wide; at that width the o7 columns show (max-width:96rem hid them for good) */
+  @container lrows (max-width:80rem){ .lc.o5{display:none}  }
+  @container lrows (max-width:64rem){ .lc.o3{display:none}  }
   @container lrows (max-width:48rem){
-    .lc.o2,.lchead{display:none} .trow .meta .mlc.o2{display:inline-flex}
+    .lc.o2,.lchead{display:none} 
     .lcols{gap:.5rem}
     .lcols .lc{width:auto;max-width:6.5rem}
     .lcols .lc-who{max-width:none}
@@ -3746,7 +3581,6 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 }
 @media (max-width:767px){
   .lc.o2,.lchead{display:none}
-  .trow .meta .mlc.o2{display:inline-flex}
   .lcols{gap:.5rem;font-size:var(--fs-xs)}
   .lcols .lc{width:auto;max-width:5.5rem}
   .lcols .lc-who{max-width:none}
@@ -3825,34 +3659,11 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 @media (max-width:767px){ .empty svg.bot{width:5.25rem;height:5.25rem} .empty.hempty{padding:2rem 1rem} }
 /* 2.14.0 (#425, review): rows of a list with its own columns: title, then a second line with the rest (never squeezed
    behind a long title); the cells sit level with the title's first line */
-.trow.haslc .lcols{align-self:flex-start;min-height:calc(var(--row-fs) * 1.45)}
-@media (min-width:768px){
-  .trow.hascols.haslc{align-items:flex-start;padding-top:var(--row-py);padding-bottom:var(--row-py)}
-  .trow.hascols.haslc .chk{margin-top:calc((var(--row-fs) * 1.45 - .875rem) / 2)}
-  .trow.hascols.haslc .tgut{margin-top:calc((var(--row-fs) * 1.45 - var(--fs-s) * 1.45) / 2)}
-  .trow.hascols.haslc .tmain{flex-direction:column;align-items:stretch;gap:0}
-  .trow.hascols.haslc .ttl{white-space:normal;overflow:visible}
-  .trow.hascols.haslc .meta{flex-wrap:wrap;overflow:visible;margin-top:1px;flex:none}
-  .trow.hascols.haslc .meta:empty{display:none}
-}
-@media (max-width:767px){
-  .trow.haslc .tmain{flex:1 1 0;min-width:40%}
-  .trow.haslc .lcols{flex:0 1 auto;min-width:0;max-width:48%;overflow:hidden}
-  .trow.haslc .lcols .lc{max-width:4.75rem;flex:0 1 auto;min-width:0}
-  .trow.haslc .lcols .lc-who{max-width:none;flex:none}
-  .trow.haslc .tgut{min-width:2.25rem}
-}
 /* 2.40.0 (#1191): tablets and an unfolded Fold (600-899 px): the list rows get real columns like on a desktop, narrower and
    with the column titles; what does not fit falls away on the right instead of moving into a second line (the title keeps
    at least 10rem). Phones (< 600 px) and the rest of the app (sidebar, dock, dialogs) stay as they are. */
 @media (min-width:600px) and (max-width:767px){
   .lwrap{container:lrows / inline-size}
-  .trow.hascols{align-items:center}
-  .trow.hascols .chk{margin-top:0}
-  .trow.hascols .tmain{flex-direction:row;align-items:baseline;gap:.5rem;min-width:10rem}
-  .trow.hascols .ttl{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .trow.hascols .meta{flex-wrap:nowrap;overflow:hidden;margin-top:0;min-width:0;flex:1 1 0}
-  .trow.hascols .meta .m-col,.trow.hascols .meta .mlc,.trow.hascols .wcell{display:none}
   .tcols{display:flex;align-items:center;gap:.5rem;flex:none;font:var(--fs-xs)/var(--lh-tight) var(--mono);color:var(--text2);font-variant-numeric:tabular-nums;cursor:pointer}
   .tcols>span{display:inline-flex;align-items:center;justify-content:flex-end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .tcols .c-time{width:3rem}
@@ -3864,9 +3675,7 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
   .tcols .over{color:var(--p5)}
   .tcols .today{color:var(--accent)}
   .lchead{display:flex;gap:.5rem;padding-left:.75rem;padding-right:.25rem}
-  .trow.haslc .tmain{flex:1 1 0;min-width:10rem}
-  .trow.haslc .lcols{flex:none;max-width:none;gap:.5rem;font-size:var(--fs-xs);overflow:visible}
-  .trow.haslc .lcols .lc,.lchead .lc{flex:none;max-width:none}
+  .lchead .lc{flex:none;max-width:none}
   .lc.o2{display:inline-flex}
   /* the same widths for the cells and the column titles (.lcols .lc{width:auto} of the phone rules above weighs more than .lc-due) */
   :is(.lcols,.lchead) .lc-due{width:6rem}:is(.lcols,.lchead) .lc-tags{width:6rem}:is(.lcols,.lchead) .lc-f{width:5.5rem}:is(.lcols,.lchead) .lc-prio{width:2.75rem}:is(.lcols,.lchead) .lc-deps{width:4.5rem}:is(.lcols,.lchead) .lc-created{width:4.5rem}
@@ -3911,11 +3720,6 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 /* the priority as a shape (! / !! / !!!) next to the title, in the priority colour (the circle alone was colour only) */
 .ttl .prm{font:600 var(--fs-s)/1 var(--mono);margin-left:.375rem;letter-spacing:-.06em;vertical-align:.06em;white-space:nowrap}
 .prm.p7{color:var(--p7)}.prm.p5{color:var(--p5)}.prm.p3{color:var(--p3)}.prm.p1{color:var(--p1)}
-.trow.done .prm{display:none}
-/* the row title is a focus stop (roving): the focus ring around the title, not the whole row */
-.trow .ttl[data-kt]:focus{outline:none}
-.trow .ttl[data-kt]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-s)}
-.trow:has(.ttl[data-kt]:focus-visible){background:var(--accent-soft)}
 /* fields: a 2 px ring on keyboard focus (a coloured 1 px border alone was faint), dialogs focused as a whole: no ring */
 input:focus-visible,select:focus-visible,textarea:focus-visible{box-shadow:0 0 0 1px var(--accent)}
 /* 2.18.0: composite input bars (quick add inline / sheet / dock, comment box, search fields, the palette) show the focus
@@ -3935,13 +3739,11 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{box-shadow:0 0 0
 }
 /* Windows high contrast / forced colours: states that were only a background or a colour get a border / outline */
 @media (forced-colors: active){
-  .chk{border-color:CanvasText!important;forced-color-adjust:none;background:Canvas}
-  .chk.on{background:Highlight!important;border-color:Highlight!important;color:HighlightText!important}
-  .trow.sel,.trow.kfocus,.srow.on,.seg button.on,.lkopts button.on,.mquick button.on,.menu-list button.on,[aria-pressed="true"],[aria-selected="true"]{outline:2px solid Highlight;outline-offset:-2px}
+  .srow.on,.seg button.on,.lkopts button.on,.mquick button.on,.menu-list button.on,[aria-pressed="true"],[aria-selected="true"]{outline:2px solid Highlight;outline-offset:-2px}
   .btn,.iconbtn,.mbb,.qchip,.chip,.ttchip{border:1px solid ButtonText}
   .adot,.sdot,.badge,.prm{forced-color-adjust:none}
   :focus-visible{outline:2px solid Highlight!important;outline-offset:2px}
-  .modal>.card,#pop,#toast,#detail,#side{border:1px solid CanvasText}
+  .modal>.card,#pop,#toast,#side{border:1px solid CanvasText}
 }
 /* fields are recognisable as fields (1.4.11: 3:1 against what is around them) */
 :root{--field-line:#6b6e76}
@@ -3949,7 +3751,6 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{box-shadow:0 0 0
 @media (prefers-color-scheme: light){ :root[data-theme="auto"]{--field-line:#86898f} }
 input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{border-color:var(--field-line)}
 input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{border-color:var(--accent)}
-#detail:focus{outline:none}
 /* the boxes around borderless fields (composer, comment / chat box, settings search, palette, subtask / tag fields) */
 .qadd .box,.qadd.dock,.ccomp,.ssearch,.ctsearch,.chcomp textarea{border-color:var(--field-line)}
 .qadd.dock .box{border-color:transparent}
@@ -4007,9 +3808,8 @@ body.pgdrag:not(.lcwdrag)::after{content:"";position:fixed;inset:0;z-index:59;cu
 /* 2.39.1 (#1217): fine lines between the columns through every row and the titles (lists with their own columns, wide
    layouts): a 1 px line half a gap left of each cell, cut to the row; the cell clips its content itself (clip-path) */
 @media (min-width:768px){ @container lrows (min-width:48.0625rem){
-  .trow.haslc,.lchead{overflow-y:clip}
-  .trow.haslc .lcols .lc{position:relative;overflow:visible;clip-path:inset(-100vh 0 -100vh -.5rem)}
-  .trow.haslc .lcols .lc::before,.lchead .lc::before{content:"";position:absolute;left:calc(-.375rem - .5px);top:-100vh;bottom:-100vh;width:1px;background:var(--line);pointer-events:none}
+  .lchead{overflow-y:clip}
+  .lchead .lc::before{content:"";position:absolute;left:calc(-.375rem - .5px);top:-100vh;bottom:-100vh;width:1px;background:var(--line);pointer-events:none}
 } }
 .lcguide{position:fixed;width:2px;margin-left:-1px;background:var(--accent);z-index:60;pointer-events:none;border-radius:1px}
 /* 2.39.1 (#1217): moving a column: the grabbed title dims, the accent line shows where it goes */
@@ -4275,7 +4075,7 @@ a.tref:hover{background:var(--accent-soft)}
 @media (pointer:coarse){ .tcrhead .iconbtn,.nthead .iconbtn,.dcust .iconbtn{min-width:2.75rem;min-height:2.75rem} .dwl a,.dtl li,.dpl a{min-height:2.75rem} }
 @media (min-width:768px){ body.in-team #view{padding-bottom:1rem} }
 .ngmain{min-height:2.5rem;display:flex;flex-direction:column;justify-content:center}
-@media (pointer:coarse){ .ngmain{min-height:2.75rem} .dtl .dtt{align-self:stretch;display:flex;align-items:center} .dtl .chk::after{inset:-1.0625rem} }
+@media (pointer:coarse){ .ngmain{min-height:2.75rem} .dtl .dtt{align-self:stretch;display:flex;align-items:center}  }
 /* 2.17.0 (#649): "Show more" at the end of a very long view */
 .rowmore{display:flex;align-items:center;gap:.75rem;padding:.75rem 0;flex-wrap:wrap}
 .tccomp,.cbub.tcedit{position:relative}
@@ -4387,10 +4187,6 @@ a.tref:hover{background:var(--accent-soft)}
 @media (pointer:coarse){ .ddup .iconbtn{min-width:2.75rem;min-height:2.75rem;justify-content:center} .ddupt .linkbtn{min-height:2.75rem} }
 /* 2.18.0 (#430): milestones = tasks with a diamond instead of the round status glyph; milestone section in the task panel */
 .msd{display:inline-block;flex:none;width:.5625rem;height:.5625rem;border:1.5px solid currentColor;border-radius:1px;transform:rotate(45deg);margin:0 .3125rem 0 .125rem;vertical-align:.0625rem}
-.chk.ms{border-radius:2px;transform:rotate(45deg) scale(.88)}
-.chk.ms svg{transform:rotate(-45deg)}
-.chk.ms.work{border-left-color:var(--st-work)}
-.povm .chk.ms{border-radius:2px}
 .meta .msm{display:inline-flex;align-items:center;font-size:var(--fs-xs);color:var(--muted)}
 .meta .mschip{display:inline-flex;align-items:center;max-width:12rem;font-size:var(--fs-xs);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meta .mschip .msd{width:.4375rem;height:.4375rem}
@@ -4426,7 +4222,7 @@ a.tref:hover{background:var(--accent-soft)}
 .msrnh h6{margin-bottom:.25rem}
 .msrn{font-size:var(--fs-s);background:var(--bg2);border-radius:var(--r-s);padding:.375rem .625rem;overflow-wrap:anywhere}
 @media (pointer:coarse){ .mstasks .linkbtn,.msbtab summary{min-height:2.75rem;min-width:2.75rem;display:flex;align-items:center} .msrnh .btn{min-height:2.75rem} .fields .dmsl{min-height:2.75rem} }
-@media (forced-colors:active){ .chk.ms{border-color:CanvasText!important} .msbar i{background:Highlight} }
+@media (forced-colors:active){  .msbar i{background:Highlight} }
 .povm .pmn .linkbtn{min-width:0;max-width:100%;min-height:1.5rem;text-align:left;color:var(--text);display:flex;align-items:center}
 @media (pointer:coarse){ .povm .pmn .linkbtn{min-height:2.75rem;min-width:2.75rem} }
 /* 2.18.0 review (R13): completed calendar chips readable (opacity .5 gave 3.2:1): muted text + strike-through instead */
@@ -4823,16 +4619,12 @@ button.lkchip:hover{border-color:var(--accent)}
 /* 2.22.0 (#681): the inbox section of Today, a row with its quick buttons (today, tomorrow, a list) */
 .tinbox .ghead .i{margin-right:-.125rem}
 .tinrow{display:flex;align-items:center;gap:.25rem;min-width:0}
-.tinrow>.trow{flex:1;min-width:0}
 .tinacts{display:inline-flex;gap:.125rem;flex:none}
 @media (pointer:coarse){ .tinacts .iconbtn{width:2.75rem;height:2.75rem} }
 .emobtn.sugg{outline:1px dashed color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:2px}
 /* 2.22.0 (#683): editing a title right in the list shows ONE focus ring: the field's own (an outline, so the row keeps its
    height), never a second one around the row (keyboard focus, :has(:focus-visible) background ring). Same for the other
    fields that sit inside a row: "add to section", "add subtask", the tag field, Kanban's add field */
-.trow.iedit,.trow.iedit.kfocus,.trow:has(.ttlin:focus){outline:0!important;box-shadow:none!important}
-.trow .ttlin{border:0;background:transparent;padding:0;line-height:inherit;border-radius:var(--r-s)}
-.trow .ttlin:focus,.trow .ttlin:focus-visible{outline:0;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 9%,transparent)}
 .secadd input{border-bottom-color:var(--field-line)}
 :is(.secadd,.subadd) input:focus-visible,#d-tag:focus-visible,.kadd input:focus-visible{outline:0;box-shadow:inset 0 -2px 0 var(--accent);border-bottom-color:var(--accent)}
 .secadd:has(input:focus),.subadd:has(input:focus){box-shadow:none;outline:0}
@@ -5221,12 +5013,8 @@ button.lkchip:hover{border-color:var(--accent)}
 /* 2.32.0 (#1055): the phone's selection bar: four equal labelled buttons (Move, Date, Complete, More); a grip at the end of
    each row drags it while selecting (no long press needed there) */
 #mbar.mb4 .mbb{flex:1 1 0;min-width:3.25rem}
-.trow .tgrip{flex:none;display:inline-flex;align-items:center;justify-content:center;width:2.75rem;min-height:2.75rem;margin:-.375rem -.5rem -.375rem 0;color:var(--muted);touch-action:none;cursor:grab}
 /* the phone: the multi panel is a bottom sheet over the list (the rows above it stay tappable) */
 @media (max-width:767px){
-  #detail.multi{top:auto;max-height:min(82dvh,calc(var(--vvh,100dvh) - 3rem));border-radius:1rem 1rem 0 0;border-top:1px solid var(--line2);box-shadow:0 -.75rem 2.5rem rgba(0,0,0,.35);transform:translateY(102%);padding-top:0;padding-bottom:var(--safe-b);z-index:46}
-  #detail.multi.open{transform:none}
-  #detail.multi .dtop{border-radius:1rem 1rem 0 0}
   .mef{grid-template-columns:minmax(5.75rem,7rem) minmax(0,1fr) auto}
 }
 /* #937: a docked box with the focus, pinned right above an iOS keyboard (vvPin) */
@@ -5450,10 +5238,6 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 /* 2.31.1 (#1051 device test): on a phone the number starts the meta line right of the done circle; the circle's touch area
    (::after, 17 px each side) reached over it, so a tap on the number ticked the task off. Rightwards it now ends 2 px
    past the circle, short of the title column */
-@media (max-width:767px){
-  :root .trow .chk::after{left:auto;right:-.125rem;width:2.75rem}  /* still 44 px wide: it grows to the left instead */
-  .trow > .caret{z-index:1}  /* the subtask arrow right of the circle stays tappable above that area */
-}
 /* 2.32.0 (#1063, #983, #1061): the view builder. Blocks in the chosen order; "half" = two side by side on a computer,
    "full" = the whole width; phones: one column. Customize = the editor list (.lyed .dcust, the start page's rows). */
 .lygrid{display:grid;grid-template-columns:minmax(0,1fr);gap:0 1rem;align-items:start}
@@ -5507,8 +5291,6 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 @media (hover:none),(pointer:coarse){
   #chat-msgs .cmsg:not(.rxshow):not(:focus-within) .rxrow .rx.rxtog{position:absolute;width:1px;height:1px;min-width:0;min-height:0;margin:0;padding:0;overflow:hidden;clip-path:inset(50%)}
 }
-/* 2.32.0 (#1071): phones: swiping the open task sideways to the next / previous one; "3 of 12" for a moment at the top */
-#detail.dswipe{overflow-x:hidden}
 .dswpos{position:fixed;top:calc(var(--safe-t,0px) + .5rem);left:50%;transform:translate(-50%,-.5rem);z-index:70;padding:.25rem .75rem;border-radius:99rem;background:var(--bg3);border:1px solid var(--line2);color:var(--text2);font-size:var(--fs-s);box-shadow:0 .25rem 1rem rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
 .dswpos.on{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){ .dswpos{transition:none} }
@@ -5584,7 +5366,6 @@ mark.mshl{background:color-mix(in srgb,var(--accent) 28%,transparent);color:inhe
 .ntfask .ntfaskb{display:flex;gap:.375rem;flex:none;margin-left:auto}
 @media (max-width:767px){ .ntfask{margin:.375rem .5rem 0} .ntfask .annt{flex:1 1 calc(100% - 1.5rem)} .ntfask .ntfaskb .btn{min-height:2.75rem} .ntfcust .chkl{min-height:2.75rem} }
 /* 2.33.0 (#1087): iPhone keyboard with the focus in the comment box: the task panel fills exactly the visible part (detailKbFit) */
-@media (max-width:767px){ #detail.vvfix{top:var(--vvt,0px);bottom:auto;height:var(--vvh,100dvh);transition:none} }
 .chrbtn{display:inline-flex;align-items:center;justify-content:center;height:1.5rem;padding:0 .4375rem;border-radius:99rem;border:1px solid var(--line2);background:transparent;color:var(--text2);cursor:pointer}
 @media (pointer:coarse){ .chrbtn{min-width:2.75rem;min-height:2.75rem} }
 /* 2.34.0 (#1090): the usage ring's own box is 44 px on touch screens (the visible ring stays 18 px), the line keeps its height;
@@ -5724,8 +5505,6 @@ body.lydragging,body.lydragging *{cursor:grabbing!important;-webkit-user-select:
 /* 2.36.0 (#1118): the lock of a task: a small lock after the title in the row, the lock button in the task header */
 .ttl .tlkr{display:inline-flex;vertical-align:-.15em;margin-left:.375rem;color:var(--muted)}
 .ttl .tlkr svg{width:var(--ic-s);height:var(--ic-s)}
-#detail .dtop .tlkb.on{color:var(--accent)}
-#detail.tlk #d-md{cursor:text}
 /* 2.36.0 (#1110): the agent's suggestion buttons sit below the time / reactions line of its message */
 .cmsg > .cmeta + .cchoices{margin-top:.375rem;margin-bottom:0}
 
@@ -5914,7 +5693,7 @@ svg.i.lbot .d{fill:var(--bot)}
 /* 2.38.0 (#1178 / #1155): touch screens: a long press on a task row (its title too) or in the sidebar is the app's gesture
    (select, drag, menu), never a text selection with the system's Copy bar; copying a title stays in the task's panel */
 @media (hover: none), (pointer: coarse){
-  .trow,.trow .ttl,#side{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  #side{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   #side input,#side textarea{-webkit-user-select:text;user-select:text}
 }
 /* 2.38.0 (#1173): the installed app does not zoom (pinch, double tap); lifted while a picture / file view / the timeline is open */
@@ -6057,11 +5836,6 @@ html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5re
 /* ---- 2.40.0 D (#1366): PDF in the browser + own download button ---- */
 /* ---- 2.40.0 D (#1368 #1381 #1366): office documents ---- */
 /* ---- end 2.40.0 D ---- */
-/* 2.40.0 (#1344): My tasks in the own order - the grey subtitle "List › Section" under a task (a tap opens the list) */
-.trow .mosub{display:inline-flex;align-items:center;gap:.25rem;max-width:100%;padding:0;border:0;background:none;font:inherit;font-size:var(--fs-xs);color:var(--muted);cursor:pointer;min-width:0}
-.trow .mosub > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.trow .mosub:hover{color:var(--text);text-decoration:underline}
-@media (pointer:coarse){ .trow .mosub{min-height:1.75rem} }
 /* 2.41.0 (#1365): "My tasks": the small group "From hidden lists" and the folded "Hidden" with one head per list */
 .ghead.mturg,.ghead.mthid{font-weight:500;color:var(--muted)}
 .ghead.mturg{font-size:var(--fs-xs)}
@@ -6135,15 +5909,9 @@ html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5re
 .tzmodal .btn.danger{color:var(--p5)}
 
 /* 2.43.0 D (#1500) a task in its own window: only the task panel */
-html.mini-task #main,html.mini-task #top,html.mini-task .qdock,html.mini-task #detail .dclose,html.mini-task #detail .back,html.mini-task #detail [data-mwtask]{display:none!important}
+html.mini-task #main,html.mini-task #top,html.mini-task .qdock{display:none!important}
 html.mini-task #app,html.mini-task #app.detail-open{grid-template-columns:minmax(0,1fr)}
 .mwgone{display:flex;flex-direction:column;align-items:center;gap:.75rem;padding:3rem 1.5rem;text-align:center;color:var(--muted)}
-/* 2.43.0 B (#1330, #1003): dependencies by dragging (Alt + drop, the panel's drop fields), several tasks at once */
-#view .trow.dgdep,#view .trow.dgonto,#view .trow.dgno{position:relative;box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-soft)}
-#view .trow.dgno{box-shadow:inset 0 0 0 2px var(--line2);background:none}
-#view .trow.dgdep::after,#view .trow.dgonto::after,#view .trow.dgno::after{content:attr(data-dg);position:absolute;right:.5rem;top:50%;transform:translateY(-50%);z-index:2;pointer-events:none;
-  padding:.125rem .5rem;border-radius:99rem;background:var(--accent);color:var(--accent-ink);font-size:var(--fs-s);font-weight:600;white-space:nowrap;max-width:70%;overflow:hidden;text-overflow:ellipsis}
-#view .trow.dgno::after{background:var(--bg4);color:var(--text2)}
 .dgghost{position:fixed;top:-200px;left:-200px;padding:.375rem .75rem;border-radius:99rem;background:var(--accent);color:var(--accent-ink);font-size:var(--fs-m);font-weight:600;white-space:nowrap}
 .dgzones{display:flex;gap:.5rem;margin:.375rem 0 .5rem}
 .dgzone{flex:1;display:flex;flex-direction:column;gap:.125rem;padding:.625rem .75rem;border:2px dashed var(--line2);border-radius:var(--r-l);color:var(--text2);font-size:var(--fs-m);min-height:3.25rem}
@@ -6247,7 +6015,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .fxkr select{max-width:12rem}
 /* 2.43.0 A (#1331): a list like a spreadsheet (sheetgrid.js): the active cell, a selected range, the fill handle, the
    new row under the last one, the paste preview */
-#view .lcols .lc[tabindex],#view .trow .tmain .ttl.sgact{outline:none}
+#view .lcols .lc[tabindex]{outline:none}
 #view .lcols .lc[data-sgk]{align-self:stretch;min-height:1.25rem}  /* an empty due / assignee cell is still a target */
 #view .sgact{position:relative;box-shadow:inset 0 0 0 2px var(--accent);border-radius:var(--r-s)}
 #view .lcols .lc.sgsel{position:relative;background:color-mix(in srgb,var(--accent) 14%,transparent);border-radius:0}
@@ -6444,25 +6212,8 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .pmcs li{line-height:var(--lh)}
 /* 2.46.1 E (#1622) inline title edit: the field is a block on the circle's line (no inline baseline / strut offset), the frame
    ends before the columns, row-mode rows centre it instead of baseline-aligning to the meta */
-.trow.iedit .ttl{display:block;line-height:var(--lh);min-height:calc(var(--row-fs) * 1.45)}
-.trow.iedit .ttlin{display:block;width:100%;min-height:0;line-height:inherit;margin:0;vertical-align:top;resize:none;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;letter-spacing:inherit;color:inherit;padding:0;border:0;border-radius:2px;background:color-mix(in srgb,var(--accent) 9%,transparent)}  /* 2.497.0 (#4056): the title as it stands: same font and wrapping, height from ttlinFit, a soft tint instead of a frame */
-@media (min-width:600px){
-  .trow.hascols.iedit:not(.haslc) .tmain{align-items:center}
-  .trow.hascols.iedit .ttl{flex:1 1 auto;min-width:0}
-  .trow.hascols.iedit .meta{flex:0 1 auto}
-}
-@media (min-width:768px){
-  .trow.hascols.iedit .ttl{flex:1 1 0;min-width:0}
-  .trow.hascols.iedit .meta{flex:0 1 auto}
-}
 /* 2.437.0 A (#3626): in a narrow list (task panel open) the row is the phone row, title above the columns: the field fills the
    width right of the circle (the row-mode centring above left it floating mid-row) */
-@media (min-width:600px){
-  @container lrows (max-width:48rem){
-    .trow.hascols.iedit .tmain{align-items:stretch}
-    .trow.hascols.iedit .ttl{flex:none;width:100%}
-  }
-}
 
 /* 2.46.1 E (#1637) Office: three tab levels, calmer and flush left -- area tabs as pills, the module's tabs underlined,
    the document kinds as small segment switches; search field and filter share one height; no heading above the tabs */
@@ -6506,8 +6257,6 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 @keyframes an_pop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
 @keyframes an_popout{from{opacity:1;transform:none}to{opacity:0;transform:scale(.8)}}
 @keyframes an_hint{from{opacity:0}to{opacity:1}}
-.trow.an-rowout{opacity:0;transform:translateX(.75rem);transition:opacity .18s ease-in,transform .18s ease-in;pointer-events:none}
-.trow.an-rowin{animation:an_rowin .3s ease-out}  /* 2.98.0 D (#2163): .2 s -> .3 s */
 @media (max-width:767px){
   #fab:not(.gone){animation:an_pop .2s ease-out}
   #fab.gone.an-out{display:grid!important;animation:an_popout .18s ease-in forwards;pointer-events:none}
@@ -6557,15 +6306,13 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 @keyframes an_tin{from{opacity:0;translate:0 .75rem}to{opacity:1;translate:0 0}}
 @keyframes an_tout{from{opacity:1;translate:0 0}to{opacity:0;translate:0 .75rem}}
 @media (min-width:768px) and (prefers-reduced-motion:no-preference){
-  #app.detail-open>#detail:not(.hidden):not(.an-out){animation:an_pin .2s cubic-bezier(.2,.8,.2,1)}
-  #detail.an-out{display:flex!important;position:fixed;z-index:44;margin:0;animation:an_pout .18s ease-in forwards;pointer-events:none}
   #side.an-sin{animation:an_sin .2s cubic-bezier(.2,.8,.2,1)}
   #pop:not(.hidden):not(.sheet),.dpop:not(.sheet){transform-origin:top center;animation:an_mpop .16s cubic-bezier(.2,.8,.2,1)}
   #pop.hidden.an-out:not(.sheet){display:block!important;animation:an_mpopout .15s ease-in forwards;pointer-events:none}
   .dpop.an-out:not(.sheet){animation:an_mpopout .15s ease-in forwards;pointer-events:none}
   #toast:not(.hidden){animation:an_tin .2s cubic-bezier(.2,.8,.2,1)}
   #toast.hidden.an-out{display:flex!important;animation:an_tout .18s ease-in forwards;pointer-events:none}
-  .trow.an-rowin,#side .an-rowin{animation:an_rowin .2s cubic-bezier(.2,.8,.2,1)}
+  #side .an-rowin{animation:an_rowin .2s cubic-bezier(.2,.8,.2,1)}
 }
 /* 2.46.0 C (#1606 / #1605): the question before a folder role replaces roles set per list (three buttons, wrap on a phone);
    a group's picture in the chip of a task assigned to it */
@@ -6784,11 +6531,6 @@ a.wkitem:hover{background:var(--bg3)}
 /* 2.49.0 D (#1766) ticking off: the line runs over the title (ui-strike), then the row folds away (ui-gone, only when completed
    tasks are hidden). Height is animated on purpose here; reduced motion draws the line at once (ui-now) and drops the row. */
 @keyframes ui_strike{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-.trow.ui-strike .ttl{position:relative;color:var(--muted);transition:color .35s}
-.trow.ui-strike .ttl::after{content:'';position:absolute;left:0;right:0;top:55%;height:1.5px;background:var(--faint);transform-origin:left center;animation:ui_strike .35s ease-out forwards;pointer-events:none}
-.trow.ui-strike.ui-now .ttl{transition:none}
-.trow.ui-strike.ui-now .ttl::after{animation:none}
-.trow.ui-gone{height:0!important;min-height:0;opacity:0;overflow:hidden;padding-top:0;padding-bottom:0;margin-top:0;margin-bottom:0;border-width:0;pointer-events:none;transition:height .25s ease-in,opacity .25s ease-in,padding .25s ease-in,margin .25s ease-in}
 /* 2.48.0 C (#1367) PDF preview (pdfview.js): the text viewer's box, wider, pages on a neutral ground */
 /* 2.48.0 C (#1642) locked notes (notelock.js): the lock under a note, the locked placeholder, the unlocked editor; the printable recovery code */
 .lnbar{display:flex;margin:.125rem 0 .25rem}
@@ -7293,8 +7035,6 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 #main.lp-acc,#fab.lp-acc{--accent:var(--lpd);--accent-ink:var(--lpid);--accent-soft:color-mix(in srgb,var(--accent) 9%,var(--bg));--st-complete:var(--accent)}
 :root[data-theme="light"] :is(#main,#fab).lp-acc{--accent:var(--lpl);--accent-ink:var(--lpil)}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"] :is(#main,#fab).lp-acc{--accent:var(--lpl);--accent-ink:var(--lpil)} }
-#main:not(.lp-one) #view .trow.lpc,#view .kcards .trow.lpc{box-shadow:inset .1875rem 0 0 var(--lpc)}
-#main:not(.lp-one) #view .trow.lpc::before,#view .kcards .trow.lpc::before{left:.375rem}
 .cal .ev.lpc,.week .ev.lpc,.wev.lpc{border-left-color:var(--lpc)}
 .wev.lpc{background:color-mix(in srgb,var(--lpc) 16%,var(--bg2))}
 :is(.cal,.week) .ev.lpc.p5{background:color-mix(in srgb,var(--p5) 20%,var(--bg3))}
@@ -7917,21 +7657,6 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .meta .mlm .mll{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta .mlm svg.i{flex:0 0 auto;color:var(--accent)}
 @media (max-width:599px){.meta .mlm{max-width:8rem}}
-/* 2.320.0 (#3289): the field Projects in the task panel; Alt onto a project in the sidebar (the hint while dragging) */
-#detail .dmlp{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;margin:.125rem 0 .5rem;font-size:var(--fs-s);color:var(--text2)}
-#detail .dmlpk{color:var(--muted);margin-right:.125rem}
-#detail .mlp{display:inline-flex;align-items:center;gap:.25rem;max-width:14rem;min-height:1.75rem;padding:0 .5rem;border:1px solid var(--line2);border-radius:99rem;min-width:0}
-#detail .mlp.own{background:var(--bg3)}
-#detail .mlp>span,#detail .mlpn>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#detail .mlp svg.i{flex:0 0 auto;color:var(--muted)}
-#detail .mlp:has(.mlpx){padding-right:0}
-#detail .mlpn{display:inline-flex;align-items:center;gap:.25rem;min-width:0;min-height:1.5rem;color:inherit}
-#detail .mlpn:hover{color:var(--text)}
-#detail .mlpx{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:1.5rem;min-height:1.5rem;border-radius:99rem;color:var(--muted)}
-#detail .mlpx:hover{background:var(--bg3);color:var(--text)}
-#detail .mlpadd{display:inline-flex;align-items:center;gap:.25rem;min-height:1.75rem;min-width:1.75rem;justify-content:center;padding:0 .5rem;border:1px dashed var(--line2);border-radius:99rem;color:var(--accent)}
-#detail .mlpadd:hover{background:var(--accent-soft)}
-@media (pointer:coarse){ #detail .mlpadd{min-height:2.75rem;min-width:2.75rem} }  /* Sammelzug 2.376 (p260): a full touch target */
 .srow.mlalt,.srow.mlno,.srow.mlhint{position:relative}
 .srow.mlalt{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
 .srow.mlno{box-shadow:inset 0 0 0 2px var(--line2)}
@@ -8089,8 +7814,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .msvvqa{margin:0 0 .5rem}
 .msvvqa .box{display:flex;align-items:center;gap:.5rem}
 .msvvqa input{flex:1 1 auto;min-width:0;min-height:2.75rem}
-.trow.msvrow .meta{flex-wrap:wrap}
-.trow.msvrow .tmain{cursor:pointer}
 .msvvdlg .card{max-width:36rem}
 .msvvdh{display:flex;align-items:center;gap:.5rem}
 .msvvdsrv{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
@@ -8123,7 +7846,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .ev.msvev .msvb{min-width:auto;height:.875rem;padding:0 .1875rem;font-size:var(--fs-xxs)}
 .msvvcal{display:flex;flex-direction:column;gap:.125rem;margin-top:.5rem}
 .cevrow.msvcev{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
-@media (max-width:599px){.trow.msvrow .meta .lst{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 /* 2.73.0 B (#1473) move and export everything (Settings > Data, move.js) */
 .umzbar { display: grid; gap: .375rem; margin: .5rem 0; }
 .umzbar progress { width: 100%; height: .5rem; accent-color: var(--accent); }
@@ -8214,7 +7936,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 :root[data-pack="contrast"]{--bg:#000000;--bg2:#0a0a0a;--bg3:#161616;--bg4:#333333;--line:#5c5c5c;--line2:#8a8a8a;--text:#ffffff;--text2:#f0f0f0;--muted:#c4c4c4;--faint:#a3a3a3;--field-line:#a3a3a3}
 :root[data-pack="contrast"][data-theme="light"]{--bg:#ffffff;--bg2:#ffffff;--bg3:#f0f0f0;--bg4:#c8c8c8;--line:#8a8a8a;--line2:#5c5c5c;--text:#000000;--text2:#1a1a1a;--muted:#3d3d3d;--faint:#5a5a5a;--field-line:#5a5a5a}
 @media (prefers-color-scheme: light){ :root[data-pack="contrast"][data-theme="auto"]{--bg:#ffffff;--bg2:#ffffff;--bg3:#f0f0f0;--bg4:#c8c8c8;--line:#8a8a8a;--line2:#5c5c5c;--text:#000000;--text2:#1a1a1a;--muted:#3d3d3d;--faint:#5a5a5a;--field-line:#5a5a5a} }
-:root[data-pack="contrast"] .trow{border-bottom-color:var(--line)}
 .o3c-packs{grid-template-columns:repeat(auto-fill,minmax(6.5rem,1fr))}
 .o3c-pv{display:flex;flex-direction:column;gap:.25rem;width:4rem;height:2.5rem;padding:.375rem;border-radius:var(--r-s);background:var(--pb);border:1px solid var(--pl)}
 .o3c-pv i{display:block;height:.25rem;border-radius:.125rem;background:var(--pt);width:70%}
@@ -8237,8 +7958,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .o3c-ring{flex:none;width:.875rem;height:.875rem;border-radius:50%;background:conic-gradient(var(--accent) calc(var(--p) * 1%),var(--bg4) 0);-webkit-mask:radial-gradient(farthest-side,transparent 58%,#000 62%);mask:radial-gradient(farthest-side,transparent 58%,#000 62%)}
 /* ticking off: the circle pops (transform + opacity only, 200 ms); none with reduced motion */
 @keyframes o3c-pop{0%{transform:scale(.7);opacity:.4}60%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:1}}
-.chk.o3c-pop{animation:o3c-pop .35s ease-out}  /* 2.98.0 D (#2163): .2 s -> .35 s (sheetmotion.js UI_POP_MS keeps the row's exit behind it) */
-@media (prefers-reduced-motion: reduce){ .chk.o3c-pop{animation:none} }
 /* 2.84.0 A (#1198) e-mail as an input of the hub: the section "E-mails" (client card, project page), the reading view, the inbox */
 .hbmwrap{display:flex;flex-direction:column;gap:.5rem}
 .hbmq{display:flex;align-items:center;gap:.375rem;background:var(--bg3);border:1px solid var(--line2);border-radius:var(--radius);padding:0 .5rem}
@@ -8664,7 +8383,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #app.sb-b>#kbar{grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:.5rem;height:var(--kbH);min-width:0;padding:0 .75rem 0 .5rem;background:var(--kbbg,var(--bg2));border-bottom:1px solid var(--line);--kbsr:var(--bg3)}
 :root[data-theme="light"] #kbar{--kbbg:var(--bg);--kbsr:var(--bg)}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"] #kbar{--kbbg:var(--bg);--kbsr:var(--bg)} }
-#app.sb-b>#srail,#app.sb-b>#side,#app.sb-b>#main,#app.sb-b>#detail{grid-row:2}
+#app.sb-b>#srail,#app.sb-b>#side,#app.sb-b>#main{grid-row:2}
 #app.sb-b.side-rail #side{top:var(--kbH)}
 #app.sb-b #top .menu,#app.sb-b #top .cmdbar{display:none!important}
 /* 2.165.8 (#2619): folded + task open below 1140 px the menu button stood in for the hidden bar; 2.290.0 C (#3163): the bar stays */
@@ -8753,29 +8472,13 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 /* list rows with their own columns in a narrow list on a computer: the cells move under the title (like on a phone), the
    title gets the row's width and no longer breaks after each word (the number joins them); render.js copies the first two cells into the line under
    the title (.mlc.o0), hidden everywhere else */
-.trow .meta:has(> .mlc.o0):not(:has(> :not(.mlc.o0))){display:none}
-@media (min-width:768px){ @container lrows (max-width:36rem){
-  .trow.haslc .lcols{display:none}
-  .trow.haslc .meta .mlc.o0{display:inline-flex}
-  .trow.haslc .tgut{display:none}  /* the number moves into that line too (like on a phone, .mid) */
-  .trow.haslc .meta .mid{display:inline-flex;font:var(--fs-s) var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
-  .trow.haslc.sel .meta .mid{color:var(--accent)}
-  :root .trow.hascols.haslc .meta:has(> .mlc.o0){display:flex}
-} }
 /* the task header on a touch computer: the close button stays in the first row at the right (the other buttons wrap under
    it instead of pushing it into a row of its own) */
-@media (min-width:768px) and (pointer:coarse){
-  #detail .dtop:has(> .dclose){padding-right:calc(.75rem + 2.75rem + .375rem)}
-  #detail .dtop > .dclose{position:absolute;top:.625rem;right:.75rem;min-width:2.75rem;min-height:2.75rem;justify-content:center}
-}
 /* live train fix: the room for the close button is only needed in the first row; the second row (date + Today / Tomorrow)
    takes it back, so the date is not cut short (Fold 8 unfolded, 904 px) */
-@media (min-width:768px) and (pointer:coarse){ @container dtop (max-width:27.99rem){ #detail .dtop:has(> .dclose) .dq[data-d="1"]{margin-right:calc(-2.75rem - .375rem)} } }
 /* 2.218.0 B (#2805): phone hit areas of at least 2.75rem (look unchanged, the area grows by padding / ::after) and UI values
    (dates, times, reminder buttons) in the normal font with equal-width digits instead of monospace */
 @media (hover:none),(max-width:767px){
-  .trow > .caret{position:relative}
-  .trow > .caret::after{content:"";position:absolute;inset:-.625rem -.5rem}
   .qchip:not(.dsxwho){position:relative}
   .qchip:not(.dsxwho)::after{content:"";position:absolute;left:0;right:0;top:50%;height:2.75rem;transform:translateY(-50%)}
   .tsbar .iconbtn{min-width:2.75rem;min-height:2.75rem}
@@ -8799,7 +8502,6 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
    the flow until it is used (while it has the focus it stays docked above the keyboard). The list's end keeps the plus
    button's room through #view's padding (#2815) */
 @media (max-height:500px) and (min-aspect-ratio:1/1){
-  #detail .dbot:not(:focus-within):not(.vvpin){position:static}
   .vsegm{margin:0 0 .25rem;padding:.125rem}
   .vsegm button{min-height:2rem;padding:0 .5rem}
   .vsegm button:not(.on)>span{display:none}
@@ -8865,4 +8567,3 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 /* 2.634.0 (#4797) board (mouse): the placeholder where the dragged card will land (dnd.js kph_*); the neighbours slide to
    make room (FLIP, transform only, class kflip while it runs). Reduced motion: the placeholder alone, nothing slides */
 #view .kcards>.kph{flex-shrink:0;border:2px dashed var(--accent);border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 8%,transparent);pointer-events:auto}
-@media (prefers-reduced-motion:no-preference){ #view .kcards>.trow.kflip{transition:transform .18s cubic-bezier(.2,.8,.2,1)} }

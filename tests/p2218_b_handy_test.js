@@ -1,7 +1,8 @@
 // 2.218.0 B (#2801, #2805): phone messages and hit areas; static check of the shipped code and rules (no app start).
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const rd = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
-const app = rd('static/app.css'), ev = rd('static/js/events.js'), und = rd('static/js/undo.js');
+// 2.828.0 (#5446): the row rules moved from app.css into the start style file css/start-00-lists.css
+const app = rd('static/app.css') + '\n' + rd('static/css/start-00-lists.css'), ev = rd('static/js/events.js'), und = rd('static/js/undo.js');
 let ok = 0; const F = [];
 const check = (c, w) => { if (c) ok++; else { F.push(w); console.log('FAIL:', w); } };
 // --- #2801
