@@ -1,6 +1,24 @@
 {
  "versions": [
   {
+   "version": "2.870.0",
+   "date": "2026-11-10",
+   "items": [
+    {
+     "de": "Einstellungen, Kontakt, Mail, Video-Freigabe und Agent einrichten lassen sich am rechten Rand oder an der Ecke größer ziehen; die Größe bleibt gemerkt, Doppelklick stellt sie zurück.",
+     "en": "Settings, contacts, mails, video reviews and the agent setup can be dragged wider at their right edge or corner; the size is kept, a double click resets it."
+    },
+    {
+     "de": "Das Feld Archivnummer erscheint nur noch bei Scans und Dokumenten mit Nummer; sonst vergibst du sie über Aktionen.",
+     "en": "The archive number field now only shows for scans and documents that have a number; otherwise assign one from Actions."
+    },
+    {
+     "de": "Im Agent-Chat am Handy bricht der Zwischenstand unter „schreibt…“ jetzt auf bis zu drei Zeilen um; Tippen zeigt den ganzen Text.",
+     "en": "In the agent chat on a phone the interim status under \"is writing\" now wraps to up to three lines; a tap shows the whole text."
+    }
+   ]
+  },
+  {
    "version": "2.858.0",
    "date": "2026-11-10",
    "items": [
