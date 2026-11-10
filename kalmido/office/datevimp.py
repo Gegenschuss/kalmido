@@ -44,7 +44,7 @@ from .legacyimport import fi_norm, _client_used, bk_detail, fi_client_undo_check
 from ..team.clients import clean_client  # 2.369.5 (#2517): pulled up from functions
 from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
-from .okern import ofk_register, ofk_restore, ofk_trash  # 2.784.0 (#5366)
+from .okern import ofk_purge, ofk_register, ofk_restore, ofk_trash  # 2.784.0 (#5366), 2.809.0 (#5418): ofk_purge
 
 DI_MAX = 10 * 1024 * 1024       # the uploaded file
 DI_ROWS_MAX = 20000             # data rows of one file
@@ -570,7 +570,7 @@ def di_undo(c, oid, uid, r):
         same = (_sup_fp(oid, oc_dec_fields(c, oid, "office_suppliers", r2)) == made[str(r2["id"])]) if str(r2["id"]) in made \
             else r2["updated_at"] == r2["created_at"]
         if same:
-            c.execute("DELETE FROM office_suppliers WHERE id=? AND org_id=?", (r2["id"], oid))
+            ofk_purge(c, DI_SUP_KIND, r2["id"])  # 2.809.0 (#5418): the core's way, no obj_undo / obj_history left behind
             n += 1
         else:
             kept["suppliers"] = kept.get("suppliers", 0) + 1

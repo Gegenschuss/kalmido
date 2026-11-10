@@ -15,8 +15,12 @@ from ..core.access import Denied
 from ..core.objects import OBJ, obj_register, obj_row
 from ..core.pg import qi, system_ctx
 from ..core.retention import ret_on, ret_trash_cut
-from ..core.writes import obj_restore, obj_trash, obj_trash_prune
-from .model import office_role, pb_owner
+from ..core.writes import _purge_rows, obj_restore, obj_trash, obj_trash_prune
+from ..core.objects import obj_forget  # 2.809.0 (#5418)
+from ..core.pg import write_lock  # 2.809.0 (#5418)
+from .model import office_on, office_role, pb_owner
+from ..accounts.orgroles import is_write_request, office_allowed  # 2.809.0 (#5418)
+from ..accounts.supportgrant import sga_org_foreign  # 2.809.0 (#5418)
 from .rights import office_can
 
 OFK = {}  # kind -> {table, area, need}
@@ -33,6 +37,13 @@ def _base_of(kind):
         if row is None or not row["org_id"]:
             return None
         oid = row["org_id"]
+        # 2.809.0 (#5418): the same gates as the office routes (office_gate / office_org) also on the core's way (/api/undo,
+        # the trash): the office switched on for the person, the organisation role may write there (office_allowed: no
+        # read-only, accounting or guest), and a support session writes into no foreign organisation (sga_org_foreign)
+        if not office_on(c, uid) or office_allowed(c, uid, oid, write=True) is not None:
+            return None
+        if is_write_request() and sga_org_foreign(c, oid):
+            return None
         owner = pb_owner(c, oid)
         if owner is not None:  # a personal office: only its owner
             return "manage" if owner == uid else None
@@ -87,3 +98,12 @@ def ofk_restore(c, uid, kind, rid):
             c.commit()
             raise Denied(404)
     return obj_restore(c, uid, kind, rid)
+
+
+def ofk_purge(c, kind, rid):
+    """2.809.0 (#5418): delete one row of an office kind for good on the core's way (core/writes.py _purge_rows: its history,
+    undo steps with their emptied groups, revoked shares and children go along, no obj_undo / obj_history left behind) --
+    for the office's own deletes that checked the rights themselves (the DATEV import's undo, office/datevimp.py di_undo)."""
+    write_lock(c, f"obj-{kind}-{int(rid)}")
+    _purge_rows(c, kind, OBJ[kind], rid)
+    obj_forget()

@@ -136,4 +136,34 @@ check("IDSDONE" in out and row(S4) == (None, None) and row(S3) is not None, f"id
 check(names(A) == ["Example Live Ltd", "Example Timber Ltd"] or sorted(names(A) or []) == ["Example Live Ltd", "Example Timber Ltd"],
       f"the list: the live ones only {names(A)}")
 
+# ---------------------------------------------------------------- 2.809.0 (#5418): the core's way has the office's gates
+# the office switched off for the person: an own step of an office kind is not taken back via /api/undo (noaccess, stays)
+S5 = supplier(ORG, "Example Gate Ltd")
+check(A.delete(OFC + f"/{S5}").ok and row(S5)[0], "#5418: into the trash")
+G5 = groups(AID)[-1]["id"]
+OFF = ",".join(x for x in FEATURES.split(",") if x != "office")
+check(A.patch(B + "/api/settings", json={"features": OFF}).ok and A.get(OFC).status_code == 403, "#5418: the office switched off (its route 403)")
+r = A.post(B + f"/api/undo/to/{G5}")
+st = r.json().get("stayed") or [] if r.ok else []
+check(row(S5)[0] and G5 not in (r.json().get("undone") or [] if r.ok else [G5]) and st and st[0].get("code") == "noaccess",
+      f"#5418: office off -> the step is refused (noaccess), the supplier stays in the trash {r.status_code} {r.text[:300]}")
+check(A.patch(B + "/api/settings", json={"features": FEATURES}).ok and A.get(OFC).ok, "#5418: the office on again")
+r = A.post(B + f"/api/undo/to/{G5}")
+check(r.ok and row(S5)[0] is None, f"#5418: office on -> the same step goes back {r.status_code} {r.text[:200]}")
+# the DATEV import's undo deletes its suppliers on the core's way: no obj_undo / obj_history / emptied group left behind
+RUN = dbx("INSERT INTO office_import_runs(org_id, kind, counts, detail, created_by, created_at) VALUES(?,?,?,?,?,?) RETURNING id",
+          (ORG, "datev", "{}", "{}", AID, OLD))[0][0]
+S6 = supplier(ORG, "Example Import Ltd")
+dbx("UPDATE office_suppliers SET import_run_id=? WHERE id=?", (RUN, S6))
+check(A.delete(OFC + f"/{S6}").ok and A.post(OFC + f"/{S6}/restore").ok, "#5418: the imported supplier deleted and restored (steps + history)")
+G6 = [x["id"] for x in groups(AID)[-2:]]
+dbx("UPDATE office_suppliers SET updated_at=created_at WHERE id=?", (S6,))  # unchanged since the run: the undo takes it
+check(dbx("SELECT COUNT(*) FROM obj_undo WHERE kind=? AND ref_id=?", (K, S6))[0][0] == 2, "#5418: two undo rows of the supplier before")
+r = A.post(B + f"/api/office/legacy/runs/{RUN}/undo", json={})
+check(r.ok and (r.json().get("removed") or {}).get("suppliers") == 1 and row(S6) is None,
+      f"#5418: the import's undo removes the supplier {r.status_code} {r.text[:300]}")
+left = [dbx(f"SELECT COUNT(*) FROM {t} WHERE kind=? AND ref_id=?", (K, S6))[0][0] for t in ("obj_undo", "obj_history")]
+check(left == [0, 0], f"#5418: no obj_undo / obj_history rows left of the removed supplier {left}")
+check(not dbx(f"SELECT 1 FROM undo_groups WHERE id IN ({G6[0]}, {G6[1]})"), "#5418: its emptied step groups went too")
+
 sys.exit(done("p2784_b_office_trash_core"))
