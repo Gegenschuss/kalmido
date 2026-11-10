@@ -215,41 +215,48 @@ A.post(B + f"/api/obj/{K}/{r.json()['id']}/trash")
 
 # ---------------------------------------------------------------- 2.897.0 (#5547): the agent's ?view=, the window of opened texts
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
-r = A.post(B + "/api/my/agents", json={"username": "docbot", "display_name": "Docbot", "scopes": ["read", "files:read"], "org_id": ORG})
-check(r.ok, "setup: an agent of the organisation " + r.text[:200])
-AG, AGH = r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
+
+
+def mk_agent(name, org=None, s=A):
+    r = s.post(B + "/api/my/agents", json={"username": name, "display_name": name.title(), "scopes": ["read", "files:read"],
+                                          **({"org_id": org} if org else {})})
+    assert r.ok, r.text
+    return r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
+
+
+AG, AGH = mk_agent("docbot", ORG)  # an agent of the organisation: the organisation's folders
 for f_ in (OPEN, SHUT):
     check(A.post(B + f"/api/files/nodes/{f_}/shares", json={"agent_id": AG, "role": "view"}).status_code == 201, "setup: the folders shared with the agent")
 
 
-def v1_view(vid, **p):
-    r = sess().get(B + "/api/v1/documents", params={"view": vid, **p}, headers=AGH)
+def v1_view(hd, vid, **p):
+    r = sess().get(B + "/api/v1/documents", params={"view": vid, **p}, headers=hd)
     return sorted(d["id"] for d in r.json()["data"]) if r.ok else r.status_code
 
 
-def agent_view(title, ws, rl):
-    r = A.post(B + f"/api/obj/{K}", json={"title": title, "rules": rl, "ws": ws})
+def agent_view(title, ws, rl, aid, org=False, s=A):
+    """A view of s (alice) shared with agent aid (org: first with everyone of the organisation, so its agent may get it)."""
+    r = s.post(B + f"/api/obj/{K}", json={"title": title, "rules": rl, "ws": ws})
     assert r.status_code == 201, r.text
     vid = r.json()["id"]
-    assert A.post(B + f"/api/obj/{K}/{vid}/shares", json={"agent_id": AG, "role": "view"}).status_code == 201
+    if org:
+        assert s.post(B + f"/api/docs/views/{vid}/share", json={"all": True}).ok
+    r = s.post(B + f"/api/obj/{K}/{vid}/shares", json={"agent_id": aid, "role": "view"})
+    assert r.status_code == 201, r.text
     return vid
 
 
-VW = agent_view("Walrus here", WS, rules(T))
-check(v1_view(VW) == sorted([D1, D2, D3]), f"#5547: the agent's list through a view shared with it {v1_view(VW)}")
-VP = agent_view("Walrus private", "private", rules(T))
-check(in_view(A, VP, "private") == [] and v1_view(VP) == [],
-      f"#5547 rueckfall: the view's workspace holds for the agent as in the app (private: none of the organisation's) {v1_view(VP)}")
-VS = agent_view("Failed only", WS, {**rules(T), "state": "failed"})
-check(in_view(A, VS) == [] and v1_view(VS) == [], f"#5547 rueckfall: the view's state holds for the agent as in the app {v1_view(VS)}")
-check(sess().get(B + "/api/v1/documents", params={"view": VS, "state": "done"}, headers=AGH).json()["data"] != [],
-      "#5547: a parameter of the request goes before the view's")
+VW = agent_view("Walrus here", WS, rules(T), AG, org=True)
+check(v1_view(AGH, VW) == sorted([D1, D2, D3]), f"#5547: the agent's list through a view shared with it {v1_view(AGH, VW)}")
+VS = agent_view("Failed only", WS, {**rules(T), "state": "failed"}, AG, org=True)
+check(in_view(A, VS) == [] and v1_view(AGH, VS) == [], f"#5547 rueckfall: the view's state holds for the agent as in the app {v1_view(AGH, VS)}")
+check(v1_view(AGH, VS, state="done") == sorted([D1, D2, D3]), "#5547: a parameter of the request goes before the view's")
 VN = A.post(B + f"/api/obj/{K}", json={"title": "Not shared", "rules": rules(T), "ws": WS}).json()["id"]
-check(v1_view(VN) == 404, "#5547: a view not shared with the agent stays 404")
+check(v1_view(AGH, VN) == 404, "#5547: a view not shared with the agent stays 404")
 
 # the window (3 texts here): four documents with the phrase, the one with the sender last
-Z = [doc_new(A, f"zebra-{i}.txt", "Zebra stripes paper", WS) for i in range(3)]
-Z4 = doc_new(A, "zebra-4.txt", "Zebra stripes paper", WS, sender="Stripe Co")
+Z = [doc_new(A, f"zebra-{i}.txt", f"Zebra stripes paper number {i}", WS) for i in range(3)]
+Z4 = doc_new(A, "zebra-4.txt", "Zebra stripes paper number 4", WS, sender="Stripe Co")
 fc = A.get(B + "/api/docs/facets", params={"ws": WS}).json()
 STRIPE = g("senders", "Stripe Co")
 PH = {"f": "text", "op": "has", "v": '"zebra stripes"'}
@@ -275,4 +282,13 @@ check(r.status_code == 201, f"freelancer: her view with rules ({r.status_code})"
 FV = r.json()["id"]
 check(in_view(Fr, FV, "private") == sorted([F1, F2]) and Fr.get(B + f"/api/docs/views/{FV}/hits").json()["total"] == 2, "freelancer: the list and the hits")
 check(A.get(B + "/api/docs", params={"ws": "all", "view": FV}).status_code == 404, "the instance admin does not run her view")
+# 2.897.0 (#5547): her own agent through her view: the view's workspace holds (rueckfall: before, every workspace)
+FG, FGH = mk_agent("wombot", s=Fr)
+FROOT = Fr.get(B + "/api/docs/settings", params={"ws": "private"}).json()["root_id"]
+check(Fr.post(B + f"/api/files/nodes/{FROOT}/shares", json={"agent_id": FG, "role": "view"}).status_code == 201, "setup: freelancer shares her documents with her agent")
+FVP = agent_view("Receipts here", "private", FR, FG, s=Fr)
+check(v1_view(FGH, FVP) == sorted([F1, F2]), f"freelancer: her agent's list through her view (API v1 ?view=) {v1_view(FGH, FVP)}")
+FVO = agent_view("Receipts elsewhere", WS, FR, FG, s=Fr)
+check(in_view(Fr, FVO) == [] and v1_view(FGH, FVO) == [],
+      f"#5547 rueckfall: the view's workspace holds for the agent as in the app (not her private documents) {v1_view(FGH, FVO)}")
 sys.exit(done("p2857_a_docfilter"))
