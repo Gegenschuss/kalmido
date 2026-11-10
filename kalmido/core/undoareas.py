@@ -70,9 +70,10 @@ def ua_trash_fix(table, rid, was, on_restore=None, on_trash=None, cols=("deleted
     return fix
 
 
-def ua_done(c):
+def ua_done(c, drop=False):
     """2.809.0 (#5476): ua_post, and a step that changed nothing (its copy after = before: a save of the same values) goes
-    again, with its group when that is left without parts. -> the request's group id when the step stayed, else None."""
+    again, with its group when that is left without parts; drop=True: the step goes in any case (the write did more than
+    its copy can bring back, the area's own way back stays). -> the request's group id when the step stayed, else None."""
     from flask import g, has_request_context
     st = g.get("obj_undo_step") if has_request_context() else None
     ua_post(c)
@@ -81,7 +82,7 @@ def ua_done(c):
     r = c.execute("SELECT fp_before, fp_after, group_id, sess FROM obj_undo WHERE id=?", (st[0],)).fetchone()
     if r is None:
         return None
-    if r["fp_before"] == r["fp_after"] and not r["sess"]:
+    if (drop or r["fp_before"] == r["fp_after"]) and not r["sess"]:
         c.execute("DELETE FROM obj_undo WHERE id=?", (st[0],))
         ug_gc(c, [r["group_id"]])
         if r["group_id"] and not c.execute("SELECT 1 FROM undo_groups WHERE id=?", (r["group_id"],)).fetchone():

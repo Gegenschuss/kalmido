@@ -711,7 +711,7 @@ function fdCreate(lid, body, done) {
     if (j.modules_on?.length || j.type === 'formula') { try { await load(); } catch { /* offline: the next load */ } }  // the module switched on / the computed values
     render(); done?.(fieldById(j.id) || fdDef(j), true);
     let id = j.id;
-    histAdd({label: tr('New field') + ': ' + qn(j.name), lids: [lid],
+    histAdd({label: tr('New field') + ': ' + qn(j.name), lids: [lid], ...(j.undo_group ? {srv: true} : {}),  // 2.809.0 (#5476): the server lists the step
       undo: async () => { await api('DELETE', '/api/fields/' + id); return {}; },
       redo: async () => { id = (await api('POST', `/api/lists/${lid}/fields`, body)).id; return {}; }});
   }, () => done?.(null, true)).finally(() => FD_TMP.delete(tmp));
@@ -743,7 +743,7 @@ function fdEdit(f, body, done) {
     if ('required' in body) back.required = old.required;
     const now = sel ? JSON.parse(JSON.stringify(x?.options?.options || [])) : null;  // what the server stored (undo / redo say what they saw)
     const go = (b, p) => async () => { await api('PATCH', '/api/fields/' + f.id, sel ? {...b, _prev: {options: p}} : b); return {}; };
-    histAdd({label: tr('Edit field') + ': ' + qn(old.name), lids: [f.list_id], undo: go(back, now), redo: go(body, seen)});
+    histAdd({label: tr('Edit field') + ': ' + qn(old.name), lids: [f.list_id], undo: go(back, now), redo: go(body, seen), ...(j?.undo_group ? {srv: true} : {})});  // 2.809.0 (#5476)
   }, e => {
     const x = fieldById(f.id); if (e?.status === 409 && e.data?.field && x) { Object.assign(x, fdDef(e.data.field)); render(); }  // the current state, not ours
     done?.(fieldById(f.id), true);
@@ -769,7 +769,7 @@ function fdDelete(f, done) {
     done?.(null, true);
     if (!was) return;
     let id = f.id, tid = dj?.trash_id;  // 2.550.0 (#4528): the server keeps it in the field trash
-    const e = histAdd({label: tr('Delete field') + ': ' + qn(was.name), lids: [lid],
+    const e = histAdd({label: tr('Delete field') + ': ' + qn(was.name), lids: [lid], ...(dj?.undo_group ? {srv: true} : {}),  // 2.809.0 (#5476)
       undo: async () => {
         if (tid) { await api('POST', `/api/fields/trash/${tid}/restore`); tid = null; id = f.id; await load(); return {}; }  // same id, all values
         // the field again (same name, type, options with their ids), then the values of the tasks loaded here

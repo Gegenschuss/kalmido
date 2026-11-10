@@ -368,9 +368,12 @@ def field_create(lid):
         if cols is not None and len(cols) < COL_MAX:
             c.execute("UPDATE lists SET col_cfg=? WHERE id=?", (json.dumps([*cols, f"f:{fid}"]), lid))
     on = tb_fields_module_on(c, lid)  # 2.39.1 (#1293)
+    from .fieldundo import fdu_life  # 2.809.0 (#5476): a step of the person's undo list
+    ug = fdu_life(c, fid, "create", name, lid, None)
     bump(c)
     c.commit()
-    return jsonify({**field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c), "modules_on": on})
+    return jsonify({**field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c), "modules_on": on,
+                    **({"undo_group": ug} if ug else {})})
 
 
 FIELD_KIND = "list_field"  # 2.610.0 (#4762): a custom field, a side object of the core (core/objparts.py); its lock since #4701
@@ -396,6 +399,8 @@ def field_update(fid):
     if fd_col(r, "org_field_id") and (name != r["name"] or opts != json.loads(r["options"] or "{}")):
         # 2.609.0 (#3373): name and options of a linked field are the organisation's (changed there for every project)
         return err(tr("This field belongs to the organisation: change it in the organisation's fields"), 409)
+    from .fieldundo import fdu_post, fdu_pre  # 2.809.0 (#5476): a step of the person's undo list
+    n0 = fdu_pre(c, fid, r)
     if r["type"] == "formula":
         fx_set(c, r["list_id"], b, opts, fid)
     if "pinned" in b:
@@ -416,9 +421,10 @@ def field_update(fid):
     c.execute("UPDATE list_fields SET name=?, options=? WHERE id=?", (name, json.dumps(opts, ensure_ascii=False), fid))
     if name.casefold() != (r["name"] or "").casefold():  # 2.757.0 (#4501): a folder's field renamed -> the list differs
         fdf_named_gone(c, r["list_id"], "list_fields", r["name"])
+    ug = fdu_post(c, fid, n0)
     bump(c)
     c.commit()
-    return jsonify(field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c))
+    return jsonify({**field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c), **({"undo_group": ug} if ug else {})})
 
 
 def field_prune_opts(c, fid, ftype, opts):
@@ -540,6 +546,18 @@ def field_delete(fid):
     field's row, held = {vals, n, grouped}); trash_id = the copy's id."""
     c = db()
     r = need_field(c, fid)
+    n, tid = fd_trash(c, r)
+    from .fieldundo import fdu_life  # 2.809.0 (#5476): a step of the person's undo list
+    ug = fdu_life(c, fid, "delete", r["name"], r["list_id"], tid)
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, values=n, trash_id=tid, **({"undo_group": ug} if ug else {}))
+
+
+def fd_trash(c, r):
+    """2.809.0 (#5476, from field_delete): field row r into the field trash (the core's copy trash) with its values -> (values
+    removed, trash id). The caller checked the rights (need_field), bumps and commits."""
+    fid = r["id"]
     fdf_named_gone(c, r["list_id"], "list_fields", r["name"])  # 2.757.0 (#4501): a folder's field deleted -> the list differs
     vals = [[v[0], v[1]] for v in c.execute("SELECT task_id, value FROM task_field_values WHERE field_id=? ORDER BY task_id", (fid,))]
     grouped = c.execute("SELECT 1 FROM lists WHERE id=? AND group_field=?", (r["list_id"], f"cf:{fid}")).fetchone()
@@ -551,9 +569,7 @@ def field_delete(fid):
     n = c.execute("DELETE FROM task_field_values WHERE field_id=?", (fid,)).rowcount
     c.execute("DELETE FROM list_fields WHERE id=?", (fid,))
     c.execute("UPDATE lists SET group_field='' WHERE group_field=?", (f"cf:{fid}",))  # 2.144.0 A2 (#2414): no grouping by a gone field
-    bump(c)
-    c.commit()
-    return jsonify(ok=True, values=n, trash_id=tid)
+    return n, tid
 
 
 def ftr_person():
@@ -634,13 +650,28 @@ def field_trash_restore(tid):
     values only of people who still reach it); the grouping by it when the project has no other one. The row leaves the trash."""
     c = db()
     r = ftr_row(c, tid)
+    try:
+        fid, n = fd_back(c, r)
+    except BadInput as e:
+        return err(str(e))
+    from .fieldundo import fdu_life  # 2.809.0 (#5476): a step of the person's undo list
+    fdu_life(c, fid, "restore", str(ftr_parts(r)[0].get("name") or ""), r["list_id"], None)
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, field=field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c), values=n)
+
+
+def fd_back(c, r):
+    """2.809.0 (#5476, from field_trash_restore): copy r of the field trash (list_part_trash, kind FIELD_KIND) back as the field
+    (its id, its values that still fit) -> (field id, values); the copy goes. Denied 409 when the field exists, BadInput at the
+    limit of fields; the caller checked the rights (ftr_row), bumps and commits."""
     lid, fid = r["list_id"], r["ref_id"]
     snap, held = ftr_parts(r)
     ftype = str(snap.get("type") or "")
     if c.execute("SELECT 1 FROM list_fields WHERE id=?", (fid,)).fetchone():
         raise Denied(409, tr("This field exists already"))
     if c.execute("SELECT COUNT(*) FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0] >= FIELD_MAX:
-        return err(tr("At most {0} fields per project", FIELD_MAX))
+        raise BadInput(tr("At most {0} fields per project", FIELD_MAX))
 
     def fix(c, s):  # 2.783.0 (#5368): the row as it was, with what may no longer hold (the pin limit, a gone organisation field)
         for k in [k for k in s if k not in FTR_COLS]:
@@ -671,9 +702,7 @@ def field_trash_restore(tid):
         cols = columns_out(cc, {x[0] for x in c.execute("SELECT id FROM list_fields WHERE list_id=?", (lid,))})
         if cols is not None and f"f:{fid}" not in cols and len(cols) < COL_MAX:
             c.execute("UPDATE lists SET col_cfg=? WHERE id=?", (json.dumps([*cols, f"f:{fid}"]), lid))
-    bump(c)
-    c.commit()
-    return jsonify(ok=True, field=field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c), values=n)
+    return fid, n
 
 
 def search_field_ids(c, uid, q):

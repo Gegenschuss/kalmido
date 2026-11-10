@@ -8,12 +8,15 @@ Invented names only.
  - time entries (personal/timeundo.py): a change on the laptop is listed on the phone (area time, duration before) and goes
    back / forward; a deleted entry comes back with its id and goes again on redo; not back into a project without time
    tracking; another person cannot take it back
+ - custom fields (lists/fieldundo.py): a new field is a step (undo = field trash, redo = back with its id); a rename goes back;
+   an option added and used since is not removed by an undo (409); a change that clears values records no server step; a
+   deleted field comes back and goes again on redo
  - a project's settings (lists/lpundo.py): a rename + colour on the laptop is listed on the phone (area tasks, kind listset,
    label with the old name, device, the answer names its group) and goes back from there; redo; archiving -> undo -> out of
    the archive; a save of the same values and a save with a folder (side effects) record no step; a new sidebar order since
    does not block the undo; a rename by someone else since stays (named); a project admin takes back her own rename, but not
    after she became an editor (noaccess); another person neither lists nor takes back the step (404)
-freelancer-matrix: undo (a person without an organisation: her project's colour, her new section and her deleted time entry go back from the list)
+freelancer-matrix: undo (a person without an organisation: her project's colour, her new section and field and her deleted time entry go back from the list)
 usage: p2809_a_undo_test.py <datadir>"""
 import os
 import sys
@@ -204,6 +207,54 @@ res = back(A, gd["id"])
 check(not res.get("undone") and res.get("stayed") and A.get(B + f"/api/time/entries/{TE2}").status_code == 404,
       f"a deleted entry does not come back into a project without time tracking (409, named) {res}")
 
+# ---------------------------------------------------------------- custom fields: create / change / delete
+def fld(s, fid):
+    return next((x for x in s.get(B + "/api/state").json().get("fields", []) if x["id"] == fid), None)
+
+
+r = A.post(B + "/api/lists", json={"name": "Felder Beispiel"})
+FLX = r.json()["id"]
+r = A.post(B + f"/api/lists/{FLX}/fields", json={"name": "Phase", "type": "select",
+                                                  "options": {"options": [{"id": "a1", "name": "Dreh", "color": "blue"}]}}, headers=LAP)
+check(r.ok and r.json().get("undo_group"), f"a new field: a step {r.status_code} {r.text[:120]}")
+FX = r.json()["id"]
+g = newest(PHONE)
+check(g.get("kind") == "field_life" and "Phase" in (g.get("label") or ""), f"listed with its name {g}")
+res = back(PHONE, g["id"])
+check(res.get("undone") == [g["id"]] and fld(A, FX) is None, f"taken back: the field is gone (field trash) {res}")
+r = PHONE.post(B + f"/api/undo/{g['id']}/redo")
+check(r.ok and fld(A, FX) is not None, f"redo: the field is back with its id {r.status_code} {r.text[:120]}")
+r = A.patch(B + f"/api/fields/{FX}", json={"name": "Phase Neu", "pinned": 1})
+check(r.ok and r.json().get("undo_group"), f"the field renamed: a step {r.status_code} {r.text[:120]}")
+g = newest(A)
+check(g.get("kind") == "list_field" and "Phase" in (g.get("label") or ""), f"listed {g}")
+res = back(A, g["id"])
+f = fld(A, FX) or {}
+check(res.get("undone") == [g["id"]] and f.get("name") == "Phase" and not f.get("pinned"), f"undo: the old name, not on the rows {res} {f.get('name')}")
+r = A.post(B + "/api/tasks", json={"title": "Drehtag", "list_id": FLX})
+TF = r.json()["id"]
+r = A.patch(B + f"/api/fields/{FX}", json={"options": {"options": [{"id": "a1", "name": "Dreh", "color": "blue"},
+                                                                    {"id": "a2", "name": "Schnitt", "color": "red"}]}})
+g = newest(A)
+A.put(B + f"/api/lists/{FLX}/members", json={"user_id": BOB, "role": "edit"})
+r = Bo.patch(B + f"/api/tasks/{TF}", json={"fields": {str(FX): "a2"}})  # someone else uses the new option
+check(r.ok, f"(setup) bob sets the new option {r.status_code} {r.text[:120]}")
+res = back(A, g["id"])
+f = fld(A, FX) or {}
+check(not res.get("undone") and res.get("stayed") and len((f.get("options") or {}).get("options") or []) == 2,
+      f"an option added and used since: its removal does not go back (409, named) {res}")
+before = newest(A).get("id")
+r = A.patch(B + f"/api/fields/{FX}", json={"options": {"options": [{"id": "a1", "name": "Dreh", "color": "blue"}]}})
+check(r.ok and not r.json().get("undo_group") and newest(A).get("id") == before,
+      f"a change that removes a used option (its values go) records no step of the server {newest(A)}")
+r = A.delete(B + f"/api/fields/{FX}")
+check(r.ok and r.json().get("undo_group"), f"the field deleted: a step {r.status_code}")
+g = newest(A)
+res = back(A, g["id"])
+check(res.get("undone") == [g["id"]] and fld(A, FX) is not None, f"undo of the delete: the field is back {res}")
+r = A.post(B + f"/api/undo/{g['id']}/redo")
+check(r.ok and fld(A, FX) is None, f"redo: deleted again {r.status_code} {r.text[:120]}")
+
 # freelancer-matrix
 r = Fr.post(B + "/api/lists", json={"name": "Frida Projekt", "color": "#3366cc"})
 FL = r.json()["id"]
@@ -217,6 +268,11 @@ FS = r.json()["id"]
 g = newest(Fr)
 res = back(Fr, g["id"])
 check(g.get("kind") == "section_life" and res.get("undone") == [g["id"]] and FS not in secs(Fr, FL), f"... and her new section goes back {res}")
+r = Fr.post(B + f"/api/lists/{FL}/fields", json={"name": "Frida Feld", "type": "text"})
+FFX = r.json().get("id")
+g = newest(Fr)
+res = back(Fr, g["id"])
+check(g.get("kind") == "field_life" and res.get("undone") == [g["id"]] and fld(Fr, FFX) is None, f"... and her new field goes back {res}")
 Fr.patch(B + f"/api/lists/{FL}", json={"time_tracking": True})
 r = Fr.post(B + "/api/time/entries", json={"list_id": FL, "start": DAY + "T10:00", "minutes": 15})
 FT = r.json()["id"]

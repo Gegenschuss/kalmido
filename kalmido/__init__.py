@@ -598,6 +598,7 @@ ORDER = (
     "lists.lpundo",  # 2.809.0 (#5476): a project's settings in the step groups
     "lists.secundo",  # 2.809.0 (#5476): creating / deleting / restoring a section in the step groups
     "personal.timeundo",  # 2.809.0 (#5476): changing / deleting a time entry in the step groups
+    "lists.fieldundo",  # 2.809.0 (#5476): a project's custom fields in the step groups
     "admin.supporter",  # 2.74.0 (#338): the supporter licence (self-hosted only, a badge, unlocks nothing)
     "admin.operator",  # 2.144.0 D (#797): the hosting operator's interface (off unless a token file is configured)
     "life.bmundo", "calendars.pollundo", "hub.absundo", "lists.envundo",  # 2.809.0 (#5476, part B): steps in the step groups
