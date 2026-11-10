@@ -30,6 +30,7 @@ def tpu_scope(rid, _oid):
 
 obj_track(TPU_KIND, "sched_polls", undo_scope=tpu_scope,
           undo_keep={"sched_polls": {"user_id", "token", "token_hash", "trash_owner", "closed_at", "chosen_id", "event_id", "event_ref"}},
+          undo_nofp={"sched_polls": {"token", "token_hash"}},  # 2.809.0 (#5476, review): a new link is no change of a step
           undo_label=tpu_label, undo_free=("deleted_at",))
 GONE[TPU_KIND] = "sched_polls"  # an account's deletion takes its history / undo rows (core/objhooks.py)
 

@@ -142,6 +142,12 @@ check(res.get("undone") == [g["id"]] and p.get("title") == "Teamessen Beispiel" 
       f"taken back from the phone: title, place and the old times {res} {p.get('title')} {[o['start'] for o in p.get('options', [])]}")
 res = redo(PHONE, g["id"])
 check(res.get("redone") == 1 and poll().get("title") == "Teamessen Neu", f"redo: the new title again {res}")
+# 2.809.0 (#5476, review): a new link (no step of its own) does not make the earlier steps a conflict
+r = A.patch(B + f"/api/polls/{PID}", json={"title": "Teamessen Link"})
+g = newest(A)
+check(r.ok and A.patch(B + f"/api/polls/{PID}", json={"regenerate": True}).ok, f"(setup) a title step, then a new link {r.status_code}")
+res = back(A, g["id"])
+check(res.get("undone") == [g["id"]] and poll().get("title") == "Teamessen Neu", f"the title step goes back after a new link {res}")
 tok = row("sched_polls", PID, "token_hash")["token_hash"]
 r = A.patch(B + f"/api/polls/{PID}", json={"link_on": False})
 check(r.ok and not poll()["link_on"], f"the link switched off {r.status_code}")

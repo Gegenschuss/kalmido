@@ -28,7 +28,7 @@ def bmu_label(r):
 
 
 obj_track(BMU_KIND, "bookmarks", undo_keep={"bookmarks": {"user_id", "src", "src_id", "kk_arch", *BMU_PREVIEW}},
-          undo_nofp={"bookmarks": set(BMU_PREVIEW)}, undo_label=bmu_label, undo_free=("deleted_at",))
+          undo_nofp={"bookmarks": {"kk_arch", *BMU_PREVIEW}}, undo_label=bmu_label, undo_free=("deleted_at",))
 GONE[BMU_KIND] = "bookmarks"  # an account's deletion takes its history / undo rows (core/objhooks.py)
 
 

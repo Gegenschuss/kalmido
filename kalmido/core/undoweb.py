@@ -20,6 +20,7 @@ from flask import g, jsonify, request
 from .config import app
 from .ctx import me
 from .db import bump, db
+from .db import IntegrityError  # 2.809.0 (#5476, review)
 from .errors import BadInput, Denied
 from .i18n import N_, tr, tr_stored
 from .objects import obj_need, obj_row
@@ -97,6 +98,8 @@ def _diff_part(c, uid, p, redo):
     except Denied as e:
         code = "noaccess" if e.code in (403, 404) else "conflict"
         return {"group": p["group_id"], "kind": kind, "id": rid, "code": code, "reason": e.text()}
+    except IntegrityError:  # 2.809.0 (#5476, review): a unique row came back meanwhile (a feed followed again): the part stays
+        return {"group": p["group_id"], "kind": kind, "id": rid, "code": "conflict", "reason": tr(UNDO_CONFLICT)}
     except BadInput as e:  # a value the area's checks refuse now (a rule changed since): stays, named
         return {"group": p["group_id"], "kind": kind, "id": rid, "code": "conflict", "reason": str(e)}
 
