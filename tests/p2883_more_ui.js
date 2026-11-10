@@ -25,15 +25,17 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
 
   const w = await boot({user: 'alice', hash: 'today', mobile: true}), d = w.document;
   check(await until(() => d.querySelector('#tabs button')), 'the tab bar is drawn');
-  // pinned: more than fit on a phone; Knowledge pages, Calendar and Reading overflow into "More"
-  w.eval(`LS.set('tabbar', ['s:inbox', 's:today', 'search', 'lists', 'wiki', 'm:cal', 'a:reading']); S.settings.nav_menus = '{}'; render()`);
+  // pinned: more than fit on a phone; Knowledge pages, Calendar and Reading overflow into "More". The area Knowledge is
+  // hidden in the drawer (the photo of 10.11.), so Knowledge pages stays a View - with the book, not the three dots
+  w.eval(`LS.set('tabbar', ['s:inbox', 's:today', 'search', 'lists', 'wiki', 'm:cal', 'a:reading']); S.settings.nav_menus = '{}'; S.settings.sidebar = JSON.stringify({hidden: ['e:wiki']}); render()`);
+  check(!JSON.parse(w.eval(`JSON.stringify(tabAreaItems().map(t => t.id))`)).includes('wiki'), 'the area Knowledge is hidden in the drawer');
   check(await until(() => d.querySelector('#tabs [data-act="tabs-more"]')), 'More is in the tab bar');
   const ov = JSON.parse(w.eval(`JSON.stringify(tabOverflow().rest.map(t => t.id))`));
   check(ov.includes('wiki') && !ov.includes('m:cal') && !ov.includes('a:reading'), '#5560: Views keep Knowledge pages, Calendar and Reading go to Areas only ' + ov.join('|'));
   d.querySelector('#tabs [data-act="tabs-more"]').click();
   check(await until(() => d.querySelector('#pop [role="menuitem"]')), 'More opens');
   const M = JSON.parse(w.eval(`JSON.stringify([...document.querySelectorAll('#pop [role="menuitem"]')].map(b => ({l: b.querySelector('.ml')?.textContent || '', i: b.querySelector('.mlic') ? 'lic' : b.querySelector('svg.i')?.innerHTML || ''})))`));
-  const P = JSON.parse(w.eval(`JSON.stringify({book: ic('book'), dots: ic('dots')})`)), inner = h => h.replace(/^<svg[^>]*>|<\/svg>$/g, '');
+  const P = JSON.parse(w.eval(`JSON.stringify(Object.fromEntries(['book', 'dots'].map(n => { const t = document.createElement('div'); t.innerHTML = ic(n); return [n, t.firstChild.innerHTML]; })))`)), inner = h => h;  // the same serialisation as the menu's
   const labels = M.map(x => x.l);
   // (1) the real icon: Knowledge pages has the book, no entry falls back to the three dots
   const wk = M.find(x => x.l === 'Knowledge pages');
@@ -53,7 +55,11 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   d.querySelector('#tabs [data-act="tabs-more"]').click();
   await until(() => d.querySelector('#pop [role="menuitem"]'));
   [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => b.querySelector('.ml')?.textContent === 'Calendar')?.click();
-  check(await until(() => w.S.route.mod === 'cal'), '#5560: Calendar from More opens the calendar ' + w.S.route.mod);
+  check(await until(() => w.eval('S.route.mod') === 'cal'), '#5560: Calendar from More opens the calendar ' + w.eval('S.route.mod'));
+  // the area Knowledge shown again: the pinned Knowledge pages is the same place -> once, under Areas, no heading Views
+  w.eval(`closePop(); S.settings.sidebar = '{}'; render()`);
+  const ov2 = JSON.parse(w.eval(`JSON.stringify(tabOverflow().rest.map(t => t.id))`));
+  check(ov2.length === 0, '#5560: with the area Knowledge in the drawer nothing stays under Views ' + ov2.join('|'));
   // without overflow the heading Views is gone
   w.eval(`LS.set('tabbar', ['s:inbox', 's:today', 'm:cal', 'a:reading']); render()`);
   w.eval(`tabsMore(document.querySelector('#tabs [data-act="tabs-more"]') || document.querySelector('#top h1'))`);
