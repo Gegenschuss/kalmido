@@ -97,9 +97,19 @@ function bkTabHtml() {
 }
 // the upload of receipts (camera / files); 2.276.0 A (#3039): also on top of Office > Receipts (office_receipts.js rcp_tabHtml)
 // 2.591.0 (#4892): the camera button only on touch devices (capture= does nothing on a desktop); there "Upload files" is the main button
-const bkPhotoHtml = () => `<div class="bk-photo">${isTouch() ? `<label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf,.xml,application/xml,text/xml" capture="environment" multiple hidden></label>` : ''}
-    <label class="btn${isTouch() ? '' : ' pri'} bk-files">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="bk-files" accept="${BK_ACCEPT}" multiple hidden></label>
-    ${(typeof BK !== 'undefined' && BK.info?.receipts || []).length ? '' : `<span class="muted bk-photohint">${tr('The receipt is saved in the file store (folder “{0}”) and listed under Office > Receipts; amount and date are recognised.', tr('Documents|folder'))}</span>`}</div>`;  // 2.298.0 A2 (#3186): only while empty
+// 2.892.0 (#5453): on a touch device ONE button "Upload receipt" -- its sheet offers the camera or the files (the two inputs
+// stay, hidden); empty = show the line on where the receipt goes (the caller knows whether the office holds receipts yet)
+function bkPhotoHtml(empty) {
+  if (empty === undefined) empty = !(typeof BK !== 'undefined' && BK.info?.receipts || []).length;
+  const hint = empty ? `<span class="muted bk-photohint">${tr('The receipt is saved in the file store (folder “{0}”) and listed under Office > Receipts; amount and date are recognised.', tr('Documents|folder'))}</span>` : '';  // 2.298.0 A2 (#3186): only while empty
+  if (isTouch()) return `<div class="bk-photo"><button type="button" class="btn pri bk-shot" data-bk="up" aria-haspopup="menu">${ic('upload')}<span>${tr('Upload receipt')}</span></button>
+    <input type="file" id="bk-file" accept="image/*,application/pdf,.xml,application/xml,text/xml" capture="environment" multiple hidden aria-label="${esc(tr('Photograph receipt'))}">
+    <input type="file" id="bk-files" accept="${esc(BK_ACCEPT)}" multiple hidden aria-label="${esc(tr('Upload files'))}">${/*html-ok*/ hint/* the span above */}</div>`;
+  return `<div class="bk-photo"><label class="btn pri bk-files">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="bk-files" accept="${esc(BK_ACCEPT)}" multiple hidden></label>${/*html-ok*/ hint/* the span above */}</div>`;
+}
+// 2.892.0 (#5453): the sheet of the one upload button: camera or files (the click on the hidden input stays inside the tap)
+const bkUpMenu = b => menu(b, [{label: tr('Photograph receipt'), icon: 'camera', fn: () => $('#bk-file')?.click()},
+  {label: tr('Select files'), icon: 'upload', sub: tr('Photos, PDF, e-invoice or ZIP'), fn: () => $('#bk-files')?.click()}], null, null, tr('Upload receipt'));
 // 2.147.0 (#2461): the export for any tax advisor -- the booking list of the year as CSV, or with invoices and receipts as ZIP
 function bkExportHtml() {
   if (!ofcFeat('books.export_csv')) return '';
@@ -397,12 +407,14 @@ async function bkSheet(id, fresh) {
     ${ofcRowF('bk-cat', tr('Category'), ofcIn('bk-cat', r.category, {max: 60, list: 'bk-cats', ph: tr('e.g. Travel, Material, Software')}) + `<datalist id="bk-cats">${cats.map(k => `<option value="${esc(k)}"${bkAcct(k) ? ` label="${esc(bkAcct(k).account)}"` : ''}>`).join('')}</datalist>`)}
     <div class="bk-acct muted" aria-live="polite"></div>
     ${ofcRowF('bk-vat', tr('VAT rate'), ofcSel('bk-vat', r.vat_pct ?? (!r.is_receipt && doc.einvoice ? doc.extracted?.vat_pct ?? '' : ''), BK_VATS, tr('unknown')))}
-    ${ofcRowF('bk-amount', tr('Amount (gross)'), ofcIn('bk-amount', doc.amount ? fmtNum(+doc.amount, 2) : '', {num: true}), ofcCur(), {keep: 1})}
+    ${/*html-ok*/ ofcRowF('bk-amount', tr('Amount (gross)'), `<span class="bk-amtw">${/*html-ok*/ ofcIn('bk-amount', doc.amount ? fmtNum(+doc.amount, 2) : '', {num: true})/* the field builder escapes */}<span class="muted bk-cur">${esc(ofcCur())}</span></span>`)/* 2.892.0 (#5453): the currency beside the amount (was a line of its own below it); row + field builders escape */}
     <div class="row"><label id="bk-datel">${tr('Date')}</label>${dateIn('bk-date', doc.date || '', {label: tr('Date')})}</div>
     ${r.is_receipt ? `<div class="bk-chkrow"><label class="chkl"><input type="checkbox" id="bk-chk" ${r.checked_at ? 'checked' : ''}><span>${tr('Checked')}</span></label> <small class="muted bk-chkby" aria-live="polite">${esc(bkChkTxt(r))}</small></div>` : ''}
     <div class="aerr" role="alert"></div>
     ${BK.billed[id] ? `<p class="muted bk-billed">${esc(bkBilledTxt(BK.billed[id]))}</p>` : ''}
-    <div class="foot"><a class="btn ghost" href="#docs/${id}">${tr('Open document')}</a>${!BK.billed[id] && r.is_receipt && doc.amount ? `<button class="btn ghost" data-m="bill">${tr('Bill on to a client …')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+    <div class="foot"><a class="btn ghost bk-f2" href="#docs/${id}">${tr('Open document')}</a>${!BK.billed[id] && r.is_receipt && doc.amount ? `<button class="btn ghost bk-f2" data-m="bill">${tr('Bill on to a client …')}</button>` : ''}<span class="spacer"></span><button type="button" class="btn ghost bk-fmore" data-m="more" aria-haspopup="menu">${ic('dots', 's')}<span>${tr('More')}</span></button><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  // 2.892.0 (#5453): on a phone the foot is one row -- Open document / Bill on behind "More" (bk-f2 hidden, office.css); "More" sits right beside
+  // Cancel / Save, not at the left edge where the sticky foot lies over the "Checked" box of a long sheet (p2784_a_office_head_ui, 320 px)
   md.classList.add('ofcdlg', 'bk-sheet');
   md.dataset.rxid = String(id);
   if (typeof rcl_dock === 'function') rcl_dock(md);  // 2.557.0 A (#4553): beside the list of receipts on a wide area
@@ -420,6 +432,7 @@ async function bkSheet(id, fresh) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
+    if (b.dataset.m === 'more') { menu(b, [...md.querySelectorAll('.foot .bk-f2')].map(x => ({label: x.textContent.trim(), icon: x.dataset.m === 'bill' ? 'send' : 'file', fn: () => x.click()})), null, null, tr('Receipt')); return; }  // 2.892.0 (#5453)
     if (b.dataset.m === 'acct') { bkAcctEdit(md); return; }
     if (b.dataset.m === 'acct-save') { bkAcctSave(md); return; }
     if (b.dataset.m === 'bill') { close(); bkBillModal([id]); return; }
@@ -576,6 +589,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-bk]'); if (!b || (S.route?.mod !== 'office' && !b.closest('.ostax'))) return;  // 2.365.2 D (#2789): + Settings > Company & office
   const k = b.dataset.bk;
   if (k === 'rc') { bkSheet(+b.dataset.id, false); return; }
+  if (k === 'up') { bkUpMenu(b); return; }  // 2.892.0 (#5453)
   if (k === 'einv') { bkEinvTake(+b.dataset.id, b); return; }
   if (k === 'bill') { bkBillModal(null); return; }
   if (k === 'basis') { bkSetUndo('vat_basis', b.dataset.v); return; }

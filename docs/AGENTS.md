@@ -2454,7 +2454,9 @@ receipt suggestion; the recognised `text` stays the source.
 
 2.299.0: `get_document` also carries `checks` for receipts -- the hints of Kalmido's fixed check (required details of an
 invoice, net + VAT = gross, VAT rate, the format of a VAT ID / tax number): `{items: [{code, level: hint|warn, text}],
-hidden}` or null. Hints only, nothing is blocked; hiding them is for people in the app (agents get `403`).
+hidden}` or null. Hints only, nothing is blocked; hiding them is for people in the app (agents get `403`). 2.892.0: each
+item also carries `soft` -- true when it only says the text did not show a detail ("Please check: ... not found"); the app
+does not count those as hints of the receipt (a receipt with only soft items shows no hint).
 
 ### Receipts: suggest project and category
 

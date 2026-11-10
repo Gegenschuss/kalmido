@@ -81,6 +81,14 @@ RCK_MSG = {
     "recipient": ("hint", N_("Please check: name and address of the recipient (required above 250 EUR)")),
     "meal": ("hint", N_("Entertainment: note the occasion, the participants and a tip (Office > Entertainment)")),
 }
+# 2.892.0 (#5453): the codes that only say the text did not show a detail (the recognition did not find it; the paper may
+# well have it): listed at the receipt below the real hints, never counted as a hint ("With hints", the number, the filter)
+RCK_SOFT = frozenset(("supplier", "address", "taxid_read", "number_read", "service", "net", "vat", "recipient"))
+
+
+def rck_soft(code):
+    """True for a hint that only says the text did not show a detail (RCK_SOFT)."""
+    return code in RCK_SOFT
 
 
 def _c(v):
@@ -177,6 +185,10 @@ def rck_check(fields, text=None, today=None):
     raw_rates, zero = [], False
     if text:
         raw_net, raw_vat, raw_gross, raw_rates, zero = _raw(text)
+        # 2.892.0 (#5453): a text without any amount, rate or date is no readable invoice (a scan without its words, a cover
+        # page): its checks would say "Missing" for what was only not read -> checked as a receipt without text
+        if raw_gross is None and raw_net is None and raw_vat is None and not raw_rates and not zero and not EX.find_dates(text):
+            text, lines = None, []
     gross = _c(f.get("gross"))
     if gross is None:
         gross = _c(f.get("amount"))

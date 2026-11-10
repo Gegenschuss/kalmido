@@ -259,12 +259,15 @@ function rx_html(d) {
 function rck_html(d) {
   const k = d?.checks;
   if (!k?.items?.length) return '';
-  const w = d.role !== 'view', n = k.items.length;
+  // 2.892.0 (#5453): only real gaps count; "not found in the text" (soft) is listed below them, never shown on its own
+  const real = k.items.filter(x => !x.soft), soft = k.items.filter(x => x.soft);
+  if (!real.length) return '';
+  const w = d.role !== 'view', n = real.length;
   if (k.hidden) return w ? `<div class="rck rck-off"><span class="muted">${esc(trn('{0} hint hidden', '{0} hints hidden', n))}</span>
     <button type="button" class="linkbtn" data-rck="show:${d.id}">${tr('Show')}</button></div>` : '';
-  const warn = k.items.some(x => x.level === 'warn');
+  const warn = real.some(x => x.level === 'warn');
   return `<details class="rck${warn ? ' rck-warn' : ''}"><summary>${ic('alert', 's')}<span>${esc(trn('{0} hint on this receipt', '{0} hints on this receipt', n))}</span></summary>
-    <ul class="rck-list">${k.items.map(x => `<li class="${x.level === 'warn' ? 'rck-w' : 'rck-h'}">${esc(x.text)}</li>`).join('')}</ul>
+    <ul class="rck-list">${real.map(x => `<li class="${x.level === 'warn' ? 'rck-w' : 'rck-h'}">${esc(x.text)}</li>`).join('')}${soft.map(x => `<li class="rck-h rck-s">${esc(x.text)}</li>`).join('')}</ul>
     ${w ? `<button type="button" class="btn sm ghost" data-rck="hide:${d.id}">${tr('Hide hints')}</button>` : ''}</details>`;
 }
 async function rck_post(id, act) {

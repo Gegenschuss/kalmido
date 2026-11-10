@@ -98,7 +98,8 @@ async function receipt(ck, ws, name, amount, day, category, vat) {
     await sleep(300);
     check(await ev(`!document.querySelector('.rcl-filters').open`), 'on a phone the filters are folded away');
     check(await ev(noSide), 'on a phone nothing sticks out to the side');
-    check(await ev(`document.querySelector('#rcl-zip').getBoundingClientRect().height >= 44 && document.querySelector('.rcl-filters summary').getBoundingClientRect().height >= 44`), 'on a phone the targets are large');
+    // 2.892.0 (#5453): on a phone CSV / ZIP sit behind "More" in the tool row (the first receipt in the first screen)
+    check(await ev(`document.querySelector('.rcl-tools .rcl-mbtn').getBoundingClientRect().height >= 44 && !document.querySelector('#rcl-zip').getClientRects().length && document.querySelector('.rcl-filters summary').getBoundingClientRect().height >= 44`), 'on a phone the targets are large');
     await ev(`(() => { document.querySelector('.rcl-filters summary').click(); return 1; })()`);
     await sleep(300);
     check(await ev(`document.querySelector('.rcl-filters').open`) && await ev(noSide), 'opened filters fit on a phone');

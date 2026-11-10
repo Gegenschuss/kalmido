@@ -1279,3 +1279,28 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
   .ocdrow.ocdgrid .ocd{flex-basis:100%}
   .bnkother:has(.ocdrow) .ocdrow{max-height:none}
 }
+/* 2.892.0 (#5453): the tool row of the receipts list (office_receipts.js rclToolsHtml): upload, Select, kinds, CSV / ZIP in one
+   row; on a phone only the upload and "More" (the rest in its sheet), so the first receipt stands in the first screen */
+.rcl-tools{flex-wrap:wrap;gap:.5rem;margin:.25rem 0 .5rem}
+.rcl-tools .bk-photo,.rcl-tools .rcl-exp,.rcl-tools .rcp-kinds{display:contents}
+.rcl-tools .bk-shot,.rcl-tools .bk-files{min-height:var(--tb-h);font-size:inherit;padding:0 1rem}
+.rcl-tools .bk-photohint{flex:1 1 100%;order:9}
+.rcl-tools .btn{min-height:var(--tb-h)}
+.rcl-mbtn{display:none}
+@media (max-width:599px){
+  .rcl-tools .rcl-wide{display:none}
+  .rcl-tools .bk-shot,.rcl-tools .bk-files{width:auto;flex:1 1 auto;justify-content:center}
+  .rcl-tools .spacer{display:none}
+  .rcl-mbtn{display:inline-flex}
+}
+/* 2.892.0 (#5453): the receipt sheet on a phone -- the currency beside the amount, the foot in one row (Save, Cancel, More) */
+.bk-amtw{display:flex;align-items:center;gap:.5rem;min-width:0}
+.bk-amtw .bk-cur{flex:none}
+.bk-sheet .foot .bk-fmore{display:none}
+@media (max-width:599px){
+  .bk-sheet .foot{flex-wrap:nowrap}
+  .bk-sheet .foot .bk-f2{display:none}
+  .bk-sheet .foot .bk-fmore{display:inline-flex}
+  .bk-sheet .foot .btn{min-width:0}
+}
+.rck-list .rck-s{color:var(--muted)}

@@ -26,10 +26,10 @@ from ..files.store import fs_log_add
 from ..docs import store as S
 from ..docs.ingest import doc_on_done
 from ..docs.web import _doc, _no_agent, doc_json
-from ..docs.rcheck import rck_check
+from ..docs.rcheck import rck_check, rck_soft
 
 RCK_FILL = 200          # stale receipts checked per list request (the rest on the next one; ~1 s)
-RCK_VER = "1"           # part of the stamp: a new rule set checks every receipt again
+RCK_VER = "2"           # part of the stamp: a new rule set checks every receipt again (2.892.0 #5453: "2", unreadable text)
 RCK_MEAL = re.compile(r"bewirt|restaurant|gastst|hospitality|entertainment|\bmeals?\b", re.I)
 _AMT = re.compile(r"-?\d+\.\d{2}")
 
@@ -75,6 +75,11 @@ def _shown(codes, ok):
     return [x for x in (codes or "").split(",") if x and x != "." and x not in ok]
 
 
+def _real(codes, ok):
+    """2.892.0 (#5453): the number of shown hints that count (not the "not found in the text" ones, rcheck.RCK_SOFT)."""
+    return sum(1 for x in _shown(codes, ok) if not rck_soft(x))
+
+
 def rck_run(c, m, r=None, store=True):
     """Check document meta m now -> items (None: no receipt); store=True keeps the codes (rchk) and the state they are for."""
     if r is None:
@@ -106,17 +111,18 @@ def rck_view(c, m):
     if not items:
         return None
     ok = set((m["rchk_ok"] or "").split(","))
-    return {"items": [{"code": x["code"], "level": x["level"], "text": _text(x)} for x in items],
+    # 2.892.0 (#5453): soft = only "not found in the text" (listed, not counted as a hint)
+    return {"items": [{"code": x["code"], "level": x["level"], "text": _text(x), "soft": rck_soft(x["code"])} for x in items],
             "hidden": all(x["code"] in ok for x in items)}
 
 
 def rck_seen(c, rows, fill=False):
-    """{node_id: number of shown hints} for list rows (node_id, rchk, rchk_at, rchk_ok + the columns of rck_stamp);
+    """{node_id: number of shown hints that count (2.892.0 #5453: without the soft ones)} for list rows (node_id, rchk, rchk_at, rchk_ok + the columns of rck_stamp);
     fill=True checks up to RCK_FILL stale ones now (and commits). -> (counts, pending = stale ones left)."""
     out, stale = {}, []
     for x in rows:
         if x["rchk"] and x["rchk_at"] == rck_stamp(x, x):
-            out[x["node_id"]] = len(_shown(x["rchk"], x["rchk_ok"]))
+            out[x["node_id"]] = _real(x["rchk"], x["rchk_ok"])
         else:
             stale.append(x)
     done = 0
@@ -125,10 +131,10 @@ def rck_seen(c, rows, fill=False):
             done += 1
             m = S.meta_row(c, x["node_id"])
             if m:
-                out[x["node_id"]] = len(_shown(rck_codes(rck_run(c, m) or []), m["rchk_ok"]))
+                out[x["node_id"]] = _real(rck_codes(rck_run(c, m) or []), m["rchk_ok"])
         c.commit()
     for x in stale[done:]:  # not checked yet: what was stored before (maybe nothing)
-        out.setdefault(x["node_id"], len(_shown(x["rchk"], x["rchk_ok"])))
+        out.setdefault(x["node_id"], _real(x["rchk"], x["rchk_ok"]))
     return out, len(stale) - done
 
 

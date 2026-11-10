@@ -57,15 +57,42 @@ async function rclLoad(more) {
 function rclReload() { if (RCL.data) { RCL.key = ''; if (rclHere()) rclLoad(false); } }  // 2.276.0 A (#3039): rclHere (Office > Receipts too)
 function rclSet(patch) { Object.assign(RCL.f, patch); rclSave(); rclLoad(false); }
 
-function rclHtml(own) {  // 2.276.0 A (#3039): own = the page Office > Receipts (no way back to the bookkeeping)
+function rclHtml(own, pre) {  // 2.276.0 A (#3039): own = the page Office > Receipts (no way back to the bookkeeping)
   if (RCL.oid !== OFC.info?.org_id || !RCL.f) Object.assign(RCL, {oid: OFC.info?.org_id, f: rclRestore(), data: null, rows: [], key: '', err: null});
   if (RCL.open == null) RCL.open = !window.matchMedia?.('(max-width: 600px)').matches;
-  const back = (own ? '' : `<div class="ofcbar rcl-top"><a class="btn sm ghost" href="#office/books" data-navup>${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a><span class="spacer"></span></div>`) + `
+  // 2.892.0 (#5453): one tool row on top (upload, choose, the kinds, CSV / ZIP; on a phone the rest behind "More"), then what
+  // the own page puts before the list (pre: handed in, new in the office), the heading, the folded filters and the list
+  const back = (own ? '' : `<div class="ofcbar rcl-top"><a class="btn sm ghost" href="#office/books" data-navup>${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a><span class="spacer"></span></div>`)
+    + rclToolsHtml(own) + (pre || '') + `
     <h3 class="ofcgrp" id="rcl-h">${tr('All receipts')}</h3>`;
   if (RCL.key !== rclQuery() && !RCL.loading) setTimeout(() => rclLoad(false), 0);
   if (RCL.err) return back + rclFiltersHtml() + `<div class="empty">${esc(RCL.err)}</div>`;
   if (!RCL.data) return back + rclFiltersHtml() + `<p class="muted lempty">${tr('Loading…')}</p>`;
   return back + rclFiltersHtml() + rclListHtml();
+}
+// 2.892.0 (#5453): the kinds of receipts with pages of their own (entertainment, travel expenses) on Office > Receipts
+const rcl_kinds = () => typeof ofm_all === 'function' ? ofm_all().filter(i => ['meals', 'travel'].includes(i.key) && i.on() && ofm_need(i) && ofm_ok(i)) : [];
+const rcl_n = () => RCL.data?.total?.count || 0;
+// 2.892.0 (#5453): the tool row -- was: two upload buttons, a line of explanation, the kinds, then CSV / ZIP and "Select" in
+// rows of their own (on a phone the first receipt began below the fold). While choosing, the bar of the choice takes its place.
+function rclToolsHtml(own) {
+  if (RCL.sel) return rclSelBar();
+  const ks = own ? rcl_kinds() : [], exp = ofcFeat('books.export_csv'), q = rclQuery();
+  const up = own && typeof bkPhotoHtml === 'function' ? bkPhotoHtml(!OFC.info?.used?.receipt) : '';
+  const sel = rcl_n() ? `<button type="button" class="btn sm ghost rcl-wide" data-rcl="sel">${ic('check', 's')}<span>${tr('Select')}</span></button>` : '';
+  const kinds = ks.length ? `<nav class="rcp-kinds rcl-wide" aria-label="${esc(tr('Other receipts'))}">${ks.map(i => `<a class="btn sm ghost" href="#${i.go}" data-rcp="${i.key}">${ic(i.icon, 's')}<span>${esc(tr(i.name))}</span></a>`).join('')}</nav>` : '';
+  const ex = exp ? `<span class="rcl-exp rcl-wide"><a class="btn sm ghost" id="rcl-csv" href="/api/office/books/receipts.csv?${esc(q)}" download>${ic('download', 's')}<span>CSV</span></a>
+    <a class="btn sm ghost" id="rcl-zip" href="/api/office/books/receipts.zip?${esc(q)}" download>${ic('download', 's')}<span>${tr('ZIP for the tax adviser')}</span></a></span>` : '';
+  const more = sel || kinds || ex ? `<button type="button" class="btn sm ghost rcl-mbtn" data-rcl="menu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots', 's')}<span>${tr('More')}</span></button>` : '';
+  return `<div class="ofcbar rcl-tools rcl-selbar">${/*html-ok*/ up/* bkPhotoHtml */}${/*html-ok*/ sel/* built above, text through tr */}<span class="spacer"></span>${/*html-ok*/ kinds/* built above, escaped */}${/*html-ok*/ ex/* built above, escaped */}${/*html-ok*/ more/* built above, escaped */}</div>`;
+}
+// 2.892.0 (#5453): "More" on a phone: the kinds, CSV, ZIP and "Select" (the same actions as the wide row)
+function rclMenu(b) {
+  const ks = rcl_kinds(), csv = $('#rcl-csv'), zip = $('#rcl-zip');
+  menu(b, [...ks.map(i => ({label: tr(i.name), icon: i.icon, fn: () => go(i.go)})), ks.length ? '-' : null,
+    rcl_n() ? {label: tr('Select'), icon: 'check', fn: () => { RCL.sel = new Set(); ofcDraw(); }} : null,
+    csv ? {label: tr('Export as CSV'), icon: 'download', fn: () => csv.click()} : null,
+    zip ? {label: tr('ZIP for the tax adviser'), icon: 'download', fn: () => zip.click()} : null], null, null, tr('All receipts'));
 }
 
 function rclFiltersHtml() {
@@ -138,8 +165,7 @@ function rcl_dockSync() {
   place(); requestAnimationFrame(() => requestAnimationFrame(place));  // again once the wider pair is laid out (measured at once it was still the narrow page)
 }
 window.addEventListener('hashchange', () => setTimeout(rcl_dockSync, 0));  // another page: the receipt goes back into the middle
-function rclSelBar() {
-  if (!RCL.sel) return `<div class="ofcbar rcl-selbar"><button type="button" class="btn sm ghost" data-rcl="sel">${ic('check', 's')}<span>${tr('Select')}</span></button><span class="spacer"></span></div>`;
+function rclSelBar() {  // 2.892.0 (#5453): "Select" itself sits in the tool row (rclToolsHtml)
   const n = RCL.sel.size, off = !n || RCL.busy ? 'disabled' : '';
   return `<div class="ofcbar rcl-selbar on" role="toolbar" aria-label="${esc(tr('Select'))}"><button type="button" class="btn sm ghost" data-rcl="selall">${tr('Select all')}</button>
     <span class="muted rcl-seln" aria-live="polite">${esc(tr('{0} selected', n))}</span><span class="spacer"></span>
@@ -166,15 +192,12 @@ async function rclCheckSel(on) {
   histToast(label, histAdd({label, undo: async () => { await rclChecked(ch, !on); return {}; }, redo: async () => { await rclChecked(ch, on); return {}; }}));
 }
 function rclListHtml() {
-  const d = RCL.data, t = d.total, q = rclQuery();
-  const exp = !ofcFeat('books.export_csv') ? '' : `<div class="ofcbar rcl-exp"><span class="spacer"></span>
-    <a class="btn sm ghost" id="rcl-csv" href="/api/office/books/receipts.csv?${esc(q)}" download>${ic('download', 's')}<span>CSV</span></a>
-    <a class="btn sm" id="rcl-zip" href="/api/office/books/receipts.zip?${esc(q)}" download>${ic('download', 's')}<span>${tr('ZIP for the tax adviser')}</span></a></div>`;
+  const d = RCL.data, t = d.total;  // 2.892.0 (#5453): CSV / ZIP and "Select" moved into the tool row (rclToolsHtml)
   if (!t.count) RCL.sel = null;
-  if (!t.count) return `${exp}<p class="muted lempty rcl-empty">${tr('No receipts match these filters.')}</p>${bkNote()}`;
+  if (!t.count) return `<p class="muted lempty rcl-empty">${tr('No receipts match these filters.')}</p>${bkNote()}`;
   // the mark "Not paid" only where payments are recorded at all (bank reconciliation) and the list mixes both
   RCL.paidMark = RCL.f.status === 'all' && RCL.rows.some(r => r.paid_at);
-  return `${exp}${rclSelBar()}<ul class="ofclist rcl-list${RCL.sel ? ' rcl-choosing' : ''}" role="list" aria-labelledby="rcl-h">${RCL.rows.map(rclRow).join('')}</ul>
+  return `<ul class="ofclist rcl-list${RCL.sel ? ' rcl-choosing' : ''}" role="list" aria-labelledby="rcl-h">${RCL.rows.map(rclRow).join('')}</ul>
     ${d.more ? `<p class="rcl-more"><button type="button" class="btn ghost" data-rcl="more" ${RCL.loading ? 'disabled' : ''}>${tr('Load more')}</button></p>` : ''}
     <div class="bk-profit rcl-sum"><span>${esc(trn('{0} receipt', '{0} receipts', t.count))} <small class="muted">· ${tr('Net')} ${ofcMoney(t.net)} · ${tr('VAT')} ${ofcMoney(t.vat)}</small></span><b>${ofcMoney(t.gross)}</b></div>
     ${bkNote()}`;
@@ -217,6 +240,7 @@ document.addEventListener('click', e => {
   if (k === 'reset') { const d = rclDefault(); rclSet({category: '', supplier: '', project: '', novat: false, hints: false, q: '', status: d.status, checked: d.checked}); return; }
   // 2.420.0 C (#3448): the multiple choice
   if (k === 'sel') { RCL.sel = new Set(); ofcDraw(); return; }
+  if (k === 'menu') { rclMenu(b); return; }  // 2.892.0 (#5453)
   if (k === 'selx') { RCL.sel = null; ofcDraw(); return; }
   if (k === 'selall' && RCL.sel) { const all = RCL.rows.every(r => RCL.sel.has(r.node_id)); RCL.sel = new Set(all ? [] : RCL.rows.map(r => r.node_id)); ofcDraw(); return; }
   if (k === 'chk' || k === 'unchk') { rclCheckSel(k === 'chk'); return; }
@@ -230,9 +254,8 @@ document.addEventListener('click', e => {
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['receipts', 'ticket', N_('Receipts'), 1, () => rcp_tabHtml(), 'money']));
 function rcp_tabHtml() {
   if (!ofcAdmin()) return OFC.info?.submit ? rsb_tabHtml() : ofcLockedHtml();  // 2.356.0 D (#3129, #3006): members hand in receipts
-  const ks = typeof ofm_all === 'function' ? ofm_all().filter(i => ['meals', 'travel'].includes(i.key) && i.on() && ofm_need(i) && ofm_ok(i)) : [];
-  const kinds = ks.length ? `<nav class="rcp-kinds" aria-label="${esc(tr('Other receipts'))}">${ks.map(i => `<a class="btn sm ghost" href="#${i.go}" data-rcp="${i.key}">${ic(i.icon, 's')}<span>${esc(tr(i.name))}</span></a>`).join('')}</nav>` : '';
-  return rcl_pairWrap(`<div class="rcp">${typeof bkPhotoHtml === 'function' ? bkPhotoHtml() : ''}${kinds}${rsb_inHtml()}${amv_html()}${rcn_html()}${rclHtml(true)}</div>`);  // 2.743.0 B (#4930): in the pair; 2.356.0 D (#3129): + handed in; 2.522.0 (#4433): + new in the office; 2.547.0 (#4434): + the old receipts' move
+  // 2.892.0 (#5453): upload, kinds, CSV / ZIP in the tool row of the list (rclToolsHtml); handed in / move / new in between
+  return rcl_pairWrap(`<div class="rcp">${/*html-ok*/ rclHtml(true, rsb_inHtml() + amv_html() + rcn_html())/* the page's own builders, each escapes */}</div>`);  // 2.743.0 B (#4930): in the pair; 2.356.0 D (#3129): + handed in; 2.522.0 (#4433): + new in the office; 2.547.0 (#4434): + the old receipts' move
 }
 
 // ---- 2.522.0 (#4433): "New in the office" -- the documents the general input sorted into the office (or a person moved there)
