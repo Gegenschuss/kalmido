@@ -123,6 +123,10 @@ c.commit(); c.close()`);
     w.eval(`evAskScope('Change a repeating event').then(v => { window.__sc = v; })`);
     md = await until(() => d.querySelector('.modal.cdlg.evscope'));
     check(md && !md.querySelector('[data-sc="all"]').classList.contains('danger') && md.querySelector('[data-sc="all"]').classList.contains('pri'), '#5466: changing: "All dates" as the main button, no warning colour');
+    // 2.832.0 (#5480): the form's default button (the first submit button: the one the Enter of the form presses) is the highlighted
+    // "All dates", not the inserted "Only this date"
+    const defb = md?.querySelector('form button[type="submit"]');
+    check(defb && defb.dataset.sc === 'all' && md.querySelector('[data-sc="one"]').type === 'button', '#5480: Enter in the question = the highlighted "All dates" ' + (defb ? defb.textContent.trim() : '-'));
     click(w, md.querySelector('[data-sc="all"]'));
     check(await until(() => w.eval('window.__sc') === 'all'), '#5466: All dates answers all');
     // a single event: no question, the toast takes it back

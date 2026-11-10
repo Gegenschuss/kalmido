@@ -187,8 +187,11 @@ async function evAskScope(title, del) {
     md.classList.add('evscope');
     const yes = md.querySelector('[data-cd="yes"]'), no = md.querySelector('[data-cd="no"]');
     yes.dataset.sc = 'all'; if (no) no.dataset.sc = '';
-    yes.insertAdjacentHTML('beforebegin', `<button type="submit" class="btn" data-sc="one">${esc(tr('Only this date'))}</button>`);
+    // 2.832.0 (#5480): a plain button with its own submit - as the first submit button of the form it was the default one,
+    // so the Enter of the form chose "Only this date" while "All dates" is the highlighted button
+    yes.insertAdjacentHTML('beforebegin', `<button type="button" class="btn" data-sc="one">${esc(tr('Only this date'))}</button>`);
     md.addEventListener('click', e => { const b = e.target.closest('[data-sc]'); if (b && b.dataset.sc) sc = b.dataset.sc; }, true);
+    md.querySelector('[data-sc="one"]').addEventListener('click', () => md.querySelector('form')?.requestSubmit());
   }});
   return ok ? sc : null;
 }
