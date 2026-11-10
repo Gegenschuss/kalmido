@@ -4,6 +4,7 @@
 - the switch "Members may see and use the agent" does not open a personal agent to the members (the hint says so):
   it stays out of their agent list and they cannot chat with it
 - a person outside the list sees neither the list nor the agent
+- a team agent: listed for the organisation's members since 2.777.0 (#5378), reached ("shared": true) only with the switch on
 - the owner moves the personal agent between private and the organisation (PATCH /api/my/agents/<id> org_id)
 usage: p2466_b_api_test.py <datadir>"""
 import os
@@ -86,9 +87,14 @@ if r.status_code == 409:
 check(r.ok, "the team agent joins the team list " + r.text[:160])
 m = member(state(Ca), TL, TA)
 check(m and m.get("agent") and "agent_owner" not in m, f"a team agent has no agent_owner: {m}")
-check(TA not in [a["id"] for a in state(Ca)["agents"]], "switch off: carol cannot use the team agent")
+# 2.821.0 (#5501): since 2.777.0 (#5378) a team agent is listed for every member of its organisation, as not reached
+# ("shared": false, nothing of its work) while no project is open to her; the switch decides whether she reaches it
+ta = {a["id"]: a for a in state(Ca)["agents"]}.get(TA)
+check(not ta or ta.get("shared") is False, f"switch off: carol cannot use the team agent (listed as not reached: {ta and ta.get('shared')})")
+check(not ta or ta.get("status_task") is None and not ta.get("job_tasks"), "switch off: carol sees nothing of the team agent's work")
 A.patch(B + f"/api/lists/{TL}", json={"agent_members": True})
-check(TA in [a["id"] for a in state(Ca)["agents"]], "switch on: carol can use the team agent")
+ta = {a["id"]: a for a in state(Ca)["agents"]}.get(TA)
+check(ta and ta.get("shared") is True, f"switch on: carol can use the team agent ({ta and ta.get('shared')})")
 
 # ---------------------------------------------------------------- #1708: the workspace of a personal agent
 r = Bo.post(B + "/api/my/agents", json={"username": "bobbot2", "display_name": "Bob bot 2"})
