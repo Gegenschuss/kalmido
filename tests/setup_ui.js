@@ -46,11 +46,14 @@ const api = async (jar, method, url, body) => (await fetch(B + url.replace(/^\//
 
 async function step1(w, user = 'admin') {
   const d = w.document;
-  const form = d.querySelector('.authscreen #auth-form');
-  if (!form) return false;
+  // 2.826.0 (#5504): CI v2.787.0 red here - open() only sleeps 1.5 s, under load the login screen of the fresh container came
+  // later and step 1 gave up at once; wait for the form itself (up to 15 s) and say what was on screen when it is not there
+  const form = await waitSel(d, '.authscreen #auth-form', 15000);
+  if (!form) { console.log('setup step 1: no #auth-form, screen:', (d.body ? d.body.textContent : '').replace(/\s+/g, ' ').slice(0, 300)); return false; }
   d.querySelector('#au-user').value = user; d.querySelector('#au-name').value = 'Admin'; d.querySelector('#au-pw').value = 'password123';
   form.dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
   for (let i = 0; i < 150 && !d.querySelector('.setupcard'); i++) await sleep(100);  // #3506: up to 15 s - under a full Mac load (16 places) 3 s were too short
+  if (!d.querySelector('.setupcard')) console.log('setup step 1: no .setupcard after submit, screen:', (d.body ? d.body.textContent : '').replace(/\s+/g, ' ').slice(0, 300));
   return !!d.querySelector('.setupcard');
 }
 const feats = st => st.settings.features.split(',');
