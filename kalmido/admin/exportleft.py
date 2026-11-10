@@ -92,6 +92,7 @@ UMZ_LEFT_TABLES = {
     "list_bell": _VIEW, "list_folder_skip": _VIEW, "list_mine_hide": _VIEW, "rss_reads": _VIEW, "task_seen": _VIEW, "tchat_reads": _VIEW,
     "tchat_thread_reads": _VIEW, "user_task_order": _VIEW, "wait_hidden": _VIEW,
     "user_mine_sections": _VIEW,  # 2.569.0 (#4395): the own sections of "My tasks", like user_task_order
+    "user_mine_rules": _VIEW, "user_mine_rule_runs": _VIEW,  # 2.823.0 (#4773): the own rules of "My tasks" and their markers
     "eph_state": _SERVER,  # 2.622.0 (#3891): sign-in steps, tickets, typing markers of minutes (core/ephem.py)
 }
 

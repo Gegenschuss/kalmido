@@ -51,6 +51,7 @@ const LD_MODS = {
   bookmarks: ['bookmarks', 'readlater'],  // 2.97.0 A (#1950); 2.172.0 B (#2679): readlater.js = the view "Read later"
   cfkinds: ['cfkinds'],  // 2.156.0 B (#2069): editing multiple choice / rating cells, the task link picker, the field dialog's currency / rating part
   mineboard: ['mineboard'],  // 2.156.0 C (#2072): My tasks as a board
+  minerules: ['minerules'],  // 2.823.0 (#4773): the dialog of the own rules of My tasks
   sectpl: ['sectpl'],  // 2.156.0 C (#2073): the section templates dialog of a list
   objprop: ['objprop'],  // 2.623.0 (#4718): the card of an agent's change proposal for a core object (agents.js propOpen)
   orgschema: ['orgschema'],  // 2.609.0 (#3373): the fields of the organisation in a project's settings, the required-field question
@@ -169,6 +170,7 @@ const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewConta
   tsl_card: ['timesheet'], hbm_hubView: ['hubmail', 1],  // 2.149.0 F (#2518): the time page's timesheet card (it fetches the month itself)
   sht_pic: ['shoot'], sht_bar: ['shoot'],  // 2.636.0 (#4565): the board of a shoot (calendar.js viewKanban)
   ms_clView: ['clientpage', 1],  // 2.563.0 (#4742): Office > Clients (clients.js viewClients)
+  mr_open: ['minerules'],  // 2.823.0 (#4773): My tasks > Rules…
   viewSteps: ['undolist', 1]};  // 2.773.0 (#5250): the page "Recent steps"
 // 2.556.0 (#4685) "New for you": once per new version (the version seen last is a user setting, accounts/whatsnew.py) the
 // server is asked what is new since then; only when there is something the dialog's module loads (whatsnew.js). Nothing at

@@ -688,6 +688,8 @@ APP_ONLY = [
      ("PUT /api/lists/{}/in-mine", "* /api/me/wait-suggestions")),
     ("2.569.0 (#4395): the own sections of My tasks are, like the own order, personal app settings of a person; agents have none",
      ("* /api/mine-sections", "* /api/mine-sections/{}", "PUT /api/mine-sections/order", "POST /api/mine-sections/init")),
+    ("2.823.0 (#4773): the own rules of My tasks only move tasks in the person's own order; personal, agents neither read nor propose them",
+     ("* /api/mine-rules", "* /api/mine-rules/{}", "POST /api/mine-rules/{}/restore", "PUT /api/mine-rules/order", "POST /api/mine-rules/apply")),
     ("2.29.0 (#1029): the permission mode switch in the chat header; in the API it is the agent's runtime (admins: "
      "PATCH /api/admin/agents/{id}, owners: PATCH /api/my/agents/{id}), the agent reads it in GET /agent",
      ("PUT /api/agents/{}/permission-mode",)),

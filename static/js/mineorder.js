@@ -73,6 +73,7 @@ function moViewItems() {
   if (!moActive() || moBoard()) return [];  // 2.156.0 C (#2072): the board has its own columns
   const set = v => () => { if (moView() === v) return; S.settings.mine_view = v; render(); api('PATCH', '/api/settings', {mine_view: v}).catch(() => {}); };
   return [{label: tr('Own order'), icon: 'sort', on: moView() === 'own', fn: set('own')}, {label: tr('Grouped by project'), icon: 'list', on: moView() === 'lists', fn: set('lists')},
+    ...(mseOn() ? [{label: tr('Rules…'), icon: 'zap', fn: () => mr_open()}] : []),  // 2.823.0 (#4773): the own rules (minerules.js, loaded on demand)
     ...(moView() === 'own' && !isMobile() ? [{label: tr('Project as a column'), icon: 'columns', on: moListCol(), fn: () => { LS.set('moListCol', !moListCol()); render(); }}] : [])];  // 2.569.0 (#4395)
 }
 
@@ -150,9 +151,10 @@ document.addEventListener('click', e => {
 // ---- 2.569.0 (#4395): own sections in the own order (/api/mine-sections, kalmido/tasks/mineorder.py; /api/state mine_sections
 // {list, tasks}). Personal: they never change a list, its sections or its order. On top the fixed section "Recently assigned"
 // (kind recent: tasks without a place; shown while it has tasks, never renamed or deleted); the first opening makes "Now",
-// "Soon", "Someday" (kinds now / soon / later, the name '' = the translated default). A task due today or overdue goes into the
-// section of kind now (also renamed) unless the person put it into a section by hand (tasks map); without such a section the
-// rule is gone. A task with a place but no section stands in the topmost section. Deleting a section moves its tasks into the
+// "Soon", "Someday" (kinds now / soon / later, the name '' = the translated default). 2.823.0 (#4773): a task due today or
+// overdue goes into Now through the person's first own rule (server, kalmido/tasks/minerules.py: it writes the section like a
+// drag, once per due day; switched off or deleted = it stays where it is). A task with a place but no section stands in the
+// topmost section. Deleting a section moves its tasks into the
 // topmost one left (Undo brings it back); renaming and deleting carry the version (409 = changed on another device).
 const MSE_KIND = {recent: N_('Recently assigned'), now: N_('Now'), soon: N_('Soon'), later: N_('Someday')};
 const mseList = () => S.mineSecs?.list || [];
@@ -166,7 +168,7 @@ const mseKeepFold = ms => { for (const s of ms?.list || []) if (mseFoldP.has(s.i
 function mseFromState(j) {
   if (!j.mine_sections) return;
   const q = OUT.q.some(e => e.url === '/api/tasks/mine-order');  // a drag waiting offline keeps its sections
-  S.mineSecs = {list: mseKeepFold(j.mine_sections).list || [], tasks: q && S.mineSecs ? S.mineSecs.tasks : j.mine_sections.tasks || {}};
+  S.mineSecs = {list: mseKeepFold(j.mine_sections).list || [], rules: j.mine_sections.rules || 0, tasks: q && S.mineSecs ? S.mineSecs.tasks : j.mine_sections.tasks || {}};
 }
 let mseIniting = false;
 async function mseInit() {  // the first opening of the own order: the default sections (once; the server does nothing a second time)
@@ -178,16 +180,16 @@ async function mseInit() {  // the first opening of the own order: the default s
 function mseOf(t, x) {
   const p = x.map[t.id];
   if (p && x.ids.has(p)) return p;  // put there by hand: wins
-  if (x.now && mtUrgent(t, x.t0)) return x.now.id;
   if (moPos(t) == null && x.rec) return x.rec.id;
   return x.top ? x.top.id : null;
 }
 function mseCtx() {
   const L = mseList(), own = L.filter(s => s.kind !== 'recent');
-  return {rec: L.find(s => s.kind === 'recent'), own, now: own.find(s => s.kind === 'now'), top: own[0], ids: new Set(own.map(s => s.id)), map: S.mineSecs?.tasks || {}, t0: today()};
+  return {rec: L.find(s => s.kind === 'recent'), own, top: own[0], ids: new Set(own.map(s => s.id)), map: S.mineSecs?.tasks || {}};
 }
 // views.js groupTasks: the groups of the own order (arr = the shown tasks in the own order)
 function mseGroups(arr) {
+  mrApplySoon();  // 2.823.0 (#4773)
   const x = mseCtx(), by = new Map();
   for (const t of arr) { const k = mseOf(t, x); if (!by.has(k)) by.set(k, []); by.get(k).push(t); }
   const mk = s => {
@@ -265,3 +267,31 @@ document.addEventListener('click', e => {
 }, true);
 // 2.695.0 (#4619): a long press (phone) / right click (computer) on a row opens what its "…" opens (multisel.js lm_btnMenu)
 if (typeof lm_btnMenu === 'function') lm_btnMenu('#view .ghead.mosec', '[data-mse-menu]');  // the head of an own section of My tasks
+
+// ---- 2.823.0 (#4773): the person's own rules (kalmido/tasks/minerules.py; the dialog: minerules.js, module minerules). The
+// server decides and moves; the app only says which tasks "My tasks" shows (no hidden projects) when they change, at most every
+// MR_GAP ms, while the own order with sections is open and the person has active rules (mine_sections.rules). A drag waiting
+// offline goes first. The answer brings the new own order and sections, like a drag of the person.
+const MR_GAP = 700;
+let mrSig = '', mrT = 0, mrBusy = false;
+function mrApplySoon() {
+  if (!mseOn() || !(S.mineSecs?.rules > 0) || mrT || mrBusy) return;
+  mrT = setTimeout(mrApply, MR_GAP);
+}
+async function mrApply() {
+  mrT = 0;
+  if (!mseOn() || !(S.mineSecs?.rules > 0) || OUT.q.some(e => e.url === '/api/tasks/mine-order') || navigator.onLine === false) return;
+  const ts = moAll().filter(t => t.id > 0 && !mtHid(t)), t0 = today();
+  const sig = t0 + '|' + (S.mineSecs.rules) + '|' + ts.map(t => [t.id, t.due || '', t.priority || 0, t.list_id, (t.ltags || []).join(','), moPos(t) == null ? 'n' : ''].join(':')).join(';');
+  if (sig === mrSig) return;
+  mrBusy = true;
+  try {
+    const j = await rawFetch('POST', '/api/mine-rules/apply', {ids: ts.map(t => t.id), today: t0});  // never queued: offline it runs at the next change
+    mrSig = sig;
+    if (j?.mine_order && !OUT.q.some(e => e.url === '/api/tasks/mine-order')) {
+      S.mineOrder = j.mine_order; S.mineBase = moIds(j.mine_order);
+      mseFromState(j);
+      if (j.moved) { mrSig = ''; render(); }
+    }
+  } catch { /* offline / an older server: the next change asks again */ } finally { mrBusy = false; }
+}

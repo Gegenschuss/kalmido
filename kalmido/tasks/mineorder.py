@@ -7,8 +7,8 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, write_lock, iso, iso_ms, now_utc
-from ..core.access import Denied, tvis, vis_sql, list_role
+from ..core.db import body, bump, db, write_lock, iso, iso_ms, local_now, now_utc
+from ..core.access import Denied, live_sql, tvis, vis_sql, list_role
 from ..core.conflict import ccf_check  # 2.569.0 (#4395): versions of the own sections
 from ..accounts.session import me
 
@@ -149,8 +149,9 @@ def ms_list(c, uid):
 
 
 def vw_mine_sections(c, uid):
-    """/api/state mine_sections: {list: the sections, tasks: {task id (str): section id} of the tasks put into one by hand}."""
-    return {"list": ms_list(c, uid), "tasks": {str(r[0]): r[1] for r in c.execute(
+    """/api/state mine_sections: {list: the sections, tasks: {task id (str): section id} of the tasks put into one by hand,
+    rules: 2.823.0 (#4773) the number of the person's active own rules (0 = the app need not send POST /api/mine-rules/apply)}."""
+    return {"list": ms_list(c, uid), "rules": ms_rules_n(c, uid), "tasks": {str(r[0]): r[1] for r in c.execute(
         f"SELECT o.task_id, o.section_id FROM user_task_order o JOIN tasks t ON t.id=o.task_id WHERE o.user_id=? "
         f"AND o.section_id IS NOT NULL AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.')}", (uid, uid, uid))}}
 
@@ -168,6 +169,7 @@ def _ms_init(c, uid):
     t = iso_ms(now_utc())  # the version of a section: milliseconds, two devices within one second still differ
     c.executemany("INSERT INTO user_mine_sections(user_id, name, pos, collapsed, kind, created_at, updated_at) VALUES(?,?,?,?,?,?,?)",
                   [(uid, "", n, 0, k, t, t) for n, k in enumerate(MS_DEFAULTS)])
+    ms_rule_seed(c, uid)  # 2.823.0 (#4773): "due today or overdue -> Now" is the person's first own rule
     return True
 
 
@@ -203,8 +205,9 @@ def ms_init_post():
 
 @app.post("/api/mine-sections")
 def ms_create():
-    """{name, after?: section id (default: at the end), restore?: {kind, collapsed, pos, tasks: [task ids]}} -> a new own section.
-    restore = the Undo of a deletion: the section comes back with its kind, place and folding, and the tasks it had."""
+    """{name, after?: section id (default: at the end), restore?: {id, kind, collapsed, pos, tasks: [task ids]}} -> a new own section.
+    restore = the Undo of a deletion: the section comes back with its kind, place and folding, and the tasks it had; 2.823.0
+    (#4773): the own rules that moved into the deleted one (its old id) move into it again."""
     c, uid = _ms_person()
     b = body() or {}
     rs = b.get("restore") if isinstance(b.get("restore"), dict) else None
@@ -237,6 +240,8 @@ def ms_create():
     for i in range(0, len(back), 500):
         part = back[i:i + 500]
         c.execute(f"UPDATE user_task_order SET section_id=? WHERE user_id=? AND task_id IN ({','.join('?' * len(part))})", (sid, uid, *part))
+    if rs and isinstance(rs.get("id"), int) and not isinstance(rs.get("id"), bool):  # 2.823.0 (#4773): its rules point at it again
+        c.execute("UPDATE user_mine_rules SET section_id=? WHERE user_id=? AND section_id=?", (sid, uid, rs["id"]))
     return _ms_answer(c, uid, id=sid)
 
 
@@ -288,7 +293,7 @@ def ms_delete(sid):
     c.execute("UPDATE user_task_order SET section_id=? WHERE user_id=? AND section_id=?", (top, uid, sid))
     c.execute("DELETE FROM user_mine_sections WHERE id=?", (sid,))
     c.executemany("UPDATE user_mine_sections SET pos=? WHERE id=?", [(n + 1, x) for n, x in enumerate(y for y in rows if y != sid)])
-    restore = {"name": r["name"] or "", "kind": r["kind"] or "", "pos": rows.index(sid) + 1, "collapsed": bool(r["collapsed"]), "tasks": tasks}
+    restore = {"id": sid, "name": r["name"] or "", "kind": r["kind"] or "", "pos": rows.index(sid) + 1, "collapsed": bool(r["collapsed"]), "tasks": tasks}
     return _ms_answer(c, uid, restore=restore, moved_to=top)
 
 
@@ -311,3 +316,33 @@ def ms_order_put():
     new += [x for x in rows if x not in new]  # sections the list did not name keep their place at the end
     c.executemany("UPDATE user_mine_sections SET pos=? WHERE id=?", [(n + 1, x) for n, x in enumerate(new)])
     return _ms_answer(c, uid)
+
+
+# ---- 2.823.0 (#4773): the person's own rules (kalmido/tasks/minerules.py) -- what the sections need of them lives here
+def ms_rules_n(c, uid):
+    """/api/state mine_sections.rules: the active own rules (+1 while the first one is still to be made): 0 = the app need not
+    send POST /api/mine-rules/apply."""
+    n = c.execute(f"SELECT COUNT(*) FROM user_mine_rules WHERE user_id=? AND active AND {live_sql()}", (uid,)).fetchone()[0]
+    return n + (1 if _ms_seed_due(c, uid) else 0)
+
+
+def _ms_seed_due(c, uid):
+    return bool(not c.execute("SELECT 1 FROM user_mine_rules WHERE user_id=? AND dflt LIMIT 1", (uid,)).fetchone()
+                and c.execute("SELECT 1 FROM user_mine_sections WHERE user_id=? AND kind='now' LIMIT 1", (uid,)).fetchone())
+
+
+def ms_rule_seed(c, uid, today=None):
+    """The first own rule "due today or overdue -> Now, at the top" (once per person; the caller holds the write lock). It
+    replaces the fixed rule of 2.569 in the client; what the person put into a section by hand before (hand wins) gets its
+    marker, so the rule does not take it away. A deleted one stays as deleted (dflt): it never comes back by itself."""
+    if not _ms_seed_due(c, uid):
+        return False
+    now = c.execute("SELECT id FROM user_mine_sections WHERE user_id=? AND kind='now' ORDER BY pos, id LIMIT 1", (uid,)).fetchone()[0]
+    t, pos = iso_ms(now_utc()), c.execute("SELECT COALESCE(MIN(pos), 1) - 1 FROM user_mine_rules WHERE user_id=?", (uid,)).fetchone()[0]
+    rid = c.execute("INSERT INTO user_mine_rules(user_id, name, trig, trig_val, section_id, place, pos, active, dflt, created_at, updated_at) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?) RETURNING id", (uid, "", "due", "n", now, "top", pos, True, True, t, t)).fetchone()[0]
+    day = (today or local_now().date()).isoformat()
+    c.execute("INSERT INTO user_mine_rule_runs(user_id, rule_id, task_id, key, at) SELECT ?, ?, t.id, 'due:' || substr(t.due, 1, 10), ? "
+              "FROM user_task_order o JOIN tasks t ON t.id=o.task_id WHERE o.user_id=? AND o.section_id IS NOT NULL AND t.due IS NOT NULL "
+              "AND substr(t.due, 1, 10)<=? ON CONFLICT DO NOTHING", (uid, rid, iso(now_utc()), uid, day))
+    return True

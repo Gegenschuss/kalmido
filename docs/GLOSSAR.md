@@ -706,6 +706,7 @@ Tasks: lifecycle, dependencies, attachments, trash, relations, reminders, review
 - `kalmido/tasks/ftsearch.py` (`fts`) - Full-text search on the server
 - `kalmido/tasks/lifecycle.py` (`task`) - Applying changes, completing (repeats)
 - `kalmido/tasks/mineorder.py` (`ms`) - "My tasks" in the person's own order (table user_task_order: user_id, task_id, pos)
+- `kalmido/tasks/minerules.py` (`mr`) - The person's own rules of "My tasks": move a task into an own section, once per occasion
 - `kalmido/tasks/movememo.py` (`tmm`) - What a move of a task ends, remembered so that moving it back brings it back
 - `kalmido/tasks/multilist.py` (`ml`) - A task in several lists without a copy
 - `kalmido/tasks/oneway.py` (`irr`) - The mark "irreversible" of a task and the task
@@ -917,6 +918,7 @@ The start-up module.
 - `static/js/mindmap.js` (`mm`) - The mind map a view of a list next to List / Kanban / Timeline
 - `static/js/mineboard.js` (`mb`) - "My tasks" as a board, module "
 - `static/js/mineorder.js` (`mse`) - "My tasks" in the person's own order
+- `static/js/minerules.js` (`mr`) - The dialog of the own rules of "My tasks", module "minerules"
 - `static/js/minewait.js` (`mw`) - The view "Waiting for me" (#mine_wait)
 - `static/js/miniwin.js` (`mw`) - A list in its own small browser window
 - `static/js/move.js` (`umz`) - (kalmido/admin/acctexport.py: start, state polled while it runs, download, delete)
