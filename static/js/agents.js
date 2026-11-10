@@ -1097,9 +1097,12 @@ async function schedOpen(aid) {
   const md = modal('<div class="schedbody"></div>');
   md.classList.add('schedmd');
   const draw = () => {
-    const mine = j.data.filter(s => s.mine).length;
+    const mine = j.data.filter(s => s.mine).length, own = j.data.filter(s => s.mine && !s.list_check), allOff = own.length && own.every(s => !s.enabled);
+    // 2.826.0 (#5510): pause / resume all of my plans with this agent in one step (with undo); the chat stays on
+    // allBtn: built just above from ic() and esc(tr()) (html-ok below)
+    const allBtn = own.length ? `<div class="schedall"><button type="button" class="btn sm" data-sm="all">${ic(allOff ? 'play' : 'pause', 's')} ${esc(allOff ? tr('Resume all') : tr('Pause all'))}</button></div>` : '';
     $('.schedbody', md).innerHTML = `<h3>${ic('clock', 's')} ${esc(tr('Planned jobs: {0}', a.name))}</h3>
-      <div class="shint">${esc(tr('{0} gets each plan at its time as a job and answers in your chat. It sees only the projects shared with it.', a.name))}</div>
+      <div class="shint">${esc(tr('{0} gets each plan at its time as a job and answers in your chat. It sees only the projects shared with it.', a.name))}</div>${/*html-ok*/ allBtn}
       <div class="schedlist">${j.data.length ? j.data.map(schedRowHtml).join('') : `<div class="muted mhint">${esc(tr('No plans yet.'))}</div>`}</div>
       <div class="foot"><span class="muted">${esc(tr('{0} of {1}', mine, j.max))}</span><span class="spacer"></span><button class="btn" data-sm="close">${tr('Close')}</button>
         ${j.may_create ? `<button class="btn pri" data-sm="new" ${mine >= j.max ? 'disabled' : ''}>${ic('plus', 's')} ${tr('New plan')}</button>` : ''}</div>`;
@@ -1110,7 +1113,15 @@ async function schedOpen(aid) {
     const b = e.target.closest('[data-sm]'); if (!b || b.dataset.sm === 'toggle') return;
     const sid = +(b.closest('[data-sid]')?.dataset.sid || 0), s = j.data.find(x => x.id === sid);
     if (b.dataset.sm === 'close') md.remove();
-    else if (b.dataset.sm === 'new') schedForm(md, a, null, reload);
+    else if (b.dataset.sm === 'all') {  // 2.826.0 (#5510)
+      const own = j.data.filter(x => x.mine && !x.list_check), on = own.length > 0 && own.every(x => !x.enabled);
+      b.disabled = true;
+      let r; try { r = await api('PATCH', `/api/agents/${a.id}/schedules`, {enabled: on}); } catch { b.disabled = false; return; }
+      await reload();
+      const ids = r.changed || [];
+      if (ids.length) toast(on ? trn('{0} plan resumed', '{0} plans resumed', ids.length) : trn('{0} plan paused', '{0} plans paused', ids.length),
+        async () => { try { await api('PATCH', `/api/agents/${a.id}/schedules`, {enabled: !on, ids}); } catch { return; } if (md.isConnected) await reload(); });
+    } else if (b.dataset.sm === 'new') schedForm(md, a, null, reload);
     else if (b.dataset.sm === 'edit' && s) schedForm(md, a, s, reload);
     else if (b.dataset.sm === 'del' && s) {
       if (!await askConfirm(tr('Delete this plan?'), s.title, {ok: tr('Delete'), danger: true})) return;

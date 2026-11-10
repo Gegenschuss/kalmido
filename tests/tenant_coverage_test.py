@@ -1083,6 +1083,7 @@ ROUTES = {
     "GET /api/v1/time/gaps": "aggregate", "GET /api/agents/{}/schedules": "agent", "POST /api/agents/{}/schedules": "agent",
     "PATCH /api/agent-schedules/{}": "agent", "DELETE /api/agent-schedules/{}": "agent", "POST /api/agent-schedules/{}/run": "agent",
     "GET /api/v1/agent/schedules": "agent", "GET /api/v1/attachments/{}/text": "attachment", "POST /api/pdf-text": "own",
+    "PATCH /api/agents/{}/schedules": "agent",  # 2.826.0 (#5510): pause / resume all of MY plans with an agent (p2826_b_api_test.py)
     # 2.39.0 (#1168): the Playbook of a list (need_list: people who do not see the list 404, p2390_a_api_test.py) and of a
     # folder (the own folders only), agent proposals, the scheduled list checks (an agent of the list); #1179: editing an own
     # message in an agent chat (only the sender, only an agent one may use)

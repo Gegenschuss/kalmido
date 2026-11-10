@@ -271,7 +271,7 @@ ROUTES = {
     "GET /api/proposals/{}": "agents", "GET /api/v1/agent": "agents", "GET /api/v1/agent/chats": "agents",
     "GET /api/v1/agent/events": "agents", "GET /api/v1/agent/jobs": "agents", "GET /api/v1/agent/jobs/{}": "agents",
     "GET /api/v1/agent/quota": "agents", "GET /api/v1/agent/schedules": "agents", "GET /api/v1/agent/usage": "agents",
-    "GET /api/v1/agents": "agents", "PATCH /api/agent-schedules/{}": "agents", "PATCH /api/agents/{}/chat/{}": "agents",
+    "GET /api/v1/agents": "agents", "PATCH /api/agent-schedules/{}": "agents", "PATCH /api/agents/{}/schedules": "agents", "PATCH /api/agents/{}/chat/{}": "agents",
     "PATCH /api/agents/{}/color": "agents", "PATCH /api/my/agents/{}": "agents", "PATCH /api/v1/agent/jobs/{}": "agents",
     "POST /api/agent-schedules/{}/run": "agents", "POST /api/agents/jobs/{}/action": "agents",
     "POST /api/agents/{}/chat": "agents", "POST /api/agents/{}/chat/{}/choice": "agents",

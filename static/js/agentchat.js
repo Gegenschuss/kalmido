@@ -831,6 +831,8 @@ document.addEventListener('click', e => {
     {label: tr('Always show steps'), icon: 'list', on: stepsAlwaysOn(), fn: () => stepsAlways()},
     ...kbd_item('agent'),  // 2.380 E (#3449)
     {label: tr('Show usage'), icon: 'chart', cls: 'chmi-qshow', on: quotaShowOn(), fn: () => quotaShow(!quotaShowOn())},  // 2.407.0 B (#3493)
+    // 2.826.0 (#5510): its plans (morning briefing and so on) as on its card (only where the card shows the button)
+    ...!S.chat.job && agentById(S.chat.aid) && agentById(S.chat.aid).shared !== false ? [{label: tr('Plans'), icon: 'clock', cls: 'chmi-plans', fn: () => schedOpen(S.chat.aid)}] : [],
     {label: tr('Chat settings'), icon: 'cog', fn: () => acset_open()},  // 2.233.0 A (#2848)
     ...S.chat.job ? [] : ['-', {label: tr('Delete history'), icon: 'trash', fn: () => acdDeleteAll()}]]);
 });

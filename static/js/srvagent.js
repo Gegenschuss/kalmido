@@ -230,10 +230,18 @@ async function srv_stDraw(md, a) {
   box.innerHTML = `${!hint ? '' : `<div class="shint keep srvwait" role="note"><span>${esc(hint)}</span>
       <button type="button" class="btn sm" data-srv="share">${ic('users', 's')} ${tr('Share project')}</button></div>`}
     <h4 id="srv-st-h">${tr('Starter pack')}</h4><div class="srvruns" role="list" aria-labelledby="srv-st-h">${/*html-ok*/ SRV_ST.map(([k, n]) => { const st = (j.items || {})[k] || 'missing';
-      return `<div class="mrow srvsti" role="listitem" data-srv-sti="${esc(k)}" data-state="${esc(st)}"><span class="n">${esc(tr(n))} <small class="muted">${st === 'missing' ? '' : esc(tr(SRV_ST_STATE[st] || st))}</small></span>${st === 'missing' ? `<button type="button" class="btn sm" data-srv-add="${esc(k)}">${ic('plus', 's')} ${tr('Add')}</button>` : ''}</div>`; }).join('')}</div>
+      const sid = (j.ids || {})[k], sw = sid && (st === 'active' || st === 'paused');  // 2.826.0 (#5510): a routine with its own plan: a switch
+      return `<div class="mrow srvsti" role="listitem" data-srv-sti="${esc(k)}" data-state="${esc(st)}"><span class="n">${esc(tr(n))} ${sw ? '' : `<small class="muted">${st === 'missing' ? '' : esc(tr(SRV_ST_STATE[st] || st))}</small>`}</span>${sw ? `<label class="chkl srvstsw"><input type="checkbox" role="switch" data-srv-sw="${esc(String(sid))}" ${st === 'active' ? 'checked' : ''} aria-label="${esc(tr(n))}"><span>${esc(tr(SRV_ST_STATE[st]))}</span></label>` : ''}${st === 'missing' ? `<button type="button" class="btn sm" data-srv-add="${esc(k)}">${ic('plus', 's')} ${tr('Add')}</button>` : ''}</div>`; }).join('')}</div>
     <div class="shint keep" id="srv-sthint" role="status" hidden></div>`;
   box.dataset.ws = j.org_id ? 'org:' + j.org_id : 'private';
   md._srvSt = j;
+  // 2.826.0 (#5510): On / Paused sets the same enabled as the Plans dialog; a paused plan stays and can be switched on again
+  box.onchange = async e => {
+    const x = /** @type {any} */ (e.target); if (!x?.dataset?.srvSw) return;
+    x.disabled = true;
+    try { await api('PATCH', `/api/agent-schedules/${+x.dataset.srvSw}`, {enabled: x.checked}); } catch { x.checked = !x.checked; x.disabled = false; return; }
+    if (md.isConnected) await srv_stDraw(md, a);
+  };
 }
 // after "Share project": the waiting routines asked again start at once (else the server's watchdog starts them within a minute)
 async function srv_stWake(md, a) {

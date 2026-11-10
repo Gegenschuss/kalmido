@@ -243,6 +243,18 @@ def srv_starter_apply(c, a, uid, items, days):
     return out
 
 
+def srv_starter_plan_ids(c, aid, uid):
+    """2.826.0 (#5510): {item: id of uid's plan} for the starter routines with a plan of their own (briefing, tidy, followup,
+    office): the agent's window switches them on / off with PATCH /api/agent-schedules/<id> (the same enabled as in Plans)."""
+    out = {}
+    for k in ("briefing", "tidy", "followup", "office"):
+        r = c.execute("SELECT id FROM agent_schedules WHERE agent_id=? AND user_id=? AND srv_flow=? AND list_check=0 ORDER BY id",
+                      (aid, uid, k)).fetchone()
+        if r:
+            out[k] = r["id"]
+    return out
+
+
 def srv_starter_state(c, a, uid):
     """2.777.0 C (#5378): what of the starter pack agent a (agent_row) already has for person uid -> {item: state}: active (the
     plan runs / the rule is there), waiting (a plan waits for a shared project), paused (a plan switched off), missing (not set up
@@ -321,5 +333,5 @@ def srv_starter_get(aid):
     c = db()
     a = srv_need(c, aid)
     # own (review F2): I shared one of MY projects with it myself (agents/core.py agent_shared_by) -- only that wakes my waiting plans
-    return jsonify(items=srv_starter_state(c, a, me()), shared=agent_shares(c, aid, me()), own=agent_shared_by(c, aid, me()),
+    return jsonify(items=srv_starter_state(c, a, me()), ids=srv_starter_plan_ids(c, aid, me()),  # 2.826.0 (#5510): ids shared=agent_shares(c, aid, me()), own=agent_shared_by(c, aid, me()),
                    projects=agent_projects_count(c, aid), org_id=a["org_id"])

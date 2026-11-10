@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import g, jsonify
 
 from ..core.config import app, TZ
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, st_ids, system_ctx
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso
 from ..core.access import Denied, list_role, reading_ids
@@ -435,6 +435,37 @@ def agent_schedule_update(sid):
     _sched_set_next(c, sid)
     c.commit()
     return jsonify(sched_dict(c, sched_row(c, sid), uid))
+
+
+@app.patch("/api/agents/<int:aid>/schedules")
+def agent_schedules_all(aid):
+    """2.826.0 (#5510): {enabled, ids?} -- pauses or resumes every plan of MINE with this agent in one step (never another
+    person's plan, not the scheduled checks of lists); ids: only these of my plans (the undo step of the app). The chat with
+    the agent stays on. Resuming computes the next run from now: missed runs are not made up. Answer: {changed: [ids], data}."""
+    c, uid = db(), me()
+    if not agent_row(c, aid) or is_agent(g.user) or not agent_shares(c, aid, uid):
+        raise Denied(404)
+    b = body()
+    if not isinstance(b.get("enabled"), bool):
+        return err(tr("enabled must be true or false"))
+    ids = b.get("ids")
+    if ids is not None and (not isinstance(ids, list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids) or len(ids) > 500):
+        return err(tr("ids must be a list of numbers"))
+    on = 1 if b["enabled"] else 0
+    q, args = "SELECT id FROM agent_schedules WHERE agent_id=? AND user_id=? AND list_check=0 AND enabled<>?", [aid, uid, on]
+    if ids is not None:
+        q += " AND id = ANY(CAST(? AS BIGINT[]))"
+        args.append(st_ids(ids))
+    changed = [r["id"] for r in c.execute(q + " ORDER BY id", tuple(args)).fetchall()]
+    ts = iso(now_utc())
+    for sid in changed:
+        c.execute("UPDATE agent_schedules SET enabled=?, share_wait=0, updated_at=?" + (", last_state=''" if on else "") + " WHERE id=?",
+                  (on, ts, sid))
+        _sched_set_next(c, sid)
+    c.commit()
+    rows = c.execute("SELECT * FROM agent_schedules WHERE agent_id=? AND user_id=? AND list_check=0 ORDER BY id", (aid, uid)).fetchall()
+    names = user_names(c, [aid, uid])
+    return jsonify(changed=changed, data=[sched_dict(c, r, uid, names) for r in rows])
 
 
 @app.delete("/api/agent-schedules/<int:sid>")
