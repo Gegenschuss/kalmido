@@ -140,7 +140,7 @@ async function orr_del(gid) {
 }
 
 // ---- Log
-const ORR_ACT = {member_groups: N_('changed the groups of {0}'), group_create: N_('created the group {0}'), group_change: N_('changed the group {0}'), group_delete: N_('deleted the group {0}')};
+const ORR_ACT = {member_groups: N_('changed the groups of {0}'), group_create: N_('created the group {0}'), group_change: N_('changed the group {0}'), group_delete: N_('deleted the group {0}'), group_restore: N_('restored the group {0}')};
 function orr_logHtml(d) {
   if (ORR.logErr) return `<div class="empty">${esc(ORR.logErr)}</div>`;
   if (!ORR.log) { if (!ORR.logBusy) { ORR.logBusy = true; setTimeout(orr_logLoad, 0); } return `<p class="muted lempty">${tr('Loading…')}</p>`; }
@@ -161,7 +161,7 @@ function orr_logLines(d, x) {
   if (x.action === 'group_change' && b.name !== a.name) out.push(`${tr('Name')}: ${arrow(b.name || '', a.name || '')}`);
   for (const ar of d.areas || []) {
     const lb = (b.levels || {})[ar.key] || 'none', la = (a.levels || {})[ar.key] || 'none';
-    if (x.action === 'group_change' ? lb !== la : (x.action === 'group_create' ? la : lb) !== 'none') out.push(`${an(ar.key)}: ${x.action === 'group_change' ? arrow(orr_lvName(lb), orr_lvName(la)) : orr_lvName(x.action === 'group_create' ? la : lb)}`);
+    if (x.action === 'group_change' ? lb !== la : (/^group_(create|restore)$/.test(x.action) ? la : lb) !== 'none') out.push(`${an(ar.key)}: ${x.action === 'group_change' ? arrow(orr_lvName(lb), orr_lvName(la)) : orr_lvName(/^group_(create|restore)$/.test(x.action) ? la : lb)}`);
   }
   const sb = b.specials || [], sa = a.specials || [];
   for (const s of sa) if (!sb.includes(s)) out.push(tr('+ {0}', sn(s)));

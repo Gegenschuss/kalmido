@@ -779,6 +779,12 @@ def ofr_group_delete(gid):
     return jsonify(ok=True, trash={"kind": OFR_TRASH, "id": gid})
 
 
+def ofr_group_restored(c, oid, uid, gid):
+    """2.866.0 (#5302 F5): a rights group back from the office trash goes into the rights log too (group_restore, its definition
+    as after) -- without it the log showed the group as deleted while it exists. Its members do not come back with it."""
+    ofr_log(c, oid, uid, "group_restore", group=f"g:{gid}", after=_group_cur(c, oid, gid))
+
+
 def _keep_a_manager(c, oid, drop_group=None, user=None, new_refs=None):
     """Decision 5: at least one person keeps the rights management. The organisation's admins always have it, so this only
     refuses where an area has no admin (never in practice) -- kept as the explicit rule."""

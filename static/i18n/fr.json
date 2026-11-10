@@ -17985,6 +17985,7 @@
   "The PDF cannot be read": "Le PDF ne peut pas être lu",
   "This PDF has more than {0} pages - its pages cannot be changed here": "Ce PDF compte plus de {0} pages - ses pages ne peuvent pas être modifiées ici",
   "The pages of this document cannot be changed (read-only or a locked month)": "Les pages de ce document ne peuvent pas être modifiées (lecture seule ou mois verrouillé)",
+  "restored the group {0}": "a restauré le groupe {0}",
   "Don’t recognise “{0}”": "Ne pas reconnaître « {0} »",
   "Done could not be saved": "Impossible d’enregistrer comme terminée",
   "“Won’t do” could not be saved": "Impossible d’enregistrer « Ne sera pas fait »",

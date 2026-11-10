@@ -24,7 +24,7 @@ from ..core.access import Denied
 from ..core.retention import ret_days
 from .ledger import ofx_log
 from .model import office_ctx, office_role
-from .rights import ofr_admin_or
+from .rights import ofr_admin_or, ofr_group_restored
 from .eqcare import eqc_sync
 from .okern import OFK, ofk_restore, ofk_trash_items  # 2.905.0 (#5414): the kinds that moved onto the core's trash
 from ..core.objects import obj_row
@@ -247,6 +247,8 @@ def otb_restore_route(tid):
         OTB_CHECK[kind](c, oid, ref)
     if kind in OTB_MANY:  # 2.567.0 (#4707): e.g. imported trips only into open months
         OTB_MANY[kind](c, oid, notes.get("ids") or [ref])
+    if kind == "rgroup":  # 2.866.0 (#5302 F5): the rights log names the restore as it named the delete
+        ofr_group_restored(c, oid, uid, int(ref))
     if kind == "contracts" and t0:  # 2.272.0 F (#3038, review E2-M3): its PDF files that went with it come back too
         since = parse_iso(t0["deleted_at"]) - timedelta(seconds=2)
         for f in c.execute("SELECT id, deleted_at FROM office_contract_files WHERE org_id=? AND contract_id=? AND deleted_at IS NOT NULL",
