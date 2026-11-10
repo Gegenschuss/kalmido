@@ -5,9 +5,9 @@
    delivery state and the decisions take no gap of the panel (60-80 px under "Watch") */
 .cms>.cmempty.cmload{padding:.1875rem .375rem .1875rem 2.625rem;font-size:var(--fs-s);line-height:var(--lh);text-align:left}
 .dbody>:is(#d-dv,#d-ow,#d-dec):empty{display:none}
-/* the phone's bar holds date, Today / Tomorrow and Complete in one row (the project is in the path on top); a date chip keeps
-   room for its day, else the row wraps once */
-.dthumb .dchip{min-width:6rem}
+/* the phone's bar holds date, Today / Tomorrow and Complete in one row (the project is in the path on top); the date chip is
+   never cut short: a long date with its time moves Complete into a second row instead (the row wraps once) */
+.dthumb .dchip{flex:1 0 auto;min-width:6rem}
 /* a narrow phone (up to 384 px): "-1 day" leaves the bar (the date chip's picker has it), so date, Today / Tomorrow and Complete fit one row */
 @container dthumb (max-width:24rem){ .dthumb .dq[data-d="-1"]{display:none} }
 /* Watch and "N watchers" one element (a joined pair) */
