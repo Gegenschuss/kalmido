@@ -339,10 +339,13 @@ async function dc_open(id, o = {}) {
   const v = $('.dv-view'); if (v) dc_mdDraw(v);
 }
 // ---- 2.476.0 (#3935): leafing through the open document -- always in the list as shown (filtered, sorted: DC.docs, like
-// the arrow keys). "3 of 48" and two arrow buttons above the preview; a swipe sideways on the preview (not on the fields
-// below) turns to the next / previous one, which glides in; past the last loaded one the next page loads, at the real end
+// the arrow keys). "3 of 48" and two arrow buttons above the preview; a swipe sideways (2.882.0, #5557: anywhere in the view,
+// not only on the preview) turns to the next / previous one, which glides in; past the last loaded one the next page loads, at the real end
 // the page springs back. A preview enlarged with two fingers moves with one finger instead; normal size again = swipes.
-const DCW = {sw: null, pz: null, end: 0};
+// 2.882.0 (#5557): the swipe is the shared one of swipenav.js (as the task panel, detail.js dswInit) over the whole view:
+// preview, head and fields (dc_swArea decides the exceptions); DCW keeps the zoom with two fingers and the pan of an enlarged
+// preview. h = the swipe's handle (swn_attach); end / snap read it, zEnd = the end of a zoom / pan (its lift is no tap either)
+const DCW = {sw: null, pz: null, zEnd: 0, h: null, get end() { return Math.max(this.zEnd, this.h?.at() || 0); }, get snap() { return !!this.h?.snapping(); }};
 // 2.683.0 (#5150): the list it was opened from: a folder of the file store (its document cards as shown there, DC.navSrc from
 // abdocs.js, the route stays on the file store) or the documents' list (DC.docs with its filter, sorting and next pages)
 function dc_nav() {
@@ -426,10 +429,9 @@ function dc_zoomSet(box, k, x, y) {
   if (el) { el.style.transformOrigin = '0 0'; el.style.transform = k > 1 ? `translate(${Math.round(x)}px, ${Math.round(y)}px) scale(${k.toFixed(3)})` : ''; }
 }
 const dc_pvBox = t => t?.closest?.('.dv-view .dv-pages');  // 2.583.0 (#4835): the preview of the view
+// two fingers on the preview zoom it; one finger moves the enlarged picture (2.882.0, #5557: the swipe itself is swipenav.js)
 document.addEventListener('touchstart', e => {
   if (!e.touches) return;  // a plain Event("touchstart") (tests, synthetic taps) has no touch list
-  const was = DCW.sw?.body;  // 2.727.0 (#5202): a second finger mid-swipe: the sheets go back into place
-  if (was && !DCW.snap) { dc_nbClear(was); was.style.transition = ''; was.style.transform = ''; }
   const box = dc_pvBox(e.target);
   if (!box || DCW.snap) { DCW.sw = null; return; }  // 2.727.0 (#5202): not while the last one still snaps in
   const z = box._z || {k: 1, x: 0, y: 0};
@@ -441,10 +443,8 @@ document.addEventListener('touchstart', e => {
     return;
   }
   const t = e.touches[0];
-  if (DCW.pz) return;
-  // the phone's own Back gesture at the screen's edges; a page enlarged by the browser moves as the browser does
-  if (t.clientX < 16 || t.clientX > innerWidth - 16 || (window.visualViewport?.scale || 1) > 1.05) { DCW.sw = null; return; }
-  DCW.sw = {box, x0: t.clientX, y0: t.clientY, lx: t.clientX, lt: Date.now(), v: 0, dx: 0, lock: null, pan: z.k > 1, z};
+  if (DCW.pz || z.k <= 1) { DCW.sw = null; return; }  // normal size: one finger is the swipe of swipenav.js (dc_swArea)
+  DCW.sw = {box, x0: t.clientX, y0: t.clientY, pan: true, z};
 }, {passive: true});
 document.addEventListener('touchmove', e => {
   const p = DCW.pz;
@@ -460,36 +460,53 @@ document.addEventListener('touchmove', e => {
   }
   const s = DCW.sw; if (!s || e.touches.length !== 1) return;
   const t = e.touches[0], dx = t.clientX - s.x0, dy = t.clientY - s.y0;
-  if (s.pan) {  // enlarged: one finger moves the picture
-    if (e.cancelable) e.preventDefault();
-    s.moved = s.moved || Math.hypot(dx, dy) > 8;
-    dc_zoomSet(s.box, s.z.k, s.z.x + dx, s.z.y + dy);
-    return;
-  }
-  if (!s.lock) {
-    if (Math.hypot(dx, dy) < 10) return;
-    s.lock = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
-    const md = s.box.closest('.dc-md');
-    if (s.lock === 'y' || dc_navIdx(DC.doc) < 0 || $('.dc-body', md)?.dataset.id !== String(DC.doc?.id)) { DCW.sw = null; return; }  // up / down: the page scrolls
-    s.body = $('.dc-body', md);
-    const i = dc_navIdx(DC.doc), v = dc_nav();  // 2.683.0 (#5150): the list it was opened from
-    s.edge = {'1': !v.docs[i + 1] && v.docs.length >= v.total, '-1': i <= 0};
-    dc_nbAdd(s.body, s.edge['1'] ? null : v.docs[i + 1] || 0, s.edge['-1'] ? null : v.docs[i - 1] || 0);  // 2.727.0 (#5202): the neighbours lie beside it and glide along
-  }
+  // enlarged: one finger moves the picture
   if (e.cancelable) e.preventDefault();
-  s.v = (t.clientX - s.lx) / Math.max(1, Date.now() - s.lt); s.lx = t.clientX; s.lt = Date.now();
-  s.dx = dx;
-  const end = s.edge[dx < 0 ? '1' : '-1'];  // nothing there: the page follows only a little
-  s.body.style.transition = 'none';
-  s.body.style.transform = `translateX(${Math.round(end ? dx * .3 : dx)}px)`;
+  s.moved = s.moved || Math.hypot(dx, dy) > 8;
+  dc_zoomSet(s.box, s.z.k, s.z.x + dx, s.z.y + dy);
 }, {passive: false});
+// ---- 2.882.0 (#5557): the swipe over the whole document view with the shared helper (swipenav.js swn_attach, as the task
+// panel): one finger sideways on the preview, the head or the fields leafs. Not: typing / marking in a field, a select, a part
+// that scrolls sideways (the preview zoomed wider than its box, the tabs), marked text (swn_skip), an enlarged preview (one
+// finger moves it), two fingers (the zoom), a start within 16 px of the screen's edge (the phone's Back), a dialog on top.
+// The body of the document is the frame that stays (inside): its parts glide, the neighbours lie inside it (dc_swPeek).
+function dc_swArea(t) {
+  if (!t?.closest || $('.modal') || $('#pop:not(.hidden)') || DCW.pz) return null;
+  const md = t.closest('.dv-view'); if (!md || t.closest('.swn-nb, .dc-nb')) return null;
+  const body = /** @type {HTMLElement|null} */ (md.querySelector(':scope > .dc-body'));
+  if (!body || body.dataset.id !== String(DC.doc?.id) || dc_navIdx(DC.doc) < 0) return null;  // it left the list: the arrows still lead on
+  if ((dc_pvBox(t)?._z?.k || 1) > 1) return null;  // enlarged: one finger moves the picture
+  return typeof swn_skip === 'function' && swn_skip(t, md) ? null : body;
+}
+function dc_swCan(dir) {
+  const v = dc_nav(), i = dc_navIdx(DC.doc); if (!v || i < 0) return false;
+  return dir > 0 ? !!v.docs[i + 1] || v.docs.length < v.total : i > 0;  // past the loaded ones the next page loads (dc_step)
+}
+// the neighbour beside the open one: drawn ahead whole (2.736.0, #5212: the real body with all its fields) or a placeholder
+// (title, type, date, its small picture; an empty sheet while the next page is not loaded yet)
+function dc_swPeek(dir) {
+  const v = dc_nav(), i = dc_navIdx(DC.doc); if (!v || i < 0) return null;
+  const x = v.docs[i + dir], e = x && dc_nbFresh(x.id);
+  if (e?.el?.firstChild) { e.el.classList.remove('dc-nb-n', 'dc-nb-p'); return {el: e.el}; }
+  const nb = document.createElement('div');
+  nb.className = 'dc-nb'; nb.setAttribute('aria-hidden', 'true');
+  nb.innerHTML = x ? dc_nbHtml(x) : '<div class="dc-nbv"></div>';
+  return {el: nb};
+}
+// a body drawn ahead that was not turned to waits on outside the page (docview.js dcv_nbPark); a placeholder goes with its frame
+function dc_swBack(el) { if (/** @type {any} */ (el)._dcnb && typeof dcv_nbPark === 'function') dcv_nbPark(el); }
+function dc_swInit() {
+  if (DCW.h) return;
+  // lazy-ok-begin: runs only once swipenav.js is in (the typeof / loadModule below)
+  if (typeof swn_attach === 'function') DCW.h = swn_attach(document, {area: dc_swArea, can: dc_swCan, go: dir => dc_step(dir, true), peek: dc_swPeek, back: dc_swBack, inside: true, busy: () => !!DCW.pz});
+  // lazy-ok-end
+  else if (!dc_swInit.wait && typeof loadModule === 'function') { dc_swInit.wait = true; loadModule('swipenav').then(() => { dc_swInit.wait = false; dc_swInit(); }, () => { dc_swInit.wait = false; }); }
+}
 // ---- 2.727.0 (#5202): leafing like turning a page. While the finger swipes, the previous / next document of the list lies
 // left / right of the open one as a placeholder (title, type, date, its small picture - fetched ahead when the document was
 // drawn - or an empty sheet) inside .dc-body, so all three glide together over the whole width. Let go far enough: the new one
 // snaps fully into place and only then its content loads (dc_step, no glide-in afterwards); short of it: all springs back.
 // prefers-reduced-motion: no snapping animation, it changes at once. At the real end the short spring back stays (dc_bounce).
-// the gap between the sheets: 1rem as in docs.css (.dc-nb-n / .dc-nb-p), in px for the glide (the rem scale follows the font size)
-const DC_NBGAP = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 function dc_nbThumb(x) {
   if (!x) return '';
   if (x.thumb) return `/api/docs/${x.id}/thumb?v=${encodeURIComponent(x.updated_at || '')}`;
@@ -499,33 +516,14 @@ function dc_nbHtml(x) {
   const u = dc_nbThumb(x), meta = [x.type?.name, x.date ? dc_day(x.date) : ''].filter(Boolean).join(' · ');
   return `<div class="lhdr dc-nbh"><h3>${esc(x.name || x.sender?.name || '')}</h3></div>${meta ? `<p class="dc-nbm muted">${esc(meta)}</p>` : ''}<div class="dc-nbv">${u ? `<img src="${esc(u)}" alt="">` : ''}</div>`;
 }
-function dc_nbAdd(body, next, prev) {  // null = nothing on that side (the end); 0 = not loaded yet
-  body.querySelectorAll(':scope > .dc-nb').forEach(x => { if (x._dcnb && typeof dcv_nbPark === 'function') dcv_nbPark(x); else x.remove(); });
-  body.style.position = 'relative';
-  body.closest('.dc-md')?.classList.add('dc-sw');
-  for (const [x, cls] of [[next, 'dc-nb-n'], [prev, 'dc-nb-p']]) {
-    if (x === null) continue;
-    const e = x && dc_nbFresh(x.id);  // 2.736.0 (#5212): drawn ahead = the real body with all its fields glides along
-    if (e?.el?.firstChild) { e.el.classList.remove('dc-nb-n', 'dc-nb-p'); e.el.classList.add(cls); body.appendChild(e.el); continue; }
-    const nb = document.createElement('div');
-    nb.className = `dc-nb ${cls}`; nb.setAttribute('aria-hidden', 'true');
-    nb.innerHTML = x ? dc_nbHtml(x) : '<div class="dc-nbv"></div>';  // not loaded yet (the next page): an empty sheet
-    body.appendChild(nb);
-  }
-}
-function dc_nbClear(body) {
-  if (!body) return;
-  body.querySelectorAll(':scope > .dc-nb').forEach(x => { if (x._dcnb && typeof dcv_nbPark === 'function') dcv_nbPark(x); else x.remove(); });  // 2.736.0 (#5212): a body drawn ahead waits on
-  body.style.position = '';
-  body.closest('.dc-md')?.classList.remove('dc-sw');
-}
-// the new document is drawn into the body that still stands where its placeholder snapped in: back to its place at once
+// the new document is drawn into the body that still stands where its neighbour snapped in: its parts back in place at once,
+// the neighbours laid in by the swipe (swipenav.js, 2.882.0 #5557) out of it (a body drawn ahead waits on, dc_swBack)
 function dc_nbLand(body) {
-  dc_nbClear(body);
-  if (!body.style.transform) return;
-  body.style.transition = 'none'; body.style.transform = '';
-  void body.offsetWidth;
-  body.style.transition = '';
+  for (const w of body.querySelectorAll(':scope > .swn-nb')) { const x = w.firstElementChild; if (x) dc_swBack(/** @type {HTMLElement} */ (x)); w.remove(); }
+  for (const x of body.children) {
+    const p = /** @type {HTMLElement} */ (x); if (!p.style.transform) continue;
+    p.style.transition = 'none'; p.style.transform = ''; void p.offsetWidth; p.style.transition = '';
+  }
 }
 // the small pictures of the two neighbours are fetched while the open one is read (the browser keeps them; at most a few)
 function dc_nbPre(d) {
@@ -585,41 +583,16 @@ async function dc_nbRecheck(d) {
   if (DC.doc !== d || !x?.id || JSON.stringify(x) === JSON.stringify(d)) return;  // changed here meanwhile: its own save goes on
   DC.doc = x; dc_mdDraw(dc_mdOpen());
 }
-async function dc_snap(s, dir) {
-  const b = s.body, id = b.dataset.id, w = b.offsetWidth || s.box.clientWidth || innerWidth;
-  const ms = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : Math.round(Math.max(120, Math.min(260, 260 * (1 - Math.abs(s.dx) / (w + DC_NBGAP())))));
-  DCW.snap = true;
-  try {
-    b.style.transition = ms ? `transform ${ms}ms ease-out` : 'none';
-    b.style.transform = `translateX(${-dir * (w + DC_NBGAP())}px)`;
-    if (ms) await new Promise(ok => { setTimeout(ok, ms + 60); b.addEventListener('transitionend', ev => { if (ev.target === b) ok(); }, {once: true}); });  // a promise settles once: the late timer does nothing
-    await dc_step(dir, true);
-  } catch { /* api() shows its own error */ } finally {
-    DCW.snap = false;
-    if (b.isConnected && b.dataset.id === id) { dc_nbClear(b); b.style.transition = ''; b.style.transform = ''; }  // not turned after all: back into place
-  }
-}
 function dc_touchEnd(e) {
   if (DCW.pz) {
     if (e.touches?.length >= 2) return;
-    const b = DCW.pz.box; DCW.pz = null; DCW.end = Date.now();
+    const b = DCW.pz.box; DCW.pz = null; DCW.zEnd = Date.now();
     if ((b._z?.k || 1) <= 1.05) dc_zoomSet(b, 1, 0, 0);
     if (e.touches?.length === 1) DCW.sw = null;  // the finger left on the picture does not swipe
     return;
   }
   const s = DCW.sw; DCW.sw = null;
-  if (!s) return;
-  if (s.pan) { if (s.moved) DCW.end = Date.now(); return; }
-  if (!s.body) return;
-  DCW.end = Date.now();
-  const w = s.box.clientWidth || innerWidth;
-  // far enough (a fifth of the width) or a quick flick: the next / previous document, else back into place
-  const go = e.type !== 'touchcancel' && (Math.abs(s.dx) > Math.min(90, w * .2) || (Math.abs(s.dx) > 30 && Math.abs(s.v) > .35 && Math.sign(s.v) === Math.sign(s.dx)));
-  const dir = s.dx < 0 ? 1 : -1;
-  if (go && !s.edge[String(dir)]) { dc_snap(s, dir); return; }  // 2.727.0 (#5202): the neighbour snaps in, then it loads
-  dc_nbClear(s.body);
-  s.body.style.transition = ''; s.body.style.transform = '';
-  if (go) dc_step(dir);  // the real end: it springs back
+  if (s?.moved) DCW.zEnd = Date.now();  // the enlarged picture moved: its lift is no tap
 }
 document.addEventListener('touchend', dc_touchEnd, {passive: true});
 document.addEventListener('touchcancel', dc_touchEnd, {passive: true});

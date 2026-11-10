@@ -10,7 +10,7 @@
    of a PDF one below the other, drawn sharp at the size shown (again after a zoom or a new width, a page only when it comes
    near, a limit per page's canvas), the page counter, zoom, Width, Whole page, Full screen; an image in its original. Grips
    between the columns set their widths (kept per device, a double click / Home = the standard). Phones: one column, the
-   preview on top, the fields below, a swipe sideways on the preview leafs (docs.js dc_touchEnd), two fingers zoom.
+   preview on top, the fields below, a swipe sideways leafs (2.882.0, #5557: anywhere in the view, swipenav.js via docs.js dc_swArea), two fingers zoom.
    Replaces the pane beside the list (2.430.0, #3582), the phone's sheet and the reading view (2.521.0, #4476: its preview
    of every page, its grips and its full screen live on here). The file is part of the module docs (lazyload.js), docs.js
    asks it through typeof checks. Classic script sharing the global scope with the others. */
@@ -117,6 +117,7 @@ function dcv_draw(md) {
   if (typeof dn_draw === 'function' && !d.file) dn_draw(md, d);  // 2.635.0 (#4807 d): the notes (docnotes.js), under the fields
   const cur = $('.dv-strip .dv-th.on', md); if (cur) cur.scrollIntoView?.({block: 'nearest'});
   if (DC.slide) dc_slideIn(md);  // 2.476.0 (#3935): the next document glides in from the side (2.727.0, #5202: only the arrows / keys; a swipe snapped it in)
+  if (typeof dc_swInit === 'function') dc_swInit();  // 2.882.0 (#5557): the swipe over the whole view (swipenav.js)
   if (typeof dc_nbPre === 'function') dc_nbPre(d);  // 2.727.0 (#5202): the neighbours' small pictures ahead (2.736.0, #5212: and the neighbours drawn whole)
 }
 // 2.583.0 (#4832): a plain file has no recognised text
@@ -138,7 +139,7 @@ function dcv_bodyHtml(d, nb) {
 // dc_nbAhead) and drawn here by the same lines as the open one (dcv_bodyHtml, the preview by dcv_pvDraw at the width it
 // will have) into a body of their own. It waits outside the page in a holder of the open body's size (laid out, so the
 // pages get their final size; no ids while it waits: the page's own fields stay the only ones), a swipe lays it beside the
-// open body (docs.js dc_nbAdd) and after the snap it takes the open body's place as it is (dcv_nbTake): no request, no
+// open body (2.882.0, #5557: swipenav.js, docs.js dc_swPeek) and after the snap it takes the open body's place as it is (dcv_nbTake): no request, no
 // picture that moves, no text that comes later. The body left behind waits as the neighbour on the other side.
 function dcv_nbHold() {
   let h = $('.dv-nbhold');
@@ -426,11 +427,16 @@ async function dcv_pvDraw(md, d, nb) {
   if (!box._sc) { box._sc = true; box.addEventListener('scroll', () => dcv_pgn(box), {passive: true}); }
   const live = () => (nb && !nb.taken ? !nb.ctrl.signal.aborted : box.isConnected && !box.closest('.dv-nbhold')) && box._pv === key;
   box.dataset.pages = ''; box._base = null;
-  box.innerHTML = `<div class="dv-pgcol">${d.thumb ? `<div class="dv-pg dv-img dv-thumb"><img src="${esc(dc_thumbUrl(d))}" alt=""></div>` : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`}</div>`;
+  // 2.882.0 (#5557): the first picture already stands at its final size (dcv_phSize): the small picture in a page of the real
+  // page's shape, a PDF without one an empty page; nothing grows or shrinks when the file is there
+  const ph = dcv_phSize(d), isImg = /^image\//.test(d.mime || '') && d.thumb;
+  box._ph = ph ? [ph] : null;
+  box.innerHTML = `<div class="dv-pgcol">${ph ? `<div class="dv-pg dv-ph${isImg ? ' dv-img' : ''}${d.thumb ? ' dv-thumb' : ''}">${d.thumb ? `<img src="${esc(dc_thumbUrl(d))}" alt="">` : ''}</div>` : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`}</div>`;
+  if (ph) { dcv_layout(box, false, true); dcv_phLearn(box, d); }
   dcv_pgn(box); dcv_zbar(box);
-  if (/^image\//.test(d.mime || '') && d.thumb) {  // the original, not the small picture
+  if (isImg) {  // the original, not the small picture
     const im = new Image(); im.alt = d.name;
-    im.onload = () => { if (!live()) return; box.innerHTML = '<div class="dv-pgcol"><div class="dv-pg dv-img"></div></div>'; $('.dv-pg', box).appendChild(im); box._base = [{w: im.naturalWidth || 600, h: im.naturalHeight || 800, img: true}]; dcv_layout(box, false, true); };
+    im.onload = () => { if (!live()) return; box.innerHTML = '<div class="dv-pgcol"><div class="dv-pg dv-img"></div></div>'; $('.dv-pg', box).appendChild(im); box._base = [{w: im.naturalWidth || 600, h: im.naturalHeight || 800, img: true}]; dcv_phKeep(d, box._base); dcv_layout(box, false, true); };
     im.src = dcv_fileUrl(d);
     return;
   }
@@ -451,22 +457,55 @@ async function dcv_pvDraw(md, d, nb) {
     }
     if (nb && !nb.taken) { nb.pdf = {doc, box, gen: 0, nb: true}; }  // 2.736.0 (#5212): the neighbour's own (dcv_nbTake makes it the view's)
     else { if (DVW.pdf) dcv_free(); DVW.pdf = {doc, box, gen: 0}; }
-    box._base = base;
-    box.innerHTML = `<div class="dv-pgcol">${base.map((_, i) => `<div class="dv-pg" data-i="${i}"></div>`).join('')}</div>`;
+    box._base = base; dcv_phKeep(d, base);
+    // 2.882.0 (#5557): the small picture stays in the first page until its sharp drawing replaces it (dcv_page): no white flash
+    box.innerHTML = `<div class="dv-pgcol">${base.map((_, i) => `<div class="dv-pg" data-i="${i}">${i === 0 && d.thumb ? `<img class="dv-pgth" src="${esc(dc_thumbUrl(d))}" alt="">` : ''}</div>`).join('')}</div>`;
     box.dataset.pages = String(base.length);
     dcv_layout(box, false, true);
   } catch { /* the small picture stays */ }
 }
+// ---- 2.882.0 (#5557): the preview without a jump. Before the file is there the box shows one page of the real page's shape
+// (box._ph, laid out by dcv_layout like the real pages): the size of the first page seen before in this session (DVW.sz, per
+// document and file size), else the shape of its small picture once it is known, else an A4 page (595 x 842 points, most
+// documents). An image: its own size seen before, else the small picture's shape.
+const DCV_A4 = {w: 595, h: 842};
+function dcv_phSize(d) {
+  if (!d.thumb && !(dc_isPdf(d) && d.size <= 40e6)) return null;  // nothing to show: the icon as before
+  const k = DVW.sz?.get(d.id); if (k && k.v === d.size) return {w: k.w, h: k.h, mw: k.mw};
+  const im = d.thumb ? dcv_thumbSeen(dc_thumbUrl(d)) || (d.file || d.thumb_l ? dcv_thumbSeen(dc_thumbUrl(d, true)) : null) : null;  // the small one, or the sharp one of a big card
+  return im ? {w: DCV_A4.w, h: Math.round(DCV_A4.w * im.h / im.w)} : {...DCV_A4};
+}
+// the small picture's shape when the browser has it already (fetched ahead for the neighbours, the cards of the list)
+function dcv_thumbSeen(u) {
+  const im = new Image(); im.src = u;
+  return im.complete && im.naturalWidth > 0 ? {w: im.naturalWidth, h: im.naturalHeight} : null;
+}
+// the small picture came later than the page was laid out and has another shape: the page takes it at once (while the file loads)
+function dcv_phLearn(box, d) {
+  const im = /** @type {HTMLImageElement|null} */ (box.querySelector('.dv-ph img')); if (!im || DVW.sz?.get(d.id)?.v === d.size) return;
+  const fit = () => {
+    const p = box._ph?.[0]; if (!p || box._base || !im.naturalWidth || !im.isConnected) return;
+    const h = Math.round(p.w * im.naturalHeight / im.naturalWidth);
+    if (Math.abs(h - p.h) / p.h > .01) { box._ph = [{w: p.w, h, mw: p.mw}]; dcv_layout(box, false, true); }
+  };
+  if (im.complete) fit(); else im.addEventListener('load', fit, {once: true});
+}
+// the real size, remembered for the next time it opens (leafing back and forth, the view opened again)
+function dcv_phKeep(d, base) {
+  const m = DVW.sz || (DVW.sz = new Map()), b0 = base[0]; if (!b0) return;
+  m.set(d.id, {v: d.size, w: b0.w, h: b0.h, mw: Math.max(...base.map(x => x.w))});
+  if (m.size > 200) m.delete(m.keys().next().value);
+}
 // the pages get their final size before they are drawn (no jumps): Width = the widest page fills the box, Whole page = the
 // first page fits in it, else the zoom chosen (pdf.js scale: 1 = one point per CSS pixel; an image: 1 = its pixels)
 function dcv_scale(box) {
-  const z = dcv_zoom(), b = box._base, b0 = b[0], mw = Math.max(...b.map(x => x.w));
+  const z = dcv_zoom(), b = box._base || box._ph, b0 = b[0], mw = box._base ? Math.max(...b.map(x => x.w)) : b0.mw || b0.w;  // 2.882.0 (#5557): the page before the file
   if (z === 'width') return Math.min(b0.img ? 2 : DCV_ZMAX, box._aw / mw);
   if (z === 'page') return Math.min(b0.img ? 2 : DCV_ZMAX, box._aw / b0.w, box._ah / b0.h);
   return +z;
 }
 function dcv_layout(box, keep, force) {
-  if (!box?.isConnected || !box._base) return;
+  if (!box?.isConnected || !(box._base || box._ph)) return;  // 2.882.0 (#5557): the page before the file too
   const cs = getComputedStyle(box), px = k => parseFloat(cs[k] || '0') || 0;
   const aw = Math.max(120, box.clientWidth - px('paddingLeft') - px('paddingRight') - 2), ah = Math.max(120, box.clientHeight - px('paddingTop') - px('paddingBottom') - 2);
   if (!force && !keep && Math.abs((box._aw || 0) - aw) < 2 && Math.abs((box._ah || 0) - ah) < 2) return;
@@ -475,10 +514,12 @@ function dcv_layout(box, keep, force) {
   if (!force && !keep && box._s === s) return;
   box._s = s;
   const pages = $$('.dv-pg', box);
-  pages.forEach((p, i) => { const b = box._base[i] || box._base[0]; p.style.width = Math.floor(b.w * s) + 'px'; p.style.height = Math.floor(b.h * s) + 'px'; });
+  const bs = box._base || box._ph;
+  pages.forEach((p, i) => { const b = bs[i] || bs[0]; p.style.width = Math.floor(b.w * s) + 'px'; p.style.height = Math.floor(b.h * s) + 'px'; });
   if (keep) box.scrollTop = top * box.scrollHeight;
   if (typeof pv_textScale === 'function') pv_textScale(box, s);  // 2.742.0 (#4861): the text layers stay on their page
   dcv_zbar(box); dcv_pgn(box);
+  if (!box._base) return;  // 2.882.0 (#5557): the page before the file: nothing to draw yet
   const pdf = DVW.pdf?.box === box ? DVW.pdf : [...(DCW.nb?.values() || [])].find(e => e.pdf?.box === box)?.pdf; if (!pdf || pdf.off) return;  // 2.736.0 (#5212): + a neighbour's
   pdf.gen++; pdf.s = s;
   for (const p of pages) p.dataset.s = '';

@@ -1,5 +1,6 @@
 // 2.755.0 UI test (#5236: leafing without a seam at the rest of the places, after #5212 / p2736_b) - own container (start.sh),
 // kalmido-suite:
+// 2.882.0 (#5557): the swipe is swipenav.js now: the neighbour lies in the body as .swn-nb > .dc-nb, the body's parts glide
 // jsdom (phone) + Firefox (touch, 400 px). Invented data only. P2755E_NOSTART=1 = the container runs.
 // - documents (docview.js dcv_nbDraw): the neighbour drawn ahead has its receipt line (receipts.js rc_nbFill), its letters
 //   (letterdoc.js ltd_nbFill) and the runs of its flows (docflows.js dfl_runs) FILLED before the swipe, with its own data: the
@@ -99,10 +100,10 @@ function hold(w, el, dx) {  // one finger from (200, 300) by dx in a few steps, 
     '... the open one\'s state stays its own (RC / LTD, its letter line)');
 
   hold(m, prev(), -120);
-  const nb = () => d.querySelector('.dv-view .dc-body > .dc-nb-n');
+  const nb = () => d.querySelector('.dv-view .dc-body > .swn-nb[data-dir="1"] > .dc-nb');
   check((nb()?.querySelector('.ltd')?.textContent || '').includes('Letter of ' + order[1]) && nb()?.querySelector('.rc-slot')?.children.length > 0 && (nb()?.querySelector('.dc-flows')?.textContent || '').includes('Flow of ' + order[1]),
     'mid-swipe: the sheet beside it shows its receipt, its letters and its flows already');
-  m.eval(`window.__ltd = document.querySelector('.dv-view .dc-body > .dc-nb-n .ltd'); window.__rc = document.querySelector('.dv-view .dc-body > .dc-nb-n .rc-slot'); 1`);
+  m.eval(`window.__ltd = document.querySelector('.dv-view .dc-body > .swn-nb[data-dir="1"] > .dc-nb .ltd'); window.__rc = document.querySelector('.dv-view .dc-body > .swn-nb[data-dir="1"] > .dc-nb .rc-slot'); 1`);
   const b = {rc: gets(order[1], '/api/docs/#/receipt'), lt: gets(order[1], '/api/office/letters/doc/#')};
   touch(m, prev(), 'touchend', []);
   check(await until(() => shown() === order[1]), 'let go: the next document stands there');

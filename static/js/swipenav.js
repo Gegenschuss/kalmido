@@ -21,7 +21,12 @@
    the area glides by that width; the pictures fetched ahead are decoded too, so the one turned to stands there at once.
    2.754.0 (#5213): o.inside = the area is a frame that stays (the task panel #detail, its styles hang on it): its children
    glide, the neighbour lies inside it over the part seen now (its scroll position, its inner size); o.edge = the screen edge
-   left to the phone's Back (px, default 16); o.busy() = something else owns the finger now (a long press): no swipe. */
+   left to the phone's Back (px, default 16); o.busy() = something else owns the finger now (a long press): no swipe.
+   2.882.0 (#5557): the document view (docs.js) leafs with this helper too, over its whole page (preview, head, fields). o.back(el)
+   = a neighbour made ready by the caller (o.peek -> {el}) leaves its placeholder unused (sprung back, or the other side): the
+   caller keeps it (docs.js parks it again), it is not thrown away with the placeholder. The handle tells more: snapping() = the
+   last one still snaps in, at() = when the last swipe ended. swn_skip(target, stop) = the shared exceptions where one finger
+   is no swipe: typing / marking in a field, a select or slider, a part that scrolls sideways (up to stop), marked text. */
 'use strict';
 
 const SWN_EDGE = 16, SWN_GAP = 16;
@@ -42,7 +47,7 @@ function swn_box(el, full, inside) {
   const cs = getComputedStyle(f), pl = parseFloat(cs.paddingLeft) || 0, pt = parseFloat(cs.paddingTop) || 0;
   return {l: pl, t: pt, w: f.clientWidth - pl - (parseFloat(cs.paddingRight) || 0), h: f.clientHeight - pt - (parseFloat(cs.paddingBottom) || 0)};
 }
-/** @param {HTMLElement} root @param {{area: (t: any) => HTMLElement|null, can: (dir: number) => boolean, go: (dir: number) => any, peek?: (dir: number) => ({img?: string, el?: HTMLElement}|null), full?: boolean, inside?: boolean, edge?: number, busy?: () => boolean}} o */
+/** @param {HTMLElement|Document} root @param {{area: (t: any) => HTMLElement|null, can: (dir: number) => boolean, go: (dir: number) => any, peek?: (dir: number) => ({img?: string, el?: HTMLElement}|null), full?: boolean, inside?: boolean, edge?: number, busy?: () => boolean, back?: (el: HTMLElement) => void}} o */
 function swn_attach(root, o) {
   /** @type {any} */
   let s = null, end = 0, snap = false;
@@ -56,13 +61,15 @@ function swn_attach(root, o) {
     for (const p of parts(c.el)) put(p, `translateX(${dx}px)`);
     for (const nb of c.nb) put(nb, `translateX(${dx + +nb.dataset.dir * (c.w + SWN_GAP)}px)`);
   };
+  /** @param {HTMLElement} nb a placeholder goes: 2.882.0 (#5557) the caller's own neighbour inside it back to the caller first */
+  const rid = nb => { const x = /** @type {HTMLElement|null} */ (nb.firstElementChild); if (o.back && x && /** @type {any} */ (nb)._own === x && x.parentElement === nb) o.back(x); nb.remove(); };
   /** @param {any} c */
-  const clear = c => { for (const nb of c?.nb || []) nb.remove(); if (c) c.nb = []; };
+  const clear = c => { for (const nb of c?.nb || []) rid(nb); if (c) c.nb = []; };
   /** @param {any} c */
   const loose = c => {
     for (const el of parts(c.el)) { el.style.transition = 'transform .2s ease-out'; el.style.transform = ''; setTimeout(() => { if (!el.style.transform) el.style.transition = ''; }, 250); }
     for (const nb of c.nb) { nb.style.transition = 'transform .2s ease-out'; nb.style.transform = `translateX(${+nb.dataset.dir * (c.w + SWN_GAP)}px)`; }
-    const gone = c.nb; c.nb = []; setTimeout(() => gone.forEach((/** @type {HTMLElement} */ x) => x.remove()), 250);
+    const gone = c.nb; c.nb = []; setTimeout(() => gone.forEach((/** @type {HTMLElement} */ x) => rid(x)), 250);
   };
   const drop = () => { if (s?.lock) loose(s); s = null; };
   /** @param {HTMLElement} el @param {number} dir the neighbour beside the area, in its place and size */
@@ -70,7 +77,7 @@ function swn_attach(root, o) {
     const p = o.peek ? o.peek(dir) : null, nb = document.createElement('div'), b = swn_box(el, o.full, o.inside);
     nb.className = 'swn-nb'; nb.dataset.dir = String(dir); nb.setAttribute('aria-hidden', 'true');
     nb.style.cssText = `position:absolute;left:${b.l}px;top:${b.t}px;width:${b.w}px;height:${b.h}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden`;
-    if (p?.el) nb.appendChild(p.el);  // 2.736.0 (#5212): made ready by the caller, as it will stand
+    if (p?.el) { nb.appendChild(p.el); /** @type {any} */ (nb)._own = p.el; }  // 2.736.0 (#5212): made ready by the caller, as it will stand
     else if (p?.img) { const im = document.createElement('img'); im.src = p.img; im.alt = ''; im.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain'; nb.appendChild(im); }
     else { const pg = document.createElement('div'); pg.style.cssText = 'height:min(90%,calc(100vw * 297 / 210));aspect-ratio:210 / 297;max-width:94%;background:var(--bg3,#eee);border-radius:4px'; nb.appendChild(pg); }
     if (o.inside) el.appendChild(nb); else el.after(nb);  // 2.754.0 (#5213): inside the frame, after its own children
@@ -132,7 +139,17 @@ function swn_attach(root, o) {
   root.addEventListener('touchend', fin, {passive: true});
   root.addEventListener('touchcancel', fin, {passive: true});
   prime();
-  return {recent: (ms = 700) => Date.now() - end < ms, prime};
+  return {recent: (ms = 700) => Date.now() - end < ms, prime, snapping: () => snap, at: () => end};
+}
+// 2.882.0 (#5557): where one finger on the area is no swipe (the document view; the task panel keeps its own list, detail.js)
+/** @param {any} t the element under the finger @param {Element} stop the area's frame (the search for a sideways scroller ends there) */
+function swn_skip(t, stop) {
+  const f = t?.closest?.('textarea, input, select, [contenteditable="true"], [contenteditable=""]');
+  if (f && (f === document.activeElement || f.matches('select, input[type="range"]'))) return true;  // typing / marking in a field (one without the focus may be swiped over)
+  for (let x = t; x && x !== stop && x.nodeType === 1; x = x.parentElement) {
+    if (x.scrollWidth > x.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(x).overflowX)) return true;  // it scrolls sideways itself
+  }
+  const sel = getSelection?.(); return !!(sel && !sel.isCollapsed && String(sel).trim());  // marked text: the finger moves the marking
 }
 /** @param {HTMLElement|null|undefined} el @param {number} dir */
 function swn_slideIn(el, dir) {

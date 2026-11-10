@@ -55,10 +55,10 @@
 /* 2.727.0 (#5202): leafing like a page: while swiping, the previous / next document lies beside the open one as a placeholder
    (title, type / date, its small picture or an empty sheet) and glides along; nothing sticks out sideways meanwhile
    (2.583.0: inside the document view's body) */
-.dv-view.dc-sw{overflow-x:hidden}
-.dc-body>.dc-nb{position:absolute;top:0;width:100%;height:100%;box-sizing:border-box;overflow:hidden;pointer-events:none}
-.dc-body>.dc-nb-n{left:calc(100% + 1rem)}
-.dc-body>.dc-nb-p{right:calc(100% + 1rem)}
+/* 2.882.0 (#5557): laid in by swipenav.js (.swn-nb, the body is the frame that stays): the body holds them and clips what
+   glides out sideways; the neighbour fills the place beside the open one */
+.dv-view .dc-body:has(> .swn-nb){position:relative;overflow-x:clip}
+.dc-body>.swn-nb>.dc-nb{flex:none;align-self:stretch;width:100%;height:100%;box-sizing:border-box;overflow:hidden;pointer-events:none}
 /* 2.736.0 (#5212): the neighbours drawn whole wait outside the page in a holder of the open body's size (docview.js dcv_nbHold),
    laid out like the body (their pages get their final size); a swipe lays them beside the open body */
 .dv-nbhold{position:fixed;left:-300vw;top:0;z-index:-1;pointer-events:none;overflow:hidden;contain:layout paint}

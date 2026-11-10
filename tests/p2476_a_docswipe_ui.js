@@ -3,8 +3,9 @@
 // page at its end), own container (start.sh), jsdom + Firefox (phone 390 px and 320 px). Invented data only.
 // P2476A_NOSTART=1 = the container runs. A small page (DC.page = 2, the test switch) stands for the 200 of a real load.
 // - phone: "1 of 5" and two arrow buttons above the preview; a swipe to the left on the preview = the next document (glides
-//   in with the swipe - 2.727.0 #5202, the address follows), to the right = the one before; a swipe on the fields below or up / down changes nothing; the
-//   end of a swipe opens no viewer
+//   in with the swipe - 2.727.0 #5202, the address follows), to the right = the one before; up / down changes nothing; the
+//   end of a swipe opens no viewer. 2.882.0 (#5557): a swipe on the fields below and on the head turns as well (swipenav.js
+//   over the whole view), in a field being typed in it does not; before the first / after the last it springs back (in place)
 // - past the last loaded document the next page loads (swipe and arrow button); at the real end the page springs back
 // - the preview enlarged with two fingers: one finger moves it, no turn; back at normal size the swipe turns again
 // - the list: "Load more (2 of 5)" at its end loads the next page (Firefox: its end coming into view loads it by itself)
@@ -80,6 +81,7 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   const shown = () => +(d.querySelector('.dv-view .dc-body')?.dataset.id || 0);
   const nav = () => d.querySelector('.dv-view .dc-navn')?.textContent || '';
   const prev = () => d.querySelector('.dv-view .dv-pages');
+  const still = () => !d.querySelector('.dv-view .dc-body > .swn-nb') && ![...d.querySelector('.dv-view .dc-body').children].some(x => x.style.transform);  // 2.882.0 (#5557): sprung back, in place
   click(m, d.querySelector(`[data-dco="${order[0]}"]`));
   check(await until(() => shown() === order[0] && prev()), 'phone: the document opens as the page');
   check(nav() === '1 of 5', '"1 of 5" above the preview: ' + nav());
@@ -102,10 +104,17 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   check(await until(() => shown() === order[0] && nav() === '1 of 5'), 'a swipe to the right: the document before');
   swipe(m, prev(), 150);
   await sleep(300);
-  check(shown() === order[0] && d.querySelector('.dv-view .dc-body').classList.contains('dc-bnc-p'), 'before the first: it springs back, the first stays');
+  check(shown() === order[0] && still(), 'before the first: it springs back, the first stays');
+  // 2.882.0 (#5557): the whole view leafs (as the task panel): the fields below and the head too, not a field being typed in
+  swipe(m, d.querySelector('.dv-view #dc-sender'), -150);
+  check(await until(() => shown() === order[1] && nav() === '2 of 5'), 'a swipe on the fields below: the next document (#5557)');
+  m.eval(`document.querySelector('.dv-view #dc-sender').focus(); 1`);
   swipe(m, d.querySelector('.dv-view #dc-sender'), -150);
   await sleep(300);
-  check(shown() === order[0], 'a swipe on the fields below changes nothing');
+  check(shown() === order[1] && still(), '... in a field being typed in it does not turn (the finger marks text there)');
+  m.eval(`document.activeElement.blur(); 1`);
+  swipe(m, d.querySelector('.dv-view .dv-title'), 150);
+  check(await until(() => shown() === order[0] && nav() === '1 of 5'), 'a swipe on the head: the document before (#5557)');
   swipe(m, prev(), -20, -160);
   await sleep(300);
   check(shown() === order[0], 'a swipe up on the preview changes nothing (the page scrolls)');
@@ -124,7 +133,7 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   const last = shown();
   swipe(m, prev(), -150);
   await sleep(300);
-  check(shown() === last && d.querySelector('.dv-view .dc-body').classList.contains('dc-bnc-n'), 'at the real end: it springs back');
+  check(shown() === last && still(), 'at the real end: it springs back');
   check(new Set(m.eval('DC.docs.map(x => x.id)')).size === 5, '... the list holds each document once');
 
   // two fingers enlarge the preview: one finger moves it then, no turn
@@ -202,7 +211,15 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
       // (two cards fill no phone: the end of the list is in view at once, page after page follows until all are there)
       check(await wait(`DC.docs.length === 5 && document.querySelectorAll('.dc-card').length === 5 && !document.querySelector('.dc-moreld')`), `Firefox ${W}: the end of the list in view loads the next pages by itself`);
       const first = await ev(`DC.docs[0].id`);
-      await ev(`(document.querySelector('.dc-view [data-dco="${first}"]').click(), 1)`);
+      // 2.882.0 (#5557): the preview stands at its final size from the first picture: the page before the file (its small
+      // picture, in the real page's shape) and the drawn page have the same size, every frame from the click on is measured
+      await wait(`!!document.querySelector('.dc-view [data-dco="${first}"] img')?.complete`);
+      const sz = await ev(`new Promise(ok => { const seen = [], t0 = Date.now(); document.querySelector('.dc-view [data-dco="${first}"]').click();
+        (function f() { const b = document.querySelector('.dv-view .dv-pages'), p = b?.querySelector('.dv-pg'), pv = document.querySelector('.dv-view .dv-pv');
+          if (p) seen.push([p.offsetWidth, p.offsetHeight, b._base ? 1 : 0, pv.offsetHeight]);
+          if ((b?._base && b.querySelector('canvas')) || Date.now() - t0 > 10000) ok(seen); else requestAnimationFrame(f); })(); })`);
+      const fin = sz[sz.length - 1] || [], pre = sz.filter(x => !x[2]);
+      check(pre.length && fin[2] && sz.every(x => Math.abs(x[0] - fin[0]) <= 2 && Math.abs(x[1] - fin[1]) <= 2 && x[3] === fin[3]), `Firefox ${W}: the preview does not jump: the page before the file has the drawn page's size (#5557) ` + JSON.stringify([pre[0], fin, sz.length]));
       check(await wait(`!!document.querySelector('.dv-view .dc-nav') && !!document.querySelector('.dv-view .dv-pages')`), `Firefox ${W}: the page with "x of N"`);
       const r = await ev(`(() => { const n = document.querySelector('.dv-view .dc-nav').getBoundingClientRect(), p = document.querySelector('.dv-view .dv-pages'), c = document.querySelector('.dv-view');
         return {l: Math.round(n.left), r: Math.round(n.right), cw: Math.round(c.getBoundingClientRect().width), ta: getComputedStyle(p).touchAction, txt: document.querySelector('.dc-navn').textContent, sw: c.scrollWidth, ccw: c.clientWidth}; })()`);
@@ -210,9 +227,9 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
       await ev(`(() => { ${TOUCH} sw(document.querySelector('.dv-view .dv-pages'), -${Math.round(W * .4)}); return 1; })()`);
       check(await wait(`+document.querySelector('.dv-view .dc-body').dataset.id === DC.docs[1].id && /^2 of /.test(document.querySelector('.dc-navn').textContent)`), `Firefox ${W}: a swipe on the preview turns to the next document`);
       check(await ev(`location.hash === '#ablage/' + DC.docs[1].id`), `Firefox ${W}: ... the address follows`);
+      // 2.882.0 (#5557): on the fields below it turns as well (the whole view, as the task panel)
       await ev(`(() => { ${TOUCH} sw(document.querySelector('.dv-view #dc-sender'), -${Math.round(W * .4)}); return 1; })()`);
-      await sleep(400);
-      check(await ev(`+document.querySelector('.dv-view .dc-body').dataset.id === DC.docs[1].id`), `Firefox ${W}: a swipe on the fields does not turn`);
+      check(await wait(`+document.querySelector('.dv-view .dc-body').dataset.id === DC.docs[2].id && /^3 of /.test(document.querySelector('.dc-navn').textContent)`), `Firefox ${W}: a swipe on the fields turns too (#5557)`);
       await shot(`p2476a-docswipe-${W}.png`);
       await ev(`(document.querySelector('.dv-view .dv-back').click(), 1)`);
       await wait(`!document.querySelector('.dc-md')`);

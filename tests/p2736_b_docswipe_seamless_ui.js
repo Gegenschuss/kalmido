@@ -1,4 +1,5 @@
 // kalmido-suite:
+// 2.882.0 (#5557): the swipe is swipenav.js now: the neighbour lies in the body as .swn-nb > .dc-nb, the body's parts glide
 // 2.736.0 UI test (#5212: leafing without a seam, on the document view of 2.583.0 - the direct neighbours of the open document
 // are fetched completely and drawn ahead with the same drawing as the open one (docview.js dcv_bodyHtml); after the snap the
 // body is only swapped: no request for the document, no picture that jumps, no text that comes later), own container
@@ -87,15 +88,15 @@ function hold(w, el, dx) {  // one finger from (200, 300) by dx in a few steps, 
   check(!m.eval(`DCW.nb.has(${order[2]})`), '... only the direct neighbours (the third is not fetched)');
 
   hold(m, prev(), -120);
-  const nb = () => d.querySelector('.dv-view .dc-body > .dc-nb-n');
+  const nb = () => d.querySelector('.dv-view .dc-body > .swn-nb[data-dir="1"] > .dc-nb');
   check(nb()?.querySelector('[data-dcp="name"]')?.value === names[1] && nb().querySelector('.dc-props'), 'mid-swipe: the real sheet of the next one lies beside it, all fields there: ' + nb()?.textContent.slice(0, 80));
   check(nb()?.inert === true && nb()?.getAttribute('aria-hidden') === 'true', '... not reachable meanwhile (inert, hidden from screen readers)');
-  m.eval(`window.__pv = document.querySelector('.dv-view .dc-body > .dc-nb-n .dv-pages'); window.__in = document.querySelector('.dv-view .dc-body > .dc-nb-n [data-dcp="name"]'); window.__old = document.querySelector('.dv-view .dc-body'); 1`);
+  m.eval(`window.__pv = document.querySelector('.dv-view .dc-body > .swn-nb[data-dir="1"] > .dc-nb .dv-pages'); window.__in = document.querySelector('.dv-view .dc-body > .swn-nb[data-dir="1"] > .dc-nb [data-dcp="name"]'); window.__old = document.querySelector('.dv-view .dc-body'); 1`);
   const before = docGets(order[1]), before0 = docGets(order[0]);
   touch(m, prev(), 'touchend', []);
   check(await until(() => shown() === order[1]), 'let go: the next document stands there');
   check(m.eval(`document.querySelector('.dv-view .dc-body .dv-pages') === __pv && document.querySelector('.dv-view [data-dcp="name"]') === __in`), '... the body drawn ahead was taken over as it was (the same preview box, the same field: nothing drawn anew)');
-  check(d.querySelector('.dv-view [data-dcp="name"]').value === names[1] && !d.querySelector('.dv-view .dc-nb') && !body().style.transform, '... its title at once, no placeholder left, in place');
+  check(d.querySelector('.dv-view [data-dcp="name"]').value === names[1] && !d.querySelector('.dv-view .dc-nb, .dv-view .swn-nb') && ![...body().children].some(x => x.style.transform), '... its title at once, no placeholder left, in place');
   // #4876: #dc-name is the document's title (data-dcp title), the file name has #dc-file (data-dcp name)
   check(d.querySelector('.dv-view #dc-name') === d.querySelector('.dv-view [data-dcp="title"]') && d.querySelector('.dv-view #dc-file') === d.querySelector('.dv-view [data-dcp="name"]') && d.querySelectorAll('[id="dc-name"]').length === 1 && d.querySelectorAll('[id="dc-file"]').length === 1, '... its ids back (the label and the field belong together again)');
   // the body left behind waits as the neighbour before it once its preview was finished (jsdom draws no PDF: fetched anew then; Firefox below)
@@ -156,14 +157,14 @@ function hold(w, el, dx) {  // one finger from (200, 300) by dx in a few steps, 
       check(fit[0] === true && fit[1] === true, `Firefox ${W}: the open preview and the one drawn ahead: the same width for the pages empty and filled, drawn for it (its scrollbar takes no width later): ` + JSON.stringify(fit));
       const r0 = await ev(`(() => { const c =document.querySelector('.dv-view .dc-body .dv-pages canvas'); if (c) c.__was = 1; return (${R})(document.querySelector('.dv-view .dc-body .dv-pages').getBoundingClientRect()); })()`);
       const mid = await ev(`(() => { ${TOUCH} hold(document.querySelector('.dv-view .dc-body .dv-pages'), -${Math.round(W * .35)});
-        const n = document.querySelector('.dv-view .dc-body > .dc-nb-n'); if (!n) return null; const cv = n.querySelector('.dv-pages canvas'); if (cv) cv.__ahead = 1;
+        const n = document.querySelector('.dv-view .dc-body > .swn-nb[data-dir="1"] > .dc-nb'); if (!n) return null; const cv = n.querySelector('.dv-pages canvas'); if (cv) cv.__ahead = 1;
         return {pv: (${R})(n.querySelector('.dv-pages').getBoundingClientRect()), bar: (${R})(n.querySelector('.dv-pvbar')?.getBoundingClientRect() || {}), body: (${R})(n.getBoundingClientRect()), head: [...(document.querySelector('.dv-view .dv-head')?.children || [])].filter(k => k.getBoundingClientRect().width).map(k => k.className.split(' ')[0] + ':' + Math.round(k.getBoundingClientRect().top) + '/' + Math.round(k.getBoundingClientRect().height) + '/' + Math.round(k.getBoundingClientRect().width) + (k.tagName === 'H2' ? '=' + k.textContent : '')), name: n.querySelector('[data-dcp="name"]')?.value, cv: !!cv, t0: performance.now()}; })()`);
       check(mid?.cv && mid.name === await ev(`DC.docs[1].name`), `Firefox ${W}: mid-swipe the next one lies there with its page and its title ` + JSON.stringify(mid));
       await ev(`(() => { ${TOUCH} tc(document.querySelector('.dv-view .dc-body .dv-pages'), 'touchend', []); return 1; })()`);
       check(await wait(`DC.doc?.id === DC.docs[1].id && document.querySelector('.dv-view .dc-body')?.dataset.id === String(DC.docs[1].id)`), `Firefox ${W}: let go, the next one is open`);
       const at1 = await ev(`({pv: (${R})(document.querySelector('.dv-view .dc-body .dv-pages').getBoundingClientRect()), name: document.querySelector('.dv-view [data-dcp="name"]')?.value, same: document.querySelector('.dv-view .dc-body .dv-pages canvas')?.__ahead === 1})`);
       check(at1.name === mid?.name && at1.same, `Firefox ${W}: at once its title and the same page drawn ahead (not drawn again) ` + JSON.stringify(at1));
-      check(await wait(`!window.__net || window.__net.n === 0`, 80) && await wait(`!document.querySelector('.dv-view .dc-nb') && !document.querySelector('.dv-view .dc-body').style.transform`), `Firefox ${W}: settled (no request open)`);
+      check(await wait(`!window.__net || window.__net.n === 0`, 80) && await wait(`!document.querySelector('.dv-view .dc-nb, .dv-view .swn-nb') && ![...document.querySelector('.dv-view .dc-body').children].some(x => x.style.transform)`), `Firefox ${W}: settled (no request open)`);
       const at2 = await ev(`({pv: (${R})(document.querySelector('.dv-view .dc-body .dv-pages').getBoundingClientRect()), bar: (${R})(document.querySelector('.dv-view .dc-body .dv-pvbar')?.getBoundingClientRect() || {}), body: (${R})(document.querySelector('.dv-view .dc-body').getBoundingClientRect()), head: [...(document.querySelector('.dv-view .dv-head')?.children || [])].filter(k => k.getBoundingClientRect().width).map(k => k.className.split(' ')[0] + ':' + Math.round(k.getBoundingClientRect().top) + '/' + Math.round(k.getBoundingClientRect().height) + '/' + Math.round(k.getBoundingClientRect().width) + (k.tagName === 'H2' ? '=' + k.textContent : '')), kids: [...document.querySelector('.dv-view .dc-body').children].map(k => k.className.split(' ')[0] + ':' + Math.round(k.getBoundingClientRect().top) + '+' + Math.round(k.getBoundingClientRect().height)), same: document.querySelector('.dv-view .dc-body .dv-pages canvas')?.__ahead === 1,
         gets: performance.getEntriesByType('resource').filter(e => e.startTime > ${mid?.t0 || 0} && new URL(e.name).pathname === '/api/docs/' + DC.docs[1].id).map(e => e.name)})`);
       const near = (a, b) => typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= 1;

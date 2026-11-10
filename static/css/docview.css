@@ -92,7 +92,7 @@
 .dv-pg canvas,.dv-pg img{display:block;width:100%;height:100%}
 .dv-pg.dv-img{background:none}
 .dv-pg.dv-thumb{width:min(100%,30rem)}
-.dv-pg.dv-thumb img{height:auto}
+.dv-pg.dv-thumb img{object-fit:contain}  /* 2.882.0 (#5557): the page already has its final size (docview.js dcv_phSize) */
 .dv-pgcol>.dc-ph{margin:3rem auto;color:#c8cbce}
 .dv-pgcol>.dc-ph svg{width:3rem;height:3rem}
 @media (prefers-reduced-motion:reduce){ .dv-more .dc-chev,.dv-actw .dc-chev{transition:none} }
