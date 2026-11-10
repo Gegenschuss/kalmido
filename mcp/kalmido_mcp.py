@@ -2300,9 +2300,12 @@ TOOLS += [
            "sender": {"type": "string", "description": "Sender ids (one of them)"}, "type": {"type": "string", "description": "Document type ids (one of them)"},
            "folder": {"type": "string", "description": "Folder ids"}, "added_from": D, "added_to": D,
            "no_tag": {"type": "boolean"}, "no_sender": {"type": "boolean"}, "no_type": {"type": "boolean"},
-           "ftype": {"type": "string", "description": "Comma-separated: pdf, image, office, text, other"}}),
+           "ftype": {"type": "string", "description": "Comma-separated: pdf, image, office, text, other"},
+           # 2.897.0 (#5547): the API's view= of 2.857.0 (#5518) through MCP too
+           "view": {"type": "integer", "description": "A saved view (kind docview) shared with you: its filter, workspace and state on top; "
+                                                       "your other parameters go first"}}),
      lambda api, a: api.call("GET", "/documents", {**_pick(a, ("q", "state", "from", "to", "limit", "cursor", "tag", "tag_mode", "not_tag", "sender",
-                                                               "type", "folder", "added_from", "added_to", "ftype")),
+                                                               "type", "folder", "added_from", "added_to", "ftype", "view")),
                                                    **({"review": "1"} if a.get("review") else {}),
                                                    **{k: "1" for k in ("no_tag", "no_sender", "no_type") if a.get(k)}})),
     ("get_document", "2.48.0: one document with its fields, open suggestions and the recognised text (OCR / text layer).",

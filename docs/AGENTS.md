@@ -4703,6 +4703,10 @@ organisation" is for people, not agents). Reading a view gives you its search, n
 (f: `sender`, `type`, `tag`, `folder`, `date`, `added`, `ftype`, `asn`, `review`, `text`, `cf`; op: `in`, `nin`, `empty`, `from`,
 `to`, `eq`, `set`, `has`, `nhas`; an older view's `query` comes converted). Run it with `GET /api/v1/documents?view=<id>`:
 the view's filter on top of your own access (other parameters narrow it further).
+*Since 2.897.0 (#5547):* `?view=<id>` (MCP `list_documents` with `view`) also takes the view's workspace (`ws`) and its own
+`area`, `state` and `unbooked`, exactly as the app's list does; a parameter you send yourself (e.g. `state`) goes first, the
+order stays newest first. An older view's field filters and dates convert as the search read them (spaces and a trailing
+comma in the field ids, a date with a time cut to the day).
 
 *Since 2.566.0 (stage 3, #4712):* calendars and address books are kinds of the shared core too (`evcal`, `address_book`),
 without the generic object routes above: agents keep the calendar and address book API (`/event-calendars`, `/events`,

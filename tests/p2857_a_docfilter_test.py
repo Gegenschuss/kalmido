@@ -291,4 +291,20 @@ check(v1_view(FGH, FVP) == sorted([F1, F2]), f"freelancer: her agent's list thro
 FVO = agent_view("Receipts elsewhere", WS, FR, FG, s=Fr)
 check(in_view(Fr, FVO) == [] and v1_view(FGH, FVO) == [],
       f"#5547 rueckfall: the view's workspace holds for the agent as in the app (not her private documents) {v1_view(FGH, FVO)}")
+# ---------------------------------------------------------------- 2.897.0 (#5547): MCP list_documents passes view= (static: the call it makes)
+sys.path.insert(0, os.path.join(N, "..", "mcp"))
+import kalmido_mcp as m  # noqa: E402
+
+tool = next(t for t in m.TOOLS if t[0] == "list_documents")
+calls = []
+
+
+class Api:
+    def call(self, method, path, body=None, **k):
+        calls.append((method, path, body))
+        return {}
+
+
+tool[3](Api(), {"view": 7, "q": "x"})
+check(calls == [("GET", "/documents", {"q": "x", "view": 7})] and "view" in tool[2]["properties"], f"MCP: list_documents passes view ({calls})")
 sys.exit(done("p2857_a_docfilter"))
