@@ -1,4 +1,4 @@
-// 2.802.0 B UI tests (#5462 the calendar head on a phone and a tablet, real layout): own container (start.sh), Firefox with a finger.
+// 2.855.0 B UI tests (#5462 the calendar head on a phone and a tablet, real layout): own container (start.sh), Firefox with a finger.
 // kalmido-suite: fresh
 // Invented data only.
 // - 360 x 740: one line of views + one line of the period; the month grid starts in the upper fifth; "..." opens a menu with

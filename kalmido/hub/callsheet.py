@@ -1,4 +1,4 @@
-"""2.802.0 (#1956): the call sheet of a shoot day (Film-Tagesdispo) -- a PDF to send to everybody on the day.
+"""2.855.0 (#1956): the call sheet of a shoot day (Film-Tagesdispo) -- a PDF to send to everybody on the day.
 
 One shoot day = one job of the disposition (hub/dispo.py: the bookings made together, hub_bookings.job). The call sheet
 takes what the app already knows -- the day, the title and the crew of the job (people, contacts, open places of a crew

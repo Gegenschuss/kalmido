@@ -1,4 +1,4 @@
-// 2.802.0 A UI test (#1956): the call sheet of a shoot day in the app. Own container (start.sh). Invented names only.
+// 2.855.0 A UI test (#1956): the call sheet of a shoot day in the app. Own container (start.sh). Invented names only.
 // kalmido-suite: fresh
 // - with Film & Video the booking sheet of the disposition has the button "Call sheet"; it loads callsheet.js on demand
 //   (lazyload.js) and opens the dialog of that shoot day: the crew of the booking is listed with the contact's phone

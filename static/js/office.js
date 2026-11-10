@@ -174,7 +174,7 @@ function ofc_setJump() {
 }
 const ofc_setBody = () => S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : `<p class="muted lempty">${tr('Loading…')}</p>`;
 // 2.470.0 (#3596): the pages behind Settings (services, text blocks, rights) lead back there; was the tab row General | Templates
-// 2.802.0 (#5456): the button names where it leads (Settings › Company & office [› Texts & templates]), not just "Settings"
+// 2.855.0 (#5456): the button names where it leads (Settings › Company & office [› Texts & templates]), not just "Settings"
 const ofr_backHtml = tab => ofr_grp() && ofr_lvOf('settings') === 'none' ? '' : `<div class="ofcbar"><button type="button" class="btn sm" data-setgo="${tab === 'settings' ? 'biz' : 'biz-tpl'}">${ic('back', 's')} ${esc(tab === 'settings' ? tr('Settings › Company & office') : tr('Settings › Company & office › {0}', tr('Texts & templates')))}</button></div>`;
 function viewOffice() {
   if (!officeOn()) return `<div class="empty">${setLinkHtml(tr('Office & finance is off (Settings > Modules)'))}</div>`;
@@ -1094,7 +1094,7 @@ function ost_save(el) {
       el._ostV = undefined;
       const d = FG.d[fk] || (FG.d[fk] = {f: {}}); d.f[k] = v;  // the value stays (a redraw puts it back, closing the page asks)
       if (x?.oxaRedraw) await ofcInfo(true);  // 2.528.0 (#4305 A3): changed elsewhere: the current settings, the typed value on top
-      ost_mark(el.isConnected ? el : ost_find(el) || el, 'err', tr('Not saved: {0}', ofcErrHere(x)));  // 2.528.0 (#4305 A3): the field drawn again (changed elsewhere); 2.802.0 (#5451): said once, at the field
+      ost_mark(el.isConnected ? el : ost_find(el) || el, 'err', tr('Not saved: {0}', ofcErrHere(x)));  // 2.528.0 (#4305 A3): the field drawn again (changed elsewhere); 2.855.0 (#5451): said once, at the field
     }
   });
   return OST.q;
@@ -1125,8 +1125,8 @@ function ost_markBack() {
 }
 // 2.40.0 (#1378): one upload helper for the office (FormData + the CSRF header X-Requested-With via rawFetch, the server's error text)
 const ofcUpload = (url, file) => { const fd = new FormData(); fd.append('file', file); return rawFetch('POST', url, fd); };
-const ofcUpErr = x => ofcErrTxt(x);  // 2.802.0 (#5451)
-// 2.802.0 (#5451): an error of the office is said once and in plain words. api() already says a refused or failed request
+const ofcUpErr = x => ofcErrTxt(x);  // 2.855.0 (#5451)
+// 2.855.0 (#5451): an error of the office is said once and in plain words. api() already says a refused or failed request
 // (it marks the error shown); ofcErr says only what nobody said yet (an own check, rawFetch), an empty text as a plain sentence.
 // ofcErrHere = the text for a place on the page (a dialog's .aerr, an empty list): api()'s toast of the same text goes, the
 // place keeps it (one message, where it belongs)
@@ -1137,7 +1137,7 @@ function ofcErr(x) {
   toast(ofcErrTxt(x));
   if (x && typeof x === 'object') x.shown = true;
 }
-// 2.802.0 (#5451): mail sending missing on the server, in plain words (the variable only in the server's docs)
+// 2.855.0 (#5451): mail sending missing on the server, in plain words (the variable only in the server's docs)
 const ofcNoMail = () => tr('E-mail sending is not set up on this server yet: whoever runs the server sets it up.');
 /** @param {any} x @returns {string} */
 function ofcErrHere(x) {

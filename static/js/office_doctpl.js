@@ -460,7 +460,7 @@ function dsb_upload(x) {
 }
 async function dsb_mail(x) {
   let m; try { m = await api('GET', `${DSB_API}/${x.id}/mail`); } catch (e) { ofcErr(e); return; }
-  if (!m.smtp) { toast(ofcNoMail()); return; }  // 2.802.0 (#5451): no variable name
+  if (!m.smtp) { toast(ofcNoMail()); return; }  // 2.855.0 (#5451): no variable name
   const md = modal(`<h3>${tr('Send by e-mail')} · ${esc(x.kind_label)}</h3>
     ${ofcRowF('dsb-to', tr('To'), `<input id="dsb-to" type="email" value="${esc(m.to || '')}" maxlength="200" autocomplete="off">`)}
     ${ofcRowF('dsb-subj', tr('Subject'), ofcIn('dsb-subj', m.subject, {max: 200}))}

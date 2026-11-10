@@ -1,5 +1,5 @@
 // kalmido-suite: fresh
-// 2.802.0 part C (#5456) UI test: the office settings. Own container (start.sh, mode workspaces), jsdom for both people,
+// 2.855.0 part C (#5456) UI test: the office settings. Own container (start.sh, mode workspaces), jsdom for both people,
 // Firefox (desktop, mouse) for the layout. Invented data only. freelancer-matrix: office (an organisation's admin, a person
 // without one)
 // - "Next running number" is one form: every field with its hint ("at least … · applies to …") right below it, ONE "Apply"

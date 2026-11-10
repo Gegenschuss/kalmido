@@ -62,7 +62,7 @@ async function quotaDialog(j) {
 // 2.13.3: the + button follows rotations / folding too (not only a full render): hidden where the add bar or the header's
 // "New task" is there (tablets, an unfolded Fold in portrait)
 function fabSync() { const f = $('#fab'); if (f) f.classList.toggle('gone', fabOff() || S.multi.size > 0 || (!!$('#view .qdock') && (tabletDock() || !isMobile())));
-  if (f) { const ev = typeof calFabEv === 'function' && calFabEv(), l = ev ? tr('New event') : tr('New task'); if (f.getAttribute('aria-label') !== l) { f.setAttribute('aria-label', l); f.title = ev ? l : kt(l, 'n'); } } }  // 2.802.0 (#5462): in a phone's calendar the + adds an event
+  if (f) { const ev = typeof calFabEv === 'function' && calFabEv(), l = ev ? tr('New event') : tr('New task'); if (f.getAttribute('aria-label') !== l) { f.setAttribute('aria-label', l); f.title = ev ? l : kt(l, 'n'); } } }  // 2.855.0 (#5462): in a phone's calendar the + adds an event
 window.addEventListener('resize', () => { if (S.booted) requestAnimationFrame(fabSync); });
 // 2.44.0 (#1187): the focus timer and family are tabs of their areas (Time, Home) now: areas.js, tab ids "a:<area>"
 // 2.208.0 (#2771): the module tasks shows as the area Projects (tab bar, Add tab)

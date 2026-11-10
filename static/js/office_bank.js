@@ -36,7 +36,7 @@ const bfbBooksStale = () => {
 const bnkReload = () => { BNK.data = null; BNK.imports = BNK.showImp ? BNK.imports : null; BNK.other = null; BNK.cand = null; bfbBooksStale(); ofcDraw(); };
 const bnkAmt = v => `${+v > 0 ? '+' : '−'}${ofcMoney(Math.abs(+v))}`;
 
-// 2.802.0 (#5456): the page links the bank accounts (IBAN, default account: Settings › Company & office › Bank & taxes)
+// 2.855.0 (#5456): the page links the bank accounts (IBAN, default account: Settings › Company & office › Bank & taxes)
 function bnkHtml() {
   if (BNK.oid !== OFC.info?.org_id) Object.assign(BNK, {oid: OFC.info?.org_id, data: null, imports: null, err: null, other: null, cand: null, fints: null});  // 2.616.0 (#2473): + fints  // another office area
   if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts

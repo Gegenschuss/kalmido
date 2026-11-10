@@ -33,7 +33,7 @@ function oimHtml() {
   if (!ofcAdmin()) return `<div class="empty">${ic('lock')}<span>${tr('Only for admins of the office.')}</span></div>`;
   if (OIM.runs === null && !OIM.loading) { OIM.loading = true; setTimeout(async () => { await oimLoad(); OIM.loading = false; }, 0); }
   setTimeout(oim_jump, 0);  // 2.122.3 A (#2335)
-  const back = `<div class="ofcbar"><button type="button" class="btn sm" data-setgo="biz">${ic('back', 's')} ${esc(tr('Settings › Company & office'))}</button></div>`;  // 2.802.0 (#5456): names where it leads
+  const back = `<div class="ofcbar"><button type="button" class="btn sm" data-setgo="biz">${ic('back', 's')} ${esc(tr('Settings › Company & office'))}</button></div>`;  // 2.855.0 (#5456): names where it leads
   return `<div class="oim">${back}<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('You see everything before it is saved. Undo an import under Import runs; some imports only within 24 hours.')}</p>
     <section class="oimsec" id="oim-master"><h4>${ic('list', 's')} ${tr('Master data from a spreadsheet')}</h4><div class="shint">${tr('Contacts: the address in one cell or in the columns street, postcode, city.')}</div>
     <p class="muted">${tr('Excel or CSV with the sheets Contacts, Services, Equipment.')}</p>

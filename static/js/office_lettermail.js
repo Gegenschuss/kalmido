@@ -209,7 +209,7 @@ async function ltmMailModal(id) {
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="send">${ic('send', 's')} ${tr('Send')}</button></div>`);
   md.classList.add('ofcdlg', 'ltm-dlg');
   const close = fgModal(md);
-  if (info && info.mail_on === false) $('.aerr', md).textContent = ofcNoMail();  // 2.802.0 (#5451)
+  if (info && info.mail_on === false) $('.aerr', md).textContent = ofcNoMail();  // 2.855.0 (#5451)
   md.addEventListener('click', async e => {
     const b = /** @type {any} */ (e.target).closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }

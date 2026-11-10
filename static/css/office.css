@@ -177,7 +177,7 @@
 .ofdsecb .row label{min-width:9rem;color:var(--muted);font-size:var(--fs-s)}
 .ofdsecb .row input,.ofdsecb .row select,.ofdsecb .row textarea{flex:1;min-width:8rem}
 .ofdsecb .row.ofdtxt select{min-height:var(--fld-h)}
-.ofdsecb .row.ofdchk>label.chkl{min-width:0;margin-left:9.5rem;display:inline-flex;align-items:center;gap:.5rem;color:inherit;font-size:var(--fs-m)}  /* 2.802.0 (#5456): a tick in the field column */
+.ofdsecb .row.ofdchk>label.chkl{min-width:0;margin-left:9.5rem;display:inline-flex;align-items:center;gap:.5rem;color:inherit;font-size:var(--fs-m)}  /* 2.855.0 (#5456): a tick in the field column */
 .ofdsecb .row.ofdchk input[type=checkbox]{flex:none;min-width:0}
 .ofdsecb .row .ofdtxt{flex:1;min-width:0;display:flex}
 .ofdsecb .row .ofdtxt select{width:100%;max-width:100%;min-width:0;min-height:var(--fld-h)}
@@ -198,7 +198,7 @@
   .ofdrt .ofdrtf{flex-direction:column;flex-wrap:nowrap;width:100%;min-width:0}
   .ofdrt .ofdrtf select,.ofdrt .ofdrtf input{width:100%;min-width:0;flex:none}
   .ofdsecb .row .chkl{justify-content:flex-start;gap:.5rem}
-  .ofdsecb .row.ofdchk>label.chkl{margin-left:0}  /* 2.802.0 (#5456) */
+  .ofdsecb .row.ofdchk>label.chkl{margin-left:0}  /* 2.855.0 (#5456) */
 }
 .ofdfs{border:0;margin:0;padding:0;min-width:0}
 .ofdfs[disabled] .ofdadd,.ofdfs[disabled] .ofdmv,.ofdfs[disabled] [data-ofd="fld-add"],.ofdfs[disabled] [data-ofd="fld-del"]{display:none}
@@ -918,7 +918,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .onum h4{margin:1rem 0 .25rem}
 .onum .onumrow .numin{width:8rem}
 .onum .onumshared .numin{opacity:.6}  /* 2.433.0 (#3597): on the invoices' counter */
-.onum .onumrow>.lacts{flex:1;min-width:0}  /* 2.802.0 (#5456): the field column holds field, preview and its hint */
+.onum .onumrow>.lacts{flex:1;min-width:0}  /* 2.855.0 (#5456): the field column holds field, preview and its hint */
 .onum .onumrow .onumh{margin-top:-.25rem}  /* the hint right below its field */
 .onum .onumrow{margin-bottom:.5rem}
 .onum .onumfoot{margin-top:.25rem}

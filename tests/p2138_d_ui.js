@@ -54,7 +54,7 @@ async function part_numranges() {
   check(d.querySelectorAll('#onum-box .onumrow').length === 5, 'five series: quotation, invoice, credit note, reminder, delivery note');
   check(!d.querySelector('#onum-box input[id^="os-"]') && d.querySelector('#onum-box').hasAttribute('data-fg-skip'), 'not part of the settings save (no os- ids, form guard skipped)');
   const rowI = () => d.querySelector('.onumrow[data-kind="invoice"]');
-  // 2.802.0 (#5456): one "Apply" at the end of the form instead of one per row
+  // 2.855.0 (#5456): one "Apply" at the end of the form instead of one per row
   const applyB = () => d.querySelector('#onum-box [data-onum="apply"]');
   check(new RegExp('applies to ' + Y).test(rowI().textContent) && /at least 1/.test(rowI().textContent), 'invoice: "applies to <year>", smallest value');
   check(!/applies to/.test(d.querySelector('.onumrow[data-kind="offer"]').textContent), 'quotation without a year in the scheme: no year hint');
@@ -81,7 +81,7 @@ async function part_numranges() {
   // a quotation needs no reason
   const io = d.querySelector('#onum-offer'); io.value = '40'; io.dispatchEvent(new w.Event('input', {bubbles: true}));
   check(!d.querySelector('#onum-offer-why'), 'quotations: no reason field');
-  applyB().click();  // 2.802.0 (#5456): the form's one Apply
+  applyB().click();  // 2.855.0 (#5456): the form's one Apply
   check(await until(async () => (await range('offer')).next === 40, 40), 'quotation series at 40');
   w.close();
 

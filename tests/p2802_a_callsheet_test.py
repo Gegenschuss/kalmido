@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
-"""2.802.0 A (#1956): the call sheet of a shoot day (Film-Tagesdispo, hub/callsheet.py). Invented people, firms and numbers only.
+"""2.855.0 A (#1956): the call sheet of a shoot day (Film-Tagesdispo, hub/callsheet.py). Invented people, firms and numbers only.
  - without Film & Video: GET /api/team/dispo/callsheet/<job> and its PDF 404 (as if there was nothing)
  - with it: the day, the title, the project, the production (office master data) and the crew of the job come from the app;
    a contact booked brings its mobile number / e-mail, a member booked the ones of the address book entry with her e-mail

@@ -672,7 +672,7 @@ document.addEventListener('click', async e => {
     case 'filter-new': closeSide(); filterModal(); break;
     case 'filter-edit': filterModal(id); break;
     case 'cal-done': setShowDone(!showDoneCal(), 'cal'); break;
-    case 'cal-more': e.stopPropagation(); calMoreMenu(a); break;  // 2.802.0 (#5462)
+    case 'cal-more': e.stopPropagation(); calMoreMenu(a); break;  // 2.855.0 (#5462)
     // 2.36.1 (#1127): timeline names hide a calendar, "…" on a name / on "Events today" opens the calendar switches
     case 'cvx-tlhide': cvxTlHide(a.dataset.key, a.dataset.name); break;
     case 'cvx-tlmenu': e.stopPropagation(); cvxTlMenu(a, a.dataset.key, a.dataset.name); break;

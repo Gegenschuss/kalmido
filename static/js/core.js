@@ -704,7 +704,7 @@ async function api(method, url, body) {
   // 2.64.1 (#1817): encrypted before the outbox (it holds ciphers only); a Promise only when there is something to encrypt, so
   // an offline edit is still applied locally at once
   const lo = typeof le2eOut === 'function' ? le2eOut(method, url, body) : body;
-  if (lo instanceof Promise) { try { body = await lo; } catch (e) { if (e.message !== 'auth') { toast(e.message); e.shown = true; } throw e; } } else body = lo;  // 2.802.0 (#5451): said once
+  if (lo instanceof Promise) { try { body = await lo; } catch (e) { if (e.message !== 'auth') { toast(e.message); e.shown = true; } throw e; } } else body = lo;  // 2.855.0 (#5451): said once
   // 2.126.0 D (#1990): a new task carries its own id from the first try on: sent again (the answer got lost) = the same task
   if (method === 'POST' && url === '/api/tasks' && body && typeof body === 'object' && !(body instanceof FormData) && !body.client_ref) body = {...body, client_ref: Date.now().toString(36) + Math.random().toString(36).slice(2, 10)};
   // 2.359.0 A (#3023): a temporary id (created offline) never goes to the server as such: the real id once its create went out,
@@ -733,11 +733,11 @@ async function api(method, url, body) {
   catch (e) {
     if (e instanceof Offline) {
       if (queueable(method, url) && !(body instanceof FormData)) return enqueue(method, url, body);
-      if (method !== 'GET') { toast(tr('Offline: only works again with a connection')); e.shown = true; }  // 2.802.0 (#5451)
+      if (method !== 'GET') { toast(tr('Offline: only works again with a connection')); e.shown = true; }  // 2.855.0 (#5451)
     } else if (e.message !== 'auth' && !e.shown) {
       if (e.data?.out_request && typeof oor_ask === 'function') toast(e.message, () => oor_ask(e.data.out_request), 10000, tr('Ask an admin'));  // 2.361.2 (#2923)
       else toast(e.message);
-      e.shown = true;  // 2.802.0 (#5451): said once - a caller's catch sees it (office.js ofcErr)
+      e.shown = true;  // 2.855.0 (#5451): said once - a caller's catch sees it (office.js ofcErr)
     }
     throw e;
   }

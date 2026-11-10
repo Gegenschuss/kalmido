@@ -1,5 +1,5 @@
 // kalmido-suite: fresh
-// 2.802.0 part C (#5451) UI test: an error in the office is said once and in plain words. Own container (start.sh, mode
+// 2.855.0 part C (#5451) UI test: an error in the office is said once and in plain words. Own container (start.sh, mode
 // workspaces), jsdom, invented data only. freelancer-matrix: office (an organisation's admin and a person without one)
 // - api() marks an error it said (x.shown): the office's ofcErr says nothing more; an error nobody said yet is said once, an empty
 //   one as a plain sentence (never "unknown" or an empty toast)

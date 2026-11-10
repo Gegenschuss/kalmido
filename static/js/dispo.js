@@ -203,7 +203,7 @@ function dp_editSheet(b) {
     if (s) { $$('.dpstat button', md).forEach(x => { x.classList.toggle('on', x === s); x.setAttribute('aria-pressed', x === s); }); return; }
     const k = e.target.closest('[data-m]'); if (!k) return;
     if (k.dataset.m === 'close') { md.remove(); return; }
-    if (k.dataset.m === 'callsheet') { md.remove(); cs_open(b.job, d.org_id); return; }  // 2.802.0 (#1956): lazyload.js loads callsheet.js
+    if (k.dataset.m === 'callsheet') { md.remove(); cs_open(b.job, d.org_id); return; }  // 2.855.0 (#1956): lazyload.js loads callsheet.js
     if (k.dataset.m === 'delone') { del(+k.dataset.id, false); return; }
     if (k.dataset.m === 'del') { del(b.id, true); return; }
     const t0 = $('#dpe-t0', md).value, t1 = $('#dpe-t1', md).value, a = $('#dpe-from', md).value, z = $('#dpe-to', md).value || a;

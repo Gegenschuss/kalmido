@@ -26,7 +26,7 @@ const tourMods = () => ({
     {id: 'cal4', t: tr('New appointment'), d: tr('Select a free time to add an appointment.')},
     {id: 'cal5', sel: '[data-act="ev-cals"]', ms: '.calbar [data-act="cal-more"]', t: tr('Your calendars'), d: tr('Show or hide calendars, add subscriptions and share a calendar of your own from its menu.')},
     {id: 'cal6', sel: '#view .qadd .box', ms: '#fab', t: tr('Tasks in the calendar'), d: tr('Add a task with a date down here: it shows on its day. Drag a task or an appointment to move it.'),
-      dm: feat('events') ? tr('The + adds an appointment, a new task comes from the menu “…”. Hold a task or an appointment to drag it to another day.') : tr('The + adds a task: with a date it shows in the calendar. Hold a task or an appointment to drag it to another day.')},  // 2.802.0 (#5462): on a phone the + adds an event, a task waits in the head's "…"; Calendars / Completed are shown on "…" too
+      dm: feat('events') ? tr('The + adds an appointment, a new task comes from the menu “…”. Hold a task or an appointment to drag it to another day.') : tr('The + adds a task: with a date it shows in the calendar. Hold a task or an appointment to drag it to another day.')},  // 2.855.0 (#5462): on a phone the + adds an event, a task waits in the head's "…"; Calendars / Completed are shown on "…" too
     {id: 'cal7', sel: '[data-act="cal-done"]', ms: '.calbar [data-act="cal-more"]', opt: 1, t: tr('Completed tasks'), d: tr('Show or hide what is already done.')},
     tourRail('cal')],
   office: [{id: 'office1', t: tr('Your office'), d: tr('Clients, quotations, invoices and receipts in one place.')},

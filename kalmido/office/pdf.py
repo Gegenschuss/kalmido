@@ -28,7 +28,7 @@ import re
 import struct
 import unicodedata
 import zlib
-from urllib.parse import quote  # 2.802.0 (#1956): pdf_uri_esc
+from urllib.parse import quote  # 2.855.0 (#1956): pdf_uri_esc
 
 try:
     from ..core.i18n import LANGS, N_, tr
@@ -477,7 +477,7 @@ class _Page:
         self.links.append((x, y, w, h, to, to_y))
 
     def uri(self, x, y, w, h, url):
-        """2.802.0 (#1956): the box x, y, w, h opens url (an ASCII web address) in the reader's app (PDF/A allows URI actions)."""
+        """2.855.0 (#1956): the box x, y, w, h opens url (an ASCII web address) in the reader's app (PDF/A allows URI actions)."""
         if not re.match(r"(?i)^(https?://|mailto:)", str(url)):  # review 2.802 F5: web and mail addresses only
             raise ValueError("pdf uri: scheme")
         self.links.append((x, y, w, h, str(url), None))
@@ -675,7 +675,7 @@ def _meta_text(s):
 
 
 def pdf_uri_esc(url):
-    """2.802.0 (#1956): a web address as the text of a PDF string: ASCII only (else percent-encoded), ( ) \\ escaped."""
+    """2.855.0 (#1956): a web address as the text of a PDF string: ASCII only (else percent-encoded), ( ) \\ escaped."""
     s = quote(str(url), safe=":/?#[]@!$&'*+,;=%~-._")
     return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
@@ -738,7 +738,7 @@ def pdf_write(pages, images, title="", author="", xml=None, meta=None):
         cid = add(f"<< /Length {len(content)} /Filter /FlateDecode >>\nstream\n".encode() + content + b"\nendstream")
         xo = " ".join([f"/{n} {img_ids[n]} 0 R" for n in sorted(p.images) if n in img_ids] + [f"/{n} {form_ids[n]} 0 R" for n in sorted(getattr(p, "forms", None) or {})])
         ann = " ".join(f"<< /Type /Annot /Subtype /Link /F 4 /Border [0 0 0] /Rect [{x:.2f} {p.H - y - h:.2f} {x + w:.2f} {p.H - y:.2f}] "
-                       + (f"/A << /S /URI /URI ({pdf_uri_esc(to)}) >> >>" if isinstance(to, str) else  # 2.802.0 (#1956): a web link (_Page.uri)
+                       + (f"/A << /S /URI /URI ({pdf_uri_esc(to)}) >> >>" if isinstance(to, str) else  # 2.855.0 (#1956): a web link (_Page.uri)
                           f"/Dest [{page_at[id(to)]} 0 R /XYZ null {to.H - to_y:.2f} null] >>") for x, y, w, h, to, to_y in getattr(p, "links", None) or [])
         pid = add(f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {p.W:.2f} {p.H:.2f}] {f'/Annots [{ann}] ' if ann else ''}"
                   f"/Resources << /Font << /F1 {font_ids[False]} 0 R /F2 {font_ids[True]} 0 R >> /XObject << {xo} >> "

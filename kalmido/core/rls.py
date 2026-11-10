@@ -78,7 +78,7 @@ TABLES = (
     "hub_absences",  # 2.50.0 A (#1195): absences (the area they were entered in; the app hides the kind)
     "hub_leave_quota",  # 2.125.0 A (#2117): vacation accounts (the area like hub_absences)
     "hub_bookings",  # 2.50.0 A (#1194): bookings of the disposition
-    "hub_callsheets",  # 2.802.0 (#1956): the call sheet of a shoot day (org_id like its bookings)
+    "hub_callsheets",  # 2.855.0 (#1956): the call sheet of a shoot day (org_id like its bookings)
     "office_signoffs",  # 2.50.0 C (#1200): approval links (NULL = a private list's acceptance, the app checks the list)
     "video_reviews", "video_versions", "video_comments",  # 2.99.1 A (#1959): video sign-offs (NULL = private, the app checks owner / task / list / client)
     "office_pay_props",  # 2.51.0 A (#1350): payment suggestions of agents

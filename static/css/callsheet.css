@@ -1,4 +1,4 @@
-/* 2.802.0 (#1956): the call sheet dialog of a shoot day (static/js/callsheet.js), loaded with its module */
+/* 2.855.0 (#1956): the call sheet dialog of a shoot day (static/js/callsheet.js), loaded with its module */
 .csmd .card { max-width: 47.5rem; }
 .csmd .cssec { border-top: 1px solid var(--line); padding: .4rem 0; }
 .csmd .cssec > summary { cursor: pointer; font-weight: 600; padding: .35rem 0; }

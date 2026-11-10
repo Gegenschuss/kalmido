@@ -178,7 +178,7 @@ button.cyd:hover{background:var(--bg2)}
   .evcfoot .evclinks{flex:1 1 100%}
   .evcfoot .btn.pri{flex:1 1 100%;justify-content:center;min-height:2.75rem}
 }
-/* 2.802.0 (#5462): the calendar head (calBar, .cbm) on a phone and a tablet. Up to 1000 px: Completed, Find a date, Calendars and the
+/* 2.855.0 (#5462): the calendar head (calBar, .cbm) on a phone and a tablet. Up to 1000 px: Completed, Find a date, Calendars and the
    timeline's "No date" wait in "..." (calMoreMenu, the buttons stay in the DOM, hidden here), the rest stays on one quiet line, the title gives way first. A phone: one line
    of views, one line of the period (title, back / Today / next, "..."); "+ Event" is the round + there. A computer is unchanged. */
 .calbar.cbm .calmore{display:none}

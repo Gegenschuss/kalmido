@@ -1,5 +1,5 @@
 // @ts-check
-/* Kalmido web client: the call sheet of a shoot day (2.802.0, #1956), module "callsheet" (lazyload.js, loaded by the button
+/* Kalmido web client: the call sheet of a shoot day (2.855.0, #1956), module "callsheet" (lazyload.js, loaded by the button
    "Call sheet" of a booking in the disposition, dispo.js dp_editSheet; only with the industry Film & Video). One dialog per
    shoot day (= one job of the disposition): what the app knows is shown (day, crew, project, client, production), the day
    details are typed in (set phone, location, call times, lunch, wrap, weather, important, cast, transport, the shot list's

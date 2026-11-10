@@ -401,7 +401,7 @@ ROUTES = {
     "POST /api/team/dispo/bookings": "hub", "POST /api/team/dispo/bookings/restore": "hub",
     "POST /api/team/dispo/bookings/{}/fill": "hub",  # 2.589.0 (#4571): open places of a shoot day from a quotation (p2589_b_dispo_test.py, freelancer-matrix: hub)
     "GET /api/team/dispo/callsheet/{}": "hub", "PUT /api/team/dispo/callsheet/{}": "hub", "GET /api/team/dispo/callsheet/{}/pdf": "hub",
-    "GET /api/team/dispo/callsheet/{}/sketch": "hub",  # 2.802.0 (#1956): the call sheet of a shoot day (p2802_a_callsheet_test.py, freelancer-matrix: hub)
+    "GET /api/team/dispo/callsheet/{}/sketch": "hub",  # 2.855.0 (#1956): the call sheet of a shoot day (p2802_a_callsheet_test.py, freelancer-matrix: hub)
     "PUT /api/team/absences/holidays": "hub",
     # 2.125.0 A (#2117, #2118): vacation account, requests, the working week
     "GET /api/team/leave": "hub", "PUT /api/team/leave/quota": "hub", "PUT /api/team/leave/approval": "hub",

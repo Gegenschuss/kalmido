@@ -1,4 +1,4 @@
-"""2.802.0 (#1956): the call sheet of a shoot day (hub/callsheet.py). One row per shoot day of the disposition: org_id + job
+"""2.855.0 (#1956): the call sheet of a shoot day (hub/callsheet.py). One row per shoot day of the disposition: org_id + job
 = the bookings made together (hub_bookings.job, one shoot day). data = the editable day details as JSON (set phone, location
 texts, call times per department, lunch, wrap, weather, important, cast, transport, chosen shot list day); sketch = the
 directions sketch the person uploaded (base64 PNG / JPEG, checked like every upload), sketch_mime its type. Both sealed with

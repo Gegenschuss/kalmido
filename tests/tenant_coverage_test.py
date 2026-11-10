@@ -1285,10 +1285,10 @@ ROUTES = {
     "POST /api/team/dispo/bookings": "hub", "PATCH /api/team/dispo/bookings/{}": "hub", "DELETE /api/team/dispo/bookings/{}": "hub",
     "POST /api/team/dispo/bookings/restore": "hub", "GET /api/team/bookings/mine": "hub", "GET /api/v1/absences": "hub",
     "POST /api/team/dispo/bookings/{}/fill": "hub",  # 2.589.0 (#4571): p2589_b_dispo_test.py
-    "GET /api/team/dispo/callsheet/{}": "hub",  # 2.802.0 (#1956): the call sheet of a shoot day (p2802_a_callsheet_test.py)
-    "PUT /api/team/dispo/callsheet/{}": "hub",  # 2.802.0 (#1956): p2802_a_callsheet_test.py
-    "GET /api/team/dispo/callsheet/{}/pdf": "hub",  # 2.802.0 (#1956): p2802_a_callsheet_test.py
-    "GET /api/team/dispo/callsheet/{}/sketch": "hub",  # 2.802.0 (#1956): p2802_a_callsheet_test.py
+    "GET /api/team/dispo/callsheet/{}": "hub",  # 2.855.0 (#1956): the call sheet of a shoot day (p2802_a_callsheet_test.py)
+    "PUT /api/team/dispo/callsheet/{}": "hub",  # 2.855.0 (#1956): p2802_a_callsheet_test.py
+    "GET /api/team/dispo/callsheet/{}/pdf": "hub",  # 2.855.0 (#1956): p2802_a_callsheet_test.py
+    "GET /api/team/dispo/callsheet/{}/sketch": "hub",  # 2.855.0 (#1956): p2802_a_callsheet_test.py
     # 2.51.0 C (#1352 #1353 #1355): agents on the pin board, time check / proposals, the disposition + shoot proposals (p251_c_api_test.py)
     "GET /api/v1/lists/{}/notepads": "list", "POST /api/v1/lists/{}/notepads": "list", "PATCH /api/v1/notepads/{}": "list",
     "DELETE /api/v1/notepads/{}": "list", "PUT /api/v1/lists/{}/status-pad": "list", "GET /api/v1/lists/{}/weekly-status": "list",

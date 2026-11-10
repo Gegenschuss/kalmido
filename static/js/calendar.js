@@ -293,7 +293,7 @@ function calBar(title, done = true, extra = '') {
   return `<div class="calbar cbm"><h2>${title}</h2><div class="seg">${modes.map(([k, n]) => `<button class="${S.calMode === k ? 'on' : ''}" data-act="cal-mode" data-k="${k}" aria-pressed="${S.calMode === k ? 'true' : 'false'}">${n}</button>`).join('')}</div>${dn}${evb}${extra}
     <button class="iconbtn calmore" data-act="cal-more" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button><div class="calnav"><button class="iconbtn" data-act="cal-prev" title="${esc(tr('Previous period'))}" aria-label="${esc(tr('Previous period'))}">${ic('left')}</button><button class="btn sm" data-act="cal-today">${tr('Today')}</button><button class="iconbtn" data-act="cal-next" title="${esc(tr('Next period'))}" aria-label="${esc(tr('Next period'))}">${ic('right')}</button></div></div>`;
 }
-// 2.802.0 (#5462): phone and tablet: the head keeps the views, the period and "..."; Completed, Find a date, Calendars and the
+// 2.855.0 (#5462): phone and tablet: the head keeps the views, the period and "..."; Completed, Find a date, Calendars and the
 // timeline's "No date" wait in this menu (with their word). The entries press the head's own buttons (hidden by calendar.css),
 // so each does exactly what it does on a computer. On a phone the round + adds an event (calFabEv), a task comes from here.
 function calMoreMenu(anchor) {
@@ -308,7 +308,7 @@ function calMoreMenu(anchor) {
     nd ? {label: tr('No date'), icon: 'cal', on: nd.classList.contains('on'), cls: 'calm-nd', fn: press('[data-act="tl-nd"]')} : null,
   ], null, null, tr('Calendar'));
 }
-// 2.802.0 (#5462): the round + of a phone in the calendar adds an event (with events on; a list's calendar keeps the task)
+// 2.855.0 (#5462): the round + of a phone in the calendar adds an event (with events on; a list's calendar keeps the task)
 const calFabEv = () => S.route.mod === 'cal' && !S.lcal && feat('events') && isMobile();
 function isoWeek(s) { const d = pd(s); d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7); const w1 = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - w1) / 864e5 - 3 + (w1.getDay() + 6) % 7) / 7); }
 const cvxKey = e => e.holiday ? 'x:hol' : e.absence ? `x:${e.absence === 'team' ? 'team' : 'abs'}` : e.own ? `e:${e.cal}` : `s:${e.sub}`;  // 2.155.0 B (#2076): x = holidays / absences
