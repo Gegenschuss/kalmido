@@ -11,8 +11,8 @@ sheet a part of its shoot day (the same rights, a history of its own); no new ri
 - callsheet: a kind with the core's columns (hub_callsheets, migrations.d/5532_a.py) without routes, folder node or listing
   (the pattern of sheets/shkern.py, office/okern.py): hub/callsheet.py checks what it checked before (the module, the
   industry Film & Video, a live booking of the job) and then saves the day details through obj_write (lock, version, history,
-  undo step, bump); the sketch, too large for a copy in the history, goes through the adapters (obj_undo_pre / _post,
-  obj_history_add with a mark instead of the picture). Its trash is the core's: the shoot day's last live booking deleted ->
+  undo step, bump); the sketch, too large for a copy in the history or an undo step, goes through the adapter
+  obj_history_add (a mark instead of the picture) and is in no undo copy (core/writes.py undo_skip). Its trash is the core's: the shoot day's last live booking deleted ->
   the call sheet into the trash (obj_trash), a booking back -> out of it (obj_restore); the core's hourly run deletes it for
   good after the trash period (trash_prune=True, with its history and undo rows).
 

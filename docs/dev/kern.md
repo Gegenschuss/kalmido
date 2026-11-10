@@ -479,8 +479,7 @@ core, the call sheet a part of its shoot day with the same rights and a history 
 - `callsheet` is a kind with the core's columns on `hub_callsheets` (`migrations.d/5532_a.py`) without routes, node or listing
   (the pattern of `sheets/shkern.py`): `hub/callsheet.py` saves the day details through `obj_write` (the field `data`, sealed
   with the organisation's key when its encryption is on -- the history keeps the sealed text, as `ow_write`), the sketch
-  through the adapters (`obj_undo_pre` / `obj_undo_post`, `obj_history_add` with the mark `picture`: a picture never goes into
-  the history). `GET /api/team/dispo/callsheet/<job>/history` lists the core's history (who, when, which details).
+  through the adapter `obj_history_add` (a mark, never the picture, see `undo_skip` below). `GET /api/team/dispo/callsheet/<job>/history` lists the core's history (who, when, which details).
 - `undo_skip(table, *columns)` (core/writes.py): columns no undo copy holds -- the sketch (up to 4 MB) would make every step
   of the call sheet too big for its step group (`ug_fits`, a barrier of "back to here"). They are not in the copy or its
   fingerprint, and taking a step back leaves them as they are; a change of the sketch alone records no step, its history
