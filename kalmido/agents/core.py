@@ -958,7 +958,7 @@ def agent_contact_age(c, a):
 # 2.826.0 (#5509): a person's chat message the agent has not fetched (no delivered_at) and not answered after it; the
 # oldest such message counts. Older than PENDING_DAYS days is left out (messages from before delivered_at existed)
 PENDING_DAYS = 30
-_PENDING_SQL = f"""SELECT m.agent_id, MIN(m.created_at) FROM agent_chat m
+_PENDING_SQL = """SELECT m.agent_id, MIN(m.created_at) FROM agent_chat m
                   WHERE m.agent_id = ANY(CAST(? AS BIGINT[])) AND m.sender='user' AND m.delivered_at IS NULL
                   AND COALESCE(m.kind, '')<>'unshared' AND m.created_at>?
                   AND NOT EXISTS(SELECT 1 FROM agent_chat r WHERE r.agent_id=m.agent_id AND r.user_id=m.user_id
