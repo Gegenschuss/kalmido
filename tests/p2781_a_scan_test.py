@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
 """2.781.0 part A (#5390): the scan mark of a document (docs/scanmark.py, doc_meta.auto["_scan"], doc_json "scan") -- it
-decides whether the document view shows the archive number field for a document without a number (p2781_a_docview.js).
+decides whether the document view shows the archive number field for a document without a number (tests/p2497_a_docform_ui.js).
  (a) a digital PDF with vector text: no scan
  (b) a PDF of one page-filling picture (no text): a scan
  (c) a page-filling picture with an invisible OCR layer (text render mode 3), as a scanner writes it: a scan

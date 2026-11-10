@@ -38,6 +38,7 @@ from ..accounts.orgroles import org_role_key  # 2.369.5 (#2517): pulled up from 
 from ..core.errors import BadInput  # 2.369.5 (#2517): pulled up from functions
 from .ocr import thumb_bytes, doc_text, qr_codes, OCR_PAGES, QR_DOC_S, THUMB_WL  # 2.369.5 (#2517): pulled up from functions; 2.583.0 (#4812): THUMB_WL
 from .ocr import OCR_LANG_MAX, ocr_choices  # 2.635.0 (#4807 b)
+from .scanmark import scan_of  # 2.836.0 (#5390): the scan mark
 from ..office.einvoice_in import ei_of_file, ei_text, ei_amount, ei_details, ei_compact, ei_receipt  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
 
@@ -1403,7 +1404,7 @@ def process(c, nid):
     if ei and not res.get("error"):
         res["method"] = "e-invoice"
     thumb_store(c, m, node, data, res.get("kind"))
-    from .scanmark import scan_of            # 2.781.0 (#5390): read before the row is locked (a PDF is read in a child process)
+    # 2.781.0 (#5390): read before the row is locked (a PDF is read in a child process)
     scan = scan_of(node["name"], node["mime"], data, res.get("kind"), m["source"], einvoice=bool(ei))
     text = res.get("text") or ""
     asn_found = None

@@ -135,6 +135,13 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     check(await open(nav, ev, L) && await ready(ev, `document.querySelector('#rc-cat')?.value === 'Fees'`), 'after a new load it shows the receipt part at once');
     await call(CA, 'PUT', `/api/docs/${L.id}/receipt`, {project_id: null, category: '', vat_pct: null});
 
+    // 2.836.0 (#5390): a digital document without the field gets its number from "Assign archive number" under Actions; then the field shows it
+    check(await open(nav, ev, P) && await ev(`!document.querySelector('#dc-asn')`), '#5390: the moved letter has no archive number field');
+    await ev(`document.querySelector('[data-dc="actsmore"]')?.click()`);
+    check(await ready(ev, `document.querySelector('.dv-amenu [data-dc="asnnext"]')?.getClientRects().length > 0`), '#5390: Actions offers "Assign archive number"');
+    await ev(`document.querySelector('.dv-amenu [data-dc="asnnext"]')?.click()`);
+    check(await ready(ev, `Number(document.querySelector('#dc-asn')?.value) > 0`), '#5390: after "Assign archive number" the field shows the new number');
+
     // ---- a receipt, an invoice with recognised values: the part at once
     check(await open(nav, ev, R) && await ready(ev, `document.querySelector('#rc-cat')?.value === 'Material'`), 'a receipt: the part at once');
     check(await ev(`!document.querySelector('[data-rc="open:0"]')`), 'a receipt: no button');

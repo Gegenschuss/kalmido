@@ -15,6 +15,8 @@ from ..core.env import env_bool
 from ..files.store import fs_read  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
 from . import store as S  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import live_sql  # 2.836.0 (#5390): the trash condition of the scan mark's catch-up
+from .scanmark import scan_of  # 2.836.0 (#5390)
 
 FILL = env_bool("KALMIDO_DOCS_THUMB_FILL", True)
 FILL_S = max(1, int(os.environ.get("KALMIDO_DOCS_THUMB_FILL_S", "15") or 15))  # s between two portions
@@ -149,14 +151,13 @@ def p5390_scan_fill(c):
     if st.get("done"):
         return 0
     below = int(st.get("below") or 2 ** 62)
-    rows = c.execute("""SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
-                        WHERE d.node_id < ? AND d.state='done' AND POSITION('"_scan"' IN COALESCE(d.auto, ''))=0 AND n.deleted_at IS NULL
+    rows = c.execute(f"""SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
+                        WHERE d.node_id < ? AND d.state='done' AND POSITION('"_scan"' IN COALESCE(d.auto, ''))=0 AND {live_sql("n")}
                           AND (d.source='scan' OR LOWER(n.mime)='application/pdf' OR LOWER(n.mime) LIKE 'image/%' OR LOWER(n.name) LIKE '%.pdf')  -- pg-ok: LOWER() on the column
                         ORDER BY d.node_id DESC LIMIT ?""", (below, FILL_N)).fetchall()  # pg-ok: LOWER() on the column only
     if not rows:
         gset(c, FILL_SCAN_KEY, json.dumps({"done": 1}))
         return 0
-    from .scanmark import scan_of
     for (nid,) in rows:
         try:
             with c.savepoint():  # one broken document never stops the catch-up
