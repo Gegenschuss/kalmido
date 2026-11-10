@@ -130,19 +130,21 @@ const FEAT = 'cal,comments,collab,agents,kanban,timeline';
     check(await ffLogin(o) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
     await o.nav(B + '#l/' + L); await ready(ev);
-    const tabs = `(() => { const t = document.querySelector('#top .ttabs'); if (!t) return null; const bs = [...t.querySelectorAll('button')]; return {lvl: document.querySelector('#top').className, vis: bs.every(b => b.getBoundingClientRect().width > 0), icons: bs.every(b => b.querySelector('svg').getBoundingClientRect().width > 0), text: bs.some(b => b.querySelector('.vtl').getBoundingClientRect().width > 0)}; })()`;
+    const tabs = `(() => { const t = document.querySelector('#top .ttabs'); if (!t) return null; const bs = [...t.querySelectorAll('button')]; const on = t.querySelector('button.on'); return {lvl: document.querySelector('#top').className, on: !!on && on.getBoundingClientRect().width > 0, vis: bs.every(b => b.getBoundingClientRect().width > 0), icons: bs.every(b => b.querySelector('svg').getBoundingClientRect().width > 0), text: bs.some(b => b.querySelector('.vtl').getBoundingClientRect().width > 0)}; })()`;
     let tb = await ev(tabs);
     check(tb && tb.vis && tb.text, `${tag}: the view tabs with text (panel closed) ` + JSON.stringify(tb));
     await ev(`(() => { openDetail(${T}); return 1; })()`); await sleep(1200);
     tb = await ev(tabs);
-    check(tb && tb.vis, `${tag}: #1062 the view tabs stay with the task panel open ` + JSON.stringify(tb));
+    // 2.828.0 (#5443): the project name before the symbols - when the title does not fit whole, the switch shows only the
+    // active view (#top.tvc, a click opens the others); it stays in the header either way, never in "…"
+    check(tb && tb.on && (tb.vis || /\btvc\b/.test(tb.lvl)), `${tag}: #1062 the view tabs stay with the task panel open ` + JSON.stringify(tb));
     check(await ev(`!/Mono/.test(getComputedStyle(document.querySelector('#detail .dfoot .dfc')).fontFamily)`), `${tag}: #1062 the footer of the task panel in the normal font`);
     await shot('p2320d-1440-detail-tabs.png');
     // a narrower window with a long list name: the header folds (tl3 / tl4), the tabs become icons instead of going into "…"
     await call('PATCH', `/api/lists/${L}`, {name: 'Software for the new customer portal'});
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1180, height: 900}}); await ev(`(async () => { await load(); render(); openDetail(${T}); return 1; })()`); await sleep(1500);
     tb = await ev(tabs);
-    check(tb && tb.vis && tb.icons && !tb.text && /\btl[34]\b/.test(tb.lvl), `1180: #1062 narrow header: the view tabs as icons ` + JSON.stringify(tb));
+    check(tb && tb.on && (/\btvc\b/.test(tb.lvl) || tb.vis && tb.icons && /\btl[34]\b/.test(tb.lvl)), `1180: #1062 narrow header: the view tabs as icons or only the active one (#5443) ` + JSON.stringify(tb));
     check(!await ev(`topMoreItems().some(x => /^(List|Kanban|Timeline)$/.test(x.label || ''))`), '1180: #1062 the tabs are not in "…"');
     await shot('p2320d-1180-detail-icons.png');
     await call('PATCH', `/api/lists/${L}`, {name: 'Software'});

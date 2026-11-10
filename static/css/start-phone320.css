@@ -9,6 +9,18 @@
 .vsegm.many button.on{flex-wrap:wrap;align-content:flex-start;height:2.25rem;overflow:hidden}
 .vsegm.many button.on>svg.i{height:2.25rem}
 .vsegm.many button.on>span{flex:none;overflow:visible;line-height:2.25rem}
+/* CI fix of 2.873.0 (#5443): a finger device's view switch is 44 px high (app.css .vsegm, 2.828.0): the clipped second line follows
+   that height, else a long name sat half visible in the lower 8 px; a low window keeps the thinner 36 px (#2810) */
+@media (pointer:coarse){
+  .vsegm.many button.on{height:2.75rem}
+  .vsegm.many button.on>svg.i{height:2.75rem}
+  .vsegm.many button.on>span{line-height:2.75rem}
+}
+@media (max-height:500px) and (min-aspect-ratio:1/1){
+  .vsegm.many button.on{height:2.25rem}
+  .vsegm.many button.on>svg.i{height:2.25rem}
+  .vsegm.many button.on>span{line-height:2.25rem}
+}
 /* 2.498.0 (#3854): a narrow phone: "New project" is its symbol; the workspace sign a real 44 px target, the name keeps the sidebar */
 @media (max-width:767px){
   #top:is(.tl1,.tl2,.tl3,.tl4) .tnewp>span{display:none}

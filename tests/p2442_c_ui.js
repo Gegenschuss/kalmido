@@ -90,7 +90,8 @@ const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'ut
     const low = await ev(LOW);
     await size(640, 800); await sleep(250);
     const tall = await ev(LOW);
-    check(low.seg > 0 && low.seg < tall.seg && low.words < tall.words, '#2810: the view switch folds ' + JSON.stringify({low, tall}));
+    // 2.828.0 (#5443): the switch has one form on every width (only the active view says its name), so a low window only makes it thinner
+    check(low.seg > 0 && low.seg < tall.seg && low.words <= 1 && tall.words === 1, '#2810: the view switch folds ' + JSON.stringify({low, tall}));
     check(low.top < tall.top && low.tabs < tall.tabs, '#2810: head and tab bar are thinner ' + JSON.stringify({low, tall}));
     check(low.pad >= low.tabs + low.fab + 16, '#2810: the list ends with the plus button\'s room ' + JSON.stringify(low));
     await size(390, 400); await sleep(250);
