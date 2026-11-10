@@ -1,8 +1,8 @@
 /* 2.802.0 (#1956): the call sheet dialog of a shoot day (static/js/callsheet.js), loaded with its module */
-.csmd .card { max-width: 760px; }
+.csmd .card { max-width: 47.5rem; }
 .csmd .cssec { border-top: 1px solid var(--line); padding: .4rem 0; }
 .csmd .cssec > summary { cursor: pointer; font-weight: 600; padding: .35rem 0; }
-.csmd .csgrid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 .75rem; }
+.csmd .csgrid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.375rem, 1fr)); gap: 0 .75rem; }
 .csmd .cshint { margin: .2rem 0 .4rem; font-size: .85em; }
 .csmd .csrows { display: flex; flex-direction: column; gap: .3rem; margin-bottom: .3rem; }
 .csmd .csrow { display: grid; grid-template-columns: repeat(var(--cs-cols, 2), minmax(0, 1fr)) auto; gap: .3rem; align-items: center; }
@@ -10,7 +10,7 @@
 .csmd .cscrew { list-style: none; margin: 0; padding: 0; }
 .csmd .cscrew li { padding: .2rem 0; border-bottom: 1px solid var(--line); }
 .csmd .cscrew li.csopen span:first-of-type { color: var(--muted); font-style: italic; }
-.csmd .cssketch img { max-width: 100%; max-height: 260px; display: block; margin: .3rem 0; border: 1px solid var(--line); border-radius: 6px; }
+.csmd .cssketch img { max-width: 100%; max-height: 16.25rem; display: block; margin: .3rem 0; border: 1px solid var(--line); border-radius: .375rem; }
 .csmd .csmap { margin: .1rem 0 .4rem; }
 .csmd .cserr:not([hidden]) { color: var(--danger, #b42318); margin: .4rem 0; }
 /* phones: the cast / transport tables wrap into two columns per line instead of seven narrow fields */

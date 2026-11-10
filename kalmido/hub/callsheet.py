@@ -128,7 +128,7 @@ def cs_people(c, uid, rows):
         if not books or not mail:
             return None
         for r in c.execute(f"SELECT fn, given, family, emails, phones FROM contacts WHERE book_id IN ({q}) AND {live_sql()} "
-                           "AND kind='individual' AND lower(emails) LIKE ? ESCAPE '\\' LIMIT 20", (*books, "%" + re.sub(r"([%_\\])", r"\\\1", mail.lower()) + "%")):
+                           "AND kind='individual' AND emails ILIKE ? ESCAPE '\\' LIMIT 20", (*books, "%" + re.sub(r"([%_\\])", r"\\\1", mail.lower()) + "%")):
             try:  # review 2.802 F4: a contact with broken e-mail JSON is skipped, not a 500
                 ems = json.loads(r["emails"] or "[]")
             except ValueError:
