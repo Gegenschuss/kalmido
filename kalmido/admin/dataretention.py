@@ -354,12 +354,27 @@ def orf_candidates(age_s, after=""):
     return out
 
 
+def _orf_pdfopt_orig(c, ids):
+    """2.892.0 (#4873, review F6): {(node_id, version)} of the originals an "Optimise PDF" kept (doc_meta.pdf_opt "orig",
+    docs/pdfoptq.py): the scan as it came stays however many versions follow."""
+    out = set()
+    for i in range(0, len(ids), ORF_BATCH):
+        part = ids[i:i + ORF_BATCH]
+        for r in c.execute(f"SELECT node_id, pdf_opt FROM doc_meta WHERE pdf_opt <> '' AND node_id IN ({','.join('?' * len(part))})", part):
+            try:
+                o = (json.loads(r[1]) or {}).get("orig") or {}
+                out.add((r[0], int(o["from"])))
+            except (ValueError, TypeError, KeyError, AttributeError):
+                pass
+    return out
+
+
 def orf_prune_versions(c, nid=None, kill=None):
     """Versions of a file beyond FS_VERSIONS_KEEP (never the newest). kill=None: only while ret_on("files"). Returns
     (how many, the stored paths of the deleted rows -- or of those that would go in a dry run)."""
     kill = ret_on("files") if kill is None else kill
     one = " WHERE node_id=?" if nid is not None else ""
-    rows = c.execute(f"SELECT id, path, node_id FROM (SELECT id, path, node_id, row_number() OVER (PARTITION BY node_id ORDER BY no DESC) AS rn "
+    rows = c.execute(f"SELECT id, path, node_id, no FROM (SELECT id, path, node_id, no, row_number() OVER (PARTITION BY node_id ORDER BY no DESC) AS rn "
                      f"FROM fs_versions{one}) v WHERE rn>?", ((nid,) if nid is not None else ()) + (FS_VERSIONS_KEEP,)).fetchall()
     if rows:  # 2.186.0 B (#2600): a booked receipt keeps every version (which one was booked is not known)
         from ..receipts.suggest import olk_fs_locked
@@ -370,7 +385,8 @@ def orf_prune_versions(c, nid=None, kill=None):
             part = ids[i:i + ORF_BATCH]
             office.update(x[0] for x in c.execute(f"SELECT node_id FROM ({DRT_OFFICE_NODES}) o WHERE node_id IN ({','.join('?' * len(part))})", part))
         kept = office | {n for n in ids if n not in office and olk_fs_locked(c, n, arrival=True, hold=True)}  # 2.533.0 A2 (#4318 B30): + a received e-invoice; 2.545.0 (#4595): + the extended lock
-        rows = [r for r in rows if r["node_id"] not in kept]
+        orig = _orf_pdfopt_orig(c, ids)  # 2.892.0 (#4873, review F6): the original before "Optimise PDF" stays
+        rows = [r for r in rows if r["node_id"] not in kept and (r["node_id"], r["no"]) not in orig]
     if rows and kill:
         c.execute(f"DELETE FROM fs_versions WHERE id IN ({','.join('?' * len(rows))})", [r["id"] for r in rows])
     return len(rows), [r["path"] for r in rows]

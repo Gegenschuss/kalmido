@@ -216,6 +216,16 @@ def docs_run_once():
             except Exception as e:  # noqa: BLE001 -- the queue never dies
                 c.rollback()
                 print("docs: split scan", type(e).__name__, e, flush=True)
+            from .pdfoptq import po_queued  # 2.892.0 (#4873): "Optimise PDF" (measure / new version), when no document waits
+            try:
+                with system_ctx(c):  # docs queue: optimises a PDF for the person who asked (its write right checked there), nothing handed to another
+                    took = po_queued(c)
+                c.commit()
+                if took:
+                    return 1
+            except Exception as e:  # noqa: BLE001 -- the queue never dies
+                c.rollback()
+                print("docs: pdf optimise", type(e).__name__, e, flush=True)
             from .thumbfill import p61a_thumb_fill, p2583_thumb_l_fill, p5390_scan_fill  # 2.66.1 (#1944): previews of imports from before, while nothing waits; 2.583.0 (#4812): + the sharp ones
             try:
                 with system_ctx(c):  # docs queue: server-side catch-up of every workspace's previews, nothing handed to a person
@@ -278,6 +288,8 @@ def docs_take_up(c):
     with system_ctx(c):  # docs queue: server-side recognition of every workspace's documents, nothing handed to a person
         if every:
             c.execute("UPDATE doc_meta SET state='wait', updated_at=? WHERE state='run'", (_now(),))
+            from .pdfoptq import po_take_up  # 2.892.0 (#4873, review F4): an "Optimise PDF" cut off by the restart, at once
+            po_take_up(c)
         else:
             c.execute("UPDATE doc_meta SET state='wait', updated_at=? WHERE node_id=? AND state='run'", (_now(), lost))
     c.commit()

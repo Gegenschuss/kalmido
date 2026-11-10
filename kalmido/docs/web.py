@@ -209,6 +209,8 @@ def doc_json(c, m, node, full=False, role=None, pre=None):
         d["notes"] = dn_view(c, m, role or "view", me())  # 2.635.0 (#4807 d): the notes, oldest first (also for agents: read only)
         if acx_of(c, me()).role != "agent":  # 2.522.0 (#4433): office or private space, "Move to office" / "Wrong area"
             d["area"] = ar_view(c, dict(node, role=role or "view"), m, me())
+            from .pdfoptq import po_brief
+            d["pdfopt"] = po_brief(c, m, node)  # 2.892.0 (#4873, #4806): "Optimise PDF" possible / the original before it (people only)
     return d
 
 
@@ -956,6 +958,7 @@ def _settings_json(c, ws, uid):
     cfg = S.cfg_get(c, ws)
     from .fields import df_list  # 2.153.0 (#2179): the custom fields of the workspace
     return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "fields": df_list(c, ws), "levels": cfg["levels"], "inbox": cfg["inbox"],
+            "pdf_opt_auto": cfg["pdf_opt_auto"],  # 2.892.0 (#4873): optimise new scans automatically
             "rules": _rules_v(c, ws) if can else [], **_flow_extra(c, ws, can), **_settings_labels(c, ws, uid, can), "folders": folders,
             "root_id": root, "inbox_path": S.inbox_path(c, root, uid), "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "ocr_langs": _ocr_view(cfg), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws),
             "title_pattern": cfg["title_pattern"], "title_auto": cfg["title_auto"], "title_pattern_default": S.TITLE_PATTERN,  # 2.783.0 (#4882)

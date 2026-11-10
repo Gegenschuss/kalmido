@@ -60,7 +60,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supp
   '/static/js/calabs.js', '/static/js/docviews.js', '/static/js/docfacets.js', '/static/js/docs.js', '/static/js/paperless.js',
   '/static/js/receipts.js', '/static/js/letterdoc.js', '/static/js/letteragent.js', '/static/js/docsplit.js', '/static/js/docscan.js',
   '/static/js/docfetch.js', '/static/js/abdocs.js', '/static/js/docview.js', '/static/js/tilesize.js', '/static/js/docflows.js',
-  '/static/js/docnotes.js', '/static/js/docpages.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js',
+  '/static/js/docnotes.js', '/static/js/docpages.js', '/static/js/pdfopt.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js',
   '/static/js/integrations.js', '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js',
   '/static/js/bookmarks.js', '/static/js/readlater.js', '/static/js/cfkinds.js', '/static/js/mineboard.js', '/static/js/minerules.js',
   '/static/js/sectpl.js', '/static/js/objprop.js', '/static/js/orgschema.js', '/static/js/asstprop.js', '/static/js/sheetprop.js',

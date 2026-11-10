@@ -228,6 +228,7 @@ function dcv_headHtml(d, w) {
 function dcv_actsHtml(d, w) {
   const more = [d.einvoice ? `<a class="btn sm dc-einv" href="/api/docs/${d.id}/einvoice" target="_blank" rel="noopener">${ic('receipt', 's')} ${tr('Readable view')}</a>` : '',  // 2.146.0 A (#2451)
     typeof dsp_actBtn === 'function' && !d.file ? dsp_actBtn(d, w) : '',  // 2.154.0 A (#1111): split a stack
+    typeof po_actBtns === 'function' ? po_actBtns(d, w) : '',  // 2.892.0 (#4873, #4806): Optimise PDF, the searchable PDF and the original (pdfopt.js)
     d.parent_id ? `<a class="btn sm" href="#ablage/${d.parent_id}">${ic('folder', 's')} ${tr('Show in the file store')}</a>` : '',
     d.role === 'owner' && typeof ab_share === 'function' ? `<button type="button" class="btn sm" data-dc="share">${ic('users', 's')} ${tr('Share…')}</button>` : '',
     d.role === 'owner' && typeof xl_newDlg === 'function' ? `<button type="button" class="btn sm" data-dc="xlink">${ic('link', 's')} ${tr('Link for external people…')}</button>` : '',  // 2.210 C (#2761)

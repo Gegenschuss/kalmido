@@ -753,6 +753,9 @@ APP_ONLY = [
     # 2.299.0 D (#3193): the hints of the receipt check are hidden / shown again by people; agents read them with GET /documents/{id}
     ("2.299.0 D (#3193): the hints of the fixed receipt check are hidden or shown again by people only; agents read them as "
      "`checks` of GET /documents/{id}", ("=POST /api/docs/{}/checks",)),
+    # 2.892.0 (#4873): Optimise PDF makes a new version of a scan for a person; agents get 403 and write versions with their own uploads
+    ("2.892.0 (#4873): a person optimises a scanned PDF (smaller new version with a text layer, blank pages listed before); "
+     "agents get 403 - they read the result as the document's current version", ("* /api/docs/{}/pdfopt", "=POST /api/docs/pdfopt")),
     # 2.522.0 (#4433): the area of a document (office / private) is moved by people only; agents never sort or move it
     ("2.522.0 (#4433): a person moves a document between the office and the private file store (Move to office, Wrong area); "
      "agents get 403, the server sorts the general input itself", ("=POST /api/docs/{}/area",)),

@@ -1,0 +1,251 @@
+#!/usr/bin/env python3
+# kalmido-suite: fresh
+"""2.892.0 (#4873, includes #4806): "Optimise PDF" as a new version. Own container (start.sh). Invented names only; the scans
+(Pillow pictures as PDFs without a text layer) are drawn in the test container.
+freelancer-matrix: files
+tenant-matrix: document
+ - unit (docs/pdfopt.py loaded as a single file in the container, its real tools): a page of text -> black and white, a page
+   with a coloured photo -> colour, a grey gradient -> grey, an almost white page -> blank (ink + no text); never every page
+   blank; Otsu threshold, "not smaller", the level bw / gray; the optimised PDF is smaller, has the pages without the blank
+   one and a text layer with the page's words
+ - API as a person without organisation: GET .../pdfopt says it can; the check measures the pages (state ready, the blank
+   page listed); the run makes a NEW VERSION (2 versions, the original = version 1 byte for byte, "orig" names it, the new
+   one smaller, one page less), the document is recognised again from its text layer (method pdf, its words in the text)
+ - not smaller -> no new version (state same, both sizes)
+ - a PDF with its own text (not scanned) -> 409; another account -> 404 (GET and POST)
+ - the selection: POST /api/docs/pdfopt with a scan, a text PDF and another person's document -> 1 queued, 2 skipped; review
+   F5: "blank" without the list of the pages seen first removes no page (the blank page of the scan stays)
+ - "Optimise new scans automatically": a new scan of the private space is optimised by itself (auto, no page removed); a
+   receipt upload of the office (area office) never (GoBD), it keeps one version
+usage: p2892_c_pdfopt_test.py <datadir>   (P2892C_NOSTART=1: the container runs already)"""
+import base64
+import json
+import subprocess
+import sys
+
+import kt
+from kt import B, CT, check, until
+from freelancer_fixture import freelancer
+
+kt.fresh(prefix="P2892C", env={"KALMIDO_DOCS_SCAN_S": "2"})
+A = kt.setup()
+FEAT = "docs,files,office"
+A.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
+FID, Fr = freelancer(B, A, features=FEAT)
+GID, Go = freelancer(B, A, "fiona", features=FEAT)
+
+# a scan: every page a picture (300 dpi, a light paper grain so the JPEG of the scan is as big as a real one), no text layer
+SCAN = r"""
+import base64, io, json, random, sys
+from PIL import Image, ImageDraw, ImageFont
+random.seed(7)
+f = ImageFont.load_default(size=56)
+W, H = 2480, 3508
+grain = Image.effect_noise((W, H), 6).point(lambda x: 236 + (x - 128) // 12)
+pages = []
+for spec in json.loads(sys.argv[1]):
+    kind, text = spec.split(':', 1) if ':' in spec else (spec, '')
+    if kind == 'blank':
+        im = Image.merge('RGB', [grain] * 3)
+    else:
+        im = Image.merge('RGB', [grain] * 3)
+        d = ImageDraw.Draw(im)
+        for i, ln in enumerate(text.split('|')):
+            d.text((260, 400 + i * 110), ln, fill=(20, 20, 20), font=f)
+        if kind == 'color':
+            d.rectangle((300, 1600, 2100, 2900), fill=(200, 40, 40))
+            d.ellipse((700, 1900, 1600, 2700), fill=(40, 90, 200))
+        if kind == 'photo':
+            g = Image.linear_gradient('L').resize((2000, 2400))
+            im.paste(Image.merge('RGB', [g] * 3), (240, 800))
+    pages.append(im)
+o = io.BytesIO()
+pages[0].save(o, 'PDF', resolution=300, save_all=True, append_images=pages[1:], quality=85)
+print(base64.b64encode(o.getvalue()).decode())
+"""
+
+
+def text_pdf(s):
+    """A one-page PDF with its own text (Helvetica), written by hand: no tool needed."""
+    stream = b"BT /F1 18 Tf 72 760 Td (" + s.encode() + b") Tj ET"
+    objs = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+            b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream", b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    out, offs = b"%PDF-1.4\n", []
+    for i, o in enumerate(objs, 1):
+        offs.append(len(out))
+        out += b"%d 0 obj\n" % i + o + b"\nendobj\n"
+    x = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1) + b"".join(b"%010d 00000 n \n" % o for o in offs)
+    return out + b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, x)
+
+
+TINY = r"""
+import base64, io
+from PIL import Image
+im = Image.new('1', (60, 80), 1)
+o = io.BytesIO()
+im.save(o, 'PDF', resolution=72)
+print(base64.b64encode(o.getvalue()).decode())
+"""
+
+
+def py(code, *args, timeout=600):
+    out = subprocess.run(["docker", "exec", CT, "python", "-c", code, *args], capture_output=True, text=True, timeout=timeout)
+    assert out.returncode == 0, out.stderr[-2000:]
+    return out.stdout
+
+
+def scan(pages):
+    return base64.b64decode(py(SCAN, json.dumps(pages)))
+
+
+def up(s, name, data, ws="private", **form):
+    r = s.post(B + "/api/docs", data={"ws": ws, **form}, files=[("files", (name, data, "application/pdf"))])
+    assert r.status_code == 201, r.text
+    return r.json()["ids"][0]
+
+
+def doc(s, nid):
+    r = s.get(B + f"/api/docs/{nid}")
+    return r.json() if r.ok else None
+
+
+def done(s, nid, secs=300):
+    return until(lambda: (lambda d: d if d and d["state"] in ("done", "failed") else None)(doc(s, nid)), secs)
+
+
+def po(s, nid):
+    r = s.get(B + f"/api/docs/{nid}/pdfopt")
+    return r.json() if r.ok else {"http": r.status_code}
+
+
+def po_until(s, nid, states, secs=600):
+    return until(lambda: (lambda j: j if j.get("state") in states else None)(po(s, nid)), secs, step=1)
+
+
+def versions(s, nid):
+    return s.get(B + f"/api/files/nodes/{nid}").json().get("versions") or []
+
+
+# ================================================================ unit: the tools in the container (a single-file load)
+UNIT = r"""
+import base64, importlib.util, io, json, sys
+s = importlib.util.spec_from_file_location('po', '/app/kalmido/docs/pdfopt.py'); P = importlib.util.module_from_spec(s); s.loader.exec_module(P)
+data = base64.b64decode(sys.stdin.read())
+out = {"kind": [P.po_kind('auto', 0.05, 0.2, 0.1), P.po_kind('auto', 0.05, 0.0, 0.4), P.po_kind('auto', 0.05, 0.0, 0.02),
+                P.po_kind('bw', 0.05, 0.5, 0.5), P.po_kind('gray', 0.05, 0.5, 0.0)],
+       "blank": [P.po_blank(0.001, ' \n '), P.po_blank(0.001, 'Rechnung Nummer 12'), P.po_blank(0.05, ''), P.po_blank(0.001, None)],
+       "pdrop": [P.po_drop([{'b': 0}, {'b': 1}], True), P.po_drop([{'b': 0}, {'b': 1}], False), P.po_drop([{'b': 1}, {'b': 1}], True)],
+       "otsu": [P.po_otsu([0] * 40 + [100] + [0] * 179 + [900] + [0] * 35), P.po_otsu([0] * 256)],
+       "smaller": [P.po_smaller(100, 99), P.po_smaller(100, 100), P.po_smaller(100, 0)]}
+pages = P.po_analyse(data)
+out["pages"] = [{"k": p["k"], "b": p["b"]} for p in pages]
+r = P.po_optimise(data, 'auto', True, None, pages)
+from pypdf import PdfReader
+rd = PdfReader(io.BytesIO(r["pdf"]))
+out.update(before=len(data), after=len(r["pdf"]), drop=r["drop"], kinds=r["kinds"], n=len(rd.pages),
+           text=" ".join((p.extract_text() or "") for p in rd.pages)[:3000])
+bw = P.po_optimise(data, 'bw', False)
+out.update(bw_kinds=bw["kinds"], bw_n=len(PdfReader(io.BytesIO(bw["pdf"])).pages))
+print(json.dumps(out))
+"""
+U4 = scan(["text:Rechnung Nummer 4711|Beispiel Reiher GmbH|Summe 12,00 EUR", "color:Farbseite Prospekt", "photo:Fotoseite Garten", "blank"])
+u = json.loads(subprocess.run(["docker", "exec", "-i", CT, "python", "-c", UNIT], input=base64.b64encode(U4).decode(),
+                              capture_output=True, text=True, timeout=900).stdout or "{}")
+check(u.get("kind") == ["color", "gray", "bw", "bw", "gray"], f"unit: the kind of a page per level {u.get('kind')}")
+check(u.get("blank") == [True, False, False, False], f"unit: blank = little ink AND no text, unread = never {u.get('blank')}")
+check(u.get("pdrop") == [[2], [], []], f"unit: the blank pages go only with the switch, never every page {u.get('pdrop')}")
+check(u.get("otsu", [0])[0] in range(90, 211) and 40 <= u["otsu"][0] < 220 and u["otsu"][1] == 160, f"unit: Otsu threshold between the two peaks, held in its bounds {u.get('otsu')}")
+check(u.get("smaller") == [True, False, False], f"unit: only a smaller file counts {u.get('smaller')}")
+check(u.get("pages") == [{"k": "bw", "b": 0}, {"k": "color", "b": 0}, {"k": "gray", "b": 0}, {"k": "bw", "b": 1}],
+      f"unit: measured pages: text bw, colour photo colour, grey gradient grey, white page blank {u.get('pages')}")
+check(u.get("drop") == [4] and u.get("n") == 3, f"unit: the optimised PDF has 3 pages (the blank page 4 left out) {u.get('drop')} {u.get('n')}")
+check(0 < u.get("after", 0) < u.get("before", 0), f"unit: smaller {u.get('before')} -> {u.get('after')}")
+check(u.get("kinds") == {"bw": 1, "gray": 1, "color": 1}, f"unit: one page of each kind {u.get('kinds')}")
+check("4711" in u.get("text", "") or "Rechnung" in u.get("text", ""), f"unit: the text layer carries the page's words {u.get('text', '')[:200]!r}")
+check(u.get("bw_kinds") == {"bw": 4, "gray": 0, "color": 0} and u.get("bw_n") == 4, f"unit: level bw = every page bw, switch off keeps every page {u.get('bw_kinds')} {u.get('bw_n')}")
+
+# ================================================================ API as a person without organisation
+D = scan(["text:Mietvertrag Wohnung 17|Beispiel Hausverwaltung|Miete 800 EUR", "blank"])
+DID = up(Fr, "mietvertrag-scan.pdf", D)
+d = done(Fr, DID)
+check(d and d["state"] == "done" and d["method"] == "ocr", f"the scan was recognised by text recognition {d and (d['state'], d['method'])}")
+check((d or {}).get("pdfopt", {}).get("can") is True and not d["pdfopt"].get("orig"), f"the document says it can be optimised {(d or {}).get('pdfopt')}")
+j = po(Fr, DID)
+check(j.get("can") is True and j.get("state") == "" and j.get("office") is False, f"GET .../pdfopt: can, nothing yet {j}")
+r = Fr.post(B + f"/api/docs/{DID}/pdfopt", json={"mode": "auto", "check": 1})
+check(r.status_code == 202, f"check: queued {r.status_code} {r.text[:200]}")
+j = po_until(Fr, DID, ("ready", "failed"))
+check(j and j.get("state") == "ready" and j.get("pages") == [{"k": "bw", "b": 0}, {"k": "bw", "b": 1}] and j.get("drop") == [2] and j.get("fresh"),
+      f"check: the pages measured, page 2 would go {j}")
+r = Fr.post(B + f"/api/docs/{DID}/pdfopt", json={"mode": "auto"})
+check(r.status_code == 202 and r.json().get("state") == "wait", f"run: queued {r.status_code} {r.text[:200]}")
+check(Fr.post(B + f"/api/docs/{DID}/pdfopt", json={"mode": "auto"}).status_code == 409, "run: a second start while it runs -> 409")
+j = po_until(Fr, DID, ("done", "same", "failed"))
+check(j and j.get("state") == "done" and j.get("before") == len(D) and 0 < j.get("after", 0) < len(D), f"run: done, smaller {j}")
+check(j and j.get("from") == 1 and j.get("to") == 2 and j.get("orig") == 1 and j.get("drop") == [2], f"run: a new version 2 from 1, the original named {j}")
+vs = versions(Fr, DID)
+check([v["no"] for v in vs] == [2, 1] and vs[0]["size"] == j.get("after"), f"the file has two versions, the new one current {vs}")
+orig = Fr.get(B + f"/api/files/nodes/{DID}/content", params={"v": 1, "dl": 1})
+check(orig.ok and orig.content == D, "the original (version 1) is unchanged, byte for byte")
+# 2.892.0 review F3: the queue writes the history entry of the new version for the person who asked, not for nobody
+lg = kt.dbx("SELECT user_id FROM fs_log WHERE node_id=? AND action='version' ORDER BY id DESC LIMIT 1", (DID,))
+check(lg and lg[0][0] == FID, f"the history names the person who optimised {lg}")
+cur = Fr.get(B + f"/api/docs/{DID}/file", params={"dl": 1})
+check(cur.ok and len(cur.content) == j.get("after") and cur.content[:4] == b"%PDF", "the document's file is the optimised one")
+d = until(lambda: (lambda x: x if x and x["state"] == "done" and x["method"] == "pdf" else None)(doc(Fr, DID)), 300)
+check(d and d["pages"] == 1 and ("Mietvertrag" in (d.get("text") or "") or "800" in (d.get("text") or "")),
+      f"recognised again from the text layer: one page, its words {d and (d['method'], d['pages'], (d.get('text') or '')[:120])}")
+check(d and d.get("pdfopt", {}).get("orig") == 1, f"the view offers the original (#4806: original + searchable PDF) {d and d.get('pdfopt')}")
+
+# not smaller -> no new version
+T = base64.b64decode(py(TINY))
+TID = up(Fr, "kleiner-zettel.pdf", T)
+t = done(Fr, TID)
+check(t and t["method"] == "ocr" and t["pdfopt"]["can"], f"a tiny scan can be optimised {t and (t['method'], t.get('pdfopt'))}")
+check(Fr.post(B + f"/api/docs/{TID}/pdfopt", json={"mode": "bw"}).status_code == 202, "tiny: run queued")
+j = po_until(Fr, TID, ("done", "same", "failed"))
+check(j and j.get("state") == "same" and j.get("before") == len(T) and j.get("after", 0) >= len(T), f"not smaller: state same, both sizes {j}")
+check([v["no"] for v in versions(Fr, TID)] == [1], "not smaller: no new version")
+
+# a PDF with its own text; another person
+X = text_pdf("Invented contract of the Example Heron Club")
+XID = up(Fr, "vertrag-digital.pdf", X)
+x = done(Fr, XID)
+check(x and x["method"] == "pdf" and x["pdfopt"]["can"] is False, f"a PDF with its own text cannot be optimised {x and x.get('pdfopt')}")
+r = Fr.post(B + f"/api/docs/{XID}/pdfopt", json={"mode": "auto"})
+check(r.status_code == 409, f"... POST -> 409 {r.status_code}")
+check(Go.get(B + f"/api/docs/{DID}/pdfopt").status_code == 404, "another account: GET -> 404")
+check(Go.post(B + f"/api/docs/{DID}/pdfopt", json={"mode": "bw"}).status_code == 404, "another account: POST -> 404")
+check(Fr.post(B + f"/api/docs/{DID}/pdfopt", json={"mode": "colour"}).status_code == 400, "an unknown level -> 400")
+
+# the selection: one scan queued, a text PDF and somebody else's document skipped
+S2 = scan(["text:Versicherung Police 99|Beispiel Versicherung AG", "blank"])
+SID = up(Fr, "police-scan.pdf", S2)
+check(done(Fr, SID) is not None, "selection: the scan recognised")
+GSID = up(Go, "fiona-scan.pdf", scan(["text:Fiona Brief 5|Beispiel Verein"]))
+r = Fr.post(B + "/api/docs/pdfopt", json={"ids": [SID, XID, GSID], "mode": "bw", "blank": True})
+# tenant: POST /api/docs/pdfopt
+check(r.status_code == 202 and r.json() == {"queued": [SID], "skipped": 2}, f"selection: 1 queued, 2 skipped {r.status_code} {r.text[:200]}")
+j = po_until(Fr, SID, ("done", "same", "failed"))
+check(j and j.get("state") == "done" and j.get("mode") == "bw", f"selection: optimised {j}")
+# 2.892.0 review F5: nobody saw a list of its pages -> "blank" is ignored, no page goes
+check(j and not j.get("drop") and j.get("kinds") == {"bw": 2, "gray": 0, "color": 0}, f"selection: no page removed without the list seen first {j}")
+check([v["no"] for v in versions(Go, GSID)] == [1], "selection: the other person's document untouched")
+
+# ================================================================ "Optimise new scans automatically", never the office's receipts
+r = Fr.put(B + "/api/docs/settings", json={"ws": "private", "pdf_opt_auto": True})
+check(r.ok and r.json().get("pdf_opt_auto") is True, f"setting on {r.status_code} {r.text[:200]}")
+check(Fr.get(B + "/api/docs/settings", params={"ws": "private"}).json().get("pdf_opt_auto") is True, "setting kept")
+AID = up(Fr, "neuer-scan.pdf", scan(["text:Stromabrechnung 2026|Beispiel Stadtwerke", "blank"]))
+RID = up(Fr, "beleg-scan.pdf", scan(["text:Quittung Tankstelle|Beispiel Tank 45,10 EUR"]), area="office")
+j = po_until(Fr, AID, ("done", "same", "failed"))
+check(j and j.get("state") == "done" and j.get("auto") == 1 and not j.get("drop"), f"a new scan optimised by itself, no page removed {j}")
+check(done(Fr, RID) is not None, "the office receipt recognised")
+rj = po(Fr, RID)
+check(rj.get("office") is True and rj.get("state") in ("", "skipped") and [v["no"] for v in versions(Fr, RID)] == [1],
+      f"the office receipt is never optimised automatically, one version {rj}")
+check(rj.get("can") is True, f"... but the button is there (with the hint) {rj}")
+
+sys.exit(kt.done("p2892_c_pdfopt"))

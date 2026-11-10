@@ -1232,6 +1232,9 @@ ROUTES = {
     # sheet is the same PDF for everyone (no data)
     "GET /api/docs/{}/split": "document", "GET /api/docs/{}/split/thumbs": "document", "POST /api/docs/{}/split": "document",
     "POST /api/docs/{}/unsplit": "document", "POST /api/docs/{}/split/dismiss": "document", "POST /api/docs/{}/task/link": "document",
+    "GET /api/docs/{}/pdfopt": "document",  # 2.892.0 (#4873): another person 404 (p2892_c_pdfopt_test.py)
+    "POST /api/docs/{}/pdfopt": "document",  # 2.892.0 (#4873): another person 404 (p2892_c_pdfopt_test.py)
+    "POST /api/docs/pdfopt": "document",  # 2.892.0 (#4873): another person's document skipped, never queued (p2892_c_pdfopt_test.py)
     "GET /api/docs/{}/pages": "document", "POST /api/docs/{}/pages": "document",  # 2.777.0 (#4874): pages of a PDF deleted / turned as a new version (p2777_b_docpages_test.py: another person 404, read-only 403)
     "GET /api/tasks/{}/docs": "document", "GET /api/docs/split-sheet.pdf": "public",
     # 2.122.0 B (#2294 #2099): the chosen documents at once / as a ZIP; tags of files and folders (p2122_b_api_test.py: another

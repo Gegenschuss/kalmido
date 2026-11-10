@@ -197,6 +197,10 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_PAPERLESS_ZIP_CHUNK_KB` | `8192` | Size in KB of one upload part of a Paperless export. |
 | `KALMIDO_PAPERLESS_ZIP_DIR` | `<data dir>/paperless-zip` | Folder of the Paperless export uploads while they are imported. |
 | `KALMIDO_PAPERLESS_ZIP_MAX_MB` | `4096` | Size in MB of one uploaded Paperless export. |
+| `KALMIDO_PDFOPT_DOC_S` | `1800` | Optimise PDF: seconds one run may take in all. |
+| `KALMIDO_PDFOPT_MB` | `100` | Optimise PDF: size of one PDF in MB at most. |
+| `KALMIDO_PDFOPT_PAGES` | `60` | Optimise PDF: pages of one PDF at most (2.892.0, #4873). |
+| `KALMIDO_PDFOPT_WAIT` | `200` | Optimise PDF: runs one person may have waiting at most (more: 429). |
 | `KALMIDO_PDF_MEM_MB` | `512` | Memory in MB of the PDF reader. |
 | `KALMIDO_PDF_PARALLEL` | `2` | PDFs read at the same time. |
 | `KALMIDO_PDF_TIMEOUT_S` | `20` | Seconds for reading the text of one PDF. |

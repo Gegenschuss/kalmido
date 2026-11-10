@@ -177,6 +177,10 @@ VARS = (
     _v("KALMIDO_OCR_PAGE_S", "60", "Seconds per page at most.", "files"),
     _v("KALMIDO_OCR_PARALLEL", "1", "Documents recognised at the same time.", "files"),
     _v("KALMIDO_OCR_MEM_MB", "1024", "Memory in MB of one recognition tool.", "files"),
+    _v("KALMIDO_PDFOPT_PAGES", "60", "Optimise PDF: pages of one PDF at most (2.892.0, #4873).", "files"),
+    _v("KALMIDO_PDFOPT_MB", "100", "Optimise PDF: size of one PDF in MB at most.", "files"),
+    _v("KALMIDO_PDFOPT_DOC_S", "1800", "Optimise PDF: seconds one run may take in all.", "files"),
+    _v("KALMIDO_PDFOPT_WAIT", "200", "Optimise PDF: runs one person may have waiting at most (more: 429).", "files"),
     _v("KALMIDO_SPLIT_PAGES", "100", "Pages of a scanned stack at most that are split into letters (2-500).", "files"),  # 2.522.0 (#4180)
     _v("KALMIDO_PDF_TIMEOUT_S", "20", "Seconds for reading the text of one PDF.", "files"),
     _v("KALMIDO_PDF_PARALLEL", "2", "PDFs read at the same time.", "files"),

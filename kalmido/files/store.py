@@ -719,9 +719,9 @@ def fs_put(c, uid, parent_id, name, data, mime=None, org_id=None, agent_id=None,
     return nid
 
 
-def fs_new_version(c, nid, data, mime=None):
+def fs_new_version(c, nid, data, mime=None, uid=None):
     """Store data as the newest version of file nid (the older ones stay). The caller checked the write right. Returns the
-    new version number."""
+    new version number. 2.892.0 (#4873): uid = the person a background run writes for (no request: docs/pdfoptq.py)."""
     from ..admin.hosting import quota_guard
     n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     if not n or n["kind"] != "file":
@@ -732,7 +732,7 @@ def fs_new_version(c, nid, data, mime=None):
     pl_receipt_need_open(c, nid)  # 2.237.0 B (#2864): every new version (upload of the same name, API v1) keeps a locked receipt
     data = bytes(data or b"")
     _check_data(n["name"], data)
-    uid = _uid()
+    uid = uid or _uid()
     if uid and _is_agent(c, uid):  # #380: an agent never writes an executable / script file people may run
         if unexec_name(n["name"]) != n["name"]:
             raise Denied(403, tr("Agents do not write new versions of executable files"))
@@ -828,10 +828,11 @@ def fs_folder(c, uid, org_id, names, agent_id=None):
 fs_change_hooks = []  # 2.352.0 A (#2748): f(c, nid, action) after every change noted by fs_log_add (lists/lffolder.py)
 
 
-def fs_log_add(c, nid, action, detail=""):
+def fs_log_add(c, nid, action, detail="", uid=None):
     """Note an access of the signed-in account in the node's history. Agents: every access; people: only changes (reads of
-    people are not logged -- the history answers "what did the agent do with my file")."""
-    uid = _uid()
+    people are not logged -- the history answers "what did the agent do with my file").
+    2.892.0 (#4873, review F3): uid = the person a background step works for (checked there); never from request data."""
+    uid = uid or _uid()
     agent = bool(uid) and _is_agent(c, uid)
     if not agent and action in READ_ACTIONS:
         return

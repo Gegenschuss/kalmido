@@ -483,7 +483,8 @@ def cfg_get(c, ws):
             "ocr_langs": [str(x) for x in ol][:OCR_LANG_MAX] if isinstance(ol, list) else [],
             # 2.783.0 (#4882): the title pattern and "Title automatically" (on unless switched off)
             "title_pattern": str(d.get("title_pattern") or "").strip()[:TITLE_PATTERN_MAX] or TITLE_PATTERN,
-            "title_auto": d.get("title_auto", True) is not False}
+            "title_auto": d.get("title_auto", True) is not False,
+            "pdf_opt_auto": d.get("pdf_opt_auto") is True}  # 2.892.0 (#4873): optimise new scans automatically (off by default)
 
 
 def cfg_set(c, ws, data):
@@ -509,6 +510,8 @@ def cfg_set(c, ws, data):
         cur["title_pattern"] = tp
     if "title_auto" in data:
         cur["title_auto"] = bool(data["title_auto"])
+    if "pdf_opt_auto" in data:  # 2.892.0 (#4873)
+        cur["pdf_opt_auto"] = bool(data["pdf_opt_auto"])
     rid = root_id(c, ws)  # 2.48.0 review: the mark of the documents folder stays
     if rid:
         cur["root_id"] = rid

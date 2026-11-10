@@ -531,6 +531,8 @@ ORDER = (
     "integrations.docflowhook",  # 2.581.0 (#4803): the flows' scheduled tick and webhook calls (after docs.flows; no routes)
     "docs.split",  # 2.154.0 A (#1111): a stack scan split into documents by its archive number codes / separator sheets
     "docs.pages",  # 2.777.0 B (#4874): pages of a PDF document deleted / turned as a new version (after docs.split)
+    "docs.pdfopt",  # 2.892.0 (#4873): "Optimise PDF" -- the tools (no routes): pages measured, black and white / grey, text layer
+    "docs.pdfoptq",  # 2.892.0 (#4873, #4806): "Optimise PDF" as a new version -- routes, queue step, the automatic setting
     "docs.area",  # 2.522.0 (#4433): office and private file store apart: the general input sorts, "Move to office", "Wrong area"
     "docs.areamove",  # 2.547.0 (#4434): the old receipts of the private file store into the office once (preview, undo 30 days)
     "docs.tasklink",  # 2.154.0 A (#1111): a document linked with an existing task, the documents of a task

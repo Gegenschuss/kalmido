@@ -319,6 +319,8 @@ Documents: upload and ingest, recognition, classification, fields, search, folde
 - `kalmido/docs/notes.py` (`dn`) - Notes on a document
 - `kalmido/docs/ocr.py` (`ocr`) - The text of a document and its preview image
 - `kalmido/docs/pages.py` - Pages of a PDF document deleted or turned by 90 degrees, saved as a new version of its file
+- `kalmido/docs/pdfopt.py` (`po`) - "Optimise PDF", the tools: a scan's pages measured, made black and white / grey / colour, a text layer (Tesseract)
+- `kalmido/docs/pdfoptq.py` (`po`) - "Optimise PDF" as a new version of the file: routes, the queue step, "Optimise new scans automatically"
 - `kalmido/docs/rcheck.py` (`rck`) - The fixed check of a receipt
 - `kalmido/docs/recog.py` (`rc`) - Recognition per folder or file
 - `kalmido/docs/rules.py` (`clean`) - Rules that sort documents ("contains word X -> sender Y, type Z, tag T, folder F")
@@ -1019,6 +1021,7 @@ The start-up module.
 - `static/js/orgvis.js` (`ov`) - Who sees an organisation list
 - `static/js/palette.js` (`tour`) - Keyboard shortcuts, the command palette, the welcome tour
 - `static/js/paperless.js` (`pl`) - Paperless-ngx connection in the settings of the documents (self-hosted servers only): preview, mapping and background import
+- `static/js/pdfopt.js` (`po`) - "Optimise PDF" in the document view, the selection bar and the documents settings
 - `static/js/pdfview.js` (`pv`) - The PDF preview
 - `static/js/photometa.js` - Photo metadata on upload. The server removes GPS, camera and capture time from uploaded photos (kalmido/files/photometa.py)
 - `static/js/pinboard.js` (`wg`) - A colour per block for everyone in the project (lists.page_style)

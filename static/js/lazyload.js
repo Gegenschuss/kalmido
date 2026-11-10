@@ -41,7 +41,7 @@ const LD_MODS = {
   calrrule: ['calrrule'],  // 2.155.0 C (#2075): the own repeat rule dialog, loaded by the event editor
   calabs: ['calabs'],  // 2.155.0 B (#2076, #2077): holidays / absences in the "Calendars" window, the availability bar
   docviews: ['docviews', 'docfacets'],  // 2.772.0 (#4890): docfacets.js = the filters with numbers below the file store's tree;  2.579.0 (#4802): saved views of the documents search (the list, the sidebar, Today)
-  docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'docfetch', 'abdocs', 'docview', 'tilesize', 'docflows', 'docnotes', 'docpages'],  // 2.583.0 (#4812): tilesize.js = the card size  // 2.583.0 (#4835): docview.js = the document view (was docread.js, the reading view)  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letterdoc.js, letteragent.js; 2.154.0 A (#1111): docsplit.js; 2.207.0 A (#2763): docscan.js
+  docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'docfetch', 'abdocs', 'docview', 'tilesize', 'docflows', 'docnotes', 'docpages', 'pdfopt'],  // 2.583.0 (#4812): tilesize.js = the card size  // 2.583.0 (#4835): docview.js = the document view (was docread.js, the reading view)  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letterdoc.js, letteragent.js; 2.154.0 A (#1111): docsplit.js; 2.207.0 A (#2763): docscan.js
   life: ['life', 'devlink', 'budget'],  // 2.149.0 F (#2518): budget.js (its view and dialogs used life.js already)
    // 2.140.0 B (#2136): devlink.js = a device <-> office equipment
   integrations: ['integrations'],
