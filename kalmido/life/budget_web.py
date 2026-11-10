@@ -108,7 +108,11 @@ def budget_entry_get(eid):
 @app.patch("/api/budget/entries/<int:eid>")
 def budget_entry_patch(eid):
     c, uid = db(), me()
-    return _done(c, entry_update(c, uid, eid, body()))
+    from .budundo import bdu_post, bdu_pre  # 2.809.0 (#5476): a step of the person's undo list
+    bdu_pre(c, uid, eid)
+    out = entry_update(c, uid, eid, body())
+    ug = bdu_post(c)
+    return _done(c, {**out, **({"undo_group": ug} if ug else {})})
 
 
 @app.delete("/api/budget/entries/<int:eid>")
@@ -116,15 +120,22 @@ def budget_entry_delete(eid):
     """-> {ok, entry, trash}: the entry as it was, now in the trash with its receipts (2.567.0 A, #4707: the undo is
     POST .../restore; deleted for good after the trash period)."""
     c, uid = db(), me()
+    from .budundo import bdu_post, bdu_pre  # 2.809.0 (#5476): a step of the person's undo list
+    bdu_pre(c, uid, eid, "delete")
     out, _paths = entry_delete(c, uid, eid)
-    return _done(c, {"ok": True, "entry": out, "trash": True})
+    ug = bdu_post(c)
+    return _done(c, {"ok": True, "entry": out, "trash": True, **({"undo_group": ug} if ug else {})})
 
 
 @app.post("/api/budget/entries/<int:eid>/restore")
 def budget_entry_restore(eid):
     """2.567.0 A (#4707): the entry back from the trash (receipts, template link) -> the entry."""
     c, uid = db(), me()
-    return _done(c, entry_restore(c, uid, eid))
+    from .budundo import bdu_post, bdu_pre  # 2.809.0 (#5476): a step of the person's undo list
+    bdu_pre(c, uid, eid, "restore")
+    out = entry_restore(c, uid, eid)
+    bdu_post(c)
+    return _done(c, out)
 
 
 @app.get("/api/budget/<int:lid>/recurring")

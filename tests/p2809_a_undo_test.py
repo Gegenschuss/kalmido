@@ -15,6 +15,8 @@ Invented names only.
  - templates (lists/tplundo.py): a rename goes back; into the trash -> undo -> back, redo -> trash
  - sprints (lists/sprundo.py): planning one -> undo = gone, redo = back with its id; a change of its goal goes back; a removed
    sprint comes back
+ - budget entries (life/budundo.py): a change goes back from the phone (old title and amount) and forward; into the trash ->
+   undo -> back, redo -> trash
  - a project's settings (lists/lpundo.py): a rename + colour on the laptop is listed on the phone (area tasks, kind listset,
    label with the old name, device, the answer names its group) and goes back from there; redo; archiving -> undo -> out of
    the archive; a save of the same values and a save with a folder (side effects) record no step; a new sidebar order since
@@ -32,7 +34,7 @@ from kt import B, check, done  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 
 kt.fresh(prefix="P2809A")
-FEAT = "collab,comments,time"
+FEAT = "collab,comments,time,home,budget"
 A = kt.setup()
 A.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
@@ -336,6 +338,32 @@ check(r.ok and r.json().get("undo_group") and spr(A, SPX) is None, f"the sprint 
 g = newest(A)
 res = back(A, g["id"])
 check(res.get("undone") == [g["id"]] and spr(A, SPX) is not None, f"undo: the sprint is back {res}")
+
+# ---------------------------------------------------------------- budget entries: change / trash
+r = A.post(B + "/api/budget/lists", json={})
+check(r.ok, f"(setup) a budget {r.status_code} {r.text[:120]}")
+BL = r.json()["list_id"]
+r = A.post(B + f"/api/budget/{BL}/entries", json={"day": DAY, "amount": "12.50", "kind": "out", "title": "Kaffee Beispiel"})
+check(r.status_code == 201, f"(setup) an entry {r.status_code} {r.text[:120]}")
+BE = r.json()["id"]
+r = A.patch(B + f"/api/budget/entries/{BE}", json={"amount": "14.00", "title": "Kaffee Neu"}, headers=LAP)
+check(r.ok and r.json().get("undo_group"), f"the entry changed: a step {r.status_code} {r.text[:120]}")
+g = newest(PHONE)
+res = back(PHONE, g["id"])
+e = A.get(B + f"/api/budget/entries/{BE}").json()
+check(g.get("kind") == "budget_entry" and g.get("area") == "budget" and res.get("undone") == [g["id"]]
+      and e.get("title") == "Kaffee Beispiel" and str(e.get("amount")).startswith("12.5"),
+      f"taken back from the phone: the old title and amount {res} {e.get('title')} {e.get('amount')}")
+r = PHONE.post(B + f"/api/undo/{g['id']}/redo")
+check(r.ok and A.get(B + f"/api/budget/entries/{BE}").json().get("title") == "Kaffee Neu", f"redo: the new title {r.status_code}")
+r = A.delete(B + f"/api/budget/entries/{BE}")
+check(r.ok and r.json().get("undo_group") and A.get(B + f"/api/budget/entries/{BE}").status_code == 404, f"the entry into the trash: a step {r.status_code}")
+g = newest(A)
+res = back(A, g["id"])
+check(res.get("undone") == [g["id"]] and A.get(B + f"/api/budget/entries/{BE}").ok, f"undo: the entry is back {res}")
+r = A.post(B + f"/api/undo/{g['id']}/redo")
+check(r.ok and A.get(B + f"/api/budget/entries/{BE}").status_code == 404, f"redo: in the trash again {r.status_code} {r.text[:120]}")
+check(Bo.post(B + f"/api/undo/to/{g['id']}").status_code == 404, "another person cannot take it back (404)")
 
 # freelancer-matrix
 r = Fr.post(B + "/api/lists", json={"name": "Frida Projekt", "color": "#3366cc"})

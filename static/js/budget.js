@@ -204,7 +204,7 @@ function bg_entryModal(e, cf) {
     // someone else changed the entry since -> "Changed elsewhere, not undone", their change stays
     let ver = r?.updated_at || '';
     const st = (b, from) => undoStep(`/api/budget/entries/${id}`, b, ver, {now: from, label: title, then: j => { ver = j?.updated_at || ver; }}).finally(bg_after);
-    histAdd({label: tr('Entry “{0}” changed', title), undo: () => st(before, body), redo: () => st(body, before)});
+    histAdd({label: tr('Entry “{0}” changed', title), ...(r?.undo_group ? {srv: true} : {}), undo: () => st(before, body), redo: () => st(body, before)});  // 2.809.0 (#5476)
     toast(tr('Saved')); bg_refresh();
   }, e ? null : '#bg-amt');
   bg_kindWire(md, 'bg-kind', k => { const s = $('#bg-cat', md); s.innerHTML = bg_catOpts(k, +s.value || null); });
@@ -255,7 +255,7 @@ async function bg_delEntry(e) {
   let r; try { r = await optWrite(bg_entCut(e.id), () => api('DELETE', `/api/budget/entries/${e.id}`), bg_draw, {mod: true}); } catch { return; }
   let cur = r.entry || e;
   // 2.567.0 A (#4707): the entry waits in the trash with its receipts; the undo takes it back out (another device too)
-  offerUndo(tr('Deleted: {0}', e.title), histAdd({label: tr('Entry “{0}” deleted', e.title), undo: async () => { cur = r.trash ? await api('POST', `/api/budget/entries/${cur.id}/restore`) : await api('POST', `/api/budget/${cur.list_id}/entries`, bg_body(cur)); bg_after(); },
+  offerUndo(tr('Deleted: {0}', e.title), histAdd({label: tr('Entry “{0}” deleted', e.title), ...(r.undo_group ? {srv: true} : {}), undo: async () => { cur = r.trash ? await api('POST', `/api/budget/entries/${cur.id}/restore`) : await api('POST', `/api/budget/${cur.list_id}/entries`, bg_body(cur)); bg_after(); },
     redo: async () => { await api('DELETE', `/api/budget/entries/${cur.id}`); bg_after(); }}));
   bg_refresh();
 }
