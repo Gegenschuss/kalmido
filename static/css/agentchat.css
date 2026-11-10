@@ -557,3 +557,11 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 .jcbb{padding:0 .625rem .625rem;overflow-wrap:anywhere}
 /* 2.826.0 (#5509): ready, starts with the next message: in the chat header (agentchat module) a calm ring instead of the filled green dot */
 .adot.st-idle.stby{background:var(--bg2);box-shadow:inset 0 0 0 2px var(--ok)}
+/* 2.854.0 (#5508): narrow screens - the live interim status wraps (up to 3 lines, then "..."), a tap opens the whole text (and closes
+   it again); the block keeps the height of 3 lines while there are steps, so the message list does not jump with every new one */
+@media (max-width:40rem) {
+  .chstepl{min-height:calc(3 * var(--lh-tight) * var(--fs-xs) + .25rem);justify-content:flex-start}
+  .chstep{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;white-space:normal;overflow:hidden;overflow-wrap:anywhere}
+  .chstep+.chstep{display:none}  /* the older lines only when opened: the block keeps its height with every new status */
+  .chsteps.open .chstep{display:block;-webkit-line-clamp:unset;line-clamp:unset;overflow:visible}
+}

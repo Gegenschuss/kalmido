@@ -798,9 +798,9 @@ function stepsSet(k, on) {
 }
 function chatStepsLiveHtml() {
   const live = S.chat.live || [];
-  if (!live.length) return '<div class="chsteps hidden" id="chat-steps"></div>';
+  if (!live.length) { S.chat.stOpen = false; return '<div class="chsteps hidden" id="chat-steps"></div>'; }  // 2.854.0 (#5508)
   if (!stepsLiveOn()) return `<div class="chsteps off" id="chat-steps"><button type="button" class="linkbtn chstepon" data-act="steps-live" data-on="1">${esc(tr('Show steps'))}</button></div>`;
-  return `<div class="chsteps" id="chat-steps"><button type="button" class="chstepl" data-act="steps-live" data-on="0" title="${esc(tr('Hide steps'))}"><span class="sr">${esc(tr('Hide steps'))}: </span>${live.map(x => `<span class="chstep">${esc(x.text)}</span>`).join('')}</button></div>`;
+  return `<div class="chsteps${S.chat.stOpen ? ' open' : ''}" id="chat-steps"><button type="button" class="chstepl" data-act="steps-live" data-on="0" title="${esc(tr('Hide steps'))}"><span class="sr">${esc(tr('Hide steps'))}: </span>${live.map(x => `<span class="chstep">${esc(x.text)}</span>`).join('')}</button></div>`;
 }
 function chatStepsKept(m) {
   const st = m.steps || []; if (!st.length) return '';
@@ -880,6 +880,14 @@ function stepsLive(on) {
   stepsSet('agent_steps_live', on); jobStepsRedraw(true);
   if (!on) $('#chat-in')?.focus({preventScroll: true});
 }
+// 2.854.0 (#5508): on a narrow screen a tap on a clamped interim status opens the whole text (and closes it again) instead of
+// hiding the steps; a tap on a status that fits hides the steps as before
+document.addEventListener('click', e => {
+  const box = e.target.closest?.('#chat-steps.chsteps'), st = box?.querySelector('.chstep');
+  if (!st || !window.matchMedia?.('(max-width: 40rem)').matches) return;
+  if (!box.classList.contains('open') && ![...box.querySelectorAll('.chstep')].some(x => x.scrollHeight > x.clientHeight + 1)) return;
+  S.chat.stOpen = !box.classList.contains('open'); box.classList.toggle('open', S.chat.stOpen); e.stopImmediatePropagation();
+}, true);
 // a tap on the typing dots brings hidden steps back
 document.addEventListener('click', e => { if (e.target.closest?.('#chat-typing') && !stepsLiveOn() && (S.chat.live || []).length) stepsLive(true); });
 // a job's history ("History"): open / closed per job (default: the switch above), loaded when opened
