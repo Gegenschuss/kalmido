@@ -17,6 +17,7 @@ from ..core.undogroups import UG_LABEL
 from ..core.undoweb import undo_need_reg
 from ..core.writes import obj_track
 from .dispo import DSP_SLOT, _gate, _may_change, _res_index, _row, dsp_resources
+from .dspkern import dsk_sync  # 2.872.0 (#5532)
 
 DSU_KIND = "booking"
 DSU_WHAT = {"delete": UA_DELETED, "restore": UA_RESTORED}
@@ -56,7 +57,6 @@ def dsu_need(c, uid, rid, oid):
         if now != was and n["resource_kind"] != DSP_SLOT and now not in _res_index(dsp_resources(c, uid, n["org_id"])):
             raise Denied(409, tr("unknown"))  # the place filled back with someone who is no resource of the area any more
         if bool(n["deleted_at"]) != bool(r["deleted_at"]):  # 2.872.0 (#5532): the call sheet follows the shoot day's trash
-            from .dspkern import dsk_sync
             dsk_sync(c, uid, n["org_id"], n["job"])
     return {"fix": fix, "lock": f"hub_bookings-{int(rid)}"}
 

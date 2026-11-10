@@ -22,14 +22,18 @@ accounting -- or the owner of the personal area): 'manage' when their organisati
 (orgroles.org_writes: not read-only), 'view' when read-only; nobody else. Steps 1 + 2 of obj_role stay on top (the
 organisation floor; agents never reach a role here). An object in the trash: only 'manage' (step 4).
 The space: an organisation's area -> (org, None); a personal area -> (None, None) (its owner is checked by abs_org)."""
+import json
+
 from ..core.access import Denied, live_sql
 from ..core.db import usettings
 from ..core.i18n import N_, tr
-from ..core.objects import obj_need, obj_register
+from ..core.objects import obj_need, obj_reg_node, obj_register
+from ..core.orgcrypt import oc_enc_fields
 from ..core.pg import system_ctx
-from ..core.writes import _purge_rows, obj_reg_node, obj_restore, obj_trash
+from ..core.writes import _purge_rows, obj_restore, obj_trash
 from ..accounts.orgroles import RO_MSG, org_writes
 from .absence import abs_org
+from .callsheet import cs_clean
 
 DSK_DAY, DSK_CS = "shoot_day", "callsheet"
 DSK_SKETCH = "picture"  # the history's mark of a sketch (never the picture itself)
@@ -88,9 +92,6 @@ def _cs_visible(c, uid):  # the candidates only (cap hook: obj_role decides each
 def _cs_data(c, value, row):
     """The field 'data' of obj_write: the day details (a dict, hub/callsheet.py cs_clean), stored as JSON, sealed with the
     organisation's key when its encryption is on (core/orgcrypt.py FIELDS: the history keeps the sealed text, as ow_write)."""
-    import json
-    from ..core.orgcrypt import oc_enc_fields
-    from .callsheet import cs_clean
     d = cs_clean(value if value is not None else {})
     txt = json.dumps(d, ensure_ascii=False)
     return oc_enc_fields(c, row["org_id"], "hub_callsheets", {"data": txt})["data"] if row is not None else txt

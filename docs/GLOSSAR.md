@@ -405,6 +405,7 @@ The mail hub: filed e-mails, mailboxes and rules, absences, holidays and dispatc
 - `kalmido/hub/agentdispo.py` (`adz`) - Shoot planning by an agent
 - `kalmido/hub/callsheet.py` (`cs`) - The call sheet of a shoot day (Film & Video): day details per disposition job, saved sealed, and the PDF for everybody on the day
 - `kalmido/hub/dispo.py` (`dsp`) - Resources and disposition -- booking crew and equipment for shoot days, seeing who and what is free per day, spotting double bookings
+- `kalmido/hub/dspkern.py` (`dsk`) - The disposition on the shared core: the shoot day (light kind) and its call sheet (kind with history, undo and trash)
 - `kalmido/hub/dspundo.py` - Undo across devices for dispatch bookings (one part per booking, delete and restore)
 - `kalmido/hub/hmv1.py` (`hmv`) - The filed e-mails in the REST API v1 + MCP
 - `kalmido/hub/holidays.py` (`hol`) - 2.461 public holidays per country
