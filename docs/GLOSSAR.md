@@ -322,6 +322,7 @@ Documents: upload and ingest, recognition, classification, fields, search, folde
 - `kalmido/docs/recog.py` (`rc`) - Recognition per folder or file
 - `kalmido/docs/rules.py` (`clean`) - Rules that sort documents ("contains word X -> sender Y, type Z, tag T, folder F")
 - `kalmido/docs/scankeys.py` (`sk`) - Scan inboxes for the folder watcher
+- `kalmido/docs/scanmark.py` - Is a document a scan? Decides whether the document view shows the archive number field for a document without a number
 - `kalmido/docs/split.py` (`sp`) - A stack scan (one PDF of several letters)
 - `kalmido/docs/store.py` (`doc`) - Documents -- the data side (no routes)
 - `kalmido/docs/tasklink.py` (`dtl`) - A document linked with an EXISTING task (besides "Create task" of docs/web.py docs_task)
