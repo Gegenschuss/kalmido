@@ -137,8 +137,11 @@ const RESULT = `(() => { const P = window.__dp; P.done = true; window.__ro.on = 
         check(!r1.after, `${W} list: the drag class is gone after release`);
         check(r1.cv > 50 && r1.skipAfter === 0, `${W} list: rows may skip their drawing during the drag (${r1.cv} rows), none after release (${r1.skipAfter})`);
         // 2.586.0 A (#4860): the bar / mode fitting rests during the drag (at most every 200 ms) and runs once after release
-        const fit = Object.values(r1.fitDrag).reduce((n, v) => n + v, 0);
-        check(Object.values(r1.fitDrag).every(v => v <= Math.ceil(r1.ms / 200) + 1) && fit < r1.steps, `${W} list: the bar watchers rest during the drag (${fit} fits for ${r1.steps} steps in ${r1.ms} ms, each at most every 200 ms) ` + JSON.stringify(r1.fitDrag));
+        // 2.832.0 (#5516, CI red of 2.819.0): each watcher on its own rests (fewer runs than steps, at most one per 200 ms). The sum
+        // of the three against the steps was no measure of the rest: on the slower CI runner the drag took 5.5 s, each watcher ran
+        // 20 times (limit 29) and the three together reached the 60 steps although the 200 ms held for every one of them
+        const fv = Object.values(r1.fitDrag), fmax = Math.max(0, ...fv);
+        check(fv.every(v => v <= Math.ceil(r1.ms / 200) + 1) && fmax < r1.steps, `${W} list: the bar watchers rest during the drag (at most ${fmax} fits of one watcher for ${r1.steps} steps in ${r1.ms} ms, each at most every 200 ms) ` + JSON.stringify(r1.fitDrag));
         check((r1.fitAfter.fitTop || 0) + (r1.fitAfter.fitDtop || 0) + (r1.fitAfter.lsd_sync || 0) >= 1, `${W} list: the bars are fitted after release ` + JSON.stringify(r1.fitAfter));
       }
       // after release: the bars fit the final width (the watchers ran once more)
