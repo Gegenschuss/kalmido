@@ -38,11 +38,20 @@ function ul_time(ms) {
   return d.toLocaleString(LOCALE(), /** @type {any} */ (o));
 }
 // the rows (see the head of the file); off = cannot be undone from here, why = the reason shown under it
+// the tasks a step of this browser changed (a bundled step: its parts too)
+const ul_tids = e => !e ? [] : [...(e.snaps || []), ...(e.after || [])].map(x => +rid(x.id)).filter(Boolean).concat((e.parts || []).flatMap(ul_tids));
 function ul_rows() {
   const linked = new Set(HIST.undo.flatMap(ul_qOf));
   const pend = OUT.q.filter(q => !q.done && !linked.has(q)).map(q => ({key: 'q:' + q.k, kind: 'q', label: ul_qLabel(q), at: 0, off: true, why: tr('Not sent yet')}));
   const loc = HIST.undo.filter(e => !e.srv).map(e => ({key: ul_key(e), kind: 'l', e, label: e.label, at: e.at || 0, area: e.area, pend: histPending(e)}));
-  const srv = (UL.items || []).map(g => ({key: 's:' + g.id, kind: 's', g, label: g.label || tr('Change'), at: Date.parse(g.at) || 0, area: g.area, dev: g.device, state: g.state}));
+  // #3860 (CI red of 2.848.0, undo_ui): since 2.774.0 (#5251) the server records every task step too (kind 'task', "Edited …"); a
+  // step this browser still holds in its own history is listed once, as its own row: the server's twin of it (same device, same
+  // task, not older than the own step's second - the server's times are whole seconds) stays out, else both rows interleaved by
+  // the second and "Back up to here" took the change back twice
+  const mine = new Map();
+  for (const e of HIST.undo) if (!e.srv) for (const id of ul_tids(e)) mine.set(id, Math.min(mine.get(id) ?? Infinity, Math.floor((e.at || 0) / 1000) * 1000));
+  const twin = g => g.kind === 'task' && !!g.device && g.device === histDevice() && mine.has(+g.ref_id) && (Date.parse(g.at) || 0) >= /** @type {number} */ (mine.get(+g.ref_id));
+  const srv = (UL.items || []).filter(g => !twin(g)).map(g => ({key: 's:' + g.id, kind: 's', g, label: g.label || tr('Change'), at: Date.parse(g.at) || 0, area: g.area, dev: g.device, state: g.state}));
   const rows = [...loc, ...srv].sort((a, b) => b.at - a.at).slice(0, UL_MAX);
   let wall = '';
   for (const r of rows) {

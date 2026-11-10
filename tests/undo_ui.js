@@ -262,10 +262,17 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   for (const p of [1, 3, 5, 0]) { await w.eval(`patchTask(${j1}, {priority: ${p}})`); await sleep(60); }
   // 2.773.0 (#5250): a right-click on ← opens the list "Recent steps" (undolist.js): this browser's task steps are rows
   // "only this device" with "Back up to here" (was: a menu of the last 10 steps, "Undo up to here")
+  // #3860 (CI red of 2.848.0): the server records these task steps too (2.774.0, #5251), its times are whole seconds; with
+  // all four on the server before the list opens, its twins of them must stay out (else they sorted in between this browser's
+  // rows by the second, "Back up to here" took the change back twice and the toast counted only a part)
+  check(await until(() => w.eval('!OUT.q.some(q => !q.done)')), 'the four priority changes reached the server');
   btn('undo').dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
   const items = await until(() => { const r = [...d.querySelectorAll('#pop:not(.hidden) .ulbody .ulrow.ul-l')]; return r.length >= 4 && w.eval('UL.items !== null') && r; });
   check(items && items.length >= 4 && items.every(r => /only this device/.test(r.textContent)) && /Recent steps/.test(d.querySelector('#pop .ulhead')?.textContent || ''), `right-click: the list "Recent steps" with this browser's steps (${items && items.length})`);
   check(/Priority of “Jump”: None/.test(items[0]?.textContent) && /Priority of “Jump”: High/.test(items[1]?.textContent), 'newest first');
+  const tw = JSON.parse(w.eval(`JSON.stringify({srv: (UL.items || []).filter(g => g.kind === 'task' && +g.ref_id === ${j1} && g.device === histDevice()).length,
+    rows: ul_rows().filter(r => r.kind === 's' && r.g.kind === 'task' && +r.g.ref_id === ${j1} && r.g.device === histDevice()).map(r => r.label)})`));
+  check(tw.srv >= 4 && tw.rows.length === 0, `the server's twins of this browser's steps are not listed twice: ${JSON.stringify(tw)}`);
   const before = hl('undo');
   items[2].querySelector('[data-ul-go]').click(); await sleep(50); await idle(); await until(() => !w.eval('UL.busy'));
   check((await get(j1)).priority === 1 && hl('undo') === before - 3 && hl('redo') >= 3, 'third entry: three steps undone in order');
