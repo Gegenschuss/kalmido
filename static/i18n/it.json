@@ -10851,7 +10851,6 @@
   "The event is attached as a calendar file. Your answer goes to {0}.": "L'evento è allegato come file di calendario. La tua risposta va a {0}.",
   "Your calendar app removes the event with the attached file.": "Con il file allegato la tua app calendario rimuove l'evento.",
   "Send the invitation by e-mail": "Invia l'invito per e-mail",
-  "People outside Kalmido are not notified.": "Le persone fuori da Kalmido non vengono avvisate.",
   "Subscription link…": "Link di abbonamento…",
   "Anyone who has the link sees the events of this calendar. Keep it to yourself.": "Chi ha il link vede gli eventi di questo calendario. Tienilo per te.",
   "At a fixed time": "A un'ora fissa",
@@ -18065,5 +18064,10 @@
   "People|event": "Persone",
   "Also private": "Anche privato",
   "Off: the office disappears in the workspace Private, the offices of your organisations stay. Nothing is deleted; switched on again, everything is there as before.": "Spento: l’ufficio scompare nell’area di lavoro Privato, gli uffici delle tue organizzazioni restano. Non viene cancellato nulla; riacceso, tutto è come prima.",
-  "The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.": "L’ufficio è spento nell’area di lavoro Privato. Accendilo in Impostazioni > Moduli > Ufficio e finanze > Anche privato."
+  "The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.": "L’ufficio è spento nell’area di lavoro Privato. Accendilo in Impostazioni > Moduli > Ufficio e finanze > Anche privato.",
+  "Repeat ends": "Fine della ripetizione",
+  "Only you so far: add a name or e-mail": "Per ora solo tu: aggiungi un nome o un’e-mail",
+  "Time zone, status, link": "Fuso orario, stato, link",
+  "Search a city": "Cerca una città",
+  "Guests outside Kalmido do not get an invitation by e-mail. Let them know yourself.": "Gli ospiti fuori da Kalmido non ricevono un invito via e-mail. Avvisali tu."
 }

@@ -44,6 +44,10 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(after.title === 'Weekly (renamed elsewhere)' && !(after.overrides || []).some(o => o.rid === occ), 'the date was not changed from the stale copy ' + JSON.stringify(after.overrides || []));
   // a fresh copy saves the date
   click(w, d.querySelector('.modal.evmodal [data-evm="close"]'));
+  // 2.846.0 (#5465): the editor came back with typed but unsaved input: closing it asks first ("Discard" closes it)
+  check(await until(() => d.querySelector('.modal.cdlg [data-cd="yes"]')), 'the editor with unsaved input asks before it closes');
+  d.querySelector('.modal.cdlg [data-cd="yes"]')?.click();
+  await until(() => !d.querySelector('.modal.evmodal'));
   w.eval(`evEditor({ev: ${JSON.stringify(after)}, occ: ${JSON.stringify(occ)}})`);
   md = await until(() => d.querySelector('.modal.evmodal'));
   click(w, md.querySelector('[data-evsc="one"]'));

@@ -33,6 +33,17 @@ const EV_REM_DAY = [['-540', N_('On the day at 9:00')], ['900', N_('1 day before
 const EV_REM_TXT = {'0': N_('At the start'), '5': N_('5 min'), '10': N_('10 min'), '15': N_('15 min'), '30': N_('30 min'), '60': N_('1 h'), '120': N_('2 h'),
   '1440': N_('1 day'), '2880': N_('2 days'), '10080': N_('1 week')};
 const evRemLabel = (m, allDay) => { if (allDay) { const o = EV_REM_DAY.find(x => x[0] === String(m)); if (o) return tr(o[1]); } return EV_REM_TXT[String(m)] ? tr(EV_REM_TXT[String(m)]) : remLabel(String(m)); };
+// 2.846.0 (#5465): the reminders after the all-day switch: the ones chosen for that kind before, else the own choice carried
+// over to the nearest of the other kind (1 day before -> 1 day before at 9:00), else the kind's default
+const EV_REM_T2D = [[10080, 9540], [2880, 2340], [1440, 900]];
+function evRemSwitch(mem, cur, ad) {
+  const was = ad ? 'timed' : 'day', now = ad ? 'day' : 'timed', def = ad ? [-540] : [15];
+  const c = (cur || []).map(Number); mem[was] = c;
+  if (mem[now]) return [...mem[now]];
+  if (!c.length || (c.length === 1 && c[0] === (ad ? 15 : -540))) return def;
+  const m = ad ? c.map(x => (EV_REM_T2D.find(([t]) => x >= t) || [0, -540])[1]) : c.map(x => (EV_REM_T2D.find(([, d]) => d === x) || [15])[0]);
+  return [...new Set(m)].slice(0, 10);
+}
 const evCalColor = e => cssColor((S.cal.evcals || {})[e.cal]?.color) || cssColor(evCal(e.cal)?.color) || 'var(--accent)';
 const evCalName = e => e.cal == null ? tr('Invitation') : (S.cal.evcals || {})[e.cal]?.name || evCal(e.cal)?.name || tr('Calendar');
 // 2.559.0 (#4659): calendar writes show at once, like optWrite (core.js) for the state: put() changes the shown range (S.cal.items,
@@ -210,6 +221,17 @@ async function evPeople() {
   return EVU;
 }
 const evTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } };
+// 2.846.0 (#5465): a time zone as people search it: the city first, the region after it ("Berlin (Europe)"), no underscores
+function evTzLabel(z) {
+  const p = String(z || '').split('/'), city = p.pop().replace(/_/g, ' '), reg = p.join(' · ').replace(/_/g, ' ');
+  return reg ? `${city} (${reg})` : city;
+}
+function evTzFind(v, cur) {  // what was typed / picked -> the zone (the label, the IANA name or the city alone); '' = none
+  const q = String(v || '').trim().toLowerCase(); if (!q) return '';
+  const zs = evZones(cur);
+  return zs.find(z => evTzLabel(z).toLowerCase() === q) || zs.find(z => z.toLowerCase() === q)
+    || zs.find(z => evTzLabel(z).split(' (')[0].toLowerCase() === q) || '';
+}
 function evZones(cur) {
   let z = [];
   try { z = Intl.supportedValuesOf('timeZone'); } catch { z = []; }
@@ -318,16 +340,16 @@ async function evEditor(o = {}) {
     <div class="row evdt"><span class="rlab">${tr('Starts')}</span>${dateIn('ev-sd', st.start.slice(0, 10), {label: tr('Start date'), clear: false})}<span class="evtm" ${st.all_day ? 'hidden' : ''}>${timeIn('ev-stm', st.all_day ? '09:00' : st.start.slice(11, 16), {label: tr('Start time'), clear: false})}</span></div>
     <div class="row evdt"><span class="rlab">${tr('Ends')}</span>${dateIn('ev-ed', endDay(st.end), {label: tr('End date'), clear: false})}<span class="evtm" ${st.all_day ? 'hidden' : ''}>${timeIn('ev-etm', st.all_day ? '10:00' : st.end.slice(11, 16), {label: tr('End time'), clear: false})}</span></div>
     <div class="row evrep"><label for="ev-rep">${tr('Repeat')}</label><select id="ev-rep" data-sheet-ico="repeat">${EV_REP.map(([k, n]) => `<option value="${k}" ${k === repK ? 'selected' : ''}>${tr(n)}</option>`).join('')}${repK === 'custom' ? `<option value="custom" selected>${esc(repeatLabelBase(rrBase(st.rrule)))}</option>` : ''}</select>
-      <select id="ev-repend" aria-label="${esc(tr('Ends'))}" ${repK ? '' : 'hidden'}><option value="">${tr('forever')}</option><option value="until" ${rrEnd(st.rrule).type === 'until' ? 'selected' : ''}>${tr('until a date')}</option><option value="count" ${rrEnd(st.rrule).type === 'count' ? 'selected' : ''}>${tr('a number of times')}</option></select>
+      <select id="ev-repend" aria-label="${esc(tr('Repeat ends'))}" title="${esc(tr('Repeat ends'))}" ${repK ? '' : 'hidden'}><option value="">${tr('forever')}</option><option value="until" ${rrEnd(st.rrule).type === 'until' ? 'selected' : ''}>${tr('until a date')}</option><option value="count" ${rrEnd(st.rrule).type === 'count' ? 'selected' : ''}>${tr('a number of times')}</option></select>
       <span id="ev-reu" ${rrEnd(st.rrule).type === 'until' ? '' : 'hidden'}>${dateIn('ev-until', rrEnd(st.rrule).type === 'until' ? rrEnd(st.rrule).val : '', {label: tr('until a date'), clear: false})}</span>
       <input id="ev-count" class="numin" type="number" inputmode="numeric" min="1" max="999" value="${rrEnd(st.rrule).type === 'count' ? esc(rrEnd(st.rrule).val) : '10'}" aria-label="${esc(tr('a number of times'))}" ${rrEnd(st.rrule).type === 'count' ? '' : 'hidden'}></div>
     <div class="row"><label for="ev-loc">${tr('Location')}</label><input id="ev-loc" maxlength="500" value="${esc(st.location || '')}" autocomplete="off"></div>
     <div class="row evrems"><span class="rlab" id="ev-rem-l">${tr('Reminders')}</span><div class="evchips" id="ev-rems" role="group" aria-labelledby="ev-rem-l"></div></div>
     <div class="row evatts"><span class="rlab" id="ev-att-l">${tr('People|event')}</span><div class="evatt-w"><div class="evchips" id="ev-atts" role="group" aria-labelledby="ev-att-l"></div>
-      <div class="evattadd"><input id="ev-attin" list="ev-attl" autocomplete="off" placeholder="${esc(tr('Name or e-mail'))}" aria-label="${esc(tr('Add a person'))}" enterkeyhint="done"><datalist id="ev-attl"></datalist><button type="button" class="btn sm" data-evm="attadd">${ic('plus', 's')} ${tr('Add')}</button></div></div></div>
+      <div class="evattadd"><input id="ev-attin" list="ev-attl" autocomplete="off" placeholder="${esc(atts.length ? tr('Name or e-mail') : tr('Only you so far: add a name or e-mail'))}" aria-label="${esc(tr('Add a person'))}" enterkeyhint="done"><datalist id="ev-attl"></datalist><button type="button" class="btn sm" data-evm="attadd">${ic('plus', 's')} ${tr('Add')}</button></div></div></div>
     <div class="row ppcol"><label for="ev-desc">${tr('Notes')}</label><textarea id="ev-desc" rows="3" maxlength="20000">${esc(st.description || '')}</textarea></div>
-    <details class="evmore"><summary>${tr('More')}</summary>
-      <div class="row"><label for="ev-tz">${tr('Time zone')}</label><select id="ev-tz">${evZones(st.tz).map(z => `<option value="${esc(z)}" ${z === (st.tz || evTz()) ? 'selected' : ''}>${esc(z.replace(/_/g, ' '))}</option>`).join('')}</select></div>
+    <details class="evmore"><summary>${ic('chev', 's fcar')}<span>${tr('More options')}</span><span class="muted evmoreh">${tr('Time zone, status, link')}</span></summary>
+      <div class="row"><label for="ev-tzq">${tr('Time zone')}</label><input type="hidden" id="ev-tz" value="${esc(st.tz || evTz())}"><input id="ev-tzq" list="ev-tzl" value="${esc(evTzLabel(st.tz || evTz()))}" autocomplete="off" placeholder="${esc(tr('Search a city'))}" enterkeyhint="done"><datalist id="ev-tzl"></datalist></div>
       <div class="row"><label for="ev-status">${tr('Status')}</label><select id="ev-status"><option value="confirmed">${tr('Confirmed')}</option><option value="tentative" ${st.status === 'tentative' ? 'selected' : ''}>${tr('Tentative')}</option><option value="cancelled" ${st.status === 'cancelled' ? 'selected' : ''}>${tr('Cancelled')}</option></select></div>
       <div class="row"><label for="ev-busy">${tr('Show as busy')}</label><label class="swc"><input type="checkbox" id="ev-busy" ${st.busy !== false ? 'checked' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show as busy'))}</span></label></div>
       <div class="row"><label for="ev-url">${tr('Link')}</label><input id="ev-url" type="url" inputmode="url" value="${esc(st.url || '')}" placeholder="https://…" autocomplete="off"></div>
@@ -347,9 +369,13 @@ async function evEditor(o = {}) {
   const drawAtts = () => {
     efb_go(md, atts, ev);  // 2.155.0 B (#2077): the availability bar (calabs.js)
     $('#ev-atts', md).innerHTML = atts.length ? atts.map((a, i) => `<span class="evatp ps-${esc(a.partstat || 'needs-action')}">${a.user_id ? av(a.user_id, a.name || ppl.get(a.user_id) || '') : ic(a.contact_id ? 'user' : 'at', 's')}<span>${esc(a.name || ppl.get(a.user_id) || a.email)}</span><span class="muted evps">${esc(tr(EV_PS_WORD[a.partstat || 'needs-action']))}</span><button type="button" class="iconbtn" data-evatrm="${i}" aria-label="${esc(tr('Remove {0}', a.name || a.email || ''))}">${ic('x', 's')}</button></span>`).join('')
-      : `<span class="muted">${tr('Only you')}</span>`;
+      : '';  // 2.846.0 (#5465): "Only you" is the placeholder of the people field, not a line above it
+    $('#ev-atts', md).hidden = !atts.length;
+    const ai = $('#ev-attin', md); if (ai) ai.placeholder = atts.length ? tr('Name or e-mail') : tr('Only you so far: add a name or e-mail');
     if (typeof evi_draw === 'function') evi_draw(md, atts);  // 2.111.0 B (#2056): the invitation switch (evinvite.js)
   };
+  // 2.846.0 (#5465): the all-day switch keeps the reminders chosen for each kind (off and on again: the own ones are back)
+  const remMem = {[st.all_day ? 'day' : 'timed']: (st.reminders || []).map(Number)};
   drawRems(); drawAtts(); rows(); if (typeof evi_init === 'function') evi_init(md, ev, atts);
   // 2.565.0 (#4705): what the dialog would save now (sc = 'one': only this date's fields), read once as it opened (base); the
   // event the dialog builds on is the server's one (after a conflict: the current one, o.cf.raw)
@@ -370,8 +396,8 @@ async function evEditor(o = {}) {
   const srv = o.cf?.raw || ev, dlg = ev && !o.dvw && typeof saveDialog === 'function' ? {base: objBase(form(scope), o.cf?.mine)} : null;
   const evAgain = (raw, mine, cf) => {  // the editor again on the current event, what was typed over it
     const m = {...mine}; delete m.send_invites;
-    if (scope === 'one') { const ov = {rid: o.occ, ...evOccView(raw, o.occ), ...m}; delete ov.updated_at; return evEditor({ev: {...raw, overrides: [...(raw.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ, cf}); }
-    return evEditor({ev: {...raw, ...m, ...(m.attendees ? {attendees: atts} : {})}, occ: o.occ, cf});
+    if (scope === 'one') { const ov = {rid: o.occ, ...evOccView(raw, o.occ), ...m}; delete ov.updated_at; return evEditor({ev: {...raw, overrides: [...(raw.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ, cf, unsaved: true}); }
+    return evEditor({ev: {...raw, ...m, ...(m.attendees ? {attendees: atts} : {})}, occ: o.occ, cf, unsaved: true});  // 2.846.0 (#5465): unsaved = closing asks
   };
   if (dlg) {  // lazy-ok-begin: dlg exists only once objsave.js is loaded (typeof saveDialog above, evEditor loads the module)
     const view = () => scope === 'one' ? (x => evOccView(x, o.occ)) : undefined, opened = () => scope === 'one' ? evOccView(srv, o.occ) : srv;
@@ -407,7 +433,12 @@ async function evEditor(o = {}) {
   md.addEventListener('change', e => {
     const id = e.target.id;
     if (id === 'ev-cal') rows();  // 2.52.0 (#1128)
-    if (id === 'ev-allday') { const ad = e.target.checked; $$('.evtm', md).forEach(x => { x.hidden = ad; }); st.reminders = ad ? [-540] : [15]; drawRems(); }
+    if (id === 'ev-allday') { const ad = e.target.checked; $$('.evtm', md).forEach(x => { x.hidden = ad; }); st.reminders = evRemSwitch(remMem, st.reminders, ad); drawRems(); }
+    if (id === 'ev-tzq') {  // 2.846.0 (#5465): the searched city sets the zone; nothing found = the zone stays
+      const z = evTzFind(e.target.value, val('ev-tz')), h = $('#ev-tz', md);
+      if (z && z !== h.value) { h.value = z; h.dispatchEvent(new Event('change', {bubbles: true})); }
+      e.target.value = evTzLabel(h.value);
+    }
     if (id === 'ev-rep') { const k = e.target.value; $('#ev-repend', md).hidden = !k; if (!k) { $('#ev-reu', md).hidden = true; $('#ev-count', md).hidden = true; } }
     if (id === 'ev-repend') { $('#ev-reu', md).hidden = e.target.value !== 'until'; $('#ev-count', md).hidden = e.target.value !== 'count'; }
     if (id === 'ev-sd' && val('ev-ed') < val('ev-sd')) dpSet($('#ev-ed', md), val('ev-sd'));
@@ -425,15 +456,16 @@ async function evEditor(o = {}) {
       const s = scope === 'one' ? st.occStart : st.start, en = scope === 'one' ? st.occEnd : st.end;
       dpSet($('#ev-sd', md), s.slice(0, 10)); dpSet($('#ev-ed', md), endDay(en));
       if (!st.all_day) { dpSet($('#ev-stm', md), s.slice(11, 16)); dpSet($('#ev-etm', md), en.slice(11, 16)); }
+      ['ev-sd', 'ev-ed', 'ev-stm', 'ev-etm'].forEach(i => { const f = $('#' + i, md); if (f && fgStart.has(f)) fgStart.set(f, fgVal(f)); });  // #5465: the switch alone is nothing typed
       $('.evrep', md).hidden = $('.evatts', md).hidden = $('.evrems', md).hidden = scope === 'one';
       if (typeof evi_draw === 'function') evi_draw(md, atts);
       return;
     }
     const b = e.target.closest('[data-evm]'); if (!b) return;
     const k = b.dataset.evm;
-    if (k === 'close') md.remove();
+    if (k === 'close') md._close();  // 2.846.0 (#5465): asks first when something was typed (modalGuard below)
     else if (k === 'attadd') attAdd();
-    else if (k === 'task') { md.remove(); openDetail(st.task_id); }
+    else if (k === 'task') { await md._close(); if (!md.isConnected) openDetail(st.task_id); }
     else if (k === 'untask') { st.task_id = null; b.closest('.row').remove(); }
     else if (k === 'del') { md.remove(); evDelete(ev, o.occ); }
     else if (k === 'save') {
@@ -463,8 +495,8 @@ async function evEditor(o = {}) {
         if (dlg) { const mine = objDiff(dlg.base, body); evAgain(srv, mine, {raw: srv, cur: srv, mine, theirs: [], both: []}); return; }  // lazy-ok: dlg only with objsave.js loaded; what was typed stays "changed" for the next save
         // "Only this date": what was typed comes back as that date's own change (the editor then saves only it again)
         const ov = {rid: o.occ, title: body.title, location: body.location, description: body.description, all_day: body.all_day, start: body.start, end: body.end};
-        evEditor(!ev ? {...o, ...body, attendees: atts} : scope === 'one' ? {ev: {...ev, overrides: [...(ev.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ}
-          : {ev: {...ev, ...body, cal_id: body.cal_id ?? ev.cal_id, attendees: atts}, occ: o.occ});
+        evEditor(!ev ? {...o, ...body, attendees: atts, unsaved: true} : scope === 'one' ? {ev: {...ev, overrides: [...(ev.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ, unsaved: true}
+          : {ev: {...ev, ...body, cal_id: body.cal_id ?? ev.cal_id, attendees: atts}, occ: o.occ, unsaved: true});
         return;
       }
       if (!ev && j?.id) {  // clickable before the range / the state come again
@@ -475,7 +507,23 @@ async function evEditor(o = {}) {
       toast(ev ? tr('Event saved') : tr('Event created'));
     }
   });
-  setTimeout(() => { if (!ev) $('#ev-title', md)?.focus(); }, 40);
+  // 2.846.0 (#5465): Esc, X, Cancel and a click next to the dialog ask before typed input is lost (like fgModal: modalGuard);
+  // besides the fields the reminders, the people and the task link count; an editor opened again after a failed save
+  // (o.unsaved: what was typed is not on the server) always asks
+  const fgStart = new Map(fgFields(md).map(f => [f, fgVal(f)]));  // per element: a redrawn row is new and counts from its drawn state
+  const extra = () => JSON.stringify([(st.reminders || []).map(Number), atts.map(a => [a.user_id, a.contact_id, a.email]), st.task_id]), extra0 = extra();
+  modalGuard(md, () => !!o.unsaved || extra() !== extra0 || fgFields(md).some(f => fgStart.has(f) ? fgStart.get(f) !== fgVal(f) : fgVal(f) !== fgDef(f)));
+  md.addEventListener('focusin', e => {  // the time zone list is filled when it is searched (some hundred cities)
+    if (e.target.id !== 'ev-tzq') return;
+    e.target.select?.();
+    const dl = $('#ev-tzl', md); if (dl && !dl.childElementCount) dl.innerHTML = evZones(val('ev-tz')).map(z => `<option value="${esc(evTzLabel(z))}"></option>`).join('');
+  });
+  // 2.846.0 (#5465): a new event starts in its title; an existing one there too with a mouse (caret at the end), with fingers
+  // (isTouchUi) not: the keyboard would cover the event one only wants to look at or move
+  setTimeout(() => {
+    const t = $('#ev-title', md); if (!t || !md.isConnected || o.cf) return;
+    if (!ev) t.focus(); else if (!isTouchUi()) { t.focus(); try { t.setSelectionRange(t.value.length, t.value.length); } catch { /* no caret */ } }
+  }, 40);
   return md;
 }
 const evMin = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000));

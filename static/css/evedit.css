@@ -1,0 +1,12 @@
+/* Kalmido web client: the event editor (calevents.js evEditor), loaded with the module "evinvite" that the editor loads
+   before it opens (static/js/lazyload.js LD_CSS). 2.846.0 (#5465): "More options" reads as a fold (arrow + what is inside);
+   a person's chip stays one line on a phone (long names end in …); the time zone search field takes the row */
+.evmore>summary{gap:.375rem;color:var(--text2);list-style:none;border-top:1px solid var(--line);padding-top:.25rem}
+.evmore>summary::-webkit-details-marker{display:none}
+.evmore>summary .fcar{transform:rotate(-90deg);transition:transform .15s;flex:none}
+.evmore[open]>summary .fcar{transform:none}
+.evmore>summary .evmoreh{font-size:var(--fs-s);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.evatp{min-width:0;white-space:nowrap}
+.evatp>span:not(.evps):not(.avatar){min-width:0;overflow:hidden;text-overflow:ellipsis}
+.evatp>.evps,.evatp>.avatar,.evatp>.iconbtn,.evatp>svg{flex:none}
+#ev-tzq{flex:1;min-width:0}

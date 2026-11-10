@@ -27,7 +27,8 @@ function evi_draw(md, atts) {  // the row under "People": only while someone out
   if (!ext.length && !st.orig.size) { row.hidden = true; row.innerHTML = ''; return; }
   row.hidden = false;
   if (st.info && !st.info.mail_ok) {
-    row.innerHTML = `<span class="rlab"></span><span class="muted mhint">${esc(tr('E-mail sending is not set up on this server'))}. ${esc(tr('People outside Kalmido are not notified.'))}</span>`;
+    // 2.846.0 (#5465): in everyday words, without the server's set-up
+    row.innerHTML = `<span class="rlab"></span><span class="muted mhint" id="ev-invno">${esc(tr('Guests outside Kalmido do not get an invitation by e-mail. Let them know yourself.'))}</span>`;
     return;
   }
   const cb = $('#ev-inv', md);

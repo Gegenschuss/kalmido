@@ -10830,7 +10830,6 @@
   "The event is attached as a calendar file. Your answer goes to {0}.": "Der Termin hängt als Kalenderdatei an. Deine Antwort geht an {0}.",
   "Your calendar app removes the event with the attached file.": "Mit der angehängten Datei entfernt deine Kalender-App den Termin.",
   "Send the invitation by e-mail": "Einladung per E-Mail senden",
-  "People outside Kalmido are not notified.": "Personen außerhalb von Kalmido erfahren nichts davon.",
   "Subscription link…": "Kalender-Link…",
   "Anyone who has the link sees the events of this calendar. Keep it to yourself.": "Wer den Link hat, sieht die Termine dieses Kalenders. Gib ihn nicht weiter.",
   "At a fixed time": "Zu fester Zeit",
@@ -18064,5 +18063,10 @@
   "People|event": "Gästeliste",
   "Also private": "Auch privat",
   "Off: the office disappears in the workspace Private, the offices of your organisations stay. Nothing is deleted; switched on again, everything is there as before.": "Aus: Im Arbeitsbereich Privat verschwindet das Büro, die Büros deiner Organisationen bleiben. Nichts wird gelöscht; wieder an, ist alles wie vorher da.",
-  "The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.": "Das Büro ist im Arbeitsbereich Privat ausgeschaltet. Einschalten unter Einstellungen > Module > Büro & Finanzen > Auch privat."
+  "The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.": "Das Büro ist im Arbeitsbereich Privat ausgeschaltet. Einschalten unter Einstellungen > Module > Büro & Finanzen > Auch privat.",
+  "Repeat ends": "Ende der Wiederholung",
+  "Only you so far: add a name or e-mail": "Bisher nur du: Name oder E-Mail hinzufügen",
+  "Time zone, status, link": "Zeitzone, Status, Link",
+  "Search a city": "Stadt suchen",
+  "Guests outside Kalmido do not get an invitation by e-mail. Let them know yourself.": "Gäste außerhalb von Kalmido bekommen keine Einladung per E-Mail. Sag ihnen selbst Bescheid."
 }

@@ -10851,7 +10851,6 @@
   "The event is attached as a calendar file. Your answer goes to {0}.": "De afspraak zit als agendabestand in de bijlage. Je antwoord gaat naar {0}.",
   "Your calendar app removes the event with the attached file.": "Met het bijgevoegde bestand haalt je agenda-app de afspraak weg.",
   "Send the invitation by e-mail": "Uitnodiging per e-mail sturen",
-  "People outside Kalmido are not notified.": "Mensen buiten Kalmido krijgen geen bericht.",
   "Subscription link…": "Abonnementslink…",
   "Anyone who has the link sees the events of this calendar. Keep it to yourself.": "Wie de link heeft, ziet de afspraken van deze agenda. Houd hem voor jezelf.",
   "At a fixed time": "Op een vast tijdstip",
@@ -18064,5 +18063,10 @@
   "People|event": "Personen",
   "Also private": "Ook privé",
   "Off: the office disappears in the workspace Private, the offices of your organisations stay. Nothing is deleted; switched on again, everything is there as before.": "Uit: het kantoor verdwijnt in de werkruimte Privé, de kantoren van je organisaties blijven. Er wordt niets verwijderd; weer aan, is alles zoals voorheen.",
-  "The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.": "Het kantoor staat uit in de werkruimte Privé. Zet het aan onder Instellingen > Modules > Kantoor en financiën > Ook privé."
+  "The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.": "Het kantoor staat uit in de werkruimte Privé. Zet het aan onder Instellingen > Modules > Kantoor en financiën > Ook privé.",
+  "Repeat ends": "Einde van de herhaling",
+  "Only you so far: add a name or e-mail": "Nu alleen jij: voeg een naam of e-mail toe",
+  "Time zone, status, link": "Tijdzone, status, link",
+  "Search a city": "Zoek een stad",
+  "Guests outside Kalmido do not get an invitation by e-mail. Let them know yourself.": "Gasten buiten Kalmido krijgen geen uitnodiging per e-mail. Laat het ze zelf weten."
 }

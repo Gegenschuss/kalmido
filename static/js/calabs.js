@@ -106,18 +106,19 @@ const efb_min = s => { const m = /^(\d{2}):(\d{2})$/.exec(s || ''); return m ? +
 function efb_draw(md, atts, ev) {
   if (!feat('events') || S.me?.kid) return;
   if (!md._efb) {
-    md._efb = {atts, ev, seq: 0, t: 0};
+    md._efb = {atts, ev, seq: 0, t: debounce(box => efb_fetch(md, box), 200)};
     md.addEventListener('change', e => { if (/^ev-(sd|stm|etm|ed|allday|tz)$/.test(/** @type {any} */ (e.target).id || '')) efb_draw(md, md._efb.atts, md._efb.ev); });
   }
   md._efb.atts = atts;
+  // 2.846.0 (#5465): a new event without other people from Kalmido has no bar ("You … busy" alone says nothing new)
+  if (!ev?.id && !atts.some(a => a.user_id && a.user_id !== S.me?.id)) { md._efb.t.cancel(); md._efb.seq++; $('#ev-fb', md)?.remove(); return; }
   let box = $('#ev-fb', md);
   if (!box) {
     const w = $('#ev-atts', md)?.closest('.evatt-w'); if (!w) return;
     w.insertAdjacentHTML('beforeend', '<div class="efb" id="ev-fb" aria-live="polite"></div>');
     box = $('#ev-fb', md);
   }
-  clearTimeout(md._efb.t);
-  md._efb.t = setTimeout(() => efb_fetch(md, box), 200);
+  md._efb.t(box);  // #5465: debounce (core.js) instead of a clearTimeout / setTimeout pair
 }
 
 async function efb_fetch(md, box) {

@@ -10851,7 +10851,6 @@
   "The event is attached as a calendar file. Your answer goes to {0}.": "La cita va adjunta como archivo de calendario. Tu respuesta llega a {0}.",
   "Your calendar app removes the event with the attached file.": "Con el archivo adjunto tu app de calendario elimina la cita.",
   "Send the invitation by e-mail": "Enviar la invitación por correo",
-  "People outside Kalmido are not notified.": "Las personas fuera de Kalmido no reciben aviso.",
   "Subscription link…": "Enlace de suscripción…",
   "Anyone who has the link sees the events of this calendar. Keep it to yourself.": "Quien tenga el enlace ve las citas de este calendario. No lo compartas.",
   "At a fixed time": "A una hora fija",
@@ -18064,5 +18063,10 @@
   "People|event": "Personas",
   "Also private": "También privado",
   "Off: the office disappears in the workspace Private, the offices of your organisations stay. Nothing is deleted; switched on again, everything is there as before.": "Desactivado: la oficina desaparece en el espacio de trabajo Privado, las oficinas de tus organizaciones se quedan. No se borra nada; al volver a activarlo, todo está como antes.",
-  "The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.": "La oficina está desactivada en el espacio de trabajo Privado. Actívala en Ajustes > Módulos > Oficina y finanzas > También privado."
+  "The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.": "La oficina está desactivada en el espacio de trabajo Privado. Actívala en Ajustes > Módulos > Oficina y finanzas > También privado.",
+  "Repeat ends": "Fin de la repetición",
+  "Only you so far: add a name or e-mail": "Por ahora solo tú: añade un nombre o un correo",
+  "Time zone, status, link": "Zona horaria, estado, enlace",
+  "Search a city": "Buscar una ciudad",
+  "Guests outside Kalmido do not get an invitation by e-mail. Let them know yourself.": "Los invitados fuera de Kalmido no reciben invitación por correo. Avísales tú."
 }

@@ -90,10 +90,12 @@ const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())
     await call(ev, 'POST', '/api/events', {cal_id: cal.id, title: 'Vorher', start: `${D}T09:00`, end: `${D}T10:00`, tz: 'Europe/Berlin'});
     await ev(`(() => { evEditor({start: '${D}T09:30', end: '${D}T10:30', cal_id: ${cal.id}}); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.evmodal #ev-attin')`), 'the event editor');
-    check(await ready(ev, `document.querySelectorAll('#ev-fb .efbr').length === 1`), 'the bar shows me alone first');
-    check(await ready(ev, `document.querySelector('#ev-fb .efbr')?.classList.contains('busy')`), 'my earlier event collides: busy');
+    // 2.846.0 (#5465): a new event without other people has no bar (it showed "You … busy" alone); with bob: me + him
+    await ready(ev, `typeof efb_draw === 'function'`);  // calabs.js is in: a bar would stand now
+    check(await ev(`!document.querySelector('#ev-fb')`), 'a new event without guests: no availability bar');
     await ev(`(() => { const m = document.querySelector('.evmodal'); const i = m.querySelector('#ev-attin'); i.value = 'Bob Beispiel'; m.querySelector('[data-evm="attadd"]').click(); return 1; })()`);
-    check(await ready(ev, `document.querySelectorAll('#ev-fb .efbr').length === 2`), 'inviting bob adds his line');
+    check(await ready(ev, `document.querySelectorAll('#ev-fb .efbr').length === 2`), 'inviting bob shows the bar: my line and his');
+    check(await ready(ev, `document.querySelector('#ev-fb .efbr')?.classList.contains('busy')`), 'my earlier event collides: busy');
     check(await ready(ev, `[...document.querySelectorAll('#ev-fb .efbr')].some(x => x.classList.contains('away') && /Bob/.test(x.textContent) && /away/.test(x.textContent))`), 'bob is away that day');
     check(await ev(`!!document.querySelector('#ev-fb .efbsel') && !!document.querySelector('#ev-fb .efbb.busy')`), 'the event\'s time marked, my busy span grey');
     check(!(await ev(`/Vorher/.test(document.querySelector('#ev-fb').textContent)`)), 'no titles in the bar');

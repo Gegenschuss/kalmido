@@ -10851,7 +10851,6 @@
   "The event is attached as a calendar file. Your answer goes to {0}.": "L'événement est joint en fichier de calendrier. Ta réponse va à {0}.",
   "Your calendar app removes the event with the attached file.": "Avec le fichier joint, ton app de calendrier retire l'événement.",
   "Send the invitation by e-mail": "Envoyer l'invitation par e-mail",
-  "People outside Kalmido are not notified.": "Les personnes hors de Kalmido ne sont pas prévenues.",
   "Subscription link…": "Lien d'abonnement…",
   "Anyone who has the link sees the events of this calendar. Keep it to yourself.": "Quiconque a le lien voit les événements de ce calendrier. Garde-le pour toi.",
   "At a fixed time": "À heure fixe",
@@ -18064,5 +18063,10 @@
   "People|event": "Personnes",
   "Also private": "Aussi en privé",
   "Off: the office disappears in the workspace Private, the offices of your organisations stay. Nothing is deleted; switched on again, everything is there as before.": "Désactivé : le bureau disparaît de l’espace de travail Privé, les bureaux de tes organisations restent. Rien n’est supprimé ; une fois réactivé, tout est là comme avant.",
-  "The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.": "Le bureau est désactivé dans l’espace de travail Privé. Active-le sous Paramètres > Modules > Bureau et finances > Aussi en privé."
+  "The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.": "Le bureau est désactivé dans l’espace de travail Privé. Active-le sous Paramètres > Modules > Bureau et finances > Aussi en privé.",
+  "Repeat ends": "Fin de la répétition",
+  "Only you so far: add a name or e-mail": "Pour l’instant, toi seul : ajoute un nom ou un e-mail",
+  "Time zone, status, link": "Fuseau horaire, statut, lien",
+  "Search a city": "Chercher une ville",
+  "Guests outside Kalmido do not get an invitation by e-mail. Let them know yourself.": "Les invités hors de Kalmido ne reçoivent pas d’invitation par e-mail. Préviens-les toi-même."
 }

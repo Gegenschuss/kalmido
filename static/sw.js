@@ -85,7 +85,7 @@ const LAZY_CSS = ['/static/css/settings.css', '/static/css/contacts.css', '/stat
   '/static/css/playbook.css', '/static/css/timeline.css', '/static/css/feeds.css', '/static/css/bookmarks.css', '/static/css/sheets.css',
   '/static/css/videorev.css', '/static/css/tagsel.css', '/static/css/filereq.css', '/static/css/fltdlg.css', '/static/css/abscan.css',
   '/static/css/ablage.css', '/static/css/calabs.css', '/static/css/sideviews.css', '/static/css/navmenu.css', '/static/css/whatsnew.css',
-  '/static/css/shoot.css', '/static/css/splitview.css', '/static/css/undolist.css'];
+  '/static/css/shoot.css', '/static/css/splitview.css', '/static/css/undolist.css', '/static/css/evedit.css'];
 self.addEventListener('install', e => { e.waitUntil(swInstall().then(() => self.skipWaiting())); });
 // 2.149.0 B (#2506): the server names every precached static file with its content hash (/sw-manifest.json). A file is kept
 // under "<url>?v=<hash>" (the address index.html asks for), so an update copies every unchanged file from the old cache and
