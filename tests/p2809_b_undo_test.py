@@ -12,6 +12,7 @@ Invented names only.
    back; redo; deleted -> undo -> back; a member takes back the change of their own absence
  - a project's environments (lists/envundo.py): renamed -> undo -> the old name and switch; the webhook alone is no step;
    removed -> undo -> back with the webhook off; removed again, the name taken meanwhile -> undo refused (named)
+ - appointment types (calendars/apptundo.py): name and length -> undo from the phone; deleted -> undo -> back
  - only own steps: another person neither lists nor takes back a step (404)
 freelancer-matrix: undo (a person without an organisation: her bookmark step goes back from the list)
 usage: p2809_b_undo_test.py <datadir>"""
@@ -217,6 +218,25 @@ check(r.status_code == 201, f"(setup) the name taken by a new environment {r.sta
 res = back(A, g["id"])
 check(not res.get("undone") and res.get("stayed") and res["stayed"][0].get("reason") and row("list_envs", EN, "deleted_at").get("deleted_at"),
       f"back out of the trash refused: the name is taken meanwhile {res}")
+
+# ---------------------------------------------------------------- appointment types of the booking page
+r = A.put(B + "/api/appt/page", json={"title": "Termine Beispiel"})
+check(r.ok, f"(setup) the booking page {r.status_code} {r.text[:120]}")
+r = A.post(B + "/api/appt/types", json={"name": "Erstgespraech", "duration_min": 30})
+check(r.status_code == 201, f"(setup) an appointment type {r.status_code} {r.text[:120]}")
+AT = r.json()["id"]
+r = A.patch(B + f"/api/appt/types/{AT}", json={"name": "Beratung", "duration_min": 60}, headers=LAP)
+g = newest(PHONE)
+check(r.ok and g.get("kind") == "appt_type" and g.get("area") == "calendar" and "Erstgespraech" in (g.get("label") or ""),
+      f"the phone lists the appointment type's step {r.status_code} {g}")
+res = back(PHONE, g["id"])
+t = [x for x in A.get(B + "/api/appt/types").json().get("types", []) if x["id"] == AT]
+check(res.get("undone") == [g["id"]] and t and t[0]["name"] == "Erstgespraech" and t[0]["duration_min"] == 30, f"taken back: name and length {res} {t}")
+r = A.delete(B + f"/api/appt/types/{AT}")
+g = newest(A)
+res = back(A, g["id"])
+check(r.ok and res.get("undone") == [g["id"]] and [x for x in A.get(B + "/api/appt/types").json().get("types", []) if x["id"] == AT],
+      f"undo of the delete: the type is back {res}")
 
 # ---------------------------------------------------------------- only own steps
 g = newest(A)

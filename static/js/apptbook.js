@@ -206,14 +206,14 @@ async function apbTypeSave(t, body) {
   // 2.566.0 (#4704): only the changed keys, against the version the step before left (core.js undoStep)
   let ver = j?.updated_at || '';
   const st = (b, from) => undoStep(`/api/appt/types/${t.id}`, b, ver, {now: from, label: t.name || tr('Appointment type changed'), then: x => { ver = x?.updated_at || ver; }}).finally(apbReload);
-  offerUndo(tr('Saved'), histAdd({label: tr('Appointment type changed'), undo: () => st(old, body), redo: () => st(body, old)}));
+  offerUndo(tr('Saved'), histAdd({label: tr('Appointment type changed'), srv: true, undo: () => st(old, body), redo: () => st(body, old)}));
   return j;
 }
 async function apbTypeDelete(t) {
   if (!t) return;
   try { await api('DELETE', `/api/appt/types/${t.id}`); } catch { return; }
   apbReload();
-  offerUndo(tr('Deleted'), histAdd({label: tr('Appointment type deleted'), undo: async () => { await api('POST', `/api/appt/types/${t.id}/restore`, {}); apbReload(); },
+  offerUndo(tr('Deleted'), histAdd({label: tr('Appointment type deleted'), srv: true, undo: async () => { await api('POST', `/api/appt/types/${t.id}/restore`, {}); apbReload(); },
     redo: async () => { await api('DELETE', `/api/appt/types/${t.id}`); apbReload(); }}));
 }
 

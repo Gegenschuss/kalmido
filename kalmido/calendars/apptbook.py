@@ -373,9 +373,12 @@ def apb_type_edit(tid):
     except BadInput as x:
         return err(str(x))
     if f:
+        if set(f) - {"sort"}:  # 2.809.0 (#5476): the owner's step (calendars/apptundo.py); a new order alone is none
+            _apb_step(c, uid, tid)
         f["updated_at"] = iso_ms(now_utc())
         c.execute(f"UPDATE appt_types SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), tid])
         bump(c)
+        _apb_done(c)
         c.commit()
     return jsonify(apb_type_out(apb_type_row(c, uid, tid)))
 
@@ -385,9 +388,12 @@ def apb_type_delete(tid):
     """Deleted with deleted_at (Undo: restore); its bookings stay as they are."""
     c = db()
     uid = apb_gate(c)
+    write_lock(c, f"appt_types-{tid}")  # 2.809.0 (#5476): the lock of its saves around its step
     apb_type_row(c, uid, tid)
+    _apb_step(c, uid, tid, "delete")
     c.execute("UPDATE appt_types SET deleted_at=? WHERE id=?", (iso(now_utc()), tid))
     bump(c)
+    _apb_done(c)
     c.commit()
     return jsonify(ok=True)
 
@@ -396,11 +402,25 @@ def apb_type_delete(tid):
 def apb_type_restore(tid):
     c = db()
     uid = apb_gate(c)
+    write_lock(c, f"appt_types-{tid}")  # 2.809.0 (#5476)
     apb_type_row(c, uid, tid, deleted=True)
+    _apb_step(c, uid, tid, "restore")
     c.execute("UPDATE appt_types SET deleted_at=NULL, updated_at=? WHERE id=?", (iso(now_utc()), tid))
     bump(c)
+    _apb_done(c)
     c.commit()
     return jsonify(apb_type_out(apb_type_row(c, uid, tid)))
+
+
+def _apb_step(c, uid, tid, what=None):
+    """2.809.0 (#5476): the undo step of uid's write of appointment type tid (calendars/apptundo.py imports this module)."""
+    from .apptundo import apu_pre
+    apu_pre(c, uid, tid, what)
+
+
+def _apb_done(c):
+    from .apptundo import apu_post
+    apu_post(c)
 
 
 # bookings
