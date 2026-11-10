@@ -71,7 +71,7 @@ def v1_docs_list():
     rules = None
     if a.get("view") is not None:  # 2.857.0 (#5518): a saved view shared with the caller: its filter on top (docs/dfilter.py)
         from ..core.objects import obj_need
-        if not str(a["view"]).isdigit():
+        if not str(a["view"]).isdecimal():
             raise BadInput(tr("Invalid value: {0}", "view"))
         rules = dvf_rules(obj_need(c, me(), "docview", int(a["view"]), "view")[0])
     rows, total, _rev = doc_query(c, me(), {**a, "limit": limit, "offset": off}, rules=rules)

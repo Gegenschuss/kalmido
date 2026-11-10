@@ -402,7 +402,7 @@ def docs_list():
     uid = me()
     vis = doc_visible(c, uid)  # 2.525.0 (#4195): once for the whole answer
     args, rules = request.args, None
-    if str(request.args.get("view") or "").isdigit():  # 2.857.0 (#5518): ?view=<id> = a saved view's filter (one the caller may see)
+    if str(request.args.get("view") or "").isdecimal():  # 2.857.0 (#5518): ?view=<id> = a saved view's filter (one the caller may see)
         from ..core.objects import obj_need
         from .dfilter import dvf_args, dvf_rules
         row, _ = obj_need(c, uid, "docview", int(request.args["view"]), "view")

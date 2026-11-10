@@ -194,6 +194,20 @@ check(isinstance(j, dict) and len(j["rules"]["conds"][0]["v"]) == 500 and j["tot
 check(count(A, ws="org:abc", rules=R1) == 400, "the count: a bad workspace is 400")
 check(sess().post(B + "/api/docs/views/count", json={"rules": R1}).status_code in (401, 403), "the count needs a signed-in person")
 
+# ---------------------------------------------------------------- 2.857.0 (#5518 review): limits and robust values (rueckfall)
+j = count(A, rules=rules({"f": "sender", "op": "nin", "v": [str(900000 + i) for i in range(40)]}))
+check(isinstance(j, dict) and len(j["rules"]["conds"][0]["v"]) == 30, "a name condition keeps at most 30 names, as the search")
+j = count(A, rules=rules(*[{"f": "text", "op": "has", "v": f"word{i}"} for i in range(8)], op="or"))
+check(isinstance(j, dict) and len(j["rules"]["conds"]) == 5, "at most 5 text conditions per filter")
+ALL = len(flat(A, ""))
+check(total(A, rules({"f": "text", "op": "nhas", "v": "date:foo"})) == ALL, "a text with nothing searchable is off, not an empty view")
+check(total(A, rules({"f": "asn", "op": "eq", "v": "\u00b2"})) == ALL, "asn: a superscript digit is no number (off, no 500)")
+r = A.post(B + f"/api/obj/{K}", json={"title": "Odd folder", "ws": WS, "rules": rules({"f": "folder", "op": "in", "v": ["\u00b2"]})})
+check(r.status_code == 201, f"a view with an odd folder value is stored ({r.status_code})")
+check(A.get(B + "/api/docs/views", params={"ws": WS}).status_code == 200, "the views' list stays 200 with an odd folder value (no 500)")
+check(A.get(B + "/api/docs", params={"ws": WS, "view": "\u00b2"}).status_code != 500, "?view= with a superscript digit is no 500")
+A.post(B + f"/api/obj/{K}/{r.json()['id']}/trash")
+
 # ---------------------------------------------------------------- freelancer-matrix: obj -- a person without an organisation
 F1 = doc_new(Fr, "wombat.txt", "Wombat receipt", "private", sender="Burrow Shop")
 F2 = doc_new(Fr, "koala.txt", "Koala receipt", "private")

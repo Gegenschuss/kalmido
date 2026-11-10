@@ -38,6 +38,9 @@ DVF_OPS = {"sender": ("in", "nin", "empty"), "type": ("in", "nin", "empty"), "ta
            "asn": ("eq", "from", "to", "set", "empty"), "review": ("in", "nin"), "text": ("has", "nhas"), "cf": ("in", "nin")}
 DVF_EXTRA = ("sort", "dir", "area", "unbooked", "state")  # the view's own search parameters next to its conditions
 DVF_JSON_MAX = 20000
+DVF_NAMES_MAX = 30  # 2.857.0 (#5518 review): names per condition, as many as the search takes (dsearch.py dsr_ids out[:30])
+DVF_TEXT_MAX = 5    # 2.857.0 (#5518 review): text conditions per filter (each one reads the documents' texts)
+DVF_FOLDERS_MAX = 50  # 2.857.0 (#5518 review): folder ids of one folder condition
 DVF_PRESETS = ("d7", "d30", "d90", "m0", "m1", "y0", "y1")
 _IDS = re.compile(r"[0-9]{1,12}(?:[,;][0-9]{1,12}){0,99}")
 _ISO = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -77,7 +80,7 @@ def dvf_cond_clean(cnd):
     out = {"f": f, "op": op}
     if op in ("in", "nin"):
         vs = [x for x in (_val(y) for y in (v if isinstance(v, list) else [])[:VAL_MAX]) if x]
-        out["v"] = list(dict.fromkeys(vs))
+        out["v"] = list(dict.fromkeys(vs))[:DVF_NAMES_MAX if f in ("sender", "type", "tag", "folder") else VAL_MAX]
     elif op in ("has", "nhas"):
         out["v"] = v.strip()[:500] if isinstance(v, str) else ""
     elif op in ("from", "to", "eq"):
@@ -105,6 +108,8 @@ def dvf_clean(v):
         raise BadInput(tr("Invalid value: {0}", "rules"))
     conds = v.get("conds") if isinstance(v.get("conds"), list) else []
     out = {"op": "or" if v.get("op") == "or" else "and", "conds": [x for x in (dvf_cond_clean(c) for c in conds[:COND_MAX]) if x]}
+    texts = [x for x in out["conds"] if x["f"] == "text"][DVF_TEXT_MAX:]  # the ones over the limit are left out
+    out["conds"] = [x for x in out["conds"] if not any(x is t for t in texts)]
     for k in DVF_EXTRA:
         x = v.get(k)
         if isinstance(x, str) and _EXTRA.fullmatch(x):
@@ -215,7 +220,7 @@ def _pos(c, cnd, base_where, base_params):
         if op == "set":
             return one([("has_asn", "1")])
         n = str(v or "")
-        if not n.isdigit():
+        if not n.isdecimal():  # isdigit lets "²" through, int() then fails
             return None
         return one([("asn", {"eq": f"{n}-{n}", "from": f"{n}-999999999", "to": f"0-{n}"}[op])])
     if f in ("date", "added") and op in ("from", "to"):
@@ -229,7 +234,7 @@ def _pos(c, cnd, base_where, base_params):
         hit = dsr_hits(c, f"FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {' AND '.join(base_where + w)}", base_params + p, q, text)
         if hit is not None:
             w, p = w + ["d.node_id = ANY(CAST(? AS BIGINT[]))"], p + [st_ids(hit)]
-        return _all(w, p) or ("TRUE", [])
+        return _all(w, p)  # nothing searchable in the text (e.g. only "date:foo"): the condition is off
     if not isinstance(v, list) or not v:
         return None
     if f in ("sender", "type", "tag"):  # one of the names (the search: several sender / type = one of them, tag_mode any)
@@ -237,7 +242,8 @@ def _pos(c, cnd, base_where, base_params):
     if f == "folder":
         if cnd.get("sub") == 0:
             return one([("folder", x) for x in v])
-        return _any(one([("under", i)]) for x in v for i in re.split(r"[,;]", x) if i.isdigit())
+        ids = [i for x in v for i in re.split(r"[,;]", x) if i.isdecimal()][:DVF_FOLDERS_MAX]
+        return _any(one([("under", i)]) for i in dict.fromkeys(ids))
     if f in ("date", "added"):
         parts = []
         for x in v:
