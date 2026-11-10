@@ -105,8 +105,10 @@ const today = new Date().toISOString().slice(0, 10);
     await nav(B + '#office/settings');
     check(await ready(ev, `!!document.querySelector('#os-skonto') && document.querySelector('#os-skonto-days').value === '10'`, 80), 'settings: the cash discount default');
     // ================= a person without organisation
-    await signIn(ev, 'frida');
+    // 2.826.0 (#5505): first leave the app, then sign in - CI v2.787.0 red: the open office page reacted to the new sign-in
+    // (its own reload) and aborted the following navigate (NS_BINDING_ABORTED, also on the retries in ff.js)
     await nav(B + 'static/icon.svg');
+    await signIn(ev, 'frida');
     const FOFF = await quote(CF);
     check(await openDialog(ev, nav, FOFF), 'freelancer: the dialog');
     await ev(pick('progress'));
