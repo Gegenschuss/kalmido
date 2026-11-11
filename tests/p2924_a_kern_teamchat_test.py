@@ -161,6 +161,16 @@ Bo, A, Fe = sess("bob"), sess("alice"), sess("fred")
 check(not old_table(), "copy: every row has its share -> tchat_members is dropped")
 check("team chat, stage 7a (#5069): every old row has its share in the shared core -- tchat_members dropped" in logs(), "copy: the log says so")
 check(sql("SELECT value FROM settings WHERE key='migr_tcx5069'") == [("1",)], "copy: ran once (flag)")
+# 2.924.0 (#5069, Fable review F1): the DROP raises the database's back limit to this image's minor - an older image refuses
+# to start (core/db.py appver_check "format") instead of creating tchat_members empty again and taking every member's share
+fl = dict(sql("SELECT key, value FROM kalmido_meta WHERE key IN ('back_floor','back_floor_how')"))
+mine = in_app("import json; from kalmido.core.config import APP_VERSION; print(json.dumps(APP_VERSION))")
+check(isinstance(mine, str) and fl.get("back_floor") == ".".join(mine.split(".")[:2] + ["0"]) and "#5069" in (fl.get("back_floor_how") or ""),
+      f"drop: back_floor is the minor of this image {fl} {mine}")
+v = in_app("import json, sys; from kalmido.core.db import appver_check; from kalmido.core.config import APP_VERSION as m; "
+           "x = m.split('.'); prev = f'{x[0]}.{int(x[1]) - 1}.0'; "
+           "print(json.dumps(appver_check(m, prev, mine=prev, floor=sys.argv[1])))", fl.get("back_floor"))
+check(v == "format", f"drop: the previous minor (the one step back) now refuses to start on this database: {v}")
 check(share(C, BOB) == "edit" and reads(Bo, C), "copy: bob's old row of the closed channel became his share, he reads it")
 n2 = nodes(R2)
 check(len(n2) == 1 and n2[0][1] == ALICE and n2[0][2] == K, f"copy: the room without a node got one (owner its maker, the organisation) {n2}")

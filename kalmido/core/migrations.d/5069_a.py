@@ -18,6 +18,8 @@ Counting beforehand (read-only, the same rule as the start check):
 (before the first start of 2.924 the forward copy has not run yet: rows of rooms without a node count here, the copy gives them one)
 
 What has no way back: the rows of tchat_members (since 2.565.0 every way in and out wrote the share too, the forward copy covers
-the rest) and its obj_revoked rows. A version before 2.924 fails on the missing table (its readers: the room list, the search,
-the export); the way back is a newer version only."""
+the rest) and its obj_revoked rows. An older version would NOT fail: its schema.py creates the table empty again and its
+tcx_core_sync would take every member's share (Fable review F1). So the DROP raises the database's back limit to the minor
+of the image that dropped (core/kernretire.py kern_retire_floor): an older image refuses to start and names the reason;
+the way back is a newer version or a backup from before."""
 # drop-ok tchat_members: stage 7a of the shared core (#5069, decided 07.11.2026), the members are core shares; collab/tcxcore.py tcx_core_retire drops it after the start check

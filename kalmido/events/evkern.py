@@ -181,8 +181,11 @@ def _old_triggers_drop(c, out):
         if (tg, tb) in trig:
             c.execute(f"DROP TRIGGER IF EXISTS {qi(tg, _OLD_TRIG)} ON {qi(tb, _OLD_TRIG)}")
             out["triggers"] = out.get("triggers", 0) + 1
-    for fn in OLD_FUNCS:
-        c.execute(f"DROP FUNCTION IF EXISTS {qi(fn, _OLD_TRIG)}()")
+    funcs = {r[0] for r in c.execute("SELECT proname FROM pg_proc WHERE pronamespace=current_schema()::regnamespace "  # pg-ok: pg_catalog
+                                      f"AND proname IN ({','.join('?' * len(OLD_FUNCS))})", OLD_FUNCS).fetchall()}
+    for fn in OLD_FUNCS:  # fable 2.924 F6: only the ones still there (not four DROP statements at every start)
+        if fn in funcs:
+            c.execute(f"DROP FUNCTION IF EXISTS {qi(fn, _OLD_TRIG)}()")
 
 
 def ev_kern_drop(c):
@@ -200,9 +203,8 @@ def ev_kern_drop(c):
        "storage"); the next start checks again;
     4. else the sync triggers of stage 3 and their functions go, then DROP TABLE ev_cal_members, book_members and their rows
        in obj_revoked (src = the old table: nothing can put them back; the twin share row of the node stays restorable).
-    One way: a version before 2.924 started on the database afterwards makes the two tables again (empty) and its triggers;
-    its readers read the nodes' shares (every object with members has one), so it runs, and the next start of this one
-    drops them again. Returns {what: number}."""
+    One way: after the DROP the database refuses an older version (core/kernretire.py kern_retire_floor, fable 2.924 F1).
+    Returns {what: number}."""
     out = {}
     with system_ctx(c):  # structure of every workspace
         have = [x for x in OLD_TABLES if c.execute("SELECT to_regclass(?) IS NOT NULL", (x[0],)).fetchone()[0]]

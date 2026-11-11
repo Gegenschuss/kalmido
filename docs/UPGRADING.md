@@ -44,3 +44,8 @@ note about row security) and do not know what came later, such as the closed per
 this limit (`back_floor` in the table `kalmido_meta`), and every version from 2.359.3 on refuses to start below the limit
 of its database and names the step (emergency only: `KALMIDO_ALLOW_DOWNGRADE=1`). A later limit is added to this list and
 to `BACK_LIMITS` in `kalmido/core/db.py` in the same release.
+
+**Shared core, stage 7 (team chat, calendars, address books):** the first start of the version with this step copies the old
+member rows into the shared core and then deletes the old member tables. From then on the database refuses every older
+version (its limit is the version that deleted them, it names the reason): an older version would create the tables empty
+again and take every member's access. The way back is a newer version or a backup from before the update.
