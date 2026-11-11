@@ -1659,7 +1659,6 @@ PUT /api/lists/{}/in-mine
 PUT /api/lists/{}/layout
 PUT /api/lists/{}/links/order
 PUT /api/lists/{}/page-style
-PUT /api/lists/{}/playbook
 PUT /api/me/avatar
 PUT /api/newsletter
 PUT /api/newsletter/consent
