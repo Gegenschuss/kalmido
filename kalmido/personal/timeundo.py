@@ -109,10 +109,16 @@ def teu_scrub_moved(c, eid, lid, tid):
     """#5582 (review of 2.900, finding 3): an entry moved by a save into a locked project (or onto a task of one): its older
     steps (changes and a delete taken back) hold the note and task title of before in their copies -> they go, as the lock
     drops them for the entries already there (collab/liste2eguard.py le2b_scrub_undo_free). The step of this save is recorded
-    after it. The caller commits."""
+    after it. The caller commits.
+    Review 2.936: also its history rows (core/writes.py obj_undo_hist keeps note / task title before and after an undo), under
+    the entry's lock (an undo of the same entry waits); True = moved into a locked project: the save records no undo step
+    (its copy would hold the note of before)."""
     if not _locked(c, lid, tid):
-        return 0
-    return le2b_scrub_undo(c, "kind IN (?, ?) AND ref_id=?", (TEU_KIND, TEU_LIFE, int(eid)))
+        return False
+    write_lock(c, f"time-{int(eid)}")
+    le2b_scrub_undo(c, "kind IN (?, ?) AND ref_id=?", (TEU_KIND, TEU_LIFE, int(eid)))
+    c.execute("DELETE FROM obj_history WHERE kind=? AND ref_id=?", (TEU_KIND, int(eid)))
+    return True
 
 
 def teu_deleted(c, uid, row):

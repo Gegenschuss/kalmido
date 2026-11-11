@@ -57,6 +57,13 @@ def run(s, who):
     r = s.patch(B + f"/api/time/entries/{te}", json={"minutes": 45, "note": mk + "Second"})
     check(r.ok and r.json().get("undo_group"), f"(setup) {who}: a change is an undo step {r.status_code} {r.text[:160]}")
     check(bool(copies(mk + "First")), f"(setup) {who}: the step's copy holds the first note")
+    # 2.936.0 review: an undo + redo of that step writes the note before / after into the history (core/writes.py obj_undo_hist)
+    g0 = r.json()["undo_group"]
+    r = s.post(B + f"/api/undo/to/{g0}")
+    check(r.ok, f"(setup) {who}: undo of the change {r.status_code} {r.text[:160]}")
+    r = s.post(B + f"/api/undo/{g0}/redo")
+    check(r.ok and (s.get(B + f"/api/time/entries/{te}").json().get("note") or "") == mk + "Second",
+          f"(setup) {who}: redo of the change {r.status_code} {r.text[:160]}")
     dbw("UPDATE lists SET e2e='on' WHERE id=?", (lk,))
     r = s.patch(B + f"/api/time/entries/{te}", json={"list_id": lk, "note": ""})
     e = s.get(B + f"/api/time/entries/{te}").json()
@@ -64,6 +71,11 @@ def run(s, who):
           f"a) {who}: the entry moves into the locked project without its note {r.status_code} {r.text[:200]}")
     left = copies(mk + "First")
     check(not left, f"#5582 a) {who}: its older undo step (the note of before in the copy) is gone {left}")
+    # 2.936.0 review (Fable, findings 1 + 2): the move itself records no step holding the note of before, its history rows go
+    left = copies(mk + "Second")
+    check(not left, f"#5582 a) {who}: no undo copy holds the note it had just before the move {left}")
+    hist = kt.dbx("SELECT id FROM obj_history WHERE kind='time_entry' AND ref_id=?", (te,))
+    check(not hist, f"#5582 a) {who}: no history row of the moved entry is left (note before / after an undo) {hist}")
     dbw("UPDATE lists SET e2e=NULL WHERE id=?", (lk,))
 
     # ---- b) redo of a deleted entry whose project was locked since

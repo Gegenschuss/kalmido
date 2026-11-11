@@ -707,9 +707,11 @@ def time_update(eid):
     ug = None
     if sets:
         from .timeundo import teu_post, teu_pre, teu_scrub_moved  # 2.809.0 (#5476): a step of the person's undo list
-        if ("task_id" in b or "list_id" in b) and (lid, tid) != (r["list_id"], r["task_id"]):
-            teu_scrub_moved(c, eid, lid, tid)  # #5582: into a locked project: its older steps (old note in the copy) go
-        teu_pre(c, me(), eid)
+        moved = ("task_id" in b or "list_id" in b) and (lid, tid) != (r["list_id"], r["task_id"])
+        # #5582: into a locked project: its older steps and history (old note in the copy) go, and this save records no step
+        # (its copy would hold the note of before); review 2.936: under the entry's lock, before anything else is written
+        if not (moved and teu_scrub_moved(c, eid, lid, tid)):
+            teu_pre(c, me(), eid)
         guard = " AND billed_doc_id IS NULL" if tbill_guard(r, b) else ""  # 2.144.6 A (#2053 review 1): billed meanwhile -> 409
         # 2.576.0 (#4764): to the millisecond: two saves in one second are two versions for the dialog's watch (objsave.js dlgStale)
         if c.execute(f"UPDATE time_entries SET {', '.join(sets)}, updated_at=? WHERE id=?{guard}", (*args, iso_ms(now_utc()), eid)).rowcount == 0:
