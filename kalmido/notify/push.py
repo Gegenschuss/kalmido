@@ -36,8 +36,6 @@ from ..core.merges import mg_prune  # 2.149.0 G (#2517): pulled up from function
 from ..lists.lffolder import lf_expire_tick  # 2.352.0 A (#2748)
 from ..core.dlock import dl_of, dl_task_hidden  # 2.369.5 (#2517): pulled up from functions
 from ..core.access import _list_role  # 2.369.5 (#2517): pulled up from functions
-from ..lists.listtrash import otr_prune  # 2.369.5 (#2517): pulled up from functions
-from ..tasks.tasktrash import ttp_tick  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgretain import odl_retired_prune  # 2.369.5 (#2517): pulled up from functions
 from ..lists.listhead import o3c_pic_tick  # 2.498.0 (#3884): module level, it sits in a lower layer
 from ..accounts.tenancy import boundary_tick  # 2.369.5 (#2517): pulled up from functions
@@ -792,8 +790,6 @@ def _watchdog_tick(c):
     from ..videos.review import vdr_trash_prune
     _wd_section(c, "video trash", vdr_trash_prune)  # 2.99.1 (#1959) review M3: video sign-offs in the trash after 30 days
     _wd_section(c, "list folder shares", lf_expire_tick)  # 2.352.0 A (#2748): an expired share of a projects folder ends its roles
-    _wd_section(c, "list trash", otr_prune)  # 2.102.0 A (#1988): deleted lists for good after 30 days, with their files
-    _wd_section(c, "task trash", ttp_tick)  # 2.116.0 A (#2063): tasks in the trash after KALMIDO_TRASH_DAYS (switch: core/retention)
     from ..admin.dataretention import ckd_tick, lgc_tick, orf_tick
     _wd_section(c, "old logs", lgc_tick)  # 2.152.0 D (#2171): daily; old logs only while the switch "logs" is on, expired sessions / tokens always
     _wd_section(c, "orphan files", orf_tick)  # 2.152.0 D (#2173): weekly; files without a row, old file versions (switch "files")

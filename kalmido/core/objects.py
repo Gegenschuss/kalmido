@@ -61,6 +61,12 @@ Interface (signatures fixed; stages 2 / 3 and the first areas #1958 #1957 #4675 
                  it (only the ones that went with it) and are deleted for good with it
       trash_prune True: the core's retention run (obj_trash_tick) deletes the kind's trash after the trash period; False
                  (default): the area keeps its own run until its stage moves it onto the core
+      2.936.0 (#5364, stage 2a of the core's trash: tasks and projects) -- the area's part of the delete for good is its
+      obj_on_purge hook (core/writes.py); the registration adds:
+      trash_keep f(alias) -> (sql, args): the objects of the trash the retention run leaves (kept by law); counted as
+                 <kind>_kept in its report
+      trash_batch the most objects one run takes of the kind (default OBJ_PRUNE_BATCH; the rest follows in the next hour)
+                 A light kind may have trash_prune too (retention only: its trash and restore stay its area's routes).
       2.754.0 (#5268, Q0b of the cross-section audit #3563) -- a light kind of an old area (task, event, hub_mail, client):
       node       False: the kind has no reference node at all (no fs_ref_register, no shares, no folder, no routes -- routes=
                  is ignored --, no fields, no write path of the core: obj_reg_node refuses it with 404, obj_visible_sql / obj_rows with ValueError -- the
@@ -197,7 +203,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
                  fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True, node_shares=False,
                  fs_hooks=None, org_join="member", children=(), trash_prune=False, node=True, agent_own=False,
-                 on_share_back=None):
+                 on_share_back=None, trash_keep=None, trash_batch=None):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload).
     2.565.0 (#4719): listed=False = the object's reference node only carries its shares (files/fsref.py): it lies in no
     folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take.
@@ -243,9 +249,11 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
     kids = tuple(tuple(x) for x in (children or ()))  # 2.773.0 (#5292)
     if any(len(x) != 2 or not all(_TABLE.fullmatch(y or "") for y in x) or x[0] == table for x in kids):
         raise ValueError(f"obj_register {kind}: children must be ((table, key column), ...) of other tables")
-    if not node and (kids or trash_prune):  # a light kind (2.754.0, #5268) has no trash of the core (2.773.0, #5292)
-        raise ValueError(f"obj_register {kind}: a kind without node has no children / trash_prune")
-    reg.update(children=kids, trash_prune=bool(trash_prune))
+    # a light kind (2.754.0, #5268) has no trash of the core (2.773.0, #5292); 2.936.0 (#5364): only the retention run
+    if not node and kids:
+        raise ValueError(f"obj_register {kind}: a kind without node has no children")
+    reg.update(children=kids, trash_prune=bool(trash_prune), trash_keep=trash_keep,
+               trash_batch=int(trash_batch) if trash_batch else None)  # 2.936.0 (#5364)
     OBJ[kind] = reg
     if not fsref:
         return reg  # 2.568.0 (#4739): the area's own registration in files/fsref.py stays

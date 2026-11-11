@@ -215,6 +215,15 @@ c.commit()
   kinds: the own runs of the bookmarks, feeds, video sign-offs (reviews; comments deleted on their own stay there), the
   calendars and the address books' line of `tp_tick` are gone. The rows in the trash before 2.947.0 are the core's trash as
   they are (`deleted_by` empty: only who manages them restores them).
+- 2.936.0 (#5364, stage 2a of the trash: tasks and projects): their trash period is the core's run too. The kind `list`
+  (`lists/lmcore.py`) and the light kind `task` (`core/objlight.py`; a light kind may have `trash_prune`, retention only)
+  delete through their `obj_on_purge` hooks (`lists/listtrash.py otr_core_purge`: the project with its tasks and files;
+  `tasks/tasktrash.py ttp_core_purge`: the task with its subtasks and attachments, subtasks not due are detached).
+  `obj_register(trash_keep=f(alias) -> (sql, args))` = what the run leaves (kept by law: `lists.retain_until`), checked again
+  under the lock and reported as `<kind>_kept`; `trash_batch=n` = at most n per run (projects 50, tasks 500). A hook that
+  fails keeps its object for the next run and counts as `<kind>_err` (one savepoint per kind; the run raises after its
+  commit, the watchdog reports it). The runs `ttp_tick` and `otr_prune` are gone; the report run is `obj_trash` (`task`,
+  `task_kept`, `list`, `list_kept`).
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
   `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).

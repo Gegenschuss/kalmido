@@ -389,7 +389,7 @@ def obj_purge_after(keep_locked=False):
     """2.809.0 (#5365): collects the after-commit work of the purges within ({"after": [...], "locked": n}); the caller commits
     and then calls unlink_files(box["after"]). keep_locked: a Denied of an area's hook keeps that object (counted) instead of
     refusing (the retention run)."""
-    box = {"after": [], "locked": 0, "keep": bool(keep_locked)}
+    box = {"after": [], "locked": 0, "err": [], "keep": bool(keep_locked)}  # 2.936.0 (#5364, review): err
     tok = _PURGE_BOX.set(box)
     try:
         yield box
@@ -410,6 +410,14 @@ def _purge_area(c, kind, rid):
         if box is None or not box["keep"]:
             raise
         box["locked"] += 1
+        return False
+    except Exception as e:  # noqa: BLE001 - 2.936.0 (#5364): in the retention run one object that fails (its savepoint undone)
+        # waits for the next run instead of holding every other one back hour after hour; it is no lock -- counted as
+        # <kind>_err with its message, and obj_trash_tick raises after its commit so the watchdog reports it (_wd_section)
+        if box is None or not box["keep"]:
+            raise
+        print("obj purge:", kind, int(rid), "kept for the next run:", type(e).__name__, str(e)[:200], flush=True)
+        box["err"].append(f"{kind} {int(rid)}: {type(e).__name__}")
         return False
     if out and box is not None:
         box["after"] += list(out)
@@ -519,19 +527,50 @@ def obj_purge(c, uid, kind, rid):
 OBJ_PRUNE_BATCH = 500  # 2.809.0 (#5365, review): at most so many objects per kind and run (one lock each); the rest next hour
 
 
+def _reg_trash(kind):
+    """2.936.0 (#5364): the registration of a core kind for the retention run -- a kind with a node, or a light kind with
+    trash_prune (its area's obj_on_purge hook deletes it: tasks); Denied(404) for any other light kind."""
+    reg = obj_reg(kind)
+    if not reg.get("node", True) and not reg.get("trash_prune"):
+        raise Denied(404)  # 2.754.0 (#5268): a light kind has no trash of the core
+    return reg
+
+
+def _keep(reg, a):
+    """2.936.0 (#5364): (' AND NOT (...)', args) of the kind's objects the retention run leaves (trash_keep), else ('', ())."""
+    if reg.get("trash_keep") is None:
+        return "", ()
+    sql, args = reg["trash_keep"](a)
+    return f" AND NOT ({sql})", tuple(args)
+
+
 def obj_trash_due(c, kind, cut=None, limit=None):
     """2.773.0 (#5292): the ids of the kind's objects in the trash longer than the trash period (core/retention.py ret_trash_cut).
     2.783.0 (#5368): a side object of core/objparts.py (part_kind trash_prune=True) the same way.
-    2.809.0 (#5365, review): limit = at most so many (the oldest ids first; core kinds only)."""
+    2.809.0 (#5365, review): limit = at most so many (the oldest ids first; core kinds only).
+    2.936.0 (#5364): without the ones its trash_keep leaves (kept by law)."""
     if kind in PART_KINDS and kind not in OBJ:
         with system_ctx(c):
             return part_trash_due(c, kind, cut or ret_trash_cut())
-    reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no trash of the core
+    reg = _reg_trash(kind)
     t = reg["table"]
+    kq, ka = _keep(reg, qi(t, (t,)))
     with system_ctx(c):  # the retention run reads every workspace's trash (ids only, no content)
         lim = f" LIMIT {int(limit)}" if limit else ""
-        return [r[0] for r in c.execute(f"SELECT id FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<? ORDER BY id{lim}",
-                                        (cut or ret_trash_cut(),)).fetchall()]
+        return [r[0] for r in c.execute(f"SELECT id FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<?{kq} ORDER BY id{lim}",
+                                        (cut or ret_trash_cut(), *ka)).fetchall()]
+
+
+def obj_trash_kept(c, kind, cut=None):
+    """2.936.0 (#5364): how many of the kind's objects past the trash period its trash_keep leaves (kept by law); 0 without."""
+    reg = _reg_trash(kind)
+    if reg.get("trash_keep") is None:
+        return 0
+    t = reg["table"]
+    sql, args = reg["trash_keep"](qi(t, (t,)))
+    with system_ctx(c):  # the retention run counts every workspace's kept trash (a number only, no content)
+        return c.execute(f"SELECT COUNT(*) FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<? AND ({sql})",
+                         (cut or ret_trash_cut(), *args)).fetchone()[0]
 
 
 def obj_trash_prune(c, kind, cut=None, purge=None, ids=None, paths=None):
@@ -540,7 +579,10 @@ def obj_trash_prune(c, kind, cut=None, purge=None, ids=None, paths=None):
     report (ret_report run obj_<kind>). ids: read already by the caller. Returns their number; the caller commits.
     2.783.0 (#5368): a side object kind (core/objparts.py part_kind trash_prune=True: webhooks, chat messages, member memos,
     the copies of list_part_trash) goes through part_trash_purge; the files it names land in paths (the caller unlinks them
-    after its commit: files/store.py fs_purge_files)."""
+    after its commit: files/store.py fs_purge_files).
+    2.936.0 (#5364): the kind's trash_keep (kept by law) stays, also when checked again under the lock; trash_batch per kind;
+    when deleting, the number is the objects deleted (also one that went with another of the run, e.g. a subtask with its
+    parent), not the ones restored or kept meanwhile."""
     purge = ret_on("trash") if purge is None else bool(purge)
     if kind in PART_KINDS and kind not in OBJ:
         old = obj_trash_due(c, kind, cut) if ids is None else [int(x) for x in ids]
@@ -550,29 +592,37 @@ def obj_trash_prune(c, kind, cut=None, purge=None, ids=None, paths=None):
             if paths is not None:
                 paths += got
         return len(old)
-    reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no trash of the core
+    reg = _reg_trash(kind)  # 2.936.0 (#5364): a light kind with trash_prune too (tasks)
     # 2.809.0 (#5365, review): a batch per run - every file-store node runs here now, and thousands of advisory locks in one
     # transaction would break the whole tick (max_locks_per_transaction) hour after hour
-    old = obj_trash_due(c, kind, cut, limit=OBJ_PRUNE_BATCH) if ids is None else [int(x) for x in ids]
+    old = obj_trash_due(c, kind, cut, limit=reg.get("trash_batch") or OBJ_PRUNE_BATCH) if ids is None else [int(x) for x in ids]
     if old and purge:
         t, cut = reg["table"], cut or ret_trash_cut()
+        kq, ka = _keep(reg, qi(t, (t,)))
+        n = 0
         with system_ctx(c):  # no person: the period ran out (the rights were checked when it went into the trash)
             for rid in old:
                 write_lock(c, f"obj-{kind}-{int(rid)}")
                 # 2.784.0 (#5366 review): checked again under the lock - a restore (e.g. via /api/undo) between reading the
                 # ids and the lock keeps its row alive instead of losing it for good
-                if not c.execute(f"SELECT 1 FROM {qi(t, (t,))} WHERE id=? AND {trash_sql()} AND deleted_at<?",
-                                 (int(rid), cut)).fetchone():
+                if not c.execute(f"SELECT 1 FROM {qi(t, (t,))} WHERE id=? AND {trash_sql()} AND deleted_at<?{kq}",
+                                 (int(rid), cut, *ka)).fetchone():
+                    # 2.936.0 (#5364): gone = it went with another one of this run (a subtask with its parent): counted
+                    if not c.execute(f"SELECT 1 FROM {qi(t, (t,))} WHERE id=?", (int(rid),)).fetchone():
+                        n += 1
                     continue
                 _purge_rows(c, kind, reg, rid)
+                n += 1
         obj_forget()
         bump(c, _area(reg))
+        return n
     return len(old)
 
 
 def obj_trash_tick(c, force=False):
     """2.773.0 (#5292): the watchdog's hourly run over the kinds registered with trash_prune=True (the others keep their
-    area's run until their stage moves them onto the core)."""
+    area's run until their stage moves them onto the core). 2.936.0 (#5364): + <kind>_kept (trash_keep, kept by law); tasks
+    and projects run here too (the runs ttp_tick / otr_prune went)."""
     if not ret_due("obj_trash", force=force):
         return {}
     purge, cut, out = ret_on("trash"), ret_trash_cut(), {}
@@ -580,12 +630,27 @@ def obj_trash_tick(c, force=False):
     with obj_purge_after(keep_locked=True) as box:  # 2.809.0 (#5365): the areas' stored files after the commit, receipts locked
         for kind, reg in sorted(OBJ.items()):
             if reg.get("trash_prune"):
-                n0 = box["locked"]
-                n = obj_trash_prune(c, kind, cut, purge)
+                n0, a0, e0 = box["locked"], len(box["after"]), len(box["err"])
+                try:  # 2.936.0 (#5364, review): one savepoint per kind -- a kind that fails holds back no other one
+                    with c.savepoint():
+                        n = obj_trash_prune(c, kind, cut, purge)
+                except Exception as e:  # noqa: BLE001 - this kind waits for the next run, the watchdog hears of it below
+                    del box["after"][a0:]  # its rows stay, so do their files
+                    box["locked"] = n0
+                    del box["err"][e0:]
+                    box["err"].append(f"{kind}: {type(e).__name__}")
+                    print("core trash:", kind, type(e).__name__, str(e)[:200], flush=True)
+                    out[kind + "_err"] = 1
+                    continue
+                er = len(box["err"]) - e0
+                if er:
+                    out[kind + "_err"] = er
                 lk = box["locked"] - n0
-                out[kind] = n - lk  # 2.809.0 (#5365, review): a locked receipt counts as locked, not as deleted
+                out[kind] = n - lk - er  # 2.809.0 (#5365, review): a locked receipt counts as locked, not as deleted (2.936.0: nor an error)
                 if lk:
                     out[kind + "_locked"] = lk
+                if reg.get("trash_keep") is not None:  # 2.936.0 (#5364)
+                    out[kind + "_kept"] = obj_trash_kept(c, kind, cut)
         for kind, k in sorted(PART_KINDS.items()):  # 2.783.0 (#5368): the side objects (core/objparts.py), one savepoint each
             if k["trash_prune"] and kind not in OBJ:
                 got = []
@@ -605,6 +670,8 @@ def obj_trash_tick(c, force=False):
     unlink_files(box["after"])  # 2.809.0 (#5365): after the commit (a failed commit keeps the rows and their files)
     if paths:  # after the commit: a failed commit keeps the rows and their files
         fs_purge_files([], paths)
+    if box["err"]:  # 2.936.0 (#5364, review): after the commit -- the watchdog (notify/push.py _wd_section) reports it
+        raise RuntimeError("core trash run: " + "; ".join(box["err"][:10]))
     return out
 
 

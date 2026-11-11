@@ -9,23 +9,23 @@ organisation's admins, its owner and its list admins, all only while they are me
 owner who left never sees it, and nothing of it ever lands in a private space). Agents never. Restoring brings the list
 back into the same place (archived, the same organisation or private space). After OTR_TRASH_DAYS the watchdog deletes it
 for good (tasks, comments, attachments with their files, fields, chat); time entries stay with list_id NULL (bookkeeping).
+2.936.0 (#5364, stage 2a of the core's trash): that run is the core's (core/writes.py obj_trash_tick over the kind list of
+lists/lmcore.py: trash_prune, trash_keep=otr_keep, its obj_on_purge hook otr_core_purge); otr_prune went.
 Lists with end-to-end encryption keep the immediate hard delete (lists.list_purge)."""
-import time
 from datetime import timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import bump, db, err, iso, now_utc
-from ..core.retention import ret_days, ret_on, ret_report, ret_trash_cut
+from ..core.retention import ret_days, ret_on
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import collab_all, Denied, health_hidden, token_lists
+from ..core.access import collab_all, Denied, health_hidden, live_sql, token_lists, trash_sql  # 2.936.0 (#5364): live_sql, trash_sql
 from .lists import list_purge  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.pictures import list_icon_drop_file  # 2.369.5 (#2517): pulled up from functions
 
 OTR_TRASH_DAYS = max(1, ret_days("trash"))  # 2.272.0 A (#3026): floor 1 like ret_trash_days; 30 like the other trash periods; 2.152.0 (#2165): KALMIDO_TRASH_DAYS moves it
-OTR_PRUNE = {"at": 0.0}
 
 
 def otr_trash(c, lid, uid):
@@ -37,7 +37,7 @@ def otr_trash(c, lid, uid):
             break
         ts = iso(t + timedelta(seconds=i))
     c.execute("UPDATE lists SET deleted_at=?, deleted_by=? WHERE id=?", (ts, uid, lid))
-    c.execute("UPDATE tasks SET deleted_at=? WHERE list_id=? AND deleted_at IS NULL", (ts, lid))
+    c.execute(f"UPDATE tasks SET deleted_at=? WHERE list_id=? AND {live_sql()}", (ts, lid))
     from ..integrations.gitfolder import gf_before_list_delete
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository keeps syncing into a live list of its folder
     return ts
@@ -71,7 +71,7 @@ def otr_can(c, uid, r):
 
 
 def otr_need(c, lid):
-    r = c.execute("SELECT * FROM lists WHERE id=? AND deleted_at IS NOT NULL", (lid,)).fetchone()
+    r = c.execute(f"SELECT * FROM lists WHERE id=? AND {trash_sql()}", (lid,)).fetchone()
     if not otr_can(c, me(), r):
         raise Denied(404)
     return r
@@ -104,7 +104,7 @@ def otr_index():
     orgs = user_orgs(c, uid)
     oq = ",".join("?" * len(orgs)) or "NULL"
     rows = c.execute(f"""SELECT l.*, (SELECT COUNT(*) FROM tasks t WHERE t.list_id=l.id AND t.deleted_at=l.deleted_at) AS n
-                         FROM lists l WHERE l.deleted_at IS NOT NULL AND (l.owner_id=? OR l.org_id IN ({oq})
+                         FROM lists l WHERE {trash_sql('l')} AND (l.owner_id=? OR l.org_id IN ({oq})
                            OR l.id IN (SELECT list_id FROM list_members WHERE user_id=? AND role='admin'))
                          ORDER BY l.deleted_at DESC, l.id""", (uid, *orgs, uid)).fetchall()
     rows = [r for r in rows if otr_can(c, uid, r)]
@@ -176,46 +176,28 @@ def otr_delete(lid):
     return jsonify(ok=True)
 
 
-def otr_prune(c, force=False):
-    """The watchdog (at most hourly, system context): lists in the trash longer than the trash period go for good.
-    2.272.0 A (#3026): like every retention run only while ret_on("trash") is on, else it counts (ret_report run="lists").
-    Returns the number of lists deleted for good."""
-    if not force and time.time() - OTR_PRUNE["at"] < 3600:
-        return 0
-    OTR_PRUNE["at"] = time.time()
-    cut, purge = ret_trash_cut(), ret_on("trash")
-    n = 0
-    # 2.186.0 A (#2566): a project with receipts kept by law (lists.retain_until, useradmin.ua8_receipts_keep) waits for its end
-    today = now_utc().date().isoformat()
-    due = [r[0] for r in c.execute("SELECT id FROM lists WHERE deleted_at IS NOT NULL AND deleted_at<? AND (retain_until IS NULL "
-                                   "OR retain_until='' OR retain_until<?)", (cut, today)).fetchall()]
-    counts = {"lists_kept": c.execute("SELECT COUNT(*) FROM lists WHERE deleted_at IS NOT NULL AND deleted_at<? AND retain_until>=?",
-                                      (cut, today)).fetchone()[0]}
-    if not purge:
-        q = ",".join("?" * len(due)) or "NULL"
-        counts["lists"] = len(due)
-        counts["tasks"] = c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN ({q})", due).fetchone()[0] if due else 0
-        ret_report(c, "trash", counts, False, run="lists")
-        c.commit()
-        return 0
-    for lid in due:
-        got = otr_hard(c, lid)
-        if got is None:  # 2.102.0 review F1: restored meanwhile
-            c.commit()
-            continue
-        icon, files = got
-        c.commit()
-        otr_drop_files(lid, icon, files)
-        n += 1
-    counts["lists"] = n
-    ret_report(c, "trash", counts, True, run="lists")
-    c.commit()
-    return n
+def otr_keep(a):
+    """2.936.0 (#5364): obj_register trash_keep of the kind list -- a project with receipts kept by law (lists.retain_until today
+    or later, useradmin.ua8_receipts_keep; 2.186.0 A, #2566) waits for its end (counted as list_kept)."""
+    return f"COALESCE({a}.retain_until, '')>=?", (now_utc().date().isoformat(),)
+
+
+def otr_core_purge(c, lid):
+    """2.936.0 (#5364): the obj_on_purge hook of the kind list (lists/lmcore.py) -- the core's retention run (core/writes.py
+    obj_trash_tick: system context, the id checked again under its lock, the switch ret_on("trash"), its report run
+    "obj_trash" with list / list_kept / list_err) deletes the project here with its tasks (otr_hard); the icon and the
+    files after its commit. Denied(409) = it stays (restored meanwhile). An error undoes this project only (the core's
+    savepoint), it waits for the next run and the run reports it as list_err (core/writes.py _purge_area). otr_prune went."""
+    got = otr_hard(c, lid)
+    if got is None:  # 2.102.0 review F1: restored meanwhile
+        raise Denied(409)
+    icon, files = got
+    return [lambda: otr_drop_files(lid, icon, files)]
 
 
 def otr_err_task(c, tid):
     """A task of a list in the trash comes back only with its list (409 for whoever may restore the list, else 404)."""
-    r = c.execute("SELECT l.* FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=? AND l.deleted_at IS NOT NULL", (tid,)).fetchone()
+    r = c.execute(f"SELECT l.* FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=? AND {trash_sql('l')}", (tid,)).fetchone()
     if r is None:
         return None
     if not otr_can(c, me(), r):
