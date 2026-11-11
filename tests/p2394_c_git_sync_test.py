@@ -240,6 +240,24 @@ check(x.get("title") == "Fresh issue" and x.get("section_id") == BACKLOG and "Fr
       f"title, section Backlog, text, reference, link: {[x.get(k) for k in ('title', 'section_id', 'content', 'url')]}")
 check(sorted(x.get("ltags") or []) == ["p1", "ui"], f"labels -> project tags: {x.get('ltags')}")
 check(any(c.startswith("@octo on ") and "First!" in c for c in comments(T2)), f"its comment: {comments(T2)}")
+# 2.981.0 (#5274, B4, decided 08.11.2026 question 7): an imported comment belongs to no account here: user_id NULL, the remote
+# author's name as ext_name (was the person who connected the repository); so the deletion of that account keeps the kept text
+# of such a comment in the trash (core/objcomments.py ocm_purge_user takes only the account's own words)
+gc = kt.dbx("SELECT id, user_id, ext_name FROM obj_comments WHERE kind='task' AND ref_id=? AND body LIKE '@octo on %'", (T2,))
+check(gc and gc[0][1] is None and gc[0][2] == "octo", f"B4: the imported comment has no account as its author, the name octo {gc}")
+if gc:
+    GC = gc[0][0]
+    kt.dbx("INSERT INTO obj_comment_trash(comment_id, body, mentions) SELECT id, body, mentions FROM obj_comments WHERE id=?", (GC,))
+    kt.dbx("UPDATE obj_comments SET body='', deleted_at=CURRENT_TIMESTAMP WHERE id=?", (GC,))
+    conn_by = kt.dbx("SELECT created_by FROM git_conns WHERE id=?", (GID,))[0][0]
+    out = subprocess.run(["docker", "exec", CT, "python", "-c", "import app\nfrom kalmido.core.db import connect\n"
+                          "from kalmido.core.objcomments import ocm_purge_user\nc = connect()\n"
+                          f"ocm_purge_user(c, {int(conn_by)})\nc.commit()\nc.close()"], capture_output=True, text=True)
+    check(out.returncode == 0, f"the account purge of the connecting person runs {out.stderr[-400:]}")
+    check(kt.dbx("SELECT body FROM obj_comment_trash WHERE comment_id=?", (GC,)) != [],
+          "B4: the purge of the connecting person's account keeps the kept text of the imported comment in the trash")
+    kt.dbx("UPDATE obj_comments k SET body=x.body, deleted_at=NULL FROM obj_comment_trash x WHERE x.comment_id=k.id AND k.id=?", (GC,))
+    kt.dbx("DELETE FROM obj_comment_trash WHERE comment_id=?", (GC,))
 check(acts(T2, "created") and acts(T2, "created")[0]["data"].get("gsy") == "acme/app#2", "the history names the issue")
 
 # ---- pull: changes of a linked issue

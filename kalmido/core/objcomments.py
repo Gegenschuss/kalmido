@@ -62,7 +62,8 @@ from .objhooks import MOVE, USER_GONE
 from .pg import insert_id, qi, st_ids, system_ctx, table_columns
 from ..accounts.orgroles import org_say_refusal
 
-OCM_KINDS = ("task", "video", "doc_note")  # 2.981.0 (#5273, stage Q4b): + the comments of a video / picture review, the notes on a document
+OCM_KINDS = ("task", "video", "doc_note", "tchat")  # 2.981.0 (#5273, stage Q4b): + the comments of a video / picture review, the notes on a
+#            document; (#5274, Q4c) 'tchat' = the team chat's helpers only (its people hook for the parser; its messages stay in tchat_msgs)
 OCM_MENTION_RE = re.compile(r"<@(\d+)>")  # THE mention token (was MENTION_RE in collab/comments.py, replies.py, ...)
 OCM_MAX = 10000  # characters of a comment (a ciphertext may be longer: the kind's hook text_max)
 OCM_TS = 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00:00"'  # the old ISO form with milliseconds (core/db.py iso_ms)
@@ -79,6 +80,8 @@ def ocm_kind(kind, **hooks):
     role(c, uid, ref_id) -> None | 'view' | 'edit' | 'manage': the area's own role instead of obj_role (2.981.0: a document's
       notes, the file store's role -- its core kind gives no role to who only reads)
     seal(c, ref_id, text) -> the stored text (2.981.0: a document's notes are sealed with the workspace key)
+    say(c, ref_id, uid) -> None | the refusal text: the area's say rule instead of the organisation role's (2.981.0, #5274: the
+      team chat's rooms -- a list's channel, an organisation's channel / group, a direct message; collab/teamchat.py)
     web: {read(c, ref_id, uid) -> raises Denied, add(c, ref_id, uid, b) -> id, out(c, ref_id, uid) -> JSON, changed(c, ref_id),
       state(c, row, uid, value)}: the generic routes (core/objcmtweb.py); a kind without them keeps its own routes
     people(c, ref_id) -> {uid}: who may be mentioned (who reads it)
@@ -111,7 +114,7 @@ def ocm_old_cols(a=""):
             f"{ts('created_at')}, {ts('edited_at')}, {ts('deleted_at')}, {p}extra->>'suggestion' AS suggestion, "
             f"{p}parent_id AS reply_to, {p}extra->'choices' AS choices, {p}extra->'choice' AS choice, {p}ext_name, "
             f"CASE WHEN COALESCE(({p}extra->>'portal')::boolean, false) THEN 1 ELSE 0 END AS portal, "
-            f"{p}extra->>'rule_name' AS rule_name, {p}client_ref")
+            f"{p}extra->>'rule_name' AS rule_name, {p}client_ref, {p}extra->>'source' AS source")  # 2.981.0 (#5274): source
 
 
 OCM_COLS = ocm_old_cols() + ", kind, ref_id, org_id, deleted_by"
@@ -171,7 +174,9 @@ def ocm_row_out(r):
             "edited_at": r["edited_at"], "mentions": [int(x) for x in (r["mentions"] or "").split(",") if x],
             "suggestion": json.loads(r["suggestion"]) if r["suggestion"] else None,
             "reply_to": r["reply_to"] if "reply_to" in k else None, "ext_name": r["ext_name"] if "ext_name" in k else None,
-            "portal": bool(r["portal"]) if "portal" in k else False, "rule_name": r["rule_name"] if "rule_name" in k else None}
+            "portal": bool(r["portal"]) if "portal" in k else False, "rule_name": r["rule_name"] if "rule_name" in k else None,
+            # 2.981.0 (#5274): 'git' = imported from a repository (ext_name: its author); only when set
+            **({"source": r["source"]} if "source" in k and r["source"] else {})}
 
 
 def ocm_extra(c, cid, key, value):
@@ -221,6 +226,9 @@ def ocm_say_refusal(c, kind, ref_id, uid):
     orgroles.py RO_MSG / GUEST_MSG, not translated): a guest / read-only person of the object's organisation who cannot change
     the object itself only reads. Private objects and people without that role: None. (Was task_say_refusal, #4549.)"""
     from .objects import OBJ_RANK, obj_space
+    own = (OCM_HOOKS.get(kind) or {}).get("say")
+    if own is not None:  # 2.981.0 (#5274): the area's rule (the team chat's rooms)
+        return own(c, int(ref_id), uid)
     sp = obj_space(c, ocm_obj(kind), int(ref_id))
     msg = org_say_refusal(c, uid, sp[0]) if sp and sp[0] else None
     return msg if msg and OBJ_RANK[_role(c, uid, kind, ref_id) or None] < OBJ_RANK["edit"] else None

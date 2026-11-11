@@ -18247,5 +18247,6 @@
   "Select the model per run": "Model per run kiezen",
   "For your messages and decisions": "Voor je berichten en beslissingen",
   "For routine": "Voor routine",
-  "Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.": "Je berichten, knoppen, reacties en opmerkingen en elke run die een beslissing kan vragen gebruiken het eerste model; stille wekmomenten, nieuwe taken, opvolgingen en geplande taken zonder waarschuwing het tweede. Bij twijfel het eerste."
+  "Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.": "Je berichten, knoppen, reacties en opmerkingen en elke run die een beslissing kan vragen gebruiken het eerste model; stille wekmomenten, nieuwe taken, opvolgingen en geplande taken zonder waarschuwing het tweede. Bij twijfel het eerste.",
+  "{0} (from the repository)": "{0} (uit de repository)"
 }

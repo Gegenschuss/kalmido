@@ -251,9 +251,12 @@ def gis_after(r, uid, lg, stats):
                 imp_warn_rep(rep, tr("Only the first {0} comments of an issue were imported", GIS_COMMENTS_MAX, lg=lg), t["title"])
             for x in cms:
                 # 2.394.0 C (#3377 review of B): control / bidi characters out; without a date the task's (the import's) time
-                head = tr("@{0} on {1}:", imp_line(x["author"], 100) or "?", _gis_day(x["created_at"], lg), lg=lg)
-                cid = ocm_add(c, "task", tid, uid, (head + "\n\n" + imp_textblock(x["body"], 100000))[:100000],
-                              created_at=x["created_at"] or row["created_at"] or ts)  # 2.972.0 (#5272): the core's comment
+                who = imp_line(x["author"], 100) or "?"
+                head = tr("@{0} on {1}:", who, _gis_day(x["created_at"], lg), lg=lg)
+                # 2.972.0 (#5272): the core's comment; 2.981.0 (#5274, question 7): no account as its author (was the importing
+                # person: its deletion took the kept text of such a comment in the trash with it), the remote author's name
+                cid = ocm_add(c, "task", tid, None, (head + "\n\n" + imp_textblock(x["body"], 100000))[:100000], ext_name=who, extra={"source": "git"},
+                              created_at=x["created_at"] or row["created_at"] or ts)
                 if isinstance(x.get("id"), int) and not isinstance(x.get("id"), bool):
                     c.execute("""INSERT INTO git_issue_comments(conn_id,issue_no,remote_id,comment_id,created_at) VALUES(?,?,?,?,?)
                                  ON CONFLICT DO NOTHING""", (r["id"], n["no"], x["id"], cid, ts))

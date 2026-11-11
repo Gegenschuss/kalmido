@@ -18247,5 +18247,6 @@
   "Select the model per run": "Modell je Lauf wählen",
   "For your messages and decisions": "Für deine Nachrichten und Entscheidungen",
   "For routine": "Für Routine",
-  "Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.": "Deine Nachrichten, Knöpfe, Reaktionen und Kommentare und jeder Lauf, der eine Entscheidung brauchen kann, nehmen das erste Modell; stille Weckrufe, neue Aufgaben, Nachfassen und geplante Aufträge ohne Warnzeichen das zweite. Im Zweifel das erste."
+  "Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.": "Deine Nachrichten, Knöpfe, Reaktionen und Kommentare und jeder Lauf, der eine Entscheidung brauchen kann, nehmen das erste Modell; stille Weckrufe, neue Aufgaben, Nachfassen und geplante Aufträge ohne Warnzeichen das zweite. Im Zweifel das erste.",
+  "{0} (from the repository)": "{0} (aus dem Repository)"
 }

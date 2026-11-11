@@ -405,24 +405,29 @@ def _gone_task(t, r):
     return not t or t["deleted_at"] or t["list_id"] != r["list_id"]
 
 
-def _author(c, r):
-    """Who the sync's comments belong to: the person who connected the repository, else the project's owner."""
+def _conn_lang(c, r):
+    """The language of the sync's texts (the author line of a comment, the report): the person who connected the repository,
+    else the project's owner. 2.981.0 (#5274, decided 08.11.2026 question 7): only the language -- an imported comment
+    belongs to nobody here (user_id NULL, the remote author's name as ext_name), not to the person who connected it (was
+    _author: the account's deletion took the kept text of such a comment in the trash with it, B4)."""
     if r["created_by"] and c.execute("SELECT 1 FROM users WHERE id=?", (r["created_by"],)).fetchone():
-        return r["created_by"]
-    return c.execute("SELECT owner_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()[0]
+        return lang(c, r["created_by"])
+    return lang(c, c.execute("SELECT owner_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()[0])
 
 
 def gsy_take_comments(c, r, tid, no, cms, lg):
     """The issue comments cms not seen yet -> comments of task tid (author line, their own date). -> how many."""
     have = {x[0] for x in c.execute("SELECT remote_id FROM git_issue_comments WHERE conn_id=? AND remote_id IS NOT NULL", (r["id"],))}
-    uid, n, ts = _author(c, r), 0, iso_ms(now_utc())
+    n, ts = 0, iso_ms(now_utc())
     for x in cms:
         rid = x.get("id")
         if not isinstance(rid, int) or isinstance(rid, bool) or rid in have:
             continue
-        head = tr("@{0} on {1}:", imp_line(x["author"], 100) or "?", _gis_day(x["created_at"], lg), lg=lg)
-        cid = ocm_add(c, "task", tid, uid, (head + "\n\n" + imp_textblock(x["body"], 100000))[:100000],
-                      created_at=x["created_at"] or ts)  # 2.972.0 (#5272): the core's comment
+        who = imp_line(x["author"], 100) or "?"
+        head = tr("@{0} on {1}:", who, _gis_day(x["created_at"], lg), lg=lg)
+        # 2.972.0 (#5272): the core's comment; 2.981.0 (#5274): no account as its author, the remote author's name (ext_name)
+        cid = ocm_add(c, "task", tid, None, (head + "\n\n" + imp_textblock(x["body"], 100000))[:100000], ext_name=who, extra={"source": "git"},
+                      created_at=x["created_at"] or ts)
         c.execute("INSERT INTO git_issue_comments(conn_id,issue_no,remote_id,comment_id,created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
                   (r["id"], no, rid, cid, ts))
         n += 1
@@ -461,7 +466,7 @@ def gsy_pull(c, r, k, get):
     if gsy_block(c, r):
         c.execute("UPDATE git_conns SET issue_error=? WHERE id=?", (gsy_block(c, r), r["id"]))
         return False
-    deadline, changed, lg = time.monotonic() + GSY_ROUND_S, False, lang(c, _author(c, r))
+    deadline, changed, lg = time.monotonic() + GSY_ROUND_S, False, _conn_lang(c, r)  # 2.981.0 (#5274): was lang(c, _author(c, r))
     complete = False  # 2.394.0 D (#3377 review 5): a round that stopped early keeps no ETag (else the same page answers 304)
     try:
         if r["issue_rw"] == -1:

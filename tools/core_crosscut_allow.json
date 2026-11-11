@@ -75,7 +75,6 @@
   "kalmido/agents/proposals.py:v1_person_chat_react": "route only (the web / v1 address stays): the rule and the rows are the core's since stage Q1 (core/objreact.py orx_toggle, orx_set)",
   "kalmido/agents/usage.py:v1_comment_react": "route only (the web / v1 address stays): the rule and the rows are the core's since stage Q1 (core/objreact.py orx_toggle, orx_set)",
   "kalmido/collab/reactions.py:comment_react": "route only (the web / v1 address stays): the rule and the rows are the core's since stage Q1 (core/objreact.py orx_toggle, orx_set)",
-  "kalmido/collab/teamchat.py:need_room_say": "stage Q4 (comments) moves it into the core (team chat rooms after #5069)",
   "kalmido/collab/teamchat.py:tchat_react": "route only (the web / v1 address stays): the rule and the rows are the core's since stage Q1 (core/objreact.py orx_toggle, orx_set)",
   "kalmido/collab/teamchat.py:v1_tchat_react": "route only (the web / v1 address stays): the rule and the rows are the core's since stage Q1 (core/objreact.py orx_toggle, orx_set)"
  },

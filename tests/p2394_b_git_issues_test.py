@@ -164,9 +164,12 @@ T1 = t1[0][0] if t1 else 0
 LTQ = "SELECT lt.name FROM obj_tag_links x JOIN obj_tags lt ON lt.id=x.tag_id WHERE x.kind='task' AND x.obj_id=?"  # 2.947.0 (#5275): the core's tags (obj_tags / obj_tag_links)
 check(sorted(x[0] for x in kt.dbx(LTQ, (T1,))) == ["bug", "ui"] and not kt.dbx("SELECT 1 FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=?", (T1,)), "labels = project tags")  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
 # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
-cm = kt.dbx("SELECT body, created_at, user_id FROM obj_comments WHERE kind='task' AND ref_id=? ORDER BY created_at", (T1,))
+# 2.981.0 (#5274, B4): an imported comment belongs to no account (user_id NULL, was the importing person), the remote author's
+# name as ext_name
+cm = kt.dbx("SELECT body, created_at, user_id, ext_name FROM obj_comments WHERE kind='task' AND ref_id=? ORDER BY created_at", (T1,))
 check(len(cm) == 2 and cm[0][0].startswith("@octocat on 2026-09-02:") and "I can reproduce" in cm[0][0] and cm[0][1].startswith("2026-09-02")
-      and cm[1][0].startswith("@ghost on 2026-09-03:") and cm[0][2] == 1, f"comments with author line and their date: {cm}")
+      and cm[1][0].startswith("@ghost on 2026-09-03:") and cm[0][2] is None and cm[0][3] == "octocat" and cm[1][3] == "ghost",
+      f"comments with author line and their date, no account as author, the remote author's name: {cm}")
 t2 = kt.dbx("SELECT status, completed_at FROM tasks WHERE tt_id=?", (f"github:{GID}:2",))
 check(t2 and t2[0][0] == 2 and str(t2[0][1]).startswith("2026-09-04"), f"closed = done with its date: {t2}")
 check(not kt.dbx("SELECT 1 FROM tasks WHERE tt_id=?", (f"github:{GID}:3",)), "the pull request did not become a task")

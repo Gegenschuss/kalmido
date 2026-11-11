@@ -22,4 +22,5 @@ function cv_read(md) {
   return out;
 }
 // the author of a comment: a customer's comment through the public link carries the name they typed (collab.js)
-const cv_who = (c, U) => c.ext_name ? tr('{0} (client, via the link)', c.ext_name) : uname(c.user_id, U);
+// 2.981.0 (#5274): a comment imported from a repository (source git) names its author there, not a client
+const cv_who = (c, U) => !c.ext_name ? uname(c.user_id, U) : c.source === 'git' ? tr('{0} (from the repository)', c.ext_name) : tr('{0} (client, via the link)', c.ext_name);

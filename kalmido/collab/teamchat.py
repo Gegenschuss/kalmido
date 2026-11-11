@@ -16,7 +16,7 @@ from ..accounts.orgroles import FULL_READ, org_say_refusal, role_known
 from ..accounts.orgs import INSTANCE_ENV
 from ..tasks.validation import as_int
 from ..collab.comments import collab_on, comment_plain, lang_of, push_gate, push_gate_due, push_gate_reset, user_names
-from ..core.objcomments import OCM_MENTION_RE, ocm_visible_names  # 2.972.0 (#5272): the one mention token / name rule of the core
+from ..core.objcomments import OCM_MENTION_RE, ocm_kind, ocm_mentions_clean, ocm_need_say  # 2.972.0 (#5272): the one mention token / name rule of the core; 2.981.0 (#5274): + the parser
 from ..collab.news import list_bells
 from ..core.errors import reject_unknown, BadInput
 from ..core.conflict import ccf_check, take_version  # 2.564.0 D (#4701); 2.638.0 (#4775): take_version
@@ -206,11 +206,11 @@ def tchat_say_refusal(c, r, uid):
     return None
 
 
-def need_room_say(c, r):
-    """2.607.0 (#4549): 403 with the organisation role's text when I may only read in room r."""
-    msg = tchat_say_refusal(c, r, me())
-    if msg:
-        raise Denied(403, tr(msg))
+def tchat_need_say(c, r):
+    """2.607.0 (#4549): 403 with the organisation role's text when I may only read in room r. 2.981.0 (#5274, stage Q4c): the
+    core's say rule (core/objcomments.py ocm_need_say, kind 'tchat' with this area's hook say = tchat_say_refusal); was
+    need_room_say."""
+    ocm_need_say(c, "tchat", r["id"])
 
 
 def need_room(c, rid):
@@ -458,18 +458,20 @@ def _e2e_parse(v):
     return e2e_msg_parse(v)
 
 
-def tchat_clean_mentions(c, r, text):
-    allowed = tchat_room_members(c, r)
-    names = ocm_visible_names(c, [int(x) for x in OCM_MENTION_RE.findall(text)])  # 2.148.1 A (#2490): '@?' for unseen accounts
-    found = []
+def _tchat_people(c, rid):
+    """2.981.0 (#5274): who may be mentioned in room rid -- its members (the people hook of the core's parser)."""
+    r = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (int(rid),)).fetchone()
+    return tchat_room_members(c, r) if r is not None else set()
 
-    def sub(m):
-        uid = int(m.group(1))
-        if uid in allowed:
-            found.append(uid)
-            return m.group(0)
-        return "@" + names.get(uid, "?")
-    return OCM_MENTION_RE.sub(sub, text), list(dict.fromkeys(found))
+
+# 2.981.0 (#5274, stage Q4c): the team chat keeps its message stream (tchat_msgs) and takes the core's mention parser
+# (core/objcomments.py ocm_mentions_clean: '@name' / '@?' for a token of someone outside the room; was tchat_clean_mentions)
+def _tchat_say(c, rid, uid):
+    r = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (int(rid),)).fetchone()
+    return tchat_say_refusal(c, r, uid) if r is not None else None
+
+
+ocm_kind("tchat", people=_tchat_people, say=_tchat_say)
 
 
 @app.get("/api/team")
@@ -566,7 +568,7 @@ def tchat_post(rid):
     need_tchat(c)
     r = need_room(c, rid)
     need_dm_open(c, r)  # 2.266.0 (#2970)
-    need_room_say(c, r)  # 2.607.0 (#4549): guests / read-only people of the organisation only read
+    tchat_need_say(c, r)  # 2.607.0 (#4549): guests / read-only people of the organisation only read; 2.981.0: the core's rule
     from .teamchan import tcx_add, tcx_files_refused, tcx_input, tcx_members, tcx_store
     b, files = tcx_input(body())  # 2.113.1 (#2059): JSON, or a multipart form with files (field file, repeatable)
     if r["kind"] == "channel" and r["archived_at"]:
@@ -596,7 +598,7 @@ def tchat_post(rid):
     tid = b.get("task_id")
     if tid is not None and (isinstance(tid, bool) or not isinstance(tid, int) or not task_visible(c, tid, me())):
         return err(tr("Invalid value: {0}", "task_id"))
-    text, mentions = tchat_clean_mentions(c, r, text.strip()) if not enc and text else ("", [])
+    text, mentions = ocm_mentions_clean(c, "tchat", r["id"], text.strip()) if not enc and text else ("", [])  # 2.981.0 (#5274)
     if enc and r["kind"] == "list":  # 2.64.2 C (#1817): the browser names the @mentioned members of an encrypted message
         from ..collab.liste2echan import le2c_mentions
         mentions = le2c_mentions(c, r, b)
@@ -862,7 +864,7 @@ def tchat_edit(mid):
     need_tchat(c)
     m, r = need_tmsg(c, mid, edit=True)
     need_dm_open(c, r)  # 2.266.0 (#2970): a frozen DM takes no edits (deleting one's own stays)
-    need_room_say(c, r)  # 2.607.0 (#4549)
+    tchat_need_say(c, r)  # 2.607.0 (#4549); 2.981.0 (#5274): the core's say rule
     b = body()
     # 2.564.0 D (#4701): the version the edit box opened with (edited_at, else created_at); edited meantime -> 409 + the message
     write_lock(c, f"tchat_msgs-{mid}")
@@ -897,7 +899,7 @@ def tchat_edit(mid):
         return err(tr("The message is empty"))
     if len(text) > TCHAT_MAX:
         return err(tr("The message is too long (max. {0} characters)", TCHAT_MAX))
-    text, mentions = tchat_clean_mentions(c, r, text.strip())
+    text, mentions = ocm_mentions_clean(c, "tchat", r["id"], text.strip())  # 2.981.0 (#5274): the core's parser
     known = {int(x) for x in OCM_MENTION_RE.findall(m["body"] or "")}
     c.execute("UPDATE tchat_msgs SET body=?, edited_at=? WHERE id=?", (text, iso_ms(now_utc()), mid))
     from ..agents.chat import med_team_edited  # 2.39.0 (#1179): agents that got it as team_message learn the change

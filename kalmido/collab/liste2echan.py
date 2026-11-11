@@ -19,7 +19,7 @@ from ..core.i18n import tr
 from .e2e import E2E_MSG_MAX, E2E_B64, e2e_msg_parse
 from .liste2e import le2a_gen, le2a_reenc_again, le2e_writer_ok
 from .teamchat import tchat_room_members, TCHAT_MAX  # 2.369.5 (#2517): pulled up from functions
-from .teamchat import need_room, need_room_say, need_tchat  # 2.640.0 (#3388)
+from .teamchat import need_room, tchat_need_say, need_tchat  # 2.640.0 (#3388)
 from .e2eresv import e2r_new, e2r_ok  # 2.640.0 (#3388)
 from ..accounts.session import me
 
@@ -102,7 +102,7 @@ def le2c_msgid(rid):
     c = db()
     need_tchat(c)
     r = need_room(c, rid)
-    need_room_say(c, r)
+    tchat_need_say(c, r)  # 2.981.0 (#5274): the core's say rule
     mode, _gen = le2c_mode(c, r)
     if not mode:
         return err(tr("This conversation is not encrypted"), 409)
