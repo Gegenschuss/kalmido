@@ -343,7 +343,7 @@ def le2b_scrub(c, lid):
                                             "OR (kind='section_order' AND ref_id=?)", (lid, lid, lid))
     n["undo_time"] = le2b_scrub_undo(c, f"kind='time_entry' AND ref_id IN (SELECT id FROM time_entries WHERE list_id=? OR task_id IN ({tq}))",
                                      (lid, lid))
-    n.update(le2b_scrub_undo_free(c, lid))  # 2.900.0 (#5550)
+    n.update(le2b_scrub_undo_free(c, lid))  # 2.900.0 (#5550, #5551)
     n.update(le2b_scrub_trash(c, lid))  # #5549: after undo_sections (it reads the section copies)
     for fn in _SCRUB_MORE:
         n.update(fn(c, lid) or {})
@@ -362,12 +362,17 @@ def le2b_scrub_undo(c, where, args):
 
 
 def le2b_scrub_undo_free(c, lid):
-    """2.900.0 (#5550): the undo steps whose copy (obj_undo.snap / redo hold the whole row, core/writes.py _snap) keeps a
-    free text the lock empties (le2b_scrub_free): the time entries of the project and of its tasks also when the entry was
-    deleted since ("time_life", its row only in the copy) or moved elsewhere. Part of le2b_scrub; core/db.py runs it once
-    for the projects locked before. Idempotent, the caller commits. Returns {what: groups dropped}."""
+    """2.900.0 (#5550, #5551): the undo steps whose copy (obj_undo.snap / redo hold the whole row, core/writes.py _snap)
+    keeps a free text the lock empties (le2b_scrub_free) or refuses: the time entries of the project and of its tasks also
+    when the entry was deleted since ("time_life", its row only in the copy) or moved elsewhere, the project's own settings
+    ("listset": description, status note) and its notepads ("notepad": title and text before they were emptied for the
+    lock; also of a notepad deleted since). Part of le2b_scrub; core/db.py runs it once for the projects locked before.
+    Idempotent, the caller commits. Returns {what: groups dropped}."""
     tids = [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))]
-    return {"undo_time_copies": _scrub_undo_ids(c, le2b_undo_copies(c, ("time_entry", "time_life"), [lid], tids))}
+    return {"undo_time_copies": _scrub_undo_ids(c, le2b_undo_copies(c, ("time_entry", "time_life"), [lid], tids)),
+            "undo_settings": le2b_scrub_undo(c, "kind='listset' AND ref_id=?", (lid,)),  # #5551
+            "undo_notepads": le2b_scrub_undo(c, "kind='notepad' AND ref_id IN (SELECT id FROM list_notepads WHERE list_id=?)", (lid,))
+            + _scrub_undo_ids(c, le2b_undo_copies(c, ("notepad",), [lid], ()))}  # #5551
 
 
 def _undo_rows(js):

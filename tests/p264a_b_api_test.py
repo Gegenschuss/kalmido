@@ -147,6 +147,18 @@ r = A.post(B + "/api/time/entries", json={"list_id": L, "start": (datetime.now()
 check(r.ok, f"(setup) a project time entry with a note {r.status_code} {r.text[:200]}")
 r = A.delete(B + f"/api/time/entries/{r.json()['id']}")
 check(r.ok and r.json().get("undo_group"), f"#5550: deleted: an undo step holding the row {r.status_code} {r.text[:200]}")
+# 2.900.0 (#5551): the project's settings step ("listset") holds the description / status note, a notepad emptied for the
+# lock ("notepad") its texts before -- both in the copy; the sweep below finds any of them left in obj_undo
+dbx("UPDATE lists SET description=?, status_note=? WHERE id=?", (MK + "Desc", MK + "StatusNote", L), write=True)
+r = A.patch(B + f"/api/lists/{L}", json={"color": "#336699"})
+check(r.ok and dbx("SELECT 1 FROM obj_undo WHERE kind='listset' AND ref_id=? AND snap LIKE ?", (L, f"%{MK}Desc%")),
+      f"#5551: a settings change: an undo step whose copy holds the description {r.status_code} {r.text[:200]}")
+r = A.post(B + f"/api/lists/{L}/notepads", json={"title": MK + "PadTitle", "body": MK + "PadBody"})
+check(r.ok, f"(setup) a notepad {r.status_code} {r.text[:200]}")
+PAD = r.json()["id"]
+r = A.patch(B + f"/api/notepads/{PAD}", json={"title": "", "body": ""})
+check(r.ok and dbx("SELECT 1 FROM obj_undo WHERE kind='notepad' AND ref_id=? AND snap LIKE ?", (PAD, f"%{MK}PadBody%")),
+      f"#5551: emptied for the lock: an undo step whose copy holds the texts {r.status_code} {r.text[:200]}")
 SEC = dbx("SELECT id FROM sections WHERE list_id=?", (L,))[0][0]
 # copies the app writes in other places (shopping memory, a mail address, an agent proposal): written here like the app does
 dbx("INSERT INTO shop_memory(list_id,item,section_id,at) VALUES(?,?,?,?)", (L, MK.lower() + "milk", SEC, "2026-01-01T00:00:00Z"), write=True)
