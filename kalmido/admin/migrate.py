@@ -34,7 +34,7 @@ from ..core.config import APP_VERSION, DATABASE_URL, DB
 from ..core.db import DataDirError, DbError, FRAG_MIGRATIONS, FRAG_SCHEMA, connect_direct, init_db, iso, now_utc
 from ..core.schema import MIGRATIONS, SCHEMA
 from ..core.i18n import N_  # 2.149.0 G (#2517): pulled up from functions
-from ..core.pg import pool_refresh  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import pool_refresh, ts_canon  # 2.149.0 G (#2517): pulled up from functions; 2.933.0 (#5404): ts_canon
 
 TAG = "migrate-sqlite:"
 _Q4 = Decimal("0.0001")
@@ -44,6 +44,10 @@ _NODEF = object()
 _INT_RE = re.compile(r"[+-]?\d+")
 _INTF_RE = re.compile(r"[+-]?\d+\.0*")
 _SAMPLE = 20  # row references kept per correction in the report
+# 2.933.0 (#5404): columns renamed since the SQLite era -> {table: {new name in Postgres: old name in the SQLite file}};
+# 2.905.0 (#5288) renamed templates.user_id to owner_id (core/tplmove.py does it for a Postgres table, this for the SQLite file)
+SRC_RENAMED = {"templates": {"owner_id": "user_id"}}
+_TSTZ = "timestamp with time zone"
 # a private agent (no workspace) as a member of an organisation's list: row-level security hides the list from it (K2-3)
 K23_SQL = ("SELECT m.list_id, m.user_id FROM list_members m JOIN lists l ON l.id=m.list_id JOIN agents a ON a.user_id=m.user_id "
            "WHERE a.org_id IS NULL AND l.org_id IS NOT NULL ORDER BY 1, 2")
@@ -300,6 +304,15 @@ class Mig:
                 return bytes(v)
             self.fix(t, col, "text -> binary", ref)
             return str(v).encode("utf-8", "surrogatepass")
+        if ty == _TSTZ:  # 2.933.0 (#5404): TEXT times of the SQLite file -> the canonical ISO form the read-back gives (pg.py ts_canon)
+            s = ts_canon(v.decode("utf-8", "replace") if isinstance(v, bytes) else str(v).strip())
+            if s.endswith("+00:00"):
+                return s
+            if nullable:
+                self.fix(t, col, "no point in time -> NULL", ref)
+                return None
+            self.fix(t, col, "no point in time -> the time of the move", ref)
+            return ts_canon(now_utc())
         if ty == "jsonb":
             if not isinstance(v, str):
                 v = v.decode("utf-8", "replace") if isinstance(v, bytes) else json.dumps(v)
@@ -341,6 +354,8 @@ class Mig:
         """(columns copied, their types) for table t; notes for columns only one side has."""
         pgc = {x[0]: x for x in self.cols[t]}
         have = self.src_cols(t)
+        ren = {new: old for new, old in SRC_RENAMED.get(t, {}).items() if old in have and new in pgc and new not in have}
+        have = [next((n for n, o in ren.items() if o == x), x) for x in have]  # 2.933.0 (#5404): the old name read as the new one
         miss = [x for x in pgc if x not in have and not (t == "list_members" and x == "id")]
         extra = [x for x in have if x not in pgc]
         if t == "task_tags" and "user_id" in miss:  # single-user era: (task_id, tag); init_db gives them to the first admin
@@ -360,7 +375,8 @@ class Mig:
         cols = list(use)
         if not use:
             raise MigError(f"{t}: no column of the SQLite table matches this version")
-        sel = ", ".join(f'"{x}"' for x in use)
+        src = {new: old for new, old in SRC_RENAMED.get(t, {}).items() if old in self.src_cols(t)}  # 2.933.0 (#5404)
+        sel = ", ".join(f'"{src.get(x, x)}"' for x in use)
         rows = []
         idx = {x: i for i, x in enumerate(use)}
         idpos = idx.get("id")

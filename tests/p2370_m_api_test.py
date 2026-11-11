@@ -175,6 +175,11 @@ for t in ("comments", "attachments", "office_doc_items", "agent_chat", "list_mem
     # that the watchdog ends right after the start become time entries there (pomo_id set): count the moved rows only
     w = " WHERE pomo_id IS NULL" if t == "time_entries" else ""
     check(psql(f"SELECT COUNT(*) FROM {t}{w}") == str(want[t]), f"(b) {t}: {want[t]} rows in Postgres ({psql(f'SELECT COUNT(*) FROM {t}{w}')}, all {psql(f'SELECT COUNT(*) FROM {t}')})")
+# 2.933.0 (#5404): templates.user_id of the SQLite file is owner_id since 2.905 (#5288): every template keeps its owner and its times
+check(psql("SELECT COUNT(*) FROM templates WHERE owner_id IS NOT NULL AND created_at IS NOT NULL") == str(want["templates"])
+      and "templates: column(s) user_id of the SQLite file not taken over (gone in this version)" not in rep.get("notes", []),
+      f"(b) templates: {want['templates']} rows with their owner ({psql('SELECT COUNT(*) FROM templates')}) "
+      + str([x for x in rep.get("notes", []) if x.startswith("templates")])[:200])
 for t in ("activity", "notifications"):  # (the app writes / tidies these right after the start: the report's count)
     check(rep.get("tables", {}).get(t, {}).get("written") == want[t], f"(b) {t}: {want[t]} rows copied")
 check(want["tasks"] >= 20000 and want["comments"] >= 50000 and want["activity"] >= 50000, "(b) the fixture is big")
