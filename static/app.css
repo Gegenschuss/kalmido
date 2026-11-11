@@ -6475,6 +6475,9 @@ html.mini-chat body.in-chat #view,html.mini-chat body.in-team #view{padding-left
 .authscreen .qd,.authscreen .qdslot{text-align:center}
 .authscreen .qdslot{min-height:2.6rem;margin:0 0 1rem}
 .qd.dashq{margin:-.5rem 0 1rem;max-width:70ch}
+/* 2.955.0 (#5239): on Today the placeholder holds the room of a two-line quote, so the first load does not push the blocks down */
+.dash .qdslot,.qd.dashq{min-height:2.9rem}
+.dash .qdslot{margin:-.5rem 0 1rem}
 .authscreen input:not([type=checkbox]){border-radius:.75rem;background:var(--bg3);border:1px solid var(--line2)}
 .authscreen input:not([type=checkbox]):focus{border-color:var(--accent);box-shadow:0 0 0 .1875rem color-mix(in srgb,var(--accent) 22%,transparent);outline:none}
 .authscreen .btn{height:auto;min-height:2.75rem;border-radius:.75rem}
