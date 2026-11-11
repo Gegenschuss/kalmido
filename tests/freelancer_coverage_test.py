@@ -1521,7 +1521,6 @@ POST /api/office/legacy/split
 POST /api/office/letters/tree/folders
 POST /api/office/logbook/close
 POST /api/office/meals/{}/file/{}/restore
-POST /api/office/meals/{}/restore
 POST /api/office/packs/install
 POST /api/office/packs/installed/{}/{}/restore
 POST /api/office/packs/validate
