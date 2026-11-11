@@ -141,7 +141,7 @@ def rcf_bank_name(c, oid, import_id):
     if import_id:
         r = c.execute("SELECT bank_account_id FROM office_bank_imports WHERE id=? AND org_id=?", (import_id, oid)).fetchone()
         if r and r[0]:
-            a = c.execute(f"SELECT * FROM {BKA_TABLE} WHERE id=? AND org_id=?", (r[0], oid)).fetchone()
+            a = c.execute("SELECT * FROM office_bank_accounts WHERE id=? AND org_id=?", (r[0], oid)).fetchone()
             if a:
                 return label(oc_dec_fields(c, oid, BKA_TABLE, a))
         named = {b["account"] for b in cfb_balances(c, oid) if b["import_id"] == import_id and b["account"]}
