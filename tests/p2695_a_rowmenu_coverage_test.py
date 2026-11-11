@@ -48,7 +48,10 @@ RM_LEFT = {
     ("hubmail.js", 'data-hbma="menu"'): (1, "the head of an open mailbox (its address); the address rows are marked"),
     ("jobchat.js", 'data-act="chat-head-menu"'): (1, "the head of the agent chat"),
     ("mindmap.js", 'data-mm="more"'): (1, "the tool bar of the mind map"),
+    # 2.892.0 (#5453, job/3927): the foot of a receipt sheet and the tool bar of the receipts page get "More" on a phone
+    ("office_books.js", 'data-m="more"'): (1, "the foot of a receipt sheet on a phone (Open document / Bill on), no row"),
     ("office_docs.js", 'data-ofd="more"'): (1, "the bar of an open office document"),
+    ("office_receipts.js", 'data-rcl="menu"'): (1, "the tool bar of the receipts page on a phone (kinds, CSV, ZIP, Select), no row"),
     ("office_doctpl.js", 'data-dt="more"'): (1, "the bar of an open document from a template"),
     ("office_letters.js", 'data-lt="more"'): (1, "the bar of an open letter"),
     ("polls.js", 'data-tpo="menu"'): (1, "the head of the poll dialog"),
