@@ -896,7 +896,7 @@ def cs_last_no(c, oid, lid):
     """The highest shoot day number of project lid's call sheets in area oid, the ones in the trash too (review 2.988 F4: a
     count gave a number twice after a delete); a number typed as text that is no whole number does not count."""
     best = 0
-    for r in c.execute(f"SELECT cs.* FROM hub_callsheets cs WHERE cs.org_id=? AND EXISTS (SELECT 1 FROM hub_bookings b WHERE "
+    for r in c.execute("SELECT cs.* FROM hub_callsheets cs WHERE cs.org_id=? AND EXISTS (SELECT 1 FROM hub_bookings b WHERE "
                        "b.org_id=cs.org_id AND b.job=cs.job AND b.list_id=?)", (oid, int(lid))):
         v = str(cs_data(oc_dec_fields(c, oid, "hub_callsheets", r)).get("day_no") or "").strip()
         if v.isdigit() and len(v) < 6:
