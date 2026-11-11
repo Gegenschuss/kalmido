@@ -26,8 +26,8 @@ from kt import B, check, dbx, done, fresh, sess  # noqa: E402
 from obj_probe import in_app  # noqa: E402
 
 fresh(prefix="P2993B")
-O = B + "/api/office"
-M = O + "/meals"
+OFF = B + "/api/office"
+M = OFF + "/meals"
 PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
 OLD = "2020-01-02T03:04:05.000Z"
 
@@ -65,7 +65,7 @@ def listed(s):
 
 
 def trash(s):
-    r = s.get(O + "/trash")
+    r = s.get(OFF + "/trash")
     return [(x.get("core"), x["id"], x["kind"], x.get("label") or "") for x in r.json().get("items", [])] if r.ok else None
 
 
@@ -109,8 +109,8 @@ it = [x for x in trash(A) if x[0] == "omeal" and x[1] == M1]
 check(it and it[0][2] == "meal" and "Trattoria Esempio" in it[0][3], f"the office trash shows it with its label {it}")
 check(not [x for x in A.get(B + "/api/undo").json().get("items", []) if "Entertainment" in (x.get("label") or "")],
       "no step in the person's undo list (step=False)")
-check(Ol.post(O + f"/trash/core/omeal/{M1}/restore").status_code == 404 and mrow(M1)[0], "another organisation: 404, it stays in the trash")
-r = A.post(O + f"/trash/core/omeal/{M1}/restore")
+check(Ol.post(OFF + f"/trash/core/omeal/{M1}/restore").status_code == 404 and mrow(M1)[0], "another organisation: 404, it stays in the trash")
+r = A.post(OFF + f"/trash/core/omeal/{M1}/restore")
 check(r.ok and r.json().get("kind") == "meal" and M1 in listed(A) and mrow(M1) == (None, None), f"restored from the office trash {r.text[:200]}")
 g = A.get(M + f"/{M1}/file/{F1}")
 check(g.ok and g.content == PDF and stored(ORG, FN1), "its bill is still there (the same bytes)")
@@ -118,8 +118,8 @@ check(A.delete(M + f"/{M1}").ok and A.post(M + f"/{M1}/restore").ok and M1 in li
 
 # ---------------------------------------------------------------- delete for good from the office trash
 check(A.delete(M + f"/{M1}").ok, "into the trash again")
-check(Ol.delete(O + f"/trash/core/omeal/{M1}").status_code == 404 and mrow(M1), "another organisation: no delete for good (404)")
-r = A.delete(O + f"/trash/core/omeal/{M1}")
+check(Ol.delete(OFF + f"/trash/core/omeal/{M1}").status_code == 404 and mrow(M1), "another organisation: no delete for good (404)")
+r = A.delete(OFF + f"/trash/core/omeal/{M1}")
 check(r.ok and mrow(M1) is None and frow(F1) is None and not stored(ORG, FN1), f"deleted for good: meal, bill row and stored file gone {r.text[:200]}")
 
 # ---------------------------------------------------------------- the retention run: past the period, with bill and log
@@ -159,8 +159,8 @@ check(frow(FK1) is None and not stored(ORG, FNK1) and frow(FK2) is not None and 
       f"after the keep period: the removed bill goes, the live one and the meal stay {n}")
 
 # ---------------------------------------------------------------- contract files
-C1 = A.post(O + "/contracts", json={"name": "Example Framework Contract"}).json()["id"]
-CF = O + f"/contracts/{C1}/files"
+C1 = A.post(OFF + "/contracts", json={"name": "Example Framework Contract"}).json()["id"]
+CF = OFF + f"/contracts/{C1}/files"
 
 
 def cup():
@@ -174,14 +174,14 @@ _, _, KN1 = frow(K1, "office_contract_files")
 check(A.delete(CF + f"/{K1}").ok and frow(K1, "office_contract_files")[0], "a contract file removed (the trash)")
 it = [x for x in trash(A) if x[0] == "ocfile" and x[1] == K1]
 check(it and it[0][2] == "contract_file" and "Example Framework Contract" in it[0][3], f"in the office trash with its contract's name {it}")
-check(Ol.post(O + f"/trash/core/ocfile/{K1}/restore").status_code == 404, "another organisation: 404")
-r = A.post(O + f"/trash/core/ocfile/{K1}/restore")
+check(Ol.post(OFF + f"/trash/core/ocfile/{K1}/restore").status_code == 404, "another organisation: 404")
+r = A.post(OFF + f"/trash/core/ocfile/{K1}/restore")
 check(r.ok and [x["id"] for x in A.get(CF).json()["items"]] == [K1], f"restored from the office trash: listed again {r.text[:200]}")
 check(A.delete(CF + f"/{K1}").ok and A.post(CF + f"/{K1}/restore").ok and frow(K1, "office_contract_files")[0] is None, "the toast's undo restores it too")
 # the contract in the trash: its file only comes back with it
 check(A.delete(CF + f"/{K1}").ok, "removed again")
-check(A.delete(O + f"/contracts/{C1}").ok, "the contract deleted")
-r = A.post(O + f"/trash/core/ocfile/{K1}/restore")
+check(A.delete(OFF + f"/contracts/{C1}").ok, "the contract deleted")
+r = A.post(OFF + f"/trash/core/ocfile/{K1}/restore")
 check(r.status_code == 409 and frow(K1, "office_contract_files")[0], f"a file of a contract in the trash: 409, it stays in the trash {r.status_code} {r.text[:200]}")
 dbx("UPDATE office_contract_files SET deleted_at=? WHERE id=?", (OLD, K1))
 n = tick()
@@ -196,8 +196,8 @@ check(A.delete(M + f"/{MF}").status_code == 404, "someone else: 404 on her meal"
 check(Fr.delete(M + f"/{MF}").ok and MF not in listed(Fr) and mrow(MF)[1] == FID, "freelancer: into the trash")
 check(any(x[0] == "omeal" and x[1] == MF for x in trash(Fr)) and not any(x[1] == MF and x[0] == "omeal" for x in trash(A)),
       "freelancer: in her office trash, not in another one")
-check(A.post(O + f"/trash/core/omeal/{MF}/restore").status_code == 404, "someone else: no restore (404)")
-check(Fr.post(O + f"/trash/core/omeal/{MF}/restore").ok and MF in listed(Fr), "freelancer: restored")
+check(A.post(OFF + f"/trash/core/omeal/{MF}/restore").status_code == 404, "someone else: no restore (404)")
+check(Fr.post(OFF + f"/trash/core/omeal/{MF}/restore").ok and MF in listed(Fr), "freelancer: restored")
 check(Fr.delete(M + f"/{MF}").ok, "freelancer: into the trash again")
 dbx("UPDATE office_meals SET deleted_at=? WHERE id=?", (OLD, MF))
 n = tick()
