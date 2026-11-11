@@ -19,6 +19,90 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.962.0] - 2026-11-11
+
+Package 2.951 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Redo of a change the undo took out of the outbox before it was sent says "Redone: …" while the device is online; the hint "sent as soon as you are online" only appears offline (#5638).
+
+Package 2.947 (Bündel: Kern-Querschnitt Q5a: Tags-Kern obj_tags: Projekt-, Papierkorb-Kern Stufe 5: Kalender, Kontakte, Leben, Polish Büro: Wortwahl verein).
+
+### Changed
+- Tags run on the shared core: project tags and organisation labels are rows of one tag table (`obj_tags`, scope list / org, ready for personal and workspace tags) with one link table (`obj_tag_links`). An organisation label now sits on the task itself - no copy per project any more; a project that leaves its organisation (or whose organisation is deleted) keeps the labels of its tasks as project tags, and a project that joins one hands its same-named project tags to the labels. Members with a restricted role (guest, accounting) only see labels a task of their project carries. Organisation labels are part of the organisation export; the git issue sync finds a label of the project's organisation by name. Tags on end-to-end encrypted tasks stay plain text (as before, now fixed in the core). The old tables `list_tags`, `task_list_tags` and `org_tags` move over at start and are dropped (#5275; one-way: migration fragment `5275_a`, the way back is the backup).
+- Calendars, address books, bookmarks, feeds and video sign-offs use the core's one trash: a deleted calendar takes its events along and can be taken back from Recent steps; bookmarks and feeds keep their own undo step; the hourly trash run of the core deletes all five after the trash period (an address book with its contacts, a bookmark with its picture); the own restore and purge ways of these areas are gone (#5367)
+- Office wording: one thing, one word - Briefpapier, Dokumentnummer for own documents, Textbaustein, Geräte, Erstattung for card refunds, "Im Gespräch" as the pipeline stage after a lead, distinct names for the three contract menu points, settings always "Einstellungen > Firma & Büro"; a draft without number names its kind in the document lists; deleting into the office trash says "Moved to the trash" (#5454)
+- Data retention: the activity clean-up reads the portal history rows to spare once per run instead of grouping them again in every batch of 5,000 (#5055)
+
+### Fixed
+- Events: the trash's retention run deletes in one statement, so a calendar restored at the same moment keeps its events (#5367)
+
+Package 2.937 (Bündel: Gemeinsamer Kern Stufe 7c: Wiki und Tabellen nur n, Büro: übrige Löschrouten auf doppeltes Hochzählen ).
+
+### Changed
+- Shared core stage 7c: tables and knowledge pages / folders decide who may see them only through the shares on their node in the shared core. The Share dialog of a table and of a knowledge page lists, adds, changes and ends those node shares directly (the file store's dialog shows the same rows); a group shared on a table's node counts too (#5244)
+- Tables: an address typed into the Share dialog stays its own row until the person signs in; then it becomes that account's core share. Moving a table and undoing the move gives the shares back through the core (#5244)
+- Knowledge: a person share's card data (the switch "show pictures", the News entry) lives in the new table `wiki_share_cards` next to the core share; the dialog's id of a person share is `p<share id>`, public links keep their numbers. Ending a share and Undo keep the same id (#5244)
+- Office: every delete / restore route counts the office area once per request, also when one request deletes many rows (fixed costs, letter links); other devices reload the office view once instead of several times (#5632)
+
+### Added
+- `kalmido/core/kernretire.py kern_retire_rows`: the stage-7 clean-up for an old table that stays - start check, delete old rows, drop columns, retype, raise the back limit (#5244)
+
+### Fixed
+- Sharing a file store node with the same person twice at the same moment no longer makes two share rows (a lock per node and person in `obj_node_share`) (#5244)
+
+### Migration (one way)
+- At the first start with this version the old person rows of `sheet_shares` and `wiki_shares` are copied forward a last time, then checked; with nothing left over they are deleted, `sheet_shares.core_id` and `wiki_shares.core_id` / `core_id2` are dropped, their times become TIMESTAMPTZ (`is_folder` BOOLEAN) and the database's back limit rises: a version before 2.937 does not start on it. A database from before 2.565 (no `core_id` yet) runs the same steps. While a row is left that the core does not hold, nothing is deleted and admins see an alert (#5244)
+
+Package 2.956 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), USt-Jahreserklärung 20).
+
+### Added
+- Board: a column with the meaning "done" or "rejected" shows the tasks completed or marked "won't do" in it (newest first, five and the rest behind "Show N more tasks"), crossed out, also in the board with lanes; the count in the column head and the WIP limit still count open tasks only, a board with only completed cards no longer says "No tasks." (#3912)
+
+### Changed
+- Back on phones and tablets (Android Back, swipe) is exactly one visible step for every layer: one shared mechanism in backclose.js where every layer (dialog, menu, lightbox, search, sheets, tour, date picker, the sidebar drawer and the page itself) can carry views of its own; Back takes the top view away and only the last Back closes the layer. New: Back closes the open sidebar drawer instead of leaving the page, closes the date picker only (the dialog below stays), and steps back through the tour's cards (the last Back ends it); the search counted twice and left a stray history entry; a drawer reopened by Back no longer makes the following Back a dead one (#5230)
+
+Package 2.957 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Office > Credit cards and Bank: receipts file themselves into month folders (#4910). A statement's PDF and every receipt matched with one of its positions (upload at the position or a later match) go to Documents / Receipts / Credit card / <card with holder> / <year> / <YYYY-MM month> (the statement's month); a receipt matched with a bank booking (by hand or a provider's invoice matched by itself) goes to Documents / Receipts / Bank / <account> / <year> / <YYYY-MM month> (the booking's day). The receipt gets the tag "Credit card" / "Bank". Only documents still in the inbox move; documents filed by hand stay; taking the match back moves nothing back; a folder of the path opened wider than the documents folder (organisation access, a share, a public link) takes no receipt. One shared part for both ways (office/rcfolder.py).
+
+Package 2.953 (Bündel: Gesperrte Ordner: Rest (Schlüsselwechsel, Unterordner-Suche, Review-Funde)).
+
+### Added
+- Locked folders: when someone loses access (a share taken back, leaving the organisation or a group, a deleted account), the folder gets a new key: the browser of its owner (or an organisation admin) changes it on opening the folder and encrypts the files again with it; a key seen for the first time on that device waits for the button "Change the key now" in the folder's bar. Earlier versions of a file stay readable for the people keeping the folder; who lost access gets nothing added afterwards (#3348)
+- Locked folders: the name search in the bar finds files and folders in the subfolders too (in the browser, over the decrypted names); a hit below shows the folder it lies in (#3348)
+- Locked folders: a folder with its content moves into or out of a locked folder (one question, every file re-encrypted in the browser, files and folders keep their ids, shares and links); before the first step the server says what would block it (#3348)
+
+### Changed
+- Locking a folder removes the tags of the files and folders in it (the server could read them); the lock dialog says how many first. Moving a file into a locked folder removes its tags too (#3348)
+- Locked folders: several items chosen at once move across the border after one question, encrypted files are downloaded decrypted one by one (no ZIP of ciphertexts), "Move to another workspace" leaves locked items out, and the targets of "Move to…" show the decrypted names of folders in a locked folder (#3348)
+- Agents: a folder that holds a locked folder somewhere below it can no longer be shared with an agent (409 `fs_locked_agent`, as locking refuses a folder below an agent's share) (#3348)
+
+### Fixed
+- Locked folders, review findings of 2.353: who reaches only a part of a locked folder learns nothing about the rest (progress, who switched it, when); a deleted file request does not come back into a folder locked since; no version restore while a folder is being locked or unlocked (never an octet-stream version of a decrypted file); locking waits for a plain upload below the folder that runs at the same moment, and a write into a locked folder finishes before its switch ends; undoing a move to another workspace never puts a plain item below a folder locked since; a move into a locked folder that is refused at the end leaves no stored file behind (#3348)
+
+Package 2.962 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Back in menus goes one step back (#5231): a second level ("More…", "Change position…", the chat menu's "Usage", "Page width…") and a follow menu (an entry that opens another menu or picker in the same place, e.g. task "…" > "New date…") are steps of Back - the Android Back key and the menu's "Back" row show the menu before instead of closing everything; closing the menu (X, tap outside) takes all its steps along.
+- Back in windows with a second view goes one view back (#5232): the CSV / bank imports (start > columns > preview), the merge dialog, playbook versions and regular checks, the agent's plan form, the wiki history and a shared wiki page (linked page, editor), the folder pickers (wiki "From the file store", new approval) and the sub-tabs of Settings > Agents / Organisation / Server; the window closes only with the last Back.
+
+### Fixed
+- The bank fetch (FinTS) shows its Back button in the TAN / approval / preview steps (it was never shown) (#5232).
+- The office's bank import has a way back from the column view (and the CAMT preview) to the start step (#5232).
+
+Package 2.955 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Sign-in page and Today: a Dada quote of the day (78 public-domain quotes with verified sources, Ball, Schwitters, Picabia, Satie and others). The sign-in page shows the quote alone above the form instead of the old greeting; Today shows it below "Good evening, {name}": the original in italics, below it small the translation in the interface language and the author (work and year as a tooltip; sound poems never translated). One quote per day, the same on both pages, no jump on a redraw; the file loads on demand (#5239)
+
+### Changed
+- Client timesheet of an invoice: non-billable time entries are left out by default; a switch "Show non-billable entries" in the send dialog and in the new timesheet PDF dialog brings them back, marked "not billable", with the billable hours apart in the total. Entries billed on another invoice of the same office carry "billed with <number>" (only when the sender may see it, otherwise "already billed") (#5648)
+- Personal tags run on the shared core: they are rows of `obj_tags` (scope user, an agent's own tags in its own scope) with `obj_tag_links`; one name per person regardless of case (Kunde / kunde are merged), CalDAV categories, filters, the data lock, API v1, the account export and import read the core; promoting a tag moves its links. The old table `task_tags` moves over at start and is dropped (#5276; one-way: migration fragment `5276_a`, the way back is the backup)
+
+### Fixed
+- Retention export: a check that the sign-off CSV carries no token columns (#3811)
+
 ## [2.941.0] - 2026-11-11
 
 Package 2.928 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -166,7 +250,8 @@ Package 2.900 (Bündel: Projekt-Sperre: Rückgängig-Kopien von Zeiteinträge, P
 
 Not released (the CI of this version was red); its changes are listed under 2.902.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.941.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.962.0...HEAD
+[2.962.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.962.0
 [2.941.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.941.0
 [2.929.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.929.0
 [2.910.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.910.0
