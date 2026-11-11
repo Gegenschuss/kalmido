@@ -184,8 +184,9 @@ const DPG_HOLD = 350;
 function dpg_dragStart(/** @type {PointerEvent} */ e, /** @type {any} */ b) {
   if (e.button !== 0 || DPG.busy) return;
   const p = +b.dataset.dpgp, touch = e.pointerType !== 'mouse';
-  const d = DPG.drag = {p, id: e.pointerId, x: e.clientX, y: e.clientY, on: false, el: b, tm: 0, over: null, after: false, done: false};
-  if (touch) d.tm = setTimeout(() => { if (DPG.drag === d) dpg_dragOn(d); }, DPG_HOLD);
+  const d = DPG.drag = {p, id: e.pointerId, x: e.clientX, y: e.clientY, on: false, el: b, hold: null, over: null, after: false, done: false};
+  d.hold = debounce(() => { if (DPG.drag === d) dpg_dragOn(d); }, DPG_HOLD);  // the long press on a phone (core.js debounce: perf_budget)
+  if (touch) d.hold();
 }
 function dpg_dragOn(/** @type {any} */ d) {
   d.on = true;
@@ -199,7 +200,7 @@ function dpg_dragMove(/** @type {PointerEvent} */ e) {
   const d = DPG.drag; if (!d || e.pointerId !== d.id) return;
   if (!d.on) {
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
-    if (e.pointerType !== 'mouse') { clearTimeout(d.tm); DPG.drag = null; return; }  // a finger moving at once: the strip scrolls
+    if (e.pointerType !== 'mouse') { d.hold.cancel(); DPG.drag = null; return; }  // a finger moving at once: the strip scrolls
     dpg_dragOn(d);
   }
   e.preventDefault();
@@ -216,7 +217,7 @@ function dpg_dropAt(/** @type {any} */ d, /** @type {number} */ x, /** @type {nu
 }
 function dpg_dragEnd(/** @type {PointerEvent} */ e) {
   const d = DPG.drag; if (!d || e.pointerId !== d.id) return;
-  clearTimeout(d.tm); DPG.drag = null;
+  d.hold.cancel(); DPG.drag = null;
   if (!d.on) return;
   d.done = true; DPG.dragged = Date.now();  // the click that follows the drop does not choose
   $('.dv-view .dpg-list')?.classList.remove('dpg-dragging');
