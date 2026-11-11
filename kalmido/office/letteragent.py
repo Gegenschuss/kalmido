@@ -12,7 +12,7 @@ from flask import jsonify
 from ..core.config import app
 from ..core.db import body, bump, db
 from ..core.i18n import N_, tr
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..personal.timetrack import BadInput
 from ..api.v1 import v1_view
 from .letters import lt_org
@@ -161,7 +161,7 @@ def lta_v1(c, oid, aid, d):
     out = lt_public(c, oid, d)
     out.pop("created_by", None)
     links = []
-    for r in c.execute("SELECT node_id, kind FROM office_letter_links WHERE letter_id=? AND org_id=? ORDER BY id", (d["id"], oid)):
+    for r in c.execute(f"SELECT node_id, kind FROM office_letter_links WHERE letter_id=? AND org_id=? AND {live_sql()} ORDER BY id", (d["id"], oid)):  # 2.905.0 (#5414)
         if lta_agent_sees(c, r["node_id"], aid):
             links.append({"node_id": r["node_id"], "kind": r["kind"]})
     out["links"] = links

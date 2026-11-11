@@ -7,12 +7,15 @@ tenant-matrix: office
  - a fixed cost (with its reminder row): DELETE answers trash_id, the office trash lists it, the toast's undo
    (POST /api/office/trash/undo/fixed_cost/<id>) brings it back with the old id and its reminder; another office 404, a
    member 403, a second undo 404
- - a correction of the cash flow: the same through the undo route (cf_adjust)
+ - a correction of the cash flow: the same through the undo route (cf_adjust); 2.905.0 (#5414): the core's trash (oadjust)
  - the start balance (a table without an id): DELETE answers trash_id, the office trash restores it; set again meanwhile:
    409 and the new value stays
- - a letter's link to a document: DELETE answers trash_id, the undo writes the link back
+ - a letter's link to a document: DELETE answers trash_id, the undo writes the link back; 2.905.0 (#5414): the core's
+   trash (oletlink); linked again after a removal: the row of the trash is the link again
  - an import of fixed costs taken back (POST .../fixed-costs/delete): ONE entry in the office trash, restore brings every
    row back and the import run counts as not undone again
+   2.905.0 (#5414): a fixed cost and the rows of an import taken back lie in the core's trash (kind ofixed, deleted_at): the
+   toast's undo is POST /api/office/trash/core/ofixed/<id>/restore?undo=1, the office trash lists each row (core = ofixed)
  - an import of trips taken back (POST .../trips/delete): one entry, the undo brings the trips back; a month locked since:
    409 and nothing comes back
 The same for a person without an organisation (freelancer_fixture: the personal office).
@@ -80,30 +83,34 @@ def scenario(S, who, ws, other, member=None):
     oid = sql("SELECT org_id FROM office_fixed_costs WHERE id=?", (fid,))[0][0]
     sql("INSERT INTO office_sub_reminders(org_id, fixed_id, due, created_at) VALUES(?,?,?,?)", (oid, fid, PM2, PM1))
     r = S.delete(B + f"{O}/fixed-costs/{fid}")
-    tf = r.json().get("trash_id") if r.ok else None
-    check(r.ok and tf and r.json().get("item", {}).get("id") == fid and not sql("SELECT 1 FROM office_fixed_costs WHERE id=?", (fid,)),
-          f"{who}: the fixed cost goes with a copy in the office trash {r.text[:200]}")
+    # 2.905.0 (#5414): the core's trash (the row stays with deleted_at), the toast's undo through core/ofixed ?undo=1
+    tf = (r.json().get("trash") or {}).get("id") if r.ok else None
+    check(r.ok and tf == fid and r.json().get("item", {}).get("id") == fid and sql("SELECT 1 FROM office_fixed_costs WHERE id=? AND deleted_at IS NOT NULL", (fid,))
+          and not [x for x in S.get(B + O + "/fixed-costs").json().get("items") or [] if x["id"] == fid],
+          f"{who}: the fixed cost goes into the trash, gone from the list {r.text[:200]}")
     check(in_trash(S, tf, "fixed_cost"), f"{who}: the office trash lists the fixed cost")
-    check(other.post(B + f"/api/office/trash/undo/fixed_cost/{tf}").status_code in (403, 404), f"{who}: another office: the undo 403 / 404")
+    check(other.post(B + f"/api/office/trash/core/ofixed/{tf}/restore?undo=1").status_code in (403, 404), f"{who}: another office: the undo 403 / 404")
     if member is not None:
-        check(member.post(B + f"/api/office/trash/undo/fixed_cost/{tf}").status_code == 403, f"{who}: a member: the undo 403")
-    check(S.post(B + f"/api/office/trash/undo/cf_adjust/{tf}").status_code == 404, f"{who}: the undo of another kind 404")
-    r = S.post(B + f"/api/office/trash/undo/fixed_cost/{tf}")
+        check(member.post(B + f"/api/office/trash/core/ofixed/{tf}/restore?undo=1").status_code == 403, f"{who}: a member: the undo 403")
+    check(S.post(B + f"/api/office/trash/core/oadjust/{tf}/restore?undo=1").status_code == 404, f"{who}: the undo of another kind 404")
+    r = S.post(B + f"/api/office/trash/core/ofixed/{tf}/restore?undo=1")
     got = [x for x in S.get(B + O + "/fixed-costs").json().get("items") or [] if x["id"] == fid]
     check(r.ok and r.json().get("id") == fid and got and got[0]["amount"] == "49.90" and got[0]["label"] == f"Software {who}",
           f"{who}: the undo brings the fixed cost back (same id, amount readable) {r.text[:200]} {got}")
     check(sql("SELECT 1 FROM office_sub_reminders WHERE fixed_id=?", (fid,)), f"{who}: its reminder row came back with it")
-    check(S.post(B + f"/api/office/trash/undo/fixed_cost/{tf}").status_code == 404, f"{who}: a second undo 404")
+    check(S.post(B + f"/api/office/trash/core/ofixed/{tf}/restore?undo=1").status_code == 404, f"{who}: a second undo 404")
 
     # ------------------------------------------------------------ a correction of the cash flow
     r = S.post(B + O + "/cashflow/adjust", json={"month": MONTH, "dir": "out", "amount": "120", "note": f"Bar {who}"})
     check(r.status_code == 201, f"{who}: setup correction {r.text[:200]}")
     aid = r.json()["id"]
     r = S.delete(B + f"{O}/cashflow/adjust/{aid}")
-    ta = r.json().get("trash_id") if r.ok else None
-    check(r.ok and ta and not sql("SELECT 1 FROM office_cf_adjust WHERE id=?", (aid,)), f"{who}: the correction goes with a copy {r.text[:200]}")
-    r = S.post(B + f"/api/office/trash/undo/cf_adjust/{ta}")
-    check(r.ok and r.json().get("id") == aid and sql("SELECT 1 FROM office_cf_adjust WHERE id=?", (aid,)), f"{who}: the undo brings the correction back {r.text[:200]}")
+    # 2.905.0 (#5414): the core's trash (kind oadjust, the row stays with deleted_at)
+    ta = (r.json().get("trash") or {}).get("id") if r.ok else None
+    check(r.ok and ta == aid and sql("SELECT 1 FROM office_cf_adjust WHERE id=? AND deleted_at IS NOT NULL", (aid,)), f"{who}: the correction goes into the trash {r.text[:200]}")
+    check(in_trash(S, ta, "cf_adjust"), f"{who}: the office trash lists the correction")
+    r = S.post(B + f"/api/office/trash/core/oadjust/{ta}/restore?undo=1")
+    check(r.ok and r.json().get("id") == aid and sql("SELECT 1 FROM office_cf_adjust WHERE id=? AND deleted_at IS NULL", (aid,)), f"{who}: the undo brings the correction back {r.text[:200]}")
 
     # ------------------------------------------------------------ the start balance (no id column)
     r = S.put(B + O + "/cashflow/start", json={"amount": "1500.00", "day": PM1})
@@ -130,12 +137,21 @@ def scenario(S, who, ws, other, member=None):
     lid = r.json()["id"]
     link = sql("SELECT id FROM office_letter_links WHERE letter_id=? AND node_id=?", (lid, nid))
     r = S.delete(B + f"{O}/letters/{lid}/links/{nid}?kind=answers")
-    tl = r.json().get("trash_id") if r.ok else None
-    check(r.ok and tl and link and not sql("SELECT 1 FROM office_letter_links WHERE letter_id=?", (lid,)), f"{who}: the link goes with a copy {r.text[:200]}")
-    r = S.post(B + f"/api/office/trash/undo/letter_link/{tl}")
+    # 2.905.0 (#5414): the core's trash (kind oletlink, the row stays with deleted_at)
+    tl = (r.json().get("trash") or {}).get("id") if r.ok else None
+    check(r.ok and link and tl == link[0][0] and not sql("SELECT 1 FROM office_letter_links WHERE letter_id=? AND deleted_at IS NULL", (lid,))
+          and not r.json().get("links"), f"{who}: the link goes into the trash {r.text[:200]}")
+    check(in_trash(S, tl, "letter_link"), f"{who}: the office trash lists the link")
+    r = S.post(B + f"/api/office/trash/core/oletlink/{tl}/restore?undo=1")
     check(r.ok and r.json().get("ids") == [link[0][0]] and sql("SELECT 1 FROM office_letter_links WHERE id=?", (link[0][0],)),
           f"{who}: the undo writes the link back {r.text[:200]}")
     check(any(x["node_id"] == nid for x in S.get(B + f"{O}/letters/{lid}/links").json().get("links") or []), f"{who}: the letter shows the link again")
+    # 2.905.0 (#5414): removed again and linked again: the row of the trash is the link again (one link per letter / document / kind)
+    check(S.delete(B + f"{O}/letters/{lid}/links/{nid}?kind=answers").ok, f"{who}: removed again")
+    r = S.post(B + f"{O}/letters/{lid}/links", json={"node_id": nid, "kind": "answers"})
+    check(r.status_code == 201 and any(x["node_id"] == nid for x in r.json().get("links") or [])
+          and sql("SELECT id FROM office_letter_links WHERE letter_id=? AND node_id=? AND deleted_at IS NULL", (lid, nid)) == link,
+          f"{who}: linked again: the same row, live {r.status_code} {r.text[:200]}")
 
     # ------------------------------------------------------------ an import of fixed costs taken back
     items = [{"label": f"Miete {who}", "amount": "800", "repeat": "monthly", "start": PM1[:8] + "01"},
@@ -144,14 +160,14 @@ def scenario(S, who, ws, other, member=None):
     check(r.status_code == 201 and r.json()["created"] == 2, f"{who}: setup fixed costs import {r.text[:200]}")
     fids = sorted(r.json()["ids"])
     r = S.post(B + O + "/fixed-costs/delete", json={"ids": fids})
-    ti = r.json().get("trash_id") if r.ok else None
-    check(r.ok and r.json().get("deleted") == 2 and ti and not sql("SELECT 1 FROM office_fixed_costs WHERE id IN (?,?)", tuple(fids)),
-          f"{who}: the import taken back goes into the office trash {r.text[:200]}")
-    n = sum(1 for x in S.get(B + O + "/trash").json()["items"] if x["kind"] == "fixed_import")
-    check(n == 1, f"{who}: one entry for the import, not one per row ({n})")
-    r = S.post(B + f"{O}/trash/{ti}/restore")
-    back = sorted(x[0] for x in sql("SELECT id FROM office_fixed_costs WHERE id IN (?,?)", tuple(fids)))
-    check(r.ok and back == fids, f"{who}: the office trash brings every imported row back {r.text[:200]} {back}")
+    # 2.905.0 (#5414): every row into the core's trash (one step of the person), the office trash lists each (core = ofixed)
+    check(r.ok and r.json().get("deleted") == 2 and len(sql("SELECT 1 FROM office_fixed_costs WHERE id IN (?,?) AND deleted_at IS NOT NULL", tuple(fids))) == 2,
+          f"{who}: the import taken back goes into the trash {r.text[:200]}")
+    n = sorted(x["id"] for x in S.get(B + O + "/trash").json()["items"] if x.get("core") == "ofixed" and x["id"] in fids)
+    check(n == fids, f"{who}: the office trash lists its rows ({n})")
+    rs = [S.post(B + f"{O}/trash/core/ofixed/{x}/restore") for x in fids]
+    back = sorted(x[0] for x in sql("SELECT id FROM office_fixed_costs WHERE id IN (?,?) AND deleted_at IS NULL", tuple(fids)))
+    check(all(x.ok for x in rs) and back == fids, f"{who}: the office trash brings every imported row back {[x.text[:100] for x in rs]} {back}")
     rr = sql("SELECT r.undone_at FROM office_import_runs r JOIN office_fixed_costs f ON f.import_run_id=r.id WHERE f.id=?", (fids[0],))
     check(rr and rr[0][0] is None, f"{who}: the import run counts as not undone again {rr}")
 
@@ -165,6 +181,7 @@ def scenario(S, who, ws, other, member=None):
     r = S.post(B + O + "/trips/delete", json={"ids": tids})
     tt = r.json().get("trash_id") if r.ok else None
     check(r.ok and r.json().get("deleted") == 2 and tt and in_trash(S, tt, "trip_import"), f"{who}: the trips import taken back: one entry {r.text[:200]}")
+    check(other.post(B + f"/api/office/trash/undo/trip_import/{tt}").status_code in (403, 404), f"{who}: another office: the undo 403 / 404")
     r = S.post(B + f"/api/office/trash/undo/trip_import/{tt}")
     check(r.ok and sorted(r.json().get("ids") or []) == tids and len(sql("SELECT id FROM office_trips WHERE id IN (?,?)", tuple(tids))) == 2,
           f"{who}: the undo brings both trips back {r.text[:200]}")
