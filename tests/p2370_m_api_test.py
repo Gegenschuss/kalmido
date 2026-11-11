@@ -19,6 +19,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -157,14 +158,20 @@ mt = next((ln for ln in lg.splitlines() if ln.startswith("migrate-sqlite: done:"
 print(f"MIGRATION big: {rows} rows in {len(want)} tables, start to healthy {secs:.1f} s; {mt}", flush=True)
 rep = report()
 # 2.771.0 (#5342): a table of the SQLite file that this version no longer has (paperless_links, dropped by
-# migrations.d/5265_a.py in 2.755) is not taken over: the report has every OTHER table and names the gone one in its notes
-GONE = {"paperless_links", "chat_reactions", "comment_reactions", "tchat_rx",  # #5404: + the reaction tables, moved into obj_reactions by migrations.d/5269_a.py (2.772)
-        "task_seen"}  # 2.933.0 (#5404): + the read marks, moved into obj_seen by migrations.d/5284_a.py (2.905)
+# migrations.d/5265_a.py in 2.755) is not taken over: the report has every OTHER table and names the gone one in its notes.
+# 2.991.0 (#5404): the gone tables are no longer a hand-kept list (red after every core step that drops a table: the reaction
+# tables 2.772, task_seen 2.905, book_members / ev_cal_members 2.924, folder_people / group_shares ...): the report's notes
+# name them, and each one named must really be missing in Postgres (a table that exists but was skipped stays red), and
+# every other table of the SQLite file must be in the report. The known ones stay as a floor.
+GONE_MIN = {"paperless_links", "chat_reactions", "comment_reactions", "tchat_rx", "task_seen"}
+GONE_RE = "table (.+) of the SQLite file not taken over \\(gone in this version\\)"
+GONE = {m.group(1) for m in (re.fullmatch(GONE_RE, x) for x in rep.get("notes", [])) if m} & set(want)
+there = {t for t in GONE if psql(f"SELECT to_regclass('public.{t}') IS NOT NULL") != "f"}
+check(not there, f"(b) report: a table named gone is missing in Postgres too {sorted(there)}")
+check(GONE_MIN & set(want) <= GONE, f"(b) report: the known gone tables are named in the notes {sorted((GONE_MIN & set(want)) - GONE)}")
 kept = {t for t in want if t not in GONE}
 check(rep.get("status") == "ok" and set(rep.get("tables", {})) == kept,
       f"(b) report: ok, every table still in this version ({len(rep.get('tables', {}))}/{len(kept)}) {sorted(kept ^ set(rep.get('tables', {})))[:5]}")
-check(all(f"table {t} of the SQLite file not taken over (gone in this version)" in rep.get("notes", []) for t in GONE & set(want)),
-      "(b) report: the gone table is named in the notes " + str([x for x in rep.get("notes", []) if x.startswith("table ")])[:300])
 diff = {t: (want[t], x.get("source"), x.get("written")) for t, x in rep.get("tables", {}).items() if x.get("source") != want.get(t)}
 check(not diff, "(b) report: source rows = rows of the SQLite file " + str(diff)[:300])
 left = {t: x for t, x in rep.get("tables", {}).items() if x.get("written") != x.get("source")}
