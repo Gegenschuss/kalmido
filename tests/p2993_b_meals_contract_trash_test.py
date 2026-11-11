@@ -203,4 +203,22 @@ dbx("UPDATE office_meals SET deleted_at=? WHERE id=?", (OLD, MF))
 n = tick()
 check(mrow(MF) is None and frow(FF) is None and not stored(PB, FNF), f"freelancer: purged after the period with her bill {n}")
 
+# ---------------------------------------------------------------- fable F1: a member who manages quotes reads the office trash,
+# but the core's rows (an entertainment receipt's place and occasion) only the office admin sees - restoring / deleting them is his
+r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "member"}], "username": "mona", "display_name": "Mona",
+                                   "password": "password123", "email": "mona@example.com"})
+check(r.ok, "setup: mona as member " + r.text[:200])
+MONA = r.json().get("id")
+Mo = sess("mona")
+Mo.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": FEATURES, "workspace": f"org:{ORG}"})
+r = A.post(B + "/api/office/rights/groups", json={"from": "tpl:none", "name": "Quotes managers"})
+GQ = r.json().get("id") if r.status_code == 201 else None
+check(GQ and A.patch(B + f"/api/office/rights/groups/{GQ}", json={"levels": {"offers": "manage"}}).ok
+      and A.put(B + f"/api/office/rights/people/{MONA}", json={"groups": [f"g:{GQ}"]}).ok, "setup: mona manages quotes")
+M9 = meal(A, place_name="Secret Example Place")
+check(A.delete(M + f"/{M9}").ok and any(x[0] == "omeal" and x[1] == M9 for x in trash(A)), "the admin sees the meal in the office trash")
+t = trash(Mo)
+check(t is not None and not [x for x in t if x[0]] and "Secret Example Place" not in json.dumps(t),
+      f"fable F1: a quotes manager reads the office trash without the core's rows {t}")
+
 sys.exit(done("p2993_b_meals_contract_trash"))

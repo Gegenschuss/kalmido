@@ -412,10 +412,13 @@ def _purge_area(c, kind, rid):
     if f is None:
         return True
     box = _PURGE_BOX.get()
+    n0 = len(box["after"]) if box is not None else 0
     try:
         with c.savepoint():
             out = f(c, int(rid))
     except Denied:
+        if box is not None:  # 2.993.0 (#5413, fable F2): the savepoint is undone, so is the after-commit work a nested purge of
+            del box["after"][n0:]  # the hook queued (a bill file's unlink): its row stays, its file must stay too
         if box is None or not box["keep"]:
             raise
         box["locked"] += 1
@@ -423,6 +426,8 @@ def _purge_area(c, kind, rid):
     except Exception as e:  # noqa: BLE001 - 2.936.0 (#5364): in the retention run one object that fails (its savepoint undone)
         # waits for the next run instead of holding every other one back hour after hour; it is no lock -- counted as
         # <kind>_err with its message, and obj_trash_tick raises after its commit so the watchdog reports it (_wd_section)
+        if box is not None:
+            del box["after"][n0:]  # 2.993.0 (#5413, fable F2): as above
         if box is None or not box["keep"]:
             raise
         print("obj purge:", kind, int(rid), "kept for the next run:", type(e).__name__, str(e)[:200], flush=True)

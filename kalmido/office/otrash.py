@@ -226,7 +226,10 @@ def otb_list():
     rows = c.execute("SELECT id, kind, sub, ref_id, label, deleted_by, deleted_at FROM office_trash WHERE org_id=? "
                      "ORDER BY deleted_at DESC, id DESC LIMIT 500", (oid,)).fetchall()
     # 2.905.0 (#5414): + the rows of the kinds on the core's trash (office/okern.py view=), marked core = their kind
-    items = [dict(r) for r in rows] + ofk_trash_items(c, oid)
+    # 2.993.0 (#5413, fable F1): the core's rows only for the office admin - restoring / deleting them is the admin's alone
+    # (otb_core_restore / otb_core_delete), and their labels (an entertainment receipt's place and occasion, a contract's
+    # name) are not for a person who may only manage documents
+    items = [dict(r) for r in rows] + (ofk_trash_items(c, oid) if office_role(c, uid, oid) == "admin" else [])
     items.sort(key=lambda x: (str(x["deleted_at"] or ""), x["id"]), reverse=True)
     return jsonify(items=items[:500], days=max(1, ret_days("trash")))
 

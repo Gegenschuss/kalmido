@@ -117,6 +117,8 @@ def ofk_restore(c, uid, kind, rid, undo=False):
             unlink_files(box["after"])
             with system_ctx(c):
                 kept = c.execute(f"SELECT 1 FROM {qi(OBJ[kind]['table'], _tables())} WHERE id=?", (int(rid),)).fetchone()
+            if kept and box["err"]:  # 2.993.0 (#5413, fable F2): the purge failed (not a lock) - no restore of a half-checked row,
+                raise Denied(409)  # the next retention run tries again
             if kept:  # kept by law (a receipt: trash_keep / the hook's Denied): it stays in the trash and comes back as any other
                 return obj_restore(c, uid, kind, rid, undo=undo, step=OFK.get(kind, {}).get("step", True))
             raise Denied(404)
