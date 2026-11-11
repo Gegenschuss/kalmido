@@ -147,6 +147,15 @@ r = A.post(B + "/api/time/entries", json={"list_id": L, "start": (datetime.now()
 check(r.ok, f"(setup) a project time entry with a note {r.status_code} {r.text[:200]}")
 r = A.delete(B + f"/api/time/entries/{r.json()['id']}")
 check(r.ok and r.json().get("undo_group"), f"#5550: deleted: an undo step holding the row {r.status_code} {r.text[:200]}")
+# review (Fable): an undo before the lock writes the row's changes into obj_history (note before / after): the sweep finds it
+r = A.post(B + "/api/time/entries", json={"list_id": L, "start": (datetime.now() - timedelta(hours=8)).isoformat(timespec="seconds"),
+                                          "minutes": 15, "note": MK + "HistNote"})
+check(r.ok, f"(setup) another project time entry with a note {r.status_code} {r.text[:200]}")
+r = A.patch(B + f"/api/time/entries/{r.json()['id']}", json={"note": MK + "HistNote2"})
+GH = r.json().get("undo_group") if r.ok else None
+check(bool(GH) and A.post(B + f"/api/undo/to/{GH}").ok
+      and dbx("SELECT 1 FROM obj_history WHERE kind='time_entry' AND vals_before::text || vals_after::text LIKE ?", (f"%{MK}HistNote%",)),
+      f"(setup) its note change undone: a history row with both notes {GH}")
 # 2.900.0 (#5551): the project's settings step ("listset") holds the description / status note, a notepad emptied for the
 # lock ("notepad") its texts before -- both in the copy; the sweep below finds any of them left in obj_undo
 dbx("UPDATE lists SET description=?, status_note=? WHERE id=?", (MK + "Desc", MK + "StatusNote", L), write=True)
@@ -517,7 +526,8 @@ L4 = A.post(B + "/api/lists", json={"name": "Locked later", "org_id": None}).jso
 dbx("UPDATE lists SET time_tracking=1 WHERE id=?", (L4,), write=True)
 _st = (datetime.now() - timedelta(hours=7)).isoformat(timespec="seconds")
 E1 = A.post(B + "/api/time/entries", json={"list_id": L4, "start": _st, "minutes": 25, "note": "Back note"}).json()["id"]
-r = A.patch(B + f"/api/time/entries/{E1}", json={"minutes": 35, "note": "Other note"})
+# review (Fable): the note emptied by the step itself, so the lock leaves the row as the step left it and only the guard refuses
+r = A.patch(B + f"/api/time/entries/{E1}", json={"minutes": 35, "note": ""})
 G1 = r.json().get("undo_group") if r.ok else None
 E2 = A.post(B + "/api/time/entries", json={"list_id": L4, "start": _st, "minutes": 5, "note": "Gone note"}).json()["id"]
 r = A.delete(B + f"/api/time/entries/{E2}")

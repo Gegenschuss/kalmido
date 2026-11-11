@@ -341,8 +341,8 @@ def le2b_scrub(c, lid):
     n["undo_sections"] = le2b_scrub_undo(c, "(kind IN ('section', 'section_life') AND ref_id IN (SELECT id FROM sections WHERE list_id=? "
                                             "UNION SELECT ref_id FROM list_part_trash WHERE list_id=? AND kind='section')) "
                                             "OR (kind='section_order' AND ref_id=?)", (lid, lid, lid))
-    n["undo_time"] = le2b_scrub_undo(c, f"kind='time_entry' AND ref_id IN (SELECT id FROM time_entries WHERE list_id=? OR task_id IN ({tq}))",
-                                     (lid, lid))
+    n["undo_time"] = n.get("undo_time", 0) + le2b_scrub_undo(  # 2.900.0 (review): + what le2b_scrub_tasks counted
+        c, f"kind='time_entry' AND ref_id IN (SELECT id FROM time_entries WHERE list_id=? OR task_id IN ({tq}))", (lid, lid))
     n.update(le2b_scrub_undo_free(c, lid))  # 2.900.0 (#5550, #5551)
     n.update(le2b_scrub_trash(c, lid))  # #5549: after undo_sections (it reads the section copies)
     for fn in _SCRUB_MORE:
@@ -369,7 +369,13 @@ def le2b_scrub_undo_free(c, lid):
     lock; also of a notepad deleted since). Part of le2b_scrub; core/db.py runs it once for the projects locked before.
     Idempotent, the caller commits. Returns {what: groups dropped}."""
     tids = [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))]
-    return {"undo_time_copies": _scrub_undo_ids(c, le2b_undo_copies(c, ("time_entry", "time_life"), [lid], tids)),
+    # review (Fable): an undo / redo before the lock wrote the whole row's changes into the history (core/writes.py
+    # obj_undo_hist, also columns never written back): the note / task title, description / status note, notepad texts
+    hist = c.execute("""DELETE FROM obj_history WHERE (kind='time_entry' AND ref_id IN (SELECT id FROM time_entries WHERE list_id=?
+                        OR task_id IN (SELECT id FROM tasks WHERE list_id=?))) OR (kind='listset' AND ref_id=?)
+                        OR (kind='notepad' AND ref_id IN (SELECT id FROM list_notepads WHERE list_id=?))""", (lid, lid, lid, lid)).rowcount
+    return {"history_copies": hist,
+            "undo_time_copies": _scrub_undo_ids(c, le2b_undo_copies(c, ("time_entry", "time_life"), [lid], tids)),
             "undo_settings": le2b_scrub_undo(c, "kind='listset' AND ref_id=?", (lid,)),  # #5551
             "undo_notepads": le2b_scrub_undo(c, "kind='notepad' AND ref_id IN (SELECT id FROM list_notepads WHERE list_id=?)", (lid,))
             + _scrub_undo_ids(c, le2b_undo_copies(c, ("notepad",), [lid], ()))}  # #5551
@@ -625,6 +631,8 @@ def le2b_scrub_tasks(c, ids):
         # 2.900.0 (#5550): + the steps of their time entries (the note and task title emptied above sit in the copy)
         n["undo_time"] = n.get("undo_time", 0) + le2b_scrub_undo(
             c, f"kind='time_entry' AND ref_id IN (SELECT id FROM time_entries WHERE task_id IN ({q}))", part)
+        n["history_time"] = n.get("history_time", 0) + c.execute(  # review (Fable): their history rows too (le2b_scrub_undo_free)
+            f"DELETE FROM obj_history WHERE kind='time_entry' AND ref_id IN (SELECT id FROM time_entries WHERE task_id IN ({q}))", part).rowcount
     # ... and of their entries deleted or moved elsewhere since (the row only in the copy)
     n["undo_time"] = n.get("undo_time", 0) + _scrub_undo_ids(c, le2b_undo_copies(c, ("time_entry", "time_life"), (), ids))
     n.update(le2b_scrub_trash_tasks(c, set(ids)))  # #5562

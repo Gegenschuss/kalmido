@@ -74,7 +74,7 @@ def _place_ok(c, uid, lid):
 
 
 def _locked(c, lid, tid):
-    """2.878.0 (#5550): the entry's project (or its task's) has the end-to-end lock: no note, no task title in plain text."""
+    """2.900.0 (#5550): the entry's project (or its task's) has the end-to-end lock: no note, no task title in plain text."""
     return le2b_list_locked(c, lid) or le2b_task_locked(c, tid)
 
 
@@ -96,7 +96,7 @@ def teu_need(c, uid, rid, oid):
         if now["end"] is not None or was["end"] is not None:
             bw_check(c, [(was["list_id"], was["task_id"]), (now["list_id"], now["task_id"])])
         if now["note"] and _locked(c, now["list_id"], now["task_id"]):
-            # 2.878.0 (#5550): a step of before the lock writes no note back into a locked project: refused (409, the part
+            # 2.900.0 (#5550): a step of before the lock writes no note back into a locked project: refused (409, the part
             # stays and the write back is rolled back with its history row; the task title is never written back, TEU_KEEP)
             raise LE2EDenied("list_e2e_plain")
     return {"fix": fix, "lock": f"time-{int(rid)}"}
@@ -144,7 +144,7 @@ def teu_life_run(c, uid, eid, data, redo):
             row["client_id"] = None
         for k in ("billed_doc_id", "billed_at", "billed_item_id"):
             row[k] = None
-        if _locked(c, row.get("list_id"), row.get("task_id")):  # 2.878.0 (#5550): back without its plain texts
+        if _locked(c, row.get("list_id"), row.get("task_id")):  # 2.900.0 (#5550): back without its plain texts
             row.update(note="", task_title="")
             data = {**data, "row": {**(data.get("row") or {}), "note": "", "task_title": ""}}
         have = table_columns(c, "time_entries")
