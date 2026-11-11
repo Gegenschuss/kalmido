@@ -166,8 +166,9 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   calls.length = 0;
   d.querySelector('#toast button').click();
   check(await until(async () => (await taskOf(w3)).due === before[w3].due && (await taskOf(w2)).start === before[w2].start && (await taskOf(w1)).due === before[w1].due), 'one undo: everything back');
-  const wr = calls.filter(c => c[0] !== 'GET' && /\/api\/tasks/.test(c[1]));
-  check(wr.length === 1 && /\/api\/tasks\/batch/.test(wr[0][1]), `the undo is one request too: ${JSON.stringify(wr)}`);
+  // 2.979.0 (#5667): since #5255 the server takes the step back by its group (undo.js histDo): one POST /api/undo/to/<group>
+  const wr = calls.filter(c => c[0] !== 'GET' && /\/api\/(tasks|undo)/.test(c[1]));
+  check(wr.length === 1 && /\/api\/undo\/to\/\d+/.test(wr[0][1]), `the undo is one request too: ${JSON.stringify(wr)}`);
   // with dependents in other lists (Website: setting on)
   // the undo reloads and redraws after the server answered; on a busy CI runner that can take longer than 4 s, and a drag
   // that starts before it ends races its reload (2.12.1: the drag below then never reached the server)

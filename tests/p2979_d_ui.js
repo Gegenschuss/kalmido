@@ -84,16 +84,18 @@ async function reading(ck, user, tag) {
   await w.eval(`histStep('undo').then(() => 1)`);
   check(await until(() => r.row(r.A)), 'read later: undo once more: back');
   // the next change works on the row brought back
+  n0 = steps();
   click(w, r.row(r.A)?.querySelector('[data-rl="tick"]'));
-  check(await until(() => !r.row(r.A)), 'read later: the link brought back can be ticked off again');
+  check(await until(() => !r.row(r.A) && steps() > n0), 'read later: the link brought back can be ticked off again');
   const srvA = await until(async () => { const t = await call(CA, 'GET', `/api/tasks/${r.A}`); return t.done || t.status === 1 || t.completed_at ? t : null; });
   check(srvA, 'read later: the server has it done');
   await w.eval(`histStep('undo').then(() => 1)`);
   check(await until(() => r.row(r.A)), 'read later: and back');
 
   // ---- a list not shown is old after the undo; the view fetches it when it opens again
+  n0 = steps();
   click(w, r.row(r.Bid)?.querySelector('[data-rl="tick"]'));
-  check(await until(() => !r.row(r.Bid)), 'read later: ticked off before leaving the view');
+  check(await until(() => !r.row(r.Bid) && steps() > n0), 'read later: ticked off before leaving the view, one step');
   w.location.hash = 'home';
   check(await until(() => !d.querySelector('.rlview')), 'another page');
   await w.eval(`histStep('undo').then(() => 1)`);
@@ -107,8 +109,9 @@ async function reading(ck, user, tag) {
   const CF = await login('fiona');
   await call(CF, 'PATCH', '/api/settings', {lang: 'en', features: FEAT, tour: 'done', workspace: 'private'});
   const f = await reading(CF, 'fiona', 'fiona');
+  const fn0 = f.w.eval('HIST.undo.length');
   click(f.w, f.row(f.A)?.querySelector('[data-rl="tick"]'));
-  check(await until(() => !f.row(f.A)), 'fiona: ticked off');
+  check(await until(() => !f.row(f.A) && f.w.eval('HIST.undo.length') > fn0), 'fiona: ticked off, one step (after the answer)');
   await f.w.eval(`histStep('undo').then(() => 1)`);
   check(await until(() => f.row(f.A)), 'fiona: one undo shows her link again');
   f.w.close();
