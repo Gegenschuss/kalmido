@@ -42,7 +42,7 @@ from ..core.db import body, bump, db, iso, now_utc
 from ..core.i18n import N_, tr, trn
 from ..core.merges import mg_fk_refs
 from ..core.orgcrypt import FIELDS, JSON_KEYS, oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_store, oc_read_file, oc_write_file
-from ..core.pg import insert_id, table_columns, write_lock
+from ..core.pg import insert_id, qi, table_columns, write_lock
 from ..files.scan import sc_copy_mark
 from .oftref import oft_dropped  # 2.351.0 F (#2749)
 from ..core.errors import BadInput
@@ -273,7 +273,8 @@ def ofm_need(c, uid, what, ids):
         return (pb_personal(c, uid) if w is None else w), rows
     t = OFM_TABLE[what]
     q = ",".join("?" * len(ids))
-    rows = c.execute(f"SELECT * FROM {t} WHERE id IN ({q}) ORDER BY id", ids).fetchall()
+    live = f" AND {live_sql()}" if what in ("sets", "contracts") else ""  # 2.905.0 (#5414, review): one in the core's trash does not move (404)
+    rows = c.execute(f"SELECT * FROM {qi(t, OFM_TABLE.values())} WHERE id IN ({q}){live} ORDER BY id", ids).fetchall()
     if len(rows) != len(ids):
         raise Denied(404)
     areas = {r["org_id"] for r in rows}

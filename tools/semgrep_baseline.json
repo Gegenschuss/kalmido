@@ -2795,14 +2795,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/office/legacyimport.py",
-   "code": "for x in c.execute(f\"SELECT id FROM {MD[kind]['table']} WHERE org_id=? AND import_run_id=? AND archived=0 ORDER BY id\", (oid, r[\"id\"])):",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/office/legacyimport.py",
    "code": "ids = [x[0] for x in c.execute(f\"SELECT t.id FROM {table} t WHERE t.org_id=? AND t.import_run_id=?{alive} ORDER BY t.id\", (oid, r[\"id\"]))]",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
@@ -2820,14 +2812,6 @@
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/office/letters.py",
    "code": "c.execute(f\"UPDATE office_letter_profiles SET {', '.join(k + '=?' for k in upd)} WHERE org_id=? AND user_id=?\", list(upd.values()) + [oid, uid])",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/office/model.py",
-   "code": "c.execute(f\"DELETE FROM {m['table']} WHERE id=? AND org_id=?\", (r[\"id\"], oid))",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296
@@ -2860,38 +2844,6 @@
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/office/model.py",
    "code": "cur_id = insert_id(c, f\"INSERT INTO {m['table']}({','.join(cols)}) VALUES({','.join('?' * len(cols))})\", vals)",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/office/model.py",
-   "code": "elif not c.execute(f\"SELECT 1 FROM {spec} WHERE id=? AND org_id=?\", (i, oid)).fetchone():",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/office/model.py",
-   "code": "if not c.execute(f\"SELECT 1 FROM {table} WHERE id=? AND org_id=?\", (i, oid)).fetchone():",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/office/model.py",
-   "code": "r = c.execute(f\"SELECT * FROM {MD[kind]['table']} WHERE id=? AND org_id=?\", (rid, oid)).fetchone()",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/office/model.py",
-   "code": "sql = f\"SELECT * FROM {m['table']} WHERE org_id=?\"",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296
@@ -3076,14 +3028,6 @@
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/office/officemove.py",
    "code": "rows = c.execute(f\"SELECT * FROM {kt} WHERE org_id=? AND {col} IN ({','.join('?' * len(pid))}) ORDER BY id\", (src, *pid)).fetchall() if pid else []",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/office/officemove.py",
-   "code": "rows = c.execute(f\"SELECT * FROM {t} WHERE id IN ({q}) ORDER BY id\", ids).fetchall()",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296

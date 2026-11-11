@@ -25,7 +25,7 @@ from ..core.pg import write_lock  # 2.809.0 (#5418)
 from .model import office_on, office_role, pb_owner
 from ..accounts.orgroles import is_write_request, office_allowed  # 2.809.0 (#5418)
 from ..accounts.supportgrant import sga_org_foreign  # 2.809.0 (#5418)
-from .rights import office_can  # 2.905.0 (#5414): office/rights.py loads first and imports this module at its end (its groups)
+from .rights import office_can  # 2.905.0 (#5414): rights.py never imports this module at its top (its trash kind is registered in office/web.py)
 
 OFK = {}  # kind -> {table, area, need, base, view}
 
@@ -78,21 +78,25 @@ def _space_of(table):
     return space
 
 
-def ofk_register(kind, table, label, area, need="manage", children=(), base=None, view=None):
+def ofk_register(kind, table, label, area, need="manage", children=(), base=None, view=None, step=True):
     """Registers an office kind on the core's trash (module docstring); area = its rights area (office/rights.py), need =
     the level its route needs to delete a row (an "own" level: the route checks the row is the person's own).
     2.905.0 (#5414): base(c, uid, row) -> 'manage' | None replaces the area's level (the rights groups: who manages the
     rights); view = {"kind": the app's name of it (or fn(row)), "label": fn(c, oid, row) -> text, "ctx": the module's context
-    () -> (c, uid, oid) for the toast's undo, "back": fn(c, oid, row) after a restore} shows it in the office trash."""
-    OFK[kind] = {"table": table, "area": area, "need": need, "base": base, "view": view}
+    () -> (c, uid, oid) for the toast's undo, "back": fn(c, oid, row) after a restore} shows it in the office trash.
+    2.905.0 (#5414, review): step=False = no step in the person's undo list (GET /api/undo): a kind whose route does more
+    than the core on trash / restore (in-use checks, members out, the view's back hook) is only taken back through its
+    own routes (the toast's undo, the office trash), never by the core's undo / redo that would skip them."""
+    OFK[kind] = {"table": table, "area": area, "need": need, "base": base, "view": view, "step": step}
     return obj_register(kind, table, label=label, fields={}, area="office", routes=False, listed=False, fsref=False,
                         space=_space_of(table), base_role=_base_of(kind), visible=_visible_of(table), cap=lambda c, uid, rid: None,
                         scopes=("office", "office"), children=children, trash_prune=True)
 
 
 def ofk_trash(c, uid, kind, rid):
-    """Into the core's trash (the route checked the office rights and that the row may go); one undo step of the person."""
-    return obj_trash(c, uid, kind, rid)
+    """Into the core's trash (the route checked the office rights and that the row may go); one undo step of the person
+    (not for a kind registered with step=False, see ofk_register)."""
+    return obj_trash(c, uid, kind, rid, step=OFK.get(kind, {}).get("step", True))
 
 
 def ofk_restore(c, uid, kind, rid, undo=False):
@@ -107,7 +111,7 @@ def ofk_restore(c, uid, kind, rid, undo=False):
             obj_trash_prune(c, kind, purge=True, ids=[int(rid)])
             c.commit()
             raise Denied(404)
-    return obj_restore(c, uid, kind, rid, undo=undo)
+    return obj_restore(c, uid, kind, rid, undo=undo, step=OFK.get(kind, {}).get("step", True))  # 2.905.0 (#5414, review): ofk_register step
 
 
 def ofk_purge(c, kind, rid):

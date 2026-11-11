@@ -190,7 +190,9 @@ c.commit()
   back) moved onto the core's trash. `view=` in `ofk_register` shows such a kind in the office trash (`GET
   /api/office/trash` lists its rows with `core` = the kind; `POST /api/office/trash/core/<kind>/<id>/restore`, `DELETE
   .../core/<kind>/<id>`; `?undo=1` = the toast's undo with the module's rights, the person's own step). A delete answers
-  `trash: {kind, id}`. Still on the office trash of copies: drafts, parts, trips, card lines, the start balance (no id
+  `trash: {kind, id}`. `step=False` in `ofk_register` (master data, rights groups, fixed costs): no step in the person's
+  undo list - the core's undo / redo would skip what their routes do besides (in-use check, contract files, members out,
+  the import run, review 2.905); they come back only through the toast's undo and the office trash. Still on the office trash of copies: drafts, parts, trips, card lines, the start balance (no id
   column) and the sign-offs (`office_signoffs`, rows without an organisation); copies of the moved kinds made before 2.905
   stay restorable there until their period ends (no data move).
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new

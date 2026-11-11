@@ -442,13 +442,14 @@ def _omd_back(table):
 
 for _t, _k in OMD_KIND.items():
     ofk_register(_k, _t, N_("Master data"), _OMD_AREA[_t], need="edit",
-                 view={"kind": _omd_ui(_t), "label": _omd_label(_t), "ctx": lambda: _ctx(admin=True), "back": _omd_back(_t)})
+                 view={"kind": _omd_ui(_t), "label": _omd_label(_t), "ctx": lambda: _ctx(admin=True), "back": _omd_back(_t)},
+                 step=False)  # 2.905.0 (#5414, review): in-use check / contract files / care tasks run only on its routes
 
 # 2.905.0 (#5414): an own rights group in the core's trash (office/rights.py); registered here, not in rights.py, because okern
 # reads office_can from rights at its top (a module-level okern import in rights.py would close an import cycle).
 ofk_register(OFR_TRASH, "office_rgroups", N_("Rights group"), "settings", base=_ofr_trash_base,
              view={"kind": "rgroup", "label": lambda c, oid, row: row.get("name") or "", "ctx": _ofr_trash_ctx,
-                   "back": _ofr_trash_back})
+                   "back": _ofr_trash_back}, step=False)  # review: members out / last manager kept only on its routes
 obj_on_purge(OFR_TRASH, _ofr_on_purge)
 
 

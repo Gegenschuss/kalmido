@@ -60,7 +60,8 @@ def _rk_fixed_back(c, oid, row):
 
 
 ofk_register(RK_FIXED_KIND, "office_fixed_costs", N_("Fixed cost"), "cashflow", need="edit",
-             view={"kind": RK_FIXED_TRASH, "label": lambda c, oid, row: row.get("label") or "", "ctx": _ctx, "back": _rk_fixed_back})
+             view={"kind": RK_FIXED_TRASH, "label": lambda c, oid, row: row.get("label") or "", "ctx": _ctx, "back": _rk_fixed_back},
+             step=False)  # 2.905.0 (#5414, review): the import run's back hook runs only on its routes
 
 ow_kind("office_fixed_cost", "office_fixed_costs")
 
