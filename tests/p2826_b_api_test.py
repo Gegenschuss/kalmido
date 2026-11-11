@@ -81,12 +81,25 @@ check(nows == 3 and fut == 3, f"resumed: each plan has its next run in the futur
 
 # a starter plan that waits for a project of her own (share_wait, #5378 review F2) keeps waiting: Resume all never starts it
 FU = ids["followup"]
+# CI red of 2.883.0: the watchdog (every TASKS_WATCHDOG_INTERVAL s, sched_wait_wake) wakes this plan by itself - frida owns her
+# personal agent, so for the watchdog she has shared it - and left (1, 0) behind although Resume all had left the plan out
+# (changed [1, 3]). The endpoint's property is "FU in no changed list"; (1, 0) with FU in no changed list can only be the watchdog,
+# then the round is set up again (right after a watchdog round, so the next one is ~30 s away).
+for _round in range(3):
+    c.execute("UPDATE agent_schedules SET enabled=0, share_wait=1, next_at=NULL WHERE id=?", (FU,))
+    c.commit()
+    r0 = Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": False})
+    r = Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": True})
+    touched = FU in (r0.json().get("changed") or []) + (r.json().get("changed") or [])
+    st = tuple(q("SELECT enabled, share_wait FROM agent_schedules WHERE id=?", (FU,))[0])
+    if touched or st != (1, 0):
+        break
+    print(f"  (the watchdog woke the waiting plan during round {_round + 1}, again)")
+check(r0.ok, "pause all")
+check(r.ok and not touched and st == (0, 1),
+      f"#5510: Resume all leaves a waiting starter plan waiting {r.text[:200]} {st}")
 c.execute("UPDATE agent_schedules SET enabled=0, share_wait=1, next_at=NULL WHERE id=?", (FU,))
 c.commit()
-check(Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": False}).ok, "pause all")
-r = Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": True})
-check(r.ok and FU not in (r.json().get("changed") or []) and tuple(q("SELECT enabled, share_wait FROM agent_schedules WHERE id=?", (FU,))[0]) == (0, 1),
-      f"#5510: Resume all leaves a waiting starter plan waiting {r.text[:200]} {q('SELECT enabled, share_wait FROM agent_schedules WHERE id=?', (FU,))}")
 r = Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": True, "ids": [FU]})
 check(r.ok and r.json().get("changed") == [], "... also when named in ids")
 

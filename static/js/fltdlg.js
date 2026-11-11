@@ -42,7 +42,7 @@ function kflt_rowHtml(c, i, cs, /** @type {any} */ cat, ctx = null) {
   const unit = cat.unit ? cat.unit(c) : null;
   const val = c.op === 'empty' || c.op === 'set' ? '<span class="fc-vn"></span>'
     : c.op === 'has' || c.op === 'nhas' ? `<input class="fc-t" data-i="${i}" value="${esc(c.v || '')}" placeholder="${esc(cat.ph ? cat.ph(c) : tr('Title or notes contain …'))}" aria-label="${esc(tr('Value'))}" autocomplete="off">`
-    : !kflt_isList(c) ? `<span class="fc-num"><input class="fc-n" data-i="${i}" ${cat.input?.(c) === 'date' ? 'type="date"' : 'inputmode="decimal"'} value="${esc(c.v ?? '')}" aria-label="${esc(tr('Value'))}">${unit ? `<span class="muted">${esc(unit)}</span>` : ''}</span>`
+    : !kflt_isList(c) ? `<span class="fc-num">${/*html-ok*/ cat.input?.(c) === 'date' ? dateIn('fc-d' + i, c.v ?? '', {label: tr('Value'), attrs: 'class="fc-n" data-i="' + i + '"'}) : `<input class="fc-n" data-i="${i}" inputmode="decimal" value="${esc(c.v ?? '')}" aria-label="${esc(tr('Value'))}">`}${unit ? `<span class="muted">${esc(unit)}</span>` : ''}</span>`
     : (s => `<button type="button" class="btn sm fc-v${s ? '' : ' fc-v0'}" data-i="${i}" aria-haspopup="menu" aria-label="${esc(tr('Value'))}: ${esc(s || tr('Select'))}"><span class="fc-vs">${esc(s || tr('Select') + '…')}</span>${ic('chev', 's')}</button>`)(kflt_sum(c, cs, cat));
   return `<div class="fcond" data-i="${i}">${what}${ops}${val}<button type="button" class="iconbtn fc-x" data-i="${i}" aria-label="${esc(tr('Remove condition'))}" title="${esc(tr('Remove condition'))}">${ic('x', 's')}</button></div>`;
 }
@@ -91,7 +91,7 @@ function kflt_rows(/** @type {any} */ host, /** @type {any[]} */ cs, /** @type {
   host.addEventListener('input', e => {
     const el = /** @type {HTMLInputElement} */ (e.target), c = cs[+(el.dataset.i ?? -1)]; if (!c) return;
     if (el.classList.contains('fc-t')) { c.v = el.value; o.changed?.(); }
-    if (el.classList.contains('fc-n')) { const v = el.value.trim(); c.v = v === '' || el.type === 'date' ? v : numIn(v); o.changed?.(); }  // 2.857.0 (#5518): a date stays its text
+    if (el.classList.contains('fc-n')) { const v = el.value.trim(); c.v = v === '' || el.dataset.dp === 'date' ? v : numIn(v); o.changed?.(); }  // 2.857.0 (#5518): a date stays its text; 2.898 (#5518): the app's own date picker (ux1_ui: no native date inputs)
   });
   host.addEventListener('click', e => {
     const b = /** @type {HTMLElement} */ (e.target).closest('button'); if (!b || !host.contains(b)) return;

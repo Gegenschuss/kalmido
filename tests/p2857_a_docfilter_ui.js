@@ -72,7 +72,7 @@ const docNew = async (name, text, fields) => {
   click(w, md().querySelector('[data-m="cond-add"]'));
   change(w, row(1).querySelector('.fc-f'), 'date');
   change(w, row(1).querySelector('.fc-op'), 'from');
-  check(row(1).querySelector('input.fc-n')?.type === 'date', 'Document date "from": a date field');
+  check(row(1).querySelector('input.fc-n')?.dataset.dp === 'date' && !!row(1).querySelector('[data-dpfor]') && !row(1).querySelector('input[type="date"]'), 'Document date "from": the app\'s date picker (no native date input)');
   input(w, row(1).querySelector('input.fc-n'), '2000-01-01');
   check(await until(() => /^1 document matches/.test(cnt())), `a date long ago changes nothing: ${cnt()}`);
   input(w, md().querySelector('#f-name'), 'Polar papers');
