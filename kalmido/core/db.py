@@ -1447,8 +1447,7 @@ def init_db(guard=True, load=None):
         if gsetting(c, "migr_e2ehist5564") != "1":  # #5564: one way -- the history rows of time entries / notepads deleted
             # before a lock kept their note / text; migr_e2eundo5550 took the copies that named their project, so the rows no
             # step can bring back go for every project (le2b_hist_gone: read per object only, nobody sees them any more)
-            with pg_system_ctx(c):  # every person's rows
-                n = le2b_hist_gone(c)
+            n = le2b_hist_gone(c)  # across organisations itself (system_ctx)
             gset(c, "migr_e2ehist5564", "1")
             if n:
                 print(f"history rows of deleted time entries / notepads removed {n}", flush=True)

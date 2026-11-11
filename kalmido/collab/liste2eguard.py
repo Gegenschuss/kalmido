@@ -22,7 +22,7 @@ from flask import g, has_request_context, request
 
 from ..core.config import API_PREFIX, app
 from ..core.db import db
-from ..core.pg import write_lock  # #5574
+from ..core.pg import system_ctx, write_lock  # #5574, #5564
 from ..core.undogroups import ug_drop_ids, ug_gids
 from ..core.i18n import N_, tr
 from .liste2e import LE2E_PREFIX, le2e_is_cipher, le2e_modes, le2e_neutral
@@ -299,7 +299,7 @@ def le2b_scrub(c, lid):
     Returns {what: rows} (counts only, for the history / a test)."""
     n = {}
     tq = "SELECT id FROM tasks WHERE list_id=?"
-    n.update(le2b_scrub_tasks(c, [r[0] for r in c.execute(tq, (lid,))]))
+    n.update(le2b_scrub_tasks(c, [r[0] for r in c.execute(tq, (lid,))], hist=False))
     n["time_entries"] = c.execute(f"UPDATE time_entries SET task_title='' WHERE task_title!='' AND (list_id=? OR task_id IN ({tq}))",
                                   (lid, lid)).rowcount
     n.update(le2b_scrub_free(c, lid))  # 2.538.0 (#4372)
@@ -344,7 +344,8 @@ def le2b_scrub(c, lid):
                                             "OR (kind='section_order' AND ref_id=?)", (lid, lid, lid))
     n["undo_time"] = n.get("undo_time", 0) + le2b_scrub_undo(  # 2.900.0 (review): + what le2b_scrub_tasks counted
         c, f"kind='time_entry' AND ref_id IN (SELECT id FROM time_entries WHERE list_id=? OR task_id IN ({tq}))", (lid, lid))
-    n.update(le2b_scrub_undo_free(c, lid))  # 2.900.0 (#5550, #5551)
+    with system_ctx(c):  # #5564 (review): listset rows carry the project's organisation, the locking person may see others
+        n.update(le2b_scrub_undo_free(c, lid))  # 2.900.0 (#5550, #5551)
     n.update(le2b_scrub_trash(c, lid))  # #5549: after undo_sections (it reads the section copies)
     for fn in _SCRUB_MORE:
         n.update(fn(c, lid) or {})
@@ -386,14 +387,19 @@ def le2b_scrub_undo_free(c, lid):
 def le2b_hist_gone(c):
     """#5564, one way: the history rows (obj_history; core/writes.py obj_undo_hist writes a note / notepad text before and
     after) of time entries and notepads that are gone (a hard delete) and that no undo step can bring back any more (a
-    deleted time entry comes back only through an undo part of its id, "time_life"; a deleted notepad never). History is
+    deleted time entry comes back only through its "time_life" undo part; a deleted notepad never). History is
     read per object only (core/writes.py obj_history), so such a row has no reader -- but it keeps the text, also of a
     project locked since. Only an undo copy named their project, and those go on many ways (the person's cap, the age limit,
     a new step ends the way forward, the lock itself): so the lock (le2b_scrub, after its copies went) and core/db.py once
     take every such row they see, not by project. Idempotent, the caller commits. Returns the rows deleted."""
-    return c.execute("""DELETE FROM obj_history h WHERE (h.kind='time_entry' AND NOT EXISTS (SELECT 1 FROM time_entries t WHERE t.id=h.ref_id)
-                        AND NOT EXISTS (SELECT 1 FROM obj_undo u WHERE u.kind IN ('time_entry', 'time_life') AND u.ref_id=h.ref_id))
-                        OR (h.kind='notepad' AND NOT EXISTS (SELECT 1 FROM list_notepads p WHERE p.id=h.ref_id))""").rowcount
+    # review (Fable): only a "time_life" part brings an entry back (personal/timeundo.py teu_life_run); a "time_entry" step
+    # of a gone entry is refused (teu_need 404) and may name another project, so it keeps nothing alive. One statement per
+    # kind (an anti-join each), the copies read across organisations (system_ctx)
+    with system_ctx(c):
+        n = c.execute("""DELETE FROM obj_history h WHERE h.kind='time_entry' AND NOT EXISTS (SELECT 1 FROM time_entries t WHERE t.id=h.ref_id)
+                         AND NOT EXISTS (SELECT 1 FROM obj_undo u WHERE u.kind='time_life' AND u.ref_id=h.ref_id)""").rowcount
+        return n + c.execute("""DELETE FROM obj_history h WHERE h.kind='notepad'
+                                AND NOT EXISTS (SELECT 1 FROM list_notepads p WHERE p.id=h.ref_id)""").rowcount
 
 
 def _undo_rows(js):
@@ -632,7 +638,7 @@ def _trash_plain(r):
     return any(isinstance(v, list) and len(v) > 1 and v[1] and not le2e_is_cipher(v[1]) for v in held.get("vals") or [])
 
 
-def le2b_scrub_tasks(c, ids):
+def le2b_scrub_tasks(c, ids, hist=True):
     """The copies of tasks that were just moved into a list with the lock (part A calls it after the move): their history
     texts, time entry snapshots and pending tidy events, #5562: their texts in the trash copies of other projects. The caller commits."""
     ids = [int(x) for x in ids or [] if isinstance(x, int)]
@@ -664,7 +670,8 @@ def le2b_scrub_tasks(c, ids):
     # ... and of their entries deleted or moved elsewhere since (the row only in the copy)
     n["undo_time"] = n.get("undo_time", 0) + _scrub_undo_ids(c, le2b_undo_copies(c, ("time_entry", "time_life"), (), ids))
     n.update(le2b_scrub_trash_tasks(c, set(ids)))  # #5562
-    n["history_gone"] = le2b_hist_gone(c)  # #5564: their entries deleted since (the copies went just above)
+    if hist:  # #5564: their entries deleted since (the copies went just above); le2b_scrub runs it once at its end
+        n["history_gone"] = le2b_hist_gone(c)
     return n
 
 
