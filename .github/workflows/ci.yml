@@ -256,6 +256,10 @@ jobs:
       # 2.754.0 (#5297): every ${} in an HTML template is escaped / a safe helper / marked; the old findings are the baseline
       - name: Every ${} in an HTML template is escaped, new findings red (2.754.0, #5297)
         run: python tools/check_innerhtml.py
+      # 2.924.0 (#5224): a new scrollIntoView / scrollTo / scrollTop assignment / focus() without preventScroll outside a dialog
+      # needs `// sprung-ok: <reason>`; the old places are the baseline (tools/scrolljump_baseline.json, only shrinks)
+      - name: The view moves only when the person makes it move - new jumps need a reason (2.924.0, #5224)
+        run: python tools/check_scrolljump.py
       - name: Every table with people's data is exported or named (2.362.4, #3107)
         run: python tools/check_export_tables.py
       - name: Every new *_id column has a foreign key or a 'no FK' marker (2.755.0, #5261)

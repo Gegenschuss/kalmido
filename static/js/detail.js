@@ -563,12 +563,12 @@ document.addEventListener('toggle', e => { if (e.target.id === 'd-more') LS.set(
 let cmxShown = null;
 function cmxScrollGet() {
   const d = $('#detail'); if (!d || cmxShown == null || cmxShown !== S.sel) return null;
-  const m = el => el && {top: el.scrollTop, end: el.scrollHeight - el.clientHeight > 4 && el.scrollHeight - el.clientHeight - el.scrollTop < 4};
+  const m = el => el && {top: el.scrollTop, end: el.scrollHeight - el.clientHeight > 4 && el.scrollHeight - el.clientHeight - el.scrollTop < 4, a: kr_mark(el)};  // 2.924.0 (#5224): + the reading place (keepReading)
   return {id: cmxShown, d: m(d), b: m($('.dbody', d)), p: m($('#d-cpane', d))};
 }
 function cmxScrollSet(s, endOnly = false) {
   const d = $('#detail'); if (!s || !d || s.id !== S.sel) return;
-  const put = (el, v) => { if (!el || !v || (endOnly && !v.end)) return; const want = v.end ? el.scrollHeight : v.top; if (Math.abs(el.scrollTop - want) > 1) el.scrollTop = want; };
+  const put = (el, v) => { if (!el || !v || (endOnly && !v.end && !v.a)) return; if (!v.end) { kr_back(el, v.a, v.top); return; } if (el.scrollHeight - el.scrollTop - el.clientHeight > 1) el.scrollTop = el.scrollHeight; };  // sprung-ok: who was at the end stays there (newest comments); 2.924.0 (#5224): else the reading place, not the pixel offset
   put(d, s.d); put($('.dbody', d), s.b); put($('#d-cpane', d), s.p);
 }
 function renderDetail() {

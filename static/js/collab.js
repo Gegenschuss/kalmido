@@ -884,7 +884,7 @@ function drawTimeline() {
   const n2 = $('#d-jump-count'); if (n2) n2.textContent = S.tl.comments?.length || '';
   const t = taskById(S.sel), want = !!t && (cmSplitOn(t) || (S.tl.comments?.length || 0) > 0 || !!CPEND[S.sel]?.length || cmSocial(t) || tlForeign(t).length > 0);
   if (t && $('#detail .dcomp') && !!$('#d-tl') !== want) {  // #315: the list appears with the first comment (or goes with the last)
-    const f = document.activeElement?.id === 'c-input'; renderDetail(); if (f) $('#c-input')?.focus();
+    const f = document.activeElement?.id === 'c-input'; renderDetail(); if (f) $('#c-input')?.focus({preventScroll: true});  // 2.924.0 (#5224): preventScroll
   }
   cmxScrollSet(sc, true);
   if (S.tlScroll === S.sel && S.tl.comments) { S.tlScroll = null; const b = $('#d-tl-items'); (cmtNew() ? $('#d-tl') : b?.lastElementChild)?.scrollIntoView({block: 'nearest'}); }  // opened from a comment (#386: newest first = the top)

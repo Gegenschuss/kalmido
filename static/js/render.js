@@ -942,7 +942,7 @@ let morphRoot = null;
 const FL = {hooks: [], added: null, vsig: null, ins: 0};
 function fl_onAdded(fn) { FL.hooks.push(fn); }
 // 2.46.2 (#1718): a part of a view drawn again: morphed when it has content (kept nodes, no flash), built when empty
-function fl_set(el, html) { const prev = morphRoot; if (el.firstChild) morphRoot = el; try { setHtml(el, html); } finally { morphRoot = prev; } }
+function fl_set(el, html) { const prev = morphRoot; if (el.firstChild) morphRoot = el; try { if (el.firstChild) keepReading(kr_scroller(el), () => setHtml(el, html)); else setHtml(el, html); } finally { morphRoot = prev; } }  // 2.924.0 (#5224): + keepReading
 // 2.46.2 (#1718): live redraws of the view (job steps, the jobs list, agent status, the agent band) are gathered: at most one
 // every 400 ms (the first after ~one frame). raw = renderView (else viewSafeRender: a busy field waits); mod = only while that
 // module is shown. A redraw in between (a click) restarts the 400 ms.
@@ -1081,12 +1081,44 @@ function vw_anchor(el) {
   for (const n of el.querySelectorAll(VW_ANCH)) { const r = n.getBoundingClientRect(); if (r.height > 0 && r.top >= top && r.top < bot) return [n, r.top]; }
   return null;
 }
-function vw_anchorBack(el, a) {
-  if (!a || !a[0].isConnected) return;
-  const d = a[0].getBoundingClientRect().top - a[1];
-  if (Math.abs(d) >= 0.5) el.scrollTop += d;
+// 2.924.0 (#5224): the one way a redraw keeps the reading place (product rule of 08.11.2026: the view moves only when the person makes
+// it move). Before: the element with a key (fl_key: id / data-k / data-id / ...) at the top of what is in sight, not sticky
+// / fixed, and its screen position; after: exactly that position again (a box that grew above it, a task inserted on top,
+// a card that moved no longer push the text away under the finger). The browser's own anchoring (overflow-anchor: auto on
+// #view) is not undone by a pixel value: only the difference that is left is corrected. No key in sight = the old pixel
+// value; at the very top nothing is held (a new entry appears on top). The agents page prefers the row tapped last
+// (vw_anchor). el = the scrolling element (#view, a panel, a chat box); null = nothing to keep.
+const KR_POS = /^(sticky|fixed)$/;
+const kr_sel = n => n.id ? `[id="${cssEsc(n.id)}"]` : (k => k ? `${n.nodeName.toLowerCase()}[${k}="${cssEsc(n.getAttribute(k))}"]` : null)(['data-k', 'data-id', 'data-cid', 'data-aid', 'data-jid', 'data-mid', 'data-key', 'data-section'].find(k => n.hasAttribute(k)));
+function kr_mark(el) {
+  if (!el || !(el.scrollTop > 0)) return null;
+  const va = vw_anchor(el); if (va) return {n: va[0], top: va[1], sel: null};
+  if (typeof document.elementFromPoint !== 'function') return null;
+  const r = el.getBoundingClientRect(), h = Math.min(el.clientHeight, innerHeight - r.top);
+  for (const fy of [0, 0.15, 0.3, 0.5]) for (const fx of [0.5, 0.15]) {
+    const y = r.top + Math.max(2, h * fy), x = r.left + Math.max(8, el.clientWidth * fx);
+    let n = document.elementFromPoint(x, y), hit = null;
+    if (!n || !el.contains(n) || n === el) continue;
+    for (; n && n !== el; n = n.parentElement) { if (KR_POS.test(getComputedStyle(n).position)) { hit = null; break; } if (!hit && fl_key(n) != null) hit = n; }
+    if (hit && n === el) { const b = hit.getBoundingClientRect(); if (b.height > 0) return {n: hit, top: b.top, sel: kr_sel(hit)}; }
+  }
+  return null;
 }
-function vw_anchorKeep(fn) { const el = $('#view'), a = vw_anchor(el); try { return fn(); } finally { vw_anchorBack(el, a); } }
+function kr_back(el, a, px) {
+  if (!el) return;
+  if (!(px > 0)) { if (el.scrollTop > 0) el.scrollTop = 0; return; }  // sprung-ok: the very top stays the top
+  let n = a?.n;
+  if (n && !n.isConnected) { try { n = a?.sel ? el.querySelector(a.sel) : null; } catch { n = null; } }  // the area was built anew (the detail panel)
+  if (n && el.contains(n) && n.getClientRects().length) { const d = n.getBoundingClientRect().top - a.top; if (Math.abs(d) >= 0.5) el.scrollTop += d; return; }  // sprung-ok: back to the reading place
+  if (Math.abs(el.scrollTop - px) >= 1) el.scrollTop = px;  // sprung-ok: no key in sight: the old pixel offset
+}
+function keepReading(el, fn) { const a = kr_mark(el), px = el?.scrollTop; try { return fn(); } finally { kr_back(el, a, px); } }
+// the scrolling box around n (fl_set: a part drawn again keeps the place in its own box)
+function kr_scroller(n) {
+  for (; n && n !== document.body && n !== document.documentElement; n = n.parentElement) if (n.scrollHeight > n.clientHeight + 1 && /^(auto|scroll)$/.test(getComputedStyle(n).overflowY)) return n;
+  return null;
+}
+function vw_anchorKeep(fn) { return keepReading($('#view'), fn); }  // 2.924.0 (#5224): the agents page's boxes through keepReading
 function renderView() { FL.vlast = Date.now(); return td_rcRun(() => { const r = an_view(() => keepFocus($('#view'), renderView0));  // 2.46.1 (#1560): a view change / a new empty hint fades in
     rowRove(); rowMoreWatch(); agb_after(); vl_after(); vm_after(); td_lcSweep(); topw_sync(); topw_later(); return r; }); }  // 2.65.0 (#1825): vl_after = the window of a long list; 2.413.0 A (#3439): vm_after = a view entered again gets its place back (viewmem.js)  // 2.599.0 (#4814): topw_sync = the page's width for #top
 // ---- 2.599.0 (#4814): the page reports its width once to #main: data-w = lesen | form | seite (the widths of :root,
@@ -1160,7 +1192,7 @@ function renderView0() {
   // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
   // it is patched in place
   if (m === 'agents' && S.route.agent && chatFull() && S.chat.aid === +S.route.agent && $('#view .chview')?.dataset.aid === String(S.chat.aid) && $('#chat-in')) { chatPatch(); agentLive(); renderMultiBar(); return; }
-  const scroll = el.scrollTop, ctk = ct_scrollKeep(el), anc = vw_anchor(el);  // 2.431.0 C (#3598); 2.758.0 (#5223): agents page
+  const scroll = el.scrollTop, ctk = ct_scrollKeep(el), anc = FL.vsig === fl_sig() ? kr_mark(el) : null;  // 2.431.0 C (#3598); 2.758.0 (#5223): agents page; 2.924.0 (#5224): keepReading's mark, only in the same view
   const wbs = $('#wbody')?.scrollTop, tls = $('#tlscroll')?.scrollLeft, tlt = $('#tlscroll')?.scrollTop, wasRm = !!$('.tl.rm');
   const qi = $('#qinput'), qf = !!qi && document.activeElement === qi, qv = qi ? qi.value : '';  // the composer survives a re-render
   const tin = $('#view .ttlin'), tinF = !!tin && document.activeElement === tin;  // 2.0.2: inline title edit + section input too
@@ -1216,11 +1248,11 @@ function renderView0() {
   else if (isTimeline()) setHtml(el, vsegHtml(routeList()) + viewTimeline(routeList().id));  // 2.13.0 (#453 A7)
   else if (moActive() && moBoard()) setHtml(el, mb_view());  // 2.156.0 C (#2072): My tasks as a board (mineboard.js)
   else setHtml(el, viewList());
-  el.scrollTop = scroll; ctk(); vw_anchorBack(el, anc);
+  kr_back(el, anc, scroll); ctk();  // 2.924.0 (#5224): the reading place, not the pixel offset (keepReading)
   if (m === 'agents' && $('#view .chview')) { chatFit(); chatPatch(); } else { if (m === 'team') chatFit(); /* 2.446.0 (#3334) */ else document.body.classList.remove('kb-open'); if (S.chat && !$('#chat-msgs')) S.chat.seenAt = 0; }  /* the chat left (chs cont) */  // 2.12.2 (#451): a chat opens at its newest message; 2.380 F (#3381): a new box at its place / first new message (chs_restore), an old one stays
   if (S.ie) inlineEditMount(tinF);
-  const sa2 = $('#view .secadd-in'); if (sa2 && S.secAdd) { sa2.value = S.secAdd.v || ''; if (saiF) sa2.focus(); }
-  const q2 = $('#qinput'); if (q2 && qi && q2 !== qi) { q2.value = qv; if (qf) { q2.focus(); updateChips(q2); } }
+  const sa2 = $('#view .secadd-in'); if (sa2 && S.secAdd) { sa2.value = S.secAdd.v || ''; if (saiF) sa2.focus({preventScroll: true}); }
+  const q2 = $('#qinput'); if (q2 && qi && q2 !== qi) { q2.value = qv; if (qf) { q2.focus({preventScroll: true}); updateChips(q2); } }
   const wb = $('#wbody'); if (wb) cvw_scroll(wb, wbs);  // lazy-ok: #wbody = calview.js drew it; 2.828.0 (#5463): the first entry or 07:00, a new grid starts there
   const tl = $('#tlscroll');
   if (tl && isRoadmap()) { const keep = wasRm && !S.rmScrollReset; S.rmScrollReset = false; rmAfterRender(tl, keep ? tls : undefined, keep ? tlt : undefined); }
@@ -1229,7 +1261,7 @@ function renderView0() {
   renderMultiBar();
   const f2 = fk && fk();
   if (f2 && f2 !== fa && document.activeElement !== f2) { if (fv != null && 'value' in f2) f2.value = fv; f2.focus({preventScroll: true}); try { if (fs[0] != null) f2.setSelectionRange(fs[0], fs[1]); } catch { /* no caret */ } }
-  if (S.route.key === 'search') { const i = $('#searchq'); if (i && document.activeElement !== i) { i.value = S.searchQ || ''; if (!isTouch() || S.searchFocus) i.focus(); } S.searchFocus = false; }  // 2.655.0 (#5081): touch: only on opening Search, not back after every render
+  if (S.route.key === 'search') { const i = $('#searchq'); if (i && document.activeElement !== i) { i.value = S.searchQ || ''; if (!isTouch() || S.searchFocus) i.focus({preventScroll: true}); } S.searchFocus = false; }  // 2.655.0 (#5081): touch: only on opening Search, not back after every render
 }
 
 // ------------------------------------------------------------------ render: task rows
@@ -2314,7 +2346,7 @@ async function doSearch(q) {
     if (one && !hit) { if (S.searchQ === q) { S.searchRes = null; $('#sresults').innerHTML = ''; } return; }
     if (!one && typeof le2eSearch === 'function') j.tasks = le2eSearch(q, j.tasks);  // 2.64.1 (#1817): locked lists, searched here (the server cannot)
     S.searchRes = j.tasks; S.extra = j.tasks; S.searchResQ = q;
-    $('#sresults').innerHTML = renderSearchRes(); vl_after();
+    keepReading($('#view'), () => { $('#sresults').innerHTML = renderSearchRes(); vl_after(); });  // 2.924.0 (#5224): results that load again keep the hit read in place
     if (S.searchEnter === q) { S.searchEnter = null; searchEnterOpen(q); }
   }, 200);
 }
