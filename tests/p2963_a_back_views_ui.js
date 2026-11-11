@@ -82,7 +82,8 @@ const upload = async (ck, url, name, text) => { const fd = new FormData(); fd.ap
     await go(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); return 1; })()`);
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
-    const STATE = `JSON.stringify({open: f8d_open(), depth: f8d_depth(), st: history.state, p: f8d_bk.pushed, skip: f8d_bk.skip, hash: location.hash, sel: S.sel})`;
+    // a Back too many may leave the app (a red run): the state says so instead of ending the whole run
+    const STATE = `(() => { try { return JSON.stringify({open: f8d_open(), depth: f8d_depth(), st: history.state, p: f8d_bk.pushed, skip: f8d_bk.skip, hash: location.hash, sel: S.sel}); } catch (e) { return 'not in the app: ' + location.pathname; } })()`;
     const back = () => ev(`(history.back(), 1)`);
     const tap = sel => ev(`(() => { const e = ${sel}; if (!e) return 0; e.click(); return 1; })()`);
     const txt = sel => `(document.querySelector('${sel}')?.textContent || '')`;
