@@ -30,7 +30,8 @@ const upload = async (url, field, name, text, extra) => {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
-  await call('PATCH', '/api/settings', {tour: 'done', lang: 'en'});
+  const st0 = await call('GET', '/api/state');
+  await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: [...new Set([...(st0.settings?.features || '').split(','), 'files', 'docs', 'wiki', 'office', 'clients', 'contacts'])].filter(Boolean).join(',')});
   const lst = await call('POST', '/api/lists', {name: 'Garden plans'});
   const lst2 = await call('POST', '/api/lists', {name: 'Kitchen plans'});
   check(lst.id > 0 && lst2.id > 0, 'two lists ' + JSON.stringify(lst));
