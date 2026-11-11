@@ -470,8 +470,11 @@ def wkh_count(c):
 
 # ---- 2.958.0 (#5281, stage Q7a): wiki_versions -> obj_versions at the start, then the old table goes ---------------------
 WKH_RETIRE_WAITS = N_("Knowledge history clean-up waits: {0} old versions in {1} cannot be opened now (the key of their space is missing), the old table stays. See the server log.")
-WKH_RETIRE_WHY = ("cannot be opened now (the key of their space is missing) -- they stay there, the table stays, nothing dropped; "
-                  "the next start tries again (core/migrations.d/5281_a.py)")
+# 2.958.0 (#5281, Fable review F7): the alert names the pages and the way out (docs/dev/kern.md "Versions")
+WKH_RETIRE_WAITS_PAGES = N_("Knowledge history clean-up waits: {0} old versions in {1} could not move (pages {2}), the old table stays. See the server log and the way out in docs/dev/kern.md (Versions).")
+WKH_RETIRE_WHY = ("cannot be opened now (the key of their space is missing) or their id is taken -- they stay there, the table "
+                  "stays, nothing dropped; the next start tries again (core/migrations.d/5281_a.py; the way out for a key that "
+                  "is gone for good: docs/dev/kern.md, Versions)")
 
 
 def _wkh_old_ts(v, fallback):
@@ -505,39 +508,47 @@ def _wkh_old_body(c, v, keys):
 
 
 def wkh_move_old(c):
-    """2.958.0 (#5281): every row of wiki_versions into obj_versions (kind "wiki"): its id where it is free (the undo steps of
+    """2.958.0 (#5281): every row of wiki_versions into obj_versions (kind "wiki"): with its id (the undo steps of
     #5253 name version ids), the next numbers of its page in the old order, wkx_held_at as held_at, a sealed text sealed again
-    for obj_versions. A moved row leaves wiki_versions at once (idempotent). -> {"moved": n, "kept": m}."""
+    for obj_versions. A moved row leaves wiki_versions at once (idempotent). -> {"moved": n, "kept": m, "pages": [page ids kept]}.
+    Fable review F1: a row whose id is taken in obj_versions stays (a log line) -- a new id would make the old version the
+    newest (every reader sorts by id); the identity always goes on after both tables' ids, so the rows left keep theirs."""
     cols = table_columns(c, "wiki_versions")
     held = "wkx_held_at" if "wkx_held_at" in cols else "NULL"
     now = iso_ms(now_utc())
-    out, keys, nxt, last = {"moved": 0, "kept": 0}, {}, {}, 0
+    out, keys, nxt, last, kept = {"moved": 0, "kept": 0}, {}, {}, 0, set()
     while True:
         rows = c.execute(f"SELECT id, page_id, org_id, owner_id, path, body, size, created_by, created_at, updated_at, {held} AS held "
                          f"FROM wiki_versions WHERE id>? ORDER BY id LIMIT {WKH_BATCH}", (last,)).fetchall()
         for v in rows:
+            pid = int(v["page_id"])
             body = _wkh_old_body(c, v, keys)
+            if body is not None and c.execute("SELECT 1 FROM obj_versions WHERE id=?", (v["id"],)).fetchone():
+                print(f"knowledge history, stage Q7a (#5281): old version {v['id']} of page {pid} stays in wiki_versions -- its id is "
+                      "taken in obj_versions (docs/dev/kern.md, Versions)", flush=True)  # F1: never a new id
+                body = None
             if body is None:
                 out["kept"] += 1
+                kept.add(pid)
                 continue
-            pid = int(v["page_id"])
             if pid not in nxt:
                 nxt[pid] = c.execute("SELECT COALESCE(MAX(no), 0) FROM obj_versions WHERE kind=? AND ref_id=?", (WKH_KIND, pid)).fetchone()[0]
             nxt[pid] += 1
-            free = not c.execute("SELECT 1 FROM obj_versions WHERE id=?", (v["id"],)).fetchone()
             at = _wkh_old_ts(v["created_at"], now)
             args = (WKH_KIND, pid, nxt[pid], v["org_id"], v["owner_id"], v["path"] or "", body, int(v["size"] or 0), v["created_by"],
                     at, _wkh_old_ts(v["updated_at"], at), _wkh_old_ts(v["held"], now) if v["held"] else None)
-            c.execute("INSERT INTO obj_versions(" + ("id," if free else "") + "kind,ref_id,no,org_id,owner_id,title,body,size,created_by,"
-                      "created_at,updated_at,held_at) VALUES(" + ("?," if free else "") + "?,?,?,?,?,?,?,?,?,?,?,?)",
-                      ((v["id"],) if free else ()) + args)
+            c.execute("INSERT INTO obj_versions(id,kind,ref_id,no,org_id,owner_id,title,body,size,created_by,created_at,updated_at,"
+                      "held_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", (v["id"],) + args)
             c.execute("DELETE FROM wiki_versions WHERE id=?", (v["id"],))
             out["moved"] += 1
         if len(rows) < WKH_BATCH:
             break
         last = rows[-1]["id"]
-    if out["moved"]:  # the identity goes on after the ids taken over
-        c.execute("SELECT setval(pg_get_serial_sequence('obj_versions', 'id'), GREATEST((SELECT COALESCE(MAX(id), 0) FROM obj_versions), 1))")
+    # the identity goes on after the ids taken over AND the ids still waiting in wiki_versions (Fable review F1: also with
+    # nothing moved), never lower than it already is
+    c.execute("SELECT setval(pg_get_serial_sequence('obj_versions', 'id'), GREATEST((SELECT MAX(id) FROM obj_versions), "
+              "(SELECT MAX(id) FROM wiki_versions), pg_sequence_last_value(pg_get_serial_sequence('obj_versions', 'id')::regclass), 1))")
+    out["pages"] = sorted(kept)
     return out
 
 
@@ -545,8 +556,12 @@ def _wkh_left(c):
     return c.execute("SELECT COUNT(*) FROM wiki_versions").fetchone()[0]
 
 
-def _wkh_alert(n, tables):
-    aa_now("storage", "kern5281:" + ",".join(tables), WKH_RETIRE_WAITS, (int(n), ", ".join(tables)))
+def _wkh_alert(n, tables, pages=()):
+    if not pages:
+        aa_now("storage", "kern5281:" + ",".join(tables), WKH_RETIRE_WAITS, (int(n), ", ".join(tables)))
+        return
+    shown = ", ".join(str(p) for p in list(pages)[:20]) + (" ..." if len(pages) > 20 else "")  # F7: which pages, the way out
+    aa_now("storage", "kern5281:" + ",".join(tables), WKH_RETIRE_WAITS_PAGES, (int(n), ", ".join(tables), shown))
 
 
 def wkh_retire(c):
@@ -565,8 +580,9 @@ def wkh_retire(c):
             if floor:
                 print(f"knowledge history, stage Q7a (#5281): {out['moved']} old version(s) moved; versions before {floor} no "
                       "longer start on this database", flush=True)
-        out.update(kern_retire(c, ("wiki_versions",), _wkh_left, "knowledge history, stage Q7a (#5281)", alert=_wkh_alert,
-                               why=WKH_RETIRE_WHY))
+        pages = out.pop("pages", [])
+        out.update(kern_retire(c, ("wiki_versions",), _wkh_left, "knowledge history, stage Q7a (#5281)",
+                               alert=lambda n, t: _wkh_alert(n, t, pages), why=WKH_RETIRE_WHY))
     return out
 
 

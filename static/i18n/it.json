@@ -18207,6 +18207,7 @@
   "Moved to the trash": "Spostato nel cestino",
   "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "La pulizia del nucleo comune è in attesa: {0} vecchie righe di membri in {1} non hanno ancora una condivisione, la vecchia tabella resta. Vedi il log del server.",
   "Knowledge history clean-up waits: {0} old versions in {1} cannot be opened now (the key of their space is missing), the old table stays. See the server log.": "La pulizia della cronologia della conoscenza è in attesa: {0} vecchie versioni in {1} non si possono aprire ora (manca la chiave del loro spazio), la vecchia tabella resta. Vedi il log del server.",
+  "Knowledge history clean-up waits: {0} old versions in {1} could not move (pages {2}), the old table stays. See the server log and the way out in docs/dev/kern.md (Versions).": "La pulizia della cronologia della conoscenza è in attesa: {0} vecchie versioni in {1} non si sono potute spostare (pagine {2}), la vecchia tabella resta. Vedi il log del server e la via d’uscita in docs/dev/kern.md (Versions).",
   "Select at least two documents": "Scegli almeno due documenti",
   "Only documents of one workspace can be merged": "Si possono unire solo documenti dello stesso spazio di lavoro",
   "was page {0}": "prima pagina {0}",

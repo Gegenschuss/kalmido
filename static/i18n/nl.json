@@ -18206,6 +18206,7 @@
   "Moved to the trash": "Naar de prullenbak verplaatst",
   "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Opschonen van de gedeelde kern wacht: {0} oude ledenregels in {1} hebben nog geen deling, de oude tabel blijft. Zie het serverlog.",
   "Knowledge history clean-up waits: {0} old versions in {1} cannot be opened now (the key of their space is missing), the old table stays. See the server log.": "Opschonen van de kennisgeschiedenis wacht: {0} oude versies in {1} kunnen nu niet worden geopend (de sleutel van hun ruimte ontbreekt), de oude tabel blijft. Zie het serverlog.",
+  "Knowledge history clean-up waits: {0} old versions in {1} could not move (pages {2}), the old table stays. See the server log and the way out in docs/dev/kern.md (Versions).": "Opschonen van de kennisgeschiedenis wacht: {0} oude versies in {1} konden niet worden verplaatst (pagina’s {2}), de oude tabel blijft. Zie het serverlog en de uitweg in docs/dev/kern.md (Versions).",
   "Select at least two documents": "Kies minstens twee documenten",
   "Only documents of one workspace can be merged": "Alleen documenten uit één werkruimte kunnen worden samengevoegd",
   "was page {0}": "eerst pagina {0}",

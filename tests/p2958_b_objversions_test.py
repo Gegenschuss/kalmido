@@ -10,6 +10,9 @@ freelancer-matrix: wiki
    sealed with the old context, a row held at a lock and a private row of a person without an organisation -> each in
    obj_versions with its id, the next numbers of its page, held_at, the sealed text readable (sealed again at rest); a row
    whose text cannot be opened keeps the table (start check, log line), nothing dropped
+ - Fable review F1 / F3 / F7: the identity goes on after the ids still waiting (a save while a row waits gets no id of it),
+   a row whose id is taken stays (log line, never a new id), the back limit rises as soon as a row moved, a plain text that
+   only starts with "kenc1:" moves unchanged
  - once that row is gone: the next start drops wiki_versions (log line), the back limit names #5281, a later start is a
    no-op; a new save after the move gets a new id and the next number
  - a page deleted for good takes its versions along (trigger kalmido_ov_gone)
@@ -204,9 +207,22 @@ check(any(v["id"] == 900004 for v in fv) and Fe.get(B + f"/api/wiki/pages/{FP}/v
 cur = A.get(B + f"/api/wiki/pages/{P}").json()
 r = A.post(B + f"/api/wiki/pages/{P}/versions/900001/restore", json={"expect_updated_at": cur["updated_at"]})
 check(r.ok and r.json().get("body") == "Alter Klartext", f"a moved version restores {r.text[:200]}")
+# Fable review F1: the restore is a new version while 900005 still waits -- its id must not be the waiting one
+check(not sql("SELECT 1 FROM obj_versions WHERE id=900005") and vrows(P)[-1][0] > 900005,
+      f"F1: new versions while a row waits never take its id {vrows(P)[-2:]}")
+
+# ================================================================== F1: a row whose id is taken stays (never a new id)
+sql(OLD_INS, (900001, P, K, None, "Handbuch/Alt", "Doppelte id", 11, ALICE, T0, T0, None), write=True)
+sql("DELETE FROM wiki_versions WHERE id=900005", write=True)
+restart()
+A, Bo = sess("alice"), sess("bob")
+check(old_table() and sql("SELECT id FROM wiki_versions") == [(900001,)], f"F1: the row with a taken id stays {sql('SELECT id FROM wiki_versions')}")
+check(f"old version 900001 of page {P} stays in wiki_versions -- its id is taken" in logs(), "F1: the log names it")
+check(sql("SELECT body FROM obj_versions WHERE id=900001") == [("Alter Klartext",)] and
+      not sql("SELECT 1 FROM obj_versions WHERE body='Doppelte id'"), "F1: the version with that id is untouched, no new id for the old row")
 
 # ================================================================== the row gone: the next start drops the table
-sql("DELETE FROM wiki_versions WHERE id=900005", write=True)
+sql("DELETE FROM wiki_versions WHERE id=900001", write=True)
 restart()
 A, Bo = sess("alice"), sess("bob")
 check(not old_table(), "every row moved: wiki_versions is dropped")

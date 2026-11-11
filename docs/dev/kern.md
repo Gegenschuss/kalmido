@@ -550,7 +550,14 @@ First kind: the knowledge pages (kind `wiki`, wiki/wkhist.py; spaces with the lo
 them with `held_at` until the trash period ends, `wiki_spaces.wkx_holds` names who may see a held row again). The old table
 `wiki_versions` went one way: at the start `wkh_retire` moved every row (its id kept for the undo steps of #5253, the text
 sealed again for the new context), then dropped the table after the start check (`kern_retire`; a text whose key is missing
-keeps the table until a later start). The organisation export keeps `wiki/versions.json` with its columns (`page_id`,
+keeps the table until a later start). Fable review of 2.958 (F1, F3, F7): a row whose id is already taken in `obj_versions`
+stays too (never a new id: every reader sorts by id), the identity of `obj_versions` always goes on after the ids of both
+tables, the back limit rises as soon as a row has moved (not only at the DROP), and a text that only starts with `kenc1:`
+without the whole shape of a sealed text moves unchanged (read as before). The way out for rows that stay for good (the
+admins' alert and the log name their pages; the key of the space is gone, no recovery key, no backup of the server key):
+check the page and its newest versions in `obj_versions`, then delete those rows with
+`DELETE FROM wiki_versions WHERE page_id IN (<pages of the alert>)` and start again -- the next start drops the table. That
+loses only versions nobody can open any more. The organisation export keeps `wiki/versions.json` with its columns (`page_id`,
 `path`); its import writes into `obj_versions`. Next kinds: the playbooks and the procedure documentation (stage Q7b).
 
 ### Versions of tables (stage Q7c, 2.800.0, #5283)
