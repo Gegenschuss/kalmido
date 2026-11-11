@@ -155,6 +155,7 @@ def _part(c, uid, p, redo):
                 reg = _reg(kind)
             except Denied:
                 raise Denied(404, tr(UG_GONE)) from None  # the kind's module is not there (any more)
+            g.undo_running_gid = p["group_id"]  # 2.991.0 (#5634): a kind's fix (personal/timeundo.py) keeps the group running now
             ext = _need(c, uid, kind, rid, p["org_id"])
             if ext.get("keep"):
                 keep = ext["keep"]
@@ -173,6 +174,8 @@ def _part(c, uid, p, redo):
     except Denied as e:
         code = "noaccess" if e.code in (403, 404) else "conflict"
         return {"group": p["group_id"], "kind": kind, "id": rid, "code": code, "reason": e.text()}
+    finally:
+        g.pop("undo_running_gid", None)
 
 
 def _state(c, gid):

@@ -101,6 +101,11 @@ def teu_need(c, uid, rid, oid):
             # 2.900.0 (#5550): a step of before the lock writes no note back into a locked project: refused (409, the part
             # stays and the write back is rolled back with its history row; the task title is never written back, TEU_KEEP)
             raise LE2EDenied("list_e2e_plain")
+        if (now["list_id"], now["task_id"]) != (was["list_id"], was["task_id"]) and _locked(c, now["list_id"], now["task_id"]):
+            # 2.991.0 (#5634, review 2.936 finding 3): taken back (or forward) into a locked project: the entry's other
+            # steps (a note written in the open project since) and its history rows go, as after a save (teu_scrub_moved);
+            # the group running now stays (core/undoweb.py _part marks it) and records its history row after this
+            _teu_scrub(c, rid, g.get("undo_running_gid"))
     return {"fix": fix, "lock": f"time-{int(rid)}"}
 
 
@@ -118,9 +123,17 @@ def teu_scrub_moved(c, eid, lid, tid):
     if not _locked(c, lid, tid):
         return False
     write_lock(c, f"time-{int(eid)}")
-    le2b_scrub_undo(c, "kind IN (?, ?) AND ref_id=?", (TEU_KIND, TEU_LIFE, int(eid)))
-    c.execute("DELETE FROM obj_history WHERE kind=? AND ref_id=?", (TEU_KIND, int(eid)))
+    _teu_scrub(c, eid)
     return True
+
+
+def _teu_scrub(c, eid, keep_gid=None):
+    """The entry's undo steps (but group keep_gid, the one running) and its history rows go. The caller holds time-<eid>."""
+    if keep_gid:
+        le2b_scrub_undo(c, "kind IN (?, ?) AND ref_id=? AND group_id<>?", (TEU_KIND, TEU_LIFE, int(eid), int(keep_gid)))
+    else:
+        le2b_scrub_undo(c, "kind IN (?, ?) AND ref_id=?", (TEU_KIND, TEU_LIFE, int(eid)))
+    c.execute("DELETE FROM obj_history WHERE kind=? AND ref_id=?", (TEU_KIND, int(eid)))
 
 
 def teu_deleted(c, uid, row):
