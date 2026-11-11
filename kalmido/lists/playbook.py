@@ -59,10 +59,9 @@ def pb_text(v):
 
 
 PB_KIND = "playbook"  # 2.977.0 (#5282, stage Q7b): the kind of a Playbook's versions in obj_versions (ref_id = its head)
-# a version row as the code before 2.977 read it from playbooks (the routes and agents see the same keys)
-PB_VCOLS = ("p.id AS head_id, p.list_id, p.owner_id, p.folder, v.no AS version, v.body, v.source, v.created_by AS author_id, "
-            "v.created_at")
-PB_VJOIN = f"playbooks p JOIN obj_versions v ON v.kind='{PB_KIND}' AND v.ref_id=p.id"
+# a version row as the code before 2.977 read it from playbooks (the routes and agents see the same keys), up to its WHERE
+PB_VSQL = ("SELECT p.id AS head_id, p.list_id, p.owner_id, p.folder, v.no AS version, v.body, v.source, v.created_by AS author_id, "
+           "v.created_at FROM playbooks p JOIN obj_versions v ON v.kind='playbook' AND v.ref_id=p.id WHERE ")
 
 
 def _where(lid, owner, folder):
@@ -87,7 +86,7 @@ def pb_current(c, lid=None, owner=None, folder=None):
     """The newest version row of a list's (lid) or a folder's Playbook, or None ({version, body, source, author_id,
     created_at, list_id, owner_id, folder, head_id}; 2.977.0 #5282: read from obj_versions)."""
     w, a = _where(lid, owner, folder)
-    return c.execute(f"SELECT {PB_VCOLS} FROM {PB_VJOIN} WHERE {w} ORDER BY v.no DESC LIMIT 1", a).fetchone()
+    return c.execute(PB_VSQL + w + " ORDER BY v.no DESC LIMIT 1", a).fetchone()
 
 
 def pb_cache_drop():
@@ -118,7 +117,9 @@ def pb_parts(c, lid):
     lr = c.execute("SELECT owner_id, COALESCE(folder,'') AS folder, life FROM lists WHERE id=?", (lid,)).fetchone()
     if not lr:
         return None, None, []
-    rows = c.execute(f"""SELECT DISTINCT ON (COALESCE(p.list_id, 0), COALESCE(p.folder, '')) {PB_VCOLS} FROM {PB_VJOIN}
+    rows = c.execute("""SELECT DISTINCT ON (COALESCE(p.list_id, 0), COALESCE(p.folder, '')) p.id AS head_id, p.list_id, p.owner_id,
+                        p.folder, v.no AS version, v.body, v.source, v.created_by AS author_id, v.created_at
+                        FROM playbooks p JOIN obj_versions v ON v.kind='playbook' AND v.ref_id=p.id
                         WHERE p.list_id=? OR (p.list_id IS NULL AND p.owner_id=? AND ?<>'' AND (p.folder=? OR left(?, length(p.folder) + 1)=p.folder || '/'))
                         ORDER BY COALESCE(p.list_id, 0), COALESCE(p.folder, ''), v.no DESC""",
                      (lid, lr["owner_id"], lr["folder"], lr["folder"], lr["folder"])).fetchall()
@@ -182,13 +183,14 @@ def pb_flags(c, rows):
     if not ids:
         return {}
     q = ",".join("?" * len(ids))
-    out = {r[0]: True for r in c.execute(f"""SELECT DISTINCT ON (p.list_id) p.list_id, v.body FROM {PB_VJOIN} WHERE p.list_id IN ({q})
+    out = {r[0]: True for r in c.execute(f"""SELECT DISTINCT ON (p.list_id) p.list_id, v.body FROM playbooks p JOIN obj_versions v
+                                             ON v.kind='playbook' AND v.ref_id=p.id WHERE p.list_id IN ({q})
                                              ORDER BY p.list_id, v.no DESC""", ids) if r[1]}
     owners = {r["owner_id"] for r in rows if r["folder"]}
     if owners:
         q2 = ",".join("?" * len(owners))
-        full = {(r[0], r[1]) for r in c.execute(f"""SELECT DISTINCT ON (p.owner_id, p.folder) p.owner_id, p.folder, v.body FROM {PB_VJOIN}
-                                                   WHERE p.list_id IS NULL AND p.owner_id IN ({q2}) ORDER BY p.owner_id, p.folder, v.no DESC""",
+        full = {(r[0], r[1]) for r in c.execute(f"""SELECT DISTINCT ON (p.owner_id, p.folder) p.owner_id, p.folder, v.body FROM playbooks p
+                                                   JOIN obj_versions v ON v.kind='playbook' AND v.ref_id=p.id WHERE p.list_id IS NULL AND p.owner_id IN ({q2}) ORDER BY p.owner_id, p.folder, v.no DESC""",
                                                 list(owners)) if r[2]}
         if full:
             for r in rows:
@@ -367,8 +369,9 @@ def _by(c, uid, names=None, kinds=None):
 def pb_versions_out(c, lid=None, owner=None, folder=None):
     from ..agents.core import agent_ids
     w, a = _where(lid, owner, folder)
-    rows = c.execute(f"SELECT v.no AS version, v.created_at, v.created_by AS author_id, v.source, length(v.body) AS chars FROM {PB_VJOIN} "
-                     f"WHERE {w} ORDER BY v.no DESC LIMIT ?", (*a, PB_KEEP)).fetchall()
+    rows = c.execute("SELECT v.no AS version, v.created_at, v.created_by AS author_id, v.source, length(v.body) AS chars FROM playbooks p "
+                     "JOIN obj_versions v ON v.kind='playbook' AND v.ref_id=p.id WHERE " + w + " ORDER BY v.no DESC LIMIT ?",
+                     (*a, PB_KEEP)).fetchall()
     names, ag = user_names(c, [r["author_id"] for r in rows]), agent_ids(c)
     return [{"version": r["version"], "created_at": r["created_at"], "by": _by(c, r["author_id"], names, ag), "source": r["source"],
              "chars": r["chars"]} for r in rows]
@@ -377,7 +380,7 @@ def pb_versions_out(c, lid=None, owner=None, folder=None):
 def pb_version_out(c, v, lid=None, owner=None, folder=None):
     from ..agents.core import agent_ids
     w, a = _where(lid, owner, folder)
-    r = c.execute(f"SELECT {PB_VCOLS} FROM {PB_VJOIN} WHERE {w} AND v.no=?", (*a, v)).fetchone()
+    r = c.execute(PB_VSQL + w + " AND v.no=?", (*a, v)).fetchone()
     if not r:
         raise Denied(404)
     return {"version": r["version"], "text": r["body"], "created_at": r["created_at"], "by": _by(c, r["author_id"], None, agent_ids(c)),

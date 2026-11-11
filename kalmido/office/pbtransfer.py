@@ -396,8 +396,8 @@ def pbt_procdoc_versions(c, src, dst):
     n = 0
     for r in c.execute("SELECT v.* FROM obj_versions v JOIN office_procdocs p ON p.id=v.ref_id WHERE v.kind='procdoc' AND v.org_id=? "
                        "AND p.org_id=? ORDER BY v.id", (src, dst)).fetchall():
-        cols = {"org_id": dst, **ofm_reseal(c, "obj_versions", r, src, dst)}
-        n += c.execute(f"UPDATE obj_versions SET {', '.join(x + '=?' for x in cols)} WHERE id=?", [*cols.values(), r["id"]]).rowcount
+        body = ofm_reseal(c, "obj_versions", r, src, dst).get("body", r["body"])  # FIELDS["obj_versions"] = body
+        n += c.execute("UPDATE obj_versions SET org_id=?, body=? WHERE id=?", (dst, body, r["id"])).rowcount
     return n
 
 
