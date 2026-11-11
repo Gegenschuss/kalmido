@@ -316,7 +316,7 @@ def pb_letter_detach(c, src):
     documents and address books end -- only the links, the documents and contacts stay as they are (the frozen recipient
     of a letter stays). -> the number of document links ended."""
     n = 0  # 2.990.0 (#5539): the core's way (history / undo steps along), in the trash too
-    for lk in c.execute("SELECT id, deleted_at FROM office_letter_links WHERE org_id=?", (src,)).fetchall():
+    for lk in c.execute("SELECT id, deleted_at FROM office_letter_links WHERE org_id=? ORDER BY id", (src,)).fetchall():
         ofk_purge(c, LTL_KIND, lk["id"])
         n += 0 if lk["deleted_at"] else 1  # the ones in the trash were ended before (pb_letter_links counts the live ones)
     n += c.execute("UPDATE office_letters SET node_id=NULL WHERE org_id=? AND node_id IS NOT NULL", (src,)).rowcount

@@ -235,7 +235,7 @@ def aim_undo(c, j, rec, back=True):
     gone = [i for i in made if i in have and (have[i]["updated_at"] or "") <= (rec.get("written_at") or "")]
     kept = [i for i in made if i in have and i not in gone]
     by_id = dict(zip(made, rec.get("rows") or []))
-    for i in gone:  # 2.990.0 (#5539): the core's way (its history / undo steps go along)
+    for i in sorted(gone):  # 2.990.0 (#5539): the core's way (its history / undo steps go along), in id order
         ofk_purge(c, RK_FIXED_KIND, i)
     n = len(gone)
     rec.update(removed=[by_id[i] for i in gone if i in by_id], kept=kept)

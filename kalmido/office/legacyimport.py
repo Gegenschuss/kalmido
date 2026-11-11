@@ -1597,10 +1597,10 @@ def fi_undo(c, oid, uid, rid, kinds=None):
         kargs = (oid, rid, *((MD[kind]["kind"],) if extra else ()))
         # 2.990.0 (#5539): the run's rows in the core's trash go for good on the core's way (history / undo steps along),
         # unless still in use (they stay in the trash until its period ends); the readers below see only the live rows
-        for row in c.execute(f"SELECT id FROM {qi(table, MD_TABLES)} WHERE org_id=? AND import_run_id=?{extra} AND {trash_sql()}", kargs).fetchall():
+        for row in c.execute(f"SELECT id FROM {qi(table, MD_TABLES)} WHERE org_id=? AND import_run_id=?{extra} AND {trash_sql()} ORDER BY id", kargs).fetchall():
             if not office_in_use(c, kind, row["id"], oid):
                 ofk_purge(c, OMD_KIND[table], row["id"])
-        for row in c.execute(f"SELECT id FROM {qi(table, MD_TABLES)} WHERE org_id=? AND import_run_id=?{extra} AND {live_sql()}", kargs).fetchall():
+        for row in c.execute(f"SELECT id FROM {qi(table, MD_TABLES)} WHERE org_id=? AND import_run_id=?{extra} AND {live_sql()} ORDER BY id", kargs).fetchall():
             if kind == "services" and s.get("producing_service_id") == row["id"]:  # the calculation rules' producing service stays active
                 kept[kind] += 1
                 continue
