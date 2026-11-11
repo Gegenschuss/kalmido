@@ -1002,7 +1002,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question (2.87.9: no longer, only the buttons) | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction`; 2.35.0 approval requests (`request_chat_approval`): `approval`, `approval_request` `{title, what}`, `via`; 2.233.0: `collected: true` when the person answered an older, collected suggestion; 2.491.0: `reply_style` of the person who pressed, when set |
 | `followup_due` | 2.1.0: the follow-up day of a task *waiting on someone* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
 | `stale_tasks` | 2.34.0 (#266): once a day (from 09:00 server time), the [tasks lying idle](#tasks-lying-idle) of the projects shared with the agent that have *Agent follows up* on (off by default); one bundled event per agent and day, at most 30 tasks | `tasks` `[{id, title, list_id, list_name, idle_days, reason, since, due, assignee_id, wait_note}]`, `count`, `default_days`, `lists` `[{id, name}]`, `hint` |
-| `scheduled_job` | 2.34.0 (#272): a [planned job](#planned-jobs) of a person is due (once per due time; after an outage only the one missed run, `late: true`), or the person pressed *Run now* (`manual: true`). Answer in your chat with `by.id` | `schedule_id`, `title`, `prompt` (the person's words: what to do), `list_id` + `list` (or `null`), `by` / `user` `{id, name}`, `chat_with` (= `by.id`), `rhythm` `{freq, days, time, tz}`, `due_at`, `late`, `manual`, `manual_by` (`{id, name}` when a manager of the agent pressed *Run now* on another person's plan, else `null`; you still answer `by.id`), `hint`; 2.39.0: a [scheduled check of a project](#playbook) adds `list_check: true`, `open_task_ids`, `open_tasks_more` (and the `playbook`) |
+| `scheduled_job` | 2.34.0 (#272): a [planned job](#planned-jobs) of a person is due (once per due time; after an outage only the one missed run, `late: true`), or the person pressed *Run now* (`manual: true`). Answer in your chat with `by.id` | `schedule_id`, `title`, `prompt` (the person's words: what to do), `list_id` + `list` (or `null`), `by` / `user` `{id, name}`, `chat_with` (= `by.id`), `rhythm` `{freq, days, time, tz}`, `due_at`, `late`, `manual`, `manual_by` (`{id, name}` when a manager of the agent pressed *Run now* on another person's plan, else `null`; you still answer `by.id`), `hint`; 2.39.0: a [scheduled check of a project](#playbook) adds `list_check: true`, `open_task_ids`, `open_tasks_more` (and the `playbook`); 2.992.0: `review` (`true` for a plan of the kind *Review in the chat* and every scheduled check of a project: a host with the [model per run](#runtime-settings) takes its review model) |
 | `message_edited` | 2.39.0 (#1179): a person edited a message the agent already had: their chat message after the agent fetched (`delivered_at`) or answered it, a comment the agent got as `comment` / `mention` / `assigned`, a team chat message it got as `team_message`. Only to the agent(s) that had it, only while they still see the task / room (health projects never). A chat message not fetched yet is simply replaced (the queued `chat` event carries the new text, no `message_edited`). Comments and team messages count as had while the original event is still in your event history (30 days). Treat it as a correction: confirm briefly, keep your running work, adjust only what the change affects | `kind`: `chat` \| `comment` \| `team`, `old`, `new`, `user` `{id, name}`; chat: `message` `{id, user_id, task_id, created_at, edited_at}`, `answered` (you wrote after it); comment: `comment` `{id, task_id, created_at, edited_at}`, `task`, `list`, `list_id`; team: `room` `{id, kind, list_id}`, `message`; 2.491.0: chat: `reply_style` of the person, when set |
 | `task.completed` | 2.392.0 (#3364): the repository's poll completed a task because its package or code is released (project switch "Complete tasks when their package or code is released", off by default); the envelope says `via: "release"`, `actor` is `null`; information only, no run | `task`, `list`, `version` (`null`: an earlier version, which one unknown) |
 | `task_changed` | 2.959.0 (#4030): a task assigned or delegated to you, or one you watch (`watch_task`), was changed by someone else (title, due date, priority, assignee, project, section, parent, repeat, link, type, points). Not for your own changes and not for your own (un)assignment (that is `assigned` / `unassigned`); not from a person the agent is not open to; not for changes a project rule makes in the background; at most 50 per agent and request (a bulk change of more tasks announces only the first 50). Switch it off in the [work style](#work-style) (`task_changed`, on by default). Information only, no run | `task`, `list`, `diff` `{field: {old, new}}` (the same as the webhook `task.updated`: API v1 names and values, never a text of a project encrypted in the browser, the old project only when you see it), `assigned` (assigned or delegated to you), `watching` |
@@ -1375,7 +1375,9 @@ with that person (`send_chat` with `user_id` = `by.id`, MCP `send_chat`). Start 
 - Templates in the app point at the data tools: *Morning briefing* (`read_briefing`), *Weekly project status*
   (`read_project_status`), *Follow up on stale tasks* (`list_stale_tasks`), *Check time tracking* (`get_time_gaps`, `list_time_entries`).
   The text stays the person's; treat it as their instruction for this one job, within your usual rules.
-- **Kind** (2.126.1, `action`): `chat` (every plan before, the default: the event `scheduled_job` as above) or `triage`
+- **Kind** (2.126.1, `action`): `chat` (every plan before, the default: the event `scheduled_job` as above), 2.992.0
+  `review` (*Review in the chat*: the same event with `review: true` - an audit, a check, reading something over; a host
+  with the model per run takes its review model for it) or `triage`
   (*Sort the basket (proposal)*, suggested as every working day at 7:30). A triage plan needs no text and has no project.
   When it is due Kalmido asks you for a proposal exactly like the button *Sort the basket*: the event `job_request` of kind
   `triage` with the person's open basket items and projects (the same input and limits), plus `scheduled: true` and
@@ -2868,7 +2870,7 @@ agent accordingly.
 | Setting | Meaning | API (`runtime`) |
 |---|---|---|
 | Model | e.g. `opus`, `sonnet`, `haiku` or a full model id; empty = the agent's default | `model` (string, `""`) |
-| Model per run (2.974.0) | *Select the model per run*: off (default) = the one model above for every run. On = the host picks per run: *For your messages and decisions* (the person's chat messages, buttons, reactions, comments, team messages, unknown events, a job wake with a hard sign, a planned job that names a decision / approval / warning / failure) and *For routine* (job wakes without a hard sign, new tasks, tidy, follow-ups, other planned jobs); an empty field = *Model*. Same rules for the names as *Model*. Shown in the admin's *Runtime* and in the owner's permissions dialog of a personal agent (section *Model*, saved at once). While it is on the chat header shows only the model of the last run | `model_split` (bool, default `false`), `model_decide`, `model_routine` (string, `""`; 400 otherwise) |
+| Model per run (2.974.0) | *Select the model per run*: off (default) = the one model above for every run. On = the host picks per run: *For your messages and decisions* (the person's chat messages, buttons, reactions, comments, team messages, unknown events, a job wake with a hard sign, a planned job that names a decision / approval / warning / failure) and *For routine* (job wakes without a hard sign, new tasks, tidy, follow-ups, other planned jobs); an empty field = *Model*. Same rules for the names as *Model*. Shown in the admin's *Runtime* and in the owner's permissions dialog of a personal agent (section *Model*, saved at once). While it is on the chat header shows only the model of the last run. 2.992.0: a third field *For reviews* (`model_review`, empty = *For your messages and decisions*) and below them the usage of the last 7 days per kind (runs, tokens, the costs only when the host reports them); the header shows *runs with <model of the last run>*, a tap opens this section (its owner, admins) | `model_split` (bool, default `false`), `model_decide`, `model_routine`, `model_review` (string, `""`; 400 otherwise) |
 | Auto-compact | summarize the conversation when this much of the context is used; off = never | `autocompact` (bool), `autocompact_pct` (10-100 or `null` = the agent's default) |
 | Nightly fresh restart | a new session every night at this time, in the server's time zone; 2.233.0: shown as *Daily summary* in the section *Interim summary* (a host that keeps chat conversations writes the day's summary then and starts the next day's conversation) | `nightly_reset` (`"HH:MM"`, `""` = off / the host's default), `timezone` |
 | Interim summary (2.233.0) | when a host that keeps a chat conversation going (`--resume`) ends it with a short summary and starts a fresh one: at a session size *small / medium / large*, after so many runs (10-500), after so many minutes of pause (5-1440, 0 = never; a pause counts only from the small size on). Defaults = the former fixed values. Saves cost; the new conversation can forget details | `rotate_size` (`"small"`, `"medium"`, `"large"`), `rotate_runs` (default 60), `rotate_idle_min` (default 45); read-only, always filled in: `rotate_mb` (0.4 / 0.8 / 1.5, the session file in MB), `rotate_tokens` (80000 / 150000 / 250000 context tokens), `rotate_idle_mb` (0.4) |
@@ -2898,6 +2900,19 @@ tool call, under 2 minutes) runs once more on the conversation's previous model,
 logs every run's model and the reason (`model sonnet (job wake without a hard sign)`). A host of your own may use the
 same keys with rules of its own.
 
+2.992.0 (#5684): a third kind, **reviews** (`model_review`, empty = `model_decide`). A run is a review only when its trigger
+says so, never because of words in a text: the event `review_requested` and a `scheduled_job` with `review: true` (a
+planned job of the kind *Review in the chat*, `action: "review"`, and every scheduled check of a project, `list_check`). An
+event in the same run that needs a decision wins (the run takes `model_decide`). The reference starter gives the usage hook
+the run's kind and a short id of the run (`KALMIDO_RUN_CLASS`, `KALMIDO_RUN_ID`); the hook sends them as `run_class` /
+`run_id` with every usage report (a server before 2.992 refuses them with 400: the hook sends the report again without
+them). Kalmido shows the last 7 days per kind in the section *Model*: runs (distinct run ids), tokens and, only when the
+host reports costs (`KALMIDO_USAGE_PRICES`), the costs - nothing is estimated
+(`GET /api/my/agents/{id}/model-usage` for the owner, `GET /api/admin/agents/{id}/model-usage` for admins ->
+`{days: 7, classes: [{run_class, runs, tokens, input, output, cache_read, cache_write, cost, calls}], cost}`; `run_class`
+`""` = reports without a kind, e.g. the summary before a new conversation or an older starter). The chat header shows
+*runs with <model>* (the model the host reported for its last run) only while the switch is on.
+
 2.312.0: *Permission questions go to* is offered in the runtime section of a team agent (the people come from
 `GET /api/agents/{id}/perm-users` -> `{team, current, people: [{id, name}]}`, for instance admins and the owner of a personal
 agent). Saving checks the person (400 `perm_user` for an agent account, a disabled account, someone the agent does not reach
@@ -2912,7 +2927,8 @@ GET /api/v1/agent   -> {…, "runtime": {"model": "sonnet", "autocompact": true,
                                         "rotate_mb": 0.8, "rotate_tokens": 150000, "rotate_idle_mb": 0.4,
                                         "git_author_name": "", "git_author_email": "", "git_coauthor": false,
                                         "git_author": "Kalmido <noreply@kalmido.com>", "dispatch": "",
-                                        "model_split": false, "model_decide": "", "model_routine": ""}}
+                                        "model_split": false, "model_decide": "", "model_routine": "",
+                                        "model_review": ""}}
 PATCH /api/admin/agents/{id}  {"runtime": {"model": "opus", "autocompact_pct": 80}}   (admins; only the given keys change)
 POST  /api/admin/agents/{id}/reset                                                     (admins; 409 while paused)
 ```
@@ -3697,7 +3713,9 @@ POST /api/v1/agent/usage  {"model": "claude-sonnet-4-5", "input_tokens": 1200, "
                            "cache_read_tokens": 45000, "cache_write_tokens": 2000,   (optional)
                            "cost_usd": 0.12,                                          (optional)
                            "task_id": 51, "list_id": 18, "job_id": 7,                 (optional; list_id comes from the task)
-                           "note": "session a1b2 · 4 messages"}                      (optional, at most 200 characters)
+                           "note": "session a1b2 · 4 messages",                      (optional, at most 200 characters)
+                           "run_class": "routine", "run_id": "9f2c41d07a3b55e1"}      (optional, 2.992.0: decide | review | routine
+                                                                                       and your id of the run, [A-Za-z0-9_-], at most 40)
   -> 201 {id, day, created_at, …, "limit": null | {period, metric, soft, hard, used, soft_pct, hard_pct,
                                                      soft_reached, reached, resets_at}}
 GET  /api/v1/agent/usage?from=2026-09-01&to=2026-09-30&group=day|task|list|model
@@ -3736,7 +3754,8 @@ library only). After every turn it reads the session transcript (`transcript_pat
 messages since its last run (a state file per session, default `~/.cache/kalmido-usage/`), and sends one report per model.
 The task is the one of the agent's status while it is `working` or `waiting` (or a fixed `KALMIDO_USAGE_TASK`). Without a
 price table it sends tokens only; with `KALMIDO_USAGE_PRICES` (JSON, USD per million tokens `[input, output, cache write,
-cache read]` per model prefix) it adds the cost. It never blocks the session: problems go to stderr, the exit code is
+cache read]` per model prefix) it adds the cost. 2.992.0: with `KALMIDO_RUN_CLASS` / `KALMIDO_RUN_ID` in its environment (the
+reference starter sets them per run while the model per run is on) it adds `run_class` / `run_id`. It never blocks the session: problems go to stderr, the exit code is
 always 0, and when Kalmido is unreachable the next run sends the missed turns.
 
 Subagents (2.11.0): Claude Code runs subagents (the Agent tool) in transcripts of their own. Wire the same command as

@@ -8,6 +8,10 @@
 // 2.974.0 (#5668): the model per run - in the admin's "Runtime" a switch below Model shows two model fields (hidden while
 // off), Save stores them, the dialog opens with them again; the owner of a personal agent (freelancer) has a section "Model"
 // in the permissions dialog with the same switch, saved at once. German: "Modell je Lauf wählen".
+// 2.992.0 (#5684): a third model "For reviews" (admin: saved with Save; owner: at once) and below the models the usage per kind
+// of the last 7 days (runs, tokens, the costs only when reported). The chat header of the own agent shows "runs with <model of
+// the last run>" only while the switch is on; a tap opens the section Model as a dialog of its own (its content: the three
+// fields and the usage), switching it off there removes the header's line at once. German: "läuft mit", "Für Prüfungen".
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -68,18 +72,22 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   const msw = md.querySelector('#ag-msplit'), msr = () => [...md.querySelectorAll('.ag-msr')];
   check(msw && !msw.checked && msw.closest('.row').previousElementSibling?.querySelector('#ag-model') && /Select the model per run/.test(msw.closest('.row').textContent),
     '#5668: the switch "Select the model per run" right below Model, off');
-  check(msr().length === 3 && msr().every(x => x.hidden), '#5668: the two model fields are hidden while it is off');
+  check(msr().length === 5 && msr().every(x => x.hidden), '#5668 / #5684: the three model fields, the hint and the usage are hidden while it is off');
   msw.checked = true; msw.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(msr().every(x => !x.hidden) && /For your messages and decisions/.test(md.textContent) && /For routine/.test(md.textContent) && /When in doubt the first/.test(md.textContent),
     '#5668: on = both fields and the explanation show');
-  md.querySelector('#ag-mdec').value = 'opus'; md.querySelector('#ag-mrou').value = 'sonnet';
+  check(/For reviews/.test(md.textContent) && md.querySelector('#ag-mrev')?.placeholder === 'Like messages and decisions'
+    && md.querySelector('#ag-mrev').closest('.row').previousElementSibling?.querySelector('#ag-mdec'), '#5684: the review model between the two, empty = like the first');
+  check(await until(() => /Last 7 days/.test(md.querySelector('.agmu')?.textContent || '') && /No usage reported yet/.test(md.querySelector('.agmu').textContent)),
+    '#5684: the usage per kind below the models (nothing reported yet)');
+  md.querySelector('#ag-mdec').value = 'opus'; md.querySelector('#ag-mrou').value = 'sonnet'; md.querySelector('#ag-mrev').value = 'fable';
   click(w, md.querySelector('[data-m="ok"]'));
-  check(await until(async () => { const r = (await adm(ag.id)).runtime; return r.model_split === true && r.model_decide === 'opus' && r.model_routine === 'sonnet'; }),
-    '#5668: Save stores the switch and both models');
+  check(await until(async () => { const r = (await adm(ag.id)).runtime; return r.model_split === true && r.model_decide === 'opus' && r.model_routine === 'sonnet' && r.model_review === 'fable'; }),
+    '#5668 / #5684: Save stores the switch and the three models');
   await until(() => !md.isConnected);
   w.eval(`agModal(${JSON.stringify(await adm(ag.id))}, null)`);
   md = await until(() => d.querySelector('#ag-model')?.closest('.modal'));
-  check(md.querySelector('#ag-msplit').checked && md.querySelector('#ag-mdec').value === 'opus' && md.querySelector('#ag-mrou').value === 'sonnet'
+  check(md.querySelector('#ag-msplit').checked && md.querySelector('#ag-mdec').value === 'opus' && md.querySelector('#ag-mrou').value === 'sonnet' && md.querySelector('#ag-mrev').value === 'fable'
     && [...md.querySelectorAll('.ag-msr')].every(x => !x.hidden), '#5668: the dialog opens again with the switch on and both models');
   click(w, md.querySelector('[data-m="close"]'));
   w.close();
@@ -103,7 +111,8 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   const CF = await login('frida');
   await call('PATCH', '/api/settings', {features: 'agents,comments', lang: 'en', tour: 'done'}, CF);
   check(!((await call('GET', '/api/state', null, CF)).me.workspaces || []).length, 'frida has no organisation');
-  const FB = (await call('POST', '/api/my/agents', {username: 'fridabot', display_name: 'Fridabot'}, CF)).id;
+  const FBR = await call('POST', '/api/my/agents', {username: 'fridabot', display_name: 'Fridabot'}, CF), FB = FBR.id;
+  const asAgent = (method, url, body) => fetch(B + 'api/v1/' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + FBR.token}, body: JSON.stringify(body)}).then(r => r.status);  // 2.992.0 (#5684)
   const mine = async () => (await call('GET', '/api/my/agents', null, CF)).agents.find(a => a.id === FB);
   w = await boot({user: 'frida', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('ai')`); await sleep(500);
@@ -130,7 +139,49 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   check(await until(async () => (await mine()).runtime.model_routine === 'sonnet'), '#5668 freelancer: model for routine saved');
   change(w, ms.querySelector('#agm-rou'), 'bad model'); await idle(w);
   check(await until(() => ms.querySelector('#agm-rou').value === 'sonnet') && (await mine()).runtime.model_routine === 'sonnet', '#5668 freelancer: an invalid model is refused, the old value back');
+  // 2.992.0 (#5684): the review model, saved at once; the usage per kind below (nothing reported yet, no costs)
+  check(ms.querySelector('#agm-rev') && !ms.querySelector('#agm-rev').closest('.row').hidden && /For reviews/.test(ms.textContent), '#5684 freelancer: the field For reviews shows');
+  change(w, ms.querySelector('#agm-rev'), 'fable');
+  check(await until(async () => (await mine()).runtime.model_review === 'fable'), '#5684 freelancer: the review model saved at once');
+  check(await until(() => /Last 7 days/.test(ms.querySelector('.agmu')?.textContent || '') && /No usage reported yet/.test(ms.querySelector('.agmu').textContent)
+    && /reports no costs/.test(ms.querySelector('.agmu').textContent)), '#5684 freelancer: the usage section, nothing yet, no costs');
   w.close();
+
+  // ================= 2.992.0 (#5684): the chat header "runs with ..." and its dialog (frida's own agent, model per run on)
+  for (const b of [{run_class: 'decide', run_id: 'r1'}, {run_class: 'decide', run_id: 'r1'}, {run_class: 'decide', run_id: 'r2'}, {run_class: 'review', run_id: 'r3'}, {run_class: 'routine', run_id: 'r4'}])
+    check(await asAgent('POST', 'agent/usage', {model: 'claude-x', input_tokens: 1000, output_tokens: 500, ...b}) === 201, '#5684 setup: a usage report ' + JSON.stringify(b));
+  check(await asAgent('PUT', 'agent/status', {status: 'idle', model: 'claude-opus-5-5'}) === 200, '#5684 setup: the host reports the model of its last run');
+  w = await boot({user: 'frida', hash: 'today'}); d = w.document;
+  w.eval(`chatOpen(${FB})`);
+  const chip = await until(() => d.querySelector('.chath .chl2 .chrunm'));
+  check(chip && chip.tagName === 'BUTTON' && chip.textContent === 'runs with claude-opus-5-5' && /Model of the last run: claude-opus-5-5/.test(chip.title),
+    '#5684: the header shows "runs with <model of the last run>" as a button for the owner ' + (chip ? chip.outerHTML : ''));
+  click(w, chip);
+  md = await until(() => [...d.querySelectorAll('.modal')].find(m => /Model of Fridabot/.test(m.querySelector('h3')?.textContent || '')));
+  const hm = md && md.querySelector('.agzmod');
+  check(hm && hm.querySelector('#agm-split').checked && hm.querySelector('#agm-dec').value === 'opus' && hm.querySelector('#agm-rev').value === 'fable' && hm.querySelector('#agm-rou').value === 'sonnet',
+    '#5684: the tap opens the section Model of this agent with its three models');
+  const li = await until(() => hm.querySelectorAll('.agmul li').length === 3 && [...hm.querySelectorAll('.agmul li')]);
+  check(li && /Messages and decisions/.test(li[0].textContent) && /Runs: 2/.test(li[0].textContent) && /4\.5k tokens/.test(li[0].textContent)
+    && /Reviews/.test(li[1].textContent) && /Runs: 1/.test(li[1].textContent) && /Routine/.test(li[2].textContent) && !/\$/.test(hm.querySelector('.agmul').textContent),
+    '#5684: the usage of the last 7 days per kind: runs, tokens, no costs (none reported) ' + (li ? li.map(x => x.textContent).join(' | ') : ''));
+  const hsw = hm.querySelector('#agm-split'); hsw.checked = false; hsw.dispatchEvent(new w.Event('change', {bubbles: true}));
+  check(await until(async () => (await mine()).runtime.model_split === false), '#5684: switched off in the dialog, saved');
+  check(await until(() => !d.querySelector('.chath .chrunm')), '#5684: off = the header line is gone at once');
+  click(w, md.querySelector('[data-m="close"]'));
+  check(await until(() => !md.isConnected), '#5684: Close closes the dialog');
+  w.close();
+  await call('PATCH', `/api/my/agents/${FB}`, {runtime: {model_split: true}}, CF);
+  await call('PATCH', '/api/settings', {lang: 'de'}, CF);
+  w = await boot({user: 'frida', hash: 'today'}); d = w.document;
+  w.eval(`chatOpen(${FB})`);
+  check(await until(() => d.querySelector('.chath .chrunm')?.textContent === 'läuft mit claude-opus-5-5'), '#5684 German: läuft mit');
+  click(w, d.querySelector('.chath .chrunm'));
+  md = await until(() => [...d.querySelectorAll('.modal')].find(m => /Modell von Fridabot/.test(m.textContent)));
+  check(md && /Für Prüfungen/.test(md.textContent) && await until(() => /Letzte 7 Tage/.test(md.textContent) && /Nachrichten und Entscheidungen/.test(md.textContent) && /Läufe: 2/.test(md.textContent)),
+    '#5684 German: Modell von, Für Prüfungen, Letzte 7 Tage, Läufe');
+  w.close();
+  await call('PATCH', '/api/settings', {lang: 'en'}, CF);
 
   // ================= Firefox: 360 and 412 px, touch
   const ffLogin = async ({ev, nav}) => {

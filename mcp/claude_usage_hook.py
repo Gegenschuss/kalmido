@@ -22,6 +22,9 @@ Configuration (environment, or an env file given as the first argument / with --
                            is sent (Kalmido then shows tokens only). The longest matching prefix wins.
   KALMIDO_USAGE_TASK        optional fixed task id; otherwise the task of the agent's status (PUT /agent/status task_id)
                            is used while the agent is "working" or "waiting".
+  KALMIDO_RUN_CLASS         2.992.0 (#5684), set by the reference runner per run while the model per run is on: decide |
+  KALMIDO_RUN_ID            review | routine and the run's id; sent as run_class / run_id (Kalmido counts usage and runs per
+                           kind). A server before 2.992 refuses the fields (400): the report goes again without them.
 
 Wire it in .claude/settings.json (project) or ~/.claude/settings.json (user):
   {"hooks": {
@@ -225,7 +228,19 @@ def current_task(base, token):
     return a.get("status_task") if a.get("status") in ("working", "waiting") else None
 
 
-def reports(sums, session_id, task_id, prices, agent_id=None):
+RUN_CLASSES = ("decide", "review", "routine")  # 2.992.0 (#5684)
+RUN_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,40}")
+
+
+def run_fields(env):
+    """2.992.0 (#5684): {run_class, run_id} of the runner's environment ({} = not told or not valid)."""
+    cls, rid = str(env.get("KALMIDO_RUN_CLASS") or ""), str(env.get("KALMIDO_RUN_ID") or "")
+    if cls not in RUN_CLASSES:
+        return {}
+    return {"run_class": cls, **({"run_id": rid} if RUN_ID_RE.fullmatch(rid) else {})}
+
+
+def reports(sums, session_id, task_id, prices, agent_id=None, run=None):
     out = []
     who = f"claude-code {str(session_id or '')[:8]}" + (f" · subagent {str(agent_id)[:12]}" if agent_id else "")
     for model, s in sums.items():
@@ -238,6 +253,7 @@ def reports(sums, session_id, task_id, prices, agent_id=None):
             r["cost_usd"] = c
         if task_id:
             r["task_id"] = task_id
+        r.update(run or {})  # 2.992.0 (#5684)
         out.append(r)
     return out
 
@@ -286,27 +302,33 @@ def _run_locked(transcript, session_id, agent_id, sp, base, token, env, dry_run,
         task = int(env["KALMIDO_USAGE_TASK"])
     elif sums and not dry_run:
         task = current_task(base, token)
-    reps = reports(sums, session_id, task, prices, agent_id)
+    reps = reports(sums, session_id, task, prices, agent_id, run_fields(env))
     if dry_run:
         for r in reps:
             print(json.dumps(r), file=out)
         return reps
     for r in reps:
-        try:
-            api(base, token, "POST", "/agent/usage", r)
-        except urllib.error.HTTPError as e:
-            if e.code == 400 and "task_id" in r:  # the task is gone or no longer visible: report without it
-                r.pop("task_id")
-                try:
-                    api(base, token, "POST", "/agent/usage", r)
-                    continue
-                except (urllib.error.URLError, OSError) as e2:
-                    e = e2
-            print(f"kalmido usage hook: report failed ({getattr(e, 'code', e)}), retried next time", file=sys.stderr)
+        # a 400 sends it again without what an older server or a gone task refuses: first (2.992.0, #5684) run_class / run_id
+        # (a server before 2.992), then the task (gone or no longer visible)
+        tries = [r, {k: v for k, v in r.items() if k not in ("run_class", "run_id")}]
+        tries.append({k: v for k, v in tries[-1].items() if k != "task_id"})
+        tries = [t for n, t in enumerate(tries) if t not in tries[:n]]
+        err = None
+        for n, t in enumerate(tries):
+            try:
+                api(base, token, "POST", "/agent/usage", t)
+                err = None
+                break
+            except urllib.error.HTTPError as e:
+                err = e
+                if e.code != 400 or n == len(tries) - 1:
+                    break
+            except (urllib.error.URLError, OSError) as e:
+                print(f"kalmido usage hook: Kalmido not reachable ({getattr(e, 'reason', e)}), retried next time", file=sys.stderr)
+                return []
+        if err is not None:
+            print(f"kalmido usage hook: report failed ({getattr(err, 'code', err)}), retried next time", file=sys.stderr)
             return []  # the state stays: the next run sends these turns again
-        except (urllib.error.URLError, OSError) as e:
-            print(f"kalmido usage hook: Kalmido not reachable ({getattr(e, 'reason', e)}), retried next time", file=sys.stderr)
-            return []
     save_state(sp, {"offset": off, "ids": st["ids"] + ids})
     return reps
 

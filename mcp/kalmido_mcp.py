@@ -1128,7 +1128,10 @@ TOOLS = [
      _obj({"model": {"type": "string", "minLength": 1, "maxLength": 100},
            **{k: {"type": "integer", "minimum": 0} for k in ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")},
            "cost_usd": {"type": "number", "minimum": 0}, "task_id": S_ID, "list_id": S_ID, "job_id": S_ID,
-           "note": {"type": "string", "maxLength": 200}}, ["model", "input_tokens", "output_tokens"]),
+           "note": {"type": "string", "maxLength": 200},
+           # 2.992.0 (#5684): the kind of run (the model per run) and your id of the run; counted per kind in Kalmido
+           "run_class": {"type": "string", "enum": ["decide", "review", "routine"]},
+           "run_id": {"type": "string", "maxLength": 40, "pattern": "^[A-Za-z0-9_-]+$"}}, ["model", "input_tokens", "output_tokens"]),
      lambda api, a: api.call("POST", "/agent/usage", body=a)),
     ("get_usage", "The agent's own reported usage between two local days (YYYY-MM-DD, default the last 30 days), grouped by "
                   "day | task | list | model, with totals and where it stands against its limit.",

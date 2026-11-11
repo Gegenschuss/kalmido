@@ -759,6 +759,16 @@ function chatRingHtml(a) {
   const {lv, p, t, lines} = u, r = 7, cf = 2 * Math.PI * r;
   return `<button type="button" class="ib chring q-${lv}" data-ii="chat-ring" aria-describedby="chat-ring" aria-expanded="false" aria-label="${esc(t)}"><svg viewBox="0 0 18 18" aria-hidden="true"><circle class="rbg" cx="9" cy="9" r="${r}"/><circle class="rfg" cx="9" cy="9" r="${r}" stroke-dasharray="${(cf * p / 100).toFixed(2)} ${cf.toFixed(2)}" transform="rotate(-90 9 9)"/></svg></button><span class="shint iisrc pl" id="chat-ring" data-ii="1">${esc(t + '\n' + lines.join('\n'))}</span>`;
 }
+// 2.992.0 (#5684): the model per run is on - a small "runs with <model of the last run>" in the header's second line; its owner
+// and admins tap it to open the section Model (agentrotate.js agm_open). Off (or no run reported yet) = nothing, as before
+const chatRunMay = a => !!S.me && ((!!a.owner_id && a.owner_id === S.me.id) || (!!S.me.is_admin && !a.owner_id));
+function chatRunModelHtml(a) {
+  const m = a.model_split ? a.host?.model || '' : '';
+  if (!m) return '';
+  const t = tr('Model of the last run: {0}', m), l = tr('runs with {0}', m);
+  return chatRunMay(a) ? `<button type="button" class="chrunm" data-act="chat-runmodel" title="${esc(t + ' · ' + tr('Select the models'))}" aria-label="${esc(t + ' · ' + tr('Select the models'))}">${esc(l)}</button>`
+    : `<span class="chrunm" title="${esc(t)}">${esc(l)}</span>`;
+}
 const chatPausedHtml = a => a.quota?.paused_until && !quotaStale(a.quota) ? `<span class="chqp">${esc(tr('paused until {0}', quotaWhen(a.quota.paused_until)))}</span>` : '';
 function chatHeadSync(a, force) {
   const hd = $('#chat-msgs')?.parentElement, nm = hd && $('.chnm', hd), l2 = hd && $('.chl2', hd); if (!nm || !l2 || !a) return;
@@ -771,6 +781,8 @@ function chatHeadSync(a, force) {
   }
   nm._rh = rh;
   // 2.350.0 A (#3317): mode and model are no longer in the header; the ⋯ menu reads them when it opens (chatHeadInfo)
+  const rm = chatRunModelHtml(a);  // 2.992.0 (#5684): except "runs with …" while the model per run is on
+  if (l2._rm !== rm) { $$('.chrunm', l2).forEach(x => x.remove()); $('.chst', l2)?.insertAdjacentHTML('afterend', rm); l2._rm = rm; }
 }
 function chatModeMenu(btn) {
   const a = agentById(S.chat.aid); if (!a) return;
@@ -1004,7 +1016,7 @@ function chatInner(aid) {
   // 2.350.0 A (#2790 #3317): one header on the phone and the desktop: name + ONE state (2.407.0 B, #3493: the usage ring always);
   // permissions, model, workspace, usage, search and the window actions sit in the ⋯ menu. Right at most the side panel
   // switch, ⋯ and close as one group (the phone: only ⋯). The search button stays hidden as the anchor of the search bar.
-  return `<div class="chath chh2${acc}">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}${chatWsHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>${msgSearchBtn('a', a.id)}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}
+  return `<div class="chath chh2${acc}">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}${chatWsHtml(a)}</span><span class="chl2">${chatStHtml(a)}${/*html-ok*/ chatRunModelHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>${msgSearchBtn('a', a.id)}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}
       <span class="chhb" role="group" aria-label="${esc(tr('Chat'))}">${back ? '' : chatWinBtns()}${/*html-ok*/ a.shared === false ? '' /* 2.777.0 C (#5378, review F4) */ : jcd_fbtnHtml() /* 2.152.2 C (#2627): the menu button */}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</span></div>
     ${jc_barHtml()}${jcd_filtHtml()}${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div>${cpnBarHtml('a:' + a.id)}<div class="chmsgs${acv ? ' wac-loc' : ''}" id="chat-msgs" data-agid="${a.id}"${acv ? ` data-agacc="${a.id}" style="--agcol:${gc};${acv}"` : gc ? ` style="--agcol:${gc}"` : ''} role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
     <button type="button" class="chnew hidden${acv ? ' wac-loc' : ''}" id="chat-new" data-act="chat-bottom"${acv ? ` data-agacc="${a.id}" style="${acv}"` : ''}>${tr('New message')} <span aria-hidden="true">↓</span></button>
@@ -1761,6 +1773,7 @@ function agModal(a, done, o = {}) {
   if (a && typeof oa_switchLoad === 'function') oa_switchLoad(md);  // 2.51.0 A (#1348)
   if (a) agPuLoad(md, a);  // 2.312.0 D (#3266)
   if (a && typeof agz_wire === 'function') agz_wire(md, a, `/api/admin/agents/${a.id}`);  // 2.233.0 B (#3189)
+  if (a && typeof agmu_load === 'function') agmu_load($('.agmu', md), `/api/admin/agents/${a.id}`);  // 2.992.0 (#5684)
   md.addEventListener('change', e => { if (e.target.id === 'ag-ac') $('#ag-acp', md).disabled = !e.target.checked;  // 2.4.1 (#377)
     if (e.target.id === 'ag-msplit') md.querySelectorAll('.ag-msr').forEach(x => { x.hidden = !e.target.checked; }); });  // 2.974.0 (#5668)
   md.addEventListener('change', e => { if (e.target.id === 'ag-owner') { const h = $('#ag-ownhint', md); if (h) h.textContent = e.target.value ? tr('Only this person sees and uses it: in the chat, at @, when assigning and sharing. Admins see it by name with the kill switch only.') : tr('A team agent for projects with several people; the owner of a project decides who may address it.'); } });
@@ -1951,15 +1964,17 @@ function agSplitFields(rt) {
   const on = !!rt.model_split, mi = (id, v, ph) => `<input id="${esc(id)}" list="ag-models" value="${esc(v || '')}" maxlength="100" placeholder="${esc(ph)}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
   return `<div class="row"><label for="ag-msplit">${tr('Model per run')}</label><label class="chkl"><input type="checkbox" id="ag-msplit" ${on ? 'checked' : ''}> ${tr('Select the model per run')}</label></div>
     <div class="row ag-msr" ${on ? '' : 'hidden'}><label for="ag-mdec">${tr('For your messages and decisions')}</label>${/*html-ok*/ mi('ag-mdec', rt.model_decide, tr('Agent default'))}</div>
+    <div class="row ag-msr" ${on ? '' : 'hidden'}><label for="ag-mrev">${tr('For reviews')}</label>${/*html-ok*/ mi('ag-mrev', rt.model_review, tr('Like messages and decisions'))}</div>
     <div class="row ag-msr" ${on ? '' : 'hidden'}><label for="ag-mrou">${tr('For routine')}</label>${/*html-ok*/ mi('ag-mrou', rt.model_routine, tr('Agent default'))}</div>
-    <div class="shint ag-msr" ${on ? '' : 'hidden'}>${tr('Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.')}</div>`;
+    <div class="shint ag-msr" ${on ? '' : 'hidden'}>${tr('Your messages, buttons, reactions and comments and every run that may need a decision use the first model; reviews (a review you ask it for, a planned job of the kind Review, a scheduled check of a project) the second, empty = the first; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign the third. When in doubt the first.')}</div>
+    <div class="agmu ag-msr" aria-live="polite" ${on ? '' : 'hidden'}></div>`;  // 2.992.0 (#5684): the third model, the usage per kind (agentrotate.js agmu_load)
 }
 function agRtBody(md) {
   const pct = $('#ag-acp', md).value.trim(), ac = $('#ag-ac', md).checked;
   if (pct && (!/^\d+$/.test(pct) || +pct < 10 || +pct > 100)) { const e = $('#ag-err', md); e.textContent = tr('Auto-compact: a percentage from 10 to 100'); e.hidden = false; $('#ag-acp', md).focus(); return null; }
   const pu = $('#ag-pu', md), ow = $('#ag-owner', md);  // 2.312.0 D (#3266): a team agent's person for permission questions
   const ms = $('#ag-msplit', md);  // 2.974.0 (#5668)
-  return {model: $('#ag-model', md).value.trim(), ...(ms ? {model_split: ms.checked, model_decide: $('#ag-mdec', md).value.trim(), model_routine: $('#ag-mrou', md).value.trim()} : {}), autocompact: ac, autocompact_pct: pct ? +pct : null, nightly_reset: $('#ag-nr', md).value || '',
+  return {model: $('#ag-model', md).value.trim(), ...(ms ? {model_split: ms.checked, model_decide: $('#ag-mdec', md).value.trim(), model_routine: $('#ag-mrou', md).value.trim(), model_review: $('#ag-mrev', md).value.trim()} : {}), autocompact: ac, autocompact_pct: pct ? +pct : null, nightly_reset: $('#ag-nr', md).value || '',
     ...($('#ag-pm:not(:disabled)', md) ? {permission_mode: $('#ag-pm', md).value} : {}),
     ...(pu && !pu.disabled && !ow?.value ? {perm_user: pu.value ? +pu.value : null} : {})};
 }
