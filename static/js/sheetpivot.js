@@ -107,7 +107,8 @@ async function spvCreate(sh, bid, spec) {
   await shbAfter(tid);
   histToast(tr('Sheet {0} created', qn(r.tab.name)), histAdd({label: tr('Created {0}', qn(r.tab.name)), ids: [], snaps: [], lids: [],
     undo: async () => { await rawFetch('DELETE', shbUrl(bid, tid)); await shbAfter(from); return {skipped: []}; },
-    redo: async () => { await rawFetch('POST', shbUrl(bid, tid, 'restore')); await shbAfter(tid); return {skipped: []}; }}));
+    redo: async () => { await rawFetch('POST', shbUrl(bid, tid, 'restore')); await shbAfter(tid); return {skipped: []}; },
+    post: dir => shbAfter(dir === 'undo' ? from : tid)}));  // 2.979.0 (#5667): after a step the server took back: the sheet to show
 }
 async function spvSave(sh, spec) {  // one Undo step: the setting before comes back (with the version read then)
   const bid = sh.book_id || sh.id, tid = sh.id, p = sh.pivot || {};

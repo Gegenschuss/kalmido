@@ -45,7 +45,8 @@ async function shxUiImportFile(f, space, lid) {
   after(false);
   const e = histAdd({label: tr('Import of {0}', qn(title)), ids: [], snaps: [], lids: [],
     undo: async () => { await rawFetch('DELETE', '/api/sheets/' + id); after(true); return {skipped: []}; },
-    redo: async () => { await rawFetch('POST', `/api/sheets/${id}/restore`); after(false); return {skipped: []}; }});
+    redo: async () => { await rawFetch('POST', `/api/sheets/${id}/restore`); after(false); return {skipped: []}; },
+    post: dir => after(dir === 'undo')});  // 2.979.0 (#5667): after a step the server took back: away from a table gone, the index again
   histToast((r.messages || []).join(' · ') || tr('Import finished'), e);
   go('sheets/' + id);
 }

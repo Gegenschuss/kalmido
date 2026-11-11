@@ -50,6 +50,15 @@ async function shvLoadIdx(key, force) {
   if (S.route.mod === 'sheets') viewSafeRender();
   if (key === 'all' && typeof sbb_sync === 'function') sbb_sync('sheets');  // 2.152.3 B (#2619): the panel
 }
+// 2.979.0 (#5667): after an undo / redo the server took back by its group: the tables' index and their folders are old (the
+// overview / panel fetch them again; shown now: at once); the open table: undo.js histRedraw (shvReload)
+histReloader('sheets', () => {
+  const ks = Object.keys(SHV.idx); if (!ks.length && !(typeof SHF !== 'undefined' && SHF.d)) return;  // lazy-ok: sheetfold.js
+  for (const k of ks) SHV.idx[k].v = -1;
+  if (typeof SHF !== 'undefined') SHF.v = -1;  // lazy-ok: sheetfold.js
+  if (typeof sbb_sync === 'function') sbb_sync('sheets');
+  if (S.route.mod === 'sheets' && !S.route.sh) renderView();
+});
 // 2.126.2 A (#2357): the pages that link this table ([[tabelle:…]]), asked once per opening (not on every cell change)
 const SHV_REFS = {id: 0, pages: []};
 async function shvRefs(id) {
@@ -535,7 +544,8 @@ async function shvNew(lid, fid) {  // 2.199.0 C (#2742): fid = into this folder 
   go('sheets/' + r.id);
   const e = histAdd({label: tr('Created {0}', qn(r.title || '')), ids: [], snaps: [], lids: [],
     undo: async () => { await rawFetch('DELETE', '/api/sheets/' + r.id); shvAfterIdx(r.id, true); return {skipped: []}; },
-    redo: async () => { await rawFetch('POST', `/api/sheets/${r.id}/restore`); shvAfterIdx(r.id); return {skipped: []}; }});
+    redo: async () => { await rawFetch('POST', `/api/sheets/${r.id}/restore`); shvAfterIdx(r.id); return {skipped: []}; },
+    post: dir => shvAfterIdx(r.id, dir === 'undo')});  // 2.979.0 (#5667): after a step the server took back: away from a table gone, the index again
   histToast(tr('Table {0} created', qn(r.title || '')), e);
 }
 function shvAfterIdx(id, gone) {
@@ -560,7 +570,8 @@ async function shvDelete(id, title, lid) {
   // 2.660.0 (#3799); 2.905.0 (#5255): no editing session any more, the delete is its own step (the server's group when it records one)
   const e = histAdd({label: tr('Deleted {0}', qn(title || '')), ids: [], snaps: [], lids: [],
     undo: async () => { await rawFetch('POST', `/api/sheets/${id}/restore`); shvAfterIdx(id); return {skipped: []}; },
-    redo: async () => { await rawFetch('DELETE', '/api/sheets/' + id); shvAfterIdx(id, true); return {skipped: []}; }});
+    redo: async () => { await rawFetch('DELETE', '/api/sheets/' + id); shvAfterIdx(id, true); return {skipped: []}; },
+    post: dir => shvAfterIdx(id, dir === 'redo')});  // 2.979.0 (#5667): after a step the server took back: away from a table gone, the index again
   histToast(tr('Table {0} deleted', qn(title || '')), e);
 }
 async function shvAttach(sh) {  // attach to a project / list of the same space (or detach)

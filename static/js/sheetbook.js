@@ -38,7 +38,8 @@ async function shbAdd(sh, copy) {
   await shbAfter(tid);
   const e = histAdd({label: tr('Created {0}', qn(name)), ids: [], snaps: [], lids: [], srv: true,  // 2.800.0 (#5409): the server lists the step
     undo: async () => { await shbReq('DELETE', shbUrl(bid, tid)); await shbAfter(from); return {skipped: []}; },
-    redo: async () => { await shbReq('POST', shbUrl(bid, tid, 'restore')); await shbAfter(tid); return {skipped: []}; }});
+    redo: async () => { await shbReq('POST', shbUrl(bid, tid, 'restore')); await shbAfter(tid); return {skipped: []}; },
+    post: dir => shbAfter(dir === 'undo' ? from : tid)});  // 2.979.0 (#5667): post = after a step the server took back (its own undo no longer runs): the sheet to show
   histToast(tr('Sheet {0} created', qn(name)), e);
 }
 async function shbRename(sh, tid) {
@@ -65,7 +66,8 @@ async function shbDelete(sh, tid) {
   await shbAfter(tid === sh.id ? next?.id : null);
   const e = histAdd({label: tr('Deleted {0}', qn(name)), ids: [], snaps: [], lids: [], srv: true,
     undo: async () => { await shbReq('POST', shbUrl(bid, tid, 'restore')); await shbAfter(tid); return {skipped: []}; },
-    redo: async () => { await shbReq('DELETE', shbUrl(bid, tid)); await shbAfter(next?.id); return {skipped: []}; }});
+    redo: async () => { await shbReq('DELETE', shbUrl(bid, tid)); await shbAfter(next?.id); return {skipped: []}; },
+    post: dir => shbAfter(dir === 'undo' ? tid : next?.id)});  // 2.979.0 (#5667): after a step the server took back: the sheet to show
   histToast(tr('Sheet {0} deleted', qn(name)), e);
 }
 // 2.671.0 (#3463 b): a new pivot sheet from the open sheet / the open pivot's setting: the dialog loads on demand (sheetpivot.js)
