@@ -16,6 +16,7 @@ deleted. Invented names only.
  - a fixed cost (kind ofixed): delete -> gone from the fixed costs, in the office trash -> restore -> back
  - a correction of the cash flow (kind oadjust): delete -> not counted in the cash flow, in the office trash -> restore
  - a letter's link (kind oletlink): p2567_c_office_trash_test.py (removed, listed, undo, linked again)
+ - 2.990.0 (#5539): the undo of a data import removes the run's services (live and in the trash) with their history
 tenant-matrix: office (another organisation: 404 on a foreign row of the core's trash, restore and delete for good)
 freelancer-matrix: office (a person without an organisation: her service deleted, listed in her trash, restored, deleted for good)
 usage: p2905_d_office_trash_4c_test.py <datadir>"""
@@ -259,5 +260,25 @@ check(A.post(T + f"/core/omd_services/{FS}/restore").status_code == 404, "someon
 check(Fr.post(T + f"/core/omd_services/{FS}/restore").ok and FS in ids(Fr, "services"), "freelancer: restored")
 check(Fr.delete(OFC + f"/services/{FS}").ok and Fr.delete(T + f"/core/omd_services/{FS}").ok and drow("office_services", FS) is None,
       "freelancer: deleted for good")
+
+# ---------------------------------------------------------------- 2.990.0 (#5539): the undo of a data import (office/legacyimport.py
+# fi_undo) deletes the run's master data on the core's way: a live row and one the person put into the trash since go for
+# good with their history (was: a plain DELETE of every row of the run, obj_history / obj_undo left behind); as a person
+# without an organisation (her personal office; the organisation's undo is the same code)
+PBF = dbx("SELECT id FROM orgs WHERE personal_of=?", (FID,))[0][0]
+RUN = dbx("INSERT INTO office_import_runs(org_id, kind, counts, detail, created_by, created_at) VALUES(?, 'data', '{}', '{}', ?, ?) RETURNING id",
+          (PBF, FID, "2026-01-02T03:04:05+00:00"))[0][0]
+IS = [Fr.post(OFC + "/services", json={"name_de": f"Example Imported {i}"}).json()["id"] for i in (1, 2)]
+dbx(f"UPDATE office_services SET import_run_id=? WHERE id IN ({IS[0]}, {IS[1]})", (RUN,))
+check(Fr.delete(OFC + f"/services/{IS[1]}").ok and drow("office_services", IS[1])[0], "import undo: one imported service into the trash since")
+for i in IS:  # what the core keeps per row (a change of it): must go with the row
+    dbx("INSERT INTO obj_history(kind, ref_id, org_id, user_id, action, created_at, updated_at) VALUES('omd_services', ?, ?, ?, 'update', ?, ?)",
+        (i, PBF, FID, "2026-01-02T03:04:05+00:00", "2026-01-02T03:04:05+00:00"))
+r = Fr.post(OFC + f"/legacy/runs/{RUN}/undo", json={"kinds": ["services"]})
+check(r.ok and (r.json().get("removed") or {}).get("services") == 1, f"import undo: the live service counted removed {r.status_code} {r.text[:200]}")
+check(drow("office_services", IS[0]) is None and drow("office_services", IS[1]) is None, "import undo: the live service and the one in the trash are gone")
+left = dbx(f"SELECT ref_id FROM obj_history WHERE kind='omd_services' AND ref_id IN ({IS[0]}, {IS[1]})")
+check(not left, f"import undo: no history of the removed services left behind (was: orphaned) {left}")
+check(not in_trash(Fr, "omd_services", IS[1]), "import undo: nothing of the run left in her trash")
 
 sys.exit(done("p2905_d_office_trash_4c"))

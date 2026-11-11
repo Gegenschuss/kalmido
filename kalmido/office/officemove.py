@@ -61,6 +61,8 @@ from .contractfiles import dma_path, dma_dir  # 2.369.5 (#2517): pulled up from 
 from ..team.clients import need_client  # 2.369.5 (#2517): pulled up from functions
 from .pdfweb import _render, epdf_name, epdf_stored  # 2.369.5 (#2517): pulled up from functions
 from .meals import bw_file_copy, bw_path  # 2.369.5 (#2517): pulled up from functions
+from .letterlinks import LTL_KIND  # 2.990.0 (#5539): a letter link ends on the core's way
+from .okern import ofk_purge  # 2.990.0 (#5539)
 
 OFM_WHAT = ("clients", "drafts", "travel", "templates", "meals")  # 2.119.0 A (#2288): + entertainment receipts (drafts)
 OFM_TABLE = {"drafts": "office_docs", "travel": "office_trips", "templates": "office_doc_templates", "meals": "office_meals"}
@@ -1022,9 +1024,10 @@ def ofm_move_space():
         for r in p["letters"]:  # 2.356.1 (#3344): the links of letterlinks.py end first (the undo restores them after the letter)
             for lk in p["letter_links"].get(r["id"], ()):
                 rec.append({"t": "office_letter_links", "id": lk["id"], "gone": {k: lk[k] for k in ("letter_id", "node_id", "kind", "created_by", "agent_id", "created_at")}})
-                c.execute("DELETE FROM office_letter_links WHERE id=?", (lk["id"],))
+                ofk_purge(c, LTL_KIND, lk["id"])  # 2.990.0 (#5539): the core's way (its history / undo steps go along)
             # 2.905.0 (#5414): its links in the core's trash cannot come back in the old office once the letter moved: gone for good
-            c.execute(f"DELETE FROM office_letter_links WHERE letter_id=? AND {trash_sql()}", (r["id"],))
+            for lk in c.execute(f"SELECT id FROM office_letter_links WHERE letter_id=? AND {trash_sql()}", (r["id"],)).fetchall():
+                ofk_purge(c, LTL_KIND, lk["id"])  # 2.990.0 (#5539)
             ofm_move_row(c, rec, "office_letters", r, src, dst, dst, {**{k: None for k in OFM_LETTER_CLEAR}, "updated_at": ts})
         detail = {"src": src, "dst": dst, "what": what, "ids": ids, "copy": 1 if copy else 0, "rows": rec, "made": made, "at": ts}
         mid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES(?,?,?,?,?,?,?)",

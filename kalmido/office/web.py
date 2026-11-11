@@ -40,7 +40,7 @@ from .model import oxa_settings_at  # 2.528.0 (#4305 A3)
 from .model import MD  # noqa: E402  2.747.0 (#5246)
 from .model import office_md_clean  # noqa: E402  2.866.0 (#5302 F8)
 from .owrite import ow_write  # noqa: E402  2.747.0 (#5246): the master data on the core's write layer
-from .okern import ofk_register  # noqa: E402  2.905.0 (#5414): the master data in the core's trash
+from .okern import ofk_purge, ofk_register  # noqa: E402  2.905.0 (#5414): the master data in the core's trash; 2.990.0 (#5539): ofk_purge
 from .rights import OFR_TRASH, _ofr_on_purge, _ofr_trash_back, _ofr_trash_base, _ofr_trash_ctx  # noqa: E402  2.905.0 (#5414)
 from ..core.writes import obj_on_purge  # noqa: E402  2.905.0 (#5414)
 from .model import OMD_KIND, _row_dict  # noqa: E402  2.905.0 (#5414)
@@ -123,8 +123,8 @@ def of_reseed_texts(c, oid, old_code):
     gone = [r["id"] for r in rows if want.get((r.get("kind"), r.get("key"))) == (r.get("text_de"), r.get("text_en"))]
     if not gone or len(gone) != len(rows):
         return 0  # own texts (or none seeded): left as they are
-    for rid in gone:
-        c.execute("DELETE FROM office_texts WHERE id=? AND org_id=?", (rid, oid))
+    for rid in gone:  # 2.990.0 (#5539): the core's way (history / undo steps along); office_rows lists only this area's rows
+        ofk_purge(c, OMD_KIND["office_texts"], rid)
     return office_seed_texts(c, oid)
 
 

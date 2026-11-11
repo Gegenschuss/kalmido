@@ -47,6 +47,8 @@ from .periodlock import pl_lock, pl_through  # 2.355.0 B (#2845)
 from ..files.fsmove import fsm_apply, fsm_plan  # 2.356.0 A (#2926)
 from ..accounts.orgs import org_role  # 2.369.5 (#2517): pulled up from functions
 from .periodlock import pl_first_month, pl_hints, pl_label  # 2.369.5 (#2517): pulled up from functions
+from .letterlinks import LTL_KIND  # 2.990.0 (#5539): the letter links end on the core's way
+from .okern import ofk_purge  # 2.990.0 (#5539)
 
 PBT_KEEP = ("office_settings", "office_company", "office_bank_accounts", "office_cf_start", "office_cf_actual", "office_numbers",
             "office_period_locks",  # 2.148.0 A (#2471): the locks of each area stay its own
@@ -313,7 +315,10 @@ def pb_letter_detach(c, src):
     """Before personal office src moves (pbt_post, web.py pb_move_post): the letters' links to the owner's private
     documents and address books end -- only the links, the documents and contacts stay as they are (the frozen recipient
     of a letter stays). -> the number of document links ended."""
-    n = c.execute("DELETE FROM office_letter_links WHERE org_id=?", (src,)).rowcount
+    n = 0  # 2.990.0 (#5539): the core's way (history / undo steps along), in the trash too
+    for lk in c.execute("SELECT id, deleted_at FROM office_letter_links WHERE org_id=?", (src,)).fetchall():
+        ofk_purge(c, LTL_KIND, lk["id"])
+        n += 0 if lk["deleted_at"] else 1  # the ones in the trash were ended before (pb_letter_links counts the live ones)
     n += c.execute("UPDATE office_letters SET node_id=NULL WHERE org_id=? AND node_id IS NOT NULL", (src,)).rowcount
     c.execute("UPDATE office_letters SET contact_id=NULL WHERE org_id=? AND contact_id IS NOT NULL", (src,))
     return n

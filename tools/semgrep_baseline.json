@@ -2611,14 +2611,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/office/legacyimport.py",
-   "code": "c.execute(f\"DELETE FROM {table} WHERE id=? AND org_id=?\", (row[\"id\"], oid))",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/office/legacyimport.py",
    "code": "c.execute(f\"UPDATE clients SET {', '.join(k + '=?' for k in back)}, updated_at=? WHERE id=? AND {pb_cl_sql(c, oid)}\",",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
@@ -2652,14 +2644,6 @@
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/office/legacyimport.py",
    "code": "c.execute(f\"UPDATE {MD[kind]['table']} SET import_run_id=? WHERE id=? AND org_id=?\", (rid, row[\"id\"], oid))",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/office/legacyimport.py",
-   "code": "for row in c.execute(f\"SELECT id FROM {table} WHERE org_id=? AND import_run_id=?{extra}\", (oid, rid, *((MD[kind][\"kind\"],) if extra else ()))).fetchall():",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296

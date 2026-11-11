@@ -177,8 +177,13 @@ j = r.json()
 check(r.ok and (j.get("count") or {}).get("letters") == 1, f"letters: the preview counts the draft only {j.get('count')}")
 check(any("sent letter stays" in n for n in j.get("notes") or []), f"letters: the sent letter stays (retention) {j.get('notes')}")
 check(any("loses its links" in n for n in j.get("notes") or []), f"letters: the preview names the links that end {j.get('notes')}")
+# 2.990.0 (#5539): the link that ends goes on the core's way - what the core keeps of it (its history) goes with it
+LK = sql("SELECT id FROM office_letter_links WHERE letter_id=?", (L1,))[0][0]
+sql("INSERT INTO obj_history(kind, ref_id, org_id, user_id, action, created_at, updated_at) VALUES('oletlink', ?, ?, ?, 'update', ?, ?)",
+    (LK, PB, FID, "2026-01-02T03:04:05+00:00", "2026-01-02T03:04:05+00:00"))
 r = move(Fr, "letters", [L1, L2], TO)
 check(r.ok and r.json().get("ok"), "letters: the move " + r.text[:300])
+check(not sql("SELECT 1 FROM obj_history WHERE kind='oletlink' AND ref_id=?", (LK,)), "letters: no history of the ended link left behind (was: orphaned)")
 MID = r.json().get("move_id")
 check(sql("SELECT org_id, client_id FROM office_letters WHERE id=?", (L1,))[0] == (KAP, None), "letters: the draft is in the organisation without the client")
 check(sql("SELECT org_id FROM office_letters WHERE id=?", (L2,))[0][0] == PB, "letters: the sent letter stays")

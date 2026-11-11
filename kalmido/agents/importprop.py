@@ -44,6 +44,8 @@ from ..agents.core import JOB_TITLE_MAX, job_dict, need_agent  # 2.369.5 (#2517)
 from ..agents.lyprop import lyp_person  # 2.369.5 (#2517): pulled up from functions
 from ..agents.usage import usage_block  # 2.369.5 (#2517): pulled up from functions
 from ..api.scopes import need_scope  # 2.369.5 (#2517): pulled up from functions
+from ..office.cashflow import RK_FIXED_KIND  # 2.990.0 (#5539): the undo deletes on the core's way
+from ..office.okern import ofk_purge  # 2.990.0 (#5539)
 
 AIM_KIND = "import"
 AIM_AREAS = ("fixed_costs",)  # later: further areas of the office (the format keeps the field)
@@ -233,7 +235,9 @@ def aim_undo(c, j, rec, back=True):
     gone = [i for i in made if i in have and (have[i]["updated_at"] or "") <= (rec.get("written_at") or "")]
     kept = [i for i in made if i in have and i not in gone]
     by_id = dict(zip(made, rec.get("rows") or []))
-    n = c.execute(f"DELETE FROM office_fixed_costs WHERE org_id=? AND id IN ({','.join('?' * len(gone)) or 'NULL'})", [oid] + gone).rowcount if gone else 0
+    for i in gone:  # 2.990.0 (#5539): the core's way (its history / undo steps go along)
+        ofk_purge(c, RK_FIXED_KIND, i)
+    n = len(gone)
     rec.update(removed=[by_id[i] for i in gone if i in by_id], kept=kept)
     ofx_log(c, oid, "delete", target="fixed_costs", detail={"count": n, "undo": 1, "job": j["id"]})
     return n, [tr("{0} fixed costs changed since", len(kept))] if kept else []
