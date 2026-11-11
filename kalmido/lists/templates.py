@@ -10,7 +10,7 @@ from ..core.schema import MAX_DEPTH
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import me
-from ..core.access import Denied, list_role, live_sql, MANAGE_ROLES, my_inbox, my_max_sort, need_list, need_task, WRITE_ROLES
+from ..core.access import Denied, list_role, live_sql, MANAGE_ROLES, my_inbox, my_max_sort, need_list, need_task, token_lists, WRITE_ROLES
 from ..core.pages import valid_link
 from ..lists.lists import list_created, clean_color, clean_folder, LIST_KINDS
 from ..tasks.validation import (
@@ -494,6 +494,8 @@ def template_create():
     b = body()
     c = db()
     uid = me()
+    if token_lists() is not None:  # 2.905.0 (#5288, review): a key limited to projects sees no template, so it makes none
+        raise Denied(403)
     try:
         to = tpl_space(c, b.get("space"))  # 2.609.0 (#3373): a template of an organisation (its admins)
     except BadInput as e:

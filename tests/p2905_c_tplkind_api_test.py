@@ -245,6 +245,7 @@ check(Ca.post(B + "/api/section-templates", json={"name": "x", "sections": ["X"]
 # ================================================================== agents: their own templates, the app's section templates not
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "structure"], "username": "planbot", "display_name": "Planbot", "org_id": ORG})
 assert r.status_code in (200, 201), r.text
+r0 = r
 AGH = {**H, "Authorization": "Bearer " + r.json()["token"]}
 r = requests.post(V + "/templates", headers=AGH, json={"kind": "task", "data": {"task": {"title": "Bot step"}}, "name": "Bot template"})
 check(r.status_code == 201, f"agent: makes a template of its own {r.status_code} {r.text[:200]}")
@@ -252,6 +253,15 @@ names = [x["name"] for x in requests.get(V + "/templates", headers=AGH).json().g
 check(names == ["Bot template"], f"agent: lists its own only (not its owner's, not the organisation's, no section templates) {names}")
 check(requests.get(B + "/api/section-templates", headers=AGH).status_code in (401, 403), "agent: no section templates")
 check("Bot template" not in tpls(A), "agent: its template is not alice's")
+# 2.905.0 (#5288, review): a key limited to projects sees no template - so it makes none either (403, nothing left behind)
+AGID = r0.json()["id"]
+LAG = mklist(A, "Bot's project")
+check(A.put(B + f"/api/lists/{LAG}/members", json={"user_id": AGID, "role": "edit"}).ok, "setup: the project is shared with the agent")
+check(A.patch(B + f"/api/admin/agents/{AGID}", json={"list_ids": [LAG], "bridge_ok": True}).ok, "setup: the agent is limited to that project")
+r = requests.post(V + "/templates", headers=AGH, json={"kind": "task", "data": {"task": {"title": "Fenced"}}, "name": "Fenced template"})
+check(r.status_code == 403, f"agent limited to projects: makes no template (403) {r.status_code} {r.text[:200]}")
+check(not sql("SELECT 1 FROM templates WHERE name='Fenced template'"), "agent limited to projects: nothing was stored")
+check(A.patch(B + f"/api/admin/agents/{AGID}", json={"list_ids": [], "bridge_ok": True}).ok, "setup: the limit lifted again")
 
 # ================================================================== a person without an organisation (freelancer-matrix: sectpl)
 FID, Fr = freelancer(B, A)
