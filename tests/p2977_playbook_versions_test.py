@@ -72,7 +72,11 @@ def _health():
 def restart():
     """The next start of the server (core/db.py init_db runs the START hooks: pb_retire, pd_retire)."""
     subprocess.run(["docker", "restart", CT], capture_output=True)
-    check(until(lambda: _health(), timeout=90), "the server is up again after the restart")
+    up = until(lambda: _health(), timeout=90)
+    check(up, "the server is up again after the restart")
+    if not up:  # the reason in the suite's output (the start's traceback)
+        print(logs()[-6000:])
+        sys.exit(1)
 
 
 def in_app(code, *args):
@@ -185,11 +189,15 @@ SEAL = in_app("import app, json, sys\nfrom kalmido.core.db import connect\nfrom 
 check(isinstance(SEAL, str) and SEAL.startswith("kenc1:"), f"setup: a text sealed with the old context {str(SEAL)[:80]}")
 L2 = A.post(B + "/api/lists", json={"name": "Altprojekt"}).json()["id"]
 T0, T1 = "2026-03-01T10:00:00+00:00", "2026-03-02T10:00:00+00:00"
+# the indexes under their names in the old form (schema.py of 2.39 - 2.976): a start finds them by name and leaves them
 for q in ("DROP INDEX IF EXISTS playbooks_list_v", "DROP INDEX IF EXISTS playbooks_folder_v", "DROP INDEX IF EXISTS office_procdocs_org",
           "ALTER TABLE playbooks ADD COLUMN version BIGINT, ADD COLUMN body TEXT NOT NULL DEFAULT '', "
           "ADD COLUMN source TEXT NOT NULL DEFAULT 'edit', ADD COLUMN author_id BIGINT, ADD COLUMN created_at TEXT",
           "ALTER TABLE office_procdocs ADD COLUMN version BIGINT, ADD COLUMN data TEXT NOT NULL DEFAULT '{}', ADD COLUMN created_by BIGINT, "
-          "ADD COLUMN created_at TEXT"):
+          "ADD COLUMN created_at TEXT",
+          "CREATE UNIQUE INDEX playbooks_list_v ON playbooks(list_id, version) WHERE list_id IS NOT NULL",
+          "CREATE UNIQUE INDEX playbooks_folder_v ON playbooks(owner_id, folder, version) WHERE list_id IS NULL",
+          "CREATE INDEX office_procdocs_org ON office_procdocs(org_id, version)"):
     sql(q, write=True)
 for lid, owner, folder, v, body, src, author, at in (
         (L2, None, None, 3, "Alt drei", "edit", None, T0), (L2, None, None, 4, "Alt vier", "proposal", 999999, T1),
