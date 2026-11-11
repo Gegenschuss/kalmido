@@ -199,6 +199,17 @@ check(path(NID)[1:] == MONTH and "Credit card" in tags(NID), f"after the recogni
 check(Bo.get(B + f"/api/files/nodes/{sql('SELECT parent_id FROM fs_nodes WHERE id=?', (NID,))[0][0]}").status_code in (403, 404),
       "the month folder itself is not handed to the member (no share, no organisation access)")
 
+# ---- review F1: a folder of the path opened wider than the documents folder takes no receipt (no silent widening)
+RCV = sql("SELECT parent_id FROM fs_nodes WHERE id=?", (sql("SELECT parent_id FROM fs_nodes WHERE id=?", (sql("SELECT parent_id FROM fs_nodes WHERE id=?", (sql("SELECT parent_id FROM fs_nodes WHERE id=?", (sql("SELECT parent_id FROM fs_nodes WHERE id=?", (NID,))[0][0],))[0][0],))[0][0],))[0][0],))[0][0]
+check(sql("SELECT name FROM fs_nodes WHERE id=?", (RCV,))[0][0] == "Receipts", "the Receipts folder found")
+r = A.patch(B + f"/api/files/nodes/{RCV}", json={"org_access": "view"})
+check(r.ok, f"the admin opens Receipts to the organisation {r.text[:200]}")
+WIDE = doc(A, "gutschrift.pdf", "5.00", f"{Y}-01-05", f"org:{ORG}")
+WP = path(WIDE)
+assert A.post(B + f"{K}/lines/{LS[2]['id']}/match", json={"node_id": WIDE}).ok
+check(path(WIDE) == WP and "Credit card" in tags(WIDE), f"opened path: the receipt stays in the inbox, the tag comes {path(WIDE)} {tags(WIDE)}")
+assert A.patch(B + f"/api/files/nodes/{RCV}", json={"org_access": ""}).ok
+
 # ---- a person without an organisation, German
 FID, Fr = freelancer(B, A, "frida")
 assert Fr.patch(B + "/api/settings", json={"lang": "de"}).ok
