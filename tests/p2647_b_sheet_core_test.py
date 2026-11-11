@@ -177,6 +177,7 @@ check(listed(A, T3) == [GINA], "#5047: the dialog lists her again")
 # 2.937.0 (#5244): was "no fallback: a card without a core share" -- there are no cards any more: a share by name is the core share
 FID, Fr = freelancer(B, A, "frida", features=FEAT)
 FIO, Fi = freelancer(B, A, "fiona", features=FEAT)
+dbx("UPDATE users SET email_proved=lower(email) WHERE id=?", (FIO,))  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); here set directly
 P1 = table(Fr, "Own rates", "private")
 dbx("INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at,email_key) VALUES(?,NULL,?,'read',?,?,'')",
     (P1, FIO, FID, "2026-11-07T10:00:00.000+00:00"))  # an old person row (only an older database has them): gives nothing

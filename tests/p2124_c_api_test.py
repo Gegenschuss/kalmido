@@ -29,7 +29,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, dbx, sess  # noqa: E402 - 2.192.0 (#2514): shared helpers (tests/kt.py)
 FEAT = "sheets,collab,comments,office"
 
 
@@ -59,6 +59,7 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": uid["erin"]}
 assert r.status_code in (200, 201), r.text
 BETA = r.json()["id"]
 Bo, Ca, Er = sess("bob"), sess("carol"), sess("erin")
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 for s in (A, Bo, Ca, Er):
     s.patch(B + "/api/settings", json={"features": FEAT, "lang": "en", "tour": "done"})
 SW = ["read", "sheets:read", "sheets:write"]
@@ -253,6 +254,7 @@ check(Ca.get(B + f"/api/sheets/{SID}").ok, "bob's private table stays shared wit
 # freelancer-matrix: sheets
 FID, Fl = freelancer(B, A, features=FEATURES + ",sheets")
 GID, Gl = freelancer(B, A, "fiona", features=FEATURES + ",sheets")
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 DA, da = agent("fridabot", owner=FID)
 FS = new(Fl, "Freelance rates")["id"]
 check(Fl.get(B + f"/api/sheets/{FS}").json().get("can_share") is True, "freelancer: her own admin, may share")

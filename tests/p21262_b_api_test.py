@@ -27,7 +27,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, dbx, sess  # noqa: E402 - 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def sql(q, args=(), write=False):
@@ -83,6 +83,7 @@ for u, n in (("bob", "Bob Member"), ("carol", "Carol Other"), ("dave", "Dave Cus
     assert r.ok, r.text
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
 Bo, Ca, Da = sess("bob"), sess("carol"), sess("dave")
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 FEAT = "cal,comments,collab,wiki"
 for s in (A, Bo, Ca, Da):
     s.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
@@ -212,6 +213,7 @@ mp2 = page(A, "private", "Other/Page", "x")
 check(share(A, page_id=mp2, kind="person", user_id=BOB).status_code == 201 and len(news(Bo)) == 0, "#2355: with the sharing row off no item")  # 2.360.0 (#2496): 0, the revoked one is gone
 # a person without an organisation (freelancer-matrix: wiki)
 FID, Fr = freelancer(B, A, features="cal,comments,collab,wiki")
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 fp = page(Fr, "private", "Offer", "the offer")
 r = share(Fr, page_id=fp, kind="person", email="dave@example.com")
 it = [x for x in news(Da) if x["actor_id"] == FID]

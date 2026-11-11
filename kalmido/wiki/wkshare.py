@@ -44,6 +44,7 @@ from ..core.db import body, bump, db, iso, local_day, local_now, now_utc
 from ..core.pg import insert_id, system_ctx
 from ..core.kernretire import kern_retire_due, kern_retire_rows  # 2.937.0 (#5244): stage 7c at the start (wsh_retire)
 from ..core.access import Denied, acx_anon_bind, live_sql
+from ..core.access import addr_account  # 2.983.0 (#5643)
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..collab.comments import user_names
 from ..core.errors import BadInput
@@ -617,9 +618,8 @@ def wsh_person(c, uid, b):
     """The person of {user_id} (404 when unknown / not visible / an agent / oneself) or {email} (None when there is no such
     person: the answer must not reveal it)."""
     if b.get("email") and not b.get("user_id"):
-        em = str(b["email"]).strip().lower()[:200]
-        r = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'", (em,)).fetchone()
-        return r[0] if r and r[0] != uid else None
+        r = addr_account(c, b["email"])  # 2.983.0 (#5643): an address nobody proved is answered like an unknown one
+        return r if r and r != uid else None
     try:
         who = int(b.get("user_id") or 0)
     except (TypeError, ValueError):

@@ -35,6 +35,7 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": uid["erin"]}
 assert r.status_code in (200, 201), r.text
 BETA = r.json()["id"]
 Bo, Ca, Do, Er = sess("bob"), sess("carol"), sess("dora"), sess("erin")
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 for s in (Bo, Ca, Do, Er):
     s.patch(B + "/api/settings", json={"lang": "en", "features": "sheets,collab,comments", "tour": "done"})
 
@@ -137,6 +138,7 @@ check(Do.get(B + f"/api/sheets/{S6}").status_code == 404, "... without access")
 # 2.453.0 (#3781): a deleted account: the address row stays open, nothing tells the address had an account
 gone = A.post(B + "/api/users", json={"orgs": [], "username": "gone", "display_name": "Gone Name", "password": "password123",
                                       "email": "gone@example.com", "features": "sheets,collab,comments"}).json()["id"]
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 S7 = new(Bo, "Deleted", space="private")
 post(Bo, S7, email="gone@example.com", role="write")
 n = rows(Bo, S7)
@@ -158,6 +160,7 @@ check(Bo.get(B + f"/api/sheets/{S1}/shares").ok and Ca.get(B + f"/api/sheets/{S1
 # a person without an organisation
 FID, Fl = freelancer(B, A, features=FEATURES + ",sheets")
 GID, Gl = freelancer(B, A, "fiona", features=FEATURES + ",sheets")
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 FS = new(Fl, "Freelance rates")
 r1, r2 = post(Fl, FS, email="fiona@example.com"), post(Fl, FS, email="nobody@example.com")
 ls = rows(Fl, FS)

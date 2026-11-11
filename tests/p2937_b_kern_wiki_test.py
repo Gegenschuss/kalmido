@@ -24,7 +24,7 @@ import dbx as dbxm  # noqa: E402
 import kt  # noqa: E402
 import requests  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
-from kt import B, DATA, check, sess, until  # noqa: E402
+from kt import B, DATA, check, dbx, sess, until  # noqa: E402
 
 FEAT = "wiki,files,collab,comments"
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
@@ -98,6 +98,7 @@ def cols():
 A = kt.setup()
 FID, Fr = freelancer(B, A, "frida", features=FEAT)
 FIO, Fi = freelancer(B, A, "fiona", features=FEAT)
+dbx("UPDATE users SET email_proved=lower(email) WHERE id=?", (FIO,))  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); here set directly
 
 # ================================================================== the dialog on the core, "Shared with me"
 WD = page(Fr, "Docs", "the index of the docs")
