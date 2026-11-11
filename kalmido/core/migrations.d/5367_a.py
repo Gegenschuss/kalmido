@@ -1,4 +1,4 @@
-"""2.925.0 (#5367, stage 5 of the core's trash): the columns the core's trash writes (core/writes.py obj_trash / obj_restore:
+"""2.947.0 (#5367, stage 5 of the core's trash): the columns the core's trash writes (core/writes.py obj_trash / obj_restore:
 rev, updated_at, updated_by, deleted_by) on the tables of the kinds that move onto it -- bookmarks (life/lfkern.py), feeds
 (rss_feeds) and video reviews (video_reviews); the calendars and address books have them since 2.566.0 (#4712). New columns,
 nullable or with a default: older versions ignore them. The rows already in the trash keep their deleted_at and are the core's

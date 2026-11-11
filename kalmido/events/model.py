@@ -15,7 +15,7 @@ from ..core.db import bump, gset, gsetting, iso, iso_ms, now_utc, usettings
 from ..core.usertz import hm_text, tz_gap, tz_of_s
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..accounts.session import me
-from ..core.access import acx_org_ok, collab_all, Denied, task_visible, trash_sql  # 2.925.0 (#5367): trash_sql
+from ..core.access import acx_org_ok, collab_all, Denied, task_visible, trash_sql  # 2.947.0 (#5367): trash_sql
 from ..core.dlock import dl_area_locked, dl_of, dl_tasks_locked  # 2.560.0 B (#4699)
 from ..core.pages import valid_url
 from ..tasks.validation import (
@@ -1291,9 +1291,9 @@ def _wd_events(c, users, S, LG, now):
             _wd_fail(c, "reminder of event", r["id"], e)
     if ret_due("events"):  # 2.272.0 A (#3026): hourly, trash period + switch like every retention run (off = count only)
         cut, purge = ret_trash_cut(), ret_on("trash")
-        # 2.925.0 (#5367): the events deleted on their own; the calendars in the trash (with their events, children) are
+        # 2.947.0 (#5367): the events deleted on their own; the calendars in the trash (with their events, children) are
         # the core's hourly run now (core/writes.py obj_trash_tick, events/evkern.py trash_prune=True)
-        # one statement each (review 2.925.0): a calendar restored between reading the ids and deleting them keeps its events
+        # one statement each (review 2.947.0): a calendar restored between reading the ids and deleting them keeps its events
         if purge:
             n = c.execute(f"DELETE FROM events WHERE {trash_sql()} AND deleted_at<?", (cut,)).rowcount or 0
         else:

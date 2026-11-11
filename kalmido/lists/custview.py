@@ -10,8 +10,8 @@ from ..core.config import ATT_DIR, OFFICE_DIR
 from ..core.i18n import tr
 from ..core.numtext import dec_char
 from ..core.errors import BadInput
-from ..core.objtags import obj_tags_of, otg_in_list, otg_list_sql  # 2.925.0 (#5275)
-from .orglabels import olb_full  # 2.925.0 (#5275, review F4)
+from ..core.objtags import obj_tags_of, otg_in_list, otg_list_sql  # 2.947.0 (#5275)
+from .orglabels import olb_full  # 2.947.0 (#5275, review F4)
 
 CV_FLAGS = ("progress", "sections", "due", "assignees", "tags", "files", "brand", "feedback")
 CV_DEFAULT = {"progress": False, "sections": True, "due": True, "assignees": False, "tags": False, "files": False, "brand": False,
@@ -61,7 +61,7 @@ def cv_clean(c, lid, v, cur):
     if "tag" in v:
         t = v["tag"]
         if t is not None and (not isinstance(t, int) or isinstance(t, bool)
-                              or not otg_in_list(c, t, lid, full=_cv_full(c))):  # 2.925.0 (#5275): a project tag or a label (review F4: one the person sees)
+                              or not otg_in_list(c, t, lid, full=_cv_full(c))):  # 2.947.0 (#5275): a project tag or a label (review F4: one the person sees)
             raise BadInput(tr("Invalid value: {0}", "tag"))
         out["tag"] = t
     return json.dumps(out, separators=(",", ":"))
@@ -72,9 +72,9 @@ def _cv_full(c):
 
 
 def cv_options(c, lid):
-    """What the share dialog offers: the list's tags and custom fields. Review F4 (2.925.0): the labels the person sees (full
+    """What the share dialog offers: the list's tags and custom fields. Review F4 (2.947.0): the labels the person sees (full
     view of the organisation, else those a task of the project carries)."""
-    return {"tags": [{"id": r["id"], "name": r["name"]} for r in c.execute(  # 2.925.0 (#5275): + the labels of the organisation
+    return {"tags": [{"id": r["id"], "name": r["name"]} for r in c.execute(  # 2.947.0 (#5275): + the labels of the organisation
                 f"SELECT ot.id, ot.name FROM obj_tags ot JOIN lists l ON l.id=? WHERE {otg_list_sql(full=_cv_full(c))} ORDER BY (ot.scope_kind<>'list'), ot.sort, ot.id", (lid,))],
             "fields": [{"id": r["id"], "name": r["name"], "type": r["type"]}
                        for r in c.execute("SELECT id, name, type FROM list_fields WHERE list_id=? AND type NOT IN ('formula', 'task') ORDER BY sort, id", (lid,))]}  # 2.156.0 B (#2069)
@@ -85,7 +85,7 @@ def cv_tag_sql(show):
     if not show["tag"]:
         return "", ()
     return (" AND (id IN (SELECT obj_id FROM obj_tag_links WHERE kind='task' AND tag_id=?) OR parent_id IN "
-            "(SELECT obj_id FROM obj_tag_links WHERE kind='task' AND tag_id=?))", (show["tag"], show["tag"]))  # 2.925.0 (#5275)
+            "(SELECT obj_id FROM obj_tag_links WHERE kind='task' AND tag_id=?))", (show["tag"], show["tag"]))  # 2.947.0 (#5275)
 
 
 def cv_progress(c, link, show):
@@ -175,7 +175,7 @@ def cv_extras(c, link, tasks, show, lg, day):
             if txt:
                 o["fields"].append((f["name"], txt))
     if show["tags"]:
-        for tid, tags in obj_tags_of(c, ids).items():  # 2.925.0 (#5275): the core's tags of the task's project
+        for tid, tags in obj_tags_of(c, ids).items():  # 2.947.0 (#5275): the core's tags of the task's project
             out[tid]["tags"] += [(x["name"], x["color"]) for x in tags]
     if show["files"]:  # 2.61.0 review, 2.64.2 B (#1817): files encrypted in the browser (enc 1 / 2) never go out through a link
         for r in c.execute(f"SELECT id, task_id, name, size FROM attachments WHERE task_id IN ({ph}) AND comment_id IS NULL AND COALESCE(enc, 0)=0 AND deleted_at IS NULL ORDER BY id", tuple(ids)):

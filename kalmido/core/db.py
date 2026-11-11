@@ -993,9 +993,9 @@ def init_db(guard=True, load=None):
             tpl_move(c)  # 2.905.0 (#5288): templates onto the shared core, section_templates into it, before 5288_a drops that table
         clk("tpl_move")
         from .objtags import otg_move, OTG_ORG_TRIGGERS
-        c.executescript(trigger_skip_present(c, OTG_ORG_TRIGGERS))  # 2.925.0 (#5275, review N1): after mig_apply (lists.org_id)
+        c.executescript(trigger_skip_present(c, OTG_ORG_TRIGGERS))  # 2.947.0 (#5275, review N1): after mig_apply (lists.org_id)
         with pg_system_ctx(c):  # every organisation's labels and projects
-            otg_move(c)  # 2.925.0 (#5275): project tags and labels into obj_tags, before the fragment 5275_a drops the old tables
+            otg_move(c)  # 2.947.0 (#5275): project tags and labels into obj_tags, before the fragment 5275_a drops the old tables
         clk("otg_move")
         have_ix = ix_have(c)  # 2.183.0 B (#2666): only the missing indexes
         for stmt in INDEXES.strip().split(";") + FRAG_AFTER:  # 2.475.0 (#3478): + the fragments' AFTER

@@ -209,7 +209,7 @@ check(all(x["org_tag_id"] is None for x in lc), f"(c) it is no label of Alpha in
 r = A.delete(B + f"/api/org-labels/{LB}")
 check(r.ok and r.json()["unlinked"] == 1, f"(c) deleted {r.text[:200]}")
 lt = next(x for x in st(Bo)["lists"] if x["id"] == L1)["tags"]
-# 2.925.0 (#5275): the label sat on the task itself (LT is the label's id); its project gets a project tag of that name
+# 2.947.0 (#5275): the label sat on the task itself (LT is the label's id); its project gets a project tag of that name
 check(any(x["name"] == "Hot" and x["org_tag_id"] is None for x in lt), f"(c) the project keeps it as its own tag {lt}")
 check(next(t for t in st(Bo)["tasks"] if t["id"] == T1)["ltags"] == ["Hot"], "(c) and the task keeps it")
 

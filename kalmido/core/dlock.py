@@ -18,7 +18,7 @@ from contextlib import nullcontext
 
 from flask import g, has_request_context, request
 
-from .objtags import obj_tag_sql  # 2.925.0 (#5275)
+from .objtags import obj_tag_sql  # 2.947.0 (#5275)
 from .pg import system_ctx
 
 DL_ALWAYS = ("journal", "mood", "health", "budget", "reading")  # fixed (scope "private" / list rules), shown as locked
@@ -145,10 +145,10 @@ def dl_task_ids(c, uid):
     if d["_tags"]:
         q = ",".join("?" * len(d["_tags"]))
         base.append(f"SELECT x.task_id FROM task_tags x JOIN tasks t ON t.id=x.task_id WHERE lower(x.tag) IN ({q}) AND t.list_id IN (SELECT id FROM s)")
-        # 2.925.0 (#5275): the project tags and labels of the core (obj_tag_sql: the tags of the task's project)
+        # 2.947.0 (#5275): the project tags and labels of the core (obj_tag_sql: the tags of the task's project)
         base.append(f"SELECT t.id FROM tasks t WHERE {obj_tag_sql('t.id', 'names')} AND t.list_id IN (SELECT id FROM s)")
         args += list(d["_tags"]) + [sorted(d["_tags"])]
-    # 2.925.0 (#5275): a label of an organisation is hidden from who is no member (row-level security) -- the lock still has to
+    # 2.947.0 (#5275): a label of an organisation is hidden from who is no member (row-level security) -- the lock still has to
     # see it on the task, so the query runs as "system"; it only decides what is HIDDEN from uid, in uid's own lists (s)
     with system_ctx(c) if d["_tags"] else nullcontext():
         rows = c.execute(f"""WITH RECURSIVE s(id) AS {acx_lists_sql(req=False)}, b(id) AS ({' UNION '.join(base)}),
@@ -198,11 +198,11 @@ def dl_tasks_locked(c, uid, tids):
     if d["_tags"]:
         q = ",".join("?" * len(d["_tags"]))
         cond.append(f"EXISTS (SELECT 1 FROM task_tags x WHERE x.task_id=t.id AND lower(x.tag) IN ({q}))")
-        cond.append(obj_tag_sql("t.id", "names"))  # 2.925.0 (#5275): the project tags and labels of the core
+        cond.append(obj_tag_sql("t.id", "names"))  # 2.947.0 (#5275): the project tags and labels of the core
         args += list(d["_tags"]) + [sorted(d["_tags"])]
     if not cond:
         return set()
-    with system_ctx(c) if d["_tags"] else nullcontext():  # 2.925.0 (#5275): as in dl_task_ids (only what is hidden)
+    with system_ctx(c) if d["_tags"] else nullcontext():  # 2.947.0 (#5275): as in dl_task_ids (only what is hidden)
         rows = c.execute(f"""WITH RECURSIVE r(id, cur) AS (
                                SELECT id, id FROM tasks WHERE id IN ({','.join('?' * len(ids))})
                                UNION SELECT r.id, t.parent_id FROM r JOIN tasks t ON t.id=r.cur WHERE t.parent_id IS NOT NULL)

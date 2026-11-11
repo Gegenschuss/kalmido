@@ -119,7 +119,7 @@ TABLES = (
     "office_payonline", "office_pay_links", "office_pay_sessions", "office_pay_events", "office_pay_payouts",  # 2.469.0 (#3459): online payment of invoices
     "ticket_types",  # 2.609.0 (#3372): own ticket types (NULL = a person's own, the app checks owner_id)
     "org_fields",  # 2.609.0 (#3373): the field schema of an organisation (NULL = a person's own, the app checks owner_id)
-    "obj_tags",  # 2.925.0 (#5275): tags of the core (was org_tags, 2.609.0 #3373); org_id = an organisation's label, NULL = a project's tag (the app checks the project)
+    "obj_tags",  # 2.947.0 (#5275): tags of the core (was org_tags, 2.609.0 #3373); org_id = an organisation's label, NULL = a project's tag (the app checks the project)
     "templates",  # 2.609.0 (#3373): task / project templates (NULL = a person's own, the app checks owner_id); 2.905.0 (#5288): + section templates
     "rss_feeds",  # 2.172.0 B (#2677): feeds (NULL = private, the app checks user_id; articles / read marks hang on feed_id)
     "reading_orgs",  # 2.172.0 B (#2677): the read-later project of an organisation

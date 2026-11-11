@@ -35,7 +35,7 @@ from ..core.db import DataDirError, DbError, FRAG_MIGRATIONS, FRAG_SCHEMA, conne
 from ..core.schema import MIGRATIONS, SCHEMA
 from ..core.i18n import N_  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import pool_refresh, ts_canon  # 2.149.0 G (#2517): pulled up from functions; 2.933.0 (#5404): ts_canon
-from ..core.objtags import OTG_LEGACY_DDL  # 2.925.0 (#5275)
+from ..core.objtags import OTG_LEGACY_DDL  # 2.947.0 (#5275)
 
 TAG = "migrate-sqlite:"
 _Q4 = Decimal("0.0001")
@@ -330,7 +330,7 @@ class Mig:
 
     # ---- the target
     def legacy_tables(self, c):
-        """2.925.0 (#5275): the project tags of the SQLite file (list_tags, task_list_tags) are copied into these two tables as
+        """2.947.0 (#5275): the project tags of the SQLite file (list_tags, task_list_tags) are copied into these two tables as
         they were; init_db's core/objtags.py otg_move takes them into obj_tags right after the copy, the fragment 5275_a drops
         them. Only when the file has them."""
         if "list_tags" in self.src_tables:

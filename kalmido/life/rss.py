@@ -13,9 +13,9 @@ from html.parser import HTMLParser
 from ..core.config import APP_NAME, APP_VERSION
 from ..core.i18n import N_, tr
 from ..core.db import connect, iso, now_utc, parse_iso
-from ..core.writes import obj_restore, obj_trash  # 2.925.0 (#5367): the core's trash (life/lfkern.py)
+from ..core.writes import obj_restore, obj_trash  # 2.947.0 (#5367): the core's trash (life/lfkern.py)
 from ..core.pg import IntegrityError, insert_id, write_lock
-from ..core.access import Denied, live_sql, task_visible  # 2.925.0 (#5367): live_sql
+from ..core.access import Denied, live_sql, task_visible  # 2.947.0 (#5367): live_sql
 from ..accounts.orgs import is_org_admin, user_orgs
 from ..accounts.orgroles import need_org_area, org_writes
 from ..tasks.validation import as_int, TITLE_MAX
@@ -48,7 +48,7 @@ RSS_SUMMARY_MAX = 500
 RSS_TITLE_MAX = 300
 RSS_URL_MAX = 2000
 RSS_PAGE = 50
-RSS_KIND = "rss_feed"     # 2.925.0 (#5367): the kind of the core's trash (life/lfkern.py; its undo kind is "feed", life/rssundo.py)
+RSS_KIND = "rss_feed"     # 2.947.0 (#5367): the kind of the core's trash (life/lfkern.py; its undo kind is "feed", life/rssundo.py)
 RSS_TRASH_DAYS = 7         # a deleted feed (undo possible) is purged after this
 RSS_UA = {"Accept": "application/rss+xml, application/atom+xml, application/rdf+xml, application/xml, text/xml;q=0.9, */*;q=0.5",
           # 2.172.0 B (#2678): an own sender for feeds (the calendar one stays for calendars)
@@ -430,7 +430,7 @@ def rss_add(c, uid, b):
     new, code = rss_fetch(c, f)
     if code:
         if old:
-            # 2.925.0 (#5367): back into the trash as it was (the core's deleted_by with it)
+            # 2.947.0 (#5367): back into the trash as it was (the core's deleted_by with it)
             c.execute("UPDATE rss_feeds SET deleted_at=?, deleted_by=? WHERE id=?", (old["deleted_at"], old["deleted_by"], fid))
         else:
             c.execute("DELETE FROM rss_feeds WHERE id=?", (fid,))
@@ -451,7 +451,7 @@ RSS_STEP = {}  # 2.809.0 (#5476): {pre, post} of the feeds' undo steps (life/rss
 
 
 def rss_delete(c, uid, fid):
-    """Deleted with its articles hidden; POST .../restore brings it back (2.925.0 #5367: the core's trash, deleted for good by
+    """Deleted with its articles hidden; POST .../restore brings it back (2.947.0 #5367: the core's trash, deleted for good by
     the core's run after the trash period)."""
     rss_need(c, uid)
     f = rss_own(c, uid, fid, manage=True)
@@ -459,7 +459,7 @@ def rss_delete(c, uid, fid):
         write_lock(c, f"rss_feeds-{int(fid)}")  # 2.809.0 (#5476): the person's step (life/rssundo.py) under its lock
         if RSS_STEP:
             RSS_STEP["pre"](c, uid, fid, "delete")
-        obj_trash(c, uid, RSS_KIND, fid, step=False)  # 2.925.0 (#5367): the core's trash; the step is the feeds' own (above)
+        obj_trash(c, uid, RSS_KIND, fid, step=False)  # 2.947.0 (#5367): the core's trash; the step is the feeds' own (above)
         if RSS_STEP:
             RSS_STEP["post"](c)
     return {"ok": True}
@@ -478,7 +478,7 @@ def rss_restore(c, uid, fid):
         write_lock(c, f"rss_feeds-{int(fid)}")  # 2.809.0 (#5476): the person's step (life/rssundo.py) under its lock
         if RSS_STEP:
             RSS_STEP["pre"](c, uid, fid, "restore")
-        try:  # 2.925.0 (#5367): the core's restore; 2.122.4 A (#1906): followed again in parallel (the unique index)
+        try:  # 2.947.0 (#5367): the core's restore; 2.122.4 A (#1906): followed again in parallel (the unique index)
             with c.savepoint():
                 obj_restore(c, uid, RSS_KIND, fid, step=False)
         except IntegrityError:
@@ -608,7 +608,7 @@ def rss_opml_export(c, uid, oid=None):
 
 def rg4_feed_restore(c, fid):
     """2.122.4 A (#1906): a deleted feed comes back -> False when the same address is followed again meanwhile (the unique
-    index rss_feeds_live refuses a second live row). 2.925.0 (#5367): following the same address again (add / OPML import),
+    index rss_feeds_live refuses a second live row). 2.947.0 (#5367): following the same address again (add / OPML import),
     not the trash's restore (rss_restore, the core's obj_restore)."""
     try:
         with c.savepoint():
@@ -725,7 +725,7 @@ _RSS_RUN = threading.Lock()
 def _wd_feeds(c, users, S, LG, now):  # noqa: ARG001
     """Watchdog: starts the fetch of due feeds of people with the module on in a thread of its own (2.85.0 review: a slow
     feed server never holds up reminders and the other sections; at most one run at a time) and cleans up old articles
-    (2.925.0 #5367: the deleted feeds go with the core's trash run, life/lfkern.py trash_prune=True)."""
+    (2.947.0 #5367: the deleted feeds go with the core's trash run, life/lfkern.py trash_prune=True)."""
     on = [u for u in users if "feeds" in (S[u].get("features") or "").split(",")]
     if on and _RSS_RUN.acquire(blocking=False):
         threading.Thread(target=_rss_run, args=(on,), daemon=True).start()

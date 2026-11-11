@@ -266,7 +266,7 @@ had been made in the app. Webhooks fire too.
 | `GET /dayplan/review?date=` | read | 2.10.0: the daily review: `done`, `open`, `moved` (tasks moved away that day) and `tomorrow` (a plan for the next working day) |
 | `POST /lists/{id}/shift` | tasks:write | Move every open dated task of a list by `{days}` in one transaction, see [Roadmap](#roadmap) |
 | `GET /tags` | read | The user's personal tags (`kind: personal`) and the tags of the lists they see (`kind: list`, with `list_id`, `color`), with task counts |
-| `GET /lists/{id}/tags` | read | The list tags of a list (shared by its members); 2.925.0: + the labels of its organisation a task of it carries (`org_tag_id` set) |
+| `GET /lists/{id}/tags` | read | The list tags of a list (shared by its members); 2.947.0: + the labels of its organisation a task of it carries (`org_tag_id` set) |
 | `POST /lists/{id}/tags` | structure | Create a list tag `{name, color?}` (members with edit rights) |
 | `PATCH /lists/{id}/tags/{tag_id}` · `DELETE …` | structure | Rename / recolour · delete a list tag (removed from every task); a label of the organisation: no rename / recolour (409), `DELETE` takes it off the project's tasks only |
 | `GET /lists/{id}/overview` | read | 2.7.1: the overview of a project list: description, key links, milestones, project files, the files of its tasks, members, status history, tracked time (`409` for the basket; 2.555.0: `time.budget_level` `none` / `ok` / `warn` from 80 % / `over` from 100 % of `time.budget_h`, `time.budget_pct`) |

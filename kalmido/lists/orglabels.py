@@ -5,7 +5,7 @@ with the label, kept as plain project tags when the label is deleted. Personal t
 app shows the three kinds apart. Only the organisation's admins change its labels; the labels of another organisation are never
 offered (the app state lists only the labels of organisations whose projects the person sees).
 
-2.925.0 (#5275, stage Q5a, decided 08.11.2026): a label is a tag of the core (core/objtags.py, obj_tags scope org) and sits on
+2.947.0 (#5275, stage Q5a, decided 08.11.2026): a label is a tag of the core (core/objtags.py, obj_tags scope org) and sits on
 the task itself -- no copy per project any more; a rename / new colour reaches every task at once. A new label takes over the
 project tags of the same name in the organisation's projects (their tasks get the label, the project tag goes). A deleted label
 leaves its tasks as plain project tags of their projects (as before)."""
@@ -71,7 +71,7 @@ def olb_out(c, r):
 
 
 def olb_full(c, uid=None):
-    """Review F4 (2.925.0): what a reader may see of the labels, for core/objtags.py otg_list_sql / otg_in_list (full=): True
+    """Review F4 (2.947.0): what a reader may see of the labels, for core/objtags.py otg_list_sql / otg_in_list (full=): True
     outside a request with a person (the server's own work), else the organisations the person fully sees (user_orgs_full) --
     a label of another organisation of a project only where a task of the project carries it."""
     if uid is None:
@@ -85,13 +85,13 @@ def olb_full(c, uid=None):
 def olb_match(c, lid, name):
     """The label of list lid's organisation named name (any case), or None (a list without an organisation: never).
     2.609.0 (#3373, review F3): only for a person with the full view of that organisation -- a guest / accounting person who
-    may tag in a shared project gets a plain project tag, so the labels' names are no oracle for them. 2.925.0 (#5275): or a
+    may tag in a shared project gets a plain project tag, so the labels' names are no oracle for them. 2.947.0 (#5275): or a
     label a task of the project carries already (they see it on that task, as they saw the project's copy before)."""
     r = c.execute("""SELECT o.* FROM obj_tags o JOIN lists l ON l.org_id=o.org_id WHERE l.id=? AND o.scope_kind='org'
                      AND lower(o.name)=lower(?)""", (lid, name)).fetchone()
     if not r:
         return None
-    full = olb_full(c)  # 2.925.0 (#5275, review F1): no me() -- the git issue sync calls this outside a request
+    full = olb_full(c)  # 2.947.0 (#5275, review F1): no me() -- the git issue sync calls this outside a request
     if full is True or r["org_id"] in full:
         return r
     used = c.execute("""SELECT 1 FROM obj_tag_links k JOIN tasks t ON t.id=k.obj_id AND k.kind='task'
@@ -137,7 +137,7 @@ def olb_create():
     if c.execute("SELECT COUNT(*) FROM obj_tags WHERE scope_kind='org' AND scope_id=?", (str(oid),)).fetchone()[0] >= OLB_MAX:
         return err(tr("At most {0} labels", OLB_MAX))
     lbid = otg_add(c, "org", oid, name, clean_color(b.get("color") or ""), by=uid)
-    # a project tag of the same name in a project of the organisation becomes this label: its tasks get the label (2.925.0, #5275)
+    # a project tag of the same name in a project of the organisation becomes this label: its tasks get the label (2.947.0, #5275)
     for r in c.execute("""SELECT ot.id FROM obj_tags ot JOIN lists l ON ot.scope_kind='list' AND ot.scope_id=CAST(l.id AS TEXT)
                           WHERE l.org_id=? AND lower(ot.name)=lower(?)""", (oid, name)).fetchall():
         otg_merge(c, r["id"], lbid)
@@ -174,7 +174,7 @@ def olb_update(lbid):
 
 @app.delete("/api/org-labels/<int:lbid>")
 def olb_delete(lbid):
-    """The label goes; its tasks keep it as a plain project tag of their project (2.925.0, #5275: made / found by name there,
+    """The label goes; its tasks keep it as a plain project tag of their project (2.947.0, #5275: made / found by name there,
     the label's colour where the project tag has none)."""
     olb_need_person()
     c, uid = db(), me()

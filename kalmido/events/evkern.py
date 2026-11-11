@@ -9,7 +9,7 @@ The calendar (ev_cals) is the object kind 'evcal' of core/objects.py:
 - losing access is the core's: obj_revoke_person takes the shares of the node when a person leaves the organisation and when
   it retires (#4697), restorable 30 days (obj_revoked; GET /api/obj/evcal/<id>/shares, POST .../shares/<rid>/restore).
 - its settings (name, colour, description) are written by obj_write (lock, version expect_updated_at, history, rev) and the
-  calendar goes into the core's trash (obj_trash, #4707) with its events (children, 2.925.0 #5367); restoring it brings them back.
+  calendar goes into the core's trash (obj_trash, #4707) with its events (children, 2.947.0 #5367); restoring it brings them back.
 - the file store: its node may lie in folders; as for the address books (files/fsref.py 2.199.0 F) filing it and sharing its
   folder stay with its owner (fs base role 'edit' only for 'manage', a member 'view'), so a member cannot pass it on.
 The kind has no generic routes (routes=False): the calendar's own routes (events/web.py) call these functions; agents keep
@@ -70,12 +70,12 @@ def _fs_space(c, cid):
 
 def _fs_on_trash(c, uid, cid, restore):
     """Its node came back out of the file store's trash while the calendar is in the core's trash: its owner restores the
-    calendar with its events (obj_restore, 2.925.0 #5367), anyone else leaves both in the trash."""
+    calendar with its events (obj_restore, 2.947.0 #5367), anyone else leaves both in the trash."""
     cal = _cal(c, cid)
     if not restore or cal is None or not cal["deleted_at"]:
         return None
     if uid and _ev_role(c, uid, cal) == "owner":
-        obj_restore(c, uid, EV_KIND, cid, step=False)  # 2.925.0 (#5367): the core's way, its events (children) with it
+        obj_restore(c, uid, EV_KIND, cid, step=False)  # 2.947.0 (#5367): the core's way, its events (children) with it
         cal_touch(c, cid)
         return None
     c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE kind='ref' AND ref_kind=? AND ref_id=?",
@@ -127,7 +127,7 @@ obj_register(EV_KIND, "ev_cals", label=N_("Calendar"), fields={"name": _f_name, 
 
 
 # ---------------------------------------------------------------- the trash (#4707)
-# 2.925.0 (#5367, stage 5 of the core's trash): the calendar's events are children of the kind (obj_register children):
+# 2.947.0 (#5367, stage 5 of the core's trash): the calendar's events are children of the kind (obj_register children):
 # obj_trash / obj_restore take them into the trash and back (the ones deleted on their own before keep their time), the
 # person's step can be taken back (/api/undo) and the core's hourly run (obj_trash_tick, trash_prune=True) deletes a calendar
 # past the trash period with its events -- the calendar's own trash / restore / purge ways (ev_cal_trash, ev_cal_restore,

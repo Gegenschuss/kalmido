@@ -146,7 +146,7 @@ check(one("SELECT assignee_id FROM tasks WHERE id=?", NT) == GID, "#3860: the ne
 AT = one("SELECT id FROM attachments WHERE task_id=?", NT)
 check(AT and G.get(B + f"/api/attachments/{AT}").content == b"the plan\n", "#3865: the file opens on the new task")
 check(one("SELECT COUNT(*) FROM sprints WHERE list_id=?", NL) == 1 and one("SELECT COUNT(*) FROM list_links WHERE list_id=?", NL) == 1, "#3860: sprint and key link")
-check(one("SELECT COUNT(*) FROM obj_tag_links WHERE kind='task' AND obj_id=?", NT) == 1, "#3860: the list tag on the task")  # 2.925.0 (#5275): the core's tags (obj_tags / obj_tag_links)
+check(one("SELECT COUNT(*) FROM obj_tag_links WHERE kind='task' AND obj_id=?", NT) == 1, "#3860: the list tag on the task")  # 2.947.0 (#5275): the core's tags (obj_tags / obj_tag_links)
 
 # ---- the same file again: the template stays, no second file
 run(G, EXP)

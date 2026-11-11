@@ -220,7 +220,7 @@ def task_inherit(c, tid, src):
     """Tags of everyone, list tags and the people of task src: what decides who sees a task (participants, an agent's data lock)."""
     c.execute("INSERT INTO task_tags(task_id,user_id,tag) SELECT ?, user_id, tag FROM task_tags WHERE task_id=? ON CONFLICT DO NOTHING", (tid, src))
     c.execute("""INSERT INTO obj_tag_links(tag_id,kind,obj_id,src,created_by) SELECT tag_id, 'task', ?, src, created_by FROM obj_tag_links
-                 WHERE kind='task' AND obj_id=? ON CONFLICT DO NOTHING""", (tid, src))  # 2.925.0 (#5275): the project tags of the core
+                 WHERE kind='task' AND obj_id=? ON CONFLICT DO NOTHING""", (tid, src))  # 2.947.0 (#5275): the project tags of the core
     c.execute("INSERT INTO task_people(task_id,user_id) SELECT ?, user_id FROM task_people WHERE task_id=? ON CONFLICT DO NOTHING", (tid, src))
 
 

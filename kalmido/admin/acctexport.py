@@ -322,7 +322,7 @@ def umz_extra_queries(uid):
     sheets = "org_id IS NULL AND owner_id=?"
     polls = "org_id IS NULL AND user_id=? AND deleted_at IS NULL"
     return {
-        # 2.925.0 (#5275): the project tags of the core (obj_tags scope list), in the files and columns of list_tags / task_list_tags as
+        # 2.947.0 (#5275): the project tags of the core (obj_tags scope list), in the files and columns of list_tags / task_list_tags as
         # before (older archives and new ones import the same way); a label of an organisation is the organisation's (its export)
         "list_tags": (f"""SELECT id, CAST(scope_id AS BIGINT) AS list_id, name, color, sort, created_at FROM obj_tags
                           WHERE scope_kind='list' AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM lists x WHERE x.id IN {own})""", (uid,)),

@@ -902,7 +902,7 @@ def v1_comment_one(c, cid):
 
 
 def v1_ltag(c, r, lid):
-    """r: an entry of ltags_of_lists (2.925.0, #5275: a project tag or a label of the organisation a task of the project carries;
+    """r: an entry of ltags_of_lists (2.947.0, #5275: a project tag or a label of the organisation a task of the project carries;
     org_tag_id = the label's id, null for a project tag)."""
     n = c.execute("""SELECT COUNT(*), COALESCE(SUM(CASE WHEN t.status=0 THEN 1 ELSE 0 END),0) FROM obj_tag_links x JOIN tasks t ON t.id=x.obj_id
                       WHERE x.tag_id=? AND x.kind='task' AND t.deleted_at IS NULL AND t.list_id=?""", (r["id"], lid)).fetchone()
@@ -1026,7 +1026,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                     "approval": nul("string", enum=["approved", "rejected", None])}}
     ltag = {"type": "object", "properties": {"id": {"type": "integer"}, "list_id": {"type": "integer"}, "name": {"type": "string"},
                                              "color": {"type": "string"}, "tasks": {"type": "integer"}, "open": {"type": "integer"},
-                                             "org_tag_id": {"type": ["integer", "null"], "description": "2.925.0 (#5275): set for a label of the "
+                                             "org_tag_id": {"type": ["integer", "null"], "description": "2.947.0 (#5275): set for a label of the "
                                                             "organisation (the same tag in every project of it; managed only by its admins in the app)"}}}
     sug = {"type": "object", "additionalProperties": False, "properties": {
         "title": {"type": "string"}, "notes": {"type": "string"}, "section_id": {"type": "integer"},

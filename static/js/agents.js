@@ -339,7 +339,7 @@ const listTags = lid => listById(lid)?.tags || [];
 const orgLabels = lid => { const l = listById(lid), lt = listTags(lid); return !l?.org_id ? [] : (S.org_labels || []).filter(o => o.org_id === l.org_id && !lt.some(x => x.name.toLowerCase() === o.name.toLowerCase())); };
 const ltagTitle = x => x?.org_tag_id ? tr('Label of the organisation: the same in every project of the organisation') : tr('Project tag: visible to everyone in the project');
 const ltagColor = (name, lid) => ltagOf(name, lid)?.color || '';
-// 2.925.0 (#5275): a label of the organisation sits on the task itself; until the project's tags are loaded again it is found
+// 2.947.0 (#5275): a label of the organisation sits on the task itself; until the project's tags are loaded again it is found
 // among the organisation's labels of the state (its colour, its title)
 const ltagOf = (name, lid) => { const n = String(name).toLowerCase(), l = listById(lid); return listTags(lid).find(x => x.name.toLowerCase() === n)
   || (l?.org_id ? (S.org_labels || []).filter(o => o.org_id === l.org_id && o.name.toLowerCase() === n).map(o => ({...o, org_tag_id: o.id}))[0] : undefined); };
@@ -409,7 +409,7 @@ function ltagsWire(md, lid) {
       }
       if (a === 'del' && x) {
         if (!await askConfirm(tr('Delete the project tag {0}?', '#' + x.name), tr('It is removed from every task of the project, for everyone.'), {ok: tr('Delete'), danger: true})) return;
-        await optWrite(ltagPut(lid, x.name, null), () => api('DELETE', `/api/list-tags/${tid}${x.org_tag_id ? `?list_id=${lid}` : ''}`));  // 2.925.0 (#5275): a label leaves this project only
+        await optWrite(ltagPut(lid, x.name, null), () => api('DELETE', `/api/list-tags/${tid}${x.org_tag_id ? `?list_id=${lid}` : ''}`));  // 2.947.0 (#5275): a label leaves this project only
       }
     } catch { redraw(); return; }
     render(); redraw();

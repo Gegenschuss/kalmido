@@ -148,9 +148,9 @@ t = Bo.get(B + f"/api/tasks/{T1}").json()
 check(t.get("list_id") == LID and t.get("title") == "Washing machine done" and t.get("content") == "Take it out"
       and t.get("due") == D and t.get("priority") == 5, f"the task in the webhook's list: {t.get('list_id')} {t.get('due')} {t.get('priority')}")
 check(t.get("created_by") == uid["bob"], "created with the rights (and name) of its creator")
-check([x[0] for x in dbx("SELECT g.name FROM obj_tag_links x JOIN obj_tags g ON g.id=x.tag_id WHERE x.kind='task' AND x.obj_id=?", (T1,))] == ["Urgent"],  # 2.925.0 (#5275): the core's tags (obj_tags / obj_tag_links)
+check([x[0] for x in dbx("SELECT g.name FROM obj_tag_links x JOIN obj_tags g ON g.id=x.tag_id WHERE x.kind='task' AND x.obj_id=?", (T1,))] == ["Urgent"],  # 2.947.0 (#5275): the core's tags (obj_tags / obj_tag_links)
       "the list tag it has (case-insensitive); no new tag")
-check(len(dbx("SELECT 1 FROM obj_tags WHERE scope_kind='list' AND scope_id=CAST(? AS TEXT)", (LID,))) == 1, "no tag was created")  # 2.925.0 (#5275): the core's tags (obj_tags / obj_tag_links)
+check(len(dbx("SELECT 1 FROM obj_tags WHERE scope_kind='list' AND scope_id=CAST(? AS TEXT)", (LID,))) == 1, "no tag was created")  # 2.947.0 (#5275): the core's tags (obj_tags / obj_tag_links)
 check(dbx("SELECT value FROM task_field_values WHERE task_id=? AND field_id=?", (T1, FLD)), "the field by its name")
 a = dbx("SELECT data FROM activity WHERE task_id=? AND kind='created'", (T1,))
 ad = a[0][0] if a else {}

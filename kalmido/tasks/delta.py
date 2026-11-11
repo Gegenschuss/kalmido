@@ -36,7 +36,7 @@ DL_CLEAN = 256   # every DL_CLEAN-th version cleans up
 DL_DAYS = 7      # versions older than this are dropped at the clean-up too (busy instances: many rows per version)
 # table -> the columns holding a task id ("full": a change there may change what a person sees -> the full state)
 DL_TABLES = {
-    "tasks": ("id",), "task_tags": ("task_id",), "obj_tag_links": ("obj_id",), "attachments": ("task_id",),  # 2.925.0 (#5275): obj_tag_links (kind task) was task_list_tags
+    "tasks": ("id",), "task_tags": ("task_id",), "obj_tag_links": ("obj_id",), "attachments": ("task_id",),  # 2.947.0 (#5275): obj_tag_links (kind task) was task_list_tags
     "comments": ("task_id",), "obj_seen": ("ref_id",), "task_field_values": ("task_id",),  # 2.905.0 (#5284): obj_seen (kind task) was task_seen
     "task_deps": ("task_id", "blocker_id"), "agent_usage": ("task_id",), "git_links": ("task_id",), "git_closes": ("task_id",),
     "task_people": ("task_id",), "task_watchers": ("task_id",), "events": ("task_id",), "contact_tasks": ("task_id",), "time_entries": ("task_id",),
@@ -45,7 +45,7 @@ DL_TABLES = {
     "task_note_locks": ("task_id",),  # 2.48.0 (#1642): the locked note marker of a task
     "task_links": ("task_id",),  # 2.71.0 B (#1459): the further lists a task is shown in (its "also")
     "agent_jobs": ("task_id",),  # 2.407.0 A (#3513): an agent's running job is the task's "working" mark
-    "lists": "full", "list_members": "full", "sections": "full", "list_fields": "full", "obj_tags": "full",  # 2.925.0 (#5275): was list_tags
+    "lists": "full", "list_members": "full", "sections": "full", "list_fields": "full", "obj_tags": "full",  # 2.947.0 (#5275): was list_tags
     "group_shares": "full", "group_members": "full", "folder_people": "full",
     "org_members": "full",  # 2.46.0 (#1603): lists seen by the whole organisation follow its members
     "list_keys": "full", "list_key_pending": "full",  # 2.64.1 (#1817): a list key handed out / the waiting list of the lock
@@ -84,7 +84,7 @@ BEGIN
         uk := ARRAY[(jn->>'owner_id')::bigint]; lk := '{}';
       END IF;
     END IF;
-    -- 2.925.0 (#5275): a project's tag is the project's (scope_id = its list); a label of an organisation (or another scope) is in
+    -- 2.947.0 (#5275): a project's tag is the project's (scope_id = its list); a label of an organisation (or another scope) is in
     -- every project of it: full for all
     IF TG_TABLE_NAME = 'obj_tags' AND COALESCE(jn->>'scope_kind', jo->>'scope_kind') <> 'list' THEN
       INSERT INTO dl_changes(task_id) VALUES (NULL); RETURN NULL;
@@ -125,7 +125,7 @@ BEGIN
     IF TG_OP <> 'DELETE' THEN jn := to_jsonb(NEW); END IF;
     IF COALESCE(jn->>'kind', jo->>'kind') IS DISTINCT FROM 'task' THEN RETURN NULL; END IF;
   END IF;
-  -- 2.925.0 (#5275): a tag on another kind of object than a task changes no task
+  -- 2.947.0 (#5275): a tag on another kind of object than a task changes no task
   IF TG_TABLE_NAME = 'obj_tag_links' AND COALESCE(to_jsonb(NEW)->>'kind', to_jsonb(OLD)->>'kind') <> 'task' THEN RETURN NULL; END IF;
   FOREACH k IN ARRAY TG_ARGV LOOP
     o := NULL; n := NULL; ol := NULL; nl := NULL; u := NULL;

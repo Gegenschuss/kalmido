@@ -8,7 +8,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso_ms, now_utc, uset, usettings
 from ..accounts.session import me
-from ..core.access import Denied, live_sql, need_feat, need_task, trash_sql  # 2.925.0 (#5367): live_sql, trash_sql
+from ..core.access import Denied, live_sql, need_feat, need_task, trash_sql  # 2.947.0 (#5367): live_sql, trash_sql
 from ..tasks.validation import as_int, valid_date
 from ..core.errors import BadInput
 from ..events.model import (
@@ -18,8 +18,8 @@ from ..events.model import (
 )
 from ..events.ics import ics_export
 from ..events.invite import evi_after_delete, evi_after_restore, evi_after_save, evi_estimate, evi_flag, evi_precheck, evi_send, evi_snap
-from ..events.invite import evi_cal_cancel  # 2.925.0 (#5367)
-from ..events.model import ev_tell  # 2.925.0 (#5367)
+from ..events.invite import evi_cal_cancel  # 2.947.0 (#5367)
+from ..events.model import ev_tell  # 2.947.0 (#5367)
 from ..api.common import v1_call  # 2.149.0 G (#2517): pulled up from functions
 from ..tasks.tasks import task_create  # 2.369.5 (#2517): pulled up from functions
 from ..core.errors import UnknownFields  # 2.369.5 (#2517): pulled up from functions
@@ -95,13 +95,13 @@ def op_cal_edit(c, uid, cid, b):
 
 
 def op_cal_delete(c, uid, cid):
-    """2.566.0 (#4707): the calendar goes into the trash with its events (2.925.0 #5367: the core's obj_trash), restorable for the
+    """2.566.0 (#4707): the calendar goes into the trash with its events (2.947.0 #5367: the core's obj_trash), restorable for the
     trash period (op_cal_restore); the invitations are cancelled as before."""
     need_evcal(c, cid, manage=True)
     mails = evi_cal_cancel(c, uid, cid)  # 2.111.0 B (#2056): its invited external attendees learn the events are gone
     for r in c.execute(f"SELECT * FROM events WHERE cal_id=? AND {live_sql()}", (int(cid),)).fetchall():
         ev_tell(c, r, "cancelled")  # 2.367.2 (#2969): the people of the server too
-    # 2.925.0 (#5367): the core's trash with its events (children) and the person's undo step (events/evkern.py)
+    # 2.947.0 (#5367): the core's trash with its events (children) and the person's undo step (events/evkern.py)
     KERN["trash"](c, uid, EV_KIND, cid)
     cal_touch(c, cid)
     bump(c)
@@ -129,7 +129,7 @@ def op_cal_restore(c, uid, cid):
         n = c.execute(f"SELECT COUNT(*) FROM ev_cals WHERE owner_id=(SELECT owner_id FROM ev_cals WHERE id=?) AND {live_sql()}", (cid,)).fetchone()[0]
     if n >= EV_CALS_MAX:
         raise Denied(409, tr("At most {0} calendars", EV_CALS_MAX))
-    KERN["restore"](c, uid, EV_KIND, cid)  # 2.925.0 (#5367): the core's way, with the events that went with it
+    KERN["restore"](c, uid, EV_KIND, cid)  # 2.947.0 (#5367): the core's way, with the events that went with it
     cal_touch(c, cid)
     bump(c)
     c.commit()

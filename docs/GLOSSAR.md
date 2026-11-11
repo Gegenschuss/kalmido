@@ -274,7 +274,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/objseen.py` (`osn`) - Read marks exist once, in the shared core: one table obj_seen (task: the highest comment id a person has seen); task_seen moved here and went (stage Q8a)
 - `kalmido/core/objparts.py` (`part`) - The shared core, stage 6b -- the side objects of a project on the core
 - `kalmido/core/objreact.py` (`orx`) - Reactions exist once, in the shared core: one table obj_reactions for comments, team chat and the agent chat
-- `kalmido/core/objtags.py` (`otg`) - Tags exist once, in the shared core: obj_tags (scope user / list / org / ws) and obj_tag_links; project tags and organisation labels since 2.925
+- `kalmido/core/objtags.py` (`otg`) - Tags exist once, in the shared core: obj_tags (scope user / list / org / ws) and obj_tag_links; project tags and organisation labels since 2.947
 - `kalmido/core/objweb.py` (`obj`) - The generic routes of the core objects (core/objects.py, core/writes.py)
 - `kalmido/core/orgcrypt.py` (`oc`) - Server-side keys per organisation
 - `kalmido/core/orgrows.py` (`orw`) - The organisation of tasks, comments, events and contacts (column org_id, migrations.d/4602_a.py)
@@ -485,7 +485,7 @@ Lists and projects: folders, sections, fields, formulas, templates, sprints, sha
 - `kalmido/lists/lpundo.py` - Undo across devices for a project's plain settings (PATCH /api/lists/<id>)
 - `kalmido/lists/membermemo.py` (`mm`) - What removing a member ends, remembered so that adding the person again brings it back
 - `kalmido/lists/orgfields.py` (`of`) - The field schema of an organisation
-- `kalmido/lists/orglabels.py` (`olb`) - Labels of an organisation -- project tags defined once for every project of the organisation (obj_tags scope org since 2.925)
+- `kalmido/lists/orglabels.py` (`olb`) - Labels of an organisation -- project tags defined once for every project of the organisation (obj_tags scope org since 2.947)
 - `kalmido/lists/orgvis.py` (`ov`) - Who sees an organisation list
 - `kalmido/lists/ownership.py` (`owner`) - Transferring the ownership of a list
 - `kalmido/lists/padundo.py` - Undo across devices for the notepads of a project's pin board (title and text)

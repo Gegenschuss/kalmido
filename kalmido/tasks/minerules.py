@@ -75,7 +75,7 @@ def _jload(v):
 
 
 def _tag_list(c, tag):
-    # 2.925.0 (#5275): a project tag is a row of the core (obj_tags scope list, scope_id = the list's id)
+    # 2.947.0 (#5275): a project tag is a row of the core (obj_tags scope list, scope_id = the list's id)
     r = c.execute("SELECT CAST(scope_id AS BIGINT) FROM obj_tags WHERE id=? AND scope_kind='list'", (tag,)).fetchone()
     return r[0] if r else None
 

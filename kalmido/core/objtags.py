@@ -1,4 +1,4 @@
-"""2.925.0 (#5275, stage Q5a of the cross-cutting core, analysis #3563, decided 08.11.2026): tags exist once, in the shared core.
+"""2.947.0 (#5275, stage Q5a of the cross-cutting core, analysis #3563, decided 08.11.2026): tags exist once, in the shared core.
 
 obj_tags (migrations.d/5275_a.py) is one tag of a scope, obj_tag_links puts it on an object:
 
@@ -206,8 +206,8 @@ def _otg_ts(c, v):
 
 
 def otg_move(c):
-    """2.925.0 (#5275): the rows of list_tags / task_list_tags / org_tags into obj_tags / obj_tag_links, while those tables are
-    there (the first start of 2.925, the copy of an old SQLite file, or again after a version before 2.925 ran and made them
+    """2.947.0 (#5275): the rows of list_tags / task_list_tags / org_tags into obj_tags / obj_tag_links, while those tables are
+    there (the first start of 2.947, the copy of an old SQLite file, or again after a version before 2.947 ran and made them
     anew). Lossless: name, colour, order and time of every tag; a project tag keeps its id where that id is free. A label's
     copy in a project (list_tags.org_tag_id) is no tag of its own any more: its tasks get the label itself, and a list rule or a
     shared view that named the copy names the label. The fragment 5275_a drops the old tables right after (one-way). Runs in

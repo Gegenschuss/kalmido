@@ -51,8 +51,8 @@ from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_tar
 from .vdmedia import vdm_body, vdm_files_ok, vdm_has_files, vdm_marks, vdm_media, vdm_need_movable, vdm_pos, vdm_pos_dict, vdm_pos_text, vdm_send, vdm_version_row  # 2.641.0 (#4769)
 from .vdmedia import vdm_pub_send  # 2.658.0 (#5015)
 from .vdmedia import vdm_pub_pos, vdm_pub_stage  # 2.764.0 (#5040)
-from ..core.writes import obj_restore, obj_trash  # 2.925.0 (#5367): the core's trash (videos/vdkern.py)
-from ..core.access import trash_sql  # 2.925.0 (#5367)
+from ..core.writes import obj_restore, obj_trash  # 2.947.0 (#5367): the core's trash (videos/vdkern.py)
+from ..core.access import trash_sql  # 2.947.0 (#5367)
 
 VDR_URL_MAX, VDR_TITLE_MAX, VDR_BODY_MAX, VDR_NAME_MAX = 2000, 200, 2000, 120
 VDR_AT_MAX = 86400.0                     # a timecode lies within 24 hours
@@ -60,7 +60,7 @@ VDR_PUB_RATE, VDR_PUB_HOUR = 10, 60      # customer comments per client address 
 VDR_MEDIA_LINK_RATE = 600               # 2.658.0 (Fable review): requests for one link's audio file per minute over all addresses
 VDR_MEDIA_RATE = 240                     # 2.658.0 (#5015): requests for the customer page's audio file per client address and minute (seeking = ranges)
 VDR_STATES = ("open", "approved", "changes")
-VDR_KIND = "video_review"  # 2.925.0 (#5367): the kind of the core's trash (videos/vdkern.py)
+VDR_KIND = "video_review"  # 2.947.0 (#5367): the kind of the core's trash (videos/vdkern.py)
 VDR_FILE_RE = re.compile(r"\.(mp4|m4v|webm|mov)$", re.I)
 # 2.633.0 (#4777): audio over a direct https link -- recognised by the file name only (Kalmido fetches no foreign URL), played by
 # the browser's own <audio> element (no script, no SoundCloud / Spotify); comments at a second like a video file
@@ -469,7 +469,7 @@ def vdr_patch(vid):
 
 @app.delete("/api/videos/<int:vid>")
 def vdr_delete(vid):
-    """To the trash (deleted_at; restore = the undo); its open customer link stops at once. 2.925.0 (#5367): the core's
+    """To the trash (deleted_at; restore = the undo); its open customer link stops at once. 2.947.0 (#5367): the core's
     trash (obj_trash; step=False: the app's undo is the restore route with its place check)."""
     c, uid = db(), me()
     vdr_need(c, vid, write=True)
@@ -527,7 +527,7 @@ def vdr_restore(vid):
         if (o or None) != (r["org_id"] or None):
             raise Denied(409, tr("Invalid value: {0}", "list_id"))  # another workspace: that is "Move to another workspace"
         c.execute("UPDATE video_reviews SET list_id=? WHERE id=?", (lid, vid))
-    obj_restore(c, uid, VDR_KIND, vid, step=False)  # 2.925.0 (#5367): the core's trash
+    obj_restore(c, uid, VDR_KIND, vid, step=False)  # 2.947.0 (#5367): the core's trash
     c.commit()
     return jsonify(vdr_dict(c, vdr_reload(c, vid), uid, full=True))
 
@@ -1135,7 +1135,7 @@ VDR_PRUNE = {"at": 0.0}
 
 def vdr_trash_prune(c):
     """2.99.1 review M3: comments in the trash longer than the trash period go for good. The watchdog calls it, at most hourly
-    (system context: every workspace). 2.925.0 (#5367): the reviews are the core's trash (videos/vdkern.py, trash_prune=True):
+    (system context: every workspace). 2.947.0 (#5367): the reviews are the core's trash (videos/vdkern.py, trash_prune=True):
     the core's hourly run deletes them (versions and comments with them, FK cascade; their approval records stay with
     video_id NULL, 2.148.1 C #2493: admins / the creator see and delete them, office/signoff.sig_gone_list); this run keeps only
     the comments deleted on their own (no kind of the core)."""

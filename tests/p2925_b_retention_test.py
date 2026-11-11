@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
-"""2.925.0 part B: the clean-up of the activity table. Invented data only.
+"""2.947.0 part B: the clean-up of the activity table. Invented data only.
  - (#5055) the daily clean-up of the activity table reads the history rows to spare for the customer portal ONCE per run
    (a temp table) and every batch DELETE only looks them up there - no batch groups the whole portal history again. The
    oldest edit of the description of a portal ticket still stays, the other old rows go; the temp table is gone after.

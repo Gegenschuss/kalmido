@@ -15,7 +15,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
 from ..core.pg import insert_id, st_ids, system_ctx, write_lock
-from ..core.objtags import otg_list_sql  # 2.925.0 (#5275)
+from ..core.objtags import otg_list_sql  # 2.947.0 (#5275)
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
@@ -212,7 +212,7 @@ def env_acceptance(c, e, version, closed, uid):
                         (lid, sec, tid, titles.get(cid, ""), i, now, now))
         task_inherit(c, sub, cid)  # 2.392.0 (#3370 review): a title stays behind the data lock of its task; the tag deploy would refill the checklist
         c.execute(f"""DELETE FROM obj_tag_links WHERE kind='task' AND obj_id=? AND tag_id IN (SELECT ot.id FROM obj_tags ot JOIN lists l ON l.id=?
-                      WHERE {otg_list_sql()} AND lower(ot.name)=lower(?))""", (sub, lid, DEPLOY_TAG))  # 2.925.0 (#5275)
+                      WHERE {otg_list_sql()} AND lower(ot.name)=lower(?))""", (sub, lid, DEPLOY_TAG))  # 2.947.0 (#5275)
     prev = g.get("user")
     if not prev:
         g.user = {"id": None, "display_name": "", "username": "", "kind": "person"}  # a hook: nobody's task

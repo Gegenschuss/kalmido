@@ -247,7 +247,7 @@ row = dbx("SELECT title, assignee_id, status FROM tasks WHERE id=?", (AT,))[0]
 check(row[0] == "Accept v2.5" and row[1] == FU and row[2] == 0, f"title and owner {row[:2]}")
 kids = sorted(x[0] for x in dbx("SELECT title FROM tasks WHERE parent_id=? AND deleted_at IS NULL", (AT,)))
 check(kids == ["Feature one", "Feature two"], f"the closed tasks as subtasks {kids}")
-check(dbx("""SELECT x.tag_id FROM obj_tag_links x JOIN tasks t ON t.id=x.obj_id AND x.kind='task' WHERE t.parent_id=? AND t.title='Feature one'""", (AT,)) == [(SEC,)],  # 2.925.0 (#5275): the core's tags (obj_tags / obj_tag_links)
+check(dbx("""SELECT x.tag_id FROM obj_tag_links x JOIN tasks t ON t.id=x.obj_id AND x.kind='task' WHERE t.parent_id=? AND t.title='Feature one'""", (AT,)) == [(SEC,)],  # 2.947.0 (#5275): the core's tags (obj_tags / obj_tag_links)
       "the line carries the tags of its task")
 ev = events(AH, "deployed")
 check(ev and ev[-1]["data"]["acceptance_task_id"] == AT, "deployed carries the id")

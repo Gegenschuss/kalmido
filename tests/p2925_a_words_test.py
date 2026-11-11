@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # kalmido-suite: nodata
-"""2.925.0 (#5454): one thing, one word in the office (German) -- static, reads static/i18n/de.json, no server.
+"""2.947.0 (#5454): one thing, one word in the office (German) -- static, reads static/i18n/de.json, no server.
  - Briefpapier (never Briefkopf), Textbaustein (never Textblock), Geräte (never Ausrüstung / Büro-Ausstattung)
  - own documents carry a Dokumentnummer (Belegnummer only for DATEV), card refunds are an Erstattung (not Gutschrift)
  - Anfrage only for leads (the next pipeline stage has its own word), Reisen (travel expenses) apart from Fahrten (logbook)

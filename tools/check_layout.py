@@ -231,7 +231,7 @@ TENANT_EXEMPT = {
     # 2.763.0 (#5269): replaces comment_reactions, tchat_rx and chat_reactions
     # 2.905.0 (#5284): replaces task_seen
     "obj_seen": "a person's own read mark of the shared core on an object (kind + ref_id -> a task); read and written only for that person, the area checks the object before it writes one",
-    # 2.925.0 (#5275): replaces task_list_tags (list_tags / org_tags: obj_tags, bound through its scope; a label has org_id)
+    # 2.947.0 (#5275): replaces task_list_tags (list_tags / org_tags: obj_tags, bound through its scope; a label has org_id)
     "obj_tag_links": "a tag of the shared core on an object (kind + obj_id -> a task's project); created_by only names who set it, the area checks the object before its tags are read or written",
     "obj_reactions": "a reaction of the shared core on its target (target_kind + target_id -> a comment's task, a team chat message's room, an agent chat message's conversation); the area checks the target before a reaction is read or written",
     "agent_steps": "2.32.0 (#1081): an agent's steps for ONE person (its chat answer / its job for that person); only that person reads them",

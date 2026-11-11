@@ -38,9 +38,9 @@ from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from 
 from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 from ..core.conflict import Conflict  # 2.564.0 (#4701/#4702)
 from ..core.conflict import ccf_check, kern_version_seed, take_version  # 2.657.0 (#5052)
-from ..core.writes import obj_purge, obj_restore, obj_trash  # 2.925.0 (#5367): the core's trash (contacts/ctkern.py)
-from ..core.access import live_sql, trash_sql  # 2.925.0 (#5367)
-from .ctfolder import CTF_BOOK  # 2.925.0 (#5367): the kind of the core
+from ..core.writes import obj_purge, obj_restore, obj_trash  # 2.947.0 (#5367): the core's trash (contacts/ctkern.py)
+from ..core.access import live_sql, trash_sql  # 2.947.0 (#5367)
+from .ctfolder import CTF_BOOK  # 2.947.0 (#5367): the kind of the core
 
 # 2.41.0 (#1437): never above the request limit (MAX_CONTENT_LENGTH answers 413 before the route), whole MB for the message
 VCF_MAX = min(50, (app.config.get("MAX_CONTENT_LENGTH") or 0) // (1024 * 1024) or 50) * 1024 * 1024
@@ -142,7 +142,7 @@ def op_book_edit(c, uid, bid, b):
 def op_book_delete(c, uid, bid):
     """2.272.0 E1 (#3038): the address book goes to the trash with its contacts (restore within ctt_days, then deleted for
     good by the core's run); the undo data of merges into it stays while it can come back. -> {contacts: n}.
-    2.925.0 (#5367): the core's trash (obj_trash, its node with it; contacts/ctkern.py)."""
+    2.947.0 (#5367): the core's trash (obj_trash, its node with it; contacts/ctkern.py)."""
     b, _ = need_book(c, bid, manage=True)
     from ..api.scopes import need_approval  # 2.148.1 D (#2495): an agent deleting a whole address book waits for a person
     need_approval(c, N_("Delete the address book “{0}” with all its contacts"), ((b["name"] or "")[:80],))
@@ -166,7 +166,7 @@ def op_book_restore(c, uid, bid):
     if b["deleted_at"]:
         if not b["owner_org_id"]:  # 2.370.4 (#3089, review N4): the trash does not count against BOOKS_MAX, a restore does
             bk_max_check(c, b["owner_id"])
-        obj_restore(c, uid, CTF_BOOK, bid, step=False)  # 2.925.0 (#5367): the core's trash, its node with it
+        obj_restore(c, uid, CTF_BOOK, bid, step=False)  # 2.947.0 (#5367): the core's trash, its node with it
         ctt_relink(c, [r[0] for r in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND {live_sql()}", (bid,)).fetchall()])  # 2.272.0 F (M8)
         for (cid,) in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND {live_sql()} AND (bday!='' OR anniversary!='')",
                                 (bid,)).fetchall():
@@ -182,7 +182,7 @@ def op_book_purge(c, uid, bid):
     b, _ = need_book(c, bid, manage=True, trash=True)
     if not b["deleted_at"]:
         raise Denied(409, tr("Only what is in the trash can be deleted permanently"))
-    # 2.925.0 (#5367): the core's delete for good (obj_purge: its node, history / undo rows, the row -- its contacts by cascade);
+    # 2.947.0 (#5367): the core's delete for good (obj_purge: its node, history / undo rows, the row -- its contacts by cascade);
     # its purge hook takes first what the core does not know (contacts/ctkern.py bk_purge_prep: its contacts' nodes and core
     # rows, review 2.578 F2; 2.66.0 #1835: the undo data of merges into it)
     obj_purge(c, uid, CTF_BOOK, bid)

@@ -1,4 +1,4 @@
-// 2.925.0 (#5454): a draft in the invoices list names its kind ("Invoice · client"), not "(no number)"; the deletion toast says where it went (jsdom)
+// 2.947.0 (#5454): a draft in the invoices list names its kind ("Invoice · client"), not "(no number)"; the deletion toast says where it went (jsdom)
 // kalmido-suite: fresh
 const {execFileSync} = require('child_process');
 const path = require('path');

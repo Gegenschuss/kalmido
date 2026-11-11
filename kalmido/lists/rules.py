@@ -32,8 +32,8 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx as pg_system
-from ..core.objtags import otg_in_list, otg_task_ids  # 2.925.0 (#5275): the project tags and labels of the core
-from .orglabels import olb_full  # 2.925.0 (#5275, review F4)
+from ..core.objtags import otg_in_list, otg_task_ids  # 2.947.0 (#5275): the project tags and labels of the core
+from .orglabels import olb_full  # 2.947.0 (#5275, review F4)
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, iso_ms
 from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, WRITE_ROLES, collab_all
@@ -341,7 +341,7 @@ def rul_cond_ok(c, r, tid):
 
 
 def _rul_task_tags(c, tid):
-    """2.925.0 (#5275, review F2): the tag ids of task tid read as the system -- only ids of the one task, compared with a
+    """2.947.0 (#5275, review F2): the tag ids of task tid read as the system -- only ids of the one task, compared with a
     rule of its list; under the trigger person's row security an organisation label stayed unseen for a non-member (a
     personal agent, a person shared in from outside) and a label condition never held."""
     with pg_system(c):
@@ -437,7 +437,7 @@ def rul_ref_gone(c, r):
         return "field"
     tags = [int(tv)] if r["trig"] == "ltag" and tv.isdigit() else []
     tags += [a.get("tag_id") or 0 for k, a in acts if k == "tag"] + ([cond["tag_id"]] if cond.get("tag_id") else [])
-    with pg_system(c):  # 2.925.0 (#5275, review F2): does the tag exist in the list -- not whether the rule's creator sees a label
+    with pg_system(c):  # 2.947.0 (#5275, review F2): does the tag exist in the list -- not whether the rule's creator sees a label
         gone = any(not otg_in_list(c, x, r["list_id"]) for x in tags)
     if gone:
         return "tag"
@@ -502,7 +502,7 @@ def _rul_full(c):
 
 
 def _rul_tag_name(c, tag_id, lid):
-    """2.925.0 (#5275, review F4): the name of a rule's tag for the reader -- a project tag of the rule's list, or a label of its
+    """2.947.0 (#5275, review F4): the name of a rule's tag for the reader -- a project tag of the rule's list, or a label of its
     organisation the reader sees (full view, or a task of the list carries it); else None (no label names as an oracle)."""
     s = otg_in_list(c, tag_id, lid, full=_rul_full(c)) if tag_id else None
     return s["name"] if s else None

@@ -69,7 +69,7 @@ ORDER = (
     "core.objreact",  # 2.763.0 (#5269): the reactions of the shared core (one table obj_reactions, one rule)
     "core.objseen",  # 2.905.0 (#5284): the read marks of the shared core (one table obj_seen, no routes)
     "core.tplmove",  # 2.905.0 (#5288): templates onto the shared core at the start (owner_id, real types, section templates moved in)
-    "core.objtags",  # 2.925.0 (#5275): the tags of the shared core (obj_tags, obj_tag_links)
+    "core.objtags",  # 2.947.0 (#5275): the tags of the shared core (obj_tags, obj_tag_links)
     "core.serializers",
     "core.compress",  # 2.65.0 (#1505): gzip for JSON answers; before core.pages = its after_request hook runs last
     "core.strip",  # 2.191.0 B (#1824): JS / CSS go out without comments (core.pages serves them)
@@ -628,11 +628,11 @@ ORDER = (
     # (it loads after every module above, so it may use their names at import time; one with an order need goes above instead)
     "collab.recent",  # 2.769.0 (#5352): "Recently edited" over Knowledge, Files and Reading (GET /api/recent)
     "core.undodiff",  # 2.774.0 (#5251): the diff parts of the step groups (no routes)
-    "life.lfkern",  # 2.925.0 (#5367): bookmarks and feeds on the core's trash (no routes)
+    "life.lfkern",  # 2.947.0 (#5367): bookmarks and feeds on the core's trash (no routes)
     "sheets.shundo",  # 2.778.0 (#5253): a person's table writes as steps on the server (no routes)
     "sheets.shustep",  # 2.800.0 (#5409): a person's structural table changes as steps on the server (no routes)
     "tasks.tundo",  # 2.774.0 (#5251): the tasks' and sections' undo steps on the server (no routes)
-    "videos.vdkern",  # 2.925.0 (#5367): video sign-offs on the core's trash (no routes)
+    "videos.vdkern",  # 2.947.0 (#5367): video sign-offs on the core's trash (no routes)
     "wiki.wkundo",  # 2.778.0 (#5253): a person's knowledge page saves as steps on the server (no routes)
     # -- end of the sorted block: only core.idem and startup follow, they stay last
     "core.idem",  # 2.270.0 C (#3022): idempotency keys of write requests (after every other before_request hook, its after_request runs first)

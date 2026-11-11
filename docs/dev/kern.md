@@ -199,7 +199,7 @@ c.commit()
   the import run, review 2.905); they come back only through the toast's undo and the office trash. Still on the office trash of copies: drafts, parts, trips, card lines, the start balance (no id
   column) and the sign-offs (`office_signoffs`, rows without an organisation); copies of the moved kinds made before 2.905
   stay restorable there until their period ends (no data move).
-- 2.925.0 (#5367, stage 5 of the trash): the calendar (`evcal`) has its events as `children` and `trash_prune=True`:
+- 2.947.0 (#5367, stage 5 of the trash): the calendar (`evcal`) has its events as `children` and `trash_prune=True`:
   `op_cal_delete` cancels the invitations and calls `obj_trash` (a step of the person's list, so it can be taken back),
   `op_cal_restore` `obj_restore`; `ev_cal_trash` / `ev_cal_restore` / `ev_cal_trash_purge` are gone and the events' run
   keeps only the events deleted on their own. The address books (`address_book`) go into the core's trash with
@@ -211,7 +211,7 @@ c.commit()
   #5476 (`life/bmundo.py` kind `bookmark`, `life/rssundo.py` kind `feed`: a tracked kind and a core kind never share a
   name, `_reg` would find the tracked one), which writes `deleted_at` and `deleted_by` back. All five are `trash_prune`
   kinds: the own runs of the bookmarks, feeds, video sign-offs (reviews; comments deleted on their own stay there), the
-  calendars and the address books' line of `tp_tick` are gone. The rows in the trash before 2.925.0 are the core's trash as
+  calendars and the address books' line of `tp_tick` are gone. The rows in the trash before 2.947.0 are the core's trash as
   they are (`deleted_by` empty: only who manages them restores them).
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
@@ -350,7 +350,7 @@ organisations + a private person, read-only, guest, a group, an agent, an expire
   (`admin/purgeshare.py`; people who reached a book through a folder of the deleted person get a share of the node). A workspace move checks the node's shares (`accounts/orgs.py obj_org_set`): a
   person or agent who does not fit the new workspace, or a group's share, is a 409.
 - The calendar's settings are written by `obj_write`, the calendar goes into the core's trash with its events
-  (2.925.0, #5367: `obj_trash` with its events as children, restore `POST /api/evcals/<id>/restore`, purged by the core's
+  (2.947.0, #5367: `obj_trash` with its events as children, restore `POST /api/evcals/<id>/restore`, purged by the core's
   run). Events are no kind of their
   own (their series, attendees and iCalendar have rules of their own): every change runs under the series lock
   `write_lock('obj-event-<id>')` with the row read again (`ev_lock`), CalDAV's If-Match under the same lock.
@@ -646,7 +646,7 @@ Who uses it: the lists' saved filters and shared views (catalog `FLT_TASKS` in v
 documents search's own `dsr_filters`, matched on the server only, the dialog's count asks `POST /api/docs/views/count`). Tests:
 `tests/p2846_a_filterkern_test.py` (the core, the lists' API), `tests/p2846_a_filterkern_ui.js` (the dialog with a stand-in catalog).
 
-### Tags (stage Q5a, 2.925.0, #5275)
+### Tags (stage Q5a, 2.947.0, #5275)
 
 Tags exist once: `obj_tags(id, scope_kind, scope_id, org_id, name, color, sort, created_by, created_at TIMESTAMPTZ)` is one
 tag of a scope, `obj_tag_links(tag_id, kind, obj_id, src person|agent|auto, created_by, created_at)` puts it on an object
@@ -683,7 +683,7 @@ unique per scope under `lower()`. It replaced `list_tags`, `task_list_tags` and 
 - The move (`otg_move`, every start while the old tables exist, as "system"): project tags keep their ids (rules and shared
   views name them; the identity is set past the old ids before the labels are made), a label's copy becomes the label (only
   links whose tag belonged to the task's own list), a project tag named like a label of its organisation becomes the label (rules / shared views that named the copy are rewritten), then the
-  fragment drops the three tables. One-way; a version before 2.925 shows no project tags until this one is back.
+  fragment drops the three tables. One-way; a version before 2.947 shows no project tags until this one is back.
 
 ## Gestures: swiping a row, leafing (2.876.0, #5559)
 

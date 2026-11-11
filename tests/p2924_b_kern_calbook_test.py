@@ -313,7 +313,7 @@ KT = A.post(B + "/api/evcals", json={"name": "Old season", "org_id": ORG}).json(
 check(A.put(B + f"/api/evcals/{KT}/members", json={"user_id": BOB, "role": "edit"}).ok, "setup: a calendar shared with bob")
 NT = node("evcal", KT)
 check(A.delete(B + f"/api/evcals/{KT}").ok and KT not in ids(Bo.get(B + "/api/evcals")), "the calendar into the trash")
-# 2.925.0 (#5367): ev_cal_trash_purge is gone - the calendars' trash is the core's run (obj_trash_prune, kind evcal)
+# 2.947.0 (#5367): ev_cal_trash_purge is gone - the calendars' trash is the core's run (obj_trash_prune, kind evcal)
 out = box("from kalmido.core.pg import system_ctx\nfrom kalmido.core.writes import obj_trash_prune\n"
           "with system_ctx(c):\n    print('purged', obj_trash_prune(c, 'evcal', '9999', True))")
 check("purged 1" in out, f"#5069: the trash emptied without an error ({out[-300:]})")

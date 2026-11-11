@@ -1,4 +1,4 @@
-// 2.925.0 (#5275) UI test, own container (start.sh): project tags and the labels of an organisation are tags of the core -- the
+// 2.947.0 (#5275) UI test, own container (start.sh): project tags and the labels of an organisation are tags of the core -- the
 // kalmido-suite: fresh
 // app shows them as before (jsdom).
 // - a label put on tasks of two projects: the task row of each project shows the chip #Kunde, the task panel its pill

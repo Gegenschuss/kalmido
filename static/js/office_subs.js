@@ -106,7 +106,7 @@ function aboModal(f) {
     try {
       if (b.dataset.m === 'del') {
         const j = await api('DELETE', `/api/office/fixed-costs/${f.id}`); md.remove(); aboReload();
-        const o = j.item; toast(j.trash ? tr('Moved to the trash') : tr('Deleted') /* 2.925.0 (#5454): says where it went */, async () => { if (j.trash) { await api('POST', `/api/office/trash/core/${j.trash.kind}/${j.trash.id}/restore?undo=1`); aboReload(); return; }  /* 2.905.0 (#5414): the core's trash */ await api('POST', '/api/office/fixed-costs', {label: o.label, amount: o.amount, start: o.start, until: o.until, repeat: o.repeat, category: o.category || '', vat_rate: o.vat_rate || 0, ...aboFields(o)}); aboReload(); });
+        const o = j.item; toast(j.trash ? tr('Moved to the trash') : tr('Deleted') /* 2.947.0 (#5454): says where it went */, async () => { if (j.trash) { await api('POST', `/api/office/trash/core/${j.trash.kind}/${j.trash.id}/restore?undo=1`); aboReload(); return; }  /* 2.905.0 (#5414): the core's trash */ await api('POST', '/api/office/fixed-costs', {label: o.label, amount: o.amount, start: o.start, until: o.until, repeat: o.repeat, category: o.category || '', vat_rate: o.vat_rate || 0, ...aboFields(o)}); aboReload(); });
         return;
       }
       if (b.dataset.m === 'unsub') { md.remove(); await aboPatch(f.id, {sub: 0}, {sub: 1}, tr('No longer a subscription')); return; }

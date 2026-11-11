@@ -395,7 +395,7 @@ REF = schema()
 
 def defect():
     """A row pair the unique index cannot hold, and without the index: pg_restore takes it, init_db cannot build the index."""
-    # 2.925.0 (#5275): list_tags went into the core's obj_tags (its unique index of the name: ix5275_obj_tags_name)
+    # 2.947.0 (#5275): list_tags went into the core's obj_tags (its unique index of the name: ix5275_obj_tags_name)
     psql("-c", f"DROP INDEX ix5275_obj_tags_name; INSERT INTO obj_tags(scope_kind, scope_id, name) VALUES ('list', '{S.list}', 'dup'), ('list', '{S.list}', 'DUP')")
 
 
@@ -518,7 +518,7 @@ check(not [x for x in leftovers() if x.startswith(("attachments.", "office."))],
 same(snap(people()), GOOD_SEEN, "4 hard stop: ... with the content of its backup")
 
 # ---- review of 2.510: the keys _pg_restore takes away: a key the backup does not know (added since), a hard stop before pg_restore
-NEWFK = "ALTER TABLE sections ADD CONSTRAINT p4286_new_fk FOREIGN KEY (list_id) REFERENCES lists(id)"  # 2.925.0 (#5275): was list_tags
+NEWFK = "ALTER TABLE sections ADD CONSTRAINT p4286_new_fk FOREIGN KEY (list_id) REFERENCES lists(id)"  # 2.947.0 (#5275): was list_tags
 hasfk = lambda: bool(kt.dbx("SELECT 1 FROM pg_constraint WHERE conname='p4286_new_fk'"))
 NOTE = os.path.join(BK, ".dropped-fks.json")
 psql("-c", NEWFK)

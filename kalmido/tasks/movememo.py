@@ -20,12 +20,12 @@ from flask import g, has_request_context
 from ..core.access import Denied, list_people, list_role, ov_role, WRITE_ROLES
 from ..core.db import iso, now_utc, parse_iso
 from ..core.pg import insert_id, st_ids
-from ..core.objtags import otg_link, otg_list_sql, OTG_TASK_FROM  # 2.925.0 (#5275)
+from ..core.objtags import otg_link, otg_list_sql, OTG_TASK_FROM  # 2.947.0 (#5275)
 from ..lists.groups import grp_shares_of_list
 from ..tasks.validation import descendants
 from ..tasks.watchers import check_delegate, dlg_events  # 2.530.0 B (#4316)
 
-# 2.925.0 (#5275): (task id, name) of the project tags and labels on the tasks of one array (any project: a move memo)
+# 2.947.0 (#5275): (task id, name) of the project tags and labels on the tasks of one array (any project: a move memo)
 MM_TAGS_SQL = f"SELECT k.obj_id, ot.name {OTG_TASK_FROM} WHERE k.obj_id = ANY(CAST(? AS BIGINT[])) AND ot.scope_kind IN ('list', 'org')"
 TMM_KEEP_H = 24  # how long a move back restores (the undo window of the other moves)
 
@@ -51,7 +51,7 @@ def tmm_snap(c, tid):
     for r in c.execute("SELECT task_id, user_id FROM task_people WHERE task_id = ANY(CAST(? AS BIGINT[]))", (st_ids(ids),)):
         people.setdefault(r[0], set()).add(r[1])
     ltags = {}
-    for r in c.execute(MM_TAGS_SQL, (st_ids(ids),)):  # 2.925.0 (#5275): the core's project tags and labels
+    for r in c.execute(MM_TAGS_SQL, (st_ids(ids),)):  # 2.947.0 (#5275): the core's project tags and labels
         ltags.setdefault(r[0], set()).add(r[1])
     links = [dict(r) for r in c.execute("SELECT list_id, section_id, sort FROM task_links WHERE task_id=?", (tid,))]
     return {"rows": rows, "people": people, "ltags": ltags, "links": links, "watchers": _watchers(c, ids)}
@@ -101,7 +101,7 @@ def tmm_after(c, tid, snap, uid=None, skip=()):
         if ch:
             d["fields"][str(t)] = ch
     tags = {}
-    for r in c.execute(MM_TAGS_SQL, (st_ids(ids),)):  # 2.925.0 (#5275)
+    for r in c.execute(MM_TAGS_SQL, (st_ids(ids),)):  # 2.947.0 (#5275)
         tags.setdefault(r[0], set()).add(r[1].casefold())
     for t, ns in ({} if "ltags" in skip else snap["ltags"]).items():
         gone = sorted(x for x in ns if x.casefold() not in tags.get(t, set()))
@@ -211,7 +211,7 @@ def tmm_restore(c, tid, prev, skip=()):
                 continue
             for nm in names:
                 r = c.execute(f"""SELECT ot.id FROM obj_tags ot JOIN lists l ON l.id=? WHERE {otg_list_sql()} AND lower(ot.name)=lower(?)
-                                  ORDER BY (ot.scope_kind='list') LIMIT 1""", (lid, nm)).fetchone()  # 2.925.0 (#5275): + a label (first, review F3)
+                                  ORDER BY (ot.scope_kind='list') LIMIT 1""", (lid, nm)).fetchone()  # 2.947.0 (#5275): + a label (first, review F3)
                 if r:
                     otg_link(c, r[0], x)
                     n("ltags")
@@ -280,7 +280,7 @@ def lmm_after(c, lid, snap, uid=None):
     l = c.execute("SELECT org_id, client_id, org_visibility, org_edit FROM lists WHERE id=?", (lid,)).fetchone()
     if not snap or not l or (l["org_id"] or None) == (snap["org"] or None):
         return {}
-    # 2.925.0 (#5275): the old organisation's labels stayed on the tasks as project tags (trigger kalmido_otg_org_moved, review F1)
+    # 2.947.0 (#5275): the old organisation's labels stayed on the tasks as project tags (trigger kalmido_otg_org_moved, review F1)
     have = {(r[0], r[1]) for r in c.execute("""SELECT task_id, list_id FROM task_links WHERE list_id=?
                                                OR task_id IN (SELECT id FROM tasks WHERE list_id=?)""", (lid, lid))}
     d = {"from": snap["org"], "to": l["org_id"], "client": snap["client"] if snap["client"] and not l["client_id"] else None,

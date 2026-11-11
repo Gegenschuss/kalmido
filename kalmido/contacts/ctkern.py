@@ -12,7 +12,7 @@ file store since 2.351.0 (contacts/ctfolder.py), so its folder shares ARE the co
 - the file store keeps the folder rules of 2.351.0 (fs_hooks): filing the book and sharing its folder stay with who manages it,
   the token scope "contacts", the module switch and the vCard content as before (on_trash None: a node coming back never
   restores a book in its trash -- contacts/web.py does, with its contacts).
-- 2.925.0 (#5367, stage 5 of the core's trash): the book goes into the core's trash (contacts/web.py op_book_delete: obj_trash,
+- 2.947.0 (#5367, stage 5 of the core's trash): the book goes into the core's trash (contacts/web.py op_book_delete: obj_trash,
   its node with it) and comes back the core's way (obj_restore) -- without a step of the undo list (step=False): the restore
   route makes its birthday tasks again and links its clients' contact persons, which the core's undo would not. Its contacts
   stay as they are (hidden with the book, no children). Deleting it for good is the core's (obj_purge, and the core's hourly
@@ -23,9 +23,9 @@ No generic routes (routes=False): the address book's own routes (contacts/web.py
 from ..core.i18n import N_
 from ..collab.news import news_add  # 2.924.0 (#5069): _share_back
 from ..core.objects import obj_node, obj_node_follow, obj_node_person_drop, obj_node_person_put, obj_register
-from ..core.objhooks import obj_rows_drop_many  # 2.925.0 (#5367)
+from ..core.objhooks import obj_rows_drop_many  # 2.947.0 (#5367)
 from ..core.pg import system_ctx
-from ..core.writes import obj_on_purge  # 2.925.0 (#5367)
+from ..core.writes import obj_on_purge  # 2.947.0 (#5367)
 from .ctfolder import CTF_BOOK, CTF_CONTACT, _book, _book_base, _book_content, _book_space, _book_title, _cap, _gate, _hidden, ctf_root
 from .model import BK_KERN, book_role, book_touch
 
@@ -69,10 +69,10 @@ obj_register(CTF_BOOK, "books", label=N_("Address book"), fields={}, title=_book
              routes=False, node_shares=True, on_share_back=_share_back, open_url=lambda bid: f"contacts/b/{int(bid)}",
              fs_hooks={"base_role": _book_base, "space": lambda c, bid: _book_space(c, _book(c, bid)), "title": _book_title,
                        "content_gate": _gate, "on_trash": None},
-             trash_prune=True)  # 2.925.0 (#5367): the core's hourly run deletes it after the trash period (bk_purge_prep first)
+             trash_prune=True)  # 2.947.0 (#5367): the core's hourly run deletes it after the trash period (bk_purge_prep first)
 
 
-# ---------------------------------------------------------------- the trash (2.925.0, #5367)
+# ---------------------------------------------------------------- the trash (2.947.0, #5367)
 def bk_purge_prep(c, bid):
     """The address books' part of the delete for good of book bid (core/writes.py obj_on_purge: obj_purge and the core's
     retention run; then the core takes its node, its own core rows and the row -- its contacts follow by FK cascade): the

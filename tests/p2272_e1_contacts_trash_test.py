@@ -211,7 +211,7 @@ check("books [" in nb and f"{BK3}" not in nb.split("books", 1)[1].split("\n", 1)
 MR = sql("INSERT INTO merge_runs(kind, target_id, book_id, snapshot, created_at) VALUES(?,?,?,?,?) RETURNING id",
          ("contact", 0, BK3, '{"x": 1}', ago()))[0][0]
 sql("UPDATE books SET deleted_at=? WHERE id=?", (ago(days=400), BK3))
-# 2.925.0 (#5367): the address books are the core's trash run (core/writes.py obj_trash_tick; contacts/ctkern.py bk_purge_prep)
+# 2.947.0 (#5367): the address books are the core's trash run (core/writes.py obj_trash_tick; contacts/ctkern.py bk_purge_prep)
 box("from kalmido.core.writes import obj_trash_tick\nprint('core', obj_trash_tick(c, True))", ("KALMIDO_PURGE_TRASH=1",))
 check(not sql("SELECT 1 FROM books WHERE id=?", (BK3,)) and sql("SELECT snapshot FROM merge_runs WHERE id=?", (MR,))[0][0] == "{}",
       "run: the book goes for good, its merge undo data with it")

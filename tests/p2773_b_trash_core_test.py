@@ -203,7 +203,7 @@ check("PURGED 1" in out and gone(O2) and parts(O2) == {} and not gone(O3) and le
       f"switch on: the old one with its children gone, the young one stays {out[-300:]}")
 
 # ---- the calendars' run goes the same core way
-# 2.925.0 (#5367): ev_cal_trash_purge is gone - the calendars are a trash_prune kind of the core's run itself
+# 2.947.0 (#5367): ev_cal_trash_purge is gone - the calendars are a trash_prune kind of the core's run itself
 out = in_app("""from kalmido.core.objects import OBJ
 from kalmido.core.writes import obj_trash_prune
 print("CAL", obj_trash_prune(c, "evcal", "2000-01-01T00:00:00+00:00", False), OBJ["evcal"]["trash_prune"])""")

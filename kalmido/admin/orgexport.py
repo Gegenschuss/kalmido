@@ -209,13 +209,13 @@ def _clean(c, oid, table, r):
     row = {k: v for k, v in dict(r).items() if k not in OX_SECRET_COLS}
     if table == "obj_reactions":
         row[OX_RX_COL[row.pop("target_kind")]] = row.pop("target_id")
-    if table == "obj_tags":  # 2.925.0 (#5275): the columns of list_tags / the labels' file
+    if table == "obj_tags":  # 2.947.0 (#5275): the columns of list_tags / the labels' file
         k, v = row.pop("scope_kind"), row.pop("scope_id")
         row.pop("created_by", None)
         if k == "list":
             row["list_id"] = int(v)
             row.pop("org_id", None)
-    if table == "obj_tag_links":  # 2.925.0 (#5275): the columns of task_list_tags (+ when and how it was set)
+    if table == "obj_tag_links":  # 2.947.0 (#5275): the columns of task_list_tags (+ when and how it was set)
         row["task_id"] = row.pop("obj_id")
         row.pop("kind", None)
         row.pop("created_by", None)
@@ -261,9 +261,9 @@ OX_AREAS = (
     ("lists/views.json", "filters", f"list_id IN ({LSQ})"),  # 2.577.0 (#3356): the shared views of a project (a private filter has no list_id)
     ("lists/members.json", "list_members", f"list_id IN ({LSQ})"),
     ("lists/fields.json", "list_fields", f"list_id IN ({LSQ})"),
-    # 2.925.0 (#5275): the project tags are rows of the core (obj_tags scope list); the file keeps list_id (_clean)
+    # 2.947.0 (#5275): the project tags are rows of the core (obj_tags scope list); the file keeps list_id (_clean)
     ("lists/tags.json", "obj_tags", f"scope_kind='list' AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM ({LSQ}) x)"),
-    ("org/labels.json", "obj_tags", "scope_kind='org' AND org_id=?"),  # 2.925.0 (#5275): the labels of the organisation (was #4031)
+    ("org/labels.json", "obj_tags", "scope_kind='org' AND org_id=?"),  # 2.947.0 (#5275): the labels of the organisation (was #4031)
     ("lists/status.json", "list_status", f"list_id IN ({LSQ})"),
     ("lists/links.json", "list_links", f"list_id IN ({LSQ})"),
     ("lists/notepads.json", "list_notepads", f"list_id IN ({LSQ})"),  # 2.43.0 (#1346): notepads on the project page
@@ -287,7 +287,7 @@ OX_AREAS = (
     ("tasks/dependencies.json", "task_deps", f"task_id IN ({TSQ})"),
     ("tasks/relations.json", "task_relations", f"task_id IN ({TSQ}) AND other_id IN ({TSQ})"),  # 2.576.0 (#3371): both tasks of the organisation
     ("tasks/field_values.json", "task_field_values", f"task_id IN ({TSQ})"),
-    # 2.925.0 (#5275): the tags of the tasks (a project tag or a label, tag_id = its id in lists/tags.json / org/labels.json); the
+    # 2.947.0 (#5275): the tags of the tasks (a project tag or a label, tag_id = its id in lists/tags.json / org/labels.json); the
     # file keeps task_id (_clean); a link to a tag of another project (the task moved since) stays out, as the app shows none
     ("tasks/tags.json", "obj_tag_links", f"""kind='task' AND obj_id IN ({TSQ}) AND tag_id IN (SELECT id FROM obj_tags WHERE (scope_kind='list'
      AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM ({LSQ}) x)) OR (scope_kind='org' AND org_id=?))"""),
@@ -519,7 +519,7 @@ OX_LEFT = {
     "merge_runs": _PERSONAL, "notify_channels": _SECRET, "support_grants": _SERVER, "office_peppol": _SECRET,
     "office_payonline": _SECRET, "office_pay_links": _SECRET, "office_pay_sessions": _ONLINEPAY, "office_pay_events": _ONLINEPAY, "office_pay_payouts": _ONLINEPAY,
     "office_trash": "the trash (not_included)",
-    "org_fields": _LATER2,  # 2.609.0 (#3373): the organisation's schema; follow-up #4031 (templates: 2.905.0, #5288; the labels: org/labels.json since 2.925.0, #5275)
+    "org_fields": _LATER2,  # 2.609.0 (#3373): the organisation's schema; follow-up #4031 (templates: 2.905.0, #5288; the labels: org/labels.json since 2.947.0, #5275)
     "org_invites": "invitations (not_included)", "org_joins": "join requests (not_included)",
     "org_keys": _SERVER, "org_members": "members.json (with the role)", "org_out_requests": "requests of one person, short-lived",
     "pl_imported": _SECRET, "pl_rules": _SECRET, "pl_sources": _SECRET, "pl_uploads": _SECRET, "portal_logins": _SECRET,

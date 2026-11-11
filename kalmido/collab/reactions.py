@@ -5,13 +5,13 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.pg import qi, system_ctx
-from ..core.objtags import (  # 2.925.0 (#5275): the tags of the shared core
+from ..core.objtags import (  # 2.947.0 (#5275): the tags of the shared core
     obj_tags_of, obj_tags_set, otg_add, otg_count, otg_find, otg_in_list, otg_link, otg_of_list, OTG_PROJECT)
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, list_role, MANAGE_ROLES, need_collab, need_list, need_task, task_visible, WRITE_ROLES
-from ..accounts.orgroles import user_orgs_full  # 2.925.0 (#5275, review F4)
+from ..accounts.orgroles import user_orgs_full  # 2.947.0 (#5275, review F4)
 from ..lists.lists import clean_color, clean_list_value
 from ..tasks.validation import as_int, CONTENT_MAX, descendants, log_act, PRIORITIES, TITLE_MAX
 from ..tasks.tasks import one_task
@@ -19,7 +19,7 @@ from ..tasks.lifecycle import apply_update
 from ..collab.comments import comment_plain, need_live_comment, task_say_refusal, user_names
 from ..core.objreact import orx_of, orx_set, orx_toggle  # 2.763.0 (#5269): the reactions of the shared core
 from ..core.errors import BadInput, UnknownFields
-from ..lists.orglabels import olb_full, olb_match  # 2.609.0 (#3373); 2.925.0 (#5275, review F4): olb_full
+from ..lists.orglabels import olb_full, olb_match  # 2.609.0 (#3373); 2.947.0 (#5275, review F4): olb_full
 from ..api.v1 import _tag_arg, PRIO_NAMES, PRIO_VALUES
 from ..lists.folderdefs import fdf_named_gone  # 2.757.0 (#4501)
 from ..agents.core import (
@@ -318,7 +318,7 @@ def clean_ltag_names(v):
 
 def ltags_of_lists(c, lids):
     """{list id: [{id, name, color, org_tag_id}]} -- the project tags of the lists, then the labels of their organisation that a
-    task of the list carries (org_tag_id = the label's id; 2.925.0 (#5275): the label itself, no copy in the project). A label
+    task of the list carries (org_tag_id = the label's id; 2.947.0 (#5275): the label itself, no copy in the project). A label
     of an organisation the reader is not a member of is not there (row-level security)."""
     out = {}
     lids = sorted({int(x) for x in lids if x})
@@ -348,10 +348,10 @@ def ltag_names(c, tid):
 def ltag_get_or_create(c, lid, name, create):
     """The id of the tag named name (any case) a task of list lid gets: the project's own tag, else a label of the project's
     organisation (one a task of the project carries already, or any for a person with the organisation's full view: olb_match),
-    else a new project tag when create (the person may change the list). Review F6 (2.925.0): a label the writer may see
+    else a new project tag when create (the person may change the list). Review F6 (2.947.0): a label the writer may see
     (olb_match) comes before a project tag of the same name -- such a tag is left only where a person without the full view
     made it; a project joining the organisation turns its tags into the labels (trigger kalmido_otg_org_moved)."""
-    ol = olb_match(c, lid, name)  # 2.609.0 (#3373), 2.925.0 (#5275): the label itself goes on the task
+    ol = olb_match(c, lid, name)  # 2.609.0 (#3373), 2.947.0 (#5275): the label itself goes on the task
     if ol:
         return ol["id"]
     r = otg_find(c, "list", lid, name)
@@ -378,7 +378,7 @@ def _ltag_src():
 
 def set_ltags(c, tid, names, log=True):
     """The project tags of task tid (names; missing ones are created when the current user may change the list). Logged.
-    2.925.0 (#5275): links of the core (obj_tags_set; a label of an organisation the writer cannot see stays on the task)."""
+    2.947.0 (#5275): links of the core (obj_tags_set; a label of an organisation the writer cannot see stays on the task)."""
     t = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
     names = clean_ltag_names(names)
     before = ltag_names(c, tid)
@@ -393,7 +393,7 @@ def set_ltags(c, tid, names, log=True):
 
 def ltags_follow(c, tid, lid):
     """After a move to list lid: the project tags of tid and its subtasks follow by name (created there when the mover may
-    change that list, else dropped). 2.925.0 (#5275): a label of the organisation stays as it is when lid is in the same
+    change that list, else dropped). 2.947.0 (#5275): a label of the organisation stays as it is when lid is in the same
     organisation; else it becomes the tag of that name there (a project tag or the other organisation's label)."""
     create = list_role(c, lid) in WRITE_ROLES if has_request_context() and getattr(g, "user", None) else True
     keep = {(k, v) for k, v in otg_of_list(c, lid)}
@@ -428,7 +428,7 @@ def ltag_row(c, tag_id, lid=None):
 def need_ltag(c, tag_id, write=True, lid=None, label=False):
     """A project tag (scope list) the person may see / change, or with lid a label of lid's organisation (in that project).
     label=True: a label without lid as the reader sees it -- for the answer "change it in the organisation's labels" only,
-    nothing is written with it. Review F4 (2.925.0): that only with the organisation's full view (a guest / accounting member
+    nothing is written with it. Review F4 (2.947.0): that only with the organisation's full view (a guest / accounting member
     passes row-level security, but gets no label it does not see in a project); with lid a label of the organisation only for
     the full view or when a task of lid carries it (otg_in_list full=olb_full)."""
     r = c.execute("SELECT * FROM obj_tags WHERE id=? AND scope_kind = ANY(CAST(? AS TEXT[]))", (tag_id, list(OTG_PROJECT))).fetchone()
@@ -495,7 +495,7 @@ def ltag_update(tag_id, lid=None):
     except BadInput as e:
         return err(str(e))
     f = ltag_fields(body(), partial=True)
-    if r["scope_kind"] == "org":  # 2.609.0 (#3373): a label changes only in the organisation's labels (its order too, 2.925.0)
+    if r["scope_kind"] == "org":  # 2.609.0 (#3373): a label changes only in the organisation's labels (its order too, 2.947.0)
         # review F7: the order too -- a label's place is the organisation's (no silent 200 for a sort that did nothing)
         if any(k in f and f[k] != r[k] for k in ("name", "color", "sort")):
             return err(tr("This label belongs to the organisation: change it in the organisation's labels"), 409)
@@ -515,7 +515,7 @@ def ltag_update(tag_id, lid=None):
 
 @app.delete("/api/list-tags/<int:tag_id>")
 def ltag_delete(tag_id, lid=None):
-    """Removes the project tag from every task of the project (answers the task ids, for the undo). 2.925.0 (#5275): a label of
+    """Removes the project tag from every task of the project (answers the task ids, for the undo). 2.947.0 (#5275): a label of
     the organisation (?list_id=) is taken off the tasks of that project only; the label stays in the organisation."""
     c = db()
     try:

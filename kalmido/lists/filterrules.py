@@ -17,7 +17,7 @@ from ..core.access import list_role, vis_sql
 from ..core.db import local_now
 from ..core.filters import COND_MAX, VAL_MAX, kflt_or as _or, kflt_where
 from ..core.pg import like_escape
-from ..core.objtags import obj_tag_sql  # 2.925.0 (#5275)
+from ..core.objtags import obj_tag_sql  # 2.947.0 (#5275)
 from .lists import FOLDER_SEP
 from .seckind import SEC_KINDS, SK_SQL
 
@@ -114,7 +114,7 @@ def _has(f, x, uid, t0):
             return None
         if x == "":
             return ("(NOT EXISTS (SELECT 1 FROM task_tags g WHERE g.task_id=tasks.id AND g.user_id=?) AND NOT "
-                    f"{obj_tag_sql('tasks.id', 'any')})", [uid])  # 2.925.0 (#5275): the core's project tags and labels
+                    f"{obj_tag_sql('tasks.id', 'any')})", [uid])  # 2.947.0 (#5275): the core's project tags and labels
         return (f"(id IN (SELECT task_id FROM task_tags WHERE user_id=? AND tag=?) OR {obj_tag_sql('tasks.id')})", [uid, x, x])
     if f in ("who", "sec", "ms"):
         col = {"who": "assignee_id", "sec": "section_id", "ms": "milestone_id"}[f]

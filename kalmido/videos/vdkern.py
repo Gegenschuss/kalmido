@@ -1,4 +1,4 @@
-"""2.925.0 (#5367, stage 5 of the core's trash): video sign-offs (video_reviews) on the ONE trash of the core (core/writes.py
+"""2.947.0 (#5367, stage 5 of the core's trash): video sign-offs (video_reviews) on the ONE trash of the core (core/writes.py
 obj_trash / obj_restore / obj_trash_prune, docs/dev/kern.md).
 
 The review is registered here as a core object without routes, folder node or listing (like the office kinds,
@@ -8,7 +8,7 @@ place gets a project first) -- without a step of the undo list (step=False): the
 place check. The core's role: 'manage' for who may change it (vdr_may write: the task / project / client it hangs at, else
 its workspace), 'view' for who sees it. Its versions and comments go by FK cascade, so the core's hourly run deletes it after
 the trash period (trash_prune=True); videos/review.py vdr_trash_prune keeps only the comments deleted on their own.
-The reviews put into the trash before 2.925.0 (and the ones videos/vdrescue.py rescues there before a hard delete) are the
+The reviews put into the trash before 2.947.0 (and the ones videos/vdrescue.py rescues there before a hard delete) are the
 core's trash as they are (deleted_at; deleted_by NULL)."""
 from ..core.i18n import N_
 from ..core.objects import obj_register, obj_row

@@ -26,10 +26,10 @@ for name in ("kalmido", "kalmido.core"):
 acc = types.ModuleType("kalmido.core.access")
 acc.acx_lists_sql = lambda write=False, req=True, ov=True: "(SELECT l.id FROM lists l WHERE l.owner_id=? OR l.id IN (SELECT list_id FROM list_members WHERE user_id=?))"
 sys.modules["kalmido.core.access"] = acc
-otg = types.ModuleType("kalmido.core.objtags")  # 2.925.0 (#5275): the filter part of the core's tags, as SQL text only
+otg = types.ModuleType("kalmido.core.objtags")  # 2.947.0 (#5275): the filter part of the core's tags, as SQL text only
 otg.obj_tag_sql = lambda col="tasks.id", by="name": f"EXISTS (SELECT 1 FROM obj_tag_links k WHERE k.kind='task' AND k.obj_id={col})"
 sys.modules["kalmido.core.objtags"] = otg
-pgm = types.ModuleType("kalmido.core.pg")  # 2.925.0 (#5275): dlock.py reads the lock's tags as "system" (system_ctx)
+pgm = types.ModuleType("kalmido.core.pg")  # 2.947.0 (#5275): dlock.py reads the lock's tags as "system" (system_ctx)
 pgm.system_ctx = lambda c: contextlib.nullcontext()
 sys.modules["kalmido.core.pg"] = pgm
 spec = importlib.util.spec_from_file_location("kalmido.core.dlock", SRC)

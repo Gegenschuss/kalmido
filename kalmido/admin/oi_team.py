@@ -414,7 +414,7 @@ def rule_fields(data):
 
 
 def _ltag_m(run, old):
-    """2.925.0 (#5275): a tag id of the archive -> the tag here: a project tag (lists/tags.json) or a label (org/labels.json)."""
+    """2.947.0 (#5275): a tag id of the archive -> the tag here: a project tag (lists/tags.json) or a label (org/labels.json)."""
     return run.m("list_tags", old) or run.m("org_tags", old)
 
 def rule_ids(c, run, who, types, src, d):
@@ -430,7 +430,7 @@ def rule_ids(c, run, who, types, src, d):
         return None
     pause, tv = "", _txt(src.get("trig_val"), 300)
     if trig in ("section", "ltag"):
-        new = run.m("sections", tv) if trig == "section" else _ltag_m(run, tv)  # 2.925.0 (#5275): a label too
+        new = run.m("sections", tv) if trig == "section" else _ltag_m(run, tv)  # 2.947.0 (#5275): a label too
         tv, pause = str(new or ""), "" if new else "section" if trig == "section" else "tag"
     elif trig == "assigned":
         new = who(tv) if tv else None

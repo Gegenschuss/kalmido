@@ -1,4 +1,4 @@
-"""2.925.0 (#5367, stage 5 of the core's trash): bookmarks and feeds on the ONE trash of the core (core/writes.py obj_trash /
+"""2.947.0 (#5367, stage 5 of the core's trash): bookmarks and feeds on the ONE trash of the core (core/writes.py obj_trash /
 obj_restore / obj_trash_prune, docs/dev/kern.md).
 
 Both are registered here as core objects without routes, folder node or listing (like the office kinds, office/okern.py):
@@ -13,7 +13,7 @@ have names of their own ("bookmark_link", "rss_feed") so the tracked undo kinds 
 - rss_feed (life/rss.py): 'manage' for who may change the sources of its space (rss_own manage: the person, an
   organisation's admins), 'view' for who reads them; its articles and read marks go by FK cascade.
 Both are trash_prune kinds: the core's hourly run deletes them after the trash period; the bookmarks' and feeds' own runs
-are gone. The rows already in the trash before 2.925.0 are the core's trash as they are (deleted_at; deleted_by NULL)."""
+are gone. The rows already in the trash before 2.947.0 are the core's trash as they are (deleted_at; deleted_by NULL)."""
 from ..core.errors import Denied
 from ..core.i18n import N_
 from ..core.objects import obj_register, obj_row

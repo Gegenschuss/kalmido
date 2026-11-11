@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
-"""2.925.0 (#5367, stage 5 of the core's trash): calendars, address books, bookmarks, feeds and video sign-offs lie in the ONE
+"""2.947.0 (#5367, stage 5 of the core's trash): calendars, address books, bookmarks, feeds and video sign-offs lie in the ONE
 trash of the core (core/writes.py obj_trash / obj_restore / obj_trash_prune). Invented names only.
  - each area: delete -> gone from its list, in the core's trash (deleted_at, deleted_by) -> restore -> visible again
  - the calendar with its events (children of the kind evcal): they go and come back with it, one deleted on its own before

@@ -23,7 +23,7 @@ from datetime import timedelta
 from ..core.db import gset, gsetting, iso, iso_ms, now_utc
 from ..core.i18n import N_
 from ..notify.alerts import aa_now  # 2.644.0 (#4192)
-from ..core.pg import qi, system_ctx  # 2.925.0 (#5055): qi
+from ..core.pg import qi, system_ctx  # 2.947.0 (#5055): qi
 from ..core.retention import ret_days, ret_on, ret_report
 from ..core.serializers import unlink_files
 from ..team.portal import _PT_EDITS
@@ -90,14 +90,14 @@ def lgc_failed(c, table, e):
     aa_now("storage", f"retention:{table}", LGC_FAILED, [table, type(e).__name__])
 
 
-LGC_KEEP_TMP = "lgc_portal_keep_ids"  # 2.925.0 (#5055): the ids to spare, read once per run (a temp table of this connection)
+LGC_KEEP_TMP = "lgc_portal_keep_ids"  # 2.947.0 (#5055): the ids to spare, read once per run (a temp table of this connection)
 
 
 def lgc_portal_keep(c=None):
     """2.186.0 C (#2602): the condition that spares, per customer portal ticket, the oldest history row of an edit of the
     description -- the portal's "your text" check (team/portal.py pt_original) reads only whether such a row exists, so
     its answer stays the same after the clean-up.
-    2.925.0 (#5055): with c the ids are read ONCE into a temp table and every batch only looks them up there: the grouping
+    2.947.0 (#5055): with c the ids are read ONCE into a temp table and every batch only looks them up there: the grouping
     over all portal history ran again in each batch DELETE of LGC_BATCH rows (measured on 1 million invented rows: about
     200 ms per batch, against 10 ms with the table read once in 80 ms). The table lives until lgc_portal_keep_drop (or the
     end of the connection). Can it not be made (rights, error), the old condition is used as before."""
@@ -119,7 +119,7 @@ def lgc_portal_keep(c=None):
 
 
 def lgc_portal_keep_drop(c):
-    """2.925.0 (#5055): the temp table of lgc_portal_keep goes after the activity table (the connection goes back to the pool)."""
+    """2.947.0 (#5055): the temp table of lgc_portal_keep goes after the activity table (the connection goes back to the pool)."""
     try:
         c.heal()
         c.execute(f"DROP TABLE IF EXISTS pg_temp.{LGC_KEEP_TMP}")
@@ -214,7 +214,7 @@ def lgc_tick(c, force=False):
         c.commit()  # 2.644.0 (#4192): the batches below commit on their own; a failed one rolls back only itself
         for table, col, cond, days in LGC_LOGS:
             if table == "activity":
-                cond = lgc_portal_keep(c)  # 2.925.0 (#5055): read once, not grouped again per batch
+                cond = lgc_portal_keep(c)  # 2.947.0 (#5055): read once, not grouped again per batch
             cut = iso(now - timedelta(days=days if days is not None else ret_days("logs")))
             try:
                 counts[table] = lgc_count_del(c, table, col, cond, cut, kill)

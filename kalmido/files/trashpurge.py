@@ -47,7 +47,7 @@ TP_PLAIN = (
     # deals, letters ... set null); never one records (kept by law) point to since -- team/clients.py CL_HOLD
     # 2.223.3 (#2878): the hold rule is team/clients.py cl_hold_sql() (finalised documents only), filled in at the run
     ("clients", "clients", None),
-    # 2.272.0 E1 (#3038): contacts (contact_care notes, contact_tasks, contact_occ cascade) and list notes; 2.925.0 (#5367):
+    # 2.272.0 E1 (#3038): contacts (contact_care notes, contact_tasks, contact_occ cascade) and list notes; 2.947.0 (#5367):
     # the address books are the core's trash (core/writes.py obj_trash_tick, their purge hook contacts/ctkern.py bk_purge_prep)
     ("contacts", "contacts", ""),
     ("notes", "notes", ""),

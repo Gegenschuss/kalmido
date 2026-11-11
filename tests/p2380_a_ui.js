@@ -58,7 +58,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   check(rows.length === 2 && d.querySelector('.ofdkinds [data-kind="invoice"]').getAttribute('aria-selected') === 'true', 'invoice chip lists the two invoices');
   const partial = rows.find(x => /RE-2026-001/.test(x.textContent));
   check(partial && /Partly paid/.test(partial.querySelector('.rotag')?.textContent || '') && partial.classList.contains('st-partial') && /open: .*1,380\.00/.test(partial.textContent), 'the finalised invoice shows "Partly paid" and the open amount: ' + (partial?.textContent || '').slice(0, 120));
-  const draft = rows.find(x => x !== partial);  // 2.925.0 (#5454): a draft row names its kind ("Invoice"), no longer "(no number)"
+  const draft = rows.find(x => x !== partial);  // 2.947.0 (#5454): a draft row names its kind ("Invoice"), no longer "(no number)"
   check(draft && /Draft/.test(draft.querySelector('.rotag')?.textContent || ''), 'the draft shows "Draft" without a number');
   check(!!d.querySelector('[data-ofd="remind"]') && !!d.querySelector('[data-ofd="new-inv"]'), 'invoice list: "Create payment reminder" and "New invoice"');
   const sel = d.querySelector('#ofd-status');

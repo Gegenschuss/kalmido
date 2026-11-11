@@ -7,7 +7,7 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.objhooks import obj_rows_drop  # 2.578.0 (#4796)
-from ..core.objtags import otg_find, otg_list_sql  # 2.925.0 (#5275)
+from ..core.objtags import otg_find, otg_list_sql  # 2.947.0 (#5275)
 from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
@@ -880,7 +880,7 @@ def lp_carry(c, lid, inbox):
                     val = val.split(",")[0]
             if val is not None:
                 c.execute("INSERT INTO task_field_values(task_id,field_id,value) VALUES(?,?,?) ON CONFLICT DO NOTHING", (v["task_id"], nid, val))
-    # 2.925.0 (#5275): the project's tags and the labels of its organisation that its tasks carry become tags of the inbox
+    # 2.947.0 (#5275): the project's tags and the labels of its organisation that its tasks carry become tags of the inbox
     for t in c.execute(f"""SELECT ot.* FROM obj_tags ot JOIN lists l ON l.id=? WHERE {otg_list_sql()} AND EXISTS (SELECT 1 FROM obj_tag_links x
                            JOIN tasks xt ON xt.id=x.obj_id WHERE x.tag_id=ot.id AND x.kind='task' AND xt.list_id=l.id)
                            ORDER BY (ot.scope_kind<>'list'), ot.sort, ot.id""", (lid,)).fetchall():

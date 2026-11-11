@@ -149,7 +149,7 @@ function rk_fixedModal(f) {
     try {
       if (b.dataset.m === 'del') {
         const j = await api('DELETE', `/api/office/fixed-costs/${f.id}`); md.remove(); rk_cfReload();
-        const o = j.item; toast(j.trash ? tr('Moved to the trash') : tr('Deleted') /* 2.925.0 (#5454): says where it went */, async () => { if (j.trash) { await api('POST', `/api/office/trash/core/${j.trash.kind}/${j.trash.id}/restore?undo=1`); rk_cfReload(); return; }  /* 2.905.0 (#5414): the core's trash */ await api('POST', '/api/office/fixed-costs', {label: o.label, amount: o.amount, start: o.start, until: o.until, repeat: o.repeat, category: o.category || '', vat_rate: o.vat_rate || 0, ...aboFields(o)}); rk_cfReload(); });  // 2.91.0 B (#1924): + the subscription fields
+        const o = j.item; toast(j.trash ? tr('Moved to the trash') : tr('Deleted') /* 2.947.0 (#5454): says where it went */, async () => { if (j.trash) { await api('POST', `/api/office/trash/core/${j.trash.kind}/${j.trash.id}/restore?undo=1`); rk_cfReload(); return; }  /* 2.905.0 (#5414): the core's trash */ await api('POST', '/api/office/fixed-costs', {label: o.label, amount: o.amount, start: o.start, until: o.until, repeat: o.repeat, category: o.category || '', vat_rate: o.vat_rate || 0, ...aboFields(o)}); rk_cfReload(); });  // 2.91.0 B (#1924): + the subscription fields
         return;
       }
       const v = id => $(id, md)?.value ?? '';
@@ -319,7 +319,7 @@ function cfs_modal(a, mo) {
       if (b.dataset.m === 'del') {
         const j = await api('DELETE', `/api/office/cashflow/adjust/${a.id}`); md.remove(); rk_cfReload();
         let id = a.id, tr0 = j.trash || null;  // 2.567.0 (#4707); 2.905.0 (#5414): the undo takes it out of the core's trash (same id)
-        offerUndo(tr0 ? tr('Moved to the trash') : tr('Deleted') /* 2.925.0 (#5454) */, histAdd({label: tr('Correction deleted'), undo: async () => { if (tr0) await api('POST', `/api/office/trash/core/${tr0.kind}/${tr0.id}/restore?undo=1`); else id = (await api('POST', '/api/office/cashflow/adjust', keep(j.item))).id; rk_cfReload(); },
+        offerUndo(tr0 ? tr('Moved to the trash') : tr('Deleted') /* 2.947.0 (#5454) */, histAdd({label: tr('Correction deleted'), undo: async () => { if (tr0) await api('POST', `/api/office/trash/core/${tr0.kind}/${tr0.id}/restore?undo=1`); else id = (await api('POST', '/api/office/cashflow/adjust', keep(j.item))).id; rk_cfReload(); },
           redo: async () => { tr0 = (await api('DELETE', `/api/office/cashflow/adjust/${id}`)).trash || null; rk_cfReload(); }}));
         return;
       }
