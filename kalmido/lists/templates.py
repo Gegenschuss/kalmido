@@ -756,6 +756,8 @@ def template_apply(tid):
         try:
             new = tpl_insert(c, d["task"], lid, sec or None, None, base, srt, uid, made=made)
             tx_apply(c, uid, lid, tx_of_template(c, r), made, st)
+            from ..tasks.tundo import tu_op
+            tu_op(c, new, "create", {"at": iso(now_utc())})  # 2.905.0 (#5255): the server's undo step (the browser keeps no copy since stage 7)
             bump(c)
             c.commit()
         except Exception:

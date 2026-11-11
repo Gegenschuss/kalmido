@@ -99,14 +99,16 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await toastClick();
   check(await until(async () => { const t = await get(t4.id); return t.due === today() && t.due_time === null; }), 'undo snooze restores date + time');
   await until(() => !w.eval('HIST.busy'));
-  // undo that meets a change made elsewhere: the other version stays
+  // undo that meets a newer change made elsewhere. 2.905.0 (#5255, undo across devices stage 7): a change of the same
+  // person on another device (the API) is that person's newest step: the toast's Undo (POST /api/undo/to) takes it back
+  // first, then its own step (was: refused as "changed elsewhere"); a change of ANOTHER person stays (undo_ui, bob)
   await w.eval(`patchUndoable(${t4.id}, {due: '${addD(today(), 2)}'}, 'x')`);
   await until(async () => (await get(t4.id)).due === addD(today(), 2));
   await call('PATCH', `/api/tasks/${t4.id}`, {due: addD(today(), 5)});
   await until(() => toastBtn());
-  await toastClick(); await until(() => /Changed elsewhere/.test(d.querySelector('#toast').textContent));
-  check((await get(t4.id)).due === addD(today(), 5), 'undo does not overwrite a newer change elsewhere');
-  check(/Changed elsewhere/.test(d.querySelector('#toast').textContent), 'conflict message');
+  await toastClick();
+  check(await until(async () => (await get(t4.id)).due === today()), 'undo takes the other device\'s newer step back first, then its own (#5255)');
+  await until(() => !w.eval('HIST.busy'));
   // batch
   await w.eval('go("l/' + HOME + '")'); await until(() => d.querySelector(`.trow[data-id="${b1.id}"]`));
   w.eval(`S.multi = new Set([${b1.id}, ${b2.id}])`);
