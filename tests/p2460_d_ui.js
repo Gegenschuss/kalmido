@@ -33,6 +33,7 @@ const FEAT = 'cal,comments,collab';
   const hid = () => [...d.querySelectorAll('.modal')].filter(m => m.style.display === 'none');
   const footBtn = (m, sel) => m.querySelector('.foot ' + sel);
   const back = m => /Back/.test(m?.querySelector('.foot .btn.pri')?.textContent || '');
+  const done = m => /^\s*Done\s*$/.test(m?.querySelector('.foot .btn.pri')?.textContent || '');  // 2.910.0 (#5442): a dialog that saves by itself says "Done", also as a sub-dialog (was "Back")
 
   // ================= #1604 folder: Share -> settings -> Share -> settings, Back each time
   w.eval(`LS.set('agSafeSeen', true); folderShareModal('Team')`);
@@ -40,7 +41,7 @@ const FEAT = 'cal,comments,collab';
   check(md && !back(md), '#1604: the Share dialog opened on its own says "Done"');
   click(w, footBtn(md, '[data-m="fsh-props"]'));
   let pr = await until(() => [...d.querySelectorAll('.modal.fsmodal')].find(m => m.style.display !== 'none'));
-  check(pr && back(pr), '#1604: the folder settings opened from Share say "Back"');
+  check(pr && done(pr) && !back(pr), '#1604: the folder settings opened from Share say "Done" (2.910.0, #5442)');
   check(vis().length === 1 && hid().length === 1, '#1604: one visible dialog, the Share dialog hidden under it');
   click(w, footBtn(pr, '[data-m="people"]'));
   await sleep(300);
@@ -60,7 +61,7 @@ const FEAT = 'cal,comments,collab';
   check(pr && !back(pr), '#1604: the folder settings on their own say "Done"');
   click(w, footBtn(pr, '[data-m="people"]'));
   md = await until(() => d.querySelector('.modal.fshmodal #fsh-members .mrow[data-uid]')?.closest('.modal'));
-  check(md && back(md) && vis().length === 1 && hid().length === 1, '#1604: Share from the settings says "Back"');
+  check(md && back(md) && vis().length === 1 && hid().length === 1, '#1604: Share from the settings says "Back"');  // 2.910.0 (#5442): the folder's Share dialog moves to "Done" in #5587
   click(w, footBtn(md, '[data-m="fsh-props"]'));
   await sleep(300);
   check(vis().length === 1 && vis()[0] === pr && hid().length === 0, '#1604: "Folder settings…" in a Share dialog with Back returns, does not stack');
@@ -74,7 +75,7 @@ const FEAT = 'cal,comments,collab';
   check(md && !back(md), '#1604: the list Share dialog on its own says "Done"');
   click(w, footBtn(md, '[data-m="list-edit"]'));
   let le = await until(() => d.querySelector('.modal [data-m="share-open"]')?.closest('.modal'));
-  check(le && back(le) && vis().length === 1 && hid().length === 1, '#1604: the list settings opened from Share say "Back"');
+  check(le && done(le) && vis().length === 1 && hid().length === 1, '#1604: the list settings opened from Share say "Done" (2.910.0, #5442)');
   click(w, le.querySelector('[data-m="share-open"]'));
   await sleep(400);
   check(vis().length === 1 && vis()[0] === md && hid().length === 0 && !le.isConnected, '#1604: "Share…" in the list settings goes back, no stack');
@@ -91,7 +92,7 @@ const FEAT = 'cal,comments,collab';
   check(le && !back(le), '#1604: the list settings on their own have no Back');
   click(w, le.querySelector('[data-m="share-open"]'));
   md = await until(() => d.querySelector('.modal [data-m="list-edit"]')?.closest('.modal'));
-  check(md && back(md) && vis().length === 1 && hid().length === 1, '#1604: Share from the list settings says "Back"');
+  check(md && done(md) && vis().length === 1 && hid().length === 1, '#1604: Share from the list settings says "Done" (2.910.0, #5442)');
   click(w, footBtn(md, '.btn.pri'));
   await sleep(400);
   check(vis().length === 1 && vis()[0] === le, '#1604: its "Back" shows the list settings again');

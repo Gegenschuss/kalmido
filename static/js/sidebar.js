@@ -779,7 +779,7 @@ async function folderPropsModal(f, opt = {}) {
       ${ownN ? `<label class="chkl"><input type="checkbox" id="fs-force"> ${esc(trn('Also the {0} project changed on its own', 'Also the {0} projects changed on their own', ownN))}</label>` : ''}</fieldset>
     <div class="fsprev" id="fs-prev" role="status" hidden></div>
     ${pbOn() ? pbAreaHtml('folder') : ''}
-    <div class="foot">${collab() ? `<button class="btn" data-m="people">${ic('users', 's')} ${tr('Share…')}</button>` : ''}<span class="spacer"></span><button class="btn pri" data-m="close">${opt.back ? ic('back', 's') + ' ' + tr('Back') : tr('Done')}</button></div>`);
+    <div class="foot">${collab() ? `<button class="btn" data-m="people">${ic('users', 's')} ${tr('Share…')}</button>` : ''}<span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);  // 2.910.0 (#5442): "Done" also as a sub-dialog (was "Back")
   md.classList.add('fsmodal');
   if (pbOn()) pbMount(md, {folder: f});  // 2.39.0 (#1168): the folder's playbook (saved on its own)
   const saved = undo => {

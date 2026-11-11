@@ -567,7 +567,7 @@ function dpSet(inp, v) {
 const DP = {el: null, anchor: null, st: null};
 function dpClose(focusBack = true) {
   if (!DP.el) return;
-  const a = DP.anchor; an_remove(DP.el); DP.el = null; DP.st = null; DP.anchor = null;  // 2.46.1 (#1558): the sheet folds away first
+  const a = DP.anchor; kb_pop(DP.el); an_remove(DP.el); DP.el = null; DP.st = null; DP.anchor = null;  // 2.46.1 (#1558): the sheet folds away first; 2.910.0 (#5442): off the key stack
   if (a) { a.setAttribute?.('aria-expanded', 'false'); if (focusBack && a.isConnected) a.focus?.({preventScroll: true}); }
 }
 // open a picker: from a field button, or directly (dpOpen(anchor, {kind, value, min, max, label, onPick}))
@@ -582,6 +582,7 @@ function dpOpen(anchor, o) {
   if (o.kind === 'date') { dpDateShell(v); dpDrawDate(); } else dpDrawTime();
   dpPlace();
   el.addEventListener('keydown', dpKey);
+  kb_push('popover', el, {close: () => dpClose(true)});  // 2.910.0 (#5442): Escape through the shared stack (keys.js): only the picker closes, the dialog below stays
   el.addEventListener('click', dpClick);
   el.addEventListener('change', e => {
     if (!e.target.classList.contains('dpy') || !DP.st) return;
@@ -691,9 +692,9 @@ function dpClick(e) {
 }
 function dpKey(e) {
   const st = DP.st; if (!st) return;
-  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); dpClose(true); return; }
-  if (e.key === 'Tab') {  // stay inside the popover
-    const f = $$('button:not([disabled]),input,select', DP.el).filter(x => x.tabIndex >= 0); if (!f.length) return;
+  if (e.key === 'Escape') return;  // 2.910.0 (#5442): the shared stack closes it (kb_push in dpOpen, keys.js)
+  if (e.key === 'Tab') {  // stay inside the popover; 2.910.0 (#5442): the dialogs' own list of what takes the focus (focusables, dialogs.js)
+    const f = focusables(DP.el).filter(x => x.tabIndex >= 0); if (!f.length) return;
     if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
     else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
     return;

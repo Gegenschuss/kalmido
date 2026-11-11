@@ -190,7 +190,7 @@ function modalA11y(m) {
     (i < 0 ? f[e.shiftKey ? f.length - 1 : 0] : f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length]).focus();
   });
   setTimeout(() => {
-    if (!document || !m.isConnected || m.contains(document.activeElement) || $('#pop:not(.hidden)')?.contains(document.activeElement)) return;
+    if (!document || !m.isConnected || m.contains(document.activeElement) || $('#pop:not(.hidden)')?.contains(document.activeElement) || $('#dpop')?.contains(document.activeElement)) return;  // 2.910.0 (#5442): + the date picker opened at once
     // CI of 2.223.2: a dialog's own first focus (data-mfocus) wins over the card when the focus got lost before (a redraw)
     const own = m.querySelector('[data-mfocus]:not([disabled])');
     if (own) { try { own.focus({preventScroll: true}); } catch { own.focus(); } return; }
@@ -680,7 +680,21 @@ function shareSummary(l) {
 // 2.32.0 (#1058): the parts below "People" fold (closed at first, a short state in the folded line); people stay open.
 // Ids of the old headings stay (l-pub-h, sh-own-h, sh-ag-h, sh-grp-h) for links and tests.
 const SH_HID = {grp: 'sh-grp-h', ag: 'sh-ag-h', pub: 'l-pub-h', own: 'sh-own-h', ntf: 'sh-ntf-h'};  // 2.33.0 (#927): + notifications
-const shSec = (k, title, inner, hide = false, open = false) => `<details class="shsec" id="sh-sec-${k}" ${hide ? 'hidden' : ''} ${open ? 'open' : ''}><summary><h4 id="${SH_HID[k]}">${title}</h4><span class="shsecst muted" id="sh-st-${k}"></span>${ic('chev', 's shchev')}</summary>${inner}</details>`;
+// 2.910.0 (#5442): the Share dialogs of a project (here) and of a folder (sharedlg.js, moves over in #5587) are one building block: the same frame
+// (shFrameHtml: head with the cross, the parts, the foot "… settings…" | "Done"), the same folded part (shSecHtml) and the same
+// role choice (shRoleSel); each dialog passes its adapter (the ids of its parts, its title and settings button). The ids stay
+// (sh-sec-* / fsh-sec-*, fp-sec-ntf) for links and tests. Every part keeps a minimum height (start-polish-listen-2910.css), so the
+// dialog does not grow in steps while its people, agents and links load.
+function shSecHtml(a, k, title, inner, hide = false, open = false) {
+  return `<details class="shsec" id="${esc(a.sec(k))}" ${hide ? 'hidden' : ''} ${open ? 'open' : ''}><summary><h4 id="${esc(a.hid[k])}">${/*html-ok*/ title/* tr() of the caller */}</h4><span class="shsecst muted" id="${esc(a.st(k))}"></span>${ic('chev', 's shchev')}</summary>${/*html-ok*/ inner/* the part's markup */}</details>`;
+}
+function shFrameHtml(a) {
+  return `<div class="lhdr"><h3>${esc(a.title)}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x')}</button></div>${/*html-ok*/ a.body/* the parts */}
+    <div class="foot"><button class="btn" data-m="${esc(a.setAct)}">${ic(a.setIcon, 's')} ${esc(a.setLabel)}</button><span class="spacer"></span><button class="btn pri" data-m="close">${esc(tr('Done'))}</button></div>`;  // a dialog that saves by itself closes with "Done" (was "Back" when opened from the settings)
+}
+const shRoleSel = (attr, cur, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
+const SH_ADP = {sec: k => 'sh-sec-' + k, st: k => 'sh-st-' + k, hid: SH_HID};
+const shSec = (k, title, inner, hide = false, open = false) => shSecHtml(SH_ADP, k, title, inner, hide, open);
 // 2.550.0 (#4528): what removing a member ended (lists/membermemo.py): the numbers as text, the memos of a project, the question
 const mmText = d => [d?.assigned && trn('{0} assignment', '{0} assignments', d.assigned), d?.values && trn('{0} person field value', '{0} person field values', d.values),
   d?.delegate && trn('{0} delegated task', '{0} delegated tasks', d.delegate), d?.watch && trn('{0} watched task', '{0} watched tasks', d.watch)].filter(Boolean).join(', ');
@@ -697,23 +711,23 @@ async function mmAsk(lid, uid, name, offer, after) {
 function shareModal(id, opt = {}) {
   const l0 = listById(id); if (!shareOk(l0)) return;
   const own = isOwner(l0);
-  const md = modal(`<div class="lhdr"><h3>${esc(tr(collab() ? N_('Share “{0}”') : N_('Owner of “{0}”'), lname(l0)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
+  const md = modal(shFrameHtml({title: tr(collab() ? N_('Share “{0}”') : N_('Owner of “{0}”'), lname(l0)), setAct: 'list-edit', setIcon: 'edit', setLabel: tr('Project settings…'), body: `
     ${collab() ? `<div class="shws" id="sh-ws"></div>` : ''}
-    ${collab() ? `<h4 id="sh-people-h">${tr('People')}</h4><div class="members" id="l-members" aria-labelledby="sh-people-h"></div>` : ''}${dsc_on() ? `<button type="button" class="linkbtn dsc-sharelink" data-dsc-open>${tr('Find a person …')}</button>` : ''}${''/* 2.49.0 (#1106) */}
+    ${collab() ? `<h4 id="sh-people-h">${tr('People')}</h4><div class="members shppl" id="l-members" aria-labelledby="sh-people-h">${/*html-ok*/ loadingHtml()}</div>` : ''}${dsc_on() ? `<button type="button" class="linkbtn dsc-sharelink" data-dsc-open>${tr('Find a person …')}</button>` : ''}${''/* 2.49.0 (#1106) */}
     ${collab() && typeof ln_shareHint === 'function' ? ln_shareHint(id) : ''}${''/* 2.48.0 (#1642): locked notes stay unreadable */}
     ${collab() && (S.peopleVis === 'contacts' || S.instanceMode === 'workspaces') && canManage(l0) ? `<div class="row shmail"><input id="sh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="share-mail">${ic('send', 's')} ${tr('Share')}</button></div>` : ''}
     ${collab() ? shSec('grp', tr('Groups'), `<div id="sh-grpwrap"></div>`, true) : ''}
-    ${collab() && agentsOn() ? shSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the projects shared with it, nothing else. Stopping the sharing ends its access at once.')}</div><div id="sh-agwrap"></div>`, true) : ''}
+    ${collab() && agentsOn() ? shSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the projects shared with it, nothing else. Stopping the sharing ends its access at once.')}</div><div id="sh-agwrap"></div>`, !canManage(l0) && !listPeople(l0).some(p => p.agent || agentById(p.user_id))) : ''}${''/* 2.910.0 (#5442): shown from the start where it will be (no step when the people have loaded) */}
     ${own && collab() ? shSec('ntf', tr('Notifications for members'), `<div id="sh-ntf"><div class="muted mhint">${tr('Loading…')}</div></div>`, false, opt.focus === 'ntf') : ''}
     ${!own && collab() ? ntfMemberHint(l0) : ''}
     ${own && pubOn('lists') && l0.e2e && typeof le2u_pubHtml === 'function' ? shSec('pub', tr('Public link'), le2u_pubHtml()) : ''}${''/* 2.64.1 (#1817) */}
     ${own && pubOn('lists') && !l0.e2e ? shSec('pub', tr('Public link'), `<div id="l-pub"><div class="muted mhint">${tr('Loading…')}</div></div>`) : ''}
     ${shSec('own', tr('Owner'), `<div id="sh-ownwrap"><div class="muted mhint" id="sh-owner"></div><div id="l-owner"></div></div>`, false, !collab())}
-    <div class="foot"><button class="btn" data-m="list-edit">${ic('edit', 's')} ${tr('Project settings…')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${opt.back ? ic('back', 's') + ' ' + tr('Back') : tr('Done')}</button></div>`);
+`}));  // 2.910.0 (#5442): the shared frame (shFrameHtml)
   md.classList.add('shmodal');
   let users = null, memos = null;  // 2.550.0 (#4528): memos = user id -> what their removal ended (owner and project admins)
   const shSecSet = (k, show, st) => { const sec = $('#sh-sec-' + k, md); if (!sec) return; sec.hidden = !show; const e = $('#sh-st-' + k, md); if (e) e.textContent = st || ''; };
-  const roleSel = (attr, cur_, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur_ ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
+  const roleSel = shRoleSel;  // 2.910.0 (#5442): the shared role choice
   const isAg = p => !!(p.agent || agentById(p.user_id));
   const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge(p.user_id) : ''}${p.via_group ? ` <span class="muted">${tr('via a group')}</span>` : ''}${p.via_folder && cur.folder ? ` <span class="muted lfvia">${esc(tr('via the folder {0}', fDisp(cur.folder)))}</span>` : ''/* 2.352.0 E (#2748) */}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id) && !p.via_group
       ? `${memos?.[p.user_id] ? `<button type="button" class="iconbtn" data-mmrest="${p.user_id}" title="${esc(tr('Restore what {0} had in this project', p.name))}" aria-label="${esc(tr('Restore what {0} had in this project', p.name))}">${ic('undo', 's')}</button>` : ''/* 2.550.0 (#4528) */}${roleSel(`data-mrole="${p.user_id}"`, p.role, tr('Role of {0}', p.name))}<button class="iconbtn" data-mrm="${p.user_id}" title="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove from project'))}" aria-label="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove {0} from this project', p.name))}">${ic('x', 's')}</button>`
@@ -738,6 +752,7 @@ function shareModal(id, opt = {}) {
       const ags = people.filter(isAg), acand = users ? users.filter(u => u.agent && !people.some(p => p.user_id === u.id) && agFits(u)) : [];
       aw.innerHTML = ags.length || (mng && acand.length) ? `<div class="members" id="sh-agents">${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent && agFits(u)) ? '' : ags.map(p => row(cur, p, mng)).join('')}${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent && agFits(u)) ? `<div class="row"><label for="sh-agsel">${tr('Agent')}</label><select id="sh-agsel"><option value="">${tr('No agent')}</option>${users.filter(u => u.agent && (agFits(u) || ags.some(p => p.user_id === u.id))).map(u => `<option value="${u.id}" ${ags[0]?.user_id === u.id ? 'selected' : ''}>${esc(u.display_name)}${!agFits(u) ? ' · ' + esc(tr('other workspace')) : ''}</option>`).join('')}</select></div>` : ''}${ags.some(p => !agFits((users || []).find(u => u.id === p.user_id) || {org_id: cur.org_id})) ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('This agent works in another workspace (from before the workspaces). Take it out of the project, or keep it on purpose.'))}</div>` : ''}</div>
         <div id="l-tidyrow">${tidyRowHtml(cur)}</div>` : '';
+      if (!aw.innerHTML && !$('#sh-sec-ag', md)?.hidden) aw.innerHTML = `<div class="muted mhint">${esc(users === null && mng ? tr('Loading…') : tr('No agent'))}</div>`;  // 2.910.0 (#5442)
       shSecSet('ag', !!aw.innerHTML, ags.length ? ags.map(p => p.name).join(', ') + (listenOn(cur) ? ' · ' + tr('listens in') : '') : tr('No agent'));
     }
     const gw = $('#sh-grpwrap', md);  // 2.10.0 (#441)
@@ -1092,7 +1107,7 @@ function listModal(id, folder = '', o = {}) {
     ${id ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}`, fown, o.open === 'proj' || (!id && (o.kind === 'project' || !!o.ptype)))}
     ${id && !l.is_inbox ? lmSec('props', tr('Properties'), pz_boxHtml(l), fown) : ''}${''/* 2.412.0 (#3552): the properties of the tasks (props.js) */}
     ${lmSec('acts', tr('Actions'), `<div class="row lacts">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore project from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${l.e2e ? tr('Delete project permanently…') : tr('Delete project…') /* 2.102.0 (#1988): into the trash */}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your projects; undo or restore any time. Deleting permanently is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive project')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave project')}</button>` : ''}${id && canEditList(id) /* 2.126.0 D (#1992 A6) */ ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted projects')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this project with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}</div>`, fown, l.archived)}
-    ${id && !o.back ? '' : `<div class="foot"><span class="spacer"></span>${id ? `<button class="btn pri" data-m="close">${ic('back', 's')} ${tr('Back')}</button>` : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`}`);
+    ${id && !o.back ? '' : `<div class="foot"><span class="spacer"></span>${id ? `<button class="btn pri" data-m="close">${tr('Done')}</button>` : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`}`)  // 2.910.0 (#5442): a dialog that saves by itself closes with "Done" (was "Back");
   lmSecWire(md);
   if (id) md.classList.add('lmodal'); else { md.classList.add('lnew'); lnew_short(md, o); }  // 2.364.0 D (#3033)
   if (!id && tplOf('list').length) api('GET', '/api/templates').then(j => {  // 2.4.0 (#328): what each own template brings

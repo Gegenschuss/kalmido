@@ -237,7 +237,7 @@ function folderRepoModal(f, opt = {}) {  // 2.37.0 (#1158): opt.back = a sub-dia
   const md = modal(`<h3>${ic('git', 's')} ${esc(tr('Repository of the folder “{0}”', fDisp(f)))}</h3>
     <div class="shint lhint">${tr('Every project in this folder and its subfolders uses it, also new ones: #123 and “fixes #123” in commits and pull requests find the tasks of all these projects. A project can switch it off or connect its own repository; a subfolder can have its own.')}</div>
     <div class="members" id="l-repos"><div class="muted mhint">${tr('Loading…')}</div></div>
-    <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${opt.back ? ic('back', 's') + ' ' + tr('Back') : tr('Done')}</button></div>`);
+    <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);  // 2.910.0 (#5442): a dialog that saves by itself closes with "Done" (was "Back" as a sub-dialog)
   md.addEventListener('click', e => { if (/** @type {HTMLElement} */ (e.target).closest('[data-m="close"]')) md.remove(); });
   repoWire(md, 0, f);
   return md;

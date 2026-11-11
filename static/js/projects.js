@@ -84,7 +84,7 @@ async function statusModal(lid) {
       <div class="shint">${collab() && l.shared ? tr('Everyone in this project gets it as news.') : tr('Shown in the project header, the sidebar and the project status.')}</div>`
     : `<div class="rohint">${ic('eye', 's')}${tr('Read-only')}</div>`}
     <h4>${tr('History')}</h4><div class="sthist" id="st-hist">${/*html-ok*/ loadingHtml()}</div>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button>${can ? `<button class="btn pri" data-m="save">${tr('Update status')}</button>` : ''}</div>`);
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${can ? tr('Cancel') : tr('Close')}</button>${can ? `<button class="btn pri" data-m="save">${tr('Save')}</button>` : ''}</div>`);  // 2.910.0 (#5442): a form = Cancel + Save, read-only = Close
   md.classList.add('stmodal');
   rawFetch('GET', `/api/lists/${lid}/status`).then(j => {
     const box = $('#st-hist', md); if (!box) return;
@@ -559,7 +559,7 @@ function depPicker(tid, dir) {
     <div class="shint">${dir === 'by' ? tr('“{0}” can only really start once the selected task is done.', esc(self?.title || '')) : tr('The selected task is then blocked by “{0}”.', esc(self?.title || ''))}</div>
     <input id="dp-q" placeholder="${tr('Search open tasks')}" autocomplete="off" style="width:100%;margin-top:.5rem">
     <div class="dplist tpk" id="dp-list" role="listbox" aria-label="${esc(tr('Open tasks'))}"></div>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button></div>`);
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);  // 2.910.0 (#5442): a pure choice closes, nothing to cancel
   md.classList.add('dpmodal');
   const draw = () => {
     const q = norm($('#dp-q', md).value || '');

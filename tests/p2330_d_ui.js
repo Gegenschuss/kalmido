@@ -113,7 +113,7 @@ const V = B + 'api/v1';
   // 2.37.0 (#1158): Repository… opens as a sub-dialog over the folder settings (which step aside, hidden): look in its own dialog
   const rmd = () => d.querySelector('.modal #l-repos')?.closest('.modal');
   check(/Repository of the folder “Apps”/.test(rmd()?.querySelector('h3')?.textContent || '') && d.querySelector('.modal #l-repos #rp-name') && !d.querySelector('.modal #rp-tok').disabled
-    && /Back/.test(rmd()?.querySelector('[data-m="close"]')?.textContent || ''),
+    && /Done/.test(rmd()?.querySelector('[data-m="close"]')?.textContent || ''),  // 2.910.0 (#5442): "Done" (was "Back")
     '#934: folder settings > Repository opens the form (sub-dialog with Back) ' + rmd()?.querySelector('h3')?.textContent);
   d.querySelector('.modal #rp-prov').value = 'github';
   d.querySelector('.modal #rp-base').value = GH; d.querySelector('.modal #rp-name').value = 'acme/app'; d.querySelector('.modal #rp-tok').value = TOKEN;
