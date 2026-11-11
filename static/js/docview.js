@@ -205,6 +205,7 @@ function dcv_nbTake(d, old) {
   const was = /** @type {any} */ (old)._dcv, pdf = DVW.pdf?.box && old.contains(DVW.pdf.box) ? DVW.pdf : null;
   old.replaceWith(el);
   DVW.pdf = e.pdf || null;
+  const nbx = $('.dv-pages', el); if (nbx?._base || nbx?._ph) dcv_layout(nbx);  // 2.905.0 (#5393): laid out in its new room at once, not 80 ms later by the ResizeObserver (the page before the file too)
   if (e.pdf) { e.pdf.nb = false; setTimeout(() => dcv_textFill(e.pdf), 0); }  // 2.742.0 (#4861): its pages drawn ahead get their text layers now
   if (was?.d && was.d.id !== d.id && !DC_PEND.has(was.d.id) && $('.dv-pages', old)?._base) {  // its preview finished
     const o = {id: was.d.id, d: was.d, set: was.set, at: Date.now(), ctrl: new AbortController(), el: old, pdf, rc: keep.rc, ltd: keep.ltd};
@@ -472,7 +473,11 @@ async function dcv_pvDraw(md, d, nb) {
 const DCV_A4 = {w: 595, h: 842};
 function dcv_phSize(d) {
   if (!d.thumb && !(dc_isPdf(d) && d.size <= 40e6)) return null;  // nothing to show: the icon as before
-  const k = DVW.sz?.get(d.id); if (k && k.v === d.size) return {w: k.w, h: k.h, mw: k.mw};
+  const img = /^image\//.test(d.mime || '') ? {img: true} : {};  // 2.905.0 (#5393): a picture's zoom limit as dcv_scale has it for the loaded one
+  const k = DVW.sz?.get(d.id); if (k && k.v === d.size) return {w: k.w, h: k.h, mw: k.mw, ...img};
+  // 2.905.0 (#5393): the first page's size the server measured (doc_json page: [w, h, widest] as pdf.js has it, a picture's pixels)
+  const pg = Array.isArray(d.page) && d.page[0] > 0 && d.page[1] > 0 ? d.page : null;
+  if (pg) return {w: pg[0], h: pg[1], mw: pg[2] > 0 ? pg[2] : pg[0], ...img};
   const im = d.thumb ? DVW.th?.get(dcv_thumbKey(dc_thumbUrl(d))) || dcv_thumbSeen(dc_thumbUrl(d)) : null;
   return im ? {w: DCV_A4.w, h: Math.round(DCV_A4.w * im.h / im.w)} : {...DCV_A4};
 }
@@ -491,7 +496,7 @@ function dcv_thumbSeen(u) {
 }
 // the small picture came later than the page was laid out and has another shape: the page takes it at once (while the file loads)
 function dcv_phLearn(box, d) {
-  const im = /** @type {HTMLImageElement|null} */ (box.querySelector('.dv-ph img')); if (!im || DVW.sz?.get(d.id)?.v === d.size) return;
+  const im = /** @type {HTMLImageElement|null} */ (box.querySelector('.dv-ph img')); if (!im || DVW.sz?.get(d.id)?.v === d.size || Array.isArray(d.page)) return;  // 2.905.0 (#5393): the server's size wins
   const fit = () => {
     const p = box._ph?.[0]; if (!p || box._base || !im.naturalWidth || !im.isConnected) return;
     const h = Math.round(p.w * im.naturalHeight / im.naturalWidth);

@@ -39,6 +39,7 @@ from ..core.errors import BadInput  # 2.369.5 (#2517): pulled up from functions
 from .ocr import thumb_bytes, doc_text, qr_codes, OCR_PAGES, QR_DOC_S, THUMB_WL  # 2.369.5 (#2517): pulled up from functions; 2.583.0 (#4812): THUMB_WL
 from .ocr import OCR_LANG_MAX, ocr_choices  # 2.635.0 (#4807 b)
 from .scanmark import scan_of  # 2.836.0 (#5390): the scan mark
+from .pagesize import pg_of  # 2.905.0 (#5393): the first page's size
 from ..office.einvoice_in import ei_of_file, ei_text, ei_amount, ei_details, ei_compact, ei_receipt  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
 
@@ -1142,7 +1143,7 @@ def redo_back(c, nid):
     auto.pop("_hand", None)
     auto.pop("_was", None)
     now_auto = meta_json(c, m, "auto", {})
-    auto.update({k: now_auto[k] for k in ("_hand", "_was", "_scan") if k in now_auto})  # 2.836.0 (#5390, review): the scan mark stays
+    auto.update({k: now_auto[k] for k in ("_hand", "_was", "_scan", "_pg") if k in now_auto})  # 2.836.0 (#5390, review): the scan mark stays; 2.905.0 (#5393): the page size of the file now
     vals = {k: prev[k] for k in REDO_COLS if k != "auto"}
     for f in hand:
         vals[HAND_FIELDS[f]] = m[HAND_FIELDS[f]]
@@ -1408,6 +1409,7 @@ def process(c, nid):
         res["method"] = "e-invoice"
     # 2.781.0 (#5390): read before the row is locked (a PDF is read in a child process); 2.836.0 (review): before thumb_store's UPDATE
     scan = scan_of(node["name"], node["mime"], data, res.get("kind"), m["source"], einvoice=bool(ei))
+    page1 = pg_of(data, res.get("kind"))     # 2.905.0 (#5393): the first page's size (a PDF in a child process), before the row lock
     thumb_store(c, m, node, data, res.get("kind"))
     text = res.get("text") or ""
     asn_found = None
@@ -1487,6 +1489,10 @@ def process(c, nid):
     if not m2:  # #3090: deleted along while the run went (users.user_delete / orgs.org_delete lock its row first)
         return None
     auto_all.pop("_asn_taken", None)         # 2.591.0 B (#4863): a fresh run, a fresh hint
+    if page1:                                # 2.905.0 (#5393): the document view's preview takes it before the file is loaded
+        auto_all["_pg"] = page1
+    else:                                    # no size of this content (another kind, unreadable, busy): never the old version's
+        auto_all.pop("_pg", None)
     if scan is not None:                     # 2.781.0 (#5390): a scan (archive number field); unknown = the old mark stays
         auto_all["_scan"] = scan
     if asn_found and not m2["asn"]:

@@ -17,6 +17,7 @@ from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from func
 from . import store as S  # 2.369.5 (#2517): pulled up from functions
 from ..core.access import live_sql  # 2.836.0 (#5390): the trash condition of the scan mark's catch-up
 from .scanmark import ScanBusy, scan_of  # 2.836.0 (#5390)
+from .pagesize import PG_IMG, PG_PDF, PgBusy, pg_of  # 2.905.0 (#5393)
 
 FILL = env_bool("KALMIDO_DOCS_THUMB_FILL", True)
 FILL_S = max(1, int(os.environ.get("KALMIDO_DOCS_THUMB_FILL_S", "15") or 15))  # s between two portions
@@ -180,4 +181,60 @@ def p5390_scan_fill(c):
         except Exception as e:  # noqa: BLE001 -- a missing file, a key that does not open, a broken PDF: skip it
             print("docs: scan mark catch-up", nid, type(e).__name__, e, flush=True)
     gset(c, FILL_SCAN_KEY, json.dumps({"below": rows[-1][0]}))
+    return len(rows)
+
+
+# 2.905.0 (#5393): the first page's size (doc_meta.auto["_pg"], docs/pagesize.py) for documents recognised before it was
+# kept -- the same catch-up pattern: only while the queue is idle and after the sharp previews are done, a portion every
+# FILL_S seconds, newest first, its own position (FILL_PG_KEY), "done" at the end. Only PDFs and pictures with a preview are
+# looked at; one that cannot be told keeps no size (the document view then shapes the preview from its small picture).
+FILL_PG_KEY = "docs_page_fill"  # settings: {"below": lowest node id handled so far} or {"done": 1}
+_QP = {"at": 0.0}
+
+
+def p5393_page_fill(c):
+    """One portion of the catch-up of the first page's size (run like p61a_thumb_fill in the queue's system context, the
+    caller commits). Returns the number of documents looked at; 0 when it is not time yet, the sharp previews still run, or
+    done."""
+    if not FILL or time.monotonic() - _QP["at"] < FILL_S:
+        return 0
+    _QP["at"] = time.monotonic()
+    try:
+        if not json.loads(gsetting(c, FILL_L_KEY) or "{}").get("done"):
+            return 0  # the sharp previews first
+        st = json.loads(gsetting(c, FILL_PG_KEY) or "{}")
+    except (ValueError, AttributeError):
+        st = {}
+    st = st if isinstance(st, dict) else {}
+    if st.get("done"):
+        return 0
+    below = int(st.get("below") or 2 ** 62)
+    rows = c.execute(f"""SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
+                        WHERE d.node_id < ? AND d.state='done' AND COALESCE(d.thumb, '')<>'' AND POSITION('"_pg"' IN COALESCE(d.auto, ''))=0 AND {live_sql("n")}
+                          AND ((LOWER(n.mime)='application/pdf' OR LOWER(n.name) LIKE '%.pdf') AND n.size <= ?  -- pg-ok: LOWER() on the column
+                               OR LOWER(n.mime) LIKE 'image/%' AND n.size <= ?)  -- pg-ok: LOWER() on the column; never a file it would not measure
+                        ORDER BY d.node_id DESC LIMIT ?""", (below, PG_PDF, PG_IMG, FILL_N)).fetchall()  # pg-ok: LOWER() on the column only
+    if not rows:
+        gset(c, FILL_PG_KEY, json.dumps({"done": 1}))
+        return 0
+    for (nid,) in rows:
+        try:
+            with c.savepoint():  # one broken document never stops the catch-up
+                node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+                data = fs_read(c, nid)
+                page = pg_of(data, file_kind(node["name"], node["mime"], data[:2048]), strict=True)
+                if page:
+                    r = c.execute("SELECT auto FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchone()  # a save meanwhile stays
+                    auto = json.loads(r["auto"] or "{}") if r else None
+                    if isinstance(auto, dict) and "_pg" not in auto:
+                        auto["_pg"] = page
+                        c.execute("UPDATE doc_meta SET auto=? WHERE node_id=?", (json.dumps(auto, separators=(",", ":")), nid))
+            c.commit()  # the row lock ends here, not after the whole portion
+        except PgBusy:  # no free PDF slot: this document again in the next portion, not skipped for good (as p5390_scan_fill)
+            c.rollback()
+            gset(c, FILL_PG_KEY, json.dumps({"below": nid + 1}))
+            return 1
+        except Exception as e:  # noqa: BLE001 -- a missing file, a key that does not open, a broken PDF: skip it
+            print("docs: page size catch-up", nid, type(e).__name__, e, flush=True)
+    gset(c, FILL_PG_KEY, json.dumps({"below": rows[-1][0]}))
     return len(rows)

@@ -511,6 +511,7 @@ ORDER = (
     "docs.rules",  # 2.48.0 (#1111): sorting rules (no routes)
     "docs.classify",  # 2.48.0 (#1111): the locally learning classifier (no routes)
     "docs.ocr",  # 2.48.0 (#1111): text recognition + preview images (no routes)
+    "docs.pagesize",  # 2.905.0 (#5393): the first page's size of a document (the view's preview); imported by docs.store / docs.thumbfill (no routes)
     "docs.scanmark",  # 2.836.0 (#5390): is a document a scan (archive number field); imported by docs.store / docs.thumbfill (no routes)
     "docs.store",  # 2.48.0 (#1111): documents: tables, sealing, word index, recognition run (no routes)
     "docs.maillink",  # 2.424.0 B (#3450): invoice download links of a mail to the document address (no routes)
