@@ -21,7 +21,11 @@ scanners). A red run is soft green only when: it ended as failure (not cancelled
 shard, every hard shard is green, every red shard names its red suites (annotations "suite X failed" of tests/run_all.sh) and
 none of them is hard (by name or by the name of its test group, tools/shards.py groups(); a suite in no group = hard), and no
 other hard job is red (name matches a pattern: e-invoice validators, semgrep, ZAP ...; a red step of "Lint ..." only when it is a
-scanner). Hard red, cancelled, only the push stage = no image, as before. The soft red parts are printed (step summary) and
+scanner). Hard red, only the push stage = no image, as before.
+2.940.0 (#5600): a CANCELLED full run counts like a red one - soft green when every hard shard and hard job ended green and
+only soft shards were cut (a newer push cancels the running CI with cancel-in-progress once the fast lane has the version
+live; v2.883, v2.897, v2.902 had all hard shards green and got no image). A hard shard or hard job that was cancelled before
+it finished is no green one = no image. The soft red parts are printed (step summary) and
 --report lists them for the release notes (weekly-release.yml).
   python3 tools/ci_gate.py --sha SHA --report   markdown of the soft red parts of SHA's newest finished full run ("" = green)
 Env: GITHUB_TOKEN (or GH_TOKEN), GITHUB_REPOSITORY, GITHUB_SHA, GITHUB_API_URL (all set on GitHub Actions)."""
@@ -41,6 +45,7 @@ SUITE_ANN_RE = re.compile(r"^suite ([A-Za-z0-9_.-]+) failed$")  # tests/run_all.
 SCANNERS = ("audit", "gitleaks", "secret", "bandit", "semgrep", "trivy")  # a red step of the Lint job is hard only as one of these
 # review 2.767.0 (#5324): the steps a scanner needs before it runs (install, the pin / OSV check) - red or not run = hard as well
 SCAN_PREP = ("install scanners*", "pinned dependencies*")
+SOFT_CONCL = ("failure", "cancelled")  # #5600: the run conclusions judge_soft looks at (cancelled = a newer push cut the run)
 
 
 def stage(job_names):
@@ -64,8 +69,8 @@ def decide(runs, jobs_of, soft=None):
                 return "green", "CI run %s is green (full stage)" % r["id"]
             why.append("run %s green, but stage %s (a release needs the full stage)" % (r["id"], st))
     if soft is not None:  # #5324: a finished full run red only in soft parts = go, like live in the fast lane
-        for r in runs:
-            if r.get("status") == "completed" and r.get("conclusion") == "failure":
+        for r in runs:  # #5600: a cancelled run as well (its cancelled hard parts are red in judge_soft)
+            if r.get("status") == "completed" and r.get("conclusion") in SOFT_CONCL:
                 ok, txt = soft(r["id"])
                 if ok:
                     return "soft", "CI run %s is red only in soft parts (full stage): %s" % (r["id"], txt)
@@ -74,7 +79,7 @@ def decide(runs, jobs_of, soft=None):
     if busy:
         return "wait", "CI run %s %s" % (busy[0]["id"], busy[0].get("status"))
     for r in runs:
-        if r.get("conclusion") != "success" and not (soft is not None and r.get("conclusion") == "failure"):
+        if r.get("conclusion") != "success" and not (soft is not None and r.get("conclusion") in SOFT_CONCL):
             why.append("run %s %s" % (r["id"], r.get("conclusion")))
     return "red", "; ".join(why)
 
@@ -160,7 +165,7 @@ def judge_soft(jobs, suites_of, pats, grp):
             return False, "the red suites of %s are not readable (unknown = hard)" % j.get("name"), info
         if c == "failure" and not su:
             return False, "%s red without a named suite (unknown = hard)" % j.get("name"), info
-        if c != "failure":  # cancelled / timed out at its time limit: its other suites stay untested (the train counts it soft too)
+        if c != "failure":  # cancelled (time limit, #5600: or a newer push) / timed out: its other suites stay untested (the train counts it soft too)
             info["cut"].append("%s (%s)" % (j.get("name"), c))
         for s in su:
             if hard_suite(s, pats, grp):
@@ -179,7 +184,7 @@ def judge_soft(jobs, suites_of, pats, grp):
             info["jobs"].append(j.get("name"))
     info["suites"] = sorted(set(info["suites"]))
     parts = (["soft suites: " + ", ".join(info["suites"])] if info["suites"] else []) + (["soft jobs: " + ", ".join(info["jobs"])] if info["jobs"] else []) \
-        + (["shards at their time limit: " + ", ".join(info["cut"])] if info["cut"] else [])
+        + (["shards cut before the end: " + ", ".join(info["cut"])] if info["cut"] else [])
     return True, "; ".join(parts) or "no red part named", info
 
 
@@ -192,7 +197,7 @@ def report_md(version, run_id, info, url=""):
            "security scanners; those were all green (same rule as the live update)." + (" CI run: %s" % url if url else ""), ""]
     out += ["- suite `%s`" % s for s in info.get("suites") or []]
     out += ["- job: %s" % j for j in info.get("jobs") or []]
-    out += ["- cut at its time limit (suites untested): %s" % c for c in info.get("cut") or []]
+    out += ["- cut before the end (time limit or a newer push, suites untested): %s" % c for c in info.get("cut") or []]
     return "\n".join(out) + "\n"
 
 

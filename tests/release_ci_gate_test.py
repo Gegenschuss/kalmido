@@ -10,7 +10,9 @@ FULL run of the workflow CI on the tagged commit (tools/ci_gate.py). Without a s
   the push stage does not; release.yml can be re-run on a tag by workflow_dispatch and skips any other ref.
 - 2.767.0 (#5324): a finished full run red only in soft parts = go ("soft"), the same rule as live in the fast lane; hard red
   (a hard shard, a hard suite by name or group, a suite in no group, a red shard without a named suite, a hard job, a scanner
-  step of Lint), cancelled or the push stage = still no image; the soft red parts go into the notes of the weekly release."""
+  step of Lint), cancelled or the push stage = still no image; the soft red parts go into the notes of the weekly release.
+- 2.940.0 (#5600): a CANCELLED full run is judged like a red one (v2.883 / v2.897 / v2.902 had every hard part green, a newer
+  push cut the rest): soft parts cut = go, a hard shard / hard job / Lint scanner cut = no image."""
 import importlib.util
 import os
 import re
@@ -250,8 +252,30 @@ res, txt = gate.decide([run(1, conclusion="failure")], jobs_of({}), soft=lambda 
 check(res == "soft" and "ux1_ui" in txt, "#5324: decide - a finished run red only in soft parts = soft (%s)" % res)
 res, txt = gate.decide([run(1, conclusion="failure")], jobs_of({}), soft=lambda rid: (False, "hard suite red: p4286_restore"))
 check(res == "red" and "p4286_restore" in txt, "#5324: decide - hard red stays red with the reason (%s, %s)" % (res, txt))
+# 2.940.0 (#5600): a cancelled run (a newer push cut it) is judged like a red one - was "never soft" in 2.767.0
 res, _ = gate.decide([run(1, conclusion="cancelled")], jobs_of({}), soft=lambda rid: (True, "x"))
-check(res == "red", "#5324: decide - a cancelled run is never soft (%s)" % res)
+check(res == "soft", "#5600: decide - a cancelled run with only soft parts cut = soft (%s)" % res)
+res, txt = gate.decide([run(1, conclusion="cancelled")], jobs_of({}), soft=lambda rid: (False, "hard shard red: x (cancelled)"))
+check(res == "red" and "hard shard" in txt, "#5600: decide - a cancelled run with a hard part cut stays red (%s, %s)" % (res, txt))
+# the shape of v2.902.0 (CI run 42954362250): every hard shard and hard job green, one soft shard cancelled by the newer push,
+# the summing job "Test suites" red, coverage cancelled - judge_soft says soft
+v2902 = red(base_jobs(job(9, "Test suites (API, UI, security)", "failure"), job(10, "Test coverage (server, reporting only)", "cancelled")),
+            5, "cancelled")
+ok, txt, info = gate.judge_soft(v2902, suites({}), PATS, GRP)
+check(ok and info["cut"], "#5600: v2.902.0 shape - hard green, soft shard cancelled = soft (%s, %s)" % (ok, txt))
+# v2.897.0 shape: one soft shard red with a soft suite, another cancelled
+v2897 = red(red(base_jobs(job(9, "Test suites (API, UI, security)", "failure")), 4), 5, "cancelled")
+ok, txt, _ = gate.judge_soft(v2897, suites({4: ["ux1_ui"]}), PATS, GRP)
+check(ok, "#5600: v2.897.0 shape - soft red + soft cancelled = soft (%s)" % txt)
+# an early push cut the run: a hard shard or a hard job (ZAP) never finished = no image
+ok, txt, _ = gate.judge_soft(red(v2902, 2, "cancelled"), suites({}), PATS, GRP)
+check(not ok and "hard shard" in txt, "#5600: a hard shard cancelled by the push = no image (%s)" % txt)
+ok, txt, _ = gate.judge_soft(v2902 + [job(11, "OWASP ZAP baseline", "cancelled")], suites({}), PATS, GRP)
+check(not ok and "hard job" in txt, "#5600: a hard job cancelled by the push = no image (%s)" % txt)
+lint4 = [job(6, "Lint, i18n, scanners", "cancelled", [{"name": "ESLint of the client", "conclusion": "success"},
+                                                      {"name": "bandit (fails on high severity only)", "conclusion": "cancelled"}])]
+ok, txt, _ = gate.judge_soft([j for j in v2902 if j["id"] != 6] + lint4, suites({}), PATS, GRP)
+check(not ok, "#5600: Lint cancelled before its scanners ran = no image (%s)" % txt)
 res, _ = gate.decide([run(1, conclusion="failure"), run(2, "in_progress")], jobs_of({}), soft=lambda rid: (True, "x"))
 check(res == "soft", "#5324: decide - a soft run does not wait for another one (%s)" % res)
 check(gate.decide_tree("soft", "x", [], jobs_of({}))[0] == "soft", "#5324: decide_tree keeps soft")
@@ -306,6 +330,10 @@ def main2(runs, jobs, anns, *extra):
 
 rc, out = main2([run(7, conclusion="failure")], soft_case, {4: ["ux1_ui"]})
 check(rc == 0 and "soft" in out, "#5324: main - soft red full run = image goes ahead (rc %s)" % rc)
+rc, out = main2([run(7, conclusion="cancelled")], v2902, {})
+check(rc == 0 and "soft" in out, "#5600: main - the cancelled run of v2.902.0 (hard green) = image goes ahead (rc %s, %s)" % (rc, out[-200:]))
+rc, out = main2([run(7, conclusion="cancelled")], red(v2902, 3, "cancelled"), {})
+check(rc == 1 and "hard shard" in out, "#5600: main - cancelled with a hard shard cut = no image (rc %s)" % rc)
 rc, out = main2([run(7, conclusion="failure")], red(base_jobs(), 4), {4: ["p1_invoice_ui"]})
 check(rc == 1 and "p1_invoice_ui" in out, "#5324: main - hard red suite = no image (rc %s)" % rc)
 rc, out = main2([run(7, conclusion="failure")], soft_case, {4: ["ux1_ui", "pg_prepare"]}, "--report", "9.9.9")
