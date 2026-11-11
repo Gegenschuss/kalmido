@@ -17,7 +17,7 @@ function openDetail(id, o = {}) {
   if (o.morph) { const pm = morphRoot; morphRoot = d; try { renderDetail(); } finally { morphRoot = pm; } }  // 2.754.0 (#5213): the neighbour's nodes taken over after a swipe are only brought up to date
   else renderDetail();
   if (other) { d.scrollTop = 0; if (d.classList.contains('dsplit')) $('.dbody', d).scrollTop = 0; }  // 2.18.0 review (R7): a different task starts at its top, not at the previous one's scroll position
-  requestAnimationFrame(() => d.classList.add('open'));
+  requestAnimationFrame(() => { if (S.sel === id) d.classList.add('open'); });  // 2.963.0 (#5233): closed within the frame (the ‹ right after Back) = stays closed
   // 2.16.0 (#473): the panel is a named region; opened with the keyboard (Enter / o on a row) or on a phone (it covers the
   // list) it takes the focus, closing it gives the focus back to the row (closeDetail)
   d.setAttribute('aria-label', tr('Task details'));
