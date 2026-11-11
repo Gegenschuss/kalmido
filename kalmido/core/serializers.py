@@ -257,7 +257,7 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
                                      SUM(CASE WHEN k.choices IS NOT NULL AND k.choice IS NULL AND k.choices->>'approval' IS NOT NULL
                                               AND k.choices->>'withdrawn_at' IS NULL AND COALESCE(k.choices->>'expires_at', '9') > ?
                                               THEN 1 ELSE 0 END) AS a
-                              FROM comments k LEFT JOIN task_seen s ON s.task_id=k.task_id AND s.user_id=?
+                              FROM comments k LEFT JOIN obj_seen s ON s.kind='task' AND s.ref_id=k.task_id AND s.user_id=?
                               WHERE k.deleted_at IS NULL AND k.task_id = ANY(CAST(? AS BIGINT[])) GROUP BY k.task_id""",
                            (uid, iso_ms(now_utc()), uid, idl)):
             if r["task_id"] in ids:

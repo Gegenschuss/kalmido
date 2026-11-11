@@ -89,8 +89,9 @@ UMZ_LEFT_TABLES = {
     _SERVER,
     "book_members": _SHARE, "ev_cal_members": _SHARE, "folder_people": _SHARE, "fs_shares": _SHARE, "group_members": _SHARE, "group_shares": _SHARE,
     "groups": _SHARE, "sheet_shares": _SHARE, "tchat_members": _SHARE,
-    "list_bell": _VIEW, "list_folder_skip": _VIEW, "list_mine_hide": _VIEW, "rss_reads": _VIEW, "task_seen": _VIEW, "tchat_reads": _VIEW,
+    "list_bell": _VIEW, "list_folder_skip": _VIEW, "list_mine_hide": _VIEW, "rss_reads": _VIEW, "tchat_reads": _VIEW,
     "tchat_thread_reads": _VIEW, "user_task_order": _VIEW, "wait_hidden": _VIEW,
+    "obj_seen": _VIEW,  # 2.905.0 (#5284): the core's read marks (was task_seen), a personal view state like before
     "user_mine_sections": _VIEW,  # 2.569.0 (#4395): the own sections of "My tasks", like user_task_order
     "user_mine_rules": _VIEW, "user_mine_rule_runs": _VIEW,  # 2.823.0 (#4773): the own rules of "My tasks" and their markers
     "eph_state": _SERVER,  # 2.622.0 (#3891): sign-in steps, tickets, typing markers of minutes (core/ephem.py)

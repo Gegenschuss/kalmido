@@ -19,6 +19,7 @@ from ..core.i18n import tr
 from ..core.pg import insert_id
 from ..core.db import body, bump, db, iso_ms, now_utc
 from ..accounts.session import me
+from ..core.objseen import osn_mark  # 2.905.0 (#5284): the read marks of the core
 from ..core.access import Denied, need_feat, need_task, task_visible
 from ..core.errors import BadInput, reject_unknown
 from ..api.common import v1_args, v1_json, v1_view
@@ -155,8 +156,7 @@ def lv_answer(c, r, uid, ids, via="button"):
     if not ap:  # a suggestion / answer button: the person's comment with that text, as if typed (the thread shows it)
         said = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,reply_to) VALUES(?,?,?,?,?,?)",
                          (r["task_id"], uid, ", ".join(labels), "", iso_ms(now_utc()), r["id"]))
-        c.execute("INSERT INTO task_seen(user_id,task_id,seen_id) VALUES(?,?,?) "
-                  "ON CONFLICT(user_id,task_id) DO UPDATE SET seen_id=GREATEST(task_seen.seen_id, excluded.seen_id)", (uid, r["task_id"], said))
+        osn_mark(c, "task", r["task_id"], uid, said)  # 2.905.0 (#5284): the read mark of the core
     r2 = c.execute("SELECT * FROM comments WHERE id=?", (r["id"],)).fetchone()
     aid = r["user_id"]
     if task_visible(c, r["task_id"], aid, full=True):  # agent_emit keeps health lists away from agents

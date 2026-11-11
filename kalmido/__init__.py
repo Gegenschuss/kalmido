@@ -66,6 +66,7 @@ ORDER = (
     "core.access",
     "core.objparts",  # 2.610.0 (#4762): the write layer of a project's side objects (stands on core.access / core.conflict)
     "core.objreact",  # 2.763.0 (#5269): the reactions of the shared core (one table obj_reactions, one rule)
+    "core.objseen",  # 2.905.0 (#5284): the read marks of the shared core (one table obj_seen, no routes)
     "core.serializers",
     "core.compress",  # 2.65.0 (#1505): gzip for JSON answers; before core.pages = its after_request hook runs last
     "core.strip",  # 2.191.0 B (#1824): JS / CSS go out without comments (core.pages serves them)

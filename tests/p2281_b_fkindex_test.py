@@ -88,7 +88,8 @@ def no_seq(q, args=(), pre=()):
 
 
 # ---- the key checks of a delete (generic plan with a parameter, like the trigger's) use an index
-KEYS = [("tchat_msgs", "task_id"), ("task_seen", "task_id"), ("user_task_order", "task_id"), ("task_push", "task_id"),
+KEYS = [("tchat_msgs", "task_id"),  # 2.905.0 (#5284): task_seen gone (obj_seen: its primary key kind, ref_id)
+        ("user_task_order", "task_id"), ("task_push", "task_id"),
         ("agent_chat", "task_id"), ("pomos", "task_id"), ("sections", "list_id"), ("notifications", "list_id"),
         ("office_docs", "list_id"), ("list_bell", "list_id"), ("tasks", "section_id"), ("wiki_pages", "created_by"),
         ("tchat_msgs", "user_id"), ("notifications", "actor_id"), ("sheet_cells", "updated_by")]

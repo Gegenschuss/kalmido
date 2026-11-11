@@ -70,7 +70,6 @@
   "task_note_locks": "own logic: the lock of a task's encrypted note (body = the sealed text)",
   "task_offer_links": "own logic: the quotation position a task came from (offer data)",
   "task_people": "own logic: the people of a task (assignees)",
-  "task_seen": "stage Q8 (read marks) takes it down: the core's read marks",
   "task_tags": "stage Q5 (tags) takes it down: the core's tags",
   "task_watchers": "stage Q9 (following) takes it down: obj_follow",
   "tchat_msgs": "own logic: the team chat's message stream (stage Q4 keeps it)",

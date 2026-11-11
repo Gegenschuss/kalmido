@@ -176,7 +176,7 @@ TENANT_EXEMPT = {
     "oauth_grants": "2.488.0 (#3363): an access of an MCP client to one agent, given by a person who may manage it (like agent_setup_codes; the agent row carries the workspace, its token goes through /api/v1)",
     "agent_server": "2.557.0 B (#4670): the settings of one server agent (agent_id = the agent; its row in agents carries the workspace), managed by who may edit the agent; its key is sealed and never served",
     "agent_runs": "2.557.0 B (#4670): the runs of one server agent (numbers and states only; the agent row carries the workspace, its tool calls go through /api/v1)",
-    "task_tags": _TASK, "attachments": _TASK, "comments": _TASK, "activity": _TASK, "task_seen": _TASK, "task_push": _TASK,
+    "task_tags": _TASK, "attachments": _TASK, "comments": _TASK, "activity": _TASK, "task_push": _TASK,
     "task_decisions": _TASK, "task_deps": _TASK, "task_relations": _TASK, "pomos": _TASK, "tidy_pending": _TASK, "task_people": _TASK, "task_watchers": _TASK,
     "habits": _OWN, "pl_conns": _OWN + " (Paperless connection, unused since 2.36.0, kept)",
     "pl_conn_users": "who could use a shared Paperless connection (unused since 2.36.0, kept)", "pl_tokens": _OWN,
@@ -230,6 +230,8 @@ TENANT_EXEMPT = {
     "push_gate": "2.367 (#2967): counts of a person's bundled pushes (no content; only that person, the summary checks access again)",
     "agent_rules": _AGENT + " (2.235.0 C #2903: its standing rules; the source is checked against what the agent sees)",
     # 2.763.0 (#5269): replaces comment_reactions, tchat_rx and chat_reactions
+    # 2.905.0 (#5284): replaces task_seen
+    "obj_seen": "a person's own read mark of the shared core on an object (kind + ref_id -> a task); read and written only for that person, the area checks the object before it writes one",
     "obj_reactions": "a reaction of the shared core on its target (target_kind + target_id -> a comment's task, a team chat message's room, an agent chat message's conversation); the area checks the target before a reaction is read or written",
     "agent_steps": "2.32.0 (#1081): an agent's steps for ONE person (its chat answer / its job for that person); only that person reads them",
     "agent_events": _AGENT + " (events are made only for lists it is in)",

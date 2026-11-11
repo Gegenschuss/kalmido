@@ -12,6 +12,7 @@ from ..core.pg import insert_id, write_lock
 from ..core.i18n import LANGS, short_day, tr, trn
 from ..core.db import body, bump, db, err, inbox_default, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import me
+from ..core.objseen import osn_get, osn_mark  # 2.905.0 (#5284): the read marks of the core
 from ..accounts.bgjobs import bgj_add, bgj_fn  # 2.370.3 (#2760)
 from ..core.access import collab_all, Denied, list_people, list_role, MANAGE_ROLES, need_feat, need_task, task_visible, pvis
 from ..core.serializers import unlink_files
@@ -200,7 +201,7 @@ def timeline(tid):
         | {a["data"].get("by") for a in acts} | {u["id"] for x in comments for e in x["reactions"] for u in e["users"]} \
         | {x["reply"]["user_id"] for x in comments if x.get("reply")} \
         | {a["data"].get("reviewer") for a in acts if a["kind"] == "review"}  # 2.82.0 (#1880): a reviewer has access to the list
-    seen = c.execute("SELECT seen_id FROM task_seen WHERE user_id=? AND task_id=?", (me(), tid)).fetchone()
+    seen = osn_get(c, "task", tid, me())  # 2.905.0 (#5284): the own read mark of the core (obj_seen)
     ag = agent_ids(c)
     from .chatsave import chat_save_of  # 2.42.0 (#1383): an agent's comment I saved as a task
     saved = chat_save_of(c, me(), "comment", [x["id"] for x in comments])  # 2.139.0 D (#2130): every comment
@@ -219,7 +220,7 @@ def timeline(tid):
         if p["id"] in ag:
             p["agent"] = True
     return jsonify(comments=comments, activity=acts, users={str(k): v for k, v in user_names(c, ids).items()},
-                   people=ppl, seen=seen[0] if seen else 0, moderator=role in MANAGE_ROLES,
+                   people=ppl, seen=seen, moderator=role in MANAGE_ROLES,
                    agents=sorted(i for i in ids | {p["id"] for p in ppl} if i in ag),
                    can_write=task_visible(c, tid, me(), write=True),
                    say_no=tr(sn) if (sn := task_say_refusal(c, tid, me())) else None,  # 2.607.0 (#4549): the box's hint
@@ -237,8 +238,7 @@ def timeline_seen(tid):
     c = db()
     need_task(c, tid, write=False, full=True)
     top = c.execute("SELECT COALESCE(MAX(id),0) FROM comments WHERE task_id=?", (tid,)).fetchone()[0]
-    c.execute("INSERT INTO task_seen(user_id,task_id,seen_id) VALUES(?,?,?) "
-              "ON CONFLICT(user_id,task_id) DO UPDATE SET seen_id=GREATEST(task_seen.seen_id, excluded.seen_id)", (me(), tid, top))
+    osn_mark(c, "task", tid, me(), top)  # 2.905.0 (#5284): the read mark of the core
     c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND task_id=? AND read_at IS NULL", (iso(now_utc()), me(), tid))
     push_handled(c, me(), [tid])
     c.commit()
@@ -381,8 +381,7 @@ def comment_create(tid):
         c.rollback()
         unlink_files(saved)
         return err(e)
-    c.execute("INSERT INTO task_seen(user_id,task_id,seen_id) VALUES(?,?,?) "
-              "ON CONFLICT(user_id,task_id) DO UPDATE SET seen_id=GREATEST(task_seen.seen_id, excluded.seen_id)", (me(), tid, cid))
+    osn_mark(c, "task", tid, me(), cid)  # 2.905.0 (#5284): the own comment counts as seen (read mark of the core)
     ptext = text
     if chs and json.loads(chs).get("approval"):  # 2.41.0 (#1383): the push says that an approval is needed
         ptext = tr("Approval needed") + ": " + json.loads(chs)["approval"]["title"] + ("\n" + text if text else "")

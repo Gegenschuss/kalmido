@@ -42,6 +42,7 @@ EXCEPT = {
     ("admin/orgcrypt_cli.py", "AND TRUE LIKE ?"): "2.138.0 (#1972): {col} is a text column name; the stand-in TRUE makes it boolean LIKE text",
     ("admin/orgcrypt_cli.py", "d.thumb_l AS path"): "2.611.0 (#4884): doc_meta.thumb_l comes with a later version (#4812); space_rows skips this entry while _thumb_cols does not see the column",
     ("files/fslock.py", "dn.lvl < TRUE"): "2.353 (#2758): {DEPTH_MAX * 2} is a number constant; the stand-in TRUE makes it integer < boolean",
+    ("core/objseen.py", "FROM task_seen s"): "2.905.0 (#5284): osn_move reads the old table task_seen only while it is there (to_regclass); the fragment 5284_a drops it",
     ("core/dlock.py", "IN (SELECT id FROM s)"):"2.235.0 B2 (#2902): a base part of the recursive query whose WITH s(...) is built around it",
 }
 

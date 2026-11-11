@@ -965,6 +965,10 @@ def init_db(guard=True, load=None):
         c.executescript(trigger_skip_present(c, PURGED_TRIGGER))  # 2.360.4 (#3243): what was deleted for good stays deleted after a restore
         c.executescript(trigger_skip_present(c, TICKET_NO_TRIGGER))  # 2.390.0 (#3353): running ticket numbers of projects with a key
         clk("triggers")
+        from .objseen import osn_move
+        with pg_system_ctx(c):  # every person's marks, like orx_move below
+            osn_move(c)  # 2.905.0 (#5284): task_seen into obj_seen before the change triggers (no change rows) and the fragment 5284_a drops it
+        clk("osn_move")
         from ..tasks.delta import dl_setup
         dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
         clk("dl_setup")

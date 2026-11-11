@@ -22,6 +22,7 @@ from ..core.i18n import lang, tr
 from ..core.db import bump, db, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied, list_role, need_task, task_visible
 from ..accounts.session import me
+from ..core.objseen import osn_mark  # 2.905.0 (#5284): the read marks of the core
 from ..core.errors import BadInput
 from ..core.config import WATCHDOG_INTERVAL  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import v1_err  # 2.149.0 G (#2517): pulled up from functions
@@ -249,8 +250,7 @@ def ctr_run(c, j, sel, ed, extra, rec):
         raise Denied(409, tr("The task is in the trash"))
     cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at) VALUES(?,?,?,?,?)",
                     (tid, uid, p["text"], "", iso_ms(now_utc())))
-    c.execute("INSERT INTO task_seen(user_id,task_id,seen_id) VALUES(?,?,?) "
-              "ON CONFLICT(user_id,task_id) DO UPDATE SET seen_id=GREATEST(task_seen.seen_id, excluded.seen_id)", (uid, tid, cid))
+    osn_mark(c, "task", tid, uid, cid)  # 2.905.0 (#5284): the read mark of the core
     log_act(c, tid, "proposal", {"agent": j["agent_id"]}, uid=uid)
     rec.update(task_id=tid, comment_id=cid, remind=False)
     if extra.get("remind") is True and t["status"] == 0 and t["due"] == inp.get("due") \

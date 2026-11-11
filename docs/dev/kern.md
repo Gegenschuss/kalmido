@@ -515,6 +515,17 @@ push; the caller builds the text in their language (an end-to-end list's push ca
   (stage Q2 rest), as does the team chat's held-back room push `collab/teamchat.py tchat_push_tick` ("N new messages";
   it still asks `tchat_room_members`, which does not know an own share that ran out, #5050 - found in the review of 2.891.0).
 
+### Read marks (stage Q8a, 2.905.0, #5284)
+
+One table `obj_seen(kind, ref_id, user_id, seen_id, seen_at TIMESTAMPTZ)` holds a person's read mark on an object; it
+replaced `task_seen`. `seen_id` is a high-water mark (kind `task`: the highest comment id the person has seen), it only grows.
+`kalmido/core/objseen.py`: `osn_mark(c, kind, id, uid, seen_id)` writes it (the higher mark stays, nothing is written when
+it would not grow), `osn_get` reads the own mark. A mark is read and written only for its own person; the area checks the
+object before it writes one. The task badge (`core/serializers.py`) joins `obj_seen` with `kind='task'`; the change feed
+(`tasks/delta.py`) notes a mark on a task as a change of that task for its reader only. The trigger `kalmido_osn_gone`
+deletes a task's marks when the task is deleted for good. Not in the exports (a personal view state). A new area with read
+marks adds its kind to `OSN_KINDS` and a trigger line in a fragment -- no table of its own (stage Q8b: team chat, RSS).
+
 
 ## Filter (2.846.0, #5520)
 
