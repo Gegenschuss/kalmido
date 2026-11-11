@@ -299,7 +299,8 @@ def le2b_scrub(c, lid):
     Returns {what: rows} (counts only, for the history / a test)."""
     n = {}
     tq = "SELECT id FROM tasks WHERE list_id=?"
-    n.update(le2b_scrub_tasks(c, [r[0] for r in c.execute(tq, (lid,))], hist=False))
+    # #5582: the copies of the steps of their time entries: once, in le2b_scrub_undo_free below (it reads them for lid and its tasks)
+    n.update(le2b_scrub_tasks(c, [r[0] for r in c.execute(tq, (lid,))], hist=False, copies=False))
     n["time_entries"] = c.execute(f"UPDATE time_entries SET task_title='' WHERE task_title!='' AND (list_id=? OR task_id IN ({tq}))",
                                   (lid, lid)).rowcount
     n.update(le2b_scrub_free(c, lid))  # 2.538.0 (#4372)
@@ -638,7 +639,7 @@ def _trash_plain(r):
     return any(isinstance(v, list) and len(v) > 1 and v[1] and not le2e_is_cipher(v[1]) for v in held.get("vals") or [])
 
 
-def le2b_scrub_tasks(c, ids, hist=True):
+def le2b_scrub_tasks(c, ids, hist=True, copies=True):
     """The copies of tasks that were just moved into a list with the lock (part A calls it after the move): their history
     texts, time entry snapshots and pending tidy events, #5562: their texts in the trash copies of other projects. The caller commits."""
     ids = [int(x) for x in ids or [] if isinstance(x, int)]
@@ -668,7 +669,8 @@ def le2b_scrub_tasks(c, ids, hist=True):
         n["history_time"] = n.get("history_time", 0) + c.execute(  # review (Fable): their history rows too (le2b_scrub_undo_free)
             f"DELETE FROM obj_history WHERE kind='time_entry' AND ref_id IN (SELECT id FROM time_entries WHERE task_id IN ({q}))", part).rowcount
     # ... and of their entries deleted or moved elsewhere since (the row only in the copy)
-    n["undo_time"] = n.get("undo_time", 0) + _scrub_undo_ids(c, le2b_undo_copies(c, ("time_entry", "time_life"), (), ids))
+    if copies:  # #5582: le2b_scrub leaves it to le2b_scrub_undo_free (one scan for the list and its tasks)
+        n["undo_time"] = n.get("undo_time", 0) + _scrub_undo_ids(c, le2b_undo_copies(c, ("time_entry", "time_life"), (), ids))
     n.update(le2b_scrub_trash_tasks(c, set(ids)))  # #5562
     if hist:  # #5564: their entries deleted since (the copies went just above); le2b_scrub runs it once at its end
         n["history_gone"] = le2b_hist_gone(c)
