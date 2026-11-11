@@ -268,11 +268,17 @@ def agent_changed_events(c, diffs):
     if not ag:
         return 0
     from .workstyle import ws_get  # loaded after this module
+    from ..tasks.lifecycle import _norm  # 2.976.0 (#5657): the comparison of tasks/validation.py log_changes
     n, styles, sent = 0, {}, {}
     actor = wh_actor(c) if getattr(g, "user", None) else None  # review F3: its own change is skipped before the data is built
     for tid, d in sorted(diffs.items()):
         row = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
         if not row:
+            continue
+        # 2.976.0 (#5657, review 2.959 F4): only what the stored row says now -- a change taken back later in the request (a
+        # savepoint rolled back, a value set back) never reaches an agent as "new"
+        d = {k: v for k, v in d.items() if k not in row.keys() or _norm(row[k]) == _norm(v[1])}
+        if not d:
             continue
         watch = wat_users(c, tid)
         dlg0 = (g.get("agent_dlg0") or {}).get(tid, row["delegate_agent_id"])  # the delegate before this request
