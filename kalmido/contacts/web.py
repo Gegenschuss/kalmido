@@ -188,10 +188,10 @@ def op_book_member_rm(c, uid, bid, who):
     bk, role = need_book(c, bid)
     if who != uid and role != "owner":
         raise Denied(403, tr("Only the owner of the address book can do this"))
+    book_touch(c, bid)  # 2.988.0 (#5604, review): the object's row first, then its share rows (the order of the put)
     n = BK_KERN["drop"](c, "address_book", bid, who)  # 2.924.0 (#5069): the shares of the node are the members (book_members is gone)
     if not n:
         raise Denied(404)
-    book_touch(c, bid)
     bump(c)
     c.commit()
 

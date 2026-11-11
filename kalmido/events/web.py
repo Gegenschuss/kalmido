@@ -146,10 +146,10 @@ def op_member_remove(c, uid, cid, who):
     cal, role = need_evcal(c, cid)
     if who != uid and role != "owner":
         raise Denied(403, tr("Only the owner of the calendar can do this"))
+    cal_touch(c, cid)  # 2.988.0 (#5604, review): the object's row first, then its share rows (the order of the put)
     n = KERN["drop"](c, EV_KIND, cid, who)  # 2.924.0 (#5069): the shares of the node are the members (ev_cal_members is gone)
     if not n:
         raise Denied(404)
-    cal_touch(c, cid)
     bump(c)
     c.commit()
 
