@@ -25,7 +25,7 @@ from ..core.kernretire import KERN_RETIRE_LOCK, kern_retire  # 2.924.0 (#5069): 
 from ..collab.tcxcore import TCX_RETIRE_WAITS  # 2.924.0 (#5069): the one text of the admins' alert of stage 7
 from ..core.objects import obj_node, obj_node_follow, obj_node_person_drop, obj_node_person_put, obj_register, obj_role, obj_visible_sql
 from ..core import objhooks
-from ..core.pg import qi, system_ctx, write_lock
+from ..core.pg import qi, system_ctx, ts_canon, write_lock  # 2.940.0 (#5605): ts_canon
 from ..core.writes import obj_restore, obj_trash, obj_trash_prune, obj_write
 from .invite import evi_cal_cancel
 from ..contacts.model import BK_KERN
@@ -54,6 +54,20 @@ def _fs_base(c, uid, cid):
         return None
     r = _ev_role(c, uid, cal)
     return "edit" if r == "owner" else ("view" if r else None)
+
+
+def _fs_space(c, cid):
+    """2.940.0 (#5605): the workspace the file store places the calendar's node in (the core's: its row's) -- none while its
+    owner's account is disabled (as contacts/ctfolder.py _book_space): its node then opens nothing in the file store, as
+    events/model.py ev_role gives its members nothing then; enabled again, its shares count at once."""
+    cal = _cal(c, cid)
+    if cal is None:
+        return None
+    with system_ctx(c):  # structure: whether its owner's account is disabled
+        u = c.execute("SELECT disabled FROM users WHERE id=?", (cal["owner_id"],)).fetchone()
+    if not u or u[0]:
+        return None
+    return (cal["org_id"] or None, cal["owner_id"])
 
 
 def _fs_on_trash(c, uid, cid, restore):
@@ -108,7 +122,8 @@ KERN.update(role=obj_role, visible=obj_visible_sql, node=obj_node, write=obj_wri
 obj_register(EV_KIND, "ev_cals", label=N_("Calendar"), fields={"name": _f_name, "color": _f_color, "description": _f_desc},
              title=lambda c, rid: (_cal(c, rid) or {"name": ""})["name"], base_role=_base, visible=_visible, area="calendar",
              scopes=("calendar", "calendar"), dl_area="calendar", routes=False, node_shares=True, on_share_back=_share_back,
-             open_url=lambda rid: "cal", fs_hooks={"base_role": _fs_base, "on_trash": _fs_on_trash})
+             open_url=lambda rid: "cal", fs_hooks={"base_role": _fs_base, "on_trash": _fs_on_trash,
+                                                  "space": _fs_space})  # 2.940.0 (#5605): _fs_space
 
 
 # ---------------------------------------------------------------- the trash (#4707)
@@ -188,6 +203,16 @@ def _old_triggers_drop(c, out):
             c.execute(f"DROP FUNCTION IF EXISTS {qi(fn, _OLD_TRIG)}()")
 
 
+def _node_trash_as_cal(c, n, cid):
+    """2.940.0 (#5605): the node ev_kern_drop just made for a calendar in the core's trash goes into the file store's trash
+    with it, as obj_trash puts it (review F7: no live node of a calendar in the trash) -- the same point in time, so
+    obj_restore (ev_cal_restore) brings it back and its shares count at once."""
+    cal = _cal(c, cid)
+    if cal is not None and cal["deleted_at"]:
+        c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?",  # the node made just now
+                  (ts_canon(cal["deleted_at"]), cal["deleted_by"], n["id"]))
+
+
 def ev_kern_drop(c):
     """2.924.0 (#5069) at every start until it is done (core/objhooks.START, core/db.init_db; the step of
     core/migrations.d/5069_b.py). Stage 7b of the shared core: calendars and address books are shared only by the shares of
@@ -195,7 +220,10 @@ def ev_kern_drop(c):
     1. the one-shot of before (ev_kern_copy, without its flag): every calendar / address book with an old row and no node
        gets its node, every row of these its share on it (the same person / agent, the row's role and date) -- so a row an
        older version wrote after a rollback comes along too; a row of an object that HAS a node is never copied (the node
-       is the truth: a share taken back there stays taken back);
+       is the truth: a share taken back there stays taken back); 2.940.0 (#5605, fable 2.924 F2): an object in the trash or
+       of a disabled owner gets its node too (the core's space is its row's: an address book's node stays live and closed,
+       as a book trashed today; a calendar's goes into the file store's trash with it, _node_trash_as_cal) -- restored /
+       enabled again, its members have their shares at once;
     2. fable F1 (#5117): a row of an object WITH a node and no share of that person is stale -- the core said no -- and is
        deleted (one way; the log names the number);
     3. the check: is a row left the core does not hold (ev_kern_left: still no node -- the copy could not make one), the
@@ -225,6 +253,8 @@ def ev_kern_drop(c):
                     with c.savepoint():
                         n = obj_node(c, owner, EV_KIND, rid, make=True) if kind == EV_KIND else \
                             BK_KERN["node"](c, owner, rid)  # contacts/ctkern.py bk_node_ensure: in its workspace's "Address book" folder
+                        if n is not None and kind == EV_KIND:
+                            _node_trash_as_cal(c, n, rid)
                 except Denied:
                     n = None
                 if n is not None:

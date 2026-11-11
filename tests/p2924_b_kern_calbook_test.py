@@ -17,6 +17,9 @@ the organisation export is a plain ZIP). Invented names only.  freelancer-matrix
  - the import of an older organisation archive with calendars/members.json / books/members.json and no node in it: the rows
    become the shares of the imported object's node at once; the export of this version has no members.json of them
  - the calendar's trash emptied: calendar, node and shares go, nothing of the old tables is needed
+ - 2.940.0 (#5605): an old row of a book / calendar in the trash or of a disabled owner, no node:
+   the start gives each its node (closed; the calendar's in the trash with it), drops the tables without an alert; restored
+   or enabled again, the member sees it with its content at once
 usage: p2924_b_kern_calbook_test.py <datadir>"""
 import hashlib
 import io
@@ -177,6 +180,74 @@ check("ev_cal_members dropped" in out and not table("ev_cal_members")
       f"#5069 F1: the next start places it and drops table, trigger and function ({out[-300:]})")
 check(share("evcal", KN, BOB) and share("evcal", KN, BOB)[1] == "view" and KN in ids(Bo.get(B + "/api/evcals")),
       "#5069: the row became bob's share of the node")
+
+# ================================================================== 2.940.0 (#5605, fable 2.924 F2): in the trash / of a disabled owner
+# an old row of an address book in the trash, of a private book of a disabled account and of a calendar in the trash, none with
+# a node: the start gives each its node (the book's live and closed, the calendar's in the trash with it), the tables go without
+# an alert, nothing opens; restored / enabled again, bob has his share at once (the content shows)
+r = A.post(B + "/api/users", json={"username": "ivy", "display_name": "Ivy", "password": "password123", "email": "ivy@example.com", "orgs": []})
+assert r.ok, r.text
+IVY = r.json()["id"]
+Iv = sess("ivy")
+Iv.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
+BT = A.post(B + "/api/books", json={"name": "Archive people"}).json()["id"]
+check(A.post(B + "/api/contacts", json={"book_id": BT, "fn": "Quinn Example"}).ok, "setup: a contact in alice's private book")
+BD = Iv.post(B + "/api/books", json={"name": "Ivy's people"}).json()["id"]
+check(Iv.post(B + "/api/contacts", json={"book_id": BD, "fn": "Rosa Example"}).ok, "setup: a contact in ivy's private book")
+KV = Iv.post(B + "/api/evcals", json={"name": "Ivy's rota", "org_id": None}).json()["id"]
+KR = A.post(B + "/api/evcals", json={"name": "Retired rota", "org_id": None}).json()["id"]
+D5 = (datetime.now(timezone.utc) + timedelta(days=2)).strftime("%Y-%m-%d")
+check(A.post(B + "/api/events", json={"cal_id": KR, "title": "Strike day", "start": D5 + "T10:00", "end": D5 + "T11:00"}).ok,
+      "setup: an event in alice's private calendar")
+check(Iv.post(B + "/api/events", json={"cal_id": KV, "title": "Load-out day", "start": D5 + "T12:00", "end": D5 + "T13:00"}).ok,
+      "setup: an event in ivy's private calendar")
+check(A.delete(B + f"/api/books/{BT}").ok and A.delete(B + f"/api/evcals/{KR}").ok, "setup: book and calendar into the trash")
+check(A.patch(B + f"/api/users/{IVY}", json={"disabled": True}).ok, "setup: ivy's account disabled")
+check(node("address_book", BT) is None and node("address_book", BD) is None and node("evcal", KR) is None and node("evcal", KV) is None,
+      "setup: none of the three has a node")
+sql("CREATE TABLE ev_cal_members (cal_id BIGINT NOT NULL REFERENCES ev_cals(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES "
+    "users(id) ON DELETE CASCADE, role TEXT NOT NULL DEFAULT 'view', hidden BIGINT NOT NULL DEFAULT 0, added_at TEXT NOT NULL, "
+    "PRIMARY KEY (cal_id, user_id))", write=True)
+sql("CREATE TABLE book_members (book_id BIGINT NOT NULL REFERENCES books(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES "
+    "users(id) ON DELETE CASCADE, role TEXT NOT NULL DEFAULT 'view', added_at TEXT NOT NULL, PRIMARY KEY (book_id, user_id))", write=True)
+sql("INSERT INTO book_members(book_id,user_id,role,added_at) VALUES(?,?,'view',?),(?,?,'view',?)", (BT, BOB, TS, BD, BOB, TS), write=True)
+sql("INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES(?,?,'view',?),(?,?,'view',?)", (KR, BOB, TS, KV, BOB, TS), write=True)
+out = box("from kalmido.notify.alerts import _AA\nprint('alert', [x[1] for x in _AA['q']])")
+check("old row(s) of" not in out and "ev_cal_members, book_members dropped" in out,
+      "#5605: the trashed book / the disabled owner's book do not hold the drop, both tables go (" + out[-400:].replace("\n", " | ") + ")")
+al = [x for x in out.splitlines() if x.startswith("alert ")]
+check(al and "kern5069" not in al[-1], f"#5605: no admin alert ({al}; " + " | ".join(x for x in out.splitlines() if "5069" in x)[:400] + ")")
+check(not table("ev_cal_members") and not table("book_members"), "#5605: both tables dropped")
+for kind, rid in (("address_book", BT), ("address_book", BD), ("evcal", KR), ("evcal", KV)):
+    check(share(kind, rid, BOB) and share(kind, rid, BOB)[1] == "view", f"#5605: {kind} {rid}: the old row became bob's share of its new node")
+check(sql("SELECT deleted_at IS NOT NULL FROM fs_nodes WHERE kind='ref' AND ref_kind='evcal' AND ref_id=?", (KR,)) == [(True,)],
+      "#5605: the trashed calendar's new node lies in the file store's trash with it (as obj_trash puts it)")
+check(sql("SELECT owner_id, org_id FROM fs_nodes WHERE kind='ref' AND ref_kind='address_book' AND ref_id=?", (BD,)) == [(IVY, None)],
+      "#5605: the disabled owner's book's node lies in her own private tree")
+check(sql("SELECT deleted_at FROM books WHERE id=?", (BT,))[0][0] is not None
+      and sql("SELECT deleted_at FROM ev_cals WHERE id=?", (KR,))[0][0] is not None, "#5605: book and calendar stay in the trash")
+for s_, who in ((Bo, "bob"), (Gi, "gina")):
+    bl = ids(s_.get(B + "/api/books"))
+    el = ids(s_.get(B + "/api/evcals"))
+    check(BT not in bl and BD not in bl and KR not in el and KV not in el, f"#5605: {who} sees none of them")
+    check("Quinn" not in s_.get(B + f"/api/contacts?book_id={BT}").text and "Rosa" not in s_.get(B + f"/api/contacts?book_id={BD}").text,
+          f"#5605: {who} reads no contact of them")
+    ev = s_.get(B + f"/api/events?from={D5}&to={D5}")
+    check(ev.ok and "Strike day" not in ev.text and "Load-out day" not in ev.text, f"#5605: {who} sees no event of them")
+    st_ = [s_.get(B + f"/api/files/nodes/{node(k, rid)}").status_code for k, rid in (("address_book", BT), ("address_book", BD), ("evcal", KR), ("evcal", KV))]
+    check(all(x in (403, 404) for x in st_), f"#5605: {who} cannot open their new nodes in the file store ({st_})")
+check(A.post(B + f"/api/books/{BT}/restore").ok, "alice restores her book")
+r = Bo.get(B + f"/api/contacts?book_id={BT}")
+check(BT in ids(Bo.get(B + "/api/books")) and r.ok and "Quinn Example" in r.text, f"#5605: bob sees the restored book and its contact at once ({r.status_code})")
+check(A.post(B + f"/api/evcals/{KR}/restore").ok, "alice restores her calendar")
+check(KR in ids(Bo.get(B + "/api/evcals")) and "Strike day" in Bo.get(B + f"/api/events?from={D5}&to={D5}").text
+      and sql("SELECT deleted_at FROM fs_nodes WHERE kind='ref' AND ref_kind='evcal' AND ref_id=?", (KR,)) == [(None,)],
+      "#5605: bob sees the restored calendar and its event at once (its node came back with it)")
+check(A.patch(B + f"/api/users/{IVY}", json={"disabled": False}).ok, "ivy's account enabled again")
+r = Bo.get(B + f"/api/contacts?book_id={BD}")
+check(BD in ids(Bo.get(B + "/api/books")) and r.ok and "Rosa Example" in r.text, f"#5605: bob sees ivy's book and its contact again ({r.status_code})")
+check(KV in ids(Bo.get(B + "/api/evcals")) and "Load-out day" in Bo.get(B + f"/api/events?from={D5}&to={D5}").text,
+      "#5605: and ivy's calendar with its event")
 
 # ================================================================== a reminder after the share was taken back
 check(A.put(B + f"/api/evcals/{K}/members", json={"user_id": GINA, "role": "view"}).ok, "setup: gina shared on the calendar as well")
