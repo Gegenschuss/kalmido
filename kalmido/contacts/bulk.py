@@ -17,7 +17,7 @@ from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
 from ..core.errors import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
-from ..contacts.model import book_touch, contact_copy, contacts_on, ct_room, my_book_ids, need_book, occ_sync, search_text, FIELD_MAX, ITEMS_MAX, NOTE_MAX
+from ..contacts.model import book_touch, contact_copy, contacts_on, ct_room, my_book_ids, need_book, occ_sync, FIELD_MAX, ITEMS_MAX, NOTE_MAX
 from ..tasks.lifecycle import trash_task  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
 
@@ -264,8 +264,7 @@ def ms_write(c, rows, todo, redo=None, uid=None):
                 continue
         for i in blk:
             f = {**todo[i], "updated_at": ts, **({"updated_by": uid} if uid else {})}  # 2.571.0 (#4776): updated_by
-            m = {**dict(rows[i]), **f}
-            f["search"] = search_text({**m, **{k: json.loads(m[k] or "[]") for k in ("emails", "phones", "addresses", "groups")}})
+            # 2.981.0 (#5278): the search text comes from the trigger of the shared search index (core/objsearch.py)
             c.execute(f"UPDATE contacts SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), i])
         for bid in sorted({rows[i]["book_id"] for i in blk}):
             book_touch(c, bid)

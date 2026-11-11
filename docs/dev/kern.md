@@ -594,7 +594,7 @@ The task's routes stay where they are (`/api/tasks/<id>/comments`, `/api/comment
 second kind joins. `ref_id` has no foreign key: the trigger `kalmido_ocm_task_gone` deletes a task's comments when the task is
 deleted for good, `kalmido_orw_obj_comments` fills `org_id` from the task's project (row-level security), `kalmido_orx_gone`
 takes the reactions along. The start moved the old rows with their ids (`ocm_move`, through `core/objhooks.py MOVE` before
-the fragments' AFTER; `git_issue_comments` and `cmt_fts` point at `obj_comments` since, `ocm_fk`); a SQLite file of an older
+the fragments' AFTER; `git_issue_comments` points at `obj_comments` since, `ocm_fk`; `cmt_fts` went with Q6a); a SQLite file of an older
 version brings its comments in the old table (`admin/migrate.py LEGACY_COMMENTS`), the same move takes them. One-way: the old
 tables are dropped; a backup restores them.
 
@@ -794,6 +794,33 @@ rule to `OFL_LEVEL` and a `kalmido_ofl_gone` trigger line in a fragment -- no ta
 - The move: `ofl_setup` (`ofl_move`: `list_bell`) and `core/objhooks.MOVE` (`ncap_move`) before the fragment `5287_a` drops the
   old tables (one-way, the back limit is raised like Q9a; a SQLite file's old tables come in through `admin/migrate.py
   legacy_tables`).
+
+
+### Search (stage Q6a, 2.981.0, #5278)
+
+One table `obj_search(kind, ref_id, org_ref, owner_id, node_id, pkind, pid, title, names, tsv, updated_at TIMESTAMPTZ)` holds
+the search index of the open texts; it replaced `task_fts`, `cmt_fts`, the trigram indexes (`msg_trgm_*`, `tasks_trgm_*`, #4960)
+and `contacts.search`. `kalmido/core/objsearch.py`:
+- Kinds (`OSR_SOURCES`, one SQL definition per kind for the trigger and the start's fill): `task` (title A, notes B, link and code
+  snippets C; names = the ticket key), `comment` (obj_comments of every kind; `pkind` / `pid` = its object), `note`, `contact`
+  (names = the names, company and phone numbers), `wiki_page` (its name only - the text is sealed and keeps its HMAC word index),
+  `tchat` (team chat without end-to-end text), `agent_chat`. A new area with open texts adds its kind there - no index of its own.
+- Filled by the triggers `kalmido_osr_<kind>` on the source tables (every write path, also rows written straight into a table)
+  and at every start for rows written while they were missing; a new `OSR_VERSION` or fold function builds it again. Derived:
+  not exported (`exportleft.py` `_DERIVED`), an import fills it through the triggers.
+- The rules of 08.11.2026: umlauts the same everywhere (`kalmido_fold`, every query word in its variants: "Müller" finds
+  "Mueller" and back, question 13); every word at the start of a word, a part of a word only in `names` (question 14);
+  knowledge pages a share of the core opens are found by name (`wiki/wksearch.py wks_name_hits`, question 15).
+- Reading: `osr_cond(raw, alias, names=)` / `osr_ids_sql(kind, raw, names=)` give the condition / the id sub-select. **Rights are
+  not in the index**: every reader joins the source row and applies the area's check -- tasks `_task_cond` (`tasks/ftsearch.py`,
+  `core/state.py search_tasks`, v1 `q`), notes `notes_visible_sql`, contacts their books (`contacts_query`), pages `wiki_may_read`,
+  messages their room / agent (`collab/msgsearch.py`). Comments of other kinds: `osr_kind(kind, may_read=None)` registers a
+  kind, `osr_comment_hits` checks each hit with `obj_role >= view` of its object (or the kind's `may_read`); a kind not
+  registered gives no comment hits. Kinds with a `cap` hook are never listed through `obj_visible_sql`.
+- No `org_id` column on purpose (`org_ref`): row-level security would stop the GIN index (`@@` is not leakproof, like ILIKE in
+  #5116). So a row of `obj_search` never leaves without its source row: the helpers give ids for a join, nothing else.
+- The move: `osr_move` (`core/objhooks.py MOVE`) drops the old triggers / functions / trigram indexes and raises the back limit
+  before the fragment `5278_a` drops `task_fts`, `cmt_fts` and `contacts.search` (one-way).
 
 ## Filter (2.846.0, #5520)
 

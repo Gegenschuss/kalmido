@@ -1,15 +1,12 @@
 """2.116.0 B (#2065): full-text search on the server -- tasks (title, notes) and their comments, ranked.
 
-Index: Postgres full-text search with the 'simple' configuration over kalmido_fold() (collab/msgsearch.py: unaccent + lower
-case, a text with umlauts once more with ä -> ae ...), so "Ärger", "arger" and "aerger" find the same tasks as in the message
-search. No language stemmer on purpose: the lists are written in several languages and a German stemmer would cut English
-or Italian words wrongly; the prefix match (every query word is "word:*") covers plurals and typing while searching.
-Two GIN expression indexes (tasks: title weight A + notes weight B; comments: body), created by init_db (fts_index_init)
-and rebuilt when the fold function changes. Texts are capped (FTS_CAP characters) inside the index expression, so a very
-long note can never make an insert fail on the tsvector size limit.
-2.281.0 C (#3113): the vectors are stored in two side tables (task_fts, cmt_fts: id + vec, kept by triggers, GIN index on
-vec), so ranking reads them instead of computing to_tsvector once more for every hit; the same vectors, the same ranks.
-Not a column of tasks on purpose: load_tasks reads SELECT * into the start state. A rollback leaves dead side tables (harmless).
+Index: since 2.981.0 (#5278, stage Q6a) the shared search index obj_search (core/objsearch.py): kind 'task' (title weight
+A, notes B, link and code snippets C) and kind 'comment' (the comments of tasks, pkind 'task'), the 'simple' configuration
+over kalmido_fold() (unaccent + lower case, a text with umlauts once more with ä -> ae ...), so "Ärger", "arger" and
+"aerger" find the same tasks as in the message search. No language stemmer on purpose: the lists are written in several
+languages and a German stemmer would cut English or Italian words wrongly; the prefix match (every query word is "word:*")
+covers plurals and typing while searching. Until 2.981 the side tables task_fts / cmt_fts (2.281.0 C, #3113) held the
+vectors; they went with the stage.
 
 Visibility is exactly the one of search_tasks (tasks) and of the message search (comments): lists the person may see
 (vis_sql: list roles, organisation boundary, health / budget lists, a token limited to lists, agents never locked lists),
@@ -23,100 +20,35 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import db, gset, gsetting, ix_ensure, trigger_ensure
+from ..core.db import db
 from ..core.pg import st_ids
 from ..core.access import access_note, live_sql, tvis, vis_sql
 from ..core.serializers import load_tasks
 from ..accounts.session import me
-from ..collab.msgsearch import INDEX_VERSION as MSG_INDEX_VERSION, MSG_TERMS, _variants, find_marks, snippet
+from ..collab.msgsearch import find_marks, snippet
 from ..collab.comments import comment_plain, user_names
-from ..core.objcomments import ocm_fk, OCM_MENTION_RE  # 2.972.0 (#5272)
+from ..core.objcomments import OCM_MENTION_RE  # 2.972.0 (#5272)
+from ..core.objsearch import OSR_KINDS, osr_comment_hits, osr_query, osr_terms  # 2.981.0 (#5278)
 from ..collab.teamchat import md_brief
 from ..tasks.validation import as_int
 from ..core.errors import BadInput
 from ..api.common import cursor_dec, cursor_enc  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.fields import search_field_ids  # 2.369.5 (#2517): pulled up from functions
 
-FTS_VERSION = "2"  # 2.281.0 C (#3113): stored vectors (task_fts / cmt_fts) instead of expression indexes
-FTS_CAP = 100000         # characters of notes / a comment that the index reads
 FTS_CAND = 500           # ranked candidates per source before the merge
 FTS_CAND_SHORT = 200     # 2.281.0 C (#3113): ... when a word has only 1-2 letters (a prefix that hits much; the best stay)
 FTS_LIMIT = 50
 WHERE_ORDER = ("title", "notes", "comment", "field", "file")
 
 
-def _vec(col, w=None):
-    v = f"to_tsvector('simple'::regconfig, kalmido_fold(left(COALESCE({col}, ''), {FTS_CAP})))"
-    return f"setweight({v}, '{w}')" if w else v
-
-
-# the index expressions (a query must use them literally for the planner to take the index)
-TASK_VEC = f"{_vec('title', 'A')} || {_vec('content', 'B')}"
-TITLE_VEC = _vec("title")
-CMT_VEC = _vec("body")
-TASK_NEW_VEC = f"{_vec('NEW.title', 'A')} || {_vec('NEW.content', 'B')}"  # 2.281.0 C (#3113): the same in the triggers
-CMT_NEW_VEC = _vec("NEW.body")
-
-
-def fts_index_init(c):
-    """Called by init_db right after msg_index_init (kalmido_fold exists): the side tables task_fts / cmt_fts, their GIN
-    indexes and triggers; a new FTS_VERSION or a rebuilt fold function fills both again. Rows written while the triggers
-    were missing (a restore, a migration, an older version) are filled at every start."""
-    ver = f"{FTS_VERSION}.{MSG_INDEX_VERSION}"
-    new = gsetting(c, "fts_v") != ver
-    # 2.281.0 C (#3113): the expression indexes of 2.116 (an older version creates them again on its own start)
-    if new:
-        for name in ("fts_tasks", "fts_comments"):
-            c.execute(f"DROP INDEX IF EXISTS {name}")
-    c.execute("CREATE TABLE IF NOT EXISTS task_fts (task_id BIGINT PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE, "
-              "vec tsvector NOT NULL)")
-    c.execute("CREATE TABLE IF NOT EXISTS cmt_fts (comment_id BIGINT PRIMARY KEY REFERENCES obj_comments(id) ON DELETE CASCADE, "
-              "vec tsvector NOT NULL)")
-    ocm_fk(c, "cmt_fts", "comment_id", "CASCADE")  # 2.972.0 (#5272): a table from before pointed at comments
-    ix_ensure(c, "CREATE INDEX IF NOT EXISTS ix2281_task_fts_vec ON task_fts USING gin (vec)")
-    ix_ensure(c, "CREATE INDEX IF NOT EXISTS ix2281_cmt_fts_vec ON cmt_fts USING gin (vec)")
-    for fn, tbl, key, cols in (("kalmido_fts_task", "tasks", "task_id", ("title", "content")),
-                               ("kalmido_fts_cmt", "obj_comments", "comment_id", ("body",))):
-        vec = TASK_NEW_VEC if tbl == "tasks" else CMT_NEW_VEC
-        side = "task_fts" if tbl == "tasks" else "cmt_fts"
-        c.execute(f"""CREATE OR REPLACE FUNCTION {fn}() RETURNS trigger LANGUAGE plpgsql AS $fn$
-BEGIN
-  IF to_regprocedure('kalmido_fold(text)') IS NULL THEN  -- the fold function missing (until the next start): the write goes
-    DELETE FROM {side} WHERE {key}=NEW.id;             -- on, the start fills the row (an IF, not EXCEPTION: no subtransaction per row)
-    RETURN NULL;
-  END IF;
-  INSERT INTO {side}({key}, vec) VALUES (NEW.id, {vec}) ON CONFLICT ({key}) DO UPDATE SET vec=EXCLUDED.vec;
-  RETURN NULL;
-END $fn$""")
-        changed = " OR ".join(f"OLD.{x} IS DISTINCT FROM NEW.{x}" for x in cols)
-        trigger_ensure(c, f"{fn}_ins", tbl, f"CREATE OR REPLACE TRIGGER {fn}_ins AFTER INSERT ON {tbl} FOR EACH ROW EXECUTE FUNCTION {fn}()")
-        trigger_ensure(c, f"{fn}_upd", tbl, f"CREATE OR REPLACE TRIGGER {fn}_upd AFTER UPDATE OF {', '.join(cols)} ON {tbl} FOR EACH ROW "
-                       f"WHEN ({changed}) EXECUTE FUNCTION {fn}()")
-    if new:
-        c.execute("TRUNCATE task_fts, cmt_fts")
-    c.execute(f"INSERT INTO task_fts(task_id, vec) SELECT id, {TASK_VEC} FROM tasks t "
-              "WHERE NOT EXISTS (SELECT 1 FROM task_fts f WHERE f.task_id=t.id)")
-    c.execute(f"INSERT INTO cmt_fts(comment_id, vec) SELECT id, {CMT_VEC} FROM obj_comments m "
-              "WHERE NOT EXISTS (SELECT 1 FROM cmt_fts f WHERE f.comment_id=m.id)")
-    if new:
-        gset(c, "fts_v", ver)
-        print("full-text search: index (re)built", flush=True)
-
-
 def fts_terms(q):
-    """The words of a query (letters and digits only, max MSG_TERMS, each max 64 chars)."""
-    return [w[:64] for w in re.findall(r"[^\W_]+", q or "")][:MSG_TERMS]
+    """The words of a query (core/objsearch.py osr_terms)."""
+    return osr_terms(q)
 
 
 def fts_query(terms):
-    """to_tsquery text: every word as a prefix in each of its folded variants (OR), all words required (AND). The lexemes
-    hold letters / digits only, so nothing in them can be read as a tsquery operator."""
-    parts = []
-    for t in terms:
-        vs = sorted({"".join(ch for ch in v if ch.isalnum()) for v in _variants(t)} - {""})
-        if vs:
-            parts.append("(" + " | ".join(f"'{v}':*" for v in vs) + ")")
-    return " & ".join(parts)
+    """to_tsquery text of the words (core/objsearch.py osr_query): every word a prefix in each of its variants, all required."""
+    return osr_query(terms)
 
 
 def _plain(text):
@@ -174,10 +106,12 @@ def fts_search(c, uid, raw, files=True):
             best[tid] = (k, where, snip, cid)
 
     # 2.281.0 C (#3113): rank on the stored vector; title / notes only for the FTS_CAND best (in_title: the weight A part)
+    # 2.981.0 (#5278): the vector of the shared index (obj_search kind 'task'); a hit only in the link / code snippets
+    # (weight C) counts as notes
     rows = c.execute(f"""SELECT t.id, t.list_id, t.title, t.content, x.r, x.in_title FROM (
-        SELECT f.task_id, ts_rank(f.vec, q) AS r, (ts_filter(f.vec, '{{a}}') @@ q) AS in_title
-        FROM task_fts f JOIN tasks t ON t.id=f.task_id, to_tsquery('simple'::regconfig, ?) q
-        WHERE f.vec @@ q AND {_task_cond(c, uid, 't.')} ORDER BY r DESC, f.task_id DESC LIMIT {cand}) x
+        SELECT f.ref_id AS task_id, ts_rank(f.tsv, q) AS r, (ts_filter(f.tsv, '{{a}}') @@ q) AS in_title
+        FROM obj_search f JOIN tasks t ON t.id=f.ref_id, to_tsquery('simple'::regconfig, ?) q
+        WHERE f.kind='task' AND f.tsv @@ q AND {_task_cond(c, uid, 't.')} ORDER BY r DESC, f.ref_id DESC LIMIT {cand}) x
         JOIN tasks t ON t.id=x.task_id ORDER BY x.r DESC, t.id DESC""", (tsq, uid, uid)).fetchall()
     for r in rows:
         note(r["list_id"])
@@ -186,10 +120,10 @@ def fts_search(c, uid, raw, files=True):
         else:
             put(r["id"], "notes", r["r"], _snip(_plain(r["content"]), terms))
     # comments: the same visibility as the message search (who may read the task's comments)
-    # 2.972.0 (#5272): the comments of tasks in the comments' core (obj_comments kind 'task')
-    rows = c.execute(f"""SELECT x.*, m.body FROM (SELECT * FROM (SELECT DISTINCT ON (m.ref_id) m.id, m.ref_id AS task_id, t.list_id, ts_rank(f.vec, q) AS r
-        FROM cmt_fts f JOIN obj_comments m ON m.id=f.comment_id AND m.kind='task' JOIN tasks t ON t.id=m.ref_id, to_tsquery('simple'::regconfig, ?) q
-        WHERE f.vec @@ q AND {live_sql('m')} AND {_task_cond(c, uid, 't.')}
+    # 2.972.0 (#5272): the comments of tasks in the comments' core (obj_comments kind 'task'); 2.981.0 (#5278): obj_search kind 'comment'
+    rows = c.execute(f"""SELECT x.*, m.body FROM (SELECT * FROM (SELECT DISTINCT ON (m.ref_id) m.id, m.ref_id AS task_id, t.list_id, ts_rank(f.tsv, q) AS r
+        FROM obj_search f JOIN obj_comments m ON m.id=f.ref_id AND m.kind='task' JOIN tasks t ON t.id=m.ref_id, to_tsquery('simple'::regconfig, ?) q
+        WHERE f.kind='comment' AND f.pkind='task' AND f.tsv @@ q AND {live_sql('m')} AND {_task_cond(c, uid, 't.')}
         ORDER BY m.ref_id, r DESC, m.id DESC) y ORDER BY r DESC, id DESC LIMIT {cand}) x
         JOIN obj_comments m ON m.id=x.id ORDER BY x.r DESC, x.id DESC""", (tsq, uid, uid)).fetchall()
     names = user_names(c, {int(x) for r in rows for x in OCM_MENTION_RE.findall(r["body"] or "")}) if rows else {}
@@ -238,11 +172,27 @@ def fts_args(a, lim_default=20):
     return q, as_int(a.get("limit", lim_default), "limit", 1, FTS_LIMIT)
 
 
+def fts_obj_comments(c, uid, raw, limit=10):
+    """2.981.0 (#5278): comments of objects other than tasks (obj_comments of the kinds registered with core/objsearch.py
+    osr_kind; none today, the video / picture reviews and document notes join with Q4b) that uid may read: [{id, kind, ref_id,
+    snippet: {text, marks}}]. Tasks' comments stay in the hits (fts_search)."""
+    kinds = [k for k in OSR_KINDS if k != "task"]
+    terms = fts_terms(raw)
+    out = []
+    for r in osr_comment_hits(c, uid, raw, kinds, limit) if kinds else []:
+        text = _plain(r["body"])
+        if _marks(text, terms):
+            out.append({"id": r["id"], "kind": r["kind"], "ref_id": r["ref_id"], "snippet": _snip(text, terms)})
+    return out
+
+
 @app.get("/api/search")
 def fts_web():
     """?q, limit (1-50), cursor -- {hits: [{task, where, snippet: {text, marks}, comment_id?}], next, office?}.
     2.250.0 A (#2992): office: [{kind, id, label, sub, go}] (clients, quotations / invoices: office/search.py) on the first
-    page only, and only when the person sees the office -- an extra key, old clients read hits as before."""
+    page only, and only when the person sees the office -- an extra key, old clients read hits as before.
+    2.981.0 (#5278): wiki: [{id, path, space}] (knowledge pages by name, wiki/wksearch.py wks_name_hits) and comments: [{id,
+    kind, ref_id, snippet}] (comments of other objects, fts_obj_comments) on the first page, when there are any."""
     a = request.args
     try:
         q, lim = fts_args(a)
@@ -262,6 +212,15 @@ def fts_web():
         office = bs_office_hits(db(), me(), q)
         if office:
             extra["office"] = office
+        # 2.981.0 (#5278): knowledge pages by name (also those a share of the shared core opens, question 15) and comments of
+        # the other kinds the search knows (core/objsearch.py OSR_KINDS: each checked with the object's role) -- extra keys
+        from ..wiki.wksearch import wks_name_hits
+        wiki = wks_name_hits(db(), me(), q)
+        if wiki:
+            extra["wiki"] = wiki
+        cm = fts_obj_comments(db(), me(), q)
+        if cm:
+            extra["comments"] = cm
     return jsonify(hits=hits, next=cursor_enc("fs", off + lim) if more else None, **extra)
 
 

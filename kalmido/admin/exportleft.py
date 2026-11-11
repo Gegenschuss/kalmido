@@ -95,6 +95,7 @@ UMZ_LEFT_TABLES = {
     "list_folder_skip": _VIEW, "list_mine_hide": _VIEW,
     "user_task_order": _VIEW, "wait_hidden": _VIEW,
     "obj_seen": _VIEW,  # 2.905.0 (#5284): the core's read marks (was task_seen), a personal view state like before
+    "obj_search": _DERIVED,  # 2.981.0 (#5278): the shared search index (core/objsearch.py), rebuilt from the imported rows by its triggers
     "user_mine_sections": _VIEW,  # 2.569.0 (#4395): the own sections of "My tasks", like user_task_order
     "user_mine_rules": _VIEW, "user_mine_rule_runs": _VIEW,  # 2.823.0 (#4773): the own rules of "My tasks" and their markers
     "eph_state": _SERVER,  # 2.622.0 (#3891): sign-in steps, tickets, typing markers of minutes (core/ephem.py)

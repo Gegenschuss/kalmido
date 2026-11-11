@@ -94,7 +94,7 @@ def quiet(what):
 good = defs()
 for name in ("list_members.list_e2e_members", "org_members.wiki_e2e_members", "time_entries.time_title_e2e", "tasks.time_task_list",
              "tasks.time_task_title", "tasks.kalmido_dl_tasks", "orgs.kalmido_acx_orgs", "tasks.kalmido_ml_task",
-             "tasks.kalmido_fts_task_upd", "tasks.kalmido_sec_at", "tasks.kalmido_ticket_no", "api_tokens.kalmido_revoked_api_tokens",
+             "tasks.kalmido_osr_task_upd", "tasks.kalmido_sec_at", "tasks.kalmido_ticket_no", "api_tokens.kalmido_revoked_api_tokens",
              "lists.kalmido_purged_lists"):
     check(name in good, f"#2731: trigger {name} is there")
 quiet("unchanged")
@@ -117,9 +117,9 @@ for what, table, trig, stmt in (
         ("WHEN", "tasks", "time_task_list",
          "CREATE OR REPLACE TRIGGER time_task_list AFTER UPDATE OF list_id ON tasks FOR EACH ROW "
          "WHEN (NEW.list_id IS NOT DISTINCT FROM OLD.list_id) EXECUTE FUNCTION kalmido_time_task_list()"),
-        ("one branch of WHEN", "tasks", "kalmido_fts_task_upd",
-         "CREATE OR REPLACE TRIGGER kalmido_fts_task_upd AFTER UPDATE OF title, content ON tasks FOR EACH ROW "
-         "WHEN (OLD.title IS DISTINCT FROM NEW.title) EXECUTE FUNCTION kalmido_fts_task()"),
+        ("one branch of WHEN", "tasks", "kalmido_osr_task_upd",  # 2.981.0 (#5278): the shared search index's trigger (was kalmido_fts_task_upd)
+         "CREATE OR REPLACE TRIGGER kalmido_osr_task_upd AFTER UPDATE OF title, content ON tasks FOR EACH ROW "
+         "WHEN (OLD.title IS DISTINCT FROM NEW.title) EXECUTE FUNCTION kalmido_osr_task()"),
         ("argument", "api_tokens", "kalmido_revoked_api_tokens",
          "CREATE OR REPLACE TRIGGER kalmido_revoked_api_tokens AFTER DELETE ON api_tokens FOR EACH ROW "
          "EXECUTE FUNCTION kalmido_revoked_note('pw_hash')"),
@@ -142,7 +142,7 @@ quiet("after the repairs")
 
 # a function is replaced by its CREATE OR REPLACE FUNCTION of every start, without a table lock
 for fn, ret in (("kalmido_time_title_e2e", "NEW"), ("kalmido_list_e2e_members", "NEW"), ("kalmido_dl_touch", "NULL"),
-                ("kalmido_fts_task", "NULL"), ("kalmido_acx_bump", "NULL"), ("kalmido_ml_prune", "NULL")):
+                ("kalmido_osr_task", "NULL"), ("kalmido_acx_bump", "NULL"), ("kalmido_ml_prune", "NULL")):  # 2.981.0 (#5278): kalmido_fts_task -> kalmido_osr_task
     src = sql("SELECT prosrc FROM pg_proc WHERE proname=?", (fn,))[0][0]
     sql(f"CREATE OR REPLACE FUNCTION {fn}() RETURNS trigger LANGUAGE plpgsql AS $fn$BEGIN RETURN {ret}; END$fn$", write=True)
     r = start()
@@ -151,7 +151,7 @@ for fn, ret in (("kalmido_time_title_e2e", "NEW"), ("kalmido_list_e2e_members", 
 
 # the former CREATE INDEX IF NOT EXISTS of the start: each comes back when it is gone
 fk = sql("SELECT relname FROM pg_class WHERE relname LIKE 'fk2103!_%' ESCAPE '!' AND relkind='i' ORDER BY relname LIMIT 1")[0][0]
-for ix in ("tasks_agroup", "tasks_msid", "ix2281_task_fts_vec", "ix2281_cmt_fts_vec", "msg_trgm_obj_comments", "office_doc_items_org", fk):  # 2.972.0 (#5272): msg_trgm_obj_comments
+for ix in ("tasks_agroup", "tasks_msid", "ix5278_obj_search_tsv", "office_doc_items_org", fk):  # 2.981.0 (#5278): obj_search instead of task_fts / cmt_fts / trigram
     check(sql("SELECT 1 FROM pg_class WHERE relname=?", (ix,)) == [(1,)], f"#2731: index {ix} there")
     sql(f"DROP INDEX {ix}", write=True)
     r = start()

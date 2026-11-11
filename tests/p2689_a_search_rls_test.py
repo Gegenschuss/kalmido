@@ -90,7 +90,7 @@ got = search(A, "needle")
 want = {mine[k] for k in ("title", "notes", "url", "lit", "inbox")}
 check(got == want, f"alice finds her needles in title, notes, link and her private inbox ({sorted(got)} vs {sorted(want)})")
 check(not (got & set(FOREIGN)) and GONE not in got, "... never Beta's, not the deleted one")
-check(search(A, "50%_needle") == {mine["lit"]}, "% and _ are taken literally")
+check(search(A, "50%_needle") == {mine["lit"]}, "% and _ are no wildcards")  # 2.981.0 (#5278): words of the shared index, punctuation ignored
 check(search(A, "NEEDLE IN THE") == {mine["title"]}, "the search ignores case")
 check(search(Ca, "needle") == set(FOREIGN), "carol finds only Beta's needles")
 check(len(search(A, "filler task 19")) > 0, "a word of the seeded tasks in the visible list is found")
@@ -132,7 +132,8 @@ check(any("tasks_list" in x or "tasks_done" in x for x in pn), "... it starts fr
 SRC = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "kalmido", "core", "state.py"), encoding="utf-8").read()
 body = SRC[SRC.index("def search_tasks("):]
 body = body[:body.index("\n@app.")]
-check("SELECT id FROM tasks WHERE title ILIKE" not in body and "(title ILIKE ? ESCAPE" in body,
-      "search_tasks tests the text on the visible lists' tasks, no id set over the whole table per field")
+# 2.981.0 (#5278): the text through the shared search index obj_search (no ILIKE on tasks any more), still on the visible lists
+check("SELECT id FROM tasks WHERE title ILIKE" not in body and "title ILIKE ?" not in body and 'osr_ids_sql("task"' in body
+      and "vis_search_lids(c, uid)" in body, "search_tasks tests the text on the visible lists' tasks through obj_search")
 
 sys.exit(kt.done("p2689_a_search_rls"))

@@ -14,6 +14,7 @@ freelancer-matrix: tasks  tenant-matrix: list, org, agent, session
    numbers as /api/team); a @mention in a list channel
  - #2515 the indexes exist (tasks_done, tasks_due, events_range, the trigram ones, tasks_open stays); the main search finds
    title, notes, link and code snippet matches, also part of a word ("rechn" finds "Rechnung"), two letters, nothing foreign
+   (2.981.0, #5278: the trigram indexes went, a word start only: "rechn" yes, "ie" in "Lieferung" no)
  - a person without an organisation: state, version, delta and search work the same (own private list)
  - #2508 the cache is used: a membership removed with the triggers off stays cached until the TTL (10 s), then counts
  - PERF line (information): the time of a poll
@@ -220,8 +221,10 @@ else:
 
 # ================================================================ #2515: indexes + the main search
 idx = {r[0] for r in dbx("SELECT indexname FROM pg_indexes WHERE tablename IN ('tasks', 'events')")}
-want = {"tasks_done", "tasks_due", "events_range", "tasks_trgm_title", "tasks_trgm_content", "tasks_trgm_url", "tasks_snippets", "tasks_open"}
+want = {"tasks_done", "tasks_due", "events_range", "tasks_snippets", "tasks_open"}
 check(want <= idx, f"#2515: the indexes exist (tasks_open stays) {sorted(want - idx)}")
+# 2.981.0 (#5278): the trigram indexes of the main search went (it reads the shared search index obj_search)
+check(not {"tasks_trgm_title", "tasks_trgm_content", "tasks_trgm_url"} & idx, f"#5278: the trigram indexes are gone {sorted(idx)}")
 SL = A.post(B + "/api/lists", json={"name": "Search here"}).json()["id"]
 S1 = A.post(B + "/api/tasks", json={"title": "Rechnung Oktober", "list_id": SL}).json()["id"]
 S2t = A.post(B + "/api/tasks", json={"title": "Paket", "content": "Notiz zur Lieferung am Dienstag", "list_id": SL}).json()["id"]
@@ -240,7 +243,8 @@ check(search(A, "rechn") == {S1}, f"#2515: part of a word in the title ({search(
 check(search(A, "LIEFERUNG") == {S2t}, "#2515: a word of the notes, any case")
 check(search(A, "abc-xyz") == {S3}, "#2515: the link")
 check(search(A, "hokus") == {S4} and search(A, "zauber") == {S4}, "#2515: code snippet text and path")
-check(S1 in search(A, "re") and S2t in search(A, "ie"), "#2515: two letters still match (title and notes)")
+# 2.981.0 (#5278, question 14): a word start, no part inside a word any more ("ie" no longer finds "Lieferung")
+check(S1 in search(A, "re") and S2t in search(A, "li") and S2t not in search(A, "ie"), "#2515: two letters still match at a word start (title and notes)")
 check(search(A, "100%") == set() and search(A, "a_b") == set(), "#2515: % and _ are literal")
 check(search(Fr, "rechn") == {FT} and FT not in search(A, "rechn"), "#2515: each person finds only their own (freelancer included)")
 

@@ -3281,14 +3281,6 @@
   },
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/tasks/ftsearch.py",
-   "code": "c.execute(f\"\"\"CREATE OR REPLACE FUNCTION {fn}() RETURNS trigger LANGUAGE plpgsql AS $fn$",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/tasks/lifecycle.py",
    "code": "c.execute(f\"UPDATE tasks SET {''.join(k + '=?, ' for k in put)}due=?, reminded=?, updated_at=? WHERE id=?\",",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",

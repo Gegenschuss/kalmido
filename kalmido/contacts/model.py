@@ -11,6 +11,7 @@ from datetime import date, datetime, timedelta
 
 from flask import has_request_context
 
+from ..core.objsearch import osr_ids_sql  # 2.981.0 (#5278)
 from ..core.i18n import lang, N_, tr
 from ..core.pg import insert_id, like_escape, st_ids, system_ctx
 from ..core.db import bump, iso, iso_ms, local_now, now_utc, usettings
@@ -791,17 +792,6 @@ def _jl(v):
         return []
 
 
-def search_text(v):
-    parts = [v.get("fn"), v.get("given"), v.get("family"), v.get("nickname"), v.get("org"), v.get("dept"), v.get("title"), v.get("note", "")[:500]]
-    for k in ("emails", "phones"):
-        parts += [x.get("value", "") for x in (v.get(k) if isinstance(v.get(k), list) else _jl(v.get(k)))]
-    parts += [re.sub(r"[^\d+]", "", x.get("value", "")) for x in (v.get("phones") if isinstance(v.get("phones"), list) else _jl(v.get("phones")))]
-    for a in (v.get("addresses") if isinstance(v.get("addresses"), list) else _jl(v.get("addresses"))):
-        parts += [a.get(k, "") for k in ("street", "city", "code", "country")]
-    parts += v.get("groups") if isinstance(v.get("groups"), list) else _jl(v.get("groups"))
-    return " ".join(str(x) for x in parts if x).lower()[:4000]
-
-
 # ---- validation of a contact body (web + API)
 CT_KEYS = ("book_id", "kind", "fn", "given", "family", "middle", "prefix", "suffix", "nickname", "org", "dept", "title", "emails",
            "phones", "addresses", "urls", "bday", "anniversary", "note", "groups", "photo")
@@ -949,7 +939,7 @@ def contact_store(c, uid, book_id, f, cid=None, uid_=None, href=None, extra=None
         cols.update(book_id=book_id, uid=uid_, href=href, extra=extra or "",
                     version=version or "3.0", src_digest=src_digest or "", created_by=uid, created_at=ts, updated_at=ts,
                     updated_by=uid)  # 2.571.0 (#4776): who changed it last (app, API / agents, CardDAV, import all end here)
-        cols["search"] = search_text({**cols, **{k: _jl(cols[k]) for k in ("emails", "phones", "addresses", "groups")}})
+        # 2.981.0 (#5278): the search text: the trigger of the shared search index (core/objsearch.py, kind 'contact')
         cid = insert_id(c, f"INSERT INTO contacts({','.join(cols)}) VALUES({','.join('?' * len(cols))})", list(cols.values()))
     else:
         f = dict(f)
@@ -964,8 +954,6 @@ def contact_store(c, uid, book_id, f, cid=None, uid_=None, href=None, extra=None
             f["updated_by"] = uid  # 2.571.0 (#4776)
         c.execute(f"UPDATE contacts SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), cid])
         r = c.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
-        c.execute("UPDATE contacts SET search=? WHERE id=?",
-                  (search_text({**dict(r), **{k: _jl(r[k]) for k in ("emails", "phones", "addresses", "groups")}}), cid))
         if "fn" in f or "org" in f:  # 2.351.0 B (#2749): the name on its folder node
             from .ctfolder import CTF_CONTACT, ctf_renamed
             ctf_renamed(c, CTF_CONTACT, cid, r["fn"] or r["org"])
@@ -1044,9 +1032,13 @@ def contacts_query(c, uid, q="", book=None, group=None, limit=500, offset=0, tra
     if one:
         inb = f"({inb} OR id IN ({','.join(str(int(x)) for x in sorted(set(one)))}))"
     where, args = f"{inb} AND kind!='group' AND deleted_at IS {'NOT ' if trash else ''}NULL", list(ids)
-    for w in [x for x in re.split(r"\s+", (q or "").lower().strip()) if x][:6]:
-        where += " AND search ILIKE ? ESCAPE '\\'"
-        args.append("%" + w.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
+    if (q or "").strip():  # 2.981.0 (#5278, stage Q6a, question 14): the shared search index (core/objsearch.py, kind 'contact'):
+        # every word at the start of a word, in the names / company / phone numbers anywhere
+        ids_sql, x = osr_ids_sql("contact", q, names=True)
+        if ids_sql is None:
+            return [], 0
+        where += f" AND id IN {ids_sql}"
+        args += x
     if group:
         where += " AND groups ILIKE ? ESCAPE '\\'"
         args.append("%" + like_escape(json.dumps(group, ensure_ascii=False)) + "%")

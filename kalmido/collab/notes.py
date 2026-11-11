@@ -2,6 +2,7 @@
 import re
 from flask import jsonify, request, Response
 
+from ..core.objsearch import osr_ids_sql  # 2.981.0 (#5278)
 from ..core.config import app
 from ..core.pg import IntegrityError, insert_id, write_lock
 from ..core.i18n import tr
@@ -296,10 +297,13 @@ def notes_search(c, uid, q, lid=None, limit=50):
         a.append(lid)
     if q:
         w += " AND list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL)"  # 2.64.1 (#1817, M7): ciphertexts are not searched
-        for word in q.split()[:6]:
-            like = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-            w += " AND (title ILIKE ? ESCAPE '\\' OR body ILIKE ? ESCAPE '\\' OR tags ILIKE ? ESCAPE '\\')"
-            a += [like, like, like]
+        # 2.981.0 (#5278, stage Q6a): every word at the start of a word of the title, text or tags, through the shared search
+        # index (core/objsearch.py, obj_search kind 'note'; umlauts as ae / oe / ue) -- no ILIKE on the notes
+        ids, x = osr_ids_sql("note", q)
+        if ids is None:
+            return []
+        w += f" AND id IN {ids}"
+        a += x
     return c.execute(f"SELECT * FROM notes WHERE {w} ORDER BY pinned DESC, updated_at DESC LIMIT ?", (*a, limit)).fetchall()
 
 

@@ -1,10 +1,10 @@
 """2.33.0 (#1080): search in conversations -- task comments, team chat (channels + direct messages) and agent chats.
 
-Index (2.37.0, #1150, Postgres): no separate table. kalmido_fold(body) (IMMUTABLE: unaccent + lower case; a text with
-umlauts also once more with ä -> ae, ö -> oe, ü -> ue, ß -> ss) has a trigram GIN index on each of the three message tables
-(pg_trgm), so the index follows every insert / edit / delete by itself, also rows written straight into the tables. A query
-word matches the beginning of a word of the folded text (regular expression, word start), in the same variants as before:
-"Ärger", "arger" and "aerger" all find "Ärger". init_db() creates the function and the indexes (msg_index_init).
+Index (2.981.0, #5278): the shared search index obj_search (core/objsearch.py) with the kinds comment, tchat and agent_chat
+-- kept by triggers, so it follows every insert / edit / delete, also rows written straight into the tables. A query word
+matches the beginning of a word of the folded text (kalmido_fold: unaccent + lower case, a text with umlauts once more with
+ae / oe / ue / ss), in every variant: "Ärger", "arger" and "aerger" all find "Ärger". Until 2.981 a trigram index per message
+table (2.37.0, #1150) did that with a regular expression; it went with stage Q6a.
 
 Visibility is strict and the same as reading the conversation: comments of tasks the person may see with their comments (list
 role, participants only their own tasks, a token limited to lists), team chat rooms the person is in (channel: a full role in
@@ -15,19 +15,19 @@ ids in filters simply find nothing. The snippet is plain text with the hit range
 the device searches them (the web client merges sources in msgSearch(), see static/js/msgsearch.js). Every hit therefore
 names its kind (art: c | t | a) and its chat type (task | list | dm | agent)."""
 import re
-import unicodedata
 
 from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import db, gset, gsetting, ix_ensure
+from ..core.db import db
 from ..accounts.session import me
 from ..core.access import collab_all, Denied, FULL_ROLES, list_role, live_sql, tvis, vis_search_lids, vis_sql
 from ..tasks.validation import as_int
 from ..core.errors import BadInput
 from ..collab.comments import comment_plain, user_names
 from ..core.objcomments import ocm_old_cols, OCM_MENTION_RE  # 2.972.0 (#5272)
+from ..core.objsearch import osr_cond, osr_fold_char as _fold_char, osr_variants as _variants  # 2.981.0 (#5278)
 from ..collab.teamchat import md_brief, tchat_on, tchat_room_ok
 from ..agents.core import agent_ids, agent_shares, is_agent
 from ..api.v1 import API_PAGE_MAX
@@ -39,51 +39,9 @@ CHAT_TYPES = ("task", "list", "dm", "agent", "channel", "group")  # 2.113.1 (#20
 MSG_CAND = 1000          # candidates per kind before the per-row checks
 MSG_TERMS = 8
 SNIP = 160               # characters of a snippet
-INDEX_VERSION = "2"  # 2.37.0: kalmido_fold() + trigram indexes (a new version re-creates both)
-
-_FOLD = "{x}"
-for _a, _b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("Ä", "Ae"), ("Ö", "Oe"), ("Ü", "Ue"), ("ß", "ss")):
-    _FOLD = f"replace({_FOLD},'{_a}','{_b}')"
 
 
-# the three message tables with an index on kalmido_fold(body)
-MSG_TABLES = ("obj_comments", "tchat_msgs", "agent_chat")  # 2.972.0 (#5272): comments -> obj_comments (index msg_trgm_obj_comments)
-
-
-def _fold_fn(c):
-    """SQL: CREATE OR REPLACE FUNCTION kalmido_fold(text) -- unaccent schema-qualified (an index expression must not depend on
-    the search path)."""
-    sch = c.execute("SELECT extnamespace::regnamespace::text FROM pg_extension WHERE extname='unaccent'").fetchone()[0]
-    ua = f"{sch}.unaccent('{sch}.unaccent'::regdictionary, %s)"
-    return ("CREATE OR REPLACE FUNCTION kalmido_fold(t text) RETURNS text LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $fold$\n"
-            f"DECLARE x text := lower({ua % 't'}); y text := lower({ua % _FOLD.format(x='t')});\n"
-            "BEGIN RETURN CASE WHEN x = y THEN x ELSE x || chr(10) || y END; END $fold$")
-
-
-def msg_index_init(c):
-    """Called by init_db inside its transaction (an error must surface there): the fold function and one trigram index per
-    message table, created once; a new INDEX_VERSION replaces the function and rebuilds the indexes."""
-    have = c.execute("SELECT 1 FROM pg_proc WHERE proname='kalmido_fold' AND pronamespace=current_schema()::regnamespace").fetchone()
-    new = not have or gsetting(c, "msg_fts_v") != INDEX_VERSION
-    if new:
-        c.execute(_fold_fn(c))
-    for t in MSG_TABLES:
-        if new:
-            c.execute(f"DROP INDEX IF EXISTS msg_trgm_{t}")
-        ix_ensure(c, f"CREATE INDEX IF NOT EXISTS msg_trgm_{t} ON {t} USING gin (kalmido_fold(body) gin_trgm_ops)")
-    if new:
-        gset(c, "msg_fts_v", INDEX_VERSION)
-        print("message search: index (re)built", flush=True)
-
-
-# ---- matching (also for the snippet: the same folding as the index, in Python)
-def _fold_char(ch):
-    if ch == "ß":
-        return "ss"
-    d = unicodedata.normalize("NFKD", ch)
-    return "".join(x for x in d if not unicodedata.combining(x)).lower() or ch.lower()
-
-
+# ---- matching (the snippet: the same folding as the index, in Python; core/objsearch.py)
 def _folded(text):
     """(folded text, map folded position -> original position)."""
     out, pos = [], []
@@ -100,22 +58,13 @@ def msg_terms(q):
     return [w[:64] for w in re.findall(r"\w+", q or "") if w.strip("_")][:MSG_TERMS]
 
 
-def _variants(term):
-    """Folded forms of a query word: as typed (ä -> a), with ä -> ae (the text says "ae") and ae -> a (the text says "ä")."""
-    f = "".join(_fold_char(ch) for ch in term)
-    ex = "".join(_fold_char(ch) for ch in re.sub("[äöüÄÖÜ]", lambda m: m.group(0) + "e", term))  # ä -> ae (text written "ae")
-    return {f, ex, f.replace("ae", "a").replace("oe", "o").replace("ue", "u")}
-
-
-def _pg_re(v):
-    """A folded word as a literal in a Postgres regular expression."""
-    return "".join(ch if ch.isalnum() else "\\" + ch for ch in v)
-
-
-def match_sql(terms):
-    """(SQL condition on m.body, its parameters): every word at the beginning of a word of the folded text, in any variant."""
-    pats = ["\\m(" + "|".join(sorted(_pg_re(v) for v in _variants(t) if v)) + ")" for t in terms]
-    return " AND ".join(["kalmido_fold(m.body) ~ ?"] * len(pats)), pats
+def match_sql(terms, kind):
+    """(SQL condition on the message m of kind in obj_search, its parameters): every word at the beginning of a word of the
+    folded text, in any variant (2.981.0, #5278: the shared index instead of the trigram index)."""
+    cond, args = osr_cond(" ".join(terms), "s")
+    if cond is None:  # no letter or digit in the words: nothing found
+        return "FALSE", []
+    return f"m.id IN (SELECT s.ref_id FROM obj_search s WHERE s.kind='{kind}' AND {cond})", args
 
 
 def find_marks(text, terms):
@@ -165,7 +114,6 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
     terms = msg_terms(q)
     if not terms:
         return []
-    mcond, match = match_sql(terms)
     agent_me = is_agent(g.user) if getattr(g, "user", None) is not None else False
     arts = set(arts or ARTS)
     if room is not None:
@@ -185,6 +133,7 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
         return roles[lid]
 
     if "c" in arts:
+        mcond, match = match_sql(terms, "comment")  # 2.981.0 (#5278): the comments' rows of the shared index
         # 2.695.0 (#4960): the visible lists as an array (vis_search_lids, without the lock's): their tasks through the index
         # tasks_list, their comments through comments_task -- under row-level security the trigram index cannot help
         # 2.972.0 (#5272): the comments' core (obj_comments kind 'task'), the row in its old shape (created_at as ISO text)
@@ -201,6 +150,7 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
     if "t" in arts and (collab_all() if agent_me else tchat_on(c, uid)):
         from .tcxcore import tcx_core_rooms_sql  # 2.565.0 (#4719): + the channels shared with a group of uid
         from ..core.objects import obj_gate  # 2.654.0 (#5053)
+        mcond, match = match_sql(terms, "tchat")  # 2.981.0 (#5278)
         rows = c.execute(f"""SELECT m.id, m.room_id, m.user_id, m.body, m.created_at, r.kind, r.list_id, r.a, r.b
             FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
             WHERE {mcond} AND m.deleted_at IS NULL AND m.enc IS NULL AND ((r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN {vis_sql()}
@@ -240,6 +190,7 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
             if agent is not None:
                 cond += " AND m.agent_id=?"
                 a2.append(agent)
+        mcond, match = match_sql(terms, "agent_chat")  # 2.981.0 (#5278)
         sq = ""
         if sender is not None:
             sq = " AND ((m.sender='user' AND m.user_id=?) OR (m.sender='agent' AND m.agent_id=?))"

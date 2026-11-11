@@ -632,7 +632,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   emails TEXT NOT NULL DEFAULT '[]', phones TEXT NOT NULL DEFAULT '[]', addresses TEXT NOT NULL DEFAULT '[]', urls TEXT NOT NULL DEFAULT '[]',
   bday TEXT NOT NULL DEFAULT '', anniversary TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
   groups TEXT NOT NULL DEFAULT '[]', photo TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '3.0',
-  extra TEXT NOT NULL DEFAULT '', src_digest TEXT NOT NULL DEFAULT '', search TEXT NOT NULL DEFAULT '',
+  extra TEXT NOT NULL DEFAULT '', src_digest TEXT NOT NULL DEFAULT '',  -- 2.981.0 (#5278): search went into obj_search
   created_by BIGINT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
   deleted_at TEXT, imp_at TEXT, imp_rev TEXT);  -- 2.272.0 E1 (#3038): the trash; 2.273.0 F2 (#3048): the last file import
 CREATE INDEX IF NOT EXISTS contacts_book ON contacts(book_id);
@@ -4234,11 +4234,8 @@ CREATE INDEX IF NOT EXISTS git_branches_task ON git_branches(task_id) WHERE task
 CREATE INDEX IF NOT EXISTS tasks_done ON tasks(list_id, completed_at) WHERE status<>0 AND deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS tasks_due ON tasks(due) WHERE due IS NOT NULL AND status=0 AND deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS events_range ON events(cal_id, first_day) WHERE deleted_at IS NULL;
--- 2.149.0 C (#2515): the main search (core/state.py search_tasks: ILIKE '%x%') finds title / notes / link by trigram index,
--- with the same matches as the scan before (pg_trgm, see init_db), and the few tasks with code snippets directly
-CREATE INDEX IF NOT EXISTS tasks_trgm_title ON tasks USING gin (title gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS tasks_trgm_content ON tasks USING gin (content gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS tasks_trgm_url ON tasks USING gin (url gin_trgm_ops);
+-- 2.149.0 C (#2515): the few tasks with code snippets directly. 2.981.0 (#5278): the trigram indexes tasks_trgm_* of the
+-- main search went (core/state.py search_tasks reads the shared search index obj_search, core/objsearch.py osr_move drops them)
 CREATE INDEX IF NOT EXISTS tasks_snippets ON tasks(id) WHERE snippets IS NOT NULL;
 -- 2.155.0 A (#2079): one CalDAV collection name per owner
 CREATE UNIQUE INDEX IF NOT EXISTS ev_cals_dav_name ON ev_cals(owner_id, dav_name) WHERE dav_name IS NOT NULL;

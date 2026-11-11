@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """2.281.0 C (#3113) full-text search with stored vectors, own container (start.sh). freelancer-matrix: tasks
- - the side tables task_fts / cmt_fts with their GIN indexes exist, the expression indexes of 2.116 are gone
+ - the side tables task_fts / cmt_fts with their GIN indexes exist, the expression indexes of 2.116 are gone (2.981.0, #5278:
+   the shared search index obj_search instead, the side tables are gone)
  - the same hits, order and place (title / notes / comment / field) as the ranking of 2.116 (computed here in SQL the old way)
  - visibility: the owner, a list guest, another organisation, a person without an organisation
  - the vectors follow: a new title / note / comment, a renamed title (the old word no longer), a deleted comment, a task gone
@@ -109,11 +110,12 @@ def hits(s, q):
 
 
 # ---- the side tables
-t = {r[0] for r in dbx("SELECT tablename FROM pg_tables WHERE tablename IN ('task_fts', 'cmt_fts')")}
-HAVE = check(t == {"task_fts", "cmt_fts"}, f"the side tables exist: {t}")  # (without them the checks below still run)
+# 2.981.0 (#5278): task_fts / cmt_fts went into the shared search index obj_search (kinds task / comment, GIN on tsv)
+t = {r[0] for r in dbx("SELECT tablename FROM pg_tables WHERE tablename IN ('task_fts', 'cmt_fts', 'obj_search')")}
+HAVE = check(t == {"obj_search"}, f"the shared index exists, the side tables are gone: {t}")  # (without it the checks below still run)
 ix = {r[0] for r in dbx("SELECT indexname FROM pg_indexes WHERE indexname IN ('fts_tasks', 'fts_comments', "
-                        "'ix2281_task_fts_vec', 'ix2281_cmt_fts_vec')")}
-check(ix == {"ix2281_task_fts_vec", "ix2281_cmt_fts_vec"}, f"the GIN indexes of the side tables, not the expression ones: {ix}")
+                        "'ix2281_task_fts_vec', 'ix2281_cmt_fts_vec', 'ix5278_obj_search_tsv')")}
+check(ix == {"ix5278_obj_search_tsv"}, f"the GIN index of the shared index, not the old ones: {ix}")
 
 # ---- data: a shared list (bob a member), a private one, carl's and the freelancer's own
 W = lst(A, "Work", org_id=ORG)
@@ -186,7 +188,8 @@ check(hits(A, "lemur") == [], "a deleted comment is no hit")
 GONE = task(A, W, "Wombat temporary")
 comment(A, GONE, "wombat comment")
 dbx("DELETE FROM tasks WHERE id=?", (GONE,), write=True)
-check(HAVE and dbx("SELECT count(*) FROM task_fts WHERE task_id=?", (GONE,))[0][0] == 0, "a task gone for good: its vector goes with it")
+check(HAVE and dbx("SELECT count(*) FROM obj_search WHERE kind='task' AND ref_id=?", (GONE,))[0][0] == 0,
+      "a task gone for good: its vector goes with it")  # 2.981.0 (#5278): obj_search
 check(hits(A, "wombat") == [], "... and is no hit")
 
 # ---- custom fields as before (text, select, multiselect; the weaker place "field")
@@ -210,8 +213,8 @@ check(r.ok and {x["id"] for x in r.json()["tasks"]} >= {TF1, TF2}, "the simple s
 
 # ---- a row missing in the side table is filled at the next start
 if HAVE:
-    dbx("DELETE FROM task_fts WHERE task_id=?", (T["n1"],), write=True)
-    dbx("DELETE FROM cmt_fts WHERE comment_id=?", (C1,), write=True)
+    dbx("DELETE FROM obj_search WHERE kind='task' AND ref_id=?", (T["n1"],), write=True)  # 2.981.0 (#5278): obj_search
+    dbx("DELETE FROM obj_search WHERE kind='comment' AND ref_id=?", (C1,), write=True)
 restart()
 A = login(B, "alice")
 h2 = hits(A, "zebra")
