@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.941.0** (2026-11-11):
-- **Sharing**: team chat rooms, calendars and address books now share only through the shared core.
-- **Calm view**: the screen no longer jumps after a redraw; pictures in knowledge pages and bookmarks keep their size while loading.
-- **Files**: the left panel uses the same calm row grid as Projects.
-- **Agents**: undoing an applied proposal takes the whole proposal back.
+**2.962.0** (2026-11-11):
+- **Files**: locked folders get a new key when someone loses access, are searchable in subfolders and accept folders moved in and out; receipts matched in Credit cards / Bank file themselves into month folders.
+- **Sharing**: tables and knowledge pages share only through the shared core; tags (project, organisation, personal) run on the shared core.
+- **Phones**: Back goes exactly one step in menus, windows, drawer, date picker and tour.
+- **Boards and Today**: done / rejected columns show completed tasks; a Dada quote of the day.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
