@@ -148,6 +148,12 @@ dbx("INSERT INTO comments(id, task_id, user_id, body, mentions, created_at, dele
 dbx("INSERT INTO comment_trash_text(comment_id, body, mentions) VALUES(?,?,?)", (OLD_ID + 1, f"aufbewahrt <@{ALICE}>", f"{ALICE}"))
 box("pass")  # the next start of the app
 check(not table_there("comments") and not table_there("comment_trash_text"), "the start dropped the old tables made again")
+# review 2.972 (Fable F1/F2): the move raises the back limit to the minor of this image (core/kernretire.py), not to the package
+# label: the train numbers the release, an older image would make the old table again, empty
+mine = box("from kalmido.core.config import APP_VERSION\nprint(APP_VERSION)")
+fl = dict(dbx("SELECT key, value FROM kalmido_meta WHERE key IN ('back_floor','back_floor_how')"))
+check(fl.get("back_floor") == ".".join(mine.split(".")[:2] + ["0"]) and "#5272" in (fl.get("back_floor_how") or ""),
+      f"the move raised back_floor to the minor of this image {fl} {mine}")
 m = dbx("""SELECT kind, ref_id, user_id, parent_id, array_to_string(mentions, ','), extra->>'suggestion', extra->'choices'->'choices'->0->>'id',
                   (extra->>'portal')::boolean, extra->>'rule_name', client_ref, created_at = '2026-11-01T08:30:00.123+00:00'::timestamptz,
                   edited_at IS NULL, org_id, jsonb_typeof(extra->'choices'->'choices'->0->'note') = 'null'

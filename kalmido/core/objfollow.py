@@ -35,6 +35,7 @@ Interface (c = the connection; kind = 'task'):
 import json
 
 from .db import iso, now_utc, trigger_skip_present
+from .kernretire import kern_retire_floor
 from .pg import st_ids
 
 OFL_KINDS = ("task",)
@@ -179,17 +180,25 @@ OFL_OLD_BELL = """INSERT INTO obj_follow(user_id, kind, ref_id, org_id, mode, un
     ON CONFLICT DO NOTHING"""
 
 
+OFL_FLOOR_HOW = ("task watchers and bells moved into the shared core (obj_follow, #5285) and the old tables were dropped - an "
+                 "older version would make them again empty and lose what it writes there; go back only with a backup from before")
+
+
 def ofl_move(c):
     """2.972.0 (#5285): the rows of task_watchers and task_bell into obj_follow, while those tables are there (the first start
     of 2.972, or again after a version before 2.972 ran and made them anew). Only rows whose task and person still exist; a
     row there already stays. One statement per table inside the start transaction; an old time that is not in the app's ISO
     form becomes now instead of failing the cast. The fragment 5285_a drops the old tables right after (one-way). Returns the
     rows moved."""
-    n = 0
+    n, old = 0, False
     if c.execute("SELECT to_regclass('task_watchers')").fetchone()[0]:
         n += c.execute(OFL_OLD_WATCH, (OFL_ISO,)).rowcount
+        old = True
     if c.execute("SELECT to_regclass('task_bell')").fetchone()[0]:
         n += c.execute(OFL_OLD_BELL, (OFL_DAY, OFL_ISO, OFL_ISO)).rowcount
+        old = True
+    if old:  # review 2.972 (Fable F1/F2): the back limit = the minor of the image that moves (core/kernretire.py), not the label
+        kern_retire_floor(c, how=OFL_FLOOR_HOW)
     return n
 
 

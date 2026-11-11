@@ -195,6 +195,12 @@ dbx("""INSERT INTO task_bell(task_id,user_id,org_id,level,until,set_by,created_a
     (T2, ALICE, ORG, ALICE, json.dumps({"level": "mute", "until": None, "set_by": None}), ALICE))
 box("pass")  # the next start of the app
 check(not table_there("task_watchers") and not table_there("task_bell"), "the start dropped the old tables made again")
+# review 2.972 (Fable F1/F2): the move raises the back limit to the minor of this image (core/kernretire.py), not to the package
+# label: the train numbers the release, an older image would make the old tables again, empty
+mine = box("from kalmido.core.config import APP_VERSION\nprint(APP_VERSION)")
+fl = dict(dbx("SELECT key, value FROM kalmido_meta WHERE key IN ('back_floor','back_floor_how')"))
+check(fl.get("back_floor") == ".".join(mine.split(".")[:2] + ["0"]) and "#5285" in (fl.get("back_floor_how") or ""),
+      f"the move raised back_floor to the minor of this image {fl} {mine}")
 check(rows(T2) == sorted([(ALICE, "watch"), (GINA, "watch"), (ALICE, "urgent")]), f"their rows moved into obj_follow {rows(T2)}")
 m = dbx("""SELECT until::text, set_by, prev->>'level', act, act_by, org_id, created_at::text FROM obj_follow
            WHERE kind='task' AND ref_id=? AND user_id=? AND mode='urgent'""", (T2, ALICE))

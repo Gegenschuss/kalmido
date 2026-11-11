@@ -53,8 +53,9 @@ def _kr_ver(v):
     return t if t and t != (0, 0, 0) else None
 
 
-def kern_retire_floor(c, mine=None):
-    """Raise kalmido_meta back_floor to x.y.0 of this image (module docstring), never lower it. "" when nothing changed."""
+def kern_retire_floor(c, mine=None, how=KERN_RETIRE_HOW):
+    """Raise kalmido_meta back_floor to x.y.0 of this image (module docstring), never lower it. "" when nothing changed.
+    2.972.0 (#5272 / #5285): how = the reason the start check names (the comments' and following's moves pass their own)."""
     m = _kr_ver(APP_VERSION if mine is None else mine)
     if not m or not table_exists(c, "kalmido_meta"):
         return ""
@@ -63,7 +64,7 @@ def kern_retire_floor(c, mine=None):
     have = _kr_ver(r[0]) if r else None
     if have and have >= (m[0], m[1], 0):
         return ""
-    for k, x in (("back_floor", v), ("back_floor_how", KERN_RETIRE_HOW)):
+    for k, x in (("back_floor", v), ("back_floor_how", how)):
         c.execute("INSERT INTO kalmido_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (k, x))
     return v
 

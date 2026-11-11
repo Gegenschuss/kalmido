@@ -50,7 +50,8 @@ member rows into the shared core and then deletes the old member tables. From th
 version (its limit is the version that deleted them, it names the reason): an older version would create the tables empty
 again and take every member's access. The way back is a newer version or a backup from before the update.
 
-**Never go back before the release with package 2.972** (the CHANGELOG names it; the start check stamps that release's own
-version as the limit). From then on the comments of tasks are rows of one shared table (`obj_comments`); the old
-table is gone. An older version would make it again empty and write new comments there, which the next start of the newer version could
-not take over. Go back only by restoring a backup made before the update.
+**Never go back before the release with package 2.972** (the CHANGELOG names it): its first start moves the comments of tasks
+into one shared table (`obj_comments`) and the watchers and bells of tasks into `obj_follow`, drops the old tables and raises
+the database's limit to the minor of that release (like stage 7 above). An older version would make the old tables again empty
+and write there what the next start of the newer version could not take over. Go back only by restoring a backup made before
+the update.

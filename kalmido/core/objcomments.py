@@ -57,6 +57,7 @@ from .db import iso_ms, now_utc
 from .errors import BadInput, Denied
 from .i18n import N_, tr, trn
 from .objparts import part_kind, part_write
+from .kernretire import kern_retire_floor
 from .objhooks import MOVE, USER_GONE
 from .pg import insert_id, qi, st_ids, system_ctx, table_columns
 from ..accounts.orgroles import org_say_refusal
@@ -539,6 +540,11 @@ def _old(cols, name, sql, null="NULL"):
     return sql if name in cols else null
 
 
+OCM_FLOOR_HOW = ("the task comments moved into the shared core (obj_comments, #5272) and the old table was dropped - an older "
+                 "version would make it again empty and write comments the next start cannot take over; go back only with a "
+                 "backup from before")
+
+
 def ocm_move(c):
     """2.972.0 (#5272): the rows of comments / comment_trash_text into obj_comments / obj_comment_trash, while those tables
     are there (the first start of 2.972, or again after a version before 2.972 ran and made them anew), with their ids; an id
@@ -578,6 +584,9 @@ def ocm_move(c):
         ol = c.execute("SELECT pg_sequence_last_value(CAST(pg_get_serial_sequence('comments', 'id') AS regclass))").fetchone()[0] or 0
         c.execute("SELECT setval(pg_get_serial_sequence('obj_comments', 'id'), GREATEST(MAX(id), ?, 1), MAX(id) IS NOT NULL OR ? > 0) "
                   "FROM obj_comments", (int(ol), int(ol)))
+        # review 2.972 (Fable F1/F2): the back limit is the minor of the image that moves (core/kernretire.py, like stage 7), not
+        # the package label: the train numbers the release; an older image would make comments again, empty (ids from 1)
+        kern_retire_floor(c, how=OCM_FLOOR_HOW)
     for table, (col, action) in OCM_FK.items():
         ocm_fk(c, table, col, action)
     return n

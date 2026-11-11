@@ -457,10 +457,7 @@ def appver_newer_minor(other, mine=None):
 # raised), so an image of the future, which does not know the limit yet, refuses to start and can still name the step. A
 # release that adds a limit adds a line here and in docs/UPGRADING.md. Limits below 2.149 stand only there: those images
 # have no start check at all.
-BACK_LIMITS = (("2.149.0", "going back below 2.149 is not supported: those versions have no start check, see docs/UPGRADING.md"),
-               # review 2.972 (#5272): the task comments are rows of obj_comments; an older image makes an empty comments table
-               # again (ids from 1), the next start would skip its rows as doubles (data lost, other comments' reactions)
-               ("2.972.0", "going back to a version before the move of the task comments into obj_comments (package 2.972) is not supported, see docs/UPGRADING.md"))
+BACK_LIMITS = (("2.149.0", "going back below 2.149 is not supported: those versions have no start check, see docs/UPGRADING.md"),)
 
 
 def appver_check(stored, prev, mine=None, floor=None):
@@ -661,12 +658,7 @@ def secret_need_guard(new):
 def back_floor_stamp(c):
     """2.359.3 (#2896): after a successful start (inside the init transaction): the highest format limit into kalmido_meta.
     Only ever raised, also after a restore of an older backup."""
-    # review 2.972: a limit above this image's own version counts as this version (the code of the limit is in this image; the
-    # train numbers the release, which may be lower than the package label) - so the image's own next start passes and the
-    # step back to the version before it is refused from its first start on
-    mine = appver_parse(APP_VERSION)
-    lims = [(x[0] if not mine or appver_parse(x[0]) <= mine else APP_VERSION, x[1]) for x in BACK_LIMITS]
-    v, how = max(lims, key=lambda x: appver_parse(x[0]))
+    v, how = max(BACK_LIMITS, key=lambda x: appver_parse(x[0]))
     r = c.execute("SELECT value FROM kalmido_meta WHERE key='back_floor'").fetchone()
     have = appver_parse(r[0]) if r else None
     if have and have >= appver_parse(v):
