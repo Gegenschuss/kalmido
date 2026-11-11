@@ -323,6 +323,8 @@ def undo_prune(c, force=False):
 
 
 UG_TRACKED = {}  # kind -> table of core/writes.py obj_track (filled there; this module is below writes.py)
+UG_LIFE = {}  # 2.983.0 (#5589): kind -> the kind of the undo part that can still bring a deleted row back (personal/timeundo.py:
+#              time_entry -> time_life); ug_drop_orphans keeps the row's history while such a part exists
 
 
 def ug_drop_orphans(c):
@@ -340,7 +342,11 @@ def ug_drop_orphans(c):
         ug_gc(c, gids)
         # 2.777.0 (#5254, review F4): their history rows too (an undo / redo writes one: an event's title and text) -- a
         # purged event, file node, habit, office row or client leaves no history behind (one-way, the row is gone for good)
-        n += c.execute(f"DELETE FROM obj_history WHERE {cond.replace('obj_undo.', 'obj_history.')}", (kind,)).rowcount
+        # 2.983.0 (#5589): not while a part of UG_LIFE can bring the row back (a deleted time entry's "time_life"): its history
+        # goes with the run after that part ran out (as collab/liste2eguard.py le2b_hist_gone at a lock)
+        life = " AND NOT EXISTS (SELECT 1 FROM obj_undo u WHERE u.kind=? AND u.ref_id=obj_history.ref_id)" if kind in UG_LIFE else ""
+        n += c.execute(f"DELETE FROM obj_history WHERE {cond.replace('obj_undo.', 'obj_history.')}{life}",
+                       (kind, UG_LIFE[kind]) if life else (kind,)).rowcount
     return n
 
 

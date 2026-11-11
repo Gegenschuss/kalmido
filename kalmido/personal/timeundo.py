@@ -25,6 +25,7 @@ from ..core.i18n import N_, tr
 from ..core.objhooks import GONE
 from ..core.pg import qi, table_columns, write_lock
 from ..core.undoareas import ua_done, ua_pre
+from ..core.undogroups import UG_LIFE
 from ..core.undodiff import ug_diff_add, undo_diff_reg, undo_person
 from ..core.undoweb import undo_need_reg
 from ..core.writes import obj_track
@@ -57,6 +58,7 @@ def teu_label(r):
 obj_track(TEU_KIND, "time_entries", area=TEU_AREA, undo_keep={"time_entries": set(TEU_KEEP)},
           undo_nofp={"time_entries": set(TEU_NOFP)}, undo_label=teu_label)
 GONE[TEU_KIND] = "time_entries"  # an account's deletion takes its history / undo rows (core/objhooks.py)
+UG_LIFE[TEU_KIND] = TEU_LIFE  # 2.983.0 (#5589): the watchdog's undo run keeps a deleted entry's history while it can come back
 
 
 def teu_pre(c, uid, eid):
