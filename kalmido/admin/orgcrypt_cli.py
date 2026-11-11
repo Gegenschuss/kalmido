@@ -611,7 +611,8 @@ def docs_pass(c, enc, stop=None):
                             continue
                     if new != r["v"]:
                         # 2.981.0 (#5274): AND the workspace -- obj_comment_trash's id is unique only with its kind
-                        out["changed"] += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {wx} IS NOT NULL AND {col}=?", (new, r["rid"], r["v"])).rowcount
+                        out["changed"] += c.execute(f"UPDATE {qi(table, DOC_TABLES)} SET {qi(col, {col})}=? WHERE {qi(idc, {idc})}=? AND {wx} IS NOT NULL "
+                                                    f"AND {qi(col, {col})}=?", (new, r["rid"], r["v"])).rowcount
             c.commit()
             if len(rows) < BATCH:
                 break
@@ -648,7 +649,8 @@ def docs_settle(c, account, stop=None):
                     if is_acct == account or (account and S._acct_key(c, r["ws"], True) is None):
                         continue
                     new = S.doc_seal_as(c, r["ws"], ctx, plain, account)
-                    out["changed"] += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {wx} IS NOT NULL AND {col}=?", (new, r["rid"], r["v"])).rowcount  # 2.981.0 (#5274)
+                    out["changed"] += c.execute(f"UPDATE {qi(table, DOC_TABLES)} SET {qi(col, {col})}=? WHERE {qi(idc, {idc})}=? AND {wx} IS NOT NULL "
+                                                f"AND {qi(col, {col})}=?", (new, r["rid"], r["v"])).rowcount  # 2.981.0 (#5274)
             c.commit()
             if len(rows) < BATCH:
                 break

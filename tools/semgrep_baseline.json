@@ -477,22 +477,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/admin/orgcrypt_cli.py",
-   "code": "out[\"changed\"] += c.execute(f\"UPDATE {table} SET {col}=? WHERE {idc}=? AND {col}=?\", (new, r[\"rid\"], r[\"v\"])).rowcount",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/admin/orgcrypt_cli.py",
-   "code": "out[\"changed\"] += c.execute(f\"UPDATE {table} SET {col}=? WHERE {idc}=? AND {col}=?\", (new, r[\"rid\"], r[\"v\"])).rowcount",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/admin/orgcrypt_cli.py",
    "code": "r = c.execute(f\"SELECT {col} AS v FROM {table} WHERE org_id=? AND substr({col}, 1, {len(oc.PREFIX)})=? LIMIT 1\", (oid, oc.PREFIX)).fetchone()",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
