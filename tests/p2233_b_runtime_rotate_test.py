@@ -175,8 +175,7 @@ check(cl["decide"]["runs"] == 2 and cl["decide"]["tokens"] == 3 * 110 + 5 and cl
       f"#5684: decide: 2 runs (distinct ids), tokens = input + output + cache writes, no cost reported = none {cl.get('decide')}")
 check(cl["review"]["runs"] == 1 and cl["review"]["cost"] == 0.25 and cl["routine"]["runs"] == 1 and cl["routine"]["calls"] == 2
       and cl[""]["runs"] == 0 and cl[""]["calls"] == 1 and j["cost"] is True, f"#5684: review with its cost, routine counts the run with an id {j}")
-check(G.get(B + f"/api/my/agents/{FB}/model-usage").status_code == 404 and Bo.get(B + f"/api/my/agents/{FB}/model-usage").status_code == 404,
-      "#5684: another person, a member: 404")
+check(Bo.get(B + f"/api/my/agents/{FB}/model-usage").status_code == 404, "#5684: a member: 404")
 check(A.get(B + f"/api/admin/agents/{FB}/model-usage").json()["classes"][1]["runs"] == 1, "#5684: an admin sees it too")
 # a planned job of the kind review: the event says so (the starter takes the review model)
 r = F.post(B + f"/api/agents/{FB}/schedules", json={"title": "Weekly audit", "prompt": "Read the open tasks over", "action": "review",
@@ -194,6 +193,7 @@ ev = [e for e in events(FBH, cur) if e["event"] == "scheduled_job"]
 check(r.ok and len(ev) == 1 and ev[0]["data"].get("review") is False, f"#5684: a chat plan: review false {ev}")
 F.delete(B + f"/api/agent-schedules/{SID}")
 _, G = freelancer(B, A, name="gero")
+check(G.get(B + f"/api/my/agents/{FB}/model-usage").status_code == 404, "#5684: another person without an organisation: 404")
 check(G.patch(B + f"/api/my/agents/{FB}", json={"runtime": {"rotate_runs": 20}}).status_code in (403, 404), "another person: not theirs")
 check(G.patch(B + f"/api/my/agents/{FB}", json={"runtime": {"model_split": False}}).status_code in (403, 404), "#5668: another person: not theirs")
 check(Bo.patch(B + f"/api/my/agents/{FB}", json={"runtime": {"rotate_runs": 20}}).status_code in (403, 404), "a member: not theirs")
