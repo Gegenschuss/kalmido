@@ -335,9 +335,17 @@ def rul_cond_ok(c, r, tid):
         return False
     if "section_id" in d and t["section_id"] != d["section_id"]:
         return False
-    if "tag_id" in d and d["tag_id"] not in otg_task_ids(c, tid):
+    if "tag_id" in d and d["tag_id"] not in _rul_task_tags(c, tid):
         return False
     return True
+
+
+def _rul_task_tags(c, tid):
+    """2.925.0 (#5275, review F2): the tag ids of task tid read as the system -- only ids of the one task, compared with a
+    rule of its list; under the trigger person's row security an organisation label stayed unseen for a non-member (a
+    personal agent, a person shared in from outside) and a label condition never held."""
+    with pg_system(c):
+        return otg_task_ids(c, tid)
 
 
 # ---------------------------------------------------------------- 2.138.0 D (#2060): created / assigned / field, priority / tag / field
@@ -429,7 +437,9 @@ def rul_ref_gone(c, r):
         return "field"
     tags = [int(tv)] if r["trig"] == "ltag" and tv.isdigit() else []
     tags += [a.get("tag_id") or 0 for k, a in acts if k == "tag"] + ([cond["tag_id"]] if cond.get("tag_id") else [])
-    if any(not otg_in_list(c, x, r["list_id"]) for x in tags):
+    with pg_system(c):  # 2.925.0 (#5275, review F2): does the tag exist in the list -- not whether the rule's creator sees a label
+        gone = any(not otg_in_list(c, x, r["list_id"]) for x in tags)
+    if gone:
         return "tag"
     if cond.get("section_id") and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (cond["section_id"], r["list_id"])).fetchone():
         return "section"
@@ -699,7 +709,7 @@ def rul_snap(c, tid):
     if not t:
         return {}
     return {"list_id": t["list_id"], "section_id": t["section_id"], "status": t["status"],
-            "tags": otg_task_ids(c, tid),
+            "tags": _rul_task_tags(c, tid),
             "assignee": t["assignee_id"], "fields": rul_fvals(c, tid, t["list_id"])}  # 2.138.0 D (#2060)
 
 
@@ -716,7 +726,7 @@ def rul_fire(c, tid, before):
     t = c.execute("SELECT id, list_id, section_id, status, deleted_at, assignee_id FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t or t["deleted_at"]:
         return
-    tags = otg_task_ids(c, tid)
+    tags = _rul_task_tags(c, tid)
     new = before is _NEW
     ev = set()
     if t["section_id"] and (new or t["section_id"] != before["section_id"] or t["list_id"] != before["list_id"]):

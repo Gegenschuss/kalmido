@@ -91,7 +91,8 @@ def olb_match(c, lid, name):
                      AND lower(o.name)=lower(?)""", (lid, name)).fetchone()
     if not r:
         return None
-    if r["org_id"] in user_orgs_full(c, me()):
+    full = olb_full(c)  # 2.925.0 (#5275, review F1): no me() -- the git issue sync calls this outside a request
+    if full is True or r["org_id"] in full:
         return r
     used = c.execute("""SELECT 1 FROM obj_tag_links k JOIN tasks t ON t.id=k.obj_id AND k.kind='task'
                         WHERE k.tag_id=? AND t.list_id=? LIMIT 1""", (r["id"], lid)).fetchone()

@@ -341,7 +341,7 @@ def tx_apply(c, uid, lid, x, made, st, start=None, scale=1.0, fmap=None):
     smap = _list_part(c, uid, lid, x["list"], start, scale) if x.get("list") else {}
     # 2.925.0 (#5275): the project's tags and the labels of its organisation (a template of the same organisation keeps them)
     ltags = {r["name"].lower(): r["id"] for r in c.execute(f"SELECT ot.id, ot.name FROM obj_tags ot JOIN lists l ON l.id=? WHERE {otg_list_sql(full=olb_full(c, uid))} "
-                                                          "ORDER BY (ot.scope_kind='list')", (lid,))}
+                                                          "ORDER BY (ot.scope_kind<>'list')", (lid,))}  # review F3: a label wins over a project tag of its name, as in ltag_get_or_create
     from ..tasks.watchers import check_delegate
     seen, who = {}, {}
 

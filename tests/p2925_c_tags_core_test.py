@@ -14,6 +14,8 @@
  - the organisation export holds the labels (org/labels.json) and the tasks' tags (tasks/tags.json with a label's id)
  - a task of an end-to-end locked project: its tag name stays plain text (decided 08.11.2026, question 10)
  - a person without an organisation: project tags work in her own project
+ - second review (2.925.0): F1 olb_match outside a request (git issue sync), F2 a label condition of a rule holds for a
+   trigger outside the organisation
  - review findings: F1 a project leaving its organisation on a side way / the organisation deleted keeps the labels as project
    tags, a label counts / converts only projects of its organisation; F2 / F3 the move keeps small ids, rewrites rules per
    list, keeps old SQLite times, drops links to copies of other projects; F4 a guest gets no unseen label (empty PATCH, rule
@@ -403,6 +405,23 @@ check({"lists", "sections", "list_fields", "list_tags", "list_status", "list_lin
 # ================================================================== a person without an organisation
 FID, Fr = freelancer(B, A)
 FL = Fr.post(B + "/api/lists", json={"name": "Eigenes"}).json()["id"]
+
+# second review (2.925.0) F1: the git issue sync matches a label outside a request (no person) -- it got a RuntimeError there
+out = box(f"""from kalmido.lists.orglabels import olb_match
+r = olb_match(c, {LQ}, 'vertraulich-label')
+print('OLBM' + str(r['id'] if r else None))""")
+check(f"OLBM{SEC}" in out, f"review F1: the label is found outside a request (the server's own work) {out[-200:]}")
+# second review F2: a label condition holds when a person outside the organisation (shared into the project) closes the task
+check(A.put(B + f"/api/lists/{LQ}/members", json={"user_id": FID, "role": "edit"}).ok, "F2 setup: frida (no organisation) edits Geteilt")
+r = A.post(B + f"/api/lists/{LQ}/rules", json={"name": "Dringend", "trigger": {"kind": "done"},
+                                                "action": {"kind": "priority", "priority": "urgent"}, "conditions": {"tag_id": SEC}})
+check(r.ok, f"F2 setup: alice's rule with the label as condition {r.status_code} {r.text[:200]}")
+F2R = r.json().get("id")
+r = Fr.patch(B + f"/api/tasks/{TQ2}", json={"status": 2})
+check(r.ok, f"F2 setup: frida closes the task that carries the label {r.status_code} {r.text[:200]}")
+check(dbx("SELECT priority FROM tasks WHERE id=?", (TQ2,)) not in ([(0,)], [(None,)]),
+      f"review F2: the rule ran - its label condition held for a trigger outside the organisation {dbx('SELECT priority FROM tasks WHERE id=?', (TQ2,))}")
+check(dbx("SELECT active FROM list_rules WHERE id=?", (F2R,))[0][0] in (1, True), f"review F2: the rule is not paused for a 'gone' tag {dbx('SELECT active FROM list_rules WHERE id=?', (F2R,))}")
 FT = task(Fr, FL, "Angebot schreiben")
 r = Fr.patch(B + f"/api/tasks/{FT}", json={"ltags": ["Eilig"]})
 check(r.ok and ltags_of(Fr, FT) == ["Eilig"], f"freelancer: a project tag on her task {r.status_code} {r.text[:200]}")

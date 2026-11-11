@@ -211,7 +211,7 @@ def tmm_restore(c, tid, prev, skip=()):
                 continue
             for nm in names:
                 r = c.execute(f"""SELECT ot.id FROM obj_tags ot JOIN lists l ON l.id=? WHERE {otg_list_sql()} AND lower(ot.name)=lower(?)
-                                  ORDER BY (ot.scope_kind<>'list') LIMIT 1""", (lid, nm)).fetchone()  # 2.925.0 (#5275): + a label
+                                  ORDER BY (ot.scope_kind='list') LIMIT 1""", (lid, nm)).fetchone()  # 2.925.0 (#5275): + a label (first, review F3)
                 if r:
                     otg_link(c, r[0], x)
                     n("ltags")
