@@ -221,6 +221,12 @@ def _need_read(c, kind, ref_id, uid):
         raise Denied(404)
 
 
+def ocm_may_read(c, uid, kind, ref_id):
+    """2.981.0 (#5273): uid reads the comments of (kind, ref_id) -- the kind's role (obj_role of its object, or its role hook)
+    >= view. The check of the shared search (core/objsearch.py osr_kind may_read) for the kinds whose name is no core kind."""
+    return bool(uid) and _role(c, uid, kind, ref_id) is not None
+
+
 def ocm_say_refusal(c, kind, ref_id, uid):
     """None when uid may say something on (kind, ref_id) as far as its organisation goes, else the refusal text (accounts/
     orgroles.py RO_MSG / GUEST_MSG, not translated): a guest / read-only person of the object's organisation who cannot change

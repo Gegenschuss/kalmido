@@ -18,7 +18,8 @@ from flask import jsonify
 from ..core.config import app
 from ..core.db import body, bump, db, iso, parse_iso
 from ..core.access import Denied, acx_of, live_sql
-from ..core.objcomments import OCM_TS, ocm_add, ocm_edit, ocm_kind, ocm_restore, ocm_trash  # 2.981.0 (#5273): the comments' core
+from ..core.objcomments import OCM_TS, ocm_add, ocm_edit, ocm_kind, ocm_may_read, ocm_restore, ocm_trash  # 2.981.0 (#5273): the comments' core
+from ..core.objsearch import osr_kind  # 2.981.0 (#5273 x #5278): the shared search
 from ..core.errors import BadInput  # 2.981.0 (#5273)
 from ..core.i18n import tr
 from ..accounts.session import me
@@ -224,5 +225,8 @@ def _dn_changed(c, nid):
 # 2.981.0 (#5273): the generic routes of core/objcmtweb.py (/api/obj/doc_note/<document>/comments, /api/obj/comments/<cid>)
 DN_WEB = {"read": lambda c, nid, uid: _note_doc(c, nid), "add": lambda c, nid, uid, b: dn_new(c, nid, b), "patch": _dn_patch,
           "out": _dn_out, "changed": _dn_changed}
+# 2.981.0 (#5273 x #5278): a note is found by the shared search for who sees the document (the file store's role); a note
+# sealed with the workspace key (a server key set) has no readable words there -- the documents' own word index finds it
+osr_kind(DN_KIND, may_read=lambda c, uid, nid: ocm_may_read(c, uid, DN_KIND, nid))
 ocm_kind(DN_KIND, obj="fs_entry", role=_dn_base, people=lambda c, nid: set(), sealed=lambda c, nid: False,
          sealed_in=lambda c, nid, t: (t, []), text_max=lambda t: DN_MAX, seal=_dn_seal, web=DN_WEB)

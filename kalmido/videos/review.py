@@ -54,7 +54,8 @@ from .vdmedia import vdm_pub_send  # 2.658.0 (#5015)
 from .vdmedia import vdm_pub_pos, vdm_pub_stage  # 2.764.0 (#5040)
 from ..core.writes import obj_restore, obj_trash  # 2.947.0 (#5367): the core's trash (videos/vdkern.py)
 from ..core.access import live_sql, trash_sql  # 2.947.0 (#5367); 2.981.0 (#5273): live_sql
-from ..core.objcomments import ocm_add, ocm_edit, ocm_kind, ocm_restore, ocm_trash, ocm_video_cols as vdc_cols  # 2.981.0 (#5273): the comments' core
+from ..core.objcomments import ocm_add, ocm_edit, ocm_kind, ocm_may_read, ocm_restore, ocm_trash, ocm_video_cols as vdc_cols
+from ..core.objsearch import osr_kind  # 2.981.0 (#5273 x #5278): the shared search  # 2.981.0 (#5273): the comments' core
 from ..core.objparts import part_write  # 2.981.0 (#5273): the lock of a comment (done)
 
 VDR_URL_MAX, VDR_TITLE_MAX, VDR_BODY_MAX, VDR_NAME_MAX = 2000, 200, 2000, 120
@@ -1185,5 +1186,7 @@ def _vdc_patch(c, rid, cid, uid, b):
 VDC_WEB = {"read": lambda c, rid, uid: vdr_need(c, rid), "add": lambda c, rid, uid, b: vdc_web_add(c, vdr_need(c, rid), uid, b),
            "patch": _vdc_patch, "out": lambda c, rid, uid: vdr_dict(c, vdr_reload(c, rid), uid, full=True),
            "changed": vdr_touch}
+# 2.981.0 (#5273 x #5278): a review comment is found by the shared search (obj_search) for who sees the review (its role)
+osr_kind(VDC_KIND, may_read=lambda c, uid, rid: ocm_may_read(c, uid, VDC_KIND, rid))
 ocm_kind(VDC_KIND, obj=VDR_KIND, people=_vdc_people, sealed=lambda c, rid: False, sealed_in=lambda c, rid, t: (t, []),
          text_max=lambda t: VDR_BODY_MAX, trash=_vdc_trash, restore=_vdc_restore, web=VDC_WEB)

@@ -155,6 +155,15 @@ check(r.ok and C3 in vcom(Bo, VID), f"POST /api/obj/comments/<cid>/restore {r.st
 check(Do.get(B + f"/api/obj/video/{VID}/comments").status_code == 404, "dora (no member of the project) gets 404")
 check(Do.delete(B + f"/api/obj/comments/{C3}").status_code == 404, "... and cannot reach the comment either")
 TID = A.post(B + "/api/tasks", json={"title": "Aufgabe", "list_id": LID}).json()["id"]
+
+# ================================================================== the shared search (#5278): who sees the review finds it
+r = Bo.post(B + f"/api/videos/{VID}/comments", json={"body": "Kranichflug im Abspann", "at_sec": 40})
+CS = r.json().get("comment_id") if r.ok else 0
+r = Bo.get(B + "/api/search", params={"q": "kranichflug"})
+hits = [x for x in (r.json().get("comments") or []) if x.get("kind") == "video"] if r.ok else []
+check(r.ok and any(x["id"] == CS and x["ref_id"] == VID for x in hits), f"#5278: bob finds the review comment through /api/search {r.status_code} {r.text[:200]}")
+r = Do.get(B + "/api/search", params={"q": "kranichflug"})
+check(r.ok and not any(x.get("id") == CS for x in r.json().get("comments") or []), "#5278: dora (no member of the project) finds it not")
 check(A.get(B + f"/api/obj/task/{TID}/comments").status_code == 404, "the task keeps its own routes (404 here)")
 
 # ================================================================== a document's note: trash instead of DELETE (B6)
