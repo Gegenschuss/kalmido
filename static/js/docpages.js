@@ -203,12 +203,16 @@ function dpg_dragMove(/** @type {PointerEvent} */ e) {
     dpg_dragOn(d);
   }
   e.preventDefault();
-  for (const x of $$('.dv-view .dpg .drop-b, .dv-view .dpg .drop-a')) x.classList.remove('drop-b', 'drop-a');
-  const t = /** @type {any} */ (document.elementFromPoint(e.clientX, e.clientY))?.closest?.('.dv-view .dpg [data-dpgp]');
-  d.over = t && !d.ps.includes(+t.dataset.dpgp) ? +t.dataset.dpgp : null;
-  if (d.over) { const r = t.getBoundingClientRect(); d.after = e.clientX > r.left + r.width / 2; t.classList.add(d.after ? 'drop-a' : 'drop-b'); }
+  dpg_dropAt(d, e.clientX, e.clientY);
   const ls = $('.dv-view .dpg-list');  // near an edge the strip scrolls along
   if (ls) { const r = ls.getBoundingClientRect(); if (e.clientX < r.left + 30) ls.scrollLeft -= 12; else if (e.clientX > r.right - 30) ls.scrollLeft += 12; }
+}
+// the page under the pointer: the drop goes before / after it (its left / right half), marked in the strip
+function dpg_dropAt(/** @type {any} */ d, /** @type {number} */ x, /** @type {number} */ y) {
+  for (const el of $$('.dv-view .dpg .drop-b, .dv-view .dpg .drop-a')) el.classList.remove('drop-b', 'drop-a');
+  const t = /** @type {any} */ (document.elementFromPoint(x, y))?.closest?.('.dv-view .dpg [data-dpgp]');
+  d.over = t && !d.ps.includes(+t.dataset.dpgp) ? +t.dataset.dpgp : null;
+  if (d.over) { const r = t.getBoundingClientRect(); d.after = x > r.left + r.width / 2; t.classList.add(d.after ? 'drop-a' : 'drop-b'); }
 }
 function dpg_dragEnd(/** @type {PointerEvent} */ e) {
   const d = DPG.drag; if (!d || e.pointerId !== d.id) return;
@@ -216,6 +220,7 @@ function dpg_dragEnd(/** @type {PointerEvent} */ e) {
   if (!d.on) return;
   d.done = true; DPG.dragged = Date.now();  // the click that follows the drop does not choose
   $('.dv-view .dpg-list')?.classList.remove('dpg-dragging');
+  if (e.type === 'pointerup' && (e.clientX || e.clientY)) dpg_dropAt(d, e.clientX, e.clientY);  // where the finger / mouse let go (a last move may not have come)
   if (e.type === 'pointerup' && d.over && dpg_moveTo(d.ps, d.over, d.after)) { DPG.sel = new Set(d.ps); DPG.last = d.ps[0]; }
   dpg_draw(); if (DPG.sel.size) dpg_said();
 }

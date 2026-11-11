@@ -260,6 +260,7 @@ async function histRedraw(srv) {
   if (typeof OFD !== 'undefined' && typeof ofdLoadDoc === 'function' && OFD.doc?.id) { OFD.list = null; await ofdLoadDoc(OFD.doc.id, true).catch(() => {}); }  // lazy-ok: an open office document
   else if (typeof ofcReload === 'function' && S.route?.mod === 'office') ofcReload();  // lazy-ok
   if (typeof SHV !== 'undefined' && SHV.sh && typeof shvReload === 'function') await shvReload().catch(() => {});  // lazy-ok: an open table
+  if (typeof ab_relist === 'function' && ['ablage', 'docs'].includes(S.route?.mod)) ab_relist();  // lazy-ok: 2.959.0 (#4805): the file store / documents list (a node back from the trash)
 }
 // n steps back (undo) or forward (redo), one after the other
 // 2.773.0 (#5250): only = these entries (newest first) instead of the newest n (the toast's own entry, the list "Recent

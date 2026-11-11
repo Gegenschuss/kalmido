@@ -472,7 +472,7 @@ document.addEventListener('touchmove', e => {
 // The body of the document is the frame that stays (inside): its parts glide, the neighbours lie inside it (dc_swPeek).
 function dc_swArea(t) {
   if (!t?.closest || $('.modal') || $('#pop:not(.hidden)') || DCW.pz) return null;
-  const md = t.closest('.dv-view'); if (!md || t.closest('.swn-nb, .dc-nb')) return null;
+  const md = t.closest('.dv-view'); if (!md || t.closest('.swn-nb, .dc-nb, .dpg')) return null;  // 2.959.0 (#4805): + the page strip (a finger drags its pages)
   const body = /** @type {HTMLElement|null} */ (md.querySelector(':scope > .dc-body'));
   if (!body || body.dataset.id !== String(DC.doc?.id) || dc_navIdx(DC.doc) < 0) return null;  // it left the list: the arrows still lead on
   if ((dc_pvBox(t)?._z?.k || 1) > 1) return null;  // enlarged: one finger moves the picture

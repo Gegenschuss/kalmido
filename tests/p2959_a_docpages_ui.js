@@ -173,7 +173,11 @@ const ver = async id => (await call('GET', `/api/files/nodes/${id}`)).version;
       check(await wait(`document.querySelectorAll('.dv-view .dv-pages .dv-pg').length === 3 && !!document.querySelector('.dv-view [data-dpg="open"]')`), `Firefox ${tag}: the view with three pages`);
       await ev(`(document.querySelector('.dv-view [data-dpg="open"]').click(), 1)`);
       check(await wait(`document.querySelectorAll('.dpg [data-dpgp]').length === 3`), `Firefox ${tag}: the strip open`);
-      const r1 = await ev(`(() => { const r = document.querySelector('.dpg [data-dpgp="1"]').getBoundingClientRect(), t = document.querySelector('.dpg [data-dpgp="3"]').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, tx: t.left + t.width * 0.8}; })()`);
+      // measured once the small pages are drawn and the strip stands still (two equal readings)
+      await wait(`document.querySelectorAll('.dpg [data-dpgt] canvas').length === 3`);
+      const posJs = `(() => { const r = document.querySelector('.dpg [data-dpgp="1"]').getBoundingClientRect(), t = document.querySelector('.dpg [data-dpgp="3"]').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, tx: t.left + t.width * 0.8}; })()`;
+      let r1 = await ev(posJs);
+      for (let i = 0; i < 40; i++) { await sleep(150); const r2 = await ev(posJs); if (JSON.stringify(r2) === JSON.stringify(r1)) break; r1 = r2; }
       // page 1 dragged onto the right half of page 3 (a finger holds first)
       await drag(r1.x, r1.y, r1.tx - r1.x, 0, touch ? 'touch' : 'mouse', touch ? 600 : 0);
       const order = `[...document.querySelectorAll('.dpg [data-dpgp]')].map(x => +x.dataset.dpgp).join(',')`;
@@ -198,8 +202,11 @@ const ver = async id => (await call('GET', `/api/files/nodes/${id}`)).version;
       check(await wait(`!!document.querySelector('#pop .msm-merge')`), 'Firefox phone: More offers "Merge PDFs…"');
       await ev(`(document.querySelector('#pop .msm-merge').click(), 1)`);
       check(await wait(`document.querySelectorAll('.dpm-md .dpm-row').length === 2`), 'Firefox phone: the merge dialog with both rows');
-      const ml = await ev(`(() => { const m = document.querySelector('.dpm-md'), b = m.querySelector('[data-dpm="run"]').getBoundingClientRect(), rs = [...m.querySelectorAll('.dpm-row')].map(r => r.getBoundingClientRect());
-        return {sw: m.scrollWidth, cw: m.clientWidth, bb: Math.round(b.bottom), br: Math.round(b.right), vh: innerHeight, vw: innerWidth, rr: Math.max(...rs.map(r => Math.round(r.right)))}; })()`);
+      // the phone's dialog slides in from below: measured once it stands (a real state, no fixed wait)
+      const mlJs = `(() => { const m = document.querySelector('.dpm-md'), b = m.querySelector('[data-dpm="run"]').getBoundingClientRect(), rs = [...m.querySelectorAll('.dpm-row')].map(r => r.getBoundingClientRect());
+        return {sw: m.scrollWidth, cw: m.clientWidth, bb: Math.round(b.bottom), br: Math.round(b.right), vh: innerHeight, vw: innerWidth, rr: Math.max(...rs.map(r => Math.round(r.right)))}; })()`;
+      await wait(`(${mlJs.replace(/;\s*$/, '')}).bb <= innerHeight && !document.querySelector('.dpm-md').getAnimations({subtree: true}).length`, 40);
+      const ml = await ev(mlJs);
       check(ml && ml.sw <= ml.cw + 1 && ml.br <= ml.vw && ml.bb <= ml.vh && ml.rr <= ml.vw, 'Firefox phone: rows and the button in view, nothing sideways ' + JSON.stringify(ml));
       await shot('p2959-merge-phone.png');
       await ev(`(document.querySelector('.dpm-md [data-dpm="run"]').click(), 1)`);
