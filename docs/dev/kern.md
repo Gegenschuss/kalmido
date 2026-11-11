@@ -816,9 +816,11 @@ One table `obj_search(kind, ref_id, org_ref, owner_id, node_id, pkind, pid, titl
 the search index of the open texts; it replaced `task_fts`, `cmt_fts`, the trigram indexes (`msg_trgm_*`, `tasks_trgm_*`, #4960)
 and `contacts.search`. `kalmido/core/objsearch.py`:
 - Kinds (`OSR_SOURCES`, one SQL definition per kind for the trigger and the start's fill): `task` (title A, notes B, link and code
-  snippets C; names = the ticket key), `comment` (obj_comments of every kind; `pkind` / `pid` = its object), `note`, `contact`
+  snippets C; names = the ticket key), `comment` (obj_comments of every kind but `doc_note`; `pkind` / `pid` = its object), `note`, `contact`
   (names = the names, company and phone numbers), `wiki_page` (its name only - the text is sealed and keeps its HMAC word index),
   `tchat` (team chat without end-to-end text), `agent_chat`. A new area with open texts adds its kind there - no index of its own.
+  Sealed texts stay out: a source's `skip` names its rows without an index row (the trigger deletes theirs, the start clears
+  the rest) -- a document's note (`doc_note`, sealed with the workspace key) is found by the documents' own word index.
 - Filled by the triggers `kalmido_osr_<kind>` on the source tables (every write path, also rows written straight into a table)
   and at every start for rows written while they were missing; a new `OSR_VERSION` or fold function builds it again. Derived:
   not exported (`exportleft.py` `_DERIVED`), an import fills it through the triggers.

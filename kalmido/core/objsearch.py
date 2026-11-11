@@ -6,7 +6,7 @@ plain ILIKE of the task, note and contact searches.
 One row per object (kind, ref_id): org_ref / owner_id / node_id (the container: a task's or note's project, a contact's address
 book, a team chat message's room, an agent chat's agent), pkind / pid (a comment's object), title, names (folded names and
 numbers for the part-of-a-word match) and tsv (the 'simple' configuration over kalmido_fold: title weight A, text B, more C).
-Kinds (OSR_SOURCES): task, comment (obj_comments of every kind), note, contact, wiki_page (the page's name only: its text is
+Kinds (OSR_SOURCES): task, comment (obj_comments of every kind but a document's sealed note, #5278), note, contact, wiki_page (the page's name only: its text is
 sealed and keeps its HMAC word index, wiki/wksearch.py), tchat (team chat messages without end-to-end text), agent_chat.
 
 Filled by triggers on the source tables (every write path, also the old ones and rows written straight into the tables), and
@@ -139,10 +139,13 @@ OSR_SOURCES = {
              "names": "CASE WHEN {r}.ticket_no IS NOT NULL THEN (SELECT l.ticket_key || '-' || {r}.ticket_no FROM lists l "
                       "WHERE l.id={r}.list_id AND l.ticket_key IS NOT NULL) END",
              "cols": ("title", "content", "url", "snippets", "ticket_no", "list_id", "org_id", "created_by")},
-    # a comment of any kind (obj_comments): its text; pkind / pid = its object
+    # a comment of any kind (obj_comments): its text; pkind / pid = its object. 2.981.0 (#5278 x #5273): not a document's note
+    # (kind doc_note): its text is sealed with the workspace key (a ciphertext in a word index finds nothing and its rights
+    # are the document's) -- the notes are found by the documents' own word index (docs/store.py doc_index). skip = the rows
+    # of the table that get no index row (the trigger deletes theirs, the start clears what an earlier build left)
     "comment": {"table": "obj_comments", "org": "{r}.org_id", "owner": "{r}.user_id", "node": "NULL::bigint",
                 "pkind": "{r}.kind", "pid": "{r}.ref_id", "title": "NULL::text", "body": "{r}.body",
-                "cols": ("body", "org_id", "kind", "ref_id")},
+                "skip": "{r}.kind = 'doc_note'", "cols": ("body", "org_id", "kind", "ref_id")},
     # a note of a project: title A, text B, tags C
     "note": {"table": "notes", "org": "(SELECT l.org_id FROM lists l WHERE l.id={r}.list_id)", "owner": "{r}.created_by",
              "node": "{r}.list_id", "title": "{r}.title", "body": "{r}.body", "more": "{r}.tags",
@@ -208,6 +211,17 @@ OSR_SET = ", ".join(f"{x}=EXCLUDED.{x}" for x in OSR_COLS.split(", ")[2:]) + ", 
 OSR_UPSERT = "ON CONFLICT (kind, ref_id) DO UPDATE SET " + OSR_SET
 
 
+def _skip(kind, r):
+    """2.981.0 (#5278): the SQL of the rows of kind's table that get no index row (OSR_SOURCES skip), FALSE without."""
+    return _x(OSR_SOURCES[kind], "skip", r, "FALSE")
+
+
+def _skip_branch(kind):
+    if "skip" not in OSR_SOURCES[kind]:
+        return ""
+    return f"\n  ELSIF {_skip(kind, 'NEW')} THEN\n    DELETE FROM obj_search WHERE kind = '{kind}' AND ref_id = NEW.id;"
+
+
 def _fn(kind):
     """The trigger function of kind: the row as system (row-level security: the index row follows its source, whoever wrote it)."""
     return f"""CREATE OR REPLACE FUNCTION kalmido_osr_{kind}() RETURNS trigger LANGUAGE plpgsql AS $fn$
@@ -215,7 +229,7 @@ DECLARE prev text := current_setting('app.role', true);
 BEGIN
   PERFORM set_config('app.role', 'system', true);
   IF TG_OP = 'DELETE' THEN
-    DELETE FROM obj_search WHERE kind = '{kind}' AND ref_id = OLD.id;
+    DELETE FROM obj_search WHERE kind = '{kind}' AND ref_id = OLD.id;{_skip_branch(kind)}
   ELSIF to_regprocedure('kalmido_fold(text)') IS NULL THEN  -- the fold function missing (until the next start): the write goes on,
     DELETE FROM obj_search WHERE kind = '{kind}' AND ref_id = NEW.id;  -- the start fills the row (an IF: no subtransaction per row)
   ELSE
@@ -243,9 +257,11 @@ def _triggers(c, kind):
 def osr_fill(c, kind):
     """The rows of kind's table without an index row get one; index rows whose source is gone go. Returns the rows added."""
     t = OSR_SOURCES[kind]["table"]
-    c.execute(f"DELETE FROM obj_search s WHERE s.kind='{kind}' AND NOT EXISTS (SELECT 1 FROM {qi(t, OSR_TABLES)} r WHERE r.id=s.ref_id)")
+    # 2.981.0 (#5278): a row of the skipped ones (a document's note) loses its index row too
+    c.execute(f"DELETE FROM obj_search s WHERE s.kind='{kind}' AND NOT EXISTS (SELECT 1 FROM {qi(t, OSR_TABLES)} r WHERE r.id=s.ref_id "
+              f"AND NOT ({_skip(kind, 'r')}))")
     return c.execute(f"{OSR_INSERT} SELECT {_values(kind, 'r')} FROM {qi(t, OSR_TABLES)} r "
-                     f"WHERE NOT EXISTS (SELECT 1 FROM obj_search s WHERE s.kind='{kind}' AND s.ref_id=r.id) "
+                     f"WHERE NOT ({_skip(kind, 'r')}) AND NOT EXISTS (SELECT 1 FROM obj_search s WHERE s.kind='{kind}' AND s.ref_id=r.id) "
                      "ON CONFLICT (kind, ref_id) DO NOTHING").rowcount
 
 

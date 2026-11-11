@@ -277,6 +277,13 @@ dbx("CREATE TRIGGER kalmido_fts_task_ins AFTER INSERT ON tasks FOR EACH ROW EXEC
 dbx("ALTER TABLE contacts ADD COLUMN search TEXT NOT NULL DEFAULT ''")
 dbx("CREATE INDEX tasks_trgm_title ON tasks USING gin (title gin_trgm_ops)")
 dbx("CREATE INDEX msg_trgm_tchat_msgs ON tchat_msgs USING gin (kalmido_fold(body) gin_trgm_ops)")
+# 2.981.0 (#5278, review): a document's note (obj_comments kind doc_note, its text sealed) gets no row in obj_search -- the
+# documents' own word index finds it; a row an earlier build left goes at the next start
+DNC = dbx("INSERT INTO obj_comments(kind, ref_id, user_id, body) VALUES('doc_note', 1, NULL, 'Reiherflug Notiz') RETURNING id")[0][0]
+check(not there("SELECT 1 FROM obj_search WHERE kind='comment' AND ref_id=?", (DNC,)), "a document's note gets no row in the shared index")
+dbx("UPDATE obj_comments SET body='Reiherflug Notiz 2' WHERE id=?", (DNC,))
+check(not there("SELECT 1 FROM obj_search WHERE kind='comment' AND ref_id=?", (DNC,)), "... nor when its text changes")
+dbx("INSERT INTO obj_search(kind, ref_id, pkind, pid, title, names, tsv) VALUES('comment', ?, 'doc_note', 1, '', '', to_tsvector('simple', 'reiherflug'))", (DNC,))
 box("pass")  # the next start of the app
 check(not table_there("task_fts") and not table_there("cmt_fts"), "the start dropped the side tables made again")
 check(not there("SELECT 1 FROM information_schema.columns WHERE table_name='contacts' AND column_name='search'"), "... and contacts.search")
@@ -288,6 +295,8 @@ fl = dict(dbx("SELECT key, value FROM kalmido_meta WHERE key IN ('back_floor','b
 check(fl.get("back_floor") == ".".join(mine.split(".")[:2] + ["0"]) and "#5278" in (fl.get("back_floor_how") or ""),
       f"the move raised back_floor to the minor of this image {fl} {mine}")
 check(there("SELECT 1 FROM obj_search WHERE kind='note' AND ref_id=?", (N1,)), "a lost index row is filled at the start")
+check(not there("SELECT 1 FROM obj_search WHERE kind='comment' AND ref_id=?", (DNC,)), "the start clears the index row of a document's note")
+dbx("DELETE FROM obj_comments WHERE id=?", (DNC,))
 kt.fresh(prefix="P2981B", keep=True)
 A = kt.sess("alice")
 T2 = task(A, W, "Nach dem Umzug Müller")
