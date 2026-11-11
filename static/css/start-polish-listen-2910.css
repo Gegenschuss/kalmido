@@ -4,7 +4,8 @@
 .qchip.qdx{border:0;padding:0 .125rem;margin-left:-.25rem;color:var(--muted);font:inherit}
 .qchip.qdx:hover{color:var(--text)}
 .qadd .qttl{align-self:center;font-size:var(--fs-s);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
-/* 2.910.0 (#5442): the Share dialog of a project / a folder (shFrameHtml, dialogs.js): "Loading…" takes the height of a
-   person's row, the people part keeps room for the owner and the "Share with …" row, so the dialog does not grow in steps */
-.shmodal :is(.members,.shsec>div)>.mhint:only-child{min-height:2.75rem;box-sizing:border-box}
+/* 2.910.0 (#5442): the Share dialog of a project (shFrameHtml, dialogs.js): the people's "Loading…" (loadingHtml) takes the
+   height of a person's row and of the "Share with …" row that replaces it, the people part keeps room for the owner and the
+   "Share with …" row, so the dialog does not grow in steps while it loads */
+.shmodal .shppl .eload.es-row{min-height:2.75rem}
 .shmodal .shppl{min-height:5.75rem}
