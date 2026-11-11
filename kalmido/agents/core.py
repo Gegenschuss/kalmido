@@ -268,7 +268,6 @@ def agent_changed_events(c, diffs):
     if not ag:
         return 0
     from .workstyle import ws_get  # loaded after this module
-    from ..tasks.lifecycle import _norm  # 2.976.0 (#5657): the comparison of tasks/validation.py log_changes
     n, styles, sent = 0, {}, {}
     actor = wh_actor(c) if getattr(g, "user", None) else None  # review F3: its own change is skipped before the data is built
     for tid, d in sorted(diffs.items()):
@@ -277,7 +276,7 @@ def agent_changed_events(c, diffs):
             continue
         # 2.976.0 (#5657, review 2.959 F4): only what the stored row says now -- a change taken back later in the request (a
         # savepoint rolled back, a value set back) never reaches an agent as "new"
-        d = {k: v for k, v in d.items() if k not in row.keys() or _norm(row[k]) == _norm(v[1])}
+        d = {k: v for k, v in d.items() if k not in row.keys() or _ac_same(row[k], v[1])}
         if not d:
             continue
         watch = wat_users(c, tid)
@@ -303,6 +302,11 @@ def agent_changed_events(c, diffs):
                 n += 1
                 sent[aid] = sent.get(aid, 0) + 1
     return n
+
+
+def _ac_same(a, b):
+    """2.976.0 (#5657): the same task value as tasks/lifecycle.py _norm sees it ("" = None, compared as text)."""
+    return (None if a in ("", None) else str(a)) == (None if b in ("", None) else str(b))
 
 
 AGENT_CHANGED_MAX = 50  # 2.959.0 (#4030, review F2): task_changed per agent and request (a bulk change of hundreds of tasks)
