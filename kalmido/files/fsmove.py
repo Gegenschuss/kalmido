@@ -34,7 +34,7 @@ from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same
 from .fstags import dt_move
 from .store import FS_DIR, DEPTH_MAX, fs_chain, fs_height, fs_log_add, fs_space, fs_visible_sql_c, need_node, safe_fs_name, _free_name, _now, _place
 from .fsroots import fs_area_need_stay, fs_area_root_need_free  # 2.199.0 (#2742, Fable review); 2.200.0 A (#2747)
-from .fslock import fsl_space_guard  # 2.353.0 A (#2758)
+from .fslock import fl_is_locked, fsl_space_guard  # 2.353.0 A (#2758); 2.953 (#3348): fl_is_locked
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import OO_ADMIN_ONLY, oo_denied, oo_into_note, org_out_ok, org_out  # 2.369.5 (#2517): pulled up from functions
@@ -529,8 +529,9 @@ def fsm_memo_apply(c, back, to, uid):
         for nid, pid, name in d.get("under") or []:  # still at the top of the folder's workspace (and owner when private)
             p = c.execute("SELECT org_id, owner_id, deleted_at FROM fs_nodes WHERE id=?", (pid,)).fetchone() if pid else None
             r = c.execute("SELECT parent_id, org_id, owner_id, deleted_at FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+            # 2.953 (#3348, review N12): never back below a folder locked since (the item is plain): it stays at the top
             if p and r and not p["deleted_at"] and r["parent_id"] is None and (r["org_id"] or None) == (p["org_id"] or None) \
-                    and (p["org_id"] or r["owner_id"] == p["owner_id"]):
+                    and (p["org_id"] or r["owner_id"] == p["owner_id"]) and not fl_is_locked(c, pid):
                 nm = name if r["deleted_at"] else _free_name(c, pid, r["owner_id"], p["org_id"], name, skip=nid)
                 c.execute("UPDATE fs_nodes SET parent_id=?, name=? WHERE id=?", (pid, nm, nid))
                 n += 1

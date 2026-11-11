@@ -13557,7 +13557,6 @@
   "This folder is being encrypted. Try again in a moment.": "Esta carpeta se está cifrando. Inténtalo de nuevo en un momento.",
   "Locked folder: names and files are encrypted in your browser. The server, agents and API tokens cannot read them.": "Carpeta bloqueada: los nombres y archivos están cifrados en tu navegador. El servidor, los agentes y los tokens de API no pueden leerlos.",
   "Search names": "Buscar nombres",
-  "Search names in this folder": "Buscar nombres en esta carpeta",
   "{0} file encrypted and uploaded": ["{0} archivo cifrado y subido", "{0} archivos cifrados y subidos"],
   "Move into a locked folder?": "¿Mover a una carpeta bloqueada?",
   "Move out of the locked folder?": "¿Sacar de la carpeta bloqueada?",
@@ -18209,5 +18208,16 @@
   "Edit filter…": "Editar filtro…",
   "Words or the search syntax (tag:Name, \"exact text\", -word)": "Palabras o sintaxis de búsqueda (tag:Nombre, \"texto exacto\", -palabra)",
   "Moved to the trash": "Movido a la papelera",
-  "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "La limpieza del núcleo común espera: {0} filas antiguas de miembros en {1} aún no tienen permiso, la tabla antigua se mantiene. Consulta el registro del servidor."
+  "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "La limpieza del núcleo común espera: {0} filas antiguas de miembros en {1} aún no tienen permiso, la tabla antigua se mantiene. Consulta el registro del servidor.",
+  "Only the first {0} folders were searched.": "Solo se buscaron las primeras {0} carpetas.",
+  "Someone no longer has access to this folder. Change its key so that they cannot read what is added from now on.": "Alguien ya no tiene acceso a esta carpeta. Cambia su clave para que no pueda leer lo que se añada a partir de ahora.",
+  "Search names in this folder and its subfolders": "Buscar nombres en esta carpeta y sus subcarpetas",
+  "The key of the folder was changed.": "Se ha cambiado la clave de la carpeta.",
+  "{0} item is encrypted in your browser and moved, folders with their content. Earlier versions are removed; the server and agents can no longer read them.": ["{0} elemento se cifra en tu navegador y se mueve, las carpetas con su contenido. Las versiones anteriores se eliminan; el servidor y los agentes ya no pueden leerlo.", "{0} elementos se cifran en tu navegador y se mueven, las carpetas con su contenido. Las versiones anteriores se eliminan; el servidor y los agentes ya no pueden leerlos."],
+  "{0} item is decrypted in your browser and stored readable for the server again, folders with their content. Earlier encrypted versions are removed.": ["{0} elemento se descifra en tu navegador y se guarda de nuevo legible para el servidor, las carpetas con su contenido. Las versiones cifradas anteriores se eliminan.", "{0} elementos se descifran en tu navegador y se guardan de nuevo legibles para el servidor, las carpetas con su contenido. Las versiones cifradas anteriores se eliminan."],
+  "{0} (moving)": "{0} (moviendo)",
+  "{0}: {1} done": "{0}: {1} hechos",
+  "Moving": "Moviendo",
+  "The tags of {0} file or folder in it are removed (the server could read them).": ["Se eliminan las etiquetas de {0} archivo o carpeta que contiene (el servidor podría leerlas).", "Se eliminan las etiquetas de {0} archivos o carpetas que contiene (el servidor podría leerlas)."],
+  "The key of this folder was changed meanwhile.": "Mientras tanto se ha cambiado la clave de esta carpeta."
 }

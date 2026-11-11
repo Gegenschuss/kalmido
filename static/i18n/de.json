@@ -13557,7 +13557,6 @@
   "This folder is being encrypted. Try again in a moment.": "Dieser Ordner wird gerade verschlüsselt. Versuche es gleich noch einmal.",
   "Locked folder: names and files are encrypted in your browser. The server, agents and API tokens cannot read them.": "Gesperrter Ordner: Namen und Dateien sind in deinem Browser verschlüsselt. Server, Agenten und API-Token können sie nicht lesen.",
   "Search names": "Namen suchen",
-  "Search names in this folder": "Namen in diesem Ordner suchen",
   "{0} file encrypted and uploaded": ["{0} Datei verschlüsselt und hochgeladen", "{0} Dateien verschlüsselt und hochgeladen"],
   "Move into a locked folder?": "In einen gesperrten Ordner verschieben?",
   "Move out of the locked folder?": "Aus dem gesperrten Ordner verschieben?",
@@ -18209,5 +18208,16 @@
   "Edit filter…": "Filter bearbeiten…",
   "Words or the search syntax (tag:Name, \"exact text\", -word)": "Wörter oder Suchsyntax (tag:Name, \"genauer Text\", -Wort)",
   "Moved to the trash": "In den Papierkorb gelegt",
-  "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Aufräumen im gemeinsamen Kern wartet: {0} alte Mitglieder-Zeilen in {1} sind noch nicht im Kern geteilt, die alte Tabelle bleibt. Siehe Server-Log."
+  "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Aufräumen im gemeinsamen Kern wartet: {0} alte Mitglieder-Zeilen in {1} sind noch nicht im Kern geteilt, die alte Tabelle bleibt. Siehe Server-Log.",
+  "Only the first {0} folders were searched.": "Nur die ersten {0} Ordner wurden durchsucht.",
+  "Someone no longer has access to this folder. Change its key so that they cannot read what is added from now on.": "Jemand hat keinen Zugriff mehr auf diesen Ordner. Wechsle den Schlüssel, damit Neues für diese Person nicht lesbar ist.",
+  "Search names in this folder and its subfolders": "Namen in diesem Ordner und seinen Unterordnern suchen",
+  "The key of the folder was changed.": "Der Schlüssel des Ordners wurde gewechselt.",
+  "{0} item is encrypted in your browser and moved, folders with their content. Earlier versions are removed; the server and agents can no longer read them.": ["{0} Element wird in deinem Browser verschlüsselt und verschoben, Ordner mit Inhalt. Frühere Versionen werden entfernt; Server und Agenten können es nicht mehr lesen.", "{0} Elemente werden in deinem Browser verschlüsselt und verschoben, Ordner mit Inhalt. Frühere Versionen werden entfernt; Server und Agenten können sie nicht mehr lesen."],
+  "{0} item is decrypted in your browser and stored readable for the server again, folders with their content. Earlier encrypted versions are removed.": ["{0} Element wird in deinem Browser entschlüsselt und wieder für den Server lesbar gespeichert, Ordner mit Inhalt. Frühere verschlüsselte Versionen werden entfernt.", "{0} Elemente werden in deinem Browser entschlüsselt und wieder für den Server lesbar gespeichert, Ordner mit Inhalt. Frühere verschlüsselte Versionen werden entfernt."],
+  "{0} (moving)": "{0} (wird verschoben)",
+  "{0}: {1} done": "{0}: {1} erledigt",
+  "Moving": "Verschieben",
+  "The tags of {0} file or folder in it are removed (the server could read them).": ["Die Tags von {0} Datei oder Ordner darin werden entfernt (der Server könnte sie lesen).", "Die Tags von {0} Dateien oder Ordnern darin werden entfernt (der Server könnte sie lesen)."],
+  "The key of this folder was changed meanwhile.": "Der Schlüssel dieses Ordners wurde inzwischen gewechselt."
 }

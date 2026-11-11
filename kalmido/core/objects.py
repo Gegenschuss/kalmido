@@ -114,7 +114,7 @@ from ..files.store import fs_role  # 2.649.0 (#5051): _take_public
 from ..files.fsref import fs_unshare_hooks  # 2.649.0 (#5051): obj_boundary_take
 from ..files.web import _agent_event, _inherited_shares, _share_targets, _shares
 from .dlock import dl_of
-from ..files.fslock import fl_is_locked, fsl_denied
+from ..files.fslock import fsl_agent_share_guard
 from ..accounts.orgretain import upg_heir
 from ..accounts.orgretain import obj_share_gone  # 2.924.0 (#5069)
 
@@ -738,8 +738,7 @@ def obj_node_share(c, uid, n, key, target, role="view", expires_at=None, org=Non
     if key not in ("user_id", "group_id", "agent_id") or role not in ("view", "edit"):
         raise BadInput(tr("Invalid data"))
     if key == "agent_id" and not checked:
-        if fl_is_locked(c, n["id"]):
-            raise fsl_denied("fs_locked_agent")
+        fsl_agent_share_guard(c, n["id"])  # 2.953 (#3348, review N13): on, in or above a locked folder
     mq, ma = match or ("", ())
     # Fable review of 2.937 F4: two requests at once (a double click, two devices) made two rows of one person on one node
     # (fs_shares has no unique index there; ending one left the other open). The check-then-write runs under a lock of the

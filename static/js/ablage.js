@@ -386,8 +386,17 @@ async function ab_move(n, target) {
   ab_reload();
   offerUndo(tr('“{0}” moved', n.name), histAdd({label: tr('Move “{0}”', n.name), undo: () => ab_req('PATCH', `/api/files/nodes/${n.id}`, {parent_id: was}), redo: () => ab_req('PATCH', `/api/files/nodes/${n.id}`, {parent_id: target || null})}));
 }
+// 2.953 (#3348, review N16): the folders of "Move to…" -- the names below a locked folder decrypted here (fslock.js), never as ciphers
+async function ab_moveTargets() {
+  const fs = (await api('GET', '/api/files/folders?ablage=1')).folders || [];
+  if (fs.some(f => f.lock_id)) {
+    if (typeof fsl_paths !== 'function' && typeof loadModule === 'function') await loadModule('fslock').catch(() => {});
+    if (typeof fsl_paths === 'function') await fsl_paths(fs); else for (const f of fs) if (f.lock_id) f.path = f.parts.map(p => p.startsWith('e2e1:') ? tr('Encrypted') : p).join(' / ');
+  }
+  return fs;
+}
 async function ab_moveDlg(n, at) {  // 2.768.0 (#4888): at = the anchor of the menu (the document view's Actions)
-  let fs; try { fs = (await api('GET', '/api/files/folders?ablage=1')).folders; } catch { return; }
+  let fs; try { fs = await ab_moveTargets(); } catch { return; }
   // the same space and tree only (the server refuses the rest, and a folder into itself)
   const ok = fs.filter(f => (f.org_id || null) === (n.org_id || null) && f.owner_id === n.owner_id && f.id !== n.id && f.id !== n.parent_id);
   const items = [...(n.parent_id ? [{label: tr('Top level'), icon: 'up', fn: () => ab_move(n, null)}] : []), ...ok.map(f => ({label: f.path, icon: 'folder', fn: () => ab_move(n, f.id)}))];
@@ -716,9 +725,10 @@ async function ab_linkFile(refKind, refId, org) {
 // workspace). What the person may not change is left out and counted ("2 skipped"): the server's bulk routes are all or nothing.
 // The trash keeps its own bar (ab_trashBar). Replaces AB.sel / AB.selOn of the rows + DC.sel / DC.selOn of the document cards and
 // their two bars (2.96.0 A #1941, 2.428.0 A #3581, 2.430.0 #3582). Each action = ONE undo step.
-const ab_smvOk = n => !!n && n.kind !== 'link' && !n.agent_id && ab_canWrite(n.role);  // another workspace (2.96.0 A, #1941)
+const ab_smvOk = n => !!n && n.kind !== 'link' && !n.agent_id && !n.locked && ab_canWrite(n.role);  // another workspace (2.96.0 A, #1941); 2.953 (#3348, review N16): a locked folder stays in its workspace
 const ab_selInfo = x => ({id: x.id, name: x.name || '', kind: x.kind || 'file', role: x.role || '', org_id: x.org_id || null, parent_id: x.parent_id ?? null,
-  owner_id: x.owner_id ?? null, agent_id: x.agent_id || null, locked: !!x.locked, up: x.up || null, isdoc: x.kind ? !!x.doc : !x.file});
+  owner_id: x.owner_id ?? null, agent_id: x.agent_id || null, locked: !!x.locked, up: x.up || null, isdoc: x.kind ? !!x.doc : !x.file,
+  lock_id: x.lock_id || null, mime: x.mime || '', _enc: !!x._enc});  // 2.953 (#3348, review N16): what a locked folder's moves / downloads need
 // a node of the open folder (with its document, when the documents' list has it) or a document of the list (docs.js DC.docs)
 function ab_selObj(id) {
   const n = ab_item(id), d = typeof DC === 'undefined' ? null : (DC.docs || []).find(x => x.id === id);
@@ -766,7 +776,7 @@ async function ab_selMove(anchor) {
   if (!ok.length) { toast(ab_skipTxt(skip)); return; }
   const org = ok[0].org_id || null;
   if (ok.some(x => (x.org_id || null) !== org)) { toast(tr('Select items of one workspace')); return; }
-  let fs; try { fs = (await api('GET', '/api/files/folders?ablage=1')).folders; } catch { return; }  // no folder in the trash (#4881)
+  let fs; try { fs = await ab_moveTargets(); } catch { return; }  // no folder in the trash (#4881); 2.953 (#3348): names decrypted
   const own = ok.find(x => x.owner_id != null)?.owner_id, ids = new Set(ok.map(x => x.id));
   const tg = fs.filter(f => (f.org_id || null) === org && (own == null || f.owner_id === own) && !ids.has(f.id));
   const items = [{label: tr('Top level'), icon: 'up', fn: () => ab_selMoveTo(ok, null, skip)}, ...tg.map(f => ({label: f.path, icon: 'folder', fn: () => ab_selMoveTo(ok, f.id, skip)}))];
@@ -774,19 +784,27 @@ async function ab_selMove(anchor) {
 }
 async function ab_selMoveTo(xs, target, skip = 0) {
   const done = [];
+  // 2.953 (#3348, review N16): what crosses a locked folder's border goes re-encrypted in the browser, after one question
+  let fx = null;
+  if (typeof fsl_moveMany === 'function') { try { fx = await fsl_moveMany(xs, target); } catch (e) { if (!e.shown) toast(e.message || tr('unknown')); return; } }
+  if (fx?.cancel) return;
+  if (fx) { xs = fx.rest; skip += fx.skip; }
   for (const x of xs) {
     if ((x.parent_id ?? null) === (target || null)) continue;
     try { await rawFetch('PATCH', `/api/files/nodes/${x.id}`, {parent_id: target || null}); done.push({id: x.id, was: x.parent_id ?? null}); }
     catch (e) { if (!e.status || e.status >= 500) { toast(e.message || tr('unknown')); break; } skip++; }  // refused: skipped, the rest goes on
   }
   ab_selEnd(); ab_relist(); ab_selDraw();
-  if (!done.length) { if (skip) toast(ab_skipTxt(skip)); return; }
+  if (!done.length) { if (fx?.moved || skip) toast([fx?.moved ? trn('{0} item moved', '{0} items moved', fx.moved) : '', ab_skipTxt(skip)].filter(Boolean).join(' · ')); return; }
   const all = async to => { for (const x of done) { try { await api('PATCH', `/api/files/nodes/${x.id}`, {parent_id: to(x)}); } catch { /* shown */ } } ab_relist(); return {}; };
-  offerUndo([trn('{0} item moved', '{0} items moved', done.length), ab_skipTxt(skip)].filter(Boolean).join(' · '), histAdd({label: tr('Move to…'), undo: () => all(x => x.was), redo: () => all(() => target || null)}));
+  offerUndo([trn('{0} item moved', '{0} items moved', done.length + (fx?.moved || 0)), ab_skipTxt(skip)].filter(Boolean).join(' · '), histAdd({label: tr('Move to…'), undo: () => all(x => x.was), redo: () => all(() => target || null)}));
 }
 function ab_selDl() {
-  const xs = ab_selVals(), ok = xs.filter(abm_dlOk), skip = xs.length - ok.length;
-  if (!ok.length) { toast(ab_skipTxt(skip)); return; }
+  const xs = ab_selVals(), enc = xs.filter(x => x.locked && x.lock_id !== x.id);  // 2.953 (#3348, review N16): the server holds only ciphertexts
+  const ok = xs.filter(x => !enc.includes(x) && abm_dlOk(x)), dec = enc.filter(x => x.kind === 'file' && typeof fsl_open === 'function');
+  const skip = xs.length - ok.length - dec.length;
+  (async () => { for (const x of dec) await fsl_open(x, true); })();  // each one decrypted here and saved (no ZIP of ciphertexts)
+  if (!ok.length) { if (skip) toast(ab_skipTxt(skip)); return; }
   if (ok.length > 1 && ok.every(x => x.isdoc) && typeof dc_zip === 'function') dc_zip(ok.map(x => x.id)); else abm_download(ok);
   if (skip) toast(ab_skipTxt(skip));
 }
@@ -818,7 +836,7 @@ function ab_selSpace(xs) {
   return ab_smvSpace(xs);
 }
 async function ab_smvPlaces(to) {
-  const fs = (await api('GET', '/api/files/folders?ablage=1')).folders || [];
+  const fs = await ab_moveTargets();  // 2.953 (#3348, review N16)
   return fs.filter(f => (f.org_id || null) === (to || null) && (to || f.owner_id === S.me?.id)).map(f => ({id: f.id, label: f.path}));
 }
 async function ab_smvDry(b) {  // the dry run: an error of the server is the dialog's block (no toast)

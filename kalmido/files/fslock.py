@@ -132,10 +132,26 @@ def fsl_need_reach(c, chain):
         raise Denied(404)
 
 
+def fsl_hold(c, ids, shared=True):
+    """2.953 (#3348, review N11): the switch of a locked folder and the writes into it exclude each other until the transaction
+    ends -- a plain write below a folder (shared, on every folder of its chain) is either committed before the folder starts to
+    lock (the browser then converts it) or sees the lock; a write into a locked folder finishes before its switch ends (finish,
+    stop, rotate: exclusive on the folder) or sees the new state. Shared holders never wait for each other."""
+    ids = [int(i) for i in ids if i]
+    if not ids:
+        return
+    fn = "pg_advisory_xact_lock_shared" if shared else "pg_advisory_xact_lock"
+    c.execute(f"SELECT {fn}(hashtext('fsl:' || v)) FROM (VALUES {','.join(['(?)'] * len(ids))}) t(v)", [str(i) for i in ids]).fetchall()
+
+
 def fsl_need_plain(c, parent_id):
     """Every plain way of adding below folder parent_id (upload, new folder, API, scans, mail filing, office filing): 409 in a
     locked folder -- the browser adds there through this module's routes."""
-    if parent_id and fsl_of(c, parent_id) is not None:
+    if not parent_id:
+        return
+    chain = fs_chain(c, parent_id)
+    fsl_hold(c, [r["id"] for r in chain])  # 2.953 (#3348, review N11): not past a lock starting at this moment
+    if fsl_of_chain(c, chain) is not None:
         raise fsl_denied("fs_locked")
 
 
@@ -158,6 +174,8 @@ def fsl_move_guard(c, n, tid):
     """files/web.py _move: node n moves into folder tid (None: the top). Inside one locked folder: fine (same key). Across its
     border (in, out, from one to another): 409 fs_locked_move (the browser re-encrypts through /api/files/lock/move). A
     locked folder never moves into another one (409 fs_locked_nest)."""
+    if tid:
+        fsl_hold(c, [r["id"] for r in fs_chain(c, tid)])  # 2.953 (#3348, review N11): as fsl_need_plain
     if not _fsl_any(c):
         return
     lt = fsl_of(c, tid) if tid else None
@@ -170,6 +188,13 @@ def fsl_move_guard(c, n, tid):
     if held and tid:  # 2.353.0 F (#2758, review M2): a locked folder moves only where it could be locked
         if _fsl_above_block(c, fs_chain(c, tid), move=True):
             raise fsl_denied("fs_locked_place")
+
+
+def fsl_agent_share_guard(c, nid):
+    """A share with an agent on node nid: never on or in a locked folder, nor above one (2.953 (#3348, review N13): as locking
+    refuses a folder below an agent's share, _fsl_above_block)."""
+    if fl_is_locked(c, nid) or fsl_subtree_locked(c, nid):
+        raise fsl_denied("fs_locked_agent")
 
 
 def fsl_space_guard(c, ids):
@@ -260,9 +285,25 @@ def fsl_info(c, nid, uid):
          **({"aad_r": r["aad_r"], "aad_w": r["aad_w"]} if r["aad_r"] else {})}  # #4300
         for r in c.execute("SELECT * FROM fs_lock_keys WHERE node_id=? AND user_id=? ORDER BY gen", (nid, uid))]
     pending = [{"user_id": p["user_id"], "name": p["name"], "has_keys": p["has_keys"]} for p in people if mode and gen not in p["key_gens"]]
+    reenc = int(lk["e2e_reenc"] or 0) if mode == "on" else 0
     return {"node_id": nid, "aad_id": int(lk["aad_folder"] or nid) if lk else nid, "mode": mode, "gen": gen, "by": lk["e2e_by"] if lk else None, "at": lk["e2e_at"] if lk else None,
             "can_manage": fsl_can_manage(c, uid, nid), "keys": keys, "members": people, "pending": pending,
-            "left": fsl_left(c, lk) if mode in ("encrypting", "decrypting") else 0}
+            "left": fsl_left(c, lk) if fsl_switching(lk) else 0,
+            "rotate": gen if mode == "on" and (int(lk["e2e_rotate"] or 0) or fsl_stale(c, nid, people)) else 0, "reenc": reenc}
+
+
+def fsl_switching(lk):
+    """Is a conversion running for lock row lk -- a switch (encrypting / decrypting) or, in 'on', the encryption with a new key
+    after a key change (2.953, #3348: e2e_reenc)?"""
+    return bool(lk) and (lk["e2e"] in ("encrypting", "decrypting") or (lk["e2e"] == "on" and int(lk["e2e_reenc"] or 0) > 0))
+
+
+def fsl_stale(c, nid, people):
+    """2.953 (#3348): the people holding a key of locked folder nid who no longer reach it (a share taken back, left the
+    organisation or a group, lost the role) -- people = fsl_people of it. They could read what is added with the key they hold:
+    the folder needs a new one (fsl_rotate)."""
+    now = {p["user_id"] for p in people}
+    return sorted({r[0] for r in c.execute("SELECT DISTINCT user_id FROM fs_lock_keys WHERE node_id=?", (nid,))} - now)
 
 
 # ---------------------------------------------------------------- route helpers
@@ -340,13 +381,43 @@ def _fsl_forget_names(c, nid):
     c.execute(f"UPDATE fs_log SET detail='' WHERE node_id=? AND detail<>'' AND action NOT IN ({q})", (nid, *FSL_LOG_KEEP))
 
 
-def _fsl_replace(c, n, data, mime, gen, uid):
+def _fsl_forget_tags(c, nid):
+    """2.953 (#3348): the tags of a node go when it becomes ciphertext -- they are plain words the server
+    reads (the lock dialog says so first, fsl_get "tagged"); new ones are refused in a locked folder (files/fstags.py)."""
+    from ..docs.store import set_tags  # a document never lies in a locked folder (_fsl_inner_block): the plain node's tags
+    set_tags(c, nid, [])
+
+
+def _fsl_tagged(c, nid):
+    """How many nodes of the subtree of nid carry tags (the hint of the lock dialog)."""
+    ids = fs_subtree(c, nid)
+    return int(c.execute(f"SELECT COUNT(DISTINCT node_id) FROM doc_node_tags WHERE node_id IN ({','.join('?' * len(ids))})",
+                         ids).fetchone()[0]) if ids else 0
+
+
+def _fsl_replace(c, n, data, mime, gen, uid, made=None):
     """Store data as the only version of file row n (the earlier ones -- plain before the lock, or the other format -- go:
-    the wanted consequence of locking / unlocking; nothing else is removed). -> the stored files to unlink after the commit."""
+    the wanted consequence of locking / unlocking; nothing else is removed). -> the stored files to unlink after the commit.
+    made: a list that gets the new file's path (2.953 (#3348, review N14): removed again when the request fails later)."""
     old = [r[0] for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (n["id"],))]
     no = _store_version(c, n["id"], fs_space(n["org_id"], n["owner_id"]), data, mime, uid)
+    if made is not None:
+        made.append(c.execute("SELECT path FROM fs_versions WHERE node_id=? AND no=?", (n["id"], no)).fetchone()[0])
     c.execute("DELETE FROM fs_versions WHERE node_id=? AND no<>?", (n["id"], no))
     return old
+
+
+def _fsl_rekey(c, n, data, uid, made):
+    """2.953 (#3348): the current version of encrypted file row n in the new generation: stored as the next version, the version
+    it replaces goes; the earlier versions stay in their generation (the people keeping the folder keep those keys; who lost access
+    could read them before). -> the stored file to unlink after the commit."""
+    old = c.execute("SELECT no, path FROM fs_versions WHERE node_id=? AND no=?", (n["id"], n["cur_version"])).fetchone()
+    no = _store_version(c, n["id"], fs_space(n["org_id"], n["owner_id"]), data, FSL_MIME, uid)
+    made.append(c.execute("SELECT path FROM fs_versions WHERE node_id=? AND no=?", (n["id"], no)).fetchone()[0])
+    if not old:
+        return []
+    c.execute("DELETE FROM fs_versions WHERE node_id=? AND no=?", (n["id"], old["no"]))
+    return [old["path"]]
 
 
 def _fsl_unlink(paths):
@@ -424,8 +495,12 @@ def fsl_get(nid):
     out = fsl_info(c, root, uid)
     if not out["can_manage"]:  # who has access to a part only: its own keys, nothing about the other people
         out["members"], out["pending"] = [], []
-    if not lk:
+        # 2.953 (#3348, review N5): nor about the subtree (how much is left to convert, who switched when, why it cannot be locked)
+        out.update(left=0, by=None, at=None, rotate=0)
+        return jsonify(out)
+    if not lk or not lk["e2e"]:
         out["block"] = _fsl_start_block(c, n, uid) if n["kind"] == "folder" else tr("Not a folder")
+        out["tagged"] = _fsl_tagged(c, nid) if n["kind"] == "folder" else 0  # 2.953 (#3348): the lock dialog names them
     return jsonify(out)
 
 
@@ -437,6 +512,7 @@ def fsl_start(nid):
     c = db()
     b = body()
     uid, n = _fsl_folder(c, nid, manage=True)
+    fsl_hold(c, [nid], shared=False)  # 2.953 (#3348, review N11): plain writes below it finish first (they are converted then)
     lk = fsl_row(c, nid)
     if lk and lk["e2e"]:
         return err(tr("The folder is already locked."), 409)
@@ -493,11 +569,14 @@ def fsl_start(nid):
     return jsonify(fsl_info(c, nid, uid))
 
 
-def _fsl_switch(c, nid):
-    """(uid, folder, lock row) of a running switch (encrypting / decrypting) -- its managers only."""
+def _fsl_switch(c, nid, hold=None):
+    """(uid, folder, lock row) of a running switch (encrypting / decrypting, or the new key's encryption: fsl_switching) -- its
+    managers only. hold: 'shared' (a convert) / 'excl' (the end of the switch) -- see fsl_hold; the row is read after it."""
     uid, n = _fsl_folder(c, nid, manage=True)
+    if hold:
+        fsl_hold(c, [nid], shared=hold == "shared")
     lk = fsl_row(c, nid)
-    if not lk or lk["e2e"] not in ("encrypting", "decrypting"):
+    if not fsl_switching(lk):
         raise Denied(409, tr("No encryption change is running for this folder."))
     return uid, n, lk
 
@@ -536,7 +615,7 @@ def fsl_raw(nid, fid):
         raise Denied(409, tr("The folder is not locked."))
     if n["kind"] != "file":
         raise Denied(409, tr("Not a file"))
-    if lk["e2e"] in ("encrypting", "decrypting") and fsl_can_manage(c, me(), nid):
+    if fsl_switching(lk) and fsl_can_manage(c, me(), nid):
         pass  # the switch reads the nodes in the trash as well
     else:
         need_node(c, fid)
@@ -552,9 +631,10 @@ def fsl_raw(nid, fid):
 def fsl_convert(nid, fid):
     """multipart name (+ file for a file): node fid below folder nid in the target format of the running switch, replacing
     name and content of the same node. encrypting: a name cipher and a KENC file of the current generation; decrypting: the
-    plain name and bytes (+ type). The earlier versions of the file go (see _fsl_replace)."""
+    plain name and bytes (+ type). The earlier versions of the file go (see _fsl_replace). 2.953 (#3348) 'on' with e2e_reenc (after
+    a key change): a name cipher and a KENC file of the new generation in place of the current version (_fsl_rekey)."""
     c = db()
-    uid, _n, lk = _fsl_switch(c, nid)
+    uid, _n, lk = _fsl_switch(c, nid, "shared")  # 2.953 (#3348, review N11): never past the end of the switch
     n = _fsl_inner(c, nid, fid)
     mode, gen = lk["e2e"], int(lk["e2e_gen"] or 0)
     todo = (n["e2e_gen"] > 0) if mode == "decrypting" else (n["e2e_gen"] == 0 or n["e2e_gen"] < gen)
@@ -562,7 +642,7 @@ def fsl_convert(nid, fid):
         return err(tr("Nothing to do"), 409)
     name = request.form.get("name") or ""
     f = request.files.get("file")
-    gone = []
+    gone, made = [], []
     try:
         if mode == "decrypting":
             if le2e_is_cipher(name) or not name.strip():
@@ -579,7 +659,7 @@ def fsl_convert(nid, fid):
                     raise ValueError(tr("{0}: larger than {1} MB", name, MAX_FILE_MB))
                 # 2.666.0 (#4074 1): plain again = checks and recognition like an upload (virus scan, type, photo data), as fsl_move
                 data, mime, info = up_check(c, name, data, _mime_of(name, request.form.get("type") or ""), uid, n["org_id"], "fs")
-                gone = _fsl_replace(c, n, data, mime, 0, uid)
+                gone = _fsl_replace(c, n, data, mime, 0, uid, made)
                 c.execute("UPDATE fs_nodes SET mime=? WHERE id=?", (mime, fid))
                 up_after_store(c, "fs", fid, n["org_id"], info)
             name = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], name, skip=fid)
@@ -590,14 +670,23 @@ def fsl_convert(nid, fid):
             if n["kind"] == "file":
                 if not f:
                     raise ValueError(tr("File missing"))
-                gone = _fsl_replace(c, n, _fsl_data(f, gen), FSL_MIME, gen, uid)
+                if mode == "on":  # 2.953 (#3348): the new key -- only the current version is encrypted again, the earlier ones stay
+                    gone = _fsl_rekey(c, n, _fsl_data(f, gen), uid, made)
+                else:
+                    gone = _fsl_replace(c, n, _fsl_data(f, gen), FSL_MIME, gen, uid, made)
                 c.execute("UPDATE fs_nodes SET mime=? WHERE id=?", (FSL_MIME, fid))
                 _fsl_forget(c, fid)
             _fsl_forget_names(c, fid)
+            _fsl_forget_tags(c, fid)  # 2.953 (#3348)
             c.execute("UPDATE fs_nodes SET name=?, e2e_gen=? WHERE id=?", (name, gen, fid))
     except ValueError as e:
         c.rollback()
+        _fsl_unlink(made)
         return err(str(e))
+    except Exception:  # 2.953 (#3348, review N14): a refused file (virus scan) leaves no stored file behind
+        c.rollback()
+        _fsl_unlink(made)
+        raise
     bump(c)
     c.commit()
     _fsl_unlink(gone)
@@ -608,18 +697,24 @@ def fsl_convert(nid, fid):
 def fsl_finish(nid):
     """Ends a switch when nothing is left: encrypting -> on, decrypting -> open (the keys go)."""
     c = db()
-    uid, _n, lk = _fsl_switch(c, nid)
+    uid, _n, lk = _fsl_switch(c, nid, "excl")  # 2.953 (#3348, review N11): the running converts first, then the count
     left = fsl_left(c, lk)
     if left:
         return jsonify(error=tr("Not all files are converted yet."), code="fs_lock_left", left=left), 409
     mode = lk["e2e"]
+    if mode == "on":  # 2.953 (#3348): the new key's encryption is done
+        c.execute("UPDATE fs_locks SET e2e_reenc=0 WHERE node_id=? AND e2e='on' AND e2e_gen=?", (nid, lk["e2e_gen"]))
+        fs_log_add(c, nid, "lock", "rekeyed")
+        bump(c)
+        c.commit()
+        return jsonify(fsl_info(c, nid, uid))
     if not c.execute("UPDATE fs_locks SET e2e=?, e2e_at=? WHERE node_id=? AND e2e=? AND e2e_gen=?",
                      ("on" if mode == "encrypting" else None, iso(now_utc()), nid, mode, lk["e2e_gen"])).rowcount:
         c.rollback()
         return err(tr("No encryption change is running for this folder."), 409)
     if mode == "decrypting":
         c.execute("DELETE FROM fs_lock_keys WHERE node_id=?", (nid,))
-        c.execute("UPDATE fs_locks SET aad_folder=NULL WHERE node_id=?", (nid,))  # #4300: no ciphertext of the old server is left
+        c.execute("UPDATE fs_locks SET aad_folder=NULL, e2e_rotate=0, e2e_reenc=0 WHERE node_id=?", (nid,))  # 2.953 (#3348): open, no key to change  # #4300: no ciphertext of the old server is left
     fs_log_add(c, nid, "lock", "done" if mode == "encrypting" else "off")
     bump(c)
     c.commit()
@@ -634,6 +729,7 @@ def fsl_stop(nid):
     c = db()
     b = body()
     uid, _n = _fsl_folder(c, nid, manage=True)
+    fsl_hold(c, [nid], shared=False)  # 2.953 (#3348, review N11): the writes into the folder running now finish first
     lk = fsl_row(c, nid)
     want = ("encrypting",) if b.get("abort") is True else ("on", "encrypting")
     if not lk or lk["e2e"] not in want:
@@ -651,6 +747,68 @@ def fsl_stop(nid):
     bump(c)
     c.commit()
     return jsonify(fsl_info(c, nid, uid))
+
+
+@app.post("/api/files/lock/<int:nid>/rotate")
+def fsl_rotate(nid):
+    """{gen, keys: [{user_id, wrapped}]} -- 2.953 (#3348, like the knowledge spaces' wke_rotate): a new
+    generation of the folder key after someone lost access (fsl_stale, or an account deleted: e2e_rotate) or on request: a manager
+    holding the current key, only in 'on'; gen must be e2e_gen + 1 (another change first: 409 code fs_lock_gen). Who reaches the
+    folder and is not in keys waits for it (the banner's button); an entry for someone who does not reach it -> 400. The copies of
+    who lost access go (every generation). Starts the encryption with the new key (e2e_reenc = gen: todo / convert / finish);
+    the earlier generations stay for the people keeping the folder (older versions, the files not done yet)."""
+    c = db()
+    b = body()
+    uid, n = _fsl_folder(c, nid, manage=True)
+    fsl_hold(c, [nid], shared=False)  # the writes into the folder running now finish with the old key first
+    lk = fsl_row(c, nid)
+    if not lk or lk["e2e"] != "on":
+        return err(tr("The folder is not locked."), 409)
+    cur = int(lk["e2e_gen"] or 0)
+    mine = e2e_keys_of(c, uid)
+    if not mine or not c.execute("SELECT 1 FROM fs_lock_keys WHERE node_id=? AND user_id=? AND gen=?", (nid, uid, cur)).fetchone():
+        return err(tr("You have no key for this folder yet."), 409)
+    gen, keys = b.get("gen"), b.get("keys")
+    if isinstance(gen, bool) or not isinstance(gen, int):
+        return err(tr("Invalid value: {0}", "gen"))
+    if gen != cur + 1:
+        return jsonify(error=tr("The key of this folder was changed meanwhile."), code="fs_lock_gen", gen=cur), 409
+    people = fsl_people(c, n)
+    ready = {p["user_id"] for p in people if p["has_keys"]}
+    if not isinstance(keys, list) or not keys or len(keys) > FSL_KEYS_MAX:
+        return err(tr("Invalid value: {0}", "keys"))
+    given = {}
+    for k in keys:
+        w = _fsl_wrapped(k.get("wrapped")) if isinstance(k, dict) else None
+        u = k.get("user_id") if isinstance(k, dict) else None
+        if not w or isinstance(u, bool) or not isinstance(u, int) or u not in ready or u in given:
+            return err(tr("Invalid value: {0}", "keys"))
+        given[u] = w
+    if uid not in given:
+        return err(tr("Invalid value: {0}", "keys"))
+    ts = iso(now_utc())
+    if not c.execute("UPDATE fs_locks SET e2e_gen=?, e2e_rotate=0, e2e_reenc=?, e2e_by=?, e2e_at=? WHERE node_id=? AND e2e='on' AND e2e_gen=?",
+                     (gen, gen, uid, ts, nid, cur)).rowcount:
+        c.rollback()
+        return jsonify(error=tr("The key of this folder was changed meanwhile."), code="fs_lock_gen", gen=cur), 409
+    gone = fsl_stale(c, nid, people)
+    if gone:
+        c.execute(f"DELETE FROM fs_lock_keys WHERE node_id=? AND user_id IN ({','.join('?' * len(gone))})", (nid, *gone))
+    for u, w in given.items():
+        c.execute("INSERT INTO fs_lock_keys(node_id,gen,user_id,wrapped,wrapped_by,wrapper_pub,created_at) VALUES(?,?,?,?,?,?,?)",
+                  (nid, gen, u, w, uid, mine["pub"], ts))
+    fs_log_add(c, nid, "lock", "rekey")
+    bump(c)
+    c.commit()
+    return jsonify(fsl_info(c, nid, uid))
+
+
+def fsl_user_purge(c, uid):
+    """Account deletion (accounts/users.py user_purge, before the cascade takes its key rows): the locked folders whose key the
+    person held get a new key (e2e_rotate) -- afterwards no row would tell. Across organisations (an instance admin deletes)."""
+    with system_ctx(c):
+        c.execute("UPDATE fs_locks SET e2e_rotate=e2e_gen WHERE e2e IS NOT NULL AND node_id IN (SELECT node_id FROM fs_lock_keys WHERE user_id=?)",
+                  (uid,))
 
 
 @app.post("/api/files/lock/<int:nid>/keys")
@@ -698,6 +856,8 @@ def fsl_keys(nid):
 def _fsl_on(c, nid, write=True):
     """(uid, node, lock row) of a node (a folder for adding) in a locked folder that is 'on'."""
     uid, n, lk = _fsl_lock_of_node(c, nid, write=write)
+    fsl_hold(c, [lk["node_id"]])  # 2.953 (#3348, review N11): the state read below holds until this write is committed
+    lk = fsl_row(c, lk["node_id"])
     if lk["e2e"] != "on":
         raise fsl_denied("fs_locked_busy")
     return uid, n, lk
@@ -809,6 +969,33 @@ def fsl_version(fid):
     return jsonify(ok=True, version=no), 201
 
 
+@app.get("/api/files/lock/movecheck/<int:fid>")
+def fsl_movecheck(fid):
+    """2.953 (#3348): before the browser moves folder fid WITH its content across a locked folder's border (?to= the target
+    folder, empty = the top of the space): {block: why it cannot go (a message) or null, count: the nodes below it} -- into a
+    locked folder the list of locking (_fsl_inner_block over the subtree), never a locked folder inside it, no running switch."""
+    c = db()
+    _fsl_person()
+    n = need_node(c, fid, write=True)
+    tid = request.args.get("to", type=int) or None
+    if tid:
+        need_node(c, tid)  # a folder the person does not see: 404 before anything about its lock
+    ls = fsl_of(c, n["parent_id"]) if n["parent_id"] else None
+    lt = fsl_of(c, tid) if tid else None
+    ids = [r[0] for r in c.execute(  # outside the trash only: what lies in it stays on its side (fsl_move)
+        "WITH RECURSIVE dn(id, lvl) AS (SELECT id, 0 FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL UNION ALL "
+        f"SELECT x.id, dn.lvl + 1 FROM fs_nodes x JOIN dn ON x.parent_id=dn.id WHERE x.deleted_at IS NULL AND dn.lvl < {DEPTH_MAX * 2}) "
+        "SELECT id FROM dn", (fid,))]
+    block = None
+    if fsl_subtree_locked(c, fid):
+        block = tr(FSL_MSG["fs_locked_nest"])
+    elif (lt and lt["e2e"] != "on") or (ls and ls["e2e"] != "on"):
+        block = tr(FSL_MSG["fs_locked_busy"])
+    elif lt and (ls["node_id"] if ls else None) != lt["node_id"]:
+        block = _fsl_inner_block(c, [fid, *ids])
+    return jsonify(block=block, count=len(ids))
+
+
 def fsl_restore_version(c, n, no):
     """files/web.py: an older version of an encrypted file becomes the newest again (its ciphertext as it is: no check, no
     recognition -- fs_new_version would treat it as a plain upload). -> the new number."""
@@ -832,13 +1019,18 @@ def fsl_move(fid):
     tid = request.form.get("parent_id", type=int) or None
     if tid:
         need_node(c, tid)  # 2.353.0 F (#2758, review N4): a folder the person does not see: 404 before anything about its lock
+    fsl_hold(c, [r["id"] for r in fs_chain(c, n["parent_id"])] if n["parent_id"] else [])  # 2.953 (#3348, review N11)
+    fsl_hold(c, [r["id"] for r in fs_chain(c, tid)] if tid else [])
     ls = fsl_of(c, n["parent_id"]) if n["parent_id"] else None
     lt = fsl_of(c, tid) if tid else None
     if (ls["node_id"] if ls else None) == (lt["node_id"] if lt else None):
         return err(tr("Nothing to do"), 409)
     if fsl_subtree_locked(c, fid) or (lt and lt["e2e"] != "on") or (ls and ls["e2e"] != "on"):
         raise fsl_denied("fs_locked_busy" if not fsl_subtree_locked(c, fid) else "fs_locked_nest")
-    if n["kind"] == "folder" and c.execute("SELECT 1 FROM fs_nodes WHERE parent_id=? LIMIT 1", (fid,)).fetchone():
+    # 2.953 (#3348): a folder crosses when nothing outside the trash lies in it -- the browser moves its content first (fsl_moveTree:
+    # a folder of the same name on the other side, the content, this folder, the content back into it); what lies in the trash
+    # inside it stays on its side, below the folder's old parent (a restore puts it there)
+    if n["kind"] == "folder" and c.execute("SELECT 1 FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL LIMIT 1", (fid,)).fetchone():
         return err(tr("Move the files of a folder into or out of a locked folder one by one."), 409)
     if lt:
         block = _fsl_inner_block(c, [fid])  # 2.353.0 F (#2758, review N3): the same list as locking (mails, an agent's folder too)
@@ -846,7 +1038,7 @@ def fsl_move(fid):
             return err(block, 409)
     name = request.form.get("name") or ""
     f = request.files.get("file")
-    gone = []
+    gone, made = [], []
     try:
         if lt:
             gen = int(lt["e2e_gen"])
@@ -855,10 +1047,11 @@ def fsl_move(fid):
             if n["kind"] == "file":
                 if not f:
                     raise ValueError(tr("File missing"))
-                gone = _fsl_replace(c, n, _fsl_data(f, gen), FSL_MIME, gen, uid)
+                gone = _fsl_replace(c, n, _fsl_data(f, gen), FSL_MIME, gen, uid, made)
                 _fsl_forget(c, fid)
                 c.execute("UPDATE fs_nodes SET mime=? WHERE id=?", (FSL_MIME, fid))
             _fsl_forget_names(c, fid)
+            _fsl_forget_tags(c, fid)  # 2.953 (#3348)
             c.execute("UPDATE fs_nodes SET name=?, e2e_gen=? WHERE id=?", (name, gen, fid))
         else:
             if le2e_is_cipher(name) or not name.strip():
@@ -872,17 +1065,24 @@ def fsl_move(fid):
                 if fsl_blob_gen(data[:FSL_HEAD]) is not None or not data or len(data) > MAX_FILE_MB * 1024 * 1024:
                     raise ValueError(tr("Invalid value: {0}", "file"))
                 data, mime, info = up_check(c, name, data, _mime_of(name, request.form.get("type") or ""), uid, n["org_id"], "fs")
-                gone = _fsl_replace(c, n, data, mime, 0, uid)
+                gone = _fsl_replace(c, n, data, mime, 0, uid, made)
                 c.execute("UPDATE fs_nodes SET mime=? WHERE id=?", (mime, fid))
                 up_after_store(c, "fs", fid, n["org_id"], info)  # plain again: checks and recognition like an upload
             c.execute("UPDATE fs_nodes SET name=?, e2e_gen=0 WHERE id=?", (name, fid))
+        if n["kind"] == "folder":  # 2.953 (#3348): its trash stays on this side (see above)
+            c.execute("UPDATE fs_nodes SET parent_id=? WHERE parent_id=? AND deleted_at IS NOT NULL", (n["parent_id"], fid))
         c.execute("UPDATE fs_nodes SET parent_id=? WHERE id=?", (n["parent_id"], fid))
         n2 = dict(c.execute("SELECT * FROM fs_nodes WHERE id=?", (fid,)).fetchone())
         n2["role"] = n["role"]
         _move(c, n2, tid, uid, fsl_ok=True)  # rights on the target, same space, depth, the free name
     except ValueError as e:
         c.rollback()
+        _fsl_unlink(made)
         return err(str(e))
+    except Exception:  # 2.953 (#3348, review N14): a refusal of _move (rights, space, depth) leaves no stored file behind
+        c.rollback()
+        _fsl_unlink(made)
+        raise
     fs_log_add(c, fid, "move", "lock")
     bump(c)
     c.commit()

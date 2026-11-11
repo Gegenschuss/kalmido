@@ -13557,7 +13557,6 @@
   "This folder is being encrypted. Try again in a moment.": "Deze map wordt versleuteld. Probeer het zo opnieuw.",
   "Locked folder: names and files are encrypted in your browser. The server, agents and API tokens cannot read them.": "Vergrendelde map: namen en bestanden zijn in je browser versleuteld. De server, agents en API-tokens kunnen ze niet lezen.",
   "Search names": "Namen zoeken",
-  "Search names in this folder": "Namen in deze map zoeken",
   "{0} file encrypted and uploaded": ["{0} bestand versleuteld en geüpload", "{0} bestanden versleuteld en geüpload"],
   "Move into a locked folder?": "Naar een vergrendelde map verplaatsen?",
   "Move out of the locked folder?": "Uit de vergrendelde map verplaatsen?",
@@ -18209,5 +18208,16 @@
   "Edit filter…": "Filter bewerken…",
   "Words or the search syntax (tag:Name, \"exact text\", -word)": "Woorden of zoeksyntaxis (tag:Naam, \"exacte tekst\", -woord)",
   "Moved to the trash": "Naar de prullenbak verplaatst",
-  "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Opschonen van de gedeelde kern wacht: {0} oude ledenregels in {1} hebben nog geen deling, de oude tabel blijft. Zie het serverlog."
+  "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Opschonen van de gedeelde kern wacht: {0} oude ledenregels in {1} hebben nog geen deling, de oude tabel blijft. Zie het serverlog.",
+  "Only the first {0} folders were searched.": "Alleen de eerste {0} mappen zijn doorzocht.",
+  "Someone no longer has access to this folder. Change its key so that they cannot read what is added from now on.": "Iemand heeft geen toegang meer tot deze map. Wijzig de sleutel zodat die persoon niet kan lezen wat vanaf nu wordt toegevoegd.",
+  "Search names in this folder and its subfolders": "Namen in deze map en de submappen zoeken",
+  "The key of the folder was changed.": "De sleutel van de map is gewijzigd.",
+  "{0} item is encrypted in your browser and moved, folders with their content. Earlier versions are removed; the server and agents can no longer read them.": ["{0} item wordt in je browser versleuteld en verplaatst, mappen met hun inhoud. Eerdere versies worden verwijderd; server en agents kunnen het niet meer lezen.", "{0} items worden in je browser versleuteld en verplaatst, mappen met hun inhoud. Eerdere versies worden verwijderd; server en agents kunnen ze niet meer lezen."],
+  "{0} item is decrypted in your browser and stored readable for the server again, folders with their content. Earlier encrypted versions are removed.": ["{0} item wordt in je browser ontsleuteld en weer leesbaar voor de server opgeslagen, mappen met hun inhoud. Eerdere versleutelde versies worden verwijderd.", "{0} items worden in je browser ontsleuteld en weer leesbaar voor de server opgeslagen, mappen met hun inhoud. Eerdere versleutelde versies worden verwijderd."],
+  "{0} (moving)": "{0} (wordt verplaatst)",
+  "{0}: {1} done": "{0}: {1} klaar",
+  "Moving": "Verplaatsen",
+  "The tags of {0} file or folder in it are removed (the server could read them).": ["De tags van {0} bestand of map erin worden verwijderd (de server zou ze kunnen lezen).", "De tags van {0} bestanden of mappen erin worden verwijderd (de server zou ze kunnen lezen)."],
+  "The key of this folder was changed meanwhile.": "De sleutel van deze map is intussen gewijzigd."
 }

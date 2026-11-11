@@ -13557,7 +13557,6 @@
   "This folder is being encrypted. Try again in a moment.": "Ce dossier est en cours de chiffrement. Réessaie dans un instant.",
   "Locked folder: names and files are encrypted in your browser. The server, agents and API tokens cannot read them.": "Dossier verrouillé : les noms et fichiers sont chiffrés dans ton navigateur. Le serveur, les agents et les jetons d’API ne peuvent pas les lire.",
   "Search names": "Chercher des noms",
-  "Search names in this folder": "Chercher des noms dans ce dossier",
   "{0} file encrypted and uploaded": ["{0} fichier chiffré et envoyé", "{0} fichiers chiffrés et envoyés"],
   "Move into a locked folder?": "Déplacer dans un dossier verrouillé ?",
   "Move out of the locked folder?": "Sortir du dossier verrouillé ?",
@@ -18209,5 +18208,16 @@
   "Edit filter…": "Modifier le filtre…",
   "Words or the search syntax (tag:Name, \"exact text\", -word)": "Mots ou syntaxe de recherche (tag:Nom, \"texte exact\", -mot)",
   "Moved to the trash": "Mis à la corbeille",
-  "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Le nettoyage du noyau commun attend : {0} anciennes lignes de membres dans {1} n’ont pas encore de partage, l’ancienne table reste. Voir le journal du serveur."
+  "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Le nettoyage du noyau commun attend : {0} anciennes lignes de membres dans {1} n’ont pas encore de partage, l’ancienne table reste. Voir le journal du serveur.",
+  "Only the first {0} folders were searched.": "Seuls les {0} premiers dossiers ont été parcourus.",
+  "Someone no longer has access to this folder. Change its key so that they cannot read what is added from now on.": "Quelqu'un n'a plus accès à ce dossier. Change sa clé pour que cette personne ne puisse pas lire ce qui sera ajouté désormais.",
+  "Search names in this folder and its subfolders": "Chercher des noms dans ce dossier et ses sous-dossiers",
+  "The key of the folder was changed.": "La clé du dossier a été changée.",
+  "{0} item is encrypted in your browser and moved, folders with their content. Earlier versions are removed; the server and agents can no longer read them.": ["{0} élément est chiffré dans ton navigateur et déplacé, les dossiers avec leur contenu. Les versions précédentes sont supprimées ; le serveur et les agents ne peuvent plus le lire.", "{0} éléments sont chiffrés dans ton navigateur et déplacés, les dossiers avec leur contenu. Les versions précédentes sont supprimées ; le serveur et les agents ne peuvent plus les lire."],
+  "{0} item is decrypted in your browser and stored readable for the server again, folders with their content. Earlier encrypted versions are removed.": ["{0} élément est déchiffré dans ton navigateur et de nouveau enregistré lisible pour le serveur, les dossiers avec leur contenu. Les versions chiffrées précédentes sont supprimées.", "{0} éléments sont déchiffrés dans ton navigateur et de nouveau enregistrés lisibles pour le serveur, les dossiers avec leur contenu. Les versions chiffrées précédentes sont supprimées."],
+  "{0} (moving)": "{0} (déplacement)",
+  "{0}: {1} done": "{0} : {1} faits",
+  "Moving": "Déplacement",
+  "The tags of {0} file or folder in it are removed (the server could read them).": ["Les tags de {0} fichier ou dossier qu'il contient sont supprimés (le serveur pourrait les lire).", "Les tags de {0} fichiers ou dossiers qu'il contient sont supprimés (le serveur pourrait les lire)."],
+  "The key of this folder was changed meanwhile.": "La clé de ce dossier a été changée entre-temps."
 }

@@ -565,9 +565,11 @@ def files_version_restore(nid, no):
     if n["kind"] != "file" or not v:
         raise Denied(404)
     fs_web_expect(c, nid, (request.get_json(silent=True) or {}).get("expect_version", request.args.get("expect_version")))  # 2.577.0 (#4708 3)
-    from .fslock import fl_is_locked, fsl_restore_version
+    from .fslock import fsl_restore_version
     _fsu_step(c, me(), n, "version")  # 2.777.0 (#5254)
-    if fl_is_locked(c, nid):  # 2.353.0 A (#2758): the ciphertext as it is
+    # 2.353.0 A (#2758): the ciphertext as it is; 2.953 (#3348, review N7): by the node's own format, not by the folder's lock --
+    # while a folder is being unlocked, a file already decrypted holds plain versions only (a typed upload, never octet-stream)
+    if (n["e2e_gen"] or 0) > 0:
         new = fsl_restore_version(c, n, no)
     else:
         new = fs_new_version(c, nid, fs_read(c, nid, no), v["mime"])
@@ -897,9 +899,8 @@ def files_share_add(nid):
     if not key:
         return err(tr("Expected {0}", "user_id | group_id | agent_id"))
     if key == "agent_id":
-        from .fslock import fl_is_locked, fsl_denied
-        if fl_is_locked(c, nid):
-            raise fsl_denied("fs_locked_agent")  # 2.353.0 A (#2758)
+        from .fslock import fsl_agent_share_guard
+        fsl_agent_share_guard(c, nid)  # 2.353.0 A (#2758); 2.953 (#3348, review N13): above a locked folder too
     try:
         tid = int(b[key])
     except (TypeError, ValueError):
@@ -1091,6 +1092,10 @@ def files_folders():
         rows = {k: v for k, v in rows.items() if k not in hide}
     chains = fs_chains(c, rows.keys())  # 2.595.0 (#4881): no folder in the trash, nor below one (children carry no deleted_at of their own)
     rows = {k: v for k, v in rows.items() if not fs_deleted(chains.get(k, []))}
+    from .fslock import fsl_map, fsl_person_ok
+    lk = fsl_map(c, list(rows))  # 2.953 (#3348, review N16): the browser decrypts the names of a locked folder's targets
+    if lk and not fsl_person_ok():
+        rows = {k: v for k, v in rows.items() if k not in lk}  # agents and API tokens: no folder of a locked folder
     out = []
     for r in rows.values():
         if ROLE_RANK[fs_role(c, r["id"], uid)] < ROLE_RANK["edit"]:
@@ -1099,7 +1104,10 @@ def files_folders():
         while p in rows and guard < 64:
             path.insert(0, rows[p]["name"])
             p, guard = rows[p]["parent_id"], guard + 1
-        out.append({"id": r["id"], "name": r["name"], "path": " / ".join(path), "org_id": r["org_id"], "owner_id": r["owner_id"]})
+        x = {"id": r["id"], "name": r["name"], "path": " / ".join(path), "org_id": r["org_id"], "owner_id": r["owner_id"]}
+        if r["id"] in lk:  # the names below the lock are ciphers: the parts to decrypt (a name may hold " / " itself)
+            x.update(lock_id=lk[r["id"]][0], parts=path)
+        out.append(x)
     out.sort(key=lambda x: x["path"].lower())
     return jsonify(folders=out[:1000])
 

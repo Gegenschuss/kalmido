@@ -4,7 +4,7 @@
 'use strict';
 
 // lock id = the id of the locked folder. info: GET /api/files/lock/<id>; keys: {gen: CryptoKey} once the encryption is unlocked
-const FSL = {info: {}, keys: {}, tried: {}, memo: new Map(), busy: {}, auto: {}, q: '', wait: {}, aad: {}};  // wait: {lock id: [{user_id, name}]} (2.353.0 F); aad: #4300
+const FSL = {info: {}, keys: {}, tried: {}, memo: new Map(), busy: {}, auto: {}, q: '', wait: {}, aad: {}, find: /** @type {any} */ (null), rot: {}};  // rot: {lock id: true} = a key change waits for the button (2.953)  // wait: {lock id: [{user_id, name}]} (2.353.0 F); aad: #4300
 const FSL_HEAD = 9;
 const fslIs = v => typeof v === 'string' && v.startsWith('e2e1:');
 // #4300: an imported folder stays bound to its id on the server it was locked on (known from fslInfo, before any key of the folder)
@@ -126,8 +126,31 @@ async function fsl_prep(j) {
     await fslPrepNode(n);
   }
   if (FSL.qFor !== j.node?.id) FSL.q = '';  // the name search belongs to the folder it was typed in
-  if (j.node?.locked && FSL.q) j.items = (j.items || []).filter(n => n.name.toLowerCase().includes(FSL.q.toLowerCase()));
+  if (j.node?.locked && FSL.q) j.items = await fslFind(j, FSL.q);
   return j;
+}
+// 2.953 (#3348): the name search of a locked folder covers its subfolders too -- the server cannot search
+// ciphers, so the browser walks the folders below (GET /api/files per folder: only what the person sees) and matches the names it
+// decrypted; a hit below carries its path from the open folder (the row shows it). At most FSL_FIND_DIRS folders, remembered for
+// FSL_FIND_MS while the same folder is searched (one walk per search, not per letter).
+const FSL_FIND_DIRS = 300, FSL_FIND_MS = 30000;
+async function fslFind(j, q) {
+  const id = j.node.id, low = q.toLowerCase();
+  let t = FSL.find;
+  if (!t || t.id !== id || Date.now() - t.at > FSL_FIND_MS) {
+    const all = (j.items || []).map(n => ({n, path: ''})), dirs = all.filter(x => x.n.kind === 'folder');
+    let seen = 0;
+    while (dirs.length && seen < FSL_FIND_DIRS) {
+      const d = dirs.shift(); seen++;
+      let kids; try { kids = (await rawFetch('GET', `/api/files?parent=${d.n.id}`)).items || []; } catch { continue; }
+      const path = d.path ? d.path + ' / ' + d.n.name : d.n.name;
+      for (const k of kids) { await fslPrepNode(k); const x = {n: k, path}; all.push(x); if (k.kind === 'folder') dirs.push(x); }
+    }
+    t = FSL.find = {id, at: Date.now(), all};
+    if (dirs.length) toast(tr('Only the first {0} folders were searched.', FSL_FIND_DIRS));
+  }
+  const hits = t.all.filter(x => !x.n._sealed && x.n.name.toLowerCase().includes(low)).map(x => (x.path ? {...x.n, path: x.path} : x.n));
+  return hits;
 }
 const fsl_prep1 = n => fslPrepNode(n);
 
@@ -139,16 +162,24 @@ function fsl_bannerHtml(d) {
   // 2.353.0 F (#2758, review M1): waiting people get the key only by this button (with their names), never silently
   return `<div class="fslbar" role="note">${ic('lock', 's')}<span>${esc(busy ? tr('This folder is being encrypted. Try again in a moment.') : tr('Locked folder: names and files are encrypted in your browser. The server, agents and API tokens cannot read them.') + ' ' + tr('No camera scan here: the server would see the pages.'))}</span>
     ${sealed ? `<button type="button" class="btn sm" data-fsl="unlock">${ic('lock', 's')} ${tr('Unlock')}</button>` : ''}
+    ${FSL.rot[n.lock_id] ? `<span class="e2ewarn" role="alert">${esc(tr('Someone no longer has access to this folder. Change its key so that they cannot read what is added from now on.'))}</span><button type="button" class="btn sm" data-fsl="rotate">${ic('key', 's')} ${esc(tr('Change the key now'))}</button>` : ''}
     ${wait.length ? `<span class="muted">${esc(trn('{0} person waits for the key', '{0} people wait for the key', wait.length))}</span><button type="button" class="btn sm" data-fsl="release" title="${esc(names)}">${ic('key', 's')} ${esc(tr('Hand over the key to {0}', names))}</button>` : ''}
-    <input type="search" class="fslq" id="fsl-q" data-fsl="q" value="${esc(FSL.q)}" placeholder="${esc(tr('Search names'))}" aria-label="${esc(tr('Search names in this folder'))}"></div>`;
+    <input type="search" class="fslq" id="fsl-q" data-fsl="q" value="${esc(FSL.q)}" placeholder="${esc(tr('Search names'))}" aria-label="${esc(tr('Search names in this folder and its subfolders'))}"></div>`;
 }
 document.addEventListener('input', (/** @type {any} */ e) => {
   const q = e.target.closest?.('[data-fsl="q"]'); if (!q) return;
+  if (!q.value) FSL.find = null;  // 2.953 (#3348): a new search walks the subfolders again
   FSL.q = q.value; FSL.qFor = S.route.nid; clearTimeout(FSL.qT); FSL.qT = setTimeout(() => { AB.key = ''; ab_load(); }, 250);
 });
 document.addEventListener('click', async (/** @type {any} */ e) => {
   const b = e.target.closest?.('[data-fsl]'); if (!b || b.dataset.fsl === 'q') return;
   if (b.dataset.fsl === 'unlock') { if (await e2eEnsure()) { FSL.keys = {}; ab_reload(); } }
+  if (b.dataset.fsl === 'rotate') {  // 2.953 (#3348): the key change by hand (keys first seen on this device included)
+    const lid = AB.data?.node?.lock_id; if (!lid) return;
+    b.disabled = true;
+    try { if (await fslRekey(lid, true, fslProgToast(tr('Encrypting')))) toast(tr('The key of the folder was changed.')); } catch (x) { if (!x.shown) fslToast(x); }
+    ab_reload();
+  }
   if (b.dataset.fsl === 'release') {
     const lid = AB.data?.node?.lock_id, wait = FSL.wait[lid] || []; if (!lid || !wait.length) return;
     b.disabled = true;
@@ -258,35 +289,110 @@ async function fsl_newVersionFile(n, f) {
 }
 // moving across the border of a locked folder: re-encrypted here (true = handled, false = an ordinary move)
 async function fsl_moveHook(n, target) {
-  let t = null;
-  if (target) { try { t = await rawFetch('GET', `/api/files/nodes/${target}`); } catch { return false; } }
-  const from = n.locked && n.lock_id !== n.id ? n.lock_id : null, to = t?.locked ? t.lock_id : null;
+  let to;
+  try { to = await fslLockAt(target); } catch { return false; }
+  const from = fslFrom(n);
   if (from === to) return false;
   if (n.kind === 'folder' && n.lock_id === n.id) return false;  // the locked folder itself (the server refuses nesting)
-  const yes = await askConfirm(to ? tr('Move into a locked folder?') : tr('Move out of the locked folder?'),
-    to ? tr('“{0}” is encrypted in your browser and moved. Its earlier versions are removed; the server and agents can no longer read it.', n.name)
-      : tr('“{0}” is decrypted in your browser and stored readable for the server again. Its earlier encrypted versions are removed.', n.name), {ok: tr('Move')});
-  if (!yes) return true;
-  const fd = new FormData();
-  try {
-    let f = null;
-    if (n.kind === 'file') {
-      if (from) { await fslKeys(from, true); f = await fslFileDec(from, await fslFetch(n)); }
-      else { const r = await fetch(ab_url(n, true), {credentials: 'same-origin'}); if (!r.ok) throw fslErr(tr('File damaged or missing'), 'file'); f = {name: n.name, type: n.mime, data: new Uint8Array(await r.arrayBuffer())}; }
-    }
-    if (to) {
-      await fslKeys(to, true); const g = (await fslInfo(to, true)).gen;
-      fd.append('name', await fslNameEnc(to, n.name, g));
-      if (f) fd.append('file', new Blob([await fslFileEnc(to, {...f, name: n.name}, g)]), 'encrypted.kenc');
-    } else {
-      fd.append('name', n.name);
-      if (f) { fd.append('file', new Blob([f.data]), 'file'); fd.append('type', f.type); }
-    }
-  } catch (x) { fslToast(x); return true; }
-  if (target) fd.append('parent_id', String(target));
-  try { await api('POST', `/api/files/lock/move/${n.id}`, fd); } catch { return true; }
+  let block; try { block = await fslMoveCheck(n, target); } catch (x) { if (!x.shown) fslToast(x); return true; }
+  if (block) { toast(block); return true; }
+  if (!await fslAskMove(to, n.name, 1)) return true;
+  try { await fslMoveNode(n, from, to, target); } catch (x) { if (!x.shown) fslToast(x); ab_reload(); return true; }
   ab_reload(); toast(tr('“{0}” moved', n.name));
   return true;
+}
+// 2.953 (#3348, review N16): the paths of "Move to…" (GET /api/files/folders: parts + lock_id below a locked folder) decrypted here
+async function fsl_paths(fs) {
+  for (const f of fs) {
+    if (!f.lock_id || !Array.isArray(f.parts)) continue;
+    const out = [];
+    for (const p of f.parts) { try { out.push(await fslNameDec(f.lock_id, p, false)); } catch { out.push(tr('Encrypted')); } }
+    f.path = out.join(' / '); f.name = out[out.length - 1];
+  }
+  return fs;
+}
+// 2.953 (#3348): the locked folder a target folder lies in (null: open, the top of a space too)
+async function fslLockAt(target) {
+  if (!target) return null;
+  const t = await rawFetch('GET', `/api/files/nodes/${target}`);
+  return t?.locked ? t.lock_id : null;
+}
+const fslFrom = n => n.locked && n.lock_id !== n.id ? n.lock_id : null;
+// one question for one or several nodes crossing the border (to: the target's lock, null = out of the locked folder)
+function fslAskMove(to, name, k) {
+  return askConfirm(to ? tr('Move into a locked folder?') : tr('Move out of the locked folder?'),
+    k === 1 && name ? (to ? tr('“{0}” is encrypted in your browser and moved. Its earlier versions are removed; the server and agents can no longer read it.', name)
+      : tr('“{0}” is decrypted in your browser and stored readable for the server again. Its earlier encrypted versions are removed.', name))
+      : (to ? trn('{0} item is encrypted in your browser and moved, folders with their content. Earlier versions are removed; the server and agents can no longer read them.', '{0} items are encrypted in your browser and moved, folders with their content. Earlier versions are removed; the server and agents can no longer read them.', k)
+        : trn('{0} item is decrypted in your browser and stored readable for the server again, folders with their content. Earlier encrypted versions are removed.', '{0} items are decrypted in your browser and stored readable for the server again, folders with their content. Earlier encrypted versions are removed.', k)),
+    {ok: tr('Move')});
+}
+// one file / an empty folder across the border: re-encrypted here (POST /api/files/lock/move)
+async function fslMoveOne(n, from, to, target) {
+  const fd = new FormData();
+  let f = null;
+  if (n.kind === 'file') {
+    if (from) { await fslKeys(from, true); f = await fslFileDec(from, await fslFetch({id: n.id, lock_id: from})); }
+    else { const r = await fetch(ab_url(n, true), {credentials: 'same-origin'}); if (!r.ok) throw fslErr(tr('File damaged or missing'), 'file'); f = {name: n.name, type: n.mime, data: new Uint8Array(await r.arrayBuffer())}; }
+  }
+  if (to) {
+    await fslKeys(to, true); const g = (await fslInfo(to, true)).gen;
+    fd.append('name', await fslNameEnc(to, n.name, g));
+    if (f) fd.append('file', new Blob([await fslFileEnc(to, {...f, name: n.name}, g)]), 'encrypted.kenc');
+  } else {
+    fd.append('name', n.name);
+    if (f) { fd.append('file', new Blob([f.data]), 'file'); fd.append('type', f.type); }
+  }
+  if (target) fd.append('parent_id', String(target));
+  await api('POST', `/api/files/lock/move/${n.id}`, fd);
+}
+// the nodes in folder id (outside the trash), names decrypted here (a sealed one stops the move: no key, nothing to write)
+async function fslKids(id) {
+  const j = await rawFetch('GET', `/api/files?parent=${id}`);
+  for (const k of j.items || []) { await fslPrepNode(k, true); if (k._sealed) throw fslErr(tr('You do not have the key of this folder yet.'), 'fs_lock_key'); }
+  return j.items || [];
+}
+async function fslNewFolder(to, target, name, n) {
+  if (to) return api('POST', '/api/files/lock/folder', {parent_id: target, name: await fslNameEnc(to, name)});
+  return api('POST', '/api/files/folders', target ? {parent_id: target, name} : {space: n.org_id ? 'org:' + n.org_id : 'private', name});
+}
+// 2.953 (#3348): a folder WITH its content across the border, every id kept (shares, links of the nodes stay):
+// a folder of the same name on the other side takes the content (each file re-encrypted, subfolders the same way), then the folder
+// itself crosses empty, then the content moves back into it and the helper folder goes. A step that fails stops: what moved stays
+// whole on its new side, the rest on the old one (both readable), the helper folder named "<name> (moving)".
+async function fslMoveNode(n, from, to, target, prog) {
+  if (n.kind !== 'folder') { await fslMoveOne(n, from, to, target); prog?.(); return; }
+  const kids = await fslKids(n.id);
+  if (!kids.length) { await fslMoveOne(n, from, to, target); prog?.(); return; }
+  const tmp = await fslNewFolder(to, target, tr('{0} (moving)', n.name), n);
+  for (const k of kids) await fslMoveNode(k, from, to, tmp.id, prog);
+  await fslMoveOne(n, from, to, target); prog?.();
+  for (const k of await rawFetch('GET', `/api/files?parent=${tmp.id}`).then(j => j.items || [])) await api('PATCH', `/api/files/nodes/${k.id}`, {parent_id: n.id});
+  try { await rawFetch('DELETE', `/api/files/nodes/${tmp.id}`); await rawFetch('DELETE', `/api/files/nodes/${tmp.id}?purge=1`); } catch { /* an empty folder in the trash */ }
+}
+// what the server refuses for a whole subtree, asked before the first step (fsl_movecheck)
+async function fslMoveCheck(n, target) {
+  if (n.kind !== 'folder') return null;
+  const j = await rawFetch('GET', `/api/files/lock/movecheck/${n.id}${target ? '?to=' + target : ''}`);
+  return j.block || null;
+}
+// 2.953 (#3348, review N16): the bar's Move / a drop of several nodes -- the ones crossing a locked folder's border go re-encrypted
+// here after ONE question; -> null (none crosses) | {cancel} | {rest: the nodes for the plain way, moved, skip}
+async function fsl_moveMany(xs, target) {
+  const to = await fslLockAt(target);
+  const cross = xs.filter(x => !(x.kind === 'folder' && x.lock_id === x.id) && fslFrom(x) !== to && (x.parent_id ?? null) !== (target || null));
+  if (!cross.length) return null;
+  if (!await fslAskMove(to, cross[0].name, cross.length)) return {cancel: true};
+  let moved = 0, skip = 0, done = 0;
+  const prog = () => { if (++done % 10 === 0) toast(tr('{0}: {1} done', tr('Moving'), done)); };
+  for (const x of cross) {
+    try {
+      const block = await fslMoveCheck(x, target);
+      if (block) { skip++; toast(block); continue; }
+      await fslMoveNode(x, fslFrom(x), to, target, prog); moved++;
+    } catch (e) { if (e instanceof Offline) { fslToast(e); break; } if (!e.shown) fslToast(e); skip++; }
+  }
+  return {rest: xs.filter(x => !cross.includes(x)), moved, skip};
 }
 
 // ------------------------------------------------------------------ locking and unlocking a folder (owner / organisation admins)
@@ -387,6 +493,51 @@ async function fslRelease(lid, uids) {
   delete FSL.info[lid];
   return j;
 }
+// 2.953 (#3348, like the knowledge spaces' wkeRotate): a new folder key (generation + 1) after someone lost
+// access, wrapped for everyone keeping the current one whose public key this browser knows (the others wait for the banner's
+// button); the automatic change does not wrap for a key this device sees for the first time (byHand: the button does). Then the
+// files and names are encrypted again with it (fslMigrate: todo / convert / finish in 'on').
+async function fslRotate(lid, byHand) {
+  if (!await e2eEnsure()) return false;
+  const info = await fslInfo(lid, true);
+  if (info.mode !== 'on' || !info.can_manage || !info.rotate) return false;
+  const cur = info.gen, gen = cur + 1;
+  if (!(info.keys || []).some(k => k.gen === cur)) throw fslErr(tr('You do not have the key of this folder yet.'), 'fs_lock_key');
+  await fslKeys(lid, true);
+  const people = (info.members || []).filter(m => m.has_keys && (m.key_gens || []).includes(cur));
+  if (!byHand && people.some(m => m.user_id !== S.me.id && LE2E.fresh.has(m.user_id))) return false;
+  const raw = e2eRand(32), keys = [];
+  try {
+    if (!people.some(m => m.user_id === S.me.id)) people.unshift({user_id: S.me.id});
+    for (const m of people) {
+      let pub;
+      try { pub = await fslPubFor(lid, m.user_id); } catch (e) { if (m.user_id === S.me.id || e instanceof Offline) throw e; continue; }  // -> waits for the key
+      keys.push({user_id: m.user_id, wrapped: await fslWrap(raw, lid, gen, m.user_id, pub)});
+    }
+    let j;
+    try { j = await rawFetch('POST', `/api/files/lock/${lid}/rotate`, {gen, keys}); }
+    catch (e) { if (e?.data?.code !== 'fs_lock_gen') throw e; delete FSL.info[lid]; return false; }  // another browser was faster
+    FSL.info[lid] = j;
+    (FSL.keys[lid] || (FSL.keys[lid] = {}))[j.gen] = await crypto.subtle.importKey('raw', raw, {name: 'AES-GCM'}, false, ['encrypt', 'decrypt']);
+  } finally { raw.fill(0); }
+  return true;
+}
+// the key change and the encryption with the new key, once (FSL.busy); -> true when something ran
+async function fslRekey(lid, byHand, onProg) {
+  if (FSL.busy[lid]) return false;
+  FSL.busy[lid] = 1;
+  try {
+    let info = await fslInfo(lid, true);
+    if (info.rotate && !await fslRotate(lid, byHand)) {
+      info = await fslInfo(lid, true);  // another browser changed it meanwhile, or a key seen here for the first time: the button
+      if (info.rotate) { FSL.rot[lid] = true; return false; }
+    }
+    delete FSL.rot[lid];
+    info = await fslInfo(lid, true);
+    if (info.reenc) { await fslKeys(lid, true); await fslMigrate(lid, onProg); }
+    return true;
+  } finally { delete FSL.busy[lid]; }
+}
 const fslProgToast = (what) => (done, total) => { if (total) toast(tr('{0}: {1} of {2}', what, done, total)); };
 async function fsl_lockDlg(n) {
   if (!fslOk()) { toast(tr('This browser cannot encrypt')); return; }
@@ -399,6 +550,8 @@ async function fsl_lockDlg(n) {
     [tr('Names and files of this folder are encrypted in your browser. The server, the operator, agents and API tokens cannot read them any more: no preview, no text recognition, no search on the server.'),
       `<b>${esc(tr('Warning: if you and everyone holding the key lose passphrase and recovery code, the content is lost permanently. Nobody can restore it, not even the operator.'))}</b>`,
       get.length ? tr('These people get the key with the lock: {0}', get.map(m => m.name).join(', ')) : '',
+      // 2.953 (#3348): tags are plain words the server reads -- they are removed with the lock
+      info.tagged ? trn('The tags of {0} file or folder in it are removed (the server could read them).', 'The tags of {0} files or folders in it are removed (the server could read them).', info.tagged) : '',
       without.length ? tr('Waiting for the key until they set up encryption: {0}', without.map(m => m.name).join(', ')) : ''].filter(Boolean).map(x => `<p>${x.startsWith('<b>') ? x : esc(x)}</p>`).join('')});
   if (!yes) return;
   try { await fslStart(n.id, fslProgToast(tr('Encrypting'))); } catch (x) { if (!x.shown) toast(tr('The folder stays open: {0}', x.message || '?')); ab_reload(); return; }
@@ -448,6 +601,12 @@ async function fsl_auto(d) {
     const info = await fslInfo(lid, true);
     if (!info.can_manage) return;
     if (info.mode !== 'on') { await fslResume(lid); ab_reload(); return; }
+    if (info.rotate || info.reenc) {  // 2.953 (#3348): someone lost access -- a new key, then the files with it
+      delete FSL.busy[lid];
+      const had = !!FSL.rot[lid];
+      if (await fslRekey(lid, false)) { toast(tr('The key of the folder was changed.')); ab_reload(); return; }
+      if (!had && FSL.rot[lid]) ab_draw();
+    }
     const w = (info.pending || []).filter(p => p.has_keys).map(p => ({user_id: p.user_id, name: p.name}));
     const was = (FSL.wait[lid] || []).map(p => p.user_id).join();
     FSL.wait[lid] = w;

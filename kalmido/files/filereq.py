@@ -43,7 +43,7 @@ from ..accounts.sharedefs import FRQ_DAYS_MAX, FRQ_FILES_MAX, FRQ_TYPES, sd_for 
 from ..lists.public import BOT_ERROR, PUB_CSP, pub_html, public_links_on
 from .store import fs_chain, fs_deleted, fs_role, fs_put, safe_fs_name, _now, _place
 from .fsroots import fs_area_folder_name  # 2.200.0 A (#2747, review 6)
-from .fslock import fsl_need_unlocked  # 2.353.0 A (#2758)
+from .fslock import fl_is_locked, fsl_need_unlocked  # 2.353.0 A (#2758)
 from ..tasks.attachments import EXEC_EXT  # 2.369.5 (#2517): pulled up from functions
 from .scan import SC_EXEC, _sc_magic  # 2.369.5 (#2517): pulled up from functions
 from .web import _names, _expiry  # 2.369.5 (#2517): pulled up from functions
@@ -131,6 +131,8 @@ def frq_alive(c, r):
         return False
     chain = fs_chain(c, r["node_id"])
     if not chain or fs_deleted(chain) or chain[0]["kind"] != "folder" or (chain[0]["org_id"] or None) != (r["org_id"] or None):
+        return False
+    if fl_is_locked(c, r["node_id"]):  # 2.953 (#3348, review N6): a folder locked since takes nothing from outside
         return False
     return fs_role(c, r["node_id"], r["created_by"], chain=chain) in ("owner", "edit")
 
@@ -288,6 +290,8 @@ def frq_update(rid):
         if not isinstance(b["revoked"], bool):
             raise Denied(400, tr("Invalid value: {0}", "revoked"))
         f["revoked_at"] = (r["revoked_at"] or _now()) if b["revoked"] else None
+        if r["revoked_at"] and not b["revoked"]:
+            fsl_need_unlocked(c, r["node_id"], "fs_locked_link")  # 2.953 (#3348, review N6): no way back into a locked folder
         if r["revoked_at"] and not b["revoked"] and fs_role(c, r["node_id"], r["created_by"]) not in ("owner", "edit"):
             # 2.649.0 (#5051, Fable 1): back only while its creator still writes there (the rule of frq_alive), else a
             # request revoked on leaving would open again on coming back
@@ -324,6 +328,7 @@ def frq_restore(rid):
     _gate()
     r, role = _row(c, rid)
     if r["deleted_at"]:
+        fsl_need_unlocked(c, r["node_id"], "fs_locked_link")  # 2.953 (#3348, review N6): the request comes back only into an open folder
         c.execute("UPDATE fs_upload_requests SET deleted_at=NULL WHERE id=?", (rid,))
     bump(c)
     c.commit()
