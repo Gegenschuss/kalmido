@@ -215,6 +215,11 @@ dbx("INSERT INTO video_comments(id, review_id, version_id, org_id, body, author_
     (VID, VER, ORG, BOB))
 dbx("INSERT INTO video_comments(id, review_id, version_id, org_id, body, author_id, created_at, deleted_at) VALUES(4, ?, ?, ?, 'Vor dem Stichtag', ?, '2026-11-01T09:00:00+00:00', '2026-11-02T10:00:00+00:00')",
     (VID, VER, ORG, BOB))
+# review 2.981 (Fable F1): the old table deleted only the comment's row - its answers stayed live; they share its deletion now
+dbx("INSERT INTO video_comments(id, review_id, version_id, org_id, parent_id, body, author_id, created_at) VALUES(5, ?, ?, ?, 3, 'Antwort auf geloescht', ?, '2026-11-01T10:00:00+00:00')",
+    (VID, VER, ORG, BOB))
+dbx("INSERT INTO video_comments(id, review_id, version_id, org_id, parent_id, body, author_id, created_at) VALUES(6, ?, ?, ?, 4, 'Antwort vor Stichtag', ?, '2026-11-01T10:00:00+00:00')",
+    (VID, VER, ORG, BOB))
 dbx("INSERT INTO doc_notes(org_id, ws, node_id, user_id, author, text, source, created_at) VALUES(?, ?, ?, NULL, 'Paul Paperless', 'Altnotiz', 'paperless', '2026-11-01T08:00:00+00:00')",
     (OB, f"o{OB}", DN))
 box("pass")  # the next start of the app
@@ -230,6 +235,16 @@ gone = dbx("SELECT x.body FROM obj_comment_trash x JOIN obj_comments k ON k.id=x
 bodies = [g[0] for g in gone]
 check("Alt geloescht" in bodies and "Vor dem Stichtag" not in bodies,
       f"a deleted comment keeps its text in the trash, one deleted before the clean-up of #5263 is left out {bodies}")
+# review 2.981 (Fable F1): the answer of a deleted comment goes into the trash with it (text kept, under its comment), the
+# answer of a comment left out is left out too - never a live top comment, never without end in the database
+ra = dbx("""SELECT k.deleted_at IS NOT NULL, k.parent_id IS NOT NULL, x.body FROM obj_comments k
+            LEFT JOIN obj_comment_trash x ON x.comment_id=k.id WHERE k.kind='video' AND k.ref_id=? AND x.body='Antwort auf geloescht'""", (VID,))
+check(ra and ra[0][0] is True and ra[0][1] is True, f"the answer of a deleted comment moved into the trash with it {ra}")
+rb = dbx("""SELECT k.id FROM obj_comments k LEFT JOIN obj_comment_trash x ON x.comment_id=k.id
+            WHERE k.kind='video' AND k.ref_id=? AND (k.body='Antwort vor Stichtag' OR x.body='Antwort vor Stichtag')""", (VID,))
+check(not rb, f"the answer of a comment cleaned up by #5263 is left out of the move {rb}")
+r = Bo.get(B + f"/api/obj/video/{VID}/comments")
+check(r.ok and "Antwort auf geloescht" not in r.text and "Antwort vor Stichtag" not in r.text, f"neither answer shows live {r.status_code} {r.text[:200]}")
 nt = dbx("SELECT ext_name, extra->>'source', body, user_id FROM obj_comments WHERE kind='doc_note' AND ref_id=? AND ext_name='Paul Paperless'", (DN,))
 check(nt and nt[0][1] == "paperless" and nt[0][2] == "Altnotiz" and nt[0][3] is None, f"the note moved with its name and source {nt}")
 r = Bo.get(B + NB)

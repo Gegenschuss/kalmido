@@ -170,6 +170,11 @@ cm = kt.dbx("SELECT body, created_at, user_id, ext_name FROM obj_comments WHERE 
 check(len(cm) == 2 and cm[0][0].startswith("@octocat on 2026-09-02:") and "I can reproduce" in cm[0][0] and cm[0][1].startswith("2026-09-02")
       and cm[1][0].startswith("@ghost on 2026-09-03:") and cm[0][2] is None and cm[0][3] == "octocat" and cm[1][3] == "ghost",
       f"comments with author line and their date, no account as author, the remote author's name: {cm}")
+# review 2.981 (Fable F5): the agent sees such a comment as synced from the git host, never as a customer's
+r = requests.get(B + f"/api/v1/tasks/{T1}/comments", headers={"Authorization": "Bearer " + AGTOK, "X-Requested-With": "kalmido"})
+au = [x["author"] for x in (r.json().get("data") or [])] if r.ok else []
+check(r.ok and len(au) == 2 and all(a.get("source") == "git" and not a.get("customer") and a["name"] in ("octocat", "ghost") for a in au),
+      f"v1: a git comment says source git, no customer: {r.status_code} {au}")
 t2 = kt.dbx("SELECT status, completed_at FROM tasks WHERE tt_id=?", (f"github:{GID}:2",))
 check(t2 and t2[0][0] == 2 and str(t2[0][1]).startswith("2026-09-04"), f"closed = done with its date: {t2}")
 check(not kt.dbx("SELECT 1 FROM tasks WHERE tt_id=?", (f"github:{GID}:3",)), "the pull request did not become a task")

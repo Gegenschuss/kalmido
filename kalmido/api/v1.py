@@ -1699,7 +1699,10 @@ def v1_comment(c, d, names):
     au = c.execute("SELECT kind FROM users WHERE id=?", (d["user_id"],)).fetchone() if d["user_id"] else None
     return {"id": d["id"], "task_id": d.get("task_id"),
             "author": {"id": d["user_id"], "name": names.get(d["user_id"], "") or d.get("ext_name") or "", "agent": bool(au and au["kind"] == "agent"),
-                       **({"customer": True} if d.get("ext_name") else {})},  # 2.50.0 (#329): a customer's comment through the public link
+                       # 2.50.0 (#329): a customer's comment through the public link; review 2.981 (Fable F5): a comment synced
+                       # from the git host (source git, #5274) is no customer's, it says its source
+                       **({"customer": True} if d.get("ext_name") and d.get("source") != "git" else {}),
+                       **({"source": d["source"]} if d.get("source") else {})},
             "reactions": d.get("reactions") or [], "suggestion": d.get("suggestion"),
             "body": d["body"], "text": comment_plain(c, d["body"]), "mentions": d["mentions"], "created_at": d["created_at"],
             "edited_at": d["edited_at"], "attachments": [{k: a[k] for k in ("id", "name", "mime", "size")} for a in d["attachments"]],
