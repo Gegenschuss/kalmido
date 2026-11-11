@@ -1,6 +1,28 @@
 {
  "versions": [
   {
+   "version": "2.897.0",
+   "date": "2026-11-11",
+   "items": [
+    {
+     "de": "Dateien, Wissen und Lesen starten mit einer ruhigen Liste: Zuletzt bearbeitet, Privat, deine Organisationen und Geteilt.",
+     "en": "Files, Knowledge and Reading start with a calm list: Recently edited, Private, your organisations and Shared."
+    },
+    {
+     "de": "Zuletzt bearbeitet hat eine eigene Seite mit Filtern nach Bereich.",
+     "en": "Recently edited has its own page with filters by workspace."
+    },
+    {
+     "de": "In der Dokument-Ansicht blätterst du am Handy jetzt mit einem Wisch überall in der Maske, auch auf den Feldern.",
+     "en": "In the document view on the phone you now leaf with a swipe anywhere, also on the fields."
+    },
+    {
+     "de": "Die Vorschau eines Dokuments steht sofort in ihrer richtigen Größe und springt beim Laden nicht mehr.",
+     "en": "A document's preview stands at its right size at once and no longer jumps while loading."
+    }
+   ]
+  },
+  {
    "version": "2.883.0",
    "date": "2026-11-11",
    "items": [
