@@ -486,9 +486,11 @@ def _wkh_old_ts(v, fallback):
 
 def _wkh_old_body(c, v, keys):
     """The body of an old row sealed for obj_versions (the same key of its space, the context OBJV_CTX); None when a sealed
-    text cannot be opened now (it stays in wiki_versions for the next start)."""
+    text cannot be opened now (it stays in wiki_versions for the next start). Fable review F7: a value without the whole
+    shape of a sealed text (wsb_sealed_shape) is no ciphertext -- it moves unchanged, and wkh_open decides at reading as for
+    the old table (shown as text while sealing is off, unreadable while on), instead of holding wiki_versions for ever."""
     body = v["body"] or ""
-    if not oc_is_enc(body) or le2e_is_cipher(body):
+    if not oc_is_enc(body) or le2e_is_cipher(body) or not wsb_sealed_shape(body):
         return body
     sid = wkh_sid(v["org_id"], v["owner_id"])
     if sid not in keys:

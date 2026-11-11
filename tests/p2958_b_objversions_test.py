@@ -170,7 +170,8 @@ old = [(900001, P, K, None, "Handbuch/Alt", "Alter Klartext", 14, ALICE, T0, T0,
        (900002, P, K, None, "Handbuch/Alt", SEAL, 24, BOB, T1, T1, None),
        (900003, P, K, None, "Handbuch/Alt", "Gehaltener Stand", 16, ALICE, T1, T1, HELD),
        (900004, FP, None, FE, "Tagebuch", "Alter privater Stand", 20, FE, T0, T0, None),
-       (900005, P, K, None, "Handbuch/Alt", "kenc1:" + "A" * 48, 9, ALICE, T1, T1, None)]  # cannot be opened (no valid tag)
+       (900005, P, K, None, "Handbuch/Alt", "kenc1:" + "A" * 48, 9, ALICE, T1, T1, None),  # cannot be opened (no valid tag)
+       (900000, FP, None, FE, "Tagebuch", "kenc1: kein Siegel, nur so begonnen", 35, FE, T0, T0, None)]  # F7: plain, no sealed shape
 for x in old:
     sql(OLD_INS, x, write=True)
 restart()
@@ -178,6 +179,9 @@ A, Bo, Fe = sess("alice"), sess("bob"), sess("fred")
 check(old_table(), "start check: a row that cannot be opened keeps wiki_versions (nothing dropped)")
 check(f"{LABEL}: 1 old row(s) of wiki_versions cannot be opened now" in logs(), "start check: the log names the row left")
 check(sql("SELECT id FROM wiki_versions") == [(900005,)], f"start check: only that row stays {sql('SELECT id FROM wiki_versions')}")
+# 2.958.0 (#5281, Fable review F7): a plain text that only starts like a sealed one moved unchanged (it held the table before)
+check(sql("SELECT body FROM obj_versions WHERE id=900000") == [("kenc1: kein Siegel, nur so begonnen",)],
+      f"F7: the plain text starting with kenc1: moved unchanged {sql('SELECT body FROM obj_versions WHERE id=900000')}")
 mv = {x[0]: x for x in vrows(P)}
 check({900001, 900002, 900003} <= set(mv) and [mv[i][1] for i in (900001, 900002, 900003)] == [4, 5, 6],
       f"moved with their ids and the next numbers of the page {sorted(mv.values())}")
