@@ -3604,23 +3604,7 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/wiki/wkhist.py",
-   "code": "for r in c.execute(f\"SELECT left(body, 6) AS p, COUNT(*) AS n FROM {t} WHERE body<>'' AND left(body, 5)<>'e2e1:' GROUP BY left(body, 6)\"):",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/wiki/wkhist.py",
    "code": "now = c.execute(f\"SELECT org_id, owner_id, body FROM {table} WHERE id=?\", (r[\"id\"],)).fetchone()",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/wiki/wkhist.py",
-   "code": "rows = c.execute(f\"SELECT id, org_id, owner_id, body FROM {table} WHERE id>? AND body<>'' ORDER BY id LIMIT {WKH_BATCH}\",",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296

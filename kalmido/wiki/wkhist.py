@@ -37,7 +37,7 @@ from ..core.db import body, bump, db, iso_ms, now_utc
 from ..core import objhooks  # 2.958.0 (#5281): START (wkh_retire)
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import OrgCryptError, PREFIX, _aad, _b64u, oc_active_for, oc_dec_k, oc_is_enc, oc_key, oc_user_space
-from ..core.pg import system_ctx, table_columns, table_exists, ts_canon, write_lock
+from ..core.pg import qi, system_ctx, table_columns, table_exists, ts_canon, write_lock
 from ..core.kernretire import KERN_RETIRE_LOCK, kern_retire  # 2.958.0 (#5281): wkh_retire
 from ..notify.alerts import aa_now  # 2.958.0 (#5281): the admins' alert of wkh_retire
 from ..core.objversions import (OBJV_CTX, obj_version_add, obj_version_drop, obj_version_get,  # 2.958.0 (#5281)
@@ -53,6 +53,7 @@ from .wikie2e import wke_page_mode, wke_denied  # 2.369.5 (#2517): pulled up fro
 
 WKH_CTX, WKH_VCTX = "wiki_pages.body", OBJV_CTX  # 2.958.0 (#5281): a version's text is sealed as a row of obj_versions
 WKH_OLD_VCTX = "wiki_versions.body"  # 2.958.0 (#5281): the context of the old table, read once by wkh_retire
+WKH_TABLES = ("wiki_pages", "obj_versions")  # 2.958.0 (#5281): the tables of the passes (wkh_settle, wkh_count; qi)
 WKH_MERGE = 600     # seconds: saves of the same person within this time share a version
 WKH_KEEP = 100      # versions per page
 WKH_BATCH = 200
@@ -413,7 +414,7 @@ def wkh_settle(c, plain=None, stop=None):
                 return out
             with system_ctx(c):  # orgcrypt: server-side bulk work over every space, never content handed to a person
                 write_lock(c, "orgcrypt")
-                rows = c.execute(f"SELECT id, org_id, owner_id, body FROM {table} WHERE id>? AND body<>''{only} ORDER BY id LIMIT {WKH_BATCH}",
+                rows = c.execute(f"SELECT id, org_id, owner_id, body FROM {qi(table, WKH_TABLES)} WHERE id>? AND body<>''{only} ORDER BY id LIMIT {WKH_BATCH}",
                                  (last,)).fetchall()
                 for r in rows:
                     v, sid = r["body"], wkh_sid(r["org_id"], r["owner_id"])
@@ -462,7 +463,7 @@ def wkh_count(c):
     out = {"sealed": 0, "plain": 0}
     with system_ctx(c):  # orgcrypt: counts only
         for t, only in (("wiki_pages", ""), ("obj_versions", f" AND kind='{WKH_KIND}'")):  # 2.958.0 (#5281)
-            for r in c.execute(f"SELECT left(body, 6) AS p, COUNT(*) AS n FROM {t} WHERE body<>'' AND left(body, 5)<>'e2e1:'{only} GROUP BY left(body, 6)"):
+            for r in c.execute(f"SELECT left(body, 6) AS p, COUNT(*) AS n FROM {qi(t, WKH_TABLES)} WHERE body<>'' AND left(body, 5)<>'e2e1:'{only} GROUP BY left(body, 6)"):
                 out["sealed" if r["p"] == PREFIX else "plain"] += int(r["n"])
     return out
 
