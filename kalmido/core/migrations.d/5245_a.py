@@ -26,6 +26,9 @@ the group count is the number of rows the copy will make):
 
 What has no way back: the rows of folder_people (the folder nodes' shares hold the same people and roles) and of group_shares
 (copied forward first; a row of the basket or of a folder path without a node gave nothing and is lost). A folder's group
-share now gives a folder role (frole: a person removed from one project by hand stays out, list_folder_skip) instead of grole."""
+share now gives a folder role (frole: a person removed from one project by hand stays out, list_folder_skip) instead of grole.
+A folder's group share lives on the folder's nodes, one per workspace tree; a node made later at the same path of the same owner
+(the first project there in another workspace) takes the group shares of its namesakes (lffolder._path_node, Fable review F9),
+like the old row (owner, folder) reached every tree. A person's folder share does not follow that way (as since 2.352.0)."""
 # drop-ok folder_people: stage 7d of the shared core (#5245, decided 08.11.2026), a mirror of the folder nodes' shares; lists/lkretire.py lk_retire drops it after the start check
 # drop-ok group_shares: stage 7d of the shared core (#5245, decided 08.11.2026), group shares are fs_shares rows of the nodes; lists/lkretire.py lk_retire drops it after the start check

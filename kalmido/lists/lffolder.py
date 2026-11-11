@@ -53,7 +53,7 @@ from ..core.config import app
 from ..core.access import Denied, acx_of, joined_lists_sql, live_sql, qn_is, reading_ids, reading_sql  # 2.477.0 (#3881): + qn_is
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc, uset, usettings
 from ..core.i18n import N_, lang, tr
-from ..core.pg import system_ctx, table_exists
+from ..core.pg import st_ids, system_ctx, table_exists
 from ..accounts.orgroles import FULL_WRITE, org_role_key, org_writes
 from ..accounts.orgs import user_orgs, ws_member_problem
 from ..accounts.session import me
@@ -159,6 +159,29 @@ def _child_folder(c, parent, owner, name):
     return r[0] if r else None
 
 
+def _group_shares_adopt(c, nid, owner, path):
+    """2.958.0 (#5245, Fable review F9): a folder node just made at owner's path (the first project there in another workspace)
+    takes the live group shares of its namesakes (owner's folder nodes at the same path in the other trees; per group the highest
+    list role) -- like the old row (owner, folder) of group_shares, which reached that path in every tree. A person's folder
+    share does not follow this way (as since 2.352.0)."""
+    others = [f["id"] for f in lf_folder_nodes(c, owner, path) if f["id"] != nid]
+    if not others:
+        return 0
+    best = {}
+    with system_ctx(c):
+        for r in c.execute("""SELECT group_id, role, list_role, created_by FROM fs_shares WHERE node_id = ANY(CAST(? AS BIGINT[]))
+                              AND group_id IS NOT NULL AND COALESCE(list_own, 0)=0 AND (expires_at IS NULL OR expires_at > ?)
+                              ORDER BY id""", (st_ids(sorted(others)), _now())).fetchall():
+            role = r["list_role"] if r["list_role"] in LIST_ROLES else ("edit" if r["role"] == "edit" else "view")
+            if r["group_id"] not in best or _RANK[role] > _RANK[best[r["group_id"]][0]]:
+                best[r["group_id"]] = (role, r["created_by"])
+        for gid, (role, by) in sorted(best.items()):
+            c.execute("INSERT INTO fs_shares(node_id,group_id,role,list_role,created_by,created_at) VALUES(?,?,?,?,?,?)",
+                      (nid, gid, "edit" if role in ("admin", "edit") else "view", role, by or owner, _now()))
+            _log(c, nid, "share", f"group:{gid}:{role}")
+    return len(best)
+
+
 def _path_node(c, root, owner, org, path, create=True):
     """The folder node of owner's path below root (created when missing; None when missing and not create)."""
     cur = root
@@ -172,6 +195,7 @@ def _path_node(c, root, owner, org, path, create=True):
             x = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at)
                                 VALUES(?,?,?,?,?,?,?,?)""", (cur, "folder", nm, owner, org, owner, ts, ts))
             _log(c, x, "create")
+            _group_shares_adopt(c, x, owner, "/".join(_parts(path)[:i + 1]))
         cur = x
     return cur
 

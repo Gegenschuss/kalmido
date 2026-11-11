@@ -128,6 +128,19 @@ check(r.ok and [x["group_id"] for x in r.json()["groups"]] == [G] and sees(S["do
 check(A.delete(B + f"/api/folders/groups/{G}", params={"folder": "Pier"}).ok and not sees(S["dora"], LF), "the folder's group share ends")
 check(A.delete(B + f"/api/folders/groups/{G}", params={"folder": "Pier"}).status_code == 404, "a second time: 404")
 
+# ---------------------------------------------------------------- (3b) Fable review F9 / F4 / F8
+# F9: a folder node made later at the same path (the first project there in another workspace) takes the folder's group shares
+LB = new_list(A, "Bay plan", "Bay")
+check(A.put(B + f"/api/folders/groups/{G}", json={"folder": "Bay", "role": "edit"}).ok, "alice shares her folder Bay with the group")
+r = A.post(B + "/api/lists", json={"name": "Bay notes", "folder": "Bay", "org_id": None})
+check(r.ok, "setup: alice's private project in Bay (her own tree) " + r.text[:200])
+LBP = r.json()["id"]
+bay = dbx("SELECT id FROM fs_nodes WHERE kind='folder' AND name='Bay' AND owner_id=? AND deleted_at IS NULL", (ALICE,))
+check(len(bay) == 2, f"setup: Bay is a folder node in two trees {bay}")
+gb = dbx("""SELECT s.node_id, s.list_role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='folder' AND n.name='Bay'
+            AND n.owner_id=? AND s.group_id=? AND COALESCE(s.list_own, 0)=0 ORDER BY s.node_id""", (ALICE, G))
+check(len(gb) == 2 and {x[1] for x in gb} == {"edit"}, f"F9: the new Bay node carries the group's share too (as the old row (owner, folder) did) {gb}")
+check(lgroups(LBP) == [(G, "edit", "Bay")], f"F9: the private project names the folder's group share {lgroups(LBP)}")
 # ---------------------------------------------------------------- (4) a person without an organisation
 FID, Fr = freelancer(B, A)
 r = Fr.post(B + "/api/lists", json={"name": "Sketches", "folder": "Studio"})
