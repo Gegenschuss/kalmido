@@ -18,7 +18,7 @@ Interface:
 from flask import g
 
 from ..collab.liste2e import LE2EDenied
-from ..collab.liste2eguard import le2b_list_locked, le2b_task_locked
+from ..collab.liste2eguard import le2b_list_locked, le2b_scrub_undo, le2b_task_locked  # #5582: + le2b_scrub_undo
 from ..core.access import list_role, need_time
 from ..core.errors import Denied
 from ..core.i18n import N_, tr
@@ -105,6 +105,16 @@ def teu_need(c, uid, rid, oid):
 undo_need_reg(TEU_KIND, teu_need)
 
 
+def teu_scrub_moved(c, eid, lid, tid):
+    """#5582 (review of 2.900, finding 3): an entry moved by a save into a locked project (or onto a task of one): its older
+    steps (changes and a delete taken back) hold the note and task title of before in their copies -> they go, as the lock
+    drops them for the entries already there (collab/liste2eguard.py le2b_scrub_undo_free). The step of this save is recorded
+    after it. The caller commits."""
+    if not _locked(c, lid, tid):
+        return 0
+    return le2b_scrub_undo(c, "kind IN (?, ?) AND ref_id=?", (TEU_KIND, TEU_LIFE, int(eid)))
+
+
 def teu_deleted(c, uid, row):
     """The diff part of a deleted finished entry (row = the row as it was)."""
     if undo_person(c) is None or row is None or row["end"] is None:
@@ -129,6 +139,11 @@ def teu_life_run(c, uid, eid, data, redo):
     now = c.execute("SELECT * FROM time_entries WHERE id=?", (int(eid),)).fetchone()
     tsl_check(c, uid, row.get("start"))
     if redo:
+        if now is not None and _locked(c, now["list_id"], now["task_id"]):
+            # #5582 (review of 2.900, finding 4): in a locked project now (the lock emptied the note): compared and kept
+            # without its plain texts, as the undo branch writes it back
+            row.update(note="", task_title="")
+            data = {**data, "row": {**(data.get("row") or {}), "note": "", "task_title": ""}}
         if now is None or now["billed_doc_id"] or not _same(now, row):
             raise Denied(409, tr(TEU_GONE))
         c.execute("DELETE FROM time_entries WHERE id=? AND billed_doc_id IS NULL", (int(eid),))
