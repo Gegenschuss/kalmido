@@ -41,6 +41,7 @@ from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from func
 from ..hub.absence import ABS_STATES  # 2.369.5 (#2517): pulled up from functions
 from ..lists.lists import LIST_COLOR_RE  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.modcards import MC_ICON_RE, MC_NAME_MAX, mc_mods  # 2.575.0 (#3778)
+from .oi_store import _st as oi_store_st  # 2.924.0 (#5069): the archive's channel nodes waiting for their room
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
 _W_PEOPLE = N_("Entries of people who were not selected were not imported: {0}")
@@ -130,15 +131,38 @@ def _room(c, run, src, d, ctx):
 
 
 def _room_after(c, run, src, nid, ctx):
-    """2.362.0 (#3092): the importing person is the first member of an imported channel (it would be invisible to them)."""
-    if src.get("kind") == "channel":
-        c.execute("INSERT INTO tchat_members(room_id,user_id,added_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
-                  (nid, ctx.uid, ctx.uid, iso(now_utc())))
+    """2.362.0 (#3092): the importing person is the first member of an imported channel (it would be invisible to them).
+    2.924.0 (#5069): the members are shares of the room's reference node in the shared core (tchat_members is no member
+    table any more): the node is set at once -- the archive's node of this channel (admin/oi_store.py, it came with the store
+    and waits in _CORE_LATE) points at the new room now, else the share below makes one (recorded for the undo)."""
+    if src.get("kind") != "channel":
+        return
+    from ..collab.tcxcore import TCX_KIND, tcx_core_add
+    with system_ctx(c):  # the node of the target's room is structure (the import made the room)
+        for sid, kind, ref in oi_store_st(run).get("refs") or []:
+            if kind == TCX_KIND and _oid(ref) == _oid(src.get("id")) and run.m("fs_nodes", sid) \
+                    and not c.execute("SELECT 1 FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (TCX_KIND, nid)).fetchone():
+                c.execute("UPDATE fs_nodes SET ref_id=? WHERE id=? AND kind='ref' AND ref_kind=? AND ref_id IS NULL",
+                          (nid, run.m("fs_nodes", sid), TCX_KIND))
+        had = c.execute("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (TCX_KIND, nid)).fetchone()
+    tcx_core_add(c, nid, ctx.uid, ctx.uid)
+    if not had:
+        with system_ctx(c):  # read the node the share above just made (structure of the import, recorded for the undo)
+            n = c.execute("SELECT id, org_id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (TCX_KIND, nid)).fetchone()
+        if n:
+            run.created["oi"].append(["fs_nodes", n["id"], n["org_id"]])
 
 
 def _room_member(c, run, src, d, ctx):
-    """2.362.0 (#3092): a member of a channel (the importing person is one already: _room_after)."""
-    return False if d.get("user_id") == ctx.uid else d
+    """2.362.0 (#3092): a member of a channel (the importing person is one already: _room_after). 2.924.0 (#5069): an archive
+    of a version before 2.924 names them in chat/members.json -- they become shares of the room's node (made at once by
+    _room_after), never a row of the old table; later archives carry the shares with the node (store/shares.json)."""
+    room, who = run.m("tchat_rooms", src.get("room_id")), d.get("user_id")
+    if room and who and who != ctx.uid:
+        from ..collab.tcxcore import tcx_core_add
+        tcx_core_add(c, room, who, ctx.uid)
+        run.count("tchat_members")
+    return False
 
 
 def _chat_file(c, run, src, d, ctx):
@@ -833,8 +857,10 @@ SPECS = [
     # 2.362.0 (#3092): + the organisation's channels with their members and the files of the messages
     OiT("chat/channels.json", "tchat_rooms", refs={"list_id": "lists"}, people={"created_by": "null"}, space=(), label=N_("Team chat"),
         prep=_room, after=_room_after),
-    OiT("chat/members.json", "tchat_members", refs={"room_id": "tchat_rooms"}, need=("room_id",), people={"user_id": "member", "added_by": "null"},
-        space=(), rid=False, label=N_("Team chat"), prep=_room_member),
+    # 2.924.0 (#5069): the members of an older archive as core shares (_room_member writes them; node_id 0 only lets the row through
+    # to it, nothing is inserted)
+    OiT("chat/members.json", "fs_shares", refs={"room_id": "tchat_rooms"}, need=("room_id",), people={"user_id": "member", "added_by": "null"},
+        space=(), rid=False, label=N_("Team chat"), prep=_room_member, fixed={"node_id": 0}),
     # 2.278.0 B (#3094): thread_of (the thread's first message) mapped like reply_to, never the old id
     OiT("chat/messages.json", "tchat_msgs", refs={"room_id": "tchat_rooms", "task_id": "tasks"}, need=("room_id",),
         people={"user_id": "null", "pinned_by": "null"}, late={"reply_to": "tchat_msgs", "thread_of": "tchat_msgs"}, space=(), enc=False, label=N_("Team chat"),

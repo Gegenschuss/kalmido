@@ -4,12 +4,11 @@ the core (core/objects.py, docs/dev/kern.md).
 - The room (a row of tchat_rooms, kind 'channel' | 'group') is registered with listed=False: its reference node only carries
   its members as shares (fs_shares: a person, an agent, a group) -- it lies in no folder and the file store never shows it.
   Direct messages and list conversations are no objects of the core (their rule is the pair / the list).
-- Members: every way in (create, add, join, the import) writes the share AND the old row of tchat_members; every way out
-  (leave, remove, a person's agents along, leaving the organisation, a role going down, the retirement) takes both
-  (the shares into obj_revoked: restorable). tchat_members stays the reader fallback until stage 7; tcx_core_sync at every
-  start copies its rows forward (also what an older version added after a rollback) and takes back the person / agent shares
-  whose row an older version removed -- the fallback never opens what the core took away, and the core never what the
-  fallback lost.
+- Members: every way in (create, add, join, the import) writes the share; every way out (leave, remove, a person's agents
+  along, leaving the organisation, a role going down, the retirement) takes it (into obj_revoked: restorable).
+  2.924.0 (#5069, stage 7a, one-way): the core alone decides -- the old table tchat_members (2.565.0 to 2.923: the reader
+  fallback, kept in step) is neither read nor written. tcx_core_copy, once at a start (flag migr_tcx5069): every channel /
+  group with old rows and without a node gets one, every old row without a share gets one; nothing is taken back.
 - A group (lists/groups.py, the admin's groups) as subject: a channel shared with a group has every member of the group as a
   member while they qualify: an enabled person, for an organisation's channel a full member of that organisation (member /
   admin / read-only -- a guest or an accounting member needs a personal invitation, the rule of the open channels). Group
@@ -21,19 +20,19 @@ the core (core/objects.py, docs/dev/kern.md).
 
 Interface:
   TCX_KIND = 'tchat_room'
-  tcx_core_add(c, rid, uid, actor)          uid (a person or an agent) joins room rid: share + tchat_members row
-  tcx_core_take(c, rid, uids, actor, reason='unshare')   they leave: shares into obj_revoked, rows deleted
+  tcx_core_add(c, rid, uid, actor)          uid (a person or an agent) joins room rid: the share of its node
+  tcx_core_take(c, rid, uids, actor, reason='unshare')   they leave: shares into obj_revoked
   tcx_core_group_put(c, rid, gid, actor) / tcx_core_group_take(c, rid, gid, actor) -> bool
   tcx_core_groups(c, rids) -> {room id: [group ids]}
   tcx_core_members_sql() -> SQL (room_id, user_id, via): via = the group id (0 = a personal share)
   tcx_core_rooms_sql(uid) -> SQL of the room ids uid is a member of through the core (person, agent, group)
-  tcx_core_sync(c) -> {added, taken, nodes}   every start (core/db.py init_db)
+  tcx_core_copy(c) -> {nodes, added}   once at a start (core/db.py init_db, flag migr_tcx5069; 2.924.0, #5069)
 """
 from ..core import objhooks  # 2.565.0: START (core/db.init_db runs the forward copy)
 from ..core.db import iso, now_utc
 from ..core.i18n import N_
-from ..core.objects import _take as obj_take_rows, obj_member_put, obj_member_take, obj_register, obj_share_rows_sql
-from ..core.pg import system_ctx
+from ..core.objects import obj_member_put, obj_member_take, obj_register, obj_share_rows_sql
+from ..core.pg import system_ctx, table_exists
 from .teamchan import tcx_can_manage, tcx_members, tcx_room_ok  # loaded before (kalmido/__init__.py ORDER)
 
 TCX_KIND = "tchat_room"
@@ -42,16 +41,15 @@ _KINDS = ("channel", "group")
 
 def _space(c, rid):
     """(org_id | None, owner) of a channel / group: the owner of its node is who made it, else the node's owner now, else
-    its first person (fs_nodes.owner_id); None for a direct message / list conversation (no object of the core)."""
+    its first person (fs_nodes.owner_id; 2.924.0, #5069: no old member rows read any more); None for a direct message / list
+    conversation (no object of the core)."""
     r = c.execute("SELECT kind, org_id, created_by FROM tchat_rooms WHERE id=?", (int(rid),)).fetchone()
     if not r or r["kind"] not in _KINDS:
         return None
     owner = r["created_by"]
     if not owner:
         with system_ctx(c):  # who keeps the node of a room whose maker is gone (structure)
-            x = c.execute("SELECT owner_id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (TCX_KIND, int(rid))).fetchone() \
-                or c.execute("SELECT m.user_id FROM tchat_members m JOIN users u ON u.id=m.user_id WHERE m.room_id=? "
-                             "AND COALESCE(u.kind,'')!='agent' ORDER BY m.created_at, m.user_id LIMIT 1", (int(rid),)).fetchone()
+            x = c.execute("SELECT owner_id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (TCX_KIND, int(rid))).fetchone()
         owner = x[0] if x else None
     return (r["org_id"] or None, owner)
 
@@ -103,21 +101,18 @@ def _key(c, uid):
 
 
 def tcx_core_add(c, rid, uid, actor):
-    """uid joins channel / group rid (the caller checked tcx_may_add / joining): the core's share and the fallback row."""
+    """uid joins channel / group rid (the caller checked tcx_may_add / joining): the core's share (2.924.0, #5069: alone)."""
     obj_member_put(c, actor, TCX_KIND, rid, _key(c, uid), uid, "edit")
-    c.execute("INSERT INTO tchat_members(room_id,user_id,added_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
-              (rid, uid, actor, iso(now_utc())))
 
 
 def tcx_core_take(c, rid, uids, actor, reason="unshare"):
-    """uids leave room rid: their shares go into obj_revoked (restorable), their fallback rows go. Returns the shares taken."""
+    """uids leave room rid: their shares go into obj_revoked (restorable). Returns the shares taken."""
     uids = sorted({int(u) for u in uids or ()})
     if not uids:
         return 0
     n = 0
     for key in ("user_id", "agent_id"):
         n += obj_member_take(c, actor, TCX_KIND, rid, key, uids, reason)
-    c.execute(f"DELETE FROM tchat_members WHERE room_id=? AND user_id IN ({','.join('?' * len(uids))})", (rid, *uids))
     return n
 
 
@@ -141,24 +136,34 @@ def tcx_core_groups(c, rids):
     return out
 
 
-# ---------------------------------------------------------------- every start
-def tcx_core_sync(c):
-    """Keeps the core's shares and tchat_members in step (module docstring), inside init_db's transaction: rows of
-    tchat_members without a share get one (the copy forward of 2.565.0, and what an older version added); person / agent
-    shares of a room without their row lose it (an older version removed them; into obj_revoked). Group shares stay."""
+# ---------------------------------------------------------------- once at a start (2.924.0, #5069: stage 7a)
+TCX_OLD = "tchat_members"
+TCX_COPY_FLAG = "migr_tcx5069"  # the forward copy ran (once: the writers no longer keep the old rows, a second copy would reopen)
+
+
+def tcx_core_copy(c):
+    """The forward copy, once, inside init_db's transaction (objhooks.START with its flag, like events/evkern.py ev_kern_copy):
+    every channel / group with old member rows and without a node gets one (owner: its maker, else its first person, else the
+    owner of an agent in it, else an admin of its organisation), every old row without a share gets one (a person's / an
+    agent's, role edit, its added_by / created_at). Nothing is taken back: since 2.565.0 every way out took both, and the
+    start of 2.565 to 2.923 (tcx_core_sync) took a share whose row was gone. {nodes, added}; {} without the old table."""
+    if not table_exists(c, TCX_OLD):
+        return {}
     ts = iso(now_utc())
-    nodes = c.execute("""INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,ref_kind,ref_id,created_by,created_at,updated_at)
-                         SELECT NULL, 'ref', CASE WHEN r.name != '' THEN r.name ELSE 'Team chat' END,
-                                COALESCE(r.created_by, (SELECT m.user_id FROM tchat_members m JOIN users u ON u.id=m.user_id
-                                                        WHERE m.room_id=r.id AND COALESCE(u.kind,'')!='agent'
-                                                        ORDER BY m.created_at, m.user_id LIMIT 1)),
-                                r.org_id, ?, r.id, r.created_by, ?, ?
-                         FROM tchat_rooms r WHERE r.kind IN ('channel','group')
-                           AND EXISTS (SELECT 1 FROM tchat_members m WHERE m.room_id=r.id)
-                           AND NOT EXISTS (SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=r.id)
-                           AND COALESCE(r.created_by, (SELECT m.user_id FROM tchat_members m JOIN users u ON u.id=m.user_id
-                                                       WHERE m.room_id=r.id AND COALESCE(u.kind,'')!='agent' LIMIT 1)) IS NOT NULL
-                         ON CONFLICT DO NOTHING""", (TCX_KIND, ts, ts, TCX_KIND)).rowcount
+    owner = """COALESCE(r.created_by,
+                        (SELECT m.user_id FROM tchat_members m JOIN users u ON u.id=m.user_id WHERE m.room_id=r.id
+                         AND COALESCE(u.kind,'')!='agent' ORDER BY m.created_at, m.user_id LIMIT 1),
+                        (SELECT a.owner_id FROM tchat_members m JOIN agents a ON a.user_id=m.user_id WHERE m.room_id=r.id
+                         AND a.owner_id IS NOT NULL ORDER BY m.created_at, m.user_id LIMIT 1),
+                        (SELECT om.user_id FROM org_members om WHERE om.org_id=r.org_id AND om.role='admin' ORDER BY om.user_id LIMIT 1))"""
+    nodes = c.execute(f"""INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,ref_kind,ref_id,created_by,created_at,updated_at)
+                          SELECT NULL, 'ref', CASE WHEN r.name != '' THEN r.name ELSE 'Team chat' END, {owner},
+                                 r.org_id, ?, r.id, r.created_by, ?, ?
+                          FROM tchat_rooms r WHERE r.kind IN ('channel','group')
+                            AND EXISTS (SELECT 1 FROM tchat_members m WHERE m.room_id=r.id)
+                            AND NOT EXISTS (SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=r.id)
+                            AND {owner} IS NOT NULL
+                          ON CONFLICT DO NOTHING""", (TCX_KIND, ts, ts, TCX_KIND)).rowcount
     added = 0
     for key, cond in (("user_id", "COALESCE(u.kind,'')!='agent'"), ("agent_id", "u.kind='agent'")):
         added += c.execute(f"""INSERT INTO fs_shares(node_id,{key},role,created_by,created_at,by_role)
@@ -167,14 +172,6 @@ def tcx_core_sync(c):
                                JOIN fs_nodes n ON n.kind='ref' AND n.ref_kind=? AND n.ref_id=m.room_id
                                WHERE {cond} AND NOT EXISTS (SELECT 1 FROM fs_shares s WHERE s.node_id=n.id AND s.{key}=m.user_id)""",
                            (TCX_KIND,)).rowcount
-    gone = c.execute("""SELECT s.id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id
-                        WHERE n.kind='ref' AND n.ref_kind=? AND s.group_id IS NULL
-                          AND NOT EXISTS (SELECT 1 FROM tchat_members m WHERE m.room_id=n.ref_id AND m.user_id=COALESCE(s.user_id, s.agent_id))""",
-                     (TCX_KIND,)).fetchall()
-    taken = 0
-    if gone:
-        ids = [x[0] for x in gone]
-        taken = obj_take_rows(c, "fs_shares", f"id IN ({','.join('?' * len(ids))})", tuple(ids), "unshare", None, None, "user_id", kind=TCX_KIND)
-    return {"nodes": nodes, "added": added, "taken": taken}
+    return {"nodes": nodes, "added": added}
 
-objhooks.START.append(("tcx_core_sync", False, tcx_core_sync))  # 2.565.0 (#4719): every start (core/db.init_db)
+objhooks.START.append((TCX_COPY_FLAG, True, tcx_core_copy))  # 2.924.0 (#5069): once (core/db.init_db sets the flag)

@@ -21,6 +21,9 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 from kt import FAILS, OKS, check, sess  # noqa: E402  shared helpers (tests/kt.py)
+# 2.924.0 (#5069): tchat_members is gone -- a room's members are the shares of its node in the shared core
+TCHAT_M = ("(SELECT n.ref_id AS room_id, COALESCE(s.user_id, s.agent_id) AS user_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id "
+           "WHERE n.kind='ref' AND n.ref_kind='tchat_room') tm")
 
 
 def usess(user, pw="password123"):
@@ -73,7 +76,7 @@ r = Er.post(B + f"/api/team/rooms/{CH}/members", json={"user_id": ERIN})
 check(r.status_code in (403, 404), f"erin: does not join it again {r.status_code} {r.text[:160]}")
 r = Er.post(B + f"/api/team/rooms/{CH}/members", json={"user_id": uid["nora"]})
 check(r.status_code in (403, 404), f"erin: adds nobody to it {r.status_code} {r.text[:160]}")
-check(not sql("SELECT 1 FROM tchat_members WHERE room_id=? AND user_id IN (?,?)", (CH, ERIN, uid["nora"])), "nobody new in it")
+check(not sql("SELECT 1 FROM " + TCHAT_M + " WHERE room_id=? AND user_id IN (?,?)", (CH, ERIN, uid["nora"])), "nobody new in it")
 r = Er.get(B + f"/api/team/rooms/{CH}/messages")
 check(r.status_code in (403, 404), f"erin: its history stays closed {r.status_code}")
 check(Bo.get(B + f"/api/team/rooms/{CH}/messages").ok, "bob (member): reads it as before")

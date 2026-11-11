@@ -1188,8 +1188,8 @@ def init_db(guard=True, load=None):
             if any(n.values()):
                 print("list folders into the projects trees (#2748):", n, flush=True)
         # 2.565.0 (#4717 #4719): the areas' forward copies onto the shared core (core/objhooks.START, filled by the areas):
-        # the team chat's members kept in step with tchat_members every start (collab/tcxcore.py tcx_core_sync, also what an older
-        # version added / removed after a rollback); once, the shares of tables and of knowledge pages / folders with people as
+        # once, the team chat's old member rows copied forward (collab/tcxcore.py tcx_core_copy, 2.924.0 #5069: stage 7a; was
+        # tcx_core_sync every start, which also took back); once, the shares of tables and of knowledge pages / folders with people as
         # core shares on their reference nodes (sheets/shshare.py shs_core_move, wiki/wkshare.py wsh_core_move; no one-way step)
         for key, once, f in list(objhooks.START):
             if once and gsetting(c, key) == "1":

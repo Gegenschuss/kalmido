@@ -33,6 +33,9 @@ import requests
 import dbx as dbxm
 from freelancer_fixture import FEATURES, freelancer
 from kt import FAILS, OKS, check, sess, su_get
+# 2.924.0 (#5069): tchat_members is gone -- a room's members are the shares of its node in the shared core
+TCHAT_M = ("(SELECT n.ref_id AS room_id, COALESCE(s.user_id, s.agent_id) AS user_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id "
+           "WHERE n.kind='ref' AND n.ref_kind='tchat_room') tm")
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -224,7 +227,7 @@ ch = dbx("SELECT id, kind, name, org_id, is_open FROM tchat_rooms WHERE org_id=?
 check([x["name"] for x in ch] == ["Allgemein Umzug"], f"#3092: only the open channel came along {[dict(x) for x in ch]}")
 NCH = ch[0]["id"] if ch else 0
 check(ch and ch[0]["is_open"] == 1, "#3092: it stays open")
-mem = {x[0] for x in dbx("SELECT user_id FROM tchat_members WHERE room_id=?", (NCH,))}
+mem = {x[0] for x in dbx("SELECT user_id FROM " + TCHAT_M + " WHERE room_id=?", (NCH,))}
 check(mem == {ALICE, BOB}, f"#3092: alice and the ticked bob are its members {mem}")
 msg = dbx("SELECT id, body FROM tchat_msgs WHERE room_id=?", (NCH,))
 check([x["body"] for x in msg] == ["Hier der Plan"], f"#3092: the message came along {[dict(x) for x in msg]}")

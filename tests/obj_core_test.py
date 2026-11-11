@@ -28,6 +28,9 @@ sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
 from kt import B, check, dbx, docker_logs_on_first_fail, done, sess  # noqa: E402
 from obj_probe import K, agent, ids, in_app, new, role, start  # noqa: E402
+# 2.924.0 (#5069): tchat_members is gone -- a room's members are the shares of its node in the shared core
+TCHAT_M = ("(SELECT n.ref_id AS room_id, COALESCE(s.user_id, s.agent_id) AS user_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id "
+           "WHERE n.kind='ref' AND n.ref_kind='tchat_room') tm")
 
 start("OBJCORE")
 docker_logs_on_first_fail()
@@ -207,10 +210,10 @@ CL = r.json().get("id") or (r.json().get("room") or {}).get("id")
 check(CH and CL and Ca.post(B + f"/api/team/rooms/{CH}/members", json={"user_id": uid["carl"]}).ok, f"setup: carl joins the open channel {CH}")
 A.post(B + f"/api/team/rooms/{CL}/members", json={"user_id": uid["gina"]})
 check(dbx("SELECT COUNT(*) FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE s.user_id=? AND n.org_id=?", (uid["gina"], ORG))[0][0] >= 1
-      and dbx("SELECT COUNT(*) FROM tchat_members WHERE user_id=? AND room_id=?", (uid["gina"], CL))[0][0] == 1, "setup: gina has shares and a closed channel")
+      and dbx("SELECT COUNT(*) FROM " + TCHAT_M + " WHERE user_id=? AND room_id=?", (uid["gina"], CL))[0][0] == 1, "setup: gina has shares and a closed channel")
 check(A.delete(B + f"/api/orgs/{ORG}/members/{uid['gina']}").ok, "gina leaves the organisation")
 check(dbx("SELECT COUNT(*) FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE s.user_id=? AND n.org_id=?", (uid["gina"], ORG))[0][0] == 0
-      and dbx("SELECT COUNT(*) FROM tchat_members WHERE user_id=? AND room_id=?", (uid["gina"], CL))[0][0] == 0, "her shares and channel rows are gone")
+      and dbx("SELECT COUNT(*) FROM " + TCHAT_M + " WHERE user_id=? AND room_id=?", (uid["gina"], CL))[0][0] == 0, "her shares and channel rows are gone")
 check(dbx("SELECT COUNT(*) FROM obj_revoked WHERE user_id=? AND reason='leave'", (uid["gina"],))[0][0] >= 2, "... into obj_revoked (restorable)")
 r = A.put(B + f"/api/orgs/{ORG}/members", json={"email": "gina@example.com", "role": "guest"})
 back = dbx("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (ORG, uid["gina"]))
@@ -226,7 +229,7 @@ check(A.delete(B + f"/api/orgs/{ORG}/members/{uid['bob']}").ok, "bob (the owner 
 check(dbx("SELECT owner_id FROM obj_probe WHERE id=?", (O1,))[0][0] == ALICE and role(A, O1) == "manage" and role(Bo, O1) == 404,
       "his organisation object goes to the heir (the admin who removed him)")
 check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["carl"], "role": "guest"}).ok, "carl is demoted to guest")
-check(dbx("SELECT COUNT(*) FROM tchat_members WHERE user_id=? AND room_id=?", (uid["carl"], CH))[0][0] == 0
+check(dbx("SELECT COUNT(*) FROM " + TCHAT_M + " WHERE user_id=? AND room_id=?", (uid["carl"], CH))[0][0] == 0
       and role(Ca, O3) == 404, "a guest: out of the open channel joined, the object no longer by the organisation's role")
 
 # ---------------------------------------------------------------- review F1: an account deleted keeps the organisation's objects

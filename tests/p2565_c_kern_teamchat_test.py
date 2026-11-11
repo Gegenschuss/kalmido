@@ -4,11 +4,11 @@
 (mode workspaces). Invented names only.
 tenant-matrix: team
 freelancer-matrix: team
- - adding / removing a member works through the core: the share of the room's reference node (fs_shares) and the fallback
-   row (tchat_members) come and go together; a removed member's share lands in obj_revoked; leaving oneself too
+ - adding / removing a member works through the core: the share of the room's reference node (fs_shares; 2.924.0, #5069:
+   alone, no row of tchat_members); a removed member's share lands in obj_revoked; leaving oneself too
  - the room's node never shows in the file store (the organisation's top, "shared with me")
- - migration: a member row written the old way (tchat_members only) gets its share at the next start and the person reads
-   the channel; a row an older version removed loses its share at the next start (the fallback opens nothing taken away)
+ - 2.924.0 (#5069, turned round): a share taken in the core stays taken after the next start and a share given stays (no
+   start takes anything back; the one forward copy of old rows: tests/p2924_a_kern_teamchat_test.py)
  - an open channel: a member reads it without joining, a guest / an accounting member does not (and a group gives them nothing)
  - leaving the organisation ends the channel access (share and row; obj_revoked), joining again brings no old channel back
  - a group shared with a channel: its full members read it, a guest of the group does not; unsharing ends it; a group
@@ -62,6 +62,9 @@ def share(rid, who, key="user_id"):
 
 
 def row(rid, who):
+    """2.924.0 (#5069): no writer writes tchat_members any more -- never an old row (False also once the table is gone)."""
+    if sql("SELECT to_regclass('tchat_members')")[0][0] is None:
+        return False
     return bool(sql("SELECT 1 FROM tchat_members WHERE room_id=? AND user_id=?", (rid, who)))
 
 
@@ -90,7 +93,7 @@ def token(s, name):
 
 
 def restart():
-    """The next start of the server (core/db.py init_db runs collab/tcxcore.py tcx_core_sync)."""
+    """The next start of the server (core/db.py init_db; 2.924.0: collab/tcxcore.py tcx_core_copy ran once, nothing in step)."""
     subprocess.run(["docker", "restart", CT], capture_output=True)
     check(until(lambda: _health(), timeout=90), "the server is up again after the restart")
 
@@ -152,12 +155,12 @@ A.patch(B + "/api/settings", json={"workspace": f"org:{K}"})
 
 # ================================================================== add / remove through the core
 C1 = channel(A, "Closed one", K, [BOB])
-check(share(C1, BOB) == "edit" and row(C1, BOB), "add: bob's share on the room's node and his fallback row")
-check(share(C1, ALICE) == "edit" and row(C1, ALICE), "add: the maker is a member through the core too")
+check(share(C1, BOB) == "edit" and not row(C1, BOB), "add: bob's share on the room's node, no old row")  # 2.924.0 (#5069): no fallback row
+check(share(C1, ALICE) == "edit" and not row(C1, ALICE), "add: the maker is a member through the core alone")  # 2.924.0 (#5069)
 check(reads(Bo, C1), "add: bob reads the closed channel")
 no(Mi.get(B + f"/api/team/rooms/{C1}/messages"), "add: mia (not invited) reads the closed channel")
 check(A.post(B + f"/api/team/rooms/{C1}/members", json={"user_id": MIA}).ok, "add: alice adds mia")
-check(share(C1, MIA) == "edit" and row(C1, MIA) and reads(Mi, C1), "add: mia's share + row, she reads it")
+check(share(C1, MIA) == "edit" and reads(Mi, C1), "add: mia's share, she reads it")  # 2.924.0 (#5069): no row
 check(A.delete(B + f"/api/team/rooms/{C1}/members/{MIA}").ok, "remove: alice removes mia")
 check(share(C1, MIA) is None and not row(C1, MIA), "remove: mia's share and row are gone")
 check(revoked(C1, MIA, "unshare"), "remove: mia's share is in obj_revoked (restorable)")
@@ -173,20 +176,16 @@ check(not [x for x in items if x.get("ref_kind") == "tchat_room"], "files: no no
 nid = sql("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind='tchat_room' AND ref_id=?", (C1,))[0][0]
 no(Bo.get(B + f"/api/files?parent={nid}"), "files: the room's node by its id")
 
-# ================================================================== migration: rows of the old way
-C2 = channel(A, "Old way", K)
-sql("INSERT INTO tchat_members(room_id,user_id,added_by,created_at) VALUES(?,?,?,'2026-11-01T10:00:00Z')", (C2, BOB, ALICE), write=True)
-# 2.924.0 (#5069 7a step 1): no reader reads tchat_members any more -- a row of the old way alone opens nothing before the start
-check(share(C2, BOB) is None and not reads(Bo, C2), "migration: a row of the old way only - bob does not read before the start")
-sql("DELETE FROM tchat_members WHERE room_id=? AND user_id=?", (C1, BOB), write=True)  # an older version removed bob from C1
-check(share(C1, BOB) == "edit", "migration: bob's share in C1 still there before the start")
+# ================================================================== 2.924.0 (#5069, turned round): the start keeps the core's state
+C2 = channel(A, "Old way", K, members=(BOB,))
+check(share(C2, BOB) == "edit" and reads(Bo, C2), "7a: bob is in C2 through his share")
+check(A.delete(B + f"/api/team/rooms/{C1}/members/{BOB}").ok and share(C1, BOB) is None, "7a: alice takes bob out of C1 in the core")
 restart()
 A, Bo = sess("alice"), sess("bob")
-check(share(C2, BOB) == "edit", "migration: the next start copies bob's row of C2 into a share")
-check(reads(Bo, C2), "migration: the migrated member reads the channel")
-check(share(C1, BOB) is None and revoked(C1, BOB, "unshare"), "migration: the share whose row an older version removed is taken (obj_revoked)")
-no(Bo.get(B + f"/api/team/rooms/{C1}/messages"), "migration: bob reads C1 no more")
-check(A.post(B + f"/api/team/rooms/{C1}/members", json={"user_id": BOB}).ok and reads(Bo, C1), "migration: bob added again reads C1")
+check(share(C2, BOB) == "edit" and reads(Bo, C2), "7a: after the start bob's share of C2 stays")
+check(share(C1, BOB) is None and revoked(C1, BOB, "unshare"), "7a: after the start the share taken stays taken (obj_revoked)")
+no(Bo.get(B + f"/api/team/rooms/{C1}/messages"), "7a: bob reads C1 no more after the start")
+check(A.post(B + f"/api/team/rooms/{C1}/members", json={"user_id": BOB}).ok and reads(Bo, C1), "7a: bob added again reads C1")
 
 # ================================================================== open channel: the role filter
 OC = channel(A, "Open one", K, open_=True)
@@ -231,7 +230,7 @@ no(requests.get(V + f"/team/rooms/{C1}/messages", headers=AGOH), "boundary: an a
 no(requests.get(V + f"/team/rooms/{C1}/messages", headers=AGH), "agent: not added - no reading")
 no(requests.get(V + f"/team/rooms/{OC}/messages", headers=AGH), "agent: an open channel it was not added to")
 check(A.post(B + f"/api/team/rooms/{C1}/members", json={"user_id": AG}).ok, "agent: alice adds the organisation's agent to C1")
-check(share(C1, AG, "agent_id") == "edit" and row(C1, AG), "agent: its share (agent) and row")
+check(share(C1, AG, "agent_id") == "edit", "agent: its share (agent)")  # 2.924.0 (#5069): no row
 check(reads(None, C1, AGH), "agent: reads the channel it was added to (API v1)")
 rooms = {x.get("id") for x in (requests.get(V + "/team/rooms", headers=AGH).json().get("data") or [])}
 check(C1 in rooms and OC not in rooms and C2 not in rooms, f"agent: lists only its channel ({sorted(x for x in rooms if x)})")
@@ -239,7 +238,7 @@ r = A.post(B + f"/api/team/rooms/{C1}/members", json={"user_id": AGO})
 check(r.status_code in (400, 403, 404) and share(C1, AGO, "agent_id") is None, f"agent: an agent of another organisation cannot be added ({r.status_code})")
 
 # ================================================================== leaving the organisation
-check(row(C1, BOB) and share(C1, BOB), "leave org: bob is in C1 before")
+check(share(C1, BOB), "leave org: bob is in C1 before")  # 2.924.0 (#5069): the share alone
 check(A.delete(B + f"/api/orgs/{K}/members/{BOB}").ok, "leave org: bob leaves Kappa")
 check(share(C1, BOB) is None and not row(C1, BOB) and share(C2, BOB) is None, "leave org: his shares and rows of the channels are gone")
 check(revoked(C1, BOB, "leave"), "leave org: his share is in obj_revoked (reason leave)")
@@ -280,7 +279,7 @@ for x in (FR, FE):
 r = Fr.post(B + "/api/team/channels", json={"name": "Own room", "org_id": None, "members": [FE]})
 check(r.status_code in (200, 201), "freelancer: a private channel with a coworker " + r.text[:160])
 PC = r.json().get("id")
-check(share(PC, FE) == "edit" and row(PC, FE) and reads(Fe, PC), "freelancer: the coworker is a member through the core and reads it")
+check(share(PC, FE) == "edit" and reads(Fe, PC), "freelancer: the coworker is a member through the core and reads it")
 check(sql("SELECT org_id FROM fs_nodes WHERE kind='ref' AND ref_kind='tchat_room' AND ref_id=?", (PC,)) == [(None,)],
       "freelancer: the room's node is in her own space")
 items = Fr.get(B + "/api/files?space=private").json().get("items") or []

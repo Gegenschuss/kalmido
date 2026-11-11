@@ -22,6 +22,9 @@ import kt  # noqa: E402
 import requests  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 from kt import B, DATA, FAILS, OKS, check, sess  # noqa: E402,F401
+# 2.924.0 (#5069): tchat_members is no member table any more -- a room's members are the shares of its node in the shared core
+TCHAT_M = ("(SELECT n.ref_id AS room_id, COALESCE(s.user_id, s.agent_id) AS user_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id "
+           "WHERE n.kind='ref' AND n.ref_kind='tchat_room') tm")
 
 FEAT = "cal,events,contacts,comments,collab,files,wiki,docs,office,clients"
 V = B + "/api/v1"
@@ -189,16 +192,18 @@ for who in (BOB, GINA):
     r = A.post(B + f"/api/files/nodes/{FI}/shares", json={"user_id": who, "role": "view"})
     check(r.status_code == 201, f"a: the folder shared with {who} {r.text[:160]}")
 now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-sql("INSERT INTO tchat_members(room_id,user_id,added_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING", (CC, BAG, BOB, now), write=True)
+sql("INSERT INTO fs_shares(node_id,agent_id,role,created_by,created_at) SELECT id, ?, 'edit', ?, ? FROM fs_nodes WHERE kind='ref' "
+    "AND ref_kind='tchat_room' AND ref_id=? AND NOT EXISTS (SELECT 1 FROM fs_shares x WHERE x.node_id=fs_nodes.id AND x.agent_id=?)",
+    (BAG, BOB, now, CC, BAG), write=True)  # 2.924.0 (#5069): bob's agent as a share of the room's node
 sql("INSERT INTO fs_shares(node_id,agent_id,role,created_by,created_at) VALUES(?,?,'view',?,?)", (FI, BAG, ALICE, now), write=True)
 check(Gi.get(B + f"/api/team/rooms/{CC}/messages").ok, "a: gina reads the closed channel before")
 for who in (BOB, GINA):
     check(A.delete(B + f"/api/orgs/{K}/members/{who}").ok, f"a: {who} leaves Kappa")
-check(not sql("SELECT 1 FROM tchat_members WHERE user_id IN (?,?,?) AND room_id IN (?,?)", (BOB, GINA, BAG, CC, OC)),
+check(not sql("SELECT 1 FROM " + TCHAT_M + " WHERE user_id IN (?,?,?) AND room_id IN (?,?)", (BOB, GINA, BAG, CC, OC)),
       "a: no channel member rows of the leavers (nor bob's agent)")
 check(not sql("SELECT 1 FROM fs_shares WHERE user_id IN (?,?) OR agent_id=?", (BOB, GINA, BAG)), "a: no folder shares of the leavers (nor bob's agent)")
 check(not sql("SELECT 1 FROM agents WHERE user_id=? AND org_id IS NOT NULL", (BAG,)), "a: bob's agent left with him")
-check(sql("SELECT 1 FROM tchat_members WHERE room_id=? AND user_id=?", (CC, ALICE)) != [], "a: the channel's other member stays")
+check(sql("SELECT 1 FROM " + TCHAT_M + " WHERE room_id=? AND user_id=?", (CC, ALICE)) != [], "a: the channel's other member stays")
 member(K, BOB, "member")
 member(K, GINA, "guest")
 for s, who in ((Bo, "bob (member again)"), (Gi, "gina (guest)")):
@@ -217,8 +222,8 @@ check(CC2, "b: a closed channel with bob " + r.text[:160])
 check(Bo.get(B + f"/api/team/rooms/{OC}/messages").ok and Bo.post(B + f"/api/team/rooms/{OC}/messages", json={"body": "hello"}).status_code in (200, 201),
       "b: bob reads and writes in the open channel as a member")
 member(K, BOB, "guest")
-check(not sql("SELECT 1 FROM tchat_members WHERE room_id=? AND user_id=?", (OC, BOB)), "b: the guest's row in the open channel is gone")
-check(sql("SELECT 1 FROM tchat_members WHERE room_id=? AND user_id=?", (CC2, BOB)) != [], "b: the closed channel stays (personal invitation)")
+check(not sql("SELECT 1 FROM " + TCHAT_M + " WHERE room_id=? AND user_id=?", (OC, BOB)), "b: the guest's row in the open channel is gone")
+check(sql("SELECT 1 FROM " + TCHAT_M + " WHERE room_id=? AND user_id=?", (CC2, BOB)) != [], "b: the closed channel stays (personal invitation)")
 no(Bo.get(B + f"/api/team/rooms/{OC}/messages"), "b: the guest reads the open channel no more")
 no(Bo.post(B + f"/api/team/rooms/{OC}/messages", json={"body": "still here"}), "b: the guest writes in the open channel no more")
 check(Bo.get(B + f"/api/team/rooms/{CC2}/messages").ok, "b: the guest still reads the closed channel")

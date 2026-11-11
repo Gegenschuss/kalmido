@@ -994,8 +994,6 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
             q = ",".join("?" * len(ppl))
             out["fs_shares"] = _take(c, "fs_shares", f"(user_id IN ({q}) OR agent_id IN ({q})) AND node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)",
                                      (*ppl, *ppl, int(org)), reason, by, int(org), "user_id")
-            out["tchat_members"] = _take(c, "tchat_members", f"user_id IN ({q}) AND room_id IN (SELECT id FROM tchat_rooms WHERE org_id=?)",
-                                         (*ppl, int(org)), reason, by, int(org), "user_id")
             # 2.649.0 (#5051): their public links and file requests in the organisation die (coming back, also as a guest = still dead)
             out.update(_take_public(c, "created_by=? AND org_id=?", (int(uid), int(org)), reason, by, int(org)))
             for reg in OBJ.values():  # 2.566.0 (#4712): the old member tables of kinds moving onto the core (ev_cal_members ...)
@@ -1018,8 +1016,6 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                 ppl = [int(uid), *_agents_of(c, uid)]
                 q = ",".join("?" * len(ppl))
                 rooms = "SELECT id FROM tchat_rooms WHERE org_id=? AND kind='channel' AND is_open=1"
-                out["tchat_members"] = _take(c, "tchat_members", f"user_id IN ({q}) AND room_id IN ({rooms})",
-                                             (*ppl, int(org)), reason, by, int(org), "user_id")
                 out["fs_shares"] = _take(c, "fs_shares", f"(user_id IN ({q}) OR agent_id IN ({q})) AND node_id IN (SELECT id FROM fs_nodes "
                                          f"WHERE kind='ref' AND ref_kind='tchat_room' AND ref_id IN ({rooms}))",
                                          (*ppl, *ppl, int(org)), reason, by, int(org), "user_id")
@@ -1031,8 +1027,7 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                            f"AND n.ref_kind='{r['kind']}')" for r in OBJ.values() if r["members"])
             out["fs_shares"] = _take(c, "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)" + keep, (int(org),), reason, by,
                                      int(org), "user_id")
-            out["tchat_members"] = _take(c, "tchat_members", "room_id IN (SELECT id FROM tchat_rooms WHERE org_id=?)", (int(org),),
-                                         reason, by, int(org), "user_id")
+            # 2.924.0 (#5069): the rooms' members are the shares above (tchat_members is no member table any more)
             out.update(_take_public(c, "org_id=?", (int(org),), reason, by, int(org)))  # 2.649.0 (#5051)
             for reg in OBJ.values():  # 2.566.0 (#4712, #4697): everyone but the owner and the owner's own agents (their delegates)
                 if reg["members"]:
@@ -1090,8 +1085,9 @@ def _boundary_share(c, n, s):
 
 
 def _boundary_old(c, reg, rid, uid, org):
-    """The old member row of core object rid (a calendar's / book's member table, a room's tchat_members) of person uid."""
-    mt, key = reg["members"] or (("tchat_members", "room_id") if reg["kind"] == "tchat_room" else (None, None))
+    """The old member row of core object rid (a calendar's / book's member table) of person uid. 2.924.0 (#5069): a room has
+    none any more (its shares are the members)."""
+    mt, key = reg["members"] or (None, None)
     if not mt:
         return 0
     return _take(c, mt, f"{key}=? AND user_id=?", (int(rid), int(uid)), "boundary", None, org, "user_id",
@@ -1122,8 +1118,7 @@ def obj_boundary_take(c, table, oid, uid):
                     c.execute("UPDATE sheet_shares SET revoked_at=? WHERE id=?", (iso_ms(now_utc()), x["id"]))
                 out += 1
         else:
-            reg = next((r for r in OBJ.values() if (r["members"] or (None,))[0] == table), None) if table != "tchat_members" \
-                else OBJ.get("tchat_room")
+            reg = next((r for r in OBJ.values() if (r["members"] or (None,))[0] == table), None)  # 2.924.0 (#5069): no tchat_members
             if reg is None:
                 return None
             org = c.execute(f"SELECT org_id FROM {reg['table']} WHERE id=?", (oid,)).fetchone()

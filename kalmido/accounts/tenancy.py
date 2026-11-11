@@ -149,11 +149,12 @@ CHECKS = {
     # 2.113.1 B (#2059): a member of an organisation's team chat channel who is not (any more) in it, an agent of another
     # workspace in a channel or a personal agent whose owner is not in it (the read layer ignores them: collab/teamchan.py
     # tcx_members; boundary_repair takes the person out)
-    "tchat_person": ("SELECT m.room_id, m.user_id FROM tchat_members m JOIN tchat_rooms r ON r.id=m.room_id JOIN users u ON u.id=m.user_id "
-                     "WHERE r.org_id IS NOT NULL AND " + _PERSON.format(o="r", m="m")),
-    "tchat_agent": ("SELECT m.room_id, m.user_id FROM tchat_members m JOIN tchat_rooms r ON r.id=m.room_id JOIN agents a ON a.user_id=m.user_id "
-                    "WHERE COALESCE(a.org_id,0)!=COALESCE(r.org_id,0) OR (a.owner_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM tchat_members x "
-                    "WHERE x.room_id=m.room_id AND x.user_id=a.owner_id))"),  # 2.113.1 (#2059): + a personal agent whose owner is not in it
+    # 2.924.0 (#5069): the members are the shares of the room's node (tchat_members is read no more): a person / an agent
+    # outside the room's organisation is file_person / file_agent (the node has the room's organisation; boundary_repair takes
+    # the share through the core); left here: a personal agent whose owner has no share of the room (counted)
+    "tchat_agent": ("SELECT n.ref_id, s.agent_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id JOIN agents a ON a.user_id=s.agent_id "
+                    "WHERE n.kind='ref' AND n.ref_kind='tchat_room' AND a.owner_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM fs_shares x "
+                    "WHERE x.node_id=s.node_id AND x.user_id=a.owner_id)"),
     # an agent of an organisation that is gone, or a personal agent working in an organisation its owner is not in
     "agent": ("SELECT a.user_id, a.owner_id FROM agents a WHERE a.org_id IS NOT NULL AND (NOT EXISTS (SELECT 1 FROM orgs o WHERE o.id=a.org_id) "
               "OR (a.owner_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=a.org_id AND om.user_id=a.owner_id)))"),
@@ -340,9 +341,8 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "task_watcher_person": ("task_watchers", "task_id"),  # 2.473.0 (#3357)
           "assistant_person": ("assistant_access", "list_id"),  # 2.75.0 A (#1411)
           "hub_token_person": ("hub_tokens", "org_id"),  # 2.84.0 A (#1198)
-          "sheet_share_person": ("sheet_shares", "sheet_id"),  # 2.124.0 C (#2113)
-          "tchat_person": ("tchat_members", "room_id")}  # 2.113.1 B (#2059)
-RP_CORE = ("fs_shares", "sheet_shares", "tchat_members", "ev_cal_members", "book_members")  # 2.649.0 (#5051): core/objhooks.obj_boundary
+          "sheet_share_person": ("sheet_shares", "sheet_id")}  # 2.124.0 C (#2113); 2.924.0 (#5069): tchat_person is file_person
+RP_CORE = ("fs_shares", "sheet_shares", "ev_cal_members", "book_members")  # 2.649.0 (#5051): core/objhooks.obj_boundary
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Organisation > People")
 
 
@@ -353,7 +353,7 @@ RP_ORG = {"list_person": "SELECT org_id FROM lists WHERE id=?", "group": "SELECT
           "book_person": "SELECT org_id FROM books WHERE id=?", "file_person": "SELECT org_id FROM fs_nodes WHERE id=?",
           "att_person": "SELECT k.org_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?",
           "task_bell_person": "SELECT l.org_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?",
-          "sheet_share_person": "SELECT org_id FROM sheets WHERE id=?", "tchat_person": "SELECT org_id FROM tchat_rooms WHERE id=?",
+          "sheet_share_person": "SELECT org_id FROM sheets WHERE id=?",
           "doc_mail_person": None, "hub_token_person": None,
           "client_contact": "SELECT org_id FROM clients WHERE id=?", "hub_mail_ref": "SELECT org_id FROM hub_mails WHERE id=?"}
 

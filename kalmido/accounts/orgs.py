@@ -1574,10 +1574,8 @@ def org_open_chan_off(c, oid, uid, role):
     if role in FULL_READ:
         return
     with system_ctx(c):  # the person's own rows in the organisation's channels, also when an admin changes the role
-        c.execute("DELETE FROM tchat_members WHERE (user_id=? OR user_id IN (SELECT user_id FROM agents WHERE owner_id=?)) AND room_id IN "
-                  "(SELECT id FROM tchat_rooms WHERE kind='channel' AND is_open=1 AND org_id=?)", (uid, uid, oid))
-        # 2.565.0 (#4719): and their shares of those rooms in the shared core (core/objects.py obj_revoke_person took them into
-        # obj_revoked just before; this keeps both in step should a row be left)
+        # 2.565.0 (#4719): their shares of those rooms in the shared core (core/objects.py obj_revoke_person took them into
+        # obj_revoked just before; this takes one that was left). 2.924.0 (#5069): no old rows of tchat_members any more
         c.execute("DELETE FROM fs_shares WHERE (user_id=? OR user_id IN (SELECT user_id FROM agents WHERE owner_id=?) OR agent_id IN "
                   "(SELECT user_id FROM agents WHERE owner_id=?)) AND node_id IN (SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind='tchat_room' "
                   "AND ref_id IN (SELECT id FROM tchat_rooms WHERE kind='channel' AND is_open=1 AND org_id=?))", (uid, uid, uid, oid))

@@ -294,6 +294,10 @@ check(r.status_code == 201 and len(j(r).get("attachments") or []) == 1, "e2e: th
 FID, Fr = freelancer(B, A)
 FIO, Fi = freelancer(B, A, "fiona")  # a second freelancer: they work together through a group of the instance
 import dbx  # noqa: E402  (no route links two freelancers without the mail confirmation of the discovery: a group row)
+# 2.924.0 (#5069): tchat_members is gone -- a room's members are the shares of its node in the shared core
+TCHAT_M = ("(SELECT n.ref_id AS room_id, COALESCE(s.user_id, s.agent_id) AS user_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id "
+           "WHERE n.kind='ref' AND n.ref_kind='tchat_room') tm")
+TCHAT_NODE = "SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind='tchat_room' AND ref_id=?"
 DBC = dbx.connect(DATA)
 DBC.execute("INSERT INTO groups(name,oidc_group,created_at,created_by) VALUES(?,?,?,?)", ("Freelance pool", "", "2026-10-19T08:00:00", ALICE))
 GID = DBC.execute("SELECT id FROM groups WHERE name=?", ("Freelance pool",)).fetchone()[0]
@@ -333,12 +337,13 @@ check(requests.get(V + f"/team/rooms/{SEC}/messages", headers=BBH).status_code =
 r = A.delete(B + f"/api/team/rooms/{SEC}/members/{BOB}")
 check(r.ok and j(r).get("members") == 1, "review: alice (admin) removes bob, his agent goes along " + r.text[:200])
 check(requests.get(V + f"/team/rooms/{SEC}/messages", headers=BBH).status_code == 404, "review: bobbot reads bob's former channel no more")
-check(DBC.execute("SELECT COUNT(*) FROM tchat_members WHERE room_id=? AND user_id=?", (SEC, BB)).fetchone()[0] == 0, "review: bobbot's member row is gone")
+check(DBC.execute("SELECT COUNT(*) FROM " + TCHAT_M + " WHERE room_id=? AND user_id=?", (SEC, BB)).fetchone()[0] == 0, "review: bobbot's share is gone")
 check(Bo.patch(B + f"/api/team/rooms/{SEC}", json={"name": "Back"}).status_code in (403, 404), "review: bob (creator, removed) no longer renames it")
 check(Bo.post(B + f"/api/team/rooms/{SEC}/members", json={"user_id": BOB}).status_code in (403, 404), "review: bob cannot add himself back")
-DBC.execute("INSERT INTO tchat_members(room_id,user_id,added_by,created_at) VALUES(?,?,?,?)", (SEC, BB, BOB, "2026-10-19T08:00:00"))
+DBC.execute("INSERT INTO fs_shares(node_id,agent_id,role,created_by,created_at) SELECT id, ?, 'edit', ?, ? FROM fs_nodes "
+            "WHERE kind='ref' AND ref_kind='tchat_room' AND ref_id=?", (BB, BOB, "2026-10-19T08:00:00", SEC))  # 2.924.0 (#5069): a share
 check(requests.get(V + f"/team/rooms/{SEC}/messages", headers=BBH).status_code == 404, "review: a left-over agent row without its owner reads nothing")
-DBC.execute("DELETE FROM tchat_members WHERE room_id=? AND user_id=?", (SEC, BB))
+DBC.execute("DELETE FROM fs_shares WHERE agent_id=? AND node_id IN (" + TCHAT_NODE + ")", (BB, SEC))
 # a list channel's file follows the list out of the organisation
 MV = A.post(B + "/api/lists", json={"name": "Moving", "org_id": ORG}).json()["id"]
 assert A.put(B + f"/api/lists/{MV}/members", json={"user_id": BOB, "role": "edit"}).ok
