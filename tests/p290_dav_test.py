@@ -100,7 +100,7 @@ def by_uid(uid):
 
 
 def tags(tid, uid):
-    return sorted(x[0] for x in db("SELECT tag FROM task_tags WHERE task_id=? AND user_id=?", (tid, uid)))
+    return sorted(x[0] for x in db("SELECT tag FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=? AND user_id=?", (tid, uid)))  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
 
 
 PF_CAL = ('<?xml version="1.0"?><D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" '

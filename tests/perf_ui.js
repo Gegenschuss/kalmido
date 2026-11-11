@@ -33,6 +33,7 @@ async function round(n) {
 import random, datetime
 from kalmido.core.db import connect
 from kalmido.core.pg import insert_id
+from kalmido.core.objtags import otg_user_add  # 2.955.0 (#5276)
 c = connect()
 random.seed(7)
 now = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -54,7 +55,7 @@ while made < n:
         c.execute("INSERT INTO tasks(list_id, parent_id, title, sort, created_at, updated_at, created_by) VALUES(?,?,?,?,?,?,1)", (lid, t, f"Sub {made}", made, now, now))
         made += 1
     if random.random() < .2:
-        c.execute("INSERT INTO task_tags(task_id, user_id, tag) VALUES(?,1,?) ON CONFLICT DO NOTHING", (t, random.choice(["home", "work", "urgent", "later"])))
+        otg_user_add(c, t, 1, random.choice(["home", "work", "urgent", "later"]))  # 2.955.0 (#5276): the core's personal tags
     if random.random() < .1:
         c.execute("INSERT INTO comments(task_id, user_id, body, created_at) VALUES(?,1,?,?)", (t, "A comment", now))
 c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version'")

@@ -63,7 +63,7 @@ def task(title, uid):
 
 
 def tags(tid):
-    return sorted(x[0] for x in dbx("SELECT tag FROM task_tags WHERE task_id=?", (tid,)))
+    return sorted(x[0] for x in dbx("SELECT tag FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=?", (tid,)))  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
 
 
 def count(uid):

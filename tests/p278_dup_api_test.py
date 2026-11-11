@@ -102,8 +102,8 @@ check(ts["Permit"][2] == D(-3) and ts["Permit"][1] == 0 and ts["Permit"][4] == 5
 check(ts["Foundation"][2] == D(10) and ts["Foundation"][3] == D(7) and ts["Foundation"][5] == "Build", f"dates + section {ts['Foundation'][1:6]}")
 check(ts["Order concrete"][6] == ts["Foundation"][7], "subtask under its parent")
 check(ts["Permit"][8] is None, "no assignee in the copy")
-check(dbx("SELECT tag FROM task_tags WHERE task_id=?", (ts["Permit"][7],)) and
-      dbx("SELECT tag FROM task_tags WHERE task_id=?", (ts["Permit"][7],))[0][0] == "legal", "tags")
+check(dbx("SELECT tag FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=?", (ts["Permit"][7],)) and  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
+      dbx("SELECT tag FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=?", (ts["Permit"][7],))[0][0] == "legal", "tags")  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
 fv = dbx("""SELECT v.value, f.name FROM task_field_values v JOIN list_fields f ON f.id=v.field_id WHERE v.task_id=?""", (ts["Permit"][7],))
 check(fv and fv[0][1] == "Budget" and float(fv[0][0]) == 1200 and dbx("SELECT list_id FROM list_fields WHERE name='Budget' AND list_id=?", (C1,)),
       f"field + value on the copy's own field {fv}")

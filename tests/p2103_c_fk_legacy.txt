@@ -92,7 +92,6 @@ sheet_links.list_id
 sheet_links.target_id
 sheets.agent_id
 space_moves.obj_id
-task_tags.user_id
 task_vectors.list_id
 tasks.approver_id
 tasks.assignee_group_id

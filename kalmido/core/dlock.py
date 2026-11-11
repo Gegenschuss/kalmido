@@ -18,7 +18,7 @@ from contextlib import nullcontext
 
 from flask import g, has_request_context, request
 
-from .objtags import obj_tag_sql  # 2.947.0 (#5275)
+from .objtags import obj_tag_sql, obj_utag_sql  # 2.947.0 (#5275); 2.955.0 (#5276): obj_utag_sql
 from .pg import system_ctx
 
 DL_ALWAYS = ("journal", "mood", "health", "budget", "reading")  # fixed (scope "private" / list rules), shown as locked
@@ -143,11 +143,11 @@ def dl_task_ids(c, uid):
         base.append("SELECT t.id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.tt_id LIKE 'mail:%' AND l.org_id IS NULL"  # pg-ok: the prefix is always lower case; LIKE matches the partial index
                     " AND t.list_id IN (SELECT id FROM s)")
     if d["_tags"]:
-        q = ",".join("?" * len(d["_tags"]))
-        base.append(f"SELECT x.task_id FROM task_tags x JOIN tasks t ON t.id=x.task_id WHERE lower(x.tag) IN ({q}) AND t.list_id IN (SELECT id FROM s)")
+        # 2.955.0 (#5276): anyone's personal tags of the core (were task_tags)
+        base.append(f"SELECT t.id FROM tasks t WHERE {obj_utag_sql('t.id', 'names', 'any')} AND t.list_id IN (SELECT id FROM s)")
         # 2.947.0 (#5275): the project tags and labels of the core (obj_tag_sql: the tags of the task's project)
         base.append(f"SELECT t.id FROM tasks t WHERE {obj_tag_sql('t.id', 'names')} AND t.list_id IN (SELECT id FROM s)")
-        args += list(d["_tags"]) + [sorted(d["_tags"])]
+        args += [sorted(d["_tags"]), sorted(d["_tags"])]  # 2.955.0 (#5276): one array each (personal, project)
     # 2.947.0 (#5275): a label of an organisation is hidden from who is no member (row-level security) -- the lock still has to
     # see it on the task, so the query runs as "system"; it only decides what is HIDDEN from uid, in uid's own lists (s)
     with system_ctx(c) if d["_tags"] else nullcontext():
@@ -196,10 +196,9 @@ def dl_tasks_locked(c, uid, tids):
     if d["_mail"]:
         cond.append("(t.tt_id LIKE 'mail:%' AND l.org_id IS NULL)")  # pg-ok: the prefix is always lower case (tasks_mail_list)
     if d["_tags"]:
-        q = ",".join("?" * len(d["_tags"]))
-        cond.append(f"EXISTS (SELECT 1 FROM task_tags x WHERE x.task_id=t.id AND lower(x.tag) IN ({q}))")
+        cond.append(obj_utag_sql("t.id", "names", "any"))  # 2.955.0 (#5276): anyone's personal tags of the core (were task_tags)
         cond.append(obj_tag_sql("t.id", "names"))  # 2.947.0 (#5275): the project tags and labels of the core
-        args += list(d["_tags"]) + [sorted(d["_tags"])]
+        args += [sorted(d["_tags"]), sorted(d["_tags"])]  # 2.955.0 (#5276): one array each (personal, project)
     if not cond:
         return set()
     with system_ctx(c) if d["_tags"] else nullcontext():  # 2.947.0 (#5275): as in dl_task_ids (only what is hidden)

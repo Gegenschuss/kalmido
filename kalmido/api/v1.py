@@ -41,7 +41,7 @@ from ..personal.habits import habit_log, habit_times, need_habit
 from ..personal.timetrack import clean_day_hours, entry_out, time_create, time_rounding, time_rows, vis_ids
 from ..core.errors import BadInput, field_alias, reject_unknown, UnknownFields
 from ..core.conflict import need_version, version_rule, VersionRequired  # 2.564.0 (#4702)
-from ..core.objtags import obj_tag_sql  # 2.947.0 (#5275)
+from ..core.objtags import obj_tag_sql, obj_utag_sql, otg_user_add, otg_user_drop, otg_user_names  # 2.947.0 (#5275); 2.955.0 (#5276): personal tags
 from ..lists.filterrules import filter_where, rule_kinds, rule_sort  # 2.577.0 (#3356)
 from ..lists.sections import filter_read  # 2.577.0 (#3356)
 from ..lists.seckind import SEC_KINDS, sk_derive, sk_filter, sk_first, sk_of, sk_task, SK_STATUS
@@ -374,7 +374,7 @@ def v1_task(d):
 def task_for(c, row, uid):
     """task_core of a tasks row as user uid sees it (their tags, the field values of the task's list)."""
     from ..collab.reactions import ltag_names
-    tags = [r[0] for r in c.execute("SELECT tag FROM task_tags WHERE task_id=? AND user_id=? ORDER BY tag", (row["id"], uid))]
+    tags = otg_user_names(c, row["id"], uid)  # 2.955.0 (#5276): the core's personal tags (were task_tags)
     fields = {str(r[0]): r[1] for r in c.execute("""SELECT v.field_id, v.value FROM task_field_values v JOIN list_fields f
                                                     ON f.id=v.field_id WHERE v.task_id=? AND f.list_id=?""", (row["id"], row["list_id"]))}
     if row["list_id"]:  # 2.43.0 (#1328): formula fields are computed (read-only for agents too)
@@ -965,7 +965,7 @@ def v1_tasks():
             where.append(f"due IS NOT NULL AND due{op}?")
             args.append(a[k])
     if a.get("tag"):  # 2.0.0: a personal tag or a list tag of that name
-        where.append(f"(id IN (SELECT task_id FROM task_tags WHERE user_id=? AND tag=?) OR {obj_tag_sql('tasks.id')})")  # 2.947.0 (#5275)
+        where.append(f"({obj_utag_sql('tasks.id')} OR {obj_tag_sql('tasks.id')})")  # 2.947.0 (#5275); 2.955.0 (#5276): personal tags of the core, any case
         args += [uid, a["tag"].lstrip("#"), a["tag"].lstrip("#")]
     if a.get("list_tag"):
         where.append(obj_tag_sql("tasks.id"))  # 2.947.0 (#5275): a project tag or a label of that name
@@ -1624,8 +1624,9 @@ def tag_count():
         tag = _tag_arg(request.args.get("tag"))
     except BadInput as e:
         return err(str(e))
-    r = c.execute(f"""SELECT COUNT(*), COALESCE(SUM(CASE WHEN t.status=0 THEN 1 ELSE 0 END),0) FROM task_tags g JOIN tasks t ON t.id=g.task_id
-                      WHERE g.user_id=? AND g.tag=? AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()} AND {tvis(c, uid, "t.")}""",
+    # 2.955.0 (#5276): the core's personal tags (any case)
+    r = c.execute(f"""SELECT COUNT(*), COALESCE(SUM(CASE WHEN t.status=0 THEN 1 ELSE 0 END),0) FROM tasks t
+                      WHERE {obj_utag_sql('t.id')} AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()} AND {tvis(c, uid, "t.")}""",
                   (uid, tag, uid, uid)).fetchone()
     return jsonify(tasks=r[0], open=r[1])
 
@@ -1638,14 +1639,12 @@ def tag_delete():
         tag = _tag_arg(body().get("tag"))
     except BadInput as e:
         return err(str(e))
-    rows = c.execute("""SELECT g.task_id, t.deleted_at FROM task_tags g JOIN tasks t ON t.id=g.task_id
-                        WHERE g.user_id=? AND g.tag=?""", (uid, tag)).fetchall()
-    ids = [r[0] for r in rows]
-    c.execute("DELETE FROM task_tags WHERE user_id=? AND tag=?", (uid, tag))
+    ids = sorted(otg_user_drop(c, uid, tag))  # 2.955.0 (#5276): the core's personal tag (any case) goes with its links
+    n = c.execute("SELECT COUNT(*) FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) AND deleted_at IS NULL", (ids,)).fetchone()[0] if ids else 0
     if ids:
         bump(c)
     c.commit()
-    return jsonify(ok=True, ids=ids, count=sum(1 for r in rows if not r[1]))
+    return jsonify(ok=True, ids=ids, count=n)
 
 
 @app.post("/api/tags/restore")
@@ -1661,9 +1660,10 @@ def tag_restore():
     n = 0
     for i in range(0, len(ids), 500):
         part = ids[i:i + 500]
-        n += c.execute(f"""INSERT INTO task_tags(task_id,user_id,tag) SELECT id, ?, ? FROM tasks
-                           WHERE id IN ({','.join('?' * len(part))}) AND list_id IN {vis_sql()} AND {tvis(c, uid)} ON CONFLICT DO NOTHING""",
-                       (uid, tag, *part, uid, uid)).rowcount
+        for (tid,) in c.execute(f"""SELECT id FROM tasks WHERE id IN ({','.join('?' * len(part))}) AND list_id IN {vis_sql()} AND {tvis(c, uid)}
+                                    AND NOT {obj_utag_sql('tasks.id')} ORDER BY id""", (*part, uid, uid, uid, tag)).fetchall():
+            otg_user_add(c, tid, uid, tag, by=uid)  # 2.955.0 (#5276): the core's personal tag (made again when it went)
+            n += 1
     if n:
         bump(c)
     c.commit()
@@ -1676,9 +1676,11 @@ def v1_tags():
     from ..agents.usage import v1_ltag
     v1_args(())
     c, uid = db(), me()
-    rows = c.execute(f"""SELECT g.tag, COUNT(*) AS n, SUM(CASE WHEN t.status=0 THEN 1 ELSE 0 END) AS open FROM task_tags g
-                         JOIN tasks t ON t.id=g.task_id WHERE g.user_id=? AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()}
-                         AND {tvis(c, uid, "t.")} GROUP BY g.tag ORDER BY lower(g.tag)""", (uid, uid, uid)).fetchall()
+    # 2.955.0 (#5276): the personal tags of the core (scope user; were task_tags)
+    rows = c.execute(f"""SELECT ot.name AS tag, COUNT(*) AS n, SUM(CASE WHEN t.status=0 THEN 1 ELSE 0 END) AS open FROM obj_tag_links g
+                         JOIN obj_tags ot ON ot.id=g.tag_id AND ot.scope_kind='user' AND ot.scope_id=CAST(CAST(? AS BIGINT) AS TEXT)
+                         JOIN tasks t ON t.id=g.obj_id AND g.kind='task' WHERE t.deleted_at IS NULL AND t.list_id IN {vis_sql()}
+                         AND {tvis(c, uid, "t.")} GROUP BY ot.id, ot.name ORDER BY lower(ot.name)""", (uid, uid, uid)).fetchall()
     out = [{"name": r["tag"], "tasks": r["n"], "open": r["open"], "kind": "personal"} for r in rows]
     vl = visible_lists(c, uid)  # 2.0.0: the list tags of the lists I see
     # 2.602.0 D (#4508): one query for all of them; still list by list in visible_lists' order, each by sort, name. 2.947.0 (#5275):

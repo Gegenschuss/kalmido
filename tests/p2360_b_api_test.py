@@ -104,7 +104,7 @@ for body, what in (({"title": "Renamed"}, "title"), ({"content": "Other text"}, 
     r = Bo.patch(B + f"/api/tasks/{T}", json=body)
     check(r.status_code == 400 and "locked" in r.text.lower(), f"locked: the app cannot change the {what} -> 400 " + f"{r.status_code} {r.text[:100]}")
 check(dbx("SELECT title, content, due, priority, list_id, repeat, assignee_id FROM tasks WHERE id=?", (T,))[0] == before, "nothing changed")
-check(not dbx("SELECT 1 FROM task_tags WHERE task_id=?", (T,)), "no tag stored")
+check(not dbx("SELECT 1 FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=?", (T,)), "no tag stored")  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
 # free while locked
 r = Bo.patch(B + f"/api/tasks/{T}", json={"content": "Intro\n- [x] one\n- [ ] two"})
 check(r.ok and "- [x] one" in r.json()["content"], "a checkbox tick in the notes is allowed " + r.text[:120])

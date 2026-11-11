@@ -58,7 +58,7 @@ from ..accounts.session import me
 from ..accounts.bgjobs import bgj_active, bgj_add, bgj_busy, bgj_drop, bgj_fn  # 2.370.3 (#2760)
 from ..lists.listhead import HEAD_STYLES  # 2.459.0 (#3849)
 from ..lists.lists import clean_color, LIST_COLOR_RE
-from ..core.objtags import otg_add, otg_find, otg_link  # 2.947.0 (#5275)
+from ..core.objtags import otg_add, otg_find, otg_link, otg_user_add  # 2.947.0 (#5275); 2.955.0 (#5276): otg_user_add
 from ..lists.fields import fx_tpl_fix  # 2.362.4 (#3100)
 from ..lists.formula import fx_display  # 2.362.4 (#3100)
 from ..lists.templates import tpl_clean  # 2.362.4 (#3100)
@@ -1802,7 +1802,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         tid = run.m("tasks", r.get("task_id"))
         tag = _txt(r.get("tag"), 100).strip()
         if tid and tag and _oid(r.get("user_id")) == me_old and not run.old("tasks", tid):  # 2.531.0 (#4317) F16
-            umz_insert(c, "task_tags", {"task_id": tid, "user_id": uid, "tag": tag}, rid=False)
+            otg_user_add(c, tid, uid, tag, by=uid)  # 2.955.0 (#5276): the core's personal tags (the file keeps task_tags' columns)
     umz_task_ltags(c, run, data, uid)
     for r in data.get("task_note_locks", []):  # browser-encrypted with my note password: only my own
         tid = run.m("tasks", r.get("task_id"))

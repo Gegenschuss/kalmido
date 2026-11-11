@@ -538,7 +538,10 @@ def do_complete(c, tid, status=2, undo=None):
         cur_id = insert_id(c, f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
                         [vals[k] for k in cols])
         # 2.602.0 D (#4508): one INSERT ... SELECT instead of one INSERT per tag
-        c.execute("INSERT INTO task_tags(task_id,user_id,tag) SELECT ?, user_id, tag FROM task_tags WHERE task_id=?", (cur_id, tid))
+        # 2.955.0 (#5276): everyone's personal tags (the core's scope user; were task_tags rows)
+        c.execute("""INSERT INTO obj_tag_links(tag_id,kind,obj_id,src,created_by,created_at) SELECT k.tag_id, 'task', ?, k.src, k.created_by, k.created_at
+                     FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task' AND k.obj_id=?
+                     ON CONFLICT DO NOTHING""", (cur_id, tid))
         c.execute("INSERT INTO task_field_values(task_id,field_id,value) SELECT ?, field_id, value FROM task_field_values WHERE task_id=?",
                   (cur_id, tid))
         chn_note(c, cur_id, "complete")  # 2.367.3 (#2973): the original is open again after this; its completed copy is what the channels report

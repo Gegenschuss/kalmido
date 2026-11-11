@@ -594,7 +594,7 @@ def _user_purge(c, uid, made):
     c.execute("DELETE FROM time_entries WHERE user_id=?", (uid,))  # 2.152.0 A: the private ones (organisation time stays, upg_rest)
     c.execute("DELETE FROM filters WHERE user_id=? AND shared=0", (uid,))
     c.execute("UPDATE filters SET user_id=NULL WHERE user_id=?", (uid,))  # 2.577.0 (#3356): a shared view stays with its project
-    c.execute("DELETE FROM task_tags WHERE user_id=?", (uid,))
+    c.execute("DELETE FROM obj_tags WHERE scope_kind='user' AND scope_id=?", (str(uid),))  # 2.955.0 (#5276): the personal tags (were task_tags)
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=?", (uid,))
     c.execute("UPDATE tasks SET delegate_agent_id=NULL WHERE delegate_agent_id=?", (uid,))  # 2.473.0 (#3357)
     c.execute("DELETE FROM task_watchers WHERE user_id=?", (uid,))

@@ -25,6 +25,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..core.config import app, APP_NAME, APP_VERSION, PUBLIC_URL, TZ
 from ..core.pg import insert_id
+from ..core.objtags import otg_unames, otg_user_of  # 2.955.0 (#5276)
 from ..core.i18n import N_, lang, tr
 from ..core.db import (
     body, bump, db, gset, gsetting, inbox_default, iso, iso_ms, local_now, now_utc, parse_iso, usettings,
@@ -722,8 +723,8 @@ def dav_ctx(c, u, task_ids):
         q = ",".join("?" * len(part))
         for r in c.execute(f"SELECT * FROM dav_meta WHERE task_id IN ({q})", part):
             meta[r["task_id"]] = r
-        for r in c.execute(f"SELECT task_id, tag FROM task_tags WHERE user_id=? AND task_id IN ({q}) ORDER BY tag", [u["id"], *part]):
-            tags.setdefault(r["task_id"], []).append(r["tag"])
+        for k, v in otg_user_of(c, u["id"], part).items():  # 2.955.0 (#5276): CATEGORIES = u's personal tags of the core
+            tags.setdefault(k, []).extend(v)
     extra_meta = {}
 
     def uid(pid):
@@ -765,8 +766,9 @@ def dav_coll_key(c, u, lst):
     where, args = dav_where(c, u, lst)
     r = c.execute(f"""SELECT count(*), max(t.updated_at),
                              md5(string_agg(t::text || '|' || COALESCE(m::text, '') || '|' || COALESCE(pm.uid, '') || '|'
-                                            || COALESCE((SELECT string_agg(x.tag, ',' ORDER BY x.tag) FROM task_tags x
-                                                         WHERE x.task_id=t.id AND x.user_id=?), ''), '/' ORDER BY t.id)),
+                                            || COALESCE((SELECT string_agg(ot.name, ',' ORDER BY ot.name) FROM obj_tag_links x
+                                                         JOIN obj_tags ot ON ot.id=x.tag_id AND ot.scope_kind='user'
+                                                         WHERE x.kind='task' AND x.obj_id=t.id AND ot.scope_id=CAST(CAST(? AS BIGINT) AS TEXT)), ''), '/' ORDER BY t.id)),
                              (SELECT l.e2e IS NOT NULL FROM lists l WHERE l.id=?),
                              (SELECT s.value FROM user_settings s WHERE s.user_id=? AND s.key='allday_time')
                       FROM tasks t LEFT JOIN dav_meta m ON m.task_id=t.id LEFT JOIN dav_meta pm ON pm.task_id=t.parent_id
@@ -1299,7 +1301,7 @@ def dav_patch(c, u, cur, v, caps, lid):
         p["remind_at"] = v["remind_at"]
     if "tags" in v or "CATEGORIES" in caps:
         want = v.get("tags") or []
-        if sorted(my_tags(c, tid)) != sorted(want):
+        if sorted(x.lower() for x in my_tags(c, tid)) != sorted(x.lower() for x in otg_unames(want)):  # 2.955.0 (#5276): Kunde = kunde
             p["tags"] = want
     if v["parent_uid"] or "RELATED-TO" in caps:
         pid = dav_parent_id(c, u, lid, tid, v["parent_uid"])

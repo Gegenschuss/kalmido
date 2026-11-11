@@ -285,7 +285,7 @@ it = (r.json().get("proposal") or {}).get("items", [{}])[0]
 check(it.get("task_id") == T1 and it.get("list_id") is None and it.get("tags") == ["urgent", "office"] and it.get("due") == "2030-02-01",
       "tags: one item, foreign list id dropped " + json.dumps(it))
 check(A.post(B + f"/api/proposals/{JT}/apply", json={"select": ["0"]}).ok, "tags: applied")
-tg = [x[0] for x in dbx("SELECT tag FROM task_tags WHERE task_id=?", (T1,))]
+tg = [x[0] for x in dbx("SELECT tag FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=?", (T1,))]  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
 check("urgent" in tg and "office" in tg, "tags: on the task " + str(tg))
 check(run(A, kind="tags", task_id=TP).status_code == 403, "tags: unshared list 403")
 

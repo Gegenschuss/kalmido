@@ -165,7 +165,7 @@ HID = one("SELECT id FROM habits WHERE user_id=? AND name='Umzug Laufen'", (GID,
 
 
 def kids():
-    return (one("SELECT COUNT(*) FROM habit_logs WHERE habit_id=?", (HID or 0,)), one("SELECT COUNT(*) FROM task_tags WHERE task_id=?", (TID or 0,)),
+    return (one("SELECT COUNT(*) FROM habit_logs WHERE habit_id=?", (HID or 0,)), one("SELECT COUNT(*) FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=?", (TID or 0,)),  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
             one("SELECT COUNT(*) FROM task_watchers WHERE task_id=?", (TID or 0,)), one("SELECT COUNT(*) FROM task_deps WHERE task_id=?", (TID or 0,)))
 
 

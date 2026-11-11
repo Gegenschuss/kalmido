@@ -95,7 +95,7 @@ D = r.json()["task"]
 check(D["assignee_id"] == uid["bob"] and D["title"] == "Lay deck" and D["section_id"] == SEC and D["status"] == 0, "the copy: assignee, section, open")
 check(D.get("sprint_id") == S1, "the copy: the sprint")
 check([x[1] for x in atts(D["id"])] == ["plan.txt"] and atts(D["id"])[0][2] != atts(T)[0][2], "the copy: its own stored file")
-check(one("SELECT COUNT(*) FROM task_tags WHERE task_id=? AND user_id=? AND tag='bobs-own-tag'", (D["id"], uid["bob"])) == 1, "the copy: the tag of another person, for that person")
+check(one("SELECT COUNT(*) FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=? AND user_id=? AND tag='bobs-own-tag'", (D["id"], uid["bob"])) == 1, "the copy: the tag of another person, for that person")  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
 check(one("SELECT COUNT(*) FROM obj_tag_links WHERE kind='task' AND obj_id=?", (D["id"],)) == 1, "the copy: the list tag")  # 2.947.0 (#5275): the core's tags (obj_tags / obj_tag_links)
 check(one("SELECT value FROM task_field_values WHERE task_id=? AND field_id=?", (D["id"], FP)) == str(uid["bob"]), "the copy: the person field")
 check(one("SELECT value FROM task_field_values WHERE task_id=? AND field_id=?", (D["id"], FT)) == str(BL), "the copy: the task field")
@@ -128,7 +128,7 @@ check(one("SELECT COUNT(*) FROM list_members WHERE list_id=?", (N,)) == 0, "the 
 NT = dbx("SELECT id, assignee_id, sprint_id FROM tasks WHERE list_id=? AND title='Lay deck' AND parent_id IS NULL ORDER BY id", (N,))
 check(len(NT) == 2 and all(x[1] is None for x in NT), "tenant: bob cannot see the copy: not assigned there " + str(NT))
 check(all(x[2] for x in NT), "the copy: the tasks in the new sprint")
-check(dbx("SELECT 1 FROM task_tags WHERE task_id=? AND user_id=?", (NT[0][0], uid["bob"])) == [], "tenant: no tag for somebody outside the copy")
+check(dbx("SELECT 1 FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=? AND user_id=?", (NT[0][0], uid["bob"])) == [], "tenant: no tag for somebody outside the copy")  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
 check(one("SELECT COUNT(*) FROM task_field_values v JOIN list_fields f ON f.id=v.field_id WHERE v.task_id=? AND f.type='person'", (NT[0][0],)) == 0,
       "tenant: no person field for somebody outside the copy")
 tv = dbx("SELECT v.value FROM task_field_values v JOIN list_fields f ON f.id=v.field_id WHERE v.task_id=? AND f.type='task'", (NT[0][0],))
@@ -167,11 +167,11 @@ TT, tdata = r.json()["id"], r.json()["data"]
 r = A.post(B + f"/api/templates/{TT}/apply", json={"list_id": L})
 check(r.ok and r.json()["task"]["assignee_id"] == uid["bob"], "into a list bob sees: assigned " + r.text[:200])
 NEW = r.json()["task"]["id"]
-check(one("SELECT COUNT(*) FROM task_tags WHERE task_id=? AND user_id=?", (NEW, uid["bob"])) == 1 and [x[1] for x in atts(NEW)] == ["two.txt"], "into a list bob sees: his tag + the file")
+check(one("SELECT COUNT(*) FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=? AND user_id=?", (NEW, uid["bob"])) == 1 and [x[1] for x in atts(NEW)] == ["two.txt"], "into a list bob sees: his tag + the file")  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
 own = A.post(B + "/api/lists", json={"name": "Mine only"}).json()["id"]
 r = A.post(B + f"/api/templates/{TT}/apply", json={"list_id": own})
 check(r.ok and r.json()["task"]["assignee_id"] is None, "tenant: into a list bob does not see: nobody assigned")
-check(one("SELECT COUNT(*) FROM task_tags WHERE task_id=? AND user_id=?", (r.json()["task"]["id"], uid["bob"])) == 0, "tenant: and no tag of his")
+check(one("SELECT COUNT(*) FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=? AND user_id=?", (r.json()["task"]["id"], uid["bob"])) == 0, "tenant: and no tag of his")  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
 
 # template_update: a partial update
 r = A.patch(B + f"/api/templates/{TP}", json={"data": {"name": "Renamed project"}})

@@ -1,7 +1,7 @@
 """2.609.0 (#3373): labels of an organisation -- project tags defined once for every project of the organisation (org_tags).
 In a project they are project tags linked to the label (list_tags.org_tag_id): made the first time a task of the project gets
 the label (collab/reactions.py ltag_get_or_create, also for people who may not make new project tags), renamed and recoloured
-with the label, kept as plain project tags when the label is deleted. Personal tags (task_tags) stay private and unchanged; the
+with the label, kept as plain project tags when the label is deleted. Personal tags (2.955.0 #5276: obj_tags scope user) stay private; the
 app shows the three kinds apart. Only the organisation's admins change its labels; the labels of another organisation are never
 offered (the app state lists only the labels of organisations whose projects the person sees).
 

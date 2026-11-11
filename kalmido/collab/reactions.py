@@ -6,7 +6,8 @@ from flask import g, has_request_context, jsonify, request
 from ..core.config import app
 from ..core.pg import qi, system_ctx
 from ..core.objtags import (  # 2.947.0 (#5275): the tags of the shared core
-    obj_tags_of, obj_tags_set, otg_add, otg_count, otg_find, otg_in_list, otg_link, otg_of_list, OTG_PROJECT)
+    obj_tags_of, obj_tags_set, otg_add, otg_count, otg_find, otg_in_list, otg_link, otg_of_list, OTG_PROJECT,
+    otg_user_rescope)  # 2.955.0 (#5276): promote = a scope change
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
@@ -547,12 +548,10 @@ def ltag_promote(lid):
     except BadInput as e:
         return err(str(e))
     i = ltag_get_or_create(c, lid, name, True)
-    ids = [r[0] for r in c.execute("""SELECT g.task_id FROM task_tags g JOIN tasks t ON t.id=g.task_id
-                                      WHERE g.user_id=? AND g.tag=? AND t.list_id=?""", (me(), tag, lid))]
-    src, by = _ltag_src()
+    # 2.955.0 (#5276): a scope change in the core -- the links of my personal tag (any case) on the list's tasks move to the
+    # project's tag (when and by whom they were set stays); my tag goes when no other task keeps it
+    ids = otg_user_rescope(c, me(), tag, i, lid)
     for x in ids:
-        otg_link(c, i, x, src=src, by=by)
-        c.execute("DELETE FROM task_tags WHERE task_id=? AND user_id=? AND tag=?", (x, me(), tag))
         log_act(c, x, "ltags", {"tags": ltag_names(c, x)})
     bump(c)
     c.commit()

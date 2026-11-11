@@ -12,6 +12,7 @@ from ..core.access import plists, PROJ_SQL, pvis
 from ..core.pg import st_ids
 from ..core.dlock import dl_tasks_locked  # 2.576.0 (#3371)
 from ..core.db import iso, iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
+from ..core.objtags import otg_user_of  # 2.955.0 (#5276)
 from ..core.retention import ret_days  # 2.272.0 E2 (#3038)
 
 
@@ -114,18 +115,9 @@ def task_dict(r, tags, full_snips=False):
 
 
 def tags_for(c, ids=None, uid=None):
-    out = {}
     uid = uid or me()
-    if ids is not None:  # 2.65.0 (#1505): only the rows of these tasks (one array parameter)
-        ids = set(ids)
-        for r in c.execute("SELECT task_id, tag FROM task_tags WHERE user_id=? AND task_id = ANY(CAST(? AS BIGINT[])) ORDER BY tag",
-                           (uid, st_ids(ids))):
-            out.setdefault(r["task_id"], []).append(r["tag"])
-        return out
-    for r in c.execute("SELECT task_id, tag FROM task_tags WHERE user_id=? ORDER BY tag", (uid,)):
-        if ids is None or r["task_id"] in ids:
-            out.setdefault(r["task_id"], []).append(r["tag"])
-    return out
+    # 2.955.0 (#5276): the personal tags of the core (obj_tags scope user; were task_tags); 2.65.0 (#1505): only these tasks
+    return otg_user_of(c, uid, None if ids is None else st_ids(set(ids)))
 
 
 ST_NOTE_MAX = 200  # 2.280.0 A (#3108): a longer note is not in the start state (lean_notes)

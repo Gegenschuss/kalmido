@@ -3892,6 +3892,10 @@ Tasks have `tags` (the caller's personal tags) and `list_tags` (names). Both can
 
 `GET /api/v1/tasks?tag=x` matches both personal and project tags. `?list_tag=x` matches project tags only. `GET /api/v1/tags` returns both kinds (`kind`: `personal` or `list`).
 
+**Personal tags (2.955.0):** an agent's personal tags are its own (nobody else sees them, the agent sees no one else's). They
+ignore upper and lower case like project tags: `tags: ["Kunde", "kunde"]` is one tag, the spelling first used stays (an
+existing tag `Kunde` keeps that spelling when `kunde` is set), and `?tag=kunde` finds it. A leading `#` and spaces are dropped.
+
 **Labels of an organisation (2.947.0):** in a project of an organisation, `list_tags` also holds the organisation's labels (the
 same tag in every project of it, managed only by its admins in the app). A label sits on the task itself: `GET .../lists/{id}/tags`
 lists it with `org_tag_id` (its id; `null` for a project tag) once a task of the project carries it, `PATCH` refuses to rename

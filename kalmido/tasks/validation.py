@@ -10,6 +10,7 @@ from flask import g, has_request_context
 from ..core.schema import MAX_DEPTH
 from ..core.i18n import N_, tr
 from ..core.db import iso_ms, now_utc, parse_iso
+from ..core.objtags import otg_unames  # 2.955.0 (#5276)
 from ..core.pages import valid_link
 from ..api.common import act_via  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -553,10 +554,11 @@ def lock_problem(c, cur, f, b=None):
             break
     if not hit and isinstance(b, dict):
         from ..tasks.tasks import my_tags
+        have = {x.lower() for x in my_tags(c, cur["id"])}  # 2.955.0 (#5276): personal tags compare without case (Kunde = kunde)
         if "tags" in b and isinstance(b["tags"], list):
-            hit = sorted({str(x).strip().lstrip("#") for x in b["tags"] if str(x).strip()}) != sorted(my_tags(c, cur["id"]))
+            hit = {x.lower() for x in otg_unames(str(x) for x in b["tags"])} != have
         elif b.get("add_tags") and isinstance(b["add_tags"], list):
-            hit = bool({str(x).strip().lstrip("#") for x in b["add_tags"]} - set(my_tags(c, cur["id"])))
+            hit = bool({x.lower() for x in otg_unames(str(x) for x in b["add_tags"])} - have)
         if not hit and "ltags" in b:
             from ..collab.reactions import clean_ltag_names, ltag_names
             try:

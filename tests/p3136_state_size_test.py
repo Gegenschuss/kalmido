@@ -96,8 +96,12 @@ def fill(list_ids, per, users, tag_uid):
           CASE WHEN (j * 7 + l) % 5 = 0 THEN to_char(now() - ((j % 28) || ' days')::interval, 'YYYY-MM-DD"T"HH24:MI:SS') END,
           (ARRAY[{us}])[1 + j % {len(users)}], CASE WHEN j % 4 = 0 THEN (ARRAY[{us}])[1 + (j / 4) % {len(users)}] END
         FROM unnest(ARRAY[{ids}]) l, generate_series(1, {per}) j""")
-    kt.dbx(f"""INSERT INTO task_tags (task_id, user_id, tag) SELECT id, {int(tag_uid)}, (ARRAY['kunde','intern','dringend'])[1 + id % 3]
-        FROM tasks WHERE list_id IN ({ids}) AND id % 5 < 2 ON CONFLICT DO NOTHING""")
+    # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user, obj_tag_links)
+    kt.dbx(f"""INSERT INTO obj_tags (scope_kind, scope_id, name) SELECT 'user', '{int(tag_uid)}', x FROM unnest(ARRAY['kunde','intern','dringend']) x
+        ON CONFLICT DO NOTHING""")
+    kt.dbx(f"""INSERT INTO obj_tag_links (tag_id, kind, obj_id) SELECT ot.id, 'task', t.id FROM tasks t
+        JOIN obj_tags ot ON ot.scope_kind='user' AND ot.scope_id='{int(tag_uid)}' AND ot.name=(ARRAY['kunde','intern','dringend'])[1 + t.id % 3]
+        WHERE t.list_id IN ({ids}) AND t.id % 5 < 2 ON CONFLICT DO NOTHING""")
 
 
 fill(lids, 103, [aid, uid["bob"], uid["dave"]], uid["bob"])

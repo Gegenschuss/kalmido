@@ -21,7 +21,7 @@ from ..core.db import insert_id, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, list_role
 from ..core.errors import BadInput
-from ..core.objtags import obj_tags_of, otg_link, otg_list_sql  # 2.947.0 (#5275)
+from ..core.objtags import obj_tags_of, otg_link, otg_list_sql, otg_user_add  # 2.947.0 (#5275); 2.955.0 (#5276): otg_user_add
 from .orglabels import olb_full  # 2.947.0 (#5275, review F4): a label only for the applier's full view
 from ..core.orgcrypt import oc_copy_file, oc_user_space, oc_task_org, oc_task_space  # 2.369.5 (#2517): pulled up from functions
 from .lists import LIST_COLOR_RE  # 2.369.5 (#2517): pulled up from functions
@@ -77,8 +77,10 @@ def tx_collect(c, uid, lid, order, base, x, dup=False, fidx=None, ftypes=None):
                 nd(r["id"])[k] = r[col]
         if r["sprint_id"] in smap:
             nd(r["id"])["sp"] = smap[r["sprint_id"]]
-    for r in c.execute(f"SELECT task_id, user_id, tag FROM task_tags WHERE task_id IN ({q}) AND user_id<>? ORDER BY tag", (uid,)):
-        nd(r["task_id"]).setdefault("xt", {}).setdefault(str(r["user_id"]), []).append(r["tag"])
+    # 2.955.0 (#5276): the others' personal tags of the core (were task_tags)
+    for r in c.execute(f"""SELECT k.obj_id, ot.scope_id, ot.name FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user'
+                           WHERE k.kind='task' AND k.obj_id IN ({q}) AND ot.scope_id<>CAST(CAST(? AS BIGINT) AS TEXT) ORDER BY ot.name""", (uid,)):
+        nd(r[0]).setdefault("xt", {}).setdefault(str(r[1]), []).append(r[2])
     for tid, tags in obj_tags_of(c, list(keys)).items():  # 2.947.0 (#5275): + the labels
         nd(tid).setdefault("lt", []).extend(x["name"] for x in tags)
     for r in c.execute(f"SELECT task_id, list_id FROM task_links WHERE task_id IN ({q})"):
@@ -371,7 +373,7 @@ def tx_apply(c, uid, lid, x, made, st, start=None, scale=1.0, fmap=None):
         for u, tags in (n.get("xt") or {}).items():
             if sees(u):
                 for t in tags:
-                    c.execute("INSERT INTO task_tags(task_id,user_id,tag) VALUES(?,?,?) ON CONFLICT DO NOTHING", (tid, int(u), t))
+                    otg_user_add(c, tid, int(u), t, by=uid)  # 2.955.0 (#5276): the core's personal tags of person u
         for name in n.get("lt") or []:
             if name.lower() in ltags:
                 otg_link(c, ltags[name.lower()], tid, by=uid)

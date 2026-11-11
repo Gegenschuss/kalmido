@@ -1047,7 +1047,10 @@ def umz_export_queries(uid):
         "list_envs": (f"SELECT id, list_id, name, sort, auto_close, created_at, deleted_at FROM list_envs WHERE list_id IN {own}", (uid,)),  # 2.60.0 (#1514): never the hook token
         "env_deploys": (f"SELECT * FROM env_deploys WHERE env_id IN (SELECT id FROM list_envs WHERE list_id IN {own})", (uid,)),
         "tasks": (f"SELECT * FROM tasks WHERE list_id IN {own}", (uid,)),
-        "task_tags": ("SELECT * FROM task_tags WHERE user_id=?", (uid,)),
+        # 2.955.0 (#5276): my personal tags of the core (obj_tags scope user), in the file and columns of task_tags as before
+        "task_tags": ("""SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k
+                         JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' AND ot.scope_id=CAST(CAST(? AS BIGINT) AS TEXT)
+                         WHERE k.kind='task' ORDER BY k.obj_id, ot.name""", (uid,)),
         "habits": ("SELECT * FROM habits WHERE user_id=? AND deleted_at IS NULL", (uid,)),  # 2.530.0 B (#4315): not the trash
         "habit_logs": ("SELECT * FROM habit_logs WHERE habit_id IN (SELECT id FROM habits WHERE user_id=? AND deleted_at IS NULL)", (uid,)),
         "pomos": ("SELECT * FROM pomos WHERE user_id=?", (uid,)),

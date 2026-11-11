@@ -9,6 +9,7 @@ from ..core.objparts import part_kind, part_write  # 2.610.0 (#4762): the core's
 from ..core.schema import MAX_DEPTH, USER_DEFAULTS
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, inbox_default, iso, now_utc
+from ..core.objtags import otg_user_names, otg_user_set  # 2.955.0 (#5276)
 from ..core.usertz import user_now
 from ..accounts.session import me
 from ..core.access import (
@@ -146,14 +147,16 @@ def hard_delete(c, ids, lists=None):
 
 
 def set_tags(c, tid, tags, uid=None):
+    """2.955.0 (#5276): the personal tags of uid (default: me) on task tid become `tags` -- rows of the core (obj_tags scope
+    user), names once under lower() (Kunde / kunde are one tag, decided 08.11.2026); an agent's are its own."""
+    from ..collab.reactions import _ltag_src
     uid = uid or me()
-    c.execute("DELETE FROM task_tags WHERE task_id=? AND user_id=?", (tid, uid))
-    for t in dict.fromkeys(x.strip().lstrip("#") for x in tags if x and x.strip().lstrip("#")):
-        c.execute("INSERT INTO task_tags(task_id,user_id,tag) VALUES(?,?,?)", (tid, uid, t))
+    src, by = _ltag_src()
+    otg_user_set(c, tid, [str(x) for x in tags if x], uid, src=src, by=by)
 
 
 def my_tags(c, tid):
-    return [r[0] for r in c.execute("SELECT tag FROM task_tags WHERE task_id=? AND user_id=?", (tid, me()))]
+    return otg_user_names(c, tid, me())  # 2.955.0 (#5276): the core's personal tags (were task_tags)
 
 
 def one_task(c, tid):
@@ -218,9 +221,8 @@ WEB_COMMENT |= {"portal"}  # 2.63.0 B (#1513): an answer the customer sees
 
 def task_inherit(c, tid, src):
     """Tags of everyone, list tags and the people of task src: what decides who sees a task (participants, an agent's data lock)."""
-    c.execute("INSERT INTO task_tags(task_id,user_id,tag) SELECT ?, user_id, tag FROM task_tags WHERE task_id=? ON CONFLICT DO NOTHING", (tid, src))
     c.execute("""INSERT INTO obj_tag_links(tag_id,kind,obj_id,src,created_by) SELECT tag_id, 'task', ?, src, created_by FROM obj_tag_links
-                 WHERE kind='task' AND obj_id=? ON CONFLICT DO NOTHING""", (tid, src))  # 2.947.0 (#5275): the project tags of the core
+                 WHERE kind='task' AND obj_id=? ON CONFLICT DO NOTHING""", (tid, src))  # 2.947.0 (#5275): the project tags of the core; 2.955.0 (#5276): and everyone's personal tags (were task_tags)
     c.execute("INSERT INTO task_people(task_id,user_id) SELECT ?, user_id FROM task_people WHERE task_id=? ON CONFLICT DO NOTHING", (tid, src))
 
 

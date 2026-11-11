@@ -11,6 +11,7 @@ from flask import Response
 from ..core.config import app, TZ
 from ..core.i18n import tr
 from ..core.db import db, local_now
+from ..core.objtags import otg_user_of  # 2.955.0 (#5276): the personal tags of the core (were task_tags)
 from ..core.serializers import csv_cell
 from ..accounts.session import me
 
@@ -76,9 +77,7 @@ def ex_tasks(c, uid, lid):
     rows = c.execute("SELECT t.*, u.display_name AS who FROM tasks t LEFT JOIN users u ON u.id=t.assignee_id "
                      "WHERE t.list_id=? AND t.deleted_at IS NULL ORDER BY t.sort, t.id", (lid,)).fetchall()
     tags = {}
-    for r in c.execute("SELECT task_id, tag FROM task_tags WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?) ORDER BY tag",
-                       (uid, lid)):
-        tags.setdefault(r["task_id"], []).append(r["tag"])
+    tags.update(otg_user_of(c, uid, [r["id"] for r in rows]))
     return secs, rows, tags
 
 

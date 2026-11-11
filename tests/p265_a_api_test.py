@@ -73,6 +73,7 @@ SEED = f"""
 import random, datetime
 from kalmido.core.db import connect
 from kalmido.core.pg import insert_id
+from kalmido.core.objtags import otg_user_add  # 2.955.0 (#5276)
 c = connect()
 random.seed(11)
 now = datetime.datetime.now(datetime.timezone.utc)
@@ -107,8 +108,7 @@ while made < {NT}:
                                 "VALUES(?,?,?,?,?,?,?,?)", (lid, t, f"Sub {{made}}", made, T0, T0, alice, ass)))
         made += 1
     if random.random() < .2:
-        c.execute("INSERT INTO task_tags(task_id, user_id, tag) VALUES(?,?,?) ON CONFLICT DO NOTHING",
-                  (t, random.choice([alice, bob]), random.choice(["home", "work", "urgent", "later"])))
+        otg_user_add(c, t, random.choice([alice, bob]), random.choice(["home", "work", "urgent", "later"]))  # 2.955.0 (#5276): the core's personal tags
     if random.random() < .1:
         k = insert_id(c, "INSERT INTO comments(task_id, user_id, body, created_at) VALUES(?,?,?,?)",
                       (t, random.choice([alice, bob]), "A comment", T0))

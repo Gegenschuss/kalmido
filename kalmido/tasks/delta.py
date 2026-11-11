@@ -36,7 +36,7 @@ DL_CLEAN = 256   # every DL_CLEAN-th version cleans up
 DL_DAYS = 7      # versions older than this are dropped at the clean-up too (busy instances: many rows per version)
 # table -> the columns holding a task id ("full": a change there may change what a person sees -> the full state)
 DL_TABLES = {
-    "tasks": ("id",), "task_tags": ("task_id",), "obj_tag_links": ("obj_id",), "attachments": ("task_id",),  # 2.947.0 (#5275): obj_tag_links (kind task) was task_list_tags
+    "tasks": ("id",), "obj_tag_links": ("obj_id",), "attachments": ("task_id",),  # 2.947.0 (#5275): obj_tag_links (kind task) was task_list_tags; 2.955.0 (#5276): and task_tags
     "comments": ("task_id",), "obj_seen": ("ref_id",), "task_field_values": ("task_id",),  # 2.905.0 (#5284): obj_seen (kind task) was task_seen
     "task_deps": ("task_id", "blocker_id"), "agent_usage": ("task_id",), "git_links": ("task_id",), "git_closes": ("task_id",),
     "task_people": ("task_id",), "task_watchers": ("task_id",), "events": ("task_id",), "contact_tasks": ("task_id",), "time_entries": ("task_id",),
@@ -86,7 +86,13 @@ BEGIN
     END IF;
     -- 2.947.0 (#5275): a project's tag is the project's (scope_id = its list); a label of an organisation (or another scope) is in
     -- every project of it: full for all
-    IF TG_TABLE_NAME = 'obj_tags' AND COALESCE(jn->>'scope_kind', jo->>'scope_kind') <> 'list' THEN
+    -- 2.955.0 (#5276): a person's own tag (scope user): made or gone, its links mark the tasks (a cascade fires their trigger);
+    -- renamed: full for that person only. A file store's tag (scope ws) is on no task.
+    IF TG_TABLE_NAME = 'obj_tags' AND COALESCE(jn->>'scope_kind', jo->>'scope_kind') = 'ws' THEN RETURN NULL; END IF;
+    IF TG_TABLE_NAME = 'obj_tags' AND COALESCE(jn->>'scope_kind', jo->>'scope_kind') = 'user' THEN
+      IF TG_OP <> 'UPDATE' THEN RETURN NULL; END IF;
+      uk := ARRAY[(jo->>'scope_id')::bigint, (jn->>'scope_id')::bigint]; lk := '{}';
+    ELSIF TG_TABLE_NAME = 'obj_tags' AND COALESCE(jn->>'scope_kind', jo->>'scope_kind') <> 'list' THEN
       INSERT INTO dl_changes(task_id) VALUES (NULL); RETURN NULL;
     END IF;
     IF uk IS NULL THEN

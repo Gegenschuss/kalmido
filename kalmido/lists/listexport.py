@@ -18,6 +18,7 @@ from flask import Response, request
 from ..core.config import app
 from ..core.i18n import dec_comma, lang, tr
 from ..core.db import db, local_now
+from ..core.objtags import otg_user_of  # 2.955.0 (#5276): the personal tags of the core (were task_tags)
 from ..core.access import Denied, list_role, tvis, vis_sql
 from ..accounts.session import me
 from ..personal.timetrack import _csv_cell
@@ -128,9 +129,7 @@ def lex_csv(lid):
     ids = [r["id"] for r in rows]
     tags = {}
     if ids:
-        q = ",".join(str(int(i)) for i in ids)
-        for r in c.execute(f"SELECT task_id, tag FROM task_tags WHERE user_id=? AND task_id IN ({q}) ORDER BY tag", (uid,)):
-            tags.setdefault(r[0], []).append(r[1])
+        tags.update(otg_user_of(c, uid, ids))
     fields = [f for f in c.execute("SELECT * FROM list_fields WHERE list_id=? AND type!='formula' ORDER BY sort, id", (lid,))]
     vals = {}
     if ids and fields:

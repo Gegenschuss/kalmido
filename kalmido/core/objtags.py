@@ -6,7 +6,7 @@ obj_tags (migrations.d/5275_a.py) is one tag of a scope, obj_tag_links puts it o
     list        the project's id         a project tag: everyone in the project sees it, editors manage it (collab/reactions.py)
     org         the organisation's id    a label of the organisation: the same in every project of it, its admins manage it
                                          (lists/orglabels.py); org_id is set, so row-level security shows it to members only
-    user        the person's id          stage Q5b (task_tags), not moved yet
+    user        the person's id          a personal tag: only that person sees and sets it (stage Q5b, 2.955.0, #5276)
     ws          the workspace key        stage Q5c (doc_tags), not moved yet
 
 A task carries the tags of its project's scopes: the project's own tags and the labels of the project's organisation, each
@@ -136,14 +136,16 @@ def otg_link(c, tag_id, oid, kind="task", src="person", by=None):
               (tag_id, kind, oid, src if src in OTG_SRC else "person", by, now_utc()))
 
 
-def obj_tags_set(c, oid, tag_ids, kind="task", scopes=OTG_PROJECT, src="person", by=None):
+def obj_tags_set(c, oid, tag_ids, kind="task", scopes=OTG_PROJECT, src="person", by=None, scope_id=None):
     """The tags of object oid among the scope kinds `scopes` become exactly tag_ids (a link already there keeps its time and
     who set it). Links to tags of other scope kinds stay; a tag the reader cannot see (another organisation's label: row-level
-    security) is neither read nor removed."""
+    security) is neither read nor removed. scope_id (2.955.0, #5276): only the tags of this one scope (a person's own: another
+    person's personal tags on the object stay)."""
     want = list(dict.fromkeys(int(x) for x in tag_ids))
-    c.execute("""DELETE FROM obj_tag_links WHERE kind=? AND obj_id=? AND NOT (tag_id = ANY(CAST(? AS BIGINT[])))
-                 AND EXISTS (SELECT 1 FROM obj_tags ot WHERE ot.id=obj_tag_links.tag_id AND ot.scope_kind = ANY(CAST(? AS TEXT[])))""",
-              (kind, oid, want, list(scopes)))
+    one = "" if scope_id is None else " AND ot.scope_id=CAST(? AS TEXT)"
+    c.execute(f"""DELETE FROM obj_tag_links WHERE kind=? AND obj_id=? AND NOT (tag_id = ANY(CAST(? AS BIGINT[])))
+                 AND EXISTS (SELECT 1 FROM obj_tags ot WHERE ot.id=obj_tag_links.tag_id AND ot.scope_kind = ANY(CAST(? AS TEXT[])){one})""",
+              (kind, oid, want, list(scopes), *(() if scope_id is None else (str(scope_id),))))
     for i in want:
         otg_link(c, i, oid, kind, src, by)
 
@@ -282,3 +284,188 @@ def otg_rekey_refs(c, m, lid):
         return
     for o, n in sorted(m.items()):
         c.execute("SELECT kalmido_otg_rekey(?, ?, ?)", (int(lid), int(o), int(n)))
+
+
+# ---------------------------------------------------------------- personal tags (stage Q5b, 2.955.0, #5276)
+# A person's own tags (was task_tags): scope user, scope_id = the person's id. Nobody else sees them -- every reader below asks
+# for one person's scope. An agent keeps its own (the scope of the agent's account, decided 08.11.2026, question 12). The name
+# is unique per person under lower() (question 8: Kunde / kunde are one tag; the first spelling stays). Plain text also on a
+# task of an end-to-end locked project (question 10). A personal tag lives while a task carries it: a tag whose last link
+# goes is deleted (otg_user_prune), as a task_tags row was the tag itself. Rights: the task's (the caller checked them).
+OTG_USER = ("user",)
+
+
+def otg_uname(v):
+    """A personal tag's name as stored and compared: trimmed, no leading '#' ('' = none). Was tasks.set_tags' own rule."""
+    return str(v or "").strip().lstrip("#").strip()
+
+
+def otg_unames(names):
+    """The names, normalised, each once under lower() (the first spelling wins), in their order."""
+    out = {}
+    for x in names or ():
+        n = otg_uname(x)
+        if n:
+            out.setdefault(n.lower(), n)
+    return list(out.values())
+
+
+def obj_utag_sql(col="tasks.id", by="name", who="?"):
+    """SQL: the task in column `col` carries a personal tag. who='?': of the person given as the first `?` argument (an id),
+    who='any': of anyone (the data lock). by='name' (any case, one `?`), 'names' (a lower-case text array, one `?`),
+    'any' (no argument)."""
+    cond = {"name": "AND lower(ot.name)=lower(?)", "names": "AND lower(ot.name) = ANY(CAST(? AS TEXT[]))", "any": ""}[by]
+    scope = "" if who == "any" else "AND ot.scope_id=CAST(CAST(? AS BIGINT) AS TEXT)"
+    return (f"EXISTS (SELECT 1 FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id WHERE k.kind='task' AND k.obj_id={col} "
+            f"AND ot.scope_kind='user' {scope} {cond})")
+
+
+def otg_user_of(c, uid, ids=None):
+    """{task id: [names]} -- the personal tags of person uid on the tasks ids (None = on every task), each list by name."""
+    out = {}
+    q = f"""SELECT k.obj_id, ot.name FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id
+            WHERE k.kind='task' AND ot.scope_kind='user' AND ot.scope_id=CAST(CAST(? AS BIGINT) AS TEXT)
+            {"AND k.obj_id = ANY(CAST(? AS BIGINT[]))" if ids is not None else ""} ORDER BY ot.name, k.obj_id"""
+    args = (int(uid),) if ids is None else (int(uid), sorted({int(x) for x in ids if x}))
+    if ids is not None and not args[1]:
+        return out
+    for r in c.execute(q, args):
+        out.setdefault(r[0], []).append(r[1])
+    return out
+
+
+def otg_user_names(c, tid, uid):
+    """The personal tags of person uid on task tid, by name."""
+    return otg_user_of(c, uid, [tid]).get(int(tid), [])
+
+
+def otg_user_list(c, uid, limit=500):
+    """The names of person uid's tags that a task carries, by name (at most limit)."""
+    return [r[0] for r in c.execute("""SELECT ot.name FROM obj_tags ot WHERE ot.scope_kind='user' AND ot.scope_id=CAST(CAST(? AS BIGINT) AS TEXT)
+                                       AND EXISTS (SELECT 1 FROM obj_tag_links k WHERE k.tag_id=ot.id) ORDER BY ot.name LIMIT ?""",
+                                    (int(uid), int(limit)))]
+
+
+def otg_user_tag(c, uid, name, by=None):
+    """The id of person uid's tag `name` (any case), made when it is not there yet; None for an empty name."""
+    n = otg_uname(name)
+    if not n:
+        return None
+    r = otg_find(c, "user", int(uid), n)
+    if r:
+        return r["id"]
+    c.execute("""INSERT INTO obj_tags(scope_kind,scope_id,name,color,sort,created_by,created_at) VALUES('user',?,?,'',0,?,?)
+                 ON CONFLICT DO NOTHING""", (str(int(uid)), n, by if by is not None else (int(uid) or None), now_utc()))
+    return otg_find(c, "user", int(uid), n)["id"]
+
+
+def otg_user_prune(c, uid, ids=None):
+    """Person uid's tags (only ids, when given) that no task carries any more go (a personal tag lives on its tasks)."""
+    c.execute(f"""DELETE FROM obj_tags ot WHERE ot.scope_kind='user' AND ot.scope_id=CAST(CAST(? AS BIGINT) AS TEXT)
+                  {"AND ot.id = ANY(CAST(? AS BIGINT[]))" if ids is not None else ""}
+                  AND NOT EXISTS (SELECT 1 FROM obj_tag_links k WHERE k.tag_id=ot.id)""",
+              (int(uid),) if ids is None else (int(uid), sorted(int(x) for x in ids)))
+
+
+def otg_user_set(c, tid, names, uid, src="person", by=None):
+    """The personal tags of person uid on task tid become exactly `names` (normalised, once under lower()); another person's
+    tags and the project's stay. A tag left without a task goes."""
+    uid = int(uid)
+    had = {r[0] for r in c.execute("""SELECT ot.id FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id WHERE k.kind='task'
+                                      AND k.obj_id=? AND ot.scope_kind='user' AND ot.scope_id=?""", (tid, str(uid)))}
+    want = [otg_user_tag(c, uid, n, by) for n in otg_unames(names)]
+    obj_tags_set(c, tid, want, scopes=OTG_USER, src=src, by=by, scope_id=uid)
+    if had - set(want):
+        otg_user_prune(c, uid, had - set(want))
+
+
+def otg_user_add(c, tid, uid, name, src="person", by=None):
+    """Puts person uid's tag `name` on task tid as well (made when new). The tag's id, None for an empty name."""
+    i = otg_user_tag(c, uid, name, by)
+    if i:
+        otg_link(c, i, tid, "task", src, by)
+    return i
+
+
+def otg_user_drop(c, uid, name, tids=None):
+    """Takes person uid's tag `name` (any case) off the tasks tids (None = off every task); the tag goes when no task keeps it.
+    The task ids it was taken off."""
+    r = otg_find(c, "user", int(uid), otg_uname(name))
+    if not r:
+        return []
+    if tids is None:
+        ids = [x[0] for x in c.execute("DELETE FROM obj_tag_links WHERE tag_id=? AND kind='task' RETURNING obj_id", (r["id"],))]
+    else:
+        ids = [x[0] for x in c.execute("""DELETE FROM obj_tag_links WHERE tag_id=? AND kind='task' AND obj_id = ANY(CAST(? AS BIGINT[]))
+                                          RETURNING obj_id""", (r["id"], sorted(int(x) for x in tids)))]
+    otg_user_prune(c, uid, [r["id"]])
+    return ids
+
+
+def otg_user_rescope(c, uid, name, into_id, lid):
+    """Promote (2.955.0, #5276: a scope change): the links of person uid's tag `name` (any case) on the tasks of list lid move to
+    tag into_id (a project's tag or label), keeping when and by whom each was set; uid's tag goes when no other task keeps it.
+    The task ids."""
+    r = otg_find(c, "user", int(uid), otg_uname(name))
+    if not r:
+        return []
+    ids = [x[0] for x in c.execute("""SELECT k.obj_id FROM obj_tag_links k JOIN tasks t ON t.id=k.obj_id
+                                      WHERE k.tag_id=? AND k.kind='task' AND t.list_id=? ORDER BY k.obj_id""", (r["id"], lid))]
+    if ids:
+        c.execute("""INSERT INTO obj_tag_links(tag_id,kind,obj_id,src,created_by,created_at)
+                     SELECT ?, kind, obj_id, src, created_by, created_at FROM obj_tag_links
+                     WHERE tag_id=? AND kind='task' AND obj_id = ANY(CAST(? AS BIGINT[])) ON CONFLICT DO NOTHING""", (into_id, r["id"], ids))
+        otg_user_drop(c, uid, r["name"], ids)
+    return ids
+
+
+def otg_adopt_user(c, uid):
+    """The personal tags of the single-user era (scope_id '0', copied from an old file before any account existed) become
+    person uid's; a tag of the same name uid has already takes their tasks. The number of tags adopted."""
+    n = 0
+    for r in c.execute("SELECT id, name FROM obj_tags WHERE scope_kind='user' AND scope_id='0' ORDER BY id").fetchall():
+        have = otg_find(c, "user", int(uid), r["name"])
+        if have:
+            otg_merge(c, r["id"], have["id"])
+        else:
+            c.execute("UPDATE obj_tags SET scope_id=?, created_by=? WHERE id=?", (str(int(uid)), int(uid), r["id"]))
+        n += 1
+    return n
+
+
+# the old table, for the copy of a SQLite file (admin/migrate.py) and as a version before 2.955 makes it; otg_move_user takes it
+OTG_USER_LEGACY_DDL = """
+CREATE TABLE IF NOT EXISTS task_tags (
+  task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, user_id BIGINT NOT NULL DEFAULT 0,
+  tag TEXT NOT NULL, PRIMARY KEY (task_id, user_id, tag));
+"""
+
+
+def otg_move_user(c):
+    """2.955.0 (#5276): the rows of task_tags into obj_tags (scope user) / obj_tag_links while that table is there (the first
+    start of 2.955, the copy of an old SQLite file, or again after a version before 2.955 ran and made it anew); the fragment
+    5276_a drops it right after (one-way). A person's names equal under lower() become one tag (decided 08.11.2026, question
+    8): its spelling is the one on most of the person's tasks (a tie: the first in sort order); names are trimmed and lose a
+    leading '#'. A row of an account that is gone is left out; a row of the single-user era (user_id 0) waits under scope_id
+    '0' for the first account (otg_adopt_user). A link's src is 'agent' on an agent's own tags. Runs as "system" in the start
+    transaction. Returns the number of tags made."""
+    if not _otg_has(c, "task_tags"):
+        return 0
+    norm = r"ltrim(regexp_replace(g.tag, '^\s+|\s+$', '', 'g'), '#')"
+    c.execute(f"""CREATE TEMP TABLE otg_tt ON COMMIT DROP AS
+                  SELECT g.task_id, g.user_id, btrim({norm}) AS name FROM task_tags g
+                  WHERE (g.user_id = 0 OR EXISTS (SELECT 1 FROM users u WHERE u.id=g.user_id)) AND btrim({norm}) <> ''""")
+    n = c.execute("""INSERT INTO obj_tags(scope_kind, scope_id, name, color, sort, created_by, created_at)
+                     SELECT DISTINCT ON (x.user_id, lower(x.name)) 'user', CAST(x.user_id AS TEXT), x.name, '', 0, NULLIF(x.user_id, 0),
+                            CURRENT_TIMESTAMP
+                     FROM (SELECT user_id, name, COUNT(*) AS n FROM otg_tt GROUP BY user_id, name) x
+                     ORDER BY x.user_id, lower(x.name), x.n DESC, x.name
+                     ON CONFLICT DO NOTHING""").rowcount
+    c.execute("""INSERT INTO obj_tag_links(tag_id, kind, obj_id, src, created_by, created_at)
+                 SELECT DISTINCT ot.id, 'task', x.task_id,
+                        CASE WHEN EXISTS (SELECT 1 FROM users u WHERE u.id=x.user_id AND u.kind='agent') THEN 'agent' ELSE 'person' END,
+                        NULLIF(x.user_id, 0), CURRENT_TIMESTAMP
+                 FROM otg_tt x JOIN obj_tags ot ON ot.scope_kind='user' AND ot.scope_id=CAST(x.user_id AS TEXT) AND lower(ot.name)=lower(x.name)
+                 ON CONFLICT DO NOTHING""")
+    c.execute("DROP TABLE otg_tt")
+    return n

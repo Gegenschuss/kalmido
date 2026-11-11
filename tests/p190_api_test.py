@@ -183,7 +183,7 @@ r = A.post(B + "/api/tags/delete", json={"tag": "x"})
 check(r.ok and sorted(r.json()["ids"]) == sorted([t1, t2, t3]) and r.json()["count"] == 2, f"delete {r.json()}")
 check(A.get(B + "/api/version").json()["v"] > v0, "version bumped")
 with db() as c:
-    rows = c.execute("SELECT task_id, user_id, tag FROM task_tags WHERE tag='x' ORDER BY user_id").fetchall()
+    rows = c.execute("SELECT task_id, user_id, tag FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE tag='x' ORDER BY user_id").fetchall()  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
 check(rows == [(t1, ids["bob"], "x")], f"only alice's rows gone, bob's tag stays {rows}")
 st = A.get(B + "/api/state").json()
 tt = {t["id"]: t for t in st["tasks"]}

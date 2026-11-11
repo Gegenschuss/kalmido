@@ -16,6 +16,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id
+from ..core.objtags import otg_user_list  # 2.955.0 (#5276)
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, usettings
 from ..core.access import Denied, list_people, list_role, my_inbox, need_task, org_trip_sql, vis_sql, WRITE_ROLES
@@ -506,7 +507,7 @@ def asst_run():
             notes = "" if ln_is_locked(c, tid) else (task["content"] or "")[:4000]
             inp = _asst_inp({"items": [{"task_id": tid, "title": task["title"], "notes": notes}], "lists": []})
             pkind, jtask, lid = "triage", tid, task["list_id"]
-            own = [r[0] for r in c.execute("SELECT DISTINCT tag FROM task_tags WHERE user_id=? ORDER BY tag LIMIT 200", (uid,))]
+            own = otg_user_list(c, uid, 200)  # 2.955.0 (#5276): the core's personal tags (were task_tags)
             data = asst_task_text(c, task) + "\n\n" + json.dumps({"task_id": tid, "existing_tags": own, "current_tags": my_tags(c, tid),
                                                                  "today": local_now().date().isoformat()}, ensure_ascii=False)
         elif kind == "triage":

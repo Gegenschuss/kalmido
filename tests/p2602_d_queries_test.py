@@ -275,7 +275,7 @@ for who, s, lid in (("bob", Bo, P[0]), ("frida", Fr, F2)):
     cp = kt.dbx("SELECT id FROM tasks WHERE title=? AND status=2 AND id<>?", (title, tid))
     check(len(cp) == 1, f"#4508 {who}: one completed copy ({len(cp)})")
     if cp:
-        tags = lambda t: sorted((r[0], r[1]) for r in kt.dbx("SELECT user_id, tag FROM task_tags WHERE task_id=?", (t,)))  # noqa: E731
+        tags = lambda t: sorted((r[0], r[1]) for r in kt.dbx("SELECT user_id, tag FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=?", (t,)))  # noqa: E731
         orig = tags(tid)
         check(len(orig) == 3 and tags(cp[0][0]) == orig and {u for u, _ in orig} == {uid[who]},
               f"#4508 {who}: the copy carries the same tags (user + tag) {tags(cp[0][0])} / {orig}")

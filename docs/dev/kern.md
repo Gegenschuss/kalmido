@@ -671,7 +671,7 @@ Tags exist once: `obj_tags(id, scope_kind, scope_id, org_id, name, color, sort, 
 tag of a scope, `obj_tag_links(tag_id, kind, obj_id, src person|agent|auto, created_by, created_at)` puts it on an object
 (`kalmido/core/objtags.py`, fragment `migrations.d/5275_a.py`). The scopes: `list` (a project's tags, `scope_id` = the list
 id as text), `org` (the labels of an organisation, `org_id` set: row-level security shows them to its members only), `user`
-(stage Q5b: the personal tags, `task_tags` still) and `ws` (stage Q5c: the file store's tags, `doc_tags` still). A name is
+(stage Q5b, 2.955.0: a person's own tags, `scope_id` = the person's id) and `ws` (stage Q5c: the file store's tags, `doc_tags` still). A name is
 unique per scope under `lower()`. It replaced `list_tags`, `task_list_tags` and `org_tags`.
 - A task carries the tags of its project's scopes: the project's own and the labels of the project's organisation. A label
   sits on the task itself (decided 08.11.2026: no copy per project any more); a rename or a new colour reaches every task at
@@ -703,6 +703,25 @@ unique per scope under `lower()`. It replaced `list_tags`, `task_list_tags` and 
   views name them; the identity is set past the old ids before the labels are made), a label's copy becomes the label (only
   links whose tag belonged to the task's own list), a project tag named like a label of its organisation becomes the label (rules / shared views that named the copy are rewritten), then the
   fragment drops the three tables. One-way; a version before 2.947 shows no project tags until this one is back.
+
+### Personal tags (stage Q5b, 2.955.0, #5276)
+
+A person's own tags are `obj_tags` rows of scope `user` (`scope_id` = the person's id; an agent's are the agent account's,
+decided 08.11.2026, question 12) with links of kind `task`; `task_tags` is gone (fragment `5276_a`, one-way). Nobody else sees
+them: every reader asks for one person's scope.
+- Names: `otg_uname` (trimmed, no leading `#`) and unique per person under `lower()` -- `Kunde` / `kunde` are one tag, the first
+  spelling stays (question 8). Plain text also on a task of an end-to-end locked project (question 10).
+- Reading: `otg_user_of(c, uid, ids)` (bulk, by name), `otg_user_names`, `otg_user_list` (the names a task carries),
+  `obj_utag_sql(col, by, who)` (the filter part: filters, API v1 `tag=`, the data lock with `who='any'`).
+- Writing: `otg_user_set(c, tid, names, uid)` (exactly these; `tasks.set_tags`, so the task's history and server undo carry
+  them as the field `tags`), `otg_user_add`, `otg_user_drop`; a personal tag lives while a task carries it (`otg_user_prune`).
+  Promoting it to a project tag is a scope change: `otg_user_rescope` moves the links on the project's tasks (time and author
+  stay). The single-user era's tags wait under `scope_id '0'` for the first account (`otg_adopt_user`).
+- The delta state: a link marks the task; a renamed personal tag is "full" for that person only.
+- An account deleted for good takes its tags along (trigger `kalmido_otg_gone_user`). The account export keeps the file
+  `task_tags` with its old columns; the import writes into the core.
+- The move (`otg_move_user`, every start while `task_tags` exists, as "system"): names equal under `lower()` per person become
+  one tag (the spelling on most tasks), rows of an account that is gone stay out; then the fragment drops the table.
 
 ## Gestures: swiping a row, leafing (2.876.0, #5559)
 

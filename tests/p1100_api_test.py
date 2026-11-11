@@ -266,7 +266,10 @@ P.patch(B + f"/api/tasks/{T1}", json={"tags": ["mine"]})
 check(P.get(B + "/api/tags/count", params={"tag": "hidetag"}).json() == {"tasks": 0, "open": 0}, "tag count of alice's tag: 0")
 check(P.get(B + "/api/tags/count", params={"tag": "mine"}).json()["tasks"] == 1, "own tag count")
 A.post(B + "/api/tags/delete", json={"tag": "hidetag"})
-dbx("INSERT INTO task_tags(task_id,user_id,tag) VALUES(?,?,?)", (T3, ids["pete"], "stale"))  # e.g. from before a role change
+# 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user, obj_tag_links)
+dbx("INSERT INTO obj_tags(scope_kind,scope_id,name) VALUES('user',?,'stale') ON CONFLICT DO NOTHING", (str(ids["pete"]),))  # e.g. from before a role change
+dbx("""INSERT INTO obj_tag_links(tag_id,kind,obj_id) SELECT id, 'task', ? FROM obj_tags WHERE scope_kind='user' AND scope_id=? AND name='stale'""",
+    (T3, str(ids["pete"])))
 check(P.get(B + "/api/tags/count", params={"tag": "stale"}).json()["tasks"] == 0, "tag on a task I no longer see: not counted")
 check(P.post(B + "/api/tags/restore", json={"tag": "x", "ids": [T3, T1]}).json()["count"] == 1, "tag restore skips hidden tasks")
 # templates, export, public link

@@ -18,6 +18,7 @@ from ..tasks.validation import (
 )
 from ..tasks.ttypes import tt_check  # 2.609.0 (#3372)
 from ..tasks.tasks import ms_target, one_task, set_tags
+from ..core.objtags import otg_user_names  # 2.955.0 (#5276)
 from ..core.errors import BadInput
 from ..core.conflict import ccf_check  # 2.564.0 (#4701)
 from ..accounts.onboarding import app_industries  # 2.636.0 (#4565); 2.828.0 (#5511): the set
@@ -65,7 +66,7 @@ def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None, dup=None
     dup (2.78.0, #1881, tpl_list_data): past dates stay, the state comes along (st / done_at), completed subtasks only with done."""
     def off(d):
         return ((date.fromisoformat(d) - base).days if dup is not None else max(0, (date.fromisoformat(d) - base).days)) if d else None
-    tags = [r[0] for r in c.execute("SELECT tag FROM task_tags WHERE task_id=? AND user_id=? ORDER BY tag", (t["id"], uid))]
+    tags = otg_user_names(c, t["id"], uid)  # 2.955.0 (#5276): the core's personal tags (were task_tags)
     kids = c.execute(f"""SELECT * FROM tasks WHERE parent_id=? AND deleted_at IS NULL{' AND status=0' if dup is not None and not dup.get('done') else ''}
                          ORDER BY sort, id""", (t["id"],)).fetchall() if depth < MAX_DEPTH - 1 else []
     if skip:  # 2.574.0 (#3376): subtasks the data lock of the copying agent covers stay out (with theirs; _dup_locked)

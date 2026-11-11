@@ -57,7 +57,7 @@ from ..accounts.orgroles import user_orgs_full  # 2.777.0 C (#5378)
 # APPROVERS (👍 / 👎 on an agent's comment count as approval / rejection): people -- never agents -- who are the list owner, a list
 # admin, the task's assignee or an instance admin (and see the task). Everyone else's reaction is just a reaction.
 # LIST TAGS: tags that belong to a list (list_tags) and are shared by all its members, colours per list, next to the personal
-# tags (task_tags, per user, unchanged). Members with edit rights create / rename / colour / delete them; participants may
+# tags (per user; 2.955.0 #5276: obj_tags scope user, was task_tags). Members with edit rights create / rename / colour / delete them; participants may
 # only use existing ones on their tasks. Moving a task to another list takes its list tags along by name.
 # TIDY (lists.agent_tidy off | suggest | auto): only for lists an agent is a member (or the owner) of. suggest = the agent
 # comments with a structured suggestion (comments.suggestion); 👍 by someone who may change the task (or "Apply") applies

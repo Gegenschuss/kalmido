@@ -292,7 +292,8 @@ def adopt_orphans(c, uid):
     n += c.execute("UPDATE tasks SET created_by=? WHERE created_by IS NULL", (uid,)).rowcount
     for t in ("habits", "pomos", "filters"):
         n += c.execute(f"UPDATE {t} SET user_id=? WHERE user_id IS NULL", (uid,)).rowcount
-    n += c.execute("UPDATE task_tags SET user_id=? WHERE user_id=0", (uid,)).rowcount
+    from .objtags import otg_adopt_user
+    n += otg_adopt_user(c, uid)  # 2.955.0 (#5276): the personal tags of the single-user era (scope_id '0'; were task_tags rows with user_id 0)
     return n
 
 
@@ -992,10 +993,11 @@ def init_db(guard=True, load=None):
         with pg_system_ctx(c):  # every organisation's templates
             tpl_move(c)  # 2.905.0 (#5288): templates onto the shared core, section_templates into it, before 5288_a drops that table
         clk("tpl_move")
-        from .objtags import otg_move, OTG_ORG_TRIGGERS
+        from .objtags import otg_move, otg_move_user, OTG_ORG_TRIGGERS
         c.executescript(trigger_skip_present(c, OTG_ORG_TRIGGERS))  # 2.947.0 (#5275, review N1): after mig_apply (lists.org_id)
         with pg_system_ctx(c):  # every organisation's labels and projects
             otg_move(c)  # 2.947.0 (#5275): project tags and labels into obj_tags, before the fragment 5275_a drops the old tables
+            otg_move_user(c)  # 2.955.0 (#5276): the personal tags (task_tags) into obj_tags scope user, before 5276_a drops the table
         clk("otg_move")
         have_ix = ix_have(c)  # 2.183.0 B (#2666): only the missing indexes
         for stmt in INDEXES.strip().split(";") + FRAG_AFTER:  # 2.475.0 (#3478): + the fragments' AFTER

@@ -35,7 +35,7 @@ from ..core.db import DataDirError, DbError, FRAG_MIGRATIONS, FRAG_SCHEMA, conne
 from ..core.schema import MIGRATIONS, SCHEMA
 from ..core.i18n import N_  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import pool_refresh, ts_canon  # 2.149.0 G (#2517): pulled up from functions; 2.933.0 (#5404): ts_canon
-from ..core.objtags import OTG_LEGACY_DDL  # 2.947.0 (#5275)
+from ..core.objtags import OTG_LEGACY_DDL, OTG_USER_LEGACY_DDL  # 2.947.0 (#5275); 2.955.0 (#5276)
 
 TAG = "migrate-sqlite:"
 _Q4 = Decimal("0.0001")
@@ -335,6 +335,8 @@ class Mig:
         them. Only when the file has them."""
         if "list_tags" in self.src_tables:
             c.executescript(OTG_LEGACY_DDL)
+        if "task_tags" in self.src_tables:  # 2.955.0 (#5276): the personal tags, taken by otg_move_user, dropped by 5276_a
+            c.executescript(OTG_USER_LEGACY_DDL)
 
     def pg_meta(self, c):
         cols = {}
