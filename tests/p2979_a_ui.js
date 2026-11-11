@@ -21,6 +21,7 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
 async function person(ck, user, tag) {
   const a = await call(ck, 'POST', '/api/bookmarks', {url: `https://example.com/${tag}-eins`, title: `Zebra ${tag}`});
   const b = await call(ck, 'POST', '/api/bookmarks', {url: `https://example.com/${tag}-zwei`, title: `Pelikan ${tag}`});
+  a.id = a.bookmark?.id; b.id = b.bookmark?.id;
   check(a.id > 0 && b.id > 0, `${user}: two bookmarks (${a.http} ${b.http})`);
   const w = await boot({user, hash: 'bookmarks'}); const d = w.document;
   const card = id => d.querySelector(`.bmcard[data-id="${id}"]`);
