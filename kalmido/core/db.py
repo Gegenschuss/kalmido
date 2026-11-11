@@ -1395,7 +1395,7 @@ def init_db(guard=True, load=None):
                           "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value WHERE user_settings.value=''",  # the start fills in defaults first
                           (",".join(areas), uid))
             gset(c, "migr_tours2466", "1")
-        from ..collab.liste2eguard import le2b_scrub_free, le2b_scrub_trash, le2b_scrub_trash_tasks, le2b_scrub_undo_free, le2b_trash_section_fit  # #4372, #5549, #5562, #5550, #5565
+        from ..collab.liste2eguard import le2b_scrub_free, le2b_scrub_trash, le2b_scrub_trash_tasks, le2b_scrub_undo_free, le2b_trash_section_fit, le2b_hist_gone  # #4372, #5549, #5562, #5550, #5565, #5564
         if gsetting(c, "migr_e2efree4372") != "1":  # 2.538.0 (#4372, review 2646 finding 1): one way -- a project locked before
             # 2.538 loses its time notes, status notes and descriptions as a project locked now does (le2b_scrub). Only 'on': one
             # still 'encrypting' gets the whole scrub at its finish, one 'decrypting' shows its texts again
@@ -1444,6 +1444,14 @@ def init_db(guard=True, load=None):
             gset(c, "migr_e2etrashsec5565", "1")
             if n:
                 print(f"projects with a lock switched before: section names of tasks in the trash removed {n}", flush=True)
+        if gsetting(c, "migr_e2ehist5564") != "1":  # #5564: one way -- the history rows of time entries / notepads deleted
+            # before a lock kept their note / text; migr_e2eundo5550 took the copies that named their project, so the rows no
+            # step can bring back go for every project (le2b_hist_gone: read per object only, nobody sees them any more)
+            with pg_system_ctx(c):  # every person's rows
+                n = le2b_hist_gone(c)
+            gset(c, "migr_e2ehist5564", "1")
+            if n:
+                print(f"history rows of deleted time entries / notepads removed {n}", flush=True)
         if gsetting(c, "migr_offerlist4586") != "1":  # 2.620.0 (#4586, review C M1): the links of tasks moved before the trigger
             # kalmido_offer_link_list (migrations.d/4586_a.py) follow their task's list once
             c.execute("UPDATE task_offer_links l SET list_id=t.list_id FROM tasks t WHERE t.id=l.task_id AND l.list_id<>t.list_id")

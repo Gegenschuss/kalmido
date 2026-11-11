@@ -157,6 +157,28 @@ GH = r.json().get("undo_group") if r.ok else None
 check(bool(GH) and A.post(B + f"/api/undo/to/{GH}").ok
       and dbx("SELECT 1 FROM obj_history WHERE kind='time_entry' AND vals_before::text || vals_after::text LIKE ?", (f"%{MK}HistNote%",)),
       f"(setup) its note change undone: a history row with both notes {GH}")
+# 2.914.0 (#5564): the same, then the entry and a notepad deleted (a hard delete): their history rows outlive the row and
+# nothing names the project any more (the notepad's step went with the next step, the entry's with the lock); the sweep
+# below finds a note / text left in obj_history
+r = A.post(B + "/api/time/entries", json={"list_id": L, "start": (datetime.now() - timedelta(hours=9)).isoformat(timespec="seconds"),
+                                          "minutes": 12, "note": MK + "GoneHist"})
+check(r.ok, f"(setup) a third project time entry with a note {r.status_code} {r.text[:200]}")
+EG = r.json()["id"]
+r = A.patch(B + f"/api/time/entries/{EG}", json={"note": MK + "GoneHist2"})
+GG = r.json().get("undo_group") if r.ok else None
+check(bool(GG) and A.post(B + f"/api/undo/to/{GG}").ok and A.delete(B + f"/api/time/entries/{EG}").ok
+      and dbx("SELECT 1 FROM obj_history WHERE kind='time_entry' AND ref_id=? AND vals_before::text || vals_after::text LIKE ?",
+              (EG, f"%{MK}GoneHist%")) and not dbx("SELECT 1 FROM time_entries WHERE id=?", (EG,)),
+      f"(setup) #5564: undone, then deleted: its history row with the notes stays {GG}")
+r = A.post(B + f"/api/lists/{L}/notepads", json={"title": "Pad", "body": MK + "GonePad"})
+check(r.ok, f"(setup) a second notepad {r.status_code} {r.text[:200]}")
+PG = r.json()["id"]
+r = A.patch(B + f"/api/notepads/{PG}", json={"body": MK + "GonePad2"})
+GP = (dbx("SELECT group_id FROM obj_undo WHERE kind='notepad' AND ref_id=? ORDER BY id DESC LIMIT 1", (PG,)) or [[None]])[0][0] if r.ok else None
+check(bool(GP) and A.post(B + f"/api/undo/to/{GP}").ok and A.delete(B + f"/api/notepads/{PG}").ok
+      and dbx("SELECT 1 FROM obj_history WHERE kind='notepad' AND ref_id=? AND vals_before::text || vals_after::text LIKE ?",
+              (PG, f"%{MK}GonePad%")),
+      f"(setup) #5564: a notepad undone, then deleted: its history row with the texts stays {GP} {r.text[:200]}")
 # 2.900.0 (#5551): the project's settings step ("listset") holds the description / status note, a notepad emptied for the
 # lock ("notepad") its texts before -- both in the copy; the sweep below finds any of them left in obj_undo
 dbx("UPDATE lists SET description=?, status_note=? WHERE id=?", (MK + "Desc", MK + "StatusNote", L), write=True)

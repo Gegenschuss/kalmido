@@ -348,6 +348,7 @@ def le2b_scrub(c, lid):
     n.update(le2b_scrub_trash(c, lid))  # #5549: after undo_sections (it reads the section copies)
     for fn in _SCRUB_MORE:
         n.update(fn(c, lid) or {})
+    n["history_gone"] = le2b_hist_gone(c)  # #5564: last -- the copies of the project's deleted entries went above
     return n
 
 
@@ -380,6 +381,19 @@ def le2b_scrub_undo_free(c, lid):
             "undo_settings": le2b_scrub_undo(c, "kind='listset' AND ref_id=?", (lid,)),  # #5551
             "undo_notepads": le2b_scrub_undo(c, "kind='notepad' AND ref_id IN (SELECT id FROM list_notepads WHERE list_id=?)", (lid,))
             + _scrub_undo_ids(c, le2b_undo_copies(c, ("notepad",), [lid], ()))}  # #5551
+
+
+def le2b_hist_gone(c):
+    """#5564, one way: the history rows (obj_history; core/writes.py obj_undo_hist writes a note / notepad text before and
+    after) of time entries and notepads that are gone (a hard delete) and that no undo step can bring back any more (a
+    deleted time entry comes back only through an undo part of its id, "time_life"; a deleted notepad never). History is
+    read per object only (core/writes.py obj_history), so such a row has no reader -- but it keeps the text, also of a
+    project locked since. Only an undo copy named their project, and those go on many ways (the person's cap, the age limit,
+    a new step ends the way forward, the lock itself): so the lock (le2b_scrub, after its copies went) and core/db.py once
+    take every such row they see, not by project. Idempotent, the caller commits. Returns the rows deleted."""
+    return c.execute("""DELETE FROM obj_history h WHERE (h.kind='time_entry' AND NOT EXISTS (SELECT 1 FROM time_entries t WHERE t.id=h.ref_id)
+                        AND NOT EXISTS (SELECT 1 FROM obj_undo u WHERE u.kind IN ('time_entry', 'time_life') AND u.ref_id=h.ref_id))
+                        OR (h.kind='notepad' AND NOT EXISTS (SELECT 1 FROM list_notepads p WHERE p.id=h.ref_id))""").rowcount
 
 
 def _undo_rows(js):
@@ -650,6 +664,7 @@ def le2b_scrub_tasks(c, ids):
     # ... and of their entries deleted or moved elsewhere since (the row only in the copy)
     n["undo_time"] = n.get("undo_time", 0) + _scrub_undo_ids(c, le2b_undo_copies(c, ("time_entry", "time_life"), (), ids))
     n.update(le2b_scrub_trash_tasks(c, set(ids)))  # #5562
+    n["history_gone"] = le2b_hist_gone(c)  # #5564: their entries deleted since (the copies went just above)
     return n
 
 
