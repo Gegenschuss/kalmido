@@ -197,7 +197,6 @@ filters.shared bool
 folder_agents.created_at time
 folder_heads.updated_at time
 folder_notif.updated_at time
-folder_people.created_at time
 folder_props.props json
 folder_props.updated_at time
 form_entries.answers json
@@ -247,7 +246,6 @@ git_prs.merged_at time
 git_prs.updated_at time
 git_tags.seen_at time
 group_members.added_at time
-group_shares.added_at time
 groups.created_at time
 habits.archived bool
 habits.created_at time

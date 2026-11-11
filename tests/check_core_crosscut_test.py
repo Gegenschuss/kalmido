@@ -161,7 +161,8 @@ check(not bad, f"the repository: {bad}")
 al = cc.load_allow()
 check(all(isinstance(v, str) and len(v) > 20 for v in list(al["rights"].values()) + list(al["tables"].values())),
       "every allow line has a reason of its own (#5522)")
-check({"fs_shares", "group_shares", "sheet_shares", "wiki_shares"} <= set(al["tables"]) and "kalmido/accounts/users.py:need_admin" in al["rights"],
+# 2.958.0 (#5245): group_shares is gone (stage 7d), not in the allow file any more
+check({"fs_shares", "sheet_shares", "wiki_shares"} <= set(al["tables"]) and not {"group_shares", "folder_people"} & set(al["tables"]) and "kalmido/accounts/users.py:need_admin" in al["rights"],
       "today's share tables and rights checks stand in the allow file (#5522)")
 check(all(isinstance(v, str) and len(v) > 20 for v in al["filter"].values()) and "kalmido/docs/dsearch.py:dsr_filters" in al["filter"],
       "today's filters outside the core stand in the allow file with their reason (#5523)")

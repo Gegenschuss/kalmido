@@ -46,7 +46,7 @@ DL_TABLES = {
     "task_links": ("task_id",),  # 2.71.0 B (#1459): the further lists a task is shown in (its "also")
     "agent_jobs": ("task_id",),  # 2.407.0 A (#3513): an agent's running job is the task's "working" mark
     "lists": "full", "list_members": "full", "sections": "full", "list_fields": "full", "obj_tags": "full",  # 2.947.0 (#5275): was list_tags
-    "group_shares": "full", "group_members": "full", "folder_people": "full",
+    "group_members": "full",  # 2.958.0 (#5245): group_shares, folder_people are gone (shares of nodes; grp_sync writes list_members)
     "org_members": "full",  # 2.46.0 (#1603): lists seen by the whole organisation follow its members
     "list_keys": "full", "list_key_pending": "full",  # 2.64.1 (#1817): a list key handed out / the waiting list of the lock
     "filters": "full",  # 2.577.0 (#3356): a shared view is in the state of everyone in its project

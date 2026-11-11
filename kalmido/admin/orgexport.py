@@ -550,7 +550,7 @@ OX_LEFT = {
     "agent_audit": _AGENT, "agent_burst_held": _SERVER, "agent_decisions": _AGENT, "agent_jobs": _AGENT, "agent_list_access": _AGENT, "agent_schedules": _AGENT, "agent_usage": _AGENT,
     "assistant_access": _PERSONAL, "assistant_log": _PERSONAL, "budget_cats": _PERSONAL, "budget_entries": _PERSONAL,
     "budget_files": _PERSONAL, "budget_meta": _PERSONAL, "budget_recurring": _PERSONAL, "contact_srcs": _SECRET, "ctr_notices": _PERSONAL, "dav_sync": _DERIVED,
-    "dl_changes": _DERIVED, "env_deploys": _SECRET, "git_conns": _SECRET, "group_shares": "groups of people (not_included)",
+    "dl_changes": _DERIVED, "env_deploys": _SECRET, "git_conns": _SECRET,
     "hook_in": _SECRET, "issue_hooks": _SECRET,
     "issue_reports": "fingerprints of error reports: a counter and limit of this server, the reports themselves are tasks",  # 2.455.0 (#3469)
     "kk_conns": _SECRET, "list_bell": _PERSONAL, "list_envs": _SECRET, "list_key_pending": "list keys (client_encrypted)",

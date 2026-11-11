@@ -210,7 +210,6 @@ TENANT_EXEMPT = {
     "space_moves": "2.96.0 (#1941): a page / table moved between workspaces (both sides; read only through the object's visibility: wiki/wkmove.py, sheets/shmove.py)",
     "doc_office_moves": "2.547.0 (#4434): the undo of one person's receipts move into the office (read and written only for user_id = the signed-in person, docs/areamove.py; the documents carry the workspace)",
     "deleted_accounts": "2.152.0 B (#2172): the instance's journal of deleted accounts (hashes only), read by the restore alone, never by a person",
-    "folder_people": "the owner's folder shared with people: every list share goes through the workspace rule (_folder_member_add)",
     "folder_agents": "2.41.0 (#1420): the agents of an owner's folder; every list share goes through the workspace rule (folder_apply / list_agent_set)",
     "folder_notif": _OWN + " (2.33.0 #927: the owner's notification template of a folder; it only limits pushes of people already in its lists)",
     "git_folders": _OWN + " (2.33.0 #934: the owner's folder repository; it serves only the owner's lists in that folder)",

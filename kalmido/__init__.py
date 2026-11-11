@@ -606,6 +606,7 @@ ORDER = (
     "collab.tcxcore",  # 2.565.0 (#4719): the team chat's channels and groups as a kind of the shared core (no routes of its own)
     "lists.tplkind",  # 2.905.0 (#5288): task, project and section templates as a kind of the shared core (after core.writes)
     "lists.lmcore",  # 2.568.0 (#4739): the projects as a kind of the shared core (shares, revocation, settings history)
+    "lists.lkretire",  # 2.958.0 (#5245): stage 7d, folder_people and group_shares go at the start (no routes)
     "events.evkern", "contacts.ctkern",  # 2.566.0 (#4712): calendars and address books as kinds of the shared core (stage 3)
     "core.objlight",  # 2.754.0 (#5268): the light kinds task, event, hub_mail, client of the shared core (after their areas)
     "core.objnotify",  # 2.891.0 (#5270): THE send decision (obj_role >= view of every recipient), after the kinds it asks

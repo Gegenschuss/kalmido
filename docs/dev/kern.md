@@ -68,7 +68,9 @@ obj_register("meeting", "meetings", label=N_("Meeting"), area="calendar",
   `obj_role` does not read them again), `share_cols` (its own columns on `fs_shares`, e.g. `list_role` / `list_own`, put back
   by `obj_share_restore`), `on_restore` (the area puts its role table right under its own rules after a restore, or refuses;
   only for the area's own rows of a person / an agent, `list_own = 1` -- any other row of the node takes the core's way, a
-  group's own row is refused with 409), the reason `expired` in `obj_revoked` for an own row that ran out,
+  group's own row is refused with 409; since stage 7d, 2.958.0 #5245, a project's share with a group IS such a row: `group_id`,
+  `list_own = 1`, `list_role` -- written by `lists/groups.py` `grp_own_put`, read by `grp_shares_of_list`; a folder's share with a
+  group or a person is a share of the folder's node, read by `lffolder.lf_people_rows` / `groups.grp_folder_rows`), the reason `expired` in `obj_revoked` for an own row that ran out,
   `on_revoke` (its part of `obj_revoke_person`) and `list_col` (the column a token's project limit is checked against). Its
   routes call `obj_share(..., extra=..., checked=True)` / `obj_unshare(..., checked=True)` after checking the right and the
   target themselves.
@@ -492,8 +494,8 @@ Shares and rights checks (2.846.0, #5522): who may do what exists once too (sect
 - a new `def need_*(`, `def *_role(` or `def *_can(` outside `kalmido/core/`: a rights check of its own. A new area asks
   `obj_need` / `obj_role` (or `AccessCtx`, `need_list`, `need_task`) instead.
 
-The tables of today (`fs_shares` as the core's own, `group_shares`, `folder_people`, `sheet_shares`, `wiki_shares`, the old
-member tables of stage 7 ...) stand in the allow file's `tables`, the checks of today in its section `rights`, each with its
+The tables of today (`fs_shares` as the core's own, `sheet_shares`, `wiki_shares`, the old member tables of stage 7 ...;
+`group_shares` and `folder_people` went with stage 7d, 2.958.0 #5245) stand in the allow file's `tables`, the checks of today in its section `rights`, each with its
 reason: the stage that takes it down (7b-7e), a door / hook to the core's role, or the area's own logic (the instance admin, a
 server switch, a person's own rows, agents, the office groups).
 
