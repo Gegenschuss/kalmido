@@ -6466,7 +6466,15 @@ html.mini-chat body.in-chat #view,html.mini-chat body.in-team #view{padding-left
 .modal.authscreen[data-lgfoot]::after{content:attr(data-lgfoot);position:relative;z-index:1;font-size:var(--fs-s);color:var(--muted);text-align:center}
 .modal.authscreen .alogo{justify-content:center;font-size:1.625rem;margin-bottom:1.25rem}
 .modal.authscreen .alogo b{font-weight:650;letter-spacing:-.02em}
-.authscreen .lghello{text-align:center;font-size:var(--fs-l);font-weight:550;color:var(--text2);margin:0 0 1rem}
+/* 2.955.0 (#5239): the Dada quote of the day (quotes_dada.js): the original calm and italic, below it small and grey the
+   translation and the author; long lines wrap, nothing is cut; on the sign-in page centred, alone above the form */
+.qd{margin:0 0 1rem;overflow-wrap:break-word}
+.qd .qdo{margin:0;font-style:italic;color:var(--text2);line-height:1.4}
+.qd figcaption{margin-top:.2rem;font-size:var(--fs-s);color:var(--muted);line-height:1.35}
+.qd .qda[title]{cursor:help}
+.authscreen .qd,.authscreen .qdslot{text-align:center}
+.authscreen .qdslot{min-height:2.6rem;margin:0 0 1rem}
+.qd.dashq{margin:-.5rem 0 1rem;max-width:70ch}
 .authscreen input:not([type=checkbox]){border-radius:.75rem;background:var(--bg3);border:1px solid var(--line2)}
 .authscreen input:not([type=checkbox]):focus{border-color:var(--accent);box-shadow:0 0 0 .1875rem color-mix(in srgb,var(--accent) 22%,transparent);outline:none}
 .authscreen .btn{height:auto;min-height:2.75rem;border-radius:.75rem}

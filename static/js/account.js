@@ -547,9 +547,12 @@ function lg_decor(el) {
     if (!f) f = requestAnimationFrame(() => { f = 0; el.style.setProperty('--lgx', x + 'px'); el.style.setProperty('--lgy', y + 'px'); });
   }, {passive: true});
 }
-function lg_hello() {
-  const h = new Date().getHours();
-  return h >= 5 && h < 11 ? tr('Good morning, nice to have you here.') : h >= 18 || h < 5 ? tr('Good evening, nice to have you here.') : tr('Welcome back, nice to have you here.');
+// 2.955.0 (#5239): the Dada quote of the day (quotes_dada.js, loaded on demand; before the sign-in too): the line when the file
+// is in, else a placeholder that the file fills once it is (the next drawing has the line at once, no jump on a redraw)
+function qd_slot(/** @type {string} */ cls) {
+  if (typeof qd_html === 'function') return qd_html(cls);
+  if (typeof loadModule === 'function') loadModule('quotes').then(() => qd_fill(), () => {});  // offline without the file: no line
+  return `<div class="qdslot" data-qd="${esc(cls)}"></div>`;
 }
 // 2.22.0 (#697): the page "Set up your account" (the link of an invitation or a password reset: /#invite/<token>)
 async function inviteScreen(tok) {
@@ -642,7 +645,7 @@ async function authScreen(j) {
   } else {
     const setup = kind === 'setup';
     el.innerHTML = `<div class="card">${logo}
-      ${setup ? '' : `<p class="lghello">${esc(lg_hello())}</p>`}${''/* 2.49.0 (#1553) */}
+      ${setup ? '' : qd_slot('lgq')}${''/* 2.49.0 (#1553); 2.955.0 (#5239): the Dada quote of the day instead of the greeting */}
       ${setup ? `<p>${tr('Welcome! Create the first account, it becomes the admin.')}</p>${info.login ? `<p class="muted">${esc(tr('Signed in at the sign-in proxy as “{0}”: the account is linked to it, a password is optional.', info.login))}</p>` : ''}` : ''}
       <form id="auth-form" autocomplete="on">
         ${setup && info.setup_code ? `<label class="aulab" for="au-code">${tr('Setup code')}</label><input id="au-code" autocapitalize="off" autocomplete="one-time-code" spellcheck="false" required aria-describedby="au-code-h"><div class="shint shcode" id="au-code-h">${tr('The server prints it into its log at start: {0}', '<code>docker compose logs kalmido</code>')}</div>` : ''}${''/* 2.45.0 (#1515) */}

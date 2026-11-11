@@ -104,6 +104,7 @@ const LD_MODS = {
   recent: ['recent'],  // 2.769.0 (#5352): "Recently edited" (the overview "All workspaces" of Knowledge / Files / Reading, the start page's block)
   ofwalk: ['office_walk'],  // 2.778.0 (#5383): the walk-through of open card positions / bank bookings (office_cards.js, office_bank.js)
   callsheet: ['callsheet'],  // 2.855.0 (#1956): the call sheet of a shoot day (the disposition's booking dialog, Film & Video only)
+  quotes: ['quotes_dada'],  // 2.955.0 (#5239): the Dada quote of the day (the sign-in page, Today; account.js qd_slot)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat

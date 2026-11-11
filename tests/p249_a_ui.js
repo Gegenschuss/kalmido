@@ -18,7 +18,6 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env,
   EXTRA: (process.env.EXTRA || '') + ' -e KALMIDO_SMTP_HOST=127.0.0.1 -e KALMIDO_SMTP_PORT=1025 -e KALMIDO_SMTP_TLS=none -e KALMIDO_MAIL_FROM=kalmido@example.test'}});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...(ck ? {Cookie: ck} : {})}, body: body ? JSON.stringify(body) : undefined}); return r.json().catch(() => ({})); };
-const GREET = ['Good morning, nice to have you here.', 'Welcome back, nice to have you here.', 'Good evening, nice to have you here.'];
 
 (async () => {
   await sleep(600);
@@ -34,13 +33,15 @@ const GREET = ['Good morning, nice to have you here.', 'Welcome back, nice to ha
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     await nav(B);
     for (let i = 0; i < 40 && !await ev(`!!document.querySelector('.authscreen #auth-form')`).catch(() => false); i++) await sleep(250);
+    // 2.955.0 (#5239): the quote of the day comes with its file (loaded on demand, before the sign-in)
+    for (let i = 0; i < 40 && !await ev(`!!document.querySelector('.authscreen figure.qd .qdo')`).catch(() => false); i++) await sleep(250);
   };
   const look = ev => ev(`(() => { const el = document.querySelector('.authscreen'), c = el.querySelector('.card'), cr = c.getBoundingClientRect(), cs = getComputedStyle(c), bs = getComputedStyle(el), gb = getComputedStyle(el, '::before'), ga = getComputedStyle(el, '::after');
     const rem = document.querySelector('#au-rem')?.closest('label')?.getBoundingClientRect(), fg = document.querySelector('[data-au="forgot"]')?.getBoundingClientRect();
     const rgb = s => (s.match(/[\\d.]+/g) || []).slice(0, 3).map(x => /^color\\(/.test(s) ? Number(x) * 255 : Number(x));  // color-mix() gives color(srgb 0..1)
     return {w: innerWidth, h: innerHeight, sw: document.documentElement.scrollWidth, cl: cr.left, cr: innerWidth - cr.right, cw: cr.width, ct: cr.top, cb: cr.bottom, rad: parseFloat(cs.borderTopLeftRadius),
       shadow: cs.boxShadow, bg: rgb(cs.backgroundColor), grad: bs.backgroundImage, anim: gb.animationName, foot: ga.content, lgx: el.style.getPropertyValue('--lgx'),
-      hello: document.querySelector('.lghello')?.textContent || '', heron: !!c.querySelector('.heron, svg.bot'),  /* 2.136.0 (#2193): no figure either */ logo: !!c.querySelector('.alogo svg'),
+      hello: document.querySelector('.authscreen figure.qd .qdo')?.textContent || '', author: document.querySelector('.authscreen figure.qd .qda')?.textContent || '', old: /nice to have you here|Welcome back/.test(c.textContent),  /* 2.955.0 (#5239) */ heron: !!c.querySelector('.heron, svg.bot'),  /* 2.136.0 (#2193): no figure either */ logo: !!c.querySelector('.alogo svg'),
       row: rem && fg ? Math.abs((rem.top + rem.height / 2) - (fg.top + fg.height / 2)) : 99, fgh: fg ? fg.height : 0,
       btn: getComputedStyle(c.querySelector('.btn.pri')).backgroundImage}; })()`);
 
@@ -49,7 +50,8 @@ const GREET = ['Good morning, nice to have you here.', 'Welcome back, nice to ha
     const {ev, cmd, ctx, shot} = o;
     await page(o, 'dark', 1280, 860);
     let L = await look(ev);
-    check(GREET.includes(L.hello), '#1553: a greeting by the time of day: ' + L.hello);
+    // 2.955.0 (#5239): the Dada quote of the day instead of the greeting by the time of day
+    check(L.hello && /^— \S/.test(L.author) && !L.old, '#5239: the quote of the day with its author above the fields, no greeting: ' + L.hello + ' ' + L.author);
     check(L.logo && !L.heron, '#1553: the logo only, no heron / figure');
     check(/linear-gradient/.test(L.grad), '#1553: a soft gradient behind the card');
     check(L.anim === 'lgpulse', '#1553: the glow pulses: ' + L.anim);

@@ -520,7 +520,7 @@ function viewHome() {
   const parts = Object.fromEntries(lyBlocks('home').map(b => [b[0], dashCard(b[0])]));
   if (S.ly.view === 'home') return `<div class="dash">${lyEditor('home', {parts})}</div>`;  // 2.35.0 (#1097): with the cards
   return `<div class="dash"><div class="dashhead"><h2>${esc(greet)}</h2><span class="muted">${esc(fmtDateLoc(today()))}</span><span class="spacer"></span>${lyCustomBtn('home')}</div>
-    ${hpSummary()}${forMeBanner()}${lyHtml('home', parts, {cols: true, empty: `<p class="muted">${tr('Every block is hidden. “+ Block” brings them back.')}</p>`})}</div>`;
+    ${qd_slot('dashq')}${''/* 2.955.0 (#5239): the Dada quote of the day */}${hpSummary()}${forMeBanner()}${lyHtml('home', parts, {cols: true, empty: `<p class="muted">${tr('Every block is hidden. “+ Block” brings them back.')}</p>`})}</div>`;
 }
 document.addEventListener('submit', e => {
   if (!e.target.matches?.('[data-dsearch]')) return;
