@@ -173,10 +173,12 @@ def rgroup(who, s, member_id=None):
     if member_id:
         check(s.put(B + OFF + f"/rights/people/{member_id}", json={"groups": [f"g:{gid}"]}).ok, f"3 {who}: setup: a member in the group")
     r = s.delete(B + OFF + f"/rights/groups/{gid}")
-    tid = r.json().get("trash_id") if r.ok else None
-    check(r.ok and tid and not sql("SELECT 1 FROM office_rgroups WHERE id=?", (gid,)), f"3 {who}: the group goes, a trash copy {r.text[:200]}")
+    # 2.905.0 (#5414): the core's trash (kind orgroup, the row stays with deleted_at), restore through core/
+    tid = (r.json().get("trash") or {}).get("id") if r.ok else None
+    check(r.ok and tid == gid and sql("SELECT 1 FROM office_rgroups WHERE id=? AND deleted_at IS NOT NULL", (gid,))
+          and not any(x["id"] == gid for x in s.get(B + OFF + "/rights").json().get("groups") or []), f"3 {who}: the group goes into the trash {r.text[:200]}")
     check(in_trash(s, tid, "rgroup"), f"3 {who}: the office trash lists the rights group")
-    r = s.post(B + OFF + f"/trash/{tid}/restore")
+    r = s.post(B + OFF + f"/trash/core/orgroup/{tid}/restore")
     check(r.ok, f"3 {who}: restored {r.text[:200]}")
     g = next((x for x in s.get(B + OFF + "/rights").json().get("groups") or [] if x["id"] == gid), None)
     check(g and g["name"] == f"Schnitt {who}" and g["levels"] == levels, f"3 {who}: the group's definition is back {g}")

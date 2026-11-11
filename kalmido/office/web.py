@@ -40,6 +40,8 @@ from .model import oxa_settings_at  # 2.528.0 (#4305 A3)
 from .model import MD  # noqa: E402  2.747.0 (#5246)
 from .owrite import ow_write  # noqa: E402  2.747.0 (#5246): the master data on the core's write layer
 from .okern import ofk_register  # noqa: E402  2.905.0 (#5414): the master data in the core's trash
+from .rights import OFR_TRASH, _ofr_on_purge, _ofr_trash_back, _ofr_trash_base, _ofr_trash_ctx  # noqa: E402  2.905.0 (#5414)
+from ..core.writes import obj_on_purge  # noqa: E402  2.905.0 (#5414)
 from .model import OMD_KIND, _row_dict  # noqa: E402  2.905.0 (#5414)
 
 
@@ -441,6 +443,13 @@ def _omd_back(table):
 for _t, _k in OMD_KIND.items():
     ofk_register(_k, _t, N_("Master data"), _OMD_AREA[_t], need="edit",
                  view={"kind": _omd_ui(_t), "label": _omd_label(_t), "ctx": lambda: _ctx(admin=True), "back": _omd_back(_t)})
+
+# 2.905.0 (#5414): an own rights group in the core's trash (office/rights.py); registered here, not in rights.py, because okern
+# reads office_can from rights at its top (a module-level okern import in rights.py would close an import cycle).
+ofk_register(OFR_TRASH, "office_rgroups", N_("Rights group"), "settings", base=_ofr_trash_base,
+             view={"kind": "rgroup", "label": lambda c, oid, row: row.get("name") or "", "ctx": _ofr_trash_ctx,
+                   "back": _ofr_trash_back})
+obj_on_purge(OFR_TRASH, _ofr_on_purge)
 
 
 # ---- import / export of the master data (JSON file)

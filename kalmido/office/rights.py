@@ -28,6 +28,7 @@ from ..core.db import body, db, iso, now_utc
 from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, system_ctx
+from ..core.access import live_sql  # 2.905.0 (#5414): a group in the core's trash is gone
 from ..core.rls import rls_org_open  # 2.602.0 (#4729)
 from ..accounts.orgs import org_role
 from ..accounts.orgroles import office_allowed
@@ -311,7 +312,7 @@ def _group_def(c, oid, ref):
     except ValueError:
         return None
     with system_ctx(c):  # structure of the area's rights (also asked for other people and agents)
-        r = c.execute("SELECT rights, specials FROM office_rgroups WHERE id=? AND org_id=?", (gid, oid)).fetchone()
+        r = c.execute(f"SELECT rights, specials FROM office_rgroups WHERE id=? AND org_id=? AND {live_sql()}", (gid, oid)).fetchone()
     if not r:
         return None
     return _levels_clean(_load(r[0], {})), tuple(_specials_clean(_load(r[1], [])))
@@ -580,7 +581,7 @@ def _within(levels, specials, caps):
 
 def _group_rows(c, oid):
     with system_ctx(c):  # the area's own groups (rights page of a manager, org_id bound)
-        return [dict(r) for r in c.execute("SELECT id, name, base, rights, specials FROM office_rgroups WHERE org_id=? ORDER BY lower(name), id", (oid,))]
+        return [dict(r) for r in c.execute(f"SELECT id, name, base, rights, specials FROM office_rgroups WHERE org_id=? AND {live_sql()} ORDER BY lower(name), id", (oid,))]
 
 
 def _ref_def(c, oid, ref, uid_role=""):
@@ -723,7 +724,7 @@ def ofr_group_post():
 
 def _group_cur(c, oid, gid):
     with system_ctx(c):  # one own group of the area (org_id bound)
-        r = c.execute("SELECT id, name, rights, specials FROM office_rgroups WHERE id=? AND org_id=?", (gid, oid)).fetchone()
+        r = c.execute(f"SELECT id, name, rights, specials FROM office_rgroups WHERE id=? AND org_id=? AND {live_sql()}", (gid, oid)).fetchone()
     if not r:
         raise Denied(404)
     return {"name": r["name"], "levels": _levels_clean(_load(r["rights"], {})), "specials": _specials_clean(_load(r["specials"], []))}
@@ -768,14 +769,14 @@ def ofr_group_delete(gid):
     for u in users:
         if not c.execute("SELECT 1 FROM office_rgroup_members WHERE org_id=? AND user_id=?", (oid, u)).fetchone():
             c.execute("INSERT INTO office_rgroup_members(org_id, user_id, tpl, created_at) VALUES(?,?,?,?)", (oid, u, TPL_NONE, iso(now_utc())))
-    from .otrash import otb_put  # otrash loads this module at its top
-    # 2.747.0 (#5246, #4707): the group's definition (name, levels, specials) into the office trash -- its members are taken
-    # out above and do NOT come back with it (a restore hands out no rights; the log keeps who they were)
-    tid = otb_put(c, oid, uid, "rgroup", "office_rgroups", gid, cur["name"])
-    c.execute("DELETE FROM office_rgroups WHERE id=? AND org_id=?", (gid, oid))
+    # 2.747.0 (#5246, #4707): the group's definition (name, levels, specials) into the trash -- its members are taken
+    # out above and do NOT come back with it (a restore hands out no rights; the log keeps who they were).
+    # 2.905.0 (#5414): the core's trash (deleted_at, kind orgroup) instead of a copy in office_trash and the row deleted
+    from .okern import ofk_trash  # okern reads office_can from here at its top (a top import here would close a cycle)
+    ofk_trash(c, uid, OFR_TRASH, gid)
     ofr_log(c, oid, uid, "group_delete", group=f"g:{gid}", before={**cur, "members": users})
     c.commit()
-    return jsonify(ok=True, trash_id=tid)
+    return jsonify(ok=True, trash={"kind": OFR_TRASH, "id": gid})
 
 
 def _keep_a_manager(c, oid, drop_group=None, user=None, new_refs=None):
@@ -849,3 +850,44 @@ def ofr_log_get():
     c, uid, oid, mg = _ctx_rights()
     _need_manager(c, uid, oid, mg)
     return jsonify(items=ofr_log_rows(c, oid))
+
+
+# 2.905.0 (#5414, stage 4c of the core's trash): an own group lies in the core's trash when deleted (office/okern.py).
+# the kind is registered in office/web.py (it imports okern and this module at its top); okern reads office_can
+# from here, so this module never imports okern at module level (p2369_5_layers: no new import cycle).
+OFR_TRASH = "orgroup"
+
+
+def _ofr_trash_base(c, uid, row):
+    """The core's role of a group of the trash: 'manage' for who manages the office rights of its area (ofr_manager)."""
+    return "manage" if ofr_manager(c, uid, row["org_id"]) else None
+
+
+def _ofr_trash_ctx():
+    c, uid, oid, mg = _ctx_rights(True)
+    _need_manager(c, uid, oid, mg)
+    return c, uid, oid
+
+
+def _ofr_trash_back(c, oid, row):
+    """2.905.0 (#5414, review): a group out of the trash hands out no rights - members added while it was being deleted
+    (a parallel ofr_person_put) go, as the hard delete's ON DELETE CASCADE did before."""
+    _ofr_members_out(c, oid, row["id"])
+
+
+def _ofr_members_out(c, oid, gid):
+    """2.905.0 (#5414, review): the members of group gid leave it; one left without any row gets "No office access" (as
+    ofr_group_delete does) -- no row would mean the implicit "Previous access" only an admin hands out."""
+    users = [r[0] for r in c.execute("SELECT user_id FROM office_rgroup_members WHERE org_id=? AND group_id=?", (oid, gid)).fetchall()]
+    c.execute("DELETE FROM office_rgroup_members WHERE org_id=? AND group_id=?", (oid, gid))
+    for u in users:
+        if not c.execute("SELECT 1 FROM office_rgroup_members WHERE org_id=? AND user_id=?", (oid, u)).fetchone():
+            c.execute("INSERT INTO office_rgroup_members(org_id, user_id, tpl, created_at) VALUES(?,?,?,?)", (oid, u, TPL_NONE, iso(now_utc())))
+
+
+def _ofr_on_purge(c, gid):
+    """2.905.0 (#5414, review): a group deleted for good (purge / retention) -- members a parallel ofr_person_put added while it
+    lay in the trash go with "No office access" instead of the FK cascade leaving them on "Previous access"."""
+    r = c.execute("SELECT org_id FROM office_rgroups WHERE id=?", (gid,)).fetchone()
+    if r:
+        _ofr_members_out(c, r[0], gid)
