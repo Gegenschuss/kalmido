@@ -25,7 +25,7 @@ import requests
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kt  # noqa: E402
 from kt import B, CT, H, check, dbx  # noqa: E402
-from freelancer_fixture import FEATURES, freelancer  # noqa: E402
+from freelancer_fixture import FEATURES, freelancer, org_join  # noqa: E402
 
 
 def box(code):
@@ -50,8 +50,8 @@ def tags_of(s, tid):
     return next((t.get("tags") for t in st(s)["tasks"] if t["id"] == tid), None)
 
 
-def mklist(s, name):
-    r = s.post(B + "/api/lists", json={"name": name, "kind": "project"})
+def mklist(s, name, org=None):
+    r = s.post(B + "/api/lists", json={"name": name, "kind": "project", **({"org_id": org} if org else {})})
     assert r.ok, r.text
     return r.json()["id"]
 
@@ -64,8 +64,9 @@ def task(s, lid, title):
 
 def utags(uid):
     """(name, task ids) of person uid's personal tags in the core, by name."""
-    return dbx("""SELECT ot.name, array_agg(k.obj_id ORDER BY k.obj_id) FROM obj_tags ot LEFT JOIN obj_tag_links k ON k.tag_id=ot.id
-                  WHERE ot.scope_kind='user' AND ot.scope_id=? GROUP BY ot.id, ot.name ORDER BY ot.name""", (str(uid),))
+    rows = dbx("""SELECT ot.name, string_agg(CAST(k.obj_id AS TEXT), ',' ORDER BY k.obj_id) FROM obj_tags ot LEFT JOIN obj_tag_links k
+                  ON k.tag_id=ot.id WHERE ot.scope_kind='user' AND ot.scope_id=? GROUP BY ot.id, ot.name ORDER BY ot.name""", (str(uid),))
+    return [(n, [int(x) for x in ids.split(",")] if ids else []) for n, ids in rows]
 
 
 kt.fresh(prefix="P2955C")
@@ -75,18 +76,19 @@ A = kt.sess("alice")
 A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True, "modules": ["comments"]})
 ALICE = kt.me_id(A)
 A.patch(B + "/api/settings", json={"lang": "en", "features": FEATURES, "tour": "done"})
+ORG = st(A)["me"]["workspaces"][0]["id"]
 uid = {}
 for u in ("bob", "carl"):
-    r = A.post(B + "/api/users", json={"orgs": [], "username": u, "display_name": u.title(), "password": kt.PASSWORD,
+    r = A.post(B + "/api/users", json={"orgs": [ORG] if u == "bob" else [], "username": u, "display_name": u.title(), "password": kt.PASSWORD,
                                        "email": f"{u}@example.com"})
     assert r.ok, r.text
     uid[u] = r.json()["id"]
+org_join(B, "bob", ORG)
 Bo, Ca = kt.sess("bob"), kt.sess("carl")
 for s in (Bo, Ca):
     s.patch(B + "/api/settings", json={"lang": "en", "features": FEATURES, "tour": "done"})
 BOB, CARL = uid["bob"], uid["carl"]
-L = mklist(A, "Kundenprojekt")
-A.put(B + f"/api/lists/{L}/members", json={"user_id": BOB, "role": "edit"})
+L = mklist(A, "Kundenprojekt", ORG)  # the organisation's project: bob (a member) and the agent of the organisation reach it
 T1, T2, T3, T4 = (task(A, L, x) for x in ("Angebot", "Rechnung", "Anruf", "Termin"))
 
 # ================================================================== the old table is gone, the move of a rolled-back database
@@ -138,8 +140,8 @@ check(tags_of(Bo, T1) == ["kunde"] and "Intern" in tags_of(A, T2), "bob's tags a
 # ================================================================== CalDAV CATEGORIES read the core
 out = box(f"""from kalmido.calendars.caldav import dav_ctx
 u = c.execute("SELECT * FROM users WHERE id=?", ({ALICE},)).fetchone()
-print('DAV' + repr(dav_ctx(c, u, [{T1}, {T2}])['tags']))""")
-check(f"DAV{{{T1}: ['Kunde'], {T2}: ['Altlast', 'Intern', 'Kunde']}}" in out, f"CalDAV CATEGORIES: alice's tags of the core, not bob's {out[-300:]}")
+print('DAV' + repr(sorted(dav_ctx(c, u, [{T1}, {T2}])['tags'].items())))""")
+check(f"DAV[({T1}, ['Kunde']), ({T2}, ['Altlast', 'Intern', 'Kunde'])]" in out, f"CalDAV CATEGORIES: alice's tags of the core, not bob's {out[-300:]}")
 
 # ================================================================== promote = a scope change
 at = dbx("""SELECT k.created_at FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id WHERE ot.scope_kind='user' AND ot.scope_id=?
@@ -151,7 +153,7 @@ check(lt == [("list", at[0][0])] if at else False, f"the link moved to the proje
 check(not any(x[0] == "Intern" for x in utags(ALICE)), "the personal tag is gone")
 
 # ================================================================== an agent keeps its own tags
-r = A.post(B + "/api/my/agents", json={"username": "taggerbot", "display_name": "Taggerbot", "scopes": ["read", "tasks:write"], "org_id": None})
+r = A.post(B + "/api/my/agents", json={"username": "taggerbot", "display_name": "Taggerbot", "scopes": ["read", "tasks:write"], "org_id": ORG})
 check(r.status_code == 201, f"an agent {r.status_code} {r.text[:200]}")
 AG, HG = r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
 A.put(B + f"/api/lists/{L}/members", json={"user_id": AG, "role": "edit"})
@@ -167,9 +169,9 @@ out = box(f"""from kalmido.accounts.settings import umz_export_queries
 sql, args = umz_export_queries({ALICE})['task_tags']
 print('EXP' + repr(sorted(tuple(r) for r in c.execute(sql, args).fetchall())))""")
 check(f"({T1}, {ALICE}, 'Kunde')" in out and "Geheim" not in out, f"the account export: the file task_tags with my tags only {out[-300:]}")
-Ca.post(B + "/api/lists", json={"name": "Carl privat"})
-CL = next(x["id"] for x in st(Ca)["lists"] if x["name"] == "Carl privat")
-CT1 = task(Ca, CL, "Carls Aufgabe")
+r = Ca.post(B + "/api/tasks", json={"title": "Carls Aufgabe"})  # his basket: an account with a project of its own is not deleted
+assert r.ok, r.text
+CT1 = r.json()["id"]
 Ca.patch(B + f"/api/tasks/{CT1}", json={"tags": ["Carls"]})
 check(utags(CARL) == [("Carls", [CT1])], "carl has a tag")
 check(A.delete(B + f"/api/users/{CARL}").ok, "carl deleted")
