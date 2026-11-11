@@ -412,6 +412,11 @@ def rule_fields(data):
     return {_oid(f.get("id")): f.get("type") for f in data.get("list_fields") or [] if isinstance(f, dict)}
 
 
+
+def _ltag_m(run, old):
+    """2.925.0 (#5275): a tag id of the archive -> the tag here: a project tag (lists/tags.json) or a label (org/labels.json)."""
+    return run.m("list_tags", old) or run.m("org_tags", old)
+
 def rule_ids(c, run, who, types, src, d):
     """2.455.0 (#3469): the row d of rule src with every id inside it mapped, for the account and the organisation import. Trigger
     and action point at columns, tags, fields, people and lists of the list; what did not come along pauses the rule (the settings
@@ -425,7 +430,7 @@ def rule_ids(c, run, who, types, src, d):
         return None
     pause, tv = "", _txt(src.get("trig_val"), 300)
     if trig in ("section", "ltag"):
-        new = run.m("sections" if trig == "section" else "list_tags", tv)
+        new = run.m("sections", tv) if trig == "section" else _ltag_m(run, tv)  # 2.925.0 (#5275): a label too
         tv, pause = str(new or ""), "" if new else "section" if trig == "section" else "tag"
     elif trig == "assigned":
         new = who(tv) if tv else None
@@ -509,7 +514,7 @@ def _rule_act_ids(run, who, types, name, lid, act, a, had_target):
             return None
         v = {"priority": a["priority"]}
     elif act == "tag":
-        v = {"tag_id": run.m("list_tags", a.get("tag_id"))}
+        v = {"tag_id": _ltag_m(run, a.get("tag_id"))}
         pause = "" if v["tag_id"] else "tag"
     else:  # field: a person's value is an id too; a value of other types has none
         fid, val = run.m("list_fields", a.get("field_id")), a.get("value")
@@ -533,7 +538,7 @@ def _rule_cond_ids(run, who, conds):
         out["priority"] = d["priority"]
     for k, m, why in (("user_id", None, "assignee"), ("tag_id", "list_tags", "tag"), ("section_id", "sections", "section")):
         if d.get(k):
-            new = who(d[k]) if m is None else run.m(m, d[k])
+            new = who(d[k]) if m is None else _ltag_m(run, d[k]) if m == "list_tags" else run.m(m, d[k])
             if new:
                 out[k] = new
             else:

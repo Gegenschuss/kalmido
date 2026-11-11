@@ -395,11 +395,12 @@ REF = schema()
 
 def defect():
     """A row pair the unique index cannot hold, and without the index: pg_restore takes it, init_db cannot build the index."""
-    psql("-c", f"DROP INDEX list_tags_name; INSERT INTO list_tags(list_id, name, created_at) VALUES ({S.list}, 'dup', '2026-01-01'), ({S.list}, 'DUP', '2026-01-01')")
+    # 2.925.0 (#5275): list_tags went into the core's obj_tags (its unique index of the name: ix5275_obj_tags_name)
+    psql("-c", f"DROP INDEX ix5275_obj_tags_name; INSERT INTO obj_tags(scope_kind, scope_id, name) VALUES ('list', '{S.list}', 'dup'), ('list', '{S.list}', 'DUP')")
 
 
 def heal():
-    psql("-c", "DELETE FROM list_tags WHERE lower(name)='dup'; CREATE UNIQUE INDEX list_tags_name ON list_tags(list_id, lower(name))")
+    psql("-c", "DELETE FROM obj_tags WHERE lower(name)='dup'; CREATE UNIQUE INDEX ix5275_obj_tags_name ON obj_tags(scope_kind, scope_id, lower(name))")
 
 
 defect()
@@ -415,7 +416,7 @@ r = restore(A, name=BAD)
 j = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
 check(r.status_code == 400 and j.get("code") == "restore" and "nothing was changed" in j.get("error", ""),
       f"4 way back works: a clear message {r.status_code} {r.text[:240]}")
-check("restore failed:" in logs() and "list_tags_name" in logs(), "4 way back works: the log names what init_db met (pg_restore had gone through)")
+check("restore failed:" in logs() and "ix5275_obj_tags_name" in logs(), "4 way back works: the log names what init_db met (pg_restore had gone through)")
 check(health().ok, "4 way back works: the server is healthy")
 A2 = sess("alice")
 same(snap({"alice": A2, "frida": sess("frida")}), BEFORE, "4 way back works: the state of before, with its files")
@@ -448,8 +449,8 @@ try:  # the defect is still in the database: the start cannot complete it and mu
     start(K1, keep=True, wait="25")
     check(False, "4 way back fails: a start on the defect does not come up")
 except AssertionError:
-    check("list_tags_name" in logs(), "4 way back fails: a start on the defect stops and its log names the reason")
-psql("-c", "DELETE FROM list_tags WHERE lower(name)='dup'")
+    check("ix5275_obj_tags_name" in logs(), "4 way back fails: a start on the defect stops and its log names the reason")
+psql("-c", "DELETE FROM obj_tags WHERE lower(name)='dup'")
 start(K1, keep=True)
 check(health().ok, "4 way back fails: the restart without the defect completes the database, healthy again")
 gaps, _ = schema_gaps(REF, schema())
@@ -517,7 +518,7 @@ check(not [x for x in leftovers() if x.startswith(("attachments.", "office."))],
 same(snap(people()), GOOD_SEEN, "4 hard stop: ... with the content of its backup")
 
 # ---- review of 2.510: the keys _pg_restore takes away: a key the backup does not know (added since), a hard stop before pg_restore
-NEWFK = "ALTER TABLE list_tags ADD CONSTRAINT p4286_new_fk FOREIGN KEY (list_id) REFERENCES lists(id)"
+NEWFK = "ALTER TABLE sections ADD CONSTRAINT p4286_new_fk FOREIGN KEY (list_id) REFERENCES lists(id)"  # 2.925.0 (#5275): was list_tags
 hasfk = lambda: bool(kt.dbx("SELECT 1 FROM pg_constraint WHERE conname='p4286_new_fk'"))
 NOTE = os.path.join(BK, ".dropped-fks.json")
 psql("-c", NEWFK)
@@ -535,7 +536,7 @@ r = alone(STOP, GOOD)
 check(r.returncode == 9 and not hasfk() and os.path.exists(NOTE), f"4 keys: a hard stop just before pg_restore: the key is gone, the list knows it {r.returncode} {hasfk()} {r.stderr[-300:]}")
 start(K1, keep=True)
 check(hasfk() and not os.path.exists(NOTE), f"4 keys: the next start brings it back {hasfk()}")
-psql("-c", "ALTER TABLE list_tags DROP CONSTRAINT p4286_new_fk")
+psql("-c", "ALTER TABLE sections DROP CONSTRAINT p4286_new_fk")
 
 # ---- review of 2.510: a helper imports the package beside a running restore or check: it leaves their work folders alone
 MK = """

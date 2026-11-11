@@ -7,6 +7,8 @@ from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.pg import insert_id, system_ctx
+from ..core.objtags import otg_list_sql  # 2.925.0 (#5275, review F7)
+from ..lists.orglabels import olb_full  # 2.925.0 (#5275, review F7)
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc
 # 2.783.0 (#5368): the trash and its retention run are the core's (core/objparts.py part_trash / part_restore, core/writes.py
@@ -270,7 +272,10 @@ def whi_task_body(c, lid, b):
             tags = [x.strip() for x in tags.split(",") if x.strip()]
         if not isinstance(tags, list) or any(not isinstance(x, str) for x in tags):
             raise BadInput(tr("Invalid value: {0}", "tags"))
-        have = {r["name"].casefold(): r["name"] for r in c.execute("SELECT name FROM list_tags WHERE list_id=?", (lid,))}
+        # 2.925.0 (#5275), review F7: the project's tags and the labels of its organisation the hook's owner sees (olb_full: what
+        # set_ltags / olb_match then link), by name
+        have = {r["name"].casefold(): r["name"] for r in c.execute(f"SELECT ot.name FROM obj_tags ot JOIN lists l ON l.id=? WHERE {otg_list_sql(full=olb_full(c))} "
+                                                                    "ORDER BY (ot.scope_kind='list')", (lid,))}
         out["ltags"] = [have[x.strip().casefold()] for x in tags if x.strip().casefold() in have]  # never creates a tag
         ignored += [f"tags.{x.strip()}" for x in tags if x.strip().casefold() not in have]
     fields = b.get("fields")

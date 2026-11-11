@@ -25,6 +25,7 @@ from ..accounts.session import me
 from ..core.access import Denied, list_role, need_collab, task_visible, tvis
 from ..core.errors import BadInput, UnknownFields
 from ..core.objreact import orx_set  # 2.763.0 (#5269)
+from ..core.objtags import obj_tag_sql  # 2.925.0 (#5275)
 from ..tasks.oneway import DEPLOY_TAG, gate_irreversible, irreversible_open  # noqa: F401  (irreversible_open: the name other modules use here)
 from ..collab.comments import comment_plain, need_live_comment, user_names  # 2.369.5 (#2517): pulled up from functions
 from ..agents.core import agent_emit, agent_task_data, is_agent, is_approver  # 2.369.5 (#2517): pulled up from functions
@@ -39,10 +40,9 @@ def deploy_checklist(c, lid, uid=None):
     the tasks uid may see (2.223.7 D, #2941: a participant agent)."""
     if uid and not list_role(c, lid, uid):
         return []  # tvis only narrows inside lists uid can access
-    rows = c.execute(f"""SELECT t.id, t.title FROM tasks t JOIN task_list_tags x ON x.task_id=t.id JOIN list_tags lt ON lt.id=x.tag_id
-                        WHERE t.list_id=? AND lt.list_id=? AND lower(lt.name)=lower(?) AND t.deleted_at IS NULL
+    rows = c.execute(f"""SELECT t.id, t.title FROM tasks t WHERE t.list_id=? AND {obj_tag_sql('t.id')} AND t.deleted_at IS NULL
                         AND t.completed_at IS NULL AND {tvis(c, uid, "t.") if uid else "TRUE"} ORDER BY t.id LIMIT ?""",
-                     (lid, lid, DEPLOY_TAG, CHECKLIST_MAX)).fetchall()  # 2.223.7 (#2941): the participant filter in SQL (no query per task)
+                     (lid, DEPLOY_TAG, CHECKLIST_MAX)).fetchall()  # 2.925.0 (#5275): the core's tags (a label of that name too)  # 2.223.7 (#2941): the participant filter in SQL (no query per task)
     return [{"id": r["id"], "title": r["title"]} for r in rows]
 
 

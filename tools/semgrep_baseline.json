@@ -1016,14 +1016,6 @@
   },
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/collab/reactions.py",
-   "code": "c.execute(f\"UPDATE list_tags SET {','.join(k + '=?' for k in f)} WHERE id=?\", [*f.values(), tag_id])",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/collab/replies.py",
    "code": "r = c.execute(f\"SELECT * FROM {_TABLES[art]} WHERE id=? AND {cond}\", (rid, *where.values())).fetchone()",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
@@ -2201,14 +2193,6 @@
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/lists/lists.py",
    "code": "for r in c.execute(f\"SELECT {key} AS k, folder FROM {tbl} WHERE folder ILIKE '%/%'\").fetchall():",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/lists/orglabels.py",
-   "code": "c.execute(f\"UPDATE org_tags SET {','.join(k + '=?' for k in sets)} WHERE id=?\", [*sets.values(), lbid])",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296

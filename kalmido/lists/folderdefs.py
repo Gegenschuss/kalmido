@@ -15,6 +15,7 @@ from ..core.i18n import tr
 from ..core.db import uset, usettings
 from ..core.errors import BadInput
 from ..core.pg import insert_id, qi, write_lock  # 2.757.0 (#4501): qi for the two varying names below
+from ..core.objtags import otg_list_sql  # 2.925.0 (#5275)
 from ..core.db import iso, now_utc
 from ..core.ctx import me  # 2.757.0 (#4501): module level (tools/check_layers.py)
 from ..core.numtext import user_num
@@ -51,7 +52,9 @@ def fdf_cols_of(c, lid):
 
 
 def fdf_tags_of(c, lid):
-    return [{"name": r[0], "color": r[1] or ""} for r in c.execute("SELECT name, color FROM list_tags WHERE list_id=? ORDER BY sort, lower(name)", (lid,))]
+    """2.925.0 (#5275): the project's own tags (obj_tags scope list; a label of the organisation is the organisation's)."""
+    return [{"name": r[0], "color": r[1] or ""} for r in c.execute("SELECT name, color FROM obj_tags WHERE scope_kind='list' AND scope_id=? "
+                                                                   "ORDER BY sort, lower(name)", (str(lid),))]
 
 
 def fdf_clean(c, uid, k, v):
@@ -135,7 +138,9 @@ def fdf_clean(c, uid, k, v):
 
 
 def _names(c, table, lid):
-    return {r[0].casefold() for r in c.execute(f"SELECT name FROM {qi(table, ('list_fields', 'list_tags'))} WHERE list_id=?", (lid,))}
+    if table == "list_tags":  # 2.925.0 (#5275): the tags a task of the list may carry (its own, its organisation's labels)
+        return {r[0].casefold() for r in c.execute(f"SELECT ot.name FROM obj_tags ot JOIN lists l ON l.id=? WHERE {otg_list_sql()}", (lid,))}
+    return {r[0].casefold() for r in c.execute(f"SELECT name FROM {qi(table, ('list_fields',))} WHERE list_id=?", (lid,))}
 
 
 def fdf_cols_want(c, lid, v):
@@ -218,7 +223,7 @@ def fdf_apply(c, lid, k, v, uid):
                 continue
             i = ltag_get_or_create(c, lid, x["name"], True)  # BadInput at the limit
             if x["color"]:
-                c.execute("UPDATE list_tags SET color=? WHERE id=?", (x["color"], i))
+                c.execute("UPDATE obj_tags SET color=? WHERE id=? AND scope_kind='list'", (x["color"], i))  # 2.925.0 (#5275): not a label's
             have.add(x["name"].casefold())
 
 

@@ -21,6 +21,8 @@ from ..core.db import insert_id, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, list_role
 from ..core.errors import BadInput
+from ..core.objtags import obj_tags_of, otg_link, otg_list_sql  # 2.925.0 (#5275)
+from .orglabels import olb_full  # 2.925.0 (#5275, review F4): a label only for the applier's full view
 from ..core.orgcrypt import oc_copy_file, oc_user_space, oc_task_org, oc_task_space  # 2.369.5 (#2517): pulled up from functions
 from .lists import LIST_COLOR_RE  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.tasks import check_assignee  # 2.369.5 (#2517): pulled up from functions
@@ -49,7 +51,8 @@ def tx_list(c, lid, base, dup, x):
                         "s": (date.fromisoformat(s["start"]) - base).days, "e": (date.fromisoformat(s["end_day"]) - base).days})
     x["list"] = {"wip": wip, "kinds": kinds, "sprints": sprints, "sprint_cfg": r["sprint_cfg"] or "", "points_on": r["points_on"] or 0,
                  "ltags": [{"name": t["name"], "color": t["color"], "sort": t["sort"]}
-                           for t in c.execute("SELECT name, color, sort FROM list_tags WHERE list_id=? ORDER BY sort, id", (lid,))],
+                           for t in c.execute("SELECT name, color, sort FROM obj_tags WHERE scope_kind='list' AND scope_id=? ORDER BY sort, id",
+                                              (str(lid),))],  # 2.925.0 (#5275): the project's own tags (labels stay the organisation's)
                  "links": [{"title": t["title"], "url": t["url"]}
                            for t in c.execute("SELECT title, url FROM list_links WHERE list_id=? AND deleted_at IS NULL ORDER BY sort, id", (lid,))]}
     return idx
@@ -76,8 +79,8 @@ def tx_collect(c, uid, lid, order, base, x, dup=False, fidx=None, ftypes=None):
             nd(r["id"])["sp"] = smap[r["sprint_id"]]
     for r in c.execute(f"SELECT task_id, user_id, tag FROM task_tags WHERE task_id IN ({q}) AND user_id<>? ORDER BY tag", (uid,)):
         nd(r["task_id"]).setdefault("xt", {}).setdefault(str(r["user_id"]), []).append(r["tag"])
-    for r in c.execute(f"SELECT k.task_id, t.name FROM task_list_tags k JOIN list_tags t ON t.id=k.tag_id WHERE k.task_id IN ({q})"):
-        nd(r["task_id"]).setdefault("lt", []).append(r["name"])
+    for tid, tags in obj_tags_of(c, list(keys)).items():  # 2.925.0 (#5275): + the labels
+        nd(tid).setdefault("lt", []).extend(x["name"] for x in tags)
     for r in c.execute(f"SELECT task_id, list_id FROM task_links WHERE task_id IN ({q})"):
         nd(r["task_id"]).setdefault("ln", []).append(r["list_id"])
     for r in c.execute(f"SELECT task_id, field_id, value FROM task_field_values WHERE task_id IN ({q})") if fidx else ():
@@ -292,8 +295,8 @@ def _list_part(c, uid, lid, p, start, scale):
                             (lid, i + 1, s["name"], (start + timedelta(days=round(s["s"] * scale))).isoformat(),
                              (start + timedelta(days=round(s["e"] * scale))).isoformat(), s["goal"], s["state"], ts, uid))
     for t in p.get("ltags") or []:
-        c.execute("INSERT INTO list_tags(list_id,name,color,sort,created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
-                  (lid, t["name"], t["color"], t["sort"], ts))
+        c.execute("INSERT INTO obj_tags(scope_kind,scope_id,name,color,sort,created_by,created_at) VALUES('list',?,?,?,?,?,?) ON CONFLICT DO NOTHING",
+                  (str(lid), t["name"], t["color"], t["sort"], uid, ts))  # 2.925.0 (#5275)
     for i, t in enumerate(p.get("links") or []):
         c.execute("INSERT INTO list_links(list_id,title,url,sort,created_by,created_at) VALUES(?,?,?,?,?,?)", (lid, t["title"], t["url"], i + 1, uid, ts))
     return smap
@@ -336,7 +339,9 @@ def tx_apply(c, uid, lid, x, made, st, start=None, scale=1.0, fmap=None):
     from .fields import field_value
     st["skipped"] += x.get("skipped", [])
     smap = _list_part(c, uid, lid, x["list"], start, scale) if x.get("list") else {}
-    ltags = {r["name"].lower(): r["id"] for r in c.execute("SELECT id, name FROM list_tags WHERE list_id=?", (lid,))}
+    # 2.925.0 (#5275): the project's tags and the labels of its organisation (a template of the same organisation keeps them)
+    ltags = {r["name"].lower(): r["id"] for r in c.execute(f"SELECT ot.id, ot.name FROM obj_tags ot JOIN lists l ON l.id=? WHERE {otg_list_sql(full=olb_full(c, uid))} "
+                                                          "ORDER BY (ot.scope_kind='list')", (lid,))}
     from ..tasks.watchers import check_delegate
     seen, who = {}, {}
 
@@ -369,7 +374,7 @@ def tx_apply(c, uid, lid, x, made, st, start=None, scale=1.0, fmap=None):
                     c.execute("INSERT INTO task_tags(task_id,user_id,tag) VALUES(?,?,?) ON CONFLICT DO NOTHING", (tid, int(u), t))
         for name in n.get("lt") or []:
             if name.lower() in ltags:
-                c.execute("INSERT INTO task_list_tags(task_id,tag_id) VALUES(?,?) ON CONFLICT DO NOTHING", (tid, ltags[name.lower()]))
+                otg_link(c, ltags[name.lower()], tid, by=uid)
         for i, v in (n.get("pf") or {}).items() if fmap else ():
             f = fmap[int(i)] if int(i) < len(fmap) else None
             try:

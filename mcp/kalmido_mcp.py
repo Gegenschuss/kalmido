@@ -626,7 +626,7 @@ TOOLS = [
                              "of its tasks (with task_id), members with roles, the project status with its history and the tracked "
                              "time. 409 for the inbox (2.352.0: every other list is a project).",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/overview")),
-    ("list_list_tags", "Shared tags of one project (name, color).",
+    ("list_list_tags", "Shared tags of one project (name, color; org_tag_id set for a label of the organisation, the same in all its projects).",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/tags")),
     ("list_tasks", "Tasks the agent can see, filtered. status: open (default) | done | wont_do | all; assignee: me | none | user id. "
                    "compact: true = only id, title, list_id, section_id, section_kind, parent_id, status, due, due_time, priority, tags, list_tags, "

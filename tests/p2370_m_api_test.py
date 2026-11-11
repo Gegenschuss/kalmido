@@ -206,8 +206,9 @@ check(psql("SELECT rate::text FROM office_doc_items WHERE id=1") == "1234.5678" 
 check(psql("SELECT SUM(rate*qty)::numeric(14,4)::text FROM office_doc_items") == str(40 * sum((Decimal("1234.5678") + j) * (Decimal("0.5") + j) for j in range(5)).quantize(Decimal("0.0001"))),
       "(b) office totals " + psql("SELECT SUM(rate*qty) FROM office_doc_items"))
 check(psql("SELECT COUNT(*) FROM tasks WHERE snippets IS NOT NULL") == "0", "(b) tasks.snippets '' -> NULL")
-check(psql("SELECT COUNT(*) FROM list_tags WHERE list_id=%d AND lower(name)='ärger'" % big["shared_list"]) == "1"
-      and psql("SELECT COUNT(*) FROM task_list_tags WHERE tag_id=%d" % big["tags"][0]) == "2", "(b) Ärger/ärger merged, both tasks keep the tag")
+# 2.925.0 (#5275): the copied project tags moved on into the core at the same start (obj_tags keeps their ids)
+check(psql("SELECT COUNT(*) FROM obj_tags WHERE scope_kind='list' AND scope_id='%d' AND lower(name)='ärger'" % big["shared_list"]) == "1"
+      and psql("SELECT COUNT(*) FROM obj_tag_links WHERE kind='task' AND tag_id=%d" % big["tags"][0]) == "2", "(b) Ärger/ärger merged, both tasks keep the tag")
 # (g) K2-3
 k23 = rep.get("private_agents_in_organisation_lists", {})
 check(k23.get("rows") == [[big["shared_list"], big["users"]["pbot"]]] and "workspace" in k23.get("hint", ""), "(g) the report names the private agent " + str(k23))

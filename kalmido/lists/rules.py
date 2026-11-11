@@ -32,6 +32,8 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx as pg_system
+from ..core.objtags import otg_in_list, otg_task_ids  # 2.925.0 (#5275): the project tags and labels of the core
+from .orglabels import olb_full  # 2.925.0 (#5275, review F4)
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, iso_ms
 from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, WRITE_ROLES, collab_all
@@ -154,7 +156,7 @@ def rul_clean(c, lid, b, partial=None, see_only=False):
             val = str(sid)
         elif t["kind"] == "ltag":
             tag = _int(t.get("tag_id"), "trigger.tag_id")
-            if not c.execute("SELECT 1 FROM list_tags WHERE id=? AND list_id=?", (tag, lid)).fetchone():
+            if not otg_in_list(c, tag, lid, full=_rul_full(c)):
                 raise BadInput(tr("Invalid value: {0}", "trigger.tag_id"))
             val = str(tag)
         elif t["kind"] in ("assigned", "field"):
@@ -278,7 +280,7 @@ def rul_cond_clean(c, lid, d):
         out["user_id"] = uid
     if d.get("tag_id") not in (None, "", 0):
         tag = _int(d["tag_id"], "conditions.tag_id")
-        if not c.execute("SELECT 1 FROM list_tags WHERE id=? AND list_id=?", (tag, lid)).fetchone():
+        if not otg_in_list(c, tag, lid, full=_rul_full(c)):
             raise BadInput(tr("Invalid value: {0}", "conditions.tag_id"))
         out["tag_id"] = tag
     if d.get("section_id") not in (None, "", 0):
@@ -333,7 +335,7 @@ def rul_cond_ok(c, r, tid):
         return False
     if "section_id" in d and t["section_id"] != d["section_id"]:
         return False
-    if "tag_id" in d and not c.execute("SELECT 1 FROM task_list_tags WHERE task_id=? AND tag_id=?", (tid, d["tag_id"])).fetchone():
+    if "tag_id" in d and d["tag_id"] not in otg_task_ids(c, tid):
         return False
     return True
 
@@ -385,7 +387,7 @@ def rul_act_clean(c, lid, a):
     if k == "tag":
         reject_unknown(a, ("kind", "tag_id"))
         tag = _int(a.get("tag_id"), "action.tag_id")
-        if not c.execute("SELECT 1 FROM list_tags WHERE id=? AND list_id=?", (tag, lid)).fetchone():
+        if not otg_in_list(c, tag, lid, full=_rul_full(c)):
             raise BadInput(tr("Invalid value: {0}", "action.tag_id"))
         return {"tag_id": tag}
     reject_unknown(a, ("kind", "field_id", "value"))
@@ -427,7 +429,7 @@ def rul_ref_gone(c, r):
         return "field"
     tags = [int(tv)] if r["trig"] == "ltag" and tv.isdigit() else []
     tags += [a.get("tag_id") or 0 for k, a in acts if k == "tag"] + ([cond["tag_id"]] if cond.get("tag_id") else [])
-    if any(not c.execute("SELECT 1 FROM list_tags WHERE id=? AND list_id=?", (x, r["list_id"])).fetchone() for x in tags):
+    if any(not otg_in_list(c, x, r["list_id"]) for x in tags):
         return "tag"
     if cond.get("section_id") and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (cond["section_id"], r["list_id"])).fetchone():
         return "section"
@@ -485,6 +487,17 @@ def rul_sync(c, lid):
                      AND org_id IS DISTINCT FROM (SELECT org_id FROM lists WHERE id=?)""", (lid, lid, lid))
 
 
+def _rul_full(c):
+    return olb_full(c)
+
+
+def _rul_tag_name(c, tag_id, lid):
+    """2.925.0 (#5275, review F4): the name of a rule's tag for the reader -- a project tag of the rule's list, or a label of its
+    organisation the reader sees (full view, or a task of the list carries it); else None (no label names as an oracle)."""
+    s = otg_in_list(c, tag_id, lid, full=_rul_full(c)) if tag_id else None
+    return s["name"] if s else None
+
+
 def rul_dict(c, r):
     trig = {"kind": r["trig"]}
     names = {}
@@ -494,8 +507,7 @@ def rul_dict(c, r):
         names["section"] = s[0] if s else None
     elif r["trig"] == "ltag" and r["trig_val"]:
         trig["tag_id"] = int(r["trig_val"])
-        s = c.execute("SELECT name FROM list_tags WHERE id=?", (trig["tag_id"],)).fetchone()
-        names["tag"] = s[0] if s else None
+        names["tag"] = _rul_tag_name(c, trig["tag_id"], r["list_id"])
     elif r["trig"] == "assigned":  # 2.138.0 D (#2060)
         trig["user_id"] = int(r["trig_val"]) if r["trig_val"] else None
         names["trig_user"] = user_names(c, [trig["user_id"]]).get(trig["user_id"]) if trig["user_id"] else None
@@ -519,8 +531,7 @@ def rul_dict(c, r):
         if cond.get("user_id"):
             cn["user"] = user_names(c, [cond["user_id"]]).get(cond["user_id"])
         if cond.get("tag_id"):
-            s = c.execute("SELECT name FROM list_tags WHERE id=?", (cond["tag_id"],)).fetchone()
-            cn["tag"] = s[0] if s else None
+            cn["tag"] = _rul_tag_name(c, cond["tag_id"], r["list_id"])
         if cond.get("section_id"):
             s = c.execute("SELECT name FROM sections WHERE id=?", (cond["section_id"],)).fetchone()
             cn["section"] = s[0] if s else None
@@ -549,8 +560,7 @@ def rul_act_names(c, r, a):
             s = c.execute("SELECT name FROM sections WHERE id=?", (a["section_id"],)).fetchone()
             names["section_to"] = s[0] if s else None
     elif k == "tag":  # 2.138.0 D (#2060)
-        s = c.execute("SELECT name FROM list_tags WHERE id=?", (a.get("tag_id"),)).fetchone()
-        names["tag_to"] = s[0] if s else None
+        names["tag_to"] = _rul_tag_name(c, a.get("tag_id"), r["list_id"])
     elif k == "field":
         f = _field_row(c, r["list_id"], a.get("field_id") or 0)
         names["field_to"], names["value_to"] = (f["name"] if f else None), rul_val_name(c, f, a.get("value"))
@@ -689,7 +699,7 @@ def rul_snap(c, tid):
     if not t:
         return {}
     return {"list_id": t["list_id"], "section_id": t["section_id"], "status": t["status"],
-            "tags": {x[0] for x in c.execute("SELECT tag_id FROM task_list_tags WHERE task_id=?", (tid,))},
+            "tags": otg_task_ids(c, tid),
             "assignee": t["assignee_id"], "fields": rul_fvals(c, tid, t["list_id"])}  # 2.138.0 D (#2060)
 
 
@@ -706,7 +716,7 @@ def rul_fire(c, tid, before):
     t = c.execute("SELECT id, list_id, section_id, status, deleted_at, assignee_id FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t or t["deleted_at"]:
         return
-    tags = {x[0] for x in c.execute("SELECT tag_id FROM task_list_tags WHERE task_id=?", (tid,))}
+    tags = otg_task_ids(c, tid)
     new = before is _NEW
     ev = set()
     if t["section_id"] and (new or t["section_id"] != before["section_id"] or t["list_id"] != before["list_id"]):
@@ -826,7 +836,7 @@ def _rul_body(c, r, tid, k, a):
         return {"priority": RUL_PRIO.get(a.get("priority"), 0)}
     if k == "tag":
         from ..collab.reactions import ltag_names
-        return {"ltags": ltag_names(c, tid) + [c.execute("SELECT name FROM list_tags WHERE id=?", (a["tag_id"],)).fetchone()[0]]}
+        return {"ltags": ltag_names(c, tid) + [c.execute("SELECT name FROM obj_tags WHERE id=?", (a["tag_id"],)).fetchone()[0]]}
     if k == "field":
         return {"fields": {str(a["field_id"]): a.get("value")}}
     if k == "due":

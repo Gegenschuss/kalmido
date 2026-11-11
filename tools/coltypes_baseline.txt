@@ -337,7 +337,6 @@ list_rules.created_at time
 list_rules.deleted_at time
 list_rules.updated_at time
 list_status.created_at time
-list_tags.created_at time
 lists.archived bool
 lists.archived_at time
 lists.created_at time
@@ -627,7 +626,6 @@ org_keys.rotated_at time
 org_list_log.created_at time
 org_out_requests.created_at time
 org_out_requests.decided_at time
-org_tags.created_at time
 orgs.created_at time
 orgs.ret_hold_at time
 orgs.retain_until time

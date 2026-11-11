@@ -69,6 +69,7 @@ ORDER = (
     "core.objreact",  # 2.763.0 (#5269): the reactions of the shared core (one table obj_reactions, one rule)
     "core.objseen",  # 2.905.0 (#5284): the read marks of the shared core (one table obj_seen, no routes)
     "core.tplmove",  # 2.905.0 (#5288): templates onto the shared core at the start (owner_id, real types, section templates moved in)
+    "core.objtags",  # 2.925.0 (#5275): the tags of the shared core (obj_tags, obj_tag_links)
     "core.serializers",
     "core.compress",  # 2.65.0 (#1505): gzip for JSON answers; before core.pages = its after_request hook runs last
     "core.strip",  # 2.191.0 B (#1824): JS / CSS go out without comments (core.pages serves them)

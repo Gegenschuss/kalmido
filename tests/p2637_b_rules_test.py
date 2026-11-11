@@ -117,7 +117,7 @@ check(row[0] == "priority" and '"tag"' in row[1] and '"comment"' in row[1] and r
 t1 = task(A, W, "Ship")
 check(A.post(B + f"/api/tasks/{t1}/complete", json={}).ok, "the task is completed")
 check(dbx("SELECT priority FROM tasks WHERE id=?", (t1,))[0][0] == 5, "action 1: priority high")
-check(dbx("SELECT 1 FROM task_list_tags WHERE task_id=? AND tag_id=?", (t1, TAG)), "action 2: the tag")
+check(dbx("SELECT 1 FROM obj_tag_links WHERE kind='task' AND obj_id=? AND tag_id=?", (t1, TAG)), "action 2: the tag")  # 2.925.0 (#5275): the core's tags (obj_tags / obj_tag_links)
 check(comments(t1, "Chain") == ["Chain done"], f"action 3: the comment {comments(t1, 'Chain')}")
 check(A.patch(B + f"/api/rules/{R_CH}", json={"active": False}).ok, "the chain is switched off")
 

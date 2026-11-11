@@ -44,6 +44,9 @@ EXCEPT = {
     ("files/fslock.py", "dn.lvl < TRUE"): "2.353 (#2758): {DEPTH_MAX * 2} is a number constant; the stand-in TRUE makes it integer < boolean",
     ("core/objseen.py", "FROM task_seen s"): "2.905.0 (#5284): osn_move reads the old table task_seen only while it is there (to_regclass); the fragment 5284_a drops it",
     ("core/tplmove.py", "FROM section_templates"): "2.905.0 (#5288): the one-way move reads / empties the old table section_templates only when to_regclass still finds it (an older database); the schema here has it no more",
+    ("core/objtags.py", "FROM list_tags"): "2.925.0 (#5275): otg_move reads the old project tags only while the table exists (_otg_has); the fragment drops it, so the fresh schema has none",
+    ("core/objtags.py", "FROM org_tags"): "2.925.0 (#5275): otg_move reads the old labels only while the table exists (_otg_has); dropped by the fragment",
+    ("core/objtags.py", "FROM task_list_tags"): "2.925.0 (#5275): otg_move reads the old tag links only while the table exists (_otg_has); dropped by the fragment",
     ("core/dlock.py", "IN (SELECT id FROM s)"):"2.235.0 B2 (#2902): a base part of the recursive query whose WITH s(...) is built around it",
 }
 

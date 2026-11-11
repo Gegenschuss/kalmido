@@ -27,6 +27,7 @@ from ..core.db import body, bump, write_lock, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied, live_sql, trash_sql, tvis, vis_sql, list_role
 from ..core.conflict import ccf_check
 from ..core.pg import qi
+from ..core.objtags import OTG_TASK_FROM, otg_scope_sql
 from .mineorder import VW_MINE_MAX, _ms_person as _person, ms_rule_seed as mr_seed, vw_mine_order, vw_mine_sections
 
 MR_MAX = 20             # rules per person (deleted ones do not count)
@@ -74,7 +75,8 @@ def _jload(v):
 
 
 def _tag_list(c, tag):
-    r = c.execute("SELECT list_id FROM list_tags WHERE id=?", (tag,)).fetchone()
+    # 2.925.0 (#5275): a project tag is a row of the core (obj_tags scope list, scope_id = the list's id)
+    r = c.execute("SELECT CAST(scope_id AS BIGINT) FROM obj_tags WHERE id=? AND scope_kind='list'", (tag,)).fetchone()
     return r[0] if r else None
 
 
@@ -389,8 +391,7 @@ def mr_apply():
         for r in c.execute(f"SELECT id, list_id, due, priority FROM tasks WHERE id IN ({q}) AND status=0 AND {live_sql()} "
                            f"AND list_id IN {vis_sql()} AND {tvis(c, uid)}", (*part, uid, uid)):
             tasks[r["id"]] = r
-        for r in c.execute(f"SELECT x.task_id, x.tag_id FROM task_list_tags x JOIN list_tags lt ON lt.id=x.tag_id JOIN tasks t ON t.id=x.task_id "
-                           f"WHERE x.task_id IN ({q}) AND lt.list_id=t.list_id", part):
+        for r in c.execute(f"SELECT k.obj_id, ot.id {OTG_TASK_FROM} WHERE k.obj_id IN ({q}) AND {otg_scope_sql()}", part):
             tags.setdefault(r[0], set()).add(r[1])
     tids = list(tasks)
     runs = {}  # (rule id, task id) -> the keys of its markers

@@ -57,7 +57,8 @@ from ..core.access import Denied, ROLES, list_role, my_inbox, my_max_sort, WRITE
 from ..accounts.session import me
 from ..accounts.bgjobs import bgj_active, bgj_add, bgj_busy, bgj_drop, bgj_fn  # 2.370.3 (#2760)
 from ..lists.listhead import HEAD_STYLES  # 2.459.0 (#3849)
-from ..lists.lists import LIST_COLOR_RE
+from ..lists.lists import clean_color, LIST_COLOR_RE
+from ..core.objtags import otg_add, otg_find, otg_link  # 2.925.0 (#5275)
 from ..lists.fields import fx_tpl_fix  # 2.362.4 (#3100)
 from ..lists.formula import fx_display  # 2.362.4 (#3100)
 from ..lists.templates import tpl_clean  # 2.362.4 (#3100)
@@ -177,6 +178,7 @@ UMZ_READ = frozenset((
     "sprints", "task_links", "list_rules", "portal_tickets",  # 2.455.0 (#3469)
     "task_decisions",  # 2.392.0 C (#3370)
     "task_relations",  # 2.576.0 (#3371)
+    "org_tags",  # 2.925.0 (#5275): the labels of an organisation (org/labels.json of the organisation export)
     "template_files",  # 2.464.0 (#3865)
     "private_files", "private_versions", "private_area_roots", "wiki_pages", "wiki_files",  # #3470: umz_private (UMZ_PRIVATE)
     "private_locks", "private_lock_keys",  # #4300: admin/oilock.py
@@ -228,7 +230,7 @@ UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is
 UMZ_LEFT_PARTS = frozenset(p for _w, ps in UMZ_LEFT for p in ps) - UMZ_READ
 # 2.531.0 (#4317) F11: the area a refused row of a table is named under in the result (else its technical name)
 UMZ_REFUSED_AREA = {
-    "lists": N_("Projects"), "sections": N_("Sections"), "list_fields": N_("Custom fields"), "list_tags": N_("Project tags"),
+    "lists": N_("Projects"), "sections": N_("Sections"), "list_fields": N_("Custom fields"), "list_tags": N_("Project tags"), "org_tags": N_("Labels of the organisation"),  # 2.925.0 (#5275)
     "list_milestones": N_("Milestones"), "sprints": N_("Sprints"), "tasks": N_("Tasks"), "task_deps": N_("Dependencies"),
     "task_relations": N_("Relations"),  # 2.576.0 (#3371)
     "task_field_values": N_("Custom fields"), "task_tags": N_("Tags"), "task_list_tags": N_("Project tags"),
@@ -508,6 +510,7 @@ UMZ_ORG_MAP = {
     "lists/milestones.json": "list_milestones", "lists/files.json": "list_files", "tasks.json": "tasks",
     "tasks/dependencies.json": "task_deps", "tasks/field_values.json": "task_field_values", "tasks/tags.json": "task_list_tags",
     "tasks/relations.json": "task_relations",  # 2.576.0 (#3371)
+    "org/labels.json": "org_tags",  # 2.925.0 (#5275)
     "tasks/decisions.json": "task_decisions", "comments.json": "comments", "attachments.json": "attachments", "calendars.json": "event_calendars", "events.json": "events",
     "events/attendees.json": "event_attendees", "books.json": "address_books", "books/contacts.json": "contacts",
     "members.json": "members",
@@ -1065,9 +1068,64 @@ def umz_refused(run):
 # parent or None). A row counts as there while it exists outside the trash, it hangs on a parent that counts as there (column =
 # the parent), or without a parent it is still the person's (column = the owner); a list also still in the target or private
 # (nothing is written into a list that went to somebody else or another organisation). Anything else is taken over anew. Parents first.
-UMZ_SRC = {
+def umz_list_tags(c, run, data, inbox, uid):
+    """2.925.0 (#5275): the project tags of the archive (lists/tags.json, list_tags rows of any version, a label's copy of
+    2.609-2.924 too) become project tags of the core in their imported list; a name the list has already is that tag (60
+    characters: agents/core.py LTAG_NAME_MAX, not imported here: tools/check_layers.py). The labels of an organisation export
+    (org/labels.json) become labels of the target organisation (a name it has already is that label); into the private space
+    they stay names only: umz_task_ltags makes them project tags of the tasks' projects."""
+    for r in data.get("org_tags", []) if run.org else ():
+        run.step()
+        name = re.sub(r"[\x00-\x1f]", "", _txt(r.get("name"), 60)).strip().lstrip("#").strip()
+        if not name:
+            continue
+        have = otg_find(c, "org", run.org, name)
+        nid = have["id"] if have else otg_add(c, "org", run.org, name, clean_color(r.get("color") or ""), by=uid)
+        run.put("org_tags", r.get("id"), nid)
+        if not have:
+            run.count("org_tags")
+    for r in data.get("list_tags", []):
+        run.step()
+        lid = run.m("lists", r.get("list_id"))
+        if not lid or lid == inbox or run.there("list_tags", r.get("id")):
+            continue
+        name = re.sub(r"[\x00-\x1f]", "", _txt(r.get("name"), 60)).strip().lstrip("#").strip()
+        if not name:
+            continue
+        have = otg_find(c, "list", lid, name)
+        try:
+            srt = float(r.get("sort") or 0)
+        except (TypeError, ValueError):
+            srt = None
+        nid = have["id"] if have else otg_add(c, "list", lid, name, clean_color(r.get("color") or ""), by=uid, sort=srt)
+        run.put("list_tags", r.get("id"), nid)
+        if not have:
+            run.count("list_tags")
+
+
+def umz_task_ltags(c, run, data, uid):
+    """2.925.0 (#5275): the tags of the imported tasks (tasks/tags.json: a project tag, or since 2.925 a label of the organisation
+    under its id of org/labels.json). A label the target has no organisation for becomes the project tag of that name."""
+    labels = {_oid(r.get("id")): r for r in data.get("org_tags", []) if _oid(r.get("id"))}
+    for r in data.get("task_list_tags", []):
+        tid = run.m("tasks", r.get("task_id"))
+        if not tid or run.old("tasks", tid):  # 2.531.0 (#4317) F16
+            continue
+        gid = run.m("list_tags", r.get("tag_id")) or run.m("org_tags", r.get("tag_id"))
+        lab = labels.get(_oid(r.get("tag_id")))
+        if not gid and lab:
+            name = re.sub(r"[\x00-\x1f]", "", _txt(lab.get("name"), 60)).strip().lstrip("#").strip()
+            lid = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
+            if name and lid:
+                have = otg_find(c, "list", lid[0], name)
+                gid = have["id"] if have else otg_add(c, "list", lid[0], name, clean_color(lab.get("color") or ""), by=uid)
+        if gid:
+            otg_link(c, gid, tid, by=uid)
+
+
+UMZ_SRC = {  # 2.925.0 (#5275, review F5): list_tags reads a project tag's list only (another scope's id may be 'o:3')
     "lists": ("lists", "owner_id", None), "sections": ("sections", "list_id", "lists"), "list_fields": ("list_fields", "list_id", "lists"),
-    "list_tags": ("list_tags", "list_id", "lists"), "list_status": ("list_status", "list_id", "lists"), "list_links": ("list_links", "list_id", "lists"),
+    "list_tags": ("obj_tags", "CASE WHEN scope_kind='list' THEN CAST(scope_id AS BIGINT) END", "lists"), "list_status": ("list_status", "list_id", "lists"), "list_links": ("list_links", "list_id", "lists"),
     "list_milestones": ("list_milestones", "list_id", "lists"), "tasks": ("tasks", "list_id", "lists"), "notes": ("notes", "list_id", "lists"),
     "comments": ("comments", "task_id", "tasks"), "attachments": ("attachments", "task_id", "tasks"), "list_files": ("list_files", "list_id", "lists"),
     "time_entries": ("time_entries", "user_id", None), "habits": ("habits", "user_id", None), "filters": ("filters", "user_id", None),
@@ -1640,7 +1698,8 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         run.created["lists"].append(lid)
         run.count("lists")
     # what hangs on a list
-    for table, kind, fixed in (("sections", "sections", {}), ("list_fields", "list_fields", {}), ("list_tags", "list_tags", {}),
+    umz_list_tags(c, run, data, inbox, uid)  # 2.925.0 (#5275): the project tags into the core
+    for table, kind, fixed in (("sections", "sections", {}), ("list_fields", "list_fields", {}),
                                ("list_status", "list_status", {"user_id": uid}), ("list_links", "list_links", {"created_by": uid}),
                                ("list_milestones", "list_milestones", {"created_by": uid}), ("sprints", "sprints", {"created_by": uid, "review": None, "state": "planned"})):  # 2.455.0 (#3469): both from sprint_finish, a stop before it keeps no old id
         for r in data.get(table, []):
@@ -1744,10 +1803,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         tag = _txt(r.get("tag"), 100).strip()
         if tid and tag and _oid(r.get("user_id")) == me_old and not run.old("tasks", tid):  # 2.531.0 (#4317) F16
             umz_insert(c, "task_tags", {"task_id": tid, "user_id": uid, "tag": tag}, rid=False)
-    for r in data.get("task_list_tags", []):
-        tid, gid = run.m("tasks", r.get("task_id")), run.m("list_tags", r.get("tag_id"))
-        if tid and gid and not run.old("tasks", tid):  # 2.531.0 (#4317) F16
-            umz_insert(c, "task_list_tags", {"task_id": tid, "tag_id": gid}, rid=False)
+    umz_task_ltags(c, run, data, uid)
     for r in data.get("task_note_locks", []):  # browser-encrypted with my note password: only my own
         tid = run.m("tasks", r.get("task_id"))
         if tid and _oid(r.get("user_id")) == me_old and not run.old("tasks", tid):  # 2.531.0 (#4317) F16

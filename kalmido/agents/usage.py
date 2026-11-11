@@ -32,7 +32,7 @@ from ..agents.core import (
     agent_active, AGENT_EVENTS, agent_row, agent_shares, AGENT_STATUSES, AGENT_TYPING_S, AGENT_WAIT_MAX, need_person,
     JOB_ACTIONS, JOB_STATES, need_agent, TIDY_MODES,
 )
-from ..collab.reactions import clean_emoji, comment_rx_on, ltag_create, ltag_delete, ltag_update, react, with_reactions
+from ..collab.reactions import clean_emoji, comment_rx_on, ltag_create, ltag_delete, ltag_update, ltags_of_lists, react, with_reactions
 from ..agents.chat import CHAT_FILES_MAX
 from ..agents.safety import access_cleanup
 from ..agents.admin import need_agent_admin, need_own_agent
@@ -901,10 +901,19 @@ def v1_comment_one(c, cid):
     return v1_comment(c, d, user_names(c, [r["user_id"]]))
 
 
-def v1_ltag(c, r):
-    n = c.execute("""SELECT COUNT(*), COALESCE(SUM(CASE WHEN t.status=0 THEN 1 ELSE 0 END),0) FROM task_list_tags x JOIN tasks t ON t.id=x.task_id
-                     WHERE x.tag_id=? AND t.deleted_at IS NULL AND t.list_id=?""", (r["id"], r["list_id"])).fetchone()
-    return {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "color": r["color"], "tasks": n[0], "open": n[1]}
+def v1_ltag(c, r, lid):
+    """r: an entry of ltags_of_lists (2.925.0, #5275: a project tag or a label of the organisation a task of the project carries;
+    org_tag_id = the label's id, null for a project tag)."""
+    n = c.execute("""SELECT COUNT(*), COALESCE(SUM(CASE WHEN t.status=0 THEN 1 ELSE 0 END),0) FROM obj_tag_links x JOIN tasks t ON t.id=x.obj_id
+                      WHERE x.tag_id=? AND x.kind='task' AND t.deleted_at IS NULL AND t.list_id=?""", (r["id"], lid)).fetchone()
+    return {"id": r["id"], "list_id": lid, "name": r["name"], "color": r["color"], "org_tag_id": r.get("org_tag_id"), "tasks": n[0], "open": n[1]}
+
+
+def _v1_ltag_of(c, lid, tag_id):
+    x = next((x for x in ltags_of_lists(c, [lid]).get(lid, []) if x["id"] == tag_id), None)
+    if x is None:
+        raise Denied(404)
+    return x
 
 
 @app.get("/api/v1/lists/<int:lid>/tags")
@@ -913,8 +922,7 @@ def v1_list_tags(lid):
     v1_args(())
     c = db()
     need_list(c, lid, write=False)
-    return jsonify(data=[v1_ltag(c, r) for r in c.execute("SELECT * FROM list_tags WHERE list_id=? ORDER BY sort, lower(name)", (lid,))],
-                   next_cursor=None)
+    return jsonify(data=[v1_ltag(c, r, lid) for r in ltags_of_lists(c, [lid]).get(lid, [])], next_cursor=None)
 
 
 @app.post("/api/v1/lists/<int:lid>/tags")
@@ -925,7 +933,7 @@ def v1_list_tag_create(lid):
     reject_unknown(b, ("name", "color"))
     j = v1_call(ltag_create, lid, body=b)
     c = db()
-    return jsonify(v1_ltag(c, c.execute("SELECT * FROM list_tags WHERE id=?", (j["id"],)).fetchone())), 201
+    return jsonify(v1_ltag(c, j, lid)), 201
 
 
 @app.patch("/api/v1/lists/<int:lid>/tags/<tag_id>")  # not <int:>: the spec path keeps its own name
@@ -936,21 +944,20 @@ def v1_list_tag_update(lid, tag_id):
     b = v1_json()
     reject_unknown(b, ("name", "color"))
     c = db()
-    if not c.execute("SELECT 1 FROM list_tags WHERE id=? AND list_id=?", (tag_id, lid)).fetchone():
-        raise Denied(404)
-    v1_call(ltag_update, tag_id, body=b)
-    return jsonify(v1_ltag(c, c.execute("SELECT * FROM list_tags WHERE id=?", (tag_id,)).fetchone()))
+    _v1_ltag_of(c, lid, tag_id)
+    v1_call(ltag_update, tag_id, lid, body=b)
+    return jsonify(v1_ltag(c, _v1_ltag_of(c, lid, tag_id), lid))
 
 
 @app.delete("/api/v1/lists/<int:lid>/tags/<tag_id>")  # not <int:>: the spec path keeps its own name
 @v1_view
 def v1_list_tag_delete(lid, tag_id):
+    """A project tag goes; a label of the organisation is taken off the project's tasks (it stays in the organisation)."""
     v1_args(())
     tag_id = as_int(tag_id, "tag_id", 1)
     c = db()
-    if not c.execute("SELECT 1 FROM list_tags WHERE id=? AND list_id=?", (tag_id, lid)).fetchone():
-        raise Denied(404)
-    v1_call(ltag_delete, tag_id, body={})
+    _v1_ltag_of(c, lid, tag_id)
+    v1_call(ltag_delete, tag_id, lid, body={})
     return Response(status=204)
 
 
@@ -1018,7 +1025,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
     chat_rx_out = {"type": "object", "properties": {"ok": {"type": "boolean"}, "message_id": {"type": "integer"}, "reactions": {"type": "array", "items": {"type": "object"}},
                                                     "approval": nul("string", enum=["approved", "rejected", None])}}
     ltag = {"type": "object", "properties": {"id": {"type": "integer"}, "list_id": {"type": "integer"}, "name": {"type": "string"},
-                                             "color": {"type": "string"}, "tasks": {"type": "integer"}, "open": {"type": "integer"}}}
+                                             "color": {"type": "string"}, "tasks": {"type": "integer"}, "open": {"type": "integer"},
+                                             "org_tag_id": {"type": ["integer", "null"], "description": "2.925.0 (#5275): set for a label of the "
+                                                            "organisation (the same tag in every project of it; managed only by its admins in the app)"}}}
     sug = {"type": "object", "additionalProperties": False, "properties": {
         "title": {"type": "string"}, "notes": {"type": "string"}, "section_id": {"type": "integer"},
         "list_tags": {"type": "array", "items": {"type": "string"}}, "priority": {"type": "string", "enum": list(PRIO_VALUES)}}}

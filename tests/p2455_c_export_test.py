@@ -123,12 +123,15 @@ def rules(lid):
 def parts(lid):
     """A list with what its rules can point at."""
     sec = dbx("INSERT INTO sections(list_id,name) VALUES(?,'Doing') RETURNING id", (lid,))[0][0]
-    tag = dbx("INSERT INTO list_tags(list_id,name,created_at) VALUES(?,'Hot',?) RETURNING id", (lid, TS))[0][0]
+    # 2.925.0 (#5275): a project tag is a row of the core (obj_tags scope list)
+    tag = dbx("INSERT INTO obj_tags(scope_kind,scope_id,name,created_at) VALUES('list',CAST(? AS TEXT),'Hot',?) RETURNING id", (lid, TS))[0][0]
     fld = dbx("INSERT INTO list_fields(list_id,name,type,created_at) VALUES(?,'Lead','person',?) RETURNING id", (lid, TS))[0][0]
     return sec, tag, fld
 
 
 def named(table, lid, name):
+    if table == "list_tags":  # 2.925.0 (#5275): the core's tags
+        return one("SELECT id FROM obj_tags WHERE scope_kind='list' AND scope_id=CAST(? AS TEXT) AND name=?", (lid, name))
     return one(f"SELECT id FROM {table} WHERE list_id=? AND name=?", (lid, name))
 
 

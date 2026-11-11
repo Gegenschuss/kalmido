@@ -14,8 +14,12 @@ journal with its mood: never an agent's since 2.22.0 / 2.72.0 / 2.172.1) stay as
 
 Stored in agents.data_lock: JSON {areas: {key: bool}, lists: [list ids], tags: [names]}; '' = the defaults (DL_DEFAULT)."""
 import json
+from contextlib import nullcontext
 
 from flask import g, has_request_context, request
+
+from .objtags import obj_tag_sql  # 2.925.0 (#5275)
+from .pg import system_ctx
 
 DL_ALWAYS = ("journal", "mood", "health", "budget", "reading")  # fixed (scope "private" / list rules), shown as locked
 DL_LIST_AREAS = ("contracts", "home", "travel")  # the private lists of Home & life (lists.life, no organisation)
@@ -141,12 +145,15 @@ def dl_task_ids(c, uid):
     if d["_tags"]:
         q = ",".join("?" * len(d["_tags"]))
         base.append(f"SELECT x.task_id FROM task_tags x JOIN tasks t ON t.id=x.task_id WHERE lower(x.tag) IN ({q}) AND t.list_id IN (SELECT id FROM s)")
-        base.append(f"SELECT y.task_id FROM task_list_tags y JOIN list_tags z ON z.id=y.tag_id JOIN tasks t ON t.id=y.task_id"
-                    f" WHERE lower(z.name) IN ({q}) AND t.list_id IN (SELECT id FROM s)")
-        args += list(d["_tags"]) * 2
-    rows = c.execute(f"""WITH RECURSIVE s(id) AS {acx_lists_sql(req=False)}, b(id) AS ({' UNION '.join(base)}),
-                           r(id) AS (SELECT id FROM b UNION SELECT t.id FROM tasks t JOIN r ON t.parent_id=r.id)
-                         SELECT id FROM r""", args).fetchall()
+        # 2.925.0 (#5275): the project tags and labels of the core (obj_tag_sql: the tags of the task's project)
+        base.append(f"SELECT t.id FROM tasks t WHERE {obj_tag_sql('t.id', 'names')} AND t.list_id IN (SELECT id FROM s)")
+        args += list(d["_tags"]) + [sorted(d["_tags"])]
+    # 2.925.0 (#5275): a label of an organisation is hidden from who is no member (row-level security) -- the lock still has to
+    # see it on the task, so the query runs as "system"; it only decides what is HIDDEN from uid, in uid's own lists (s)
+    with system_ctx(c) if d["_tags"] else nullcontext():
+        rows = c.execute(f"""WITH RECURSIVE s(id) AS {acx_lists_sql(req=False)}, b(id) AS ({' UNION '.join(base)}),
+                               r(id) AS (SELECT id FROM b UNION SELECT t.id FROM tasks t JOIN r ON t.parent_id=r.id)
+                             SELECT id FROM r""", args).fetchall()
     out = frozenset(r[0] for r in rows)
     if cache is not None:
         cache[uid] = out
@@ -191,13 +198,14 @@ def dl_tasks_locked(c, uid, tids):
     if d["_tags"]:
         q = ",".join("?" * len(d["_tags"]))
         cond.append(f"EXISTS (SELECT 1 FROM task_tags x WHERE x.task_id=t.id AND lower(x.tag) IN ({q}))")
-        cond.append(f"EXISTS (SELECT 1 FROM task_list_tags y JOIN list_tags z ON z.id=y.tag_id WHERE y.task_id=t.id AND lower(z.name) IN ({q}))")
-        args += list(d["_tags"]) * 2
+        cond.append(obj_tag_sql("t.id", "names"))  # 2.925.0 (#5275): the project tags and labels of the core
+        args += list(d["_tags"]) + [sorted(d["_tags"])]
     if not cond:
         return set()
-    rows = c.execute(f"""WITH RECURSIVE r(id, cur) AS (
-                           SELECT id, id FROM tasks WHERE id IN ({','.join('?' * len(ids))})
-                           UNION SELECT r.id, t.parent_id FROM r JOIN tasks t ON t.id=r.cur WHERE t.parent_id IS NOT NULL)
-                         SELECT DISTINCT r.id FROM r JOIN tasks t ON t.id=r.cur JOIN lists l ON l.id=t.list_id
-                         WHERE {' OR '.join(cond)}""", (*ids, *args)).fetchall()
+    with system_ctx(c) if d["_tags"] else nullcontext():  # 2.925.0 (#5275): as in dl_task_ids (only what is hidden)
+        rows = c.execute(f"""WITH RECURSIVE r(id, cur) AS (
+                               SELECT id, id FROM tasks WHERE id IN ({','.join('?' * len(ids))})
+                               UNION SELECT r.id, t.parent_id FROM r JOIN tasks t ON t.id=r.cur WHERE t.parent_id IS NOT NULL)
+                             SELECT DISTINCT r.id FROM r JOIN tasks t ON t.id=r.cur JOIN lists l ON l.id=t.list_id
+                             WHERE {' OR '.join(cond)}""", (*ids, *args)).fetchall()
     return {r[0] for r in rows}

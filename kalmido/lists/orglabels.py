@@ -3,15 +3,21 @@ In a project they are project tags linked to the label (list_tags.org_tag_id): m
 the label (collab/reactions.py ltag_get_or_create, also for people who may not make new project tags), renamed and recoloured
 with the label, kept as plain project tags when the label is deleted. Personal tags (task_tags) stay private and unchanged; the
 app shows the three kinds apart. Only the organisation's admins change its labels; the labels of another organisation are never
-offered (the app state lists only the labels of organisations whose projects the person sees)."""
+offered (the app state lists only the labels of organisations whose projects the person sees).
+
+2.925.0 (#5275, stage Q5a, decided 08.11.2026): a label is a tag of the core (core/objtags.py, obj_tags scope org) and sits on
+the task itself -- no copy per project any more; a rename / new colour reaches every task at once. A new label takes over the
+project tags of the same name in the organisation's projects (their tasks get the label, the project tag goes). A deleted label
+leaves its tasks as plain project tags of their projects (as before)."""
 import re
 
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, write_lock
+from ..core.pg import qi, write_lock
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.db import body, bump, db, err
+from ..core.objtags import otg_add, otg_find, otg_link, otg_merge, otg_rekey_refs
 from ..accounts.session import me
 from ..core.access import Denied
 from ..core.errors import BadInput
@@ -48,7 +54,7 @@ def olb_admin(c, uid, oid):
 
 
 def olb_get(c, uid, lbid):
-    r = c.execute("SELECT * FROM org_tags WHERE id=?", (lbid,)).fetchone()
+    r = c.execute("SELECT * FROM obj_tags WHERE id=? AND scope_kind='org'", (lbid,)).fetchone()
     if not r:
         raise Denied(404)
     olb_admin(c, uid, r["org_id"])
@@ -56,17 +62,40 @@ def olb_get(c, uid, lbid):
 
 
 def olb_out(c, r):
+    """lists = the projects whose tasks carry the label."""
     return {"id": r["id"], "org_id": r["org_id"], "name": r["name"], "color": r["color"], "sort": r["sort"],
-            "lists": c.execute("SELECT COUNT(*) FROM list_tags WHERE org_tag_id=?", (r["id"],)).fetchone()[0]}
+            # review F1: only projects of the label's organisation (a link left on a task of another one is not shown)
+            "lists": c.execute("""SELECT COUNT(DISTINCT t.list_id) FROM obj_tag_links k JOIN tasks t ON t.id=k.obj_id
+                                  JOIN lists l ON l.id=t.list_id AND l.org_id=? WHERE k.tag_id=? AND k.kind='task'""",
+                               (r["org_id"], r["id"])).fetchone()[0]}
+
+
+def olb_full(c, uid=None):
+    """Review F4 (2.925.0): what a reader may see of the labels, for core/objtags.py otg_list_sql / otg_in_list (full=): True
+    outside a request with a person (the server's own work), else the organisations the person fully sees (user_orgs_full) --
+    a label of another organisation of a project only where a task of the project carries it."""
+    if uid is None:
+        u = getattr(g, "user", None) if has_request_context() else None
+        if not u:
+            return True
+        uid = u["id"]
+    return user_orgs_full(c, uid)
 
 
 def olb_match(c, lid, name):
     """The label of list lid's organisation named name (any case), or None (a list without an organisation: never).
     2.609.0 (#3373, review F3): only for a person with the full view of that organisation -- a guest / accounting person who
-    may tag in a shared project gets a plain project tag, so the labels' names are no oracle for them."""
-    r = c.execute("""SELECT o.* FROM org_tags o JOIN lists l ON l.org_id=o.org_id WHERE l.id=? AND lower(o.name)=lower(?)""",
-                  (lid, name)).fetchone()
-    return r if r and r["org_id"] in user_orgs_full(c, me()) else None
+    may tag in a shared project gets a plain project tag, so the labels' names are no oracle for them. 2.925.0 (#5275): or a
+    label a task of the project carries already (they see it on that task, as they saw the project's copy before)."""
+    r = c.execute("""SELECT o.* FROM obj_tags o JOIN lists l ON l.org_id=o.org_id WHERE l.id=? AND o.scope_kind='org'
+                     AND lower(o.name)=lower(?)""", (lid, name)).fetchone()
+    if not r:
+        return None
+    if r["org_id"] in user_orgs_full(c, me()):
+        return r
+    used = c.execute("""SELECT 1 FROM obj_tag_links k JOIN tasks t ON t.id=k.obj_id AND k.kind='task'
+                        WHERE k.tag_id=? AND t.list_id=? LIMIT 1""", (r["id"], lid)).fetchone()
+    return r if used else None
 
 
 @app.get("/api/org-labels")
@@ -81,8 +110,8 @@ def olb_index():
             orgs = [o for o in orgs if o == int(want)]
         except ValueError:
             return err(tr("Invalid value: {0}", "org_id"))
-    rows = c.execute(f"SELECT * FROM org_tags WHERE org_id IN ({','.join('?' * len(orgs))}) ORDER BY org_id, sort, lower(name), id",
-                     orgs).fetchall() if orgs else []
+    rows = c.execute("SELECT * FROM obj_tags WHERE scope_kind='org' AND org_id = ANY(CAST(? AS BIGINT[])) ORDER BY org_id, sort, lower(name), id",
+                     (orgs,)).fetchall() if orgs else []
     return jsonify(labels=[olb_out(c, r) for r in rows])
 
 
@@ -102,28 +131,18 @@ def olb_create():
         name = olb_name(b.get("name"))
     except BadInput as e:
         return err(str(e))
-    if c.execute("SELECT 1 FROM org_tags WHERE org_id=? AND lower(name)=lower(?)", (oid, name)).fetchone():
+    if otg_find(c, "org", oid, name):
         return err(tr("This label already exists in the organisation"), 409)
-    if c.execute("SELECT COUNT(*) FROM org_tags WHERE org_id=?", (oid,)).fetchone()[0] >= OLB_MAX:
+    if c.execute("SELECT COUNT(*) FROM obj_tags WHERE scope_kind='org' AND scope_id=?", (str(oid),)).fetchone()[0] >= OLB_MAX:
         return err(tr("At most {0} labels", OLB_MAX))
-    srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM org_tags WHERE org_id=?", (oid,)).fetchone()[0]
-    lbid = insert_id(c, "INSERT INTO org_tags(org_id,name,color,sort,created_at) VALUES(?,?,?,?,?)",
-                     (oid, name, clean_color(b.get("color") or ""), srt, iso(now_utc())))
-    # a project tag of the same name in a project of the organisation becomes this label (same name, its colour)
-    c.execute("""UPDATE list_tags SET org_tag_id=? WHERE org_tag_id IS NULL AND lower(name)=lower(?)
-                 AND list_id IN (SELECT id FROM lists WHERE org_id=?)""", (lbid, name, oid))
-    olb_sync(c, lbid)
+    lbid = otg_add(c, "org", oid, name, clean_color(b.get("color") or ""), by=uid)
+    # a project tag of the same name in a project of the organisation becomes this label: its tasks get the label (2.925.0, #5275)
+    for r in c.execute("""SELECT ot.id FROM obj_tags ot JOIN lists l ON ot.scope_kind='list' AND ot.scope_id=CAST(l.id AS TEXT)
+                          WHERE l.org_id=? AND lower(ot.name)=lower(?)""", (oid, name)).fetchall():
+        otg_merge(c, r["id"], lbid)
     bump(c)
     c.commit()
-    return jsonify(olb_out(c, c.execute("SELECT * FROM org_tags WHERE id=?", (lbid,)).fetchone())), 201
-
-
-def olb_sync(c, lbid):
-    """The linked project tags take the label's name (where the project has no other tag of that name) and colour."""
-    r = c.execute("SELECT * FROM org_tags WHERE id=?", (lbid,)).fetchone()
-    c.execute("UPDATE list_tags SET color=? WHERE org_tag_id=?", (r["color"], lbid))
-    c.execute("""UPDATE list_tags SET name=? WHERE org_tag_id=? AND name<>? AND NOT EXISTS (SELECT 1 FROM list_tags x
-                 WHERE x.list_id=list_tags.list_id AND x.id<>list_tags.id AND lower(x.name)=lower(?))""", (r["name"], lbid, r["name"], r["name"]))
+    return jsonify(olb_out(c, c.execute("SELECT * FROM obj_tags WHERE id=?", (lbid,)).fetchone())), 201
 
 
 @app.patch("/api/org-labels/<int:lbid>")
@@ -138,28 +157,42 @@ def olb_update(lbid):
     try:
         if "name" in b:
             sets["name"] = olb_name(b["name"])
-            if c.execute("SELECT 1 FROM org_tags WHERE org_id=? AND lower(name)=lower(?) AND id<>?", (r["org_id"], sets["name"], lbid)).fetchone():
+            if c.execute("SELECT 1 FROM obj_tags WHERE scope_kind='org' AND scope_id=? AND lower(name)=lower(?) AND id<>?",
+                         (r["scope_id"], sets["name"], lbid)).fetchone():
                 return err(tr("This label already exists in the organisation"), 409)
         if "color" in b:
             sets["color"] = clean_color(b.get("color") or "")
     except BadInput as e:
         return err(str(e))
     if sets:
-        c.execute(f"UPDATE org_tags SET {','.join(k + '=?' for k in sets)} WHERE id=?", [*sets.values(), lbid])
-        olb_sync(c, lbid)
+        c.execute(f"UPDATE obj_tags SET {','.join(qi(k, ('name', 'color')) + '=?' for k in sets)} WHERE id=?", [*sets.values(), lbid])
         bump(c)
         c.commit()
-    return jsonify(olb_out(c, c.execute("SELECT * FROM org_tags WHERE id=?", (lbid,)).fetchone()))
+    return jsonify(olb_out(c, c.execute("SELECT * FROM obj_tags WHERE id=?", (lbid,)).fetchone()))
 
 
 @app.delete("/api/org-labels/<int:lbid>")
 def olb_delete(lbid):
-    """The label goes; its project tags stay in their projects as plain project tags (on their tasks)."""
+    """The label goes; its tasks keep it as a plain project tag of their project (2.925.0, #5275: made / found by name there,
+    the label's colour where the project tag has none)."""
     olb_need_person()
     c, uid = db(), me()
-    olb_get(c, uid, lbid)
-    n = c.execute("UPDATE list_tags SET org_tag_id=NULL WHERE org_tag_id=?", (lbid,)).rowcount
-    c.execute("DELETE FROM org_tags WHERE id=?", (lbid,))
+    r = olb_get(c, uid, lbid)
+    n = 0
+    # review F1: only the projects of the label's organisation -- a link left on a task of another project (hidden there) goes
+    # with the label, it gives no project tag to a project outside the organisation
+    for lid, tids in c.execute("""SELECT t.list_id, array_agg(t.id ORDER BY t.id) FROM obj_tag_links k JOIN tasks t ON t.id=k.obj_id
+                                  JOIN lists l ON l.id=t.list_id AND l.org_id=? WHERE k.tag_id=? AND k.kind='task'
+                                  GROUP BY t.list_id ORDER BY t.list_id""", (r["org_id"], lbid)).fetchall():
+        pt = otg_find(c, "list", lid, r["name"])
+        i = pt["id"] if pt else otg_add(c, "list", lid, r["name"], r["color"], by=uid)
+        if pt and not pt["color"] and r["color"]:
+            c.execute("UPDATE obj_tags SET color=? WHERE id=?", (r["color"], i))
+        for tid in tids:
+            otg_link(c, i, tid, by=uid)
+        otg_rekey_refs(c, {int(lbid): int(i)}, lid)  # the project's rules / shared views that named the label name its tag
+        n += 1
+    c.execute("DELETE FROM obj_tags WHERE id=?", (lbid,))
     bump(c)
     c.commit()
     return jsonify(ok=True, unlinked=n)

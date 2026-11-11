@@ -195,7 +195,7 @@ r = A.post(B + f"/api/tasks/{Do_t}/partial", json={"version": "2.13"})
 check(r.ok, f"session route {r.status_code} {r.text[:200]}")
 RD = r.json()["rest"]["id"]
 check(task(Do, RD) is not None and r.json()["rest"].get("assignee_id") == ids["dora"] and r.json()["rest"].get("priority") == 5, "the participant sees the rest")
-check(dbq("SELECT tag_id FROM task_list_tags WHERE task_id=?", (RD,)) == [(ltid,)], "the list tag comes along")
+check(dbq("SELECT tag_id FROM obj_tag_links WHERE kind='task' AND obj_id=?", (RD,)) == [(ltid,)], "the list tag comes along")  # 2.925.0 (#5275): the core's tags (obj_tags / obj_tag_links)
 check(task(Do, REST) is None, "... and no other task")
 # refused
 check(Ca.post(B + f"/api/tasks/{T[6]}/partial", json={"version": "2.20"}).status_code == 404, "a stranger: 404")

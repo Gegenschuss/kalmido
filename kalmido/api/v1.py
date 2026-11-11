@@ -41,6 +41,7 @@ from ..personal.habits import habit_log, habit_times, need_habit
 from ..personal.timetrack import clean_day_hours, entry_out, time_create, time_rounding, time_rows, vis_ids
 from ..core.errors import BadInput, field_alias, reject_unknown, UnknownFields
 from ..core.conflict import need_version, version_rule, VersionRequired  # 2.564.0 (#4702)
+from ..core.objtags import obj_tag_sql  # 2.925.0 (#5275)
 from ..lists.filterrules import filter_where, rule_kinds, rule_sort  # 2.577.0 (#3356)
 from ..lists.sections import filter_read  # 2.577.0 (#3356)
 from ..lists.seckind import SEC_KINDS, sk_derive, sk_filter, sk_first, sk_of, sk_task, SK_STATUS
@@ -964,12 +965,10 @@ def v1_tasks():
             where.append(f"due IS NOT NULL AND due{op}?")
             args.append(a[k])
     if a.get("tag"):  # 2.0.0: a personal tag or a list tag of that name
-        where.append("(id IN (SELECT task_id FROM task_tags WHERE user_id=? AND tag=?) OR id IN (SELECT x.task_id FROM task_list_tags x "
-                     "JOIN list_tags lt ON lt.id=x.tag_id WHERE lower(lt.name)=lower(?) AND lt.list_id=tasks.list_id))")
+        where.append(f"(id IN (SELECT task_id FROM task_tags WHERE user_id=? AND tag=?) OR {obj_tag_sql('tasks.id')})")  # 2.925.0 (#5275)
         args += [uid, a["tag"].lstrip("#"), a["tag"].lstrip("#")]
     if a.get("list_tag"):
-        where.append("id IN (SELECT x.task_id FROM task_list_tags x JOIN list_tags lt ON lt.id=x.tag_id "
-                     "WHERE lower(lt.name)=lower(?) AND lt.list_id=tasks.list_id)")
+        where.append(obj_tag_sql("tasks.id"))  # 2.925.0 (#5275): a project tag or a label of that name
         args.append(a["list_tag"].lstrip("#"))
     if a.get("assignee"):
         if a["assignee"] == "none":
@@ -1681,14 +1680,11 @@ def v1_tags():
                          JOIN tasks t ON t.id=g.task_id WHERE g.user_id=? AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()}
                          AND {tvis(c, uid, "t.")} GROUP BY g.tag ORDER BY lower(g.tag)""", (uid, uid, uid)).fetchall()
     out = [{"name": r["tag"], "tasks": r["n"], "open": r["open"], "kind": "personal"} for r in rows]
-    lids = [d["id"] for d in visible_lists(c, uid)]  # 2.0.0: the list tags of the lists I see
-    by = {}  # 2.602.0 D (#4508): one query for all of them; still list by list in visible_lists' order, each by sort, name
-    if lids:
-        for r in c.execute("SELECT * FROM list_tags WHERE list_id = ANY(CAST(? AS BIGINT[])) ORDER BY list_id, sort, lower(name)",
-                           (st_ids(lids),)).fetchall():
-            by.setdefault(r["list_id"], []).append(r)
-    for lid in lids:
-        out += [{**v1_ltag(c, r), "kind": "list"} for r in by.get(lid, ())]
+    vl = visible_lists(c, uid)  # 2.0.0: the list tags of the lists I see
+    # 2.602.0 D (#4508): one query for all of them; still list by list in visible_lists' order, each by sort, name. 2.925.0 (#5275):
+    # visible_lists read them already (collab/reactions.py ltags_of_lists: the core's tags + the labels the project's tasks carry)
+    for d in vl:
+        out += [{**v1_ltag(c, r, d["id"]), "kind": "list"} for r in d.get("tags") or ()]
     return jsonify(data=out, next_cursor=None)
 
 

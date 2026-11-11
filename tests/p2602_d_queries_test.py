@@ -183,7 +183,9 @@ h = {'Authorization': 'Bearer TOKEN'}
 seen.clear()
 r = cl.get('/api/v1/tags', headers=h)
 # v1_tags' own query: before one 'list_id=' per list, now one '= ANY'; visible_lists' tag rows (list_id IN (...)) are not counted
-hit = [x for x in seen if re.search(r'SELECT \\* FROM list_tags WHERE list_id(=| = ANY)', x)]
+# 2.925.0 (#5275): the project tags of the core (collab/reactions.py ltags_of_lists: one statement for all lists, the one of
+# visible_lists -- v1_tags takes its tags from there, no statement of its own)
+hit = [x for x in seen if re.search(r'FROM obj_tags ot WHERE ot.scope_kind=.list. AND ot.scope_id = ANY', x)]
 n = len(hit)
 per = {}
 for lid in order:

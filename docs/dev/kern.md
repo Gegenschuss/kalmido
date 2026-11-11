@@ -646,6 +646,45 @@ Who uses it: the lists' saved filters and shared views (catalog `FLT_TASKS` in v
 documents search's own `dsr_filters`, matched on the server only, the dialog's count asks `POST /api/docs/views/count`). Tests:
 `tests/p2846_a_filterkern_test.py` (the core, the lists' API), `tests/p2846_a_filterkern_ui.js` (the dialog with a stand-in catalog).
 
+### Tags (stage Q5a, 2.925.0, #5275)
+
+Tags exist once: `obj_tags(id, scope_kind, scope_id, org_id, name, color, sort, created_by, created_at TIMESTAMPTZ)` is one
+tag of a scope, `obj_tag_links(tag_id, kind, obj_id, src person|agent|auto, created_by, created_at)` puts it on an object
+(`kalmido/core/objtags.py`, fragment `migrations.d/5275_a.py`). The scopes: `list` (a project's tags, `scope_id` = the list
+id as text), `org` (the labels of an organisation, `org_id` set: row-level security shows them to its members only), `user`
+(stage Q5b: the personal tags, `task_tags` still) and `ws` (stage Q5c: the file store's tags, `doc_tags` still). A name is
+unique per scope under `lower()`. It replaced `list_tags`, `task_list_tags` and `org_tags`.
+- A task carries the tags of its project's scopes: the project's own and the labels of the project's organisation. A label
+  sits on the task itself (decided 08.11.2026: no copy per project any more); a rename or a new colour reaches every task at
+  once. A link to a tag of another scope (the task moved) is not shown (`otg_scope_sql`); a move re-links by name
+  (`collab/reactions.py ltags_follow`, read as "system" so a mover outside the organisation leaves no hidden link). A
+  project that leaves its organisation keeps the labels as project tags, and one that joins an organisation gives its project
+  tags named like a label to that label: the trigger `kalmido_otg_org_moved` on every change of `lists.org_id` and before an
+  organisation is deleted (review F1 / F6, `kalmido_otg_left` / `kalmido_otg_joined`; rules and shared views follow through
+  `kalmido_otg_rekey`, the one rewrite the app's `otg_rekey_refs` calls too, always per list).
+- Reading: `obj_tags_of(c, ids)` (bulk, in the project's order), `obj_tag_sql(col, by)` (the filter part: filters, data lock,
+  shared views, API v1), `otg_in_list(c, tag_id, lid, full=)` / `otg_list_sql(full=)` (a tag a task of the list may carry:
+  rules, shared views). For a reader pass `full=lists/orglabels.py olb_full(c)`: the labels of organisations the person
+  fully sees, else only labels a task of the project carries (review F4 -- a guest / accounting member passes row-level
+  security, the labels' names must not be an oracle). A label's own route (`PATCH /api/list-tags/<id>` without `list_id`)
+  needs the full view.
+- Writing: `otg_add`, `otg_link`, `obj_tags_set(c, oid, tag_ids, scopes=)` (exactly these among the scope kinds; a label the
+  writer cannot see stays), `otg_merge` (a new label takes over the project tags of its name). Rights stay with the areas:
+  the project (`need_list`, `WRITE_ROLES` for a new tag) and the organisation's admins for labels (`lists/orglabels.py`).
+  Agents never manage labels; the data lock reads labels as "system" (it only decides what is hidden).
+- No foreign key on the polymorphic columns: the trigger `kalmido_otg_gone` deletes a project's tags with the project row
+  and a task's links with the task row; labels go with their organisation (`org_id` ON DELETE CASCADE).
+- The delta state: `obj_tag_links` (kind task) marks the task, a project tag the project, a label every client (full).
+- Exports keep their files: `lists/tags.json` / `tasks/tags.json` with the columns of `list_tags` / `task_list_tags`, the
+  labels new in `org/labels.json` of the organisation export (`tag_id` in `tasks/tags.json` is then a label's id); the
+  imports read old archives (a label's copy of 2.609-2.823 is a project tag) and new ones.
+- End-to-end locked projects: tag names stay plain text (decided 08.11.2026, question 10), unlike the hashed `#words` of the
+  knowledge pages.
+- The move (`otg_move`, every start while the old tables exist, as "system"): project tags keep their ids (rules and shared
+  views name them; the identity is set past the old ids before the labels are made), a label's copy becomes the label (only
+  links whose tag belonged to the task's own list), a project tag named like a label of its organisation becomes the label (rules / shared views that named the copy are rewritten), then the
+  fragment drops the three tables. One-way; a version before 2.925 shows no project tags until this one is back.
+
 ## Gestures: swiping a row, leafing (2.876.0, #5559)
 
 A row that does something when a finger swipes it sideways (complete, a short menu, remove, reply ...) builds **no touch

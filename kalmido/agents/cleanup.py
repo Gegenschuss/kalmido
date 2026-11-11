@@ -23,6 +23,7 @@ import secrets
 from flask import jsonify
 
 from ..core.pg import insert_id
+from ..core.objtags import obj_tags_of  # 2.925.0 (#5275)
 from ..core.i18n import N_, tr
 from ..core.db import bump, err, iso, now_utc
 from ..core.access import Denied, list_role, need_task, task_visible, WRITE_ROLES
@@ -132,12 +133,8 @@ def cln_request(c, uid, b):
 
 
 def cln_ltags(c, ids):
-    out = {}
-    if ids:
-        for r in c.execute(f"""SELECT x.task_id, lt.name FROM task_list_tags x JOIN list_tags lt ON lt.id=x.tag_id
-                               WHERE x.task_id IN ({','.join('?' * len(ids))}) ORDER BY lt.sort, lt.id""", ids):
-            out.setdefault(r[0], []).append(r[1])
-    return out
+    """{task id: [project tag names]} (2.925.0, #5275: the core's tags of the task's project, labels included)."""
+    return {k: [x["name"] for x in v] for k, v in obj_tags_of(c, ids).items()}
 
 
 # ---- the agent's proposal

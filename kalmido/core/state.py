@@ -19,6 +19,7 @@ from ..core.access import (
 )
 from ..core.serializers import load_tasks, running_pomo, tags_for, td_lean, TD_DEFAULTS  # 2.575.0 B (#3966): + td_lean
 from ..core.pg import st_ids
+from ..core.objtags import obj_tags_of  # 2.925.0 (#5275)
 from ..core.instance import about_info, pub_kinds_off
 from ..core.env import env_int  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
@@ -44,8 +45,8 @@ def _org_names(c, uid):  # 2.22.0 (#752)
 def _st_org_labels(c, uid):
     """2.609.0 (#3373, review F3): the labels of the organisations uid fully sees (the roles of accounts/orgroles.py FULL_READ,
     as the templates of the state)."""
-    return [dict(r) for r in c.execute("""SELECT id, org_id, name, color FROM org_tags WHERE org_id IN (SELECT org_id FROM org_members
-                                          WHERE user_id=? AND role IN ('admin', 'member', 'readonly')) ORDER BY org_id, sort, lower(name), id""", (uid,))]
+    return [dict(r) for r in c.execute("""SELECT id, org_id, name, color FROM obj_tags WHERE scope_kind='org' AND org_id IN (SELECT org_id FROM org_members
+                                          WHERE user_id=? AND role IN ('admin', 'member', 'readonly')) ORDER BY org_id, sort, lower(name), id""", (uid,))]  # 2.925.0 (#5275): obj_tags
 
 
 def _jtrip(v):
@@ -575,9 +576,8 @@ def lz_counts(c, uid, lids):
     tg, lt = {}, {}
     if ids:
         tg = tags_for(c, ids, uid)
-        for r in c.execute("""SELECT x.task_id, lt.name FROM task_list_tags x JOIN list_tags lt ON lt.id=x.tag_id JOIN tasks t ON t.id=x.task_id
-                              WHERE x.task_id = ANY(CAST(? AS BIGINT[])) AND lt.list_id=t.list_id""", (st_ids(sorted(ids)),)):
-            lt.setdefault(r[0], []).append(r[1])  # the list tags (as collab.reactions.ltags_for, a higher layer)
+        for k, v in obj_tags_of(c, ids).items():  # 2.925.0 (#5275): the project tags of the core (as collab.reactions.ltags_for)
+            lt[k] = [x["name"] for x in v]
     out = {str(x): {"n": 0, "tags": {}} for x in lids}
     for i, lid in rows:
         o = out[str(lid)]

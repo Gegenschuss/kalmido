@@ -322,8 +322,12 @@ def umz_extra_queries(uid):
     sheets = "org_id IS NULL AND owner_id=?"
     polls = "org_id IS NULL AND user_id=? AND deleted_at IS NULL"
     return {
-        "list_tags": (f"SELECT * FROM list_tags WHERE list_id IN {own}", (uid,)),
-        "task_list_tags": (f"SELECT * FROM task_list_tags WHERE task_id IN (SELECT id FROM tasks WHERE list_id IN {own})", (uid,)),
+        # 2.925.0 (#5275): the project tags of the core (obj_tags scope list), in the files and columns of list_tags / task_list_tags as
+        # before (older archives and new ones import the same way); a label of an organisation is the organisation's (its export)
+        "list_tags": (f"""SELECT id, CAST(scope_id AS BIGINT) AS list_id, name, color, sort, created_at FROM obj_tags
+                          WHERE scope_kind='list' AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM lists x WHERE x.id IN {own})""", (uid,)),
+        "task_list_tags": (f"""SELECT k.obj_id AS task_id, k.tag_id FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='list'
+                               WHERE k.kind='task' AND k.obj_id IN (SELECT id FROM tasks WHERE list_id IN {own})""", (uid,)),
         # Art. 15: the lists other people share with me (a reference) and what I wrote there
         "shared_lists": (f"""SELECT l.id, l.name, m.role, u.display_name AS owner_name, u.email AS owner_email FROM lists l
                              JOIN list_members m ON m.list_id=l.id AND m.user_id=? JOIN users u ON u.id=l.owner_id

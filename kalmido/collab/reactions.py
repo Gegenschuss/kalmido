@@ -1,14 +1,17 @@
 """Reactions on comments, tidy suggestions and shared list tags."""
 import json
 import re
-from flask import g, has_request_context, jsonify
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, st_ids
+from ..core.pg import qi, system_ctx
+from ..core.objtags import (  # 2.925.0 (#5275): the tags of the shared core
+    obj_tags_of, obj_tags_set, otg_add, otg_count, otg_find, otg_in_list, otg_link, otg_of_list, OTG_PROJECT)
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, list_role, MANAGE_ROLES, need_collab, need_list, need_task, task_visible, WRITE_ROLES
+from ..accounts.orgroles import user_orgs_full  # 2.925.0 (#5275, review F4)
 from ..lists.lists import clean_color, clean_list_value
 from ..tasks.validation import as_int, CONTENT_MAX, descendants, log_act, PRIORITIES, TITLE_MAX
 from ..tasks.tasks import one_task
@@ -16,7 +19,7 @@ from ..tasks.lifecycle import apply_update
 from ..collab.comments import comment_plain, need_live_comment, task_say_refusal, user_names
 from ..core.objreact import orx_of, orx_set, orx_toggle  # 2.763.0 (#5269): the reactions of the shared core
 from ..core.errors import BadInput, UnknownFields
-from ..lists.orglabels import olb_match  # 2.609.0 (#3373)
+from ..lists.orglabels import olb_full, olb_match  # 2.609.0 (#3373); 2.925.0 (#5275, review F4): olb_full
 from ..api.v1 import _tag_arg, PRIO_NAMES, PRIO_VALUES
 from ..lists.folderdefs import fdf_named_gone  # 2.757.0 (#4501)
 from ..agents.core import (
@@ -297,6 +300,9 @@ def list_tidy_update(c, lid, mode=None, agent=None, set_agent=False):
 
 
 # ---- list tags
+LTAG_COLS = ("name", "color", "sort")  # what PATCH /api/list-tags/<id> changes (the allowlist of qi)
+
+
 def clean_ltag_name(v):
     n = re.sub(r"[\x00-\x1f]", "", str(v or "")).strip().lstrip("#").strip()
     if not n or len(n) > LTAG_NAME_MAX or not isinstance(v, str):
@@ -311,25 +317,28 @@ def clean_ltag_names(v):
 
 
 def ltags_of_lists(c, lids):
+    """{list id: [{id, name, color, org_tag_id}]} -- the project tags of the lists, then the labels of their organisation that a
+    task of the list carries (org_tag_id = the label's id; 2.925.0 (#5275): the label itself, no copy in the project). A label
+    of an organisation the reader is not a member of is not there (row-level security)."""
     out = {}
-    lids = [x for x in lids if x]
+    lids = sorted({int(x) for x in lids if x})
     if not lids:
         return out
-    for r in c.execute(f"SELECT * FROM list_tags WHERE list_id IN ({','.join('?' * len(lids))}) ORDER BY sort, lower(name), id", lids):
-        out.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"], "color": r["color"],
-                                                 "org_tag_id": r["org_tag_id"]})  # 2.609.0 (#3373): a label of the organisation
+    # review F7: the order of the core (sort, then the name in any case, then the id) -- UNION orders by output columns only
+    for r in c.execute("""SELECT CAST(ot.scope_id AS BIGINT) AS lid, ot.id, ot.name, ot.color, NULL AS org_tag_id, 0 AS o, ot.sort,
+                          lower(ot.name) AS lname FROM obj_tags ot WHERE ot.scope_kind='list' AND ot.scope_id = ANY(CAST(? AS TEXT[]))
+                          UNION SELECT t.list_id, ot.id, ot.name, ot.color, ot.id, 1, ot.sort, lower(ot.name) FROM obj_tag_links k
+                          JOIN tasks t ON t.id=k.obj_id AND k.kind='task' JOIN lists l ON l.id=t.list_id
+                          JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='org' AND ot.scope_id=CAST(l.org_id AS TEXT)
+                          WHERE t.list_id = ANY(CAST(? AS BIGINT[]))
+                          ORDER BY lid, o, sort, lname, id""", ([str(x) for x in lids], lids)):
+        out.setdefault(r["lid"], []).append({"id": r["id"], "name": r["name"], "color": r["color"], "org_tag_id": r["org_tag_id"]})
     return out
 
 
 def ltags_for(c, ids):
-    """{task id: [list tag names]} (only tags of the task's current list)."""
-    out = {}
-    ids = list(ids)
-    if ids:  # 2.65.0 (#1505): one array parameter instead of chunks of placeholders
-        for r in c.execute("""SELECT x.task_id, lt.name FROM task_list_tags x JOIN list_tags lt ON lt.id=x.tag_id JOIN tasks t ON t.id=x.task_id
-                              WHERE x.task_id = ANY(CAST(? AS BIGINT[])) AND lt.list_id=t.list_id ORDER BY lt.sort, lower(lt.name)""", (st_ids(ids),)):
-            out.setdefault(r["task_id"], []).append(r["name"])
-    return out
+    """{task id: [project tag names]} (only tags of the task's current project and labels of its organisation)."""
+    return {k: [x["name"] for x in v] for k, v in obj_tags_of(c, ids).items()}
 
 
 def ltag_names(c, tid):
@@ -337,62 +346,104 @@ def ltag_names(c, tid):
 
 
 def ltag_get_or_create(c, lid, name, create):
-    r = c.execute("SELECT id FROM list_tags WHERE list_id=? AND lower(name)=lower(?)", (lid, name)).fetchone()
-    if r:
-        return r[0]
-    ol = olb_match(c, lid, name)  # 2.609.0 (#3373): a label of the list's organisation is made here by whoever uses it
-    if not create and not ol:
-        raise BadInput(tr("Unknown project tag: {0}", name))
-    if c.execute("SELECT COUNT(*) FROM list_tags WHERE list_id=?", (lid,)).fetchone()[0] >= LTAG_MAX:
-        raise BadInput(tr("At most {0} project tags", LTAG_MAX))
-    srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM list_tags WHERE list_id=?", (lid,)).fetchone()[0]
+    """The id of the tag named name (any case) a task of list lid gets: the project's own tag, else a label of the project's
+    organisation (one a task of the project carries already, or any for a person with the organisation's full view: olb_match),
+    else a new project tag when create (the person may change the list). Review F6 (2.925.0): a label the writer may see
+    (olb_match) comes before a project tag of the same name -- such a tag is left only where a person without the full view
+    made it; a project joining the organisation turns its tags into the labels (trigger kalmido_otg_org_moved)."""
+    ol = olb_match(c, lid, name)  # 2.609.0 (#3373), 2.925.0 (#5275): the label itself goes on the task
     if ol:
-        return insert_id(c, "INSERT INTO list_tags(list_id,name,color,sort,created_at,org_tag_id) VALUES(?,?,?,?,?,?)",
-                         (lid, ol["name"], ol["color"], srt, iso(now_utc()), ol["id"]))
-    return insert_id(c, "INSERT INTO list_tags(list_id,name,color,sort,created_at) VALUES(?,?,?,?,?)",
-                     (lid, name, "", srt, iso(now_utc())))
+        return ol["id"]
+    r = otg_find(c, "list", lid, name)
+    if r:
+        return r["id"]
+    if not create:
+        raise BadInput(tr("Unknown project tag: {0}", name))
+    if otg_count(c, "list", lid) >= LTAG_MAX:
+        raise BadInput(tr("At most {0} project tags", LTAG_MAX))
+    u = getattr(g, "user", None) if has_request_context() else None
+    return otg_add(c, "list", lid, name, by=u["id"] if u else None)
+
+
+def _ltag_src():
+    """(src, by) of a link the current request makes: an agent's / a person's (outside a request: the server's own)."""
+    u = getattr(g, "user", None) if has_request_context() else None
+    if not u:
+        return "auto", None
+    try:
+        return ("agent" if (u["kind"] or "user") == "agent" else "person"), u["id"]
+    except (KeyError, IndexError):
+        return "person", u["id"]
 
 
 def set_ltags(c, tid, names, log=True):
-    """The list tags of task tid (names; missing ones are created when the current user may change the list). Logged."""
+    """The project tags of task tid (names; missing ones are created when the current user may change the list). Logged.
+    2.925.0 (#5275): links of the core (obj_tags_set; a label of an organisation the writer cannot see stays on the task)."""
     t = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
     names = clean_ltag_names(names)
     before = ltag_names(c, tid)
     create = list_role(c, t["list_id"]) in WRITE_ROLES if has_request_context() and getattr(g, "user", None) else True
     ids = [ltag_get_or_create(c, t["list_id"], n, create) for n in names]
-    c.execute("DELETE FROM task_list_tags WHERE task_id=?", (tid,))
-    for i in dict.fromkeys(ids):
-        c.execute("INSERT INTO task_list_tags(task_id,tag_id) VALUES(?,?) ON CONFLICT DO NOTHING", (tid, i))
+    src, by = _ltag_src()
+    obj_tags_set(c, tid, ids, src=src, by=by)
     after = ltag_names(c, tid)
     if log and sorted(before, key=str.casefold) != sorted(after, key=str.casefold):
         log_act(c, tid, "ltags", {"tags": after})
 
 
 def ltags_follow(c, tid, lid):
-    """After a move to list lid: the list tags of tid and its subtasks follow by name (created there when the mover may
-    change that list, else dropped)."""
+    """After a move to list lid: the project tags of tid and its subtasks follow by name (created there when the mover may
+    change that list, else dropped). 2.925.0 (#5275): a label of the organisation stays as it is when lid is in the same
+    organisation; else it becomes the tag of that name there (a project tag or the other organisation's label)."""
     create = list_role(c, lid) in WRITE_ROLES if has_request_context() and getattr(g, "user", None) else True
+    keep = {(k, v) for k, v in otg_of_list(c, lid)}
+    src, by = _ltag_src()
     for x in [tid] + descendants(c, tid):
-        rows = c.execute("""SELECT lt.name, lt.list_id, lt.color FROM task_list_tags k JOIN list_tags lt ON lt.id=k.tag_id
-                            WHERE k.task_id=?""", (x,)).fetchall()
-        if not rows or all(r["list_id"] == lid for r in rows):
+        # review F7: read as "system" -- a mover who is no member of the old organisation (row-level security) would leave its
+        # labels' links behind on the task, hidden; they follow by name like every other tag (as a label's copy in the project did)
+        with system_ctx(c):
+            rows = c.execute("""SELECT ot.id, ot.name, ot.color, ot.scope_kind, ot.scope_id FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id
+                                WHERE k.kind='task' AND k.obj_id=? AND ot.scope_kind = ANY(CAST(? AS TEXT[]))""", (x, list(OTG_PROJECT))).fetchall()
+        gone = [r for r in rows if (r["scope_kind"], r["scope_id"]) not in keep]
+        if not gone:
             continue
-        c.execute("DELETE FROM task_list_tags WHERE task_id=?", (x,))
-        for r in rows:
+        c.execute("DELETE FROM obj_tag_links WHERE kind='task' AND obj_id=? AND tag_id = ANY(CAST(? AS BIGINT[]))", (x, [r["id"] for r in gone]))
+        for r in gone:
             try:
                 i = ltag_get_or_create(c, lid, r["name"], create)
             except BadInput:
                 continue
             if r["color"]:
-                c.execute("UPDATE list_tags SET color=? WHERE id=? AND color=''", (r["color"], i))
-            c.execute("INSERT INTO task_list_tags(task_id,tag_id) VALUES(?,?) ON CONFLICT DO NOTHING", (x, i))
+                c.execute("UPDATE obj_tags SET color=? WHERE id=? AND scope_kind='list' AND color=''", (r["color"], i))
+            otg_link(c, i, x, src=src, by=by)
 
 
-def need_ltag(c, tag_id, write=True):
-    r = c.execute("SELECT * FROM list_tags WHERE id=?", (tag_id,)).fetchone()
+def ltag_row(c, tag_id, lid=None):
+    """The answer of the tag routes: {id, list_id, name, color, sort, org_tag_id}."""
+    r = c.execute("SELECT * FROM obj_tags WHERE id=?", (tag_id,)).fetchone()
+    return {"id": r["id"], "list_id": int(r["scope_id"]) if r["scope_kind"] == "list" else lid, "name": r["name"], "color": r["color"],
+            "sort": r["sort"], "org_tag_id": r["id"] if r["scope_kind"] == "org" else None}
+
+
+def need_ltag(c, tag_id, write=True, lid=None, label=False):
+    """A project tag (scope list) the person may see / change, or with lid a label of lid's organisation (in that project).
+    label=True: a label without lid as the reader sees it -- for the answer "change it in the organisation's labels" only,
+    nothing is written with it. Review F4 (2.925.0): that only with the organisation's full view (a guest / accounting member
+    passes row-level security, but gets no label it does not see in a project); with lid a label of the organisation only for
+    the full view or when a task of lid carries it (otg_in_list full=olb_full)."""
+    r = c.execute("SELECT * FROM obj_tags WHERE id=? AND scope_kind = ANY(CAST(? AS TEXT[]))", (tag_id, list(OTG_PROJECT))).fetchone()
     if not r:
         raise Denied(404)
-    need_list(c, r["list_id"], write=write)
+    if r["scope_kind"] == "list":
+        need_list(c, int(r["scope_id"]), write=write)
+        return r
+    if lid is None and label:
+        if r["org_id"] not in user_orgs_full(c, me()):
+            raise Denied(404)
+        return r
+    if lid is None or not otg_in_list(c, tag_id, lid, full=olb_full(c)):
+        raise Denied(404)
+    need_list(c, lid, write=write)
     return r
 
 
@@ -407,52 +458,82 @@ def ltag_fields(b, partial=False):
     return out
 
 
+def _ltag_lid_arg():
+    v = request.args.get("list_id")
+    try:
+        return int(v) if v not in (None, "") else None
+    except ValueError:
+        raise BadInput(tr("Invalid value: {0}", "list_id")) from None
+
+
 @app.post("/api/lists/<int:lid>/tags")
 def ltag_create(lid):
-    """{name, color?} -- a new list tag (members with edit rights)."""
+    """{name, color?} -- a new project tag (members with edit rights); the name of a label of the organisation that the
+    person may use gives that label."""
     c = db()
     need_list(c, lid)
     f = ltag_fields(body())
-    if c.execute("SELECT 1 FROM list_tags WHERE list_id=? AND lower(name)=lower(?)", (lid, f["name"])).fetchone():
+    if otg_find(c, "list", lid, f["name"]) or any(x["name"].casefold() == f["name"].casefold() and x["org_tag_id"]
+                                                    for x in ltags_of_lists(c, [lid]).get(lid, [])):
         return err(tr("This tag already exists in the project"), 409)
     i = ltag_get_or_create(c, lid, f["name"], True)
     if f.get("color"):
-        c.execute("UPDATE list_tags SET color=? WHERE id=?", (f["color"], i))
+        c.execute("UPDATE obj_tags SET color=? WHERE id=? AND scope_kind='list'", (f["color"], i))
     bump(c)
     c.commit()
-    return jsonify(dict(c.execute("SELECT id, list_id, name, color, sort FROM list_tags WHERE id=?", (i,)).fetchone())), 201
+    return jsonify(ltag_row(c, i, lid)), 201
 
 
 @app.patch("/api/list-tags/<int:tag_id>")
-def ltag_update(tag_id):
+def ltag_update(tag_id, lid=None):
+    """{name?, color?, sort?} -- a project tag; a label of the organisation (?list_id= / lid: in that project) changes only in
+    the organisation's labels (409 for name / colour)."""
     c = db()
-    r = need_ltag(c, tag_id)
+    try:
+        lid = lid if lid is not None else _ltag_lid_arg()
+        r = need_ltag(c, tag_id, lid=lid, label=True)
+    except BadInput as e:
+        return err(str(e))
     f = ltag_fields(body(), partial=True)
-    if r["org_tag_id"] and any(k in f and f[k] != r[k] for k in ("name", "color")):  # 2.609.0 (#3373)
-        return err(tr("This label belongs to the organisation: change it in the organisation's labels"), 409)
-    if "name" in f and c.execute("SELECT 1 FROM list_tags WHERE list_id=? AND lower(name)=lower(?) AND id!=?",
-                                 (r["list_id"], f["name"], tag_id)).fetchone():
+    if r["scope_kind"] == "org":  # 2.609.0 (#3373): a label changes only in the organisation's labels (its order too, 2.925.0)
+        # review F7: the order too -- a label's place is the organisation's (no silent 200 for a sort that did nothing)
+        if any(k in f and f[k] != r[k] for k in ("name", "color", "sort")):
+            return err(tr("This label belongs to the organisation: change it in the organisation's labels"), 409)
+        return jsonify(ltag_row(c, tag_id, lid))
+    lid = int(r["scope_id"])
+    if "name" in f and c.execute("SELECT 1 FROM obj_tags WHERE scope_kind='list' AND scope_id=? AND lower(name)=lower(?) AND id!=?",
+                                 (r["scope_id"], f["name"], tag_id)).fetchone():
         return err(tr("This tag already exists in the project"), 409)
     if f:
-        c.execute(f"UPDATE list_tags SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), tag_id])
+        c.execute(f"UPDATE obj_tags SET {','.join(qi(k, LTAG_COLS) + '=?' for k in f)} WHERE id=?", [*f.values(), tag_id])
         if "name" in f and f["name"].casefold() != r["name"].casefold():  # 2.757.0 (#4501): a folder's tag renamed -> the list differs
-            fdf_named_gone(c, r["list_id"], "list_tags", r["name"])
+            fdf_named_gone(c, lid, "list_tags", r["name"])
         bump(c)
         c.commit()
-    return jsonify(dict(c.execute("SELECT id, list_id, name, color, sort FROM list_tags WHERE id=?", (tag_id,)).fetchone()))
+    return jsonify(ltag_row(c, tag_id))
 
 
 @app.delete("/api/list-tags/<int:tag_id>")
-def ltag_delete(tag_id):
-    """Removes the list tag from every task of the list (answers the task ids, for the undo)."""
+def ltag_delete(tag_id, lid=None):
+    """Removes the project tag from every task of the project (answers the task ids, for the undo). 2.925.0 (#5275): a label of
+    the organisation (?list_id=) is taken off the tasks of that project only; the label stays in the organisation."""
     c = db()
-    r = need_ltag(c, tag_id)
-    ids = [x[0] for x in c.execute("SELECT task_id FROM task_list_tags WHERE tag_id=?", (tag_id,))]
-    c.execute("DELETE FROM list_tags WHERE id=?", (tag_id,))
-    fdf_named_gone(c, r["list_id"], "list_tags", r["name"])  # 2.757.0 (#4501): a folder's tag deleted -> the list differs
+    try:
+        lid = lid if lid is not None else _ltag_lid_arg()
+        r = need_ltag(c, tag_id, lid=lid)
+    except BadInput as e:
+        return err(str(e))
+    if r["scope_kind"] == "org":
+        ids = [x[0] for x in c.execute("""DELETE FROM obj_tag_links k USING tasks t WHERE k.kind='task' AND k.tag_id=? AND t.id=k.obj_id
+                                          AND t.list_id=? RETURNING k.obj_id""", (tag_id, lid))]
+    else:
+        lid = int(r["scope_id"])
+        ids = [x[0] for x in c.execute("SELECT obj_id FROM obj_tag_links WHERE tag_id=? AND kind='task'", (tag_id,))]
+        c.execute("DELETE FROM obj_tags WHERE id=?", (tag_id,))
+    fdf_named_gone(c, lid, "list_tags", r["name"])  # 2.757.0 (#4501): a folder's tag deleted -> the list differs
     bump(c)
     c.commit()
-    return jsonify(ok=True, ids=ids, tag={"name": r["name"], "color": r["color"], "list_id": r["list_id"]})
+    return jsonify(ok=True, ids=ids, tag={"name": r["name"], "color": r["color"], "list_id": lid})
 
 
 @app.post("/api/lists/<int:lid>/tags/promote")
@@ -468,8 +549,9 @@ def ltag_promote(lid):
     i = ltag_get_or_create(c, lid, name, True)
     ids = [r[0] for r in c.execute("""SELECT g.task_id FROM task_tags g JOIN tasks t ON t.id=g.task_id
                                       WHERE g.user_id=? AND g.tag=? AND t.list_id=?""", (me(), tag, lid))]
+    src, by = _ltag_src()
     for x in ids:
-        c.execute("INSERT INTO task_list_tags(task_id,tag_id) VALUES(?,?) ON CONFLICT DO NOTHING", (x, i))
+        otg_link(c, i, x, src=src, by=by)
         c.execute("DELETE FROM task_tags WHERE task_id=? AND user_id=? AND tag=?", (x, me(), tag))
         log_act(c, x, "ltags", {"tags": ltag_names(c, x)})
     bump(c)

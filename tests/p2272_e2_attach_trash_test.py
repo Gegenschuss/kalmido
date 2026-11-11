@@ -195,16 +195,18 @@ SP = A.post(B + "/api/sections", json={"list_id": LP, "name": "Edit"}).json()["i
 F = A.post(B + f"/api/lists/{LP}/fields", json={"name": "Budget", "type": "number"}).json()["id"]
 TP = A.post(B + "/api/tasks", json={"title": "Grade", "list_id": LP, "section_id": SP}).json()["id"]
 check(A.patch(B + f"/api/tasks/{TP}", json={"fields": {str(F): 1200}}).ok, "setup: a field value")
-sql("INSERT INTO list_tags(list_id, name, color, sort, created_at) VALUES(?,?,?,?,?)", (LP, "urgent", "", 0, OLD))
-TG = one("SELECT id FROM list_tags WHERE list_id=?", (LP,))
-sql("INSERT INTO task_list_tags(task_id, tag_id) VALUES(?,?)", (TP, TG))
+# 2.925.0 (#5275): the project tags are rows of the core (obj_tags scope list, obj_tag_links)
+sql("INSERT INTO obj_tags(scope_kind, scope_id, name, color, sort, created_at) VALUES('list',?,?,?,?,?)", (str(LP), "urgent", "", 0, OLD))
+TG = one("SELECT id FROM obj_tags WHERE scope_kind='list' AND scope_id=?", (str(LP),))
+sql("INSERT INTO obj_tag_links(tag_id, kind, obj_id) VALUES(?,'task',?)", (TG, TP))
 INBOX = one("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (A_ID,))
 out = in_app(f"from kalmido.core.pg import system_ctx\nfrom kalmido.lists.lists import list_purge\nwith system_ctx(c):\n    list_purge(c, {LP}, {INBOX})\nc.commit()\nprint('ok')")
 check("ok" in out and "Traceback" not in out, "list_purge ran " + out[-600:])
 nf = one("SELECT id FROM list_fields WHERE list_id=? AND name='Budget' AND type='number'", (INBOX,))
 check(one("SELECT list_id FROM tasks WHERE id=?", (TP,)) == INBOX and one("SELECT deleted_at FROM tasks WHERE id=?", (TP,)), "list_purge: the task in the inbox trash")
 check(nf and one("SELECT value FROM task_field_values WHERE task_id=? AND field_id=?", (TP, nf)) is not None, "list_purge: the field and its value went along")
-check(one("SELECT COUNT(*) FROM task_list_tags x JOIN list_tags t ON t.id=x.tag_id WHERE x.task_id=? AND t.list_id=? AND t.name='urgent'", (TP, INBOX)) == 1,
+check(one("SELECT COUNT(*) FROM obj_tag_links x JOIN obj_tags t ON t.id=x.tag_id WHERE x.kind='task' AND x.obj_id=? AND t.scope_kind='list' "
+          "AND t.scope_id=? AND t.name='urgent'", (TP, str(INBOX))) == 1,  # 2.925.0 (#5275): the core's tags
       "list_purge: the tag went along")
 check(one("SELECT trash_section FROM tasks WHERE id=?", (TP,)) == "Edit", "list_purge: the section's name is kept")
 

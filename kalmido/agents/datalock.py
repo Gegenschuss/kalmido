@@ -14,6 +14,8 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, inbox_default
 from ..core.access import list_role, vis_sql
+from ..core.objtags import otg_list_sql  # 2.925.0 (#5275)
+from ..lists.orglabels import olb_full  # 2.925.0 (#5275, review F4): the labels the editor sees
 from ..core.dlock import (
     DL_ALWAYS, DL_DEFAULT, DL_LISTS_MAX, DL_SWITCH, DL_TAG_LEN, DL_TAGS_MAX, dl_forget, dl_list_hidden, dl_of, dl_parse, dl_tag, dl_tasks_locked,
 )
@@ -101,7 +103,8 @@ def _dl_view(c, a):
                      (uid, uid)).fetchall()
     names = {r["id"]: tr("Basket") if r["is_inbox"] and inbox_default(r["name"]) else r["name"] for r in rows}
     tags = [r[0] for r in c.execute("SELECT DISTINCT tag FROM task_tags WHERE user_id=? ORDER BY tag LIMIT 500", (uid,))]
-    tags += [r[0] for r in c.execute(f"SELECT DISTINCT name FROM list_tags WHERE list_id IN {vis_sql()} ORDER BY name LIMIT 500", (uid, uid))]
+    tags += [r[0] for r in c.execute(f"""SELECT DISTINCT ot.name FROM obj_tags ot JOIN lists l ON {otg_list_sql(full=olb_full(c, uid))}
+                                         WHERE l.id IN {vis_sql()} ORDER BY ot.name LIMIT 500""", (uid, uid))]  # 2.925.0 (#5275): + the labels
     return jsonify(data_lock={"areas": d["areas"], "lists": [{"id": x, "name": names.get(x)} for x in d["lists"]], "tags": d["tags"]},
                    always=list(DL_ALWAYS), defaults=DL_DEFAULT,
                    options={"lists": [{"id": k, "name": v} for k, v in names.items()],

@@ -161,7 +161,7 @@ check(t1 and t1[0][1] == "Login fails" and "Steps **to** reproduce" in t1[0][2] 
       f"issue 1: title, text, reference, assignee matched, the other as text, link: {t1}")
 T1 = t1[0][0] if t1 else 0
 # 2.394.0 C (#3377): labels are the project tags now (shared, synced with the issue), no longer the importer's own tags
-LTQ = "SELECT lt.name FROM task_list_tags x JOIN list_tags lt ON lt.id=x.tag_id WHERE x.task_id=?"
+LTQ = "SELECT lt.name FROM obj_tag_links x JOIN obj_tags lt ON lt.id=x.tag_id WHERE x.kind='task' AND x.obj_id=?"  # 2.925.0 (#5275): the core's tags (obj_tags / obj_tag_links)
 check(sorted(x[0] for x in kt.dbx(LTQ, (T1,))) == ["bug", "ui"] and not kt.dbx("SELECT 1 FROM task_tags WHERE task_id=?", (T1,)), "labels = project tags")
 cm = kt.dbx("SELECT body, created_at, user_id FROM comments WHERE task_id=? ORDER BY created_at", (T1,))
 check(len(cm) == 2 and cm[0][0].startswith("@octocat on 2026-09-02:") and "I can reproduce" in cm[0][0] and cm[0][1].startswith("2026-09-02")
