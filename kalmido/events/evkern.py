@@ -20,6 +20,7 @@ from ..core.db import iso_ms, now_utc
 from ..core.errors import BadInput, Denied  # 2.924.0 (#5069): Denied for ev_kern_drop
 from ..core.i18n import N_, tr
 from ..collab.news import news_add  # 2.924.0 (#5069): _share_back
+from ..notify.alerts import aa_now  # 2.924.0 (#5069): the admins' alert of ev_kern_drop (sent by the watchdog)
 from ..core.objects import obj_node, obj_node_follow, obj_node_person_drop, obj_node_person_put, obj_register, obj_role, obj_visible_sql
 from ..core import objhooks
 from ..core.pg import qi, system_ctx, write_lock
@@ -252,7 +253,6 @@ def ev_kern_drop(c):
             print("migrations: shared core stage 7b (#5069) waits - rows of the old member tables without a node of the core:",
                   ", ".join(f"{t} {n}" for t, n in left.items()), "- the tables and triggers stay (core/migrations.d/5069_b.py)", flush=True)
             out["left"] = sum(left.values())
-            from ..notify.alerts import aa_now  # the admins' alert (sent by the watchdog), not only a line in the log
             aa_now("storage", "kern5069:left", EV_KERN_LEFT, [str(out["left"])])
             return out
         _old_triggers_drop(c, out)
