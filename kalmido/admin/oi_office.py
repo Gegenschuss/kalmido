@@ -688,7 +688,7 @@ SPECS = [
         after=lambda c, run, src, nid, ctx: _oi_mark(c, run, ctx, "period", None, {"period": _txt(src.get("period"), 7)})),  # 2.237.0 D (#2870)
     # 2.148.0 C (#2472): procedure documentation; 2.977.0 (#5282): into the core's versions (obj_versions kind procdoc, _p_procdoc)
     OiT("office/procdocs.json", "obj_versions", kind="obj_versions_procdoc", people=_P, private="office", prep=_p_procdoc,
-        label=N_("Procedure documentation"), fixed={"kind": "procdoc", "no": 0}),
+        label=N_("Procedure documentation"), fixed={"kind": "procdoc", "no": 0, "ref_id": 0}),  # ref_id: the head, set by _p_procdoc
     OiT("office/suppliers.json", "office_suppliers", refs={"import_run_id": "office_import_runs"}, private="office"),  # 2.148.0 D (#2458)
     OiT("office/opening_balances.json", "office_opening_balances", refs={"import_run_id": "office_import_runs"}, private="office",
         prep=_p_opening),  # 2.188.0 A (#2498): no double on a second import
