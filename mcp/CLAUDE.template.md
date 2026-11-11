@@ -838,6 +838,9 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `contract_notice`: a shared contract's last day to cancel is near (once per deadline): answer with ONE `propose_contract_notice`
 - `letter_draft_requested`: an office admin asks you to draft an answer to a document shared with you (`node_id`, `title`, `requested_by`, `note`): ONE `create_letter_draft` with `answers`
 
+Searching (2.981.0): `search_tasks`, `search_notes`, `search_contacts` and `search_messages` match the start of a word
+(umlauts either way, "Müller" = "Mueller"); a part of a word only in names and phone numbers of contacts and in ticket keys.
+
 Related tasks (2.59.0): task events may carry `task.related` = up to 5 tasks close in meaning `[{id, title, score}]` (only
 tasks you may see; missing while the server has not computed the task yet or runs without its embedding service). Before
 creating a task, `related_tasks` (or `search_tasks` with `semantic: true`) shows likely duplicates (`dup: true`): mention

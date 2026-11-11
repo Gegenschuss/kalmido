@@ -34,7 +34,7 @@ from .access import live_sql
 from .db import gset, gsetting, trigger_ensure
 from .kernretire import kern_retire_floor
 from .objhooks import MOVE
-from .pg import like_escape, system_ctx, table_columns, table_exists
+from .pg import like_escape, qi, system_ctx, table_columns, table_exists
 
 OSR_VERSION = "1"        # a new version empties the index and builds it again at the next start
 OSR_FOLD_VERSION = "2"   # the fold function (was collab/msgsearch.py INDEX_VERSION, settings key msg_fts_v)
@@ -202,6 +202,8 @@ def _values(kind, r):
 
 
 OSR_COLS = "kind, ref_id, org_ref, owner_id, node_id, pkind, pid, title, names, tsv"
+OSR_INSERT = "INSERT INTO obj_search(" + OSR_COLS + ")"
+OSR_TABLES = {s["table"] for s in OSR_SOURCES.values()}
 OSR_SET = ", ".join(f"{x}=EXCLUDED.{x}" for x in OSR_COLS.split(", ")[2:]) + ", updated_at=CURRENT_TIMESTAMP"
 
 
@@ -216,7 +218,7 @@ BEGIN
   ELSIF to_regprocedure('kalmido_fold(text)') IS NULL THEN  -- the fold function missing (until the next start): the write goes on,
     DELETE FROM obj_search WHERE kind = '{kind}' AND ref_id = NEW.id;  -- the start fills the row (an IF: no subtransaction per row)
   ELSE
-    INSERT INTO obj_search({OSR_COLS}) VALUES ({_values(kind, 'NEW')})
+    {OSR_INSERT} VALUES ({_values(kind, 'NEW')})
       ON CONFLICT (kind, ref_id) DO UPDATE SET {OSR_SET};
   END IF;
   PERFORM set_config('app.role', COALESCE(prev, ''), true);
@@ -239,9 +241,9 @@ def _triggers(c, kind):
 
 def osr_fill(c, kind):
     """The rows of kind's table without an index row get one; index rows whose source is gone go. Returns the rows added."""
-    t = OSR_SOURCES[kind]["table"]
+    t = qi(OSR_SOURCES[kind]["table"], OSR_TABLES)
     c.execute(f"DELETE FROM obj_search s WHERE s.kind='{kind}' AND NOT EXISTS (SELECT 1 FROM {t} r WHERE r.id=s.ref_id)")
-    return c.execute(f"INSERT INTO obj_search({OSR_COLS}) SELECT {_values(kind, 'r')} FROM {t} r "
+    return c.execute(f"{OSR_INSERT} SELECT {_values(kind, 'r')} FROM {t} r "
                      f"WHERE NOT EXISTS (SELECT 1 FROM obj_search s WHERE s.kind='{kind}' AND s.ref_id=r.id) "
                      "ON CONFLICT (kind, ref_id) DO NOTHING").rowcount
 

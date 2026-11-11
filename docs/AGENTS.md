@@ -1122,6 +1122,10 @@ carry only the number `snippets_n` -- read the task itself for the code:
   code cut to 4000 characters (`"truncated": true`) and `task.snippets_total`; `get_task` returns the full code. Never
   send a truncated copy back (`400`).
 - The search (`search_tasks`, the app's search) also finds the code and the file path of snippets (not their metadata).
+- 2.981.0: every search (`search_tasks`, `search_notes`, `search_contacts`, `search_messages`, `GET /search`) reads one
+  shared index. A query word matches the start of a word (`plan` finds "Planung", not "Quartalsplanung"; umlauts either way:
+  "Müller" = "Mueller"); a part of a word counts only in names and numbers (a contact's names, company and phone numbers, a
+  task's ticket key). You still find only what you may read: the projects shared with you.
 
 ### Locked tasks
 
