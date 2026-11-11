@@ -68,7 +68,7 @@ from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from func
 from .docs import doc_row  # 2.369.5 (#2517): pulled up from functions
 from .books import bk_receipt_set_paid  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import fs_role  # 2.369.5 (#2517): pulled up from functions
-from .rcfolder import rcf_bank  # 2.957.0 (#4910)
+from .rcfolder import rcf_bank  # noqa: E402  2.957.0 (#4910)
 
 
 def _home(c, oid):

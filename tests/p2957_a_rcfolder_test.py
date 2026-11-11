@@ -93,9 +93,9 @@ ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).j
 assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "role": "member"}).ok
 for s in (A, Bo):
     s.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
-O = "/api/office"
-K = O + "/cards"
-A.put(B + O + "/settings", json={"company_fields": {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE"}})
+OF = "/api/office"
+K = OF + "/cards"
+A.put(B + OF + "/settings", json={"company_fields": {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE"}})
 Y = testclock.today().year - 1  # a closed year: nothing of the test lies in the future
 LINES = [f"Kreditkartenabrechnung vom 15.01.{Y}", "Beispielbank Mastercard Business", "Karte 5232 12XX XXXX 4711", "Saldo Vormonat 100,00-",
          "28.12. 29.12. Cafe Beispiel Berlin 12,50-", "02.01. 02.01. Ihre Zahlung 100,00+", "03.01. 04.01. Cloud Beispiel Inc USD 20,00 18,40-",
@@ -168,19 +168,19 @@ def flow(s, uid, holder, ws, words):
     check(path(cloud) == [root, "Abgelegt von Hand"], f"{ws}: filed by hand: stays {path(cloud)}")
     check(cc in tags(cloud), f"{ws}: the tag comes anyway {tags(cloud)}")
     # the bank: the booking's day decides the month
-    r = s.post(B + O + "/settings/bank-accounts", json={"label": "Geschaeftskonto Beispiel", "iban": IBAN, "default": True})
+    r = s.post(B + OF + "/settings/bank-accounts", json={"label": "Geschaeftskonto Beispiel", "iban": IBAN, "default": True})
     check(r.status_code == 201, f"{ws}: a bank account {r.text[:200]}")
-    r = s.post(B + O + "/bank/import", json={"text": camt([ntry("30.00", f"{Y}-02-03", "R-1")]), "filename": "k.xml"})
+    r = s.post(B + OF + "/bank/import", json={"text": camt([ntry("30.00", f"{Y}-02-03", "R-1")]), "filename": "k.xml"})
     check(r.status_code == 201, f"{ws}: bank import {r.text[:200]}")
-    tx = [t["id"] for t in s.get(B + O + "/bank/tx?state=all").json()["items"] if t["purpose"] == "Buchung R-1"][0]
+    tx = [t["id"] for t in s.get(B + OF + "/bank/tx?state=all").json()["items"] if t["purpose"] == "Buchung R-1"][0]
     bdoc = doc(s, "lieferant.pdf", "30.00", f"{Y}-02-01", ws)
     assert s.put(B + f"/api/docs/{bdoc}/receipt", json={"keep": True}).ok
-    r = s.post(B + O + f"/bank/tx/{tx}/match", json={"kind": "receipt", "id": bdoc})
+    r = s.post(B + OF + f"/bank/tx/{tx}/match", json={"kind": "receipt", "id": bdoc})
     check(r.ok and r.json()["match"]["kind"] == "receipt", f"{ws}: the booking matched {r.text[:200]}")
     bpath = path(bdoc)
     check(bpath[1:] == [rc, bank, "Geschaeftskonto Beispiel", str(Y), f"{Y}-02 {feb}"], f"{ws}: the receipt in the account's month folder (the booking's day) {bpath}")
     check(bank in tags(bdoc), f"{ws}: the tag Bank {tags(bdoc)}")
-    assert s.post(B + O + f"/bank/tx/{tx}/unmatch").ok
+    assert s.post(B + OF + f"/bank/tx/{tx}/unmatch").ok
     check(path(bdoc) == bpath, f"{ws}: unmatch at the bank moves nothing back {path(bdoc)}")
     return card, sid, ls, month
 
@@ -213,7 +213,7 @@ assert A.patch(B + f"/api/files/nodes/{RCV}", json={"org_access": ""}).ok
 # ---- a person without an organisation, German
 FID, Fr = freelancer(B, A, "frida")
 assert Fr.patch(B + "/api/settings", json={"lang": "de"}).ok
-Fr.put(B + O + "/settings", json={"company_fields": {"name": "Frida Beispiel", "street": "Musterweg 2", "zip": "12345", "city": "Musterstadt", "country": "DE"}})
+Fr.put(B + OF + "/settings", json={"company_fields": {"name": "Frida Beispiel", "street": "Musterweg 2", "zip": "12345", "city": "Musterstadt", "country": "DE"}})
 flow(Fr, FID, "Frida", "private", ("Belege", "Kreditkarte", "Bank", "Januar", "Februar"))
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
