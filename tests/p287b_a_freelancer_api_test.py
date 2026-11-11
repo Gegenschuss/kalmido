@@ -384,6 +384,8 @@ SUBST = [
     (r"/lists/\d+/files/$", None),
     (r"/api/v1/mails/$", "client"),  # 2.483.0 (#1902): no filed mail on the test server (EXPECT_4XX)
     (r"/office/docs/$", "doc"), (r"/office/services/$", "service"), (r"/api(/v1)?/office/$", "officekind"),
+    # 2.962 (#5666): the move check of a locked folder's border (#3348) takes any own folder (no lock needed, no ?to= = the top)
+    (r"/files/lock/movecheck/$", "folder"),
     (r"/files/nodes/$", "node"), (r"/e2e/pub/$", "me"), (r"/api/docs/$", "docnode"), (r"/documents/$", "docnode"), (r"/clients/$", "client"),
     (r"/lists/$", "list"), (r"/list-files/$", None), (r"/tasks/$", "task"), (r"/comments/$", "comment"),
     (r"/attachments/$", "attachment"), (r"/sections/$", "section"), (r"/notes/$", "note"), (r"/wiki/pages/$", "wiki"),
