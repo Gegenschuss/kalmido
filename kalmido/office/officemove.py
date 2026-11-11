@@ -1026,7 +1026,7 @@ def ofm_move_space():
                 rec.append({"t": "office_letter_links", "id": lk["id"], "gone": {k: lk[k] for k in ("letter_id", "node_id", "kind", "created_by", "agent_id", "created_at")}})
                 ofk_purge(c, LTL_KIND, lk["id"])  # 2.990.0 (#5539): the core's way (its history / undo steps go along)
             # 2.905.0 (#5414): its links in the core's trash cannot come back in the old office once the letter moved: gone for good
-            for lk in c.execute(f"SELECT id FROM office_letter_links WHERE letter_id=? AND {trash_sql()}", (r["id"],)).fetchall():
+            for lk in c.execute(f"SELECT id FROM office_letter_links WHERE letter_id=? AND {trash_sql()} ORDER BY id", (r["id"],)).fetchall():
                 ofk_purge(c, LTL_KIND, lk["id"])  # 2.990.0 (#5539)
             ofm_move_row(c, rec, "office_letters", r, src, dst, dst, {**{k: None for k in OFM_LETTER_CLEAR}, "updated_at": ts})
         detail = {"src": src, "dst": dst, "what": what, "ids": ids, "copy": 1 if copy else 0, "rows": rec, "made": made, "at": ts}
@@ -1128,14 +1128,17 @@ def rmv_undo_run(c, uid, mid, files):
             gl = r["gone"]
             if c.execute("SELECT 1 FROM office_letters WHERE id=? AND org_id=?", (gl["letter_id"], src)).fetchone() \
                     and c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (gl["node_id"],)).fetchone():
-                had = c.execute("SELECT id, deleted_at FROM office_letter_links WHERE letter_id=? AND node_id=? AND kind=?",
+                had = c.execute("SELECT id, org_id, deleted_at FROM office_letter_links WHERE letter_id=? AND node_id=? AND kind=?",
                                 (gl["letter_id"], gl["node_id"], gl["kind"])).fetchone()
+                # 2.990.0 (#5571, review): the same link made in the target since - in the core's trash there or live with the
+                # target's org - gives way on the core's way (its history / trash step of the target go with it); the link
+                # comes back as it was (was: such a row counted as "still there", the letter came back without its document)
+                if had is not None and (had["deleted_at"] or had["org_id"] != src):
+                    ofk_purge(c, LTL_KIND, had["id"])
+                    had = None
                 if had is None:
                     c.execute("INSERT INTO office_letter_links(org_id, letter_id, node_id, kind, created_by, agent_id, created_at) VALUES(?,?,?,?,?,?,?)",
                               (src, gl["letter_id"], gl["node_id"], gl["kind"], gl["created_by"], gl["agent_id"], gl["created_at"]))
-                elif had["deleted_at"]:  # 2.990.0 (#5571): the same link in the core's trash since is the one coming back (as letterlinks.ltl_link)
-                    c.execute("UPDATE office_letter_links SET org_id=?, deleted_at=NULL, deleted_by=NULL, rev=rev+1, created_by=?, agent_id=?, "
-                              "created_at=?, updated_at=NULL, updated_by=NULL WHERE id=?", (src, gl["created_by"], gl["agent_id"], gl["created_at"], had["id"]))
             continue
         cur = c.execute(f"SELECT * FROM {t} WHERE id=?", (rid,)).fetchone()
         if not cur:
