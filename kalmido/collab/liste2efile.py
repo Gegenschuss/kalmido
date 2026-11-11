@@ -144,7 +144,7 @@ def le2f_upload(tid):
         except ValueError:
             return err(tr("Invalid value: {0}", "comment_id"))
         role = need_task(c, tid, write=False, full=True)
-        cm = c.execute("SELECT user_id, deleted_at FROM comments WHERE id=? AND task_id=?", (cid, tid)).fetchone()
+        cm = c.execute("SELECT user_id, deleted_at FROM obj_comments WHERE id=? AND kind='task' AND ref_id=?", (cid, tid)).fetchone()  # 2.972.0 (#5272)
         if not cm or cm["deleted_at"]:
             raise Denied(404)
         if cm["user_id"] != uid and role not in MANAGE_ROLES:

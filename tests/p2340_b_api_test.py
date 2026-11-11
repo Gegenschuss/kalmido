@@ -88,7 +88,8 @@ OLD = ago(10)
 dbx(f"UPDATE tasks SET updated_at=?, created_at=? WHERE id IN ({','.join(str(x) for x in (T_OLD, T_WAIT, T_WAITF, T_FUT, T_CMT, T_TIME, T_DAVE, T_REP, T_PRIV, T_DONE, T_SUB, T_CAROL))})",
     (OLD, OLD), write=True)
 dbx("UPDATE tasks SET waiting_at=? WHERE id IN (?, ?)", (OLD, T_WAIT, T_WAITF), write=True)
-dbx("INSERT INTO comments(task_id, user_id, body, created_at) VALUES(?,?,?,?)", (T_CMT, BOB, "still on it", ago(1)), write=True)
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+dbx("INSERT INTO obj_comments(kind, ref_id, user_id, body, created_at) VALUES('task', ?,?,?,?)", (T_CMT, BOB, "still on it", ago(1)), write=True)
 dbx("INSERT INTO time_entries(user_id, task_id, list_id, start, \"end\", seconds, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?)",
     (ALICE, T_TIME, W, ago(1), ago(1), 600, ago(1), ago(1)), write=True)
 
@@ -168,13 +169,15 @@ busy = (datetime.now(timezone.utc) - timedelta(days=1)).date()  # the setup's co
 wd = [to - timedelta(days=i) for i in range(0, 14) if (to - timedelta(days=i)).weekday() < 5 and abs((to - timedelta(days=i) - busy).days) > 1][:4]
 we = next(to - timedelta(days=i) for i in range(0, 14) if (to - timedelta(days=i)).weekday() >= 5)
 noon = lambda d: f"{d.isoformat()}T11:00:00+00:00"  # noqa: E731
-dbx("INSERT INTO comments(task_id, user_id, body, created_at) VALUES(?,?,?,?)", (T_OLD, ALICE, "worked", noon(wd[0])), write=True)
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+dbx("INSERT INTO obj_comments(kind, ref_id, user_id, body, created_at) VALUES('task', ?,?,?,?)", (T_OLD, ALICE, "worked", noon(wd[0])), write=True)
 dbx("INSERT INTO activity(task_id, user_id, kind, data, created_at) VALUES(?,?,?,?,?)", (T_NEW, ALICE, "title", "{}", noon(wd[1])), write=True)
-dbx("INSERT INTO comments(task_id, user_id, body, created_at) VALUES(?,?,?,?)", (T_PRIV, ALICE, "private work", noon(wd[2])), write=True)
-dbx("INSERT INTO comments(task_id, user_id, body, created_at) VALUES(?,?,?,?)", (T_OLD, ALICE, "and tracked", noon(wd[3])), write=True)
+dbx("INSERT INTO obj_comments(kind, ref_id, user_id, body, created_at) VALUES('task', ?,?,?,?)", (T_PRIV, ALICE, "private work", noon(wd[2])), write=True)
+dbx("INSERT INTO obj_comments(kind, ref_id, user_id, body, created_at) VALUES('task', ?,?,?,?)", (T_OLD, ALICE, "and tracked", noon(wd[3])), write=True)
 dbx("INSERT INTO time_entries(user_id, task_id, list_id, start, \"end\", seconds, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?)",
     (ALICE, T_OLD, W, noon(wd[3]), noon(wd[3]), 1800, noon(wd[3]), noon(wd[3])), write=True)
-dbx("INSERT INTO comments(task_id, user_id, body, created_at) VALUES(?,?,?,?)", (T_OLD, ALICE, "weekend", noon(we)), write=True)
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+dbx("INSERT INTO obj_comments(kind, ref_id, user_id, body, created_at) VALUES('task', ?,?,?,?)", (T_OLD, ALICE, "weekend", noon(we)), write=True)
 g = A.get(B + "/api/time/gaps").json()
 days = {x["date"]: x for x in g["days"]}
 check(set(days) == {wd[0].isoformat(), wd[1].isoformat(), wd[2].isoformat()}, f"#269: gaps = working days with work but no time {sorted(days)} vs {wd}")

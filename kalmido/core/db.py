@@ -457,7 +457,10 @@ def appver_newer_minor(other, mine=None):
 # raised), so an image of the future, which does not know the limit yet, refuses to start and can still name the step. A
 # release that adds a limit adds a line here and in docs/UPGRADING.md. Limits below 2.149 stand only there: those images
 # have no start check at all.
-BACK_LIMITS = (("2.149.0", "going back below 2.149 is not supported: those versions have no start check, see docs/UPGRADING.md"),)
+BACK_LIMITS = (("2.149.0", "going back below 2.149 is not supported: those versions have no start check, see docs/UPGRADING.md"),
+               # review 2.972 (#5272): the task comments are rows of obj_comments; an older image makes an empty comments table
+               # again (ids from 1), the next start would skip its rows as doubles (data lost, other comments' reactions)
+               ("2.972.0", "going back to a version before the move of the task comments into obj_comments (package 2.972) is not supported, see docs/UPGRADING.md"))
 
 
 def appver_check(stored, prev, mine=None, floor=None):
@@ -658,7 +661,12 @@ def secret_need_guard(new):
 def back_floor_stamp(c):
     """2.359.3 (#2896): after a successful start (inside the init transaction): the highest format limit into kalmido_meta.
     Only ever raised, also after a restore of an older backup."""
-    v, how = max(BACK_LIMITS, key=lambda x: appver_parse(x[0]))
+    # review 2.972: a limit above this image's own version counts as this version (the code of the limit is in this image; the
+    # train numbers the release, which may be lower than the package label) - so the image's own next start passes and the
+    # step back to the version before it is refused from its first start on
+    mine = appver_parse(APP_VERSION)
+    lims = [(x[0] if not mine or appver_parse(x[0]) <= mine else APP_VERSION, x[1]) for x in BACK_LIMITS]
+    v, how = max(lims, key=lambda x: appver_parse(x[0]))
     r = c.execute("SELECT value FROM kalmido_meta WHERE key='back_floor'").fetchone()
     have = appver_parse(r[0]) if r else None
     if have and have >= appver_parse(v):
@@ -983,9 +991,19 @@ def init_db(guard=True, load=None):
         from .orgrows import orw_setup
         orw_setup(c)  # 2.662.0 (#4602): tasks / comments / events / contacts carry their parent's organisation (row-level security)
         clk("orw_setup")
+        from .objfollow import ofl_setup
+        with pg_system_ctx(c):  # every organisation's watchers and bells
+            ofl_setup(c)  # 2.972.0 (#5285): task_watchers / task_bell into obj_follow, before the fragment 5285_a drops them
+        clk("ofl_setup")
         # 2.410.0 B (#3515): when a task came into its board column (a test server: on its test clock)
         c.executescript(trigger_skip_present(c, SEC_AT_TRIGGER.replace("{off}", str(round(_TEST_OFFSET.total_seconds()) if _TEST_OFFSET is not None else 0))))
         clk("sec_at_trigger")
+        with pg_system_ctx(c):  # every organisation's rows
+            for f in list(objhooks.MOVE):  # 2.972.0 (#5272): comments / comment_trash_text into obj_comments (core/objcomments.py
+                f(c)                       # ocm_move), before the fragment 5272_a drops them
+        clk("objhooks_move")
+        # review 2.972: after the comments' move - an upgrade from before 2.763 finds the old comment_reactions' targets in
+        # obj_comments only once ocm_move ran (orx_move joins the parent table; before, they were lost)
         from .objreact import orx_move
         with pg_system_ctx(c):  # every organisation's comments / messages: the targets the old rows sit on
             orx_move(c)  # 2.763.0 (#5269): the old reaction tables into obj_reactions, before the fragment 5269_a drops them

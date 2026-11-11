@@ -1,6 +1,7 @@
 """2.53.0 C (#1424): the bell of ONE task, per person -- "As the list" (default), "Muted" or "Urgent".
 
-Table task_bell (one row per task + person; level 'list' = as the list, kept so the last change can be undone):
+The bell rows (one per task + person; level 'list' = as the list, kept so the last change can be undone) live in the core's
+obj_follow since 2.972.0 (#5285, core/objfollow.py, mode = the level; was the table task_bell):
   mute    no pushes about this task for that person (News stay); their own reminders are not touched
   urgent  every change (activity line) and every comment of the task by someone else is a push at the highest
           priority (ntfy 5 / Web Push urgency high), whatever the list bell, the matrix, the owner's template or the
@@ -21,15 +22,16 @@ from flask import g, has_request_context, jsonify
 
 from ..core.config import app, PUBLIC_URL
 from ..core.i18n import N_, tr
-from ..core.db import body, db, err, iso, local_now, now_utc, usettings
+from ..core.db import body, db, err, local_now, usettings
 from ..accounts.session import me
 from ..core.access import Denied, MANAGE_ROLES, list_people, need_collab, need_task, task_visible
 from ..core.errors import BadInput
 from ..collab.comments import collab_user, lang_of, user_names  # 2.369.5 (#2517): pulled up from functions
 from ..notify.push import push_reachable, push_prio  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import valid_date, log_act  # 2.369.5 (#2517): pulled up from functions
+from ..core.objfollow import OFL_BELL, OFL_LEVEL, ofl_bell_any, ofl_bell_back, ofl_bell_put, ofl_bells
 
-TBL_LEVELS = ("list", "mute", "urgent")
+TBL_LEVELS = OFL_BELL  # 2.972.0 (#5285): the bell's modes of obj_follow
 TBL_PRIO = "5"  # ntfy 5 = urgent (Web Push: urgency high)
 TBL_MAX_USERS = 500
 TBL_SKIP = ("created", "bell", "watch")  # history lines that never push (a new task has no bells; bell changes push on their own)
@@ -59,15 +61,7 @@ def _org_of_task(c, tid):
 def tbl_rows(c, tid, uids=None):
     """{user id: row} of the bells of task tid that belong to its current workspace (level 'list' included)."""
     _, org = _org_of_task(c, tid)
-    q = "SELECT * FROM task_bell WHERE task_id=? AND COALESCE(org_id,0)=?"
-    args = [tid, org or 0]
-    if uids is not None:
-        uids = sorted({int(u) for u in uids})
-        if not uids:
-            return {}
-        q += f" AND user_id IN ({','.join('?' * len(uids))})"
-        args += uids
-    return {r["user_id"]: r for r in c.execute(q, args)}
+    return ofl_bells(c, "task", tid, org, uids)  # 2.972.0 (#5285): the core's obj_follow
 
 
 def tbl_effective(r, s, status, done_ok=False):
@@ -102,8 +96,11 @@ def tbl_any(c):
     if not has_request_context():
         return True
     if g.get("tbl_any") is None:
-        g.tbl_any = bool(c.execute("SELECT 1 FROM task_bell WHERE level IN ('mute','urgent') LIMIT 1").fetchone())
+        g.tbl_any = ofl_bell_any(c)  # 2.972.0 (#5285)
     return g.tbl_any
+
+
+OFL_LEVEL["task"] = lambda c, uid, rid, s, done_ok: tbl_level(c, uid, rid, s, done_ok)  # 2.972.0 (#5285): obj_notify's follow step
 
 
 def tbl_urgent_users(c, tid):
@@ -223,12 +220,7 @@ def _until_in(b, level):
 
 def _put_row(c, tid, uid, org, level, until, by, act, prev):
     g.tbl_any = None  # looked up again by later history lines of this request
-    ts = iso(now_utc())
-    pj = json.dumps({"level": prev["level"], "until": prev["until"], "set_by": prev["set_by"]} if prev else None)
-    c.execute("""INSERT INTO task_bell(task_id,user_id,org_id,level,until,set_by,created_at,updated_at,prev,act,act_by)
-                 VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(task_id,user_id) DO UPDATE SET org_id=excluded.org_id, level=excluded.level,
-                 until=excluded.until, set_by=excluded.set_by, updated_at=excluded.updated_at, prev=excluded.prev, act=excluded.act,
-                 act_by=excluded.act_by""", (tid, uid, org, level, until, by, ts, ts, pj, act, me()))
+    ofl_bell_put(c, "task", tid, uid, org, level, until, by, act, me(), prev)  # 2.972.0 (#5285): the core's obj_follow
 
 
 @app.put("/api/tasks/<int:tid>/bell")
@@ -330,8 +322,7 @@ def tbl_undo(tid):
         except ValueError:
             p = None
         p = p if isinstance(p, dict) and p.get("level") in TBL_LEVELS else {"level": "list", "until": None, "set_by": None}
-        c.execute("UPDATE task_bell SET level=?, until=?, set_by=?, act=NULL, act_by=NULL, prev=NULL, updated_at=? WHERE task_id=? AND user_id=?",
-                  (p["level"], p.get("until"), p.get("set_by"), iso(now_utc()), tid, r["user_id"]))
+        ofl_bell_back(c, "task", tid, r["user_id"], p["level"], p.get("until"), p.get("set_by"))  # 2.972.0 (#5285)
         others += r["user_id"] != uid or bool(r["prev"] and p.get("set_by") and p["set_by"] != r["user_id"])  # what was in the history
     if others:
         log_act(c, tid, "bell", {"undo": 1, "n": others})

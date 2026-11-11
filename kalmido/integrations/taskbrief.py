@@ -16,7 +16,8 @@ from flask import g, jsonify
 from ..accounts.session import me
 from ..api.common import v1_args, v1_json, v1_view
 from ..api.v1 import STATUS_NAMES, v1_one
-from ..collab.comments import MENTION_RE, user_names
+from ..collab.comments import user_names
+from ..core.objcomments import OCM_MENTION_RE as MENTION_RE, OCM_TS  # 2.972.0 (#5272): the one parser of the core, the old time form
 from ..collab.liste2eguard import le2b_net, le2b_task_locked
 from ..core.access import need_task
 from ..core.config import app
@@ -81,7 +82,8 @@ def _plain(c, text):
 
 
 def _comments(c, tid, agent):
-    rows = c.execute("SELECT id, user_id, ext_name, body, created_at FROM comments WHERE task_id=? AND deleted_at IS NULL ORDER BY id",
+    rows = c.execute(f"SELECT id, user_id, ext_name, body, to_char(created_at AT TIME ZONE 'UTC', '{OCM_TS}') AS created_at FROM obj_comments "
+                     "WHERE kind='task' AND ref_id=? AND deleted_at IS NULL ORDER BY id",
                      (tid,)).fetchall()
     n = len(rows)
     rows = rows[-BRIEF_COMMENTS_MAX:]

@@ -12,12 +12,13 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..core.config import app, APP_NAME, PUB_PREFIX, PUBLIC_URL, TZ
 from ..core.i18n import browser_lang, lang, N_, short_day, tr, trn
-from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, iso_ms
+from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso
 from ..core.instance import legal_links, privacy_email, pub_kinds_off
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list, qn_private, reading_ids, reading_sql, task_visible
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import system_ctx
+from ..core.objcomments import ocm_add  # 2.972.0 (#5272)
 from ..tasks.validation import log_act, valid_date
 from ..tasks.watchers import wat_users  # 2.473.0 (#3357)
 from ..tasks.lifecycle import complete_stale, do_complete, trash_task
@@ -345,8 +346,7 @@ def cv_fb_post(token):
         return pub_html(tr("Please type your name and a comment.", lg=lg),
                         f'<div class="msg"><p class="err">{html.escape(tr("Please type your name and a comment.", lg=lg))}</p>'
                         f'<a class="btn" href="/s/{html.escape(token)}#fb">{html.escape(tr("Back", lg=lg))}</a></div>', lg, 400)
-    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,ext_name) VALUES(?,?,?,?,?,?)",
-                    (tid, None, text, "", iso_ms(now_utc()), name))
+    cid = ocm_add(c, "task", tid, None, text, ext_name=name)  # 2.972.0 (#5272): the core's comment
     t = c.execute("SELECT t.*, l.owner_id AS l_owner FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
     rcpt = ({t["l_owner"], t["created_by"], t["assignee_id"]} | tbl_urgent_users(c, tid) | wat_users(c, tid)) - {None} - agent_ids(c)  # 2.53.0 C (#1424): + "Urgent"
     for uid in sorted(rcpt):  # News + push like a comment on my task, the notification switch "comment"

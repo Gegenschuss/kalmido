@@ -76,7 +76,8 @@ def series(s, uid, lid, who):
     cr = row(cp)
     check(r.ok and row(rc)["due"] == D(0) and cr is not None and cr["deleted_at"], f"{who}: #3025 copy with a comment -> trash, series back")
     check(os.path.exists(os.path.join(DATA, "attachments", path)), f"{who}: #3025 the copy's file stays on disk")
-    check(dbx("SELECT COUNT(*) FROM comments WHERE task_id=?", (cp,))[0][0] == 1, f"{who}: #3025 the comment stays")
+    # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+    check(dbx("SELECT COUNT(*) FROM obj_comments WHERE kind='task' AND ref_id=?", (cp,))[0][0] == 1, f"{who}: #3025 the comment stays")
     # 2.272.0 F (#3025, review H2): a copy edited since (description) or with a dependency goes to the trash too
     j = s.post(B + f"/api/tasks/{rc}/complete", json={"expect_due": D(0)}).json()
     u, cp = j["undo"], j["undo"]["copy_id"]

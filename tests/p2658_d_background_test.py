@@ -270,6 +270,7 @@ check([x for x in calls if x.startswith("a")] == ["a0", "a1"] and j.get("alive")
 
 # ---------------------------------------------------------------- 6. #5113 git issue sync: the push holds no transaction
 TP = task("Push me")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
 GSP = r"""
 import json, time, app
 from kalmido.core.db import connect, insert_id
@@ -287,7 +288,7 @@ with system_ctx(c):
               (cid, TID, "2026-01-01T00:00:00Z", snap, json.dumps({"title": "2026-11-08T00:00:00.000Z"})))
     uid = c.execute("SELECT owner_id FROM lists WHERE id=?", (LID,)).fetchone()[0]
     def comment(text):
-        mid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at) VALUES(?,?,?,'',?)", (TID, uid, text, "2026-11-08T00:00:00Z"))
+        mid = insert_id(c, "INSERT INTO obj_comments(kind, ref_id,user_id,body,created_at) VALUES('task', ?,?,?,?)", (TID, uid, text, "2026-11-08T00:00:00Z"))
         return insert_id(c, "INSERT INTO git_issue_comments(conn_id,issue_no,remote_id,comment_id,created_at) VALUES(?,5,NULL,?,?)", (cid, mid, "2026-11-08T00:00:00Z"))
     x1 = comment("First from here")
 c.commit()
@@ -340,7 +341,7 @@ del calls[:]
 mode["fail"] = False
 with system_ctx(c):
     c.execute("UPDATE git_issue_comments SET send_at=? WHERE id=?", ("2026-11-08T00:00:00Z", x2))
-    row = c.execute("SELECT m.body, m.user_id FROM git_issue_comments x JOIN comments m ON m.id=x.comment_id WHERE x.id=?", (x2,)).fetchone()
+    row = c.execute("SELECT m.body, m.user_id FROM git_issue_comments x JOIN obj_comments m ON m.id=x.comment_id WHERE x.id=?", (x2,)).fetchone()
     text = GS._comment_text(c, row)
 c.commit()
 mode["remote"] = [{"id": 9500, "user": {"login": "dev"}, "body": text, "created_at": "2026-11-08T00:00:30Z"}]

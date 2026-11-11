@@ -30,15 +30,15 @@ import hmac
 import re
 
 from ..core.config import APP_NAME, EMAIL_RE, MAX_FILE_MB
-from ..core.db import bump, iso, iso_ms, now_utc
+from ..core.db import bump, iso, now_utc
 from ..core.i18n import lang, tr
-from ..core.pg import insert_id
+from ..core.objcomments import OCM_MENTION_RE as MENTION_RE, ocm_add, ocm_say_refusal  # 2.972.0 (#5272)
 from ..core.access import task_visible
 from ..core.pages import save_attachment_bytes
 from ..accounts.login import auth_key
 from ..admin.hosting import mail_budget
 from ..api.common import hit_limit
-from ..collab.comments import MAIL_REPLY, MENTION_RE, collab_user, task_say_refusal, user_names
+from ..collab.comments import MAIL_REPLY, collab_user, user_names
 from ..collab.liste2e import le2e_mode
 from ..collab.liste2eguard import le2b_list_locked
 from ..collab.news import news_add
@@ -140,11 +140,11 @@ def tmr_who(c, tid, sender, tu=0):
         return False, None
     if tu:
         r = c.execute("SELECT id FROM users WHERE id=? AND lower(email)=? AND disabled=0 AND COALESCE(kind,'user')<>'agent'", (tu, sender)).fetchone()
-        if r and task_visible(c, tid, tu, full=True) and not task_say_refusal(c, tid, tu):  # 2.607.0 (#4549): a guest /
+        if r and task_visible(c, tid, tu, full=True) and not ocm_say_refusal(c, "task", tid, tu):  # 2.607.0 (#4549): a guest /
             return True, tu  # read-only person of the list's organisation comments by mail as little as in the app
     else:
         for r in c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')<>'agent' ORDER BY id", (sender,)).fetchall():
-            if task_visible(c, tid, r[0], full=True) and not task_say_refusal(c, tid, r[0]):  # 2.607.0 (#4549)
+            if task_visible(c, tid, r[0], full=True) and not ocm_say_refusal(c, "task", tid, r[0]):  # 2.607.0 (#4549)
                 return True, None
     return sender == tmr_reporter(c, tid), None
 
@@ -181,8 +181,7 @@ def tmr_comment(c, msg, mid, tid, sender, uid):
     lg = lang(c, t["l_owner"] or t["created_by"]) if (t["l_owner"] or t["created_by"]) else "en"
     name = email.utils.parseaddr(str(msg.get("From", "")))[0].strip()[:120]
     body = (text + "\n\n" if text else "") + "— " + tr("By e-mail from {0}", sender, lg=lg)
-    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,ext_name) VALUES(?,?,?,?,?,?)",
-                    (tid, uid, body[:10000], "", iso_ms(now_utc()), None if uid else (name or sender)[:120]))
+    cid = ocm_add(c, "task", tid, uid, body[:10000], ext_name=None if uid else (name or sender)[:120])  # 2.972.0 (#5272)
     top = c.execute("SELECT COALESCE(MAX(id),0) FROM attachments WHERE task_id=?", (tid,)).fetchone()[0]
     whole = len(files) <= TMR_FILES
     for fname, mime, data in files[:TMR_FILES]:
@@ -197,7 +196,7 @@ def tmr_comment(c, msg, mid, tid, sender, uid):
     c.execute("UPDATE attachments SET comment_id=? WHERE task_id=? AND id>?", (cid, tid, top))
     tmr_keep(c, tid, mid, sender, "in")
     rcpt = {t["l_owner"], t["created_by"], t["assignee_id"]} | {r[0] for r in c.execute(
-        "SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id<?", (tid, cid))}
+        "SELECT DISTINCT user_id FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL AND id<?", (tid, cid))}
     for u in sorted(rcpt - {None, uid}):
         s = collab_user(c, u, t["list_id"])
         if s and task_visible(c, tid, u, full=True):
@@ -247,7 +246,7 @@ def tmr_send(c, tid, uid, cid):
     """Sends comment cid of task tid to the reporter (after the comment's commit). Returns '' or an error code."""
     rep = tmr_reporter(c, tid)
     t = c.execute("SELECT t.title, l.org_id FROM tasks t LEFT JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
-    k = c.execute("SELECT body FROM comments WHERE id=?", (cid,)).fetchone()
+    k = c.execute("SELECT body FROM obj_comments WHERE id=? AND kind='task'", (cid,)).fetchone()
     if not rep or not t or not k or not EMAIL_RE.fullmatch(rep):
         return "no_reporter"
     smtp, name, _own, via = _sender(c, t["org_id"] or None, uid)

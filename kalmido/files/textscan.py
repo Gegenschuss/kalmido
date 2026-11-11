@@ -459,7 +459,7 @@ def ts_task_hits(c, uid, raw):
             continue  # an organisation without its key yet has no indexed file (a search never makes a key)
         hs = [S.query_hashes(c, ws, w)[0] for w in words]
         rows += c.execute(f"""SELECT f.id, f.ws, a.task_id, a.name FROM file_text f JOIN attachments a ON a.id=f.att_id
-                              JOIN tasks t ON t.id=a.task_id LEFT JOIN comments cm ON cm.id=a.comment_id
+                              JOIN tasks t ON t.id=a.task_id LEFT JOIN obj_comments cm ON cm.id=a.comment_id
                               WHERE f.kind='att' AND f.state='found' AND f.ws=? AND a.enc=0 AND a.deleted_at IS NULL AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()}
                               AND (a.comment_id IS NULL OR (cm.id IS NOT NULL AND cm.deleted_at IS NULL))
                               AND f.id IN (SELECT w.ft_id FROM file_words w WHERE w.h=?)

@@ -205,7 +205,8 @@ out = subprocess.run(["docker", "exec", "-e", "KALMIDO_PURGE_TRASH=1", CT, "pyth
                       "c = connect()\nprint('purged', otr_prune(c, True))\nc.close()"], capture_output=True, text=True)
 check("purged 1" in out.stdout, "watchdog: one list purged " + (out.stdout + out.stderr)[-400:])
 check(not sql("SELECT 1 FROM lists WHERE id=?", (LW,)) and not sql("SELECT 1 FROM tasks WHERE id=?", (TW,))
-      and not sql("SELECT 1 FROM comments WHERE task_id=?", (TW,)), "watchdog: list, task and comment gone")
+      # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+      and not sql("SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=?", (TW,)), "watchdog: list, task and comment gone")
 check(PW and not os.path.exists(PW), "watchdog: the attachment file is gone")
 check(sql("SELECT deleted_at IS NOT NULL FROM lists WHERE id=?", (LK,)) == [(1,)], "watchdog: a list deleted today stays in the trash")
 

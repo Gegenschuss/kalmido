@@ -44,7 +44,8 @@ def task(s, lid, title, **kw):
 
 
 def watchers(tid):
-    return sorted(x[0] for x in dbx("SELECT user_id FROM task_watchers WHERE task_id=?", (tid,)))
+    # 2.972.0 (#5285): the watching rows of the core's obj_follow
+    return sorted(x[0] for x in dbx("SELECT user_id FROM obj_follow WHERE kind='task' AND ref_id=? AND mode='watch'", (tid,)))
 
 
 def delegate(tid):

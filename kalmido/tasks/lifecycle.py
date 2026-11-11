@@ -9,6 +9,7 @@ from flask import g, has_request_context, jsonify, request
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx, write_lock, st_ids
 from ..core.objparts import part_merge  # 2.610.0 (#4762): the core's merge of a list sent whole against _prev
+from ..core.objcomments import ocm_trash  # 2.972.0 (#5272)
 from ..core.schema import MAX_DEPTH
 from ..core.i18n import tr
 from ..core.db import body, bump, connect, db, err, gsetting, iso, local_now, now_utc, parse_iso
@@ -737,9 +738,9 @@ def undo_status(c, tid, u):
     if isinstance(dup, dict):
         if isinstance(dup.get("rel"), int):
             c.execute("DELETE FROM task_relations WHERE id=? AND task_id=? AND kind='duplicate'", (dup["rel"], tid))
-        if isinstance(dup.get("cm"), int):
-            c.execute("UPDATE comments SET body='', mentions='', deleted_at=? WHERE id=? AND task_id=? AND user_id=? AND deleted_at IS NULL",
-                      (ts, dup["cm"], tid, me()))
+        if isinstance(dup.get("cm"), int) and c.execute("SELECT 1 FROM obj_comments WHERE id=? AND kind='task' AND ref_id=? AND user_id=? "
+                                                        "AND deleted_at IS NULL", (dup["cm"], tid, me())).fetchone():
+            ocm_trash(c, dup["cm"], me(), check=False)  # 2.972.0 (#5272): the core's trash (was: text wiped at once)
     log_act(c, tid, "reopen")
     return None
 
@@ -748,7 +749,7 @@ def ucp_touched(c, cid):
     """2.272.0 B (#3025): True when the completed copy of a recurring task got something of its own after the completion
     made it (do_complete copies only tags and field values): comments (their reactions with them), files, time entries,
     pomodoros, subtasks. Such a copy goes to the trash on undo instead of being deleted."""
-    return c.execute("""SELECT 1 FROM comments WHERE task_id=? UNION ALL SELECT 1 FROM attachments WHERE task_id=?
+    return c.execute("""SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=? UNION ALL SELECT 1 FROM attachments WHERE task_id=?
                         UNION ALL SELECT 1 FROM time_entries WHERE task_id=? UNION ALL SELECT 1 FROM pomos WHERE task_id=?
                         UNION ALL SELECT 1 FROM tasks WHERE parent_id=?
                         UNION ALL SELECT 1 FROM task_enc_notes WHERE task_id=? UNION ALL SELECT 1 FROM task_links WHERE task_id=?

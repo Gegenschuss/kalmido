@@ -21,7 +21,7 @@ from ..accounts.discover import _push as conn_push  # 2.574.0 (#4556): a request
 from ..accounts.discover import disc_findable  # 2.574.0 (#4556, review B1)
 from ..collab.comments import send_pushes
 from ..life.bookmarks import BM_DESC_MAX, BM_MAX, BM_NOTE_MAX, BM_SITE_MAX, BM_STATES, BM_TITLE_MAX, bm_key, bm_norm_url, bm_site, bm_tags
-from ..notify.taskbell import TBL_LEVELS
+from ..core.objfollow import OFL_BELL as TBL_LEVELS, ofl_bell_put, ofl_watch  # 2.972.0 (#5285): the core's obj_follow
 from ..integrations.importers import imp_undo_after  # 2.506.0 (#4299)
 from .acctimport import _iso_ts, _oid, _txt, tr, umz_cols, umz_find, umz_insert, umz_row, umz_seen
 from ..life.budget import bud_import  # 2.765.0 (#3965)
@@ -155,17 +155,18 @@ def _bells(c, run, uid, me_old, data, ts):
         tid = run.m("tasks", r.get("task_id")) if isinstance(r, dict) else None
         if not tid or run.old("tasks", tid) or r.get("level") not in TBL_LEVELS or (_oid(r.get("set_by")) and _oid(r.get("set_by")) != me_old):
             continue
-        d = {"task_id": tid, "user_id": uid, "org_id": run.list_org.get(run.task_list.get(tid)), "level": r["level"],
-             "until": r.get("until") if _iso_ts(r.get("until")) else None, "set_by": uid if r.get("set_by") else None,
-             "created_at": r.get("created_at") if _iso_ts(r.get("created_at")) else ts, "updated_at": ts}
-        if umz_insert(c, "task_bell", d, rid=False):
-            _more(run, "task_bell", {"task_id": tid})
+        # 2.972.0 (#5285): a row of obj_follow (the archive part keeps its name and columns, older archives import the same)
+        if c.execute("SELECT 1 FROM obj_follow WHERE kind='task' AND ref_id=? AND user_id=? AND mode<>'watch'", (tid, uid)).fetchone():
+            continue
+        ofl_bell_put(c, "task", tid, uid, run.list_org.get(run.task_list.get(tid)), r["level"],
+                     r["until"][:10] if _iso_ts(r.get("until")) else None, uid if r.get("set_by") else None,
+                     at=r.get("created_at") if _iso_ts(r.get("created_at")) else ts, upd=ts)
+        _more(run, "task_bell", {"task_id": tid})
     for r in data.get("task_watchers") or []:
         run.step()
         tid = run.m("tasks", r.get("task_id")) if isinstance(r, dict) else None
-        if tid and not run.old("tasks", tid) and umz_insert(c, "task_watchers", {"task_id": tid, "user_id": uid,
-                                                     "created_at": r.get("created_at") if _iso_ts(r.get("created_at")) else ts}, rid=False):
-            _more(run, "task_watchers", {"task_id": tid})
+        if tid and not run.old("tasks", tid) and ofl_watch(c, "task", tid, uid, at=r.get("created_at") if _iso_ts(r.get("created_at")) else ts):
+            _more(run, "task_watchers", {"task_id": tid})  # 2.972.0 (#5285): a row of obj_follow
 
 
 def _names(rows):
@@ -333,6 +334,9 @@ def umz_more_write(c, run, uid, me_old, data, salt=None):
 _UNDO = {"bookmarks": "id", "pomos": "id", "view_layouts": "id", "contact_care": "contact_id", "list_layouts": "list_id",
          "task_bell": "task_id", "task_watchers": "task_id", "conn_requests": "id",
          "budget_cats": "id", "budget_recurring": "id", "budget_entries": "id", "playbooks": "id"}  # 2.765.0 (#3965)
+# 2.972.0 (#5285): the bell and the watching are rows of the core's obj_follow; the recorded key stays {"task_id": ...} (runs
+# recorded before 2.972 undo the same way) -> the condition of the part's rows there (ref_id = the task)
+_FOLLOW = {"task_bell": "kind='task' AND mode<>'watch'", "task_watchers": "kind='task' AND mode='watch'"}
 # 2.765.0 (#3965): rows without a person column -> the condition that they are still the importing person's
 _UNDO_MINE = {"budget_cats": "list_id IN (SELECT id FROM lists WHERE owner_id=?)", "budget_recurring": "list_id IN (SELECT id FROM lists WHERE owner_id=?)",
               "budget_entries": "list_id IN (SELECT id FROM lists WHERE owner_id=?)", "playbooks": "list_id IS NULL AND owner_id=?"}
@@ -354,6 +358,10 @@ def umz_more_there(c, uid, cr):
         col, ids = _UNDO[table], sorted(ids)
         for i in range(0, len(ids), 500):
             p = ids[i:i + 500]
+            if table in _FOLLOW:  # 2.972.0 (#5285)
+                out.update((table, r[0]) for r in c.execute(f"SELECT ref_id FROM obj_follow WHERE ref_id IN ({','.join('?' * len(p))}) "
+                                                             f"AND user_id=? AND {_FOLLOW[table]}", p + [uid]).fetchall())
+                continue
             mine = _UNDO_MINE.get(table, "user_id=?")  # 2.765.0 (#3965): budget rows / folder playbooks have no person column
             qc = qi(col, set(_UNDO.values()))
             out.update((table, r[0]) for r in c.execute(f"SELECT {qc} FROM {qi(table, _UNDO)} WHERE {qc} IN ({','.join('?' * len(p))}) AND {mine}",
@@ -380,6 +388,15 @@ def umz_more_undo(c, uid, cr, since, plan):
             if c.execute("UPDATE conn_requests SET status='wd_' || status WHERE id=? AND from_id=? AND status IN ('open','hidden')",
                          (v, uid)).rowcount == 0:
                 kept += 1 if c.execute("SELECT 1 FROM conn_requests WHERE id=? AND from_id=?", (v, uid)).fetchone() else 0
+            continue
+        if table in _FOLLOW:  # 2.972.0 (#5285): a bell changed since the import is the person's own choice now (as before)
+            r = c.execute(f"SELECT updated_at FROM obj_follow WHERE ref_id=? AND user_id=? AND {_FOLLOW[table]}", (v, uid)).fetchone()
+            if r is None:
+                continue
+            if table == "task_bell" and imp_undo_after(r["updated_at"], since):
+                kept += 1
+                continue
+            c.execute(f"DELETE FROM obj_follow WHERE ref_id=? AND user_id=? AND {_FOLLOW[table]}", (v, uid))
             continue
         if table in _UNDO_MINE:  # 2.765.0 (#3965): a budget row changed since / a folder written on since stays (own work now)
             mine = _UNDO_MINE[table]

@@ -1619,7 +1619,7 @@ def v1_task_attachments(tid):
     v1_args(())
     c = db()
     _v1_live(c, tid, write=False, full=True)
-    live = {r[0] for r in c.execute("SELECT id FROM comments WHERE task_id=? AND deleted_at IS NULL", (tid,))}
+    live = {r[0] for r in c.execute("SELECT id FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL", (tid,))}
     rows = c.execute("SELECT id, name, mime, size, comment_id, created_at, enc FROM attachments WHERE task_id=? AND deleted_at IS NULL ORDER BY id", (tid,)).fetchall()
     # 2.42.0 (#828): an encrypted file is listed as such (only its uploader can open it, never an agent)
     from ..files.scan import sc_up

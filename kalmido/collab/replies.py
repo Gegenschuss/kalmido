@@ -10,10 +10,13 @@ import re
 
 from ..core.i18n import tr
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.objcomments import ocm_old_cols, OCM_MENTION_RE  # 2.972.0 (#5272): the one mention token, the comments' core
 
 QUOTE_CHARS = 140
-MENTION_RE = re.compile(r"<@(\d+)>")
-_TABLES = {"c": "comments", "t": "tchat_msgs", "a": "agent_chat"}
+# 2.972.0 (#5272): a task comment is a row of obj_comments (kind 'task'), read in its old shape (task_id, reply_to, ...)
+_SELECT = {"c": f"SELECT {ocm_old_cols()} FROM obj_comments WHERE kind='task' AND ", "t": "SELECT * FROM tchat_msgs WHERE ",
+           "a": "SELECT * FROM agent_chat WHERE "}
+_WHERE = {("c", "task_id"): "ref_id"}  # the old name of a condition -> the column of obj_comments
 
 
 def reply_id(v):
@@ -37,8 +40,8 @@ def reply_check(c, art, v, **where):
     rid = reply_id(v)
     if rid is None:
         return None
-    cond = " AND ".join(f"{k}=?" for k in where)
-    r = c.execute(f"SELECT * FROM {_TABLES[art]} WHERE id=? AND {cond}", (rid, *where.values())).fetchone()
+    cond = " AND ".join(f"{_WHERE.get((art, k), k)}=?" for k in where)
+    r = c.execute(f"{_SELECT[art]}id=? AND {cond}", (rid, *where.values())).fetchone()
     if not r or ("deleted_at" in r.keys() and r["deleted_at"]):
         raise BadInput(tr("Invalid value: {0}", "reply_to"))
     return r
@@ -46,7 +49,7 @@ def reply_check(c, art, v, **where):
 
 def _plain(c, body, names):
     from ..collab.teamchat import md_brief
-    t = MENTION_RE.sub(lambda m: "@" + names.get(int(m.group(1)), "?"), md_brief(body or ""))
+    t = OCM_MENTION_RE.sub(lambda m: "@" + names.get(int(m.group(1)), "?"), md_brief(body or ""))
     t = re.sub(r"\s+", " ", t).strip()
     return t[:QUOTE_CHARS] + ("…" if len(t) > QUOTE_CHARS else "")
 
@@ -57,11 +60,11 @@ def reply_quotes(c, art, ids):
     ids = sorted({int(i) for i in ids if i})
     if not ids:
         return {}
-    rows = {r["id"]: r for r in c.execute(f"SELECT * FROM {_TABLES[art]} WHERE id IN ({','.join('?' * len(ids))})", ids)}
+    rows = {r["id"]: r for r in c.execute(f"{_SELECT[art]}id IN ({','.join('?' * len(ids))})", ids)}
     uids = set()
     for r in rows.values():
         uids.add(r["agent_id"] if art == "a" and r["sender"] == "agent" else r["user_id"])
-        uids |= {int(x) for x in MENTION_RE.findall(r["body"] or "")}
+        uids |= {int(x) for x in OCM_MENTION_RE.findall(r["body"] or "")}
     names = user_names(c, uids)
     out = {}
     for i in ids:

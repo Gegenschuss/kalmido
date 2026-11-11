@@ -171,10 +171,11 @@ check(m and "ERROR" in m["body"] and "walrus" not in m["body"], f"the tool refus
 check(not any("walrus" in json.dumps(x) for x in plog()), "the title of the task never reached the model")
 
 # ---------------------------------------------------------------- a mention: a comment through the tool
-n_c = len(dbx("SELECT id FROM comments WHERE task_id=? AND user_id=?", (T1, AID)))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+n_c = len(dbx("SELECT id FROM obj_comments WHERE kind='task' AND ref_id=? AND user_id=?", (T1, AID)))
 r = Fr.post(B + f"/api/tasks/{T1}/comments", json={"body": f"<@{AID}> FAKE_COMMENT {T1}"})
 check(r.ok, f"comment with the mention {r.status_code}")
-check(until(lambda: len(dbx("SELECT id FROM comments WHERE task_id=? AND user_id=? AND body LIKE 'FAKE comment%'", (T1, AID))) > n_c, 40),
+check(until(lambda: len(dbx("SELECT id FROM obj_comments WHERE kind='task' AND ref_id=? AND user_id=? AND body LIKE 'FAKE comment%'", (T1, AID))) > n_c, 40),
       "the server agent commented through add_comment")
 run = until(lambda: (last_run() if last_run() and last_run()[1] != "run" else None), 20)
 check(run and run[1] == "done" and run[6] == "mention", f"the mention run {run}")

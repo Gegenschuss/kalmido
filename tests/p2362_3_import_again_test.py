@@ -86,7 +86,8 @@ def run(s, iid, target="private", again=True):
 def counts(uid, name="Umzug Probe"):
     return {"lists": one("SELECT COUNT(*) FROM lists WHERE owner_id=? AND name=?", (uid, name)),
             "tasks": one("SELECT COUNT(*) FROM tasks WHERE created_by=? AND title='Erste Aufgabe'", (uid,)),
-            "comments": one("SELECT COUNT(*) FROM comments WHERE body='Eine Notiz' AND user_id=?", (uid,)),
+            # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+            "comments": one("SELECT COUNT(*) FROM obj_comments WHERE body='Eine Notiz' AND user_id=?", (uid,)),
             "sections": one("SELECT COUNT(*) FROM sections s JOIN lists l ON l.id=s.list_id WHERE l.owner_id=? AND s.name='Abschnitt'", (uid,)),
             "habits": one("SELECT COUNT(*) FROM habits WHERE user_id=? AND name='Laufen'", (uid,)),
             "contacts": one("SELECT COUNT(*) FROM contacts c JOIN books b ON b.id=c.book_id WHERE b.owner_id=? AND c.fn='Kim Kontakt'", (uid,)),
@@ -187,7 +188,8 @@ db.execute("UPDATE lists SET owner_id=? WHERE id=?", (ALICE, LIMP))
 iid, j = upload(F, FILE3)
 j = run(F, iid)
 check(j.get("state") == "done", f"import with the project handed over {j.get('state')}")
-check(not one("""SELECT COUNT(*) FROM comments c JOIN tasks t ON t.id=c.task_id WHERE t.list_id=? AND c.body='Spaeter'""", (LIMP,)),
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(not one("""SELECT COUNT(*) FROM obj_comments c JOIN tasks t ON t.id=c.ref_id AND c.kind='task' WHERE t.list_id=? AND c.body='Spaeter'""", (LIMP,)),
       "nothing lands in the project that went to somebody else")
 db.execute("UPDATE lists SET owner_id=? WHERE id=?", (FID, LIMP))
 NEWEST = one("SELECT MAX(id) FROM lists WHERE owner_id=? AND name='Umzug Probe'", (FID,))

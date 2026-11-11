@@ -125,9 +125,10 @@ def latest():
 
 
 # ================================================================== rollback safety: three nullable columns
-for t in ("comments", "tchat_msgs", "agent_chat"):
-    col = [x for x in dbx(f"PRAGMA table_info({t})") if x[1] == "reply_to"]
-    check(len(col) == 1 and col[0][3] == 0 and col[0][4] is None, f"#1076: {t}.reply_to is a nullable column without default " + str(col))
+# 2.972.0 (#5272): the task comments' reply is obj_comments.parent_id (the core's comments)
+for t, rc in (("obj_comments", "parent_id"), ("tchat_msgs", "reply_to"), ("agent_chat", "reply_to")):
+    col = [x for x in dbx(f"PRAGMA table_info({t})") if x[1] == rc]
+    check(len(col) == 1 and col[0][3] == 0 and col[0][4] is None, f"#1076: {t}.{rc} is a nullable column without default " + str(col))
 
 # ================================================================== task comments
 c1 = Bo.post(B + f"/api/tasks/{T1}/comments", json={"body": "Should the notes mention the **new** search, <@%d>?" % ALICE}).json()

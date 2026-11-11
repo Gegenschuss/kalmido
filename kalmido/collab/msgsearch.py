@@ -23,10 +23,11 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import db, gset, gsetting, ix_ensure
 from ..accounts.session import me
-from ..core.access import collab_all, Denied, FULL_ROLES, list_role, tvis, vis_search_lids, vis_sql
+from ..core.access import collab_all, Denied, FULL_ROLES, list_role, live_sql, tvis, vis_search_lids, vis_sql
 from ..tasks.validation import as_int
 from ..core.errors import BadInput
-from ..collab.comments import comment_plain, MENTION_RE, user_names
+from ..collab.comments import comment_plain, user_names
+from ..core.objcomments import ocm_old_cols, OCM_MENTION_RE  # 2.972.0 (#5272)
 from ..collab.teamchat import md_brief, tchat_on, tchat_room_ok
 from ..agents.core import agent_ids, agent_shares, is_agent
 from ..api.v1 import API_PAGE_MAX
@@ -46,7 +47,7 @@ for _a, _b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("Ä", "Ae"), ("Ö", "O
 
 
 # the three message tables with an index on kalmido_fold(body)
-MSG_TABLES = ("comments", "tchat_msgs", "agent_chat")
+MSG_TABLES = ("obj_comments", "tchat_msgs", "agent_chat")  # 2.972.0 (#5272): comments -> obj_comments (index msg_trgm_obj_comments)
 
 
 def _fold_fn(c):
@@ -186,10 +187,11 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
     if "c" in arts:
         # 2.695.0 (#4960): the visible lists as an array (vis_search_lids, without the lock's): their tasks through the index
         # tasks_list, their comments through comments_task -- under row-level security the trigram index cannot help
-        rows = c.execute(f"""SELECT m.id, m.task_id, m.user_id, m.body, m.created_at, t.list_id, t.title
-            FROM comments m JOIN tasks t ON t.id=m.task_id
-            WHERE {mcond} AND m.deleted_at IS NULL AND t.deleted_at IS NULL AND t.list_id = ANY(CAST(? AS BIGINT[])) AND {tvis(c, uid, 't.', write=True)}{snd}
-            {' AND m.task_id=?' if task is not None else ''} ORDER BY m.id DESC LIMIT {MSG_CAND}""",
+        # 2.972.0 (#5272): the comments' core (obj_comments kind 'task'), the row in its old shape (created_at as ISO text)
+        rows = c.execute(f"""SELECT {ocm_old_cols('m')}, t.list_id, t.title
+            FROM obj_comments m JOIN tasks t ON t.id=m.ref_id
+            WHERE m.kind='task' AND {mcond} AND {live_sql('m')} AND t.deleted_at IS NULL AND t.list_id = ANY(CAST(? AS BIGINT[])) AND {tvis(c, uid, 't.', write=True)}{snd}
+            {' AND m.ref_id=?' if task is not None else ''} ORDER BY m.id DESC LIMIT {MSG_CAND}""",
                          match + [vis_search_lids(c, uid)] + ([sender] if sender is not None else []) + ([task] if task is not None else [])).fetchall()
         for r in rows:
             if not role(r["list_id"]):
@@ -258,7 +260,7 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
     # plain text (mentions -> @name, Markdown markers out), the words really in it, the snippet with its marks
     ids = {h["sender_id"] for h in hits} | {h.get("_other") for h in hits}
     for h in hits:
-        ids |= {int(x) for x in MENTION_RE.findall(h["_body"])}
+        ids |= {int(x) for x in OCM_MENTION_RE.findall(h["_body"])}
     names = user_names(c, ids)
     out = []
     for h in hits:

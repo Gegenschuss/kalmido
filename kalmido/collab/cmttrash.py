@@ -3,7 +3,7 @@
 Deleting a comment or a team chat message was final: its text emptied, its files gone from the disk. Now it goes into a
 trash for the trash period (ret_days("trash")): the row keeps looking deleted exactly as before (body '', deleted_at set),
 so no read path (app, v1 / MCP, agent events, search, exports, notifications, file downloads) ever sees the kept text; the
-text waits in comment_trash_text / tchat_trash_text, the files stay as rows and on disk:
+text waits in obj_comment_trash (2.972.0, #5272; was comment_trash_text) / tchat_trash_text, the files stay as rows and on disk:
  - comment files: attachments.deleted_at = the comment's deleted_at (the attachment trash keeps them, need_attachment and the
    task's file trash already leave the files of a deleted comment out; restoring the comment brings back exactly these)
  - team chat files: tchat_files unchanged; every reader skips the files of a deleted message (tcx_files_of callers,
@@ -14,37 +14,14 @@ chat files leave the disk after the commit (tcx_trash_paths).
 2.783.0 (#5368, stage 6 of the trash core): the deleted team chat messages (tombstones) are a side object of the core
 (core/objparts.py part_kind TCX_MSG_KIND): the core's run (core/writes.py obj_trash_tick) deletes them after the period with
 the thread rule of before (a thread's first message stays while replies point at it) and their files (tcx_trash_paths,
-unlinked after the commit); files/trashpurge.py no longer has a run of its own for them."""
+unlinked after the commit); files/trashpurge.py no longer has a run of its own for them.
+2.972.0 (#5272): the comments of tasks are rows of the comments' core: their trash (obj_comment_trash, the files with the same
+time) is core/objcomments.py ocm_trash / ocm_restore with the task's hooks of collab/comments.py; comment_trash_text is gone.
+The team chat keeps its own trash text here until stage Q4c."""
 from ..core.db import iso_ms, now_utc
 from ..core.objparts import part_kind  # 2.783.0 (#5368)
 from ..core.access import live_sql  # 2.783.0 (#5368)
-
-
-def cmt_trash(c, cid):
-    """Comment cid into the trash: its text kept, its files into the attachment trash (same timestamp). The caller checked
-    the rights and commits."""
-    r = c.execute(f"SELECT body, mentions FROM comments WHERE id=? AND {live_sql()} FOR UPDATE", (cid,)).fetchone()
-    if not r:
-        return None
-    ts = iso_ms(now_utc())
-    c.execute("INSERT INTO comment_trash_text(comment_id, body, mentions) VALUES(?,?,?) ON CONFLICT(comment_id) DO UPDATE "
-              "SET body=excluded.body, mentions=excluded.mentions", (cid, r["body"] or "", r["mentions"] or ""))
-    c.execute(f"UPDATE attachments SET deleted_at=? WHERE comment_id=? AND {live_sql()}", (ts, cid))
-    c.execute("UPDATE comments SET body='', mentions='', deleted_at=? WHERE id=?", (ts, cid))
-    return ts
-
-
-def cmt_restore(c, cid):
-    """A comment from the trash back (text, mentions, the files it had at the delete). -> True, or False when there is nothing
-    to restore (deleted before 2.530, or the trash run was quicker). The caller checked the rights and commits."""
-    r = c.execute("SELECT k.deleted_at, x.body, x.mentions FROM comments k JOIN comment_trash_text x ON x.comment_id=k.id "
-                  "WHERE k.id=? AND k.deleted_at IS NOT NULL FOR UPDATE OF k", (cid,)).fetchone()
-    if not r:
-        return False
-    c.execute("UPDATE attachments SET deleted_at=NULL WHERE comment_id=? AND deleted_at=?", (cid, r["deleted_at"]))
-    c.execute("UPDATE comments SET body=?, mentions=?, deleted_at=NULL WHERE id=?", (r["body"], r["mentions"], cid))
-    c.execute("DELETE FROM comment_trash_text WHERE comment_id=?", (cid,))
-    return True
+from ..core.objcomments import ocm_trash_drop  # 2.972.0 (#5272)
 
 
 def tcx_trash(c, mid):
@@ -87,8 +64,7 @@ def ctt_purge_list(c, lid):
     comments and of the deleted messages of its channel were not converted -- they go for good now (a restore would bring back
     a plain text into a locked list, or an old ciphertext). The files of those messages: rows now, -> paths to unlink after
     the commit (the comment files went with atr_purge_list)."""
-    c.execute("DELETE FROM comment_trash_text WHERE comment_id IN (SELECT k.id FROM comments k JOIN tasks t ON t.id=k.task_id "
-              "WHERE t.list_id=?)", (lid,))
+    ocm_trash_drop(c, "task", [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))])  # 2.972.0 (#5272)
     w = "deleted_at IS NOT NULL AND room_id IN (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id=?)"
     paths = tcx_trash_paths(c, w, (lid,))
     c.execute(f"DELETE FROM tchat_files WHERE message_id IN (SELECT id FROM tchat_msgs WHERE {w})", (lid,))

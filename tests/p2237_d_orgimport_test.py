@@ -173,6 +173,7 @@ ok(A.put(B + f"/api/lists/{LO}/members", json={"user_id": BOB, "role": "edit"}),
 ok(A.patch(B + f"/api/lists/{LO}", json={"kind": "project", "time_tracking": True}), "a project with time tracking")
 TO = ok(A.post(B + "/api/tasks", json={"title": "Dreh vorbereiten", "list_id": LO}), "task")["id"]
 ok(A.patch(B + f"/api/tasks/{TO}", json={"people": [BOB]}), "bob comes along to the task")
+ok(Bo.post(B + f"/api/tasks/{TO}/watchers", json={}), "bob watches the task")  # 2.972.0 (#5285): a row of the core's obj_follow
 rooms = [x for x in A.get(B + "/api/team").json().get("rooms", []) if x.get("kind") == "list" and x.get("list_id") == LO]
 check(rooms, "the list has its channel")
 RID = rooms[0]["id"] if rooms else 0
@@ -233,6 +234,9 @@ ab = dbx("SELECT user_id, created_by, decided_by FROM hub_absences WHERE org_id=
 check(len(ab) == 1 and ab[0]["user_id"] == BOB and ab[0]["created_by"] != BOB and ab[0]["decided_by"] != BOB,
       f"bob's absence is his (like an admin enters it), not entered or decided by him {[dict(x) for x in ab]}")
 check(one("SELECT user_id FROM task_people WHERE task_id=?", (NT,)) == BOB, "bob stays on the task (sharing)")
+# 2.972.0 (#5285): tasks/watchers.json (task_id) goes into the core's obj_follow; the row takes the new organisation
+w = dbx("SELECT user_id, org_id FROM obj_follow WHERE kind='task' AND ref_id=? AND mode='watch'", (NT,))
+check([(x["user_id"], x["org_id"]) for x in w] == [(BOB, ORG3)], f"bob still watches the imported task, in the new organisation {[dict(x) for x in w]}")
 check(not dbx("SELECT 1 FROM office_doc_log WHERE org_id=? AND user_id=?", (ORG3, BOB)), "no office log entry under bob")
 nd = {x["project_title"]: x["id"] for x in dbx("SELECT id, project_title FROM office_docs WHERE org_id=?", (ORG3,))}
 check({"Fertig", "Entwurf"} <= set(nd), f"both documents came along {nd}")

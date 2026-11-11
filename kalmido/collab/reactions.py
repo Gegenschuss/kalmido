@@ -17,7 +17,8 @@ from ..lists.lists import clean_color, clean_list_value
 from ..tasks.validation import as_int, CONTENT_MAX, descendants, log_act, PRIORITIES, TITLE_MAX
 from ..tasks.tasks import one_task
 from ..tasks.lifecycle import apply_update
-from ..collab.comments import comment_plain, need_live_comment, task_say_refusal, user_names
+from ..collab.comments import comment_plain, need_live_comment, user_names
+from ..core.objcomments import ocm_extra, ocm_row, ocm_say_refusal  # 2.972.0 (#5272): the comments' core
 from ..core.objreact import orx_of, orx_set, orx_toggle  # 2.763.0 (#5269): the reactions of the shared core
 from ..core.errors import BadInput, UnknownFields
 from ..lists.orglabels import olb_full, olb_match  # 2.609.0 (#3373); 2.947.0 (#5275, review F4): olb_full
@@ -74,7 +75,7 @@ def comment_rx_on(c, k, uid, emoji, on=None):
     """2.763.0 (#5269): the core's one rule for a reaction on comment row k (core/objreact.py orx_toggle): not on one's own
     comment, a guest / read-only person of the task's organisation does not react (taking one back stays). -> on."""
     return orx_toggle(c, "comment", k["id"], uid, emoji, on, own=k["user_id"] == uid,
-                      say=lambda: task_say_refusal(c, k["task_id"], uid))
+                      say=lambda: ocm_say_refusal(c, "task", k["task_id"], uid))
 
 
 def react(c, k, uid, emoji, on):
@@ -82,13 +83,13 @@ def react(c, k, uid, emoji, on):
     Returns {"approval": ..., "applied": bool} (caller commits). The rule (comment_rx_on) the caller asked before."""
     res = {"approval": None, "applied": False}
     if emoji in ("up", "down") and k["suggestion"]:  # 2.574.0 (#3376, review F2): a thumb taken back and another one at the same
-        k = c.execute("SELECT * FROM comments WHERE id=? FOR UPDATE", (k["id"],)).fetchone() or k  # time read the stored state in turn
+        k = ocm_row(c, k["id"], lock=True) or k  # time read the stored state in turn
     if not on:
         orx_set(c, "comment", k["id"], uid, emoji, False)
         sg = json.loads(k["suggestion"]) if emoji == "up" and k["suggestion"] else None
         if sg and sg.get("state") == "open" and any(isinstance(a, dict) and a.get("by") == uid for a in sg.get("approvals") or []):
             sg["approvals"] = [a for a in sg["approvals"] if not (isinstance(a, dict) and a.get("by") == uid)]  # 2.574.0 (#3376): a first of two taken back
-            c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(sg, ensure_ascii=False), k["id"]))
+            ocm_extra(c, k["id"], "suggestion", json.dumps(sg, ensure_ascii=False))
         return res
     if not orx_set(c, "comment", k["id"], uid, emoji, True):
         return res
@@ -115,8 +116,8 @@ def react(c, k, uid, emoji, on):
             res["merge"], res["approval"] = "waiting", None  # 2.574.0 (#3376): the list wants a second approver
         elif sug.get("state") == "open" and res["approval"]:
             st = "approved" if emoji == "up" else "rejected"
-            c.execute("UPDATE comments SET suggestion=? WHERE id=?",
-                      (json.dumps({**sug, "state": st, "by": uid, "at": iso(now_utc())}, ensure_ascii=False), k["id"]))
+            ocm_extra(c, k["id"], "suggestion",
+                      json.dumps({**sug, "state": st, "by": uid, "at": iso(now_utc())}, ensure_ascii=False))
             res["merge"] = st
             if st == "approved":  # 2.60.0 C (#1512): an approved pull request counts as the review (by someone who may approve it)
                 from ..tasks.review import rvw_approved_by_pr
@@ -127,8 +128,8 @@ def react(c, k, uid, emoji, on):
             suggestion_apply(c, k, t)
             res["applied"] = True
         else:
-            c.execute("UPDATE comments SET suggestion=? WHERE id=?",
-                      (json.dumps({**sug, "state": "rejected", "by": uid, "at": iso(now_utc())}, ensure_ascii=False), k["id"]))
+            ocm_extra(c, k["id"], "suggestion",
+                      json.dumps({**sug, "state": "rejected", "by": uid, "at": iso(now_utc())}, ensure_ascii=False))
     # 2.126.0 review: logged only once the approval counts; 2.574.0 (#3376, review F3): after the gate, a first of two approvals as
     # waiting (like the decide route), a blocked one not at all. Own block after the kinds: the plain apply / reject way above is
     # the else of the kinds and never runs for a gate / merge request (#3506: as an elif here it applied a viewer's 👍)
@@ -137,7 +138,7 @@ def react(c, k, uid, emoji, on):
     elif ap0 and "waiting" in (res.get("gate"), res.get("merge")):
         log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": True, "waiting": True})
     if is_agent(author) and uid != author["id"] and task_visible(c, t["id"], author["id"], full=True):
-        k2 = c.execute("SELECT * FROM comments WHERE id=?", (k["id"],)).fetchone()
+        k2 = ocm_row(c, k["id"])
         agent_emit(c, author["id"], "reaction", agent_task_data(
             c, t["id"], author["id"], comment={"id": k2["id"], "text": comment_plain(c, k2["body"]),
                                                "suggestion": json.loads(k2["suggestion"]) if k2["suggestion"] else None},
@@ -169,11 +170,11 @@ def comment_react(cid):
     res = react(c, k, me(), emoji, on)
     bump(c)
     c.commit()
-    k = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
+    k = ocm_row(c, cid)
     return jsonify(ok=True, reactions=reactions_of(c, [cid]).get(cid, []), suggestion=json.loads(k["suggestion"]) if k["suggestion"] else None, **res)
 
 
-# ---- tidy: suggestions (comments.suggestion) and applying them
+# ---- tidy: suggestions (the comment's extra.suggestion, 2.972.0 #5272) and applying them
 def clean_suggestion(c, t, s):
     if not isinstance(s, dict):
         raise BadInput(tr("Invalid value: {0}", "suggestion"))
@@ -238,8 +239,8 @@ def tidy_apply(c, t, s):
 def suggestion_apply(c, k, t):
     sug = json.loads(k["suggestion"])
     tidy_apply(c, t, {x: sug[x] for x in ("title", "notes", "section_id", "list_tags", "priority") if x in sug})
-    c.execute("UPDATE comments SET suggestion=? WHERE id=?",
-              (json.dumps({**sug, "state": "applied", "by": me(), "at": iso(now_utc())}, ensure_ascii=False), k["id"]))
+    ocm_extra(c, k["id"], "suggestion",
+              json.dumps({**sug, "state": "applied", "by": me(), "at": iso(now_utc())}, ensure_ascii=False))
 
 
 @app.post("/api/comments/<int:cid>/apply")
@@ -261,7 +262,7 @@ def comment_apply(cid):
     orx_set(c, "comment", cid, me(), "up", True)
     author = c.execute("SELECT * FROM users WHERE id=?", (k["user_id"],)).fetchone() if k["user_id"] else None
     if is_agent(author) and task_visible(c, t["id"], author["id"], full=True):
-        k2 = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
+        k2 = ocm_row(c, cid)
         agent_emit(c, author["id"], "reaction", agent_task_data(
             c, t["id"], author["id"], comment={"id": cid, "text": comment_plain(c, k2["body"]), "suggestion": json.loads(k2["suggestion"])},
             reaction={"emoji": "up", "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}},

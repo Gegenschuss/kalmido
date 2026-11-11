@@ -8,7 +8,7 @@ for the answer ("move_ended"); tmm_restore runs when the task goes back to where
 by hand) within TMM_KEEP_H hours and puts back what is still valid there (people with access, an open sprint / milestone of
 that list, links into lists of the same workspace, detached subtasks that are still top level in their list).
 2.363.3 (#3133): tmm_wish keeps an "also in" request that arrives after the move (the offline queue) for that way back too.
-2.530.0 B (#4316): also the watchers (task_watchers) and the delegated agent (delegate_agent_id) that the move ended
+2.530.0 B (#4316): also the watchers (task_watchers; 2.972.0 #5285: obj_follow) and the delegated agent (delegate_agent_id) that the move ended
 (tasks/watchers.py wat_moved): counted as watchers / delegate, brought back on the way back while they still reach the list
 (watchers: like wat_moved; the agent: check_delegate for the person moving it back).
 """
@@ -21,6 +21,7 @@ from ..core.access import Denied, list_people, list_role, ov_role, WRITE_ROLES
 from ..core.db import iso, now_utc, parse_iso
 from ..core.pg import insert_id, st_ids
 from ..core.objtags import otg_link, otg_list_sql, OTG_TASK_FROM  # 2.947.0 (#5275)
+from ..core.objfollow import ofl_watch, ofl_watchers_of  # 2.972.0 (#5285)
 from ..lists.groups import grp_shares_of_list
 from ..tasks.validation import descendants
 from ..tasks.watchers import check_delegate, dlg_events  # 2.530.0 B (#4316)
@@ -60,8 +61,8 @@ def tmm_snap(c, tid):
 def _watchers(c, ids):
     """2.530.0 B (#4316): task id -> the set of its watchers."""
     out = {}
-    for r in c.execute("SELECT task_id, user_id FROM task_watchers WHERE task_id = ANY(CAST(? AS BIGINT[]))", (st_ids(ids),)):
-        out.setdefault(r[0], set()).add(r[1])
+    for tid, uids in ofl_watchers_of(c, "task", ids).items():  # 2.972.0 (#5285): the core's obj_follow
+        out.setdefault(tid, set()).update(uids)
     return out
 
 
@@ -171,8 +172,7 @@ def tmm_restore(c, tid, prev, skip=()):
             n("subtasks")
     for x, u in d.get("watchers") or []:  # 2.530.0 B (#4316): who still reaches the list (the rule of wat_moved)
         if x in sub and (u in people or list_role(c, lid, u)) and c.execute("SELECT 1 FROM tasks WHERE id=? AND list_id=?", (x, lid)).fetchone():
-            if c.execute("INSERT INTO task_watchers(task_id,user_id,created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING",
-                         (x, u, iso(now_utc()))).rowcount:
+            if ofl_watch(c, "task", x, u):  # 2.972.0 (#5285)
                 n("watchers")
     for x, ch in (d.get("fields") or {}).items():
         x = int(x)

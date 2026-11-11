@@ -19,6 +19,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import bump, db, iso, now_utc
 from ..core.pg import insert_id, st_ids
+from ..core.objfollow import ofl_watch  # 2.972.0 (#5285)
 from ..core.access import Denied, list_role, need_collab, need_list, task_visible
 from ..core.retention import ret_trash_cut, ret_trash_days
 from ..core.objparts import part_kind  # 2.783.0 (#5368)
@@ -38,8 +39,9 @@ def mm_snap(c, lid, uid):
             "SELECT v.task_id, v.field_id FROM task_field_values v JOIN list_fields f ON f.id=v.field_id WHERE f.list_id=? "
             "AND f.type='person' AND v.value=? ORDER BY v.task_id, v.field_id", (lid, str(uid)))],
         "delegate": [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=? AND delegate_agent_id=? ORDER BY id", (lid, uid))],
-        "watch": [r[0] for r in c.execute("SELECT w.task_id FROM task_watchers w JOIN tasks t ON t.id=w.task_id WHERE t.list_id=? "
-                                          "AND w.user_id=? ORDER BY w.task_id", (lid, uid))],
+        # 2.972.0 (#5285): rows of the core's obj_follow (mode watch)
+        "watch": [r[0] for r in c.execute("SELECT w.ref_id FROM obj_follow w JOIN tasks t ON t.id=w.ref_id WHERE w.kind='task' AND w.mode='watch' "
+                                          "AND t.list_id=? AND w.user_id=? ORDER BY w.ref_id", (lid, uid))],
     }
 
 
@@ -153,8 +155,7 @@ def member_memo_restore(lid, uid):
             done["delegate"] += 1
     for x in d.get("watch") or []:
         if x in tasks and task_visible(c, x, uid):
-            done["watch"] += c.execute("INSERT INTO task_watchers(task_id,user_id,created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING",
-                                       (x, uid, iso(now_utc()))).rowcount
+            done["watch"] += ofl_watch(c, "task", x, uid)  # 2.972.0 (#5285)
     total = sum(len(d.get(k) or []) for k in MM_KEYS)
     c.execute("DELETE FROM member_memos WHERE list_id=? AND user_id=?", (lid, uid))
     bump(c)

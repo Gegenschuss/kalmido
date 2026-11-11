@@ -25,6 +25,10 @@ NOTIFY_READERS = {}  # 2.891.0 (#5270): filled by collab/teamchat.py ('tchat_dm'
 NOTIFY_TICK = {}  # 2.891.0 (#5270): kind -> f(c, uid, id, memo) -> bool, obj_role >= view of a person in a run without a request
 #                   with the per-project answers kept in the tick's memo (core/objlight.py: 'task', the watchdog's reminders)
 BOUNDARY = []  # 2.649.0 (#5051): f(c, table, object id, user id) -> rows taken | None (core/objects.obj_boundary_take)
+MOVE = []  # 2.972.0 (#5272): f(c) that core/db.init_db runs at every start before the fragments' AFTER: a stage moves the rows
+#            of old tables into the core (core/objcomments.py ocm_move) before its fragment drops them
+USER_GONE = []  # 2.972.0 (#5272): f(c, uid) before account uid goes (accounts/users.py): the core's rows of the person
+#                 (core/objcomments.py ocm_purge_user: the kept texts of its deleted comments, its mentions)
 GONE = {}  # review 2.578 F2: kind -> table of an area's kind outside OBJ whose rows in obj_revoked / obj_history / obj_undo go
 #            with its objects when an account goes (contacts: contacts/ctfolder.py, cascade over their book)
 

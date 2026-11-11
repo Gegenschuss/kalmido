@@ -229,8 +229,9 @@ check(r.ok and r.json()["mode"] == "on", "finish: the lock is on " + r.text[:200
 row = dbx("SELECT title, content, url, snippets::text FROM tasks WHERE id=?", (T1,))[0]
 check(row[0] == CT[("tasks", T1, "title")] and row[1].startswith("e2e1:") and row[2].startswith("e2e1:") and json.loads(row[3]).startswith("e2e1:"),
       "db: title, note, link and snippets are ciphertexts (snippets as a JSON string)")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
 plain = dbx("""SELECT 'task' FROM tasks WHERE list_id=? AND (title NOT LIKE 'e2e1:%' OR (content<>'' AND content NOT LIKE 'e2e1:%'))
-               UNION ALL SELECT 'comment' FROM comments cm JOIN tasks t ON t.id=cm.task_id WHERE t.list_id=? AND cm.body<>'' AND cm.body NOT LIKE 'e2e1:%'
+               UNION ALL SELECT 'comment' FROM obj_comments cm JOIN tasks t ON t.id=cm.ref_id AND cm.kind='task' WHERE t.list_id=? AND cm.body<>'' AND cm.body NOT LIKE 'e2e1:%'
                UNION ALL SELECT 'note' FROM notes WHERE list_id=? AND (title NOT LIKE 'e2e1:%' OR body NOT LIKE 'e2e1:%')
                UNION ALL SELECT 'section' FROM sections WHERE list_id=? AND name NOT LIKE 'e2e1:%'""", (L, L, L, L))
 check(not plain, "db: no plain text left in the list (trash included) " + str(plain))

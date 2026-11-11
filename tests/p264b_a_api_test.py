@@ -220,8 +220,9 @@ r = A.post(B + f"/api/lists/{L}/e2e/bulk", json=out)
 check(r.ok and not any(r.json()["left"].values()), "bulk: everything on generation 2 " + r.text[:300])
 check(dbx("SELECT title FROM tasks WHERE id=?", (T1,))[0][0] == BOB_T1, "bulk: a value already of the current generation is not overwritten")
 check(dbx("SELECT COUNT(*) FROM activity WHERE task_id=?", (T1,))[0][0] == act0, "bulk: no history entries")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
 old = dbx("""SELECT x FROM (SELECT title AS x FROM tasks WHERE list_id=? UNION ALL SELECT content FROM tasks WHERE list_id=?
-             UNION ALL SELECT cm.body FROM comments cm JOIN tasks t ON t.id=cm.task_id WHERE t.list_id=?
+             UNION ALL SELECT cm.body FROM obj_comments cm JOIN tasks t ON t.id=cm.ref_id AND cm.kind='task' WHERE t.list_id=?
              UNION ALL SELECT title FROM notes WHERE list_id=? UNION ALL SELECT body FROM notes WHERE list_id=?
              UNION ALL SELECT name FROM sections WHERE list_id=?
              UNION ALL SELECT v.value FROM task_field_values v JOIN tasks t ON t.id=v.task_id WHERE t.list_id=?) q WHERE x<>''""", (L,) * 7)
@@ -230,7 +231,8 @@ check(old and all(gen_of(x[0]) == 2 for x in old), "db: every text of the list o
 # re-encrypted, so the end of the key change removes the kept text (a restore would bring back an unreadable old one)
 r = A.post(B + f"/api/tasks/{T1}/comments", json={"body": ct(2)})
 CT1 = r.json().get("id") if r.ok else None
-check(CT1 and A.delete(B + f"/api/comments/{CT1}").ok and dbx("SELECT 1 FROM comment_trash_text WHERE comment_id=?", (CT1,)),
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(CT1 and A.delete(B + f"/api/comments/{CT1}").ok and dbx("SELECT 1 FROM obj_comment_trash WHERE comment_id=?", (CT1,)),
       "trash: the deleted comment keeps its text until the key change ends " + r.text[:200])
 # 2.898.0 (#5563): a section and a text field deleted before the key change keep ciphertexts of generation 1 in the trash
 # (list_part_trash); a field without a ciphertext value (a select field: values stay readable) stays
@@ -243,14 +245,16 @@ r = A.post(B + f"/api/lists/{L}/e2e/finish")
 check(r.ok and r.json()["mode"] == "on" and tuple(dbx("SELECT e2e, e2e_reenc FROM lists WHERE id=?", (L,))[0]) == ("on", 0), "finish: re-encryption done " + r.text[:200])
 check([x[0] for x in dbx("SELECT ref_id FROM list_part_trash WHERE list_id=? AND ref_id IN (9905563, 9905564, 9905565)", (L,))] == [9905565],
       "#5563: the end of the key change dropped the trash copies with old ciphertexts (section, text field), the select field stays")
-check(not dbx("SELECT 1 FROM comment_trash_text WHERE comment_id=?", (CT1,)), "finish: the kept text of the trash went with the key change")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(not dbx("SELECT 1 FROM obj_comment_trash WHERE comment_id=?", (CT1,)), "finish: the kept text of the trash went with the key change")
 check(A.post(B + f"/api/lists/{L}/e2e/finish").status_code == 409, "finish: only once")
 check(A.get(B + f"/api/lists/{L}/e2e").json()["reenc"] == 0, "info: reenc 0")
 # a plain leftover in 'on' (there should be none): the todo hands it out, bulk encrypts it
-dbx("UPDATE comments SET body='left plain' WHERE id=?", (C1,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+dbx("UPDATE obj_comments SET body='left plain' WHERE id=?", (C1,))
 td = A.get(B + f"/api/lists/{L}/e2e/todo").json()
 check([x["body"] for x in td["comments"]] == ["left plain"] and td["left"]["comments"] == 1, "todo: a plain leftover in 'on' " + json.dumps(td["comments"]))
-check(A.post(B + f"/api/lists/{L}/e2e/bulk", json={"comments": [{"id": C1, "body": ct(2)}]}).ok and gen_of(dbx("SELECT body FROM comments WHERE id=?", (C1,))[0][0]) == 2,
+check(A.post(B + f"/api/lists/{L}/e2e/bulk", json={"comments": [{"id": C1, "body": ct(2)}]}).ok and gen_of(dbx("SELECT body FROM obj_comments WHERE id=?", (C1,))[0][0]) == 2,
       "bulk: the leftover encrypted")
 # an outdated tab writes a ciphertext of the old generation after the re-encryption: the next run picks it up
 assert Bo.patch(B + f"/api/tasks/{T1}", json={"content": ct(1)}).ok

@@ -183,7 +183,8 @@ def acts(tid, kind):
 
 
 def comments(tid):
-    return [x[0] for x in kt.dbx("SELECT body FROM comments WHERE task_id=? AND deleted_at IS NULL ORDER BY id", (tid,))]
+    # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+    return [x[0] for x in kt.dbx("SELECT body FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL ORDER BY id", (tid,))]
 
 
 def link(tid):
@@ -458,7 +459,8 @@ slow(0)
 j = res["r"].json() if res.get("r") is not None else {}
 check(j.get("created", {}).get("tasks") == 1 and j.get("already") == 1, f"an issue linked meanwhile is not taken twice: {str(j)[:300]}")
 TV = kt.dbx("SELECT task_id FROM git_issue_links WHERE conn_id=? AND issue_no=1", (RV,))
-cm = kt.dbx("SELECT c.body, c.created_at, t.created_at FROM comments c JOIN tasks t ON t.id=c.task_id WHERE c.task_id=?", (TV[0][0] if TV else 0,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+cm = kt.dbx("SELECT c.body, c.created_at, t.created_at FROM obj_comments c JOIN tasks t ON t.id=c.ref_id AND c.kind='task' WHERE c.ref_id=?", (TV[0][0] if TV else 0,))
 check(cm and cm[0][1][:19] == cm[0][2][:19] and cm[0][1].startswith("2026-08-01"), f"a comment without a date keeps the task's time: {cm}")
 check(cm and "‮" not in cm[0][0] and "​" not in cm[0][0] and "Bidi text here" in cm[0][0] and cm[0][0].startswith("@eve on"),
       f"control / bidi characters out: {cm and cm[0][0]!r}")

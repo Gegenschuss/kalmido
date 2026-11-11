@@ -102,11 +102,13 @@ check(rels(A, T1)[1] == {T2: "has_duplicate"}, "relates next to a duplicate chan
 r = A.post(B + f"/api/tasks/{T3}/relations", json={"other_id": T1, "kind": "duplicate", "close": True})
 j = r.json() if r.ok else {}
 check(r.ok and j.get("undo") and j["task"]["status"] == -1, f"close as duplicate: won't do, with undo {r.status_code} {r.text[:200]}")
-cm = kt.dbx("SELECT body FROM comments WHERE task_id=? AND deleted_at IS NULL", (T3,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+cm = kt.dbx("SELECT body FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL", (T3,))
 check([x[0] for x in cm] == [f"Duplicate of #{T1}"], f"close as duplicate: the comment points at the other task {cm}")
 r = A.post(B + "/api/tasks/batch", json={"ids": [T3], "action": "undo", "data": {"items": {str(T3): j.get("undo")}}})
 check(r.ok and A.get(B + f"/api/tasks/{T3}").json()["status"] == 0, f"undo: the task is open again {r.status_code} {r.text[:200]}")
-check(n_rows(T1, T3) == 0 and not kt.dbx("SELECT 1 FROM comments WHERE task_id=? AND deleted_at IS NULL", (T3,)),
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(n_rows(T1, T3) == 0 and not kt.dbx("SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL", (T3,)),
       "undo: the relation and the comment are gone too")
 r = A.post(B + f"/api/v1/tasks/{T3}/relations", json={"other_id": T4, "kind": "duplicate", "close": True}, headers={})
 check(r.status_code == 401, "API v1 needs a token")

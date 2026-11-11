@@ -33,7 +33,8 @@ from ..core.errors import BadInput, UnknownFields
 from ..core.pg import insert_id  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
-from ..collab.comments import MENTION_RE, user_names, need_live_comment  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names, need_live_comment  # 2.369.5 (#2517): pulled up from functions
+from ..core.objcomments import OCM_MENTION_RE  # 2.972.0 (#5272): the one mention token
 from ..collab.teamchat import tchat_on, tchat_room_ok  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.tasks import one_task, task_create  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import OO_ADMIN_ONLY, org_out, org_out_ok  # 2.369.5 (#2517): pulled up from functions
@@ -67,8 +68,8 @@ def chat_save_of(c, uid, kind, mids):
 
 
 def _plain_mentions(c, text):
-    names = user_names(c, [int(x) for x in MENTION_RE.findall(text or "")])
-    return MENTION_RE.sub(lambda m: "@" + names.get(int(m.group(1)), "?"), text or "")
+    names = user_names(c, [int(x) for x in OCM_MENTION_RE.findall(text or "")])
+    return OCM_MENTION_RE.sub(lambda m: "@" + names.get(int(m.group(1)), "?"), text or "")
 
 
 def _message(c, kind, mid, uid):
@@ -180,7 +181,7 @@ def chat_save():
         return jsonify(already=True, task_id=t["id"], task={"id": t["id"], "title": t["title"]})
     parent = None
     if kind == "comment":  # 2.42.0 (#1383): in the comment's list, as a subtask of its task by default
-        ct = c.execute("SELECT t.id, t.list_id FROM comments k JOIN tasks t ON t.id=k.task_id WHERE k.id=?", (mid,)).fetchone()
+        ct = c.execute("SELECT t.id, t.list_id FROM obj_comments k JOIN tasks t ON t.id=k.ref_id WHERE k.id=? AND k.kind='task'", (mid,)).fetchone()
         lid, parent = ct["list_id"], (ct["id"] if b.get("as", "sub") == "sub" else None)
     lid = lid or my_inbox(c, uid)
     need_list(c, lid)  # 404 unknown / not visible, 403 without the right to change the list

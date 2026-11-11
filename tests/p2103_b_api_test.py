@@ -207,9 +207,10 @@ sql("INSERT INTO tchat_msgs(room_id, user_id, body, created_at, thread_of) VALUE
 # comments: an emptied row of a deleted comment
 T = Fr.post(B + "/api/tasks", json={"title": "Invented task"}).json()["id"]
 check(Fr.post(B + f"/api/tasks/{T}/comments", json={"body": "First thought"}).ok, "setup: a comment")
-CM = one("SELECT id FROM comments WHERE task_id=?", (T,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+CM = one("SELECT id FROM obj_comments WHERE kind='task' AND ref_id=?", (T,))
 check(Fr.delete(B + f"/api/comments/{CM}").ok, "setup: the comment deleted (emptied row)")
-sql("UPDATE comments SET deleted_at=? WHERE id=?", (OLD, CM), write=True)
+sql("UPDATE obj_comments SET deleted_at=? WHERE id=?", (OLD, CM), write=True)
 
 # 2.152.0 (#2165): no "wiki" here -- main's own run wiki/pages.py wiki_trash_tick deletes the pages with their files (below)
 # 2.783.0 (#5368): the tombstones of the team chat are the core's run (core/writes.py obj_trash_tick, kind tchat_msg): CORE
@@ -237,7 +238,8 @@ cr = core_run(False)  # 2.783.0 (#5368), 2.809.0 (#5365)
 check(cr.get("purged") is False and all((cr.get("counts") or {}).get(k) == v for k, v in CORE.items())
       and sql("SELECT 1 FROM tchat_msgs WHERE room_id=? AND body='' AND id<>?", (ROOM, TROOT)), f"dry run of the core: the tombstone counted, it stays {cr}")
 check(one("SELECT COUNT(*) FROM wiki_pages WHERE id=?", (W_OLD,)) == 1 and one("SELECT COUNT(*) FROM sheets WHERE id=?", (S_OLD,)) == 1
-      and one("SELECT COUNT(*) FROM hub_mails WHERE id=?", (HM,)) == 1 and one("SELECT COUNT(*) FROM comments WHERE id=?", (CM,)) == 1,
+      # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+      and one("SELECT COUNT(*) FROM hub_mails WHERE id=?", (HM,)) == 1 and one("SELECT COUNT(*) FROM obj_comments WHERE id=?", (CM,)) == 1,
       "dry run: page, table, mail and comment row stay")
 check(one("SELECT COUNT(*) FROM fs_nodes WHERE id=?", (F_OLD,)) == 1 and os.path.isfile(P_OLD), "dry run: the old file and its stored file stay")
 
@@ -274,7 +276,8 @@ check(sql("SELECT body FROM tchat_msgs WHERE room_id=? AND id<>? AND thread_of I
       "team chat: the tombstone gone, the live message stays")
 check(sql("SELECT deleted_at IS NOT NULL FROM tchat_msgs WHERE id=?", (TROOT,)) == [(1,)]
       and sql("SELECT body FROM tchat_msgs WHERE thread_of=?", (TROOT,)) == [("A reply",)], "team chat: a thread's tombstone stays with its live reply")
-check(not sql("SELECT 1 FROM comments WHERE id=?", (CM,)) and sql("SELECT 1 FROM tasks WHERE id=?", (T,)), "comments: the emptied row gone, the task stays")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(not sql("SELECT 1 FROM obj_comments WHERE id=?", (CM,)) and sql("SELECT 1 FROM tasks WHERE id=?", (T,)), "comments: the emptied row gone, the task stays")
 
 # ================================================================== #2172 backups
 # 2.186.0 (#2602): the cap of 52 weeks holds only with the switch KALMIDO_PURGE_BACKUPS (p2186_c_retention covers it);

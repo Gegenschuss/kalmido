@@ -203,7 +203,7 @@ def le2b_v1_target(c):
             if r:
                 lids.add(r[0])
     if "cid" in va and path.startswith(f"{API_PREFIX}comments/"):
-        r = c.execute("SELECT task_id FROM comments WHERE id=?", (va["cid"],)).fetchone()
+        r = c.execute("SELECT ref_id FROM obj_comments WHERE id=? AND kind='task'", (va["cid"],)).fetchone()  # 2.972.0 (#5272)
         if r:
             tids.add(r[0])
     # 2.64.2 C (#1817): the channel of a list with the lock (room / message ids of the team chat)

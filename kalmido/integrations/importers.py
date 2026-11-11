@@ -2499,7 +2499,7 @@ def imp_undo_split(c, uid, ids, since, te_ids=()):
     for i in range(0, len(have), 500):
         part = have[i:i + 500]
         q = ",".join("?" * len(part))
-        for x in c.execute(f"SELECT task_id, created_at FROM comments WHERE task_id IN ({q}) AND deleted_at IS NULL", part):
+        for x in c.execute(f"SELECT ref_id AS task_id, created_at FROM obj_comments WHERE kind='task' AND ref_id IN ({q}) AND deleted_at IS NULL", part):
             if imp_undo_after(x["created_at"], since):
                 keep.add(x["task_id"])
         for x in c.execute(f"SELECT task_id, created_at FROM attachments WHERE task_id IN ({q})", part):

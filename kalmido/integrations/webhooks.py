@@ -26,6 +26,7 @@ from ..accounts.login import seal, unseal
 from ..accounts.orgs import is_org_admin, may_see  # may_see: 2.574.0 (#3376, review F4)
 from ..core.access import Denied, list_role, reading_sql, task_visible
 from ..collab.comments import collab_on, comment_plain, user_names
+from ..core.objcomments import ocm_ts  # 2.972.0 (#5272)
 from ..collab.integfail import integ_org_admins, integ_tell
 from ..core.errors import BadInput
 from ..notify.alerts import _env_int, aa_count, aa_now
@@ -365,11 +366,11 @@ def wh_enqueue(c, n, by=None):
                     if ev == "task.deleted":
                         data["permanent"] = row is None
                     if ev == "comment.created" and e["cid"]:
-                        k = c.execute("SELECT * FROM comments WHERE id=?", (e["cid"],)).fetchone()
+                        k = c.execute("SELECT id, user_id, body, created_at FROM obj_comments WHERE id=? AND kind='task'", (e["cid"],)).fetchone()
                         if not k:
                             continue
                         data["comment"] = {"id": k["id"], "author_id": k["user_id"], "text": comment_plain(c, k["body"]),
-                                           "created_at": k["created_at"],
+                                           "created_at": ocm_ts(k["created_at"]),  # review 2.972: the old ISO form (iso_ms)
                                            "files": c.execute("SELECT COUNT(*) FROM attachments WHERE comment_id=? AND deleted_at IS NULL", (k["id"],)).fetchone()[0]}
                     wh_queue(c, w, ev, data, actor, via)
         elif key[0] == "list":

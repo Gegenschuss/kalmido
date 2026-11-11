@@ -169,7 +169,7 @@ def _lock_extras(c, tid):
     ids = le2a_subtree(c, tid)
     if len(ids) > 1:
         return True
-    return bool(c.execute("SELECT 1 FROM comments WHERE task_id=? AND COALESCE(body, '')<>'' LIMIT 1", (tid,)).fetchone()
+    return bool(c.execute("SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=? AND COALESCE(body, '')<>'' LIMIT 1", (tid,)).fetchone()
                 or c.execute("""SELECT 1 FROM task_field_values v JOIN list_fields lf ON lf.id=v.field_id WHERE v.task_id=?
                                 AND lf.type='text' AND COALESCE(v.value, '')<>'' LIMIT 1""", (tid,)).fetchone())
 

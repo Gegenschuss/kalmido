@@ -35,14 +35,15 @@ from ..core.pg import insert_id, system_ctx as pg_system
 from ..core.objtags import otg_in_list, otg_task_ids  # 2.947.0 (#5275): the project tags and labels of the core
 from .orglabels import olb_full  # 2.947.0 (#5275, review F4)
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, db, err, iso, local_now, now_utc, iso_ms
+from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, WRITE_ROLES, collab_all
 from ..accounts.session import me
 from ..core.errors import BadInput, reject_unknown
 from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..tasks.tasks import can_move, check_assignee  # 2.369.5 (#2517): pulled up from functions
 from .fields import field_value, field_act  # 2.369.5 (#2517): pulled up from functions
-from ..collab.comments import user_names, comment_pushes, clean_mentions, send_pushes  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names, send_pushes  # 2.369.5 (#2517): pulled up from functions
+from ..core.objcomments import ocm_add, ocm_after, ocm_mentions_clean  # 2.972.0 (#5272): the comments' core
 from ..tasks.lifecycle import apply_update, tsk_finish, tsk_reopen  # 2.369.5 (#2517): pulled up from functions; 2.633.0 (#4781): + tsk_*
 from ..tasks.validation import lock_done_problem  # 2.633.0 (#4781)
 from ..notify.channels import chn_list_events  # 2.369.5 (#2517): pulled up from functions
@@ -960,17 +961,13 @@ def rul_carry(c, tid, src, dst):
 
 
 def rul_comment(c, r, tid, text):
-    """The rule's fixed comment, written as its creator and marked with the rule (comments.rule_name)."""
+    """The rule's fixed comment, written as its creator and marked with the rule (extra.rule_name of the comments' core).
+    2.972.0 (#5272): written, notified and sent to the agents through the core (core/objcomments.py), like a person's comment."""
     from ..integrations.webhooks import wh_note
-    t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
-    text, ment = clean_mentions(c, t["list_id"], text, tid)  # 2.148.1 H (#2490): mention tokens only of people of the list
+    text, ment = ocm_mentions_clean(c, "task", tid, text)  # 2.148.1 H (#2490): mention tokens only of people of the list
     ment = ment if collab_all() else []  # 2.367.5 (#2980): the mentioned hear of it, like a person's comment
-    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,rule_name) VALUES(?,?,?,?,?,?)",
-                    (tid, me(), text, ",".join(map(str, ment)), iso_ms(now_utc()), r["name"]))
-    if collab_all():
-        from ..agents.core import agent_comment_events
-        g.setdefault("pushes", []).extend(comment_pushes(c, t, cid, text, ment, ment, 0))
-        agent_comment_events(c, t, cid, ment, ment)
+    cid = ocm_add(c, "task", tid, me(), text, mentions=ment, extra={"rule_name": r["name"]})
+    g.setdefault("pushes", []).extend(ocm_after(c, "task", cid, text, ment))  # only with collaboration on
     wh_note(c, tid, "comment", cid=cid)
     return cid
 

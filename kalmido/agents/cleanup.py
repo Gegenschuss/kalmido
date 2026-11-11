@@ -105,8 +105,8 @@ def cln_request(c, uid, b):
     lname = "Inbox" if lst["is_inbox"] else lst["name"]
     secs = list_sections(c, uid, lid)
     ltags = cln_ltags(c, [r["id"] for r in rows])
-    ncom = dict(c.execute(f"SELECT task_id, COUNT(*) FROM comments WHERE deleted_at IS NULL AND task_id IN ({','.join('?' * len(rows))}) "
-                          "GROUP BY task_id", [r["id"] for r in rows]).fetchall())
+    ncom = dict(c.execute(f"SELECT ref_id, COUNT(*) FROM obj_comments WHERE kind='task' AND deleted_at IS NULL AND ref_id IN ({','.join('?' * len(rows))}) "
+                          "GROUP BY ref_id", [r["id"] for r in rows]).fetchall())
     by = {"id": uid, "name": user_names(c, [uid]).get(uid, "")}
     jobs = []
     for n, pk in enumerate(packs, 1):

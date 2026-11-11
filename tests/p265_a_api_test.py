@@ -69,6 +69,7 @@ A.put(B + f"/api/lists/{HL}/members", json={"user_id": AG, "role": "edit"})
 check(A.patch(B + f"/api/admin/agents/{AG}", json={"list_ids": [SH]}).ok, "setup: the agent is limited to the shared list")
 
 # ------------------------------------------------------------------ seed (deterministic: fixed seed, fixed dates)
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
 SEED = f"""
 import random, datetime
 from kalmido.core.db import connect
@@ -110,7 +111,7 @@ while made < {NT}:
     if random.random() < .2:
         otg_user_add(c, t, random.choice([alice, bob]), random.choice(["home", "work", "urgent", "later"]))  # 2.955.0 (#5276): the core's personal tags
     if random.random() < .1:
-        k = insert_id(c, "INSERT INTO comments(task_id, user_id, body, created_at) VALUES(?,?,?,?)",
+        k = insert_id(c, "INSERT INTO obj_comments(kind, ref_id, user_id, body, created_at) VALUES('task', ?,?,?,?)",
                       (t, random.choice([alice, bob]), "A comment", T0))
         if random.random() < .2:
             c.execute("INSERT INTO attachments(task_id, comment_id, user_id, name, mime, size, path, created_at) VALUES(?,?,?,?,?,?,?,?)",

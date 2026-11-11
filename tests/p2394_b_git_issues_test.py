@@ -163,7 +163,8 @@ T1 = t1[0][0] if t1 else 0
 # 2.394.0 C (#3377): labels are the project tags now (shared, synced with the issue), no longer the importer's own tags
 LTQ = "SELECT lt.name FROM obj_tag_links x JOIN obj_tags lt ON lt.id=x.tag_id WHERE x.kind='task' AND x.obj_id=?"  # 2.947.0 (#5275): the core's tags (obj_tags / obj_tag_links)
 check(sorted(x[0] for x in kt.dbx(LTQ, (T1,))) == ["bug", "ui"] and not kt.dbx("SELECT 1 FROM (SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' WHERE k.kind='task') task_tags WHERE task_id=?", (T1,)), "labels = project tags")  # 2.955.0 (#5276): personal tags are rows of the core (obj_tags scope user), read as the old task_tags
-cm = kt.dbx("SELECT body, created_at, user_id FROM comments WHERE task_id=? ORDER BY created_at", (T1,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+cm = kt.dbx("SELECT body, created_at, user_id FROM obj_comments WHERE kind='task' AND ref_id=? ORDER BY created_at", (T1,))
 check(len(cm) == 2 and cm[0][0].startswith("@octocat on 2026-09-02:") and "I can reproduce" in cm[0][0] and cm[0][1].startswith("2026-09-02")
       and cm[1][0].startswith("@ghost on 2026-09-03:") and cm[0][2] == 1, f"comments with author line and their date: {cm}")
 t2 = kt.dbx("SELECT status, completed_at FROM tasks WHERE tt_id=?", (f"github:{GID}:2",))
@@ -203,7 +204,8 @@ g1 = kt.dbx("SELECT id, content, assignee_id, status FROM tasks WHERE tt_id=?", 
 check(g1 and "Text from GitLab" in g1[0][1] and g1[0][2] == ids["octocat"] and g1[0][3] == 0, f"GitLab issue: text, assignee: {g1}")
 G1 = g1[0][0] if g1 else 0
 check(sorted(x[0] for x in kt.dbx(LTQ, (G1,))) == ["feature", "scope::x"], "GitLab labels = project tags")  # 2.394.0 C (#3377)
-gc = kt.dbx("SELECT body FROM comments WHERE task_id=?", (G1,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+gc = kt.dbx("SELECT body FROM obj_comments WHERE kind='task' AND ref_id=?", (G1,))
 check(len(gc) == 1 and gc[0][0].startswith("@gdev on 2026-08-02:") and "GL note" in gc[0][0], f"GitLab: notes without system notes: {gc}")
 g2 = kt.dbx("SELECT status, completed_at FROM tasks WHERE tt_id=?", (f"gitlab:{LID}:2",))
 check(g2 and g2[0][0] == 2 and str(g2[0][1]).startswith("2026-08-02"), f"GitLab closed: {g2}")

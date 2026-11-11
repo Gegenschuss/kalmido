@@ -16,7 +16,8 @@ from ..accounts.session import me
 from ..accounts.pictures import avatar_map
 from ..core.access import list_role, plists, pvis
 from ..core.access import list_roles  # 2.674.0 B (#4194)
-from ..collab.comments import collab_on, collab_user, lang_of, MENTION_RE, user_names
+from ..collab.comments import collab_on, collab_user, lang_of, user_names
+from ..core.objcomments import OCM_MENTION_RE  # 2.972.0 (#5272): the one mention token (comments: obj_comments)
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import list_people  # 2.369.5 (#2517): pulled up from functions
 
@@ -567,7 +568,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         return [], {}
     rows = c.execute("""SELECT n.*, t.title AS t_title, t.list_id AS t_list, t.deleted_at AS t_del,
                                k.body AS c_body, k.deleted_at AS c_del
-                        FROM notifications n LEFT JOIN tasks t ON t.id=n.task_id LEFT JOIN comments k ON k.id=n.comment_id
+                        FROM notifications n LEFT JOIN tasks t ON t.id=n.task_id LEFT JOIN obj_comments k ON k.id=n.comment_id AND k.kind='task'
                         WHERE n.user_id=? ORDER BY n.id DESC LIMIT ?""", (uid, NEWS_KEEP_MAX)).fetchall()
     roles, pl, pv = {}, set(plists(c, uid)), {}
     # 2.674.0 B (#4194): the roles of every list the rows name, read at once (list_roles, two queries) instead of one by one;
@@ -819,7 +820,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             body = r["c_body"] or ""
             if len(body) > NEWS_EXCERPT:
                 body = re.sub(r"<@?\d*$", "", body[:NEWS_EXCERPT]).rstrip() + "…"
-            uids.update(int(x) for x in MENTION_RE.findall(body))
+            uids.update(int(x) for x in OCM_MENTION_RE.findall(body))
         data = json.loads(r["data"] or "{}")
         if kind == "status":
             body = data.get("note") or ""

@@ -48,7 +48,7 @@ from ..agents.core import agent_emit, agent_row, agent_shares, is_agent, need_ag
 from ..agents.chat import _jload, chat_choices_withdraw, choice_state
 from ..agents.workstyle import ws_need_editor
 from ..agents.steps import redact  # 2.653.0 (#5079): a decision line masks secrets like a step
-from ..collab.cmttrash import cmt_trash  # 2.530.0 A (#4315, B11): text and files into the trash like comment_delete
+from ..core.objcomments import ocm_trash  # 2.530.0 A (#4315, B11): text and files into the trash like comment_delete; 2.972.0 (#5272): the core's
 
 CTL_LEVELS = ("approve_all", "routine", "free")
 CTL_ONE_WAY_FIXED = ("delete", "costs", "login", "migration")  # #2900: fixed, cannot be switched off
@@ -274,7 +274,7 @@ CTL_LEVEL_TEXT = {"approve_all": N_("Approve everything"), "routine": N_("Routin
 CTL_OBJ = (
     ("/tasks/{}", "tid", "SELECT list_id FROM tasks WHERE id=?"),
     ("/lists/{}", "lid", None),
-    ("/comments/{}", "cid", "SELECT t.list_id FROM comments k JOIN tasks t ON t.id=k.task_id WHERE k.id=?"),
+    ("/comments/{}", "cid", "SELECT t.list_id FROM obj_comments k JOIN tasks t ON t.id=k.ref_id AND k.kind='task' WHERE k.id=?"),
     ("/sections/{}", "sid", "SELECT list_id FROM sections WHERE id=?"),
     ("/notes/{}", "nid", "SELECT list_id FROM notes WHERE id=?"),
     ("/notepads/{}", "pid", "SELECT list_id FROM list_notepads WHERE id=?"),
@@ -838,12 +838,12 @@ def ctl_undo(c, r, undo):
         trash_task(c, r["target_id"])
         return None
     if r["kind"] == "comment":
-        k = c.execute("SELECT * FROM comments WHERE id=? AND deleted_at IS NULL", (r["target_id"],)).fetchone()
+        k = c.execute("SELECT id, user_id, ref_id FROM obj_comments WHERE id=? AND kind='task' AND deleted_at IS NULL", (r["target_id"],)).fetchone()
         if not k:
             return tr("The comment is gone already")
-        if k["user_id"] != r["agent_id"] or not task_visible(c, k["task_id"], me()):
+        if k["user_id"] != r["agent_id"] or not task_visible(c, k["ref_id"], me()):
             return no
-        cmt_trash(c, k["id"])
+        ocm_trash(c, k["id"], me(), check=False)  # checked above: the agent's own comment on a task the person sees
         news_forget_comment(c, k["id"])
         c.commit()
         return None

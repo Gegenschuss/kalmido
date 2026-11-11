@@ -134,7 +134,8 @@ T1 = ok(F.post(B + "/api/tasks", json={"list_id": LP, "title": "Erste", "section
 T2 = ok(F.post(B + "/api/tasks", json={"list_id": LP, "title": "Zweite"}), "task 2")["id"]
 ok(F.patch(B + f"/api/tasks/{T2}", json={"fields": {str(FP): BOB, str(FT): T1, str(FA): 3, str(FB): 4}}), "field values")
 ok(F.post(B + f"/api/tasks/{T1}/comments", json={"body": f"Danke <@{FRIDA}> und <@{BOB}>"}), "comment with mentions")
-check(f"<@{BOB}>" in rows("SELECT body FROM comments WHERE task_id=?", (T1,))[0]["body"], "the token is stored")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(f"<@{BOB}>" in rows("SELECT body FROM obj_comments WHERE kind='task' AND ref_id=?", (T1,))[0]["body"], "the token is stored")
 ok(F.post(B + "/api/filters", json={"name": "Passt", "rules": {"lists": [LP], "secs": [SEC, "none"], "who": [FRIDA, BOB, "none"],
                                                                 "sprints": ["cur", 77], "cf": {str(FA): {"num": {"op": "set"}}}}}), "filter")
 ok(F.post(B + "/api/filters", json={"name": "Nur Bob", "rules": {"lists": [LB]}}), "filter on a list that stays behind")
@@ -183,7 +184,8 @@ check(rows("SELECT COUNT(*) FROM habits WHERE user_id=?", (GINA,))[0][0] == 1, "
 check(rows("SELECT COUNT(*) FROM filters WHERE user_id=?", (GINA,))[0][0] == 3, "#3100: filters after the file came along")  # 2.521.0 (#4479): + Zeilen, Feld null
 # 2.905.0 (#5288): templates.owner_id (was user_id)
 check(rows("SELECT COUNT(*) FROM templates WHERE owner_id=?", (GINA,))[0][0] == 1, "#3100: templates after the file came along")
-body = rows("SELECT c.body FROM comments c JOIN tasks t ON t.id=c.task_id WHERE t.list_id=?", (LG,))[0]["body"]
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+body = rows("SELECT c.body FROM obj_comments c JOIN tasks t ON t.id=c.ref_id AND c.kind='task' WHERE t.list_id=?", (LG,))[0]["body"]
 check(f"<@{GINA}>" in body, f"my own mention points at my new account: {body}")
 check("@Bob" in body and f"<@{BOB}>" not in body, f"a person not ticked is plain text: {body}")
 t = {r["title"]: r["id"] for r in rows("SELECT id, title FROM tasks WHERE list_id=?", (LG,))}
@@ -221,7 +223,8 @@ check(p and p[0]["found"], f"bob is found: {j['preview']['people']}")
 j = run(He, iid, {p[0]["key"]: {"share": True}})
 check(j.get("state") == "done", f"import with a ticked person {j.get('state')} {j.get('error')}")
 LH = new_list(HENRY)
-body = rows("SELECT c.body FROM comments c JOIN tasks t ON t.id=c.task_id WHERE t.list_id=?", (LH,))[0]["body"]
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+body = rows("SELECT c.body FROM obj_comments c JOIN tasks t ON t.id=c.ref_id AND c.kind='task' WHERE t.list_id=?", (LH,))[0]["body"]
 check(f"<@{HENRY}>" in body and f"<@{BOB}>" in body, f"a ticked person stays a mention: {body}")
 ru = json.loads(rows("SELECT rules FROM filters WHERE user_id=? AND name='Passt'", (HENRY,))[0]["rules"])
 check(ru["who"] == ["me", BOB, "none"], f"a ticked person stays in the filter: {ru}")
@@ -302,7 +305,8 @@ j = wait(Ke, iid)
 check(j.get("state") == "preview", f"preview of the crafted file {j.get('state')} {j.get('error')}")
 j = run(Ke, iid)
 check(j.get("state") == "done", f"review: broken JSON from a file never fails the run ({j.get('state')}: {j.get('error')})")
-check(rows("SELECT body FROM comments c JOIN tasks t ON t.id=c.task_id WHERE t.list_id=?", (new_list(KE),))[0]["body"] == "5", "the body is coerced to text")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(rows("SELECT body FROM obj_comments c JOIN tasks t ON t.id=c.ref_id AND c.kind='task' WHERE t.list_id=?", (new_list(KE),))[0]["body"] == "5", "the body is coerced to text")
 
 
 def nolists(p):
@@ -317,7 +321,8 @@ p = [x for x in j["preview"]["people"] if x["name"] == "Bob"]
 j = run(Lo, iid, {p[0]["key"]: {"share": True}})
 check(j.get("state") == "done", f"ticked without a project {j.get('state')} {j.get('error')}")
 LL = new_list(LO)
-body = rows("SELECT c.body FROM comments c JOIN tasks t ON t.id=c.task_id WHERE t.list_id=?", (LL,))[0]["body"]
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+body = rows("SELECT c.body FROM obj_comments c JOIN tasks t ON t.id=c.ref_id AND c.kind='task' WHERE t.list_id=?", (LL,))[0]["body"]
 check("@Bob" in body and "<@" + str(BOB) not in body, f"review: a person who did not join the project is plain text: {body}")
 check(not rows("SELECT 1 FROM task_field_values v JOIN list_fields f ON f.id=v.field_id WHERE f.list_id=? AND f.type='person'", (LL,)),
       "review: and no person field keeps them")

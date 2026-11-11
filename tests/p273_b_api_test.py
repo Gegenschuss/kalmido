@@ -311,9 +311,10 @@ check(dt["Kartons beschriften"]["parent_id"] == dt["Umzugskartons packen"]["id"]
 check(all(x["created_by"] == DAVE for x in dt.values()), "created_by = the importing person")
 check(dbx("SELECT 1 FROM task_deps WHERE task_id=? AND blocker_id=?", (dt["Umzugskartons packen"]["id"], dt["Moebelwagen buchen"]["id"])),
       "dependency mapped")
-cm = {r_["body"]: r_["user_id"] for r_ in dbx("SELECT body, user_id FROM comments WHERE task_id=?", (dt["Umzugskartons packen"]["id"],))}
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+cm = {r_["body"]: r_["user_id"] for r_ in dbx("SELECT body, user_id FROM obj_comments WHERE kind='task' AND ref_id=?", (dt["Umzugskartons packen"]["id"],))}
 # 2.148.1 (#2492): another person's comment comes over by name only, never as their account (the file is not trusted)
-cx = {r_["body"]: r_["ext_name"] for r_ in dbx("SELECT body, ext_name FROM comments WHERE task_id=?", (dt["Umzugskartons packen"]["id"],))}
+cx = {r_["body"]: r_["ext_name"] for r_ in dbx("SELECT body, ext_name FROM obj_comments WHERE kind='task' AND ref_id=?", (dt["Umzugskartons packen"]["id"],))}
 check(cm.get("Kommentar von Alice") == DAVE and cm.get("Kommentar von Bob") is None and cx.get("Kommentar von Bob"), f"comment authors mapped {cm} {cx}")
 check(dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (dl["Umzug Privatliste"]["id"], ids["bob"])), "bob (ticked) shared")
 check(not dbx("SELECT 1 FROM list_members WHERE list_id IN (SELECT id FROM lists WHERE owner_id=?) AND user_id=?", (DAVE, ids["erin"])), "nobody else")
@@ -435,7 +436,8 @@ check(ft and ft[0]["created_by"] == ALICE and ft[0]["assignee_id"] is None and f
 check(dbx("SELECT parent_id FROM tasks WHERE title='Selbstzyklus Test'")[0]["parent_id"] is None, "a cycle becomes a main task")
 check(not dbx("SELECT 1 FROM tasks WHERE title='Ohne Liste Test'"), "a task of a list that is not in the file is dropped")
 check(len(dbx("SELECT title FROM tasks WHERE list_id=? AND title LIKE 'xxx%'", (fl[0]["id"] if fl else 0,))[0]["title"]) <= 2000, "a huge title is cut")
-fc = dbx("SELECT user_id, ext_name FROM comments WHERE body='Fremder Kommentar Test'")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+fc = dbx("SELECT user_id, ext_name FROM obj_comments WHERE body='Fremder Kommentar Test'")
 check(fc and fc[0]["user_id"] is None and fc[0]["ext_name"], "a foreign author stays a name, never the account with that id")
 fr = dbx("SELECT id FROM users WHERE email='frank@example.com'")
 check(fr and dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (fl[0]["id"], fr[0]["id"])), "frank invited (instance admin) and shared")
@@ -553,7 +555,8 @@ na = dbx("SELECT COUNT(*) AS n FROM attachments a JOIN tasks t ON t.id=a.task_id
          (DAVE,))[0]["n"]
 check(na == 1, f"one file fitted ({na})")
 qa = dbx("SELECT t.assignee_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.name='Kontingent Test'", (DAVE,))
-qc = dbx("SELECT c.user_id, c.ext_name FROM comments c WHERE c.body='Bob im Kontingent'")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+qc = dbx("SELECT c.user_id, c.ext_name FROM obj_comments c WHERE c.body='Bob im Kontingent'")
 # 2.362.4 (#3100): a full storage stops only the files, the sharing still runs: bob joins and stays assignee
 check(qa and all(x["assignee_id"] == ids["bob"] for x in qa) and qc and qc[0]["user_id"] is None and qc[0]["ext_name"] == "Bob aus der Datei",
       f"the sharing ran after the stop: bob is assignee, the comment keeps his name as text {qa}")

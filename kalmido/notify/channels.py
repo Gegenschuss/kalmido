@@ -601,7 +601,7 @@ def chn_event_text(c, t, ev, cid, actor, owner):
     else:
         line = tr("{0} commented on {1}", who, title, lg=lg)
         if cid and not lk:
-            k = c.execute("SELECT body FROM comments WHERE id=? AND deleted_at IS NULL", (cid,)).fetchone()
+            k = c.execute("SELECT body FROM obj_comments WHERE id=? AND kind='task' AND deleted_at IS NULL", (cid,)).fetchone()
             if k:
                 snip = comment_plain(c, k["body"])
                 line += ": " + (snip[:280] + ("…" if len(snip) > 280 else ""))

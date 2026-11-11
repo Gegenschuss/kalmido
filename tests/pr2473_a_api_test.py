@@ -125,14 +125,15 @@ assert F.post(B + f"/api/tasks/{T4}/watchers", json={}).ok
 r = F.post(B + f"/api/tasks/{T4}/duplicate", json={})
 D1 = r.json()["task"]["id"] if r.ok else 0
 check(r.ok and dbx("SELECT delegate_agent_id FROM tasks WHERE id=?", (D1,))[0]["delegate_agent_id"] == AG, f"a duplicate keeps the delegation: {r.status_code} {r.text[:120]}")
-check(dbx("SELECT COUNT(*) AS n FROM task_watchers WHERE task_id=?", (D1,))[0]["n"] == 0, "not the watchers")
+# 2.972.0 (#5285): the watching rows of the core's obj_follow (here and below)
+check(dbx("SELECT COUNT(*) AS n FROM obj_follow WHERE kind='task' AND mode='watch' AND ref_id=?", (D1,))[0]["n"] == 0, "not the watchers")
 
 # ---- watchers: who may
 TW = task(F, L, "Watched task", assignee_id=FID)
 W = B + f"/api/tasks/{TW}/watchers"
 r = Da.post(W, json={})
 check(r.ok and r.json()["mine"] and [x["id"] for x in r.json()["watchers"]] == [DID] and not r.json()["can_others"], f"a viewer watches for themselves: {r.text[:160]}")
-check(Da.post(W, json={}).ok and dbx("SELECT COUNT(*) AS n FROM task_watchers WHERE task_id=?", (TW,))[0]["n"] == 1, "twice = once")
+check(Da.post(W, json={}).ok and dbx("SELECT COUNT(*) AS n FROM obj_follow WHERE kind='task' AND mode='watch' AND ref_id=?", (TW,))[0]["n"] == 1, "twice = once")
 check(Da.post(W, json={"user_id": BID}).status_code == 403, "a viewer cannot add others")
 check(Bo.post(W, json={"user_id": DID}).status_code == 403, "a member cannot add others")
 check(Bo.delete(W + f"/{DID}").status_code == 403, "nor remove them")
@@ -181,7 +182,7 @@ assert F.put(B + f"/api/lists/{L}/members", json={"user_id": DID, "role": "view"
 TL = task(F, L, "Left behind", delegate_agent_id=AG)
 assert Da.post(B + f"/api/tasks/{TL}/watchers", json={}).ok
 assert F.delete(B + f"/api/lists/{L}/members/{DID}").ok
-check(dbx("SELECT COUNT(*) AS n FROM task_watchers WHERE user_id=?", (DID,))[0]["n"] == 0, "someone who left no longer watches")
+check(dbx("SELECT COUNT(*) AS n FROM obj_follow WHERE kind='task' AND mode='watch' AND user_id=?", (DID,))[0]["n"] == 0, "someone who left no longer watches")
 assert F.delete(B + f"/api/lists/{L}/members/{AG}").ok
 check(not dbx("SELECT delegate_agent_id FROM tasks WHERE id=?", (TL,))[0]["delegate_agent_id"], "an agent that left is no longer delegated")
 assert F.put(B + f"/api/lists/{L}/members", json={"user_id": AG, "role": "edit"}).ok
@@ -190,7 +191,7 @@ assert F.put(B + f"/api/lists/{L}/members", json={"user_id": AG, "role": "edit"}
 TM = task(F, L, "Moves with a watcher")
 assert Bo.post(B + f"/api/tasks/{TM}/watchers", json={}).ok
 assert F.patch(B + f"/api/tasks/{TM}", json={"list_id": L2}).ok
-check(dbx("SELECT COUNT(*) AS n FROM task_watchers WHERE task_id=?", (TM,))[0]["n"] == 0, "a watcher out of reach of the target goes")
+check(dbx("SELECT COUNT(*) AS n FROM obj_follow WHERE kind='task' AND mode='watch' AND ref_id=?", (TM,))[0]["n"] == 0, "a watcher out of reach of the target goes")
 
 spec = A.get(V + "/openapi.json").json() if A.get(V + "/openapi.json").ok else {}
 check("/tasks/{id}/watchers" in spec.get("paths", {}), "OpenAPI names the routes")

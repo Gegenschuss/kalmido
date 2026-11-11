@@ -74,7 +74,8 @@ def rule_of(s, lid, rid):
 
 
 def comments(tid, name):
-    return [x[0] for x in dbx("SELECT body FROM comments WHERE task_id=? AND rule_name=? ORDER BY id", (tid, name))]
+    # 2.972.0 (#5272): the comments' core, the rule's name in extra
+    return [x[0] for x in dbx("SELECT body FROM obj_comments WHERE kind='task' AND ref_id=? AND extra->>'rule_name'=? ORDER BY id", (tid, name))]
 
 
 def day(n):

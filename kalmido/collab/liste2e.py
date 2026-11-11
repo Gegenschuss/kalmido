@@ -344,7 +344,7 @@ def le2a_move(c, tid, cur, f, extra, dst):
                 writes.append(("t", r["id"], upd))
     ids = conv  # comments and field values of the tasks whose texts change format
     q = ",".join("?" * len(ids))
-    for r in c.execute(f"SELECT id, body FROM comments WHERE task_id IN ({q}) AND COALESCE(body, '')<>''", ids).fetchall():
+    for r in c.execute(f"SELECT id, body FROM obj_comments WHERE kind='task' AND ref_id IN ({q}) AND COALESCE(body, '')<>''", ids).fetchall():  # 2.972.0 (#5272)
         nv = (gc.get(r["id"]) or {}).get("body")
         if not isinstance(nv, str) or not nv or not ok(nv):
             need["comments"].append(r["id"])
@@ -367,7 +367,7 @@ def le2a_move(c, tid, cur, f, extra, dst):
             if kind == "t":
                 le2a_task_set(c, key, v)
             elif kind == "c":
-                c.execute("UPDATE comments SET body=? WHERE id=?", (v, key))
+                c.execute("UPDATE obj_comments SET body=? WHERE id=?", (v, key))
             else:
                 c.execute("UPDATE task_field_values SET value=? WHERE task_id=? AND field_id=?", (v, *key))
         # 2.556.0 C review (#4583, finding 2): a completed copy's subtask snapshot is in the source format: it goes
@@ -732,7 +732,7 @@ def le2a_left(c, lid, mode, limit=None, uid=None):
     t, snip = _le2a_conds(mode, reenc)
     tc = " OR ".join([t.format("t.title"), t.format("t.content"), t.format("t.url"), f"(t.snippets IS NOT NULL AND {snip})"])
     tasks_sql = f"FROM tasks t WHERE t.list_id=? AND ({tc})"
-    com_sql = f"FROM comments cm JOIN tasks t ON t.id=cm.task_id WHERE t.list_id=? AND {t.format('cm.body')}"
+    com_sql = f"FROM obj_comments cm JOIN tasks t ON t.id=cm.ref_id AND cm.kind='task' WHERE t.list_id=? AND {t.format('cm.body')}"  # 2.972.0 (#5272)
     note_sql = f"FROM notes n WHERE n.list_id=? AND ({t.format('n.title')} OR {t.format('n.body')})"
     sec_sql = f"FROM sections s WHERE s.list_id=? AND {t.format('s.name')}"
     fld_sql = (f"FROM task_field_values v JOIN list_fields lf ON lf.id=v.field_id AND lf.type='text' JOIN tasks t ON t.id=v.task_id "
@@ -1007,12 +1007,12 @@ def le2a_bulk(lid):
         for x in groups["comments"]:
             v = val(x.get("body"), "body", MAX_COMMENT)
             cid = iid(x)
-            row = c.execute("SELECT cm.body FROM comments cm JOIN tasks t ON t.id=cm.task_id WHERE cm.id=? AND t.list_id=?",
-                            (cid, lid)).fetchone()
+            row = c.execute("SELECT cm.body FROM obj_comments cm JOIN tasks t ON t.id=cm.ref_id AND cm.kind='task' WHERE cm.id=? AND t.list_id=?",
+                            (cid, lid)).fetchone()  # 2.972.0 (#5272)
             if v is None or not row:
                 raise bad("comments")
             if stale(row[0]):
-                c.execute("UPDATE comments SET body=? WHERE id=?", (v, cid))
+                c.execute("UPDATE obj_comments SET body=? WHERE id=?", (v, cid))
         for x in groups["notes"]:
             nid = iid(x)
             row = c.execute("SELECT title, body FROM notes WHERE id=? AND list_id=?", (nid, lid)).fetchone()

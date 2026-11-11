@@ -152,7 +152,7 @@ FL = Fr.post(B + "/api/lists", json={"name": "Eigenes"}).json()["id"]
 FT = Fr.post(B + "/api/tasks", json={"title": "Angebot schreiben", "list_id": FL}).json()["id"]
 FC = comment(Fr, FT, "Notiz")
 check(mark(FID, FT) == FC and unread(Fr, FT) == 0, f"freelancer: her own note counts as read ({mark(FID, FT)})")
-dbx("UPDATE comments SET user_id=? WHERE id=?", (ALICE, FC))  # a comment of somebody else in her list (an import, a former member)
+dbx("UPDATE obj_comments SET user_id=? WHERE id=?", (ALICE, FC))  # 2.972.0 (#5272): obj_comments - a comment of somebody else in her list (an import, a former member)
 dbx("DELETE FROM obj_seen WHERE kind='task' AND ref_id=? AND user_id=?", (FT, FID))
 check(unread(Fr, FT) == 1, f"freelancer: the other person's comment is unread ({unread(Fr, FT)})")
 r = Fr.post(B + f"/api/tasks/{FT}/seen")

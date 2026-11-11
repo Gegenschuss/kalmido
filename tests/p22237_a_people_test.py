@@ -84,7 +84,8 @@ def mention(h, lid, who, tag):
     n0 = kt.dbx("SELECT COUNT(*) FROM notifications WHERE user_id=? AND kind='mention'", (who,))[0][0]
     r = requests.post(V + f"/tasks/{t.json()['id']}/comments", headers=h, json={"body": f"hello <@{who}> {tag}"})
     assert r.ok, r.text
-    body = kt.dbx("SELECT body FROM comments WHERE task_id=? ORDER BY id DESC LIMIT 1", (t.json()["id"],))[0][0]
+    # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+    body = kt.dbx("SELECT body FROM obj_comments WHERE kind='task' AND ref_id=? ORDER BY id DESC LIMIT 1", (t.json()["id"],))[0][0]
     return body, n0, kt.dbx("SELECT COUNT(*) FROM notifications WHERE user_id=? AND kind='mention'", (who,))[0][0]
 
 

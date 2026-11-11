@@ -926,9 +926,11 @@ def list_other_agent(c, lid, uid):
 
 def dlg_gone(c, lid, uid):
     """2.473.0 (#3357): uid left list lid: tasks delegated to them there go back to the assignee alone, their watching ends
-    (caller commits)."""
+    (caller commits). 2.972.0 (#5285): their bells of its tasks too -- every row of obj_follow there (no old "Urgent" coming
+    back on re-invite; was a DELETE of task_bell beside most callers)."""
     c.execute("UPDATE tasks SET delegate_agent_id=NULL WHERE list_id=? AND delegate_agent_id=?", (lid, uid))
-    c.execute("DELETE FROM task_watchers WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
+    from .objfollow import ofl_drop
+    ofl_drop(c, uid, "task", "ref_id IN (SELECT id FROM tasks WHERE list_id=?)", (lid,))
 
 
 # 2.477.0 (#3881): the private list "Notes" of the quick note (lists.quicknote = 1) is never shared: every way a list gets

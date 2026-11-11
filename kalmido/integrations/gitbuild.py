@@ -9,7 +9,8 @@ from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..core.errors import BadInput, reject_unknown
 from ..core.i18n import tr
 from ..core.access import Denied, list_role, need_list, need_task, plists, pvis, task_visible
-from ..core.pg import insert_id, st_ids
+from ..core.pg import st_ids
+from ..core.objcomments import ocm_add  # 2.972.0 (#5272)
 from ..api.common import V1Error, v1_call, v1_json
 from ..api.v1 import _v1_live, v1_args, v1_one, v1_view
 from ..collab.liste2e import le2e_mode
@@ -631,8 +632,7 @@ def gb_partial(c, t, version, note=""):
     c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)", (tid, rest, me(), ts))
     log_act(c, tid, "dep_add", {"id": rest, "title": f"Rest: {t['title']}"[:200]})
     text = tr("Partly in {0}, rest in {1}", was, version) if was else tr("Rest in {0}", version)
-    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at) VALUES(?,?,?,'',?)",
-                    (tid, me(), f"{text}: #{rest}" + (f"\n{note}" if note else ""), ts))
+    cid = ocm_add(c, "task", tid, me(), f"{text}: #{rest}" + (f"\n{note}" if note else ""), created_at=ts)  # 2.972.0 (#5272)
     wh_note(c, tid, "comment", cid=cid)
     bump(c)
     c.commit()

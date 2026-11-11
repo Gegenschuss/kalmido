@@ -20,7 +20,7 @@ LAYERS = (
     ("agents", ("agents", "assistant", "startup")),
 )
 LAYER_OF = {"admin.migrate": "core", "api.common": "core", "accounts.orgback": "domain",
-            "core.objects": "domain", "core.writes": "domain", "core.objlight": "domain", "core.objnotify": "domain", "core.objweb": "integrations",
+            "core.objects": "domain", "core.writes": "domain", "core.objlight": "domain", "core.objnotify": "domain", "core.objcomments": "domain", "core.objweb": "integrations",
             "core.undoweb": "domain",  # 2.747.0 (#5249): the step groups' routes stand on the write path
             "core.undoareas": "domain",  # 2.777.0 (#5254): the areas' undo steps stand on the write path
             "docs.mailnamed": "integrations"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area; 2.558.0 (#4709): the shared core stands on the file store and accounts, its routes on the API
@@ -65,6 +65,7 @@ ORDER = (
     "accounts.bgjobs",  # 2.193.0 D (#2220): the queue of short background work (mails after an action, back up now) in the database
     "accounts.oidc",
     "core.access",
+    "core.objfollow",  # 2.972.0 (#5285): following an object in the shared core (one table obj_follow: watching + the bell)
     "core.objparts",  # 2.610.0 (#4762): the write layer of a project's side objects (stands on core.access / core.conflict)
     "core.objreact",  # 2.763.0 (#5269): the reactions of the shared core (one table obj_reactions, one rule)
     "core.objseen",  # 2.905.0 (#5284): the read marks of the shared core (one table obj_seen, no routes)
@@ -112,6 +113,7 @@ ORDER = (
     "tasks.mineorder",  # 2.40.0 (#1344)
     "tasks.minerules",  # 2.823.0 (#4773): the own rules of My tasks
     "tasks.delta",  # 2.42.0 (#1376): GET /api/state/delta
+    "core.objcomments",  # 2.972.0 (#5272): the comments' core (obj_comments; domain layer, LAYER_OF: it asks the core's roles)
     "collab.replies",  # 2.33.0 (#1076): before comments / teamchat / agents.chat (they import it)
     "collab.cmttrash",  # 2.530.0 A (#4315): the trash of comments and team chat messages (helpers only)
     "collab.comments",

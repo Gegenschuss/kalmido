@@ -122,7 +122,7 @@ ODL_MORE_SKIP = frozenset((
     "office_import_runs", "office_rights_log", "office_period_locks", "office_pack_installs", "office_rgroups",
     "office_rgroup_members", "office_inv_series", "office_datev_guids", "office_peppol", "office_pay_props", "bg_jobs",
     "office_payonline", "office_pay_links", "office_pay_sessions", "office_pay_events", "office_pay_payouts",  # 2.469.0 (#3459)
-    "notify_channels", "reading_orgs", "task_vectors", "upload_scan", "file_text", "merge_runs", "task_bell", "task_links",
+    "notify_channels", "reading_orgs", "task_vectors", "upload_scan", "file_text", "merge_runs", "obj_follow", "task_links",
     "hub_leave_quota", "fs_area_roots", "fs_upload_requests", "fs_ext_links", "wiki_spaces", "doc_cfg", "doc_models",
     "doc_types", "doc_tags", "doc_rules", "doc_fields", "doc_senders", "pl_sources", "pl_rules", "nl_conns", "nl_segments",
     "nl_suppress", "nl_consent_log", "portal_logins", "office_letter_profiles", "office_letter_blocks", "office_cashbooks",
@@ -664,12 +664,10 @@ def upg_mentions(c, uid):
     """Mentions of the deleted person in comments and chat messages (plain text; locked ones the server cannot read stay)
     become the words "@Deleted user"; the id leaves the comments' mention lists."""
     tok, word = UPG_MENTION.format(int(uid)), "@" + tr("Deleted person")
-    for table in ("comments", "tchat_msgs"):
+    for table in ("obj_comments", "tchat_msgs"):  # 2.972.0 (#5272): the task comments live in obj_comments
         extra = " AND enc IS NULL" if table == "tchat_msgs" else ""
         c.execute(f"UPDATE {table} SET body=replace(body, ?, ?) WHERE body LIKE ?{extra}", (tok, word, f"%{tok}%"))  # pg-ok: the token is <@digits>, case does not matter
-    for r in c.execute("SELECT id, mentions FROM comments WHERE ','||mentions||',' LIKE ?", (f"%,{int(uid)},%",)).fetchall():  # pg-ok: digits only, case does not matter
-        rest = [x for x in str(r["mentions"]).split(",") if x and x != str(int(uid))]
-        c.execute("UPDATE comments SET mentions=? WHERE id=?", (",".join(rest), r["id"]))
+    c.execute("UPDATE obj_comments SET mentions=array_remove(mentions, ?::bigint) WHERE ?::bigint = ANY(mentions)", (int(uid), int(uid)))
 
 
 def upg_info(c, uid):

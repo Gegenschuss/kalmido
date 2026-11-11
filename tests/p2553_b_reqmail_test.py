@@ -128,7 +128,8 @@ def task_of(mid):
 
 
 def comments(tid):
-    return dbx("SELECT id, user_id, body, ext_name, portal FROM comments WHERE task_id=? AND deleted_at IS NULL ORDER BY id", (tid,))
+    # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+    return dbx("SELECT id, user_id, body, ext_name, CASE WHEN COALESCE((extra->>'portal')::boolean, false) THEN 1 ELSE 0 END AS portal FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL ORDER BY id", (tid,))
 
 
 def wr(sql, args=()):
@@ -290,7 +291,8 @@ check(task_of(M8) is None, "a mail from the server's own address is not taken")
 n_out = len(outs(T1))
 check(Bo.post(B + f"/api/tasks/{T1}/complete", json={}).ok, "the first request is done")
 # past the gap between two mails, the answers before the last mail (nothing new to send but "done")
-wr("UPDATE comments SET created_at='2020-01-01T00:00:00.000+00:00' WHERE task_id=?", (T1,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+wr("UPDATE obj_comments SET created_at='2020-01-01T00:00:00.000+00:00' WHERE kind='task' AND ref_id=?", (T1,))
 wr("UPDATE portal_tickets SET last_mail_at='2021-01-01T00:00:00+00:00' WHERE task_id=?", (T1,))
 check(tick(), "the mail round runs")
 check(until(lambda: dbx("SELECT mailed_status FROM portal_tickets WHERE task_id=?", (T1,)) == [(2,)], 10), "the done state is noted")

@@ -30,7 +30,8 @@ from ..agents.proposals import PROP_OPEN_MAX, PROP_TAGS_MAX, PROP_TAG_MAX, PROP_
 from ..agents.proposals import oxa_prop_base  # 2.528.0 (#4305 A8)
 from ..agents.usage import AUDIT_DAYS  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.users import need_admin  # 2.369.5 (#2517): pulled up from functions
-from ..collab.comments import MENTION_RE, user_names, collab_user  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names, collab_user  # 2.369.5 (#2517): pulled up from functions
+from ..core.objcomments import OCM_MENTION_RE as MENTION_RE  # 2.972.0 (#5272): the one parser of the core
 from ..collab.notelock import ln_is_locked, ln_locked_ids  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.tasks import my_tags  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import valid_date, valid_hm  # 2.369.5 (#2517): pulled up from functions
@@ -259,7 +260,7 @@ def asst_task_text(c, t, comments=True):
         out.append("Notes:\n" + t["content"].strip())
     if comments:
         mine = "" if asst_others_comments(c, t) else " AND user_id=?"
-        rows = c.execute("SELECT body, created_at FROM comments WHERE task_id=? AND deleted_at IS NULL" + mine + " ORDER BY id LIMIT 200",
+        rows = c.execute("SELECT body, created_at FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL" + mine + " ORDER BY id LIMIT 200",
                          (t["id"], me()) if mine else (t["id"],)).fetchall()
         if rows:
             out.append("Comments:")

@@ -46,6 +46,7 @@ from flask import g, jsonify, Response
 
 from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL, SECRET_KEY
 from ..core.db import connect, db, err, iso, now_utc
+from ..core.objcomments import OCM_TS  # 2.972.0 (#5272): the old time form of a comment
 from ..core.pg import snapshot_level, system_ctx
 from ..core.i18n import N_, lang, tr
 from ..core.access import Denied, acx_lists_sql, acx_of
@@ -306,7 +307,7 @@ def umz_people(c, uid, salt=None):
                                            "email_hash": umz_email_hash(r["email"], salt), "lists": {}})
         p["lists"][str(r["list_id"])] = r["role"]
     for r in c.execute(f"""SELECT DISTINCT u.id, u.display_name, u.username, u.email, COALESCE(u.kind,'user') AS kind FROM users u
-                           WHERE u.id IN (SELECT user_id FROM comments WHERE task_id IN (SELECT id FROM tasks WHERE list_id IN {own}))
+                           WHERE u.id IN (SELECT user_id FROM obj_comments WHERE kind='task' AND ref_id IN (SELECT id FROM tasks WHERE list_id IN {own}))
                               OR u.id IN (SELECT assignee_id FROM tasks WHERE list_id IN {own})""", (uid, uid)):
         if r["id"] != uid and r["id"] not in out:
             out[r["id"]] = {"user_id": r["id"], "name": r["display_name"] or r["username"],
@@ -332,8 +333,10 @@ def umz_extra_queries(uid):
         "shared_lists": (f"""SELECT l.id, l.name, m.role, u.display_name AS owner_name, u.email AS owner_email FROM lists l
                              JOIN list_members m ON m.list_id=l.id AND m.user_id=? JOIN users u ON u.id=l.owner_id
                              WHERE l.id IN {shared}""", (uid, uid, uid)),
-        "shared_comments": (f"""SELECT c.id, c.task_id, t.title AS task_title, t.list_id, c.body, c.created_at, c.edited_at FROM comments c
-                                JOIN tasks t ON t.id=c.task_id WHERE c.user_id=? AND c.deleted_at IS NULL AND t.list_id IN {shared}""",
+        "shared_comments": (f"""SELECT c.id, c.ref_id AS task_id, t.title AS task_title, t.list_id, c.body,
+                                to_char(c.created_at AT TIME ZONE 'UTC', '{OCM_TS}') AS created_at,
+                                to_char(c.edited_at AT TIME ZONE 'UTC', '{OCM_TS}') AS edited_at FROM obj_comments c
+                                JOIN tasks t ON t.id=c.ref_id AND c.kind='task' WHERE c.user_id=? AND c.deleted_at IS NULL AND t.list_id IN {shared}""",
                             (uid, uid, uid)),
         # 2.84.0 (#1903): my own private filed e-mails (organisation mails, also the not assigned ones, are in the organisation export)
         "hub_mails": ("""SELECT id, client_id, list_id, message_id, from_addr, from_name, to_addrs, subject, sent_at, body, created_at, eml_id, files
@@ -429,9 +432,11 @@ def umz_mine_queries(uid):
     vis = acx_lists_sql(req=False)
     from ..collab.tcxcore import tcx_core_rooms_sql  # 2.924.0 (#5069): my channels / groups through the core alone
     return {
-        "written_comments": (f"""SELECT c.id, c.task_id, CASE WHEN t.list_id IN {vis} THEN t.title END AS task_title,
-                                 CASE WHEN t.list_id IN {vis} THEN t.list_id END AS list_id, c.body, c.created_at, c.edited_at
-                                 FROM comments c JOIN tasks t ON t.id=c.task_id WHERE c.user_id=? AND c.deleted_at IS NULL
+        "written_comments": (f"""SELECT c.id, c.ref_id AS task_id, CASE WHEN t.list_id IN {vis} THEN t.title END AS task_title,
+                                 CASE WHEN t.list_id IN {vis} THEN t.list_id END AS list_id, c.body,
+                                 to_char(c.created_at AT TIME ZONE 'UTC', '{OCM_TS}') AS created_at,
+                                 to_char(c.edited_at AT TIME ZONE 'UTC', '{OCM_TS}') AS edited_at
+                                 FROM obj_comments c JOIN tasks t ON t.id=c.ref_id AND c.kind='task' WHERE c.user_id=? AND c.deleted_at IS NULL
                                  AND t.list_id NOT IN {own} AND t.list_id NOT IN {shared} ORDER BY c.id""",
                              (uid, uid, uid, uid, uid, uid, uid, uid)),
         "channel_messages": (f"""SELECT m.id, m.room_id, r.kind AS room_kind, CASE WHEN r.list_id IN {vis}

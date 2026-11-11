@@ -21,6 +21,7 @@ from flask import g, jsonify
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.objcomments import ocm_extra, ocm_old_cols  # 2.972.0 (#5272)
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_collab, task_visible, tvis
 from ..core.errors import BadInput, UnknownFields
@@ -85,8 +86,8 @@ def gate_clean(c, t, s):
         raise BadInput(tr("Invalid value: {0}", "integrations"))
     items = []
     for cid in dict.fromkeys(ids):
-        k = c.execute("""SELECT k.id, k.suggestion, k.task_id FROM comments k JOIN tasks t ON t.id=k.task_id
-                         WHERE k.id=? AND k.deleted_at IS NULL AND t.list_id=?""", (cid, t["list_id"])).fetchone()
+        k = c.execute("""SELECT k.id, k.extra->>'suggestion' AS suggestion, k.ref_id AS task_id FROM obj_comments k JOIN tasks t ON t.id=k.ref_id
+                         WHERE k.id=? AND k.kind='task' AND k.deleted_at IS NULL AND t.list_id=?""", (cid, t["list_id"])).fetchone()
         sg = json.loads(k["suggestion"]) if k and k["suggestion"] else None
         if not sg or sg.get("kind") != "integrate":
             raise BadInput(tr("{0} is not an integration request of this project", cid))
@@ -97,6 +98,11 @@ def gate_clean(c, t, s):
     out["checklist"] = deploy_checklist(c, t["list_id"], me())
     out["tag"] = DEPLOY_TAG
     return _gate_irr_in(c, t, out)
+
+
+def gate_sug_save(c, cid, sug):
+    """2.972.0 (#5272): the request of comment cid (agent gates) is the key "suggestion" of the core's extra (its JSON text)."""
+    ocm_extra(c, cid, "suggestion", json.dumps(sug, ensure_ascii=False))
 
 
 def gate_two_eyes(c, k, t, sug, uid):
@@ -112,7 +118,7 @@ def gate_two_eyes(c, k, t, sug, uid):
     if not ap:
         ap = [{"by": uid, "at": iso(now_utc())}]
     sug["approvals"], sug["needs"] = ap, 2
-    c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(sug, ensure_ascii=False), k["id"]))
+    gate_sug_save(c, k["id"], sug)
     return True
 
 
@@ -133,17 +139,17 @@ def gate_decide(c, k, t, uid, approve, skip=False):
         # 2.223.7 (#2941): the stored suggestion goes back to the requesting agent -- only the tasks it may see (blocking still counts all)
         new["checklist"] = deploy_checklist(c, t["list_id"], k["user_id"]) if left and _gt_is_agent(c, k["user_id"]) else left
         if left and not skip and not irr:
-            c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(new, ensure_ascii=False), k["id"]))
+            gate_sug_save(c, k["id"], new)
             return "blocked"
         if left and not irr:
             new["skipped"] = new["checklist"]
     if irr:
-        c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(new, ensure_ascii=False), k["id"]))
+        gate_sug_save(c, k["id"], new)
         return "blocked"
     if approve and gate_two_eyes(c, k, t, new, uid):
         return "waiting"
     new.update(state="approved" if approve else "rejected", by=uid, at=iso(now_utc()))
-    c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(new, ensure_ascii=False), k["id"]))
+    gate_sug_save(c, k["id"], new)
     return new["state"]
 
 
@@ -164,7 +170,7 @@ def gate_decide_route(cid):
     c, b = db(), body()
     k, _ = need_live_comment(c, cid)
     # 2.574.0 (#3376, review F2): two approvers (or a thumb taken back) at the same time read the stored state in turn
-    k = c.execute("SELECT * FROM comments WHERE id=? FOR UPDATE", (cid,)).fetchone() or k
+    k = c.execute(f"SELECT {ocm_old_cols()} FROM obj_comments WHERE id=? AND kind='task' FOR UPDATE", (cid,)).fetchone() or k  # 2.972.0 (#5272): the old keys
     t = c.execute("SELECT * FROM tasks WHERE id=?", (k["task_id"],)).fetchone()
     sug = json.loads(k["suggestion"]) if k["suggestion"] else None
     if not sug or sug.get("kind") not in GATE_KINDS:
@@ -185,7 +191,7 @@ def gate_decide_route(cid):
         orx_set(c, "comment", cid, me(), "up" if approve else "down", True)
         log_act(c, t["id"], "approval", {"agent": k["user_id"], "comment": cid, "ok": approve})
         author = c.execute("SELECT * FROM users WHERE id=?", (k["user_id"],)).fetchone()
-        k2 = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
+        k2 = c.execute(f"SELECT {ocm_old_cols()} FROM obj_comments WHERE id=? AND kind='task'", (cid,)).fetchone()
         s2 = json.loads(k2["suggestion"])
         if is_agent(author) and task_visible(c, t["id"], author["id"], full=True):  # 2.36.2 (#1142): requires task visibility
             agent_emit(c, author["id"], "reaction", agent_task_data(
@@ -194,5 +200,5 @@ def gate_decide_route(cid):
                 approval="approved" if approve else "rejected", applied=False, gate=gate_event(s2)))
     bump(c)
     c.commit()
-    k2 = c.execute("SELECT suggestion FROM comments WHERE id=?", (cid,)).fetchone()
+    k2 = c.execute("SELECT extra->>'suggestion' AS suggestion FROM obj_comments WHERE id=? AND kind='task'", (cid,)).fetchone()
     return jsonify(state=st, suggestion=json.loads(k2["suggestion"]))

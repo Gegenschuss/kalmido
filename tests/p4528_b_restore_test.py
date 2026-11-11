@@ -166,8 +166,9 @@ r = F.delete(B + f"/api/lists/{L}/members/{AG}?dry=1")
 check(r.ok and r.json().get("delegate") == 1, f"dry: the agent's delegation counts {r.text[:200]}")
 check(one("SELECT COUNT(*) FROM member_memos") == 0 and one("SELECT assignee_id FROM tasks WHERE id=?", (TA1,)) == BID, "dry: nothing changes")
 check(F.delete(B + f"/api/lists/{L}/members/{BID}").ok, "bob removed")
+# 2.972.0 (#5285): the watching rows of the core's obj_follow
 check(one("SELECT assignee_id FROM tasks WHERE id=?", (TA1,)) is None and val(TV, FP) is None
-      and not one("SELECT 1 FROM task_watchers WHERE task_id=? AND user_id=?", (TW, BID)), "removed: as before, his rows end")
+      and not one("SELECT 1 FROM obj_follow WHERE kind='task' AND ref_id=? AND user_id=? AND mode='watch'", (TW, BID)), "removed: as before, his rows end")
 check(one("SELECT COUNT(*) FROM member_memos WHERE list_id=? AND user_id=? AND by_id=?", (L, BID, FID)) == 1, "removed: a memo")
 r = F.get(B + f"/api/lists/{L}/member-memos")
 check(r.ok and [(m["user_id"], m["member"], m["assigned"]) for m in r.json()["memos"]] == [(BID, False, 2)], f"memos: bob, not a member {r.text[:200]}")
@@ -185,7 +186,7 @@ check(r.ok and j.get("restored") == {"assigned": 1, "values": 1, "delegate": 0, 
       f"restore: what is still free, the taken one skipped {r.text[:200]}")
 check(one("SELECT assignee_id FROM tasks WHERE id=?", (TA1,)) == BID and one("SELECT assignee_id FROM tasks WHERE id=?", (TA2,)) == FID,
       "restore: his assignment back, frida's new one stays")
-check(val(TV, FP) == str(BID) and one("SELECT 1 FROM task_watchers WHERE task_id=? AND user_id=?", (TW, BID)), "restore: person value and watching back")
+check(val(TV, FP) == str(BID) and one("SELECT 1 FROM obj_follow WHERE kind='task' AND ref_id=? AND user_id=? AND mode='watch'", (TW, BID)), "restore: person value and watching back")
 check(F.post(B + f"/api/lists/{L}/members/{BID}/restore").status_code == 404, "restore: a second time 404")
 # the agent's delegation
 check(F.delete(B + f"/api/lists/{L}/members/{AG}").ok and one("SELECT delegate_agent_id FROM tasks WHERE id=?", (TD,)) is None, "the agent removed: the delegation ends")

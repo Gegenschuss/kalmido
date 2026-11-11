@@ -51,13 +51,15 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(rem && /Remind me/.test(rem.textContent) && take && /Take it as a note/.test(take.textContent) && !!md?.querySelector('[data-pp="discard"] .thumb svg')  /* 2.139.0 (#2401): app thumb */
     && !md.querySelector('.ppi'), '#1359: Discard / Remind me / Take it as a note, no entry list');
   click(w, rem);
-  const cm = await until(() => sql('SELECT id, user_id, body FROM comments WHERE task_id=? AND deleted_at IS NULL', [mob.id])[0]);
+  // 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+  const cm = await until(() => sql("SELECT id, user_id, body FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL", [mob.id])[0]);
   check(cm && cm.user_id === 1 && /cancel the mobile phone/.test(cm.body), '#1359: Remind me -> a comment as the person ' + JSON.stringify(cm));
   check(/4320/.test(sql('SELECT reminders FROM tasks WHERE id=?', [mob.id])[0]?.reminders || ''), '#1359: … and a reminder 3 days before');
   check(await until(() => /reminder 3 days before/.test(d.querySelector('#toast, .toast')?.textContent || ''), 30), '#1359: the toast names the reminder');
   await sleep(300);
   await w.eval("histStep('undo')");
-  check(await until(() => !sql('SELECT 1 FROM comments WHERE task_id=? AND deleted_at IS NULL', [mob.id]).length
+  // 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+  check(await until(() => !sql("SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL", [mob.id]).length
     && !/4320/.test(sql('SELECT reminders FROM tasks WHERE id=?', [mob.id])[0]?.reminders || '')), '#1359: Undo takes the note and the reminder back');
   w.close();
 

@@ -394,7 +394,7 @@ check(r.status_code == 403 and dbx("SELECT list_id FROM tasks WHERE id=?", (T[2]
 check(cl.post(f"/tasks/{TP}/move", {"position": "top"}).status_code == 404, "move: a hidden task 404")
 check(cl.post(f"/tasks/{TC}/dependencies", {"blocked_by": T[1]}).status_code == 404, "dependency on a hidden task 404")
 check(cl.post(f"/tasks/{T[1]}/dependencies", {"blocked_by": TC}).status_code == 404, "a hidden blocker 404")
-check(cl.req("PATCH", f"/comments/{dbx('SELECT id FROM comments WHERE user_id=1 LIMIT 1')[0][0]}", json={"body": "x"}).status_code == 403,
+check(cl.req("PATCH", f"/comments/{dbx('SELECT id FROM obj_comments WHERE user_id=1 LIMIT 1')[0][0]}", json={"body": "x"}).status_code == 403,
       "someone else's comment cannot be edited")
 
 # ================================================================== new routes (as alice, legacy token)

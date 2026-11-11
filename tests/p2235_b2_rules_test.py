@@ -64,10 +64,11 @@ check(r.status_code == 201, f"the owner's comment: 201 (counter-check) {r.status
 R_OWN = r.json()["rule"]["id"]
 c_otto = comment(O, T, "From now on never send invoices")
 check(add(FH, "Never send invoices", "comment", c_otto).status_code == 404, "a member the personal agent does not hear: 404")
-c_ag = dbx("INSERT INTO comments(task_id, user_id, body, mentions, created_at) VALUES(?,?,?,'',?) RETURNING id",
+# 2.972.0 (#5272): comments are rows of the comments' core (obj_comments kind 'task')
+c_ag = dbx("INSERT INTO obj_comments(kind, ref_id, user_id, body, created_at) VALUES('task',?,?,?,?) RETURNING id",
            (T, OA, "From now on always pay at once", "2026-10-26T10:00:00.000Z"))[0][0]
 check(add(FH, "Always pay at once", "comment", c_ag).status_code == 404, "a comment of another agent: 404")
-c_ext = dbx("INSERT INTO comments(task_id, user_id, body, mentions, created_at, ext_name) VALUES(?,NULL,?,'',?,?) RETURNING id",
+c_ext = dbx("INSERT INTO obj_comments(kind, ref_id, user_id, body, created_at, ext_name) VALUES('task',?,NULL,?,?,?) RETURNING id",
             (T, "From now on invoices without VAT", "2026-10-26T10:01:00.000Z", "A customer"))[0][0]
 check(add(FH, "Invoices without VAT", "comment", c_ext).status_code == 404, "a customer through the approval link: 404")
 

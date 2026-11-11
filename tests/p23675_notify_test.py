@@ -304,7 +304,8 @@ clear()
 T9 = task(Bo, "New flyer", L)
 check(wait_push(lambda x: x["topic"] == "t-carol"), f"(9) a push for the person mentioned: {pushes()}")
 check(any(x["task_id"] == T9 for x in news(Ca, "mention")), "(9) and the mention in the News")
-c9 = dbw("SELECT mentions FROM comments WHERE task_id=?", (T9,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+c9 = dbw("SELECT mentions FROM obj_comments WHERE kind='task' AND ref_id=?", (T9,))
 check(c9 and str(CAROL) in str(c9[0][0]), f"(9) stored with the comment: {c9}")
 A.delete(B + f"/api/rules/{r.json().get('id')}") if r.ok else None
 

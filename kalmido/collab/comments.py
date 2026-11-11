@@ -8,13 +8,13 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.env import env_bool
-from ..core.pg import insert_id, write_lock
+from ..core.pg import write_lock
 from ..core.i18n import LANGS, short_day, tr, trn
-from ..core.db import body, bump, db, err, inbox_default, iso, iso_ms, local_now, now_utc, usettings
+from ..core.db import body, bump, db, err, inbox_default, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.objseen import osn_get, osn_mark  # 2.905.0 (#5284): the read marks of the core
 from ..accounts.bgjobs import bgj_add, bgj_fn  # 2.370.3 (#2760)
-from ..core.access import collab_all, Denied, list_people, list_role, MANAGE_ROLES, need_feat, need_task, task_visible, pvis
+from ..core.access import collab_all, Denied, list_people, list_role, live_sql, MANAGE_ROLES, need_feat, need_task, task_visible, pvis
 from ..core.serializers import unlink_files
 from ..tasks.tasks import WEB_COMMENT
 from ..tasks.validation import ACT_NOTES  # 2.394.0 C (#3377)
@@ -22,20 +22,21 @@ from ..tasks.attachments import save_attachments
 from ..tasks.oneway import dec_list, gate_irreversible
 from .replies import reply_check, with_replies
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
-from .cmttrash import cmt_trash, cmt_restore
-from ..core.objparts import part_kind, part_write  # 2.610.0 (#4762): the core's write layer of side objects
+from ..core.objcomments import (ocm_add, ocm_after, ocm_edit, ocm_kind, ocm_list, ocm_need_say, ocm_old_cols, ocm_restore,
+                                ocm_row, ocm_row_out, ocm_say_refusal, ocm_text_in, ocm_trash, OCM_MAX, OCM_MENTION_RE)  # 2.972.0 (#5272)
 
 
 # ---------------------------------------------------------------- comments + activity timeline
 # Everyone who sees a task may comment on it (view-only members too; they still cannot change the
-# task) -- 2.607.0 (#4549): except a guest / read-only person of the list's organisation (task_say_refusal). A private task's comments are a personal log. Authors edit / delete their own comments; the
-# list owner and the list's admins (1.10.0) may delete any comment in the list (moderation). Instance admins have no extra
-# rights here. Participants comment only on their own tasks (never on a context parent).
-# Deleted comments disappear (soft delete: body, mentions and files are wiped).
-# Mentions are stored as <@user_id> tokens (+ comments.mentions); only people who see the task count.
-MAX_COMMENT = 10000
+# task) -- 2.607.0 (#4549): except a guest / read-only person of the list's organisation (core/objcomments.py ocm_say_refusal). A private task's comments are a personal log. Authors edit / delete their own comments; the
+# list owner and the list's admins (1.10.0) may delete any comment in the list (moderation; 2.972.0 #5272: 'manage' on the task, the
+# core's one rule). Instance admins have no extra rights here. Participants comment only on their own tasks (never on a context parent).
+# Deleted comments disappear (into the trash: body, mentions and files are kept there for the trash period).
+# Mentions are stored as <@user_id> tokens (+ the mentions array); only people who see the task count.
+# 2.972.0 (#5272): the rows are the comments' core (obj_comments kind 'task', core/objcomments.py); this module keeps the task's
+# routes, files, answer buttons and pushes and gives the core the task's hooks (ocm_kind below).
+MAX_COMMENT = OCM_MAX
 MAIL_REPLY = {}  # 2.393.2 B (#3375): integrations/taskmail.py (info / check / send of "also by e-mail to the reporter")
-MENTION_RE = re.compile(r"<@(\d+)>")
 
 
 def user_names(c, ids):
@@ -81,36 +82,10 @@ def task_people(c, lid, tid=None):
     return out
 
 
-def mention_names(c, ids):
-    """2.148.1 A (#2490): {id: name} for the '@name' of a mention that is not kept -- only people the writer may see
-    (else '@?', so a mention never tells the name of an unknown account)."""
-    from ..accounts.orgs import visible_people
-    names = user_names(c, ids)
-    vis = visible_people(c, me()) if has_request_context() and getattr(g, "user", None) is not None else set()
-    return names if vis is None else {k: v for k, v in names.items() if k in vis}
-
-
-def clean_mentions(c, lid, text, tid=None):
-    """Keeps <@id> tokens of people who see the list; any other token becomes plain '@name' (2.148.1 A, #2490: '@?' for
-    someone the writer may not see)."""
-    allowed = {p["id"] for p in task_people(c, lid, tid)}  # 2.86.0 (N20): tid narrows it for a participant
-    names = mention_names(c, [int(x) for x in MENTION_RE.findall(text)])
-    found = []
-
-    def sub(m):
-        uid = int(m.group(1))
-        if uid in allowed:
-            found.append(uid)
-            return m.group(0)
-        return "@" + names.get(uid, "?")
-    text = MENTION_RE.sub(sub, text)
-    return text, list(dict.fromkeys(found))
-
-
 def comment_plain(c, text, names=None):
     """Comment text for a push: tokens -> @name, whitespace collapsed."""
-    names = names or user_names(c, [int(x) for x in MENTION_RE.findall(text)])
-    return re.sub(r"\s+", " ", MENTION_RE.sub(lambda m: "@" + names.get(int(m.group(1)), "?"), text)).strip()
+    names = names or user_names(c, [int(x) for x in OCM_MENTION_RE.findall(text)])
+    return re.sub(r"\s+", " ", OCM_MENTION_RE.sub(lambda m: "@" + names.get(int(m.group(1)), "?"), text)).strip()
 
 
 def att_dicts(c, where, args):
@@ -127,38 +102,63 @@ def att_dicts(c, where, args):
 
 
 def comment_dict(r, atts):
-    return {"id": r["id"], "user_id": r["user_id"], "body": r["body"], "created_at": r["created_at"],
-            "edited_at": r["edited_at"], "mentions": [int(x) for x in (r["mentions"] or "").split(",") if x],
-            "attachments": atts.get(r["id"], []), "suggestion": json.loads(r["suggestion"]) if r["suggestion"] else None,
-            "reply_to": r["reply_to"] if "reply_to" in r.keys() else None,  # 2.33.0 (#1076): + reply (with_replies)
-            "ext_name": r["ext_name"] if "ext_name" in r.keys() else None,  # 2.50.0 (#329): written by a customer through the public link
-            "portal": bool(r["portal"]) if "portal" in r.keys() else False,  # 2.63.0 B (#1513): the customer sees it (answer / their own)
-            "rule_name": r["rule_name"] if "rule_name" in r.keys() else None}  # 2.71.0 A (#1457): written by a list rule
+    """A comment row (the old shape of core/objcomments.py ocm_old_cols) -> its JSON with its files. 2.33.0 (#1076): + reply
+    (with_replies); 2.50.0 (#329): ext_name; 2.63.0 B (#1513): portal; 2.71.0 A (#1457): rule_name."""
+    return {**ocm_row_out(r), "attachments": atts.get(r["id"], [])}
 
 
 def need_live_comment(c, cid):
-    """(comment row, my role in its list): 404 if the comment is gone or its task is not visible."""
-    r = c.execute("SELECT * FROM comments WHERE id=? AND deleted_at IS NULL", (cid,)).fetchone()
-    if not r:
+    """(comment row in the old shape, my role in its list): 404 if the comment is gone or its task is not visible."""
+    r = ocm_row(c, cid, live=True)
+    if not r or r["kind"] != "task":
         raise Denied(404)
     return r, need_task(c, r["task_id"], write=False, full=True)
 
 
-def task_say_refusal(c, tid, uid):
-    """2.607.0 (#4549): None when uid may comment / react / answer on task tid as far as the task's organisation goes, else
-    the refusal text (orgroles RO_MSG / GUEST_MSG, not translated): a guest / read-only person of the list's organisation who
-    cannot change the task only reads. Private lists, people without that role and participants of other roles: None."""
-    from ..accounts.orgroles import org_say_refusal
-    r = c.execute("SELECT l.org_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
-    msg = org_say_refusal(c, uid, r[0]) if r and r[0] else None
-    return msg if msg and not task_visible(c, tid, uid, write=True) else None
+# ---- 2.972.0 (#5272): the hooks of the kind 'task' in the comments' core
+def _cmt_list(c, tid):
+    r = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
+    return r[0] if r else None
 
 
-def need_task_say(c, tid, uid=None):
-    """2.607.0 (#4549): 403 with the organisation role's text when uid (default: me) may only read task tid."""
-    msg = task_say_refusal(c, tid, uid or me())
-    if msg:
-        raise Denied(403, tr(msg))
+def _cmt_people(c, tid):
+    lid = _cmt_list(c, tid)
+    return {p["id"] for p in task_people(c, lid, tid)} if lid else set()  # 2.86.0 (N20): tid narrows it for a participant
+
+
+def _cmt_sealed(c, tid):
+    from .liste2e import le2e_mode
+    return bool(le2e_mode(c, _cmt_list(c, tid)))
+
+
+def _cmt_sealed_in(c, tid, text):
+    from .liste2e import le2a_comment_in
+    return le2a_comment_in(c, _cmt_list(c, tid), text, tid)  # 2.64.1 (#1817): ciphertext + mentions from the browser (guarded)
+
+
+def _cmt_text_max(text):
+    from .liste2e import le2a_text_max
+    return le2a_text_max(text, MAX_COMMENT)  # 2.64.1 (#1817): a ciphertext is longer than its text
+
+
+def _cmt_nfiles(c, cid):
+    return c.execute(f"SELECT COUNT(*) FROM attachments WHERE comment_id=? AND {live_sql()}", (cid,)).fetchone()[0]
+
+
+def _cmt_trash(c, cid, ts):  # 2.530.0 A (#4315): the files into the attachment trash with the comment's time
+    c.execute(f"UPDATE attachments SET deleted_at=? WHERE comment_id=? AND {live_sql()}", (ts, cid))
+
+
+def _cmt_restore(c, cid, ts):  # ... and exactly these back
+    c.execute("UPDATE attachments SET deleted_at=NULL WHERE comment_id=? AND deleted_at=?", (cid, ts))
+
+
+def _cmt_live(c, tid):
+    return c.execute(f"SELECT * FROM tasks WHERE id=? AND {live_sql()}", (tid,)).fetchone()
+
+
+ocm_kind("task", people=_cmt_people, sealed=_cmt_sealed, sealed_in=_cmt_sealed_in, text_max=_cmt_text_max, nfiles=_cmt_nfiles,
+         trash=_cmt_trash, restore=_cmt_restore, live=_cmt_live)
 
 
 @app.get("/api/tasks/<int:tid>/timeline")
@@ -174,7 +174,7 @@ def timeline(tid):
     c = db()
     role = need_task(c, tid, write=False, full=True)
     t = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
-    rows = c.execute("SELECT * FROM comments WHERE task_id=? AND deleted_at IS NULL ORDER BY id", (tid,)).fetchall()
+    rows = ocm_list(c, "task", tid)  # 2.972.0 (#5272): the rights were checked above
     atts = att_dicts(c, "task_id=? AND comment_id IS NOT NULL", (tid,))
     # 2.370.4 (#3089 E2-N11): a comment without text whose files all lie in the trash is not shown (restoring one brings it back)
     gone = {r[0] for r in c.execute("SELECT DISTINCT comment_id FROM attachments WHERE task_id=? AND comment_id IS NOT NULL "
@@ -223,7 +223,7 @@ def timeline(tid):
                    people=ppl, seen=seen, moderator=role in MANAGE_ROLES,
                    agents=sorted(i for i in ids | {p["id"] for p in ppl} if i in ag),
                    can_write=task_visible(c, tid, me(), write=True),
-                   say_no=tr(sn) if (sn := task_say_refusal(c, tid, me())) else None,  # 2.607.0 (#4549): the box's hint
+                   say_no=tr(sn) if (sn := ocm_say_refusal(c, "task", tid, me())) else None,  # 2.607.0 (#4549): the box's hint
                    approver=is_approver(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), me()),  # 2.2.0 (#339)
                    ticket=pt_ticket_info(c, tid, me()),  # 2.63.0 B (#1513): a customer's report (box in the task panel)
                    mail_reporter=MAIL_REPLY["info"](c, tid, me()) if MAIL_REPLY else None,  # 2.393.2 B (#3375)
@@ -237,7 +237,7 @@ def timeline_seen(tid):
     from ..notify.push import push_handled
     c = db()
     need_task(c, tid, write=False, full=True)
-    top = c.execute("SELECT COALESCE(MAX(id),0) FROM comments WHERE task_id=?", (tid,)).fetchone()[0]
+    top = c.execute("SELECT COALESCE(MAX(id),0) FROM obj_comments WHERE kind='task' AND ref_id=?", (tid,)).fetchone()[0]
     osn_mark(c, "task", tid, me(), top)  # 2.905.0 (#5284): the read mark of the core
     c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND task_id=? AND read_at IS NULL", (iso(now_utc()), me(), tid))
     push_handled(c, me(), [tid])
@@ -267,9 +267,10 @@ def comment_ref(c, tid):
     if not ref:
         return None, None
     write_lock(c, f"comment-ref-{me()}")
-    r = c.execute("SELECT * FROM comments WHERE task_id=? AND user_id=? AND client_ref=?", (tid, me(), ref)).fetchone()
+    r = c.execute(f"SELECT {ocm_old_cols()} FROM obj_comments WHERE kind='task' AND ref_id=? AND user_id=? AND client_ref=?",
+                  (tid, me(), ref)).fetchone()
     if r and r["deleted_at"]:
-        c.execute("UPDATE comments SET client_ref=NULL WHERE id=?", (r["id"],))
+        c.execute("UPDATE obj_comments SET client_ref=NULL WHERE id=?", (r["id"],))
         r = None
     return ref, r
 
@@ -285,14 +286,14 @@ def comment_create(tid):
     """2.0.6 (#315): also without collaboration (a personal note). Only with collaboration on (instance switch):
     @mentions, pushes, News and agent events; comments off in my settings: refused (409), agents excepted."""
     from ..integrations.webhooks import wh_note
-    from ..agents.core import agent_comment_events, is_agent, tidy_agent_of
+    from ..agents.core import is_agent, tidy_agent_of
     from ..collab.reactions import clean_suggestion, with_reactions
     from ..integrations.git import GIT_COMMENT_CMD, git_merge_link, git_merge_request
     c = db()
     if not is_agent(g.user):
         need_feat("comments")
     need_task(c, tid, write=False, full=True)  # view-only members may comment (participants: on their own tasks)
-    need_task_say(c, tid)  # 2.607.0 (#4549): ... but not a guest / read-only person of the list's organisation
+    ocm_need_say(c, "task", tid)  # 2.607.0 (#4549): ... but not a guest / read-only person of the list's organisation
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if t["deleted_at"]:
         return err(tr("The task is in the trash"), 409)
@@ -300,8 +301,8 @@ def comment_create(tid):
     ref, hit = comment_ref(c, tid)  # 2.370.2 (#3088)
     if hit:
         return comment_answer(c, tid, hit)
-    from .liste2e import le2a_comment_in, le2a_text_max, le2e_mode
-    if len(text) > le2a_text_max(text, MAX_COMMENT):  # 2.64.1 (#1817): a ciphertext is longer than its text
+    from .liste2e import le2e_mode
+    if len(text) > _cmt_text_max(text):  # 2.64.1 (#1817): a ciphertext is longer than its text
         return err(tr("The comment is too long (max. {0} characters)", MAX_COMMENT))
     if not text and not files:
         return err(tr("The comment is empty"))
@@ -310,10 +311,7 @@ def comment_create(tid):
         mrep = MAIL_REPLY["check"](c, tid, me(), mrep) if MAIL_REPLY else False
     except ValueError as e:
         return err(str(e))
-    if le2e_mode(c, t["list_id"]) or text.startswith("e2e1:"):  # 2.64.1 (#1817): ciphertext + mentions from the browser
-        text, mentions = le2a_comment_in(c, t["list_id"], text, t["id"])  # 2.86.0 (N20 review): + task
-    else:
-        text, mentions = clean_mentions(c, t["list_id"], text, t["id"]) if collab_all() else (text, [])
+    text, mentions = ocm_text_in(c, "task", tid, text)  # 2.972.0 (#5272): the core's one parser / the lock's guard
     try:  # 2.33.0 (#1076): a reply to a comment of the same task (else 400)
         orig = reply_check(c, "c", comment_reply_in(), task_id=tid)
     except BadInput as e:
@@ -365,9 +363,8 @@ def comment_create(tid):
         return err(tr("Suggestions and answer buttons cannot go to a client"))
     if mrep and (sug or chs):  # the files of the comment stay in Kalmido (the mail carries the text)
         return err(tr("Only a text goes to the reporter by e-mail"))
-    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to,choices,portal,client_ref) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    (tid, me(), text, ",".join(map(str, mentions)), iso_ms(now_utc()),
-                     json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None, chs, portal, ref))
+    cid = ocm_add(c, "task", tid, me(), text, mentions=mentions, parent_id=orig["id"] if orig else None, client_ref=ref,
+                  extra={"suggestion": json.dumps(sug, ensure_ascii=False) if sug else None, "choices": chs, "portal": bool(portal)})
     replied = orig["user_id"] if orig and orig["user_id"] != me() else None
     if sug and sug.get("kind") == "merge_request":
         git_merge_link(c, t, sug)
@@ -385,9 +382,8 @@ def comment_create(tid):
     ptext = text
     if chs and json.loads(chs).get("approval"):  # 2.41.0 (#1383): the push says that an approval is needed
         ptext = tr("Approval needed") + ": " + json.loads(chs)["approval"]["title"] + ("\n" + text if text else "")
-    pushes = comment_pushes(c, t, cid, ptext, mentions, mentions, len(files), replied=replied) if collab_all() else []
-    if collab_all():  # 2.33.0 (#1076): an agent whose comment is answered hears it like a mention
-        agent_comment_events(c, t, cid, mentions, mentions + ([replied] if replied and replied not in mentions else []))
+    # 2.972.0 (#5272): News, pushes and the agents' event through the core (2.33.0 #1076: the answered author like a mention)
+    pushes = ocm_after(c, "task", cid, ptext, mentions, nfiles=len(files), replied=replied)
     wh_note(c, tid, "comment", cid=cid)
     from ..notify.channels import chn_note
     chn_note(c, tid, "comment", cid=cid)  # 2.142.0 A (#2145): organisation channels / channels of own lists
@@ -399,19 +395,17 @@ def comment_create(tid):
     send_pushes(pushes)
     hint = GIT_COMMENT_CMD[0](c, t, text) if not portal else None  # 2.392.0 B (#3364): "partly: rest in Y" in the first line
     sent = MAIL_REPLY["send"](c, tid, me(), cid) if mrep else None  # 2.393.2 B (#3375): '' = sent, else an error code
-    r = comment_answer(c, tid, c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone())
+    r = comment_answer(c, tid, ocm_row(c, cid))
     extra = {**({"partial": hint} if hint else {}), **({"mail_reporter": sent or "sent"} if mrep else {})}
     return jsonify({**r.get_json(), **extra}) if extra else r
 
 
-CMT_KIND = "comment"  # 2.610.0 (#4762): a side object of the core (core/objparts.py); lock and 409 key as since #4701
-part_kind(CMT_KIND, "comments", lock="comment-{id}", version=lambda r: r["edited_at"] or r["created_at"], key="comment", live="deleted_at IS NULL")
-
-
 @app.patch("/api/comments/<int:cid>")
 def comment_update(cid):
-    """Only the author edits a comment; people mentioned for the first time are notified (with collaboration on)."""
-    from ..agents.core import agent_comment_events, is_agent
+    """Only the author edits a comment; people mentioned for the first time are notified (with collaboration on).
+    2.564.0 D (#4701): the version the edit box opened with (edited_at, else created_at); changed meantime -> 409 + the comment.
+    2.972.0 (#5272): lock, version, text, mentions, the agents' change event and the pushes through the core (ocm_edit)."""
+    from ..agents.core import is_agent
     from ..collab.reactions import with_reactions
     c = db()
     if not is_agent(g.user):
@@ -419,49 +413,22 @@ def comment_update(cid):
     r, _ = need_live_comment(c, cid)
     if r["user_id"] != me():
         return err(tr("Only the author can edit this comment"), 403)
-    need_task_say(c, r["task_id"])  # 2.607.0 (#4549): a guest / read-only person changes no comment (deleting one's own stays)
-    t = c.execute("SELECT * FROM tasks WHERE id=?", (r["task_id"],)).fetchone()
+    ocm_need_say(c, "task", r["task_id"])  # 2.607.0 (#4549): a guest / read-only person changes no comment (deleting one's own stays)
     b = web_fields(body(), {"body", "mentions", "expect_updated_at"}, "PATCH /api/comments/{cid}")
-    # 2.564.0 D (#4701): the version the edit box opened with (edited_at, else created_at); changed meantime -> 409 + the comment.
-    # 2.610.0 (#4762): lock, row and version check through the core (core/objparts.py part_write); the writes follow under the lock
-    r, _ = part_write(c, CMT_KIND, cid, b, public=lambda c, r: comment_dict(r, att_dicts(c, "comment_id=?", (cid,))))
-    text = (b.get("body") or "").strip()
-    from .liste2e import le2a_comment_in, le2a_text_max, le2e_mode
-    if len(text) > le2a_text_max(text, MAX_COMMENT):  # 2.64.1 (#1817)
-        return err(tr("The comment is too long (max. {0} characters)", MAX_COMMENT))
-    nfiles = c.execute("SELECT COUNT(*) FROM attachments WHERE comment_id=? AND deleted_at IS NULL", (cid,)).fetchone()[0]
-    if not text and not nfiles:
-        return err(tr("The comment is empty"))
-    if le2e_mode(c, t["list_id"]) or text.startswith("e2e1:"):  # 2.64.1 (#1817): ciphertext + mentions from the browser
-        text, mentions = le2a_comment_in(c, t["list_id"], text, t["id"])  # 2.86.0 (N20 review): + task
-    else:
-        text, mentions = clean_mentions(c, t["list_id"], text, t["id"]) if collab_all() else (text, [])
-    old = {int(x) for x in (r["mentions"] or "").split(",") if x}
-    c.execute("UPDATE comments SET body=?, mentions=?, edited_at=? WHERE id=?",
-              (text, ",".join(map(str, mentions)), iso_ms(now_utc()), cid))  # 2.564.0 D (#4701): ms, the version of the next edit
-    new_m = [m for m in mentions if m not in old] if collab_all() else []
-    if not t["deleted_at"]:  # 2.39.0 (#1179): agents that got this comment as an event learn the change (before new mentions)
-        from ..agents.chat import med_comment_edited
-        med_comment_edited(c, t, c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone(), r["body"])
-    pushes = comment_pushes(c, t, cid, text, mentions, new_m, 0, only=new_m) if new_m and not t["deleted_at"] else []
-    if new_m and not t["deleted_at"]:
-        agent_comment_events(c, t, cid, mentions, new_m, created=False)
+    ocm_edit(c, cid, me(), b, public=lambda c, r: comment_dict(r, att_dicts(c, "comment_id=?", (cid,))))
     bump(c)
     c.commit()
-    send_pushes(pushes)
-    return jsonify(with_replies(c, "c", with_reactions(c, [comment_dict(c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone(),
-                                                                         att_dicts(c, "comment_id=?", (cid,)))]))[0])
+    return jsonify(with_replies(c, "c", with_reactions(c, [comment_dict(ocm_row(c, cid), att_dicts(c, "comment_id=?", (cid,)))]))[0])
 
 
 @app.delete("/api/comments/<int:cid>")
 def comment_delete(cid):
     """Author, or the owner of the list (moderation). The comment disappears with its files.
-    2.530.0 A (#4315): into the trash -- text and files stay until the trash period ends (collab/cmttrash.py), Undo restores it."""
+    2.530.0 A (#4315): into the trash -- text and files stay until the trash period ends, Undo restores it.
+    2.972.0 (#5272): the core's trash and its one rule (author or 'manage' on the task, core/objcomments.py ocm_trash)."""
     c = db()
-    r, role = need_live_comment(c, cid)
-    if r["user_id"] != me() and role not in MANAGE_ROLES:
-        return err(tr("Only the author or the project owner can delete this comment"), 403)
-    cmt_trash(c, cid)
+    need_live_comment(c, cid)
+    ocm_trash(c, cid, me())
     c.execute("UPDATE agent_rules SET source_excerpt='' WHERE source_kind='comment' AND source_id=?", (cid,))  # 2.235.0 B2 (#2903): nor its copy in a rule
     from ..collab.news import news_forget_comment
     news_forget_comment(c, cid)  # 2.306.0 C (#2889)
@@ -475,13 +442,11 @@ def comment_restore(cid):
     """2.530.0 A (#4315): a deleted comment back from the trash (within the trash period): the same people who could delete it
     (author, list owner / admins). 404 when nothing is kept (deleted before, or the trash run was quicker)."""
     c = db()
-    r = c.execute("SELECT * FROM comments WHERE id=? AND deleted_at IS NOT NULL", (cid,)).fetchone()
-    if not r:
+    r = ocm_row(c, cid)
+    if not r or r["kind"] != "task" or not r["deleted_at"]:
         raise Denied(404)
-    role = need_task(c, r["task_id"], write=False, full=True)
-    if r["user_id"] != me() and role not in MANAGE_ROLES:
-        return err(tr("Only the author or the project owner can delete this comment"), 403)
-    if not cmt_restore(c, cid):
+    need_task(c, r["task_id"], write=False, full=True)
+    if not ocm_restore(c, cid, me()):  # 2.972.0 (#5272): the core's restore and its rule (author or 'manage')
         raise Denied(404)
     bump(c)
     c.commit()
@@ -603,113 +568,6 @@ def burst_gate(c, uid, tid, mentioned=False, event=False, kind=""):
 
 def lang_of(s):
     return s.get("lang") if s.get("lang") in LANGS else "en"
-
-
-def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None, replied=None):
-    """Decides who gets a push for this comment (burst state updated in c, caller commits).
-    Returns [(user id, title, message, click, priority)] to send after the commit.
-    2.33.0 (#1076): replied = the author of the answered comment: "replied to your message", counted like a mention."""
-    from ..collab.news import agent_push_ok, bell_all_users, bl9_agent_comment_ok, news_add, notif_ok
-    from ..notify.push import push_prio, push_reachable
-    from ..agents.core import agent_ids
-    author = me()
-    ids = {t["assignee_id"], t["created_by"]} | set(notify_mentions) | ({replied} if replied else set())
-    before = {r[0] for r in c.execute("SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id<?",
-                                      (t["id"], cid))}
-    ids |= before
-    ids |= bell_all_users(c, t["list_id"], "comment")  # 2.1.0 (#317): the bell "All" of a list: every comment (2.6.1: or "custom")
-    from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
-    ids |= tbl_urgent_users(c, t["id"])  # 2.53.0 C (#1424): "Urgent" on the task: every comment
-    from ..tasks.watchers import wat_users
-    ids |= wat_users(c, t["id"])  # 2.473.0 (#3357): watchers like someone who commented (row "follow"); rights checked per person below
-    if only is not None:
-        ids = set(only)
-    prev = c.execute("SELECT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id<? ORDER BY id DESC LIMIT 1",
-                     (t["id"], cid)).fetchone()
-    prev = prev[0] if prev else None
-    ids.discard(None)
-    ids.discard(author)
-    if not ids:
-        return []
-    names = user_names(c, [author] + [int(x) for x in MENTION_RE.findall(text)])
-    snippet = comment_plain(c, text, names)
-    snippet = snippet[:280] + ("…" if len(snippet) > 280 else "")
-    from .liste2e import le2e_mode, le2e_neutral
-    lk = le2e_mode(c, t["list_id"])  # 2.64.2 D (#1817): a list with the lock: no words of the comment, the list's name instead
-    lname = (c.execute("SELECT name FROM lists WHERE id=?", (t["list_id"],)).fetchone() or [""])[0] if lk else ""
-    out = []
-    ag = agent_ids(c)
-    # 2.62.0 (#1854): approval cards / questions with buttons / suggestions of an agent always arrive (they wait for the person)
-    ask = c.execute("SELECT choices, suggestion FROM comments WHERE id=?", (cid,)).fetchone()
-    asks = author in ag and (ask["choices"] is not None or ask["suggestion"] is not None)
-    card = cmt_card_title(ask["choices"]) if asks else None  # 2.367.2 (#2968): an approval card names what it is about
-    for uid in sorted(ids):
-        s = collab_user(c, uid, t["list_id"]) if uid not in ag else None  # 2.0.0: agents get events (agent_comment_events)
-        if not s or not task_visible(c, t["id"], uid, full=True):  # 1.10.0: participants only about their tasks
-            continue
-        if "comments" not in (s.get("features") or "").split(","):  # 2.0.6: comments off -> no comment News / pushes
-            continue
-        # 2.62.0 (#1854): an agent's comment with "only replies to me" (also against a list bell "All": the person chose it for
-        # agents explicitly; only the task's "Urgent" still wants every comment)
-        p61_ok = bl9_agent_comment_ok(s, uid, author, ag, prev, replied, uid in notify_mentions)
-        if not asks and not p61_ok and tbl_level(c, uid, t["id"], s) != "urgent":
-            continue
-        mentioned = uid in notify_mentions or uid == replied
-        # 2.1.0 (#317): which event of the notification settings this comment is for uid (first match)
-        row = "mention" if mentioned else "comment" if uid in (t["assignee_id"], t["created_by"]) else \
-            "reply" if uid == prev else "follow"
-        # 2.28.0 (#987): a reply to my comment (the one right before) is marked: it counts as "For you" in the News
-        ment = uid in notify_mentions
-        news_add(c, uid, "mention" if ment else "comment", task_id=t["id"], comment_id=cid, actor=author, row=row, s=s,
-                 data={"reply": 1} if not ment and (uid == prev or uid == replied) else
-                 {"reach": 1} if not ment and not p61_ok else None)  # 2.66.1 (#1943): an agent's ask / an "Urgent" task reached me past "only replies"
-        lv = tbl_level(c, uid, t["id"], s)  # 2.53.0 C (#1424): the task's bell before the list's
-        if lv == "mute":
-            continue
-        if uid in notify_mentions and notif_ok(c, uid, s, row, "push", t["list_id"]):  # 2.142.0 A (#2146): by e-mail without a push device
-            from ..notify.channels import evm_note
-            evm_note(c, uid, "mention", t["id"], author, s, cid)
-        if lv == "urgent":
-            if push_reachable(c, uid, s) and not tbl_sent(uid, t["id"]):
-                lg = lang_of(s)
-                if lk:
-                    out.append((uid, tr("Urgent: {0}", le2e_neutral(lg), lg=lg), tr("{0} commented in {1}", names.get(author, "?"), lname, lg=lg),
-                                f"{PUBLIC_URL}/#t/{t['id']}", TBL_PRIO, comment_push_extra(t, lg)))
-                    continue
-                lg = lang_of(s)
-                out.append((uid, tr("Urgent: {0}", t["title"], lg=lg), tr("{0} commented: {1}", names.get(author, "?"), snippet or
-                            trn("{0} file", "{0} files", nfiles, lg=lg), lg=lg), f"{PUBLIC_URL}/#t/{t['id']}", TBL_PRIO, comment_push_extra(t, lg)))
-            continue
-        if not notif_ok(c, uid, s, row, "push", t["list_id"]) or not push_reachable(c, uid, s):
-            continue
-        # 2.28.0 (#987): an agent's comments push only when wanted; 2.367.2 (#2968): that goes first (it used to leave a "1 more
-        # comment" for the summary); an agent's question / approval card goes past agent_push and the burst gate, like a mention
-        if not asks and not mentioned and not agent_push_ok(c, uid, s, author) and \
-                not (s.get("agent_comments") == "replies" and uid == prev):
-            continue  # 2.62.0 (#1854): with "only replies to me" a reply right after my comment pushes like one with reply_to
-        if not asks and not burst_gate(c, uid, t["id"], mentioned=mentioned):
-            continue
-        lg = lang_of(s)
-        what = snippet or trn("{0} file", "{0} files", nfiles, lg=lg)
-        who = names.get(author, "?")
-        if lk:
-            msg = tr("{0} mentioned you in {1}", who, lname, lg=lg) if uid in notify_mentions else \
-                tr("{0} replied to your message in {1}", who, lname, lg=lg) if uid == replied else tr("{0} commented in {1}", who, lname, lg=lg)
-            out.append((uid, le2e_neutral(lg), msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s),
-                        {**comment_push_extra(t, lg), **({"ws": "limit"} if asks else {})}))
-            continue
-        msg = tr("{0} mentioned you: {1}", who, what, lg=lg) if uid in notify_mentions else \
-            tr("{0} replied to your message: {1}", who, what, lg=lg) if uid == replied else tr("{0} commented: {1}", who, what, lg=lg)
-        if card is not None:  # 2.367.2 (#2968): the card's own words; a question waits for the person like the chat's approval (mark "limit")
-            out.append((uid, tr("Approval needed: {0}", card or t["title"], lg=lg), tr("{0} asks in {1}", who, t["title"], lg=lg),
-                        f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), {**comment_push_extra(t, lg), "ws": "limit"}))
-            continue
-        if asks:
-            out.append((uid, t["title"], tr("{0} asks: {1}", who, what, lg=lg), f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s),
-                        {**comment_push_extra(t, lg), "ws": "limit"}))
-            continue
-        out.append((uid, t["title"], msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), comment_push_extra(t, lg)))
-    return out
 
 
 def cmt_card_title(choices):

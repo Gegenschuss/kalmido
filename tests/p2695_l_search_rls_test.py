@@ -56,10 +56,11 @@ check(dbx("SELECT org_id FROM tasks WHERE id=?", (TB,))[0][0] == BETA, "setup: B
 dbx("INSERT INTO tasks(list_id, title, created_at, updated_at) SELECT ?, CASE WHEN g % 25 = 0 THEN 'Rechnung Beta ' ELSE 'Beta item ' END || g, "
     "created_at, updated_at FROM tasks, generate_series(1, 4000) g WHERE tasks.id=?", (LB, TB))
 check(Ca.post(B + f"/api/tasks/{TB}/comments", json={"body": "Beta note"}).ok, "setup: a comment of Beta")
-dbx("INSERT INTO comments(task_id, user_id, body, created_at) SELECT t.id, c.user_id, 'Beta note ' || t.id, c.created_at "
-    "FROM comments c, tasks t WHERE c.task_id=? AND t.list_id=? AND t.id<>?", (TB, LB, TB))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+dbx("INSERT INTO obj_comments(kind, ref_id, user_id, body, created_at) SELECT 'task', t.id, c.user_id, 'Beta note ' || t.id, c.created_at "
+    "FROM obj_comments c, tasks t WHERE c.kind='task' AND c.ref_id=? AND t.list_id=? AND t.id<>?", (TB, LB, TB))
 dbx("ANALYZE tasks")
-dbx("ANALYZE comments")
+dbx("ANALYZE obj_comments")  # 2.972.0 (#5272): the task comments are rows of obj_comments
 check(dbx("SELECT COUNT(*) FROM tasks WHERE org_id=?", (BETA,))[0][0] == 4001, "setup: 4001 tasks of Beta")
 check(A.post(B + f"/api/tasks/{T1}/comments", json={"body": "Die Rechnung ist raus"}).ok, "setup: a comment")
 FID, Fr = freelancer(B, A, "frida")
@@ -138,11 +139,12 @@ for who in ("bob", "frida"):
     check(plans and any("tasks" in x and ("Index Cond" in x or "Recheck Cond" in x or "Index Scan" in x) for x in plans[0]),
           f"#4960 {who}: the tasks come through an index")
 
-res = probe("bob", "/api/search/messages?q=rechnung", "FROM comments m JOIN tasks t")
+# 2.972.0 (#5272): the comment search reads the core's obj_comments (collab/msgsearch.py)
+res = probe("bob", "/api/search/messages?q=rechnung", "FROM obj_comments m JOIN tasks t")
 print("info: comment search plan (bob):\n" + "\n".join((res.get("plans") or [[str(res)]])[0]), flush=True)
 check(res.get("status") == 200, f"the comment search request ran {str(res)[:200]}")
 cplan = (res.get("plans") or [[]])[0]
 check(not [b for b in bare_task_scans(cplan)], "#4960: the comment search reads no whole tasks table " + " || ".join(x.strip()[:110] for x in cplan if "->" in x or "Cond" in x or "Join" in x))
-check(not [x for x in cplan if "Seq Scan on comments" in x], "#4960: the comment search reads no whole comments table " + " || ".join(x.strip()[:160] for x in cplan[:14]))
+check(not [x for x in cplan if "Seq Scan on obj_comments" in x], "#4960: the comment search reads no whole comments table " + " || ".join(x.strip()[:160] for x in cplan[:14]))
 
 raise SystemExit(kt.done("p2695_l_search_rls"))

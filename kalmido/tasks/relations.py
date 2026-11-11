@@ -19,6 +19,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso_ms, now_utc
 from ..core.pg import insert_id
+from ..core.objcomments import ocm_add  # 2.972.0 (#5272)
 from ..core.errors import BadInput, reject_unknown
 from ..core.access import Denied, need_task, task_visible
 from ..core.serializers import rel_of
@@ -126,8 +127,7 @@ def rel_close_dup(c, tid, other, rid):
     push_handled(c, me(), [tid])
     cid = None
     if not le2e_task_mode(c, tid):  # a project encrypted in the browser: no plain text from the server
-        cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at) VALUES(?,?,?,'',?)",
-                        (tid, me(), tr("Duplicate of #{0}", other), iso_ms(now_utc())))
+        cid = ocm_add(c, "task", tid, me(), tr("Duplicate of #{0}", other))  # 2.972.0 (#5272): the core's comment
     undo["dup"] = {"other": other, "rel": rid, "cm": cid}
     return signed(tid, undo)
 

@@ -30,7 +30,9 @@ ROOT = os.path.dirname(N)
 # ================================================================== the code goes through the core
 ROUTES = {  # file -> {function: the core call it must make}
     "kalmido/lists/templates.py": {"template_update": "part_write", "template_delete": "part_trash", "template_restore": "part_restore"},
-    "kalmido/collab/comments.py": {"comment_update": "part_write"},
+    # 2.972.0 (#5272): a task comment is a row of the comments' core; the route edits through ocm_edit, which writes through part_write
+    "kalmido/collab/comments.py": {"comment_update": "ocm_edit"},
+    "kalmido/core/objcomments.py": {"ocm_edit": "part_write"},
     "kalmido/lists/fields.py": {"field_update": "part_write"},
     "kalmido/lists/sprints.py": {"sprint_update": "part_write"},
     "kalmido/tasks/tasks.py": {"set_waiting": "part_write"},
@@ -47,9 +49,13 @@ _op = open(os.path.join(ROOT, "kalmido", "core", "objparts.py"), encoding="utf-8
 check('return "id=?" + (f" AND ({where})" if where else "")' in _op and _op.count("w, a = _part_where(rid, where, args)") == 2,
       "review: part_trash and part_restore always bind id=rid, the area's where only narrows it")
 check("WHERE id=?{live}" in _op, "review: part_write reads the row under the lock with the kind's live condition")
-for _f in ("kalmido/lists/templates.py", "kalmido/collab/comments.py"):
+for _f in ("kalmido/lists/templates.py",):
     _src = open(os.path.join(ROOT, _f), encoding="utf-8").read()
     check('live="deleted_at IS NULL")' in _src, f"review: {_f} registers its kind with live=\"deleted_at IS NULL\"")
+# 2.972.0 (#5272): the comments' kind is registered by the core (core/objcomments.py) with the one live condition live_sql()
+_csrc = open(os.path.join(ROOT, "kalmido/core/objcomments.py"), encoding="utf-8").read()
+check("part_kind(OCM_PART, \"obj_comments\"" in _csrc and "live=live_sql())" in _csrc,
+      "review: core/objcomments.py registers the comments' kind with live=live_sql()")
 _tsrc = open(os.path.join(ROOT, "kalmido/lists/templates.py"), encoding="utf-8").read()
 # 2.905.0 (#5288): the guard asks the core's role (lists/tplkind.py: in the trash only 'manage' -- the owner of a private one,
 # an organisation's admin), no rule of its own any more

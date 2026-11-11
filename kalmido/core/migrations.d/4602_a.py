@@ -11,14 +11,13 @@ it; its policies come from the database's columns). The way back: DROP the trigg
 the columns may stay (an older version ignores them; rls.apply gives them the policy with a warning)."""
 MIGRATIONS = [
     ("tasks", "org_id", "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS org_id BIGINT REFERENCES orgs(id) ON DELETE SET NULL"),
-    ("comments", "org_id", "ALTER TABLE comments ADD COLUMN IF NOT EXISTS org_id BIGINT REFERENCES orgs(id) ON DELETE SET NULL"),
+    # 2.972.0 (#5272): comments.org_id went with comments (obj_comments has its own org_id, migrations.d/5272_a.py)
     ("events", "org_id", "ALTER TABLE events ADD COLUMN IF NOT EXISTS org_id BIGINT REFERENCES orgs(id) ON DELETE SET NULL"),
     ("contacts", "org_id", "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS org_id BIGINT REFERENCES orgs(id) ON DELETE SET NULL"),
 ]
 AFTER = [
     # the foreign keys' ON DELETE SET NULL of an organisation removed for good finds its rows by these
     "CREATE INDEX IF NOT EXISTS ix4602_tasks_org ON tasks(org_id) WHERE org_id IS NOT NULL",
-    "CREATE INDEX IF NOT EXISTS ix4602_comments_org ON comments(org_id) WHERE org_id IS NOT NULL",
     "CREATE INDEX IF NOT EXISTS ix4602_events_org ON events(org_id) WHERE org_id IS NOT NULL",
     "CREATE INDEX IF NOT EXISTS ix4602_contacts_org ON contacts(org_id) WHERE org_id IS NOT NULL",
 ]

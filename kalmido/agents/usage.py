@@ -12,6 +12,7 @@ from ..core.config import API_PREFIX, app, MAX_FILE_MB, PUBLIC_URL, TZ
 from ..core.pg import insert_id, st_ids, system_ctx  # 2.674.0 B (#4194): st_ids
 from ..core.i18n import dec_comma, fmt_int, lang, tr
 from ..core.db import bump, connect, db, inbox_default, iso, iso_ms, local_now, now_utc, parse_iso, usettings
+from ..core.objcomments import ocm_row  # 2.972.0 (#5272)
 from ..accounts.session import GATE, me
 from ..accounts.pictures import avatar_url
 from ..core.access import Denied, list_role, need_collab, need_list, task_visible
@@ -896,7 +897,7 @@ def v1_comment_unreact(cid, emoji):
 
 
 def v1_comment_one(c, cid):
-    r = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
+    r = ocm_row(c, cid)  # 2.972.0 (#5272): the core's row in the old keys
     d = with_reactions(c, [{**comment_dict(r, att_dicts(c, "comment_id=?", (cid,))), "task_id": r["task_id"]}])[0]
     return v1_comment(c, d, user_names(c, [r["user_id"]]))
 

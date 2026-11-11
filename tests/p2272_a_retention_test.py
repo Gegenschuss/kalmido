@@ -86,10 +86,11 @@ check(box("from kalmido.core.retention import ret_trash_days\nprint(ret_trash_da
       "#3026: a trash period of 0 is 1 day")
 T0 = task(A, None, "Comment holder")
 check(A.post(B + f"/api/tasks/{T0}/comments", json={"body": "gone soon"}).ok, "setup: a comment")
-CM = c.execute("SELECT id FROM comments WHERE task_id=?", (T0,)).fetchone()[0]
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+CM = c.execute("SELECT id FROM obj_comments WHERE kind='task' AND ref_id=?", (T0,)).fetchone()[0]
 check(A.delete(B + f"/api/comments/{CM}").ok, "setup: the comment deleted (emptied row in the trash)")
 box("from kalmido.files.trashpurge import tp_tick\nprint(tp_tick(c, True))", on=True, env=("KALMIDO_TRASH_DAYS=0",))
-check(exists("comments", CM), "#3026: period 0 + switch on: the comment deleted just now stays (tp_tick)")
+check(exists("obj_comments", CM), "#3026: period 0 + switch on: the comment deleted just now stays (tp_tick)")
 
 # ---------------------------------------------------------------- the list trash: switch off counts, on deletes
 LO = A.post(B + "/api/lists", json={"name": "Old project", "org_id": None}).json()["id"]

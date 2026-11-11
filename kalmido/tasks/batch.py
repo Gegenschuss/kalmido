@@ -34,7 +34,7 @@ def attachment_delete(aid):
     if a["comment_id"] is None:
         log_act(c, a["task_id"], "attach_rm", {"name": a["name"]})
     else:
-        c.execute("UPDATE comments SET edited_at=? WHERE id=?", (iso(now_utc()), a["comment_id"]))
+        c.execute("UPDATE obj_comments SET edited_at=? WHERE id=?", (iso(now_utc()), a["comment_id"]))
     bump(c)
     c.commit()
     return jsonify(one_task(c, a["task_id"]) if a["comment_id"] is None else {"ok": True})
@@ -50,7 +50,7 @@ def attachment_restore(aid):
     if a["comment_id"] is None:
         log_act(c, a["task_id"], "attach", {"names": [a["name"]], "n": 1})
     else:
-        c.execute("UPDATE comments SET edited_at=? WHERE id=?", (iso(now_utc()), a["comment_id"]))
+        c.execute("UPDATE obj_comments SET edited_at=? WHERE id=?", (iso(now_utc()), a["comment_id"]))
     bump(c)
     c.commit()
     return jsonify(one_task(c, a["task_id"]))  # also for a comment file: the task's trash list changes

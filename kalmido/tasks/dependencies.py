@@ -227,11 +227,10 @@ def unblock_events(c, done_ids):
             s = collab_user(c, uid)
             if not s or "deps" not in (s.get("features") or "").split(","):
                 continue  # module "deps" off: no News / push about dependencies (the activity line stays)
-            from ..notify.taskbell import tbl_level
             # 2.891.0 (#5270): who may still read the task decides the core's send decision (obj_role >= view)
             if not obj_notify(c, "task", w, [uid], row="unblock", lid=t["list_id"], S={uid: s},
                               news={"kind": "unblock", "task_id": w, "data": {"blocker": bl}, "actor": actor},
-                              follow=lambda u, s: not tbl_level(c, u, w, s),  # 2.53.0 C (#1424): muted / urgent (pushed by tbl_note of the history line above)
+                              follow="quiet",  # 2.53.0 C (#1424): muted / urgent (pushed by tbl_note of the history line above); 2.972.0 (#5285): obj_follow
                               gate=lambda u, s: push_reachable(c, u, s) and burst_gate(c, u, w, event=True)):
                 continue
             lg = lang_of(s)

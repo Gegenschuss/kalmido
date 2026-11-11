@@ -546,7 +546,7 @@ def _wd_followup(c, t, users, S, LG, now):
                     (tr("Waiting on: {0}", t["wait_note"], lg=lg) + " · " if t["wait_note"] else "") + lname)
     from ..tasks.watchers import wat_users
     follow = {t["assignee_id"], t["created_by"], t["delegate_agent_id"]} | wat_users(c, t["id"]) | {r[0] for r in c.execute(
-        "SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL", (t["id"],))}  # 2.473.0 (#3357): + delegated, watchers
+        "SELECT DISTINCT user_id FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL", (t["id"],))}  # 2.473.0 (#3357): + delegated, watchers
     for aid in sorted(agent_ids(c) & follow):
         if task_visible(c, t["id"], aid, full=True):
             agent_emit(c, aid, "followup_due", agent_task_data(c, t["id"], aid, waiting=waiting_of(t)), actor=None)

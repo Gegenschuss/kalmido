@@ -203,11 +203,17 @@ TG = mk(LG, "Ship it")
 def req(kind="integrate", lid=None, tid=None, by=GB):
     sug = {"kind": kind, "state": "open", **({"source": "feat/x", "target": "main", "evidence": "tests green"} if kind == "integrate" else {}),
            **({"pr_url": "https://example.com/acme/app/pull/7", "number": 7, "repo": "acme/app"} if kind == "merge_request" else {})}
-    dbx("INSERT INTO comments(task_id,user_id,body,created_at,suggestion) VALUES(?,?,?,?,?)", (tid or TG, by, "please " + kind, TS, json.dumps(sug)))
-    return dbx("SELECT id FROM comments WHERE task_id=? ORDER BY id DESC LIMIT 1", (tid or TG,))[0][0]
+    # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+    dbx("INSERT INTO obj_comments(kind, ref_id,user_id,body,created_at,extra) VALUES('task', ?,?,?,?,jsonb_build_object('suggestion', ?::text))",
+        (tid or TG, by, "please " + kind, TS, json.dumps(sug)))
+    return dbx("SELECT id FROM obj_comments WHERE kind='task' AND ref_id=? ORDER BY id DESC LIMIT 1", (tid or TG,))[0][0]
 
 
-sugg = lambda k: json.loads(dbx("SELECT suggestion FROM comments WHERE id=?", (k,))[0][0])
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+def sugg(k):
+    return json.loads(dbx("SELECT extra->>'suggestion' FROM obj_comments WHERE id=?", (k,))[0][0])
+
+
 decide = lambda s, k, d="approve": s.post(B + f"/api/comments/{k}/decide", json={"decision": d})
 react = lambda s, k, e="up", on=True: s.post(B + f"/api/comments/{k}/reactions", json={"emoji": e, "on": on})
 K0 = req()
@@ -267,6 +273,7 @@ check(len(acts) == 1 and acts[0].get("waiting") is True and acts[0].get("ok") is
 # review F2: a thumb taken back while a second approver gives one - the second reads the state after the take-back
 K6 = req()
 check(react(Ca, K6).json().get("gate") == "waiting", "F2: setup, carol's first 👍 waits")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
 HOLD = """
 import json, sys, time
 from kalmido.core import pg as _pg
@@ -274,7 +281,7 @@ from kalmido.core.config import DATABASE_URL
 cid = int(sys.argv[1])
 c, w, n = _pg.connect_direct(DATABASE_URL), _pg.connect_direct(DATABASE_URL), 0
 with _pg.system_ctx(c):
-    sug = json.loads(c.execute("SELECT suggestion FROM comments WHERE id=? FOR UPDATE", (cid,)).fetchone()[0])
+    sug = json.loads(c.execute("SELECT extra->>'suggestion' FROM obj_comments WHERE id=? FOR UPDATE", (cid,)).fetchone()[0])
     print("locked", flush=True)
     for _ in range(400):  # until the reaction request waits for the row lock (a state, not a fixed time)
         with _pg.system_ctx(w):
@@ -284,7 +291,7 @@ with _pg.system_ctx(c):
             break
         time.sleep(0.05)
     sug["approvals"] = []  # carol takes her thumb back first
-    c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(sug), cid))
+    c.execute("UPDATE obj_comments SET extra=jsonb_set(extra, '{suggestion}', to_jsonb(?::text)) WHERE id=?", (json.dumps(sug), cid))
     c.execute("DELETE FROM obj_reactions WHERE target_kind='comment' AND target_id=? AND emoji='up'", (cid,))  # 2.763.0 (#5269): the reactions are rows of the core (obj_reactions)
 c.commit()
 print("done", n, flush=True)

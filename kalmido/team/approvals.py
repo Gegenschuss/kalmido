@@ -13,7 +13,6 @@ from ..collab.news import KIND_ROW  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import lang_of, user_names, task_event  # 2.369.5 (#2517): pulled up from functions
 from ..notify.channels import evm_note  # 2.369.5 (#2517): pulled up from functions
 from ..notify.push import push_prio, push_reachable  # 2.369.5 (#2517): pulled up from functions
-from ..notify.taskbell import tbl_level  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.lifecycle import do_complete  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.dependencies import completed_ids, unblock_events  # 2.369.5 (#2517): pulled up from functions
 
@@ -46,7 +45,7 @@ def approval_request_notify(c, t, ap, note):
     # 2.891.0 (#5270): who may still read the task decides the core's send decision (obj_role >= view), no check of its own
     got = obj_notify(c, "task", t["id"], [ap], row=KIND_ROW["aprequest"], lid=t["list_id"],
                      news={"kind": "aprequest", "task_id": t["id"], "actor": actor, "data": {"note": note[:300]} if note else None},
-                     follow=lambda u, s: tbl_level(c, u, t["id"], s) != "mute")
+                     follow="unmuted")  # 2.972.0 (#5285): the bell of obj_follow
     if ap not in got:
         return
     s = got[ap]

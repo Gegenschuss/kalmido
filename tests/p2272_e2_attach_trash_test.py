@@ -264,7 +264,8 @@ check(f"RES ('report (v3).md', 3, {V1})" in out, f"version name after a version 
 
 # 2.370.4 (#3089 E2-N11): a comment without text whose only file lies in the trash is not shown; its file restored, it is back
 CE = A.post(B + f"/api/tasks/{TV}/comments", json={"body": "tmp"}).json()["id"]
-sql("UPDATE comments SET body='' WHERE id=?", (CE,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+sql("UPDATE obj_comments SET body='' WHERE id=?", (CE,))
 sql("INSERT INTO attachments(task_id, comment_id, name, path, created_at, deleted_at) VALUES(?,?,?,?,?,?)", (TV, CE, "a.pdf", "x/a.pdf", OLD, OLD))
 tl = A.get(B + f"/api/tasks/{TV}/timeline").json()
 check(not any(x["id"] == CE for x in tl.get("comments", [])), "an empty comment with its file in the trash is not shown")

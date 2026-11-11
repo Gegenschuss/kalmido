@@ -142,8 +142,9 @@ def case(fn, sender, extra=()):
         c.rollback()
         c.close()
 ALL = [U[n] for n in ("bob", "dave", "carl", "scout")]
-watch = lambda tid, ids: [("INSERT INTO task_watchers(task_id,user_id,created_at) VALUES(?,?,'2026-11-09T08:00:00') ON CONFLICT DO NOTHING",
-                           (tid, u)) for u in ids]
+# 2.972.0 (#5285): the watching rows of the core's obj_follow
+watch = lambda tid, ids: [("INSERT INTO obj_follow(user_id,kind,ref_id,mode,created_at,updated_at) VALUES(?,'task',?,'watch','2026-11-09T08:00:00Z','2026-11-09T08:00:00Z') ON CONFLICT DO NOTHING",
+                           (u, tid)) for u in ids]
 def room(c, rid, mid, ment):
     r = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (rid,)).fetchone()
     m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()

@@ -268,7 +268,9 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/mt940.py` - SWIFT MT940 / MT942 statements (the German bank dialects: Sparkasse, Volksbank, Deutsche Bank, Commerzbank ...)
 - `kalmido/core/numtext.py` - ONE reader for numbers typed by people - the same rules as parseNum in static/js/core.js
 - `kalmido/core/objects.py` (`obj`) - The shared core, stage 1 -- ONE register of object kinds and ONE role function for every new area (docs/dev/kern.md "So baut man einen neuen Bereich")
+- `kalmido/core/objfollow.py` (`ofl`) - Following exists once, in the shared core: one table obj_follow for the watchers and the bell of a task (stage Q9a)
 - `kalmido/core/objhooks.py` (`obj`) - The two things of the shared core that the layer accounts needs, without importing upward
+- `kalmido/core/objcomments.py` (`ocm`) - Comments exist once, in the shared core: one table obj_comments (kind, ref_id) with its trash obj_comment_trash, one mention parser, one say rule, one delete rule (stage Q4a)
 - `kalmido/core/objlight.py` (`obj`) - The light kinds of the shared core (task, event, hub_mail, client): kind and role only, no node, no shares, no write path
 - `kalmido/core/objnotify.py` (`obj`) - The one send decision of the shared core: every recipient of a News entry or push is cut with obj_role >= view first (stage Q2)
 - `kalmido/core/objseen.py` (`osn`) - Read marks exist once, in the shared core: one table obj_seen (task: the highest comment id a person has seen); task_seen moved here and went (stage Q8a)

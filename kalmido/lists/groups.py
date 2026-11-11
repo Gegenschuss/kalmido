@@ -261,8 +261,8 @@ def grp_sync(c, lids, actor=None):
                 c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
                 c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
                 dlg_gone(c, lid, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
-                # 2.352.0 F (#2748, review N7): like removing a member by hand (lists.py member_remove)
-                c.execute("DELETE FROM task_bell WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
+                # 2.352.0 F (#2748, review N7): like removing a member by hand (lists.py member_remove); 2.972.0 (#5285): the
+                # bells are rows of obj_follow, dlg_gone takes them
                 c.execute("DELETE FROM user_task_order WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
                 c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE list_id=? AND type='person')",
                           (str(uid), lid))

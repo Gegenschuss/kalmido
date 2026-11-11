@@ -1552,7 +1552,6 @@ POST /api/supporter/{}/swap
 POST /api/tags/delete
 POST /api/tags/restore
 POST /api/tasks/similar
-POST /api/tasks/{}/bell/undo
 POST /api/tasks/{}/chain/pull
 POST /api/tasks/{}/editing
 POST /api/tasks/{}/enc-attachments
@@ -1673,7 +1672,6 @@ PUT /api/office/cashflow/actual
 PUT /api/office/cashflow/check
 PUT /api/office/logbook/settings
 PUT /api/supporter/{}
-PUT /api/tasks/{}/bell
 PUT /api/tasks/{}/enc-note
 PUT /api/tasks/{}/note-lock
 PUT /api/v1/address-books/{}/members/{}

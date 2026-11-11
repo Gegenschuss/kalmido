@@ -1020,7 +1020,7 @@ def v1_comment_update(cid):
         raise Denied(403, tr("Only the author can edit this comment"))
     b = take_version(b)
     j = v1_call(comment_update, cid, body={"body": b["body"], **({"expect_updated_at": b["expect_updated_at"]} if b.get("expect_updated_at") else {})})
-    tid = c.execute("SELECT task_id FROM comments WHERE id=?", (cid,)).fetchone()[0]
+    tid = c.execute("SELECT ref_id FROM obj_comments WHERE id=?", (cid,)).fetchone()[0]  # 2.972.0 (#5272)
     return jsonify(v1_comment(c, {**j, "task_id": tid}, user_names(c, [j.get("user_id") or me()])))
 
 

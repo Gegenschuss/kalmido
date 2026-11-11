@@ -134,7 +134,8 @@ Fr.patch(B + "/api/settings", json={"assistant_on": "1"})
 FL = Fr.post(B + "/api/lists", json={"name": "Frida private"}).json()["id"]
 FT = Fr.post(B + "/api/tasks", json={"title": "Private plan", "list_id": FL}).json()["id"]
 Fr.post(B + f"/api/tasks/{FT}/comments", json={"body": "Frida own remark"})
-dbx("INSERT INTO comments(task_id,user_id,body,created_at) VALUES(?,?,?,?)", (FT, BOB, "Guest remark in private list", "2026-10-25T10:00:00Z"))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+dbx("INSERT INTO obj_comments(kind, ref_id,user_id,body,created_at) VALUES('task', ?,?,?,?)", (FT, BOB, "Guest remark in private list", "2026-10-25T10:00:00Z"))
 check(Fr.put(B + "/api/assistant/lists", json={"list_ids": [FL]}).ok, "freelancer shares her private list")
 um = asked(Fr, FT)
 check("Frida own remark" in um and "Guest remark in private list" in um, "freelancer: private list, every comment goes along as before")

@@ -102,7 +102,8 @@ def runs(aid=TK):
 
 
 def agent_comments(tid, aid=TK):
-    return dbx("SELECT id FROM comments WHERE task_id=? AND user_id=? AND body LIKE 'FAKE comment%'", (tid, aid))
+    # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+    return dbx("SELECT id FROM obj_comments WHERE kind='task' AND ref_id=? AND user_id=? AND body LIKE 'FAKE comment%'", (tid, aid))
 
 
 def settled(n):

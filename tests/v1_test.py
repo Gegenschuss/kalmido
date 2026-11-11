@@ -188,7 +188,8 @@ check(tl.ok, "comment while collaboration is on")
 # ------------------------------------------------------------------ collaboration for everyone: OFF
 t_bob = A.post(B + "/api/tasks", json={"title": "assigned to bob", "list_id": lid, "assignee_id": ids["bob"]}).json()["id"]
 A.post(B + f"/api/lists/{lid}/status", json={"status": "at_risk", "note": "slow"})
-before = {t: dbx(f"SELECT COUNT(*) FROM {t}")[0][0] for t in ("list_members", "comments", "activity", "notifications", "list_status", "tasks")}
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments
+before = {t: dbx(f"SELECT COUNT(*) FROM {t}")[0][0] for t in ("list_members", "obj_comments", "activity", "notifications", "list_status", "tasks")}
 news_before = dbx("SELECT COUNT(*) FROM notifications")[0][0]
 check(Bo.patch(B + "/api/admin/settings", json={"collab_all": False}).status_code == 403, "non-admin cannot switch collaboration off")
 open(os.path.join(DATA, "ntfy.log"), "w").close()
@@ -235,9 +236,9 @@ time.sleep(1.5)
 check(dbx("SELECT COUNT(*) FROM notifications")[0][0] == news_before, "off: completing an assigned task writes no News")
 check(not [x for x in (open(os.path.join(DATA, "ntfy.log")).read().splitlines() if os.path.exists(os.path.join(DATA, "ntfy.log")) else [])
            if "t-bob" in x], "off: no collaboration push to bob")
-after = {t: dbx(f"SELECT COUNT(*) FROM {t}")[0][0] for t in ("list_members", "comments", "list_status")}
+after = {t: dbx(f"SELECT COUNT(*) FROM {t}")[0][0] for t in ("list_members", "obj_comments", "list_status")}
 # 2.395.0 (#3379): + the one status update set above while collaboration was off
-check(all(after[k] == before[k] + (1 if k in ("comments", "list_status") else 0) for k in after), f"off: memberships, comments (+ the deleted note), status history (+ #3379 update) kept: {before} {after}")
+check(all(after[k] == before[k] + (1 if k in ("obj_comments", "list_status") else 0) for k in after), f"off: memberships, comments (+ the deleted note), status history (+ #3379 update) kept: {before} {after}")
 # personal lists keep working
 check(Bo.post(B + "/api/tasks", json={"title": "solo", "list_id": blid}).ok, "off: own lists work normally")
 ical = A.post(B + "/api/ical", json={"action": "create"}).json()

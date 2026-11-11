@@ -13,6 +13,7 @@ from flask import g, jsonify, request
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.i18n import tr, trn
 from ..core.db import db, inbox_default, iso, now_utc, parse_iso, uset, usettings
+from ..core.objcomments import OCM_TS  # 2.972.0 (#5272): the old time form of a comment
 from ..core.usertz import user_now
 from ..core.access import Denied, list_role, tvis, vis_sql, task_visible
 from ..accounts.session import me
@@ -159,7 +160,7 @@ def _changes(c, uid, ql, vis, since_iso):
     without assignee in uid's own lists): newly assigned, comments, status changes, date changes. One row per task, newest
     first: {id, title, list_id, list_name, kinds, by: [{id, name}], at}; plus the number of such tasks."""
     concern = f"""(t.assignee_id=? OR t.created_by=? OR (t.assignee_id IS NULL AND l.owner_id=?)
-                   OR t.id IN (SELECT task_id FROM comments WHERE user_id=? AND deleted_at IS NULL))"""
+                   OR t.id IN (SELECT ref_id FROM obj_comments WHERE kind='task' AND user_id=? AND deleted_at IS NULL))"""
     head = f"""FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.deleted_at IS NULL AND t.list_id IN ({ql}) AND {vis}"""
     kinds = ",".join(f"'{k}'" for k in BRIEF_KINDS)
     acts = c.execute(f"""SELECT a.task_id, a.user_id, a.kind, a.data, a.created_at {head.replace('FROM tasks t', 'FROM activity a JOIN tasks t ON t.id=a.task_id')}
@@ -167,7 +168,8 @@ def _changes(c, uid, ql, vis, since_iso):
                      (since_iso, uid, uid, uid, uid, uid)).fetchall()
     # comments only where uid sees the task fully (a participant's context tasks have no comments for them)
     cvis = tvis(c, uid, "t.", write=True)
-    cms = c.execute(f"""SELECT cm.task_id, cm.user_id, cm.created_at {head.replace('FROM tasks t', 'FROM comments cm JOIN tasks t ON t.id=cm.task_id')}
+    chead = head.replace("FROM tasks t", "FROM obj_comments cm JOIN tasks t ON t.id=cm.ref_id AND cm.kind='task'")  # 2.972.0 (#5272)
+    cms = c.execute(f"""SELECT cm.ref_id AS task_id, cm.user_id, to_char(cm.created_at AT TIME ZONE 'UTC', '{OCM_TS}') AS created_at {chead}
                         AND {cvis} AND cm.created_at>? AND cm.deleted_at IS NULL AND cm.user_id IS NOT NULL AND cm.user_id!=? AND {concern}""",
                     (since_iso, uid, uid, uid, uid, uid)).fetchall()
     news = c.execute(f"""SELECT t.id AS task_id, t.created_by AS user_id, t.created_at {head} AND t.status=0 AND t.assignee_id=?

@@ -86,8 +86,8 @@ def _source_of_agent(c, aid, src):
         if not m or m["sender"] != "user" or not agent_shares(c, aid, m["user_id"]):
             raise Denied(404)
         return ("chat", sid, None, m["user_id"], _excerpt(m["body"]))
-    m = c.execute("""SELECT k.id, k.task_id, k.user_id, k.body, k.ext_name, u.kind, t.list_id FROM comments k
-                     JOIN tasks t ON t.id=k.task_id LEFT JOIN users u ON u.id=k.user_id
+    m = c.execute("""SELECT k.id, k.ref_id AS task_id, k.user_id, k.body, k.ext_name, u.kind, t.list_id FROM obj_comments k
+                     JOIN tasks t ON t.id=k.ref_id AND k.kind='task' LEFT JOIN users u ON u.id=k.user_id
                      WHERE k.id=? AND k.deleted_at IS NULL""", (sid,)).fetchone()
     if not m or m["user_id"] == aid or not task_visible(c, m["task_id"], aid, full=True):
         raise Denied(404)
@@ -141,7 +141,7 @@ def _src_seen(c, r, aid):
 
 
 def _comment_alive(c, cid):
-    return bool(cid) and bool(c.execute("SELECT 1 FROM comments WHERE id=? AND deleted_at IS NULL", (cid,)).fetchone())
+    return bool(cid) and bool(c.execute("SELECT 1 FROM obj_comments WHERE id=? AND kind='task' AND deleted_at IS NULL", (cid,)).fetchone())
 
 
 @app.post("/api/v1/agent/rules")

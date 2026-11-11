@@ -625,7 +625,8 @@ def list_space_follow(c, lid, old_org, boundary):
         c.execute("""UPDATE portal_tickets SET client_id=NULL WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
                      AND client_id IS NOT NULL AND client_id NOT IN (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)""",
                   (lid, oid))
-    c.execute("""UPDATE task_bell SET org_id=? WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
+    # 2.972.0 (#5285): the bells are rows of obj_follow (a watching row follows its task by itself: kalmido_ofl_carry)
+    c.execute("""UPDATE obj_follow SET org_id=? WHERE kind='task' AND mode<>'watch' AND ref_id IN (SELECT id FROM tasks WHERE list_id=?)
                  AND org_id IS NOT DISTINCT FROM ?""", (oid, lid, old_org or None))
     return n
 
@@ -1673,8 +1674,8 @@ def org_leave(c, oid, uid, heir, back=None):
         from ..lists.groups import grp_sync
         grp_sync(c, priv)
     OLV_AREAS["home"](c, oid, uid, back)  # 2.365.1 (#3395): after the lists: what hangs at a project that went back stays attached
-    # 2.473.0 (#3357): watching without a membership ends the same way (a list open to the organisation)
-    c.execute("DELETE FROM task_watchers WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?))", (uid, oid, uid))
+    # 2.473.0 (#3357): watching without a membership ends the same way (a list open to the organisation) -- 2.972.0 (#5285):
+    # person_revoked 'leave' below takes every row of obj_follow of them and their agents in the organisation
     # 2.83.0 (#1725): tasks assigned without joining (a list everyone in the organisation may edit)
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?)", (uid, oid, uid))
     # 2.363.3 (#3133): coming along without a membership too (brought back by joining again in a list open to the organisation)
@@ -1719,8 +1720,8 @@ def org_leave(c, oid, uid, heir, back=None):
     # 2.560.0 (#4698 a): their channel memberships and file / knowledge shares in the organisation end (coming back the same
     # day, also as a guest = no old closed channels, no old folder shares) -- 2.747.0 (#5246): person_revoked 'leave' above
     # takes exactly these rows (the person and their agents) into obj_revoked; the second bare DELETE went
-    # 2.53.0 (#1424, review): the leaver's task bells in the organisation go too (else the nightly boundary check alarms)
-    c.execute("DELETE FROM task_bell WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
+    # 2.53.0 (#1424, review): the leaver's task bells in the organisation go too (else the nightly boundary check alarms) --
+    # 2.972.0 (#5285): rows of obj_follow, person_revoked 'leave' above takes them
     from ..sheets.shshare import shs_leave
     shs_leave(c, oid, [uid, *ags])  # 2.124.0 C (#2113): their shares of the organisation's tables end
     acx_drop()  # 2.36.2 (#1142): the request's access contexts follow the new memberships

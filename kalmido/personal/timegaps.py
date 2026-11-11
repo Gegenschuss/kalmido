@@ -33,7 +33,8 @@ def time_gaps(c, uid, viewer=None, days=GAP_DAYS):
     rows = c.execute(f"""
         SELECT x.tid, x.ts, t.title, t.list_id FROM (
             SELECT task_id AS tid, created_at AS ts FROM activity WHERE user_id=? AND created_at>=? AND created_at<?
-            UNION ALL SELECT task_id, created_at FROM comments WHERE user_id=? AND deleted_at IS NULL AND created_at>=? AND created_at<?
+            UNION ALL SELECT ref_id, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00:00"') FROM obj_comments
+                WHERE kind='task' AND user_id=? AND deleted_at IS NULL AND created_at>=? AND created_at<?
             UNION ALL SELECT id, completed_at FROM tasks WHERE completed_by=? AND completed_at>=? AND completed_at<?) x
         JOIN tasks t ON t.id=x.tid WHERE t.deleted_at IS NULL AND {both}""",
                      [uid, lo, hi, uid, lo, hi, uid, lo, hi] + vargs).fetchall()

@@ -45,12 +45,13 @@ from ..core.config import app
 from ..core.i18n import lang, N_, tr
 from ..core.db import bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..core.pg import insert_id, write_lock
+from ..core.objcomments import OCM_MENTION_RE as MENTION_RE, ocm_add  # 2.972.0 (#5272)
 from ..core.access import reading_sql
 from ..notify.alerts import _env_int, aa_count
 from ..calendars.subscriptions import CalError
 from ..collab.liste2e import le2e_mode
 from ..collab.reactions import clean_ltag_name, ltag_names, set_ltags
-from ..collab.comments import MENTION_RE, user_names
+from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..tasks.validation import ACT_NOTES, log_act
 from .git import GIT_SYNC, GitRate, git_ctx, git_err_text, git_http
@@ -420,8 +421,8 @@ def gsy_take_comments(c, r, tid, no, cms, lg):
         if not isinstance(rid, int) or isinstance(rid, bool) or rid in have:
             continue
         head = tr("@{0} on {1}:", imp_line(x["author"], 100) or "?", _gis_day(x["created_at"], lg), lg=lg)
-        cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at) VALUES(?,?,?,'',?)",
-                        (tid, uid, (head + "\n\n" + imp_textblock(x["body"], 100000))[:100000], x["created_at"] or ts))
+        cid = ocm_add(c, "task", tid, uid, (head + "\n\n" + imp_textblock(x["body"], 100000))[:100000],
+                      created_at=x["created_at"] or ts)  # 2.972.0 (#5272): the core's comment
         c.execute("INSERT INTO git_issue_comments(conn_id,issue_no,remote_id,comment_id,created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
                   (r["id"], no, rid, cid, ts))
         n += 1
@@ -689,7 +690,7 @@ def _push_comments(c, r, k, no):
     store broke off after the POST) is looked for among the issue's comments first (_sent_before): at most one more POST,
     only when the repository has no such comment."""
     got = {}
-    for row in c.execute("""SELECT x.id, x.send_at, m.body, m.user_id, m.deleted_at FROM git_issue_comments x JOIN comments m ON m.id=x.comment_id
+    for row in c.execute("""SELECT x.id, x.send_at, m.body, m.user_id, m.deleted_at FROM git_issue_comments x JOIN obj_comments m ON m.id=x.comment_id
                             WHERE x.conn_id=? AND x.issue_no=? AND x.remote_id IS NULL ORDER BY x.id""", (r["id"], no)).fetchall():
         if row["deleted_at"] or not (row["body"] or "").strip():
             c.execute("DELETE FROM git_issue_comments WHERE id=?", (row["id"],))

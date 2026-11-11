@@ -25,6 +25,7 @@ from ..core.config import app, PUBLIC_URL, APP_NAME
 from ..core.db import db, iso, now_utc, body, bump, err, iso_ms, parse_iso, usettings
 from ..core.i18n import browser_lang, N_, lang, short_day, tr
 from ..core.pg import insert_id, system_ctx
+from ..core.objcomments import OCM_TS, ocm_add  # 2.972.0 (#5272)
 from ..accounts.session import _token_hash
 from ..accounts.login import auth_key, seal, unseal
 from ..accounts.bgjobs import bgj_add, bgj_fn
@@ -211,8 +212,10 @@ def pt_plain(text):
 def pt_answers(c, task_id):
     """The comments the customer sees: public answers + their own, oldest first, with the shown author name."""
     out = []
-    rows = c.execute("""SELECT k.id, k.user_id, k.body, k.created_at, k.ext_name, u.display_name, u.kind, ag.ai FROM comments k
-                        LEFT JOIN users u ON u.id=k.user_id LEFT JOIN agents ag ON ag.user_id=k.user_id WHERE k.task_id=? AND k.portal=1 AND k.deleted_at IS NULL ORDER BY k.id""",
+    rows = c.execute(f"""SELECT k.id, k.user_id, k.body, to_char(k.created_at AT TIME ZONE 'UTC', '{OCM_TS}') AS created_at, k.ext_name,
+                        u.display_name, u.kind, ag.ai FROM obj_comments k
+                        LEFT JOIN users u ON u.id=k.user_id LEFT JOIN agents ag ON ag.user_id=k.user_id
+                        WHERE k.kind='task' AND k.ref_id=? AND COALESCE((k.extra->>'portal')::boolean, false) AND k.deleted_at IS NULL ORDER BY k.id""",
                      (task_id,)).fetchall()
     for r in rows:
         mine = r["user_id"] is None
@@ -332,8 +335,7 @@ def pt_comment(token):
     if not text:
         return pt_render(c, p, token, lg, tr("Please write a message.", lg=lg))
     name = (p["name"] or "").strip() or tr("Client", lg=lg)
-    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,ext_name,portal) VALUES(?,?,?,?,?,?,1)",
-                    (p["task_id"], None, text, "", iso_ms(now_utc()), name))
+    cid = ocm_add(c, "task", p["task_id"], None, text, ext_name=name, extra={"portal": True})  # 2.972.0 (#5272): the core's comment
     t = c.execute("SELECT t.*, l.owner_id AS l_owner FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (p["task_id"],)).fetchone()
     pt_team_news(c, t, cid, text, name)
     agent_comment_events(c, t, cid, [], [])
@@ -769,8 +771,8 @@ def pt_mail_tick(c):
                              AND NOT (COALESCE(p.via, '')='mail' AND COALESCE(p.unverified, 0)=1 AND COALESCE(p.claimed, 0)=0)
                              AND (p.last_mail_at IS NULL OR p.last_mail_at<=?)
                              AND ((t.status=2 AND p.mailed_status!=2) OR (t.status!=2 AND p.mailed_status=2) OR EXISTS(
-                               SELECT 1 FROM comments k WHERE k.task_id=p.task_id AND k.portal=1 AND k.user_id IS NOT NULL
-                               AND k.deleted_at IS NULL AND k.created_at>COALESCE(p.last_mail_at, p.created_at)))
+                               SELECT 1 FROM obj_comments k WHERE k.kind='task' AND k.ref_id=p.task_id AND COALESCE((k.extra->>'portal')::boolean, false)
+                               AND k.user_id IS NOT NULL AND k.deleted_at IS NULL AND k.created_at>COALESCE(p.last_mail_at, p.created_at)::timestamptz))
                              ORDER BY p.id LIMIT 100""", (cut,)).fetchall()
         for p in rows:
             since = parse_iso(p["last_mail_at"] or p["created_at"])

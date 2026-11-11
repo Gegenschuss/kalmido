@@ -440,7 +440,8 @@ check(NFD and NFD2 and hist == sorted([("move", str(NFD2)), ("move", ""), ("move
 # 2.237.0 (#2870): rows of one other person (encrypted notes, timesheets) are not put under their account
 check(one("SELECT COUNT(*) FROM task_enc_notes WHERE task_id=?", (NT,)) == 0 and "belong to other people" in W, "bob's encrypted note not taken over")
 check(one("SELECT user_id FROM task_people WHERE task_id=?", (NT,)) == BOB, "bob comes along to the new task")
-NC2 = one("SELECT id FROM comments WHERE task_id=?", (NT,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+NC2 = one("SELECT id FROM obj_comments WHERE kind='task' AND ref_id=?", (NT,))
 check(one("SELECT user_id FROM obj_reactions WHERE target_kind='comment' AND target_id=?", (NC2,)) == ALICE, "the comment reaction came along")  # 2.763.0 (#5269): the reactions are rows of the core (obj_reactions)
 bks = T("SELECT resource_kind, resource_id FROM hub_bookings WHERE org_id=?", (ORG3,))
 check(("user", BOB) in bks and ("user", DORA) not in bks, f"bookings: bob yes, dora no {bks}")  # the equipment: with part A

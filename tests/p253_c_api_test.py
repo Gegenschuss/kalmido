@@ -11,6 +11,7 @@
    undo puts back exactly the rows of one change (own and admin's)
  - "all" = the humans of the list who see the task (no agent); a News item for the people marked by someone else
  - rollback safety: one new table (task_bell), one new user setting (tbl_accept)
+ - 2.972.0 (#5285): the rows are the core's obj_follow (kind 'task', mode = the level, ref_id = the task)
 usage: p253_c_api_test.py <datadir>"""
 import json
 import os
@@ -126,7 +127,7 @@ check(put(Ca, T, level="mute", users=[BOB]).status_code == 400, "admin: only urg
 agh = {"Authorization": "Bearer " + AGTOK}
 ra, rb = requests.get(B + f"/api/tasks/{T}/bell", headers=agh), requests.put(B + f"/api/tasks/{T}/bell", headers={**agh, **H}, json={"level": "urgent", "users": [BOB]})
 check(ra.status_code in (401, 403, 404) and rb.status_code in (401, 403, 404), f"agent token: no access to the bell routes ({ra.status_code}, {rb.status_code})")
-check(not q("SELECT 1 FROM task_bell"), "nothing stored by the refused calls")
+check(not q("SELECT 1 FROM obj_follow WHERE mode<>'watch'"), "nothing stored by the refused calls")  # 2.972.0 (#5285): obj_follow
 
 # ================================================================== admin sets urgent for bob
 clear()
@@ -181,7 +182,7 @@ time.sleep(1)  # the push about the marking itself
 clear()
 A.patch(B + f"/api/tasks/{T3}", json={"title": "Dated 2"})
 check([p["prio"] for p in to("t-bob")] == ["5"], "until today: still urgent")
-q("UPDATE task_bell SET until=? WHERE task_id=?", ((T0 - timedelta(days=1)).isoformat(), T3))
+q("UPDATE obj_follow SET until=? WHERE kind='task' AND ref_id=? AND mode<>'watch'", ((T0 - timedelta(days=1)).isoformat(), T3))  # 2.972.0 (#5285)
 clear()
 A.patch(B + f"/api/tasks/{T3}", json={"title": "Dated 3"})
 check(not to("t-bob"), "until yesterday: as the list again (no push for a non-creator)")
@@ -223,7 +224,7 @@ T5 = task(Bo, "Everyone")
 r = put(Ca, T5, level="urgent", users="all")
 check(r.ok and r.json()["changed"] == 3, "all: alice, bob, carol (not the agent) " + r.text[:200])
 time.sleep(1)
-check({x[0] for x in q("SELECT user_id FROM task_bell WHERE task_id=? AND level='urgent'", (T5,))} == {ALICE, BOB, CAROL}, "all: rows")
+check({x[0] for x in q("SELECT user_id FROM obj_follow WHERE kind='task' AND ref_id=? AND mode='urgent'", (T5,))} == {ALICE, BOB, CAROL}, "all: rows")  # 2.972.0 (#5285)
 clear()
 r = Ca.post(B + f"/api/tasks/{T5}/complete", json={})
 check(r.ok, "carol completes " + r.text[:200])
@@ -242,17 +243,20 @@ if ORG:
     TB = A.post(B + "/api/tasks", json={"title": "Beta task", "list_id": LB}).json()["id"]
     check(put(A, TB, level="urgent", users=[BOB]).status_code == 404, "boundary: a person outside the organisation (not in its list) 404")
     check(bell(Bo, TB).status_code == 404 and put(Bo, TB, level="urgent").status_code == 404, "boundary: the outsider neither reads nor sets the bell")
-    check(put(A, TB, level="urgent").ok and q("SELECT org_id FROM task_bell WHERE task_id=? AND user_id=?", (TB, ALICE))[0][0] == ORG, "the row carries the organisation")
-    q("UPDATE task_bell SET org_id=NULL WHERE task_id=?", (TB,))
+    # 2.972.0 (#5285): the bell rows are rows of obj_follow
+    check(put(A, TB, level="urgent").ok and q("SELECT org_id FROM obj_follow WHERE kind='task' AND ref_id=? AND user_id=? AND mode<>'watch'", (TB, ALICE))[0][0] == ORG, "the row carries the organisation")
+    q("UPDATE obj_follow SET org_id=NULL WHERE kind='task' AND ref_id=? AND mode<>'watch'", (TB,))
     check(bell(A, TB).json()["mine"]["level"] == "list", "a row of another workspace (the task moved) is ignored")
-    q("UPDATE task_bell SET org_id=? WHERE task_id=?", (ORG, TB))
-    q("INSERT INTO task_bell(task_id,user_id,org_id,level,created_at,updated_at) VALUES(?,?,?,?,?,?)", (TB, BOB, ORG, "urgent", "2026-01-01", "2026-01-01"))
-    rows = q("SELECT b.task_id, b.user_id FROM task_bell b JOIN users u ON u.id=b.user_id WHERE b.org_id IS NOT NULL AND (u.kind='agent' OR u.kind!='agent' AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=b.org_id AND om.user_id=b.user_id))")
+    q("UPDATE obj_follow SET org_id=? WHERE kind='task' AND ref_id=? AND mode<>'watch'", (ORG, TB))
+    q("INSERT INTO obj_follow(user_id,kind,ref_id,org_id,mode) VALUES(?,'task',?,?,'urgent')", (BOB, TB, ORG))
+    rows = q("SELECT b.ref_id, b.user_id FROM obj_follow b JOIN users u ON u.id=b.user_id WHERE b.kind='task' AND b.mode<>'watch' AND b.org_id IS NOT NULL AND (u.kind='agent' OR u.kind!='agent' AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=b.org_id AND om.user_id=b.user_id))")
     check([list(x) for x in rows] == [[TB, BOB]], "the nightly boundary check finds the outsider's row " + str(rows))
 
 # ================================================================== rollback safety
-cols = {x[0] for x in q("SELECT column_name FROM information_schema.columns WHERE table_name='task_bell'")}
-check({"task_id", "user_id", "org_id", "level", "until", "set_by"} <= cols, "task_bell table")
+# 2.972.0 (#5285): the core's table obj_follow instead of task_bell (gone)
+cols = {x[0] for x in q("SELECT column_name FROM information_schema.columns WHERE table_name='obj_follow'")}
+check({"ref_id", "user_id", "org_id", "mode", "until", "set_by", "prev", "act", "act_by"} <= cols
+      and not q("SELECT to_regclass('task_bell')")[0][0], "obj_follow table, task_bell gone")
 
 print(f"p253_c_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

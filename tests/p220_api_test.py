@@ -443,7 +443,8 @@ d = ev[-1]["data"] if ev else {}
 check(d.get("approval") == "approved" and d.get("merge_request", {}).get("pr_url") == url and d.get("comment", {}).get("suggestion", {}).get("kind") == "merge_request",
       f"event: approved: {d.get('approval')} {d.get('merge_request')}")
 r = A.post(B + f"/api/comments/{CM2}/reactions", json={"emoji": "down"})
-check(json.loads(dbq("SELECT suggestion FROM comments WHERE id=?", (CM2,))[0][0])["state"] == "approved", "decided once")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(json.loads(dbq("SELECT extra->>'suggestion' FROM obj_comments WHERE id=?", (CM2,))[0][0])["state"] == "approved", "decided once")
 
 # ================================================================== inbound webhook
 r = A.patch(B + f"/api/repos/{RID}", json={"hook": "on"})

@@ -22,6 +22,7 @@ from ..collab.liste2eguard import le2b_locked_lists
 from ..core.access import Denied, token_lists, tvis
 from ..core.config import app
 from ..core.db import db, inbox_default
+from ..core.objcomments import OCM_TS  # 2.972.0 (#5272): the old time form of a comment
 from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..integrations.delivery import GATE_ALL, WAIT_KINDS, WAIT_MAX
@@ -111,8 +112,11 @@ def _chat_cards(s):
 
 
 def _comment_rows(s, cond, args=()):
-    return s.c.execute(f"""SELECT k.id, k.user_id, k.choices, k.suggestion, k.created_at, t.id AS tid, t.title, t.list_id, l.name AS list_name, l.is_inbox
-                           FROM comments k JOIN tasks t ON t.id=k.task_id JOIN lists l ON l.id=t.list_id
+    # 2.972.0 (#5272): the core's comments; choices / suggestion are keys of extra
+    return s.c.execute(f"""SELECT k.id, k.user_id, k.extra->'choices' AS choices, k.extra->>'suggestion' AS suggestion,
+                           to_char(k.created_at AT TIME ZONE 'UTC', '{OCM_TS}') AS created_at, t.id AS tid,
+                           t.title, t.list_id, l.name AS list_name, l.is_inbox
+                           FROM obj_comments k JOIN tasks t ON t.id=k.ref_id AND k.kind='task' JOIN lists l ON l.id=t.list_id
                            WHERE k.deleted_at IS NULL AND t.deleted_at IS NULL AND t.list_id IN ({s.ql}) AND {cond} AND {s.vis}
                            ORDER BY k.id DESC LIMIT {WAIT_SCAN}""", args).fetchall()
 
@@ -123,7 +127,7 @@ def _task_of(r):
 
 def _comment_cards(s):
     c, uid, out = s.c, s.uid, []
-    rows = _comment_rows(s, "k.choice IS NULL AND k.choices IS NOT NULL AND k.choices->>'approval' IS NOT NULL AND k.choices->>'withdrawn_at' IS NULL")
+    rows = _comment_rows(s, "k.extra->'choice' IS NULL AND k.extra->'choices'->>'approval' IS NOT NULL AND k.extra->'choices'->>'withdrawn_at' IS NULL")
     names = user_names(c, [r["user_id"] for r in rows if r["user_id"]])
     for r in rows:
         ch = lv_jload(r["choices"])
@@ -137,7 +141,7 @@ def _comment_cards(s):
 
 def _gates(s):
     c, uid, out, memo = s.c, s.uid, [], {}
-    rows = _comment_rows(s, "k.suggestion ILIKE ?", ('%"state": "open"%',))
+    rows = _comment_rows(s, "k.extra->>'suggestion' ILIKE ?", ('%"state": "open"%',))
     names = user_names(c, [r["user_id"] for r in rows if r["user_id"]])
     for r in rows:
         sug = json.loads(r["suggestion"])

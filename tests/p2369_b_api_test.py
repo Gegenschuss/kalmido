@@ -105,7 +105,7 @@ for what, table, trig, stmt in (
         ("dropped e2e", "list_members", "list_e2e_members", "DROP TRIGGER list_e2e_members ON list_members"),
         ("dropped e2e", "org_members", "wiki_e2e_members", "DROP TRIGGER wiki_e2e_members ON org_members"),
         ("dropped e2e", "time_entries", "time_title_e2e", "DROP TRIGGER time_title_e2e ON time_entries"),
-        ("dropped delta", "comments", "kalmido_dl_comments", "DROP TRIGGER kalmido_dl_comments ON comments"),
+        ("dropped delta", "obj_comments", "kalmido_dl_obj_comments", "DROP TRIGGER kalmido_dl_obj_comments ON obj_comments"),  # 2.972.0 (#5272)
         ("dropped in SCHEMA", "tasks", "time_task_list", "DROP TRIGGER time_task_list ON tasks"),
         ("event gone", "time_entries", "time_title_e2e", f"CREATE OR REPLACE TRIGGER time_title_e2e BEFORE INSERT {TIME_E2E}"),
         ("column gone", "list_members", "list_e2e_members",
@@ -151,7 +151,7 @@ for fn, ret in (("kalmido_time_title_e2e", "NEW"), ("kalmido_list_e2e_members", 
 
 # the former CREATE INDEX IF NOT EXISTS of the start: each comes back when it is gone
 fk = sql("SELECT relname FROM pg_class WHERE relname LIKE 'fk2103!_%' ESCAPE '!' AND relkind='i' ORDER BY relname LIMIT 1")[0][0]
-for ix in ("tasks_agroup", "tasks_msid", "ix2281_task_fts_vec", "ix2281_cmt_fts_vec", "msg_trgm_comments", "office_doc_items_org", fk):
+for ix in ("tasks_agroup", "tasks_msid", "ix2281_task_fts_vec", "ix2281_cmt_fts_vec", "msg_trgm_obj_comments", "office_doc_items_org", fk):  # 2.972.0 (#5272): msg_trgm_obj_comments
     check(sql("SELECT 1 FROM pg_class WHERE relname=?", (ix,)) == [(1,)], f"#2731: index {ix} there")
     sql(f"DROP INDEX {ix}", write=True)
     r = start()

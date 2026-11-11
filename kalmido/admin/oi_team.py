@@ -937,8 +937,9 @@ SPECS = [
     # tasks
     OiT("tasks/people.json", "task_people", refs={"task_id": "tasks"}, need=("task_id",), people={"user_id": "member"}, space=(), rid=False,
         label=N_("People")),
-    OiT("tasks/watchers.json", "task_watchers", refs={"task_id": "tasks"}, need=("task_id",), people={"user_id": "member"}, space=(), rid=False,
-        label=N_("People")),  # 2.473.0 (#3357)
+    # 2.473.0 (#3357); 2.972.0 (#5285): into the core's obj_follow (mode watch); the archive (also an older one) names task_id
+    OiT("tasks/watchers.json", "obj_follow", kind="obj_follow_watch", refs={"ref_id": "tasks"}, src={"ref_id": "task_id"}, need=("ref_id",),
+        people={"user_id": "member"}, space=(), rid=False, fixed={"kind": "task", "mode": "watch"}, label=N_("People")),
     OiT("tasks/links.json", "task_links", refs={"task_id": "tasks", "list_id": "lists", "section_id": "sections"},
         need=("task_id", "list_id"), people={"added_by": "null"}, rid=False, label=N_("Tasks")),
     OiT("tasks/decisions.json", "task_decisions", refs={"task_id": "tasks"}, need=("task_id",), people={"by_id": "null"},

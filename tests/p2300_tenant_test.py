@@ -221,7 +221,8 @@ check(boundary(A)["violations"] == 0, "workspaces: the boundary is clean")
 LA = Bo.post(B + "/api/lists", json={"name": f"{MARK} list", "org_id": ORG}).json()["id"]
 TA = Bo.post(B + "/api/tasks", json={"title": f"{MARK} task", "list_id": LA, "due": "2026-10-20", "repeat": "FREQ=WEEKLY"}).json()["id"]
 Bo.post(B + f"/api/tasks/{TA}/comments", json={"body": f"{MARK} comment"})
-CA_ = dbx("SELECT id FROM comments WHERE task_id=? ORDER BY id DESC LIMIT 1", (TA,))[0][0]
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+CA_ = dbx("SELECT id FROM obj_comments WHERE kind='task' AND ref_id=? ORDER BY id DESC LIMIT 1", (TA,))[0][0]
 Bo.post(B + f"/api/tasks/{TA}/attachments", files={"file": (f"{MARK}.txt", b"secret\n", "text/plain")})
 AA = dbx("SELECT id FROM attachments WHERE task_id=? ORDER BY id DESC LIMIT 1", (TA,))[0][0]
 KA = cal(Bo, f"{MARK} cal")

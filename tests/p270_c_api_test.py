@@ -206,7 +206,8 @@ check(r.ok and r.json().get("reminder") is True and r.json().get("comment_id"), 
 check("X-Kalmido-Undo-Gid" not in r.headers and not dbx("SELECT id FROM undo_groups WHERE user_id=? AND id>?", (ALICE, ug0)),
       "#5596: apply records no step group " + str(r.headers.get("X-Kalmido-Undo-Gid")))
 cid = r.json().get("comment_id")
-row = dbx("SELECT user_id, body, deleted_at FROM comments WHERE id=?", (cid,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+row = dbx("SELECT user_id, body, deleted_at FROM obj_comments WHERE id=?", (cid,))
 check(row and row[0][0] == ALICE and row[0][1].startswith("Cancel by") and row[0][2] is None, "a comment as the person")
 rem1 = dbx("SELECT reminders FROM tasks WHERE id=?", (C_MOB["id"],))[0][0]
 check("4320" in rem1.split(",") and set(rem0.split(",")) < set(rem1.split(",")), f"a reminder 3 days before ({rem0} -> {rem1})")
@@ -216,10 +217,11 @@ check(kt.until(lambda: any(e["data"].get("action") == "approve" and e["data"]["j
       "the agent hears approve")
 r = A.post(B + f"/api/proposals/{J2}/undo")
 check(r.ok and r.json().get("undone", 0) >= 1, "undo " + r.text[:200])
-check(dbx("SELECT deleted_at FROM comments WHERE id=?", (cid,))[0][0] is not None
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(dbx("SELECT deleted_at FROM obj_comments WHERE id=?", (cid,))[0][0] is not None
       and dbx("SELECT reminders FROM tasks WHERE id=?", (C_MOB["id"],))[0][0] == rem0, "undo: the comment and the reminder go")
 r = A.post(B + f"/api/proposals/{J2}/redo")
-check(r.ok and dbx("SELECT deleted_at, body FROM comments WHERE id=?", (cid,))[0][0] is None
+check(r.ok and dbx("SELECT deleted_at, body FROM obj_comments WHERE id=?", (cid,))[0][0] is None
       and "4320" in dbx("SELECT reminders FROM tasks WHERE id=?", (C_MOB["id"],))[0][0], "redo: both come back")
 check(not dbx("SELECT id FROM undo_groups WHERE user_id=? AND id>?", (ALICE, ug0)), "#5596: undo / redo record no step group either")
 # discard
@@ -229,7 +231,8 @@ check(r.status_code == 201 and A.post(B + f"/api/proposals/{J3}/discard").ok, "d
 check(A.post(B + f"/api/proposals/{J3}/apply", json={"select": ["0"]}).status_code == 409, "apply after discard: 409")
 check(kt.until(lambda: any(e["data"].get("action") == "reject" and e["data"]["job"]["id"] == J3 for e in events(CLH, "job")), 10, step=0.5),
       "the agent hears reject")
-check(not dbx("SELECT 1 FROM comments WHERE task_id=?", (C_L60["id"],)), "discard writes nothing")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(not dbx("SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=?", (C_L60["id"],)), "discard writes nothing")
 # a note without remind on a near deadline: no reminder button
 r = propose(CLH, C_L0["id"], text="Streaming: 9 a month, cancel by the deadline if you do not watch it.")
 J4 = r.json().get("id")
@@ -251,7 +254,8 @@ check(ev and ev[0]["data"]["task_id"] == C_BOB["id"] and ev[0]["data"]["lang"] =
 r = propose(BBH, C_BOB["id"], text="Dein Handyvertrag kostet 12 im Monat; kuendigen kannst du bis zur Frist.")
 check(r.status_code == 201, "freelancer: the proposal " + r.text[:200])
 r = Bo.post(B + f"/api/proposals/{r.json().get('id')}/apply", json={"select": ["0"]})
-check(r.ok and dbx("SELECT user_id FROM comments WHERE id=?", (r.json().get("comment_id"),))[0][0] == BOB, "freelancer: the note as the person")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(r.ok and dbx("SELECT user_id FROM obj_comments WHERE id=?", (r.json().get("comment_id"),))[0][0] == BOB, "freelancer: the note as the person")
 check(not any(e["data"]["task_id"] == C_BOB["id"] for e in events(CLH)), "alice's agent hears nothing of bob's contract")
 
 # ---------------------------------------------------------------- health lists and the journal stay closed

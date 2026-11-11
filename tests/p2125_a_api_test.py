@@ -128,7 +128,8 @@ busy = testclock.now().astimezone(timezone.utc).date()
 mon = next(d for d in days14 if d.weekday() == 0 and abs((d - busy).days) > 1)
 sat = next(d for d in days14 if d.weekday() == 5)
 for d in (mon, sat):
-    dbx("INSERT INTO comments(task_id, user_id, body, created_at) VALUES(?,?,?,?)", (T, FID, "worked", f"{d.isoformat()}T11:00:00+00:00"), write=True)
+    # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+    dbx("INSERT INTO obj_comments(kind, ref_id, user_id, body, created_at) VALUES('task', ?,?,?,?)", (T, FID, "worked", f"{d.isoformat()}T11:00:00+00:00"), write=True)
 gd = {x["date"] for x in Fr.get(B + "/api/time/gaps").json()["days"]}
 check(mon.isoformat() in gd and sat.isoformat() not in gd, f"#2118: default gaps Monday..Friday ({sorted(gd)}, mon {mon}, sat {sat})")
 check(Fr.patch(B + "/api/settings", json={"workdays": "1,2,3,4,5"}).ok, "#2118: the freelancer works Tuesday..Saturday")

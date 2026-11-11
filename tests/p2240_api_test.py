@@ -94,7 +94,8 @@ check(dbx("SELECT COUNT(*) FROM attachments")[0][0] == n0, "#910: nothing writte
 check(len([f for f in os.listdir(os.path.join(DATA, "attachments", str(tid)))]) == 3, "#910: no file left on disk")
 r = Bo.post(B + f"/api/tasks/{tid}/comments", files={"file": ("c.bin", os.urandom(400_000), "application/octet-stream")}, data={"body": "x"})
 check(r.status_code == 413 and r.json().get("code") == "quota_exceeded", f"#910: a comment file is refused too {r.status_code}")
-check(not dbx("SELECT 1 FROM comments WHERE task_id=? AND body='x'", (tid,)), "#910: ... and the comment is not saved half")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(not dbx("SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=? AND body='x'", (tid,)), "#910: ... and the comment is not saved half")
 TB = tok(Bo, ["read", "tasks:write", "attachments:write", "account"])
 r = requests.post(V + f"/tasks/{tid}/attachments", headers=TB, files={"file": ("v.bin", os.urandom(400_000), "application/octet-stream")})
 check(r.status_code == 413 and r.json()["error"]["code"] == "quota_exceeded" and r.json()["error"]["limit"] == 1024 * 1024,

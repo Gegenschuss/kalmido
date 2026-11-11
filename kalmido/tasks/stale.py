@@ -22,7 +22,8 @@ STALE_LIMIT_MAX = 200
 
 # The newest sign of life of a task: its own change, a comment, a time entry on it.
 _LAST_SQL = """GREATEST(t.updated_at,
-                   COALESCE((SELECT MAX(cm.created_at) FROM comments cm WHERE cm.task_id=t.id AND cm.deleted_at IS NULL), ''),
+                   COALESCE((SELECT to_char(MAX(cm.created_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00:00"') FROM obj_comments cm
+                             WHERE cm.kind='task' AND cm.ref_id=t.id AND cm.deleted_at IS NULL), ''),
                    COALESCE((SELECT MAX(te.updated_at) FROM time_entries te WHERE te.task_id=t.id), ''))"""
 
 

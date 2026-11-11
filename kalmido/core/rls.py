@@ -81,7 +81,7 @@ TABLES = (
     "office_signoffs",  # 2.50.0 C (#1200): approval links (NULL = a private list's acceptance, the app checks the list)
     "video_reviews", "video_versions", "video_comments",  # 2.99.1 A (#1959): video sign-offs (NULL = private, the app checks owner / task / list / client)
     "office_pay_props",  # 2.51.0 A (#1350): payment suggestions of agents
-    "task_bell",  # 2.53.0 C (#1424): the bell of one task per person (NULL = a private list's task)
+    "obj_follow",  # 2.972.0 (#5285): watching and bells of an object per person (was task_bell; NULL = a private list's task)
     "org_out_requests",  # 2.361.2 (#2923): a member's request to get something back (the app shows it to its admins / the person)
     "time_sheets",  # 2.125.0 B (#2119): monthly timesheets (NULL = a person without organisation, the app checks user_id)
     "nl_conns", "nl_segments", "nl_members", "nl_runs",  # 2.55.0 E (#1455): the newsletter connection (NULL = a person's own)
@@ -128,7 +128,8 @@ TABLES = (
     "undo_groups",  # 2.747.0 (#5249): a person's undo step groups (NULL = a private object's; the app reads only the own user_id)
     "module_cards",  # 2.575.0 (#3778): module cards (NULL = a person's private card, the app checks user_id)
     "doc_views",  # 2.579.0 (#4802): saved views of the documents search (NULL = private, the core checks owner_id)
-    "tasks", "comments", "events", "contacts",  # 2.662.0 (#4602): the parent's organisation, filled by triggers (core/orgrows.py; NULL = a private list / calendar / address book)
+    "tasks", "events", "contacts",  # 2.662.0 (#4602): the parent's organisation, filled by triggers (core/orgrows.py; NULL = a private list / calendar / address book)
+    "obj_comments",  # 2.972.0 (#5272): the comments' core (was comments; a task's comment: its project's organisation, core/orgrows.py)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

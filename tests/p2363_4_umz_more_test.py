@@ -179,9 +179,10 @@ check(CID and one("SELECT every_days FROM contact_care WHERE user_id=? AND conta
 check(one("SELECT COUNT(*) FROM view_layouts WHERE user_id=? AND view_key=? AND name='Fokus'", (GID, f"list:{LID}")) == 1,
       "#3127 the saved arrangement of the project page under the new project id")
 check(one("SELECT COUNT(*) FROM list_layouts WHERE user_id=? AND list_id=?", (GID, LID or 0)) == 1, "#3127 the project page's arrangement")
-check(one("SELECT level FROM task_bell WHERE user_id=? AND task_id=?", (GID, TID or 0)) == "urgent"
-      and one("SELECT COUNT(*) FROM task_bell WHERE user_id=?", (GID,)) == 1, "#3127 my bell arrives, the one somebody else set not")
-check(one("SELECT COUNT(*) FROM task_watchers WHERE user_id=? AND task_id=?", (GID, TID or 0)) == 1, "#3127 I follow the new task")
+# 2.972.0 (#5285): the bell and the watching are rows of the core's obj_follow
+check(one("SELECT mode FROM obj_follow WHERE user_id=? AND kind='task' AND ref_id=? AND mode<>'watch'", (GID, TID or 0)) == "urgent"
+      and one("SELECT COUNT(*) FROM obj_follow WHERE user_id=? AND mode<>'watch'", (GID,)) == 1, "#3127 my bell arrives, the one somebody else set not")
+check(one("SELECT COUNT(*) FROM obj_follow WHERE user_id=? AND kind='task' AND ref_id=? AND mode='watch'", (GID, TID or 0)) == 1, "#3127 I follow the new task")
 # settings
 st = Gi.get(B + "/api/state").json().get("settings") or {}
 check(st.get("week_start") == "sun" and st.get("start_page") == "today", f"#3127 the allowed settings move {st.get('week_start')} {st.get('start_page')}")
@@ -191,7 +192,7 @@ check(st.get("push_priority") == PUSH, f"#3127 a push setting never moves {st.ge
 check(IMP and Gi.post(B + f"/api/imports/{IMP}/undo", json={}).ok, "the undo")
 left = {t: one(f"SELECT COUNT(*) FROM {t} WHERE {col}=?", (GID,)) for t, col in (
     ("hub_mails", "owner_id"), ("video_reviews", "owner_id"), ("pomos", "user_id"), ("contact_care", "user_id"), ("view_layouts", "user_id"),
-    ("list_layouts", "user_id"), ("task_bell", "user_id"), ("task_watchers", "user_id"))}
+    ("list_layouts", "user_id"), ("obj_follow", "user_id"))}  # 2.972.0 (#5285): obj_follow instead of task_bell / task_watchers
 check(not any(left.values()), f"#3127 the undo takes them away again {left}")
 check(one("SELECT COUNT(*) FROM list_notepads WHERE title='Umzug Notiz'") == 0 and one("SELECT COUNT(*) FROM playbooks WHERE body='Umzug Playbook'") == 0
       and one("SELECT COUNT(*) FROM playbooks WHERE body='Ordner'") == 0,  # 2.765.0 (#3965): + the folder's

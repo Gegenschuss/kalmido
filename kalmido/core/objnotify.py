@@ -16,8 +16,10 @@ not optional:
               collab_user (enabled account, collaboration on)
   3. News     news = {kind, task_id, list_id, comment_id, data, actor}: the entry is written for everyone after step 2 whose
               notification settings want it (collab/news.py news_put: notif_ok 'news', the list bell)
-  4. follow   follow(uid, s) -> False = no push (the task's bell muted / urgent, a thread one does not follow; the core's
-              obj_follow of stage Q9 takes this place)
+  4. follow   the core's obj_follow (2.972.0, #5285, core/objfollow.py ofl_quiet): follow="quiet" = no push while the
+              person's bell of the object is muted or urgent (urgent pushes on its own), follow="unmuted" = no push only while
+              it is muted; done_ok = an urgency "until completed" still counts for the completion itself. Or a function
+              follow(uid, s) -> False = no push (a thread one does not follow, a rule of the area besides the bell)
   5. notif_ok THE settings check (collab/news.py): the matrix, the list bell (bells = what the caller read already), the
               ceiling of the list owner's template (notify/caps.py cap_ok, own = whose own reminder it is)
   6. gate     gate(uid, s) -> False = no push now (push_reachable, the burst / summary gates, an agent's push switch)
@@ -27,13 +29,14 @@ texts differ per area; an end-to-end list's push carries no words -- that stays 
 Interface:
   obj_readers(c, kind, rid, uids, memo=None) -> {uid}       step 1 alone (memo: a dict kept for one watchdog tick)
   obj_notify(c, kind, rid, recipients, *, row, lid=None, own=(), S=None, bells=None, news=None, follow=None, gate=None,
-             push=True, memo=None) -> {uid: settings}
+             push=True, memo=None, done_ok=False) -> {uid: settings}
 row: the event of the notification settings (str) or a function uid -> event (a mention among chat messages).
 """
 from flask import has_request_context
 
 from .objects import OBJ, OBJ_RANK, obj_role
 from .objhooks import NOTIFY_READERS, NOTIFY_TICK
+from .objfollow import ofl_quiet
 from .pg import st_ids
 from ..collab.comments import collab_user
 from ..collab.news import news_put, notif_ok
@@ -85,11 +88,13 @@ def obj_readers(c, kind, rid, uids, memo=None):
 
 
 def obj_notify(c, kind, rid, recipients, *, row, lid=None, own=(), S=None, bells=None, news=None, follow=None, gate=None,
-               push=True, memo=None):
+               push=True, memo=None, done_ok=False):
     """THE send decision about object (kind, rid) (module docstring, steps 1-6). Writes the News entries (news) and returns
     {uid: settings} of who gets the push (push=False: none, only the News)."""
     if news is not None and news.get("task_id") is not None and (kind != "task" or int(news["task_id"]) != int(rid)):
         raise ValueError("obj_notify: the News entry's task_id must be the object that was checked")  # 2.891.0 (#5270, review)
+    if follow is not None and not callable(follow) and follow not in ("quiet", "unmuted"):
+        raise ValueError(f"obj_notify: unknown follow {follow!r}")
     out = {}
     for uid in sorted(obj_readers(c, kind, rid, recipients, memo)):
         s = S.get(uid) if S is not None else collab_user(c, uid)
@@ -100,7 +105,10 @@ def obj_notify(c, kind, rid, recipients, *, row, lid=None, own=(), S=None, bells
             news_put(c, uid, s=s, row=ev, **news)
         if not push:
             continue
-        if follow is not None and not follow(uid, s):
+        if callable(follow):
+            if not follow(uid, s):
+                continue
+        elif follow is not None and ofl_quiet(c, uid, kind, rid, s, done_ok, only_mute=follow == "unmuted"):  # 2.972.0 (#5285)
             continue
         if not notif_ok(c, uid, s, ev, "push", lid, own=uid in own, bell=(bells or {}).get(uid)):
             continue

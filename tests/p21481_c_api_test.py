@@ -364,9 +364,10 @@ check(j.get("state") == "preview", f"#2492: the crafted file checks fine {j.get(
 r = A.post(B + f"/api/account/import/{iid}/run", json={"target": "private", "people": {EH("bruno@example.com"): {"share": True}}})
 j = wait_imp(A, iid) if r.status_code == 202 else {"state": r.status_code, "error": r.text[:200]}
 check(j.get("state") == "done", f"#2492: import done {j.get('state')} {j.get('error')}")
-fc = dbx("SELECT user_id, ext_name FROM comments WHERE body='Comment of another person'")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+fc = dbx("SELECT user_id, ext_name FROM obj_comments WHERE body='Comment of another person'")
 check(fc and fc[0]["user_id"] is None and fc[0]["ext_name"] == "Bruno from the file", f"#2492: another person's comment by name only {[tuple(x) for x in fc]}")
-mc = dbx("SELECT user_id FROM comments WHERE body='My own comment'")
+mc = dbx("SELECT user_id FROM obj_comments WHERE body='My own comment'")
 check(mc and mc[0]["user_id"] == ALICE, "#2492: my own comment stays mine")
 at = dbx("SELECT id, enc, mime FROM attachments WHERE name='notes.txt' ORDER BY id DESC LIMIT 1")
 check(at and at[0]["enc"] == 0 and at[0]["mime"] != "image/png", f"#2492: a file without the format's header is a normal file, its type from the content {[tuple(x) for x in at]}")

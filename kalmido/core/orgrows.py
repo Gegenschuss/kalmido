@@ -24,7 +24,7 @@ the foreign key would fail).
 """
 from .db import trigger_skip_present
 
-ORW_CHILDREN = {"tasks": "list_id", "comments": "task_id", "events": "cal_id", "contacts": "book_id"}
+ORW_CHILDREN = {"tasks": "list_id", "obj_comments": "ref_id", "events": "cal_id", "contacts": "book_id"}  # 2.972.0 (#5272): comments -> obj_comments
 
 ORW_TRIGGERS = """CREATE OR REPLACE FUNCTION kalmido_orw_fill() RETURNS trigger LANGUAGE plpgsql AS $fn$
 DECLARE prev text := current_setting('app.role', true); o bigint;
@@ -32,8 +32,12 @@ BEGIN
   PERFORM set_config('app.role', 'system', true);
   IF TG_TABLE_NAME = 'tasks' THEN
     SELECT l.org_id INTO o FROM lists l WHERE l.id = NEW.list_id;
-  ELSIF TG_TABLE_NAME = 'comments' THEN
-    SELECT l.org_id INTO o FROM tasks t JOIN lists l ON l.id = t.list_id WHERE t.id = NEW.task_id;
+  ELSIF TG_TABLE_NAME = 'obj_comments' THEN  -- 2.972.0 (#5272): a task's comment from its project; another kind keeps what it brings
+    IF NEW.kind = 'task' THEN
+      SELECT l.org_id INTO o FROM tasks t JOIN lists l ON l.id = t.list_id WHERE t.id = NEW.ref_id;
+    ELSE
+      o := NEW.org_id;
+    END IF;
   ELSIF TG_TABLE_NAME = 'events' THEN
     SELECT k.org_id INTO o FROM ev_cals k WHERE k.id = NEW.cal_id;
   ELSE
@@ -53,7 +57,7 @@ BEGIN
   IF TG_TABLE_NAME = 'lists' THEN
     UPDATE tasks SET org_id = NEW.org_id WHERE list_id = NEW.id AND org_id IS DISTINCT FROM NEW.org_id;
   ELSIF TG_TABLE_NAME = 'tasks' THEN
-    UPDATE comments SET org_id = NEW.org_id WHERE task_id = NEW.id AND org_id IS DISTINCT FROM NEW.org_id;
+    UPDATE obj_comments SET org_id = NEW.org_id WHERE kind = 'task' AND ref_id = NEW.id AND org_id IS DISTINCT FROM NEW.org_id;
   ELSIF TG_TABLE_NAME = 'ev_cals' THEN
     UPDATE events SET org_id = NEW.org_id WHERE cal_id = NEW.id AND org_id IS DISTINCT FROM NEW.org_id;
   ELSE
@@ -63,7 +67,7 @@ BEGIN
   RETURN NULL;
 END $fn$;
 CREATE OR REPLACE TRIGGER kalmido_orw_tasks BEFORE INSERT OR UPDATE OF list_id, org_id ON tasks FOR EACH ROW EXECUTE FUNCTION kalmido_orw_fill();
-CREATE OR REPLACE TRIGGER kalmido_orw_comments BEFORE INSERT OR UPDATE OF task_id, org_id ON comments FOR EACH ROW EXECUTE FUNCTION kalmido_orw_fill();
+CREATE OR REPLACE TRIGGER kalmido_orw_obj_comments BEFORE INSERT OR UPDATE OF kind, ref_id, org_id ON obj_comments FOR EACH ROW EXECUTE FUNCTION kalmido_orw_fill();
 CREATE OR REPLACE TRIGGER kalmido_orw_events BEFORE INSERT OR UPDATE OF cal_id, org_id ON events FOR EACH ROW EXECUTE FUNCTION kalmido_orw_fill();
 CREATE OR REPLACE TRIGGER kalmido_orw_contacts BEFORE INSERT OR UPDATE OF book_id, org_id ON contacts FOR EACH ROW EXECUTE FUNCTION kalmido_orw_fill();
 CREATE OR REPLACE TRIGGER kalmido_orw_carry_lists AFTER UPDATE OF org_id ON lists FOR EACH ROW
@@ -80,8 +84,8 @@ CREATE OR REPLACE TRIGGER kalmido_orw_carry_books AFTER UPDATE OF org_id ON book
 # the rows from before: each child gets its parent's organisation (comments straight from the list of their task)
 ORW_BACKFILL = (
     "UPDATE tasks t SET org_id=l.org_id FROM lists l WHERE l.id=t.list_id AND t.org_id IS DISTINCT FROM l.org_id",
-    "UPDATE comments m SET org_id=l.org_id FROM tasks t JOIN lists l ON l.id=t.list_id "
-    "WHERE t.id=m.task_id AND m.org_id IS DISTINCT FROM l.org_id",
+    "UPDATE obj_comments m SET org_id=l.org_id FROM tasks t JOIN lists l ON l.id=t.list_id "
+    "WHERE m.kind='task' AND t.id=m.ref_id AND m.org_id IS DISTINCT FROM l.org_id",
     "UPDATE events e SET org_id=k.org_id FROM ev_cals k WHERE k.id=e.cal_id AND e.org_id IS DISTINCT FROM k.org_id",
     "UPDATE contacts p SET org_id=b.org_id FROM books b WHERE b.id=p.book_id AND p.org_id IS DISTINCT FROM b.org_id",
 )

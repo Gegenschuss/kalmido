@@ -180,7 +180,8 @@ check(j.get("version") == "2.12" and j.get("partly_in") == "2.10.0" and j["task"
 check(j["rest"].get("title") == "Rest: Task 5" and j["rest"].get("list_id") == P and j["rest"].get("notes") == "the import is left", "the rest task")
 check(fval(T[5], FP) == "2.12" and fval(REST, FP) == "2.12", "version field of both = Y")
 check(dbq("SELECT 1 FROM task_deps WHERE task_id=? AND blocker_id=?", (T[5], REST)) == [(1,)], "the task waits on its rest")
-cs = [x[0] for x in dbq("SELECT body FROM comments WHERE task_id=? ORDER BY id", (T[5],))]
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+cs = [x[0] for x in dbq("SELECT body FROM obj_comments WHERE kind='task' AND ref_id=? ORDER BY id", (T[5],))]
 check(len(cs) == 1 and cs[0].startswith("Partly in 2.10.0, rest in 2.12") and f"#{REST}" in cs[0] and "the import is left" in cs[0], f"the comment {cs}")
 b5 = (task(A, T[5])["code"] or {}).get("build") or {}
 check(b5.get("stale") is False and b5.get("state") == "released", f"waiting for Y: not stale {b5}")

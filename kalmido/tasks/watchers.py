@@ -8,14 +8,16 @@ others is for the list's owner / admins. Watchers get comments like someone who 
 changes like a completion (row "complete"): no new kind of push, both are switched off in Settings > Notifications. Who gets it
 is decided when it is sent: a watcher who lost the list or the task hears nothing (2.891.0, #5270: the core's send decision
 core/objnotify.py obj_notify, obj_role >= view of the task), and leaving a
-list or a move to a list out of their reach ends the row (dlg_gone, wat_moved). In a list with the lock pushes carry no text."""
+list or a move to a list out of their reach ends the row (dlg_gone, wat_moved). In a list with the lock pushes carry no text.
+2.972.0 (#5285): the rows are the core's obj_follow (mode 'watch', core/objfollow.py; was the table task_watchers)."""
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app, PUBLIC_URL
 from ..core.i18n import tr
-from ..core.db import body, bump, db, iso, now_utc
+from ..core.db import body, bump, db
 from ..core.dlock import dl_list_locked
 from ..core.pg import st_ids
+from ..core.objfollow import ofl_unwatch, ofl_watch, ofl_watchers, ofl_watchers_of
 from ..core.errors import BadInput, UnknownFields
 from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_collab, need_task, task_visible
 from ..api.common import v1_args, v1_json, v1_view
@@ -23,7 +25,7 @@ from ..accounts.session import me
 from ..collab.comments import burst_gate, lang_of, user_names
 from ..collab.news import agent_push_ok, bell_all_users
 from ..notify.push import push_prio, push_reachable
-from ..notify.taskbell import _people, TBL_KIND_TXT, tbl_level
+from ..notify.taskbell import _people, TBL_KIND_TXT
 from ..tasks.validation import log_act
 
 
@@ -75,25 +77,29 @@ def wat_moved(c, ids, lid, people):
         c.execute("UPDATE tasks SET delegate_agent_id=NULL WHERE id=?", (r["id"],))
         # only the id: the agent is out of the target list (its ids-only "unassigned" names no list, so nothing of it reaches the agent)
         agent_emit(c, r["delegate_agent_id"], "unassigned", {"task": {"id": r["id"]}, "visible": False, "delegated": True}, actor=None)
-    for r in c.execute("SELECT task_id, user_id FROM task_watchers WHERE task_id = ANY(CAST(? AS BIGINT[]))", (st_ids(ids),)).fetchall():
-        if r["user_id"] not in people and not list_role(c, lid, r["user_id"]):
-            c.execute("DELETE FROM task_watchers WHERE task_id=? AND user_id=?", (r["task_id"], r["user_id"]))
+    for tid, uids in ofl_watchers_of(c, "task", ids).items():
+        for u in uids:
+            if u not in people and not list_role(c, lid, u):
+                ofl_unwatch(c, "task", tid, u)
 
 
 def wat_users(c, tid):
     """Who watches task tid (raw rows: rights are checked when something is sent)."""
-    return {r[0] for r in c.execute("SELECT user_id FROM task_watchers WHERE task_id=?", (tid,))}
+    return ofl_watchers(c, "task", tid)  # 2.972.0 (#5285): the core's obj_follow
 
 
 def wat_note(c, tid, kind, actor):
     """Called by every history line (tasks/validation.py log_act): completed / closed / reopened goes to the watchers, as News
     and as a push of the row "complete". Agents get no event for it (their comments: agent_comment_events)."""
-    if kind not in WAT_STATUS or not tid or not c.execute("SELECT 1 FROM task_watchers WHERE task_id=? LIMIT 1", (tid,)).fetchone():
+    if kind not in WAT_STATUS or not tid:
+        return
+    ids = wat_users(c, tid)
+    if not ids:
         return
     agent_ids, = _ag("agent_ids")
     from ..collab.liste2e import le2e_mode, le2e_neutral
     t = c.execute("SELECT id, title, list_id, created_by, assigned_by FROM tasks WHERE id=?", (tid,)).fetchone()
-    ids = wat_users(c, tid) - agent_ids(c) - {actor, None}
+    ids = ids - agent_ids(c) - {actor, None}
     if kind == "complete":  # they hear of it through task_event
         ids -= {t["created_by"], t["assigned_by"]} | bell_all_users(c, t["list_id"], "complete")
     name = user_names(c, [actor]).get(actor, "?") if actor else None
@@ -103,7 +109,7 @@ def wat_note(c, tid, kind, actor):
     pushes = obj_notify(c, "task", tid, ids, row="complete", lid=t["list_id"],
                         news={"kind": "complete", "task_id": tid, "actor": actor if actor is not None else 0,
                               "data": None if kind == "complete" else {"st": kind}},
-                        follow=lambda uid, s: not tbl_level(c, uid, tid, s, done_ok=kind == "complete"),  # muted: no push; urgent: pushed by tbl_note
+                        follow="quiet", done_ok=kind == "complete",  # 2.972.0 (#5285): the bell of obj_follow (muted: no push; urgent: pushed by tbl_note)
                         gate=lambda uid, s: push_reachable(c, uid, s) and agent_push_ok(c, uid, s, actor) and
                         burst_gate(c, uid, tid, event=True, kind="complete"))
     for uid, s in pushes.items():
@@ -161,7 +167,7 @@ def wat_add(c, tid, uid):
         return role
     if len(wat_users(c, tid)) >= WAT_MAX:
         raise BadInput(tr("Too many watchers"))
-    c.execute("INSERT INTO task_watchers(task_id,user_id,created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING", (tid, uid, iso(now_utc())))
+    ofl_watch(c, "task", tid, uid)  # 2.972.0 (#5285)
     log_act(c, tid, "watch", {"on": 1, **({"to": uid} if uid != me() else {})})
     bump(c)
     c.commit()
@@ -174,7 +180,7 @@ def wat_remove(c, tid, uid):
     role = need_task(c, tid, write=False, full=True)
     if uid != me() and role not in MANAGE_ROLES:
         raise Denied(403)
-    if c.execute("DELETE FROM task_watchers WHERE task_id=? AND user_id=?", (tid, uid)).rowcount:
+    if ofl_unwatch(c, "task", tid, uid):  # 2.972.0 (#5285)
         log_act(c, tid, "watch", {"on": 0, **({"to": uid} if uid != me() else {})})
         bump(c)
         c.commit()

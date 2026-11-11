@@ -49,3 +49,8 @@ to `BACK_LIMITS` in `kalmido/core/db.py` in the same release.
 member rows into the shared core and then deletes the old member tables. From then on the database refuses every older
 version (its limit is the version that deleted them, it names the reason): an older version would create the tables empty
 again and take every member's access. The way back is a newer version or a backup from before the update.
+
+**Never go back before the release with package 2.972** (the CHANGELOG names it; the start check stamps that release's own
+version as the limit). From then on the comments of tasks are rows of one shared table (`obj_comments`); the old
+table is gone. An older version would make it again empty and write new comments there, which the next start of the newer version could
+not take over. Go back only by restoring a backup made before the update.

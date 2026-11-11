@@ -103,7 +103,7 @@ def lex_extra(c, uid, lid, rows, ids):
     for r in c.execute(f"""SELECT d.task_id, t.title FROM task_deps d JOIN tasks t ON t.id=d.blocker_id WHERE d.task_id IN ({q})
                              AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.')} ORDER BY t.sort, t.id""", (uid, uid)):
         out["deps"].setdefault(r["task_id"], []).append(r["title"])
-    out["ncom"] = {r[0]: r[1] for r in c.execute(f"SELECT task_id, COUNT(*) FROM comments WHERE task_id IN ({q}) AND deleted_at IS NULL GROUP BY task_id")}
+    out["ncom"] = {r[0]: r[1] for r in c.execute(f"SELECT ref_id, COUNT(*) FROM obj_comments WHERE kind='task' AND ref_id IN ({q}) AND deleted_at IS NULL GROUP BY ref_id")}
     out["natt"] = {r[0]: r[1] for r in c.execute(f"""SELECT task_id, COUNT(*) FROM attachments WHERE task_id IN ({q}) AND comment_id IS NULL
                                                      AND deleted_at IS NULL GROUP BY task_id""")}
     return out

@@ -25,11 +25,12 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import db, gset, gsetting, ix_ensure, trigger_ensure
 from ..core.pg import st_ids
-from ..core.access import access_note, tvis, vis_sql
+from ..core.access import access_note, live_sql, tvis, vis_sql
 from ..core.serializers import load_tasks
 from ..accounts.session import me
 from ..collab.msgsearch import INDEX_VERSION as MSG_INDEX_VERSION, MSG_TERMS, _variants, find_marks, snippet
-from ..collab.comments import comment_plain, MENTION_RE, user_names
+from ..collab.comments import comment_plain, user_names
+from ..core.objcomments import ocm_fk, OCM_MENTION_RE  # 2.972.0 (#5272)
 from ..collab.teamchat import md_brief
 from ..tasks.validation import as_int
 from ..core.errors import BadInput
@@ -69,12 +70,13 @@ def fts_index_init(c):
             c.execute(f"DROP INDEX IF EXISTS {name}")
     c.execute("CREATE TABLE IF NOT EXISTS task_fts (task_id BIGINT PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE, "
               "vec tsvector NOT NULL)")
-    c.execute("CREATE TABLE IF NOT EXISTS cmt_fts (comment_id BIGINT PRIMARY KEY REFERENCES comments(id) ON DELETE CASCADE, "
+    c.execute("CREATE TABLE IF NOT EXISTS cmt_fts (comment_id BIGINT PRIMARY KEY REFERENCES obj_comments(id) ON DELETE CASCADE, "
               "vec tsvector NOT NULL)")
+    ocm_fk(c, "cmt_fts", "comment_id", "CASCADE")  # 2.972.0 (#5272): a table from before pointed at comments
     ix_ensure(c, "CREATE INDEX IF NOT EXISTS ix2281_task_fts_vec ON task_fts USING gin (vec)")
     ix_ensure(c, "CREATE INDEX IF NOT EXISTS ix2281_cmt_fts_vec ON cmt_fts USING gin (vec)")
     for fn, tbl, key, cols in (("kalmido_fts_task", "tasks", "task_id", ("title", "content")),
-                               ("kalmido_fts_cmt", "comments", "comment_id", ("body",))):
+                               ("kalmido_fts_cmt", "obj_comments", "comment_id", ("body",))):
         vec = TASK_NEW_VEC if tbl == "tasks" else CMT_NEW_VEC
         side = "task_fts" if tbl == "tasks" else "cmt_fts"
         c.execute(f"""CREATE OR REPLACE FUNCTION {fn}() RETURNS trigger LANGUAGE plpgsql AS $fn$
@@ -94,7 +96,7 @@ END $fn$""")
         c.execute("TRUNCATE task_fts, cmt_fts")
     c.execute(f"INSERT INTO task_fts(task_id, vec) SELECT id, {TASK_VEC} FROM tasks t "
               "WHERE NOT EXISTS (SELECT 1 FROM task_fts f WHERE f.task_id=t.id)")
-    c.execute(f"INSERT INTO cmt_fts(comment_id, vec) SELECT id, {CMT_VEC} FROM comments m "
+    c.execute(f"INSERT INTO cmt_fts(comment_id, vec) SELECT id, {CMT_VEC} FROM obj_comments m "
               "WHERE NOT EXISTS (SELECT 1 FROM cmt_fts f WHERE f.comment_id=m.id)")
     if new:
         gset(c, "fts_v", ver)
@@ -184,12 +186,13 @@ def fts_search(c, uid, raw, files=True):
         else:
             put(r["id"], "notes", r["r"], _snip(_plain(r["content"]), terms))
     # comments: the same visibility as the message search (who may read the task's comments)
-    rows = c.execute(f"""SELECT x.*, m.body FROM (SELECT * FROM (SELECT DISTINCT ON (m.task_id) m.id, m.task_id, t.list_id, ts_rank(f.vec, q) AS r
-        FROM cmt_fts f JOIN comments m ON m.id=f.comment_id JOIN tasks t ON t.id=m.task_id, to_tsquery('simple'::regconfig, ?) q
-        WHERE f.vec @@ q AND m.deleted_at IS NULL AND {_task_cond(c, uid, 't.')}
-        ORDER BY m.task_id, r DESC, m.id DESC) y ORDER BY r DESC, id DESC LIMIT {cand}) x
-        JOIN comments m ON m.id=x.id ORDER BY x.r DESC, x.id DESC""", (tsq, uid, uid)).fetchall()
-    names = user_names(c, {int(x) for r in rows for x in MENTION_RE.findall(r["body"] or "")}) if rows else {}
+    # 2.972.0 (#5272): the comments of tasks in the comments' core (obj_comments kind 'task')
+    rows = c.execute(f"""SELECT x.*, m.body FROM (SELECT * FROM (SELECT DISTINCT ON (m.ref_id) m.id, m.ref_id AS task_id, t.list_id, ts_rank(f.vec, q) AS r
+        FROM cmt_fts f JOIN obj_comments m ON m.id=f.comment_id AND m.kind='task' JOIN tasks t ON t.id=m.ref_id, to_tsquery('simple'::regconfig, ?) q
+        WHERE f.vec @@ q AND {live_sql('m')} AND {_task_cond(c, uid, 't.')}
+        ORDER BY m.ref_id, r DESC, m.id DESC) y ORDER BY r DESC, id DESC LIMIT {cand}) x
+        JOIN obj_comments m ON m.id=x.id ORDER BY x.r DESC, x.id DESC""", (tsq, uid, uid)).fetchall()
+    names = user_names(c, {int(x) for r in rows for x in OCM_MENTION_RE.findall(r["body"] or "")}) if rows else {}
     for r in rows:
         if r["task_id"] in best:
             continue

@@ -57,7 +57,8 @@ while made < n:
     if random.random() < .2:
         otg_user_add(c, t, 1, random.choice(["home", "work", "urgent", "later"]))  # 2.955.0 (#5276): the core's personal tags
     if random.random() < .1:
-        c.execute("INSERT INTO comments(task_id, user_id, body, created_at) VALUES(?,1,?,?)", (t, "A comment", now))
+        # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+        c.execute("INSERT INTO obj_comments(kind, ref_id, user_id, body, created_at) VALUES('task', ?,1,?,?)", (t, "A comment", now))
 c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version'")
 c.commit()
 c.close()

@@ -195,14 +195,16 @@ check(P.post(B + f"/p/{TK1}/comment", data={"text": "cross", "f": f}, headers={"
 check(P.post(B + f"/p/{TK3}/comment", data={"text": "other ticket's key", "f": f}).status_code == 403, "#1513: the key of another ticket 403")
 r = P.post(B + f"/p/{TK1}/comment", data={"text": "It happens in Firefox too <@1>.", "f": f}, allow_redirects=False)
 check(r.status_code == 303 and r.headers.get("Location", "").startswith(f"/p/{TK1}"), f"#1513: the answer is taken {r.status_code}")
-c = dbq("SELECT user_id, portal, ext_name, body FROM comments WHERE task_id=? ORDER BY id DESC LIMIT 1", (T1,))[0]
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+c = dbq("SELECT user_id, CASE WHEN COALESCE((extra->>'portal')::boolean, false) THEN 1 ELSE 0 END AS portal, ext_name, body FROM obj_comments WHERE kind='task' AND ref_id=? ORDER BY id DESC LIMIT 1", (T1,))[0]
 check(c["user_id"] is None and c["portal"] == 1 and c["ext_name"] == "Jane Example" and "<@1>" not in c["body"], f"#1513: a customer's comment {dict(c)}")
 news = [x for x in A.get(B + "/api/news").json().get("items", []) if x["kind"] == "comment" and (x.get("data") or {}).get("portal")]
 check(news and news[0]["data"].get("ext_name") == "Jane Example", "#1513: News for the team")
 check("It happens in Firefox too" in P.get(B + f"/p/{TK1}").text, "#1513: the customer's comment on the page")
-n0 = dbq("SELECT COUNT(*) FROM comments WHERE task_id=?", (T1,))[0][0]
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+n0 = dbq("SELECT COUNT(*) FROM obj_comments WHERE kind='task' AND ref_id=?", (T1,))[0][0]
 P.post(B + f"/p/{TK1}/comment", data={"text": "   ", "f": f})
-check(dbq("SELECT COUNT(*) FROM comments WHERE task_id=?", (T1,))[0][0] == n0, "#1513: an empty answer is not stored")
+check(dbq("SELECT COUNT(*) FROM obj_comments WHERE kind='task' AND ref_id=?", (T1,))[0][0] == n0, "#1513: an empty answer is not stored")
 ap = A.get(B + f"/api/tasks/{T1}/timeline").json()["comments"]
 check(any(x["ext_name"] == "Jane Example" and x["portal"] for x in ap), "#1513: the app sees the customer's comment with portal")
 

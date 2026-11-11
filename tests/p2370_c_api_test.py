@@ -104,14 +104,16 @@ A.delete(B + f"/api/comments/{C2}")
 check(f"c{C2}" not in find(A, "arger"), "a deleted comment is gone")
 A.delete(B + f"/api/team/messages/{D1}")
 check(find(A, "wieder") == [], "a deleted team message is gone")
-q("INSERT INTO comments(task_id,user_id,body,created_at) VALUES(?,?,?,?)", (T, ALICE, "Direkt Übermut", "2026-10-11T08:00:00Z"))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+q("INSERT INTO obj_comments(kind, ref_id,user_id,body,created_at) VALUES('task', ?,?,?,?)", (T, ALICE, "Direkt Übermut", "2026-10-11T08:00:00Z"))
 check(len(find(A, "ubermut")) == 1 and len(find(A, "uebermut")) == 1, "a row written straight into the table is found")
-q("UPDATE comments SET body='Direkt Gelassenheit' WHERE body='Direkt Übermut'")
+q("UPDATE obj_comments SET body='Direkt Gelassenheit' WHERE body='Direkt Übermut'")
 check(find(A, "ubermut") == [] and len(find(A, "gelassen")) == 1, "a row changed straight in the table follows")
 
 # ================================================================== the index
 idx = sorted(r[0] for r in q("SELECT indexname FROM pg_indexes WHERE indexname LIKE 'msg_trgm_%'"))
-check(idx == ["msg_trgm_agent_chat", "msg_trgm_comments", "msg_trgm_tchat_msgs"], "three trigram indexes " + str(idx))
+# 2.972.0 (#5272): the task comments' index is the one of obj_comments
+check(idx == ["msg_trgm_agent_chat", "msg_trgm_obj_comments", "msg_trgm_tchat_msgs"], "three trigram indexes " + str(idx))
 f = q("SELECT kalmido_fold('Großer Ärger Café')")[0][0]
 check(f.split("\n") == ["grosser arger cafe", "grosser aerger cafe"], "kalmido_fold: unaccent + lower, umlauts also as ae " + repr(f))
 

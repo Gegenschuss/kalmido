@@ -156,7 +156,9 @@ UMZ_DROP = {
               "e2e", "e2e_gen", "e2e_rotate", "e2e_reenc", "e2e_at"},
     "tasks": {"rotation", "approval", "fam", "tt_id", "nag_at", "wait_fired",
               "irreversible_yes_at", "acceptance_of"},  # 2.392.0 C (#3370): a yes is given here, an environment id means nothing here
-    "comments": {"mentions", "suggestion", "choices", "choice", "ext_name", "client_ref"},  # 2.370.2 (#3088): client_ref like the notes'
+    # 2.370.2 (#3088): client_ref like the notes'; 2.972.0 (#5272): the rows go into obj_comments (kind task), extra is set by
+    # the caller from the file's portal / rule_name (a proposal or a choice of the old server never comes along)
+    "obj_comments": {"mentions", "extra", "ext_name", "client_ref", "kind"},
     "attachments": {"path", "enc_by"},
     "list_files": {"path"},
     "video_versions": {"uploaded"},  # 2.662.0 (#5041): the review's rights stand in for the file only for an upload made here
@@ -235,7 +237,7 @@ UMZ_REFUSED_AREA = {
     "task_relations": N_("Relations"),  # 2.576.0 (#3371)
     "task_field_values": N_("Custom fields"), "task_tags": N_("Tags"), "task_list_tags": N_("Project tags"),
     "task_note_locks": N_("Encrypted notes"), "task_enc_notes": N_("Encrypted notes"), "notes": N_("Project notes"),
-    "comments": N_("Comments"), "attachments": N_("Attachments"), "list_files": N_("Files"), "time_entries": N_("Time entries"),
+    "obj_comments": N_("Comments"), "attachments": N_("Attachments"), "list_files": N_("Files"), "time_entries": N_("Time entries"),
     "habits": N_("Habits"), "habit_logs": N_("Habits"), "filters": N_("Saved filters"), "templates": N_("Templates"),
     "template_files": N_("Templates"), "books": N_("Address books"), "contacts": N_("Contacts"), "ev_cals": N_("Calendars"),
     "events": N_("Events"), "event_attendees": N_("Events"), "journal": N_("Journal"), "bookmarks": N_("Bookmarks"),
@@ -1126,7 +1128,7 @@ UMZ_SRC = {  # 2.947.0 (#5275, review F5): list_tags reads a project tag's list 
     "lists": ("lists", "owner_id", None), "sections": ("sections", "list_id", "lists"), "list_fields": ("list_fields", "list_id", "lists"),
     "list_tags": ("obj_tags", "CASE WHEN scope_kind='list' THEN CAST(scope_id AS BIGINT) END", "lists"), "list_status": ("list_status", "list_id", "lists"), "list_links": ("list_links", "list_id", "lists"),
     "list_milestones": ("list_milestones", "list_id", "lists"), "tasks": ("tasks", "list_id", "lists"), "notes": ("notes", "list_id", "lists"),
-    "comments": ("comments", "task_id", "tasks"), "attachments": ("attachments", "task_id", "tasks"), "list_files": ("list_files", "list_id", "lists"),
+    "comments": ("obj_comments", "ref_id", "tasks"), "attachments": ("attachments", "task_id", "tasks"), "list_files": ("list_files", "list_id", "lists"),
     "time_entries": ("time_entries", "user_id", None), "habits": ("habits", "user_id", None), "filters": ("filters", "user_id", None),
     "templates": ("templates", "owner_id", None), "books": ("books", "owner_id", None), "ev_cals": ("ev_cals", "owner_id", None),
     "contacts": ("contacts", "book_id", "books"), "events": ("events", "cal_id", "ev_cals"), "event_attendees": ("event_attendees", "event_id", "events"),
@@ -1209,6 +1211,17 @@ def umz_have(c, run, uid, rows, mine=False):
 
 UMZ_MENTION_RE = re.compile(r"<@(\d{1,18})>")  # as in collab/comments.py
 UMZ_NO_SPACE = N_("A file was left out because your storage is full")  # 2.362.4 (#3100)
+
+
+def umz_cmt_extra(r):
+    """2.972.0 (#5272): the extras of a comment of the file (old columns portal / rule_name) as obj_comments.extra (JSON text);
+    a key only when it has a value."""
+    x = {}
+    if r.get("portal") in (1, True, "1", "true"):
+        x["portal"] = True
+    if isinstance(r.get("rule_name"), str) and r["rule_name"].strip():
+        x["rule_name"] = r["rule_name"].strip()[:200]
+    return json.dumps(x, ensure_ascii=False)
 
 
 def umz_mentions(text, names, who):
@@ -1850,11 +1863,12 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             continue
         au = uid if _oid(r.get("user_id")) == me_old else None  # 2.148.1 C (#2492): others' comments by name only, never as an account
         ext = None if au else (names.get(_oid(r.get("user_id"))) or _txt(r.get("ext_name"), 100) or tr("Unknown"))
-        d = umz_row(c, "comments", r, {"task_id": tid, "user_id": au, "ext_name": ext, "reply_to": run.m("comments", r.get("reply_to")),
-                                        "mentions": ""}, ts)
+        # 2.972.0 (#5272): into the core's table (kind task); the file keeps the old columns (portal, rule_name -> extra)
+        d = umz_row(c, "obj_comments", r, {"kind": "task", "ref_id": tid, "user_id": au, "ext_name": ext,
+                                            "parent_id": run.m("comments", r.get("reply_to")), "extra": umz_cmt_extra(r)}, ts)
         if d and d.get("body"):  # 2.362.4 (#3100)
             d["body"] = umz_mentions(d["body"], names, who)
-        nid = umz_insert(c, "comments", d) if d else None
+        nid = umz_insert(c, "obj_comments", d) if d else None
         if nid:
             run.put("comments", r.get("id"), nid)
             run.count("comments")
@@ -2270,9 +2284,9 @@ def umz_fix_people(c, run, uid, names):
         part = ids[i:i + 500]
         q = ",".join("?" * len(part))
         nm = f"""user_id!=? AND NOT EXISTS (SELECT 1 FROM list_members m JOIN tasks t ON t.list_id=m.list_id
-                 WHERE t.id=comments.task_id AND m.user_id=comments.user_id)"""
-        for r in c.execute(f"SELECT id, user_id FROM comments WHERE task_id IN ({q}) AND user_id IS NOT NULL AND {nm}", part + [uid]).fetchall():
-            c.execute("UPDATE comments SET user_id=NULL, ext_name=? WHERE id=?", (names.get(r["user_id"]) or tr("Unknown"), r["id"]))
+                 WHERE t.id=obj_comments.ref_id AND m.user_id=obj_comments.user_id)"""  # 2.972.0 (#5272): the core's table
+        for r in c.execute(f"SELECT id, user_id FROM obj_comments WHERE kind='task' AND ref_id IN ({q}) AND user_id IS NOT NULL AND {nm}", part + [uid]).fetchall():
+            c.execute("UPDATE obj_comments SET user_id=NULL, ext_name=? WHERE id=?", (names.get(r["user_id"]) or tr("Unknown"), r["id"]))
         n = c.execute(f"""UPDATE tasks SET assignee_id=NULL, assigned_by=NULL WHERE id IN ({q}) AND assignee_id IS NOT NULL AND assignee_id!=?
                           AND NOT EXISTS (SELECT 1 FROM list_members m WHERE m.list_id=tasks.list_id AND m.user_id=tasks.assignee_id)""",
                       part + [uid]).rowcount
@@ -2282,11 +2296,11 @@ def umz_fix_people(c, run, uid, names):
         c.execute(f"""DELETE FROM task_field_values v USING list_fields f, tasks t WHERE f.id=v.field_id AND t.id=v.task_id AND t.id IN ({q})
                       AND f.type='person' AND v.value!=? AND NOT EXISTS (SELECT 1 FROM list_members m WHERE m.list_id=t.list_id AND m.user_id::text=v.value)""",
                   part + [str(uid)])
-        for r in c.execute(f"SELECT c.id, c.body, t.list_id FROM comments c JOIN tasks t ON t.id=c.task_id WHERE t.id IN ({q}) AND c.body ILIKE '%<@%'", part).fetchall():
+        for r in c.execute(f"SELECT c.id, c.body, t.list_id FROM obj_comments c JOIN tasks t ON t.id=c.ref_id AND c.kind='task' WHERE t.id IN ({q}) AND c.body ILIKE '%<@%'", part).fetchall():
             mem = {x[0] for x in c.execute("SELECT user_id FROM list_members WHERE list_id=?", (r["list_id"],)).fetchall()} | {uid}
             body = UMZ_MENTION_RE.sub(lambda m: m.group(0) if int(m.group(1)) in mem else "@" + (names.get(int(m.group(1))) or "?"), r["body"])
             if body != r["body"]:
-                c.execute("UPDATE comments SET body=? WHERE id=?", (body, r["id"]))
+                c.execute("UPDATE obj_comments SET body=? WHERE id=?", (body, r["id"]))
 
 
 def umz_invite(c, run, uid, email, name, role="member"):

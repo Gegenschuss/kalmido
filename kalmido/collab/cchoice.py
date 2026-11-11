@@ -16,14 +16,15 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.pg import insert_id
 from ..core.db import body, bump, db, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.objseen import osn_mark  # 2.905.0 (#5284): the read marks of the core
 from ..core.access import Denied, need_feat, need_task, task_visible
 from ..core.errors import BadInput, reject_unknown
 from ..api.common import v1_args, v1_json, v1_view
-from ..collab.comments import user_names, att_dicts, comment_dict, need_task_say  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names, att_dicts, comment_dict  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import live_sql
+from ..core.objcomments import ocm_add, ocm_extra, ocm_need_say, ocm_row, OCM_COLS  # 2.972.0 (#5272): the comments' core
 from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
 from ..collab.reactions import with_reactions  # 2.369.5 (#2517): pulled up from functions
 from ..collab.replies import with_replies  # 2.369.5 (#2517): pulled up from functions
@@ -61,8 +62,8 @@ def lv_choices_in(b, agent):
 
 def lv_newest(c, tid):
     """Id of the task's newest comment that is no approval card (#1037: it makes older buttons expire)."""
-    r = c.execute("""SELECT MAX(id) FROM comments WHERE task_id=? AND deleted_at IS NULL
-                     AND (choices IS NULL OR choices->>'approval' IS NULL)""", (tid,)).fetchone()
+    r = c.execute(f"""SELECT MAX(id) FROM obj_comments WHERE kind='task' AND ref_id=? AND {live_sql()}
+                      AND extra->'choices'->>'approval' IS NULL""", (tid,)).fetchone()  # 2.972.0 (#5272)
     return (r[0] or 0) if r else 0
 
 
@@ -112,8 +113,9 @@ def lv_may_decide(c, tid, uid, aid):
 
 def lv_approvals_open(c, tid):
     """The open approval cards of a task (newest last) -- the task's badge / its notification."""
-    rows = c.execute("""SELECT * FROM comments WHERE task_id=? AND deleted_at IS NULL AND choice IS NULL AND choices IS NOT NULL
-                        AND choices->>'approval' IS NOT NULL AND choices->>'withdrawn_at' IS NULL ORDER BY id""", (tid,)).fetchall()
+    rows = c.execute(f"""SELECT {OCM_COLS} FROM obj_comments WHERE kind='task' AND ref_id=? AND {live_sql()} AND extra->'choice' IS NULL
+                         AND extra->'choices'->>'approval' IS NOT NULL AND extra->'choices'->>'withdrawn_at' IS NULL ORDER BY id""",
+                     (tid,)).fetchall()  # 2.972.0 (#5272)
     return [r for r in rows if lv_state(r, lv_jload(r["choices"]), None, 0) == "open"]
 
 
@@ -121,7 +123,7 @@ def lv_answer(c, r, uid, ids, via="button"):
     """The person uid answers comment r with ids: stored once, logged, the agent hears it. -> (row, the person's comment id
     of a suggestion or None). Denied / BadInput."""
     from ..agents.core import agent_comment, agent_emit, agent_task_data, is_agent
-    need_task_say(c, r["task_id"], uid)  # 2.607.0 (#4549): a guest / read-only person answers no buttons (403)
+    ocm_need_say(c, "task", r["task_id"], uid)  # 2.607.0 (#4549): a guest / read-only person answers no buttons (403)
     ch = lv_jload(r["choices"])
     au = c.execute("SELECT kind FROM users WHERE id=?", (r["user_id"],)).fetchone() if r["user_id"] else None
     if not ch or not au or au["kind"] != "agent":
@@ -146,7 +148,8 @@ def lv_answer(c, r, uid, ids, via="button"):
         raise BadInput(tr("Invalid value: {0}", "choice_ids"))
     ids = [x for x in valid if x in ids]
     ans = {"ids": ids, "at": iso_ms(now_utc()), "user_id": uid, "via": via}
-    c.execute("UPDATE comments SET choice=? WHERE id=? AND choice IS NULL", (json.dumps(ans), r["id"]))
+    c.execute("UPDATE obj_comments SET extra = jsonb_set(extra, '{choice}', CAST(? AS JSONB)) WHERE id=? AND extra->'choice' IS NULL",
+              (json.dumps(ans), r["id"]))  # 2.972.0 (#5272): written once
     labels = [x["label"] for x in ch["choices"] if x["id"] in ids]
     ap = ch.get("approval")
     approval = ("approved" if ids == ["yes"] else "rejected") if ap else None
@@ -154,13 +157,12 @@ def lv_answer(c, r, uid, ids, via="button"):
                                         **({"approval": approval, "title": ap.get("title", "")} if ap else {})}, uid=uid)
     said = None
     if not ap:  # a suggestion / answer button: the person's comment with that text, as if typed (the thread shows it)
-        said = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,reply_to) VALUES(?,?,?,?,?,?)",
-                         (r["task_id"], uid, ", ".join(labels), "", iso_ms(now_utc()), r["id"]))
+        said = ocm_add(c, "task", r["task_id"], uid, ", ".join(labels), parent_id=r["id"])  # 2.972.0 (#5272)
         osn_mark(c, "task", r["task_id"], uid, said)  # 2.905.0 (#5284): the read mark of the core
-    r2 = c.execute("SELECT * FROM comments WHERE id=?", (r["id"],)).fetchone()
+    r2 = ocm_row(c, r["id"])
     aid = r["user_id"]
     if task_visible(c, r["task_id"], aid, full=True):  # agent_emit keeps health lists away from agents
-        k = c.execute("SELECT * FROM comments WHERE id=?", (said or r["id"],)).fetchone()
+        k = ocm_row(c, said or r["id"])
         answer = {"comment_id": r["id"], "choice_ids": ids, "labels": labels, "via": via,
                   "user": {"id": uid, "name": user_names(c, [uid]).get(uid, "")},
                   **({"approval": approval, "approval_request": {"title": ap.get("title", ""), "what": ap.get("what", "")}} if ap else {})}
@@ -178,8 +180,8 @@ def lv_withdraw(c, r, aid, outcome=None):
     if r["choice"]:
         raise Denied(409, tr("This question was answered already"))
     ch = {**ch, "withdrawn_at": iso_ms(now_utc()), **({"outcome": outcome} if outcome else {})}
-    c.execute("UPDATE comments SET choices=? WHERE id=?", (json.dumps(ch, ensure_ascii=False), r["id"]))
-    return c.execute("SELECT * FROM comments WHERE id=?", (r["id"],)).fetchone()
+    ocm_extra(c, r["id"], "choices", ch)  # 2.972.0 (#5272)
+    return ocm_row(c, r["id"])
 
 
 def lv_one(c, r):
@@ -192,7 +194,7 @@ def comment_choice(cid):
     """{choice_ids: [...]} -- I answer an agent's comment with its buttons (yes / no of an approval card, a suggestion)."""
     c = db()
     need_feat("comments")
-    r = c.execute("SELECT * FROM comments WHERE id=? AND deleted_at IS NULL", (cid,)).fetchone()
+    r = ocm_row(c, cid, live=True)  # 2.972.0 (#5272)
     if not r:
         raise Denied(404)
     need_task(c, r["task_id"], write=False, full=True)
@@ -207,7 +209,7 @@ def comment_choice_get(cid):
     """The state of a comment's buttons: {choices, choice, choice_state}."""
     c = db()
     need_feat("comments")  # 2.41.0 (#1383): like the other comment routes
-    r = c.execute("SELECT * FROM comments WHERE id=? AND deleted_at IS NULL", (cid,)).fetchone()
+    r = ocm_row(c, cid, live=True)  # 2.972.0 (#5272)
     if not r:
         raise Denied(404)
     need_task(c, r["task_id"], write=False, full=True)
@@ -229,7 +231,7 @@ def v1_comment_withdraw(cid):
     b = v1_json()
     reject_unknown(b, ("outcome",))
     c = db()
-    r = c.execute("SELECT * FROM comments WHERE id=? AND deleted_at IS NULL", (cid,)).fetchone()
+    r = ocm_row(c, cid, live=True)  # 2.972.0 (#5272)
     if not r or not task_visible(c, r["task_id"], me(), full=True):
         raise Denied(404)
     if not is_agent(g.user):  # 2.41.1 (#1383): after the lookup, like the neighbours (an unknown comment is 404, not 403)
@@ -248,7 +250,7 @@ def v1_comment_choice(cid):
     b = v1_json()
     reject_unknown(b, ("choice_ids",))
     c = db()
-    r = c.execute("SELECT * FROM comments WHERE id=? AND deleted_at IS NULL", (cid,)).fetchone()
+    r = ocm_row(c, cid, live=True)  # 2.972.0 (#5272)
     if not r:
         raise Denied(404)
     need_task(c, r["task_id"], write=False, full=True)

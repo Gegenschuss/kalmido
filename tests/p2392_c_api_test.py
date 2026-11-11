@@ -101,7 +101,8 @@ r = F.post(B + f"/api/comments/{CID}/decide", json={"decision": "approve", "skip
 check(r.ok and r.json()["state"] == "blocked" and r.json()["suggestion"]["state"] == "open", "skip_checklist does not pass " + r.text[:200])
 check(r.json()["suggestion"]["irreversible"][0]["reason"] == "Migration without a way back", "the suggestion names task and reason")
 r = F.post(B + f"/api/comments/{CID}/react", json={"emoji": "up"})
-st = json.loads(dbx("SELECT suggestion FROM comments WHERE id=?", (CID,))[0][0])
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+st = json.loads(dbx("SELECT extra->>'suggestion' FROM obj_comments WHERE id=?", (CID,))[0][0])
 check(st["state"] == "open", "a thumbs up does not pass either")
 sg = next(k for k in F.get(B + f"/api/tasks/{T2}/timeline").json()["comments"] if k["id"] == CID)["suggestion"]
 check([x["id"] for x in sg["irreversible"]] == [T1], "the timeline shows what blocks")

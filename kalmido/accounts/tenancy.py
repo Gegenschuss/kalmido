@@ -11,7 +11,7 @@ import os
 from ..core.i18n import N_
 from ..core.db import gset, gsetting, iso, local_now, now_utc
 from ..accounts.orgs import PRIVATE_FOLDER_RE, _operator_apart, has_workspaces, op_foreign_account, op_foreign_org
-from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import qi, system_ctx  # 2.149.0 G (#2517): pulled up from functions; 2.972.0 (#5285): qi
 from ..core.access import dlg_gone  # 2.473.0 (#3357)
 from ..core.objhooks import obj_boundary  # 2.649.0 (#5051)
 from ..core.objhooks import FOLLOW  # 2.924.0 (#5069): core/objects.py obj_node_follow
@@ -173,9 +173,9 @@ CHECKS = {
     "doc_mail_person": ("SELECT m.org_id, m.user_id FROM doc_mail m JOIN users u ON u.id=m.user_id WHERE m.org_id IS NOT NULL AND "
                         + _PERSON.format(o="m", m="m")),
     # 2.53.0 C (#1424): a task bell of an organisation's task held by a person outside it, or by an agent (only people get
-    # bells; the read layer ignores rows of another workspace: notify/taskbell.py tbl_rows)
-    "task_bell_person": ("SELECT b.task_id, b.user_id FROM task_bell b JOIN users u ON u.id=b.user_id WHERE b.org_id IS NOT NULL AND "
-                         "(u.kind='agent' OR " + _PERSON.format(o="b", m="b") + ")"),
+    # bells; the read layer ignores rows of another workspace: notify/taskbell.py tbl_rows). 2.972.0 (#5285): rows of obj_follow
+    "task_bell_person": ("SELECT b.ref_id, b.user_id FROM obj_follow b JOIN users u ON u.id=b.user_id WHERE b.kind='task' AND b.mode<>'watch' "
+                         "AND b.org_id IS NOT NULL AND (u.kind='agent' OR " + _PERSON.format(o="b", m="b") + ")"),
     # 2.59.0 A (#1735): a client's contact person linked to a contact outside the client's address books (an organisation's
     # client: a book the organisation owns; a client without one: its creator's own private books). (client, its creator);
     # boundary_repair drops such a link (the contact person stays)
@@ -194,9 +194,10 @@ CHECKS = {
                        "AND (bs.expires_at IS NULL OR bs.expires_at > to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"'))) "
                        "ELSE TRUE END) END"),
     # 2.473.0 (#3357): someone who watches a task of an organisation without being a member of it (boundary_repair removes the row)
-    "task_watcher_person": ("SELECT w.task_id, w.user_id FROM task_watchers w JOIN tasks t ON t.id=w.task_id JOIN lists l ON l.id=t.list_id "
-                            "JOIN users u ON u.id=w.user_id WHERE l.org_id IS NOT NULL AND u.kind!='agent' AND NOT EXISTS (SELECT 1 FROM org_members m "
-                            "WHERE m.org_id=l.org_id AND m.user_id=w.user_id)"),
+    # 2.972.0 (#5285): rows of obj_follow (mode watch)
+    "task_watcher_person": ("SELECT w.ref_id, w.user_id FROM obj_follow w JOIN tasks t ON t.id=w.ref_id JOIN lists l ON l.id=t.list_id "
+                            "JOIN users u ON u.id=w.user_id WHERE w.kind='task' AND w.mode='watch' AND l.org_id IS NOT NULL AND u.kind!='agent' "
+                            "AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=l.org_id AND m.user_id=w.user_id)"),
     # 2.60.0 C (#1512): the reviewer of an organisation's task who is neither its list's owner nor a member of the list
     "task_reviewer": ("SELECT t.id, t.reviewer_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.reviewer_id IS NOT NULL "
                       "AND l.org_id IS NOT NULL AND t.reviewer_id<>l.owner_id AND NOT EXISTS (SELECT 1 FROM list_members m "
@@ -342,11 +343,14 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "att_person": ("event_attendees", "event_id"),  # 2.87.0 (#1983)
           "file_person": ("fs_shares", "node_id"),  # 2.48.0 (#1207)
           "doc_mail_person": ("doc_mail", "org_id"),  # 2.48.0 (#1111)
-          "task_bell_person": ("task_bell", "task_id"),  # 2.53.0 C (#1424)
-          "task_watcher_person": ("task_watchers", "task_id"),  # 2.473.0 (#3357)
+          "task_bell_person": ("obj_follow", "ref_id"),  # 2.53.0 C (#1424); 2.972.0 (#5285): RP_WHERE
+          "task_watcher_person": ("obj_follow", "ref_id"),  # 2.473.0 (#3357); 2.972.0 (#5285): RP_WHERE
           "assistant_person": ("assistant_access", "list_id"),  # 2.75.0 A (#1411)
           "hub_token_person": ("hub_tokens", "org_id"),  # 2.84.0 A (#1198)
           "sheet_share_person": ("sheet_shares", "sheet_id")}  # 2.124.0 C (#2113); 2.924.0 (#5069): tchat_person is file_person
+# 2.972.0 (#5285): the rows of a kind in a shared table (obj_follow): the condition besides object and person
+RP_WHERE = {"task_bell_person": " AND kind='task' AND mode<>'watch'", "task_watcher_person": " AND kind='task' AND mode='watch'"}
+RP_NAMES = {x for pair in REPAIR.values() for x in pair}  # 2.972.0 (#5285): the allowlist of qi() for the repair's DELETE
 RP_CORE = ("fs_shares", "sheet_shares", "evcal", "address_book")  # 2.649.0 (#5051): core/objhooks.obj_boundary; 2.924.0 (#5069): no tchat_members, kinds
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Organisation > People")
 
@@ -413,7 +417,7 @@ def boundary_repair(c, keep=None):
                 continue
             # 2.649.0 (#5051): shares, table cards, room / calendar / book members through the core (obj_revoked, both sides)
             if table not in RP_CORE or obj_boundary(c, table, oid_, uid) is None:
-                c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?", (oid_, uid))
+                c.execute(f"DELETE FROM {qi(table, RP_NAMES)} WHERE {qi(col, RP_NAMES)}=? AND user_id=?" + RP_WHERE.get(k, ""), (oid_, uid))
             if table == "list_members":
                 c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (oid_, uid))
                 dlg_gone(c, oid_, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end

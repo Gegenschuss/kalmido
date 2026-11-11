@@ -21,7 +21,8 @@ from flask import g, jsonify
 from ..core.config import app
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, db, err, iso, now_utc
-from ..core.pg import insert_id, write_lock
+from ..core.pg import write_lock
+from ..core.objcomments import ocm_add  # 2.972.0 (#5272)
 from ..core.errors import BadInput
 from ..core.errors import reject_unknown
 from ..core.access import Denied
@@ -251,8 +252,8 @@ def gis_after(r, uid, lg, stats):
             for x in cms:
                 # 2.394.0 C (#3377 review of B): control / bidi characters out; without a date the task's (the import's) time
                 head = tr("@{0} on {1}:", imp_line(x["author"], 100) or "?", _gis_day(x["created_at"], lg), lg=lg)
-                cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at) VALUES(?,?,?,'',?)",
-                                (tid, uid, (head + "\n\n" + imp_textblock(x["body"], 100000))[:100000], x["created_at"] or row["created_at"] or ts))
+                cid = ocm_add(c, "task", tid, uid, (head + "\n\n" + imp_textblock(x["body"], 100000))[:100000],
+                              created_at=x["created_at"] or row["created_at"] or ts)  # 2.972.0 (#5272): the core's comment
                 if isinstance(x.get("id"), int) and not isinstance(x.get("id"), bool):
                     c.execute("""INSERT INTO git_issue_comments(conn_id,issue_no,remote_id,comment_id,created_at) VALUES(?,?,?,?,?)
                                  ON CONFLICT DO NOTHING""", (r["id"], n["no"], x["id"], cid, ts))

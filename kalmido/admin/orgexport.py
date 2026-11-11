@@ -49,7 +49,8 @@ from .exportleft import left_lines  # 2.362.4 (#3107)
 from .oilock import oil_export_keys  # #4300
 from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
-from ..core.pg import system_ctx
+from ..core.pg import qi, system_ctx, table_names
+from ..core.objcomments import ocm_old_cols  # 2.972.0 (#5272)
 from ..core.i18n import N_, lang, tr
 from ..core.access import Denied, live_sql
 from ..accounts.pictures import list_icon_path, org_icon_path, org_icon_tok  # 2.363.2 (#3106)
@@ -230,6 +231,8 @@ def _clean(c, oid, table, r):
         row["task_id"] = row.pop("obj_id")
         row.pop("kind", None)
         row.pop("created_by", None)
+    if table == "obj_follow":  # 2.972.0 (#5285): tasks/watchers.json as before (task_id, user_id, created_at)
+        row = {"task_id": row["ref_id"], "user_id": row["user_id"], "created_at": row["created_at"]}
     row.pop("legacy_aad", None)  # 2.278.0 C (#3091): a person's own move detail (old AAD), not the organisation's
     return _ox_dec_row(c, oid, table, row)
 
@@ -238,12 +241,18 @@ def _table_cols(c, table):
     return {r[0] for r in c.execute("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=?", (table,))}
 
 
+# 2.972.0 (#5272): tables whose file keeps the columns of the table before the core's (comments.json: task_id, reply_to,
+# mentions as csv, suggestion / choices / choice / portal / rule_name), so older and newer archives read alike
+OX_COLS = {"obj_comments": ocm_old_cols()}
+
+
 def _rows(c, oid, table, where, args, paged=True):
     """Every row of table matching where (keyset pages on id when the table has one: big tables never sit in memory whole)."""
+    cols, names = OX_COLS.get(table, "*"), table_names(c)  # 2.972.0 (#5272): a touched place takes qi() (#5296)
     if paged and "id" in _table_cols(c, table):
         last = None
         while True:
-            q = f"SELECT * FROM {table} WHERE ({where})" + (" AND id>?" if last is not None else "") + f" ORDER BY id LIMIT {OX_PAGE}"
+            q = f"SELECT {cols} FROM {qi(table, names)} WHERE ({where})" + (" AND id>?" if last is not None else "") + f" ORDER BY id LIMIT {OX_PAGE}"
             rs = c.execute(q, (*args, last) if last is not None else tuple(args)).fetchall()
             for r in rs:
                 yield _clean(c, oid, table, r)
@@ -251,7 +260,7 @@ def _rows(c, oid, table, where, args, paged=True):
                 return
             last = rs[-1]["id"]
     else:
-        for r in c.execute(f"SELECT * FROM {table} WHERE ({where})", tuple(args)).fetchall():
+        for r in c.execute(f"SELECT {cols} FROM {qi(table, names)} WHERE ({where})", tuple(args)).fetchall():
             yield _clean(c, oid, table, r)
 
 
@@ -306,7 +315,8 @@ OX_AREAS = (
     ("tasks/tags.json", "obj_tag_links", f"""kind='task' AND obj_id IN ({TSQ}) AND tag_id IN (SELECT id FROM obj_tags WHERE (scope_kind='list'
      AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM ({LSQ}) x)) OR (scope_kind='org' AND org_id=?))"""),
     ("tasks/people.json", "task_people", f"task_id IN ({TSQ})"),
-    ("tasks/watchers.json", "task_watchers", f"task_id IN ({TSQ})"),  # 2.473.0 (#3357)
+    # 2.473.0 (#3357); 2.972.0 (#5285): rows of the core's obj_follow (mode watch), the file keeps its columns (_clean)
+    ("tasks/watchers.json", "obj_follow", f"kind='task' AND mode='watch' AND ref_id IN ({TSQ})"),
     ("tasks/links.json", "task_links", f"task_id IN ({TSQ})"),  # 2.137.0 C (#2344): a task placed in a further list
     ("tasks/decisions.json", "task_decisions", f"task_id IN ({TSQ})"),  # 2.392.0 C (#3370)
     # 2.654.0 (#4585): where a task came from in a quotation (office/offertasks.py); the import maps task, list, quotation and the
@@ -317,11 +327,11 @@ OX_AREAS = (
     ("tasks/locked_notes.json", "task_note_locks", f"task_id IN ({TSQ})"),  # 2.48.0 (#1642): locked notes, browser-encrypted, as stored
     ("time_entries.json", "time_entries", f"list_id IN ({LSQ})"),
     ("time_sheets.json", "time_sheets", "org_id=?"),  # 2.137.0 C (#2344): monthly timesheets (note decrypted like the others)
-    ("comments.json", "comments", f"task_id IN ({TSQ})"),
+    ("comments.json", "obj_comments", f"kind='task' AND ref_id IN ({TSQ})"),  # 2.972.0 (#5272): the core's rows, the old columns (OX_COLS)
     # 2.763.0 (#5269): the reactions are rows of the core (obj_reactions); the file keeps its columns (_clean: comment_id), a
     # comment in the trash leaves its reactions out (as OX_GONE_WITH did)
     ("comments/reactions.json", "obj_reactions",
-     f"target_kind='comment' AND target_id IN (SELECT id FROM comments WHERE task_id IN ({TSQ}) AND {live_sql()})"),
+     f"target_kind='comment' AND target_id IN (SELECT id FROM obj_comments WHERE kind='task' AND ref_id IN ({TSQ}) AND {live_sql()})"),
     ("attachments.json", "attachments", f"task_id IN ({TSQ})"),
     # 2.48.0 (#1207): the organisation's file store (folders, files, versions, shares, history)
     # 2.223.3 B (#2879): without the trash (ox_live, ox_dead_nodes)
@@ -538,7 +548,7 @@ OX_LEFT = {
     "org_invites": "invitations (not_included)", "org_joins": "join requests (not_included)",
     "org_keys": _SERVER, "org_members": "members.json (with the role)", "org_out_requests": "requests of one person, short-lived",
     "pl_imported": _SECRET, "pl_rules": _SECRET, "pl_sources": _SECRET, "pl_uploads": _SECRET, "portal_logins": _SECRET,
-    "rc_suggest": _DERIVED, "task_bell": _PERSONAL, "time_wipes": _DERIVED,  # 2.530.0 B (#4315): the Undo copy of "Delete all times"
+    "rc_suggest": _DERIVED, "time_wipes": _DERIVED,  # 2.530.0 B (#4315): the Undo copy of "Delete all times"
     "list_part_trash": _DERIVED,  # 2.567.0 A (#4707): the copies of deleted sections / sprints until the trash period ends; 2.783.0 (#5368): + deleted fields, "Delete all times"
     "obj_history": _DERIVED, "obj_undo": "undo steps of 30 days", "obj_revoked": "shares removed (not_included)",  # 2.558.0 (#4709): the core's working data; 2.747.0 (#5249): 30 days
     "undo_groups": "undo steps of 30 days",  # 2.747.0 (#5249): their heads per person

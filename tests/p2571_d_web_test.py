@@ -143,7 +143,8 @@ check(len(calls) >= 2 and "foreign data from the internet" in calls[1]["last"], 
 check(len(calls) >= 2 and calls[1]["roles"][1] == "assistant", "the provider's blocks went back as they came")
 
 # ---------------------------------------------------------------- the page with orders: nothing written without a card
-check(not dbx("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND body LIKE 'INJECTED%'", (T1, AID)), "no comment from the page's orders")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(not dbx("SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=? AND user_id=? AND body LIKE 'INJECTED%'", (T1, AID)), "no comment from the page's orders")
 check(not dbx("SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND body LIKE 'INJECTED%'", (AID, GID)), "no message to Gina")
 body = m["body"] if m else ""
 check(body.count("approval") >= 2 and "ERROR" in body, f"both tool calls were refused for an approval {body[:400]}")
@@ -228,13 +229,15 @@ dbx("UPDATE agent_runs SET state='failed', ended=?, error='The server agent was 
 open(os.path.join(DATA, "slow-go"), "w").close()
 m = agent_says(after, "")
 check(m and "could not finish" in m["body"] and "slow ok" not in m["body"], f"the lost run ended itself {(m or {}).get('body', '')[:200]}")
-check(not dbx("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND body LIKE 'INJECTED slow%'", (T1, AID)),
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(not dbx("SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=? AND user_id=? AND body LIKE 'INJECTED slow%'", (T1, AID)),
       "no comment after the run was taken for lost (the web gate never fell)")
 check(dbx("SELECT state FROM agent_runs WHERE id=?", (run[0],)) == [("failed",)], "the lost run stays failed")
 check(Fr.put(SRV, json={"flow_web": {"other": False}}).ok, "web off for the next run")
 after, rid = chat(f"After the lost run FAKEWEB_INJECT {T1} {GID} {FID}")
 check(agent_says(after, "FAKEWEB done"), "the run right after the lost one answered")
-check(not dbx("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND body LIKE 'INJECTED%'", (T1, AID)),
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(not dbx("SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=? AND user_id=? AND body LIKE 'INJECTED%'", (T1, AID)),
       "the gate of the lost web run holds a moment after it (its process may still be in a step)")
 dbx("UPDATE agent_runs SET ended=? WHERE id=?", ((datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(timespec="seconds"), run[0]))
 
@@ -259,7 +262,8 @@ ans = until(lambda: dbx("SELECT body FROM agent_chat WHERE agent_id=? AND user_i
 check(ans and ans[0][0].count("approval") >= 2 and "From the web" in ans[0][0], f"the team agent's answer: both refused, the sources named {(ans or [['']])[0][0][:300]}")
 check(not dbx("SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND body LIKE 'INJECTED%'", (TMA, HID)),
       "no message from the page's orders to the other person of the project")
-check(not dbx("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND body LIKE 'INJECTED%'", (TA, TMA)), "no comment of the team agent")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(not dbx("SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=? AND user_id=? AND body LIKE 'INJECTED%'", (TA, TMA)), "no comment of the team agent")
 
 # review F2 (decision 06.11.2026): without a card only the person who asked and the owner; a person whose event lies in the
 # bundle (here Hugo's mention) is reached only by card
@@ -278,7 +282,8 @@ check(not dbx("SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND body 
 check(Fr.put(SRV, json={"flow_web": {"other": False}}).ok, "web off again")
 after, rid = chat(f"Again FAKEWEB_INJECT {T1} {GID} {FID}")
 check(agent_says(after, "FAKEWEB done"), "the run without web answered")
-check(dbx("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND body LIKE 'INJECTED%'", (T1, AID)),
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(dbx("SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=? AND user_id=? AND body LIKE 'INJECTED%'", (T1, AID)),
       "without web the agent without a control level comments directly (the web run's card was the gate)")
 
 raise SystemExit(done("p2571_d_web"))

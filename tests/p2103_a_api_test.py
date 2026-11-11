@@ -207,7 +207,8 @@ TK = Bo.post(B + "/api/tasks", json={"title": "Colour grading", "list_id": PL}).
 Ca.patch(B + f"/api/tasks/{TK}", json={"title": "Colour grading v2"})
 r = Bo.post(B + f"/api/tasks/{TK}/comments", json={"body": f"<@{CAROL}> please check the grading"})
 CM = r.json().get("id") if r.ok else None
-check(CM and sql("SELECT mentions FROM comments WHERE id=?", (CM,)) == [(str(CAROL),)], "bob mentions carol in a comment " + r.text[:120])
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(CM and sql("SELECT array_to_string(mentions, ',') FROM obj_comments WHERE id=?", (CM,)) == [(str(CAROL),)], "bob mentions carol in a comment " + r.text[:120])
 info = A.get(B + f"/api/users/{CAROL}/delete-info").json()
 p = info.get("purge") or {}
 check(p.get("agents") == 1 and p.get("calendars") == 1 and p.get("time_kept") == 1 and p.get("dms") == 1 and p.get("office") is None,
@@ -230,7 +231,8 @@ msgs = Bo.get(B + f"/api/team/rooms/{DM}/messages")
 bodies = [m.get("body") for m in (msgs.json().get("messages") or [])] if msgs.ok else []
 check(msgs.ok and "The cut is ready" in bodies, f"bob still reads it {msgs.status_code} {bodies}")
 check(any(b and "@Deleted person" in b and f"<@{CAROL}>" not in b for b in bodies), f"the mention in the chat is rewritten {bodies}")
-cb = sql("SELECT body, mentions FROM comments WHERE id=?", (CM,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+cb = sql("SELECT body, array_to_string(mentions, ',') FROM obj_comments WHERE id=?", (CM,))
 check(cb and cb[0][0] == "@Deleted person please check the grading" and cb[0][1] == "", f"the mention in the comment is rewritten {cb}")
 check(not sql("SELECT 1 FROM activity WHERE user_id=?", (CAROL,)), "the task history keeps no id of the account")
 check(Bo.get(B + "/api/team").ok, "bob's chat overview still loads")

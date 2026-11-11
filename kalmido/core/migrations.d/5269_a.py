@@ -14,7 +14,7 @@ reactions until this version is back (its next start moves what was written mean
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS obj_reactions (  -- 2.763.0 (#5269): one reaction per person, emoji and target of the core
   target_kind TEXT NOT NULL,
-  target_id BIGINT NOT NULL, -- no FK: a row of the kind's table (comment -> comments, tchat -> tchat_msgs, agent_chat -> agent_chat); kalmido_orx_gone deletes with it
+  target_id BIGINT NOT NULL, -- no FK: a row of the kind's table (comment -> obj_comments since #5272, tchat -> tchat_msgs, agent_chat -> agent_chat); kalmido_orx_gone deletes with it
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   emoji TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, -- no now(): a restore refuses a call in a default (admin/backup.py _calls_ok), pg_dump prints this one bare
@@ -25,7 +25,7 @@ BEGIN
   DELETE FROM obj_reactions WHERE target_kind = TG_ARGV[0] AND target_id = OLD.id;
   RETURN NULL;
 END $$;
-CREATE OR REPLACE TRIGGER kalmido_orx_gone_comment AFTER DELETE ON comments FOR EACH ROW EXECUTE FUNCTION kalmido_orx_gone('comment');
+-- 2.972.0 (#5272): kalmido_orx_gone_comment stands on obj_comments now (migrations.d/5272_a.py; comments is gone)
 CREATE OR REPLACE TRIGGER kalmido_orx_gone_tchat AFTER DELETE ON tchat_msgs FOR EACH ROW EXECUTE FUNCTION kalmido_orx_gone('tchat');
 CREATE OR REPLACE TRIGGER kalmido_orx_gone_agent_chat AFTER DELETE ON agent_chat FOR EACH ROW EXECUTE FUNCTION kalmido_orx_gone('agent_chat');
 """

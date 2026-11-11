@@ -560,6 +560,44 @@ check the page and its newest versions in `obj_versions`, then delete those rows
 loses only versions nobody can open any more. The organisation export keeps `wiki/versions.json` with its columns (`page_id`,
 `path`); its import writes into `obj_versions`. Next kinds: the playbooks and the procedure documentation (stage Q7b).
 
+### Comments (stage Q4a, 2.972.0, #5272)
+
+One table `obj_comments(id, kind, ref_id, org_id, user_id, ext_name, parent_id, body, mentions BIGINT[], extra JSONB,
+client_ref, created_at, edited_at, deleted_at, deleted_by)` holds the comments of every kind; `obj_comment_trash(comment_id,
+body, mentions, enc)` keeps the text of a comment in the trash. They replaced `comments` and `comment_trash_text`. Kinds today:
+`task` (a task's comments; `ref_id` = the task). Video / picture reviews and document notes follow with Q4b, the team chat takes
+the helpers with Q4c. `kalmido/core/objcomments.py`:
+- `ocm_add(c, kind, ref_id, uid, body, *, mentions, extra, ext_name, parent_id, client_ref, created_at, notify)` writes one
+  (the caller checked and cleaned; `notify=True` = `ocm_after`). `extra` holds what a kind adds -- a task: `suggestion` (its
+  JSON text), `choices`, `choice`, `portal` (true), `rule_name`; a key only with a value. `ocm_extra(c, cid, key, value)` sets
+  / removes one.
+- Reading: `ocm_row(c, cid)`, `ocm_list(c, kind, ref_id)` give the row in its old shape (`ocm_old_cols(alias)`: `task_id`,
+  `reply_to`, `mentions` "1,2", `suggestion`, `choices`, `choice`, `portal` 0/1, `rule_name`, the times as ISO text with
+  milliseconds), so answers, the API, exports and agent events stay as they were; `ocm_row_out(r)` is the JSON of one.
+- The rules exist once: reading = `obj_role >= view` of the object; saying = `ocm_say_refusal` / `ocm_need_say` (a guest /
+  read-only person of the object's organisation who cannot change it only reads; was `need_task_say`); editing = the author
+  with the version of the edit box (`ocm_edit`: lock `comment-<id>`, `expect_updated_at` -> 409 with the comment, through
+  `core/objparts.py part_write`); deleting / restoring by someone else = the author or `manage` on the object
+  (`ocm_may_delete`, decided 08.11.2026, question 3); mentions = `OCM_MENTION_RE` tokens of people the kind's hook `people`
+  names, any other token becomes `@name` (`ocm_mentions_clean`, the one parser); an end-to-end locked object takes the
+  browser's ciphertext and mentions through its guard (hook `sealed_in`).
+- The trash: `ocm_trash` / `ocm_restore` (author or `manage`; `check=False` = a system way) keep the text (a ciphertext as
+  it is) in `obj_comment_trash`, the kind's rows (a task's files) go with the same time (hooks `trash` / `restore`).
+- Notifying: `ocm_after` = `ocm_notify` (the core's send decision `obj_notify` per recipient: who reads the task, its News
+  entry, the bell, the push gates) and the agents' event once (`agent_comment_events`); every way a comment comes in calls
+  it (the app, v1 / MCP through the app's route, list rules).
+- A kind registers its hooks with `ocm_kind(kind, people=, sealed=, sealed_in=, text_max=, nfiles=, trash=, restore=,
+  live=)` (`collab/comments.py` for `task`).
+
+The task's routes stay where they are (`/api/tasks/<id>/comments`, `/api/comments/<id>` and its `restore`, `reactions`,
+`choice`; v1 `/api/v1/tasks/<id>/comments`, the MCP tools): the generic `/api/obj/<kind>/<id>/comments` comes with Q4b, when a
+second kind joins. `ref_id` has no foreign key: the trigger `kalmido_ocm_task_gone` deletes a task's comments when the task is
+deleted for good, `kalmido_orw_obj_comments` fills `org_id` from the task's project (row-level security), `kalmido_orx_gone`
+takes the reactions along. The start moved the old rows with their ids (`ocm_move`, through `core/objhooks.py MOVE` before
+the fragments' AFTER; `git_issue_comments` and `cmt_fts` point at `obj_comments` since, `ocm_fk`); a SQLite file of an older
+version brings its comments in the old table (`admin/migrate.py LEGACY_COMMENTS`), the same move takes them. One-way: the old
+tables are dropped; a backup restores them.
+
 ### Versions of tables (stage Q7c, 2.800.0, #5283)
 
 Checked against the core's versions and undo steps, the two change tables of the tables area stay, each for its own logic:
@@ -579,8 +617,9 @@ Checked against the core's versions and undo steps, the two change tables of the
 One send decision: `kalmido/core/objnotify.py obj_notify(c, kind, id, recipients, *, row, lid, own, S, bells, news, follow,
 gate, push, memo)`. Its first step is not optional: every recipient is cut with `obj_role(kind, id) >= 'view'` of the core
 (`obj_readers`); agents are never recipients (they get `agent_emit` events). Then the person's settings (`S` or
-`collab_user`), the News entry (`news`: `collab/news.py news_put`), the follow step (`follow(uid, s)`: the task's bell, a
-thread; `obj_follow` of stage Q9 takes this place), `notif_ok` (matrix, list bell, the owner's template `notify/caps.py`),
+`collab_user`), the News entry (`news`: `collab/news.py news_put`), the follow step (`follow="quiet"` / `"unmuted"`: the
+person's bell of the object in `obj_follow`, section *Following* below; or a function `follow(uid, s)` for a rule of the area
+besides it, e.g. a thread), `notif_ok` (matrix, list bell, the owner's template `notify/caps.py`),
 the gates (`gate(uid, s)`: device, burst / summary, an agent's push switch). It returns `{uid: settings}` of who gets the
 push; the caller builds the text in their language (an end-to-end list's push carries no words).
 - Kinds: a project's team chat conversation asks kind `list`; a channel / group asks `tchat_room`, whose members the core
@@ -600,8 +639,9 @@ push; the caller builds the text in their language (an end-to-end list's push ca
   `ValueError` too; the tick's task rule refuses an agent on its own (review of the first build).
 - The watchdog (no request) passes its tick's `memo`; for the task `objhooks.NOTIFY_TICK['task']` (`core/objlight.py
   _task_tick`) answers like `obj_role` with the per-project reads kept in the memo.
-- Still on their own check (later stages): the comment pushes and task events of `collab/comments.py` (stage Q4a), and the
-  pushes about one's own account / organisation without an object; News with a project or an event but no task
+- The comment pushes go through `obj_notify` since stage Q4a (2.972.0, #5272: `core/objcomments.py ocm_notify`, one call per
+  recipient with its own News entry). Still on their own check (later stages): the assign / unassign / complete pushes of
+  `collab/comments.py task_event`, and the pushes about one's own account / organisation without an object; News with a project or an event but no task
   (`news_add(list_id=…)`, the event invitations / changes) and the job push of `agents/api.py job_notify` follow in task #5512
   (stage Q2 rest), as does the team chat's held-back room push `collab/teamchat.py tchat_push_tick` ("N new messages";
   it still asks `tchat_room_members`, which does not know an own share that ran out, #5050 - found in the review of 2.891.0).
@@ -641,6 +681,37 @@ trash_prune=True)`.
   stays on the server: `extra`); the import also reads the `lists/section_templates.json` of older archives.
 - `kalmido/lists/tplkind.py` stands after the core in the module order: `core/objects.py` reaches `lists/templates.py` at its
   import, so the templates' routes call into it from inside their functions.
+
+### Following (stage Q9a, 2.972.0, #5285)
+
+One table `obj_follow(user_id, kind, ref_id, org_id, mode, until DATE, set_by, prev JSONB, act, act_by, created_at, updated_at
+TIMESTAMPTZ)` holds who follows an object and how loud; it replaced `task_watchers` and `task_bell`. `mode` is `watch` (the
+person watches the object: its comments and status changes reach them like someone who took part) or the bell (`list` = as
+the project, `mute` = no pushes, `urgent` = every change as an urgent push; `until` = the last day of an urgency, NULL = until
+the task is completed; `set_by`, and `prev` / `act` / `act_by` = the bell's one undo step). Watching and the bell are separate
+rows: the primary key holds the mode, the partial unique index `ofl_bell_one` allows one bell row per person and object, so a
+watched task can be muted at the same time. Kinds: `task`. `kalmido/core/objfollow.py`:
+- `ofl_watchers` / `ofl_watchers_of` read, `ofl_watch` / `ofl_unwatch` write the watching (`tasks/watchers.py`: who may add
+  whom, the history line, the routes); `ofl_bells`, `ofl_bell_put`, `ofl_bell_back`, `ofl_bell_any` the bell
+  (`notify/taskbell.py`: the levels' meaning, who may set urgency for others, the routes). The API and the browser see the
+  same answers as before.
+- The follow step of `obj_notify` reads it: `ofl_quiet(c, uid, kind, id, s, done_ok, only_mute)` asks the kind's bell rule
+  in `OFL_LEVEL` (the task: `taskbell.tbl_level` - an urgency ends with its day or the completion, urgency set by others only
+  while the person accepts it).
+- Who follows says nothing about who may read: `obj_notify`'s first step (`obj_role >= view`) still cuts every recipient.
+  Agents may watch a task (their events, `agents/core.py`), never get a bell, and are never push recipients.
+- The rows end with the share: `ofl_drop(c, uids, kind, where, args)` takes a person's rows on the objects matching `where`
+  (`core/access.py dlg_gone` for leaving a project, a member removed, a group / folder share gone, the boundary check);
+  `obj_revoke_person` drops them for `leave` (the person and their agents in the organisation) and `delete` (the account).
+- The rows go with their object: the trigger `kalmido_ofl_gone` (a task deleted for good). A watching row carries its task's
+  organisation (`kalmido_ofl_fill`, `kalmido_ofl_carry`; row-level security); a bell row keeps the workspace it was set in and
+  is ignored in another one (a list's workspace move takes it along, `accounts/orgs.py list_space_follow`).
+- The exports keep their files: the account export's parts `task_bell` / `task_watchers` and the organisation export's
+  `tasks/watchers.json` have their old columns (`task_id`, `level` ...), so older archives import the same way.
+- The move: `core/db.py init_db` calls `ofl_setup` (`ofl_move`) before the fragment `5285_a` drops the old tables (one-way;
+  a version before 2.972 starts with empty old tables, its rows come over at the next start of this one).
+`list_bell`, `list_notif` and `folder_notif` stay until stage Q9b. A new area with following adds its kind to `OFL_KINDS`,
+a bell rule to `OFL_LEVEL` and a `kalmido_ofl_gone` trigger line in a fragment -- no table of its own.
 
 ## Filter (2.846.0, #5520)
 

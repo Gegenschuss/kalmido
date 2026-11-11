@@ -112,7 +112,8 @@ def seen_all():
 
 
 def comments(tid):
-    return dbx("SELECT id, user_id, body, ext_name FROM comments WHERE task_id=? AND deleted_at IS NULL ORDER BY id", (tid,))
+    # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+    return dbx("SELECT id, user_id, body, ext_name FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL ORDER BY id", (tid,))
 
 
 def task_of(mid):

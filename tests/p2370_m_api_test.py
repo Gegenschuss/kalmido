@@ -171,11 +171,15 @@ left = {t: x for t, x in rep.get("tables", {}).items() if x.get("written") != x.
 check(set(left) == {"list_tags", "task_list_tags"} and left["list_tags"]["source"] - left["list_tags"]["written"] == 1,
       "(b) only the merged list tag (and the double tag of a task) differ " + str(left)[:300])
 check(psql("SELECT COUNT(*) FROM tasks") == str(want["tasks"] + want["list_milestones"]), "(b) tasks (+ the milestones of 2.17, now tasks)")
+# 2.972.0 (#5272): the old comments are rows of the core's obj_comments after the start (migrate.py loads the old table,
+# core/objcomments.py ocm_move moves them, migrations.d/5272_a.py drops it)
+OBJ = {"comments": "obj_comments"}
 for t in ("comments", "attachments", "office_doc_items", "agent_chat", "list_members", "time_entries"):
     # 2.41.0 (#1471): the lists holding time entries get time tracking on (migr_time241), so the focus sessions of the generic rows
     # that the watchdog ends right after the start become time entries there (pomo_id set): count the moved rows only
     w = " WHERE pomo_id IS NULL" if t == "time_entries" else ""
-    check(psql(f"SELECT COUNT(*) FROM {t}{w}") == str(want[t]), f"(b) {t}: {want[t]} rows in Postgres ({psql(f'SELECT COUNT(*) FROM {t}{w}')}, all {psql(f'SELECT COUNT(*) FROM {t}')})")
+    pt = OBJ.get(t, t)
+    check(psql(f"SELECT COUNT(*) FROM {pt}{w}") == str(want[t]), f"(b) {t}: {want[t]} rows in Postgres ({psql(f'SELECT COUNT(*) FROM {pt}{w}')}, all {psql(f'SELECT COUNT(*) FROM {pt}')})")
 # 2.933.0 (#5404): templates.user_id of the SQLite file is owner_id since 2.905 (#5288): every template keeps its owner and its times
 check(psql("SELECT COUNT(*) FROM templates WHERE owner_id IS NOT NULL AND created_at IS NOT NULL") == str(want["templates"])
       and "templates: column(s) user_id of the SQLite file not taken over (gone in this version)" not in rep.get("notes", []),
@@ -250,7 +254,7 @@ check(psql("SELECT priority FROM tasks WHERE id=3") == "0" and psql("SELECT dura
       and psql("SELECT pinned FROM tasks WHERE id=6") == "1", "(c) the corrected values in Postgres")
 check(psql("SELECT data::text FROM activity WHERE id=1") == "{}" and psql("SELECT COALESCE(choices::text,'null') FROM agent_chat WHERE id=10") == "null",
       "(c) JSON values in Postgres")
-check(rep.get("left_out", {}).get("comments") and psql("SELECT COUNT(*) FROM comments") == str(small["tables"]["comments"] - 1),
+check(rep.get("left_out", {}).get("comments") and psql("SELECT COUNT(*) FROM obj_comments") == str(small["tables"]["comments"] - 1),  # 2.972.0 (#5272)
       "(c) the orphan comment left out and listed " + str(rep.get("left_out")))
 
 # ================================================================== (f) an old backup zip through the admin restore

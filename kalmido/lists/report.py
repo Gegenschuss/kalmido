@@ -74,7 +74,7 @@ def project_status(c, lid, uid, *, frm=None, to=None, with_time=True, bounds=Non
                              (SELECT COUNT(*) FROM task_deps d JOIN tasks b ON b.id=d.blocker_id WHERE d.task_id=t.id AND b.status=0
                                 AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE is_inbox=0) AND {tvis(c, uid, 'b.')}) AS open_blockers,
                              (EXISTS (SELECT 1 FROM activity a WHERE a.task_id=t.id AND a.kind!='created' AND a.created_at>=? AND a.created_at<?)
-                              OR EXISTS (SELECT 1 FROM comments cm WHERE cm.task_id=t.id AND cm.deleted_at IS NULL AND cm.created_at>=? AND cm.created_at<?)
+                              OR EXISTS (SELECT 1 FROM obj_comments cm WHERE cm.kind='task' AND cm.ref_id=t.id AND cm.deleted_at IS NULL AND cm.created_at>=? AND cm.created_at<?)
                               OR EXISTS (SELECT 1 FROM time_entries te WHERE te.task_id=t.id AND te.start>=? AND te.start<?)
                               OR EXISTS (SELECT 1 FROM tasks s WHERE s.parent_id=t.id AND s.deleted_at IS NULL AND s.updated_at>=? AND s.updated_at<?)) AS moved
                            {base} AND t.status=0 AND t.parent_id IS NULL ORDER BY t.due IS NULL, t.due, t.sort, t.id""",

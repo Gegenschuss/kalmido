@@ -215,7 +215,8 @@ Ca = sess("carol")  # no longer in Alpha: sees erin (Gamma) only through nothing
 CL = Ca.post(B + "/api/lists", json={"name": "Carol notes", "org_id": None}).json()["id"]
 TID = Ca.post(B + "/api/tasks", json={"title": "Note", "list_id": CL}).json()["id"]
 r = Ca.post(B + f"/api/tasks/{TID}/comments", json={"body": f"hello <@{ERIN}> and <@{GID}>"})
-body = dbx("SELECT body FROM comments WHERE task_id=? ORDER BY id DESC LIMIT 1", (TID,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+body = dbx("SELECT body FROM obj_comments WHERE kind='task' AND ref_id=? ORDER BY id DESC LIMIT 1", (TID,))
 check(r.ok and body and "@?" in body[0][0] and "Erin" not in body[0][0], "a mention of an account one may not see: '@?' " + str(body))
 FT2 = Fr.post(B + "/api/tasks", json={"title": "Mine", "list_id": FL}).json()["id"]
 check(Fr.post(B + f"/api/tasks/{FT2}/comments", json={"body": f"note <@{FID}>"}).ok, "freelancer: comments with a mention work")
@@ -264,7 +265,8 @@ check(r.ok and dbx("SELECT org_id FROM books WHERE id=?", (r.json()["id"],))[0][
 r = Ca.post(B + f"/api/lists/{CL}/rules", json={"name": "Greet", "trigger": {"kind": "created"}, "action": {"kind": "comment", "text": f"hi <@{ERIN}>"}})
 check(r.status_code in (200, 201), "setup: a rule with a comment " + r.text[:200])
 RT = Ca.post(B + "/api/tasks", json={"title": "Ruled", "list_id": CL}).json()["id"]
-body = dbx("SELECT body FROM comments WHERE task_id=? AND rule_name IS NOT NULL", (RT,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+body = dbx("SELECT body FROM obj_comments WHERE kind='task' AND ref_id=? AND extra->>'rule_name' IS NOT NULL", (RT,))
 check(body and f"<@{ERIN}>" not in body[0][0] and "Erin" not in body[0][0], "a rule comment keeps no mention of an unseen account " + str(body))
 
 print(f"\np21481_a_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)

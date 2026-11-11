@@ -10,6 +10,7 @@ from ..core.i18n import tr
 from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.access import plists, PROJ_SQL, pvis
 from ..core.pg import st_ids
+from .objfollow import ofl_watchers_of  # 2.972.0 (#5285)
 from ..core.dlock import dl_tasks_locked  # 2.576.0 (#3371)
 from ..core.db import iso, iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from ..core.objtags import otg_user_of  # 2.955.0 (#5276)
@@ -149,11 +150,7 @@ def wk_for(c, ids):
 
 def wat_of(c, ids):
     """2.473.0 (#3357): {task id: [user ids]} of the tasks ids that have watchers."""
-    out = {}
-    if ids:
-        for r in c.execute("SELECT task_id, user_id FROM task_watchers WHERE task_id = ANY(CAST(? AS BIGINT[])) ORDER BY user_id", (st_ids(ids),)):
-            out.setdefault(r[0], []).append(r[1])
-    return out
+    return ofl_watchers_of(c, "task", ids)  # 2.972.0 (#5285): the core's obj_follow
 
 
 # 2.576.0 (#3371): the saved relations as the reading side sees them (tasks/relations.py)
@@ -230,7 +227,7 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
     atrash = {}
     # 2.272.0 F (#3038, review E2-M6): not the files of a deleted comment (their restore is 404); mine = my comment's file
     for a in c.execute("""SELECT a.id, a.task_id, a.name, a.size, a.comment_id, a.deleted_at, cm.user_id AS cm_user FROM attachments a
-                          LEFT JOIN comments cm ON cm.id=a.comment_id WHERE a.deleted_at IS NOT NULL
+                          LEFT JOIN obj_comments cm ON cm.id=a.comment_id WHERE a.deleted_at IS NOT NULL
                           AND (a.comment_id IS NULL OR (cm.id IS NOT NULL AND cm.deleted_at IS NULL))
                           AND a.task_id = ANY(CAST(? AS BIGINT[])) ORDER BY a.deleted_at DESC, a.id""", (idl,)):
         if a["task_id"] in ids:
@@ -244,13 +241,14 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
     cms, uid = {}, (g.user["id"] if has_request_context() and getattr(g, "user", None) else None)
     if uid and ids:
         # 2.41.0 (#1383): + a = open approval cards of agents in the comments (the task's badge)
-        for r in c.execute("""SELECT k.task_id, COUNT(*) AS n,
+        # 2.972.0 (#5272): the comments' core (obj_comments kind 'task'; the buttons in extra)
+        for r in c.execute("""SELECT k.ref_id AS task_id, COUNT(*) AS n,
                                      SUM(CASE WHEN k.id > COALESCE(s.seen_id, 0) AND k.user_id IS DISTINCT FROM ? THEN 1 ELSE 0 END) AS u,
-                                     SUM(CASE WHEN k.choices IS NOT NULL AND k.choice IS NULL AND k.choices->>'approval' IS NOT NULL
-                                              AND k.choices->>'withdrawn_at' IS NULL AND COALESCE(k.choices->>'expires_at', '9') > ?
+                                     SUM(CASE WHEN k.extra->'choice' IS NULL AND k.extra->'choices'->>'approval' IS NOT NULL
+                                              AND k.extra->'choices'->>'withdrawn_at' IS NULL AND COALESCE(k.extra->'choices'->>'expires_at', '9') > ?
                                               THEN 1 ELSE 0 END) AS a
-                              FROM comments k LEFT JOIN obj_seen s ON s.kind='task' AND s.ref_id=k.task_id AND s.user_id=?
-                              WHERE k.deleted_at IS NULL AND k.task_id = ANY(CAST(? AS BIGINT[])) GROUP BY k.task_id""",
+                              FROM obj_comments k LEFT JOIN obj_seen s ON s.kind='task' AND s.ref_id=k.ref_id AND s.user_id=?
+                              WHERE k.kind='task' AND k.deleted_at IS NULL AND k.ref_id = ANY(CAST(? AS BIGINT[])) GROUP BY k.ref_id""",
                            (uid, iso_ms(now_utc()), uid, idl)):
             if r["task_id"] in ids:
                 cms[r["task_id"]] = (r["n"], r["u"] or 0, r["a"] or 0)

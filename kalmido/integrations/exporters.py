@@ -112,8 +112,8 @@ def ex_todoist_csv(c, uid, lst):
     w = csv.writer(out, lineterminator="\n")  # 2.142.0 review: free text through csv_cell (no formulas in spreadsheets)
     w.writerow(TD_HEAD)
     notes = {}
-    for r in c.execute("SELECT m.task_id, m.body, u.display_name FROM comments m LEFT JOIN users u ON u.id=m.user_id "
-                       "WHERE m.deleted_at IS NULL AND m.task_id IN (SELECT id FROM tasks WHERE list_id=?) ORDER BY m.id", (lst["id"],)):
+    for r in c.execute("SELECT m.ref_id AS task_id, m.body, u.display_name FROM obj_comments m LEFT JOIN users u ON u.id=m.user_id "
+                       "WHERE m.kind='task' AND m.deleted_at IS NULL AND m.ref_id IN (SELECT id FROM tasks WHERE list_id=?) ORDER BY m.id", (lst["id"],)):
         notes.setdefault(r["task_id"], []).append((re.sub(r"<@\d+>", "@", r["body"] or ""), r["display_name"] or ""))
     for sec, srows in ex_sections(secs, rows):
         if sec is not None:

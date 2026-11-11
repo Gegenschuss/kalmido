@@ -242,9 +242,10 @@ check(len(ev) == 1 and MARK not in ev[0][0] and '"visible": false' in ev[0][0].r
 # ================================================================== reaction event to an agent that cannot see the task
 LR = A.post(B + "/api/lists", json={"name": f"{MARK} gate", "org_id": ORG}).json()["id"]
 TR = A.post(B + "/api/tasks", json={"title": f"{MARK} gate task", "list_id": LR}).json()["id"]
-dbx("INSERT INTO comments(task_id,user_id,body,created_at,suggestion) VALUES(?,?,?,?,?)",
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+dbx("INSERT INTO obj_comments(kind, ref_id,user_id,body,created_at,extra) VALUES('task', ?,?,?,?,jsonb_build_object('suggestion', ?::text))",
     (TR, AGA, "please integrate", TS, json.dumps({"kind": "integrate", "state": "open"})), write=True)
-KG = dbx("SELECT id FROM comments WHERE task_id=? ORDER BY id DESC LIMIT 1", (TR,))[0][0]
+KG = dbx("SELECT id FROM obj_comments WHERE kind='task' AND ref_id=? ORDER BY id DESC LIMIT 1", (TR,))[0][0]
 e0 = dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND event='reaction'", (AGA,))[0][0]
 r = A.post(B + f"/api/comments/{KG}/decide", json={"decision": "approve"})
 # 2.663.0 (#4341): alice owns LR (an approver), the request is open -> gate_decide_route answers 200 with the state

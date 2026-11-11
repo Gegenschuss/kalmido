@@ -83,11 +83,12 @@ TP = A.post(B + "/api/tasks", json={"title": "Private task", "list_id": INBOX}).
 TB = Ca.post(B + "/api/tasks", json={"title": "Beta task", "list_id": LB}).json()["id"]
 r = A.post(B + f"/api/tasks/{TA}/comments", json={"body": "Alpha comment"})
 check(r.ok, "comment on the Alpha task " + r.text[:120])
-CA = dbx("SELECT id FROM comments WHERE task_id=? ORDER BY id DESC LIMIT 1", (TA,))[0][0]
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+CA = dbx("SELECT id FROM obj_comments WHERE kind='task' AND ref_id=? ORDER BY id DESC LIMIT 1", (TA,))[0][0]
 A.post(B + f"/api/tasks/{TP}/comments", json={"body": "Private comment"})
-CP = dbx("SELECT id FROM comments WHERE task_id=? ORDER BY id DESC LIMIT 1", (TP,))[0][0]
-check(org_of("tasks", TA) == ALPHA and org_of("comments", CA) == ALPHA, "a task / comment of an Alpha list: org_id Alpha")
-check(org_of("tasks", TP) is None and org_of("comments", CP) is None, "a task / comment of a private list: org_id NULL")
+CP = dbx("SELECT id FROM obj_comments WHERE kind='task' AND ref_id=? ORDER BY id DESC LIMIT 1", (TP,))[0][0]
+check(org_of("tasks", TA) == ALPHA and org_of("obj_comments", CA) == ALPHA, "a task / comment of an Alpha list: org_id Alpha")
+check(org_of("tasks", TP) is None and org_of("obj_comments", CP) is None, "a task / comment of a private list: org_id NULL")
 check(org_of("tasks", TB) == BETA, "a task of a Beta list: org_id Beta")
 r = A.post(B + "/api/evcals", json={"name": "Alpha cal", "org_id": ALPHA})
 check(r.status_code in (200, 201), "an Alpha calendar " + r.text[:120])
@@ -112,11 +113,11 @@ check(org_of("contacts", PA) == ALPHA and org_of("contacts", PP) is None, "conta
 # ---- 2. moves
 r = A.patch(B + f"/api/tasks/{TA}", json={"list_id": INBOX})
 check(r.ok, "alice (admin of Alpha) moves the Alpha task into her private inbox " + r.text[:120])
-check(org_of("tasks", TA) is None and org_of("comments", CA) is None, "moved to a private list: the task and its comment become private")
+check(org_of("tasks", TA) is None and org_of("obj_comments", CA) is None, "moved to a private list: the task and its comment become private")
 r = A.patch(B + f"/api/tasks/{TA}", json={"list_id": LA})
-check(r.ok and org_of("tasks", TA) == ALPHA and org_of("comments", CA) == ALPHA, "moved back: Alpha again, with its comment")
+check(r.ok and org_of("tasks", TA) == ALPHA and org_of("obj_comments", CA) == ALPHA, "moved back: Alpha again, with its comment")
 # a parent changing its organisation: whatever the write path (here straight in SQL), the children follow
-for parent, pid, kids in (("lists", LA, (("tasks", TA), ("comments", CA))), ("ev_cals", KA, (("events", EA),)),
+for parent, pid, kids in (("lists", LA, (("tasks", TA), ("obj_comments", CA))), ("ev_cals", KA, (("events", EA),)),
                           ("books", BA, (("contacts", PA),))):
     dbx(f"UPDATE {parent} SET org_id=? WHERE id=?", (BETA, pid))
     check(all(org_of(t, i) == BETA for t, i in kids), f"{parent} moved to Beta: {', '.join(t for t, _ in kids)} follow")
@@ -128,12 +129,14 @@ dbx("UPDATE events SET cal_id=? WHERE id=?", (KP, EA))
 check(org_of("events", EA) is None, "an event moved to a private calendar: private")
 dbx("UPDATE events SET cal_id=? WHERE id=?", (KA, EA))
 check(org_of("events", EA) == ALPHA, "and back: Alpha")
-dbx("UPDATE comments SET task_id=? WHERE id=?", (TP, CA))
-check(org_of("comments", CA) is None, "a comment put on a private task: private")
-dbx("UPDATE comments SET task_id=? WHERE id=?", (TA, CA))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+dbx("UPDATE obj_comments SET ref_id=? WHERE id=?", (TP, CA))
+check(org_of("obj_comments", CA) is None, "a comment put on a private task: private")
+dbx("UPDATE obj_comments SET ref_id=? WHERE id=?", (TA, CA))
 
 # ---- 3. the database itself, as the app's role (no vis_sql: the second floor alone)
-ROWS = (("tasks", TA), ("comments", CA), ("events", EA), ("contacts", PA))
+# 2.972.0 (#5272): the task comments are rows of obj_comments (its org_id filled from the task's list like before)
+ROWS = (("tasks", TA), ("obj_comments", CA), ("events", EA), ("contacts", PA))
 for t, i in ROWS:
     check(count(t, f"id={i}", role="user", orgs=str(BETA), uid=CAROL) == 0, f"{t}: Beta's context does not see the Alpha row")
     check(count(t, f"id={i}", role="user", orgs=str(ALPHA), uid=BOB) == 1, f"{t}: Alpha's context sees it")
@@ -142,27 +145,30 @@ for t, i in ROWS:
     check(count(t, f"id={i}", role="agent", orgs=str(ALPHA), uid=BOB) == 1, f"{t}: an agent of Alpha: the row")
     check(count(t, f"id={i}", role="agent", orgs="", uid=BOB) == 0, f"{t}: a private agent: not the Alpha row")
     check(count(t, f"id={i}", role="system") == 1, f"{t}: system sees it")
-for t, i in (("tasks", TP), ("comments", CP), ("events", EP), ("contacts", PP)):
+for t, i in (("tasks", TP), ("obj_comments", CP), ("events", EP), ("contacts", PP)):
     check(count(t, f"id={i}", role="user", orgs="", uid=1) == 1, f"{t}: the private row stays visible (org_id NULL)")
 out, e = as_app([f"INSERT INTO tasks(list_id,title,created_at,updated_at) VALUES({LA},'carol sneaks in','2026-01-01','2026-01-01');"],
                 role="user", orgs=str(BETA), uid=CAROL)
 check(e is not None and "row-level security" in e, f"a task into an Alpha list from Beta's context is refused ({(e or out)})")
 check(not dbx("SELECT 1 FROM tasks WHERE title='carol sneaks in'"), "... and not written")
-out, e = as_app([f"INSERT INTO comments(task_id,body,created_at) VALUES({TA},'carol comments','2026-01-01');"], role="user", orgs=str(BETA), uid=CAROL)
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+out, e = as_app([f"INSERT INTO obj_comments(kind, ref_id,body,created_at) VALUES('task', {TA},'carol comments','2026-01-01');"], role="user", orgs=str(BETA), uid=CAROL)
 check(e is not None and "row-level security" in e, f"a comment on an Alpha task from Beta's context is refused ({(e or out)})")
 out, e = as_app([f"INSERT INTO tasks(list_id,title,created_at,updated_at,org_id) VALUES({LB},'forged','2026-01-01','2026-01-01',{ALPHA});"],
                 role="user", orgs=f"{BETA}", uid=CAROL)
 check(e is None and [x[0] for x in dbx("SELECT org_id FROM tasks WHERE title='forged'")] == [BETA],
       f"a forged org_id is replaced by the list's ({e or out})")
 out, e = as_app([f"INSERT INTO tasks(list_id,title,created_at,updated_at) VALUES({LA},'old version','2026-01-01','2026-01-01');",
-                 f"INSERT INTO comments(task_id,body,created_at) VALUES({TA},'old version','2026-01-01');",
+                 # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+                 f"INSERT INTO obj_comments(kind, ref_id,body,created_at) VALUES('task', {TA},'old version','2026-01-01');",
                  f"INSERT INTO events(cal_id,uid,href,title,start,\"end\",created_at,updated_at) VALUES({KA},'u-old','h-old','old version','{day}T08:00','{day}T09:00','2026-01-01','2026-01-01');",
                  f"INSERT INTO contacts(book_id,uid,href,fn,created_at,updated_at) VALUES({BA},'c-old','c-old','old version','2026-01-01','2026-01-01');"],
                 role="user", orgs=str(ALPHA), uid=BOB)
 check(e is None, f"the version before writes without org_id ({e})")
 for t in ("tasks", "events"):
     check([x[0] for x in dbx(f"SELECT org_id FROM {t} WHERE title='old version'")] == [ALPHA], f"{t}: a row without org_id gets the parent's")
-check([x[0] for x in dbx("SELECT org_id FROM comments WHERE body='old version'")] == [ALPHA], "comments: a row without org_id gets the task's list's")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check([x[0] for x in dbx("SELECT org_id FROM obj_comments WHERE body='old version'")] == [ALPHA], "comments: a row without org_id gets the task's list's")
 check([x[0] for x in dbx("SELECT org_id FROM contacts WHERE fn='old version'")] == [ALPHA], "contacts: a row without org_id gets the book's")
 out, e = as_app([f"UPDATE tasks SET list_id={LB} WHERE id={TA};"], role="user", orgs=str(ALPHA), uid=BOB)
 check(e is not None and "row-level security" in e and org_of("tasks", TA) == ALPHA,
@@ -193,10 +199,11 @@ check("Fred" in Fr.get(B + f"/api/contacts?book_id={FB}").text, "freelancer: the
 check(Fr.patch(B + f"/api/tasks/{FT}", json={"title": "Freelance task 2"}).ok, "freelancer: the own task is changed")
 
 # ---- 5. the rows from before: fill triggers gone, org_id empty -> the next start fills them and puts the triggers back
-for t in ("tasks", "comments", "events", "contacts"):
+for t in ("tasks", "obj_comments", "events", "contacts"):  # 2.972.0 (#5272): obj_comments
     dbx(f"DROP TRIGGER IF EXISTS kalmido_orw_{t} ON {t}")
 dbx("UPDATE tasks SET org_id=NULL WHERE id=?", (TA,))
-dbx("UPDATE comments SET org_id=NULL WHERE id=?", (CA,))
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+dbx("UPDATE obj_comments SET org_id=NULL WHERE id=?", (CA,))
 dbx("UPDATE events SET org_id=NULL WHERE id=?", (EA,))
 dbx("UPDATE contacts SET org_id=NULL WHERE id=?", (PA,))
 check(all(org_of(t, i) is None for t, i in ROWS), "setup: the rows from before (no org_id)")
@@ -211,11 +218,12 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Gamma"})
 GAMMA = r.json()["id"]
 LG = dbx("INSERT INTO lists(name,created_at,owner_id,org_id) VALUES('Gamma list','2026-01-01',1,?) RETURNING id", (GAMMA,))[0][0]
 TG = dbx("INSERT INTO tasks(list_id,title,created_at,updated_at) VALUES(?,'Gamma task','2026-01-01','2026-01-01') RETURNING id", (LG,))[0][0]
-CG = dbx("INSERT INTO comments(task_id,body,created_at) VALUES(?,'Gamma comment','2026-01-01') RETURNING id", (TG,))[0][0]
-check(org_of("tasks", TG) == GAMMA and org_of("comments", CG) == GAMMA, "setup: a Gamma task and comment")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+CG = dbx("INSERT INTO obj_comments(kind, ref_id,body,created_at) VALUES('task', ?,'Gamma comment','2026-01-01') RETURNING id", (TG,))[0][0]
+check(org_of("tasks", TG) == GAMMA and org_of("obj_comments", CG) == GAMMA, "setup: a Gamma task and comment")
 try:
     dbx("DELETE FROM orgs WHERE id=?", (GAMMA,))
-    check(org_of("tasks", TG) is None and org_of("comments", CG) is None, "the organisation removed: its task and comment became private")
+    check(org_of("tasks", TG) is None and org_of("obj_comments", CG) is None, "the organisation removed: its task and comment became private")
 except dbxm.DbError as e:  # another table may hold the organisation (not ours): only our foreign keys must not be the reason
     check(not any(x in str(e) for x in ("tasks_org_id", "comments_org_id", "events_org_id", "contacts_org_id")),
           f"removing the organisation fails on none of the new foreign keys ({str(e)[:160]})")

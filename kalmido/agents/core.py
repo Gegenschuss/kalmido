@@ -15,6 +15,7 @@ from ..core.pgbus import bus_active, bus_on, bus_send  # 2.622.0 (#3891)
 from ..core.ephem import eph_add  # 2.622.0 (#3891)
 from ..core.i18n import tr
 from ..core.db import db, inbox_default, iso, iso_ms, now_utc, parse_iso  # db: 2.959.0 (#4030)
+from ..core.objcomments import ocm_old_cols  # 2.972.0 (#5272)
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
 from ..core.dlock import dl_list_locked
@@ -409,7 +410,7 @@ def list_sections(c, uid, lid):
 
 def agent_event_comments(c, tid):
     """The newest AGENT_EVENT_COMMENTS comments of a task, oldest first, text shortened to AGENT_EVENT_COMMENT_CHARS."""
-    rows = c.execute("SELECT * FROM comments WHERE task_id=? AND deleted_at IS NULL ORDER BY id DESC LIMIT ?",
+    rows = c.execute(f"SELECT {ocm_old_cols()} FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL ORDER BY id DESC LIMIT ?",
                      (tid, AGENT_EVENT_COMMENTS)).fetchall()[::-1]
     names = user_names(c, [r["user_id"] for r in rows])
     ag = agent_ids(c)
@@ -450,7 +451,7 @@ def agent_task_data(c, tid, aid, full=None, **extra):
         full = task_visible(c, tid, aid, full=True)
     if full:
         task["comments"] = agent_event_comments(c, tid)
-        task["comments_total"] = c.execute("SELECT COUNT(*) FROM comments WHERE task_id=? AND deleted_at IS NULL", (tid,)).fetchone()[0]
+        task["comments_total"] = c.execute("SELECT COUNT(*) FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL", (tid,)).fetchone()[0]
         task["decisions"] = dec_list(c, tid, current=True)  # 2.392.0 C (#3370): those in force
         lst["sections"] = list_sections(c, aid, row["list_id"])
         rp = git_repo_for_task(c, row, aid)  # 2.2.0 (#339): the repository to work in, a branch name, the linked code (2.396.0 A #3386: its git author)
@@ -482,9 +483,9 @@ def agent_comment_events(c, t, cid, mentions, new_mentions, created=True):
     ag = agent_ids(c)
     if not ag:
         return
-    k = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
+    k = c.execute(f"SELECT {ocm_old_cols()} FROM obj_comments WHERE id=? AND kind='task'", (cid,)).fetchone()  # 2.972.0 (#5272): the old keys
     follow = {t["assignee_id"], t["created_by"], t["delegate_agent_id"]} | wat_users(c, t["id"]) | {r[0] for r in c.execute(
-        "SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id!=?", (t["id"], cid))}  # 2.473.0 (#3357): + delegated, watchers
+        "SELECT DISTINCT user_id FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL AND id!=?", (t["id"], cid))}  # 2.473.0 (#3357): + delegated, watchers
     # 2.13.1 (#471): agents set to read every comment of a person in this list ("Agent reads every comment")
     listen = set(listen_agents_of(c, t["list_id"])) if created and k["user_id"] not in ag else set()
     for aid in sorted(ag):
@@ -839,8 +840,8 @@ def tidy_tick(c):
     c.execute("""UPDATE tidy_pending SET sent_at=NULL, created_at=? WHERE sent_at IS NOT NULL
                  AND (SELECT updated_at FROM tasks WHERE id=tidy_pending.task_id) %s sent_at
                  AND NOT EXISTS (SELECT 1 FROM activity a WHERE a.task_id=tidy_pending.task_id AND a.kind='tidy' AND a.created_at>=tidy_pending.sent_at)
-                 AND NOT EXISTS (SELECT 1 FROM comments k WHERE k.task_id=tidy_pending.task_id AND COALESCE(k.suggestion,'')!=''
-                                 AND k.created_at>=tidy_pending.sent_at)""" % (">=" if TIDY_QUIET_S > 0 else ">"),  # 2.308.0 (#3274): as tidy_changed_since
+                 AND NOT EXISTS (SELECT 1 FROM obj_comments k WHERE k.kind='task' AND k.ref_id=tidy_pending.task_id AND COALESCE(k.extra->>'suggestion','')!=''
+                                 AND k.created_at>=tidy_pending.sent_at::timestamptz)""" % (">=" if TIDY_QUIET_S > 0 else ">"),  # 2.308.0 (#3274): as tidy_changed_since
               (iso(now),))
     rows = c.execute("""SELECT p.*, t.updated_at, t.deleted_at, t.list_id, l.agent_tidy FROM tidy_pending p JOIN tasks t ON t.id=p.task_id
                         JOIN lists l ON l.id=t.list_id WHERE p.sent_at IS NULL ORDER BY p.created_at LIMIT 50""").fetchall()

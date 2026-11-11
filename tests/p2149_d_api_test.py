@@ -154,7 +154,10 @@ res = in_app("from kalmido.core.db import appver_check as a\n"
              " a('2.151.0', None, '0.0.0', '3.0.0')]))")
 check(res == json.dumps(["ok", "format", "format", "ok", "format", "ok"]), f"appver_check: format limit {res}")
 fl = dict(dbx("SELECT key, value FROM kalmido_meta WHERE key IN ('back_floor','back_floor_how')"))
-check(fl.get("back_floor") == "2.149.0" and "UPGRADING" in fl.get("back_floor_how", ""), f"the database keeps the format limit {fl}")
+# 2.972.0 (#5272): the highest limit, a limit above this image's version counts as this version (the train may number the
+# release below the package label 2.972)
+want_fl = "2.972.0" if tuple(int(x) for x in VER.split(".")[:3]) >= (2, 972, 0) else ".".join(VER.split(".")[:3])
+check(fl.get("back_floor") == want_fl and "UPGRADING" in fl.get("back_floor_how", ""), f"the database keeps the format limit {want_fl} {fl}")
 set_meta("back_floor", "99.0.0")
 set_meta("back_floor_how", "run the tool xyz")
 ok = start()
@@ -163,7 +166,7 @@ check(not ok and "FATAL: this database has a format limit at Kalmido 99.0.0" in 
 ok = start(extra=("-e KALMIDO_ALLOW_DOWNGRADE=1",))
 check(ok and "WARNING: this database has a format limit" in logs(), "KALMIDO_ALLOW_DOWNGRADE=1 passes the limit with a warning")
 check(dict(dbx("SELECT key, value FROM kalmido_meta WHERE key='back_floor'")).get("back_floor") == "99.0.0", "the limit is only ever raised")
-set_meta("back_floor", "2.149.0")
+set_meta("back_floor", want_fl)  # 2.972.0 (#5272)
 
 # a database a newer minor ran on: refused
 set_meta("app_version", NEWER)

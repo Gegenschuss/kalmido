@@ -286,7 +286,7 @@ def quota_backfill(c):
         gset(c, "migr_hosted_pl", "1")
     if gsetting(c, "migr_att_user") == "1":
         return
-    c.execute("""UPDATE attachments SET user_id=(SELECT user_id FROM comments WHERE comments.id=attachments.comment_id)
+    c.execute("""UPDATE attachments SET user_id=(SELECT user_id FROM obj_comments WHERE obj_comments.id=attachments.comment_id)
                  WHERE user_id IS NULL AND comment_id IS NOT NULL""")
     c.execute("""UPDATE attachments SET user_id=(SELECT created_by FROM tasks WHERE tasks.id=attachments.task_id)
                  WHERE user_id IS NULL""")

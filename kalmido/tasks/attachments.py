@@ -228,7 +228,7 @@ def need_attachment(c, aid, write, trash=False):
         need_task(c, a["task_id"], write, full=True)
         return a
     role = need_task(c, a["task_id"], write=False, full=True)
-    cm = c.execute("SELECT user_id, deleted_at FROM comments WHERE id=?", (a["comment_id"],)).fetchone()
+    cm = c.execute("SELECT user_id, deleted_at FROM obj_comments WHERE id=? AND kind='task'", (a["comment_id"],)).fetchone()
     if not cm or cm["deleted_at"]:
         raise Denied(404)
     if write and cm["user_id"] != me() and role not in MANAGE_ROLES:

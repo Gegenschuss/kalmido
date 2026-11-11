@@ -105,9 +105,6 @@ clients.archived bool
 clients.created_at time
 clients.deleted_at time
 clients.updated_at time
-comments.created_at time
-comments.deleted_at time
-comments.edited_at time
 conn_blocks.created_at time
 conn_links.created_at time
 conn_links.deleted_at time
@@ -704,8 +701,6 @@ support_grants.created_at time
 support_grants.ended_at time
 support_grants.ends_at time
 support_grants.uses json
-task_bell.created_at time
-task_bell.updated_at time
 task_decisions.created_at time
 task_deps.created_at time
 task_enc_notes.updated_at time
@@ -719,7 +714,6 @@ task_offer_links.created_at time
 task_offer_links.updated_at time
 task_relations.created_at time
 task_vectors.updated_at time
-task_watchers.created_at time
 tasks.completed_at time
 tasks.created_at time
 tasks.deleted_at time

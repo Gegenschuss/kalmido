@@ -831,7 +831,8 @@ def list_purge(c, lid, inbox):
         tfiles = hard_delete(c, [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))], lists={lid})
     if inbox:  # 2.272.0 F (#3038, review E2-M4): without an inbox (a retired organisation) nothing to carry over
         lp_carry(c, lid, inbox)  # 2.272.0 E2 (#3038): fields, tags and section names go along
-    c.execute("DELETE FROM task_watchers WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)", (lid,))  # 2.473.0 (#3357)
+    # 2.473.0 (#3357); 2.972.0 (#5285): the watching rows of obj_follow
+    c.execute("DELETE FROM obj_follow WHERE kind='task' AND mode='watch' AND ref_id IN (SELECT id FROM tasks WHERE list_id=?)", (lid,))
     c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at,?), list_id=?, section_id=NULL, assignee_id=NULL, delegate_agent_id=NULL WHERE list_id=?",
               (ts, inbox, lid))
     icon = c.execute("SELECT icon FROM lists WHERE id=?", (lid,)).fetchone()[0]
@@ -1566,8 +1567,8 @@ def member_remove(lid, uid):
     c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
     dlg_gone(c, lid, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
-    # 2.53.0 (#1424, review): a removed member's task bells of this list go (no old "Urgent" coming back on re-invite)
-    c.execute("DELETE FROM task_bell WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
+    # 2.53.0 (#1424, review): a removed member's task bells of this list go (no old "Urgent" coming back on re-invite) --
+    # 2.972.0 (#5285): dlg_gone takes every row of obj_follow there
     # 2.82.0 (#1464): their own "My tasks" places of this list's tasks go too (the state filters them anyway)
     c.execute("DELETE FROM user_task_order WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
     c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE list_id=? AND type='person')",

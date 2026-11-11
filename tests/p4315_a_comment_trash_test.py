@@ -88,11 +88,12 @@ CM, AT, AP = comment_with_file(Bo, T, SECRET)
 check(disk(AP) in (True, None), "setup: the comment's file on disk")
 r = A.delete(B + f"/api/comments/{CM}")
 check(r.ok, f"the list owner deletes bob's comment {r.status_code}")
-row = one("SELECT body, deleted_at FROM comments WHERE id=?", (CM,))
+row = one("SELECT body, deleted_at FROM obj_comments WHERE id=?", (CM,))
 check(row and row[0] == "" and row[1], f"the row looks deleted as before (body '', deleted_at) {row}")
-check(one("SELECT body FROM comment_trash_text WHERE comment_id=?", (CM,)) == (SECRET,), "#4315: the text is kept in the trash")
-fa = one("SELECT deleted_at FROM attachments WHERE id=?", (AT,))
-check(fa is not None and fa[0] == row[1], f"#4315: the file row is kept, in the trash with the comment's time {fa}")
+check(one("SELECT body FROM obj_comment_trash WHERE comment_id=?", (CM,)) == (SECRET,), "#4315: the text is kept in the trash")
+# 2.972.0 (#5272): the comment's time is a TIMESTAMPTZ now, the file's a text: compared as points in time
+fa = one("SELECT a.deleted_at, a.deleted_at::timestamptz = k.deleted_at FROM attachments a, obj_comments k WHERE a.id=? AND k.id=?", (AT, CM))
+check(fa is not None and fa[1] is True, f"#4315: the file row is kept, in the trash with the comment's time {fa}")
 check(disk(AP) in (True, None), "#4315: the file stays on disk until the trash run")
 # nothing shows it
 for who, s in (("alice", A), ("bob", Bo), ("dave", Da)):
@@ -111,7 +112,7 @@ tl = Bo.get(B + f"/api/tasks/{T}/timeline").json()["comments"]
 k = next((x for x in tl if x["id"] == CM), None)
 check(k and k["body"] == SECRET and [a["id"] for a in k["attachments"]] == [AT], f"text and file are back {k}")
 check(Bo.get(B + f"/api/attachments/{AT}").content == b"invented file content", "the file opens again")
-check(not dbx("SELECT 1 FROM comment_trash_text WHERE comment_id=?", (CM,)), "the kept text is gone after the restore")
+check(not dbx("SELECT 1 FROM obj_comment_trash WHERE comment_id=?", (CM,)), "the kept text is gone after the restore")
 check(Bo.post(B + f"/api/comments/{CM}/restore").status_code == 404, "a live comment: nothing to restore (404)")
 # a file deleted on its own before stays in the file trash when the comment comes back
 CM2, AT2, AP2 = comment_with_file(Bo, T, "Second note", "keep.txt")
@@ -122,16 +123,16 @@ check(one("SELECT deleted_at FROM attachments WHERE id=?", (AT2,)) == (FILE_TS,)
 # the trash run after the period: row, text, file row and file go
 check(A.delete(B + f"/api/comments/{CM}").ok, "deleted again")
 write("UPDATE attachments SET deleted_at=? WHERE comment_id=?", (OLD, CM))
-write("UPDATE comments SET deleted_at=? WHERE id=?", (OLD, CM))
+write("UPDATE obj_comments SET deleted_at=? WHERE id=?", (OLD, CM))
 box("from kalmido.files.trashpurge import tp_tick\nprint(json.dumps(tp_tick(c, True)))")
-check(not dbx("SELECT 1 FROM comments WHERE id=?", (CM,)) and not dbx("SELECT 1 FROM comment_trash_text WHERE comment_id=?", (CM,)),
+check(not dbx("SELECT 1 FROM obj_comments WHERE id=?", (CM,)) and not dbx("SELECT 1 FROM obj_comment_trash WHERE comment_id=?", (CM,)),
       "the trash run removes the comment and its kept text")
 check(not dbx("SELECT 1 FROM attachments WHERE id=?", (AT,)), "the trash run removes the file row")
 check(disk(AP) in (False, None), "the trash run removes the file from disk")
 check(Bo.post(B + f"/api/comments/{CM}/restore").status_code == 404, "after the run: nothing to restore")
 # a comment deleted before 2.530 (no kept text): 404
 CM3 = Bo.post(B + f"/api/tasks/{T}/comments", json={"body": "old style"}).json()["id"]
-write("UPDATE comments SET body='', deleted_at=? WHERE id=?", ("2026-10-01T00:00:00.000+00:00", CM3))
+write("UPDATE obj_comments SET body='', deleted_at=? WHERE id=?", ("2026-10-01T00:00:00.000+00:00", CM3))
 check(Bo.post(B + f"/api/comments/{CM3}/restore").status_code == 404, "a comment deleted before 2.530 cannot be restored (404)")
 
 # ================================================================== an agent deletes a comment: approval first
@@ -145,7 +146,7 @@ check(r.status_code == 201, f"setup: the agent comments {r.status_code} {r.text[
 AC = r.json()["id"]
 r = requests.delete(B + f"/api/v1/comments/{AC}", headers=AGH)
 check(r.status_code == 202 and r.json().get("approval_required") is True, f"#4315: the agent's delete waits for approval {r.status_code} {r.text[:160]}")
-check(one("SELECT body, deleted_at FROM comments WHERE id=?", (AC,)) == ("Agent note", None), "the comment is untouched meanwhile")
+check(one("SELECT body, deleted_at FROM obj_comments WHERE id=?", (AC,)) == ("Agent note", None), "the comment is untouched meanwhile")
 r = requests.delete(B + f"/api/v1/comments/{CM2}", headers=AGH)
 check(r.status_code == 403, f"bob's comment: the agent may not delete it at all (403 before any approval) {r.status_code}")
 
@@ -223,10 +224,10 @@ assert A.put(B + f"/api/lists/{L}/members", json={"user_id": ERIN, "role": "edit
 Er = sess("erin")
 Er.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
 EC = Er.post(B + f"/api/tasks/{T}/comments", json={"body": "Heron words"}).json()["id"]
-check(Er.delete(B + f"/api/comments/{EC}").ok and dbx("SELECT 1 FROM comment_trash_text WHERE comment_id=?", (EC,)),
+check(Er.delete(B + f"/api/comments/{EC}").ok and dbx("SELECT 1 FROM obj_comment_trash WHERE comment_id=?", (EC,)),
       "account: erin's deleted comment keeps its text in the trash")
 check(A.delete(B + f"/api/users/{ERIN}").ok, "account: erin deleted")
-check(not dbx("SELECT 1 FROM comment_trash_text WHERE comment_id=?", (EC,)), "account: the kept text went with the account")
+check(not dbx("SELECT 1 FROM obj_comment_trash WHERE comment_id=?", (EC,)), "account: the kept text went with the account")
 check(A.post(B + f"/api/comments/{EC}/restore").status_code == 404, "account: the owner cannot bring erin's words back (404)")
 
 sys.exit(done("p4315_a_comment_trash"))

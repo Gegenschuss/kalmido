@@ -9,7 +9,7 @@ import zipfile
 from flask import g, jsonify, request, Response, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from ..core.objhooks import obj_gone_drop, obj_private_refs, person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
+from ..core.objhooks import obj_gone_drop, obj_private_refs, person_revoked, USER_GONE  # 2.558.0 (#4709): the shared core without importing the domain layer
 from ..core.config import app, COOKIE, EMAIL_RE, MIN_PASSWORD, PUBLIC_URL, USERNAME_RE
 from ..core.i18n import lang, LANGS, N_, tr, trn
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, now_utc, uset, usettings, iso
@@ -597,7 +597,6 @@ def _user_purge(c, uid, made):
     c.execute("DELETE FROM obj_tags WHERE scope_kind='user' AND scope_id=?", (str(uid),))  # 2.955.0 (#5276): the personal tags (were task_tags)
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=?", (uid,))
     c.execute("UPDATE tasks SET delegate_agent_id=NULL WHERE delegate_agent_id=?", (uid,))  # 2.473.0 (#3357)
-    c.execute("DELETE FROM task_watchers WHERE user_id=?", (uid,))
     c.execute("UPDATE tasks SET created_by=NULL WHERE created_by=?", (uid,))
     c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE type='person')", (str(uid),))
     user_forget_conns(c, uid)  # personal connection rows, stored tokens, grants; list bells
@@ -659,7 +658,8 @@ def _user_purge(c, uid, made):
         shs_forget(c, uid)  # 2.453.0 (#3781)
     # 2.530.0 (#4315, review K2): the kept texts of the person's deleted comments / channel messages go with the account (their
     # rows keep user_id NULL, nobody may bring the person's words back afterwards; the files go with the trash run)
-    c.execute("DELETE FROM comment_trash_text WHERE comment_id IN (SELECT id FROM comments WHERE user_id=? AND deleted_at IS NOT NULL)", (uid,))
+    for f in USER_GONE:  # 2.972.0 (#5272): the comments' core (core/objcomments.py ocm_purge_user: its trash texts, its mentions)
+        f(c, uid)
     c.execute("DELETE FROM tchat_trash_text WHERE message_id IN (SELECT id FROM tchat_msgs WHERE user_id=? AND deleted_at IS NOT NULL)", (uid,))
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     obj_gone_drop(c, gone)  # 2.578.0 (#4796): the objects went with the account (cascade): their history / undo rows too

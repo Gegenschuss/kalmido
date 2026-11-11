@@ -78,7 +78,8 @@ def orx_set(c, kind, tid, uid, emoji, on, at=None):
 
 
 # ---- the move of the three old tables (once; core/db.py init_db calls it before the fragments' AFTER drops them)
-ORX_OLD = (("comment_reactions", "comment", "comment_id", "comments"), ("tchat_rx", "tchat", "message_id", "tchat_msgs"),
+ORX_OLD = (("comment_reactions", "comment", "comment_id", "obj_comments"),  # 2.972.0 (#5272): comments -> obj_comments
+           ("tchat_rx", "tchat", "message_id", "tchat_msgs"),  # review 2.972: the tuple had slid behind the comment above
            ("chat_reactions", "agent_chat", "message_id", "agent_chat"))
 ORX_ISO = r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{1,6})?(Z|[+-]\d\d:\d\d)$"
 ORX_NAMES = {x for t, _k, col, parent in ORX_OLD for x in (t, col, parent)}  # the allowlist of qi() (#5296)

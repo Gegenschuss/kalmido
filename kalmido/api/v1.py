@@ -20,6 +20,7 @@ from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, FAIL_WIND
 from ..accounts.login import twofa_methods
 from ..core.access import collab_all, Denied, list_role, my_inbox, need_collab, need_list, need_task, need_time, time_all, token_lists, live_sql, tvis, vis_sql  # 2.955.0 (#5276): live_sql
 from ..core.serializers import load_tasks, rel_of
+from ..core.objfollow import OFL_WATCHING_SQL  # 2.972.0 (#5285)
 from ..core.instance import semver, update_state
 from ..core.state import search_tasks, visible_lists, visible_sections
 from ..lists.lists import clean_folder, clean_list_value, list_create, LIST_KIND_ALIASES, LIST_KINDS, list_update
@@ -36,7 +37,8 @@ from ..tasks.deliver import dv_apply, dv_filter, dv_view  # 2.392.2 (#3365)
 from ..tasks.ticketkey import tk_ids_ordered, tk_key, tk_parse  # 2.390.0 (#3353)
 from ..tasks.roadmap import list_shift, roadmap_build
 from ..tasks.lifecycle import task_complete, task_reopen, trash_task
-from ..collab.comments import att_dicts, comment_create, comment_dict, comment_plain, MAIL_REPLY, need_task_say, user_names
+from ..collab.comments import att_dicts, comment_create, comment_dict, comment_plain, MAIL_REPLY, user_names
+from ..core.objcomments import ocm_list, ocm_need_say  # 2.972.0 (#5272): the comments' core
 from ..collab.news import bell_custom_clean, bell_custom_of, BELL_MODES, notif_matrix, notif_update
 from ..personal.habits import habit_log, habit_times, need_habit
 from ..personal.timetrack import clean_day_hours, entry_out, time_create, time_rounding, time_rows, vis_ids
@@ -1135,7 +1137,7 @@ def v1_tasks_more(c, uid, a, where, args):
         args += x
     if a.get("watcher"):  # 2.473.0 (#3357): me | an id
         w, x = _v1_who(a, "watcher", uid, none=False)
-        where.append("id IN (SELECT task_id FROM task_watchers WHERE user_id " + w + ")")
+        where.append("id IN (" + OFL_WATCHING_SQL + " " + w + ")")  # 2.972.0 (#5285): the core's obj_follow
         args += x
     if a.get("delivery"):  # 2.392.2 (#3365): in_progress | parked | waiting | none, several comma separated
         dv_filter(a["delivery"], where, args)
@@ -1712,7 +1714,7 @@ def v1_comments(tid):
     v1_args(())
     c = db()
     _v1_live(c, tid, write=False, full=True)
-    rows = c.execute("SELECT * FROM comments WHERE task_id=? AND deleted_at IS NULL ORDER BY id", (tid,)).fetchall()
+    rows = ocm_list(c, "task", tid)  # 2.972.0 (#5272): checked above (_v1_live)
     atts = att_dicts(c, "task_id=? AND comment_id IS NOT NULL", (tid,))
     names = user_names(c, [r["user_id"] for r in rows])
     from ..collab.cchoice import lv_with_choices
@@ -1735,8 +1737,8 @@ def v1_comment_create(tid):
     from ..api.scopes import need_approval  # (api.scopes imports this module) 2.393.2 B (#3375): one import for both answers below
     c = db()
     _v1_live(c, tid, write=False, full=True)  # view-only members may comment (as in the app)
-    need_task_say(c, tid)  # 2.607.0 (#4549): not a guest / read-only person of the organisation (before any approval card)
-    again = ref and c.execute("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND client_ref=? AND deleted_at IS NULL", (tid, me(), ref.strip())).fetchone()
+    ocm_need_say(c, "task", tid)  # 2.607.0 (#4549): not a guest / read-only person of the organisation (before any approval card)
+    again = ref and c.execute("SELECT 1 FROM obj_comments WHERE kind='task' AND ref_id=? AND user_id=? AND client_ref=? AND deleted_at IS NULL", (tid, me(), ref.strip())).fetchone()
     if not again and b.get("portal") not in (None, False, 0, "0", "false", "") and not any(b.get(k) for k in ("suggestion", "choices", "approval")):
         # 2.126.0 B (#1979 G5): an agent's answer to a customer waits for a person (need_approval: agents only)
         from ..team.portal import pt_comment_flag

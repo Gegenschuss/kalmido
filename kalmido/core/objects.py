@@ -107,7 +107,7 @@ from .access import Denied, acx_of, acx_org_ok, collab_all, need_feat, token_lis
 from .db import LV_AREA_KEYS, insert_id, iso, now_iso, now_utc
 from .errors import BadInput
 from .i18n import tr
-from .pg import system_ctx, table_columns, write_lock
+from .pg import st_ids, system_ctx, table_columns, write_lock
 from ..files.fsref import FSR, _api_way as fsr_api_way, fs_ref_node, fs_ref_node_role, fs_ref_register
 from ..files.store import _free_name, _FsPre, fs_chain, fs_chains, fs_log_add, fs_visible_sql_c, safe_fs_name
 from ..files.store import fs_role  # 2.649.0 (#5051): _take_public
@@ -1075,6 +1075,8 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                                      (*ppl, *ppl, int(org)), reason, by, int(org), "user_id")
             # 2.649.0 (#5051): their public links and file requests in the organisation die (coming back, also as a guest = still dead)
             out.update(_take_public(c, "created_by=? AND org_id=?", (int(uid), int(org)), reason, by, int(org)))
+            # 2.972.0 (#5285): what they (and their agents) follow in the organisation ends: watching and bells of obj_follow
+            c.execute("DELETE FROM obj_follow WHERE org_id=? AND user_id = ANY(CAST(? AS BIGINT[]))", (int(org), st_ids(ppl)))
             ug_drop(c, "user_id=? AND org_id=?", (int(uid), int(org)))  # 2.747.0 (#5249): the step groups there with their parts
             c.execute("DELETE FROM obj_undo WHERE user_id=? AND org_id=?", (int(uid), int(org)))
             if heir and heir != uid:
@@ -1123,6 +1125,7 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                             c.execute("UPDATE fs_nodes SET owner_id=? WHERE id=?", (int(nxt), n["id"]))
             ug_drop(c, "user_id=?", (int(uid),))  # 2.747.0 (#5249)
             c.execute("DELETE FROM obj_undo WHERE user_id=?", (int(uid),))
+            c.execute("DELETE FROM obj_follow WHERE user_id=?", (int(uid),))  # 2.972.0 (#5285): watching and bells (was task_watchers in users.py)
             c.execute("UPDATE obj_history SET user_id=NULL WHERE user_id=?", (int(uid),))
             c.execute("UPDATE obj_revoked SET by_id=NULL WHERE by_id=?", (int(uid),))
             c.execute("DELETE FROM obj_revoked WHERE user_id=?", (int(uid),))

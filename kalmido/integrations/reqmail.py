@@ -40,9 +40,10 @@ import secrets
 from flask import jsonify
 
 from ..core.config import app, APP_NAME, MAX_FILE_MB
-from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
+from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.i18n import lang, tr
 from ..core.pg import insert_id
+from ..core.objcomments import ocm_add  # 2.972.0 (#5272)
 from ..core.access import Denied, MANAGE_ROLES, need_list, task_visible
 from ..core.pages import save_attachment_bytes
 from ..accounts.session import _token_hash, me
@@ -195,8 +196,7 @@ def rq_comment(c, msg, mid, p, l, verified):
         return 0
     name = (p["name"] or "").strip() or email.utils.parseaddr(str(msg.get("From", "")))[0].strip()[:120] or tr("Client", lg=lg)
     tid = p["task_id"]
-    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,ext_name,portal) VALUES(?,?,?,?,?,?,1)",
-                    (tid, None, (text or "—")[:P.PT_CMT_MAX], "", iso_ms(now_utc()), name[:120]))
+    cid = ocm_add(c, "task", tid, None, (text or "—")[:P.PT_CMT_MAX], ext_name=name[:120], extra={"portal": True})  # 2.972.0 (#5272)
     whole = _files(c, tid, files, l["owner_id"], top_comment=cid)
     _keep(c, tid, mid, "in")
     t = c.execute("SELECT t.*, l.owner_id AS l_owner FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()

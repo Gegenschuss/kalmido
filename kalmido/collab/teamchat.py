@@ -15,7 +15,8 @@ from ..core.access import live_sql  # 2.783.0 (#5368): the trash filter of the c
 from ..accounts.orgroles import FULL_READ, org_say_refusal, role_known
 from ..accounts.orgs import INSTANCE_ENV
 from ..tasks.validation import as_int
-from ..collab.comments import collab_on, comment_plain, lang_of, MENTION_RE, push_gate, push_gate_due, push_gate_reset, user_names
+from ..collab.comments import collab_on, comment_plain, lang_of, push_gate, push_gate_due, push_gate_reset, user_names
+from ..core.objcomments import OCM_MENTION_RE, ocm_visible_names  # 2.972.0 (#5272): the one mention token / name rule of the core
 from ..collab.news import list_bells
 from ..core.errors import reject_unknown, BadInput
 from ..core.conflict import ccf_check, take_version  # 2.564.0 D (#4701); 2.638.0 (#4775): take_version
@@ -24,7 +25,6 @@ from ..api.common import hit_limit, v1_args, v1_call, v1_json, v1_view
 from ..agents.core import agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_ids, is_agent, listen_agents_of, need_person
 from ..collab.reactions import clean_emoji
 from ..collab.replies import reply_check, reply_quotes
-from ..collab.comments import mention_names  # 2.369.5 (#2517): pulled up from functions
 from .cmttrash import tcx_trash, tcx_restore
 from ..core.objreact import orx_of, orx_set, orx_toggle  # 2.763.0 (#5269): the reactions of the shared core
 from ..core.objhooks import NOTIFY_READERS  # 2.891.0 (#5270): the reader of a direct message for the send decision
@@ -405,7 +405,7 @@ def md_brief(text):
 
 
 def tchat_msg_brief(c, m):
-    names = user_names(c, [int(x) for x in MENTION_RE.findall(m["body"])])
+    names = user_names(c, [int(x) for x in OCM_MENTION_RE.findall(m["body"])])
     d = {"id": m["id"], "user_id": m["user_id"], "text": comment_plain(c, md_brief(m["body"]), names)[:140], "created_at": m["created_at"]}
     if not d["text"] and not m["enc"] and not m["deleted_at"]:  # 2.113.1 (#2059): a message with files only: the first file's name (2.530.0 A #4315: a deleted one keeps them in the trash)
         f = c.execute("SELECT name FROM tchat_files WHERE message_id=? ORDER BY id LIMIT 1", (m["id"],)).fetchone()
@@ -460,7 +460,7 @@ def _e2e_parse(v):
 
 def tchat_clean_mentions(c, r, text):
     allowed = tchat_room_members(c, r)
-    names = mention_names(c, [int(x) for x in MENTION_RE.findall(text)])  # 2.148.1 A (#2490): '@?' for unseen accounts
+    names = ocm_visible_names(c, [int(x) for x in OCM_MENTION_RE.findall(text)])  # 2.148.1 A (#2490): '@?' for unseen accounts
     found = []
 
     def sub(m):
@@ -469,7 +469,7 @@ def tchat_clean_mentions(c, r, text):
             found.append(uid)
             return m.group(0)
         return "@" + names.get(uid, "?")
-    return MENTION_RE.sub(sub, text), list(dict.fromkeys(found))
+    return OCM_MENTION_RE.sub(sub, text), list(dict.fromkeys(found))
 
 
 @app.get("/api/team")
@@ -898,7 +898,7 @@ def tchat_edit(mid):
     if len(text) > TCHAT_MAX:
         return err(tr("The message is too long (max. {0} characters)", TCHAT_MAX))
     text, mentions = tchat_clean_mentions(c, r, text.strip())
-    known = {int(x) for x in MENTION_RE.findall(m["body"] or "")}
+    known = {int(x) for x in OCM_MENTION_RE.findall(m["body"] or "")}
     c.execute("UPDATE tchat_msgs SET body=?, edited_at=? WHERE id=?", (text, iso_ms(now_utc()), mid))
     from ..agents.chat import med_team_edited  # 2.39.0 (#1179): agents that got it as team_message learn the change
     med_team_edited(c, r, c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone(), m["body"])

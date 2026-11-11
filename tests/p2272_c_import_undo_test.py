@@ -98,7 +98,8 @@ check(r.ok and j.get("tasks") == 2 and j.get("kept_tasks") == 1 and j.get("kept_
       f"undo: 2 into the trash, the commented task and its list stay {r.text[:200]}")
 check(not task("Keep me", ALICE)["deleted_at"] and task("Take me", ALICE)["deleted_at"] and task("Take me too", ALICE)["deleted_at"],
       "the commented task is untouched, the others are in the trash")
-check(one("SELECT COUNT(*) FROM comments WHERE task_id=? AND deleted_at IS NULL", (K,)) == 1, "bob's comment stays")
+# 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
+check(one("SELECT COUNT(*) FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL", (K,)) == 1, "bob's comment stays")
 check(not one("SELECT deleted_at FROM lists WHERE id=?", (L1,)), "the list stays")
 check(A.post(B + f"/api/tasks/{T1}/restore").ok and not task("Take me", ALICE)["deleted_at"], "a task of the undo comes back from the trash")
 check(A.post(B + f"/api/imports/{IID}/undo").status_code == 409, "undo twice: 409")

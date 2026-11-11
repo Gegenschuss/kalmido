@@ -92,10 +92,10 @@ check(sorted(x[0] for x in sql("SELECT user_id FROM org_members WHERE org_id=?",
 LA = Bo.post(B + "/api/lists", json={"name": f"{MARK} list", "org_id": ALPHA}).json()["id"]
 LB = Ca.post(B + "/api/lists", json={"name": "Beta list", "org_id": BETA}).json()["id"]
 # 2.53.0 (#1424): task_bell points at a task (tasks have no org_id, fill_row would take the same one for both): one task and
-# one bell row per organisation
+# one bell row per organisation. 2.972.0 (#5285): the bell is a row of the core's obj_follow (fill_row knows no mode)
 for s, lid, uid, org in ((Bo, LA, BOB, ALPHA), (Ca, LB, CAROL, BETA)):
     tid = s.post(B + "/api/tasks", json={"title": "bell", "list_id": lid}).json()["id"]
-    sql("INSERT INTO task_bell(task_id,user_id,org_id,level,created_at,updated_at) VALUES(?,?,?,'mute','2026-01-01','2026-01-01') ON CONFLICT DO NOTHING", (tid, uid, org))
+    sql("INSERT INTO obj_follow(user_id,kind,ref_id,org_id,mode) VALUES(?,'task',?,?,'mute') ON CONFLICT DO NOTHING", (uid, tid, org))
     # 2.59.0 (#1375): task_vectors points at a task the same way (task_id is its key): one vector row per organisation
     sql("INSERT INTO task_vectors(task_id,org_id,list_id,model,dim,vec,text_hash,updated_at) VALUES(?,?,?,'t',0,'','','2026-01-01') ON CONFLICT DO NOTHING", (tid, org, lid))
     # 2.63.0 (#1513): portal_tickets.task_id is unique as well: one ticket per organisation on that task
@@ -131,6 +131,9 @@ for t, col, ref in sql("""SELECT tc.table_name, kcu.column_name, ccu.table_name 
 
 
 FILL_EXTRA = {"undo_groups": {"state": "barrier"}}  # 2.780.0 (#5386): columns with a default that fill_row must set
+# 2.972.0 (#5272): obj_comments.ref_id has no foreign key (kind names the table): a task comment on a task of the organisation
+FILL_REF = {("obj_comments", "ref_id"): "tasks"}
+FILL_VAL = {("obj_comments", "kind"): "task"}
 
 
 def fill_row(t, org):
@@ -138,8 +141,10 @@ def fill_row(t, org):
                   AND is_nullable='NO' AND column_default IS NULL AND is_identity='NO' AND column_name!='org_id'""", (t,))
     names, vals = ["org_id"], [str(org)]
     for name, typ in cols:
-        ref = FK.get((t, name))
-        if ref:
+        ref = FK.get((t, name)) or FILL_REF.get((t, name))
+        if (t, name) in FILL_VAL:
+            v = FILL_VAL[(t, name)]
+        elif ref:
             has_org = sql("SELECT 1 FROM information_schema.columns WHERE table_name=? AND column_name='org_id'", (ref,))
             r = sql(f"SELECT MIN(id) FROM {ref}" + (" WHERE org_id=?" if has_org and ref != "orgs" else ""), (org,) if has_org and ref != "orgs" else ())
             v = r[0][0] if r and r[0][0] is not None else 1
@@ -218,7 +223,7 @@ check(count("org_members", f"org_id={ALPHA}", role="user", orgs=str(ALPHA), uid=
 check(count("lists", f"org_id IS NULL AND owner_id={CAROL}", role="user", orgs=str(BETA), uid=CAROL) >= 1, "lists: private rows (org_id NULL) stay visible")
 
 # ---- writing
-ORW_FILLED = ("tasks", "comments", "events", "contacts")  # 2.662.0 (#4602): org_id comes from the parent (core/orgrows.py)
+ORW_FILLED = ("tasks", "obj_comments", "events", "contacts")  # 2.662.0 (#4602): org_id comes from the parent (core/orgrows.py); 2.972.0 (#5272): obj_comments
 for t in ORG_T:
     # 2.369.6 (#3139): the watchdog's upload clean-up (files/scan.py _sc_gc, every 10 min) deletes upload_scan rows without a
     # file - the made-up rows of this suite. On a busy runner the suite passes the 10 minutes and the write checks met an

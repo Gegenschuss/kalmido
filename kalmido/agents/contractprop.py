@@ -18,8 +18,9 @@ from datetime import date, timedelta
 from flask import jsonify, request
 
 from ..core.pg import insert_id
+from ..core.objcomments import ocm_add, ocm_need_say, ocm_restore, ocm_trash  # 2.972.0 (#5272)
 from ..core.i18n import lang, tr
-from ..core.db import bump, db, iso, iso_ms, local_now, now_utc
+from ..core.db import bump, db, iso, local_now, now_utc
 from ..core.access import Denied, list_role, need_task, task_visible
 from ..accounts.session import me
 from ..core.objseen import osn_mark  # 2.905.0 (#5284): the read marks of the core
@@ -27,7 +28,7 @@ from ..core.errors import BadInput
 from ..core.config import WATCHDOG_INTERVAL  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import v1_err  # 2.149.0 G (#2517): pulled up from functions
 from ..life.model import contract_out, feat_on  # 2.369.5 (#2517): pulled up from functions
-from ..collab.comments import need_task_say, user_names  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 from ..agents.safety import ids_parse  # 2.369.5 (#2517): pulled up from functions
 from ..agents.core import agent_active, agent_emit, agent_ids, agent_row, job_dict, JOB_TITLE_MAX  # 2.369.5 (#2517): pulled up from functions
 from ..office.model import office_on  # 2.369.5 (#2517): pulled up from functions
@@ -244,12 +245,11 @@ def ctr_run(c, j, sel, ed, extra, rec):
     p, inp, uid = json.loads(j["proposal"]), json.loads(j["input"] or "{}"), me()
     tid = p["task_id"]
     need_task(c, tid, write=False, full=True)  # view-only members may comment, as everywhere
-    need_task_say(c, tid)  # 2.607.0 (#4549): ... but not a guest / read-only person of the list's organisation
+    ocm_need_say(c, "task", tid, uid)  # 2.607.0 (#4549): ... but not a guest / read-only person of the list's organisation
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if t["deleted_at"]:
         raise Denied(409, tr("The task is in the trash"))
-    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at) VALUES(?,?,?,?,?)",
-                    (tid, uid, p["text"], "", iso_ms(now_utc())))
+    cid = ocm_add(c, "task", tid, uid, p["text"])  # 2.972.0 (#5272): the core's comment
     osn_mark(c, "task", tid, uid, cid)  # 2.905.0 (#5284): the read mark of the core
     log_act(c, tid, "proposal", {"agent": j["agent_id"]}, uid=uid)
     rec.update(task_id=tid, comment_id=cid, remind=False)
@@ -274,12 +274,16 @@ def ctr_undo(c, j, rec, back=True):
     if not t:
         return 0, [p.get("text", "")[:40]]
     need_task(c, tid, write=False, full=True)
-    r = c.execute("SELECT * FROM comments WHERE id=? AND task_id=? AND user_id=?", (cid, tid, me())).fetchone()
+    r = c.execute("SELECT deleted_at, edited_at FROM obj_comments WHERE id=? AND kind='task' AND ref_id=? AND user_id=?", (cid, tid, me())).fetchone()
     if r and back and not r["deleted_at"] and not r["edited_at"]:
-        n += c.execute("UPDATE comments SET body='', deleted_at=? WHERE id=?", (iso(now_utc()), cid)).rowcount
+        if ocm_trash(c, cid, me(), check=False):  # 2.972.0 (#5272): into the core's trash (its text kept there), redo restores it
+            n += 1
         news_forget_comment(c, cid)  # 2.306.0 (#2889 review N21): the News excerpt goes with the text
     elif r and not back and r["deleted_at"]:
-        n += c.execute("UPDATE comments SET body=?, deleted_at=NULL WHERE id=?", (p["text"], cid)).rowcount
+        if ocm_restore(c, cid, me(), check=False):  # review 2.972: counted only when the text was still kept
+            n += 1
+        else:
+            skipped.append((t["title"] or "")[:40])
     elif r is None or (back and r["edited_at"]):
         skipped.append((t["title"] or "")[:40])
     if rec.get("remind"):

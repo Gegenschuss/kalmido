@@ -1022,7 +1022,7 @@ pair per person): whoever gets the keys later can read older messages too. A tas
 
 A list with the lock (`lists.e2e` = `encrypting` | `on` | `decrypting`) keeps its texts as ciphertexts in the usual columns:
 `"e2e1:" + {"v": 1, "g": <generation>, "iv", "ct"}` in `tasks.title / content / url`, `tasks.snippets` (as one JSON string),
-`comments.body`, `notes.title / body`, `sections.name` and text values of custom fields (other field types stay readable).
+`obj_comments.body` (task comments, 2.972.0), `notes.title / body`, `sections.name` and text values of custom fields (other field types stay readable).
 The browser encrypts with a random list key per generation (AES-256-GCM, AAD `kalmido-list:v1:<list>:<gen>:<field>`, texts
 padded to 64-byte steps) and wraps that key for every member with ECDH between the two people's key pairs
 (`list_keys`: wrapped key, who wrapped it, the wrapper's public key as the server knows it). The server checks shapes only.

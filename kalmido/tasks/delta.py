@@ -37,9 +37,10 @@ DL_DAYS = 7      # versions older than this are dropped at the clean-up too (bus
 # table -> the columns holding a task id ("full": a change there may change what a person sees -> the full state)
 DL_TABLES = {
     "tasks": ("id",), "obj_tag_links": ("obj_id",), "attachments": ("task_id",),  # 2.947.0 (#5275): obj_tag_links (kind task) was task_list_tags; 2.955.0 (#5276): and task_tags
-    "comments": ("task_id",), "obj_seen": ("ref_id",), "task_field_values": ("task_id",),  # 2.905.0 (#5284): obj_seen (kind task) was task_seen
+    "obj_comments": ("ref_id",),  # 2.972.0 (#5272): the comments' core (kind 'task' only today: ref_id = the task)
+    "obj_seen": ("ref_id",), "task_field_values": ("task_id",),  # 2.905.0 (#5284): obj_seen (kind task) was task_seen
     "task_deps": ("task_id", "blocker_id"), "agent_usage": ("task_id",), "git_links": ("task_id",), "git_closes": ("task_id",),
-    "task_people": ("task_id",), "task_watchers": ("task_id",), "events": ("task_id",), "contact_tasks": ("task_id",), "time_entries": ("task_id",),
+    "task_people": ("task_id",), "events": ("task_id",), "contact_tasks": ("task_id",), "time_entries": ("task_id",),
     "task_enc_notes": ("task_id",),  # 2.42.0 (#828): the encrypted note marker of a task
     "task_relations": ("task_id", "other_id"),  # 2.576.0 (#3371): saved relations (both tasks show them)
     "task_note_locks": ("task_id",),  # 2.48.0 (#1642): the locked note marker of a task
@@ -66,6 +67,8 @@ DL_LIST_VIS = "owner_id,org_id,org_visibility,life,family,deleted_at,e2e"  # the
 DL_FN = """CREATE OR REPLACE FUNCTION kalmido_dl_touch() RETURNS trigger LANGUAGE plpgsql AS $fn$
 DECLARE k text; o bigint; n bigint; ol bigint; nl bigint; u bigint; jo jsonb; jn jsonb; lk text[]; uk bigint[]; x bigint;
 BEGIN
+  -- 2.972.0 (#5272): the core's comments hang on any kind of object; only a task's change a task
+  IF TG_TABLE_NAME = 'obj_comments' AND COALESCE(to_jsonb(NEW)->>'kind', to_jsonb(OLD)->>'kind') IS DISTINCT FROM 'task' THEN RETURN NULL; END IF;
   IF TG_ARGV[0] = 'full' THEN  -- one unstamped "full" row is enough (it covers the scoped ones too)
     IF EXISTS (SELECT 1 FROM dl_changes WHERE ver IS NULL AND task_id IS NULL AND list_id IS NULL AND user_id IS NULL) THEN RETURN NULL; END IF;
     IF TG_NARGS < 2 OR (TG_TABLE_NAME = 'lists' AND TG_OP = 'DELETE') THEN

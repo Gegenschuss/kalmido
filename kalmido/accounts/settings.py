@@ -1038,6 +1038,7 @@ def push_test():
 def umz_export_queries(uid):
     """2.73.0 B (#1473): the tables of "my data" (GET /api/export.json and the account export) -> {name: (sql, args)}."""
     from ..core.access import acx_lists_sql
+    from ..core.objcomments import ocm_old_cols  # 2.972.0 (#5272): the task comments in the file's old columns
     own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
     task_ids = f"(SELECT id FROM tasks WHERE list_id IN {own})"
     q = {
@@ -1056,7 +1057,7 @@ def umz_export_queries(uid):
         "pomos": ("SELECT * FROM pomos WHERE user_id=?", (uid,)),
         "filters": ("SELECT * FROM filters WHERE user_id=?", (uid,)),
         "attachments": (f"SELECT * FROM attachments WHERE task_id IN {task_ids}", (uid,)),
-        "comments": (f"SELECT * FROM comments WHERE task_id IN {task_ids} AND deleted_at IS NULL", (uid,)),
+        "comments": (f"SELECT {ocm_old_cols()} FROM obj_comments WHERE kind='task' AND ref_id IN {task_ids} AND deleted_at IS NULL", (uid,)),  # 2.972.0 (#5272): same file as before
         "task_decisions": (f"SELECT * FROM task_decisions WHERE task_id IN {task_ids} ORDER BY id", (uid,)),  # 2.392.0 C (#3370)
         # 2.71.0 (#1459, review N5): "also in list X" lines without the id of a list the person may not see
         "activity": (f"SELECT id, task_id, user_id, kind, CASE WHEN kind IN ('ml_add', 'ml_rm') THEN '{{}}'::jsonb ELSE data END AS data, "
@@ -1085,8 +1086,10 @@ def umz_export_queries(uid):
         "list_notepads": (f"SELECT * FROM list_notepads WHERE created_by=? AND list_id IN {acx_lists_sql(req=False)}", (uid, uid, uid)),
         "list_notif": (f"SELECT * FROM list_notif WHERE list_id IN {own}", (uid,)),  # 2.33.0 (#927): my notification templates
         "folder_notif": ("SELECT * FROM folder_notif WHERE owner_id=?", (uid,)),
-        "task_bell": ("SELECT task_id, level, until, set_by, created_at, updated_at FROM task_bell WHERE user_id=?", (uid,)),  # 2.53.0 C (#1424)
-        "task_watchers": ("SELECT task_id, created_at FROM task_watchers WHERE user_id=?", (uid,)),  # 2.473.0 (#3357)
+        # 2.53.0 C (#1424), 2.473.0 (#3357); 2.972.0 (#5285): rows of the core's obj_follow, the parts keep their old columns
+        "task_bell": ("SELECT ref_id AS task_id, mode AS level, until::text AS until, set_by, created_at, updated_at FROM obj_follow "
+                      "WHERE user_id=? AND kind='task' AND mode<>'watch'", (uid,)),
+        "task_watchers": ("SELECT ref_id AS task_id, created_at FROM obj_follow WHERE user_id=? AND kind='task' AND mode='watch'", (uid,)),
         "agent_steps": ("SELECT id, agent_id, job_id, message_id, text, created_at FROM agent_steps WHERE user_id=?", (uid,)),  # 2.32.0 (#1081)  # 2.32.0 (#1063): my own project page arrangements
         "agent_schedules": ("SELECT * FROM agent_schedules WHERE user_id=?", (uid,)),  # 2.34.0 (#272): my planned agent jobs
         # 2.39.0 (#1168): the Playbooks of my lists and folders (every version) and the agents' proposals for my lists

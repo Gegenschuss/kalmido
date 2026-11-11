@@ -290,8 +290,10 @@ def sample_create(c, uid):
                 v = fmt_num(x[fk]) if fk == "budget" else x[fk]
                 c.execute("INSERT INTO task_field_values(task_id,field_id,value) VALUES(?,?,?)", (tid, fields[fk], v))
         if x.get("comment") and "collab" in feats:
-            c.execute("INSERT INTO comments(task_id,user_id,body,mentions,created_at) VALUES(?,?,?,?,?)",
-                      (tid, uid, tr(x["comment"], lg=lg), "", iso(now_utc() - timedelta(hours=3))))
+            # 2.972.0 (#5272): a row of the core's comments (what core/objcomments.py ocm_add writes without notify; a function-local
+            # import of it from accounts would be one more upward import, tools/check_layers.py)
+            c.execute("INSERT INTO obj_comments(kind,ref_id,user_id,body,created_at) VALUES('task',?,?,?,?)",
+                      (tid, uid, tr(x["comment"], lg=lg), iso(now_utc() - timedelta(hours=3))))
     if project and "deps" in feats:
         for a, b in var["deps"]:
             c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
@@ -329,7 +331,7 @@ def sample_edited(c, ids):
         return set()
     q = ",".join("?" * len(ids))
     return {r[0] for r in c.execute(f"""SELECT t.id FROM tasks t WHERE t.id IN ({q}) AND (t.updated_at<>t.created_at
-                                         OR EXISTS (SELECT 1 FROM comments m WHERE m.task_id=t.id AND m.created_at>t.created_at)
+                                         OR EXISTS (SELECT 1 FROM obj_comments m WHERE m.kind='task' AND m.ref_id=t.id AND m.created_at>t.created_at::timestamptz)
                                          OR EXISTS (SELECT 1 FROM attachments a WHERE a.task_id=t.id))""", ids)}
 
 
