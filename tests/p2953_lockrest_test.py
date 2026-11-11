@@ -411,8 +411,8 @@ r = A.post(B + f"/api/files/lock/{GR}/rotate", json={"gen": gg + 1, "keys": [{"u
 check(r.ok, "a new key for the race " + r.text[:120])
 t = A.get(B + f"/api/files/lock/{GR}/todo").json()
 seen = next(it["version"] for it in t["items"] if it["id"] == GF)
-r = A.post(B + f"/api/files/lock/version/{GF}", files={"file": ("encrypted.kenc", kenc(gg), "application/octet-stream")})
-check(r.status_code == 201, "a new version saved while the browser encrypts the file again")
+r = A.post(B + f"/api/files/lock/version/{GF}", files={"file": ("encrypted.kenc", kenc(gg + 1), "application/octet-stream")})
+check(r.status_code == 201, "a new version (of the new key) saved while the browser encrypts the file again " + r.text[:120])
 newest = r.json().get("version") if r.status_code == 201 else None
 r = A.post(B + f"/api/files/lock/{GR}/convert/{GF}", data={"name": ct(gg + 1), "version": str(seen)},
            files={"file": ("encrypted.kenc", kenc(gg + 1), "application/octet-stream")})
