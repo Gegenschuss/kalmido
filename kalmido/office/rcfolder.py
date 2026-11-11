@@ -32,6 +32,8 @@ from ..core.orgcrypt import oc_dec_fields
 from ..docs.ingest import doc_on_done
 from ..docs.store import docs_root, folder_by_name, is_inbox, label_id, move_to_folder
 from ..files.store import _free_name, safe_fs_name
+from .bankacc import BKA_TABLE, bka_default, bka_rows
+from .cfbank import cfb_balances
 
 RCF_MONTHS_EN = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November",
                  "December")
@@ -131,8 +133,6 @@ def rcf_card(c, oid, sid, nid, uid=None, tag=True):
 def rcf_bank_name(c, oid, import_id):
     """The bank account of an import: the account chosen at the import (#5183), else the one its balances name (an
     account of the office with that IBAN, else '·· <last 4>'), else the office's default account; '' = not known."""
-    from .bankacc import BKA_TABLE, bka_default, bka_rows
-    from .cfbank import cfb_balances
 
     def label(a):
         iban = "".join(str(a.get("iban") or "").split())
