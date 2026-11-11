@@ -21,7 +21,7 @@
 /* 2.988.0 (#5651): the tab "Call sheets" of a project (callsheet.js viewProjCs): one row per call sheet, the grid of the rows
    of the other project pages (a line under each, the whole row a button; the PDF button at the end) */
 .pcs .pcsbar { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 .25rem; }
-.pcs .pcsbar h3 { margin: 0; font-size: var(--fs-l, 1.0625rem); }
+.pcs .pcsbar h3 { margin: 0; font-size: var(--fs-l); }
 .pcs .pcslist { display: flex; flex-direction: column; }
 .pcs .pcsrow { display: flex; align-items: center; gap: .5rem; border-bottom: 1px solid var(--line); min-height: 2.75rem; }
 .pcs .pcsopen { flex: 1; min-width: 0; display: grid; grid-template-columns: 9rem 7rem minmax(0, 1fr); gap: .75rem; align-items: center;
