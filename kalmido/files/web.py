@@ -565,11 +565,12 @@ def files_version_restore(nid, no):
     if n["kind"] != "file" or not v:
         raise Denied(404)
     fs_web_expect(c, nid, (request.get_json(silent=True) or {}).get("expect_version", request.args.get("expect_version")))  # 2.577.0 (#4708 3)
-    from .fslock import fsl_restore_version
+    from .fslock import fsl_of, fsl_denied, fsl_restore_version
+    lk = fsl_of(c, nid)
+    if lk is not None and lk["e2e"] != "on":  # 2.953 (#3348, review N7): not while the folder switches (a file of either format)
+        raise fsl_denied("fs_locked_busy")
     _fsu_step(c, me(), n, "version")  # 2.777.0 (#5254)
-    # 2.353.0 A (#2758): the ciphertext as it is; 2.953 (#3348, review N7): by the node's own format, not by the folder's lock --
-    # while a folder is being unlocked, a file already decrypted holds plain versions only (a typed upload, never octet-stream)
-    if (n["e2e_gen"] or 0) > 0:
+    if lk is not None:  # 2.353.0 A (#2758): the ciphertext as it is
         new = fsl_restore_version(c, n, no)
     else:
         new = fs_new_version(c, nid, fs_read(c, nid, no), v["mime"])

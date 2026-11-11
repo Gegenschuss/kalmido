@@ -12,7 +12,7 @@ tests/p2353_f_lockreview_test.py: ciphertexts and wrapped keys of the right form
  tags         the lock dialog learns how many nodes carry tags; locking (and moving in) removes them
  N5  who reaches a part only learns nothing about the subtree (left, by, at, block, rotate)
  N6  a deleted file request does not come back into a folder locked since
- N7  restoring a version of a file already decrypted while the folder is unlocked keeps its type (not octet-stream)
+ N7  no version restore while a folder is being unlocked (never an octet-stream version of a file already decrypted)
  N11 locking waits for a plain write below the folder that runs at the same moment (advisory lock, seen in pg_locks)
  N13 no share with an agent on a folder above a locked folder
  N14 a move into a locked folder refused at the end (another workspace) leaves no stored file behind
@@ -232,6 +232,8 @@ M = folder(A, "Outer")
 S = folder(A, "Inner", M)
 SF = upload(A, S, "old.txt")
 check(A.delete(B + f"/api/files/nodes/{SF}").ok, "the only file of Inner into the trash")
+r = Bo.get(B + f"/api/files/lock/movecheck/{M}", params={"to": L})
+check(r.status_code == 404, f"another person learns nothing about alice's folder ({r.status_code})")
 r = A.get(B + f"/api/files/lock/movecheck/{M}", params={"to": L}).json()
 check(r.get("block") is None and r.get("count") == 1, f"the check before the move: nothing blocks, one node below outside the trash ({r})")
 r = A.post(B + f"/api/files/lock/move/{S}", data={"parent_id": str(L), "name": ct(gl)})
@@ -271,10 +273,13 @@ check(A.post(B + f"/api/files/lock/{V}/stop", json={"password": "password123"}).
 convert_all(A, V, plain=True)
 cur = dbx("SELECT cur_version FROM fs_nodes WHERE id=?", (VF,))[0][0]
 r = A.post(B + f"/api/files/nodes/{VF}/versions/{cur}/restore", json={})
-check(r.ok, "a version of the decrypted file restored " + r.text[:160])
-mime = dbx("SELECT mime FROM fs_versions WHERE node_id=? ORDER BY no DESC LIMIT 1", (VF,))[0][0]
-check(mime != "application/octet-stream", f"N7: the restored version keeps its type ({mime})")
-A.post(B + f"/api/files/lock/{V}/finish", json={})
+check(r.status_code == 409 and code(r) == "fs_locked_busy", f"N7: no version restored while the folder is being unlocked ({r.status_code} {r.text[:120]})")
+mimes = [x[0] for x in dbx("SELECT mime FROM fs_versions WHERE node_id=?", (VF,))]
+check("application/octet-stream" not in mimes, f"N7: the decrypted file got no version of type octet-stream ({mimes})")
+check(A.post(B + f"/api/files/lock/{V}/finish", json={}).ok, "unlocked")
+r = A.post(B + f"/api/files/nodes/{VF}/versions/{cur}/restore", json={})
+check(r.ok and dbx("SELECT mime FROM fs_versions WHERE node_id=? ORDER BY no DESC LIMIT 1", (VF,))[0][0] == "text/plain",
+      "afterwards the version is restored as the plain file it is " + r.text[:120])
 
 # ---------------------------------------------------------------- N13 agent above a locked folder
 UP = folder(A, "Above")
@@ -294,8 +299,14 @@ check(files_on_disk(PF) == before and before, f"N14: no stored file left behind 
 
 # ---------------------------------------------------------------- N11 locking waits for a plain write running below
 W = folder(A, "Racing")
-hold = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-hold.execute("SELECT pg_advisory_lock_shared(hashtext(?))", (f"fsl:{W}",)).fetchall()  # a plain upload below W, not committed yet
+DBC, DBN = dbxm._target(os.path.join(DATA, "tasks.db"))
+# a plain upload below W, not committed yet: one psql session that keeps the shared lock until it is told to let go
+hold = subprocess.Popen(["docker", "exec", "-i", DBC, "psql", "-U", "kalmido", "-d", DBN, "-X", "-q", "-A", "-t"],
+                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+hold.stdin.write(f"SELECT pg_advisory_lock_shared(hashtext('fsl:{W}'));\nSELECT 'held';\n")
+hold.stdin.flush()
+got = [hold.stdout.readline().strip() for _ in range(2)]  # the lock call prints an empty line, then the marker
+check("held" in got, f"the plain write holds its lock ({got})")
 res = {}
 th = threading.Thread(target=lambda: res.setdefault("r", A.post(B + f"/api/files/lock/{W}/start", json={"keys": [{"user_id": ME, "wrapped": wrapped()}]})))
 th.start()
@@ -306,8 +317,9 @@ for _ in range(200):  # the start's request waits for the lock: seen in pg_locks
         break
     th.join(0.05)
 check(waiting and "r" not in res, "N11: locking waits while a plain write below the folder runs")
-hold.execute("SELECT pg_advisory_unlock_shared(hashtext(?))", (f"fsl:{W}",)).fetchall()
-hold.close()
+hold.stdin.write(f"SELECT pg_advisory_unlock_shared(hashtext('fsl:{W}'));\n\\q\n")
+hold.stdin.flush()
+hold.wait(30)
 th.join(30)
 check(res.get("r") is not None and res["r"].ok, "N11: then it locks")
 

@@ -36,8 +36,8 @@ const raw = async id => Buffer.from(await (await fetch(B + `api/files/nodes/${id
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {org_name: 'Studio Example', lang: 'en', collab_all: true});
   const st = (await call('GET', '/api/state')).j;
-  const ORG = st.me.workspaces[0].id;
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: [...new Set([...(st.settings?.features || '').split(','), 'files', 'collab'])].filter(Boolean).join(',')});
+  const ORG = (await call('GET', '/api/state')).j.me.workspaces[0].id;  // the workspaces show with the feature collab
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com', orgs: [ORG]})).j.id;
   const CKB = await login('bob');
   const kp = await webcrypto.subtle.generateKey({name: 'ECDH', namedCurve: 'P-256'}, true, ['deriveBits']);
