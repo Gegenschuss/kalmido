@@ -61,8 +61,8 @@ def _fs_space(c, cid):
     owner's account is disabled (as contacts/ctfolder.py _book_space): its node then opens nothing in the file store, as
     events/model.py ev_role gives its members nothing then; enabled again, its shares count at once."""
     cal = _cal(c, cid)
-    if cal is None:
-        return None
+    if cal is None or cal["deleted_at"]:  # fable 2.940.0 M3: a calendar in the trash opens nothing either (as _book_space),
+        return None                       # also a node that stayed live from a drop before 2.940.0
     with system_ctx(c):  # structure: whether its owner's account is disabled
         u = c.execute("SELECT disabled FROM users WHERE id=?", (cal["owner_id"],)).fetchone()
     if not u or u[0]:

@@ -248,6 +248,14 @@ r = Bo.get(B + f"/api/contacts?book_id={BD}")
 check(BD in ids(Bo.get(B + "/api/books")) and r.ok and "Rosa Example" in r.text, f"#5605: bob sees ivy's book and its contact again ({r.status_code})")
 check(KV in ids(Bo.get(B + "/api/evcals")) and "Load-out day" in Bo.get(B + f"/api/events?from={D5}&to={D5}").text,
       "#5605: and ivy's calendar with its event")
+# fable 2.940.0 M3: a calendar in the trash whose node stayed live (a drop before 2.940.0 made it so) opens nothing either
+check(A.delete(B + f"/api/evcals/{KR}").ok, "setup: alice's calendar into the trash again")
+sql("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL WHERE kind='ref' AND ref_kind='evcal' AND ref_id=?", (KR,), write=True)
+st_ = Bo.get(B + f"/api/files/nodes/{node('evcal', KR)}").status_code
+check(st_ in (403, 404) and KR not in ids(Bo.get(B + "/api/evcals")),
+      f"#5605 fable M3: bob cannot open the live node of a calendar in the trash ({st_})")
+check(A.post(B + f"/api/evcals/{KR}/restore").ok and "Strike day" in Bo.get(B + f"/api/events?from={D5}&to={D5}").text
+      and Bo.get(B + f"/api/files/nodes/{node('evcal', KR)}").ok, "#5605 fable M3: restored, bob has calendar and node again")
 
 # ================================================================== a reminder after the share was taken back
 check(A.put(B + f"/api/evcals/{K}/members", json={"user_id": GINA, "role": "view"}).ok, "setup: gina shared on the calendar as well")
