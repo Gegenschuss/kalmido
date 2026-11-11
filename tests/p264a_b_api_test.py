@@ -140,6 +140,13 @@ r = A.post(B + "/api/sections", json={"list_id": L, "name": MK + "Section"})
 check(r.ok, f"a section {r.text[:200]}")
 r = A.post(B + "/api/time/entries", json={"task_id": T, "start": (datetime.now() - timedelta(hours=1)).isoformat(timespec="seconds"), "minutes": 30})
 check(r.ok, f"a time entry on the task {r.text[:200]}")
+# 2.900.0 (#5550): a deleted time entry with a note: its undo step ("time_life") holds the whole row in its copy, the row
+# itself is gone (a match on time_entries misses it); the sweep below finds it left in obj_undo
+r = A.post(B + "/api/time/entries", json={"list_id": L, "start": (datetime.now() - timedelta(hours=6)).isoformat(timespec="seconds"),
+                                          "minutes": 20, "note": MK + "LifeNote"})
+check(r.ok, f"(setup) a project time entry with a note {r.status_code} {r.text[:200]}")
+r = A.delete(B + f"/api/time/entries/{r.json()['id']}")
+check(r.ok and r.json().get("undo_group"), f"#5550: deleted: an undo step holding the row {r.status_code} {r.text[:200]}")
 SEC = dbx("SELECT id FROM sections WHERE list_id=?", (L,))[0][0]
 # copies the app writes in other places (shopping memory, a mail address, an agent proposal): written here like the app does
 dbx("INSERT INTO shop_memory(list_id,item,section_id,at) VALUES(?,?,?,?)", (L, MK.lower() + "milk", SEC, "2026-01-01T00:00:00Z"), write=True)
@@ -374,6 +381,12 @@ MV = MK + "Move"
 T3 = A.post(B + "/api/tasks", json={"list_id": L2, "title": MV + "Title0", "content": MV + "Note"}).json()["id"]
 check(A.patch(B + f"/api/tasks/{T3}", json={"title": MV + "Title"}).ok and undo_marks(MV) >= 1,
       "an open list's task: its edit is an undo step with the plain texts (fine there)")
+# 2.900.0 (#5550): its time entries' steps hold note and task title -- one changed (time_entry), one deleted (time_life)
+_st = (datetime.now() - timedelta(hours=5)).isoformat(timespec="seconds")
+TE3 = A.post(B + "/api/time/entries", json={"task_id": T3, "start": _st, "minutes": 15, "note": MV + "TimeNote"}).json()["id"]
+check(A.patch(B + f"/api/time/entries/{TE3}", json={"note": MV + "TimeNote2"}).ok, "(setup) a time entry of the task changed")
+TE4 = A.post(B + "/api/time/entries", json={"task_id": T3, "start": _st, "minutes": 10, "note": MV + "LifeNote"}).json()["id"]
+check(A.delete(B + f"/api/time/entries/{TE4}").ok and undo_marks(MV + "LifeNote") >= 1, "(setup) a time entry of the task deleted: a step")
 ng0 = dbx("SELECT COUNT(*) FROM undo_groups WHERE user_id=1")[0][0]
 r = A.patch(B + f"/api/tasks/{T3}", json={"list_id": L, "title": cipher(5), "content": cipher(6)})
 check(r.ok and dbx("SELECT list_id FROM tasks WHERE id=?", (T3,))[0][0] == L, f"move into the locked list {r.status_code} {r.text[:200]}")
@@ -484,6 +497,33 @@ check(r.ok and r.json().get("restored") == 3 and back == [("", ""), ("", ""), ("
       f"#5562: Undo of 'delete all times' still works (bob's entry sealed again), the moved task's entries without texts {back} {r.text[:200]}")
 F3T = dbx("SELECT held FROM list_part_trash WHERE list_id=? AND kind='list_field'", (L3,))
 check(F3T and json.loads(F3T[0][0]).get("n") == 1, f"#5562: the field copy counts one task left {F3T}")
+
+# ================================================================== 2.900.0 (#5550): undo writes no note back into a locked project
+# A step of before the lock that a scrub missed (a project locked by an older version, set here in the database): taking it
+# back brings the entry back / its values back, but never a note or task title in plain text.
+L4 = A.post(B + "/api/lists", json={"name": "Locked later", "org_id": None}).json()["id"]
+dbx("UPDATE lists SET time_tracking=1 WHERE id=?", (L4,), write=True)
+_st = (datetime.now() - timedelta(hours=7)).isoformat(timespec="seconds")
+E1 = A.post(B + "/api/time/entries", json={"list_id": L4, "start": _st, "minutes": 25, "note": "Back note"}).json()["id"]
+r = A.patch(B + f"/api/time/entries/{E1}", json={"minutes": 35, "note": "Other note"})
+G1 = r.json().get("undo_group") if r.ok else None
+E2 = A.post(B + "/api/time/entries", json={"list_id": L4, "start": _st, "minutes": 5, "note": "Gone note"}).json()["id"]
+r = A.delete(B + f"/api/time/entries/{E2}")
+G2 = r.json().get("undo_group") if r.ok else None
+check(bool(G1 and G2), f"(setup) two time steps in the later locked project {G1} {G2}")
+dbx("UPDATE lists SET e2e='on' WHERE id=?", (L4,), write=True)
+dbx("UPDATE time_entries SET note='' WHERE list_id=?", (L4,), write=True)  # as le2b_scrub_free did at the lock
+nh0 = dbx("SELECT COUNT(*) FROM obj_history WHERE vals_after LIKE ? OR vals_before LIKE ?", ("%Back note%", "%Back note%"))[0][0]
+r = A.post(B + f"/api/undo/to/{G1}")
+rows = {x[0]: (x[1], x[2]) for x in dbx("SELECT id, note, seconds FROM time_entries WHERE id IN (?, ?)", (E1, E2))}
+check(r.ok and rows.get(E2, (None,))[0] == "" and rows.get(E1) == ("", 2100) and G1 in [x.get("group") for x in r.json().get("stayed") or []],
+      f"#5550: undo into a locked project: the deleted entry back without its note, the note change refused (stays) {r.status_code} {r.text[:300]} {rows}")
+check(dbx("SELECT COUNT(*) FROM obj_history WHERE vals_after LIKE ? OR vals_before LIKE ?", ("%Back note%", "%Back note%"))[0][0] == nh0,
+      "#5550: the refused step writes no history row with the note")
+check(not dbx("SELECT 1 FROM obj_undo WHERE kind='time_life' AND ref_id=? AND (snap LIKE ? OR COALESCE(redo, '') LIKE ?)",
+              (E2, "%Gone note%", "%Gone note%")),
+      "#5550: the taken back step keeps no note in its copy")
+dbx("UPDATE lists SET e2e=NULL WHERE id=?", (L4,), write=True)
 
 print(f"\n{OKS[0]} checks ok, {len(FAILS)} failed", flush=True)
 if FAILS:

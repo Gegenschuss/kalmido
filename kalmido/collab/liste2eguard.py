@@ -343,6 +343,7 @@ def le2b_scrub(c, lid):
                                             "OR (kind='section_order' AND ref_id=?)", (lid, lid, lid))
     n["undo_time"] = le2b_scrub_undo(c, f"kind='time_entry' AND ref_id IN (SELECT id FROM time_entries WHERE list_id=? OR task_id IN ({tq}))",
                                      (lid, lid))
+    n.update(le2b_scrub_undo_free(c, lid))  # 2.900.0 (#5550)
     n.update(le2b_scrub_trash(c, lid))  # #5549: after undo_sections (it reads the section copies)
     for fn in _SCRUB_MORE:
         n.update(fn(c, lid) or {})
@@ -358,6 +359,68 @@ def le2b_scrub_undo(c, where, args):
     ug_drop_ids(c, gids)
     c.execute(f"DELETE FROM obj_undo WHERE {where}", tuple(args))
     return len(gids)
+
+
+def le2b_scrub_undo_free(c, lid):
+    """2.900.0 (#5550): the undo steps whose copy (obj_undo.snap / redo hold the whole row, core/writes.py _snap) keeps a
+    free text the lock empties (le2b_scrub_free): the time entries of the project and of its tasks also when the entry was
+    deleted since ("time_life", its row only in the copy) or moved elsewhere. Part of le2b_scrub; core/db.py runs it once
+    for the projects locked before. Idempotent, the caller commits. Returns {what: groups dropped}."""
+    tids = [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))]
+    return {"undo_time_copies": _scrub_undo_ids(c, le2b_undo_copies(c, ("time_entry", "time_life"), [lid], tids))}
+
+
+def _undo_rows(js):
+    """The rows a copy holds: a snap step {table: [row]}, a diff part of a deleted row {"row": row}."""
+    try:
+        d = json.loads(js) if isinstance(js, str) else js
+    except ValueError:
+        return []
+    if not isinstance(d, dict):
+        return []
+    rows = [d["row"]] if isinstance(d.get("row"), dict) else []
+    for v in d.values():
+        if isinstance(v, list):
+            rows += [r for r in v if isinstance(r, dict)]
+    return rows
+
+
+def _int(v):
+    try:
+        return int(v) if v is not None and not isinstance(v, bool) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def le2b_undo_copies(c, kinds, lids, tids):
+    """2.900.0 (#5550): the ids of the undo parts of kinds whose copy (before or after) holds a row of a list in lids or of a
+    task in tids -- also when that row is gone or elsewhere now, which a match on ref_id misses. The database picks the
+    candidates (as le2b_scrub_trash_tasks), the rows of the copy decide."""
+    lids, tids = {int(x) for x in lids or ()}, {int(x) for x in tids or ()}
+    if not lids and not tids:
+        return []
+    ids = sorted(lids | tids)
+    out, seen = [], set()
+    kq = ",".join("?" * len(kinds))
+    for ch in [ids[i:i + 500] for i in range(0, len(ids), 500)]:
+        rx = rf'"(list|task)_id":\s*({"|".join(str(i) for i in ch)})\s*[,}}]'
+        for r in c.execute(f"SELECT id, snap, redo FROM obj_undo WHERE kind IN ({kq}) AND (snap ~ ? OR COALESCE(redo, '') ~ ?)",
+                           (*kinds, rx, rx)).fetchall():
+            if r["id"] in seen:
+                continue
+            seen.add(r["id"])
+            if any(_int(row.get("list_id")) in lids or _int(row.get("task_id")) in tids
+                   for row in _undo_rows(r["snap"]) + _undo_rows(r["redo"])):
+                out.append(int(r["id"]))
+    return out
+
+
+def _scrub_undo_ids(c, ids):
+    n = 0
+    for i in range(0, len(ids), 1000):
+        part = ids[i:i + 1000]
+        n += le2b_scrub_undo(c, f"id IN ({','.join('?' * len(part))})", part)
+    return n
 
 
 _SCRUB_MORE = []  # further copies (other modules append a function (c, lid) -> {what: n})
@@ -554,6 +617,11 @@ def le2b_scrub_tasks(c, ids):
         c.execute(f"UPDATE task_decisions SET text=? WHERE task_id IN ({q})", (le2e_neutral(), *part))
         c.execute(f"DELETE FROM tidy_pending WHERE task_id IN ({q})", part)
         n["undo_tasks"] = n.get("undo_tasks", 0) + le2b_scrub_undo(c, f"kind='task' AND ref_id IN ({q})", part)  # #5408
+        # 2.900.0 (#5550): + the steps of their time entries (the note and task title emptied above sit in the copy)
+        n["undo_time"] = n.get("undo_time", 0) + le2b_scrub_undo(
+            c, f"kind='time_entry' AND ref_id IN (SELECT id FROM time_entries WHERE task_id IN ({q}))", part)
+    # ... and of their entries deleted or moved elsewhere since (the row only in the copy)
+    n["undo_time"] = n.get("undo_time", 0) + _scrub_undo_ids(c, le2b_undo_copies(c, ("time_entry", "time_life"), (), ids))
     n.update(le2b_scrub_trash_tasks(c, set(ids)))  # #5562
     return n
 
