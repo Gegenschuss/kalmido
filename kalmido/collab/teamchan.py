@@ -37,7 +37,7 @@ from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..api.common import v1_args, v1_call, v1_json, v1_view
 from ..core.orgcrypt import oc_list_space, oc_seal_path, oc_user_space, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgroles import FULL_READ, org_say_refusal, user_orgs_full, need_org_write  # 2.369.5 (#2517): pulled up from functions; 2.565.0 (#4719): FULL_READ
-from .teamchat import tchat_coworkers, need_tchat, need_room  # 2.369.5 (#2517): pulled up from functions
+from .teamchat import tchat_coworkers, need_tchat, need_room, tchat_marks_drop  # 2.369.5 (#2517): pulled up from functions; 2.981.0 (#5286)
 from ..accounts.orgs import may_see  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachments import safe_name, unexec_name, send_stored  # 2.369.5 (#2517): pulled up from functions
 from ..notify.alerts import aa_count, aa_oserr  # 2.369.5 (#2517): pulled up from functions
@@ -519,7 +519,7 @@ def tcx_member_del(rid, uid):
         raise Denied(404)
     from .tcxcore import tcx_core_take
     tcx_core_take(c, rid, [uid], me())  # 2.565.0 (#4719): through the core (restorable), the fallback row with it
-    c.execute("DELETE FROM tchat_reads WHERE room_id=? AND user_id=?", (rid, uid))  # 2.223.2 A (#2869): tchat_sig_q counts read rooms
+    tchat_marks_drop(c, [uid], "ref_id=?", (rid,))  # 2.223.2 A (#2869): tchat_sig_q counts read rooms; 2.981.0 (#5286): the core's rows
     tcx_agents_out(c, rid, uid)
     c.commit()
     r = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (rid,)).fetchone()

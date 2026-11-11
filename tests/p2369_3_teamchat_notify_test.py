@@ -150,7 +150,8 @@ topic = lambda n: ("INSERT INTO user_settings(user_id,key,value) VALUES(?,'ntfy_
 # 2.981.0 (#5287): the project bell is a row of the core's obj_follow (kind list, the project's workspace)
 bell = lambda n, lid, mode="all": ("INSERT INTO obj_follow(user_id,kind,ref_id,org_id,mode,custom) VALUES(?,'list',?,(SELECT org_id FROM lists WHERE id=?),?,'{}') "
                                    "ON CONFLICT (user_id,kind,ref_id) WHERE mode <> 'watch' DO UPDATE SET mode=excluded.mode", (U[n], lid, lid, mode))
-mute = lambda n, rid: ("INSERT INTO tchat_reads(room_id,user_id,last_id,muted) VALUES(?,?,0,1) ON CONFLICT(room_id,user_id) DO UPDATE SET muted=1", (rid, U[n]))
+# 2.981.0 (#5286): muting a room is a row of the core's obj_follow (kind tchat, mode mute; tchat_reads is gone)
+mute = lambda n, rid: ("INSERT INTO obj_follow(user_id,kind,ref_id,mode) VALUES(?,'tchat',?,'mute') ON CONFLICT DO NOTHING", (U[n], rid))
 """
 NOTIFY = r"""
 RA, RB, LA, LB, MA, MB = %(ids)s

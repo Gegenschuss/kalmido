@@ -655,7 +655,26 @@ it would not grow), `osn_get` reads the own mark. A mark is read and written onl
 object before it writes one. The task badge (`core/serializers.py`) joins `obj_seen` with `kind='task'`; the change feed
 (`tasks/delta.py`) notes a mark on a task as a change of that task for its reader only. The trigger `kalmido_osn_gone`
 deletes a task's marks when the task is deleted for good. Not in the exports (a personal view state). A new area with read
-marks adds its kind to `OSN_KINDS` and a trigger line in a fragment -- no table of its own (stage Q8b: team chat, RSS).
+marks adds its kind to `OSN_KINDS` and a trigger line in a fragment -- no table of its own.
+
+### Read marks of the team chat and the feeds (stage Q8b, 2.981.0, #5286)
+
+- Team chat: a room's read mark is a row of `obj_seen` with kind `tchat` (`seen_id` = the highest message of the main
+  conversation read; was `tchat_reads.last_id`), a thread's with kind `tchat_thread` (`ref_id` = the thread's first message; was
+  `tchat_thread_reads`). Muting a room is a row of `obj_follow` (kind `tchat`, mode `mute`, its rule in `OFL_LEVEL`), taking part
+  in a thread one with kind `tchat_thread`, mode `watch` (`ofl_watch` / `ofl_watchers`). A new participant of a thread starts at
+  the answer that brought them in (`osn_mark(..., only_new=True)`: an older mark stays). The unread counts, the poll signature
+  (`tchat_sig_q`), "Read by", the push rules and the thread summary of `collab/teamchat.py` read these rows. The rows carry no
+  workspace (the team chat checks the room); leaving a channel or an organisation drops a person's room marks and mutes
+  (`tchat_marks_drop`, `osn_drop` + `ofl_drop`); the triggers `kalmido_osn_gone_tchat*` / `kalmido_ofl_gone_tchat*` take them with
+  the room / the message.
+- Feeds: one model in every space -- a read article is a row of `obj_seen` (kind `rss`, `seen_id` = the article), unread again
+  deletes it (`osn_clear`), "all read" goes through `osn_mark_sel`; `osn_seen_sql` is the "read at" of a list. Per article, not a
+  high-water mark per feed: an article is marked unread on its own and articles arrive out of order. `rss_reads` and
+  `rss_items.read_at` are gone (an article deleted takes its marks: `kalmido_osn_gone_rss`).
+- The move: `osn_move` (`osn_move_tchat`, `osn_move_rss`) before the fragment `5286_a` drops the old tables and the column
+  (one-way, the back limit is raised; a SQLite file's `tchat_reads` comes in through `admin/migrate.py legacy_tables`). Not in
+  the exports (a personal view state, as before).
 
 ### Templates (stage Q10, 2.905.0, #5288)
 

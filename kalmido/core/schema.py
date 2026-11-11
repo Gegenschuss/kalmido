@@ -531,10 +531,7 @@ CREATE TABLE IF NOT EXISTS tchat_msgs (
 CREATE INDEX IF NOT EXISTS tchat_msgs_room ON tchat_msgs(room_id, id);
 CREATE INDEX IF NOT EXISTS ix2281_tchat_msgs_task_id ON tchat_msgs(task_id) WHERE task_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix2281_tchat_msgs_user_id ON tchat_msgs(user_id) WHERE user_id IS NOT NULL;
-CREATE TABLE IF NOT EXISTS tchat_reads (
-  room_id BIGINT NOT NULL REFERENCES tchat_rooms(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  last_id BIGINT NOT NULL DEFAULT 0, muted BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (room_id, user_id));
-CREATE INDEX IF NOT EXISTS ix2281_tchat_reads_user_id ON tchat_reads(user_id);
+-- 2.981.0 (#5286): a person's read mark / mute of a room (tchat_reads) are rows of the core's obj_seen / obj_follow, kind 'tchat'
 -- 2.17.0 (#443): secret tokens of the e-mail addresses for new tasks (list_id NULL = the person's inbox)
 CREATE TABLE IF NOT EXISTS mail_tokens (
   token TEXT PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -2224,17 +2221,8 @@ CREATE INDEX IF NOT EXISTS tchat_files_msg ON tchat_files(message_id);
 CREATE INDEX IF NOT EXISTS ix2281_tchat_files_room_id ON tchat_files(room_id);
 CREATE INDEX IF NOT EXISTS ix2281_tchat_files_user_id ON tchat_files(user_id) WHERE user_id IS NOT NULL;
 -- 2.98.0 C/D (#2180 #2181 #2178): (new tables below this line)
--- 2.139.0 A (#2127): a person's read mark in a thread of the team chat (root_id = the thread's first message, tchat_msgs.thread_of).
--- follow = 1: I take part (the root's author, everyone who answered or was @mentioned in it: counted unread, notified); 0 = only
--- looked at it (the mark still counts for "Read by").
--- New table only: 2.138 ignores it
-CREATE TABLE IF NOT EXISTS tchat_thread_reads (
-  root_id BIGINT NOT NULL REFERENCES tchat_msgs(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  room_id BIGINT NOT NULL REFERENCES tchat_rooms(id) ON DELETE CASCADE, last_id BIGINT NOT NULL DEFAULT 0,
-  follow BIGINT NOT NULL DEFAULT 1, PRIMARY KEY (root_id, user_id));
-CREATE INDEX IF NOT EXISTS tchat_thread_reads_user ON tchat_thread_reads(user_id, room_id);
--- 2.139.0 review (F3): the poll signature (tchat_sig) reads the marks of a set of rooms
-CREATE INDEX IF NOT EXISTS tchat_thread_reads_room ON tchat_thread_reads(room_id);
+-- 2.139.0 A (#2127): a person's read mark in a thread of the team chat and taking part in it (tchat_thread_reads) are rows of the
+-- core's obj_seen / obj_follow, kind 'tchat_thread' since 2.981.0 (#5286)
 -- (2.98.0 last anchor)
 -- 2.99.0 A (#2182): files of knowledge pages (PDFs and pictures; upload and ZIP import, wiki/wikiatt.py). org_id / owner_id
 -- as the page (NULL = private, the app checks owner_id); path below ATT_DIR (wiki/<page id>/…, sealed like attachments);

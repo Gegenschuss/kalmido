@@ -1,5 +1,9 @@
 """2.981.0 (#5286, stage Q8b of the cross-cutting core, analysis #3563, decided 08.11.2026): the read marks of the feeds' articles
-are rows of the core's obj_seen (core/objseen.py, kind 'rss'); rss_reads and rss_items.read_at go.
+are rows of the core's obj_seen (core/objseen.py, kind 'rss'); rss_reads and rss_items.read_at go. The team chat's read marks
+are rows of obj_seen too (kind 'tchat' = a room, 'tchat_thread' = a thread), muting a room and taking part in a thread rows of
+obj_follow (core/objfollow.py, kind 'tchat' mode 'mute', kind 'tchat_thread' mode 'watch'); tchat_reads and tchat_thread_reads go.
+The triggers kalmido_osn_gone_tchat* / kalmido_ofl_gone_tchat*: a room / a message deleted takes its rows along (what ON DELETE
+CASCADE of the old tables did).
 
 RSS had two models for the same thing: rss_items.read_at (one mark on the article, for a private feed) and rss_reads (one row
 per person and article, for the feeds of an organisation). Now one model in every space: a read article is a row of obj_seen
@@ -11,13 +15,22 @@ The move: core/db.py init_db calls core/objseen.py osn_move (osn_move_rss) befor
 rss_items.read_at (the feed's owner) go into obj_seen (the first start of 2.981, or what an older version wrote after a rollback),
 then the table and the column are dropped. One-way: an older version makes rss_reads again, empty, but finds no column read_at
 and fails on the feeds (its start check refuses: the back limit is raised to this release); a backup restores the old state.
+The team chat the same way (core/objseen.py osn_move_tchat): its rows go into obj_seen / obj_follow, then both tables are dropped.
 """
 SCHEMA = """
 CREATE OR REPLACE TRIGGER kalmido_osn_gone_rss AFTER DELETE ON rss_items FOR EACH ROW EXECUTE FUNCTION kalmido_osn_gone('rss');
+CREATE OR REPLACE TRIGGER kalmido_osn_gone_tchat AFTER DELETE ON tchat_rooms FOR EACH ROW EXECUTE FUNCTION kalmido_osn_gone('tchat');
+CREATE OR REPLACE TRIGGER kalmido_osn_gone_tchat_thread AFTER DELETE ON tchat_msgs FOR EACH ROW EXECUTE FUNCTION kalmido_osn_gone('tchat_thread');
+CREATE OR REPLACE TRIGGER kalmido_ofl_gone_tchat AFTER DELETE ON tchat_rooms FOR EACH ROW EXECUTE FUNCTION kalmido_ofl_gone('tchat');
+CREATE OR REPLACE TRIGGER kalmido_ofl_gone_tchat_thread AFTER DELETE ON tchat_msgs FOR EACH ROW EXECUTE FUNCTION kalmido_ofl_gone('tchat_thread');
 """
 # drop-ok rss_reads: moved into obj_seen (kind rss) by core/objseen.py osn_move_rss just before (stage Q8b, decided 08.11.2026)
 # drop-ok rss_items.read_at: moved into obj_seen (kind rss, the feed owner's mark) by core/objseen.py osn_move_rss just before (stage Q8b)
+# drop-ok tchat_reads: moved into obj_seen / obj_follow (kind tchat) by core/objseen.py osn_move_tchat just before (stage Q8b)
+# drop-ok tchat_thread_reads: moved into obj_seen / obj_follow (kind tchat_thread) by core/objseen.py osn_move_tchat just before (stage Q8b)
 AFTER = [
     "DROP TABLE IF EXISTS rss_reads",
     "ALTER TABLE rss_items DROP COLUMN IF EXISTS read_at",
+    "DROP TABLE IF EXISTS tchat_thread_reads",
+    "DROP TABLE IF EXISTS tchat_reads",
 ]

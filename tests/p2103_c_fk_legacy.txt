@@ -96,8 +96,6 @@ tasks.assignee_id
 tasks.milestone_id
 tasks.reviewer_id
 tasks.sprint_id
-tchat_reads.last_id
-tchat_thread_reads.last_id
 tidy_pending.actor_id
 upload_scan.ref_id
 # 2.755.0 (#5261): found only when the check read IF NOT EXISTS / wrapped / AFTER-list steps; today's stock, the list only shrinks

@@ -731,7 +731,6 @@ tchat_msgs.created_at time
 tchat_msgs.deleted_at time
 tchat_msgs.edited_at time
 tchat_msgs.pinned_at time
-tchat_reads.muted bool
 tchat_rooms.archived_at time
 tchat_rooms.created_at time
 tchat_rooms.deleted_at time

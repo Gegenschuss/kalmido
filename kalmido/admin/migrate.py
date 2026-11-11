@@ -38,6 +38,7 @@ from ..core.pg import pool_refresh, ts_canon  # 2.149.0 G (#2517): pulled up fro
 from ..core.objtags import OTG_LEGACY_DDL, OTG_USER_LEGACY_DDL  # 2.947.0 (#5275); 2.955.0 (#5276)
 from ..core.objfollow import OFL_LIST_LEGACY_DDL  # 2.981.0 (#5287)
 from ..core.objnotifcap import NCAP_LEGACY_DDL  # 2.981.0 (#5287)
+from ..core.objseen import OSN_TCHAT_LEGACY_DDL  # 2.981.0 (#5286)
 
 TAG = "migrate-sqlite:"
 _Q4 = Decimal("0.0001")
@@ -353,6 +354,8 @@ class Mig:
             c.execute(OFL_LIST_LEGACY_DDL)
         if "list_notif" in self.src_tables or "folder_notif" in self.src_tables:  # 2.981.0 (#5287): the templates, taken by
             c.executescript(NCAP_LEGACY_DDL)                                     # ncap_move (obj_notif_cap), dropped by 5287_a
+        if "tchat_reads" in self.src_tables:  # 2.981.0 (#5286): the team chat's read marks, taken by osn_move_tchat, dropped by 5286_a
+            c.execute(OSN_TCHAT_LEGACY_DDL)
 
     def pg_meta(self, c):
         cols = {}

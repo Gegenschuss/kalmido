@@ -57,8 +57,6 @@
   "task_offer_links": "own logic: the quotation position a task came from (offer data)",
   "task_people": "own logic: the people of a task (assignees)",
   "tchat_msgs": "own logic: the team chat's message stream (stage Q4 keeps it)",
-  "tchat_reads": "stage Q8 (read marks) takes it down: the core's read marks",
-  "tchat_thread_reads": "stage Q8 (read marks) takes it down: the core's read marks",
   "tchat_trash_text": "stage Q4 (comments) takes it down: the core's comments with the trash of #5249",
   "video_comments": "stage Q4 (comments) takes it down: the core's comments",
   "wiki_links": "own logic: derived from the page text (backlinks), rebuilt on save",

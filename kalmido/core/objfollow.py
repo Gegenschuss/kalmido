@@ -48,10 +48,14 @@ from .kernretire import kern_retire_floor
 from .pg import qi, st_ids
 
 OFL_KINDS = ("task", "list")  # 2.981.0 (#5287): + 'list' (the bell of a project, was list_bell)
+# 2.981.0 (#5286, stage Q8b): + 'tchat' (a team chat room muted: mode 'mute', was tchat_reads.muted) and 'tchat_thread' (taking
+# part in a thread of the team chat: mode 'watch', was tchat_thread_reads.follow); rows without a workspace (org_id NULL, the
+# team chat checks the room), they end with the room / the message (kalmido_ofl_gone) and when a person leaves (osn / ofl_drop)
+OFL_KINDS += ("tchat", "tchat_thread")
 OFL_WATCH = "watch"
 OFL_BELL = ("list", "mute", "urgent")
 # 2.981.0 (#5287): the bell's modes per kind (a project's bell: as the matrix, everything, muted, the own choice per event)
-OFL_BELL_OF = {"task": OFL_BELL, "list": ("default", "all", "mute", "custom")}
+OFL_BELL_OF = {"task": OFL_BELL, "list": ("default", "all", "mute", "custom"), "tchat": ("mute",), "tchat_thread": ()}
 OFL_MODES = ("watch",) + tuple(dict.fromkeys(m for ms in OFL_BELL_OF.values() for m in ms))  # the CHECK of obj_follow.mode
 OFL_TABLE = {"task": "tasks", "list": "lists"}  # the kind's table: its org_id is the workspace a bell counts in
 OFL_ISO = r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{1,6})?(Z|[+-]\d\d:\d\d)$"
@@ -161,6 +165,12 @@ def ofl_bell_rest(c, kind, rid, uid, rest):
               "AND custom IS NOT NULL AND custom <> '{}'::jsonb", (rest, iso(now_utc()), _kind(kind), int(rid), int(uid)))
     c.execute("DELETE FROM obj_follow WHERE kind=? AND ref_id=? AND user_id=? AND mode<>'watch' AND mode<>?",
               (kind, int(rid), int(uid), rest))
+
+
+def ofl_bell_drop(c, kind, rid, uid):
+    """2.981.0 (#5286): uid's bell of (kind, rid) goes (e.g. a team chat room unmuted). True = there was one."""
+    return c.execute("DELETE FROM obj_follow WHERE kind=? AND ref_id=? AND user_id=? AND mode<>'watch'",
+                     (_kind(kind), int(rid), int(uid))).rowcount > 0
 
 
 def ofl_bell_put(c, kind, rid, uid, org, level, until, set_by, act=None, act_by=None, prev=None, at=None, upd=None, custom=None):

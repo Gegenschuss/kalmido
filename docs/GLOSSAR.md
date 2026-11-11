@@ -274,7 +274,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/objcomments.py` (`ocm`) - Comments exist once, in the shared core: one table obj_comments (kind, ref_id) with its trash obj_comment_trash, one mention parser, one say rule, one delete rule (stage Q4a)
 - `kalmido/core/objlight.py` (`obj`) - The light kinds of the shared core (task, event, hub_mail, client): kind and role only, no node, no shares, no write path
 - `kalmido/core/objnotify.py` (`obj`) - The one send decision of the shared core: every recipient of a News entry or push is cut with obj_role >= view first (stage Q2)
-- `kalmido/core/objseen.py` (`osn`) - Read marks exist once, in the shared core: one table obj_seen (task: the highest comment id a person has seen); task_seen moved here and went (stage Q8a)
+- `kalmido/core/objseen.py` (`osn`) - Read marks exist once, in the shared core: one table obj_seen (task: the highest comment id a person has seen); task_seen moved here and went (stage Q8a); the team chat's rooms / threads and the read feed articles too (stage Q8b)
 - `kalmido/core/objparts.py` (`part`) - The shared core, stage 6b -- the side objects of a project on the core
 - `kalmido/core/objreact.py` (`orx`) - Reactions exist once, in the shared core: one table obj_reactions for comments, team chat and the agent chat
 - `kalmido/core/objtags.py` (`otg`) - Tags exist once, in the shared core: obj_tags (scope user / list / org / ws) and obj_tag_links; project tags and organisation labels since 2.947
