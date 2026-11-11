@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.974.0** (2026-11-11):
-- **Documents**: reorder PDF pages by dragging, and merge several PDFs into one document.
-- **Agents**: a bigger model for your own messages and decisions, a cheaper one for routine; agents can be told when their tasks change.
-- **Shared core**: comments and following now run on the shared core, tags too; wiki versions and group shares follow.
-- **Phones**: Back goes one view back in threads, trashes, cards and trips and ends a selection first.
+**2.990.0** (2026-11-11):
+- **Undo**: "Recent steps" now also takes back settings, budget entries, phone calendar / contacts changes and whole deleted calendars; undo shows its result at once in every area.
+- **Disposition**: pick client and agency on the call sheet from your contacts.
+- **Office**: reminder fees ask for the day the money came; slimmer document head on a phone.
+- **Sharing**: sharing by e-mail address reaches an account only once its address is proved.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
