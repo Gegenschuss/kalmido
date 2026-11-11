@@ -26,6 +26,7 @@ from .wkhist import wkh_sid, wsb_body_or  # 2.369.5 (#2517): pulled up from func
 from .wikie2e import wke_mode, wke_open_sql  # 2.369.5 (#2517): pulled up from functions; 2.981.0 (#5278): + wke_open_sql
 from .pages import wiki_may_read, wiki_space_key  # 2.981.0 (#5278)
 from ..core.objsearch import osr_ids_sql  # 2.981.0 (#5278)
+from ..core.access import live_sql  # 2.981.0 (#5278)
 
 WKS_CATCH_UP = 300   # pages indexed again per space and search
 WKS_LIMIT, WKS_LIMIT_MAX = 30, 100
@@ -207,7 +208,7 @@ def wks_name_hits(c, uid, q, limit=10, cand=200):
     ids, args = osr_ids_sql("wiki_page", q, names=True)
     if ids is None:
         return []
-    rows = c.execute(f"SELECT p.* FROM wiki_pages p WHERE p.id IN {ids} AND p.deleted_at IS NULL AND {wke_open_sql('p')} "
+    rows = c.execute(f"SELECT p.* FROM wiki_pages p WHERE p.id IN {ids} AND {live_sql('p')} AND {wke_open_sql('p')} "
                      f"ORDER BY lower(p.path), p.id LIMIT {int(cand)}", args).fetchall()
     out = []
     for r in rows:
