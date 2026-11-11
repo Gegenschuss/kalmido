@@ -282,7 +282,7 @@ check(r.ok and dbx("SELECT mime FROM fs_versions WHERE node_id=? ORDER BY no DES
       "afterwards the version is restored as the plain file it is " + r.text[:120])
 
 # ---------------------------------------------------------------- N13 agent above a locked folder
-UP = folder(A, "Above")
+UP = folder(A, "Above", space=f"org:{ORG}")  # the agent is a share target of the organisation
 IN = folder(A, "Locked below", UP)
 lock(A, IN, [ME])
 r = A.post(B + f"/api/files/nodes/{UP}/shares", json={"agent_id": AGID, "role": "view"})
