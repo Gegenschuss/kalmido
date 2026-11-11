@@ -501,7 +501,7 @@ document.addEventListener('click', async e => {
     case 'git-ref': { const t = taskById(+a.dataset.id); if (t) copyText(gitRef(t)); break; }
     case 'ltag-rm': { const t = taskById(S.sel); patchTask(t.id, {ltags: (t.ltags || []).filter(g => g !== a.dataset.tag)}); break; }
     case 'tag-promote': tagPromote(taskById(S.sel), a.dataset.tag); break;
-    case 'open': if (!swiped) openDetail(id); break;
+    case 'open': if (!swiped) openDetail(id, {up: !!a.closest('#detail')}); break;  // 2.963.0 (#5233): a subtask from the panel = one step of Back
     case 'open-id': openDetail(id); break;
     case 'dup-x': { DUP_OFF ||= new Set(LS.get('dupOff', [])); DUP_OFF.add(id); LS.set('dupOff', [...DUP_OFF].slice(-100)); a.closest('.ddup')?.remove(); $('#d-title')?.focus(); break; }
     case 'crumb': crumbGo(a.dataset.k, a.dataset.id); break;  // 2.7.2 (#424)
@@ -535,7 +535,7 @@ document.addEventListener('click', async e => {
       await loadModule('trashui'); await ck_clearAct(act, id);  // 2.272.0 G (#3038): trashui.js (start budget)
       break;
     }
-    case 'close-detail': closeDetail(); break;
+    case 'close-detail': if (a.classList.contains('back')) det_back(); else closeDetail(); break;  // 2.963.0 (#5233): the ‹ = Back (a subtask: its task again)
     case 'collapse': {
       if (e.target.closest('.gact, .shandle') || secHeld) break;
       const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); an_rowsIn(renderView); if (k.startsWith('s:')) scl_push(); break;  // 2.46.1 (#1559): opened rows fade in; 2.156.0 C (#2073): a section's fold on every device

@@ -7,7 +7,7 @@ let saveTimers = {};
 function openDetail(id, o = {}) {
   if (S.me?.kid) return;  // 2.19.0: a child ticks in its own view, no task panel
   meEnd();  // 2.26.0 (#936): one task opened (a plain click, a title of the multi panel): the selection ends
-  const other = S.sel !== id;
+  const other = S.sel !== id, prev = S.sel;
   if (other) { S.editLink = false; S.cedit = null; S.mp = null; recentPush('t', id); wpOpened(id); }
   S.sel = id; S.editContent = false;
   if (other) dswTake(id);  // 2.754.0 (#5213): comments & co. fetched ahead for a neighbour are there at once
@@ -28,8 +28,12 @@ function openDetail(id, o = {}) {
   // 2.26.x (#953): touch tablets / the unfolded Fold too: the open task is its own history entry, so Back (Android's key /
   // gesture) closes only the task and keeps the view + sidebar; phones as before (one entry per opened task)
   // 2.622.0 (#4948): o.here = route() opened the task from a link inside the app: the link's new entry becomes the task's entry
-  if (isMobile()) history[(o.replace && history.state?.detail) || o.here ? 'replaceState' : 'pushState']({detail: id}, '', location.hash);  // 2.32.0 (#1071): a swipe to the next task replaces the entry (Back closes the task)
-  else if (isTouch() && !history.state?.detail) history[o.here ? 'replaceState' : 'pushState']({detail: id}, '', location.hash);
+  // 2.963.0 (#5233): a task opened from the open one's panel (a subtask, o.up) is one step more: its entry names the task
+  // below it (up) and how many task entries lie on each other (dn); Back and the panel's ‹ open that task again (popstate below, det_back)
+  const hs = history.state, under = other && prev && hs?.detail === prev && !o.replace && !o.here;
+  const dst = o.replace && hs?.detail ? {...hs, detail: id} : under ? {detail: id, up: prev, dn: (hs.dn || 1) + 1} : {detail: id};
+  if (isMobile()) history[(o.replace && hs?.detail) || o.here ? 'replaceState' : 'pushState'](dst, '', location.hash);  // 2.32.0 (#1071): a swipe to the next task replaces the entry (Back closes the task)
+  else if (isTouch() && (!hs?.detail || (under && o.up))) history[o.here ? 'replaceState' : 'pushState'](dst, '', location.hash);  // 2.963.0 (#5233): + a subtask from the panel
   if (cmtOn() && id > 0 && S.tl.id !== id) S.tl = {id};
   loadTimeline(id);
   loadTaskTime(id);
@@ -49,13 +53,22 @@ function closeDetail(fromPop) {
   $('#app').classList.remove('detail-open'); fitLayout();
   $$('.trow.sel').forEach(r => r.classList.remove('sel'));
   setTimeout(() => { if (!S.sel) d.classList.add('hidden'); }, isMobile() ? 230 : 0);
-  if ((isMobile() || isTouch()) && !fromPop && history.state && history.state.detail) history.back();  // closed by X / Back button: the entry goes
+  // closed by X / Back button: the entry goes; 2.963.0 (#5233): with the entries of the tasks below it (dn), none stays dead
+  if ((isMobile() || isTouch()) && !fromPop && history.state && history.state.detail) { const n = history.state.dn || 1; if (n > 1) history.go(-n); else history.back(); }
   if (S.bellBack) { S.bellBack = false; setTimeout(() => { const b = $('#kbar .bell, #top .bell'); if (b && !S.sel && $('#pop').classList.contains('hidden')) bellPop(b); }, isMobile() ? 260 : 0); }  // 2.13.0 (#453 A5)
 }
 // 2.152.7 (#2710): a Back step that lands on the open task's own entry ({detail: id}) leaves the panel open: closing a menu
 // sheet in the panel (priority, assignee …) takes its own entry away again (backclose.js); should that step ever reach this
 // listener, the task stays open instead of vanishing
-window.addEventListener('popstate', e => { if (S.sel && (isMobile() || isTouch()) && e.state?.detail !== S.sel) closeDetail(true); });
+// 2.963.0 (#5233): Back onto the entry of the task the open one was opened from (a subtask from its panel): that task again,
+// not the panel closed (it closed and left its entry as a dead Back)
+window.addEventListener('popstate', e => {
+  if (!S.sel || !(isMobile() || isTouch()) || e.state?.detail === S.sel) return;
+  if (typeof e.state?.detail === 'number' && e.state.detail > 0 && taskById(e.state.detail)) openDetail(e.state.detail, {replace: true});
+  else closeDetail(true);
+});
+// the panel's ‹: one task back when it was opened from another one's panel (the same way as Back), else closed
+function det_back() { if ((isMobile() || isTouch()) && history.state?.detail === S.sel && history.state?.up) history.back(); else closeDetail(); }
 // U02 (owner decision 1), 2.8.0 (#434): sidebar + list + task panel side by side only while the list keeps ~420 px (Fold
 // unfolded, small laptop windows, large font sizes). Otherwise the sidebar becomes a drawer: the header's menu button opens
 // it as an overlay (like the phone drawer). An unfolded Fold (~904 px) keeps the sidebar next to the list.

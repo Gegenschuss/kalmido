@@ -97,7 +97,10 @@ function rk_travelHtml() {
   if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (RK.err) return `<div class="empty">${esc(RK.err)}</div>`;
   if (!RK.data) { if (!RK.loading) setTimeout(rk_load, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
-  if (RK.open && rk_trip(RK.open)) return rk_tripHtml(rk_trip(RK.open));
+  // 2.963.0 (#5233): an open trip is one step of the travel page (it opens from many places: the list, a copy, the logbook, a
+  // link): Back and its ‹ "All trips" = the list again; the list drawn = no step left
+  if (RK.open && rk_trip(RK.open)) { f8d_viewStep('rkt', rk_tripClose); return rk_tripHtml(rk_trip(RK.open)); }
+  f8d_viewDrop('rkt');
   const views = `<div class="seg" role="group" aria-label="${esc(tr('View'))}">${[['trips', tr('Trips')], ['logbook', tr('Logbook')], ['report', tr('Evaluation')]].filter(([k]) => k !== 'logbook' || !ofr_legOwn('travel')).map(([k, n]) => `<button type="button" data-rk="view" data-v="${k}" class="${RK.view === k ? 'on' : ''}" aria-pressed="${RK.view === k}">${n}</button>`).join('')}</div>`;  // 2.93.0 B (#1928): the logbook
   if (RK.view === 'logbook' && ofr_legOwn('travel')) RK.view = 'trips';  // 2.545.0 (#4592): a member's own trips without the logbook
   if (RK.view === 'logbook') return `<div class="ofcbar rkbar">${views}</div>` + lbHtml();
@@ -417,6 +420,7 @@ async function rk_billModal(t) {
   });
 }
 
+function rk_tripClose() { RK.open = null; RK.sel.clear(); ofcDraw(); }
 // ---- events
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-rk]'); if (!b || b.tagName === 'INPUT') return;
@@ -424,7 +428,7 @@ document.addEventListener('click', e => {
   if (a === 'new') rk_tripModal(null);
   else if (a === 'open') { RK.open = +b.dataset.id; RK.sel.clear(); ofcDraw(); }
   else if (a === 'rowmore') rk_rowMenu(b.dataset.id, b);  // 2.117.0 A (#2287)
-  else if (a === 'back') { RK.open = null; RK.sel.clear(); ofcDraw(); }
+  else if (a === 'back') { if (!f8d_viewBack('rkt')) rk_tripClose(); }  // 2.963.0 (#5233): the ‹ = Back
   else if (a === 'edit' && t) { if (!rk_wait(t.id)) rk_tripModal(t); }  // 2.559.0 (#4660): not on a provisional trip / receipt
   else if (a === 'add' && t) { if (!rk_wait(t.id)) rk_itemModal(t, null); }
   else if (a === 'item' && t) { const i = t.items.find(x => x.id === +b.dataset.id); if (i && !rk_wait(i.id)) rk_itemModal(t, i); }

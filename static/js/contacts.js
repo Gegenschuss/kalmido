@@ -133,6 +133,8 @@ async function ctt_load() {
   CT.trash = {items: j?.items || [], books: bj?.items || [], days: j?.trash_days || bj?.trash_days || 0};
   ctDraw();
 }
+// 2.963.0 (#5233): the trash closes = the contacts again (Back, its ‹)
+function ctt_close() { if (!CT.trash) return; CT.trash = null; f8d_viewDrop('ctt'); ctDraw(); }
 function ctt_html() {
   const t = CT.trash, since = x => esc(tr('In the trash since {0}', fmtDate((x.deleted_at || '').slice(0, 10))));
   const bar = `<div class="ctbar"><button class="iconbtn" data-ct="tback" aria-label="${esc(tr('Back'))}">${ic('back')}</button><h2 class="sr">${tr('Trash')}</h2><b>${tr('Trash')}</b><span class="spacer"></span>${t.items?.length ? `<button class="btn sm" data-ct="tempty">${ic('trash', 's')} ${tr('Empty trash')}</button>` : ''}</div>`;
@@ -348,7 +350,7 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('#view [data-ct]'); if (!b) return;
   const k = b.dataset.ct;
   if (k === 'pick') { CT.pick = CT.pick ? null : new Set(); ctDraw(); return; }
-  if (k === 'tback') { CT.trash = null; ctDraw(); return; }  // 2.272.0 E1 (#3038)
+  if (k === 'tback') { if (!f8d_viewBack('ctt')) ctt_close(); return; }  // 2.272.0 E1 (#3038); 2.963.0 (#5233): the ‹ = Back
   if (k === 'tempty') { ctt_act('call'); return; }
   if (k === 'fold') {  // 2.666.0 D (#3624): fold a block of the card open / closed (kept per person)
     const bk = b.dataset.k; lyOptSet('contacts', bk, 'open', !ct_open(bk)); ctDraw();
@@ -359,7 +361,7 @@ document.addEventListener('click', async e => {
   else if (k === 'back') { CT.sel = null; CT.card = null; navUp('contacts'); }  // 2.743.0 (#5235)
   else if (k === 'menu') {
     menu(b, [{label: tr('Address books…'), icon: 'folder', fn: ctBooksModal},
-      {label: tr('Trash'), icon: 'trash', fn: () => { CT.trash = {}; CT.pick = null; ctDraw(); }},  // 2.272.0 E1 (#3038)
+      {label: tr('Trash'), icon: 'trash', fn: () => { CT.trash = {}; CT.pick = null; f8d_viewStep('ctt', ctt_close); ctDraw(); }},  // 2.272.0 E1 (#3038); 2.963.0 (#5233): a step of the page
       {label: tr('Import a vCard file…'), icon: 'upload', fn: () => ctImport()},
       {label: tr('Import a CSV file…'), icon: 'upload', fn: () => ctImport(null, 'csv')},  // 2.119.1 A (#2080): Outlook, Google, a spreadsheet
       ...(S.books || []).map(x => ({label: tr('Export {0} (vCard)', x.name), icon: 'download', fn: () => { location.href = `/api/books/${x.id}/export.vcf`; }})),

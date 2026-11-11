@@ -420,6 +420,8 @@ async function tth_open(rid, mid, focus) {
   if (S.tc.edit && S.tc.editTh) { S.tc.edit = null; S.tc.editTh = false; }
   const m = S.tc.msgs.find(x => x.id === mid && !x.thread_of);
   S.tc.th = {id: mid, rid, root: m || null, msgs: [], more: false, read: 0, readOk: null, err: null, ld: true};
+  // 2.963.0 (#5233): the thread full size on the team page (phone) is one step of the page: Back = the room again, not out of it
+  if (S.route.mod === 'team' && !S.cw?.lt && !tth_wide()) f8d_viewStep('tth', tth_close);
   tth_draw();
   const ok = await tth_load();
   if (S.tc.th?.rid !== rid) return false;
@@ -432,7 +434,7 @@ function tth_close() {
   const th = S.tc.th; if (!th) return;
   delete S.reply['h:' + th.id];
   if (S.tc.editTh) { S.tc.edit = null; S.tc.editTh = false; }
-  S.tc.th = null; tth_draw();
+  S.tc.th = null; f8d_viewDrop('tth'); tth_draw();  // 2.963.0 (#5233): closed another way: its step goes
   if (!isTouch()) $('#tc-in')?.focus({preventScroll: true});
 }
 async function tth_load(older = false) {
@@ -500,7 +502,7 @@ document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-act^="tth-"], [data-act="trd-show"]'); if (!a) return;
   const act = a.dataset.act;
   if (act === 'tth-open') tth_open(S.tc.rid, +a.dataset.root, true);
-  else if (act === 'tth-close') tth_close();
+  else if (act === 'tth-close') { if (!f8d_viewBack('tth')) tth_close(); }  // 2.963.0 (#5233): the ‹ goes the same way as Back
   else if (act === 'tth-send') tth_send();
   else if (act === 'tth-older') tth_load(true).then(() => tth_patch());
   else if (act === 'trd-show') trd_show(+a.dataset.rmid, !!a.closest('.tthview'));
@@ -889,7 +891,7 @@ document.addEventListener('click', trefOpen, true);
 function noteRoute(lid, id) {
   if (S.nt.id && S.nt.id !== id && !qn_leave()) noteFlush();  // 2.477.0 (#3881): a quick note left empty goes for good
   if (!lid) { noteFlush(); S.nt = {...S.nt, lid: null, id: null, notes: null}; return; }  // 2.45.0 (#1516): the overview of all notes
-  if (S.nt.lid !== lid) { S.nt = {...S.nt, lid, notes: null, err: null, trash: null}; loadNotes(lid).then(() => { if (S.route.mod === 'notes') renderView(); }); }
+  if (S.nt.lid !== lid) { if (S.nt.trash) f8d_viewDrop('ntt'); S.nt = {...S.nt, lid, notes: null, err: null, trash: null}; loadNotes(lid).then(() => { if (S.route.mod === 'notes') renderView(); }); }
   if (S.nt.id !== id) { noteFlush(); S.nt.id = id; S.nt.edit = !!id && S.nt.newId === id; S.nt.newId = null; }
 }
 // 2.602.0 (#4817): on a computer (sidebar B) the note list sits in the panel #side like the folders of Knowledge (wiki.js
@@ -908,6 +910,8 @@ function nt_pageHtml(cur) {
   const show = hid ? `<button type="button" class="btn sm" data-act="sbb-panel">${ic('panelhide', 's')}${tr('Show the sidebar')}</button>` : '';
   return `<div class="ntwrap"><div class="ntview ntsolo ntpick">${symEmpty('note', tr('Select a note in the list on the left.'), '')}${hid ? `<div class="ntpickb">${show}${nw}</div>` : ''}</div></div>`;
 }
+// 2.963.0 (#5233): the notes' trash off = the notes again (Back, the trash button)
+function ntt_close() { if (!S.nt.trash) return; S.nt.trash = null; f8d_viewDrop('ntt'); if (S.route.mod === 'notes') renderView(); }
 // the list of one list's notes (search, trash, "New note", the cards) and the open note; list null = not loaded yet
 function nt_listOf() {
   const l = listById(S.nt.lid); if (!l) return {list: null, cur: null, gone: true};
@@ -1109,7 +1113,7 @@ document.addEventListener('click', e => {
   else if (act === 'nt-mode') { noteFlush(); S.nt.edit = a.dataset.m === 'edit'; renderView(); if (S.nt.edit) setTimeout(() => { const b = $('#nt-body'); if (b) { autosize(b); b.focus(); } }, 0); }
   else if (act === 'nt-pin' && n) { ntWrite(n, {pinned: !n.pinned}).then(r => { if (!r.queued) Object.assign(n, r); renderView(); }).catch(err => toast(err instanceof Offline ? tr('Offline: only works again with a connection') : err.message)); }  // 2.143.0 C (#2153): offline too
   else if (act === 'nt-menu') noteMenu(a);
-  else if (act === 'nt-trash') { S.nt.trash = S.nt.trash ? null : {}; renderView(); }  // 2.272.0 E1 (#3038): notetrash.js draws it
+  else if (act === 'nt-trash') { if (!S.nt.trash) { S.nt.trash = {}; f8d_viewStep('ntt', ntt_close); renderView(); } else if (!f8d_viewBack('ntt')) ntt_close(); }  // 2.272.0 E1 (#3038): notetrash.js draws it; 2.963.0 (#5233): a step of the page, off again = Back
   else return;
   e.preventDefault(); e.stopPropagation();
 });

@@ -69,6 +69,23 @@ function f8d_stepDrop(/** @type {any} */ el) { if (!el?._stk?.length) return; el
 function f8d_stepsClear(/** @type {any} */ el) { if (!el?._stk?.length) return; el._stk = []; f8d_queue(); }
 // route() (core.js): another page empties the views of the page before it
 function f8d_viewNav() { const v = $('#view'); if (v?._stk?.length && v._stkAt !== location.hash) f8d_stepsClear(v); }
+// 2.963.0 (#5233): a view of a page without an address of its own (a thread, a trash, a card, a trip) as a step of #view under a
+// key: f8d_viewStep(key, back) once when it opens (open again = no second step), f8d_viewBack(key) = its visible ‹ (the same
+// way as Back: false = no step of it, close it directly), f8d_viewDrop(key) = it closed another way: its step (and the ones
+// above it) go too, no dead Back stays behind
+const f8d_viewHas = (/** @type {string} */ key) => !!$('#view')?._stk?.some((/** @type {any} */ f) => f._k === key);
+function f8d_viewStep(/** @type {string} */ key, /** @type {() => void} */ back) {
+  if (f8d_viewHas(key)) return;
+  const f = /** @type {any} */ (() => back()); f._k = key; f8d_step($('#view'), f);
+}
+function f8d_viewBack(/** @type {string} */ key) {
+  const v = $('#view'), s = v?._stk;
+  return !!s?.length && s[s.length - 1]._k === key && f8d_stepBack(v);
+}
+function f8d_viewDrop(/** @type {string} */ key) {
+  const v = $('#view'), s = v?._stk, i = s ? s.findIndex((/** @type {any} */ f) => f._k === key) : -1;
+  if (i >= 0) { s.splice(i); f8d_queue(); }
+}
 const f8d_lvl = () => { const v = history.state?.f8d; return typeof v === 'number' ? v : 0; };
 function f8d_sync() {
   f8d_bk.queued = false;

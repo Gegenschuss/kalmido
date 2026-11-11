@@ -16,14 +16,20 @@ async function ccLoad() {
   ofcDraw();
 }
 async function ccStmts() { try { CC.stmts = (await api('GET', `/api/office/cards/${CC.card}/statements`)).items || []; } catch (x) { CC.stmts = []; } ofcDraw(); }
-async function ccSheet() { try { CC.sheet = await api('GET', `/api/office/cards/statements/${CC.sid}`); } catch (x) { CC.sid = null; CC.sheet = null; } ofcDraw(); }
+async function ccSheet() { try { CC.sheet = await api('GET', `/api/office/cards/statements/${CC.sid}`); } catch (x) { CC.sid = null; CC.sheet = null; f8d_viewDrop('ccs'); } ofcDraw(); }
+// 2.963.0 (#5233): card and statement are views of the cards page without an address of their own: one step of Back each
+// (Back from the statement = its card, the next Back = the cards), their ‹ goes the same way (f8d_viewBack)
+function ccCardShow(id) { CC.card = id; CC.stmts = null; f8d_viewStep('ccc', ccCardClose); ofcDraw(); }
+function ccCardClose() { CC.card = null; f8d_viewDrop('ccc'); ofcDraw(); }
+function ccStmtShow(id) { CC.sid = id; CC.sheet = null; f8d_viewStep('ccs', ccStmtClose); ofcDraw(); }
+function ccStmtClose() { CC.sid = null; CC.sheet = null; CC.pick = null; CC.bank = null; CC.stmts = null; f8d_viewDrop('ccs'); ofcDraw(); }
 // a write changes the receipts' payment days too: the bookkeeping's loaded figures go
 const ccStale = () => { CC.sheet = null; CC.stmts = null; CC.data = null; CC.pick = null; CC.cand = null; CC.bank = null; if (typeof bfbBooksStale === 'function') bfbBooksStale(); ofcDraw(); };
 const ccName = k => `${k.provider_name} ·· ${k.last4}`;
 const ccMon = m => typeof bnr_mon === 'function' ? bnr_mon(m) : m;
 
 function ccHtml() {
-  if (CC.oid !== OFC.info?.org_id) Object.assign(CC, {oid: OFC.info?.org_id, data: null, err: null, card: null, stmts: null, sid: null, sheet: null, rem: null});
+  if (CC.oid !== OFC.info?.org_id) { Object.assign(CC, {oid: OFC.info?.org_id, data: null, err: null, card: null, stmts: null, sid: null, sheet: null, rem: null}); f8d_viewDrop('ccc'); f8d_viewDrop('ccs'); }
   if (CC.err) return `<div class="empty">${esc(CC.err)}</div>`;
   if (!CC.data) { setTimeout(ccLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (CC.sid) return ccSheetHtml();
@@ -42,7 +48,7 @@ function ccReadHint() {
 }
 function ccCardHtml() {
   const k = (CC.data.items || []).find(x => x.id === CC.card);
-  if (!k) { CC.card = null; return ccHtml(); }
+  if (!k) { CC.card = null; f8d_viewDrop('ccc'); return ccHtml(); }
   if (CC.stmts === null) { setTimeout(ccStmts, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const rows = CC.stmts.length ? `<ul class="bnklist" role="list">${CC.stmts.map(s => `<li class="bnkrow"><button type="button" class="ccopen" data-cc="stmt" data-id="${s.id}"><span class="bnkn"><b>${esc(ccMon(s.month))}</b><small class="muted">${esc(s.state === 'draft' ? tr('Waiting for confirmation') : s.open ? trn('{0} receipt missing', '{0} receipts missing', s.open) : tr('Every position has its receipt.'))}</small></span>
     <span class="bnkamt">${ofcMoney(s.total)}</span>${ic('right', 's')}</button></li>`).join('')}</ul>`
@@ -144,7 +150,7 @@ async function ccDo(label, doit, undo) {
 async function ccUpload(cid, file) {
   const fd = new FormData(); fd.append('file', file, file.name || 'statement.pdf');
   let j; try { j = await api('POST', `/api/office/cards/${cid}/statements`, fd); } catch (x) { return; }
-  CC.sid = j.statement.id; ccStale();
+  CC.sid = j.statement.id; if (CC.card === cid) f8d_viewStep('ccs', ccStmtClose); ccStale();  // 2.963.0 (#5233): the new statement is a step
   if (j.digits_differ) toast(tr('The statement names other digits than this card'));
   else toast(j.read ? (j.total_found ? tr('Statement read: please check the positions') : tr('Statement read, but its total was not found: please enter it')) : tr('This statement could not be read. Enter its positions by hand.'));
 }
@@ -187,13 +193,13 @@ document.addEventListener('click', async e => {
   const a = b.dataset.cc, id = +b.dataset.id, sid = CC.sid;
   e.preventDefault();
   if (a === 'add') ccCardDlg(null);
-  else if (a === 'card') { CC.card = id; CC.stmts = null; ofcDraw(); }
-  else if (a === 'stmt') { CC.sid = id; CC.sheet = null; ofcDraw(); }
-  else if (a === 'back') { CC.card = null; ofcDraw(); }
-  else if (a === 'tocard') { CC.sid = null; CC.sheet = null; CC.pick = null; CC.bank = null; CC.stmts = null; ofcDraw(); }
+  else if (a === 'card') ccCardShow(id);  // 2.963.0 (#5233): steps of Back
+  else if (a === 'stmt') ccStmtShow(id);
+  else if (a === 'back') { if (!f8d_viewBack('ccc')) ccCardClose(); }
+  else if (a === 'tocard') { if (!f8d_viewBack('ccs')) ccStmtClose(); }
   else if (a === 'edit') ccCardDlg((CC.data.items || []).find(x => x.id === id));
-  else if (a === 'delcard') { const ok = await ccDo(tr('Card removed'), () => api('DELETE', `/api/office/cards/${id}`), () => api('POST', `/api/office/cards/${id}/restore`)); if (ok) { CC.card = null; ofcDraw(); } }
-  else if (a === 'delstmt') { const ok = await ccDo(tr('Statement removed'), () => api('DELETE', `/api/office/cards/statements/${sid}`), () => api('POST', `/api/office/cards/statements/${sid}/restore`)); if (ok) { CC.sid = null; ofcDraw(); } }
+  else if (a === 'delcard') { const ok = await ccDo(tr('Card removed'), () => api('DELETE', `/api/office/cards/${id}`), () => api('POST', `/api/office/cards/${id}/restore`)); if (ok) ccCardClose(); }
+  else if (a === 'delstmt') { const ok = await ccDo(tr('Statement removed'), () => api('DELETE', `/api/office/cards/statements/${sid}`), () => api('POST', `/api/office/cards/statements/${sid}/restore`)); if (ok) ccStmtClose(); }
   else if (a === 'confirm') ccConfirm(sid);
   else if (a === 'reopen') ccDo(tr('Confirmation undone'), () => api('POST', `/api/office/cards/statements/${sid}/reopen`), () => api('POST', `/api/office/cards/statements/${sid}/confirm`, {accept_diff: true}));
   else if (a === 'total') {
