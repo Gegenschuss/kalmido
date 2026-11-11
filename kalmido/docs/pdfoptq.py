@@ -447,6 +447,8 @@ def _work(c, nid, v, run):
         bump(c)
         c.commit()
         return None
+    from ..files.fslock import fsl_chain_ids, fsl_hold
+    fsl_hold(c, fsl_chain_ids(c, nid))  # 2.970 (#5653, Fable review): first the locked folders' locks, then the version's (one order)
     write_lock(c, f"fs_version:{int(nid)}")  # the lock of the version number: nothing comes between the check and the write
     if int(c.execute("SELECT cur_version FROM fs_nodes WHERE id=?", (nid,)).fetchone()[0] or 0) != ver:
         return _fail(c, nid, done, "changed")

@@ -139,6 +139,7 @@ def convert_all(s, fid, plain=False):
             else:
                 data = {"name": ct(t["gen"])}
                 if it["kind"] == "file":
+                    data["version"] = str(it["version"])  # 2.970.0 (#5653): required for the encryption with a new key
                     files = {"file": ("encrypted.kenc", kenc(t["gen"]), "application/octet-stream")}
             r = s.post(B + f"/api/files/lock/{fid}/convert/{it['id']}", data=data, files=files)
             assert r.ok, r.text
@@ -414,6 +415,8 @@ seen = next(it["version"] for it in t["items"] if it["id"] == GF)
 r = A.post(B + f"/api/files/lock/version/{GF}", files={"file": ("encrypted.kenc", kenc(gg + 1), "application/octet-stream")})
 check(r.status_code == 201, "a new version (of the new key) saved while the browser encrypts the file again " + r.text[:120])
 newest = r.json().get("version") if r.status_code == 201 else None
+r = A.post(B + f"/api/files/lock/{GR}/convert/{GF}", data={"name": ct(gg + 1)}, files={"file": ("encrypted.kenc", kenc(gg + 1), "application/octet-stream")})
+check(r.status_code == 409 and not code(r), f"N-g: without the version it was made from: 409 (an old browser loads again) ({r.status_code})")
 r = A.post(B + f"/api/files/lock/{GR}/convert/{GF}", data={"name": ct(gg + 1), "version": str(seen)},
            files={"file": ("encrypted.kenc", kenc(gg + 1), "application/octet-stream")})
 check(r.status_code == 409 and not code(r), f"N-g: the old version encrypted again is refused, 409 without a code ({r.status_code} {r.text[:120]})")

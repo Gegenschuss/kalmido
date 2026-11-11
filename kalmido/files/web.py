@@ -522,6 +522,8 @@ def fs_web_expect(c, nid, v):
         v = int(v.strip())
     if isinstance(v, bool) or not isinstance(v, int):
         raise BadInput(tr("Invalid value: {0}", "expect_version"))
+    from .fslock import fsl_chain_ids, fsl_hold
+    fsl_hold(c, fsl_chain_ids(c, nid))  # 2.970 (#5653, Fable review): first the locked folders' locks, then the version's (one order)
     write_lock(c, f"fs_version:{int(nid)}")  # the lock of the new number (store.py _store_version): no upload between check and write
     if c.execute("SELECT cur_version FROM fs_nodes WHERE id=?", (nid,)).fetchone()[0] != v:
         raise Conflict("current", files_node_get(nid).get_json())
@@ -564,9 +566,9 @@ def files_version_restore(nid, no):
     v = fs_version_row(c, nid, no)
     if n["kind"] != "file" or not v:
         raise Denied(404)
-    fs_web_expect(c, nid, (request.get_json(silent=True) or {}).get("expect_version", request.args.get("expect_version")))  # 2.577.0 (#4708 3)
     from .fslock import fsl_chain_ids, fsl_denied, fsl_hold, fsl_of, fsl_restore_version
     fsl_hold(c, fsl_chain_ids(c, nid))  # 2.970 (#5653, review N-b): the lock's state read below holds until this is committed
+    fs_web_expect(c, nid, (request.get_json(silent=True) or {}).get("expect_version", request.args.get("expect_version")))  # 2.577.0 (#4708 3)
     lk = fsl_of(c, nid)
     if lk is not None and lk["e2e"] != "on":  # 2.953 (#3348, review N7): not while the folder switches (a file of either format)
         raise fsl_denied("fs_locked_busy")

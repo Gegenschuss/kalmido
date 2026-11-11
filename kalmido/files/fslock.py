@@ -197,7 +197,8 @@ def fsl_move_guard(c, n, tid):
     locked folder never moves into another one (409 fs_locked_nest)."""
     # 2.953 (#3348, review N11): as fsl_need_plain; 2.970 (#5653, review N-b / N-e): the node's own chain too (it does not leave
     # a folder starting to lock at this moment), both in one call (one order of the ids)
-    fsl_hold(c, fsl_chain_ids(c, n["id"]) + fsl_chain_ids(c, tid))
+    # (from the row: the undo has put parent_id back already, fsundo._target)
+    fsl_hold(c, [n["id"]] + fsl_chain_ids(c, n["parent_id"]) + fsl_chain_ids(c, tid))
     if not _fsl_any(c):
         return
     lt = fsl_of(c, tid) if tid else None
@@ -440,7 +441,7 @@ def _fsl_rekey(c, n, data, uid, made, base=None):
     takes the node again from the next todo (fsl_version keeps its old generation, _fsl_gen_after)."""
     write_lock(c, f"fs_version:{int(n['id'])}")  # the lock of _store_version: an upload running now is committed first, a later one waits
     cur = c.execute("SELECT cur_version FROM fs_nodes WHERE id=?", (n["id"],)).fetchone()[0]
-    if cur != n["cur_version"] or (base is not None and cur != base):
+    if cur != n["cur_version"] or cur != base:  # Fable review 2.970: required (an old browser sends none: 409, it loads again)
         raise Denied(409, tr("Someone saved a newer version meanwhile. Reload to see it."))
     old = c.execute("SELECT no, path FROM fs_versions WHERE node_id=? AND no=?", (n["id"], cur)).fetchone()
     no = _store_version(c, n["id"], fs_space(n["org_id"], n["owner_id"]), data, FSL_MIME, uid)
@@ -545,7 +546,10 @@ def fsl_start(nid):
     uid, n = _fsl_folder(c, nid, manage=True)
     # 2.953 (#3348, review N11): plain writes below it finish first (they are converted then). 2.970 (#5653, review N-c): exclusive
     # on the folders above too -- a start on a folder above or below at this moment waits and then sees this lock (_fsl_start_block)
-    fsl_hold(c, [], excl=fsl_chain_ids(c, nid))
+    up = fsl_chain_ids(c, nid)
+    fsl_hold(c, [], excl=up)
+    if fsl_chain_ids(c, nid) != up:  # Fable review 2.970: moved meanwhile -- the folders held are not its chain any more
+        return err(tr("The folders changed meanwhile. Try again."), 409)
     lk = fsl_row(c, nid)
     if lk and lk["e2e"]:
         return err(tr("The folder is already locked."), 409)

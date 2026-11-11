@@ -270,6 +270,8 @@ def fs_version_check(c, nid, b):
         return
     if isinstance(ev, bool) or not isinstance(ev, int):
         raise BadInput(tr("Invalid value: {0}", "expect_version"))
+    from .fslock import fsl_chain_ids, fsl_hold
+    fsl_hold(c, fsl_chain_ids(c, nid))  # 2.970 (#5653, Fable review): first the locked folders' locks, then the version's (one order)
     write_lock(c, f"fs_version:{int(nid)}")  # the same lock as the new number (the check and the write see no upload between)
     if c.execute("SELECT cur_version FROM fs_nodes WHERE id=?", (nid,)).fetchone()[0] != ev:
         raise Conflict("current", _v1_node(c, need_node(c, nid)))
