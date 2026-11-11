@@ -775,7 +775,9 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
   that was taken out goes with `DROP TABLE IF EXISTS <table>` in `AFTER` and a line `# drop-ok <table>: <why>` (a one-way
   step; the table may be created nowhere any more). A one-off clean-up of rows already in the trash (2.755, #5263) goes with
   `DELETE FROM <table> WHERE ... < '<ISO date>'` in `AFTER` and a line `# purge-ok <table>: <why>`: the fixed cut-off keeps it
-  a no-op after the first start; it runs as the system (every organisation's rows). `tests/p2192_c_upgrade_test.py` starts the current
+  a no-op after the first start; it runs as the system (every organisation's rows). A `NOT NULL` may go (2.930, #4922) with
+  `ALTER TABLE <table> ALTER COLUMN <column> DROP NOT NULL` in `AFTER` and a line `# nullable-ok <table>.<column>: <why the
+  version before copes with empty values>`. `tests/p2192_c_upgrade_test.py` starts the current
   server on the old dump with a row in every table.
   A fragment's `SCHEMA` may also hold a trigger (`CREATE OR REPLACE FUNCTION` with a `$$` body, then `CREATE OR REPLACE
   TRIGGER` on one statement; `trigger_skip_present` leaves an unchanged trigger alone), e.g. 2.542.0 (#4598)

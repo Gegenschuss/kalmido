@@ -172,7 +172,9 @@ try:
                  # 2.574.0 (#3779): the table of a feature taken out, with a reason, created nowhere any more
                  '# drop-ok old_t: the feature was taken out\nAFTER = ["DROP TABLE IF EXISTS old_t"]\n',
                  # review F5 (#3779): a column of a feature taken out, the same way
-                 '# drop-ok events.old_c: the feature was taken out\nAFTER = ["ALTER TABLE events DROP COLUMN IF EXISTS old_c"]\n'):
+                 '# drop-ok events.old_c: the feature was taken out\nAFTER = ["ALTER TABLE events DROP COLUMN IF EXISTS old_c"]\n',
+                 # 2.985.0 (#4922): a NOT NULL that goes, with its reason
+                 '# nullable-ok events.x: the version before reads x only joined\nAFTER = ["ALTER TABLE events ALTER COLUMN x DROP NOT NULL"]\n'):
         bad, p = frag("3481.py", text)
         check(bad == [], f"#4285: additive passes: {text.strip()[:90]} {bad}")
         os.remove(p)
@@ -209,7 +211,11 @@ try:
                        ('# drop-ok events.location: gone\nAFTER = ["ALTER TABLE events DROP COLUMN IF EXISTS location"]\n',
                         "a dropped column schema.py still creates"),
                        ('# drop-ok events.imp_at: gone\nAFTER = ["ALTER TABLE events DROP COLUMN IF EXISTS imp_at"]\n',
-                        "a dropped column a step still adds")):
+                        "a dropped column a step still adds"),
+                       # 2.985.0 (#4922): DROP NOT NULL only with the reason of exactly that column; SET NOT NULL never
+                       ('AFTER = ["ALTER TABLE events ALTER COLUMN x DROP NOT NULL"]\n', "a DROP NOT NULL without a # nullable-ok line"),
+                       ('# nullable-ok events.y: x\nAFTER = ["ALTER TABLE events ALTER COLUMN x DROP NOT NULL"]\n', "the reason of another column"),
+                       ('# nullable-ok events.x: x\nAFTER = ["ALTER TABLE events ALTER COLUMN x SET NOT NULL"]\n', "a SET NOT NULL in AFTER")):
         bad, p = frag("3482.py", text)
         check(len(bad) == 1, f"#4285: {what} is a finding {bad}")
         if "without IF EXISTS" in what:  # review F5: the finding says what is missing
