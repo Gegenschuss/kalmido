@@ -164,6 +164,10 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false, connectS 
           if (aborted) for (let i = 0; i < 50 && !await ev(`document.readyState === 'complete'`).catch(() => false); i++) await sleep(100);
         }
       }
+      // #3506 (CI red of 2.900.0, p2892_b_receipts_ui): navigate(icon.svg) now and then answers while the app page is still shown;
+      // the late load of the blank page then swallows the suite's next step (the login fetch: no answer within 120 s). Before only
+      // p2190_family_ui and p21144_d_ui waited for it themselves (2.161.2 / 2.161.3) - now every suite: until it is really the page
+      if (/static\/icon\.svg$/.test(String(url))) for (let i = 0; i < 100 && !await ev(`location.pathname === '/static/icon.svg' && document.readyState === 'complete'`).catch(() => false); i++) await sleep(100);
       // 2.501.0 (#4296): a module that does not load is red (the suite's later calls would only fail by chance); a page that
       // went away while it loaded (its own redirect or reload) is no load error. On purpose without the modules: lazy: true
       if (!lazy) {
