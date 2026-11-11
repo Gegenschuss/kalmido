@@ -18242,5 +18242,10 @@
   "Moving": "Moviendo",
   "The tags of {0} file or folder in it are removed (the server could read them).": ["Se eliminan las etiquetas de {0} archivo o carpeta que contiene (el servidor podría leerlas).", "Se eliminan las etiquetas de {0} archivos o carpetas que contiene (el servidor podría leerlas)."],
   "The key of this folder was changed meanwhile.": "Mientras tanto se ha cambiado la clave de esta carpeta.",
-  "These people get the new key: {0}": "Estas personas reciben la nueva clave: {0}"
+  "These people get the new key: {0}": "Estas personas reciben la nueva clave: {0}",
+  "Model per run": "Modelo por ejecución",
+  "Choose the model per run": "Elegir el modelo en cada ejecución",
+  "For your messages and decisions": "Para tus mensajes y decisiones",
+  "For routine": "Para la rutina",
+  "Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.": "Tus mensajes, botones, reacciones y comentarios y cada ejecución que pueda necesitar una decisión usan el primer modelo; los avisos silenciosos, tareas nuevas, seguimientos y trabajos programados sin señal de alerta usan el segundo. En caso de duda, el primero."
 }

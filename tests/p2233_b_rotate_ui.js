@@ -5,6 +5,9 @@
 // dialog of the own agent, with its own daily-summary time picker, saved at once. German labels.
 // Firefox at 360 and 412 px (touch): the permissions dialog with the section fits (no horizontal overflow, fields inside the
 // viewport, at least 40 px high). Screenshots with P2233B_SHOTS=<dir>.
+// 2.974.0 (#5668): the model per run - in the admin's "Runtime" a switch below Model shows two model fields (hidden while
+// off), Save stores them, the dialog opens with them again; the owner of a personal agent (freelancer) has a section "Model"
+// in the permissions dialog with the same switch, saved at once. German: "Modell je Lauf wählen".
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -58,6 +61,29 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   click(w, md.querySelector('[data-m="close"]'));
   w.close();
 
+  // ================= 2.974.0 (#5668): the model per run in the admin's dialog (saved with Save)
+  w = await boot({user: 'alice', hash: 'today'}); d = w.document;
+  w.eval(`agModal(${JSON.stringify(await adm(ag.id))}, null)`);
+  md = await until(() => d.querySelector('#ag-model')?.closest('.modal'));
+  const msw = md.querySelector('#ag-msplit'), msr = () => [...md.querySelectorAll('.ag-msr')];
+  check(msw && !msw.checked && msw.closest('.row').previousElementSibling?.querySelector('#ag-model') && /Choose the model per run/.test(msw.closest('.row').textContent),
+    '#5668: the switch "Choose the model per run" right below Model, off');
+  check(msr().length === 3 && msr().every(x => x.hidden), '#5668: the two model fields are hidden while it is off');
+  msw.checked = true; msw.dispatchEvent(new w.Event('change', {bubbles: true}));
+  check(msr().every(x => !x.hidden) && /For your messages and decisions/.test(md.textContent) && /For routine/.test(md.textContent) && /When in doubt the first/.test(md.textContent),
+    '#5668: on = both fields and the explanation show');
+  md.querySelector('#ag-mdec').value = 'opus'; md.querySelector('#ag-mrou').value = 'sonnet';
+  click(w, md.querySelector('[data-m="ok"]'));
+  check(await until(async () => { const r = (await adm(ag.id)).runtime; return r.model_split === true && r.model_decide === 'opus' && r.model_routine === 'sonnet'; }),
+    '#5668: Save stores the switch and both models');
+  await until(() => !md.isConnected);
+  w.eval(`agModal(${JSON.stringify(await adm(ag.id))}, null)`);
+  md = await until(() => d.querySelector('#ag-model')?.closest('.modal'));
+  check(md.querySelector('#ag-msplit').checked && md.querySelector('#ag-mdec').value === 'opus' && md.querySelector('#ag-mrou').value === 'sonnet'
+    && [...md.querySelectorAll('.ag-msr')].every(x => !x.hidden), '#5668: the dialog opens again with the switch on and both models');
+  click(w, md.querySelector('[data-m="close"]'));
+  w.close();
+
   // ================= German
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
@@ -66,6 +92,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   const sd = md.querySelector('.agzsec');
   check(sd && /Zwischenstand/.test(sd.textContent) && /Sitzungsgröße/.test(sd.textContent) && /Tägliche Zusammenfassung/.test(sd.textContent)
     && sd.querySelector('#agz-size').value === 'large', 'German: Zwischenstand, Sitzungsgröße, Tägliche Zusammenfassung');
+  check(/Modell je Lauf wählen/.test(md.textContent) && /Für Routine/.test(md.textContent), '#5668 German: Modell je Lauf wählen, Für Routine');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
@@ -91,6 +118,18 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   check(await until(async () => (await mine()).runtime.rotate_runs === 30), 'freelancer: messages saved at once');
   w.eval(`dpSet(document.querySelector('#agz-nr'), '05:15')`);
   check(await until(async () => (await mine()).runtime.nightly_reset === '05:15'), 'freelancer: daily summary time saved at once');
+  // 2.974.0 (#5668): the section "Model" of the own agent: switch on = both fields show, each saved at once
+  const ms = md.querySelector('.agzmod');
+  check(ms && /Model/.test(ms.querySelector('h4')?.textContent || '') && ms.querySelector('#agm-model') && ms.querySelector('#agm-split') && !ms.querySelector('#agm-split').checked
+    && [...ms.querySelectorAll('.agm-r')].every(x => x.hidden), '#5668 freelancer: section Model with the field and the switch (off, fields hidden)');
+  const fsw = ms.querySelector('#agm-split'); fsw.checked = true; fsw.dispatchEvent(new w.Event('change', {bubbles: true}));
+  check(await until(async () => (await mine()).runtime.model_split === true) && [...ms.querySelectorAll('.agm-r')].every(x => !x.hidden), '#5668 freelancer: switch on, saved at once, fields show');
+  change(w, ms.querySelector('#agm-dec'), ' opus ');
+  check(await until(async () => (await mine()).runtime.model_decide === 'opus') && ms.querySelector('#agm-dec').value === 'opus', '#5668 freelancer: model for own messages saved');
+  change(w, ms.querySelector('#agm-rou'), 'sonnet');
+  check(await until(async () => (await mine()).runtime.model_routine === 'sonnet'), '#5668 freelancer: model for routine saved');
+  change(w, ms.querySelector('#agm-rou'), 'bad model'); await idle(w);
+  check(await until(() => ms.querySelector('#agm-rou').value === 'sonnet') && (await mine()).runtime.model_routine === 'sonnet', '#5668 freelancer: an invalid model is refused, the old value back');
   w.close();
 
   // ================= Firefox: 360 and 412 px, touch

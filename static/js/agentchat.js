@@ -1761,7 +1761,8 @@ function agModal(a, done, o = {}) {
   if (a && typeof oa_switchLoad === 'function') oa_switchLoad(md);  // 2.51.0 A (#1348)
   if (a) agPuLoad(md, a);  // 2.312.0 D (#3266)
   if (a && typeof agz_wire === 'function') agz_wire(md, a, `/api/admin/agents/${a.id}`);  // 2.233.0 B (#3189)
-  md.addEventListener('change', e => { if (e.target.id === 'ag-ac') $('#ag-acp', md).disabled = !e.target.checked; });  // 2.4.1 (#377)
+  md.addEventListener('change', e => { if (e.target.id === 'ag-ac') $('#ag-acp', md).disabled = !e.target.checked;  // 2.4.1 (#377)
+    if (e.target.id === 'ag-msplit') md.querySelectorAll('.ag-msr').forEach(x => { x.hidden = !e.target.checked; }); });  // 2.974.0 (#5668)
   md.addEventListener('change', e => { if (e.target.id === 'ag-owner') { const h = $('#ag-ownhint', md); if (h) h.textContent = e.target.value ? tr('Only this person sees and uses it: in the chat, at @, when assigning and sharing. Admins see it by name with the kill switch only.') : tr('A team agent for projects with several people; the owner of a project decides who may address it.'); } });
   api('GET', '/api/users').then(j => { const box = $('#ag-ownrow', md); if (box && md.isConnected) { const cur = $('#ag-owner', md)?.value; box.innerHTML = ownerSel(j.users.filter(u => u.kind !== 'agent' && !u.disabled)); if (cur !== undefined) $('#ag-owner', md).value = cur; } }).catch(() => {});  // 2.28.0 (#965): whose personal agent
   // 2.1.2 (#346): the picture: a preset or none is sent with Save, an own photo (existing agents) is uploaded at once
@@ -1935,6 +1936,7 @@ function agRtFields(a) {
   return `<h4 id="ag-rt-h">${tr('Runtime')}</h4>
     <div class="shint">${tr('Kalmido never runs the agent: its host reads these settings (GET /api/v1/agent) and applies them at the next start. See “Runtime settings” in docs/AGENTS.md.')}</div>
     <div class="row"><label for="ag-model">${tr('Model')}</label><input id="ag-model" list="ag-models" value="${esc(rt.model || '')}" maxlength="100" placeholder="${esc(tr('Agent default'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><datalist id="ag-models">${AG_MODELS.map(m => `<option value="${m}"></option>`).join('')}</datalist></div>
+    ${agSplitFields(rt)}
     <div class="row"><label for="ag-ac">${tr('Auto-compact')}</label><label class="chkl"><input type="checkbox" id="ag-ac" ${rt.autocompact !== false ? 'checked' : ''}> ${tr('On')}</label><span class="agpct"><input id="ag-acp" type="number" min="10" max="100" step="1" inputmode="numeric" value="${rt.autocompact_pct ?? ''}" placeholder="${esc(tr('default'))}" aria-label="${esc(tr('Compact at (% of the context)'))}" ${rt.autocompact !== false ? '' : 'disabled'}><span class="muted">%</span></span></div>
     <div class="row"><label>${tr('Nightly fresh restart')}</label>${timeIn('ag-nr', rt.nightly_reset || '', {label: tr('Nightly fresh restart'), empty: tr('Off')})}</div>
     <div class="row"><label for="ag-pm">${tr('Approvals')}</label><select id="ag-pm"${a?.host?.permission_fixed ? ` disabled title="${esc(tr('Set on its computer'))}"` : ''}>${Object.entries(AG_PMODES).map(([k, v]) => `<option value="${k}" ${(rt.permission_mode || '') === k ? 'selected' : ''}>${esc(tr(v))}</option>`).join('')}</select></div>
@@ -1943,11 +1945,21 @@ function agRtFields(a) {
     <div class="shint" id="ag-puhint">${a.owner ? tr('A personal agent asks its owner.') : tr('Who answers when it asks for permission in the chat. Only people it reaches in a shared project; its computer takes the choice before its next run.')}</div>` : ''}
     ${a ? `<div class="row"><label></label><button class="btn sm" type="button" data-m="reset" ${a.enabled ? '' : 'disabled'}>${ic('sync', 's')} ${tr('Reset now')}</button>${!a.owner || a.owner.id === S.me?.id ? `<button class="btn sm" type="button" data-m="aw">${ic('cog', 's')} ${tr('Work style and notifications')}</button>` : ''}</div>` : ''}`;  // 2.236.0 A (#2904-#2911): aw = the owner of a personal agent / any admin of a team agent
 }
+// 2.974.0 (#5668): the model per run - a bigger model for the person's own messages and decisions, a smaller one for
+// routine; the host (mcp/agent_run.py) picks it per run. Off = the one model above, as before.
+function agSplitFields(rt) {
+  const on = !!rt.model_split, mi = (id, v, ph) => `<input id="${id}" list="ag-models" value="${esc(v || '')}" maxlength="100" placeholder="${esc(ph)}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+  return `<div class="row"><label for="ag-msplit">${tr('Model per run')}</label><label class="chkl"><input type="checkbox" id="ag-msplit" ${on ? 'checked' : ''}> ${tr('Choose the model per run')}</label></div>
+    <div class="row ag-msr" ${on ? '' : 'hidden'}><label for="ag-mdec">${tr('For your messages and decisions')}</label>${mi('ag-mdec', rt.model_decide, tr('Agent default'))}</div>
+    <div class="row ag-msr" ${on ? '' : 'hidden'}><label for="ag-mrou">${tr('For routine')}</label>${mi('ag-mrou', rt.model_routine, tr('Agent default'))}</div>
+    <div class="shint ag-msr" ${on ? '' : 'hidden'}>${tr('Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.')}</div>`;
+}
 function agRtBody(md) {
   const pct = $('#ag-acp', md).value.trim(), ac = $('#ag-ac', md).checked;
   if (pct && (!/^\d+$/.test(pct) || +pct < 10 || +pct > 100)) { const e = $('#ag-err', md); e.textContent = tr('Auto-compact: a percentage from 10 to 100'); e.hidden = false; $('#ag-acp', md).focus(); return null; }
   const pu = $('#ag-pu', md), ow = $('#ag-owner', md);  // 2.312.0 D (#3266): a team agent's person for permission questions
-  return {model: $('#ag-model', md).value.trim(), autocompact: ac, autocompact_pct: pct ? +pct : null, nightly_reset: $('#ag-nr', md).value || '',
+  const ms = $('#ag-msplit', md);  // 2.974.0 (#5668)
+  return {model: $('#ag-model', md).value.trim(), ...(ms ? {model_split: ms.checked, model_decide: $('#ag-mdec', md).value.trim(), model_routine: $('#ag-mrou', md).value.trim()} : {}), autocompact: ac, autocompact_pct: pct ? +pct : null, nightly_reset: $('#ag-nr', md).value || '',
     ...($('#ag-pm:not(:disabled)', md) ? {permission_mode: $('#ag-pm', md).value} : {}),
     ...(pu && !pu.disabled && !ow?.value ? {perm_user: pu.value ? +pu.value : null} : {})};
 }

@@ -870,7 +870,11 @@ RUNTIME_DEFAULTS = {"model": "", "autocompact": True, "autocompact_pct": None, "
                     "rotate_size": "medium", "rotate_runs": 60, "rotate_idle_min": 45,
                     "perm_user": None,  # 2.312.0 D (#3266): who answers a team agent's permission questions (None = as set up)
                     "git_author_name": "", "git_author_email": "", "git_coauthor": False,  # 2.396.0 A (#3386)
-                    "dispatch": ""}  # 2.481.0 (#3662): the starter's mechanical dispatcher: "" off, "dry" dry run, "on"
+                    "dispatch": "",  # 2.481.0 (#3662): the starter's mechanical dispatcher: "" off, "dry" dry run, "on"
+                    # 2.974.0 (#5668): the model per run. model_split on = the host picks per run: model_decide for the person's
+                    # own messages and runs that may need a decision, model_routine for routine (quiet wakes, new tasks,
+                    # follow-ups, planned jobs without a sign); '' = the host's default for that kind. Off = model as before.
+                    "model_split": False, "model_decide": "", "model_routine": ""}
 DISPATCH_MODES = ("", "dry", "on")
 # 2.396.0 A (#3386): the git author the agent's host sets for its commits (public in GitHub). '' = the neutral default;
 # git_coauthor: whether the AI appends a Co-Authored-By line. A project with a repo may override name / mail (git_author_of).
@@ -886,6 +890,13 @@ ROTATE_IDLE_RANGE = (5, 1440)
 # 2.29.0 (#1029): how the agent's host handles actions outside its allow list: ask = asks the person in the chat every time,
 # auto = the host's safety check decides (risky things stay blocked); '' = the host's own default
 PERMISSION_MODES = ("", "ask", "auto")
+
+
+def _rt_model_shown(a):
+    """2.974.0 (#5668): the set model the chat header compares with the one that runs; with the model per run on there is
+    no single one (the header shows only the model of the last run)."""
+    rt = agent_runtime(a)
+    return "" if rt.get("model_split") else rt["model"]
 
 
 def agent_runtime(a):
@@ -944,6 +955,19 @@ def runtime_clean(cur, b):
         if m and (len(m) > RUNTIME_MODEL_MAX or not RUNTIME_MODEL_RE.fullmatch(m)):
             raise BadInput(tr("Invalid value: {0}", "model"))
         out["model"] = m
+    for k in ("model_decide", "model_routine"):  # 2.974.0 (#5668): same rules as model
+        if k in b:
+            m = b[k] if b[k] is not None else ""
+            if not isinstance(m, str):
+                raise BadInput(tr("Invalid value: {0}", k))
+            m = m.strip()
+            if m and (len(m) > RUNTIME_MODEL_MAX or not RUNTIME_MODEL_RE.fullmatch(m)):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = m
+    if "model_split" in b:
+        if not isinstance(b["model_split"], bool):
+            raise BadInput(tr("Invalid value: {0}", "model_split"))
+        out["model_split"] = b["model_split"]
     if "autocompact" in b:
         if not isinstance(b["autocompact"], bool):
             raise BadInput(tr("Invalid value: {0}", "autocompact"))
@@ -1511,7 +1535,7 @@ def agent_public(c, a, uid=None, pre=None):
             "permission_mode": agent_runtime(a)["permission_mode"], "may_set_mode": bool(uid) and may_rt,
             # 2.32.0 (#1079): what its host reports it really runs with (model as the host names it, the mode of the current
             # run, the host's own default); the runtime's wished model next to it (set: … · runs: …)
-            "host": _host_info(a), "runtime_model": agent_runtime(a)["model"],
+            "host": _host_info(a), "runtime_model": _rt_model_shown(a),
             # 2.33.0 (#1045): its plan usage (the ring in the chat header; null = never reported)
             "quota": _quota(a),
             # 2.407.0 B (#3493): its costs (API-key agents: the ring against its cost limit; amounts only for owner / admins)

@@ -18242,5 +18242,10 @@
   "Moving": "Verschieben",
   "The tags of {0} file or folder in it are removed (the server could read them).": ["Die Tags von {0} Datei oder Ordner darin werden entfernt (der Server könnte sie lesen).", "Die Tags von {0} Dateien oder Ordnern darin werden entfernt (der Server könnte sie lesen)."],
   "The key of this folder was changed meanwhile.": "Der Schlüssel dieses Ordners wurde inzwischen gewechselt.",
-  "These people get the new key: {0}": "Diese Personen bekommen den neuen Schlüssel: {0}"
+  "These people get the new key: {0}": "Diese Personen bekommen den neuen Schlüssel: {0}",
+  "Model per run": "Modell je Lauf",
+  "Choose the model per run": "Modell je Lauf wählen",
+  "For your messages and decisions": "Für deine Nachrichten und Entscheidungen",
+  "For routine": "Für Routine",
+  "Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.": "Deine Nachrichten, Knöpfe, Reaktionen und Kommentare und jeder Lauf, der eine Entscheidung brauchen kann, nehmen das erste Modell; stille Weckrufe, neue Aufgaben, Nachfassen und geplante Aufträge ohne Warnzeichen das zweite. Im Zweifel das erste."
 }

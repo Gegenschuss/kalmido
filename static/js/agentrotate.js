@@ -22,7 +22,21 @@ function agz_html(a, own) {
     <div class="row"><label for="agz-runs">${tr('After messages')}</label><input id="agz-runs" class="numin" data-agzk="rotate_runs" type="number" min="10" max="500" step="1" inputmode="numeric" value="${rt.rotate_runs ?? 60}"></div>
     <div class="row"><label for="agz-idle">${tr('After a pause of')}</label><span class="agpct"><input id="agz-idle" class="numin" data-agzk="rotate_idle_min" type="number" min="0" max="1440" step="1" inputmode="numeric" value="${idle}"><span class="muted">${tr('min')}</span></span></div>
     <div class="shint">${tr('Pause: 0 = never; it counts only from the small size on.')}</div>
-    ${own ? `<div class="row agznr"><label>${tr('Daily summary')}</label>${timeIn('agz-nr', rt.nightly_reset || '', {label: tr('Daily summary'), empty: tr('Agent default')})}</div>` : '<div class="agznr-slot"></div>'}</div>${agg_html(a)}${agd_html(a)}`;
+    ${own ? `<div class="row agznr"><label>${tr('Daily summary')}</label>${timeIn('agz-nr', rt.nightly_reset || '', {label: tr('Daily summary'), empty: tr('Agent default')})}</div>` : '<div class="agznr-slot"></div>'}</div>${agg_html(a)}${agd_html(a)}${own ? agm_html(a) : ''}`;
+}
+// 2.974.0 (#5668): the model and the model per run in the owner's dialog of a personal agent (the admin dialog has them in
+// "Runtime", agentchat.js agSplitFields); saved at once like the fields above
+/** @param {any} a */
+function agm_html(a) {
+  const rt = a.runtime || {}, on = !!rt.model_split;
+  /** @param {string} id @param {string} k */
+  const mi = (id, k) => `<input id="${id}" data-agzk="${k}" list="agm-models" value="${esc(rt[k] || '')}" maxlength="100" placeholder="${esc(tr('Agent default'))}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+  return `<div class="agzsec agzmod" data-agz="${a.id}"><h4 id="agm-h">${tr('Model')}</h4>
+    <div class="row"><label for="agm-model">${tr('Model')}</label>${mi('agm-model', 'model')}<datalist id="agm-models">${['opus', 'sonnet', 'haiku'].map(m => `<option value="${m}"></option>`).join('')}</datalist></div>
+    <label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="agm-split" data-agzk="model_split" ${on ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Choose the model per run')}</span></label>
+    <div class="row agm-r" ${on ? '' : 'hidden'}><label for="agm-dec">${tr('For your messages and decisions')}</label>${mi('agm-dec', 'model_decide')}</div>
+    <div class="row agm-r" ${on ? '' : 'hidden'}><label for="agm-rou">${tr('For routine')}</label>${mi('agm-rou', 'model_routine')}</div>
+    <div class="shint agm-r" ${on ? '' : 'hidden'}>${tr('Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.')}</div></div>`;
 }
 // 2.396.0 A (#3386): the git author block (same section style, same autosave in agz_wire)
 const AGG_DEFAULT = ['Kalmido', 'noreply@kalmido.com'];
@@ -63,6 +77,22 @@ function agz_wire(md, a, base) {
       if (r?.runtime) a.runtime = r.runtime;
       savedTick(el);
     } catch { el.value = (a.runtime || {}).dispatch || ''; /* api() said it */ }
+  });
+  const mod = $(`.agzmod[data-agz="${a.id}"]`, md);  // 2.974.0 (#5668)
+  if (mod) mod.addEventListener('change', async (/** @type {any} */ e) => {
+    const el = e.target, k = el.dataset.agzk; if (!k) return;
+    const rt = a.runtime || (a.runtime = {}), v = k === 'model_split' ? !!el.checked : String(el.value).trim();
+    /** @param {boolean} on */
+    const show = on => $$('.agm-r', mod).forEach((/** @type {any} */ x) => { x.hidden = !on; });
+    if (k === 'model_split') show(!!v);
+    try {
+      const r = await api('PATCH', base, {runtime: {[k]: v}});
+      if (r?.runtime) a.runtime = r.runtime;
+      if (k !== 'model_split') el.value = v;
+      savedTick(el);
+    } catch {
+      if (k === 'model_split') { el.checked = !!rt[k]; show(!!rt[k]); } else el.value = rt[k] || '';
+    }
   });
   const slot = $('.agznr-slot', sec), nr = slot && $('#ag-nr', md)?.closest('.row');
   if (nr) { const l = $('label', nr); if (l) l.textContent = tr('Daily summary'); slot.replaceWith(nr); nr.classList.add('agznr'); }
