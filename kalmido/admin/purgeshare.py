@@ -39,7 +39,10 @@ counts it under 'ends'; only an agent of the heir's own space keeps it ('agents'
 import os
 
 from ..collab.comments import user_names
-from ..contacts.ctfolder import CTF_BOOK, ctf_dropped
+from ..contacts.ctfolder import CTF_BOOK
+from ..contacts.ctkern import bk_node_ensure  # 2.924.0 (#5069)
+from ..accounts.orgretain import obj_share_gone  # 2.924.0 (#5069)
+from ..core.objects import obj_node_follow, obj_node_person_put  # 2.924.0 (#5069)
 from ..contacts.model import book_members_of, book_touch
 from ..contacts.orgbooks import obk_hand_on
 from ..core.access import Denied, list_role
@@ -48,7 +51,7 @@ from ..core.db import iso, iso_ms, now_utc
 from ..core.i18n import tr
 from ..core.pg import insert_id, system_ctx
 from ..core.orgcrypt import OrgCryptError
-from ..events.model import cal_members
+from ..events.model import EV_KIND, cal_members
 from ..files.extlinks import xl_space_moved
 from ..files.fslock import fsl_map, fsl_of_chain
 from ..files.fsmove import fsm_doc, fsm_share_ends, fsm_text, fsm_versions, fsm_walk
@@ -232,7 +235,7 @@ def _fs_branches(c, uid, doomed=frozenset()):
     found = []
     # 2.566.0 (#4712): the reference node of a calendar / address book on the shared core carries its shares: it counts as the
     # calendar / book above, never as a shared branch of the file store
-    own = sorted(k for k, r in OBJ.items() if r.get("members"))
+    own = sorted(k for k, r in OBJ.items() if r.get("node_shares"))  # 2.924.0 (#5069): was members=
     skip = f" AND NOT (n.kind='ref' AND n.ref_kind IN ({','.join('?' * len(own))}))" if own else ""
     for (nid,) in c.execute("""SELECT DISTINCT n.id FROM fs_nodes n JOIN fs_shares s ON s.node_id=n.id WHERE n.owner_id=? AND n.org_id IS NULL
                                AND COALESCE(s.user_id, s.group_id) IS NOT NULL AND (s.expires_at IS NULL OR s.expires_at>?)
@@ -316,17 +319,26 @@ def ush_info(c, uid):
 def _calendars(c, items):
     for x in items:
         srt = (c.execute("SELECT MAX(sort) FROM ev_cals WHERE owner_id=?", (x["heir"],)).fetchone()[0] or 0) + 1  # its first calendar stays its default
-        c.execute("DELETE FROM ev_cal_members WHERE cal_id=? AND user_id=?", (x["id"], x["heir"]))
+        obj_share_gone(c, EV_KIND, x["id"], x["heir"])  # 2.924.0 (#5069): the heir needs no share of its own (was its old member row)
         c.execute("UPDATE ev_cals SET owner_id=?, sort=?, changed_at=? WHERE id=?", (x["heir"], srt, iso_ms(now_utc()), x["id"]))
+        # 2.924.0 (#5069): its node (with the other members' shares) leaves the deleted person's tree for the heir's -- the old
+        # member rows that kept them when the tree went (kalmido_kern_node_gone) are gone
+        obj_node_follow(c, EV_KIND, x["id"])
 
 
 def _books(c, items):
+    """2.924.0 (#5069): the book keeps its node (no ctf_dropped any more: the node's shares are its members now): the node
+    leaves the deleted person's tree (and its folders) for the heir's, the people who reached it through a folder of that
+    tree keep their role as a share of the node (obj_node_person_put; one with a share keeps the one it has)."""
     for x in items:
-        ctf_dropped(c, CTF_BOOK, x["id"])
         obk_hand_on(c, x["id"], x["heir"])
-        for u, role in x["others"].items():
-            c.execute("""INSERT INTO book_members(book_id,user_id,role,added_at) VALUES(?,?,?,?)
-                         ON CONFLICT (book_id, user_id) DO NOTHING""", (x["id"], u, role, iso(now_utc())))
+        obj_node_follow(c, CTF_BOOK, x["id"])
+        if x["others"]:
+            n = bk_node_ensure(c, x["heir"], x["id"])
+            have = {m["user_id"] for m in book_members_of(c, x["id"], live=True)}
+            for u, role in x["others"].items():
+                if u not in have:
+                    obj_node_person_put(c, x["heir"], n, u, role)
         book_touch(c, x["id"])
 
 

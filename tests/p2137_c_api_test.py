@@ -446,9 +446,12 @@ bks = T("SELECT resource_kind, resource_id FROM hub_bookings WHERE org_id=?", (O
 check(("user", BOB) in bks and ("user", DORA) not in bks, f"bookings: bob yes, dora no {bks}")  # the equipment: with part A
 # shares
 NCAL = one("SELECT id FROM ev_cals WHERE org_id=? AND name='Alpha Studio'", (ORG3,))
-check(T("SELECT user_id, role FROM ev_cal_members WHERE cal_id=?", (NCAL,)) == [(BOB, "edit")], "calendar share with bob")
+# 2.924.0 (#5069): the shares of the calendar's / book's node (ev_cal_members / book_members are gone)
+check(T("SELECT s.user_id, s.role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind='evcal' AND n.ref_id=?",
+        (NCAL,)) == [(BOB, "edit")], "calendar share with bob")
 NBK = one("SELECT id FROM books WHERE org_id=? AND name='Alpha Kunden'", (ORG3,))
-check(T("SELECT user_id FROM book_members WHERE book_id=?", (NBK,)) == [(BOB,)], "address book share with bob")
+check(T("SELECT s.user_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind='address_book' AND n.ref_id=?",
+        (NBK,)) == [(BOB,)], "address book share with bob")
 # forms, customer reports: new links, the address keeps its keyed hash
 NF = dbx("SELECT id, token_hash FROM forms WHERE list_id=?", (NL,))
 check(len(NF) == 1 and NF[0]["token_hash"] != one("SELECT token_hash FROM forms WHERE list_id=?", (LO,)), "the form has a new link")

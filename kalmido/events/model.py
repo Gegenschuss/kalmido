@@ -305,17 +305,15 @@ def cal_member_set(c, cid, uid, role):
     cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (cid,)).fetchone()
     if not u or uid == cal["owner_id"] or personal_agent_foreign(c, uid, me()):
         raise Denied(404, tr("unknown person"))
-    if not c.execute("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?", (cid, uid)).fetchone():  # a new member
+    if not any(m["user_id"] == uid for m in cal_members(c, cid)):  # a new member (2.924.0, #5069: no share row of theirs yet)
         need_visible(c, uid)  # 2.30.0 (#1036, B2): only people one may see (404 as for an unknown id)
         p = ws_fit_problem(c, cal["org_id"], uid, "cal")  # 2.30.0 (#1036, B3): an organisation's calendar only inside it
         if p:
             raise Denied(409, p)
-    KERN["node"](c, me(), EV_KIND, cid, make=True)  # 2.566.0 (#4712): its node first, the trigger mirrors the row into its shares
-    old = c.execute("SELECT role FROM ev_cal_members WHERE cal_id=? AND user_id=?", (cid, uid)).fetchone()
-    if old:
-        c.execute("UPDATE ev_cal_members SET role=? WHERE cal_id=? AND user_id=?", (role, cid, uid))
-    else:
-        c.execute("INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES(?,?,?,?)", (cid, uid, role, iso(now_utc())))
+    n = KERN["node"](c, me(), EV_KIND, cid, make=True)  # 2.566.0 (#4712): its node first
+    # 2.924.0 (#5069): the share row on its node is the membership (core/objects.py obj_node_person_put; was ev_cal_members +
+    # the mirror trigger): the same person again changes the role, a share that ran out comes back without end date (#5089)
+    if KERN["put"](c, me(), n, uid, role):
         news_add(c, uid, "evshare", data={"cal_id": cid, "name": cal["name"], "role": role}, row="share")
     cal_touch(c, cid)
 

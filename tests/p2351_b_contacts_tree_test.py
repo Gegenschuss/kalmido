@@ -5,7 +5,7 @@
    /api/contacts/folders); a book / a single contact is filed with POST /api/files/refs and shows in the tree
  - a folder share (view / edit) gives that role on a filed book (all its contacts, also ones added later) or on a filed
    contact (only that one); never the owner's rights: the book's settings, deleting / moving a contact shared on its own
- - book_members stays valid: the higher role of book share and folder counts, nothing gets narrower
+ - the book's own share stays valid: the higher role of book share and folder counts, nothing gets narrower
  - filing needs 'edit' from the address book itself; withdrawing the share / taking it out of the folder takes it away
  - CardDAV gives exactly what the person may see: a book through a folder as its collection, single contacts in the
    read-only collection s1 (PUT / DELETE there 403)
@@ -150,7 +150,7 @@ check(place(Bo, "address_book", BK, None).status_code == 403, "bob: filing / tak
 check(A.patch(B + f"/api/files/shares/{S1}", json={"role": "edit"}).ok and role(Bo, P1) == "edit", "share edit = edit")
 check(Bo.patch(B + f"/api/contacts/{P1}", json={"note": "Met at the fair"}).ok, "bob changes the contact")
 check(Bo.patch(B + f"/api/books/{BK}", json={"name": "Mine now"}).status_code == 403, "never the book's settings (owner only)")
-# book_members stays valid: the higher one counts
+# the book's own share stays valid: the higher one counts
 check(A.put(B + f"/api/books/{BK}/members", json={"user_id": uid["bob"], "role": "view"}).ok, "alice also shares the book itself (view)")
 check(role(Bo, P1) == "edit", "book share view + folder edit = edit (the higher one)")
 check(A.patch(B + f"/api/files/shares/{S1}", json={"role": "view"}).ok and A.put(B + f"/api/books/{BK}/members", json={"user_id": uid["bob"], "role": "edit"}).ok
@@ -219,7 +219,7 @@ check(r.ok and ag.patch(V + f"/contacts/{O1}", json={"note": "x"}).status_code =
 check(ng.get(V + f"/contacts/{O1}").status_code in (403, 404), "an agent token without the scope contacts: never")
 r = ag.get(V + "/address-books")
 check(r.ok and any(b["id"] == OB for b in r.json()["data"]), "agent: the book in its list")
-# the book share dialog offers agents: the server takes them (book_members)
+# the book share dialog offers agents: the server takes them (the share of its node)
 B2 = book(A, "Partners", ORG)
 Q1 = contact(A, B2, "Quinn Partner")
 check(ag.get(V + f"/contacts/{Q1}").status_code == 404, "agent: another book unseen")

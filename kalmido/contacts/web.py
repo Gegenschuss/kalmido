@@ -28,7 +28,7 @@ from ..accounts.orgs import user_orgs
 from ..accounts.bgjobs import bgj_active, bgj_add, bgj_busy, bgj_current, bgj_fn, bgj_progress, bgj_state  # 2.370.3 (#2760)
 from ..core.zipread import base_name, is_zip, zip_read, ZipLimit  # 2.149.0 G (#2517): pulled up from functions
 from ..contacts.model import task_contacts  # 2.369.5 (#2517): pulled up from functions
-from ..contacts.model import BK_KERN, bk_has_node  # 2.566.0 (#4712): the shared core (contacts/ctkern.py fills it)
+from ..contacts.model import BK_KERN  # 2.566.0 (#4712): the shared core (contacts/ctkern.py fills it)
 from ..contacts.model import VC_BEGIN_RE  # 2.630.0 (#4593)
 from ..core.pages import too_large  # 2.369.5 (#2517): pulled up from functions
 from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_post, ua_pre  # 2.777.0 (#5254)
@@ -103,7 +103,7 @@ def op_book_edit(c, uid, bid, b):
     if "org_id" in b and bk["owner_org_id"] and b["org_id"] != bk["owner_org_id"]:  # 2.52.0 C (#1438)
         raise Denied(409, tr("An address book of an organisation stays in it"))
     if "org_id" in b and not bk["owner_org_id"]:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
-        if obj_org_set(c, "books", "book_id", "book_members", bid, b["org_id"], "book"):
+        if obj_org_set(c, "books", bid, b["org_id"], "book"):
             BK_KERN["follow"](c, "address_book", bid)  # 2.566.0 (#4712): its node (and the shares on it) follow (contacts/ctkern.py)
             book_touch(c, bid)
     f = book_fields({k: b[k] for k in ("name", "color") if k in b})
@@ -121,7 +121,7 @@ def op_book_edit(c, uid, bid, b):
             f["occ_list_id"] = lid
             if bk["owner_org_id"] and bk["owner_id"] != uid:  # 2.52.0 C (#1438): the birthdays go to the admin who chose the list
                 f["owner_id"] = uid
-                c.execute("DELETE FROM book_members WHERE book_id=? AND user_id=?", (bid, uid))
+                BK_KERN["drop"](c, "address_book", bid, uid)  # 2.924.0 (#5069): its node's share (was book_members)
     if f:
         c.execute(f"UPDATE books SET {','.join(k + '=?' for k in f)}, rev=rev+1, updated_at=?, updated_by=? WHERE id=?",
                   [*f.values(), iso_ms(now_utc()), uid, bid])  # 2.657.0 (#5052): a new version
@@ -204,11 +204,7 @@ def op_book_member_rm(c, uid, bid, who):
     bk, role = need_book(c, bid)
     if who != uid and role != "owner":
         raise Denied(403, tr("Only the owner of the address book can do this"))
-    n = c.execute("DELETE FROM book_members WHERE book_id=? AND user_id=?", (bid, who)).rowcount  # the trigger takes its share too
-    if bk_has_node(c, bid):  # 2.566.0 (#4712, review F5): a share of the node without a member row (restored in the core), as op_member_remove
-        with system_ctx(c):
-            n += c.execute("DELETE FROM fs_shares WHERE node_id IN (SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind='address_book' AND ref_id=?) "
-                           "AND (user_id=? OR agent_id=?)", (int(bid), who, who)).rowcount
+    n = BK_KERN["drop"](c, "address_book", bid, who)  # 2.924.0 (#5069): the shares of the node are the members (book_members is gone)
     if not n:
         raise Denied(404)
     book_touch(c, bid)

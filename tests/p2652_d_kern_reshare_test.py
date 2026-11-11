@@ -4,7 +4,7 @@
 person in again, and the boundary check counts a client's contact person in a private book only while the book's share with
 the client's creator is live. Own container. People without an organisation (the freelancer case). Invented names only.
 freelancer-matrix: pim
- - the mirror kalmido_kern_mirror (migrations.d/5089_a.py): a calendar / an address book shared, the core share's expiry put
+ - sharing anew (5089_a.py; 2.924.0 #5069: core/objects.py obj_node_person_put, the mirror is gone): a calendar / an address book shared, the core share's expiry put
    in the past (the person no longer sees it), shared again through PUT /api/evcals|books/<id>/members: the share is without
    end date and the person sees it again (regression: only the role was set, the old expiry stayed)
  - accounts/tenancy.py client_contact: a client (no organisation) of fiona linked to a contact of dora's private book that
@@ -112,8 +112,7 @@ def flagged():
 s = share("address_book", BK, FIONA)
 check(s and s[2] is None and not flagged(), f"the book's share with fiona lives: her client's contact person crosses nothing ({s})")
 sql("UPDATE fs_shares SET expires_at=? WHERE id=?", (PAST, s[0]), write=True)
-check(sql("SELECT role FROM book_members WHERE book_id=? AND user_id=?", (BK, FIONA)) == [("edit",)],
-      "setup: fiona's old member row stands (an expiry is no event of the database)")
+# 2.924.0 (#5069): book_members is gone -- the run-out share alone decides
 check(flagged(), "#5089: the share ran out: the boundary check counts the client's contact person (regression: book_members still counted)")
 check(Do.put(B + f"/api/books/{BK}/members", json={"user_id": FIONA, "role": "view"}).ok and not flagged(),
       "#5089: shared again through the dialog: counted no more")

@@ -35,9 +35,11 @@ from ..files.web import _expiry
 from ..api.scopes import need_scope
 
 
-def _reg(kind):
+def _reg(kind, shares=False):
+    """The kind's hooks; 404 for a kind without the generic routes. 2.924.0 (#5069): shares=True also lets a kind with
+    node_shares through (calendars, address books: their own routes share, these list the shares taken back and restore one)."""
     reg = obj_reg(kind)
-    if not reg["routes"]:
+    if not reg["routes"] and not (shares and reg.get("node_shares")):
         raise Denied(404)
     return reg
 
@@ -132,7 +134,7 @@ def obj_undo_route(kind, rid):
 
 @app.get("/api/obj/<kind>/<int:rid>/shares")
 def obj_shares_route(kind, rid):
-    _reg(kind)
+    _reg(kind, shares=True)
     return jsonify(obj_shares(db(), me(), kind, rid))
 
 
@@ -161,7 +163,7 @@ def obj_unshare_route(kind, rid, sid):
 
 @app.post("/api/obj/<kind>/<int:rid>/shares/<int:revoked_id>/restore")
 def obj_share_restore_route(kind, rid, revoked_id):
-    _reg(kind)
+    _reg(kind, shares=True)
     c, uid = db(), me()
     sid = obj_share_restore(c, uid, kind, rid, revoked_id)
     c.commit()

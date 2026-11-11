@@ -315,16 +315,15 @@ def book_member_set(c, bid, uid, role):
         raise Denied(404, tr("unknown person"))
     if is_agent(u) and not has_request_context():
         raise Denied(404, tr("unknown person"))
-    if not c.execute("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?", (bid, uid)).fetchone():  # a new member
+    if not any(m["user_id"] == uid for m in book_members_of(c, bid)):  # a new member (2.924.0, #5069: no share row of theirs yet)
         need_visible(c, uid)  # 2.30.0 (#1036, B2): only people one may see (404 as for an unknown id)
         p = ws_fit_problem(c, b["org_id"], uid, "book")  # 2.30.0 (#1036, B3): an organisation's address book only inside it
         if p:
             raise Denied(409, p)
-    BK_KERN["node"](c, me(), bid)  # 2.566.0 (#4712): its node first (contacts/ctkern.py), the trigger mirrors the row into its shares
-    if c.execute("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?", (bid, uid)).fetchone():
-        c.execute("UPDATE book_members SET role=? WHERE book_id=? AND user_id=?", (role, bid, uid))
-    else:
-        c.execute("INSERT INTO book_members(book_id,user_id,role,added_at) VALUES(?,?,?,?)", (bid, uid, role, iso(now_utc())))
+    n = BK_KERN["node"](c, me(), bid)  # 2.566.0 (#4712): its node first (contacts/ctkern.py)
+    # 2.924.0 (#5069): the share row on its node is the membership (core/objects.py obj_node_person_put; was book_members + the
+    # mirror trigger): the same person again changes the role, a share that ran out comes back without end date (#5089)
+    if BK_KERN["put"](c, me(), n, uid, role):
         news_add(c, uid, "abshare", data={"book_id": bid, "name": b["name"], "role": role}, row="share")
     book_touch(c, bid)
 

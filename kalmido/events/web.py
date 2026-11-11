@@ -25,7 +25,7 @@ from ..accounts.orgs import obj_org_set, ws_fit_problem  # 2.369.5 (#2517): pull
 from ..core.conflict import Conflict  # 2.564.0 (#4701/#4702)
 from ..core.conflict import ccf_check, kern_version_seed, take_version  # 2.657.0 (#5052)
 from ..core.pg import write_lock  # 2.657.0 (#5052)
-from ..events.model import EV_CALS_MAX, EV_KIND, KERN, ev_has_node, ev_role  # 2.566.0 (#4712): the shared core (events/evkern.py fills KERN)
+from ..events.model import EV_CALS_MAX, EV_KIND, KERN, ev_role  # 2.566.0 (#4712): the shared core (events/evkern.py fills KERN)
 from ..files.fsref import fs_ref_rename  # 2.566.0 (#4712)
 from ..core.pg import system_ctx  # 2.566.0 (#4712)
 from ..core.retention import ret_trash_days  # 2.566.0 (#4707)
@@ -64,7 +64,7 @@ def op_cal_edit(c, uid, cid, b):
         cal = kern_version_seed(c, "ev_cals", cid)
         ccf_check(b, cal["updated_at"], "current", lambda: cal_public(c, cal, uid))
     if "org_id" in b:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
-        if obj_org_set(c, "ev_cals", "cal_id", "ev_cal_members", cid, b["org_id"], "cal"):
+        if obj_org_set(c, "ev_cals", cid, b["org_id"], "cal"):
             KERN["follow"](c, EV_KIND, cid)  # 2.566.0 (#4712): its node (and the shares on it) follow
             cal_touch(c, cid)
     f = {k: b[k] for k in ("name", "color", "description") if k in b}
@@ -141,11 +141,7 @@ def op_member_remove(c, uid, cid, who):
     cal, role = need_evcal(c, cid)
     if who != uid and role != "owner":
         raise Denied(403, tr("Only the owner of the calendar can do this"))
-    n = c.execute("DELETE FROM ev_cal_members WHERE cal_id=? AND user_id=?", (cid, who)).rowcount  # the trigger takes its share too
-    if ev_has_node(c, cid):  # 2.566.0 (#4712): a share of the node without a member row (restored in the core) goes as well
-        with system_ctx(c):
-            n += c.execute("DELETE FROM fs_shares WHERE node_id IN (SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?) "
-                           "AND (user_id=? OR agent_id=?)", (EV_KIND, cid, who, who)).rowcount
+    n = KERN["drop"](c, EV_KIND, cid, who)  # 2.924.0 (#5069): the shares of the node are the members (ev_cal_members is gone)
     if not n:
         raise Denied(404)
     cal_touch(c, cid)

@@ -980,9 +980,9 @@ def fs_org_live(c, oid):
 
 def _core_refs_out():
     """2.566.0 (#4712): the reference nodes of the kinds moving onto the shared core with their member table (calendars,
-    address books: core/objhooks.OBJ members=) are where their shares hang, no content of the file store -- the objects are
+    address books: core/objhooks.OBJ node_shares, 2.924.0 #5069: was members=) are where their shares hang, no content of the file store -- the objects are
     their areas' (they stay with their owners)."""
-    kinds = sorted(k for k, r in OBJ.items() if r.get("members") and k.replace("_", "").isalnum())  # the register's names ([a-z][a-z0-9_]*)
+    kinds = sorted(k for k, r in OBJ.items() if r.get("node_shares") and k.replace("_", "").isalnum())  # the register's names ([a-z][a-z0-9_]*)
     return (" AND NOT (x.kind = 'ref' AND x.ref_kind IN (" + ",".join(f"'{k}'" for k in kinds) + "))") if kinds else ""
 
 

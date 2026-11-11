@@ -14,6 +14,7 @@ from ..accounts.orgs import PRIVATE_FOLDER_RE, _operator_apart, has_workspaces, 
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import dlg_gone  # 2.473.0 (#3357)
 from ..core.objhooks import obj_boundary  # 2.649.0 (#5051)
+from ..core.objhooks import FOLLOW  # 2.924.0 (#5069): core/objects.py obj_node_follow
 from ..accounts.orgs import INSTANCE_ENV  # 2.369.5 (#2517): pulled up from functions
 
 # when the check runs: once a day at this local hour or later; KALMIDO_TENANT_CHECK=always = at every watchdog tick (tests)
@@ -26,6 +27,7 @@ TENANT_SAMPLE = 20
 # agent's workspace (agents.org_id, NULL = private) differs from the object's. Rows that only come from a group share
 # (list_members.grole set, no own role) are counted as "group".
 _PERSON = "u.kind!='agent' AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id={o}.org_id AND om.user_id={m}.user_id)"
+_NODE_SHARES = "FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id AND n.kind='ref' AND n.ref_kind='{rk}' JOIN {t} {o} ON {o}.id=n.ref_id "  # 2.924.0 (#5069)
 CHECKS = {
     "list_person": ("SELECT m.list_id, m.user_id FROM list_members m JOIN lists l ON l.id=m.list_id JOIN users u ON u.id=m.user_id "
                     "WHERE l.org_id IS NOT NULL AND NOT (m.grole IS NOT NULL AND m.own_role IS NULL) AND " + _PERSON.format(o="l", m="m")),
@@ -40,9 +42,11 @@ CHECKS = {
                            "ON a.user_id=m.user_id WHERE a.org_id IS NULL AND l.org_id IS NOT NULL"),
     "list_owner": ("SELECT l.id, l.owner_id FROM lists l JOIN users u ON u.id=l.owner_id WHERE l.org_id IS NOT NULL AND u.kind!='agent' "
                    "AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=l.org_id AND om.user_id=l.owner_id)"),
-    "cal_person": ("SELECT m.cal_id, m.user_id FROM ev_cal_members m JOIN ev_cals k ON k.id=m.cal_id JOIN users u ON u.id=m.user_id "
-                   "WHERE k.org_id IS NOT NULL AND " + _PERSON.format(o="k", m="m")),
-    "cal_agent": ("SELECT m.cal_id, m.user_id FROM ev_cal_members m JOIN ev_cals k ON k.id=m.cal_id JOIN agents a ON a.user_id=m.user_id "
+    # 2.924.0 (#5069): a calendar's / address book's members are the shares of its reference node (ev_cal_members / book_members
+    # are gone): (object id, person / agent) as before
+    "cal_person": ("SELECT DISTINCT n.ref_id, s.user_id " + _NODE_SHARES.format(rk="evcal", t="ev_cals", o="k") + "JOIN users u ON u.id=s.user_id "
+                   "WHERE k.org_id IS NOT NULL AND " + _PERSON.format(o="k", m="s")),
+    "cal_agent": ("SELECT DISTINCT n.ref_id, s.agent_id " + _NODE_SHARES.format(rk="evcal", t="ev_cals", o="k") + "JOIN agents a ON a.user_id=s.agent_id "
                   "WHERE COALESCE(a.org_id,0)!=COALESCE(k.org_id,0)"),
     "cal_owner": ("SELECT k.id, k.owner_id FROM ev_cals k JOIN users u ON u.id=k.owner_id WHERE k.org_id IS NOT NULL AND u.kind!='agent' "
                   "AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=k.org_id AND om.user_id=k.owner_id)"),
@@ -53,9 +57,9 @@ CHECKS = {
                    "JOIN users u ON u.id=a.user_id WHERE k.org_id IS NOT NULL AND e.deleted_at IS NULL AND " + _PERSON.format(o="k", m="a")),
     "att_agent": ("SELECT a.event_id, a.user_id FROM event_attendees a JOIN events e ON e.id=a.event_id JOIN ev_cals k ON k.id=e.cal_id "
                   "JOIN agents g ON g.user_id=a.user_id WHERE k.org_id IS NOT NULL AND e.deleted_at IS NULL AND g.org_id IS DISTINCT FROM k.org_id"),
-    "book_person": ("SELECT m.book_id, m.user_id FROM book_members m JOIN books b ON b.id=m.book_id JOIN users u ON u.id=m.user_id "
-                    "WHERE b.org_id IS NOT NULL AND " + _PERSON.format(o="b", m="m")),
-    "book_agent": ("SELECT m.book_id, m.user_id FROM book_members m JOIN books b ON b.id=m.book_id JOIN agents a ON a.user_id=m.user_id "
+    "book_person": ("SELECT DISTINCT n.ref_id, s.user_id " + _NODE_SHARES.format(rk="address_book", t="books", o="b") + "JOIN users u ON u.id=s.user_id "
+                    "WHERE b.org_id IS NOT NULL AND " + _PERSON.format(o="b", m="s")),
+    "book_agent": ("SELECT DISTINCT n.ref_id, s.agent_id " + _NODE_SHARES.format(rk="address_book", t="books", o="b") + "JOIN agents a ON a.user_id=s.agent_id "
                    "WHERE COALESCE(a.org_id,0)!=COALESCE(b.org_id,0)"),
     "book_owner": ("SELECT b.id, b.owner_id FROM books b JOIN users u ON u.id=b.owner_id WHERE b.org_id IS NOT NULL AND u.kind!='agent' "
                    "AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=b.org_id AND om.user_id=b.owner_id)"),
@@ -178,7 +182,7 @@ CHECKS = {
     # 2.126.0 C (#1992 K10): a client without organisation: also a private book shared with its creator (as office/contacts_cl.py)
     # 2.652.0 (#5089): "shared with its creator" as the core has it (contacts/model.py bk_member_role): a book with a reference
     # node only by a live share of that node to the creator (not expired; a node in the file store's trash holds the link back
-    # as core/objects.py obj_share_rows_sql trash=True), a book without one by its old member row. The time from the database's
+    # as core/objects.py obj_share_rows_sql trash=True); 2.924.0 (#5069): a book without a node by nobody. The time from the database's
     # own clock (CHECKS is read once at import; no "?": boundary_repair adds its own)
     "client_contact": ("SELECT DISTINCT cl.id, cl.created_by FROM office_client_contacts k JOIN clients cl ON cl.id=k.client_id "
                        "JOIN contacts ct ON ct.id=k.contact_id JOIN books b ON b.id=ct.book_id WHERE CASE WHEN cl.org_id IS NOT NULL "
@@ -188,7 +192,7 @@ CHECKS = {
                        "THEN NOT EXISTS (SELECT 1 FROM fs_shares bs JOIN fs_nodes bn ON bn.id=bs.node_id WHERE bn.kind='ref' "
                        "AND bn.ref_kind='address_book' AND bn.ref_id=b.id AND bs.user_id=cl.created_by AND bs.role IN ('view', 'edit') "
                        "AND (bs.expires_at IS NULL OR bs.expires_at > to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"'))) "
-                       "ELSE NOT EXISTS (SELECT 1 FROM book_members bm WHERE bm.book_id=b.id AND bm.user_id=cl.created_by) END) END"),
+                       "ELSE TRUE END) END"),
     # 2.473.0 (#3357): someone who watches a task of an organisation without being a member of it (boundary_repair removes the row)
     "task_watcher_person": ("SELECT w.task_id, w.user_id FROM task_watchers w JOIN tasks t ON t.id=w.task_id JOIN lists l ON l.id=t.list_id "
                             "JOIN users u ON u.id=w.user_id WHERE l.org_id IS NOT NULL AND u.kind!='agent' AND NOT EXISTS (SELECT 1 FROM org_members m "
@@ -333,7 +337,7 @@ def boundary_check(c):
 # object from them, and moving the agent to the right workspace brings its access back. Owners outside their organisation
 # and agents whose owner left stay counted as before.
 REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", "list_id"),
-          "cal_person": ("ev_cal_members", "cal_id"), "book_person": ("book_members", "book_id"),
+          "cal_person": ("evcal", "cal_id"), "book_person": ("address_book", "book_id"),  # 2.924.0 (#5069): the node's shares (obj_boundary)
           "att_person": ("event_attendees", "event_id"),  # 2.87.0 (#1983)
           "file_person": ("fs_shares", "node_id"),  # 2.48.0 (#1207)
           "doc_mail_person": ("doc_mail", "org_id"),  # 2.48.0 (#1111)
@@ -342,7 +346,7 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "assistant_person": ("assistant_access", "list_id"),  # 2.75.0 A (#1411)
           "hub_token_person": ("hub_tokens", "org_id"),  # 2.84.0 A (#1198)
           "sheet_share_person": ("sheet_shares", "sheet_id")}  # 2.124.0 C (#2113); 2.924.0 (#5069): tchat_person is file_person
-RP_CORE = ("fs_shares", "sheet_shares", "ev_cal_members", "book_members")  # 2.649.0 (#5051): core/objhooks.obj_boundary; 2.924.0 (#5069): no tchat_members
+RP_CORE = ("fs_shares", "sheet_shares", "evcal", "address_book")  # 2.649.0 (#5051): core/objhooks.obj_boundary; 2.924.0 (#5069): no tchat_members, kinds
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Organisation > People")
 
 
@@ -596,15 +600,19 @@ def ws_migrate_objs(c):
     for u in [r[0] for r in c.execute("SELECT user_id FROM agents WHERE org_id IS NULL")]:
         org_of.pop(u, None)
     cnt = {"cal": [0, 0, 0], "book": [0, 0, 0]}  # org, private, mismatch
-    mem = "SELECT m.user_id, u.kind, a.org_id AS a_org FROM {t} m JOIN users u ON u.id=m.user_id LEFT JOIN agents a ON a.user_id=m.user_id WHERE m.{k}=?"
-    for kind, table, mt, key, extra in (("cal", "ev_cals", "ev_cal_members", "cal_id", ""), ("book", "books", "book_members", "book_id", ", src_id")):
+    # 2.924.0 (#5069): the members are the shares of the object's node (a database of 2.29 has none: everything fits)
+    mem = ("SELECT COALESCE(s.user_id, s.agent_id) AS user_id, u.kind, a.org_id AS a_org FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id "
+           "AND n.kind='ref' AND n.ref_kind='{rk}' JOIN users u ON u.id=COALESCE(s.user_id, s.agent_id) LEFT JOIN agents a ON a.user_id=u.id WHERE n.ref_id=?")
+    for kind, table, rk, extra in (("cal", "ev_cals", "evcal", ""), ("book", "books", "address_book", ", src_id")):
         for r in c.execute(f"SELECT id, owner_id, name{extra} FROM {table} WHERE org_id IS NULL").fetchall():
             cand = org_of.get(r["owner_id"])
             if PRIVATE_FOLDER_RE.match((r["name"] or "").strip()) or (kind == "book" and r["src_id"]):
                 cand = None
-            oid, bad = _obj_ws(c, mem.format(t=mt, k=key), r["id"], cand)
+            oid, bad = _obj_ws(c, mem.format(rk=rk), r["id"], cand)
             if oid:
                 c.execute(f"UPDATE {table} SET org_id=? WHERE id=?", (oid, r["id"]))
+                for f in FOLLOW:  # 2.924.0 (#5069): its node (the members' shares) follows into the organisation's tree
+                    f(c, rk, r["id"])
                 cnt[kind][0] += 1
             else:
                 cnt[kind][1] += 1

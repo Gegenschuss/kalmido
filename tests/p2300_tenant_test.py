@@ -113,9 +113,20 @@ def book(s, name, **kw):
 KT, KF, KPA, KX = cal(A, "Team")["id"], cal(A, "Familie")["id"], cal(A, "Agentcal")["id"], cal(A, "Mixed")["id"]
 BT, BP = book(A, "Team contacts")["id"], book(A, "Privat")["id"]
 TS = "2026-10-01T00:00:00+00:00"
-for k, u in ((KT, BOB), (KPA, PA), (KX, AG1), (KX, PA)):
-    dbx("INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES(?,?,'view',?)", (k, u, TS), write=True)
-dbx("INSERT INTO book_members(book_id,user_id,role,added_at) VALUES(?,?,'view',?)", (BT, BOB, TS), write=True)
+# 2.924.0 (#5069): the members are shares of the object's node (ev_cal_members / book_members are gone); written past the app
+# (the private agent would be refused there), the node at the top of alice's private tree as for a private object
+
+
+def raw_share(kind, rid, who, key="user_id"):
+    n = dbx("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (kind, rid))
+    nid = n[0][0] if n else dbx("INSERT INTO fs_nodes(kind,name,owner_id,org_id,ref_kind,ref_id,created_at,updated_at) "
+                                "VALUES('ref',?,1,NULL,?,?,?,?) RETURNING id", (f"{kind} {rid}", kind, rid, TS, TS), write=True)[0][0]
+    dbx(f"INSERT INTO fs_shares(node_id,{key},role,created_at) VALUES(?,?,'view',?)", (nid, who, TS), write=True)
+
+
+for k, u, key in ((KT, BOB, "user_id"), (KPA, PA, "agent_id"), (KX, AG1, "agent_id"), (KX, PA, "agent_id")):
+    raw_share("evcal", k, u, key)
+raw_share("address_book", BT, BOB)
 # as a 2.29 server left them: no workspace yet, the migration not run
 dbx("UPDATE ev_cals SET org_id=NULL", write=True)
 dbx("UPDATE books SET org_id=NULL", write=True)
@@ -133,7 +144,9 @@ bw = {b["id"]: b for b in st["books"]}
 check(bw[BT]["org_id"] == ORG and bw[BP]["org_id"] is None, "#1036 migration: address books the same way " + str({k: bw[k]["org_id"] for k in bw}))
 check(KT in {c["id"] for c in Bo.get(B + "/api/state").json()["evcals"]}, "#1036 migration: bob still has the shared calendar")
 bd = boundary(A)
-check(bd["violations"] == 1 and bd["kinds"] == {"cal_agent": 1} and bd["sample"]["cal_agent"] == [[KX, AG1]],
+# 2.924.0 (#5069): the agent's share of the calendar's node is counted as the calendar's and as the node's (file_agent), as
+# since 2.566 (#4712) when the old row and its mirrored share stood side by side
+check(bd["kinds"].get("cal_agent") == 1 and bd["sample"]["cal_agent"] == [[KX, AG1]] and set(bd["kinds"]) <= {"cal_agent", "file_agent"},
       "#1036 boundary: the team agent in the private calendar is counted (kept, not removed) " + str(bd))
 check(A.delete(B + f"/api/evcals/{KX}/members/{AG1}").ok and boundary(A)["violations"] == 0, "#1036 boundary: taken out -> 0")
 check(Bo.get(B + "/api/admin/orgs").status_code == 403, "#1036 boundary: the count is for the operator only")

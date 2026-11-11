@@ -227,7 +227,7 @@ def cal_purge(who, s, agid):
     check(not sql("SELECT 1 FROM fs_nodes WHERE id=?", (node[0][0],)), f"4 {who}: its node too")
     for t in ("obj_history", "obj_undo", "obj_revoked"):
         check(sql(f"SELECT COUNT(*) FROM {t} WHERE kind='evcal' AND ref_id=?", (k,)) == [(0,)], f"4 {who}: its {t} rows too")
-    for t, col in (("ev_cal_members", "cal_id"), ("events", "cal_id"), ("ev_cal_feeds", "cal_id")):
+    for t, col in (("events", "cal_id"), ("ev_cal_feeds", "cal_id")):  # 2.924.0 (#5069): ev_cal_members is gone
         check(sql(f"SELECT COUNT(*) FROM {t} WHERE {col}=?", (k,)) == [(0,)], f"4 {who}: its {t} rows too (cascade)")
     check(sql("SELECT deleted_at FROM ev_cals WHERE id=?", (keep,)) == [(None,)], f"4 {who}: a calendar not in the trash stays")
 

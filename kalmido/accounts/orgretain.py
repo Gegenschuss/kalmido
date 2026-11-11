@@ -316,15 +316,24 @@ def odl_public_off(c, oid):
     c.execute("UPDATE appt_pages SET enabled=0 WHERE office_org_id=? OR cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)", (oid, oid))
 
 
+def obj_share_gone(c, kind, rid, who):
+    """2.924.0 (#5069): every share row of person / agent who on the reference node of core object (kind, rid) goes, deleted
+    (the new owner of a calendar / address book needs none; a member leaving it in its own dialog): what deleting the old
+    member row did through the mirror trigger of stage 3. Returns the number of rows; the caller commits."""
+    with system_ctx(c):  # the node may lie in an organisation's tree; the caller checked
+        return c.execute("DELETE FROM fs_shares WHERE node_id IN (SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?) "
+                         "AND (user_id=? OR agent_id=?)", (kind, int(rid), int(who), int(who))).rowcount
+
+
 def obj_nodes_follow(c, oid):
-    """2.566.0 (#4712, review F1): the reference nodes of the calendars / address books (the kinds of the shared core with an
-    old member table, core/objhooks.OBJ members=) that still lie in organisation oid's tree while their object left it (it
+    """2.566.0 (#4712, review F1): the reference nodes of the calendars / address books (the kinds of the shared core whose
+    own dialog shares the node, core/objhooks.OBJ node_shares -- 2.924.0, #5069: was members=) that still lie in organisation oid's tree while their object left it (it
     became private: org_leave without an heir, odl_retire, odl_dismantle) follow it into its owner's private tree with their
     shares (core/objects.obj_node_follow). The node stays the object's truth: a share taken back in the core stays taken
     back (its old member row is not read again), a share that lives only in the core stays (was: the node was deleted).
     Call after the object's org_id changed; the caller is in system_ctx."""
     for reg in OBJ.values():
-        if reg.get("members"):
+        if reg.get("node_shares"):
             for (rid,) in c.execute(f"SELECT n.ref_id FROM fs_nodes n JOIN {reg['table']} o ON o.id=n.ref_id WHERE n.kind='ref' AND n.ref_kind=? "
                                     "AND n.org_id=? AND o.org_id IS DISTINCT FROM n.org_id ORDER BY n.ref_id", (reg["kind"], int(oid))).fetchall():
                 for f in FOLLOW:
@@ -597,7 +606,7 @@ def upg_rest(c, uid):
         for (xid, oid) in c.execute("SELECT id, org_id FROM ev_cals WHERE owner_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
             heir = upg_heir(c, oid, uid)
             if heir:
-                c.execute("DELETE FROM ev_cal_members WHERE cal_id=? AND user_id=?", (xid, heir))
+                obj_share_gone(c, "evcal", xid, heir)  # 2.924.0 (#5069): the new owner needs no share (was its old member row)
                 c.execute("UPDATE ev_cals SET owner_id=? WHERE id=?", (heir, xid))
         from ..personal.timesheet import tsl_user_gone
         tsl_user_gone(c, uid)  # 2.360.2 D (#2561): before the entries lose the person (its hours are noted on the month)

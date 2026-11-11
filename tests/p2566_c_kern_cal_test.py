@@ -2,13 +2,13 @@
 # kalmido-suite: fresh
 """2.566.0 part C (#4712): calendars and address books on the shared core (stage 3). Own container (mode workspaces). Invented
 names only.  tenant-matrix: calendar, book   freelancer-matrix: pim
- - a calendar / an address book shared with a person gets its reference node; the trigger mirrors the member row into the
-   node's share (added, role changed, deleted); the person sees it through the core
- - a share taken back in the core (the node's share gone, the old member row still there) is not reopened by the old row
-   (regression: before, ev_cal_members / book_members alone gave the access); sharing again brings it back
- - an old member row of a calendar WITHOUT a node is still read (the fallback of one release)
+ - a calendar / an address book shared with a person gets its reference node and the person's share on it (added, role
+   changed, removed in the members dialog); the person sees it through the core (2.924.0 #5069: only through the core --
+   ev_cal_members / book_members and their mirror triggers are gone)
+ - a share taken back in the core is gone; sharing again brings it back
+ - a calendar WITHOUT a node is shared with nobody
  - a workspace move of a calendar / book: its node follows with the shares, the member keeps it
- - leaving the organisation: the core's revocation takes the member rows and the shares (restorable rows in obj_revoked) (#4697)
+ - leaving the organisation: the core's revocation takes the shares (restorable rows in obj_revoked) (#4697)
  - an agent with the data lock "calendar" / "contacts" sees nothing of a calendar / book shared with it through the core (#4699)
  - two writers: an event saved with an old version (expect, and the core's name expect_updated_at) -> 409 with the event as it is,
    the other's change stays; CalDAV PUT with an old If-Match -> 412, the change stays; calendar settings with an old
@@ -16,14 +16,13 @@ names only.  tenant-matrix: calendar, book   freelancer-matrix: pim
  - deleting a calendar puts it into the trash with its events (gone from the lists, the range, CalDAV); only its owner restores
    it (a member 404), with exactly the events that went with it (#4707)
  - a person without an organisation: her own calendar shared with her agent, the trash and the restore as above
- - review F4: member rows written while there was no node are all mirrored when the node comes; review F3: a node in the
-   file store's trash is still the node (a share taken back stays taken back), it does not go there alone while it carries
-   shares, and removed for good it writes its shares back into the member rows
+ - review F3: a node in the file store's trash is still the node (a share taken back stays taken back), it does not go there
+   alone while it carries shares; removed for good (2.924.0 #5069) its shares go with it (no member rows to fall back on)
  - review F5: the members dialog of a book removes a share that lives only in the core
  - review F2: a workspace move checks the shares of the node (a person only in the core, a group): 409, nothing moves
  - review F1: the owner leaves the organisation without an heir: the calendar's node follows into the private tree, a share
    taken back in the core stays taken back, one only in the core stays
- - the start's one-shot (migr_kern4712, a restart on the same data): members without a node get it and their core shares
+ - (the start's copy of old member rows, formerly migr_kern4712: tests/p2924_b_kern_calbook_test.py, 2.924.0 #5069)
 usage: p2566_c_kern_cal_test.py <datadir>"""
 import os
 import sys
@@ -100,22 +99,21 @@ for who in (BOB, GINA):
 K = A.post(B + "/api/evcals", json={"name": "Studio plan", "org_id": ORG}).json()["id"]
 check(node("evcal", K) is None, "a calendar without members has no node yet")
 check(A.put(B + f"/api/evcals/{K}/members", json={"user_id": BOB, "role": "edit"}).ok, "the calendar shared with bob")
-check(node("evcal", K) is not None and share("evcal", K, BOB) == "edit", "#4712: its node and bob's core share (mirrored by the trigger)")
+check(node("evcal", K) is not None and share("evcal", K, BOB) == "edit", "#4712: its node and bob's core share")
 check(K in ids(Bo.get(B + "/api/evcals")), "bob sees the calendar")
 E1 = A.post(B + "/api/events", json={"cal_id": K, "title": "Kick-off", "start": f"{D}T09:00", "end": f"{D}T10:00"}).json()
 check(bool(E1.get("id")) and E1.get("updated_at"), f"an event in it {str(E1)[:120]}")
 m = {x["user_id"]: x["role"] for x in {c["id"]: c for c in A.get(B + "/api/evcals").json()["items"]}[K]["members"]}
 check(m == {BOB: "edit"}, f"the owner's member list comes from the core {m}")
 
-sql("UPDATE ev_cal_members SET role='view' WHERE cal_id=? AND user_id=?", (K, BOB), write=True)
-check(share("evcal", K, BOB) == "view", "#4712: a role changed in the old table follows into the core share (any code path)")
+# 2.924.0 (#5069): the members dialog changes the role of the core share itself (no old table any more)
+check(A.put(B + f"/api/evcals/{K}/members", json={"user_id": BOB, "role": "view"}).ok and share("evcal", K, BOB) == "view",
+      "#4712: a role changed in the dialog is the core share's role")
 check(Bo.patch(B + f"/api/events/{E1['id']}", json={"title": "x"}).status_code == 403, "bob, now view, cannot change the event")
 check(A.put(B + f"/api/evcals/{K}/members", json={"user_id": BOB, "role": "edit"}).ok, "bob back to edit")
 
 # a share taken back in the core: the old row must not reopen it (regression of the fallback)
 sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (node("evcal", K), BOB), write=True)
-# 2.647.0 (#5046): the old member row goes with the core share (trigger kalmido_kern_back, core -> old); before it stood there
-check(not sql("SELECT role FROM ev_cal_members WHERE cal_id=? AND user_id=?", (K, BOB)), "#5046: the old member row goes with the core share")
 check(K not in ids(Bo.get(B + "/api/evcals")), "#4712: the core share is gone -> bob no longer sees the calendar (old row not read)")
 check(Bo.get(B + f"/api/events/{E1['id']}").status_code == 404, "#4712: nor its event")
 check(Bo.get(B + "/api/events", params={"from": D, "to": D, "calendar_id": K}).status_code == 404, "#4712: nor its range")
@@ -124,12 +122,9 @@ check(A.put(B + f"/api/evcals/{K}/members", json={"user_id": BOB, "role": "edit"
 check(K in ids(Bo.get(B + "/api/evcals")), "bob sees it again")
 check(A.delete(B + f"/api/evcals/{K}/members/{GINA}").status_code == 404, "removing someone who is no member: 404")
 
-# the fallback: an old member row of a calendar without a node is read
+# 2.924.0 (#5069): no fallback any more -- a calendar without a node is shared with nobody
 K2 = A.post(B + "/api/evcals", json={"name": "Old style", "org_id": ORG}).json()["id"]
-sql("INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES(?,?,'view','2026-11-01T00:00:00+00:00')", (K2, GINA), write=True)
-check(node("evcal", K2) is None and K2 in ids(Gi.get(B + "/api/evcals")), "#4712: without a node the old member row still counts")
-sql("DELETE FROM ev_cal_members WHERE cal_id=? AND user_id=?", (K2, GINA), write=True)
-check(K2 not in ids(Gi.get(B + "/api/evcals")), "and without it nothing")
+check(node("evcal", K2) is None and K2 not in ids(Gi.get(B + "/api/evcals")), "#5069: without a node nobody but its owner has it")
 
 # ================================================================== the address book's share is the core's
 BK = A.post(B + "/api/books", json={"name": "Studio contacts", "org_id": ORG}).json()["id"]
@@ -142,8 +137,8 @@ check(BK not in ids(Gi.get(B + "/api/books")) and Gi.get(B + f"/api/contacts/{C1
       "#4712: the book's core share gone -> gina no longer sees it nor its contact (old row not read)")
 check(A.put(B + f"/api/books/{BK}/members", json={"user_id": GINA, "role": "edit"}).ok and BK in ids(Gi.get(B + "/api/books")),
       "sharing the book again")
-sql("DELETE FROM book_members WHERE book_id=? AND user_id=?", (BK, GINA), write=True)
-check(share("address_book", BK, GINA) is None and BK not in ids(Gi.get(B + "/api/books")), "#4712: the old row deleted -> the core share goes too")
+check(A.delete(B + f"/api/books/{BK}/members/{GINA}").ok, "2.924.0 (#5069): gina removed in the book's members dialog")
+check(share("address_book", BK, GINA) is None and BK not in ids(Gi.get(B + "/api/books")), "#5069: the dialog takes the core share")
 check(A.put(B + f"/api/books/{BK}/members", json={"user_id": GINA, "role": "edit"}).ok, "gina back in the book")
 
 # a workspace move: the node follows with its shares (the members keep the object)
@@ -208,10 +203,9 @@ check(Bo.patch(B + f"/api/evcals/{K}", json={"name": "Bob's"}).status_code == 40
 # ================================================================== leaving the organisation (#4697 through the core)
 check(A.delete(B + f"/api/orgs/{ORG}/members/{GINA}").ok, "gina leaves the organisation")
 check(BK not in ids(Gi.get(B + "/api/books")), "#4697: gina no longer has the organisation's book")
-check(not sql("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?", (BK, GINA)) and share("address_book", BK, GINA) is None,
-      "#4712: her member row and her core share are gone")
-check(sql("SELECT COUNT(*) FROM obj_revoked WHERE user_id=? AND reason='leave' AND src IN ('book_members','fs_shares')", (GINA,))[0][0] >= 1,
-      "#4712: taken by the core's revocation (restorable rows)")
+check(share("address_book", BK, GINA) is None, "#4712: her core share is gone")
+check(sql("SELECT COUNT(*) FROM obj_revoked WHERE user_id=? AND reason='leave' AND src='fs_shares' AND kind='address_book' AND ref_id=?",
+          (GINA, BK))[0][0] >= 1, "#4712: taken by the core's revocation (restorable rows)")
 
 # ================================================================== the trash (#4707)
 E2 = A.post(B + "/api/events", json={"cal_id": K, "title": "Review", "start": f"{D}T14:00", "end": f"{D}T15:00"}).json()
@@ -264,25 +258,14 @@ check(FK not in ids(ag("/event-calendars")), "freelancer: gone for her agent too
 check(F.post(B + f"/api/evcals/{FK}/restore").ok and FK in ids(F.get(B + "/api/evcals")) and F.get(B + f"/api/events/{FE['id']}").ok,
       "freelancer: restored with its event")
 
-# ================================================================== review F4: rows written while there was no node
-# (an import / a repair past cal_member_set): the node made later mirrors them all, nobody loses the access silently
+# ================================================================== ivy (2.924.0, #5069: review F4 -- old rows written while there was no node
+# -- went with the old tables; the start's copy of such rows: tests/p2924_b_kern_calbook_test.py)
 r = A.post(B + "/api/users", json={"username": "ivy", "display_name": "Ivy", "password": "password123", "email": "ivy@example.com", "orgs": []})
 assert r.ok, r.text
 IVY = r.json()["id"]
 Iv = sess("ivy")
 Iv.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
 check(A.put(B + f"/api/orgs/{ORG}/members", json={"email": "ivy@example.com", "role": "member"}).ok, "ivy (a member of the organisation, alice sees her) joins the organisation")
-K4 = A.post(B + "/api/evcals", json={"name": "Imported plan"}).json()["id"]
-B4 = A.post(B + "/api/books", json={"name": "Imported book"}).json()["id"]
-sql("INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES(?,?,'view','2026-11-01T00:00:00+00:00')", (K4, IVY), write=True)
-sql("INSERT INTO book_members(book_id,user_id,role,added_at) VALUES(?,?,'view','2026-11-01T00:00:00+00:00')", (B4, BOB), write=True)
-check(node("evcal", K4) is None and node("address_book", B4) is None, "F4: imported member rows, no node yet")
-check(A.put(B + f"/api/evcals/{K4}/members", json={"user_id": BOB, "role": "edit"}).ok
-      and A.put(B + f"/api/books/{B4}/members", json={"user_id": IVY, "role": "edit"}).ok, "F4: then a member through the app")
-check(share("evcal", K4, IVY) == "view" and K4 in ids(Iv.get(B + "/api/evcals")),
-      "review F4: the imported calendar member got her core share with the node and keeps the calendar")
-check(share("address_book", B4, BOB) == "view" and B4 in ids(Bo.get(B + "/api/books")),
-      "review F4: the imported book member got his core share with the node and keeps the book")
 
 # ================================================================== review F3: a node in the file store's trash is still the node
 K5 = A.post(B + "/api/evcals", json={"name": "Tidy plan"}).json()["id"]
@@ -294,11 +277,13 @@ check(K5 not in ids(Bo.get(B + "/api/evcals")), "F3: bob taken back in the core"
 r = A.delete(B + f"/api/files/nodes/{N5}")
 check(r.status_code == 409, f"review F3: the calendar's entry with shares does not go into the file store's trash alone ({r.status_code})")
 sql("UPDATE fs_nodes SET deleted_at='2026-11-05T00:00:00+00:00' WHERE id=?", (N5,), write=True)  # there anyway (an older version)
-check(K5 not in ids(Bo.get(B + "/api/evcals")), "review F3: its node in the file store's trash -> bob's old member row is not read again")
+check(K5 not in ids(Bo.get(B + "/api/evcals")), "review F3: its node in the file store's trash -> bob stays out")
 sql("DELETE FROM fs_nodes WHERE id=?", (N5,), write=True)  # the file store's trash emptied
-check(not sql("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?", (K5, BOB)) and K5 not in ids(Bo.get(B + "/api/evcals")),
-      "review F3: the node removed for good takes bob's dead member row with it, he stays out")
-check(K5 in ids(Iv.get(B + "/api/evcals")), "review F3: ivy, shared on the node, keeps the calendar through her row")
+# 2.924.0 (#5069): no member rows to write back into any more -- the node's shares go with it (the protect hook above is
+# what keeps a shared node out of the trash)
+check(K5 not in ids(Bo.get(B + "/api/evcals")) and K5 not in ids(Iv.get(B + "/api/evcals")),
+      "#5069: the node removed for good: bob stays out, ivy's share went with the node")
+check(K5 in ids(A.get(B + "/api/evcals")), "#5069: the owner keeps the calendar")
 B5 = A.post(B + "/api/books", json={"name": "Tidy book"}).json()["id"]
 check(A.put(B + f"/api/books/{B5}/members", json={"user_id": IVY, "role": "edit"}).ok, "F3: a book shared with ivy")
 N6 = node("address_book", B5)
@@ -306,16 +291,16 @@ sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (N6, IVY), write=True
 sql("INSERT INTO fs_shares(node_id,user_id,role,created_at) VALUES(?,?,'view','2026-11-05T00:00:00+00:00')", (N6, BOB), write=True)  # only in the core
 check(B5 not in ids(Iv.get(B + "/api/books")) and B5 in ids(Bo.get(B + "/api/books")), "F3: ivy taken back, bob shared in the core only")
 sql("UPDATE fs_nodes SET deleted_at='2026-11-05T00:00:00+00:00' WHERE id=?", (N6,), write=True)
-check(B5 not in ids(Iv.get(B + "/api/books")), "review F3: the book's node in the file store's trash -> ivy's old row is not read again")
+check(B5 not in ids(Iv.get(B + "/api/books")) and B5 not in ids(Bo.get(B + "/api/books")),
+      "review F3: the book's node in the file store's trash -> no share counts")
 sql("DELETE FROM fs_nodes WHERE id=?", (N6,), write=True)
-check(B5 not in ids(Iv.get(B + "/api/books")) and B5 in ids(Bo.get(B + "/api/books")),
-      "review F3: the book's node removed for good: ivy stays out, bob's core-only share lives on as his row")
+check(B5 not in ids(Iv.get(B + "/api/books")) and B5 not in ids(Bo.get(B + "/api/books")),
+      "#5069: the book's node removed for good: its shares went with it")
 
 # ================================================================== review F5: a book's share only in the core goes in the members dialog
 check(A.put(B + f"/api/books/{B5}/members", json={"user_id": IVY, "role": "view"}).ok, "F5: the tidy book shared with ivy again")
 N9 = node("address_book", B5)
-check(N9 is not None and share("address_book", B5, BOB) == "view", "F5: its new node mirrored bob's row as well (F4)")
-sql("DELETE FROM book_members WHERE book_id=? AND user_id=?", (B5, BOB), write=True)
+check(N9 is not None and share("address_book", B5, BOB) is None, "F5: a new node, bob not on it (#5069: no old row to mirror)")
 sql("INSERT INTO fs_shares(node_id,user_id,role,created_at) VALUES(?,?,'view','2026-11-05T00:00:00+00:00')", (N9, BOB), write=True)  # restored in the core
 check(B5 in ids(Bo.get(B + "/api/books")), "F5: bob has the book through the core only")
 r = A.delete(B + f"/api/books/{B5}/members/{BOB}")
@@ -330,9 +315,7 @@ sql("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'admin') ON CONFLIC
 K7 = A.post(B + "/api/evcals", json={"name": "Shared rota", "org_id": ORG}).json()["id"]
 check(A.put(B + f"/api/evcals/{K7}/members", json={"user_id": BOB, "role": "view"}).ok, "F2: the organisation's calendar shared with bob")
 N8 = node("evcal", K7)
-sql("DELETE FROM ev_cal_members WHERE cal_id=? AND user_id=?", (K7, BOB), write=True)
-sql("INSERT INTO fs_shares(node_id,user_id,role,created_at) VALUES(?,?,'view','2026-11-05T00:00:00+00:00')", (N8, BOB), write=True)  # restored in the core
-check(K7 in ids(Bo.get(B + "/api/evcals")), "F2: bob has it through the core only (no member row)")
+check(K7 in ids(Bo.get(B + "/api/evcals")), "F2: bob has it through the core (2.924.0, #5069: the only way)")
 r = A.patch(B + f"/api/evcals/{K7}", json={"org_id": ORG2})
 check(r.status_code == 409, f"review F2: into an organisation bob is not in -> 409 for his core share ({r.status_code} {r.text[:120]})")
 check(sql("SELECT org_id FROM ev_cals WHERE id=?", (K7,)) == [(ORG,)] and sql("SELECT org_id FROM fs_nodes WHERE id=?", (N8,)) == [(ORG,)],
@@ -363,20 +346,7 @@ check(node("evcal", K6) == N7 and sql("SELECT org_id FROM fs_nodes WHERE id=?", 
 check(K6 not in ids(Bo.get(B + "/api/evcals")), "review F1: bob, taken back in the core, does not get her now private calendar back")
 check(K6 in ids(Iv.get(B + "/api/evcals")) and share("evcal", K6, IVY) == "view", "review F1: ivy's core-only share stays with the node")
 
-# ================================================================== the one-shot copy at the start (migr_kern4712)
-K3 = A.post(B + "/api/evcals", json={"name": "Before the update"}).json()["id"]
-B3 = A.post(B + "/api/books", json={"name": "Old book"}).json()["id"]
-sql("INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES(?,?,'edit','2026-11-01T00:00:00+00:00')", (K3, BOB), write=True)
-sql("INSERT INTO book_members(book_id,user_id,role,added_at) VALUES(?,?,'view','2026-11-01T00:00:00+00:00')", (B3, BOB), write=True)
-sql("UPDATE ev_cals SET updated_at='' WHERE id=?", (K3,), write=True)
-check(node("evcal", K3) is None and node("address_book", B3) is None, "rows of an older version: members without a node")
-sql("DELETE FROM settings WHERE key='migr_kern4712'", write=True)
-if kt.fresh(env={"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_API_RATE": "100000"}, prefix="P2566C", keep=True):
-    check(share("evcal", K3, BOB) == "edit" and share("address_book", B3, BOB) == "view",
-          "#4712: the start's one-shot gave them their nodes and copied the members into the core's shares")
-    check(sql("SELECT updated_at<>'' FROM ev_cals WHERE id=?", (K3,)) == [(True,)], "#4712: the one-shot set the calendar's version")
-    check(sql("SELECT value FROM settings WHERE key='migr_kern4712'") == [("1",)], "#4712: and set its flag")
-    Bo2 = sess("bob")
-    check(K3 in ids(Bo2.get(B + "/api/evcals")) and B3 in ids(Bo2.get(B + "/api/books")), "#4712: bob keeps both after the copy")
+# 2.924.0 (#5069): the one-shot copy at the start (migr_kern4712) is part of events/evkern.py ev_kern_drop now:
+# tests/p2924_b_kern_calbook_test.py
 
 sys.exit(kt.done("p2566_c_kern_cal"))

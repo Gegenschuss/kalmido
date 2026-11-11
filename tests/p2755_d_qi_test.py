@@ -128,9 +128,9 @@ check([tuple(x) for x in dbx("SELECT title, body FROM p2755_w WHERE id=1")] == [
 check([tuple(x) for x in dbx("SELECT pos, txt FROM p2755_wm WHERE w_id=1 ORDER BY pos")] == [(1, "old 1"), (2, "old 2")],
       "_write_back replaces the many rows")
 
-# --- 5. obj_org_set: the allowlist of its three names
+# --- 5. obj_org_set: the allowlist of its table name (2.924.0, #5069: the member table and key column went)
 r = in_app("from kalmido.accounts.orgs import obj_org_set\n"
-           + refused("obj_org_set(c, 'users', 'cal_id', 'ev_cal_members', 1, None, 'cal')") + "\nprint(json.dumps({'r': r}))")
+           + refused("obj_org_set(c, 'users', 1, None, 'cal')") + "\nprint(json.dumps({'r': r}))")
 check(r.get("r") == "ValueError", f"obj_org_set refuses a table outside ev_cals / books: {r}")
 
 dbx("DROP TABLE IF EXISTS p2755_ref, p2755_pk, p2755_w, p2755_wm")

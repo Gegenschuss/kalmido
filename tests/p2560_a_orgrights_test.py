@@ -121,14 +121,20 @@ def cal_book(oid, tag, ags):
     return k, bk, ev
 
 
+# 2.924.0 (#5069): a share row of person / agent x on the node of calendar / address book ref_id
+NSHARE = ("SELECT 1 FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind='{k}' AND n.ref_id=? "
+          "AND (s.user_id=? OR s.agent_id=?)")
+
+
 def gone_for(k, bk, ev, tag, agh=None):
     check(k not in ids(Bo.get(B + "/api/evcals")), f"{tag}: the former colleague no longer has the calendar")
     no(Bo.get(B + f"/api/evcals/{k}/export.ics"), f"{tag}: former colleague calendar export")
     no(Bo.patch(B + f"/api/evcals/{k}", json={"name": "x"}), f"{tag}: former colleague changes the calendar")
     check(bk not in ids(Bo.get(B + "/api/books")), f"{tag}: the former colleague no longer has the address book")
     no(Bo.get(B + f"/api/books/{bk}/export.vcf"), f"{tag}: former colleague address book export")
-    check(not sql("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?", (k, BOB))
-          and not sql("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?", (bk, BOB)), f"{tag}: bob's member rows are gone")
+    # 2.924.0 (#5069): the members are the shares of the node (ev_cal_members / book_members are gone)
+    check(not sql(NSHARE.format(k="evcal"), (k, BOB, BOB))
+          and not sql(NSHARE.format(k="address_book"), (bk, BOB, BOB)), f"{tag}: bob's shares are gone")
     check(not sql("SELECT 1 FROM event_attendees WHERE event_id=? AND user_id=?", (ev, BOB)), f"{tag}: bob's invitation is gone")
     if agh:
         check(k not in ids(requests.get(V + "/event-calendars", headers=agh)), f"{tag}: the former agent lists no calendar (API v1)")
@@ -153,9 +159,9 @@ lock_doc(r.json().get("id"))
 r = A.delete(B + f"/api/admin/orgs/{R1}", params={"confirm": "1"})
 check(r.ok and r.json().get("retired") is True, "retire: the organisation is retired " + r.text[:200])
 gone_for(K1, BK1, EV1, "retire", AGH)
-check(not sql("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?", (K1, AG)), "retire: the organisation's agent's row is gone")
-check(sql("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?", (K1, PA)) != []
-      and sql("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?", (BK1, PA)) != [], "retire: the owner's own agent stays")
+check(not sql(NSHARE.format(k="evcal"), (K1, AG, AG)), "retire: the organisation's agent's share is gone")
+check(sql(NSHARE.format(k="evcal"), (K1, PA, PA)) != []
+      and sql(NSHARE.format(k="address_book"), (BK1, PA, PA)) != [], "retire: the owner's own agent stays")
 
 # ================================================================== #4697 delete (no retention)
 D1 = org("Delete One")

@@ -116,6 +116,7 @@ from ..files.web import _agent_event, _inherited_shares, _share_targets, _shares
 from .dlock import dl_of
 from ..files.fslock import fl_is_locked, fsl_denied
 from ..accounts.orgretain import upg_heir
+from ..accounts.orgretain import obj_share_gone  # 2.924.0 (#5069)
 
 from .objhooks import BOUNDARY  # 2.649.0 (#5051)
 from .undogroups import ug_drop  # 2.747.0 (#5249): a person's step groups go where their undo rows go
@@ -194,15 +195,19 @@ def f_date(null=True):
 def obj_register(kind, table, *, label, fields, open_url=None, space=None, title=None, base_role=None, visible=None, cap=None,
                  hidden=None, org_access="edit", area="other", scopes=("read", "tasks:write"), dl_area=None, feat=None,
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
-                 fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True, members=None,
-                 fs_hooks=None, org_join="member", children=(), trash_prune=False, node=True, agent_own=False):
+                 fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True, node_shares=False,
+                 fs_hooks=None, org_join="member", children=(), trash_prune=False, node=True, agent_own=False,
+                 on_share_back=None):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload).
     2.565.0 (#4719): listed=False = the object's reference node only carries its shares (files/fsref.py): it lies in no
     folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take.
-    2.566.0 (#4712, stage 3): members = (table, key column) of the area's old member table while it moves onto the core (one
-    release a fallback reader, its rows mirrored into the shares of the object's node by a trigger, migrations.d/4712_a.py):
-    obj_revoke_person takes its rows with the shares (leave: the person and their agents; retire: everyone but the owner
-    and the owner's own agents), so a fallback row never opens what the core closed. fs_hooks = keyword arguments of fs_ref_register that replace the core's
+    2.924.0 (#5069, stage 7b): node_shares=True = an area whose own sharing dialog writes the shares of the object's node (the
+    calendars and address books; their old member tables of stage 3, members= before, are gone): the node does not go into the
+    file store's trash alone while it carries shares (_members_protect), when an organisation retires the shares of the
+    owner's own agents stay on it (their delegates; the node follows the object into the owner's private tree), and the
+    generic routes GET /api/obj/<kind>/<id>/shares and POST .../shares/<rid>/restore serve it (core/objweb.py).
+    on_share_back = f(c, uid, id, share) after obj_share_restore put a share of such a kind back the core's way (the core
+    checked the target): the area's side effects (cal_touch / book_touch, the News of a new share). fs_hooks = keyword arguments of fs_ref_register that replace the core's
     (base_role, on_trash, content_gate ...): a kind the file store knew before the core keeps its folder rules (contacts:
     filing and sharing the book's node stay with who manages it, files/fsref.py 2.199.0 F).
     2.579.0 (#4802): org_join = who may bring an object into an organisation (obj_create with org_id, core/writes.py
@@ -215,8 +220,8 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
     if not _NAME.fullmatch(kind or "") or not _TABLE.fullmatch(table or ""):
         raise ValueError(f"obj_register: invalid kind / table {kind!r} {table!r}")
     if not node:  # 2.754.0 (#5268): a light kind (module docstring): only its role, title, open_url and space
-        if base_role is None or fields or members:
-            raise ValueError(f"obj_register {kind}: a kind without a node needs base_role and has no fields or members")
+        if base_role is None or fields or node_shares:  # 2.924.0 (#5069): node_shares was members
+            raise ValueError(f"obj_register {kind}: a kind without a node needs base_role and has no fields or node shares")
         routes, fsref = False, False
     elif base_role is not None and visible is None:
         raise ValueError(f"obj_register {kind}: a base_role hook needs its visible hook (obj_visible_sql)")
@@ -231,12 +236,10 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
            # 2.568.0 (#4739): an old area with its own reference kind and role table (module docstring)
            "fsref": bool(fsref), "share_cols": tuple(x for x in share_cols if _TABLE.fullmatch(x)), "on_restore": on_restore,
            "on_revoke": on_revoke, "list_col": list_col if _TABLE.fullmatch(list_col or "") else "list_id",
-           "members": tuple(members) if members else None,  # 2.566.0 (#4712)
+           "node_shares": bool(node_shares), "on_share_back": on_share_back,  # 2.924.0 (#5069): was members= (stage 3)
            "org_join": org_join,  # 2.579.0 (#4802)
            "node": bool(node),  # 2.754.0 (#5268)
            "agent_own": bool(agent_own)}  # 2.905.0 (#5288)
-    if members and (len(members) != 2 or not all(_TABLE.fullmatch(x or "") for x in members)):
-        raise ValueError(f"obj_register {kind}: members must be (table, key column)")
     kids = tuple(tuple(x) for x in (children or ()))  # 2.773.0 (#5292)
     if any(len(x) != 2 or not all(_TABLE.fullmatch(y or "") for y in x) or x[0] == table for x in kids):
         raise ValueError(f"obj_register {kind}: children must be ((table, key column), ...) of other tables")
@@ -269,7 +272,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                 return "stays"
         return on_trash(c, uid, rid, restore) if on_trash else None
 
-    if members and protect is None:  # review F3 (#4712): the node of a shared object stays out of the file store's trash alone
+    if node_shares and protect is None:  # review F3 (#4712): the node of a shared object stays out of the file store's trash alone
         protect = _members_protect(kind)
     fsr = dict(label=label, open_url=reg["open_url"], base_role=fsr_base, space=lambda c, rid: obj_space(c, kind, rid),
                protect=protect, hidden=hidden, on_trash=fsr_on_trash, title=lambda c, rid: obj_title(c, kind, rid),
@@ -280,7 +283,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
 
 
 def _members_protect(kind):
-    """2.566.0 (#4712, review F3): the file store's protect hook of a kind with an old member table: while its node carries
+    """2.566.0 (#4712, review F3): the file store's protect hook of a kind with node_shares (#5069): while its node carries
     shares it does not go into the file store's trash on its own (its people would lose the object while the object itself
     stays); it goes there with the object (obj_trash), a folder going into the trash leaves it one level up."""
     def protect(c, rid):
@@ -834,6 +837,8 @@ def obj_share_restore(c, uid, kind, rid, revoked_id):
     if own:
         s2 = dict(s, id=sid)
         reg["on_restore"](c, uid, int(rid), s2)
+    elif reg.get("on_share_back"):  # 2.924.0 (#5069, fable F3): a calendar's / book's side effects (touch, News), the core checked
+        reg["on_share_back"](c, uid, int(rid), dict(s, id=sid))
     return sid
 
 
@@ -931,6 +936,40 @@ def obj_member_take(c, by, kind, rid, key, targets, reason="unshare"):
     return out
 
 
+# ---------------------------------------------------------------- 2.924.0 (#5069): a calendar's / address book's own dialog
+def obj_node_person_put(c, by, n, target, role):
+    """The share of person / agent target on reference node n (a row; a kind with node_shares) after the area's own dialog
+    checked who may share and with whom (events/model.py cal_member_set, contacts/model.py book_member_set): it replaces the
+    old member row of stage 3. The same target again changes the role of each of its rows on the node; a row whose end date
+    has passed comes back without one (sharing anew lets the person in again, #5089), a still valid end date (given in the
+    file store's dialog) stays. Returns True when the target had no row on the node (a new member: the area's News). The
+    caller commits."""
+    if role not in ("view", "edit"):
+        raise BadInput(tr("Invalid data"))
+    u = c.execute("SELECT kind FROM users WHERE id=?", (int(target),)).fetchone()
+    key = "agent_id" if u is not None and (u[0] or "user") == "agent" else "user_id"
+    now = iso(now_utc())
+    with system_ctx(c):  # the node may lie in an organisation's tree; the area checked the right
+        n_old = c.execute("UPDATE fs_shares SET role=?, expires_at=CASE WHEN expires_at IS NOT NULL AND expires_at<=? THEN NULL "
+                          "ELSE expires_at END WHERE node_id=? AND (user_id=? OR agent_id=?)",
+                          (role, now, n["id"], int(target), int(target))).rowcount
+        if not n_old:
+            insert_id(c, f"INSERT INTO fs_shares(node_id,{key},role,created_by,created_at,by_role) VALUES(?,?,?,?,?,?)",
+                      (n["id"], int(target), role, by, now, _by_role(c, by, n["org_id"]) if by else None))
+        fs_log_add(c, n["id"], "share", f"{key[:-3]}:{int(target)}:{role}")
+    obj_forget()
+    return not n_old
+
+
+def obj_node_person_drop(c, kind, rid, who):
+    """Person / agent who leaves the object of kind (its own dialog: the owner takes them out, or they leave): every share row
+    of theirs on its reference node goes (deleted, as the old member row went; no obj_revoked: the dialog shares anew).
+    Returns the number of rows. The caller checked the right and commits."""
+    out = obj_share_gone(c, kind, rid, who)
+    obj_forget()
+    return out
+
+
 # ---------------------------------------------------------------- revocation in one place
 def _take(c, src, sql, args, reason, by, org, who_col, kind=None):
     """Moves the rows of src matching sql into obj_revoked and deletes them. Returns their number."""
@@ -996,11 +1035,6 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                                      (*ppl, *ppl, int(org)), reason, by, int(org), "user_id")
             # 2.649.0 (#5051): their public links and file requests in the organisation die (coming back, also as a guest = still dead)
             out.update(_take_public(c, "created_by=? AND org_id=?", (int(uid), int(org)), reason, by, int(org)))
-            for reg in OBJ.values():  # 2.566.0 (#4712): the old member tables of kinds moving onto the core (ev_cal_members ...)
-                if reg["members"]:
-                    mt, key = reg["members"]
-                    out[mt] = _take(c, mt, f"user_id IN ({q}) AND {key} IN (SELECT id FROM {reg['table']} WHERE org_id=?)",
-                                    (*ppl, int(org)), reason, by, int(org), "user_id", kind=reg["kind"])
             ug_drop(c, "user_id=? AND org_id=?", (int(uid), int(org)))  # 2.747.0 (#5249): the step groups there with their parts
             c.execute("DELETE FROM obj_undo WHERE user_id=? AND org_id=?", (int(uid), int(org)))
             if heir and heir != uid:
@@ -1021,21 +1055,14 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                                          (*ppl, *ppl, int(org)), reason, by, int(org), "user_id")
         elif reason == "retire" and org:
             # 2.566.0 (#4712, review F1): the shares of the owner's own agents on a calendar's / book's node stay (their delegates,
-            # as their member rows below): the node follows the object into the owner's private tree (orgretain.obj_nodes_follow)
+            # 2.924.0, #5069: their old member rows are gone): the node follows the object into the owner's private tree (orgretain.obj_nodes_follow)
             keep = "".join(f" AND NOT EXISTS (SELECT 1 FROM fs_nodes n JOIN {r['table']} k ON k.id=n.ref_id JOIN agents a ON "
                            f"a.user_id=fs_shares.agent_id AND a.owner_id=k.owner_id WHERE n.id=fs_shares.node_id AND n.kind='ref' "
-                           f"AND n.ref_kind='{r['kind']}')" for r in OBJ.values() if r["members"])
+                           f"AND n.ref_kind='{r['kind']}')" for r in OBJ.values() if r["node_shares"])
             out["fs_shares"] = _take(c, "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)" + keep, (int(org),), reason, by,
                                      int(org), "user_id")
             # 2.924.0 (#5069): the rooms' members are the shares above (tchat_members is no member table any more)
             out.update(_take_public(c, "org_id=?", (int(org),), reason, by, int(org)))  # 2.649.0 (#5051)
-            for reg in OBJ.values():  # 2.566.0 (#4712, #4697): everyone but the owner and the owner's own agents (their delegates)
-                if reg["members"]:
-                    mt, key = reg["members"]
-                    out[mt] = _take(c, mt, f"{key} IN (SELECT id FROM {reg['table']} WHERE org_id=?) AND NOT EXISTS (SELECT 1 FROM "
-                                    f"{reg['table']} k WHERE k.id={mt}.{key} AND (k.owner_id={mt}.user_id OR EXISTS (SELECT 1 FROM "
-                                    f"agents a WHERE a.user_id={mt}.user_id AND a.owner_id=k.owner_id)))",
-                                    (int(org),), reason, by, int(org), "user_id", kind=reg["kind"])
             ug_drop(c, "org_id=?", (int(org),))  # 2.747.0 (#5249)
             c.execute("DELETE FROM obj_undo WHERE org_id=?", (int(org),))
         elif reason == "delete" and uid:
@@ -1085,13 +1112,9 @@ def _boundary_share(c, n, s):
 
 
 def _boundary_old(c, reg, rid, uid, org):
-    """The old member row of core object rid (a calendar's / book's member table) of person uid. 2.924.0 (#5069): a room has
-    none any more (its shares are the members)."""
-    mt, key = reg["members"] or (None, None)
-    if not mt:
-        return 0
-    return _take(c, mt, f"{key}=? AND user_id=?", (int(rid), int(uid)), "boundary", None, org, "user_id",
-                 kind=reg["kind"] if reg["members"] else None)
+    """The old member row of core object rid of person uid. 2.924.0 (#5069): none any more -- a room's, a calendar's and an
+    address book's members are the shares of its node (tchat_members, ev_cal_members and book_members are gone)."""
+    return 0
 
 
 def obj_boundary_take(c, table, oid, uid):
@@ -1118,7 +1141,9 @@ def obj_boundary_take(c, table, oid, uid):
                     c.execute("UPDATE sheet_shares SET revoked_at=? WHERE id=?", (iso_ms(now_utc()), x["id"]))
                 out += 1
         else:
-            reg = next((r for r in OBJ.values() if (r["members"] or (None,))[0] == table), None)  # 2.924.0 (#5069): no tchat_members
+            # 2.924.0 (#5069): a calendar's / book's member is the share of its node: tenancy REPAIR names the kind (evcal |
+            # address_book) instead of the gone member table
+            reg = OBJ[table] if table in OBJ and OBJ[table]["node_shares"] else None
             if reg is None:
                 return None
             org = c.execute(f"SELECT org_id FROM {reg['table']} WHERE id=?", (oid,)).fetchone()

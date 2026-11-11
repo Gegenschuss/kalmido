@@ -18208,5 +18208,6 @@
   "Filter “{0}” changed": "Filter „{0}“ geändert",
   "Edit filter…": "Filter bearbeiten…",
   "Words or the search syntax (tag:Name, \"exact text\", -word)": "Wörter oder Suchsyntax (tag:Name, \"genauer Text\", -Wort)",
+  "Shared core: {0} old member rows of calendars or address books have no node in the core yet, so the old tables stay. The server log names them; the next start checks again.": "Gemeinsamer Kern: {0} alte Mitglieds-Zeilen von Kalendern oder Adressbüchern haben noch keinen Knoten im Kern, darum bleiben die alten Tabellen stehen. Das Server-Log nennt sie; der nächste Start prüft erneut.",
   "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Aufräumen im gemeinsamen Kern wartet: {0} alte Mitglieder-Zeilen in {1} sind noch nicht im Kern geteilt, die alte Tabelle bleibt. Siehe Server-Log."
 }

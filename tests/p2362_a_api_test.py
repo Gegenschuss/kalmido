@@ -117,6 +117,9 @@ AA = None
 r = A.post(B + f"/api/tasks/{TA}/attachments", files={"file": (f"{MARK}.txt", b"secret\n", "text/plain")})
 if r.ok:
     AA = dbx("SELECT id FROM attachments WHERE task_id=? ORDER BY id DESC LIMIT 1", (TA,))[0][0]
+# 2.924.0 (#5069): person x's share row on the node of calendar / address book ref_id (the membership since stage 7b)
+NODE_SHARE = ("SELECT 1 FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind='{k}' AND n.ref_id=? "
+              "AND s.user_id=?")
 KA = A.post(B + "/api/evcals", json={"name": f"{MARK} cal"}).json()
 check(KA.get("org_id") == ORG, "setup: the calendar is Alpha's " + str(KA))
 KA = KA["id"]
@@ -183,8 +186,9 @@ check(LA not in (layer_lists(DAVE) or {LA}), "layer: dave's list scope no longer
 
 # a membership row left behind (as an older version could leave it) gives no access back: second floor
 dbx("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,'edit','edit',0,?) ON CONFLICT DO NOTHING", (LA, DAVE, TS), write=True)
-dbx("INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES(?,?,'view',?) ON CONFLICT DO NOTHING", (KA, DAVE, TS), write=True)
-dbx("INSERT INTO book_members(book_id,user_id,role,added_at) VALUES(?,?,'view',?) ON CONFLICT DO NOTHING", (BA, DAVE, TS), write=True)
+# 2.924.0 (#5069): a calendar's / book's member is a share of its node (ev_cal_members / book_members are gone)
+dbx("INSERT INTO fs_shares(node_id,user_id,role,created_at) SELECT id, ?, 'view', ? FROM fs_nodes WHERE kind='ref' AND ref_kind='evcal' AND ref_id=?", (DAVE, TS, KA), write=True)
+dbx("INSERT INTO fs_shares(node_id,user_id,role,created_at) SELECT id, ?, 'view', ? FROM fs_nodes WHERE kind='ref' AND ref_kind='address_book' AND ref_id=?", (DAVE, TS, BA), write=True)
 sees_nothing("dave", "left-behind rows")
 check(LA not in (layer_lists(DAVE) or {LA}) and LA not in (layer_lists(DAVE, True) or {LA}), "layer: left-behind row not in the scope (read / write)")
 r = S["dave"].post(B + f"/api/tasks/{TAP}/approval", json={"action": "cancel"})
@@ -196,7 +200,7 @@ mem = [r[0] for r in dbx("SELECT user_id FROM org_members WHERE org_id=?", (ORG,
 r = A.patch(B + f"/api/admin/orgs/{ORG}", json={"members": mem})
 check(r.ok, "path 2: the instance admin sets the members " + r.text[:100])
 check(not dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (LA, BOB)), "path 2: bob left the list (like org_leave)")
-check(not dbx("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?", (KA, BOB)), "path 2: bob left the calendar")
+check(not dbx(NODE_SHARE.format(k="evcal"), (KA, BOB)), "path 2: bob left the calendar")
 sees_nothing("bob", "path 2 (members set by the instance admin)")
 
 # ================================================================== path 3: frank leaves himself
@@ -329,7 +333,7 @@ check(S["alice"].get(B + f"/api/tasks/{TA}").ok and MARK in S["alice"].get(B + f
 
 # ================================================================== the nightly check repairs memberships across the boundary
 dbx("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,'edit','edit',0,?) ON CONFLICT DO NOTHING", (LA, ZED, TS), write=True)
-dbx("INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES(?,?,'view',?) ON CONFLICT DO NOTHING", (KA, ZED, TS), write=True)
+dbx("INSERT INTO fs_shares(node_id,user_id,role,created_at) SELECT id, ?, 'view', ? FROM fs_nodes WHERE kind='ref' AND ref_kind='evcal' AND ref_id=?", (ZED, TS, KA), write=True)
 check(LA not in lists_of(Z), "left-behind row for zed: still no access")
 restart("-e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_TENANT_CHECK=always", KALMIDO_ADMIN_ALERTS="1")
 A = sess("alice")
@@ -341,8 +345,8 @@ for _ in range(30):
     time.sleep(0.5)
 check(len(items) == 1 and MARK not in items[0]["message"], "repair: one security alert with counts only " + str([i["message"] for i in items]))
 check(not dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id IN (?,?)", (LA, DAVE, ZED)), "repair: the rows across the boundary are gone (lists)")
-check(not dbx("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id IN (?,?)", (KA, DAVE, ZED)), "repair: (calendars)")
-check(not dbx("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?", (BA, DAVE)), "repair: (address books)")
+check(not dbx(NODE_SHARE.format(k="evcal"), (KA, DAVE)) and not dbx(NODE_SHARE.format(k="evcal"), (KA, ZED)), "repair: (calendars)")
+check(not dbx(NODE_SHARE.format(k="address_book"), (BA, DAVE)), "repair: (address books)")
 check(dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (LA, ERIN)), "repair: members of the organisation stay")
 check(A.get(B + "/api/admin/orgs").json()["boundary"]["violations"] == 0, "repair: the boundary is clean")
 

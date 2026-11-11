@@ -19,6 +19,7 @@ from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from function
 from .navmenus import nav_clean_org, nav_org_off  # 2.418.0 (#3560)
 from .orgretain import Nn_, odl_former  # 2.186.0 A (#2599); 2.414.0 (#3502): Nn_ marks the plural pair below
 from .orgretain import obj_nodes_follow  # 2.566.0 (#4712)
+from .orgretain import obj_share_gone  # 2.924.0 (#5069)
 from .pictures import org_icon_tok, org_icon_url, AVATAR_MAX_MB, LIST_ICON_DIR, list_icon_process, org_icon_drop_file, org_icon_path  # 2.369.5 (#2517): pulled up from functions
 from ..core.i18n import trn  # 2.369.5 (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.369.5 (#2517): pulled up from functions
@@ -507,12 +508,12 @@ def ws_chosen_org(c, uid):
     return mine[0] if len(mine) == 1 else None
 
 
-_OBJ_ORG_TABLES, _OBJ_ORG_MEMBERS, _OBJ_ORG_KEYS = {"ev_cals", "books"}, {"ev_cal_members", "book_members"}, {"cal_id", "book_id"}
+_OBJ_ORG_TABLES = {"ev_cals", "books"}  # 2.755.0 (#5296); 2.924.0 (#5069): the old member tables are gone
 
 
-def obj_org_set(c, table, oid_col, members, obj_id, v, kind):
-    """2.30.0 (#1036): the owner moves calendar / address book obj_id (table ev_cals | books, its member table + key column)
-    into workspace v (clean_org_id). Refused (409) while a member (person or agent) does not fit the new workspace (named).
+def obj_org_set(c, table, obj_id, v, kind):
+    """2.30.0 (#1036): the owner moves calendar / address book obj_id (table ev_cals | books; 2.924.0, #5069: without its old
+    member table) into workspace v (clean_org_id). Refused (409) while a member (person or agent) does not fit the new workspace (named).
     Returns True when it changed. The caller commits."""
     # 2.755.0 (#5296): the names only from the allowlist
     r = c.execute(f"SELECT owner_id, org_id FROM {qi(table, _OBJ_ORG_TABLES)} WHERE id=?", (obj_id,)).fetchone()
@@ -523,7 +524,7 @@ def obj_org_set(c, table, oid_col, members, obj_id, v, kind):
     oid = clean_org_id(c, v, me())
     if (oid or None) == (r["org_id"] or None):
         return False
-    for uid in _obj_sharers(c, table, members, oid_col, obj_id):
+    for uid in _obj_sharers(c, table, obj_id):
         p = ws_fit_problem(c, oid, uid, kind)
         if p:
             raise Denied(409, p)
@@ -540,17 +541,16 @@ def obj_org_set(c, table, oid_col, members, obj_id, v, kind):
     return True
 
 
-def _obj_sharers(c, table, members, oid_col, obj_id):
+def _obj_sharers(c, table, obj_id):
     """2.566.0 (#4712, review F2): the people and agents calendar / address book obj_id is shared with, as the shared core
-    sees it: the shares of its reference node (they follow it into the new workspace, core/objects.obj_node_follow), else
-    its old member rows. A group's share on the node is refused (409): a group has no workspace, and the core lets a share
+    sees it: the shares of its reference node (they follow it into the new workspace, core/objects.obj_node_follow; 2.924.0,
+    #5069: no node = nobody, the old member rows are gone). A group's share on the node is refused (409): a group has no workspace, and the core lets a share
     go only to the people of the object's own one -- its owner takes it back first (the file store's dialog)."""
     ref = {"ev_cals": "evcal", "books": "address_book"}[table]
     with system_ctx(c):  # structure: the node may lie in the organisation's tree, its shares are the owner's own object's
         n = c.execute("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (ref, int(obj_id))).fetchone()
-        if n is None:
-            sql = f"SELECT user_id FROM {qi(members, _OBJ_ORG_MEMBERS)} WHERE {qi(oid_col, _OBJ_ORG_KEYS)}=? ORDER BY user_id"
-            return [r[0] for r in c.execute(sql, (obj_id,)).fetchall()]
+        if n is None:  # 2.924.0 (#5069): no node = shared with nobody (the old member rows are gone)
+            return []
         rows = c.execute("SELECT user_id, agent_id, group_id FROM fs_shares WHERE node_id=? ORDER BY id", (n[0],)).fetchall()
     if any(r["group_id"] for r in rows):
         raise Denied(409, tr("Shared with a group: remove that share before the workspace changes"))
@@ -1683,10 +1683,10 @@ def org_leave(c, oid, uid, heir, back=None):
     obk_leave(c, oid, uid, heir)  # 2.52.0 C (#1438): the organisation's own address books stay with it (another manager)
     # 2.30.0 (#1036): the organisation's calendars and address books follow the same way: the leaver's go to heir (else
     # they become private), the leaver leaves the ones of others
-    for table, mt, key in (("ev_cals", "ev_cal_members", "cal_id"), ("books", "book_members", "book_id")):
+    for table, kind in (("ev_cals", "evcal"), ("books", "address_book")):
         for (xid,) in c.execute(f"SELECT id FROM {table} WHERE owner_id=? AND org_id=?", (uid, oid)).fetchall():
             if heir and heir != uid:
-                c.execute(f"DELETE FROM {mt} WHERE {key}=? AND user_id=?", (xid, heir))
+                obj_share_gone(c, kind, xid, heir)  # 2.924.0 (#5069): the new owner needs no share of its own (was the old member row)
                 c.execute(f"UPDATE {table} SET owner_id=? WHERE id=?", (heir, xid))
             else:
                 c.execute(f"UPDATE {table} SET org_id=NULL WHERE id=?", (xid,))

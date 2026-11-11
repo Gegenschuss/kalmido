@@ -102,8 +102,7 @@ B1 = book(An, "Friends")
 for who, role in ((DORA, "view"), (CARA, "edit"), (BERT, "edit")):
     assert An.put(B + f"/api/books/{B1}/members", json={"user_id": who, "role": role}).ok
 # within one second the lower id wins: cara's share is made the older one, so the date is what decides here
-write("UPDATE book_members SET added_at='2020-01-01T00:00:00Z' WHERE book_id=? AND user_id=?", (B1, CARA))
-# 2.647.0 (#5046): the heir is read from the core's shares of the book's node (its created_at), no longer from book_members
+# 2.647.0 (#5046): the heir is read from the core's shares of the book's node (its created_at); 2.924.0 (#5069): book_members is gone
 write("UPDATE fs_shares SET created_at='2020-01-01T00:00:00Z' WHERE user_id=? AND node_id IN (SELECT id FROM fs_nodes WHERE kind='ref' "
       "AND ref_kind='address_book' AND ref_id=?)", (CARA, B1))
 r = Be.post(B + "/api/contacts", json={"book_id": B1, "fn": "Olaf Example"})
@@ -182,9 +181,14 @@ r = A.delete(B + f"/api/users/{ANNA}")
 check(r.ok, "the account goes " + r.text[:200])
 
 check(owner("ev_cals", C1) == BERT, "the shared calendar: the longest-standing active person with edit (not the read-only or disabled one)")
-check(not dbx("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?", (C1, BERT)), "the new owner has no share of its own")
-check(dbx("SELECT role FROM ev_cal_members WHERE cal_id=? AND user_id=?", (C1, CARA))[0][0] == "edit", "cara keeps her share")
-check(dbx("SELECT role FROM ev_cal_members WHERE cal_id=? AND user_id=?", (C1, DORA))[0][0] == "view", "dora keeps hers")
+# 2.924.0 (#5069): the shares of the calendar's node are its members (ev_cal_members is gone); the node went into bert's tree
+NROLE = ("SELECT s.role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=? "
+         "AND (s.user_id=? OR s.agent_id=?)")
+check(not dbx(NROLE, ("evcal", C1, BERT, BERT)), "the new owner has no share of its own")
+check(dbx(NROLE, ("evcal", C1, CARA, CARA)) == [("edit",)], "cara keeps her share")
+check(dbx(NROLE, ("evcal", C1, DORA, DORA)) == [("view",)], "dora keeps hers")
+check(dbx("SELECT owner_id FROM fs_nodes WHERE kind='ref' AND ref_kind='evcal' AND ref_id=?", (C1,)) == [(BERT,)],
+      "2.924.0 (#5069): the calendar's node lives on in the heir's tree (the deleted person's tree went)")
 r = Ca.get(B + f"/api/events/{EV}")
 check(r.ok, "cara's appointment is still there " + r.text[:120])
 r = Be.patch(B + f"/api/evcals/{C1}", json={"name": "Family, now bert's"})
@@ -197,8 +201,10 @@ check(owner("books", B1) == CARA, f"the shared book: the longest-standing edit s
 check(Be.get(B + f"/api/contacts/{CT}").ok, "bert's contact is still there")
 check(owner("books", B2) is None, "a read-only book goes")
 check(owner("books", B3) == CARA, f"a book through the folder's edit share ({owner('books', B3)})")
-check(dbx("SELECT role FROM book_members WHERE book_id=? AND user_id=?", (B3, DORA))[0][0] == "view", "the folder's read share lives on as a share of the book")
-check(not dbx("SELECT 1 FROM fs_nodes WHERE ref_kind='address_book' AND ref_id=?", (B3,)), "the book's node left with the folder")
+check(dbx(NROLE, ("address_book", B3, DORA, DORA)) == [("view",)], "the folder's read share lives on as a share of the book")
+# 2.924.0 (#5069): the book keeps its node (its shares are the members now): out of the folder, into cara's tree
+check(dbx("SELECT owner_id, parent_id FROM fs_nodes WHERE kind='ref' AND ref_kind='address_book' AND ref_id=?", (B3,)) == [(CARA, None)],
+      "the book's node left the folder for the heir's tree")
 
 check(owner("sheets", S1) == BERT and owner("sheet_files", FILE) == BERT, "the shared table and its file: the longest-standing write share")
 r = Be.get(B + f"/api/sheets/{S1}")
