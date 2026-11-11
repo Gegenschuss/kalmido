@@ -270,8 +270,26 @@ c.commit()
   its own restore / trash (`ua_trash_fix`) and re-checks the target the copy puts the row into (calendar, address book,
   folder). A file's content is never copied: its step holds the version it pointed at (`cur_version`); a version the
   clean-up removed cannot come back (409); `FSU_VERSION_HOOKS` let an area refresh what it derived from the content.
-  The browser's own steps (`histAdd`) stay until stages 2 / 7. Not yet: CalDAV / CardDAV and API v1 writes, budget,
-  settings.
+  The browser's own steps (`histAdd`) stay until stages 2 / 7.
+- Undo across devices, stage 6 rest (2.985.0, #5394): CalDAV / CardDAV PUT and DELETE of an event / a card record the same
+  steps as the app (the device = the app password's name, `g.undo_device`); API v1 shares the app's write functions, so a
+  person's token records them too. A whole calendar / address book into the trash and out of it is a trash step of its core
+  kind taken back the area's own way (`core/undoweb.py` `undo_trash_reg`: the calendar with its events, the book with its
+  contacts' links and birthday tasks; an undo sends no mails). Settings are key-value rows without id or version: one diff
+  part per changed key (`accounts/setundo.py`, kind `setting`, area `self`, recorded before the commit; view state such as
+  folded folders or the shown workspace is no step), the reset of the settings one group. Budget entries
+  (`life/budundo.py`, kind `budget_entry`) carry their sealed values as stored; `obj_track(undo_spaces=)` names the spaces
+  whose keys sealed the copy, and `_undo_rekeyed` refuses it (409, before the fingerprint) when such a key was rotated
+  since or the list's space is not the copy's any more (moved, encryption switched) -- a copy is never written back under
+  another key. Not yet: budget categories and templates, the project settings.
+  Review of #5394 (same release): a device's DAV writes join one group per app password and area for 10 minutes
+  (`core/undogroups.py` `undo_bundle`, label "Several changes") and never end the person's way forward; a setting changed
+  again from the same device within 10 minutes joins its step while that is the newest. Privacy choices (push channel,
+  "title only", sharing defaults, photo metadata, video players, read receipts, own mails, quiet hours, busy times) are
+  no step; `su_run` checks the key again and writes through `clean_setting`. A reset's step brings the view state and the
+  active saved arrangement back and empties the app's own "undo the reset". `obj_track(hist_skip=)` keeps sealed columns
+  out of `obj_history`; a budget list resealed (`bud_settle`) drops its entries' undo copies and history rows
+  (`core/writes.py` `obj_undo_forget`), so no plain copy outlives switching the encryption on.
 - Undo across devices, stage 7 (2.905.0, #5255): the browser keeps no copies and no undo functions for areas whose writes
   record a step. A write that recorded one answers with `X-Kalmido-Undo-Gid: <group>` (`core/undoweb.py`
   `undo_gid_header`); `static/js/undo.js` `histAdd` puts the group into the entry (`gids`; a change still in the outbox:

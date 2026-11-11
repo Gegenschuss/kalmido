@@ -113,7 +113,7 @@ check(g.get("state") == "done" and g.get("area") == "office" and g.get("label_ke
 it = A.get(B + "/api/undo").json()["items"]
 check(it and it[0]["id"] == g["id"] and it[0]["label"] == f"Changed: Invoice #{I1}", f"GET /api/undo: the label in the reader's language {it[:1]}")
 A.patch(B + "/api/settings", json={"lang": "de"})
-it = A.get(B + "/api/undo").json()["items"]
+it = [x for x in A.get(B + "/api/undo").json()["items"] if x.get("area") != "self"]  # 2.985.0 (#5394): the language switch is a step of its own
 check(it and it[0]["label"] == f"Geändert: Rechnung #{I1}", f"... and in German {it[:1]}")
 A.patch(B + "/api/settings", json={"lang": "en"})
 check(A.patch(B + f"/api/clients/{CL}", json={"note": "VIP"}).ok, "alice changes the client")

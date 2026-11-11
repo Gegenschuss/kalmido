@@ -76,6 +76,7 @@ NEED_VERSION = N_("Send expect_updated_at (the updated_at you read): agents chan
 UNDO_CONFLICT = N_("Changed by someone else in the meantime, so it cannot be undone")
 UNDO_MOVED = N_("Moved to another workspace in the meantime, so it cannot be undone")
 UNDO_REKEYED = N_("The organisation's key was changed since then, so it cannot be undone")  # 2.747.0 (#5249, review F1)
+UNDO_SPACE_REKEYED = N_("The key of its space was changed since then, so it cannot be undone")  # 2.985.0 (#5394): obj_track undo_spaces
 UNDO_NOTHING = N_("Nothing to undo")
 PURGE_FIRST = N_("Put it into the trash first")
 UG_TRASHED = N_("Moved to the trash: {0}")  # 2.773.0 (#5292): the label of a trash step (core/undogroups.py)
@@ -88,16 +89,24 @@ MOVE_SHARED = N_("It is shared with people or agents: remove those shares first"
 OBJ_TRACK = {}  # 2.567.0 (#4711): kind -> {table, area, undo_scope, undo_keep, undo_nofp, fields: None} (obj_track)
 
 
-def obj_track(kind, table, *, area="other", undo_scope=None, undo_keep=None, undo_nofp=None, undo_label=None, undo_free=None):
+def obj_track(kind, table, *, area="other", undo_scope=None, undo_keep=None, undo_nofp=None, undo_label=None, undo_free=None,
+              undo_spaces=None, hist_skip=None):
     """2.567.0 (#4711): an old area's kind for the history and the undo only (module docstring). undo_keep / undo_nofp:
     {table: {column}} never written back on undo / never part of the fingerprint (a number drawn since, cached sums).
     2.747.0 (#5252): undo_label(main row as stored) -> (i18n key, [values]) = the label of its step group (obj_undo_pre).
     2.777.0 (#5254): undo_free = columns of UNDO_FIXED the undo writes back on the MAIN row all the same (deleted_at,
-    deleted_by: a step "into the trash" goes back; the area's fix then does what its own restore / trash does besides)."""
+    deleted_by: a step "into the trash" goes back; the area's fix then does what its own restore / trash does besides).
+    2.985.0 (#5394): undo_spaces(c, snap) -> [space ids] whose keys sealed the copy about to be written back (core/orgcrypt.py:
+    an organisation > 0, an account < 0); a rotation of one since the step (or one running) refuses it like the
+    organisation's own (_undo_rekeyed). The function itself raises Denied(409) when the copy's space is not the one its rows
+    belong to now (a list moved into another space, its encryption switched) -- life/budundo.py.
+    2.985.0 (#5394, review F2): hist_skip = main-row columns never written into obj_history by an undo / redo (obj_undo_hist:
+    the sealed columns of a budget entry -- a plain copy there would outlive the encryption)."""
     UG_TRACKED[kind] = table  # 2.747.0 (#5249, review F2): undogroups.py ug_drop_orphans
     OBJ_TRACK[kind] = {"kind": kind, "table": table, "area": area, "undo_scope": undo_scope, "fields": None,
                        "undo_keep": dict(undo_keep or {}), "undo_nofp": dict(undo_nofp or {}), "undo_label": undo_label,
-                       "undo_free": frozenset(undo_free or ())}
+                       "undo_free": frozenset(undo_free or ()), "undo_spaces": undo_spaces,
+                       "hist_skip": frozenset(hist_skip or ())}
     return OBJ_TRACK[kind]
 
 
@@ -458,6 +467,12 @@ def _trash_step(c, uid, kind, rid, oid, op):
     ug_added(c, grp, 0)
 
 
+def obj_trash_step(c, uid, kind, rid, oid, op):
+    """2.985.0 (#5394): the trash / restore step of an area that puts a core kind into its trash its own way (an address book:
+    contacts/web.py bk_trash); taken back through the area's own way (core/undoweb.py undo_trash_reg). op trash | restore."""
+    _trash_step(c, uid, kind, rid, oid, op)
+
+
 def obj_trash(c, uid, kind, rid, step=True):
     """Into the trash (deleted_at): restorable by who manages it (obj_restore). 2.773.0 (#5292): THE trash of the core -- its
     children go with it (obj_register children) and the step can be taken back (step=False: the undo itself)."""
@@ -806,7 +821,7 @@ def obj_undo_pre(c, uid, kind, rid, oid=None):
     label = (UG_LABEL, [[reg["label"]]]) if reg.get("label") else (UG_LABEL_PLAIN, [])
     if callable(reg.get("undo_label")):  # 2.747.0 (#5252): a tracked kind names its object (office/oubar.py)
         label = reg["undo_label"](main) or label
-    grp = ug_current(c, uid, _area(reg), main.get("org_id"), label)
+    grp = ug_current(c, uid, _area(reg), main.get("org_id"), label, obj=(kind, int(rid)))  # 2.985.0 (#5394, review F6)
     gid = grp["id"] if grp is not None and ug_fits(c, grp, n) else None
     if not tok and gid is None:
         return  # a group too big for copies: listed, nothing to keep
@@ -848,26 +863,32 @@ def _main_org(snap, sc):
     return ((snap.get(sc[0][0]) or [{}])[0]).get("org_id")
 
 
-def _undo_rekeyed(c, st):
+def _undo_rekeyed(c, st, reg=None, snap=None):
     """2.747.0 (#5249, review F1): a copy holds the sealed values (kenc1:) as they were; after a key rotation of the
     organisation (or while one runs) the old key is gone or going, so writing the copy back would leave unreadable text.
-    A step older than the rotation (or any step during one) is refused with 409, never written back."""
+    A step older than the rotation (or any step during one) is refused with 409, never written back.
+    2.985.0 (#5394): + the spaces the kind names for the copy snap (obj_track undo_spaces: a budget row's list space); checked
+    before the fingerprint, so the answer names the key change and not "changed by someone else" (a rotation reseals rows)."""
     oid = st["org_id"] if "org_id" in st.keys() else None
-    if not oid:
-        return
-    with system_ctx(c):  # org_keys is infrastructure (core/orgcrypt.py reads it as "system"); only the two times are read
-        k = c.execute("SELECT rot_started_at, rotated_at FROM org_keys WHERE org_id=?", (int(oid),)).fetchone()
-    if k and (k["rot_started_at"] or (k["rotated_at"] and str(st["created_at"] or "") < str(k["rotated_at"]))):
-        raise Denied(409, tr(UNDO_REKEYED))
+    spaces = {int(oid)} if oid else set()
+    fn = (reg or {}).get("undo_spaces")
+    extra = {int(x) for x in (fn(c, snap or {}) or ()) if x} if callable(fn) else set()
+    for sp in sorted(spaces | extra):
+        if sp <= 0:
+            continue  # an account's key is never rotated (core/orgcrypt.py: only re-wrapped under a new server key)
+        with system_ctx(c):  # org_keys is infrastructure (core/orgcrypt.py reads it as "system"); only the two times are read
+            k = c.execute("SELECT rot_started_at, rotated_at FROM org_keys WHERE org_id=?", (sp,)).fetchone()
+        if k and (k["rot_started_at"] or (k["rotated_at"] and str(st["created_at"] or "") < str(k["rotated_at"]))):
+            raise Denied(409, tr(UNDO_REKEYED if sp in spaces else UNDO_SPACE_REKEYED))
 
 
 def _undo_one(c, sc, st, uid, reg, fix=None):
     nofp = reg.get("undo_nofp") or {}
     cur = _snap(c, sc)
+    old = json.loads(st["snap"])
+    _undo_rekeyed(c, st, reg, old)  # 2.985.0 (#5394): before the fingerprint (a rotation reseals the rows it compares)
     if not _fp_is(cur, nofp, st["fp_after"]):
         raise Denied(409, tr(UNDO_CONFLICT))
-    _undo_rekeyed(c, st)
-    old = json.loads(st["snap"])
     if _main_org(old, sc) != _main_org(cur, sc):
         raise Denied(409, tr(UNDO_MOVED))
     _write_back(c, sc, old, uid, reg.get("undo_keep"), reg.get("undo_free") or ())
@@ -881,10 +902,10 @@ def _undo_one(c, sc, st, uid, reg, fix=None):
 def _redo_one(c, sc, st, uid, reg, fix=None):
     nofp = reg.get("undo_nofp") or {}
     cur = _snap(c, sc)
-    if not _fp_is(cur, nofp, st["fp_undone"]) or not st["redo"]:
+    new = json.loads(st["redo"]) if st["redo"] else None
+    _undo_rekeyed(c, st, reg, new)  # 2.985.0 (#5394): the spaces of the copy written forward, before the fingerprint
+    if not _fp_is(cur, nofp, st["fp_undone"]) or not new:
         raise Denied(409, tr(UNDO_CONFLICT))
-    _undo_rekeyed(c, st)
-    new = json.loads(st["redo"])
     if _main_org(new, sc) != _main_org(cur, sc):
         raise Denied(409, tr(UNDO_MOVED))
     _write_back(c, sc, new, uid, reg.get("undo_keep"), reg.get("undo_free") or ())
@@ -955,8 +976,36 @@ def obj_undo_hist(c, uid, kind, rid, oid, reg, sc, first, last, action):
     t = sc[0][0]
     b0, a0 = (first.get(t) or [{}])[0], (last.get(t) or [{}])[0]
     keys = reg["fields"] if reg["fields"] is not None else [k for k in {**b0, **a0} if k not in UNDO_FIXED and k not in UNDO_NO_FP]
-    diff = [k for k in keys if not _same(b0.get(k), a0.get(k))]
+    skip = reg.get("hist_skip") or ()  # 2.985.0 (#5394, review F2): sealed columns stay out of the history
+    diff = [k for k in keys if k not in skip and not _same(b0.get(k), a0.get(k))]
     obj_history_add(c, uid, kind, rid, {k: b0.get(k) for k in diff}, {k: a0.get(k) for k in diff}, action=action, org_id=oid, agent=False)
+
+
+def obj_undo_forget(c, kind, ids):
+    """2.985.0 (#5394, review F2): the undo copies (every step of the kind's rows ids, also of an editor session) and the history
+    rows of those rows go -- their values are about to be sealed, a plain copy must not outlive that. A group left without
+    parts goes (core/undogroups.py ug_gc); one that keeps other parts gets the plain label "Change" (its label could name a
+    value of these rows); review F7: so do the toobig groups of the kind's area. Inside the caller's transaction, as the system (a background pass)."""
+    ids = sorted({int(x) for x in ids or () if x})
+    if not ids:
+        return
+    with system_ctx(c):  # the undo / history rows of the resealed rows only: nothing is read out
+        for at in range(0, len(ids), 500):
+            part = ids[at:at + 500]
+            q = ",".join("?" * len(part))
+            gone = ug_gids(c, f"kind=? AND ref_id IN ({q})", (kind, *part))
+            c.execute(f"DELETE FROM obj_undo WHERE kind=? AND ref_id IN ({q})", (kind, *part))
+            ug_gc(c, gone)
+            if gone:
+                c.execute(f"UPDATE undo_groups SET label_key=?, label_args='[]' WHERE id IN ({','.join('?' * len(gone))})",
+                          (UG_LABEL_PLAIN, *gone))
+            c.execute(f"DELETE FROM obj_history WHERE kind=? AND ref_id IN ({q})", (kind, *part))
+        # 2.985.0 (#5394, review F7): a toobig group lost its parts (ug_fits), so ug_gids cannot find it - its label could still
+        # name a plain value of these rows: every toobig group of the kind's area gets the plain label (rare, only the label goes)
+        area = (OBJ_TRACK.get(kind) or {}).get("area") or ""
+        if area and area != "other":
+            c.execute("UPDATE undo_groups SET label_key=?, label_args='[]' WHERE area=? AND state='toobig' AND label_args<>'[]'",
+                      (UG_LABEL_PLAIN, area))
 
 
 def obj_cols_ok(c, kind):

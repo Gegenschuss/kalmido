@@ -20,6 +20,8 @@ from ..calendars.caldav import (
 )
 from ..calendars.caldav import dav_code_fp, dav_fp, dav_once, dav_rendered, DavLazy  # 2.665.0 (#4196), 2.673.0 (#5124)
 from ..events.model import att_rows, ev_att_ok, ev_delete, ev_expand, events_on, my_cal_ids
+from ..core.undoareas import UA_DELETED, ua_plain, ua_post, ua_pre  # 2.985.0 (#5394): the steps of a device's changes
+from .evundo import EVU_KIND  # 2.985.0 (#5394)
 from ..events.model import cal_touch, is_occ, occ_ps_of, EV_OCC_PS_MAX  # 2.383.0 (#2587)
 from ..events.ics import etag, ev_lines, EvError, read_vevent, store_parsed, wrap
 from ..events.web import op_rsvp  # 2.369.5 (#2517): pulled up from functions
@@ -394,6 +396,7 @@ def ev_put(c, u, coll, name, pw_row=None):
         if v["uid"] != have[0]["uid"] and c.execute("SELECT 1 FROM events WHERE cal_id=? AND uid=? AND id!=? AND deleted_at IS NULL",
                                                     (coll["id"], v["uid"], eid)).fetchone():
             raise DavError(403, "This UID exists already", "<C:no-uid-conflict/>")
+        ua_pre(c, u["id"], EVU_KIND, eid)  # 2.985.0 (#5394): the person's step, under the event's lock (member_now)
         # 2.144.5 B (#2379): a PUT without any ATTENDEE from a client that never wrote one keeps the attendees (and their
         # answers); a client that writes them removes them by leaving them out
         store_parsed(c, u["id"], coll["id"], v, eid=eid, keep_attendees=not v["attendees_raw"] and not knows_att)
@@ -401,6 +404,7 @@ def ev_put(c, u, coll, name, pw_row=None):
             c.execute("UPDATE events SET uid=? WHERE id=?", (v["uid"], eid))
         if v["attendees_raw"]:  # 2.383.0 (#2587): the own answers to single dates, also in a calendar one may edit
             ev_occ_answers(c, u, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), v)
+        ua_post(c)
         c.commit()
         return Response(status=204)
     dup = c.execute("SELECT href FROM events WHERE cal_id=? AND uid=? AND deleted_at IS NULL", (coll["id"], v["uid"])).fetchone()
@@ -480,7 +484,9 @@ def evdav(m, c, u, pw_row, kind, key, name):
         im = request.headers.get("If-Match", "").strip()
         if im and im != "*" and have[1] not in [x.strip() for x in im.split(",")]:
             raise DavError(412, "The resource was changed meanwhile")
+        ua_pre(c, u["id"], EVU_KIND, have[0]["id"], UA_DELETED, ua_plain(have[0]["title"], have[0]["id"]))  # 2.985.0 (#5394)
         ev_delete(c, have[0], u["id"])  # 2.571.0 (#4776): updated_by
+        ua_post(c)
         c.commit()
         return Response(status=204)
     if m == "PROPPATCH":

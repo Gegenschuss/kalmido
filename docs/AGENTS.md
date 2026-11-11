@@ -1191,6 +1191,9 @@ with an old one it answers `409` `conflict` with the state now under `current` (
 Undo steps (2.747.0): an agent's writes record no undo steps of a person, and the routes of a person's last steps
 (`/api/undo`) answer `403` to an agent; they are not part of the REST API or MCP. A person takes an agent's change back
 through its proposal, batch or decision instead.
+2.985.0: writes with a person's own token (REST API v1, e.g. `PATCH /api/v1/me/notifications`, and CalDAV / CardDAV
+with an app password) do record that person's undo steps (DAV steps name the app password as the device); an agent's
+token still records none.
 Read first, send the version back:
 
 | Area | Write | Version to send | Read it from |

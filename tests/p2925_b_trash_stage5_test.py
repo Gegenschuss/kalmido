@@ -87,7 +87,8 @@ check(len(groups(FID)) == g0 + 2, f"calendar: delete and restore are two steps o
 check(Fr.delete(B + f"/api/evcals/{K}").ok and K not in cal_ids(Fr), "calendar: deleted again")
 GT = groups(FID)[-1]["id"]
 it = Fr.get(B + "/api/undo").json()["items"]
-check(it and it[0]["id"] == GT and it[0]["undo"] is True and "Calendar" in it[0]["label"], f"undo: the step is listed {it[:1]}")
+check(it and it[0]["id"] == GT and it[0]["undo"] is True and "Example Plans" in it[0]["label"],
+      f"undo: the step is listed with the calendar's name (2.952.0 #5394) {it[:1]}")
 check(A.post(B + f"/api/undo/to/{GT}").status_code == 404 and row("ev_cals", K)[0], "undo: a foreign step 404, it stays in the trash")
 r = Fr.post(B + f"/api/undo/to/{GT}")
 check(r.ok and K in cal_ids(Fr) and Fr.get(B + f"/api/events/{E2}").ok and evd(E3),

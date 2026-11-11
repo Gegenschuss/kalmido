@@ -711,6 +711,8 @@ def settings_update():
             v = clean_setting(k, v)  # BadInput: 400, nothing stored
             if v is not None:
                 vals[k] = v
+    from .setundo import su_mark  # 2.985.0 (#5394): the changed keys are steps of the list "Recent steps" (after this module)
+    su_mark(c, me(), list(vals), bundle=True)  # review F6: the same keys again from the same device within 10 min = one step
     if "show_done_views" in vals:  # 2.46.1 (#1422): an own choice against a folder's "Hide completed" is marked
         rs_done_sync(c, me(), usettings(c, me()).get("show_done_views"), vals["show_done_views"])  # 2.593.0 (#4590): one import for both
     if "show_progress" in vals:  # 2.757.0 (#4501): an own choice against a folder's "Show the progress bar" is marked
@@ -864,6 +866,8 @@ def settings_reset():
         if not un:
             return err(tr("Nothing to undo"), 404)
         vals = {k: (v if isinstance(v, str) else None) for k, v in un["vals"].items() if k in RS_KEYS}
+        from .setundo import su_mark  # 2.985.0 (#5394)
+        su_mark(c, uid, list(vals), reset=2)  # review N4: every key it puts back, the quiet hours too
         cur_sdv = usettings(c, uid).get("show_done_views")
         for k, v in vals.items():
             rs_put(c, uid, k, v)
@@ -882,6 +886,8 @@ def settings_reset():
     if not ch:
         return jsonify(ok=True, items=[], undo=rs_undo_get(c, uid) is not None)
     lyv = {k: lyv_active_id(c, uid, k) for k in ch if k == "dashboard" or k in LAYOUT_KEYS}
+    from .setundo import SU_RESET, su_mark  # 2.985.0 (#5394): the reset is one step of the list "Recent steps"
+    su_mark(c, uid, list(ch), label=(SU_RESET, []), reset=True, lyv=lyv)  # review F4: view state + arrangements too
     uset(c, uid, "reset_undo", json.dumps({"at": iso(now_utc()), "vals": ch, "lyv": {k: v for k, v in lyv.items() if v}},
                                           ensure_ascii=False, separators=(",", ":")))
     for k in ch:

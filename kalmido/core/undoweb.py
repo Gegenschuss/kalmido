@@ -36,6 +36,7 @@ from .writes import UNDO_CONFLICT, obj_restore, obj_trash  # 2.773.0 (#5292): tr
 
 UNDO_NEED = {}  # kind -> fn(c, uid, rid, oid) -> {"fix": fn(c), "keep": {table: {column}}, "lock": name}; Denied = may not
 TRASH_MODES = ("trash", "restore")  # 2.773.0 (#5292): obj_undo.mode of a step without a copy (core/writes.py _trash_step)
+UNDO_TRASH = {}  # 2.985.0 (#5394): kind -> {"restore": fn(c, uid, rid), "trash": fn(c, uid, rid)} (undo_trash_reg)
 UG_NOACCESS = N_("You may not change it any more, so it cannot be undone")
 UG_GONE = N_("It is no longer there, so it cannot be undone")
 UG_STOP = N_("Stopped before a step that cannot be undone: {0}")
@@ -51,6 +52,14 @@ def undo_need_reg(kind, fn):
     (403 / 404 = no access, 409 = its own reason) or returns {"fix", "keep"} as obj_undo_run takes them, and "lock" when
     the kind's saves take another write_lock than obj-<kind>-<id> (ow_write lock=)."""
     UNDO_NEED[kind] = fn
+
+
+def undo_trash_reg(kind, restore, trash):
+    """2.985.0 (#5394): a core kind whose area puts it into / takes it out of the trash its own way (a calendar with its
+    events, an address book with its contacts' links and birthday tasks): a trash step of it goes back through restore(c,
+    uid, rid) / trash(c, uid, rid) -- each checks the person's rights of now and raises Denied -- instead of obj_restore /
+    obj_trash. Neither commits nor sends mails (the group commits; an undo sends no mails)."""
+    UNDO_TRASH[kind] = {"restore": restore, "trash": trash}
 
 
 def _need(c, uid, kind, rid, oid):
@@ -114,13 +123,17 @@ def _trash_part(c, uid, kind, rid, p, redo):
     st = c.execute("SELECT * FROM obj_undo WHERE id=?", (p["id"],)).fetchone()
     if st is None or st["state"] != ("undone" if redo else "done"):
         raise Denied(409, tr(UNDO_NOTHING))
+    write_lock(c, f"obj-{kind}-{int(rid)}")  # 2.985.0 (#5394, review F10): the trash state read under the lock of obj_trash / obj_restore
     row = obj_row(c, kind, rid)
     if row is None:
         raise Denied(404, tr(UG_GONE))
     back = (st["mode"] == "trash") != bool(redo)  # undo of a trash / redo of a restore = out of the trash
     if bool(row["deleted_at"]) != back:
         raise Denied(409, tr(UNDO_CONFLICT))
-    if back:  # 2.778.0 (#5371): the own step back with the role of putting it in (trash_role 'edit' = write), not 'manage'
+    hook = UNDO_TRASH.get(kind)  # 2.985.0 (#5394): the area's own way (calendars, address books)
+    if hook:
+        hook["restore" if back else "trash"](c, uid, rid)
+    elif back:  # 2.778.0 (#5371): the own step back with the role of putting it in (trash_role 'edit' = write), not 'manage'
         obj_restore(c, uid, kind, rid, step=False, undo=True)
     else:
         obj_trash(c, uid, kind, rid, step=False)

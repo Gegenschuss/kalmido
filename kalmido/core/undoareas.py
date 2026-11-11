@@ -28,7 +28,7 @@ UA_RESTORED = N_("Restored: {0}")
 UA_DELETED = N_("Deleted: {0}")  # the key exists (core/i18n)
 UA_RENAMED = N_("Renamed: {0}")  # the key exists
 UA_VERSION = N_("New version: {0}")
-UA_TABLES = ("events", "contacts", "fs_nodes")  # the tables of ua_trash_fix (names only through qi)
+UA_TABLES = ("events", "contacts", "fs_nodes", "budget_entries")  # the tables of ua_trash_fix (names only through qi); 2.985.0 (#5394): budget_entries
 UA_SEALED = ("kenc", "e2e")  # core/orgcrypt.py PREFIX kenc1:, collab/liste2e.py e2e1: never in a label (stored in plain text)
 
 

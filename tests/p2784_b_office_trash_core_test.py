@@ -143,11 +143,25 @@ check(A.delete(OFC + f"/{S5}").ok and row(S5)[0], "#5418: into the trash")
 G5 = groups(AID)[-1]["id"]
 OFF = ",".join(x for x in FEATURES.split(",") if x != "office")
 check(A.patch(B + "/api/settings", json={"features": OFF}).ok and A.get(OFC).status_code == 403, "#5418: the office switched off (its route 403)")
+def drop_newer(gid):
+    """2.985.0 (#5394): the settings steps after group gid leave the list (the gate is checked, not the settings undo)."""
+    new = [x[0] for x in dbx("SELECT id FROM undo_groups WHERE user_id=? AND id>?", (AID, gid))]
+    if new:
+        dbx(f"DELETE FROM obj_undo WHERE group_id IN ({','.join(str(int(x)) for x in new)})")
+        dbx(f"DELETE FROM undo_groups WHERE id IN ({','.join(str(int(x)) for x in new)})")
+
+
+# 2.985.0 (#5394): switching the office off is a step of its own now (kind setting); "back to here" would take it back
+# first and the office would be on again. The gate is what this checks, so that newer step leaves the list.
+drop_newer(G5)
+check(A.get(OFC).status_code == 403, "#5418: the office still off without the settings step")
 r = A.post(B + f"/api/undo/to/{G5}")
 st = r.json().get("stayed") or [] if r.ok else []
 check(row(S5)[0] and G5 not in (r.json().get("undone") or [] if r.ok else [G5]) and st and st[0].get("code") == "noaccess",
       f"#5418: office off -> the step is refused (noaccess), the supplier stays in the trash {r.status_code} {r.text[:300]}")
 check(A.patch(B + "/api/settings", json={"features": FEATURES}).ok and A.get(OFC).ok, "#5418: the office on again")
+drop_newer(G5)  # 2.985.0 (#5394): switching it on again is a step too; "back to here" would switch the office off first
+check(A.get(OFC).ok, "#5418: the office still on without the settings step")
 r = A.post(B + f"/api/undo/to/{G5}")
 check(r.ok and row(S5)[0] is None, f"#5418: office on -> the same step goes back {r.status_code} {r.text[:200]}")
 # the DATEV import's undo deletes its suppliers on the core's way: no obj_undo / obj_history / emptied group left behind

@@ -27,12 +27,13 @@ from ..accounts.orgs import obj_org_set, ws_fit_problem  # 2.369.5 (#2517): pull
 from ..core.conflict import Conflict  # 2.564.0 (#4701/#4702)
 from ..core.conflict import ccf_check, kern_version_seed, take_version  # 2.657.0 (#5052)
 from ..core.pg import write_lock  # 2.657.0 (#5052)
-from ..events.model import EV_CALS_MAX, EV_KIND, KERN, ev_role  # 2.566.0 (#4712): the shared core (events/evkern.py fills KERN)
+from ..events.model import EV_KIND, KERN, ev_role  # 2.566.0 (#4712): the shared core (events/evkern.py fills KERN)
 from ..files.fsref import fs_ref_rename  # 2.566.0 (#4712)
-from ..core.pg import system_ctx  # 2.566.0 (#4712)
 from ..core.retention import ret_trash_days  # 2.566.0 (#4707)
 from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_plain, ua_post, ua_pre  # 2.777.0 (#5254)
-from .evundo import EVU_KIND  # 2.777.0 (#5254)
+from .evundo import EVU_KIND, cal_restore_do  # 2.777.0 (#5254); 2.985.0 (#5394): cal_restore_do
+from ..core.undogroups import undo_label  # 2.985.0 (#5394)
+from ..core.writes import UG_TRASHED  # 2.985.0 (#5394): the label of a calendar's trash step
 
 
 def _unknown(b, allowed):
@@ -97,11 +98,13 @@ def op_cal_edit(c, uid, cid, b):
 def op_cal_delete(c, uid, cid):
     """2.566.0 (#4707): the calendar goes into the trash with its events (2.947.0 #5367: the core's obj_trash), restorable for the
     trash period (op_cal_restore); the invitations are cancelled as before."""
-    need_evcal(c, cid, manage=True)
+    cal, _ = need_evcal(c, cid, manage=True)
+    undo_label(c, UG_TRASHED, ua_plain(cal["name"], cid))  # 2.952.0 (#5394): a step of "Recent steps" (an agent records none)
     mails = evi_cal_cancel(c, uid, cid)  # 2.111.0 B (#2056): its invited external attendees learn the events are gone
     for r in c.execute(f"SELECT * FROM events WHERE cal_id=? AND {live_sql()}", (int(cid),)).fetchall():
         ev_tell(c, r, "cancelled")  # 2.367.2 (#2969): the people of the server too
-    # 2.947.0 (#5367): the core's trash with its events (children) and the person's undo step (events/evkern.py)
+    # 2.947.0 (#5367): the core's trash with its events (children) and the person's undo step (taken back the calendar's
+    # way, events/evundo.py undo_trash_reg)
     KERN["trash"](c, uid, EV_KIND, cid)
     cal_touch(c, cid)
     bump(c)
@@ -124,13 +127,7 @@ def op_cal_trash(c, uid):
 
 def op_cal_restore(c, uid, cid):
     """2.566.0 (#4707): the calendar out of the trash with the events that went with it (its owner; 404 otherwise)."""
-    need_evcal(c, cid, manage=True, trash=True)
-    with system_ctx(c):
-        n = c.execute(f"SELECT COUNT(*) FROM ev_cals WHERE owner_id=(SELECT owner_id FROM ev_cals WHERE id=?) AND {live_sql()}", (cid,)).fetchone()[0]
-    if n >= EV_CALS_MAX:
-        raise Denied(409, tr("At most {0} calendars", EV_CALS_MAX))
-    KERN["restore"](c, uid, EV_KIND, cid)  # 2.947.0 (#5367): the core's way, with the events that went with it
-    cal_touch(c, cid)
+    cal_restore_do(c, uid, cid, step=True)  # 2.985.0 (#5394): a step of "Recent steps"
     bump(c)
     c.commit()
     return cal_public(c, c.execute("SELECT * FROM ev_cals WHERE id=?", (cid,)).fetchone(), uid)
