@@ -174,6 +174,8 @@ old = [(900001, P, K, None, "Handbuch/Alt", "Alter Klartext", 14, ALICE, T0, T0,
        (900000, FP, None, FE, "Tagebuch", "kenc1: kein Siegel, nur so begonnen", 35, FE, T0, T0, None)]  # F7: plain, no sealed shape
 for x in old:
     sql(OLD_INS, x, write=True)
+fl = dict(sql("SELECT key, value FROM kalmido_meta WHERE key IN ('back_floor','back_floor_how')"))
+check("#5281" not in (fl.get("back_floor_how") or ""), f"setup: the back limit does not name #5281 yet {fl}")
 restart()
 A, Bo, Fe = sess("alice"), sess("bob"), sess("fred")
 check(old_table(), "start check: a row that cannot be opened keeps wiki_versions (nothing dropped)")
@@ -182,6 +184,9 @@ check(sql("SELECT id FROM wiki_versions") == [(900005,)], f"start check: only th
 # 2.958.0 (#5281, Fable review F7): a plain text that only starts like a sealed one moved unchanged (it held the table before)
 check(sql("SELECT body FROM obj_versions WHERE id=900000") == [("kenc1: kein Siegel, nur so begonnen",)],
       f"F7: the plain text starting with kenc1: moved unchanged {sql('SELECT body FROM obj_versions WHERE id=900000')}")
+# Fable review F3: the back limit rose with the move, not only at the DROP
+fl = dict(sql("SELECT key, value FROM kalmido_meta WHERE key IN ('back_floor','back_floor_how')"))
+check("#5281" in (fl.get("back_floor_how") or ""), f"F3: rows moved, the table stays -- the back limit already names #5281 {fl}")
 mv = {x[0]: x for x in vrows(P)}
 check({900001, 900002, 900003} <= set(mv) and [mv[i][1] for i in (900001, 900002, 900003)] == [4, 5, 6],
       f"moved with their ids and the next numbers of the page {sorted(mv.values())}")

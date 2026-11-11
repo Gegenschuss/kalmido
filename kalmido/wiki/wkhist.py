@@ -38,7 +38,7 @@ from ..core import objhooks  # 2.958.0 (#5281): START (wkh_retire)
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import OrgCryptError, PREFIX, _aad, _b64u, oc_active_for, oc_dec_k, oc_is_enc, oc_key, oc_user_space
 from ..core.pg import qi, system_ctx, table_columns, table_exists, ts_canon, write_lock
-from ..core.kernretire import KERN_RETIRE_LOCK, kern_retire  # 2.958.0 (#5281): wkh_retire
+from ..core.kernretire import KERN_RETIRE_LOCK, kern_retire, kern_retire_floor  # 2.958.0 (#5281): wkh_retire
 from ..notify.alerts import aa_now  # 2.958.0 (#5281): the admins' alert of wkh_retire
 from ..core.objversions import (OBJV_CTX, obj_version_add, obj_version_drop, obj_version_get,  # 2.958.0 (#5281)
                                 obj_version_merge, obj_version_prune, obj_version_rows)
@@ -560,6 +560,11 @@ def wkh_retire(c):
         if not table_exists(c, "wiki_versions"):  # another process did it meanwhile
             return {}
         out = wkh_move_old(c)
+        if out["moved"]:  # Fable review F3: the data left the old table now -- an older image must not start before the DROP
+            floor = kern_retire_floor(c)
+            if floor:
+                print(f"knowledge history, stage Q7a (#5281): {out['moved']} old version(s) moved; versions before {floor} no "
+                      "longer start on this database", flush=True)
         out.update(kern_retire(c, ("wiki_versions",), _wkh_left, "knowledge history, stage Q7a (#5281)", alert=_wkh_alert,
                                why=WKH_RETIRE_WHY))
     return out
