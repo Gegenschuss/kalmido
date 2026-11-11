@@ -138,6 +138,8 @@ async function otr_load(force) {
   try { const j = await api('GET', '/api/trash/lists'); S.otr.items = j.lists || []; S.otr.days = j.days || 30; } catch { S.otr.items = S.otr.items || []; return; }
   if (S.route.key === 'trash') renderView();
 }
+// 2.979.0 (#5667): a delete / restore the server took back by its group: the trash page fetches its deleted projects again, elsewhere they count as old
+histReloader('listtrash', () => { if (S.otr.items === null) return; S.otr.at = 0; if (S.route.key === 'trash') return otr_load(true); });
 // 2.119.1 C (#2304): `active` = the list was not archived before the delete (archived first by it): the undo brings it back
 // active (folder and position stay with the row), the redo archives it again first; restoring from the trash page stays archive
 function otr_offerUndo(id, nm, active = false) {

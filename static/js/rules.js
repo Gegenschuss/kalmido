@@ -115,11 +115,14 @@ async function rul_load(lid) {
   const j = await api('GET', `/api/lists/${lid}/rules`);
   RUL[lid] = {rules: j.rules || [], limit: j.limit || 50, available: j.available !== false};
 }
+// 2.979.0 (#5667): a rule's delete the server took back by its group: an open rules box fetches again; the others fetch when they open (rul_mount)
+histReloader('rules', () => { const b = /** @type {any} */ ($('#l-rules')); if (b?._reload) return b._reload(); });
 function rul_mount(md, l) {
   const box = $('#l-rules', md); if (!box || box._rul) return;
   box._rul = true;
   const lid = l.id, draw = () => { const b = $('#l-rules', md); if (b) b.innerHTML = rul_rowsHtml(lid); };
   rul_load(lid).then(draw).catch(() => { box.innerHTML = `<div class="muted mhint">${tr('Could not load the rules.')}</div>`; });
+  box._reload = () => rul_load(lid).then(draw);  // 2.979.0 (#5667): histReloader above
   box.addEventListener('change', async e => {
     const i = e.target.dataset.rulOn; if (!i) return;
     try { await api('PATCH', `/api/rules/${i}`, {active: e.target.checked}); await rul_load(lid); } catch { /* api() showed it */ }
