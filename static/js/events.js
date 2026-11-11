@@ -167,7 +167,20 @@ function updateChips(input) {
   const chips = input.closest('.qadd').querySelector('.chips');
   if (!chips) return;
   const r = parseQuick(input.value, S.quick.ignore);
-  chips.innerHTML = r.chips.map(c => `<button class="qchip ${c.off ? 'off' : ''}" data-qtype="${esc(c.type)}" title="${c.off ? tr('recognise again') : tr("don't recognise")}">${esc(c.label)}</button>`).join('') + qMismatch(r) + (input.id === 'qsheet' && !S.quickPreset?.capture ? dsxWhoChip() : '');  // 2.36.2 (#1138)
+  // 2.910.0 (#5445): each recognised part shows once - the docked composer's own chips (#qdchips) already show date, project and
+  // priority, so their parser chips stay out there (a part a picked chip overrules stays: the word still leaves the title)
+  const dup = $('#qdchips', input.closest('.qadd')) ? new Set(['date', 'list', 'prio'].filter(k => !S.qov?.win?.[k])) : new Set();
+  const shown = r.chips.filter(c => c.off || !dup.has(c.type));
+  // the phone sheet: the field scrolls to the end while typing, so the title itself stays in sight in front of the chips
+  const ttl = input.id === 'qsheet' && r.chips.some(c => !c.off) && r.title?.trim() ? `<span class="qttl">${esc(r.title.trim())}</span>` : '';
+  chips.innerHTML = ttl + shown.map(c => `<button class="qchip ${c.off ? 'off' : ''}" data-qtype="${esc(c.type)}" title="${c.off ? tr('recognise again') : tr("don't recognise")}">${esc(c.label)}</button>`).join('') + qMismatch(r) + (input.id === 'qsheet' && !S.quickPreset?.capture ? dsxWhoChip() : '');  // 2.36.2 (#1138)
+  qHintSync(input, r);
+}
+// 2.910.0 (#5445): the syntax help leaves once the text has a recognised part (a capture's lead line stays)
+function qHintSync(input, r = parseQuick(input.value, S.quick.ignore)) {
+  const qh = input.closest('.qadd')?.querySelector('.qhint'), cs = qh?.querySelector('.qhcs'); if (!cs) return;
+  const rec = r.chips.some(c => !c.off);
+  cs.hidden = rec; qh.hidden = rec && !qh.querySelector('.qhlead');
 }
 // U21: a date that is not on the repeat's own days ("tomorrow … every monday"): say what happens
 function qMismatch(r) {
@@ -282,6 +295,7 @@ function openQuickSheet(prefill = '', preset = {}) {
   const i0 = $('.box > svg', q); if (i0) i0.outerHTML = ic(preset.capture ? 'zap' : 'plus');
   inp.placeholder = preset.capture ? tr('Capture to the basket…') : preset.section_name ? tr('Add a task to {0}', preset.section_name) : tr('Add task…');
   if (preset.capture && !hint) qh.innerHTML = qHelpChips('qsheet', true);
+  qHintSync(inp);  // 2.910.0 (#5445)
   // 2.26.x (#952): the focus in the same tap (no timer first): iOS opens the keyboard only for a focus inside the user's
   // gesture, so the sheet and the keyboard come up together; a second try a moment later if something took it back
   inp.focus();

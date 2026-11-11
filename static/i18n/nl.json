@@ -17993,6 +17993,7 @@
   "The PDF cannot be read": "De pdf kan niet worden gelezen",
   "This PDF has more than {0} pages - its pages cannot be changed here": "Deze pdf heeft meer dan {0} pagina's - de pagina's kunnen hier niet worden gewijzigd",
   "The pages of this document cannot be changed (read-only or a locked month)": "De pagina's van dit document kunnen niet worden gewijzigd (alleen lezen of een vergrendelde maand)",
+  "Don’t recognise “{0}”": "“{0}” niet herkennen",
   "The + adds an appointment, a new task comes from the menu “…”. Hold a task or an appointment to drag it to another day.": "De + voegt een afspraak toe, een nieuwe taak komt uit het menu ‘…’. Houd een taak of afspraak ingedrukt om hem naar een andere dag te slepen.",
   "Arrival": "Aankomst",
   "Make-up": "Make-up",

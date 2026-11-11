@@ -1,0 +1,6 @@
+/* 2.910.0 (#5442 dialogs, #5445 quick add): a start file - app.css takes no new rules (tools/check_appcss.py).
+   The quick add and the list dialogs are drawn at start, so their rules load with app.css (the server sends this behind it). */
+/* 2.910.0 (#5445): the small x after a chip read from the text ("don't recognise"); the title in front of the phone sheet's chips */
+.qchip.qdx{border:0;padding:0 .125rem;margin-left:-.25rem;color:var(--muted);font:inherit}
+.qchip.qdx:hover{color:var(--text)}
+.qadd .qttl{align-self:center;font-size:var(--fs-s);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}

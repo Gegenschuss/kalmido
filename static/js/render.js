@@ -2103,11 +2103,14 @@ function qdockChips() {
   const d = quickDefaults(), r = parseQuick(inp.value, S.quick.ignore), o = S.qov;
   const q = qovPick(o, r, d), due = q.due, lid = q.list_id || inbox()?.id, pr = q.priority;
   const PRN = {0: N_('No priority'), 1: N_('Low'), 3: N_('Medium'), 5: N_('High'), 7: N_('Urgent')};
-  box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o && q.due === o.due ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>` +
+  // 2.910.0 (#5445): a value read from the text shows only here (no second parser chip below); its small x keeps "don't recognise"
+  const qdx = k => { const c = !(o.win || {})[k] && r.chips.find(x => x.type === k && !x.off);
+    return c ? `<button type="button" class="qchip qdx" data-qtype="${esc(k)}" title="${esc(tr("don't recognise"))}" aria-label="${esc(tr('Don’t recognise “{0}”', c.label))}">${ic('x', 's')}</button>` : ''; };
+  box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o && q.due === o.due ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>${/*html-ok*/ qdx('date')}` +
     (d.who ? `<span class="qdc set dsxwho">${ic('user', 's')}${esc(personNameAny(d.who) || '?')}</span>` : '') +  // 2.36.2 (#1138): for that person
     (d.noList && !o.list_id && !r.list_id ? `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No project with {0} that you can add to: share a project with them first.', personNameAny(d.who) || '?'))}</span>` :
-    `<button type="button" class="qdc set ${o.list_id && q.list_id === o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>`) +
-    `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o && q.priority === o.priority ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>`;
+    `<button type="button" class="qdc set ${o.list_id && q.list_id === o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>${/*html-ok*/ qdx('list')}`) +
+    `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o && q.priority === o.priority ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>${/*html-ok*/ qdx('prio')}`;
   msvvQSync(box);  // 2.73.0 C (#661): "→ Server · List" once another server is linked
 }
 const total0 = groups => groups.some(g => g.tasks.length);
