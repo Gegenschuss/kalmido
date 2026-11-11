@@ -227,6 +227,7 @@ async function dropTask0(id, el, clientY) {
   const after = snapTask(S.tasks.get(id)), rev = after && (before.list_id !== after.list_id || before.due !== after.due || (before.due_time || null) !== (after.due_time || null) || (before.section_id || null) !== (after.section_id || null) || before.priority !== after.priority) && reverseOf(before, after);
   if (res?.shifted?.length) { shiftUndo(before, {...after, shifted: res.shifted}, after?.due ? tr('Date: {0}', dayLabel(after.due)) : ''); return; }
   { const wn = rev && before.list_id !== after.list_id && wsc_moveMsg(before.list_id, after.list_id, ''); if (wn) { offerUndo(wn, histFields(histLabel(before, after), [[before, after, UNDO_FIELDS]], {res})); return; } }  // 2.53.0 (#1474): Private -> organisation
+  if (rev && dnd_kindStayed(before, after)) { toast(wip_msg(tr('Moved to section {0}', secName(after.section_id)), after.section_id)); return; }  // 2.958.0 (#3911)
   if (rev) offerUndo(before.list_id !== after.list_id ? tr('Moved to {0}', lname(listById(after.list_id))) : (before.section_id || null) !== (after.section_id || null) && before.due === after.due ? wip_msg(tr('Moved to section {0}', secName(after.section_id)), after.section_id) : before.priority !== after.priority && before.due === after.due ? tr('Priority: {0}', tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High'), '', N_('Urgent')][after.priority] || N_('None'))) : after.due ? tr('Date: {0}', dayLabel(after.due)) : tr('Date removed'),
     histFields(histLabel(before, after), [[before, after, UNDO_FIELDS]], {res}));
 }
@@ -247,6 +248,12 @@ const dndPrev = (before, item) => Object.fromEntries(Object.keys(item).filter(k 
 // (list view + kanban columns, mouse), long-press on a task = "Move to section…", on a section header = move up / down
 const secHandle = sid => `<span class="shandle" draggable="true" data-sdrag="${sid}" title="${esc(tr('Drag to reorder sections'))}" aria-hidden="true">${ic('grip', 's')}</span>`;
 const secName = sid => sid ? (S.sections.find(x => x.id === sid)?.name || '') : tr('Unassigned');
+// 2.958.0 (#3911): a completed / rejected task moved into a column of that meaning: the move changed no status (a drag out by hand still undoes)
+function dnd_kindStayed(before, after) {
+  if (!before || !after || !before.status || before.status !== after.status || before.list_id !== after.list_id) return false;
+  const k = S.sections.find(x => x.id === after.section_id)?.kind;
+  return before.status === 2 ? k === 'done' : before.status === -1 && k === 'rejected';
+}
 // a task into a section, at its top; a subtask becomes a standalone task there (as in kanban); one undo
 function taskToSection(id, sid) { return histGroup(() => taskToSection0(id, sid)); }
 async function taskToSection0(id, sid) {
@@ -267,6 +274,7 @@ async function taskToSection0(id, sid) {
   if (sk_moved(res, id)) return;  // 2.577.0 (#3354)
   const after = snapTask(S.tasks.get(id)), rev = after && reverseOf(before, after, ['section_id', 'parent_id']);
   const msg = wip_msg(before.parent_id ? tr('Subtask is now standalone') + ' · ' + tr('Moved to section {0}', secName(sid)) : tr('Moved to section {0}', secName(sid)), sid);  // 2.60.0 (#1510): + over the WIP limit
+  if (rev && dnd_kindStayed(before, after)) { toast(msg); return; }  // 2.958.0 (#3911): a done task into the done column: the status did not change, nothing to undo
   if (rev) offerUndo(msg, histFields(tr('Moved {0} to section {1}', qn(t.title.slice(0, 40)), secName(sid)), [[before, after, ['section_id']]], {res})); else toast(msg);
 }
 // 2.41.2 (#1501): the sections of list lid in the order ids, locally (S.sections keeps its slots; the server's sort follows)
