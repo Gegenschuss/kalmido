@@ -17954,6 +17954,7 @@
   "A receipt of the office: the original stays as an older version of the file (tab History).": "Ein Beleg des Büros: Das Original bleibt als ältere Version der Datei erhalten (Tab Verlauf).",
   "At least one page must stay": "Mindestens eine Seite muss bleiben",
   "At most {0} pages can be changed here": "Hier lassen sich höchstens {0} Seiten ändern",
+  "The documents are too large to merge": "Die Dokumente sind zu groß zum Zusammenfügen",
   "Blank?": "Leer?",
   "Delete blank pages": "Leere Seiten löschen",
   "Delete or turn pages": "Seiten löschen oder drehen",

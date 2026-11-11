@@ -202,4 +202,57 @@ check(r.status_code == 409 and ver(Fr, D1) == 1 and doc(Fr, R), f"locked receipt
 g = Fr.get(B + f"/api/docs/{R}/pages").json()
 check(g.get("write") is False, f"... the strip is told it cannot write {g}")
 
+# ================================================================ 2.976.0 (#5657, review 2.959 F8): the merge's child process
+# counts the pages itself (no dp_count per document): unknown counts (0) are counted there, more than the limit together is
+# 413, a result over the output budget gets its own message "too large to merge" (413). Red before: _merge took
+# [(bytes, pages)] and every count came from dp_count.
+MERGE_PROBE = r"""
+import io, json
+from pypdf import PdfWriter
+from kalmido.core.config import app as kapp
+from kalmido.core.access import Denied
+from kalmido.docs import docmerge as dm
+
+
+def pdf(n):
+    w = PdfWriter()
+    for _ in range(n):
+        w.add_blank_page(200, 200)
+    b = io.BytesIO()
+    w.write(b)
+    return b.getvalue()
+
+
+res = {}
+a, b = pdf(2), pdf(3)
+with kapp.test_request_context('/api/docs/merge'):
+    out, pages = dm._merge(bytearray(a + b), [len(a), len(b)], [0, 3])
+    res['pages'], res['pdf'] = pages, out[:4].decode()
+    try:
+        dm._merge(bytearray(a + b), [len(a), len(b)], [2, 4])
+    except Denied as e:
+        res["mismatch"] = e.code
+    dm.DP_PAGES = 4
+    try:
+        dm._merge(bytearray(a + b), [len(a), len(b)], [0, 0])
+    except Denied as e:
+        res["many"] = e.code
+    dm.DP_PAGES, dm.MERGE_WORKER = 1000, dm.MERGE_WORKER.replace("2 * len(src) + (32 << 20)", "1")
+    try:
+        dm._merge(bytearray(a + b), [len(a), len(b)], [0, 0])
+    except Denied as e:
+        res['big'] = [e.code, e.msg]
+res['no_dp_count'] = not hasattr(dm, 'dp_count')
+print(json.dumps(res))
+"""
+r = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", "import app\n" + MERGE_PROBE],
+                   capture_output=True, text=True)
+pr = json.loads((r.stdout.strip().splitlines() or ["{}"])[-1] or "{}") if r.returncode == 0 else {}
+check(pr.get("pages") == 5 and pr.get("pdf") == "%PDF", f"#5657: the merge's child process counts the pages, an unknown count too {pr} {r.stderr[-300:]}")
+check(pr.get("mismatch") == 409, f"#5657: a count other than the recognised one: 409 {pr}")
+check(pr.get("many") == 413, f"#5657: more pages together than the limit, counted in the child process: 413 {pr}")
+check((pr.get("big") or [0])[0] == 413 and "too large to merge" in str((pr.get("big") or ["", ""])[1]),
+      f"#5657: a result over the budget: its own message 'too large to merge' (413) {pr}")
+check(pr.get("no_dp_count") is True, "#5657: no child process per document any more (docmerge does not use dp_count)")
+
 sys.exit(kt.done("p2959_a_docpages_api"))

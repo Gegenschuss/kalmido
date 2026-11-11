@@ -12,7 +12,10 @@ all in one workspace (one organisation, or the same person's private area: 403 o
 (409), no document still being recognised (409), not in a locked folder (409 fs_locked), no receipt of a locked month or one
 the bookkeeping has taken over (office/periodlock.py pl_receipt_need_open / pl_tree_need_open: 409) -- neither the first nor
 one of the others. At most DM_DOCS documents, DP_PAGES pages and DP_BYTES bytes together (413). pypdf runs in the same
-limited child process as docs/pages.py (memory, CPU, no files written), the page count of every PDF checked there again."""
+limited child process as docs/pages.py (memory, CPU, no files written), the page count of every PDF checked there again.
+2.976.0 (#5657, review 2.959 F8): the pages are counted in that ONE child process (no child process per document any more),
+the documents go to it as one buffer filled as they are read (no second copy of all of them), and a merge whose result would
+be too large gets its own message (413)."""
 import json
 
 from flask import jsonify
@@ -32,35 +35,41 @@ from ..files.fslock import fsl_need_unlocked
 from ..office.periodlock import pl_receipt_need_open, pl_tree_need_open
 from .batch import dsr_idlist
 from .ingest import docs_kick
-from .pages import DP_BYTES, DP_PAGES, PAGES_WORKER, _dp_run, _known_pages, _pdf_doc, dp_count
+from .pages import DP_BYTES, DP_PAGES, PAGES_WORKER, _dp_run, _known_pages, _pdf_doc
 from .split import _no_agent
 
 DM_DOCS = 50  # documents merged at most at once
 
-# the PDFs one after the other on stdin, argv JSON {lens: [bytes of each], ns: [pages of each]}; out: the merged PDF.
-# Exit 3 = one is encrypted, 4 = the output budget exceeded, 5 = a page count is not the one the server checked against.
+# the PDFs one after the other on stdin, argv JSON {lens: [bytes of each], ns: [pages of each, 0 = not known], max: pages
+# together}; out: the merged PDF, the page count on stderr ("pages N"). Exit 3 = one is encrypted, 4 = the output budget
+# exceeded, 5 = a page count is not the one the recognition found, 6 = more than max pages together.
+# 2.976.0 (#5657): the pages counted here (not one child process per document), each document read through a memoryview.
 MERGE_WORKER = PAGES_WORKER[:PAGES_WORKER.index("ch = json.loads")] + r"""
 ch = json.loads(sys.argv[1])
-src = sys.stdin.buffer.read()
+src = memoryview(sys.stdin.buffer.read())
 if sum(ch["lens"]) != len(src) or len(ch["lens"]) != len(ch["ns"]):
     sys.exit(5)
 w = PdfWriter()
-at = 0
+at = total = 0
 for ln, n in zip(ch["lens"], ch["ns"]):
     r = PdfReader(io.BytesIO(src[at:at + ln]))
     at += ln
     if r.is_encrypted and not r.decrypt(""):
         sys.exit(3)
-    if len(r.pages) != n:
+    if n and len(r.pages) != n:
         sys.exit(5)
+    total += len(r.pages)
+    if total > ch["max"]:
+        sys.exit(6)
     for p in r.pages:
         w.add_page(p)
 b = io.BytesIO()
 w.write(b)
-out = b.getvalue()
+out = b.getbuffer()
 if len(out) > 2 * len(src) + (32 << 20):
     sys.exit(4)
 sys.stdout.buffer.write(out)
+sys.stderr.write("pages %d" % total)
 """
 
 
@@ -72,18 +81,27 @@ def dm_same_space(nodes):
             raise Denied(403, tr("Only documents of one workspace can be merged"))
 
 
-def _merge(parts):
-    """parts = [(bytes, pages)] -> the merged PDF, else Denied(409) (the messages of docs/pages.py _edit)."""
-    p = _dp_run(MERGE_WORKER, json.dumps({"lens": [len(d) for d, _n in parts], "ns": [n for _d, n in parts]}), b"".join(d for d, _n in parts), 240)
+def _merge(buf, lens, ns):
+    """buf = the PDFs one after the other (lens: bytes of each, ns: pages of each, 0 = not known) -> (the merged PDF, its pages),
+    else Denied (the messages of docs/pages.py _edit; 413 too many pages / too large)."""
+    p = _dp_run(MERGE_WORKER, json.dumps({"lens": lens, "ns": ns, "max": DP_PAGES}), buf, 240)
     if p is None:
         raise Denied(409, tr("The pages cannot be read right now, try again later"))
     if p.returncode == 3:
         raise Denied(409, tr("The PDF is encrypted and cannot be changed"))
     if p.returncode == 5:
         raise Denied(409, tr("The PDF cannot be read"))
+    if p.returncode == 6:
+        raise Denied(413, tr("At most {0} pages can be changed here", DP_PAGES))
+    if p.returncode == 4:
+        raise Denied(413, tr("The documents are too large to merge"))  # 2.976.0 (#5657): the merged PDF over its budget
     if p.returncode != 0 or not p.stdout.startswith(b"%PDF"):
         raise Denied(409, tr("The pages cannot be read right now, try again later"))
-    return p.stdout
+    try:
+        pages = int(p.stderr.decode(errors="replace").rsplit("pages ", 1)[1].split()[0])
+    except (IndexError, ValueError):
+        raise Denied(409, tr("The pages cannot be read right now, try again later")) from None
+    return p.stdout, pages
 
 
 @app.post("/api/docs/merge")
@@ -112,24 +130,25 @@ def docs_merge():
     for i in sorted(ids):  # review F1: every document's lock (the same as an upload / docs/pages.py), sorted against a deadlock;
         write_lock(c, f"fs_version:{int(i)}")  # _pdf_doc below reads each one again under it (a merge in reverse order waits)
     fs_web_expect(c, first, b.get("expect_version"))
-    parts, size, total, was = [], 0, 0, None
+    buf, lens, ns, known, was = bytearray(), [], [], 0, None  # 2.976.0 (#5657): one buffer, the pages counted in the child process
     for i in ids:
         m, n, data = _pdf_doc(c, i, True)  # 409 not a PDF, 413 too large, fs_locked
         if m["state"] in ("wait", "run"):
             return err(tr("The document is still being recognised"), 409)
-        np = _known_pages(m, n) or dp_count(data)
-        if np is None:
-            return err(tr("The pages cannot be read right now, try again later"), 409)
-        size += len(data)
-        total += np
-        if size > DP_BYTES:
+        np = _known_pages(m, n)  # 0 = not known: the merge's child process counts it
+        known += np
+        if len(buf) + len(data) > DP_BYTES:
             return err(tr("The file is too large (at most {0} MB)", DP_BYTES >> 20), 413)
-        if total > DP_PAGES:
+        if known > DP_PAGES:  # what the recognition knows already says it before anything runs
             return err(tr("At most {0} pages can be changed here", DP_PAGES), 413)
-        parts.append((data, np))
+        buf += data
+        lens.append(len(data))
+        ns.append(np)
         if i == first:
             was = n
-    out = _merge(parts)
+        del data
+    out, total = _merge(buf, lens, ns)
+    del buf
     fsu_pre(c, uid, was, "version")  # ONE step group of the request: the version of the first + the others into the trash
     try:
         no = fs_new_version(c, first, out, "application/pdf")
