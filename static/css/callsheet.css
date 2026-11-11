@@ -26,7 +26,7 @@
 .pcs .pcsrow { display: flex; align-items: center; gap: .5rem; border-bottom: 1px solid var(--line); min-height: 2.75rem; }
 .pcs .pcsopen { flex: 1; min-width: 0; display: grid; grid-template-columns: 9rem 7rem minmax(0, 1fr); gap: .75rem; align-items: center;
   text-align: left; background: none; border: 0; padding: .5rem .25rem; color: inherit; font: inherit; cursor: pointer; border-radius: .375rem; }
-.pcs .pcsopen:hover { background: var(--hover, rgba(127, 127, 127, .08)); }
+.pcs .pcsopen:hover { background: var(--bg3); }
 .pcs .pcsopen > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pcs .pcsempty { margin: .75rem 0; }
 @media (max-width: 640px) {

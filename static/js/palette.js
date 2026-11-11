@@ -112,8 +112,8 @@ window.addEventListener('keydown', e => {
   }
   if (TOUR.on && !TOUR.paused) {  // the tour owns the keyboard while it is open (2.223.0 A (#2821): not while it pauses)
     if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); tourEnd(true); }
-    else if (k === 'ArrowRight' || k === 'Enter') { e.preventDefault(); e.stopPropagation(); tourGo(TOUR.i + 1); }
-    else if (k === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); tourGo(TOUR.i - 1); }
+    else if (k === 'ArrowRight' || k === 'Enter') { e.preventDefault(); e.stopPropagation(); tourNext(); }  // 2.994.1 (#5230): the keys keep the steps of Back like the buttons
+    else if (k === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); tourBack(); }
     return;
   }
   if ($('.palette')) return;  // its input handles the keys
@@ -683,9 +683,7 @@ function tourStart(mod) {
   el.addEventListener('click', e => {
     const b = e.target.closest('[data-tour]'); if (!b) return;
     const a = b.dataset.tour;
-    // 2.956.0 (#5230): every card shown by Next is one step of Back (backclose.js f8d_step); its Back button = that Back
-    if (a === 'next') { const was = TOUR.i; tourGo(was + 1); if (TOUR.on && TOUR.i > was) f8d_step(el, () => tourGo(was)); }
-    else if (a === 'back') { if (!f8d_stepBack(el)) tourGo(TOUR.i - 1); } else tourEnd(true);
+    if (a === 'next') tourNext(); else if (a === 'back') tourBack(); else tourEnd(true);
   });
   el.addEventListener('change', e => { if (e.target.id === 't-sample') TOUR.sampleOn = e.target.checked; if (e.target.id === 't-ptype') TOUR.ptype = e.target.value; if (e.target.id === 't-more') TOUR.more = e.target.checked; if (e.target.closest?.('#t-industry')) { TOUR.industry = indPicked($('#t-industry', el)); tourGo(TOUR.i); } });  /* 2.828.0 (#5511): boxes */  // 2.578.0 (#4573): the sample's text follows the industry
   el.addEventListener('click', e => { const b = e.target.closest('[data-tpurpose]'); if (!b) return; TOUR.purpose = TOUR.purpose === b.dataset.tpurpose ? '' : b.dataset.tpurpose; tourGo(TOUR.i); $(`.tour [data-tpurpose="${b.dataset.tpurpose}"]`)?.focus({preventScroll: true});  /* 2.956.0 (#5230): the card is fixed, nothing to scroll to */ });  // 2.19.0 (#653)
@@ -715,6 +713,9 @@ function tourPlace(r, vw, vh, mh) {  // mh: the card's measured height (2.5.2, K
   const left = Math.max(12, Math.min(vw - cw - 12, r.left > vw / 2 ? r.right - cw : r.left));
   return {ring, card: `width:${cw}px;left:${left}px;${below ? `top:${Math.min(vh - ch, r.bottom + 14)}px` : `bottom:${Math.max(12, vh - r.top + 14)}px`}`};
 }
+// 2.956.0 (#5230): every card shown by Next (button, Enter, ->) is one step of Back (backclose.js f8d_step); Back (button, <-) = that Back
+function tourNext() { const el = $('.tour'), was = TOUR.i; tourGo(was + 1); if (el && TOUR.on && TOUR.i > was) f8d_step(el, () => tourGo(was)); }
+function tourBack() { if (!f8d_stepBack($('.tour'))) tourGo(TOUR.i - 1); }
 function tourGo(i) {
   if (!TOUR.on || TOUR.paused) return;
   if (i >= TOUR.steps.length) { tourEnd(false); return; }
