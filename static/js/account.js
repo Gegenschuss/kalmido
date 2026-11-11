@@ -645,7 +645,7 @@ async function authScreen(j) {
   } else {
     const setup = kind === 'setup';
     el.innerHTML = `<div class="card">${logo}
-      ${setup ? '' : qd_slot('lgq')}${''/* 2.49.0 (#1553); 2.955.0 (#5239): the Dada quote of the day instead of the greeting */}
+      ${/*html-ok*/ setup ? '' : qd_slot('lgq')}${''/* 2.49.0 (#1553); 2.955.0 (#5239): the Dada quote of the day instead of the greeting */}
       ${setup ? `<p>${tr('Welcome! Create the first account, it becomes the admin.')}</p>${info.login ? `<p class="muted">${esc(tr('Signed in at the sign-in proxy as “{0}”: the account is linked to it, a password is optional.', info.login))}</p>` : ''}` : ''}
       <form id="auth-form" autocomplete="on">
         ${setup && info.setup_code ? `<label class="aulab" for="au-code">${tr('Setup code')}</label><input id="au-code" autocapitalize="off" autocomplete="one-time-code" spellcheck="false" required aria-describedby="au-code-h"><div class="shint shcode" id="au-code-h">${tr('The server prints it into its log at start: {0}', '<code>docker compose logs kalmido</code>')}</div>` : ''}${''/* 2.45.0 (#1515) */}

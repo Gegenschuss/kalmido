@@ -1048,6 +1048,7 @@ The start-up module.
 - `static/js/purposemods.js` - The switch "Switch on all modules" under "What do you use Kalmido for?" (Settings > Modules and the first-run setup)
 - `static/js/quickadd.js` (`ms`) - The quick-add parser (six languages)
 - `static/js/quickadd2.js` (`qa2`) - Quick add, second part: @person (assign)
+- `static/js/quotes_dada.js` (`qd`) - The Dada quote of the day on the sign-in page and on Today (loaded on demand: lazyload.js LD_MODS quotes; account.js qd_slot draws it)
 - `static/js/readlater.js` (`rdl`) - The view "Read later" (area Reading, part of the module "reading", loaded on demand with bookmarks.js: lazyload.js LD_MODS, styles in static/css/bookmarks.css)
 - `static/js/receipts.js` (`rc`) - An agent's suggestion waits here with Accept / Reject (one undo step each: reopen)
 - `static/js/recent.js` - "Recently edited": the overview "All workspaces" of Knowledge, Files and Reading and the start page block (GET /api/recent)
