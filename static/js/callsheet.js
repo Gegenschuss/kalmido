@@ -33,7 +33,8 @@ function cs_mapHref(t) {
 const cs_ctLabel = x => [x.person, x.company].filter(Boolean).join(' – ') || '?';
 const cs_ctCard = x => x ? [x.company, x.person, x.phone, x.email].filter(Boolean).join(' · ') : '';
 function cs_ctHtml(k, label, cur, list, freeHtml) {
-  const opts = (list || []).map(x => `<option value="${esc(String(x.id))}" ${cur && cur.id === x.id ? 'selected' : ''}>${esc(cs_ctLabel(x))}</option>`).join('');
+  // review F1: the contact chosen is always a choice (also beyond the first 500 of the list)
+  const opts = (cur && !(list || []).some(x => x.id === cur.id) ? [cur, ...list || []] : list || []).map(x => `<option value="${esc(String(x.id))}" ${cur && cur.id === x.id ? 'selected' : ''}>${esc(cs_ctLabel(x))}</option>`).join('');
   return `<div class="row"><label for="cs-${esc(k)}_contact">${tr(label)}</label><select id="cs-${esc(k)}_contact" data-f="${esc(k)}_contact" data-n="1">
       <option value="">${esc(k === 'client' ? tr('From the client file or free text') : tr('Free text'))}</option>${/*html-ok*/ opts}</select></div>
     <p class="muted cshint csct" data-ct="${esc(k)}"${cur ? '' : ' hidden'}>${esc(cs_ctCard(cur))}</p>

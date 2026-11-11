@@ -632,7 +632,8 @@ def le2b_trash_sec_plain(c):
     start. A switch still running empties its section trash at its finish (lists/parttrash.py lpt_section_purge_list).
     Idempotent, the caller commits. Returns the copies dropped. One way: those sections cannot be restored any more."""
     return c.execute("DELETE FROM list_part_trash WHERE kind='section' AND list_id IN (SELECT id FROM lists WHERE e2e='on') "
-                     """AND position('"name": "e2e1:' in snap)=0""").rowcount
+                     """AND position('"name": "e2e1:' in snap)=0 AND position('"name": ""' in snap)=0 """
+                     """AND position('"name": null' in snap)=0""").rowcount  # review: an empty name is no plain text (_trash_plain)
 
 
 def _trash_plain(r):

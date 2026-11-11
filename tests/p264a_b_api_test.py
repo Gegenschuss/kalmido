@@ -888,6 +888,11 @@ check(not waited and r is not None and r.ok and r.json().get("restored") == 1,
 check(dbx("SELECT task_title, task_id FROM time_entries WHERE start=? AND list_id=?", (PROBE["start"], L3)) == [("ProbeTitle5588", None)],
       f"#5588 review F2: no lock state bit about a foreign task for an unsealed entry "
       f"{dbx('SELECT task_title, task_id FROM time_entries WHERE start=? AND list_id=?', (PROBE['start'], L3))}")
+# 2.986.0 (#5588, review of 2.986 F5): a seal with characters outside ASCII is no seal (hmac.compare_digest raised TypeError: 500)
+PROBE2 = dict(PROBE, sig="\u00e4" * 40, start=(datetime.now() - timedelta(hours=16)).isoformat(timespec="seconds"),
+              end=(datetime.now() - timedelta(hours=15, minutes=59)).isoformat(timespec="seconds"))
+r = A.post(B + f"/api/lists/{L3}/time/restore", json={"entries": [PROBE2]}, timeout=60)
+check(r.status_code < 500, f"#5588: a non-ASCII seal is refused or ignored, never a 500 ({r.status_code} {r.text[:160]})")
 
 
 def order_race(child, parent, call):

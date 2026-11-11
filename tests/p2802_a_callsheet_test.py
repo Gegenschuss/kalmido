@@ -20,6 +20,7 @@ freelancer-matrix: hub (frida has no organisation: her own area, her own office,
 tenant-matrix: hub (greta, another person's area: frida's call sheet 404 for reading, the PDF and saving)
 usage: p2802_a_callsheet_test.py <datadir>"""
 import base64
+import json
 import re
 import struct
 import zlib
@@ -258,6 +259,20 @@ check(a.get("agency_contact") is None and a.get("client_contact") is None and "G
 txt = pdf_text(Fr.get(B + f"/api/team/dispo/callsheet/{JOB3}/pdf?org={PERS}").content)
 check(not has(txt, "Gerd Geheim") and not has(txt, "0170 8080808") and not has(txt, "Frida privat") and not has(txt, "0170 9990000"),
       "a smuggled id: nothing of the contact in the PDF (neither the columns, the crew list nor the distribution line)")
+# review F1/F3 (2.986.0, #5649): a contact this person cannot read is not handed out in data, and a save of the dialog (which
+# then sends no id) keeps it instead of dropping it silently; the same id sent back passes, another unreadable one is 400
+d_ = Fr.get(B + f"/api/team/dispo/callsheet/{JOB3}?org={PERS}").json()["callsheet"]["data"]
+check("agency_contact" not in d_ and "client_contact" not in d_, f"an unreadable contact id is not handed out {d_}")
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB3}?org={PERS}", json={"data": {"loc_name": "Neuer Ort"}})
+check(r.ok, "a save without the unreadable ids " + r.text[:160])
+raw = json.loads(kt.dbx("SELECT data FROM hub_callsheets WHERE org_id=? AND job=?", (PERS, JOB3))[0][0])
+check(raw.get("agency_contact") == SECRET and raw.get("client_contact") == FOREIGN and raw.get("loc_name") == "Neuer Ort",
+      f"... keeps the contacts somebody else chose {raw}")
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB3}?org={PERS}", json={"data": {"agency_contact": SECRET, "client_contact": FOREIGN}})
+check(r.ok, "the same unreadable ids sent back: no 400 " + r.text[:160])
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB3}?org={PERS}", json={"data": {"agency_contact": FOREIGN}})
+check(r.status_code == 400, f"another unreadable id instead: 400 ({r.status_code})")
+check(kt.dbx("SELECT cs_agency_id FROM lists WHERE id=?", (L,))[0][0] == ANJA, "a kept unreadable agency is not remembered at the project")
 # a contact gone to the trash is not shown any more either
 check(Fr.delete(B + f"/api/contacts/{ANJA}").ok, "the agency contact into the trash")
 a = Fr.get(B + f"/api/team/dispo/callsheet/{JOB2}?org={PERS}").json()["callsheet"]["auto"]

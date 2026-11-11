@@ -287,9 +287,12 @@ def cs_auto(c, uid, oid, rows, d=None, choice=True):
 def cs_public(c, uid, oid, job, rows, r=None):
     r = r if r is not None else cs_row(c, oid, job)
     d = cs_data(r)
-    return {"job": job, "org_id": oid, "data": d, "sketch": bool(r and r.get("sketch")),
+    a = cs_auto(c, uid, oid, rows, d)
+    # review F3: a contact id this person may not read is not handed out (cs_put keeps it when the dialog saves)
+    pub = {k: v for k, v in d.items() if k not in CS_REFS or (a.get(k) or {}).get("id") == v}
+    return {"job": job, "org_id": oid, "data": pub, "sketch": bool(r and r.get("sketch")),
             "sketch_url": f"/api/team/dispo/callsheet/{job}/sketch?org={oid}" if r and r.get("sketch") else "",
-            "updated_at": (r or {}).get("updated_at") or "", "can_edit": org_writes(c, uid, oid), "auto": cs_auto(c, uid, oid, rows, d)}
+            "updated_at": (r or {}).get("updated_at") or "", "can_edit": org_writes(c, uid, oid), "auto": a}
 
 
 # ---------------------------------------------------------------- writing
@@ -396,10 +399,6 @@ def cs_put(job):
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     data = cs_clean(b.get("data") or {})
-    books = dsp_book_ids(c, uid, oid)
-    for k in CS_REFS:  # 2.986.0 (#5649): only a contact the person may read in this area (an id of another book: 400)
-        if data.get(k) and not cs_contact(c, uid, oid, data[k], books):
-            raise BadInput(tr("Invalid value: {0}", k))
     sketch = None
     if "sketch" in b and b["sketch"] not in (None, False):
         sketch = ("", "") if b["sketch"] == "" else cs_sketch_in(c, uid, oid, b["sketch"])
@@ -410,6 +409,16 @@ def cs_put(job):
     dsk_sync(c, uid, oid, job)  # a call sheet an older version left in the trash beside live bookings comes back first
     r = cs_row(c, oid, job)
     ccf_check(b, (r or {}).get("updated_at") or "", "callsheet", lambda: cs_public(c, uid, oid, job, rows, r))
+    books = dsp_book_ids(c, uid, oid)
+    was, kept = (cs_data(r) if r else {}), set()  # under the lock (review F1)
+    for k in CS_REFS:  # 2.986.0 (#5649): only a contact the person may read in this area (an id of another book: 400)
+        if was.get(k) and not cs_contact(c, uid, oid, was[k], books) and data.get(k) in (None, was[k]):
+            # review F1: a contact chosen by someone who reads a book this person does not: it stays (the dialog hides it,
+            # cs_public), so a change of the place does not drop it silently
+            data[k] = was[k]
+            kept.add(k)
+        elif data.get(k) and not cs_contact(c, uid, oid, data[k], books):
+            raise BadInput(tr("Invalid value: {0}", k))
     if r is None:
         now = iso_ms(now_utc())
         rid = insert_id(c, "INSERT INTO hub_callsheets(org_id, job, data, sketch, sketch_mime, owner_id, rev, created_by, "
@@ -429,7 +438,7 @@ def cs_put(job):
         obj_history_add(c, uid, DSK_CS, rid, {"sketch": _pic_mark(r.get("sketch"))}, {"sketch": _pic_mark(sketch[0])}, org_id=oid)
     if data != cs_data(r):
         obj_write(c, uid, DSK_CS, rid, {"data": data})
-    cs_agency_keep(c, uid, rows, data.get("agency_contact"))
+    cs_agency_keep(c, uid, rows, None if "agency_contact" in kept else data.get("agency_contact"))
     bump(c)
     c.commit()
     return jsonify(callsheet=cs_public(c, uid, oid, job, rows))
@@ -446,8 +455,8 @@ def cs_agency_keep(c, uid, rows, cid):
     if not lid or proj.get("locked") or proj.get("role") not in ("owner", "admin", "edit") or proj.get("agency_id") == cid:
         return
     write_lock(c, f"obj-list-{int(lid)}")  # the project's lock (lists/lists.py, PATCH /api/lists/<id>)
-    old = c.execute("SELECT cs_agency_id FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
-    if old is None or old[0] == cid:
+    old = c.execute("SELECT cs_agency_id, archived FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
+    if old is None or old[0] == cid or old[1]:  # review F2: an archived project stays as it is
         return
     c.execute("UPDATE lists SET cs_agency_id=? WHERE id=?", (cid, lid))
     obj_history_add(c, uid, LMC_KIND, lid, {"cs_agency_id": old[0]}, {"cs_agency_id": cid})

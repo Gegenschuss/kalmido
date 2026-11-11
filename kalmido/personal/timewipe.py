@@ -244,7 +244,7 @@ def tzw_lock_tasks(c, ents, lid=None, trust=False):
         t = e.get("task_id") if isinstance(e, dict) else None
         return isinstance(t, int) and not isinstance(t, bool) and 0 < t < 2 ** 63
     ents = [e for e in ents if tid_ok(e)] if isinstance(ents, list) else []
-    sure = {e["task_id"] for e in ents if trust or (isinstance(e.get("sig"), str) and lid is not None
+    sure = {e["task_id"] for e in ents if trust or (isinstance(e.get("sig"), str) and e["sig"].isascii() and lid is not None
                                                      and hmac.compare_digest(e["sig"], h6b_sig(c, lid, e)))}
     rest = sorted({e["task_id"] for e in ents} - sure)
     if rest:  # the person's view decides which of the other ids are held (read only, no lock yet)
