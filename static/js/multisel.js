@@ -184,3 +184,28 @@ cm_bind('#chat-msgs .cmsg', lm_open('[data-act="chat-msg-menu"]', (b, r) => { co
 // 2.725.0 (#5177): the long press of a section head is taken by dnd.js's hold (drag / menu on release, ms_lpTake): one menu, not two
 const LM_SECHEAD = cm_bind('#view .ghead[data-section]', lm_open('[data-act="section-menu"]', (b, r) => sectionMenu(r, +b.dataset.id)), null, lm_keep);
 cm_bind('#view .tl-cal .tl-name', lm_open('[data-act="cvx-tlmenu"]', (b, r) => cvxTlMenu(r, b.dataset.key, b.dataset.name)), null, lm_keep);
+// 2.963.0 (#5234): a selection mode is one step of the page on a touch screen (backclose.js f8d_step on #view): Back ends the
+// selection and stays on the page (it went one page back before). Each row: [key, on() = the selection is shown, end() = what
+// Esc does there]. ms_stepSync runs after every change of the page (a mutation, the tasks' bar): a selection that starts
+// gets its step, one ended another way (the bar's X, Esc, an action) loses it again (its history entry goes: no dead Back)
+const MS_STEPS = /** @type {Array<[string, () => any, () => void]>} */ ([
+  ['tasks', () => S.multiMode || S.multi.size, () => { S.multi.clear(); S.multiMode = false; render(); }],  // events.js ev_escGlobal
+  ['contacts', () => typeof CT === 'object' && CT.pick && S.route.mod === 'contacts', () => bk_end()],
+  ['clients', () => typeof MSC === 'object' && MSC.pick && S.route.mod === 'clients', () => ms_clEnd()],
+  // the documents and the file store share one selection (ablage.js AB, 2.768.0 #4888)
+  ['ablage', () => typeof AB === 'object' && AB.selOn && $('#view .abview, #view .dc-view'), () => { ab_selEnd(); ab_selDraw(); }],
+  ['wiki', () => typeof WK === 'object' && WK.selOn && S.route.mod === 'wiki', () => { wk_selEnd(); renderView(); }],
+  ['travel', () => typeof RK === 'object' && RK.sel.size && $('#view #rk-sbar'), () => { RK.sel.clear(); ofcDraw(); }],
+]);
+function ms_stepSync() {
+  const v = $('#view'); if (!v || typeof f8d_step !== 'function') return;
+  for (const [key, on, end] of MS_STEPS) {
+    const i = (v._stk || []).findIndex(f => f._ms === key);
+    if (on() && i < 0) { const f = () => end(); f._ms = key; f8d_step(v, f); }
+    else if (!on() && i >= 0) { v._stk.splice(i, 1); f8d_queue(); }
+  }
+}
+if (isTouch()) {
+  new MutationObserver(ms_stepSync).observe(document.body, {childList: true, subtree: true});
+  new MutationObserver(ms_stepSync).observe(document.body, {attributes: true, attributeFilter: ['class']});  // the tasks' bar (sidebar.js renderMultiBar: body.msel)
+}

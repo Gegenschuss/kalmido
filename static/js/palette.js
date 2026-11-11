@@ -516,6 +516,8 @@ function openPalette(mode = null) {
     <div class="pfoot">${kb('↑')}${kb('↓')}<span>${tr('select')}</span>${kb('Enter')}<span>${tr('run')}</span><span class="spacer"></span>${kb('?')}<span>${tr('all shortcuts')}</span></div></div>`;
   md.addEventListener('mousedown', e => { if (e.target === md) closePalette(); });
   document.body.appendChild(md);
+  // 2.963.0 (#5234): the mode "Move to another project" is one step of the search (backclose.js): Back = Esc, back to the search
+  if (mode === 'move' && typeof f8d_step === 'function') f8d_step(md, () => openPalette());
   const inp = $('.pqin', md);
   inp.addEventListener('input', () => { clearTimeout(PAL.tq); PAL.tq = setTimeout(() => { PAL.tq = 0; PAL.q = inp.value; PAL.i = 0; palDraw(); }, PAL_WAIT); });  // 2.579.0 (#4199): after a short pause in typing
   inp.addEventListener('keydown', e => {
