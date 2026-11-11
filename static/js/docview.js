@@ -54,7 +54,7 @@ function dcv_fill(id) {
 // from the list / the file store / a link inside the app: a new entry in the browser's history, the place of the list kept
 function dcv_go(id) {
   const v = $('#view'), inList = dc_listOn() && !dc_hashId();  // 2.752.0 (#4887): + a folder's documents
-  DVW.back = {hash: location.hash || '#ablage/docs', y: inList && v ? v.scrollTop : null, id, pushed: true}; DVW.closed = null;
+  DVW.back = {hash: location.hash || '#ablage/docs', y: inList && v ? v.scrollTop : null, id, pushed: true}; DVW.closed = null; DVW.sw = null;  // 2.940.0 (#5601): the strip starts around the one opened
   AB_FILEIDS.add(id); location.hash = `#ablage/${id}`;  // 2.752.0 (#4887): one address for files and documents (core.js)
 }
 window.addEventListener('hashchange', () => { if (typeof DVW === 'object') DVW.closed = null; });
@@ -97,6 +97,8 @@ function dcv_restore() {
 function dcv_draw(md) {
   const d = DC.doc; if (!d || !md) return;
   dcv_hook(md);
+  const sm = dcv_stMark(md);  // 2.940.0 (#5601): the strip's place before the body is drawn anew
+  { const i = DC.navSrc ? -1 : dc_navIdx(d); if (i >= 0) DVW.sw = dcv_stWin(i); }  // the window of the strip stays while the document is in it
   const w = d.role !== 'view';
   let body = $('.dc-body', md);
   if (body && body.dataset.id !== String(d.id)) {
@@ -115,7 +117,7 @@ function dcv_draw(md) {
   dcv_pvDraw(md, d);
   if (typeof dfl_runs === 'function' && !d.file) dfl_runs(md, d);  // 2.581.0 (#4803): the runs of flows with Undo (docflows.js)
   if (typeof dn_draw === 'function' && !d.file) dn_draw(md, d);  // 2.635.0 (#4807 d): the notes (docnotes.js), under the fields
-  const cur = $('.dv-strip .dv-th.on', md); if (cur) cur.scrollIntoView?.({block: 'nearest'});
+  dcv_stBack(md, sm);  // 2.940.0 (#5601): the strip does not move on a click; only a document out of sight is brought in, just so far
   if (DC.slide) dc_slideIn(md);  // 2.476.0 (#3935): the next document glides in from the side (2.727.0, #5202: only the arrows / keys; a swipe snapped it in)
   if (typeof dc_swInit === 'function') dc_swInit();  // 2.882.0 (#5557): the swipe over the whole view (swipenav.js)
   if (typeof dc_nbPre === 'function') dc_nbPre(d);  // 2.727.0 (#5202): the neighbours' small pictures ahead (2.736.0, #5212: and the neighbours drawn whole)
@@ -243,9 +245,17 @@ function dcv_actsHtml(d, w) {
   return `<a class="btn sm dv-dl" href="${dcv_fileUrl(d, true)}" download title="${esc(tr('Download'))}">${ic('download', 's')} <span>${tr('Download')}</span></a>${more.length ? `<span class="dv-actw"><button type="button" class="btn sm" data-dc="actsmore" aria-expanded="${open}" aria-controls="dc-amore" aria-haspopup="true">${tr('Actions')}${ic('chev', 's dc-chev')}</button><div class="dc-ag dc-amore dv-amenu" id="dc-amore" ${open ? '' : 'hidden'}>${more.join('')}</div></span>` : ''}${w ? `<button type="button" class="btn sm danger dc-adel" data-dc="del" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')} <span>${tr('Delete')}</span></button>` : ''}`;
 }
 const dcv_gripHtml = (which, label) => `<button type="button" class="dv-grip" data-dvgrip="${which}" aria-label="${esc(label + ': ' + tr('Resize (arrow keys; double-click: default size)'))}" title="${esc(tr('Drag to resize · double-click: default size'))}"></button>`;
-// the strip: the neighbours in the list as shown (up to 15 on each side), the open one marked; a document outside the list alone
+// the strip: the neighbours in the list as shown (31 entries around the open one), the open one marked; a document outside the list alone.
+// 2.940.0 (#5601): the window stays where it is while the open document lies in it (DVW.sw, its first entry): a click on a small
+// picture only moves the mark; the window moves on only when leafing goes past its edge
+const DCV_STN = 31;
+function dcv_stWin(i) {
+  const s = DVW.sw, n = (DC.docs || []).length;
+  if (s != null && s >= 0 && i >= s && i < Math.min(n, s + DCV_STN)) return s;
+  return Math.max(0, i - 15);
+}
 function dcv_stripHtml(d, off) {
-  const ds = DC.docs || [], i = DC.navSrc ? -1 : dc_navIdx(d), list = i < 0 ? [d] : ds.slice(Math.max(0, i - 15), i + 16);  // 2.683.0 (#5150): a file store folder's list has ids only
+  const ds = DC.docs || [], i = DC.navSrc ? -1 : dc_navIdx(d), s = i < 0 ? 0 : dcv_stWin(i), list = i < 0 ? [d] : ds.slice(s, s + DCV_STN);  // 2.683.0 (#5150): a file store folder's list has ids only
   const t = off ? tr('Show the list') : tr('Hide the list');
   return `<nav class="dv-strip" aria-label="${esc(tr('In the list'))}"><div class="dv-sthd"><span class="dv-stt">${tr('In the list')}</span><button type="button" class="iconbtn" data-dc="dvstrip" aria-expanded="${!off}" aria-label="${esc(t)}" title="${esc(t)}">${ic(off ? 'panelshow' : 'panelhide', 's')}</button></div>${off ? '' : `<ul>${list.map(x => {
     const on = x.id === d.id, nm = x.sender?.name || dc_title(x);  // 2.750.0 (#4876): the title
@@ -387,7 +397,28 @@ function dcv_sync() {
     slot.innerHTML = h;
     if (f) $(`.dc-nav [data-dc="${f}"]`, slot)?.focus({preventScroll: true});
   }
-  const st = $('.dv-strip', v); if (st) { const t = document.createElement('template'); t.innerHTML = dcv_stripHtml(d, dcv_stripOff()); const n = t.content.firstElementChild; if (n && st.innerHTML !== n.innerHTML) st.replaceWith(n); }
+  const st = $('.dv-strip', v); if (st) { const t = document.createElement('template'); t.innerHTML = dcv_stripHtml(d, dcv_stripOff()); const n = t.content.firstElementChild; if (n && st.innerHTML !== n.innerHTML) { const sm = dcv_stMark(v); st.replaceWith(n); dcv_stBack(v, sm); } }  // 2.940.0 (#5601): keeps its place
+}
+// 2.940.0 (#5601): the strip's place over a redraw: an entry in sight and its distance from the strip's top (by its document)
+function dcv_stMark(root) {
+  const st = $('.dv-strip', root); if (!st || !st.clientHeight) return null;
+  const r = st.getBoundingClientRect();
+  for (const li of $$('li[data-k]', st)) { const b = li.getBoundingClientRect(); if (b.bottom > r.top + 1) return {k: li.dataset.k, dy: b.top - r.top, px: st.scrollTop}; }
+  return {k: null, dy: 0, px: st.scrollTop};
+}
+// back to that place (the same entry at the same height), then the open document into sight only when it is not: as far as needed
+function dcv_stBack(root, sm) {
+  const st = $('.dv-strip', root); if (!st || !st.clientHeight) return;
+  const r = () => st.getBoundingClientRect();
+  if (sm) {
+    const li = sm.k ? $$('li[data-k]', st).find(x => x.dataset.k === sm.k) : null;
+    const y = li ? st.scrollTop + li.getBoundingClientRect().top - r().top - sm.dy : sm.px;
+    if (Math.abs(st.scrollTop - y) >= 0.5) st.scrollTop = y;  // sprung-ok: the place it had (#5601)
+  }
+  const cur = $('.dv-th.on', st); if (!cur) return;
+  const a = r(), b = (cur.closest('li') || cur).getBoundingClientRect();
+  if (b.top < a.top) st.scrollTop -= a.top - b.top;  // sprung-ok: the open document came out of sight (leafing past the edge): as far as needed
+  else if (b.bottom > a.bottom) st.scrollTop += b.bottom - a.bottom;  // sprung-ok: as above
 }
 
 // ---- the preview: an image as itself, a PDF with every page (drawn when it comes near, sharp at the size shown)
