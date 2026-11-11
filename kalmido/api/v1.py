@@ -20,7 +20,7 @@ from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, FAIL_WIND
 from ..accounts.login import twofa_methods
 from ..core.access import collab_all, Denied, list_role, my_inbox, need_collab, need_list, need_task, need_time, time_all, token_lists, live_sql, tvis, vis_sql  # 2.955.0 (#5276): live_sql
 from ..core.serializers import load_tasks, rel_of
-from ..core.objfollow import OFL_WATCHING_SQL  # 2.972.0 (#5285)
+from ..core.objfollow import OFL_WATCHING_SQL, ofl_bells_here  # 2.972.0 (#5285); 2.981.0 (#5287): a project's bell
 from ..core.instance import semver, update_state
 from ..core.state import search_tasks, visible_lists, visible_sections
 from ..lists.lists import clean_folder, clean_list_value, list_create, LIST_KIND_ALIASES, LIST_KINDS, list_update
@@ -667,8 +667,8 @@ def v1_me():
 
 def v1_notif(c, uid):
     """2.1.0 (#317): my notification settings: the matrix + the bells of my lists (only lists not on "default")."""
-    rows = c.execute(f"SELECT list_id, mode, custom FROM list_bell WHERE user_id=? AND mode!='default' AND list_id IN {vis_sql()}",
-                     (uid, uid, uid)).fetchall()
+    rows = [(r["ref_id"], r["level"], r["custom"]) for r in ofl_bells_here(c, "list", uid=uid, modes=("all", "mute", "custom"),
+                                                                          where=f"f.ref_id IN {vis_sql()}", args=(uid, uid))]
     return {"events": notif_matrix(usettings(c, uid)),
             "lists": {str(r[0]): r[1] for r in rows},
             # 2.6.1 (#404): the event choice of lists on "custom" (events missing there = as in the matrix)

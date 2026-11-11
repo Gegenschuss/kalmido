@@ -41,7 +41,8 @@ def sql(q, args=()):
 
 
 def marks(u, rooms):
-    return {x[0] for x in sql("SELECT room_id FROM tchat_reads WHERE user_id=?", (u,))} & set(rooms)
+    # 2.981.0 (#5286): the read marks are rows of the core's obj_seen (kind tchat; tchat_reads is gone)
+    return {x[0] for x in sql("SELECT ref_id FROM obj_seen WHERE kind='tchat' AND user_id=?", (u,))} & set(rooms)
 
 
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)

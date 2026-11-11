@@ -56,6 +56,12 @@ the database's limit to the minor of that release (like stage 7 above). An older
 and write there what the next start of the newer version could not take over. Go back only by restoring a backup made before
 the update.
 
-**Never go back before the release with package 2.981** either: its first start moves the comments of video / picture reviews and
+**Never go back before the release with package 2.981** (the CHANGELOG names it): its first start moves the bells of projects
+into `obj_follow` and the owners' notification templates of projects and folders into `obj_notif_cap`, drops `list_bell`,
+`list_notif` and `folder_notif` and raises the database's limit to the minor of that release. An older version would make the
+old tables again empty: no project bells, and every share back on the default template "Read-only". Go back only by restoring a
+backup made before the update.
+
+The same release's first start also moves the comments of video / picture reviews and
 the notes on documents into the same shared table (`obj_comments`), drops the old tables and raises the database's limit to the
 minor of that release. An older version would make them again empty. Go back only by restoring a backup made before the update.

@@ -244,14 +244,13 @@ check(dbx("SELECT COUNT(DISTINCT user_id) FROM login_ips")[0][0] >= 4, "#834: pr
 
 # ================================================================== migration (once) + the one-time question
 check(A.get(B + "/api/state").json()["notif_ask"] == [], "#927: no question on a new server")
-dbx("DELETE FROM list_notif", write=True)
-dbx("DELETE FROM folder_notif", write=True)
+dbx("DELETE FROM obj_notif_cap", write=True)  # 2.981.0 (#5287): list_notif / folder_notif are rows of the core's obj_notif_cap
 dbx("DELETE FROM settings WHERE key='migr_notiftpl2330'", write=True)
 start(keep=True)
 A, Bo = sess("alice"), sess("bob")
-rows = dbx("SELECT list_id, user_id, tpl FROM list_notif ORDER BY list_id")
+rows = dbx("SELECT ref_id, user_id, tpl FROM obj_notif_cap WHERE kind='list' ORDER BY ref_id")  # 2.981.0 (#5287)
 check((L, 0, "all") in rows and not any(r[0] == F1 for r in rows), "#927 migration: the shared list got all, the list in the shared folder not " + str(rows))
-check(dbx("SELECT owner_id, folder, user_id, tpl FROM folder_notif") == [(1, "Crew", 0, "all")], "#927 migration: the shared folder got all")
+check(dbx("SELECT ref_id, path, user_id, tpl FROM obj_notif_cap WHERE kind='folder'") == [(1, "Crew", 0, "all")], "#927 migration: the shared folder got all")
 ask = A.get(B + "/api/state").json()["notif_ask"]
 check({(x["kind"], x.get("id") or x.get("folder")) for x in ask} == {("folder", "Crew"), ("list", L)}, "#927 migration: the owner is asked once " + json.dumps(ask))
 check(Bo.get(B + "/api/state").json()["notif_ask"] == [], "#927 migration: members are not asked")
@@ -263,8 +262,8 @@ check(A.post(B + "/api/notify-templates/asked", json={}).ok and A.get(B + "/api/
 cols = [r[1] for r in dbx("PRAGMA table_info(lists)")]
 check(not any("notif" in c for c in cols) and not any("notif" in r[1] for r in dbx("PRAGMA table_info(list_members)")),
       "rollback: lists / list_members unchanged")
-check([r[1] for r in dbx("PRAGMA table_info(list_notif)")] == ["list_id", "user_id", "tpl", "custom", "updated_at"]
-      and [r[1] for r in dbx("PRAGMA table_info(login_ips)")] == ["ip", "user_id", "at"], "rollback: only new tables")
+# 2.981.0 (#5287): list_notif went into the core's obj_notif_cap (one-way, docs/UPGRADING.md); the account export keeps its columns
+check([r[1] for r in dbx("PRAGMA table_info(login_ips)")] == ["ip", "user_id", "at"], "rollback: only new tables")
 r = A.get(B + "/api/export.json")
 exp = r.json() if r.ok else {}
 check("list_notif" in exp and "folder_notif" in exp, "#927: the account export carries the templates")

@@ -192,7 +192,6 @@ filters.rules json
 filters.shared bool
 folder_agents.created_at time
 folder_heads.updated_at time
-folder_notif.updated_at time
 folder_props.props json
 folder_props.updated_at time
 form_entries.answers json
@@ -320,7 +319,6 @@ list_milestones.done bool
 list_mine_hide.created_at time
 list_notepads.created_at time
 list_notepads.updated_at time
-list_notif.updated_at time
 list_paperless.added_at time
 list_part_trash.deleted_at time
 list_part_trash.held json
@@ -665,8 +663,6 @@ retention_log.detail json
 rss_feeds.created_at time
 rss_feeds.deleted_at time
 rss_items.fetched_at time
-rss_items.read_at time
-rss_reads.read_at time
 sched_poll_votes.answers json
 sched_poll_votes.created_at time
 sched_poll_votes.updated_at time
@@ -734,7 +730,6 @@ tchat_msgs.created_at time
 tchat_msgs.deleted_at time
 tchat_msgs.edited_at time
 tchat_msgs.pinned_at time
-tchat_reads.muted bool
 tchat_rooms.archived_at time
 tchat_rooms.created_at time
 tchat_rooms.deleted_at time

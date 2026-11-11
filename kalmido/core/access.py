@@ -931,6 +931,7 @@ def dlg_gone(c, lid, uid):
     c.execute("UPDATE tasks SET delegate_agent_id=NULL WHERE list_id=? AND delegate_agent_id=?", (lid, uid))
     from .objfollow import ofl_drop
     ofl_drop(c, uid, "task", "ref_id IN (SELECT id FROM tasks WHERE list_id=?)", (lid,))
+    ofl_drop(c, uid, "list", "ref_id=?", (lid,))  # 2.981.0 (#5287): and their bell of the project itself (was list_bell, kept)
 
 
 # 2.477.0 (#3881): the private list "Notes" of the quick note (lists.quicknote = 1) is never shared: every way a list gets

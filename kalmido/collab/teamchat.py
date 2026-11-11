@@ -29,6 +29,11 @@ from .cmttrash import tcx_trash, tcx_restore
 from ..core.objreact import orx_of, orx_set, orx_toggle  # 2.763.0 (#5269): the reactions of the shared core
 from ..core.objhooks import NOTIFY_READERS  # 2.891.0 (#5270): the reader of a direct message for the send decision
 from ..lists.groups import grp_own_rows  # 2.958.0 (#5245): the projects' own group shares (group_shares is gone)
+# 2.981.0 (#5286, stage Q8b): the read marks are rows of the core's obj_seen (kind 'tchat' = a room, 'tchat_thread' = a thread),
+# muting a room and taking part in a thread rows of obj_follow (tchat_reads / tchat_thread_reads are gone)
+from ..core.objseen import osn_get, osn_mark
+from ..core.objfollow import OFL_LEVEL, ofl_bell_drop, ofl_bell_put, ofl_drop, ofl_watch, ofl_watchers
+from ..core.objseen import osn_drop
 
 
 # ---------------------------------------------------------------- 2.17.0 (#419): team chat
@@ -244,8 +249,28 @@ def tchat_shared_lists(c, uid, mm=None):
 
 
 def tchat_last_read(c, rid, uid):
-    r = c.execute("SELECT last_id, muted FROM tchat_reads WHERE room_id=? AND user_id=?", (rid, uid)).fetchone()
-    return (r["last_id"], bool(r["muted"])) if r else (0, False)
+    r = c.execute(f"SELECT {TCH_SEEN}, {TCH_MUTED}", (rid, uid, rid, uid)).fetchone()  # 2.981.0 (#5286): the core's rows
+    return (r[0] or 0, bool(r[1]))
+
+
+def tchat_marks_drop(c, uids, where, args=()):
+    """2.981.0 (#5286): the people uids leave the rooms matching where (an SQL condition on ref_id = the room id, with its
+    args): their read marks there and their mutes go (rows of the core's obj_seen / obj_follow, kind 'tchat'); the marks of
+    the threads stay, as before (they count only beside a room mark). The caller commits."""
+    return osn_drop(c, uids, "tchat", where, args) + ofl_drop(c, uids, "tchat", where, args)
+
+
+def _tchat_level(c, uid, rid, s, done_ok=False):
+    """2.981.0 (#5286): the follow rule of a team chat room for obj_notify (core/objfollow.py OFL_LEVEL): 'mute' when muted."""
+    return "mute" if tchat_last_read(c, rid, uid)[1] else None
+
+
+OFL_LEVEL["tchat"] = _tchat_level
+
+
+# 2.981.0 (#5286): the room's read mark and mute of a person (two ? each: room, person), a thread's mark (root, person)
+TCH_SEEN = "(SELECT seen_id FROM obj_seen WHERE kind='tchat' AND ref_id=? AND user_id=?)"
+TCH_MUTED = "EXISTS (SELECT 1 FROM obj_follow WHERE kind='tchat' AND ref_id=? AND user_id=? AND mode='mute')"
 
 
 def tchat_rooms(c, uid, create=False, full=True):
@@ -309,19 +334,24 @@ def _tchat_room_counts(c, ids, uid):
     lasts = {r["room_id"]: r for r in c.execute(
         f"SELECT DISTINCT ON (room_id) * FROM tchat_msgs WHERE room_id = ANY(CAST(? AS BIGINT[])) AND {live_sql()} "
         "AND thread_of IS NULL ORDER BY room_id, id DESC", (ids,))}
+    # 2.981.0 (#5286): the read marks / mutes / threads taken part in are rows of the core's obj_seen / obj_follow
     reads = {r[0]: (r[1], bool(r[2])) for r in c.execute(
-        "SELECT room_id, last_id, muted FROM tchat_reads WHERE user_id=? AND room_id = ANY(CAST(? AS BIGINT[]))", (uid, ids))}
+        """SELECT x.id, COALESCE(s.seen_id,0), f.user_id IS NOT NULL FROM unnest(CAST(? AS BIGINT[])) x(id)
+           LEFT JOIN obj_seen s ON s.kind='tchat' AND s.ref_id=x.id AND s.user_id=?
+           LEFT JOIN obj_follow f ON f.kind='tchat' AND f.ref_id=x.id AND f.user_id=? AND f.mode='mute'
+           WHERE s.user_id IS NOT NULL OR f.user_id IS NOT NULL""", (ids, uid, uid))}
     pat = f"%<@{uid}>%"
     unr = {r[0]: (r[1], bool(r[2])) for r in c.execute(
         f"""SELECT m.room_id, COUNT(*) FILTER (WHERE COALESCE(m.user_id,0)!=?), bool_or(m.body ILIKE ?) FROM tchat_msgs m
-           LEFT JOIN tchat_reads d ON d.room_id=m.room_id AND d.user_id=?
-           WHERE m.room_id = ANY(CAST(? AS BIGINT[])) AND m.id>COALESCE(d.last_id,0) AND {live_sql("m")} AND m.thread_of IS NULL
+           LEFT JOIN obj_seen d ON d.kind='tchat' AND d.ref_id=m.room_id AND d.user_id=?
+           WHERE m.room_id = ANY(CAST(? AS BIGINT[])) AND m.id>COALESCE(d.seen_id,0) AND {live_sql("m")} AND m.thread_of IS NULL
            GROUP BY m.room_id""", (uid, pat, uid, ids))}
     thr = {r[0]: (r[1], bool(r[2])) for r in c.execute(
-        f"""SELECT t.room_id, COUNT(*), COALESCE(SUM(CASE WHEN m.body ILIKE ? THEN 1 ELSE 0 END),0) FROM tchat_msgs m
-           JOIN tchat_thread_reads t ON t.root_id=m.thread_of AND t.user_id=? AND t.follow=1
-           WHERE t.room_id = ANY(CAST(? AS BIGINT[])) AND m.room_id=t.room_id AND m.id>t.last_id AND {live_sql("m")}
-           AND COALESCE(m.user_id,0)!=? GROUP BY t.room_id""", (pat, uid, ids, uid))}
+        f"""SELECT m.room_id, COUNT(*), COALESCE(SUM(CASE WHEN m.body ILIKE ? THEN 1 ELSE 0 END),0) FROM tchat_msgs m
+           JOIN obj_follow w ON w.kind='tchat_thread' AND w.ref_id=m.thread_of AND w.user_id=? AND w.mode='watch'
+           LEFT JOIN obj_seen t ON t.kind='tchat_thread' AND t.ref_id=m.thread_of AND t.user_id=w.user_id
+           WHERE m.room_id = ANY(CAST(? AS BIGINT[])) AND m.id>COALESCE(t.seen_id,0) AND {live_sql("m")}
+           AND COALESCE(m.user_id,0)!=? GROUP BY m.room_id""", (pat, uid, ids, uid))}
     return lasts, reads, unr, thr
 
 
@@ -355,9 +385,11 @@ def tchat_sig_q(uid):
             WHERE (r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN """ + vis_sql(ov=False) + ")")
     # 2.139.0 A (#2129, #2127): + the read marks of everyone (mine included) in the conversations I have read and in their
     # threads, so "Read by" shows without reloading
-    rd = """SELECT (SELECT COALESCE(SUM(last_id),0) FROM tchat_reads WHERE room_id IN (SELECT room_id FROM tchat_reads WHERE user_id=?)),
-                   (SELECT COALESCE(SUM(last_id),0) + COUNT(*) FROM tchat_thread_reads
-                    WHERE room_id IN (SELECT room_id FROM tchat_reads WHERE user_id=?))"""
+    # 2.981.0 (#5286): rows of the core's obj_seen (kind tchat = a room, tchat_thread = a thread of a room's message)
+    rd = """SELECT (SELECT COALESCE(SUM(seen_id),0) FROM obj_seen WHERE kind='tchat' AND ref_id IN
+                    (SELECT ref_id FROM obj_seen WHERE kind='tchat' AND user_id=?)),
+                   (SELECT COALESCE(SUM(t.seen_id),0) + COUNT(*) FROM obj_seen t JOIN tchat_msgs m ON m.id=t.ref_id
+                    WHERE t.kind='tchat_thread' AND m.room_id IN (SELECT ref_id FROM obj_seen WHERE kind='tchat' AND user_id=?))"""
     # 2.113.1 (#2059): + the messages of my channels / groups and their names, states, members
     # 2.640.0 (#4183): from the counters per room as above: newest id, count, change counter, pins (the rooms: tcx_sig_q)
     x = """SELECT COALESCE(MAX(s.max_id),0), COALESCE(SUM(s.n),0), COALESCE(SUM(s.rev),0), COALESCE(SUM(s.pins),0) FROM tchat_room_sig s
@@ -634,8 +666,7 @@ def tchat_post(rid):
     if root:  # 2.139.0 A (#2127): the thread's people (its first message's author, the @mentioned, me: read up to here)
         tth_follow(c, r, root, [*mentions, *([orig["user_id"]] if orig and orig["user_id"] else [])], mid)
     else:
-        c.execute("INSERT INTO tchat_reads(room_id,user_id,last_id) VALUES(?,?,?) ON CONFLICT(room_id,user_id) DO UPDATE SET last_id=excluded.last_id",
-                  (rid, me(), mid))
+        osn_mark(c, "tchat", rid, me(), mid)  # 2.981.0 (#5286): the core's obj_seen
     m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
     tchat_notify(c, r, m, mentions, replied=orig["user_id"] if orig and orig["user_id"] != me() else None)
     c.commit()
@@ -695,7 +726,7 @@ def tchat_notify(c, r, m, mentions, replied=None, only=None):
     # an agent (no loop between agents); health lists and an agent's list limit stay with agent_emit
     listen = set(listen_agents_of(c, r["list_id"])) if r["kind"] == "list" and sender not in ags else set()
     root = m["thread_of"] if "thread_of" in m.keys() else None  # 2.139.0 A (#2127): an answer in a thread notifies its people only
-    follow = {x[0] for x in c.execute("SELECT user_id FROM tchat_thread_reads WHERE root_id=? AND follow=1", (root,))} if root else set()
+    follow = ofl_watchers(c, "tchat_thread", root) if root else set()  # 2.981.0 (#5286): the core's obj_follow
     rcpt = sorted((members if only is None else members & set(only)) - {sender})
     # 2.369.3 (#3199): what the push rules need of every person of the room, in one query each before the loop (was five to
     # eight per person): account state + settings (collab_user), read mark / mute, the list bell, the list's name; the
@@ -789,8 +820,11 @@ def tchat_notify_pre(c, r, uids):
     if not out["s"]:
         return out
     q = sorted(out["s"])
-    out["reads"] = {x[0]: (x[1], bool(x[2])) for x in c.execute(
-        "SELECT user_id, last_id, muted FROM tchat_reads WHERE room_id=? AND user_id = ANY(CAST(? AS BIGINT[]))", (r["id"], q))}
+    out["reads"] = {x[0]: (x[1], bool(x[2])) for x in c.execute(  # 2.981.0 (#5286): the core's obj_seen / obj_follow
+        """SELECT x.id, COALESCE(s.seen_id,0), f.user_id IS NOT NULL FROM unnest(CAST(? AS BIGINT[])) x(id)
+           LEFT JOIN obj_seen s ON s.kind='tchat' AND s.ref_id=? AND s.user_id=x.id
+           LEFT JOIN obj_follow f ON f.kind='tchat' AND f.ref_id=? AND f.user_id=x.id AND f.mode='mute'
+           WHERE s.user_id IS NOT NULL OR f.user_id IS NOT NULL""", (q, r["id"], r["id"]))}
     if r["list_id"]:
         out["bells"] = list_bells(c, q, r["list_id"])
     out["reach"] = push_reachable_many(c, out["s"])
@@ -981,8 +1015,14 @@ def tchat_read(rid):
         if not isinstance(b["muted"], bool):
             return err(tr("Invalid value: {0}", "muted"))
         muted = b["muted"]
-    c.execute("INSERT INTO tchat_reads(room_id,user_id,last_id,muted) VALUES(?,?,?,?) ON CONFLICT(room_id,user_id) "
-              "DO UPDATE SET last_id=excluded.last_id, muted=excluded.muted", (rid, me(), max(lr, lid), int(muted)))
+    # 2.981.0 (#5286): the core's obj_seen (the higher mark stays; a room without messages gets its row of 0 too: tchat_sig_q
+    # counts the rooms with a mark of mine) and obj_follow (muted)
+    osn_mark(c, "tchat", rid, me(), max(lr, lid))
+    if "muted" in b:
+        if muted:
+            ofl_bell_put(c, "tchat", rid, me(), None, "mute", None, me())
+        else:
+            ofl_bell_drop(c, "tchat", rid, me())
     if lid and not c.execute("SELECT 1 FROM tchat_msgs WHERE room_id=? AND id>?", (rid, max(lr, lid))).fetchone():
         push_handled(c, me(), [], (f"team-{rid}",))  # 2.19.0 (#668): read here = its notification closes elsewhere
     c.commit()
@@ -992,7 +1032,8 @@ def tchat_read(rid):
 # ---- 2.139.0 A (#2127): threads. A message answers in a thread when it carries thread_of = the id of the thread's first
 # message (the root, a message of the main conversation of the same room). One level: an answer to an answer hangs at the same
 # root. The main conversation lists no thread answers; the root carries thread_count / thread_last_at / thread_users and my
-# unread answers. tchat_thread_reads keeps a read mark per person and thread; follow = the person takes part (the root's
+# unread answers. A read mark per person and thread (2.981.0 #5286: obj_seen kind tchat_thread, was tchat_thread_reads); taking
+# part (obj_follow kind tchat_thread, mode watch; was its column follow) = the person takes part (the root's
 # author, who answered, who was @mentioned or answered by reply_to; in a DM both): only they count its answers as unread and
 # get its pushes. The plain id is metadata, so threads work in end-to-end encrypted rooms too (the text stays sealed).
 TTH_USERS = 3  # avatars of a thread's line
@@ -1023,19 +1064,21 @@ def tth_follow(c, r, root, uids, mid):
     uids = the @mentioned / answered: from this answer on), the sender also read it up to mid."""
     ra = c.execute("SELECT user_id FROM tchat_msgs WHERE id=?", (root,)).fetchone()
     full = {ra[0] if ra else None, *((r["a"], r["b"]) if r["kind"] == "dm" else ())} - {None, me()}
-    for u in sorted(full | (set(uids) - {None, me()})):
-        c.execute("INSERT INTO tchat_thread_reads(root_id,user_id,room_id,last_id,follow) VALUES(?,?,?,?,1) "
-                  "ON CONFLICT(root_id,user_id) DO UPDATE SET follow=1", (root, u, r["id"], 0 if u in full else mid - 1))
-    c.execute("INSERT INTO tchat_thread_reads(root_id,user_id,room_id,last_id,follow) VALUES(?,?,?,?,1) ON CONFLICT(root_id,user_id) "
-              "DO UPDATE SET follow=1, last_id=GREATEST(tchat_thread_reads.last_id, excluded.last_id)", (root, me(), r["id"], mid))
+    for u in sorted(full | (set(uids) - {None, me()})):  # 2.981.0 (#5286): the core's obj_follow / obj_seen
+        ofl_watch(c, "tchat_thread", root, u)
+        if u not in full and mid > 1:  # from this answer on: a start mark, an older mark of the person stays
+            osn_mark(c, "tchat_thread", root, u, mid - 1, only_new=True)
+    ofl_watch(c, "tchat_thread", root, me())
+    osn_mark(c, "tchat_thread", root, me(), mid)
 
 
 def tth_unread(c, rid, uid):
     """(unread answers in the threads of room rid uid takes part in, whether one of them @mentions uid)."""
     r = c.execute(f"""SELECT COUNT(*), COALESCE(SUM(CASE WHEN m.body ILIKE ? THEN 1 ELSE 0 END),0) FROM tchat_msgs m
-                     JOIN tchat_thread_reads t ON t.root_id=m.thread_of AND t.user_id=? AND t.follow=1
-                     WHERE t.room_id=? AND m.room_id=? AND m.id>t.last_id AND {live_sql("m")} AND COALESCE(m.user_id,0)!=?""",
-                  (f"%<@{uid}>%", uid, rid, rid, uid)).fetchone()
+                     JOIN obj_follow w ON w.kind='tchat_thread' AND w.ref_id=m.thread_of AND w.user_id=? AND w.mode='watch'
+                     LEFT JOIN obj_seen t ON t.kind='tchat_thread' AND t.ref_id=m.thread_of AND t.user_id=w.user_id
+                     WHERE m.room_id=? AND m.id>COALESCE(t.seen_id,0) AND {live_sql("m")} AND COALESCE(m.user_id,0)!=?""",
+                  (f"%<@{uid}>%", uid, rid, uid)).fetchone()  # 2.981.0 (#5286): the core's obj_follow / obj_seen
     return r[0], bool(r[1])
 
 
@@ -1053,9 +1096,13 @@ def tth_summary(c, uid, ids):
                            GROUP BY thread_of, user_id ORDER BY MAX(id) DESC""", ids):
         if r[0] in out and len(out[r[0]]["users"]) < TTH_USERS:
             out[r[0]]["users"].append(r[1])
-    for r in c.execute(f"""SELECT t.root_id, t.follow, (SELECT COUNT(*) FROM tchat_msgs m WHERE m.thread_of=t.root_id AND m.id>t.last_id
-                             AND {live_sql("m")} AND COALESCE(m.user_id,0)!=?) FROM tchat_thread_reads t
-                           WHERE t.user_id=? AND t.root_id IN ({q})""", (uid, uid, *ids)):
+    # 2.981.0 (#5286): taking part = obj_follow (kind tchat_thread), the read mark = obj_seen
+    for r in c.execute(f"""SELECT x.id, w.user_id IS NOT NULL, (SELECT COUNT(*) FROM tchat_msgs m WHERE m.thread_of=x.id
+                             AND m.id>COALESCE(t.seen_id,0) AND {live_sql("m")} AND COALESCE(m.user_id,0)!=?)
+                           FROM unnest(CAST(? AS BIGINT[])) x(id)
+                           LEFT JOIN obj_follow w ON w.kind='tchat_thread' AND w.ref_id=x.id AND w.user_id=? AND w.mode='watch'
+                           LEFT JOIN obj_seen t ON t.kind='tchat_thread' AND t.ref_id=x.id AND t.user_id=?
+                           WHERE w.user_id IS NOT NULL OR t.user_id IS NOT NULL""", (uid, ids, uid, uid)):
         if r[0] in out:
             out[r[0]].update(follow=bool(r[1]), unread=r[2] if r[1] else 0)
     return out
@@ -1069,8 +1116,7 @@ def tth_fields(x):
 
 
 def tth_last_read(c, root, uid):
-    r = c.execute("SELECT last_id FROM tchat_thread_reads WHERE root_id=? AND user_id=?", (root, uid)).fetchone()
-    return r[0] if r else 0
+    return osn_get(c, "tchat_thread", root, uid)  # 2.981.0 (#5286): the core's obj_seen
 
 
 def tth_read(c, rid, b):
@@ -1085,13 +1131,13 @@ def tth_read(c, rid, b):
         lid = c.execute("SELECT COALESCE(MAX(id),0) FROM tchat_msgs WHERE thread_of=?", (root["id"],)).fetchone()[0]
     elif isinstance(lid, bool) or not isinstance(lid, int):
         return err(tr("Invalid value: {0}", "last_id"))
-    c.execute("INSERT INTO tchat_thread_reads(root_id,user_id,room_id,last_id,follow) VALUES(?,?,?,?,0) ON CONFLICT(root_id,user_id) "
-              "DO UPDATE SET last_id=GREATEST(tchat_thread_reads.last_id, excluded.last_id)", (root["id"], me(), rid, max(lid, 0)))
+    if lid > 0:  # 2.981.0 (#5286): the core's obj_seen (the higher mark stays; looking does not make me take part)
+        osn_mark(c, "tchat_thread", root["id"], me(), lid)
     c.commit()
     return jsonify(ok=True, thread=root["id"], last_id=tth_last_read(c, root["id"], me()), unread=tchat_unread(c, me()))
 
 
-# ---- 2.139.0 A (#2129): "Read by". The read marks are there (tchat_reads.last_id, in a thread tchat_thread_reads.last_id); a
+# ---- 2.139.0 A (#2129): "Read by". The read marks are there (2.981.0 #5286: obj_seen kind tchat, in a thread tchat_thread); a
 # member of the room sees, at their own messages, who of the others read up to there. The personal setting chat_read_receipts
 # ("Send read receipts", default on) off = the others do not see my mark and I see nobody's (both ways). Agents read through
 # mark_team_chat_read and count like people.
@@ -1107,8 +1153,8 @@ def trd_marks(c, rid, mem, uid, root=None):
         return {}
     off = {r[0] for r in c.execute("SELECT user_id FROM user_settings WHERE key='chat_read_receipts' AND value='0' AND user_id IN "
                                    f"({','.join('?' * len(others))})", others)}
-    have = {r[0]: r[1] for r in (c.execute("SELECT user_id, last_id FROM tchat_thread_reads WHERE root_id=?", (root,)) if root
-                                 else c.execute("SELECT user_id, last_id FROM tchat_reads WHERE room_id=?", (rid,)))}
+    have = {r[0]: r[1] for r in c.execute("SELECT user_id, seen_id FROM obj_seen WHERE kind=? AND ref_id=?",  # 2.981.0 (#5286)
+                                          ("tchat_thread", root) if root else ("tchat", rid))}
     return {u: have.get(u, 0) for u in others if u not in off}
 
 

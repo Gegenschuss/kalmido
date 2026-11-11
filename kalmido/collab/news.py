@@ -18,6 +18,7 @@ from ..core.access import list_role, plists, pvis
 from ..core.access import list_roles  # 2.674.0 B (#4194)
 from ..collab.comments import collab_on, collab_user, lang_of, user_names
 from ..core.objcomments import OCM_MENTION_RE  # 2.972.0 (#5272): the one mention token (comments: obj_comments)
+from ..core.objfollow import OFL_LEVEL, ofl_bells_here  # 2.981.0 (#5287): a project's bell is a row of the core's obj_follow
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import list_people  # 2.369.5 (#2517): pulled up from functions
 
@@ -180,7 +181,7 @@ def news_wanted(s, kind):
 # = the behaviour up to 2.0.8: pushes for comments, mentions, assignments, completions, unblocked tasks, approvals and
 # reminders; no pushes for status and sharing; newtask off; reply on (as comment); followup on.
 # 2.367.2 (#2968): the News of "approval" are on by default (an agent waits for the person).
-# The bell of a list (table list_bell, per user): all = every event of that list (also every comment and new task) as
+# The bell of a list (per user; 2.981.0 #5287: a row of the core's obj_follow, kind 'list', was the table list_bell): all = every event of that list (also every comment and new task) as
 # News and push; default = the matrix; mute = nothing from that list except mentions of me and assignments to me (these
 # follow the matrix). Reminders and follow-ups are my own and never muted by a bell.
 NOTIF_ROWS = ("comment", "reply", "follow", "mention", "assign", "newtask", "complete", "status", "share", "unblock",
@@ -330,21 +331,29 @@ def notif_update(s, v):
 
 
 def list_bell(c, uid, lid):
-    """(mode, custom choice dict) of my bell for list lid."""
+    """(mode, custom choice dict) of my bell for list lid (2.981.0, #5287: the core's obj_follow, kind 'list')."""
     if not lid:
         return "default", {}
-    r = c.execute("SELECT mode, custom FROM list_bell WHERE user_id=? AND list_id=?", (uid, lid)).fetchone()
-    return (r["mode"], bell_custom_of(r["custom"])) if r else ("default", {})
+    r = next(iter(ofl_bells_here(c, "list", rid=lid, uid=uid)), None)
+    return (r["level"], bell_custom_of(r["custom"])) if r else ("default", {})
 
 
 def list_bells(c, uids, lid):
     """2.369.3 (#3199): list_bell of several accounts for one list in one query: {uid: (mode, custom)}."""
     out = {u: ("default", {}) for u in uids}
     if lid and out:
-        for r in c.execute("SELECT user_id, mode, custom FROM list_bell WHERE list_id=? AND user_id = ANY(CAST(? AS BIGINT[]))",
-                           (lid, sorted(out))):
-            out[r["user_id"]] = (r["mode"], bell_custom_of(r["custom"]))
+        for r in ofl_bells_here(c, "list", rid=lid, uids=out):  # 2.981.0 (#5287)
+            out[r["user_id"]] = (r["level"], bell_custom_of(r["custom"]))
     return out
+
+
+def _list_level(c, uid, lid, s, done_ok=False):
+    """2.981.0 (#5287): the bell rule of kind 'list' for obj_notify's follow step (core/objfollow.py OFL_LEVEL): 'mute' while
+    the person's bell of the project is muted. The rest of a project bell (all / custom, the unmuted mentions) stays notif_ok's."""
+    return "mute" if list_bell(c, uid, lid)[0] == "mute" else None
+
+
+OFL_LEVEL["list"] = _list_level
 
 
 def bell_custom_of(raw):
@@ -405,8 +414,8 @@ def bell_all_users(c, lid, row=None):
     """Who wants every event of this list: the bell "all", and (2.6.1, #404) "custom" with event row ticked (News or push)."""
     out = set()
     key = BELL_CUSTOM_KEY.get(row, row)
-    for r in c.execute("SELECT user_id, mode, custom FROM list_bell WHERE list_id=? AND mode IN ('all','custom')", (lid,)):
-        if r["mode"] == "all" or (key and any(bell_custom_of(r["custom"]).get(key, {}).values())):
+    for r in ofl_bells_here(c, "list", rid=lid, modes=("all", "custom")):  # 2.981.0 (#5287): the core's obj_follow
+        if r["level"] == "all" or (key and any(bell_custom_of(r["custom"]).get(key, {}).values())):
             out.add(r["user_id"])
     if out:  # 2.46.0 (#1603): only the owner and members (a reader through "Everyone in the organisation" gets no events)
         out &= list_people(c, lid)
