@@ -25,7 +25,7 @@ from flask import jsonify, request
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc
 from ..core.i18n import N_, tr
-from ..core.access import Denied
+from ..core.access import Denied, live_sql, trash_sql
 from ..core.pg import IntegrityError, system_ctx
 from ..core.objhooks import REVOKE  # 2.953 (#3348): fsl_user_purge
 from ..accounts.session import me
@@ -991,8 +991,8 @@ def fsl_movecheck(fid):
     ls = fsl_of(c, n["parent_id"]) if n["parent_id"] else None
     lt = fsl_of(c, tid) if tid else None
     ids = [r[0] for r in c.execute(  # outside the trash only: what lies in it stays on its side (fsl_move)
-        "WITH RECURSIVE dn(id, lvl) AS (SELECT id, 0 FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL UNION ALL "
-        f"SELECT x.id, dn.lvl + 1 FROM fs_nodes x JOIN dn ON x.parent_id=dn.id WHERE x.deleted_at IS NULL AND dn.lvl < {DEPTH_MAX * 2}) "
+        f"WITH RECURSIVE dn(id, lvl) AS (SELECT id, 0 FROM fs_nodes WHERE parent_id=? AND {live_sql()} UNION ALL "
+        f"SELECT x.id, dn.lvl + 1 FROM fs_nodes x JOIN dn ON x.parent_id=dn.id WHERE {live_sql('x')} AND dn.lvl < {DEPTH_MAX * 2}) "
         "SELECT id FROM dn", (fid,))]
     block = None
     if fsl_subtree_locked(c, fid):
@@ -1038,7 +1038,7 @@ def fsl_move(fid):
     # 2.953 (#3348): a folder crosses when nothing outside the trash lies in it -- the browser moves its content first (fsl_moveTree:
     # a folder of the same name on the other side, the content, this folder, the content back into it); what lies in the trash
     # inside it stays on its side, below the folder's old parent (a restore puts it there)
-    if n["kind"] == "folder" and c.execute("SELECT 1 FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL LIMIT 1", (fid,)).fetchone():
+    if n["kind"] == "folder" and c.execute(f"SELECT 1 FROM fs_nodes WHERE parent_id=? AND {live_sql()} LIMIT 1", (fid,)).fetchone():
         return err(tr("Move the files of a folder into or out of a locked folder one by one."), 409)
     if lt:
         block = _fsl_inner_block(c, [fid])  # 2.353.0 F (#2758, review N3): the same list as locking (mails, an agent's folder too)
@@ -1078,7 +1078,7 @@ def fsl_move(fid):
                 up_after_store(c, "fs", fid, n["org_id"], info)  # plain again: checks and recognition like an upload
             c.execute("UPDATE fs_nodes SET name=?, e2e_gen=0 WHERE id=?", (name, fid))
         if n["kind"] == "folder":  # 2.953 (#3348): its trash stays on this side (see above)
-            c.execute("UPDATE fs_nodes SET parent_id=? WHERE parent_id=? AND deleted_at IS NOT NULL", (n["parent_id"], fid))
+            c.execute(f"UPDATE fs_nodes SET parent_id=? WHERE parent_id=? AND {trash_sql()}", (n["parent_id"], fid))
         c.execute("UPDATE fs_nodes SET parent_id=? WHERE id=?", (n["parent_id"], fid))
         n2 = dict(c.execute("SELECT * FROM fs_nodes WHERE id=?", (fid,)).fetchone())
         n2["role"] = n["role"]
