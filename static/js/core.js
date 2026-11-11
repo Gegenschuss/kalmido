@@ -700,6 +700,23 @@ function savedTick(el, again) {
   const follow = n => setTimeout(() => { if (m.isConnected) { if (n < 2) follow(n + 1); return; } const x = id && document.getElementById(id); if (x && x !== el) savedTick(x, true); }, [150, 400, 900][n]);
   if (!again && id) follow(0);
 }
+// 2.910.0 (#5444): an error in plain words: WHAT did not work first (a whole sentence, e.g. tr('Done could not be saved')), the
+// server's own text only as an addition in brackets; offline (an Offline error or the stored 'offline') the one sentence of the
+// app; without a sentence the server's text as before. e: an Error or a stored message
+function errText(e, what) {
+  if (e instanceof Offline || e === 'offline') return tr('Only available online.');
+  const raw = String((typeof e === 'string' ? e : e?.message) || '').trim();
+  if (!what) return raw || tr('Something went wrong');
+  return raw && raw !== what ? `${what} (${raw})` : what;
+}
+// what an api() write of the list area failed to save (its toast says it first); '' = the server's text alone as before
+function apiWhat(method, url, body) {
+  const u = String(url).split('?')[0];
+  if (method === 'POST' && /^\/api\/tasks\/-?\d+\/complete$/.test(u)) return body?.status === -1 ? tr('“Won’t do” could not be saved') : tr('Done could not be saved');
+  if (method === 'POST' && /^\/api\/tasks\/-?\d+\/reopen$/.test(u)) return tr('Reopening could not be saved');
+  if (method === 'POST' && u === '/api/tasks/reorder') return tr('The move was not saved, the task is back in its place');
+  return '';
+}
 /** @param {string} method @param {string} url @param {any} [body] @returns {Promise<any>} */  // 2.102.0 (#1995)
 async function api(method, url, body) {
   const lk = tlkGuard(method, url, body); if (lk) throw lk;  // 2.36.0 (#1118)
@@ -738,7 +755,7 @@ async function api(method, url, body) {
       if (method !== 'GET') { toast(tr('Offline: only works again with a connection')); e.shown = true; }  // 2.855.0 (#5451)
     } else if (e.message !== 'auth' && !e.shown) {
       if (e.data?.out_request && typeof oor_ask === 'function') toast(e.message, () => oor_ask(e.data.out_request), 10000, tr('Ask an admin'));  // 2.361.2 (#2923)
-      else toast(e.message);
+      else toast(errText(e, apiWhat(method, url, body)));  // 2.910.0 (#5444): what was not saved, the server's text as an addition
       e.shown = true;  // 2.855.0 (#5451): said once - a caller's catch sees it (office.js ofcErr)
     }
     throw e;

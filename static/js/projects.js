@@ -90,7 +90,7 @@ async function statusModal(lid) {
     const box = $('#st-hist', md); if (!box) return;
     box.innerHTML = j.items.length ? j.items.map(x => `<div class="shi"><span class="stdot st-${esc(x.status || 'none')}"></span><div><div><b>${esc(x.status ? statusLabel(x.status) : tr('Status cleared'))}</b> <span class="muted">${esc(x.name || tr('Someone'))} · ${esc(fmtWhen(x.created_at))}</span></div>${x.note ? `<div class="shn">${esc(x.note)}</div>` : ''}</div></div>`).join('')
       : `<div class="muted mhint">${tr('No status updates yet.')}</div>`;
-  }).catch(e => { const box = $('#st-hist', md); if (box) box.innerHTML = `<div class="muted mhint">${e instanceof Offline ? tr('Only available online.') : esc(e.message)}</div>`; });
+  }).catch(e => { const box = $('#st-hist', md); if (box) box.innerHTML = `<div class="muted mhint">${esc(errText(e, tr('The history could not be loaded')))}</div>`; });  // 2.910.0 (#5444)
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.st !== undefined) { sel = b.dataset.st; $$('.stopt', md).forEach(x => x.classList.toggle('on', x === b)); return; }
@@ -270,7 +270,7 @@ function viewProjOv() {
   const l = routeList(), d = S.povD[l.id];
   if (!d || (!d.busy && d.v !== S.v)) setTimeout(() => povLoad(l.id), 0);
   const head = `${listHead(l, {noPill: true})}`;  // 2.13.0 (#453 P1): "Set status" only once (in the status section)
-  if (!d?.j) return `<div class="pov">${head}<div class="muted mhint">${d?.err ? (d.err === 'offline' ? tr('Only available online.') : esc(d.err)) : tr('Loading…')}</div></div>`;
+  if (!d?.j) return `<div class="pov">${head}<div class="muted mhint">${d?.err ? esc(errText(d.err, tr('The overview could not be loaded'))) : tr('Loading…')}</div></div>`;  // 2.910.0 (#5444)
   const j = d.j, can = !!j.can_edit && !l.archived, t0 = today();
   // description (2.538.0 #4372: none in a project with the lock -- not encrypted, the server refuses it)
   const ed = S.povEdit === l.id, povLong = !ed && mdIsLong(j.description);  // 2.331.0 A (#3310): a long description folds like a task's
@@ -490,7 +490,7 @@ function depsHtml(t) {
   const D = S.dp.id === t.id ? S.dp : null, ro = !canEdit(t);
   const head = `<h5>${tr('Dependencies')}${t.blocked && !t.status ? ` <span class="blk">${ic('lock', 's')}${tr('blocked')}</span>` : ''}</h5>`;
   if (!D) return head + `${/*html-ok*/ loadingHtml()}`;
-  if (D.err) return head + `<div class="muted mhint">${D.err === 'offline' ? tr('Dependencies are only available online.') : esc(D.err)}</div>`;
+  if (D.err) return head + `<div class="muted mhint">${esc(errText(D.err, tr('The dependencies could not be loaded')))}</div>`;  // 2.910.0 (#5444): offline the one sentence
   // 2.25.0 (UX-43): ONE button "Waiting on…" picks what the task waits on: another task (it is then blocked by it) or
   // someone outside (with a follow-up day); "Blocking…" stays for the other direction
   const add = dir => ro ? '' : dir === 'by' ? `<button class="btn sm dadd" data-act="wait-on" data-id="${t.id}" aria-haspopup="menu">${ic('hourglass', 's')} ${tr('Waiting on…|choose')}</button>`

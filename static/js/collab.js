@@ -820,7 +820,7 @@ function commentHtml(c, U, ro = false) {
 }
 function timelineItems(ro = false) {
   const T = S.tl;
-  if (T.err) return `<div class="muted cmempty">${T.err === 'offline' ? tr('Comments and history are only available online.') : esc(T.err)}</div>`;
+  if (T.err) return `<div class="muted cmempty">${esc(errText(T.err, tr('The comments could not be loaded')))}</div>`;  // 2.910.0 (#5444): offline the one sentence
   if (!T.comments) return `<div class="muted cmempty cmload">${tr('Loading…')}</div>`;  // 2.891.0 (#5439): one line (start-detail-5439.css)
   const U = T.users || {};
   const items = [...T.comments.map(c => ({at: c.created_at, c, ro})), ...actItems(taskById(T.id), T).map(a => ({at: a.created_at, a}))]  // 2.685.0 (#5162): level 1 none, 2 changes of others, 3 all
@@ -838,7 +838,7 @@ function timelineItems(ro = false) {
 // 2.0.7: the folded history of a private list (as in 2.0.5): all changes of the task, oldest first
 function histItems() {
   const T = S.tl;
-  if (T.err) return `<div class="muted cmempty">${T.err === 'offline' ? tr('Comments and history are only available online.') : esc(T.err)}</div>`;
+  if (T.err) return `<div class="muted cmempty">${esc(errText(T.err, tr('The history could not be loaded')))}</div>`;  // 2.910.0 (#5444): offline the one sentence
   if (!T.activity) return `<div class="muted cmempty">${tr('Loading…')}</div>`;
   return T.activity.map(a => `<div class="actl"><span>${actText(a, T.users || {})}</span><time>${fmtWhen(a.created_at)}</time></div>`).join('');
 }

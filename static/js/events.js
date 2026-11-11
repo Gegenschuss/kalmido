@@ -519,7 +519,7 @@ document.addEventListener('click', async e => {
     case 'news-unread': S.nf.unread = !S.nf.unread; LS.set('newsUnread', S.nf.unread); renderView(); break;
     case 'news-readall': newsReadAll().then(() => { if (S.route.mod === 'news') renderView(); }); break;  // 2.13.0: with undo
     case 'news-filter': if (a.dataset.nk === '') newsKindSet(''); S.nf.filter = 'fme' in a.dataset && S.nf.filter === 'me' && a.getAttribute('aria-pressed') === 'true' ? '' : a.dataset.f; LS.set('newsFilter', S.nf.filter);  /* 2.13.0: the chip toggles */ S.nf.items = null; renderView(); break;
-    case 'toggle': e.stopPropagation(); toggleTask(id); break;
+    case 'toggle': e.stopPropagation(); toggleTask(id).catch(() => {}); break;  // 2.910.0 (#5444): a refusal was said by api() and the tick went back
     case 'flow-why': e.stopPropagation(); e.preventDefault(); toast(tr(FLOW_WHY), null, 6000); break;
     case 'assign': e.stopPropagation(); assignMenu(a, id); break;
     case 'delegate': e.stopPropagation(); dlg_menu(a, id); break;  // 2.473.0 (#3357)

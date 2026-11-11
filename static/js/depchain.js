@@ -47,7 +47,7 @@ function dch_skipText(ch) {
 function dch_canPull(t) { return !!t && t.status === 0 && !!t.due && dFor(t) && dch_waiting(t.id).some(dch_movable); }
 async function dch_pull(id) {
   let r;
-  try { r = await api('POST', `/api/tasks/${id}/chain/pull`, {}); } catch (e) { toast(e.message || tr('Dependencies are only available online.')); return; }
+  try { r = await api('POST', `/api/tasks/${id}/chain/pull`, {}); } catch (e) { if (e instanceof Offline || e?.message) return; toast(errText(e)); return; }  // 2.910.0 (#5444): api() said it already (offline too)
   const sh = r?.shifted || [];
   if (!sh.length) { toast([tr('Nothing to pull in: the waiting tasks already follow right after it'), dch_skipText(r?.chain)].filter(Boolean).join(' · ')); return; }
   await load().catch(() => {}); render();

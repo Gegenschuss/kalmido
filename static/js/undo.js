@@ -461,6 +461,8 @@ async function ckKidsAsk(ts) {
   }
   return askConfirm(trn('{0} open subtask left. Complete it too?', '{0} open subtasks left. Complete them all?', n), '', {ok: tr('Complete all'), cancel: tr('Cancel')});
 }
+// 2.910.0 (#5444): a completion the server refused: the circle of the row is empty again (as lstStatusOpt puts a status back)
+const chkBack = id => $$(`.trow[data-id="${id}"] .chk`).forEach(c => { c.classList.remove('on'); c.innerHTML = ''; if (c.hasAttribute('aria-checked')) c.setAttribute('aria-checked', 'false'); });
 async function toggleTask(id) {
   const t = taskById(id); if (!t) return;
   if (!canEdit(t)) { roToast(); return; }
@@ -495,7 +497,7 @@ async function toggleTask(id) {
   UI.pend.set(id, anim);
   const call = api('POST', `/api/tasks/${id}/complete`, t.repeat && t.due ? {expect_due: t.due, ...(/TIMES=/.test(t.repeat) ? {expect_time: t.due_time || ''} : {})} : undefined);  // 2.116.0 review F2: + the time of a several-times-a-day rule
   anim.api = call.catch(() => {});
-  let j; try { j = await call; } catch (x) { anim.cancel(); UI.pend.delete(id); an_rowsBack([id]); throw x; }
+  let j; try { j = await call; } catch (x) { anim.cancel(); UI.pend.delete(id); an_rowsBack([id]); chkBack(id); throw x; }  // 2.910.0 (#5444): + the tick goes back
   await anim.done; await ui_idle();
   if (anim.cancelled) return;  // ticked off again meanwhile: that call reopens
   UI.pend.delete(id);
