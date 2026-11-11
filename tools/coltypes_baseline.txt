@@ -746,7 +746,6 @@ tasks.updated_at time
 tasks.wait_until time
 tasks.waiting_at time
 tchat_files.created_at time
-tchat_members.created_at time
 tchat_msgs.created_at time
 tchat_msgs.deleted_at time
 tchat_msgs.edited_at time

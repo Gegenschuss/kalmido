@@ -8,7 +8,9 @@ the core (core/objects.py, docs/dev/kern.md).
   along, leaving the organisation, a role going down, the retirement) takes it (into obj_revoked: restorable).
   2.924.0 (#5069, stage 7a, one-way): the core alone decides -- the old table tchat_members (2.565.0 to 2.923: the reader
   fallback, kept in step) is neither read nor written. tcx_core_copy, once at a start (flag migr_tcx5069): every channel /
-  group with old rows and without a node gets one, every old row without a share gets one; nothing is taken back.
+  group with old rows and without a node gets one, every old row without a share gets one; nothing is taken back. Then
+  tcx_core_retire at every start while the table exists: the start check counts the rows still without a share -- none:
+  DROP TABLE tchat_members (core/kernretire.py, core/migrations.d/5069_a.py); else a clear line in the log, the table stays.
 - A group (lists/groups.py, the admin's groups) as subject: a channel shared with a group has every member of the group as a
   member while they qualify: an enabled person, for an organisation's channel a full member of that organisation (member /
   admin / read-only -- a guest or an accounting member needs a personal invitation, the rule of the open channels). Group
@@ -27,12 +29,15 @@ Interface:
   tcx_core_members_sql() -> SQL (room_id, user_id, via): via = the group id (0 = a personal share)
   tcx_core_rooms_sql(uid) -> SQL of the room ids uid is a member of through the core (person, agent, group)
   tcx_core_copy(c) -> {nodes, added}   once at a start (core/db.py init_db, flag migr_tcx5069; 2.924.0, #5069)
+  tcx_core_retire(c) -> {} | {left} | {dropped, revoked}   every start while tchat_members exists (after tcx_core_copy)
 """
 from ..core import objhooks  # 2.565.0: START (core/db.init_db runs the forward copy)
 from ..core.db import iso, now_utc
 from ..core.i18n import N_
 from ..core.objects import obj_member_put, obj_member_take, obj_register, obj_share_rows_sql
+from ..core.kernretire import kern_retire  # 2.924.0 (#5069): the start check and DROP of stage 7
 from ..core.pg import system_ctx, table_exists
+from ..notify.alerts import aa_now  # 2.924.0 (#5069): the admins learn when the start check keeps the old table
 from .teamchan import tcx_can_manage, tcx_members, tcx_room_ok  # loaded before (kalmido/__init__.py ORDER)
 
 TCX_KIND = "tchat_room"
@@ -175,3 +180,30 @@ def tcx_core_copy(c):
     return {"nodes": nodes, "added": added}
 
 objhooks.START.append((TCX_COPY_FLAG, True, tcx_core_copy))  # 2.924.0 (#5069): once (core/db.init_db sets the flag)
+
+
+def tcx_core_left(c):
+    """The start check: old rows of a channel / group without a share of their person / agent on the room's node (any role,
+    also an expired one or a node in the trash: the core has the membership, it decides). Rows of a direct message / list
+    conversation never were members of the core (none are written there) and do not count."""
+    return c.execute("""SELECT COUNT(*) FROM tchat_members m JOIN tchat_rooms r ON r.id=m.room_id
+                        WHERE r.kind IN ('channel','group') AND NOT EXISTS (
+                          SELECT 1 FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id
+                          WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=m.room_id AND COALESCE(s.user_id, s.agent_id)=m.user_id)""",
+                     (TCX_KIND,)).fetchone()[0]
+
+
+def tcx_core_retire(c):
+    """Every start while tchat_members exists (core/db.py init_db, after the forward copy): the start check, then DROP TABLE
+    tchat_members and its rows in obj_revoked (one-way, core/migrations.d/5069_a.py), or a line in the log and the table stays."""
+    return kern_retire(c, (TCX_OLD,), tcx_core_left, "team chat, stage 7a (#5069)", alert=_retire_alert)
+
+
+TCX_RETIRE_WAITS = N_("Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.")
+
+
+def _retire_alert(n, tables):
+    """The admins' alert of the start check (kind storage; counts and table names only)."""
+    aa_now("storage", "kern5069:" + ",".join(tables), TCX_RETIRE_WAITS, (int(n), ", ".join(tables)))
+
+objhooks.START.append(("tcx_core_retire", False, tcx_core_retire))  # 2.924.0 (#5069): every start until the table is gone

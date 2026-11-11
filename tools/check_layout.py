@@ -221,7 +221,6 @@ TENANT_EXEMPT = {
     "groups": "instance-wide groups of the operator: visible only through members one may see (B1); shares go through the rule",
     "group_members": "members of a group (see groups); materialized into list_members under the workspace rule",
     "tchat_msgs": _CHAT, "tchat_reads": _CHAT,
-    "tchat_members": "2.113.1 B (#2059): members of a team chat channel / group: bound through its room (tchat_rooms.org_id; tenancy CHECKS tchat_person / tchat_agent)",
     "tchat_thread_reads": "2.139.0 A (#2127): a person's read mark in a thread of a team chat room: bound through its room (like tchat_reads)",
     "agent_chat": "a person's chat with an agent (agent_id + user_id; the agent's workspace decides what it sees)",
     "agent_chat_prefs": "2.233.0 A (#2848): a person's own settings for one agent chat (agent_id + user_id, like agent_chat)",

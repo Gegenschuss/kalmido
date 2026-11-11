@@ -1121,7 +1121,7 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/collab/teamchan.py",
-   "code": "return {r[0] for r in c.execute(f\"SELECT user_id FROM tchat_members WHERE room_id=? UNION SELECT user_id FROM {tcx_core_members_sql()} cm \"",
+   "code": "return {r[0] for r in c.execute(f\"SELECT user_id FROM {tcx_core_members_sql()} cm WHERE cm.room_id=? AND cm.via=0\", (rid,))}",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296

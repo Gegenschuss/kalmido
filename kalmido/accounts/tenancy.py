@@ -342,7 +342,7 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "assistant_person": ("assistant_access", "list_id"),  # 2.75.0 A (#1411)
           "hub_token_person": ("hub_tokens", "org_id"),  # 2.84.0 A (#1198)
           "sheet_share_person": ("sheet_shares", "sheet_id")}  # 2.124.0 C (#2113); 2.924.0 (#5069): tchat_person is file_person
-RP_CORE = ("fs_shares", "sheet_shares", "ev_cal_members", "book_members")  # 2.649.0 (#5051): core/objhooks.obj_boundary
+RP_CORE = ("fs_shares", "sheet_shares", "ev_cal_members", "book_members")  # 2.649.0 (#5051): core/objhooks.obj_boundary; 2.924.0 (#5069): no tchat_members
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Organisation > People")
 
 

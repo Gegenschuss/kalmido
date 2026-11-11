@@ -18207,5 +18207,6 @@
   "{0} document matches": ["{0} document correspond", "{0} documents correspondent"],
   "Filter “{0}” changed": "Filtre « {0} » modifié",
   "Edit filter…": "Modifier le filtre…",
-  "Words or the search syntax (tag:Name, \"exact text\", -word)": "Mots ou syntaxe de recherche (tag:Nom, \"texte exact\", -mot)"
+  "Words or the search syntax (tag:Name, \"exact text\", -word)": "Mots ou syntaxe de recherche (tag:Nom, \"texte exact\", -mot)",
+  "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Le nettoyage du noyau commun attend : {0} anciennes lignes de membres dans {1} n’ont pas encore de partage, l’ancienne table reste. Voir le journal du serveur."
 }

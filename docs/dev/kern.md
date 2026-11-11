@@ -353,8 +353,17 @@ job of kind `obj_patch` of agents/proposals.py, and accepting it is `obj_write`.
   the proposal write the values back with the version the last step left (changed since: skipped).
 - Old areas: nothing moves yet (stage 2: office and clients #4711, stage 3: calendars and contacts #4712).
 - Stage 5 (#4719, 2.565.0): team chat channels and group conversations are the kind `tchat_room` (collab/tcxcore.py,
-  listed=False); members are shares (person, agent, group), tchat_members stays the reader fallback (kept in step at every
-  start, tcx_core_sync) until stage 7. The materialisation of group shares into list_members.grole stays until stage 6 (#4739).
+  listed=False); members are shares (person, agent, group). The materialisation of group shares into list_members.grole stays
+  until stage 6 (#4739). Stage 7a (#5069, 2.924.0, one-way): the core alone decides -- every reader (room list, members,
+  signature, open channels, message search, the visible hook, account / organisation export) and every writer (join, leave,
+  remove, leaving the organisation, a role going down, the retirement, the boundary repair, the import) uses the shares of the
+  room's node only. At a start: `tcx_core_copy` once (flag `migr_tcx5069`: rooms with old rows and without a node get one,
+  rows without a share get one, nothing is taken back), then `tcx_core_retire` while the old table exists
+  (`core/kernretire.py kern_retire`, the helper of every stage-7 area): the start check -- rows still without a share: the
+  table stays with a line in the log; none: `DROP TABLE tchat_members` and its `obj_revoked` rows
+  (core/migrations.d/5069_a.py). The organisation export carries the members as the channel node's shares
+  (store/shares.json); an older archive's chat/members.json becomes shares on the node, which the import sets at once
+  (admin/oi_team.py). The boundary check `tchat_person` is `file_person`; `tchat_agent` counts over the shares.
 - Stage 6 (2.568.0, #4739): the projects' shares (members, the project's agent) are share rows of the core on the project's
   node (expiry, created_by, taken back into `obj_revoked`, restorable: `GET /api/lists/<id>/shares`,
   `POST /api/lists/<id>/shares/<rid>/restore`); `list_members` stays the role table every reader uses. A group's share gives
@@ -493,7 +502,7 @@ thread; `obj_follow` of stage Q9 takes this place), `notif_ok` (matrix, list bel
 the gates (`gate(uid, s)`: device, burst / summary, an agent's push switch). It returns `{uid: settings}` of who gets the
 push; the caller builds the text in their language (an end-to-end list's push carries no words).
 - Kinds: a project's team chat conversation asks kind `list`; a channel / group asks `tchat_room`, whose members the core
-  still reads together with the old `tchat_members` rows until stage 7a (#5069) - no block of its own here.
+  are the shares of its node alone since stage 7a (#5069) - no block of its own here.
 - Callers: `news_add` (an entry about a task; notices about one's own access without an object stay `news_put`), the
   watchers (`tasks/watchers.py wat_note`), the team chat (`collab/teamchat.py tchat_notify`: a project's conversation =
   kind `list`, a channel / group = `tchat_room`, a direct message = `tchat_dm`, its pair: `objhooks.NOTIFY_READERS`), the

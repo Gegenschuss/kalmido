@@ -313,8 +313,9 @@ OX_AREAS = (
     ("store/shares.json", "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
     ("store/history.json", "fs_log", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
     # 2.362.0 (#3092): + the organisation's channels (CSQ), their members and the files of the messages (bytes under files/tchat/)
+    # 2.924.0 (#5069): the members are the shares of the channel's node (store/nodes.json + store/shares.json; tchat_members is
+    # gone, chat/members.json only comes from older archives: admin/oi_team.py _room_member)
     ("chat/channels.json", "tchat_rooms", f"id IN ({RSQ})"),
-    ("chat/members.json", "tchat_members", f"room_id IN ({CSQ})"),
     ("chat/messages.json", "tchat_msgs", f"room_id IN ({RSQ})"),
     ("chat/reactions.json", "obj_reactions",  # 2.137.0 C (#2344); 2.763.0 (#5269): rows of the core, the file keeps message_id
      f"target_kind='tchat' AND target_id IN (SELECT id FROM tchat_msgs WHERE room_id IN ({RSQ}) AND {live_sql()})"),

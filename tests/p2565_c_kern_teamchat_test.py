@@ -178,6 +178,7 @@ no(Bo.get(B + f"/api/files?parent={nid}"), "files: the room's node by its id")
 
 # ================================================================== 2.924.0 (#5069, turned round): the start keeps the core's state
 C2 = channel(A, "Old way", K, members=(BOB,))
+check(sql("SELECT to_regclass('tchat_members')")[0][0] is None, "7a: the old table tchat_members is gone (step 3)")
 check(share(C2, BOB) == "edit" and reads(Bo, C2), "7a: bob is in C2 through his share")
 check(A.delete(B + f"/api/team/rooms/{C1}/members/{BOB}").ok and share(C1, BOB) is None, "7a: alice takes bob out of C1 in the core")
 restart()
