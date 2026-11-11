@@ -13557,6 +13557,7 @@
   "{0} file encrypted and uploaded": ["{0} bestand versleuteld en geüpload", "{0} bestanden versleuteld en geüpload"],
   "Move into a locked folder?": "Naar een vergrendelde map verplaatsen?",
   "Move out of the locked folder?": "Uit de vergrendelde map verplaatsen?",
+  "The folders changed meanwhile. Try again.": "De mappen zijn intussen gewijzigd. Probeer het opnieuw.",
   "What lies in the trash of a folder stays on this side: restored, it goes into the folder the moved folder lay in before.": "Wat in de prullenbak van een map ligt, blijft aan deze kant: hersteld komt het in de map waarin de map eerst lag.",
   "“{0}” is encrypted in your browser and moved. Its earlier versions are removed; the server and agents can no longer read it.": "„{0}” wordt in je browser versleuteld en verplaatst. Eerdere versies worden verwijderd; server en agents kunnen het niet meer lezen.",
   "“{0}” is decrypted in your browser and stored readable for the server again. Its earlier encrypted versions are removed.": "„{0}” wordt in je browser ontsleuteld en weer leesbaar voor de server opgeslagen. Eerdere versleutelde versies worden verwijderd.",

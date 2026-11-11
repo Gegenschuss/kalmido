@@ -13557,6 +13557,7 @@
   "{0} file encrypted and uploaded": ["{0} Datei verschlüsselt und hochgeladen", "{0} Dateien verschlüsselt und hochgeladen"],
   "Move into a locked folder?": "In einen gesperrten Ordner verschieben?",
   "Move out of the locked folder?": "Aus dem gesperrten Ordner verschieben?",
+  "The folders changed meanwhile. Try again.": "Die Ordner haben sich inzwischen geändert. Bitte erneut versuchen.",
   "What lies in the trash of a folder stays on this side: restored, it goes into the folder the moved folder lay in before.": "Was im Papierkorb eines Ordners liegt, bleibt auf dieser Seite: wiederhergestellt landet es im Ordner, in dem der Ordner bisher lag.",
   "“{0}” is encrypted in your browser and moved. Its earlier versions are removed; the server and agents can no longer read it.": "„{0}“ wird in deinem Browser verschlüsselt und verschoben. Die früheren Versionen werden entfernt; Server und Agenten können die Datei danach nicht mehr lesen.",
   "“{0}” is decrypted in your browser and stored readable for the server again. Its earlier encrypted versions are removed.": "„{0}“ wird in deinem Browser entschlüsselt und für den Server wieder lesbar gespeichert. Die früheren verschlüsselten Versionen werden entfernt.",

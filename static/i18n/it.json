@@ -13557,6 +13557,7 @@
   "{0} file encrypted and uploaded": ["{0} file cifrato e caricato", "{0} file cifrati e caricati"],
   "Move into a locked folder?": "Spostare in una cartella bloccata?",
   "Move out of the locked folder?": "Spostare fuori dalla cartella bloccata?",
+  "The folders changed meanwhile. Try again.": "Le cartelle sono cambiate nel frattempo. Riprova.",
   "What lies in the trash of a folder stays on this side: restored, it goes into the folder the moved folder lay in before.": "Ciò che si trova nel cestino di una cartella resta da questa parte: ripristinato, finisce nella cartella in cui si trovava la cartella.",
   "“{0}” is encrypted in your browser and moved. Its earlier versions are removed; the server and agents can no longer read it.": "«{0}» viene cifrato nel tuo browser e spostato. Le versioni precedenti vengono rimosse; server e agenti non possono più leggerlo.",
   "“{0}” is decrypted in your browser and stored readable for the server again. Its earlier encrypted versions are removed.": "«{0}» viene decifrato nel tuo browser e salvato di nuovo leggibile per il server. Le versioni cifrate precedenti vengono rimosse.",
