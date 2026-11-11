@@ -577,7 +577,9 @@ def fd_trash_purge_text(c, lid):
     text fields leave the field trash, like its deleted sections (lists/parttrash.py lpt_section_purge_list): their values are
     plain text the lock does not show, or of the old key. Switching off drops only the copies holding ciphertexts
     (collab/liste2eguard.py le2b_trash_cipher_purge, #5563): plain values written while decrypting stay. Fields of other types stay (their values
-    are readable in a locked project too, decision E2). The caller commits. Returns the copies dropped."""
+    are readable in a locked project too, decision E2). At the switch on le2b_scrub (le2b_scrub_trash) ran before and dropped
+    the copies already; the call is the safety net there and does the work at the end of a key change (Fable review, finding 6).
+    The caller commits. Returns the copies dropped."""
     ids = [r["id"] for r in c.execute("SELECT id, snap, held FROM list_part_trash WHERE list_id=? AND kind=?", (lid, FIELD_KIND)).fetchall()
            if ftr_parts(r)[0].get("type") == "text"]
     if ids:
