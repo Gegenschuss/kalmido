@@ -139,9 +139,9 @@ ALICE = A.get(B + "/api/state").json()["me"]["id"]
 A.patch(B + f"/api/users/{ALICE}", json={"email": "alice@example.com"})
 A.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
 ORGS = {}
-for k, n in (("src", "Alpha Quelle"), ("oth", "Omega Fremd"), ("gam", "Gamma Ziel"), ("del", "Delta Ziel")):
+for k, n in (("src", "Alpha Quelle"), ("oth", "Omega Fremd"), ("gam", "Gamma Ziel"), ("del", "Delta Ziel"), ("eps", "Epsilon Ziel")):
     ORGS[k] = A.post(B + "/api/admin/orgs", json={"name": n, "admin_id": ALICE}).json()["id"]
-SRC, OTH, GAM, DEL = (ORGS[k] for k in ("src", "oth", "gam", "del"))
+SRC, OTH, GAM, DEL, EPS = (ORGS[k] for k in ("src", "oth", "gam", "del", "eps"))
 
 # ---------------------------------------------------------------- the source and another organisation
 OF = schema(A, SRC, "source", "Client", "Incident")
@@ -206,6 +206,21 @@ DL1 = project_of(DEL, "Support")
 check(one("SELECT org_field_id FROM list_fields WHERE list_id=?", (DL1,))["org_field_id"] is None,
       "another type under the same key: the project field stays unlinked")
 check([x["key"] for x in dbx("SELECT key FROM ticket_types WHERE org_id=?", (DEL,))] == ["incident"], "the type came along")
+
+# 2.976.0 (#5657, review 2.959 F7): a select field with the key and the same option ids, but one option under another name:
+# linking would let the target's field rename the project's values, so the project field stays unlinked (red before: linked)
+r = A.post(B + "/api/org-fields", json={"space": f"org:{EPS}", "name": "Kunde", "type": "select", "key": "client",
+                                        "options": {"options": [{"id": "acme", "name": "Acme"}, {"id": "init", "name": "Umbrella"}]}})
+check(r.ok, f"the target has a select field with the key, an option renamed {r.text[:160]}")
+EOF_ID = r.json().get("id")
+iid4, IMP4 = imp(A, OX, RK, EPS)
+check([x["id"] for x in dbx("SELECT id FROM org_fields WHERE org_id=?", (EPS,))] == [EOF_ID], "no second field with the key (select)")
+EL1 = project_of(EPS, "Support")
+check(EL1 and one("SELECT org_field_id FROM list_fields WHERE list_id=?", (EL1,))["org_field_id"] is None,
+      "the same option ids under another name: the project field stays unlinked")
+check(one("SELECT options FROM org_fields WHERE id=?", (EOF_ID,))["options"].count("Umbrella") == 1, "the target's field keeps its names")
+A.post(B + f"/api/imports/{IMP4}/undo")
+A.delete(B + f"/api/account/import/{iid4}")
 
 # ---------------------------------------------------------------- undo
 r = A.post(B + f"/api/imports/{IMP}/undo")
