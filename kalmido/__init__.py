@@ -432,6 +432,7 @@ ORDER = (
     "office.catacct",  # 2.121.0 (#2093): receipt categories with an SKR03 / SKR04 account (no routes; shown by office.books)
     "office.receiptlist",  # 2.153.0 (#2055): receipts list over all months with filters + its CSV / ZIP for the tax adviser
     "office.rcsubmit",  # 2.356.0 D (#3129): members hand in receipts to the bookkeeping
+    "office.rcfolder",  # 2.957.0 (#4910): receipts of the credit cards and the bank file themselves into month folders
     "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
     "office.bankrules",  # 2.299.0 B (#3191): bank rules: marking bookings by rule, rules learned from confirmations
     "office.bankacc",  # 2.470.0 (#3596): the bank accounts of an office as master data
