@@ -82,6 +82,15 @@ async function wk_load(sp, force) {
   if (S.route.mod === 'wiki') wk_redraw();
   if (typeof sbb_sync === 'function') sbb_sync('wiki');  // 2.152.3 B (#2620): the panel's folders
 }
+// 2.979.0 (#5667): after an undo / redo the server took back by its group (the step's own undo with wk_after no longer runs):
+// every space's index and the open page are old (wk_after's marks); the page being written in stays (wk_loadPage)
+histReloader('wiki', () => {
+  const sps = Object.keys(WK.idx); if (!sps.length && !WK.pg) return;
+  for (const sp of sps) { WK.idx[sp].v = -1; WK.idx[sp].mk = (WK.idx[sp].mk || 0) + 1; }
+  WK.pgMk = (WK.pgMk || 0) + 1; if (WK.pg) WK.pg._v = -1;
+  if (S.route.mod === 'wiki') renderView();
+  if (typeof sbb_sync === 'function') sbb_sync('wiki');
+});
 async function wk_loadPage(id, force) {
   if (WK.busy['p' + id] || (!force && WK.pg && WK.pg.id === id && (WK.pg._v === S.v || WK.dirty || (WK.edit && wk_typing())))) return;  // 2.554.0 (#4052): the editor is open on every page one may write: only while one writes in it
   WK.busy['p' + id] = true;
@@ -276,7 +285,8 @@ async function wk_fRename(sp, f) {
   const ren = async (nm, was) => { const r = await rawFetch('PATCH', `/api/files/nodes/${f.id}`, {name: nm}); follow(was, r?.name || nm); wk_after(sp); };
   try { await ren(name.trim(), f.name); } catch (e) { toast(e.message); return; }
   histToast(tr('Renamed'), histAdd({label: tr('Renamed {0}', qn(f.name)), ids: [], snaps: [], lids: [], wsp: sp,
-    undo: async () => { await ren(f.name, name.trim()); return {skipped: []}; }, redo: async () => { await ren(name.trim(), f.name); return {skipped: []}; }}));
+    undo: async () => { await ren(f.name, name.trim()); return {skipped: []}; }, redo: async () => { await ren(name.trim(), f.name); return {skipped: []}; },
+    post: dir => dir === 'undo' ? follow(name.trim(), f.name) : follow(f.name, name.trim())}));  // 2.979.0 (#5667): a step the server took back: the open folder follows its name
 }
 async function wk_fTrash(sp, f) {
   await wk_flush();
