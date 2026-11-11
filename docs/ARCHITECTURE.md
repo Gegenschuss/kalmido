@@ -684,6 +684,9 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 - Code loaded at start calls a module's functions only through the stand-ins in `lazyload.js` (`LD_CALL`: load, then
   call; `LD_VIEW`: draw "Loading…", load, draw the view again) or after `await loadModule(...)`. Constants of an
   on-demand module do not exist before it is loaded (`typeof X` to ask).
+- 2.924.0 (#5224): `tools/check_scrolljump.py` (CI, job lint) is red for a new place that moves the view (scrollIntoView,
+  scrollTo / scrollBy, a scrollTop assignment, focus() without preventScroll outside a dialog) without `// sprung-ok: <reason>`;
+  the old places are `tools/scrolljump_baseline.json` (only shrinks). Redraws keep the reading place with keepReading (render.js).
 - 2.149.0 F (#2519): `tools/check_lazy_calls.py` (CI, job lint) finds calls from a start file into a function that only an
   on-demand file declares. Allowed: a stand-in, a guard (`typeof X`, `window.X`, `X?.(`, `loadModule(` up to four lines
   before), or a mark with the reason why the module is loaded there: `// lazy-ok: <reason>` on the line (in a template

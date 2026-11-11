@@ -654,3 +654,20 @@ the swipe to reply on a message (collab.js: chat, team chat, agent chat, comment
 Leafing with a swipe (the next / previous document or picture: the full screen of a document, the image viewer, the task
 panel) is the other gesture of the core: `static/js/swipenav.js` -- `swn_attach(root, {area, can, go, peek})`. The calendar's
 gestures (calgest.js) are their own.
+
+## Calm view: a redraw keeps the reading place (2.924.0, #5224)
+
+The view moves only when the person makes it move; a jump the person asked for (a link, a search hit, "go to ...") is one
+calm jump. A new area does not keep scroll positions itself:
+
+- `keepReading(el, fn)` (static/js/render.js) runs `fn` (the redraw) and keeps the element with a key (`id`, `data-k`,
+  `data-id`, ... as the morph matches them) at the top of what is in sight on its screen position; no key in sight = the old
+  pixel offset, the very top stays the top. `renderView` (so every live delta, `lpMorphView`), `fl_set`, the search results
+  and the detail panel use it; a part drawn into a box of its own: `fl_set(box, html)` (it finds the scrolling box).
+  Give rows and cards a key - that is what keeps them in place (and what the morph keeps as the same node).
+- The browser's own anchoring (`overflow-anchor: auto` on `#view`) stays on; never set `scrollTop` back to a saved pixel
+  value after a redraw (that undoes it).
+- A focus given back after a redraw: `focus({preventScroll: true})`.
+- `tools/check_scrolljump.py` (CI lint) is red for a NEW `scrollIntoView` / `scrollTo` / `scrollBy` / `scrollTop =` /
+  `focus()` without `preventScroll` outside a dialog; a jump the person asked for carries `// sprung-ok: <reason>`. The
+  places from before are the baseline `tools/scrolljump_baseline.json` (only shrinks, `--update`).
