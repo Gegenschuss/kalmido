@@ -34,7 +34,7 @@ const raw = async id => Buffer.from(await (await fetch(B + `api/files/nodes/${id
   await sleep(600);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {org_name: 'Studio Example', lang: 'en', collab_all: true});
+  await call('POST', '/api/admin/setup', {org_name: 'Studio Example', lang: 'en', collab_all: true, modules: ['comments', 'collab']});
   const st = (await call('GET', '/api/state')).j;
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: [...new Set([...(st.settings?.features || '').split(','), 'files', 'collab'])].filter(Boolean).join(',')});
   const ORG = (await call('GET', '/api/state')).j.me.workspaces[0].id;  // the workspaces show with the feature collab
