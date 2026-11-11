@@ -422,7 +422,7 @@ def lf_own_expired(c, lid):
     grp_sync ends their own role (lf_expire_tick finds the lists)."""
     with system_ctx(c):
         return {r[0] for r in c.execute("""SELECT COALESCE(s.user_id, s.agent_id) FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id
-                                           WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=? AND s.list_own=1
+                                           WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=? AND s.list_own=1 AND s.group_id IS NULL
                                            AND s.expires_at IS NOT NULL AND s.expires_at <= ?""", (LF_KIND, int(lid), _now()))}
 
 
@@ -442,7 +442,7 @@ def lf_own_stale(c, lid, skip_locked=False):
         else:
             c.execute("SELECT id FROM lists WHERE id=? FOR UPDATE", (int(lid),)).fetchall()
         ids = [r[0] for r in c.execute("""SELECT s.id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind=?
-                                          AND n.ref_id=? AND s.list_own=1 AND NOT EXISTS (SELECT 1 FROM list_members m WHERE
+                                          AND n.ref_id=? AND s.list_own=1 AND s.group_id IS NULL AND NOT EXISTS (SELECT 1 FROM list_members m WHERE
                                           m.list_id=n.ref_id AND m.user_id=COALESCE(s.user_id, s.agent_id) AND m.own_role IS NOT NULL)""",
                                        (LF_KIND, int(lid))).fetchall()]
         if not ids:
@@ -655,7 +655,7 @@ def lf_expire_tick(c):
                         WHERE m.own_role IS NOT NULL AND s.expires_at IS NOT NULL AND s.expires_at <= ? AND m.list_id IN ({q})""", (now,))}
         # 2.568.0 (#4739, review F1): the core's own member rows follow list_members on every way a role ends (not only grp_sync)
         stale = [r[0] for r in c.execute("""SELECT DISTINCT n.ref_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id
-                                             WHERE n.kind='ref' AND n.ref_kind=? AND s.list_own=1 AND NOT EXISTS (SELECT 1 FROM list_members m
+                                             WHERE n.kind='ref' AND n.ref_kind=? AND s.list_own=1 AND s.group_id IS NULL AND NOT EXISTS (SELECT 1 FROM list_members m
                                              WHERE m.list_id=n.ref_id AND m.user_id=COALESCE(s.user_id, s.agent_id) AND m.own_role IS NOT NULL)""",
                                           (LF_KIND,)).fetchall()]
     for lid in sorted(stale):  # 2.644.0 (#5024): rows locked in id order, like acctimport.umz_share
