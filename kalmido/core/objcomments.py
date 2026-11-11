@@ -734,7 +734,7 @@ def ocm_move_q4b(c):
                        SELECT v.id, COALESCE(NULLIF(v.deleted_at, ''), t.del) FROM video_comments v JOIN t ON v.parent_id=t.id)
                      SELECT id, MIN(del) AS del FROM t GROUP BY id""")
         gone = f"e.del IS NOT NULL AND e.del < '{OCM_Q4B_CUT}'"
-        _q4b_ids(c, "video_comments", f"v JOIN _ocm_q4b_del e ON e.id=v.id WHERE NOT ({gone}) "
+        _q4b_ids(c, "video_comments", f"v WHERE NOT EXISTS (SELECT 1 FROM _ocm_q4b_del e WHERE e.id=v.id AND {gone}) "
                  "AND EXISTS (SELECT 1 FROM video_reviews r WHERE r.id=v.review_id)")
         pos = (("t", "at_sec"), ("page", "page"), ("x", "pos_x"), ("y", "pos_y"))
         anchor = ("NULLIF(jsonb_strip_nulls(jsonb_build_object('version_id', v.version_id"
