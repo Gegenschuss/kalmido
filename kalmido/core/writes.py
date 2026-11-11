@@ -330,14 +330,10 @@ def obj_space_set(c, uid, kind, rid, org_id):
         _join_ok(c, uid, reg, org_id)
         if row["owner_id"] != uid and org_role_key(c, row["owner_id"], org_id) is None:
             raise Denied(409, tr(MOVE_OWNER))
-    # 2.657.0 (#4828): the shares (its node's and the kind's old member table) are checked BEFORE org_out writes its log / News
+    # 2.657.0 (#4828): the shares of its node (2.924.0, #5069: the old member tables are gone) are checked BEFORE org_out writes its log / News
     with system_ctx(c):  # structure: whether its node (in the tree it leaves) carries a share
         shared = c.execute("SELECT 1 FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=? "
                            "LIMIT 1", (kind, int(rid))).fetchone()
-        if not shared and reg.get("members"):
-            mt, key = reg["members"]  # names checked by obj_register; the owner's own row is no share
-            shared = c.execute(f"SELECT 1 FROM {mt} WHERE {key}=? AND user_id!=? LIMIT 1",
-                               (int(rid), row["owner_id"])).fetchone()
     if shared:
         raise Denied(409, tr(MOVE_SHARED))
     if old is not None:

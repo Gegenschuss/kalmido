@@ -33,7 +33,7 @@ from ..events.model import need_event  # 2.369.5 (#2517): pulled up from functio
 # ---------------------------------------------------------------- 2.21.0 (#658): contacts
 # Kalmido keeps the contacts itself (one database with the tasks and events) and serves them over CardDAV
 # (contacts/carddav.py), so the phone's contacts app syncs directly. Address books (books) belong to a person and are
-# shared like lists (book_members: view = read, edit = change). A contact is one vCard: the fields Kalmido shows and
+# shared like lists (view = read, edit = change; 2.924.0, #5069: the shares of its node in the core). A contact is one vCard: the fields Kalmido shows and
 # edits are columns (name parts, company, e-mails, phones, addresses, web links, birthday, anniversary, notes, groups,
 # photo); every other property a client wrote is kept as it came (extra) and sent back, so a round trip loses nothing.
 # Contacts are sensitive: the API needs the scope "contacts" (never in an agent's default), only people who see the
@@ -64,7 +64,7 @@ def contacts_on(c, uid):
 # ---- address books and rights
 # 2.52.0 C (#1438): an address book can belong to an organisation (owner_org_id = its org_id, NULL = a person's book). Its
 # admins manage it (role 'owner'), its other members (people, no kid accounts, no agents) read or change it as org_role
-# says (view | edit | none); shares (book_members) add to that. owner_id stays filled: the technical manager (whose lists the
+# says (view | edit | none); shares (its node's, #5069) add to that. owner_id stays filled: the technical manager (whose lists the
 # birthdays go to), without rights of its own -- leaving the organisation or deleting the account hands it on (orgbooks.py).
 BOOK_RANK = {None: 0, "view": 1, "edit": 2, "owner": 3}
 
@@ -135,45 +135,37 @@ def _book_role(c, uid, b, trash=False):
 
 
 def bk_member_role(c, bid, uid):
-    """2.566.0 (#4712): uid's own share of the book (what book_members was): a book with a live node -- the share of exactly
-    that node to the person / agent (not a folder's above it: those are book_role's fold); without one the old member row."""
-    if bk_has_node(c, bid):
-        with system_ctx(c):  # the share rows of the book's own node (it may lie in a tree the asker reads only through it)
-            r = c.execute("SELECT s.role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind='address_book' "
-                          "AND n.ref_id=? AND n.deleted_at IS NULL AND (s.user_id=? OR s.agent_id=?) AND (s.expires_at IS NULL OR s.expires_at>?) "
-                          "ORDER BY s.role='edit' DESC LIMIT 1", (int(bid), int(uid), int(uid), iso(now_utc()))).fetchone()
-        return r[0] if r and r[0] in BOOK_ROLES else None
-    r = c.execute("SELECT role FROM book_members WHERE book_id=? AND user_id=?", (bid, uid)).fetchone()
-    return r[0] if r else None
+    """2.566.0 (#4712): uid's own share of the book (what an old member row was): the share of exactly its node to the person /
+    agent (not a folder's above it: those are book_role's fold), live. 2.924.0 (#5069): no node = none (the old row is gone)."""
+    with system_ctx(c):  # the share rows of the book's own node (it may lie in a tree the asker reads only through it)
+        r = c.execute("SELECT s.role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind='address_book' "
+                      "AND n.ref_id=? AND n.deleted_at IS NULL AND (s.user_id=? OR s.agent_id=?) AND (s.expires_at IS NULL OR s.expires_at>?) "
+                      "ORDER BY s.role='edit' DESC LIMIT 1", (int(bid), int(uid), int(uid), iso(now_utc()))).fetchone()
+    return r[0] if r and r[0] in BOOK_ROLES else None
 
 
 # 2.566.0 (#4712): an address book is an object kind of the shared core ('address_book', contacts/ctkern.py). Its shares are
-# rows of fs_shares on its reference node (the folder way of 2.351.0, ctf_node_role), which the trigger kalmido_kern_mirror
-# keeps equal to book_members (core/migrations.d/4712_a.py). A book WITH a live node is shared only by its node (a share taken
-# back in the core stays taken back); the old member row is read only for a book without one (one release, stage 7 removes it).
+# rows of fs_shares on its reference node (the folder way of 2.351.0, ctf_node_role). 2.924.0 (#5069, stage 7b): the only ones
+# -- book_members, its fallback reader and the mirror triggers are gone (core/migrations.d/5069_b.py).
 BK_KERN = {}  # node: contacts/ctkern.py bk_node_ensure (it loads after the shared core, ORDER)
 BK_NODE_SQL = "SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind='address_book' AND n.ref_id={}"  # review F3: one in the file store's trash too
 
 
 def bk_has_node(c, bid):
-    """2.566.0 (#4712): has address book bid a reference node (then its core shares count, not book_members; review F3: one in the file store's trash too)?"""
+    """2.566.0 (#4712): has address book bid a reference node (review F3: one in the file store's trash too)?"""
     with system_ctx(c):  # structure: whether the node exists, not what it holds
         return c.execute(BK_NODE_SQL.format("?"), (int(bid),)).fetchone() is not None
 
 
 def book_members_of(c, bid, live=False):
-    """[{user_id, role}] of the book's members: the shares of its live node (people and agents), else the old rows.
-    2.647.0 (#5046): live=True = only shares not expired, each with added_at (the heir of a deleted account): never the old
-    rows of a book with a node (a share taken back or run out in the core is no member any more)."""
-    if bk_has_node(c, bid):
-        exp = " AND (s.expires_at IS NULL OR s.expires_at>?)" if live else ""
-        with system_ctx(c):  # the manager's view of its own book's shares (the node may lie in an organisation's tree)
-            rows = c.execute(
-                "SELECT COALESCE(s.user_id, s.agent_id), s.role, s.created_at FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' "
-                "AND n.ref_kind='address_book' AND n.ref_id=? AND n.deleted_at IS NULL AND (s.user_id IS NOT NULL OR s.agent_id IS NOT NULL)"
-                f"{exp} ORDER BY s.created_at, s.id", (int(bid), *((iso(now_utc()),) if live else ()))).fetchall()
-    else:
-        rows = c.execute("SELECT user_id, role, added_at FROM book_members WHERE book_id=? ORDER BY added_at", (bid,)).fetchall()
+    """[{user_id, role}] of the book's members: the shares of its live node (people and agents; 2.924.0, #5069: only those).
+    2.647.0 (#5046): live=True = only shares not expired, each with added_at (the heir of a deleted account)."""
+    exp = " AND (s.expires_at IS NULL OR s.expires_at>?)" if live else ""
+    with system_ctx(c):  # the manager's view of its own book's shares (the node may lie in an organisation's tree)
+        rows = c.execute(
+            "SELECT COALESCE(s.user_id, s.agent_id), s.role, s.created_at FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' "
+            "AND n.ref_kind='address_book' AND n.ref_id=? AND n.deleted_at IS NULL AND (s.user_id IS NOT NULL OR s.agent_id IS NOT NULL)"
+            f"{exp} ORDER BY s.created_at, s.id", (int(bid), *((iso(now_utc()),) if live else ()))).fetchall()
     if not live:
         return [{"user_id": m[0], "role": m[1]} for m in rows]
     out = {}
@@ -211,13 +203,7 @@ def my_book_ids(c, uid, fold=True):
             role = base[r[1]] if base[r[1]] in (None, "owner") else (r[2] if r[2] in BOOK_ROLES else None)
             if role:
                 out[r[0]] = role
-    if collab_all():
-        for r in c.execute("SELECT m.book_id, m.role, b.org_id, b.owner_org_id FROM book_members m JOIN books b ON b.id=m.book_id "
-                           "JOIN users u ON u.id=b.owner_id WHERE m.user_id=? AND (u.disabled=0 OR b.owner_org_id IS NOT NULL) AND b.deleted_at IS NULL "
-                           f"AND NOT EXISTS ({BK_NODE_SQL.format('m.book_id')})", (uid,)):  # 2.566.0 (#4712): the others by the fold below
-            if acx_org_ok(c, uid, r[2]) and (not r[3] or r[3] == r[2]):  # 2.36.2 (#1142): organisation books only for its members
-                if BOOK_RANK.get(r[1], 0) > BOOK_RANK.get(out.get(r[0]), 0):  # 2.52.0 C (#1438): the better of share + organisation role
-                    out[r[0]] = r[1]
+    # 2.924.0 (#5069): the books shared with uid are the shares of their nodes only (the fold below; book_members is gone)
     if out and "readonly" in org_roles_of(c, uid).values():  # 2.143.0 A (#2151)
         orgs = {r[0]: r[1] for r in c.execute(f"SELECT id, org_id FROM books WHERE id IN ({','.join(str(int(k)) for k in out)})")}
         out = {k: _bk_ro(c, uid, orgs.get(k), v) for k, v in out.items()}

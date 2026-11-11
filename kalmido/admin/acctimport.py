@@ -2754,7 +2754,7 @@ def _umz_undo_rows(c, uid, r):
             part = [x for x in part if plan.goes(table, x)]
         if table in ("ev_cals", "books"):  # 2.272.0 C (#3027): only a calendar / address book nothing was added to or changed in
             sub, mem = ("events", "cal_id") if table == "ev_cals" else ("contacts", "book_id")
-            mt, mc = ("ev_cal_members", "cal_id") if table == "ev_cals" else ("book_members", "book_id")
+            rk = "evcal" if table == "ev_cals" else "address_book"  # 2.924.0 (#5069): shared = a share of its node (no member table)
             go = []
             for x in part:
                 rows = c.execute(f"SELECT created_at, updated_at FROM {sub} WHERE {mem}=?", (x,)).fetchall()
@@ -2763,7 +2763,8 @@ def _umz_undo_rows(c, uid, r):
                 ch = c.execute(f"SELECT changed_at FROM {table} WHERE id=?", (x,)).fetchone()
                 if any(imp_undo_after(y["created_at"], since) or imp_undo_after(y["updated_at"], since) for y in rows) \
                         or (ch is not None and imp_undo_after(ch["changed_at"], since)) \
-                        or c.execute(f"SELECT 1 FROM {mt} WHERE {mc}=? AND user_id!=?", (x, uid)).fetchone():
+                        or c.execute("SELECT 1 FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind=? "
+                                     "AND n.ref_id=? AND COALESCE(s.user_id, s.agent_id, 0)!=?", (rk, x, uid)).fetchone():
                     if c.execute(f"SELECT 1 FROM {table} WHERE id=? AND {col}=?", (x, uid)).fetchone():
                         kept_cals += table == "ev_cals"
                         kept_books += table == "books"

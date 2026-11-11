@@ -32,7 +32,7 @@ from ..notify.push import push_prio  # 2.369.5 (#2517): pulled up from functions
 
 # ---------------------------------------------------------------- 2.21.0 (#659): events
 # Real appointments next to the tasks, in the same database. A person has calendars (ev_cals: name, colour), shares
-# them like lists (ev_cal_members: view = read, edit = change events; the owner manages), and every calendar is a CalDAV
+# them like lists (view = read, edit = change events; the owner manages; 2.924.0, #5069: shares of its node in the core), and every calendar is a CalDAV
 # collection of VEVENTs (events/dav.py) next to the task lists (VTODO), so the phone's calendar app syncs it directly.
 # An event: title, from - to in the local wall time of its time zone (tz, '' = the server's; all day: dates, end
 # exclusive like iCalendar), location, notes, repeat rule (RRULE) with left-out occurrences (exdates) and changed ones
@@ -93,9 +93,9 @@ def wall_s(dt):
 
 # ---- calendars and rights
 # 2.566.0 (#4712): a calendar is an object kind of the shared core ('evcal', events/evkern.py, docs/dev/kern.md). Its shares
-# are the core's: rows of fs_shares on its reference node, which the trigger kalmido_kern_mirror keeps equal to ev_cal_members
-# (core/migrations.d/4712_a.py). A calendar WITH a live node is shared only by its node (a share taken back in the core stays
-# taken back); the old member row is read only for a calendar without one (one release long, stage 7 removes the table).
+# are the core's: rows of fs_shares on its reference node. 2.924.0 (#5069, stage 7b): the only ones -- the old member table
+# ev_cal_members, its fallback reader and the mirror triggers are gone (core/migrations.d/5069_b.py); a calendar without a
+# node is shared with nobody.
 EV_KIND = "evcal"
 KERN = {}  # 2.566.0 (#4712): obj_role / obj_visible_sql / obj_node / obj_write and the calendar's trash of the shared core, filled
 #            by events/evkern.py (it loads after the areas, kalmido/__init__.py ORDER)
@@ -104,8 +104,7 @@ _CAL_COLS = ("id", "org_id", "owner_id", "deleted_at")
 
 
 def ev_has_node(c, cid):
-    """2.566.0 (#4712): has calendar cid a reference node (then its core shares count, not ev_cal_members; review F3: one in
-    the file store's trash too)?"""
+    """2.566.0 (#4712): has calendar cid a reference node (review F3: one in the file store's trash too)?"""
     with system_ctx(c):  # structure: whether the node exists, not what it holds (an organisation's node too)
         return c.execute(EV_NODE_SQL.format("?"), (int(cid),)).fetchone() is not None
 
@@ -130,20 +129,13 @@ def ev_role(c, uid, cal, trash=False):
 
 
 def _ev_role(c, uid, cal):
-    """The calendar's own role (the core's base role of kind 'evcal'): its owner, or a member row of a calendar without a
-    live reference node (2.566.0, #4712: with one, its shares are the core's and obj_role reads them)."""
+    """The calendar's own role (the core's base role of kind 'evcal'): its owner. 2.924.0 (#5069): its members are the shares
+    of its node only (obj_role reads them; the old member row of a calendar without a node is gone)."""
     if cal is None or dl_area_locked(c, uid, "calendar"):  # 2.560.0 B (#4699): the agent's data lock leaves the calendars out
         return None
     if "org_id" in cal.keys() and not acx_org_ok(c, uid, cal["org_id"]):  # 2.36.2 (#1142): organisation calendars: members only
         return None
-    if cal["owner_id"] == uid:
-        return "owner"
-    if not collab_all() or c.execute("SELECT disabled FROM users WHERE id=?", (cal["owner_id"],)).fetchone()[0]:
-        return None
-    if ev_has_node(c, cal["id"]):
-        return None
-    r = c.execute("SELECT role FROM ev_cal_members WHERE cal_id=? AND user_id=?", (cal["id"], uid)).fetchone()
-    return r[0] if r else None
+    return "owner" if cal["owner_id"] == uid else None
 
 
 def can_write(role):
@@ -173,13 +165,7 @@ def my_cal_ids(c, uid, hidden=True):
     out = {r[0]: "owner" for r in c.execute("SELECT id, org_id FROM ev_cals WHERE owner_id=? AND deleted_at IS NULL", (uid,))
            if acx_org_ok(c, uid, r[1])}
     if collab_all():
-        # 2.566.0 (#4712): the member rows only of calendars without a live node; the others' shares are the core's (below)
-        for r in c.execute("SELECT m.cal_id, m.role, m.hidden, k.org_id FROM ev_cal_members m JOIN ev_cals k ON k.id=m.cal_id "
-                           "JOIN users u ON u.id=k.owner_id WHERE m.user_id=? AND u.disabled=0 AND k.deleted_at IS NULL "
-                           f"AND NOT EXISTS ({EV_NODE_SQL.format('m.cal_id')})", (uid,)):
-            if (hidden or not r["hidden"]) and acx_org_ok(c, uid, r["org_id"]):  # 2.36.2 (#1142)
-                out.setdefault(r[0], r[1])
-        out.update(_ev_core_ids(c, uid, set(out), hidden))
+        out.update(_ev_core_ids(c, uid, set(out)))  # 2.924.0 (#5069): the shares of the core only (no member rows any more)
     if "readonly" in org_roles_of(c, uid).values():  # 2.143.0 A (#2151): read-only in an organisation -> its calendars view
         ro = {r[0] for r in c.execute(f"SELECT id FROM ev_cals WHERE id IN ({','.join(str(int(k)) for k in out) or '0'}) AND org_id IN "
                                       f"({','.join(str(int(o)) for o, rk in org_roles_of(c, uid).items() if rk == 'readonly')})")}
@@ -190,37 +176,31 @@ def my_cal_ids(c, uid, hidden=True):
     return out
 
 
-def _ev_core_ids(c, uid, have, hidden=True):
-    """2.566.0 (#4712): {calendar id: role} of the calendars the core's shares open to uid (not yet in have). A person's own
-    "hide" mark of a member row stays (hidden=False leaves those out)."""
+def _ev_core_ids(c, uid, have):
+    """2.566.0 (#4712): {calendar id: role} of the calendars the core's shares open to uid (not yet in have). 2.924.0 (#5069):
+    the "hide" mark of the old member row (never set since evcals_hidden) went with its table."""
     ids = [r[0] for r in c.execute(f"SELECT id FROM ev_cals WHERE id IN {KERN['visible'](c, uid, EV_KIND)}").fetchall() if r[0] not in have]
     if not ids:
         return {}
     q = ",".join("?" * len(ids))
-    hid = set() if hidden else {r[0] for r in c.execute(f"SELECT cal_id FROM ev_cal_members WHERE user_id=? AND hidden=1 AND cal_id IN ({q})",
-                                                         (uid, *ids))}
     out = {}
     for r in c.execute(f"SELECT * FROM ev_cals WHERE id IN ({q})", ids).fetchall():
         role = ev_role(c, uid, r)
-        if role and r["id"] not in hid:
+        if role:
             out[r["id"]] = role
     return out
 
 
 def cal_members(c, cid, live=False):
-    """[{user_id, role}] of the calendar's members: 2.566.0 (#4712) the shares of its live node (people and agents), else the
-    old member rows. 2.647.0 (#5046): live=True = only shares not expired, each with added_at -- the one reader of who is a
-    member for the areas besides the rights (reminders, the heir of a deleted account), never the old rows of a calendar
-    with a node (a share taken back or run out in the core is no member any more)."""
-    if ev_has_node(c, cid):
-        exp = " AND (s.expires_at IS NULL OR s.expires_at>?)" if live else ""
-        with system_ctx(c):  # the owner's view of its own calendar's shares (the node may lie in an organisation's tree)
-            rows = c.execute(
-                "SELECT COALESCE(s.user_id, s.agent_id), s.role, s.created_at FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' "
-                "AND n.ref_kind='evcal' AND n.ref_id=? AND n.deleted_at IS NULL AND (s.user_id IS NOT NULL OR s.agent_id IS NOT NULL)"
-                f"{exp} ORDER BY s.created_at, s.id", (int(cid), *((iso(now_utc()),) if live else ()))).fetchall()
-    else:
-        rows = c.execute("SELECT user_id, role, added_at FROM ev_cal_members WHERE cal_id=? ORDER BY added_at", (cid,)).fetchall()
+    """[{user_id, role}] of the calendar's members: 2.566.0 (#4712) the shares of its live node (people and agents); 2.924.0
+    (#5069): only those (no node = nobody). 2.647.0 (#5046): live=True = only shares not expired, each with added_at -- the
+    one reader of who is a member for the areas besides the rights (reminders, the heir of a deleted account)."""
+    exp = " AND (s.expires_at IS NULL OR s.expires_at>?)" if live else ""
+    with system_ctx(c):  # the owner's view of its own calendar's shares (the node may lie in an organisation's tree)
+        rows = c.execute(
+            "SELECT COALESCE(s.user_id, s.agent_id), s.role, s.created_at FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' "
+            "AND n.ref_kind='evcal' AND n.ref_id=? AND n.deleted_at IS NULL AND (s.user_id IS NOT NULL OR s.agent_id IS NOT NULL)"
+            f"{exp} ORDER BY s.created_at, s.id", (int(cid), *((iso(now_utc()),) if live else ()))).fetchall()
     if not live:
         return [{"user_id": m[0], "role": m[1]} for m in rows]
     out = {}
@@ -231,8 +211,8 @@ def cal_members(c, cid, live=False):
 
 
 def ev_member_role(c, cid, uid):
-    """2.647.0 (#5046): uid's own live share of calendar cid (view | edit | None), what an ev_cal_members row was: a calendar
-    with a node -- the share of exactly that node, not expired; without one the old row. No owner, no organisation floor."""
+    """2.647.0 (#5046): uid's own live share of calendar cid (view | edit | None), what an old member row was: the share of
+    exactly its node, not expired (2.924.0, #5069: no node = none). No owner, no organisation floor."""
     return next((m["role"] for m in cal_members(c, cid, live=True) if m["user_id"] == int(uid)), None)
 
 

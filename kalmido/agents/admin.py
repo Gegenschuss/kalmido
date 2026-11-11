@@ -6,7 +6,7 @@ from datetime import timedelta
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app, TZ, USERNAME_RE
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, qi, system_ctx
 from ..core.i18n import tr, trn
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, iso_ms, now_utc, uset, usettings, write_lock
 from ..accounts.session import _token_hash, me
@@ -576,15 +576,13 @@ def _agent_ws_check(c, aid, v):
     if n:
         raise BadInput(tr("The agent is still in {0} projects of another workspace: take it out of them first", n))
     # 2.30.0 (#1036): calendars and address books follow the same rule
-    # 2.647.0 (#5046): the members as the core has them -- the live shares of a node, the old row only without one (a share
-    # taken back / run out in the core does not hold the agent back)
+    # 2.647.0 (#5046): the members as the core has them -- the live shares of a node (a share taken back / run out in the core
+    # does not hold the agent back); 2.924.0 (#5069): only those (the old member rows are gone)
     from ..core.objects import obj_share_rows_sql  # loads after this module (ORDER)
     with system_ctx(c):  # numbers only (the calendar / book may lie in a tree the admin does not see)
-        n = sum(c.execute(f"SELECT COUNT(*) FROM {tb} k WHERE COALESCE(k.org_id,0)!=? AND (k.id IN (SELECT ref_id FROM "
-                          f"{obj_share_rows_sql(kd, trash=True)} x WHERE x.user_id=? OR x.agent_id=?) OR (k.id IN (SELECT {col} FROM {mt} WHERE "
-                          f"user_id=?) AND NOT EXISTS (SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind='{kd}' AND n.ref_id=k.id)))",
-                          (v or 0, aid, aid, aid)).fetchone()[0]
-                for kd, tb, mt, col in (("evcal", "ev_cals", "ev_cal_members", "cal_id"), ("address_book", "books", "book_members", "book_id")))
+        n = sum(c.execute(f"SELECT COUNT(*) FROM {qi(tb, ('ev_cals', 'books'))} k WHERE COALESCE(k.org_id,0)!=? AND k.id IN (SELECT ref_id FROM "
+                          f"{obj_share_rows_sql(kd, trash=True)} x WHERE x.user_id=? OR x.agent_id=?)", (v or 0, aid, aid)).fetchone()[0]
+                for kd, tb in (("evcal", "ev_cals"), ("address_book", "books")))
     if n:
         raise BadInput(tr("The agent is still in {0} calendars or address books of another workspace: take it out of them first", n))
 

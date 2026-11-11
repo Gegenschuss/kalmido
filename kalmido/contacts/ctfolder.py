@@ -7,13 +7,13 @@ folder; a book / contact gets its node only when somebody files it (none for the
 their contacts and book_members stay as they are -- an older version reading a database with these nodes simply ignores them
 (the folders are ordinary folders of the file store, the nodes unknown kinds: fsref.fs_ref_json no_access).
 
-Rights: book_role / need_contact (contacts/model.py) = the address book's own role (owner, book_members, the organisation's
+Rights: book_role / need_contact (contacts/model.py) = the address book's own role (owner, its node's shares, the organisation's
 role) OR the role a folder gives (fs_ref_node_role: shares with people / groups, agents only through a share with exactly
 them; never organisation access nor the folder's ownership); the higher one counts, a folder never gives 'owner' and never
 narrows a share. A book in a folder gives its role on all its contacts (also the ones added later); a contact in a folder
 only that contact. Filing needs the right to manage the address book (its owner, an organisation book's admins; fsref.fs_ref_may_file: neither a
 folder share nor a book share with edit is enough -- they cannot share the book either).
-A book through a folder works like a share of the book (book_members): its contacts are read / changed / deleted as the role
+A book through a folder works like a share of the book (its node's, 2.924.0 #5069): its contacts are read / changed / deleted as the role
 says; the book's settings, sharing and deleting stay with its owner. A contact through its own folder only: reading and
 changing its fields -- deleting it or moving it into another address book stay with who has a role on the book.
 - hidden: a token without the scope "contacts" (a person's or an agent's) never reaches a book / contact through a folder.
@@ -110,7 +110,7 @@ def _gate(c, uid, rid):
 
 
 def _cap(c, uid, rid):
-    """The most a folder share gives: nothing with the module off or collaboration off (like book_members)."""
+    """The most a folder share gives: nothing with the module off or collaboration off (like a share of the book)."""
     if not collab_all() or not contacts_on(c, uid):
         return None
     return "edit"
