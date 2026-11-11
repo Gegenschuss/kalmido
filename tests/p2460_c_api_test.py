@@ -143,13 +143,15 @@ r = Bo.get(GD, params={"folder": F, "role": "view"})
 check(r.status_code == 404, f"another person: nothing of Alice's folder (unknown group 404) {r.status_code} {r.text[:200]}")
 r = A.put(B + f"/api/folders/groups/{G}", json={"folder": F, "role": "view", "apply": False})
 check(r.ok, "group: only new lists")
-check(dbx("SELECT role FROM group_shares WHERE list_id=? AND group_id=?", (L1, G))[0][0] == "admin", "Alpha keeps the group's own role")
+# 2.958.0 (#5245): group_shares is gone; the project's own group share is read by GET /api/lists/<id>/groups (via "list")
+gown = lambda lid, gid: [x["role"] for x in A.get(B + f"/api/lists/{lid}/groups").json()["groups"] if x["group_id"] == gid and x["via"] == "list"]
+check(gown(L1, G) == ["admin"], f"Alpha keeps the group's own role {gown(L1, G)}")
 check(own_role(L1, CAROL)[1] == "admin" and own_role(L2, CAROL)[1] == "view", f"Carol: admin in Alpha, view in Beta {own_role(L1, CAROL)} {own_role(L2, CAROL)}")
 r = A.put(B + f"/api/folders/groups/{G}", json={"folder": F, "role": "participant"})
 check(r.ok, "group: set everywhere")
-check(dbx("SELECT role FROM group_shares WHERE list_id=? AND group_id=?", (L1, G))[0][0] == "participant", "Alpha: the group's own role replaced")
+check(gown(L1, G) == ["participant"], f"Alpha: the group's own role replaced {gown(L1, G)}")
 check(own_role(L1, CAROL)[1] == "participant", f"Carol: participant in Alpha {own_role(L1, CAROL)}")
-check(dbx("SELECT COUNT(*) FROM group_shares WHERE group_id=?", (G2,))[0][0] == 0, "another group untouched")
+check(dbx("SELECT COUNT(*) FROM fs_shares WHERE group_id=?", (G2,))[0][0] == 0, "another group untouched")
 
 # ---- #1605 group pictures
 GA = B + f"/api/admin/groups/{G}/avatar"

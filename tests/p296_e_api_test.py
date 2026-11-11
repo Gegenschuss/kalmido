@@ -444,7 +444,8 @@ for p in (f"/lists/{L}", f"/tasks/{T}", f"/tasks/{T}/comments", f"/tasks/{T}/att
     check(gone(v1(AGT, p)), f"after: the agent gets 404 on {p}")
 check(L not in [x["id"] for x in v1(AGT, "/lists").json().get("data") or []], "after: the agent's lists no longer show it")
 check(one("SELECT COUNT(*) FROM list_members WHERE list_id=?", (L,)) == 0 and
-      one("SELECT COUNT(*) FROM group_shares WHERE list_id=?", (L,)) == 0, "db: no member / group share left")
+      one("SELECT COUNT(*) FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind='list' "  # 2.958.0 (#5245): group_shares is gone
+          "AND n.ref_id=? AND s.group_id IS NOT NULL", (L,)) == 0, "db: no member / group share left")
 check(until(lambda: head_space(APATH) == -BOB, 60), f"disk: the settle pass sealed the file for bob's account ({head_space(APATH)})")
 check(Bo.get(B + f"/api/attachments/{AID}").content == ATXT, "bob reads the file")
 tl = Bo.get(B + f"/api/tasks/{T}/timeline").json()

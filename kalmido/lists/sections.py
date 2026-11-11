@@ -146,13 +146,8 @@ def _folder_move(c, uid, fn):
             arr = []
         arr = [fn(x) for x in arr if isinstance(x, str)]
         uset(c, uid, k, json.dumps(list(dict.fromkeys(x for x in arr if x)), ensure_ascii=False))
-    # 2.10.0 (#441): folder shares with groups follow a renamed / moved folder; a deleted folder's share goes
-    for r in c.execute("SELECT id, folder FROM group_shares WHERE owner_id=? AND list_id IS NULL", (uid,)).fetchall():
-        nf = fn(r["folder"])
-        if not nf or (nf != r["folder"] and folder_under(r["folder"], nf)):  # deleted (its lists went up a level): never widen
-            c.execute("DELETE FROM group_shares WHERE id=?", (r["id"],))
-        elif nf != r["folder"]:
-            c.execute("UPDATE group_shares SET folder=? WHERE id=?", (nf, r["id"]))
+    # 2.10.0 (#441): folder shares with groups follow a renamed / moved folder; a deleted folder's share goes. 2.958.0 (#5245): they
+    # are shares of the folder's nodes, which lffolder.lf_folder_repath / lf_folder_dissolve move or remove (group_shares is gone)
     grp_sync(c, grp_list_ids(c, owner=uid) | {r[0] for r in c.execute("SELECT list_id FROM list_members m JOIN lists l ON l.id=m.list_id "
                                                                        "WHERE m.grole IS NOT NULL AND l.owner_id=?", (uid,))})
 

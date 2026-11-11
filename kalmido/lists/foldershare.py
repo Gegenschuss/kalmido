@@ -365,9 +365,9 @@ def sh_folder_shares(c, uid):
     from .lffolder import lf_people_rows  # 2.958.0 (#5245): the shares of the folders' nodes (folder_people is gone)
     for r in lf_people_rows(c, uid):
         slot(r["folder"])["people"] += 1
-    for r in c.execute("SELECT folder, COUNT(*) FROM group_shares WHERE owner_id=? AND list_id IS NULL AND folder IS NOT NULL GROUP BY folder",
-                       (uid,)).fetchall():
-        slot(r[0])["groups"] = r[1]
+    from .groups import grp_folder_rows  # 2.958.0 (#5245): the folder nodes' group shares (group_shares is gone)
+    for f in {(r["folder"], r["group_id"]) for r in grp_folder_rows(c, owner=uid)}:
+        slot(f[0])["groups"] += 1
     for r in c.execute("""SELECT a.folder, u.display_name, u.username FROM folder_agents a JOIN users u ON u.id=a.agent_id
                           WHERE a.owner_id=? AND u.disabled=0 ORDER BY a.folder, a.pos, a.agent_id""", (uid,)).fetchall():
         slot(r[0])["agents"].append(r[1] or r[2])

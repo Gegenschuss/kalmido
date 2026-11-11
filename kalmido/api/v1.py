@@ -2068,8 +2068,9 @@ def v1_list_group_del(lid, group_id):
     v1_args(())
     c = db()
     need_list(c, lid, write=False, manage=True)
-    gr = c.execute("SELECT g.name FROM groups g JOIN group_shares s ON s.group_id=g.id WHERE g.id=? AND s.list_id=?",
-                   (_v1_gid(group_id), lid)).fetchone()  # 2.86.0 (N29): only a group the list is shared with
+    from ..lists.groups import grp_own_rows  # 2.958.0 (#5245): the project's own group shares (group_shares is gone)
+    gr = c.execute("SELECT name FROM groups WHERE id=?", (_v1_gid(group_id),)).fetchone() \
+        if grp_own_rows(c, [lid], gid=_v1_gid(group_id)) else None  # 2.86.0 (N29): only a group the list is shared with
     if gr:
         need_approval(c, N_("Stop sharing the project “{0}” with the group “{1}”"), (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], gr[0]),
                       list_id=lid)

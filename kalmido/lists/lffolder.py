@@ -475,17 +475,17 @@ def lf_resync(c, lids, actor=None):
         grp_sync(c, lids, actor)
 
 
-def lf_folder_share(c, owner, path, uid, role):
+def lf_folder_share(c, owner, path, uid, role, group=False):
     """The old route /api/folders/people: owner's folder at path (every tree; none yet: one in owner's own tree) is shared with
     person / agent uid with list role role (None: the share goes), the lists below
     get their roles anew. Caller commits. 2.958.0 (#5245): no mirror into folder_people any more (gone, lf_people_rows)."""
-    agent = bool(c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone())
-    key = "agent_id" if agent else "user_id"
+    agent = not group and bool(c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone())
+    key = "group_id" if group else "agent_id" if agent else "user_id"  # 2.958.0 (#5245): group = uid is a group (group_shares is gone)
     nodes = lf_folder_ensure(c, owner, path) if role else lf_folder_nodes(c, owner, path)
     lids = set()
     with system_ctx(c):
         for f in nodes:
-            old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=?", (f["id"], uid)).fetchone()
+            old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=? AND COALESCE(list_own, 0)=0", (f["id"], uid)).fetchone()
             if role is None:
                 if old:
                     c.execute("DELETE FROM fs_shares WHERE id=?", (old[0],))

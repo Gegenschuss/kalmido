@@ -8,7 +8,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, dlg_gone, my_max_sort, need_collab, need_list, qn_private, ROLES, task_visible
-from ..lists.lists import clean_folder, folder_under
+from ..lists.lists import clean_folder
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgroles import org_role_key  # 2.568.0 (#4739)
 from ..lists.lists import _in_folder, member_folder_adopt  # 2.369.5 (#2517): pulled up from functions
@@ -43,41 +43,100 @@ def grp_of_user(c, uid):
     return [r[0] for r in c.execute("SELECT group_id FROM group_members WHERE user_id=? ORDER BY group_id", (uid,))]
 
 
+# 2.958.0 (#5245, stage 7d of the shared core): group_shares is gone. A project's own share with a group is a row of the core on
+# the project's node (fs_shares.group_id, list_own = 1, list_role = the project role; written by list_group_set through
+# core/objects.py obj_share); a folder's share with a group is a share of the folder's nodes (list_own 0, lffolder.lf_folder_share),
+# which reaches the projects below at runtime through the folders (lffolder.lf_want -> list_members.frole, like a person's).
+GS_OWN = """SELECT n.ref_id AS list_id, s.group_id, s.role, s.list_role, s.id, s.node_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id
+            WHERE n.kind='ref' AND n.ref_kind='list' AND s.group_id IS NOT NULL AND s.list_own=1"""
+
+
+def _grole(s):
+    return s["list_role"] if s["list_role"] in ROLE_RANK else ("edit" if s["role"] == "edit" else "view")
+
+
+def grp_own_rows(c, lids=None, gid=None):
+    """2.958.0 (#5245): [{list_id, group_id, role, share_id}] of the projects' own shares with groups (lids / group gid)."""
+    q, a = GS_OWN, []
+    if lids is not None:
+        q += " AND n.ref_id = ANY(CAST(? AS BIGINT[]))"
+        a.append(st_ids(sorted({int(x) for x in lids})))
+    if gid is not None:
+        q += " AND s.group_id=?"
+        a.append(int(gid))
+    with system_ctx(c):  # the node lies in the owner's tree, also when a list admin / another member asks
+        return [{"list_id": r["list_id"], "group_id": r["group_id"], "role": _grole(r), "share_id": r["id"]}
+                for r in c.execute(q + " ORDER BY s.id", a).fetchall()]
+
+
+def grp_folder_rows(c, owner=None, gid=None, nids=None):
+    """2.958.0 (#5245): [{owner_id, folder, group_id, role, node_id, share_id}] of the live group shares of projects folders
+    (a folder not in the trash, not expired; its owner and path: lffolder.lf_node_folder)."""
+    from .lffolder import lf_node_folder
+    from ..files.store import _now
+    q, a = ["n.kind='folder'", "n.deleted_at IS NULL", "s.group_id IS NOT NULL", "COALESCE(s.list_own, 0)=0",
+            "(s.expires_at IS NULL OR s.expires_at > ?)"], [_now()]
+    if owner is not None:
+        q.append("n.owner_id=?")
+        a.append(int(owner))
+    if gid is not None:
+        q.append("s.group_id=?")
+        a.append(int(gid))
+    if nids is not None:
+        q.append("s.node_id = ANY(CAST(? AS BIGINT[]))")
+        a.append(st_ids(sorted({int(x) for x in nids})))
+    out, where = [], {}
+    with system_ctx(c):
+        for s in c.execute(f"""SELECT s.id, s.node_id, s.group_id, s.role, s.list_role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id
+                               WHERE {' AND '.join(q)} ORDER BY s.id""", a).fetchall():
+            if s["node_id"] not in where:
+                where[s["node_id"]] = lf_node_folder(c, s["node_id"])
+            k = where[s["node_id"]]
+            if k and k[1]:
+                out.append({"owner_id": k[0], "folder": k[1], "group_id": s["group_id"], "role": _grole(s), "node_id": s["node_id"],
+                            "share_id": s["id"]})
+    return out
+
+
 def grp_shares_of_list(c, lid):
-    """[(group_id, role, via)] of list lid: shared directly (via 'list') or through a folder of its owner (via the folder)."""
+    """[(group_id, role, via)] of list lid: shared directly (via 'list') or through a folder above it (via the folder's path).
+    2.958.0 (#5245): read from the shares of its node and of the folders of its chain (group_shares is gone)."""
+    from .lffolder import LF_KIND
+    from ..files.fsref import fs_ref_node
+    from ..files.store import fs_chain
     lr = c.execute("SELECT owner_id, folder, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
     if not lr or lr["is_inbox"]:
         return []
-    out = [(r["group_id"], r["role"], "list") for r in c.execute(
-        "SELECT group_id, role FROM group_shares WHERE list_id=?", (lid,))]
-    if lr["folder"]:
-        for r in c.execute("SELECT group_id, role, folder FROM group_shares WHERE list_id IS NULL AND owner_id=?", (lr["owner_id"],)):
-            if folder_under(lr["folder"], r["folder"]):
-                out.append((r["group_id"], r["role"], r["folder"]))
+    out = [(r["group_id"], r["role"], "list") for r in grp_own_rows(c, [lid])]
+    with system_ctx(c):
+        n = fs_ref_node(c, LF_KIND, lid)
+        chain = fs_chain(c, n["id"]) if n is not None and not n["deleted_at"] else []
+    fids = [x["id"] for x in chain[1:] if x["kind"] == "folder"]
+    if fids:
+        for r in grp_folder_rows(c, nids=fids):
+            out.append((r["group_id"], r["role"], r["folder"]))
     return out
 
 
 def grp_shares_of_lists(c, rows):
-    """2.280.0 B (#3116): grp_shares_of_list for many lists (rows with id, owner_id, folder, is_inbox) and the groups' names, in
-    three queries for all -> ({list id: [(group_id, role, via)]}, {group id: name})."""
+    """2.280.0 B (#3116): grp_shares_of_list for many lists (rows with id, owner_id, folder, is_inbox) and the groups' names ->
+    ({list id: [(group_id, role, via)]}, {group id: name}). 2.958.0 (#5245): the own shares of all lists in one query, the
+    folders' group shares once with the lists below them (lffolder.lf_lists_below)."""
+    from .lffolder import lf_lists_below
     rows = [r for r in rows if not r["is_inbox"]]
     out, names = {}, {}
     if not rows:
         return out, names
-    for r in c.execute("SELECT list_id, group_id, role FROM group_shares WHERE list_id = ANY(CAST(? AS BIGINT[])) ORDER BY id",
-                       (st_ids(sorted({r["id"] for r in rows})),)).fetchall():
+    ids = {r["id"] for r in rows}
+    for r in grp_own_rows(c, ids):
         out.setdefault(r["list_id"], []).append((r["group_id"], r["role"], "list"))
-    owners = sorted({r["owner_id"] for r in rows if r["folder"] and r["owner_id"]})
-    fs = {}
-    if owners:
-        for r in c.execute("SELECT owner_id, group_id, role, folder FROM group_shares WHERE list_id IS NULL AND owner_id = ANY(CAST(? AS BIGINT[])) "
-                           "ORDER BY id", (st_ids(owners),)).fetchall():
-            fs.setdefault(r["owner_id"], []).append(r)
-    for lr in rows:
-        if lr["folder"]:
-            for r in fs.get(lr["owner_id"], ()):
-                if folder_under(lr["folder"], r["folder"]):
-                    out.setdefault(lr["id"], []).append((r["group_id"], r["role"], r["folder"]))
+    below = {}
+    for r in grp_folder_rows(c):
+        if r["node_id"] not in below:
+            below[r["node_id"]] = lf_lists_below(c, r["node_id"])
+        for lid in below[r["node_id"]]:
+            if lid in ids:
+                out.setdefault(lid, []).append((r["group_id"], r["role"], r["folder"]))
     gids = sorted({x[0] for v in out.values() for x in v if x[0]})
     if gids:
         names = {r[0]: r[1] for r in c.execute("SELECT id, name FROM groups WHERE id = ANY(CAST(? AS BIGINT[]))", (st_ids(gids),))}
@@ -96,16 +155,13 @@ def grp_org_limited(c, org_id, uid):
 def grp_list_ids(c, gid=None, owner=None):
     """Lists touched by the shares of group gid (or by the folder shares of owner): the ones grp_sync must look at."""
     ids = set()
-    q, a = ("WHERE group_id=?", (gid,)) if gid is not None else ("WHERE owner_id=?", (owner,))
-    for r in c.execute(f"SELECT list_id, owner_id, folder FROM group_shares {q}", a):
-        if r["list_id"]:
-            ids.add(r["list_id"])
-        else:
-            for x in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND folder!='' AND is_inbox=0", (r["owner_id"],)):
-                if folder_under(x["folder"], r["folder"]):
-                    ids.add(x["id"])
+    from .lffolder import lf_lists_below
+    if gid is not None:  # 2.958.0 (#5245): the projects' own shares with the group (group_shares is gone)
+        ids.update(r["list_id"] for r in grp_own_rows(c, gid=gid))
+    if owner is not None:  # 2.958.0 (#5245): the lists below owner's folders shared with a group
+        for r in grp_folder_rows(c, owner=owner):
+            ids.update(lf_lists_below(c, r["node_id"]))
     if gid is not None:  # 2.352.0 A (#2748): the lists below projects folders shared with the group
-        from .lffolder import lf_lists_below
         with system_ctx(c):
             for r in c.execute("SELECT node_id FROM fs_shares WHERE group_id=?", (gid,)).fetchall():
                 ids.update(lf_lists_below(c, r[0]))
@@ -138,7 +194,9 @@ def grp_sync(c, lids, actor=None):
         want, gname = {}, {}
         from ..accounts.orgs import ws_member_problem
         if not lr["is_inbox"]:
-            for gid, role, _via in grp_shares_of_list(c, lid):
+            for gid, role, via in grp_shares_of_list(c, lid):
+                if via != "list":  # 2.958.0 (#5245): a folder's group share is a folder role (lf_want -> frole), not grole
+                    continue
                 for uid in grp_members(c, gid):
                     if uid == lr["owner_id"] or uid in agents or ws_member_problem(c, lid, uid):  # 2.28.0 (#935): of the list's workspace only
                         continue
@@ -217,7 +275,7 @@ def grp_touch(c, owner):
     (#2748): their nodes follow their paths (lf_sync_owner); a list that got a new place gets its roles through the folders anew."""
     from .lffolder import lf_sync_owner
     moved = set(lf_sync_owner(c, owner))
-    if c.execute("SELECT 1 FROM group_shares WHERE owner_id=? AND list_id IS NULL", (owner,)).fetchone():
+    if grp_folder_rows(c, owner=owner):  # 2.958.0 (#5245): a folder of owner shared with a group
         grp_sync(c, grp_list_ids(c, owner=owner) | {r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=?", (owner,))})
     elif moved:
         grp_sync(c, moved)
@@ -239,8 +297,9 @@ def grp_dict(c, r, full=True):
          "avatar": fg_avatar_url(r),  # 2.46.0 (#1605)
          "members": [{"user_id": u, "name": names.get(u, "?")} for u in mem], "created_at": r["created_at"]}
     if full:
-        d["shares"] = [{"list_id": s["list_id"], "folder": s["folder"], "owner_id": s["owner_id"], "role": s["role"]}
-                       for s in c.execute("SELECT * FROM group_shares WHERE group_id=? ORDER BY id", (r["id"],))]
+        # 2.958.0 (#5245): the shares of the projects' and folders' nodes (group_shares is gone), the same shape as before
+        d["shares"] = [{"list_id": s["list_id"], "folder": None, "owner_id": None, "role": s["role"]} for s in grp_own_rows(c, gid=r["id"])] + \
+                      [{"list_id": None, "folder": s["folder"], "owner_id": s["owner_id"], "role": s["role"]} for s in grp_folder_rows(c, gid=r["id"])]
     return d
 
 
@@ -398,7 +457,7 @@ def group_delete(gid):
     need_group(c, gid)
     lids = grp_list_ids(c, gid)
     c.execute("UPDATE tasks SET assignee_group_id=NULL WHERE assignee_group_id=?", (gid,))
-    c.execute("DELETE FROM group_shares WHERE group_id=?", (gid,))
+    # 2.958.0 (#5245): the group's shares of projects and folders are fs_shares rows: they go with the group (ON DELETE CASCADE)
     c.execute("DELETE FROM group_members WHERE group_id=?", (gid,))
     old = c.execute("SELECT avatar FROM groups WHERE id=?", (gid,)).fetchone()
     c.execute("DELETE FROM groups WHERE id=?", (gid,))
@@ -444,15 +503,38 @@ def list_group_set(lid, gid):
         p = ws_member_problem(c, lid, uid)
         if p:
             return err(p, 409)
-    if c.execute("SELECT 1 FROM group_shares WHERE list_id=? AND group_id=?", (lid, gid)).fetchone():
-        c.execute("UPDATE group_shares SET role=? WHERE list_id=? AND group_id=?", (role, lid, gid))
-    else:
-        c.execute("INSERT INTO group_shares(group_id,list_id,role,added_by,added_at) VALUES(?,?,?,?,?)",
-                  (gid, lid, role, me(), iso(now_utc())))
+    grp_own_put(c, me(), lid, gid, role)  # 2.958.0 (#5245): the core's row on the project's node (group_shares is gone)
     grp_sync(c, [lid])
     bump(c)
     c.commit()
     return jsonify(ok=True)
+
+
+def grp_own_put(c, actor, lid, gid, role):
+    """2.958.0 (#5245): project lid's own share with group gid (the route checked the right, the group and the project's rules):
+    the core's row on the project's node (core/objects.py obj_share, list_own 1, list_role = role); the same group again changes
+    its role. -> share id | None (the basket)."""
+    from ..core.objects import obj_share
+    from .lffolder import lf_place
+    if not lf_place(c, int(lid)):
+        return None
+    with system_ctx(c):  # the node may lie in a folder the actor does not see (another person's path)
+        return obj_share(c, actor, "list", int(lid), "group_id", int(gid), "edit" if role in ("admin", "edit") else "view", None,
+                         extra={"list_role": role, "list_own": 1}, checked=True)
+
+
+def grp_own_drop(c, lid, gid):
+    """2.958.0 (#5245): project lid's own share with group gid goes (the node's log names it; a group's row is not restorable
+    through the core, docs/dev/kern.md) -> True when there was one."""
+    from .lffolder import _log
+    rows = [r for r in grp_own_rows(c, [lid], gid=gid)]
+    with system_ctx(c):
+        for r in rows:
+            nid = c.execute("SELECT node_id FROM fs_shares WHERE id=?", (r["share_id"],)).fetchone()
+            c.execute("DELETE FROM fs_shares WHERE id=?", (r["share_id"],))
+            if nid:
+                _log(c, nid[0], "unshare", str(r["share_id"]))
+    return bool(rows)
 
 
 @app.delete("/api/lists/<int:lid>/groups/<int:gid>")
@@ -460,7 +542,7 @@ def list_group_del(lid, gid):
     need_collab()
     c = db()
     need_list(c, lid, write=False, manage=True)
-    if not c.execute("DELETE FROM group_shares WHERE list_id=? AND group_id=?", (lid, gid)).rowcount:
+    if not grp_own_drop(c, lid, gid):  # 2.958.0 (#5245)
         return err(tr("unknown"), 404)
     grp_sync(c, [lid])
     bump(c)
@@ -473,21 +555,30 @@ def folder_groups_get():
     """?folder=<path>: the groups my folder (and its subfolders) is shared with."""
     c = db()
     f = clean_folder(str(request.args.get("folder") or ""), False)
-    return jsonify(groups=[{"group_id": r["group_id"], "name": grp_name(c, r["group_id"]), "role": r["role"]}
-                           for r in c.execute("SELECT group_id, role FROM group_shares WHERE owner_id=? AND list_id IS NULL AND folder=?",
-                                              (me(), f))])
+    return jsonify(groups=[{"group_id": gid, "name": grp_name(c, gid), "role": role}
+                           for gid, role in sorted(_fgroups(c, me(), f).items())])  # 2.958.0 (#5245): the folder nodes' shares
+
+
+def _fgroups(c, owner, f):
+    """2.958.0 (#5245): {group id: role} of owner's folder at path f (the highest of its nodes' group shares)."""
+    out = {}
+    for r in grp_folder_rows(c, owner=owner):
+        if r["folder"] == f:
+            out[r["group_id"]] = role_max(out.get(r["group_id"]), r["role"])
+    return out
 
 
 def fg_group_diff(c, owner, f, gid, role):
     """2.46.0 (#1606): [{list_id, name, role}] of owner's lists in folder f shared with group gid directly with another role than
     `role` -- only when the folder is shared with the group already and its role changes (a first share touches no list)."""
-    prev = c.execute("SELECT role FROM group_shares WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (owner, f, gid)).fetchone()
-    if not prev or prev[0] == role:
+    prev = _fgroups(c, owner, f).get(gid)  # 2.958.0 (#5245): the folder nodes' and the projects' nodes' shares
+    if not prev or prev == role:
         return []
-    return [{"list_id": r["id"], "name": r["name"], "role": r["role"]} for r in c.execute(
-        """SELECT l.id, l.name, l.folder, s.role FROM lists l JOIN group_shares s ON s.list_id=l.id AND s.group_id=?
-           WHERE l.owner_id=? AND l.archived=0 AND l.is_inbox=0 ORDER BY lower(l.name), l.id""", (gid, owner)).fetchall()
-        if _in_folder(r["folder"], f) and r["role"] != role]
+    own = {r["list_id"]: r["role"] for r in grp_own_rows(c, gid=gid)}
+    return [{"list_id": r["id"], "name": r["name"], "role": own[r["id"]]} for r in c.execute(
+        """SELECT l.id, l.name, l.folder FROM lists l WHERE l.owner_id=? AND l.archived=0 AND l.is_inbox=0
+           ORDER BY lower(l.name), l.id""", (owner,)).fetchall()
+        if r["id"] in own and _in_folder(r["folder"], f) and own[r["id"]] != role]
 
 
 @app.get("/api/folders/groups/<int:gid>/diff")
@@ -525,16 +616,15 @@ def folder_group_set(gid):
                 p = ws_member_problem(c, l["id"], uid)
                 if p:
                     return err(p, 409)
-    if c.execute("SELECT 1 FROM group_shares WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (me(), f, gid)).fetchone():
+    before = grp_list_ids(c, owner=me())
+    if gid in _fgroups(c, me(), f):
         # 2.46.0 (#1606): a changed folder role also replaces the group's own role in the lists of the folder, unless apply: false
         if b.get("apply", True) is not False:
             for x in fg_group_diff(c, me(), f, gid, role):
-                c.execute("UPDATE group_shares SET role=? WHERE list_id=? AND group_id=?", (role, x["list_id"], gid))
-        c.execute("UPDATE group_shares SET role=? WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (role, me(), f, gid))
-    else:
-        c.execute("INSERT INTO group_shares(group_id,owner_id,folder,role,added_by,added_at) VALUES(?,?,?,?,?,?)",
-                  (gid, me(), f, role, me(), iso(now_utc())))
-    grp_sync(c, grp_list_ids(c, owner=me()))
+                grp_own_put(c, me(), x["list_id"], gid, role)  # 2.958.0 (#5245)
+    from .lffolder import lf_folder_share
+    lf_folder_share(c, me(), f, gid, role, group=True)  # 2.958.0 (#5245): the share of the folder's nodes (group_shares is gone)
+    grp_sync(c, before | grp_list_ids(c, owner=me()))
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -546,8 +636,10 @@ def folder_group_del(gid):
     c = db()
     f = clean_folder(str(request.args.get("folder") or ""), False)
     before = grp_list_ids(c, owner=me())
-    if not c.execute("DELETE FROM group_shares WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (me(), f, gid)).rowcount:
+    if gid not in _fgroups(c, me(), f):  # 2.958.0 (#5245): the folder nodes' shares (group_shares is gone)
         return err(tr("unknown"), 404)
+    from .lffolder import lf_folder_share
+    lf_folder_share(c, me(), f, gid, None, group=True)
     grp_sync(c, before)
     bump(c)
     c.commit()

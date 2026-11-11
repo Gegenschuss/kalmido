@@ -12,7 +12,6 @@ from ..core.db import body, bump, db, err
 from ..core.access import Denied, list_role
 from ..accounts.pictures import ALL_PRESETS, AVATAR_DIR, AVATAR_MAX_MB, avatar_process
 from ..lists.groups import need_group
-from ..lists.lists import folder_under
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.groups import grp_visible  # 2.369.5 (#2517): pulled up from functions
 
@@ -61,15 +60,11 @@ def fg_may_see(c, gid):
         return False
     if grp_visible(c, r):
         return True
-    for s in c.execute("SELECT list_id, owner_id, folder FROM group_shares WHERE group_id=?", (gid,)).fetchall():
-        if s["list_id"]:
-            if list_role(c, s["list_id"]):
-                return True
-        elif s["owner_id"] and s["folder"]:
-            for x in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND folder!='' AND is_inbox=0", (s["owner_id"],)).fetchall():
-                if folder_under(x["folder"], s["folder"]) and list_role(c, x["id"]):
-                    return True
-    return False
+    from .groups import grp_folder_rows, grp_own_rows  # 2.958.0 (#5245): the nodes' shares (group_shares is gone)
+    from .lffolder import lf_lists_below
+    if any(list_role(c, s["list_id"]) for s in grp_own_rows(c, gid=gid)):
+        return True
+    return any(list_role(c, x) for s in grp_folder_rows(c, gid=gid) for x in lf_lists_below(c, s["node_id"]))
 
 
 def _fg_set(c, gid, value):

@@ -97,9 +97,11 @@ def tchat_members_of(c, lids):
     for (lid, u), role in mem.items():
         if role != "participant":
             cand[lid].add(u)
-    for r in c.execute("""SELECT s.list_id, gm.user_id FROM group_shares s JOIN group_members gm ON gm.group_id=s.group_id
-                          WHERE s.list_id = ANY(CAST(? AS BIGINT[])) AND s.role!='participant'""", (ids,)):
-        cand[r[0]].add(r[1])
+    from ..lists.groups import grp_own_rows  # 2.958.0 (#5245): the projects' own group shares (group_shares is gone)
+    gsh = [x for x in grp_own_rows(c, ids) if x["role"] != "participant"]
+    for x in gsh:
+        for r in c.execute("SELECT user_id FROM group_members WHERE group_id=?", (x["group_id"],)):
+            cand[x["list_id"]].add(r[0])
     aid = g.get("audit_aid") if has_request_context() else None  # list_role notes an agent's access for every role it finds
     uids = sorted({u for s in cand.values() for u in s if u} | ({aid} if aid else set()))
     kinds = {r[0]: r[1] for r in c.execute("SELECT id, kind FROM users WHERE id = ANY(CAST(? AS BIGINT[]))", (uids,))}
