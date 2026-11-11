@@ -22,7 +22,8 @@ const F8D_LV = [
   ['lightbox', () => $$('.lightbox'), el => el.remove()],
   ['pop', () => { const pop = $('#pop'); return pop && !pop.classList.contains('hidden') ? [pop] : []; }, () => closePop()],
   // 2.497.0 (#4040): shopping mode has its own history entry (family.js): a second one here stayed behind after closing it (a dead Back)
-  ['modal', () => $$('.modal:not(.authscreen):not(.an-out):not(.shopmode)'), el => modalClose(el)],
+  // 2.956.0 (#5230): not the search palette (a .modal too): it is its own level, it counted twice (two entries for one level)
+  ['modal', () => $$('.modal:not(.authscreen):not(.an-out):not(.shopmode):not(.palette)'), el => modalClose(el)],
   // 2.619.0 (#4943): the quick add sheet on its own (was 'pop': closePop only closed it through popOnClose, which a menu opened
   // in the sheet (list, template) had taken over: Back then closed nothing); a sheet still folding away (an-out) is closed already;
   // closing: the scrim + whoever holds popOnClose, then the sheet (popovers.js)
@@ -106,6 +107,9 @@ window.addEventListener('popstate', e => {
   // 2.766.0 (#5322, CI red p2123_d_ui since #5214): an entry not ours with another address = a new view (location.hash = ...,
   // a link): the settings opened into an area closed before #5214 and stayed open on their overview after it
   const nav = typeof v !== 'number' && !!f8d_bk.at && location.href !== f8d_bk.at;
+  // 2.956.0 (#5230): an area icon in the phone's drawer changes the page and keeps the drawer open (areas.js sbm_go, the route
+  // asks sbm_hold): that new address is no Back - the drawer stays our level with its entry, Back from there closes it
+  if (nav && f8d_open() === 'side' && typeof SBM === 'object' && SBM.keep) return;
   f8d_bk.pushed -= close; e.stopImmediatePropagation();
   for (let i = 0; i < close && f8d_open(); i++) f8d_closeTop(nav);
   f8d_queue();

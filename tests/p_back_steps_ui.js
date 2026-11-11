@@ -108,18 +108,18 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
 
       // 5. the tour: Next = a step, Back one card back, its Back button the same, the last Back ends it
       await ev(`(tourStart(), 1)`);
-      check(await at(1, `!!document.querySelector('.tour .tcard') && TOUR.i === 0`), `${W}: the tour opens on its first card ` + await ev(STATE));
+      check(await at(1, `!!document.querySelector('.tour .tcard [data-tour="next"]') && TOUR.i === 0`, 10000), `${W}: the tour opens on its first card ` + await ev(STATE));
       const card = () => ev(`document.querySelector('.tour .tcard h3')?.textContent || ''`);
       const c0 = await card();
-      await ev(`(document.querySelector('.tour [data-tour="next"]').click(), 1)`);
-      check(await at(2, `TOUR.i === 1`), `${W}: Next: card 2, a step of Back ` + await ev(STATE));
+      await ev(`(document.querySelector('.tour [data-tour="next"]')?.click(), 1)`);
+      check(await at(2, `TOUR.i === 1 && !!document.querySelector('.tour [data-tour="back"]')`), `${W}: Next: card 2, a step of Back ` + await ev(STATE));
       const c1 = await card();
-      await ev(`(document.querySelector('.tour [data-tour="next"]').click(), 1)`);
-      check(await at(3, `TOUR.i === 2`), `${W}: Next: card 3 ` + await ev(STATE));
+      await ev(`(document.querySelector('.tour [data-tour="next"]')?.click(), 1)`);
+      check(await at(3, `TOUR.i === 2 && !!document.querySelector('.tour [data-tour="back"]')`), `${W}: Next: card 3 ` + await ev(STATE));
       check(c0 && c1 && c0 !== c1, `${W}: the cards differ ` + JSON.stringify([c0, c1]));
       await back();
       check(await at(2, `TOUR.i === 1`) && await card() === c1, `${W}: Back shows card 2 again ` + await ev(STATE));
-      await ev(`(document.querySelector('.tour [data-tour="back"]').click(), 1)`);
+      await ev(`(document.querySelector('.tour [data-tour="back"]')?.click(), 1)`);
       check(await at(1, `TOUR.i === 0`) && await card() === c0, `${W}: the tour's own Back = card 1, its entry goes ` + await ev(STATE));
       await back();
       check(await wait(`!TOUR.on && !document.querySelector('.tour') && f8d_bk.pushed === 0 && location.hash === '#today'`, {timeout: 6000}), `${W}: the last Back ends the tour, Today stays ` + await ev(STATE));
