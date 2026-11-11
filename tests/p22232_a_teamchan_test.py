@@ -64,11 +64,12 @@ r = Er.post(B + "/api/team/channels", json={"name": "Board room", "org_id": ORG,
 check(r.status_code == 201, "setup: erin's closed channel " + r.text[:200])
 CH = r.json()["id"]
 check(Er.post(B + f"/api/team/rooms/{CH}/messages", json={"body": "Budget for the next shoot"}).ok, "setup: a message")
-check(Er.post(B + f"/api/team/rooms/{CH}/read", json={}).ok and sql("SELECT 1 FROM tchat_reads WHERE room_id=? AND user_id=?", (CH, ERIN)),
+# 2.981.0 (#5286): the read mark is a row of the core's obj_seen (kind tchat; tchat_reads is gone)
+check(Er.post(B + f"/api/team/rooms/{CH}/read", json={}).ok and sql("SELECT 1 FROM obj_seen WHERE kind='tchat' AND ref_id=? AND user_id=?", (CH, ERIN)),
       "setup: erin's read mark")
 r = Er.delete(B + f"/api/team/rooms/{CH}/members/{ERIN}")
 check(r.ok, "erin leaves " + r.text[:200])
-check(not sql("SELECT 1 FROM tchat_reads WHERE room_id=? AND user_id=?", (CH, ERIN)), "erin: the read mark of the left channel is gone")
+check(not sql("SELECT 1 FROM obj_seen WHERE kind='tchat' AND ref_id=? AND user_id=?", (CH, ERIN)), "erin: the read mark of the left channel is gone")
 r = Er.patch(B + f"/api/team/rooms/{CH}", json={"open": True})
 check(r.status_code in (403, 404), f"erin (creator + admin, no member): does not open it {r.status_code} {r.text[:160]}")
 check(sql("SELECT is_open FROM tchat_rooms WHERE id=?", (CH,))[0][0] == 0, "the channel stays closed")
@@ -96,7 +97,7 @@ FC = r.json()["id"] if r.status_code == 201 else None
 check(FC, "frida: a channel of her own space " + r.text[:200])
 check(Fr.post(B + f"/api/team/rooms/{FC}/read", json={}).ok, "frida: reads it")
 check(Fr.delete(B + f"/api/team/rooms/{FC}/members/{FID}").ok, "frida: leaves it")
-check(not sql("SELECT 1 FROM tchat_reads WHERE room_id=? AND user_id=?", (FC, FID)), "frida: no read mark left")
+check(not sql("SELECT 1 FROM obj_seen WHERE kind='tchat' AND ref_id=? AND user_id=?", (FC, FID)), "frida: no read mark left")
 check(Fr.post(B + f"/api/team/rooms/{FC}/members", json={"user_id": FID}).status_code in (403, 404), "frida: no way back in")
 
 print(f"p22232_a_teamchan: {OKS[0]} ok, {len(FAILS)} failed", flush=True)

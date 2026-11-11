@@ -248,7 +248,8 @@ check([(x["id"], x["name"], x["seconds"]) for x in repf["lists"]] == [(FL, "Frid
 
 # ================================================================ statements: 2 vs 30 foreign lists (no repository)
 # /api/state as a whole still grows per list through the team chat rooms (2.281 #3110); the statements of the helpers of this
-# part are counted in the app (git_conns / git_folders / list_notif / folder_notif / group_shares / groups / org_members).
+# part are counted in the app (git_conns / git_folders / obj_notif_cap / group_shares / groups / org_members).
+# 2.981.0 (#5287): list_notif / folder_notif are rows of the core's obj_notif_cap
 PROBE = """
 from kalmido.core import pg
 import re
@@ -265,7 +266,7 @@ cl.post('/api/auth/login', json={'username': 'vera', 'password': 'password123'},
 cl.get('/api/state', headers=hh)
 seen.clear()
 r = cl.get('/api/state', headers=hh)
-pat = re.compile(r'\\b(git_conns|git_folders|list_notif|folder_notif)\\b|FROM group_shares WHERE|FROM groups WHERE|FROM org_members WHERE user_id')
+pat = re.compile(r'\\b(git_conns|git_folders|obj_notif_cap)\\b|FROM group_shares WHERE|FROM groups WHERE|FROM org_members WHERE user_id')
 print(json.dumps({'status': r.status_code, 'all': len(seen), 'helpers': sum(1 for x in seen if pat.search(x))}))
 """
 

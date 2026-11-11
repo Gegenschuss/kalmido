@@ -14,6 +14,8 @@ Without any template a share gets TPL_DEFAULT ("read", or KALMIDO_NOTIF_TEMPLATE
 Lists and folders that were shared before 2.33 got "all" written once (migration in core/db.py), and their owners are
 asked once in the app (user setting notif_tpl_ask: "1" = ask, "0" = answered).
 Tables (new, so 2.32 runs on with the database): list_notif, folder_notif; user_id 0 = everyone of the list / folder.
+2.981.0 (#5287, stage Q9b): both are rows of the shared core's obj_notif_cap (core/objnotifcap.py: kind 'list' = ref_id the
+list, kind 'folder' = ref_id the owner and path the folder); the rules above stay here.
 """
 import json
 import os
@@ -22,8 +24,9 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err, iso, now_utc, uset
+from ..core.db import body, bump, db, err, uset
 from ..core.pg import st_ids
+from ..core.objnotifcap import ncap_drop, ncap_put, ncap_rows, ncap_rows_of  # 2.981.0 (#5287): the core's obj_notif_cap
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_collab
 from ..core.errors import BadInput
@@ -76,8 +79,7 @@ def custom_clean(v):
 
 
 def _folder_rows(c, owner, folder, uid):
-    return {r["user_id"]: r for r in c.execute("SELECT user_id, tpl, custom FROM folder_notif WHERE owner_id=? AND folder=? AND user_id IN (?, 0)",
-                                               (owner, folder, uid))}
+    return ncap_rows(c, "folder", owner, folder, (uid, 0))  # 2.981.0 (#5287)
 
 
 def tpl_for(c, lid, uid):
@@ -106,18 +108,14 @@ def tpl_prefetch(c, lids, uid):
     lids = sorted({int(x) for x in lids or () if (x, uid) not in cache})
     if not lids:
         return
-    ids = st_ids(lids)
     lr = {r["id"]: r for r in c.execute("SELECT l.id, l.owner_id, l.folder, u.kind AS owner_kind FROM lists l LEFT JOIN users u ON u.id=l.owner_id "
-                                        "WHERE l.id = ANY(CAST(? AS BIGINT[]))", (ids,)).fetchall()}
+                                        "WHERE l.id = ANY(CAST(? AS BIGINT[]))", (st_ids(lids),)).fetchall()}
     ln, fn = {}, {}
-    for r in c.execute("SELECT list_id, user_id, tpl, custom FROM list_notif WHERE list_id = ANY(CAST(? AS BIGINT[])) AND user_id IN (?, 0)",
-                       (ids, uid)).fetchall():
-        ln.setdefault(r["list_id"], {})[r["user_id"]] = r
+    for r in ncap_rows_of(c, "list", lids, (uid, 0)):  # 2.981.0 (#5287): the core's obj_notif_cap
+        ln.setdefault(r["ref_id"], {})[r["user_id"]] = r
     owners = sorted({r["owner_id"] for r in lr.values() if r["owner_id"] and r["owner_id"] != uid and r["folder"]})
-    if owners:
-        for r in c.execute("SELECT owner_id, folder, user_id, tpl, custom FROM folder_notif WHERE owner_id = ANY(CAST(? AS BIGINT[])) "
-                           "AND user_id IN (?, 0)", (st_ids(owners), uid)).fetchall():
-            fn.setdefault((r["owner_id"], r["folder"]), {})[r["user_id"]] = r
+    for r in ncap_rows_of(c, "folder", owners, (uid, 0)):
+        fn.setdefault((r["ref_id"], r["path"]), {})[r["user_id"]] = r
     for lid in lids:
         cache[(lid, uid)] = _tpl_for(c, lid, uid, (lr, ln, fn))
 
@@ -128,8 +126,7 @@ def _tpl_for(c, lid, uid, pre=None):
         "SELECT l.owner_id, l.folder, u.kind AS owner_kind FROM lists l LEFT JOIN users u ON u.id=l.owner_id WHERE l.id=?", (lid,)).fetchone()
     if not lr or not lr["owner_id"] or lr["owner_id"] == uid or lr["owner_kind"] == "agent":
         return None  # the owner is never limited; a list of an agent has nobody who could choose a template: not limited
-    rows = pre[1].get(lid, {}) if pre else \
-        {r["user_id"]: r for r in c.execute("SELECT user_id, tpl, custom FROM list_notif WHERE list_id=? AND user_id IN (?, 0)", (lid, uid))}
+    rows = pre[1].get(lid, {}) if pre else ncap_rows(c, "list", lid, uids=(uid, 0))  # 2.981.0 (#5287)
     for u, src in ((uid, "member"), (0, "list")):
         if u in rows:
             return {"tpl": rows[u]["tpl"], "custom": custom_of(rows[u]["custom"]), "source": src, "folder": None}
@@ -193,7 +190,7 @@ def _inherited(c, owner, path, uid=0, skip_first=False):
 
 def list_tpl_info(c, lid):
     lr = c.execute("SELECT id, owner_id, folder FROM lists WHERE id=?", (lid,)).fetchone()
-    own = {r["user_id"]: r for r in c.execute("SELECT user_id, tpl, custom FROM list_notif WHERE list_id=?", (lid,))}
+    own = ncap_rows(c, "list", lid)  # 2.981.0 (#5287)
     inh = _inherited(c, lr["owner_id"], lr["folder"] or "")
     people = []
     for p in _people_list(c, lid, lr["owner_id"]):
@@ -205,7 +202,7 @@ def list_tpl_info(c, lid):
 
 
 def folder_tpl_info(c, owner, f):
-    own = {r["user_id"]: r for r in c.execute("SELECT user_id, tpl, custom FROM folder_notif WHERE owner_id=? AND folder=?", (owner, f))}
+    own = ncap_rows(c, "folder", owner, f)  # 2.981.0 (#5287)
     inh = _inherited(c, owner, f, skip_first=True)
     people = []
     for p in lf_people_rows(c, owner):
@@ -215,7 +212,7 @@ def folder_tpl_info(c, owner, f):
             people.append({"user_id": r["id"], "name": r["display_name"] or r["username"], "own": _row_out(own.get(r["id"]))})
     lids = [r["id"] for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (owner,)).fetchall()
             if _in_folder(r["folder"] or "", f)]
-    own_lists = [r[0] for r in c.execute(f"SELECT list_id FROM list_notif WHERE user_id=0 AND list_id IN ({','.join('?' * len(lids))})", lids)] if lids else []
+    own_lists = [r["ref_id"] for r in ncap_rows_of(c, "list", lids, (0,))]  # 2.981.0 (#5287)
     eff = _row_out(own.get(0)) or {"tpl": inh["tpl"], "custom": inh["custom"]}
     return {"scope": "folder", "folder": f, "own": _row_out(own.get(0)), "inherited": inh, "effective": eff, "people": people,
             "lists": len(lids), "lists_own": len(own_lists), "templates": list(NOTIF_TPLS), "custom_rows": list(CUSTOM_ROWS),
@@ -278,11 +275,9 @@ def list_tpl_put(lid):
     if uid and (uid == me() or not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()):
         return err(tr("unknown person"), 404)
     if tpl is None:
-        c.execute("DELETE FROM list_notif WHERE list_id=? AND user_id=?", (lid, uid))
+        ncap_drop(c, "list", lid, "", uid)  # 2.981.0 (#5287): the core's obj_notif_cap
     else:
-        c.execute("INSERT INTO list_notif(list_id,user_id,tpl,custom,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(list_id,user_id) "
-                  "DO UPDATE SET tpl=excluded.tpl, custom=COALESCE(excluded.custom, list_notif.custom), updated_at=excluded.updated_at",
-                  (lid, uid, tpl, cust, iso(now_utc())))
+        ncap_put(c, "list", lid, "", uid, tpl, cust)
     uset(c, me(), "notif_tpl_ask", "0")  # chosen: the one-time question is answered
     bump(c)
     c.commit()
@@ -327,15 +322,13 @@ def folder_tpl_put():
         return err(tr("unknown person"), 404)
     if "tpl" in b:
         if tpl is None:
-            c.execute("DELETE FROM folder_notif WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid))
+            ncap_drop(c, "folder", me(), f, uid)  # 2.981.0 (#5287): the core's obj_notif_cap
         else:
-            c.execute("INSERT INTO folder_notif(owner_id,folder,user_id,tpl,custom,updated_at) VALUES(?,?,?,?,?,?) "
-                      "ON CONFLICT(owner_id,folder,user_id) DO UPDATE SET tpl=excluded.tpl, custom=COALESCE(excluded.custom, folder_notif.custom), "
-                      "updated_at=excluded.updated_at", (me(), f, uid, tpl, cust, iso(now_utc())))
+            ncap_put(c, "folder", me(), f, uid, tpl, cust)
     if b.get("reset_lists") is True:
         for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall():
             if _in_folder(r["folder"] or "", f):
-                c.execute("DELETE FROM list_notif WHERE list_id=? AND user_id=0", (r["id"],))
+                ncap_drop(c, "list", r["id"], "", 0)
     uset(c, me(), "notif_tpl_ask", "0")
     bump(c)
     c.commit()
@@ -344,12 +337,13 @@ def folder_tpl_put():
 
 def folder_tpl_rename(c, uid, old, new):
     """A folder of uid was renamed / moved (old -> new, subfolders along): its templates go along."""
-    for r in c.execute("SELECT DISTINCT folder FROM folder_notif WHERE owner_id=?", (uid,)).fetchall():
+    # 2.981.0 (#5287): rows of the core's obj_notif_cap (kind 'folder', ref_id = the owner, path = the folder)
+    for r in c.execute("SELECT DISTINCT path FROM obj_notif_cap WHERE kind='folder' AND ref_id=?", (uid,)).fetchall():
         if folder_under(r[0], old):
             nf = new + r[0][len(old):]  # 2.37.0 (#1150): UPDATE OR REPLACE -> drop the rows in the way, then move
-            c.execute("DELETE FROM folder_notif WHERE owner_id=? AND folder=? AND folder<>? AND user_id IN "
-                      "(SELECT user_id FROM folder_notif WHERE owner_id=? AND folder=?)", (uid, nf, r[0], uid, r[0]))
-            c.execute("UPDATE folder_notif SET folder=? WHERE owner_id=? AND folder=?", (nf, uid, r[0]))
+            c.execute("DELETE FROM obj_notif_cap WHERE kind='folder' AND ref_id=? AND path=? AND path<>? AND user_id IN "
+                      "(SELECT user_id FROM obj_notif_cap WHERE kind='folder' AND ref_id=? AND path=?)", (uid, nf, r[0], uid, r[0]))
+            c.execute("UPDATE obj_notif_cap SET path=? WHERE kind='folder' AND ref_id=? AND path=?", (nf, uid, r[0]))
 
 
 # ---------------------------------------------------------------- the one-time question to owners of lists shared before 2.33
@@ -358,12 +352,12 @@ def notif_ask_state(c, uid, s):
     question is open (setting notif_tpl_ask = "1"); else []."""
     if (s or {}).get("notif_tpl_ask") != "1":
         return []
-    alls = {r[0] for r in c.execute("SELECT folder FROM folder_notif WHERE owner_id=? AND user_id=0 AND tpl='all'", (uid,))}
+    alls = {r[0] for r in c.execute("SELECT path FROM obj_notif_cap WHERE kind='folder' AND ref_id=? AND user_id=0 AND tpl='all'", (uid,))}
     people = sorted({p["folder"] for p in lf_people_rows(c, uid) if p["folder"] in alls and c.execute(
         "SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'')!='agent'", (p["user_id"],)).fetchone()})
     out = [{"kind": "folder", "folder": f, "name": f.split(_fsep())[-1]} for f in people]
     out += [{"kind": "list", "id": r["id"], "name": r["name"]} for r in c.execute(
-        """SELECT l.id, l.name FROM lists l JOIN list_notif n ON n.list_id=l.id AND n.user_id=0
+        """SELECT l.id, l.name FROM lists l JOIN obj_notif_cap n ON n.kind='list' AND n.ref_id=l.id AND n.path='' AND n.user_id=0
            WHERE l.owner_id=? AND l.archived=0 AND n.tpl='all' AND EXISTS (SELECT 1 FROM list_members m JOIN users hu ON hu.id=m.user_id AND COALESCE(hu.kind,'')!='agent' WHERE m.list_id=l.id)
            ORDER BY lower(l.name)""", (uid,))]
     return out[:20]
@@ -381,19 +375,18 @@ def notif_ask_done():
 def notif_tpl_migrate(c):
     """Once (2.33.0): lists and folders shared so far keep every notification ("all", written explicitly); their owners
     are asked once. A list in a shared folder of its owner follows the folder (only the folder gets the row)."""
-    now = iso(now_utc())
     folders = {}
     for r in sorted({(p["owner_id"], p["folder"]) for p in lf_people_rows(c) if c.execute(
             "SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'')!='agent'", (p["user_id"],)).fetchone()}):  # shared with people (only agents: nothing to ask)
         folders.setdefault(r[0], []).append(r[1])
-        c.execute("INSERT INTO folder_notif(owner_id,folder,user_id,tpl,custom,updated_at) VALUES(?,?,0,'all',NULL,?) ON CONFLICT DO NOTHING", (r[0], r[1], now))
+        ncap_put(c, "folder", r[0], r[1], 0, "all", once=True)  # 2.981.0 (#5287): the core's obj_notif_cap
     owners, n = set(folders), 0
     for r in c.execute("""SELECT l.id, l.owner_id, l.folder FROM lists l WHERE l.owner_id IS NOT NULL
                           AND EXISTS (SELECT 1 FROM list_members m JOIN users hu ON hu.id=m.user_id AND COALESCE(hu.kind,'')!='agent' WHERE m.list_id=l.id AND m.user_id!=l.owner_id)""").fetchall():
         owners.add(r["owner_id"])
         if any(_in_folder(r["folder"] or "", f) for f in folders.get(r["owner_id"], [])):
             continue
-        n += c.execute("INSERT INTO list_notif(list_id,user_id,tpl,custom,updated_at) VALUES(?,0,'all',NULL,?) ON CONFLICT DO NOTHING", (r["id"], now)).rowcount
+        n += ncap_put(c, "list", r["id"], "", 0, "all", once=True)
     for uid in owners:
         if c.execute("SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'')!='agent'", (uid,)).fetchone():
             uset(c, uid, "notif_tpl_ask", "1")

@@ -10,6 +10,7 @@ from ..core.i18n import languages, tr
 from ..core.schema import MAX_DEPTH
 from ..core.retention import ret_on
 from ..core.dlock import dl_list_hidden  # 2.235.0 B (#2902)
+from ..core.objfollow import ofl_bells_here  # 2.981.0 (#5287): a project's bell is a row of the core's obj_follow
 from ..core.db import ag_cursor, ag_cursor_parse, db, err, gsetting, inbox_names, iso, local_now, lv_versions, now_utc, usettings  # 2.619.0 (#3890): + lv_versions
 from ..accounts.session import me, session_gen, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
@@ -158,7 +159,7 @@ def visible_lists(c, uid, light=False):
                 if m["user_id"] in pown:
                     m["agent_owner"] = pown[m["user_id"]]
     snames = user_names(c, [r["status_by"] for r in rows])
-    bells = {r[0]: (r[1], r[2]) for r in c.execute("SELECT list_id, mode, custom FROM list_bell WHERE user_id=?", (uid,))}
+    bells = {r["ref_id"]: (r["level"], r["custom"]) for r in ofl_bells_here(c, "list", uid=uid)}
     repos = git_repos_of_lists(c, ids)  # 2.2.0 (#271)
     if collab_all():  # 2.280.0 B (#3116): the owners' limits of all foreign lists at once (cap_hint below reads the cache)
         tpl_prefetch(c, [r["id"] for r in rows if r["owner_id"] != uid], uid)

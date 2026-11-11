@@ -6,7 +6,7 @@
  - unread: the main conversation + the threads I take part in (root author, answered, mentioned); reading a thread only
    looking does not make me take part; a read mark per thread
  - pushes: a thread answer notifies its people only (not the whole channel), the room's mute still applies; a DM both
- - read receipts: read_by at my own messages (main conversation: tchat_reads, a thread: its read marks), room.read_ok;
+ - read receipts: read_by at my own messages (main conversation: its read marks, a thread: its read marks; 2.981.0 #5286: rows of obj_seen), room.read_ok;
    "Send read receipts" off = not shown in either direction; agents count when they mark read; the version marker t moves
    when someone else reads
  - strangers see neither a thread nor read_by; agents read / answer threads through v1 (only rooms they are in) and get

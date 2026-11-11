@@ -655,7 +655,26 @@ it would not grow), `osn_get` reads the own mark. A mark is read and written onl
 object before it writes one. The task badge (`core/serializers.py`) joins `obj_seen` with `kind='task'`; the change feed
 (`tasks/delta.py`) notes a mark on a task as a change of that task for its reader only. The trigger `kalmido_osn_gone`
 deletes a task's marks when the task is deleted for good. Not in the exports (a personal view state). A new area with read
-marks adds its kind to `OSN_KINDS` and a trigger line in a fragment -- no table of its own (stage Q8b: team chat, RSS).
+marks adds its kind to `OSN_KINDS` and a trigger line in a fragment -- no table of its own.
+
+### Read marks of the team chat and the feeds (stage Q8b, 2.981.0, #5286)
+
+- Team chat: a room's read mark is a row of `obj_seen` with kind `tchat` (`seen_id` = the highest message of the main
+  conversation read; was `tchat_reads.last_id`), a thread's with kind `tchat_thread` (`ref_id` = the thread's first message; was
+  `tchat_thread_reads`). Muting a room is a row of `obj_follow` (kind `tchat`, mode `mute`, its rule in `OFL_LEVEL`), taking part
+  in a thread one with kind `tchat_thread`, mode `watch` (`ofl_watch` / `ofl_watchers`). A new participant of a thread starts at
+  the answer that brought them in (`osn_mark(..., only_new=True)`: an older mark stays). The unread counts, the poll signature
+  (`tchat_sig_q`), "Read by", the push rules and the thread summary of `collab/teamchat.py` read these rows. The rows carry no
+  workspace (the team chat checks the room); leaving a channel or an organisation drops a person's room marks and mutes
+  (`tchat_marks_drop`, `osn_drop` + `ofl_drop`); the triggers `kalmido_osn_gone_tchat*` / `kalmido_ofl_gone_tchat*` take them with
+  the room / the message.
+- Feeds: one model in every space -- a read article is a row of `obj_seen` (kind `rss`, `seen_id` = the article), unread again
+  deletes it (`osn_clear`), "all read" goes through `osn_mark_sel`; `osn_seen_sql` is the "read at" of a list. Per article, not a
+  high-water mark per feed: an article is marked unread on its own and articles arrive out of order. `rss_reads` and
+  `rss_items.read_at` are gone (an article deleted takes its marks: `kalmido_osn_gone_rss`).
+- The move: `osn_move` (`osn_move_tchat`, `osn_move_rss`) before the fragment `5286_a` drops the old tables and the column
+  (one-way, the back limit is raised; a SQLite file's `tchat_reads` comes in through `admin/migrate.py legacy_tables`). Not in
+  the exports (a personal view state, as before).
 
 ### Templates (stage Q10, 2.905.0, #5288)
 
@@ -710,8 +729,31 @@ watched task can be muted at the same time. Kinds: `task`. `kalmido/core/objfoll
   `tasks/watchers.json` have their old columns (`task_id`, `level` ...), so older archives import the same way.
 - The move: `core/db.py init_db` calls `ofl_setup` (`ofl_move`) before the fragment `5285_a` drops the old tables (one-way;
   a version before 2.972 starts with empty old tables, its rows come over at the next start of this one).
-`list_bell`, `list_notif` and `folder_notif` stay until stage Q9b. A new area with following adds its kind to `OFL_KINDS`,
-a bell rule to `OFL_LEVEL` and a `kalmido_ofl_gone` trigger line in a fragment -- no table of its own.
+A new area with following adds its kind to `OFL_KINDS` (its bell's modes to `OFL_BELL_OF`, its table to `OFL_TABLE`), a bell
+rule to `OFL_LEVEL` and a `kalmido_ofl_gone` trigger line in a fragment -- no table of its own.
+
+### Following projects and the owner's ceilings (stage Q9b, 2.981.0, #5287)
+
+- The bell of a project is a row of `obj_follow` with kind `list` (it replaced `list_bell`): mode `default` (as the
+  notification matrix; the row stays only while it holds the person's own choice), `all`, `mute` or `custom`; the own choice per
+  event is the column `custom` (JSONB, kept while another mode is set). `collab/news.py` reads it (`list_bell`, `list_bells`,
+  `bell_all_users`, `notif_ok`) through `ofl_bells_here` (only rows of the project's current workspace), `lists/projects.py
+  bell_store` writes it (`ofl_bell_put` / `ofl_bell_rest`). Its rule in `OFL_LEVEL` answers `mute`; the rest of a project bell
+  (everything, the own choice, mentions through a muted bell) stays `notif_ok`'s.
+- The row carries the project's workspace (row-level security) and goes along when the project moves (`accounts/orgs.py
+  list_space_follow`); it ends with the share (`dlg_gone`: leaving the project; `obj_revoke_person`), with the account
+  (`accounts/users.py user_forget_conns`, also when an account becomes an agent) and with the project (`kalmido_ofl_gone_list`).
+- The owner's ceiling of the notifications (`notify/caps.py`: read | work | all | custom, per project or folder, for everyone or
+  one person) is one table `obj_notif_cap(kind, ref_id, path, user_id, tpl, custom JSONB, updated_at TIMESTAMPTZ)`
+  (`core/objnotifcap.py`, `ncap_*`; it replaced `list_notif` and `folder_notif`): kind `list` = a project (`path` empty), kind
+  `folder` = a folder of the owner (`ref_id` = the owner's account, `path` = the folder, keyed like every folder setting). A
+  ceiling only limits pushes of people already in the project, it never gives a right. `kalmido_ncap_gone` takes the rows with
+  the project / the owner's account (and the rows that name a deleted person).
+- Exports keep their parts: the account export's `list_notif` / `folder_notif` have their old columns. A project bell was never
+  exported (a personal view state).
+- The move: `ofl_setup` (`ofl_move`: `list_bell`) and `core/objhooks.MOVE` (`ncap_move`) before the fragment `5287_a` drops the
+  old tables (one-way, the back limit is raised like Q9a; a SQLite file's old tables come in through `admin/migrate.py
+  legacy_tables`).
 
 
 ### Search (stage Q6a, 2.981.0, #5278)

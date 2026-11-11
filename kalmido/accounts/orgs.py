@@ -6,6 +6,8 @@ import re
 from flask import g, has_request_context, jsonify, request
 
 from ..core.objhooks import obj_settle, person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
+from ..core.objfollow import ofl_drop  # 2.981.0 (#5286)
+from ..core.objseen import osn_drop  # 2.981.0 (#5286)
 from ..core.config import app, OFFICE_DIR
 from ..core.pg import insert_id, like_escape, qi, system_ctx
 from ..core.i18n import N_, tr
@@ -628,6 +630,9 @@ def list_space_follow(c, lid, old_org, boundary):
     # 2.972.0 (#5285): the bells are rows of obj_follow (a watching row follows its task by itself: kalmido_ofl_carry)
     c.execute("""UPDATE obj_follow SET org_id=? WHERE kind='task' AND mode<>'watch' AND ref_id IN (SELECT id FROM tasks WHERE list_id=?)
                  AND org_id IS NOT DISTINCT FROM ?""", (oid, lid, old_org or None))
+    # 2.981.0 (#5287): the bells of the project itself (kind 'list', was list_bell) go along too
+    c.execute("UPDATE obj_follow SET org_id=? WHERE kind='list' AND ref_id=? AND mode<>'watch' AND org_id IS NOT DISTINCT FROM ?",
+              (oid, lid, old_org or None))
     return n
 
 
@@ -1715,8 +1720,11 @@ def org_leave(c, oid, uid, heir, back=None):
     # 2.351.0 D (#3214): their read marks in the organisation's channels and list conversations go too (tchat_sig_q
     # counts the marks of every room with a mark of mine: the reading in rooms left would stay visible); 2.373.0 (#3337):
     # groups have no organisation and the person stays a member there -- their marks stay
-    c.execute("DELETE FROM tchat_reads WHERE user_id IN (%s) AND room_id IN (SELECT id FROM tchat_rooms WHERE org_id=? OR "
-              "list_id IN (SELECT id FROM lists WHERE org_id=?))" % ",".join("?" * (len(ags) + 1)), (uid, *ags, oid, oid))
+    # 2.981.0 (#5286): the marks and mutes are rows of the core's obj_seen / obj_follow (kind tchat, like collab/teamchat.py
+    # tchat_marks_drop: the marks of the threads stay)
+    rooms = "ref_id IN (SELECT id FROM tchat_rooms WHERE org_id=? OR list_id IN (SELECT id FROM lists WHERE org_id=?))"
+    osn_drop(c, [uid, *ags], "tchat", rooms, (oid, oid))
+    ofl_drop(c, [uid, *ags], "tchat", rooms, (oid, oid))
     # 2.560.0 (#4698 a): their channel memberships and file / knowledge shares in the organisation end (coming back the same
     # day, also as a guest = no old closed channels, no old folder shares) -- 2.747.0 (#5246): person_revoked 'leave' above
     # takes exactly these rows (the person and their agents) into obj_revoked; the second bare DELETE went

@@ -92,8 +92,8 @@ UMZ_LEFT_TABLES = {
     "fs_shares": _SHARE, "group_members": _SHARE,  # 2.958.0 (#5245): folder_people, group_shares are gone
     "wiki_share_cards": _SHARE,  # 2.937.0 (#5244): the card of a person share of a knowledge page (on fs_shares)
     "groups": _SHARE, "sheet_shares": _SHARE,  # 2.924.0 (#5069): tchat_members, ev_cal_members, book_members are gone
-    "list_bell": _VIEW, "list_folder_skip": _VIEW, "list_mine_hide": _VIEW, "rss_reads": _VIEW, "tchat_reads": _VIEW,
-    "tchat_thread_reads": _VIEW, "user_task_order": _VIEW, "wait_hidden": _VIEW,
+    "list_folder_skip": _VIEW, "list_mine_hide": _VIEW,
+    "user_task_order": _VIEW, "wait_hidden": _VIEW,
     "obj_seen": _VIEW,  # 2.905.0 (#5284): the core's read marks (was task_seen), a personal view state like before
     "obj_search": _DERIVED,  # 2.981.0 (#5278): the shared search index (core/objsearch.py), rebuilt from the imported rows by its triggers
     "user_mine_sections": _VIEW,  # 2.569.0 (#4395): the own sections of "My tasks", like user_task_order

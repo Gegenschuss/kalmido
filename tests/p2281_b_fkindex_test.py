@@ -88,10 +88,11 @@ def no_seq(q, args=(), pre=()):
 
 
 # ---- the key checks of a delete (generic plan with a parameter, like the trigger's) use an index
+# 2.981.0 (#5287): list_bell gone (obj_follow kind 'list': its index kind, ref_id; the trigger kalmido_ofl_gone_list)
 KEYS = [("tchat_msgs", "task_id"),  # 2.905.0 (#5284): task_seen gone (obj_seen: its primary key kind, ref_id)
         ("user_task_order", "task_id"), ("task_push", "task_id"),
         ("agent_chat", "task_id"), ("pomos", "task_id"), ("sections", "list_id"), ("notifications", "list_id"),
-        ("office_docs", "list_id"), ("list_bell", "list_id"), ("tasks", "section_id"), ("wiki_pages", "created_by"),
+        ("office_docs", "list_id"), ("tasks", "section_id"), ("wiki_pages", "created_by"),
         ("tchat_msgs", "user_id"), ("notifications", "actor_id"), ("sheet_cells", "updated_by")]
 for i, (t, c) in enumerate(KEYS):
     ok, p = no_seq(f"EXECUTE p2281k{i}(1)", pre=("SET plan_cache_mode = force_generic_plan",

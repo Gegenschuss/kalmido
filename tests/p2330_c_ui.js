@@ -92,8 +92,9 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     await ev(`(() => { document.querySelectorAll('.modal, .mwrap, .smodal').forEach(m => m.remove()); return 1; })()`);
 
     // ================= the one-time question (as after the migration)
-    sql("INSERT INTO list_notif(list_id,user_id,tpl,custom,updated_at) VALUES(?,0,'all',NULL,'2026-10-01T00:00:00Z') "
-        + "ON CONFLICT (list_id,user_id) DO UPDATE SET tpl=excluded.tpl, custom=excluded.custom, updated_at=excluded.updated_at", [L]);
+    // 2.981.0 (#5287): the template is a row of the core's obj_notif_cap (kind list)
+    sql("INSERT INTO obj_notif_cap(kind,ref_id,path,user_id,tpl,custom,updated_at) VALUES('list',?,'',0,'all',NULL,'2026-10-01T00:00:00Z') "
+        + "ON CONFLICT (kind,ref_id,path,user_id) DO UPDATE SET tpl=excluded.tpl, custom=excluded.custom, updated_at=excluded.updated_at", [L]);
     sql("INSERT INTO user_settings(user_id,key,value) VALUES(1,'notif_tpl_ask','1') ON CONFLICT (user_id,key) DO UPDATE SET value=excluded.value");
     await nav(B + 'static/icon.svg'); await nav(B + '#l/' + L); await ready(ev);
     const s5 = await ev(`(() => { const b = document.querySelector('#ntfask'); if (!b) return null; const bs = [...b.querySelectorAll('button')]; return {txt: bs.map(x => x.textContent).join('|'), h: Math.min(...bs.map(x => x.getBoundingClientRect().height)), w: b.getBoundingClientRect().right <= innerWidth + .5}; })()`);
@@ -107,7 +108,7 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
 
     // ================= the member's view
     check(await ffLogin(o, 'bob') === 200, 'login bob');
-    sql('DELETE FROM list_notif WHERE list_id=?', [L]);
+    sql("DELETE FROM obj_notif_cap WHERE kind='list' AND ref_id=?", [L]);  // 2.981.0 (#5287)
     await nav(B + '#l/' + L); await ready(ev);
     const s6 = await ev(`(() => { shareModal(${L}); const h = document.querySelector('.ntfhint'); const own = !!document.querySelector('#sh-sec-ntf'); document.querySelectorAll('.modal, .mwrap').forEach(m => m.remove()); return {h: h ? h.textContent.trim() : '', own}; })()`);
     // 2.152.2 (#2624): project instead of list
