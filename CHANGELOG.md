@@ -19,7 +19,131 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.974.0] - 2026-11-11
+## [2.990.0] - 2026-11-11
+
+Package 2.831 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Lists wording, rest (#5481): in "Edit project" the parts read "Was das Projekt kann" and "Formulare, Regeln & Anbindungen", unchanged task properties "Wie vom Projekttyp vorgegeben"; the project page block "Fluss" is now "Durchlauf" (chart "Offen und erledigt im Verlauf"); the read role of projects and organisations reads "Nur ansehen" instead of "Nur lesen". German texts only; Kanban, WIP and Backlog still appear only where their feature is on (docs/dev/glossar.md).
+
+Package 2.982.0 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p271_ui, ).
+
+### Fixed
+- Test suite rls_direct: the setup row of `obj_tags` is now an organisation label; the made-up scope broke the scope check added with the core tags (#5386).
+
+Package 2.866 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Recent steps / "Back up to here": a step that cannot be undone (a finalised invoice, a sent document) now holds only the older steps of its own workspace; a private step or a step of another organisation behind it still goes back. A group too big for copies still stops everything. A bundled step stays in one workspace (#5302 N2).
+
+### Fixed
+- Office rights: restoring a rights group from the office trash is written to the rights log ("restored the group ...") (#5302 F5).
+- Files: sharing a projects folder with a list role writes the share and its log line with the final role (#5302 F6).
+- Files: a share that ended with a move into another workspace and came back with the move back keeps the role of the person who made it, and is no longer offered for a second restore (#5302 F7).
+- Office master data: a save that changes nothing ("800" for 800, blanks around a name, an unknown field) no longer writes a history entry or an undo step (#5302 F8).
+- Undo across devices: a write while "Back up to here" of the same person runs on another device no longer risks a deadlock; an undone group in use is tidied by the next step (#5302 F9).
+- Office undo labels never show a browser-encrypted or sealed value (#5302 N5); test: leaving an organisation drops the step groups there (#5302 F10).
+
+Package 2.872 (Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Gemeinsamer Kern: Disposition (Drehtage, Buchungen).
+### Changed
+- Disposition on the shared core (#5532): the shoot day is a light kind of the core (`shoot_day`, its rights are the core's `obj_need` instead of an own check) and the call sheet a kind with the core's columns (`callsheet`, a part of its shoot day: the same rights, its own history). Saving the call sheet goes through `obj_write` (version check, history with who / when / which details, an undo step across devices); the directions sketch is noted in the history as a mark, never as the picture. The call sheet goes into the core's trash with the last booking of its shoot day and comes back with a booking (also when the delete is taken back from the list of steps); the core's run deletes it after the trash period. New route `GET /api/team/dispo/callsheet/<job>/history`. Migration fragment 5532_a: new nullable columns on hub_callsheets only (owner_id, rev, updated_by, deleted_at, deleted_by).
+
+Package 2.884 (Bündel: Polish Kalender: calendar.css aufräumen, Trefferfl, Tabellen-Rückgängig: Wiederholen eines Löschens se).
+
+### Changed
+- Calendar polish (#5469): event chips in the month and week view and timed blocks in the week are keyboard buttons (Tab,
+  Enter / Space opens the event), calendar targets (chips, colour swatches, show switches, palette, year days, "+N") get a
+  44 px touch area on a finger, the handle to drag an event longer is visible on touch, calendars without a colour use the
+  theme's muted colour, inline styles moved into classes. Find it: Calendar > Week > Tab to an event, Enter.
+
+### Fixed
+- Table undo (#5479): redoing a deleted row, column or sheet puts it into the trash with the current time (the trash clean-up
+  no longer removes it at once), a deleted sheet comes back only below the sheet limit (the table's lock is held while
+  counting), renaming a further sheet stays undoable after the table moved to another project.
+
+Package 2.912 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Office: marking a reminder fee as paid asks the day the money came (default today, not before the reminder, not in the future); a paid fee shows its day and offers "Change date" (#5419)
+- Muster GmbH year: a deferral case (0980 / 0990) with hand-computed values, sharper working notes (laptop depreciation, fees on 4970 exempt under section 4 no. 8 VAT act, travel costs of the managing director as a Kalmido mechanic), the VAT return comparison is strict (#5419)
+
+Package 2.913 (Bündel: Bündel: Polish Listen: Ordner-Teilen-Dialog auf den gemein).
+
+### Changed
+- Lists, dialogs alike, rest of #5442 (#5587): the folder's Share dialog is built from the same frame as the project's (cross in the head, folded parts, "Folder settings…" | "Done") and says "Done" also when opened from the folder settings (was "Back"); it no longer grows in steps while its people load. The folder's role question ("Replace the roles set per project?") has "Only new projects" on the left, "Cancel" + "Set everywhere" on the right. The task choice of the multi-selection ("Waiting on a task…", "Subtasks of…" after dragging or selecting several tasks) closes with "Close" instead of "Cancel".
+
+Package 2.936 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- #5364: Tasks and projects in the trash are deleted for good after the trash period by the one retention run of the shared core (kinds task and list on obj_trash_tick with obj_on_purge hooks); legally kept items stay and are counted as task_kept / list_kept; the runs ttp_tick and otr_prune are gone; a failing hook keeps only its object (counted as <kind>_err, reported to the watchdog), one savepoint per kind.
+- #5448: Office document head on a phone: one navigation line (back arrow, number, status); Declined, Create invoice (before acceptance), Delivery note and Change number move into the "…" menu; Send and Record payment keep their labelled buttons; the workspace chip only shows with more than one office; tab rows fade at a cut edge; on a computer the big heading names the document number.
+- #5457: office.css tidy-up - app breakpoint 768px, dead double rules removed, global focus rule, safe grid minimums, --fs-* sizes, on-accent text, 44 px touch targets for the workspace chip, the number pen and "All figures".
+- #5599: The suites of encryption, rights, import and migrations count as hard in the CI too (tests/hard_suites.txt), so they run on the hard shards that hold a release.
+### Fixed
+- #5582: Project lock: a time entry moved into a locked project drops its older undo steps (old note in the copy); redoing a deleted entry there keeps no note in its copy; switching the lock on reads the undo copies of its time entries once instead of once more per task (the index obj_undo(kind, ref_id) came with #5564).
+
+Package 2.944 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Backups: checking an uploaded format-3 archive takes the store's readers' lock too (by format, not by origin), so a running clean-up answers "busy" instead of a false "shared files missing"; an upload that expired meanwhile answers "not found" (#5054)
+
+Package 2.969 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Shared core: the Undo of an ended knowledge share (`obj_node_reshare`) puts a share back only when its node still lies in the owner's / workspace's space the caller checked, and only when the revoked row was written there - the folder share's "pair" on the page of the folder's name included; otherwise 409 and nothing comes back (hardening, Fable review 2.937 F7) (#5644)
+
+Package 2.973 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- A task deleted for good (trash emptied) no longer leaves personal tags behind that no task carries any more: the delete trigger of the core removes them with the task's links, for every person (#5656)
+- The move of old personal tags (task_tags) trims a tab or line break after a leading '#' like the app does, so '#<tab>Kunde' becomes the tag Kunde instead of a second, hidden tag (#5656)
+
+Package 2.970 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Locked folders, the low findings of the security review of 2.953: a new version, a tag, a restored version or a move out of a folder now waits while a folder above it starts to lock (it is then converted or refused, never left plain in a locked tree); locking a folder holds the folders above it too, so two people locking a folder and its subfolder at the same moment can no longer make one locked folder inside another; a move takes its locks in one fixed order, and the locks of locked folders have a key space of their own (no waiting behind unrelated writes) (#5653)
+- Locked folders: while files are encrypted again with a new key, a version saved at that moment stays the current one (the browser encrypts the newest version in the next round) (#5653)
+- Locked folders: the check before moving a folder counts only the items the person sees; the question before moving a folder across a locked folder's border says that what lies in the folder's trash stays on this side and goes back into the former parent folder when restored (#5653)
+
+Package 2.976 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- #5657: Rotating PDF pages accepts only plain page numbers; a superscript digit or a very long number is refused (400) instead of a server error.
+- #5657: An organisation import links a project's select field to an existing schema field only when every option has the same id and the same name (otherwise the field stays unlinked with a warning).
+- #5657: The agent event task_changed carries only what is stored: a change taken back in the same request is left out, a value written again later is sent as stored.
+- #5657: Merging PDF documents counts the pages in its one limited child process (no extra process per document) and holds the documents once in memory; a result that would be too large gets its own message.
+
+Package 2.985 (Bündel: Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Gemeinsamer Kern: Disposition (Drehtage, Buchungen, Rückgängi).
+### Added
+- #5394: Undo across devices, stage 6 rest - changes to settings (one step per change, a reset is one step), budget entries, writes through CalDAV / CardDAV (named after the app password, bundled for 10 minutes) and the REST API v1 with a person's own token, and putting a whole calendar or address book into the trash now appear in "Recent steps" and can be taken back from any device. Privacy and consent settings (push titles, sharing defaults, read receipts, assistant, mail digests, calendar feed scope, test mode) record no step. A budget entry is never taken back after its list space's key changed or encryption was switched.
+### Fixed
+- #4922: A silent organisation invitation no longer disappears when the invited account deletes itself or is cleaned up; it stays in the list as a neutral entry with the address the admin typed, expires like any other and gives way to a new invitation of the same address (migration 4922_a: org_joins.email, org_joins.user_id nullable).
+
+Package 2.979 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- #5667: Undo / redo in areas with their own data in the browser shows the result again. Since undo across devices (#5255) the server takes a step back by its group and the step's own undo function (which also fetched the area again) no longer ran: a bookmark, budget entry, contract, letter reference, file, table sheet, wiki folder and others stayed as before the undo until a reload, and the next change could fail with "changed elsewhere". The shared undo core now has one registration per area (`histReloader`, core.js; run by undo.js `histRedraw`, also for "Back up to here" in Recent steps): a shown area fetches its data again, one not shown is marked old and fetched when it opens. Registered: bookmarks, read later, feeds, budget, contacts and their folders, booking page, absences / leave, dispo, team chat, calendar (Today, Home), office (contracts, bank and its accounts / rules / bookings without receipt, books and an open receipt sheet, cards, cash flow, quotations / invoices list, generated documents, import, letterhead, letter references, number ranges, packs, receipts, recurring invoices, terms, folder trees, invitations, clients, receipt sheet, portal, newsletter), file store, document view, tables (index, new / deleted / imported sheet, pivot), wiki, task relations, project rules, section templates, the template list in settings. Deleting an active project goes back again in one step (#2304, p21191_c_ui). Suites p2979_a_ui - p2979_e_ui; roadmap_ui expects the undo of a drag as one server group request.
+
+Package 2.986 (Bündel: Call Sheet: Kunde und Agentur aus den Kontakten wä, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Call sheet: client and agency are chosen from the contacts (#5649). In the call sheet dialog (Disposition, a shoot day, Call sheet) "Client" and "Agency" are a choice of the people and companies of the area's address books you may read; below it the contact's company, person, phone and e-mail. The client still comes from the project's client file until a contact is chosen; the agency chosen is remembered at the project and fills the next new call sheet of the same project. The free text stays as the fallback (older call sheets keep theirs). The PDF shows company, person, phone and e-mail in the client column and the crew list, the agency's person is on the distribution line. A contact somebody else chose from a book you cannot read stays on the call sheet and is not shown to you. Additive migration `5649_a` (`lists.cs_agency_id`).
+
+### Fixed
+- Project lock, rest of the review of 2.909 (#5588): moving a task (also a drag of several, an indent, a moving batch) locks the task and its subtasks in id order first, so it no longer deadlocks (error 500) against "Restore" of "Delete all times"; the lock state of a task moved into a locked project of another organisation is read for sealed entries only; a non-ASCII seal is refused instead of a server error. The clean-up of plain section names in the trash of locked projects (`5552_a`, fixed cut-off) is now a once-run at the start (`migr_e2etrashsec5588`), so an instance that updates later is cleaned too; `5552_a` stays as an empty fragment. More tests (trash purge at the end of a key change, 409 while encrypting, the app's real movers).
+
+Package 2.983 (Bündel: Teilen per E-Mail-Adresse: Bindung an ein Konto nu, Agenten als Beobachter: Statuswechsel als Ereignis, Verlauf gelöschter Zeiteintr).
+
+### Changed
+- Sharing a table or a knowledge page by e-mail address binds it to an account only when that account proved the address (a mailed link, a verified OIDC claim, a confirmed sign-up). A table's address otherwise stays an open address share that is taken at the next sign-in after the proof; the knowledge page answers as for an unknown address. Sharing an address again re-checks an older binding (#5643)
+- Agents watching a task (`watch_task`) also get the event `status_changed` (completed / closed / reopened) by others, through the agent gate; information only, no run (#3915)
+- The hourly undo run keeps the history of a deleted time entry while it can still be brought back, then removes it - also without a project lock (#5589)
+
+Package 2.990 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- Reminder fees: opening again or redating a fee paid before 2.545 (no paid day) checks the reminder's date against the period lock; a locked month answers 409 instead of letting the change through (#5484).
+- Office move undo: a letter's link to a document comes back even when the same link was made in the target and removed into its trash (or still lives there) since (#5571).
+- Documents: a recognition run that finds no free PDF slot keeps the stored first-page size instead of dropping it (#5571).
+- Office trash: the undo of a data import, a moved letter's links, a moving personal office's letter links, an agent fixed-cost import's undo and the swapped country-pack texts delete on the core's way, so no history or undo steps are left behind; the import undo reads only live master data and also removes the run's unused entries from the trash (#5539).
 
 Package 2.963 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 
@@ -152,6 +276,10 @@ Package 2.955 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 
 ### Fixed
 - Retention export: a check that the sign-off CSV carries no token columns (#3811)
+
+## [2.974.0] - 2026-11-11
+
+Not released (the CI of this version was red); its changes are listed under 2.990.0.
 
 ## [2.962.0] - 2026-11-11
 
@@ -304,7 +432,8 @@ Package 2.900 (Bündel: Projekt-Sperre: Rückgängig-Kopien von Zeiteinträge, P
 
 Not released (the CI of this version was red); its changes are listed under 2.902.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.974.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.990.0...HEAD
+[2.990.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.990.0
 [2.974.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.974.0
 [2.962.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.962.0
 [2.941.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.941.0

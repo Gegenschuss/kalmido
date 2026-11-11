@@ -1,6 +1,32 @@
 {
  "versions": [
   {
+   "version": "2.990.0",
+   "date": "2026-11-11",
+   "items": [
+    {
+     "de": "Termine im Kalender lassen sich mit der Tastatur öffnen und am Handy leichter treffen.",
+     "en": "Calendar events open with the keyboard and are easier to hit on a phone."
+    },
+    {
+     "de": "Beim Markieren einer Mahngebühr als bezahlt fragt Kalmido nach dem Tag, an dem das Geld kam; das Datum lässt sich später ändern.",
+     "en": "Marking a reminder fee as paid now asks for the day the money came; the date can be changed later."
+    },
+    {
+     "de": "Am Handy zeigt ein offenes Angebot oder eine Rechnung oben nur noch eine schlanke Zeile, weitere Schritte stehen im Mehr-Menü.",
+     "en": "On a phone an open quote or invoice shows one slim line at the top, further steps are in the more menu."
+    },
+    {
+     "de": "„Letzte Schritte“ nimmt jetzt auch Einstellungen, Budget-Einträge, Änderungen vom Handy-Kalender/-Adressbuch und gelöschte ganze Kalender zurück.",
+     "en": "\"Recent steps\" now also takes back settings, budget entries, changes from your phone's calendar/contacts and whole deleted calendars."
+    },
+    {
+     "de": "Auf dem Call Sheet wählst du Kunde und Agentur jetzt aus deinen Kontakten, die Agentur merkt sich das Projekt.",
+     "en": "On the call sheet you now pick client and agency from your contacts, and the project remembers the agency."
+    }
+   ]
+  },
+  {
    "version": "2.974.0",
    "date": "2026-11-11",
    "items": [
