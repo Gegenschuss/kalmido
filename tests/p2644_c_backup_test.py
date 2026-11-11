@@ -10,6 +10,8 @@
    the lock (the download took it before the ticket); the download then comes complete
  - (L3) a check (verify) holds the lock only for the server's own format-3 backups: an uploaded archive and an own
    format-2 backup are checked while a clean-up runs; an own format-3 one still says store_busy
+   2.944.0 (#5054): by format, not by origin - an uploaded format-3 archive says store_busy too (the uploaded one above
+   is format 2 and is still checked)
  - (counter) a check with a typed-in passphrase that does not fit counts as a failed try (as the restore): after the
    limit the check says 429; a check with the saved passphrase is not held up by it
 usage: p2644_c_backup_test.py <datadir>        (P2644C_NOSTART=1: the server already runs with the settings below)"""
@@ -114,6 +116,10 @@ check(r0.ok and members(r0.content)[0].get("format_version") == 2, f"setup: its 
 F2 = r0.content
 up = A.post(B + "/api/admin/backups/upload", data=F2, headers={"Content-Type": "application/octet-stream"})
 check(up.ok and up.json().get("upload", "").startswith("upload-"), f"setup: the download uploaded again {up.status_code} {up.text[:160]}")
+# 2.944.0 (#5054): the server's own format-3 file uploaded as it is (an upload of format 3: reads the store as well)
+with open(os.path.join(BK, x.get("name", "-")), "rb") as fh:
+    up3 = A.post(B + "/api/admin/backups/upload", data=fh.read(), headers={"Content-Type": "application/octet-stream"})
+check(up3.ok and up3.json().get("upload", "").startswith("upload-"), f"setup: a format-3 archive uploaded {up3.status_code} {up3.text[:160]}")
 own2 = bkname(testclock.now() - timedelta(days=1), "manual")
 open(os.path.join(BK, own2), "wb").write(F2)  # an own backup of format 2 (no shared files)
 ticket = A.post(url, json={"password": PASSWORD}).json().get("ticket", "")
@@ -137,7 +143,13 @@ v = A.post(B + f"/api/admin/backups/{own2}/verify", json={})
 check(v.ok, f"(L3) an own format-2 backup is checked while a clean-up runs {v.status_code} {v.text[:160]}")
 v = A.post(B + f"/api/admin/backups/{x.get('name', '-')}/verify", json={})
 check(v.status_code == 409 and v.json().get("code") == "store_busy", f"(L3) an own format-3 backup still waits for the clean-up {v.status_code} {v.text[:160]}")
+# 2.944.0 (#5054): the lock goes by format, not by origin - an uploaded format-3 archive waits for the clean-up too
+v3 = B + f"/api/admin/backups/{up3.json().get('upload', 'x')}/verify"
+v = A.post(v3, json={})
+check(v.status_code == 409 and v.json().get("code") == "store_busy", f"(L3, #5054) an uploaded format-3 archive waits for the clean-up {v.status_code} {v.text[:160]}")
 release()
+v = A.post(v3, json={})
+check(v.ok, f"(L3, #5054) after the clean-up the uploaded format-3 archive is checked {v.status_code} {v.text[:160]}")
 
 # (L1) the same ticket works after the clean-up, once
 r = A.get(url, params={"t": ticket})

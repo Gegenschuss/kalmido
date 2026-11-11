@@ -2519,8 +2519,15 @@ def backups_verify(name):
             return e
     pw = given or bk_passphrase(c)
     # 2.525.0 (#4303): no clean-up of the store while its shared files are checked. 2.644.0 (#4530): only an own format-3
-    # backup reads the store; an uploaded or format-2 one checks without holding the lock (a clean-up is not held up)
-    fmt3 = own and bk_meta(p, bool(bk_parse_name(name)["encrypted"])).get("format_version") == 3
+    # backup reads the store; an uploaded or format-2 one checks without holding the lock (a clean-up is not held up).
+    # 2.944.0 (#5054): the lock goes by format, not by origin: an uploaded format-3 archive reads the store as well (else a
+    # clean-up meanwhile answers "shared_missing" instead of store_busy); format 2 still checks without it
+    if own:
+        enc = bool(bk_parse_name(name)["encrypted"])
+    else:  # an upload's name says nothing: its first bytes do (as on the upload)
+        with open(p, "rb") as f:
+            enc = f.read(len(BK_MAGIC)) == BK_MAGIC
+    fmt3 = bk_meta(p, enc).get("format_version") == 3
     work = tempfile.mkdtemp(prefix=".verify-", dir=BK_DIR)
     rlock = None
     try:
