@@ -18,7 +18,7 @@ from ..core.numtext import user_num
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, test_seconds, uset, usettings
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, FAIL_WINDOW, client_ip, me, rate_ip
 from ..accounts.login import twofa_methods
-from ..core.access import collab_all, Denied, list_role, my_inbox, need_collab, need_list, need_task, need_time, time_all, token_lists, tvis, vis_sql
+from ..core.access import collab_all, Denied, list_role, my_inbox, need_collab, need_list, need_task, need_time, time_all, token_lists, live_sql, tvis, vis_sql  # 2.955.0 (#5276): live_sql
 from ..core.serializers import load_tasks, rel_of
 from ..core.instance import semver, update_state
 from ..core.state import search_tasks, visible_lists, visible_sections
@@ -1640,7 +1640,7 @@ def tag_delete():
     except BadInput as e:
         return err(str(e))
     ids = sorted(otg_user_drop(c, uid, tag))  # 2.955.0 (#5276): the core's personal tag (any case) goes with its links
-    n = c.execute("SELECT COUNT(*) FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) AND deleted_at IS NULL", (ids,)).fetchone()[0] if ids else 0
+    n = c.execute(f"SELECT COUNT(*) FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) AND {live_sql()}", (ids,)).fetchone()[0] if ids else 0
     if ids:
         bump(c)
     c.commit()
