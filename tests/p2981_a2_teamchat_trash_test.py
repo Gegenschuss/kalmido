@@ -84,9 +84,9 @@ BOB, DORA, OTTO, ERIK = kt.me_id(Bo), kt.me_id(Do), kt.me_id(Ot), kt.me_id(Er)
 
 # ================================================================== the table
 check(not table_there("tchat_trash_text"), "the old table tchat_trash_text is gone")
-key = dbx("""SELECT array_agg(a.attname::text ORDER BY a.attname) FROM pg_constraint con JOIN pg_attribute a ON a.attrelid=con.conrelid
+key = dbx("""SELECT string_agg(a.attname::text, ',' ORDER BY a.attname) FROM pg_constraint con JOIN pg_attribute a ON a.attrelid=con.conrelid
              AND a.attnum = ANY(con.conkey) WHERE con.contype='p' AND con.conrelid='obj_comment_trash'::regclass""")
-check(key and key[0][0] == ["comment_id", "kind"], f"obj_comment_trash: key (kind, comment_id) {key}")
+check(key and key[0][0] == "comment_id,kind", f"obj_comment_trash: key (kind, comment_id) {key}")
 check(not dbx("SELECT 1 FROM pg_constraint WHERE contype='f' AND conrelid='obj_comment_trash'::regclass"),
       "obj_comment_trash: no foreign key (a kind names its table, triggers delete with the row)")
 

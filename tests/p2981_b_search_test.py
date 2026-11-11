@@ -283,7 +283,7 @@ DNC = dbx("INSERT INTO obj_comments(kind, ref_id, user_id, body) VALUES('doc_not
 check(not there("SELECT 1 FROM obj_search WHERE kind='comment' AND ref_id=?", (DNC,)), "a document's note gets no row in the shared index")
 dbx("UPDATE obj_comments SET body='Reiherflug Notiz 2' WHERE id=?", (DNC,))
 check(not there("SELECT 1 FROM obj_search WHERE kind='comment' AND ref_id=?", (DNC,)), "... nor when its text changes")
-dbx("INSERT INTO obj_search(kind, ref_id, pkind, pid, title, names, tsv) VALUES('comment', ?, 'doc_note', 1, '', '', to_tsvector('simple', 'reiherflug'))", (DNC,))
+dbx("INSERT INTO obj_search(kind, ref_id, pkind, pid, title, names, tsv) VALUES('comment', ?, 'doc_note', 1, '', '', to_tsvector('simple', 'reiherflug')) ON CONFLICT DO NOTHING", (DNC,))
 box("pass")  # the next start of the app
 check(not table_there("task_fts") and not table_there("cmt_fts"), "the start dropped the side tables made again")
 check(not there("SELECT 1 FROM information_schema.columns WHERE table_name='contacts' AND column_name='search'"), "... and contacts.search")
