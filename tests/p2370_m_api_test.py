@@ -158,7 +158,8 @@ print(f"MIGRATION big: {rows} rows in {len(want)} tables, start to healthy {secs
 rep = report()
 # 2.771.0 (#5342): a table of the SQLite file that this version no longer has (paperless_links, dropped by
 # migrations.d/5265_a.py in 2.755) is not taken over: the report has every OTHER table and names the gone one in its notes
-GONE = {"paperless_links", "chat_reactions", "comment_reactions", "tchat_rx"}  # #5404: + the reaction tables, moved into obj_reactions by migrations.d/5269_a.py (2.772)
+GONE = {"paperless_links", "chat_reactions", "comment_reactions", "tchat_rx",  # #5404: + the reaction tables, moved into obj_reactions by migrations.d/5269_a.py (2.772)
+        "task_seen"}  # 2.933.0 (#5404): + the read marks, moved into obj_seen by migrations.d/5284_a.py (2.905)
 kept = {t for t in want if t not in GONE}
 check(rep.get("status") == "ok" and set(rep.get("tables", {})) == kept,
       f"(b) report: ok, every table still in this version ({len(rep.get('tables', {}))}/{len(kept)}) {sorted(kept ^ set(rep.get('tables', {})))[:5]}")
