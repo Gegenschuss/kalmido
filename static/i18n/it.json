@@ -18209,6 +18209,8 @@
   "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "La pulizia del nucleo comune è in attesa: {0} vecchie righe di membri in {1} non hanno ancora una condivisione, la vecchia tabella resta. Vedi il log del server.",
   "Tell it when its tasks change (old and new value)": "Avvisarlo quando cambiano le sue attività (valore vecchio e nuovo)",
   "For tasks assigned or delegated to it or that it watches.": "Per le attività assegnate o delegate a lui o che osserva.",
+  "A field of the organisation with the same key but another type is there; its project fields stay unlinked: {0}": "Esiste già un campo dell’organizzazione con la stessa chiave ma un altro tipo; i suoi campi di progetto restano non collegati: {0}",
+  "A project field does not match the field of the organisation and stays unlinked: {0}": "Un campo di progetto non corrisponde al campo dell’organizzazione e resta non collegato: {0}",
   "billed with {0}": "fatturato con {0}",
   "already billed": "già fatturato",
   "Billable hours": "Ore fatturabili",

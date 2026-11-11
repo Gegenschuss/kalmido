@@ -191,6 +191,8 @@ def _ox_dec_row(c, oid, table, row):
             row["data"] = json.dumps(fl, ensure_ascii=False)
         elif row.get("data") is not None:
             row["data"] = None  # not readable as a flow: nothing of it goes out
+    if table in OX_PART_COLS:  # 2.959.0 (#4031): the plain parts (the organisation's field schema)
+        row = {k: row.get(k) for k in OX_PART_COLS[table]}
     if table == "templates":  # 2.905.0 (#5288): what a template keeps on this server only (people, sealed file copies; lists/tplextra.py)
         row["extra"] = "{}"
     if table == "rss_feeds":  # 2.455.0 (#3469): the feed stays visible by its title, never its key; the import takes none without address
@@ -199,6 +201,11 @@ def _ox_dec_row(c, oid, table, row):
         for k in ("etag", "last_modified", "last_fetch", "last_ok", "last_error", "fails"):
             row.pop(k, None)
     return row
+
+
+# 2.959.0 (#4031): the columns of the plain parts -- what the part is, never the table's internals (organisation, owner, times):
+# the import (admin/oi_team.py) reads them so, whatever table holds them later
+OX_PART_COLS = {"org_fields": ("id", "key", "name", "type", "options", "sort")}
 
 
 # 2.763.0 (#5269): the column a reaction's target had in the archive before the core's table (the import reads it so, old archives too)
@@ -280,6 +287,9 @@ OX_AREAS = (
     # (was lists/section_templates.json, 2.362.0 #3096; an older archive's file is still read by the import), not the trash
     ("lists/templates.json", "templates", f"org_id=? AND {live_sql()}"),
     ("lists/ticket_types.json", "ticket_types", "org_id=?"),  # 2.609.0 (#3372): the organisation's own ticket types
+    # 2.959.0 (#4031): the organisation's field schema (lists/orgfields.py; list_fields.org_field_id names a row of it), a plain
+    # part (OX_PART_COLS: no table internals)
+    ("lists/org_fields.json", "org_fields", "org_id=?"),
     # 2.81.0 (#1866): customer reports of those lists (team/portal.py): the address in plain text, never the status link
     ("portal/tickets.json", "portal_tickets", f"list_id IN ({LSQ})"),
     ("lists/admin_log.json", "org_list_log", "org_id=?"),
@@ -519,7 +529,6 @@ OX_LEFT = {
     "merge_runs": _PERSONAL, "notify_channels": _SECRET, "support_grants": _SERVER, "office_peppol": _SECRET,
     "office_payonline": _SECRET, "office_pay_links": _SECRET, "office_pay_sessions": _ONLINEPAY, "office_pay_events": _ONLINEPAY, "office_pay_payouts": _ONLINEPAY,
     "office_trash": "the trash (not_included)",
-    "org_fields": _LATER2,  # 2.609.0 (#3373): the organisation's schema; follow-up #4031 (templates: 2.905.0, #5288; the labels: org/labels.json since 2.947.0, #5275)
     "org_invites": "invitations (not_included)", "org_joins": "join requests (not_included)",
     "org_keys": _SERVER, "org_members": "members.json (with the role)", "org_out_requests": "requests of one person, short-lived",
     "pl_imported": _SECRET, "pl_rules": _SECRET, "pl_sources": _SECRET, "pl_uploads": _SECRET, "portal_logins": _SECRET,

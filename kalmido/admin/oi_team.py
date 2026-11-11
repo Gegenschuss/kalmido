@@ -42,6 +42,11 @@ from ..hub.absence import ABS_STATES  # 2.369.5 (#2517): pulled up from function
 from ..lists.lists import LIST_COLOR_RE  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.modcards import MC_ICON_RE, MC_NAME_MAX, mc_mods  # 2.575.0 (#3778)
 from .oi_store import _st as oi_store_st  # 2.924.0 (#5069): the archive's channel nodes waiting for their room
+from ..core.pg import qi, write_lock  # 2.959.0 (#4031)
+from ..tasks.ttypes import TT_MAX, tt_clean  # 2.959.0 (#4031)
+from ..tasks.validation import TICKET_TYPES, TT_KEY_RE  # 2.959.0 (#4031)
+from ..lists.orgfields import OF_KEY_RE, OF_MAX, OF_TYPES_OFF  # 2.959.0 (#4031)
+from ..lists.fields import field_clean_def  # 2.959.0 (#4031)
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
 _W_PEOPLE = N_("Entries of people who were not selected were not imported: {0}")
@@ -821,6 +826,73 @@ def _sct_names(v):
     return v if isinstance(v, list) else []
 
 
+# ---------------------------------------------------------------- 2.959.0 (#4031): own ticket types and the field schema
+# Checked like the app makes them (tasks/ttypes.py, lists/orgfields.py); into an organisation its own, into the private space the
+# importing person's own. One with the same key in the target stays as it is and the archive's id maps to it, so the linked
+# project fields (FINISH _schema_links) find it. The labels of the organisation: acctimport.py umz_list_tags (2.947.0, #5275).
+_OI_SCHEMA_TABLES = ("ticket_types", "org_fields")
+
+
+def _oi_scope(ctx):
+    return ("org_id=?", (ctx.space,)) if ctx.space else ("org_id IS NULL AND owner_id=?", (ctx.uid,))
+
+
+def _oi_have(c, run, src, kind, table, cond, args, most):
+    """The row of the target with the same key -> mapped, False; the target full -> None (warned); else True (create)."""
+    q, a = cond
+    old = c.execute(f"SELECT id FROM {qi(table, _OI_SCHEMA_TABLES)} WHERE {q} AND {args[0]}", (*a, *args[1:])).fetchone()
+    if old:
+        run.put(kind, src.get("id"), old[0])
+        return False
+    if c.execute(f"SELECT COUNT(*) FROM {qi(table, _OI_SCHEMA_TABLES)} WHERE {q}", a).fetchone()[0] >= most:
+        return None
+    return True
+
+
+def _ttype(c, run, src, d, ctx):
+    """An own ticket type: key as tasks.ttype stores it (tasks keep their type by the key, nothing to map), never a built-in one."""
+    key = src.get("key")
+    if not isinstance(key, str) or not TT_KEY_RE.match(key) or key in TICKET_TYPES or key == "none":
+        return None
+    try:
+        f = tt_clean({"name": src.get("name"), "icon": src.get("icon") or "", "color": src.get("color") or "",
+                      "template": src.get("tpl") if isinstance(src.get("tpl"), str) else "", "enabled": src.get("enabled") not in (0, False)}, True)
+    except BadInput:
+        return None
+    write_lock(c, f"ticket-types-{ctx.space or 'u' + str(ctx.uid)}")  # the same lock as tasks/ttypes.py
+    new = _oi_have(c, run, src, "ticket_types", "ticket_types", _oi_scope(ctx), ("key=?", key), TT_MAX)
+    if not new:
+        return new
+    d.update(org_id=ctx.space, owner_id=None if ctx.space else ctx.uid, key=key, **f)
+    return d
+
+
+def _ofield(c, run, src, d, ctx):
+    """A field of the schema: name, type and options through the app's check; the key stays (the API reads fields by it)."""
+    key = src.get("key")
+    if not isinstance(key, str) or not OF_KEY_RE.fullmatch(key):
+        return None
+    try:
+        opts = json.loads(src["options"]) if isinstance(src.get("options"), str) else src.get("options")
+        name, ftype, opts = field_clean_def({"name": src.get("name"), "type": src.get("type"), "options": opts if isinstance(opts, dict) else {}})
+    except (BadInput, ValueError):
+        return None
+    if ftype in OF_TYPES_OFF:
+        return None
+    write_lock(c, f"org-fields-{ctx.space or 'u' + str(ctx.uid)}")  # the count against OF_MAX and the insert together
+    q, a = _oi_scope(ctx)
+    have = c.execute(f"SELECT type FROM org_fields WHERE {q} AND key=?", (*a, key)).fetchone()
+    if have and have["type"] != ftype:  # another type under the same key would rewrite the project fields linked to it
+        run.warning(N_("A field of the organisation with the same key but another type is there; its project fields stay unlinked: {0}"), name)
+        return False
+    new = _oi_have(c, run, src, "org_fields", "org_fields", _oi_scope(ctx), ("key=?", key), OF_MAX)
+    if not new:
+        return new
+    d.update(org_id=ctx.space, owner_id=None if ctx.space else ctx.uid, key=key, name=name, type=ftype,
+             options=json.dumps(opts, ensure_ascii=False))
+    return d
+
+
 # required columns the archive never has (secrets, *_id): placeholders umz_row keeps, prep sets the real value
 _NEW_TOKEN = {"token": "", "token_hash": ""}
 
@@ -844,6 +916,9 @@ SPECS = [
         enc=False, label=N_("Templates"), prep=_tpl),
     OiT("lists/section_templates.json", "templates", kind="section_templates", enc=False, label=N_("Section templates"),
         fixed={"owner_id": 0}, prep=_tpl_sections),  # owner_id: a placeholder umz_row keeps, _tpl sets the importing person
+    # 2.959.0 (#4031): own ticket types and the field schema (the linked project fields: FINISH _schema_links)
+    OiT("lists/ticket_types.json", "ticket_types", enc=False, label=N_("Ticket types"), prep=_ttype),
+    OiT("lists/org_fields.json", "org_fields", enc=False, label=N_("Fields of the organisation"), prep=_ofield),
     # 2.575.0 (#3778): the module cards of the organisation (only into an organisation; a card is a cap there) + their people
     OiT("settings/module_cards.json", "module_cards", people={"user_id": "null", "created_by": "null"}, private=False, enc=False,
         label=N_("Module cards"), prep=_modcard),
@@ -941,4 +1016,34 @@ SPECS = [
         enc=False, label=N_("Read later"), prep=_reading),
 ]
 FIXES = [OiFix("tasks", "tasks", "sprint_id", "sprints")]  # the sprint of a task
-FINISH = [_sprints]  # 2.455.0 (#3469)
+
+
+def _opt_ids(raw):
+    try:
+        d = json.loads(raw) if isinstance(raw, str) else raw
+    except ValueError:
+        return set()
+    return {o.get("id") for o in (d or {}).get("options") or [] if isinstance(o, dict)} if isinstance(d, dict) else set()
+
+
+def _schema_links(c, run, uid, data, who):
+    """2.959.0 (#4031): a project field linked to the schema, on the target's rows -- only for rows this run created (an earlier
+    import's row keeps what people did with it since), only inside the list's own workspace (lists/orgfields.py of_for_list), the
+    same type and (select) every option of the project field in the schema field (else its sync would prune the values), and one
+    link per list and schema row (as of_list_switch)."""
+    for src in data.get("list_fields") or []:
+        fid, ofid = run.m("list_fields", src.get("id")), run.m("org_fields", src.get("org_field_id"))
+        if not fid or not ofid or run.old("list_fields", fid):
+            continue
+        f = c.execute("SELECT f.list_id, f.type, f.options, l.org_id, l.owner_id FROM list_fields f JOIN lists l ON l.id=f.list_id WHERE f.id=?", (fid,)).fetchone()
+        o = c.execute("SELECT org_id, owner_id, type, options FROM org_fields WHERE id=?", (ofid,)).fetchone()
+        if not f or not o or (o["org_id"] != f["org_id"] or (not o["org_id"] and o["owner_id"] != f["owner_id"])):
+            continue
+        if o["type"] != f["type"] or (f["type"] in ("select", "multiselect") and not _opt_ids(f["options"]) <= _opt_ids(o["options"])) \
+                or c.execute("SELECT 1 FROM list_fields WHERE list_id=? AND org_field_id=? AND id<>?", (f["list_id"], ofid, fid)).fetchone():
+            run.warning(N_("A project field does not match the field of the organisation and stays unlinked: {0}"), str(src.get("name") or ""))
+            continue
+        c.execute("UPDATE list_fields SET org_field_id=? WHERE id=?", (ofid, fid))
+
+
+FINISH = [_sprints, _schema_links]  # 2.455.0 (#3469); 2.959.0 (#4031): the project fields' link to the schema

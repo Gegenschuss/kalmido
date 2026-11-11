@@ -18208,6 +18208,8 @@
   "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Opschonen van de gedeelde kern wacht: {0} oude ledenregels in {1} hebben nog geen deling, de oude tabel blijft. Zie het serverlog.",
   "Tell it when its tasks change (old and new value)": "Melden wanneer zijn taken veranderen (oude en nieuwe waarde)",
   "For tasks assigned or delegated to it or that it watches.": "Voor taken die aan hem zijn toegewezen of gedelegeerd of die hij volgt.",
+  "A field of the organisation with the same key but another type is there; its project fields stay unlinked: {0}": "Er is al een veld van de organisatie met dezelfde sleutel maar een ander type; de projectvelden blijven ongekoppeld: {0}",
+  "A project field does not match the field of the organisation and stays unlinked: {0}": "Een projectveld past niet bij het veld van de organisatie en blijft ongekoppeld: {0}",
   "billed with {0}": "gefactureerd met {0}",
   "already billed": "al gefactureerd",
   "Billable hours": "Factureerbare uren",
