@@ -60,7 +60,7 @@ from ..accounts.session import me
 from ..files import store as fs_store
 from ..files.fsref import fs_ref_may_file, fs_ref_need_move, fs_ref_node, fs_ref_node_role, fs_ref_register, fs_ref_role
 from ..files.fsroots import fs_area_root, fs_area_root_of, fs_area_rule
-from .groups import grp_org_limited, grp_sync
+from .groups import grp_dl_full, grp_org_limited, grp_sync
 from .sections import folder_rename_do
 from ..files.store import DEPTH_MAX, _now, fs_chain, fs_deleted, fs_height, fs_log_add, fs_role, safe_fs_name
 
@@ -523,6 +523,7 @@ def lf_folder_share(c, owner, path, uid, role, group=False):
                 _log(c, f["id"], "share", f"{key[:-3]}:{uid}:{role}")
             lids.update(lf_lists_below(c, f["id"]))
     lf_resync(c, lids)
+    grp_dl_full(c, lids, [owner] if nodes else [])  # Fable review F4: the folder marks also without a member row changed
 
 
 def lf_people_rows(c, owner=None, uid=None):

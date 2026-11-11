@@ -519,6 +519,18 @@ def list_group_set(lid, gid):
     return jsonify(ok=True)
 
 
+def grp_dl_full(c, lids=(), uids=()):
+    """2.958.0 (#5245, Fable review F4): a share of a node with a group / a folder's share changes what the projects show (the
+    group / folder marks of /api/state) also when no row of list_members changes (a group whose members are there already, an
+    empty group, an empty folder) -- fs_shares has no delta trigger (tasks/delta.py DL_TABLES). The delta's own "full" rows of
+    dl_changes (as its trigger writes them): one for whoever sees each list of lids, one for each person of uids."""
+    for col, ids in (("list_id", lids), ("user_id", uids)):
+        for x in sorted({int(i) for i in ids if i}):
+            c.execute(f"""INSERT INTO dl_changes(task_id, {col}) SELECT NULL, ? WHERE NOT EXISTS (SELECT 1 FROM dl_changes
+                          WHERE ver IS NULL AND task_id IS NULL AND {col}=? AND {'user_id' if col == 'list_id' else 'list_id'} IS NULL)""",
+                      (x, x))
+
+
 def grp_own_put(c, actor, lid, gid, role):
     """2.958.0 (#5245): project lid's own share with group gid (the route checked the right, the group and the project's rules):
     the core's row on the project's node (core/objects.py obj_share, list_own 1, list_role = role); the same group again changes
@@ -528,8 +540,10 @@ def grp_own_put(c, actor, lid, gid, role):
     if not lf_place(c, int(lid)):
         return None
     with system_ctx(c):  # the node may lie in a folder the actor does not see (another person's path)
-        return obj_share(c, actor, "list", int(lid), "group_id", int(gid), "edit" if role in ("admin", "edit") else "view", None,
-                         extra={"list_role": role, "list_own": 1}, checked=True)
+        sid = obj_share(c, actor, "list", int(lid), "group_id", int(gid), "edit" if role in ("admin", "edit") else "view", None,
+                        extra={"list_role": role, "list_own": 1}, checked=True)
+    grp_dl_full(c, [lid])  # F4
+    return sid
 
 
 def grp_own_drop(c, lid, gid):
@@ -543,6 +557,8 @@ def grp_own_drop(c, lid, gid):
             c.execute("DELETE FROM fs_shares WHERE id=?", (r["share_id"],))
             if nid:
                 _log(c, nid[0], "unshare", str(r["share_id"]))
+    if rows:
+        grp_dl_full(c, [lid])  # F4
     return bool(rows)
 
 
