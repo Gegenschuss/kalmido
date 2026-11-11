@@ -1,4 +1,5 @@
 """Agents: accounts, event queue + long polling, runtime settings, permissions of people towards agents."""
+import contextlib
 import json
 import os
 import re
@@ -13,7 +14,7 @@ from ..core.pg import insert_id, system_ctx, WEB_THREADS
 from ..core.pgbus import bus_active, bus_on, bus_send  # 2.622.0 (#3891)
 from ..core.ephem import eph_add  # 2.622.0 (#3891)
 from ..core.i18n import tr
-from ..core.db import inbox_default, iso, iso_ms, now_utc, parse_iso
+from ..core.db import db, inbox_default, iso, iso_ms, now_utc, parse_iso  # db: 2.959.0 (#4030)
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
 from ..core.dlock import dl_list_locked
@@ -30,7 +31,7 @@ from ..core.errors import BadInput
 from ..notify.alerts import _env_int
 from ..api.v1 import task_for, WH_ON
 from ..api.common import act_via
-from ..integrations.webhooks import wh_actor, wh_log, WH_QUEUE_MAX
+from ..integrations.webhooks import wh_actor, wh_diff_out, wh_log, WH_QUEUE_MAX  # wh_diff_out: 2.959.0 (#4030)
 from ..collab.replies import reply_of  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import user_orgs  # 2.777.0 C (#5378)
@@ -97,6 +98,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "contract_notice",  # 2.70.0 C (#1359): a shared contract's last day to cancel is near (once; agents/contractprop.py)
                 "abort",  # 2.144.0 A (#2412): the person pressed Stop in its chat (user, job_id?): end the running answer / the job's step
                 "letter_draft_requested",  # 2.153.0 (#2031): an office admin asks the agent to draft an answer to a shared document
+                "task_changed",  # 2.959.0 (#4030): a task assigned / delegated to the agent or watched by it changed: diff {field: {old, new}}
                 )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop", "message")  # 2.56.0 (#1791): message = text to a running job, no state change
@@ -233,6 +235,75 @@ def agent_wakeup(resp):
     if has_request_context() and g.pop("agent_wake", False):
         agent_notify(aids=g.pop("agent_wake_ids", None))  # 2.658.0 (#4193): only the agents of this request's events
     return resp
+
+
+@app.after_request
+def agent_task_changed(resp):
+    """2.959.0 (#4030): after a request that changed tasks, the event task_changed with the same diff as the webhook
+    task.updated (tasks/validation.py log_changes collects it per request; integrations/webhooks.py wh_enqueue takes it
+    later: Flask runs the after-request hooks backwards, so this one, registered after agent_wakeup and after the webhooks'
+    wh_flush, runs before both and its events still wake the agents)."""
+    d = g.get("wh_diff") if has_request_context() else None
+    if d and resp.status_code < 400:
+        try:
+            c = db()
+            with c.savepoint():  # a failure half way takes back the events already queued (all or none)
+                n = agent_changed_events(c, d)
+            if n:
+                c.commit()
+        except Exception as e:  # noqa: BLE001 - never fail a request that already succeeded (like wh_flush)
+            with contextlib.suppress(Exception):
+                db().heal()
+            print("agents: task_changed failed:", type(e).__name__, e, flush=True)
+    return resp
+
+
+def agent_changed_events(c, diffs):
+    """2.959.0 (#4030): task_changed to the agents a changed task is assigned or delegated to or that watch it, each with the
+    diff as it may see it (wh_diff_out: never a text of a project encrypted in the browser, the old project only when it sees
+    it). Not for a change of its own, not for its own (un)assignment (that is assigned / unassigned), not while its work style
+    switches task_changed off. Returns the number of events."""
+    ag = agent_ids(c)
+    if not ag:
+        return 0
+    from .workstyle import ws_get  # loaded after this module
+    n, styles = 0, {}
+    for tid, d in sorted(diffs.items()):
+        row = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+        if not row:
+            continue
+        watch = wat_users(c, tid)
+        dlg0 = (g.get("agent_dlg0") or {}).get(tid, row["delegate_agent_id"])  # the delegate before this request
+        lo = d.get("list_id")
+        for aid in sorted(({row["assignee_id"], row["delegate_agent_id"]} | watch) & ag):
+            if aid in (d.get("assignee_id") or ()) or (aid == row["delegate_agent_id"] and aid != dlg0):
+                continue  # assigned / delegated to it (or taken away) in this request: its event assigned / unassigned says it
+            if aid not in styles:
+                a = agent_row(c, aid)
+                styles[aid] = bool(a and ws_get(a).get("task_changed"))
+            if not styles[aid] or not task_visible(c, tid, aid, full=True):
+                continue
+            dv = wh_diff_out(c, d, aid, row)
+            if lo and lo[0] and lo[0] != lo[1] and not _agent_sees_list(c, aid, lo[0]):
+                dv = {k: {**v, "old": None} for k, v in dv.items()}  # nothing of the time in a project out of its reach
+            if not dv:
+                continue
+            extra = {"diff": dv, "assigned": aid in (row["assignee_id"], row["delegate_agent_id"]), "watching": aid in watch}
+            if agent_emit(c, aid, "task_changed", agent_task_data(c, tid, aid, full=True, **extra)):
+                n += 1
+    return n
+
+
+def _agent_sees_list(c, aid, lid):
+    """2.959.0 (#4030): list lid is in agent aid's reach: a member, not a list that never reaches an agent, inside its
+    list_ids limit and outside its data lock (the rules of agent_emit)."""
+    if not list_role(c, lid, aid) or agent_never_lids(c, [lid]) or dl_list_locked(c, aid, lid):
+        return False
+    a = agent_row(c, aid)
+    if a and a["list_ids"]:
+        from ..agents.safety import ids_parse
+        return lid in ids_parse(a["list_ids"])
+    return True
 
 
 def wh_queue_raw(c, w, env):
@@ -1017,7 +1088,8 @@ def is_approver(c, t, uid, agent=None, assignee=True):
 # others are list automations the list's owner switched on (tidy, task_added) or checked where they start (job_request:
 # POST /api/proposals, chat: agent_shares, job: job_may_act). An agent's actions never reach another agent unless the list
 # had agent_peers on; 2.40.0 (#1373): never (every event).
-AGENT_GATED = ("mention", "comment", "assigned", "unassigned", "reaction", "team_message", "wake")
+AGENT_GATED = ("mention", "comment", "assigned", "unassigned", "reaction", "team_message", "wake",
+               "task_changed")  # 2.959.0 (#4030): a person without the agent switch reaches it neither by a change
 AGENT_UNGATED = ("job", "ping", "runtime_changed", "reset", "followup_due")
 # 2.26.0 (#928): the SQL condition "list l is open to person ? for agent ?": owner, list admin (own role), the list
 # belongs to that agent (it shared the list itself); parameters (person, agent, person) or the owner switched on "Members may see and use the agent"

@@ -46,11 +46,13 @@ WS_DEFAULTS = {
     "results_to": "both",
     # #2911 the next step as one button at the end of every answer
     "next_step": True,
+    # 2.959.0 (#4030): the event task_changed (old / new of each field) for the tasks assigned / delegated to it or it watches
+    "task_changed": True,
 }
 WS_CHOICES = {"budget_period": ("", "day", "week"), "budget_metric": ("tokens", "cost"), "work_mode": ("always", "office"),
               "quiet_mode": ("off", "on"), "report_length": ("line", "short", "long"), "push": ("limits", "results", "never"),
               "results_to": ("comment", "chat", "both")}
-WS_BOOLS = ("report_tables", "report_jargon", "next_step")
+WS_BOOLS = ("report_tables", "report_jargon", "next_step", "task_changed")  # 2.959.0 (#4030): + task_changed
 WS_HM = ("work_from", "work_to", "quiet_from", "quiet_to")
 WS_LEGACY = {"push": "results"}  # an agent made before 2.236.0 keeps the pushes it had
 WS_NEW = {"push": "limits"}  # what a new agent stores at creation

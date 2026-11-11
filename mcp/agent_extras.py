@@ -45,7 +45,8 @@ def job_cmd():
     return _quoted(sys.executable or "python3") + " " + _quoted(os.path.join(HERE, "agent_job.py"))
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
 BUNDLE_EVENTS = ("task_added", "tasks_added", "tidy")
-INFO_EVENTS = ("missed", "playbook_proposal", "deployed", "task.completed")  # 2.60.0 (#1514): deployed = information only; 2.392.0 B (#3364): a task completed by a release too
+INFO_EVENTS = ("missed", "playbook_proposal", "deployed", "task.completed",  # 2.60.0 (#1514): deployed = information only; 2.392.0 B (#3364): a task completed by a release too
+               "task_changed")  # 2.959.0 (#4030): a change of its own or a watched task: a note for the next run
 FILES_MAX = 10             # the server takes 10 files per chat message
 NOTES_MAX = 40
 CONTEXT_TASKS = 8          # tasks whose text comes with a bundle

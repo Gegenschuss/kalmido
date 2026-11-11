@@ -18206,6 +18206,8 @@
   "Words or the search syntax (tag:Name, \"exact text\", -word)": "Wörter oder Suchsyntax (tag:Name, \"genauer Text\", -Wort)",
   "Moved to the trash": "In den Papierkorb gelegt",
   "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Aufräumen im gemeinsamen Kern wartet: {0} alte Mitglieder-Zeilen in {1} sind noch nicht im Kern geteilt, die alte Tabelle bleibt. Siehe Server-Log.",
+  "Tell it when its tasks change (old and new value)": "Melden, wenn sich seine Aufgaben ändern (alter und neuer Wert)",
+  "For tasks assigned or delegated to it or that it watches.": "Für Aufgaben, die ihm zugewiesen oder übergeben sind oder die er beobachtet.",
   "billed with {0}": "abgerechnet mit {0}",
   "already billed": "bereits abgerechnet",
   "Billable hours": "Abrechenbare Stunden",

@@ -76,7 +76,9 @@ function aw_html(ws, st) {
     <div class="row"><label for="aw-push">${tr('May disturb')}</label>${aw_sel('push', ws.push)}</div>
     <div class="shint">${tr('Limits: a one-way step, a refusal, a stop or an error.')}</div>
     <div class="row"><label for="aw-results_to">${tr('Results go to')}</label>${aw_sel('results_to', ws.results_to)}</div>
-    <div class="row"><label></label>${aw_chk('next_step', ws.next_step, tr('Next step as a button at the end of every answer'))}</div>`;
+    <div class="row"><label></label>${aw_chk('next_step', ws.next_step, tr('Next step as a button at the end of every answer'))}</div>
+    <div class="row"><label></label>${/*html-ok*/ aw_chk('task_changed', ws.task_changed ?? true, tr('Tell it when its tasks change (old and new value)'))}</div>
+    <div class="shint">${tr('For tasks assigned or delegated to it or that it watches.')}</div>${''/* 2.959.0 (#4030) */}`;
 }
 // parses the field of key k into the value the server wants (null = invalid, shown under the field)
 function aw_read(k, el) {

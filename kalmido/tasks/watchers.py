@@ -57,6 +57,8 @@ def dlg_events(c, tid, old, new):
     """The agent's events of a changed delegation; an agent that is the assignee as well hears of that one only."""
     if old == new:
         return
+    if has_request_context():  # 2.959.0 (#4030): agents/core.py agent_changed_events skips the one delegated in this request
+        g.setdefault("agent_dlg0", {}).setdefault(tid, old)
     agent_assign_event, = _ag("agent_assign_event")
     who = c.execute("SELECT assignee_id FROM tasks WHERE id=?", (tid,)).fetchone()[0]
     if new and new != who:
