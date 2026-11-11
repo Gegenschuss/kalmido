@@ -159,9 +159,11 @@ const cw_sepHtml = i => `<div class="cwsep" role="separator" aria-orientation="h
 function cw_draw() {
   const p = $('#achat'); if (!p) return;
   cw_pick(); cw_fit(S.cw.act);
+  // 2.940.0 (#5225): each window keeps its place over the rebuild (at the end stays at the end, higher up stays there); a new one opens at the end
+  const was = {}; for (const s of p.querySelectorAll('.cwin[data-cw]')) { const b = $('.chmsgs', s); if (b) was[s.dataset.cw] = chatNear(b) ? -1 : b.scrollTop; }
   p.classList.add('cwsplit'); p.classList.toggle('cwmany', S.cw.wins.length > 1); delete p.dataset.aid; p.dataset.cw = S.cw.wins.map(w => w.k).join(',');
   p.innerHTML = S.cw.wins.map((w, i) => (i ? cw_sepHtml(i) : '') + cw_winHtml(w)).join('');
-  for (const b of p.querySelectorAll('.cwin .chmsgs')) b.scrollTop = b.scrollHeight;
+  for (const s of p.querySelectorAll('.cwin[data-cw]')) { const b = $('.chmsgs', s), y = was[s.dataset.cw]; if (b) b.scrollTop = y == null || y < 0 ? b.scrollHeight : y; }  // sprung-ok: the place the window had (#5225)
   for (const w of S.cw.wins) cw_loadIf(w.k);
 }
 function cw_syncIds() { for (const w of S.cw.wins) { const s = cw_sec(w.k); if (s) (cw_isLive(w.k) ? cw_idsOn : cw_idsOff)(s); } }

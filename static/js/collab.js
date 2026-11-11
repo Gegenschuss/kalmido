@@ -597,7 +597,7 @@ function tlMenu(anchor) {
 function tlActSet(n) { LS.set('activityLevel', n === ACT_LV(taskById(S.sel)) ? 0 : n); renderDetail(); }
 async function cmtOrderToggle() {
   const v = cmtNew() ? 'old' : 'new', f = document.activeElement?.id === 'c-input';
-  S.settings.comment_order = v; renderDetail(); if (f) $('#c-input')?.focus();
+  S.settings.comment_order = v; renderDetail(); if (f) $('#c-input')?.focus({preventScroll: true});  // 2.940.0 (#5225)
   try { await api('PATCH', '/api/settings', {comment_order: v}); } catch { /* api() showed it; the local choice stays until the next load */ }
 }
 const uname = (id, U) => (U || {})[id] || (id ? tr('Deleted person') : tr('Someone'));

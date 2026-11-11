@@ -1261,7 +1261,7 @@ function renderView0() {
   renderMultiBar();
   const f2 = fk && fk();
   if (f2 && f2 !== fa && document.activeElement !== f2) { if (fv != null && 'value' in f2) f2.value = fv; f2.focus({preventScroll: true}); try { if (fs[0] != null) f2.setSelectionRange(fs[0], fs[1]); } catch { /* no caret */ } }
-  if (S.route.key === 'search') { const i = $('#searchq'); if (i && document.activeElement !== i) { i.value = S.searchQ || ''; if (!isTouch() || S.searchFocus) i.focus({preventScroll: true}); } S.searchFocus = false; }  // 2.655.0 (#5081): touch: only on opening Search, not back after every render
+  if (S.route.key === 'search') { const i = $('#searchq'); if (i && document.activeElement !== i) { i.value = S.searchQ || ''; if (S.searchFocus) i.focus({preventScroll: true}); } S.searchFocus = false; }  // 2.655.0 (#5081); 2.940.0 (#5225): only on opening Search (phone and desktop), never back after a render - a field being typed in comes back above (f2)
 }
 
 // ------------------------------------------------------------------ render: task rows

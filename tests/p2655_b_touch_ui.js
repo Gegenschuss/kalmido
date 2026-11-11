@@ -114,8 +114,9 @@ const ymd = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '
     const sq = await until(() => d.activeElement?.id === 'searchq' && d.activeElement);
     check(sq, `${tag}: opening Search focuses its field`);
     sq?.blur(); w.eval('render()');
-    if (touch) await passed(w);
-    check((d.activeElement?.id === 'searchq') === !touch, `${tag}: after a render the search field ${touch ? 'stays without focus' : 'has the focus again'}`);
+    await passed(w);
+    // 2.940.0 (#5225): on the desktop too - the field gets the focus only on opening Search, never back after a render
+    check(d.activeElement?.id !== 'searchq', `${tag}: after a render the search field stays without focus`);
 
     // ---- calendar chips
     w.close();
