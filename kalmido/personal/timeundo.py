@@ -15,6 +15,8 @@ The billing columns, the device's client id, the reminder marks and the focus se
 Interface:
   teu_pre(c, uid, eid) / teu_post(c) -> group id | None    around the PATCH's write
   teu_deleted(c, uid, row) -> group id | None              after the DELETE (the row as it was)"""
+import json
+
 from flask import g
 
 from ..collab.liste2e import LE2EDenied
@@ -104,9 +106,34 @@ def teu_need(c, uid, rid, oid):
         if (now["list_id"], now["task_id"]) != (was["list_id"], was["task_id"]) and _locked(c, now["list_id"], now["task_id"]):
             # 2.991.0 (#5634, review 2.936 finding 3): taken back (or forward) into a locked project: the entry's other
             # steps (a note written in the open project since) and its history rows go, as after a save (teu_scrub_moved);
-            # the group running now stays (core/undoweb.py _part marks it) and records its history row after this
+            # the group running now stays (core/undoweb.py _part marks it); its own copies are cleaned in after()
             _teu_scrub(c, rid, g.get("undo_running_gid"))
-    return {"fix": fix, "lock": f"time-{int(rid)}"}
+            into.append(True)
+
+    def after(c, part_id):
+        """2.991.0 (#5634, review): the step running keeps no note either - its copy of the row before the undo (a move
+        and a note in ONE save) is written after fix (core/writes.py _undo_one: redo), and its history row after that."""
+        if not into:
+            return
+        st = c.execute("SELECT snap, redo FROM obj_undo WHERE id=?", (int(part_id),)).fetchone()
+        if st is not None:
+            c.execute("UPDATE obj_undo SET snap=?, redo=? WHERE id=?", (_teu_blank(st["snap"]), _teu_blank(st["redo"]), int(part_id)))
+        c.execute("DELETE FROM obj_history WHERE kind=? AND ref_id=?", (TEU_KIND, int(rid)))
+    into = []
+    return {"fix": fix, "after": after, "lock": f"time-{int(rid)}"}
+
+
+def _teu_blank(js):
+    """A copy (obj_undo.snap / redo: {table: [rows]}) without the free texts the lock keeps out (note, task title)."""
+    if not js:
+        return js
+    d = json.loads(js)
+    for r in d.get("time_entries") or []:
+        if r.get("note"):
+            r["note"] = ""
+        if r.get("task_title"):
+            r["task_title"] = None
+    return json.dumps(d, ensure_ascii=False, default=str)
 
 
 undo_need_reg(TEU_KIND, teu_need)
@@ -130,7 +157,9 @@ def teu_scrub_moved(c, eid, lid, tid):
 def _teu_scrub(c, eid, keep_gid=None):
     """The entry's undo steps (but group keep_gid, the one running) and its history rows go. The caller holds time-<eid>."""
     if keep_gid:
-        le2b_scrub_undo(c, "kind IN (?, ?) AND ref_id=? AND group_id<>?", (TEU_KIND, TEU_LIFE, int(eid), int(keep_gid)))
+        # review: ug_drop_ids unlinks the parts of an editor session (group_id NULL) instead of deleting them: NULL is not kept
+        le2b_scrub_undo(c, "kind IN (?, ?) AND ref_id=? AND (group_id IS NULL OR group_id<>?)",
+                        (TEU_KIND, TEU_LIFE, int(eid), int(keep_gid)))
     else:
         le2b_scrub_undo(c, "kind IN (?, ?) AND ref_id=?", (TEU_KIND, TEU_LIFE, int(eid)))
     c.execute("DELETE FROM obj_history WHERE kind=? AND ref_id=?", (TEU_KIND, int(eid)))
