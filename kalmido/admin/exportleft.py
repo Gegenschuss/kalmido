@@ -49,7 +49,7 @@ UMZ_LEFT_TABLES = {
     "budget_files": _FILES,
     "chat_saves": _LATER, "contact_links": _LATER, "contact_tasks": _LATER, "ctr_notices": _LATER, "folder_heads": _LATER, "folder_props": _LATER,
     "fs_log": _LATER, "git_branches": _LATER, "git_folders": _LATER, "issue_reports": _LATER, "kid_rewards": _LATER, "life_trip_costs": _LATER,
-    "list_rule_runs": _LATER, "ticket_types": _LATER, "org_fields": _LATER, "sheet_links": _LATER, "shop_memory": _LATER,
+    "list_rule_runs": _LATER, "sheet_links": _LATER, "shop_memory": _LATER,
     "wiki_spaces": _LATER, "obj_versions": _LATER,  # 2.958.0 (#5281): the versions of the core (was wiki_versions)
     # 2.531.0 (#4317 F12): the tables without a person, organisation, list or task column that still hold a person's data
     "chat_files": _LATER, "kid_pins": _SECRET, "kid_pin_open": _SECRET, "conn_requests": _ASK,
@@ -112,7 +112,6 @@ UMZ_LATER_NAMES = {
     "life_trip_costs": "costs of trips", "list_rule_runs": "runs of project rules",
     "sheet_links": "links between tables and tasks", "shop_memory": "remembered shopping items", "wiki_spaces": "spaces of knowledge pages",
     "obj_versions": "history of knowledge pages",  # 2.958.0 (#5281): was wiki_versions
-    "ticket_types": "own ticket types", "org_fields": "own field templates",  # 2.609.0 (#3372, #3373)
 }
 
 # 2.531.0 (#4317 F12): the tables that hold nobody's data (no person, organisation, list or task column and no row that belongs

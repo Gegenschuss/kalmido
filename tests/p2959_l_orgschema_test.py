@@ -12,6 +12,8 @@ rebuilds them with new ids and the links of the projects (the labels: org/labels
  - undo of the first import: the type and the field go again; the undo of the second leaves the existing field
  - freelancer-matrix: a person without an organisation imports the export into the private workspace: the type and the field as
    their own (org_id NULL, owner_id them), the project field linked to their own field
+ - 2.995.0 (#5602): the ACCOUNT export of a person without an organisation carries their own type and field; another person's
+   import rebuilds them as hers with the project field linked, the undo takes them out again
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY (P2959L_NOSTART=1 = the server already runs like that).
 usage: p2959_l_orgschema_test.py <datadir>"""
 # freelancer-matrix: tasks
@@ -253,6 +255,66 @@ check(not dbx("SELECT 1 AS x FROM org_fields WHERE owner_id=? AND key='spyfield'
 r = Fr.post(B + f"/api/imports/{FIMP}/undo")
 check(r.ok and not dbx("SELECT 1 AS x FROM ticket_types WHERE owner_id=?", (FID,)) and not dbx("SELECT 1 AS x FROM org_fields WHERE owner_id=?", (FID,)),
       "freelancer: undo takes them out again")
+
+# ---------------------------------------------------------------- 2.995.0 (#5602): the account export of a person without an organisation
+# carries their own ticket types and field schema; the import of another person rebuilds them as hers, the project field linked
+# again (red before: exportleft.py had both as "not yet in the account export", the target had neither)
+r = Fr.post(B + "/api/ticket-types", json={"space": "private", "name": "Wartung", "icon": "zap", "color": "#225588", "template": "**Geraet**\n"})
+check(r.ok, f"#5602: freelancer: an own ticket type {r.text[:160]}")
+r = Fr.post(B + "/api/org-fields", json={"space": "private", "name": "Kunde", "type": "select",
+                                         "options": {"options": [{"id": "nord", "name": "Nord"}, {"id": "sued", "name": "Sued"}]}})
+check(r.ok, f"#5602: freelancer: an own schema field {r.text[:160]}")
+OWNF = r.json().get("id")
+TTK = (one("SELECT key FROM ticket_types WHERE owner_id=? AND org_id IS NULL", (FID,)) or {}).get("key")
+OWNL = mklist(Fr, "Wartungsplan")
+r = Fr.put(B + f"/api/lists/{OWNL}/org-fields/{OWNF}", json={"on": True})
+OWNLF = r.json().get("field_id")
+check(r.ok and OWNLF and TTK, f"#5602: the own field switched on in the own project {r.text[:160]}")
+r = Fr.post(B + "/api/tasks", json={"title": "Filter tauschen", "list_id": OWNL, "ttype": TTK, "fields": {str(OWNLF): "sued"}})
+check(r.ok and r.json().get("ttype") == TTK, f"#5602: a task of the own type with a value {r.text[:200]}")
+r = Fr.post(B + "/api/account/export")
+check(r.status_code == 202, f"#5602: account export started {r.text[:120]}")
+for _ in range(480):
+    if Fr.get(B + "/api/account/export").json().get("state") != "running":
+        break
+    time.sleep(0.25)
+AX = su_get(Fr, B + "/api/account/export/file", "password123").content
+check(AX[:2] == b"PK" or len(AX) > 100, "#5602: the account export file")
+GID, Gr = freelancer(B, A, name="greta")
+Gr.patch(B + "/api/settings", json={"features": FEAT})
+giid = upload(Gr, AX)
+j = wait(Gr, giid)
+check(j.get("state") == "preview", f"#5602: opened {j.get('state')} {j.get('error')}")
+r = Gr.post(B + f"/api/account/import/{giid}/run", json={"again": True, "target": "private", "people": {}})
+check(r.status_code == 202, f"#5602: run starts {r.status_code} {r.text[:200]}")
+j = wait(Gr, giid)
+GIMP = (j.get("result") or {}).get("import_id")
+check(j.get("state") == "done", f"#5602: import done {j.get('state')} {j.get('error')} {(j.get('result') or {}).get('warnings')}")
+gt = dbx("SELECT key, name, icon, color, tpl, org_id FROM ticket_types WHERE owner_id=?", (GID,))
+check([(x["key"], x["name"], x["icon"], x["color"], x["tpl"], x["org_id"]) for x in gt] == [(TTK, "Wartung", "zap", "#225588", "**Geraet**\n", None)],
+      f"#5602: the own ticket type came along as hers {gt}")
+gf = dbx("SELECT id, key, type, options, org_id FROM org_fields WHERE owner_id=?", (GID,))
+check(len(gf) == 1 and gf[0]["key"] == "kunde" and gf[0]["type"] == "select" and gf[0]["org_id"] is None and "Sued" in gf[0]["options"]
+      and gf[0]["id"] != OWNF, f"#5602: the own field came along as hers with a new id {gf}")
+GL = own_lists_of(GID, "Wartungsplan")
+glf = one("SELECT id, org_field_id FROM list_fields WHERE list_id=?", (GL,)) if GL else None
+check(glf and gf and glf["org_field_id"] == gf[0]["id"], f"#5602: the project field is linked to her own field {glf}")
+gtask = one("SELECT id, ttype FROM tasks WHERE list_id=? AND title='Filter tauschen'", (GL,)) if GL else None
+check(gtask and gtask["ttype"] == TTK, f"#5602: the task keeps its own type {gtask}")
+# what she sees in the app: the own type offered, the own field listed with its project, the task with its type
+r = Gr.get(B + "/api/ticket-types", params={"space": "private"})
+check(r.ok and [x["key"] for x in r.json().get("types", [])] == [TTK], f"#5602: the app lists her own type {r.text[:200]}")
+r = Gr.get(B + "/api/org-fields")
+check(r.ok and [(x["key"], x.get("lists")) for x in r.json().get("fields", [])] == [("kunde", 1)], f"#5602: the app lists her own field with its project {r.text[:200]}")
+r = Gr.get(B + f"/api/lists/{GL}/ticket-types")
+check(r.ok and TTK in r.text, f"#5602: her project offers the own type {r.text[:200]}")
+tk = next((t for t in Gr.get(B + "/api/state").json().get("tasks", []) if t["id"] == (gtask or {}).get("id")), {})
+check(tk.get("ttype") == TTK, f"#5602: the task in the app shows its type {tk.get('ttype')}")
+check(one("SELECT org_field_id FROM list_fields WHERE id=?", (OWNLF,))["org_field_id"] == OWNF, "#5602: the source's project keeps its link")
+r = Gr.post(B + f"/api/imports/{GIMP}/undo")
+check(r.ok and not dbx("SELECT 1 AS x FROM ticket_types WHERE owner_id=?", (GID,)) and not dbx("SELECT 1 AS x FROM org_fields WHERE owner_id=?", (GID,)),
+      f"#5602: undo takes her type and field out again {r.text[:160]}")
+Gr.delete(B + f"/api/account/import/{giid}")
 
 if FAILS:
     ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")

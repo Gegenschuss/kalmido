@@ -193,6 +193,7 @@ UMZ_READ = frozenset((
     # 2.765.0 (#3965): absences (my personal office) and timesheets through the areas (umz_private), the household budgets
     # (life/budget.py bud_import) and a folder's playbooks directly (admin/umz_more.py)
     "absences", "timesheets", "budgets",
+    "ticket_types", "org_fields",  # 2.995.0 (#5602): my own ticket types and field schema through the areas (UMZ_PRIVATE_MORE)
 ))
 # #3470: the private file store, knowledge pages and tables of an account export go through the organisation import's areas
 # (admin/oi_store.py) into my private space: account part -> archive entry of the organisation export
@@ -2049,7 +2050,10 @@ def umz_write(c, run, uid, man, zf, files, data, people):
 # 2.363.4 (#3127): account parts that go through the areas of admin/orgimport.py (archive entry of the organisation export); a
 # notepad or playbook only on a project of the file (the others hang on projects of other people, umz_left names them)
 UMZ_PRIVATE_MORE = (("video_reviews", "videos/reviews.json"), ("video_versions", "videos/versions.json"),
-                    ("video_comments", "videos/comments.json"), ("list_notepads", "lists/notepads.json"), ("playbooks", "lists/playbooks.json"))
+                    ("video_comments", "videos/comments.json"), ("list_notepads", "lists/notepads.json"), ("playbooks", "lists/playbooks.json"),
+                    # 2.995.0 (#5602): my own ticket types and field schema, into my private space as the organisation import does
+                    # (admin/oi_team.py _ttype / _ofield; a type or field with the same key here stays and the project fields link to it)
+                    ("ticket_types", "lists/ticket_types.json"), ("org_fields", "lists/org_fields.json"))
 
 
 def umz_mails_oi(data, nodes, me_old):
@@ -2211,7 +2215,8 @@ def umz_private(c, run, uid, man, zf, files, data, who):
     run.org = None
     try:
         if oi:
-            oi_write(c, run, uid, man, zf, files, {"oi": oi, "people": data.get("people") or []}, who)
+            # 2.995.0 (#5602): + the project fields, so oi_team._schema_links links them to my own field schema again
+            oi_write(c, run, uid, man, zf, files, {"oi": oi, "people": data.get("people") or [], "list_fields": data.get("list_fields") or []}, who)
         umz_more_write(c, run, uid, me_old, data, umz_salt(man))  # 2.363.4 (#3127): bookmarks, focus sessions, arrangements, bells ... (2.531.0 #4317: + salt)
     finally:
         run.org = org

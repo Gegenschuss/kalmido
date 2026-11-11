@@ -421,6 +421,13 @@ def umz_extra_queries(uid):
                            FROM list_rules WHERE list_id IN {own} AND deleted_at IS NULL ORDER BY id""", (uid, uid, uid, uid)),
         "portal_tickets": (f"""SELECT id, task_id, list_id, name, email, notify, mailed_status, lang, claimed, created_at, last_seen_at, last_mail_at
                                FROM portal_tickets WHERE list_id IN {private} ORDER BY id""", (uid,)),
+        # 2.995.0 (#5602): my own ticket types and my own field schema (a person's private ones; an organisation's are in its
+        # export). The import rebuilds them in my private space like the organisation import (admin/oi_team.py _ttype / _ofield)
+        # and links the project fields to them again (list_fields.org_field_id, oi_team._schema_links)
+        "ticket_types": ("SELECT id, key, name, icon, color, tpl, sort, enabled, created_at FROM ticket_types "
+                         "WHERE org_id IS NULL AND owner_id=? ORDER BY sort, id", (uid,)),
+        "org_fields": ("SELECT id, key, name, type, options, sort, created_at FROM org_fields "
+                       "WHERE org_id IS NULL AND owner_id=? ORDER BY sort, id", (uid,)),
     }
 
 
