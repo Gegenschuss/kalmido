@@ -49,7 +49,7 @@ UNDO_GID_HDR = "X-Kalmido-Undo-Gid"  # 2.905.0 (#5255)
 
 def undo_need_reg(kind, fn):
     """A tracked kind (core/writes.py obj_track) says who may take its steps back now: fn(c, uid, rid, oid) raises Denied
-    (403 / 404 = no access, 409 = its own reason) or returns {"fix", "keep"} as obj_undo_run takes them, and "lock" when
+    (403 / 404 = no access, 409 = its own reason) or returns {"fix", "keep"} as obj_undo_run takes them, "after" (2.991.0: fn(c, part id) once the part and its history row are written) and "lock" when
     the kind's saves take another write_lock than obj-<kind>-<id> (ow_write lock=)."""
     UNDO_NEED[kind] = fn
 
@@ -155,6 +155,7 @@ def _part(c, uid, p, redo):
                 reg = _reg(kind)
             except Denied:
                 raise Denied(404, tr(UG_GONE)) from None  # the kind's module is not there (any more)
+            g.undo_running_gid = p["group_id"]  # 2.991.0 (#5634): a kind's fix (personal/timeundo.py) keeps the group running now
             ext = _need(c, uid, kind, rid, p["org_id"])
             if ext.get("keep"):
                 keep = ext["keep"]
@@ -168,11 +169,15 @@ def _part(c, uid, p, redo):
                 raise Denied(409, tr(UNDO_NOTHING))  # an editor session took it meanwhile
             a, z = (_redo_one if redo else _undo_one)(c, sc, st, uid, reg, ext.get("fix"))
             obj_undo_hist(c, uid, kind, rid, p["org_id"], reg, sc, a, z, "redo" if redo else "undo")
+            if ext.get("after"):  # 2.991.0 (#5634): the kind cleans the part's own copies / history once they are written
+                ext["after"](c, p["id"])
             p["area"] = _area(reg)
         return None
     except Denied as e:
         code = "noaccess" if e.code in (403, 404) else "conflict"
         return {"group": p["group_id"], "kind": kind, "id": rid, "code": code, "reason": e.text()}
+    finally:
+        g.pop("undo_running_gid", None)
 
 
 def _state(c, gid):
@@ -230,6 +235,8 @@ def undo_group_to(c, uid, gid):
             break
         if grp["org_id"] in held:
             continue
+        if c.execute("SELECT 1 FROM undo_groups WHERE id=?", (grp["id"],)).fetchone() is None:
+            continue  # 2.991.0 (#5634, review): dropped on the way down by a kind's scrub (personal/timeundo.py), not undone
         total += 1
         moved, stayed = _run_group(c, uid, grp, False)
         out["stayed"] += stayed

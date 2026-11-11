@@ -42,6 +42,7 @@ from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from .ledger import ofx_log, ofx_release  # 2.542.0 (#4598): + ofx_release
 from .model import office_gate, office_org, pb_owner
 from .officemove import ofm_reseal
+from .procdoc import PD_WAITING, pd_waiting  # 2.977.0 (#5282)
 from .payonline import POL_EXPIRE_S
 from .periodlock import pl_lock, pl_through  # 2.355.0 B (#2845)
 from ..files.fsmove import fsm_apply, fsm_plan  # 2.356.0 A (#2926)
@@ -147,6 +148,8 @@ def pbt_plan(c, uid, src, dst):
     since = iso(now_utc() - timedelta(seconds=POL_EXPIRE_S))
     if c.execute("SELECT 1 FROM office_pay_sessions WHERE org_id=? AND (state='pending' OR (state IN ('new', 'open') AND created_at>=?)) LIMIT 1", (src, since)).fetchone():
         conflicts.append(tr("An online payment is under way; please wait until it has arrived"))
+    if pd_waiting(c, src) or pd_waiting(c, dst):  # 2.977.0 (#5282, Fable review F3): old versions wait for their move
+        conflicts.append(tr(PD_WAITING))
     if c.execute("SELECT 1 FROM office_pay_links WHERE org_id=? LIMIT 1", (src,)).fetchone():
         notes.append(tr("Pay links already sent or printed work again once the organisation has set up online payment"))
     for t in tables:
@@ -274,8 +277,7 @@ def pbt_dup_notes(c, src, dst):
         out.append(trn("{0} opening balance differs from the organisation's: the organisation keeps its own, yours stays in your private office",
                        "{0} opening balances differ from the organisation's: the organisation keeps its own, yours stay in your personal office",
                        int(diff)))
-    if c.execute("SELECT 1 FROM office_procdocs WHERE org_id=? LIMIT 1", (src,)).fetchone() \
-            and c.execute("SELECT 1 FROM office_procdocs WHERE org_id=? LIMIT 1", (dst,)).fetchone():
+    if c.execute(PBT_PD_HAS, (src,)).fetchone() and c.execute(PBT_PD_HAS, (dst,)).fetchone():  # 2.977.0 (#5282): versions, not heads
         out.append(tr("The organisation has its own procedure documentation: it stays the only one, yours stays in your private office"))
     return out
 
@@ -340,7 +342,9 @@ def pbt_extra(t, dst):
                  "AND x.account=office_opening_balances.account)")
         args = (dst,)
     elif t == "office_procdocs":  # 2.188.0 A (#2498): the target's own procedure documentation stays the only one
-        extra = " AND NOT EXISTS (SELECT 1 FROM office_procdocs x WHERE x.org_id=?)"
+        # 2.977.0 (#5282): the head; a head of the target without versions does not count (pbt_empty_heads takes it first)
+        extra = (" AND NOT EXISTS (SELECT 1 FROM office_procdocs x WHERE x.org_id=? AND EXISTS (SELECT 1 FROM obj_versions v "
+                 "WHERE v.kind='procdoc' AND v.ref_id=x.id))")
         args = (dst,)
     elif t == "office_datev_guids":  # 2.188.0 A (#2498): a receipt file the target has exported itself keeps the target's GUID
         extra = (" AND NOT EXISTS (SELECT 1 FROM office_datev_guids x WHERE x.org_id=? AND (x.doc_id=office_datev_guids.doc_id "
@@ -375,6 +379,29 @@ def pbt_rows(c, src, dst, tables):
         else:
             out[t] = c.execute(f"UPDATE {t} SET org_id=? WHERE {w}{extra}", (dst,) + (src,) * n + args).rowcount
     return out
+
+
+PBT_PD_HAS = "SELECT 1 FROM obj_versions WHERE kind='procdoc' AND org_id=? LIMIT 1"  # 2.977.0 (#5282): an area with procedure documentation
+
+
+def pbt_empty_heads(c, dst):
+    """2.977.0 (#5282): a head of the procedure documentation of area dst without versions (an import undone) goes before the
+    personal office's head moves in (office_procdocs_org is unique)."""
+    return c.execute("DELETE FROM office_procdocs p WHERE p.org_id=? AND NOT EXISTS (SELECT 1 FROM obj_versions v WHERE "
+                     "v.kind='procdoc' AND v.ref_id=p.id)", (dst,)).rowcount
+
+
+def pbt_procdoc_versions(c, src, dst):
+    """2.977.0 (#5282, stage Q7b): the versions of the procedure documentation are rows of the core's obj_versions (kind procdoc,
+    org_id = the office area). When its head moved with pbt_rows (the target had none), they follow: org_id src -> dst, the
+    sealed text opened with src's key and sealed with dst's. A head that stayed (the target keeps its own) keeps its versions.
+    -> how many moved."""
+    n = 0
+    for r in c.execute("SELECT v.* FROM obj_versions v JOIN office_procdocs p ON p.id=v.ref_id WHERE v.kind='procdoc' AND v.org_id=? "
+                       "AND p.org_id=? ORDER BY v.id", (src, dst)).fetchall():
+        body = ofm_reseal(c, "obj_versions", r, src, dst).get("body", r["body"])  # FIELDS["obj_versions"] = body
+        n += c.execute("UPDATE obj_versions SET org_id=?, body=? WHERE id=?", (dst, body, r["id"])).rowcount
+    return n
 
 
 def pbt_drive_closed(c, src, dst):
@@ -429,7 +456,9 @@ def pbt_post():
         # 2.355.0 B (#2843): the bank bookings keep the personal office's fingerprints (keyed per area, the EndToEndId is not
         # stored to key them anew); key_org tells the duplicate check of the organisation's imports (bank.py _key_orgs)
         c.execute("UPDATE office_bank_tx SET key_org=? WHERE org_id=? AND key_org IS NULL", (src, src))
+        pbt_empty_heads(c, dst)  # 2.977.0 (#5282): one head per area (unique), an empty one of the target makes room
         counts = pbt_rows(c, src, dst, p["tables"])
+        pbt_procdoc_versions(c, src, dst)  # 2.977.0 (#5282): the moved head's versions (obj_versions) follow it
         locked = pl_through(c, src)
         if locked:  # 2.355.0 B (#2845): the locked months go along (logged as a lock in the organisation's office log)
             pl_lock(c, dst, uid, locked)

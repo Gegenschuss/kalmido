@@ -11,8 +11,10 @@ from rows it just read or created) -- and deleting the parent now empties the re
 
 Not here, with the reason (schema.py "-- no FK"): office_docs.contact_id (0 = "no contact person", a deleted contact person
 falls back to the client's default), the log tables (agent_audit, dl_changes, org_list_log, assistant_log: they keep ids of
-what is gone on purpose), playbooks.author_id (2.152.0, review B-M7: a version keeps its author's id like the log tables;
-NULL would make a gone author's text the owner's own text, which the agent follows -- #1978: a foreign text stays foreign).
+what is gone on purpose). playbooks.author_id (2.152.0, review B-M7: a gone author's text must not become the owner's own text,
+which the agent follows -- #1978: a foreign text stays foreign) went with stage Q7b (2.977.0, #5282): a version's author is
+obj_versions.created_by (ON DELETE SET NULL), and for the playbooks NULL means "an author who is gone" (foreign, never the owner):
+every version names its author, the move wrote the owner's id where the old row had NULL (lists/playbook.py pb_move_old).
 """
 import json
 

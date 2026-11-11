@@ -117,6 +117,18 @@ def oi_tables():
     return {s.table for s in oi_specs() if s.rid}
 
 
+def oi_space_cols():
+    """{table: space columns} for the undo's guard (a row moved to another space since stays). 2.977.0 (#5282, Fable review F2):
+    a table several specs share (obj_versions: the versions of knowledge pages, procedure documentation and playbooks) takes
+    the space columns of the spec that has them; a row of a spec without one is recorded with the space None (oi_write) and
+    has NULL there (a playbook's version), so the guard holds for every kind."""
+    out = {}
+    for s in oi_specs():
+        if s.space or s.table not in out:
+            out[s.table] = s.space
+    return out
+
+
 def oi_key_tables():
     """2.137.0 A (#2344): {table: key columns} of the tables without id recorded by their key."""
     return {s.table: s.key for s in oi_specs() if not s.rid and s.key}
@@ -324,7 +336,7 @@ def oi_write(c, run, uid, man, zf, files, data, who):
                 continue
             if spec.rid:
                 run.put(spec.kind, src.get("id"), nid)
-                run.created["oi"].append([spec.table, nid, space])
+                run.created["oi"].append([spec.table, nid, space if spec.space else None])  # 2.977.0 (#5282): oi_space_cols
                 if spec.late:
                     lates.append((spec, src, nid))
             elif spec.key:  # 2.137.0 A (#2344): a row without id, recorded by its key for the undo
@@ -444,7 +456,7 @@ def oi_undo(c, uid, cr, since, plan):
     nothing new below them, still in their space), the rest of what goes into its trash first, then their files.
     -> (rows removed, rows of settings that stay)."""
     tables = oi_tables()
-    space_cols = {s.table: s.space for s in oi_specs()}
+    space_cols = oi_space_cols()
     n = kept_keys = 0
     keyed = oi_key_tables()
     undo_trash(c, uid, plan)
@@ -639,7 +651,7 @@ def _oi_undo_key(c, table, key, vals, space, col):
 
 def oi_undo_plan(c, cr, since):
     """2.506.0 (#4299): what the undo of this run may take back (umz_undoplan.undo_plan)."""
-    return undo_plan(c, cr, since, oi_tables(), {s.table: s.space for s in oi_specs()})
+    return undo_plan(c, cr, since, oi_tables(), oi_space_cols())
 
 
 def oi_undo_preview(gone, more=None):

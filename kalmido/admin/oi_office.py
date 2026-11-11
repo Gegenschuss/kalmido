@@ -21,7 +21,8 @@ from .orgimport import _oid  # 2.654.0 (#4585)
 from ..core.orgcrypt import oc_item_store, oc_json_store, oc_log_detail  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_fields  # 2.188.0 A (#2498)
 from ..core.orgcrypt import OrgCryptError  # 2.516.0 (#4364)
-from ..core.pg import system_ctx  # 2.516.0 (#4364)
+from ..core.pg import system_ctx, write_lock  # 2.516.0 (#4364); 2.977.0 (#5282): + write_lock
+from ..office.procdoc import PD_KIND, pd_head  # 2.977.0 (#5282): the head of the procedure documentation
 from ..office.ledger import ofx_release  # 2.542.0 (#4598)
 from ..office.calc import dec  # 2.188.0 A (#2498)
 from ..core.db import insert_id, iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
@@ -410,15 +411,27 @@ def _oi_jsonv(v):
 
 def _p_procdoc(c, run, src, d, ctx):
     """2.148.0 C (#2472): versions of the procedure documentation follow the ones the area already has (rows come by id).
-    2.188.0 A (#2498): a target office that had its own before keeps only those (a second import adds nothing twice)."""
-    had = _oi_before(c, run, "procdocs", ctx.space, "SELECT * FROM office_procdocs WHERE org_id=?")
+    2.188.0 A (#2498): a target office that had its own before keeps only those (a second import adds nothing twice).
+    2.977.0 (#5282, stage Q7b): a version is a row of the core's obj_versions (kind procdoc) on the area's head (office_procdocs,
+    made here when the area has none); the archive's row (org_id, version, data, created_by,
+    created_at) as before, the JSON text into body (sealed by the engine with the area's key, enc)."""
+    had = _oi_before(c, run, "procdocs", ctx.space, "SELECT body FROM obj_versions WHERE kind='procdoc' AND org_id=?")
     if had:
         want = _oi_jsonv(src.get("data"))
-        if not any(_oi_jsonv(oc_dec_fields(c, ctx.space, "office_procdocs", r).get("data")) == want for r in had):
+        if not any(_oi_jsonv(oc_dec_fields(c, ctx.space, "obj_versions", r).get("body")) == want for r in had):
             run.warning(N_("The target office already has its own procedure documentation; it was kept."))
         return False
-    r = c.execute("SELECT MAX(version) FROM office_procdocs WHERE org_id=?", (d.get("org_id"),)).fetchone()
-    d["version"] = int((r[0] if r else 0) or 0) + 1
+    data = src.get("data")
+    data = json.dumps(data, ensure_ascii=False) if isinstance(data, dict) else data
+    if not isinstance(data, str) or not isinstance(_oi_jsonv(data), dict):
+        return None
+    oid = d.get("org_id")
+    write_lock(c, f"office_procdoc_{int(oid)}")  # the lock of office/procdoc.py pd_put
+    head = pd_head(c, oid, make=True)  # an undo leaves the head without versions (as none: pbtransfer.pbt_empty_heads)
+    at = d.get("created_at") or iso(now_utc())
+    d.update(ref_id=head, no=c.execute("SELECT COALESCE(MAX(no), 0) + 1 FROM obj_versions WHERE kind=? AND ref_id=?",
+                                       (PD_KIND, head)).fetchone()[0],
+             owner_id=None, title="", body=data, size=len(data.encode("utf-8")), created_at=at, updated_at=at, held_at=None, source="")
     return d
 
 
@@ -673,8 +686,9 @@ SPECS = [
     OiT("office/period_locks.json", "office_period_locks", people={"locked_by": "null"}, private="office", rid=False,
         key=("org_id", "period"),  # 2.148.0 A (#2471): locked accounting periods
         after=lambda c, run, src, nid, ctx: _oi_mark(c, run, ctx, "period", None, {"period": _txt(src.get("period"), 7)})),  # 2.237.0 D (#2870)
-    OiT("office/procdocs.json", "office_procdocs", people=_P, private="office", prep=_p_procdoc,
-        label=N_("Procedure documentation")),  # 2.148.0 C (#2472): procedure documentation
+    # 2.148.0 C (#2472): procedure documentation; 2.977.0 (#5282): into the core's versions (obj_versions kind procdoc, _p_procdoc)
+    OiT("office/procdocs.json", "obj_versions", kind="obj_versions_procdoc", people=_P, private="office", prep=_p_procdoc,
+        label=N_("Procedure documentation"), fixed={"kind": "procdoc", "no": 0, "ref_id": 0}),  # ref_id: the head, set by _p_procdoc
     OiT("office/suppliers.json", "office_suppliers", refs={"import_run_id": "office_import_runs"}, private="office"),  # 2.148.0 D (#2458)
     OiT("office/opening_balances.json", "office_opening_balances", refs={"import_run_id": "office_import_runs"}, private="office",
         prep=_p_opening),  # 2.188.0 A (#2498): no double on a second import

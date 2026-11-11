@@ -998,9 +998,11 @@ def obj_node_person_put(c, by, n, target, role):
     old member row of stage 3. The same target again changes the role of each of its rows on the node; a row whose end date
     has passed comes back without one (sharing anew lets the person in again, #5089), a still valid end date (given in the
     file store's dialog) stays. Returns True when the target had no row on the node (a new member: the area's News). The
-    caller commits."""
+    caller commits. 2.988.0 (#5604): under the node's lock until the transaction ends -- two shares of the same person at the
+    same time saw no row both and inserted two; now the second waits and changes the first one's row."""
     if role not in ("view", "edit"):
         raise BadInput(tr("Invalid data"))
+    write_lock(c, f"node-share-{int(n['id'])}")
     u = c.execute("SELECT kind FROM users WHERE id=?", (int(target),)).fetchone()
     key = "agent_id" if u is not None and (u[0] or "user") == "agent" else "user_id"
     now = iso(now_utc())

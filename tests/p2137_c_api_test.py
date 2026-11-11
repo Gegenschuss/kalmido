@@ -485,7 +485,9 @@ check(T("SELECT list_id, org_id FROM task_links WHERE task_id=?", (NT,)) == [(NL
 # notes, notepads, playbook, histories
 check(one("SELECT COUNT(*) FROM notes WHERE list_id=? AND title='Kick-off'", (NL,)) == 1, "project note")
 check(one("SELECT COUNT(*) FROM list_notepads WHERE list_id=?", (NL,)) == 1, "notepad")
-check(one("SELECT body FROM playbooks WHERE list_id=? ORDER BY version DESC LIMIT 1", (NL,)) == "Kunden binnen eines Tages antworten.", "playbook")
+# 2.977.0 (#5282): the versions are rows of the core's obj_versions on the Playbook's head
+check(one("SELECT v.body FROM playbooks p JOIN obj_versions v ON v.kind='playbook' AND v.ref_id=p.id WHERE p.list_id=? ORDER BY v.no DESC LIMIT 1",
+          (NL,)) == "Kunden binnen eines Tages antworten.", "playbook")
 check(one("SELECT COUNT(*) FROM activity WHERE task_id=?", (NT,)) >= 1, "task history came along")
 # 2.137.1 (#2399): the ids inside the history point at the new rows, unknown old ids are gone
 ha = [(k, json.loads(d) if isinstance(d, str) else d) for k, d in T("SELECT kind, data FROM activity WHERE task_id=? ORDER BY id", (NT,))]

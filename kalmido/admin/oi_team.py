@@ -43,6 +43,7 @@ from ..lists.lists import LIST_COLOR_RE  # 2.369.5 (#2517): pulled up from funct
 from ..accounts.modcards import MC_ICON_RE, MC_NAME_MAX, mc_mods  # 2.575.0 (#3778)
 from .oi_store import _st as oi_store_st  # 2.924.0 (#5069): the archive's channel nodes waiting for their room
 from ..core.pg import qi, write_lock  # 2.959.0 (#4031)
+from ..lists.playbook import PB_KIND, PB_SOURCES, pb_head  # 2.977.0 (#5282): the head of a Playbook, its versions in the core
 from ..tasks.ttypes import TT_MAX, tt_clean  # 2.959.0 (#4031)
 from ..tasks.validation import TICKET_TYPES, TT_KEY_RE  # 2.959.0 (#4031)
 from ..lists.orgfields import OF_KEY_RE, OF_MAX, OF_TYPES_OFF  # 2.959.0 (#4031)
@@ -896,6 +897,26 @@ def _ofield(c, run, src, d, ctx):
 # required columns the archive never has (secrets, *_id): placeholders umz_row keeps, prep sets the real value
 _NEW_TOKEN = {"token": "", "token_hash": ""}
 
+def _playbook(c, run, src, d, ctx):
+    """2.977.0 (#5282): a version of the archive's lists/playbooks.json (list_id, version, body, source, author_id, created_at)
+    as a row of the core's versions: ref_id = the head of the new list's Playbook (made when it has none), the next number, its
+    source; the author is the importing person when it was them or nobody (the owner's own text), else NULL: another person's
+    text stays foreign (a version without an author is a gone author's text, lists/playbook.py pb_effective; #1978)."""
+    if not isinstance(src.get("body"), str):
+        return None
+    lid = d["ref_id"]
+    write_lock(c, f"playbook:{lid}")  # the lock of lists/playbook.py pb_save
+    head = pb_head(c, lid=lid, make=True)
+    a, at = src.get("author_id"), d.get("created_at") or iso(now_utc())
+    body = src["body"]
+    d.update(ref_id=head, no=c.execute("SELECT COALESCE(MAX(no), 0) + 1 FROM obj_versions WHERE kind=? AND ref_id=?",
+                                       (PB_KIND, head)).fetchone()[0],
+             org_id=None, owner_id=None, title="", body=body, size=len(body.encode("utf-8")), held_at=None,
+             created_by=None if a is not None and ctx.who(a) != ctx.uid else ctx.uid, created_at=at, updated_at=at,
+             source=src.get("source") if src.get("source") in PB_SOURCES else "import")
+    return d
+
+
 SPECS = [
     OiT("organisation.json", "orgs", space=(), rid=False, enc=False, prep=_org),
     # lists
@@ -907,8 +928,10 @@ SPECS = [
         space=(), fixed=_NEW_TOKEN, label=N_("Forms"), prep=_form),
     OiT("lists/form_entries.json", "form_entries", refs={"task_id": "tasks", "form_id": "forms", "client_id": "clients"},
         need=("task_id", "form_id"), space=(), rid=False, label=N_("Forms")),
-    OiT("lists/playbooks.json", "playbooks", refs={"list_id": "lists"}, need=("list_id",), people={"author_id": "null"}, space=(),
-        label=N_("Playbooks")),
+    # 2.977.0 (#5282, stage Q7b): a version into the core's obj_versions (kind playbook) on the head of the list's Playbook; the
+    # archive (also an older one) names the list list_id and the author author_id (_playbook)
+    OiT("lists/playbooks.json", "obj_versions", kind="obj_versions_playbook", refs={"ref_id": "lists"}, src={"ref_id": "list_id"},
+        need=("ref_id",), space=(), label=N_("Playbooks"), prep=_playbook, enc=False, fixed={"kind": PB_KIND, "no": 0}),
     # 2.905.0 (#5288): the organisation's templates (task, project and section templates, one kind of the core; into the private
     # space: the importing person's own); an archive before 2.905 has its section templates in lists/section_templates.json
     # (2.362.0, #3096)

@@ -6,6 +6,10 @@ Invented names only. For alice (organisation admin) and for a person without an 
     held the note of before); the save itself works and leaves the entry in the locked project
  b) a deleted entry taken back, then its project locked (by an older version: the note emptied, the step missed): redo
     deletes it again (no 409 because of the emptied note) and its copy keeps no note
+ c) 2.991.0 (#5634): an entry of the locked project moved out, a note written there, both steps taken back: the entry is in the
+    locked project again, the note's step and the history rows went, the step taken back stays (its redo works);
+    d) the move and the note in one save taken back: that step's own copy and history keep no note; e) the note in an
+    editor session (X-Kalmido-Undo): its part goes as well
 The lock is set in the database (e2e='on'), as p264a_b_api does for the steps a scrub missed.
 freelancer-matrix: time (a person without an organisation: her entry moved into her locked project, her redo of a deleted entry there)
 usage: p2936_c_lock_rest_test.py <datadir>"""
@@ -96,6 +100,55 @@ def run(s, who):
     left = copies(mk + "Gone")
     check(not left, f"#5582 b) {who}: the step's copy keeps no note {left}")
     dbw("UPDATE lists SET e2e=NULL WHERE id=?", (lb,))
+    # ---- c) 2.991.0 (#5634, review 2.936 finding 3): taken back into the locked project: the step of the note written in the
+    # open project since (its copy and redo hold the note) and the entry's history rows go; the entry is back in the locked one
+    lc, lo2 = plist(s, f"{who} Sealed"), plist(s, f"{who} Elsewhere")
+    r = s.post(B + "/api/time/entries", json={"list_id": lc, "start": DAY + "T15:00", "minutes": 25})
+    te3 = r.json()["id"] if r.ok else 0
+    dbw("UPDATE lists SET e2e='on' WHERE id=?", (lc,))
+    r = s.patch(B + f"/api/time/entries/{te3}", json={"list_id": lo2})
+    g1 = r.json().get("undo_group") if r.ok else None
+    r = s.patch(B + f"/api/time/entries/{te3}", json={"note": mk + "Outside"})
+    g2 = r.json().get("undo_group") if r.ok else None
+    check(bool(g1 and g2), f"(setup) {who}: moved out of the locked project, a note there, two steps {g1} {g2} {r.status_code} {r.text[:160]}")
+    r = s.post(B + f"/api/undo/to/{g1}")
+    e = s.get(B + f"/api/time/entries/{te3}").json()
+    check(r.ok and e.get("list_id") == lc and (e.get("note") or "") == "",
+          f"#5634 c) {who}: undo of both steps brings the entry back into the locked project without the note {r.status_code} {r.text[:200]} {e}")
+    left = copies(mk + "Outside")
+    check(not left, f"#5634 c) {who}: no undo copy keeps the note written outside {left}")
+    hist = kt.dbx("SELECT id FROM obj_history h WHERE kind='time_entry' AND ref_id=? AND h::text LIKE ?", (te3, f"%{mk}Outside%"))
+    check(not hist, f"#5634 c) {who}: no history row of the entry keeps the note {hist}")
+    r = s.post(B + f"/api/undo/{g1}/redo")
+    e = s.get(B + f"/api/time/entries/{te3}").json()
+    check(r.ok and e.get("list_id") == lo2, f"#5634 c) {who}: the step running stayed, its redo moves it out again {r.status_code} {r.text[:200]} {e}")
+    # d) review of 2.991: the move and the note in ONE save, taken back: the step running keeps no note (its redo copy, its history row)
+    r = s.post(B + "/api/time/entries", json={"list_id": lc, "start": DAY + "T16:00", "minutes": 15})
+    te4 = r.json()["id"] if r.ok else 0
+    r = s.patch(B + f"/api/time/entries/{te4}", json={"list_id": lo2, "note": mk + "OneSave"})
+    g4 = r.json().get("undo_group") if r.ok else None
+    check(bool(g4), f"(setup) {who}: moved out with a note in one save {r.status_code} {r.text[:160]}")
+    r = s.post(B + f"/api/undo/to/{g4}")
+    e = s.get(B + f"/api/time/entries/{te4}").json()
+    check(r.ok and e.get("list_id") == lc and (e.get("note") or "") == "", f"#5634 d) {who}: back in the locked project {r.status_code} {e}")
+    left = copies(mk + "OneSave")
+    hist = kt.dbx("SELECT id FROM obj_history h WHERE kind='time_entry' AND ref_id=? AND h::text LIKE ?", (te4, f"%{mk}OneSave%"))
+    check(not left and not hist, f"#5634 d) {who}: the step taken back keeps no note (copy {left}, history {hist})")
+    # e) review of 2.991: the note written in an editor session (X-Kalmido-Undo): its part goes too (not only unlinked)
+    r = s.post(B + "/api/time/entries", json={"list_id": lc, "start": DAY + "T17:00", "minutes": 10})
+    te5 = r.json()["id"] if r.ok else 0
+    r = s.patch(B + f"/api/time/entries/{te5}", json={"list_id": lo2})
+    g5 = r.json().get("undo_group") if r.ok else None
+    r = s.patch(B + f"/api/time/entries/{te5}", json={"note": mk + "Session"}, headers={"X-Kalmido-Undo": "ab12cd34ef56ab12cd34"})
+    check(bool(g5) and r.ok, f"(setup) {who}: moved out, a note in an editor session {g5} {r.status_code} {r.text[:160]}")
+    r = s.post(B + f"/api/undo/to/{g5}")
+    e = s.get(B + f"/api/time/entries/{te5}").json()
+    left = copies(mk + "Session")
+    if r.ok and e.get("list_id") == lc:
+        check(not left, f"#5634 e) {who}: back in the locked project, no part of the editor session keeps the note {left}")
+    else:  # the note step not taken back with the groups: the entry stays outside, nothing of it in a locked project
+        check(e.get("list_id") == lo2, f"#5634 e) {who}: the entry stays outside with its note {r.status_code} {e}")
+    dbw("UPDATE lists SET e2e=NULL WHERE id=?", (lc,))
 
 
 run(A, "Alice")

@@ -43,7 +43,8 @@ from .pg import qi, table_columns, table_exists, write_lock
 
 KERN_RETIRE_LOCK = "kalmido-kern5069"
 KERN_RETIRE_HOW = ("the shared core dropped the old member tables (team chat, calendars, address books; #5069) and the old share "
-                   "rows of tables and knowledge pages (#5244) and the old version table of the knowledge pages (#5281) - an older version would rebuild them empty or read columns that "
+                   "rows of tables and knowledge pages (#5244), the old version table of the knowledge pages (#5281) and the version "
+                   "columns of the playbooks and the procedure documentation (#5282) - an older version would rebuild them empty or read columns that "
                    "are gone; go back only with a backup from before")
 
 
@@ -118,9 +119,10 @@ def kern_retire_due(c, table, cols, typed):
     return True
 
 
-def kern_retire_rows(c, table, cols, left, label, prune=None, alter=(), alert=None):
+def kern_retire_rows(c, table, cols, left, label, prune=None, alter=(), alert=None, why=None):
     """2.937.0 (#5244): the start check, then the old rows and columns of a table that stays (module docstring). label names
-    the stage in the log. alter: fixed statements of the caller (no values of users in them)."""
+    the stage in the log. alter: fixed statements of the caller (no values of users in them). why (2.977.0, #5282) = what the
+    log says of rows left instead of "have no share in the shared core" (old version rows that move into obj_versions)."""
     cols = tuple(cols)
     if not table_exists(c, table) or not set(cols) & table_columns(c, table):
         return {}
@@ -130,8 +132,8 @@ def kern_retire_rows(c, table, cols, left, label, prune=None, alter=(), alert=No
         return {}
     n = left(c)
     if n:
-        print(f"{label}: {n} old row(s) of {table} have no share in the shared core -- nothing dropped; give those objects their "
-              "node / shares (or delete the rows) and start again", flush=True)
+        print(f"{label}: {n} old row(s) of {table} " + (why or "have no share in the shared core -- nothing dropped; give those objects "
+              "their node / shares (or delete the rows) and start again"), flush=True)
         if alert:
             alert(n, [table])
         return {"left": n}

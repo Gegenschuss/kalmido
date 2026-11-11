@@ -193,7 +193,10 @@ check("Home budget" in csv and "Alpha budget" not in csv, f"bob: the export list
 
 # ================================================================== #2874: what retires an organisation
 OM = A.post(B + "/api/admin/orgs", json={"name": "Omega Docs", "admin_id": ALICE}).json()["id"]
-sql("INSERT INTO office_procdocs(org_id, version, data, created_by, created_at) VALUES(?,?,?,?,?)", (OM, 1, "{}", ALICE, NOW), write=True)
+# 2.977.0 (#5282): the head in office_procdocs, the version in the core's obj_versions
+sql("INSERT INTO office_procdocs(org_id) VALUES(?)", (OM,), write=True)
+sql("INSERT INTO obj_versions(kind, ref_id, no, org_id, body, created_by, created_at, updated_at) SELECT 'procdoc', id, 1, org_id, '{}', ?, ?, ? "
+    "FROM office_procdocs WHERE org_id=?", (ALICE, NOW, NOW, OM), write=True)
 r = A.delete(B + f"/api/admin/orgs/{OM}")
 check(r.status_code == 409 and (r.json().get("retain_until") or "") >= "2036-12-31" and (r.json().get("kept") or {}).get("procdocs") == 1,
       "Omega (procedure documentation only): retired instead of deleted " + r.text[:300])

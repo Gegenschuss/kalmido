@@ -152,7 +152,7 @@ def add_balance(oid, account, amount):
 
 
 def n_procdocs(oid):
-    return sql("SELECT COUNT(*) FROM office_procdocs WHERE org_id=?", (oid,))[0][0]
+    return sql("SELECT COUNT(*) FROM obj_versions WHERE kind='procdoc' AND org_id=?", (oid,))[0][0]  # 2.977.0 (#5282): versions in the core
 
 
 def upload(s, data, name="alpha.kalmido-export"):

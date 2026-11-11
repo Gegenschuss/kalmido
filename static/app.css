@@ -6469,8 +6469,8 @@ html.mini-chat body.in-chat #view,html.mini-chat body.in-team #view{padding-left
 /* 2.955.0 (#5239): the Dada quote of the day (quotes_dada.js): the original calm and italic, below it small and grey the
    translation and the author; long lines wrap, nothing is cut; on the sign-in page centred, alone above the form */
 .qd{margin:0 0 1rem;overflow-wrap:break-word}
-.qd .qdo{margin:0;font-style:italic;color:var(--text2);line-height:1.4}
-.qd figcaption{margin-top:.2rem;font-size:var(--fs-s);color:var(--muted);line-height:1.35}
+.qd .qdo{margin:0;font-style:italic;color:var(--text2);line-height:var(--lh)}
+.qd figcaption{margin-top:.25rem;font-size:var(--fs-s);color:var(--muted);line-height:var(--lh-tight)}
 .qd .qda[title]{cursor:help}
 .authscreen .qd,.authscreen .qdslot{text-align:center}
 .authscreen .qdslot{min-height:2.6rem;margin:0 0 1rem}

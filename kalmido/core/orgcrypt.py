@@ -101,7 +101,8 @@ FIELDS = {
     "office_drive_log": ("prev",),  # 2.93.0 B (#1928): the change log of the logbook
     "office_cash_entries": ("text",), "office_cash_log": ("prev",),  # 2.121.0 B (#2095): the cash book
     "office_ledger_entries": ("text",),  # 2.666.0 (#3461): adjusting / opening entries of the balance sheet
-    "office_procdocs": ("data",),  # 2.148.0 C (#2472): the procedure documentation (own texts + prefilled snapshot)
+    # 2.148.0 C (#2472): the procedure documentation (own texts + prefilled snapshot) -- 2.977.0 (#5282): its versions are rows of
+    # obj_versions (kind procdoc, body below; the field pass seals them, admin/orgcrypt_cli.py FIELD_KIND), office_procdocs is the head
     "office_suppliers": ("name", "street", "zip", "city", "vat_id", "iban"),  # 2.148.0 D (#2458): creditors of the DATEV import
     "office_bookarch": ("doc1", "doc2", "text", "raw"), "office_bookarch_accts": ("label",),  # 2.414.0 (#3502): the booking archive
     "office_bookarch_docs": ("file_name",), "office_bookarch_files": ("file_name",),  # 2.414.0 review F8: names may carry a client's
@@ -124,7 +125,9 @@ FIELDS = {
     # 2.123.0 A (#2105, #2102): the text of knowledge pages in spaces without the lock and of their history; a private page
     # with the account key (space -owner), sealed / opened by wiki/wkhist.py (the passes: wkh_settle, not fields_pass)
     "wiki_pages": ("body",),
-    "obj_versions": ("body",),  # 2.958.0 (#5281): the core's versions (was wiki_versions); kind "wiki" sealed / opened by wiki/wkhist.py
+    # 2.958.0 (#5281): the core's versions (was wiki_versions); kind "wiki" sealed / opened by wiki/wkhist.py; 2.977.0 (#5282): kind
+    # "procdoc" with the office area's key by office/procdoc.py and the field pass; kind "playbook" stays plain (no org_id)
+    "obj_versions": ("body",),
 }
 JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"): ("costs", "margin"),
              ("office_doc_parts", "totals"): ("costs", "margin")}  # 2.47.0 (#1215)
@@ -157,7 +160,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_vehicles": N_("Logbook"), "office_drives": N_("Logbook"), "office_drive_log": N_("Logbook"),  # 2.93.0 B (#1928)
                  "office_cash_entries": N_("Cash book"), "office_cash_log": N_("Cash book"),  # 2.121.0 B (#2095)
                  "office_ledger_entries": N_("Balance sheet entries"),  # 2.666.0 (#3461)
-                 "office_procdocs": N_("Procedure documentation"),  # 2.148.0 C (#2472)
+                 "office_procdocs": N_("Procedure documentation"),  # 2.148.0 C (#2472); 2.977.0 (#5282): its versions in obj_versions
                  "office_suppliers": N_("Suppliers of the DATEV import"),  # 2.148.0 D (#2458)
                  "office_bookarch": N_("Booking archive"), "office_bookarch_accts": N_("Booking archive"),  # 2.414.0 (#3502)
                  "office_bookarch_docs": N_("Booking archive"), "office_bookarch_files": N_("Booking archive"),

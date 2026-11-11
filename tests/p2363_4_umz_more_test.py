@@ -164,8 +164,10 @@ check(one("SELECT COUNT(*) FROM video_versions WHERE review_id=? AND provider='v
 check(one("SELECT COUNT(*) FROM list_notepads WHERE list_id=? AND title='Umzug Notiz'", (LID or 0,)) == 1
       and one("SELECT COUNT(*) FROM list_notepads WHERE title='Fremde Notiz'") == 0, "#3127 the notepad of my project arrives, the other one not")
 # 2.765.0 (#3965): the folder's playbook arrives too
-check(one("SELECT COUNT(*) FROM playbooks WHERE list_id=? AND body='Umzug Playbook'", (LID or 0,)) == 1
-      and one("SELECT COUNT(*) FROM playbooks WHERE body='Ordner' AND list_id IS NULL AND owner_id=?", (GID,)) == 1,
+# 2.977.0 (#5282): a Playbook's versions are rows of the core's obj_versions on its head
+PBV = "playbooks p JOIN obj_versions v ON v.kind='playbook' AND v.ref_id=p.id"
+check(one(f"SELECT COUNT(*) FROM {PBV} WHERE p.list_id=? AND v.body='Umzug Playbook'", (LID or 0,)) == 1
+      and one(f"SELECT COUNT(*) FROM {PBV} WHERE v.body='Ordner' AND p.list_id IS NULL AND p.owner_id=?", (GID,)) == 1,
       "#3127 the project's playbook arrives, #3965 the folder's too")
 # bookmarks
 bm = kt.dbx("SELECT url_key, state, preview FROM bookmarks WHERE user_id=? AND deleted_at IS NULL ORDER BY id", (GID,))
@@ -194,8 +196,10 @@ left = {t: one(f"SELECT COUNT(*) FROM {t} WHERE {col}=?", (GID,)) for t, col in 
     ("hub_mails", "owner_id"), ("video_reviews", "owner_id"), ("pomos", "user_id"), ("contact_care", "user_id"), ("view_layouts", "user_id"),
     ("list_layouts", "user_id"), ("obj_follow", "user_id"))}  # 2.972.0 (#5285): obj_follow instead of task_bell / task_watchers
 check(not any(left.values()), f"#3127 the undo takes them away again {left}")
-check(one("SELECT COUNT(*) FROM list_notepads WHERE title='Umzug Notiz'") == 0 and one("SELECT COUNT(*) FROM playbooks WHERE body='Umzug Playbook'") == 0
-      and one("SELECT COUNT(*) FROM playbooks WHERE body='Ordner'") == 0,  # 2.765.0 (#3965): + the folder's
+check(one("SELECT COUNT(*) FROM list_notepads WHERE title='Umzug Notiz'") == 0
+      and one("SELECT COUNT(*) FROM obj_versions WHERE kind='playbook' AND body='Umzug Playbook'") == 0  # 2.977.0 (#5282): the core's versions
+      and one("SELECT COUNT(*) FROM obj_versions WHERE kind='playbook' AND body='Ordner'") == 0
+      and one("SELECT COUNT(*) FROM playbooks WHERE list_id IS NULL AND owner_id=?", (GID,)) == 0,  # 2.765.0 (#3965): + the folder's
       "#3127 ... the notepad and the playbooks too")
 check([r[0] for r in kt.dbx("SELECT id FROM bookmarks WHERE user_id=? AND deleted_at IS NULL", (GID,))] == [BEFORE],
       "#3127 ... the imported bookmark too, the one saved before stays")

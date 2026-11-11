@@ -7,7 +7,8 @@ schemes, cash books, bank imports, locked months, DATEV, backups, encryption) an
 sentences about Kalmido only say what the code does; what Kalmido cannot know (legal form, server location, where backups
 are kept, restore tests) is a gap "[ ... fill in ]" the view marks. Names and roles of members only, never mail addresses.
 
-Stored in office_procdocs: every save is a new version (number per area, 1, 2, ...) with the own texts AND the prefilled
+Stored in the core's obj_versions (2.977.0, #5282, stage Q7b: kind "procdoc" on the area's head row in office_procdocs; was a
+row of office_procdocs per version): every save is a new version (number per area, 1, 2, ...) with the own texts AND the prefilled
 texts of that moment (data, JSON, encrypted at rest like the other office free texts), so an old version reads as it was.
 The current view = the prefilled texts of now + the own texts of the latest version. Markdown and PDF of the current state
 or of a version carry the version, its date and the company.
@@ -26,20 +27,28 @@ from ..core.config import APP_VERSION, app
 from ..core.db import db, gsetting, iso, now_utc
 from ..core.access import Denied
 from ..core.i18n import N_, lang, tr
-from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
-from ..core.pg import insert_id, write_lock
+from ..core.orgcrypt import OrgCryptError, oc_dec_fields, oc_dec_k, oc_enc_fields, oc_enc_k, oc_is_enc, oc_key
+from ..core.pg import insert_id, table_columns, table_exists, write_lock
+from ..core.objversions import (OBJV_CTX, obj_version_add, obj_version_free_no, obj_version_last, obj_version_no,  # 2.977.0 (#5282)
+                                obj_version_old_ts)
+from ..core import objhooks  # 2.977.0 (#5282): the start hook pd_retire
+from ..notify.alerts import aa_now  # 2.977.0 (#5282): the admins' alert of pd_retire
+from ..core.kernretire import KERN_RETIRE_LOCK, kern_retire_floor, kern_retire_rows  # 2.977.0 (#5282)
 from ..personal.timetrack import BadInput
 from .model import office_gate, office_org, office_role, office_settings, ofx_name1, pb_owner
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
-from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions; 2.977.0 (#5282): + pd_retire
 from .ledger import ofx_company, ofx_log  # 2.369.5 (#2517): pulled up from functions
 from .packs import office_pack  # 2.369.5 (#2517): pulled up from functions
 from .periodlock import pl_label, pl_through  # 2.369.5 (#2517): pulled up from functions
 
 PD_TEXT_MAX = 20000  # characters of one own text
 PD_VERSIONS_MAX = 500
+PD_KIND = "procdoc"  # 2.977.0 (#5282, stage Q7b): the kind of the versions in obj_versions (ref_id = the area's head row)
 PD_GAP = {"de": "[ ... ausfüllen ]", "en": "[ ... to fill in ]"}
 PD_NO_VERSION = N_("This version does not exist")
+# 2.977.0 (#5282, Fable review F3 / F4): an area whose old versions wait for the move (pd_retire: its key is missing now)
+PD_WAITING = N_("The procedure documentation of this office still waits for its move to the new storage (its key is missing). Try again after the next start.")
 
 # the outline: section key -> (number, title de, title en, fields); field = (key, title de, title en, need own text)
 PD_OUTLINE = (
@@ -77,7 +86,7 @@ PD_EINV = {"zugferd": "ZUGFeRD", "xrechnung": "XRechnung", "none": "-", "": "-"}
 def pd_offered(c, oid, s=None):
     """2.449.0 (#3768): the German pack, or an area that saved versions before it changed its pack."""
     s = s if s is not None else office_settings(c, oid)
-    return (s.get("pack") or "DE").upper() == "DE" or bool(c.execute("SELECT 1 FROM office_procdocs WHERE org_id=? LIMIT 1", (oid,)).fetchone())
+    return (s.get("pack") or "DE").upper() == "DE" or bool(c.execute("SELECT 1 FROM obj_versions WHERE kind=? AND org_id=? LIMIT 1", (PD_KIND, oid)).fetchone())  # 2.977.0 (#5282)
 
 
 def _ctx(admin=False):
@@ -289,24 +298,50 @@ def pd_auto(c, oid, L):
 
 
 # ---------------------------------------------------------------- versions
+def _pd_ver(r):
+    """A row of obj_versions as the code before 2.977 read a row of office_procdocs (data = the sealed JSON text)."""
+    return {"id": r["id"], "version": r["no"], "data": r["body"], "created_by": r["created_by"], "created_at": r["created_at"]}
+
+
 def _row_data(c, oid, r):
-    d = oc_dec_fields(c, oid, "office_procdocs", r)
+    d = oc_dec_fields(c, oid, "obj_versions", {"body": r["data"]})  # sealed with the context obj_versions.body (OBJV_CTX)
     try:
-        v = json.loads(d.get("data") or "{}")
+        v = json.loads(d.get("body") or "{}")
     except ValueError:
         v = {}
     return v if isinstance(v, dict) else {}
 
 
+def pd_head(c, oid, make=False):
+    """2.977.0 (#5282): the id of the head row of area oid's procedure documentation (None: none yet); make: create it (the
+    caller holds the lock office_procdoc_<oid>)."""
+    r = c.execute("SELECT id FROM office_procdocs WHERE org_id=? ORDER BY id DESC LIMIT 1", (oid,)).fetchone()
+    if r or not make:
+        return r[0] if r else None
+    return insert_id(c, "INSERT INTO office_procdocs(org_id) VALUES(?)", (oid,))
+
+
+def pd_waiting(c, oid):
+    """2.977.0 (#5282, Fable review F3 / F4): True while old version rows of area oid wait in office_procdocs (pd_retire kept
+    them: the area's key is missing). No new version then (its number would come before the old ones) and no transfer of the
+    office (the old rows would move unsealed or be taken for an empty head)."""
+    if "version" not in table_columns(c, "office_procdocs"):
+        return False
+    return c.execute("SELECT 1 FROM office_procdocs WHERE org_id=? AND version IS NOT NULL LIMIT 1", (oid,)).fetchone() is not None
+
+
 def pd_latest(c, oid):
-    return c.execute("SELECT * FROM office_procdocs WHERE org_id=? ORDER BY version DESC, id DESC LIMIT 1", (oid,)).fetchone()
+    h = pd_head(c, oid)
+    r = obj_version_last(c, PD_KIND, h) if h else None
+    return _pd_ver(r) if r else None
 
 
 def pd_version_row(c, oid, version):
-    r = c.execute("SELECT * FROM office_procdocs WHERE org_id=? AND version=? ORDER BY id DESC LIMIT 1", (oid, version)).fetchone()
+    h = pd_head(c, oid)
+    r = obj_version_no(c, PD_KIND, h, version) if h else None
     if r is None:
         raise Denied(404, tr(PD_NO_VERSION))
-    return r
+    return _pd_ver(r)
 
 
 def _user_name(c, uid):
@@ -389,15 +424,17 @@ def pd_put():
     own = _own_clean(b.get("own") or {})
     L = _lg(b.get("lang"))
     write_lock(c, f"office_procdoc_{int(oid)}")
+    if pd_waiting(c, oid):  # 2.977.0 (#5282, Fable review F4)
+        raise Denied(409, tr(PD_WAITING))
+    head = pd_head(c, oid, make=True)  # 2.977.0 (#5282)
     latest = pd_latest(c, oid)
     n = (latest["version"] if latest else 0) + 1
     base = b.get("base")
     if base is not None and (not isinstance(base, int) or base != n - 1):
         raise Denied(409, tr("Someone saved a newer version meanwhile. Reload to see it."))
     data = json.dumps({"own": own, "auto": pd_auto(c, oid, L), "lang": L, "app_version": APP_VERSION}, ensure_ascii=False)
-    row = oc_enc_fields(c, oid, "office_procdocs", {"data": data})
-    insert_id(c, "INSERT INTO office_procdocs(org_id, version, data, created_by, created_at) VALUES(?,?,?,?,?)",
-              (oid, n, row["data"], uid, iso(now_utc())))
+    row = oc_enc_fields(c, oid, "obj_versions", {"body": data})  # 2.977.0 (#5282): a version of the core, number n
+    obj_version_add(c, PD_KIND, head, oid, None, "", row["body"], len(data.encode("utf-8")), uid, iso(now_utc()))
     ofx_log(c, oid, "procdoc", target="procdoc", detail={"version": n, "fields": sorted(own)})
     c.commit()
     return jsonify(pd_state(c, uid, oid, None, L))
@@ -407,8 +444,9 @@ def pd_put():
 def pd_versions():
     """The saved versions, newest first: [{version, created_at, created_by}] (names only)."""
     c, uid, oid = _ctx(admin=True)  # 2.237.0 A (#2861)
-    rows = c.execute("SELECT version, created_by, created_at FROM office_procdocs WHERE org_id=? ORDER BY version DESC, id DESC LIMIT ?",
-                     (oid, PD_VERSIONS_MAX)).fetchall()
+    h = pd_head(c, oid)  # 2.977.0 (#5282): the versions of the core
+    rows = c.execute("SELECT no AS version, created_by, created_at FROM obj_versions WHERE kind=? AND ref_id=? ORDER BY no DESC LIMIT ?",
+                     (PD_KIND, h, PD_VERSIONS_MAX)).fetchall() if h else []
     names = {}
     out = []
     for r in rows:
@@ -416,6 +454,89 @@ def pd_versions():
             names[r["created_by"]] = _user_name(c, r["created_by"])
         out.append({"version": r["version"], "created_at": r["created_at"], "created_by": names[r["created_by"]]})
     return jsonify(items=out)
+
+
+# ---- 2.977.0 (#5282, stage Q7b): the old version rows of office_procdocs -> obj_versions at the start, then the columns go ----
+PD_OLD_COLS = ("version", "data", "created_by", "created_at")
+PD_RETIRE_LABEL = "procedure documentation, stage Q7b (#5282)"
+PD_RETIRE_WAITS = N_("Procedure documentation clean-up waits: {0} old versions in {1} cannot be opened now (the key of their office is missing), the old columns stay. See the server log.")
+PD_RETIRE_WHY = ("cannot be opened now (the key of their office is missing) -- they stay there, nothing dropped; the next start "
+                 "tries again (core/migrations.d/5282_a.py)")
+
+
+def pd_move_old(c):
+    """Every old version row of office_procdocs (version set) into obj_versions kind "procdoc": ref_id = the head of its area
+    (the area's newest row, which stays), its number kept where it is free, the sealed JSON opened with the context
+    office_procdocs.data and sealed again with obj_versions.body (the same key), created_by (an account that is gone: NULL),
+    created_at as TIMESTAMPTZ. All of an area or nothing: an area with a text that cannot be opened now moves nothing (its
+    rows stay for the next start). A moved row gets version NULL at once (idempotent). -> {"moved": n, "kept": m}."""
+    now, out = iso(now_utc()), {"moved": 0, "kept": 0}
+    people = {r[0] for r in c.execute("SELECT DISTINCT u.id FROM users u JOIN office_procdocs p ON p.created_by=u.id")}
+    for (oid,) in c.execute("SELECT DISTINCT org_id FROM office_procdocs WHERE version IS NOT NULL ORDER BY org_id").fetchall():
+        rows = c.execute("SELECT id, version, data, created_by, created_at FROM office_procdocs WHERE org_id=? AND version IS NOT NULL "
+                         "ORDER BY version, id", (oid,)).fetchall()
+        key, moved = None, []
+        try:
+            for r in rows:
+                v = r["data"] or "{}"
+                if oc_is_enc(v):
+                    key = key or oc_key(c, oid, create=False)
+                    plain = oc_dec_k(key, oid, "office_procdocs.data", v)
+                    moved.append((r, oc_enc_k(key, oid, OBJV_CTX, plain), len(plain.encode("utf-8"))))
+                else:
+                    moved.append((r, v, len(v.encode("utf-8"))))
+        except (OrgCryptError, TypeError, ValueError):
+            print(f"{PD_RETIRE_LABEL}: the {len(rows)} old version(s) of office area {oid} stay in office_procdocs -- {PD_RETIRE_WHY}",
+                  flush=True)
+            out["kept"] += len(rows)
+            continue
+        head = c.execute("SELECT MAX(id) FROM office_procdocs WHERE org_id=?", (oid,)).fetchone()[0]
+        for r, body, size in moved:
+            at = obj_version_old_ts(r["created_at"], now)
+            c.execute("INSERT INTO obj_versions(kind,ref_id,no,org_id,owner_id,title,body,size,created_by,created_at,updated_at,source) "
+                      "VALUES(?,?,?,?,NULL,'',?,?,?,?,?,'')",
+                      (PD_KIND, head, obj_version_free_no(c, PD_KIND, head, r["version"]), oid, body, size,
+                       r["created_by"] if r["created_by"] in people else None, at, at))
+            c.execute("UPDATE office_procdocs SET version=NULL WHERE id=?", (r["id"],))
+            out["moved"] += 1
+    return out
+
+
+def _pd_left(c):
+    return c.execute("SELECT COUNT(*) FROM office_procdocs WHERE version IS NOT NULL").fetchone()[0]
+
+
+def _pd_prune(c):
+    """The rows besides the heads (the newest row of each area); their versions are in obj_versions on the head."""
+    return c.execute("DELETE FROM office_procdocs p WHERE EXISTS (SELECT 1 FROM office_procdocs x WHERE x.org_id=p.org_id AND x.id>p.id)").rowcount
+
+
+def _pd_alert(n, tables):
+    aa_now("storage", "kern5282:" + ",".join(tables), PD_RETIRE_WAITS, (int(n), ", ".join(tables)))
+
+
+def pd_retire(c):
+    """2.977.0 (#5282, core/objhooks.START, every start until done): pd_move_old, then the start check, the rows besides the
+    heads and the columns PD_OLD_COLS (core/kernretire.py kern_retire_rows: the back limit rises), one head per area (unique
+    index). {} once the columns are gone (a catalog read)."""
+    if not table_exists(c, "office_procdocs") or "data" not in table_columns(c, "office_procdocs"):
+        return {}
+    with system_ctx(c):  # every office area's documentation; nothing is handed to a person
+        write_lock(c, KERN_RETIRE_LOCK)
+        if "data" not in table_columns(c, "office_procdocs"):  # another process did it meanwhile
+            return {}
+        # the new code writes heads (org_id only) while old rows wait for a key: the old columns must not refuse them
+        c.execute("ALTER TABLE office_procdocs ALTER COLUMN version DROP NOT NULL, ALTER COLUMN created_at DROP NOT NULL")
+        out = pd_move_old(c)
+        if out["moved"]:  # the data left the old columns: an older image must not start before the drop
+            kern_retire_floor(c)
+        out.update(kern_retire_rows(c, "office_procdocs", PD_OLD_COLS, _pd_left, PD_RETIRE_LABEL, prune=_pd_prune, alert=_pd_alert,
+                                    why=PD_RETIRE_WHY,
+                                    alter=("CREATE UNIQUE INDEX IF NOT EXISTS office_procdocs_org ON office_procdocs(org_id)",)))
+    return out
+
+
+objhooks.START.append(("kern5282_procdocs", False, pd_retire))  # 2.977.0 (#5282): every start until the old columns are gone
 
 
 # ---------------------------------------------------------------- export

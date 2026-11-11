@@ -554,8 +554,6 @@ office_privacy_sheets.created_at time
 office_privacy_sheets.sent_at time
 office_privacy_sheets.signed_at time
 office_privacy_sheets.updated_at time
-office_procdocs.created_at time
-office_procdocs.data json
 office_purchases.accepted_at time
 office_purchases.created_at time
 office_rgroup_members.created_at time
@@ -633,7 +631,6 @@ pl_uploads.created_at time
 pl_uploads.updated_at time
 playbook_proposals.created_at time
 playbook_proposals.decided_at time
-playbooks.created_at time
 pomos.done bool
 pomos.paused_at time
 portal_logins.created_at time

@@ -12,22 +12,27 @@ space, wiki/wkhist.py); NULL = an ordinary row.
 The rows go with their object: obj_rows_drop / obj_rows_drop_many (core/objhooks.py) take them with the history, and a kind
 whose table rows are deleted by other ways too gets the trigger kalmido_ov_gone('<kind>') on its table (5281_a.py: wiki_pages).
 
-Kinds today: "wiki" (wiki/wkhist.py). The playbooks and the procedure documentation follow (stage Q7b)."""
-from .pg import insert_id, write_lock
+Kinds today: "wiki" (wiki/wkhist.py); 2.977.0 (#5282, stage Q7b): "playbook" (lists/playbook.py: ref_id = a row of playbooks,
+the head of a list's or a folder's Playbook) and "procdoc" (office/procdoc.py: ref_id = a row of office_procdocs, the head of an
+office area's procedure documentation). source (2.977.0): how a version came, in the area's words (the playbooks: edit, restore,
+proposal, import, template); '' = not said (the knowledge pages, the procedure documentation)."""
+from datetime import datetime
+
+from .pg import insert_id, ts_canon, write_lock
 
 OBJV_TABLE = "obj_versions"
 OBJV_CTX = "obj_versions.body"  # the AAD context of a sealed body (core/orgcrypt.py FIELDS["obj_versions"])
-OBJV_COLS = "id, kind, ref_id, no, org_id, owner_id, title, body, size, created_by, created_at, updated_at, held_at"
+OBJV_COLS = "id, kind, ref_id, no, org_id, owner_id, title, body, size, created_by, created_at, updated_at, held_at, source"  # 2.977.0 (#5282): + source
 
 
-def obj_version_add(c, kind, ref_id, org_id, owner_id, title, body, size, by, at, held_at=None):
+def obj_version_add(c, kind, ref_id, org_id, owner_id, title, body, size, by, at, held_at=None, source=""):
     """A new version of object kind / ref_id with the next number (under the lock objv-<kind>-<id> until the transaction
-    ends). body as it is stored (the area sealed it). -> its id."""
+    ends). body as it is stored (the area sealed it); source (2.977.0, #5282) how it came. -> its id."""
     write_lock(c, f"objv-{kind}-{int(ref_id)}")
     no = c.execute("SELECT COALESCE(MAX(no), 0) + 1 FROM obj_versions WHERE kind=? AND ref_id=?", (kind, int(ref_id))).fetchone()[0]
-    return insert_id(c, "INSERT INTO obj_versions(kind,ref_id,no,org_id,owner_id,title,body,size,created_by,created_at,updated_at,held_at) "
-                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                     (kind, int(ref_id), no, org_id, owner_id, title or "", body or "", int(size or 0), by, at, at, held_at))
+    return insert_id(c, "INSERT INTO obj_versions(kind,ref_id,no,org_id,owner_id,title,body,size,created_by,created_at,updated_at,held_at,"
+                        "source) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                     (kind, int(ref_id), no, org_id, owner_id, title or "", body or "", int(size or 0), by, at, at, held_at, source or ""))
 
 
 def obj_version_merge(c, vid, title, body, size, at):
@@ -46,6 +51,20 @@ def obj_version_get(c, kind, ref_id, vid):
     if vid is None:
         return None
     return c.execute(f"SELECT {OBJV_COLS} FROM obj_versions WHERE id=? AND kind=? AND ref_id=?", (int(vid), kind, int(ref_id))).fetchone()
+
+
+def obj_version_no(c, kind, ref_id, no):
+    """2.977.0 (#5282): version number `no` of object kind / ref_id (None: no such number) -- the areas whose routes name a
+    version by its number (the playbooks, the procedure documentation)."""
+    if no is None:
+        return None
+    return c.execute(f"SELECT {OBJV_COLS} FROM obj_versions WHERE kind=? AND ref_id=? AND no=?", (kind, int(ref_id), int(no))).fetchone()
+
+
+def obj_version_last(c, kind, ref_id):
+    """2.977.0 (#5282): the newest version of object kind / ref_id (the highest number), or None."""
+    return c.execute(f"SELECT {OBJV_COLS} FROM obj_versions WHERE kind=? AND ref_id=? ORDER BY no DESC LIMIT 1",
+                     (kind, int(ref_id))).fetchone()
 
 
 def obj_version_prune(c, kind, ref_id, keep):
@@ -71,3 +90,22 @@ def obj_version_drop(c, kind, ref_ids):
     if not ids:
         return 0
     return c.execute("DELETE FROM obj_versions WHERE kind=? AND ref_id = ANY(CAST(? AS BIGINT[]))", (kind, ids)).rowcount
+
+
+def obj_version_old_ts(v, fallback):
+    """2.977.0 (#5282): an old TEXT time of an area's table as it goes into obj_versions (TIMESTAMPTZ): canonical, or fallback
+    when no cast could read it (the moves of stage Q7: wiki/wkhist.py, lists/playbook.py, office/procdoc.py)."""
+    t = ts_canon(v) if v else ""
+    try:
+        datetime.fromisoformat(t)
+        return t
+    except ValueError:
+        return fallback
+
+
+def obj_version_free_no(c, kind, ref_id, want):
+    """2.977.0 (#5282): the number an old version keeps when it moves into obj_versions -- its own (want) when no version of the
+    object has it yet, else the next free one after the highest."""
+    if want and not c.execute("SELECT 1 FROM obj_versions WHERE kind=? AND ref_id=? AND no=?", (kind, int(ref_id), int(want))).fetchone():
+        return int(want)
+    return c.execute("SELECT COALESCE(MAX(no), 0) + 1 FROM obj_versions WHERE kind=? AND ref_id=?", (kind, int(ref_id))).fetchone()[0]

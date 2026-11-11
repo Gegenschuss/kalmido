@@ -173,7 +173,7 @@ async function cs_open(job, org) {
   md.addEventListener('click', async e => {
     const b = /** @type {any} */ (e.target).closest?.('[data-cs]'); if (!b || b.disabled) return;
     const k = b.dataset.cs;
-    if (k === 'close') { md.remove(); return; }
+    if (k === 'close') { md.remove(); pcs_after(); return; }
     if (k === 'rowadd') { const box = cs_one(`.csrows[data-k="${b.dataset.k}"]`, md); if (!box) return; const tmp = document.createElement('div'); setHtml(tmp, cs_lineHtml(b.dataset.k, {})); box.append(...tmp.childNodes); cs_one('.csrow:last-child input', box)?.focus(); return; }
     if (k === 'rowdel') { b.closest('.csrow')?.remove(); return; }
     if (k === 'sketchdel') { sketch = ''; const box = cs_one('.cssketch', md); if (box) setHtml(box, `<p class="muted">${tr('The picture goes with "Save".')}</p>`); b.remove(); return; }
@@ -193,3 +193,72 @@ async function cs_open(job, org) {
     }
   });
 }
+
+// ---- 2.988.0 (#5651): the tab "Call sheets" of a project (projects.js viewChoices, only with Film & Video and the module
+// "dispo"): every call sheet of the project as a row (date, shoot day no., location, PDF); a tap opens it (cs_open). "New
+// call sheet" asks for the day; the server makes the shoot day in the background (one open place of the disposition) and the
+// call sheet (POST /api/team/dispo/callsheets). The way through Disposition > shoot day > "Call sheet" stays as it is.
+S.pcsD = S.pcsD || {};  // list id -> {j, v, busy, err}
+async function pcs_load(lid, force) {
+  const d = S.pcsD[lid] || (S.pcsD[lid] = {});
+  if (d.busy || (!force && d.j && d.v === S.v)) return;
+  d.busy = true;
+  try { d.j = await rawFetch('GET', `/api/team/dispo/callsheets?list=${lid}`); d.v = S.v; d.err = ''; }
+  catch (e) { if (e.message === 'auth') return; d.err = e instanceof Offline ? 'offline' : e.message; d.v = S.v; }
+  finally { d.busy = false; }
+  if (routeList()?.id === lid && pcsOn(routeList())) viewSafeRender();
+}
+/** after the call sheet dialog: the project's tab (when it is the page shown) loads its rows again (a location saved) */
+function pcs_after() { const l = routeList(); if (l && pcsOn(l)) pcs_load(l.id, true); }
+/** one row of the tab (a key for the calm view: data-k) */
+function pcs_rowHtml(x) {
+  const pdf = `/api/team/dispo/callsheet/${encodeURIComponent(x.job)}/pdf?org=${encodeURIComponent(String(x.org_id))}`;
+  const no = x.day_no ? tr('Shoot day {0}', x.day_no) : '';
+  return `<div class="pcsrow" data-k="cs-${esc(x.job)}"><button type="button" class="pcsopen" data-pcs="open" data-job="${esc(x.job)}" data-org="${esc(String(x.org_id))}">
+    <span class="pcsd">${esc(fmtDayAbs(x.date))}${x.start ? ` <span class="muted">${esc(x.start)}</span>` : ''}</span><span class="pcsn">${esc(no)}</span>
+    <span class="pcsl">${x.location ? esc(x.location) : `<span class="muted">${tr('No location yet')}</span>`}</span></button>
+    <a class="btn sm" href="${esc(pdf)}" download data-pcs="pdf" title="${esc(tr('Call sheet as PDF'))}" aria-label="${esc(tr('Call sheet as PDF'))}">${ic('download', 's')}<span>${tr('PDF')}</span></a></div>`;
+}
+function viewProjCs() {
+  const l = routeList(), d = S.pcsD[l.id];
+  if (!d || (!d.busy && d.v !== S.v)) setTimeout(() => pcs_load(l.id), 0);
+  const head = listHead(l, {noPill: true});
+  if (!d?.j) return `<div class="pov pcs">${/*html-ok*/ head}<div class="muted mhint">${d?.err ? esc(errText(d.err, tr('The call sheets could not be loaded'))) : tr('Loading…')}</div></div>`;
+  const j = d.j, can = !!j.can_add && !l.archived;
+  const bar = `<div class="pcsbar"><h3>${tr('Call sheets')}</h3><span class="spacer"></span>${can ? `<button type="button" class="btn sm pri" data-pcs="new">${ic('plus', 's')}<span>${tr('New call sheet')}</span></button>` : ''}</div>`;
+  const rows = j.callsheets || [];
+  const body = j.locked ? `<p class="muted pcsempty">${tr('This project is locked: its call sheets are not shown here.')}</p>`
+    : rows.length ? `<div class="pcslist">${/*html-ok*/ rows.map(pcs_rowHtml).join('')}</div>`
+      : `<p class="muted pcsempty">${can ? tr('No call sheets yet. "New call sheet" makes one for a shoot day.') : tr('No call sheets yet.')}</p>`;
+  return `<div class="pov pcs">${/*html-ok*/ head}${/*html-ok*/ bar}${/*html-ok*/ body}</div>`;
+}
+/** "New call sheet": the day, then the shoot day in the background and the call sheet opens */
+function pcs_new(l) {
+  const md = modal(`<h3>${tr('New call sheet')}</h3><div class="row"><label for="pcs-day">${tr('Shoot day')}</label>${/*html-ok*/ dateIn('pcs-day', today())}</div>
+    <p class="muted cshint">${tr('The shoot day is added to the disposition with an open place for the crew.')}</p>
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-pcs="cancel">${tr('Cancel')}</button><button type="button" class="btn pri" data-pcs="make">${ic('check', 's')} ${tr('Create')}</button></div>`);
+  md.addEventListener('click', async e => {
+    const b = /** @type {any} */ (e.target).closest?.('[data-pcs]'); if (!b) return;
+    if (b.dataset.pcs === 'cancel') { md.remove(); return; }
+    if (b.dataset.pcs !== 'make' || b.disabled) return;
+    const day = /** @type {any} */ (cs_one('#pcs-day', md))?.value || '';
+    if (!day) { toast(tr('Please select a date')); return; }
+    b.disabled = true;
+    try {
+      const r = await api('POST', '/api/team/dispo/callsheets', {list_id: l.id, date: day});
+      md.remove();
+      let ids = [r.booking_id];
+      histAdd({label: tr('Call sheet created'), srv: true,
+        undo: async () => { try { ids = (await api('DELETE', `/api/team/dispo/bookings/${ids[0]}?all=1`)).ids || ids; } catch { /* api() said it */ } pcs_load(l.id, true); },
+        redo: async () => { try { await api('POST', '/api/team/dispo/bookings/restore', {ids}); } catch { /* api() said it */ } pcs_load(l.id, true); }});
+      await pcs_load(l.id, true);
+      if (r.callsheet) cs_open(r.callsheet.job, r.callsheet.org_id);
+    } catch { b.disabled = false; /* api() said it */ }
+  });
+}
+document.addEventListener('click', e => {
+  const b = /** @type {any} */ (e.target).closest?.('#view [data-pcs]'); if (!b) return;
+  const l = routeList(); if (!l) return;
+  if (b.dataset.pcs === 'open') { cs_open(b.dataset.job, +b.dataset.org); return; }
+  if (b.dataset.pcs === 'new') pcs_new(l);
+});

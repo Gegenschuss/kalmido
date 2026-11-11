@@ -1252,7 +1252,7 @@ function renderView0() {
   else if (S.route.key === 'steps') setHtml(el, viewSteps());  // 2.773.0 (#5250): the page "Recent steps" (undolist.js)
   else if (S.route.key === 'projects') setHtml(el, viewProjStart());  // 2.417.0 A (#3559)
   else if (isRoadmap()) setHtml(el, viewRoadmap());
-  else if (isOverview()) setHtml(el, viewProjOv());  // 2.7.1 (#410)
+  else if (isOverview()) setHtml(el, pcsOn(routeList()) ? viewProjCs() : viewProjOv());  // 2.7.1 (#410); 2.988.0 (#5651): the call sheets (callsheet.js)
   else if (isMindmap()) setHtml(el, vsegHtml(routeList()) + viewMindmap(routeList()));  // 2.49.0 (#1201)
   else if (isListCal()) { setHtml(el, lcal_view(routeList())); requestAnimationFrame(calFit); }  // 2.156.0 C (#2071): listcal.js (module calendar)
   else if (isKanban()) setHtml(el, viewKanban());

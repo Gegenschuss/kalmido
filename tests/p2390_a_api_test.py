@@ -351,7 +351,7 @@ items = wait_for(lambda: [x for x in A.get(B + "/api/admin/backups").json().get(
 name = items[0]["name"] if items else ""
 r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
 check(r.ok and r.json().get("ok"), "backup: a backup with playbooks verifies " + r.text[:200])
-dbx("DELETE FROM playbooks", write=True)
+dbx("DELETE FROM playbooks", write=True)  # 2.977.0 (#5282): the heads; their versions in obj_versions go with them (trigger)
 dbx("DELETE FROM playbook_proposals", write=True)
 r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "name": name})
 check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
@@ -362,8 +362,11 @@ check(d.get("version") == 5 and len(A.get(PB(W) + "/versions").json()["versions"
 
 # ---- deleting the list removes its Playbook
 A.patch(B + f"/api/lists/{nl}", json={"archived": True})
+NLH = [r[0] for r in dbx("SELECT id FROM playbooks WHERE list_id=?", (nl,))]  # 2.977.0 (#5282): its head (versions in obj_versions)
 check(A.delete(B + f"/api/lists/{nl}").ok and A.delete(B + f"/api/trash/lists/{nl}").ok, "setup: delete the template list")  # 2.102.0 (#1988): deleting moves the list into the list trash; the purge from there deletes for good
 check(dbx("SELECT COUNT(*) FROM playbooks WHERE list_id=?", (nl,))[0][0] == 0, "#1168: a deleted list takes its Playbook along")
+check(len(NLH) == 1 and dbx("SELECT COUNT(*) FROM obj_versions WHERE kind='playbook' AND ref_id=?", (NLH[0],))[0][0] == 0,
+      "#5282: ... and its versions in the core (trigger kalmido_ov_gone)")
 
 print(f"p2390_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

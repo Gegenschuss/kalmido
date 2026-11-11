@@ -316,7 +316,9 @@ def book_member_set(c, bid, uid, role):
         raise Denied(404, tr("unknown person"))
     if is_agent(u) and not has_request_context():
         raise Denied(404, tr("unknown person"))
-    if not any(m["user_id"] == uid for m in book_members_of(c, bid)):  # a new member (2.924.0, #5069: no share row of theirs yet)
+    # a new member (2.924.0, #5069: no share row of theirs yet); 2.988.0 (#5604): no LIVE share -- one that ran out counts as
+    # none, so the checks run before the core's put below lets the person in again
+    if bk_member_role(c, bid, uid) is None:
         need_visible(c, uid)  # 2.30.0 (#1036, B2): only people one may see (404 as for an unknown id)
         p = ws_fit_problem(c, b["org_id"], uid, "book")  # 2.30.0 (#1036, B3): an organisation's address book only inside it
         if p:
@@ -324,9 +326,10 @@ def book_member_set(c, bid, uid, role):
     n = BK_KERN["node"](c, me(), bid)  # 2.566.0 (#4712): its node first (contacts/ctkern.py)
     # 2.924.0 (#5069): the share row on its node is the membership (core/objects.py obj_node_person_put; was book_members + the
     # mirror trigger): the same person again changes the role, a share that ran out comes back without end date (#5089)
+    book_touch(c, bid)  # 2.988.0 (#5604): the object's row first, then the node's lock in the put (the order of
+    # admin/purgeshare.py: two orders could deadlock)
     if BK_KERN["put"](c, me(), n, uid, role):
         news_add(c, uid, "abshare", data={"book_id": bid, "name": b["name"], "role": role}, row="share")
-    book_touch(c, bid)
 
 
 def contact_visible(c, cid, uid, trash=False):

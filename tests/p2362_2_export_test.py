@@ -166,7 +166,10 @@ now = "2026-10-20T10:00:00+00:00"
 BOOK = dbx("INSERT INTO office_cashbooks(org_id, name, created_at, updated_at) VALUES(?,?,?,?) RETURNING id", (PB, "Kasse", now, now))[0][0]
 dbx("INSERT INTO office_cash_entries(org_id, book_id, no, day, node_id, created_at, updated_at) VALUES(?,?,1,'2026-10-20',?,?,?)", (PB, BOOK, FILED, now, now))
 dbx("INSERT INTO office_equipment(org_id, name, receipt_node_id, created_at, updated_at) VALUES(?,?,?,?,?)", (PB, "Kamera", FOREIGN, now, now))  # never in the file
-dbx("INSERT INTO office_procdocs(org_id, version, data, created_at) VALUES(?,1,'{\"s\":\"Verfahren Frida\"}',?)", (PB, now))
+# 2.977.0 (#5282): the head in office_procdocs, the version in the core's obj_versions (kind procdoc)
+PDH = dbx("INSERT INTO office_procdocs(org_id) VALUES(?) RETURNING id", (PB,))[0][0]
+dbx("INSERT INTO obj_versions(kind, ref_id, no, org_id, body, created_at, updated_at) VALUES('procdoc',?,1,?,'{\"s\":\"Verfahren Frida\"}',?,?)",
+    (PDH, PB, now, now))
 dbx("INSERT INTO office_dunning_marks(org_id, doc_id, level, created_at) VALUES(?,?,1,?)", (PB, INV, now))
 dbx("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,'invoice','2026',7) ON CONFLICT DO NOTHING", (PB,))
 dbx("""INSERT INTO office_signoffs(org_id, doc_id, title, token_hash, token, ip, user_agent, signer_name, created_at)

@@ -20,6 +20,9 @@ names only.  tenant-matrix: calendar, book   freelancer-matrix: pim
    alone while it carries shares; removed for good (2.924.0 #5069) its shares go with it (no member rows to fall back on)
  - review F5: the members dialog of a book removes a share that lives only in the core
  - review F2: a workspace move checks the shares of the node (a person only in the core, a group): 409, nothing moves
+ - 2.988.0 (#5604): a share that ran out is no membership: sharing again runs the checks (a person outside the
+   organisation is refused, the old row stays expired), a member still inside comes back; eight shares of one person at once
+   leave one share row
  - review F1: the owner leaves the organisation without an heir: the calendar's node follows into the private tree, a share
    taken back in the core stays taken back, one only in the core stays
  - (the start's copy of old member rows, formerly migr_kern4712: tests/p2924_b_kern_calbook_test.py, 2.924.0 #5069)
@@ -206,6 +209,45 @@ check(BK not in ids(Gi.get(B + "/api/books")), "#4697: gina no longer has the or
 check(share("address_book", BK, GINA) is None, "#4712: her core share is gone")
 check(sql("SELECT COUNT(*) FROM obj_revoked WHERE user_id=? AND reason='leave' AND src='fs_shares' AND kind='address_book' AND ref_id=?",
           (GINA, BK))[0][0] >= 1, "#4712: taken by the core's revocation (restorable rows)")
+
+# ================================================================== 2.988.0 (#5604): an expired share is no membership
+K9 = A.post(B + "/api/evcals", json={"name": "Night shift", "org_id": ORG}).json()["id"]
+B9 = A.post(B + "/api/books", json={"name": "Night contacts", "org_id": ORG}).json()["id"]
+for kind, url, rid in (("evcal", "evcals", K9), ("address_book", "books", B9)):
+    check(A.put(B + f"/api/{url}/{rid}/members", json={"user_id": BOB, "role": "view"}).ok, f"#5604: {kind} shared with bob (its node)")
+    nd = node(kind, rid)
+    # gina (no longer in the organisation) with a share that ran out, as the file store's dialog leaves one with an end date
+    sql("INSERT INTO fs_shares(node_id,user_id,role,created_at,expires_at) VALUES(?,?,'view','2026-11-01T00:00:00+00:00',"
+        "'2026-11-02T00:00:00+00:00')", (nd, GINA), write=True)
+    r = A.put(B + f"/api/{url}/{rid}/members", json={"user_id": GINA, "role": "edit"})
+    check(r.status_code in (404, 409), f"#5604: {kind}: the expired share does not skip the checks - gina outside the organisation "
+                                       f"is refused ({r.status_code} {r.text[:120]})")
+    check(sql("SELECT role, expires_at IS NOT NULL FROM fs_shares WHERE node_id=? AND user_id=?", (nd, GINA)) == [("view", True)],
+          f"#5604: {kind}: her expired share stays as it was (not revived)")
+    check(rid not in ids(Gi.get(B + f"/api/{url}")), f"#5604: {kind}: gina does not get it")
+    # bob's own share ran out: sharing anew lets him in again (#5089), he is still in the organisation
+    sql("UPDATE fs_shares SET expires_at='2026-11-02T00:00:00+00:00' WHERE node_id=? AND user_id=?", (nd, BOB), write=True)
+    check(A.put(B + f"/api/{url}/{rid}/members", json={"user_id": BOB, "role": "edit"}).ok and rid in ids(Bo.get(B + f"/api/{url}"))
+          and share(kind, rid, BOB) == "edit", f"#5604: {kind}: bob shared anew is back (his row, without end date)")
+
+# 2.988.0 (#5604): two shares of one person at the same time leave ONE share row (obj_node_person_put under the node's lock)
+from concurrent.futures import ThreadPoolExecutor  # noqa: E402
+for kind, url, rid in (("evcal", "evcals", K9), ("address_book", "books", B9)):
+    nd = node(kind, rid)
+    check(A.delete(B + f"/api/{url}/{rid}/members/{BOB}").ok and share(kind, rid, BOB) is None, f"#5604: {kind}: bob taken out again")
+    for rnd in range(3):
+        sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (nd, BOB), write=True)
+
+        def put(i, url=url, rid=rid):
+            s = requests.Session()
+            s.headers.update(A.headers)
+            s.cookies.update(A.cookies)
+            return s.put(B + f"/api/{url}/{rid}/members", json={"user_id": BOB, "role": "edit" if i % 2 else "view"}).status_code
+
+        with ThreadPoolExecutor(8) as ex:
+            codes = list(ex.map(put, range(8)))
+        n_rows = sql("SELECT COUNT(*) FROM fs_shares WHERE node_id=? AND user_id=?", (nd, BOB))[0][0]
+        check(all(x == 200 for x in codes) and n_rows == 1, f"#5604: {kind} round {rnd}: 8 shares at once -> one row ({n_rows}, {codes})")
 
 # ================================================================== the trash (#4707)
 E2 = A.post(B + "/api/events", json={"cal_id": K, "title": "Review", "start": f"{D}T14:00", "end": f"{D}T15:00"}).json()

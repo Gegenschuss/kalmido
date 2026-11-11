@@ -412,6 +412,7 @@ ROUTES = {
     "GET /api/team/dispo/callsheet/{}": "hub", "PUT /api/team/dispo/callsheet/{}": "hub", "GET /api/team/dispo/callsheet/{}/pdf": "hub",
     "GET /api/team/dispo/callsheet/{}/sketch": "hub",  # 2.855.0 (#1956): the call sheet of a shoot day (p2802_a_callsheet_test.py, freelancer-matrix: hub)
     "GET /api/team/dispo/callsheet/{}/history": "hub",  # 2.872.0 (#5532): its history of the core (p5532_a_dispokern_test.py, freelancer-matrix: hub)
+    "GET /api/team/dispo/callsheets": "hub", "POST /api/team/dispo/callsheets": "hub",  # 2.988.0 (#5651): a project's tab "Call sheets" (p2988_a_callsheets_test.py, freelancer-matrix: hub)
     "PUT /api/team/absences/holidays": "hub",
     # 2.125.0 A (#2117, #2118): vacation account, requests, the working week
     "GET /api/team/leave": "hub", "PUT /api/team/leave/quota": "hub", "PUT /api/team/leave/approval": "hub",
@@ -1662,7 +1663,6 @@ PUT /api/lists/{}/in-mine
 PUT /api/lists/{}/layout
 PUT /api/lists/{}/links/order
 PUT /api/lists/{}/page-style
-PUT /api/lists/{}/playbook
 PUT /api/me/avatar
 PUT /api/newsletter
 PUT /api/newsletter/consent

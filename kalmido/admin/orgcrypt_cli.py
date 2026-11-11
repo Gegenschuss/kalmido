@@ -65,6 +65,16 @@ FIELD_ORG_ROWS = ("office_company", "office_settings", "office_cf_start", "offic
 FIELD_JOBS = [(t, "org_id" if t in FIELD_ORG_ROWS else "id", col, "log" if (t, col) == ("office_doc_log", "detail") else "text")
               for t, cols in oc.FIELDS.items() if not t.startswith(FIELD_SETTLED) for col in cols] + [
     (t, "org_id" if t in FIELD_ORG_ROWS else "id", col, "json") for (t, col) in oc.JSON_KEYS]
+# 2.977.0 (#5282): the versions of the procedure documentation are rows of the core's obj_versions (kind procdoc): this pass seals
+# and opens them like the office's other fields; the knowledge pages' kind stays with wkh_settle (FIELD_KIND: the kind per table)
+FIELD_KIND = {"obj_versions": "procdoc"}
+FIELD_JOBS += [("obj_versions", "id", "body", "text")]
+
+
+def field_scope(table):
+    """2.977.0 (#5282): -> (WHERE part, number of org id arguments) of the field pass in table (osig_scope + FIELD_KIND)."""
+    w, k = osig_scope(table)
+    return (f"{w} AND kind='{FIELD_KIND[table]}'", k) if table in FIELD_KIND else (w, k)
 # 2.126.0 A (#1971): (table, id column, column, sealing context) of the documents' values: sealed per workspace (column ws)
 # by docs/store.py doc_seal, the organisation's key or the person's own key
 DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", "amount", "suggest", "trained", "extracted", "summary")] + [  # 2.138.0: + summary (2.126.1 #2123)
@@ -199,7 +209,7 @@ def fields_pass(c, oid, enc, key, stop=None):
                 return n
             with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
                 write_lock(c, "orgcrypt")
-                w, k = osig_scope(table)
+                w, k = field_scope(table)  # 2.977.0 (#5282): obj_versions only kind procdoc
                 sql = f"SELECT {idc} AS rid, {col} AS v FROM {table} WHERE {w}"
                 if enc:  # 2.148.1 G (#2481): sealed / empty values need no pass (every start runs this)
                     sql += f" AND {col} IS NOT NULL AND CAST({col} AS TEXT) NOT LIKE '{oc.PREFIX}%'"  # pg-ok: the prefix has no case
@@ -255,7 +265,7 @@ def fields_count(c, oid):
     out = {"enc": 0, "plain": 0}
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         for table, idc, col, kind in FIELD_JOBS:
-            w, k = osig_scope(table)
+            w, k = field_scope(table)  # 2.977.0 (#5282)
             for r in c.execute(f"SELECT {col} AS v FROM {table} WHERE {w}", (oid,) * k):
                 s = _is_enc(table, col, kind, r["v"])
                 if s is not None:
