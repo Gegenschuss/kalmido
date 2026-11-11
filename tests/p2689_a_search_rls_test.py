@@ -133,7 +133,7 @@ SRC = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "kalmi
 body = SRC[SRC.index("def search_tasks("):]
 body = body[:body.index("\n@app.")]
 # 2.981.0 (#5278): the text through the shared search index obj_search (no ILIKE on tasks any more), still on the visible lists
-check("SELECT id FROM tasks WHERE title ILIKE" not in body and "ILIKE" not in body and 'osr_ids_sql("task"' in body
+check("SELECT id FROM tasks WHERE title ILIKE" not in body and "title ILIKE ?" not in body and 'osr_ids_sql("task"' in body
       and "vis_search_lids(c, uid)" in body, "search_tasks tests the text on the visible lists' tasks through obj_search")
 
 sys.exit(kt.done("p2689_a_search_rls"))

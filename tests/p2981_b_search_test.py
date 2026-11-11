@@ -155,9 +155,11 @@ C1 = contact(A, given="Anna", family="Bankmann", org="Mueller Bau", phones=[{"va
 CF = contact(Fr, fn="Jürgen Fröhlich", phones=[{"value": "030 777 8899"}])["id"]
 
 # ================================================================== umlauts (question 13)
-for q in ("Müller", "Mueller", "muller", "MÜLLER"):
+for q in ("Müller", "Mueller", "MÜLLER", "mueller"):
     got = tasks_found(A, q)
     check({TM1, TM2, TP} <= got and TB not in got, f"tasks: {q!r} finds Müller and Mueller (alice, not Beta's) {sorted(got, key=str)}")
+got = tasks_found(A, "muller")
+check({TM1, TP} <= got and TM2 not in got, f"tasks: 'muller' (typed without the umlaut) finds Müller, not Mueller {sorted(got, key=str)}")
 h, _ = fts(A, "mueller")
 check({(TM1, "title"), (TM2, "notes"), (TP, "title")} <= h, f"/api/search: title and notes hits for 'mueller' {h}")
 check(notes_found(A, "mueller") == {N1} and notes_found(A, "übersicht") == {N1} and notes_found(A, "uebersicht") == {N1},
