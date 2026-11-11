@@ -169,7 +169,8 @@ for name, f in (("busy", busy), ("none", lambda *a, **k: None)):
     c = connect()
     st = S.process(c, %d)
     c.commit()
-    print(name, st, S.meta_json(c, S.meta_row(c, %d), "auto", {}).get("_pg"))
+    pg = S.meta_json(c, S.meta_row(c, %d), "auto", {}).get("_pg")
+    print(name, st, [round(x) for x in pg] if pg else None)
     c.close()
 """
 r = subprocess.run(["docker", "exec", "-i", "-w", "/app", CT, "python", "-"], input=F5571 % (P, P), capture_output=True, text=True, timeout=180)
