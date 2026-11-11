@@ -796,7 +796,10 @@ def ocm_move_q4c(c):
     tchat_trash_text (the kept texts of deleted team chat messages, while that table is there) go into it as kind 'tchat' with
     their message's id; a text whose message is gone or not deleted any more stays behind. The fragment 5274_a drops the old
     table right after (one-way). -> rows moved."""
-    ocm_trash_key(c)
+    if ocm_trash_key(c):
+        # review 2.981 (Fable D1): the new key alone (a database without the old table, made since this version) raises the
+        # back limit too - an older image would read obj_comment_trash without kind (a message's text under a comment's id)
+        kern_retire_floor(c, how=OCM_Q4C_HOW)
     if not c.execute("SELECT to_regclass('tchat_trash_text')").fetchone()[0]:
         return 0
     n = c.execute("""INSERT INTO obj_comment_trash(kind, comment_id, body, enc)
