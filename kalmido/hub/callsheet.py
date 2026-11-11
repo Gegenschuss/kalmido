@@ -25,7 +25,13 @@ GET  /api/team/dispo/callsheet/<job>?org=      the stored details + what comes f
 PUT  /api/team/dispo/callsheet/<job>?org=      {data: {...}, sketch?: data URI | "" (remove), expect_updated_at?}
 GET  /api/team/dispo/callsheet/<job>/pdf?org=  the PDF (?inline=1: shown in the browser instead of downloaded)
 GET  /api/team/dispo/callsheet/<job>/sketch?org=  the stored sketch (the dialog's preview)
-GET  /api/team/dispo/callsheet/<job>/history?org=  2.872.0 (#5532): who changed the call sheet when, and which details"""
+GET  /api/team/dispo/callsheet/<job>/history?org=  2.872.0 (#5532): who changed the call sheet when, and which details
+2.986.0 (#5649): client and agency are chosen from the contacts (data.client_contact / data.agency_contact = a contact id):
+the client still comes from the project's client file and a contact chosen replaces it; the agency is one contact (company +
+person, phone, e-mail of the contact). Only contacts of the area's address books the viewer may read (the rule of cs_people,
+cs_contact): an id of any other book is refused on saving (400) and shown nowhere (the dialog, the PDF, its distribution
+line). The agency chosen is remembered at the project (lists.cs_agency_id, by a person who edits the project) and fills a new
+call sheet of the project. The free texts data.client / data.agency stay as the fallback (older call sheets keep theirs)."""
 import base64
 import binascii
 import hashlib
@@ -73,6 +79,7 @@ CS_ROWS = {"calls": (("dept", "time"), 30),
            "cast": (("role", "name", "phone", "arrival", "makeup", "costume", "ready"), 60),
            "transport": (("vehicle", "from", "to", "riders", "cargo", "call"), 30)}
 CS_CELL = 200
+CS_REFS = ("client_contact", "agency_contact")  # 2.986.0 (#5649): contact ids of the day details
 CS_CTRL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
 
@@ -171,17 +178,56 @@ def cs_people(c, uid, oid, rows):
     return out
 
 
+def cs_book_q(books):
+    return ",".join("?" * len(books))
+
+
+def cs_contact_info(r):
+    """{id, company, person, phone, email} of a contact row (2.986.0, #5649): an organisation contact is the company, a person
+    carries the company of the contact's field "organisation"."""
+    name = (r["fn"] or f"{r['given'] or ''} {r['family'] or ''}").strip()
+    company, person = (name, "") if r["kind"] == "org" else ((r["org"] or "").strip(), name)
+    return {"id": r["id"], "company": company, "person": person, "phone": _first(r["phones"], ("cell", "mobile")),
+            "email": _first(r["emails"])}
+
+
+def cs_contact(c, uid, oid, cid, books=None):
+    """2.986.0 (#5649): the contact cid as cs_contact_info when it is a person / an organisation in an address book of the area
+    uid may read (dsp_book_ids, the rule of cs_people), else None -- an id of another book shows nothing."""
+    if not cid:
+        return None
+    books = dsp_book_ids(c, uid, oid) if books is None else books
+    if not books:
+        return None
+    r = c.execute(f"SELECT id, kind, fn, given, family, org, emails, phones FROM contacts WHERE id=? AND book_id IN ({cs_book_q(books)}) "
+                  f"AND kind IN ('individual', 'org') AND {live_sql()}", (int(cid), *books)).fetchone()
+    return cs_contact_info(r) if r else None
+
+
+def cs_contacts(c, uid, oid, books=None):
+    """2.986.0 (#5649): the choice of the dialog: [{id, company, person, phone, email}] of the people and organisations of the
+    area's address books uid may read (the same books as dsp_contacts of the disposition's places)."""
+    books = dsp_book_ids(c, uid, oid) if books is None else books
+    if not books:
+        return []
+    return [cs_contact_info(r) for r in c.execute(
+        f"SELECT id, kind, fn, given, family, org, emails, phones FROM contacts WHERE book_id IN ({cs_book_q(books)}) "
+        f"AND kind IN ('individual', 'org') AND {live_sql()} ORDER BY lower(fn), id LIMIT 500", books)]
+
+
 def cs_project(c, uid, rows):
-    """{name, client: {name, contact, phone, email, address}, list_id, shoot} of the job's project, when uid sees it."""
+    """{name, client: {name, contact, phone, email, address}, list_id, shoot, agency_id, role} of the job's project, when uid
+    sees it (2.986.0, #5649: + the agency remembered at the project and uid's role there)."""
     lid = next((b["list_id"] for b in rows if b.get("list_id")), None)
-    if not lid or not list_role(c, lid, uid):
+    role = list_role(c, lid, uid) if lid else None
+    if not role:
         return {}
-    r = c.execute("SELECT id, name, ptype, client_id FROM lists WHERE id=?", (lid,)).fetchone()
+    r = c.execute("SELECT id, name, ptype, client_id, cs_agency_id FROM lists WHERE id=?", (lid,)).fetchone()
     if not r:
         return {}
     locked = bool(le2e_mode(c, lid))
-    out = {"list_id": r["id"], "name": "" if locked else (r["name"] or ""), "client": {},
-           "shoot": (r["ptype"] or "") == "shoot" and not locked and ptype_ok(c, uid, "shoot")}
+    out = {"list_id": r["id"], "name": "" if locked else (r["name"] or ""), "client": {}, "role": role, "locked": locked,
+           "agency_id": r["cs_agency_id"], "shoot": (r["ptype"] or "") == "shoot" and not locked and ptype_ok(c, uid, "shoot")}
     if r["client_id"]:
         # review 2.802 F1: the client file's own reading rules (not guests / accounting, a private client = its creator only)
         cl = next(iter(client_rows(c, uid, only=r["client_id"])), None)
@@ -219,22 +265,31 @@ def cs_when(rows):
     return d0, (st[0] if st else ""), (en[-1] if en and en[-1] != "23:59" else "")
 
 
-def cs_auto(c, uid, oid, rows):
-    """What the call sheet takes from the app (not stored): day, title, project, client, production, crew, shot list days."""
+def cs_auto(c, uid, oid, rows, d=None, choice=True):
+    """What the call sheet takes from the app (not stored): day, title, project, client, production, crew, shot list days.
+    2.986.0 (#5649): + the contacts chosen in the day details d (client_contact / agency_contact, only readable ones), the
+    agency remembered at the project (agency_default) and, with choice, the contacts to choose from."""
     d0, t0, t1 = cs_when(rows)
     proj = cs_project(c, uid, rows)
     crew = cs_people(c, uid, oid, rows)
     days = cs_shot_days(c, uid, proj)
+    d = d or {}
+    books = dsp_book_ids(c, uid, oid)
     return {"date": d0, "start": t0, "end": t1, "title": rows[0]["title"] or "", "project": proj.get("name", ""),
             "client": proj.get("client") or {}, "production": cs_production(c, oid), "crew": crew,
-            "shot_days": [n for n, s in days], "list_id": proj.get("list_id")}
+            "shot_days": [n for n, s in days], "list_id": proj.get("list_id"),
+            "client_contact": cs_contact(c, uid, oid, d.get("client_contact"), books),
+            "agency_contact": cs_contact(c, uid, oid, d.get("agency_contact"), books),
+            "agency_default": cs_contact(c, uid, oid, proj.get("agency_id"), books),
+            **({"contacts": cs_contacts(c, uid, oid, books)} if choice else {})}
 
 
 def cs_public(c, uid, oid, job, rows, r=None):
     r = r if r is not None else cs_row(c, oid, job)
-    return {"job": job, "org_id": oid, "data": cs_data(r), "sketch": bool(r and r.get("sketch")),
+    d = cs_data(r)
+    return {"job": job, "org_id": oid, "data": d, "sketch": bool(r and r.get("sketch")),
             "sketch_url": f"/api/team/dispo/callsheet/{job}/sketch?org={oid}" if r and r.get("sketch") else "",
-            "updated_at": (r or {}).get("updated_at") or "", "can_edit": org_writes(c, uid, oid), "auto": cs_auto(c, uid, oid, rows)}
+            "updated_at": (r or {}).get("updated_at") or "", "can_edit": org_writes(c, uid, oid), "auto": cs_auto(c, uid, oid, rows, d)}
 
 
 # ---------------------------------------------------------------- writing
@@ -254,6 +309,15 @@ def cs_clean(d):
     for k, n in CS_TEXT.items():
         if k in d:
             out[k] = _cell(d.get(k), n)
+    for k in CS_REFS:  # 2.986.0 (#5649): a contact id (cs_put checks that the person may read it); none = "" / null / 0
+        v = d.get(k)
+        if v in (None, "", 0):
+            continue
+        if isinstance(v, str) and v.strip().isdigit():
+            v = int(v.strip())
+        if not isinstance(v, int) or isinstance(v, bool) or not 0 < v < 2 ** 62:
+            raise BadInput(tr("Invalid value: {0}", k))
+        out[k] = v
     for k, (cols, most) in CS_ROWS.items():
         v = d.get(k)
         if v is None:
@@ -332,6 +396,10 @@ def cs_put(job):
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     data = cs_clean(b.get("data") or {})
+    books = dsp_book_ids(c, uid, oid)
+    for k in CS_REFS:  # 2.986.0 (#5649): only a contact the person may read in this area (an id of another book: 400)
+        if data.get(k) and not cs_contact(c, uid, oid, data[k], books):
+            raise BadInput(tr("Invalid value: {0}", k))
     sketch = None
     if "sketch" in b and b["sketch"] not in (None, False):
         sketch = ("", "") if b["sketch"] == "" else cs_sketch_in(c, uid, oid, b["sketch"])
@@ -361,9 +429,28 @@ def cs_put(job):
         obj_history_add(c, uid, DSK_CS, rid, {"sketch": _pic_mark(r.get("sketch"))}, {"sketch": _pic_mark(sketch[0])}, org_id=oid)
     if data != cs_data(r):
         obj_write(c, uid, DSK_CS, rid, {"data": data})
+    cs_agency_keep(c, uid, rows, data.get("agency_contact"))
     bump(c)
     c.commit()
     return jsonify(callsheet=cs_public(c, uid, oid, job, rows))
+
+
+def cs_agency_keep(c, uid, rows, cid):
+    """2.986.0 (#5649): the agency chosen is remembered at the job's project (lists.cs_agency_id) for its next call sheet --
+    by a person who edits the project (owner, project admin, editor), not in a locked project; the project's history notes
+    it (the id, no contact data). Anyone else: the call sheet is saved, the project stays as it was."""
+    from ..core.writes import obj_history_add
+    from ..lists.lmcore import LMC_KIND
+    proj = cs_project(c, uid, rows) if cid else {}
+    lid = proj.get("list_id")
+    if not lid or proj.get("locked") or proj.get("role") not in ("owner", "admin", "edit") or proj.get("agency_id") == cid:
+        return
+    write_lock(c, f"obj-list-{int(lid)}")  # the project's lock (lists/lists.py, PATCH /api/lists/<id>)
+    old = c.execute("SELECT cs_agency_id FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
+    if old is None or old[0] == cid:
+        return
+    c.execute("UPDATE lists SET cs_agency_id=? WHERE id=?", (cid, lid))
+    obj_history_add(c, uid, LMC_KIND, lid, {"cs_agency_id": old[0]}, {"cs_agency_id": cid})
 
 
 @app.get("/api/team/dispo/callsheet/<job>/history")
@@ -529,14 +616,16 @@ def cs_pdf(c, uid, oid, job, rows):
     T = lambda s, *a: tr(s, *a, lg=lg)  # noqa: E731
     r = cs_row(c, oid, job)
     d = cs_data(r)
-    a = cs_auto(c, uid, oid, rows)
+    a = cs_auto(c, uid, oid, rows, d, choice=False)
+    cc, ac = a["client_contact"], a["agency_contact"]  # 2.986.0 (#5649): the contacts chosen (only readable ones, cs_contact)
     doc = CsDoc(lg)
     title = a["project"] or a["title"]
     prod = a["production"]
     cast = d.get("cast") or []
     client = a["client"]
-    # the distribution line: everybody of the crew, the cast, the client's contact person
-    names = [x["name"] for x in a["crew"] if not x["open"]] + [x.get("name", "") for x in cast] + [client.get("contact", "")]
+    # the distribution line: everybody of the crew, the cast, the client's contact person (2.986.0, #5649: + the agency's)
+    names = [x["name"] for x in a["crew"] if not x["open"]] + [x.get("name", "") for x in cast] + \
+        [cc["person"] if cc else client.get("contact", ""), ac["person"] if ac else ""]
     seen, dist = set(), []
     for n in names:
         n = (n or "").strip()
@@ -555,11 +644,16 @@ def cs_pdf(c, uid, oid, job, rows):
     cols = []
     cols.append((T(N_("Production")), [prod["name"]] + prod["lines"]))
     cl = []
-    if d.get("client"):
+    card = lambda x: [v for v in (x["company"], x["person"], x["phone"], x["email"]) if v]  # noqa: E731
+    if cc:
+        cl += card(cc)
+    elif d.get("client"):
         cl += d["client"].splitlines()
     elif client:
         cl += [client.get("name", ""), client.get("contact", ""), client.get("address", ""), client.get("phone", ""), client.get("email", "")]
-    if d.get("agency"):
+    if ac:
+        cl += ["", T(N_("Agency")) + ":"] + card(ac)
+    elif d.get("agency"):
         cl += ["", T(N_("Agency")) + ":"] + d["agency"].splitlines()
     cols.append((T(N_("Client")), cl))
     contacts = d.get("contacts") or [{"role": x["function"], "name": x["name"], "phone": x["phone"]} for x in a["crew"] if x["function"] and not x["open"]][:8]
@@ -648,9 +742,13 @@ def cs_pdf(c, uid, oid, job, rows):
     crew_rows = [["__group__", T(N_("Crew"))]] + [[x["function"], x["name"], x["mail"], x["phone"]] for x in a["crew"]]
     if cast:
         crew_rows += [["__group__", T(N_("Cast"))]] + [[x.get("role", ""), x.get("name", ""), "", x.get("phone", "")] for x in cast]
-    if d.get("agency"):
+    if ac:
+        crew_rows += [["__group__", T(N_("Agency"))], [ac["company"], ac["person"], ac["email"], ac["phone"]]]
+    elif d.get("agency"):
         crew_rows += [["__group__", T(N_("Agency"))], ["", d["agency"].splitlines()[0], "", ""]]
-    if client.get("contact") or client.get("name"):
+    if cc:
+        crew_rows += [["__group__", T(N_("Client"))], [cc["company"], cc["person"], cc["email"], cc["phone"]]]
+    elif client.get("contact") or client.get("name"):
         crew_rows += [["__group__", T(N_("Client"))], [client.get("name", ""), client.get("contact", ""), client.get("email", ""), client.get("phone", "")]]
     doc.table(T(N_("Crew list")), [(T(N_("Function")), .24), (T(N_("Name")), .26), (T(N_("E-mail")), .3), (T(N_("Phone")), .2)], crew_rows)
     if d.get("transport"):

@@ -18262,5 +18262,8 @@
   "Select the model per run": "Scegliere il modello a ogni esecuzione",
   "For your messages and decisions": "Per i tuoi messaggi e le decisioni",
   "For routine": "Per la routine",
-  "Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.": "I tuoi messaggi, pulsanti, reazioni e commenti e ogni esecuzione che può richiedere una decisione usano il primo modello; i risvegli silenziosi, le nuove attività, i solleciti e i lavori pianificati senza segnale di allarme usano il secondo. Nel dubbio il primo."
+  "Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.": "I tuoi messaggi, pulsanti, reazioni e commenti e ogni esecuzione che può richiedere una decisione usano il primo modello; i risvegli silenziosi, le nuove attività, i solleciti e i lavori pianificati senza segnale di allarme usano il secondo. Nel dubbio il primo.",
+  "From the client file or free text": "Dalla scheda cliente o testo libero",
+  "Client: free text": "Cliente: testo libero",
+  "Agency: free text": "Agenzia: testo libero"
 }

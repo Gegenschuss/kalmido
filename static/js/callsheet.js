@@ -27,6 +27,19 @@ function cs_mapHref(t) {
   return /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent) ? `https://maps.apple.com/?q=${q}` : `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
 
+// 2.986.0 (#5649): client and agency from the contacts -- a select of the area's contacts the person may read (like the
+// disposition's places, dispo.js dp_fillHtml), the contact's company, person, phone and e-mail below it; the free text stays
+// as the fallback (shown while no contact is chosen). A new call sheet starts with the agency remembered at the project.
+const cs_ctLabel = x => [x.person, x.company].filter(Boolean).join(' – ') || '?';
+const cs_ctCard = x => x ? [x.company, x.person, x.phone, x.email].filter(Boolean).join(' · ') : '';
+function cs_ctHtml(k, label, cur, list, freeHtml) {
+  const opts = (list || []).map(x => `<option value="${esc(String(x.id))}" ${cur && cur.id === x.id ? 'selected' : ''}>${esc(cs_ctLabel(x))}</option>`).join('');
+  return `<div class="row"><label for="cs-${esc(k)}_contact">${tr(label)}</label><select id="cs-${esc(k)}_contact" data-f="${esc(k)}_contact" data-n="1">
+      <option value="">${esc(k === 'client' ? tr('From the client file or free text') : tr('Free text'))}</option>${/*html-ok*/ opts}</select></div>
+    <p class="muted cshint csct" data-ct="${esc(k)}"${cur ? '' : ' hidden'}>${esc(cs_ctCard(cur))}</p>
+    <div class="csfree" data-ct="${esc(k)}"${cur ? ' hidden' : ''}>${/*html-ok*/ freeHtml}</div>`;
+}
+
 /** one line of an editable table (key of CS_ROWS) */
 function cs_lineHtml(key, r) {
   return `<div class="csrow" data-k="${esc(key)}">${CS_ROWS[key].map(([c, label]) => `<input data-c="${esc(c)}" maxlength="200" value="${esc(r[c] || '')}" placeholder="${esc(tr(label))}" aria-label="${esc(tr(label))}">`).join('')}<button type="button" class="iconbtn" data-cs="rowdel" aria-label="${esc(tr('Remove line'))}" title="${esc(tr('Remove line'))}">${ic('x', 's')}</button></div>`;
@@ -48,8 +61,8 @@ function cs_formHtml(cs) {
       ${/*html-ok*/ txt('subtitle', N_('Subtitle'), a.project && a.title !== a.project ? a.title : '')}
       <div class="csgrid2">${/*html-ok*/ txt('day_no', N_('Shoot day no.'), '1', 12)}${/*html-ok*/ txt('set_name', N_('Set phone: name'))}${/*html-ok*/ txt('set_phone', N_('Set phone: number'), '', 60)}</div>
       <p class="muted cshint">${tr('Production')}: ${esc([prod.name, ...(prod.lines || [])].filter(Boolean).join(', ') || tr('from the master data of the office'))}</p>
-      ${/*html-ok*/ area('client', N_('Client'), [cl.name, cl.contact, cl.address, cl.phone, cl.email].filter(Boolean).join('\n') || tr('Company, contact person, phone, e-mail'), 400)}
-      ${/*html-ok*/ area('agency', N_('Agency'), tr('optional'), 400)}
+      ${/*html-ok*/ cs_ctHtml('client', N_('Client'), a.client_contact, a.contacts, area('client', N_('Client: free text'), [cl.name, cl.contact, cl.address, cl.phone, cl.email].filter(Boolean).join('\n') || tr('Company, contact person, phone, e-mail'), 400))}
+      ${/*html-ok*/ cs_ctHtml('agency', N_('Agency'), a.agency_contact || (!cs.updated_at && !d.agency ? a.agency_default : null), a.contacts, area('agency', N_('Agency: free text'), tr('optional'), 400))}
       <p class="lbl">${tr('Contacts')}</p><p class="muted cshint">${tr('Empty: the crew functions of the bookings with their phone numbers.')}</p>${/*html-ok*/ cs_rowsHtml('contacts', d.contacts || [])}
     </details>
     <details class="cssec" open><summary>${tr('Location')}</summary>
@@ -85,7 +98,7 @@ function cs_formHtml(cs) {
 function cs_collect(md) {
   /** @type {Record<string, any>} */
   const out = {};
-  cs_all('[data-f]', md).forEach(el => { const v = el.value.trim(); if (v) out[el.dataset.f] = v; });
+  cs_all('[data-f]', md).forEach(el => { const v = el.value.trim(); if (v) out[el.dataset.f] = el.dataset.n ? +v : v; });  // 2.986.0 (#5649): data-n = a contact id
   for (const k of Object.keys(CS_ROWS)) {
     const rows = cs_all(`.csrow[data-k="${k}"]`, md).map(r => Object.fromEntries(cs_all('input', r).map(i => [i.dataset.c, i.value.trim()]))).filter(r => Object.values(r).some(Boolean));
     if (k === 'calls' && rows.every(r => !r.time)) continue;  // only the suggested departments without a time: nothing to keep
@@ -141,6 +154,12 @@ async function cs_open(job, org) {
   const fname = () => `callsheet-${(cs.auto?.date || '')}.pdf`;
   md.addEventListener('change', async e => {
     const t = /** @type {any} */ (e.target);
+    if (t.dataset?.n && t.dataset.f) {  // 2.986.0 (#5649): a contact chosen -> its card, else the free text
+      const k = t.dataset.f.replace(/_contact$/, ''), x = (cs.auto?.contacts || []).find(y => y.id === +t.value);
+      const card = cs_one(`.csct[data-ct="${k}"]`, md), free = cs_one(`.csfree[data-ct="${k}"]`, md);
+      if (card) { card.textContent = cs_ctCard(x); card.hidden = !x; }
+      if (free) free.hidden = !!x;
+    }
     if (t.id === 'cs-loc_address') { const p = cs_one('.csmap', md); if (p) setHtml(p, t.value.trim() ? `<a href="${esc(cs_mapHref(t.value.trim()))}" target="_blank" rel="noopener noreferrer">${ic('link', 's')} ${tr('Open in maps')}</a>` : ''); }
     if (t.id === 'cs-sketch' && t.files?.[0]) {
       const f = t.files[0];
