@@ -117,11 +117,10 @@ TABLES = (
     "support_grants",  # 2.485.0 (#3939): support access granted to the operator (NULL = a person's own account; read in system_ctx)
     "office_peppol", "office_peppol_sends",  # 2.154.0 B (#1960): the Peppol connection of an office area + its sends
     "office_payonline", "office_pay_links", "office_pay_sessions", "office_pay_events", "office_pay_payouts",  # 2.469.0 (#3459): online payment of invoices
-    "section_templates",  # 2.156.0 C (#2073): section templates (NULL = a person's own, the app checks user_id)
     "ticket_types",  # 2.609.0 (#3372): own ticket types (NULL = a person's own, the app checks owner_id)
     "org_fields",  # 2.609.0 (#3373): the field schema of an organisation (NULL = a person's own, the app checks owner_id)
     "org_tags",  # 2.609.0 (#3373): labels of an organisation
-    "templates",  # 2.609.0 (#3373): task / project templates (NULL = a person's own, the app checks user_id)
+    "templates",  # 2.609.0 (#3373): task / project templates (NULL = a person's own, the app checks owner_id); 2.905.0 (#5288): + section templates
     "rss_feeds",  # 2.172.0 B (#2677): feeds (NULL = private, the app checks user_id; articles / read marks hang on feed_id)
     "reading_orgs",  # 2.172.0 B (#2677): the read-later project of an organisation
     "life_trip_costs",  # 2.173.0 A (#2680): the office trip of a trip project (org_id = the office area)

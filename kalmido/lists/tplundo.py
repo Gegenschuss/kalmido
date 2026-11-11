@@ -21,7 +21,7 @@ from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_done, ua_plain, ua_pre
 from ..core.undogroups import UG_LABEL
 from ..core.undoweb import undo_need_reg
 from ..core.writes import obj_track
-from .templates import TPL_MAX_PER_USER, tpl_may_write
+from .templates import TPL_MAX_PER_USER, tpl_may_write, tpl_room_kinds
 
 TPU_KIND = "list_template"
 TPU_WHAT = {"delete": UA_DELETED, "restore": UA_RESTORED}
@@ -33,7 +33,7 @@ def tpu_label(r):
 
 
 obj_track(TPU_KIND, "templates", area="tasks",
-          undo_keep={"templates": {"user_id", "org_id", "kind", "data", "extra", "created_at", "deleted_by"}},
+          undo_keep={"templates": {"owner_id", "org_id", "kind", "data", "extra", "created_at", "deleted_by"}},
           undo_label=tpu_label, undo_free=("deleted_at",))
 GONE[TPU_KIND] = "templates"
 
@@ -55,7 +55,8 @@ def tpu_post(c):
 
 def tpu_need(c, uid, rid, oid):
     was = c.execute("SELECT * FROM templates WHERE id=?", (int(rid),)).fetchone()
-    if was is None or not (was["user_id"] == int(uid) if was["org_id"] is None else was["org_id"] in user_orgs_full(c, uid)):
+    # 2.905.0 (#5288): owner_id (was user_id); a section template (kind 'sections') is a template of the core too
+    if was is None or not (was["owner_id"] == int(uid) if was["org_id"] is None else was["org_id"] in user_orgs_full(c, uid)):
         raise Denied(404)
     if not tpl_may_write(c, was):
         raise Denied(403)
@@ -63,10 +64,12 @@ def tpu_need(c, uid, rid, oid):
     def fix(c):
         now = c.execute("SELECT deleted_at, org_id FROM templates WHERE id=?", (int(rid),)).fetchone()
         if was["deleted_at"] and not now["deleted_at"]:  # the limit of its space, itself counted (tpl_room before a restore)
-            q, a = ("org_id=?", now["org_id"]) if now["org_id"] else ("org_id IS NULL AND user_id=?", int(uid))
-            if c.execute(f"SELECT COUNT(*) FROM templates WHERE {q} AND {live_sql()}", (a,)).fetchone()[0] > TPL_MAX_PER_USER:
+            q, a = ("org_id=?", now["org_id"]) if now["org_id"] else ("org_id IS NULL AND owner_id=?", int(uid))
+            ks = tpl_room_kinds(was["kind"])  # 2.905.0 (#5288): section templates count on their own, as tpl_room
+            if c.execute(f"SELECT COUNT(*) FROM templates WHERE {q} AND kind IN ({','.join('?' * len(ks))}) AND {live_sql()}",
+                         (a, *ks)).fetchone()[0] > TPL_MAX_PER_USER:
                 raise Denied(409, tr("At most {0} templates", TPL_MAX_PER_USER))
-    return {"fix": fix, "lock": f"template-{int(rid)}"}
+    return {"fix": fix, "lock": f"obj-template-{int(rid)}"}  # 2.905.0 (#5288, Fable F4): the lock of lists/templates.py part_kind
 
 
 undo_need_reg(TPU_KIND, tpu_need)

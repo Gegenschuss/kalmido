@@ -686,9 +686,6 @@ sched_polls.created_at time
 sched_polls.deleted_at time
 sched_polls.expires_at time
 sched_polls.updated_at time
-section_templates.created_at time
-section_templates.sections json
-section_templates.updated_at time
 sessions.created_at time
 sessions.expires_at time
 sessions.last_seen_at time
@@ -762,11 +759,6 @@ tchat_rooms.is_open bool
 tchat_rooms.last_at time
 tchat_rooms.updated_at time
 template_files.created_at time
-templates.created_at time
-templates.data json
-templates.deleted_at time
-templates.extra json
-templates.updated_at time
 ticket_types.created_at time
 ticket_types.enabled bool
 tidy_pending.created_at time

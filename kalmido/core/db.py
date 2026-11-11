@@ -31,6 +31,7 @@ from . import config  # 2.369.5 (#2517): pulled up from functions
 from . import objhooks  # 2.565.0 (#4717 #4719): START, the areas' forward copies onto the shared core
 from .i18n import N_  # 2.369.5 (#2517): pulled up from functions
 from .moneycol import mc_migrate  # 2.755.0 (#5293): the plain money columns of the office as NUMERIC(14,2)
+from .tplmove import tpl_move  # 2.905.0 (#5288): templates onto the shared core
 
 
 # 2.48.0 (#1207): modules of 2.48 that are on for everyone once (features_rev 11)
@@ -988,6 +989,9 @@ def init_db(guard=True, load=None):
         with pg_system_ctx(c):  # every organisation's comments / messages: the targets the old rows sit on
             orx_move(c)  # 2.763.0 (#5269): the old reaction tables into obj_reactions, before the fragment 5269_a drops them
         clk("orx_move")
+        with pg_system_ctx(c):  # every organisation's templates
+            tpl_move(c)  # 2.905.0 (#5288): templates onto the shared core, section_templates into it, before 5288_a drops that table
+        clk("tpl_move")
         have_ix = ix_have(c)  # 2.183.0 B (#2666): only the missing indexes
         for stmt in INDEXES.strip().split(";") + FRAG_AFTER:  # 2.475.0 (#3478): + the fragments' AFTER
             m = _IX_LINE.search(stmt + ";")

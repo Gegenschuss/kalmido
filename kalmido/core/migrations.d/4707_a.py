@@ -31,7 +31,7 @@ MIGRATIONS = [
     ("budget_recurring", "deleted_by", "ALTER TABLE budget_recurring ADD COLUMN IF NOT EXISTS deleted_by BIGINT"),
     ("budget_recurring", "trash_cat_id",
      "ALTER TABLE budget_recurring ADD COLUMN IF NOT EXISTS trash_cat_id BIGINT REFERENCES budget_cats(id) ON DELETE SET NULL"),
-    ("templates", "deleted_at", "ALTER TABLE templates ADD COLUMN IF NOT EXISTS deleted_at TEXT"),
+    ("templates", "deleted_at", "ALTER TABLE templates ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"),  # 2.905.0 (#5288): TIMESTAMPTZ (core/tplmove.py moves an older TEXT column)
     ("templates", "deleted_by", "ALTER TABLE templates ADD COLUMN IF NOT EXISTS deleted_by BIGINT"),
     ("list_links", "deleted_at", "ALTER TABLE list_links ADD COLUMN IF NOT EXISTS deleted_at TEXT"),
     ("list_links", "deleted_by", "ALTER TABLE list_links ADD COLUMN IF NOT EXISTS deleted_by BIGINT"),

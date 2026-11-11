@@ -126,7 +126,8 @@ check(not {"r", "g", "xt", "ln", "files"} & set(n) and str(OTHER) not in json.du
 # ---- the import
 GID, G = freelancer(B, A, "gina")
 _, j = run(G, EXP)
-GT = one("SELECT id FROM templates WHERE user_id=? AND name='Harbour tpl'", GID)
+# 2.905.0 (#5288): templates.owner_id (was user_id)
+GT = one("SELECT id FROM templates WHERE owner_id=? AND name='Harbour tpl'", GID)
 check(GT, "the template came along")
 gx = json.loads(one("SELECT extra FROM templates WHERE id=?", GT))
 gn = gx["nodes"][NODE]
@@ -164,7 +165,8 @@ def craft(p):
 
 KID, K = freelancer(B, A, "kerstin")
 run(K, tampered(EXP, craft))
-KT = one("SELECT id FROM templates WHERE user_id=? AND name='Harbour tpl'", KID)
+# 2.905.0 (#5288): templates.owner_id (was user_id)
+KT = one("SELECT id FROM templates WHERE owner_id=? AND name='Harbour tpl'", KID)
 kx = one("SELECT extra FROM templates WHERE id=?", KT)
 check("passwd" not in kx and "files" not in kx and "javascript" not in kx, f"#3860: nothing of the crafted parts is stored {kx}")
 check(one("SELECT COUNT(*) FROM template_files WHERE user_id=?", KID) == 0, "#3865: a file for no task of the template stays away")
@@ -179,7 +181,8 @@ def craft2(p):
 
 LID, Li = freelancer(B, A, "lina")
 run(Li, tampered(EXP, craft2))
-check("passwd" not in one("SELECT extra FROM templates WHERE user_id=?", LID), "#3860: text in the file's extra is not stored either")
+# 2.905.0 (#5288): templates.owner_id (was user_id)
+check("passwd" not in one("SELECT extra FROM templates WHERE owner_id=?", LID), "#3860: text in the file's extra is not stored either")
 
 # ---- the undo takes the file along
 full = os.path.join(DATA, "attachments", gf[0][0])

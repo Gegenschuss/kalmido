@@ -19,6 +19,7 @@ from .orgimport import OiFix, OiT, _oid, _txt, tr  # noqa: F401
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.db import iso, now_utc  # 2.278.0 B (#3094)
 from .acctimport import umz_billed  # 2.278.0 B (#3094)
+from .acctimport import umz_template_data  # 2.905.0 (#5288)
 from ..accounts.login import seal  # 2.380 H (#2398)
 from ..accounts.session import _token_hash  # 2.380 H (#2398)
 from .orgexport import _safe_part  # 2.380 H (#2398)
@@ -741,6 +742,32 @@ def _org(c, run, src, d, ctx):
     return False
 
 
+def _tpl(c, run, src, d, ctx):
+    """2.905.0 (#5288): a template of the archive as a new one makes it -- its data through tpl_clean (only names, offsets and node
+    keys: no id of the old server stays), nothing of what it kept on the old server (extra: people, file copies), owned by the
+    importing person, a fresh version."""
+    kind = src.get("kind") if src.get("kind") in ("task", "list", "sections") else None
+    data = umz_template_data(kind, src.get("data")) if kind else None
+    if data is None:
+        return None
+    d.update(owner_id=ctx.uid, kind=kind, data=data, extra="{}", rev=1, created_by=ctx.uid, updated_by=ctx.uid, deleted_at=None,
+             deleted_by=None)
+    return d
+
+
+def _tpl_sections(c, run, src, d, ctx):
+    """2.905.0 (#5288): a section template of an archive before 2.905 (lists/section_templates.json: name + sections)."""
+    return _tpl(c, run, {"kind": "sections", "data": {"sections": _sct_names(src.get("sections"))}}, d, ctx)
+
+
+def _sct_names(v):
+    try:
+        v = json.loads(v) if isinstance(v, str) else v
+    except ValueError:
+        return []
+    return v if isinstance(v, list) else []
+
+
 # required columns the archive never has (secrets, *_id): placeholders umz_row keeps, prep sets the real value
 _NEW_TOKEN = {"token": "", "token_hash": ""}
 
@@ -757,8 +784,13 @@ SPECS = [
         need=("task_id", "form_id"), space=(), rid=False, label=N_("Forms")),
     OiT("lists/playbooks.json", "playbooks", refs={"list_id": "lists"}, need=("list_id",), people={"author_id": "null"}, space=(),
         label=N_("Playbooks")),
-    # 2.362.0 (#3096): section templates of the organisation (into the private space: the importing person's own)
-    OiT("lists/section_templates.json", "section_templates", people={"user_id": "me"}, enc=False, label=N_("Section templates")),
+    # 2.905.0 (#5288): the organisation's templates (task, project and section templates, one kind of the core; into the private
+    # space: the importing person's own); an archive before 2.905 has its section templates in lists/section_templates.json
+    # (2.362.0, #3096)
+    OiT("lists/templates.json", "templates", people={"owner_id": "me", "created_by": "null", "updated_by": "null", "deleted_by": "null"},
+        enc=False, label=N_("Templates"), prep=_tpl),
+    OiT("lists/section_templates.json", "templates", kind="section_templates", enc=False, label=N_("Section templates"),
+        fixed={"owner_id": 0}, prep=_tpl_sections),  # owner_id: a placeholder umz_row keeps, _tpl sets the importing person
     # 2.575.0 (#3778): the module cards of the organisation (only into an organisation; a card is a cap there) + their people
     OiT("settings/module_cards.json", "module_cards", people={"user_id": "null", "created_by": "null"}, private=False, enc=False,
         label=N_("Module cards"), prep=_modcard),

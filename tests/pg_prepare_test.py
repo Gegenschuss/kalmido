@@ -43,6 +43,7 @@ EXCEPT = {
     ("admin/orgcrypt_cli.py", "d.thumb_l AS path"): "2.611.0 (#4884): doc_meta.thumb_l comes with a later version (#4812); space_rows skips this entry while _thumb_cols does not see the column",
     ("files/fslock.py", "dn.lvl < TRUE"): "2.353 (#2758): {DEPTH_MAX * 2} is a number constant; the stand-in TRUE makes it integer < boolean",
     ("core/objseen.py", "FROM task_seen s"): "2.905.0 (#5284): osn_move reads the old table task_seen only while it is there (to_regclass); the fragment 5284_a drops it",
+    ("core/tplmove.py", "FROM section_templates"): "2.905.0 (#5288): the one-way move reads / empties the old table section_templates only when to_regclass still finds it (an older database); the schema here has it no more",
     ("core/dlock.py", "IN (SELECT id FROM s)"):"2.235.0 B2 (#2902): a base part of the recursive query whose WITH s(...) is built around it",
 }
 

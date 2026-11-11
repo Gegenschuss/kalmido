@@ -51,7 +51,9 @@ for _f in ("kalmido/lists/templates.py", "kalmido/collab/comments.py"):
     _src = open(os.path.join(ROOT, _f), encoding="utf-8").read()
     check('live="deleted_at IS NULL")' in _src, f"review: {_f} registers its kind with live=\"deleted_at IS NULL\"")
 _tsrc = open(os.path.join(ROOT, "kalmido/lists/templates.py"), encoding="utf-8").read()
-check('r["user_id"] == uid if r["org_id"] is None else r["org_id"] in user_orgs_full(c, uid) and tpl_may_write(c, r)' in _tsrc
+# 2.905.0 (#5288): the guard asks the core's role (lists/tplkind.py: in the trash only 'manage' -- the owner of a private one,
+# an organisation's admin), no rule of its own any more
+check("        if not tpl_may_write(c, r):\n            raise Denied(404)" in _tsrc
       and "part_restore(c, TPL_KIND, tid, uid, guard=guard)" in _tsrc,
       "review: a template restore narrows (in the core's guard, under the lock) to the person's own templates or, since 2.609.0 "
       "(#3373), an organisation's template its admin may change")
@@ -157,7 +159,8 @@ check(TPL_MAX > 0, "setup: the template limit")
 have = len(tpls(Fr))
 GONE = Fr.post(B + "/api/templates", json={"list_id": L, "name": "Spare"}).json()["id"]
 check(Fr.delete(B + f"/api/templates/{GONE}").ok, "limit: one template in the trash")
-kt.dbx("INSERT INTO templates(user_id, kind, name, data, created_at, updated_at) SELECT ?, 'task', 'Fill ' || n, "
+# 2.905.0 (#5288): templates.owner_id (was user_id)
+kt.dbx("INSERT INTO templates(owner_id, kind, name, data, created_at, updated_at) SELECT ?, 'task', 'Fill ' || n, "
        "'{\"task\": {\"title\": \"Fill\"}}', '2031-01-01T00:00:00Z', '2031-01-01T00:00:00Z' FROM generate_series(1, ?) AS n",
        (FID, TPL_MAX - have))
 check(len(tpls(Fr)) >= TPL_MAX, f"limit: {TPL_MAX} live templates")

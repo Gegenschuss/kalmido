@@ -181,7 +181,8 @@ check(rows("SELECT COUNT(*) FROM attachments a JOIN tasks t ON t.id=a.task_id WH
 check(rows("SELECT COUNT(*) FROM time_entries WHERE user_id=?", (GINA,))[0][0] == 1, "#3100: the time entry after the file came along")
 check(rows("SELECT COUNT(*) FROM habits WHERE user_id=?", (GINA,))[0][0] == 1, "#3100: the habit after the file came along")
 check(rows("SELECT COUNT(*) FROM filters WHERE user_id=?", (GINA,))[0][0] == 3, "#3100: filters after the file came along")  # 2.521.0 (#4479): + Zeilen, Feld null
-check(rows("SELECT COUNT(*) FROM templates WHERE user_id=?", (GINA,))[0][0] == 1, "#3100: templates after the file came along")
+# 2.905.0 (#5288): templates.owner_id (was user_id)
+check(rows("SELECT COUNT(*) FROM templates WHERE owner_id=?", (GINA,))[0][0] == 1, "#3100: templates after the file came along")
 body = rows("SELECT c.body FROM comments c JOIN tasks t ON t.id=c.task_id WHERE t.list_id=?", (LG,))[0]["body"]
 check(f"<@{GINA}>" in body, f"my own mention points at my new account: {body}")
 check("@Bob" in body and f"<@{BOB}>" not in body, f"a person not ticked is plain text: {body}")
@@ -208,7 +209,8 @@ check(rc["op"] == "or" and cv[("list", False)] == {"f": "list", "op": "nin", "v"
 check(cv[("sec", False)]["v"] == [sec, "none"] and cv[("who", False)]["v"] == ["me", "none"] and cv[("sprint", False)]["v"] == ["cur"], f"#4479: column, person, sprint like the old rules: {rc}")
 check(cv[("cf", True)]["fid"] == f["Menge"]["id"] and cv[("cf", False)]["v"] == ["Neu"], f"#4479: a field condition follows its field, one by name stays: {rc}")
 check(cv[("folder", False)]["v"] == ["Kunden"] and cv[("text", False)]["v"] == "alt", f"#4479: folder paths and text stay: {rc}")
-tpl = json.loads(rows("SELECT data FROM templates WHERE user_id=?", (GINA,))[0]["data"])
+# 2.905.0 (#5288): templates.owner_id (was user_id)
+tpl = json.loads(rows("SELECT data FROM templates WHERE owner_id=?", (GINA,))[0]["data"])
 check(tpl.get("fields") and "list_id" not in json.dumps(tpl), f"the template as a new one stores it: {sorted(tpl)}")
 
 # ---------------------------------------------------------------- a ticked person

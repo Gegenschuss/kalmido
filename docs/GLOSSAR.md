@@ -289,6 +289,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/stmtfiles.py` (`stmt`) - The uploaded statements of one request
 - `kalmido/core/strip.py` (`strip`) - The client's JavaScript and CSS go out without comments (the files in the repo keep them: they are the documentation)
 - `kalmido/core/tokenhash.py` (`tkh`) - The personal upload token (POST /drop)
+- `kalmido/core/tplmove.py` (`tpm`) - Templates onto the shared core at the start: owner_id, real types, section templates moved into templates (#5288)
 - `kalmido/core/undoareas.py` - Undo across devices, stage 6 -- what the areas outside the office share to record and take back their steps
 - `kalmido/core/undodiff.py` (`undo`) - Undo across devices, stage 3 -- diff parts of the step groups: an area keeps only what a step changed and takes it back through its own write path
 - `kalmido/core/undogroups.py` (`ug`) - Undo across devices, stage 1 -- the core's undo steps grouped per account (table undo_groups)
@@ -495,13 +496,14 @@ Lists and projects: folders, sections, fields, formulas, templates, sprints, sha
 - `kalmido/lists/ruleundo.py` - Undo across devices for a project's rules (change, trash, restore; checked with the rights of the person taking it back)
 - `kalmido/lists/seckind.py` (`sk`) - The meaning of a column (sections.kind)
 - `kalmido/lists/sections.py` (`folder`) - Saved filters, folders and sections (kanban columns)
-- `kalmido/lists/sectpl.py` (`sct`) - Section templates -- a name and the ordered names of a list
+- `kalmido/lists/sectpl.py` (`sct`) - Section templates -- a name and the ordered names of a list (templates of kind sections since #5288)
 - `kalmido/lists/secundo.py` - Undo across devices for creating, deleting and restoring a project's section (diff parts)
 - `kalmido/lists/shoot.py` (`sht`) - The shot list of a shoot (project type "shoot", lists/templates.py PTYPES)
 - `kalmido/lists/sprints.py` (`spr`) - Sprints of a project list -- time boxes with a goal, a burndown and a close-out review
 - `kalmido/lists/sprundo.py` - Undo across devices for a project's sprints (plan, change, remove, restore)
-- `kalmido/lists/templates.py` (`tpl`) - Task and list templates, built-in project types
+- `kalmido/lists/templates.py` (`tpl`) - Task, list and section templates (a kind of the shared core, lists/tplkind.py), built-in project types
 - `kalmido/lists/tplextra.py` (`tx`) - What a duplicate and a template carry beyond the plain task nodes (lists/templates.py)
+- `kalmido/lists/tplkind.py` (`tk`) - Task, project and section templates as one kind of the shared core: its register and the role checks (#5288)
 - `kalmido/lists/tplundo.py` - Undo across devices for the person's templates (rename, trash, restore)
 
 ### `kalmido/newsletter/`

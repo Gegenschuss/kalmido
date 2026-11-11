@@ -101,7 +101,7 @@ ODL_MORE = (
     ("all_receipts", Nn_("{0} receipt", "{0} receipts"), "rc_receipts"),
     ("suppliers", Nn_("{0} supplier", "{0} suppliers"), "office_suppliers"),
     ("bookmarks", Nn_("{0} bookmark", "{0} bookmarks"), "bookmarks"),
-    ("section_templates", Nn_("{0} section template", "{0} section templates"), "section_templates"),
+    ("templates", Nn_("{0} template", "{0} templates"), "templates"),  # 2.905.0 (#5288): task, project and section templates (was section_templates)
     # 2.533.0 (#4318) B44: named in the delete dialog instead of only "other entries"
     ("absences", Nn_("{0} absence", "{0} absences"), "hub_absences"),
     ("bookings", Nn_("{0} resource booking", "{0} resource bookings"), "hub_bookings"),

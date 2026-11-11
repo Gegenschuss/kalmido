@@ -622,13 +622,11 @@ def _user_purge(c, uid, made):
     files += tcx_user_purge(c, uid)  # 2.113.1 (#2059): its team chat files sealed with its own key
     from ..lists.tplextra import tx_reown, tx_user_files
     with system_ctx(c):  # 2.609.0 (#3373, review F4): an organisation's templates stay with it: the heir (an admin first) owns them
-        from ..accounts.orgretain import upg_heir
-        for (o,) in c.execute("SELECT DISTINCT org_id FROM templates WHERE user_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
-            h = upg_heir(c, o, uid)
-            if h:  # their file copies sealed for the heir before this account's key goes (none: they go with the account)
-                for (t,) in c.execute("SELECT id FROM templates WHERE user_id=? AND org_id=?", (uid, o)).fetchall():
-                    c.execute("UPDATE templates SET user_id=? WHERE id=?", (h, t))
-                    files += tx_reown(c, t, h, made)
+        # 2.905.0 (#5288): the shared core handed them to the heir already (person_revoked above, kind "template"); their file
+        # copies still sealed for this account are sealed for their owner now, before this account's key goes
+        for (t, h) in c.execute("SELECT DISTINCT t.id, t.owner_id FROM templates t JOIN template_files f ON f.template_id=t.id "
+                                "WHERE f.user_id=? AND t.owner_id<>?", (uid, uid)).fetchall():
+            files += tx_reown(c, t, h, made)
     from ..admin.orgcrypt_cli import before_user_delete
     if before_user_delete(c, uid)[1]:  # a file that lives on could not be sealed for its new place: keep the key
         raise Denied(409, tr("Some files could not be encrypted again for their new place. Nothing was deleted; see the server log."))
@@ -644,18 +642,14 @@ def _user_purge(c, uid, made):
     if av:  # 2.152.0 (#2164): the own photo goes after the commit for every caller (also the re-delete after a restore)
         files.append(lambda: avatar_drop_file(uid, av))
     with system_ctx(c):  # 2.172.0 (#2677): an organisation's feeds stay with the organisation (next admin), not with their adder
-        # 2.239.0 D (#2866): without another admin the heir of the account's organisation things takes them (orgretain.upg_heir),
-        # and the organisation's section templates stay the same way; private ones go with the account (cascade)
+        # 2.239.0 D (#2866): without another admin the heir of the account's organisation things takes them (orgretain.upg_heir);
+        # private ones go with the account (cascade). 2.905.0 (#5288): section templates are templates of the core (above)
         from ..accounts.orgretain import upg_heir
         for (o,) in c.execute("SELECT DISTINCT org_id FROM rss_feeds WHERE user_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
             h = upg_heir(c, o, uid)
             if h:
                 c.execute("UPDATE rss_items SET user_id=? WHERE user_id=? AND feed_id IN (SELECT id FROM rss_feeds WHERE org_id=? AND user_id=?)", (h, uid, o, uid))
                 c.execute("UPDATE rss_feeds SET user_id=? WHERE user_id=? AND org_id=?", (h, uid, o))
-        for (o,) in c.execute("SELECT DISTINCT org_id FROM section_templates WHERE user_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
-            h = upg_heir(c, o, uid)
-            if h:
-                c.execute("UPDATE section_templates SET user_id=? WHERE user_id=? AND org_id=?", (h, uid, o))
         # 2.172.1 A (#2689): an organisation's bookmarks stay with it the same way (private ones go with the account)
         for (o,) in c.execute("SELECT DISTINCT org_id FROM bookmarks WHERE user_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
             h = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone()

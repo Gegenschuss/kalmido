@@ -10,7 +10,7 @@ from ..core.schema import MAX_DEPTH
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import me
-from ..core.access import Denied, list_role, MANAGE_ROLES, my_inbox, my_max_sort, need_list, need_task, WRITE_ROLES
+from ..core.access import Denied, list_role, live_sql, MANAGE_ROLES, my_inbox, my_max_sort, need_list, need_task, WRITE_ROLES
 from ..core.pages import valid_link
 from ..lists.lists import list_created, clean_color, clean_folder, LIST_KINDS
 from ..tasks.validation import (
@@ -24,11 +24,11 @@ from ..accounts.onboarding import app_industries  # 2.636.0 (#4565); 2.828.0 (#5
 from ..core.objparts import part_kind, part_restore, part_trash, part_write  # 2.610.0 (#4762): the core's write layer of side objects
 from ..core.serializers import unlink_files
 from ..core.dlock import dl_of, dl_tasks_locked  # 2.574.0 (#3376): data lock of a copying agent
-from .tplextra import tx_apply, tx_collect, tx_keys, tx_of_template, tx_paths, tx_prune, tx_reown, tx_same_list, tx_state, tx_store
+from .tplextra import tx_apply, tx_collect, tx_keys, tx_of_template, tx_prune, tx_reown, tx_same_list, tx_state, tx_store
 from ..accounts.layouts import LAYOUT_BLOCK_RE, LAYOUT_BLOCKS_MAX, WG_COLORS, WG_PAD_BODY_MAX, WG_PAD_TITLE_MAX, WG_PADS_MAX, clean_layout  # 2.369.5 (#2517): pulled up from functions
-from ..accounts.orgroles import need_org_write, org_writes, user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import need_org_write, user_orgs_full  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.supportgrant import sga_scope_check  # 2.609.0 (#3373, review F1)
-from ..accounts.orgs import is_org_admin, ws_default_org  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import ws_default_org  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -40,14 +40,19 @@ from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functio
 # today puts the dates relative to today. Subtasks up to MAX_DEPTH levels; 2.363.3 (#3134): assignees, files, the tags of others and
 # whatever else names people or stored files stay on the server (templates.extra, template_files; lists/tplextra.py).
 TPL_MAX_NODES = 500
+TPL_KINDS = ("task", "list")  # 2.905.0 (#5288): the kinds of /api/templates; "sections" are served by lists/sectpl.py
 TPL_MAX_PER_USER = 200  # 2.609.0 (#3373, review F4): a person's private templates; an organisation's have the same limit of their own
+TPL_LIST_MAX = 5000  # 2.905.0 (#5288): the most templates one listing reads (own + every organisation's, each at most TPL_MAX_PER_USER per kind)
 
 
-def tpl_room(c, oid, uid):
+def tpl_room(c, oid, uid, kinds=None):
     """2.609.0 (#3373, review F4): the error when space oid (None = uid's private one) holds TPL_MAX_PER_USER templates, else None.
-    An organisation's templates no longer count for the person who made them."""
-    q, a = ("org_id=?", oid) if oid else ("org_id IS NULL AND user_id=?", uid)
-    if c.execute(f"SELECT COUNT(*) FROM templates WHERE {q} AND deleted_at IS NULL", (a,)).fetchone()[0] >= TPL_MAX_PER_USER:
+    An organisation's templates no longer count for the person who made them. 2.905.0 (#5288): kinds = the templates that count
+    (section templates have their own limit, as before)."""
+    kinds = kinds or TPL_KINDS
+    q, a = ("org_id=?", [oid]) if oid else ("org_id IS NULL AND owner_id=?", [uid])  # 2.905.0 (#5288): owner_id (was user_id)
+    if c.execute(f"SELECT COUNT(*) FROM templates WHERE {q} AND kind IN ({','.join('?' * len(kinds))}) AND {live_sql()}",
+                 (*a, *kinds)).fetchone()[0] >= TPL_MAX_PER_USER:
         return err(tr("At most {0} templates", TPL_MAX_PER_USER))
     return None
 HHMM_RE = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
@@ -173,6 +178,16 @@ def tpl_clean(kind, d):
     count = [0, set()]
     if kind == "task":
         return {"task": tpl_clean_node(d.get("task"), 0, count)}
+    if kind == "sections":  # 2.905.0 (#5288): a section template (lists/sectpl.py): the names, each once, in their order
+        out, seen = [], set()
+        for x in d.get("sections") if isinstance(d.get("sections"), list) else []:
+            n = str(x if isinstance(x, (str, int, float)) and not isinstance(x, bool) else "").strip()[:200]
+            if n and n.casefold() not in seen:
+                seen.add(n.casefold())
+                out.append(n)
+        if not out:
+            raise ValueError(tr("The template has no sections"))
+        return {"sections": out[:50]}
     secs = [str(x).strip()[:200] for x in (d.get("sections") or []) if str(x).strip()][:50]
     tasks = []
     for n in d.get("tasks") or []:
@@ -330,33 +345,35 @@ def tpl_merge(kind, old, new):
     return out
 
 
-def tpl_dict(r):
+def tpl_dict(r, role=None):
     d = json.loads(r["data"] or "{}")
     return {"id": r["id"], "kind": r["kind"], "name": r["name"], "data": d, "count": tpl_count(d),
-            "created_at": r["created_at"], "updated_at": r["updated_at"], **tpl_org_of(r)}
+            "created_at": r["created_at"], "updated_at": r["updated_at"], **tpl_org_of(r, role)}
 
 
 TPL_KIND = "template"  # 2.610.0 (#4762): a side object of the core (core/objparts.py); the lock of before (#4701), "template" of a 409
-part_kind(TPL_KIND, "templates", lock="template-{id}", version=lambda r: r["updated_at"], key="template", live="deleted_at IS NULL")
+part_kind(TPL_KIND, "templates", lock="obj-template-{id}",  # 2.905.0 (#5288, Fable F4): the core's lock of the kind
+           version=lambda r: r["updated_at"], key="template", live="deleted_at IS NULL")
 
 
-# 2.609.0 (#3373): a template of an organisation (templates.org_id): every member with the full view reads and uses it, its
-# admins add, change and delete it; org_id NULL = the person's own as before. Never a template of another organisation (404).
-def tpl_org_of(r):
-    oid = r["org_id"] if "org_id" in r.keys() else None
-    return {"org_id": oid, "mine": r["user_id"] == me(), "can_edit": tpl_may_write(db(), r)}
+# 2.905.0 (#5288, stage Q10): templates (task, list and sections) are ONE kind of the shared core -- registered and checked in
+# lists/tplkind.py (after the core in kalmido ORDER: core/objects.py reaches this module at its import, so the calls into it
+# stand inside the functions). Was tpl_may_write / tpl_space / tpl_visible_sql here and a copy sct_* in sectpl.py.
+def tpl_org_of(r, role=None):
+    """The workspace part of a template's answer: org_id, mine (its owner), can_edit (the core's role: edit or more)."""
+    from .tplkind import tk_can_edit
+    return {"org_id": r["org_id"], "mine": r["owner_id"] == me(), "can_edit": tk_can_edit(db(), r, role)}
 
 
 def tpl_may_write(c, r):
-    oid = r["org_id"] if "org_id" in r.keys() else None
-    if not oid:
-        return r["user_id"] == me()
-    return org_writes(c, me(), oid) and is_org_admin(c, me(), oid)
+    """May the person change / delete template row r (one in the trash: the core's 'manage' there)?"""
+    from .tplkind import tk_can_edit
+    return tk_can_edit(c, r)
 
 
 def tpl_space(c, v):
-    """org id (None = private) of a space value "private" | "org:<id>" | <id>: 404 for an organisation the person does not fully
-    see, 403 for a member who is no admin of it."""
+    """org id (None = private) of a space value "private" | "org:<id>" | <id> (BadInput when it is none). Whether the person may
+    bring a template there is the core's (obj_space_set: 404 for an organisation they are not in, 403 for a member)."""
     if v in (None, "", "private", 0, "0"):
         return None
     s = str(v)
@@ -364,35 +381,52 @@ def tpl_space(c, v):
         oid = int(s[4:] if s.startswith("org:") else s)
     except ValueError:
         raise BadInput(tr("Invalid value: {0}", "space")) from None
-    if oid not in user_orgs_full(c, me()):
+    if oid not in user_orgs_full(c, me()):  # 2.905.0 (#5288 review F7): no count / log for an organisation not the person's
         raise Denied(404)
-    if not (org_writes(c, me(), oid) and is_org_admin(c, me(), oid)):
-        raise Denied(403, tr("Only an administrator of the organisation can change its templates"))
     return oid
 
 
-def need_template(c, tid, write=False):
-    r = c.execute("SELECT * FROM templates WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone()  # 2.567.0 A (#4707)
-    if not r or (r["org_id"] is None and r["user_id"] != me()) or (r["org_id"] is not None and r["org_id"] not in user_orgs_full(c, me())):
-        raise Denied(404)
-    if write and not tpl_may_write(c, r):
-        raise Denied(403, tr("Only an administrator of the organisation can change its templates"))
-    return r
+def tpl_space_set(c, tid, to):
+    """2.905.0 (#5288): template tid into space to (None = private) through the core (obj_space_set: 'manage', admins only into
+    or out of an organisation, logged). An admin who takes an organisation's template out owns it from now on (2.609.0, #3373
+    review F2: no longer its first maker) -> the old paths of its file copies, sealed again for the new owner (made += new ones)."""
+    from .tplkind import tk_space_set
+    return tk_space_set(c, tid, to)
 
 
-def tpl_visible_sql(c):
-    """(where, args) of the templates the person sees: their own private ones and those of their organisations (2.609.0)."""
-    orgs = user_orgs_full(c, me())
-    return ("deleted_at IS NULL AND ((org_id IS NULL AND user_id=?)" + (f" OR org_id IN ({','.join('?' * len(orgs))})" if orgs else "") + ")",
-            [me(), *orgs])
+def tpl_room_kinds(kind):
+    """2.905.0 (#5288): the kinds that count together for the limit of a template of kind (section templates on their own)."""
+    return ("sections",) if kind == "sections" else TPL_KINDS
+
+
+def tpl_new(c, uid, kind, name, data, to=None):
+    """2.905.0 (#5288): a new template of uid (the caller checked what it holds) -> its id. Made in uid's own space and, for an
+    organisation (to), brought there by the core (obj_space_set: its admins only, 404 / 403 otherwise -- the caller's
+    transaction is not committed then)."""
+    ts = iso(now_utc())
+    tid = insert_id(c, "INSERT INTO templates(owner_id,kind,name,data,created_at,updated_at,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?)",
+                    (uid, kind, name, json.dumps(data, ensure_ascii=False), ts, ts, uid, uid))
+    if to is not None:
+        tpl_space_set(c, tid, to)
+    return tid
+
+
+def need_template(c, tid, write=False, kinds=TPL_KINDS):
+    """The live template tid of one of kinds the person sees (the core's role), else 404; write: edit or more, else 403."""
+    from .tplkind import tk_need
+    return tk_need(c, tid, write, kinds)
+
+
+def tpl_rows(c, kinds=TPL_KINDS):
+    """[(row, role)] of the templates of kinds the person sees, by kind (list first) and name."""
+    from .tplkind import tk_rows
+    rows = tk_rows(c, kinds, TPL_LIST_MAX)
+    return sorted(rows, key=lambda x: (x[0]["kind"] != "task", (x[0]["name"] or "").lower(), x[0]["id"]))  # task first (kind DESC)
 
 
 @app.get("/api/templates")
 def templates_list():
-    c = db()
-    q, a = tpl_visible_sql(c)
-    return jsonify(templates=[tpl_dict(r) for r in c.execute(
-        f"SELECT * FROM templates WHERE {q} ORDER BY kind DESC, lower(name), id", a)])
+    return jsonify(templates=[tpl_dict(r, role) for r, role in tpl_rows(db())])  # 2.905.0 (#5288): the core's listing
 
 
 def tpl_list_data(c, lid, uid, base, rel=False, dup=None, extra=None, skip=()):
@@ -508,9 +542,7 @@ def template_create():
     name = (str(b.get("name") or "").strip() or name or (data.get("name") if kind == "list" else data["task"]["title"]))[:200]
     if not name:
         return err(tr("Name missing"))
-    ts = iso(now_utc())
-    cur_id = insert_id(c, "INSERT INTO templates(user_id,kind,name,data,created_at,updated_at,org_id) VALUES(?,?,?,?,?,?,?)",
-                    (uid, kind, name, json.dumps(data, ensure_ascii=False), ts, ts, to))
+    cur_id = tpl_new(c, uid, kind, name, data, to)  # 2.905.0 (#5288): a kind of the core (into an organisation: obj_space_set)
     st = tx_state()
     try:
         tx_store(c, uid, cur_id, extra, st)
@@ -568,12 +600,10 @@ def _tpl_update(c, tid, r, b, gone, made):
             full = tpl_room(c, to, me())  # review F2: the limit of the new space (the new owner's own templates)
             if full:
                 return full
-            if r["org_id"]:
-                org_out(c, r["org_id"], to, "template", r["name"])
-            # 2.609.0 (#3373, review F2): the admin who moves it out of the organisation owns it now (no longer its first maker),
-            # its file copies follow (sealed for the new owner)
-            c.execute("UPDATE templates SET org_id=?, user_id=? WHERE id=?", (to, me(), tid))
-            gone += tx_reown(c, tid, me(), made)
+            # 2.905.0 (#5288): through the core (obj_space_set: its admins, out of an organisation logged); 2.609.0 (#3373,
+            # review F2): the admin who moves it out of the organisation owns it now, its file copies follow (sealed for them)
+            if tpl_space_set(c, tid, to)[2]:
+                gone += tx_reown(c, tid, me(), made)
     if "name" in b:
         name = str(b["name"] or "").strip()[:200]
         if not name:
@@ -587,14 +617,16 @@ def _tpl_update(c, tid, r, b, gone, made):
             return err(str(e) or tr("Invalid template"))
         c.execute("UPDATE templates SET data=? WHERE id=?", (json.dumps(data, ensure_ascii=False), tid))
         gone += tx_prune(c, tid, r["extra"], tx_keys(data))
-    c.execute("UPDATE templates SET updated_at=? WHERE id=?", (iso(now_utc()), tid))
+    from .tplkind import tk_touch
+    tk_touch(c, tid)  # 2.905.0 (#5288): rev, updated_at, updated_by (the core's columns)
     return None
 
 
 @app.delete("/api/templates/<int:tid>")
 def template_delete(tid):
     """2.567.0 A (#4707): the template goes to the trash with its own file copies (no longer deleted at once); the undo is
-    POST /api/templates/<id>/restore, after the trash period tpl_trash_tick deletes it for good -> {ok, id, trash}."""
+    POST /api/templates/<id>/restore, after the trash period the core's run deletes it for good (lists/tplkind.py
+    tk_on_purge, 2.905.0 #5288) -> {ok, id, trash}."""
     c = db()
     need_template(c, tid, write=True)
     from .tplundo import tpu_post, tpu_pre  # 2.809.0 (#5476): a step of the person's undo list
@@ -613,10 +645,10 @@ def template_restore(tid):
     uid = me()
     # 2.610.0 (#4762): through the core (core/objparts.py part_restore), under the template's lock; 2.609.0 (#3373): the own one,
     # or an organisation's template whose admin (who may delete it) brings it back, within its space's limit (review F4)
-    def guard(c, r):
-        if not (r["user_id"] == uid if r["org_id"] is None else r["org_id"] in user_orgs_full(c, uid) and tpl_may_write(c, r)):
+    def guard(c, r):  # 2.905.0 (#5288): the core's role ('manage' for a template in the trash)
+        if not tpl_may_write(c, r):
             raise Denied(404)
-        return tpl_room(c, r["org_id"], uid)
+        return tpl_room(c, r["org_id"], uid, kinds=tpl_room_kinds(r["kind"]))
 
     from .tplundo import tpu_post, tpu_pre  # 2.809.0 (#5476): a step of the person's undo list
     tpu_pre(c, uid, tid, "restore")
@@ -628,19 +660,6 @@ def template_restore(tid):
     c.commit()
     return jsonify(tpl_dict(row))
 
-
-
-def tpl_trash_tick(c, cut, purge):
-    """2.567.0 A (#4707): templates in the trash since before cut (files/trashpurge.py tp_tick, system context): counted, and
-    with purge deleted for good (template_files cascade) -> (count, the paths of their file copies to remove after the commit)."""
-    ids = [r[0] for r in c.execute("SELECT id FROM templates WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,))]
-    if not purge or not ids:
-        return len(ids), []
-    paths = []
-    for tid in ids:
-        paths += tx_paths(c, tid)
-        c.execute("DELETE FROM templates WHERE id=?", (tid,))
-    return len(ids), paths
 
 
 def tpl_ttype(c, lid, k):

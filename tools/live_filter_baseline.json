@@ -1,6 +1,6 @@
 {
  "about": "tools/check_live_filter.py (#5292): handwritten 'deleted_at IS NULL' per file; only shrinks",
- "total": 1072,
+ "total": 1068,
  "files": {
   "kalmido/accounts/discover.py": 6,
   "kalmido/accounts/onboarding.py": 5,
@@ -158,7 +158,7 @@
   "kalmido/lists/rules.py": 10,
   "kalmido/lists/sections.py": 1,
   "kalmido/lists/shoot.py": 2,
-  "kalmido/lists/templates.py": 14,
+  "kalmido/lists/templates.py": 11,
   "kalmido/lists/tplextra.py": 2,
   "kalmido/newsletter/sync.py": 3,
   "kalmido/notify/channels.py": 1,

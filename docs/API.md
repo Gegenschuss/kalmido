@@ -1669,8 +1669,8 @@ its creator and the organisation's admins change it; another organisation / pers
 |---|---|
 | `GET /api/section-templates` | the templates the person sees: `{templates: [{id, name, sections: [names], space, org_id, mine, can_edit, updated_at}]}` |
 | `POST /api/section-templates` | `{name, space?, list_id \| sections}`: `list_id` = that list's section names (who may write the list; a list with the lock: 409), `sections` = names (blanks and doubles dropped, at most 50) |
-| `PATCH /api/section-templates/{id}` | `{name?, sections?}` (its creator or an admin of its organisation, else 403) |
-| `DELETE /api/section-templates/{id}` | the same people; lists made with it keep their sections |
+| `PATCH /api/section-templates/{id}` | `{name?, sections?, expect_updated_at?}` (a private one its owner, an organisation's only its admins, else 403; an old version: 409 with the current one); a rename alone answers `undo_group` (2.905.0, #5288) |
+| `DELETE /api/section-templates/{id}` | the same people; into the templates' trash (`POST /api/templates/{id}/restore` brings it back, `undo_group` = the step), lists made with it keep their sections |
 | `POST /api/lists/{id}/sections/from-template` | `{template_id}`: the template's names the list lacks (any case) are added at the end in the template's order; nothing is removed or renamed. Answer `{added: [section rows], skipped: [names already there]}` |
 
 2.56.1 (#1799): the symbols of a task row and the sidebar's markers are settings too (`PATCH /api/settings`): `row_icons`

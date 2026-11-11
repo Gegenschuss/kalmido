@@ -67,6 +67,7 @@ ORDER = (
     "core.objparts",  # 2.610.0 (#4762): the write layer of a project's side objects (stands on core.access / core.conflict)
     "core.objreact",  # 2.763.0 (#5269): the reactions of the shared core (one table obj_reactions, one rule)
     "core.objseen",  # 2.905.0 (#5284): the read marks of the shared core (one table obj_seen, no routes)
+    "core.tplmove",  # 2.905.0 (#5288): templates onto the shared core at the start (owner_id, real types, section templates moved in)
     "core.serializers",
     "core.compress",  # 2.65.0 (#1505): gzip for JSON answers; before core.pages = its after_request hook runs last
     "core.strip",  # 2.191.0 B (#1824): JS / CSS go out without comments (core.pages serves them)
@@ -598,6 +599,7 @@ ORDER = (
     "core.undoareas",  # 2.777.0 (#5254): what the areas share to record and take back their steps (no routes)
     "agents.objprop",  # 2.623.0 (#4718): an agent's change of a core object as a proposal a person accepts (after core.objweb)
     "collab.tcxcore",  # 2.565.0 (#4719): the team chat's channels and groups as a kind of the shared core (no routes of its own)
+    "lists.tplkind",  # 2.905.0 (#5288): task, project and section templates as a kind of the shared core (after core.writes)
     "lists.lmcore",  # 2.568.0 (#4739): the projects as a kind of the shared core (shares, revocation, settings history)
     "events.evkern", "contacts.ctkern",  # 2.566.0 (#4712): calendars and address books as kinds of the shared core (stage 3)
     "core.objlight",  # 2.754.0 (#5268): the light kinds task, event, hub_mail, client of the shared core (after their areas)

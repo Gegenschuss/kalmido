@@ -2343,6 +2343,10 @@ view), the server deletes them for good after the trash period. In the trash the
 agents included. The household budget never reaches an agent; its entries, categories and recurring entries go to the
 trash the same way in the app.
 
+**Templates (2.905.0).** The routes and answers of `/api/v1/templates` (`list_templates`, `create_template`, ...) stay. An agent
+sees and uses the templates it made itself, as before; the templates of its owner and of an organisation it does not see. A
+token limited to projects sees no template (a template is no part of a project). Section templates stay in the app.
+
 The reference starter (`mcp/agent_run.py`, [AGENT-SETUP.md](AGENT-SETUP.md#9-autostart-with-the-runtime-launcher)) uses this for you (2.44.0): files in the run's folder `$KALMIDO_OUTBOX` and images the agent looked at go as one multipart chat message before the answer; a job (`mcp/agent_job.py`) posts its result with `job_id` and its files and then wakes the chat agent with one chat run (2.46.6; a job lost by a restart goes on once in its session); task events of projects the agent listens in are bundled into one run.
 
 Permissions are the app's: an agent reads files only of tasks it sees with their comments (a project shared with it; as a

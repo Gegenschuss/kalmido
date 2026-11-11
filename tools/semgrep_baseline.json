@@ -2327,14 +2327,6 @@
   },
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/lists/sectpl.py",
-   "code": "c.execute(f\"UPDATE section_templates SET {','.join(k + '=?' for k in sets)} WHERE id=?\", [*sets.values(), tid])",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/lists/sprints.py",
    "code": "c.execute(f\"UPDATE sprints SET {','.join(k + '=?' for k in f)} WHERE id=?\", (*f.values(), sid))",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",

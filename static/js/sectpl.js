@@ -1,7 +1,7 @@
 // @ts-check
 /* Kalmido web client: section templates (2.156.0 C, #2073), module "sectpl" (lazyload.js, loaded when the dialog opens).
    The list menu's "Section templates…" (dialogs.js listMenuItems): save the list's sections (names in their order) as a
-   template - private or for an organisation (all its members see it, its creator and the admins change it) - and add a
+   template - private or for an organisation (all its members see it, its admins change it; 2.905.0 #5288: a template of the core) - and add a
    template's sections to this list: only the names it lacks are added at the end, nothing is removed or renamed
    (GET / POST /api/section-templates, PATCH / DELETE /api/section-templates/<id>, POST /api/lists/<id>/sections/from-template).
    2.609.0 (#3372): also the project dialog's "Types and templates…" (ticketTplModal, from dialogs.js, start budget #4198).
@@ -54,8 +54,10 @@ async function sct_open(lid) {
     }
     if (m === 'del') {
       if (!await askConfirm(tr('Delete the template “{0}”?', t.name), tr('Projects made with it keep their sections.'), {ok: tr('Delete'), danger: true})) return;
-      try { await api('DELETE', '/api/section-templates/' + id); } catch { return; }
+      let j; try { j = await api('DELETE', '/api/section-templates/' + id); } catch { return; }
       draw();
+      // 2.905.0 (#5288): it waits in the trash of templates (a template of the core): the toast and the undo history take it back out
+      offerUndo(tr('Template deleted'), histAdd({label: tr('Template “{0}” deleted', t.name), ...(j?.undo_group ? {srv: true} : {}), undo: async () => { await api('POST', `/api/templates/${id}/restore`); draw(); }, redo: async () => { await api('DELETE', '/api/section-templates/' + id); draw(); }}));
     }
   });
   draw();

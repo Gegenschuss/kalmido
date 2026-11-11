@@ -434,7 +434,8 @@ def state():
         avatars=avatar_map(c, uid),
         colors=ac_color_map(c, uid),  # 2.47.1 (#1721): {user id: fixed account colour} of the accounts I see
         # 2.609.0 (#3373): + the templates of the person's organisations (full view; lists/templates.py need_template decides)
-        templates=[dict(r) for r in c.execute("""SELECT id, kind, name, org_id FROM templates WHERE deleted_at IS NULL AND ((org_id IS NULL AND user_id=?) OR org_id IN
+        # 2.905.0 (#5288): owner_id (was user_id); only task / project templates (section templates are fetched by their dialog)
+        templates=[dict(r) for r in c.execute("""SELECT id, kind, name, org_id FROM templates WHERE deleted_at IS NULL AND kind IN ('task', 'list') AND ((org_id IS NULL AND owner_id=?) OR org_id IN
                                                  (SELECT org_id FROM org_members WHERE user_id=? AND role IN ('admin', 'member', 'readonly')))
                                                  ORDER BY lower(name), id""", (uid, uid))],
         # 2.609.0 (#3373): the labels of the person's organisations (lists/orglabels.py); review F3: only with the full view

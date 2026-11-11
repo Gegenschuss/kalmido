@@ -526,6 +526,30 @@ object before it writes one. The task badge (`core/serializers.py`) joins `obj_s
 deletes a task's marks when the task is deleted for good. Not in the exports (a personal view state). A new area with read
 marks adds its kind to `OSN_KINDS` and a trigger line in a fragment -- no table of its own (stage Q8b: team chat, RSS).
 
+### Templates (stage Q10, 2.905.0, #5288)
+
+Task, project and section templates are one kind of the core, `template`, on the table `templates` (`kind` task | list |
+sections; a section template's `data` is `{"sections": [name, ...]}`). `section_templates` and the rule copies
+(`tpl_visible_sql`, `tpl_may_write`, `sct_*`) are gone. `kalmido/lists/tplkind.py` registers it:
+`obj_register("template", "templates", org_access="view", org_join="admin", routes=False, listed=False, agent_own=True,
+trash_prune=True)`.
+- Who reads / changes one is `obj_role`: a private template its owner; an organisation's every member with the full view
+  reads and uses it, its admins change and delete it; only they bring one into the organisation or take it out
+  (`obj_space_set`, logged). An admin who takes one out owns it from then on (its file copies are sealed for them).
+- `agent_own=True` (new option of `obj_register`): an agent's own private object of the kind (one it made through the API) is
+  its own (`manage`, listed); everything else an agent reaches only through a share. A token limited to projects sees no
+  template (the kind has no `list_id`).
+- The routes stay the area's (`/api/templates` for task / list, `/api/section-templates` for sections) and so does the trash
+  (`part_trash` / `part_restore`); a section template is deleted into that trash too. After the trash period the core's run
+  deletes a template for good (`trash_prune=True`, `obj_on_purge`: `tk_on_purge` hands back its file copies and drops its undo
+  rows); `files/trashpurge.py` has no template part any more. Renaming, deleting and restoring a section template are steps of
+  the person's undo list like a task / project template's (`lists/tplundo.py`, kind `list_template`).
+- `templates.owner_id` was `user_id`; times are `TIMESTAMPTZ`, `data` / `extra` `JSONB`. `kalmido/core/tplmove.py` moves an
+  older table at the start (rename, types each in a savepoint) and the rows of `section_templates` into it, before the fragment
+  `5288_a` drops that table (one-way). The organisation export carries the templates (`lists/templates.json`, without what
+  stays on the server: `extra`); the import also reads the `lists/section_templates.json` of older archives.
+- `kalmido/lists/tplkind.py` stands after the core in the module order: `core/objects.py` reaches `lists/templates.py` at its
+  import, so the templates' routes call into it from inside their functions.
 
 ## Filter (2.846.0, #5520)
 

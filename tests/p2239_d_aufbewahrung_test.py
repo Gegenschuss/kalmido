@@ -183,13 +183,14 @@ for u, role in (("bob", "admin"), ("gina", "guest"), ("carl", "member")):
 sql("INSERT INTO org_members(org_id, user_id, role) VALUES(?,?,'member')", (OG, ALICE))
 F1 = sql("INSERT INTO rss_feeds(user_id, org_id, url, created_at) VALUES(?,?,?,?) RETURNING id", (ids["bob"], OG, "https://example.com/team.xml", NOW))[0][0]
 F2 = sql("INSERT INTO rss_feeds(user_id, url, created_at) VALUES(?,?,?) RETURNING id", (ids["bob"], "https://example.com/own.xml", NOW))[0][0]
-T1 = sql("INSERT INTO section_templates(user_id, org_id, name, created_at, updated_at) VALUES(?,?,?,?,?) RETURNING id", (ids["bob"], OG, "Team", NOW, NOW))[0][0]
-T2 = sql("INSERT INTO section_templates(user_id, name, created_at, updated_at) VALUES(?,?,?,?) RETURNING id", (ids["bob"], "Privat", NOW, NOW))[0][0]
+# 2.905.0 (#5288): section templates are templates of the shared core (kind sections, owner_id); the core hands them to the heir
+T1 = sql("INSERT INTO templates(owner_id, org_id, kind, name, data, created_at, updated_at) VALUES(?,?,'sections',?,'{\"sections\": [\"A\"]}',?,?) RETURNING id", (ids["bob"], OG, "Team", NOW, NOW))[0][0]
+T2 = sql("INSERT INTO templates(owner_id, kind, name, data, created_at, updated_at) VALUES(?,'sections',?,'{\"sections\": [\"A\"]}',?,?) RETURNING id", (ids["bob"], "Privat", NOW, NOW))[0][0]
 r = A.delete(B + f"/api/users/{ids['bob']}")
 check(r.ok, f"account: (setup) the only admin deleted {r.status_code} {r.text[:200]}")
 check(sql("SELECT user_id FROM rss_feeds WHERE id=?", (F1,)) == [(ALICE,)], "account: the organisation's feed goes to a member (no admin left)")
-check(sql("SELECT user_id FROM section_templates WHERE id=?", (T1,)) == [(ALICE,)], "account: the organisation's section template too")
-check(not sql("SELECT 1 FROM rss_feeds WHERE id=?", (F2,)) and not sql("SELECT 1 FROM section_templates WHERE id=?", (T2,)),
+check(sql("SELECT owner_id FROM templates WHERE id=?", (T1,)) == [(ALICE,)], "account: the organisation's section template too")  # 2.905.0 (#5288)
+check(not sql("SELECT 1 FROM rss_feeds WHERE id=?", (F2,)) and not sql("SELECT 1 FROM templates WHERE id=?", (T2,)),
       "account: the private feed and template go with the account")
 
 # ================================================================== the hosted bypass only after the retention gate

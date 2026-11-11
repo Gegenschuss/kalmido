@@ -1071,7 +1071,7 @@ UMZ_SRC = {
     "list_milestones": ("list_milestones", "list_id", "lists"), "tasks": ("tasks", "list_id", "lists"), "notes": ("notes", "list_id", "lists"),
     "comments": ("comments", "task_id", "tasks"), "attachments": ("attachments", "task_id", "tasks"), "list_files": ("list_files", "list_id", "lists"),
     "time_entries": ("time_entries", "user_id", None), "habits": ("habits", "user_id", None), "filters": ("filters", "user_id", None),
-    "templates": ("templates", "user_id", None), "books": ("books", "owner_id", None), "ev_cals": ("ev_cals", "owner_id", None),
+    "templates": ("templates", "owner_id", None), "books": ("books", "owner_id", None), "ev_cals": ("ev_cals", "owner_id", None),
     "contacts": ("contacts", "book_id", "books"), "events": ("events", "cal_id", "ev_cals"), "event_attendees": ("event_attendees", "event_id", "events"),
     "sprints": ("sprints", "list_id", "lists"), "list_rules": ("list_rules", "list_id", "lists"),  # 2.455.0 (#3469)
     "portal_tickets": ("portal_tickets", "list_id", "lists"),
@@ -1834,7 +1834,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             run.count("time_entries")
     org_kind = man.get("kind") == "org"
     for src, table, kind, fixed in (("habits", "habits", "habits", {"user_id": uid}), ("filters", "filters", "filters", {"user_id": uid}),
-                                    ("templates", "templates", "templates", {"user_id": uid}),
+                                    ("templates", "templates", "templates", {"owner_id": uid}),  # 2.905.0 (#5288): owner_id (was user_id)
                                     ("address_books", "books", "books", {"owner_id": uid, "org_id": org if org_kind else None, "owner_org_id": None}),
                                     ("event_calendars", "ev_cals", "ev_cals", {"owner_id": uid, "org_id": org if org_kind else None})):
         for r in data.get(src, []):
@@ -2747,7 +2747,7 @@ def _umz_undo_rows(c, uid, r):
     n_lists, kept_lists, went = imp_undo_lists(c, uid, own_lists, back, since)
     imp_undo_trash(c, [i for i in back if i not in went], back, r["id"])
     kept_cals = kept_books = 0
-    for table, col in (("habits", "user_id"), ("filters", "user_id"), ("templates", "user_id"), ("ev_cals", "owner_id"),
+    for table, col in (("habits", "user_id"), ("filters", "user_id"), ("templates", "owner_id"), ("ev_cals", "owner_id"),
                        ("books", "owner_id"), ("time_entries", "user_id")):
         part = [int(x) for x in cr.get(table) or []]
         if table not in ("ev_cals", "books"):  # 2.506.0 (#4299)

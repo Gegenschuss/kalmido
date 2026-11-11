@@ -188,8 +188,8 @@ def lpt_index():
             items.append({"kind": "link", "id": r["id"], "list_id": r["list_id"], "name": r["title"] or r["url"], "deleted_at": r["deleted_at"],
                           "deleted_by": r["deleted_by"]})
     orgs = user_orgs_full(c, uid)  # 2.609.0 (#3373, review F5): + the organisations' templates whose admin may bring them back
-    for r in c.execute("SELECT id, name, deleted_at, deleted_by, org_id, user_id FROM templates WHERE deleted_at IS NOT NULL AND "
-                       "((org_id IS NULL AND user_id=?)" + (f" OR org_id IN ({','.join('?' * len(orgs))})" if orgs else "") + ")",
+    for r in c.execute("SELECT * FROM templates WHERE deleted_at IS NOT NULL AND "  # 2.905.0 (#5288): owner_id (was user_id), the core's role
+                       "((org_id IS NULL AND owner_id=?)" + (f" OR org_id IN ({','.join('?' * len(orgs))})" if orgs else "") + ")",
                        (uid, *orgs)).fetchall():
         if not tpl_may_write(c, r):  # as template_restore: a member's own one made for the organisation is no longer theirs
             continue

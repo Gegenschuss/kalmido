@@ -195,7 +195,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                  hidden=None, org_access="edit", area="other", scopes=("read", "tasks:write"), dl_area=None, feat=None,
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
                  fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True, members=None,
-                 fs_hooks=None, org_join="member", children=(), trash_prune=False, node=True):
+                 fs_hooks=None, org_join="member", children=(), trash_prune=False, node=True, agent_own=False):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload).
     2.565.0 (#4719): listed=False = the object's reference node only carries its shares (files/fsref.py): it lies in no
     folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take.
@@ -208,7 +208,10 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
     2.579.0 (#4802): org_join = who may bring an object into an organisation (obj_create with org_id, core/writes.py
     obj_space_set): "member" (default: every member who writes there) or "admin" (only its admins: a saved view of the
     documents search, which a person keeps private until an admin shares it with everyone of the organisation; 2.657.0, #4828:
-    obj_create refuses an org_id for such a kind, even from an admin -- it is made private and shared with obj_space_set)."""
+    obj_create refuses an org_id for such a kind, even from an admin -- it is made private and shared with obj_space_set).
+    2.905.0 (#5288): agent_own=True = an agent's own private object of the kind (owner_id = the agent, made through the area's own
+    API route, e.g. a template) is its own ('manage', listed) as a person's is; every other object an agent still reaches only
+    through a share."""
     if not _NAME.fullmatch(kind or "") or not _TABLE.fullmatch(table or ""):
         raise ValueError(f"obj_register: invalid kind / table {kind!r} {table!r}")
     if not node:  # 2.754.0 (#5268): a light kind (module docstring): only its role, title, open_url and space
@@ -230,7 +233,8 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
            "on_revoke": on_revoke, "list_col": list_col if _TABLE.fullmatch(list_col or "") else "list_id",
            "members": tuple(members) if members else None,  # 2.566.0 (#4712)
            "org_join": org_join,  # 2.579.0 (#4802)
-           "node": bool(node)}  # 2.754.0 (#5268)
+           "node": bool(node),  # 2.754.0 (#5268)
+           "agent_own": bool(agent_own)}  # 2.905.0 (#5288)
     if members and (len(members) != 2 or not all(_TABLE.fullmatch(x or "") for x in members)):
         raise ValueError(f"obj_register {kind}: members must be (table, key column)")
     kids = tuple(tuple(x) for x in (children or ()))  # 2.773.0 (#5292)
@@ -383,8 +387,8 @@ def _base(c, uid, reg, row):
     if reg["base_role"]:
         r = reg["base_role"](c, uid, int(row["id"]))
         return r if r in OBJ_ROLES else None
-    if acx_of(c, uid).role == "agent":
-        return None
+    if acx_of(c, uid).role == "agent":  # 2.905.0 (#5288): agent_own -- its own private object only
+        return "manage" if reg.get("agent_own") and not row["org_id"] and row["owner_id"] == uid else None
     org, owner = row["org_id"] or None, row["owner_id"]
     if not org:
         return "manage" if owner == uid else None
@@ -557,6 +561,8 @@ def _visible_sql(c, uid, kind):
         full = [o for o, rk in roles.items() if rk in FULL_READ and rk != "admin"]
         if full and reg["org_access"]:
             parts.append(f"o.org_id IN ({_ids(full)})")
+    elif reg.get("agent_own"):  # 2.905.0 (#5288): an agent's own private objects of the kind
+        parts.append(f"(o.org_id IS NULL AND o.owner_id = {uid})")
     sh = _share_sql(c, uid, reg, agent)
     if sh:
         parts.append(f"o.id IN {sh}")

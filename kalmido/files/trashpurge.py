@@ -5,8 +5,8 @@ columns, pipeline deals, invoice series, the
 emptied rows of deleted comments (2.530.0 A, #4315: with their kept text and
 files, collab/cmttrash.py); since 2.223.3 A (#2879) also absences,
 disposition bookings, scheduling polls with their votes, appointment types and file requests; since 2.567.0 A (#4707) the
-household budget (life/budget.py bud_trash_tick: entries with their receipts, templates, categories) and the project
-/ task templates (lists/templates.py tpl_trash_tick, with their file copies).
+household budget (life/budget.py bud_trash_tick: entries with their receipts, templates, categories); the project / task /
+section templates since 2.905.0 (#5288) through the core's run (lists/tplkind.py tk_on_purge, with their file copies).
 2.783.0 (#5368): the tombstones of the team chat, deleted custom fields, member memos, the Undo copies of "Delete all times",
 the copies of sections / sprints and the inbound webhooks are deleted by the core's run (core/writes.py obj_trash_tick).
 
@@ -24,7 +24,6 @@ from ..core.retention import ret_on, ret_report, ret_trash_cut
 from ..tasks.atttrash import atr_tick  # 2.272.0 E2 (#3038)
 from ..office.otrash import otb_tick  # 2.272.0 E2 (#3038)
 from ..life.budget import bud_trash_tick  # 2.567.0 A (#4707)
-from ..lists.templates import tpl_trash_tick  # 2.567.0 A (#4707)
 from ..files.store import fs_purge_files  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
 from ..hub.hubmail import hbm_mail_nodes  # 2.536.0 (#4338): the nodes of a mail, shared with deleting it
@@ -115,13 +114,7 @@ def tp_tick(c, force=False):
         except Exception as e:  # noqa: BLE001 - like the plain areas below: this one waits for the next run
             print("trash purge: budget", type(e).__name__, flush=True)
             counts["budget_err"] = 1
-        try:  # 2.567.0 A (#4707): project / task templates (with their file copies)
-            with c.savepoint():
-                counts["templates"], tpp = tpl_trash_tick(c, cut, purge)
-            paths += tpp
-        except Exception as e:  # noqa: BLE001
-            print("trash purge: templates", type(e).__name__, flush=True)
-            counts["templates_err"] = 1
+        # 2.905.0 (#5288): project / task / section templates: the core's run (core/writes.py obj_trash_tick, lists/tplkind.py)
         for key, table, extra in TP_PLAIN:
             if extra is None:  # 2.223.3 (#2878): clients -- the same hold rule as deleting a client
                 from ..team.clients import cl_hold_sql

@@ -241,8 +241,9 @@ check(not dbx("SELECT 1 FROM tchat_msgs WHERE body IN ('nur fuer bob', 'privat u
 NVH = one("SELECT id FROM office_vehicles WHERE org_id=?", (ORG3,))
 check(dbx("SELECT 1 FROM office_drive_closed WHERE org_id=? AND vehicle_id=? AND month='2026-03'", (ORG3, NVH)),
       "#3096: March stays closed in the logbook (GoBD)")
-st = dbx("SELECT user_id, sections FROM section_templates WHERE org_id=?", (ORG3,))
-check(len(st) == 1 and st[0]["user_id"] == ALICE and "Schnitt" in st[0]["sections"], f"#3096: the section template {[dict(x) for x in st]}")
+# 2.905.0 (#5288): a section template is a template of the core (kind sections, owner_id, data {"sections": [...]})
+st = dbx("SELECT owner_id, data FROM templates WHERE org_id=? AND kind='sections'", (ORG3,))
+check(len(st) == 1 and st[0]["owner_id"] == ALICE and "Schnitt" in st[0]["data"], f"#3096: the section template {[dict(x) for x in st]}")
 NL = one("SELECT id FROM lists WHERE org_id=? AND name='Umzug Projekt'", (ORG3,))
 NTK = one("SELECT id FROM tasks WHERE list_id=? AND title='Drehplan'", (NL,))
 check(dbx("SELECT 1 FROM contact_tasks ct JOIN contacts c ON c.id=ct.contact_id WHERE ct.task_id=? AND ct.kind='waiting' AND c.id<>?", (NTK, CO)),

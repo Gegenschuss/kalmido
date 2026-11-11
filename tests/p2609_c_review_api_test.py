@@ -157,14 +157,16 @@ attach(Do, TF0, "spec.txt", b"the spec\n")
 TF = tpl(Do, task_id=TF0, name="Escalation", space=f"org:{ORG}")
 r = A.delete(B + f"/api/users/{uid['dora']}")
 check(r.ok, f"F4: dora's account deleted {r.status_code} {r.text[:160]}")
-check(dbx("SELECT user_id, org_id FROM templates WHERE id=?", (TF,)) == [(ALICE, ORG)], "F4: the organisation's template stays, with the heir")
+# 2.905.0 (#5288): templates.owner_id (was user_id)
+check(dbx("SELECT owner_id, org_id FROM templates WHERE id=?", (TF,)) == [(ALICE, ORG)], "F4: the organisation's template stays, with the heir")
 check(any(x["id"] == TF for x in Bo.get(B + "/api/templates").json()["templates"]), "F4: the members still see it")
 r = Bo.post(B + f"/api/templates/{TF}/apply", json={"list_id": L1})
 nt = r.json().get("task", {}).get("id") if r.ok else None
 f = files_of(nt) if nt else []
 check(f and Bo.get(B + f"/api/attachments/{f[0][0]}").content == b"the spec\n", f"F4: its file opens after the key went {r.text[:120]} {f}")
 # the limit: the organisation's templates no longer count for the person who made them
-dbw("INSERT INTO templates(user_id,kind,name,data,created_at,updated_at,org_id) SELECT ?, 'task', 'bulk ' || g, '{\"task\":{\"title\":\"x\"}}', "
+# 2.905.0 (#5288): templates.owner_id (was user_id)
+dbw("INSERT INTO templates(owner_id,kind,name,data,created_at,updated_at,org_id) SELECT ?, 'task', 'bulk ' || g, '{\"task\":{\"title\":\"x\"}}', "
     "'2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', ? FROM generate_series(1, 200) g", (ALICE, ORG))
 r = A.post(B + "/api/templates", json={"kind": "task", "data": {"task": {"title": "Mine"}}, "name": "Still mine"})
 check(r.ok, f"F4: 200 organisation templates do not block her own {r.status_code} {r.text[:120]}")
@@ -179,7 +181,8 @@ TD = tpl(Ev, task_id=TD0, name="Eve's checklist", space=f"org:{ORG}")
 check(dbx("SELECT user_id FROM template_files WHERE template_id=?", (TD,)) == [(uid["eve"],)], "setup: the template has eve's file copy")
 r = A.patch(B + f"/api/templates/{TD}", json={"space": "private"})
 check(r.ok and r.json()["org_id"] is None and r.json()["mine"] is True, f"F2: the admin who makes it private owns it {r.text[:160]}")
-check(dbx("SELECT user_id FROM templates WHERE id=?", (TD,)) == [(ALICE,)], "F2: user_id = the admin")
+# 2.905.0 (#5288): templates.owner_id (was user_id)
+check(dbx("SELECT owner_id FROM templates WHERE id=?", (TD,)) == [(ALICE,)], "F2: owner_id = the admin")
 check(dbx("SELECT user_id FROM template_files WHERE template_id=?", (TD,)) == [(ALICE,)], "F2: its file copies follow")
 check(not any(x["id"] == TD for x in Ev.get(B + "/api/templates").json()["templates"]), "F2: not eve's private template")
 r = A.post(B + f"/api/templates/{TD}/apply", json={"list_id": LA})
