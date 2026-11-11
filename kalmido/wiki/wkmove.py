@@ -386,7 +386,6 @@ def wkr_move(c, uid, src, to, b, dry):
     notes = [trn("{0} page moves", "{0} pages move", len(rows)), tr(WKR_PLAIN) if sst["mode"] and not tst["mode"] else ""]
     from .wkshare import wsh_end_moved  # 2.273.0 B (#3042): shares that end and a history that cannot go along are named
     shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r in rows], dry=True)
-    q = ",".join("?" * len(ids))
     vers = obj_version_count(c, WKM_VKIND, ids) if tst["mode"] else 0  # 2.958.0 (#5281): the core's versions
     notes += [wkm_share_note(shares), trn("{0} earlier version is deleted: a workspace with the lock keeps no history",
                                           "{0} earlier versions are deleted: a workspace with the lock keeps no history", vers) if vers else "",

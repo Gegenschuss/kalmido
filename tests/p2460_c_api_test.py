@@ -144,7 +144,10 @@ check(r.status_code == 404, f"another person: nothing of Alice's folder (unknown
 r = A.put(B + f"/api/folders/groups/{G}", json={"folder": F, "role": "view", "apply": False})
 check(r.ok, "group: only new lists")
 # 2.958.0 (#5245): group_shares is gone; the project's own group share is read by GET /api/lists/<id>/groups (via "list")
-gown = lambda lid, gid: [x["role"] for x in A.get(B + f"/api/lists/{lid}/groups").json()["groups"] if x["group_id"] == gid and x["via"] == "list"]
+def gown(lid, gid):
+    return [x["role"] for x in A.get(B + f"/api/lists/{lid}/groups").json()["groups"] if x["group_id"] == gid and x["via"] == "list"]
+
+
 check(gown(L1, G) == ["admin"], f"Alpha keeps the group's own role {gown(L1, G)}")
 check(own_role(L1, CAROL)[1] == "admin" and own_role(L2, CAROL)[1] == "view", f"Carol: admin in Alpha, view in Beta {own_role(L1, CAROL)} {own_role(L2, CAROL)}")
 r = A.put(B + f"/api/folders/groups/{G}", json={"folder": F, "role": "participant"})
