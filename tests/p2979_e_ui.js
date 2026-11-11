@@ -6,7 +6,8 @@
 //  - rules.js: a rule deleted in the open project dialog; one undo shows it again in the open box, it can be switched off
 //    afterwards (no stale row), redo removes it again
 //  - sectpl.js: a section template deleted in its open dialog; undo shows it again there, redo removes it
-//  - listadmin.js: the trash page's "Deleted projects": a delete taken back by undo leaves the shown list, redo brings it back
+//  - listadmin.js: an active project deleted: the trash keeps no server step, so the step must not take the archiving's group
+//    (one undo brings it back active, the trash page drops it; redo puts it into the trash again)
 //  - settings.js: Settings > Data > templates: a template deleted from its dialog; undo shows it again in the open list
 // jsdom, fresh container. Invented names only. The waits are on states (rows, the server's answer), never on a fixed time.
 const {boot, errs, B, login, until: until0} = require('./boot');
@@ -33,15 +34,16 @@ async function rulesCase(ck, user, L, w) {
   await undo(w);
   check(await until(() => row()), `${user}: undo (server group): the open dialog shows the rule again`);
   check(/Kranich/.test(row()?.textContent || ''), `${user}: ... with its name (${(row()?.textContent || '').slice(0, 60)})`);
-  const sw = row()?.querySelector('[data-rul-on]');
-  if (sw) { sw.checked = false; sw.dispatchEvent(new w.Event('change', {bubbles: true})); }
-  check(await until(async () => ((await call(ck, 'GET', `/api/lists/${L}/rules`)).rules || []).some(x => x.id === R.id && !x.active)), `${user}: the rule brought back can be changed again (switched off)`);
-  check(await until(() => row()?.classList.contains('off')), `${user}: ... and the row shows it off`);
   await redo(w);
   check(await until(() => !row()), `${user}: redo: deleted again, the row goes`);
   check(!((await call(ck, 'GET', `/api/lists/${L}/rules`)).rules || []).some(x => x.id === R.id), `${user}: the server has it deleted`);
   await undo(w);
   check(await until(() => row()), `${user}: undo once more: back in the box`);
+  // a change after the undo (a new step; it ends the way forward, so it comes after the redo)
+  const sw = row()?.querySelector('[data-rul-on]');
+  if (sw) { sw.checked = false; sw.dispatchEvent(new w.Event('change', {bubbles: true})); }
+  check(await until(async () => ((await call(ck, 'GET', `/api/lists/${L}/rules`)).rules || []).some(x => x.id === R.id && !x.active)), `${user}: the rule brought back can be changed again (switched off)`);
+  check(await until(() => row()?.classList.contains('off')), `${user}: ... and the row shows it off`);
   d.querySelector('.modal [data-m="close"], .modal [data-act="close"]')?.click();
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
 }
@@ -94,25 +96,31 @@ async function rulesCase(ck, user, L, w) {
   check(await until(() => !trow()), 'redo: gone again');
   [...d.querySelectorAll('.smodal')].forEach(m => m.remove());
 
-  // ---- listadmin.js: the trash page's "Deleted projects"
+  // ---- listadmin.js: an ACTIVE project deleted (archived first, then into the trash, #2304): the trash keeps no server step,
+  // the step goes back by its own functions; it must not take the archiving's group (the server would take back only that)
   const G = (await call(CA, 'POST', '/api/lists', {name: 'Stork'})).id;
-  await call(CA, 'PATCH', `/api/lists/${G}`, {archived: 1});
-  check(await until(() => w.eval(`!!listById(${G})`)), 'the client knows the archived project');
-  check(await w.eval(`listDeleteForGood(${G})`) === true, 'deleted into the trash');
-  check(await until(() => w.eval('(HIST.undo[HIST.undo.length - 1]?.label || "")').includes('Stork') && w.eval('histGids(HIST.undo[HIST.undo.length - 1]).length') > 0), 'the delete is the newest step, a group of the server');
+  await call(CA, 'POST', '/api/tasks', {title: 'Count the storks', list_id: G});
+  await w.eval('load().then(() => 1)');
+  check(await until(() => w.eval(`!!listById(${G}) && !listById(${G}).archived`)), 'the client knows the active project');
+  check(await w.eval(`listDeleteForGood(${G})`) === true, 'deleted');
+  const lst = async () => ((await call(CA, 'GET', '/api/state')).lists || []).find(x => x.id === G);
+  const inTrash = async () => ((await call(CA, 'GET', '/api/trash/lists')).lists || []).some(x => x.id === G);
+  check(await until(() => w.eval('(HIST.undo[HIST.undo.length - 1]?.label || "")').includes('Stork')), 'the delete is the newest step');
+  check(await inTrash(), 'the server has it in the trash');
+  check(w.eval('histGids(HIST.undo[HIST.undo.length - 1]).length') === 0, 'the step carries no server group (its own functions take it back)');
   w.location.hash = 'trash';
   const orow = () => d.querySelector(`.otrlists .otrrow[data-otr="${G}"]`);
   check(await until(() => orow()), 'the trash page shows the deleted project');
   await undo(w);
-  check(await until(() => !orow()), 'undo (server group): the shown trash no longer lists it');
-  check(await until(() => w.eval(`!!listById(${G})`)), '... and the project is back in the app');
+  check(await until(async () => { const x = await lst(); return x && !x.archived; }), 'one undo brings it back ACTIVE');
+  check(!(await inTrash()), '... nothing left in the trash');
+  check(await until(() => !orow()), '... and the shown trash page no longer lists it');
+  check(await until(() => w.eval(`!!listById(${G}) && !listById(${G}).archived`)), '... the app shows the active project again');
   await redo(w);
+  check(await until(() => inTrash()), 'redo: into the trash again');
   check(await until(() => orow()), 'redo: the trash page lists it again');
-  w.location.hash = 'inbox';
   await undo(w);
-  check(w.eval('S.otr.at') === 0, 'a trash not shown is marked old after the undo');
-  w.location.hash = 'trash';
-  check(await until(() => d.querySelector('.otrlists') === null || !orow()), 'back on the trash page: the project is not listed');
+  check(await until(async () => { const x = await lst(); return x && !x.archived; }), 'undo after redo: active again');
   w.close();
 
   // ---- a person without an organisation (freelancer parity): her rule
