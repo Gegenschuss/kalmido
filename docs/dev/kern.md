@@ -514,6 +514,10 @@ core, the call sheet a part of its shoot day with the same rights and a history 
   entry is the mark `picture:<8 hex of its SHA-256>`.
 - The role of both: the person may enter the area with the module on (`abs_org`) -> `manage` when the organisation role
   writes, `view` read-only; agents and kid accounts nothing; `cap` gives nothing (no shares).
+- The tab "Call sheets" of a project (2.988.0, #5651, `GET / POST /api/team/dispo/callsheets`) lists the call sheets with
+  `obj_rows(callsheet)` (the core decides each row) narrowed to the shoot days of the project; "New call sheet" makes the shoot
+  day (one open place of the disposition, titled "Shoot day") and the call sheet's row (`cs_make`: the core's columns, history
+  "create"), no list of its own beside the core.
 - The trash: the shoot day's last live booking deleted -> `obj_trash` of the call sheet, a booking back (the route, or the
   step list's undo / redo through `dsu_need`'s fix) -> `obj_restore` (`dsk_sync`); the core's run deletes it after the period
   (`trash_prune=True`), the bookings' trash run deletes a call sheet without any booking the core's way (`dsk_orphans`).
