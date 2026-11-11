@@ -104,7 +104,9 @@ check(done(Fr, D) and doc(Fr, D)["pages"] == 3, "setup: a three-page PDF recogni
 check(widths(content(Fr, D)) == [600, 700, 800], f"setup: the pages in their order {widths(content(Fr, D))}")
 for bad, what in (({"order": [1, 2]}, "a page missing"), ({"order": [1, 1, 2, 3]}, "a page twice"), ({"order": [1, 2, 4]}, "past the end"),
                   ({"order": [3, 1, 2], "delete": [2]}, "a deleted page in the order"), ({"order": ["3", "1", "2"]}, "not numbers"),
-                  ({"order": [True, 2, 3]}, "a bool"), ({"order": "3,1,2"}, "not a list"), ({"order": [1, 2, 3]}, "the same order only")):
+                  ({"order": [True, 2, 3]}, "a bool"), ({"order": "3,1,2"}, "not a list"), ({"order": [1, 2, 3]}, "the same order only"),
+                  # 2.976.0 (#5657): a superscript digit as the page key ("²".isdigit() is True) was a 500
+                  ({"rotate": {"\u00b2": 90}}, "a superscript page number")):
     r = Fr.post(B + f"/api/docs/{D}/pages", json={**bad, "expect_version": 1})
     check(r.status_code == 400, f"reorder invalid ({what}) -> 400 ({r.status_code} {r.text[:120]})")
 check(ver(Fr, D) == 1, "... nothing stored: still version 1")
