@@ -18,50 +18,6 @@ an object with a node. A share's new expiry date changes nothing here (no UPDATE
 New function and trigger only: the version before keeps running on it (it would only see fewer stale old rows); the way back is
 DROP TRIGGER kalmido_kern_back ON fs_shares (and DROP FUNCTION kalmido_kern_back()). The function reads only columns fs_shares
 has had since 2.48 (node_id, user_id, agent_id, role, expires_at).
-"""
-SCHEMA = """
-CREATE OR REPLACE FUNCTION kalmido_kern_back() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE nk TEXT; nr BIGINT; who BIGINT; best TEXT; prev TEXT; psync TEXT; ts TEXT;
-BEGIN
-  IF current_setting('app.kern_sync', true) = '1' THEN
-    RETURN NULL;  -- kalmido_kern_node_gone / this function itself write the rows
-  END IF;
-  who := COALESCE(OLD.user_id, OLD.agent_id);
-  IF who IS NULL THEN
-    RETURN NULL;  -- a group's share: the old tables never had one
-  END IF;
-  IF TG_OP = 'UPDATE' AND (NEW.role IS NOT DISTINCT FROM OLD.role OR NEW.role NOT IN ('view', 'edit')) THEN
-    RETURN NULL;
-  END IF;
-  prev := current_setting('app.role', true);
-  psync := current_setting('app.kern_sync', true);
-  PERFORM set_config('app.role', 'system', true);
-  SELECT ref_kind, ref_id INTO nk, nr FROM fs_nodes WHERE id = OLD.node_id AND kind = 'ref' AND ref_kind IN ('evcal', 'address_book');
-  IF nk IS NOT NULL THEN
-    PERFORM set_config('app.kern_sync', '1', true);
-    ts := to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"');
-    SELECT s.role INTO best FROM fs_shares s WHERE s.node_id = OLD.node_id AND COALESCE(s.user_id, s.agent_id) = who
-      AND s.role IN ('view', 'edit') AND (s.expires_at IS NULL OR s.expires_at > ts) ORDER BY (s.role = 'edit') DESC LIMIT 1;
-    IF TG_OP = 'UPDATE' AND best IS NULL THEN
-      best := NEW.role;  -- review: an UPDATE takes the best live share of the person (a second edit share wins), else its own
-    END IF;
-    IF nk = 'evcal' THEN
-      IF best IS NULL THEN
-        DELETE FROM ev_cal_members WHERE cal_id = nr AND user_id = who;
-      ELSE
-        UPDATE ev_cal_members SET role = best WHERE cal_id = nr AND user_id = who AND role <> best;
-      END IF;
-    ELSE
-      IF best IS NULL THEN
-        DELETE FROM book_members WHERE book_id = nr AND user_id = who;
-      ELSE
-        UPDATE book_members SET role = best WHERE book_id = nr AND user_id = who AND role <> best;
-      END IF;
-    END IF;
-    PERFORM set_config('app.kern_sync', COALESCE(psync, ''), true);
-  END IF;
-  PERFORM set_config('app.role', COALESCE(prev, ''), true);
-  RETURN NULL;
-END $$;
-CREATE OR REPLACE TRIGGER kalmido_kern_back AFTER DELETE OR UPDATE OF role ON fs_shares FOR EACH ROW EXECUTE FUNCTION kalmido_kern_back();
+2.924.0 (#5069, stage 7b): the function and trigger (kalmido_kern_back) went with the old member tables (events/evkern.py ev_kern_drop,
+core/migrations.d/5069_b.py); this fragment keeps only its history.
 """

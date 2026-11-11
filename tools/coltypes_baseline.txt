@@ -70,7 +70,6 @@ bg_jobs.beat_at time
 bg_jobs.created_at time
 bg_jobs.finished_at time
 bg_jobs.started_at time
-book_members.added_at time
 bookmarks.created_at time
 bookmarks.deleted_at time
 bookmarks.fetched_at time
@@ -178,8 +177,6 @@ doc_views.updated_at time
 e2e_keys.created_at time
 e2e_keys.updated_at time
 ev_cal_feeds.created_at time
-ev_cal_members.added_at time
-ev_cal_members.hidden bool
 ev_cals.changed_at time
 ev_cals.created_at time
 ev_cals.deleted_at time

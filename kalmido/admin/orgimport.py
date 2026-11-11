@@ -235,7 +235,7 @@ def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="",
 # 2.278.0 B (#3094): what a dropped row's warning names for tables without a label of their own
 _OI_AREA = {"office_payments": N_("Payments"), "office_pay_props": N_("Payments"), "office_trip_items": N_("Travel expenses"),
             "office_cash_entries": N_("Cash book"), "office_cash_closings": N_("Cash book"), "office_cash_log": N_("Cash book"),
-            "ev_cal_members": N_("Calendars"), "book_members": N_("Address books")}
+            "calendars_members": N_("Calendars"), "books_members": N_("Address books")}  # 2.924.0 (#5069): report keys, no tables
 
 
 def oi_area(spec):

@@ -697,8 +697,12 @@ def _core_member(c, run, src, d, ctx):
     """2.647.0 (#5046): a member row of a calendar / an address book whose object has a reference node in the archive comes
     along only while that node has a live share (not expired) of the same person / agent in the archive: the node's shares
     are the truth (core/migrations.d/4712_a.py), a row its share was taken back from (an archive of a version before 2.647,
-    which wrote the old rows as they stood) never reopens the object here. Then _not_me."""
-    kind, col = {"ev_cal_members": ("evcal", "cal_id"), "book_members": ("address_book", "book_id")}[ctx.spec.table]
+    which wrote the old rows as they stood) never reopens the object here. Then _not_me.
+    2.924.0 (#5069): only an archive of a version before 2.924 has these files (the tables are gone): the row becomes the share
+    of the imported object's reference node at once (made now when the archive brought none; not later like a channel's
+    node, _CORE_LATE), unless the person / agent has one there already (store/shares.json came first). Always False: no row
+    of its own."""
+    kind, col, table = _CORE_MEMBER_OF[ctx.spec.path]
     idx = getattr(run, "oi_core_members", None)
     if idx is None:
         oi = ctx.data.get("oi") or {}
@@ -716,7 +720,27 @@ def _core_member(c, run, src, d, ctx):
     obj = (kind, _oid(src.get(col)))
     if obj in idx[0] and (*obj, _oid(src.get("user_id"))) not in idx[1]:
         return False
-    return _not_me(c, run, src, d, ctx)
+    d = _not_me(c, run, src, d, ctx)
+    rid, who = run.m(table, src.get(col)), (d or {}).get("user_id")
+    if not d or not rid or not who:
+        return False
+    from ..core.objects import obj_node, obj_node_person_put  # the domain layer loads after the import areas (ORDER)
+    from ..contacts.ctkern import bk_node_ensure
+    with system_ctx(c):  # the node of the object this import just made (in the target's tree)
+        had = c.execute("SELECT 1 FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (kind, rid)).fetchone()
+        n = obj_node(c, ctx.uid, kind, rid, make=True) if kind == "evcal" else bk_node_ensure(c, ctx.uid, rid)
+        if n is not None and not had:  # made here: recorded for the undo (like the channel's node, _room_after)
+            run.created["oi"].append(["fs_nodes", n["id"], n["org_id"]])
+        if n is not None and not c.execute("SELECT 1 FROM fs_shares WHERE node_id=? AND (user_id=? OR agent_id=?)",
+                                           (n["id"], int(who), int(who))).fetchone():
+            obj_node_person_put(c, ctx.uid, n, int(who), d.get("role") if d.get("role") in ("view", "edit") else "view")
+            run.count(ctx.spec.path.split("/")[0] + "_members")  # the report's number (no table of its own any more)
+    return False
+
+
+# 2.924.0 (#5069): archive file -> (kind, object column, object table); the spec's table is fs_shares with node_id 0 as a stand-in
+# (umz_row needs the column): _core_member writes the share itself and never lets the row through
+_CORE_MEMBER_OF = {"calendars/members.json": ("evcal", "cal_id", "ev_cals"), "books/members.json": ("address_book", "book_id", "books")}
 
 
 def _modcard(c, run, src, d, ctx):
@@ -870,12 +894,12 @@ SPECS = [
     OiT("chat/files.json", "tchat_files", refs={"message_id": "tchat_msgs", "room_id": "tchat_rooms"}, need=("message_id", "room_id"),
         people={"user_id": "null"}, space=(), enc=False, label=N_("Team chat"), prep=_chat_file),
     # shares of calendars and address books (only with ticked people)
-    OiT("calendars/members.json", "ev_cal_members", refs={"cal_id": "ev_cals"}, need=("cal_id",), people={"user_id": "member"}, space=(),
-        rid=False, prep=_core_member),  # 2.647.0 (#5046)
+    OiT("calendars/members.json", "fs_shares", refs={"cal_id": "ev_cals"}, need=("cal_id",), people={"user_id": "member"}, space=(),
+        rid=False, fixed={"node_id": 0}, label=N_("Calendars"), prep=_core_member),  # 2.647.0 (#5046); 2.924.0 (#5069): shares of the node
     OiT("books/contact_tasks.json", "contact_tasks", refs={"contact_id": "contacts", "task_id": "tasks"}, need=("contact_id", "task_id"),
         people={"added_by": "null"}, space=(), rid=False, label=N_("Contacts")),  # 2.362.0 (#3096)
-    OiT("books/members.json", "book_members", refs={"book_id": "books"}, need=("book_id",), people={"user_id": "member"}, space=(),
-        rid=False, prep=_core_member),  # 2.647.0 (#5046)
+    OiT("books/members.json", "fs_shares", refs={"book_id": "books"}, need=("book_id",), people={"user_id": "member"}, space=(),
+        rid=False, fixed={"node_id": 0}, label=N_("Address books"), prep=_core_member),  # 2.647.0 (#5046); 2.924.0 (#5069): shares of the node
     # newsletter
     OiT("newsletter/connection.json", "nl_conns", people={"created_by": "null"}, label=N_("Newsletter"), prep=_nl_conn),
     OiT("newsletter/segments.json", "nl_segments", refs={"conn_id": "nl_conns"}, need=("conn_id",), label=N_("Newsletter"), prep=_nl_seg),

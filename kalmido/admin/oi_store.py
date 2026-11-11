@@ -86,10 +86,9 @@ _REF_KINDS = {"wiki": "wiki_pages", "sheet": "sheets"}
 # the top of the workspace's tree or in any folder (no area): it comes along with its shares and history and points at the
 # imported calendar / book in _finish_refs (one that did not come along goes again, like a page's node)
 _CORE_REF_KINDS = {"evcal": "ev_cals", "address_book": "books"}
-_CORE_MEMBERS = {"evcal": ("ev_cal_members", "cal_id"), "address_book": ("book_members", "book_id")}
 # 2.581.0 (#4811): reference nodes of the shared core (#4709) outside the areas' trees. Calendars and address books (#4712) are
-# in when the store comes (base import): their node points at the new row at once (the trigger kalmido_kern_node_made mirrors
-# their member rows, the shares of the archive land on it). The team chat's channels (#4719) come later (oi_team): their node
+# in when the store comes (base import): their node points at the new row at once (the shares of the archive land on it;
+# 2.924.0, #5069: an older archive's calendars/members.json -> admin/oi_team.py _core_member). The team chat's channels (#4719) come later (oi_team): their node
 # is set in _finish_refs like a page's. A project's node (#4739) is made by the base import itself (lists/lffolder.py lf_place):
 # the archive's node maps onto it, so its own member shares and its history follow (its "create" line is the target's).
 _CORE_NOW = {"evcal": "ev_cals", "address_book": "books"}
@@ -702,9 +701,6 @@ def _finish_refs(c, run):
         nid, new = run.m("fs_nodes", sid), run.m({**_REF_KINDS, **_CORE_REF_KINDS, **_CORE_LATE}[kind], ref)
         if nid and new and not c.execute("SELECT 1 FROM fs_nodes WHERE ref_kind=? AND ref_id=? AND kind='ref'", (kind, new)).fetchone():
             c.execute("UPDATE fs_nodes SET ref_id=? WHERE id=?", (new, nid))
-            if kind in _CORE_MEMBERS:  # 2.566.0 (#4712): the node is the truth now -- the member rows the object has (also of a
-                t, col = _CORE_MEMBERS[kind]  # calendar of the target this one went into) are mirrored onto it, as on a node made
-                c.execute(f"UPDATE {t} SET role=role WHERE {col}=?", (new,))  # (trigger kalmido_kern_mirror, 4712_a.py)
         elif nid:
             c.execute("DELETE FROM fs_nodes WHERE id=? AND kind='ref' AND ref_id IS NULL", (nid,))
 

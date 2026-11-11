@@ -87,8 +87,8 @@ UMZ_LEFT_TABLES = {
     _SERVER, "ev_invite_day": _SERVER, "ev_reminded": _SERVER, "idem_keys": _SERVER, "imports": _SERVER, "login_ips": _SERVER, "notify_mail_queue":
     _SERVER, "org_keys": _SERVER, "org_out_requests": _SERVER, "push_gate": _SERVER, "quiet_push_held": _SERVER, "sample_items": _SERVER, "task_push": _SERVER, "tidy_pending": _SERVER, "upload_scan":
     _SERVER,
-    "book_members": _SHARE, "ev_cal_members": _SHARE, "folder_people": _SHARE, "fs_shares": _SHARE, "group_members": _SHARE, "group_shares": _SHARE,
-    "groups": _SHARE, "sheet_shares": _SHARE,  # 2.924.0 (#5069): tchat_members is gone
+    "folder_people": _SHARE, "fs_shares": _SHARE, "group_members": _SHARE, "group_shares": _SHARE,
+    "groups": _SHARE, "sheet_shares": _SHARE,  # 2.924.0 (#5069): tchat_members, ev_cal_members, book_members are gone
     "list_bell": _VIEW, "list_folder_skip": _VIEW, "list_mine_hide": _VIEW, "rss_reads": _VIEW, "tchat_reads": _VIEW,
     "tchat_thread_reads": _VIEW, "user_task_order": _VIEW, "wait_hidden": _VIEW,
     "obj_seen": _VIEW,  # 2.905.0 (#5284): the core's read marks (was task_seen), a personal view state like before

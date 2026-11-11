@@ -72,9 +72,13 @@ obj_register("meeting", "meetings", label=N_("Meeting"), area="calendar",
   `on_revoke` (its part of `obj_revoke_person`) and `list_col` (the column a token's project limit is checked against). Its
   routes call `obj_share(..., extra=..., checked=True)` / `obj_unshare(..., checked=True)` after checking the right and the
   target themselves.
-- An old area moving onto the core (stage 3): `members=(table, key column)` names its old member table (one release a
-  fallback reader): `obj_revoke_person` takes its rows with the shares when a person leaves / the organisation retires.
-  `fs_hooks={...}` replaces keyword arguments of the file store's registration, for a kind the file store knew before the core
+- An area whose own sharing dialog writes the shares of the object's node (stage 3, the calendars and address books):
+  `node_shares=True` (2.924.0, #5069; with `on_share_back=f(c, uid, id, share)` for the dialog's side effects when a share
+  comes back through the core's restore; it replaced `members=(table, key column)`, the old member table, gone since stage 7b):
+  the node stays out of the file store's trash alone while it carries shares, the shares of the owner's own agents stay when
+  the organisation retires, and the generic routes `GET /api/obj/<kind>/<id>/shares` + `POST .../shares/<rid>/restore` work
+  for the kind (the shares taken back, restorable 30 days). The dialog writes with `obj_node_person_put(c, by, node, target,
+  role)` / `obj_node_person_drop(c, kind, id, target)` after its own checks. `fs_hooks={...}` replaces keyword arguments of the file store's registration, for a kind the file store knew before the core
   (the address books keep their folder rules: filing and sharing the node stay with who manages it).
 
 The kind is registered with the file store's reference nodes at the same time (files/fsref.py): the object can lie in
@@ -305,27 +309,31 @@ organisations + a private person, read-only, guest, a group, an agent, an expire
 - `evcal` (ev_cals, events/evkern.py) and `address_book` (books, contacts/ctkern.py) are kinds without the generic routes
   (`routes=False`); their own routes, the API v1 and CalDAV / CardDAV call the core. Their role is `obj_role`
   (events/model.py `ev_role`; the books' `book_role` reads the same share through its folder way, `ctf_node_role`).
-- Their shares are rows of `fs_shares` on the object's reference node. The trigger `kalmido_kern_mirror`
-  (core/migrations.d/4712_a.py) mirrors every change of the old member tables `ev_cal_members` / `book_members` into them
-  (a row added, its role changed, deleted -- any code path), once the object has a node: the start's one-shot
-  (`migr_kern4712`) gave every calendar / book with members its node, a new member gets it first. With a live node only the
-  core's share counts, so a share taken back in the core (the file store's dialog, `obj_revoke_person`) stays taken back;
-  without one the old row is still read. Stage 7 removes the old tables and the trigger.
-- The way back (2.647.0, #5046): the trigger `kalmido_kern_back` (core/migrations.d/5046_a.py) on `fs_shares` deletes the
-  old member row when a person's / agent's share of the node is deleted in the core (unless another live share of theirs
-  stays) and gives it the core's role when that changes; it writes with `app.kern_sync`, so the mirror does not run back. An
-  expiry is no event of the database: everything that asks who is a member besides the rights reads the core's live shares
-  (`cal_members(..., live=True)` / `ev_member_role`, `book_members_of(..., live=True)` / `bk_member_role`): reminders, the
-  heir of a deleted account, news, the agent's workspace check, the client contact link. The organisation export writes
-  `members.json` only for people with a live share on the node, and the import drops an archive's member row whose node in
-  the archive has no live share of that person.
-- The node is the truth as soon as it exists (review of 2.566.0): a node made by any path (the first member, a share in the
-  core, filing it in a folder) mirrors all member rows the object has at that moment; a node in the file store's trash is
-  still the node (no share counts then, the old rows are not read again), and while it carries shares it does not go there
-  on its own (the file store's protect hook), only with the object; a node removed for good first writes its shares to people
-  and agents back into the member rows (trigger `kalmido_kern_node_gone`). An object that becomes private (its owner leaves
-  without an heir, the organisation retires) keeps its node: it follows into the owner's private tree
-  (`accounts/orgretain.py obj_nodes_follow`). A workspace move checks the node's shares (`accounts/orgs.py obj_org_set`): a
+- Their shares are rows of `fs_shares` on the object's reference node -- since stage 7b (2.924.0, #5069) the only ones. The
+  old member tables `ev_cal_members` / `book_members`, their fallback reader and the sync triggers of 2.566 / 2.647 / 2.652
+  (`kalmido_kern_mirror`, `kalmido_kern_node_made`, `kalmido_kern_node_gone`, `kalmido_kern_back`) are gone: the calendar's
+  and the book's own dialog writes the node's shares (`cal_member_set` / `book_member_set` -> `obj_node_person_put`: the same
+  person again changes the role, a share that ran out comes back without end date, a valid end date stays; removing a member
+  deletes their rows, `obj_node_person_drop`). A calendar / book without a node is shared with nobody.
+- The drop (core/migrations.d/5069_b.py, `events/evkern.py ev_kern_drop`, every start until done): every object with an old
+  row and no node gets its node and every such row its share (the one-shot `migr_kern4712` of before, without a flag); a row
+  of an object WITH a node and no share of that person is stale (the core said no) and is deleted; then a start check: an
+  old row still without a node keeps both tables AND the triggers (no half state; a log line "stage 7b (#5069) waits" with
+  the numbers and an admin alert of kind "storage"); else the triggers and functions go, then `DROP TABLE` and their rows in
+  `obj_revoked`. A share the core took back (`obj_revoke_person`) comes back through `POST /api/obj/<kind>/<id>/shares/<rid>/restore`
+  like a file share; the kind's `on_share_back` hook then does what the dialog does for a new member (News, `cal_touch` /
+  `book_touch`).
+- Who is a member besides the rights reads the core's live shares (`cal_members(..., live=True)` / `ev_member_role`,
+  `book_members_of(..., live=True)` / `bk_member_role`): reminders, the heir of a deleted account, news, the agent's workspace
+  check, the client contact link, the workspace boundary check (tenancy `cal_person` / `book_person`). The organisation
+  export has no `members.json` for them any more (the shares are in `store/shares.json`); an older archive's
+  `calendars/members.json` / `books/members.json` still imports: each row becomes the share of the imported object's node
+  (made at once when the archive brought none), unless the archive's node already gave that person one.
+- A node in the file store's trash is still the node (no share counts then); while it carries shares it does not go there
+  on its own (the file store's protect hook), only with the object. An object that becomes private (its owner leaves without
+  an heir, the organisation retires) keeps its node: it follows into the owner's private tree (`accounts/orgretain.py
+  obj_nodes_follow`); a private calendar / book handed to the heir of a deleted account takes its node into the heir's tree
+  (`admin/purgeshare.py`; people who reached a book through a folder of the deleted person get a share of the node). A workspace move checks the node's shares (`accounts/orgs.py obj_org_set`): a
   person or agent who does not fit the new workspace, or a group's share, is a 409.
 - The calendar's settings are written by `obj_write`, the calendar goes into the core's trash with its events
   (`ev_cal_trash`, restore `POST /api/evcals/<id>/restore`, purged with the events' trash run). Events are no kind of their
