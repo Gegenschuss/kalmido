@@ -115,7 +115,9 @@ for what, q, args in (
 p = plan("SELECT COUNT(*), COALESCE(MAX(id),0) FROM notifications WHERE user_id=? AND read_at IS NULL", (1,))
 check(any(n[2] == "ix2281_notifications_unread" for n in p), f"the unread news (4-s poll) use the partial index: {p}")
 names = {r[0] for r in sql("SELECT indexname FROM pg_indexes WHERE indexname LIKE 'ix2281\\_%'")}
-check(len(names) >= 180, f"the 2.281 indexes exist ({len(names)})")
+# 2.981.0 (#5273 #5274 #5278 #5286 #5287): seven went with their tables (list_bell, tchat_reads, video_comments x3,
+# task_fts / cmt_fts) - the rows live in obj_follow / obj_seen / obj_comments / obj_search with their own indexes
+check(len(names) >= 173, f"the 2.281 indexes exist ({len(names)})")
 
 
 # ---- "Empty trash": big = background job, small = in the request

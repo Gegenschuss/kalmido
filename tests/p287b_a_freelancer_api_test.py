@@ -362,6 +362,7 @@ SUBST = [
     # objprobe exists only with KALMIDO_TEST_OBJ, obj_core_test.py / obj_write_test.py): the sweep calls them with it and an id
     # of the setup and expects 404 (EXPECT_4XX) -- the first real area on the core makes them stale, then its objects go here
     (r"/api/obj/$", "objkind"), (r"/api/obj/objprobe/$", "list"),
+    (r"/api/obj/doc_note/$", "docnode"),  # 2.981.0 (#5273): the notes of the own document through the comments' core (USE)
     (r"/api/v1/agent/objects/$", "objkind"), (r"/api/v1/agent/objects/objprobe/$", "list"),
     (r"/api/team/dispo/callsheet/$", "dispojob"),  # 2.855.0 (#1956)
     # 2.421.0 A (#2936): own objects of the setup above; file ids of other stores than the file store: none (skipped)
@@ -396,6 +397,7 @@ SUBST = [
     (r"/absences/$", "absence"), (r"/budget/$", "budget"),
 ]
 IDS["me"] = FID
+IDS["dnkind"] = "doc_note"  # 2.981.0 (#5273): the kind of the generic comment routes in the sweep (USE)
 IDS["ledgercsv"] = "bs"  # 2.666.0 (#3461): ledger/<what>.csv names a list, not an id; 2.685.0 (#5128): "bs" -- ledger/<what>.pdf knows bs / pl only
 
 
@@ -403,7 +405,8 @@ IDS["ledgercsv"] = "bs"  # 2.666.0 (#3461): ledger/<what>.csv names a list, not 
 USE = {"GET /api/files/nodes/{}/requests": {"node": "folder"}, "GET /api/office/docs/{}/peppol": {"doc": "invoice"},
        "GET /api/office/docs/{}/ubl": {"doc": "invoice"}, "GET /api/office/docs/{}/xml": {"doc": "invoice"},
        "GET /api/office/docs/{}/timesheet.pdf": {"doc": "invoice"}, "GET /api/tasks/{}/milestone": {"task": "milestone"},
-       "GET /api/v1/tasks/{}/milestone": {"task": "milestone"}}
+       "GET /api/v1/tasks/{}/milestone": {"task": "milestone"},
+       "GET /api/obj/{}/{}/comments": {"objkind": "dnkind"}}  # 2.981.0 (#5273): objprobe has no comments; doc_note on the own document
 # 2.421.0 A (#2936): route -> the query a GET needs ({key} = an id of IDS), so it answers with data instead of a 400
 FROM_TO = {"from": "2030-03-01", "to": "2030-03-31"}
 QUERY = {

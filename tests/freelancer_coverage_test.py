@@ -1563,7 +1563,6 @@ POST /api/tasks/{}/typing
 POST /api/tasks/{}/wake
 POST /api/team/absences/{}/restore
 POST /api/team/messages/{}/pin
-POST /api/team/messages/{}/reactions
 POST /api/trash/lists/{}/export.zip
 POST /api/users/{}/approve
 POST /api/users/{}/invite
@@ -1655,7 +1654,6 @@ PUT /api/folders/agents
 PUT /api/folders/playbook
 PUT /api/folders/public-links
 PUT /api/life/karakeep
-PUT /api/lists/{}/bell
 PUT /api/lists/{}/folder-repo
 PUT /api/lists/{}/header
 PUT /api/lists/{}/icon
