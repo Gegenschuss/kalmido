@@ -2,7 +2,7 @@
 // kalmido-suite: fresh
 // - with Film & Video and the module Disposition the project's view switch has "Call sheets"; a click shows the page (it loads
 //   callsheet.js on demand): the heading, the hint "No call sheets yet" and the button "New call sheet"
-// - "New call sheet": a day, "Create" -> the call sheet dialog of that day opens (its heading names the project); closed, the
+// - "New call sheet": a day, "Create" -> the call sheet dialog of that day opens (its heading names the project to who sees it; the shoot day's own title is "Shoot day", review F3); closed, the
 //   tab shows the row: the day, "Shoot day 1", "No location yet" and a PDF button; a location saved in the dialog shows in the
 //   row; a tap on the row opens the call sheet again with what was saved; back to "List" shows the tasks again
 // - a read-only member of the organisation sees the row, but no "New call sheet"
@@ -65,7 +65,7 @@ async function tab(user, lid) {
   if (nm) nm.querySelector('#pcs-day').value = D;
   nm?.querySelector('[data-pcs="make"]')?.click();
   let md = await until(() => d.querySelector('.modal.csmd #cs-loc_name') && d.querySelector('.modal.csmd'));
-  check(md && /Kinospot Winter/.test(txt(md.querySelector('h3'))) && !d.querySelector('.modal #pcs-day'), 'the call sheet of the new shoot day opened: ' + txt(md?.querySelector('h3')));
+  check(md && /Call sheet: Kinospot Winter/.test(txt(md.querySelector('h3'))) && !d.querySelector('.modal #pcs-day'), 'the call sheet of the new shoot day opened: ' + txt(md?.querySelector('h3')));
   check(md?.querySelector('#cs-day_no')?.value === '1', 'its shoot day number 1');
   md.querySelector('#cs-loc_name').value = 'Eisstadion Beispiel';
   md.querySelector('[data-cs="save"]')?.click();
@@ -89,7 +89,7 @@ async function tab(user, lid) {
   await until(() => !d.querySelector('.modal.csmd'));
   // the disposition knows the shoot day
   const dp = await call(A, 'GET', `/api/team/dispo?start=${D}&days=1&org=${org.id}`);
-  check((dp.bookings || []).some(b => b.kind === 'slot' && b.title === 'Kinospot Winter'), 'the disposition has the shoot day (an open place)');
+  check((dp.bookings || []).some(b => b.kind === 'slot' && b.title === 'Shoot day'), 'the disposition has the shoot day (an open place)');
   // back to the list: the tasks again
   d.querySelector('#top [data-act="view-list"]')?.click();
   check(await until(() => /Drehbuch fertig/.test(txt(d.querySelector('#view'))) && !d.querySelector('#view .pcs')), 'back to "List": the tasks, no call sheets page');

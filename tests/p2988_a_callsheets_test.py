@@ -8,6 +8,8 @@
  - the rows: date, shoot day no., location (after a save of the call sheet), oldest day first; a shoot day made in the
    disposition with a saved call sheet is in the list too, one without a saved call sheet is not (no call sheet yet)
  - Film & Video as the second industry of the area: the call sheet opens and lists (the first industry alone hid it)
+ - review 2.988: the shoot day's title is "Shoot day" (F3), the next number is the highest + 1 (F4), an archived project / the
+   inbox take none (F6)
  - undo of "new": the shoot day's bookings deleted -> the call sheet leaves the list; restored -> back
  - rights: another person 404 (list and new; an agent: hub/dispo.py _gate as every route of the disposition), the module Disposition off 403 / 409; an organisation: the
    admin adds, a read-only member sees the rows without can_add and POST 403
@@ -41,8 +43,8 @@ check(r.ok and r.json() == {"callsheets": [], "can_add": True, "locked": False},
 r = Fr.post(URL, json={"list_id": L, "date": "2027-05-04"})
 check(r.status_code == 201, "a call sheet for 4 May " + r.text[:200])
 c1 = r.json().get("callsheet") or {}
-check(c1.get("date") == "2027-05-04" and c1.get("day_no") == "1" and c1.get("title") == "Werbefilm Garten" and c1.get("location") == "",
-      f"its row: the day, shoot day 1, the project's name, no location yet {c1}")
+check(c1.get("date") == "2027-05-04" and c1.get("day_no") == "1" and c1.get("title") == "Shoot day" and c1.get("location") == "",
+      f"its row: the day, shoot day 1, the title Shoot day (review F3: not the project's name), no location yet {c1}")
 B1 = r.json().get("booking_id")
 J1, ORG1 = c1.get("job"), c1.get("org_id")
 bk = [tuple(x) for x in kt.dbx("SELECT resource_kind, resource_id, status, list_id, start, \"end\" FROM hub_bookings WHERE job=?", (J1,))]
@@ -89,6 +91,12 @@ check(J1 not in [x["job"] for x in Fr.get(URL + f"?list={L}").json()["callsheets
 check(Fr.post(B + "/api/team/dispo/bookings/restore", json={"ids": r.json()["ids"]}).ok, "redo: restored")
 check(J1 in [x["job"] for x in Fr.get(URL + f"?list={L}").json()["callsheets"]], "redo: the call sheet is back")
 
+# review F4: the next number is the highest + 1 (a deleted shoot day does not give its number twice; its call sheet in the trash counts)
+B2 = kt.dbx("SELECT id FROM hub_bookings WHERE job=?", (J2,))[0][0]
+check(Fr.delete(B + f"/api/team/dispo/bookings/{B2}?all=1").ok, "shoot day 2 deleted")
+r = Fr.post(URL, json={"list_id": L, "date": "2027-05-08"})
+check(r.status_code == 201 and r.json()["callsheet"]["day_no"] == "4", f"the next one: shoot day 4 (1, 3 and 2 in the trash) {r.text[:160]}")
+
 # ------------------------------------------------------------ rights
 check(Gr.get(B + f"/api/team/dispo/callsheets?list={L}").status_code == 404, "greta: frida's project 404")
 check(Gr.post(B + "/api/team/dispo/callsheets", json={"list_id": L, "date": "2027-05-04"}).status_code == 404, "greta: no call sheet in frida's project")
@@ -98,6 +106,15 @@ check(Fr.patch(B + "/api/settings", json={"features": FEAT.replace(",dispo", "")
 check(Fr.get(URL + f"?list={L}").status_code in (403, 409) and Fr.post(URL, json={"list_id": L, "date": "2027-05-04"}).status_code in (403, 409),
       "module off: refused")
 check(Fr.patch(B + "/api/settings", json={"features": FEAT}).ok, "and on again")
+# review F6: an archived project and the inbox take no new call sheet
+LA = Fr.post(B + "/api/lists", json={"name": "Altes Projekt", "kind": "project"}).json()["id"]
+check(Fr.patch(B + f"/api/lists/{LA}", json={"archived": 1}).ok, "a project archived")
+check(Fr.get(URL + f"?list={LA}").json().get("can_add") is False and Fr.post(URL, json={"list_id": LA, "date": "2027-05-04"}).status_code == 403,
+      "archived: no new call sheet (403)")
+INBOX = kt.dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox<>0", (FID,))
+if INBOX:
+    check(Fr.post(URL, json={"list_id": INBOX[0][0], "date": "2027-05-04"}).status_code == 404, "the inbox: 404")
+check(len(kt.dbx("SELECT 1 FROM hub_bookings WHERE list_id=?", (LA,))) == 0, "nothing made in the archived project")
 
 # ------------------------------------------------------------ an organisation: the admin adds, a read-only member only reads
 ALICE = A.get(B + "/api/state").json()["me"]["id"]

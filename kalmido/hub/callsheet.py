@@ -842,8 +842,8 @@ def _cs_proj(c, uid, lid):
         raise BadInput(tr("Invalid data")) from None
     if not list_role(c, lid, uid):
         raise Denied(404)
-    r = c.execute("SELECT id, name, org_id, owner_id FROM lists WHERE id=?", (lid,)).fetchone()
-    if r is None:
+    r = c.execute("SELECT id, name, org_id, owner_id, archived, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
+    if r is None or r["is_inbox"]:  # review 2.988 F6: the inbox is no project (the client offers no tab there)
         raise Denied(404)
     return r, bool(le2e_mode(c, lid))
 
@@ -853,8 +853,11 @@ def _cs_new_area(c, uid, lst):
     owner, only when uid is that owner -- hub/dispo.py dsp_create takes a private project of the own area only), or None."""
     if not lst["org_id"] and lst["owner_id"] != uid:
         return None
+    pid = None if lst["org_id"] else pb_personal(c, uid, create=False)  # review 2.988 F5: a GET makes no personal area
+    if not lst["org_id"] and pid is None:
+        return None
     try:
-        oid = _area(c, uid, lst["org_id"] or pb_personal(c, uid))
+        oid = _area(c, uid, lst["org_id"] or pid)
     except Denied:
         return None
     return oid if "film" in inds_of_area(c, oid) else None
@@ -875,8 +878,9 @@ def cs_list_rows(c, uid, lid):
             film[oid] = "film" in inds_of_area(c, oid)
         if not film[oid]:
             continue
-        bs = [dict(b) for b in c.execute(f"SELECT start, \"end\", title FROM hub_bookings WHERE org_id=? AND job=? AND {live_sql()}",
-                                         (oid, r["job"]))]
+        # review 2.988 F7: a booking of this project first (a job's bookings share their title; ordered for one answer)
+        bs = [dict(b) for b in c.execute(f"SELECT start, \"end\", title FROM hub_bookings WHERE org_id=? AND job=? AND {live_sql()} "
+                                         "ORDER BY (list_id=?) DESC, id", (oid, r["job"], int(lid)))]
         if not bs:
             continue
         d = cs_data(oc_dec_fields(c, oid, "hub_callsheets", r))
@@ -888,6 +892,18 @@ def cs_list_rows(c, uid, lid):
     return out
 
 
+def cs_last_no(c, oid, lid):
+    """The highest shoot day number of project lid's call sheets in area oid, the ones in the trash too (review 2.988 F4: a
+    count gave a number twice after a delete); a number typed as text that is no whole number does not count."""
+    best = 0
+    for r in c.execute(f"SELECT cs.* FROM hub_callsheets cs WHERE cs.org_id=? AND EXISTS (SELECT 1 FROM hub_bookings b WHERE "
+                       "b.org_id=cs.org_id AND b.job=cs.job AND b.list_id=?)", (oid, int(lid))):
+        v = str(cs_data(oc_dec_fields(c, oid, "hub_callsheets", r)).get("day_no") or "").strip()
+        if v.isdigit() and len(v) < 6:
+            best = max(best, int(v))
+    return best
+
+
 @app.get("/api/team/dispo/callsheets")
 def cs_list():
     """?list=<project>: {callsheets: [...] (cs_list_rows), can_add}. 2.988.0 (#5651). The module "dispo" on (else 403), the
@@ -897,16 +913,16 @@ def cs_list():
     if locked:
         return jsonify(callsheets=[], can_add=False, locked=True)
     oid = _cs_new_area(c, uid, lst)
-    can = bool(oid) and list_role(c, lst["id"], uid) in WRITE_ROLES and org_writes(c, uid, oid)
+    can = bool(oid) and not lst["archived"] and list_role(c, lst["id"], uid) in WRITE_ROLES and org_writes(c, uid, oid)
     return jsonify(callsheets=cs_list_rows(c, uid, lst["id"]), can_add=can, locked=False)
 
 
 @app.post("/api/team/dispo/callsheets")
 def cs_new():
     """{list_id, date: YYYY-MM-DD}: a new call sheet of the project (2.988.0, #5651). Its shoot day is made in the background:
-    one open place of the disposition on that day (resource 'slot', pencilled in, titled with the project's name; filled in
+    one open place of the disposition on that day (resource 'slot', pencilled in, titled "Shoot day"; filled in
     the disposition like an open place from a quotation), then the call sheet's row (the core's history "create") with the
-    next shoot day number of the project. Rights: the project's write role, the area's write role (the shoot day's right of the
+    next shoot day number of the project (cs_last_no + 1). Rights: the project's write role, the area's write role (the shoot day's right of the
     core, dspkern.dsk_need_day). Answers {callsheet: the row of the tab, booking_id} 201."""
     c, uid = _gate()
     b = body()
@@ -916,7 +932,7 @@ def cs_new():
     oid = _cs_new_area(c, uid, lst)
     if not oid:
         raise Denied(404)
-    if locked or list_role(c, lst["id"], uid) not in WRITE_ROLES:
+    if locked or lst["archived"] or list_role(c, lst["id"], uid) not in WRITE_ROLES:  # review 2.988 F6: an archived project
         raise Denied(403, tr("You can only read this project"))
     need_org_write(c, uid, oid)  # a read-only member of the area: 403 before anything is made (as dsp_create)
     day = b.get("date")
@@ -928,16 +944,18 @@ def cs_new():
         raise BadInput(tr("Invalid value: {0}", "date")) from None
     from .dspkern import dsk_need_day
     write_lock(c, f"hub_callsheets-new-{int(lst['id'])}")  # two at once: the day numbers one after the other
-    n = len(cs_list_rows(c, uid, lst["id"]))
+    n = cs_last_no(c, oid, lst["id"])
     job = secrets.token_hex(8)
     now = iso(now_utc())  # as hub/dispo.py dsp_create
     bid = insert_id(c, "INSERT INTO hub_bookings(org_id,job,title,start,\"end\",resource_kind,resource_id,res_label,status,note,list_id,"
                        "created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (oid, job, (lst["name"] or "").strip()[:200] or tr("Shoot day"), day, day, DSP_SLOT, 0, tr("Crew")[:200],
+                    (oid, job, tr("Shoot day"), day, day, DSP_SLOT, 0, tr("Crew")[:200],
                      "option", "", lst["id"], uid, now, now))
     dsk_need_day(c, uid, [c.execute("SELECT * FROM hub_bookings WHERE id=?", (bid,)).fetchone()])  # the core's floor (403 read-only)
     write_lock(c, f"hub_callsheets-{oid}-{job}")
     cs_make(c, uid, oid, job, {"day_no": str(n + 1)})
+    # review 2.988 F3: the shoot day's title is "Shoot day", not the project's name -- the disposition (and its export) shows
+    # titles to every member of the area, a project's name only to those who see the project (dispo.py dsp_export)
     bump(c)
     c.commit()
     row = next((x for x in cs_list_rows(c, uid, lst["id"]) if x["job"] == job), None)
