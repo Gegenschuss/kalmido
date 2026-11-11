@@ -4,8 +4,9 @@
 // - the name search of a locked folder finds a file in a subfolder; its row shows the folder it lies in
 // - a folder WITH content moves into the locked folder (one question): every id stays, the server keeps ciphers only, the helper
 //   folder is gone, the view shows the plain names; and out again: plain names and the plain bytes on the server
-// - a person whose share is taken back: the owner's browser changes the folder key on opening it (a new generation, the file
-//   encrypted again with it) and the file still opens
+// - a person whose share is taken back: the folder asks for a new key; on a device that sees a remaining member's key for the first
+//   time nothing changes on its own (the bar's button names who gets the key), then a new generation, the file encrypted again
+//   with it, and the file still opens
 // bob's key pair is made here in Node (a real P-256 point: alice's browser wraps the folder key for it)
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -46,6 +47,13 @@ const raw = async id => Buffer.from(await (await fetch(B + `api/files/nodes/${id
     bundle_pass: {v: 1, kdf: 'pbkdf2-sha256', iter: 600000, salt: b64(16), iv: b64(12), ct: b64(200)},
     bundle_rec: {v: 1, kdf: 'hkdf-sha256', salt: b64(16), iv: b64(12), ct: b64(200)}}, CKB);
   check(put.status < 300, 'setup: bob has a key pair ' + put.status);
+  // carl keeps the folder; his key is "seen for the first time" on alice's next device (Fable review M1)
+  const CARL = (await call('POST', '/api/users', {username: 'carl', display_name: 'Carl', password: 'password123', email: 'carl@example.com', orgs: [ORG]})).j.id;
+  const CKC = await login('carl');
+  const kc = await webcrypto.subtle.exportKey('jwk', (await webcrypto.subtle.generateKey({name: 'ECDH', namedCurve: 'P-256'}, true, ['deriveBits'])).publicKey);
+  await call('PUT', '/api/e2e/keys', {pub: {kty: 'EC', crv: 'P-256', x: kc.x, y: kc.y, ext: true, key_ops: []},
+    bundle_pass: {v: 1, kdf: 'pbkdf2-sha256', iter: 600000, salt: b64(16), iv: b64(12), ct: b64(200)},
+    bundle_rec: {v: 1, kdf: 'hkdf-sha256', salt: b64(16), iv: b64(12), ct: b64(200)}}, CKC);
 
   const BOX = await folder('Strongbox'), SUB = await folder('Deeper', BOX);
   await upload(SUB, 'deepnote.txt', 'ZQWdeep words');
@@ -54,6 +62,7 @@ const raw = async id => Buffer.from(await (await fetch(B + `api/files/nodes/${id
   const TEAM = await folder('Team box', null, `org:${ORG}`);
   const sh = await call('POST', `/api/files/nodes/${TEAM}/shares`, {user_id: BOB, role: 'view'});
   check(sh.status === 201 && sh.j.id, 'setup: the team box shared with bob');
+  check((await call('POST', `/api/files/nodes/${TEAM}/shares`, {user_id: CARL, role: 'view'})).status === 201, 'setup: and with carl');
   const kidsOf = async id => (await kids(id)).map(x => x.name);
 
   await firefox(async ({cmd, ev, nav, ctx, shot}) => {
@@ -117,9 +126,18 @@ const raw = async id => Buffer.from(await (await fetch(B + `api/files/nodes/${id
     check((await call('DELETE', `/api/files/shares/${sh.j.id}`)).status === 200, 'the share of bob taken back');
     check((await call('GET', `/api/files/lock/${TEAM}`)).j.rotate === 1, 'the folder asks its owner for a new key');
     await boot(`#ablage/${TEAM}`); await unlock();
-    await ev('(FSL.auto = {}, ab_reload(), 1)');  // the owner opens the folder with her encryption unlocked (fsl_auto)
+    // a new device: carl's key is seen here for the first time -> no automatic change, the bar offers the button (Fable review M1)
+    await ev(`(LS.set('e2eSeen:' + S.me.id + ':${CARL}', ''), FSL.auto = {}, ab_reload(), 1)`);
+    check(await waitFor(`!!document.querySelector('[data-fsl="rotate"]')`), 'M1: a key first seen here: no automatic change, the bar offers "Change the key now"');
+    check((await call('GET', `/api/files/lock/${TEAM}`)).j.gen === 1, 'M1: nothing was changed on its own');
+    await shot('p2953-rotate-button.png');
+    await ev(`(document.querySelector('[data-fsl="rotate"]').click(), 1)`);
+    check(await waitFor(`(document.querySelector('#cdlg-b')?.textContent || '').includes('Carl')`), 'the button names who gets the new key');
+    await ev(`(document.querySelector('[data-cd="yes"]').click(), 1)`);
     const rk = await waitFor(`rawFetch('GET', '/api/files/lock/${TEAM}').then(j => j.gen === 2 && j.reenc === 0)`, 160);
-    check(rk === true, 'opening the folder runs the key change and the encryption with the new key');
+    check(rk === true, 'the button changes the key, the files are encrypted with the new one');
+    const mem = (await call('GET', `/api/files/lock/${TEAM}`)).j.members || [];
+    check(mem.find(m => m.user_id === CARL)?.key_gens?.includes(2) && !mem.some(m => m.user_id === BOB), 'carl got the new key, bob is no member any more');
     const info = (await call('GET', `/api/files/lock/${TEAM}`)).j;
     check(info.gen === 2 && info.reenc === 0 && info.rotate === 0, 'a new generation, the files encrypted again ' + JSON.stringify({gen: info.gen, reenc: info.reenc, rotate: info.rotate}));
     const tf = (await kids(TEAM))[0];

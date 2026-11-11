@@ -505,15 +505,19 @@ async function fslRotate(lid, byHand) {
   if (!(info.keys || []).some(k => k.gen === cur)) throw fslErr(tr('You do not have the key of this folder yet.'), 'fs_lock_key');
   await fslKeys(lid, true);
   const people = (info.members || []).filter(m => m.has_keys && (m.key_gens || []).includes(cur));
-  if (!byHand && people.some(m => m.user_id !== S.me.id && LE2E.fresh.has(m.user_id))) return false;
+  // Fable review M1: the keys first (fslPubFor fills LE2E.fresh); the automatic change never wraps for a key this device sees for
+  // the first time (the button does, after naming everyone who gets the new key)
+  const pubs = new Map();
+  for (const m of people) {
+    if (m.user_id === S.me.id) continue;
+    try { pubs.set(m.user_id, await fslPubFor(lid, m.user_id)); } catch (e) { if (e instanceof Offline) throw e; }  // -> waits for the key
+  }
+  if (!byHand && [...pubs.keys()].some(u => LE2E.fresh.has(u))) return false;
+  if (byHand && pubs.size && !await askConfirm(tr('Change the key now'), tr('These people get the new key: {0}', [...pubs.keys()].map(u => fslName(lid, u)).join(', ')), {ok: tr('Change the key now')})) return false;
   const raw = e2eRand(32), keys = [];
   try {
-    if (!people.some(m => m.user_id === S.me.id)) people.unshift({user_id: S.me.id});
-    for (const m of people) {
-      let pub;
-      try { pub = await fslPubFor(lid, m.user_id); } catch (e) { if (m.user_id === S.me.id || e instanceof Offline) throw e; continue; }  // -> waits for the key
-      keys.push({user_id: m.user_id, wrapped: await fslWrap(raw, lid, gen, m.user_id, pub)});
-    }
+    keys.push({user_id: S.me.id, wrapped: await fslWrap(raw, lid, gen, S.me.id, E2E.own)});
+    for (const [u, pub] of pubs) keys.push({user_id: u, wrapped: await fslWrap(raw, lid, gen, u, pub)});
     let j;
     try { j = await rawFetch('POST', `/api/files/lock/${lid}/rotate`, {gen, keys}); }
     catch (e) { if (e?.data?.code !== 'fs_lock_gen') throw e; delete FSL.info[lid]; return false; }  // another browser was faster

@@ -18219,5 +18219,6 @@
   "{0}: {1} done": "{0}: {1} klaar",
   "Moving": "Verplaatsen",
   "The tags of {0} file or folder in it are removed (the server could read them).": ["De tags van {0} bestand of map erin worden verwijderd (de server zou ze kunnen lezen).", "De tags van {0} bestanden of mappen erin worden verwijderd (de server zou ze kunnen lezen)."],
-  "The key of this folder was changed meanwhile.": "De sleutel van deze map is intussen gewijzigd."
+  "The key of this folder was changed meanwhile.": "De sleutel van deze map is intussen gewijzigd.",
+  "These people get the new key: {0}": "Deze personen krijgen de nieuwe sleutel: {0}"
 }

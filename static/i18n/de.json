@@ -18219,5 +18219,6 @@
   "{0}: {1} done": "{0}: {1} erledigt",
   "Moving": "Verschieben",
   "The tags of {0} file or folder in it are removed (the server could read them).": ["Die Tags von {0} Datei oder Ordner darin werden entfernt (der Server könnte sie lesen).", "Die Tags von {0} Dateien oder Ordnern darin werden entfernt (der Server könnte sie lesen)."],
-  "The key of this folder was changed meanwhile.": "Der Schlüssel dieses Ordners wurde inzwischen gewechselt."
+  "The key of this folder was changed meanwhile.": "Der Schlüssel dieses Ordners wurde inzwischen gewechselt.",
+  "These people get the new key: {0}": "Diese Personen bekommen den neuen Schlüssel: {0}"
 }

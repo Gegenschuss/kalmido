@@ -203,6 +203,16 @@ r = A.post(B + f"/api/files/lock/{R}/finish", json={})
 check(r.ok and r.json().get("reenc") == 0 and r.json().get("mode") == "on", "finish: the encryption with the new key is done " + r.text[:160])
 check(lupload(A, R, g3) > 0, "new files come with the new generation")
 
+# Fable review M2: a share inside the locked folder that expired counts as gone (no key, the folder asks for a new one)
+R2 = folder(A, "Inner share box")
+R2S = folder(A, "Shared inside", R2)
+check(A.post(B + f"/api/files/nodes/{R2S}/shares", json={"user_id": BOB, "role": "view", "expires_at": "2099-01-01"}).ok, "a share with an end date inside")
+g21 = lock(A, R2, [ME, BOB])
+check(BOB in {m["user_id"] for m in A.get(B + f"/api/files/lock/{R2}").json()["members"]}, "bob counts while his share runs")
+dbx("UPDATE fs_shares SET expires_at='2020-01-01T00:00:00+00:00' WHERE node_id=? AND user_id=?", (R2S, BOB))
+i2 = A.get(B + f"/api/files/lock/{R2}").json()
+check(BOB not in {m["user_id"] for m in i2["members"]} and i2["rotate"] == g21, f"M2: the expired share counts as gone, the folder asks for a new key ({i2['rotate']})")
+
 # an account that held a key is deleted: the folder asks for a new key (no row would tell afterwards)
 r = A.post(B + "/api/users", json={"username": "carl", "display_name": "Carl", "password": "password123", "orgs": [ORG]})
 CARL = r.json()["id"]

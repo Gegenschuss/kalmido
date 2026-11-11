@@ -18219,5 +18219,6 @@
   "{0}: {1} done": "{0}: {1} hechos",
   "Moving": "Moviendo",
   "The tags of {0} file or folder in it are removed (the server could read them).": ["Se eliminan las etiquetas de {0} archivo o carpeta que contiene (el servidor podría leerlas).", "Se eliminan las etiquetas de {0} archivos o carpetas que contiene (el servidor podría leerlas)."],
-  "The key of this folder was changed meanwhile.": "Mientras tanto se ha cambiado la clave de esta carpeta."
+  "The key of this folder was changed meanwhile.": "Mientras tanto se ha cambiado la clave de esta carpeta.",
+  "These people get the new key: {0}": "Estas personas reciben la nueva clave: {0}"
 }

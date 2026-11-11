@@ -18219,5 +18219,6 @@
   "{0}: {1} done": "{0} : {1} faits",
   "Moving": "Déplacement",
   "The tags of {0} file or folder in it are removed (the server could read them).": ["Les tags de {0} fichier ou dossier qu'il contient sont supprimés (le serveur pourrait les lire).", "Les tags de {0} fichiers ou dossiers qu'il contient sont supprimés (le serveur pourrait les lire)."],
-  "The key of this folder was changed meanwhile.": "La clé de ce dossier a été changée entre-temps."
+  "The key of this folder was changed meanwhile.": "La clé de ce dossier a été changée entre-temps.",
+  "These people get the new key: {0}": "Ces personnes reçoivent la nouvelle clé : {0}"
 }

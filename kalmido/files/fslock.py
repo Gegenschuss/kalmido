@@ -229,7 +229,9 @@ def fsl_people(c, ln):
         us = {r["user_id"]} if r["user_id"] else {x[0] for x in c.execute("SELECT user_id FROM group_members WHERE group_id=?", (r["group_id"],))}
         cand |= us
         if r["node_id"] != ln["id"]:
-            inner |= us
+            # 2.953 (#3348, Fable review M2): a share inside counts only while it gives a role there (expired, a project's own
+            # member row, a group left: no) -- else who lost it would never count as gone (fsl_stale) and could get the key
+            inner |= {u for u in us if u and fs_role(c, r["node_id"], u)}
     cand.discard(None)
     if not cand:
         return []
@@ -861,10 +863,20 @@ def fsl_keys(nid):
 
 
 # ---------------------------------------------------------------- routes: working in a locked folder
+def _fsl_gen_after(n, lk):
+    """The generation of node n after a rename / a new version in lock row lk: the current one -- 2.953 (#3348, Fable review N-d):
+    while the files are encrypted with a new key, a node not done yet keeps its old number (its other part is still of the old
+    key), so the todo of the key change still takes it."""
+    gen = int(lk["e2e_gen"])
+    old = int(n["e2e_gen"] or 0)
+    return old if int(lk["e2e_reenc"] or 0) and 0 < old < gen else gen
+
+
 def _fsl_on(c, nid, write=True):
     """(uid, node, lock row) of a node (a folder for adding) in a locked folder that is 'on'."""
     uid, n, lk = _fsl_lock_of_node(c, nid, write=write)
-    fsl_hold(c, [lk["node_id"]])  # 2.953 (#3348, review N11): the state read below holds until this write is committed
+    fsl_hold(c, [lk["node_id"], nid])  # 2.953 (#3348, review N11): the state read below holds until this write is committed;
+    # Fable review N-a: the node itself too (a folder of it crossing the border at this moment holds it exclusively, fsl_move)
     lk = fsl_row(c, lk["node_id"])
     if lk["e2e"] != "on":
         raise fsl_denied("fs_locked_busy")
@@ -943,7 +955,7 @@ def fsl_rename(fid):
         return err(tr("Invalid value: {0}", "name"), 409)  # the locked folder's own name is plain (the normal rename)
     if not fsl_name_ok(b.get("name"), int(lk["e2e_gen"])):
         return err(tr("Invalid value: {0}", "name"))
-    c.execute("UPDATE fs_nodes SET name=?, e2e_gen=?, updated_at=? WHERE id=?", (b["name"], int(lk["e2e_gen"]), _now(), fid))
+    c.execute("UPDATE fs_nodes SET name=?, e2e_gen=?, updated_at=? WHERE id=?", (b["name"], _fsl_gen_after(n, lk), _now(), fid))
     fs_log_add(c, fid, "rename", "")
     bump(c)
     c.commit()
@@ -969,8 +981,8 @@ def fsl_version(fid):
     quota_guard(c, uid, len(data))
     fs_web_expect(c, fid, request.form.get("expect_version"))  # 2.577.0 (#4708 3): an older version read -> 409, as the plain file routes
     no = _store_version(c, fid, fs_space(n["org_id"], n["owner_id"]), data, FSL_MIME, uid)
-    if (n["e2e_gen"] or 0) != gen:
-        c.execute("UPDATE fs_nodes SET e2e_gen=? WHERE id=?", (gen, fid))  # the name stays of its generation (still readable)
+    if (n["e2e_gen"] or 0) != _fsl_gen_after(n, lk):
+        c.execute("UPDATE fs_nodes SET e2e_gen=? WHERE id=?", (_fsl_gen_after(n, lk), fid))  # the name stays of its generation (still readable)
     fs_log_add(c, fid, "version", str(no))
     bump(c)
     c.commit()
@@ -1029,6 +1041,7 @@ def fsl_move(fid):
         need_node(c, tid)  # 2.353.0 F (#2758, review N4): a folder the person does not see: 404 before anything about its lock
     fsl_hold(c, [r["id"] for r in fs_chain(c, n["parent_id"])] if n["parent_id"] else [])  # 2.953 (#3348, review N11)
     fsl_hold(c, [r["id"] for r in fs_chain(c, tid)] if tid else [])
+    fsl_hold(c, [fid], shared=False)  # Fable review N-a: no write into this node (a folder) while it crosses the border
     ls = fsl_of(c, n["parent_id"]) if n["parent_id"] else None
     lt = fsl_of(c, tid) if tid else None
     if (ls["node_id"] if ls else None) == (lt["node_id"] if lt else None):
