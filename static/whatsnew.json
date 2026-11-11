@@ -1,6 +1,64 @@
 {
  "versions": [
   {
+   "version": "2.962.0",
+   "date": "2026-11-11",
+   "items": [
+    {
+     "de": "Organisations-Labels hängen direkt an der Aufgabe und bleiben beim Verschieben zwischen Projekten erhalten.",
+     "en": "Organisation labels sit on the task itself and stay when it moves between projects."
+    },
+    {
+     "de": "Ein gelöschter Kalender lässt sich samt Terminen unter „Letzte Schritte“ zurückholen.",
+     "en": "A deleted calendar can be brought back with its events from Recent steps."
+    },
+    {
+     "de": "Im Büro heißt jetzt jedes Ding überall gleich, und Entwürfe zeigen ihre Dokumentart statt „ohne Nummer“.",
+     "en": "The office now uses one word for each thing, and drafts show their document type instead of \"no number\"."
+    },
+    {
+     "de": "Zurück schließt am Handy genau einen Schritt: Menü-Schublade, Datumswähler und Tour-Karten einzeln.",
+     "en": "Back on the phone goes exactly one step: the menu drawer, the date picker and the tour cards one at a time."
+    },
+    {
+     "de": "Erledigt- und Abgelehnt-Spalten im Board zeigen die zuletzt erledigten Aufgaben.",
+     "en": "Done and rejected columns on the board show the recently completed tasks."
+    },
+    {
+     "de": "Belege, die du einer Kreditkarten-Position oder einer Bankbuchung zuordnest, landen automatisch im passenden Monatsordner unter Belege.",
+     "en": "Receipts you match with a credit card position or a bank booking now land in the right month folder under Receipts by themselves."
+    },
+    {
+     "de": "In gesperrten Ordnern findet die Namenssuche jetzt auch Dateien in Unterordnern.",
+     "en": "The name search of a locked folder now finds files in its subfolders too."
+    },
+    {
+     "de": "Ordner mit Inhalt lassen sich in gesperrte Ordner hinein- und wieder herausschieben.",
+     "en": "Folders with their content can now be moved into and out of locked folders."
+    },
+    {
+     "de": "Verliert jemand den Zugriff auf einen gesperrten Ordner, bekommt der Ordner automatisch einen neuen Schlüssel.",
+     "en": "When someone loses access to a locked folder, the folder gets a new key automatically."
+    },
+    {
+     "de": "Zurück in Menüs und Fenstern geht jetzt eine Stufe zurück, statt alles zu schließen.",
+     "en": "Back in menus and windows now goes one step back instead of closing everything."
+    },
+    {
+     "de": "Auf der Anmeldeseite und auf Heute steht jeden Tag ein anderes Dada-Zitat mit Übersetzung und Autor.",
+     "en": "The sign-in page and Today show a different Dada quote every day, with translation and author."
+    },
+    {
+     "de": "Der Stundennachweis an den Kunden lässt nicht abrechenbare Einträge weg und nennt bei schon abgerechneten die Rechnung.",
+     "en": "The client timesheet leaves out non-billable entries and names the invoice of entries already billed."
+    },
+    {
+     "de": "Persönliche Tags unterscheiden nicht mehr zwischen Groß- und Kleinschreibung, doppelte werden zusammengeführt.",
+     "en": "Personal tags no longer depend on upper or lower case; duplicates are merged."
+    }
+   ]
+  },
+  {
    "version": "2.941.0",
    "date": "2026-11-11",
    "items": [
