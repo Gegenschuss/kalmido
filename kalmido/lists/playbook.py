@@ -20,7 +20,10 @@ import hashlib
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, write_lock
+from ..core.pg import insert_id, system_ctx, table_columns, table_exists, write_lock  # 2.977.0 (#5282): + the start hook
+from ..core.objversions import obj_version_add, obj_version_free_no, obj_version_old_ts, obj_version_prune  # 2.977.0 (#5282): the core's versions
+from ..core import objhooks  # 2.977.0 (#5282): the start hook pb_retire
+from ..core.kernretire import KERN_RETIRE_LOCK, kern_retire_floor, kern_retire_rows  # 2.977.0 (#5282)
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso
 from ..accounts.session import me
@@ -55,16 +58,36 @@ def pb_text(v):
     return v
 
 
+PB_KIND = "playbook"  # 2.977.0 (#5282, stage Q7b): the kind of a Playbook's versions in obj_versions (ref_id = its head)
+# a version row as the code before 2.977 read it from playbooks (the routes and agents see the same keys)
+PB_VCOLS = ("p.id AS head_id, p.list_id, p.owner_id, p.folder, v.no AS version, v.body, v.source, v.created_by AS author_id, "
+            "v.created_at")
+PB_VJOIN = f"playbooks p JOIN obj_versions v ON v.kind='{PB_KIND}' AND v.ref_id=p.id"
+
+
 def _where(lid, owner, folder):
     if lid:
-        return "list_id=?", (lid,)
-    return "list_id IS NULL AND owner_id=? AND folder=?", (owner, folder)
+        return "p.list_id=?", (lid,)
+    return "p.list_id IS NULL AND p.owner_id=? AND p.folder=?", (owner, folder)
+
+
+def pb_head(c, lid=None, owner=None, folder=None, make=False):
+    """2.977.0 (#5282): the id of the head row of a list's (lid) or a folder's Playbook (playbooks holds only the heads, the
+    versions are rows of obj_versions kind "playbook"); make: create it when there is none (the caller holds the lock
+    playbook:<lid> / playbook:<owner>:<folder>). None when there is none."""
+    w, a = _where(lid, owner, folder)
+    r = c.execute(f"SELECT p.id FROM playbooks p WHERE {w} ORDER BY p.id DESC LIMIT 1", a).fetchone()
+    if r or not make:
+        return r[0] if r else None
+    return insert_id(c, "INSERT INTO playbooks(list_id,owner_id,folder) VALUES(?,?,?)",
+                     (lid, None if lid else owner, None if lid else folder))
 
 
 def pb_current(c, lid=None, owner=None, folder=None):
-    """The newest version row of a list's (lid) or a folder's Playbook, or None."""
+    """The newest version row of a list's (lid) or a folder's Playbook, or None ({version, body, source, author_id,
+    created_at, list_id, owner_id, folder, head_id}; 2.977.0 #5282: read from obj_versions)."""
     w, a = _where(lid, owner, folder)
-    return c.execute(f"SELECT * FROM playbooks WHERE {w} ORDER BY version DESC LIMIT 1", a).fetchone()
+    return c.execute(f"SELECT {PB_VCOLS} FROM {PB_VJOIN} WHERE {w} ORDER BY v.no DESC LIMIT 1", a).fetchone()
 
 
 def pb_cache_drop():
@@ -74,18 +97,19 @@ def pb_cache_drop():
 
 def pb_save(c, text, source, author, lid=None, owner=None, folder=None):
     """Stores text as the new version of the Playbook (list lid, or folder of owner) unless it equals the current one.
-    Returns (version, created_at, changed). The caller checked rights and commits."""
+    Returns (version, created_at, changed). The caller checked rights and commits. 2.977.0 (#5282): a version of the core
+    (obj_versions kind "playbook" on the Playbook's head; at most PB_KEEP, the oldest go)."""
     write_lock(c, f"playbook:{lid}" if lid else f"playbook:{owner}:{folder}")
     cur = pb_current(c, lid, owner, folder)
     if (cur["body"] if cur else "") == text:
         return (cur["version"], cur["created_at"], False) if cur else (0, None, False)
-    v, ts = (cur["version"] if cur else 0) + 1, iso(now_utc())
-    c.execute("INSERT INTO playbooks(list_id,owner_id,folder,version,body,source,author_id,created_at) VALUES(?,?,?,?,?,?,?,?)",
-              (lid, None if lid else owner, None if lid else folder, v, text, source if source in PB_SOURCES else "edit", author, ts))
-    w, a = _where(lid, owner, folder)
-    c.execute(f"DELETE FROM playbooks WHERE {w} AND version<=?", (*a, v - PB_KEEP))
+    head = cur["head_id"] if cur else pb_head(c, lid, owner, folder, make=True)
+    ts = iso(now_utc())
+    vid = obj_version_add(c, PB_KIND, head, None, None if lid else owner, "", text, len(text.encode("utf-8")), author, ts,
+                          source=source if source in PB_SOURCES else "edit")
+    obj_version_prune(c, PB_KIND, head, PB_KEEP)
     pb_cache_drop()
-    return v, ts, True
+    return c.execute("SELECT no FROM obj_versions WHERE id=?", (vid,)).fetchone()[0], ts, True
 
 
 def pb_parts(c, lid):
@@ -94,9 +118,9 @@ def pb_parts(c, lid):
     lr = c.execute("SELECT owner_id, COALESCE(folder,'') AS folder, life FROM lists WHERE id=?", (lid,)).fetchone()
     if not lr:
         return None, None, []
-    rows = c.execute("""SELECT DISTINCT ON (COALESCE(p.list_id, 0), COALESCE(p.folder, '')) p.* FROM playbooks p
+    rows = c.execute(f"""SELECT DISTINCT ON (COALESCE(p.list_id, 0), COALESCE(p.folder, '')) {PB_VCOLS} FROM {PB_VJOIN}
                         WHERE p.list_id=? OR (p.list_id IS NULL AND p.owner_id=? AND ?<>'' AND (p.folder=? OR left(?, length(p.folder) + 1)=p.folder || '/'))
-                        ORDER BY COALESCE(p.list_id, 0), COALESCE(p.folder, ''), p.version DESC""",
+                        ORDER BY COALESCE(p.list_id, 0), COALESCE(p.folder, ''), v.no DESC""",
                      (lid, lr["owner_id"], lr["folder"], lr["folder"], lr["folder"])).fetchall()
     own = next((r for r in rows if r["list_id"]), None)
     folders = sorted(((r["folder"], r) for r in rows if not r["list_id"]), key=lambda x: len(x[0]))
@@ -118,8 +142,9 @@ def pb_effective(c, lid):
     parts = [x["text"] for x in fl] + ([own["body"]] if own and own["body"] else [])
     text = PB_SEP.join(parts)
     times = [x["updated_at"] for x in fl] + ([own["created_at"]] if own else [])
-    # 2.126.0 B (#1978): who wrote the parts (a version without an author: the list's owner)
-    authors = sorted({r["author_id"] or lr["owner_id"] for _, r in folders if r["body"]} | ({own["author_id"] or lr["owner_id"]} if own and own["body"] else set()))
+    # 2.126.0 B (#1978): who wrote the parts. 2.977.0 (#5282): every version names its author; NULL = an author who is gone
+    # (obj_versions.created_by ON DELETE SET NULL) -> 0, foreign like before (review B-M7), never the owner's own text
+    authors = sorted({r["author_id"] or 0 for _, r in folders if r["body"]} | ({own["author_id"] or 0} if own and own["body"] else set()))
     return {"text": text, "list_text": own["body"] if own else "", "list_version": own["version"] if own else 0,
             "list_row": own, "folders": fl, "updated_at": max(times) if times else None, "key": pb_key(text), "life": lr["life"],
             "authors": authors}
@@ -157,13 +182,13 @@ def pb_flags(c, rows):
     if not ids:
         return {}
     q = ",".join("?" * len(ids))
-    out = {r[0]: True for r in c.execute(f"""SELECT DISTINCT ON (list_id) list_id, body FROM playbooks WHERE list_id IN ({q})
-                                             ORDER BY list_id, version DESC""", ids) if r[1]}
+    out = {r[0]: True for r in c.execute(f"""SELECT DISTINCT ON (p.list_id) p.list_id, v.body FROM {PB_VJOIN} WHERE p.list_id IN ({q})
+                                             ORDER BY p.list_id, v.no DESC""", ids) if r[1]}
     owners = {r["owner_id"] for r in rows if r["folder"]}
     if owners:
         q2 = ",".join("?" * len(owners))
-        full = {(r[0], r[1]) for r in c.execute(f"""SELECT DISTINCT ON (owner_id, folder) owner_id, folder, body FROM playbooks
-                                                   WHERE list_id IS NULL AND owner_id IN ({q2}) ORDER BY owner_id, folder, version DESC""",
+        full = {(r[0], r[1]) for r in c.execute(f"""SELECT DISTINCT ON (p.owner_id, p.folder) p.owner_id, p.folder, v.body FROM {PB_VJOIN}
+                                                   WHERE p.list_id IS NULL AND p.owner_id IN ({q2}) ORDER BY p.owner_id, p.folder, v.no DESC""",
                                                 list(owners)) if r[2]}
         if full:
             for r in rows:
@@ -176,18 +201,24 @@ def pb_flags(c, rows):
 
 def pb_folder_rename(c, uid, old, new):
     """A folder of uid was renamed / moved (old -> new, subfolders along): its Playbooks go along. A folder merged into an
-    existing one: its versions follow the target's (the moved text becomes the current one; nothing is lost)."""
-    for (f,) in c.execute("SELECT DISTINCT folder FROM playbooks WHERE list_id IS NULL AND owner_id=?", (uid,)).fetchall():
+    existing one: its versions follow the target's (the moved text becomes the current one; nothing is lost). 2.977.0
+    (#5282): the head moves; merged into a target that has a head, the versions are added to the target's versions in their
+    order (new rows, so the ids grow with the numbers as everywhere in obj_versions) and the moved head goes."""
+    for hid, f in c.execute("SELECT id, folder FROM playbooks WHERE list_id IS NULL AND owner_id=? ORDER BY id", (uid,)).fetchall():
         if not folder_under(f, old):
             continue
         nf = new + f[len(old):]
         if nf == f:
             continue
-        tmax = c.execute("SELECT COALESCE(MAX(version), 0) FROM playbooks WHERE list_id IS NULL AND owner_id=? AND folder=?", (uid, nf)).fetchone()[0]
-        c.execute("UPDATE playbooks SET folder=?, version=version+? WHERE list_id IS NULL AND owner_id=? AND folder=?", (nf, tmax, uid, f))
-        if tmax:
-            top = c.execute("SELECT MAX(version) FROM playbooks WHERE list_id IS NULL AND owner_id=? AND folder=?", (uid, nf)).fetchone()[0]
-            c.execute("DELETE FROM playbooks WHERE list_id IS NULL AND owner_id=? AND folder=? AND version<=?", (uid, nf, top - PB_KEEP))
+        tgt = pb_head(c, owner=uid, folder=nf)
+        if tgt is None:
+            c.execute("UPDATE playbooks SET folder=? WHERE id=?", (nf, hid))
+            continue
+        for v in c.execute("SELECT body, size, created_by, created_at, source FROM obj_versions WHERE kind=? AND ref_id=? ORDER BY no",
+                           (PB_KIND, hid)).fetchall():
+            obj_version_add(c, PB_KIND, tgt, None, uid, "", v["body"], v["size"], v["created_by"], v["created_at"], source=v["source"])
+        c.execute("DELETE FROM playbooks WHERE id=?", (hid,))  # its versions go with it (trigger kalmido_ov_gone)
+        obj_version_prune(c, PB_KIND, tgt, PB_KEEP)
     pb_cache_drop()
 
 
@@ -198,9 +229,87 @@ def pb_folder_removed(c, uid, name, move):
     cur = pb_current(c, owner=uid, folder=name)
     if cur and cur["body"]:
         pb_save(c, "", "edit", uid, owner=uid, folder=name)
-    for (f,) in c.execute("SELECT DISTINCT folder FROM playbooks WHERE list_id IS NULL AND owner_id=?", (uid,)).fetchall():
+    for (f,) in c.execute("SELECT DISTINCT folder FROM playbooks WHERE list_id IS NULL AND owner_id=? ORDER BY folder", (uid,)).fetchall():
         if f != name and f.startswith(name + "/"):
             pb_folder_rename(c, uid, f, move(f))
+
+
+# ---- 2.977.0 (#5282, stage Q7b): the old version rows of playbooks -> obj_versions at the start, then the old columns go ------
+PB_OLD_COLS = ("version", "body", "source", "author_id", "created_at")
+PB_RETIRE_LABEL = "playbooks, stage Q7b (#5282)"
+PB_RETIRE_WHY = ("were not moved into obj_versions -- nothing dropped, the next start tries again (core/migrations.d/5282_a.py)")
+
+
+def pb_move_old(c):
+    """Every old version row of playbooks (version set) into obj_versions kind "playbook": ref_id = the head of its Playbook
+    (the newest row of its list / owner + folder, which stays), its number kept where it is free, author_id as created_by (an
+    account that is gone: NULL), its source, created_at as TIMESTAMPTZ. A moved row gets version NULL at once (idempotent; the
+    other rows go in pb_retire's prune). -> {"moved": n}."""
+    now, out, heads = iso(now_utc()), {"moved": 0}, {}
+    people = {r[0] for r in c.execute("SELECT DISTINCT u.id FROM users u JOIN playbooks p ON p.author_id=u.id")}
+    owners = {r[0]: r[1] for r in c.execute("SELECT DISTINCT l.id, l.owner_id FROM lists l JOIN playbooks p ON p.list_id=l.id")}
+    rows = c.execute("SELECT id, list_id, owner_id, folder, version, body, source, author_id, created_at FROM playbooks "
+                     "WHERE version IS NOT NULL ORDER BY COALESCE(list_id, 0), owner_id, folder, version, id").fetchall()
+    for r in rows:
+        key = (r["list_id"],) if r["list_id"] else (None, r["owner_id"], r["folder"])
+        if key not in heads:
+            if r["list_id"]:
+                heads[key] = c.execute("SELECT MAX(id) FROM playbooks WHERE list_id=?", (r["list_id"],)).fetchone()[0]
+            else:
+                heads[key] = c.execute("SELECT MAX(id) FROM playbooks WHERE list_id IS NULL AND owner_id=? AND folder=?",
+                                       (r["owner_id"], r["folder"])).fetchone()[0]
+        head, body = heads[key], r["body"] or ""
+        at = obj_version_old_ts(r["created_at"], now)
+        c.execute("INSERT INTO obj_versions(kind,ref_id,no,org_id,owner_id,title,body,size,created_by,created_at,updated_at,source) "
+                  "VALUES(?,?,?,NULL,?,'',?,?,?,?,?,?)",
+                  (PB_KIND, head, obj_version_free_no(c, PB_KIND, head, r["version"]), None if r["list_id"] else r["owner_id"], body,
+                   len(body.encode("utf-8")), _pb_old_author(r, people, owners), at, at,
+                   r["source"] if r["source"] in PB_SOURCES else "edit"))
+        c.execute("UPDATE playbooks SET version=NULL WHERE id=?", (r["id"],))
+        out["moved"] += 1
+    return out
+
+
+def _pb_old_author(r, people, owners):
+    """The author of an old version as obj_versions.created_by: its account; NULL in the old row meant the owner's own text
+    (#1978) -> the owner's id (the list's / the folder's); an account that is gone -> NULL (foreign, review B-M7)."""
+    if r["author_id"] is None:
+        return owners.get(r["list_id"]) if r["list_id"] else r["owner_id"]
+    return r["author_id"] if r["author_id"] in people else None
+
+
+def _pb_left(c):
+    return c.execute("SELECT COUNT(*) FROM playbooks WHERE version IS NOT NULL").fetchone()[0]
+
+
+def _pb_prune(c):
+    """The rows besides the heads (the newest row of each Playbook); their versions are in obj_versions on the head."""
+    return c.execute("DELETE FROM playbooks p WHERE EXISTS (SELECT 1 FROM playbooks x WHERE x.id>p.id AND "
+                     "((p.list_id IS NOT NULL AND x.list_id=p.list_id) OR (p.list_id IS NULL AND x.list_id IS NULL AND "
+                     "x.owner_id=p.owner_id AND x.folder=p.folder)))").rowcount
+
+
+def pb_retire(c):
+    """2.977.0 (#5282, core/objhooks.START, every start until done): pb_move_old, then the old rows besides the heads and the
+    columns PB_OLD_COLS go (core/kernretire.py kern_retire_rows: the start check, the back limit), the heads get their unique
+    indexes. {} once the columns are gone (a catalog read)."""
+    if not table_exists(c, "playbooks") or "version" not in table_columns(c, "playbooks"):
+        return {}
+    with system_ctx(c):  # every person's Playbooks; nothing is handed to a person
+        write_lock(c, KERN_RETIRE_LOCK)
+        if "version" not in table_columns(c, "playbooks"):  # another process did it meanwhile
+            return {}
+        c.execute("ALTER TABLE playbooks ALTER COLUMN version DROP NOT NULL, ALTER COLUMN created_at DROP NOT NULL")
+        out = pb_move_old(c)
+        if out["moved"]:  # the data left the old columns: an older image must not start before the drop
+            kern_retire_floor(c)
+        out.update(kern_retire_rows(c, "playbooks", PB_OLD_COLS, _pb_left, PB_RETIRE_LABEL, prune=_pb_prune, why=PB_RETIRE_WHY, alter=(
+            "CREATE UNIQUE INDEX IF NOT EXISTS playbooks_list_v ON playbooks(list_id) WHERE list_id IS NOT NULL",
+            "CREATE UNIQUE INDEX IF NOT EXISTS playbooks_folder_v ON playbooks(owner_id, folder) WHERE list_id IS NULL")))
+    return out
+
+
+objhooks.START.append(("kern5282_playbooks", False, pb_retire))  # 2.977.0 (#5282): every start until the old columns are gone
 
 
 # ---------------------------------------------------------------- rights
@@ -258,8 +367,8 @@ def _by(c, uid, names=None, kinds=None):
 def pb_versions_out(c, lid=None, owner=None, folder=None):
     from ..agents.core import agent_ids
     w, a = _where(lid, owner, folder)
-    rows = c.execute(f"SELECT version, created_at, author_id, source, length(body) AS chars FROM playbooks WHERE {w} "
-                     f"ORDER BY version DESC LIMIT ?", (*a, PB_KEEP)).fetchall()
+    rows = c.execute(f"SELECT v.no AS version, v.created_at, v.created_by AS author_id, v.source, length(v.body) AS chars FROM {PB_VJOIN} "
+                     f"WHERE {w} ORDER BY v.no DESC LIMIT ?", (*a, PB_KEEP)).fetchall()
     names, ag = user_names(c, [r["author_id"] for r in rows]), agent_ids(c)
     return [{"version": r["version"], "created_at": r["created_at"], "by": _by(c, r["author_id"], names, ag), "source": r["source"],
              "chars": r["chars"]} for r in rows]
@@ -268,7 +377,7 @@ def pb_versions_out(c, lid=None, owner=None, folder=None):
 def pb_version_out(c, v, lid=None, owner=None, folder=None):
     from ..agents.core import agent_ids
     w, a = _where(lid, owner, folder)
-    r = c.execute(f"SELECT * FROM playbooks WHERE {w} AND version=?", (*a, v)).fetchone()
+    r = c.execute(f"SELECT {PB_VCOLS} FROM {PB_VJOIN} WHERE {w} AND v.no=?", (*a, v)).fetchone()
     if not r:
         raise Denied(404)
     return {"version": r["version"], "text": r["body"], "created_at": r["created_at"], "by": _by(c, r["author_id"], None, agent_ids(c)),

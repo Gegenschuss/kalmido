@@ -355,8 +355,11 @@ def fk_name(table, col):
 check(all(fk_name(t, c_) for t, c_ in (("doc_meta", "task_id"), ("rc_receipts", "list_id"), ("notes", "created_by"), ("agents", "owner_id"),
                                        ("habits", "user_id"), ("budget_recurring", "contract_task_id"))),
       "#2174: a new database has the keys")
-# 2.152.0 (#2174, review B-M7): playbooks.author_id keeps the id of a gone author (no key; NULL would mean the owner's text)
-check(fk_name("playbooks", "author_id") is None, "#2174 B-M7: playbooks.author_id has no foreign key")
+# 2.152.0 (#2174, review B-M7): playbooks.author_id kept the id of a gone author (no key; NULL would mean the owner's text)
+# 2.977.0 (#5282): the column is gone (stage Q7b), a version's author is obj_versions.created_by; a gone author's NULL counts as
+# foreign there (lists/playbook.py pb_effective; tests/p2977_playbook_versions_test.py)
+check("author_id" not in {r[0] for r in sql("SELECT column_name FROM information_schema.columns WHERE table_name='playbooks'")},
+      "#5282: playbooks keeps only the head (no author_id)")
 INBOX = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (ALICE,))[0][0]
 TK = A.post(B + "/api/tasks", json={"title": "Beleg prüfen", "list_id": INBOX}).json()["id"]
 sql(f"ALTER TABLE doc_meta DROP CONSTRAINT {fk_name('doc_meta', 'task_id')}", write=True)

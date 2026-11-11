@@ -223,10 +223,8 @@ def _clean(c, oid, table, r):
         if k == "list":
             row["list_id"] = int(v)
             row.pop("org_id", None)
-    if table == "obj_versions":  # 2.958.0 (#5281): the columns of wiki_versions (an older archive reads the same)
-        row["page_id"], row["path"] = row.pop("ref_id"), row.pop("title")
-        for k in ("kind", "no", "held_at"):
-            row.pop(k, None)
+    if table == "obj_versions":  # 2.958.0 (#5281) / 2.977.0 (#5282): the old table's columns (an older archive reads the same)
+        return ox_objv_row(c, oid, row)
     if table == "obj_tag_links":  # 2.947.0 (#5275): the columns of task_list_tags (+ when and how it was set)
         row["task_id"] = row.pop("obj_id")
         row.pop("kind", None)
@@ -235,6 +233,27 @@ def _clean(c, oid, table, r):
         row = {"task_id": row["ref_id"], "user_id": row["user_id"], "created_at": row["created_at"]}
     row.pop("legacy_aad", None)  # 2.278.0 C (#3091): a person's own move detail (old AAD), not the organisation's
     return _ox_dec_row(c, oid, table, row)
+
+
+def ox_objv_row(c, oid, row):
+    """2.977.0 (#5282): a row of the core's versions (obj_versions) as the archive file of its kind has it since before the core:
+    wiki/versions.json the columns of wiki_versions (2.958.0, #5281), lists/playbooks.json those of playbooks (list_id, owner_id,
+    folder, version, body, source, author_id, created_at), office/procdocs.json those of office_procdocs (org_id, version, data
+    = the JSON text, created_by, created_at). The sealed text opened first (its context is obj_versions.body)."""
+    row = _ox_dec_row(c, oid, "obj_versions", row)
+    kind = row.get("kind")
+    if kind == "playbook":
+        h = c.execute("SELECT list_id, owner_id, folder FROM playbooks WHERE id=?", (row["ref_id"],)).fetchone()
+        return {"id": row["id"], "list_id": h["list_id"] if h else None, "owner_id": h["owner_id"] if h else None,
+                "folder": h["folder"] if h else None, "version": row["no"], "body": row["body"], "source": row.get("source") or "edit",
+                "author_id": row["created_by"], "created_at": row["created_at"]}
+    if kind == "procdoc":
+        return {"id": row["id"], "org_id": row["org_id"], "version": row["no"], "data": row["body"] or "{}",
+                "created_by": row["created_by"], "created_at": row["created_at"]}
+    row["page_id"], row["path"] = row.pop("ref_id"), row.pop("title")
+    for k in ("kind", "no", "held_at", "source"):
+        row.pop(k, None)
+    return row
 
 
 def _table_cols(c, table):
@@ -294,7 +313,8 @@ OX_AREAS = (
     ("lists/files.json", "list_files", f"list_id IN ({LSQ})"),
     ("lists/forms.json", "forms", f"list_id IN ({LSQ})"),
     ("lists/form_entries.json", "form_entries", f"form_id IN (SELECT id FROM forms WHERE list_id IN ({LSQ}))"),  # 2.137.0 C (#2344): answers of form entries
-    ("lists/playbooks.json", "playbooks", f"list_id IN ({LSQ})"),
+    # 2.977.0 (#5282): the versions are rows of the core's obj_versions on the Playbook's head; the file keeps its columns (_clean)
+    ("lists/playbooks.json", "obj_versions", f"kind='playbook' AND ref_id IN (SELECT id FROM playbooks WHERE list_id IN ({LSQ}))"),
     ("lists/sprints.json", "sprints", f"list_id IN ({LSQ})"),  # 2.137.0 C (#2344): sprints of the lists (tasks.sprint_id)
     # 2.905.0 (#5288, rest of #4031): the organisation's templates -- task, project and section templates, one kind of the core
     # (was lists/section_templates.json, 2.362.0 #3096; an older archive's file is still read by the import), not the trash
@@ -403,7 +423,9 @@ OX_AREAS = (
     ("office/cash_closings.json", "office_cash_closings", "org_id=?"),
     ("office/cash_log.json", "office_cash_log", "org_id=?"),
     ("office/period_locks.json", "office_period_locks", "org_id=?"),  # 2.148.0 A (#2471): locked accounting periods
-    ("office/procdocs.json", "office_procdocs", "org_id=?"),  # 2.148.0 C (#2472): versions of the procedure documentation
+    # 2.148.0 C (#2472): versions of the procedure documentation; 2.977.0 (#5282): rows of the core's obj_versions, the file keeps its
+    # columns (_clean)
+    ("office/procdocs.json", "obj_versions", "kind='procdoc' AND org_id=?"),
     ("office/suppliers.json", "office_suppliers", "org_id=?"),  # 2.148.0 D (#2458): creditors of the DATEV import
     ("office/opening_balances.json", "office_opening_balances", "org_id=?"),  # 2.148.0 D (#2458)
     ("office/ledger_entries.json", "office_ledger_entries", "org_id=?"),  # 2.666.0 (#3461): adjusting / opening entries of the balance sheet
@@ -461,7 +483,8 @@ OX_AREAS = (
     ("wiki/files.json", "wiki_files", "org_id=?"),  # 2.99.0 A (#2182): their PDFs and pictures (the bytes under files/wiki/)
     # 2.137.0 B (#2344): the history of the pages (texts decrypted); 2.958.0 (#5281): rows of the core's versions, the file keeps
     # its columns (_clean: page_id, path)
-    ("wiki/versions.json", "obj_versions", "kind='wiki' AND org_id=?"),
+    # 2.977.0 (#5282): the versions of a page in the trash stay out with it (was OX_GONE_WITH, now three kinds share the table)
+    ("wiki/versions.json", "obj_versions", "kind='wiki' AND org_id=? AND ref_id NOT IN (SELECT id FROM wiki_pages WHERE deleted_at IS NOT NULL)"),
     ("sheets/sheets.json", "sheets", "org_id=?"),  # 2.89.0 (#1916): tables with their columns, rows and cells
     ("sheets/columns.json", "sheet_columns", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
     ("sheets/rows.json", "sheet_rows", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
@@ -556,6 +579,9 @@ OX_LEFT = {
     "field_trash": _DERIVED, "member_memos": _DERIVED,  # 2.550.0 (#4528): deleted fields / a removed member's ways back (trash period)
     "task_vectors": _DERIVED, "upload_scan": _SERVER, "webhooks": _SECRET, "wiki_shares": _SECRET,
     "wiki_spaces": "the lock of a space (client_encrypted names it)",
+    # 2.977.0 (#5282): the heads; their versions are office/procdocs.json and lists/playbooks.json (obj_versions)
+    "office_procdocs": "the head of the procedure documentation (its versions: office/procdocs.json)",
+    "playbooks": "the head of a project's Playbook (its versions: lists/playbooks.json)",
     # list column
     "agent_audit": _AGENT, "agent_burst_held": _SERVER, "agent_decisions": _AGENT, "agent_jobs": _AGENT, "agent_list_access": _AGENT, "agent_schedules": _AGENT, "agent_usage": _AGENT,
     "assistant_access": _PERSONAL, "assistant_log": _PERSONAL, "budget_cats": _PERSONAL, "budget_entries": _PERSONAL,
@@ -591,7 +617,6 @@ OX_GONE_WITH = {  # table -> (parent table, column) pairs: a row goes when its p
     "video_versions": (("video_reviews", "review_id"),),
     "video_comments": (("video_reviews", "review_id"),),
     "wiki_files": (("wiki_pages", "page_id"),),
-    "obj_versions": (("wiki_pages", "ref_id"),),  # 2.958.0 (#5281): the export takes kind 'wiki' only (wiki/versions.json)
 }
 
 

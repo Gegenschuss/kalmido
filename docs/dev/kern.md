@@ -612,7 +612,24 @@ admins' alert and the log name their pages; the key of the space is gone, no rec
 check the page and its newest versions in `obj_versions`, then delete those rows with
 `DELETE FROM wiki_versions WHERE page_id IN (<pages of the alert>)` and start again -- the next start drops the table. That
 loses only versions nobody can open any more. The organisation export keeps `wiki/versions.json` with its columns (`page_id`,
-`path`); its import writes into `obj_versions`. Next kinds: the playbooks and the procedure documentation (stage Q7b).
+`path`); its import writes into `obj_versions`.
+
+Stage Q7b (2.977.0, #5282): the playbooks (kind `playbook`, lists/playbook.py) and the procedure documentation (kind
+`procdoc`, office/procdoc.py) keep only their head -- `playbooks` one row per Playbook (`list_id`, or `owner_id` + `folder`),
+`office_procdocs` one row per office area (`org_id`), both unique -- and every version is a row of `obj_versions` with
+`ref_id` = the head (the trigger `kalmido_ov_gone` on both tables takes the versions with their head). `obj_versions.source`
+names how a version came in the area's words (a playbook's edit / restore / proposal / import / template; '' elsewhere). The
+routes name a version by its number (`obj_version_no`, `obj_version_last`). A playbook's version has no `org_id` (the playbooks
+had no row-level security; who sees the list reads it) and `owner_id` = the folder's owner; for the playbooks a `created_by`
+NULL means an author who is gone (foreign, never the owner's own text, #1978 / review B-M7). A procedure documentation's
+version has `org_id` = the office area and its JSON text sealed with the area's key (context `obj_versions.body`; the field pass
+of admin/orgcrypt_cli.py seals and opens kind `procdoc`, `FIELD_KIND`). The move at the start (`pb_retire`, `pd_retire`,
+`kern_retire_rows`): every old row into `obj_versions` (its number kept where free, the sealed text sealed again), the newest
+row of each Playbook / area stays as the head, the old columns go and the back limit rises; an area whose sealed text cannot
+be opened now moves nothing and keeps the columns until a later start (log line, admins' alert). The archives keep
+`lists/playbooks.json`, `office/procdocs.json` and `books/procedure-documentation.csv` with their old columns
+(admin/orgexport.py `ox_objv_row`); the imports write into `obj_versions`. The personal office moving into an organisation
+takes the versions along, sealed anew (office/pbtransfer.py `pbt_procdoc_versions`).
 
 ### Comments (stage Q4a, 2.972.0, #5272)
 

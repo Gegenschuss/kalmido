@@ -179,6 +179,7 @@ from kalmido.admin import orgcrypt_cli as cl
 from kalmido.core import orgcrypt as oc
 from kalmido.core.pg import system_ctx
 want = {(t, col) for t, cols in oc.FIELDS.items() if not t.startswith(cl.FIELD_SETTLED) for col in cols} | set(oc.JSON_KEYS)
+want |= {(t, col) for t in cl.FIELD_KIND for col in oc.FIELDS[t]}  # 2.977.0 (#5282): obj_versions, only its kind procdoc
 got = {(t, col) for t, _i, col, _k in cl.FIELD_JOBS}
 bad = []
 c = app.connect()

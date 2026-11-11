@@ -73,7 +73,7 @@ RX_TABLES = (
     ("contracts/contracts.csv", "office_contracts"),
     ("contracts/contract-files.csv", "office_contract_files"),
     ("contracts/agreements.csv", "office_agreements"),
-    ("books/procedure-documentation.csv", "office_procdocs"),
+    ("books/procedure-documentation.csv", "obj_versions"),  # 2.977.0 (#5282): the versions in the core (RX_WHERE: kind procdoc)
     ("books/number-ranges.csv", "office_numbers"),
     ("books/opening-balances.csv", "office_opening_balances"),
     ("books/period-locks.csv", "office_period_locks"),
@@ -112,6 +112,7 @@ RX_TABLES = (
     ("letters/letter-links.csv", "office_letter_links"),  # 2.362.2 (#3105)
 )
 RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'",  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'
+            "obj_versions": "kind='procdoc' AND org_id=?",  # 2.977.0 (#5282): the procedure documentation's versions (not the wiki's)
             # 2.362.2 (#3105): the links of a draft stay out with the draft
             "office_letter_links": "org_id=? AND letter_id IN (SELECT id FROM office_letters WHERE org_id=? AND status<>'draft')"}
 # 2.372.0 (#3316): the signature snapshot of a receipt stays on its PDF, not in the CSV

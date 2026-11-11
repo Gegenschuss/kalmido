@@ -90,8 +90,12 @@ OLIST = r.json().get("list_id") if r.ok else 0
 check(OLIST and one("SELECT COUNT(*) FROM budget_cats WHERE list_id=?", (OLIST,)) > 0, f"guard: otto's list has its default categories {OLIST}")
 OTTO_BUD = {t: one(f"SELECT COUNT(*) FROM {t} WHERE list_id=?", (OLIST,)) for t in ("budget_cats", "budget_recurring", "budget_entries")}
 kt.dbx("INSERT INTO time_sheets(user_id, month, state, note, created_at, updated_at) VALUES(?, '2026-08', 'open', '', ?, ?)", (GID, TS, TS))
-kt.dbx("INSERT INTO playbooks(list_id, owner_id, folder, version, body, source, created_at) VALUES(NULL, ?, 'Bestand', 1, 'Gina eigen', 'edit', ?)",
-       (GID, TS))
+# 2.977.0 (#5282): the head in playbooks, the version in the core's obj_versions
+PBH = kt.dbx("INSERT INTO playbooks(list_id, owner_id, folder) VALUES(NULL, ?, 'Bestand') RETURNING id", (GID,))[0][0]
+kt.dbx("INSERT INTO obj_versions(kind, ref_id, no, owner_id, body, size, created_by, created_at, updated_at, source) "
+       "VALUES('playbook', ?, 1, ?, 'Gina eigen', 10, ?, ?, ?, 'edit')", (PBH, GID, GID, TS, TS))
+PBQ = ("SELECT p.folder, v.no, v.body, v.created_by, v.source FROM playbooks p JOIN obj_versions v ON v.kind='playbook' AND v.ref_id=p.id "
+       "WHERE p.list_id IS NULL AND p.owner_id=? ORDER BY p.folder, v.no")
 
 FILE = mkzip({
     "lists": [{"id": 1, "name": "Umzug Projekt", "created_at": TS},
@@ -199,7 +203,7 @@ now = {t: one(f"SELECT COUNT(*) FROM {t} WHERE list_id=?", (OLIST,)) for t in OT
 check(now == OTTO_BUD, f"#3965 otto's budget list gets nothing from gina's file {now} {OTTO_BUD}")
 
 # folder playbooks
-pbs = kt.dbx("SELECT folder, version, body, author_id, source FROM playbooks WHERE list_id IS NULL AND owner_id=? ORDER BY folder, version", (GID,))
+pbs = kt.dbx(PBQ, (GID,))  # 2.977.0 (#5282)
 check([(p[0], p[1], p[2]) for p in pbs] == [("Bestand", 1, "Gina eigen"), ("Kunden", 1, "Ordner v1"), ("Kunden", 2, "Ordner v2")],
       f"#3965 the folder's playbook arrives with both versions, the folder gina has keeps hers {pbs}")
 check(pbs[1][3] == GID and pbs[2][3] is None and pbs[2][4] == "proposal", f"#3965 ... the author only when it was me {pbs}")
@@ -219,7 +223,7 @@ left = {t: one(f"SELECT COUNT(*) FROM {t} WHERE list_id=?", (BL or 0,)) for t in
 # list went into the trash all the same - the report said "kept", the budget was gone)
 check(left == {"budget_cats": 1, "budget_recurring": 1, "budget_entries": 2} and one("SELECT deleted_at FROM lists WHERE id=?", (BL or 0,)) is None,
       f"#3965 ... the budget list with an entry changed since stays whole, with all its rows {left}")
-check([(p[0], p[2]) for p in kt.dbx("SELECT folder, version, body FROM playbooks WHERE list_id IS NULL AND owner_id=?", (GID,))] == [("Bestand", "Gina eigen")],
+check([(p[0], p[2]) for p in kt.dbx(PBQ, (GID,))] == [("Bestand", "Gina eigen")],  # 2.977.0 (#5282)
       "#3965 ... the folder's playbook too, gina's own stays")
 now = {t: one(f"SELECT COUNT(*) FROM {t} WHERE list_id=?", (OLIST,)) for t in OTTO_BUD}
 check(now == OTTO_BUD and one("SELECT COUNT(*) FROM lists WHERE id=? AND deleted_at IS NULL", (OLIST,)) == 1, f"#3965 otto's list is untouched {now}")

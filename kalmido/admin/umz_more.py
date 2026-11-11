@@ -26,7 +26,8 @@ from ..integrations.importers import imp_undo_after  # 2.506.0 (#4299)
 from .acctimport import _iso_ts, _oid, _txt, tr, umz_cols, umz_find, umz_insert, umz_row, umz_seen
 from ..life.budget import bud_import  # 2.765.0 (#3965)
 from ..lists.lists import clean_folder  # 2.765.0 (#3965)
-from ..lists.playbook import PB_KEEP, PB_SOURCES, pb_text  # 2.765.0 (#3965)
+from ..lists.playbook import PB_KEEP, PB_KIND, PB_SOURCES, pb_head, pb_text  # 2.765.0 (#3965); 2.977.0 (#5282): + the head
+from ..core.objversions import obj_version_add  # 2.977.0 (#5282): a folder's Playbook versions in the core
 
 # the parts written here (each also in acctimport.UMZ_READ)
 UMZ_MORE = ("bookmarks", "pomos", "contact_care", "view_layouts", "list_layouts", "task_bell", "task_watchers",
@@ -304,15 +305,17 @@ def _folder_pbs(c, run, uid, me_old, data):
         if c.execute("SELECT 1 FROM playbooks WHERE list_id IS NULL AND owner_id=? AND folder=? LIMIT 1", (uid, folder)).fetchone():
             here.append(folder)
             continue
+        # 2.977.0 (#5282, stage Q7b): the head of the folder's Playbook, its versions in the core's obj_versions (in their order)
+        head = pb_head(c, owner=uid, folder=folder, make=True)
         for v in sorted(vers)[-PB_KEEP:]:
             r, text = vers[v]
             src = r.get("source") if r.get("source") in PB_SOURCES else "import"
-            d = {"list_id": None, "owner_id": uid, "folder": folder, "version": v, "body": text, "source": src,
-                 "author_id": uid if _oid(r.get("author_id")) == me_old else None,
-                 "created_at": r.get("created_at") if _iso_ts(r.get("created_at")) else iso(now_utc())}
-            nid = umz_insert(c, "playbooks", d)
-            if nid:
-                _more(run, "playbooks", nid)
+            # the author: me when it was me or nobody (the owner's own text); another person of the old server stays foreign (NULL:
+            # for the playbooks a version without an author is a gone author's text, never the owner's own, 2.977.0 #5282)
+            a = _oid(r.get("author_id"))
+            obj_version_add(c, PB_KIND, head, None, uid, "", text, len(text.encode("utf-8")), uid if a is None or a == me_old else None,
+                            r.get("created_at") if _iso_ts(r.get("created_at")) else iso(now_utc()), source=src)
+        _more(run, "playbooks", head)
     if here:
         run.warning(N_("Folders that have a playbook here already keep it: {0}"), ", ".join(here[:UMZ_NAMES_MAX]))
 
@@ -374,7 +377,6 @@ def umz_more_undo(c, uid, cr, since, plan):
     Bookmarks: the plan judges them (their preview fetch writes the time columns) and counts them. A focus session is finished and
     has no way to change."""
     kept = 0
-    pbs = {x[1] for x in cr.get("more") or [] if isinstance(x, list) and len(x) == 2 and x[0] == "playbooks"}  # 2.765.0 (#3965)
     for item in reversed(cr.get("more") or []):
         if not (isinstance(item, list) and len(item) == 2 and item[0] in _UNDO):
             continue
@@ -401,9 +403,11 @@ def umz_more_undo(c, uid, cr, since, plan):
         if table in _UNDO_MINE:  # 2.765.0 (#3965): a budget row changed since / a folder written on since stays (own work now)
             mine = _UNDO_MINE[table]
             if table == "playbooks":  # a version saved since on that folder (one this import did not make) keeps the folder's history
-                r = c.execute(f"SELECT folder FROM playbooks WHERE id=? AND {mine}", (v, uid)).fetchone()
-                gone = r is not None and not any(x["id"] not in pbs for x in c.execute(
-                    "SELECT id FROM playbooks WHERE list_id IS NULL AND owner_id=? AND folder=?", (uid, r["folder"])))
+                # 2.977.0 (#5282): the import recorded the folder's head; its versions are in obj_versions (the import's keep the
+                # archive's times, a version saved since is newer than the import)
+                r = c.execute(f"SELECT id FROM playbooks WHERE id=? AND {mine}", (v, uid)).fetchone()
+                gone = r is not None and not any(imp_undo_after(x["created_at"], since) for x in c.execute(
+                    "SELECT created_at FROM obj_versions WHERE kind=? AND ref_id=?", (PB_KIND, v)))
                 kept += r is not None and not gone
             else:  # 2.765.0 (fable F5): a budget row is never deleted on its own - its list goes into the trash with all its rows,
                 # or stays whole when anything in it was written since (importers.imp_undo_lists, imp_budget_touched)

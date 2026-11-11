@@ -47,7 +47,6 @@
   "org_joins": "own logic: an open invitation of an existing account into an organisation (the role it will give), not a share",
   "org_members": "own logic: an organisation's members and their role (member / admin / guest / read-only / accounting), the organisation floor the core's AccessCtx reads",
   "playbook_proposals": "own logic: the proposed playbook text (body)",
-  "playbooks": "stage Q7 (versions): versions in the main table; a playbook's own text (body) besides",
   "push_tags": "own logic: a device's push topics (subscriptions of the push service)",
   "reading_orgs": "own logic: which organisations read a list (a right)",
   "rss_reads": "stage Q8 (read marks) takes it down: the core's read marks",

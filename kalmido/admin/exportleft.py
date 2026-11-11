@@ -139,6 +139,8 @@ RX_LEFT_TABLES = {
     "office_peppol": _RX_SECRET, "office_payonline": _RX_SECRET, "office_pay_links": _RX_SECRET,
     "office_pay_sessions": _RX_WORK, "office_pay_events": _RX_WORK, "office_pay_payouts": _RX_WORK,
     "office_cf_actual": _RX_WORK, "office_cf_adjust": _RX_WORK, "office_cf_start": _RX_WORK, "office_trash": _RX_WORK,
+    # 2.977.0 (#5282): the head only; the versions go as books/procedure-documentation.csv (obj_versions kind procdoc)
+    "office_procdocs": "the head of the procedure documentation; its versions are books/procedure-documentation.csv",
 }
 
 

@@ -59,7 +59,8 @@ ODL_LEGAL = (
     ("open_receipts", "receipt", "SELECT substr(COALESCE(NULLIF(m.doc_date, ''), r.set_at), 1, 4) FROM rc_receipts r "
                                  "LEFT JOIN doc_meta m ON m.node_id=r.node_id WHERE r.org_id=? AND r.paid_at IS NULL AND r.vat_pct IS NULL"),
     ("payments", "book", "SELECT substr(COALESCE(NULLIF(date, ''), created_at), 1, 4) FROM office_payments WHERE org_id=?"),
-    ("procdocs", "book", "SELECT substr(created_at, 1, 4) FROM office_procdocs WHERE org_id=?"),
+    # 2.977.0 (#5282): its versions are rows of the core's obj_versions (kind procdoc, TIMESTAMPTZ)
+    ("procdocs", "book", "SELECT CAST(EXTRACT(YEAR FROM created_at) AS TEXT) FROM obj_versions WHERE kind='procdoc' AND org_id=?"),
     ("signoffs", "letter", "SELECT substr(COALESCE(NULLIF(signed_at, ''), created_at), 1, 4) FROM office_signoffs "
                            "WHERE org_id=? AND (state='accepted' OR signed_at IS NOT NULL)"),
     # 2.355.0 B (#2845): the asset register (a book) from the year of a device's last depreciation: purchase month + useful

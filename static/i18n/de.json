@@ -18220,6 +18220,7 @@
   "The old value is no longer valid, so it cannot be undone": "Der alte Wert ist nicht mehr gültig, daher nicht rückgängig zu machen",
   "The list was encrypted since then, so it cannot be undone": "Die Liste wurde seitdem verschlüsselt, daher nicht rückgängig zu machen",
   "Knowledge history clean-up waits: {0} old versions in {1} cannot be opened now (the key of their space is missing), the old table stays. See the server log.": "Aufräumen des Wissensverlaufs wartet: {0} alte Versionen in {1} lassen sich gerade nicht öffnen (der Schlüssel ihres Bereichs fehlt), die alte Tabelle bleibt. Siehe Server-Log.",
+  "Procedure documentation clean-up waits: {0} old versions in {1} cannot be opened now (the key of their office is missing), the old columns stay. See the server log.": "Aufräumen der Verfahrensdokumentation wartet: {0} alte Versionen in {1} lassen sich gerade nicht öffnen (der Schlüssel ihres Büros fehlt), die alten Spalten bleiben. Siehe Server-Log.",
   "Knowledge history clean-up waits: {0} old versions in {1} could not move (pages {2}), the old table stays. See the server log and the way out in docs/dev/kern.md (Versions).": "Aufräumen des Wissensverlaufs wartet: {0} alte Versionen in {1} ließen sich nicht umziehen (Seiten {2}), die alte Tabelle bleibt. Siehe Server-Log und den Ausweg in docs/dev/kern.md (Versions).",
   "Select at least two documents": "Wähle mindestens zwei Dokumente",
   "Only documents of one workspace can be merged": "Nur Dokumente aus einem Arbeitsbereich lassen sich zusammenfügen",

@@ -107,7 +107,8 @@ check(r.ok and r.json()["version"] == 2, "save version 2 " + r.text[:200])
 check(A.put(B + P, json={"own": {"nonsense": "x"}}).status_code == 400, "unknown field: 400")
 check(A.put(B + P, json={"own": {"company": 5}}).status_code == 400, "a number as text: 400")
 check(A.put(B + P, json={"own": {"company": "x" * 20001}}).status_code == 400, "too long: 400")
-rows = sql("SELECT version, data FROM office_procdocs WHERE org_id=? ORDER BY version", (ORG,))
+# 2.977.0 (#5282): the versions are rows of the core's obj_versions (kind procdoc)
+rows = sql("SELECT no, body FROM obj_versions WHERE kind='procdoc' AND org_id=? ORDER BY no", (ORG,))
 check([x[0] for x in rows] == [1, 2] and all(str(x[1]).startswith("kenc1:") for x in rows), f"two versions, encrypted at rest {[x[0] for x in rows]}")
 check(A.get(B + P).json()["version"] == 2 and field(A.get(B + P).json(), "company")["own"] == "GmbH, film production (test v2)", "current = version 2")
 
@@ -145,7 +146,7 @@ for who, s in (("accounting", Da),):
     check(r.ok and r.json()["version"] == 2 and r.json()["can_edit"] == 0, f"{who} reads (can_edit 0) " + r.text[:200])
     check(s.get(B + P + "/versions").ok and s.get(B + P + ".md").ok and s.get(B + P + ".pdf?version=1").ok, f"{who} reads versions and exports")
     check(s.put(B + P, json={"own": {"company": "not allowed"}}).status_code == 403, f"{who} may not save: 403")
-check(len(sql("SELECT 1 FROM office_procdocs WHERE org_id=?", (ORG,))) == 2, "no version from the refused saves")
+check(len(sql("SELECT 1 FROM obj_versions WHERE kind='procdoc' AND org_id=?", (ORG,))) == 2, "no version from the refused saves")  # 2.977.0 (#5282)
 
 r = Ca.get(B + P)
 check(r.ok and r.json()["version"] == 0 and "Alpha" not in json.dumps(r.json()), "another organisation sees none of it")

@@ -48,7 +48,7 @@ TABLES = (
     "office_cashbooks", "office_cash_entries", "office_cash_closings", "office_cash_log",  # 2.121.0 B (#2095): the cash book
     "office_period_locks",  # 2.148.0 A (#2471): locked accounting periods
     "office_ledger_entries",  # 2.666.0 (#3461): adjusting / opening entries of the balance sheet
-    "office_procdocs",  # 2.148.0 C (#2472): versions of the procedure documentation (GoBD)
+    "office_procdocs",  # 2.148.0 C (#2472): the procedure documentation (GoBD); 2.977.0 (#5282): its head, versions in obj_versions
     "office_suppliers", "office_opening_balances",  # 2.148.0 D (#2458): the DATEV import (creditors, opening balances)
     "office_bookarch", "office_bookarch_accts", "office_bookarch_docs", "office_bookarch_files",  # 2.414.0 (#3502): the booking archive
     "office_datev_guids",  # 2.188.0 A (#2498): the GUIDs of the receipt images in the DATEV ZIP

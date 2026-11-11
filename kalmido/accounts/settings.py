@@ -1099,7 +1099,10 @@ def umz_export_queries(uid):
         "agent_steps": ("SELECT id, agent_id, job_id, message_id, text, created_at FROM agent_steps WHERE user_id=?", (uid,)),  # 2.32.0 (#1081)  # 2.32.0 (#1063): my own project page arrangements
         "agent_schedules": ("SELECT * FROM agent_schedules WHERE user_id=?", (uid,)),  # 2.34.0 (#272): my planned agent jobs
         # 2.39.0 (#1168): the Playbooks of my lists and folders (every version) and the agents' proposals for my lists
-        "playbooks": (f"SELECT * FROM playbooks WHERE list_id IN {own} OR (list_id IS NULL AND owner_id=?) ORDER BY list_id, folder, version",
+        # 2.977.0 (#5282, stage Q7b): the versions are rows of obj_versions on the Playbook's head; the file keeps its columns
+        "playbooks": ("SELECT v.id, p.list_id, p.owner_id, p.folder, v.no AS version, v.body, v.source, v.created_by AS author_id, "
+                      "v.created_at FROM playbooks p JOIN obj_versions v ON v.kind='playbook' AND v.ref_id=p.id "
+                      f"WHERE p.list_id IN {own} OR (p.list_id IS NULL AND p.owner_id=?) ORDER BY p.list_id, p.folder, v.no",
                       (uid, uid)),
         "playbook_proposals": (f"SELECT * FROM playbook_proposals WHERE list_id IN {own}", (uid,)),
         "org_list_actions": ("SELECT * FROM org_list_log WHERE by_id=?", (uid,)),  # 2.35.0 (#1101): what I did as an organisation admin
