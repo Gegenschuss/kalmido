@@ -229,6 +229,7 @@ TENANT_EXEMPT = {
     "agent_rules": _AGENT + " (2.235.0 C #2903: its standing rules; the source is checked against what the agent sees)",
     # 2.763.0 (#5269): replaces comment_reactions, tchat_rx and chat_reactions
     # 2.905.0 (#5284): replaces task_seen
+    "obj_search": "2.981.0 (#5278): the shared search index, derived from the source rows (owner_id only records the author); no org_id on purpose (row-level security would stop its GIN index) - every reader joins the source row, which carries its workspace, and checks the area's rights",
     "obj_seen": "a person's own read mark of the shared core on an object (kind + ref_id -> a task); read and written only for that person, the area checks the object before it writes one",
     # 2.947.0 (#5275): replaces task_list_tags (list_tags / org_tags: obj_tags, bound through its scope; a label has org_id)
     "obj_tag_links": "a tag of the shared core on an object (kind + obj_id -> a task's project); created_by only names who set it, the area checks the object before its tags are read or written",

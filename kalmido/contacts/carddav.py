@@ -164,12 +164,12 @@ def _ab_where(book):
 
 def ab_coll_key(c, u, book):
     """2.665.0 (#4196): the key of an address book for u without rendering: its contacts digested in SQL (count, last change,
-    every column; the photo by its length, its start and end and the contact's updated_at, which every write of a photo
+    every column (2.981.0, #5278: contacts.search went); the photo by its length, its start and end and the contact's updated_at, which every write of a photo
     sets - not the whole picture on every poll), plus name, role, "everyone in the organisation", the contacts of the
     shared collection and the code of the rendering."""
     where, args = _ab_where(book)
     r = c.execute(f"""SELECT count(*), max(ct.updated_at),
-                             md5(string_agg((to_jsonb(ct) - 'photo' - 'search')::text || '|' || length(ct.photo) || '|'
+                             md5(string_agg((to_jsonb(ct) - 'photo')::text || '|' || length(ct.photo) || '|'
                                             || md5(left(ct.photo, 64) || right(ct.photo, 256)), '/' ORDER BY ct.id))
                       FROM contacts ct WHERE {where}""", args).fetchone()
     return dav_fp("book", u["id"], book["key"], tuple(r), book["name"], book["role"], collab_all(), book.get("ids"), dav_code_fp())

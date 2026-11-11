@@ -510,7 +510,7 @@ def _files_txt(n, lg):
 
 
 # ---- the foreign keys on comments and the move of the old tables (once; core/db.py init_db, before AFTER drops them)
-OCM_FK = {"git_issue_comments": ("comment_id", "SET NULL"), "cmt_fts": ("comment_id", "CASCADE")}
+OCM_FK = {"git_issue_comments": ("comment_id", "SET NULL")}  # 2.981.0 (#5278): cmt_fts went (obj_search, core/objsearch.py)
 OCM_ISO = r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])[T ]([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d{1,6})?)?(Z|[+-]\d\d(:?\d\d)?)?$"
 
 
@@ -550,7 +550,7 @@ def ocm_move(c):
     are there (the first start of 2.972, or again after a version before 2.972 ran and made them anew), with their ids; an id
     there already stays as it is. Mentions "1,2" -> an array, the extras -> extra (only keys with a value), the times -> real
     points in time (a time not in ISO form: now for created_at / deleted_at, NULL for edited_at). Then the identity goes on
-    after the highest id and the foreign keys of git_issue_comments / cmt_fts point at obj_comments. The fragment 5272_a drops
+    after the highest id and the foreign key of git_issue_comments points at obj_comments. The fragment 5272_a drops
     the old tables right after (one-way). Returns the comments moved."""
     n = 0
     if c.execute("SELECT to_regclass('comments')").fetchone()[0]:

@@ -220,8 +220,10 @@ else:
 
 # ================================================================ #2515: indexes + the main search
 idx = {r[0] for r in dbx("SELECT indexname FROM pg_indexes WHERE tablename IN ('tasks', 'events')")}
-want = {"tasks_done", "tasks_due", "events_range", "tasks_trgm_title", "tasks_trgm_content", "tasks_trgm_url", "tasks_snippets", "tasks_open"}
+want = {"tasks_done", "tasks_due", "events_range", "tasks_snippets", "tasks_open"}
 check(want <= idx, f"#2515: the indexes exist (tasks_open stays) {sorted(want - idx)}")
+# 2.981.0 (#5278): the trigram indexes of the main search went (it reads the shared search index obj_search)
+check(not {"tasks_trgm_title", "tasks_trgm_content", "tasks_trgm_url"} & idx, f"#5278: the trigram indexes are gone {sorted(idx)}")
 SL = A.post(B + "/api/lists", json={"name": "Search here"}).json()["id"]
 S1 = A.post(B + "/api/tasks", json={"title": "Rechnung Oktober", "list_id": SL}).json()["id"]
 S2t = A.post(B + "/api/tasks", json={"title": "Paket", "content": "Notiz zur Lieferung am Dienstag", "list_id": SL}).json()["id"]

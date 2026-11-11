@@ -10,7 +10,7 @@ from ..core.i18n import languages, tr
 from ..core.schema import MAX_DEPTH
 from ..core.retention import ret_on
 from ..core.dlock import dl_list_hidden  # 2.235.0 B (#2902)
-from ..core.db import ag_cursor, ag_cursor_parse, db, err, gsetting, inbox_names, iso, like_escape, local_now, lv_versions, now_utc, usettings  # 2.619.0 (#3890): + lv_versions
+from ..core.db import ag_cursor, ag_cursor_parse, db, err, gsetting, inbox_names, iso, local_now, lv_versions, now_utc, usettings  # 2.619.0 (#3890): + lv_versions
 from ..accounts.session import me, session_gen, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
 from ..accounts.colors import ac_color_map
@@ -676,10 +676,13 @@ def task_query():
 
 
 def search_tasks(c, uid, raw, limit, files=True):
-    """Visible tasks whose title, notes, link or a custom field value contains raw (web search, REST API). files=False
-    (audit G4: an API token without attachments:read): the recognised text of files does not count."""
+    """Visible tasks whose title, notes, link, code snippets or ticket key match raw, or a custom field value contains it (web
+    search, REST API). files=False (audit G4: an API token without attachments:read): the recognised text of files does not
+    count. 2.981.0 (#5278, stage Q6a): the words through the shared search index (core/objsearch.py, obj_search kind 'task'):
+    every word at the start of a word (umlauts as ae / oe / ue), a part of the ticket key anywhere -- no ILIKE on the tasks."""
     from ..lists.fields import search_field_ids
-    q = f"%{like_escape(raw)}%"  # 2.37.0 (#1150): the text literally (Postgres reads a backslash as an escape in LIKE)
+    from .objsearch import osr_ids_sql
+    ids_sql, ids_args = osr_ids_sql("task", raw, names=True)
     fids = sorted(search_field_ids(c, uid, raw))[:2000] if raw else []
     from ..files.textscan import ts_task_hits
     fhit = ts_task_hits(c, uid, raw) if files else {}  # 2.61.0 (#1820): the recognised text of a task's files finds the task
@@ -693,16 +696,17 @@ def search_tasks(c, uid, raw, limit, files=True):
     # 29 ms before, 2.5 ms now). The matches are the same.
     # 2.695.0 (#4960): the visible lists as one array first (vis_search_lids, without the lock's), so the planner cannot read
     # every task of the instance for the subquery; tests/p2695_l_search_rls_test.py
+    # 2.981.0 (#5278): the words through obj_search (word start; a part of the ticket key), the field / file hits as before
     rows = load_tasks(c, "list_id = ANY(CAST(? AS BIGINT[])) "
                          f"AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
-                         "AND (title ILIKE ? ESCAPE '\\' OR content ILIKE ? ESCAPE '\\' OR url ILIKE ? ESCAPE '\\' "
-                         "OR (snippets IS NOT NULL AND EXISTS (SELECT 1 FROM "
-                         "jsonb_array_elements(CASE WHEN jsonb_typeof(snippets)='array' THEN snippets ELSE '[]'::jsonb END) j "
-                         "WHERE (j->>'code') ILIKE ? ESCAPE '\\' OR (j->>'path') ILIKE ? ESCAPE '\\')) "
-                         "OR id = ANY(CAST(? AS BIGINT[]))) "
-                         "ORDER BY status, updated_at DESC LIMIT ?", (vis_search_lids(c, uid), q, q, q, q, q, list(fids), limit))
-    for t in rows:  # 2.61.0 (#1820): "in file <name>" when only a file's text matched
-        if t["id"] in fhit and not any(raw.casefold() in (t.get(k) or "").casefold() for k in ("title", "content", "url")):
+                         f"AND ({'id IN ' + ids_sql + ' OR ' if ids_sql else ''}id = ANY(CAST(? AS BIGINT[]))) "
+                         "ORDER BY status, updated_at DESC LIMIT ?", (vis_search_lids(c, uid), *ids_args, list(fids), limit))
+    txt = set()
+    if fhit and ids_sql:  # 2.61.0 (#1820): "in file <name>" when only a file's text matched (not the task's own words)
+        txt = {r[0] for r in c.execute(f"SELECT t.id FROM tasks t WHERE t.id = ANY(CAST(? AS BIGINT[])) AND t.id IN {ids_sql}",
+                                       (sorted(fhit), *ids_args))}
+    for t in rows:
+        if t["id"] in fhit and t["id"] not in txt:
             t["file_hit"] = fhit[t["id"]]
     return rows
 

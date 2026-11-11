@@ -20,7 +20,7 @@ LAYERS = (
     ("agents", ("agents", "assistant", "startup")),
 )
 LAYER_OF = {"admin.migrate": "core", "api.common": "core", "accounts.orgback": "domain",
-            "core.objects": "domain", "core.writes": "domain", "core.objlight": "domain", "core.objnotify": "domain", "core.objcomments": "domain", "core.objweb": "integrations",
+            "core.objects": "domain", "core.writes": "domain", "core.objlight": "domain", "core.objnotify": "domain", "core.objcomments": "domain", "core.objsearch": "domain", "core.objweb": "integrations",
             "core.undoweb": "domain",  # 2.747.0 (#5249): the step groups' routes stand on the write path
             "core.undoareas": "domain",  # 2.777.0 (#5254): the areas' undo steps stand on the write path
             "docs.mailnamed": "integrations"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area; 2.558.0 (#4709): the shared core stands on the file store and accounts, its routes on the API
@@ -114,6 +114,7 @@ ORDER = (
     "tasks.minerules",  # 2.823.0 (#4773): the own rules of My tasks
     "tasks.delta",  # 2.42.0 (#1376): GET /api/state/delta
     "core.objcomments",  # 2.972.0 (#5272): the comments' core (obj_comments; domain layer, LAYER_OF: it asks the core's roles)
+    "core.objsearch",  # 2.981.0 (#5278): the shared search index obj_search (domain layer, LAYER_OF: it asks the core's roles)
     "collab.replies",  # 2.33.0 (#1076): before comments / teamchat / agents.chat (they import it)
     "collab.cmttrash",  # 2.530.0 A (#4315): the trash of comments and team chat messages (helpers only)
     "collab.comments",

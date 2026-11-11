@@ -1143,7 +1143,8 @@ _TOC_SKIP = ("DATABASE PROPERTIES", "ROW SECURITY", "DEFAULT ACL", "STDSTRINGS",
 _TOC_KINDS = tuple(sorted(_TOC_KEEP + _TOC_SKIP, key=len, reverse=True))
 _TOC_LINE = re.compile(r"(\d+); (\d+) (\d+) (.*)")
 # 2.116.0 (#2065, job #692): the full-text indexes (tasks/ftsearch.py) call to_tsvector / setweight / "left": not in the
-# call list of _calls_ok, and they need not be: a restore leaves them out and init_db creates them again (fts_index_init)
+# call list of _calls_ok, and they need not be: a restore leaves them out and init_db creates them again (fts_index_init;
+# 2.981.0, #5278: gone, the shared search index obj_search indexes a plain column)
 _TOC_REBUILT = {"fts_tasks", "fts_comments"}
 
 

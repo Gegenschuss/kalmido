@@ -84,12 +84,12 @@
  "search_functions": {
   "kalmido/accounts/servers.py:msv_search": "stage Q6 (search) moves it onto the shared search",
   "kalmido/api/v1.py:v1_search": "stage Q6 (search) moves it onto the shared search",
-  "kalmido/collab/notes.py:notes_search": "stage Q6 (search) moves it onto the shared search",
-  "kalmido/collab/notes.py:v1_notes_search": "stage Q6 (search) moves it onto the shared search",
+  "kalmido/collab/notes.py:notes_search": "reads the shared search index obj_search since stage Q6a (#5278); the area keeps its rights per hit and its answer",
+  "kalmido/collab/notes.py:v1_notes_search": "reads the shared search index obj_search since stage Q6a (#5278); the area keeps its rights per hit and its answer",
   "kalmido/files/textscan.py:files_search": "stage Q6 (search) moves it onto the shared search",
   "kalmido/files/v1.py:v1_files_search": "stage Q6 (search) moves it onto the shared search",
   "kalmido/hub/hubmail.py:_search": "stage Q6 (search) moves it onto the shared search",
-  "kalmido/tasks/ftsearch.py:fts_search": "stage Q6 (search) moves it onto the shared search",
+  "kalmido/tasks/ftsearch.py:fts_search": "reads the shared search index obj_search since stage Q6a (#5278); the area keeps its rights per hit and its answer",
   "kalmido/wiki/pages.py:wiki_search": "stage Q6 (search) moves it onto the shared search",
   "kalmido/wiki/wksearch.py:wks_search": "stage Q6 (search) moves it onto the shared search"
  },

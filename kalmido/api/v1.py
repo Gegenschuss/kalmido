@@ -1157,7 +1157,9 @@ def v1_tasks_more(c, uid, a, where, args):
         tsq = fts_query(fts_terms(a["q"]))
         if not tsq:
             raise BadInput(tr("Invalid value: {0}", "q"))
-        where.append("id IN (SELECT f.task_id FROM task_fts f WHERE f.vec @@ to_tsquery('simple'::regconfig, ?))")
+        # 2.981.0 (#5278): the shared search index obj_search (title A / notes B of a task; not its link or code: weight C)
+        where.append("id IN (SELECT f.ref_id FROM obj_search f, to_tsquery('simple'::regconfig, ?) q WHERE f.kind='task' "
+                     "AND f.tsv @@ q AND ts_filter(f.tsv, '{a,b}') @@ q)")
         args.append(tsq)
     return rsort
 

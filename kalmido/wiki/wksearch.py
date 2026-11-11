@@ -23,7 +23,9 @@ from ..core.db import connect
 from ..core.orgcrypt import _kek, _kek_check, _row, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
 from .wkhist import WikiUnreadable, wkh_body  # 2.280.0 C (#3114): loads before this module (kalmido/__init__.py ORDER)
 from .wkhist import wkh_sid, wsb_body_or  # 2.369.5 (#2517): pulled up from functions
-from .wikie2e import wke_mode  # 2.369.5 (#2517): pulled up from functions
+from .wikie2e import wke_mode, wke_open_sql  # 2.369.5 (#2517): pulled up from functions; 2.981.0 (#5278): + wke_open_sql
+from .pages import wiki_may_read, wiki_space_key  # 2.981.0 (#5278)
+from ..core.objsearch import osr_ids_sql  # 2.981.0 (#5278)
 
 WKS_CATCH_UP = 300   # pages indexed again per space and search
 WKS_LIMIT, WKS_LIMIT_MAX = 30, 100
@@ -194,6 +196,26 @@ def wks_search(c, uid, spaces, q, limit=WKS_LIMIT, offset=0):
             "SELECT p.id, p.org_id, p.owner_id, p.path, p.attrs, p.created_by, p.updated_by, p.created_at, p.updated_at "
             f"FROM wiki_pages p WHERE p.id IN ({','.join('?' * len(part))})", part)})
     return [full[i] for i in ids if i in full], len(hits)
+
+
+def wks_name_hits(c, uid, q, limit=10, cand=200):
+    """2.981.0 (#5278, question 15): knowledge pages whose name matches q (the shared index obj_search kind 'wiki_page': word
+    start, part of the name too) that uid may read -- through the space or a share of the shared core on the page / its folders
+    (wiki_may_read = wkf_role, also the pages wks_search leaves out because their space is not uid's). Not in the trash, not of
+    a space with the lock (the browser searches those). The text stays with the sealed word index (wks_search).
+    [{id, path, space}] by name."""
+    ids, args = osr_ids_sql("wiki_page", q, names=True)
+    if ids is None:
+        return []
+    rows = c.execute(f"SELECT p.* FROM wiki_pages p WHERE p.id IN {ids} AND p.deleted_at IS NULL AND {wke_open_sql('p')} "
+                     f"ORDER BY lower(p.path), p.id LIMIT {int(cand)}", args).fetchall()
+    out = []
+    for r in rows:
+        if wiki_may_read(c, uid, r):  # the page's own role per hit (never more than opening it)
+            out.append({"id": r["id"], "path": r["path"], "space": wiki_space_key(r["org_id"])})
+            if len(out) >= limit:
+                break
+    return out
 
 
 # ---- 2.376 (#3292): the snippet of a hit

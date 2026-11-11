@@ -1476,12 +1476,9 @@ def init_db(guard=True, load=None):
         from .fkeys import fk_ensure
         fk_ensure(c)  # 2.152.0 C (#2174): the missing foreign keys (orphans cleaned first), every start, idempotent
         clk("fk_ensure")
-        from ..collab.msgsearch import msg_index_init
-        msg_index_init(c)  # 2.33.0 (#1080) / 2.37.0: the message search (kalmido_fold + trigram GIN indexes)
-        clk("msg_index_init")
-        from ..tasks.ftsearch import fts_index_init
-        fts_index_init(c)  # 2.116.0 B (#2065): full-text search of tasks + comments (GIN indexes over kalmido_fold)
-        clk("fts_index_init")
+        from .objsearch import osr_init
+        osr_init(c)  # 2.981.0 (#5278): the shared search index obj_search (kalmido_fold, the source triggers, the missing rows);
+        clk("osr_init")  # was msg_index_init (2.37.0, trigram indexes) and fts_index_init (2.116.0 B, task_fts / cmt_fts)
         from .rls import apply as rls_apply, OFF_HELP
         rls_on = rls_apply(c)  # 2.37.0 (#1150): row-level security per organisation (policies + the app role)
         clk("rls_apply")

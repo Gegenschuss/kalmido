@@ -111,9 +111,9 @@ q("UPDATE obj_comments SET body='Direkt Gelassenheit' WHERE body='Direkt Übermu
 check(find(A, "ubermut") == [] and len(find(A, "gelassen")) == 1, "a row changed straight in the table follows")
 
 # ================================================================== the index
-idx = sorted(r[0] for r in q("SELECT indexname FROM pg_indexes WHERE indexname LIKE 'msg_trgm_%'"))
-# 2.972.0 (#5272): the task comments' index is the one of obj_comments
-check(idx == ["msg_trgm_agent_chat", "msg_trgm_obj_comments", "msg_trgm_tchat_msgs"], "three trigram indexes " + str(idx))
+idx = sorted(r[0] for r in q("SELECT indexname FROM pg_indexes WHERE indexname LIKE 'msg_trgm_%' OR indexname='ix5278_obj_search_tsv'"))
+# 2.972.0 (#5272): the task comments' index is the one of obj_comments; 2.981.0 (#5278): the shared search index obj_search instead
+check(idx == ["ix5278_obj_search_tsv"], "the shared search index, no trigram index " + str(idx))
 f = q("SELECT kalmido_fold('Großer Ärger Café')")[0][0]
 check(f.split("\n") == ["grosser arger cafe", "grosser aerger cafe"], "kalmido_fold: unaccent + lower, umlauts also as ae " + repr(f))
 

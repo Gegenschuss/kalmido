@@ -55,3 +55,9 @@ into one shared table (`obj_comments`) and the watchers and bells of tasks into 
 the database's limit to the minor of that release (like stage 7 above). An older version would make the old tables again empty
 and write there what the next start of the newer version could not take over. Go back only by restoring a backup made before
 the update.
+
+**Never go back before the release with package 2.981** (the CHANGELOG names it): its first start builds one shared search
+index (`obj_search`) for tasks, comments, notes, contacts, the names of knowledge pages and messages, drops the old search
+tables (`task_fts`, `cmt_fts`), the trigram indexes and the column `contacts.search`, and raises the database's limit to the
+minor of that release. An older version would write contacts into the dropped column. Go back only by restoring a backup made
+before the update. The first start reads every text once to build the index (a large instance: a few minutes).

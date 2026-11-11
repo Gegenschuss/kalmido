@@ -435,9 +435,12 @@ def ctx_dupes_for(c, uid, fn, emails, phones, skip=None):
         if k == "name":
             conds.append("lower(fn)=?")
             args.append(x)
-        else:
-            conds.append("search ILIKE ? ESCAPE '\\'")
+        elif k == "email":  # 2.981.0 (#5278): contacts.search went -- the e-mail in the contact's list of e-mails
+            conds.append("emails ILIKE ? ESCAPE '\\'")
             args.append("%" + like_escape(x) + "%")
+        else:  # the last 9 digits of a phone number in the phone numbers of the shared search index (core/objsearch.py names)
+            conds.append("id IN (SELECT s.ref_id FROM obj_search s WHERE s.kind='contact' AND s.names LIKE ?)")
+            args.append("%" + x + "%")
     q = ",".join("?" * len(books))
     rows = c.execute(f"SELECT * FROM contacts WHERE book_id IN ({q}) AND kind!='group' AND deleted_at IS NULL AND ({' OR '.join(conds)}) ORDER BY id LIMIT 200",
                      [*books, *args]).fetchall()

@@ -243,8 +243,10 @@ restart()
 A = sess("alice")
 check(keys(find(A, "arger")) == after, "an older index version is rebuilt at the start")
 check(dbx("SELECT value FROM settings WHERE key='msg_fts_v'")[0][0] == "2", "index version stored")
-check(sorted(r[0] for r in dbx("SELECT indexname FROM pg_indexes WHERE indexname LIKE 'msg_trgm_%'")) ==
-      ["msg_trgm_agent_chat", "msg_trgm_obj_comments", "msg_trgm_tchat_msgs"], "three trigram indexes (comments, team chat, agent chat)")  # 2.972.0 (#5272)
+# 2.981.0 (#5278): the trigram indexes went; the three message kinds are rows of the shared search index obj_search
+check(dbx("SELECT indexname FROM pg_indexes WHERE indexname LIKE 'msg_trgm_%'") == [], "no trigram index any more")
+check({r[0] for r in dbx("SELECT DISTINCT kind FROM obj_search WHERE kind IN ('comment', 'tchat', 'agent_chat')")} >= {"comment"},
+      "the messages are in the shared search index")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

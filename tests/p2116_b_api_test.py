@@ -103,8 +103,9 @@ def ids(hits):
 
 # ---- the index
 # 2.281.0 (#3113): the vectors are stored in side tables (task_fts / cmt_fts) with their GIN indexes, no expression indexes
-names = {r[0] for r in dbx("SELECT indexname FROM pg_indexes WHERE indexname IN ('ix2281_task_fts_vec', 'ix2281_cmt_fts_vec')")}
-check(names == {"ix2281_task_fts_vec", "ix2281_cmt_fts_vec"}, f"the two GIN indexes exist: {names}")
+# 2.981.0 (#5278): the shared search index obj_search (one GIN index) replaced the side tables
+names = {r[0] for r in dbx("SELECT indexname FROM pg_indexes WHERE indexname IN ('ix2281_task_fts_vec', 'ix2281_cmt_fts_vec', 'ix5278_obj_search_tsv')")}
+check(names == {"ix5278_obj_search_tsv"}, f"the GIN index of obj_search exists, the old ones are gone: {names}")
 
 # ---- ranking: title before notes, the comment hit with its snippet
 T_TITLE = task(A, W, "Projektplan Kickoff")
