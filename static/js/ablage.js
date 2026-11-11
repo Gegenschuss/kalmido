@@ -76,6 +76,13 @@ async function ab_load() {
 }
 function ab_draw() { if (S.route.mod !== 'ablage') return; const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('ablage', viewAblage()))); }
 const ab_reload = () => { AB.key = ''; ab_ptStale(); if (S.route.mod === 'ablage') { ab_load(); if (typeof dc_inFold === 'function' && dc_inFold()) dc_load(); } };  // 2.752.0 (#4887): + a folder's documents  // 2.152.3 B (#2621): + the panel's folders
+// 2.979.0 (#5667): after an undo / redo the server took back by its group (the step's own undo with ab_reload / ab_verAfter no
+// longer runs; undo.js histRedraw lists a shown file store / documents list itself): a file store not shown and the panel's
+// folders are old, an open details dialog reads its node again (the document view: docs.js, its reloader 'docs')
+histReloader('ablage', () => {
+  if (!['ablage', 'docs'].includes(S.route.mod) && (AB.dkey || Object.keys(AB.pt || {}).length)) { AB.key = ''; ab_ptStale(); }
+  const dl = $('.abdlg')?.dataset.abid; if (dl) return ab_details(+dl);
+});
 
 // ---- the view
 function viewAblage() {
