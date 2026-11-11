@@ -3,7 +3,8 @@
 POST /api/office/docs/<id>/delivery     {title?: "delivery" | "service"} a delivery note draft from quotation / invoice <id>
                                         (positions without prices, recipient, project, language taken over; source_doc_id)
 GET  /api/office/docs/<id>/timesheet.pdf   the time entries of the invoice's client in its period of service as a PDF
-                                        (invoices only; ?inline=1 shows it in the browser)
+                                        (invoices only; ?inline=1 shows it in the browser; 2.955.0 (#5648): billable entries
+                                        only, ?nonbillable=1 adds the non-billable ones, marked)
 The delivery note itself is created / edited / finalised / sent through the normal document routes (office/docs.py,
 ledger.py, invoices.py: kind "delivery", own number series, no tax, no e-invoice, no payment state); the print model
 carries noprice (office/pdf.py draws no price columns, no totals and the receipt box "received / accepted").
@@ -87,15 +88,25 @@ def ls_sheet_ok(r):
     return r["kind"] == "invoice" and bool(r["client_id"]) and bool(r["service_from"] and r["service_to"])
 
 
-def ls_sheet_report(c, oid, uid, r):
+def ls_nonbillable(v):
+    """2.955.0 (#5648): the switch "Show non-billable entries" of the timesheet (?nonbillable=1 / send body nonbillable: true);
+    default off = the client's sheet lists the billable entries only."""
+    return v in (1, True, "1", "true")
+
+
+def ls_sheet_report(c, oid, uid, r, nonbillable=False):
     """The report (personal.timetrack.time_report) of the lists of the invoice's client in its period: exactly what the
-    signed-in person sees in the time report (visibility, rounding); BadInput without entries."""
+    signed-in person sees in the time report (visibility, rounding); BadInput without entries.
+    2.955.0 (#5648): entries holds what is printed -- without non-billable entries unless nonbillable; the empty message and
+    LS_MAX_ENTRIES count that selection."""
     if not ls_sheet_ok(r):
         raise BadInput(tr("The timesheet needs an invoice with a client and a period of service"))
     lists = [x[0] for x in c.execute(
         f"SELECT l.id FROM lists l WHERE l.client_id=? AND {pb_cl_sql(c, oid, 'l.org_id', 'l.owner_id')} AND l.id IN {vis_sql()}", (r["client_id"], uid, uid))]
     rep = time_report(c, uid, {"from": r["service_from"], "to": r["service_to"], "scope": "all", "lists": ",".join(str(x) for x in lists) or "-1"},
                       own=n43_admin_lists(c, uid)) if lists else None
+    if rep and not nonbillable:
+        rep["entries"] = [e for e in rep["entries"] if e.get("billable", True)]
     if not rep or not rep["entries"]:
         raise BadInput(tr("There are no time entries for this client in the period of service"))
     if len(rep["entries"]) > LS_MAX_ENTRIES:
@@ -107,16 +118,44 @@ def ls_hours(sec, lang, fmt=None):
     return pdf_num(round(sec / 3600, 2), lang, fmt) + " h"
 
 
-def ls_sheet_model(c, oid, uid, r):
+def ls_billed_marks(c, uid, r, ents, lang):
+    """2.955.0 (#5648): {entry id: "billed with <number>" / "billed"} for printed entries billed on ANOTHER document than
+    invoice row r (entries of r itself need no mark). The number only when the sending person may see that document's
+    numbering (timebill.tbill_shows, the rule of tbill_out); else just "already billed"."""
+    from ..core.pg import st_ids
+    from .timebill import tbill_doc, tbill_shows
+    ids = [e["id"] for e in ents if e.get("billed")]
+    if not ids:
+        return {}
+    out, docs = {}, {}
+    for x in c.execute("SELECT id, billed_doc_id FROM time_entries WHERE id = ANY(CAST(? AS BIGINT[])) AND billed_doc_id IS NOT NULL",
+                       (st_ids(ids),)):
+        bid = x["billed_doc_id"]
+        if bid == r["id"]:
+            continue
+        if bid not in docs:
+            docs[bid] = tbill_doc(c, bid)
+        d = docs[bid]
+        if d is None:  # the document is gone: the entry counts as open (tbill_out)
+            continue
+        num = d["number"] if d["number"] and tbill_shows(c, d, uid) else ""
+        out[x["id"]] = tr("billed with {0}", num, lg=lang) if num else tr("already billed", lg=lang)
+    return out
+
+
+def ls_sheet_model(c, oid, uid, r, nonbillable=False):
     """The print model of the timesheet of invoice row r: the invoice's letterhead and recipient, one table row per entry
-    (date | person and activity | hours, grouped by list), the total hours below."""
-    rep = ls_sheet_report(c, oid, uid, r)
+    (date | person and activity | hours, grouped by list), the total hours below.
+    2.955.0 (#5648): non-billable entries only with nonbillable (marked "not billable", the total then shows the billable
+    hours apart); an entry billed on another document carries "billed with <number>"."""
+    rep = ls_sheet_report(c, oid, uid, r, nonbillable)
     m = _model(c, oid, r["id"])
     lang = m.get("lang") if m.get("lang") in LANGS else "de"  # 2.185.0 C (#2520): the model's language (docs.odoc_render: doc_lg)
     fmt = m.get("formats") or {}
     order = {x["id"]: i for i, x in enumerate(rep["lists"])}
     names = {x["id"]: x["name"] for x in rep["lists"]}
     ents = sorted(rep["entries"], key=lambda e: (order.get(e["list_id"] or 0, 0), e["start"], e["id"]))
+    marks = ls_billed_marks(c, uid, r, ents, lang)
     lines, cur = [], object()
     for e in ents:
         lid = e["list_id"] or 0
@@ -125,9 +164,11 @@ def ls_sheet_model(c, oid, uid, r):
             lines.append({"kind": "heading", "title": names.get(lid) or tr("No project", lg=lang)})
         what = " · ".join(x for x in (e["title"], (e["note"] or "").strip()) if x)
         who = e["user_name"] or ""
+        tags = ([] if e.get("billable", True) else [tr("not billable", lg=lang)]) + ([marks[e["id"]]] if e["id"] in marks else [])
         lines.append({"kind": "item", "pos": pdf_date(e["day"], lang, fmt), "title": f"{who}: {what}" if who and what else (who or what),
-                      "detail": "", "qty_text": ls_hours(e["rounded"], lang, fmt), "unit": ""})
-    total = rep["total"]["rounded"]
+                      "detail": " · ".join(tags), "qty_text": ls_hours(e["rounded"], lang, fmt), "unit": ""})
+    total = sum(e["rounded"] for e in ents)  # 2.955.0 (#5648): only what is printed
+    billable = sum(e["rounded"] for e in ents if e.get("billable", True))
     ml = dict(m.get("labels") or {})
     ml.update(pos=tr("Date", lg=lang), service=tr("Person and activity", lg=lang), qty=tr("Hours", lg=lang))
     sf, st = r["service_from"], r["service_to"]
@@ -136,20 +177,21 @@ def ls_sheet_model(c, oid, uid, r):
              lines=lines, labels=ml, noprice=True, pos_w=62, payment=None, reminder=None, vat_note_text="", valid_note="", fx_note="", accepted=None,
              rights={"title": "", "rows": [], "exceptions": "", "exclusive": 0, "note": ""}, fields=[],
              meta=[[tr("Invoice no.", lg=lang), r["number"] or ""], [tr("Period of service", lg=lang), per]],
-             totals={"rows": [[tr("Total hours", lg=lang), ls_hours(total, lang, fmt)]], "show_tax_lines": False})
+             totals={"rows": [[tr("Total hours", lg=lang), ls_hours(total, lang, fmt)]]
+                     + ([[tr("Billable hours", lg=lang), ls_hours(billable, lang, fmt)]] if billable != total else []), "show_tax_lines": False})
     return m
 
 
-def ls_sheet_file(c, oid, uid, r):
+def ls_sheet_file(c, oid, uid, r, nonbillable=False):
     """(file name, PDF bytes, mime) of the timesheet of invoice row r (for the PDF menu and the invoice mail)."""
-    return ("timesheet-" + epdf_name(r) + ".pdf", office_pdf(ls_sheet_model(c, oid, uid, r)), "application/pdf")
+    return ("timesheet-" + epdf_name(r) + ".pdf", office_pdf(ls_sheet_model(c, oid, uid, r, nonbillable)), "application/pdf")
 
 
 @app.get("/api/office/docs/<int:did>/timesheet.pdf")
 def ls_sheet_get(did):
     c, uid, oid = _ctx()
     r = doc_row(c, oid, did)
-    name, data, mime = ls_sheet_file(c, oid, uid, r)
+    name, data, mime = ls_sheet_file(c, oid, uid, r, ls_nonbillable(request.args.get("nonbillable")))  # 2.955.0 (#5648)
     ofx_log(c, oid, "pdf", doc_id=did, detail={"file": "timesheet"}, dedupe_min=10)
     c.commit()
     return _file_response(data, name, mime, inline=request.args.get("inline") == "1")

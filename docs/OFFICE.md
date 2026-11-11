@@ -2678,11 +2678,17 @@ document texts are encrypted at rest in organisations with encryption.
 - **Timesheet of an invoice** (`GET /api/office/docs/<id>/timesheet.pdf`, `?inline=1`): for an invoice with a client and a
   period of service, the time entries of the client's lists in that period (date, person, activity, hours per list, total),
   rounded like the time report, by the settings of the person who makes the sheet. Only entries the signed-in person may see
-  in the time report; made on demand, never stored. All entries of the period are listed, **also those not billable or billed
-  on another invoice**, each with the person's name, the task title and the entry's note, as the client will read them, so
-  the sum need not match the invoice. Check the sheet before you attach it.
+  in the time report; made on demand, never stored. Each entry shows the person's name, the task title and the entry's note,
+  as the client will read them. *Since 2.955.0 (#5648):* **entries marked not billable are left out by default**; the switch
+  "Show non-billable entries" (in the send dialog and in the dialog of *Timesheet (PDF)*; `?nonbillable=1` on the PDF,
+  `nonbillable: true` on `POST .../send`) adds them, marked "not billable", and the total then shows the billable hours apart.
+  "Total hours" counts only the printed entries. Entries already billed stay in; one billed on **another** invoice carries
+  "billed with <number>" (the number only when the person making the sheet has a role in that document's office, else
+  "already billed"); entries of this invoice carry no mark. Nothing left after the selection = the same message as without
+  entries. Check the sheet before you attach it.
   `POST .../send` takes `timesheet: true` to attach it as a second file (the invoice's own PDF / ZUGFeRD file is unchanged;
-  the DATEV copy never gets it). The document answer has `timesheet_ok`.
+  the DATEV copy never gets it). The document answer has `timesheet_ok` (client and period of service set; it does not
+  count entries). The month timesheet of the Time page is the internal view and lists everything as before.
 
 ## E-mail signature, sender and answer address
 

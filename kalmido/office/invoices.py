@@ -1245,7 +1245,8 @@ def inv_send(c, oid, uid, r, b, later=False, auto=False):
     sheet = []
     if r["kind"] == "invoice" and b.get("timesheet") in (1, True, "1", "true"):  # 2.120.0 D (#2089): the timesheet as a second attachment
         from .delivery import ls_sheet_file
-        sheet = [ls_sheet_file(c, oid, uid, r)]
+        from .delivery import ls_nonbillable
+        sheet = [ls_sheet_file(c, oid, uid, r, ls_nonbillable(b.get("nonbillable")))]  # 2.955.0 (#5648): the dialog's switch
     from .terms import agb_mail_files
     mail_files, terms = agb_mail_files(c, oid, r, b, files + sheet)  # 2.113.2 (#2253): the terms PDF on request (quotations: by default; never to DATEV)
     # 2.39.0 (#1209 audit N4): the client's answer goes to the company, not the server; 2.439.0 (#3617): or where the person says
