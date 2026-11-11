@@ -547,6 +547,29 @@ check(not dbx("SELECT 1 FROM obj_undo WHERE kind='time_life' AND ref_id=? AND (s
       "#5550: the taken back step keeps no note in its copy")
 dbx("UPDATE lists SET e2e=NULL WHERE id=?", (L4,), write=True)
 
+# ================================================================== 2.902.0 (#5574): an older window still holding the answer of
+# "Delete all times" restores after a task moved into the locked project: its title / note stay empty, and the server's copy
+# (sealed again by the move) is used up all the same -- an Undo by the copy afterwards brings nothing twice
+T7 = A.post(B + "/api/tasks", json={"list_id": L3, "title": MK + "OldWinTitle"}).json()["id"]
+for s_, note_, h_ in ((A, MK + "OldWinNote", 9), (Bo, MK + "OldWinBob", 10)):
+    r = s_.post(B + "/api/time/entries", json={"task_id": T7, "start": (datetime.now() - timedelta(hours=h_)).isoformat(timespec="seconds"),
+                                              "minutes": 15, "note": note_})
+    check(r.ok, f"#5574: a time entry with a note {r.text[:200]}")
+N3 = dbx("SELECT COUNT(*) FROM time_entries WHERE list_id=?", (L3,))[0][0]
+r = A.post(B + f"/api/lists/{L3}/time/delete-all", json={"confirm": "Other open"})
+W4, ENTS4 = (r.json().get("wipe"), r.json().get("entries")) if r.ok else (None, None)
+check(r.ok and W4 and len(ENTS4 or []) == N3, f"#5574: delete all times again {r.status_code} {r.text[:200]}")
+r = A.patch(B + f"/api/tasks/{T7}", json={"list_id": L, "title": cipher(41)})
+check(r.ok and dbx("SELECT list_id FROM tasks WHERE id=?", (T7,))[0][0] == L, f"#5574: the task moves into the locked project {r.status_code} {r.text[:200]}")
+r = A.post(B + f"/api/lists/{L3}/time/restore", json={"entries": ENTS4})  # the older window: its answer with the old seals
+plain = dbx("SELECT note, task_title FROM time_entries WHERE list_id=? AND (note LIKE ? OR task_title LIKE ?)", (L3, f"%{MK}%", f"%{MK}%"))
+check(r.ok and r.json().get("restored") == N3 and not plain,
+      f"#5574: the older window's Undo brings no text of the moved task back {plain} {r.text[:200]}")
+check(not dbx("SELECT 1 FROM list_part_trash WHERE id=?", (W4,)), "#5574: the server's copy is used up although the move sealed it again")
+r = A.post(B + f"/api/lists/{L3}/time/restore", json={"wipe": W4})
+check(r.status_code == 404 and dbx("SELECT COUNT(*) FROM time_entries WHERE list_id=?", (L3,))[0][0] == N3,
+      f"#5574: a second Undo by the copy doubles nothing {r.status_code} {r.text[:200]}")
+
 print(f"\n{OKS[0]} checks ok, {len(FAILS)} failed", flush=True)
 if FAILS:
     print("FAILED:\n - " + "\n - ".join(FAILS))

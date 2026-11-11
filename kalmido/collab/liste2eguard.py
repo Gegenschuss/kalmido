@@ -22,12 +22,13 @@ from flask import g, has_request_context, request
 
 from ..core.config import API_PREFIX, app
 from ..core.db import db
+from ..core.pg import write_lock  # #5574
 from ..core.undogroups import ug_drop_ids, ug_gids
 from ..core.i18n import N_, tr
 from .liste2e import LE2E_PREFIX, le2e_is_cipher, le2e_modes, le2e_neutral
 from ..api.common import v1_err  # 2.369.5 (#2517): pulled up from functions
 from ..lists.fields import FIELD_KIND  # #5549
-from ..personal.timewipe import TZW_KIND, h6b_sig  # #5549
+from ..personal.timewipe import TZW_KIND, TZW_LOCK, h6b_sig  # #5549; #5574: + TZW_LOCK
 
 LE2B_API_MSG = N_("This project is encrypted in the browser. Its texts cannot be read or changed through the API or by agents.")
 LE2B_OFF_MSG = N_("Not available in projects encrypted in the browser.")
@@ -650,12 +651,17 @@ def le2b_scrub_trash_tasks(c, ids):
     rows, seen = [], set()
     for ch in [sorted(ids)[i:i + 500] for i in range(0, len(ids), 500)]:  # review 1: the database picks the copies naming them
         alt = "|".join(str(i) for i in ch)
-        for r in c.execute("SELECT id, list_id, kind, held FROM list_part_trash WHERE kind IN (?, ?) AND held ~ ? ORDER BY id",
+        for r in c.execute("SELECT id, list_id, kind, ref_id, held FROM list_part_trash WHERE kind IN (?, ?) AND held ~ ? ORDER BY id",
                            (FIELD_KIND, TZW_KIND, rf'"task_id":\s*({alt})\s*[,}}]|\[\s*({alt})\s*,')).fetchall():
             if r["id"] not in seen:
                 seen.add(r["id"])
                 rows.append(r)
-    for r in rows:
+    for r in sorted(rows, key=lambda x: x["id"]):
+        # #5574: under the area's lock of the copy (tz_restore: time-wipe-{copy id}, fd_back: field-{field id}), read again
+        write_lock(c, TZW_LOCK.format(id=r["id"]) if r["kind"] == TZW_KIND else f"field-{int(r['ref_id'] or 0)}")
+        r = c.execute("SELECT id, list_id, kind, held FROM list_part_trash WHERE id=?", (r["id"],)).fetchone()
+        if not r:
+            continue  # restored / used up meanwhile
         try:
             held = json.loads(r["held"] or "null")
         except ValueError:

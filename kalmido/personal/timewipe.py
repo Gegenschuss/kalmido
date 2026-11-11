@@ -20,7 +20,7 @@ from ..core.db import body, bump, db, iso, now_utc
 from ..core.i18n import tr
 from ..core.access import Denied, list_role, need_list, need_time
 from ..accounts.session import me
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, system_ctx, write_lock  # #5574: + write_lock
 from ..core.objparts import part_kind  # 2.783.0 (#5368)
 from ..core import objhooks  # 2.783.0 (#5368): tzw_move at every start, the copies go with an account
 from ..accounts.login import auth_key  # 2.369.5 (#2517): pulled up from functions
@@ -106,7 +106,8 @@ def n43_restore_ids(c, owner, e):
 
 
 TZW_KIND = "time_wipe"  # 2.783.0 (#5368): the Undo copy of "Delete all times" in the core's copy trash (module docstring)
-part_kind(TZW_KIND, "time_entries", lock="time-wipe-{id}", agent=False, trash_prune=True, copy=True)
+TZW_LOCK = "time-wipe-{id}"  # #5574: the write lock of one copy (its list_part_trash id)
+part_kind(TZW_KIND, "time_entries", lock=TZW_LOCK, agent=False, trash_prune=True, copy=True)
 
 
 def tzw_dict(r):
@@ -125,6 +126,12 @@ def tzw_add(c, uid, lid, entries, n, seconds, at=None):
     return insert_id(c, "INSERT INTO list_part_trash(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
                      (lid, TZW_KIND, uid, json.dumps({"n": int(n or 0), "seconds": int(seconds or 0)}), entries, uid,
                       at or iso(now_utc())))
+
+
+def tzw_key(e):
+    """#5574: an entry of a copy as (person, start, end) -- the same entry in an older window's answer and in the server's
+    copy, whatever its seal (le2b_scrub_trash_tasks seals the copy again)."""
+    return (e.get("user_id"), str(e.get("start") or "")[:40], str(e.get("end") or "")[:40])
 
 
 def tzw_set(c, wid, entries):
@@ -235,6 +242,7 @@ def tz_restore(lid):
         wid = b.get("wipe")
         if not isinstance(wid, int) or isinstance(wid, bool):
             raise Denied(400, tr("Invalid value: {0}", "wipe"))
+        write_lock(c, TZW_LOCK.format(id=wid))  # #5574: one change of the copy at a time (le2b_scrub_trash_tasks takes it too)
         w = tz_wipe_row(c, lid, uid, wid)
         if not w:
             raise Denied(404)
@@ -243,7 +251,7 @@ def tz_restore(lid):
         ents = b.get("entries")
     if not isinstance(ents, list) or len(ents) > TZ_MAX_RESTORE:
         raise Denied(400, tr("Invalid value: {0}", "entries"))
-    ts, n, left = iso(now_utc()), 0, []
+    ts, n, left, came = iso(now_utc()), 0, [], set()  # #5574: came = (person, start, end) of what is back now
     for e in ents:
         if not isinstance(e, dict) or not e.get("start") or not e.get("end"):
             continue
@@ -256,6 +264,7 @@ def tz_restore(lid):
                 continue
             if c.execute('SELECT 1 FROM time_entries WHERE user_id=? AND list_id=? AND start=? AND "end"=?',
                          (owner, lid, str(e["start"])[:40], str(e["end"])[:40])).fetchone():
+                came.add(tzw_key(e))  # #5574: back already (an earlier Undo)
                 continue
         if not c.execute("SELECT 1 FROM users WHERE id=?", (owner,)).fetchone() or not list_role(c, lid, owner):
             left.append(e)  # 2.530.0 (#4315, review M1): stays in the server's copy, may come back later
@@ -272,12 +281,14 @@ def tz_restore(lid):
         if tid and not c.execute("SELECT 1 FROM tasks WHERE id=? AND list_id=?", (tid, lid)).fetchone():
             tid = None
         from .timesheet import tsl_is_locked
-        from ..collab.liste2e import le2e_mode
+        from ..collab.liste2e import le2e_mode, le2e_task_mode
         if tsl_is_locked(c, owner, str(e["start"])[:40]):
             left.append(e)  # 2.530.0 (#4315, review M1): stays in the server's copy
             continue  # 2.125.0 B (#2119): never into a closed month
         cid, pid = n43_restore_ids(c, owner, e)
         lk_ = le2e_mode(c, lid)  # #5549 (review 1): an older window's entries after the lock: no plain task title either
+        ot = e.get("task_id")  # #5574: the task moved into a locked project since the delete: its title / note neither
+        lk_ = lk_ or (isinstance(ot, int) and not isinstance(ot, bool) and le2e_task_mode(c, ot))
         insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,client_id,pomo_id,
                                                  reminded,auto_stopped,created_at,updated_at)
                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
@@ -287,21 +298,26 @@ def tz_restore(lid):
                    1 if e.get("reminded") in (1, True) else 0, 1 if e.get("auto_stopped") in (1, True) else 0,
                    n43_iso(e.get("created_at")) or ts, ts))
         n += 1
+        came.add(tzw_key(e))
     if w and left:  # 2.530.0 (#4315, review M1): what could not come back (closed month, left the project) stays for later
         tzw_set(c, w["id"], json.dumps(left))  # 2.783.0 (#5368): the core's copy
     elif w:
         tzw_set(c, w["id"], None)  # 2.530.0 B (#4315): its way back is used
     else:  # 2.530.0 B (#4315): the answer's copy came back (an older window): the server's copy of that delete is used up too
-        sigs = {e.get("sig") for e in ents if isinstance(e, dict) and isinstance(e.get("sig"), str)}
-        for r in c.execute("SELECT id, held FROM list_part_trash WHERE list_id=? AND kind=? AND ref_id=?", (lid, TZW_KIND, uid)).fetchall() if sigs else []:
+        # #5574: matched by (person, start, end), not by the seal: le2b_scrub_trash_tasks seals a copy again after a move into a
+        # locked project, the older window still holds the old seal (the copy stayed and a second Undo doubled the entries)
+        ids = [r[0] for r in c.execute("SELECT id FROM list_part_trash WHERE list_id=? AND kind=? AND ref_id=? ORDER BY id",
+                                       (lid, TZW_KIND, uid)).fetchall()] if came else []
+        for xid in ids:
+            write_lock(c, TZW_LOCK.format(id=xid))  # #5574: read again under the copy's lock
+            r = c.execute("SELECT held FROM list_part_trash WHERE id=? AND kind=?", (xid, TZW_KIND)).fetchone()
             try:
-                xs = [x for x in json.loads(r["held"] or "[]") if isinstance(x, dict)]
-                if sigs & {x.get("sig") for x in xs}:  # 2.530.0 (#4315, review M1): only what really came back is used up
-                    gone = sigs - {x.get("sig") for x in left}
-                    rest = [x for x in xs if x.get("sig") not in gone]
-                    tzw_set(c, r["id"], json.dumps(rest) if rest else None)  # 2.783.0 (#5368)
+                xs = [x for x in json.loads((r["held"] if r else None) or "[]") if isinstance(x, dict)]
             except ValueError:
                 continue
+            rest = [x for x in xs if tzw_key(x) not in came]  # 2.530.0 (#4315, review M1): only what really came back
+            if r and len(rest) != len(xs):
+                tzw_set(c, xid, json.dumps(rest, ensure_ascii=False) if rest else None)  # 2.783.0 (#5368)
     if n:
         bump(c)
     if n:  # 2.555.0 (#4570, review F2): restored hours count for the budget warning like new ones
