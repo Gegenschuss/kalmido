@@ -561,8 +561,11 @@ W4, ENTS4 = (r.json().get("wipe"), r.json().get("entries")) if r.ok else (None, 
 check(r.ok and W4 and len(ENTS4 or []) == N3, f"#5574: delete all times again {r.status_code} {r.text[:200]}")
 r = A.patch(B + f"/api/tasks/{T7}", json={"list_id": L, "title": cipher(41)})
 check(r.ok and dbx("SELECT list_id FROM tasks WHERE id=?", (T7,))[0][0] == L, f"#5574: the task moves into the locked project {r.status_code} {r.text[:200]}")
+H4 = dbx("SELECT held FROM list_part_trash WHERE id=?", (W4,))
+check(H4 and MK not in H4[0][0] and not {e["sig"] for e in json.loads(H4[0][0]) if e.get("task_id") == T7} & {e["sig"] for e in ENTS4 if e.get("task_id") == T7},
+      f"#5574: the move emptied and sealed the server's copy again (the older window's seals no longer match) {H4}")
 r = A.post(B + f"/api/lists/{L3}/time/restore", json={"entries": ENTS4})  # the older window: its answer with the old seals
-plain = dbx("SELECT note, task_title FROM time_entries WHERE list_id=? AND (note LIKE ? OR task_title LIKE ?)", (L3, f"%{MK}%", f"%{MK}%"))
+plain = dbx("SELECT note, task_title FROM time_entries WHERE note LIKE ? OR task_title LIKE ?", (f"%{MK}OldWin%", f"%{MK}OldWin%"))  # review: in any project
 check(r.ok and r.json().get("restored") == N3 and not plain,
       f"#5574: the older window's Undo brings no text of the moved task back {plain} {r.text[:200]}")
 check(not dbx("SELECT 1 FROM list_part_trash WHERE id=?", (W4,)), "#5574: the server's copy is used up although the move sealed it again")

@@ -548,6 +548,10 @@ def le2b_scrub_trash(c, lid, plain_only=False):
     for r in c.execute("SELECT id, kind, snap, held FROM list_part_trash WHERE list_id=? AND kind IN (?, ?, ?) ORDER BY id",
                        (lid, "section", FIELD_KIND, TZW_KIND)).fetchall():
         if r["kind"] == TZW_KIND:
+            write_lock(c, TZW_LOCK.format(id=r["id"]))  # #5574 (review 2): under the copy's lock (tz_restore), read again
+            r = c.execute("SELECT id, kind, held FROM list_part_trash WHERE id=?", (r["id"],)).fetchone()
+            if not r:
+                continue  # used up meanwhile
             try:
                 es = json.loads(r["held"] or "[]")
             except ValueError:
