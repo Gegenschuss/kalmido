@@ -38,6 +38,7 @@ from .books import bk_home_rate, bk_receipt_set_paid, bk_receipts, bk_to_home, b
 from .calc import dec, dstr, money
 from .model import office_ctx_admin as _ctx, office_settings, office_settings_lock, office_settings_save
 from .periodlock import pl_is_locked
+from .rcfolder import rcf_bank  # 2.957.0 (#4910)
 from .recurring import RIN_MONTHS, _rin_months
 
 BV_DAYS = 5  # days after the booking before its invoice counts as missing (default)
@@ -259,6 +260,7 @@ def bv_autolink(c, nid, today=None):
     bk_receipt_set_paid(c, oid, nid, t["day"])
     c.execute("UPDATE office_bank_tx SET match_kind='receipt', match_id=?, payment_id=NULL, matched_by=NULL, matched_at=?, rule_id=NULL "
               "WHERE id=? AND org_id=? AND match_kind IS NULL", (nid, iso(now_utc()), t["id"], oid))
+    rcf_bank(c, oid, t, nid)  # 2.957.0 (#4910): like a person's match: the account's month folder (only from the inbox) + tag
     bump(c)
     return {"matched": t["id"]}
 

@@ -29,6 +29,7 @@ from .cards import (CC_CONFIRMED, CC_DRAFT_ONLY, CC_KINDS, CC_NAME_MAX, _line_in
 from .model import office_settings
 from .otrash import OTB_CHECK, otb_gone_out, otb_put, otb_restore
 from .rcsubmit import rsb_ingest
+from .rcfolder import rcf_card  # 2.957.0 (#4910)
 from .bank import _rc_paid_amount  # 2.369.5 (#2517): pulled up from functions
 from .owrite import ow_history_answer, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer (kind office_cc_line: cards.py)
 
@@ -325,6 +326,7 @@ def _match(c, oid, uid, x, s, nid):
     if not rc["paid_at"]:
         bk_receipt_set_paid(c, oid, nid, x["day"])
     c.execute("UPDATE office_cc_lines SET state='matched', node_id=?, matched_by=?, matched_at=? WHERE id=? AND org_id=?", (nid, uid, iso(now_utc()), x["id"], oid))
+    rcf_card(c, oid, s["id"], nid, uid)  # 2.957.0 (#4910): the receipt into the card's month folder (only from the inbox) + tag
     a = abs(x["amount"])
     return {"receipt": dstr(rc["amount"]), "position": dstr(a)} if rc["amount"] is not None and rc["amount"] != a else None
 

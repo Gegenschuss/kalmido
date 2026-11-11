@@ -25,6 +25,7 @@ from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..docs.ingest import docs_ingest, docs_kick
+from .rcfolder import rcf_card  # 2.957.0 (#4910)
 from ..files.store import fs_log_add, fs_read
 from ..files.upsafe import h6d_read
 from .bank import _clean, _home, _tx_dec
@@ -330,6 +331,7 @@ def cc_upload(cid):
     sid = insert_id(c, f"INSERT INTO office_cc_statements({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     for n, x in enumerate(r["lines"]):
         _line_insert(c, oid, sid, n, x)
+    rcf_card(c, oid, sid, nid, uid, tag=False)  # 2.957.0 (#4910): the statement's PDF into the card's month folder (only from the inbox)
     ofx_log(c, oid, "create", target="cards", detail={"statement": sid, "card": cid, "month": mo, "lines": len(r["lines"])})
     bump(c)
     c.commit()

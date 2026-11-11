@@ -68,6 +68,7 @@ from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from func
 from .docs import doc_row  # 2.369.5 (#2517): pulled up from functions
 from .books import bk_receipt_set_paid  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import fs_role  # 2.369.5 (#2517): pulled up from functions
+from .rcfolder import rcf_bank  # 2.957.0 (#4910)
 
 
 def _home(c, oid):
@@ -840,6 +841,8 @@ def bnk_match(tid):
             differs = {"receipt": dstr(rc["amount"]), "booking": dstr(-t["amount"])}
     c.execute("UPDATE office_bank_tx SET match_kind=?, match_id=?, payment_id=?, matched_by=?, matched_at=?, rule_id=NULL WHERE id=? AND org_id=?",
               (kind, mid, pid, uid, iso(now_utc()), tid, oid))
+    if kind == "receipt":
+        rcf_bank(c, oid, t, mid, uid)  # 2.957.0 (#4910): the receipt into the account's month folder (only from the inbox) + tag
     rcat = _br.br_on_receipt(c, oid, t, mid) if kind == "receipt" else None  # 2.299.0 B (#3191): a category rule names the receipt's category
     learn = _br.br_learn(c, oid, t, kind, mid)  # 2.299.0 B (#3191): the second time the same way -> "Always like this?"
     bump(c)
