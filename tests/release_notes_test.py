@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # kalmido-suite: nodata
 """2.538.0 (#4360): tools/release_notes.py makes a public release text from a CHANGELOG section like the one of 2.502.0:
-bundle titles ("Bündel: ...", "Sammelpaket: ...") and lines about main / CI are gone, the top shows three to five real
+package titles (2.940.0, #5636: all of them, not only "Bündel: ...") and lines about main / CI are gone, the top shows three to five real
 highlights, the whole text stays below MAX_CHARS, the link to the CHANGELOG is at the end. Without a server (CI Lint)."""
 import importlib.util
 import os
@@ -44,8 +44,25 @@ check("too long for this page" in out, "a cut text says so")
 check("Test and CI fixes" in out and "a flake in p5_ui fixed" in out, "CI lines stay in the folded block")
 
 small = rn.render("Package 2.540 (Real title for people).\n### Added\n- One thing (#9).\n### Fixed\n- Main red after CI 2.1.0 (#3506).\n")
-check("Real title for people" in small and "One thing" in small and "Main red" not in small and "too long" not in small,
-      "a short text keeps real titles, drops the main line, is not cut")
+# 2.940.0 (#5636): no package title reaches the public text any more, also not an English one
+check("Real title for people" not in small and "One thing" in small and "Main red" not in small and "too long" not in small,
+      "a short text drops the title and the main line, keeps the entry, is not cut")
+
+# 2.940.0 (#5636): the titles that slipped through the bundle word filter (measured 11.11.2026) never reach the text
+TITLES = ["Teil 3/4: Bündel Export 1: Rechnungen", "Neubau von 2.790: iPhone-Tableiste, Papierkorb Stufe 3",
+          "Start pflegen: Startgröße senken", "Social-Media-Planer (ohne Veröffentlichen)"]
+for long_text in (False, True):
+    src = "".join(f"Package 2.{800 + i}.0 ({t}).\n### Added\n- English entry {i} people can see (#{6000 + i}).\n"
+                  + ("### Fixed\n" + "".join(f"- Fix {i}.{j}: " + "word " * 40 + "\n" for j in range(20)) if long_text else "")
+                  for i, t in enumerate(TITLES))
+    o = rn.render(src)
+    check(not any(w in o for t in TITLES for w in (t, t.split(":")[0], t.split(" (")[0])),
+          f"no package title in the text (long={long_text})")
+    check("In this release" not in o, f"no 'In this release' line from titles (long={long_text})")
+    check(all(f"English entry {i}" in o for i in range(len(TITLES))), f"every package's entries stay (long={long_text})")
+    check(o.count("### Added") + o.count("#### Added") == 1, f"entries merged under one Added heading (long={long_text})")
+    check(len(o) <= rn.MAX_CHARS, f"below MAX_CHARS (long={long_text})")
+check(not hasattr(rn, "BUNDLE"), "the bundle word filter is gone (mechanism removed, not widened)")
 
 print("release_notes: %d ok, %d failed" % (OKS[0], len(FAILS)))
 sys.exit(1 if FAILS else 0)

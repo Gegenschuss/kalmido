@@ -4,8 +4,9 @@
     python3 tools/release_notes.py section.md > notes.md
 
 The CHANGELOG stays as it is; only the text of the GitHub release changes:
-- a short summary on top (what the release brings, from the package titles),
-- "Package X.Y.Z (Title)." becomes a heading "Title" without the internal package number,
+- a short summary on top,
+- "Package X.Y.Z (Title)." lines are dropped (2.940.0, #5636: package titles are internal and often German; the entries
+  of all packages are merged by heading into one area),
 - internal task numbers like (#2742) are dropped, others in the text are set in code font (GitHub would link them to
   unrelated issues of this repository),
 - lines about test and CI fixes ("CI of X.Y.Z: ...") move into a folded block at the end,
@@ -14,6 +15,9 @@ The CHANGELOG stays as it is; only the text of the GitHub release changes:
 by heading), lines about main and CI ("Main red after CI ...") are dropped, the top shows three to five real highlights
 (first Added / Changed entries), and the whole text stays below MAX_CHARS (GitHub refuses release texts over 125000
 characters; the rest is only a link to the CHANGELOG).
+2.940.0 (#5636): no package title at all reaches the public text (not only bundles: "Teil 3/4: ...", "Neubau von ...",
+"Start pflegen: ..." slipped through the word filter) - the summary line "In this release" is gone, the top shows only the
+English highlights.
 Standard library only (the release job runs it with the runner's python3).
 """
 import re
@@ -23,7 +27,6 @@ LONG = 3000  # characters; longer notes fold their areas
 MAX_CHARS = 20000  # hard limit of the whole text; GitHub's own limit is 125000, a release page nobody reads is no use
 HIGHLIGHTS = 5
 HIGHLIGHT_LEN = 200
-BUNDLE = re.compile(r"^(?:B[üu]ndel|Sammelpaket|Bundle|Collective package)\s*:", re.I)
 MAINCI = re.compile(r"^\s*(?:-\s*)?(?:main\s+(?:red|is red)|CI\s+red|CI-only\s+red)\b|^\s*(?:-\s*)?Main red after CI", re.I)
 CHANGELOG_URL = "https://github.com/Gegenschuss/kalmido/blob/main/CHANGELOG.md"
 PKG = re.compile(r"^Package\s+\d+(?:\.\d+){1,2}[a-z]?\s*\((.+)\)\.?\s*$")
@@ -38,12 +41,11 @@ def clean(line):
 
 
 def parse(text):
-    """-> (areas [(title, [lines])], ci [lines]); text before the first package line is an area without title."""
+    """-> (areas [("", [lines])], ci [lines]): one merged area (or none); a package line only starts the next part."""
     areas, ci = [["", []]], []
     for raw in text.splitlines():
-        m = PKG.match(raw.strip())
-        if m:
-            areas.append([m.group(1).strip(), []])
+        if PKG.match(raw.strip()):  # 2.940.0 (#5636): the title is internal, the line goes
+            areas.append(["", []])
             continue
         if MAINCI.search(raw):
             continue
@@ -64,20 +66,15 @@ def parse(text):
             keep.append(l)
         while keep and not keep[-1].strip():
             keep.pop()
-        if BUNDLE.match(title):
-            title = ""
-        if title or any(x.strip() for x in keep):
+        if any(x.strip() for x in keep):
             out.append((title, keep))
     return merge_untitled(out), ci
 
 
 def merge_untitled(areas):
-    """All areas without a title (bundles, text before the first package) become ONE area, entries merged by heading."""
-    heads, order, titled = {}, [], []
-    for title, lines in areas:
-        if title:
-            titled.append((title, lines))
-            continue
+    """All package parts become ONE area without title, entries merged by heading."""
+    heads, order = {}, []
+    for _, lines in areas:
         cur = ""
         for l in lines:
             if l.startswith("#"):
@@ -94,13 +91,13 @@ def merge_untitled(areas):
         merged += ([h] if h else []) + heads[h] + [""]
     while merged and not merged[-1].strip():
         merged.pop()
-    return ([("", merged)] if merged else []) + titled
+    return [("", merged)] if merged else []
 
 
 def highlights(areas):
     """Up to HIGHLIGHTS real entries: the first Added / Changed lines (tests and internals skipped), shortened."""
     found = []
-    for _, lines in sorted(areas, key=lambda a: bool(a[0])):  # merged untitled area first, then titled ones
+    for _, lines in areas:
         sec = ""
         for l in lines:
             if l.startswith("#"):
@@ -114,16 +111,11 @@ def highlights(areas):
 
 
 def summary(areas, ci):
-    titles = [t for t, _ in areas if t]
-    if titles:
-        cap = [t[:1].upper() + t[1:] for t in titles]
-        more = f" (and {len(cap) - 4} more)" if len(cap) > 4 else ""
-        s = "**In this release:** " + " · ".join(cap[:4]) + more + "."
-    elif areas:
+    if areas:
         s = "This release brings the changes listed below."
     else:
         s = "A maintenance release: fixes found by the tests, no new features."
-    if ci and (titles or areas):
+    if ci and areas:
         s += " Fixes found by the automated tests are folded at the end."
     s += " Update with update.sh / update.ps1 in your install folder; your data and settings are kept."
     return s
@@ -131,11 +123,8 @@ def summary(areas, ci):
 
 def render(text):
     areas, ci = parse(text)
-    body = []
-    for title, lines in areas:
-        sec = [re.sub(r"^###\s", "#### ", l) if title else l for l in lines]
-        body.append((title, sec))
-    full = sum(len("\n".join(s)) for _, s in body)
+    body = [sec for _, sec in areas]
+    full = sum(len("\n".join(s)) for s in body)
     out = [summary(areas, ci), ""]
     hl = highlights(areas)
     if hl:
@@ -146,7 +135,7 @@ def render(text):
     if ci:
         budget -= sum(len(x) + 1 for x in ci) + 100
     skipped = 0
-    for title, sec in body:
+    for sec in body:
         cost = len("\n".join(sec)) + 120
         if cost > budget:
             skipped += 1
@@ -164,12 +153,9 @@ def render(text):
                 continue
             sec, cost = part, used
         budget -= cost
-        if full > LONG and (title or hl):
-            label = title[:1].upper() + title[1:] if title else "All changes"
-            out += ["<details>", f"<summary><b>{label}</b></summary>", "", *sec, "", "</details>", ""]
+        if full > LONG and hl:
+            out += ["<details>", "<summary><b>All changes</b></summary>", "", *sec, "", "</details>", ""]
         else:
-            if title:
-                out += [f"### {title[:1].upper() + title[1:]}", ""]
             out += [*sec, ""]
     if skipped:
         out += ["The rest of the changes is too long for this page; see the CHANGELOG.", ""]
