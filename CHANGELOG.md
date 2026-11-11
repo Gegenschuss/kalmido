@@ -8,6 +8,7 @@ in Settings > Help shows that section of the target version.
 
 ## Older versions
 
+- [2.800-2.899](docs/changelog/2.800-2.899.md)
 - [2.700-2.799](docs/changelog/2.700-2.799.md)
 - [2.600-2.699](docs/changelog/2.600-2.699.md)
 - [2.500-2.599](docs/changelog/2.500-2.599.md)
@@ -18,262 +19,45 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.897.0] - 2026-11-11
+## [2.900.0] - 2026-11-11
 
-Package 2.880 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-
-### Changed
-- Files, Knowledge and Reading under "All workspaces": the overview is a calm list of rows of one kind - "Recently edited" (opens its own page), Private, each organisation, Shared with me; the trash sits small at the end. No chips and no item list on the overview any more (#5561).
-- The new page "Recently edited" (#wiki/recent, #ablage/recent, #reading/recent): back arrow to the overview (the phone's Back works too), pinned favourites, filter chips by workspace (All / Private / an organisation / Shared with me) above the list; each row shows only name and time, plus who edited it when it was someone else. "More" in the start page's block "Recently edited" leads there (#5561).
-
-Package 2.882 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-
-### Changed
-- Documents (#5557): leafing with a swipe works on the whole document view on phones and tablets - the preview, the head and the fields below - with the same shared swipe as the task panel (swipenav.js). It does not leaf while typing or marking text in a field, on parts that scroll sideways (a preview zoomed wider than its box, the tabs), with two fingers / an enlarged preview, or from the 16 px edge (the phone's Back gesture). Arrow keys and the arrows on the computer stay.
-- Documents (#5557): the preview stands at its final size from the first picture: before the file is there, the page already has the real page's shape (from the small picture or the size seen before, else A4) and the small picture stays in it until the sharp page is drawn - nothing grows, shrinks or flashes white when opening or leafing.
-
-Package 2.897 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-
-### Fixed
-- Agent API: `GET /api/v1/documents?view=<id>` (and MCP `list_documents`, which now passes `view`) takes the view's workspace, area, state and "new in the office" as the app's list does; a parameter of the request goes first (#5547)
-- Documents: an older saved view (only its query string) converts field filters with spaces or a trailing comma in the field ids and dates with a time as the search read them, instead of dropping them (#5547)
-- Documents: a saved view's exact phrase / exclusion opens the document texts (at most 3000) only after the view's other conditions and the list's own filters, so a match among many documents is no longer missed (#5547)
-
-## [2.883.0] - 2026-11-11
-
-Package 2.857 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Kern-Wächter: zweite Filter-Logik außerhalb des Fi).
-
-### Added
-- Documents: saved filters work like the lists' saved filters - the same condition dialog (what / compare / value, AND / OR, "is none of", live count, value menus with a search field) with sender, document type, folder with subfolders, label, document date, added on, file type, archive number, to review, text and custom fields; "+ New filter" in the sidebar group "Saved filters" under Files; "Save view" from the search bar opens the same dialog prefilled. Built on the shared core's filter (fltkern.js / fltdlg.js / core/filters.py) as its second user; hits and counts always with the rights of whoever looks. Older views open converted and hit the same documents (#5518)
-- API: `?view=<id>` on `/api/docs` and `/api/v1/documents` runs a saved view the caller may see; `POST /api/docs/views/count` for the dialog's live count; a view's field `rules` (#5518)
-
-### Changed
-- Core guard: `tools/check_core_crosscut.py` reports a filter evaluator or condition dialog of an area's own outside the core's filter (Python and browser), today's exceptions with their reason in `core_crosscut_allow.json` section `filter` (#5523)
-- Documents: "Update view" / "Take over the current filters" open the filter dialog with the view's conditions plus the current search (#5518)
-
-Package 2.867.0 (Bündel: Polish Navigation: Seitenleiste am Handy gleichmäß).
-### Changed
-- Phone menu (the drawer behind the menu button, top left): the area icons form one calm grid of equal columns - up to 5 areas one row, more four per row (was up to 7 x 2 with columns as wide as their names) - and every area name is written in the same type size (#5540).
-- Phone menu: the small dot that is part of an icon (Projects, Calendar, Time, Files ...) is drawn in the icon's own colour there; a coloured dot on an area icon now only means that something new waits. A count on an area icon is that dot (named for screen readers); the numbers stand in the rows below it, and the agent pill in the header leaves its number out while the menu is open - one count per thing (#5540).
-- Phone menu: an agent's status dot shows the status colour only (no ring in the agent's own colour beside it); a tap on the dot explains the state and what the colours mean, a tap on the rest of the row opens the chat as before (#5540).
-
-Package 2.875 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-### Security
-- Switching on browser encryption for a project now also removes the plain-text trash copies the server kept: deleted sections (their names) and deleted custom fields (the tasks' values) go for good, the undo copies of "Delete all times" lose note and task title (sealed again, Undo keeps working); an Undo from an older window no longer writes a plain task title back. Projects locked before get a one-time pass for their plain copies (#5549)
-
-Package 2.876 (Bündel: Polish Kern: gemeinsamer Baustein Zeilen-Wischen ().
-### Changed
-- Shared core: one building block for swiping a row sideways (#5559) - `static/js/rowswipe.js` (`rsw_attach`): the task row (right = completed, left = the short menu), the news (either side removes) and the swipe to reply on a message now use the same gesture rules: 10 px and clearly sideways before it counts, 24 px at the screen edges stay the phone's Back gesture, a held finger (long press, drag) is no swipe, a light vibration at the threshold on all three, a cancelled touch does nothing, the click right after a swipe opens nothing, reduced motion without gliding. A live redraw while a finger is on any of these rows now waits until it is up (before: only the messages). `docs/dev/kern.md` has a new section "Gestures".
-
-Package 2.879 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+Package 2.898 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 
 ### Security
-- Project lock: switching the lock on (or off) now empties the project's trash of deleted sections and the section names that tasks in the trash remember; a section with a plain name never comes back into a locked project, neither through restore nor through undo, and a restored task makes no plain-named section there. A one-off clean-up removes plain-named section copies from the trash of projects that are locked already (#5552).
+- A task moved into a project encrypted in the browser no longer leaves its title, note or field values in the trash copies of other projects ("Delete all times" undo copy, deleted custom fields); a one-time pass cleans projects locked before (#5562).
+- Switching the encryption off or finishing a key change removes the trash copies that hold ciphertexts (deleted sections, deleted text fields), so a later restore cannot bring back unreadable text (#5563).
 
-Package 2.883 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-### Fixed
-- #5560: phone tab bar, "More" sheet: every entry shows its own icon (Knowledge pages, Tables, Office no longer show three dots), a place that is both an overflowing pinned tab and an area (Calendar, Reading) is listed once under Areas, and the sheet has no empty head line - its close X sits in the grip's line.
-
-## [2.873.2] - 2026-11-10
-
-### Fixed
-- main: on a phone with many views the active view tab shows its whole name or only its symbol again, never a half-visible second line; the call sheet dialog's spacing and hint follow the type scale (CI red of 2.873.0: p2320_d_ui, p2380_a_api, p2380_u1_ui, p2419_scale, p2442_c_ui, p2498_a_phone320_ui, p2695_a_rowmenu_coverage).
-
-## [2.873.1] - 2026-11-10
-
-### Fixed
-- main: after a zoom in the document view the text of the pages stays markable while the page is drawn anew (CI red of 2.870.0, p2742_c_textlayer_ui).
-
-## [2.873.0] - 2026-11-10
-
-Package 2.828 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-
-### Changed
-- Industry: Settings > General, the first-run setup and the welcome tour show one box per industry instead of a single choice; several industries can be on at once (e.g. Film & Video and Agency) and ticking one never switches the others off. Film-only things (shoot project type, shoot days into the dispo, the film sample project) apply as soon as Film is among the chosen. `PUT /api/industry` takes `industries: [...]`, the old `industry: "x"` still sets exactly that one; `GET` returns `codes` (#5511).
-- Calendar week and day: an event two rows high or more shows its time above a one-line title; from three overlapping events the phone week shows thin colour stripes with a "+N" button that opens the day. Week and day start at the first event of the shown days or 07:00, whichever is earlier. The now line runs behind the events. In the month "+N" is a button ("2 more") that opens the day. The year view shows all twelve months on a computer (six per row) and opens at the chosen month on a phone; calendar names in the phone timeline are no longer cut after a few characters (#5463).
-- Calendars window: readable column heads (Calendar / Today / Plan) over their switches; on a phone one "Show" switch per calendar, "In Today" and "When planning" move into the row's menu; "Done" closes the window, "On the phone", "Booking" and "Subscribed calendars" are quiet links; "New calendar" and "Trash" are rows at the end of the own calendars. One shared colour palette with colour names instead of hex codes, 44 px targets on touch (#5464).
-- Lists: the view switch has one form on every width - the active view with its name, the others as symbols named in their tooltip - and is 44 px high on touch; touch tablets no longer fold it. When the project name would be cut, the header shows only the active view first. The phone's column strip fades out at the edge where more column names wait instead of ending mid-word (#5443).
-- Lists: the rules for list rows, check marks and the detail live in their own start style file `static/css/start-00-lists.css` (one check mark definition, a small z-index scale in `:root`, duplicates and dead `.lhead .lpx` rules gone); dragging a task onto a project no longer lies above dialogs (#5446).
-
-### Fixed
-- Lists: editing a task title in the row keeps a visible keyboard focus frame (#5446).
-
-### Fixed
-- main: switching on the end-to-end lock of a project also drops the server's undo steps of its sections (created / deleted) and of its time entries, which still held the section name or the note in plain text (CI red of 2.858.0, p264a_b_api)
-- main: the agent setup prompt (file and app) matches step 9 of the setup guide again (CI red of 2.858.0, p2306_f_doc_anchors)
-- main: p2239_b_logs no longer counts the watchdog's security line of the first admin as a leak (CI red of 2.858.0)
-
-Package 2.855 (Bündel: Call Sheet (Drehplan / Tagesablauf), Polish Kalender: Kopfleiste am Handy und Tablet sc, Polish Büro: Fehler-Rückmeldung einmal und ).
+Package 2.892 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Added
-- Call sheet of a shoot day (Film & Video only, #1956): in the Disposition's booking sheet a "Call sheet" button opens the day details (subtitle, shoot day number, set phone, location with parking / public transport, call times per department, shoot start, lunch, wrap, strike, weather as free text, important note, contacts, cast, transport, attachments) and an uploaded directions sketch (PNG / JPEG, at most 4 MB and 12 megapixels); the PDF has page 1 (distribution, production / client / contacts, DISPOSITION with weekday and date, location with "Open in maps" link, times, important box), the cast, the crew list grouped with phone and e-mail (open places as "– ?? –"), the transport, the shots of the chosen shot list day, the sketch on its own page and a footer "company – project – as of date time, page n of N" on every page. Data from the disposition, the office master data, the readable address books and the shot list; no weather or map service. Stored per shoot day in hub_callsheets (migration fragment 1956_callsheet, new table only; sealed with the org key), saving with version check; it goes with the last booking of its shoot day in the trash run, phone and e-mail come only from the address books of the area.
+- Documents: "Optimise PDF" in the document view's Actions and in the selection bar's More - a scanned PDF becomes a new version in black and white, greyscale or colour per page (Automatic, Black and white, Greyscale) with a searchable text layer; the size before and after is shown ("2.4 MB -> 160 KB"), a result that is not smaller keeps the file unchanged, the original stays as the older version and is never pruned; "Remove blank pages" lists the pages that go before anything happens (#4873)
+- Documents: the setting "Optimise new scans automatically" (off by default) - never for office receipts, where only the button with a note that the original stays is offered (#4873)
+- Documents: after an optimisation, Actions offers "Download searchable PDF" and "Download original" (#4873, #4806)
+- Optimise PDF runs Poppler and Tesseract per page in their own process with memory, CPU, file size and time limits, at most 60 pages / 100 MB per run (KALMIDO_PDFOPT_*), at most 200 waiting runs per person; agents get 403 (#4873)
 ### Changed
-- Calendar head on a phone and a tablet (#5462): on a phone two rows (views, then period with back / today / next and "..."), the round plus creates an appointment in the calendar; poll, calendars, completed tasks and "Undated" are in the "..." menu; at tablet width everything in one row without wrapping; the view buttons report aria-pressed.
-- Office settings (#5456): number ranges are one form with one "Apply" and the hint under its field; the bank page links to the bank accounts; Import and Rights say where "back" leads; "Exclusive" in the content rights sits with its text.
-### Fixed
-- Office errors are said once and in plain words (#5451): no double or triple message, an empty error text becomes a sentence, a field the invoice editor did not save says so at the field and keeps the value, no server variable names (mail sending, bank access) shown to people, the send dialog says when something could not be loaded.
-
-Package 2.869 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+- Office > Receipts: the list comes first - one tool row (Upload, Select, receipt types, CSV / ZIP); on a phone only "Upload receipt" and "More" stay visible, the rest is in the More menu, the first receipt shows at 360 px without scrolling; touch devices get ONE upload button with a sheet (Photo / Files), the bookkeeping page too; the receipt sheet shows "EUR" beside the amount and its foot (More, Cancel, Save) fits one line on a phone (#5453)
+- Receipt checks: "... not found" hints are soft - listed last and not counted, so a complete receipt carries no hint label; a text without amount, rate and date counts as unreadable; the check version rises to 2 (all receipts are checked again, 200 per list call); the agents' check items carry `soft` (#5453)
+- Office on a phone: the big country card "Where is your office?" of a new office stands only on the office start page; every other page shows the slim line with "Select country" leading there; the second choice is labelled "Basis of the income statement" (#5449)
+- Office dialogs like the rest of the app (#5455): Cancel left of the main button, "Close" is no main button, deleting and other final confirmations (journal entry, closing a cash day, cash book storno, a bank rule's marks) are red, delete buttons are solid red, the PDF question of a draft is the app's usual question dialog, the rights group picker is the app's menu (phone sheet, Escape)
 
 ### Fixed
-- Documents: the "Suggest title" button beside the title has its own class instead of the "automatic" mark's - same look and place in the label line, but no longer counted or styled as a mark; p2555_a_formnarrow_ui stays green with either form of its mark filter and checks the button's place (#5531, CI red of 2.833.0).
+- main: the documents' filter dialog uses the app's own date picker instead of a native date field (CI red of 2.883.0, ux1_ui); the p2826_b_api test no longer races the watchdog that wakes a waiting starter plan.
 
-## [2.870.0] - 2026-11-10
-
-Package 2.805 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-
+Package 2.891 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p21382_b_ui).
 ### Changed
-- Settings: on a computer the dialog opens again at the width its content needs (the tabs and one form column, about 57.5rem), also on wide monitors - the 96rem of #4554 are gone; the content goes along with any width (#5357)
-
-### Added
-- Dialogs: a size grip on the right edge and in the bottom right corner of Settings, Edit contact, a mail of the hub, Video review and Set up an agent - drag it to make the dialog wider (the corner also taller), the content goes along; each dialog keeps its size per device, double click (or Enter on the grip) brings back the default size, arrow keys resize, never smaller than the default and at most the window minus 4rem; mouse only, phones and touch keep the sheet without a grip (#5357)
-
-Package 2.836 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-
-### Changed
-- Documents: the archive number field and "Next free number" show only for a document that already has a number or is a scan (came through a scan inbox, a picture, or a PDF whose pages are page-filling pictures with at most an invisible OCR layer). Digital PDFs and e-invoices no longer show the field; "Assign archive number" is in every document's Actions menu. Documents from before get the scan mark from the background catch-up (#5390).
-
-Package 2.854 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Spaltenbreite ziehen in großen Listen ruckelt noch, Sammelpaket: Aufgaben ohn).
-
-### Changed
-- Agent chat on a phone: the live interim status under "… is writing" wraps to up to 3 lines instead of being cut to one line; a tap on a cut status shows the whole text, a second tap closes it again. The block keeps its height while the agent works, so the messages above do not jump with every new status; wide screens stay as before (#5508).
-- Tools: the lint step `tools/check_lazy_calls.py` scans identifiers instead of one huge alternation and checks a local shadowing once per file and name - same output, about 3.5 s instead of 90-230 s (#5492).
-
+- Split view: the right half is now the normal app with its sidebar, tab bar and menus and the full data (address /?split=1); it keeps only the guard against writing UI state or settings; offered from 90 rem (about 1440 px) window width; a narrow document view keeps room for its title (#5358)
+- Notifications: one send decision obj_notify in the core - every recipient of a News entry, reminder, watcher note, team chat push, event reminder, review / approval / urgent bell push is cut with the core read right (obj_role >= view) before anything is sent; the per-area recipient checks are gone (#5270)
+- Task panel calmer: the newest comment is in sight on opening, the phone's bottom bar fits one row without the project, the Projects field only for tasks in more than one project, Watch and the watcher count as one element, no empty Attachments heading for readers, no gap under Watch, comments' Loading keeps its height (#5439)
+- Lists: empty, loading, error and no-access states from one block (emptyState / loadingHtml / errorState with Try again / noAccessState); a filter without hits says so and offers Change filter; an empty board shows an empty state; + Section sits under the empty text; Completed / Trash show a load error instead of "empty" (#5440)
 ### Fixed
-- Bank bookings: a long press (phone) or right click (computer) on an open booking opens its "More" menu, like the other rows with "…"; the suite p2695_a_rowmenu_coverage is green again (#5354).
+- Dragging a column width in a large list no longer turns the drawing of off-screen rows off and on (Firefox 300 rows: release to done 69 -> 44 ms, 60 frames per second); the width sheet is not rewritten when unchanged (#5360)
+- CI red p21382_b_ui: the organisation dialog's size grip after the foot let the card overflow 1.25rem; the grip nets zero there (#5353)
 
-### Fixed
-- main: splitting a stack in the document view keeps its "Split into N documents" message with Undo - a list of flow runs asked just before the split no longer answers afterwards with a "Not found" message in its place (#4887, CI red of 2.833.0, p2154_a_ui); the "Suggest title" button is no "automatic" mark for p2555_a_formnarrow_ui (#4882); the subscribed-calendar mark uses the icon size token (#5468, p2419_scale); every test selection of a changed stylesheet now takes the scale guard p2419_scale along, so a size off the scale is caught before the CI (#5530).
-- main: the list "Recent steps" shows a task change of this browser once - its copy on the server no longer stands beside it, so "Back up to here" takes every change back exactly once (#5251, CI red of 2.848.0, undo_ui).
+Package 2.900 (Bündel: Projekt-Sperre: Rückgängig-Kopien von Zeiteinträge, Projekt-Sperre: Rückgängig-Kopien von Projekt-Eins).
 
-## [2.858.0] - 2026-11-10
+### Security
+- Project lock: switching the end-to-end lock on now also drops the undo steps whose copy keeps a time entry's note or task title in plain text - of entries deleted since, of entries of tasks moved into a locked project and of entries moved elsewhere - and the history rows an earlier undo wrote with those texts; undo never writes a note back into a locked project (a deleted entry comes back without its note, a note change is refused and stays) (#5550)
+- Project lock: the undo steps and history rows of the project's settings (description, status note) and of its notepads (title and text before they were emptied for the lock) go at the lock too (#5551)
+- A one-time run at start applies both to projects locked before; the whole step group goes, so a few harmless undo steps of locked projects disappear once (#5550, #5551)
 
-Package 2.826 (Bündel: Agent-Status: „nicht verbunden“ nur bei echter Stö, Agent-Chat: Pläne (Morgen-Briefing usw.) im ⋯-Menü, Sammelpaket: Aufgaben ohne P).
-
-### Added
-- Agent chat: the "…" menu of the chat header has "Plans" (the same dialog as the card's "Plans" button). The Plans dialog has "Pause all" / "Resume all" on top: all of your own plans with this agent in one step, with undo; other people's plans stay as they are, plans waiting for a project of your own keep waiting, missed runs are not made up. New route `PATCH /api/agents/<id>/schedules` `{enabled, ids?}` (#5510).
-- Private AI on the Kalmido server: each starter routine with its own plan (briefing, tidy up the inbox, follow-ups, billing) has an On / Paused switch instead of the plain "On" text; a paused plan stays and can be switched on again. `GET /api/agents/<id>/server/starter` carries the plan ids (#5510).
-
-### Changed
-- Agent status: "not connected" only for a real problem - the agent never got in touch, or a chat message to it has waited more than 5 minutes without being fetched or answered. An agent that starts on demand (cloud or server agent) and answered its last message shows "ready" with a calm ring and the hint "starts with the next message" (chat header, agent list, sidebar dots); "connected, but no service running" only while a message waits. The agent payload carries `pending_age` (#5509).
-
-### Fixed
-- Tests: p263_c_api keeps its time entries on one day around midnight UTC, p2120_a_ui leaves the app before the second sign-in; both run again in CI (#5507, #5505). setup_ui waits for the login form instead of a fixed 1.5 s and, like p2467_c_ui, logs the screen when it fails (#5504, #5506; both stay skipped until the cause is proven).
-
-Package 2.809 (Neubau von 2.790: iPhone-Tableiste, Papierkorb Stufe 3).
-### Added
-- Recent steps across devices for more areas: custom fields, sections, sprints, project settings, templates, rules, time entries, budget entries, sidebar folders, bookmarks, followed feeds, scheduling polls, appointment types, team absences, dispatch bookings, a project's environments and the pin board's notepads are steps of the person's undo list on the server - taken back from any device (#5476)
-### Changed
-- iPhone home-screen app: the empty strip below the tab bar labels is about halved (one value, --tabs-pb, 11 instead of 22 px on a 34 px home indicator area); everything above the bar moves along. Desktop and Android unchanged (#5437)
-- Files, knowledge pages (with their files) and tables use the one trash of the shared core: delete, restore, delete for good and the hourly retention run go through it; their own purge runs are gone. Receipts kept by law stay locked in the trash (#5365)
-- Bank list in the office: a calmer row - the suggestion, one "Other receipt/invoice" button and a More menu with explained marks; the missing-receipt hint once above the list (#5452)
-- Office kinds on the core check that the office is on and allowed (also in a support session); undoing a DATEV import puts its suppliers away the core's way (#5418)
-### Fixed
-- iPhone home-screen app: headers (lists, agent chat, team chat rooms) looked blurred and dimmed under the clock - iOS blurs the top edge unless the header is a full-width sticky box; on phones they are now sticky at the top (#5437)
-
-Package 2.849.0 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-
-### Fixed
-- Documents: right after "Split" a late step of the browser history could land on the split stack's address again; the app fetched the gone stack and its "Not found" message took the place of the split's message with Undo. A document split in this window now leaves its address quietly, the Undo stays (CI red p2154_a_ui in 2.786.0 and 2.833.0; regression step in the suite) (#5478).
-
-Package 2.846 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-### Added
-- Shared core: one filter building block (#5520) - `static/js/fltkern.js` (matching), `static/js/fltdlg.js` (`kflt_rows` condition rows, `kflt_dialog` saved-filter dialog) and `kalmido/core/filters.py` (`kflt_where` / `kflt_match`) with a field catalog per area; task lists and newsletter segments now use only it, behaviour and stored data unchanged. `docs/dev/kern.md` has a new section "Filter".
-- Core guard (#5522): `tools/check_core_crosscut.py` turns red on new share tables (name ending in `_shares`, or a user/org/group/agent column plus a role/perm column) and on new rights checks (`def need_*`, `*_role`, `*_can`) outside `kalmido/core/`; existing ones are listed with a reason in `tools/core_crosscut_allow.json`.
-### Changed
-- Calendar event editor (#5465): Esc, X, Cancel or a click next to the dialog ask before typed input is lost; the all-day switch keeps your own reminders; "More options" is a visible fold with a city search for the time zone; "Only you so far" is the placeholder of the people field; the hint for guests outside Kalmido is in everyday words; a new event without other people shows no availability bar; the repeat end is labelled "Repeat ends"; existing events focus the title only with a mouse.
-
-## [2.848.0] - 2026-11-10
-
-Package 2.823 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-
-### Added
-- My tasks > "…" > Rules…: every person sets up to 20 own rules for their own view of My tasks. A rule only moves a task into one of the person's own sections, at the top or the end - the task, its project and the project's order never change. Triggers: some days before the due date, due today, due today or overdue, overdue, newly assigned to me, the priority becomes high, from a project, gets a project tag; optional "Only if" (priority, project, project tag). Each rule moves a task once per occasion (a due day, the priority becoming high, ...): what the person moves by hand afterwards stays where it was put. The topmost rule that applies wins (arrow up in the list). Switch, edit, delete with Undo; agents neither read nor propose these rules (#4773).
-
-### Changed
-- My tasks: "due today or overdue -> Now" is no longer fixed in the app but the person's first own rule (switch it off or delete it in Rules…; a deleted one does not come back). Tasks put into a section by hand before stay there (#4773).
-- The Undo of a deleted own section points the rules of that section at it again (#4773).
-
-Package 2.832.0 (Bündel: CI-only rot: p2599_b_kopf_ui (Wiederholung: Fix #5, CI-only rot: p2462_c_ui (Wiederholung: Fix #5301 h, CI-only rot: p2586_a_dragper).
-### Fixed
-- Calendar: Enter in the question for a repeating event no longer picks "Only this date"; the inserted button is a plain button with its own submit, the highlighted "All dates" stays the form's default (#5480)
-- CI red p2599_b_kopf_ui: the suite follows #5309 again - start and list report the page width "seite" (#top on the content's edges), Wide of a note is 96rem; a later test fix had expected the state without #5309 (#5514)
-- CI red p2462_c_ui: the test scrolls up with the wheel like a person, which ends the 2 s "stay at the newest message" phase of a room just opened; on the slower CI runner that phase put the box back to the end (#5515)
-- CI red p2586_a_dragperf_ui: the bar watchers are checked one by one (fewer runs than steps, at most every 200 ms) instead of their sum against the steps (#5516)
-
-## [2.833.0] - 2026-11-10
-
-Package 2.783 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Spaltenbreite ziehen in großen).
-
-### Added
-- Documents: a title pattern per workspace in Settings > Documents (default "{Sender} {Type} {Date}", date as DD.MM.YYYY, empty parts drop out with their separator) and a switch "Title automatically" (on by default). Recognition, rules, "Apply learned" and "Recognise again" set the title from it as long as nobody set it by hand; a title set by hand (person or agent) is never replaced, existing documents are not rewritten. The document sheet has "Suggest title" next to the title (with undo), the selection bar "Set title from pattern" under "Edit". New read endpoint `GET /api/docs/<id>/title-suggest`; `doc_json` carries `title_manual` (#4882).
-
-### Changed
-- Trash core stage 6: incoming webhooks, deleted team chat messages, member memos, deleted list fields, "Delete all times" copies and section / sprint copies are cleaned up by the core's one trash run after their retention period; the areas' own clean-up paths are gone. Deleted fields and time copies now live as copies in the core's side-object trash (old rows move over at start); restoring a field also brings back "required" and its organisation field (#5368).
-
-### Fixed
-- Knowledge on a computer: folder, workspace start, tag, search hits and "All workspaces" use the full width under the toolbar instead of a narrow column in the middle (#5375).
-- Knowledge page on a computer: header, search and bar stay where the list has them (no jump when a page opens), the editor card uses the full width and ends at the window edge - the text scrolls inside, "Attach files" and the footer stay visible; only the text column follows the width switch (#5376).
-- Files: in folders with recognition the toolbar stays on one line at 320 px - "New folder" and "Share" show only their icon on narrow screens (#5356).
-
-Package 2.794 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-
-### Added
-- Settings > Modules > Office & finance (parts of the area Office): a switch "Also private" for people in an organisation. Off, the workspace Private shows no office (no entry in the sidebar, no page, not under "All workspaces"), contacts and clients stay; the offices of the organisations stay as they are. The server answers requests to the private office with a clear hint where to switch it on, and the bell items of the private office (payments, overdue invoices) are hidden meanwhile. Nothing is deleted: switched on again, the private office is there with the same data. Stored like a private module card (ws_mods_off), the default stays on (#5392).
-
-Package 2.800 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ).
-
-### Added
-- Undo across devices, stage 5 rest (#5409): deleting rows and columns, column settings, moving and sorting, the chart, colour rules, cell names, frozen values, rows kept in view and the sheets of the bar are steps of Recent steps; a change someone else made since stays and is named, the rest goes back. Taking a table's project back needs the same rights as changing it.
-- Removing a calendar subscription can be undone from its toast for 15 minutes (#5466).
-
-### Changed
-- Calendar (#5466): the "only this / all events" question is a normal dialog, "All events" in warning colour when deleting; a single event or one date of a series is deleted without asking and the toast offers Undo; deleting a calendar shows Undo; the custom repeat says "Apply"; the share dialog has the close button.
-- Calendar (#5468): dated tasks follow the chosen workspace like the events; events of subscribed calendars carry a subscription mark.
-- Calendar wording (#5467): "Termin" throughout, "Abonnierte Kalender" and "Kalender-Link", roles "kann ansehen" / "kann bearbeiten", "belegt", no ICS / iCal in everyday texts.
-- Lists wording (#5441): the sidebar group says "Projekte", the section-less group "Ohne Abschnitt", the board's lanes "Gruppieren nach", taking a task "Selbst übernehmen"; a board card reads "seit 2 Std."; one tone for empty hints; shared word list docs/dev/glossar.md.
-- Tables (#5283, stage Q7c): the cell history follows the logs' retention switch (daily clean-up, index); sheet_changes stays (agents' trail and target of the people's table steps), reason in docs/dev/kern.md.
-
-### Fixed
-- The event window no longer reaches below the window's edge: it is placed again once its details are loaded, scrolls itself when needed and keeps Edit / Accept / Decline in sight; Delete comes last; "Hide on Today" moved to the calendars window (#5460).
-- Undoing a move out of a locked list no longer fails for tasks with subtasks, comments or text fields: that part is kept and named, the other fields go back (#5447).
-
-Package 2.821 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-### Fixed
-- #5501: CI red p2466_b_api - the suite follows the decided change of #5378 (a team agent is listed for every member of its organisation, reached only through a project opened to her).
-
-## [2.819.0] - 2026-11-10
-
-Package 2.784 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-
-### Added
-- Office: a complete business year 2025 of a fictitious "Muster GmbH" (SKR03, accrual accounting) as a hard check suite: the journal, account balances, P&L, balance sheet and the quarterly VAT returns are compared to the cent with expected values computed by hand, with the gaps Kalmido does not cover named explicitly; a demo loader plays the same data into a test instance and refuses live addresses (#5387)
-- Office: a guard suite for the office head at 320/460/840 px - the sub area bar and buttons like Apply never overlap (#5402)
-
-### Changed
-- Office: suppliers go into the core's one trash - deleting and restoring them is a step of Recent steps, the core's retention run clears them after the trash period (#5366, first kind of the office)
-
-### Fixed
-- Office: a reminder fee marked as paid takes the day the money came (optional day) instead of always today, so a fee paid in December counts in December; a paid day in a locked month can no longer be moved or opened again (#5387)
-- Trash: the retention run checks a row again under its lock, so a restore in the same moment is never lost (#5366)
-
-Package 2.757 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
-
-### Added
-- Folders now also hand their default view, columns, custom fields and project tags to the projects inside them; repeat reminder, hours per day, hourly rate and the progress bar can be set once per folder (folder settings). A project that differs from its folder shows it and goes back with "Back to the folder" (#4501).
-- docs/GLOSSAR.md explains every Python module, every script under static/js and the common function prefixes; linked from CONTRIBUTING.md, a lint guard (tools/check_glossar.py) asks for a line for every new module (#5295).
-
-### Fixed
-- Lists and the start page report their width to the header again: the top bar lines up with the content instead of standing 4 px beside it, and the width "Wide" of a note / knowledge page keeps its list + note layout (CI red p2599_b_kopf_ui, #5309).
-- p151_ui says why the hint of the task just tracked is missing (toast, totals on the page and on the server); the Mac red was the sub-second discard fixed in #5186 (#5211).
-
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.897.0...HEAD
-[2.897.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.897.0
-[2.883.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.883.0
-[2.873.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.2
-[2.873.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.1
-[2.873.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.0
-[2.870.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.870.0
-[2.858.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.858.0
-[2.848.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.848.0
-[2.833.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.833.0
-[2.819.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.819.0
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.900.0...HEAD
+[2.900.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.900.0

@@ -19,8 +19,11 @@
 
 ## What's new
 
-**2.847.0** (2026-11-10):
-- **My tasks**: own rules per person (view menu > Rules...) move tasks into your own sections automatically - by due date, priority, project or project tag - without changing the tasks themselves.
+**2.900.0** (2026-11-11):
+- **Documents**: "Optimise PDF" turns a scan into a small, searchable new version; the original stays as an older version.
+- **Office**: receipts list comes first, one upload button, hints only for real gaps.
+- **Split view**: the right half is the full app with navigation, offered from about 1440 px.
+- **Project lock**: undo copies and history rows of locked projects no longer keep plain texts.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 

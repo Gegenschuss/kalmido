@@ -1,6 +1,32 @@
 {
  "versions": [
   {
+   "version": "2.900.0",
+   "date": "2026-11-11",
+   "items": [
+    {
+     "de": "Gescannte PDFs lassen sich unter „Aktionen“ verkleinern und durchsuchbar machen - das Original bleibt als ältere Version.",
+     "en": "Scanned PDFs can be made smaller and searchable under \"Actions\" - the original stays as an older version."
+    },
+    {
+     "de": "Unter Büro > Belege steht die Liste jetzt oben, Hochladen ist ein Knopf und Hinweise erscheinen nur bei echten Lücken.",
+     "en": "Office > Receipts now shows the list first, upload is one button and hints only appear for real gaps."
+    },
+    {
+     "de": "Die geteilte Ansicht zeigt rechts die volle App mit Navigation und ist schon ab etwa 1440 Pixel Fensterbreite da.",
+     "en": "The split view shows the full app with navigation on the right and is offered from about 1440 pixels window width."
+    },
+    {
+     "de": "Im Aufgaben-Detail ist der neueste Kommentar gleich zu sehen, am Handy bleibt mehr Platz für den Inhalt.",
+     "en": "The task panel shows the newest comment right away and leaves more room for the content on the phone."
+    },
+    {
+     "de": "Leere Listen, Ladezustände und Filter ohne Treffer sehen überall gleich aus, mit „Filter ändern“ direkt dabei.",
+     "en": "Empty lists, loading states and filters without hits look the same everywhere, with Change filter right there."
+    }
+   ]
+  },
+  {
    "version": "2.897.0",
    "date": "2026-11-11",
    "items": [
