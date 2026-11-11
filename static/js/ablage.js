@@ -819,7 +819,8 @@ function ab_selMoreItems() {
   const xs = ab_selVals(), docs = xs.filter(x => x.isdoc), orgs = new Set(xs.map(x => x.org_id || null)), from = orgs.size === 1 ? [...orgs][0] : null;
   return [docs.length && typeof dcx_csv === 'function' ? {label: tr('Export as CSV'), icon: 'download', cls: 'msm-csv', fn: () => dcx_csv(docs.map(x => x.id))} : null,
     orgs.size <= 1 && smv_can(from) ? {label: tr('Move to another workspace…'), icon: 'building', cls: 'msm-space', fn: () => ab_selSpace(xs)} : null,
-    docs.length && typeof po_selItem === 'function' ? po_selItem(docs) : null].filter(Boolean);  // 2.892.0 (#4873): Optimise PDF (pdfopt.js)
+    docs.length && typeof po_selItem === 'function' ? po_selItem(docs) : null,  // 2.892.0 (#4873): Optimise PDF (pdfopt.js)
+    docs.length > 1 && docs.length === xs.length && typeof dpm_selItem === 'function' ? dpm_selItem(docs) : null].filter(Boolean);  // 2.959.0 (#4805): Merge PDFs (docpages.js)
 }
 const ab_selMore = b => menu(b, ab_selMoreItems(), null, null, tr('Selection'));
 // a right click (or the "…") on a chosen row / card while several are chosen: what the bar offers, as a menu (the same functions)

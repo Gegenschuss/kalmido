@@ -1237,6 +1237,7 @@ ROUTES = {
     "GET /api/docs/{}/pdfopt": "document",  # 2.892.0 (#4873): another person 404 (p2892_c_pdfopt_test.py)
     "POST /api/docs/{}/pdfopt": "document",  # 2.892.0 (#4873): another person 404 (p2892_c_pdfopt_test.py)
     "POST /api/docs/pdfopt": "document",  # 2.892.0 (#4873): another person's document skipped, never queued (p2892_c_pdfopt_test.py)
+    "POST /api/docs/merge": "document",  # 2.959.0 (#4805): another person's document 404, another workspace 403 (p2959_a_docpages_api_test.py)
     "GET /api/docs/{}/pages": "document", "POST /api/docs/{}/pages": "document",  # 2.777.0 (#4874): pages of a PDF deleted / turned as a new version (p2777_b_docpages_test.py: another person 404, read-only 403)
     "GET /api/tasks/{}/docs": "document", "GET /api/docs/split-sheet.pdf": "public",
     # 2.122.0 B (#2294 #2099): the chosen documents at once / as a ZIP; tags of files and folders (p2122_b_api_test.py: another

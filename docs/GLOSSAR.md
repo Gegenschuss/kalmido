@@ -324,7 +324,8 @@ Documents: upload and ingest, recognition, classification, fields, search, folde
 - `kalmido/docs/notes.py` (`dn`) - Notes on a document
 - `kalmido/docs/ocr.py` (`ocr`) - The text of a document and its preview image
 - `kalmido/docs/pagesize.py` (`pg`) - The size of a document's first page, so the document view's preview stands where the full page will stand
-- `kalmido/docs/pages.py` - Pages of a PDF document deleted or turned by 90 degrees, saved as a new version of its file
+- `kalmido/docs/pages.py` - Pages of a PDF document deleted, turned by 90 degrees or reordered, saved as a new version of its file
+- `kalmido/docs/docmerge.py` (`dm`) - Several PDF documents merged into a new version of the first one, the others into the trash
 - `kalmido/docs/pdfopt.py` (`po`) - "Optimise PDF", the tools: a scan's pages measured, made black and white / grey / colour, a text layer (Tesseract)
 - `kalmido/docs/pdfoptq.py` (`po`) - "Optimise PDF" as a new version of the file: routes, the queue step, "Optimise new scans automatically"
 - `kalmido/docs/rcheck.py` (`rck`) - The fixed check of a receipt

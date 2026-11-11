@@ -7,6 +7,7 @@ fs_new_version: rights, locked receipts / folders, quota, the upload checks); th
 ("Restore version" of the tab History, files/web.py files_version_restore -- one step). The document keeps its id, archive
 number, sender, tags and links; only the recognition runs again for the new content (text, page count, preview -- values
 set by hand stay, docs/store.py HAND_FIELDS), no new sorting. Unlike "Split stack" (docs/split.py) nothing new is made.
+2.959.0 (#4805): + order (the pages that stay in a new order, dragged in the strip); merging several documents: docs/docmerge.py.
 
 GET /api/docs/<id>/pages gives what the strip needs: the page count, the file's version (expect_version), the pages the
 stack scan found blank (doc_meta.split_scan pages[].blank -- a suggestion, nothing is deleted by it) and whether the
@@ -74,10 +75,11 @@ if n != ch["n"]:
     sys.exit(5)
 gone = set(ch["delete"])
 turn = {int(k): v for k, v in ch["rotate"].items()}
+order = ch.get("order") or [i for i in range(1, n + 1) if i not in gone]
+if sorted(order) != [i for i in range(1, n + 1) if i not in gone]:
+    sys.exit(5)
 w = PdfWriter()
-for i in range(1, n + 1):
-    if i in gone:
-        continue
+for i in order:
     p = w.add_page(r.pages[i - 1])
     if turn.get(i):
         p.rotate(turn[i])
@@ -120,8 +122,9 @@ def dp_count(data):
 
 
 def dp_clean(b, n):
-    """(delete [1-based pages, ascending], rotate {page: 90|180|270}) of a request body for a PDF of n pages, else BadInput.
-    At least one page stays, at least one change."""
+    """(delete [1-based pages, ascending], rotate {page: 90|180|270}, order) of a request body for a PDF of n pages, else
+    BadInput. At least one page stays, at least one change. 2.959.0 (#4805): order = the pages that stay in their new order
+    (1-based, a permutation of exactly those pages; [] = as they are)."""
     dl, rt = b.get("delete", []), b.get("rotate", {})
     if not isinstance(dl, list) or not isinstance(rt, dict) or len(dl) > n or len(rt) > n:
         raise BadInput(tr("Invalid value: {0}", "pages"))
@@ -139,13 +142,18 @@ def dp_clean(b, n):
             turn[p] = v % 360
     if len(gone) >= n:
         raise BadInput(tr("At least one page must stay"))
-    if not gone and not turn:
+    keep = [i for i in range(1, n + 1) if i not in gone]
+    order = b.get("order") or []
+    if not isinstance(order, list) or (order and (any(not isinstance(p, int) or isinstance(p, bool) for p in order) or sorted(order) != keep)):
+        raise BadInput(tr("Invalid value: {0}", "order"))  # 2.959.0 (#4805): every page that stays, each once
+    order = [] if order == keep else order
+    if not gone and not turn and not order:
         raise BadInput(tr("Nothing to change"))
-    return sorted(gone), turn
+    return sorted(gone), turn, order
 
 
-def _edit(data, n, gone, turn):
-    p = _dp_run(PAGES_WORKER, json.dumps({"n": n, "delete": gone, "rotate": {str(k): v for k, v in turn.items()}}), data, 180)
+def _edit(data, n, gone, turn, order=()):
+    p = _dp_run(PAGES_WORKER, json.dumps({"n": n, "delete": gone, "rotate": {str(k): v for k, v in turn.items()}, "order": list(order)}), data, 180)
     if p is None:
         raise Denied(409, tr("The pages cannot be read right now, try again later"))
     if p.returncode == 3:
@@ -209,8 +217,9 @@ def _known_pages(m, n):
 
 @app.post("/api/docs/<int:nid>/pages")
 def docs_pages_save(nid):
-    """{delete?: [1-based pages], rotate?: {"<page>": 90|180|270}, expect_version?} -> the document with its new version
-    (201). The file's older version stays (the undo: files_version_restore)."""
+    """{delete?: [1-based pages], rotate?: {"<page>": 90|180|270}, order?: [1-based pages that stay, new order],
+    expect_version?} -> the document with its new version (201). The file's older version stays (the undo:
+    files_version_restore). 2.959.0 (#4805): order = the pages reordered (the strip's drag / "Move left / right")."""
     _no_agent()
     c = db()
     b = body()
@@ -227,8 +236,8 @@ def docs_pages_save(nid):
         return err(tr("The pages cannot be read right now, try again later"), 409)
     if np > DP_PAGES:
         return err(tr("At most {0} pages can be changed here", DP_PAGES), 413)
-    gone, turn = dp_clean(b, np)
-    out = _edit(data, np, gone, turn)
+    gone, turn, order = dp_clean(b, np)
+    out = _edit(data, np, gone, turn, order)
     fsu_pre(c, me(), n, "version")  # 2.777.0 (#5254): the step points at the version before (taken back from the list too)
     try:
         no = fs_new_version(c, nid, out, "application/pdf")
@@ -237,8 +246,8 @@ def docs_pages_save(nid):
         return err(str(e))
     fs_log_add(c, nid, "version", str(no))
     v = sp_get(m)  # the blank marks follow the pages that stay (the next recognition run reads them again)
-    if isinstance(v.get("pages"), list) and len(v["pages"]) == np:
-        sp_put(c, nid, {**v, "n": np - len(gone), "pages": [p for i, p in enumerate(v["pages"]) if i + 1 not in gone]})
+    if isinstance(v.get("pages"), list) and len(v["pages"]) == np:  # 2.959.0 (#4805): in the new order
+        sp_put(c, nid, {**v, "n": np - len(gone), "pages": [v["pages"][i - 1] for i in (order or range(1, np + 1)) if i not in gone]})
     # recognised again (text, page count, preview); the sorting and the values set by hand stay (docs_redo without its undo copy)
     c.execute("UPDATE doc_meta SET state='wait', tries=0, error='', updated_at=? WHERE node_id=?", (now_iso(), nid))
     bump(c)

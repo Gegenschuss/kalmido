@@ -170,6 +170,21 @@
 .dpg-pg.gone .dpg-th{opacity:.35}
 .dv-pg.dpg-gone{opacity:.3}
 @media (prefers-reduced-motion:reduce){.dpg-th{transition:none}}
+/* 2.959.0 (#4805): reordering the pages (dragged by mouse or finger) */
+.dpg-pg{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.dpg-pg.dragging{opacity:.45}
+.dpg-list.dpg-dragging{touch-action:none;cursor:grabbing}
+.dpg-pg.drop-b{box-shadow:-3px 0 0 #fff}
+.dpg-pg.drop-a{box-shadow:3px 0 0 #fff}
+.dpg-was{opacity:.7}
+.dpg-dragnote{margin:0;font-size:var(--fs-s);color:rgba(255,255,255,.75)}
+.dpm-list{margin:.5rem 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.25rem}
+.dpm-row{display:flex;align-items:center;gap:.5rem;padding:.375rem .5rem;border:1px solid var(--border,#ccc);border-radius:var(--r-s,.375rem);background:var(--bg,#fff);-webkit-user-select:none;user-select:none}
+.dpm-row.dragging{opacity:.45}
+.dpm-row.dpm-over{border-color:var(--accent)}
+.dpm-grip{cursor:grab;touch-action:none;padding:.25rem;color:var(--muted)}
+.dpm-no{min-width:1.5rem;font-weight:600}
+.dpm-nm{flex:1;min-width:0;overflow-wrap:anywhere}
 @media (max-width:767px){
   .dv-pv:has(>.dpg:not([hidden])){height:88dvh}  /* the strip open: the preview keeps room for the pages */
   .dpg-bar .btn:not(.pri)>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%)}

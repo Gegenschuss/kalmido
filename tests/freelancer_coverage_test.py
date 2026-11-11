@@ -321,6 +321,7 @@ ROUTES = {
     "POST /api/docs/{}/unsplit": "files", "POST /api/docs/{}/split/dismiss": "files", "POST /api/docs/{}/task/link": "files",
     "GET /api/tasks/{}/docs": "files", "GET /api/docs/split-sheet.pdf": "files",
     "GET /api/docs/{}/pages": "files", "POST /api/docs/{}/pages": "files",  # 2.777.0 B (#4874): p2777_b_docpages_test.py, freelancer-matrix: files
+    "POST /api/docs/merge": "files",  # 2.959.0 (#4805): p2959_a_docpages_api_test.py, freelancer-matrix: files
     # 2.892.0 (#4873, #4806): "Optimise PDF" as a new version (p2892_c_pdfopt_test.py, freelancer-matrix: files)
     "GET /api/docs/{}/pdfopt": "files", "POST /api/docs/{}/pdfopt": "files", "POST /api/docs/pdfopt": "files",
     "GET /api/docs": "files", "GET /api/docs/facets": "files", "GET /api/docs/settings": "files",  # 2.772.0 (#4890): facets = p4890_a_api_test.py

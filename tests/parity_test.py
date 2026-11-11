@@ -452,7 +452,7 @@ APP_ONLY = [
     # 2.777.0 (#4874)
     ("2.777.0 (#4874): deleting and turning pages of a PDF as a new version is a person's step in the document view (agents are "
      "refused like splitting a stack); agents read documents with /documents and add versions through the file routes",
-     ("* /api/docs/{}/pages",)),
+     ("* /api/docs/{}/pages", "=POST /api/docs/merge")),  # 2.959.0 (#4805): merging documents is the same person's step
     # 2.207.0 A (#2763)
     ("2.207.0 A (#2763): scan inboxes (upload-only keys for the folder watcher), the folder watcher downloads and the mail note are a "
      "person's setup in the document settings; agents upload with /documents (files:write) and never get docs:upload",
