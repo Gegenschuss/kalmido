@@ -101,29 +101,29 @@ _GONE = object()
 def merge_value(b, o, t, present=(True, True, True)):
     """The merged value of one key; _GONE = the key goes, CONFLICT = no rule merges it."""
     pb, po, pt = present
-    B, O, T = (b if pb else _GONE), (o if po else _GONE), (t if pt else _GONE)
+    vb, vo, vt = (b if pb else _GONE), (o if po else _GONE), (t if pt else _GONE)
     eq = lambda x, y: (x is _GONE and y is _GONE) or (x is not _GONE and y is not _GONE and _canon(x) == _canon(y))  # noqa: E731
-    if eq(O, T):
-        return O
-    if eq(O, B):
-        return T
-    if eq(T, B):
-        return O
-    vals = [v for v in (B, O, T) if v is not _GONE]
-    if all(_is_count(v) for v in vals) and (O is not _GONE or T is not _GONE):
-        n = _count(B if B is not _GONE else 0, O if O is not _GONE else 0, T if T is not _GONE else 0)
+    if eq(vo, vt):
+        return vo
+    if eq(vo, vb):
+        return vt
+    if eq(vt, vb):
+        return vo
+    vals = [v for v in (vb, vo, vt) if v is not _GONE]
+    if all(_is_count(v) for v in vals) and (vo is not _GONE or vt is not _GONE):
+        n = _count(vb if vb is not _GONE else 0, vo if vo is not _GONE else 0, vt if vt is not _GONE else 0)
         return n if n else _GONE
-    if O is not _GONE and T is not _GONE:
-        if isinstance(O, dict) and isinstance(T, dict) and (B is _GONE or isinstance(B, dict)):
-            return _merge_dict(B if B is not _GONE else {}, O, T)
-        if isinstance(O, list) and isinstance(T, list) and (B is _GONE or isinstance(B, list)):
-            return _merge_list(B if B is not _GONE else [], O, T)
-    if O is _GONE or T is _GONE:  # one side removed, the other changed: a dict / list keeps the other side's change merged
-        kept = T if O is _GONE else O
-        if isinstance(kept, dict) and isinstance(B, dict):
-            return _merge_dict(B, {}, kept) if O is _GONE else _merge_dict(B, kept, {})
-        if isinstance(kept, list) and isinstance(B, list):
-            return _merge_list(B, [], kept) if O is _GONE else _merge_list(B, kept, [])
+    if vo is not _GONE and vt is not _GONE:
+        if isinstance(vo, dict) and isinstance(vt, dict) and (vb is _GONE or isinstance(vb, dict)):
+            return _merge_dict(vb if vb is not _GONE else {}, vo, vt)
+        if isinstance(vo, list) and isinstance(vt, list) and (vb is _GONE or isinstance(vb, list)):
+            return _merge_list(vb if vb is not _GONE else [], vo, vt)
+    if vo is _GONE or vt is _GONE:  # one side removed, the other changed: a dict / list keeps the other side's change merged
+        kept = vt if vo is _GONE else vo
+        if isinstance(kept, dict) and isinstance(vb, dict):
+            return _merge_dict(vb, {}, kept) if vo is _GONE else _merge_dict(vb, kept, {})
+        if isinstance(kept, list) and isinstance(vb, list):
+            return _merge_list(vb, [], kept) if vo is _GONE else _merge_list(vb, kept, [])
     return CONFLICT
 
 

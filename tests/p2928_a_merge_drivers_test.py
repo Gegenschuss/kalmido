@@ -63,12 +63,14 @@ def fresh_repo(with_drivers=True):
     subprocess.run(["bash", os.path.join(r, "tools", "git_setup.sh")], capture_output=True, check=True)
     put(r, "tools/live_filter_baseline.json", lf(a=4, b=3, c=3))
     put(r, "docs/dev/kern.md", KERN)
-    git(r, "add", "-A"); git(r, "commit", "-qm", "base")
+    git(r, "add", "-A")
+    git(r, "commit", "-qm", "base")
     return r
 
 
 def branch(r, name, files):
-    git(r, "checkout", "-q", "main"); git(r, "checkout", "-qb", name)
+    git(r, "checkout", "-q", "main")
+    git(r, "checkout", "-qb", name)
     for rel, text in files.items():
         put(r, rel, text)
     git(r, "commit", "-qam", name)
@@ -81,7 +83,8 @@ check("tools/*_baseline.json merge=baseline" in ga and "docs/dev/kern.md merge=d
 r = fresh_repo()
 branch(r, "p1", {"tools/live_filter_baseline.json": lf(a=2, b=3, c=3), "docs/dev/kern.md": KERN.replace("c.commit()\n", "c.commit()\n\nP1 paragraph\n")})
 branch(r, "p2", {"tools/live_filter_baseline.json": lf(a=4, b=1, c=3), "docs/dev/kern.md": KERN.replace("c.commit()\n", "c.commit()\n\nP2 paragraph\n")})
-git(r, "checkout", "-q", "main"); git(r, "merge", "-q", "--ff-only", "p1")
+git(r, "checkout", "-q", "main")
+git(r, "merge", "-q", "--ff-only", "p1")
 p = git(r, "rebase", "main", "p2", ok=False)  # the train's move-up: rebase commit by commit
 check(p.returncode == 0, f"the second package rebases onto the first without a conflict: {(p.stdout + p.stderr).strip()[-300:]}")
 got = rd(r, "tools/live_filter_baseline.json")
@@ -96,7 +99,8 @@ shutil.rmtree(r, ignore_errors=True)
 r = fresh_repo()
 branch(r, "q1", {"docs/dev/kern.md": KERN.replace("save text", "save text A")})
 branch(r, "q2", {"docs/dev/kern.md": KERN.replace("save text", "save text B")})
-git(r, "checkout", "-q", "main"); git(r, "merge", "-q", "--ff-only", "q1")
+git(r, "checkout", "-q", "main")
+git(r, "merge", "-q", "--ff-only", "q1")
 p = git(r, "merge", "q2", ok=False)
 check(p.returncode != 0 and "<<<<<<<" in rd(r, "docs/dev/kern.md"), "the same line rewritten differently stays a conflict with markers")
 shutil.rmtree(r, ignore_errors=True)
@@ -105,7 +109,8 @@ shutil.rmtree(r, ignore_errors=True)
 r = fresh_repo(with_drivers=False)
 branch(r, "o1", {"docs/dev/kern.md": KERN.replace("routes", "routes changed")})
 branch(r, "o2", {"docs/dev/kern.md": KERN.replace("save text", "save changed")})
-git(r, "checkout", "-q", "main"); git(r, "merge", "-q", "--ff-only", "o1")
+git(r, "checkout", "-q", "main")
+git(r, "merge", "-q", "--ff-only", "o1")
 p = git(r, "merge", "-q", "o2", ok=False)
 check(p.returncode == 0 and "routes changed" in rd(r, "docs/dev/kern.md") and "save changed" in rd(r, "docs/dev/kern.md"),
       f"without the scripts: git's line merge as before: {p.stderr.strip()[-200:]}")
