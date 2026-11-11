@@ -2523,11 +2523,16 @@ def backups_verify(name):
     # 2.944.0 (#5054): the lock goes by format, not by origin: an uploaded format-3 archive reads the store as well (else a
     # clean-up meanwhile answers "shared_missing" instead of store_busy); format 2 still checks without it
     if own:
-        enc = bool(bk_parse_name(name)["encrypted"])
+        fmt3 = bk_meta(p, bool(bk_parse_name(name)["encrypted"])).get("format_version") == 3
     else:  # an upload's name says nothing: its first bytes do (as on the upload)
-        with open(p, "rb") as f:
-            enc = f.read(len(BK_MAGIC)) == BK_MAGIC
-    fmt3 = bk_meta(p, enc).get("format_version") == 3
+        try:
+            with open(p, "rb") as f:
+                enc = f.read(len(BK_MAGIC)) == BK_MAGIC
+            fmt3 = bk_meta(p, enc).get("format_version") == 3
+        except FileNotFoundError:  # expired (clean-up of .uploads/) between the path check and the read
+            raise BackupError("not_found") from None
+        finally:
+            _BK["meta"].pop(name, None)  # review: an upload's manifest is not kept in the summary cache (read once here)
     work = tempfile.mkdtemp(prefix=".verify-", dir=BK_DIR)
     rlock = None
     try:
