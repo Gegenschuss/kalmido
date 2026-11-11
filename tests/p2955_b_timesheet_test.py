@@ -162,6 +162,11 @@ check(f"billed with {other['number']}" in t, f"an entry billed on another invoic
 # (both offices count from the same scheme: Beta's number may equal this invoice's own number in the sheet's head)
 check(t.count("billed with") == 1 and "already billed" in t, "a document of an office without a role: only 'already billed'")
 check(t.count("billed with") == 1 and inv["number"] and f"billed with {inv['number']}" not in t, "an entry of this invoice carries no mark")
+# review 2.955.0: a role in the other office does not put its number onto this office's sheet (it goes to an outside client)
+sql("INSERT INTO org_members(org_id, user_id, role) VALUES(?, ?, 'member') ON CONFLICT DO NOTHING", (ORG2, ALICE), write=True)
+_, tm = sheet(A, INV)
+check(tm.count("billed with") == 1 and "already billed" in tm, "a role in the other office: still only 'already billed' for its document")
+sql("DELETE FROM org_members WHERE org_id=? AND user_id=?", (ORG2, ALICE), write=True)
 
 # ================================================================ the switch: non-billable entries shown and marked
 r, t2 = sheet(A, INV, nb=True)

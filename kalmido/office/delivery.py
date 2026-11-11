@@ -120,10 +120,12 @@ def ls_hours(sec, lang, fmt=None):
     return pdf_num(round(sec / 3600, 2), lang, fmt) + " h"
 
 
-def ls_billed_marks(c, uid, r, ents, lang):
+def ls_billed_marks(c, oid, uid, r, ents, lang):
     """2.955.0 (#5648): {entry id: "billed with <number>" / "billed"} for printed entries billed on ANOTHER document than
     invoice row r (entries of r itself need no mark). The number only when the sending person may see that document's
-    numbering (timebill.tbill_shows, the rule of tbill_out); else just "already billed"."""
+    numbering (timebill.tbill_shows, the rule of tbill_out) AND the document belongs to this sheet's office oid (review
+    2.955.0: the sheet goes to an outside client - no number of another office, even one the sender has a role in);
+    else just "already billed"."""
     ids = [e["id"] for e in ents if e.get("billed")]
     if not ids:
         return {}
@@ -138,7 +140,7 @@ def ls_billed_marks(c, uid, r, ents, lang):
         d = docs[bid]
         if d is None:  # the document is gone: the entry counts as open (tbill_out)
             continue
-        num = d["number"] if d["number"] and tbill_shows(c, d, uid) else ""
+        num = d["number"] if d["number"] and d.get("org_id") == oid and tbill_shows(c, d, uid) else ""
         out[x["id"]] = tr("billed with {0}", num, lg=lang) if num else tr("already billed", lg=lang)
     return out
 
@@ -155,7 +157,7 @@ def ls_sheet_model(c, oid, uid, r, nonbillable=False):
     order = {x["id"]: i for i, x in enumerate(rep["lists"])}
     names = {x["id"]: x["name"] for x in rep["lists"]}
     ents = sorted(rep["entries"], key=lambda e: (order.get(e["list_id"] or 0, 0), e["start"], e["id"]))
-    marks = ls_billed_marks(c, uid, r, ents, lang)
+    marks = ls_billed_marks(c, oid, uid, r, ents, lang)
     lines, cur = [], object()
     for e in ents:
         lid = e["list_id"] or 0
