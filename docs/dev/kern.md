@@ -520,6 +520,37 @@ writes them into the old files (`comments/reactions.json` with `comment_id`, `ch
 older archives and new ones import the same way. A new area with reactions adds its kind to `ORX_KINDS` and a trigger line in
 a fragment -- no table of its own.
 
+### Versions (stage Q7a, 2.958.0, #5281)
+
+`obj_versions` is the core's second table next to `obj_history` (core/objversions.py, core/migrations.d/5281_a.py): numbered
+whole states of an object's content. Three things that look alike and stay apart:
+- `obj_history`: field changes (who changed which field, before -> after, merged within ten minutes; a page's rename);
+- `obj_undo` (#5249): a person's steps, 30 days, taken back with the rights of now;
+- `obj_versions`: a version = a numbered whole state, kept by the area's limit, restorable as a new version.
+
+Columns: `kind`, `ref_id` (the object; no FK), `no` (its number per object, the oldest going does not renumber; unique per
+object), `org_id` / `owner_id` (as the object: row-level security and the key space of a sealed body), `title` (the
+object's name then), `body` (the whole state, sealed by the area with the context `obj_versions.body` = `OBJV_CTX`), `size`,
+`created_by`, `created_at` / `updated_at` / `held_at` TIMESTAMPTZ (`held_at`: the area holds the row out of sight).
+- Writing: `obj_version_add(c, kind, ref_id, org_id, owner_id, title, body, size, by, at)` (the next number, under the lock
+  `objv-<kind>-<id>`), `obj_version_merge(c, vid, title, body, size, at)` (a save merged into the last one by the area's
+  rule), `obj_version_prune(c, kind, ref_id, keep)`, `obj_version_drop(c, kind, ref_ids)`.
+- Reading: `obj_version_rows(c, kind, ref_id, limit)` (newest first), `obj_version_get(c, kind, ref_id, vid)`,
+  `obj_version_count(c, kind, ref_ids)`.
+- The rows go with their object: `obj_rows_drop` / `obj_rows_drop_many` take them with the history, and a kind whose rows are
+  deleted by other ways too gets the trigger `kalmido_ov_gone('<kind>')` on its table (5281_a.py: `wiki_pages`).
+- The area keeps its rules on top and checks its rights before every call: when a save merges or makes a version, how many
+  stay, who reads and restores (a restore = the old state saved as a new version through the area's own write path, with its
+  version check and lock). There are no generic routes for versions yet; v1 / MCP keep the area's own (the knowledge pages:
+  `GET /api/wiki/pages/<id>/versions`, `POST .../versions/<vid>/restore`, the agent's page routes, unchanged).
+
+First kind: the knowledge pages (kind `wiki`, wiki/wkhist.py; spaces with the lock keep none, switching the lock on holds
+them with `held_at` until the trash period ends, `wiki_spaces.wkx_holds` names who may see a held row again). The old table
+`wiki_versions` went one way: at the start `wkh_retire` moved every row (its id kept for the undo steps of #5253, the text
+sealed again for the new context), then dropped the table after the start check (`kern_retire`; a text whose key is missing
+keeps the table until a later start). The organisation export keeps `wiki/versions.json` with its columns (`page_id`,
+`path`); its import writes into `obj_versions`. Next kinds: the playbooks and the procedure documentation (stage Q7b).
+
 ### Versions of tables (stage Q7c, 2.800.0, #5283)
 
 Checked against the core's versions and undo steps, the two change tables of the tables area stay, each for its own logic:

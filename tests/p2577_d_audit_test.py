@@ -262,7 +262,7 @@ pv = Fr.post(B + "/api/wiki/pages", json={"path": "Spurseite", "body": "eins"}).
 Fr.patch(B + f"/api/wiki/pages/{pv}", json={"body": "zwei"})  # the history begins with a save
 vs = Fr.get(B + f"/api/wiki/pages/{pv}/versions").json().get("versions") or []
 check(vs and vs[0].get("agent") is False, f"(4) a person's version is not marked as an agent's {vs[:1]}")
-kt.dbx("UPDATE wiki_versions SET created_by=? WHERE page_id=?", (ag.get("id"), pv))
+kt.dbx("UPDATE obj_versions SET created_by=? WHERE kind='wiki' AND ref_id=?", (ag.get("id"), pv))  # 2.958.0 (#5281): obj_versions
 vs = Fr.get(B + f"/api/wiki/pages/{pv}/versions").json().get("versions") or []
 check(vs and vs[0].get("agent") is True, f"(4) a version an agent account wrote is marked as an agent's {vs[:1]}")
 

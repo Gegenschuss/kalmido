@@ -133,13 +133,13 @@ r = Bo.post(B + "/api/wiki/pages", json={"space": "private", "path": "Notiz/Umzu
 MV = r.json()["id"]
 assert Bo.patch(B + f"/api/wiki/pages/{MV}", json={"body": "bereinigt"}).ok
 assert Bo.patch(B + f"/api/wiki/pages/{MV}", json={"body": "bereinigt, zweite Fassung"}).ok
-nv = dbx("SELECT COUNT(*) FROM wiki_versions WHERE page_id=?", (MV,))[0][0]
+nv = dbx("SELECT COUNT(*) FROM obj_versions WHERE kind='wiki' AND ref_id=?", (MV,))[0][0]  # 2.958.0 (#5281): obj_versions
 check(nv >= 1, f"earlier versions in the private workspace ({nv})")
 r = Bo.post(B + "/api/wiki/move-space", json={"pages": [MV], "space": "private", "to": f"org:{ORG}", "dest": "", "dry": True})
 check(r.ok and r.json().get("versions") == nv and any("earlier version" in x for x in r.json().get("notes", [])),
       "#2496: the dry run names the versions that stay behind " + r.text[:300])
 r = Bo.post(B + "/api/wiki/move-space", json={"pages": [MV], "space": "private", "to": f"org:{ORG}", "dest": ""})
-check(r.ok and not dbx("SELECT 1 FROM wiki_versions WHERE page_id=?", (MV,)), "#2496: in the organisation no earlier private version " + r.text[:200])
+check(r.ok and not dbx("SELECT 1 FROM obj_versions WHERE kind='wiki' AND ref_id=?", (MV,)), "#2496: in the organisation no earlier private version " + r.text[:200])
 vv = Ca.get(B + f"/api/wiki/pages/{MV}/versions")
 check(vv.ok and not any("1234" in json.dumps(x) for x in vv.json().get("versions", [])), "#2496: another member reads no old state")
 

@@ -173,8 +173,9 @@ check(stored() == BEFORE, f"and no sealed copy stays on the disk: {BEFORE} -> {s
 write("DROP TRIGGER p2508_no ON users; DROP FUNCTION p2508_no()")
 
 # an old state of a page nobody can open any more does not stop the deletion (review)
-write("""INSERT INTO wiki_versions(page_id, owner_id, path, body, created_at, updated_at)
-         VALUES(?, ?, 'Team/Plan', 'kenc1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', '2020-01-01', '2020-01-01')""", (P1, ANNA))
+# 2.958.0 (#5281): a row of the core's obj_versions (kind wiki)
+write("""INSERT INTO obj_versions(kind, ref_id, no, owner_id, title, body, created_at, updated_at)
+         VALUES('wiki', ?, 9999, ?, 'Team/Plan', 'kenc1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', '2020-01-01', '2020-01-01')""", (P1, ANNA))
 
 # ---------------------------------------------------------------- the deletion
 r = A.delete(B + f"/api/users/{ANNA}")
@@ -231,7 +232,7 @@ check(r.ok and r.json().get("role") == "view", "cara still reads it " + r.text[:
 check(owner("wiki_pages", P3) is None and owner("wiki_pages", P4) is None, "read-only and unshared pages go")
 r = dbx("SELECT body FROM wiki_pages WHERE id=?", (P2,))[0][0]
 check(r.startswith("kenc1:"), "the text is sealed for its new owner, not lying open")
-check(not dbx("SELECT 1 FROM wiki_versions WHERE page_id=? AND body LIKE 'kenc1:AAAA%'", (P1,)), "the unreadable old state went")
+check(not dbx("SELECT 1 FROM obj_versions WHERE kind='wiki' AND ref_id=? AND body LIKE 'kenc1:AAAA%'", (P1,)), "the unreadable old state went")
 check(not dbx("SELECT 1 FROM users WHERE id=?", (ANNA,)), "and the account is gone")
 
 # ---------------------------------------------------------------- 2.537.0 (#4347): shared branches of the file store

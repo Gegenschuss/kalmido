@@ -25,12 +25,14 @@ from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same, smv_target
 from ..core.errors import BadInput
 from ..core.serializers import unlink_files
+from ..core.objversions import obj_version_count  # 2.958.0 (#5281): the core's versions
 from .pages import wiki_clean_path, wiki_need, wiki_set_links, wiki_space, wiki_space_key, wiki_space_sql
 from .wikie2e import wke_mode, wke_space_sql, WKE_PATH_MAX, WKE_VS, wke_body_max, wke_cipher_ok  # 2.369.5 (#2517): pulled up from functions
 from .pages import WIKI_BODY_MAX, wiki_frontmatter  # 2.369.5 (#2517): pulled up from functions
 from ..collab.liste2e import le2e_is_cipher, le2e_parse, le2e_writer_ok  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import org_sees_all  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
+WKM_VKIND = "wiki"  # 2.958.0 (#5281): the pages' kind in obj_versions (wkhist.py WKH_KIND)
 
 WKM_FILE_RE = re.compile(r"/api/files/|/f/[A-Za-z0-9_-]{8,}|/s/[A-Za-z0-9_-]{8,}|\[\[\s*datei\s*:", re.I)  # 2.123.0 C (#2107): + [[datei:…]]
 
@@ -118,7 +120,7 @@ def wkm_vers_dropped(c, ids, to):
     organisation's edits); into the private space it goes along (the mover read it already)."""
     if to is None or not ids:
         return 0
-    return c.execute(f"SELECT COUNT(*) FROM wiki_versions WHERE page_id IN ({','.join('?' * len(ids))})", ids).fetchone()[0]
+    return obj_version_count(c, WKM_VKIND, ids)  # 2.958.0 (#5281): the core's versions
 
 
 def wkm_vers_note(n):
@@ -385,7 +387,7 @@ def wkr_move(c, uid, src, to, b, dry):
     from .wkshare import wsh_end_moved  # 2.273.0 B (#3042): shares that end and a history that cannot go along are named
     shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r in rows], dry=True)
     q = ",".join("?" * len(ids))
-    vers = c.execute(f"SELECT COUNT(*) FROM wiki_versions WHERE page_id IN ({q})", ids).fetchone()[0] if tst["mode"] else 0
+    vers = obj_version_count(c, WKM_VKIND, ids) if tst["mode"] else 0  # 2.958.0 (#5281): the core's versions
     notes += [wkm_share_note(shares), trn("{0} earlier version is deleted: a workspace with the lock keeps no history",
                                           "{0} earlier versions are deleted: a workspace with the lock keeps no history", vers) if vers else "",
               oo_into_note(c, src, to)]  # 2.361.2 B (#2923)

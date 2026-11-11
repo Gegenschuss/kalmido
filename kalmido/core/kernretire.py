@@ -43,7 +43,7 @@ from .pg import qi, table_columns, table_exists, write_lock
 
 KERN_RETIRE_LOCK = "kalmido-kern5069"
 KERN_RETIRE_HOW = ("the shared core dropped the old member tables (team chat, calendars, address books; #5069) and the old share "
-                   "rows of tables and knowledge pages (#5244) - an older version would rebuild them empty or read columns that "
+                   "rows of tables and knowledge pages (#5244) and the old version table of the knowledge pages (#5281) - an older version would rebuild them empty or read columns that "
                    "are gone; go back only with a backup from before")
 
 
@@ -68,8 +68,10 @@ def kern_retire_floor(c, mine=None):
     return v
 
 
-def kern_retire(c, tables, left, label, drop=None, alert=None):
-    """The start check and DROP of the old member tables `tables` (module docstring). label names the stage in the log."""
+def kern_retire(c, tables, left, label, drop=None, alert=None, why=None):
+    """The start check and DROP of the old member tables `tables` (module docstring). label names the stage in the log;
+    why (2.958.0, #5281) = what the log says of rows left instead of "have no share in the shared core" (an old table whose
+    rows move into a core table of their own, not into shares: wiki_versions -> obj_versions)."""
     tables = tuple(tables)
     if not any(table_exists(c, t) for t in tables):
         return {}
@@ -79,8 +81,8 @@ def kern_retire(c, tables, left, label, drop=None, alert=None):
         return {}
     n = left(c)
     if n:
-        print(f"{label}: {n} old row(s) of {', '.join(have)} have no share in the shared core -- the table stays, nothing dropped; "
-              "give those objects their node / shares (or delete the rows) and start again", flush=True)
+        print(f"{label}: {n} old row(s) of {', '.join(have)} " + (why or "have no share in the shared core -- the table stays, nothing "
+              "dropped; give those objects their node / shares (or delete the rows) and start again"), flush=True)
         if alert:
             alert(n, have)
         return {"left": n}

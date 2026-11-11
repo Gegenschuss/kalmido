@@ -33,7 +33,7 @@ from ..files.store import FS_DIR, fs_read  # 2.369.5 (#2517): pulled up from fun
 from .orgexport import _safe_part  # 2.369.5 (#2517): pulled up from functions
 from ..videos.review import vdr_parse  # 2.369.5 (#2517): pulled up from functions
 from .acctimport import umz_cols  # 2.369.5 (#2517): pulled up from functions
-from ..wiki.wkhist import wkh_seal, WKH_VCTX  # 2.369.5 (#2517): pulled up from functions
+from ..wiki.wkhist import wkh_seal, WKH_KIND, WKH_VCTX  # 2.369.5 (#2517): pulled up from functions; 2.958.0 (#5281): + WKH_KIND
 from ..wiki.pages import wiki_set_links  # 2.369.5 (#2517): pulled up from functions
 from ..wiki.wksearch import wks_index  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
@@ -554,13 +554,18 @@ def _page(c, run, src, d, ctx):
 
 
 def _wiki_version(c, run, src, d, ctx):
+    """2.958.0 (#5281): a version of the archive's wiki/versions.json (page_id, path, body ... as before) becomes a row of the
+    core's versions (obj_versions kind "wiki": ref_id = the page, title = its name then, the next number of the page)."""
     if str(src.get("path") or "").startswith(_LOCKED) or str(src.get("body") or "").startswith(_LOCKED):
         return None
-    pg = c.execute("SELECT org_id, owner_id FROM wiki_pages WHERE id=?", (d["page_id"],)).fetchone()
+    pg = c.execute("SELECT org_id, owner_id FROM wiki_pages WHERE id=?", (d["ref_id"],)).fetchone()
     if not pg:
         return None
     d["owner_id"] = pg["owner_id"]
+    d["title"] = str(src.get("path") or "")
     d["body"] = wkh_seal(c, pg["org_id"], pg["owner_id"], d.get("body") or "", ctx=WKH_VCTX)
+    d["no"] = c.execute("SELECT COALESCE(MAX(no), 0) + 1 FROM obj_versions WHERE kind=? AND ref_id=?", (WKH_KIND, d["ref_id"])).fetchone()[0]
+    d["held_at"] = None
     return d
 
 
@@ -851,8 +856,9 @@ SPECS = [
     OiT("wiki/pages.json", "wiki_pages", people={"created_by": "null", "updated_by": "null"}, label=N_("Knowledge pages"), prep=_page,
         enc=False),
     OiT("wiki/files.json", "wiki_files", refs={"page_id": "wiki_pages"}, need=("page_id",), people=_P, prep=_wiki_file),
-    OiT("wiki/versions.json", "wiki_versions", refs={"page_id": "wiki_pages"}, need=("page_id",), people=_P, prep=_wiki_version,
-        enc=False),
+    # 2.958.0 (#5281): into the core's versions; the archive (also an older one) names the page page_id and its name path
+    OiT("wiki/versions.json", "obj_versions", kind="obj_versions_wiki", refs={"ref_id": "wiki_pages"}, src={"ref_id": "page_id"},
+        need=("ref_id",), people=_P, prep=_wiki_version, enc=False, fixed={"kind": WKH_KIND, "no": 0}),
     # tables
     OiT("sheets/sheets.json", "sheets", refs={"list_id": "lists"}, late={"book_id": "sheets"},
         people={"created_by": "null", "updated_by": "null"}, label=N_("Tables"), prep=_sheet),

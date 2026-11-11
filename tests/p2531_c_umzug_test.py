@@ -76,7 +76,7 @@ check(any(x.startswith("the trash of your files, knowledge pages, tables, addres
 check(any(x.startswith("tasks in the trash with their comments and files") for x in NI), f"F10 the tasks of the trash are named: {txt[:400]}")
 later = next((x for x in NI if x.startswith("not yet in the file: ")), "")
 check("history of knowledge pages" in later and "rewards of the family" in later, f"F9 the areas not yet in the export by name: {later[:300]}")
-check("wiki_versions" not in txt and "kid_rewards" not in txt and "conn_requests" not in txt, f"F9 no table name on the page: {txt[:300]}")
+check("wiki_versions" not in txt and "obj_versions" not in txt and "kid_rewards" not in txt and "conn_requests" not in txt, f"F9 no table name on the page: {txt[:300]}")
 check(len(NI) == len(set(NI)), f"F9 no line twice: {len(NI)} {len(set(NI))}")
 
 # ---- F17: a task in the trash with a comment and a file

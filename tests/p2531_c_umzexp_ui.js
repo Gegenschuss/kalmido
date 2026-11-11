@@ -43,7 +43,7 @@ const lines = md => [...md.querySelectorAll('#s-umz-exp .umzleft .umzleftl li')]
   check(/^What is not in the file \(\d+\)$/.test(sum) && sum.includes(`(${L0.length})`), `F9 its summary counts the lines: ${sum} ${L0.length}`);
   check(L0.some(x => x.startsWith('the trash of your files, knowledge pages, tables, address books')), `F10 the trashes are named: ${L0.slice(-6).join(' | ')}`);
   check(L0.some(x => x.startsWith('not yet in the file: ') && x.includes('history of knowledge pages')), 'F9 the areas not yet in the export by name');
-  check(!L0.some(x => /wiki_versions|kid_rewards|conn_requests/.test(x)), 'F9 no table name');
+  check(!L0.some(x => /wiki_versions|obj_versions|kid_rewards|conn_requests/.test(x)), 'F9 no table name');  // 2.958.0 (#5281): + obj_versions
 
   click(w, md.querySelector('#s-umz-exp [data-umz="exp"]'));
   const dl = await until(() => md.querySelector('#s-umz-exp a[href="/api/account/export/file"]'), 150);

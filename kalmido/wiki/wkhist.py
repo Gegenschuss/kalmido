@@ -11,12 +11,17 @@ wkh_settle) seals what is still plain. The way back before running 2.122 or olde
     python -m kalmido.admin.orgcrypt_cli encrypt-wiki     (wiki_encrypt=1, sealed again)
 decrypt-all and decrypt-private make them plain as well (for all / the private spaces).
 
-#2102: wiki_versions keeps the states of a page: every save notes the text (sealed like the page) -- saves of the same person
+#2102: the history keeps the states of a page: every save notes the text (sealed like the page) -- saves of the same person
 within WKH_MERGE seconds share one version (the autosave does not make hundreds), at most WKH_KEEP per page (the oldest
 go). A state saved outside this path (an older version of the app, a [[link]] renamed, an import) is noted as its own
 version before the next save. Restoring = the old text saved as a new version (Undo in the app: the text before).
 Spaces with the lock keep no history (the server cannot read their texts; switching the lock on holds the history of the
 space until the trash period ends, 2.528.0 D #4306: wkx_hold_space / wkx_tick). The rows go with their page (trash -> final deletion), its organisation or its owner.
+
+2.958.0 (#5281, stage Q7a of the cross-cutting core): the states are rows of the core's versions (core/objversions.py,
+obj_versions, kind "wiki" = WKH_KIND, the kind of the renames in obj_history too): title = the page's name then, held_at = held
+at a lock (was wiki_versions.wkx_held_at). The rules above stay here (merge, keep, prev, rights); the table wiki_versions is
+gone (wkh_retire: moved at the start, then dropped).
 """
 import json
 import os
@@ -29,9 +34,14 @@ from flask import jsonify
 from ..accounts.session import me
 from ..core.config import app
 from ..core.db import body, bump, db, iso_ms, now_utc
-from ..core.i18n import tr
+from ..core import objhooks  # 2.958.0 (#5281): START (wkh_retire)
+from ..core.i18n import N_, tr
 from ..core.orgcrypt import OrgCryptError, PREFIX, _aad, _b64u, oc_active_for, oc_dec_k, oc_is_enc, oc_key, oc_user_space
-from ..core.pg import system_ctx, write_lock
+from ..core.pg import system_ctx, table_columns, table_exists, ts_canon, write_lock
+from ..core.kernretire import KERN_RETIRE_LOCK, kern_retire  # 2.958.0 (#5281): wkh_retire
+from ..notify.alerts import aa_now  # 2.958.0 (#5281): the admins' alert of wkh_retire
+from ..core.objversions import (OBJV_CTX, obj_version_add, obj_version_drop, obj_version_get,  # 2.958.0 (#5281)
+                                obj_version_merge, obj_version_prune, obj_version_rows)
 from ..core.retention import ret_due, ret_report, ret_trash_cut  # 2.528.0 D (#4306)
 from ..core.serializers import unlink_files  # 2.528.0 D (#4306)
 from ..core.access import Denied
@@ -41,7 +51,8 @@ from ..collab.liste2e import le2e_is_cipher
 from .pages import wiki_need, wiki_dict, wiki_frontmatter, wiki_set_links  # 2.369.5 (#2517): pulled up from functions
 from .wikie2e import wke_page_mode, wke_denied  # 2.369.5 (#2517): pulled up from functions
 
-WKH_CTX, WKH_VCTX = "wiki_pages.body", "wiki_versions.body"
+WKH_CTX, WKH_VCTX = "wiki_pages.body", OBJV_CTX  # 2.958.0 (#5281): a version's text is sealed as a row of obj_versions
+WKH_OLD_VCTX = "wiki_versions.body"  # 2.958.0 (#5281): the context of the old table, read once by wkh_retire
 WKH_MERGE = 600     # seconds: saves of the same person within this time share a version
 WKH_KEEP = 100      # versions per page
 WKH_BATCH = 200
@@ -159,9 +170,8 @@ def _locked(r):
 
 
 def _ins(c, r, path, text, by, at):
-    c.execute("INSERT INTO wiki_versions(page_id,org_id,owner_id,path,body,size,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
-              (r["id"], r["org_id"], r["owner_id"], path, wkh_seal(c, r["org_id"], r["owner_id"], text, WKH_VCTX),
-               len(text.encode()), by, at, at))
+    obj_version_add(c, WKH_KIND, r["id"], r["org_id"], r["owner_id"], path, wkh_seal(c, r["org_id"], r["owner_id"], text, WKH_VCTX),
+                    len(text.encode()), by, at)  # 2.958.0 (#5281): the core's versions
 
 
 def wkh_note(c, pid, uid, ts, prev=None, fresh=False):
@@ -171,8 +181,7 @@ def wkh_note(c, pid, uid, ts, prev=None, fresh=False):
     if not r or _locked(r):
         return
     text = wkh_body(c, r)
-    last = c.execute("SELECT id, org_id, owner_id, path, body, created_by, created_at, wkx_held_at FROM wiki_versions WHERE page_id=? "
-                     "ORDER BY id DESC LIMIT 1", (pid,)).fetchone()
+    last = next(iter(obj_version_rows(c, WKH_KIND, pid, 1)), None)  # 2.958.0 (#5281)
     try:
         ltext = _vbody(c, last) if last else None
     except WikiUnreadable:  # 2.126.2 B (#2358): an unreadable last version: the new state gets a version of its own
@@ -188,14 +197,11 @@ def wkh_note(c, pid, uid, ts, prev=None, fresh=False):
     if prev is not None and last is None and (ltext if ltext is not None else prev[0]) == text:
         return  # 2.571.0 (#4766): a page without history renamed: its text is the one before
     if (last is not None and not fresh and last["created_by"] == uid and 0 <= _ts(ts) - _ts(last["created_at"]) < WKH_MERGE
-            and not last["wkx_held_at"]):  # 2.528.0 D (#4306): a version held at a lock takes no new text
-        c.execute("UPDATE wiki_versions SET path=?, body=?, size=?, updated_at=? WHERE id=?",
-                  (r["path"], wkh_seal(c, r["org_id"], r["owner_id"], text, WKH_VCTX), len(text.encode()), ts, last["id"]))
+            and not last["held_at"]):  # 2.528.0 D (#4306): a version held at a lock takes no new text
+        obj_version_merge(c, last["id"], r["path"], wkh_seal(c, r["org_id"], r["owner_id"], text, WKH_VCTX), len(text.encode()), ts)
     elif text or last is not None or prev is not None:
         _ins(c, r, r["path"], text, uid, ts)
-    cut = c.execute("SELECT id FROM wiki_versions WHERE page_id=? ORDER BY id DESC LIMIT 1 OFFSET ?", (pid, WKH_KEEP - 1)).fetchone()
-    if cut:
-        c.execute("DELETE FROM wiki_versions WHERE page_id=? AND id<?", (pid, cut["id"]))
+    obj_version_prune(c, WKH_KIND, pid, WKH_KEEP)
 
 
 # 2.571.0 (#4766): a page's name is its own field: a rename goes into the core's history (obj_history, kind "wiki"), the
@@ -245,20 +251,39 @@ def wkh_prev(c, r):
 
 
 # ---- 2.528.0 D (#4306, B26): switching the lock on holds the history and the files in the trash instead of deleting them ---
-# wkx_held_at (migrations.d/4306_d.py) marks the rows; while the space is locked nobody sees them (the routes below answer a
+# held_at of the versions (obj_versions, 2.958.0 #5281; was wiki_versions.wkx_held_at) and wiki_files.wkx_held_at
+# (migrations.d/4306_d.py) mark the rows; while the space is locked nobody sees them (the routes below answer a
 # locked space without history, wikiatt serves no file of it); wkx_tick deletes held versions and held trash files after the
 # trash period (ret_trash_cut; review 2.528: also with the retention switch off), or earlier wka_tick / the core trash run (2.809.0, #5365). Once the
 # lock is off again a held row is shown only to the people named in wiki_spaces.wkx_holds for its time (who could read the
 # space then): no later member, share or agent gets it. The org export leaves held versions out (admin/orgexport.py ox_live).
+# The keys of wkx_holds are the time of the switch as text; a version's held_at reads back as the same canonical text
+# (TIMESTAMPTZ, core/pg.py ts_canon), a file's wkx_held_at is that text: both are compared through ts_canon.
 def _wkx_where(oid, owner, alias=""):
     p = alias + "." if alias else ""
     return (f"{p}org_id=?", [oid]) if oid else (f"{p}org_id IS NULL AND {p}owner_id=?", [owner])
 
 
+def _wkx_held_times(c, w, a):
+    """The times of the holds rows of a space still carry (versions and files), canonical."""
+    out = {ts_canon(r[0]) for r in c.execute(f"SELECT DISTINCT held_at FROM obj_versions WHERE kind=? AND {w} AND held_at IS NOT NULL",
+                                              [WKH_KIND, *a])}
+    return out | {ts_canon(r[0]) for r in c.execute(f"SELECT DISTINCT wkx_held_at FROM wiki_files WHERE {w} AND wkx_held_at IS NOT NULL", a)}
+
+
+def _wkx_holds(raw):
+    """{canonical time: [user ids]} of a wiki_spaces.wkx_holds value (None: not readable)."""
+    try:
+        holds = json.loads(raw or "{}")
+    except ValueError:
+        return None
+    return {ts_canon(k): v for k, v in holds.items()} if isinstance(holds, dict) else None
+
+
 def wkx_counts(c, oid, owner):
     """What switching the lock on would hold: {versions, files} of the space (the dialog before the switch, wke_info)."""
     w, a = _wkx_where(oid, owner)
-    return {"versions": c.execute(f"SELECT COUNT(*) FROM wiki_versions WHERE {w}", a).fetchone()[0],
+    return {"versions": c.execute(f"SELECT COUNT(*) FROM obj_versions WHERE kind=? AND {w}", [WKH_KIND, *a]).fetchone()[0],
             "files": c.execute(f"SELECT COUNT(*) FROM wiki_files WHERE deleted_at IS NOT NULL AND {w}", a).fetchone()[0]}
 
 
@@ -266,42 +291,33 @@ def wkx_hold_space(c, sp, users, ts):
     """The lock of space row sp is switched on at ts (wikie2e.wke_start): its word index goes (derived, plain words); its
     versions and its files in the trash are held from ts (also rows an earlier switch held: the new period counts) for the
     people users. -> {versions, files} held. The caller commits."""
-    import json
     oid, owner = sp["org_id"], sp["owner_id"]
     w, a = _wkx_where(oid, owner)
     c.execute(f"DELETE FROM wiki_words WHERE page_id IN (SELECT id FROM wiki_pages WHERE {w})", a)
     # 2.571.0 (#4766): the names of its pages in the core's history are plain words too
     c.execute(f"DELETE FROM obj_history WHERE kind='wiki' AND ref_id IN (SELECT id FROM wiki_pages WHERE {w})", a)
     row = c.execute("SELECT wkx_holds FROM wiki_spaces WHERE id=?", (sp["id"],)).fetchone()
-    try:
-        holds = json.loads(row[0] or "{}") if row else {}
-    except ValueError:
-        holds = {}
-    old = {}  # earlier holds: only who was named then AND now keeps a re-held row
-    for r in c.execute(f"SELECT DISTINCT wkx_held_at FROM wiki_versions WHERE {w} AND wkx_held_at IS NOT NULL UNION "
-                       f"SELECT DISTINCT wkx_held_at FROM wiki_files WHERE {w} AND wkx_held_at IS NOT NULL", [*a, *a]):
-        old[r[0]] = set(holds.get(r[0]) or [])
+    holds = (_wkx_holds(row[0]) if row else {}) or {}
+    old = {t: set(holds.get(t) or []) for t in _wkx_held_times(c, w, a)}  # earlier holds: only who was named then AND now keeps a re-held row
     now = set(int(u) for u in users)
     for o in old.values():
         now &= o
-    n_v = c.execute(f"UPDATE wiki_versions SET wkx_held_at=? WHERE {w}", [ts, *a]).rowcount
+    n_v = c.execute(f"UPDATE obj_versions SET held_at=? WHERE kind=? AND {w}", [ts, WKH_KIND, *a]).rowcount
     n_f = c.execute(f"UPDATE wiki_files SET wkx_held_at=? WHERE deleted_at IS NOT NULL AND {w}", [ts, *a]).rowcount
-    c.execute("UPDATE wiki_spaces SET wkx_holds=? WHERE id=?", (json.dumps({ts: sorted(now)} if n_v or n_f else {}), sp["id"]))
+    c.execute("UPDATE wiki_spaces SET wkx_holds=? WHERE id=?", (json.dumps({ts_canon(ts): sorted(now)} if n_v or n_f else {}), sp["id"]))
     return {"versions": n_v, "files": n_f}
 
 
 def wkx_may_see(c, r, held_at, uid):
     """May uid see a row of page r held at held_at? An ordinary row (None): yes; a held one: only who wkx_holds names for it."""
-    import json
     if not held_at:
         return True
     w, a = _wkx_where(r["org_id"], r["owner_id"])
     sp = c.execute(f"SELECT wkx_holds FROM wiki_spaces WHERE {w}", a).fetchone()
-    try:
-        holds = json.loads(sp["wkx_holds"] or "{}") if sp else {}
-    except ValueError:
+    holds = _wkx_holds(sp["wkx_holds"]) if sp else {}
+    if holds is None:
         return False
-    return int(uid) in set(holds.get(held_at) or [])
+    return int(uid) in set(holds.get(ts_canon(held_at)) or [])
 
 
 def wkx_tick(c, force=False):
@@ -309,17 +325,16 @@ def wkx_tick(c, force=False):
     (Fable 1): also with the retention switch off -- the person agreed to the period when switching the lock on, readable
     copies of an encrypted space must not stay for good. A space open again keeps them (its people see them again,
     wkx_may_see). Holds no row names any more are cleared."""
-    import json
     if not ret_due("wiki_e2e_held", force=force):
         return {}
     cut = ret_trash_cut()
-    due = ("FROM {t} v JOIN wiki_spaces s ON (v.org_id IS NOT NULL AND s.org_id=v.org_id) OR "
-           "(v.org_id IS NULL AND s.org_id IS NULL AND s.owner_id=v.owner_id) WHERE v.wkx_held_at IS NOT NULL AND v.wkx_held_at<? "
-           "AND s.e2e IS NOT NULL")
+    space = ("JOIN wiki_spaces s ON (v.org_id IS NOT NULL AND s.org_id=v.org_id) OR "
+             "(v.org_id IS NULL AND s.org_id IS NULL AND s.owner_id=v.owner_id)")
     with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
-        n = c.execute(f"DELETE FROM wiki_versions WHERE id IN (SELECT v.id {due.format(t='wiki_versions')})", (cut,)).rowcount
-        files = c.execute(f"SELECT v.id, v.path {due.format(t='wiki_files')} AND v.deleted_at IS NOT NULL ORDER BY v.id LIMIT 500",
-                          (cut,)).fetchall()
+        n = c.execute(f"DELETE FROM obj_versions WHERE id IN (SELECT v.id FROM obj_versions v {space} WHERE v.kind=? "
+                      "AND v.held_at IS NOT NULL AND v.held_at<? AND s.e2e IS NOT NULL)", (WKH_KIND, cut)).rowcount
+        files = c.execute(f"SELECT v.id, v.path FROM wiki_files v {space} WHERE v.wkx_held_at IS NOT NULL AND v.wkx_held_at<? "
+                          "AND s.e2e IS NOT NULL AND v.deleted_at IS NOT NULL ORDER BY v.id LIMIT 500", (cut,)).fetchall()
         if files:  # like wka_tick: row, scan / text marks, the stored file after the commit
             ids = [r["id"] for r in files]
             q = ",".join("?" * len(ids))
@@ -329,13 +344,12 @@ def wkx_tick(c, force=False):
         ret_report(c, "trash", {"versions": n, "files": len(files)}, True, run="wiki_e2e_held")
         for s in c.execute("SELECT id, org_id, owner_id, wkx_holds FROM wiki_spaces WHERE wkx_holds<>'{}'").fetchall():
             w, a = _wkx_where(s["org_id"], s["owner_id"])
-            live = {r[0] for r in c.execute(f"SELECT wkx_held_at FROM wiki_versions WHERE {w} AND wkx_held_at IS NOT NULL UNION "
-                                            f"SELECT wkx_held_at FROM wiki_files WHERE {w} AND wkx_held_at IS NOT NULL", [*a, *a])}
+            live = _wkx_held_times(c, w, a)
             try:
                 holds = json.loads(s["wkx_holds"])
             except ValueError:
                 holds = {}
-            keep = {k: v for k, v in holds.items() if k in live}
+            keep = {k: v for k, v in holds.items() if ts_canon(k) in live}
             if keep != holds:
                 c.execute("UPDATE wiki_spaces SET wkx_holds=? WHERE id=?", (json.dumps(keep), s["id"]))
     c.commit()
@@ -352,18 +366,18 @@ def wkh_move(c, rows, to, uid, keep=True):
     q = ",".join("?" * len(ids))
     c.execute(f"DELETE FROM wiki_words WHERE page_id IN ({q})", ids)
     if not keep:
-        c.execute(f"DELETE FROM wiki_versions WHERE page_id IN ({q})", ids)
+        obj_version_drop(c, WKH_KIND, ids)  # 2.958.0 (#5281)
         return
     owner = None if to else uid
     src = {r["id"]: r for r in rows}
-    for v in c.execute(f"SELECT id, page_id, wkx_held_at FROM wiki_versions WHERE page_id IN ({q}) AND wkx_held_at IS NOT NULL",
-                       ids).fetchall():  # 2.528.0 D (#4306): held at a lock -- along only when the mover could read the space then
-        if wkx_may_see(c, src[v["page_id"]], v["wkx_held_at"], uid):
-            c.execute("UPDATE wiki_versions SET wkx_held_at=NULL WHERE id=?", (v["id"],))
+    for v in c.execute(f"SELECT id, ref_id, held_at FROM obj_versions WHERE kind=? AND ref_id IN ({q}) AND held_at IS NOT NULL",
+                       [WKH_KIND, *ids]).fetchall():  # 2.528.0 D (#4306): held at a lock -- along only when the mover could read the space then
+        if wkx_may_see(c, src[v["ref_id"]], v["held_at"], uid):
+            c.execute("UPDATE obj_versions SET held_at=NULL WHERE id=?", (v["id"],))
         else:
-            c.execute("DELETE FROM wiki_versions WHERE id=?", (v["id"],))
-    for v in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_versions WHERE page_id IN ({q})", ids).fetchall():
-        c.execute("UPDATE wiki_versions SET org_id=?, owner_id=?, body=? WHERE id=?",
+            c.execute("DELETE FROM obj_versions WHERE id=?", (v["id"],))
+    for v in c.execute(f"SELECT id, org_id, owner_id, body FROM obj_versions WHERE kind=? AND ref_id IN ({q})", [WKH_KIND, *ids]).fetchall():
+        c.execute("UPDATE obj_versions SET org_id=?, owner_id=?, body=? WHERE id=?",
                   (to, owner, wkh_seal(c, to, owner, _vbody(c, v), WKH_VCTX), v["id"]))
 
 
@@ -373,11 +387,11 @@ def wkh_drop_unreadable(c, ids):
     if not ids:
         return
     q = ",".join("?" * len(ids))
-    for v in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_versions WHERE page_id IN ({q})", ids).fetchall():
+    for v in c.execute(f"SELECT id, org_id, owner_id, body FROM obj_versions WHERE kind=? AND ref_id IN ({q})", [WKH_KIND, *ids]).fetchall():
         try:
             _vbody(c, v)
         except WikiUnreadable:
-            c.execute("DELETE FROM wiki_versions WHERE id=?", (v["id"],))
+            c.execute("DELETE FROM obj_versions WHERE id=?", (v["id"],))
 
 
 # ---- the passes (admin/orgcrypt_cli.py) ---------------------------------------------------------------------------------
@@ -392,14 +406,14 @@ def wkh_settle(c, plain=None, stop=None):
         if sid not in keys:
             keys[sid] = oc_key(c, sid, create=plain is None)
         return keys[sid]
-    for table, ctx in (("wiki_pages", WKH_CTX), ("wiki_versions", WKH_VCTX)):
+    for table, ctx, only in (("wiki_pages", WKH_CTX, ""), ("obj_versions", WKH_VCTX, f" AND kind='{WKH_KIND}'")):  # 2.958.0 (#5281)
         last = 0
         while True:
             if stop and stop():
                 return out
             with system_ctx(c):  # orgcrypt: server-side bulk work over every space, never content handed to a person
                 write_lock(c, "orgcrypt")
-                rows = c.execute(f"SELECT id, org_id, owner_id, body FROM {table} WHERE id>? AND body<>'' ORDER BY id LIMIT {WKH_BATCH}",
+                rows = c.execute(f"SELECT id, org_id, owner_id, body FROM {table} WHERE id>? AND body<>''{only} ORDER BY id LIMIT {WKH_BATCH}",
                                  (last,)).fetchall()
                 for r in rows:
                     v, sid = r["body"], wkh_sid(r["org_id"], r["owner_id"])
@@ -447,10 +461,108 @@ def wkh_count(c):
     """{"sealed": n, "plain": n} over the page texts and versions outside spaces with the lock (status)."""
     out = {"sealed": 0, "plain": 0}
     with system_ctx(c):  # orgcrypt: counts only
-        for t in ("wiki_pages", "wiki_versions"):
-            for r in c.execute(f"SELECT left(body, 6) AS p, COUNT(*) AS n FROM {t} WHERE body<>'' AND left(body, 5)<>'e2e1:' GROUP BY left(body, 6)"):
+        for t, only in (("wiki_pages", ""), ("obj_versions", f" AND kind='{WKH_KIND}'")):  # 2.958.0 (#5281)
+            for r in c.execute(f"SELECT left(body, 6) AS p, COUNT(*) AS n FROM {t} WHERE body<>'' AND left(body, 5)<>'e2e1:'{only} GROUP BY left(body, 6)"):
                 out["sealed" if r["p"] == PREFIX else "plain"] += int(r["n"])
     return out
+
+
+# ---- 2.958.0 (#5281, stage Q7a): wiki_versions -> obj_versions at the start, then the old table goes ---------------------
+WKH_RETIRE_WAITS = N_("Knowledge history clean-up waits: {0} old versions in {1} cannot be opened now (the key of their space is missing), the old table stays. See the server log.")
+WKH_RETIRE_WHY = ("cannot be opened now (the key of their space is missing) -- they stay there, the table stays, nothing dropped; "
+                  "the next start tries again (core/migrations.d/5281_a.py)")
+
+
+def _wkh_old_ts(v, fallback):
+    """An old TEXT time as it goes into a TIMESTAMPTZ column: canonical, or fallback when no cast could read it."""
+    t = ts_canon(v) if v else ""
+    try:
+        datetime.fromisoformat(t)
+        return t
+    except ValueError:
+        return fallback
+
+
+def _wkh_old_body(c, v, keys):
+    """The body of an old row sealed for obj_versions (the same key of its space, the context OBJV_CTX); None when a sealed
+    text cannot be opened now (it stays in wiki_versions for the next start)."""
+    body = v["body"] or ""
+    if not oc_is_enc(body) or le2e_is_cipher(body):
+        return body
+    sid = wkh_sid(v["org_id"], v["owner_id"])
+    if sid not in keys:
+        try:
+            keys[sid] = oc_key(c, sid, create=False) if sid else None
+        except OrgCryptError:
+            keys[sid] = None
+    try:
+        return _seal(keys[sid], sid, WKH_VCTX, oc_dec_k(keys[sid], sid, WKH_OLD_VCTX, body))
+    except (OrgCryptError, TypeError, ValueError):
+        return None
+
+
+def wkh_move_old(c):
+    """2.958.0 (#5281): every row of wiki_versions into obj_versions (kind "wiki"): its id where it is free (the undo steps of
+    #5253 name version ids), the next numbers of its page in the old order, wkx_held_at as held_at, a sealed text sealed again
+    for obj_versions. A moved row leaves wiki_versions at once (idempotent). -> {"moved": n, "kept": m}."""
+    cols = table_columns(c, "wiki_versions")
+    held = "wkx_held_at" if "wkx_held_at" in cols else "NULL"
+    now = iso_ms(now_utc())
+    out, keys, nxt, last = {"moved": 0, "kept": 0}, {}, {}, 0
+    while True:
+        rows = c.execute(f"SELECT id, page_id, org_id, owner_id, path, body, size, created_by, created_at, updated_at, {held} AS held "
+                         f"FROM wiki_versions WHERE id>? ORDER BY id LIMIT {WKH_BATCH}", (last,)).fetchall()
+        for v in rows:
+            body = _wkh_old_body(c, v, keys)
+            if body is None:
+                out["kept"] += 1
+                continue
+            pid = int(v["page_id"])
+            if pid not in nxt:
+                nxt[pid] = c.execute("SELECT COALESCE(MAX(no), 0) FROM obj_versions WHERE kind=? AND ref_id=?", (WKH_KIND, pid)).fetchone()[0]
+            nxt[pid] += 1
+            free = not c.execute("SELECT 1 FROM obj_versions WHERE id=?", (v["id"],)).fetchone()
+            at = _wkh_old_ts(v["created_at"], now)
+            args = (WKH_KIND, pid, nxt[pid], v["org_id"], v["owner_id"], v["path"] or "", body, int(v["size"] or 0), v["created_by"],
+                    at, _wkh_old_ts(v["updated_at"], at), _wkh_old_ts(v["held"], now) if v["held"] else None)
+            c.execute("INSERT INTO obj_versions(" + ("id," if free else "") + "kind,ref_id,no,org_id,owner_id,title,body,size,created_by,"
+                      "created_at,updated_at,held_at) VALUES(" + ("?," if free else "") + "?,?,?,?,?,?,?,?,?,?,?,?)",
+                      ((v["id"],) if free else ()) + args)
+            c.execute("DELETE FROM wiki_versions WHERE id=?", (v["id"],))
+            out["moved"] += 1
+        if len(rows) < WKH_BATCH:
+            break
+        last = rows[-1]["id"]
+    if out["moved"]:  # the identity goes on after the ids taken over
+        c.execute("SELECT setval(pg_get_serial_sequence('obj_versions', 'id'), GREATEST((SELECT COALESCE(MAX(id), 0) FROM obj_versions), 1))")
+    return out
+
+
+def _wkh_left(c):
+    return c.execute("SELECT COUNT(*) FROM wiki_versions").fetchone()[0]
+
+
+def _wkh_alert(n, tables):
+    aa_now("storage", "kern5281:" + ",".join(tables), WKH_RETIRE_WAITS, (int(n), ", ".join(tables)))
+
+
+def wkh_retire(c):
+    """2.958.0 (#5281, core/objhooks.START, every start until done): wkh_move_old, then the start check and DROP TABLE
+    wiki_versions (core/kernretire.py kern_retire: rows left = texts that cannot be opened now; the back limit rises). {} once
+    the table is gone (a catalog read)."""
+    if not table_exists(c, "wiki_versions"):
+        return {}
+    with system_ctx(c):  # every space's versions; nothing is handed to a person
+        write_lock(c, KERN_RETIRE_LOCK)
+        if not table_exists(c, "wiki_versions"):  # another process did it meanwhile
+            return {}
+        out = wkh_move_old(c)
+        out.update(kern_retire(c, ("wiki_versions",), _wkh_left, "knowledge history, stage Q7a (#5281)", alert=_wkh_alert,
+                               why=WKH_RETIRE_WHY))
+    return out
+
+
+objhooks.START.append(("kern5281_wiki", False, wkh_retire))  # 2.958.0 (#5281): every start until wiki_versions is gone
 
 
 # ---- routes ---------------------------------------------------------------------------------------------------------------
@@ -461,25 +573,24 @@ def _page(pid, write=False):
 
 
 def _version(c, pid, vid, r=None):
-    v = c.execute("SELECT * FROM wiki_versions WHERE id=? AND page_id=?", (vid, pid)).fetchone()
-    if not v or (r is not None and not wkx_may_see(c, r, v["wkx_held_at"], me())):  # 2.528.0 D (#4306): held at a lock
+    v = obj_version_get(c, WKH_KIND, pid, vid)  # 2.958.0 (#5281)
+    if not v or (r is not None and not wkx_may_see(c, r, v["held_at"], me())):  # 2.528.0 D (#4306): held at a lock
         raise Denied(404)
     return v
 
 
 @app.get("/api/wiki/pages/<int:pid>/versions")
 def wkh_list(pid):
-    """The history of a page (newest first): [{id, path, size, created_at, updated_at, by_name, current}]; e2e = a space with
+    """The history of a page (newest first): [{id, no, path, size, created_at, updated_at, by_name, current}]; e2e = a space with
     the lock (no history). Who may read the page reads its history."""
     c, r, locked = _page(pid)
     if locked:
         return jsonify(versions=[], e2e=True)
-    rows = c.execute("SELECT id, org_id, owner_id, path, body, size, created_by, created_at, updated_at, wkx_held_at FROM wiki_versions "
-                     "WHERE page_id=? ORDER BY id DESC LIMIT ?", (pid, WKH_KEEP)).fetchall()
+    rows = obj_version_rows(c, WKH_KIND, pid, WKH_KEEP)  # 2.958.0 (#5281)
     seen = {}  # 2.528.0 D (#4306): held at a lock -- only for who could read the space then (one look per hold)
-    for h in {x["wkx_held_at"] for x in rows if x["wkx_held_at"]}:
+    for h in {x["held_at"] for x in rows if x["held_at"]}:
         seen[h] = wkx_may_see(c, r, h, me())
-    rows = [x for x in rows if not x["wkx_held_at"] or seen[x["wkx_held_at"]]]
+    rows = [x for x in rows if not x["held_at"] or seen[x["held_at"]]]
     names = user_names(c, {x["created_by"] for x in rows})
     by = sorted({int(x["created_by"]) for x in rows if x["created_by"]})
     agents = {r_[0] for r_ in c.execute(f"SELECT id FROM users WHERE kind='agent' AND id IN ({','.join('?' * len(by))})", by)} if by else set()
@@ -496,7 +607,8 @@ def wkh_list(pid):
     from .wkfolder import wkf_shared, wkf_shown_path
     uid = me()
     info = wkf_shared(c, uid)  # 2.200.0 F (#2747, review B3): through a share the paths start at the shared node
-    out = [{"id": x["id"], "path": wkf_shown_path(c, uid, r, info, x["path"]), "size": x["size"], "created_at": x["created_at"],
+    out = [{"id": x["id"], "no": x["no"],  # 2.958.0 (#5281): + its number (the core's versions)
+            "path": wkf_shown_path(c, uid, r, info, x["title"]), "size": x["size"], "created_at": x["created_at"],
             "updated_at": x["updated_at"], "by_name": names.get(x["created_by"], ""),
             "agent": x["created_by"] in agents,  # 2.577.0 (#4708 4): a version an agent account wrote
             "current": i == 0 and same(x)}
@@ -513,7 +625,7 @@ def wkh_get(pid, vid):
     v = _version(c, pid, vid, r)
     from .wkfolder import wkf_shown_path
     # 2.200.0 F (#2747, review B3): the path from the share down
-    return jsonify(id=v["id"], path=wkf_shown_path(c, me(), r, path=v["path"]), body=_vbody(c, v), size=v["size"], created_at=v["created_at"], updated_at=v["updated_at"],
+    return jsonify(id=v["id"], no=v["no"], path=wkf_shown_path(c, me(), r, path=v["title"]), body=_vbody(c, v), size=v["size"], created_at=v["created_at"], updated_at=v["updated_at"],
                    by_name=user_names(c, [v["created_by"]]).get(v["created_by"], ""))
 
 

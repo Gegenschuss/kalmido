@@ -144,7 +144,7 @@ def body(s, pid):
 
 
 def nvers(pid):
-    return dbx("SELECT COUNT(*) FROM wiki_versions WHERE page_id=?", (pid,))[0][0]
+    return dbx("SELECT COUNT(*) FROM obj_versions WHERE kind='wiki' AND ref_id=?", (pid,))[0][0]  # 2.958.0 (#5281): obj_versions
 
 
 def save(s, pid, text):
@@ -186,7 +186,7 @@ GF = groups(FID)[-1]["id"]
 check(Fr.post(B + f"/api/undo/to/{GF}").ok and cell(FR[0], FC[0]) == "one", "freelancer: her table step taken back")
 check(Ol.post(B + f"/api/undo/to/{GF}").status_code == 404, "someone else: 404 on her step")
 FP = page(Fr, "private", "Diary", "Day one")
-dbx("UPDATE wiki_versions SET created_at='2026-01-02T03:04:05.000Z', updated_at='2026-01-02T03:04:05.000Z' WHERE page_id=?", (FP,))
+dbx("UPDATE obj_versions SET created_at='2026-01-02T03:04:05.000Z', updated_at='2026-01-02T03:04:05.000Z' WHERE kind='wiki' AND ref_id=?", (FP,))  # 2.958.0 (#5281)
 dbx("UPDATE wiki_pages SET updated_at='2026-01-02T03:04:05.000Z' WHERE id=?", (FP,))
 save(Fr, FP, "Day two")
 GP = groups(FID)[-1]["id"]

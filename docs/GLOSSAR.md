@@ -275,6 +275,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/objparts.py` (`part`) - The shared core, stage 6b -- the side objects of a project on the core
 - `kalmido/core/objreact.py` (`orx`) - Reactions exist once, in the shared core: one table obj_reactions for comments, team chat and the agent chat
 - `kalmido/core/objtags.py` (`otg`) - Tags exist once, in the shared core: obj_tags (scope user / list / org / ws) and obj_tag_links; project tags and organisation labels since 2.947
+- `kalmido/core/objversions.py` (`obj_version`) - Versions exist once, in the shared core: one table obj_versions for numbered whole states (knowledge pages since 2.958, stage Q7a)
 - `kalmido/core/objweb.py` (`obj`) - The generic routes of the core objects (core/objects.py, core/writes.py)
 - `kalmido/core/orgcrypt.py` (`oc`) - Server-side keys per organisation
 - `kalmido/core/orgrows.py` (`orw`) - The organisation of tasks, comments, events and contacts (column org_id, migrations.d/4602_a.py)

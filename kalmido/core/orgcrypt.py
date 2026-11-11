@@ -123,7 +123,8 @@ FIELDS = {
     "office_equipment": ("purchase_net", "new_value", "current_value", "serial_no"),  # 2.92.0 B (#1931): the value of equipment
     # 2.123.0 A (#2105, #2102): the text of knowledge pages in spaces without the lock and of their history; a private page
     # with the account key (space -owner), sealed / opened by wiki/wkhist.py (the passes: wkh_settle, not fields_pass)
-    "wiki_pages": ("body",), "wiki_versions": ("body",),
+    "wiki_pages": ("body",),
+    "obj_versions": ("body",),  # 2.958.0 (#5281): the core's versions (was wiki_versions); kind "wiki" sealed / opened by wiki/wkhist.py
 }
 JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"): ("costs", "margin"),
              ("office_doc_parts", "totals"): ("costs", "margin")}  # 2.47.0 (#1215)
@@ -171,7 +172,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_agreements": N_("Business contracts and insurances"),  # 2.92.0 A (#1925)
                  "office_equipment": N_("Purchase prices and margins"),  # 2.92.0 B (#1931): purchase price, new and current value
                  # 2.123.0 A (#2105, #2102): texts of knowledge pages (spaces without the lock) and their history
-                 "wiki_pages": N_("Texts of knowledge pages and their history"), "wiki_versions": N_("Texts of knowledge pages and their history"),
+                 "wiki_pages": N_("Texts of knowledge pages and their history"), "obj_versions": N_("Texts of knowledge pages and their history"),  # 2.958.0 (#5281)
                  # 2.306.0 A (#2885): the journal with the account key (life/model.py jr_seal, no FIELDS entry: no org_id column)
                  "journal": N_("Journal and mood")}
 PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))

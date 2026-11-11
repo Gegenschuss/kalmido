@@ -73,8 +73,7 @@
   "video_comments": "stage Q4 (comments) takes it down: the core's comments",
   "wiki_links": "own logic: derived from the page text (backlinks), rebuilt on save",
   "wiki_pages": "own logic: a page's text (body)",
-  "wiki_shares": "public page links only (kind link, token_hash) - the area's share links without an account; person shares are core shares since stage 7c (#5244)",
-  "wiki_versions": "stage Q7 (versions) takes it down: the core's versions"
+  "wiki_shares": "public page links only (kind link, token_hash) - the area's share links without an account; person shares are core shares since stage 7c (#5244)"
  },
  "code": {
   "kalmido/accounts/orgroles.py:need_org_say": "the organisation's say rule (org_say_refusal); since stage Q1 the core's reaction rule asks it through the area's say hook (core/objreact.py orx_toggle)",

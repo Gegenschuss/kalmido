@@ -9,7 +9,7 @@ A person's token sees what the person sees in the app (full paths of their own s
 Locked spaces (wikie2e.py: path and text are ciphertexts) never come here, not even for their own people.
 Writing needs the role 'edit' on the page; a new page needs 'edit' on its folder (checked before the name, and again on the
 new page before the commit). Renaming (path, relink: people's tokens) needs the area's own right, a share edits the text only.
-The text keeps the web route's rules: size, the frontmatter, the history (wiki_versions), the word index, the links;
+The text keeps the web route's rules: size, the frontmatter, the history (the core's versions, 2.958.0 #5281), the word index, the links;
 expect_updated_at guards against overwriting a change made in between (409 with the current page, checked in the UPDATE).
 A token without wiki:read gets no text back (writing answers the page without body / attrs).
 Every read, write and creation by an agent is noted in the history of the page's node (fs_log), not a listing. No event.

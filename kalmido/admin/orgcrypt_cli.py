@@ -60,7 +60,7 @@ BATCH = 200
 # 2.148.1 C (#2481): derived from oc.FIELDS / oc.JSON_KEYS (every protected table, a test compares them); the household
 # budget (sid, bud_settle) and the knowledge pages (wkh_settle) have their own passes; tables with one row per organisation
 # use org_id as their id column
-FIELD_SETTLED = ("budget_", "wiki_")
+FIELD_SETTLED = ("budget_", "wiki_", "obj_versions")  # 2.958.0 (#5281): the knowledge pages' versions (wkh_settle)
 FIELD_ORG_ROWS = ("office_company", "office_settings", "office_cf_start", "office_payonline")
 FIELD_JOBS = [(t, "org_id" if t in FIELD_ORG_ROWS else "id", col, "log" if (t, col) == ("office_doc_log", "detail") else "text")
               for t, cols in oc.FIELDS.items() if not t.startswith(FIELD_SETTLED) for col in cols] + [
@@ -1271,7 +1271,7 @@ def _rot_jobs(oid):
     for (t, col), keys in oc.JSON_KEYS.items():
         out.append((t, "org_id" if t in ROT_ORG_ROWS else "id", col, "org_id", "json", f"{t}.{col}"))
     out += [(t, idc, col, "ws", "ws", ctx) for t, idc, col, ctx in ROT_WS]
-    # 2.138.0 C (#1972, review F6): page texts (wiki_pages / wiki_versions .body) come with oc.FIELDS
+    # 2.138.0 C (#1972, review F6): page texts (wiki_pages / obj_versions .body, 2.958.0 #5281) come with oc.FIELDS
     return out
 
 

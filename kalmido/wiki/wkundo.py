@@ -2,7 +2,8 @@
 mode "ref").
 
 A save of the page's text (PATCH /api/wiki/pages/<id> with body, a version restored) points to the page's own history
-(wiki/wkhist.py wiki_versions): {b: the version before the save, a: the version it left}. No second copy. The saves of the
+(wiki/wkhist.py; 2.958.0 #5281: the core's versions, obj_versions kind "wiki", the ids kept by the move): {b: the version
+before the save, a: the version it left}. No second copy. The saves of the
 same person within WKH_MERGE share one version, so they share one step too (a save that leaves the same pair adds nothing).
 Taking it back = the text of version b saved as a new version (as the version list's "Restore" does), forward again = the
 text of version a the same way. Conflict = the version number: the page's newest version must still be the one the step
@@ -20,7 +21,8 @@ from ..core.undogroups import UG_LABEL, UG_TRACKED
 from ..core.undoweb import UG_GONE
 from ..core.writes import UNDO_NOTHING
 from .pages import wiki_need
-from .wkhist import WikiUnreadable, _locked, _vbody, wkh_body, wkh_put_text
+from ..core.objversions import obj_version_get, obj_version_rows  # 2.958.0 (#5281)
+from .wkhist import WKH_KIND, WikiUnreadable, _locked, _vbody, wkh_body, wkh_put_text
 
 WKU_KIND = "wiki"  # the page's kind in the core's history (wkhist.py WKH_KIND)
 WKU_AREA = "wiki"
@@ -28,7 +30,7 @@ WKU_CHANGED = "Changed in the meantime by {0}"  # an existing text (wkhist.py wk
 
 
 def _two(c, pid):
-    return [r[0] for r in c.execute("SELECT id FROM wiki_versions WHERE page_id=? ORDER BY id DESC LIMIT 2", (int(pid),)).fetchall()]
+    return [r[0] for r in obj_version_rows(c, WKH_KIND, pid, 2, cols="id")]
 
 
 def wku_pre(c, pid):
@@ -77,14 +79,14 @@ def wku_run(c, uid, pid, data, redo):
     vs = _two(c, pid)
     try:
         cur = wkh_body(c, r)
-        v = c.execute("SELECT * FROM wiki_versions WHERE id=? AND page_id=?", (want, int(pid))).fetchone() if want else None
+        v = obj_version_get(c, WKH_KIND, pid, want) if want else None
         same = v is not None and _vbody(c, v) == cur
     except WikiUnreadable:
         raise Denied(404, tr(UG_GONE)) from None
     if not want or not vs or vs[0] != want or not same:  # saved elsewhere since (another version, or the text moved on)
         who = user_names(c, [r["updated_by"]]).get(r["updated_by"]) or "?"
         raise Denied(409, tr(WKU_CHANGED, who))
-    t = c.execute("SELECT * FROM wiki_versions WHERE id=? AND page_id=?", (to, int(pid))).fetchone() if to else None
+    t = obj_version_get(c, WKH_KIND, pid, to) if to else None
     if t is None:
         raise Denied(404, tr(UG_GONE))  # the version went (at most WKH_KEEP per page)
     try:

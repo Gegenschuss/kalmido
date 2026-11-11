@@ -18206,6 +18206,7 @@
   "Words or the search syntax (tag:Name, \"exact text\", -word)": "Palabras o sintaxis de búsqueda (tag:Nombre, \"texto exacto\", -palabra)",
   "Moved to the trash": "Movido a la papelera",
   "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "La limpieza del núcleo común espera: {0} filas antiguas de miembros en {1} aún no tienen permiso, la tabla antigua se mantiene. Consulta el registro del servidor.",
+  "Knowledge history clean-up waits: {0} old versions in {1} cannot be opened now (the key of their space is missing), the old table stays. See the server log.": "La limpieza del historial de conocimiento espera: {0} versiones antiguas en {1} no se pueden abrir ahora (falta la clave de su espacio), la tabla antigua se mantiene. Consulta el registro del servidor.",
   "Select at least two documents": "Elige al menos dos documentos",
   "Only documents of one workspace can be merged": "Solo se pueden unir documentos de un mismo espacio de trabajo",
   "was page {0}": "antes página {0}",

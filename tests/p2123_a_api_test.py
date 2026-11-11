@@ -156,7 +156,8 @@ check(r.ok and A.get(B + f"/api/wiki/pages/{MV}").json().get("body") == "Text de
       and raw(MV).startswith("kenc1:"), "#2105: private -> organisation: sealed for the organisation, a member reads it " + r.text[:200])
 vv = vers(A, MV)
 # 2.360.0 (#2496): into an organisation the earlier (private) versions do not go along -- its members would read them
-check(vv == [] and not sql("SELECT 1 FROM wiki_versions WHERE page_id=?", (MV,)), "#2496: no private versions in the organisation " + str(vv)[:200])
+# 2.958.0 (#5281): the versions are rows of the core's obj_versions (kind wiki)
+check(vv == [] and not sql("SELECT 1 FROM obj_versions WHERE kind='wiki' AND ref_id=?", (MV,)), "#2496: no private versions in the organisation " + str(vv)[:200])
 save(A, MV, "Text der umziehenden Seite mit Quitte, dritte Fassung")  # a version made in the organisation
 # 2.361.2 (#2923): a member takes a page out of the organisation only after an admin released the request
 rq = Bo.post(B + f"/api/orgs/{ORG}/out-requests", json={"kind": "wiki", "id": MV}).json().get("id")
@@ -166,7 +167,7 @@ check(r.ok and Bo.get(B + f"/api/wiki/pages/{MV}").json().get("body", "").endswi
       and A.get(B + f"/api/wiki/pages/{MV}").status_code == 404, "#2105: and back into the private workspace " + r.text[:200])
 vv = vers(Bo, MV) or []
 check(len(vv) >= 1 and all(Bo.get(B + f"/api/wiki/pages/{MV}/versions/{v['id']}").ok for v in vv), "#2102: versions readable after the way back")
-check(all(x[0].startswith("kenc1:") for x in sql("SELECT body FROM wiki_versions WHERE page_id=? AND body<>''", (MV,))),
+check(all(x[0].startswith("kenc1:") for x in sql("SELECT body FROM obj_versions WHERE kind='wiki' AND ref_id=? AND body<>''", (MV,))),
       "#2102: the versions are sealed in the database")
 
 # a plain page from before 2.123 (written straight into the database): read, found, sealed by the pass
@@ -188,13 +189,13 @@ check(v is not None and len(v) == 1 and v[0]["current"] and v[0]["by_name"] == "
 save(A, H1, "eins zwei drei vier")
 v = vers(Bo, H1)
 check(len(v) == 2 and v[0]["by_name"] == "Alice Admin" and v[0]["current"] and not v[1]["current"], "#2102: another person = a new version " + str(v))
-sql("UPDATE wiki_versions SET created_at='2026-01-01T08:00:00.000+00:00' WHERE id=?", (v[0]["id"],), write=True)
+sql("UPDATE obj_versions SET created_at='2026-01-01T08:00:00.000+00:00' WHERE id=?", (v[0]["id"],), write=True)  # 2.958.0 (#5281)
 save(A, H1, "eins zwei drei vier fuenf")
 v = vers(Bo, H1)
 check(len(v) == 3, "#2102: the same person after more than 10 minutes = a new version " + str(len(v)))
 d = Bo.get(B + f"/api/wiki/pages/{H1}/versions/{v[-1]['id']}").json()
 check(d.get("body") == "eins zwei drei" and d.get("path") == "Verlauf/Seite", "#2102: a version with its text " + str(d)[:200])
-check(sql("SELECT body FROM wiki_versions WHERE id=?", (v[-1]["id"],))[0][0].startswith("kenc1:"), "#2102: a version is sealed at rest")
+check(sql("SELECT body FROM obj_versions WHERE id=?", (v[-1]["id"],))[0][0].startswith("kenc1:"), "#2102: a version is sealed at rest")
 # restore: a stale expect_updated_at = 409, then restore = a new version; the Undo of the app = the text before again
 r = Bo.post(B + f"/api/wiki/pages/{H1}/versions/{v[-1]['id']}/restore", json={"expect_updated_at": "2000-01-01T00:00:00.000+00:00"})
 check(r.status_code == 409 and r.json().get("page"), "#2102: restore after someone else saved: 409 with the page " + r.text[:200])
@@ -212,10 +213,11 @@ check(Ca.get(B + f"/api/wiki/pages/{H1}/versions").status_code == 404 and Ca.get
 check(Bo.get(B + f"/api/wiki/pages/{P1}/versions/{v[0]['id']}").status_code == 404, "#2102: a version of another page 404")
 # the limit: at most 100 per page (the oldest go)
 for i in range(120):
-    sql("INSERT INTO wiki_versions(page_id, org_id, owner_id, path, body, size, created_by, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
-        (H1, ORG, None, "Verlauf/Seite", f"alt {i}", 5, ALICE, f"2025-01-01T00:{i // 60:02d}:{i % 60:02d}.000+00:00", "2025-01-01T00:00:00.000+00:00"), write=True)
+    # 2.958.0 (#5281): rows of obj_versions (kind wiki, a number of their own)
+    sql("INSERT INTO obj_versions(kind, ref_id, no, org_id, owner_id, title, body, size, created_by, created_at, updated_at) VALUES('wiki',?,?,?,?,?,?,?,?,?,?)",
+        (H1, 1000 + i, ORG, None, "Verlauf/Seite", f"alt {i}", 5, ALICE, f"2025-01-01T00:{i // 60:02d}:{i % 60:02d}.000+00:00", "2025-01-01T00:00:00.000+00:00"), write=True)
 save(A, H1, "nach dem Limit")
-n = sql("SELECT COUNT(*) FROM wiki_versions WHERE page_id=?", (H1,))[0][0]
+n = sql("SELECT COUNT(*) FROM obj_versions WHERE kind='wiki' AND ref_id=?", (H1,))[0][0]
 check(n == 100, f"#2102: at most 100 versions per page ({n})")
 # freelancer-matrix: wiki -- the history of a private page of a person without an organisation
 save(Fr, FP, "Private Notiz zum Kunden Kumquat, geaendert")
@@ -260,7 +262,7 @@ check(r.ok and r.json() == {"versions": [], "e2e": True}, "#2102: a space with t
 # ================================================================ #2105 the way back (before running 2.122) and again
 rc, out = cli("decrypt-wiki")
 check(rc == 0, "#2105: decrypt-wiki " + out[-300:])
-sealed = sql("SELECT COUNT(*) FROM wiki_pages WHERE left(body, 6)='kenc1:'")[0][0] + sql("SELECT COUNT(*) FROM wiki_versions WHERE left(body, 6)='kenc1:'")[0][0]
+sealed = sql("SELECT COUNT(*) FROM wiki_pages WHERE left(body, 6)='kenc1:'")[0][0] + sql("SELECT COUNT(*) FROM obj_versions WHERE kind='wiki' AND left(body, 6)='kenc1:'")[0][0]
 check(sealed == 0 and raw(P1) == Bo.get(B + f"/api/wiki/pages/{P1}").json()["body"] and "Zitronenbaum" in raw(P1),
       f"#2105: after decrypt-wiki every page text and version is plain ({sealed} sealed)")
 check(raw(FP) == Fr.get(B + f"/api/wiki/pages/{FP}").json()["body"], "#2105: the private pages too")

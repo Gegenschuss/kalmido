@@ -90,7 +90,7 @@ def vers(s, pid):
 
 
 def nvers(pid):
-    return sql("SELECT COUNT(*) FROM wiki_versions WHERE page_id=?", (pid,))[0][0]
+    return sql("SELECT COUNT(*) FROM obj_versions WHERE kind='wiki' AND ref_id=?", (pid,))[0][0]  # 2.958.0 (#5281): obj_versions
 
 
 def start(s, space, uid):
@@ -155,7 +155,7 @@ check(nvers(P) == NV, f"#4306 (B26): the history is still there after switching 
 fr = sql("SELECT id, deleted_at, wkx_held_at FROM wiki_files WHERE id IN (?, ?) ORDER BY id", (F1, F2))
 check(len(fr) == 2 and all(x[1] and x[2] for x in fr) and stored(REL1) and stored(REL2),
       f"#4306 (B26): the files in the trash and their stored bytes are still there, held {fr}")
-HELD = sql("SELECT DISTINCT wkx_held_at FROM wiki_versions WHERE page_id=?", (P,))
+HELD = sql("SELECT DISTINCT held_at FROM obj_versions WHERE kind='wiki' AND ref_id=?", (P,))  # 2.958.0 (#5281): held_at
 check(len(HELD) == 1 and HELD[0][0], f"#4306: every version is held from the switch {HELD}")
 holds = json.loads(sql("SELECT wkx_holds FROM wiki_spaces WHERE org_id=?", (ORG,))[0][0])
 BOB = Bo.get(B + "/api/state").json()["me"]["id"]
@@ -205,7 +205,7 @@ check(r.ok and sql("SELECT deleted_at, wkx_held_at FROM wiki_files WHERE id=?", 
       "#4306: an earlier member brings the page back with its held file " + r.text[:200])
 
 # ---------------------------------------------------------------- the period: due, but open -> stays; due and locked -> goes
-sql("UPDATE wiki_versions SET wkx_held_at=? WHERE page_id=? AND wkx_held_at IS NOT NULL", (OLD, P), write=True)
+sql("UPDATE obj_versions SET held_at=? WHERE kind='wiki' AND ref_id=? AND held_at IS NOT NULL", (OLD, P), write=True)  # 2.958.0 (#5281)
 sql("UPDATE wiki_spaces SET wkx_holds=? WHERE org_id=?", (json.dumps({OLD: [ALICE, BOB]}), ORG), write=True)
 run("wkx_tick", True)
 check(nvers(P) >= NV, "#4306: held versions of a space open again stay after the period")
@@ -214,7 +214,7 @@ sql("UPDATE wiki_files SET deleted_at=?, wkx_held_at=? WHERE id=?", (OLD, OLD, F
 # 2.528.0 (#4306, review Fable 1): with the retention switch off the held rows of a locked space still go after the period
 # (before: only counted, readable copies of an encrypted space stayed for good)
 run("wkx_tick", False)
-check(sql("SELECT COUNT(*) FROM wiki_versions WHERE page_id=? AND wkx_held_at IS NOT NULL", (P,))[0][0] == 0,
+check(sql("SELECT COUNT(*) FROM obj_versions WHERE kind='wiki' AND ref_id=? AND held_at IS NOT NULL", (P,))[0][0] == 0,
       "#4306 (B26): after the trash period the run deletes the held versions of the locked space, also with the switch off")
 check(not sql("SELECT 1 FROM wiki_files WHERE id=?", (F2,)) and not stored(REL2),
       "#4306 (B26): the held file in the trash goes with them after the period, also with the switch off")
@@ -226,7 +226,7 @@ FID, Fr = freelancer(B, A, features="cal,comments,collab,wiki")
 keys_up(Fr)
 fp = page(Fr, "private", "Diary", "one")
 save(Fr, fp, "two")
-fsql = "UPDATE wiki_versions SET created_at=?, updated_at=? WHERE page_id=?"
+fsql = "UPDATE obj_versions SET created_at=?, updated_at=? WHERE kind='wiki' AND ref_id=?"  # 2.958.0 (#5281)
 sql(fsql, (OLD, OLD, fp), write=True)  # the next save is a version of its own (no merge with the last one)
 save(Fr, fp, "three")
 FV = nvers(fp)
@@ -238,7 +238,7 @@ r = start(Fr, "private", FID)
 check(r.ok and nvers(fp) == FV and sql("SELECT wkx_held_at FROM wiki_files WHERE id=?", (ff,))[0][0] and stored(frel),
       f"freelancer #4306 (B26): switching on keeps history and trash file {r.status_code} {r.text[-200:]}")
 check(Fr.get(B + f"/api/wiki/pages/{fp}/versions").json() == {"versions": [], "e2e": True}, "freelancer: locked = no history shown")
-sql("UPDATE wiki_versions SET wkx_held_at=? WHERE page_id=?", (OLD, fp), write=True)
+sql("UPDATE obj_versions SET held_at=? WHERE kind='wiki' AND ref_id=?", (OLD, fp), write=True)  # 2.958.0 (#5281)
 run("wkx_tick", True)
 check(nvers(fp) == 0, "freelancer #4306: after the period the held versions of the locked private space go")
 

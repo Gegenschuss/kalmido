@@ -137,7 +137,7 @@ ODL_MORE_SKIP = frozenset((
     "office_archive_log", "office_cash_closings", "office_cash_log", "office_bank_imports", "office_bank_balances",
     "office_cc_cards", "office_cc_statements",  # 2.444.0 (#3447): their positions carry the years
     "office_cf_start", "office_cf_adjust", "office_cf_actual", "office_peppol_sends", "office_procdocs", "video_versions",
-    "video_comments", "sheet_shares", "sheet_files", "wiki_files", "wiki_shares", "wiki_versions", "tchat_files",
+    "video_comments", "sheet_shares", "sheet_files", "wiki_files", "wiki_shares", "obj_versions", "tchat_files",
     "hub_mail_links", "rc_suggest", "pl_imported", "pl_uploads", "doc_meta", "doc_field_values", "doc_mail", "nl_runs",
     "doc_fetchers", "doc_fetch_portals",  # 2.425.0 C (#3453): a person's receipt fetchers (connections, not content)
 ))

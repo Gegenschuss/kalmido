@@ -231,7 +231,8 @@ body = b.get("body") or (b.get("page") or {}).get("body") or ""
 check(f"/api/wiki/files/{NWF}/bild.png" in body and f"[[datei:{NF}]]" in body, f"the page links the new picture and file {body}")
 check(A.get(B + f"/api/wiki/files/{NWF}").content == PNG, "the picture is readable")
 check(dbx("SELECT body FROM wiki_pages WHERE id=?", (NP,))[0]["body"].startswith("kenc1:"), "the page text is sealed at rest")
-nv, sv = (dbx("SELECT COUNT(*) AS n FROM wiki_versions WHERE page_id=?", (x,))[0]["n"] for x in (NP, WP))
+# 2.958.0 (#5281): the versions are rows of the core's obj_versions (kind wiki)
+nv, sv = (dbx("SELECT COUNT(*) AS n FROM obj_versions WHERE kind='wiki' AND ref_id=?", (x,))[0]["n"] for x in (NP, WP))
 check(nv == sv and sv >= 1, f"the page history came along {nv} {sv}")
 # tables
 ts = one("SELECT id FROM sheets WHERE org_id=? AND title='Kalkulation'", (GAM,))
@@ -290,10 +291,10 @@ def live_nodes(where, args):
 
 LIVE = {"wiki_pages": "deleted_at IS NULL", "sheets": "deleted_at IS NULL",
         "wiki_files": "page_id IN (SELECT id FROM wiki_pages WHERE deleted_at IS NULL)",
-        "wiki_versions": "page_id IN (SELECT id FROM wiki_pages WHERE deleted_at IS NULL)", "sheet_files": "sheet_id IN (SELECT id FROM sheets WHERE deleted_at IS NULL)"}
+        "obj_versions": "kind='wiki' AND ref_id IN (SELECT id FROM wiki_pages WHERE deleted_at IS NULL)", "sheet_files": "sheet_id IN (SELECT id FROM sheets WHERE deleted_at IS NULL)"}
 LN = live_nodes("org_id=?", (GAM,))
 left = {t: dbx(f"SELECT COUNT(*) AS n FROM {t} WHERE org_id=?" + (f" AND {LIVE[t]}" if t in LIVE else ""), (GAM,))[0]["n"]
-        for t in ("doc_rules", "wiki_pages", "wiki_files", "wiki_versions", "sheets",
+        for t in ("doc_rules", "wiki_pages", "wiki_files", "obj_versions", "sheets",  # 2.958.0 (#5281): obj_versions
                   "sheet_files", "video_reviews", "video_versions", "video_comments")}
 check(not any(left.values()) and not LN, f"undo takes every taken-over row out {left} {LN}")
 check(dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (NF,)), "2.506.0 (#4299): the versions stay with their node in the trash")

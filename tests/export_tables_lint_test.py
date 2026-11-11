@@ -83,8 +83,9 @@ rc, out = with_edit(("admin", "exportleft.py"), "UMZ_FREE_TABLES = {\n", 'UMZ_FR
 check(rc == 1 and "zz_gone: stale in UMZ_FREE_TABLES" in out, f"a table with nobody's data that is gone is a finding: {out[-300:]}")
 rc, out = with_edit(("admin", "exportleft.py"), "UMZ_FREE_TABLES = {\n", 'UMZ_FREE_TABLES = {\n    "habits": "x",\n')
 check(rc == 1 and "habits: in UMZ_FREE_TABLES but it holds" in out, f"a table with a person's data named as nobody's is a finding: {out[-300:]}")
-rc, out = with_edit(("admin", "exportleft.py"), '"wiki_versions": "history of knowledge pages",', "")
-check(rc == 1 and "wiki_versions: not yet in the account export but without a readable name" in out, f"an area without a readable name is a finding: {out[-300:]}")
+# 2.958.0 (#5281): the versions of the knowledge pages are rows of obj_versions
+rc, out = with_edit(("admin", "exportleft.py"), '"obj_versions": "history of knowledge pages",', "")
+check(rc == 1 and "obj_versions: not yet in the account export but without a readable name" in out, f"an area without a readable name is a finding: {out[-300:]}")
 rc, out = with_edit(("accounts", "settings.py"), '    q = {\n        "lists":', '    q = {\n        "zz_part": ("SELECT * FROM habits", ()),\n        "lists":')
 check(rc == 1 and "zz_part" in out, f"a part the import does not know is a finding: {out[-300:]}")
 rc, out = with_edit(("admin", "orgexport.py"), '    ("bookmarks.json", "bookmarks", "org_id=?"),\n',

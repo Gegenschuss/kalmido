@@ -60,7 +60,6 @@ TABLES = (
     "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)
     "wiki_files",  # 2.99.0 A (#2182): files of knowledge pages (NULL = private, the app checks owner_id like the page)
     "wiki_shares",  # 2.123.0 B (#2104): shares of knowledge pages / folders (NULL = private, the app checks owner_id)
-    "wiki_versions",  # 2.123.0 A (#2102): the history of knowledge pages (NULL = private, the app checks the page)
     "fs_nodes",  # 2.48.0 (#1207): the file store (org_id NULL = a person's own tree)
     "fs_upload_requests",  # 2.122.0 A (#2097): file requests of a folder (NULL = private, the app checks the folder)
     "doc_fetchers", "doc_fetch_portals",  # 2.425.0 C (#3453): receipt fetchers (NULL = the person's own documents, the app checks user_id)
@@ -125,6 +124,7 @@ TABLES = (
     "reading_orgs",  # 2.172.0 B (#2677): the read-later project of an organisation
     "life_trip_costs",  # 2.173.0 A (#2680): the office trip of a trip project (org_id = the office area)
     "obj_history", "obj_undo", "obj_revoked",  # 2.558.0 (#4709): the core's history, undo steps and revoked rows (NULL = a private object)
+    "obj_versions",  # 2.958.0 (#5281): the core's versions (was wiki_versions; NULL = a private object, the app checks it)
     "undo_groups",  # 2.747.0 (#5249): a person's undo step groups (NULL = a private object's; the app reads only the own user_id)
     "module_cards",  # 2.575.0 (#3778): module cards (NULL = a person's private card, the app checks user_id)
     "doc_views",  # 2.579.0 (#4802): saved views of the documents search (NULL = private, the core checks owner_id)

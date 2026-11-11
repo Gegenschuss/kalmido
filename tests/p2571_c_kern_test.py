@@ -107,13 +107,13 @@ def wiki(who, s, me, space):
     check(r.status_code == 201, f"{who}: setup: a page {r.text[:200]}")
     pid = r.json()["id"]
     u0 = s.get(B + f"/api/wiki/pages/{pid}").json()["updated_at"]
-    nv = dbx("SELECT COUNT(*) FROM wiki_versions WHERE page_id=?", (pid,))[0][0]
+    nv = dbx("SELECT COUNT(*) FROM obj_versions WHERE kind='wiki' AND ref_id=?", (pid,))[0][0]  # 2.958.0 (#5281): obj_versions
     r = s.patch(B + f"/api/wiki/pages/{pid}", json={"path": f"Notes/Beta {who}", "expect_updated_at": u0})
     check(r.ok and r.json()["path"] == f"Notes/Beta {who}", f"{who}: page renamed {r.status_code} {r.text[:200]}")
     h = hist("wiki", pid)
     check(len(h) == 1 and h[0][0] == me and f"Notes/Alpha {who}" in h[0][3] and f"Notes/Beta {who}" in h[0][4],
           f"{who}: one obj_history entry for the rename {h}")
-    check(dbx("SELECT COUNT(*) FROM wiki_versions WHERE page_id=?", (pid,))[0][0] == nv, f"{who}: a rename alone makes no version")
+    check(dbx("SELECT COUNT(*) FROM obj_versions WHERE kind='wiki' AND ref_id=?", (pid,))[0][0] == nv, f"{who}: a rename alone makes no version")
     r = s.patch(B + f"/api/wiki/pages/{pid}", json={"path": "Notes/Stale", "expect_updated_at": u0})
     check(r.status_code == 409 and r.json().get("page"), f"{who}: an old version 409 with the page {r.status_code} {r.text[:200]}")
     check(len(hist("wiki", pid)) == 1, f"{who}: the 409 notes nothing")

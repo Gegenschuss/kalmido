@@ -27,7 +27,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   await call('PATCH', '/api/settings', {features: [...feats, 'wiki'].join(',')});
   const PG = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Docs/Plan', body: 'Line one\nLine two'})).id;
   await call('PATCH', '/api/wiki/pages/' + PG, {body: 'Line one\nLine two\nLine three'});
-  sql('UPDATE wiki_versions SET created_at=? WHERE page_id=?', ['2026-01-01T08:00:00.000+00:00', PG]);  // older than 10 minutes
+  sql("UPDATE obj_versions SET created_at=? WHERE kind='wiki' AND ref_id=?", ['2026-01-01T08:00:00.000+00:00', PG]);  // older than 10 minutes; 2.958.0 (#5281): obj_versions
   await call('PATCH', '/api/wiki/pages/' + PG, {body: 'Line one\nLine 2 changed\nLine three\nLine four'});
   const vs = (await call('GET', `/api/wiki/pages/${PG}/versions`)).versions || [];
   check(vs.length === 2 && vs[0].current, 'setup: two versions, the newest current ' + JSON.stringify(vs));

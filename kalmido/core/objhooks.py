@@ -94,7 +94,7 @@ def obj_gone_drop(c, refs):
 
 
 def obj_rows_drop_many(c, kind, ids, gone=None):
-    """The rows in obj_history / obj_undo / obj_revoked of the objects ids of kind, 500 at a time; gone = the kind's table:
+    """The rows in obj_history / obj_undo / obj_revoked / obj_versions of the objects ids of kind, 500 at a time; gone = the kind's table:
     only of those whose row is not there any more. Returns the number of rows deleted. One-way."""
     from .pg import qi, table_names
     from .undogroups import ug_gc, ug_gids  # 2.747.0 (#5249)
@@ -106,7 +106,7 @@ def obj_rows_drop_many(c, kind, ids, gone=None):
             q = ",".join("?" * len(part))
             cg = f" AND NOT EXISTS (SELECT 1 FROM {qi(gone, table_names(c))} g WHERE g.id=obj_undo.ref_id)" if gone else ""
             gids = ug_gids(c, f"kind=? AND ref_id IN ({q}){cg}", [kind] + part)  # 2.747.0 (#5249): their step groups
-            for t in ("obj_history", "obj_undo", "obj_revoked"):
+            for t in ("obj_history", "obj_undo", "obj_revoked", "obj_versions"):  # 2.958.0 (#5281): + the versions
                 cond = f" AND NOT EXISTS (SELECT 1 FROM {gone} g WHERE g.id={t}.ref_id)" if gone else ""
                 n += c.execute(f"DELETE FROM {t} WHERE kind=? AND ref_id IN ({q}){cond}", [kind] + part).rowcount
             ug_gc(c, gids)
@@ -114,14 +114,15 @@ def obj_rows_drop_many(c, kind, ids, gone=None):
 
 
 def obj_rows_drop(c, kind, rid):
-    """2.578.0 (#4796): an object deleted for good -- its rows in obj_history / obj_undo / obj_revoked go with it (as
+    """2.578.0 (#4796): an object deleted for good -- its rows in obj_history / obj_undo / obj_revoked (2.958.0, #5281: and
+    obj_versions) go with it (as
     core/writes.py obj_purge; for the old areas' own deletion: lists/lists.py list_purge, contacts/web.py op_book_purge).
     Returns the number of rows deleted. One-way."""
     from .undogroups import ug_gc, ug_gids  # 2.747.0 (#5249): their step groups (a group left without parts goes)
     n = 0
     with system_ctx(c):  # also the rows other people wrote on the object
         gids = ug_gids(c, "kind=? AND ref_id=?", (kind, int(rid)))
-        for t in ("obj_history", "obj_undo", "obj_revoked"):
+        for t in ("obj_history", "obj_undo", "obj_revoked", "obj_versions"):  # 2.958.0 (#5281): + the versions
             n += c.execute(f"DELETE FROM {t} WHERE kind=? AND ref_id=?", (kind, int(rid))).rowcount
         ug_gc(c, gids)
     return n

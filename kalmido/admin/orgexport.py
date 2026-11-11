@@ -222,6 +222,10 @@ def _clean(c, oid, table, r):
         if k == "list":
             row["list_id"] = int(v)
             row.pop("org_id", None)
+    if table == "obj_versions":  # 2.958.0 (#5281): the columns of wiki_versions (an older archive reads the same)
+        row["page_id"], row["path"] = row.pop("ref_id"), row.pop("title")
+        for k in ("kind", "no", "held_at"):
+            row.pop(k, None)
     if table == "obj_tag_links":  # 2.947.0 (#5275): the columns of task_list_tags (+ when and how it was set)
         row["task_id"] = row.pop("obj_id")
         row.pop("kind", None)
@@ -445,7 +449,9 @@ OX_AREAS = (
     ("office/log.json", "office_doc_log", "org_id=?"),
     ("wiki/pages.json", "wiki_pages", "org_id=?"),  # 2.49.0 (#1199): knowledge pages
     ("wiki/files.json", "wiki_files", "org_id=?"),  # 2.99.0 A (#2182): their PDFs and pictures (the bytes under files/wiki/)
-    ("wiki/versions.json", "wiki_versions", "org_id=?"),  # 2.137.0 B (#2344): the history of the pages (texts decrypted)
+    # 2.137.0 B (#2344): the history of the pages (texts decrypted); 2.958.0 (#5281): rows of the core's versions, the file keeps
+    # its columns (_clean: page_id, path)
+    ("wiki/versions.json", "obj_versions", "kind='wiki' AND org_id=?"),
     ("sheets/sheets.json", "sheets", "org_id=?"),  # 2.89.0 (#1916): tables with their columns, rows and cells
     ("sheets/columns.json", "sheet_columns", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
     ("sheets/rows.json", "sheet_rows", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
@@ -575,7 +581,7 @@ OX_GONE_WITH = {  # table -> (parent table, column) pairs: a row goes when its p
     "video_versions": (("video_reviews", "review_id"),),
     "video_comments": (("video_reviews", "review_id"),),
     "wiki_files": (("wiki_pages", "page_id"),),
-    "wiki_versions": (("wiki_pages", "page_id"),),
+    "obj_versions": (("wiki_pages", "ref_id"),),  # 2.958.0 (#5281): the export takes kind 'wiki' only (wiki/versions.json)
 }
 
 
@@ -583,8 +589,10 @@ def ox_live(c, table, where):
     """2.223.3 B (#2879): where without the soft-deleted rows of table and the rows of a deleted parent (OX_GONE_WITH)."""
     if table not in OX_KEEP_DELETED and "deleted_at" in _table_cols(c, table):
         where = f"({where}) AND deleted_at IS NULL"
-    if "wkx_held_at" in _table_cols(c, table):  # 2.528.0 D (#4306): versions held at a lock stay out (only who read them then)
+    if "wkx_held_at" in _table_cols(c, table):  # 2.528.0 D (#4306): files held at a lock stay out (only who read them then)
         where = f"({where}) AND wkx_held_at IS NULL"
+    if table == "obj_versions":  # 2.958.0 (#5281): the versions' hold is held_at now
+        where = f"({where}) AND held_at IS NULL"
     for parent, col in OX_GONE_WITH.get(table, ()):
         if "deleted_at" in _table_cols(c, parent):
             where = f"({where}) AND {col} NOT IN (SELECT id FROM {parent} WHERE deleted_at IS NOT NULL)"
