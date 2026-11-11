@@ -425,6 +425,7 @@ QUERY = {
     "GET /api/office/books/archive/accounts": {"year": "2026"}, "GET /api/office/books/archive/bookings": {"year": "2026"},
     "GET /api/wiki/query": {"page": "{wiki}", "q": "zeige: seiten"}, "GET /api/wiki/mentions": {"task": "{task}"}, "GET /api/forms/{}/client-link": {"client": "{client}"},
     "GET /api/files/collections/{}": {"space": "private"}, "GET /api/wiki/refs": {"file": "{node}"},
+    "GET /api/team/dispo/callsheets": {"list": "{list}"},  # 2.988.0 (#5651): the call sheets of a project need ?list=
 }
 
 
