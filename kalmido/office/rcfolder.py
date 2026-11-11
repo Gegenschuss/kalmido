@@ -26,6 +26,7 @@ from contextlib import nullcontext
 
 from flask import has_app_context
 
+from ..core.access import live_sql
 from ..core.config import app
 from ..core.i18n import LANGS, lang, tr
 from ..core.orgcrypt import oc_dec_fields
@@ -62,7 +63,7 @@ def _in_inbox(c, node, root):
         return False
     if p == root:
         return True
-    r = c.execute("SELECT parent_id, name FROM fs_nodes WHERE id=? AND kind='folder' AND deleted_at IS NULL", (p,)).fetchone()
+    r = c.execute(f"SELECT parent_id, name FROM fs_nodes WHERE id=? AND kind='folder' AND {live_sql()}", (p,)).fetchone()
     return bool(r) and r["parent_id"] == root and is_inbox(r["name"])
 
 
@@ -71,7 +72,7 @@ def rcf_file(c, nid, kind, name, day, uid=None, tag=True):
     Receipts / <Credit card|Bank> / name / <year> / <YYYY-MM month> of day. Returns the folder id it moved to, or None.
     uid: who matched (recorded as the maker of new folders; None: the documents folder's owner). tag False: the folder only
     (the statement's PDF is no receipt)."""
-    node = c.execute("SELECT * FROM fs_nodes WHERE id=? AND kind='file' AND deleted_at IS NULL", (nid,)).fetchone()
+    node = c.execute(f"SELECT * FROM fs_nodes WHERE id=? AND kind='file' AND {live_sql()}", (nid,)).fetchone()
     if node is None:
         return None
     m = c.execute("SELECT ws FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
@@ -168,7 +169,7 @@ def rcf_on_done(c, nid, first):
         with nullcontext() if has_app_context() else app.app_context():
             for r in c.execute("SELECT org_id, statement_id FROM office_cc_lines WHERE node_id=? AND state='matched' LIMIT 1", (nid,)).fetchall():
                 rcf_card(c, r["org_id"], r["statement_id"], nid)
-            for r in c.execute("SELECT org_id, id FROM office_bank_tx WHERE match_kind='receipt' AND match_id=? AND deleted_at IS NULL LIMIT 1",
+            for r in c.execute(f"SELECT org_id, id FROM office_bank_tx WHERE match_kind='receipt' AND match_id=? AND {live_sql()} LIMIT 1",
                                (nid,)).fetchall():
                 t = c.execute("SELECT import_id, day FROM office_bank_tx WHERE id=?", (r["id"],)).fetchone()
                 rcf_bank(c, r["org_id"], t, nid)

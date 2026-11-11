@@ -636,6 +636,7 @@ Office & finance: quotations, invoices, bank, books, tax, DATEV, e-invoices, let
 - `kalmido/office/portaldocs.py` (`kp`) - The customer's documents in the customer portal (module "portal" + office)
 - `kalmido/office/privacy.py` (`dsb`) - Data protection sheets of a client
 - `kalmido/office/procdoc.py` (`pd`) - The procedure documentation (Verfahrensdokumentation, GoBD)
+- `kalmido/office/rcfolder.py` (`rcf`) - Receipts of the credit cards and of the bank file themselves into month folders (Receipts / Credit card or Bank / card or account / year / month)
 - `kalmido/office/rcsubmit.py` (`rsb`) - Members hand in receipts to the bookkeeping ("Submit receipt")
 - `kalmido/office/receiptlist.py` (`rcl`) - The receipts list of the bookkeeping over all months, with filters, and the export of exactly that list
 - `kalmido/office/recurring.py` (`rin`) - Invoice series -- a template invoice repeated every month / quarter / year (drafts or sent)
