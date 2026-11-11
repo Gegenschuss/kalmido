@@ -234,6 +234,10 @@ jobs:
       # 2.548.0 (#4511): a warning only (exit 0): CSS classes without a use, @media widths outside phone 599 / tablet 767
       - name: CSS classes without a use, breakpoints (warning only)
         run: python tools/check_css_classes.py
+      # 2.991.0 (#5530): the type and spacing scale (tests/p2419_scale_test.py) as a lint step: a soft suite slipped through to the
+      # full CI six times; a lint step runs on the build job's Mac run and holds the einreihen check
+      - name: Type and spacing scale of the stylesheets (tools/check_css_scale.py)
+        run: python tools/check_css_scale.py
       - name: Server layers (module-level imports only from the own or a lower layer)
         run: python tools/check_layers.py -v
       # 2.521.0 (#4391): red only over a ceiling (decke_* in tools/perf_budget.json); the growth per package is measured by the train
