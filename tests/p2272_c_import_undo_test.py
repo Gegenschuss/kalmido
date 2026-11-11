@@ -187,7 +187,7 @@ dbx("UPDATE office_fixed_costs SET created_at=?, updated_at=? WHERE id IN (?, ?)
 check(Fr.patch(B + f"{F}/{FIX[0]}", json={"amount": "550.00"}).ok, "a fixed cost changed after the import")
 r = Fr.post(B + F + "/delete", json={"ids": FIX})
 check(r.ok and r.json()["deleted"] == 1 and r.json()["kept"] == 1 and dbx("SELECT 1 FROM office_fixed_costs WHERE id=?", (FIX[0],))
-      and not dbx("SELECT 1 FROM office_fixed_costs WHERE id=?", (FIX[1],)), f"fixed costs undo: the changed one stays {r.text[:200]}")
+      and not dbx("SELECT 1 FROM office_fixed_costs WHERE id=? AND deleted_at IS NULL", (FIX[1],)), f"fixed costs undo: the changed one stays {r.text[:200]}")  # 2.905.0 (#5414): the other one is in the trash
 
 # 2.370.4 (#3089 N15): the toast undo of a trips / fixed costs import only takes rows made within the undo window (24 h)
 r = Fr.post(B + F + "/import", json={"items": [{"label": "Alt", "amount": "10.00", "repeat": "monthly", "start": "2025-01-01"}]})

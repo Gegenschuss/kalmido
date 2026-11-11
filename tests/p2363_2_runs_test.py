@@ -50,7 +50,7 @@ check(Fr.post(O + "/fixed-costs/import", json={"items": rows}).json()["created"]
 dbxm.connect(DATA).execute("UPDATE office_fixed_costs SET updated_at='2030-01-01T00:00:00Z' WHERE id=?", (ids[0],))
 r = undo(run[0]["id"])
 check(r.ok and r.json()["removed"]["fixed_costs"] == 1 and r.json()["kept"]["entries"] == 1, "#3104: the undo keeps the changed row " + r.text[:200])
-check([x[0] for x in sql("SELECT id FROM office_fixed_costs WHERE id IN (?,?)", tuple(ids))] == [ids[0]], "#3104: only the unchanged one went")
+check([x[0] for x in sql("SELECT id FROM office_fixed_costs WHERE id IN (?,?) AND deleted_at IS NULL", tuple(ids))] == [ids[0]], "#3104: only the unchanged one went")  # 2.905.0 (#5414): into the trash
 check(runs("fixed_costs")[0]["undone_at"], "#3104: the run shows as undone")
 check(undo(run[0]["id"]).status_code == 409, "#3104: undone twice = 409")
 # the toast's undo settles the run

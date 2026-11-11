@@ -30,7 +30,7 @@ from ..core.config import app
 from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import bump, db, iso, now_utc, parse_iso
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..accounts.session import me
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_err, v1_json, v1_view
@@ -229,7 +229,7 @@ def aim_undo(c, j, rec, back=True):
         return len(ids), []
     made = [int(x) for x in rec.get("made") or []]
     q = ",".join("?" * len(made)) or "NULL"
-    have = {r["id"]: r for r in c.execute(f"SELECT id, label, updated_at FROM office_fixed_costs WHERE org_id=? AND id IN ({q})", [oid] + made)}
+    have = {r["id"]: r for r in c.execute(f"SELECT id, label, updated_at FROM office_fixed_costs WHERE org_id=? AND id IN ({q}) AND {live_sql()}", [oid] + made)}  # 2.905.0 (#5414)
     gone = [i for i in made if i in have and (have[i]["updated_at"] or "") <= (rec.get("written_at") or "")]
     kept = [i for i in made if i in have and i not in gone]
     by_id = dict(zip(made, rec.get("rows") or []))

@@ -25,7 +25,7 @@ from ..core.pg import insert_id
 from ..personal.timetrack import _csv_cell
 from ..core.errors import BadInput
 from .calc import CALC_LOCALE, calc_lang, dec, dstr, fmt_point, money
-from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import live_sql, my_inbox  # 2.149.0 G (#2517): pulled up from functions
 from .model import pb_owner  # 2.369.5 (#2517): pulled up from functions
 from .fixedimport import fci_people  # 2.369.5 (#2517): pulled up from functions
 from .cashflow import rk_fixed, _fixed_public  # 2.369.5 (#2517): pulled up from functions
@@ -315,7 +315,7 @@ def abo_tick(c, now=None, force=False):
         return
     _ABO_LAST["at"] = time.monotonic()
     today = _today()
-    rows = c.execute("SELECT * FROM office_fixed_costs WHERE sub=1 AND remind_days>0 AND remind_user IS NOT NULL ORDER BY org_id, id").fetchall()
+    rows = c.execute(f"SELECT * FROM office_fixed_costs WHERE sub=1 AND remind_days>0 AND remind_user IS NOT NULL AND {live_sql()} ORDER BY org_id, id").fetchall()  # 2.905.0 (#5414): not the trash
     people = {}
     for r in rows:
         oid = r["org_id"]

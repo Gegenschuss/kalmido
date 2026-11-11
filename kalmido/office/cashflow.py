@@ -22,9 +22,9 @@ from flask import jsonify, request
 from ..core.config import app
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .homecur import hc_doc_fx, hc_home
@@ -45,11 +45,22 @@ from .travel import rk_trips  # 2.369.5 (#2517): pulled up from functions
 from .docs import doc_row  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
-from .otrash import OTB_UNDO, otb_put  # noqa: E402  2.567.0 (#4707): a deleted fixed cost goes into the office trash
+from .okern import ofk_register, ofk_trash  # noqa: E402  2.905.0 (#5414): a deleted fixed cost goes into the core's trash
 from .euerbasis import eb_flows, eb_income_payment_ids, eb_segments  # noqa: E402  2.603.0 (#4927): the basis of the EUeR per year
 
-RK_FIXED_TRASH = "fixed_cost"  # 2.567.0 (#4707): kind of a deleted fixed cost / subscription in the office trash
-OTB_UNDO[RK_FIXED_TRASH] = _ctx  # the toast's undo: the office admin, as deleting it
+RK_FIXED_TRASH = "fixed_cost"  # 2.567.0 (#4707): kind of a deleted fixed cost / subscription in the office trash (the app's name)
+RK_FIXED_KIND = "ofixed"  # 2.905.0 (#5414): its kind of the core's trash (the toast's undo: POST /api/office/trash/core/ofixed/<id>/restore?undo=1)
+
+
+def _rk_fixed_back(c, oid, row):
+    """2.905.0 (#5414): a fixed cost of an import taken back comes out of the trash: its import run counts as not undone again."""
+    if row.get("import_run_id"):
+        c.execute("UPDATE office_import_runs SET undone_at=NULL, undone_by=NULL WHERE id=? AND org_id=? AND undone_at IS NOT NULL",
+                  (row["import_run_id"], oid))
+
+
+ofk_register(RK_FIXED_KIND, "office_fixed_costs", N_("Fixed cost"), "cashflow", need="edit",
+             view={"kind": RK_FIXED_TRASH, "label": lambda c, oid, row: row.get("label") or "", "ctx": _ctx, "back": _rk_fixed_back})
 
 ow_kind("office_fixed_cost", "office_fixed_costs")
 
@@ -156,7 +167,7 @@ def fci_gross(amount, rate):
 
 
 def rk_fixed(c, oid):
-    return [_fixed_public(c, oid, r) for r in c.execute("SELECT * FROM office_fixed_costs WHERE org_id=? ORDER BY lower(label), id", (oid,))]
+    return [_fixed_public(c, oid, r) for r in c.execute(f"SELECT * FROM office_fixed_costs WHERE org_id=? AND {live_sql()} ORDER BY lower(label), id", (oid,))]
 
 
 def rk_fixed_days(f, first, last):
@@ -201,7 +212,7 @@ def rk_fixed_post():
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    if c.execute("SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=?", (oid,)).fetchone()[0] >= MAX_FIXED:
+    if c.execute(f"SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=? AND {live_sql()}", (oid,)).fetchone()[0] >= MAX_FIXED:
         raise BadInput(tr("Too many entries"))
     row = rk_fixed_clean(b, c=c, oid=oid)  # 2.91.0 B (#1924): c, oid for seats / remind_user
     ts = iso(now_utc())
@@ -214,7 +225,7 @@ def rk_fixed_post():
 
 
 def _fixed_row(c, oid, fid):
-    r = c.execute("SELECT * FROM office_fixed_costs WHERE id=? AND org_id=?", (fid, oid)).fetchone()
+    r = c.execute(f"SELECT * FROM office_fixed_costs WHERE id=? AND org_id=? AND {live_sql()}", (fid, oid)).fetchone()  # 2.905.0 (#5414): the trash = 404
     if not r:
         raise Denied(404)
     return r
@@ -229,6 +240,7 @@ def rk_fixed_patch(fid):
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     ow_write(c, uid, "office_fixed_cost", fid, b, lambda c, b, cur: rk_fixed_clean(b, cur, c=c, oid=oid), oid=oid,  # 2.91.0 B (#1924)
+             where=f"id=? AND org_id=? AND {live_sql()}",  # 2.905.0 (#5414): one in the trash is not saved (404)
              dec=lambda c, r: oc_dec_fields(c, oid, "office_fixed_costs", r), enc=lambda c, v: oc_enc_fields(c, oid, "office_fixed_costs", v),
              lock=f"office_fixed_costs-{int(fid)}",  # the same lock as the delete (#4707)
              public=lambda c, cur: _fixed_public(c, oid, _fixed_row(c, oid, fid)))
@@ -246,16 +258,14 @@ def rk_fixed_history(fid):
 
 @app.delete("/api/office/fixed-costs/<int:fid>")
 def rk_fixed_delete(fid):
-    """Deletes an entry; answers it as it was and 2.567.0 (#4707) its office trash id (trash_id: the client's undo writes the
-    copy back, POST /api/office/trash/undo/fixed_cost/<id>; restorable from the office trash until its period ends)."""
+    """Deletes an entry; answers it as it was and 2.905.0 (#5414) where it lies in the core's trash (trash = {kind, id}: the
+    client's undo POST /api/office/trash/core/ofixed/<id>/restore?undo=1; restorable from the office trash until its period ends)."""
     c, uid, oid = _ctx()
     write_lock(c, f"office_fixed_costs-{int(fid)}")
     old = _fixed_public(c, oid, _fixed_row(c, oid, fid))
-    tid = otb_put(c, oid, uid, RK_FIXED_TRASH, "office_fixed_costs", fid, old.get("label") or "")  # 2.567.0 (#4707): a copy first (the label is plain, the amount sealed)
-    c.execute("DELETE FROM office_fixed_costs WHERE id=? AND org_id=?", (fid, oid))
-    bump(c)
+    ofk_trash(c, uid, RK_FIXED_KIND, fid)  # 2.905.0 (#5414): the core's trash (deleted_at), an undo step of the person
     c.commit()
-    return jsonify(ok=True, item=old, trash_id=tid)
+    return jsonify(ok=True, item=old, trash={"kind": RK_FIXED_KIND, "id": fid})
 
 
 @app.post("/api/office/fixed-costs/category-rename")
@@ -279,7 +289,7 @@ def rk_fixed_cat_rename():
         raise BadInput(tr("Invalid value: {0}", "from"))  # "Without category" as a whole is not renamed (no pencil there)
     write_lock(c, f"office_fixed_costs-cat-{int(oid)}")
     rows = [oc_dec_fields(c, oid, "office_fixed_costs", r) for r in
-            c.execute("SELECT * FROM office_fixed_costs WHERE org_id=? ORDER BY id", (oid,)).fetchall()]
+            c.execute(f"SELECT * FROM office_fixed_costs WHERE org_id=? AND {live_sql()} ORDER BY id", (oid,)).fetchall()]
     hit = [r["id"] for r in rows if (r.get("category") or "") == old and (ids is None or r["id"] in ids)]
     if not hit:
         raise Denied(404)

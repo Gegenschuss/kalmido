@@ -545,6 +545,7 @@ OX_GONE_WITH = {  # table -> (parent table, column) pairs: a row goes when its p
     "contacts": (("books", "book_id"),),
     "office_client_contacts": (("clients", "client_id"),),
     "office_meal_files": (("office_meals", "meal_id"),),
+    "office_sub_reminders": (("office_fixed_costs", "fixed_id"),),  # 2.905.0 (#5414): the reminders of a subscription in the trash
     "sheet_columns": (("sheets", "sheet_id"),),
     "sheet_rows": (("sheets", "sheet_id"),),
     "sheet_cells": (("sheets", "sheet_id"), ("sheet_rows", "row_id"), ("sheet_columns", "col_id")),

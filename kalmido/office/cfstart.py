@@ -17,20 +17,26 @@ from datetime import date, timedelta
 
 from flask import jsonify
 
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.config import app
 from ..core.db import body, bump, iso, local_now, now_utc, write_lock
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .cashflow import DATE_RE, MONTH_RE, _add_months, _ctx
 from .model import office_settings  # 2.369.5 (#2517): pulled up from functions
-from .otrash import OTB_UNDO, otb_put  # 2.567.0 (#4707): the start balance and a correction go into the office trash
+from .otrash import OTB_UNDO, otb_put  # 2.567.0 (#4707): the start balance goes into the office trash
+from .okern import ofk_register, ofk_trash  # 2.905.0 (#5414): a correction goes into the core's trash
 
-CFS_TRASH_START, CFS_TRASH_ADJ = "cf_start", "cf_adjust"  # 2.567.0 (#4707): their kinds in the office trash
-OTB_UNDO[CFS_TRASH_START] = OTB_UNDO[CFS_TRASH_ADJ] = _ctx  # the toast's undo: the office admin, as deleting them
+CFS_TRASH_START, CFS_TRASH_ADJ = "cf_start", "cf_adjust"  # 2.567.0 (#4707): their kinds in the office trash (the app's names)
+OTB_UNDO[CFS_TRASH_START] = _ctx  # the toast's undo: the office admin, as deleting it
+# 2.905.0 (#5414): a correction lies in the core's trash (kind oadjust; toast's undo POST /api/office/trash/core/oadjust/<id>/restore?undo=1).
+# The start balance stays on the office trash: office_cf_start has no id (one row per office, key org_id), the core's trash needs one.
+CFS_ADJ_KIND = "oadjust"
+ofk_register(CFS_ADJ_KIND, "office_cf_adjust", N_("Correction"), "cashflow", need="edit",
+             view={"kind": CFS_TRASH_ADJ, "label": lambda c, oid, row: row.get("month") or "", "ctx": _ctx})
 from .cashflow import rk_cashflow  # 2.369.5 (#2517): pulled up from functions
 from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 D (#4711): the corrections save through the core's write layer
 
@@ -128,7 +134,7 @@ def _adj_public(c, oid, r):
 
 
 def cfs_adjust(c, oid, first_month, last_month):
-    rows = c.execute("SELECT * FROM office_cf_adjust WHERE org_id=? AND month>=? AND month<=? ORDER BY month, id", (oid, first_month, last_month))
+    rows = c.execute(f"SELECT * FROM office_cf_adjust WHERE org_id=? AND month>=? AND month<=? AND {live_sql()} ORDER BY month, id", (oid, first_month, last_month))
     return [_adj_public(c, oid, r) for r in rows.fetchall()]
 
 
@@ -149,7 +155,7 @@ def _adj_clean(b, cur=None):
 
 
 def _adj_row(c, oid, aid):
-    r = c.execute("SELECT * FROM office_cf_adjust WHERE id=? AND org_id=?", (aid, oid)).fetchone()
+    r = c.execute(f"SELECT * FROM office_cf_adjust WHERE id=? AND org_id=? AND {live_sql()}", (aid, oid)).fetchone()  # 2.905.0 (#5414): the trash = 404
     if not r:
         raise Denied(404)
     return r
@@ -164,7 +170,7 @@ def cfs_adjust_post():
         raise BadInput(tr("Invalid data"))
     row = _adj_clean(b)
     write_lock(c, f"office_cfs_{int(oid)}")
-    if c.execute("SELECT COUNT(*) FROM office_cf_adjust WHERE org_id=? AND month=?", (oid, row["month"])).fetchone()[0] >= CFS_MAX_MONTH:
+    if c.execute(f"SELECT COUNT(*) FROM office_cf_adjust WHERE org_id=? AND month=? AND {live_sql()}", (oid, row["month"])).fetchone()[0] >= CFS_MAX_MONTH:
         raise BadInput(tr("Too many entries"))
     ts = iso(now_utc())
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)
@@ -183,6 +189,7 @@ def cfs_adjust_patch(aid):
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     ow_write(c, uid, "office_cf_adjust", aid, b, lambda c, b, cur: _adj_clean(b, cur), oid=oid,
+             where=f"id=? AND org_id=? AND {live_sql()}",  # 2.905.0 (#5414): one in the trash is not saved (404)
              dec=lambda c, r: oc_dec_fields(c, oid, "office_cf_adjust", r), enc=lambda c, v: oc_enc_fields(c, oid, "office_cf_adjust", v),
              lock=f"office_cf_adjust-{int(aid)}",  # the same lock as the delete (#4707)
              public=lambda c, cur: _adj_public(c, oid, _adj_row(c, oid, aid)))
@@ -200,16 +207,14 @@ def cfs_adjust_history(aid):
 
 @app.delete("/api/office/cashflow/adjust/<int:aid>")
 def cfs_adjust_delete(aid):
-    """Deletes a correction; answers it as it was and 2.567.0 (#4707) its office trash id (the client's undo writes the copy
-    back, POST /api/office/trash/undo/cf_adjust/<trash_id>)."""
+    """Deletes a correction; answers it as it was and 2.905.0 (#5414) where it lies in the core's trash (trash = {kind, id}:
+    the client's undo POST /api/office/trash/core/oadjust/<id>/restore?undo=1; label in the trash: the month)."""
     c, uid, oid = _ctx()
     write_lock(c, f"office_cf_adjust-{int(aid)}")
     old = _adj_public(c, oid, _adj_row(c, oid, aid))
-    tid = otb_put(c, oid, uid, CFS_TRASH_ADJ, "office_cf_adjust", aid, old["month"])  # label: the month (amount and note are sealed)
-    c.execute("DELETE FROM office_cf_adjust WHERE id=? AND org_id=?", (aid, oid))
-    bump(c)
+    ofk_trash(c, uid, CFS_ADJ_KIND, aid)  # 2.905.0 (#5414): the core's trash (deleted_at), an undo step of the person
     c.commit()
-    return jsonify(ok=True, item=old, trash_id=tid)
+    return jsonify(ok=True, item=old, trash={"kind": CFS_ADJ_KIND, "id": aid})
 
 
 # ---------------------------------------------------------------- the real balance at the end of a month

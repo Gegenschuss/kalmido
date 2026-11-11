@@ -19,7 +19,7 @@ import zipfile
 from datetime import date, timedelta
 from xml.sax.saxutils import escape
 
-from flask import Response, g, jsonify
+from flask import Response, jsonify
 
 from ..core.config import PUBLIC_URL, app
 from ..core.db import body, bump, iso, local_now, now_utc, write_lock
@@ -32,9 +32,11 @@ from .calc import dec, dstr, money
 from .cashflow import MAX_FIXED, _ctx, fci_gross, rk_fixed, rk_fixed_clean
 from .legacyimport import _upload, fi_book, fx_run, fx_settle
 from .model import office_settings, office_settings_lock, office_settings_save
-from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import live_sql, my_inbox  # 2.149.0 G (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
-from .otrash import OTB_MANY, OTB_UNDO, otb_put  # 2.567.0 (#4707)
+from .otrash import OTB_MANY  # 2.567.0 (#4707)
+from .okern import ofk_trash  # 2.905.0 (#5414)
+from .cashflow import RK_FIXED_KIND  # 2.905.0 (#5414)
 from .model import office_on, pb_owner  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
 
@@ -283,7 +285,7 @@ def fci_write(c, uid, oid, items, detail=None, kept=None, run=False):
     rows = [row for _, row in pick]
     if kept is not None:
         kept[:] = [it for it, _ in pick]
-    have = c.execute("SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=?", (oid,)).fetchone()[0]
+    have = c.execute(f"SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=? AND {live_sql()}", (oid,)).fetchone()[0]
     if have + len(rows) > MAX_FIXED:
         raise BadInput(tr("Too many fixed costs: at most {0}, {1} already there", MAX_FIXED, have))
     ts, ids = iso(now_utc()), []
@@ -318,17 +320,19 @@ def fci_remove(c, oid, ids, uid=None):
     """2.272.0 C (#3027): deletes the fixed costs `ids` of the area unchanged since they were made (updated_at = created_at, no
     reminder sent). 2.370.4 (#3089 N15): and made within the undo window (FCI_UNDO_HOURS) - an older row stays.
     2.567.0 (#4707): the ones that go first into the office trash as ONE entry (restore brings the import back whole; uid =
-    who took it back). -> how many went. No commit."""
+    who took it back). 2.905.0 (#5414): each into the core's trash (deleted_at; one step of the person for all of them, the
+    office trash lists them one by one, a restore counts the run as not undone again). -> how many went. No commit."""
     if not ids:
         return 0
     q = ",".join("?" * len(ids))
     cut = iso(now_utc() - timedelta(hours=FCI_UNDO_HOURS))
-    gone = [r[0] for r in c.execute(f"""SELECT id FROM office_fixed_costs f WHERE org_id=? AND id IN ({q}) AND updated_at=created_at AND created_at>=?
+    gone = [r[0] for r in c.execute(f"""SELECT id FROM office_fixed_costs f WHERE org_id=? AND id IN ({q}) AND updated_at=created_at AND created_at>=? AND {live_sql('f')}
                                         AND NOT EXISTS (SELECT 1 FROM office_sub_reminders r WHERE r.fixed_id=f.id) ORDER BY id""", [oid] + ids + [cut]).fetchall()]
     if not gone:
         return 0
-    otb_put(c, oid, uid, FCI_TRASH, "office_fixed_costs", gone, tr("Import") + f" · {len(gone)}", sub="import")
-    return c.execute("DELETE FROM office_fixed_costs WHERE org_id=? AND id = ANY(CAST(? AS BIGINT[]))", (oid, gone)).rowcount
+    for fid in gone:
+        ofk_trash(c, uid, RK_FIXED_KIND, fid)
+    return len(gone)
 
 
 def fci_trash_back(c, oid, ids):
@@ -339,8 +343,7 @@ def fci_trash_back(c, oid, ids):
 
 
 FCI_TRASH = "fixed_import"  # 2.567.0 (#4707): kind of an import of fixed costs taken back, in the office trash
-OTB_MANY[FCI_TRASH] = fci_trash_back
-OTB_UNDO[FCI_TRASH] = _ctx  # the office admin, as taking it back
+OTB_MANY[FCI_TRASH] = fci_trash_back  # 2.905.0 (#5414): only for the copies made before 2.905 (until their period ends); no toast's undo any more
 
 
 @app.post("/api/office/fixed-costs/delete")
@@ -355,12 +358,12 @@ def fci_delete_many():
         raise BadInput(tr("Invalid data"))
     ids = sorted(set(ids))
     q = ",".join("?" * len(ids))
-    have = c.execute(f"SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=? AND id IN ({q})", [oid] + ids).fetchone()[0] if ids else 0
+    have = c.execute(f"SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=? AND id IN ({q}) AND {live_sql()}", [oid] + ids).fetchone()[0] if ids else 0
     n = fci_remove(c, oid, ids, uid)
     fx_settle(c, oid, uid, "fixed_costs")  # 2.363.2 (#3104)
     bump(c)
     c.commit()
-    return jsonify(ok=True, deleted=n, kept=have - n, trash_id=g.get("otb_id") if n else None)  # 2.567.0 (#4707)
+    return jsonify(ok=True, deleted=n, kept=have - n)  # 2.905.0 (#5414): in the core's trash (no office trash id any more)
 
 
 # ---------------------------------------------------------------- the template
