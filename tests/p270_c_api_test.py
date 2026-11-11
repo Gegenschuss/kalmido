@@ -198,8 +198,13 @@ check(requests.post(B + f"/api/proposals/{J2}/discard", headers={**H, **CLH}).st
 check(Bo.get(B + f"/api/proposals/{J2}").status_code == 404 and Bo.post(B + f"/api/proposals/{J2}/apply", json={"select": ["0"]}).status_code == 404,
       "another person: 404")
 rem0 = dbx("SELECT reminders FROM tasks WHERE id=?", (C_MOB["id"],))[0][0]
+ug0 = dbx("SELECT COALESCE(MAX(id), 0) FROM undo_groups WHERE user_id=?", (ALICE,))[0][0]
 r = A.post(B + f"/api/proposals/{J2}/apply", json={"select": ["0"], "remind": True})
 check(r.ok and r.json().get("reminder") is True and r.json().get("comment_id"), "apply with remind " + r.text[:300])
+# 2.934.0 (#5596): the proposal is one step of its own (.../undo) - no step group of the core beside it (the app's Undo took
+# back only that group: the reminder went, the note stayed)
+check("X-Kalmido-Undo-Gid" not in r.headers and not dbx("SELECT id FROM undo_groups WHERE user_id=? AND id>?", (ALICE, ug0)),
+      "#5596: apply records no step group " + str(r.headers.get("X-Kalmido-Undo-Gid")))
 cid = r.json().get("comment_id")
 row = dbx("SELECT user_id, body, deleted_at FROM comments WHERE id=?", (cid,))
 check(row and row[0][0] == ALICE and row[0][1].startswith("Cancel by") and row[0][2] is None, "a comment as the person")
@@ -216,6 +221,7 @@ check(dbx("SELECT deleted_at FROM comments WHERE id=?", (cid,))[0][0] is not Non
 r = A.post(B + f"/api/proposals/{J2}/redo")
 check(r.ok and dbx("SELECT deleted_at, body FROM comments WHERE id=?", (cid,))[0][0] is None
       and "4320" in dbx("SELECT reminders FROM tasks WHERE id=?", (C_MOB["id"],))[0][0], "redo: both come back")
+check(not dbx("SELECT id FROM undo_groups WHERE user_id=? AND id>?", (ALICE, ug0)), "#5596: undo / redo record no step group either")
 # discard
 r = propose(CLH, C_L60["id"], text="Electricity: until the deadline you can switch; it costs 50 a month.")
 J3 = r.json().get("id")

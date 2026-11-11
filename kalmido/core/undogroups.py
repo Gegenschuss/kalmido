@@ -19,6 +19,7 @@ record steps (obj_is_agent in obj_undo_pre); a barrier of an agent is not writte
 
 Interface:
   ug_current(c, uid, area, org_id, label) -> the request's group {id, state, parts, bytes} (opened on first use) or None
+  ug_own()                          2.934.0 (#5596): this request keeps its own undo (a proposal's apply / undo / redo): no group
   ug_fits(c, grp, n) -> bool        may a copy of n bytes join (False: the group became / is toobig, the part counted)
   ug_added(c, grp, n)               a part of n bytes joined
   ug_gids(c, where, args) -> [group ids] of the obj_undo rows matching where (before deleting them)
@@ -141,7 +142,7 @@ def _open(c, uid, area, org_id, label, state="done", token=""):
 def ug_current(c, uid, area, org_id, label):
     """The group of this request for uid: the one already open in g, a bundled one (token within UNDO_BUNDLE_S seconds), or a
     new one. label = (key, [values]) unless undo_label set one. None outside a request."""
-    if not has_request_context():
+    if not has_request_context() or g.get("undo_own"):
         return None
     cur = g.get("undo_group")
     if cur and cur["uid"] == int(uid):
@@ -159,6 +160,15 @@ def ug_current(c, uid, area, org_id, label):
     cur = {"uid": int(uid), "id": row["id"], "state": row["state"], "parts": int(row["parts"]), "bytes": int(row["bytes"])}
     g.undo_group = cur
     return cur
+
+
+def ug_own():
+    """2.934.0 (#5596): the writes of this request are one step of their own with their own way back (an agent's proposal:
+    POST /api/proposals/<id>/apply, its /undo and /redo, agents/proposals.py) - they record no step group. Before, the apply
+    answered with the group of the few writes the core tracks (the reminder of a contract task, not the comment), the app's
+    Undo took back only that group and skipped the proposal's own undo (static/js/undo.js histDo)."""
+    if has_request_context():
+        g.undo_own = True
 
 
 def _save(c, grp):

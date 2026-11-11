@@ -8,6 +8,7 @@ from flask import g, jsonify, request
 from ..core.config import app, PUBLIC_URL
 from ..core.pg import insert_id, write_lock  # 2.528.0 (#4305 A8): write_lock
 from ..core.pg import st_ids  # 2.674.0 B (#4194)
+from ..core.undogroups import ug_own  # 2.934.0 (#5596)
 from ..agents.core import agents_shared  # 2.674.0 B (#4194)
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc, iso_ms
@@ -1020,6 +1021,7 @@ def proposal_apply(jid):
     """{select: ["0", "0.1", ...], edits: {key: {title?, due?, section?, assignee_id?, list_id?, section_id?}}, name?, folder?,
     share_agent?} -> creates / changes the selected entries as the current person; one undo step (POST .../undo)."""
     need_collab()
+    ug_own()  # 2.934.0 (#5596): one step of its own (POST .../undo), no step group of the core beside it
     c = db()
     j = need_prop(c, jid, lock=True, team=True)  # 2.569.0 B (#4675)
     if j["prop_state"] != "ready" or not j["proposal"]:
@@ -1105,6 +1107,7 @@ def prop_titles(c, ids):
 def proposal_undo(jid):
     """Takes an applied proposal back (one step): created tasks go to the trash (a new project list is removed when nobody
     added or changed anything in it), changes of the inbox items are reverted. What someone changed since stays (skipped)."""
+    ug_own()  # 2.934.0 (#5596): the proposal's own way back / forward records no new step group
     c = db()
     j = need_prop(c, jid, lock=True, team="applied")  # 2.569.0 B (#4675)
     rec = json.loads(j["applied"] or "null")
@@ -1195,6 +1198,7 @@ def proposal_undo(jid):
 def proposal_redo(jid):
     """The way forward again after an undo: trashed tasks come back; a removed project is created again; triage changes are
     applied again (what someone changed since stays)."""
+    ug_own()  # 2.934.0 (#5596): the proposal's own way back / forward records no new step group
     c = db()
     j = need_prop(c, jid, lock=True, team="applied")  # 2.569.0 B (#4675)
     rec = json.loads(j["applied"] or "null")
