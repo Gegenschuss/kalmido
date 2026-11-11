@@ -424,7 +424,9 @@ def agent_event_comments(c, tid):
              "attachments": nat.get(r["id"], 0)}
         if len(txt) > AGENT_EVENT_COMMENT_CHARS:
             d["truncated"] = True
-        if r["ext_name"]:  # 2.50.0 (#329): a customer's comment through the public link (no account, the name they typed)
+        if r["ext_name"] and r["source"] == "git":  # review 2.981 (Fable F5): synced from the git host (#5274), no customer
+            d["author"].update(name=r["ext_name"], source="git")
+        elif r["ext_name"]:  # 2.50.0 (#329): a customer's comment through the public link (no account, the name they typed)
             d["author"].update(name=r["ext_name"], customer=True)
         if "portal" in r.keys() and r["portal"]:  # 2.63.0 B (#1513): the customer of a customer report sees it
             d["portal"] = True

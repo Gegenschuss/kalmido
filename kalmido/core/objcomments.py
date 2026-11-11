@@ -721,25 +721,40 @@ def ocm_move_q4b(c):
     if c.execute("SELECT to_regclass('video_comments')").fetchone()[0]:
         had = True
         cols = table_columns(c, "video_comments")
-        gone = f"v.deleted_at IS NOT NULL AND v.deleted_at <> '' AND v.deleted_at < '{OCM_Q4B_CUT}'"
-        _q4b_ids(c, "video_comments", f"v WHERE NOT ({gone}) AND EXISTS (SELECT 1 FROM video_reviews r WHERE r.id=v.review_id)")
+        # review 2.981 (Fable F1): an answer shares the deletion of its comment (the old table deleted only the comment's row,
+        # its answers went with the CASCADE of a deletion for good): e.del = the row's own deletion or that of the nearest
+        # deleted comment above it -> an answer of a comment in the trash goes into the trash with it (the core's period ends
+        # both), an answer of a comment left out (cleaned up by #5263) is left out too, never a top comment of its own
+        c.execute("DROP TABLE IF EXISTS _ocm_q4b_del")
+        c.execute("""CREATE TEMP TABLE _ocm_q4b_del ON COMMIT DROP AS
+                     WITH RECURSIVE t(id, del) AS (
+                       SELECT v.id, NULLIF(v.deleted_at, '') FROM video_comments v
+                       WHERE v.parent_id IS NULL OR NOT EXISTS (SELECT 1 FROM video_comments q WHERE q.id=v.parent_id)
+                       UNION
+                       SELECT v.id, COALESCE(NULLIF(v.deleted_at, ''), t.del) FROM video_comments v JOIN t ON v.parent_id=t.id)
+                     SELECT id, MIN(del) AS del FROM t GROUP BY id""")
+        gone = f"e.del IS NOT NULL AND e.del < '{OCM_Q4B_CUT}'"
+        _q4b_ids(c, "video_comments", f"v JOIN _ocm_q4b_del e ON e.id=v.id WHERE NOT ({gone}) "
+                 "AND EXISTS (SELECT 1 FROM video_reviews r WHERE r.id=v.review_id)")
         pos = (("t", "at_sec"), ("page", "page"), ("x", "pos_x"), ("y", "pos_y"))
         anchor = ("NULLIF(jsonb_strip_nulls(jsonb_build_object('version_id', v.version_id"
                   + "".join(f", '{k}', v.{col}" for k, col in pos if col in cols) + ")), '{}'::jsonb)")
         args = []
         cr = _q4b_ts(cols, "v", "created_at", "CURRENT_TIMESTAMP", args)
-        dl = _q4b_ts(cols, "v", "deleted_at", "CURRENT_TIMESTAMP", args)
+        dl = _q4b_ts(list(cols) + ["del"], "e", "del", "CURRENT_TIMESTAMP", args)
         n += c.execute(f"""INSERT INTO obj_comments(id, kind, ref_id, org_id, user_id, ext_name, parent_id, body, anchor, state,
                                                     created_at, deleted_at)
                            SELECT m.new, 'video', v.review_id, v.org_id, v.author_id, NULLIF(v.ext_name, ''), p.new,
-                                  CASE WHEN COALESCE(v.deleted_at, '') = '' THEN COALESCE(v.body, '') ELSE '' END, {anchor},
+                                  CASE WHEN e.del IS NULL THEN COALESCE(v.body, '') ELSE '' END, {anchor},
                                   CASE WHEN COALESCE(v.done, 0) <> 0 THEN 'done' END, {cr},
-                                  CASE WHEN COALESCE(v.deleted_at, '') = '' THEN NULL ELSE {dl} END
-                           FROM video_comments v JOIN _ocm_q4b_ids m ON m.old=v.id LEFT JOIN _ocm_q4b_ids p ON p.old=v.parent_id
+                                  CASE WHEN e.del IS NULL THEN NULL ELSE {dl} END
+                           FROM video_comments v JOIN _ocm_q4b_ids m ON m.old=v.id JOIN _ocm_q4b_del e ON e.id=v.id
+                           LEFT JOIN _ocm_q4b_ids p ON p.old=v.parent_id
                            ORDER BY m.new""", args).rowcount
         c.execute("""INSERT INTO obj_comment_trash(comment_id, body) SELECT m.new, COALESCE(v.body, '')
-                     FROM video_comments v JOIN _ocm_q4b_ids m ON m.old=v.id WHERE COALESCE(v.deleted_at, '') <> ''
-                     ON CONFLICT DO NOTHING""")
+                     FROM video_comments v JOIN _ocm_q4b_ids m ON m.old=v.id JOIN _ocm_q4b_del e ON e.id=v.id
+                     WHERE e.del IS NOT NULL ON CONFLICT DO NOTHING""")
+        c.execute("DROP TABLE IF EXISTS _ocm_q4b_del")
     if c.execute("SELECT to_regclass('doc_notes')").fetchone()[0]:
         had = True
         cols = table_columns(c, "doc_notes")

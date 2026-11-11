@@ -489,7 +489,7 @@ OX_AREAS = (
     ("videos/versions.json", "video_versions", "org_id=?"),
     # 2.981.0 (#5273): the comments are rows of obj_comments (kind video), the file keeps its columns (OX_KIND_COLS); not those of
     # a review in the trash (was OX_GONE_WITH)
-    ("videos/comments.json", "obj_comments", "kind='video' AND org_id=? AND ref_id NOT IN (SELECT id FROM video_reviews WHERE deleted_at IS NOT NULL)"),
+    ("videos/comments.json", "obj_comments", "kind='video' AND org_id=? AND deleted_at IS NULL AND ref_id NOT IN (SELECT id FROM video_reviews WHERE deleted_at IS NOT NULL)"),
     # 2.48.0 (#1111): documents (recognised text, amounts, sender names and rules decrypted); not the learnt models, not the
     # keyed word index (both are rebuilt from the documents), not the forwarding addresses (their token is a secret)
     ("documents/meta.json", "doc_meta", "org_id=?"),
@@ -499,7 +499,7 @@ OX_AREAS = (
     ("documents/document_tags.json", "doc_node_tags", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),  # 2.122.0 B (#2099): + files / folders
     ("documents/fields.json", "doc_fields", "org_id=?"),  # 2.153.0 (#2179): custom fields + their values (decrypted)
     ("documents/field_values.json", "doc_field_values", "org_id=?"),
-    ("documents/notes.json", "obj_comments", "kind='doc_note' AND org_id=?"),  # 2.635.0 (#4807 d): notes on documents (decrypted); 2.981.0 (#5273): obj_comments
+    ("documents/notes.json", "obj_comments", "kind='doc_note' AND org_id=? AND deleted_at IS NULL"),  # review 2.981 (Fable F6): not the notes in the trash; 2.635.0 (#4807 d): notes on documents (decrypted); 2.981.0 (#5273): obj_comments
     ("documents/rules.json", "doc_rules", "org_id=?"),
     ("documents/settings.json", "doc_cfg", "org_id=?"),
     ("documents/receipts.json", "rc_receipts", "org_id=?"),  # 2.137.0 B (#2344): project and category of receipts (set by people)

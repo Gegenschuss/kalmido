@@ -213,7 +213,11 @@ def _dn_out(c, nid, uid):
 def _dn_patch(c, nid, cid, uid, b):
     """A note's text changed by its author (the core's edit: version, lock comment-<id>, 409 with the note)."""
     if "body" in b or "text" in b:
-        ocm_edit(c, cid, uid, {**b, "body": str(b.get("body") if "body" in b else b.get("text") or "")})
+        m, n = _note_doc(c, nid)
+        # review 2.981 (Fable F4): a 409 answers with the note as the app shows it (opened text, author), never the raw row
+        # (the sealed text, org_id, deleted_by)
+        ocm_edit(c, cid, uid, {**b, "body": str(b.get("body") if "body" in b else b.get("text") or "")},
+                 public=lambda c, row: next((x for x in dn_view(c, m, n["role"], uid) if x["id"] == row["id"]), {"id": row["id"]}))
 
 
 def _dn_changed(c, nid):
