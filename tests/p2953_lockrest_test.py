@@ -16,6 +16,10 @@ tests/p2353_f_lockreview_test.py: ciphertexts and wrapped keys of the right form
  N11 locking waits for a plain write below the folder that runs at the same moment (advisory lock, seen in pg_locks)
  N13 no share with an agent on a folder above a locked folder
  N14 a move into a locked folder refused at the end (another workspace) leaves no stored file behind
+ 2.970 (#5653) the low findings of the review: N-b a tag change / version restore waits for a folder above that starts to lock;
+              N-c locking a folder waits for a plain write below the folder ABOVE it (no nested locks of two starts); N-e a move
+              takes its locks in the order of their ids; N-g a file encrypted again with a new key does not replace a version
+              saved meanwhile
 usage: p2953_lockrest_test.py <datadir>
 freelancer-matrix: files  tenant-matrix: file"""
 import base64
@@ -313,7 +317,7 @@ DBC, DBN = dbxm._target(os.path.join(DATA, "tasks.db"))
 # a plain upload below W, not committed yet: one psql session that keeps the shared lock until it is told to let go
 hold = subprocess.Popen(["docker", "exec", "-i", DBC, "psql", "-U", "kalmido", "-d", DBN, "-X", "-q", "-A", "-t"],
                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-hold.stdin.write(f"SELECT pg_advisory_lock_shared(hashtext('fsl:{W}'));\nSELECT 'held';\n")
+hold.stdin.write(f"SELECT pg_advisory_lock_shared(21022, {W});\nSELECT 'held';\n")  # 2.970.0 (#5653, review N-f): fsl_hold's own key space
 hold.stdin.flush()
 got = [hold.stdout.readline().strip() for _ in range(2)]  # the lock call prints an empty line, then the marker
 check("held" in got, f"the plain write holds its lock ({got})")
@@ -327,11 +331,95 @@ for _ in range(200):  # the start's request waits for the lock: seen in pg_locks
         break
     th.join(0.05)
 check(waiting and "r" not in res, "N11: locking waits while a plain write below the folder runs")
-hold.stdin.write(f"SELECT pg_advisory_unlock_shared(hashtext('fsl:{W}'));\n\\q\n")
+hold.stdin.write(f"SELECT pg_advisory_unlock_shared(21022, {W});\n\\q\n")
 hold.stdin.flush()
 hold.wait(30)
 th.join(30)
 check(res.get("r") is not None and res["r"].ok, "N11: then it locks")
+
+# ---------------------------------------------------------------- 2.970 (#5653): the low findings of the review
+def held_run(lock_sql, unlock_sql, call):
+    """call() runs in a thread while one psql session holds an advisory lock (lock_sql) -> (waited, granted, response):
+    waited = the request waits for it (seen in pg_locks, a real state), granted = the advisory locks the request's own session
+    held meanwhile (fsl_hold's key space, 21022), response once the lock is let go."""
+    hs = subprocess.Popen(["docker", "exec", "-i", DBC, "psql", "-U", "kalmido", "-d", DBN, "-X", "-q", "-A", "-t"],
+                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    hs.stdin.write(f"SELECT pg_backend_pid();\n{lock_sql};\nSELECT 'held';\n")
+    hs.stdin.flush()
+    lines = []
+    while "held" not in lines and len(lines) < 10:
+        lines.append(hs.stdout.readline().strip())
+    pid = int(next(x for x in lines if x.isdigit()))
+    out, waited, granted = {}, False, None
+    th = threading.Thread(target=lambda: out.setdefault("r", call()))
+    th.start()
+    for _ in range(200):
+        w = dbx("SELECT pid FROM pg_locks WHERE locktype='advisory' AND NOT granted AND pid<>?", (pid,))
+        if w:
+            waited = "r" not in out
+            granted = dbx("SELECT COUNT(*) FROM pg_locks WHERE locktype='advisory' AND granted AND classid=21022 AND pid=?", (w[0][0],))[0][0]
+            break
+        th.join(0.05)
+    hs.stdin.write(f"{unlock_sql};\n\\q\n")
+    hs.stdin.flush()
+    hs.wait(30)
+    th.join(30)
+    return waited, granted, out.get("r")
+
+
+# N-c: a start on a folder waits for a plain write below the folder above it (that write could be in it); then it locks
+NP = folder(A, "Nest parent")
+NC = folder(A, "Nest child", NP)
+waited, _g, r = held_run(f"SELECT pg_advisory_lock_shared(21022, {NP})", f"SELECT pg_advisory_unlock_shared(21022, {NP})",
+                         lambda: A.post(B + f"/api/files/lock/{NC}/start", json={"keys": [{"user_id": ME, "wrapped": wrapped()}]}))
+check(waited, "N-c: locking a folder waits for a write running below the folder above it")
+check(r is not None and r.ok, "N-c: then it locks " + (r.text[:120] if r is not None else ""))
+r = A.post(B + f"/api/files/lock/{NP}/start", json={"keys": [{"user_id": ME, "wrapped": wrapped()}]})
+check(r.status_code == 409, f"N-c: the folder above cannot be locked as well ({r.status_code})")
+A.post(B + f"/api/files/lock/{NC}/stop", json={"abort": True})
+
+# N-b: a tag on a plain file waits while a folder above starts to lock (it would be a plain word in a locked tree)
+TB = folder(A, "Tag race")
+TBF = upload(A, TB, "race.txt")
+waited, _g, r = held_run(f"SELECT pg_advisory_lock(21022, {TB})", f"SELECT pg_advisory_unlock(21022, {TB})",
+                         lambda: A.put(B + f"/api/files/nodes/{TBF}/tags", json={"tags": ["invented race"]}))
+check(waited, "N-b: a tag change waits while a folder above starts to lock")
+check(r is not None and r.ok, "N-b: then it is saved (the folder did not lock) " + (r.text[:120] if r is not None else ""))
+cur = dbx("SELECT cur_version FROM fs_nodes WHERE id=?", (TBF,))[0][0]
+waited, _g, r = held_run(f"SELECT pg_advisory_lock(21022, {TB})", f"SELECT pg_advisory_unlock(21022, {TB})",
+                         lambda: A.post(B + f"/api/files/nodes/{TBF}/versions/{cur}/restore", json={}))
+check(waited and r is not None and r.ok, "N-b: a version restore waits too, then it is done")
+
+# N-e: a move into a locked folder takes its locks in the order of their ids -- held at the smallest (the top folder), it holds
+# none of the others while it waits (the chain from the bottom would hold the source folder first)
+ET = folder(A, "Order top")
+ES = folder(A, "Order source", ET)
+EL = folder(A, "Order locked")
+gel = lock(A, EL, [ME])
+EF = upload(A, ES, "order.txt")
+waited, granted, r = held_run(f"SELECT pg_advisory_lock(21022, {ET})", f"SELECT pg_advisory_unlock(21022, {ET})",
+                              lambda: A.post(B + f"/api/files/lock/move/{EF}", data={"parent_id": str(EL), "name": ct(gel)},
+                                             files={"file": ("x", kenc(gel), "application/octet-stream")}))
+check(waited and granted == 0, f"N-e: the move waits at the smallest id first, holding nothing else ({waited}, {granted})")
+check(r is not None and r.ok, "N-e: then it moves " + (r.text[:120] if r is not None else ""))
+
+# N-g: encrypting a file again with a new key does not replace a version saved meanwhile
+GR = folder(A, "Rekey race")
+gg = lock(A, GR, [ME])
+GF = lupload(A, GR, gg)
+r = A.post(B + f"/api/files/lock/{GR}/rotate", json={"gen": gg + 1, "keys": [{"user_id": ME, "wrapped": wrapped()}]})
+check(r.ok, "a new key for the race " + r.text[:120])
+t = A.get(B + f"/api/files/lock/{GR}/todo").json()
+seen = next(it["version"] for it in t["items"] if it["id"] == GF)
+r = A.post(B + f"/api/files/lock/version/{GF}", files={"file": ("encrypted.kenc", kenc(gg), "application/octet-stream")})
+check(r.status_code == 201, "a new version saved while the browser encrypts the file again")
+newest = r.json().get("version") if r.status_code == 201 else None
+r = A.post(B + f"/api/files/lock/{GR}/convert/{GF}", data={"name": ct(gg + 1), "version": str(seen)},
+           files={"file": ("encrypted.kenc", kenc(gg + 1), "application/octet-stream")})
+check(r.status_code == 409 and not code(r), f"N-g: the old version encrypted again is refused, 409 without a code ({r.status_code} {r.text[:120]})")
+check(dbx("SELECT cur_version FROM fs_nodes WHERE id=?", (GF,))[0][0] == newest, "N-g: the version saved meanwhile stays the current one")
+t = convert_all(A, GR)
+check(t["left"] == 0 and dbx("SELECT e2e_gen FROM fs_nodes WHERE id=?", (GF,))[0][0] == gg + 1, "N-g: the next round encrypts the newest version")
 
 # ---------------------------------------------------------------- a person without an organisation
 FID, Fr = freelancer(B, A, "frida")

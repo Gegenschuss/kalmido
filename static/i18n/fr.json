@@ -13557,6 +13557,7 @@
   "{0} file encrypted and uploaded": ["{0} fichier chiffré et envoyé", "{0} fichiers chiffrés et envoyés"],
   "Move into a locked folder?": "Déplacer dans un dossier verrouillé ?",
   "Move out of the locked folder?": "Sortir du dossier verrouillé ?",
+  "What lies in the trash of a folder stays on this side: restored, it goes into the folder the moved folder lay in before.": "Ce qui se trouve dans la corbeille d'un dossier reste de ce côté : une fois restauré, il va dans le dossier où se trouvait le dossier.",
   "“{0}” is encrypted in your browser and moved. Its earlier versions are removed; the server and agents can no longer read it.": "« {0} » est chiffré dans ton navigateur puis déplacé. Ses versions précédentes sont supprimées ; le serveur et les agents ne peuvent plus le lire.",
   "“{0}” is decrypted in your browser and stored readable for the server again. Its earlier encrypted versions are removed.": "« {0} » est déchiffré dans ton navigateur et de nouveau enregistré lisible pour le serveur. Ses versions chiffrées précédentes sont supprimées.",
   "Encryption of this folder stopped without progress. Try again later.": "Le chiffrement de ce dossier n’avance plus. Réessaie plus tard.",
