@@ -272,8 +272,9 @@ check(b"\xfc" in raw and b"\xc3" not in raw, "fixture really is Windows-1252")
 st, j = imp(A, "mstodo", "outlook-aufgaben.csv")
 pr = task("Präsentation für Müller")
 check(st == 200 and pr and pr["due"] == "2026-10-15" and pr["start"] == "2026-10-01" and pr["priority"] == 5, "Outlook DE (cp1252): umlauts, dates, Hoch")
-check(pr["reminders"] == "60" and tags(pr["id"]) == ["Büro", "Kunde"] and "Folien überarbeiten – dringend" in pr["content"],
-      "reminder 08:00 on the all-day due date = 60 min before 09:00; categories; notes")
+# 2.955.0 (#5276): personal tags are one per name in any case -- "Büro" finds the tag "büro" the Todoist import made above
+check(pr["reminders"] == "60" and sorted(tags(pr["id"]), key=str.casefold) == ["büro", "Kunde"] and "Folien überarbeiten – dringend" in pr["content"],
+      "reminder 08:00 on the all-day due date = 60 min before 09:00; categories (Büro = the existing büro); notes")
 check(task("Blumen gießen")["status"] == 2 and task("Geschenk für Jürgen")["priority"] == 1, "Erledigt -> done, Niedrig -> low")
 st, j = imp(A, "mstodo", "outlook-tasks-en.csv")
 pi = task("Pay invoice")
