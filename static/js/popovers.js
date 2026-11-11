@@ -11,7 +11,8 @@ const popRetLive = r => {
   const same = e => r.id ? e.id === r.id : !!r.dataset?.act && e.dataset.act === r.dataset.act && e.dataset.id === r.dataset.id;  // (no CSS.escape: jsdom has none)
   return [...document.querySelectorAll(r.id ? '[id]' : '[data-act]')].find(e => same(e) && e.getClientRects().length && !e.closest('#pop')) || null;
 };
-function closePop() { popFocusBack(); document.body.classList.remove('pop-open'); /* 2.28.0 (#976) */ const t = $('#toast'); if (t && !t.classList.contains('hidden') && $('#pop.sheet:not(.hidden)')) requestAnimationFrame(() => toastPlace(t)); $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; kb_pop($('#pop')); /* 2.630.0 (#4510) */ sideRearm(); }
+// 2.962.0 (#5231): the views of a menu (second level, follow menu) are steps of Back on #pop (backclose.js f8d_step): closing it empties them
+function closePop() { pop_follow = null; f8d_stepsClear($('#pop')); popFocusBack(); document.body.classList.remove('pop-open'); /* 2.28.0 (#976) */ const t = $('#toast'); if (t && !t.classList.contains('hidden') && $('#pop.sheet:not(.hidden)')) requestAnimationFrame(() => toastPlace(t)); $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; kb_pop($('#pop')); /* 2.630.0 (#4510) */ sideRearm(); }
 // 2.30.0 (#1043): a menu / popover opened from the open drawer (phone, folded sidebar) took over the drawer's close hook and
 // hid its scrim; a dialog opened from it (Folder settings…, People and roles…, Edit list…) then left the drawer open without
 // dimming, and a tap next to it went to the task behind. When the popover closes and the drawer is still open, the drawer gets
@@ -28,12 +29,21 @@ function tch_overlaysClose() {
     sc.classList.add('hidden'); sc.classList.remove('clear', 'overmodal'); if (popOnClose === closeSide) popOnClose = null;
   }
 }
+// 2.962.0 (#5231): a menu entry whose fn opens another menu / picker in #pop (a follow menu, also a little later: assignMenu
+// loads first) makes the menu before it a step of Back: Back opens it again instead of closing everything. Set by menu()'s
+// click, taken by the next openPop; gone with the next tap / key, a dialog opened in between, or after POP_FOLLOW_MS.
+// pop_sig: the entries of the menu opening now - the same menu drawn again (a toggle that keeps its menu open) is no new step.
+let pop_follow = null, pop_sig = '';
+const POP_FOLLOW_MS = 4000;
+['pointerdown', 'keydown'].forEach(k => document.addEventListener(k, () => { pop_follow = null; }, true));
 function openPop(anchor, html, onClose) {
   const p = $('#pop');
+  const fw = pop_follow, sig = pop_sig; pop_follow = null; pop_sig = '';
   p.onclick = null;  // a click handler of the previous popover (menu, calendar event) never carries over
   p.onpointerdown = null; p.ondblclick = null; p.classList.remove('bellpop', 'bpfull'); p.style.width = ''; p.style.height = p.style.maxHeight = p.style.transform = p.style.transition = '';  // 2.7.0: nothing of the bell's dropdown carries over (2.39.1 #1181: nor a dragged sheet height)
   if (p.classList.contains('hidden')) { const ae = document.activeElement; popRet = anchor?.focus && anchor.isConnected && !anchor.closest?.('#pop') ? anchor : ae && ae !== document.body && !ae.closest?.('#pop') ? ae : null; }
   p.innerHTML = html; p.classList.remove('hidden'); document.body.classList.add('pop-open');  // 2.28.0 (#976): the grips step aside
+  if (fw && Date.now() < fw.until && $$('.modal').length === fw.nm) { p._stk = fw.stk; if (sig && sig === fw.sig) { if (p._stk.length) f8d_queue(); } else f8d_step(p, fw.reopen); }
   $('#scrim').classList.remove('hidden');
   // #318: a menu opened from inside a dialog (e.g. Settings > Agents > "Share a list with an agent…") goes above it
   const om = !!anchor?.closest?.('.modal'); p.classList.toggle('overmodal', om); $('#scrim').classList.toggle('overmodal', om);
@@ -99,16 +109,21 @@ function menu(anchor, items, back, fsel, title) {
   if (grp) html += '</div>';
   // 2.220.0 B (#2811): every menu has a name: the sheet's title, else the title / the button that opened it
   const mnm = String(tt || anchor?.getAttribute?.('aria-label') || anchor?.getAttribute?.('title') || anchor?.textContent?.trim?.() || '').replace(/…$/, '').slice(0, 80);
+  // 2.962.0 (#5231): what this menu shows (pop_follow: the same menu drawn again is no new step of Back)
+  const sig = items.map(x => x === '-' ? '-' : x.head ? 'h:' + x.head : x.row ? x.row.map(y => y.label).join('+') : x.label).join('|');
+  pop_sig = sig;
   const p = openPop(anchor, `${hd}<div class="menu-list" role="menu"${hd && tt ? ' aria-labelledby="tch-sht"' : mnm ? ` aria-label="${esc(mnm)}"` : ''}>${html}</div>`);
   // 2.41.0 (#1439): a live redraw can remove the anchor while the menu is open (its rect is then 0/0 and the second level jumped to the
   // top left): keep a snapshot of the anchor and the menu's own place, and open the second level from those
   const pos0 = [p.style.left, p.style.top], snap = {r: anchor?.getBoundingClientRect?.() || {left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0}, om: p.classList.contains('overmodal')};
   const live = () => anchor?.isConnected ? anchor : {getBoundingClientRect: () => snap.r, closest: sel => snap.om && sel === '.modal' ? {} : null};
   const up = () => { const m = menu(live(), items, back, '.msubm'); if (!isMobile()) { m.style.left = pos0[0]; m.style.top = pos0[1]; } return m; };
-  p._menuBack = back || null;
+  // 2.962.0 (#5231): ← / the "Back" row = one step of Back (on a touch screen through its history entry, which goes with it)
+  p._menuBack = back ? () => { if (!f8d_stepBack(p)) back(); } : null;
   p._menuOpen = (it, b) => {
     const pr = p.getBoundingClientRect(), er = b?.getBoundingClientRect?.();
-    const m = menu(live(), [{label: tr('Back'), icon: 'back', cls: 'mback', fn: up}, {head: it.label.replace(/…$/, '')}, ...it.more], up, '[role="menuitem"]:not(.mback):not([disabled])');
+    const m = menu(live(), [{label: tr('Back'), icon: 'back', cls: 'mback', mback: 1, fn: up}, {head: it.label.replace(/…$/, '')}, ...it.more], up, '[role="menuitem"]:not(.mback):not([disabled])');
+    f8d_step(p, up);  // 2.962.0 (#5231): the second level is a step: Back (Android) shows the first level again, not closing it all
     if (!isMobile() && pr.width) {  // computer: the second level opens beside the menu, level with the entry; the phone sheet just replaces
       const w = m.offsetWidth, h = m.offsetHeight; let x = pr.right + 4;
       if (x + w > innerWidth - 12) x = pr.left - w - 4;
@@ -116,7 +131,11 @@ function menu(anchor, items, back, fsel, title) {
     }
     return m;
   };
-  p.onclick = e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; let it = items[+b.dataset.i]; if (it.row) it = it.row[+b.dataset.j]; if (it.more) { p._menuOpen(it, b); return; } closePop(); tchSheetT = String(it.label || '').replace(/…$/, ''); try { it.fn(); } finally { tchSheetT = ''; } };
+  p.onclick = e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; let it = items[+b.dataset.i]; if (it.row) it = it.row[+b.dataset.j]; if (it.more) { p._menuOpen(it, b); return; } if (it.mback) { p._menuBack ? p._menuBack() : it.fn(); return; }
+    // 2.962.0 (#5231): should fn open a follow menu / picker in #pop, this menu (at its place, with its steps) is the step before it
+    const at = [p.style.left, p.style.top], stk = [...(p._stk || [])];
+    const reopen = () => { const m = menu(live(), items, back, fsel, tt); if (!isMobile()) { m.style.left = at[0]; m.style.top = at[1]; } };
+    closePop(); pop_follow = {stk, reopen, sig, nm: $$('.modal').length, until: Date.now() + POP_FOLLOW_MS}; tchSheetT = String(it.label || '').replace(/…$/, ''); try { it.fn(); } finally { tchSheetT = ''; } };
   // 2.16.0 (#473): the menu gets the focus (first item); ↑ ↓ Home End move in it, Esc / Tab out close it (keydown below)
   setTimeout(() => { if (document && !p.classList.contains('hidden') && !p.contains(document.activeElement)) ((fsel && p.querySelector(fsel)) || p.querySelector('[role="menuitem"]:not([disabled])'))?.focus({preventScroll: true}); }, 0);
   return p;

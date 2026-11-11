@@ -10,6 +10,7 @@
 // - the tour: every card shown by Next is a step; Back and the tour's own Back button go one card back, the last Back ends it
 // - the views of a page (#view._stk, f8d_step): Back shows the view before; another page empties them (no stale entries)
 // - a lightbox over a dialog, the search palette: one Back each
+// - 2.962.0 (#5231): menus: a second level and a follow menu are steps (task menu, a chat header menu with Usage)
 // The settings' areas (#5214) stay in p2736_l_settings_back_ui.
 // P4: alice works without an organisation: the person without an organisation
 // freelancer-matrix: n/a - no route of its own, the Back key in the browser
@@ -33,7 +34,7 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en'});
   const lst = await call('POST', '/api/lists', {name: 'Garden plans'});
   check(lst.id > 0, 'a list ' + JSON.stringify(lst));
-  await call('POST', '/api/tasks', {title: 'Water the tomatoes', list_id: lst.id});
+  const tsk = await call('POST', '/api/tasks', {title: 'Water the tomatoes', list_id: lst.id});
 
   await firefox(async ({cmd, ev, nav: go, ctx, shot, until: wait}) => {
     await go(B + 'static/icon.svg');
@@ -137,6 +138,44 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
       await at(1);
       await ev(`(location.hash = '#inbox', 1)`);
       check(await wait(`S.route?.key === 'inbox' && !document.querySelector('#view')._stk?.length && f8d_bk.pushed === 0 && !f8d_bk.skip && location.hash === '#inbox'`, {timeout: 6000}), `${W}: another page empties the views of the page before ` + await ev(STATE));
+
+      // 7. 2.962.0 (#5231): menus. A second level (more:) and a follow menu (an entry opening another menu in the same sheet)
+      // are steps: Back shows the menu before, the last Back closes it; the "Back" row does the same. The task's "…" menu
+      // (More… = second level, New date… = follow menu) and a chat-like header menu (Usage > Back closed it all before)
+      await start();
+      const tid = tsk.id; await wait(`!!S.tasks?.get?.(${tid})`, {timeout: 8000});
+      check(tid > 0, `${W}: the task is loaded`);
+      const popTxt = `(document.querySelector('#pop:not(.hidden)')?.textContent || '')`;
+      const openTaskMenu = async () => { await ev(`(taskMenu(document.querySelector('#top [data-act="side"]'), ${tid}), 1)`); return at(1, `${popTxt}.includes('New date')`); };
+      check(await openTaskMenu(), `${W}: the task menu opens, one entry ` + await ev(STATE));
+      await ev(`([...document.querySelectorAll('#pop [role=menuitem]')].find(b => /New date/.test(b.textContent)).click(), 1)`);
+      check(await at(2, `!document.querySelector("#pop .mtmore") && document.querySelectorAll("#pop [role=menuitem]").length > 0`), `${W}: New date… opens its choices in the sheet, a step of Back ` + await ev(STATE));
+      await back();
+      check(await at(1, `${popTxt}.includes('New date') && ${popTxt}.includes('More')`), `${W}: Back shows the task menu again, not closing it all ` + await ev(STATE));
+      await ev(`(document.querySelector('#pop .mtmore').click(), 1)`);
+      check(await at(2, `!!document.querySelector('#pop .mback') && !${popTxt}.includes('New date')`), `${W}: More… opens the second level ` + await ev(STATE));
+      await back();
+      check(await at(1, `!document.querySelector('#pop .mback') && ${popTxt}.includes('New date')`), `${W}: Back from More… = the task menu ` + await ev(STATE));
+      await back();
+      check(await wait(`document.querySelector('#pop').classList.contains('hidden') && f8d_bk.pushed === 0 && !f8d_bk.skip && ${onToday}`, {timeout: 6000}), `${W}: the last Back closes the menu, Today stays ` + await ev(STATE));
+      // the chat header menu's shape: Usage = a second level; its "Back" row = Back; a follow menu below the second level
+      await ev(`(window.__hm = () => menu(document.querySelector('#top [data-act="side"]'), [{label: 'Fold long messages', fn() {}}, {label: 'Usage this month', cls: 'chmi-use', more: [{label: '12 messages', fn() {}}, {label: 'Pick a period', fn: () => menu(document.querySelector('#top [data-act="side"]'), [{label: 'Last week', fn() {}}])}]}]), window.__hm(), 1)`);
+      await at(1, `${popTxt}.includes('Usage this month')`);
+      await ev(`(document.querySelector('#pop .chmi-use').click(), 1)`);
+      check(await at(2, `${popTxt}.includes('12 messages')`), `${W}: chat menu > Usage opens its lines ` + await ev(STATE));
+      await ev(`([...document.querySelectorAll('#pop [role=menuitem]')].find(b => /Pick a period/.test(b.textContent)).click(), 1)`);
+      check(await at(3, `${popTxt}.includes('Last week')`), `${W}: a follow menu under Usage, three steps ` + await ev(STATE));
+      await back();
+      check(await at(2, `${popTxt}.includes('12 messages')`), `${W}: Back = Usage again ` + await ev(STATE));
+      await ev(`(document.querySelector('#pop .mback').click(), 1)`);
+      check(await at(1, `${popTxt}.includes('Fold long messages') && !${popTxt}.includes('12 messages')`), `${W}: the "Back" row = the chat menu, its entry goes ` + await ev(STATE));
+      await back();
+      check(await wait(`document.querySelector('#pop').classList.contains('hidden') && f8d_bk.pushed === 0 && !f8d_bk.skip && ${onToday}`, {timeout: 6000}), `${W}: Back closes the chat menu, Today stays ` + await ev(STATE));
+      // closing a menu with steps another way (its X) takes all its entries away
+      await ev(`(window.__hm(), document.querySelector('#pop .chmi-use').click(), 1)`);
+      await at(2);
+      await ev(`(document.querySelector('#pop .tch-shx').click(), 1)`);
+      check(await wait(`document.querySelector('#pop').classList.contains('hidden') && f8d_bk.pushed === 0 && !f8d_bk.skip && ${onToday}`, {timeout: 6000}), `${W}: the X closes the menu with its steps, no entry stays ` + await ev(STATE));
     }
   }, true);
 
