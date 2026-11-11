@@ -159,7 +159,8 @@ check("Total hours" in t and "Billable hours" not in t, "default: one total, no 
 check(hours(t, 5), "default total = 2.5 + 0.5 + 0.75 + 1.25 h = 5 h: " + t[-300:])
 # billed elsewhere: the number of the own office's other invoice; another office's document: only "already billed"
 check(f"billed with {other['number']}" in t, f"an entry billed on another invoice names it ({other['number']})")
-check(beta["number"] not in t and "already billed" in t, "a document of an office without a role: only 'already billed'")
+# (both offices count from the same scheme: Beta's number may equal this invoice's own number in the sheet's head)
+check(t.count("billed with") == 1 and "already billed" in t, "a document of an office without a role: only 'already billed'")
 check(t.count("billed with") == 1 and inv["number"] and f"billed with {inv['number']}" not in t, "an entry of this invoice carries no mark")
 
 # ================================================================ the switch: non-billable entries shown and marked
