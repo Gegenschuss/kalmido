@@ -15446,7 +15446,6 @@
   "agents and their logs (never in the organisation export)": "agenten en hun logboeken (nooit in de organisatie-export)",
   "credentials or link secrets": "inloggegevens of linkgeheimen",
   "fingerprints of error reports: a counter and limit of this server, the reports themselves are tasks": "vingerafdrukken van foutmeldingen: teller en limiet van deze server, de meldingen zelf zijn taken",
-  "groups of people": "groepen personen",
   "invitations": "uitnodigingen",
   "join requests": "toetredingsverzoeken",
   "list keys (client_encrypted)": "projectsleutels (client_encrypted)",

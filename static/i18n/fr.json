@@ -15446,7 +15446,6 @@
   "agents and their logs (never in the organisation export)": "les agents et leurs journaux (jamais dans l’export de l’organisation)",
   "credentials or link secrets": "identifiants ou secrets de liens",
   "fingerprints of error reports: a counter and limit of this server, the reports themselves are tasks": "empreintes de rapports d’erreur : compteur et limite de ce serveur, les rapports eux-mêmes sont des tâches",
-  "groups of people": "groupes de personnes",
   "invitations": "invitations",
   "join requests": "demandes d’adhésion",
   "list keys (client_encrypted)": "clés de projets (client_encrypted)",
