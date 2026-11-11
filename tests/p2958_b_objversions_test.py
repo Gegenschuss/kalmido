@@ -14,6 +14,7 @@ freelancer-matrix: wiki
    no-op; a new save after the move gets a new id and the next number
  - a page deleted for good takes its versions along (trigger kalmido_ov_gone)
 usage: p2958_b_objversions_test.py <datadir>"""
+import base64
 import json
 import os
 import subprocess
@@ -38,7 +39,8 @@ OLD_INS = ("INSERT INTO wiki_versions(id,page_id,org_id,owner_id,path,body,size,
            "VALUES(?,?,?,?,?,?,?,?,?,?,?)")
 LABEL = "knowledge history, stage Q7a (#5281)"
 
-kt.fresh(env={"KALMIDO_INSTANCE_MODE": "workspaces"}, prefix="P2958B")
+kt.fresh(env={"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_ORGCRYPT_DELAY": "0",
+              "KALMIDO_SECRET_KEY": base64.b64encode(os.urandom(32)).decode()}, prefix="P2958B")  # a server key: sealed versions
 
 
 def sql(q, args=(), write=False):
