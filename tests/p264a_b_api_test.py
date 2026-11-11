@@ -20,6 +20,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timedelta
 
@@ -649,6 +650,46 @@ check(not dbx("SELECT 1 FROM list_part_trash WHERE id=?", (W4,)), "#5574: the se
 r = A.post(B + f"/api/lists/{L3}/time/restore", json={"wipe": W4})
 check(r.status_code == 404 and dbx("SELECT COUNT(*) FROM time_entries WHERE list_id=?", (L3,))[0][0] == N3,
       f"#5574: a second Undo by the copy doubles nothing {r.status_code} {r.text[:200]}")
+
+# ================================================================== 2.909.0 (#5583): "Delete all times" restored while a move of
+# the task into the locked project is under way (the mover holds the task, has emptied its time entries and not committed):
+# the restore waits for the move and then writes no title / note; without the task lock it read the lock state of before the
+# move and its plain texts stayed in time_entries (the mover's scrub did not see its rows)
+T8 = A.post(B + "/api/tasks", json={"list_id": L3, "title": MK + "RaceTitle"}).json()["id"]
+r = A.post(B + "/api/time/entries", json={"task_id": T8, "start": (datetime.now() - timedelta(hours=12)).isoformat(timespec="seconds"),
+                                         "minutes": 10, "note": MK + "RaceNote"})
+check(r.ok, f"#5583: a time entry with a note {r.text[:200]}")
+r = A.post(B + f"/api/lists/{L3}/time/delete-all", json={"confirm": "Other open"})
+W8, N8 = (r.json().get("wipe"), len(r.json().get("entries") or [])) if r.ok else (None, 0)
+check(r.ok and W8 and N8, f"#5583: delete all times {r.status_code} {r.text[:200]}")
+HOLD = subprocess.Popen(
+    ["docker", "exec", "-i", CT, "python", "-c",
+     "import os, sys; os.environ['TASKS_WATCHDOG']='0'\nimport app\nfrom kalmido.core.pg import system_ctx\nc=app.connect()\n"
+     "with system_ctx(c):\n"
+     f"    c.execute('UPDATE tasks SET list_id=?, title=? WHERE id=?', ({L}, {cipher(46)!r}, {T8}))\n"
+     f"    c.execute(\"UPDATE time_entries SET task_title='', note='' WHERE task_id=?\", ({T8},))\n"
+     "print('held', flush=True)\nsys.stdin.readline()\nc.commit()\nprint('done', flush=True)"],
+    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+held = HOLD.stdout.readline().strip()
+RES = {}
+RT = threading.Thread(target=lambda: RES.update(r=A.post(B + f"/api/lists/{L3}/time/restore", json={"wipe": W8})))
+RT.start()
+waited, t_end = False, time.time() + 30
+while RT.is_alive() and time.time() < t_end:  # a real state: the restore's backend waits for a row lock, or the restore is done
+    if dbx("SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%FOR SHARE%'"):
+        waited = True
+        break
+    time.sleep(0.1)
+HOLD.stdin.write("\n")
+HOLD.stdin.flush()
+hold_out = HOLD.communicate(timeout=60)
+RT.join(60)
+r = RES.get("r")
+plain = dbx("SELECT note, task_title FROM time_entries WHERE note LIKE ? OR task_title LIKE ?", (f"%{MK}Race%", f"%{MK}Race%"))
+check(held == "held" and "done" in hold_out[0], f"#5583 setup: the move held and committed {held} {hold_out}")
+check(waited, "#5583: the restore waits for the move of its task (task rows held before the lock state is read)")
+check(r is not None and r.ok and r.json().get("restored") == N8 and not plain,
+      f"#5583: the restore after the move into the locked project writes no plain title / note {plain} {r.text[:200] if r is not None else None}")
 
 print(f"\n{OKS[0]} checks ok, {len(FAILS)} failed", flush=True)
 if FAILS:

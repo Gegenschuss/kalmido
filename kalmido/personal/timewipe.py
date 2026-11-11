@@ -20,7 +20,7 @@ from ..core.db import body, bump, db, iso, now_utc
 from ..core.i18n import tr
 from ..core.access import Denied, list_role, need_list, need_time
 from ..accounts.session import me
-from ..core.pg import insert_id, system_ctx, write_lock  # #5574: + write_lock
+from ..core.pg import insert_id, st_ids, system_ctx, write_lock  # #5574: + write_lock; #5583: + st_ids
 from ..core.objparts import part_kind  # 2.783.0 (#5368)
 from ..core import objhooks  # 2.783.0 (#5368): tzw_move at every start, the copies go with an account
 from ..accounts.login import auth_key  # 2.369.5 (#2517): pulled up from functions
@@ -229,6 +229,18 @@ def tz_delete_all(lid):
     return jsonify(ok=True, deleted=len(ids), seconds=prev["seconds"], billed=prev["billed"], entries=back, wipe=wid)
 
 
+def tzw_lock_tasks(c, ents):
+    """#5583 (finding of the review of #5574): the tasks the entries name, held (FOR SHARE, in id order) until tz_restore commits.
+    A move of such a task into a locked project (collab/liste2e.py le2a_move -> le2b_scrub_tasks) waits for the restore, so the
+    restore never reads the lock state of before the move while the move's scrub misses the entries it writes; a move done
+    first is seen. A task deleted for good meanwhile is not there to hold (accepted rest risk, decision #5583). Also keeps the
+    order tasks -> copy's lock, so bw_check at the end cannot deadlock against the mover."""
+    ids = sorted({e["task_id"] for e in ents if isinstance(e, dict) and isinstance(e.get("task_id"), int)
+                  and not isinstance(e.get("task_id"), bool)}) if isinstance(ents, list) else []
+    if ids:
+        c.execute("SELECT id FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) ORDER BY id FOR SHARE", (st_ids(ids),)).fetchall()
+
+
 @app.post("/api/lists/<int:lid>/time/restore")
 def tz_restore(lid):
     need_time()
@@ -242,15 +254,22 @@ def tz_restore(lid):
         wid = b.get("wipe")
         if not isinstance(wid, int) or isinstance(wid, bool):
             raise Denied(400, tr("Invalid value: {0}", "wipe"))
-        write_lock(c, TZW_LOCK.format(id=wid))  # #5574: one change of the copy at a time (le2b_scrub_trash_tasks takes it too)
+        # #5583: the order of every writer is first the tasks, then the copy's lock (a move into a locked project holds its
+        # task and then takes the copy's lock in le2b_scrub_trash_tasks): the copy unlocked, its tasks, the copy again locked
         w = tz_wipe_row(c, lid, uid, wid)
         if not w:
             raise Denied(404)
+        tzw_lock_tasks(c, json.loads(w["entries"] or "[]"))
+        write_lock(c, TZW_LOCK.format(id=wid))  # #5574: one change of the copy at a time (le2b_scrub_trash_tasks takes it too)
+        w = tz_wipe_row(c, lid, uid, wid)
+        if not w:
+            raise Denied(404)  # used up meanwhile
         ents = json.loads(w["entries"] or "[]")
     else:
         ents = b.get("entries")
     if not isinstance(ents, list) or len(ents) > TZ_MAX_RESTORE:
         raise Denied(400, tr("Invalid value: {0}", "entries"))
+    tzw_lock_tasks(c, ents)  # #5583: before the lock state and the task of each entry are read (again for the copy: its entries now)
     ts, n, left, came = iso(now_utc()), 0, [], set()  # #5574: came = (person, start, end) of what is back now
     for e in ents:
         if not isinstance(e, dict) or not e.get("start") or not e.get("end"):
