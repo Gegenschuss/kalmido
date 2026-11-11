@@ -11,8 +11,10 @@ schema.py no longer creates either table, nor the trigger quicknote_groups.
 
 The DROP is no statement of this file (a fragment's AFTER runs before the areas' start hooks and cannot hold the start check):
 at a start, inside core/db.py init_db's one transaction (core/objhooks.START, lists/lkretire.py):
-1. lk_grp_copy once (flag migr_grp5245): every group_shares row without its share gets one (a project's node placed where its
-   path says, a folder's nodes made where missing), then grp_sync of every project;
+1. lk_grp_copy at every start until no row is left (then flag migr_grp5245; Fable review F6): every group_shares row without
+   its share gets one (a project's node placed where its path says, a folder's nodes made where missing; a share there already
+   keeps the higher role, F5), then grp_sync of the projects of the groups named; the rows the core holds then leave
+   group_shares at once (a later run copies only what is still missing) and the back limit rises already here (F3);
 2. lk_retire at every start while a table exists (core/kernretire.py kern_retire, lock kalmido-kern5069), each table alone:
    the start check counts old rows the core does not hold -- not 0: the table stays, a line in the log, the admins' alert;
    0: DROP TABLE, its rows of obj_revoked, the database's back limit rises to this minor (an older image would rebuild the

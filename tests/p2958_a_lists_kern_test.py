@@ -11,6 +11,9 @@ the shares of their nodes (kalmido/lists/lffolder.py, groups.py, lkretire.py). I
    the share follows a renamed folder and ends with DELETE
  - the start's one-way step: old rows of group_shares are copied forward (a project's own row, a folder's row), both tables are
    dropped; a folder_people row without a share holds the table back (the start check), without it the table goes
+ - Fable review (2.958): F3 the back limit rises with the copy, F4 a share without a member row is a delta "full", F5 a share
+   there already keeps the higher role, F6 the copy repeats until no row is left (per path), F8 the state's folder group
+   marks, F9 a folder node made later takes its namesakes' group shares
 freelancer-matrix: lists (a person without an organisation shares a private folder with a person and lists her)
 usage: p2958_a_lists_kern_test.py <datadir>"""
 import os
@@ -141,39 +144,6 @@ gb = dbx("""SELECT s.node_id, s.list_role FROM fs_shares s JOIN fs_nodes n ON n.
             AND n.owner_id=? AND s.group_id=? AND COALESCE(s.list_own, 0)=0 ORDER BY s.node_id""", (ALICE, G))
 check(len(gb) == 2 and {x[1] for x in gb} == {"edit"}, f"F9: the new Bay node carries the group's share too (as the old row (owner, folder) did) {gb}")
 check(lgroups(LBP) == [(G, "edit", "Bay")], f"F9: the private project names the folder's group share {lgroups(LBP)}")
-# ---------------------------------------------------------------- (3b) Fable review F9 / F4 / F8
-# F9: a folder node made later at the same path (the first project there in another workspace) takes the folder's group shares
-LB = new_list(A, "Bay plan", "Bay")
-check(A.put(B + f"/api/folders/groups/{G}", json={"folder": "Bay", "role": "edit"}).ok, "alice shares her folder Bay with the group")
-r = A.post(B + "/api/lists", json={"name": "Bay notes", "folder": "Bay", "org_id": None})
-check(r.ok, "setup: alice's private project in Bay (her own tree) " + r.text[:200])
-LBP = r.json()["id"]
-bay = dbx("SELECT id FROM fs_nodes WHERE kind='folder' AND name='Bay' AND owner_id=? AND deleted_at IS NULL", (ALICE,))
-check(len(bay) == 2, f"setup: Bay is a folder node in two trees {bay}")
-gb = dbx("""SELECT s.node_id, s.list_role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='folder' AND n.name='Bay'
-            AND n.owner_id=? AND s.group_id=? AND COALESCE(s.list_own, 0)=0 ORDER BY s.node_id""", (ALICE, G))
-check(len(gb) == 2 and {x[1] for x in gb} == {"edit"}, f"F9: the new Bay node carries the group's share too (as the old row (owner, folder) did) {gb}")
-check(lgroups(LBP) == [(G, "edit", "Bay")], f"F9: the private project names the folder's group share {lgroups(LBP)}")
-# F8: the state names the folders' group shares of the lists it holds (read through the folders above them only)
-st = {x["id"]: x for x in A.get(B + "/api/state").json()["lists"]}
-check([(x["group_id"], x["via"]) for x in st[LB]["groups"]] == [(G, "Bay")] and st[LP]["groups"] == [],
-      f"F8: the state's group marks {st[LB]['groups']} {st[LP]['groups']}")
-check(A.delete(B + f"/api/folders/groups/{G}", params={"folder": "Bay"}).ok, "cleanup: the Bay share ends")
-
-
-# ---------------------------------------------------------------- (3b) Fable review F9 / F4 / F8
-# F9: a folder node made later at the same path (the first project there in another workspace) takes the folder's group shares
-LB = new_list(A, "Bay plan", "Bay")
-check(A.put(B + f"/api/folders/groups/{G}", json={"folder": "Bay", "role": "edit"}).ok, "alice shares her folder Bay with the group")
-r = A.post(B + "/api/lists", json={"name": "Bay notes", "folder": "Bay", "org_id": None})
-check(r.ok, "setup: alice's private project in Bay (her own tree) " + r.text[:200])
-LBP = r.json()["id"]
-bay = dbx("SELECT id FROM fs_nodes WHERE kind='folder' AND name='Bay' AND owner_id=? AND deleted_at IS NULL", (ALICE,))
-check(len(bay) == 2, f"setup: Bay is a folder node in two trees {bay}")
-gb = dbx("""SELECT s.node_id, s.list_role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='folder' AND n.name='Bay'
-            AND n.owner_id=? AND s.group_id=? AND COALESCE(s.list_own, 0)=0 ORDER BY s.node_id""", (ALICE, G))
-check(len(gb) == 2 and {x[1] for x in gb} == {"edit"}, f"F9: the new Bay node carries the group's share too (as the old row (owner, folder) did) {gb}")
-check(lgroups(LBP) == [(G, "edit", "Bay")], f"F9: the private project names the folder's group share {lgroups(LBP)}")
 # F8: the state names the folders' group shares of the lists it holds (read through the folders above them only)
 st = {x["id"]: x for x in A.get(B + "/api/state").json()["lists"]}
 check([(x["group_id"], x["via"]) for x in st[LB]["groups"]] == [(G, "Bay")] and st[LP]["groups"] == [],
@@ -219,6 +189,26 @@ dbx("INSERT INTO group_shares(group_id,owner_id,folder,role,added_by,added_at) V
     (G, ALICE, "Old", "edit", ALICE, "2026-10-01T08:00:00Z"))
 dbx("INSERT INTO folder_people(owner_id,folder,user_id,role,created_at) VALUES(?,?,?,?,?)", (ALICE, "Old", uid["carl"], "view", "2026-10-01T08:00:00Z"))
 dbx("DELETE FROM settings WHERE key='migr_grp5245'")  # an older database: the copy has not run yet
+# Fable review F5: the Old folder's node has a share of the group already (view, e.g. from the file store): the copy raises it
+OLDN = dbx("SELECT id FROM fs_nodes WHERE kind='folder' AND name='Old' AND owner_id=?", (ALICE,))[0][0]
+dbx("INSERT INTO fs_shares(node_id,group_id,role,list_role,created_by,created_at) VALUES(?,?,?,?,?,?)",
+    (OLDN, G, "view", "view", ALICE, "2026-10-01T08:00:00Z"))
+# F6 / F3: a second group whose shares cannot be written at the first start (a trigger drops them, standing in for a project /
+# folder without a node), while the group has a share on another folder of alice (Docks): the start check counts per path
+G2 = A.post(B + "/api/admin/groups", json={"name": "Deck hands", "members": [uid["bob"]]}).json()["id"]
+LM2 = new_list(A, "Old ledger")
+DOCKS = dbx("SELECT id FROM fs_nodes WHERE kind='folder' AND name='Docks' AND owner_id=?", (ALICE,))[0][0]
+dbx("INSERT INTO fs_shares(node_id,group_id,role,list_role,created_by,created_at) VALUES(?,?,?,?,?,?)",
+    (DOCKS, G2, "view", "view", ALICE, "2026-10-01T08:00:00Z"))
+dbx("INSERT INTO group_shares(group_id,list_id,role,added_by,added_at) VALUES(?,?,?,?,?)", (G2, LM2, "edit", ALICE, "2026-10-01T08:00:00Z"))
+dbx("INSERT INTO group_shares(group_id,owner_id,folder,role,added_by,added_at) VALUES(?,?,?,?,?,?)",
+    (G2, ALICE, "Old", "view", ALICE, "2026-10-01T08:00:00Z"))
+dbx("""CREATE FUNCTION p2958a_hold() RETURNS trigger LANGUAGE plpgsql AS $f$ BEGIN
+       IF NEW.group_id = %d THEN RETURN NULL; END IF; RETURN NEW; END $f$""" % int(G2))
+dbx("CREATE TRIGGER p2958a_hold BEFORE INSERT ON fs_shares FOR EACH ROW EXECUTE FUNCTION p2958a_hold()")
+MINOR = ".".join(str(dbx("SELECT value FROM kalmido_meta WHERE key='app_version'")[0][0]).split(".")[:2] + ["0"])
+bf0 = dbx("SELECT value FROM kalmido_meta WHERE key='back_floor'")
+check([tuple(x) for x in bf0] != [(MINOR,)], f"setup: the back limit is not this minor yet {bf0} {MINOR}")
 
 
 def logs():
@@ -234,24 +224,36 @@ def _health():
 
 
 def restart():
-    """The next start of the server (core/db.py init_db runs lists/lkretire.py lk_grp_copy once, then lk_retire)."""
+    """The next start of the server (core/db.py init_db runs lists/lkretire.py lk_grp_copy until done, then lk_retire)."""
     subprocess.run(["docker", "restart", CT], capture_output=True)
     check(until(_health, timeout=90), "the server is up again after the restart")
 
 
 restart()
 A = sess("alice")
-check(not table("group_shares") and table("folder_people"),
-      "first start: group_shares copied forward and dropped, folder_people held back by the start check (a row without a share)")
+check(table("group_shares") and table("folder_people"),
+      "first start: both tables held back by the start check (group_shares: the second group's rows, folder_people: a row without a share)")
 check("projects, stage 7d (#5245): folder_people: 1 old row(s) of folder_people have no share in the shared core" in logs(),
       "the log names the row left")
+left = dbx("SELECT group_id, list_id, folder FROM group_shares ORDER BY id")
+check([tuple(x) for x in left] == [(G2, LM2, None), (G2, None, "Old")],
+      f"F6: the folder row of the second group counts (per path, not any folder of the owner); the rows the core holds left the table {left}")
+check(dbx("SELECT value FROM settings WHERE key='migr_grp5245'") == [], "F6: the copy's flag waits until no row is left")
+bf = dbx("SELECT value FROM kalmido_meta WHERE key='back_floor'")
+check([tuple(x) for x in bf] == [(MINOR,)], f"F3: the back limit rose to this minor with the copy, before the DROP {bf} {MINOR}")
 check(lgroups(LM) == [(G, "admin", "list")] and lgroups(LO) == [(G, "edit", "Old")], f"the copies answer as before {lgroups(LM)} {lgroups(LO)}")
 check(member(LM, uid["dora"])[2] == "admin" and member(LO, uid["dora"])[3] == "edit",
       f"dora: the project's group role (grole), the folder's as a folder role (frole) {member(LM, uid['dora'])} {member(LO, uid['dora'])}")
 check(sees(sess("dora"), LM) and sees(sess("dora"), LO), "dora sees both projects")
 dbx("DELETE FROM folder_people")
+dbx("DROP TRIGGER p2958a_hold ON fs_shares")
+dbx("DROP FUNCTION p2958a_hold()")
 restart()
-check(not table("folder_people") and not table("group_shares"), "without the row the next start drops folder_people")
+check(not table("folder_people") and not table("group_shares"), "without the row the next start drops folder_people, group_shares after the "
+      "second copy")
+check(lgroups(LM2) == [(G2, "edit", "list")] and (G2, "view", "Old") in (lgroups(LO) or []),
+      f"F6: the next start copied the rows left {lgroups(LM2)} {lgroups(LO)}")
+check(sees(sess("bob"), LM2), "bob sees the second group's project")
 bf = dbx("SELECT value FROM kalmido_meta WHERE key='back_floor'")
 check(bf and bf[0][0], f"the back limit was raised (an older image would rebuild the tables empty) {bf}")
 check(lgroups(LM) == [(G, "admin", "list")], "the group share stays after the drop")
