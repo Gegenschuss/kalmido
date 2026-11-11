@@ -19,6 +19,17 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.929.0] - 2026-11-11
+
+Package 2.914 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Security
+- Locking a project: the change history of its deleted time entries and notepads (the note / text before and after an undo) no longer keeps the text; it goes at the lock, and once at start for every project, as nothing can bring such an entry back. The lock also removes the history and undo copies of the project's settings across organisations (#5564)
+
+Package 2.929 (Bündel: Aufräumung der GitHub-Versionen: Frist 14 -> 3 Tag).
+### Changed
+- The prune of old GitHub release objects and image versions keeps everything younger than 3 days instead of 14; the workflow "Prune releases" has a new input `days` to run it by hand with another window. Still kept: one checked version per week for 4 weeks, the current latest release, the newest checked version and all above it, `:latest`; git tags are never deleted (#5598).
+
 ## [2.910.0] - 2026-11-11
 
 Package 2.905 (Bündel: Rückgängig über alle Geräte, Stufe 7: Browser-Verl, Dokument-Ansicht: Vorschaubild springt beim Wechse, Kern-Querschnitt Q8a: Gelese).
@@ -97,7 +108,8 @@ Package 2.900 (Bündel: Projekt-Sperre: Rückgängig-Kopien von Zeiteinträge, P
 
 Not released (the CI of this version was red); its changes are listed under 2.902.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.910.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.929.0...HEAD
+[2.929.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.929.0
 [2.910.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.910.0
 [2.902.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.902.0
 [2.900.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.900.0
