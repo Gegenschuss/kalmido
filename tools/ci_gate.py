@@ -17,11 +17,11 @@ request per run. Not a loosening: the code of the tag has to have passed the ful
 2.767.0 (#5324): the image follows the same rule as live in the fast lane - a finished FULL run that is
 red only in SOFT parts counts as well ("soft green"). Hard = the list tests/hard_suites.txt of the tagged tree (the one list the
 CI plan puts on its hard shards "Test suites N/M full hart" and the live train reads; invoices / office, backup, login,
-scanners). A red run is soft green only when: it ended as failure (not cancelled), it was the full stage with at least one hard
+scanners). A red run is soft green only when: it ended as failure (2.940.0, #5600: or cancelled), it was the full stage with at least one hard
 shard, every hard shard is green, every red shard names its red suites (annotations "suite X failed" of tests/run_all.sh) and
 none of them is hard (by name or by the name of its test group, tools/shards.py groups(); a suite in no group = hard), and no
 other hard job is red (name matches a pattern: e-invoice validators, semgrep, ZAP ...; a red step of "Lint ..." only when it is a
-scanner). Hard red, only the push stage = no image, as before.
+scanner). Hard red, only the push stage = no image, as before (2.940.0: "failure" above reads "failure or cancelled").
 2.940.0 (#5600): a CANCELLED full run counts like a red one - soft green when every hard shard and hard job ended green and
 only soft shards were cut (a newer push cancels the running CI with cancel-in-progress once the fast lane has the version
 live; v2.883, v2.897, v2.902 had all hard shards green and got no image). A hard shard or hard job that was cancelled before
@@ -45,6 +45,9 @@ SUITE_ANN_RE = re.compile(r"^suite ([A-Za-z0-9_.-]+) failed$")  # tests/run_all.
 SCANNERS = ("audit", "gitleaks", "secret", "bandit", "semgrep", "trivy")  # a red step of the Lint job is hard only as one of these
 # review 2.767.0 (#5324): the steps a scanner needs before it runs (install, the pin / OSV check) - red or not run = hard as well
 SCAN_PREP = ("install scanners*", "pinned dependencies*")
+# fable 2.940.0 M2 (#5600): a red Lint is soft only when these scanner steps are THERE and green (positive check: a Lint
+# cancelled mid-way may list only the steps it began)
+LINT_MUST = ("pinned dependencies*", "install scanners*", "bandit*", "pip-audit (image*")
 SOFT_CONCL = ("failure", "cancelled")  # #5600: the run conclusions judge_soft looks at (cancelled = a newer push cut the run)
 
 
@@ -132,7 +135,9 @@ def hard_job(job, pats):
         # review (#5324): a scanner (or its install / pin check) that is red OR did not run (skipped after an earlier red step) = hard
         miss = [n for n in ((x.get("name") or "").lower() for x in steps if x.get("conclusion") != "success")
                 if "(informational)" not in n and any(fnmatch.fnmatch(n, m) for m in scan)]
-        return not red or bool(miss)
+        ok = [(x.get("name") or "").lower() for x in steps if x.get("conclusion") == "success"]
+        lack = [m for m in LINT_MUST if not any(fnmatch.fnmatch(n, m) for n in ok)]  # fable 2.940.0 M2 (#5600)
+        return not red or bool(miss) or bool(lack)
     return any(fnmatch.fnmatch(low, m) for m in pats)
 
 
@@ -174,8 +179,11 @@ def judge_soft(jobs, suites_of, pats, grp):
     for j in jobs:
         if SHARD_RE.match(j.get("name") or "") or j.get("conclusion") == "success":
             continue
-        if j.get("conclusion") in ("skipped", None):  # review (#5324): a hard job that did not run is no green one
-            if hard_job(j, pats) and not (j.get("name") or "").lower().startswith("lint"):
+        if j.get("conclusion") is None or j.get("status") not in (None, "completed"):
+            # fable 2.940.0 M1 (#5600): a job without a result in a finished (cancelled) run = unknown = hard
+            return False, "job without a result: %s (%s)" % (j.get("name"), j.get("status")), info
+        if j.get("conclusion") == "skipped":  # review (#5324): a hard job that did not run is no green one
+            if hard_job(j, pats) or (j.get("name") or "").lower().startswith("lint"):  # fable 2.940.0 M1: Lint too
                 return False, "hard job did not run: %s" % j.get("name"), info
             continue
         if hard_job(j, pats):

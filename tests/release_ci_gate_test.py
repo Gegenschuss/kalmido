@@ -223,8 +223,13 @@ check(ok and info["jobs"] == ["Browser demo + quick add languages"], "#5324: a r
 for nm in ("E-invoice validators (veraPDF, KoSIT)", "OWASP ZAP baseline"):
     ok, txt, _ = gate.judge_soft(base_jobs(job(7, nm, "failure")), suites({}), PATS + ["*einvoice*", "e-invoice*"], GRP)
     check(not ok and "hard job" in txt, "#5324: a red hard job (%s) = no image (%s)" % (nm, txt))
-def lint(st):
-    return [job(6, "Lint, i18n, scanners", "failure", [{"name": "Set up job", "conclusion": "success"}, {"name": st, "conclusion": "failure"}])]
+SCAN_OK = [{"name": n, "conclusion": "success"} for n in ("Pinned dependencies stay pinned", "Install scanners",
+                                                           "bandit (fails on high severity only)", "pip-audit (image and embedding service)")]
+
+
+def lint(st):  # 2.940.0 (#5600, fable M2): the scanner steps are listed green, as in a Lint that ran to its end
+    steps = [{"name": "Set up job", "conclusion": "success"}, {"name": st, "conclusion": "failure"}]
+    return [job(6, "Lint, i18n, scanners", "failure", steps + [x for x in SCAN_OK if x["name"].lower() != st.lower()])]
 
 
 ok, txt, _ = gate.judge_soft([j for j in base_jobs() if j["id"] != 6] + lint("ESLint of the client"), suites({}), PATS, GRP)
@@ -276,6 +281,16 @@ lint4 = [job(6, "Lint, i18n, scanners", "cancelled", [{"name": "ESLint of the cl
                                                       {"name": "bandit (fails on high severity only)", "conclusion": "cancelled"}])]
 ok, txt, _ = gate.judge_soft([j for j in v2902 if j["id"] != 6] + lint4, suites({}), PATS, GRP)
 check(not ok, "#5600: Lint cancelled before its scanners ran = no image (%s)" % txt)
+# fable 2.940.0 M2: a Lint cancelled mid-way that lists only the steps it began (no scanner entry at all) = no image
+lint5 = [job(6, "Lint, i18n, scanners", "cancelled", [{"name": "ESLint of the client", "conclusion": "cancelled"}])]
+ok, txt, _ = gate.judge_soft([j for j in v2902 if j["id"] != 6] + lint5, suites({}), PATS, GRP)
+check(not ok and "Lint" in txt, "#5600 fable M2: Lint without its scanner steps listed = no image (%s)" % txt)
+# fable 2.940.0 M1: a job still without a result in the finished run, a skipped Lint = no image
+ok, txt, _ = gate.judge_soft([j for j in v2902 if j["id"] != 6] + [dict(job(6, "Lint, i18n, scanners", None), status="in_progress")],
+                             suites({}), PATS, GRP)
+check(not ok and "without a result" in txt, "#5600 fable M1: Lint without a result = no image (%s)" % txt)
+ok, txt, _ = gate.judge_soft([j for j in v2902 if j["id"] != 6] + [job(6, "Lint, i18n, scanners", "skipped")], suites({}), PATS, GRP)
+check(not ok and "did not run" in txt, "#5600 fable M1: a skipped Lint = no image (%s)" % txt)
 res, _ = gate.decide([run(1, conclusion="failure"), run(2, "in_progress")], jobs_of({}), soft=lambda rid: (True, "x"))
 check(res == "soft", "#5324: decide - a soft run does not wait for another one (%s)" % res)
 check(gate.decide_tree("soft", "x", [], jobs_of({}))[0] == "soft", "#5324: decide_tree keeps soft")

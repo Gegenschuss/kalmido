@@ -23,6 +23,8 @@ name: Release
 # too (all hard shards green, no red suite / job of tests/hard_suites.txt of the tagged tree; tools/ci_gate.py). Hard red, cancelled
 # or only the push stage = no image as before. checks: read = the annotations naming the red suites; the soft red parts go into the
 # step summary and, with ci_gate.py --report, into the notes of the weekly release.
+# 2.940.0 (#5600): a CANCELLED full run (a newer push cut it) counts like a red one - every hard shard and hard job green, only
+# soft shards cut = image; a cut hard part, a job without a result or a Lint whose scanners did not all run green = no image.
 on:
   push:
     tags: ["v*.*.*"]
