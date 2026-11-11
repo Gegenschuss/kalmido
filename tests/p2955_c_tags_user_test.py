@@ -88,7 +88,8 @@ Bo, Ca = kt.sess("bob"), kt.sess("carl")
 for s in (Bo, Ca):
     s.patch(B + "/api/settings", json={"lang": "en", "features": FEATURES, "tour": "done"})
 BOB, CARL = uid["bob"], uid["carl"]
-L = mklist(A, "Kundenprojekt", ORG)  # the organisation's project: bob (a member) and the agent of the organisation reach it
+L = mklist(A, "Kundenprojekt", ORG)  # the organisation's project: bob and the agent of the organisation become its members
+A.put(B + f"/api/lists/{L}/members", json={"user_id": BOB, "role": "edit"})
 T1, T2, T3, T4 = (task(A, L, x) for x in ("Angebot", "Rechnung", "Anruf", "Termin"))
 
 # ================================================================== the old table is gone, the move of a rolled-back database
@@ -157,7 +158,8 @@ r = A.post(B + "/api/my/agents", json={"username": "taggerbot", "display_name": 
 check(r.status_code == 201, f"an agent {r.status_code} {r.text[:200]}")
 AG, HG = r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
 A.put(B + f"/api/lists/{L}/members", json={"user_id": AG, "role": "edit"})
-r = requests.patch(B + f"/api/v1/tasks/{T1}", headers=HG, json={"tags": ["Bot-Privat", "bot-privat"]})
+ver = requests.get(B + f"/api/v1/tasks/{T1}", headers=HG).json().get("updated_at")
+r = requests.patch(B + f"/api/v1/tasks/{T1}", headers=HG, json={"tags": ["Bot-Privat", "bot-privat"], "expect_updated_at": ver})
 check(r.ok and r.json().get("tags") == ["Bot-Privat"], f"the agent sets its own tag {r.status_code} {r.text[:200]}")
 check(utags(AG) == [("Bot-Privat", [T1])] and dbx("SELECT k.src FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id WHERE ot.scope_id=?",
                                                     (str(AG),)) == [("agent",)], f"scope user of the agent, src agent {utags(AG)}")
