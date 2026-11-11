@@ -1556,7 +1556,6 @@ POST /api/tasks/{}/chain/pull
 POST /api/tasks/{}/editing
 POST /api/tasks/{}/enc-attachments
 POST /api/tasks/{}/list-attachments
-POST /api/tasks/{}/seen
 POST /api/tasks/{}/take
 POST /api/tasks/{}/to-shopping
 POST /api/tasks/{}/typing
