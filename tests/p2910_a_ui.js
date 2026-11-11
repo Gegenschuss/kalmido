@@ -9,6 +9,10 @@
 //   built from the shared frame (cross, parts, "… settings…" | "Done") and keeps its height while it loads (Firefox; the folder's
 //   dialog follows in #5587); a member
 //   who cannot manage opens Share with agents around (regression: the template asked a helper defined only after it)
+// - 2.913.0 (#5587): the folder's Share dialog on the same frame: opened from the folder settings it says "Done" (was "Back"),
+//   its people show up (no Loading left), the folder's role question = "Only new projects" left, Cancel + "Set everywhere"
+//   right; the task choice of the multi-selection (dgPick) closes with "Close" and lists the tasks; Firefox: the folder's
+//   Share dialog keeps its height while it loads like the project's
 // - #5445: "Logo approve tomorrow !high #client" in the docked composer shows the day once (its chip, no second parser chip),
 //   the priority once, the tag as its chip; the syntax help leaves once something is recognised and comes back for an empty
 //   field; the small x after the date chip = "don't recognise"; the phone sheet shows the title in front of its chips
@@ -74,6 +78,23 @@ const txt = el => (el?.textContent || '').replace(/\s+/g, ' ').trim();
   md.querySelector('[data-m="fsh-props"]').click();
   le = await until(() => [...d.querySelectorAll('.modal.fsmodal')].find(m => m.style.display !== 'none'));
   check(le && txt(le.querySelector('.foot .btn.pri')) === 'Done', '#5442: folder settings as a sub-dialog close with "Done" ' + txt(le?.querySelector('.foot')));
+  shut();
+  // 2.913.0 (#5587): the folder settings on their own -> "Share…": the folder's Share dialog as a sub-dialog says "Done" too
+  // (was "Back"), with its people shown
+  le = await open(`folderPropsModal('Studio')`, '.modal.fsmodal [data-m="people"]');
+  le?.querySelector('.foot [data-m="people"]').click();
+  md = await until(() => [...d.querySelectorAll('.modal.fshmodal')].find(m => m.style.display !== 'none' && m.querySelector('#fsh-members .fshowner')));
+  check(md && txt(md.querySelector('.foot .btn.pri')) === 'Done' && !/Back/.test(txt(md.querySelector('.foot'))), '#5587: folder Share as a sub-dialog closes with "Done" ' + txt(md?.querySelector('.foot')));
+  check(md && /Alice/.test(txt(md.querySelector('#fsh-members'))) && !md.querySelector('#fsh-members .eload') && md.querySelector('#fsh-members.shppl'), '#5587: folder Share shows its people (the owner), no Loading left ' + txt(md?.querySelector('#fsh-members')).slice(0, 80));
+  check(md && md.querySelector('select[data-fprole], #fsh-members') && md.querySelector('#fsh-sec-own > summary .shsecst#fsh-st-own'), '#5587: folder Share: the shared folded part (state in the folded line)');
+  md?.querySelector('.foot .btn.pri').click();
+  check(await until(() => [...d.querySelectorAll('.modal.fsmodal')].find(m => m.style.display !== 'none')), '#5587: "Done" leads back to the folder settings');
+  shut();
+  // 2.913.0 (#5587): the task choice of the multi-selection: the tasks are there, it closes with "Close"
+  md = await open(`dgPick({title: 'Pick a task', filter: () => true, near: S.tasks.get(${TID}), pick: () => {}})`, '.modal.dgpick');
+  check(await until(() => /Sand the boards/.test(txt(md?.querySelector('#dg-list')))) && JSON.stringify(foot(md)) === JSON.stringify(['Close']), '#5587: the multi-selection task choice lists the tasks and closes with "Close" ' + JSON.stringify(foot(md)));
+  md?.querySelector('.foot [data-m="close"]').click();
+  check(await until(() => !d.querySelector('.modal.dgpick:not(.an-out)')), '#5587: "Close" closes the choice');
   shut();
   // a form: Cancel + Save, Save at the right edge, Cancel right next to it
   md = await open(`statusModal(${WORK})`, '.modal.stmodal');
@@ -189,7 +210,7 @@ const txt = el => (el?.textContent || '').replace(/\s+/g, ' ').trim();
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: wd, height: ht}});
       await nav(B + `#l/${WORK}`);
       await wait(`!!document.querySelector('#view .trow')`, 80);
-      for (const [fn, sel] of [[`shareModal(${WORK})`, '.modal.shmodal:not(.fshmodal)']]) {  // the folder's Share dialog moves onto the frame in #5587
+      for (const [fn, sel] of [[`shareModal(${WORK})`, '.modal.shmodal:not(.fshmodal)'], [`folderShareModal('Studio')`, '.modal.fshmodal']]) {  // 2.913.0 (#5587): + the folder's Share dialog on the frame
         const hs = await ev(`new Promise(res => { const hs = []; ${fn}; const t0 = performance.now();
           const tick = () => { const c = document.querySelector('${sel} .card'); if (c) hs.push(Math.round(c.getBoundingClientRect().height)); if (performance.now() - t0 < 2500) requestAnimationFrame(tick); else res(hs); }; requestAnimationFrame(tick); })`);
         const loaded = await ev(`!document.querySelector('${sel} .eload') || 'still'`);

@@ -85,7 +85,7 @@ function dgPick(o) {
   const md = modal(`<h3>${esc(o.title)}</h3>${o.hint ? `<div class="shint keep">${esc(o.hint)}</div>` : ''}
     <input id="dg-q" placeholder="${esc(tr('Search open tasks'))}" autocomplete="off" style="width:100%;margin-top:.5rem">
     <div class="dplist tpk" id="dg-list" role="listbox" aria-label="${esc(tr('Open tasks'))}"></div>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button></div>`);
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);  // 2.913.0 (#5587): a pure choice closes, nothing to cancel
   md.classList.add('dpmodal', 'dgpick');
   const self = o.near;
   const draw = () => {

@@ -56,7 +56,7 @@ const FEAT = 'cal,comments,collab';
   // 2.152.2 (#2624): project instead of list
   check(q && /In 1 project Bob has a role of its own \(Beta: Admin\)\./.test(q.textContent), '#1606: the question names the list and its role: ' + (q?.textContent || '').replace(/\s+/g, ' ').slice(0, 200));
   // 2.152.2 (#2624): project instead of list
-  check(q && [...q.querySelectorAll('[data-fgrq]')].map(b => b.textContent).join('|') === 'Cancel|Only new projects|Set everywhere', '#1606: Cancel | Only new lists | Set everywhere');
+  check(q && [...q.querySelectorAll('[data-fgrq]')].map(b => b.textContent).join('|') === 'Only new projects|Cancel|Set everywhere', '#1606: Only new lists | Cancel | Set everywhere');  // 2.913.0 (#5587): Cancel right next to the main button
   click(w, q.querySelector('[data-fgrq="new"]'));
   await until(async () => await folderRole() === 'view');
   check(await folderRole() === 'view' && await roleOf(LB) === 'admin' && await roleOf(LA) === 'edit', '#1606: "Only new lists": the folder role changes, the lists keep theirs');
