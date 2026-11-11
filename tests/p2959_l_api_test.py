@@ -130,6 +130,18 @@ check(n == 50, f"#4030 review F2: at most 50 task_changed per agent and request,
 # (a savepoint rolled back after log_changes) still holds that change in g.wh_diff: agent_changed_events checks each field
 # against the row read fresh -- the title that never got stored stays out, the priority that did comes (red before: both)
 row = F.get(B + f"/api/tasks/{TC}").json()
+
+
+def tail_seq(t, s=0):
+    """The newest event's seq, page by page (events() returns one page: after the bulk change above, last() stays behind)."""
+    while True:
+        ev = events(t, s)
+        if not ev or max(e.get("seq", 0) for e in ev) <= s:
+            return s
+        s = max(e.get("seq", 0) for e in ev)
+
+
+
 CODE = """
 from flask import g
 from kalmido.core.config import app as kapp
@@ -143,7 +155,7 @@ with kapp.test_request_context('/api/tasks'):
         c.commit()
 print(json.dumps(n))
 """
-s0 = last(TA)
+s0 = tail_seq(TA)
 r = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", "import app, json\n" + CODE.replace(
     "TID", str(TC)).replace("TITLE", json.dumps(row["title"])).replace("OLDP", str(0 if row["priority"] else 1)).replace("PRIO", str(row["priority"]))], capture_output=True, text=True)
 check(r.returncode == 0, f"(setup) agent_changed_events in the app {r.stderr[-400:]}")
@@ -151,11 +163,11 @@ ev = evs(TA, s0, "task_changed", TC)
 d = ev[0]["data"].get("diff") if ev else {}
 check(len(ev) == 1 and "title" not in d and "priority" in d,
       f"#5657: a change taken back in the request stays out of the diff, the stored one comes {d}")
-s1 = last(TA)
+s1 = tail_seq(TA, s0)
 r = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", "import app, json\n" + CODE.replace(
     "TID", str(TC)).replace("TITLE", json.dumps(row["title"])).replace("OLDP", "5").replace("PRIO", str(9 if row["priority"] != 9 else 1))],
     capture_output=True, text=True)
 check(r.returncode == 0 and not evs(TA, s1, "task_changed", TC),
-      f"#5657: nothing of it stored: no task_changed at all {r.stderr[-300:]}")
+      f"#5657: nothing of it stored: no task_changed at all {r.stdout[-200:]} {r.stderr[-300:]} {evs(TA, s1, 'task_changed', TC)} {row.get('priority')}")
 
 sys.exit(done("p2959_l_api"))
