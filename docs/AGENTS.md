@@ -2243,8 +2243,8 @@ answer `404`.
 **Locked folders (2.353.0):** a person may lock a folder: names and files below it are encrypted in the browser, the
 server keeps ciphertexts only. Agents and API tokens never reach a locked folder, not even through a share on a folder
 above it: it is missing from every listing, reads answer `404`, writes into it answer `409` (code `fs_locked`), and a
-locked folder cannot be shared with an agent (`409`, code `fs_locked_agent`). Nothing to do for an agent but to not
-expect files there.
+locked folder cannot be shared with an agent (`409`, code `fs_locked_agent`; since 2.953 also a folder that holds a locked
+folder somewhere below it). Nothing to do for an agent but to not expect files there.
 
 | What | Endpoint | MCP |
 |---|---|---|
