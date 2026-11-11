@@ -11,6 +11,7 @@ Rebuilt on main from the template of job/3917 (tests/p2889_b_docpage_test.py the
  (d) the catch-up: a document from before (no size) gets it while the queue is idle
  (e) review F1 (job/3684): a PNG's size is read from its header only, never decoded in the app process; a WebP's from its RIFF
      header (never through Pillow; a forged huge canvas gives no size)
+ (f) 2.990.0 (#5571): no free PDF slot during a recognition run keeps the stored size
 All as a person WITHOUT an organisation (freelancer). Invented pages and pictures only (made here).
 usage: p2905_b_docpage_test.py <datadir>
 freelancer-matrix: docs"""
@@ -150,4 +151,29 @@ out = r.stdout.strip().splitlines()
 check(bool(out) and out[0].endswith("[300, 200] None None 0"), f"(e) the PNG's size read from its header only {r.stdout.strip()!r} {r.stderr[-300:]!r}")
 check(len(out) > 1 and out[1] == "WEBP [321, 123] None True True", f"(e) a WebP's size from its header, a huge canvas gives none at once {out[1:]!r} {r.stderr[-300:]!r}")
 check(len(out) > 2 and out[2] == "TIFF None [40, 30] [30, 40] ['JPEG']", f"(e) no TIFF, no PNG eXIf parsed, a JPEG turned by its EXIF {out[2:]!r} {r.stderr[-300:]!r}")
+
+# (f) 2.990.0 (#5571): a recognition run that finds no free PDF slot keeps the stored size (the catch-up is done already, it
+# would not ask again); content without a size (no slot problem) still drops it. Run in the app's container (S.pg_of replaced).
+F5571 = r"""
+import sys
+sys.path.insert(0, "/app")
+from kalmido.docs import store as S
+from kalmido.docs.pagesize import PgBusy
+from kalmido.core.db import connect
+def busy(data, kind, wait=2, strict=False):
+    if strict:
+        raise PgBusy()
+    return None
+for name, f in (("busy", busy), ("none", lambda *a, **k: None)):
+    S.pg_of = f
+    c = connect()
+    st = S.process(c, %d)
+    c.commit()
+    print(name, st, S.meta_json(c, S.meta_row(c, %d), "auto", {}).get("_pg"))
+    c.close()
+"""
+r = subprocess.run(["docker", "exec", "-i", "-w", "/app", CT, "python", "-"], input=F5571 % (P, P), capture_output=True, text=True, timeout=180)
+out = r.stdout.strip().splitlines()
+check(len(out) > 0 and out[0] == "busy done [792, 612, 792]", f"(f) no free PDF slot: the stored size stays (was: dropped) {out!r} {r.stderr[-400:]!r}")
+check(len(out) > 1 and out[1] == "none done None", f"(f) content without a size: the old size goes {out[1:]!r} {r.stderr[-300:]!r}")
 sys.exit(done("p2905_b_docpage"))

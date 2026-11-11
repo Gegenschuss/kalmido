@@ -39,7 +39,7 @@ from ..core.errors import BadInput  # 2.369.5 (#2517): pulled up from functions
 from .ocr import thumb_bytes, doc_text, qr_codes, OCR_PAGES, QR_DOC_S, THUMB_WL  # 2.369.5 (#2517): pulled up from functions; 2.583.0 (#4812): THUMB_WL
 from .ocr import OCR_LANG_MAX, ocr_choices  # 2.635.0 (#4807 b)
 from .scanmark import scan_of  # 2.836.0 (#5390): the scan mark
-from .pagesize import pg_of  # 2.905.0 (#5393): the first page's size
+from .pagesize import PgBusy, pg_of  # 2.905.0 (#5393): the first page's size; 2.990.0 (#5571): PgBusy
 from ..office.einvoice_in import ei_of_file, ei_text, ei_amount, ei_details, ei_compact, ei_receipt  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
 
@@ -1409,7 +1409,10 @@ def process(c, nid):
         res["method"] = "e-invoice"
     # 2.781.0 (#5390): read before the row is locked (a PDF is read in a child process); 2.836.0 (review): before thumb_store's UPDATE
     scan = scan_of(node["name"], node["mime"], data, res.get("kind"), m["source"], einvoice=bool(ei))
-    page1 = pg_of(data, res.get("kind"))     # 2.905.0 (#5393): the first page's size (a PDF in a child process), before the row lock
+    try:                                     # 2.905.0 (#5393): the first page's size (a PDF in a child process), before the row lock
+        page1, pg_busy = pg_of(data, res.get("kind"), strict=True), False
+    except PgBusy:                           # 2.990.0 (#5571): no free PDF slot now -- the stored size stays (the catch-up is done)
+        page1, pg_busy = None, True
     thumb_store(c, m, node, data, res.get("kind"))
     text = res.get("text") or ""
     asn_found = None
@@ -1491,7 +1494,7 @@ def process(c, nid):
     auto_all.pop("_asn_taken", None)         # 2.591.0 B (#4863): a fresh run, a fresh hint
     if page1:                                # 2.905.0 (#5393): the document view's preview takes it before the file is loaded
         auto_all["_pg"] = page1
-    else:                                    # no size of this content (another kind, unreadable, busy): never the old version's
+    elif not pg_busy:                        # no size of this content (another kind, unreadable): never the old version's
         auto_all.pop("_pg", None)
     if scan is not None:                     # 2.781.0 (#5390): a scan (archive number field); unknown = the old mark stays
         auto_all["_scan"] = scan

@@ -1124,10 +1124,15 @@ def rmv_undo_run(c, uid, mid, files):
         if r.get("gone"):  # 2.356.1 (#3344): a link of a letter that ended, back while the letter is home again and the document is there
             gl = r["gone"]
             if c.execute("SELECT 1 FROM office_letters WHERE id=? AND org_id=?", (gl["letter_id"], src)).fetchone() \
-                    and c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (gl["node_id"],)).fetchone() \
-                    and not c.execute("SELECT 1 FROM office_letter_links WHERE letter_id=? AND node_id=? AND kind=?", (gl["letter_id"], gl["node_id"], gl["kind"])).fetchone():
-                c.execute("INSERT INTO office_letter_links(org_id, letter_id, node_id, kind, created_by, agent_id, created_at) VALUES(?,?,?,?,?,?,?)",
-                          (src, gl["letter_id"], gl["node_id"], gl["kind"], gl["created_by"], gl["agent_id"], gl["created_at"]))
+                    and c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (gl["node_id"],)).fetchone():
+                had = c.execute("SELECT id, deleted_at FROM office_letter_links WHERE letter_id=? AND node_id=? AND kind=?",
+                                (gl["letter_id"], gl["node_id"], gl["kind"])).fetchone()
+                if had is None:
+                    c.execute("INSERT INTO office_letter_links(org_id, letter_id, node_id, kind, created_by, agent_id, created_at) VALUES(?,?,?,?,?,?,?)",
+                              (src, gl["letter_id"], gl["node_id"], gl["kind"], gl["created_by"], gl["agent_id"], gl["created_at"]))
+                elif had["deleted_at"]:  # 2.990.0 (#5571): the same link in the core's trash since is the one coming back (as letterlinks.ltl_link)
+                    c.execute("UPDATE office_letter_links SET org_id=?, deleted_at=NULL, deleted_by=NULL, rev=rev+1, created_by=?, agent_id=?, "
+                              "created_at=?, updated_at=NULL, updated_by=NULL WHERE id=?", (src, gl["created_by"], gl["agent_id"], gl["created_at"], had["id"]))
             continue
         cur = c.execute(f"SELECT * FROM {t} WHERE id=?", (rid,)).fetchone()
         if not cur:

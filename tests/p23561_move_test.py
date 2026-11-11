@@ -187,9 +187,16 @@ ws(Fr, TO)
 r = Fr.get(B + O + f"/letters/{L1}")
 check(r.ok and r.json().get("subject") == "Widerspruch Entwurf", "letters: the draft opens in the organisation (sealed anew) " + r.text[:200])
 ws(Fr, "private")
+# 2.990.0 (#5571): the same link made in the organisation since and removed into the core's trash there - the undo brings the
+# link back all the same (was: the row in the trash counted as "still there", the letter came back without its document)
+sql("INSERT INTO office_letter_links(org_id, letter_id, node_id, kind, created_by, created_at, deleted_at, deleted_by) "
+    "VALUES(?,?,?,'answers',?,now(),now(),?)", (KAP, L1, NODE, FID, FID))
 undo(Fr, MID)
 check(sql("SELECT org_id, client_id FROM office_letters WHERE id=?", (L1,))[0] == (PB, CLL), "letters: the undo brings the draft and its client back")
-check(sql("SELECT node_id FROM office_letter_links WHERE letter_id=?", (L1,)) == [(NODE,)], "letters: the undo links the document again")
+check(sql("SELECT node_id, org_id FROM office_letter_links WHERE letter_id=? AND deleted_at IS NULL", (L1,)) == [(NODE, PB)],
+      f"letters: the undo links the document again, live in the personal office {sql('SELECT node_id, org_id, deleted_at FROM office_letter_links WHERE letter_id=?', (L1,))}")
+check([x["node_id"] for x in (Fr.get(B + O + f"/letters/{L1}/links").json().get("links") or [])] == [NODE],
+      "letters: the letter shows its document again " + Fr.get(B + O + f"/letters/{L1}/links").text[:200])
 r = Fr.get(B + O + f"/letters/{L1}")
 check(r.ok and r.json().get("subject") == "Widerspruch Entwurf", "letters: readable in the personal office again " + r.text[:200])
 
