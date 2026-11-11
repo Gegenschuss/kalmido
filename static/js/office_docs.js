@@ -160,10 +160,16 @@ function ofdDraw() {
 }
 // a function, not typeof OFD in areas.js: the module comes later, and a typeof on a const of a later script can stay "undefined" in jsdom (p2380_b_buero_ui)
 function ofd_openDoc() { return OFD.doc; }
+// 2.936.0 (#5448): a phone on an open document: its head (back + number + status) is the page's only way back (areas.js
+// leaves out the office menu row and the path); the big heading of a computer names the document (render.js, ofd_crumbSync)
+function ofd_phoneDoc() { return !!S.route.id && isMobile() && ofd_tabOn(); }
+function ofd_docTitle() { const d = OFD.doc; return d && d.id === S.route.id && ofd_tabOn() ? `${ofdKindName(d.kind, true)} ${d.number || tr('Draft')}` : ''; }
 // 2.356.0 C (#3004): the path line is drawn with the page (before the document has loaded) -> it follows the open document here
 function ofd_crumbSync() {
   if (typeof ofm_detail !== 'function') return;
   const html = ofm_detail('office'), old = $('#view .ofmcrumb');
+  const dt = isMobile() ? '' : ofd_docTitle(), h1 = dt && $('#top h1 .ht');  // 2.936.0 (#5448): the heading follows the document once it has loaded
+  if (h1 && h1.textContent !== dt) { h1.textContent = dt; h1.parentElement.title = dt; }
   if (old) { if (!html) old.remove(); else if (old.outerHTML !== html) old.outerHTML = html; return; }
   if (!html) return;
   const h = $('#view .ofbody > .ofpt'), nav = $('#view .ofpb'), body = $('#view .ofbody');
@@ -182,6 +188,7 @@ function ofdOffersTab(el) {
     if (ofd_pairOn() && !OFD.list && !OFD.loading && OFD.doc?.id === id) setTimeout(ofdLoadList, 0);  // 2.557.0 A (#4553): the list beside the document (of the document's kind)
   } else { ofd_kindHash(); if (!OFD.list && !OFD.loading) setTimeout(ofdLoadList, 0); }
   keepFocus(el, () => fl_set(el, id ? ofd_pairHtml() : ofdListHtml()));  // 2.46.2 (#1718): morphed
+  if (typeof ofr_fade === 'function') ofr_fade(el);  // 2.936.0 (#5448): the kind tabs of a narrow screen fade at a cut edge
   const sl = id && $('.lsdl', el); if (sl && OFD.lsdTop) sl.scrollTop = OFD.lsdTop;  // 2.557.0 A (#4553): the list keeps its place when the next document opens
   if (id) el.querySelectorAll('textarea[data-grow-min]').forEach(t => ofcGrow(t, +t.dataset.grow || 3));  // 2.431.0 (#3594 review): a long subject wrapped by the field's width fits at once
   // 2.308.0 (#3251): the listeners sit on the tab body, not on a box inside it (the body and the box in it were both wired depending on timing: one click opened two dialogs)
@@ -307,7 +314,7 @@ const ofdTa = (k, v, rows = 3, o = {}) => `<textarea id="ofd-${k}" data-f="${k}"
 const ofdCanSend = d => !!d && !!d.locked && !d.via_folder && !ofr_noSp('offers', 'release');
 function ofdEditorHtml() {
   const d = OFD.doc && OFD.doc.id === S.route.id ? OFD.doc : null;
-  const back = `<button type="button" class="btn sm ofdback" data-ofd="back">${ic('left', 's')}<span>${ofdKindName(OFD.kind)}</span></button>`;
+  const back = `<button type="button" class="btn sm ofdback" data-ofd="back" aria-label="${esc(tr('Back to {0}', ofdKindName(OFD.kind)))}" title="${esc(tr('Back to {0}', ofdKindName(OFD.kind)))}">${ic('left', 's')}<span>${ofdKindName(OFD.kind)}</span></button>`;  // 2.936.0 (#5448): a phone shows the arrow only (office.css)
   if (!d) return `<div class="ofdhead">${back}</div>` + (OFD.err ? `<div class="empty">${ic('receipt')}<span>${esc(OFD.err)}</span></div>` : `<p class="muted lempty">${tr('Loading…')}</p>`);
   const adm = ofcAdmin(), t = d.totals || {};
   const txtOpt = kind => ofcTextOpts(kind, ofdTl(d));  // 2.40.0 (#1381): no silent German
@@ -322,10 +329,10 @@ function ofdEditorHtml() {
   const acts = [];
   if (kind === 'offer') acts.push(kvaNextHtml(d, lk, ro));  // 2.138.0 E (#2235): the next step of the quotation; 2.144.7 (#2572): + "Create invoice"
   if (kind === 'invoice' && lk && d.status !== 'cancelled' && adm) acts.push(`<button type="button" class="btn sm" data-ofd="pay">${ic('plus', 's')}<span>${tr('Record payment')}</span></button>`);
-  if ((kind === 'offer' || kind === 'invoice') && ofd_lsOn()) acts.push(`<button type="button" class="btn sm" data-ofd="to-ls" title="${esc(tr('A delivery note or proof of service with the positions, without prices'))}">${ic('file', 's')}<span>${tr('Delivery note')}</span></button>`);  // 2.120.0 D (#2089)
+  if ((kind === 'offer' || kind === 'invoice') && ofd_lsOn()) acts.push(`<button type="button" class="btn sm ofd2m" data-ofd="to-ls" title="${esc(tr('A delivery note or proof of service with the positions, without prices'))}">${ic('file', 's')}<span>${tr('Delivery note')}</span></button>`);  // 2.120.0 D (#2089)
   if (ofdCanSend(d)) acts.push(d.trial ? `<button type="button" class="btn sm" data-ofd="send" disabled title="${esc(tr('A trial document cannot be sent by e-mail; create a real document for your client'))}">${ic('send', 's')}<span>${tr('Send|mail')}</span></button>` : `<button type="button" class="btn sm" data-ofd="send">${ic('send', 's')}<span>${tr('Send|mail')}</span></button>`);  // 2.542.0 (#4594): a trial document: the button is off with the reason  // 2.113.2 (#2253): a finalised quotation is mailed too
   if (vf) acts.length = 0;
-  const head = `<div class="ofdhead">${back}<span class="ofdnum"><b>${lk ? ic('lock', 's') + ' ' : ''}${inv ? esc(absKindName(d) || ofdKindName(kind, true)) + ' ' : ''}${esc(numTxt)}</b>${tri_tag(d) /* 2.144.10 C (#2576) */}${typeof onumDocHtml === 'function' ? onumDocHtml(d) : ''}${d.number || lk || d.number_at_finalize || !adm ? '' : `<button type="button" class="btn sm" data-ofd="number">${tr('Assign number')}</button>`}</span>
+  const head = `<div class="ofdhead">${back}<span class="ofdnum"><b>${inv ? `<span class="ofdkn">${esc(absKindName(d) || ofdKindName(kind, true))} </span>` : '' /* 2.936.0 (#5448): a phone puts the kind small above the number (office.css) */}${lk ? ic('lock', 's') + ' ' : ''}${esc(numTxt)}</b>${tri_tag(d) /* 2.144.10 C (#2576) */}${typeof onumDocHtml === 'function' ? onumDocHtml(d) : ''}${d.number || lk || d.number_at_finalize || !adm ? '' : `<button type="button" class="btn sm" data-ofd="number">${tr('Assign number')}</button>`}</span>
     ${stSel}<span class="spacer"></span>
     <span class="ofdsave muted" aria-live="polite">${OFD.saving ? tr('Saving…') : OFD.err ? esc(OFD.err) : ''}</span>${acts.join('')}
     ${lk || ro || ofr_noSp('offers', 'release') /* 2.187.0 A (#2476) */ ? '' : `<button type="button" class="btn sm ofdfin" data-ofd="finalize" title="${esc(tr('Freeze number, positions, sums, sender and tax rates'))}">${ic('lock', 's')}<span>${tr('Finalise')}</span></button>`}
@@ -542,9 +549,10 @@ const ekPctHtml = (it, i, line, d) => `<input data-i="${i}" data-k="rate" inputm
 // sent -> Accepted / Declined, accepted -> Create invoice. Before acceptance the invoice asks once (no lock).
 // 2.144.7 (#2572): "Create invoice" is always a visible button (main button once accepted, a plain one before), no longer in "…"
 function kvaNextHtml(d, lk, ro) {
-  const st = (v, icon, label, cls = '') => `<button type="button" class="btn sm ofdnext${cls}" data-ofd="kva-st" data-st="${v}" aria-label="${esc(tr(label))}" title="${esc(tr(label))}">${ic(icon, 's')}<span>${tr(label)}</span></button>`;
+  // 2.936.0 (#5448): ofd2m = a phone shows it in "…" (ofdMoreItems); the main step keeps its button with its word
+  const st = (v, icon, label, cls = ' ofd2m') => `<button type="button" class="btn sm ofdnext${cls}" data-ofd="kva-st" data-st="${v}" aria-label="${esc(tr(label))}" title="${esc(tr(label))}">${ic(icon, 's')}<span>${tr(label)}</span></button>`;
   const acc = d.status === 'accepted';
-  const inv = `<button type="button" class="btn sm${acc ? ' pri' : ''} ofdnext ofdtoinv" data-ofd="to-invoice" aria-label="${esc(tr('Create invoice'))}" title="${esc(tr('An invoice draft with the positions of this quotation'))}">${ic('receipt', 's')}<span>${tr('Create invoice')}</span></button>`;
+  const inv = `<button type="button" class="btn sm${acc ? ' pri' : ' ofd2m'} ofdnext ofdtoinv" data-ofd="to-invoice" aria-label="${esc(tr('Create invoice'))}" title="${esc(tr('An invoice draft with the positions of this quotation'))}">${ic('receipt', 's')}<span>${tr('Create invoice')}</span></button>`;
   if (d.status === 'sent') return st('accepted', 'check', N_('Accepted|document'), ' pri') + st('declined', 'x', N_('Rejected')) + inv;
   if (d.status === 'draft' && (lk || ro)) return st('sent', 'send', N_('Mark as sent'), ' pri') + inv;
   return inv;  // accepted: the main button; a draft that can be edited ("Finalise" behind) or declined: a plain one
@@ -833,7 +841,12 @@ async function ofdChange0(e) {
 function ofdMoreItems(d, inList) {
   const gone = () => { OFD.doc = null; OFD.list = null; if (inList) ofdLoadList(true); else go(`office/${ofd_sec()}`); };
   if (d.via_folder) return [{label: tr('Preview (PDF)'), icon: 'eye', fn: () => ofdPdfOpen(d, false)}];  // 2.199.0 B (#2742): read through a folder only
+  // 2.936.0 (#5448): the editor's next steps a phone hides in its head (office.css .ofd2m) come first here, a tap = that button
+  const mvIc = b => ({'to-invoice': 'receipt', 'to-ls': 'file'})[b.dataset.ofd] || (b.dataset.onum ? 'edit' : b.dataset.st === 'declined' ? 'x' : b.dataset.st === 'sent' ? 'send' : 'check');
+  const mv = inList ? [] : $$('#view .ofdhead .ofd2m, #view .ofdhead .onumpen').filter(b => getComputedStyle(b).display === 'none')  // + "Change number" (its pen)
+    .map(b => ({label: b.textContent.trim() || b.getAttribute('aria-label') || '', icon: mvIc(b), next: b.dataset.ofd === 'to-ls', fn: () => b.click()}));
   const items = [
+      ...mv, mv.length ? '-' : null,
       !d.trial ? {label: tr('File in a folder…'), icon: 'folder', fn: () => ofd_fileDlg(d)} : null,  // 2.199.0 B (#2742)
       d.kind === 'credit' ? null : {label: tr('Duplicate'), icon: 'copy', fn: async () => { try { const ask = await ofdDupAsk(d); if (!ask) return; const j = await ofdRefCall(`dup${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/duplicate`, {client_ref: ref, ...ask})); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(ofd_href(j.id, j.kind)); } catch (x) { ofcErr(x); } }},
       d.kind === 'offer' && d.client_id && ofcAdmin() && typeof dtFromOffer === 'function' ? {label: tr('Create order confirmation'), icon: 'file', fn: () => dtFromOffer(d)} : null,  // 2.93.0 A (#1927)

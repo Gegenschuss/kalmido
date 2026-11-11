@@ -194,7 +194,7 @@
   .ofdgrid .row label,.ofdsecb .row label{min-width:100%}
   .ofdgrid .row .ofchint,.ofdgrid .row>.shint.keep{margin-left:0}
   .ofdhead .btn span{display:none}
-  .ofdhead .ofdback span{display:inline}
+  .ofdhead .ofdback span{display:none}  /* 2.936.0 (#5448): the arrow only (its name is the label), so number and status share its line */
   .ofdtotals dl{max-width:none}
   .ofdrt .ofdrtf{flex-direction:column;flex-wrap:nowrap;width:100%;min-width:0}
   .ofdrt .ofdrtf select,.ofdrt .ofdrtf input{width:100%;min-width:0;flex:none}
@@ -222,7 +222,21 @@
 @media (max-width:599px) {
   .ofdhead .ofdfin span{display:inline}
   .ofdhead .ofdnext.pri span{display:inline}  /* 2.138.0 E (#2235): the next step keeps its word on the phone */
+  /* 2.936.0 (#5448): line 1 = back, number, status (the number shortens); line 2 = the actions with their words; the other next
+     steps (.ofd2m) wait in "…" */
+  .ofdhead .ofdnum{flex:1 1 0;min-width:0;font-size:var(--fs-m)}
+  .ofdhead .ofdnum:has(.onumdoc){flex-basis:100%}
+  .ofdhead .ofdnum>b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ofdhead .ofdnum .ofdkn{display:block;overflow:hidden;text-overflow:ellipsis;font-size:var(--fs-s);font-weight:400;color:var(--muted);line-height:var(--lh-tight)}
+  .ofdhead .ofdstat{flex:0 1 auto;min-width:0;max-width:7.5rem}
+  .ofdhead>.spacer{flex:0 0 100%;height:0}
+  .ofdhead .ofd2m,.ofdhead .onumpen{display:none}
+  .ofdhead [data-ofd="pay"] span,.ofdhead [data-ofd="send"] span{display:inline}
 }
+/* 2.936.0 (#5448): a tab row that scrolls sideways fades out where more follows (areas.js ofr_fade), no cut word */
+.ofx-r{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 2.5rem),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 2.5rem),transparent)}
+.ofx-l{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 2.5rem),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 2.5rem),transparent)}
+.ofx-l.ofx-r{-webkit-mask-image:linear-gradient(to right,transparent,#000 2.5rem,#000 calc(100% - 2.5rem),transparent);mask-image:linear-gradient(to right,transparent,#000 2.5rem,#000 calc(100% - 2.5rem),transparent)}
 .ofdstat.st-overdue{color:var(--danger)}
 .ofdpaysum{display:flex;gap:1rem;flex-wrap:wrap;justify-content:flex-end;margin:.5rem 0;font-variant-numeric:tabular-nums}
 .ofdpay .ib,.ofdref .ofdlt{margin-left:auto}

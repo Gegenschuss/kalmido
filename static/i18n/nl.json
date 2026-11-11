@@ -18204,6 +18204,7 @@
   "Filter “{0}” changed": "Filter ‘{0}’ gewijzigd",
   "Edit filter…": "Filter bewerken…",
   "Words or the search syntax (tag:Name, \"exact text\", -word)": "Woorden of zoeksyntaxis (tag:Naam, \"exacte tekst\", -woord)",
+  "Back to {0}": "Terug naar {0}",
   "The day the money came: the fee counts in its month and year.": "De dag waarop het geld binnenkwam: de kosten tellen in die maand en dat jaar.",
   "Moved to the trash": "Naar de prullenbak verplaatst",
   "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Opschonen van de gedeelde kern wacht: {0} oude ledenregels in {1} hebben nog geen deling, de oude tabel blijft. Zie het serverlog.",

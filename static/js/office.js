@@ -102,11 +102,17 @@ const ofc_sp = () => { const sp = ofc_spOpen(); return sp && ofc_spaces().includ
 const ofc_allOvr = () => wsOn() && wsCur() === 'all' && ofc_spaces().length > 1 && !ofc_sp();
 const ofc_allUpHtml = () => ofc_sp() ? `<a href="#office" class="linkbtn ofcallup" data-ofcall="up">${esc(tr('All workspaces'))}</a><span class="abcsep" aria-hidden="true">/</span>` : '';
 const ofc_wsKey = () => (typeof wsCur === 'function' ? wsCur() : '') + (ofc_sp() ? '>' + ofc_sp() : '');  // OFC.ws: the shown office (a workspace, or "All" + an area)
+// the office header: the area, the company, the role (2.936.0, #5448: without an area no leading dot, nothing = no line)
+function ofc_headHtml(ro) {
+  const area = ofc_allUpHtml() /* 2.543.0 (#4606) */ + ofcAreaHtml() /* 2.356.0 B (#2932) */;
+  const org = (OFC.info.settings?.company?.name ? ` · ${esc(OFC.info.settings.company.name)}` : '') + (OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ro ? ` · ${esc(OFC.info.role === 'readonly' || ofr_grp() ? tr('Read-only') : tr('Accounting'))}` : '');
+  return area + (org ? `<span class="muted ofcorg">${/*html-ok*/ area ? org : org.slice(3) /* escaped above */}</span>` : '');
+}
 // the office's area in its header (Private / the organisation), with organisations the workspace switch itself
 function ofcAreaHtml() {
   const ws = ofcWs(), nm = OFC.info.personal ? tr('Private|workspace') : (orgLabelOf(OFC.info.org_id) || wsName(ws));
   return wsOn() ? `<button type="button" class="wsbadge ofcws" data-act="ws-menu" aria-haspopup="menu" title="${esc(tr('Workspace: {0}', nm))}" aria-label="${esc(tr('Workspace: {0}', nm))}">${wsIcon(ws)}<span>${esc(nm)}</span></button>`
-    : `<span class="ofcws">${esc(nm)}</span>`;
+    : '';  // 2.936.0 (#5448): one office only: no area name (was the text "Private")
 }
 async function ofcLoad(kind, force) {
   if (!kind || ofcDocTab(kind) || kind === 'settings') return;
@@ -205,7 +211,7 @@ function viewOffice() {
   const ro = ['readonly', 'accounting'].includes(OFC.info?.role)  // 2.143.0 A (#2151): reads only (create / delete hidden in app.css)
     || (!!ofr_grp() && !!ofr_area(tab) && ['none', 'view'].includes(ofr_lvOf(ofr_area(tab))) && !(tab === 'receipts' && OFC.info?.submit));  // 2.356.0 D (#3129): hands in  // 2.187.0 A (#2476): the group's level of this area
   // 2.147.2 A (#2500): the role words here, not oinvRoleSel (settings module): a direct start of the office threw and stayed on "Loading…"
-  const html = `<div class="dash office" data-ofctab="${tab}"${ro ? ' data-ofcro="1"' : ''}>${OFC.info && typeof tri_stripHtml === 'function' ? tri_stripHtml() : '' /* 2.417.0 C (#3445): the test mode strip */}<div class="ofchead">${OFC.info ? `${ofc_allUpHtml() /* 2.543.0 (#4606) */}${ofcAreaHtml()/* 2.356.0 B (#2932) */}<span class="muted ofcorg">${OFC.info.settings?.company?.name ? ` · ${esc(OFC.info.settings.company.name)}` : ''}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ro ? ` · ${esc(OFC.info.role === 'readonly' || ofr_grp() ? tr('Read-only') : tr('Accounting'))}` : ''}</span>` : ''}</div><div class="ofcbody"${ofcDocTab(tab) && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
+  const html = `<div class="dash office" data-ofctab="${tab}"${ro ? ' data-ofcro="1"' : ''}>${OFC.info && typeof tri_stripHtml === 'function' ? tri_stripHtml() : '' /* 2.417.0 C (#3445): the test mode strip */}<div class="ofchead">${/*html-ok*/ OFC.info && !(typeof ofd_phoneDoc === 'function' && ofd_phoneDoc()) /* 2.936.0 (#5448): an open document on a phone: its head only; ofc_headHtml escapes */ ? ofc_headHtml(ro) : ''}</div><div class="ofcbody"${ofcDocTab(tab) && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
   if (ofcDocTab(tab) && OFC.info && typeof ofdOffersTab === 'function') setTimeout(() => { const el = $('.office .ofcbody .pboffers') || $('.office .ofcbody'); if (el && ofcTab() === tab) ofdOffersTab(el); }, 0);  // 2.47.3 (#1360): below the hint
   return html;
 }
