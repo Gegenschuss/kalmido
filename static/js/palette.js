@@ -686,7 +686,7 @@ function tourStart(mod) {
     else if (a === 'back') { if (!f8d_stepBack(el)) tourGo(TOUR.i - 1); } else tourEnd(true);
   });
   el.addEventListener('change', e => { if (e.target.id === 't-sample') TOUR.sampleOn = e.target.checked; if (e.target.id === 't-ptype') TOUR.ptype = e.target.value; if (e.target.id === 't-more') TOUR.more = e.target.checked; if (e.target.closest?.('#t-industry')) { TOUR.industry = indPicked($('#t-industry', el)); tourGo(TOUR.i); } });  /* 2.828.0 (#5511): boxes */  // 2.578.0 (#4573): the sample's text follows the industry
-  el.addEventListener('click', e => { const b = e.target.closest('[data-tpurpose]'); if (!b) return; TOUR.purpose = TOUR.purpose === b.dataset.tpurpose ? '' : b.dataset.tpurpose; tourGo(TOUR.i); $(`.tour [data-tpurpose="${b.dataset.tpurpose}"]`)?.focus(); });  // 2.19.0 (#653)
+  el.addEventListener('click', e => { const b = e.target.closest('[data-tpurpose]'); if (!b) return; TOUR.purpose = TOUR.purpose === b.dataset.tpurpose ? '' : b.dataset.tpurpose; tourGo(TOUR.i); $(`.tour [data-tpurpose="${b.dataset.tpurpose}"]`)?.focus({preventScroll: true});  /* 2.956.0 (#5230): the card is fixed, nothing to scroll to */ });  // 2.19.0 (#653)
   TOUR.ptype = ''; TOUR.purpose = '';
   // 2.165.0 (#2612): the very first start of the account greets once: the figure waves on the first card (tourGo)
   TOUR.hi = !mod && S.settings.tour === 'pending' && !LS.get('botHi', false); TOUR.hiShown = false;
