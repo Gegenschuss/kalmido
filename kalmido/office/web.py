@@ -399,7 +399,8 @@ def office_row_delete(kind, rid):
     _ltx_need(c, uid, oid, old)
     res = office_delete(c, oid, kind, rid)
     ofx_log(c, oid, "delete" if res == "deleted" else "archive", target=kind, detail={"id": old["id"], "before": _ltx_log(old)})
-    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
+    if not g.get("lv_bumped"):  # 2.933.0 (#5384): the core's trash (ofk_trash -> obj_trash) ticked "office" already: once only
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     # 2.905.0 (#5414): trash = the row in the core's trash (the toast's undo: POST /api/office/trash/core/<kind>/<id>/restore?undo=1)
     tk = g.get("ofk_trash") if res == "deleted" else None
