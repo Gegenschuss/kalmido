@@ -699,11 +699,11 @@ def wsh_restore(sid):
         rv = wsh_revoked(c, n)
         k = json.loads(rv["row_json"]).get("wiki_card") or {}
         from ..core.objects import obj_node_reshare
-        back = obj_node_reshare(c, rv["id"])
+        back = obj_node_reshare(c, rv["id"], owner=uid, org=None)  # 2.969.0 (#5644): the node must still be uid's private one
         if back is None:  # the person has a share of that node again (or the node went): nothing to bring back
             c.commit()
             raise Denied(409, tr("Already shared"))
-        pair = obj_node_reshare(c, k["pair"]) if k.get("pair") else None
+        pair = obj_node_reshare(c, k["pair"], owner=uid, org=None) if k.get("pair") else None  # #5644: the pair too (else 409, all rolled back)
         c.execute("INSERT INTO wiki_share_cards(fs_share_id,folder,pair_id,images,email) VALUES(?,?,?,?,?) ON CONFLICT (fs_share_id) DO NOTHING",
                   (n, bool(k.get("folder")), pair[0] if pair else None, bool(k.get("images")), k.get("email") or ""))
         bump(c)

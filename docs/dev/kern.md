@@ -434,7 +434,8 @@ Stage 7c, knowledge pages (2.937.0, #5244, one-way): the person rows of `wiki_sh
 A person share of the knowledge dialog is only its share on the node (+ the "pair" on the page of the folder's name); its
 card data (folder, pictures, the address typed in, the pair) lives in `wiki_share_cards` (`fs_share_id`, ON DELETE CASCADE),
 the dialog's id is `p<fs_shares id>`. Revoking = `obj_node_unshare` of both shares, the card rides in the obj_revoked row
-(`wiki_card`); the Undo puts them back under the same ids (`obj_node_reshare`, for a node no kind names). The start
+(`wiki_card`); the Undo puts them back under the same ids (`obj_node_reshare`, for a node no kind names; since 2.969.0, #5644,
+it takes the owner / workspace the caller checked and refuses with 409 when the node lies elsewhere today). The start
 (wiki/wkshare.py `wsh_retire`, `kern_retire_rows`) copies the last rows forward, checks, then deletes the person rows, drops
 the two columns, moves the times to TIMESTAMPTZ and `is_folder` to BOOLEAN and raises the back limit. `wiki_shares` = public
 links only.
