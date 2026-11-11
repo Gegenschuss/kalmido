@@ -18,6 +18,27 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.897.0] - 2026-11-11
+
+Package 2.880 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Files, Knowledge and Reading under "All workspaces": the overview is a calm list of rows of one kind - "Recently edited" (opens its own page), Private, each organisation, Shared with me; the trash sits small at the end. No chips and no item list on the overview any more (#5561).
+- The new page "Recently edited" (#wiki/recent, #ablage/recent, #reading/recent): back arrow to the overview (the phone's Back works too), pinned favourites, filter chips by workspace (All / Private / an organisation / Shared with me) above the list; each row shows only name and time, plus who edited it when it was someone else. "More" in the start page's block "Recently edited" leads there (#5561).
+
+Package 2.882 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Documents (#5557): leafing with a swipe works on the whole document view on phones and tablets - the preview, the head and the fields below - with the same shared swipe as the task panel (swipenav.js). It does not leaf while typing or marking text in a field, on parts that scroll sideways (a preview zoomed wider than its box, the tabs), with two fingers / an enlarged preview, or from the 16 px edge (the phone's Back gesture). Arrow keys and the arrows on the computer stay.
+- Documents (#5557): the preview stands at its final size from the first picture: before the file is there, the page already has the real page's shape (from the small picture or the size seen before, else A4) and the small picture stays in it until the sharp page is drawn - nothing grows, shrinks or flashes white when opening or leafing.
+
+Package 2.897 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Agent API: `GET /api/v1/documents?view=<id>` (and MCP `list_documents`, which now passes `view`) takes the view's workspace, area, state and "new in the office" as the app's list does; a parameter of the request goes first (#5547)
+- Documents: an older saved view (only its query string) converts field filters with spaces or a trailing comma in the field ids and dates with a time as the search read them, instead of dropping them (#5547)
+- Documents: a saved view's exact phrase / exclusion opens the document texts (at most 3000) only after the view's other conditions and the list's own filters, so a match among many documents is no longer missed (#5547)
+
 ## [2.883.0] - 2026-11-11
 
 Package 2.857 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Kern-Wächter: zweite Filter-Logik außerhalb des Fi).
@@ -245,7 +266,8 @@ Package 2.757 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: 
 - Lists and the start page report their width to the header again: the top bar lines up with the content instead of standing 4 px beside it, and the width "Wide" of a note / knowledge page keeps its list + note layout (CI red p2599_b_kopf_ui, #5309).
 - p151_ui says why the hint of the task just tracked is missing (toast, totals on the page and on the server); the Mac red was the sub-second discard fixed in #5186 (#5211).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.883.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.897.0...HEAD
+[2.897.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.897.0
 [2.883.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.883.0
 [2.873.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.2
 [2.873.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.1
