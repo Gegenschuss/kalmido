@@ -17149,8 +17149,6 @@
   "{0} task has this type and will have no type": ["{0} tâche a ce type et n'aura plus de type", "{0} tâches ont ce type et n'auront plus de type"],
   "{0} task will have no type.": ["{0} tâche n'aura plus de type.", "{0} tâches n'auront plus de type."],
   "“{0}” needs these fields:": "« {0} » a besoin de ces champs :",
-  "own ticket types": "types de tickets personnels",
-  "own field templates": "modèles de champs personnels",
   "{0}: more than {1} projects have this field": "{0} : plus de {1} projets ont ce champ",
   "Apply what was learned": "Appliquer ce qui a été appris",
   "Sorts every document in To review again with the rules and what was learned (no new text recognition)": "Reclasse chaque document de À vérifier avec les règles et ce qui a été appris (sans nouvelle reconnaissance du texte)",

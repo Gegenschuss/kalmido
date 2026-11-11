@@ -17149,8 +17149,6 @@
   "{0} task has this type and will have no type": ["{0} taak heeft dit type en krijgt geen type meer", "{0} taken hebben dit type en krijgen geen type meer"],
   "{0} task will have no type.": ["{0} taak krijgt geen type meer.", "{0} taken krijgen geen type meer."],
   "“{0}” needs these fields:": "‘{0}’ heeft deze velden nodig:",
-  "own ticket types": "eigen tickettypes",
-  "own field templates": "eigen veldsjablonen",
   "{0}: more than {1} projects have this field": "{0}: meer dan {1} projecten hebben dit veld",
   "Apply what was learned": "Geleerde toepassen",
   "Sorts every document in To review again with the rules and what was learned (no new text recognition)": "Ordent elk document in Te controleren opnieuw met de regels en het geleerde (geen nieuwe tekstherkenning)",
