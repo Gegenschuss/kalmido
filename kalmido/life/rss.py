@@ -15,6 +15,7 @@ from ..core.i18n import N_, tr
 from ..core.db import connect, iso, now_utc, parse_iso
 from ..core.writes import obj_restore, obj_trash  # 2.947.0 (#5367): the core's trash (life/lfkern.py)
 from ..core.pg import IntegrityError, insert_id, write_lock
+from ..core.objseen import osn_clear, osn_mark, osn_mark_sel, osn_seen_sql  # 2.981.0 (#5286): the read mark is the core's obj_seen
 from ..core.access import Denied, live_sql, task_visible  # 2.947.0 (#5367): live_sql
 from ..accounts.orgs import is_org_admin, user_orgs
 from ..accounts.orgroles import need_org_area, org_writes
@@ -300,8 +301,9 @@ def rss_fetch(c, f):
 # ---- the feeds of a person
 # 2.172.0 B (#2677): feeds live in a space like bookmarks -- org_id NULL = private (only its owner), else every member of
 # the organisation (not guests / accounting) reads them; the sources of an organisation are followed, unfollowed and
-# imported by its admins. The read mark is per person: rss_items.read_at for private feeds (as before), rss_reads for the
-# feeds of an organisation. Every view shows ONE space (no mixed view); without a space the private one (the API before).
+# imported by its admins. The read mark is per person: 2.981.0 (#5286) one row of the core's obj_seen (kind 'rss') per read
+# article, in both spaces (was rss_items.read_at for private feeds, rss_reads for the feeds of an organisation). Every view
+# shows ONE space (no mixed view); without a space the private one (the API before).
 def rss_space(c, uid, v, write=False):
     """org id (None = private) of a space value "private" | "org:<id>" | <id>; 404 for an organisation uid is not in (or
     only as guest / accounting), 403 for a change by a read-only member (write)."""
@@ -341,9 +343,9 @@ def _fw(oid, uid, a="f"):
     return (f"{a}.org_id=?", [oid]) if oid else (f"{a}.org_id IS NULL AND {a}.user_id=?", [uid])
 
 
-def _rd(oid):
-    """SQL of the person's read mark of article i (one ? = the person in an organisation's space)."""
-    return "(SELECT r.read_at FROM rss_reads r WHERE r.item_id=i.id AND r.user_id=?)" if oid else "i.read_at"
+def _rd():
+    """SQL of the person's read mark of article i (one ? = the person). 2.981.0 (#5286): the core's obj_seen in every space."""
+    return osn_seen_sql("rss", "i")
 
 
 def rss_feed_out(r, unread=0):
@@ -355,9 +357,8 @@ def rss_feed_out(r, unread=0):
 
 def rss_feeds(c, uid, oid=None):
     w, a = _fw(oid, uid)
-    ra = [uid] if oid else []
     un = dict(c.execute(f"""SELECT i.feed_id, COUNT(*) FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id WHERE {w}
-                            AND f.deleted_at IS NULL AND {_rd(oid)} IS NULL GROUP BY i.feed_id""", (*a, *ra)).fetchall())
+                            AND f.deleted_at IS NULL AND {_rd()} IS NULL GROUP BY i.feed_id""", (*a, uid)).fetchall())
     rows = c.execute(f"SELECT f.* FROM rss_feeds f WHERE {w} AND f.deleted_at IS NULL ORDER BY LOWER(f.title), f.id", a).fetchall()
     feeds = [rss_feed_out(r, un.get(r["id"], 0)) for r in rows]
     return {"feeds": feeds, "unread": sum(x["unread"] for x in feeds), "max": RSS_MAX_FEEDS, "space": rss_space_key(oid),
@@ -367,7 +368,7 @@ def rss_feeds(c, uid, oid=None):
 def rss_unread(c, uid, oid=None):
     w, a = _fw(oid, uid)
     return c.execute(f"""SELECT COUNT(*) FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id WHERE {w} AND f.deleted_at IS NULL
-                         AND {_rd(oid)} IS NULL""", (*a, *([uid] if oid else []))).fetchone()[0]
+                         AND {_rd()} IS NULL""", (*a, uid)).fetchone()[0]
 
 
 def rss_own(c, uid, fid, manage=False):
@@ -440,11 +441,8 @@ def rss_add(c, uid, b):
 
 
 def rss_items_unread(c, uid, f):
-    """Unread articles of feed row f for uid."""
-    if f["org_id"]:
-        return c.execute("""SELECT COUNT(*) FROM rss_items i WHERE i.feed_id=? AND NOT EXISTS
-                            (SELECT 1 FROM rss_reads r WHERE r.item_id=i.id AND r.user_id=?)""", (f["id"], uid)).fetchone()[0]
-    return c.execute("SELECT COUNT(*) FROM rss_items WHERE feed_id=? AND read_at IS NULL", (f["id"],)).fetchone()[0]
+    """Unread articles of feed row f for uid (2.981.0, #5286: the core's obj_seen in every space)."""
+    return c.execute(f"SELECT COUNT(*) FROM rss_items i WHERE i.feed_id=? AND {_rd()} IS NULL", (f["id"], uid)).fetchone()[0]
 
 
 RSS_STEP = {}  # 2.809.0 (#5476): {pre, post} of the feeds' undo steps (life/rssundo.py fills it; it imports this module)
@@ -498,7 +496,7 @@ def rss_items(c, uid, feed=None, unread=False, offset=0, oid=None):
     """The newest articles of a space first (one feed / only unread on request), RSS_PAGE per page."""
     rss_need(c, uid)
     w, a = _fw(oid, uid)
-    ra = [uid] if oid else []
+    ra = [uid]  # 2.981.0 (#5286): the read mark is the person's row of obj_seen in every space
     q, qa = "", []
     if feed:
         f = rss_own(c, uid, feed)
@@ -507,9 +505,9 @@ def rss_items(c, uid, feed=None, unread=False, offset=0, oid=None):
         q += " AND i.feed_id=?"
         qa.append(feed)
     if unread:
-        q += f" AND {_rd(oid)} IS NULL"
+        q += f" AND {_rd()} IS NULL"
         qa += ra
-    rows = c.execute(f"""SELECT i.*, {_rd(oid)} AS rd, f.title AS ftitle, f.url AS furl FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id
+    rows = c.execute(f"""SELECT i.*, {_rd()} AS rd, f.title AS ftitle, f.url AS furl FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id
                          WHERE {w} AND f.deleted_at IS NULL{q} ORDER BY i.published DESC, i.id DESC LIMIT ? OFFSET ?""",
                      (*ra, *a, *qa, RSS_PAGE + 1, offset)).fetchall()
     return {"items": [_item_out(r) for r in rows[:RSS_PAGE]], "more": len(rows) > RSS_PAGE, "unread": rss_unread(c, uid, oid),
@@ -542,22 +540,14 @@ def rss_mark(c, uid, b):
             raise Denied(404, tr("Not found"))
         fq, fa = " AND i.feed_id=?", [fid]
     iq, ia = (f" AND i.id IN ({','.join('?' * len(ids))})", ids) if ids is not None else ("", [])
-    ts = iso(now_utc())
     w, a = _fw(oid, uid)
-    if not oid:
-        cond = "i.read_at IS NULL" if read else "i.read_at IS NOT NULL"
-        rows = c.execute(f"""UPDATE rss_items SET read_at=? WHERE id IN (SELECT i.id FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id
-                             WHERE {w} AND f.deleted_at IS NULL AND {cond}{iq}{fq}) RETURNING id""",
-                         (ts if read else None, *a, *ia, *fa)).fetchall()
-        return {"ids": sorted(r[0] for r in rows)}
-    sel = (f"SELECT i.id FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id WHERE {w} AND f.deleted_at IS NULL{iq}{fq} AND "
-           f"{'NOT ' if read else ''}EXISTS (SELECT 1 FROM rss_reads r WHERE r.item_id=i.id AND r.user_id=?)")
+    # 2.981.0 (#5286): one model in every space -- a read article is a row of the core's obj_seen (kind 'rss', seen_id = its id)
+    sel = f"SELECT i.id FROM rss_items i JOIN rss_feeds f ON f.id=i.feed_id WHERE {w} AND f.deleted_at IS NULL{iq}{fq}"
     if read:
-        rows = c.execute(f"INSERT INTO rss_reads(item_id,user_id,read_at) SELECT x.id, ?, ? FROM ({sel}) x ON CONFLICT DO NOTHING RETURNING item_id",
-                         (uid, ts, *a, *ia, *fa, uid)).fetchall()
+        ids = osn_mark_sel(c, "rss", uid, f"SELECT y.id AS ref_id, y.id AS seen_id FROM ({sel} AND {_rd()} IS NULL) y", (*a, *ia, *fa, uid))
     else:
-        rows = c.execute(f"DELETE FROM rss_reads WHERE user_id=? AND item_id IN ({sel}) RETURNING item_id", (uid, *a, *ia, *fa, uid)).fetchall()
-    return {"ids": sorted(r[0] for r in rows)}
+        ids = osn_clear(c, "rss", uid, sel, (*a, *ia, *fa))
+    return {"ids": sorted(ids)}
 
 
 def rss_later(c, uid, iid):
@@ -579,12 +569,8 @@ def rss_later(c, uid, iid):
     lid = rl_list(c, uid, oid)
     rl_need_write(c, uid, lid)
     tid = _insert(c, uid, lid, (it["title"] or it["url"] or tr("Article"))[:TITLE_MAX], url=it["url"] or None)
-    ts = iso(now_utc())
     c.execute("UPDATE rss_items SET saved_task_id=? WHERE id=?", (tid, iid))
-    if oid:
-        c.execute("INSERT INTO rss_reads(item_id,user_id,read_at) VALUES(?,?,?) ON CONFLICT DO NOTHING", (iid, uid, ts))
-    else:
-        c.execute("UPDATE rss_items SET read_at=COALESCE(read_at, ?) WHERE id=?", (ts, iid))
+    osn_mark(c, "rss", iid, uid, iid)  # 2.981.0 (#5286): read (the core's obj_seen, every space)
     return {"task_id": tid, "list_id": lid, "created": True, "space": rss_space_key(oid)}
 
 

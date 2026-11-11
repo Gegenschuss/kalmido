@@ -664,8 +664,6 @@ retention_log.detail json
 rss_feeds.created_at time
 rss_feeds.deleted_at time
 rss_items.fetched_at time
-rss_items.read_at time
-rss_reads.read_at time
 sched_poll_votes.answers json
 sched_poll_votes.created_at time
 sched_poll_votes.updated_at time

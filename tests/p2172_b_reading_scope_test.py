@@ -167,7 +167,10 @@ r = A.post(B + "/api/feeds/read", json={"ids": OI, "read": True})
 check(r.ok and r.json()["ids"] == [], "the organisation's articles cannot be marked in the private workspace")
 check(Fr.post(B + "/api/feeds/read", json={"ids": OI, "read": True}).json().get("ids") == [], "non-member: marks nothing")
 check(Fr.post(B + "/api/feeds/read", json={"ids": OI, "read": True, "space": SP}).status_code == 404, "non-member in the space: 404")
-check(not dbx("SELECT 1 FROM rss_items WHERE feed_id=? AND read_at IS NOT NULL", (OF,)), "the shared article row keeps no read mark")
+# 2.981.0 (#5286): the read mark is a row of the core's obj_seen per person (rss_items.read_at and rss_reads are gone)
+check(not dbx("SELECT 1 FROM information_schema.columns WHERE table_name='rss_items' AND column_name='read_at'")
+      and dbx("SELECT COUNT(*) FROM obj_seen WHERE kind='rss' AND ref_id IN (SELECT id FROM rss_items WHERE feed_id=?)", (OF,))[0][0] == len(OI),
+      "the shared article row keeps no read mark: the read-only member's own marks are rows of obj_seen")
 
 # ================================================================ read later lands in the article's space
 r = Bo.post(B + f"/api/feeds/items/{OI[0]}/later")
