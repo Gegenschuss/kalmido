@@ -204,11 +204,7 @@ def folder_rename_do(c, uid, old, new):
     from ..lists.lffolder import lf_folder_repath
     lf_folder_repath(c, uid, old, new)
     _folder_move(c, uid, lambda p: new + p[len(old):] if folder_under(p, old) else p)
-    for fp in c.execute("SELECT folder, user_id FROM folder_people WHERE owner_id=?", (uid,)).fetchall():  # 2.22.0 (#740)
-        if folder_under(fp[0], old):
-            nf = new + fp[0][len(old):]  # 2.37.0 (#1150): UPDATE OR REPLACE -> drop the row in the way, then move
-            c.execute("DELETE FROM folder_people WHERE owner_id=? AND folder=? AND user_id=? AND folder<>?", (uid, nf, fp[1], fp[0]))
-            c.execute("UPDATE folder_people SET folder=? WHERE owner_id=? AND folder=? AND user_id=?", (nf, uid, fp[0], fp[1]))
+    # 2.958.0 (#5245): the folder's people are the shares of its nodes (lf_folder_repath above moved them); folder_people is gone
     from ..notify.caps import folder_tpl_rename
     folder_tpl_rename(c, uid, old, new)  # 2.33.0 (#927): the folder's notification templates go along
     from ..integrations.gitfolder import gf_rename
@@ -250,7 +246,7 @@ def folder_delete():
     gf_folder_removed(c, uid, lambda p: "" if up(p) == "\0" else up(p))  # 2.33.0 (#934): its repositories go to the parent folder
     from ..lists.playbook import pb_folder_removed
     pb_folder_removed(c, uid, name, up)  # 2.39.0 (#1168): the subfolders' Playbooks move up; the folder's own one ends empty (history kept)
-    c.execute("DELETE FROM folder_people WHERE owner_id=? AND folder=?", (uid, name))  # 2.22.0 (#740): the folder is gone
+    # 2.958.0 (#5245): the folder's people were the shares of its nodes (lf_folder_dissolve took them); folder_people is gone
     c.execute("DELETE FROM folder_agents WHERE owner_id=? AND folder=?", (uid, name))  # 2.41.0 (#1420)
     grp_touch(c, uid)  # 2.352.0 A (#2748)
     bump(c)

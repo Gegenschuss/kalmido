@@ -1166,7 +1166,7 @@ def init_db(guard=True, load=None):
         if gsetting(c, "migr_folder931") != "1":
             from ..lists.lists import _folder_member_add, _in_folder, collab_all as _ca
             n = 0
-            if _ca():
+            if _ca() and table_exists(c, "folder_people"):  # 2.958.0 (#5245): gone on a new database
                 for fp in c.execute("SELECT * FROM folder_people").fetchall():
                     for l in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(folder,'')!='' AND created_at>?",
                                        (fp["owner_id"], fp["created_at"])).fetchall():

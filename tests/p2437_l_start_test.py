@@ -48,6 +48,10 @@ for u in ("bob", "carol", "dave", "erin"):
 aid = dbx("SELECT id FROM users WHERE username='alice'")[0][0]
 dbx(f"UPDATE lists SET owner_id={aid} WHERE owner_id IS NULL")
 dbx("INSERT INTO list_members(list_id,user_id,role,own_role,added_at) SELECT l.id,u.id,'edit','edit','2026-01-01T00:00:00' FROM lists l, users u WHERE u.id<>l.owner_id AND l.is_inbox=0 ON CONFLICT DO NOTHING")
+# 2.958.0 (#5245): folder_people is gone on a new database; the old table of 2.351 (the start's retirement drops it again)
+dbx("""CREATE TABLE IF NOT EXISTS folder_people (owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, folder TEXT NOT NULL,
+       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, role TEXT NOT NULL DEFAULT 'edit', created_at TEXT NOT NULL,
+       PRIMARY KEY (owner_id, folder, user_id))""")
 dbx("INSERT INTO folder_people(owner_id,folder,user_id,role,created_at) SELECT DISTINCT l.owner_id,l.folder,u.id,'edit','2026-01-01T00:00:00' FROM lists l, users u WHERE u.id<>l.owner_id AND l.folder<>'' ON CONFLICT DO NOTHING")
 dbx("DELETE FROM settings WHERE key='migr_lf2352'")
 subprocess.run(["docker", "restart", CT], check=True, capture_output=True)

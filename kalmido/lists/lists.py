@@ -1160,9 +1160,13 @@ def folder_people_get():
     from flask import request
     c = db()
     f = clean_folder(request.args.get("folder") or "", strict=False)
-    return jsonify(people=[{"user_id": r[0], "role": r[1], "name": r[2] or r[3] or ""} for r in  # 2.41.0 (#1420): + name
-                           c.execute("""SELECT p.user_id, p.role, u.display_name, u.username FROM folder_people p JOIN users u ON u.id=p.user_id
-                                        WHERE p.owner_id=? AND p.folder=? ORDER BY p.created_at""", (me(), f))])
+    from ..lists.lffolder import lf_people_rows  # 2.958.0 (#5245): the shares of the folder's nodes (folder_people is gone)
+    out = []
+    for r in lf_people_rows(c, me()):
+        u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["user_id"],)).fetchone() if r["folder"] == f else None
+        if u is not None:
+            out.append({"user_id": r["user_id"], "role": r["role"], "name": u[0] or u[1] or ""})  # 2.41.0 (#1420): + name
+    return jsonify(people=out)
 
 
 # ---- 2.46.0 (#1606): before a changed folder role reaches the lists of the folder, the client asks when lists have a role
@@ -1170,7 +1174,9 @@ def folder_people_get():
 def fg_people_diff(c, owner, f, uid, role):
     """[{list_id, name, role}] of owner's lists in folder f where the folder role `role` would replace a role of uid set by hand."""
     from ..family.family import is_kid
-    prev = c.execute("SELECT role FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (owner, f, uid)).fetchone()
+    from ..lists.lffolder import lf_people  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
+    prev = lf_people(c, owner, f).get(uid)
+    prev = (prev,) if prev else None
     if not prev or prev[0] == role:  # a first share or the same role touches no list role
         return []
     r2 = "participant" if is_kid(c, uid) else role
@@ -1237,7 +1243,9 @@ def folder_people_put():
     p = le2a_folder_problem(c, me(), f, role, uid)  # 2.64.1 (#1817): no participants in lists with the lock
     if p:
         return jsonify(error=p, code="list_e2e_member"), 409
-    prev = c.execute("SELECT role FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid)).fetchone()
+    from ..lists.lffolder import lf_people  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
+    prev = lf_people(c, me(), f).get(uid)
+    prev = (prev,) if prev else None
     rows = [r for r in c.execute("SELECT id, name, folder FROM lists WHERE owner_id=? AND archived=0 AND is_inbox=0", (me(),)).fetchall()
             if _in_folder(r["folder"], f)]
     had = {r[0]: r[1] for r in c.execute("SELECT list_id, role FROM list_members WHERE user_id=?", (uid,))}

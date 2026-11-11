@@ -54,8 +54,8 @@ def ln_list_problem(c, lid, uid):
     people = c.execute("""SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id
                           WHERE m.list_id=? AND m.user_id<>? AND COALESCE(u.kind, '')<>'agent' LIMIT 1""", (lid, uid)).fetchone()
     groups = c.execute("SELECT 1 FROM group_shares WHERE list_id=? LIMIT 1", (lid,)).fetchone()
-    folder = (r["folder"] or "") and c.execute("SELECT 1 FROM folder_people WHERE owner_id=? AND folder=? LIMIT 1",
-                                                (uid, r["folder"])).fetchone()
+    from ..lists.lffolder import lf_people  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
+    folder = (r["folder"] or "") and lf_people(c, uid, r["folder"])
     if people or groups or folder or ov_open(r):
         return tr("Notes can only be locked in projects that are not shared.")
     return None

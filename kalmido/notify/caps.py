@@ -206,9 +206,13 @@ def list_tpl_info(c, lid):
 def folder_tpl_info(c, owner, f):
     own = {r["user_id"]: r for r in c.execute("SELECT user_id, tpl, custom FROM folder_notif WHERE owner_id=? AND folder=?", (owner, f))}
     inh = _inherited(c, owner, f, skip_first=True)
-    people = [{"user_id": r["id"], "name": r["display_name"] or r["username"], "own": _row_out(own.get(r["id"]))} for r in c.execute(
-        """SELECT u.id, u.username, u.display_name FROM folder_people p JOIN users u ON u.id=p.user_id
-           WHERE p.owner_id=? AND p.folder=? AND COALESCE(u.kind,'')!='agent' ORDER BY p.created_at, u.id""", (owner, f))]
+    from ..lists.lffolder import lf_people_rows  # 2.958.0 (#5245): the shares of the folder's nodes (folder_people is gone)
+    people = []
+    for p in lf_people_rows(c, owner):
+        r = c.execute("SELECT id, username, display_name FROM users WHERE id=? AND COALESCE(kind,'')!='agent'",
+                      (p["user_id"],)).fetchone() if p["folder"] == f else None
+        if r is not None:
+            people.append({"user_id": r["id"], "name": r["display_name"] or r["username"], "own": _row_out(own.get(r["id"]))})
     lids = [r["id"] for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (owner,)).fetchall()
             if _in_folder(r["folder"] or "", f)]
     own_lists = [r[0] for r in c.execute(f"SELECT list_id FROM list_notif WHERE user_id=0 AND list_id IN ({','.join('?' * len(lids))})", lids)] if lids else []
@@ -285,9 +289,14 @@ def list_tpl_put(lid):
     return jsonify(list_tpl_info(c, lid))
 
 
+def _fpeople(c, owner, f):
+    from ..lists.lffolder import lf_people
+    return lf_people(c, owner, f)
+
+
 def _my_folder(c, f):
     return any(_in_folder(r[0] or "", f) for r in c.execute("SELECT folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),))) or \
-        bool(c.execute("SELECT 1 FROM folder_people WHERE owner_id=? AND folder=?", (me(), f)).fetchone())
+        bool(_fpeople(c, me(), f))  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
 
 
 @app.get("/api/folders/notify-template")
@@ -315,7 +324,7 @@ def folder_tpl_put():
         uid = _uid_in(b)
     except BadInput as e:
         return err(str(e))
-    if uid and not c.execute("SELECT 1 FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid)).fetchone():
+    if uid and uid not in _fpeople(c, me(), f):  # 2.958.0 (#5245)
         return err(tr("unknown person"), 404)
     if "tpl" in b:
         if tpl is None:
@@ -350,10 +359,11 @@ def notif_ask_state(c, uid, s):
     question is open (setting notif_tpl_ask = "1"); else []."""
     if (s or {}).get("notif_tpl_ask") != "1":
         return []
-    out = [{"kind": "folder", "folder": r[0], "name": r[0].split(_fsep())[-1]} for r in c.execute(
-        "SELECT DISTINCT p.folder FROM folder_people p JOIN folder_notif n ON n.owner_id=p.owner_id AND n.folder=p.folder AND n.user_id=0 "
-        "JOIN users hu ON hu.id=p.user_id AND COALESCE(hu.kind,'')!='agent' "
-        "WHERE p.owner_id=? AND n.tpl='all' ORDER BY p.folder", (uid,))]
+    from ..lists.lffolder import lf_people_rows  # 2.958.0 (#5245): the folders' shares with people (folder_people is gone)
+    alls = {r[0] for r in c.execute("SELECT folder FROM folder_notif WHERE owner_id=? AND user_id=0 AND tpl='all'", (uid,))}
+    people = sorted({p["folder"] for p in lf_people_rows(c, uid) if p["folder"] in alls and c.execute(
+        "SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'')!='agent'", (p["user_id"],)).fetchone()})
+    out = [{"kind": "folder", "folder": f, "name": f.split(_fsep())[-1]} for f in people]
     out += [{"kind": "list", "id": r["id"], "name": r["name"]} for r in c.execute(
         """SELECT l.id, l.name FROM lists l JOIN list_notif n ON n.list_id=l.id AND n.user_id=0
            WHERE l.owner_id=? AND l.archived=0 AND n.tpl='all' AND EXISTS (SELECT 1 FROM list_members m JOIN users hu ON hu.id=m.user_id AND COALESCE(hu.kind,'')!='agent' WHERE m.list_id=l.id)
@@ -375,8 +385,9 @@ def notif_tpl_migrate(c):
     are asked once. A list in a shared folder of its owner follows the folder (only the folder gets the row)."""
     now = iso(now_utc())
     folders = {}
-    for r in c.execute("SELECT DISTINCT p.owner_id, p.folder FROM folder_people p JOIN users hu ON hu.id=p.user_id "
-                       "AND COALESCE(hu.kind,'')!='agent'").fetchall():  # shared with people (only agents: nothing to ask)
+    from ..lists.lffolder import lf_people_rows  # 2.958.0 (#5245): the folders' shares (folder_people is gone)
+    for r in sorted({(p["owner_id"], p["folder"]) for p in lf_people_rows(c) if c.execute(
+            "SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'')!='agent'", (p["user_id"],)).fetchone()}):  # shared with people (only agents: nothing to ask)
         folders.setdefault(r[0], []).append(r[1])
         c.execute("INSERT INTO folder_notif(owner_id,folder,user_id,tpl,custom,updated_at) VALUES(?,?,0,'all',NULL,?) ON CONFLICT DO NOTHING", (r[0], r[1], now))
     owners, n = set(folders), 0

@@ -229,6 +229,10 @@ check(Fr.post(B + "/api/lists/folders", json={"parent_id": next(s for s in tree(
 # ---------------------------------------------------------------- the one-way migration: who sees what stays the same
 # old-style data (2.351): path folders, folder_people and their copies in the lists as personal member rows
 people = [uid["carl"], uid["dora"]]
+# 2.958.0 (#5245): folder_people is gone on a new database (lists/lkretire.py); the old table of 2.351 for this migration test
+dbx("""CREATE TABLE IF NOT EXISTS folder_people (owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, folder TEXT NOT NULL,
+       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, role TEXT NOT NULL DEFAULT 'edit', created_at TEXT NOT NULL,
+       PRIMARY KEY (owner_id, folder, user_id))""")
 mig = []
 for i in range(5):
     for j in range(3):

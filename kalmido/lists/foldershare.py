@@ -362,8 +362,9 @@ def sh_folder_shares(c, uid):
 
     def slot(f):
         return out.setdefault(f, {"people": 0, "groups": 0, "agents": []})
-    for r in c.execute("SELECT folder, COUNT(*) FROM folder_people WHERE owner_id=? GROUP BY folder", (uid,)).fetchall():
-        slot(r[0])["people"] = r[1]
+    from .lffolder import lf_people_rows  # 2.958.0 (#5245): the shares of the folders' nodes (folder_people is gone)
+    for r in lf_people_rows(c, uid):
+        slot(r["folder"])["people"] += 1
     for r in c.execute("SELECT folder, COUNT(*) FROM group_shares WHERE owner_id=? AND list_id IS NULL AND folder IS NOT NULL GROUP BY folder",
                        (uid,)).fetchall():
         slot(r[0])["groups"] = r[1]

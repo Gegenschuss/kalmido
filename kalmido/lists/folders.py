@@ -444,7 +444,8 @@ def folder_member_created(c, uid, lid):
     if not r or r["is_inbox"] or not r["folder"] or r["owner_id"] != uid or not collab_all():
         return 0
     n = 0
-    for fp in c.execute("SELECT owner_id, folder FROM folder_people WHERE user_id=? AND owner_id!=?", (uid, uid)).fetchall():
+    from .lffolder import lf_people, lf_people_rows  # 2.958.0 (#5245): the folders' shares (folder_people is gone)
+    for fp in [x for x in lf_people_rows(c, uid=uid) if x["owner_id"] != uid]:
         if not folder_under(r["folder"], fp["folder"]) or not may_see(c, uid, fp["owner_id"]):
             continue
         # only the folder that really holds the owner's shared lists for uid (not a private folder of the same name)
@@ -455,7 +456,7 @@ def folder_member_created(c, uid, lid):
         if _folder_member_add(c, lid, fp["owner_id"], "admin", uid):
             n += 1
         from ..agents.admin import personal_agent_foreign
-        for p in c.execute("SELECT user_id, role FROM folder_people WHERE owner_id=? AND folder=? AND user_id!=?", (fp["owner_id"], fp["folder"], uid)).fetchall():
+        for p in [{"user_id": u, "role": r} for u, r in sorted(lf_people(c, fp["owner_id"], fp["folder"]).items()) if u != uid]:
             # 2.30.0 (#1036): only people uid may see and no personal agent of somebody else (as when uid shares by hand);
             # the workspace rule itself is checked by _folder_member_add
             if not may_see(c, uid, p["user_id"]) or personal_agent_foreign(c, p["user_id"], uid):
@@ -467,11 +468,14 @@ def folder_member_created(c, uid, lid):
 
 def folders_shared_in(c, uid):
     """The folders of other people shared with uid (the new-list dialog says the list will be shared with them)."""
+    from .lffolder import lf_people, lf_people_rows  # 2.958.0 (#5245): the folders' shares (folder_people is gone)
     out = []
-    for fp in c.execute("""SELECT f.owner_id, f.folder, u.display_name, u.username FROM folder_people f JOIN users u ON u.id=f.owner_id
-                           WHERE f.user_id=? AND f.owner_id!=? ORDER BY f.folder""", (uid, uid)).fetchall():
-        n = c.execute("SELECT COUNT(*) FROM folder_people WHERE owner_id=? AND folder=? AND user_id!=?", (fp["owner_id"], fp["folder"], uid)).fetchone()[0]
-        out.append({"owner_id": fp["owner_id"], "owner_name": fp["display_name"] or fp["username"], "folder": fp["folder"], "people": n + 1})
+    for fp in sorted((x for x in lf_people_rows(c, uid=uid) if x["owner_id"] != uid), key=lambda x: x["folder"]):
+        u = c.execute("SELECT display_name, username FROM users WHERE id=?", (fp["owner_id"],)).fetchone()
+        if u is None:
+            continue
+        n = len([x for x in lf_people(c, fp["owner_id"], fp["folder"]) if x != uid])
+        out.append({"owner_id": fp["owner_id"], "owner_name": u["display_name"] or u["username"], "folder": fp["folder"], "people": n + 1})
     return out
 
 

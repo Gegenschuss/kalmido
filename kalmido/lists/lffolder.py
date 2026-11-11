@@ -53,7 +53,7 @@ from ..core.config import app
 from ..core.access import Denied, acx_of, joined_lists_sql, qn_is, reading_ids, reading_sql  # 2.477.0 (#3881): + qn_is
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc, uset, usettings
 from ..core.i18n import N_, lang, tr
-from ..core.pg import system_ctx
+from ..core.pg import system_ctx, table_exists
 from ..accounts.orgroles import FULL_WRITE, org_role_key, org_writes
 from ..accounts.orgs import user_orgs, ws_member_problem
 from ..accounts.session import me
@@ -477,8 +477,8 @@ def lf_resync(c, lids, actor=None):
 
 def lf_folder_share(c, owner, path, uid, role):
     """The old route /api/folders/people: owner's folder at path (every tree; none yet: one in owner's own tree) is shared with
-    person / agent uid with list role role (None: the share goes). folder_people follows (_people_mirror), the lists below
-    get their roles anew. Caller commits."""
+    person / agent uid with list role role (None: the share goes), the lists below
+    get their roles anew. Caller commits. 2.958.0 (#5245): no mirror into folder_people any more (gone, lf_people_rows)."""
     agent = bool(c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone())
     key = "agent_id" if agent else "user_id"
     nodes = lf_folder_ensure(c, owner, path) if role else lf_folder_nodes(c, owner, path)
@@ -498,29 +498,46 @@ def lf_folder_share(c, owner, path, uid, role):
                           (f["id"], uid, "edit" if role in ("admin", "edit") else "view", role, owner, _now()))
                 _log(c, f["id"], "share", f"{key[:-3]}:{uid}:{role}")
             lids.update(lf_lists_below(c, f["id"]))
-    _people_mirror(c, owner, path)
     lf_resync(c, lids)
 
 
-def _people_mirror(c, owner, path):
-    """folder_people of (owner, path) = the person / agent shares of owner's folder nodes at path (the readers of folder_people
-    -- notification templates, the lock's checks, the sidebar's marks, older versions -- see the folder's shares)."""
-    if not _parts(path):
-        return
-    want = {}
+def lf_people_rows(c, owner=None, uid=None):
+    """2.958.0 (#5245, stage 7d of the shared core): the person / agent shares of the projects folders as the rows of the old
+    table folder_people (gone) -- [{owner_id, folder, user_id, role, created_at}]: per folder (its owner and path, lf_node_folder)
+    and person the highest list role of the live shares (not expired, a folder not in the trash, no group's share, not the
+    folder owner's own), owner = only the folders of that person, uid = only the shares with that person / agent. Read at
+    runtime from fs_shares, so an expiry ends it at once (no tick needed)."""
+    q, a = ["n.kind='folder'", "n.deleted_at IS NULL", "s.group_id IS NULL", "COALESCE(s.list_own, 0)=0",
+            "(s.expires_at IS NULL OR s.expires_at > ?)"], [_now()]
+    if owner is not None:
+        q.append("n.owner_id=?")
+        a.append(int(owner))
+    if uid is not None:
+        q.append("COALESCE(s.user_id, s.agent_id)=?")
+        a.append(int(uid))
+    out, where = {}, {}
     with system_ctx(c):
-        for f in lf_folder_nodes(c, owner, path):
-            for s in c.execute("SELECT user_id, agent_id, role, list_role FROM fs_shares WHERE node_id=? AND group_id IS NULL", (f["id"],)):
-                u = s["user_id"] or s["agent_id"]
-                if u and u != owner:
-                    want[u] = _rmax(want.get(u), s["list_role"] if s["list_role"] in LIST_ROLES else ("edit" if s["role"] == "edit" else "view"))
-    have = {r[0]: r[1] for r in c.execute("SELECT user_id, role FROM folder_people WHERE owner_id=? AND folder=?", (owner, path))}
-    for u in set(have) - set(want):
-        c.execute("DELETE FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (owner, path, u))
-    for u, r in want.items():
-        if have.get(u) != r:
-            c.execute("INSERT INTO folder_people(owner_id,folder,user_id,role,created_at) VALUES(?,?,?,?,?) ON CONFLICT(owner_id,folder,user_id) "
-                      "DO UPDATE SET role=excluded.role", (owner, path, u, r, iso(now_utc())))
+        for s in c.execute(f"""SELECT s.node_id, COALESCE(s.user_id, s.agent_id) AS who, s.role, s.list_role, s.created_at
+                               FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE {' AND '.join(q)} ORDER BY s.id""", a).fetchall():
+            if s["node_id"] not in where:
+                where[s["node_id"]] = lf_node_folder(c, s["node_id"])
+            k = where[s["node_id"]]
+            if not k or not k[1] or not s["who"] or s["who"] == k[0]:
+                continue
+            role = s["list_role"] if s["list_role"] in LIST_ROLES else ("edit" if s["role"] == "edit" else "view")
+            x = out.get((k[0], k[1], s["who"]))
+            if x is None:
+                out[(k[0], k[1], s["who"])] = {"owner_id": k[0], "folder": k[1], "user_id": s["who"], "role": role,
+                                               "created_at": s["created_at"]}
+            else:
+                x["role"] = _rmax(x["role"], role)
+                x["created_at"] = min(str(x["created_at"] or ""), str(s["created_at"] or "")) or x["created_at"]
+    return sorted(out.values(), key=lambda r: (r["owner_id"], r["folder"], str(r["created_at"] or ""), r["user_id"]))
+
+
+def lf_people(c, owner, path):
+    """2.958.0 (#5245): {uid: list role} owner's folder at path is shared with (lf_people_rows of that folder)."""
+    return {r["user_id"]: r["role"] for r in lf_people_rows(c, owner) if r["folder"] == path}
 
 
 # ---------------------------------------------------------------- hooks of the file store
@@ -541,10 +558,6 @@ def _on_change(c, nid, action):
         lids = lf_lists_below(c, nid)
         if action in ("move", "restore", "trash"):
             _paths_follow(c, lids)
-        if action in ("share", "share_change", "unshare"):
-            k = lf_node_folder(c, nid)
-            if k and k[1]:
-                _people_mirror(c, *k)
         lf_resync(c, lids)
     finally:
         _busy.on -= 1
@@ -671,7 +684,8 @@ def lf_migrate(c):
         for o in owners:
             out["nodes"] += len(lf_sync_owner(c, o))
         agents = {r[0] for r in c.execute("SELECT id FROM users WHERE kind='agent'")}
-        for fp in c.execute("SELECT owner_id, folder, user_id, role, created_at FROM folder_people ORDER BY owner_id, folder, user_id").fetchall():
+        for fp in (c.execute("SELECT owner_id, folder, user_id, role, created_at FROM folder_people ORDER BY owner_id, folder, user_id").fetchall()
+                   if table_exists(c, "folder_people") else ()):  # 2.958.0 (#5245): gone on a new database (lf_people_retire)
             role = fp["role"] if fp["role"] in LIST_ROLES else "edit"
             key = "agent_id" if fp["user_id"] in agents else "user_id"
             for f in lf_folder_ensure(c, fp["owner_id"], fp["folder"]):

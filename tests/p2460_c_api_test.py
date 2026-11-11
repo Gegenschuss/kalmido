@@ -108,7 +108,9 @@ check(r.status_code == 401, f"not signed in 401: {r.status_code}")
 r = A.put(B + "/api/folders/people", json={"folder": F, "user_id": BOB, "role": "view", "apply": False})
 check(r.ok and r.json()["updated"] == 0, f"apply false: no list changed {r.text[:200]}")
 check(own_role(L2, BOB)[0] == "admin" and own_role(L1, BOB)[0] == "edit", f"lists keep their roles {own_role(L1, BOB)} {own_role(L2, BOB)}")
-check(dbx("SELECT role FROM folder_people WHERE user_id=?", (BOB,))[0][0] == "view", "the folder role is view")
+# 2.958.0 (#5245): folder_people is gone, the folder's people are the shares of its nodes (GET /api/folders/people reads them)
+check([x["role"] for x in A.get(B + "/api/folders/people", params={"folder": F}).json()["people"] if x["user_id"] == BOB] == ["view"],
+      "the folder role is view")
 L4 = A.post(B + "/api/lists", json={"name": "Delta", "folder": F}).json()["id"]
 check(own_role(L4, BOB) == (None, "view"), f"a new list gets the new folder role (2.352.0: through the folder) {own_role(L4, BOB)}")
 check(own_role(LX, BOB)[0] == "view", "a list outside the folder is untouched")
