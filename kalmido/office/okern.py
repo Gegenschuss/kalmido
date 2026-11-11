@@ -131,7 +131,8 @@ def ofk_trash_items(c, oid):
         v = k.get("view")
         if not v:
             continue
-        for r in c.execute(f"SELECT * FROM {qi(k['table'], _tables())} WHERE org_id=? AND {trash_sql()} ORDER BY id", (oid,)).fetchall():
+        for r in c.execute(f"SELECT * FROM {qi(k['table'], _tables())} WHERE org_id=? AND {trash_sql()} "
+                           "ORDER BY deleted_at DESC, id DESC LIMIT 500", (oid,)).fetchall():  # review 2.905.0: bounded per kind
             row = dict(r)
             out.append({"id": row["id"], "core": kind, "kind": v["kind"](row) if callable(v["kind"]) else v["kind"], "sub": "",
                         "ref_id": row["id"], "label": (v["label"](c, oid, row) or "")[:300], "deleted_by": row.get("deleted_by"),
