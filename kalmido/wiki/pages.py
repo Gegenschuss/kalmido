@@ -339,9 +339,6 @@ def wiki_index():
     wsh_mark(c, oid, uid, pages)
     from .wkfolder import wkf_sync, wkf_tree  # 2.200.0 A (#2747): the folders of the tree (the path <-> tree check first)
     tree = wkf_tree(c, uid, oid, wkf_sync(c, uid, oid), pages)
-    if oid is None and tree["root"]:  # 2.565.0 (#4717): person shares not moved yet become core shares once the tree is there
-        from .wkshare import wsh_core_move
-        wsh_core_move(c, uid)
     c.commit()
     out = dict(space=wiki_space_key(oid), may_write=org_writes(c, uid, oid), pages=pages, e2e=e2e, more=more,
                root=tree["root"], folders=tree["folders"])  # 2.143.0 A (#2151); 2.169.1 (#2672): more

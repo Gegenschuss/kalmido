@@ -209,10 +209,8 @@ CHECKS = {
     # 2.99.0 A (#2182): a file of a knowledge page that lies in another space than its page (org / owner) -- (file, who stored it)
     "wiki_file": ("SELECT f.id, f.created_by FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE "
                   "COALESCE(f.org_id,0)<>COALESCE(p.org_id,0) OR (p.org_id IS NULL AND f.owner_id IS DISTINCT FROM p.owner_id)"),
-    # 2.123.0 B (#2104): a live person share of a knowledge page / folder that crosses a boundary: in an organisation's space
-    # (people get shares in private spaces only), with an agent, or with the space's owner itself -- (share, person)
-    "wiki_share": ("SELECT s.id, s.user_id FROM wiki_shares s JOIN users u ON u.id=s.user_id WHERE s.kind='person' AND s.revoked_at IS NULL "
-                   "AND (s.org_id IS NOT NULL OR u.kind='agent' OR s.user_id=s.owner_id)"),
+    # 2.937.0 (#5244, stage 7c): "wiki_share" is gone -- a person share of a knowledge page / folder is a share of its node
+    # (fs_shares), counted by file_person / file_agent above; wiki_shares holds public links only
     # 2.122.0 A (#2097): a file request in another workspace than its folder, or of an organisation's folder made by a person
     # outside that organisation (the link stops anyway: files/filereq.py frq_alive) -- (request, its creator); counted only
     "file_request": ("SELECT q.id, q.created_by FROM fs_upload_requests q JOIN fs_nodes n ON n.id=q.node_id WHERE q.deleted_at IS NULL "
@@ -270,8 +268,11 @@ CHECKS = {
     # another workspace, or a share whose org_id differs from its table's (the read layer refuses all: sheets/shshare.py shs_fits)
     "sheet_share_person": ("SELECT s.sheet_id, s.user_id FROM sheet_shares s JOIN sheets t ON t.id=s.sheet_id JOIN users u ON u.id=s.user_id "
                            "WHERE s.revoked_at IS NULL AND t.org_id IS NOT NULL AND " + _PERSON.format(o="t", m="s")),
-    "sheet_share_agent": ("SELECT s.sheet_id, s.user_id FROM sheet_shares s JOIN sheets t ON t.id=s.sheet_id JOIN agents a ON a.user_id=s.user_id "
-                          "WHERE s.revoked_at IS NULL AND (COALESCE(a.org_id,0)!=COALESCE(t.org_id,0) OR s.org_id IS DISTINCT FROM t.org_id)"),
+    # 2.937.0 (#5244): a person / agent holds a table's share on its node (fs_shares; a person outside: file_person), sheet_shares
+    # keeps the addresses typed in (bound to an account: user_id)
+    "sheet_share_agent": ("SELECT n.ref_id, s.agent_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id JOIN sheets t ON t.id=n.ref_id "
+                          "JOIN agents a ON a.user_id=s.agent_id WHERE n.kind='ref' AND n.ref_kind='sheet' AND "
+                          "COALESCE(a.org_id,0)!=COALESCE(t.org_id,0)"),
     # 2.97.0 A (#1950): a bookmark of an organisation held by an agent or by a person outside it (the read layer needs the
     # membership: life/bookmarks.py bm_get; counted only) -- (bookmark, owner)
     "bookmark_owner": ("SELECT b.id, b.user_id FROM bookmarks b JOIN users u ON u.id=b.user_id WHERE b.org_id IS NOT NULL AND "

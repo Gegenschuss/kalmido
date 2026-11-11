@@ -3,11 +3,10 @@
 stay as the share's card (an address typed in, the switch "show pictures", the dialog's id) and point to their core share:
 sheet_shares.core_id, wiki_shares.core_id (+ core_id2: a folder share's page of the same name). A row with core_id NULL is
 read as before for one release (fallback, rows not moved yet); the one-shot migr_core4717 (core/db.py init_db) copies them
-forward. Nullable columns only: older versions ignore them (and keep reading the rows as before)."""
+forward. Nullable columns only: older versions ignore them (and keep reading the rows as before).
+2.937.0 (#5244, stage 7c): sheet_shares.core_id (5244_a.py) and wiki_shares.core_id / core_id2 (5244_b.py) are gone again:
+the start drops them after its check, no step adds them any more."""
 SCHEMA = ""
 MIGRATIONS = [
-    ("sheet_shares", "core_id", "ALTER TABLE sheet_shares ADD COLUMN IF NOT EXISTS core_id BIGINT"),
-    ("wiki_shares", "core_id", "ALTER TABLE wiki_shares ADD COLUMN IF NOT EXISTS core_id BIGINT"),
-    ("wiki_shares", "core_id2", "ALTER TABLE wiki_shares ADD COLUMN IF NOT EXISTS core_id2 BIGINT"),
 ]
 AFTER = []

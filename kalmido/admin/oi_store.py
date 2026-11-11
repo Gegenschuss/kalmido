@@ -37,7 +37,10 @@ from ..wiki.wkhist import wkh_seal, WKH_VCTX  # 2.369.5 (#2517): pulled up from 
 from ..wiki.pages import wiki_set_links  # 2.369.5 (#2517): pulled up from functions
 from ..wiki.wksearch import wks_index  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
-from ..sheets.shshare import SHS_CARD, shs_core_move  # 2.647.0 (#5047)
+from ..sheets.shshare import shs_core_of, shs_put  # 2.647.0 (#5047); 2.937.0 (#5244)
+from ..core.access import Denied  # 2.937.0 (#5244)
+from ..core.pg import system_ctx  # 2.937.0 (#5244)
+from ..files.fsref import fs_ref_node  # 2.937.0 (#5244)
 from ..docs.store import doc_seal as _doc_seal  # 2.635.0 (#4807 d)
 
 _LOCKED = "e2e1:"
@@ -150,7 +153,9 @@ def _node(c, run, src, d, ctx):
     if d["kind"] == "ref" and src.get("ref_kind") in (*_CORE_NOW, *_CORE_LATE, _LIST_REF):
         return _core_node(c, run, src, d, ctx, st, sid)
     if d["kind"] == "ref":
-        if not (src.get("ref_kind") in _REF_KINDS and area or src.get("ref_kind") in _CORE_REF_KINDS):
+        # 2.937.0 (#5244): + a table's node at the top of the tree (shshare.py shs_node: a table in no folder; it carries the shares)
+        top_sheet = src.get("ref_kind") == "sheet" and not src.get("parent_id")
+        if not (src.get("ref_kind") in _REF_KINDS and (area or top_sheet) or src.get("ref_kind") in _CORE_REF_KINDS):
             return None
         d["ref_id"] = None
         st["refs"].append((sid, src["ref_kind"], src.get("ref_id")))
@@ -302,7 +307,30 @@ def _lock_key(c, run, src, d, ctx):
 
 
 def _share(c, run, src, d, ctx):
-    return d if d.get("user_id") and _not_agent(c, d["user_id"]) else None  # people only (groups and agents stay out)
+    if not (d.get("user_id") and _not_agent(c, d["user_id"])):
+        return None  # people only (groups and agents stay out)
+    # 2.937.0 (#5244): a share of a table's node is the table's share (no card any more): noted for _finish_sheet_shares, which
+    # puts it on the imported table's node when the node of the archive did not stay (a table already placed, _finish_refs)
+    sn = _sheet_nodes(run, ctx).get(_oidi(src.get("node_id")))
+    if sn:
+        _sheet_share_note(run, sn, None, d["user_id"], {"view": "read", "edit": "write"}.get(src.get("role")), src.get("expires_at"))
+    return d
+
+
+def _sheet_nodes(run, ctx):
+    """2.937.0 (#5244): {archive node id: archive table id} of the tables' reference nodes in store/nodes.json."""
+    st = _st(run)
+    if "sheet_nodes" not in st:
+        oi = ctx.data.get("oi") or {}
+        st["sheet_nodes"] = {_oidi(r.get("id")): _oidi(r.get("ref_id")) for r in oi.get("store/nodes.json") or []
+                             if r.get("kind") == "ref" and r.get("ref_kind") == "sheet" and _oidi(r.get("ref_id"))}
+    return st["sheet_nodes"]
+
+
+def _sheet_share_note(run, src_sid, sid, who, role, expires_at=None):
+    if not hasattr(run, "oi_sheet_shares"):
+        run.oi_sheet_shares = []
+    run.oi_sheet_shares.append((src_sid, sid, who, role, expires_at))
 
 
 # ---- documents ---------------------------------------------------------------------------------------------------------
@@ -597,9 +625,13 @@ def _sheet_link(c, run, src, d, ctx):
 
 
 def _sheet_share(c, run, src, d, ctx):
-    if "core_id" in d:  # 2.565.0 (#4717): the source's core share came with the store (fs_shares, imported before): 2.647.0
-        d["core_id"] = run.m("fs_shares", src.get("core_id"))  # (#5047) the card names it again (checked in _finish_sheet_shares)
-    return d if d["user_id"] is not None and _not_agent(c, d["user_id"]) else None  # 2.360.2 M (#2561): an open address row never
+    """2.937.0 (#5244): a row of sheets/shares.json (a person's / agent's share of an archive before stage 7c; addresses were
+    never exported, 2.360.2 M #2561) is no row of its own any more: _finish_sheet_shares makes it the core share of the
+    imported table's node unless the archive's file store brought that node (its store/shares.json is the truth then). Always
+    False."""
+    if d.get("user_id") is not None and d.get("sheet_id") and _not_agent(c, d["user_id"]):
+        _sheet_share_note(run, _oidi(src.get("sheet_id")), d["sheet_id"], d["user_id"], d.get("role"))
+    return False
 
 
 # ---- video sign-offs -------------------------------------------------------------------------------------------------------
@@ -653,25 +685,26 @@ def _finish_sheets(c, run, oi, who):
 
 
 def _finish_sheet_shares(c, run, oi, uid):
-    """2.647.0 (#5047): every imported table share card is bound to its core share -- the one that came with the store when it
-    lies on the table's own node and names the same account, else a new one (shshare.py shs_core_move); never a card without
-    a core share next to a core share of its own (two rights, the one ended in one dialog left open in the other)."""
-    sheets = set()
-    for r in oi.get("sheets/shares.json") or []:
-        nid = run.m("sheet_shares", r.get("id"))
-        x = c.execute("SELECT id, sheet_id, user_id, core_id FROM sheet_shares WHERE id=?", (nid,)).fetchone() if nid else None
-        if x is None:
+    """2.647.0 (#5047): one right per share, never a card beside a core share. 2.937.0 (#5244): the shares of an imported table
+    are the core shares of its node -- each share of the archive's table node (store/shares.json, _share) and each row of an
+    older archive's sheets/shares.json is a share of the imported table's node (shshare.py shs_put) unless the account has one
+    there already (the archive's node stayed with its shares: role and end date as they came)."""
+    for src_sid, sid, who, role, expires_at in getattr(run, "oi_sheet_shares", None) or []:
+        sid = sid or run.m("sheets", src_sid)
+        r = c.execute("SELECT * FROM sheets WHERE id=?", (sid,)).fetchone() if sid else None
+        if r is None or r["book_id"]:
             continue
-        sheets.add(x["sheet_id"])
-        f = c.execute("SELECT f.role FROM fs_shares f JOIN fs_nodes n ON n.id=f.node_id WHERE f.id=? AND n.kind='ref' "
-                      "AND n.ref_kind='sheet' AND n.ref_id=? AND ? IN (f.user_id, f.agent_id)",
-                      (x["core_id"], x["sheet_id"], x["user_id"])).fetchone() if x["core_id"] else None
-        if f is None:
-            c.execute("UPDATE sheet_shares SET core_id=NULL WHERE id=?", (x["id"],))
-        else:  # review: the card shows the role the core grants
-            c.execute("UPDATE sheet_shares SET role=? WHERE id=?", (SHS_CARD.get(f["role"], "read"), x["id"]))
-    for sid in sorted(sheets):
-        shs_core_move(c, sid, by=uid)
+        with system_ctx(c):  # the node of the table this import just made (in the target's tree)
+            made = fs_ref_node(c, "sheet", sid) is None
+            try:
+                with c.savepoint():
+                    if shs_core_of(c, sid, who) is None:
+                        shs_put(c, uid, r, who, role if role in ("read", "write") else "read", expires_at or None)
+            except Denied:  # the node is full: the share stays out
+                continue
+            n = fs_ref_node(c, "sheet", sid)
+            if made and n is not None:  # made here: recorded for the undo (like a calendar's node, oi_team._core_member)
+                run.created["oi"].append(["fs_nodes", n["id"], n["org_id"]])
 
 
 def _body(run, text):

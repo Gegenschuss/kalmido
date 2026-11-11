@@ -249,8 +249,9 @@ jp = idx(A, "private")
 fmine = node_of(Q1)[1]
 r = A.patch(B + f"/api/files/nodes/{fmine}", json={"name": "Ours"})
 check(r.ok and path_of(Q1) == "Ours/Note" and path_of(Q2) == "Ours/Other", "private: renaming the folder")
-sh = {x[0] for x in sql("SELECT path FROM wiki_shares WHERE owner_id=?", (uid["alice"],))}
-check(sh == {"Ours/Note", "Ours"}, f"the wiki_shares follow {sh}")
+# 2.937.0 (#5244): person shares lie on the nodes (they follow the rename), the dialog shows their paths from the tree
+sh = {x["path"] for x in A.get(B + "/api/wiki/shares", params={"space": "private"}).json().get("shares", [])}
+check(sh == {"Ours/Note", "Ours"}, f"the shares follow {sh}")
 check(Bo.get(B + "/api/files", params={"parent": jp.get("root")}).status_code == 404, "nobody else sees a private tree")
 # a locked space (simulated: the lock row + a ciphertext path)
 sql("INSERT INTO wiki_spaces(owner_id, e2e, e2e_gen) VALUES(?, 'on', 1)", (uid["olga"],), write=True)

@@ -241,7 +241,10 @@ for t, i, what in (("sheets", T2, "table made in Alpha"), ("sheets", T5, "table 
 check(sql("SELECT owner_id, list_id FROM sheets WHERE id=?", (T1,))[0] == (CAROL, None), "the table is carol's")
 check(sql("SELECT owner_id FROM sheets WHERE id=?", (T1B,))[0][0] == CAROL, "the further sheet followed")
 check(Da.get(B + f"/api/sheets/{T1}").status_code in (403, 404), "dave's share ended")
-check(not sql("SELECT 1 FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (T1,)), "no live share left")
+# 2.937.0 (#5244): the shares are the core shares of the table's node (+ the addresses typed in)
+check(not sql("SELECT 1 FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (T1,)) and not sql(
+    "SELECT 1 FROM fs_shares f JOIN fs_nodes n ON n.id=f.node_id WHERE n.kind='ref' AND n.ref_kind='sheet' AND n.ref_id=?", (T1,)),
+    "no live share left")
 check(sql("SELECT list_id FROM sheets WHERE id=?", (T3,))[0][0] == OWNL, "a project that went back keeps its table")
 check(sql("SELECT list_id FROM sheets WHERE id=?", (T4,))[0][0] is None, "a project of Alpha lets go of the table")
 Ca.patch(B + "/api/settings", json={"workspace": "private"})

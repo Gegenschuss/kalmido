@@ -714,9 +714,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 p = str(d.get("path") or "")
             except (ValueError, AttributeError):
                 continue
-            if not c.execute("SELECT 1 FROM wiki_shares WHERE kind='person' AND org_id IS NULL AND user_id=? AND owner_id=? AND lower(path)=lower(?) "
-                             "AND is_folder=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?) LIMIT 1",
-                             (uid, r["actor_id"], p, 1 if d.get("folder") else 0, iso(now_utc()))).fetchone():
+            from ..wiki.wkshare import wsh_news_live  # 2.937.0 (#5244, stage 7c): the share is a core share with its card
+            if not wsh_news_live(c, uid, r["actor_id"], p, bool(d.get("folder"))):
                 continue
         elif kind == "signoff":  # 2.266.0 (#2965): a customer's decision, while I am still in that office (or see its list)
             from ..office.signoff import sig_news_live

@@ -9,7 +9,8 @@ core shares (fs_shares on the reference node, core/objects.py obj_node_share), t
  - knowledge: a person share of a page / a folder lands on the node(s); the folder share covers a page renamed below it and
    stops for a page moved out; #4668: a page restored as "Name (2)" keeps its share; revoke / restore (Undo)
  - the fallback: 2.647.0 (#5047): an old row not moved yet (core_id NULL) gives nothing any more; the one-shots
-   migr_core4717 / migr_core5047 (and the knowledge index) copy it forward, then it works through the core
+   migr_core4717 / migr_core5047 (and the knowledge index) copy it forward, then it works through the core (2.937.0, #5244:
+   knowledge only, the tables' forward copy and drop: p2937_a_kern_sheets_test)
  - a public link stays a link with the maker's rule of #4698 (maker made read-only: the link ends)
  - tenant-matrix: wiki, sheet_share (a person of no organisation / another workspace: 404, no share; an agent: only what is
    shared with it, never a knowledge person share)
@@ -82,7 +83,9 @@ check(r.status_code == 201, f"bob shares the organisation's table with the guest
 SH1 = r.json().get("id")
 nid, parent = node_of("sheet", T1)
 check(nid and parent is None and core("sheet", T1, GINA) == ["view"], f"the share lies on the table's node at the top of its tree {nid} {parent}")
-check(dbx("SELECT core_id IS NOT NULL FROM sheet_shares WHERE id=?", (SH1,)) == [(True,)], "the old row is the card of the core share")
+# 2.937.0 (#5244): no card -- the dialog's id is the core share's
+check(dbx("SELECT user_id FROM fs_shares WHERE id=?", (SH1,)) == [(GINA,)] and not dbx("SELECT 1 FROM sheet_shares WHERE sheet_id=?", (T1,)),
+      "the dialog's id is the core share's, no old row")
 check(Gi.get(B + f"/api/sheets/{T1}").status_code == 200, "the guest reads the table")
 check(Gi.patch(B + f"/api/sheets/{T1}", json={"title": "Rates x"}).status_code == 403, "read only: no change")
 row = next((x for x in Bo.get(B + "/api/sheets?space=all").json().get("sheets", []) if x["id"] == T1), {})
@@ -107,12 +110,11 @@ r = Bo.delete(B + f"/api/sheets/{T1}/shares/{SH1}")
 check(r.ok and not core("sheet", T1, GINA), f"revoked: the core share is gone {r.status_code}")
 check(Gi.get(B + f"/api/sheets/{T1}").status_code == 404, "... the guest reads nothing at once")
 check(dbx("SELECT COUNT(*) FROM obj_revoked WHERE src='fs_shares' AND kind='sheet' AND ref_id=?", (T1,))[0][0] == 1, "... restorable in obj_revoked")
-check(dbx("SELECT revoked_at IS NOT NULL FROM sheet_shares WHERE id=?", (SH1,)) == [(True,)], "... the card is marked")
 
 # a core share taken back in the file store's dialog ends the share, the card does not reopen it
 r = Bo.post(B + f"/api/sheets/{T1}/shares", json={"user_id": GINA, "role": "read"})
 check(r.status_code == 201 and Gi.get(B + f"/api/sheets/{T1}").status_code == 200, "shared again (Undo = the same person again)")
-fsid = dbx("SELECT core_id FROM sheet_shares WHERE id=?", (SH1,))[0][0]
+fsid = r.json().get("id")  # 2.937.0 (#5244): the core share's id
 check(Bo.delete(B + f"/api/files/shares/{fsid}").ok, "the core share taken back in the file store's dialog")
 check(Gi.get(B + f"/api/sheets/{T1}").status_code == 404, "the card alone opens nothing (no fallback for a moved row)")
 check(Bo.get(B + f"/api/sheets/{T1}/shares").json()["shares"] == [], "... and is no longer listed")
@@ -156,9 +158,10 @@ W2 = page(Fr, "Docs/Deep/Part")
 W3 = page(Fr, "Other")
 r = Fr.post(B + "/api/wiki/shares", json={"space": "private", "folder": "Docs", "kind": "person", "email": "fiona@example.com"})
 check(r.ok, f"frida shares the folder Docs by address {r.status_code} {r.text[:160]}")
-card = dbx("SELECT id, core_id FROM wiki_shares WHERE kind='person' AND owner_id=? AND path='Docs'", (FID,))
+# 2.937.0 (#5244): the card is a row of wiki_share_cards on the core share, the dialog's id "p<share id>"
+card = dbx("SELECT k.fs_share_id FROM wiki_share_cards k JOIN fs_shares f ON f.id=k.fs_share_id WHERE f.user_id=? AND k.folder", (FIO,))
 fold = dbx("SELECT n.id FROM fs_nodes n JOIN fs_shares s ON s.node_id=n.id WHERE s.id=? AND n.kind='folder' AND n.name='Docs'",
-           (card[0][1],)) if card and card[0][1] else []
+           (card[0][0],)) if card else []
 check(bool(fold), f"the folder share is a core share on the folder's node {card}")
 check({W1, W2} <= shared(Fi) and W3 not in shared(Fi), "fiona reads the folder's pages, not the others")
 check(Fi.get(B + f"/api/wiki/shared/pages/{W2}").status_code == 200, "... the page two levels down too")
@@ -182,7 +185,8 @@ check(W4 in shared(Fi) and Fi.get(B + f"/api/wiki/shared/pages/{W4}").json().get
 check(W5 not in shared(Fi), "#4668: the new page of the old name is not shared")
 
 # revoke and Undo
-sid4 = dbx("SELECT id FROM wiki_shares WHERE kind='person' AND page_id=?", (W4,))[0][0]
+sid4 = "p%d" % dbx("SELECT f.id FROM fs_shares f JOIN fs_nodes n ON n.id=f.node_id WHERE n.ref_kind='wiki' AND n.ref_id=? AND f.user_id=?",
+                   (W4, FIO))[0][0]  # 2.937.0 (#5244): the dialog's id of a person share
 check(Fr.delete(B + f"/api/wiki/shares/{sid4}").ok and not core("wiki", W4, FIO), "revoked: the core share is gone")
 check(Fi.get(B + f"/api/wiki/shared/pages/{W4}").status_code == 404, "... fiona reads nothing at once")
 check(Fr.post(B + f"/api/wiki/shares/{sid4}/restore").ok and core("wiki", W4, FIO) == ["view"], "Undo: the core share is back")
@@ -206,31 +210,8 @@ check(A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "r
 check(anon.get(B + WL).status_code in (404, 410), "the link of a maker made read-only ends")
 A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "role": "member"})
 
-# ================================================================ the fallback and the forward copy (migration)
-TS = "2026-11-05T10:00:00.000+00:00"
-T2 = table(Bo, "Old share", SP)
-dbx("INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at) VALUES(?,?,?,'read',?,?)", (T2, ORG, GINA, BOB, TS))
-# 2.647.0 (#5047): the fallback is gone -- an old table share not moved yet gives nothing until the forward copy hangs it on the core
-check(Gi.get(B + f"/api/sheets/{T2}").status_code == 404, "no fallback: an old table share not moved yet reads nothing")
-W6 = page(Fr, "Legacy")
-dbx("INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,user_id,token,created_by,created_at,page_id,images) "
-    "VALUES(NULL,?,'Legacy',0,'person',?,'',?,?,?,0)", (FID, FIO, FID, TS, W6))
-check(Fi.get(B + f"/api/wiki/shared/pages/{W6}").status_code == 404, "no fallback: an old page share not moved yet reads nothing")  # 2.647.0 (#5047)
-# 2.565.0: one key per area (core/objhooks.START); 2.647.0 (#5047): + the second forward copy before the fallback went
-dbx("DELETE FROM settings WHERE key IN ('migr_core4717','migr_core4717_wiki','migr_core5047','migr_core5047_wiki')")
-kt.fresh(prefix="P2565B", env={"KALMIDO_API_RATE": "100000"}, keep=True)  # the start runs the one-shot again
-Bo, Gi, Fr, Fi = sess("bob"), sess("gina"), sess("frida"), sess("fiona")
-check(core("sheet", T2, GINA) == ["view"] and dbx("SELECT core_id IS NOT NULL FROM sheet_shares WHERE sheet_id=?", (T2,)) == [(True,)],
-      "migration: the old table share is a core share now, its row the card")
-check(core("wiki", W6, FIO) == ["view"], "migration: the old page share is a core share now")
-check(Gi.get(B + f"/api/sheets/{T2}").status_code == 200 and Fi.get(B + f"/api/wiki/shared/pages/{W6}").status_code == 200,
-      "migrated shares work")
-check(dbx("SELECT value FROM settings WHERE key='migr_core4717'") == [("1",)], "the one-shot is done")
-fsid = dbx("SELECT core_id FROM sheet_shares WHERE sheet_id=?", (T2,))[0][0]
-check(Bo.delete(B + f"/api/files/shares/{fsid}").ok and Gi.get(B + f"/api/sheets/{T2}").status_code == 404,
-      "the migrated share taken back in the core: the old row reopens nothing")
-w6 = dbx("SELECT id FROM wiki_shares WHERE page_id=?", (W6,))[0][0]
-check(Fr.delete(B + f"/api/wiki/shares/{w6}").ok and Fi.get(B + f"/api/wiki/shared/pages/{W6}").status_code == 404,
-      "the migrated page share revoked: gone at once")
+# ================================================================ the forward copy (migration): stage 7c
+# 2.937.0 (#5244): stage 7c dropped the old person rows and core_id / core_id2; the forward copy and the drop of a database
+# before stage 7c are tests/p2937_a_kern_sheets_test.py (tables) and tests/p2937_b_kern_wiki_test.py (knowledge)
 
 sys.exit(kt.done("p2565_b_kern_wiki_sheets"))

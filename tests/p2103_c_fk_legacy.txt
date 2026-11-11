@@ -113,7 +113,5 @@ office_doc_items.origin_id
 office_doc_parts.origin_id
 user_task_order.section_id
 office_equipment.warranty_task_id
-sheet_shares.core_id
-wiki_shares.core_id
 office_meals.pay_id
 office_bank_imports.bank_account_id

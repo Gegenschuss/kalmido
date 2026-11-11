@@ -277,6 +277,7 @@ class Conn:
         self._sp = itertools.count(1)
         self.closed = False
         self.commits = 0  # 2.566.0 (#4706): commits of this connection (db.py lv_auto_bump: a write route that committed)
+        self.rollbacks = 0  # 2.937.0 (#5632, Fable F10): rollbacks (also to a savepoint) -- db.py bump's "once" ends with one
         # 2.774.0 (#5251): work that belongs into the transaction right before it commits (core/undodiff.py: the undo steps
         # of the tasks a request changed, read once the request's writes are final); key -> fn(conn); a rollback drops them
         self.pre_commit = {}
@@ -354,6 +355,7 @@ class Conn:
         self._begin()
         if args is None and sql.lstrip()[:11].upper() == "ROLLBACK TO":  # 2.306.0 D1 (#2875): a savepoint of the caller's own
             cur = self._pgx(_raw(sql))  # (tasks/batch.py): set_config is undone with it, the stored context applies again (as savepoint())
+            self.rollbacks += 1
             self._db_ctx = None  # 2.369.6 (#3139): with the next statement
             return cur
         if args is None or (not args and "?" not in sql):
@@ -391,12 +393,14 @@ class Conn:
     def rollback(self):
         self.pre_commit = {}  # 2.774.0 (#5251): what the hooks would record was rolled back
         self._pg.rollback()
+        self.rollbacks += 1
 
     def heal(self):
         """After a caught database error: roll back when the transaction is aborted (Postgres refuses every further
         statement until then); a healthy transaction is left alone. True when it rolled back."""
         if self._pg.info.transaction_status == TransactionStatus.INERROR:
             self._pg.rollback()
+            self.rollbacks += 1
             return True
         return False
 
@@ -418,6 +422,7 @@ class Conn:
             yield self
         except BaseException:
             self._pgx(f"ROLLBACK TO SAVEPOINT {name}")
+            self.rollbacks += 1
             self._db_ctx = None  # 2.37.0 (#1150): a context set inside the savepoint was rolled back with it (2.369.6: applied by the next statement)
             raise
         else:

@@ -57,8 +57,9 @@ def shk_people(c, sheet_row):
         ids = {r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=? AND role IN ('admin','member','readonly')", (sheet_row["org_id"],))}
     else:
         ids = {sheet_row["owner_id"]} if sheet_row["owner_id"] else set()
-    # 2.124.0 (#2113): + the people this one table is shared with (agents drop out below)
-    ids |= {r[0] for r in c.execute("SELECT user_id FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (sheet_row["id"],))}
+    # 2.124.0 (#2113): + the people this one table is shared with (agents drop out below); 2.937.0 (#5244): its node's core shares
+    from .shshare import shs_core_q  # loads later (ORDER)
+    ids |= {r[0] for r in shs_core_q(c, "x.user_id", "x.ref_id=? AND x.user_id IS NOT NULL", (sheet_row["id"],), trash=False)}
     ids = [int(i) for i in ids if i]
     if not ids:
         return {}

@@ -149,7 +149,8 @@ check([x[0] for x in dbx("SELECT user_id FROM sheet_shares WHERE sheet_id=?", (S
 # removing an address row: the address is gone, Undo = the address again
 x = [v for v in rows(Bo, S1) if v["email"] == "carol@example.com"][0]
 check(Bo.delete(B + f"/api/sheets/{S1}/shares/{x['id']}").ok, "stop sharing by address")
-check(not dbx("SELECT 1 FROM sheet_shares WHERE id=?", (x["id"],)), "the row with the address is deleted")
+# 2.937.0 (#5244): an address's id in the dialog is minus its row's id (a person's is its core share's)
+check(x["id"] < 0 and not dbx("SELECT 1 FROM sheet_shares WHERE id=?", (-x["id"],)), "the row with the address is deleted")
 check(Ca.get(B + f"/api/sheets/{S1}").status_code == 404, "the access ends at once")
 check(post(Bo, S1, email="carol@example.com").status_code == 201 and Ca.get(B + f"/api/sheets/{S1}").ok, "Undo: the address again")
 check(Bo.get(B + f"/api/sheets/{S1}/shares").ok and Ca.get(B + f"/api/sheets/{S1}/shares").status_code == 403, "a recipient never manages shares")

@@ -84,6 +84,7 @@ Interface (signatures fixed; stages 2 / 3 and the first areas #1958 #1957 #4675 
   obj_gate(c, uid, kind, row) -> bool   steps 1 + 2 of obj_role for a row the area listed itself (2.565.0, #4719)
   obj_token_lists(uid) -> set | None    the list limit of uid's own API token in this request (step 2)
   obj_share_rows_sql(kind) -> "(SELECT ref_id, user_id, group_id, agent_id, role, created_by ...)" the live shares of the kind
+      (2.937.0, #5244: also a file store reference kind outside OBJ, e.g. 'sheet'; + share_id, node_id, node_org, node_owner ...)
   obj_member_put(c, by, kind, id, key, target, role="edit") / obj_member_take(c, by, kind, id, key, targets, reason="unshare")
       a kind registered with listed=False (the team chat's rooms): the area's own rule decided, the core writes / takes back
       the share row (taken = obj_revoked, restorable)
@@ -104,10 +105,9 @@ from flask import g, has_request_context, request
 from ..accounts.orgroles import FULL_READ, RO_MSG, org_role_key
 from .access import Denied, acx_of, acx_org_ok, collab_all, need_feat, token_lists
 from .db import LV_AREA_KEYS, insert_id, iso, now_iso, now_utc
-from .db import iso_ms  # 2.649.0 (#5051): a table's card (sheet_shares.revoked_at)
 from .errors import BadInput
 from .i18n import tr
-from .pg import system_ctx, table_columns
+from .pg import system_ctx, table_columns, write_lock
 from ..files.fsref import FSR, _api_way as fsr_api_way, fs_ref_node, fs_ref_node_role, fs_ref_register
 from ..files.store import _free_name, _FsPre, fs_chain, fs_chains, fs_log_add, fs_visible_sql_c, safe_fs_name
 from ..files.store import fs_role  # 2.649.0 (#5051): _take_public
@@ -725,6 +725,9 @@ def obj_share(c, uid, kind, rid, key, target, role="view", expires_at=None, extr
                           match=_share_match(reg, extra), extra=extra)
 
 
+OBJ_SHARE_LOCKS = 256  # Fable F4: the lock buckets of obj_node_share
+
+
 def obj_node_share(c, uid, n, key, target, role="view", expires_at=None, org=None, event=True, checked=False, match=None,
                    extra=None):
     """2.565.0 (#4717): the share row itself on reference node n (a row) -- obj_share's write, also for the old areas whose
@@ -738,6 +741,11 @@ def obj_node_share(c, uid, n, key, target, role="view", expires_at=None, org=Non
         if fl_is_locked(c, n["id"]):
             raise fsl_denied("fs_locked_agent")
     mq, ma = match or ("", ())
+    # Fable review of 2.937 F4: two requests at once (a double click, two devices) made two rows of one person on one node
+    # (fs_shares has no unique index there; ending one left the other open). The check-then-write runs under a lock of the
+    # node and the person -- in one of OBJ_SHARE_LOCKS buckets, so a start-up step sharing many nodes in one transaction
+    # holds a bounded number of advisory locks; two pairs in one bucket only wait for each other.
+    write_lock(c, f"kalmido-fsshare-{(int(n['id']) * 7919 + int(target)) % OBJ_SHARE_LOCKS}")
     old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=?{mq}", (n["id"], int(target), *ma)).fetchone()
     if old:
         c.execute("UPDATE fs_shares SET role=?, expires_at=? WHERE id=?", (role, expires_at, old[0]))
@@ -796,6 +804,35 @@ def obj_node_unshare(c, uid, n, sid, kind=None, ref_id=None, org=None, reason="u
     fs_log_add(c, n["id"], "unshare", str(s["id"]))
     obj_forget()
     return out
+
+
+def obj_node_reshare(c, revoked_id):
+    """2.937.0 (#5244, stage 7c): put the share row of obj_revoked revoked_id (src fs_shares, obj_node_unshare) back on its
+    node under its OLD id -- obj_share_restore's step for a share of a node no kind names (a knowledge folder), after the
+    area checked who may and that the person may still have it. The same id keeps an Undo / Redo of the area's dialog on
+    one share. -> (share id, the row as it was) | None when the row, its node (in the trash too) or its person is gone, or the
+    node holds a share of that person / group / agent by now (the obj_revoked row goes then). The caller commits."""
+    r = c.execute("SELECT * FROM obj_revoked WHERE id=? AND src='fs_shares'", (int(revoked_id),)).fetchone()
+    if r is None:
+        return None
+    s = json.loads(r["row_json"])
+    key = next((k for k in ("user_id", "group_id", "agent_id") if s.get(k)), None)
+    n = c.execute("SELECT id, deleted_at FROM fs_nodes WHERE id=?", (int(s.get("node_id") or 0),)).fetchone()
+    taken = key and n is not None and c.execute(f"SELECT 1 FROM fs_shares WHERE node_id=? AND {key}=?", (n["id"], int(s[key]))).fetchone()
+    gone = not key or n is None or n["deleted_at"] or c.execute("SELECT 1 FROM fs_shares WHERE id=?", (int(s["id"]),)).fetchone()
+    who = key and (c.execute("SELECT 1 FROM groups WHERE id=?", (int(s[key]),)) if key == "group_id" else
+                   c.execute("SELECT 1 FROM users WHERE id=?", (int(s[key]),))).fetchone()
+    if gone or taken or not who:
+        c.execute("DELETE FROM obj_revoked WHERE id=?", (r["id"],))
+        return None
+    role = s.get("role") if s.get("role") in ("view", "edit") else "view"
+    c.execute(f"INSERT INTO fs_shares(id,node_id,{key},role,expires_at,created_by,created_at,by_role) VALUES(?,?,?,?,?,?,?,?)",
+              (int(s["id"]), n["id"], int(s[key]), role, s.get("expires_at"), s.get("created_by"), s.get("created_at") or iso(now_utc()),
+               s.get("by_role")))
+    c.execute("DELETE FROM obj_revoked WHERE id=?", (r["id"],))
+    fs_log_add(c, n["id"], "share", f"{key[:-3]}:{int(s[key])}:{role}")
+    obj_forget()
+    return int(s["id"]), s
 
 
 def obj_share_restore(c, uid, kind, rid, revoked_id):
@@ -877,11 +914,15 @@ def obj_share_rows_sql(kind, trash=False):
     """The live shares of the reference nodes of kind as an SQL subquery (no ? parameters) with the columns ref_id, user_id,
     group_id, agent_id, role, created_by -- for an area that reads its members in bulk (team chat: collab/teamchan.py
     tcx_members_of). Not in the trash, not expired; the area applies its own rules to the people it names. 2.647.0 (#5046,
-    review): trash=True also counts nodes in the trash (a check that holds back while a share could come back)."""
-    reg = obj_reg(kind)
+    review): trash=True also counts nodes in the trash (a check that holds back while a share could come back).
+    2.937.0 (#5244, stage 7c): kind may also be a reference kind of the file store that is no core kind (tables 'sheet', knowledge
+    pages / folders: files/fsref.py FSR), and the subquery names the share (share_id, expires_at, created_at) and its node
+    (node_id, node_org, node_owner: the area checks the node lies in the object's workspace, fsref _same_space)."""
+    k = OBJ[kind]["kind"] if kind in OBJ else (kind if kind in FSR else obj_reg(kind)["kind"])
     now = now_iso().replace("'", "")
-    return (f"(SELECT n.ref_id, s.user_id, s.group_id, s.agent_id, s.role, s.created_by FROM fs_shares s JOIN fs_nodes n ON n.id = s.node_id "
-            f"WHERE n.kind = 'ref' AND n.ref_kind = '{reg['kind']}'{'' if trash else ' AND n.deleted_at IS NULL'} "
+    return (f"(SELECT n.ref_id, s.user_id, s.group_id, s.agent_id, s.role, s.created_by, s.id AS share_id, s.expires_at, s.created_at, "
+            f"n.id AS node_id, n.org_id AS node_org, n.owner_id AS node_owner FROM fs_shares s JOIN fs_nodes n ON n.id = s.node_id "
+            f"WHERE n.kind = 'ref' AND n.ref_kind = '{k}'{'' if trash else ' AND n.deleted_at IS NULL'} "
             f"AND (s.expires_at IS NULL OR s.expires_at > '{now}'))")
 
 
@@ -1128,17 +1169,16 @@ def obj_boundary_take(c, table, oid, uid):
         if table == "fs_shares":
             n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (oid,)).fetchone()
             out = sum(_boundary_share(c, n, s) for s in c.execute("SELECT * FROM fs_shares WHERE node_id=? AND user_id=?", (oid, uid)).fetchall())
-        elif table == "sheet_shares":  # the card and its core share (sheets/shshare.py shs_leave, one table)
+        elif table == "sheet_shares":  # an address bound to uid and its core share (sheets/shshare.py shs_leave, one table)
+            # 2.937.0 (#5244): sheet_shares holds the addresses typed in only; a share by name is a row of fs_shares (file_person)
             out = 0
-            for x in c.execute("SELECT * FROM sheet_shares WHERE sheet_id=? AND user_id=? AND revoked_at IS NULL", (oid, uid)).fetchall():
-                n = c.execute("SELECT n.* FROM fs_nodes n JOIN fs_shares f ON f.node_id=n.id WHERE f.id=?", (x["core_id"],)).fetchone() \
-                    if x["core_id"] else None
-                if n is not None:
-                    obj_node_unshare(c, None, n, x["core_id"], kind="sheet", ref_id=oid, org=x["org_id"] or None, reason="boundary")
-                if x["email_key"]:  # 2.360.2 M (#2561): an address row stays listed, open again (no account, no right)
-                    c.execute("UPDATE sheet_shares SET user_id=NULL, core_id=NULL WHERE id=?", (x["id"],))
-                else:
-                    c.execute("UPDATE sheet_shares SET revoked_at=? WHERE id=?", (iso_ms(now_utc()), x["id"]))
+            n = fs_ref_node(c, "sheet", oid)
+            for x in c.execute("SELECT * FROM sheet_shares WHERE sheet_id=? AND user_id=? AND email_key!='' AND revoked_at IS NULL",
+                               (oid, uid)).fetchall():
+                for s in (c.execute("SELECT id FROM fs_shares WHERE node_id=? AND user_id=?", (n["id"], uid)).fetchall() if n else []):
+                    obj_node_unshare(c, None, n, s["id"], kind="sheet", ref_id=oid, org=x["org_id"] or None, reason="boundary")
+                # 2.360.2 M (#2561): the address row stays listed, open again (no account, no right)
+                c.execute("UPDATE sheet_shares SET user_id=NULL WHERE id=?", (x["id"],))
                 out += 1
         else:
             # 2.924.0 (#5069): a calendar's / book's member is the share of its node: tenancy REPAIR names the kind (evcal |

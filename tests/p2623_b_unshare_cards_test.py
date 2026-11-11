@@ -75,18 +75,18 @@ def shared(s):
 T1 = table(Bo, "Rates", SP)
 r = Bo.post(B + f"/api/sheets/{T1}/shares", json={"user_id": GINA, "role": "read"})
 check(r.status_code == 201 and Gi.get(B + f"/api/sheets/{T1}").status_code == 200, f"bob shares the table with the guest {r.status_code}")
-SH1 = r.json().get("id")
-fsid = dbx("SELECT core_id FROM sheet_shares WHERE id=?", (SH1,))[0][0]
+# 2.937.0 (#5244): the dialog's id is the core share's (no card any more)
+fsid = r.json().get("id")
+check(dbx("SELECT user_id FROM fs_shares WHERE id=?", (fsid,)) == [(GINA,)], "2.937.0 (#5244): the dialog's id is the core share's")
 check(Fi.delete(B + f"/api/files/shares/{fsid}").status_code in (403, 404), "tenant-matrix: sheet_share -- fiona (another workspace) cannot take it back")
-check(dbx("SELECT revoked_at IS NULL FROM sheet_shares WHERE id=?", (SH1,)) == [(True,)], "... the card stays")
+check(dbx("SELECT 1 FROM fs_shares WHERE id=?", (fsid,)) == [(1,)], "... the share stays")
 r = Bo.delete(B + f"/api/files/shares/{fsid}")
 check(r.ok and Gi.get(B + f"/api/sheets/{T1}").status_code == 404, f"taken back in the file store's dialog: the guest reads nothing {r.status_code}")
-check(dbx("SELECT revoked_at IS NOT NULL FROM sheet_shares WHERE id=?", (SH1,)) == [(True,)], "#4778: the card is marked ended (revoked_at)")
 check(revoked("sheet", T1) == 1, "... the row lies in obj_revoked")
 check(Bo.get(B + f"/api/sheets/{T1}/shares").json()["shares"] == [], "... the table's dialog lists nothing")
 r = Bo.post(B + f"/api/sheets/{T1}/shares", json={"user_id": GINA, "role": "read"})
-check(r.status_code == 201 and dbx("SELECT revoked_at IS NULL, core_id IS NOT NULL FROM sheet_shares WHERE id=?", (SH1,)) == [(True, True)],
-      f"Undo (share again): the same card opens again with a new core share {r.status_code}")
+check(r.status_code == 201 and dbx("SELECT user_id FROM fs_shares WHERE id=?", (r.json().get("id"),)) == [(GINA,)],
+      f"Undo (share again): a new core share {r.status_code}")
 check(Gi.get(B + f"/api/sheets/{T1}").status_code == 200, "... and works")
 
 # a share made in the file store on the table's node (no card): into obj_revoked as well
@@ -129,7 +129,9 @@ check(dbx("SELECT org_id FROM obj_revoked WHERE src='fs_shares' AND kind='wiki' 
 P1 = table(Fr, "Own rates", "private")
 r = Fr.post(B + f"/api/sheets/{P1}/shares", json={"email": "fiona@example.com", "role": "read"})
 check(r.status_code == 201 and Fi.get(B + f"/api/sheets/{P1}").status_code == 200, f"frida shares a private table by address {r.status_code}")
-fsp = dbx("SELECT core_id FROM sheet_shares WHERE sheet_id=? AND user_id=?", (P1, FIO))
+# 2.937.0 (#5244): the address is bound to fiona's account, her right is her core share on the table's node
+fsp = dbx("SELECT f.id FROM fs_shares f JOIN fs_nodes n ON n.id=f.node_id WHERE n.kind='ref' AND n.ref_kind='sheet' AND n.ref_id=? "
+          "AND f.user_id=?", (P1, FIO))
 check(bool(fsp) and Fr.delete(B + f"/api/files/shares/{fsp[0][0] if fsp else 0}").ok, "frida takes it back in the file store's dialog")
 check(Fi.get(B + f"/api/sheets/{P1}").status_code == 404, "... fiona reads nothing")
 check(dbx("SELECT COUNT(*) FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (P1,))[0][0] == 0,
@@ -140,29 +142,34 @@ check(revoked("sheet", P1) == 1, "... the row in obj_revoked")
 W1 = page(Fr, "Note", "first note")
 r = Fr.post(B + "/api/wiki/shares", json={"page_id": W1, "kind": "person", "email": "fiona@example.com"})
 check(r.ok and W1 in shared(Fi), f"frida shares a page with fiona {r.status_code}")
-card = dbx("SELECT id, core_id FROM wiki_shares WHERE kind='person' AND page_id=?", (W1,))
-check(bool(card and card[0][1]), f"the card has its core share {card}")
-CID, FS1 = card[0] if card else (0, 0)
+# 2.937.0 (#5244, stage 7c): the card is a row of wiki_share_cards on the core share (no person row of wiki_shares any more)
+card = dbx("SELECT k.fs_share_id FROM wiki_share_cards k JOIN fs_shares f ON f.id=k.fs_share_id JOIN fs_nodes n ON n.id=f.node_id "
+           "WHERE n.kind='ref' AND n.ref_kind='wiki' AND n.ref_id=?", (W1,))
+check(bool(card), f"the core share has its card {card}")
+FS1 = card[0][0] if card else 0
+check(not dbx("SELECT 1 FROM wiki_shares WHERE kind<>'link'"), "#5244: wiki_shares holds no person row")
 r = Fr.delete(B + f"/api/files/shares/{FS1}")
 check(r.ok and W1 not in shared(Fi) and Fi.get(B + f"/api/wiki/shared/pages/{W1}").status_code == 404,
       f"taken back in the file store's dialog: fiona reads nothing {r.status_code}")
-check(dbx("SELECT revoked_at IS NOT NULL FROM wiki_shares WHERE id=?", (CID,)) == [(True,)], "#4778: the page card is marked ended")
+check(not dbx("SELECT 1 FROM wiki_share_cards WHERE fs_share_id=?", (FS1,)), "#4778: the card went with its share")
 check(revoked("wiki", W1) == 1, "... the row in obj_revoked")
-r = Fr.post(B + f"/api/wiki/shares/{CID}/restore")
-check(r.ok and dbx("SELECT revoked_at IS NULL FROM wiki_shares WHERE id=?", (CID,)) == [(True,)], f"Undo: the card opens again {r.status_code}")
-check(Fi.get(B + f"/api/wiki/shared/pages/{W1}").status_code == 200, "... with a new core share, fiona reads again")
+r = Fr.post(B + f"/api/wiki/shares/p{FS1}/restore")
+check(r.ok and r.json().get("id") == f"p{FS1}" and not r.json().get("revoked") and r.json().get("user", {}).get("name") == "fiona@example.com",
+      f"Undo: the share and its card come back under the same id, with the typed address {r.status_code} {r.text[:160]}")
+check(Fi.get(B + f"/api/wiki/shared/pages/{W1}").status_code == 200, "... fiona reads again")
 
 # a folder card with two core shares (the folder, the page of the same name): it ends as a whole
 W2 = page(Fr, "Docs", "the index")
 W3 = page(Fr, "Docs/Intro")
 r = Fr.post(B + "/api/wiki/shares", json={"space": "private", "folder": "Docs", "kind": "person", "email": "fiona@example.com"})
 check(r.ok, f"frida shares the folder Docs {r.status_code} {r.text[:120]}")
-fc = dbx("SELECT id, core_id, core_id2 FROM wiki_shares WHERE kind='person' AND owner_id=? AND path='Docs' AND is_folder=1", (FID,))
-check(bool(fc and fc[0][1] and fc[0][2]), f"the folder card has two core shares {fc}")
-FC, C1, C2 = fc[0] if fc else (0, 0, 0)
+fc = dbx("SELECT k.fs_share_id, k.pair_id FROM wiki_share_cards k JOIN fs_shares f ON f.id=k.fs_share_id JOIN fs_nodes n ON n.id=f.node_id "
+         "WHERE n.kind='folder' AND n.owner_id=? AND k.folder", (FID,))
+check(bool(fc and fc[0][0] and fc[0][1]), f"the folder card has two core shares {fc}")
+C1, C2 = fc[0] if fc else (0, 0)
 check(W3 in shared(Fi), "fiona reads the folder's page")
 check(Fr.delete(B + f"/api/files/shares/{C1}").ok, "the folder's core share taken back in the file store's dialog")
-check(dbx("SELECT revoked_at IS NOT NULL FROM wiki_shares WHERE id=?", (FC,)) == [(True,)], "#4778: the folder card is marked ended")
+check(not dbx("SELECT 1 FROM wiki_share_cards WHERE fs_share_id=?", (C1,)), "#4778: the folder card ended")
 check(not dbx("SELECT 1 FROM fs_shares WHERE id IN (?, ?)", (C1, C2)), "... its other core share went with it")
 check(W2 not in shared(Fi) and W3 not in shared(Fi), "... fiona reads none of its pages")
 check(Gi.get(B + f"/api/wiki/shared/pages/{W3}").status_code == 404, "another person reads nothing of frida's pages")

@@ -167,7 +167,8 @@ check(Ca.get(B + f"/api/sheets/{SID}").status_code == 404 and SID not in ids(Ca)
 check(Ca.put(B + f"/api/sheets/{SID}/cells", json={"cells": [{**CELL, "raw": "1"}]}).status_code == 404, "carol: no writing after the stop")
 check(Bo.delete(B + f"/api/sheets/{SID}/shares/{SHC}").status_code == 404, "stopping twice: 404")
 r = share(Bo, SID, user_id=uid["carol"], role="write")
-check(r.status_code == 201 and r.json().get("id") == SHC, "sharing again revives the same share " + r.text[:200])
+# 2.937.0 (#5244): was "the same share" -- the share is a core share now, sharing again makes a new one (the old in obj_revoked)
+check(r.status_code == 201 and r.json().get("id") and len(r.json().get("shares", [])) == 1, "sharing again: one share " + r.text[:200])
 check(Ca.get(B + f"/api/sheets/{SID}").ok, "carol reads it again")
 
 # the trash

@@ -320,6 +320,8 @@ with the agents of the table's workspace (a private table: your own agent). The 
 is one Undo step. Moving the table to another workspace ends its shares (the check names them); leaving an organisation
 ends the shares of its tables; a table in the trash is hidden from the recipients until it is restored. Agents see a table
 shared with them in `sheets_list` (`shared_in`, `share_role`) like the tables of their projects.
-Routes: `GET|POST /api/sheets/{id}/shares`, `PATCH|DELETE /api/sheets/{id}/shares/{share}`.
+Routes: `GET|POST /api/sheets/{id}/shares`, `PATCH|DELETE /api/sheets/{id}/shares/{share}`. 2.937.0 (#5244): a share with a
+person or an agent is the share of the table's entry in the file store (`{share}` = its id there; the file store's Share
+dialog shows and ends the same row), an address typed in has a negative `{share}`.
 
 The search (Mod+K) finds tables by their title (only the ones you may open) and opens them.

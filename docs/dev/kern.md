@@ -403,11 +403,30 @@ node at the top of its workspace's tree (sheets/shshare.py `shs_node`); taking a
 own shares (files/fsref.py `fs_ref_place`). A share of a knowledge folder is a share of the folder's node (and of the page of
 the same name), no longer a path prefix, so it follows renames, moves and a restore as "Name (2)".
 
-The old rows (`sheet_shares`, `wiki_shares` kind person) stay as the share's card (the dialog's id, an address typed in, the
+Up to 2.936 the old rows (`sheet_shares`, `wiki_shares` kind person) stayed as the share's card (the dialog's id, an address typed in, the
 switch "show pictures") with `core_id` (+ `core_id2`) and give nothing themselves; a row not moved yet (`core_id` NULL) is
 read as before for one release (core first, then the old row). The one-shot `migr_core4717` (core/db.py) and the areas
 (`shs_core_move`, `wsh_core_move`) copy them forward. Public links of pages stay rows of `wiki_shares` (no share with an
 account). Not moved yet: the tables' and pages' own fields (title, name) still save through their areas, not `obj_write`.
+
+Stage 7c, tables (2.937.0, #5244, one way): no card any more. The Share dialog of a table lists, adds, changes and ends the
+shares of its node (sheets/shshare.py `shs_list`, `shs_put`, `shs_take`; a person's / agent's id in the dialog is the
+`fs_shares` id, the file store's dialog shows the same rows); the read path is `shs_roles_of` over
+`obj_share_rows_sql('sheet')` (a group the person is in counts too) with the table's own rules (`shs_fits`). `sheet_shares`
+keeps only the addresses typed in: open, or bound to the account of that address (`user_id`), whose right is that account's
+core share on the node (nothing names it: the row and the share meet by table and account). A move to another workspace
+takes the node's shares into `obj_revoked` (kind `sheet`), its undo puts them back with `shs_restore` (the tables' way of
+`obj_share_restore`: a table is no core kind). At the start `shs_retire` copies the last old rows forward, checks, deletes
+the rows of people and drops `core_id` (core/kernretire.py `kern_retire_rows`, core/migrations.d/5244_a.py).
+
+Stage 7c, knowledge pages (2.937.0, #5244, one-way): the person rows of `wiki_shares` and its `core_id` / `core_id2` are gone.
+A person share of the knowledge dialog is only its share on the node (+ the "pair" on the page of the folder's name); its
+card data (folder, pictures, the address typed in, the pair) lives in `wiki_share_cards` (`fs_share_id`, ON DELETE CASCADE),
+the dialog's id is `p<fs_shares id>`. Revoking = `obj_node_unshare` of both shares, the card rides in the obj_revoked row
+(`wiki_card`); the Undo puts them back under the same ids (`obj_node_reshare`, for a node no kind names). The start
+(wiki/wkshare.py `wsh_retire`, `kern_retire_rows`) copies the last rows forward, checks, then deletes the person rows, drops
+the two columns, moves the times to TIMESTAMPTZ and `is_folder` to BOOLEAN and raises the back limit. `wiki_shares` = public
+links only.
 
 ## Stage 6b: the side objects of a project (2.610.0, #4762)
 

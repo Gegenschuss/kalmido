@@ -1195,7 +1195,8 @@ def init_db(guard=True, load=None):
         # 2.565.0 (#4717 #4719): the areas' forward copies onto the shared core (core/objhooks.START, filled by the areas):
         # once, the team chat's old member rows copied forward, then tchat_members dropped after the start check (collab/tcxcore.py
         # tcx_core_copy / tcx_core_retire, 2.924.0 #5069: stage 7a; was tcx_core_sync every start); once, the shares of tables and of knowledge pages / folders with people as
-        # core shares on their reference nodes (sheets/shshare.py shs_core_move, wiki/wkshare.py wsh_core_move; no one-way step)
+        # core shares on their reference nodes (2.937.0 #5244, stage 7c: every start until done, sheets/shshare.py shs_retire and
+        # wiki/wkshare.py wsh_retire - the last forward copy, the start check, then the old person rows and core_id go, one way)
         for key, once, f in list(objhooks.START):
             if once and gsetting(c, key) == "1":
                 continue
@@ -1666,6 +1667,9 @@ def uset(c, uid, key, value):
               "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value", (uid, key, str(value)))
 
 
+LV_ONCE = ("office",)  # 2.937.0 (#5632): areas that tick at most once per request and commit (see bump)
+
+
 def bump(c, area=None):
     area = area or lv_area()  # 2.558.0 (#4709): a core object names its area (core/objects.py obj_register area=)
     r = c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version' RETURNING value").fetchone()
@@ -1691,6 +1695,13 @@ def bump(c, area=None):
     u = getattr(g, "user", None) if has_request_context() else None
     if a in LV_OWN:  # #5407: + "undo", the own list of steps (core/undogroups.py), counted per account like "self"
         a = f"{a}:{int(u['id'])}" if u is not None and u["id"] is not None else "other"
+    if a in LV_ONCE and has_request_context():  # 2.937.0 (#5632): one tick of this area per request and transaction (a loop of obj_trash / a route's own bump after the core's)
+        done = g.__dict__.setdefault("lv_once", {})
+        k = (id(c), a)  # per connection: a second connection of the same request ticks on its own
+        st = (getattr(c, "commits", 0), getattr(c, "rollbacks", 0))  # Fable F10: a rolled-back tick does not count
+        if done.get(k) == st:
+            return
+        done[k] = st
     n = c.execute("INSERT INTO settings(key,value) VALUES(?, '1') ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(settings.value AS BIGINT)+1 AS TEXT) "
                   "RETURNING value", ("version:" + a,)).fetchone()
     if a.startswith("self:") and n and not lv_state_setting():  # the window that wrote learns its own counter (X-Kalmido-Lv): no full reload for it

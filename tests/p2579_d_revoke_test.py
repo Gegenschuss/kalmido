@@ -282,8 +282,9 @@ after(X1, "1 revoked")
 X2 = make("Ex", "private")
 G2 = grant(X2)
 before(X2, "2 expired")
-sql("UPDATE wiki_shares SET expires_at=? WHERE id=?", (PAST, G2["wiki"]))
-sql("UPDATE fs_shares SET expires_at=? WHERE id IN (SELECT core_id FROM wiki_shares WHERE id=? UNION SELECT core_id2 FROM wiki_shares WHERE id=?)", (PAST, G2["wiki"], G2["wiki"]))
+# 2.937.0 (#5244): a person share of a page is its core share (+ its pair), the dialog's id "p<share id>"
+W2F = int(str(G2["wiki"]).lstrip("p") or 0)
+sql("UPDATE fs_shares SET expires_at=? WHERE id IN (SELECT fs_share_id FROM wiki_share_cards WHERE fs_share_id=? UNION SELECT pair_id FROM wiki_share_cards WHERE fs_share_id=?)", (PAST, W2F, W2F))
 for kind, rid in (("evcal", X2["cal"]), ("address_book", X2["book"]), ("list", X2["list"])):
     sql("UPDATE fs_shares SET expires_at=? WHERE user_id=? AND node_id IN (SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?)", (PAST, BOB, kind, rid))
 r = A.patch(B + f"/api/files/shares/{G2['fs']}", json={"expires_at": PAST})

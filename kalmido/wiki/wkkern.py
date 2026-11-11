@@ -58,7 +58,7 @@ def _wkk_purge(c, rid):
         c.execute("DELETE FROM file_text WHERE kind='wiki' AND ref_id = ANY(CAST(? AS BIGINT[]))", (fids,))
     c.execute("DELETE FROM space_moves WHERE kind='wiki' AND obj_id=?", (int(rid),))
     # a share of exactly this page ends with it (a later page of the same name is not shared by the old link); folder shares stay
-    c.execute("UPDATE wiki_shares s SET revoked_at=? FROM wiki_pages p WHERE p.id=? AND s.is_folder=0 AND s.revoked_at IS NULL "
+    c.execute("UPDATE wiki_shares s SET revoked_at=? FROM wiki_pages p WHERE p.id=? AND CAST(s.is_folder AS INTEGER)=0 AND s.revoked_at IS NULL "
               "AND COALESCE(s.org_id,0)=COALESCE(p.org_id,0) AND COALESCE(s.owner_id,0)=COALESCE(p.owner_id,0) AND lower(s.path)=lower(p.path) "
               f"AND NOT EXISTS (SELECT 1 FROM wiki_pages x WHERE {live_sql('x')} AND COALESCE(x.org_id,0)=COALESCE(p.org_id,0) "
               "AND COALESCE(x.owner_id,0)=COALESCE(p.owner_id,0) AND lower(x.path)=lower(p.path))", (iso(now_utc()), int(rid)))

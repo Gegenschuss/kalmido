@@ -134,11 +134,11 @@ function wsh_fill(md, tgt, sp, folder, legacy) {
         else { step(tr('Shared with {0}|wiki', s.user?.name || '?'), s.id, true); }
         await changed();
       } else if (a === 'img') {  // 2.380 H (#2356)
-        const s = j.shares.find(x => x.id === +b.dataset.id); if (!s) return;
+        const s = j.shares.find(x => String(x.id) === b.dataset.id); if (!s) return;
         await calReq('PATCH', `/api/wiki/shares/${s.id}`, {images: !s.images});
         await changed();
       } else if (a === 'end') {
-        const s = j.shares.find(x => x.id === +b.dataset.id); if (!s) return;
+        const s = j.shares.find(x => String(x.id) === b.dataset.id); if (!s) return;
         if (s.kind === 'link' && !await askConfirm(tr('Turn the public link off?'), tr('It stops working at once.'), {ok: tr('Switch off'), danger: true})) return;
         await calReq('DELETE', `/api/wiki/shares/${s.id}`);
         await changed(); step(s.kind === 'link' ? tr('Public link switched off') : tr('Stopped sharing with {0}', s.user?.name || '?'), s.id, false);

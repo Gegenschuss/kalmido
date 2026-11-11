@@ -695,8 +695,6 @@ sheet_files.deleted_at time
 sheet_links.created_at time
 sheet_links.undone_at time
 sheet_rows.deleted_at time
-sheet_shares.created_at time
-sheet_shares.revoked_at time
 sheets.created_at time
 sheets.deleted_at time
 sheets.updated_at time
@@ -814,11 +812,6 @@ wiki_pages.attrs json
 wiki_pages.created_at time
 wiki_pages.deleted_at time
 wiki_pages.updated_at time
-wiki_shares.created_at time
-wiki_shares.expires_at time
-wiki_shares.is_folder bool
-wiki_shares.last_used_at time
-wiki_shares.revoked_at time
 wiki_spaces.e2e_at time
 wiki_spaces.wkx_holds json
 wiki_versions.created_at time

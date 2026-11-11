@@ -157,9 +157,7 @@ def sheets_restore(sid):
         from .shbook import sheets_tabs_restore
         return sheets_tabs_restore(r["book_id"], sid)
     from .shkern import shk_restore  # 2.809.0 (#5365): the core's trash
-    shk_restore(c, me(), sid)
-    from .shshare import shs_core_move
-    shs_core_move(c, sid)  # 2.565.0 (#4717): its old share rows not moved yet get their core shares
+    shk_restore(c, me(), sid)  # 2.937.0 (#5244): its shares are those of its node (no old rows to move forward any more)
     sh_touch(c, sid, me())
     return _done(c, sid)
 

@@ -32,6 +32,7 @@ from ..sheets.shbook import shb_deleted, shb_rights_row  # 2.369.5 (#2517): pull
 from ..agents.core import agent_row, JOB_TITLE_MAX, job_dict, need_agent  # 2.369.5 (#2517): pulled up from functions
 from ..agents.safety import ids_parse  # 2.369.5 (#2517): pulled up from functions
 from ..sheets.core import sh_may, ShBook, sh_need, sh_eval  # 2.369.5 (#2517): pulled up from functions
+from ..sheets.shshare import shs_core_q  # 2.937.0 (#5244): the table's core share with the agent
 from ..sheets.step2 import _col, _linked, _cell, _bump_area, _gate, sh2_to_tasks, sh2_undo  # 2.369.5 (#2517): pulled up from functions
 from ..agents.proposals import _p_keys, _p_list, _p_str, PROP_TITLE_MAX, PROP_MAX_BYTES, prop_ready_notify, prop_validate, _p_date  # 2.369.5 (#2517): pulled up from functions
 from ..agents.usage import usage_block  # 2.369.5 (#2517): pulled up from functions
@@ -96,8 +97,7 @@ def ast2_person(c, aid, sheet, lid, want):
             raise BadInput(tr(SHT_NO_PERSON))
         return pid
     rr = shb_rights_row(c, sheet) or sheet
-    cands = [r[0] for r in c.execute("SELECT created_by FROM sheet_shares WHERE sheet_id=? AND user_id=? AND revoked_at IS NULL "
-                                     "ORDER BY id DESC", (rr["id"], aid)).fetchall()]
+    cands = [r[0] for r in shs_core_q(c, "x.created_by", "x.ref_id=? AND x.agent_id=? ORDER BY x.share_id DESC", (rr["id"], aid), trash=False).fetchall()]
     for pid in cands + [rr["owner_id"], rr["created_by"]]:
         # 2.674.0 (#4382 finding 13): also without for_user_id only a person who may address the agent in that list
         if pid and pid != aid and ast2_person_ok(c, pid, sheet, lid) and agent_usable(c, aid, pid, lid):

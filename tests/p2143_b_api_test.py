@@ -413,7 +413,8 @@ check(gone(a1) and not stored(a1_path) and not gone(a3), "#2211 its file is dele
 r = A.post(B + "/api/wiki/purge", json={"space": "private", "all": True})
 check(r.ok and r.json()["ids"] == [a2] and gone(a2) and trash_ids(A, "private") == [], f"#2211 empty trash {r.text}")
 check(A.post(B + "/api/wiki/purge", json={"space": "private", "ids": "x"}).status_code == 400, "#2211 ids must be a list")
-check(bool(SHARE) and dbc.execute("SELECT revoked_at FROM wiki_shares WHERE id=?", (SHARE,)).fetchone()[0],
+# 2.937.0 (#5244): a person share is the core share on the page's node ("p<share id>"): it goes with the node
+check(bool(SHARE) and not dbc.execute("SELECT 1 FROM fs_shares WHERE id=?", (int(str(SHARE).lstrip("p")),)).fetchone(),
       "#2211 the share of the purged page ended (a later page of that name is not shared by it)")
 
 # ---- other people / organisations (tenant-matrix: wiki)

@@ -284,13 +284,11 @@ r = A.post(B + f"/api/sheets/{SH}/move-space", json={"to": "private"})
 mid = r.json().get("move_id")
 check(r.ok and mid, f"setup: table moved to Private {r.text[:120]}")
 r = A.post(B + f"/api/sheets/{SH}/move-space", json={"to": f"org:{ORG}", "undo": mid})
-shs = kt.dbx("SELECT COUNT(*) FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (SH,))[0][0]
-check(r.ok and r.json().get("shares_back") == 1 and int(shs) == 1, f"#3042: the undo of the table move brings bob's share back {r.text[:160]} {shs}")
-# 2.647.0 (#5047): not only the card -- its core share is there again and the dialog lists bob (the access test of a person
-# outside the space: p2647_b_sheet_core_test)
-live = kt.dbx("SELECT COUNT(*) FROM sheet_shares s JOIN fs_shares f ON f.id=s.core_id WHERE s.sheet_id=? AND s.revoked_at IS NULL "
-              "AND f.user_id=?", (SH, BOB))[0][0]
-check(int(live) == 1, f"#5047: the share back has its core share {live}")
+# 2.937.0 (#5244): the share is the core share of the table's node (no card any more) -- it is there again (the access test of a
+# person outside the space: p2937_a_kern_sheets_test)
+live = kt.dbx("SELECT COUNT(*) FROM fs_shares f JOIN fs_nodes n ON n.id=f.node_id WHERE n.kind='ref' AND n.ref_kind='sheet' "
+              "AND n.ref_id=? AND f.user_id=?", (SH, BOB))[0][0]
+check(r.ok and r.json().get("shares_back") == 1 and int(live) == 1, f"#3042: the undo of the table move brings bob's share back {r.text[:160]} {live}")
 check(any(x.get("user_id") == BOB for x in A.get(B + f"/api/sheets/{SH}/shares").json().get("shares", [])), "#5047: the dialog lists bob again")
 
 # files: share, opening and the trash below a folder come back with the undo (move back)

@@ -31,6 +31,7 @@ from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok  # 2.
 from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 
 SHM_REF_RE = re.compile(r"\{(p|l|k|t):(\d{1,18})\}")
+SHS_UNDO_MAX = 500  # 2.937.0 (#5244): the core shares one undo puts back at most (the node holds at most 200 anyway)
 SHM_ONLY = N_("Only who created this table or an admin of the organisation can move it out of it")
 
 
@@ -93,7 +94,8 @@ def sheets_move_space(sid):
     offers = sum(c.execute("SELECT COUNT(*) FROM sheet_links WHERE sheet_id=? AND kind='offer' AND undone_at IS NULL", (t,)).fetchone()[0]
                  for t in tabs)
     formulas = sum(shm_foreign_formulas(c, t, to) for t in tabs)
-    shares = c.execute("SELECT COUNT(*) FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (sid,)).fetchone()[0]  # 2.124.0 C (#2113)
+    from .shshare import shs_count  # 2.937.0 (#5244): the core shares of its node + the open addresses
+    shares = shs_count(c, [sid]).get(sid, 0)  # 2.124.0 C (#2113)
     notes = [tr("The table is no longer attached to its project") if unbind else "",
              tr("Every member of the organisation can then open the table") if unbind and to else "",  # review 2.96 (L4)
              trn("{0} row carried over to a task of the old workspace loses its link", "{0} rows carried over to tasks of the old workspace lose their link",
@@ -107,7 +109,7 @@ def sheets_move_space(sid):
     if b.get("dry"):
         return jsonify(smv_answer(notes, None, count=1))
     ts = iso_ms(now_utc())
-    back, revived, sback, sback_ids = None, [], 0, []
+    back, revived, sback = None, [], 0
     if b.get("undo") not in (None, "", 0):
         u = b.get("undo")
         if isinstance(u, bool) or not isinstance(u, int):
@@ -128,31 +130,31 @@ def sheets_move_space(sid):
     # 2.365.1 (#3395): brought_by = who brought it in from the private space (goes back when they leave, accounts/orgback.py)
     c.execute("UPDATE sheets SET org_id=?, owner_id=?, list_id=?, brought_by=? WHERE id=?",
               (to, None if to else uid, list_id, uid if to and not r["org_id"] else None, sid))
-    ended = [x[0] for x in c.execute("SELECT id FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (sid,))]  # 2.273.0 B (#3042)
-    if shares:  # 2.124.0 C (#2113): every share ends (the people / agents belong to the old workspace; share again there)
-        from .shshare import shs_end
-        shs_end(c, sid)
-    if back and back.get("shares"):  # 2.273.0 B (#3042): the undo brings back the shares the move ended (if they still fit)
-        from .shshare import _agent_row, shs_drop_cache, shs_fits
-        r2 = sh_reload(c, sid)
-        for x in c.execute("SELECT id, org_id, user_id FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NOT NULL", (sid,)).fetchall():
-            if x["id"] in back["shares"] and (x["org_id"] or None) == (to or None) and (
-                    x["user_id"] is None or shs_fits(c, x["user_id"], r2, _agent_row(c, x["user_id"]))):  # 2.360.2 M (#2561): an open address row
-                # 2.647.0 (#5047): its core share went with the move (shs_end): the card gets a new one below
-                c.execute("UPDATE sheet_shares SET revoked_at=NULL, core_id=NULL WHERE id=?", (x["id"],))
-                sback += 1
-                sback_ids.append(x["id"])
-        shs_drop_cache()
+    # 2.124.0 C (#2113): every share ends (the people / agents belong to the old workspace; share again there). 2.937.0 (#5244):
+    # the core shares of its node go into obj_revoked (ended_core: their ids, for the undo), the addresses are marked ended
+    from .shshare import shs_end
+    ended, ended_core = shs_end(c, sid)
     shf_after_move(c, sid)  # 2.199.0 C (#2742): its folder belongs to the old workspace
-    if sback_ids:  # 2.647.0 (#5047): the cards back get their core shares on the table's node in this workspace (the old one went)
-        from .shshare import shs_core_put
+    if back and (back.get("shares") or back.get("core")):  # 2.273.0 B (#3042): the undo brings back what the move ended (if it still fits)
+        from .shshare import _agent_row, _bind, shs_drop_cache, shs_fits, shs_restore
         r2 = sh_reload(c, sid)
-        for i in sback_ids:
-            try:
-                with c.savepoint():
-                    shs_core_put(c, uid, r2, i, event=False)
-            except Denied:  # no room on the node: the card stays without a right (listed, the owner sees it)
-                print(f"WARNING sheet share card {i} found no room after the undo of a move (#5047)", flush=True)
+        ids = [i for i in back.get("shares") or [] if isinstance(i, int)]
+        for x in (c.execute(f"SELECT id, org_id, user_id, created_by FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NOT NULL AND "
+                            f"email_key!='' AND id IN ({','.join('?' * len(ids))})", (sid, *ids)).fetchall() if ids else []):
+            if (x["org_id"] or None) == (to or None):  # an address of this workspace (2.360.2 M, #2561)
+                who = x["user_id"]
+                c.execute("UPDATE sheet_shares SET revoked_at=NULL, user_id=NULL WHERE id=?", (x["id"],))
+                if who and shs_fits(c, who, r2, _agent_row(c, who)):
+                    try:
+                        with c.savepoint():
+                            _bind(c, r2, x["id"], who, uid)  # its core share went with the move: a new one on this node
+                    except Denied:  # no room on the node: the address stays open
+                        pass
+                sback += 1
+        for i in [i for i in back.get("core") or [] if isinstance(i, int)][:SHS_UNDO_MAX]:  # 2.937.0 (#5244)
+            if shs_restore(c, uid, r2, i):
+                sback += 1
+        shs_drop_cache()
     new_paths, old_paths = [], []  # 2.363.3 (#3133): sealed into new stored files, the old ones go after the commit
     try:
         shk_move_files(c, sid, to, uid, new_paths, old_paths)  # 2.124.0 B (#2110): the files of file cells go along, sealed with the target's key
@@ -169,7 +171,7 @@ def sheets_move_space(sid):
                 out = [i for i in ids if i not in revived]
                 if out:  # a task moved on in between: its link stays ended
                     c.execute(f"UPDATE sheet_links SET undone_at=? WHERE id IN ({','.join('?' * len(out))})", [ts, *out])
-        detail = {"list_id": r["list_id"] if unbind else None, "links": links, "at": ts, "shares": ended}
+        detail = {"list_id": r["list_id"] if unbind else None, "links": links, "at": ts, "shares": ended, "core": ended_core}
         mid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('sheet',?,?,?,?,?,?)",
                         (sid, r["org_id"], to, uid, ts, json.dumps(detail)))
         sh_touch(c, sid, uid)
@@ -193,17 +195,16 @@ def shm_home(c, r, uid, new_paths, old_paths):
     l = c.execute("SELECT org_id FROM lists WHERE id=?", (r["list_id"],)).fetchone() if r["list_id"] else None
     keep = bool(l) and not l["org_id"]
     links = [x for t in tabs for x in shm_links_out(c, t, None)]
-    ended = [x[0] for x in c.execute("SELECT id FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (sid,))]
     c.execute("UPDATE sheets SET org_id=NULL, owner_id=?, list_id=?, brought_by=NULL WHERE id=?", (uid, r["list_id"] if keep else None, sid))
-    if ended:
-        shs_end(c, sid)
+    ended, ended_core = shs_end(c, sid)  # 2.937.0 (#5244): addresses ended, core shares into obj_revoked
     shf_after_move(c, sid)
     shk_move_files(c, sid, None, uid, new_paths, old_paths)
     shb_move(c, sid, None, uid, new_paths, old_paths)
     if links:
         c.execute(f"UPDATE sheet_links SET undone_at=? WHERE id IN ({','.join('?' * len(links))})", [ts, *links])
     c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('sheet',?,?,NULL,?,?,?)",
-              (sid, r["org_id"], uid, ts, json.dumps({"list_id": None if keep else r["list_id"], "links": links, "at": ts, "shares": ended})))
+              (sid, r["org_id"], uid, ts, json.dumps({"list_id": None if keep else r["list_id"], "links": links, "at": ts, "shares": ended,
+                          "core": ended_core})))
     sh_touch(c, sid, uid)
 
 

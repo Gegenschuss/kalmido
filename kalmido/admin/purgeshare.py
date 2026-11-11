@@ -62,12 +62,11 @@ from ..sheets.core import sh_touch
 from ..sheets.shbook import shb_move
 from ..sheets.shfolder import SHF_KIND, shf_after_move
 from ..sheets.shkinds import shk_move_files
-from ..sheets.shshare import shs_core_move, shs_drop_cache
+from ..sheets.shshare import SHS_CARD, shs_core_q, shs_drop_cache, shs_put  # 2.937.0 (#5244)
 from ..wiki.wikie2e import wke_mode
 from ..wiki.wkfolder import WKF_KIND, WKF_SEEN, wkf_node_of, wkf_sync
 from ..wiki.wkhist import wkh_drop_unreadable, wsb_body_or
 from ..wiki.wkmove import wkm_place
-from ..wiki.wkshare import wsh_covers, wsh_rows
 
 
 def _accounts(c, ids):
@@ -286,14 +285,15 @@ def _plan(c, uid, doomed):
             direct = [(m["added_at"], m["user_id"], m["role"]) for m in book_members_of(c, bid, live=True)]  # 2.647.0 (#5046)
             out["books"].append(_item(c, uid, oid, bid, direct, _folder_shares(c, uid, CTF_BOOK, bid), "edit"))
         for sid, lid in c.execute("SELECT id, list_id FROM sheets WHERE owner_id=? AND org_id IS NULL AND book_id IS NULL AND deleted_at IS NULL", (uid,)).fetchall():
-            direct = c.execute("SELECT created_at, user_id, role FROM sheet_shares WHERE sheet_id=? AND user_id IS NOT NULL AND revoked_at IS NULL", (sid,)).fetchall()
+            # 2.937.0 (#5244): the people of the table's node (its core shares; a bound address is its account's share)
+            direct = shs_core_q(c, "x.created_at, x.user_id, x.role", "x.ref_id=? AND x.user_id IS NOT NULL", (sid,), trash=False).fetchall()
             lr = c.execute("SELECT owner_id FROM lists WHERE id=? AND org_id IS NULL", (lid,)).fetchone() if lid else None
             out["sheets"].append(_item(c, uid, None, sid, [tuple(x) for x in direct], _folder_shares(c, uid, SHF_KIND, sid), "write", lr[0] if lr else None))
         if not wke_mode(c, None, uid)[0]:
-            shares = [r for r in wsh_rows(c, None, uid) if r["kind"] == "person" and r["user_id"]]
+            # 2.937.0 (#5244, stage 7c): a person share of the knowledge dialog is a share of the page's / folder's node --
+            # _folder_shares reads the page's node and the folders above it (no card of wiki_shares any more)
             for p in c.execute("SELECT id, path FROM wiki_pages WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL", (uid,)).fetchall():
-                read = [(r["created_at"], r["user_id"], "view") for r in shares if wsh_covers(r, p["path"], p["id"])]
-                out["wiki"].append(_item(c, uid, None, p["id"], read, _folder_shares(c, uid, WKF_KIND, p["id"]), "edit",
+                out["wiki"].append(_item(c, uid, None, p["id"], [], _folder_shares(c, uid, WKF_KIND, p["id"]), "edit",
                                          fits=lambda u: not wke_mode(c, None, u)[0]))  # review: never into a space with the lock (the text would lie open there)
         out["folders"], gone = _fs_branches(c, uid, doomed)  # 2.537.0 (#4347)
     return {k: [x for x in v if x] for k, v in out.items()}, gone
@@ -342,23 +342,37 @@ def _books(c, items):
         book_touch(c, x["id"])
 
 
+def _sheet_put(c, heir, r, who, role, expires_at=None):
+    """2.937.0 (#5244): one share of table r on its node in the heir's tree (shshare.py shs_put); a full node keeps the rest."""
+    try:
+        with c.savepoint():
+            shs_put(c, heir, r, who, role, expires_at)
+    except Denied:
+        print(f"WARNING table {r['id']}: no room for a share after its hand-on (#5244)", flush=True)
+
+
 def _sheets(c, items, new_paths, old_paths):
     for x in items:
         sid, heir = x["id"], x["heir"]
         lid = c.execute("SELECT list_id FROM sheets WHERE id=?", (sid,)).fetchone()[0]
-        c.execute("DELETE FROM sheet_shares WHERE sheet_id=? AND user_id=?", (sid, heir))
+        c.execute("DELETE FROM sheet_shares WHERE sheet_id=? AND user_id=?", (sid, heir))  # an address bound to the heir
+        # 2.937.0 (#5244): the shares are the core shares of the table's node, which goes with the move below: kept here and
+        # put on the node in the heir's tree after it (the heir's own goes: the table is theirs)
+        n = fs_ref_node(c, "sheet", sid)
+        keep = c.execute("SELECT user_id, agent_id, role, expires_at FROM fs_shares WHERE node_id=? AND (user_id IS NOT NULL OR "
+                         "agent_id IS NOT NULL) AND COALESCE(user_id, agent_id)<>?", (n["id"], heir)).fetchall() if n else []
         c.execute("UPDATE sheets SET owner_id=?, list_id=? WHERE id=?", (heir, lid if lid and list_role(c, lid, heir) else None, sid))
         shf_after_move(c, sid)
         shk_move_files(c, sid, None, heir, new_paths, old_paths, strict=False)  # 2.528.0 (#4306 B25): a broken file never stops the deletion
         shb_move(c, sid, None, heir, new_paths, old_paths, strict=False)
-        for u, role in x["others"].items():
-            c.execute("""INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at) VALUES(?,NULL,?,?,?,?)
-                         ON CONFLICT (sheet_id, user_id) DO UPDATE SET role=excluded.role, revoked_at=NULL WHERE sheet_shares.revoked_at IS NOT NULL""",
-                      (sid, u, "write" if role == "edit" else "read", heir, iso_ms(now_utc())))
-        # 2.565.0 (#4717): the shares are core shares on the table's node -- the old node went with the move above, so every live
-        # row gets its core share anew in the heir's tree (shshare.py shs_core_move)
-        c.execute("UPDATE sheet_shares SET core_id=NULL WHERE sheet_id=? AND revoked_at IS NULL", (sid,))
-        shs_core_move(c, sid)
+        r = c.execute("SELECT * FROM sheets WHERE id=?", (sid,)).fetchone()
+        have = set()
+        for s in keep:
+            have.add(s["user_id"] or s["agent_id"])
+            _sheet_put(c, heir, r, s["user_id"] or s["agent_id"], SHS_CARD.get(s["role"], "read"), s["expires_at"])
+        for u, role in x["others"].items():  # a folder share of the deleted person's tree becomes a share of the table
+            if u not in have:
+                _sheet_put(c, heir, r, u, "write" if role == "edit" else "read")
         sh_touch(c, sid, heir)
     shs_drop_cache()
 

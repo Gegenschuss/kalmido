@@ -170,14 +170,16 @@ r = A.post(B + "/api/sheets", json={"title": "Fruit", "space": f"org:{K}"})
 check(r.ok, "setup: a table of Kestrel " + r.text[:160])
 SID = r.json()["id"]
 check(A.post(B + f"/api/sheets/{SID}/shares", json={"user_id": CARL, "role": "read"}).status_code == 201, "setup: carl gets the table")
-CARD = dbx("SELECT id, core_id FROM sheet_shares WHERE sheet_id=? AND user_id=?", (SID, CARL))
-check(CARD and CARD[0][1], f"setup: the card and its core share {CARD}")
+# 2.937.0 (#5244): carl's share is the core share of the table's node (no card any more)
+CARD = dbx("SELECT 0, f.id FROM fs_shares f JOIN fs_nodes n ON n.id=f.node_id WHERE n.kind='ref' AND n.ref_kind='sheet' AND n.ref_id=? "
+           "AND f.user_id=?", (SID, CARL))
+check(CARD and CARD[0][1], f"setup: carl's core share {CARD}")
 dbx("DELETE FROM org_members WHERE org_id=? AND user_id=?", (K, CARL))  # outside every route: a row across the boundary
 r = A.post(B + "/api/admin/orgs/boundary/repair", json={})
 check(r.ok and r.json().get("removed", 0) >= 2, "4: the repair runs " + r.text[:200])
 check(not dbx("SELECT 1 FROM fs_shares WHERE node_id=? AND user_id=?", (AF, OTTO)), "4: otto's share is gone")
 check(dbx("SELECT reason FROM obj_revoked WHERE src='fs_shares' AND user_id=?", (OTTO,)) == [("boundary",)], "4: otto's share is in obj_revoked (boundary)")
-check(dbx("SELECT revoked_at IS NOT NULL FROM sheet_shares WHERE id=?", (CARD[0][0],)) == [(True,)], "4: carl's card is ended (revoked_at), not only its core share")
+check(not dbx("SELECT 1 FROM sheet_shares WHERE sheet_id=?", (SID,)), "4: 2.937.0 (#5244): no card of carl (the share was the core's only)")
 check(not dbx("SELECT 1 FROM fs_shares WHERE id=?", (CARD[0][1],)), "4: carl's core share is gone")
 check(dbx("SELECT reason FROM obj_revoked WHERE src='fs_shares' AND user_id=? AND kind='sheet' AND ref_id=?", (CARL, SID)) == [("boundary",)],
       "4: carl's core share is in obj_revoked (boundary)")

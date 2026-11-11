@@ -213,7 +213,9 @@ r = Be.get(B + f"/api/sheets/{S1}/files/{FILE}")
 check(r.ok and r.content == PDF, f"the file sealed for bert reads as before ({r.status_code})")
 check(dbx("SELECT path FROM sheet_files WHERE id=?", (FILE,))[0][0] != OLD_PATH, "into a new stored file")
 check(Ca.get(B + f"/api/sheets/{S1}").json().get("can_write"), "cara keeps her write share")
-check(not dbx("SELECT 1 FROM sheet_shares WHERE sheet_id=? AND user_id=?", (S1, BERT)), "bert's own share row is gone")
+# 2.937.0 (#5244): the share is the core share of the table's node (no card): the heir's own goes, cara's stays on the new node
+check(not dbx("SELECT 1 FROM fs_shares f JOIN fs_nodes n ON n.id=f.node_id WHERE n.kind='ref' AND n.ref_kind='sheet' AND n.ref_id=? "
+              "AND f.user_id=?", (S1, BERT)), "bert's own share is gone")
 check(owner("sheets", S2) is None, "a read-only table goes")
 check(owner("sheets", S3) == BERT, "a table through the folder's edit share")
 r = Do.get(B + f"/api/sheets/{S3}")

@@ -8,6 +8,9 @@
    again and the dialog lists her (before: only revoked_at was cleared, the core share was gone, she read nothing)
  - no fallback: a card without a core share (core_id NULL) gives nothing; a change of its role in the dialog hangs it on
    the core (person without organisation: freelancer-matrix)
+2.937.0 (#5244, stage 7c): no card any more -- the import brings the core shares only (both dialogs show the same row, ending
+it in one ends it in the other), the undo of a move restores the core share, a person without organisation shares by name on
+the core; the forward copy of old rows and their drop: p2937_a_kern_sheets_test.
 Starts its OWN container (workspaces mode + KALMIDO_SECRET_KEY for the organisation export; P2647B_NOSTART=1 = it runs).
 usage: p2647_b_sheet_core_test.py <datadir>"""
 # freelancer-matrix: sheets
@@ -75,6 +78,11 @@ def listed(s, sid):
     return [x.get("user_id") for x in s.get(B + f"/api/sheets/{sid}/shares").json().get("shares", [])]
 
 
+def dlg_id(s, sid, who):
+    """2.937.0 (#5244): the id of who's row in the table's dialog (= its core share's)."""
+    return next((x["id"] for x in s.get(B + f"/api/sheets/{sid}/shares").json().get("shares", []) if x.get("user_id") == who), None)
+
+
 def EH(email):
     return hashlib.sha256(("kalmido-people|" + email.strip().lower()).encode()).hexdigest()
 
@@ -134,22 +142,22 @@ check(j.get("state") == "done", f"imported into the empty organisation {j.get('s
 N0, N1, N2 = ((dbx("SELECT id FROM sheets WHERE org_id=? AND title=?", (ORG3, t)) or [[None]])[0][0] for t in ("Loose", "Rates", "Costs"))
 check(N0 and N1 and N2, f"the tables came along {N0} {N1} {N2}")
 for n in (N0, N1, N2):
-    cards = dbx("SELECT id, core_id FROM sheet_shares WHERE sheet_id=? AND user_id=? AND revoked_at IS NULL", (n, GINA))
+    # 2.937.0 (#5244): was "one card, one core share, bound to each other" -- now the core share alone, the dialog shows it
+    cards = dbx("SELECT id FROM sheet_shares WHERE sheet_id=?", (n,))
     cs = core(n, GINA)
-    check(len(cards) == 1 and len(cs) == 1 and cards[0][1] == cs[0],
-          f"#5047: one card, one core share, bound to each other (no second unbound right) {[tuple(x) for x in cards]} {cs}")
+    check(not cards and len(cs) == 1 and dlg_id(A, n, GINA) == cs[0],
+          f"#5244: one core share, the table's dialog shows that row (no card) {[tuple(x) for x in cards]} {cs}")
     check(Gi.get(B + f"/api/sheets/{n}").status_code == 200 and listed(A, n) == [GINA], "the guest reads the imported table, the dialog lists her")
 
 # ending it in the table's dialog ends the core share too
-c1 = dbx("SELECT id FROM sheet_shares WHERE sheet_id=? AND user_id=?", (N1, GINA))[0][0]
+c1 = dlg_id(A, N1, GINA)
 check(A.delete(B + f"/api/sheets/{N1}/shares/{c1}").ok, "ended in the table's dialog")
 check(not core(N1, GINA), "#5047: ... the core share is gone too")
 check(Gi.get(B + f"/api/sheets/{N1}").status_code == 404, "#5047: ... the guest reads nothing any more")
 
-# ending it in the file store's dialog ends the card too
+# ending it in the file store's dialog ends it in the table's dialog too
 fs2 = (core(N2, GINA) or [0])[0]
 check(A.delete(B + f"/api/files/shares/{fs2}").ok, "ended in the file store's dialog")
-check(dbx("SELECT revoked_at IS NOT NULL FROM sheet_shares WHERE sheet_id=? AND user_id=?", (N2, GINA)) == [(True,)], "#5047: ... the card is ended")
 check(Gi.get(B + f"/api/sheets/{N2}").status_code == 404 and listed(A, N2) == [], "#5047: ... the guest reads nothing, the dialog is empty")
 check(Gi.get(B + f"/api/sheets/{T1}").status_code == 200, "the source organisation's share stays untouched")
 
@@ -161,41 +169,28 @@ MID = r.json().get("move_id") if r.ok else None
 check(MID and Gi.get(B + f"/api/sheets/{T3}").status_code == 404 and not core(T3, GINA), f"moved to Private: the share ends {r.text[:160]}")
 r = A.post(B + f"/api/sheets/{T3}/move-space", json={"to": f"org:{ORG}", "undo": MID})
 check(r.ok and r.json().get("shares_back") == 1, f"the undo names the share back {r.text[:160]}")
-c3 = dbx("SELECT core_id FROM sheet_shares WHERE sheet_id=? AND user_id=? AND revoked_at IS NULL", (T3, GINA))
-check(c3 and c3[0][0] and core(T3, GINA) == [c3[0][0]], f"#5047: the card back has a new core share on the table's node {[tuple(x) for x in c3]}")
+check(len(core(T3, GINA)) == 1, "#5047: the share back is a core share on the table's node again")  # 2.937.0 (#5244): no card
 check(Gi.get(B + f"/api/sheets/{T3}").status_code == 200, "#5047: the guest reads the table again")
 check(listed(A, T3) == [GINA], "#5047: the dialog lists her again")
 
-# ================================================================ no fallback (freelancer-matrix: sheets)
+# ================================================================ a person without organisation (freelancer-matrix: sheets)
+# 2.937.0 (#5244): was "no fallback: a card without a core share" -- there are no cards any more: a share by name is the core share
 FID, Fr = freelancer(B, A, "frida", features=FEAT)
 FIO, Fi = freelancer(B, A, "fiona", features=FEAT)
 P1 = table(Fr, "Own rates", "private")
-dbx("INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at) VALUES(?,NULL,?,'read',?,?)",
-    (P1, FIO, FID, "2026-11-07T10:00:00.000+00:00"))  # a card an older version left without its core share
-check(Fi.get(B + f"/api/sheets/{P1}").status_code == 404, "#5047: a card without a core share gives nothing (no fallback)")
-check(not any(x["id"] == P1 for x in Fi.get(B + "/api/sheets?space=shared").json().get("sheets", [])), "... nor in 'Shared with me'")
-cp = dbx("SELECT id FROM sheet_shares WHERE sheet_id=? AND user_id=?", (P1, FIO))[0][0]
-check(listed(Fr, P1) == [FIO], "the owner still sees the card in the dialog")
-check(Fr.patch(B + f"/api/sheets/{P1}/shares/{cp}", json={"role": "read"}).ok and len(core(P1, FIO)) == 1,
-      "a change in the dialog hangs it on the core")
-check(Fi.get(B + f"/api/sheets/{P1}").status_code == 200, "... then the person without organisation reads it")
+dbx("INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at,email_key) VALUES(?,NULL,?,'read',?,?,'')",
+    (P1, FIO, FID, "2026-11-07T10:00:00.000+00:00"))  # an old person row (only an older database has them): gives nothing
+check(Fi.get(B + f"/api/sheets/{P1}").status_code == 404 and listed(Fr, P1) == [], "#5244: an old person row gives nothing and is not listed")
+dbx("DELETE FROM sheet_shares WHERE sheet_id=?", (P1,))
+# two people without organisation see each other only by address (no shared list): the address is bound to her account at once
+r = Fr.post(B + f"/api/sheets/{P1}/shares", json={"email": "fiona@example.com", "role": "read"})
+cp = next((x["id"] for x in Fr.get(B + f"/api/sheets/{P1}/shares").json().get("shares", [])), None)
+check(r.status_code == 201 and cp and cp < 0 and len(core(P1, FIO)) == 1 and Fi.get(B + f"/api/sheets/{P1}").status_code == 200,
+      f"a share by address: bound, the core share, she reads it {r.text[:160]}")
+check(any(x["id"] == P1 for x in Fi.get(B + "/api/sheets?space=shared").json().get("sheets", [])), "... in 'Shared with me'")
+check(Fr.patch(B + f"/api/sheets/{P1}/shares/{cp}", json={"role": "write"}).ok and Fi.patch(B + f"/api/sheets/{P1}", json={"title": "Rates x"}).ok,
+      "a change in the dialog changes the core share's role")
 check(Fr.delete(B + f"/api/sheets/{P1}/shares/{cp}").ok and Fi.get(B + f"/api/sheets/{P1}").status_code == 404 and not core(P1, FIO),
-      "ended: card and core share go together")
-
-# 2.647.0 (#5047, review): the forward copy binds a card to the core share the person already holds (file store dialog, with
-# an expiry) -- the core keeps its role and expiry, the card shows it; before: a time-limited read became a lasting write
-P2 = table(Fr, "Rates with expiry", "private")
-dbx("INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at) VALUES(?,NULL,?,'read',?,?)",
-    (P2, FIO, FID, "2026-11-07T10:00:00.000+00:00"))  # two people without organisation: the card as above
-cid = dbx("SELECT id FROM sheet_shares WHERE sheet_id=? AND user_id=?", (P2, FIO))[0][0]
-check(Fr.patch(B + f"/api/sheets/{P2}/shares/{cid}", json={"role": "read"}).ok, "setup: the card gets its core share")
-c2 = dbx("SELECT id, core_id FROM sheet_shares WHERE id=?", (cid,))[0]
-dbx("UPDATE fs_shares SET role='view', expires_at='2099-01-01T00:00:00+00:00' WHERE id=?", (c2[1],))
-dbx("UPDATE sheet_shares SET core_id=NULL, role='write' WHERE id=?", (c2[0],))  # an unbound card next to the core share
-check(Fr.delete(B + f"/api/sheets/{P2}").ok and Fr.post(B + f"/api/sheets/{P2}/restore").ok, "trash and back (runs the forward copy)")
-check(dbx("SELECT role, expires_at FROM fs_shares WHERE id=?", (c2[1],)) == [("view", "2099-01-01T00:00:00+00:00")],
-      "#5047 review: the core share keeps its role and expiry")
-check(dbx("SELECT core_id, role FROM sheet_shares WHERE id=?", (c2[0],)) == [(c2[1], "read")] and core(P2, FIO) == [c2[1]],
-      "#5047 review: the card is bound to it and shows the core's role")
+      "ended: the core share goes")
 
 sys.exit(kt.done("p2647_b_sheet_core"))

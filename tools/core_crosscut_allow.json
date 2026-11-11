@@ -57,7 +57,7 @@
   "rss_reads": "stage Q8 (read marks) takes it down: the core's read marks",
   "sheet_hist": "own logic: a table's cell history (decision Q7c, #5283: under the logs' retention switch)",
   "sheet_links": "own logic: batch undo of a table's links (check again after #5249)",
-  "sheet_shares": "stage 7c (#5244) takes it down: the tables' old share card rows, core shares since stage 4 (#4717)",
+  "sheet_shares": "own logic since stage 7c (#5244): the addresses typed in of a table's Share dialog (sealed e-mail address, bound at sign-in); every share with a person / agent is a core share (fs_shares)",
   "task_bell": "stage Q9 (following) takes it down: obj_follow",
   "task_enc_notes": "own logic: a task's encrypted note is content of its own",
   "task_keys": "own logic: a ticket number (prefix + no), not following",
@@ -74,7 +74,7 @@
   "video_comments": "stage Q4 (comments) takes it down: the core's comments",
   "wiki_links": "own logic: derived from the page text (backlinks), rebuilt on save",
   "wiki_pages": "own logic: a page's text (body)",
-  "wiki_shares": "stage 7c (#5244) takes the person rows down (core shares since stage 4, #4717); public page links (kind link, token_hash) stay as the area's share links",
+  "wiki_shares": "public page links only (kind link, token_hash) - the area's share links without an account; person shares are core shares since stage 7c (#5244)",
   "wiki_versions": "stage Q7 (versions) takes it down: the core's versions"
  },
  "code": {

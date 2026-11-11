@@ -66,6 +66,22 @@ moved("office", lambda: A.put(B + BA + f"/{AID}", json={"label": "Hauptkonto"}),
 moved("office", lambda: A.put(B + O + "/letterhead", json={"hide_footer": False}), "letterhead margins / switches PUT")
 moved("office", lambda: A.put(B + O + "/letterhead", json={"hide_footer": False}), "letterhead PUT without a change", exact=0)
 
+# ================================================================ 2.937.0 (#5632): the delete / restore routes on the core's trash
+# (obj_trash ticks itself; a loop of rows or a route's own bump after it must not add a second tick)
+FX = {"label": "Miete", "amount": 500, "start": "2026-01-01", "repeat": "monthly"}
+r = A.post(B + O + "/fixed-costs", json=FX)
+check(r.status_code == 201, f"#5632 setup: fixed cost ({r.status_code} {r.text[:200]})")
+F1 = r.json().get("id") if r.ok else 0
+moved("office", lambda: A.delete(B + O + f"/fixed-costs/{F1}"), "#5632 fixed cost DELETE (core trash)")
+moved("office", lambda: A.post(B + O + f"/trash/core/ofixed/{F1}/restore"), "#5632 fixed cost restore from the core's trash")
+F2 = A.post(B + O + "/fixed-costs", json={**FX, "label": "Strom"}).json().get("id")
+moved("office", lambda: A.post(B + O + "/fixed-costs/delete", json={"ids": [F1, F2]}), "#5632 fixed costs delete many (loop of obj_trash)")
+r = A.post(B + O + "/cashflow/adjust", json={"month": "2026-03", "dir": "in", "amount": 100})
+check(r.status_code == 201, f"#5632 setup: correction ({r.status_code} {r.text[:200]})")
+moved("office", lambda: A.delete(B + O + f"/cashflow/adjust/{r.json().get('id')}"), "#5632 cash flow correction DELETE")
+r = A.post(B + O + "/rights/groups", json={"name": "Wegdamit"})
+moved("office", lambda: A.delete(B + O + f"/rights/groups/{r.json().get('id')}"), "#5632 rights group DELETE")
+
 # ================================================================ the after-hook of the core
 moved("office", lambda: A.post(B + O + "/rights/groups", json={"name": "Schnittteam"}), "after-hook: rights group POST (no bump of its own)")
 moved("office", lambda: A.get(B + O + "/settings"), "a reading request", exact=0)
@@ -94,5 +110,48 @@ moved("other", lambda: Fr.patch(B + f"/api/bookmarks/{BM}", json={"note": "Notiz
 # ================================================================ a person without an organisation
 moved("office", lambda: Fr.put(B + O + "/settings", json={"company": {"name": "Frida"}, "currency": "EUR"}), "personal office: settings PUT")
 moved("office", lambda: Fr.post(B + BA, json={"iban": "DE89370400440532013000"}), "personal office: bank account POST")
+
+r = Fr.post(B + O + "/fixed-costs", json=FX)
+check(r.status_code == 201, f"#5632 setup: personal fixed cost ({r.status_code} {r.text[:200]})")
+moved("office", lambda: Fr.delete(B + O + f"/fixed-costs/{r.json().get('id')}"), "#5632 personal office: fixed cost DELETE")
+
+# ================================================================ 2.937.0 (#5632, Fable F10): a rolled-back tick does not count
+# bump's "once per request" ended only with a commit: a first tick inside a savepoint that rolls back hid the next one
+F10 = r"""
+import json
+from flask import g
+from kalmido.core.config import app
+from kalmido.core.db import bump, db
+from kalmido.core.pg import system_ctx
+with app.test_request_context("/api/office/x"):
+    g.user = None
+    c = db()
+    with system_ctx(c):
+        v = lambda: int((c.execute("SELECT value FROM settings WHERE key='version:office'").fetchone() or ["0"])[0])
+        a0 = v()
+        try:
+            with c.savepoint():
+                bump(c, "office")
+                raise KeyError
+        except KeyError:
+            pass
+        a1 = v()
+        bump(c, "office")
+        a2 = v()
+        bump(c, "office")
+        a3 = v()
+    c.rollback()
+    print(json.dumps([a0, a1, a2, a3]))
+"""
+import json  # noqa: E402
+import subprocess  # noqa: E402
+CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+x = subprocess.run(["docker", "exec", "-i", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", F10], capture_output=True, text=True)
+try:
+    got = json.loads(x.stdout.strip().splitlines()[-1])
+except (ValueError, IndexError):
+    got = (x.stdout + x.stderr)[-600:]
+check(isinstance(got, list) and got[1] == got[0] and got[2] == got[0] + 1 and got[3] == got[2],
+      f"#5632 F10: a tick rolled back with its savepoint -> the next bump of the request counts, a third does not {got}")
 
 sys.exit(done("p2566_b_bump"))

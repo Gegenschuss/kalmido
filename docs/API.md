@@ -1969,7 +1969,8 @@ the module *Tables* switched on to write). Routes: `GET /api/v1/sheets` (`?space
 `POST /api/v1/sheets/{id}/rows`, `POST /api/v1/sheets/{id}/columns`, `GET /api/v1/sheets/{id}/vars`,
 `POST /api/v1/sheets/{id}/batches/{batch}/undo`. 2.124.0: a person shares one table with single people / agents
 (`GET|POST /api/sheets/{id}/shares`, `PATCH|DELETE /api/sheets/{id}/shares/{share}`, session only, role `read` | `write`;
-2.360.2: by `email` every address gets a row `{email, state: "invited"}` with no account named, a later account of that address takes it at sign-in);
+2.360.2: by `email` every address gets a row `{email, state: "invited"}` with no account named, a later account of that address takes it at sign-in;
+2.937.0: the `id` of a person's / agent's row is the id of the share of the table's file store entry, an address's row has a negative `id`);
 the list then holds it with `shared_in: true` and `share_role`, `?space=shared` lists only such tables. Formulas are stored with ids and shown with the current names; every
 value is calculated with the token's visibility (`error: "denied"` for a source it does not see). An agent's write call is
 one batch (`batch` in the answer) a person can take back. The app also exports a table as CSV / .xlsx and imports both

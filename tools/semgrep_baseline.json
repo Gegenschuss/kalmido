@@ -3275,6 +3275,13 @@
   },
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
+   "file": "kalmido/sheets/shshare.py",
+   "code": "return c.execute(f\"SELECT {cols} FROM {sub} x {join} WHERE {where}\", args)",
+   "reason": "no name: sub is the fixed subquery text of core/objects.py obj_share_rows_sql (ref kind 'sheet' from the FSR registry, no user value); cols / where / join are fixed text of the callers in shshare / purgeshare / sheetprop / shkinds, values go as ? parameters (#5244)",
+   "date": "2026-11-11"
+  },
+  {
+   "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/sheets/web.py",
    "code": "c.execute(f\"UPDATE sheet_columns SET {','.join(k + '=?' for k in f)} WHERE id=?\", [*f.values(), col_id])",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",

@@ -18,15 +18,33 @@ and address books 7b), called from the area's start hook (core/objhooks.START, i
   and agent's share of every room. The minor of the running image, not a fixed line in BACK_LIMITS: the release number is
   set by the train, the package label is not the version.
 The fragment core/migrations.d/<task>_x.py carries the documentation and the drop-ok line of each table (a fragment's AFTER
-runs before the start hooks and cannot hold the start check)."""
+runs before the start hooks and cannot hold the start check).
+
+2.937.0 (#5244, stage 7c): an area whose old table STAYS with fewer rows and columns (tables: sheet_shares keeps the rows of an
+address typed in; knowledge: wiki_shares keeps the public links) retires its part with
+
+  kern_retire_rows(c, table, cols, left, label, prune=None, alter=(), alert=None) -> {} | {"left": n} | {"dropped": k, "pruned": m}
+
+- Nothing to do once the table or every one of `cols` is gone (two catalog reads).
+- The same lock and start check as kern_retire (`left(c)` not 0: a log line, alert(n, [table]), nothing changes).
+- 0: `prune(c)` (deletes the old rows the core holds now; returns their number), then ALTER TABLE ... DROP COLUMN of each of
+  `cols` still there, then each statement of `alter` (retyping, a CHECK the rows left must keep), the rows of obj_revoked with
+  src = table, and the back limit as above (an older image would read the dropped columns).
+
+kern_retire_due(c, table, cols, typed) -> bool (Fable review of 2.937 F1): whether the start hook has work. "Done" is the
+target state (the column `typed` is TIMESTAMPTZ, as schema.py makes it), not the missing `cols`: a database from before the
+columns came (a backup from before 2.565 played in, a jump over versions) has neither -- the hook adds `cols` back (nullable
+BIGINT, under the lock) and runs as usual (forward copy, start check, drop), instead of losing every share of a person in
+silence."""
 import re
 
 from .config import APP_VERSION
-from .pg import qi, table_exists, write_lock
+from .pg import qi, table_columns, table_exists, write_lock
 
 KERN_RETIRE_LOCK = "kalmido-kern5069"
-KERN_RETIRE_HOW = ("the shared core dropped the old member tables (team chat, calendars, address books; #5069) - an older "
-                   "version would rebuild them empty and take every member's share; go back only with a backup from before")
+KERN_RETIRE_HOW = ("the shared core dropped the old member tables (team chat, calendars, address books; #5069) and the old share "
+                   "rows of tables and knowledge pages (#5244) - an older version would rebuild them empty or read columns that "
+                   "are gone; go back only with a backup from before")
 
 
 def _kr_ver(v):
@@ -75,3 +93,52 @@ def kern_retire(c, tables, left, label, drop=None, alert=None):
     print(f"{label}: every old row has its share in the shared core -- {', '.join(have)} dropped"
           + (f"; versions before {floor} no longer start on this database" if floor else ""), flush=True)
     return {"dropped": len(have), "revoked": revoked}
+
+
+def kern_retire_due(c, table, cols, typed):
+    """2.937.0 (#5244, Fable F1): True when the old rows of `table` still wait for kern_retire_rows (module docstring); a
+    database from before `cols` came gets them back first (empty, nullable BIGINT: every old row counts as not moved yet)."""
+    cols = tuple(cols)
+    if not table_exists(c, table):
+        return False
+    if set(cols) & table_columns(c, table):
+        return True
+    t = c.execute("SELECT data_type FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? "
+                  "AND column_name=?", (table, typed)).fetchone()
+    if t is None or t[0] == "timestamp with time zone":
+        return False  # done (or a fresh database: schema.py made the target types)
+    write_lock(c, KERN_RETIRE_LOCK)
+    for x in cols:
+        c.execute(f"ALTER TABLE {qi(table, (table,))} ADD COLUMN IF NOT EXISTS {qi(x, cols)} BIGINT")
+    print(f"{table}: a database from before the shared core's columns {', '.join(cols)} -- added back, its old rows are copied "
+          "forward and checked now (#5244)", flush=True)
+    return True
+
+
+def kern_retire_rows(c, table, cols, left, label, prune=None, alter=(), alert=None):
+    """2.937.0 (#5244): the start check, then the old rows and columns of a table that stays (module docstring). label names
+    the stage in the log. alter: fixed statements of the caller (no values of users in them)."""
+    cols = tuple(cols)
+    if not table_exists(c, table) or not set(cols) & table_columns(c, table):
+        return {}
+    write_lock(c, KERN_RETIRE_LOCK)
+    have = [x for x in cols if x in table_columns(c, table)]
+    if not have:  # another process did it meanwhile
+        return {}
+    n = left(c)
+    if n:
+        print(f"{label}: {n} old row(s) of {table} have no share in the shared core -- nothing dropped; give those objects their "
+              "node / shares (or delete the rows) and start again", flush=True)
+        if alert:
+            alert(n, [table])
+        return {"left": n}
+    pruned = (prune(c) or 0) if prune else 0
+    for x in have:
+        c.execute(f"ALTER TABLE {qi(table, (table,))} DROP COLUMN IF EXISTS {qi(x, have)}")  # one-way (the fragment's drop-ok line)
+    for stmt in alter:
+        c.execute(stmt)
+    c.execute("DELETE FROM obj_revoked WHERE src=?", (table,))
+    floor = kern_retire_floor(c)
+    print(f"{label}: every old row of {table} has its share in the shared core -- {pruned} row(s) and column(s) {', '.join(have)} "
+          "dropped" + (f"; versions before {floor} no longer start on this database" if floor else ""), flush=True)
+    return {"dropped": len(have), "pruned": pruned}
