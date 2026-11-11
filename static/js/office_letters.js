@@ -19,7 +19,7 @@ const LT_FIELDS = ['rcpt_name', 'rcpt_address', 'rcpt_email', 'letter_date', 're
 function ltReload() { LT.data = null; LT.cur = null; ofcDraw(); }
 const ltCurrent = () => LT.cur;
 const ltHooks = (k, d) => LT_HOOKS[k].map(f => { try { return f(d) || ''; } catch (x) { console.error(x); return ''; } }).join('');
-const ltStTag = d => `<span class="rotag dtp-st lt-st-${esc(d.status)}">${esc(tr(LT_ST[d.status] || d.status))}</span>`;
+const ltStTag = d => `<span class="rotag dtp-st dtp-st-${esc(d.status)}">${esc(tr(LT_ST[d.status] || d.status))}</span>`;
 const ltIn = (col, v, o = {}) => `<input id="lt-${col}" name="${col}" value="${esc(v ?? '')}" maxlength="${o.max || 300}" ${o.type ? `type="${o.type}"` : ''} ${o.num ? 'inputmode="numeric"' : ''} ${o.ph ? `placeholder="${esc(o.ph)}"` : ''} ${o.ro ? 'readonly' : ''} autocomplete="off">`;
 const ltRow = (col, label, field, hint) => ofcRowF('lt-' + col, label, field, hint);
 const ltPdfUrl = (d, dl) => `/api/office/letters/${d.id}/pdf${dl ? '?dl=1' : ''}`;

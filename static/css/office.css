@@ -405,6 +405,8 @@ ul.ofdpick .chkl{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75re
 .rkcfbin{background:var(--accent)}
 .rkcfbout{background:var(--accent);opacity:.35}
 .rkcftab td,.rkcftab th{padding:0 .25rem;vertical-align:middle}
+/* #5495: the shared base of the flat row buttons (open a row / pick an entry): no fill, no frame, 44 px hit area, left text */
+.ccopen,.dma-open,.ltm-pick,.lt-sugb{background:none;border:0;min-height:2.75rem;text-align:left}
 .rkcftab td .rkcfv{display:inline-flex;align-items:center;justify-content:flex-end;margin:0;min-height:2.75rem;min-width:4rem;padding:0 .25rem;background:none;border:0;color:var(--text);font:inherit;font-variant-numeric:tabular-nums;cursor:pointer;border-radius:var(--radius)}
 .rkcftab .rkcfv:hover,.rkcftab .rkcfv:focus-visible,.rkcftab .rkcfv[aria-expanded="true"]{color:var(--accent);text-decoration:underline}
 .rkcftab .rkcfv.plan{font-style:italic}
@@ -442,7 +444,7 @@ ul.ofdpick .chkl{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75re
 .bnkacts{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
 .bnkacts .btn{min-height:2.75rem}  /* 2.114.1 A (#2017): 44 px targets */
 /* 2.444.0 (#3447): credit cards */
-.ccopen{display:flex;align-items:center;gap:.625rem;width:100%;min-height:2.75rem;background:none;border:0;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.ccopen{display:flex;align-items:center;gap:.625rem;width:100%;padding:0;color:inherit;font:inherit;cursor:pointer}
 .ccopen .bnkn{flex:1;min-width:0}
 .ccfacts{display:flex;flex-wrap:wrap;gap:.375rem 1.5rem;margin:0 0 .5rem}
 .ccfacts dt{font-size:var(--fs-s);color:var(--muted)}
@@ -671,7 +673,7 @@ button.dun-hint{cursor:pointer}
 .dtp-bar select{max-width:12rem}
 .dtp-head h3{margin:.25rem 0;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .dtp-meta{margin:0 0 .75rem;display:flex;flex-wrap:wrap;gap:.25rem;align-items:center;font-size:var(--fs-s)}
-.dtp-st-final{border-color:var(--accent);color:var(--accent)}
+.dtp-st-final,.dtp-st-sent{border-color:var(--accent);color:var(--accent)}  /* #5495: one status chip set (.rotag.dtp-st + variant) for document templates and letters */
 /* 2.153.0 (#2028): links, history and follow-up of a letter (office_letterlinks.js) */
 .ltk{margin:1rem 0}.ltk-h{margin:.25rem 0 .5rem}
 .ltk-list,.ltk-res,.ltk-tl{list-style:none;margin:.25rem 0;padding:0;display:grid;gap:.25rem}
@@ -688,7 +690,7 @@ button.dun-hint{cursor:pointer}
 .ltk-th summary{cursor:pointer;min-height:2.5rem;display:flex;align-items:center}
 .ltk-tl li{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .ltk-tl .ltk-out svg{color:var(--accent)}
-.dtp-st-signed{background:var(--accent);border-color:var(--accent);color:var(--on-accent,#fff)}
+.dtp-st-signed,.dtp-st-delivered{background:var(--accent);border-color:var(--accent);color:var(--on-accent,#fff)}
 .dtp-st-declined{color:var(--danger);border-color:var(--danger)}
 .dtp-edit{display:grid;grid-template-columns:minmax(0,var(--w-form)) minmax(0,var(--w-lesen));justify-content:center;gap:1rem;align-items:start}  /* 2.580.0 (#4815): the form (--w-form) beside its preview (--w-lesen) in the middle, as the .ofdeditor pair */
 .dtp-lab{display:block;margin:.5rem 0 .25rem;font-weight:600}
@@ -861,7 +863,7 @@ button.dun-hint{cursor:pointer}
 .dma-box{display:flex;flex-direction:column;gap:.5rem;min-width:0;flex:1}
 .dma-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.375rem}
 .dma-f{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem .5rem;padding:.375rem .5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2)}
-.dma-open{display:flex;align-items:center;gap:.5rem;flex:1 1 100%;min-width:0;min-height:2.75rem;background:none;border:0;padding:0;color:var(--text);text-align:left}
+.dma-open{display:flex;align-items:center;gap:.5rem;flex:1 1 100%;min-width:0;padding:0;color:var(--text)}
 button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--accent);text-decoration:underline}
 .dma-n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dma-open small{flex:none}
@@ -1014,19 +1016,17 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .ltm-dlg .dtp-ta{min-height:8rem}
 .ltm-blocks{max-height:50vh;overflow:auto}
 .ltm-row{gap:.5rem}
-.ltm-pick{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;min-height:2.75rem;padding:.375rem .5rem;border:0;background:none;color:inherit;font:inherit;text-align:left;border-radius:var(--radius);cursor:pointer}
+.ltm-pick{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;padding:.375rem .5rem;color:inherit;font:inherit;border-radius:var(--radius);cursor:pointer}
 .ltm-pick small{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ltm-pick:hover,.ltm-pick:focus-visible{background:var(--bg3)}
 .ltm-manage{margin:.75rem 0}
 /* 2.153.0 (#2028): letters (office_letters.js) */
 .lt-bar input[type=search]{flex:1 1 10rem;min-width:8rem;min-height:2.5rem}
-.lt-st-sent{border-color:var(--accent);color:var(--accent)}
-.lt-st-delivered{background:var(--accent);border-color:var(--accent);color:var(--on-accent,#fff)}
 .lt-form{max-width:var(--w-form);margin-inline:auto}  /* 2.580.0 (#4815): a form = --w-form */
 .lt-rc{position:relative}
 .lt-addr{width:100%;box-sizing:border-box;font:inherit;line-height:var(--lh);resize:vertical}
 .lt-sug{list-style:none;margin:-.375rem 0 .625rem;padding:.25rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);max-height:18rem;overflow:auto}
-.lt-sugb{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;padding:.375rem .5rem;border:0;border-radius:calc(var(--radius) - .125rem);background:none;color:inherit;text-align:left;cursor:pointer}
+.lt-sugb{display:flex;align-items:center;gap:.5rem;width:100%;padding:.375rem .5rem;border-radius:calc(var(--radius) - .125rem);color:inherit;cursor:pointer}
 .lt-sugb:hover,.lt-sugb:focus-visible{background:var(--bg3)}
 .lt-sugb span{display:flex;flex-direction:column;min-width:0}
 .lt-sugb small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
