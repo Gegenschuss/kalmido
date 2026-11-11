@@ -359,10 +359,10 @@ def tchat_sig_q(uid):
     # 2.113.1 (#2059): + the messages of my channels / groups and their names, states, members
     # 2.640.0 (#4183): from the counters per room as above: newest id, count, change counter, pins (the rooms: tcx_sig_q)
     x = """SELECT COALESCE(MAX(s.max_id),0), COALESCE(SUM(s.n),0), COALESCE(SUM(s.rev),0), COALESCE(SUM(s.pins),0) FROM tchat_room_sig s
-           WHERE s.room_id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION """ + tcx_core_rooms_sql(uid) + ")"  # 2.565.0 (#4719)
+           WHERE s.room_id IN (""" + tcx_core_rooms_sql(uid) + ")"  # 2.565.0 (#4719); 2.924.0 (#5069): the core alone
     tq, ta = tcx_sig_q(uid)
     return (f"SELECT * FROM ({m}) s1 CROSS JOIN ({rd}) s2 CROSS JOIN ({x}) s3 CROSS JOIN ({tq}) s4",
-            (uid, uid, uid, uid, uid, uid, uid, *ta))
+            (uid, uid, uid, uid, uid, uid, *ta))
 
 
 TCHAT_SIG_COLS = 16

@@ -618,7 +618,13 @@ def ox_csq(by_id):
     (the rule of collab/teamchan.py tcx_room_ok: an admin manages a closed channel but does not read it)."""
     u = int(by_id or 0)
     return ("SELECT id FROM tchat_rooms WHERE kind='channel' AND org_id=? AND ((is_open=1 AND archived_at IS NULL)"
-            + (f" OR id IN (SELECT room_id FROM tchat_members WHERE user_id={u})" if u else "") + ")")
+            + (f" OR id IN ({_tcx_rooms(u)})" if u else "") + ")")
+
+
+def _tcx_rooms(u):
+    """2.924.0 (#5069): the rooms u is a member of through the core alone (a person's / agent's share, a group's)."""
+    from ..collab.tcxcore import tcx_core_rooms_sql
+    return tcx_core_rooms_sql(u)
 
 
 # 2.190.0 R (#2561): rows of the file store that belong to one node (left out with a hidden filed mail's nodes)

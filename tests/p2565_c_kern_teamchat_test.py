@@ -176,7 +176,8 @@ no(Bo.get(B + f"/api/files?parent={nid}"), "files: the room's node by its id")
 # ================================================================== migration: rows of the old way
 C2 = channel(A, "Old way", K)
 sql("INSERT INTO tchat_members(room_id,user_id,added_by,created_at) VALUES(?,?,?,'2026-11-01T10:00:00Z')", (C2, BOB, ALICE), write=True)
-check(share(C2, BOB) is None and reads(Bo, C2), "migration: a row of the old way only (fallback) - bob reads before the start")
+# 2.924.0 (#5069 7a step 1): no reader reads tchat_members any more -- a row of the old way alone opens nothing before the start
+check(share(C2, BOB) is None and not reads(Bo, C2), "migration: a row of the old way only - bob does not read before the start")
 sql("DELETE FROM tchat_members WHERE room_id=? AND user_id=?", (C1, BOB), write=True)  # an older version removed bob from C1
 check(share(C1, BOB) == "edit", "migration: bob's share in C1 still there before the start")
 restart()

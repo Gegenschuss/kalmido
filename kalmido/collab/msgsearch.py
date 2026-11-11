@@ -203,9 +203,9 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
             FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
             WHERE {mcond} AND m.deleted_at IS NULL AND m.enc IS NULL AND ((r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN {vis_sql()}
               AND r.list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL))
-              OR (r.kind IN ('channel','group') AND r.id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION {tcx_core_rooms_sql(uid)}))){snd}
+              OR (r.kind IN ('channel','group') AND r.id IN ({tcx_core_rooms_sql(uid)}))){snd}
             {' AND m.room_id=?' if room is not None else ''} ORDER BY m.id DESC LIMIT {MSG_CAND}""",
-                         match + [uid, uid, uid, uid, uid] + ([sender] if sender is not None else []) + ([room] if room is not None else [])).fetchall()
+                         match + [uid, uid, uid, uid] + ([sender] if sender is not None else []) + ([room] if room is not None else [])).fetchall()  # 2.924.0 (#5069): the core alone
         ok, lnames, rrows = {}, {}, {}
         for r in rows:
             if r["room_id"] not in ok:

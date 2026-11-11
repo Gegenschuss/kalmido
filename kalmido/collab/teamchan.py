@@ -9,7 +9,7 @@ channel's organisation; agents only when a person adds them explicitly (a person
 organisation by its admins) and only agents of the same organisation (a private channel: personal agents without one).
 Group conversations (kind 'group'): three or more people who all work with each other (every pair would be allowed a direct
 message, tchat_coworkers), name optional; every member adds people (who again work with all of them) and leaves. Pushes and
-read state like a direct message. Members of both live in tchat_members.
+read state like a direct message. Members of both are shares of the room's node in the shared core (collab/tcxcore.py; 2.924.0, #5069).
 
 Files (tchat_files): the file path of the agent chat (agents/chat.py): the same limits, checks (files/upsafe.py, kind
 "tchat") and names, sealed at rest (core/orgcrypt.py: the organisation of the conversation, else the list owner's / the
@@ -61,10 +61,10 @@ def tcx_agent_org(c, aid):
 
 
 def tcx_member_ids(c, rid):
-    """The member rows of room rid: the fallback rows and the core's personal shares (2.565.0, #4719; no group's members)."""
+    """The member rows of room rid: the core's personal shares (2.565.0, #4719; no group's members). 2.924.0 (#5069): the
+    core alone (no fallback rows of tchat_members)."""
     from .tcxcore import tcx_core_members_sql
-    return {r[0] for r in c.execute(f"SELECT user_id FROM tchat_members WHERE room_id=? UNION SELECT user_id FROM {tcx_core_members_sql()} cm "
-                                    "WHERE cm.room_id=? AND cm.via=0", (rid, rid))}
+    return {r[0] for r in c.execute(f"SELECT user_id FROM {tcx_core_members_sql()} cm WHERE cm.room_id=? AND cm.via=0", (rid,))}
 
 
 def tcx_members(c, r):
@@ -79,15 +79,14 @@ def tcx_members_of(c, rooms):
     out = {r["id"]: set() for r in rooms}
     if not out:
         return out
-    # 2.565.0 (#4719): the members are the core's shares of the room (a person, an agent, a group's members: via = the group)
-    # and the fallback rows of tchat_members (kept in step, tcxcore.py); a group gives a channel only its enabled people who
-    # are full members of the channel's organisation (no guests / accounting, the rule of the open channels)
+    # 2.565.0 (#4719): the members are the core's shares of the room (a person, an agent, a group's members: via = the group);
+    # a group gives a channel only its enabled people who are full members of the channel's organisation (no guests /
+    # accounting, the rule of the open channels). 2.924.0 (#5069): the core alone (no fallback rows of tchat_members)
     from .tcxcore import tcx_core_members_sql
     rows = c.execute(f"""SELECT m.room_id, m.user_id, MIN(m.via) AS via, u.disabled, u.kind
-                         FROM (SELECT room_id, user_id, 0 AS via FROM tchat_members WHERE room_id = ANY(CAST(? AS BIGINT[]))
-                               UNION SELECT room_id, user_id, via FROM {tcx_core_members_sql()} cm WHERE cm.room_id = ANY(CAST(? AS BIGINT[]))) m
+                         FROM (SELECT room_id, user_id, via FROM {tcx_core_members_sql()} cm WHERE cm.room_id = ANY(CAST(? AS BIGINT[]))) m
                          JOIN users u ON u.id=m.user_id GROUP BY m.room_id, m.user_id, u.disabled, u.kind""",
-                     (sorted(out), sorted(out))).fetchall()
+                     (sorted(out),)).fetchall()
     ppl = sorted({x["user_id"] for x in rows if (x["kind"] or "") != "agent"})
     ags = sorted({x["user_id"] for x in rows if (x["kind"] or "") == "agent"})
     orgs, full = {}, {}
@@ -171,8 +170,8 @@ def tcx_rooms_of(c, uid, mems=None):
     from ..core.objects import obj_token_lists
     if obj_token_lists(uid) is not None:
         return []  # 2.565.0 (#4719): the core's floor (obj_role): a token limited to lists reaches no channel / group
-    rows = c.execute(f"""SELECT r.* FROM tchat_rooms r WHERE r.id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION {tcx_core_rooms_sql(uid)})
-                         AND r.kind IN ('channel','group') AND r.archived_at IS NULL""", (uid,)).fetchall()
+    rows = c.execute(f"""SELECT r.* FROM tchat_rooms r WHERE r.id IN ({tcx_core_rooms_sql(uid)})
+                         AND r.kind IN ('channel','group') AND r.archived_at IS NULL""").fetchall()  # 2.924.0 (#5069): the core alone
     mm = tcx_members_of(c, rows)
     if mems is not None:
         mems.update(mm)
@@ -218,10 +217,10 @@ def tcx_sig_q(uid):
     """2.149.0 C (#2507): the query of tcx_sig (one row, 5 columns; tchat_sig runs it inside its one statement)."""
     from .tcxcore import tcx_core_members_sql, tcx_core_rooms_sql
     # 2.565.0 (#4719): + the rooms and members through the core's shares (a group shared with a channel)
+    # 2.924.0 (#5069): the core alone (no fallback rows of tchat_members): no parameters left
     return (f"""SELECT COUNT(*), COALESCE(SUM(length(r.name)),0), COUNT(r.archived_at), COALESCE(SUM(r.is_open),0),
-                      COALESCE(SUM((SELECT COUNT(*) FROM (SELECT user_id FROM tchat_members x WHERE x.room_id=r.id
-                                    UNION SELECT user_id FROM {tcx_core_members_sql()} cm WHERE cm.room_id=r.id) xs)),0)
-                      FROM tchat_rooms r WHERE r.id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION {tcx_core_rooms_sql(uid)})""", (uid,))
+                      COALESCE(SUM((SELECT COUNT(*) FROM (SELECT user_id FROM {tcx_core_members_sql()} cm WHERE cm.room_id=r.id) xs)),0)
+                      FROM tchat_rooms r WHERE r.id IN ({tcx_core_rooms_sql(uid)})""", ())
 
 
 def tcx_sig_fmt(r):
@@ -355,9 +354,9 @@ def tcx_channels():
     uid = me()
     orgs = _orgs_full(c, uid)  # 2.143.0 A (#2151)
     from .tcxcore import tcx_core_rooms_sql
-    rows = c.execute(f"""SELECT * FROM tchat_rooms WHERE kind='channel' AND (id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION {tcx_core_rooms_sql(uid)})
+    rows = c.execute(f"""SELECT * FROM tchat_rooms WHERE kind='channel' AND (id IN ({tcx_core_rooms_sql(uid)})
                          OR created_by=? {('OR org_id IN (' + ','.join('?' * len(orgs)) + ')') if orgs else ''}) ORDER BY lower(name), id""",
-                     (uid, uid, *orgs)).fetchall()
+                     (uid, *orgs)).fetchall()  # 2.924.0 (#5069): the core alone
     from ..core.objects import obj_gate  # 2.633.0 (#4779): the core's floor per row, as need_room (a token limited to lists sees none)
     rows = [r for r in rows if obj_gate(c, uid, "tchat_room", r)]
     mm = tcx_members_of(c, rows)  # 2.281.0 B (#3110): the members of every channel at once

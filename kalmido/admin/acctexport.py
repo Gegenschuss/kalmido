@@ -423,6 +423,7 @@ def umz_mine_queries(uid):
     own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"
     shared = "(SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.owner_id!=?)"
     vis = acx_lists_sql(req=False)
+    from ..collab.tcxcore import tcx_core_rooms_sql  # 2.924.0 (#5069): my channels / groups through the core alone
     return {
         "written_comments": (f"""SELECT c.id, c.task_id, CASE WHEN t.list_id IN {vis} THEN t.title END AS task_title,
                                  CASE WHEN t.list_id IN {vis} THEN t.list_id END AS list_id, c.body, c.created_at, c.edited_at
@@ -430,10 +431,10 @@ def umz_mine_queries(uid):
                                  AND t.list_id NOT IN {own} AND t.list_id NOT IN {shared} ORDER BY c.id""",
                              (uid, uid, uid, uid, uid, uid, uid, uid)),
         "channel_messages": (f"""SELECT m.id, m.room_id, r.kind AS room_kind, CASE WHEN r.list_id IN {vis}
-                                OR r.id IN (SELECT room_id FROM tchat_members WHERE user_id=?) THEN r.name END AS room_name, r.list_id, m.body, m.enc, m.task_id,
+                                OR r.id IN ({tcx_core_rooms_sql(uid)}) THEN r.name END AS room_name, r.list_id, m.body, m.enc, m.task_id,
                                 m.thread_of, m.created_at, m.edited_at FROM tchat_msgs m LEFT JOIN tchat_rooms r ON r.id=m.room_id
                                 WHERE m.user_id=? AND m.deleted_at IS NULL AND m.room_id NOT IN (SELECT id FROM tchat_rooms WHERE kind='dm')
-                                ORDER BY m.id""", (uid, uid, uid, uid)),
+                                ORDER BY m.id""", (uid, uid, uid)),
         "other_tasks": (f"""SELECT * FROM tasks WHERE (created_by=? OR assignee_id=? OR id IN (SELECT task_id FROM task_people WHERE user_id=?))
                             AND deleted_at IS NULL AND list_id IN {vis} AND list_id NOT IN {own} ORDER BY id""",
                         (uid, uid, uid, uid, uid, uid)),
