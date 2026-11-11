@@ -19,6 +19,32 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.910.0] - 2026-11-11
+
+Package 2.905 (Bündel: Rückgängig über alle Geräte, Stufe 7: Browser-Verl, Dokument-Ansicht: Vorschaubild springt beim Wechse, Kern-Querschnitt Q8a: Gelese).
+
+### Changed
+- Undo across devices, stage 7: the browser keeps no copies of what it changed any more; Undo, Ctrl+Z and the "Recent steps" list go back through the server's undo steps only, Ctrl+Z takes back the person's newest step also from another device, a "Saved · Undo" button takes back exactly its own step; the date popover's Undo takes back the visit's server steps instead of writing a new change; areas without a server step keep "only this device" (#5255)
+- Task read marks live in the shared core table obj_seen; the old table task_seen is moved over at start and dropped (#5284)
+- Task, project and section templates are one kind of the shared core: an organisation's templates are changed only by its admins, deleting a section template puts it into the templates' trash, organisation templates come along in the organisation export, a key limited to projects sees and makes no templates; section_templates is moved into templates at start and dropped (#5288)
+- Office trash: services, equipment, sets, texts, framework contracts, roles, crew, rights groups, fixed costs (also a fixed cost import taken back), cash flow corrections and a letter's links go into the shared core's trash instead of a copy; the office trash shows them and restores them (#5414)
+
+### Fixed
+- Document view: the preview picture takes the first page's size and place at once (zoom, fit, position, shadow); loading the full document only swaps the content, nothing jumps, also when paging to the next document (#5393)
+
+Package 2.910 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Lists, dialogs alike (#5442): dialogs that save by themselves close with "Done" (also when opened from another dialog, no "Back" any more: project, folder and repository settings, the project's Share dialog), the "Blocked by…" choice closes with "Close", the project status dialog has "Cancel" + "Save" with the main button at the right edge (was "Close" + "Update status"). The date picker closes with Escape alone (the dialog below stays open, the focus goes back to the date field). The project's Share dialog is built from one shared frame and no longer grows in steps while it loads. The folder's Share dialog, its role question and the several-tasks choice follow in #5587.
+- Lists, quick add (#5445): each recognised part shows once - date, project and priority only as the composer's chips (a small x next to them = "don't recognise"), the syntax help disappears once something is recognised; on the phone the recognised title stays in sight in front of the chips.
+### Fixed
+- Lists, error messages (#5444): a refused tick says "Done could not be saved" (the server's text in brackets) and the circle is empty again; a refused move says the task is back in its place; reopening likewise; comments, history, dependencies and the project overview name what could not be loaded; offline there is one sentence ("Only available online.").
+
+Package 2.909 (Bündel: Projekt-Sperre: gelöschte Textfelder bleiben mit K, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Security
+- Project lock: deleted text fields leave the field trash when the lock is switched on and when a key change is done; a field restored from the trash (also by Undo) takes back only values that fit the project's lock now (no plain text into a locked project, no ciphertext into an open one, during a key change only the new key's values; while the lock switches the restore answers "try again" and the field stays in the trash). Tasks in the trash of projects switched before forget a section name of the other state once at the start; the one-off clean-up of plain section names in locked projects (#5552) now reaches up to the day it went live (#5565)
+- Restoring "Delete all times" and restoring a deleted field wait for a task that is being moved into a locked project at the same moment, so no plain title, note or field value lands next to it (#5583, #5565)
+
 ## [2.902.0] - 2026-11-11
 
 Package 2.902 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -71,6 +97,7 @@ Package 2.900 (Bündel: Projekt-Sperre: Rückgängig-Kopien von Zeiteinträge, P
 
 Not released (the CI of this version was red); its changes are listed under 2.902.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.902.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.910.0...HEAD
+[2.910.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.910.0
 [2.902.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.902.0
 [2.900.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.900.0

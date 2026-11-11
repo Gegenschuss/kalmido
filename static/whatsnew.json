@@ -1,6 +1,32 @@
 {
  "versions": [
   {
+   "version": "2.910.0",
+   "date": "2026-11-11",
+   "items": [
+    {
+     "de": "Beim Öffnen eines Dokuments springt das Vorschaubild nicht mehr, wenn das volle Dokument geladen ist.",
+     "en": "Opening a document, the preview no longer jumps when the full document has loaded."
+    },
+    {
+     "de": "Rückgängig und Strg+Z nehmen deine letzten Schritte zurück, auch wenn du sie auf einem anderen Gerät gemacht hast.",
+     "en": "Undo and Ctrl+Z take back your latest steps, also those made on another device."
+    },
+    {
+     "de": "Dialoge in Listen schließen einheitlich mit „Fertig“, „Schließen“ oder „Abbrechen“ + „Speichern“.",
+     "en": "List dialogs now close the same way everywhere: \"Done\", \"Close\" or \"Cancel\" + \"Save\"."
+    },
+    {
+     "de": "Die Schnelleingabe zeigt jede erkannte Angabe nur noch einmal.",
+     "en": "Quick add shows each recognised detail only once."
+    },
+    {
+     "de": "Klappt Abhaken oder Verschieben nicht, sagt eine Meldung, was nicht gespeichert wurde, und der Haken geht zurück.",
+     "en": "If ticking off or moving fails, a message says what was not saved and the tick goes back."
+    }
+   ]
+  },
+  {
    "version": "2.900.0",
    "date": "2026-11-11",
    "items": [
