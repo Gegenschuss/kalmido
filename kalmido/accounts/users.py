@@ -51,7 +51,8 @@ def user_forget_conns(c, uid):
     c.execute("DELETE FROM pl_conns WHERE kind='personal' AND owner_id=?", (uid,))
     c.execute("DELETE FROM pl_tokens WHERE user_id=?", (uid,))
     c.execute("DELETE FROM pl_conn_users WHERE user_id=?", (uid,))
-    c.execute("DELETE FROM list_bell WHERE user_id=?", (uid,))
+    with system_ctx(c):  # 2.981.0 (#5287): the list bells are rows of the core's obj_follow (every workspace; was list_bell)
+        c.execute("DELETE FROM obj_follow WHERE user_id=? AND kind='list' AND mode<>'watch'", (uid,))
 
 
 def user_admin_dict(c, u):

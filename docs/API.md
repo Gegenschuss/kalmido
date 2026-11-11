@@ -2197,7 +2197,7 @@ Event drafts are events with `status: "tentative"`; CalDAV sends them as `STATUS
 
 *Since 2.53.0.*
 
-Next to the bell of a list (`list_bell`) every person has a bell per task: **As the list** (default), **Muted** (no pushes
+Next to the bell of a list (`PUT /api/lists/{id}/bell`) every person has a bell per task: **As the list** (default), **Muted** (no pushes
 about the task; the News stay) or **Urgent** (every change and every comment of the task by someone else is a push at the
 highest priority: ntfy 5 / Web Push urgency high, whatever the list bell, the matrix or the burst rule say). An urgency ends
 on a chosen day (`until`, inclusive) or when the task is completed; afterwards the list counts again. It is a level of the

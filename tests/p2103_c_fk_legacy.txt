@@ -18,7 +18,6 @@ env_deploys.milestone_id
 ev_reminded.user_id
 file_text.ref_id
 filters.user_id
-folder_notif.user_id
 forms.section_id
 fs_log.user_id
 fs_nodes.ref_id
@@ -28,9 +27,7 @@ hub_mail_links.ref_id
 kid_stars.by_id
 kid_stars.reward_id
 list_activity.user_id
-list_bell.user_id
 list_files.user_id
-list_notif.user_id
 list_paperless.conn_id
 list_paperless.doc_id
 lists.client_id

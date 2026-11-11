@@ -211,7 +211,7 @@ TENANT_EXEMPT = {
     "doc_office_moves": "2.547.0 (#4434): the undo of one person's receipts move into the office (read and written only for user_id = the signed-in person, docs/areamove.py; the documents carry the workspace)",
     "deleted_accounts": "2.152.0 B (#2172): the instance's journal of deleted accounts (hashes only), read by the restore alone, never by a person",
     "folder_agents": "2.41.0 (#1420): the agents of an owner's folder; every list share goes through the workspace rule (folder_apply / list_agent_set)",
-    "folder_notif": _OWN + " (2.33.0 #927: the owner's notification template of a folder; it only limits pushes of people already in its lists)",
+    "obj_notif_cap": _OWN + " (2.33.0 #927: the owner's notification template of a list / folder; it only limits pushes of people already in its lists; 2.981.0 #5287: was list_notif / folder_notif)",
     "git_folders": _OWN + " (2.33.0 #934: the owner's folder repository; it serves only the owner's lists in that folder)",
     "login_ips": "2.33.0 (#834): private sign-in addresses for the proxy check, admins only (instance diagnostics)",
     "admin_login_ips": "2.36.2 (#1133): hashed sign-in addresses of admins for the security alerts (instance diagnostics)",

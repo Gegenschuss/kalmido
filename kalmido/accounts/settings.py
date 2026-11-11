@@ -1084,8 +1084,11 @@ def umz_export_queries(uid):
         "view_layout_offers": ("SELECT * FROM view_layout_offers WHERE from_user=? OR to_user=?", (uid, uid)),  # 2.55.0 (#1068)
         # 2.43.0 (#1346); 2.148.1 A (#2478): only from lists the person still sees
         "list_notepads": (f"SELECT * FROM list_notepads WHERE created_by=? AND list_id IN {acx_lists_sql(req=False)}", (uid, uid, uid)),
-        "list_notif": (f"SELECT * FROM list_notif WHERE list_id IN {own}", (uid,)),  # 2.33.0 (#927): my notification templates
-        "folder_notif": ("SELECT * FROM folder_notif WHERE owner_id=?", (uid,)),
+        # 2.33.0 (#927): my notification templates; 2.981.0 (#5287): rows of the core's obj_notif_cap, the parts keep their old columns
+        "list_notif": (f"SELECT ref_id AS list_id, user_id, tpl, custom::text AS custom, updated_at FROM obj_notif_cap "
+                       f"WHERE kind='list' AND ref_id IN {own}", (uid,)),
+        "folder_notif": ("SELECT ref_id AS owner_id, path AS folder, user_id, tpl, custom::text AS custom, updated_at FROM obj_notif_cap "
+                         "WHERE kind='folder' AND ref_id=?", (uid,)),
         # 2.53.0 C (#1424), 2.473.0 (#3357); 2.972.0 (#5285): rows of the core's obj_follow, the parts keep their old columns
         "task_bell": ("SELECT ref_id AS task_id, mode AS level, until::text AS until, set_by, created_at, updated_at FROM obj_follow "
                       "WHERE user_id=? AND kind='task' AND mode<>'watch'", (uid,)),

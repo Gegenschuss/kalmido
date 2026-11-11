@@ -147,7 +147,9 @@ def case(rid, mid, setup, mentions=()):
         c.rollback()
         c.close()
 topic = lambda n: ("INSERT INTO user_settings(user_id,key,value) VALUES(?,'ntfy_topic',?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value", (U[n], "t-" + n))
-bell = lambda n, lid, mode="all": ("INSERT INTO list_bell(user_id,list_id,mode,custom) VALUES(?,?,?,'{}') ON CONFLICT(user_id,list_id) DO UPDATE SET mode=excluded.mode", (U[n], lid, mode))
+# 2.981.0 (#5287): the project bell is a row of the core's obj_follow (kind list, the project's workspace)
+bell = lambda n, lid, mode="all": ("INSERT INTO obj_follow(user_id,kind,ref_id,org_id,mode,custom) VALUES(?,'list',?,(SELECT org_id FROM lists WHERE id=?),?,'{}') "
+                                   "ON CONFLICT (user_id,kind,ref_id) WHERE mode <> 'watch' DO UPDATE SET mode=excluded.mode", (U[n], lid, lid, mode))
 mute = lambda n, rid: ("INSERT INTO tchat_reads(room_id,user_id,last_id,muted) VALUES(?,?,0,1) ON CONFLICT(room_id,user_id) DO UPDATE SET muted=1", (rid, U[n]))
 """
 NOTIFY = r"""

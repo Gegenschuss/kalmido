@@ -66,6 +66,7 @@ ORDER = (
     "accounts.oidc",
     "core.access",
     "core.objfollow",  # 2.972.0 (#5285): following an object in the shared core (one table obj_follow: watching + the bell)
+    "core.objnotifcap",  # 2.981.0 (#5287): the owner's notification ceilings in the shared core (obj_notif_cap)
     "core.objparts",  # 2.610.0 (#4762): the write layer of a project's side objects (stands on core.access / core.conflict)
     "core.objreact",  # 2.763.0 (#5269): the reactions of the shared core (one table obj_reactions, one rule)
     "core.objseen",  # 2.905.0 (#5284): the read marks of the shared core (one table obj_seen, no routes)

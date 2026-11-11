@@ -8,6 +8,7 @@ from flask import jsonify, request
 
 from ..core.config import app, ATT_DIR, INLINE_TYPES, MAX_FILE_MB, TZ
 from ..core.objhooks import obj_rows_drop  # 2.578.0 (#4796)
+from ..core.objfollow import ofl_bell_put, ofl_bell_rest  # 2.981.0 (#5287): a project's bell is a row of the core's obj_follow
 from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso
@@ -100,13 +101,13 @@ def list_bell_set(lid):
 
 def bell_store(c, uid, lid, mode, custom=None):
     """custom (stored json) only replaces the choice when given; it is kept while another mode is set, so switching
-    back to "custom" brings it back."""
+    back to "custom" brings it back. 2.981.0 (#5287): a row of the core's obj_follow (kind 'list', was list_bell); it carries
+    the project's workspace (a list's workspace move takes it along: accounts/orgs.py list_space_follow)."""
     if mode == "default":
-        c.execute("UPDATE list_bell SET mode='default' WHERE user_id=? AND list_id=? AND custom IS NOT NULL AND custom!='{}'", (uid, lid))
-        c.execute("DELETE FROM list_bell WHERE user_id=? AND list_id=? AND mode!='default'", (uid, lid))
+        ofl_bell_rest(c, "list", lid, uid, "default")
     else:
-        c.execute("INSERT INTO list_bell(user_id,list_id,mode,custom) VALUES(?,?,?,?) ON CONFLICT(user_id,list_id) "
-                  "DO UPDATE SET mode=excluded.mode, custom=COALESCE(?, list_bell.custom)", (uid, lid, mode, custom, custom))
+        r = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()
+        ofl_bell_put(c, "list", lid, uid, r["org_id"] if r else None, mode, None, uid, custom=custom)
 
 
 @app.post("/api/lists/<int:lid>/status")

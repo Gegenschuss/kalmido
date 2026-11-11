@@ -628,6 +628,9 @@ def list_space_follow(c, lid, old_org, boundary):
     # 2.972.0 (#5285): the bells are rows of obj_follow (a watching row follows its task by itself: kalmido_ofl_carry)
     c.execute("""UPDATE obj_follow SET org_id=? WHERE kind='task' AND mode<>'watch' AND ref_id IN (SELECT id FROM tasks WHERE list_id=?)
                  AND org_id IS NOT DISTINCT FROM ?""", (oid, lid, old_org or None))
+    # 2.981.0 (#5287): the bells of the project itself (kind 'list', was list_bell) go along too
+    c.execute("UPDATE obj_follow SET org_id=? WHERE kind='list' AND ref_id=? AND mode<>'watch' AND org_id IS NOT DISTINCT FROM ?",
+              (oid, lid, old_org or None))
     return n
 
 

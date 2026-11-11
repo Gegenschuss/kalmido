@@ -563,8 +563,8 @@ OX_LEFT = {
     "dl_changes": _DERIVED, "env_deploys": _SECRET, "git_conns": _SECRET,
     "hook_in": _SECRET, "issue_hooks": _SECRET,
     "issue_reports": "fingerprints of error reports: a counter and limit of this server, the reports themselves are tasks",  # 2.455.0 (#3469)
-    "kk_conns": _SECRET, "list_bell": _PERSONAL, "list_envs": _SECRET, "list_key_pending": "list keys (client_encrypted)",
-    "list_keys": "list keys (client_encrypted)", "list_layouts": _PERSONAL, "list_mine_hide": _PERSONAL, "list_notif": _PERSONAL,
+    "kk_conns": _SECRET, "list_envs": _SECRET, "list_key_pending": "list keys (client_encrypted)",
+    "list_keys": "list keys (client_encrypted)", "list_layouts": _PERSONAL, "list_mine_hide": _PERSONAL,
     "list_paperless": _SECRET, "mail_tokens": _SECRET, "notifications": _PERSONAL, "playbook_proposals": _AGENT, "public_links": _SECRET,
     "agent_schedules": _AGENT, "budget_meta": _PERSONAL, "issue_hooks": _SECRET, "issue_reports": "not yet in the export",  # 2.362.4 (#3107)
     "shop_memory": _PERSONAL, "list_ticket_seq": _DERIVED, "task_keys": _LATER2, "list_folder_skip": _LATER2,

@@ -268,7 +268,8 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/mt940.py` - SWIFT MT940 / MT942 statements (the German bank dialects: Sparkasse, Volksbank, Deutsche Bank, Commerzbank ...)
 - `kalmido/core/numtext.py` - ONE reader for numbers typed by people - the same rules as parseNum in static/js/core.js
 - `kalmido/core/objects.py` (`obj`) - The shared core, stage 1 -- ONE register of object kinds and ONE role function for every new area (docs/dev/kern.md "So baut man einen neuen Bereich")
-- `kalmido/core/objfollow.py` (`ofl`) - Following exists once, in the shared core: one table obj_follow for the watchers and the bell of a task (stage Q9a)
+- `kalmido/core/objfollow.py` (`ofl`) - Following exists once, in the shared core: one table obj_follow for the watchers and the bell of a task (stage Q9a) and the bell of a project (stage Q9b)
+- `kalmido/core/objnotifcap.py` (`ncap`) - The owner's notification ceilings of projects and folders in the shared core: one table obj_notif_cap; list_notif and folder_notif moved here and went (stage Q9b)
 - `kalmido/core/objhooks.py` (`obj`) - The two things of the shared core that the layer accounts needs, without importing upward
 - `kalmido/core/objcomments.py` (`ocm`) - Comments exist once, in the shared core: one table obj_comments (kind, ref_id) with its trash obj_comment_trash, one mention parser, one say rule, one delete rule (stage Q4a)
 - `kalmido/core/objlight.py` (`obj`) - The light kinds of the shared core (task, event, hub_mail, client): kind and role only, no node, no shares, no write path

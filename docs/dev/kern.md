@@ -710,8 +710,31 @@ watched task can be muted at the same time. Kinds: `task`. `kalmido/core/objfoll
   `tasks/watchers.json` have their old columns (`task_id`, `level` ...), so older archives import the same way.
 - The move: `core/db.py init_db` calls `ofl_setup` (`ofl_move`) before the fragment `5285_a` drops the old tables (one-way;
   a version before 2.972 starts with empty old tables, its rows come over at the next start of this one).
-`list_bell`, `list_notif` and `folder_notif` stay until stage Q9b. A new area with following adds its kind to `OFL_KINDS`,
-a bell rule to `OFL_LEVEL` and a `kalmido_ofl_gone` trigger line in a fragment -- no table of its own.
+A new area with following adds its kind to `OFL_KINDS` (its bell's modes to `OFL_BELL_OF`, its table to `OFL_TABLE`), a bell
+rule to `OFL_LEVEL` and a `kalmido_ofl_gone` trigger line in a fragment -- no table of its own.
+
+### Following projects and the owner's ceilings (stage Q9b, 2.981.0, #5287)
+
+- The bell of a project is a row of `obj_follow` with kind `list` (it replaced `list_bell`): mode `default` (as the
+  notification matrix; the row stays only while it holds the person's own choice), `all`, `mute` or `custom`; the own choice per
+  event is the column `custom` (JSONB, kept while another mode is set). `collab/news.py` reads it (`list_bell`, `list_bells`,
+  `bell_all_users`, `notif_ok`) through `ofl_bells_here` (only rows of the project's current workspace), `lists/projects.py
+  bell_store` writes it (`ofl_bell_put` / `ofl_bell_rest`). Its rule in `OFL_LEVEL` answers `mute`; the rest of a project bell
+  (everything, the own choice, mentions through a muted bell) stays `notif_ok`'s.
+- The row carries the project's workspace (row-level security) and goes along when the project moves (`accounts/orgs.py
+  list_space_follow`); it ends with the share (`dlg_gone`: leaving the project; `obj_revoke_person`), with the account
+  (`accounts/users.py user_forget_conns`, also when an account becomes an agent) and with the project (`kalmido_ofl_gone_list`).
+- The owner's ceiling of the notifications (`notify/caps.py`: read | work | all | custom, per project or folder, for everyone or
+  one person) is one table `obj_notif_cap(kind, ref_id, path, user_id, tpl, custom JSONB, updated_at TIMESTAMPTZ)`
+  (`core/objnotifcap.py`, `ncap_*`; it replaced `list_notif` and `folder_notif`): kind `list` = a project (`path` empty), kind
+  `folder` = a folder of the owner (`ref_id` = the owner's account, `path` = the folder, keyed like every folder setting). A
+  ceiling only limits pushes of people already in the project, it never gives a right. `kalmido_ncap_gone` takes the rows with
+  the project / the owner's account (and the rows that name a deleted person).
+- Exports keep their parts: the account export's `list_notif` / `folder_notif` have their old columns. A project bell was never
+  exported (a personal view state).
+- The move: `ofl_setup` (`ofl_move`: `list_bell`) and `core/objhooks.MOVE` (`ncap_move`) before the fragment `5287_a` drops the
+  old tables (one-way, the back limit is raised like Q9a; a SQLite file's old tables come in through `admin/migrate.py
+  legacy_tables`).
 
 ## Filter (2.846.0, #5520)
 
