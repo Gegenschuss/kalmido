@@ -18,6 +18,8 @@ async function brl_load() {
   brl_draw();
 }
 function brl_draw() { const sec = $('.brlset'); if (sec) sec.outerHTML = brl_settingsHtml(); }  // only this section: the settings form keeps what is typed there
+// 2.979.0 (#5667): an undo / redo the server did: the shown rules section comes again, else it reads again when it is drawn (oid)
+histReloader('bank-rules', () => { if (BRL.items === undefined) return; if ($('.brlset')) return brl_load(); BRL.oid = -1; });
 const brl_stale = () => { if (typeof BNK === 'object') { BNK.data = null; } if (typeof bfbBooksStale === 'function') bfbBooksStale(); };
 function brl_cond(r) {
   const amt = r.amount_min || r.amount_max ? [r.amount_min ? tr('from {0}', ofcMoney(+r.amount_min)) : '', r.amount_max ? tr('to {0}', ofcMoney(+r.amount_max)) : ''].filter(Boolean).join(' ') : '';

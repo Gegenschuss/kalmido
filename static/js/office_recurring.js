@@ -27,6 +27,8 @@ async function rinLoad() {
   if (typeof ofdDraw === 'function') ofdDraw();
 }
 const rinReload = () => { RIN.items = null; RIN.err = null; rinLoad(); };
+// 2.979.0 (#5667): an undo / redo the server did: the invoice series come again
+histReloader('recurring', () => { if (!RIN.items) return; if (S.route.mod === 'office') return rinLoad(); RIN.items = null; });
 const rinById = id => (RIN.items || []).find(s => s.id === +id) || (RIN.bin || []).find(s => s.id === +id);
 const rinWhen = s => !s.active ? (s.until && s.next_date > s.until ? tr('ended') : tr('paused')) : s.next_date ? tr('next on {0}', fmtDateLoc(s.next_date)) : '';
 const rinPeriodTxt = (p, s) => { const n = rinNext(p, s); return `${fmtDateLoc(p)} – ${fmtDateLoc(rinDay(n, -1))}`; };

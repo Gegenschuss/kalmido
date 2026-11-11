@@ -25,6 +25,8 @@ async function bnr_load() {
   ofcDraw();
 }
 const bnr_reload = () => { BNR.data = null; BNR.pick = null; BNR.cand = null; BNR.cnt = undefined; if (typeof BNK === 'object') BNK.data = null; if (typeof bfbBooksStale === 'function') bfbBooksStale(); ofcDraw(); };
+// 2.979.0 (#5667): an undo / redo the server did: the bookings without a receipt and the reminder setting come again (shown: at once, else on the next view)
+histReloader('bank-noreceipt', () => { if (BNR.data) bnr_reload(); if (BNR.rem) { if ($('#bnr-every')) bnr_remLoad(); else BNR.rem = null; } });
 
 function bnr_html() {
   if (BNR.oid !== OFC.info?.org_id) Object.assign(BNR, {oid: OFC.info?.org_id, data: null, err: null, month: '', account: '', pick: null, cand: null, rules: undefined, rem: null});
@@ -223,6 +225,8 @@ async function bnv_load() {
   BNV.loading = false;
   ofcDraw();
 }
+// 2.979.0 (#5667): an undo / redo the server did: the recurring providers come again
+histReloader('bank-vendors', () => { if (!BNV.data) return; if (S.route.mod === 'office') return bnv_load(); BNV.data = null; });
 function bnv_html() {
   if (BNV.oid !== OFC.info?.org_id) Object.assign(BNV, {oid: OFC.info?.org_id, data: null});
   if (BNV.data === false) return '';

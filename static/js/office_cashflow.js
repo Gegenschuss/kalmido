@@ -19,6 +19,8 @@ async function rk_cfLoad() {
   ofcDraw();
 }
 const rk_cfReload = () => { RKF.data = null; ofcDraw(); };
+// 2.979.0 (#5667): an undo / redo the server did: the cash flow plan and the starting balance section come again
+histReloader('cashflow', () => { if (RKF.data) rk_cfReload(); if (CFS.st !== undefined) { if ($('.cfsset')) return cfs_load(); CFS.oid = -1; } });
 const rk_cfQ = () => `from=${RKF.from}&months=${RKF.months}&basis=${RKF.basis}`;  // 2.67.0 (#1838): net | gross
 
 function rk_cashflowHtml() {

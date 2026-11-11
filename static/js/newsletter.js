@@ -49,6 +49,8 @@ function nwl_draw() {
   clearTimeout(NWL.poll);
   if (NWL.d?.conn?.busy || NWL.d?.runs?.[0]?.state === 'busy') NWL.poll = setTimeout(nwl_load, 2000);
 }
+// 2.979.0 (#5667): an undo / redo the server did: the open newsletter settings come again (opening them reads anew anyway)
+histReloader('newsletter', () => { if (NWL.d && $$('.nwl-md .nwl-body').length) return nwl_load(); });
 const nwl_wsSel = () => { const l = nwl_wsList(); return l.length > 1 ? `<div class="row"><label for="nwl-ws">${tr('Workspace')}</label><select id="nwl-ws" data-nwlc="ws">${l.map(w => `<option value="${esc(w)}" ${w === NWL.ws ? 'selected' : ''}>${esc(wsName(w))}</option>`).join('')}</select></div>` : ''; };
 function nwl_formHtml(kind, c) {
   const d = NWL.d, k = d.kinds.find(x => x.kind === kind) || d.kinds[0];

@@ -7,6 +7,8 @@ const DT = {data: null, undo: null, loading: false, err: null, view: 'docs', fCl
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['gendocs', 'file', N_('Letters & contracts'), 1, () => dtTabHtml(), 'sell']);  // admins only; 'sell' = the group of 2.92.1's tab menu (#1917)
 const DT_ST = {draft: N_('Draft'), final: N_('Finished'), signed: N_('Signed'), declined: N_('Rejected')};
 const dtReload = () => { DT.data = null; DT.pv = null; DT.sg = null; ofcDraw(); };
+// 2.979.0 (#5667): an undo / redo the server did: the generated documents come again
+histReloader('gendocs', () => { if (DT.data) dtReload(); });
 const dtDoc = id => (DT.data?.docs || []).find(d => d.id === id);
 const dtTpl = id => (DT.data?.templates || []).find(t => t.id === id);
 const dtStTag = d => `<span class="rotag dtp-st dtp-st-${esc(d.status)}">${esc(tr(DT_ST[d.status] || d.status))}</span>`;

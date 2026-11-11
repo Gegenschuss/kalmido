@@ -1156,6 +1156,8 @@ async function tbill_load() {
   catch (x) { if (TBL.key === key) TBL.err = ofcErrHere(x); }
   if (TBL.key === key && S.route.mod === 'office' && OFC.tab === 'time') renderView();
 }
+// 2.979.0 (#5667): an undo / redo the server did: the list of quotations / invoices (an open document histRedraw reads itself) and the times to bill come again
+histReloader('office-docs', () => { if (TBL.data) { TBL.key = ''; if (S.route.mod === 'office' && OFC.tab === 'time') renderView(); } if (Array.isArray(OFD.list) && !OFD.doc?.id) { OFD.list = null; ofdDraw(); } });
 // 2.218.0 B (#2805): a number field in the editor selects its content on focus, so typing replaces the preset ("1" + 2 = "12")
 document.addEventListener('focusin', e => { const f = e.target; if (f && f.matches && f.matches('.numin') && f.closest('.ofdeditor, .modal')) setTimeout(() => { if (document.activeElement === f) try { f.select(); } catch {} }, 0); });
 document.addEventListener('change', e => {

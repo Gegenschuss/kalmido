@@ -18,6 +18,8 @@ async function ltkLoad() {
   if (LTK.open) ltkThread();
 }
 function ltkDraw() { const el = $(`.ltk[data-lid="${LTK.id}"]`); if (el) el.innerHTML = ltkHtml(); }
+// 2.979.0 (#5667): an undo / redo the server did: the references of the open letter come again (a link taken back shows again)
+histReloader('letterlinks', () => { if (!LTK.id || !LTK.x) return; if ($(`.ltk[data-lid="${LTK.id}"]`)) return ltkLoad(); LTK.x = null; });
 const ltkDay = v => v ? dayLabel(v, true) : '';
 const LTK_KIND = {answers: N_('Answer to'), reply: N_('Answer')}  // 2.446.0 (#3763): marked for the language files;
 function ltkHtml() {

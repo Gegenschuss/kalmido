@@ -55,6 +55,8 @@ async function rclLoad(more) {
   ofcDraw();
 }
 function rclReload() { if (RCL.data) { RCL.key = ''; if (rclHere()) rclLoad(false); } }  // 2.276.0 A (#3039): rclHere (Office > Receipts too)
+// 2.979.0 (#5667): an undo / redo the server did: the shown receipts list comes again, a list not shown reads again when it opens
+histReloader('receipts-list', rclReload);
 function rclSet(patch) { Object.assign(RCL.f, patch); rclSave(); rclLoad(false); }
 
 function rclHtml(own, pre) {  // 2.276.0 A (#3039): own = the page Office > Receipts (no way back to the bookkeeping)

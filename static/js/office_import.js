@@ -15,6 +15,8 @@ async function oimLoad() {
   try { OIM.fnt = await api('GET', '/api/office/legacy/archive/templates'); } catch { OIM.fnt = null; }  // 2.621.0 (#4600)
   await fx8a_oimClients();
 }
+// 2.979.0 (#5667): an undo / redo the server did: the import page (runs, archived documents) comes again
+histReloader('office-import', () => { const l = !!OIM.list; OIM.list = null; if (OIM.runs && S.route.mod === 'office' && S.route.tab === 'import') return oimLoad().then(ofcDraw); if (OIM.runs) OIM.runs = null; if (l) ofcDraw(); });
 // 2.80.0 (#1836): the client choice is read again on every visit of the import page and whenever the clients change
 // (core.js), not only once per page load -- a client created meanwhile was missing until a reload
 // (review: a state refresh takes the clients of the state, no extra request; a visit of the page asks the server)

@@ -60,6 +60,8 @@ async function ms_clLtLoad(id, q) {
 }
 function ms_clDraw() { if (S.route.mod === 'clients') { const el = $('#view'); if (el) { const ck = ct_scrollKeep(el); keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); ck(); } } }  // 2.431.0 C (#3598): + the columns' scroll
 const ms_clDirty = () => { MSC.items = null; MSC.inv = null; };
+// 2.979.0 (#5667): an undo / redo the server did (a move into another workspace taken back): the clients come again
+histReloader('clients', () => { if (!MSC.items) return; if (S.route.mod === 'clients') return ms_clLoad(); ms_clDirty(); });
 // 2.431.0 C (#3602): a change elsewhere (a full state of the poll, the return to the tab): the page fetches quietly what it
 // shows and keeps the old until the new is there; drawn only when the page changed (morphed: scroll, open blocks, selection
 // stay). Invoices, documents and letters are fetched again only when the office moved (or what moved is unknown: tab return)

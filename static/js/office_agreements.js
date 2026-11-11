@@ -41,6 +41,8 @@ async function agrLoad() {
   ofcDraw();
 }
 const agrReload = () => { AGR.data = null; if (typeof RKF === 'object') RKF.data = null; if (S.route.mod === 'office' && ofcTab() === 'agreements') agrLoad(); };
+// 2.979.0 (#5667): an undo / redo the server did: the shown contracts come again, a list not shown is read again when it opens
+histReloader('agreements', () => { if (AGR.data) agrReload(); });
 const agrPer = p => tr(AGR_PERS.find(x => x[0] === p)?.[1] || p);
 const agrUnit = u => tr(AGR_UNITS.find(x => x[0] === u)?.[1] || u);
 
