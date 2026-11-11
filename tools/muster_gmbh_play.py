@@ -150,7 +150,8 @@ def play(s, base, fx, ws, me, log=print):
     def doc(kind, x):
         if kind == "invoice":
             d = go("invoice " + x["key"], s.post(base + D, json={
-                "kind": "invoice", "client_id": cl[x["kunde"]], "project_title": x["titel"], "date": x["datum"], "service_from": x["datum"], "service_to": x["datum"],
+                "kind": "invoice", "client_id": cl[x["kunde"]], "project_title": x["titel"], "date": x["datum"],
+                "service_from": x.get("leistung_von", x["datum"]), "service_to": x.get("leistung_bis", x["datum"]),  # 2.912.0 (#5419): a period (RE7)
                 "items": [{"title": p["titel"], "qty": p["menge"], "rate": p["preis"], "tax": p["steuer"]} for p in x["positionen"]]}))
         elif kind == "credit":
             d = go("credit note " + x["key"], s.post(base + f"{D}/{ids[x['zu']]}/credit"))

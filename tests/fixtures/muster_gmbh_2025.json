@@ -7,7 +7,9 @@
     "revenue / expense lines of the profit and loss account and the balance sheet lines follow from the account balances (sections 266 / 275 (2) HGB); VAT of the returns:",
     "base per rate in whole euros (cut off), tax = base x rate, input tax in cents (as the ELSTER form computes it); all amounts are exact to the cent (every net amount was chosen in whole euros).",
     "Kalmido mechanics written out as postings (legitimate SKR03 practice): money in transit 1360 (bank -> cash), clearing account 1590 for bank lines without a document (the tax office, the",
-    "reminder fee, the travel refund, the restaurant bill) cleared by an adjusting entry or the matching document; debtors collective 10000, creditors collective 70000 (no own account per person)."
+    "reminder fee, the travel refund, the restaurant bill) cleared by an adjusting entry or the matching document; debtors collective 10000, creditors collective 70000 (no own account per person;",
+    "the travel expense claim of the managing director lands there too, a Kalmido mechanic: a GmbH would usually book it to an other liability / a clearing account for the director).",
+    "2.912.0 (#5419): a deferral case (section 250 HGB) with both sides: prepaid expenses 0980 (annual software subscription B04, part 2026) and deferred income 0990 (annual maintenance RE7, paid in advance), both by hand (U6, U7)."
   ],
   "jahr": 2025,
   "kontenrahmen": "SKR03",
@@ -43,7 +45,10 @@
      "rechenweg": "5 x 500,00 = 2.500,00 + 475,00 = 2.975,00; nach Mahnung (Stufe 2, 5,00 Gebühr) am 01.09. bezahlt"},
     {"key": "RE6", "kunde": "C", "datum": "2025-12-01", "titel": "Workshop Dezember", "positionen": [{"titel": "Workshop Bildsprache Teil 2", "menge": 2, "preis": "3000.00", "steuer": "standard"}],
      "buchungen": [["2025-12-01", "10000", "8400", "6000.00"], ["2025-12-01", "10000", "1776", "1140.00"]],
-     "rechenweg": "2 x 3.000,00 = 6.000,00 + 1.140,00 = 7.140,00; am Stichtag offen = Forderung 7.140,00"}
+     "rechenweg": "2 x 3.000,00 = 6.000,00 + 1.140,00 = 7.140,00; am Stichtag offen = Forderung 7.140,00"},
+    {"key": "RE7", "kunde": "A", "datum": "2025-12-01", "leistung_von": "2025-12-01", "leistung_bis": "2026-11-30", "titel": "Wartung Website", "positionen": [{"titel": "Wartung Website 01.12.2025 bis 30.11.2026 (12 Monate)", "menge": 12, "preis": "100.00", "steuer": "standard"}],
+     "buchungen": [["2025-12-01", "10000", "8400", "1200.00"], ["2025-12-01", "10000", "1776", "228.00"]],
+     "rechenweg": "12 x 100,00 = 1.200,00 netto + 228,00 USt = 1.428,00, im Voraus bezahlt am 15.12. (L23); USt ganz in Q4 2025, weil das Entgelt am 15.12. vor der Ausführung vereinnahmt ist (Anzahlung, § 13 Abs. 1 Nr. 1a Satz 4 UStG); ohne diese Zahlung entstünde sie erst mit der Ausführung am 30.11.2026; 11 der 12 Monate gehören zu 2026: passive Abgrenzung U7"}
   ],
   "gutschriften": [
     {"key": "GS1", "zu": "RE4", "datum": "2025-06-05", "positionen": [{"titel": "Minderung Workshop Bildsprache", "menge": 1, "preis": "500.00", "steuer": "standard"}],
@@ -65,7 +70,7 @@
     {"key": "B04", "datei": "cloud-software.pdf", "datum": "2025-04-01", "brutto": "600.00", "ust": "0", "kategorie": "Software", "rc13b": "eu",
      "buchungen": [["2025-04-01", "4964", "1730", "600.00"]],
      "nicht_in_kalmido": [["2025-04-01", "1577", "1787", "114.00"]],
-     "rechenweg": "Cloud-Abo eines Anbieters aus Irland, Reverse-Charge (§ 13b Abs. 1 UStG): Rechnung netto 600,00, die GmbH schuldet 19 % = 114,00 USt und zieht sie als Vorsteuer ab (§ 15 Abs. 1 Nr. 4); Saldo 0; Kreditkarte"},
+     "rechenweg": "Cloud-Jahresabo 01.04.2025 bis 31.03.2026 eines Anbieters aus Irland, Reverse-Charge (§ 13b Abs. 1 UStG): Rechnung netto 600,00, die GmbH schuldet 19 % = 114,00 USt und zieht sie als Vorsteuer ab (§ 15 Abs. 1 Nr. 4); Saldo 0; Kreditkarte; 3 der 12 Monate gehören zu 2026: aktive Abgrenzung U6"},
     {"key": "B05", "datei": "fachbuch.pdf", "datum": "2025-04-05", "brutto": "53.50", "ust": "7", "kategorie": "Fachliteratur",
      "buchungen": [["2025-04-05", "4940", "1730", "50.00"], ["2025-04-05", "1571", "1730", "3.50"]], "rechenweg": "53,50 / 1,07 = 50,00 netto + 3,50 Vorsteuer 7 %; Kreditkarte"},
     {"key": "B06", "datei": "laptop.pdf", "datum": "2025-04-15", "brutto": "2142.00", "ust": "19", "kategorie": "Hardware",
@@ -84,14 +89,14 @@
   "anlagen": [
     {"key": "AN1", "name": "Laptop", "beleg": "B06", "kauf": "2025-04-15", "netto": "1800.00", "monate": 36,
      "buchungen": [["2025-12-31", "4830", "0490", "450.00"]],
-     "rechenweg": "linear, 3 Jahre (AfA-Tabelle), zeitanteilig monatsgenau ab Anschaffungsmonat (§ 7 Abs. 1 S. 4 EStG): April bis Dezember = 9 Monate; 1.800,00 x 9 / 36 = 450,00; Restbuchwert 1.350,00"}
+     "rechenweg": "handelsrechtlich planmäßig linear über die Nutzungsdauer von 3 Jahren (§ 253 Abs. 3 HGB, AfA-Tabelle AV), zeitanteilig monatsgenau ab Anschaffungsmonat (wie § 7 Abs. 1 S. 4 EStG): April bis Dezember = 9 Monate; 1.800,00 x 9 / 36 = 450,00; Restbuchwert 1.350,00. Das steuerliche Wahlrecht einer Nutzungsdauer von 1 Jahr für Computerhardware (BMF-Schreiben vom 22.02.2022) ist nicht genutzt: Steuer- und Handelsbilanz bleiben gleich"}
   ],
   "karte": {"last4": "4242", "inhaber": "Max Mustermann", "monat": "2025-04", "summe": "655.00",
             "zeilen": [
               {"key": "K1", "tag": "2025-04-01", "haendler": "Cloud Software Ltd", "betrag": "600.00", "beleg": "B04"},
               {"key": "K2", "tag": "2025-04-05", "haendler": "Fachbuchhandlung Beispiel", "betrag": "53.50", "beleg": "B05"},
               {"key": "K3", "tag": "2025-04-30", "haendler": "Kartengebühr", "betrag": "1.50", "art": "fee",
-               "buchungen": [["2025-04-30", "4970", "1730", "1.50"]], "rechenweg": "Gebühr der Kartenfirma, kein Beleg nötig, nicht steuerbar: Nebenkosten des Geldverkehrs"}
+               "buchungen": [["2025-04-30", "4970", "1730", "1.50"]], "rechenweg": "Gebühr der Kartenfirma, kein Beleg nötig: Umsatz im Zahlungsverkehr, steuerfrei nach § 4 Nr. 8 Buchst. d UStG (keine Vorsteuer, Nebenkosten des Geldverkehrs)"}
             ],
             "rechenweg": "Monatsabrechnung April: 600,00 + 53,50 + 1,50 = 655,00; am 05.05. vom Bankkonto eingezogen, 1730 danach 0"},
   "kasse": {"name": "Handkasse", "anfang": "500.00", "anfang_tag": "2025-01-01",
@@ -150,10 +155,12 @@
               "buchungen": [["2025-10-10", "1360", "1200", "300.00"]], "rechenweg": "Bank an Geldtransit, Gegenstück KA4"},
              {"key": "L21", "tag": "2025-11-18", "betrag": "-119.00", "partner": "Restaurant Beispiel", "zweck": "Geschäftsessen", "abgleich": null,
               "buchungen": [["2025-11-18", "1590", "1200", "119.00"]], "rechenweg": "bezahlt die Bewirtung M1 (die Bewirtung bucht den Aufwand gegen 1590)"},
+             {"key": "L23", "tag": "2025-12-15", "betrag": "1428.00", "partner": "Beispiel Handel AG", "zweck": "RE7 Wartung", "abgleich": {"art": "invoice", "rechnung": "RE7"},
+              "buchungen": [["2025-12-15", "1200", "10000", "1428.00"]], "rechenweg": "Vorauszahlung RE7 voll"},
              {"key": "L22", "tag": "2025-12-31", "betrag": "-60.00", "partner": "Bank Beispiel", "zweck": "Kontoführung 2025", "abgleich": {"art": "noreceipt"},
-              "buchungen": [["2025-12-31", "4970", "1200", "60.00"]], "rechenweg": "Kontoführungsgebühr, nicht steuerbar, ohne Beleg"}
+              "buchungen": [["2025-12-31", "4970", "1200", "60.00"]], "rechenweg": "Kontoführungsgebühr ohne Beleg: steuerfrei nach § 4 Nr. 8 Buchst. d UStG (Zahlungsverkehr), keine Vorsteuer"}
            ],
-           "rechenweg": "30.000,00 + 11.900 + 2.000 + 2.760 + 3.570 - 595 + 2.975 + 5 + 288,50 - 3.000 - 450 - 2.711 - 2.142 - 655 - 2.380 - 3.000 - 238 - 1.190 - 242 - 271 - 300 - 119 - 60 = 36.145,50"},
+           "rechenweg": "30.000,00 + 11.900 + 2.000 + 2.760 + 3.570 - 595 + 2.975 + 5 + 288,50 - 3.000 - 450 - 2.711 - 2.142 - 655 - 2.380 - 3.000 - 238 - 1.190 - 242 - 271 - 300 - 119 + 1.428 - 60 = 37.573,50"},
   "bewirtung": [
     {"key": "M1", "datum": "2025-11-18", "ort": "Restaurant Beispiel", "adresse": "Marktplatz 1\n12345 Musterstadt", "anlass": "Projektplanung 2026 mit Kunde C",
      "gaeste": [{"name": "Erika Beispiel", "extra": "Seeblick Akademie e. K."}], "brutto": "119.00", "satz": 19, "bank": "L21",
@@ -169,47 +176,49 @@
      "buchungen": [["2025-09-22", "4663", "70000", "100.00"], ["2025-09-22", "1571", "70000", "7.00"],
                    ["2025-09-22", "4666", "70000", "100.00"], ["2025-09-22", "1571", "70000", "7.00"],
                    ["2025-09-23", "4664", "70000", "28.00"]],
-     "rechenweg": "Bahn Fernverkehr 7 % (§ 12 Abs. 2 Nr. 10 UStG): 100,00 + 7,00; Übernachtung ohne Frühstück 7 %: 100,00 + 7,00; Verpflegungsmehraufwand Inland 2025 An- und Abreisetag je 14,00 = 28,00 ohne Vorsteuer; Summe 242,00, erstattet am 30.09. (L18)"}
+     "rechenweg": "Bahn Fernverkehr 7 % (§ 12 Abs. 2 Nr. 10 UStG): 100,00 + 7,00; Übernachtung ohne Frühstück 7 %: 100,00 + 7,00; Verpflegungsmehraufwand Inland 2025 An- und Abreisetag je 14,00 = 28,00 ohne Vorsteuer; Summe 242,00, erstattet am 30.09. (L18). Kalmido-Mechanik: die Abrechnung des Geschäftsführers landet wie ein Lieferantenbeleg auf dem Sammelkonto 70000 (eine GmbH bucht sie sonst meist auf eine sonstige Verbindlichkeit / ein Verrechnungskonto des Geschäftsführers); U3 gleicht sie aus"}
   ],
   "umbuchungen": [
     {"key": "U1", "tag": "2025-04-10", "soll": "1780", "haben": "1590", "betrag": "2711.00", "text": "USt-Vorauszahlung Q1", "rechenweg": "L05 dem Konto USt-Vorauszahlungen zuordnen"},
     {"key": "U2", "tag": "2025-07-15", "soll": "1590", "haben": "1780", "betrag": "288.50", "text": "USt-Erstattung Q2", "rechenweg": "L14 dem Konto USt-Vorauszahlungen zuordnen"},
-    {"key": "U3", "tag": "2025-09-30", "soll": "70000", "haben": "1590", "betrag": "242.00", "text": "Reisekostenerstattung T1", "rechenweg": "L18 gleicht die Reisekostenabrechnung T1 aus"},
+    {"key": "U3", "tag": "2025-09-30", "soll": "70000", "haben": "1590", "betrag": "242.00", "text": "Reisekostenerstattung T1", "rechenweg": "L18 gleicht die Reisekostenabrechnung T1 aus (Kalmido-Mechanik: T1 steht auf dem Sammelkonto 70000, siehe T1)"},
     {"key": "U4", "tag": "2025-10-10", "soll": "1780", "haben": "1590", "betrag": "271.00", "text": "USt-Vorauszahlung Q3", "rechenweg": "L19 zuordnen"},
-    {"key": "U5", "tag": "2025-12-31", "soll": "4957", "haben": "0977", "betrag": "1200.00", "text": "Rückstellung Jahresabschluss 2025", "rechenweg": "Kosten der Erstellung des Jahresabschlusses (§ 249 Abs. 1 HGB), geschätzt 1.200,00"}
+    {"key": "U5", "tag": "2025-12-31", "soll": "4957", "haben": "0977", "betrag": "1200.00", "text": "Rückstellung Jahresabschluss 2025", "rechenweg": "Kosten der Erstellung des Jahresabschlusses (§ 249 Abs. 1 HGB), geschätzt 1.200,00"},
+    {"key": "U6", "tag": "2025-12-31", "soll": "0980", "haben": "4964", "betrag": "150.00", "text": "Aktive Rechnungsabgrenzung Cloud-Abo", "rechenweg": "B04 deckt 01.04.2025 bis 31.03.2026; Aufwand nach dem Stichtag (§ 250 Abs. 1 HGB): 600,00 x 3 / 12 = 150,00; Aufwand 2025 bleibt 450,00; im Folgejahr zurück (4964 an 0980)"},
+    {"key": "U7", "tag": "2025-12-31", "soll": "8400", "haben": "0990", "betrag": "1100.00", "text": "Passive Rechnungsabgrenzung Wartung", "rechenweg": "RE7 deckt 01.12.2025 bis 30.11.2026, vorab bezahlt; Ertrag nach dem Stichtag (§ 250 Abs. 2 HGB): 1.200,00 x 11 / 12 = 1.100,00 netto (die USt gehört nicht in die Abgrenzung); Erlös 2025 bleibt 100,00"}
   ],
   "soll": {
     "konten": {
-      "0490": "1350.00", "0800": "-25000.00", "0860": "-5500.00", "0977": "-1200.00",
-      "1000": "1736.00", "1200": "36145.50", "1360": "0.00", "1571": "17.50", "1576": "1273.00", "1590": "0.00",
-      "1730": "0.00", "1771": "-70.00", "1776": "-4750.00", "1780": "2693.50",
+      "0490": "1350.00", "0800": "-25000.00", "0860": "-5500.00", "0977": "-1200.00", "0980": "150.00", "0990": "-1100.00",
+      "1000": "1736.00", "1200": "37573.50", "1360": "0.00", "1571": "17.50", "1576": "1273.00", "1590": "0.00",
+      "1730": "0.00", "1771": "-70.00", "1776": "-4978.00", "1780": "2693.50",
       "2700": "-5.00", "3100": "2000.00", "4210": "6000.00", "4360": "450.00", "4600": "1000.00", "4650": "70.00", "4654": "30.00",
       "4663": "100.00", "4664": "28.00", "4666": "100.00", "4830": "450.00", "4910": "15.00", "4920": "200.00", "4930": "100.00",
-      "4940": "50.00", "4950": "1500.00", "4957": "1200.00", "4964": "600.00", "4970": "61.50",
-      "8300": "-1000.00", "8400": "-25000.00", "9000": "0.00", "10000": "7140.00", "70000": "-1785.00"
+      "4940": "50.00", "4950": "1500.00", "4957": "1200.00", "4964": "450.00", "4970": "61.50",
+      "8300": "-1000.00", "8400": "-25100.00", "9000": "0.00", "10000": "7140.00", "70000": "-1785.00"
     },
-    "konten_rechenweg": "Saldo = Soll - Haben aller Buchungen; Erlöse 8400: 10.000 + 4.000 + 3.000 - 500 + 2.500 + 6.000 = 25.000; USt 1776 = 25.000 x 19 %; Vorsteuer 1576: 19 + 342 + 380 + 38 + 190 + 285 + 19 = 1.273; 1571: 3,50 + 7 + 7 = 17,50; 1780: 2.711 - 288,50 + 271 = 2.693,50; Forderung 10000 = RE6; Verbindlichkeit 70000 = B11",
-    "guv": {"1": "26000.00", "4": "5.00", "5": "2000.00", "6": "0.00", "7": "450.00", "8": "11504.50", "11": "0.00", "13": "0.00", "14": "0.00", "16": "0.00"},
-    "guv_rechenweg": "Nr. 8 sonstige betriebliche Aufwendungen: 6.000 + 450 + 1.000 + 70 + 30 + 100 + 28 + 100 + 15 + 200 + 100 + 50 + 1.500 + 1.200 + 600 + 61,50 = 11.504,50",
-    "ergebnis": "12050.50",
-    "ergebnis_rechenweg": "26.000 + 5 - 2.000 - 450 - 11.504,50 = 12.050,50 (Jahresüberschuss vor Körperschaft- und Gewerbesteuer, siehe Lücken)",
-    "bilanz": {"A.II": "1350.00", "B.II.1": "7140.00", "B.II.4": "0.00", "B.IV": "37881.50",
-               "P.A.I": "25000.00", "P.A.IV": "5500.00", "P.A.V": "12050.50", "P.B": "1200.00", "P.C.4": "1785.00", "P.C.8": "836.00"},
-    "bilanz_rechenweg": "Aktiva: Laptop 1.350 + Forderung 7.140 + Bank 36.145,50 + Kasse 1.736 = 46.371,50; Passiva: 25.000 + 5.500 + 12.050,50 + Rückstellung 1.200 + Verbindlichkeit 1.785 + USt Q4 836 (1776/1771/1576/1571/1780 saldiert: -4.750 - 70 + 1.273 + 17,50 + 2.693,50 = -836) = 46.371,50",
-    "summe_aktiva": "46371.50",
+    "konten_rechenweg": "Saldo = Soll - Haben aller Buchungen; Erlöse 8400: 10.000 + 4.000 + 3.000 - 500 + 2.500 + 6.000 + 1.200 (RE7) - 1.100 (U7) = 25.100; USt 1776 = 26.200 x 19 % = 4.978 (die Abgrenzung U7 ändert die USt nicht); 4964: 600 - 150 (U6) = 450; 0980 = 150 (U6), 0990 = -1.100 (U7); Vorsteuer 1576: 19 + 342 + 380 + 38 + 190 + 285 + 19 = 1.273; 1571: 3,50 + 7 + 7 = 17,50; 1780: 2.711 - 288,50 + 271 = 2.693,50; Forderung 10000 = RE6; Verbindlichkeit 70000 = B11",
+    "guv": {"1": "26100.00", "4": "5.00", "5": "2000.00", "6": "0.00", "7": "450.00", "8": "11354.50", "11": "0.00", "13": "0.00", "14": "0.00", "16": "0.00"},
+    "guv_rechenweg": "Nr. 1 Umsatzerlöse: 8400 25.100 + 8300 1.000 = 26.100; Nr. 8 sonstige betriebliche Aufwendungen: 6.000 + 450 + 1.000 + 70 + 30 + 100 + 28 + 100 + 15 + 200 + 100 + 50 + 1.500 + 1.200 + 450 (4964 nach U6) + 61,50 = 11.354,50",
+    "ergebnis": "12300.50",
+    "ergebnis_rechenweg": "26.100 + 5 - 2.000 - 450 - 11.354,50 = 12.300,50 (Jahresüberschuss vor Körperschaft- und Gewerbesteuer, siehe Lücken)",
+    "bilanz": {"A.II": "1350.00", "B.II.1": "7140.00", "B.II.4": "0.00", "B.IV": "39309.50", "C": "150.00",
+               "P.A.I": "25000.00", "P.A.IV": "5500.00", "P.A.V": "12300.50", "P.B": "1200.00", "P.C.4": "1785.00", "P.C.8": "1064.00", "P.D": "1100.00"},
+    "bilanz_rechenweg": "Aktiva: Laptop 1.350 + Forderung 7.140 + Bank 37.573,50 + Kasse 1.736 + aktive RAP 150 (C, 0980) = 47.949,50; Passiva: 25.000 + 5.500 + 12.300,50 + Rückstellung 1.200 + Verbindlichkeit 1.785 + USt Q4 1.064 (1776/1771/1576/1571/1780 saldiert: -4.978 - 70 + 1.273 + 17,50 + 2.693,50 = -1.064) + passive RAP 1.100 (D, 0990) = 47.949,50",
+    "summe_aktiva": "47949.50",
     "ustva": {
       "q1": {"81": "14000", "86": "1000", "66": "19.00", "46": "0", "47": "0.00", "67": "0.00", "83": "2711.00"},
       "q2": {"81": "2500", "86": "0", "66": "763.50", "46": "600", "47": "114.00", "67": "114.00", "83": "-288.50"},
       "q3": {"81": "2500", "86": "0", "66": "204.00", "46": "0", "47": "0.00", "67": "0.00", "83": "271.00"},
-      "q4": {"81": "6000", "86": "0", "66": "304.00", "46": "0", "47": "0.00", "67": "0.00", "83": "836.00"},
-      "y": {"81": "25000", "86": "1000", "66": "1290.50", "46": "600", "47": "114.00", "67": "114.00", "83": "3529.50"}
+      "q4": {"81": "7200", "86": "0", "66": "304.00", "46": "0", "47": "0.00", "67": "0.00", "83": "1064.00"},
+      "y": {"81": "26200", "86": "1000", "66": "1290.50", "46": "600", "47": "114.00", "67": "114.00", "83": "3757.50"}
     },
     "ustva_rechenweg": {
       "q1": "81: RE1 10.000 + RE2 4.000 = 14.000 -> 2.660,00; 86: RE3 1.000 -> 70,00; 66: B03 19,00; 83 = 2.660 + 70 - 19 = 2.711,00",
       "q2": "81: RE4 3.000 - GS1 500 = 2.500 -> 475,00; 46/47: B04 600 x 19 % = 114,00, 67 = 114,00; 66: B05 3,50 + B06 342 + B07 380 + B08 38 = 763,50; 83 = 475 + 114 - 763,50 - 114 = -288,50",
       "q3": "81: RE5 2.500 -> 475,00; 66: B10 190 + T1 Bahn 7 + Hotel 7 = 204,00; 83 = 271,00",
-      "q4": "81: RE6 6.000 -> 1.140,00; 66: B11 285 + M1 19 = 304,00; 83 = 836,00 (am Stichtag offen, fällig 10.01.2026)",
-      "y": "Summe der Quartale: 2.711 - 288,50 + 271 + 836 = 3.529,50 = 25.000 x 19 % + 1.000 x 7 % - 1.290,50"
+      "q4": "81: RE6 6.000 + RE7 1.200 = 7.200 -> 1.368,00 (RE7 voll, die Abgrenzung U7 mindert die USt nicht); 66: B11 285 + M1 19 = 304,00; 83 = 1.368 - 304 = 1.064,00 (am Stichtag offen, fällig 10.01.2026)",
+      "y": "Summe der Quartale: 2.711 - 288,50 + 271 + 1.064 = 3.757,50 = 26.200 x 19 % + 1.000 x 7 % - 1.290,50"
     }
   }
 }

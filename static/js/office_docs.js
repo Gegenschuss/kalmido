@@ -409,7 +409,8 @@ function ofdFeeHtml(d, adm) {
   if (d.kind !== 'reminder' || !d.locked || !(+d.fee > 0)) return '';
   const st = d.fee_state || '', txt = {'': N_('open'), waived: N_('waived'), paid: N_('paid|fee'), cancelled: N_('cancelled with the invoice')}[st] || st;  // 2.355.0 D (#2846): + cancelled (final)
   const btn = (v, label) => `<button type="button" class="btn sm" data-ofd="fee" data-st="${v}">${esc(tr(label))}</button>`;
-  return `<div class="ofdfeeinfo"><span>${esc(tr('Reminder fee {0}: {1}', ofdMoney(d.fee, d), tr(txt)))}</span>${adm && st !== 'cancelled' ? (st ? btn('', N_('Open again')) : btn('waived', N_('Waive fee')) + btn('paid', N_('Fee paid'))) : ''}</div>`;
+  const day = st === 'paid' && d.fee_paid_at ? ` · ${tr('Paid on')} ${fmtDateLoc(d.fee_paid_at)}` : '';  // 2.912.0 (#5419): the day it counts on
+  return `<div class="ofdfeeinfo"><span>${esc(tr('Reminder fee {0}: {1}', ofdMoney(d.fee, d), tr(txt)) + day)}</span>${/*html-ok*/ adm && st !== 'cancelled' ? (st ? (st === 'paid' ? btn('paid', N_('Change date')) : '') + btn('', N_('Open again')) : btn('waived', N_('Waive fee')) + btn('paid', N_('Fee paid'))) : ''}</div>`;
 }
 function ofdPayList(d, adm) {  // 2.354.0 D (#2837): also the refunds of a credit note
   const ps = d.payments || [];
@@ -910,6 +911,7 @@ async function ofdClick(e) {
   if (a === 'ln-x') { const n = OFD.langNotes; OFD.langNotesShut = n ? {id: n.id, key: JSON.stringify(n.notes)} : null; OFD.langNotes = null; ofdDraw(); return; }  // 2.482.0 (#3940): remembered as closed
   if (a === 'rights-add') { OFD.rightsFor = d.id; OFD.open.rights = true; ofdDraw(); return; }  // 2.356.0 C (#3005)
   if (a === 'cf-reload') { ofd_cfReload(); return; }  // 2.269.0 A (#3012)
+  if (a === 'fee' && b.dataset.st === 'paid') { ofdFeeDayDialog(d); return; }  // 2.912.0 (#5419): asks the day the money came
   if (a === 'fee') { const j = await ofdSave('POST', `/api/office/docs/${d.id}/fee`, {state: b.dataset.st || ''}); if (j) savedTick('.ofdfeeinfo > span'); return; }  // 2.298.0 A1 (#3186): the quiet tick
   if (a === 'it-disc') { d.items.push({kind: 'discount', title: '', detail: '', qty: 1, unit: 'flat', rate: 0, tax: 'standard', raw_fee: 0, producing: 0, intext: 'intern', cost: 0, discountable: 1}); await ofdPutItems(); $(`${sc}.ofdits [data-i="${d.items.length - 1}"][data-k="rate"]`)?.focus(); return; }
   if (a === 'number') { const j = await ofdSave('POST', `/api/office/docs/${d.id}/number`, {}); if (j) { d.number = j.number; ofdDraw(); } return; }
@@ -1162,6 +1164,14 @@ function ofdPaymentDialog(d) {
     + ofdF('p-amount', tr('Amount'), `<span class="lacts"><input id="ofd-p-amount" inputmode="decimal" class="numin" value="${esc(ofdNumIn(d.kind === 'credit' ? d.refund_open : rf ? d.overpaid : d.open))}" maxlength="14"><span class="muted">${ofcSym(d.currency)}</span></span>`)
     + ofdF('p-method', tr('Method'), ofcSel('ofd-p-method', 'transfer', OFD_PAY.map(([v, n]) => [v, tr(n)]))) + ofdF('p-note', tr('Note'), `<input id="ofd-p-note" maxlength="500">`),
     tr('Record'), async md => { const j = await ofdRefCall(`pay${d.id}`, ref => ofdSave('POST', `/api/office/docs/${d.id}/payments`, {date: $('#ofd-p-date', md).value, amount: ofcNum($('#ofd-p-amount', md).value), method: $('#ofd-p-method', md).value, note: $('#ofd-p-note', md).value, client_ref: ref})); if (!j) return false; toast(rf ? tr('Refund recorded') : j.state === 'paid' ? tr('Paid in full') : tr('Payment recorded')); });
+}
+// 2.912.0 (#5419): a reminder fee marked paid (or its day changed) asks the day the money came (default: the stored day, else
+// today; not before the reminder, not in the future - the server checks it too); it decides the month and year the fee counts in
+function ofdFeeDayDialog(d) {
+  const t = today(), chg = d.fee_state === 'paid', v = chg && d.fee_paid_at ? d.fee_paid_at : t;
+  ofdDlg(chg ? tr('Change date') : tr('Fee paid'), ofdF('fee-day', tr('Paid on'), dateIn('ofd-fee-day', v, {label: tr('Paid on'), clear: false, max: t, min: d.date || ''}),
+    tr('The day the money came: the fee counts in its month and year.')),
+    chg ? tr('Save') : tr('Mark as paid'), async md => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/fee`, {state: 'paid', day: $('#ofd-fee-day', md).value}); if (!j) return false; savedTick('.ofdfeeinfo > span'); });
 }
 // 2.147.0 (#2461): the e-invoice formats of the country pack (the base pack: ZUGFeRD / Factur-X only)
 function ofdEinvOpts() {

@@ -18204,6 +18204,7 @@
   "Filter “{0}” changed": "Filtre « {0} » modifié",
   "Edit filter…": "Modifier le filtre…",
   "Words or the search syntax (tag:Name, \"exact text\", -word)": "Mots ou syntaxe de recherche (tag:Nom, \"texte exact\", -mot)",
+  "The day the money came: the fee counts in its month and year.": "Le jour où l’argent est arrivé : les frais comptent dans ce mois et cette année.",
   "Moved to the trash": "Mis à la corbeille",
   "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Le nettoyage du noyau commun attend : {0} anciennes lignes de membres dans {1} n’ont pas encore de partage, l’ancienne table reste. Voir le journal du serveur.",
   "Knowledge history clean-up waits: {0} old versions in {1} cannot be opened now (the key of their space is missing), the old table stays. See the server log.": "Le nettoyage de l’historique des pages de connaissances attend : {0} anciennes versions dans {1} ne peuvent pas être ouvertes pour l’instant (la clé de leur espace manque), l’ancienne table reste. Voir le journal du serveur.",

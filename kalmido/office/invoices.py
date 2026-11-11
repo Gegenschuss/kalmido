@@ -1813,7 +1813,7 @@ def fd_reminder_extra(c, oid, rows):
     if rems:
         ids = [d["id"] for d in rems]
         meta = {x["id"]: x for x in c.execute(
-            "SELECT id, ref_doc_ids, reminder_fee, reminder_fee_state, locked_at, currency, lang FROM office_docs WHERE org_id=? AND id IN ("
+            "SELECT id, ref_doc_ids, reminder_fee, reminder_fee_state, reminder_fee_paid_at, locked_at, currency, lang FROM office_docs WHERE org_id=? AND id IN ("
             + ",".join("?" * len(ids)) + ")", [oid] + ids)}
         refs = sorted({int(i) for x in meta.values() for i in _j(x["ref_doc_ids"] or "[]", []) if str(i).isdigit()})
         pm = inv_paid_map(c, oid, refs) if refs else {}
@@ -1828,6 +1828,7 @@ def fd_reminder_extra(c, oid, rows):
             fee = money(dec(x["reminder_fee"] or 0))
             d["settled"] = bool(x["locked_at"]) and bool(rid) and all(st.get(i) in ("paid", "cancelled") for i in rid)
             d["fee_state"] = x["reminder_fee_state"] or ""
+            d["fee_paid_at"] = (x["reminder_fee_paid_at"] or "") if d["fee_state"] == "paid" else ""  # 2.912.0 (#5419): the day it counts on
             d["fee"] = dstr(fee)
             d["fee_open"] = dstr(fee) if x["locked_at"] and fee > 0 and not d["fee_state"] else "0.00"
             d["fee_open_text"] = fmt_money(d["fee_open"], x["lang"], x["currency"])
