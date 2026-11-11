@@ -1030,12 +1030,17 @@ def _opt_names(raw):
         return {}
     if not isinstance(d, dict):
         return {}
-    return {o.get("id"): str(o.get("name") or "").strip() for o in d.get("options") or [] if isinstance(o, dict)}
+    opts = [o for o in d.get("options") or [] if isinstance(o, dict)]
+    if any(not isinstance(o.get("id"), (str, int)) or isinstance(o.get("id"), bool) for o in opts):
+        return None  # review: an option without a usable id cannot be matched (the caller leaves the field unlinked)
+    return {o["id"]: str(o.get("name") or "").strip() for o in opts}
 
 
 def _opts_fit(mine, theirs):
     """Every option of the project field (mine) is in the schema field (theirs) with the same id AND the same name."""
     a, b = _opt_names(mine), _opt_names(theirs)
+    if a is None or b is None:
+        return False
     return all(k in b and b[k] == v for k, v in a.items())
 
 

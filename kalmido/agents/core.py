@@ -276,7 +276,9 @@ def agent_changed_events(c, diffs):
             continue
         # 2.976.0 (#5657, review 2.959 F4): only what the stored row says now -- a change taken back later in the request (a
         # savepoint rolled back, a value set back) never reaches an agent as "new"
-        d = {k: v for k, v in d.items() if k not in row.keys() or _ac_same(row[k], v[1])}
+        # review: a value written again later without log_changes is told as the row has it; back on the old one = no change
+        d = {k: v if k not in row.keys() or _ac_same(row[k], v[1]) else [v[0], row[k]] for k, v in d.items()
+             if k not in row.keys() or not _ac_same(row[k], v[0])}
         if not d:
             continue
         watch = wat_users(c, tid)

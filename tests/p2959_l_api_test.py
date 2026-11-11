@@ -165,9 +165,17 @@ check(len(ev) == 1 and "title" not in d and "priority" in d,
       f"#5657: a change taken back in the request stays out of the diff, the stored one comes {d}")
 s1 = tail_seq(TA, s0)
 r = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", "import app, json\n" + CODE.replace(
-    "TID", str(TC)).replace("TITLE", json.dumps(row["title"])).replace("OLDP", "5").replace("PRIO", str(9 if row["priority"] != 9 else 1))],
+    "TID", str(TC)).replace("TITLE", json.dumps(row["title"])).replace("OLDP", str(row["priority"])).replace("PRIO", str(9 if row["priority"] != 9 else 1))],
     capture_output=True, text=True)
 check(r.returncode == 0 and not evs(TA, s1, "task_changed", TC),
       f"#5657: nothing of it stored: no task_changed at all {r.stdout[-200:]} {r.stderr[-300:]} {evs(TA, s1, 'task_changed', TC)} {row.get('priority')}")
+# review: a field written again later in the request without log_changes: the agent gets the value the row has
+s2 = tail_seq(TA, s1)
+r = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", "import app, json\n" + CODE.replace(
+    "TID", str(TC)).replace("TITLE", json.dumps(row["title"])).replace("OLDP", "5").replace("PRIO", "1")], capture_output=True, text=True)
+ev = evs(TA, s2, "task_changed", TC)
+d = ev[0]["data"].get("diff") if ev else {}
+check(r.returncode == 0 and len(ev) == 1 and d.get("priority") == {"old": "high", "new": "medium"} and "title" not in d,
+      f"#5657 review: written again later: the stored value as new {d} {r.stderr[-300:]}")
 
 sys.exit(done("p2959_l_api"))
