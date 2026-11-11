@@ -37,6 +37,7 @@ def _ag(*names):
 
 WAT_MAX = 200  # watchers of one task
 WAT_STATUS = ("complete", "wont", "reopen")  # history lines that reach the watchers
+WAT_AGENT_STATUS = {"complete": "completed", "wont": "closed", "reopen": "reopened"}  # 2.983.0 (#3915): status of the agent event
 
 
 def check_delegate(c, lid, aid):
@@ -90,7 +91,9 @@ def wat_users(c, tid):
 
 def wat_note(c, tid, kind, actor):
     """Called by every history line (tasks/validation.py log_act): completed / closed / reopened goes to the watchers, as News
-    and as a push of the row "complete". Agents get no event for it (their comments: agent_comment_events)."""
+    and as a push of the row "complete". 2.983.0 (#3915): watching agents get the event status_changed (status completed /
+    closed / reopened) while they see the task with its comments (agent_emit: not their own change, the agent gate); their
+    comments come through agent_comment_events."""
     if kind not in WAT_STATUS or not tid:
         return
     ids = wat_users(c, tid)
@@ -99,7 +102,12 @@ def wat_note(c, tid, kind, actor):
     agent_ids, = _ag("agent_ids")
     from ..collab.liste2e import le2e_mode, le2e_neutral
     t = c.execute("SELECT id, title, list_id, created_by, assigned_by FROM tasks WHERE id=?", (tid,)).fetchone()
-    ids = ids - agent_ids(c) - {actor, None}
+    ags = agent_ids(c)
+    agent_emit, agent_task_data = _ag("agent_emit", "agent_task_data")
+    for aid in sorted((ids & ags) - {actor, None}):  # 2.983.0 (#3915): the watching agents
+        if task_visible(c, tid, aid, full=True):
+            agent_emit(c, aid, "status_changed", agent_task_data(c, tid, aid, full=True, status=WAT_AGENT_STATUS[kind], watching=True))
+    ids = ids - ags - {actor, None}
     if kind == "complete":  # they hear of it through task_event
         ids -= {t["created_by"], t["assigned_by"]} | bell_all_users(c, t["list_id"], "complete")
     name = user_names(c, [actor]).get(actor, "?") if actor else None

@@ -100,6 +100,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "abort",  # 2.144.0 A (#2412): the person pressed Stop in its chat (user, job_id?): end the running answer / the job's step
                 "letter_draft_requested",  # 2.153.0 (#2031): an office admin asks the agent to draft an answer to a shared document
                 "task_changed",  # 2.959.0 (#4030): a task assigned / delegated to the agent or watched by it changed: diff {field: {old, new}}
+                "status_changed",  # 2.983.0 (#3915): a task the agent watches was completed, closed or reopened (status)
                 )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop", "message")  # 2.56.0 (#1791): message = text to a running job, no state change
@@ -1133,7 +1134,8 @@ def is_approver(c, t, uid, agent=None, assignee=True):
 # POST /api/proposals, chat: agent_shares, job: job_may_act). An agent's actions never reach another agent unless the list
 # had agent_peers on; 2.40.0 (#1373): never (every event).
 AGENT_GATED = ("mention", "comment", "assigned", "unassigned", "reaction", "team_message", "wake",
-               "task_changed")  # 2.959.0 (#4030): a person without the agent switch reaches it neither by a change
+               "task_changed",  # 2.959.0 (#4030): a person without the agent switch reaches it neither by a change
+               "status_changed")  # 2.983.0 (#3915): ... nor by a status change
 AGENT_UNGATED = ("job", "ping", "runtime_changed", "reset", "followup_due")
 # 2.26.0 (#928): the SQL condition "list l is open to person ? for agent ?": owner, list admin (own role), the list
 # belongs to that agent (it shared the list itself); parameters (person, agent, person) or the owner switched on "Members may see and use the agent"
