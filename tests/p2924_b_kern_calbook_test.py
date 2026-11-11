@@ -155,14 +155,17 @@ check("#5069" not in out, f"#5069: a later start does nothing ({out[-200:]})")
 KN = A.post(B + "/api/evcals", json={"name": "Unplaced plan", "org_id": ORG}).json()["id"]
 out = box("import kalmido.events.evkern as e\nfrom kalmido.core.errors import Denied\nfrom kalmido.notify.alerts import _AA\n"
           "def no(*a, **k):\n    raise Denied(404)\n"
+          "c.execute('RESET ROLE')\n"  # the login role of the container (the pool's kalmido_app may not create tables)
           "c.execute(\"CREATE TABLE ev_cal_members (cal_id BIGINT NOT NULL REFERENCES ev_cals(id) ON DELETE CASCADE, user_id BIGINT NOT NULL "
           "REFERENCES users(id) ON DELETE CASCADE, role TEXT NOT NULL DEFAULT 'view', hidden BIGINT NOT NULL DEFAULT 0, added_at TEXT NOT NULL, "
           "PRIMARY KEY (cal_id, user_id))\")\n"
           "c.execute(\"CREATE OR REPLACE FUNCTION kalmido_kern_mirror() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NULL; END $$\")\n"
           "c.execute(\"CREATE TRIGGER kalmido_kern_mirror_cal AFTER INSERT ON ev_cal_members FOR EACH ROW EXECUTE FUNCTION kalmido_kern_mirror()\")\n"
           f"c.execute(\"INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES({int(KN)},{int(BOB)},'view','{TS}')\")\n"
-          "e.obj_node = no\nprint('result', e.ev_kern_drop(c))\nprint('alert', [x[1] for x in _AA['q']])")
-check("stage 7b (#5069) waits" in out and "ev_cal_members 1" in out, f"#5069 F1: the start check holds the drop and the log names the row ({out[-400:]})")
+          "e.obj_node = no\ntry:\n    print('result', e.ev_kern_drop(c))\nexcept Exception as x:\n    print('ERR', repr(x)[:300])\n"
+          "print('alert', [x[1] for x in _AA['q']])")
+check("stage 7b (#5069) waits" in out and "ev_cal_members 1" in out, "#5069 F1: the start check holds the drop and the log names the row ("
+      + out[-500:].replace("\n", " | ") + ")")
 check("kern5069:left" in out, f"#5069 F1: the admins get an alert, not only a log line ({out[-300:]})")
 check(table("ev_cal_members") and sql("SELECT 1 FROM pg_trigger WHERE tgname='kalmido_kern_mirror_cal'"),
       "#5069 F1: the table AND its trigger stay (no half state)")
