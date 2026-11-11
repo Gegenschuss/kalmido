@@ -572,6 +572,19 @@ def fd_trash(c, r):
     return n, tid
 
 
+def fd_trash_purge_text(c, lid):
+    """#5565: when the lock of project lid is switched on or a key change is done (collab/liste2e.py le2a_finish), its deleted
+    text fields leave the field trash, like its deleted sections (lists/parttrash.py lpt_section_purge_list): their values are
+    plain text the lock does not show, or of the old key. Switching off drops only the copies holding ciphertexts
+    (collab/liste2eguard.py le2b_trash_cipher_purge, #5563): plain values written while decrypting stay. Fields of other types stay (their values
+    are readable in a locked project too, decision E2). The caller commits. Returns the copies dropped."""
+    ids = [r["id"] for r in c.execute("SELECT id, snap, held FROM list_part_trash WHERE list_id=? AND kind=?", (lid, FIELD_KIND)).fetchall()
+           if ftr_parts(r)[0].get("type") == "text"]
+    if ids:
+        c.execute("DELETE FROM list_part_trash WHERE id = ANY(CAST(? AS BIGINT[]))", (st_ids(ids),))
+    return len(ids)
+
+
 def ftr_person():
     """2.550.0 (#4528): the field trash is the app's (people's) way back: an agent's delete waits for a person's approval already."""
     u = getattr(g, "user", None)
@@ -681,8 +694,11 @@ def fd_back(c, r):
                  type=ftype)
         if s.get("org_field_id") and not c.execute("SELECT 1 FROM org_fields WHERE id=?", (s["org_field_id"],)).fetchone():
             s["org_field_id"] = None
+    vals = [v[:2] for v in held.get("vals") or [] if isinstance(v, list) and len(v) > 1]
+    if ftype == "text" and vals:  # #5565: only values that fit the project's lock now (a 409 while it switches keeps the copy)
+        from ..collab.liste2e import le2a_field_back
+        vals = le2a_field_back(c, lid, vals)
     part_copy_back(c, FIELD_KIND, r, f"field-{int(fid)}", fix=fix)  # the copy goes (core/objparts.py)
-    vals = held.get("vals") or []
     live = {x[0] for x in c.execute("SELECT id FROM tasks WHERE list_id=? AND id = ANY(CAST(? AS BIGINT[]))",
                                     (lid, st_ids([v[0] for v in vals])))} if vals else set()
     people = None

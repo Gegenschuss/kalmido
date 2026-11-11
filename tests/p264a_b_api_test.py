@@ -519,6 +519,83 @@ check(r.ok and r.json().get("restored") == 3 and back == [("", ""), ("", ""), ("
 F3T = dbx("SELECT held FROM list_part_trash WHERE list_id=? AND kind='list_field'", (L3,))
 check(F3T and json.loads(F3T[0][0]).get("n") == 1, f"#5562: the field copy counts one task left {F3T}")
 
+# ================================================================== 2.909.0 (#5565): deleted text fields and the lock: their values in the
+# field trash (list_part_trash.held.vals) come back only when they fit the project's lock now - restore and undo
+
+
+FLD_N = [0]
+
+
+def fld_copy(lid, tid_vals):
+    """A text field of list lid with values {task id: value} written into the field trash (deleted by alice) -> (field id,
+    trash id, undo group). The values are put into the copy straight: as an older version left them (#5549 removed such
+    copies at the switch only from 2.879 on)."""
+    FLD_N[0] += 1
+    r = A.post(B + f"/api/lists/{lid}/fields", json={"name": f"Notes {FLD_N[0]}", "type": "text"})
+    fid = r.json().get("id") if r.ok else None
+    r = A.delete(B + f"/api/fields/{fid}")
+    j = r.json() if r.ok else {}
+    held = {"vals": [[t, v] for t, v in tid_vals.items()], "n": len(tid_vals), "grouped": 0}
+    dbx("UPDATE list_part_trash SET held=? WHERE id=?", (json.dumps(held), j.get("trash_id")), write=True)
+    return fid, j.get("trash_id"), j.get("undo_group")
+
+
+def fld_vals(fid):
+    return sorted(x[1] for x in dbx("SELECT task_id, value FROM task_field_values WHERE field_id=?", (fid,)))
+
+
+# locked project L: a plain value (deleted before the lock) stays behind, a ciphertext of a known generation comes back
+F1, TR1, _ = fld_copy(L, {T: "PlainBeforeLock", TG: cipher(41)})
+r = A.post(B + f"/api/fields/trash/{TR1}/restore")
+check(r.ok and r.json().get("values") == 1 and fld_vals(F1) == [cipher(41)],
+      f"#5565: restore into the locked project brings back the ciphertext only {r.status_code} {r.text[:200]} {fld_vals(F1)}")
+# review 3: a broken ciphertext and one of a key generation the project does not have yet stay behind too
+G9 = cipher(45).replace('"g":1', '"g":9')
+F5, TR5, _ = fld_copy(L, {T: "e2e1:garbage", TG: G9})
+r = A.post(B + f"/api/fields/trash/{TR5}/restore")
+check(r.ok and r.json().get("values") == 0 and fld_vals(F5) == [],
+      f"#5565: a broken ciphertext / an unknown key generation does not come back {r.status_code} {r.text[:200]} {fld_vals(F5)}")
+# the undo way (fieldundo.py -> fd_back): the same rule
+F2, TR2, UG2 = fld_copy(L, {T: "PlainUndo", TG: cipher(42)})
+r = A.post(B + f"/api/undo/to/{UG2}") if UG2 else None
+check(r is not None and r.ok and dbx("SELECT 1 FROM list_fields WHERE id=?", (F2,)) and fld_vals(F2) == [cipher(42)],
+      f"#5565: undo of the delete in the locked project brings back the ciphertext only {r.status_code if r else None} "
+      f"{r.text[:200] if r else UG2} {fld_vals(F2)}")
+# open project L2: a ciphertext (a copy from the time it was locked) stays behind, the plain value comes back
+TO = A.post(B + "/api/tasks", json={"list_id": L2, "title": "Open field task"}).json()["id"]
+TO2 = A.post(B + "/api/tasks", json={"list_id": L2, "title": "Open field task 2"}).json()["id"]
+F3, TR3, _ = fld_copy(L2, {TO: "PlainOpen", TO2: cipher(43)})
+r = A.post(B + f"/api/fields/trash/{TR3}/restore")
+check(r.ok and r.json().get("values") == 1 and fld_vals(F3) == ["PlainOpen"],
+      f"#5565: restore into the open project brings back the plain value only {r.status_code} {r.text[:200]} {fld_vals(F3)}")
+# while the lock switches: 409 busy, the copy stays in the trash
+F4, TR4, _ = fld_copy(L, {T: cipher(44)})
+dbx("UPDATE lists SET e2e='decrypting' WHERE id=?", (L,), write=True)
+try:
+    r = A.post(B + f"/api/fields/trash/{TR4}/restore")
+finally:
+    dbx("UPDATE lists SET e2e='on' WHERE id=?", (L,), write=True)
+check(r.status_code == 409 and r.json().get("code") == "list_e2e_busy" and dbx("SELECT 1 FROM list_part_trash WHERE id=?", (TR4,))
+      and not dbx("SELECT 1 FROM list_fields WHERE id=?", (F4,)),
+      f"#5565: restore while the lock switches 409, the copy stays {r.status_code} {r.text[:200]}")
+
+# the once-run at the start (core/db.py migr_e2etrashsec5565 -> liste2eguard.py le2b_trash_section_fit): a task in the trash of
+# the locked project with a plain section name (left by a version before #5552), one of the open project with a ciphertext
+# lose it; the open project's plain name stays
+TS = [A.post(B + "/api/tasks", json={"list_id": lid, "title": "Trash " + str(i)}).json()["id"] for i, lid in enumerate((L2, L2, L2))]
+for t, name in zip(TS, ("PlainLocked", cipher(6), "OpenSection")):
+    check(A.delete(B + f"/api/tasks/{t}").ok, "#5565 setup: a task into the trash")
+    dbx("UPDATE tasks SET trash_section=? WHERE id=?", (name, t), write=True)
+dbx("UPDATE tasks SET list_id=? WHERE id=?", (L, TS[0]), write=True)  # a task of the locked project (its title is not checked here)
+rc, out, er = py("from kalmido.collab.liste2eguard import le2b_trash_section_fit\nfrom kalmido.core.pg import system_ctx\n"
+                 "c=app.connect()\nwith system_ctx(c):\n    n=le2b_trash_section_fit(c)\nc.commit()\nprint(n)")
+ts = [dbx("SELECT trash_section FROM tasks WHERE id=?", (t,))[0][0] for t in TS]
+check(rc == 0 and ts == [None, None, "OpenSection"], f"#5565: the once-run drops the section names that do not fit the lock {ts} {out} {er}")
+rc, out, er = py("from kalmido.collab.liste2eguard import le2b_trash_section_fit\nfrom kalmido.core.pg import system_ctx\n"
+                 "c=app.connect()\nwith system_ctx(c):\n    print(le2b_trash_section_fit(c))")
+check(rc == 0 and out.splitlines()[-1:] == ["0"], f"#5565: a second run finds nothing {out} {er}")
+
+
 # ================================================================== 2.900.0 (#5550): undo writes no note back into a locked project
 # A step of before the lock that a scrub missed (a project locked by an older version, set here in the database): taking it
 # back brings the entry back / its values back, but never a note or task title in plain text.

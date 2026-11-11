@@ -595,6 +595,15 @@ def le2b_trash_cipher_purge(c, lid):
     return k
 
 
+def le2b_trash_section_fit(c):
+    """#5565 (core/db.py, once): the section names that tasks in the trash remember (tasks.trash_section) and that do not fit
+    their project's lock go - a plain name in a locked project ('on'), a ciphertext in an open one. Projects switching now
+    forget them anyway (lists/parttrash.py lpt_section_purge_list); a switch still running empties them at its finish.
+    Idempotent, the caller commits. Returns the tasks changed."""
+    return c.execute("UPDATE tasks t SET trash_section=NULL FROM lists l WHERE l.id=t.list_id AND t.trash_section IS NOT NULL "
+                     "AND ((l.e2e='on' AND left(t.trash_section, 5)<>'e2e1:') OR (l.e2e IS NULL AND left(t.trash_section, 5)='e2e1:'))").rowcount
+
+
 def _trash_plain(r):
     """Does copy r (a section or a custom field of list_part_trash) hold plain text of the encrypted fields?"""
     try:

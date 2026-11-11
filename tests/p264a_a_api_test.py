@@ -385,6 +385,15 @@ check(not dbx("SELECT 1 FROM list_keys WHERE list_id=? AND user_id=?", (L, ERIN)
       "leave: the keys go, rotation pending")
 check(A.put(B + f"/api/lists/{L}/public-link", json={"mode": "view"}).status_code == 409, "public link: refused for a list with the lock")
 
+# 2.909.0 (#5565): fields deleted while locked wait in the field trash (list_part_trash); a text field's values are ciphertexts
+GEN = dbx("SELECT e2e_gen FROM lists WHERE id=?", (L,))[0][0]
+FT = A.post(B + f"/api/lists/{L}/fields", json={"name": "Locked notes", "type": "text"}).json().get("id")
+FN = A.post(B + f"/api/lists/{L}/fields", json={"name": "Locked count", "type": "number"}).json().get("id")
+r = A.patch(B + f"/api/tasks/{T1}", json={"fields": {str(FT): ct(GEN), str(FN): 7}})
+check(r.ok and A.delete(B + f"/api/fields/{FT}").ok and A.delete(B + f"/api/fields/{FN}").ok
+      and len(dbx("SELECT id FROM list_part_trash WHERE list_id=? AND kind='list_field' AND ref_id IN (?, ?)", (L, FT, FN))) == 2,
+      f"#5565: a text and a number field deleted while locked are in the field trash {r.status_code} {r.text[:200]}")
+
 # ================================================================== the way back
 check(Bo.post(B + f"/api/lists/{L}/e2e/stop", json={"password": "password123"}).status_code == 403, "stop: only the owner")
 check(A.post(B + f"/api/lists/{L}/e2e/stop", json={"password": "wrong"}).status_code == 403, "stop: asks for the password")
@@ -420,6 +429,9 @@ check([x[0] for x in dbx("SELECT ref_id FROM list_part_trash WHERE list_id=? AND
 check(not dbx("SELECT 1 FROM list_keys WHERE list_id=?", (L,)) and not dbx("SELECT 1 FROM list_key_pending WHERE list_id=?", (L,))
       and dbx("SELECT e2e IS NULL AND e2e_rotate=0 FROM lists WHERE id=?", (L,))[0][0] in (True, 1), "way back: no keys, no waiting list, open")
 check(not dbx("SELECT 1 FROM tasks WHERE list_id=? AND (title LIKE 'e2e1:%' OR content LIKE 'e2e1:%')", (L,)), "way back: no ciphertext left")
+check(not dbx("SELECT 1 FROM list_part_trash WHERE list_id=? AND kind='list_field' AND ref_id=?", (L, FT))
+      and dbx("SELECT 1 FROM list_part_trash WHERE list_id=? AND kind='list_field' AND ref_id=?", (L, FN)),
+      "#5565: way back: the deleted text field (ciphertext values) left the trash, the number field stays")
 check(A.patch(B + f"/api/tasks/{T1}", json={"title": "Plant roses again"}).ok, "open again: plain texts")
 check(A.patch(B + f"/api/tasks/{T1}", json={"title": ct(1)}).status_code == 400, "open again: no ciphertext")
 check(A.put(B + f"/api/lists/{L}/members", json={"user_id": ag["id"], "role": "edit"}).ok, "open again: agents may join")

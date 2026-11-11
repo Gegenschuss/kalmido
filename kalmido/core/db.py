@@ -1395,7 +1395,7 @@ def init_db(guard=True, load=None):
                           "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value WHERE user_settings.value=''",  # the start fills in defaults first
                           (",".join(areas), uid))
             gset(c, "migr_tours2466", "1")
-        from ..collab.liste2eguard import le2b_scrub_free, le2b_scrub_trash, le2b_scrub_trash_tasks, le2b_scrub_undo_free  # #4372, #5549, #5562, #5550
+        from ..collab.liste2eguard import le2b_scrub_free, le2b_scrub_trash, le2b_scrub_trash_tasks, le2b_scrub_undo_free, le2b_trash_section_fit  # #4372, #5549, #5562, #5550, #5565
         if gsetting(c, "migr_e2efree4372") != "1":  # 2.538.0 (#4372, review 2646 finding 1): one way -- a project locked before
             # 2.538 loses its time notes, status notes and descriptions as a project locked now does (le2b_scrub). Only 'on': one
             # still 'encrypting' gets the whole scrub at its finish, one 'decrypting' shows its texts again
@@ -1436,6 +1436,14 @@ def init_db(guard=True, load=None):
             gset(c, "migr_e2eundo5550", "1")
             if any(n.values()):
                 print("locked projects: undo copies dropped " + ", ".join(f"{k} {v}" for k, v in sorted(n.items())), flush=True)
+        if gsetting(c, "migr_e2etrashsec5565") != "1":  # #5565: one way -- the tasks in the trash of a project locked before
+            # #5552 kept their section's plain name (tasks.trash_section; a project switching now forgets it, lists/parttrash.py
+            # lpt_section_purge_list), one unlocked again a ciphertext. Their restore no longer makes such a section (#5552
+            # rt_e2e_ok); the name goes once. Only 'on' and open, as migr_e2etrash5549: a switch still running empties it at its finish
+            n = le2b_trash_section_fit(c)
+            gset(c, "migr_e2etrashsec5565", "1")
+            if n:
+                print(f"projects with a lock switched before: section names of tasks in the trash removed {n}", flush=True)
         if gsetting(c, "migr_offerlist4586") != "1":  # 2.620.0 (#4586, review C M1): the links of tasks moved before the trigger
             # kalmido_offer_link_list (migrations.d/4586_a.py) follow their task's list once
             c.execute("UPDATE task_offer_links l SET list_id=t.list_id FROM tasks t WHERE t.id=l.task_id AND l.list_id<>t.list_id")

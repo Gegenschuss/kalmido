@@ -119,6 +119,7 @@ from ..core.db import body, bump, db, err, iso, now_utc  # noqa: E402
 from ..core.access import Denied, need_list  # noqa: E402
 from ..accounts.session import me  # noqa: E402
 from ..lists.parttrash import lpt_section_purge_list  # noqa: E402  #5552: the sections in the trash when the lock switches
+from ..lists.fields import fd_trash_purge_text  # noqa: E402  #5565: the deleted text fields in the trash when the lock switches
 from .cmttrash import ctt_purge_list  # 2.530.0 A (#4315): the kept texts / files of deleted comments and channel messages
 
 LE2A_MANAGE = ("owner", "admin")  # finding M9: who may switch the lock and hand out list keys
@@ -470,6 +471,26 @@ def le2a_field_value(c, f, v, lid):
         v = le2a_clean_cipher(v.strip(), f["name"])
     le2e_guard(c, lid, {"field": v})
     return v
+
+
+def le2a_field_back(c, lid, vals):
+    """#5565: the values [[task id, value], ...] of a text field coming back from the field trash (lists/fields.py fd_back)
+    that fit the lock of list lid now: an open project takes no ciphertext, a locked one ('on') only ciphertexts of a known
+    key generation (as le2e_guard; a plain value of a copy made before the lock stays behind). While the lock switches: 409
+    busy, the copy stays in the trash (the switch's finish empties it, le2a_finish). Review 1: the project's row is held
+    (FOR UPDATE), so a finish of a switch waits for this restore and empties the trash after it."""
+    r = c.execute("SELECT e2e, e2e_gen FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
+    mode, gen = ((r[0] or None), int(r[1] or 0)) if r else (None, 0)
+    if mode is None:
+        return [v for v in vals if not le2e_is_cipher(v[1])]
+    if mode != "on":
+        if any(v[1] for v in vals):
+            raise LE2EDenied("list_e2e_busy")
+        return vals
+    out = [v for v in vals if le2e_is_cipher(v[1]) and le2a_value_ok(v[1], gen)]
+    if any((le2e_parse(v[1]) or {}).get("g", gen) < gen for v in out):
+        le2a_reenc_again(c, lid)  # an older key generation: the re-encryption is due again (as le2e_guard)
+    return out
 
 
 def le2a_text_max(v, plain_max):
@@ -1065,6 +1086,7 @@ def le2a_finish(lid):
         from .liste2eguard import le2b_trash_cipher_purge  # #5563: deleted sections and text fields hold the old key's ciphertexts
         lpt_section_purge_list(c, lid)
         le2b_trash_cipher_purge(c, lid)
+        fd_trash_purge_text(c, lid)  # #5565 review 2: deleted text fields hold values of the old key, too
         bump(c)
         c.commit()
         if gone:
@@ -1083,11 +1105,13 @@ def le2a_finish(lid):
         c.execute("UPDATE tasks SET wait_note='' WHERE list_id=? AND COALESCE(wait_note, '')<>''", (lid,))  # not encrypted: it goes
         from .liste2eguard import le2b_scrub  # H2: copies of the plain texts in other tables (history, time entries, pushes, webhooks, agent events ...)
         le2b_scrub(c, lid)
+        fd_trash_purge_text(c, lid)  # #5565: the deleted text fields hold plain values the lock no longer shows
     else:
         c.execute("UPDATE lists SET e2e_rotate=0, e2e_reenc=0 WHERE id=?", (lid,))
         c.execute("DELETE FROM list_keys WHERE list_id=?", (lid,))
         c.execute("DELETE FROM list_key_pending WHERE list_id=?", (lid,))
-        from .liste2eguard import le2b_trash_cipher_purge  # #5563: deleted text fields with ciphertext values (no key left)
+        # #5563: deleted text fields with ciphertext values (no key left) go; one deleted while decrypting (plain values) stays
+        from .liste2eguard import le2b_trash_cipher_purge
         le2b_trash_cipher_purge(c, lid)
     # #5552: deleted sections keep their names of the other state; after le2b_scrub, whose undo clean-up finds a deleted
     # section's steps through its copy in the trash
