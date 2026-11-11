@@ -76,6 +76,8 @@ EXPECT_4XX = {
     "GET /api/team/dispo/callsheet/{}/pdf": (404, "the sweep's freelancer has no Film & Video and no shoot day (p2802_a_callsheet_test.py covers it)"),  # 2.855.0 (#1956)
     "GET /api/team/dispo/callsheet/{}/sketch": (404, "the sweep's freelancer has no Film & Video and no shoot day (p2802_a_callsheet_test.py covers it)"),  # 2.855.0 (#1956)
     "GET /api/team/dispo/callsheet/{}/history": (404, "the sweep's freelancer has no Film & Video and no shoot day (p5532_a_dispokern_test.py covers it)"),  # 2.872.0 (#5532): the call sheet's new history route
+    "GET /api/team/dispo/callsheet/{}/logo": (404, "the sweep's freelancer has no Film & Video and no shoot day (p2993_a_cslogos_test.py covers it)"),  # 2.993.0 (#5650)
+    "GET /api/team/dispo/callsheet/{}/photo/{}": (404, "the sweep's freelancer has no Film & Video and no shoot day (p2993_a_cslogos_test.py covers it)"),  # 2.993.0 (#5650)
     "GET /api/lists/{}/shotlist.pdf": (404, "the own list is no shoot (project type Shoot only with Film & Video; p2636_c_dreh_api_test.py covers it)"),  # 2.636.0 (#4565)
     "GET /api/v1/office/letters/{}": (404, "an agent reads only the letters it drafted itself; the freelancer wrote this one"),
     # 2.557.0 (#4670): the own agent has no provider key stored (the provider would be an outside service)
@@ -365,6 +367,7 @@ SUBST = [
     (r"/api/obj/doc_note/$", "docnode"),  # 2.981.0 (#5273): the notes of the own document through the comments' core (USE)
     (r"/api/v1/agent/objects/$", "objkind"), (r"/api/v1/agent/objects/objprobe/$", "list"),
     (r"/api/team/dispo/callsheet/$", "dispojob"),  # 2.855.0 (#1956)
+    (r"/api/team/dispo/callsheet/[^/]+/photo/$", "contact"),  # 2.993.0 (#5650): the logo of a contact on the call sheet
     # 2.421.0 A (#2936): own objects of the setup above; file ids of other stores than the file store: none (skipped)
     (r"/me/webhooks/$", "webhook"),  # 2.391.0 (#3362)
     (r"/sprints/$", "sprint"), (r"/api/fields/$", "field"), (r"/api/docs/views/$", "docview"),  # 2.602.0 (job/3106)

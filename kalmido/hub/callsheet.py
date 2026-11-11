@@ -34,12 +34,21 @@ the client still comes from the project's client file and a contact chosen repla
 person, phone, e-mail of the contact). Only contacts of the area's address books the viewer may read (the rule of cs_people,
 cs_contact): an id of any other book is refused on saving (400) and shown nowhere (the dialog, the PDF, its distribution
 line). The agency chosen is remembered at the project (lists.cs_agency_id, by a person who edits the project) and fills a new
-call sheet of the project. The free texts data.client / data.agency stay as the fallback (older call sheets keep theirs)."""
+call sheet of the project. The free texts data.client / data.agency stay as the fallback (older call sheets keep theirs).
+2.993.0 (#5650): the call sheet (dialog and PDF) carries three logos in a row at the top: production left (the office logo of
+the area, the one of quotations and invoices, office/pdfweb.py), agency in the middle, client right (the photo of the contact
+chosen, no field of its own). A logo missing leaves its place empty, the others keep theirs. A missing contact photo can be
+uploaded at the call sheet: it is saved at the contact as its photo through the contacts' own way (contacts/web.py
+op_contact_edit: the contact's write right, 403 else, the person's undo step, vCard / sync) and so counts everywhere.
+GET  /api/team/dispo/callsheet/<job>/logo?org=             the production's logo (PNG; 404 without one)
+GET  /api/team/dispo/callsheet/<job>/photo/<contact>?org=  the photo of a contact of the area the viewer reads (404 else)
+PUT  /api/team/dispo/callsheet/<job>/photo/<contact>?org=  {photo: data URI PNG / JPEG}: the contact's new photo (the logo)"""
 import base64
 import binascii
 import hashlib
 import io
 import json
+import os
 import re
 import secrets
 from datetime import date
@@ -65,8 +74,12 @@ from ..files.upsafe import UploadRefused, up_check
 from ..lists.shoot import sht_days
 from ..lists.templates import ptype_ok
 from ..office.model import pb_personal  # 2.988.0 (#5651): a private project's area
+from ..office.model import office_settings  # 2.993.0 (#5650): the office logo of the area
+from ..office.pdfweb import opdf_logo_path, opdf_logo_process  # 2.993.0 (#5650)
+from ..contacts.model import PHOTO_MAX, book_role, need_contact  # 2.993.0 (#5650): a logo = the contact's photo
+from ..contacts.web import op_contact_edit  # 2.993.0 (#5650): the contacts' own way of saving it
 from ..office.pdf import (A4_H, C_INK, C_INK2, C_RULE, C_RULE2, MM, PDF_CW, PDF_L, _Page, pdf_date, pdf_image_object,
-                          pdf_text_width, pdf_wrap, pdf_write)
+                          pdf_logo_fit, pdf_text_width, pdf_wrap, pdf_write)
 from .dispo import DSP_SLOT, _area, _gate, dsp_book_ids
 
 CS_JOB_RE = re.compile(r"^[0-9A-Za-z_-]{1,64}$")
@@ -189,16 +202,28 @@ def cs_book_q(books):
     return ",".join("?" * len(books))
 
 
-def cs_contact_info(r):
-    """{id, company, person, phone, email} of a contact row (2.986.0, #5649): an organisation contact is the company, a person
-    carries the company of the contact's field "organisation"."""
+def cs_contact_info(r, wb=()):
+    """{id, company, person, phone, email, photo, can_photo} of a contact row (2.986.0, #5649): an organisation contact is the
+    company, a person carries the company of the contact's field "organisation". 2.993.0 (#5650): photo = it has one (the
+    logo), can_photo = its address book is one of wb (uid edits it: the upload is offered; the server checks again)."""
     name = (r["fn"] or f"{r['given'] or ''} {r['family'] or ''}").strip()
     company, person = (name, "") if r["kind"] == "org" else ((r["org"] or "").strip(), name)
     return {"id": r["id"], "company": company, "person": person, "phone": _first(r["phones"], ("cell", "mobile")),
-            "email": _first(r["emails"])}
+            "email": _first(r["emails"]), "photo": bool(r["has_photo"]), "can_photo": r["book_id"] in wb}
 
 
-def cs_contact(c, uid, oid, cid, books=None):
+CS_CT_COLS = "id, book_id, kind, fn, given, family, org, emails, phones, photo<>'' AS has_photo"  # 2.993.0 (#5650): + book, photo flag
+
+
+def cs_write_books(c, uid, books):
+    """2.993.0 (#5650): the ids of `books` uid may change contacts in (role owner / edit, contacts/model.py book_role)."""
+    if not books:
+        return set()
+    return {b["id"] for b in c.execute(f"SELECT * FROM books WHERE id IN ({cs_book_q(books)})", books)
+            if book_role(c, uid, b) in ("owner", "edit")}
+
+
+def cs_contact(c, uid, oid, cid, books=None, wb=None):
     """2.986.0 (#5649): the contact cid as cs_contact_info when it is a person / an organisation in an address book of the area
     uid may read (dsp_book_ids, the rule of cs_people), else None -- an id of another book shows nothing."""
     if not cid:
@@ -206,19 +231,20 @@ def cs_contact(c, uid, oid, cid, books=None):
     books = dsp_book_ids(c, uid, oid) if books is None else books
     if not books:
         return None
-    r = c.execute(f"SELECT id, kind, fn, given, family, org, emails, phones FROM contacts WHERE id=? AND book_id IN ({cs_book_q(books)}) "
+    r = c.execute(f"SELECT {CS_CT_COLS} FROM contacts WHERE id=? AND book_id IN ({cs_book_q(books)}) "
                   f"AND kind IN ('individual', 'org') AND {live_sql()}", (int(cid), *books)).fetchone()
-    return cs_contact_info(r) if r else None
+    return cs_contact_info(r, cs_write_books(c, uid, books) if wb is None else wb) if r else None
 
 
-def cs_contacts(c, uid, oid, books=None):
-    """2.986.0 (#5649): the choice of the dialog: [{id, company, person, phone, email}] of the people and organisations of the
-    area's address books uid may read (the same books as dsp_contacts of the disposition's places)."""
+def cs_contacts(c, uid, oid, books=None, wb=None):
+    """2.986.0 (#5649): the choice of the dialog: [{id, company, person, phone, email, photo, can_photo}] of the people and
+    organisations of the area's address books uid may read (the same books as dsp_contacts of the disposition's places)."""
     books = dsp_book_ids(c, uid, oid) if books is None else books
     if not books:
         return []
-    return [cs_contact_info(r) for r in c.execute(
-        f"SELECT id, kind, fn, given, family, org, emails, phones FROM contacts WHERE book_id IN ({cs_book_q(books)}) "
+    wb = cs_write_books(c, uid, books) if wb is None else wb
+    return [cs_contact_info(r, wb) for r in c.execute(
+        f"SELECT {CS_CT_COLS} FROM contacts WHERE book_id IN ({cs_book_q(books)}) "
         f"AND kind IN ('individual', 'org') AND {live_sql()} ORDER BY lower(fn), id LIMIT 500", books)]
 
 
@@ -244,7 +270,8 @@ def cs_project(c, uid, rows):
 
 
 def cs_production(c, oid):
-    """{name, lines: [address, phone, mail]} of the area's master data (office_company; a personal area: the own office)."""
+    """{name, lines: [address, phone, mail], logo} of the area's master data (office_company; a personal area: the own office);
+    2.993.0 (#5650): logo = the area has an office logo (cs_logo_file)."""
     r = c.execute("SELECT name, street, zip, city, email, phone FROM office_company WHERE org_id=?", (oid,)).fetchone()
     name = (r["name"] if r else "") or ""
     if not name:
@@ -254,7 +281,30 @@ def cs_production(c, oid):
     if r:
         lines = [x for x in ((r["street"] or "").strip(), " ".join(x for x in ((r["zip"] or "").strip(), (r["city"] or "").strip()) if x),
                              (r["phone"] or "").strip(), (r["email"] or "").strip()) if x]
-    return {"name": name, "lines": lines}
+    return {"name": name, "lines": lines, "logo": bool(cs_logo_file(c, oid))}
+
+
+def cs_logo_file(c, oid):
+    """2.993.0 (#5650): the path of the area's office logo (office/pdfweb.py opdf_logo_path, the logo of quotations and
+    invoices) when it has one, else None."""
+    lp = opdf_logo_path(oid)
+    return lp if office_settings(c, oid).get("logo") and os.path.isfile(lp) else None
+
+
+CS_PHOTO_RE = re.compile(r"data:image/(jpeg|png|gif|webp);base64,(.+)", re.S)
+
+
+def cs_photo_bytes(c, cid):
+    """2.993.0 (#5650): (bytes, mime) of contact cid's photo (a data URI in contacts.photo), None without one. The caller
+    checked that the person reads the contact (cs_contact)."""
+    r = c.execute("SELECT photo FROM contacts WHERE id=?", (int(cid),)).fetchone()
+    m = CS_PHOTO_RE.fullmatch((r["photo"] if r else "") or "")
+    if not m:
+        return None
+    try:
+        return base64.b64decode(m.group(2)), "image/" + m.group(1)
+    except (binascii.Error, ValueError):
+        return None
 
 
 def cs_shot_days(c, uid, proj):
@@ -282,13 +332,14 @@ def cs_auto(c, uid, oid, rows, d=None, choice=True):
     days = cs_shot_days(c, uid, proj)
     d = d or {}
     books = dsp_book_ids(c, uid, oid)
+    wb = cs_write_books(c, uid, books)  # 2.993.0 (#5650): the books whose contacts uid may give a logo
     return {"date": d0, "start": t0, "end": t1, "title": rows[0]["title"] or "", "project": proj.get("name", ""),
             "client": proj.get("client") or {}, "production": cs_production(c, oid), "crew": crew,
             "shot_days": [n for n, s in days], "list_id": proj.get("list_id"),
-            "client_contact": cs_contact(c, uid, oid, d.get("client_contact"), books),
-            "agency_contact": cs_contact(c, uid, oid, d.get("agency_contact"), books),
-            "agency_default": cs_contact(c, uid, oid, proj.get("agency_id"), books),
-            **({"contacts": cs_contacts(c, uid, oid, books)} if choice else {})}
+            "client_contact": cs_contact(c, uid, oid, d.get("client_contact"), books, wb),
+            "agency_contact": cs_contact(c, uid, oid, d.get("agency_contact"), books, wb),
+            "agency_default": cs_contact(c, uid, oid, proj.get("agency_id"), books, wb),
+            **({"contacts": cs_contacts(c, uid, oid, books, wb)} if choice else {})}
 
 
 def cs_public(c, uid, oid, job, rows, r=None):
@@ -345,12 +396,13 @@ def cs_clean(d):
     return {k: v for k, v in out.items() if v not in ("", [])}
 
 
-def cs_sketch_in(c, uid, oid, v):
+def cs_sketch_in(c, uid, oid, v, key="sketch"):
     """A sketch (data URI or base64) -> (base64 text, mime): PNG / JPEG only, at most CS_IMG_MAX bytes, through the shared
     upload checks (virus scan, photo metadata such as the place a photo was taken, files/upsafe.py up_check); a picture the
-    scanner could not check is refused (no later scan for this one)."""
+    scanner could not check is refused (no later scan for this one). 2.993.0 (#5650): key = the field of the messages (a
+    logo: "photo")."""
     if not isinstance(v, str) or not v.strip():
-        raise BadInput(tr("Invalid value: {0}", "sketch"))
+        raise BadInput(tr("Invalid value: {0}", key))
     raw = v.strip()
     m = re.match(r"data:([a-z/+.-]+);base64,", raw)
     if m:
@@ -360,7 +412,7 @@ def cs_sketch_in(c, uid, oid, v):
     try:
         data = base64.b64decode(raw, validate=True)
     except (binascii.Error, ValueError):
-        raise BadInput(tr("Invalid value: {0}", "sketch")) from None
+        raise BadInput(tr("Invalid value: {0}", key)) from None
     if len(data) > CS_IMG_MAX:
         raise BadInput(tr("The picture is too large (at most {0} MB)", CS_IMG_MAX // (1024 * 1024)))
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -532,8 +584,107 @@ def cs_sketch(job):
                     headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": "inline"})
 
 
+# ---------------------------------------------------------------- 2.993.0 (#5650): the logos
+CS_LOGO_PX = (512, 384, 256)  # a logo saved as a contact photo: at most this long edge (the first that fits PHOTO_MAX)
+
+
+def cs_img_response(data, mime):
+    return Response(data, mimetype=mime, headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+                                                  "Content-Disposition": "inline"})
+
+
+@app.get("/api/team/dispo/callsheet/<job>/logo")
+def cs_logo(job):
+    """The production's logo (the office logo of the call sheet's area) as PNG; 404 without one."""
+    c, _uid, oid, _rows = cs_gate(job)
+    lp = cs_logo_file(c, oid)
+    if not lp:
+        raise Denied(404)
+    with open(lp, "rb") as fh:
+        return cs_img_response(fh.read(), "image/png")
+
+
+def cs_photo_contact(c, uid, oid, cid):
+    """The contact cid when uid reads it in an address book of the area (cs_contact), else 404."""
+    ct = cs_contact(c, uid, oid, cid)
+    if not ct:
+        raise Denied(404)
+    return ct
+
+
+@app.get("/api/team/dispo/callsheet/<job>/photo/<int:cid>")
+def cs_photo(job, cid):
+    """The photo (= logo) of contact cid of the area (only one uid reads, cs_contact); 404 without one."""
+    c, uid, oid, _rows = cs_gate(job)
+    cs_photo_contact(c, uid, oid, cid)
+    got = cs_photo_bytes(c, cid)
+    if not got:
+        raise Denied(404)
+    return cs_img_response(*got)
+
+
+def cs_logo_photo(data):
+    """Checked picture bytes -> a contact photo as a data URI: the office logo's picture check and clean-up (office/pdfweb.py
+    opdf_logo_process: PNG / JPEG / WebP, size, orientation, 8 bit, no metadata, transparency kept), then at most CS_LOGO_PX
+    on the long edge as PNG (a logo keeps its shape and transparency; no square cut as a portrait), small enough for the
+    contact's photo (contacts/model.py PHOTO_MAX, the vCard / sync carry it)."""
+    try:
+        png, _w, _h = opdf_logo_process(data)
+    except ValueError as e:
+        raise BadInput(str(e)) from None
+    with Image.open(io.BytesIO(png)) as im:
+        im.load()
+        for px in CS_LOGO_PX:
+            x = im.copy()
+            x.thumbnail((px, px), Image.Resampling.LANCZOS)
+            out = io.BytesIO()
+            if x.mode == "RGBA":
+                x.save(out, "PNG", optimize=True)
+                uri = "data:image/png;base64," + base64.b64encode(out.getvalue()).decode("ascii")
+            else:
+                x.convert("RGB").save(out, "JPEG", quality=88, optimize=True)
+                uri = "data:image/jpeg;base64," + base64.b64encode(out.getvalue()).decode("ascii")
+            if len(uri) <= PHOTO_MAX:
+                return uri
+    raise BadInput(tr("The picture is too large (at most {0} MB)", CS_IMG_MAX // (1024 * 1024)))
+
+
+@app.put("/api/team/dispo/callsheet/<job>/photo/<int:cid>")
+def cs_photo_put(job, cid):
+    """{photo: data URI (PNG / JPEG)}: the logo of a client / agency = the photo of contact cid (a contact of the area uid
+    reads, else 404), saved at the contact by the contacts' own way (op_contact_edit: the write right of the contact, 403
+    else, before the picture is looked at; the person's undo step; vCard and sync). -> {contact: cs_contact_info}."""
+    c, uid, oid, _rows = cs_gate(job)
+    cs_photo_contact(c, uid, oid, cid)
+    need_contact(c, cid, write=True, uid=uid)  # 403 for a contact uid only reads (op_contact_edit checks it again)
+    b = body()
+    if not isinstance(b, dict):
+        raise BadInput(tr("Invalid data"))
+    raw, _mime = cs_sketch_in(c, uid, oid, b.get("photo"), "photo")  # PNG / JPEG, size, pixels, virus scan, photo metadata
+    uri = cs_logo_photo(base64.b64decode(raw))
+    op_contact_edit(c, uid, cid, {"photo": uri})  # commits
+    return jsonify(contact=cs_photo_contact(c, uid, oid, cid))
+
+
+def cs_pdf_logos(c, oid, a):
+    """[(bytes or None) x 3] of the PDF's logo row: production, agency, client (the contacts chosen, cs_auto)."""
+    out = []
+    lp = cs_logo_file(c, oid) if a["production"].get("logo") else None
+    try:
+        with open(lp, "rb") as fh:
+            out.append(fh.read(16 * 1024 * 1024))
+    except (OSError, TypeError):
+        out.append(None)
+    for k in ("agency_contact", "client_contact"):
+        x = a.get(k)
+        got = cs_photo_bytes(c, x["id"]) if x and x.get("photo") else None
+        out.append(got[0] if got else None)
+    return out
+
+
 # ---------------------------------------------------------------- the PDF
 CS_FS = 9.0
+CS_LOGO_H = 16 * MM  # 2.993.0 (#5650): the height of the logo row
 CS_LH = 12.2
 CS_TOP = 18 * MM
 CS_BOTTOM = A4_H - 20 * MM
@@ -645,6 +796,18 @@ def cs_pdf(c, uid, oid, job, rows):
     a = cs_auto(c, uid, oid, rows, d, choice=False)
     cc, ac = a["client_contact"], a["agency_contact"]  # 2.986.0 (#5649): the contacts chosen (only readable ones, cs_contact)
     doc = CsDoc(lg)
+    # 2.993.0 (#5650): the logo row on top: production left, agency centre, client right; a missing one leaves its place empty
+    logos = [pdf_image_object(x) if x else None for x in cs_pdf_logos(c, oid, a)]
+    if any(logos):
+        lw = (PDF_CW - 12) / 3
+        for i, img in enumerate(logos):
+            if not img:
+                continue
+            w, h = pdf_logo_fit(img, lw, CS_LOGO_H)
+            x = PDF_L if i == 0 else PDF_L + (PDF_CW - w) / 2 if i == 1 else PDF_L + PDF_CW - w
+            doc.images[f"CsL{i}"] = img
+            doc.p.image(f"CsL{i}", x, doc.y + (CS_LOGO_H - h) / 2, w, h)
+        doc.y += CS_LOGO_H + 10
     title = a["project"] or a["title"]
     prod = a["production"]
     cast = d.get("cast") or []
