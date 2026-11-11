@@ -41,6 +41,31 @@ function cs_ctHtml(k, label, cur, list, freeHtml) {
     <div class="csfree" data-ct="${esc(k)}"${cur ? ' hidden' : ''}>${/*html-ok*/ freeHtml}</div>`;
 }
 
+// 2.993.0 (#5650): three logos in a row on top of the call sheet -- production left (the office logo of the area), agency in
+// the middle, client right (the photo of the contact chosen in the form). A missing one leaves its place empty (a fixed box
+// of the 3er grid, the others keep theirs). Who may change the contact gets "Add logo": the picture is saved at the contact as
+// its photo (PUT .../photo/<contact>); without a contact chosen the dialog first asks for one (the choice of #5649).
+const CS_LOGO_ALT = {production: N_('Logo of the production'), agency: N_('Logo of the agency'), client: N_('Logo of the client')};
+/** the contact chosen in the form for k (agency / client): its entry of the choice, else null */
+function cs_logoCt(cs, k, md) {
+  const a = cs.auto || {}, sel = md ? cs_one(`#cs-${k}_contact`, md) : null;
+  const id = sel ? +sel.value : (a[`${k}_contact`] || (k === 'agency' && !cs.updated_at && !(cs.data || {}).agency ? a.agency_default : null))?.id;
+  if (!id) return null;
+  return (a.contacts || []).find(x => x.id === id) || [a.client_contact, a.agency_contact, a.agency_default].find(x => x && x.id === id) || null;
+}
+/** the inner part of the logo place k */
+function cs_logoCell(cs, k, md) {
+  const ver = cs._lv || {};
+  if (k === 'production') return cs.auto?.production?.logo ? `<img src="${esc(cs_url(cs.job, cs.org_id, '/logo'))}" alt="${esc(tr(CS_LOGO_ALT[k]))}">` : '';  // sprung-ok: fixed logo box (.cslogo)
+  const ct = cs_logoCt(cs, k, md);
+  if (ct?.photo) return `<img src="${esc(cs_url(cs.job, cs.org_id, '/photo/' + ct.id))}&v=${esc(String(ver[ct.id] || 0))}" alt="${esc(tr(CS_LOGO_ALT[k]))}">`;  // sprung-ok: fixed logo box (.cslogo)
+  const can = cs.can_edit && (ct ? ct.can_photo : (cs.auto?.contacts || []).some(x => x.can_photo));
+  return can ? `<button type="button" class="btn sm ghost" data-cs="logo" data-k="${esc(k)}" aria-label="${esc(tr(CS_LOGO_ALT[k]))}">${ic('upload', 's')} ${tr('Add logo')}</button>` : '';
+}
+function cs_logosHtml(cs, md) {
+  return `<div class="cslogos">${['production', 'agency', 'client'].map(k => `<div class="cslogo" data-logo="${esc(k)}">${/*html-ok*/ cs_logoCell(cs, k, md)}</div>`).join('')}</div>`;
+}
+
 /** one line of an editable table (key of CS_ROWS) */
 function cs_lineHtml(key, r) {
   return `<div class="csrow" data-k="${esc(key)}">${CS_ROWS[key].map(([c, label]) => `<input data-c="${esc(c)}" maxlength="200" value="${esc(r[c] || '')}" placeholder="${esc(tr(label))}" aria-label="${esc(tr(label))}">`).join('')}<button type="button" class="iconbtn" data-cs="rowdel" aria-label="${esc(tr('Remove line'))}" title="${esc(tr('Remove line'))}">${ic('x', 's')}</button></div>`;
@@ -56,7 +81,7 @@ function cs_formHtml(cs) {
   const cl = a.client || {}, prod = a.production || {};
   const calls = d.calls?.length ? d.calls : CS_CALL_DEPTS.map(x => ({dept: tr(x), time: ''}));
   const crew = (a.crew || []).map(p => `<li class="${p.open ? 'csopen' : ''}"><b>${esc(p.function || '')}</b> <span>${esc(p.name)}</span> <span class="muted">${esc([p.phone, p.mail].filter(Boolean).join(' · '))}</span></li>`).join('');
-  return `<h3>${tr('Call sheet')}: ${esc(a.project || a.title || '')}</h3>
+  return `${/*html-ok*/ cs_logosHtml(cs)}<h3>${tr('Call sheet')}: ${esc(a.project || a.title || '')}</h3>
     <p class="muted">${esc(fmtDayAbs(a.date))}${a.project && a.title ? ' · ' + esc(a.title) : ''}</p>
     <details class="cssec" open><summary>${tr('Header')}</summary>
       ${/*html-ok*/ txt('subtitle', N_('Subtitle'), a.project && a.title !== a.project ? a.title : '')}
@@ -90,6 +115,7 @@ function cs_formHtml(cs) {
     </details>
     ${/*html-ok*/ area('attachments', N_('More attachments'), tr('One per line'), 1000)}
     <p class="cserr" role="alert" hidden></p>
+    <input type="file" id="cs-logofile" accept="image/png,image/jpeg" hidden>
     <div class="foot"><button class="btn" data-cs="close">${tr('Close')}</button><span class="spacer"></span>
       <button class="btn" data-cs="pdf">${ic('download', 's')} ${tr('PDF')}</button>${navigator.canShare ? `<button class="btn" data-cs="share">${ic('share', 's')} ${tr('Share')}</button>` : ''}
       ${cs.can_edit ? `<button class="btn pri" data-cs="save">${ic('check', 's')} ${tr('Save')}</button>` : ''}</div>`;
@@ -128,7 +154,7 @@ async function cs_open(job, org) {
     const v = {data: cs_collect(md), expect_updated_at: cs.updated_at || undefined, ...(sketch !== undefined ? {sketch} : {})};
     try {
       const r = await api('PUT', cs_url(job, org), v);
-      cs = r.callsheet; sketch = undefined; err('');
+      cs = {...r.callsheet, _lv: cs._lv}; sketch = undefined; err('');  // 2.993.0 (#5650): _lv = the logos uploaded here (a new picture, not the cached one)
       // 2.855.0 (#1956, review F3): back / forward carry the version this save left - a change by someone else since is a
       // 409 (api() says it) and nothing is overwritten
       let ver = cs.updated_at;
@@ -153,6 +179,38 @@ async function cs_open(job, org) {
     return r.blob();
   };
   const fname = () => `callsheet-${(cs.auto?.date || '')}.pdf`;
+  // 2.993.0 (#5650): the logos -- a place drawn again, the upload (saved at the contact), the contact chosen first
+  const cs_logoDraw = k => { const box = cs_one(`.cslogo[data-logo="${k}"]`, md); if (box) setHtml(box, cs_logoCell(cs, k, md)); };
+  const cs_logoPick = k => { const f = cs_one('#cs-logofile', md); if (f) { f.dataset.k = k; f.click(); } };
+  const cs_logoUp = async (f, k) => {
+    const ct = cs_logoCt(cs, k, md);
+    if (!ct) return;
+    if (!/^image\/(png|jpeg)$/.test(f.type)) { toast(tr('Please select a PNG or JPEG picture')); return; }
+    if (f.size > CS_MAX) { toast(tr('The picture is too large (at most {0} MB)', 4)); return; }
+    try {
+      const r = await api('PUT', cs_url(job, org, '/photo/' + ct.id), {photo: await cs_readFile(f)});
+      for (const x of [...(cs.auto?.contacts || []), cs.auto?.client_contact, cs.auto?.agency_contact, cs.auto?.agency_default]) if (x && x.id === ct.id) Object.assign(x, r.contact);
+      cs._lv = {...cs._lv, [ct.id]: Date.now()};
+      cs_logoDraw('agency'); cs_logoDraw('client');
+      toast(tr('The logo is saved as the photo of the contact.'));
+    } catch { /* api() said it */ }
+  };
+  const cs_logoAsk = k => {  // no contact chosen yet: the choice first (the contacts the person may change)
+    const list = (cs.auto?.contacts || []).filter(x => x.can_photo);
+    const m = modal(`<h3>${esc(tr(CS_LOGO_ALT[k]))}</h3><p class="muted cshint">${tr('The logo is saved as the photo of the contact.')}</p>
+      <div class="row"><label for="cs-logoct">${tr('Contact')}</label><select id="cs-logoct">${list.map(x => `<option value="${esc(String(x.id))}">${esc(cs_ctLabel(x))}</option>`).join('')}</select></div>
+      <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-csl="cancel">${tr('Cancel')}</button><button type="button" class="btn pri" data-csl="ok">${ic('upload', 's')} ${tr('Select picture')}</button></div>`);
+    m.addEventListener('click', e => {
+      const b = /** @type {any} */ (e.target).closest?.('[data-csl]'); if (!b) return;
+      const v = cs_one('#cs-logoct', m)?.value;
+      m.remove();
+      if (b.dataset.csl !== 'ok' || !v) return;
+      const sel = cs_one(`#cs-${k}_contact`, md);
+      if (sel) { sel.value = v; sel.dispatchEvent(new Event('change', {bubbles: true})); }
+      toast(tr('Save the call sheet to keep the contact chosen.'));
+      cs_logoPick(k);
+    });
+  };
   md.addEventListener('change', async e => {
     const t = /** @type {any} */ (e.target);
     if (t.dataset?.n && t.dataset.f) {  // 2.986.0 (#5649): a contact chosen -> its card, else the free text
@@ -160,7 +218,9 @@ async function cs_open(job, org) {
       const card = cs_one(`.csct[data-ct="${k}"]`, md), free = cs_one(`.csfree[data-ct="${k}"]`, md);
       if (card) { card.textContent = cs_ctCard(x); card.hidden = !x; }
       if (free) free.hidden = !!x;
+      cs_logoDraw(k);  // 2.993.0 (#5650): the logo of the contact chosen
     }
+    if (t.id === 'cs-logofile' && t.files?.[0]) { await cs_logoUp(t.files[0], t.dataset.k); t.value = ''; return; }
     if (t.id === 'cs-loc_address') { const p = cs_one('.csmap', md); if (p) setHtml(p, t.value.trim() ? `<a href="${esc(cs_mapHref(t.value.trim()))}" target="_blank" rel="noopener noreferrer">${ic('link', 's')} ${tr('Open in maps')}</a>` : ''); }
     if (t.id === 'cs-sketch' && t.files?.[0]) {
       const f = t.files[0];
@@ -176,6 +236,7 @@ async function cs_open(job, org) {
     if (k === 'close') { md.remove(); pcs_after(); return; }
     if (k === 'rowadd') { const box = cs_one(`.csrows[data-k="${b.dataset.k}"]`, md); if (!box) return; const tmp = document.createElement('div'); setHtml(tmp, cs_lineHtml(b.dataset.k, {})); box.append(...tmp.childNodes); cs_one('.csrow:last-child input', box)?.focus(); return; }
     if (k === 'rowdel') { b.closest('.csrow')?.remove(); return; }
+    if (k === 'logo') { if (cs_logoCt(cs, b.dataset.k, md)) cs_logoPick(b.dataset.k); else cs_logoAsk(b.dataset.k); return; }
     if (k === 'sketchdel') { sketch = ''; const box = cs_one('.cssketch', md); if (box) setHtml(box, `<p class="muted">${tr('The picture goes with "Save".')}</p>`); b.remove(); return; }
     if (k === 'reload') { if (md._cur) { cs = md._cur; md._cur = null; sketch = undefined; draw(); } return; }
     if (k === 'save') { b.disabled = true; await save(); b.disabled = false; return; }
