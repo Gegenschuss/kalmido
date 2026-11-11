@@ -31,6 +31,8 @@ from .invoices import _insert_doc, _put_rows, inv_new_row  # 2.369.5 (#2517): pu
 from ..personal.timetrack import n43_admin_lists, time_report  # 2.369.5 (#2517): pulled up from functions
 from .pdf import pdf_num, pdf_date, office_pdf  # 2.369.5 (#2517): pulled up from functions
 from .pdfweb import _model, epdf_name, _file_response  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import st_ids  # noqa: E402  2.955.0 (#5648)
+from .timebill import tbill_doc, tbill_shows  # noqa: E402  2.955.0 (#5648): the billed mark of an entry
 
 
 def ls_items(c, oid, src):
@@ -122,8 +124,6 @@ def ls_billed_marks(c, uid, r, ents, lang):
     """2.955.0 (#5648): {entry id: "billed with <number>" / "billed"} for printed entries billed on ANOTHER document than
     invoice row r (entries of r itself need no mark). The number only when the sending person may see that document's
     numbering (timebill.tbill_shows, the rule of tbill_out); else just "already billed"."""
-    from ..core.pg import st_ids
-    from .timebill import tbill_doc, tbill_shows
     ids = [e["id"] for e in ents if e.get("billed")]
     if not ids:
         return {}
