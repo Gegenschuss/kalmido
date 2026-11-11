@@ -48,12 +48,10 @@ function dn_draw(md, d) {
       const n = (doc.notes || []).find(x => x.id === +(b.dataset.dnid || 0)); if (!n) return;
       let j; try { j = await api('DELETE', `/api/docs/${doc.id}/notes/${n.id}`); } catch { return; }
       doc.notes = j.notes; dn_draw(md, doc);
-      // the undo writes the text again as a new note of the signed-in person: only offered for an own note
-      if (n.author?.id === S.me?.id) {
-        histToast(tr('Note deleted'), histAdd({label: tr('Note deleted'),
-          undo: async () => { const r = await api('POST', `/api/docs/${doc.id}/notes`, {text: n.text}); dn_set(doc, r.notes); return {}; },
-          redo: async () => { const x = (doc.notes || []).find(y => y.text === n.text && y.author?.id === S.me?.id); if (x) { const r = await api('DELETE', `/api/docs/${doc.id}/notes/${x.id}`); dn_set(doc, r.notes); } return {}; }}));
-      } else toast(tr('Note deleted'));
+      // 2.981.0 (#5273): the note waits in the trash -- the undo brings it back as it was (author, time), for whoever deleted it
+      histToast(tr('Note deleted'), histAdd({label: tr('Note deleted'),
+        undo: async () => { const r = await api('POST', `/api/docs/${doc.id}/notes/${n.id}/restore`); dn_set(doc, r.notes); return {}; },
+        redo: async () => { const r = await api('DELETE', `/api/docs/${doc.id}/notes/${n.id}`); dn_set(doc, r.notes); return {}; }}));
     }
   });
 }

@@ -37,6 +37,11 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
 from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+# 2.981.0 (#5273): the review comments are rows of obj_comments (kind video); read here in the columns of the old table
+VC = ("(SELECT id, ref_id AS review_id, CAST(anchor->>'version_id' AS BIGINT) AS version_id, org_id, parent_id, "
+      "CAST(anchor->>'t' AS REAL) AS at_sec, body, user_id AS author_id, ext_name, CASE WHEN state='done' THEN 1 ELSE 0 END AS done, "
+      "created_at, deleted_at, CAST(anchor->>'page' AS BIGINT) AS page, CAST(anchor->>'x' AS REAL) AS pos_x, "
+      "CAST(anchor->>'y' AS REAL) AS pos_y FROM obj_comments WHERE kind='video') video_comments")
 FEAT = "cal,comments,collab,office,clients,videos"  # 2.623.0 (#4765): + videos, the module Approval (creating needs it)
 V = "/api/videos"
 
@@ -182,7 +187,7 @@ check(r.ok and next(x for x in r.json()["comments"] if x["id"] == r.json()["comm
 CX = r.json()["comment_id"]
 check(A.delete(B + f"{V}/{VID}/comments/{CX}").ok and all(x["id"] != CX for x in A.get(B + f"{V}/{VID}").json()["comments"]), "a comment deleted")
 check(A.post(B + f"{V}/{VID}/comments/{CX}/restore").ok and any(x["id"] == CX for x in A.get(B + f"{V}/{VID}").json()["comments"]), "and restored (undo)")
-check(sql("SELECT org_id FROM video_comments WHERE id=?", (C1,))[0][0] == ORG and sql("SELECT org_id FROM video_versions WHERE id=?", (V1,))[0][0] == ORG,
+check(sql(f"SELECT org_id FROM {VC} WHERE id=?", (C1,))[0][0] == ORG and sql("SELECT org_id FROM video_versions WHERE id=?", (V1,))[0][0] == ORG,
       "versions and comments carry the organisation")
 
 # ---------------------------------------------------------------- export
@@ -253,9 +258,9 @@ check(len(fk) == 2 and fk[0] != fk[1] and vk, "a form check value for comments a
 CF, DF, VV = fk[0], fk[1], vk[0]
 r = ppost(f"/s/q/{TOK}/comments", f=CF, v=VV, name="Erika Beispiel", text="Logo bitte <b>größer</b>", at="00:42")
 check(r.status_code == 303 and "sent=1" in r.headers.get("Location", ""), f"a customer comment {r.status_code}")
-row = sql("SELECT at_sec, ext_name, author_id, body FROM video_comments WHERE review_id=? AND ext_name IS NOT NULL", (CV,))
+row = sql(f"SELECT at_sec, ext_name, author_id, body FROM {VC} WHERE review_id=? AND ext_name IS NOT NULL", (CV,))
 check(len(row) == 1 and row[0][0] == 42.0 and row[0][1] == "Erika Beispiel" and row[0][2] is None, f"stored with the second and the name {row}")
-CC = sql("SELECT id FROM video_comments WHERE review_id=? AND ext_name IS NOT NULL", (CV,))[0][0]
+CC = sql(f"SELECT id FROM {VC} WHERE review_id=? AND ext_name IS NOT NULL", (CV,))[0][0]
 check(A.post(B + f"{V}/{CV}/comments", json={"parent_id": CC, "body": "Machen wir"}).ok, "the team answers the customer")
 pg = anon("/s/q/" + TOK + "?sent=1")
 check("Logo bitte &lt;b&gt;größer&lt;/b&gt;" in pg.text and "Machen wir" in pg.text and 'data-at="42.0"' in pg.text and "00:42" in pg.text
@@ -283,7 +288,7 @@ pg = anon("/s/q/" + TOK)
 check(pg.status_code == 200 and "Changes requested" in pg.text and 'name="text"' not in pg.text and "frame-src" not in pg.headers.get("Content-Security-Policy", ""),
       f"after the decision: the confirmation only (no form, the strict CSP) {pg.status_code} {pg.headers.get('Content-Security-Policy', '')[:120]} {'name=\"text\"' in pg.text} {'Changes requested' in pg.text}")
 check(ppost(f"/s/q/{TOK}/comments", f=CF, v=vk2[0], name="Erika", text="noch was").status_code == 303
-      and len(sql("SELECT 1 FROM video_comments WHERE review_id=? AND body='noch was'", (CV,))) == 0, "no comments after the decision")
+      and len(sql(f"SELECT 1 FROM {VC} WHERE review_id=? AND body='noch was'", (CV,))) == 0, "no comments after the decision")
 enc = sql("SELECT signer_name FROM office_signoffs WHERE id=?", (S1["id"],))[0][0]
 check(enc.startswith("kenc1:"), "the signer's name encrypted at rest")
 r = A.post(B + f"{V}/{CV}/signoff", json={})
@@ -339,7 +344,7 @@ r = A.post(B + f"{V}/{VID}/move-space", json={"to": "private", "place": LP})
 MID = r.json().get("move_id") if r.ok else 0
 row = sql("SELECT org_id, owner_id, task_id, list_id FROM video_reviews WHERE id=?", (VID,))[0]
 check(r.ok and r.json()["ok"] and tuple(row) == (None, ALICE, None, LP), f"moved to the private project {tuple(row)}")
-check(sql("SELECT COUNT(*) FROM video_comments WHERE review_id=? AND org_id IS NOT NULL", (VID,))[0][0] == 0
+check(sql(f"SELECT COUNT(*) FROM {VC} WHERE review_id=? AND org_id IS NOT NULL", (VID,))[0][0] == 0
       and sql("SELECT COUNT(*) FROM video_versions WHERE review_id=? AND org_id IS NOT NULL", (VID,))[0][0] == 0, "versions and comments follow")
 # 2.122.4 (#2215 L3): the records keep video_id (were emptied) and stay out of the private review's list
 check(sql("SELECT COUNT(*) FROM office_signoffs WHERE video_id=? AND org_id IS NULL", (VID,))[0][0] == 0

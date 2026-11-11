@@ -507,12 +507,37 @@ def _field_value(c, run, src, d, ctx):
 
 def _doc_note(c, run, src, d, ctx):
     """2.635.0 (#4807 d): a note on a document, sealed with the target document's workspace key (a text that did not open in
-    the export is left out); its author maps like every person column (else NULL: the note keeps its text and time)."""
+    the export is left out); its author maps like every person column (else NULL: the note keeps its text and time).
+    2.981.0 (#5273): a row of obj_comments (kind doc_note, ref_id = the document): the name it came with -> ext_name, its
+    source -> extra (the archive keeps the columns of doc_notes)."""
     v = src.get("text")
-    m = c.execute("SELECT ws FROM doc_meta WHERE node_id=?", (d["node_id"],)).fetchone()
+    m = c.execute("SELECT ws FROM doc_meta WHERE node_id=?", (d["ref_id"],)).fetchone()
     if not m or not isinstance(v, str) or not v.strip() or v.startswith("kenc1:"):
         return False
-    d["ws"], d["text"] = m[0], _doc_seal(c, m[0], "doc_notes.text", v)
+    d["body"] = _doc_seal(c, m[0], "doc_notes.text", v)
+    d["ext_name"] = str(src.get("author") or "")[:200] or None
+    d["extra"] = json.dumps({"source": src["source"]} if isinstance(src.get("source"), str) and src["source"] else {})
+    return d
+
+
+def _video_comment(c, run, src, d, ctx):
+    """2.981.0 (#5273): a comment of the archive's videos/comments.json (the columns of video_comments) becomes a row of
+    obj_comments (kind video): its version (mapped) and place -> anchor, done -> state, author_id -> user_id (the importing
+    person or nobody, like every author column; nobody keeps the name: ext_name)."""
+    num = (int, float)
+    an = {"version_id": run.m("video_versions", src.get("version_id")) if src.get("version_id") is not None else None}
+    for k, col in (("t", "at_sec"), ("page", "page"), ("x", "pos_x"), ("y", "pos_y")):
+        v = src.get(col)
+        an[k] = v if isinstance(v, num) and not isinstance(v, bool) else None
+    an = {k: v for k, v in an.items() if v is not None}
+    d["anchor"] = json.dumps(an) if an else None
+    d["state"] = "done" if src.get("done") in (1, True) else None
+    au = src.get("author_id")
+    new = ctx.who(au) if au is not None else None
+    d["user_id"] = new if new is not None and new == ctx.uid else None
+    if d["user_id"] is None and au is not None and not d.get("ext_name"):
+        d["ext_name"] = next((str(p.get("name") or "")[:100] for p in ctx.data.get("people") or []
+                              if isinstance(p, dict) and str(p.get("user_id")) == str(au)), None) or None
     return d
 
 
@@ -848,8 +873,9 @@ SPECS = [
     OiT("documents/fields.json", "doc_fields", people=_P, prep=_field),
     OiT("documents/field_values.json", "doc_field_values", refs={"node_id": "fs_nodes", "field_id": "doc_fields"},
         need=("node_id", "field_id"), prep=_field_value),
-    OiT("documents/notes.json", "doc_notes", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "null"},
-        prep=_doc_note),  # 2.635.0 (#4807 d): after the documents (doc_meta: their workspace)
+    # 2.635.0 (#4807 d): after the documents (doc_meta: their workspace); 2.981.0 (#5273): into obj_comments (kind doc_note)
+    OiT("documents/notes.json", "obj_comments", kind="obj_comments_doc_note", refs={"ref_id": "fs_nodes"}, src={"ref_id": "node_id"},
+        need=("ref_id",), people={"user_id": "null"}, prep=_doc_note, fixed={"kind": "doc_note"}),
     OiT("office/letter_links.json", "office_letter_links", refs={"letter_id": "office_letters", "node_id": "fs_nodes"},
         need=("letter_id", "node_id"), people={**_P, "agent_id": "null"}, private="office", label=N_("Letters")),
     # knowledge pages (text sealed in prep: enc off) and their files
@@ -877,8 +903,9 @@ SPECS = [
     OiT("videos/reviews.json", "video_reviews", refs={"task_id": "tasks", "list_id": "lists", "client_id": "clients"}, people=_P,
         label=N_("Video sign-offs"), prep=_video),
     OiT("videos/versions.json", "video_versions", refs={"review_id": "video_reviews"}, need=("review_id",), people=_P, prep=_video_version),
-    OiT("videos/comments.json", "video_comments", refs={"review_id": "video_reviews", "version_id": "video_versions"}, need=("review_id",),
-        late={"parent_id": "video_comments"}, people={"author_id": "null"}),
+    # 2.981.0 (#5273): into obj_comments (kind video; the archive keeps the columns of video_comments, _video_comment)
+    OiT("videos/comments.json", "obj_comments", kind="obj_comments_video", refs={"ref_id": "video_reviews"}, src={"ref_id": "review_id"},
+        need=("ref_id",), late={"parent_id": "obj_comments_video"}, prep=_video_comment, fixed={"kind": "video"}),
 ]
 FIXES = []
 FINISH = [_finish]

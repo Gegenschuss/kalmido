@@ -270,6 +270,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/objects.py` (`obj`) - The shared core, stage 1 -- ONE register of object kinds and ONE role function for every new area (docs/dev/kern.md "So baut man einen neuen Bereich")
 - `kalmido/core/objfollow.py` (`ofl`) - Following exists once, in the shared core: one table obj_follow for the watchers and the bell of a task (stage Q9a)
 - `kalmido/core/objhooks.py` (`obj`) - The two things of the shared core that the layer accounts needs, without importing upward
+- `kalmido/core/objcmtweb.py` (`ocw`) - The generic routes of the comments' core (/api/obj/<kind>/<id>/comments, /api/obj/comments/<cid>; 2.981.0)
 - `kalmido/core/objcomments.py` (`ocm`) - Comments exist once, in the shared core: one table obj_comments (kind, ref_id) with its trash obj_comment_trash, one mention parser, one say rule, one delete rule (stage Q4a)
 - `kalmido/core/objlight.py` (`obj`) - The light kinds of the shared core (task, event, hub_mail, client): kind and role only, no node, no shares, no write path
 - `kalmido/core/objnotify.py` (`obj`) - The one send decision of the shared core: every recipient of a News entry or push is cut with obj_role >= view first (stage Q2)
@@ -782,7 +783,7 @@ Teams and customers: clients, forms and questionnaires, approvals, portal, workl
 
 Video sign-offs (review links and media).
 
-- `kalmido/videos/review.py` (`vdr`) - Video sign-off with comments at a timecode (tables video_reviews / video_versions / video_comments)
+- `kalmido/videos/review.py` (`vdr`) - Video sign-off with comments at a timecode (tables video_reviews / video_versions; the comments: obj_comments kind video, 2.981.0)
 - `kalmido/videos/v1.py` (`vdr`) - Video sign-offs for agents and scripts (API v1; scopes read / comments)
 - `kalmido/videos/vdkern.py` - Video sign-offs on the one trash of the core (kind video_review, no routes, node or listing)
 - `kalmido/videos/vdlink.py` (`vdl`) - The customer link of a sign-off for clients without an account, on the approval links of office/signoff.py (kind video; no table and no token way of its own)

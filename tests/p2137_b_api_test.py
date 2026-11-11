@@ -36,6 +36,11 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
 from kt import FAILS, OKS, check, sess, until, su_get  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+# 2.981.0 (#5273): the review comments are rows of obj_comments (kind video); read here in the columns of the old table
+VC = ("(SELECT id, ref_id AS review_id, CAST(anchor->>'version_id' AS BIGINT) AS version_id, org_id, parent_id, "
+      "CAST(anchor->>'t' AS REAL) AS at_sec, body, user_id AS author_id, ext_name, CASE WHEN state='done' THEN 1 ELSE 0 END AS done, "
+      "created_at, deleted_at, CAST(anchor->>'page' AS BIGINT) AS page, CAST(anchor->>'x' AS REAL) AS pos_x, "
+      "CAST(anchor->>'y' AS REAL) AS pos_y FROM obj_comments WHERE kind='video') video_comments")
 FEAT = FEATURES + ",sheets,videos"
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
 PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
@@ -171,7 +176,7 @@ VID = r.json()["id"]
 check(A.post(B + f"/api/videos/{VID}/comments", json={"body": "Bei Sekunde zwoelf heller", "at_sec": 12}).ok, "a comment at a time code")
 
 src_counts = {t: dbx(f"SELECT COUNT(*) AS n FROM {t} WHERE org_id=?", (ORG,))[0]["n"]
-              for t in ("fs_nodes", "doc_meta", "wiki_pages", "wiki_files", "sheets", "sheet_files", "video_reviews", "video_comments")}
+              for t in ("fs_nodes", "doc_meta", "wiki_pages", "wiki_files", "sheets", "sheet_files", "video_reviews", VC)}  # 2.981.0 (#5273): VC
 check(src_counts["fs_nodes"] >= 4 and src_counts["doc_meta"] == 1, f"the source has its data {src_counts}")
 
 # ---------------------------------------------------------------- export
@@ -253,7 +258,7 @@ check(sf and A.get(B + f"/api/sheets/{NS}/files/{sf['id']}").content == PDF, "th
 nl = one("SELECT id FROM lists WHERE org_id=? AND name='Alpha Projekt'", (GAM,))
 vr = one("SELECT id, list_id FROM video_reviews WHERE org_id=?", (GAM,))
 check(vr and nl and vr["list_id"] == nl["id"], "the sign-off hangs on the new list")
-vc = dbx("SELECT body, at_sec, version_id FROM video_comments WHERE review_id=?", (vr["id"] if vr else 0,))
+vc = dbx(f"SELECT body, at_sec, version_id FROM {VC} WHERE review_id=?", (vr["id"] if vr else 0,))
 check(len(vc) == 1 and vc[0]["at_sec"] == 12 and vc[0]["version_id"], "the comment with its time code and version")
 check(A.get(B + f"/api/videos/{vr['id'] if vr else 0}").ok, "the sign-off opens")
 # the source is untouched
@@ -295,7 +300,7 @@ LIVE = {"wiki_pages": "deleted_at IS NULL", "sheets": "deleted_at IS NULL",
 LN = live_nodes("org_id=?", (GAM,))
 left = {t: dbx(f"SELECT COUNT(*) AS n FROM {t} WHERE org_id=?" + (f" AND {LIVE[t]}" if t in LIVE else ""), (GAM,))[0]["n"]
         for t in ("doc_rules", "wiki_pages", "wiki_files", "obj_versions", "sheets",  # 2.958.0 (#5281): obj_versions
-                  "sheet_files", "video_reviews", "video_versions", "video_comments")}
+                  "sheet_files", "video_reviews", "video_versions", VC)}  # 2.981.0 (#5273): VC
 check(not any(left.values()) and not LN, f"undo takes every taken-over row out {left} {LN}")
 check(dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (NF,)), "2.506.0 (#4299): the versions stay with their node in the trash")
 check(dbx("SELECT 1 FROM doc_senders WHERE org_id=?", (GAM,)) and dbx("SELECT 1 FROM doc_tags WHERE org_id=?", (GAM,)),

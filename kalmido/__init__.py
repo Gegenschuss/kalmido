@@ -20,7 +20,7 @@ LAYERS = (
     ("agents", ("agents", "assistant", "startup")),
 )
 LAYER_OF = {"admin.migrate": "core", "api.common": "core", "accounts.orgback": "domain",
-            "core.objects": "domain", "core.writes": "domain", "core.objlight": "domain", "core.objnotify": "domain", "core.objcomments": "domain", "core.objweb": "integrations",
+            "core.objects": "domain", "core.writes": "domain", "core.objlight": "domain", "core.objnotify": "domain", "core.objcomments": "domain", "core.objweb": "integrations", "core.objcmtweb": "integrations",
             "core.undoweb": "domain",  # 2.747.0 (#5249): the step groups' routes stand on the write path
             "core.undoareas": "domain",  # 2.777.0 (#5254): the areas' undo steps stand on the write path
             "docs.mailnamed": "integrations"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area; 2.558.0 (#4709): the shared core stands on the file store and accounts, its routes on the API
@@ -601,6 +601,7 @@ ORDER = (
     "agents.ideaprop",  # 2.156.0 A (#1201): "Add ideas" in the mind map -- an agent proposes sub-branches
     "lists.rules",  # 2.71.0 A (#1457): rules of a list (When ... then ...), after api.v1
     "core.objects", "core.writes", "core.objweb",  # 2.558.0 (#4709): the shared core (register, roles, write path) and its generic routes
+    "core.objcmtweb",  # 2.981.0 (#5273): the generic routes of the comments' core (/api/obj/<kind>/<id>/comments, /api/obj/comments/<cid>)
     "core.undogroups",  # 2.747.0 (#5249): the step groups per account (storage, limits, prune; no routes)
     "core.undoweb",  # 2.747.0 (#5249): undo across devices -- the own step groups listed and taken back (GET /api/undo)
     "core.undoareas",  # 2.777.0 (#5254): what the areas share to record and take back their steps (no routes)

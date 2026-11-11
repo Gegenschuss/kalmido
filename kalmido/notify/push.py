@@ -789,8 +789,7 @@ def _watchdog_tick(c):
     _wd_section(c, "undo steps", undo_prune)  # 2.747.0 (#5249): the step groups after 30 days, over 300 per person, parts without a group
     from ..core.writes import obj_trash_tick  # 2.773.0 (#5292): local, core/writes.py imports back into notify (a cycle at start-up)
     _wd_section(c, "core trash", obj_trash_tick)  # 2.773.0 (#5292): core kinds with trash_prune, hourly (ret_due), switch "trash"
-    from ..videos.review import vdr_trash_prune
-    _wd_section(c, "video trash", vdr_trash_prune)  # 2.99.1 (#1959) review M3: video sign-offs in the trash after 30 days
+    # 2.981.0 (#5273): the review comments in the trash go with the core's run of every comment (files/trashpurge.py)
     _wd_section(c, "list folder shares", lf_expire_tick)  # 2.352.0 A (#2748): an expired share of a projects folder ends its roles
     _wd_section(c, "list trash", otr_prune)  # 2.102.0 A (#1988): deleted lists for good after 30 days, with their files
     _wd_section(c, "task trash", ttp_tick)  # 2.116.0 A (#2063): tasks in the trash after KALMIDO_TRASH_DAYS (switch: core/retention)

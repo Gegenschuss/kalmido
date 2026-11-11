@@ -41,6 +41,11 @@ V = "/api/videos"
 KEY = base64.b64encode(os.urandom(32)).decode()
 FEAT = "cal,comments,collab,office,clients,feeds,videos"  # 2.623.0 (#4765): + videos, the module Approval (creating needs it)
 from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+# 2.981.0 (#5273): the review comments are rows of obj_comments (kind video); read here in the columns of the old table
+VC = ("(SELECT id, ref_id AS review_id, CAST(anchor->>'version_id' AS BIGINT) AS version_id, org_id, parent_id, "
+      "CAST(anchor->>'t' AS REAL) AS at_sec, body, user_id AS author_id, ext_name, CASE WHEN state='done' THEN 1 ELSE 0 END AS done, "
+      "created_at, deleted_at, CAST(anchor->>'page' AS BIGINT) AS page, CAST(anchor->>'x' AS REAL) AS pos_x, "
+      "CAST(anchor->>'y' AS REAL) AS pos_y FROM obj_comments WHERE kind='video') video_comments")
 
 
 def dbx(sql, args=()):
@@ -203,7 +208,7 @@ r = ppost(f"/s/q/{TOK}/comments", "de", f=fk[0], v=vk[0], name="Erika Example", 
 fk, vk = keys(anon("/s/q/" + TOK, "de").text)
 r = ppost("/s/q/" + TOK, "de", f=fk[1], v=vk[0], do="decline", name="Erika Example", reason="Swap the music")
 check(r.status_code == 303, f"#2217: the customer (German browser) requests changes {r.status_code}")
-raw = [x[0] for x in dbx("SELECT body FROM video_comments WHERE review_id=? AND ext_name IS NOT NULL ORDER BY id", (VID,))]
+raw = [x[0] for x in dbx(f"SELECT body FROM {VC} WHERE review_id=? AND ext_name IS NOT NULL ORDER BY id", (VID,))]
 check(any(b.startswith("\x1edec:declined") and b.endswith("Swap the music") for b in raw) and not any("Änderungen" in b for b in raw),
       f"#2217: stored neutral, not in the customer's language {raw!r}")
 check(not any(b.startswith("\x1e") and "Fake" in b for b in raw), f"#2217: a typed marker is not kept {raw!r}")

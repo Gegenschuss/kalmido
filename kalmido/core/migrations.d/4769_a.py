@@ -10,9 +10,7 @@ MIGRATIONS = [
     ("video_versions", "file_no", "ALTER TABLE video_versions ADD COLUMN IF NOT EXISTS file_no BIGINT"),
     ("video_versions", "file_name", "ALTER TABLE video_versions ADD COLUMN IF NOT EXISTS file_name TEXT NOT NULL DEFAULT ''"),
     ("video_versions", "mime", "ALTER TABLE video_versions ADD COLUMN IF NOT EXISTS mime TEXT NOT NULL DEFAULT ''"),
-    ("video_comments", "page", "ALTER TABLE video_comments ADD COLUMN IF NOT EXISTS page BIGINT"),
-    ("video_comments", "pos_x", "ALTER TABLE video_comments ADD COLUMN IF NOT EXISTS pos_x REAL"),
-    ("video_comments", "pos_y", "ALTER TABLE video_comments ADD COLUMN IF NOT EXISTS pos_y REAL"),
+    # 2.981.0 (#5273): video_comments.page / pos_x / pos_y went with the table into obj_comments.anchor (migrations.d/5273_a.py)
 ]
 AFTER = [
     "CREATE INDEX IF NOT EXISTS ix4769_video_versions_file_id ON video_versions(file_id) WHERE file_id IS NOT NULL",

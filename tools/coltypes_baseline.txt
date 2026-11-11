@@ -159,7 +159,6 @@ doc_meta.redo_at time
 doc_meta.taken_at time
 doc_meta.updated_at time
 doc_models.updated_at time
-doc_notes.created_at time
 doc_office_moves.created_at time
 doc_office_moves.items json
 doc_office_moves.undone_at time
@@ -775,9 +774,6 @@ users.disabled bool
 users.drop_token_at time
 users.ical_token_at time
 users.is_admin bool
-video_comments.created_at time
-video_comments.deleted_at time
-video_comments.done bool
 video_reviews.created_at time
 video_reviews.deleted_at time
 video_reviews.updated_at time

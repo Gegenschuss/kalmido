@@ -4828,7 +4828,7 @@ people (the API has no route for it).
 |---|---|---|---|
 | Sign-offs at a task / at a project and its tasks | `GET /api/v1/videos?task_id=` / `?list_id=` | `list_video_reviews` | read |
 | One sign-off: versions, state, comments with answers | `GET /api/v1/videos/{id}` | `get_video_review` | read |
-| Comment (optionally at `at_sec`) or answer (`parent_id`) | `POST /api/v1/videos/{id}/comments` | `add_video_comment` | comments |
+| Comment (optionally at `at_sec`) or answer (`parent_id`) | `POST /api/v1/videos/{id}/comments` | `add_comment` with `kind: "video"`, `id` (2.981.0; was `add_video_comment`) | comments |
 | Mark a comment done / open | `PATCH /api/v1/videos/{id}/comments/{comment_id}` | `set_video_comment_done` | comments |
 | The image / PDF / audio file of a version (2.641.0, audio 2.658.0) | `GET /api/v1/videos/{id}/versions/{version_id}/file` | - (the file tools, `file_id`) | read |
 

@@ -36,6 +36,11 @@ import kt  # noqa: E402
 import requests  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 from kt import B, DATA, check, dbx, sess  # noqa: E402
+# 2.981.0 (#5273): the review comments are rows of obj_comments (kind video); read here in the columns of the old table
+VC = ("(SELECT id, ref_id AS review_id, CAST(anchor->>'version_id' AS BIGINT) AS version_id, org_id, parent_id, "
+      "CAST(anchor->>'t' AS REAL) AS at_sec, body, user_id AS author_id, ext_name, CASE WHEN state='done' THEN 1 ELSE 0 END AS done, "
+      "created_at, deleted_at, CAST(anchor->>'page' AS BIGINT) AS page, CAST(anchor->>'x' AS REAL) AS pos_x, "
+      "CAST(anchor->>'y' AS REAL) AS pos_y FROM obj_comments WHERE kind='video') video_comments")
 
 KEY = base64.b64encode(os.urandom(32)).decode()
 kt.fresh(env={"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_ORGCRYPT_DELAY": "0", "KALMIDO_SECRET_KEY": KEY}, prefix="P2642A")
@@ -124,7 +129,7 @@ fk, vk = keys(pg.text)
 r = G.post(B + f"/s/q/{T1}/comments", data={"f": fk[0], "v": vk[0], "name": "Erika Gast", "text": "Logo <b>größer</b>", "at": "00:42"}, allow_redirects=False)
 check(r.status_code == 303 and "kgn=" in r.headers.get("Set-Cookie", "") and f"Path=/s/q/{T1}" in r.headers.get("Set-Cookie", "")
       and "HttpOnly" in r.headers.get("Set-Cookie", ""), f"a comment at 00:42; the name is kept on this link only {r.headers.get('Set-Cookie')}")
-row = dbx("SELECT at_sec, ext_name, author_id, version_id FROM video_comments WHERE review_id=? AND ext_name IS NOT NULL", (VID,))
+row = dbx(f"SELECT at_sec, ext_name, author_id, version_id FROM {VC} WHERE review_id=? AND ext_name IS NOT NULL", (VID,))
 check(len(row) == 1 and row[0][0] == 42.0 and row[0][1] == "Erika Gast" and row[0][2] is None and row[0][3] == V1, f"stored at the second as a guest {row}")
 pg = G.get(B + "/s/q/" + T1)
 check(pg.text.count('value="Erika Gast"') == 2 and "Logo &lt;b&gt;größer&lt;/b&gt;" in pg.text,
@@ -137,7 +142,7 @@ check(len(c1) == 1 and c1[0]["author"] == "Erika Gast" and c1[0]["author_id"] is
 # a version of another sign-off through this link: refused, nothing stored there
 ov = OTHER["versions"][0]["id"]
 r = G.post(B + f"/s/q/{T1}/comments", data={"f": fk[0], "v": str(ov), "name": "Erika Gast", "text": "fremd"}, allow_redirects=False)
-check(r.status_code == 409 and not dbx("SELECT 1 FROM video_comments WHERE review_id=? AND ext_name IS NOT NULL", (OTHER["id"],)),
+check(r.status_code == 409 and not dbx(f"SELECT 1 FROM {VC} WHERE review_id=? AND ext_name IS NOT NULL", (OTHER["id"],)),
       f"a version of another sign-off: 409, nothing stored there ({r.status_code})")
 pg = G.get(B + "/s/q/" + T1 + "?v=1")
 check("Anderer Film" not in pg.text, "?v= never reaches another sign-off")
@@ -295,7 +300,7 @@ check(m.status_code == 200 and m.content == PNG1 and m.headers.get("Content-Type
       f"the image through the link: its bytes, inline, sandboxed, nosniff {m.status_code} {dict(m.headers)}")
 r = cmt(GI, TI, text="Logo nach links", px="0.25", py="0.5")
 check(r.status_code == 303, f"the guest comments at a point of the image {r.status_code}")
-row = dbx("SELECT pos_x, pos_y, page, at_sec, author_id FROM video_comments WHERE review_id=? AND ext_name='Erika Gast'", (IMG["id"],))
+row = dbx(f"SELECT pos_x, pos_y, page, at_sec, author_id FROM {VC} WHERE review_id=? AND ext_name='Erika Gast'", (IMG["id"],))
 check(len(row) == 1 and row[0][0] == 0.25 and row[0][1] == 0.5 and row[0][2] is None and row[0][3] is None and row[0][4] is None,
       f"stored at x 0.25 / y 0.5 as the guest's {row}")
 R = A.get(B + f"{V}/{IMG['id']}").json()
@@ -307,7 +312,7 @@ check('data-x="0.25" data-y="0.5"' in pg.text and ">2</button>" in pg.text and '
 # (few on purpose: the guest's comments count against VDR_PUB_RATE per address, the last block below needs its 429)
 for bad, what in (({"px": "abc", "py": "0.2"}, "no number"), ({"px": "1.5", "py": "0.2"}, "outside the image")):
     r = cmt(GI, TI, text="falsch " + what, **bad)
-    check(r.status_code == 400 and not dbx("SELECT 1 FROM video_comments WHERE body=?", ("falsch " + what,)), f"a wrong point ({what}): 400, nothing stored {r.status_code}")
+    check(r.status_code == 400 and not dbx(f"SELECT 1 FROM {VC} WHERE body=?", ("falsch " + what,)), f"a wrong point ({what}): 400, nothing stored {r.status_code}")
 # a PDF as version 2 at the same link: page + point
 r = up(A, {}, "entwurf.pdf", PDF, "application/pdf", vid=IMG["id"])
 check(r.ok, f"a PDF as version 2 {r.status_code} {r.text[:200]}")
@@ -320,7 +325,7 @@ check(m.status_code == 200 and m.content == PDF and m.headers.get("Content-Type"
       and m.headers.get("X-Content-Type-Options") == "nosniff", f"the PDF through the link: sandboxed (nothing in it runs) {m.status_code} {dict(m.headers)}")
 check(GI.get(B + f"/s/q/{TI}/media?dl=1").headers.get("Content-Disposition", "").startswith("attachment"), "?dl=1: a download (the page without script)")
 r = cmt(GI, TI, text="Seite zwei Titel", px="0.5", py="0.75", pg="2")
-row = dbx("SELECT pos_x, pos_y, page FROM video_comments WHERE body='Seite zwei Titel'")
+row = dbx(f"SELECT pos_x, pos_y, page FROM {VC} WHERE body='Seite zwei Titel'")
 check(r.status_code == 303 and [tuple(x) for x in row] == [(0.5, 0.75, 2)], f"a point on page 2 of the PDF {r.status_code} {row}")
 r = cmt(GI, TI, text="ohne Seite", px="0.5", py="0.5")
 check(r.status_code == 400, f"a PDF point without its page: 400 {r.status_code}")

@@ -40,7 +40,7 @@ import warnings
 from decimal import Decimal, InvalidOperation
 
 from ..core.config import ATT_DIR, OFFICE_DIR, app, SECRET_KEY
-from ..core.pg import system_ctx, write_lock
+from ..core.pg import qi, system_ctx, write_lock  # 2.981.0 (#5273): qi
 from ..office.ledger import ofx_release  # 2.542.0 (#4598)
 from ..core import orgcrypt as oc
 from ..core.env import env_bool
@@ -79,8 +79,27 @@ DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", 
     ("pl_sources", "id", "mapping", "pl_sources.mapping"),
     ("file_text", "id", "text", "file_text.text"),
     ("doc_field_values", "id", "value", "doc_field_values.value"),  # 2.153.0 (#2179): custom field values (docs/fields.py)
-    ("doc_notes", "id", "text", "doc_notes.text"),  # 2.635.0 (#4807 d): notes on documents (docs/notes.py)
+    # 2.635.0 (#4807 d): notes on documents (docs/notes.py); 2.981.0 (#5273): rows of obj_comments kind doc_note, a note in the
+    # trash keeps its sealed text in obj_comment_trash -- their workspace comes from the document (DOC_WS)
+    ("obj_comments", "id", "body", "doc_notes.text"),
+    ("obj_comment_trash", "comment_id", "body", "doc_notes.text"),
 ]
+# 2.981.0 (#5273): the workspace of a sealed value in a table without a ws column (the notes on documents in the comments' core):
+# NULL for every other row (a task's comment), which the passes leave out (_dws(...) IS NOT NULL)
+DOC_WS = {
+    ("obj_comments", "body"): "(SELECT m.ws FROM doc_meta m WHERE obj_comments.kind = 'doc_note' AND m.node_id = obj_comments.ref_id)",
+    ("obj_comment_trash", "body"): ("(SELECT m.ws FROM obj_comments k JOIN doc_meta m ON m.node_id = k.ref_id "
+                                    "WHERE k.id = obj_comment_trash.comment_id AND k.kind = 'doc_note')"),
+}
+
+
+DOC_TABLES = {"doc_meta", "doc_senders", "doc_rules", "doc_models", "rc_suggest", "pl_uploads", "pl_sources", "file_text",
+              "doc_field_values", "obj_comments", "obj_comment_trash"}  # 2.981.0 (#5273): the allowlist of qi() for the passes below
+
+
+def _dws(table, col):
+    """2.981.0 (#5273): the SQL of the workspace of a value of DOC_JOBS / ROT_WS (the column ws, or DOC_WS)."""
+    return DOC_WS.get((table, col), "ws")
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
@@ -574,7 +593,8 @@ def docs_pass(c, enc, stop=None):
                 return out
             with system_ctx(c):  # orgcrypt: server-side bulk work over every workspace, never content handed to a person
                 write_lock(c, "orgcrypt")
-                sql = f"SELECT {idc} AS rid, ws, {col} AS v FROM {table} WHERE {col}<>'' AND left({col}, 6)" + ("<>?" if enc else "=?")
+                wx = _dws(table, col)  # 2.981.0 (#5273)
+                sql = f"SELECT {idc} AS rid, {wx} AS ws, {col} AS v FROM {qi(table, DOC_TABLES)} WHERE {wx} IS NOT NULL AND {col}<>'' AND left({col}, 6)" + ("<>?" if enc else "=?")
                 args = [oc.PREFIX]
                 if last is not None:
                     sql += f" AND {idc} > ?"
@@ -610,7 +630,8 @@ def docs_settle(c, account, stop=None):
                 return out
             with system_ctx(c):  # orgcrypt: server-side bulk work over the private workspaces, never content handed to a person
                 write_lock(c, "orgcrypt")
-                sql = f"SELECT {idc} AS rid, ws, {col} AS v FROM {table} WHERE ws LIKE 'u%' AND left({col}, 6)=?"  # pg-ok: ws prefix u is case-exact
+                wx = _dws(table, col)  # 2.981.0 (#5273)
+                sql = f"SELECT {idc} AS rid, {wx} AS ws, {col} AS v FROM {qi(table, DOC_TABLES)} WHERE {wx} LIKE 'u%' AND left({col}, 6)=?"  # pg-ok: ws prefix u is case-exact
                 args = [oc.PREFIX]
                 if last is not None:
                     sql += f" AND {idc} > ?"
@@ -672,7 +693,8 @@ def docs_forms(c):
     out = {"account_key": 0, "server_key": 0, "unreadable": 0}
     for table, idc, col, ctx in DOC_JOBS:
         with system_ctx(c):  # orgcrypt: counts only (each value is opened, never shown)
-            rows = c.execute(f"SELECT ws, {col} AS v FROM {table} WHERE ws LIKE 'u%' AND left({col}, 6)=?", (oc.PREFIX,)).fetchall()  # pg-ok: ws prefix u is case-exact
+            wx = _dws(table, col)  # 2.981.0 (#5273)
+            rows = c.execute(f"SELECT {wx} AS ws, {col} AS v FROM {qi(table, DOC_TABLES)} WHERE {wx} LIKE 'u%' AND left({col}, 6)=?", (oc.PREFIX,)).fetchall()  # pg-ok: ws prefix u is case-exact
         for r in rows:
             try:
                 out["account_key" if S.doc_open_as(c, r["ws"], ctx, r["v"])[1] else "server_key"] += 1
@@ -759,7 +781,7 @@ def docs_count(c):
     out = {"enc": 0, "plain": 0}
     with system_ctx(c):  # orgcrypt: counts only
         for table, idc, col, ctx in DOC_JOBS:
-            for r in c.execute(f"SELECT left({col}::text, 6) AS p, COUNT(*) AS n FROM {table} WHERE {col}::text<>'' "
+            for r in c.execute(f"SELECT left({col}::text, 6) AS p, COUNT(*) AS n FROM {qi(table, DOC_TABLES)} WHERE {_dws(table, col)} IS NOT NULL AND {col}::text<>'' "
                                  f"GROUP BY left({col}::text, 6)"):
                 out["enc" if r["p"] == oc.PREFIX else "plain"] += int(r["n"])
     return out
@@ -1252,7 +1274,8 @@ ROT_WS = (("doc_rules", "id", "data", "doc_rules.data"), ("doc_models", "id", "d
           ("doc_meta", "node_id", "summary", "doc_meta.summary"),  # 2.138.0 (#1972): document summaries of 2.126.1 (#2123)
           ("pl_uploads", "id", "mapping", "pl_sources.mapping"),  # 2.138.0 (#1972): the mapping chosen for an uploaded export
           ("doc_field_values", "id", "value", "doc_field_values.value"),  # 2.153.0 (#2179): custom field values (docs/fields.py)
-          ("doc_notes", "id", "text", "doc_notes.text"))  # 2.635.0 (#4807 d): notes on documents (docs/notes.py)
+          ("obj_comments", "id", "body", "doc_notes.text"),  # 2.635.0 (#4807 d): notes on documents (docs/notes.py); 2.981.0 (#5273):
+          ("obj_comment_trash", "comment_id", "body", "doc_notes.text"))  # rows of the comments' core (DOC_WS: their workspace)
 ROT_SETTLE = float(os.environ.get("KALMIDO_ORGCRYPT_ROT_SETTLE", "30"))  # 2.360.2 L (#2561): longest wait for running writers (0 = none)
 
 
@@ -1270,7 +1293,7 @@ def _rot_jobs(oid):
     out.append(("office_doc_items", "id", "cost_enc", "org_id", "text", "office_doc_items.cost_enc"))
     for (t, col), keys in oc.JSON_KEYS.items():
         out.append((t, "org_id" if t in ROT_ORG_ROWS else "id", col, "org_id", "json", f"{t}.{col}"))
-    out += [(t, idc, col, "ws", "ws", ctx) for t, idc, col, ctx in ROT_WS]
+    out += [(t, idc, col, _dws(t, col), "ws", ctx) for t, idc, col, ctx in ROT_WS]  # 2.981.0 (#5273): _dws
     # 2.138.0 C (#1972, review F6): page texts (wiki_pages / obj_versions .body, 2.958.0 #5281) come with oc.FIELDS
     return out
 

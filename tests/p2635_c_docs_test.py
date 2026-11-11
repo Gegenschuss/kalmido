@@ -185,7 +185,7 @@ check([n["text"] for n in j["notes"]] == ["Rueckruf bei Hummelwiese\nzweite Zeil
       f"#4807 (d) carol sees both, oldest first, with their authors, deletes none {j}")
 full = Ca.get(B + f"/api/docs/{DN}").json()
 check(len(full.get("notes") or []) == 2, "#4807 (d) the document view brings its notes")
-raw = [x[0] for x in kt.dbx("SELECT text FROM doc_notes WHERE node_id=? ORDER BY id", (DN,))]
+raw = [x[0] for x in kt.dbx("SELECT body FROM obj_comments WHERE kind='doc_note' AND ref_id=? ORDER BY id", (DN,))]  # 2.981.0 (#5273): obj_comments
 check(len(raw) == 2 and all(x.startswith("kenc1:") and "Hummelwiese" not in x for x in raw), f"#4807 (d) the texts are sealed with the area key {[x[:12] for x in raw]}")
 check(DN in (found(Ca, "hummelwiese") or []) and DN in (found(Ca, "kiefernz") or []), "#4807 (d) found by a word / a prefix of a note")
 check(Da.post(B + NB, json={"text": "x" * 5001}).status_code == 400 and Da.post(B + NB, json={"text": "  "}).status_code == 400,

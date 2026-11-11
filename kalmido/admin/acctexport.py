@@ -46,7 +46,7 @@ from flask import g, jsonify, Response
 
 from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL, SECRET_KEY
 from ..core.db import connect, db, err, iso, now_utc
-from ..core.objcomments import OCM_TS  # 2.972.0 (#5272): the old time form of a comment
+from ..core.objcomments import OCM_TS, ocm_video_cols  # 2.972.0 (#5272): the old time form of a comment; 2.981.0 (#5273): + video
 from ..core.pg import snapshot_level, system_ctx
 from ..core.i18n import N_, lang, tr
 from ..core.access import Denied, acx_lists_sql, acx_of
@@ -355,8 +355,9 @@ def umz_extra_queries(uid):
         # 2.99.1 A (#1959): my private video sign-offs (organisation ones are in the organisation export)
         "video_reviews": ("SELECT * FROM video_reviews WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL", (uid,)),
         "video_versions": ("SELECT * FROM video_versions WHERE review_id IN (SELECT id FROM video_reviews WHERE owner_id=? AND org_id IS NULL)", (uid,)),
-        "video_comments": ("SELECT * FROM video_comments WHERE review_id IN (SELECT id FROM video_reviews WHERE owner_id=? AND org_id IS NULL) "
-                           "AND deleted_at IS NULL", (uid,)),
+        # 2.981.0 (#5273): rows of obj_comments (kind video), in the columns of the old table (the import reads both alike)
+        "video_comments": (f"SELECT {ocm_video_cols('k')} FROM obj_comments k WHERE k.kind='video' AND k.ref_id IN (SELECT id FROM video_reviews "
+                           "WHERE owner_id=? AND org_id IS NULL) AND k.deleted_at IS NULL", (uid,)),
         # 2.148.1 C (#2494): Art. 15 -- the list of my private files (not their content), my private knowledge pages, my chats
         # with agents, what I wrote in direct messages, my absences and timesheets (protected fields decrypted, UMZ_DECRYPT)
         # #3470: + what the import needs to rebuild the tree (current version, references, order, a filed mail's mark)

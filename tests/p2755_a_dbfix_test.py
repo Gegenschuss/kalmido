@@ -4,10 +4,8 @@
  - #5265: the table paperless_links is gone after the start (migrations.d/5265_a.py), pl_conns stays
  - #5299: the indexes lists(deleted_at), fs_nodes(parent_id, deleted_at), list_activity(list_id, created_at) exist
  - #5263: a deleted comment of a video review is not in the organisation export (admin/orgexport.py ox_live), the live one is;
-   the trash run (videos/review.py vdr_trash_prune, switch on) deletes a comment after the trash period, not before; the
-   one-off clean-up (migrations.d/5263_a.py) removes at the next start the comments deleted before its cut-off -- of an
-   organisation and of a person without one -- with their answers, and keeps the live ones and those deleted after the cut-off
-   (the group's test time lies after the cut-off: every "import app" of a run in the container starts the app and so the clean-up)
+   the trash run (2.981.0 #5273: the core's run of every comment, files/trashpurge.py, switch on) deletes a comment after the
+   trash period, not before; a start keeps the comments (the one-off clean-up went into the move of 5273_a)
 The case without an organisation (freelancer fixture) runs the purge and the clean-up.
 usage: p2755_a_dbfix_test.py <datadir>"""
 import json
@@ -138,49 +136,43 @@ check("Live note p2755" in bodies and "Deleted note p2755" not in bodies,
       f"#5263: the organisation export holds the live comment, not the deleted one {sorted(bodies)}")
 
 # ================================================================== #5263 (b): the trash run after the period, not before
-PRUNE = "from kalmido.videos.review import vdr_trash_prune\nvdr_trash_prune(c)"
+# 2.981.0 (#5273): the review comments are rows of obj_comments (kind video); a comment in the trash goes with the core's run of
+# every comment (files/trashpurge.py tp_tick, its kept text in obj_comment_trash with it) -- vdr_trash_prune is gone
+PRUNE = "from kalmido.files.trashpurge import tp_tick\nprint('counts', tp_tick(c, True))"
+
+
+def vc(cid):
+    return exists("obj_comments", cid)
+
+
 C_OLD = comment(A, VO, "Old deleted p2755")
 C_YOUNG = comment(A, VO, "Young deleted p2755")
 for cid in (C_OLD, C_YOUNG):
     check(A.delete(B + f"/api/videos/{VO}/comments/{cid}").ok, f"setup: comment {cid} deleted")
-sql("UPDATE video_comments SET deleted_at=? WHERE id=?", (OLD, C_OLD))
+sql("UPDATE obj_comments SET deleted_at=? WHERE id=?", (OLD, C_OLD))
 box(PRUNE)
-check(exists("video_comments", C_OLD), "#5263: switch off (dry run): the old deleted comment stays")
+check(vc(C_OLD), "#5263: switch off (dry run): the old deleted comment stays")
 box(PRUNE, env=("KALMIDO_PURGE_TRASH=1",))
-check(not exists("video_comments", C_OLD), "#5263: switch on: the comment deleted before the trash period goes")
-check(exists("video_comments", C_YOUNG) and exists("video_comments", C_LIVE),
-      "#5263: a comment deleted within the trash period and a live one stay")
+check(not vc(C_OLD) and not sql("SELECT 1 FROM obj_comment_trash WHERE comment_id=?", (C_OLD,)),
+      "#5263 / #5273: switch on: the comment deleted before the trash period goes, its kept text with it")
+check(vc(C_YOUNG) and vc(C_LIVE), "#5263: a comment deleted within the trash period and a live one stay")
 # freelancer: a private review follows the same rule
 VF = review(Fr)
 F_OLD = comment(Fr, VF, "Frida old p2755")
 check(Fr.delete(B + f"/api/videos/{VF}/comments/{F_OLD}").ok, "setup: frida deleted her comment")
-sql("UPDATE video_comments SET deleted_at=? WHERE id=?", (OLD, F_OLD))
+sql("UPDATE obj_comments SET deleted_at=? WHERE id=?", (OLD, F_OLD))
 box(PRUNE, env=("KALMIDO_PURGE_TRASH=1",))
-check(not exists("video_comments", F_OLD), "freelancer #5263: her old deleted comment goes after the trash period")
+check(not vc(F_OLD), "freelancer #5263: her old deleted comment goes after the trash period")
 
-# ================================================================== #5263 (c): the one-off clean-up at the next start
-C_PAR = comment(A, VO, "Parent p2755")
-C_ANS = comment(A, VO, "Answer p2755", parent_id=C_PAR)
-check(A.delete(B + f"/api/videos/{VO}/comments/{C_PAR}").ok, "setup: the commented comment deleted (its answer stays live)")
+# ================================================================== #5263 (c): a start changes nothing any more
+# 2.981.0 (#5273): the one-off clean-up of 5263_a went into the move of the old table (core/objcomments.py ocm_move_q4b leaves
+# the comments deleted before the cut-off out); since the move there is no old table: a start keeps every comment as it is
 C_LATE = comment(A, VO, "Late p2755")
-check(A.delete(B + f"/api/videos/{VO}/comments/{C_LATE}").ok, "setup: one more deleted (now: after the cut-off)")
-F_DEL = comment(Fr, VF, "Frida deleted p2755")
+check(A.delete(B + f"/api/videos/{VO}/comments/{C_LATE}").ok, "setup: one more deleted")
 F_LIVE = comment(Fr, VF, "Frida live p2755")
-check(Fr.delete(B + f"/api/videos/{VF}/comments/{F_DEL}").ok, "setup: frida deleted one")
-for cid in (C_YOUNG, C_PAR, F_DEL):  # as if deleted before the update
-    sql("UPDATE video_comments SET deleted_at=? WHERE id=?", (BEFORE, cid))
-check(exists("video_comments", C_YOUNG) and exists("video_comments", C_PAR) and exists("video_comments", F_DEL),
-      "setup: the deleted comments lie in the trash before the start")
 if kt.fresh(prefix="P2755A", keep=True):  # the next start runs the fragments' AFTER
-    check(not exists("video_comments", C_YOUNG) and not exists("video_comments", C_PAR),
-          "#5263: the start removed the organisation's comments deleted before the cut-off")
-    check(not exists("video_comments", C_ANS), "#5263: the answer below a removed comment goes with it (as in the trash run)")
-    check(not exists("video_comments", F_DEL), "freelancer #5263: her deleted comment is removed too")
-    check(exists("video_comments", C_LIVE) and exists("video_comments", F_LIVE), "#5263: live comments stay")
-    check(exists("video_comments", C_LATE), "#5263: a comment deleted after the cut-off keeps its trash period (and the undo)")
+    check(vc(C_LIVE) and vc(F_LIVE) and vc(C_LATE) and vc(C_YOUNG), "#5263 / #5273: a start keeps the live comments and the trash")
     A, Fr = kt.sess("alice"), kt.sess("frida")
     check(A.post(B + f"/api/videos/{VO}/comments/{C_LATE}/restore").ok, "#5263: it can still be restored")
-    kt.fresh(prefix="P2755A", keep=True)
-    check(exists("video_comments", C_LIVE) and exists("video_comments", C_LATE), "#5263: a second start changes nothing")
 
 sys.exit(done("p2755_a_dbfix"))

@@ -32,6 +32,11 @@ import zlib
 import dbx as dbxm
 import requests
 from freelancer_fixture import freelancer
+# 2.981.0 (#5273): the review comments are rows of obj_comments (kind video); read here in the columns of the old table
+VC = ("(SELECT id, ref_id AS review_id, CAST(anchor->>'version_id' AS BIGINT) AS version_id, org_id, parent_id, "
+      "CAST(anchor->>'t' AS REAL) AS at_sec, body, user_id AS author_id, ext_name, CASE WHEN state='done' THEN 1 ELSE 0 END AS done, "
+      "created_at, deleted_at, CAST(anchor->>'page' AS BIGINT) AS page, CAST(anchor->>'x' AS REAL) AS pos_x, "
+      "CAST(anchor->>'y' AS REAL) AS pos_y FROM obj_comments WHERE kind='video') video_comments")
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -175,7 +180,7 @@ check(cm.get("Schrift größer", {}).get("pos") == {"x": 0.25, "y": 0.5} and cm[
       f"the first point: pos and number 1 {cm.get('Schrift größer')}")
 check(cm.get("Farbe wärmer", {}).get("mark") == 2 and cm.get("Allgemein gut", {}).get("pos") is None and cm["Allgemein gut"].get("mark") is None,
       f"the second point number 2, the general comment none {cm.get('Farbe wärmer')} {cm.get('Allgemein gut')}")
-db = sql("SELECT pos_x, pos_y, page, at_sec FROM video_comments WHERE id=?", (c1.json().get("comment_id"),))
+db = sql(f"SELECT pos_x, pos_y, page, at_sec FROM {VC} WHERE id=?", (c1.json().get("comment_id"),))
 check(db and abs(db[0][0] - 0.25) < 1e-6 and abs(db[0][1] - 0.5) < 1e-6 and db[0][2] is None and db[0][3] is None, f"stored as x / y {db}")
 for b, what in (({"pos": {"x": 1.5, "y": 0.2}}, "x outside 0..1"), ({"pos": {"x": 0.5}}, "x without y"), ({"at_sec": 12}, "a timecode"),
                 ({"pos": {"page": 1, "x": 0.1, "y": 0.1}}, "a page"), ({"pos": {"x": True, "y": 0.1}}, "a boolean"), ({"pos": "0.1,0.2"}, "a text")):

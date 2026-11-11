@@ -62,11 +62,11 @@ from .objhooks import MOVE, USER_GONE
 from .pg import insert_id, qi, st_ids, system_ctx, table_columns
 from ..accounts.orgroles import org_say_refusal
 
-OCM_KINDS = ("task",)
+OCM_KINDS = ("task", "video", "doc_note")  # 2.981.0 (#5273, stage Q4b): + the comments of a video / picture review, the notes on a document
 OCM_MENTION_RE = re.compile(r"<@(\d+)>")  # THE mention token (was MENTION_RE in collab/comments.py, replies.py, ...)
 OCM_MAX = 10000  # characters of a comment (a ciphertext may be longer: the kind's hook text_max)
 OCM_TS = 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00:00"'  # the old ISO form with milliseconds (core/db.py iso_ms)
-OCM_EXTRA = ("suggestion", "choices", "choice", "portal", "rule_name")  # the keys of a task's extra
+OCM_EXTRA = ("suggestion", "choices", "choice", "portal", "rule_name", "source")  # the keys of a task's extra (+ #5273: a note's source)
 OCM_DEL_TXT = N_("Only the author or the project owner can delete this comment")
 OCM_EDIT_TXT = N_("Only the author can edit this comment")
 OCM_HOOKS = {}  # kind -> {people, sealed, sealed_in, text_max, nfiles, trash, restore, live} (registered by the kind's area)
@@ -74,7 +74,13 @@ OCM_PART = "comment"  # the side object of core/objparts.py (lock comment-<id>, 
 
 
 def ocm_kind(kind, **hooks):
-    """Register the hooks of a kind (collab/comments.py for 'task'):
+    """Register the hooks of a kind (collab/comments.py for 'task', videos/review.py 'video', docs/notes.py 'doc_note'):
+    obj = the core kind whose obj_role / obj_space decide (default: kind itself; 'video' -> 'video_review')
+    role(c, uid, ref_id) -> None | 'view' | 'edit' | 'manage': the area's own role instead of obj_role (2.981.0: a document's
+      notes, the file store's role -- its core kind gives no role to who only reads)
+    seal(c, ref_id, text) -> the stored text (2.981.0: a document's notes are sealed with the workspace key)
+    web: {read(c, ref_id, uid) -> raises Denied, add(c, ref_id, uid, b) -> id, out(c, ref_id, uid) -> JSON, changed(c, ref_id),
+      state(c, row, uid, value)}: the generic routes (core/objcmtweb.py); a kind without them keeps its own routes
     people(c, ref_id) -> {uid}: who may be mentioned (who reads it)
     sealed(c, ref_id) -> bool: the object is end-to-end locked (the body is a ciphertext)
     sealed_in(c, ref_id, text) -> (text, mentions): the guard of a sealed object
@@ -109,6 +115,29 @@ def ocm_old_cols(a=""):
 
 
 OCM_COLS = ocm_old_cols() + ", kind, ref_id, org_id, deleted_by"
+
+
+def ocm_video_cols(a="k"):
+    """2.981.0 (#5273, videos/review.py VDC, the organisation export): a review comment of obj_comments (alias a) in the columns of the old table video_comments: review_id,
+    version_id / at_sec / page / pos_x / pos_y (from anchor), author_id, done 0/1 (state 'done'), the times as ISO text with
+    milliseconds (edited_at: the version of an edit) -- the answers, the API, the exports and the archive stay as they were."""
+    p = f"{a}."
+
+    def ts(col):
+        return f"to_char({p}{col} AT TIME ZONE 'UTC', '{OCM_TS}') AS {col}"
+    return (f"{p}id, {p}ref_id AS review_id, CAST({p}anchor->>'version_id' AS BIGINT) AS version_id, {p}org_id, {p}parent_id, "
+            f"CAST({p}anchor->>'t' AS REAL) AS at_sec, {p}body, {p}user_id AS author_id, {p}ext_name, "
+            f"CASE WHEN {p}state = 'done' THEN 1 ELSE 0 END AS done, {ts('created_at')}, {ts('edited_at')}, {ts('deleted_at')}, "
+            f"CAST({p}anchor->>'page' AS BIGINT) AS page, CAST({p}anchor->>'x' AS REAL) AS pos_x, CAST({p}anchor->>'y' AS REAL) AS pos_y")
+
+
+def ocm_note_cols(a="obj_comments"):
+    """2.981.0 (#5273, the organisation export): a document's note of obj_comments (alias a) in the columns of the old table
+    doc_notes: node_id, author (the name it came with), text (sealed), source, ws (the document's workspace, its key)."""
+    p = f"{a}."
+    return (f"{p}id, {p}org_id, {p}ref_id AS node_id, {p}user_id, COALESCE({p}ext_name, '') AS author, {p}body AS text, "
+            f"COALESCE({p}extra->>'source', '') AS source, to_char({p}created_at AT TIME ZONE 'UTC', '{OCM_TS}') AS created_at, "
+            f"(SELECT m.ws FROM doc_meta m WHERE m.node_id = {p}ref_id) AS ws")
 
 
 def ocm_row(c, cid, live=False, lock=False, kind="task"):
@@ -169,9 +198,17 @@ def _extra(extra):
 
 
 # ---- rights
+def ocm_obj(kind):
+    """2.981.0 (#5273): the core kind of the object a comment of kind stands on (obj_role, obj_space)."""
+    return (OCM_HOOKS.get(kind) or {}).get("obj") or kind
+
+
 def _role(c, uid, kind, ref_id):
     from .objects import obj_role
-    return obj_role(c, uid, kind, int(ref_id))
+    own = (OCM_HOOKS.get(kind) or {}).get("role")
+    if own is not None:  # 2.981.0 (#5273): the area's role (a document: the file store's)
+        return own(c, uid, int(ref_id))
+    return obj_role(c, uid, ocm_obj(kind), int(ref_id))
 
 
 def _need_read(c, kind, ref_id, uid):
@@ -184,9 +221,9 @@ def ocm_say_refusal(c, kind, ref_id, uid):
     orgroles.py RO_MSG / GUEST_MSG, not translated): a guest / read-only person of the object's organisation who cannot change
     the object itself only reads. Private objects and people without that role: None. (Was task_say_refusal, #4549.)"""
     from .objects import OBJ_RANK, obj_space
-    sp = obj_space(c, kind, int(ref_id))
+    sp = obj_space(c, ocm_obj(kind), int(ref_id))
     msg = org_say_refusal(c, uid, sp[0]) if sp and sp[0] else None
-    return msg if msg and OBJ_RANK[_role(c, uid, kind, ref_id)] < OBJ_RANK["edit"] else None
+    return msg if msg and OBJ_RANK[_role(c, uid, kind, ref_id) or None] < OBJ_RANK["edit"] else None
 
 
 def ocm_need_say(c, kind, ref_id, uid=None):
@@ -255,16 +292,19 @@ def ocm_text_check(kind, text, nfiles=0):
 
 # ---- writes
 def ocm_add(c, kind, ref_id, uid, body, *, mentions=(), extra=None, ext_name=None, parent_id=None, client_ref=None,
-            created_at=None, notify=False, nfiles=0, replied=None):
+            created_at=None, notify=False, nfiles=0, replied=None, anchor=None, state=None, org_id=None):
     """A new comment (the caller checked the rights, cleaned the text and commits) -> its id. created_at None = now.
     notify=True: the people who read the object hear of it and the agents get their event (ocm_after; the pushes go out after
-    the request, g.pushes)."""
+    the request, g.pushes). 2.981.0 (#5273): anchor (a dict: where it sits on the object), state (a review: 'done'), org_id
+    (a kind other than 'task' brings its object's organisation: row-level security, core/orgrows.py keeps it)."""
     if kind not in OCM_KINDS:
         raise ValueError(kind)
-    cid = insert_id(c, "INSERT INTO obj_comments(kind, ref_id, user_id, ext_name, parent_id, body, mentions, extra, client_ref, created_at) "
-                       "VALUES(?,?,?,?,?,?,CAST(? AS BIGINT[]),CAST(? AS JSONB),?,?)",
-                    (kind, int(ref_id), uid, ext_name, parent_id, body or "", st_ids(mentions or ()),
-                     json.dumps(_extra(extra), ensure_ascii=False), client_ref, created_at or iso_ms(now_utc())))
+    an = {k: v for k, v in (anchor or {}).items() if v is not None}
+    cid = insert_id(c, "INSERT INTO obj_comments(kind, ref_id, org_id, user_id, ext_name, parent_id, body, mentions, extra, client_ref, "
+                       "created_at, anchor, state) VALUES(?,?,?,?,?,?,?,CAST(? AS BIGINT[]),CAST(? AS JSONB),?,?,CAST(? AS JSONB),?)",
+                    (kind, int(ref_id), org_id, uid, ext_name, parent_id, body or "", st_ids(mentions or ()),
+                     json.dumps(_extra(extra), ensure_ascii=False), client_ref, created_at or iso_ms(now_utc()),
+                     json.dumps(an) if an else None, state))
     if notify:
         p = ocm_after(c, kind, cid, body or "", list(mentions or ()), nfiles=nfiles, replied=replied,
                       author=uid if uid is not None else 0)  # 0 = from outside (no account), as news_add
@@ -298,6 +338,9 @@ def ocm_edit(c, cid, uid, b, *, public=None):
     nf = _hook(kind, "nfiles")
     ocm_text_check(kind, text, nf(c, cid) if nf else 0)
     text, mentions = ocm_text_in(c, kind, ref, text)
+    seal = _hook(kind, "seal")
+    if seal:  # 2.981.0 (#5273): a document's note is stored sealed
+        text = seal(c, ref, text)
     old = {int(x) for x in (r["mentions"] or "").split(",") if x}
     c.execute("UPDATE obj_comments SET body=?, mentions=CAST(? AS BIGINT[]), edited_at=? WHERE id=?",
               (text, st_ids(mentions), iso_ms(now_utc()), int(cid)))  # ms: the version of the next edit (#4701)
@@ -592,5 +635,75 @@ def ocm_move(c):
     return n
 
 
+OCM_Q4B_HOW = ("the comments of video / picture reviews and the notes on documents moved into the shared core (obj_comments, "
+               "#5273) and the old tables were dropped - an older version would make them again empty and write comments the "
+               "next start cannot take over; go back only with a backup from before")
+OCM_Q4B_CUT = "2026-11-08"  # 2.755.0 (#5263): review comments deleted before this day were cleaned up once; the move leaves them out too
+
+
+def _q4b_ts(cols, a, col, other, args):
+    """A point in time of an old TEXT column (alias a) -> TIMESTAMPTZ: '' / NULL -> other, a text not in ISO form -> other.
+    The pattern goes into args (it holds '?')."""
+    if col not in cols:
+        return other
+    args.append(OCM_ISO)
+    return f"CASE WHEN COALESCE({a}.{col}, '') = '' THEN {other} WHEN {a}.{col} ~ ? THEN {a}.{col}::timestamptz ELSE {other} END"
+
+
+def _q4b_ids(c, table, where=""):
+    """A temporary map old id -> new id of obj_comments for the rows of table (ids in their order: answers after their comment)."""
+    c.execute("DROP TABLE IF EXISTS _ocm_q4b_ids")
+    c.execute(f"CREATE TEMP TABLE _ocm_q4b_ids ON COMMIT DROP AS SELECT x.id AS old, "
+              f"nextval(pg_get_serial_sequence('obj_comments', 'id')) AS new FROM (SELECT id FROM {qi(table, {table})} {where} ORDER BY id) x")
+
+
+def ocm_move_q4b(c):
+    """2.981.0 (#5273): the rows of video_comments (kind 'video') and doc_notes (kind 'doc_note') into obj_comments, while those
+    tables are there (the first start of the version, or again after an older version made them anew), with NEW ids (the ids of
+    obj_comments belong to the task comments; nothing outside the two tables pointed at theirs): an answer keeps its comment
+    (parent_id mapped), a review comment's place -> anchor {version_id, t | page, x, y}, done -> state 'done', the times ->
+    real points in time, a comment / note in the trash: its text into obj_comment_trash (a note's sealed text as it is), the
+    review comments deleted before the clean-up of #5263 are left out. A note's name of the person it came with (author) ->
+    ext_name, its source -> extra. The fragment 5273_a drops the two tables right after (one-way). -> rows moved."""
+    n, had = 0, False
+    if c.execute("SELECT to_regclass('video_comments')").fetchone()[0]:
+        had = True
+        cols = table_columns(c, "video_comments")
+        gone = f"v.deleted_at IS NOT NULL AND v.deleted_at <> '' AND v.deleted_at < '{OCM_Q4B_CUT}'"
+        _q4b_ids(c, "video_comments", f"v WHERE NOT ({gone}) AND EXISTS (SELECT 1 FROM video_reviews r WHERE r.id=v.review_id)")
+        pos = (("t", "at_sec"), ("page", "page"), ("x", "pos_x"), ("y", "pos_y"))
+        anchor = ("NULLIF(jsonb_strip_nulls(jsonb_build_object('version_id', v.version_id"
+                  + "".join(f", '{k}', v.{col}" for k, col in pos if col in cols) + ")), '{}'::jsonb)")
+        args = []
+        cr = _q4b_ts(cols, "v", "created_at", "CURRENT_TIMESTAMP", args)
+        dl = _q4b_ts(cols, "v", "deleted_at", "CURRENT_TIMESTAMP", args)
+        n += c.execute(f"""INSERT INTO obj_comments(id, kind, ref_id, org_id, user_id, ext_name, parent_id, body, anchor, state,
+                                                    created_at, deleted_at)
+                           SELECT m.new, 'video', v.review_id, v.org_id, v.author_id, NULLIF(v.ext_name, ''), p.new,
+                                  CASE WHEN COALESCE(v.deleted_at, '') = '' THEN COALESCE(v.body, '') ELSE '' END, {anchor},
+                                  CASE WHEN COALESCE(v.done, 0) <> 0 THEN 'done' END, {cr},
+                                  CASE WHEN COALESCE(v.deleted_at, '') = '' THEN NULL ELSE {dl} END
+                           FROM video_comments v JOIN _ocm_q4b_ids m ON m.old=v.id LEFT JOIN _ocm_q4b_ids p ON p.old=v.parent_id
+                           ORDER BY m.new""", args).rowcount
+        c.execute("""INSERT INTO obj_comment_trash(comment_id, body) SELECT m.new, COALESCE(v.body, '')
+                     FROM video_comments v JOIN _ocm_q4b_ids m ON m.old=v.id WHERE COALESCE(v.deleted_at, '') <> ''
+                     ON CONFLICT DO NOTHING""")
+    if c.execute("SELECT to_regclass('doc_notes')").fetchone()[0]:
+        had = True
+        cols = table_columns(c, "doc_notes")
+        _q4b_ids(c, "doc_notes", "d WHERE EXISTS (SELECT 1 FROM fs_nodes f WHERE f.id=d.node_id)")
+        src = "CASE WHEN COALESCE(d.source, '') <> '' THEN jsonb_build_object('source', d.source) ELSE '{}'::jsonb END" if "source" in cols else "'{}'::jsonb"
+        args = []
+        cr = _q4b_ts(cols, "d", "created_at", "CURRENT_TIMESTAMP", args)
+        n += c.execute(f"""INSERT INTO obj_comments(id, kind, ref_id, org_id, user_id, ext_name, body, extra, created_at)
+                           SELECT m.new, 'doc_note', d.node_id, d.org_id, d.user_id, NULLIF(d.author, ''), COALESCE(d.text, ''), {src}, {cr}
+                           FROM doc_notes d JOIN _ocm_q4b_ids m ON m.old=d.id ORDER BY m.new""", args).rowcount
+    if had:
+        kern_retire_floor(c, how=OCM_Q4B_HOW)  # the minor of the image that moves (core/kernretire.py, as ocm_move)
+    c.execute("DROP TABLE IF EXISTS _ocm_q4b_ids")
+    return n
+
+
 MOVE.append(ocm_move)  # core/db.py init_db, before the fragments' AFTER (core/objhooks.py)
+MOVE.append(ocm_move_q4b)  # 2.981.0 (#5273): video_comments / doc_notes, after the task comments (their ids come first)
 USER_GONE.append(ocm_purge_user)  # accounts/users.py, before an account goes

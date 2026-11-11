@@ -50,7 +50,8 @@ from .oilock import oil_export_keys  # #4300
 from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import qi, system_ctx, table_names
-from ..core.objcomments import ocm_old_cols  # 2.972.0 (#5272)
+from ..core.objcomments import ocm_note_cols, ocm_old_cols, ocm_video_cols  # 2.972.0 (#5272); 2.981.0 (#5273): + video / note
+from ..docs.store import doc_open as _doc_open  # 2.981.0 (#5273): the notes on documents (obj_comments kind doc_note)
 from ..core.i18n import N_, lang, tr
 from ..core.access import Denied, live_sql
 from ..accounts.pictures import list_icon_path, org_icon_path, org_icon_tok  # 2.363.2 (#3106)
@@ -231,6 +232,8 @@ def _clean(c, oid, table, r):
         row["task_id"] = row.pop("obj_id")
         row.pop("kind", None)
         row.pop("created_by", None)
+    if table == "obj_comments" and "ws" in row:  # 2.981.0 (#5273): a document's note, sealed with its workspace (as doc_notes was)
+        row["text"] = _doc_open(c, row["ws"], "doc_notes.text", row["text"], default=None) if row.get("text") else row.get("text")
     if table == "obj_follow":  # 2.972.0 (#5285): tasks/watchers.json as before (task_id, user_id, created_at)
         row = {"task_id": row["ref_id"], "user_id": row["user_id"], "created_at": row["created_at"]}
     row.pop("legacy_aad", None)  # 2.278.0 C (#3091): a person's own move detail (old AAD), not the organisation's
@@ -244,11 +247,23 @@ def _table_cols(c, table):
 # 2.972.0 (#5272): tables whose file keeps the columns of the table before the core's (comments.json: task_id, reply_to,
 # mentions as csv, suggestion / choices / choice / portal / rule_name), so older and newer archives read alike
 OX_COLS = {"obj_comments": ocm_old_cols()}
+# 2.981.0 (#5273): the other kinds of obj_comments keep the files and columns of their old tables (videos/comments.json:
+# video_comments, documents/notes.json: doc_notes) -- chosen by the kind the where of the entry starts with
+OX_KIND_COLS = {"kind='video'": ocm_video_cols("obj_comments"), "kind='doc_note'": ocm_note_cols("obj_comments")}
+
+
+def _ox_cols(table, where):
+    """2.981.0 (#5273): the column list of an archive entry (OX_COLS, OX_KIND_COLS), '*' for every other table."""
+    if table == "obj_comments":
+        k = next((x for x in OX_KIND_COLS if where.lstrip("(").startswith(x)), None)
+        if k:
+            return OX_KIND_COLS[k]
+    return OX_COLS.get(table, "*")
 
 
 def _rows(c, oid, table, where, args, paged=True):
     """Every row of table matching where (keyset pages on id when the table has one: big tables never sit in memory whole)."""
-    cols, names = OX_COLS.get(table, "*"), table_names(c)  # 2.972.0 (#5272): a touched place takes qi() (#5296)
+    cols, names = _ox_cols(table, where), table_names(c)  # 2.972.0 (#5272): a touched place takes qi() (#5296); 2.981.0: _ox_cols
     if paged and "id" in _table_cols(c, table):
         last = None
         while True:
@@ -472,7 +487,9 @@ OX_AREAS = (
     ("sheets/history.json", "sheet_hist", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),  # 2.124.0 B (#2112): cell history
     ("videos/reviews.json", "video_reviews", "org_id=?"),  # 2.99.1 A (#1959): video sign-offs (links only), versions, comments
     ("videos/versions.json", "video_versions", "org_id=?"),
-    ("videos/comments.json", "video_comments", "org_id=?"),
+    # 2.981.0 (#5273): the comments are rows of obj_comments (kind video), the file keeps its columns (OX_KIND_COLS); not those of
+    # a review in the trash (was OX_GONE_WITH)
+    ("videos/comments.json", "obj_comments", "kind='video' AND org_id=? AND ref_id NOT IN (SELECT id FROM video_reviews WHERE deleted_at IS NOT NULL)"),
     # 2.48.0 (#1111): documents (recognised text, amounts, sender names and rules decrypted); not the learnt models, not the
     # keyed word index (both are rebuilt from the documents), not the forwarding addresses (their token is a secret)
     ("documents/meta.json", "doc_meta", "org_id=?"),
@@ -482,7 +499,7 @@ OX_AREAS = (
     ("documents/document_tags.json", "doc_node_tags", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),  # 2.122.0 B (#2099): + files / folders
     ("documents/fields.json", "doc_fields", "org_id=?"),  # 2.153.0 (#2179): custom fields + their values (decrypted)
     ("documents/field_values.json", "doc_field_values", "org_id=?"),
-    ("documents/notes.json", "doc_notes", "org_id=?"),  # 2.635.0 (#4807 d): notes on documents (decrypted)
+    ("documents/notes.json", "obj_comments", "kind='doc_note' AND org_id=?"),  # 2.635.0 (#4807 d): notes on documents (decrypted); 2.981.0 (#5273): obj_comments
     ("documents/rules.json", "doc_rules", "org_id=?"),
     ("documents/settings.json", "doc_cfg", "org_id=?"),
     ("documents/receipts.json", "rc_receipts", "org_id=?"),  # 2.137.0 B (#2344): project and category of receipts (set by people)
@@ -589,7 +606,6 @@ OX_GONE_WITH = {  # table -> (parent table, column) pairs: a row goes when its p
     "sheet_files": (("sheets", "sheet_id"),),
     "sheet_hist": (("sheets", "sheet_id"),),
     "video_versions": (("video_reviews", "review_id"),),
-    "video_comments": (("video_reviews", "review_id"),),
     "wiki_files": (("wiki_pages", "page_id"),),
     "obj_versions": (("wiki_pages", "ref_id"),),  # 2.958.0 (#5281): the export takes kind 'wiki' only (wiki/versions.json)
 }
@@ -662,7 +678,8 @@ def _tcx_rooms(u):
 
 # 2.190.0 R (#2561): rows of the file store that belong to one node (left out with a hidden filed mail's nodes)
 OX_NODE_TABLES = ("fs_versions", "fs_shares", "fs_log", "doc_meta", "doc_node_tags", "doc_field_values", "rc_receipts",
-                  "fs_area_roots", "fs_locks", "doc_notes")  # 2.353.0 C (#2829), #4300; 2.635.0 (#4807 d): doc_notes
+                  "fs_area_roots", "fs_locks")  # 2.353.0 C (#2829), #4300; 2.981.0 (#5273): the notes by their file (OX_NODE_FILES)
+OX_NODE_FILES = ("documents/notes.json",)  # 2.635.0 (#4807 d): the notes on documents (rows of obj_comments since 2.981.0, #5273)
 
 
 def ox_hidden_nodes(c, oid, hidden):
@@ -831,7 +848,7 @@ def ox_build(c, oid, out, by=None):
                 rows = (r for r in rows if r.get("mail_id") not in hidden)
             elif hnodes and table == "fs_nodes":  # 2.190.0 R (#2561): the filed mail's folder, its files and their rows go too
                 rows = (r for r in rows if r.get("id") not in hnodes)
-            elif hnodes and table in OX_NODE_TABLES:
+            elif hnodes and (table in OX_NODE_TABLES or name in OX_NODE_FILES):
                 rows = (r for r in rows if r.get("node_id") not in hnodes)
             _put_json(zf, man, name, rows)
         if "fs_locks" in have and (by or {}).get("id"):  # #4300: only the exporting person's own copy of a folder key (it opens only with their keys)
@@ -1022,7 +1039,7 @@ def ox_pb_store(c, zf, man, lk, oid, owner, have, pre=""):
             ("documents/document_tags.json", "doc_node_tags", f"node_id IN ({k})", ()),
             ("documents/fields.json", "doc_fields", "ws=?", (ws,)),
             ("documents/field_values.json", "doc_field_values", f"node_id IN ({k})", ()),
-            ("documents/notes.json", "doc_notes", f"node_id IN ({k})", ()),  # 2.635.0 (#4807 d)
+            ("documents/notes.json", "obj_comments", f"kind='doc_note' AND ref_id IN ({k}) AND {live_sql()}", ()),  # 2.635.0 (#4807 d); 2.981.0 (#5273)
             ("documents/meta.json", "doc_meta", f"node_id IN ({k})", ()),
             ("documents/receipts.json", "rc_receipts", f"node_id IN ({k})", ())):
         if table in have:

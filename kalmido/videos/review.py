@@ -1,4 +1,5 @@
-"""2.99.1 A (#1959): video sign-off with comments at a timecode (tables video_reviews / video_versions / video_comments).
+"""2.99.1 A (#1959): video sign-off with comments at a timecode (tables video_reviews / video_versions; the comments: 2.981.0
+#5273 rows of the comments' core obj_comments, kind 'video', read here in their old shape through VDC).
 
 Kalmido stores no video: a review holds links only -- Vimeo, YouTube (also unlisted, youtu.be), a direct video file over
 https (MP4 / WebM / MOV, e.g. a Nextcloud / NAS / Dropbox file link); anything else is a "link without time control" (it
@@ -31,7 +32,7 @@ from ..core.access import Denied, FULL_ROLES, WRITE_ROLES, acx_org_ok, list_role
 from ..office.signoff import sig_people  # 2.266.0 (#2965)
 from .vdlink import VDL_LIVE_MAX, vdl_carry, vdl_live_count, vdl_name, vdl_name_set, vdl_nav, vdl_old_note, vdl_shown, vdl_uncarry  # 2.642.0 (#4772)
 from ..core.db import body, db, err, iso, now_utc
-from ..core.retention import ret_on, ret_report, ret_trash_cut, ret_trash_days  # 2.272.0 A (#3026); 2.549.0 (#4536): ret_trash_days
+from ..core.retention import ret_on, ret_trash_days  # 2.272.0 A (#3026); 2.549.0 (#4536): ret_trash_days
 from ..core.i18n import N_, csv_dialect, tr
 from ..core.pg import insert_id, write_lock
 from ..accounts.session import _accept_lang, me, rate_ip
@@ -52,7 +53,9 @@ from .vdmedia import vdm_body, vdm_files_ok, vdm_has_files, vdm_marks, vdm_media
 from .vdmedia import vdm_pub_send  # 2.658.0 (#5015)
 from .vdmedia import vdm_pub_pos, vdm_pub_stage  # 2.764.0 (#5040)
 from ..core.writes import obj_restore, obj_trash  # 2.947.0 (#5367): the core's trash (videos/vdkern.py)
-from ..core.access import trash_sql  # 2.947.0 (#5367)
+from ..core.access import live_sql, trash_sql  # 2.947.0 (#5367); 2.981.0 (#5273): live_sql
+from ..core.objcomments import ocm_add, ocm_edit, ocm_kind, ocm_restore, ocm_trash, ocm_video_cols as vdc_cols  # 2.981.0 (#5273): the comments' core
+from ..core.objparts import part_write  # 2.981.0 (#5273): the lock of a comment (done)
 
 VDR_URL_MAX, VDR_TITLE_MAX, VDR_BODY_MAX, VDR_NAME_MAX = 2000, 200, 2000, 120
 VDR_AT_MAX = 86400.0                     # a timecode lies within 24 hours
@@ -74,6 +77,11 @@ VDR_FRAME = {"youtube": "https://www.youtube-nocookie.com", "vimeo": "https://pl
 VDR_HTTPS = N_("Please paste a link that starts with https://")
 VDR_NO_TIME = N_("This link has no time control: it opens in a new tab, comments get no timecode.")
 VDR_NONE = N_("Kalmido stores no videos: paste a link from Vimeo, YouTube (also unlisted) or a direct video file (MP4, WebM, MOV) over https.")
+VDC_KIND = "video"  # 2.981.0 (#5273, stage Q4b): the comments of a review are rows of obj_comments (ref_id = the review)
+
+
+VDC = f"(SELECT {vdc_cols()} FROM obj_comments k WHERE k.kind='{VDC_KIND}') video_comments"  # read like the old table
+VDC_SEL = "SELECT * FROM " + VDC  # + " WHERE ..." (the old table's columns)
 
 
 # ---------------------------------------------------------------- links: provider, embed URL
@@ -274,7 +282,7 @@ def vdr_version_dict(v):
 def vdr_comments(c, vid, version_id=None, public=False):
     """The live comments of review vid (one version or all), oldest timecode first; public = only the customers' comments
     and the answers to them (the customer page)."""
-    rows = c.execute("SELECT * FROM video_comments WHERE review_id=? AND deleted_at IS NULL" + (" AND version_id=?" if version_id else "")
+    rows = c.execute(VDC_SEL + " WHERE review_id=? AND deleted_at IS NULL" + (" AND version_id=?" if version_id else "")
                      + " ORDER BY at_sec NULLS LAST, page NULLS FIRST, id", (vid, version_id) if version_id else (vid,)).fetchall()
     if public:
         ext = {x["id"] for x in rows if x["ext_name"] and not x["parent_id"]}
@@ -304,7 +312,7 @@ def rg4_dec_text(body, lg=None):
 def vdr_comment_dict(x, names, marks=None):
     return {"id": x["id"], "version_id": x["version_id"], "parent_id": x["parent_id"], "at_sec": x["at_sec"], "body": rg4_dec_text(x["body"]),
             "author_id": x["author_id"], "author": x["ext_name"] or names.get(x["author_id"]) or "", "customer": bool(x["ext_name"]),
-            "done": bool(x["done"]), "created_at": x["created_at"],
+            "done": bool(x["done"]), "created_at": x["created_at"], "edited_at": x["edited_at"],  # 2.981.0 (#5273): the version of an edit
             # 2.641.0 (#4769): the place {t} | {x, y} | {page, x?, y?} and the number of its point on the image / page
             "pos": vdm_pos_dict(x), "page": x["page"], "mark": (marks or {}).get(x["id"])}
 
@@ -325,8 +333,8 @@ def vdr_dict(c, r, uid, full=False, signoffs=True):
     """A review for the app: place, state, versions, open comments; full = with the comments and the approval links
     (signoffs=False: never built, the agents' API)."""
     vs = vdr_versions(c, r["id"])
-    n_open = c.execute("SELECT COUNT(*) FROM video_comments WHERE review_id=? AND deleted_at IS NULL AND done=0 AND parent_id IS NULL",
-                       (r["id"],)).fetchone()[0]
+    n_open = c.execute(f"SELECT COUNT(*) FROM obj_comments WHERE kind='{VDC_KIND}' AND ref_id=? AND {live_sql()} AND state IS NULL "
+                       "AND parent_id IS NULL", (r["id"],)).fetchone()[0]
     d = {"id": r["id"], "title": r["title"], "state": r["state"], "org_id": r["org_id"], "space": vdr_space_key(r["org_id"]),
          "task_id": r["task_id"], "list_id": r["list_id"], "client_id": r["client_id"], "created_by": r["created_by"],
          "created_at": r["created_at"], "updated_at": r["updated_at"], "deleted": bool(r["deleted_at"]),
@@ -387,7 +395,7 @@ def vdr_comment_add(c, r, uid, b, ext_name=None):
     at, page, px, py = vdm_pos(vs[ver]["kind"] or "video", b, vdr_at)  # 2.641.0 (#4769): {t} | {x, y} | {page, x, y}
     par = b.get("parent_id")
     if par not in (None, "", 0):
-        p = c.execute("SELECT id, version_id, parent_id FROM video_comments WHERE id=? AND review_id=? AND deleted_at IS NULL",
+        p = c.execute(VDC_SEL + " WHERE id=? AND review_id=? AND deleted_at IS NULL",
                       (par if isinstance(par, int) and not isinstance(par, bool) else -1, r["id"])).fetchone()
         if not p or p["parent_id"]:  # one level of answers
             raise BadInput(tr("Invalid value: {0}", "parent_id"))
@@ -396,9 +404,8 @@ def vdr_comment_add(c, r, uid, b, ext_name=None):
         par = None
     if vs[ver]["provider"] == "link":
         at = None
-    cid = insert_id(c, "INSERT INTO video_comments(review_id, version_id, org_id, parent_id, at_sec, body, author_id, ext_name, done, created_at, page, pos_x, pos_y) "
-                       "VALUES(?,?,?,?,?,?,?,?,0,?,?,?,?)", (r["id"], ver, r["org_id"], par, at, text, None if ext_name else uid, ext_name, iso(now_utc()),
-                                                            page, px, py))
+    cid = ocm_add(c, VDC_KIND, r["id"], None if ext_name else uid, text, ext_name=ext_name, parent_id=par, org_id=r["org_id"],
+                  anchor={"version_id": ver, "t": at, "page": page, "x": px, "y": py})  # 2.981.0 (#5273): the comments' core
     vdr_touch(c, r["id"])
     return cid
 
@@ -565,13 +572,25 @@ def vdr_version_del(vid, nid):
     vs = vdr_versions(c, vid)
     if len(vs) < 2 or vs[-1]["id"] != nid:
         raise Denied(409, tr("Only the newest version can be removed"))
-    if c.execute("SELECT 1 FROM video_comments WHERE version_id=? AND deleted_at IS NULL LIMIT 1", (nid,)).fetchone():
+    if c.execute(VDC_SEL + " WHERE review_id=? AND version_id=? AND deleted_at IS NULL LIMIT 1", (vid, nid)).fetchone():
         raise Denied(409, tr("This version already has comments"))
+    # 2.981.0 (#5273): the comments of the version in the trash go with it (was ON DELETE CASCADE of video_comments.version_id)
+    c.execute(f"DELETE FROM obj_comments WHERE kind='{VDC_KIND}' AND ref_id=? AND CAST(anchor->>'version_id' AS BIGINT)=?", (vid, nid))
     vdl_uncarry(c, vid, nid)  # 2.642.0 (#4772): before the version goes (its links carried on give the token back)
     c.execute("DELETE FROM video_versions WHERE id=? AND review_id=?", (nid, vid))
     vdr_touch(c, vid)
     c.commit()
     return jsonify(vdr_dict(c, vdr_reload(c, vid), uid, full=True))
+
+
+def vdc_web_add(c, r, uid, b):
+    """A person's comment on review r (the app's route and the core's generic one) -> id."""
+    par = b.get("parent_id")
+    if isinstance(par, int) and not isinstance(par, bool):  # 2.360.0 D (#2496): as in v1 -- the customer page shows this answer
+        p = c.execute(VDC_SEL + " WHERE id=? AND review_id=? AND deleted_at IS NULL", (par, r["id"])).fetchone()
+        if p and p["ext_name"] and not vdr_may(c, uid, r, write=True):
+            raise Denied(403, tr("Only people who may change the review answer the client"))
+    return vdr_comment_add(c, r, uid, b)
 
 
 @app.post("/api/videos/<int:vid>/comments")
@@ -580,60 +599,68 @@ def vdr_comment_new(vid):
     c, uid = db(), me()
     r = vdr_need(c, vid)
     b = body()
-    b = b if isinstance(b, dict) else {}
-    par = b.get("parent_id")
-    if isinstance(par, int) and not isinstance(par, bool):  # 2.360.0 D (#2496): as in v1 -- the customer page shows this answer
-        p = c.execute("SELECT ext_name FROM video_comments WHERE id=? AND review_id=? AND deleted_at IS NULL", (par, vid)).fetchone()
-        if p and p["ext_name"] and not vdr_may(c, uid, r, write=True):
-            raise Denied(403, tr("Only people who may change the review answer the client"))
-    cid = vdr_comment_add(c, r, uid, b)
+    cid = vdc_web_add(c, r, uid, b if isinstance(b, dict) else {})
     c.commit()
     return jsonify(dict(vdr_dict(c, vdr_reload(c, vid), uid, full=True), comment_id=cid))
 
 
 def vdr_comment_row(c, r, cid, deleted=False):
-    x = c.execute("SELECT * FROM video_comments WHERE id=? AND review_id=?", (cid, r["id"])).fetchone()
+    x = c.execute(VDC_SEL + " WHERE id=? AND review_id=?", (cid, r["id"])).fetchone()
     if not x or bool(x["deleted_at"]) != deleted:
         raise Denied(404)
     return x
 
 
-@app.patch("/api/videos/<int:vid>/comments/<int:cid>")
-def vdr_comment_patch(vid, cid):
-    """{done?: bool} (who may write the review or wrote the comment), {body?} (only its author)."""
-    c, uid = db(), me()
-    r = vdr_need(c, vid)
-    x = vdr_comment_row(c, r, cid)
-    b = body()
-    b = b if isinstance(b, dict) else {}
-    mine, wr = x["author_id"] == uid, vdr_may(c, uid, r, write=True)
+def vdc_set_done(c, x, done):
+    """2.981.0 (#5273): comment x (a row of VDC) done / open again, under the comment's lock (core/objparts.py, comment-<id>)."""
+    part_write(c, "comment", x["id"], {}, read=lambda c, i: x)
+    c.execute("UPDATE obj_comments SET state=? WHERE id=? AND kind=?", ("done" if done else None, x["id"], VDC_KIND))
+
+
+def vdc_change(c, r, x, uid, b, wr):
+    """2.981.0 (#5273): comment x of review r changed by uid (wr = may change the review): done (its author or wr) under the
+    comment's lock, body (its author only) through the core's edit: lock comment-<id> and, with expect_updated_at (edited_at
+    or created_at of the comment), 409 with the comment when it changed meanwhile (B3: was written over without either)."""
+    mine = x["author_id"] == uid
     if mine and ("done" in b or "body" in b):  # 2.607.0 (#4549): a guest / read-only person of the review's
         need_org_say(c, uid, r["org_id"], lambda: wr)  # organisation only reads -- asked before anything is written (review)
     if "done" in b:
         if not (mine or wr):
             raise Denied(403)
-        c.execute("UPDATE video_comments SET done=? WHERE id=?", (1 if b["done"] else 0, cid))
+        vdc_set_done(c, x, b["done"])
     if "body" in b:
         if not mine:
             raise Denied(403)
         t = vdr_clean(b.get("body"), VDR_BODY_MAX)
         if not t:
-            return err(tr("Please write a comment."))
-        c.execute("UPDATE video_comments SET body=? WHERE id=?", (t, cid))
-    vdr_touch(c, vid)
+            raise BadInput(tr("Please write a comment."))
+        ocm_edit(c, x["id"], uid, {**b, "body": t}, public=lambda c, row: vdr_comment_dict(
+            c.execute(VDC_SEL + " WHERE id=?", (row["id"],)).fetchone(), user_names(c, [row["user_id"]])))
+    vdr_touch(c, r["id"])
+
+
+@app.patch("/api/videos/<int:vid>/comments/<int:cid>")
+def vdr_comment_patch(vid, cid):
+    """{done?: bool} (who may write the review or wrote the comment), {body?, expect_updated_at?} (only its author; 409 with
+    the comment when it changed since, 2.981.0 #5273)."""
+    c, uid = db(), me()
+    r = vdr_need(c, vid)
+    x = vdr_comment_row(c, r, cid)
+    b = body()
+    b = b if isinstance(b, dict) else {}
+    vdc_change(c, r, x, uid, b, vdr_may(c, uid, r, write=True))
     c.commit()
     return jsonify(vdr_dict(c, vdr_reload(c, vid), uid, full=True))
 
 
 @app.delete("/api/videos/<int:vid>/comments/<int:cid>")
 def vdr_comment_del(vid, cid):
-    """Its author or who may write the review; deleted_at (restore = the undo)."""
+    """Its author or who may write the review (the core's rule: 'manage' on the review); into the core's trash with its
+    answers (2.981.0 #5273: the text kept in obj_comment_trash, gone for good after the trash period; restore = the undo)."""
     c, uid = db(), me()
     r = vdr_need(c, vid)
-    x = vdr_comment_row(c, r, cid)
-    if x["author_id"] != uid and not vdr_may(c, uid, r, write=True):
-        raise Denied(403)
-    c.execute("UPDATE video_comments SET deleted_at=? WHERE id=?", (iso(now_utc()), cid))
+    vdr_comment_row(c, r, cid)
+    ocm_trash(c, cid, uid)
     c.commit()
     return jsonify(vdr_dict(c, vdr_reload(c, vid), uid, full=True))
 
@@ -642,10 +669,9 @@ def vdr_comment_del(vid, cid):
 def vdr_comment_restore(vid, cid):
     c, uid = db(), me()
     r = vdr_need(c, vid)
-    x = vdr_comment_row(c, r, cid, deleted=True)
-    if x["author_id"] != uid and not vdr_may(c, uid, r, write=True):
-        raise Denied(403)
-    c.execute("UPDATE video_comments SET deleted_at=NULL WHERE id=?", (cid,))
+    vdr_comment_row(c, r, cid, deleted=True)
+    if not ocm_restore(c, cid, uid):  # nothing kept (the trash run was quicker)
+        raise Denied(404)
     c.commit()
     return jsonify(vdr_dict(c, vdr_reload(c, vid), uid, full=True))
 
@@ -764,9 +790,8 @@ def vdr_sig_decided(c, s, st, version, name, reason, lg):
     the version shown (with the reason), so the team reads it next to the other notes."""
     c.execute("UPDATE video_reviews SET state=?, updated_at=? WHERE id=?", ("approved" if st == "accepted" else "changes", iso(now_utc()), s["video_id"]))
     text = rg4_dec_store(st, reason)  # 2.122.4 A (#2217): neutral, shown in the reader's language (was the customer's)
-    insert_id(c, "INSERT INTO video_comments(review_id, version_id, org_id, parent_id, at_sec, body, author_id, ext_name, done, created_at) "
-                 "VALUES(?,?,?,NULL,NULL,?,NULL,?,?,?)", (s["video_id"], version["id"], s["org_id"], text, name,
-                                                          1 if st == "accepted" else 0, iso(now_utc())))
+    ocm_add(c, VDC_KIND, s["video_id"], None, text, ext_name=name, org_id=s["org_id"], anchor={"version_id": version["id"]},
+            state="done" if st == "accepted" else None)  # 2.981.0 (#5273): the comments' core
 
 
 def vdr_pub_key(c, s):
@@ -1079,7 +1104,7 @@ def vdr_move_space(vid):
     c.execute("UPDATE video_reviews SET org_id=?, owner_id=?, task_id=?, list_id=?, client_id=?, updated_at=?, brought_by=? WHERE id=?",
               (to, None if to else uid, new["task_id"], new["list_id"], new["client_id"], ts, uid if to and not r["org_id"] else None, vid))  # 2.365.1 (#3395): accounts/orgback.py
     c.execute("UPDATE video_versions SET org_id=? WHERE review_id=?", (to, vid))
-    c.execute("UPDATE video_comments SET org_id=? WHERE review_id=?", (to, vid))
+    c.execute(f"UPDATE obj_comments SET org_id=? WHERE kind='{VDC_KIND}' AND ref_id=?", (to, vid))  # 2.981.0 (#5273)
     if live:
         c.execute(f"UPDATE office_signoffs SET revoked_at=? WHERE id IN ({','.join('?' * len(live))})", [ts, *live])
     # 2.122.4 A (#2215 L3): the records keep video_id (were emptied and vanished from every list); the lists filter by workspace
@@ -1121,7 +1146,7 @@ def vdr_home(c, r, uid):
     c.execute("UPDATE video_reviews SET org_id=NULL, owner_id=?, task_id=?, list_id=?, client_id=?, updated_at=?, brought_by=NULL WHERE id=?",
               (uid, new["task_id"], new["list_id"], new["client_id"], ts, vid))
     c.execute("UPDATE video_versions SET org_id=NULL WHERE review_id=?", (vid,))
-    c.execute("UPDATE video_comments SET org_id=NULL WHERE review_id=?", (vid,))
+    c.execute(f"UPDATE obj_comments SET org_id=NULL WHERE kind='{VDC_KIND}' AND ref_id=?", (vid,))  # 2.981.0 (#5273)
     if live:
         c.execute(f"UPDATE office_signoffs SET revoked_at=? WHERE id IN ({','.join('?' * len(live))})", [ts, *live])
     c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('video',?,?,NULL,?,?,?)",
@@ -1129,22 +1154,36 @@ def vdr_home(c, r, uid):
     return True
 
 
-VDR_TRASH_DAYS = 30
-VDR_PRUNE = {"at": 0.0}
+# 2.981.0 (#5273): vdr_trash_prune is gone -- a comment in the trash is a row of obj_comments, deleted after the trash period by
+# the core's run with every other comment (files/trashpurge.py, its kept text with it)
 
 
-def vdr_trash_prune(c):
-    """2.99.1 review M3: comments in the trash longer than the trash period go for good. The watchdog calls it, at most hourly
-    (system context: every workspace). 2.947.0 (#5367): the reviews are the core's trash (videos/vdkern.py, trash_prune=True):
-    the core's hourly run deletes them (versions and comments with them, FK cascade; their approval records stay with
-    video_id NULL, 2.148.1 C #2493: admins / the creator see and delete them, office/signoff.sig_gone_list); this run keeps only
-    the comments deleted on their own (no kind of the core)."""
-    import time
-    if time.time() - VDR_PRUNE["at"] < 3600:
-        return
-    VDR_PRUNE["at"] = time.time()
-    cut, purge = ret_trash_cut(), ret_on("trash")  # 2.272.0 A (#3026): trash period + switch (off = count only)
-    w = f"FROM video_comments WHERE {trash_sql()} AND deleted_at<?"
-    n = c.execute(f"DELETE {w}", (cut,)).rowcount if purge else c.execute(f"SELECT COUNT(*) {w}", (cut,)).fetchone()[0]
-    ret_report(c, "trash", {"comments": n}, purge, run="videos")
-    c.commit()
+def _vdc_trash(c, cid, ts):
+    """The answers of a comment go into the trash with it (the same time; they were deleted with it by ON DELETE CASCADE)."""
+    for (i,) in c.execute(f"SELECT id FROM obj_comments WHERE kind='{VDC_KIND}' AND parent_id=? AND {live_sql()}", (int(cid),)).fetchall():
+        c.execute("INSERT INTO obj_comment_trash(comment_id, body, mentions) SELECT id, body, mentions FROM obj_comments WHERE id=? "
+                  "ON CONFLICT(comment_id) DO UPDATE SET body=excluded.body, mentions=excluded.mentions", (i,))
+        c.execute("UPDATE obj_comments SET body='', mentions='{}', deleted_at=? WHERE id=?", (ts, i))
+
+
+def _vdc_restore(c, cid, ts):
+    """... and come back with it (only those of that same time)."""
+    for (i,) in c.execute(f"SELECT id FROM obj_comments WHERE kind='{VDC_KIND}' AND parent_id=? AND deleted_at=?", (int(cid), ts)).fetchall():
+        ocm_restore(c, i, None, check=False)
+
+
+def _vdc_people(c, rid):
+    return set()  # a review comment mentions nobody (a token becomes "@name")
+
+
+def _vdc_patch(c, rid, cid, uid, b):
+    r = vdr_need(c, rid)
+    vdc_change(c, r, vdr_comment_row(c, r, cid), uid, b, vdr_may(c, uid, r, write=True))
+
+
+# 2.981.0 (#5273): the generic routes of core/objcmtweb.py (/api/obj/video/<review>/comments, /api/obj/comments/<cid>)
+VDC_WEB = {"read": lambda c, rid, uid: vdr_need(c, rid), "add": lambda c, rid, uid, b: vdc_web_add(c, vdr_need(c, rid), uid, b),
+           "patch": _vdc_patch, "out": lambda c, rid, uid: vdr_dict(c, vdr_reload(c, rid), uid, full=True),
+           "changed": vdr_touch}
+ocm_kind(VDC_KIND, obj=VDR_KIND, people=_vdc_people, sealed=lambda c, rid: False, sealed_in=lambda c, rid, t: (t, []),
+         text_max=lambda t: VDR_BODY_MAX, trash=_vdc_trash, restore=_vdc_restore, web=VDC_WEB)

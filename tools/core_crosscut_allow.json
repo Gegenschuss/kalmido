@@ -7,7 +7,6 @@
   "conn_links": "own logic: people's connections, the name only",
   "contact_links": "own logic: derived / synced address book links",
   "doc_node_tags": "stage Q5 (tags) takes it down: the core's tags",
-  "doc_notes": "stage Q4 (comments) takes it down: the core's comments",
   "doc_tags": "stage Q5 (tags) takes it down: the core's tags",
   "event_attendees": "own logic: an event's attendees with their iCalendar role (CHAIR / REQ-PARTICIPANT ...), not a right",
   "folder_notif": "stage Q9 (following) takes it down: obj_follow",
@@ -64,7 +63,6 @@
   "tchat_reads": "stage Q8 (read marks) takes it down: the core's read marks",
   "tchat_thread_reads": "stage Q8 (read marks) takes it down: the core's read marks",
   "tchat_trash_text": "stage Q4 (comments) takes it down: the core's comments with the trash of #5249",
-  "video_comments": "stage Q4 (comments) takes it down: the core's comments",
   "wiki_links": "own logic: derived from the page text (backlinks), rebuilt on save",
   "wiki_pages": "own logic: a page's text (body)",
   "wiki_shares": "public page links only (kind link, token_hash) - the area's share links without an account; person shares are core shares since stage 7c (#5244)"

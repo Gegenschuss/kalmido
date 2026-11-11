@@ -55,3 +55,7 @@ into one shared table (`obj_comments`) and the watchers and bells of tasks into 
 the database's limit to the minor of that release (like stage 7 above). An older version would make the old tables again empty
 and write there what the next start of the newer version could not take over. Go back only by restoring a backup made before
 the update.
+
+**Never go back before the release with package 2.981** either: its first start moves the comments of video / picture reviews and
+the notes on documents into the same shared table (`obj_comments`), drops the old tables and raises the database's limit to the
+minor of that release. An older version would make them again empty. Go back only by restoring a backup made before the update.

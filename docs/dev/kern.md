@@ -598,6 +598,35 @@ the fragments' AFTER; `git_issue_comments` and `cmt_fts` point at `obj_comments`
 version brings its comments in the old table (`admin/migrate.py LEGACY_COMMENTS`), the same move takes them. One-way: the old
 tables are dropped; a backup restores them.
 
+#### Reviews and document notes (stage Q4b, 2.981.0, #5273)
+
+Two more kinds of `obj_comments`: `video` (`ref_id` = a video / picture review, `video_reviews`) and `doc_note` (`ref_id` = a
+document's node, `fs_nodes`); they replaced `video_comments` and `doc_notes`. Two columns joined the table: `anchor JSONB` (where a
+comment sits on its object: a review's `{version_id, t}` / `{version_id, x, y}` / `{version_id, page, x?, y?}`) and `state TEXT`
+(a review comment: `done`, NULL = open). `ocm_add` takes `anchor`, `state` and `org_id` (a kind other than `task` brings its
+object's organisation: row-level security). New hooks of `ocm_kind`: `obj` (the core kind whose `obj_role` / `obj_space` decide:
+`video` -> `video_review`), `role(c, uid, ref_id)` (the area's role instead: a document's notes take the file store's, `manage` =
+owner / edit), `seal(c, ref_id, text)` (a note is stored sealed with its workspace key, context `doc_notes.text`; `ocm_edit` seals
+the new text) and `web` (the generic routes below). Reading in the old shape: `ocm_video_cols(a)` (the columns of
+`video_comments`: `videos/review.py VDC`, the exports), `ocm_note_cols(a)` (those of `doc_notes` with the document's `ws`).
+- Edit with the version (B3): a review comment's text goes through `ocm_edit` (`expect_updated_at` = `edited_at` or `created_at`
+  of the comment, 409 with the comment); done / open under the comment's lock (`videos/review.py vdc_set_done`).
+- Delete = the core's trash (B2, B6): `ocm_trash` / `ocm_restore` with the one rule (author or `manage`); a review comment's
+  answers go and come back with it (hooks `trash` / `restore`); the trash run of every comment (`files/trashpurge.py`) deletes
+  them after the trash period (`vdr_trash_prune` is gone). A note's sealed text waits in `obj_comment_trash` (the key rotation
+  and a document's move to another workspace seal it again, `admin/orgcrypt_cli.py DOC_WS`, `files/fsmove.py`).
+- Generic routes (`core/objcmtweb.py`, only for a kind with `web` hooks: `video`, `doc_note`; the task keeps its own):
+  `GET` / `POST /api/obj/<kind>/<id>/comments`, `PATCH` / `DELETE /api/obj/comments/<cid>`, `POST /api/obj/comments/<cid>/restore`.
+  The object's own read comes first (`web.read`: the review / the document as their routes check it, 404). The old addresses
+  (`/api/videos/<id>/comments...`, `/api/docs/<id>/notes...`, v1) stay and call the same functions; MCP `add_comment` takes
+  `kind: "video"` (was `add_video_comment`).
+- The triggers `kalmido_ocm_video_gone` / `kalmido_ocm_doc_gone` delete the comments of a review / node deleted for good. The
+  organisation export keeps `videos/comments.json` and `documents/notes.json` with their old columns (`admin/orgexport.py
+  OX_KIND_COLS`); their import writes `obj_comments` (`admin/oi_store.py _video_comment`, `_doc_note`). The start moved the old
+  rows with NEW ids (`ocm_move_q4b`, `core/objhooks.py MOVE`; an answer keeps its comment, the review comments deleted before
+  the clean-up of #5263 stay out); a SQLite file brings them in the old tables (`admin/migrate.py LEGACY_Q4B`). One-way: the
+  old tables are dropped (`5273_a.py`); a backup restores them.
+
 ### Versions of tables (stage Q7c, 2.800.0, #5283)
 
 Checked against the core's versions and undo steps, the two change tables of the tables area stay, each for its own logic:

@@ -69,7 +69,6 @@ TABLES = (
     "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "doc_models", "doc_cfg", "doc_mail",  # 2.48.0 (#1111): documents
     "doc_fields", "doc_field_values",  # 2.153.0 (#2179): custom fields of documents (NULL = a person's own workspace)
     "doc_flow_runs",  # 2.581.0 (#4803): runs of document flows (NULL = a person's own workspace)
-    "doc_notes",  # 2.635.0 (#4807 d): notes on documents (NULL = a person's own workspace, the app checks the document)
     "pl_sources", "pl_imported",  # 2.48.0 (#1152): the Paperless-ngx connection + what came in
     "pl_rules",  # 2.69.0 B (#1847): where a document rule from Paperless-ngx came from
     "rc_receipts", "rc_suggest",  # 2.48.0 (#1356): receipts: project / category, the agents' suggestions
@@ -79,7 +78,7 @@ TABLES = (
     "hub_bookings",  # 2.50.0 A (#1194): bookings of the disposition
     "hub_callsheets",  # 2.855.0 (#1956): the call sheet of a shoot day (org_id like its bookings)
     "office_signoffs",  # 2.50.0 C (#1200): approval links (NULL = a private list's acceptance, the app checks the list)
-    "video_reviews", "video_versions", "video_comments",  # 2.99.1 A (#1959): video sign-offs (NULL = private, the app checks owner / task / list / client)
+    "video_reviews", "video_versions",  # 2.99.1 A (#1959); 2.981.0 (#5273): the comments are obj_comments (kind video): video sign-offs (NULL = private, the app checks owner / task / list / client)
     "office_pay_props",  # 2.51.0 A (#1350): payment suggestions of agents
     "obj_follow",  # 2.972.0 (#5285): watching and bells of an object per person (was task_bell; NULL = a private list's task)
     "org_out_requests",  # 2.361.2 (#2923): a member's request to get something back (the app shows it to its admins / the person)

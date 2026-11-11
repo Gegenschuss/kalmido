@@ -11,6 +11,7 @@ freelancer-matrix: videos
    to a customer's comment needs the right to change the list (a viewer agent: 403); done of someone else's comment too
  - a person's own token: the same routes; a person without an organisation and its own agent: a private list
 usage: p2991_c_api_test.py <datadir>      (P2991C_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
+import json
 import os
 import subprocess
 import sys
@@ -25,6 +26,11 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+# 2.981.0 (#5273): the review comments are rows of obj_comments (kind video); read here in the columns of the old table
+VC = ("(SELECT id, ref_id AS review_id, CAST(anchor->>'version_id' AS BIGINT) AS version_id, org_id, parent_id, "
+      "CAST(anchor->>'t' AS REAL) AS at_sec, body, user_id AS author_id, ext_name, CASE WHEN state='done' THEN 1 ELSE 0 END AS done, "
+      "created_at, deleted_at, CAST(anchor->>'page' AS BIGINT) AS page, CAST(anchor->>'x' AS REAL) AS pos_x, "
+      "CAST(anchor->>'y' AS REAL) AS pos_y FROM obj_comments WHERE kind='video') video_comments")
 FEAT = "cal,comments,collab,office,clients,videos"  # 2.623.0 (#4765): + videos, the module Approval (creating needs it)
 V1 = "/api/v1/videos"
 
@@ -79,10 +85,12 @@ def review(s, **place):
 
 def customer_comment(rv, body, at=None):
     """A customer's comment as the public route stores it (author_id NULL, ext_name)."""
-    sql("INSERT INTO video_comments(review_id, version_id, org_id, parent_id, at_sec, body, author_id, ext_name, done, created_at) "
-        "VALUES(?,?,?,NULL,?,?,NULL,?,0,?)", (rv["id"], rv["versions"][-1]["id"], rv["org_id"], at, body, "Erika Beispiel",
-                                              time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())), write=True)
-    return sql("SELECT MAX(id) FROM video_comments WHERE review_id=? AND ext_name IS NOT NULL", (rv["id"],))[0][0]
+    # 2.981.0 (#5273): a row of obj_comments (kind video), its version and timecode in anchor
+    an = {"version_id": rv["versions"][-1]["id"], **({"t": at} if at is not None else {})}
+    sql("INSERT INTO obj_comments(kind, ref_id, org_id, body, user_id, ext_name, anchor, created_at) "
+        "VALUES('video',?,?,?,NULL,?,CAST(? AS JSONB),?)", (rv["id"], rv["org_id"], body, "Erika Beispiel", json.dumps(an),
+                                                             time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())), write=True)
+    return sql(f"SELECT MAX(id) FROM {VC} WHERE review_id=? AND ext_name IS NOT NULL", (rv["id"],))[0][0]
 
 
 if os.environ.get("P2991C_NOSTART") != "1":
@@ -219,7 +227,7 @@ check(r.status_code == 201, f"the agent comments at a timecode {r.status_code} {
 mine = r.json().get("comment") or {} if r.status_code == 201 else {}
 check(mine.get("agent") and mine.get("author") == "Cutbot" and mine.get("author_id") == AG and mine.get("timecode") == "00:41" and not mine.get("customer"),
       f"author = the agent {mine}")
-row = sql("SELECT author_id, ext_name FROM video_comments WHERE id=?", (mine.get("id", 0),))
+row = sql(f"SELECT author_id, ext_name FROM {VC} WHERE id=?", (mine.get("id", 0),))
 check(len(row) == 1 and row[0][0] == AG and row[0][1] is None, "stored as the agent's")
 r = ag.post(B + f"{V1}/{RT['id']}/comments", json={"parent_id": c1, "body": "Vorschlag: zwei Frames länger"})
 check(r.status_code == 201 and r.json()["comment"]["parent_id"] == c1 and r.json()["comment"]["at_sec"] is None, "an answer to a team comment")

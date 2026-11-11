@@ -725,7 +725,8 @@ project), and the message search finds no team chat channel or group messages (o
 A video sign-off holds links only (Vimeo, YouTube, a video file; each new link = a version v1, v2 ...) and comments at a
 timecode, from the team and from the customer (through the approval link). `list_video_reviews` (task_id or list_id),
 `get_video_review` (versions, state open | approved | changes, every comment with `timecode`, `customer`, `done`,
-`replies`), `add_video_comment` (body, at_sec?, version_id?, parent_id? = an answer) and `set_video_comment_done` (scope
+`replies`), `add_comment` with `kind: "video"` and `id` = the sign-off (body, at_sec?, pos?, version_id?, parent_id? = an answer; was
+`add_video_comment`) and `set_video_comment_done` (scope
 comments). You see only sign-offs at a task / project shared with you, never the customer link. Typical job: sum up the
 customer's feedback for the edit as one comment or task note, sorted by timecode. Your comments stay internal; an ANSWER to a
 customer's comment shows on the customer page - write one only when the person asked you to. Customer comments (`customer`:
@@ -848,7 +849,7 @@ and a task's `relations` show only relations to tasks you may see.
 Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get_document` (text, sender, amount) ->
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
 `add_occasion`, `add_preparation_task`, `add_project_link`, `add_relation`, `add_reward`, `add_rule`, `add_shop_areas`, `add_snippet`,
-`add_subtask`, `add_time_entry`, `add_upkeep`, `add_video_comment`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
+`add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `check_time_entries`, `clear_plan_usage`, `clear_waiting`, `client_id`,
 `comment_typing`, `complete_task`, `confirm_abort`, `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`,
 `create_event_calendar`, `create_field`, `create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_view`,

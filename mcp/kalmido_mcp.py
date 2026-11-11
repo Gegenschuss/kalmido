@@ -355,6 +355,11 @@ def t_add_decision(api, a):  # 2.392.0 C (#3370)
 
 
 def t_add_comment(api, a):
+    if (a.get("kind") or "task") == "video":  # 2.981.0 (#5273): a comment on a video / picture sign-off (was add_video_comment)
+        rid = a.get("id") if a.get("id") is not None else a.get("review_id")
+        return api.call("POST", f"/videos/{int(rid)}/comments", body=_pick(a, ("body", "at_sec", "pos", "version_id", "parent_id")))
+    if a.get("task_id") is None and a.get("id") is not None:
+        a = {**a, "task_id": a["id"]}
     b = {"body": a["body"]}
     if a.get("suggestion"):
         b["suggestion"] = a["suggestion"]
@@ -792,8 +797,22 @@ TOOLS = [
                      "of an earlier decision of the task that this one replaces (it stays readable). 409 in a project encrypted in the browser.",
      _obj({"task_id": S_ID, "text": {"type": "string", "maxLength": 4000}, "supersedes": {"type": "integer"}}, ["task_id", "text"]), t_add_decision),
     ("add_comment", "Comment on a task (Markdown; mention people as <@user_id>). Optional structured tidy suggestion. reply_to (2.33.0): "
-                    "the id of a comment of the same task you answer (its author is notified; the app shows a quote above yours).",
-     _obj({"task_id": S_ID, "body": {"type": "string", "minLength": 1}, "suggestion": SUGGESTION, "reply_to": S_ID,
+                    "the id of a comment of the same task you answer (its author is notified; the app shows a quote above yours). "
+                    "2.981.0: kind 'video' (scope comments) = a comment on a video / picture sign-off (id = the sign-off): optionally at "
+                    "at_sec (seconds; the newest version unless version_id) or on an image / PDF at pos = {x, y} / {page, x, y} (x / y "
+                    "0..1 of the width / height from the top left; page 1 = the first), or an answer to a comment (parent_id; it takes "
+                    "that comment's version and place). Your comments there stay internal; an ANSWER to a customer's comment shows on "
+                    "the customer page (needs the right to change the task / project) -- answer the customer only when the person "
+                    "asked you to. Plain text, at most 2000 characters.",
+     _obj({"kind": {"type": "string", "enum": ["task", "video"], "description": "2.981.0: what the comment is on (default task)"},
+           "id": {**S_ID, "description": "2.981.0: the object (kind video: the sign-off's id; kind task: the same as task_id)"},
+           "task_id": S_ID, "body": {"type": "string", "minLength": 1}, "suggestion": SUGGESTION, "reply_to": S_ID,
+           "at_sec": {"type": "number", "minimum": 0, "maximum": 86400, "description": "kind video: the timecode in seconds"},
+           "pos": {"type": "object", "description": "kind video: the place on an image / PDF", "properties": {
+               "t": {"type": "number", "minimum": 0}, "x": {"type": "number", "minimum": 0, "maximum": 1},
+               "y": {"type": "number", "minimum": 0, "maximum": 1}, "page": {"type": "integer", "minimum": 1}}},
+           "version_id": {**S_ID, "description": "kind video: the version (default the newest)"},
+           "parent_id": {**S_ID, "description": "kind video: answer this top-level comment"},
            "client_ref": {"type": "string", "maxLength": 64, "description": "2.370.2: your own id of this comment; called again with it (after a timeout) = the comment made the first time"},
            "choices": {"type": "array", "maxItems": 8, "description": "2.41.0: answer buttons under the comment (suggestions for the person's "
                        "answer; a press is sent as the person's comment and reaches you as a comment event with answer). Only the newest "
@@ -809,7 +828,7 @@ TOOLS = [
                              "came in by e-mail (you may change the task; never in a list with end-to-end encryption). Write it for the "
                              "reporter: factual, friendly, no internal details. It waits for a person's approval (202 + a waiting job). "
                              "Default false"}},
-          ["task_id", "body"]), t_add_comment),
+          ["body"]), t_add_comment),
     ("request_comment_approval", "2.41.0: ask for an approval in a task comment (task_id): a card 'Approval needed' with Yes / No under "
                                  "your comment, shown on the task's row until answered. title = what is to be approved, what = what happens "
                                  "on yes. Only people who may edit the task (and may instruct you) answer; the answer arrives as the event "
@@ -2684,16 +2703,7 @@ TOOLS += [
                          "images / PDFs (kind image | pdf; a version names its file_id of the file store, readable with the file tools when "
                          "shared with you); a comment's pos is {t} | {x, y} | {page, x, y} (x / y 0..1 from the top left), mark = its point's number.",
      _obj({"review_id": S_ID}, ["review_id"]), lambda api, a: api.call("GET", f"/videos/{_id(a, 'review_id')}")),
-    ("add_video_comment", "2.99.1 (scope comments): a comment on a video sign-off, optionally at at_sec (seconds; the newest version unless "
-                          "version_id), or an answer to a comment (parent_id; it takes that comment's version and timecode). Your comments "
-                          "stay internal; an ANSWER to a customer's comment shows on the customer page (needs the right to change the task "
-                          "/ project) -- answer the customer only when the person asked you to. 2.641.0: on an image / PDF pos = {x, y} / "
-                          "{page, x, y} (x / y 0..1 of the width / height from the top left; page 1 = the first) instead of at_sec.",
-     _obj({"review_id": S_ID, "body": {"type": "string", "minLength": 1, "maxLength": 2000}, "at_sec": {"type": "number", "minimum": 0, "maximum": 86400},
-           "pos": {"type": "object", "properties": {"t": {"type": "number", "minimum": 0}, "x": {"type": "number", "minimum": 0, "maximum": 1},
-                                                    "y": {"type": "number", "minimum": 0, "maximum": 1}, "page": {"type": "integer", "minimum": 1}}},
-           "version_id": S_ID, "parent_id": S_ID}, ["review_id", "body"]),
-     lambda api, a: api.call("POST", f"/videos/{_id(a, 'review_id')}/comments", body=_pick(a, ("body", "at_sec", "pos", "version_id", "parent_id")))),
+    # 2.981.0 (#5273): add_video_comment is add_comment with kind "video"
     ("set_video_comment_done", "2.99.1 (scope comments): mark a comment of a video sign-off done (done: true) or open again (false); "
                                "your own comments, or all when you may change the task / project.",
      _obj({"review_id": S_ID, "comment_id": S_ID, "done": {"type": "boolean"}}, ["review_id", "comment_id", "done"]),
@@ -2898,7 +2908,7 @@ TOOL_SCOPES["sheets:read"] = ("sheets_list", "sheet_read", "sheet_vars", "sheet_
 TOOL_SCOPES["sheets:write"] = ("sheet_create", "sheet_update", "sheet_set_cells", "sheet_append_rows", "sheet_add_column", "sheet_undo_batch",
                                "sheet_add_tab", "sheet_set_rules")  # 2.124.0 E (#2116): + sheet_add_tab; 2.578.0 (#3462 C): + sheet_set_rules
 TOOL_SCOPES["sheets:read"] += ("propose_sheet_tasks",)  # 2.126.1 B (#2125)
-TOOL_SCOPES["comments"] += ("add_video_comment", "set_video_comment_done")  # 2.99.1 C (#1959)
+TOOL_SCOPES["comments"] += ("set_video_comment_done",)  # 2.99.1 C (#1959); 2.981.0 (#5273): add_video_comment -> add_comment kind video
 TOOL_SCOPES["wiki:read"] = ("wiki_list", "wiki_read", "wiki_files", "wiki_read_file")  # 2.200.0 C (#1781); 2.488.0 B (#2209): + files
 TOOL_SCOPES["wiki:write"] = ("wiki_write", "wiki_create")
 # 2.306.0 E (#2741): the scope of the route each of these calls (tools/list hid nothing for them on a read token)
@@ -2938,7 +2948,7 @@ TOOLSETS = {
         set_list_review list_forms create_form update_form delete_form list_files read_file search_files write_file create_file_folder list_documents
         get_document update_document create_document list_notepads create_notepad update_notepad delete_notepad write_status_pad get_weekly_status
         list_layout_blocks get_view_layout propose_layout set_wip_limit set_dwell_limits get_velocity list_flow propose_import propose_rule list_video_reviews get_video_review
-        add_video_comment set_video_comment_done get_workload get_absences get_day_plan get_day_review
+        set_video_comment_done get_workload get_absences get_day_plan get_day_review
         list_views create_view set_section_kind set_task_state
     """,
     "code": """

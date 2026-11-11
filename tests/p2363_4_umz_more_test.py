@@ -158,7 +158,7 @@ v = kt.dbx("SELECT id, owner_id, org_id, list_id FROM video_reviews WHERE owner_
 check(len(v) == 1 and v[0][2] is None and v[0][3] == LID, f"#3127 the video sign-off arrives on the new project {v}")
 VID = v[0][0] if v else 0
 check(one("SELECT COUNT(*) FROM video_versions WHERE review_id=? AND provider='vimeo'", (VID,)) == 1
-      and one("SELECT author_id FROM video_comments WHERE review_id=? AND body='Schnitt'", (VID,)) == GID,
+      and one("SELECT user_id FROM obj_comments WHERE kind='video' AND ref_id=? AND body='Schnitt'", (VID,)) == GID,  # 2.981.0 (#5273): obj_comments
       "#3127 ... with its version and my comment")
 # notepad, playbook
 check(one("SELECT COUNT(*) FROM list_notepads WHERE list_id=? AND title='Umzug Notiz'", (LID or 0,)) == 1

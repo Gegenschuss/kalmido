@@ -27,7 +27,7 @@ from . import classify as CL
 from . import extract as EX
 from . import rules as RU
 from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
-from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import acx_of, Denied, live_sql  # 2.149.0 G (#2517): pulled up from functions; 2.981.0 (#5273): live_sql
 from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file, oc_seal_k, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked as _sc_locked  # 2.360.0 B (#2496)
 from ..files.store import fs_chain as _fs_chain, fs_deleted as _fs_deleted, fs_role as _fs_role  # 2.199.0 B (#2742); 2.351.0 A (#2823): fs_role
@@ -628,8 +628,9 @@ def notes_texts(c, ws, nids):
     if not out:
         return {}
     op = doc_opener(c, ws, "doc_notes.text")
-    for r in c.execute(f"SELECT node_id, text FROM doc_notes WHERE ws=? AND node_id IN ({','.join('?' * len(out))}) ORDER BY id",
-                       (ws, *out)).fetchall():
+    # 2.981.0 (#5273): the notes are rows of obj_comments (kind doc_note; the live ones); every node has one workspace (doc_meta.ws)
+    for r in c.execute(f"SELECT ref_id AS node_id, body AS text FROM obj_comments WHERE kind='doc_note' AND ref_id IN ({','.join('?' * len(out))}) "
+                       f"AND {live_sql()} ORDER BY id", tuple(out)).fetchall():
         out[r["node_id"]].append(op(r["text"]) or "")
     return {n: "\n".join(x) for n, x in out.items()}
 

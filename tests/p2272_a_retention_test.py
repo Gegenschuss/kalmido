@@ -180,8 +180,8 @@ check(not exists("wiki_pages", WP) and not os.path.exists(WFP), f"#3026: switch 
 
 # ---------------------------------------------------------------- the other runs report too (dry run)
 box("from kalmido.sheets.shkinds import shk_tick\nshk_tick(c, force=True)\nfrom kalmido.office.contractfiles import dma_purge_tick\n"
-    "dma_purge_tick(c)\nfrom kalmido.office.meals import bw_purge_tick\nbw_purge_tick(c)\nfrom kalmido.videos.review import vdr_trash_prune\n"
-    "vdr_trash_prune(c)\nprint('ok')")
+    "dma_purge_tick(c)\nfrom kalmido.office.meals import bw_purge_tick\nbw_purge_tick(c)\n"
+    "print('ok')")  # 2.981.0 (#5273): vdr_trash_prune is gone (the review comments go with the core's run of every comment)
 check({"lists", "tasks", "obj_trash", "wiki_files"} <= set(runs()), f"#3026: GET /api/admin/retention lists the runs {sorted(runs())}")  # 2.809.0 (#5365): wiki -> obj_trash
 
 # ---------------------------------------------------------------- freelancer: a private list in the trash

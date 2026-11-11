@@ -39,6 +39,11 @@ H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 from kt import FAILS, OKS, check, sess, until  # noqa: E402  shared helpers (tests/kt.py)
 from testclock import now as tnow  # noqa: E402
+# 2.981.0 (#5273): the review comments are rows of obj_comments (kind video); read here in the columns of the old table
+VC = ("(SELECT id, ref_id AS review_id, CAST(anchor->>'version_id' AS BIGINT) AS version_id, org_id, parent_id, "
+      "CAST(anchor->>'t' AS REAL) AS at_sec, body, user_id AS author_id, ext_name, CASE WHEN state='done' THEN 1 ELSE 0 END AS done, "
+      "created_at, deleted_at, CAST(anchor->>'page' AS BIGINT) AS page, CAST(anchor->>'x' AS REAL) AS pos_x, "
+      "CAST(anchor->>'y' AS REAL) AS pos_y FROM obj_comments WHERE kind='video') video_comments")
 
 
 def dbx(sql, args=()):
@@ -256,12 +261,12 @@ fk = re.search(r'name="f" value="([^"]+)"', pg.text)
 vk = re.search(r'name="v" value="([^"]+)"', pg.text)
 r = requests.post(B + f"/s/q/{QT}/comments", data={"f": fk.group(1) if fk else "", "v": vk.group(1) if vk else "", "name": "Kundin Example",
                                                      "text": "Bitte heller"}, allow_redirects=False)
-cc = dbx("SELECT id FROM video_comments WHERE review_id=? AND ext_name<>''", (VID,))
+cc = dbx(f"SELECT id FROM {VC} WHERE review_id=? AND ext_name<>''", (VID,))
 # 2.663.0 (#4341): vdr_pub_comment answers a stored comment with a 303 back to the link page (?sent=1)
 check(r.status_code == 303 and cc, f"the customer comments through the link, 303 ({r.status_code})")
 if cc:
     r = Bo.post(B + f"/api/videos/{VID}/comments", json={"body": "Antwort vom Leser", "parent_id": cc[0][0]})
-    check(r.status_code == 403 and not dbx("SELECT 1 FROM video_comments WHERE body='Antwort vom Leser'"),
+    check(r.status_code == 403 and not dbx(f"SELECT 1 FROM {VC} WHERE body='Antwort vom Leser'"),
           f"#2496: bob (only views) does not answer the customer ({r.status_code})")
     check(Bo.post(B + f"/api/videos/{VID}/comments", json={"body": "Interne Notiz"}).ok, "bob still comments internally")
     check(A.post(B + f"/api/videos/{VID}/comments", json={"body": "Wird gemacht", "parent_id": cc[0][0]}).ok, "alice (editor) answers")

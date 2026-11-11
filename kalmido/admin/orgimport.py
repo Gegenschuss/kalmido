@@ -46,7 +46,7 @@ from ..core.orgcrypt import _write_atomic  # 2.369.5 (#2517): pulled up from fun
 
 
 # 2.237.0 D (#2870): person columns with a name column beside them: a person not taken over as an account keeps the name
-OI_NAME_COLS = {("video_comments", "author_id"): "ext_name", ("office_meal_log", "user_id"): "user_name"}
+OI_NAME_COLS = {("office_meal_log", "user_id"): "user_name"}  # 2.981.0 (#5273): the review comments' author: oi_store.py _video_comment
 
 
 class OiT:

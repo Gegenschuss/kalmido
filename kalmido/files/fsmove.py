@@ -388,9 +388,14 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths, df_define=None):
             old_paths.append(src)  # 2.273.0 B (#3051): the old preview goes only once the new one is written
         except (OSError, OrgCryptError):
             pass  # no preview: the documents view shows the placeholder (docs/thumbfill.py makes it again)
-    for r in c.execute("SELECT id, text FROM doc_notes WHERE node_id=?", (nid,)).fetchall():  # 2.635.0 (#4807 d): the notes go along
-        c.execute("UPDATE doc_notes SET ws=?, org_id=?, text=? WHERE id=?",
-                  (new, to, S.doc_seal(c, new, "doc_notes.text", fsm_open(c, old, "doc_notes.text", r["text"]) or ""), r["id"]))
+    # 2.635.0 (#4807 d): the notes go along; 2.981.0 (#5273): rows of obj_comments (kind doc_note) -- a note in the trash too,
+    # its kept text in obj_comment_trash sealed again for the new workspace (a restore there opens it)
+    for r in c.execute("SELECT id, body FROM obj_comments WHERE kind='doc_note' AND ref_id=?", (nid,)).fetchall():
+        c.execute("UPDATE obj_comments SET org_id=?, body=? WHERE id=?",
+                  (to, S.doc_seal(c, new, "doc_notes.text", fsm_open(c, old, "doc_notes.text", r["body"]) or "") if r["body"] else "", r["id"]))
+        for x in c.execute("SELECT body FROM obj_comment_trash WHERE comment_id=?", (r["id"],)).fetchall():
+            c.execute("UPDATE obj_comment_trash SET body=? WHERE comment_id=?",
+                      (S.doc_seal(c, new, "doc_notes.text", fsm_open(c, old, "doc_notes.text", x["body"]) or "") if x["body"] else "", r["id"]))
     S.doc_index(c, nid, new, S.index_text(c, dict(S.meta_row(c, nid)), name, text))
     for r in c.execute("SELECT * FROM rc_receipts WHERE node_id=?", (nid,)).fetchall():
         c.execute("UPDATE rc_receipts SET ws=?, org_id=?, list_id=? WHERE node_id=?",

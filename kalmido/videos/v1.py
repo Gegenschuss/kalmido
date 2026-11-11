@@ -23,7 +23,7 @@ from ..api.common import v1_args, v1_json, v1_view
 from ..core.errors import reject_unknown
 from ..accounts.orgroles import need_org_say  # 2.607.0 (#4549)
 from .vdmedia import vdm_send, vdm_version_row  # 2.641.0 (#4769)
-from .review import vdr_comment_add, vdr_comment_row, vdr_dict, vdr_list_of, vdr_may, vdr_reload, vdr_tc, vdr_touch, vdr_versions
+from .review import VDC_SEL, vdc_set_done, vdr_comment_add, vdr_comment_row, vdr_dict, vdr_list_of, vdr_may, vdr_reload, vdr_tc, vdr_touch, vdr_versions
 
 VDR_V1_LIMIT = 200
 VDR_V1_CUSTOMER = N_("Only people who may change the task answer the client")  # the portal answers' text (team/portal.py)
@@ -122,7 +122,7 @@ def vdr_v1_comment_new(vid):
     r = vdr_v1_need(c, vid)
     par = b.get("parent_id")
     if isinstance(par, int) and not isinstance(par, bool):
-        p = c.execute("SELECT ext_name FROM video_comments WHERE id=? AND review_id=? AND deleted_at IS NULL", (par, vid)).fetchone()
+        p = c.execute(VDC_SEL + " WHERE id=? AND review_id=? AND deleted_at IS NULL", (par, vid)).fetchone()  # 2.981.0 (#5273)
         if p and p["ext_name"] and not vdr_may(c, uid, r, write=True, api=True):  # the customer page shows this answer
             raise Denied(403, tr(VDR_V1_CUSTOMER))
     cid = vdr_comment_add(c, r, uid, b)
@@ -160,7 +160,7 @@ def vdr_v1_comment_patch(vid, comment_id):
     if x["author_id"] != uid and not wr:
         raise Denied(403)
     need_org_say(c, uid, r["org_id"], lambda: wr)  # 2.607.0 (#4549, review): a guest / read-only person only reads
-    c.execute("UPDATE video_comments SET done=? WHERE id=?", (1 if b["done"] else 0, cid))
+    vdc_set_done(c, x, b["done"])  # 2.981.0 (#5273): the comments' core, under the comment's lock
     vdr_touch(c, vid)
     access_note(vdr_list_of(c, r), True)
     c.commit()

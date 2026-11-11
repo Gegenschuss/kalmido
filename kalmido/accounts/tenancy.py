@@ -132,7 +132,7 @@ CHECKS = {
                   "LEFT JOIN lists l ON l.id=v.list_id LEFT JOIN clients cl ON cl.id=v.client_id WHERE v.deleted_at IS NULL AND ("
                   "(tl.id IS NOT NULL AND tl.org_id IS DISTINCT FROM v.org_id) OR (l.id IS NOT NULL AND l.org_id IS DISTINCT FROM v.org_id) OR "
                   "(cl.id IS NOT NULL AND cl.org_id IS DISTINCT FROM v.org_id) OR EXISTS (SELECT 1 FROM video_versions x WHERE x.review_id=v.id "
-                  "AND x.org_id IS DISTINCT FROM v.org_id) OR EXISTS (SELECT 1 FROM video_comments x WHERE x.review_id=v.id AND x.org_id IS DISTINCT "
+                  "AND x.org_id IS DISTINCT FROM v.org_id) OR EXISTS (SELECT 1 FROM obj_comments x WHERE x.kind='video' AND x.ref_id=v.id AND x.org_id IS DISTINCT "
                   "FROM v.org_id) OR EXISTS (SELECT 1 FROM office_signoffs s WHERE s.video_id=v.id AND s.org_id IS DISTINCT FROM v.org_id "
                   "AND s.state='open' AND s.revoked_at IS NULL))"),  # 2.122.4 A (#2215 L3): a moved review keeps its old (closed) records
     "gen_doc_signoff": ("SELECT s.id, s.created_by FROM office_signoffs s JOIN office_gen_docs d ON d.id=s.gen_doc_id WHERE d.org_id IS DISTINCT FROM s.org_id"),

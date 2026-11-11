@@ -365,6 +365,10 @@ ROUTES = {
     "POST /api/docs/bulk": "files", "POST /api/docs/zip": "files", "GET /api/docs/zip/{}": "files",
     "POST /api/docs/apply-learned": "files",  # 2.607.0 (#4872): p2607_c_learn_api_test.py as a person without an organisation
     "GET /api/docs/{}/notes": "files", "POST /api/docs/{}/notes": "files", "DELETE /api/docs/{}/notes/{}": "files",  # 2.635.0 (#4807 d): p2635_c_docs_test.py
+    "POST /api/docs/{}/notes/{}/restore": "files",  # 2.981.0 (#5273): p2981_a_comments_test.py
+    # 2.981.0 (#5273): the generic routes of the comments' core (kinds video, doc_note; p2981_a_comments_test.py)
+    "GET /api/obj/{}/{}/comments": "videos", "POST /api/obj/{}/{}/comments": "videos", "PATCH /api/obj/comments/{}": "videos",
+    "DELETE /api/obj/comments/{}": "videos", "POST /api/obj/comments/{}/restore": "videos",
     "POST /api/docs/{}/extracted": "files",  # 2.121.0 A (#2092): take over / discard the recognised receipt values
     "GET /api/docs/{}/einvoice": "files",  # 2.146.0 A (#2451): the readable view of an e-invoice
     "POST /api/v1/files/{}/versions": "files", "PUT /api/docs/settings": "files", "PUT /api/docs/{}/receipt": "files",

@@ -58,7 +58,7 @@ UMZ_LEFT_TABLES = {
     "git_prs": _DERIVED, "git_tags": _DERIVED, "wiki_links": _DERIVED, "doc_words": _DERIVED, "file_words": _DERIVED, "hub_words": _DERIVED,
     "wiki_words": _DERIVED, "doc_node_tags": _ORG, "space_moves": _SERVER, "push_tags": _SERVER, "notify_channel_queue": _SERVER,
     "webhook_queue": _SERVER, "webhook_log": _SERVER,
-    "clients": _ORG, "doc_cfg": _ORG, "doc_fetch_portals": _ORG, "doc_field_values": _ORG, "doc_fields": _ORG, "doc_meta": _ORG, "doc_rules": _ORG, "doc_flow_runs": _DERIVED, "doc_notes": _ORG,
+    "clients": _ORG, "doc_cfg": _ORG, "doc_fetch_portals": _ORG, "doc_field_values": _ORG, "doc_fields": _ORG, "doc_meta": _ORG, "doc_rules": _ORG, "doc_flow_runs": _DERIVED,
     "doc_senders": _ORG, "doc_tags": _ORG, "doc_types": _ORG, "hub_bookings": _ORG, "hub_callsheets": _ORG, "hub_mail_links": _ORG, "nl_consent_log": _ORG,
     "nl_members": _ORG, "nl_suppress": _ORG, "office_agreements": _ORG, "office_archive": _ORG, "office_archive_log": _ORG, "office_bank_balances": _ORG,
     "office_bank_accounts": _ORG, "office_bank_imports": _ORG, "office_bank_rule_nos": _ORG, "office_bank_rules": _ORG, "office_bank_tx": _ORG, "office_bank_vendors": _ORG,

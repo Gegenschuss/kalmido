@@ -5,5 +5,6 @@ trash period, and the organisation export already leaves them out (admin/orgexpo
 go with it (parent_id ON DELETE CASCADE, as in the trash run; the review page shows no answer without its comment).
 AFTER runs at every start: the fixed cut-off makes it a no-op after the first one, and comments deleted later keep their trash
 period (and the undo). A one-way step: the rows are lost (no way back; an older version just finds fewer deleted comments)."""
-# purge-ok video_comments: deleted review comments kept their text and the guest's name without any end (deletion rule #4315)
-AFTER = ["DELETE FROM video_comments WHERE deleted_at IS NOT NULL AND deleted_at < '2026-11-08'"]
+# 2.981.0 (#5273): the table went into obj_comments (migrations.d/5273_a.py); the move (core/objcomments.py ocm_move_q4b) leaves
+# these comments out the same way (deleted before the cut-off), so the clean-up stays done and this AFTER has no step any more
+AFTER = []

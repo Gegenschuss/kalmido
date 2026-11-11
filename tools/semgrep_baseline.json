@@ -453,14 +453,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/admin/orgcrypt_cli.py",
-   "code": "for r in c.execute(f\"SELECT left({col}::text, 6) AS p, COUNT(*) AS n FROM {table} WHERE {col}::text<>'' \"",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/admin/orgcrypt_cli.py",
    "code": "for r in c.execute(f\"SELECT {col} AS v FROM {table} WHERE {w}\", (oid,) * k):",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
@@ -502,30 +494,6 @@
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/admin/orgcrypt_cli.py",
    "code": "r = c.execute(f\"SELECT {col} AS v FROM {table} WHERE org_id=? AND substr({col}, 1, {len(oc.PREFIX)})=? LIMIT 1\", (oid, oc.PREFIX)).fetchone()",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/admin/orgcrypt_cli.py",
-   "code": "rows = c.execute(f\"SELECT ws, {col} AS v FROM {table} WHERE ws LIKE 'u%' AND left({col}, 6)=?\", (oc.PREFIX,)).fetchall() # pg-ok: ws prefix u is case-exact",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/admin/orgcrypt_cli.py",
-   "code": "sql = f\"SELECT {idc} AS rid, ws, {col} AS v FROM {table} WHERE ws LIKE 'u%' AND left({col}, 6)=?\" # pg-ok: ws prefix u is case-exact",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/admin/orgcrypt_cli.py",
-   "code": "sql = f\"SELECT {idc} AS rid, ws, {col} AS v FROM {table} WHERE {col}<>'' AND left({col}, 6)\" + (\"<>?\" if enc else \"=?\")",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296
