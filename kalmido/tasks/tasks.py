@@ -152,6 +152,9 @@ def set_tags(c, tid, tags, uid=None):
     from ..collab.reactions import _ltag_src
     uid = uid or me()
     src, by = _ltag_src()
+    if by:  # an agent's own write (API v1 / MCP): its links say so (the request's user row may not carry the kind)
+        k = c.execute("SELECT kind FROM users WHERE id=?", (by,)).fetchone()
+        src = "agent" if k and k[0] == "agent" else "person"
     otg_user_set(c, tid, [str(x) for x in tags if x], uid, src=src, by=by)
 
 
