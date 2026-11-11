@@ -19,7 +19,15 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.900.0] - 2026-11-11
+## [2.902.0] - 2026-11-11
+
+Package 2.902 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Encryption: undoing "Delete all times" from an older window no longer brings back the title and note of a task that has since moved into an encrypted project; the server's undo copy is used up by person and time (not by its seal), so a second undo no longer doubles entries; the cleanup of trash copies takes the copy's lock (#5574).
+
+### Fixed
+- main: CI red of 2.900.0 in p2892_b_receipts_ui - the browser test helper waits after every jump to the blank page until it is really shown, so a late page load can no longer swallow the next sign-in (#3506).
 
 Package 2.898 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 
@@ -59,5 +67,10 @@ Package 2.900 (Bündel: Projekt-Sperre: Rückgängig-Kopien von Zeiteinträge, P
 - Project lock: the undo steps and history rows of the project's settings (description, status note) and of its notepads (title and text before they were emptied for the lock) go at the lock too (#5551)
 - A one-time run at start applies both to projects locked before; the whole step group goes, so a few harmless undo steps of locked projects disappear once (#5550, #5551)
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.900.0...HEAD
+## [2.900.0] - 2026-11-11
+
+Not released (the CI of this version was red); its changes are listed under 2.902.0.
+
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.902.0...HEAD
+[2.902.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.902.0
 [2.900.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.900.0
