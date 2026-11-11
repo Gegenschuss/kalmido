@@ -84,8 +84,8 @@ const raw = async id => Buffer.from(await (await fetch(B + `api/files/nodes/${id
     // ---- a folder with content moves in (one question) and out again, every id kept
     // the one question is answered with its button (as a person does), the move runs on
     await ev(`(window.__mv = null, rawFetch('GET', '/api/files/nodes/${OUT}').then(n => fsl_moveHook(n, ${BOX})).then(x => { window.__mv = x; }, e => { window.__mv = 'err ' + e.message; }), 1)`);
-    check(await waitFor(`!!document.querySelector('.modal [data-m="ok"]')`), 'one question before the move');
-    await ev(`(document.querySelector('.modal [data-m="ok"]').click(), 1)`);
+    check(await waitFor(`!!document.querySelector('[data-cd="yes"]')`), 'one question before the move');
+    await ev(`(document.querySelector('[data-cd="yes"]').click(), 1)`);
     const mv = await waitFor(`window.__mv`, 240);
     check(mv === true, 'the folder with content moved into the locked folder ' + mv);
     const inBox = await kids(BOX);
@@ -99,8 +99,8 @@ const raw = async id => Buffer.from(await (await fetch(B + `api/files/nodes/${id
     check(await waitFor(`[...document.querySelectorAll('.abrow .abname')].map(x => x.textContent).includes('Outside')`), 'the view shows the moved folder by its name');
     await shot('p2953-moved-in.png');
     await ev(`(window.__mv = null, fsl_moveHook(AB.data.items.find(x => x.name === 'Outside'), null).then(x => { window.__mv = x; }, e => { window.__mv = 'err ' + e.message; }), 1)`);
-    check(await waitFor(`!!document.querySelector('.modal [data-m="ok"]')`), 'one question before moving out');
-    await ev(`(document.querySelector('.modal [data-m="ok"]').click(), 1)`);
+    check(await waitFor(`!!document.querySelector('[data-cd="yes"]')`), 'one question before moving out');
+    await ev(`(document.querySelector('[data-cd="yes"]').click(), 1)`);
     const back = await waitFor(`window.__mv`, 240);
     check(back === true, 'and out again to the top ' + back);
     check((await kidsOf(OUT)).sort().join() === 'Inside,top.txt' && (await kidsOf(IN)).join() === 'inner.txt', 'plain names on the server again, ids kept');
