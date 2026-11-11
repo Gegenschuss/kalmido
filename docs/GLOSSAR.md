@@ -261,6 +261,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/instance.py` (`update`) - Version, update check and instance settings (admins)
 - `kalmido/core/ipallow.py` - The optional address rule of a key
 - `kalmido/core/jsonlimit.py` - The size limit of JSON request bodies
+- `kalmido/core/kernretire.py` - Stage 7 of the shared core: the start check and DROP of an area's old member table once the core alone decides (2.924.0, #5069)
 - `kalmido/core/mailframe.py` - The one HTML frame of every Kalmido mail (invitation, findability, appointment booking, portal, event invitation, security, notification and daily mails)
 - `kalmido/core/merges.py` (`mg`) - Merging duplicate records by hand (contacts: contacts/merge.py, clients: team/clientmerge.py)
 - `kalmido/core/moneycol.py` - Moves the plain office money columns from TEXT to NUMERIC(14,2) at start when every value fits, and reads them back as two-place text
