@@ -195,7 +195,7 @@ const MS_STEPS = /** @type {Array<[string, () => any, () => void]>} */ ([
   // the documents and the file store share one selection (ablage.js AB, 2.768.0 #4888)
   ['ablage', () => typeof AB === 'object' && AB.selOn && $('#view .abview, #view .dc-view'), () => { ab_selEnd(); ab_selDraw(); }],
   ['wiki', () => typeof WK === 'object' && WK.selOn && S.route.mod === 'wiki', () => { wk_selEnd(); renderView(); }],
-  ['travel', () => typeof RK === 'object' && RK.sel.size && $('#view #rk-sbar'), () => { RK.sel.clear(); ofcDraw(); }],
+  ['travel', () => typeof RK === 'object' && RK.sel.size && $('#view #rk-sbar'), () => { RK.sel.clear(); ofcDraw(); }],  // lazy-ok: only while the receipts of office_travel.js are shown
 ]);
 function ms_stepSync() {
   const v = $('#view'); if (!v || typeof f8d_step !== 'function') return;
