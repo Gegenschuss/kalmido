@@ -14,7 +14,7 @@ function viewKanban() {
   for (const t of tasks) (bySec.get(sc(t)) || loose).push(t);
   // 2.445.0 (#3011): the first column is always "Tasks" (it was "Unassigned" next to sections)
   if (loose.length || !secs.length) cols.push({id: null, name: tr('Tasks'), tasks: loose});
-  for (const s of secs) cols.push({id: s.id, name: s.name, tasks: bySec.get(s.id)});
+  for (const s of secs) cols.push({id: s.id, name: s.name, tasks: bySec.get(s.id), done: kdn_tasks(s, lid, k, sc)});
   // 2.138.0 D (#2060): the column parts are shared with the board in swimlanes (swimlanes.js); a lane's "+ Task" carries its key
   const head = c => `<div class="khead" ${c.id ? `data-ksec="${c.id}"` : ''}>${c.id && !ro ? secHandle(c.id) : ''}${esc(c.name)} ${wip_kHead(c)}${spt_kSum(c, lid)}${c.id && !ro ? `<button class="iconbtn" data-act="section-menu" data-id="${c.id}" title="${esc(tr('More') + ': ' + c.name)}" aria-label="${esc(tr('More') + ': ' + c.name)}">${ic('dots', 's')}</button>` : ''}</div>`;
   const add = (c, sw, swn) => ro ? '' : `<div class="kadd"><input placeholder="${tr('+ Task')}" aria-label="${esc(tr('New task in {0}', sw == null ? c.name : c.name + ' · ' + swn))}" data-kadd="${c.id ?? ''}"${sw == null ? '' : ` data-swl="${esc(sw)}"`} enterkeyhint="done"></div>`;
@@ -22,14 +22,36 @@ function viewKanban() {
   const swm = swlMode(lid), sht = listById(lid)?.ptype === 'shoot' && indOn('film');  // 2.636.0 (#4565): a shoot = the storyboard (shoot.js)
   if (swm) return `${listHead(listById(lid))}${swlBar(lid)}${swlBoard(lid, swm, cols, tasks, {head, add, knew})}`;
   // 2.891.0 (#5440): an empty board says so (the shared block) above its columns, which stay as the place to add
-  const kempty = tasks.length ? '' : emptyState({icon: 'kanban', title: tr('No tasks.'), sub: ro ? '' : tr('Add the first one in a column with “+ Task”.'), size: 'sec', cls: 'kempty'});
+  const kempty = tasks.length || cols.some(c => c.done?.length) ? '' : emptyState({icon: 'kanban', title: tr('No tasks.'), sub: ro ? '' : tr('Add the first one in a column with “+ Task”.'), size: 'sec', cls: 'kempty'});
   return `${listHead(listById(lid))}${swlBar(lid)}${sht ? sht_bar(lid) : ''}${/*html-ok*/ kempty/* emptyState */}<div class="kanban${sht ? ' shtboard' : ''}">${cols.map(c => `
     <div class="kcol" data-kcol="${c.id ?? ''}">
       ${head(c)}
-      <div class="kcards">${c.tasks.map(t => taskRow(t, {compact: true, dwell: lid, ...(sht ? {pic: sht_pic(t)} : {})})).join('')}</div>
+      <div class="kcards">${c.tasks.map(t => taskRow(t, {compact: true, dwell: lid, ...(sht ? {pic: sht_pic(t)} : {})})).join('')}${/*html-ok*/ kdn_cards(c, c.done, lid)/* task rows */}</div>
       ${add(c)}
     </div>`).join('')}
     ${knew}</div>`;
+}
+
+// 2.956.0 (#3912): a column with the meaning done / rejected (sections.kind, wip.js SK_KINDS) shows the tasks completed /
+// marked "won't do" in it (status != 0), newest first, from what the client holds (the start state keeps 14 days of completed
+// tasks), KDN_MAX of them and the rest behind "Show N more tasks" (kept per device in S.collapsed, as a fold). They are
+// crossed out and not dragged by the mouse (as "Keep completed in their section", views.js dsxOn); the count in the head, the
+// WIP limit and the points stay with the open tasks (c.tasks). "Hide completed" of the view does not hide them: such a
+// column is the place for them (new accounts hide completed tasks by default, the column would look empty again).
+const KDN_MAX = 5;
+function kdn_tasks(s, lid, k, sc) {
+  if (s.kind !== 'done' && s.kind !== 'rejected') return [];
+  const out = [];
+  for (const t of S.tasks.values()) if (t.status !== 0 && !t.parent_id && !t.context && (t.list_id === lid || ml_in(t, lid)) && sc(t) === s.id && !archHidden(t) && !wsHidden(t) && !ovHidden(t) && sprKeep(t, k)) out.push(t);
+  return out.sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || '') || b.id - a.id);
+}
+// the completed cards of column c (dn = its completed tasks, in a lane only the lane's), sub = the lane's key
+function kdn_cards(c, dn, lid, sub = '') {
+  if (!dn?.length) return '';
+  const key = `kdn:${lid}:${c.id}${sub ? ':' + sub : ''}`, all = S.collapsed.has(key), more = dn.length - KDN_MAX;
+  const row = t => taskRow(t, {compact: true, dwell: lid, drag: false});
+  const btn = more > 0 ? `<button type="button" class="btn sm kdnmore" data-act="collapse" data-key="${esc(key)}" aria-expanded="${all ? 'true' : 'false'}">${ic(all ? 'up' : 'down', 's')}${esc(all ? tr('Show less') : trn('Show {0} more task', 'Show {0} more tasks', more))}</button>` : '';
+  return (all ? dn : dn.slice(0, KDN_MAX)).map(row).join('') + btn;
 }
 
 // ------------------------------------------------------------------ calendar

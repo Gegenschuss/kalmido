@@ -61,14 +61,14 @@ document.addEventListener('click', e => {
 });
 // the board with lanes; o = the column parts of viewKanban (head, add, knew), so both boards draw a column the same way
 function swlBoard(lid, m, cols, tasks, o) {
-  const lanes = swlLanes(lid, m, tasks);
+  const lanes = swlLanes(lid, m, tasks.concat(...cols.map(c => c.done || [])));  // 2.956.0 (#3912): + the completed cards
   const top = `<div class="swlrow swlhrow">${cols.map(c => `<div class="kcol swlhc" data-kcol="${c.id ?? ''}">${o.head(c)}</div>`).join('')}${o.knew}</div>`;
   return `<div class="kanban swl" data-swlmode="${esc(m)}">${top}${lanes.map(L => {
     const per = cols.map(c => c.tasks.filter(L.has)), n = per.reduce((a, x) => a + x.length, 0), k = `swl:${lid}:${m}:${L.key}`, closed = S.collapsed.has(k);
     const dot = L.opt ? `<i class="swldot" ${lrSelStyle(L.opt)}></i>` : L.uid ? av(L.uid, L.name, 'avatar swlav') : L.cls ? `<span class="${L.cls}">${ic('flag', 's')}</span>` : '';
     return `<section class="swlane${closed ? ' closed' : ''}" data-swl="${esc(L.key)}" aria-label="${esc(L.name)}">
       <button type="button" class="swlh" data-act="collapse" data-key="${esc(k)}" aria-expanded="${!closed}">${ic('chev', 's')}${dot}<span class="swln">${esc(L.name)}</span><span class="c">${n}</span></button>
-      ${closed ? '' : `<div class="swlrow">${cols.map((c, i) => `<div class="kcol swlc" data-kcol="${c.id ?? ''}"><div class="kcards">${per[i].map(t => taskRow(t, {compact: true, dwell: lid})).join('')}</div>${o.add(c, L.key, L.name)}</div>`).join('')}</div>`}
+      ${closed ? '' : `<div class="swlrow">${cols.map((c, i) => `<div class="kcol swlc" data-kcol="${c.id ?? ''}"><div class="kcards">${per[i].map(t => taskRow(t, {compact: true, dwell: lid})).join('')}${/*html-ok*/ kdn_cards(c, c.done?.filter(L.has), lid, L.key)/* task rows */}</div>${o.add(c, L.key, L.name)}</div>`).join('')}</div>`}
     </section>`;
   }).join('')}</div>`;
 }
