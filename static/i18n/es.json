@@ -18293,5 +18293,6 @@
   "Select the models": "Elegir los modelos",
   "Review in the chat": "Revisión en el chat",
   "Review|kind of a planned job": "Revisión",
+  "Your own ticket types and fields went into your private workspace; projects imported into the organisation do not use them.": "Tus propios tipos de ticket y campos se han guardado en tu espacio privado; los proyectos importados en la organización no los usan.",
   "{0} (from the repository)": "{0} (del repositorio)"
 }

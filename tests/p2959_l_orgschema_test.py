@@ -279,7 +279,7 @@ for _ in range(480):
         break
     time.sleep(0.25)
 AX = su_get(Fr, B + "/api/account/export/file", "password123").content
-check(AX[:2] == b"PK" or len(AX) > 100, "#5602: the account export file")
+check(r.status_code == 202 and len(AX) > 100, "#5602: the account export file")
 GID, Gr = freelancer(B, A, name="greta")
 Gr.patch(B + "/api/settings", json={"features": FEAT})
 giid = upload(Gr, AX)
@@ -311,6 +311,24 @@ check(r.ok and TTK in r.text, f"#5602: her project offers the own type {r.text[:
 tk = next((t for t in Gr.get(B + "/api/state").json().get("tasks", []) if t["id"] == (gtask or {}).get("id")), {})
 check(tk.get("ttype") == TTK, f"#5602: the task in the app shows its type {tk.get('ttype')}")
 check(one("SELECT org_field_id FROM list_fields WHERE id=?", (OWNLF,))["org_field_id"] == OWNF, "#5602: the source's project keeps its link")
+# 2.995.0 (#5602, review F1): a second import of the same file brings a type that is gone again (it used to skip every area of
+# the private space once the first run had them), the field with the same key stays the one she has
+gtid = (one("SELECT id FROM ticket_types WHERE owner_id=?", (GID,)) or {}).get("id")
+r = Gr.delete(B + f"/api/ticket-types/{gtid}", params={"confirm": "1"})
+check(r.ok and not dbx("SELECT 1 AS x FROM ticket_types WHERE owner_id=?", (GID,)), f"#5602: she deleted her type {r.text[:160]}")
+giid2 = upload(Gr, AX)
+j = wait(Gr, giid2)
+check(j.get("state") == "preview", f"#5602: second import opened {j.get('state')} {j.get('error')}")
+r = Gr.post(B + f"/api/account/import/{giid2}/run", json={"again": True, "target": "private", "people": {}})
+j = wait(Gr, giid2)
+GIMP2 = (j.get("result") or {}).get("import_id")
+check(r.status_code == 202 and j.get("state") == "done", f"#5602: second import done {j.get('state')} {j.get('error')}")
+check([x["key"] for x in dbx("SELECT key FROM ticket_types WHERE owner_id=?", (GID,))] == [TTK], "#5602: the second import brings the type again")
+check([x["id"] for x in dbx("SELECT id FROM org_fields WHERE owner_id=?", (GID,))] == [gf[0]["id"] if gf else -1], "#5602: no second field with the key")
+r = Gr.post(B + f"/api/imports/{GIMP2}/undo")
+check(r.ok and [x["id"] for x in dbx("SELECT id FROM org_fields WHERE owner_id=?", (GID,))] == [gf[0]["id"] if gf else -1],
+      f"#5602: the undo of the second import leaves the field of the first {r.text[:160]}")
+Gr.delete(B + f"/api/account/import/{giid2}")
 r = Gr.post(B + f"/api/imports/{GIMP}/undo")
 check(r.ok and not dbx("SELECT 1 AS x FROM ticket_types WHERE owner_id=?", (GID,)) and not dbx("SELECT 1 AS x FROM org_fields WHERE owner_id=?", (GID,)),
       f"#5602: undo takes her type and field out again {r.text[:160]}")

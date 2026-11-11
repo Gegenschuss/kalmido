@@ -2054,6 +2054,7 @@ UMZ_PRIVATE_MORE = (("video_reviews", "videos/reviews.json"), ("video_versions",
                     # 2.995.0 (#5602): my own ticket types and field schema, into my private space as the organisation import does
                     # (admin/oi_team.py _ttype / _ofield; a type or field with the same key here stays and the project fields link to it)
                     ("ticket_types", "lists/ticket_types.json"), ("org_fields", "lists/org_fields.json"))
+UMZ_SCHEMA_OI = ("lists/ticket_types.json", "lists/org_fields.json")  # 2.995.0 (#5602): idempotent by key, also on a second run
 
 
 def umz_mails_oi(data, nodes, me_old):
@@ -2198,9 +2199,14 @@ def umz_private(c, run, uid, man, zf, files, data, who):
     oi = umz_private_oi(data, files, me_old)
     if not oi and not umz_more_has(data):
         return
-    if run.oi_done:  # 2.362.3 (#3098): an earlier import of this file brought them already
+    again = run.oi_done
+    if again:  # 2.362.3 (#3098): an earlier import of this file brought them already
         run.warning(N_("Your files, knowledge pages and tables are here already from an earlier import: they were skipped."))
-        return
+        # 2.995.0 (#5602, review F1): the own ticket types and field schema still go through (one with the same key here stays,
+        # a new one comes), so the projects this run creates find their types and link their fields
+        oi = {k: v for k, v in oi.items() if k in UMZ_SCHEMA_OI}
+        if not oi:
+            return
     here = umz_sheets_here(c, uid, data) if oi.get("time_sheets.json") else set()  # 2.765.0 (review N4): after the oi_done check
     if here:  # 2.765.0 (#3965): a month I have here already keeps the one here
         oi["time_sheets.json"] = [r for r in oi["time_sheets.json"] if r.get("month") not in here]
@@ -2209,6 +2215,8 @@ def umz_private(c, run, uid, man, zf, files, data, who):
             oi.pop("time_sheets.json")
         if not oi and not umz_more_has(data):
             return
+    if run.org and any(oi.get(k) for k in UMZ_SCHEMA_OI):  # 2.995.0 (#5602, review F2): they are mine, the projects the organisation's
+        run.warning(N_("Your own ticket types and fields went into your private workspace; projects imported into the organisation do not use them."))
     from .orgimport import oi_write
     umz_more_space(run, oi)  # 2.363.4 (#3127): a mail or sign-off in my private space never points into an organisation
     org = run.org
@@ -2217,7 +2225,8 @@ def umz_private(c, run, uid, man, zf, files, data, who):
         if oi:
             # 2.995.0 (#5602): + the project fields, so oi_team._schema_links links them to my own field schema again
             oi_write(c, run, uid, man, zf, files, {"oi": oi, "people": data.get("people") or [], "list_fields": data.get("list_fields") or []}, who)
-        umz_more_write(c, run, uid, me_old, data, umz_salt(man))  # 2.363.4 (#3127): bookmarks, focus sessions, arrangements, bells ... (2.531.0 #4317: + salt)
+        if not again:
+            umz_more_write(c, run, uid, me_old, data, umz_salt(man))  # 2.363.4 (#3127): bookmarks, focus sessions, arrangements, bells ... (2.531.0 #4317: + salt)
     finally:
         run.org = org
     run.created["oi_done"] = True
