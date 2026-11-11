@@ -164,6 +164,9 @@ async function ensureCalEv(lo, hi) {
   if (S.route.mod === 'cal' || (S.route.mod === 'tasks' && S.route.key === 'today') || S.route.mod === 'home') renderView();  // 2.144.0 C (#2418): + the start page
 }
 function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; S.cal.seq = (S.cal.seq || 0) + 1; }
+// 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the events fetched (calendar, Today, Home) come again;
+// not shown = invalidated, the next view fetches (ensureCalEv). Here and not in calview.js: Today and Home use the events without it
+histReloader('calendar', () => { if (!S.cal?.key && !S.cal?.items?.length) return; calInvalidate(); if (S.route.mod === 'cal' || (S.route.mod === 'tasks' && S.route.key === 'today') || S.route.mod === 'home') renderView(); });
 // 2.30.0 (#1036): an own event of a calendar outside the shown workspace is left out (subscriptions and invitations stay)
 const cevWs = e => !e.own || e.cal == null || wsObjIn(evCal(e.cal));
 const cevOn = d => S.cal.items.filter(e => e.d0 <= d && e.d1 >= d && cevWs(e));

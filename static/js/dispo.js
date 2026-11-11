@@ -221,6 +221,8 @@ function dp_editSheet(b) {
 }
 
 function dp_reload() { DPV.data = null; DPV.free = null; if (S.route.mod === 'workload') dp_load(); }
+// 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the bookings come again when shown, else they are fetched on the next view
+histReloader('dispo', () => { if (DPV.data) dp_reload(); });
 
 document.addEventListener('click', async e => {
   const a = e.target.closest?.('[data-act^="dp-"]'); if (!a || a.disabled) return;

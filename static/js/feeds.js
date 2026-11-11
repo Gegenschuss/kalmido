@@ -43,6 +43,8 @@ function rss_draw() {
   if (S.route.mod === 'life' && typeof viewLife === 'function') { const el = $('#view'); if (el && typeof LF !== 'undefined' && LF.data) keepFocus(el, () => setHtml(el, mg_wrap('life', viewLife()))); }
 }
 const rss_reload = () => rss_load(false);
+// 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the feeds shown (view or the card on Home & life) come again, else they are old (the next draw fetches)
+histReloader('feeds', () => { if (!RSS.done) return; if (S.route.mod === 'feeds' || S.route.mod === 'life') return rss_reload(); RSS.at = 0; });
 const rss_stale = () => !RSS.loading && (!RSS.done || Date.now() - RSS.at > 60000 || RSS.sp !== rss_sp());
 
 // ---- the card on Home & life

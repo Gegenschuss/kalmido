@@ -46,6 +46,8 @@ function bg_live() {
 }
 // after an own change
 async function bg_after() { BG.home = null; await bg_load(); }
+// 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the open budget (or the card on Home & life) comes again, a budget not shown is old (the next view fetches)
+histReloader('budget', () => { if (!BG.done && !BG.home) return; BG.home = null; if (S.route.mod === 'budget') return bg_load(); if (S.route.mod === 'life' && feat('budget')) return bg_homeLoad(); BG.stale = true; });
 // 2.559.0 (#4660): an own entry shows at once (optWrite): the rows of BG.data change before the answer, the view is drawn
 // again; afterwards the totals / month values (the server's) are fetched in the background (bg_load replaces BG.data only on
 // its answer, so the rows stay; the card on Home & life refetches by itself)

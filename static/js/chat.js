@@ -55,6 +55,8 @@ async function teamChanged() {
   if (typeof cw_teamLive === 'function') cw_teamLive();  // 2.47.1 (#1720): the team chats in the chat panel
   renderSide(); renderTabs(); renderTop();
 }
+// 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the conversations (and the open one) come again like after a change elsewhere
+histReloader('team', () => { if (S.tc.rooms == null) return; return teamChanged(); });
 // 2.18.0 (review): a one-line preview without Markdown markers ("```js", `code`, **bold**, headings, list markers, links ->
 // their text); the server does the same in md_brief() (kalmido/collab/teamchat.py), this cleans the preview of a message sent from here
 function mdBrief(t) {

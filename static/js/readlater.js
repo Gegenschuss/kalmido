@@ -37,6 +37,8 @@ function rdl_draw() {
   const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('reading', viewReading())));
 }
 const rdl_reload = () => rdl_load(false);
+// 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the shown list comes again, a list not shown is old (the next view fetches)
+histReloader('reading', () => { if (!RDL.done) return; if (S.route.mod === 'reading') return rdl_reload(); RDL.at = 0; });
 const rdl_item = id => RDL.items.find(x => x.id === id);
 
 // ---- the view
