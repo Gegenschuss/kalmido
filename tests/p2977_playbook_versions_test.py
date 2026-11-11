@@ -32,7 +32,7 @@ from kt import B, DATA, FAILS, OKS, check, sess, until  # noqa: E402,F401
 
 FEAT = "cal,comments,collab,office,clients,docs"
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-PD = "/api/office/procdoc"
+PD = B + "/api/office/procdoc"
 
 kt.fresh(env={"KALMIDO_ORGCRYPT_DELAY": "0", "KALMIDO_SECRET_KEY": base64.b64encode(os.urandom(32)).decode()}, prefix="P2977")
 
