@@ -84,9 +84,11 @@ function dfc_row(g, v, icon, name, n) {
   const on = dfc_isOn(g, v);
   return `<button type="button" class="srow smod sbbi dfcr ${on ? 'on' : ''}" data-dfc="${g}" data-dfcv="${esc(v)}" aria-pressed="${on}">${ic(icon)}<span class="n">${esc(name)}</span>${dfc_cnt(n)}</button>`;
 }
+// 2.932.0 (#5603): each group sits in a .sgroup like the groups of Projects (Views, Projects, Tags ...): the same head, the
+// same gap above it in every density (app.css #side .sgroup) - no own spacing for the documents' filters
 function dfc_group(g, label, body, manage, n) {
   const open = dfc_open(g);
-  return `<div class="dfcg" data-dfcgrp="${esc(g)}"><div class="shead sgh dfch ${open ? '' : 'closed'}"><button type="button" class="sgt" data-dfcfold="${esc(g)}" aria-expanded="${open}">${ic('chev', 's fcar')}<span>${esc(label)}</span>${!open && n ? dfc_cnt(n) : ''}</button><span class="spacer"></span>`
+  return `<div class="sgroup dfcg" data-dfcgrp="${esc(g)}"><div class="shead sgh dfch ${open ? '' : 'closed'}"><button type="button" class="sgt" data-dfcfold="${esc(g)}" aria-expanded="${open}">${ic('chev', 's fcar')}<span>${esc(label)}</span>${!open && n ? dfc_cnt(n) : ''}</button><span class="spacer"></span>`
     + `<button type="button" class="iconbtn dfcm" data-dfcm="${manage}" aria-label="${esc(manage === 'settings' ? tr('Settings of the documents') : tr('Senders, types and fields'))}" title="${esc(manage === 'settings' ? tr('Settings of the documents') : tr('Senders, types and fields'))}">${ic(manage === 'settings' ? 'gear' : 'list', 's')}</button></div>`
     + (open ? `<div class="dfcb" role="group" aria-label="${esc(label)}">${body()}</div>` : '') + '</div>';
 }

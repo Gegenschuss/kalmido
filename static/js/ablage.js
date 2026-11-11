@@ -182,11 +182,11 @@ function ab_panelHtml() {
   const files = dOn => {
     const one = real.length === 1, top = one ? ab_ptGet('s:' + real[0]) : [];
     const tree = one ? (top ? sbb_treeHtml(withColl(real[0], top), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`) : sbb_treeHtml(real.map(spaceNode), 1);
-    const rest = sbb_treeHtml(ab_spaces().filter(s => !real.includes(s)).map(spaceNode), 1);
+    const rest = sbb_treeHtml(ab_spaces().filter(s => !real.includes(s)).map(spaceNode));  // 2.932.0 (#5603): "Shared with me" and the trash on the left edge of Files / All documents (level 0), not stepped in like a sub folder; below the filter groups it starts with a group's gap, so it does not read as a value of the last group
     // 2.768.0 (#4888): "+" at the head of the tree = a new folder at the top of the space it shows (one space: that one; several: the one open)
     const add = `<button type="button" class="iconbtn abtadd" data-abtadd="${esc(one ? real[0] : (real.includes(ab_curSpace()) ? ab_curSpace() : real[0] || ''))}" title="${esc(tr('New folder'))}" aria-label="${esc(tr('New folder'))}">${ic('plus', 's')}</button>`;
     return `<div class="abthead">${sbb_row('ablage', 'folder', tr('Files'), one && cur === real[0], `data-sbbpart="ablage" ${one ? `data-absp="${esc(real[0])}"` : ''}`)}${real.length ? add : ''}</div>` + `<div class="sbbtree" role="group" aria-label="${esc(tr('Folders'))}">${tree}</div>`
-      + (dOn ? docRows() : '') + `<div class="sbbtree abrest" role="group" aria-label="${esc(tr('Shared with me'))}">${rest}</div>`;
+      + (dOn ? docRows() : '') + `<div class="sbbtree abrest${dOn ? ' sgroup' : ''}" role="group" aria-label="${esc(tr('Shared with me'))}">${rest}</div>`;
   };
   const parts = nav_sort('ablage', mg_parts(a).filter(p => !nav_orgOff('ablage', p[0]) && (p[0] === r.mod || !nav_hid('ablage', p[0]))), p => p[0]);
   const dOn = ab_docsOn() && parts.some(p => p[0] === 'docs'), fOn = parts.some(p => p[0] === 'ablage');

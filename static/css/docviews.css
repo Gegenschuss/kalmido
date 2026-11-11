@@ -9,7 +9,7 @@
   .dc-bar .dcv-cur .dcv-name{padding:0 .625rem}
 }
 /* 2.772.0 (#4890): the filters with numbers below the file store's tree (static/js/docfacets.js) */
-.dfc{margin-top:.25rem}
+/* 2.932.0 (#5603): no own margin above the groups - each group is a .sgroup (docfacets.js), the gap of Projects' groups */
 .dfch .dfcm{opacity:.6}
 .dfch:hover .dfcm,.dfch .dfcm:focus-visible{opacity:1}
 .dfcb .dfcr .c{margin-left:auto}
