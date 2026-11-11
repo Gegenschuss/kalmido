@@ -326,7 +326,8 @@ def wsh_end(c, uid, fid, reason="unshare"):
     if k is not None and k["pair_id"]:
         pn = _wsh_node(c, k["pair_id"])
         if pn is not None:
-            pair = obj_node_unshare(c, uid, pn, k["pair_id"], kind="wiki", ref_id=pn["ref_id"] if pn["kind"] == "ref" else None, reason=reason)
+            pair = obj_node_unshare(c, uid, pn, k["pair_id"], kind="wiki", ref_id=pn["ref_id"] if pn["kind"] == "ref" else None,
+                                    org=pn["org_id"] or None, reason=reason)  # 2.969.0 (#5644): the pair's row names its space too
     rv = obj_node_unshare(c, uid, n, fid, kind="wiki", ref_id=n["ref_id"] if n["kind"] == "ref" else None, org=n["org_id"] or None, reason=reason)
     if rv:  # Fable F2: a share without a card (listed as a page share) gets an empty one, so its Undo works the same way
         x = c.execute("SELECT row_json FROM obj_revoked WHERE id=?", (rv,)).fetchone()

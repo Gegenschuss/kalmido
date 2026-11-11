@@ -829,9 +829,9 @@ def obj_node_reshare(c, revoked_id, *, owner, org):
     s = json.loads(r["row_json"])
     key = next((k for k in ("user_id", "group_id", "agent_id") if s.get(k)), None)
     n = c.execute("SELECT id, deleted_at, owner_id, org_id FROM fs_nodes WHERE id=?", (int(s.get("node_id") or 0),)).fetchone()
-    if n is not None and ((n["org_id"] or None) != (org or None) or (r["org_id"] or None) not in (None, org or None)
-                          or (org is None and n["owner_id"] != owner)):
-        raise Denied(409, tr("Changed in the meantime"))
+    if (org is None and owner is None) or (r["org_id"] or None) not in (None, org or None) or (
+            n is not None and ((n["org_id"] or None) != (org or None) or (org is None and n["owner_id"] != owner))):
+        raise Denied(409, tr("Changed in the meantime"))  # review: the row's space checked also when its node went
     taken = key and n is not None and c.execute(f"SELECT 1 FROM fs_shares WHERE node_id=? AND {key}=?", (n["id"], int(s[key]))).fetchone()
     gone = not key or n is None or n["deleted_at"] or c.execute("SELECT 1 FROM fs_shares WHERE id=?", (int(s["id"]),)).fetchone()
     who = key and (c.execute("SELECT 1 FROM groups WHERE id=?", (int(s[key]),)) if key == "group_id" else
