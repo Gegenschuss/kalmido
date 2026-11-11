@@ -10,6 +10,9 @@ freelancer-matrix: office
  - a second rotation re-encrypts the copy again (no value left with a key that is gone)
  - 2.558.0 D (#4669, review F2): a copy sealed before an earlier rotation counts as trash_unreadable, the rotation finishes
  - a person without an organisation: the same in the personal office
+ - 2.905.0 (#5414): a device goes into the core's trash now (its row stays, deleted_at): the rotation re-encrypts the row as
+   any other, the restore (POST /api/office/trash/core/omd_equipment/<id>/restore) reads it; the copies above are made as
+   before 2.905 (old_copy: the row as a copy in office_trash, the row deleted) - such old copies stay until their period ends
 usage: p2558_c_trash_rot_test.py <datadir>"""
 import base64
 import json
@@ -45,6 +48,21 @@ def cli(*args):
     return r.returncode, r.stdout, r.stderr
 
 
+def old_copy(oid, eid):
+    """2.905.0 (#5414): device eid as a copy in office_trash and the row deleted, as office_delete did before 2.905 -> trash id."""
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    try:
+        row = json.loads(c.execute("SELECT CAST(row_to_json(e) AS TEXT) FROM office_equipment e WHERE id=?", (eid,)).fetchall()[0][0])
+        snap = json.dumps({"rows": [["office_equipment", [{k: v for k, v in row.items() if k not in ("deleted_at", "deleted_by", "rev", "created_by", "updated_by")}]]], "nulls": []})
+        c.execute("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?)",
+                  (oid, "equipment", "", eid, row.get("name") or "", snap, None, "2026-11-09T10:00:00.000Z"))
+        c.execute("DELETE FROM office_equipment WHERE id=?", (eid,))
+        c.commit()
+        return c.execute("SELECT MAX(id) FROM office_trash WHERE ref_id=? AND kind='equipment'", (eid,)).fetchall()[0][0]
+    finally:
+        c.close()
+
+
 def snap_vals(tid):
     snap = json.loads(one("SELECT snap FROM office_trash WHERE id=?", (tid,)) or "{}")
     rows = dict((t, r) for t, r in snap.get("rows") or [])
@@ -74,9 +92,21 @@ def case(s, who, oid):
     check(r.status_code in (200, 201) and r.json().get("id"), f"{who}: setup device {r.status_code} {r.text[:200]}")
     eid = r.json()["id"]
     check(str(one("SELECT serial_no FROM office_equipment WHERE id=?", (eid,))).startswith("kenc1:"), f"{who}: the serial number is sealed at rest")
-    r = s.delete(B + O + f"/equipment/{eid}")
-    tid = r.json().get("trash_id") if r.ok else None
-    check(r.ok and tid and one("SELECT COUNT(*) FROM office_equipment WHERE id=?", (eid,)) == 0, f"{who}: the device goes into the office trash {r.text[:200]}")
+    # 2.905.0 (#5414): the core's trash - the row stays sealed, a rotation re-encrypts it, the restore reads it
+    r = s.post(B + O + "/equipment", json={"name": f"Licht {who}", "serial_no": serial + "-K", "purchase_net": price, "purchase_date": "2025-03-01"})
+    kid = r.json()["id"]
+    r = s.delete(B + O + f"/equipment/{kid}")
+    check(r.ok and (r.json().get("trash") or {}).get("id") == kid and one("SELECT deleted_at FROM office_equipment WHERE id=?", (kid,)),
+          f"{who}: the device goes into the core's trash {r.text[:200]}")
+    k1 = one("SELECT serial_no FROM office_equipment WHERE id=?", (kid,))
+    rc, out, err = cli("rotate", "--org", str(oid))
+    k2 = one("SELECT serial_no FROM office_equipment WHERE id=?", (kid,))
+    check(rc == 0 and str(k2).startswith("kenc1:") and k2 != k1, f"{who}: the row in the trash is re-encrypted with the new key {rc} {out[-200:]}")
+    r = s.post(B + O + f"/trash/core/omd_equipment/{kid}/restore")
+    j = s.get(B + O + f"/equipment/{kid}").json()
+    check(r.ok and j.get("serial_no") == serial + "-K", f"{who}: restored from the core's trash, readable {r.text[:200]} {str(j)[:200]}")
+    tid = old_copy(oid, eid)
+    check(tid and one("SELECT COUNT(*) FROM office_equipment WHERE id=?", (eid,)) == 0, f"{who}: an old copy in the office trash")
     s1, p1 = snap_vals(tid)
     check(str(s1).startswith("kenc1:") and str(p1).startswith("kenc1:"), f"{who}: the copy keeps the sealed values {str(s1)[:12]} {str(p1)[:12]}")
     rc, out, err = cli("rotate", "--org", str(oid))
@@ -97,7 +127,7 @@ def case(s, who, oid):
     # 2.558.0 D (#4669, review F2): a copy sealed before an earlier rotation (old stock) opens with neither key: counted on
     # its own, the rotation still finishes (before the fix it stopped with "not finished" until --force)
     r = s.post(B + O + "/equipment", json={"name": f"Stativ {who}", "serial_no": f"SN-{who}-old", "purchase_date": "2025-03-01"})
-    tid2 = s.delete(B + O + f"/equipment/{r.json()['id']}").json().get("trash_id")
+    tid2 = old_copy(oid, r.json()["id"])  # 2.905.0 (#5414): an old copy (made before 2.905)
     old = one("SELECT snap FROM office_trash WHERE id=?", (tid2,))
     rc, out, err = cli("rotate", "--org", str(oid))
     c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)

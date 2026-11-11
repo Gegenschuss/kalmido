@@ -14,7 +14,7 @@ import base64
 import json
 from datetime import timedelta
 
-from flask import g, has_request_context, jsonify
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.pg import IntegrityError, insert_id, system_ctx, table_columns, write_lock
@@ -26,6 +26,9 @@ from .ledger import ofx_log
 from .model import office_ctx, office_role
 from .rights import ofr_admin_or
 from .eqcare import eqc_sync
+from .okern import OFK, ofk_restore, ofk_trash_items  # 2.905.0 (#5414): the kinds that moved onto the core's trash
+from ..core.objects import obj_row
+from ..core.writes import obj_purge
 
 OTB_REFS = {}  # table -> [(child table, column, 'c' cascade | 'n' set null)]
 OTB_DEPTH = 3
@@ -221,7 +224,10 @@ def otb_list():
     c, uid, oid = _ctx_admin()
     rows = c.execute("SELECT id, kind, sub, ref_id, label, deleted_by, deleted_at FROM office_trash WHERE org_id=? "
                      "ORDER BY deleted_at DESC, id DESC LIMIT 500", (oid,)).fetchall()
-    return jsonify(items=[dict(r) for r in rows], days=max(1, ret_days("trash")))
+    # 2.905.0 (#5414): + the rows of the kinds on the core's trash (office/okern.py view=), marked core = their kind
+    items = [dict(r) for r in rows] + ofk_trash_items(c, oid)
+    items.sort(key=lambda x: (str(x["deleted_at"] or ""), x["id"]), reverse=True)
+    return jsonify(items=items[:500], days=max(1, ret_days("trash")))
 
 
 @app.post("/api/office/trash/<int:tid>/restore")
@@ -272,6 +278,53 @@ def otb_delete_route(tid):
     if not n:
         raise Denied(404)
     bump(c)
+    c.commit()
+    return jsonify(ok=True)
+
+
+def _core_kind(c, uid, oid, kind, rid):
+    """2.905.0 (#5414): (OFK entry, row) of a row of office area oid in the core's trash of a kind the office trash shows; 404
+    otherwise (another organisation, live, unknown kind)."""
+    k = OFK.get(kind)
+    if not k or not k.get("view"):
+        raise Denied(404)
+    row = obj_row(c, kind, rid)
+    if row is None or row["org_id"] != oid or not row["deleted_at"]:
+        raise Denied(404)
+    return k, dict(row)
+
+
+@app.post("/api/office/trash/core/<kind>/<int:rid>/restore")
+def otb_core_restore(kind, rid):
+    """2.905.0 (#5414): a row of the office trash that lies in the core's trash (master data, rights groups, sign-offs, fixed
+    costs, corrections, a letter's links) comes back. The trash's restore: the office admin, as with the copies (_need_kind).
+    ?undo=1 = the toast's undo: the module's own rights (view ctx), then the person who deleted it (the core's own step,
+    obj_restore undo=True) or an office admin."""
+    k = OFK.get(kind) or {}
+    undo = request.args.get("undo") == "1" and (k.get("view") or {}).get("ctx")
+    c, uid, oid = k["view"]["ctx"]() if undo else _ctx_admin()
+    write_lock(c, f"office_trash_core_{kind}_{int(rid)}")
+    k, row = _core_kind(c, uid, oid, kind, rid)
+    own = undo and row.get("deleted_by") == uid
+    if not own and office_role(c, uid, oid) != "admin":
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
+    ofk_restore(c, uid, kind, rid, undo=own)
+    if k["view"].get("back"):
+        k["view"]["back"](c, oid, row)
+    ui = k["view"]["kind"](row) if callable(k["view"]["kind"]) else k["view"]["kind"]
+    ofx_log(c, oid, "restore", target=ui, detail={"id": rid})
+    c.commit()
+    return jsonify(ok=True, kind=ui, id=rid, ids=[rid])
+
+
+@app.delete("/api/office/trash/core/<kind>/<int:rid>")
+def otb_core_delete(kind, rid):
+    """2.905.0 (#5414): deletes such a row for good (the app asks first): the core's purge (core/writes.py obj_purge)."""
+    c, uid, oid = _ctx_admin()
+    _core_kind(c, uid, oid, kind, rid)
+    if office_role(c, uid, oid) != "admin":
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
+    obj_purge(c, uid, kind, rid)
     c.commit()
     return jsonify(ok=True)
 

@@ -109,9 +109,9 @@ def case(s, who, uid, member=None):
     check(task(t3)["status"] == 0 and task(t3)["repeat"], f"{who}: out of the archive: an open task again")
     # deleted into the trash, restored
     r = s.delete(B + O + f"/equipment/{eid}")
-    tid = r.json().get("trash_id")
-    check(r.ok and tid and task(t3)["status"] != 0, f"{who}: deleted, its task done {r.text[:200]}")
-    r = s.post(B + O + f"/trash/{tid}/restore")
+    tid = (r.json().get("trash") or {}).get("id")  # 2.905.0 (#5414): the core's trash (kind omd_equipment)
+    check(r.ok and tid == eid and task(t3)["status"] != 0, f"{who}: deleted, its task done {r.text[:200]}")
+    r = s.post(B + O + f"/trash/core/omd_equipment/{tid}/restore")
     g5 = s.get(B + O + f"/equipment/{eid}").json()
     t4 = ((g5.get("maint") or [{}])[0].get("task") or {}).get("id")
     check(r.ok and t4 and task(t4)["status"] == 0, f"{who}: restored, an open task again {r.text[:200]} {g5.get('maint')}")
@@ -144,8 +144,8 @@ def moved_on(s, who):
     check(t2 != mt and task(t2)["status"] == 0 and task(t2)["due"] == d1, f"{who}: out of the archive at the moved date {task(t2)}")
     s.post(B + f"/api/tasks/{t2}/complete")
     d2 = task(t2)["due"]
-    tid = s.delete(B + O + f"/equipment/{eid}").json().get("trash_id")
-    s.post(B + O + f"/trash/{tid}/restore")
+    tid = (s.delete(B + O + f"/equipment/{eid}").json().get("trash") or {}).get("id")  # 2.905.0 (#5414): the core's trash
+    s.post(B + O + f"/trash/core/omd_equipment/{tid}/restore")
     t3 = s.get(B + O + f"/equipment/{eid}").json()["maint"][0]["task"]["id"]
     check(d2 > d1 and task(t3)["status"] == 0 and task(t3)["due"] == d2, f"{who}: restored from the trash at the moved date {d2} {task(t3)}")
     # an overdue maintenance comes back at today, not in the past

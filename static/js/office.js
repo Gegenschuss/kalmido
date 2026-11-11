@@ -444,7 +444,7 @@ function ofcModal(kind, r) {
       if (m === 'del') {
         if (!await askConfirm(tr('Delete “{0}”?', r.name || r.name_de || r.key || ''), tr('Entries that documents, contracts or sets still use are archived instead.'), {ok: tr('Delete'), danger: true})) return;
         const j = await api('DELETE', `/api/office/${kind}/${r.id}`); md.remove(); ofcReload(kind);
-        if (j.trash_id) toast(tr('“{0}” moved to the trash', r.name || r.name_de || r.key || ''), () => api('POST', `/api/office/trash/${j.trash_id}/restore`).then(() => ofcReload(kind), x => ofcErr(x)));  // 2.272.0 E2 (#3038)
+        if (j.trash) toast(tr('“{0}” moved to the trash', r.name || r.name_de || r.key || ''), () => api('POST', `/api/office/trash/core/${j.trash.kind}/${j.trash.id}/restore?undo=1`).then(() => ofcReload(kind), x => ofcErr(x)));  // 2.272.0 E2 (#3038); 2.905.0 (#5414): the core's trash
         else toast(j.result === 'archived' ? tr('Archived (still in use)') : tr('Deleted'));
         return;
       }

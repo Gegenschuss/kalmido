@@ -201,7 +201,8 @@ r = purge(A, R_E1)
 check(r.status_code == 409 and "Kept by law until" in r.text, "#3796: the receipt swapped out keeps its lock " + r.text[:200])
 r = A.delete(B + f"{EQ}/{it2.json()['id']}")
 check(r.ok, "#3796: the item deleted " + r.text[:200])
-check(not sql("SELECT 1 FROM office_equipment WHERE id=?", (it2.json()["id"],)), "#3796: the item is gone (not archived)")
+# 2.905.0 (#5414): deleted = in the core's trash (deleted_at), not archived
+check(sql("SELECT 1 FROM office_equipment WHERE id=? AND deleted_at IS NOT NULL AND archived=0", (it2.json()["id"],)), "#3796: the item is gone (not archived)")
 r = purge(A, R_E3)
 check(r.status_code == 409 and "Kept by law until" in r.text, "#3796: the receipt of a deleted item keeps its lock " + r.text[:200])
 # 2.578.0 (#4035): archiving an item (by the API, and the delete that archives an item in use) keeps the lock running now

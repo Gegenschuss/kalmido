@@ -38,9 +38,9 @@ from flask import jsonify, request
 
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
-from ..core.pg import insert_id, write_lock
+from ..core.pg import insert_id, qi, write_lock
 from ..core.db import body, bump, db, iso, local_now, now_utc, parse_iso
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.errors import BadInput
 from .model import (MD, pb_cl_org, pb_cl_sql, office_create, office_gate, office_in_use, office_number_format, office_org, office_role, office_rows, office_scheme_period,
                     office_settings, office_update)
@@ -51,7 +51,7 @@ from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from function
 from ..team.clients import cl_refs, cl_trash
 from .contacts_cl import fk_has_name, fk_add, fk_sync  # 2.369.5 (#2517): pulled up from functions
 from ..team.clients import clean_client  # 2.369.5 (#2517): pulled up from functions
-from .model import office_row  # 2.369.5 (#2517): pulled up from functions
+from .model import MD_TABLES, office_row  # 2.369.5 (#2517): pulled up from functions; 2.905.0 (#5414): MD_TABLES
 from .model import office_settings_lock, office_settings_save  # 2.621.0 (#4600): the kept file name template
 from .sheet import dk_pack  # 2.636.0 (#4952): the industry's file name template
 from ..accounts.onboarding import ind_codes  # 2.636.0 (#4952)
@@ -1179,7 +1179,7 @@ def _run_new(c, oid, uid, kind):
 
 
 # 2.363.2 (#3104): the imports of fixed costs, trips and leads are runs too: {kind: (table, what still counts as there)}.
-FX_RUNS = {"fixed_costs": ("office_fixed_costs", ""), "trips": ("office_trips", ""), "leads": ("office_deals", " AND t.deleted_at IS NULL")}
+FX_RUNS = {"fixed_costs": ("office_fixed_costs", f" AND {live_sql('t')}"), "trips": ("office_trips", ""), "leads": ("office_deals", " AND t.deleted_at IS NULL")}  # 2.905.0 (#5414): + the fixed costs in the trash do not count
 FX_UNDO_LATE = N_("This import is older than 24 hours and can no longer be undone.")
 
 
@@ -1669,7 +1669,7 @@ def imr_used(c, oid, kind, rid, limit=3):
         if len(out) < limit:
             out += [x.get("name") or "" for x in office_rows(c, oid, "contracts") if str(rid) in (x.get("rates") or {})][:limit - len(out)]
     elif kind == "equipment":
-        for x in c.execute("SELECT name FROM office_sets WHERE org_id=? AND (items ILIKE ? OR items ILIKE ?) ORDER BY id LIMIT ?",
+        for x in c.execute(f"SELECT name FROM office_sets WHERE org_id=? AND (items ILIKE ? OR items ILIKE ?) AND {live_sql()} ORDER BY id LIMIT ?",
                            (oid, f'%"equipment_id": {int(rid)},%', f'%"equipment_id": {int(rid)}}}%', limit)):
             out.append(x["name"])
     return out
@@ -1695,7 +1695,7 @@ def imr_leftover_ids(c, oid, r):
     for kind in IMR_KINDS:
         if not (r["undone_at"] or kind in undone):
             continue
-        for x in c.execute(f"SELECT id FROM {MD[kind]['table']} WHERE org_id=? AND import_run_id=? AND archived=0 ORDER BY id", (oid, r["id"])):
+        for x in c.execute(f"SELECT id FROM {qi(MD[kind]['table'], MD_TABLES)} WHERE org_id=? AND import_run_id=? AND archived=0 AND {live_sql()} ORDER BY id", (oid, r["id"])):
             if not (kind == "services" and x["id"] == prod) and x["id"] not in (kept.get(kind) or []):
                 out.append((kind, x["id"]))
     return out

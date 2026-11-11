@@ -24,7 +24,7 @@ from ..core.config import app, APP_NAME
 from ..core.pg import insert_id, write_lock
 from ..core.i18n import dec_comma, lang, tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
-from ..core.access import Denied, need_feat
+from ..core.access import Denied, live_sql, need_feat
 from ..accounts.session import me, user_public
 from ..core.errors import BadInput
 from .absence import abs_admin, abs_days, abs_holidays, abs_holidays_shown, abs_org, abs_people, abs_state
@@ -120,9 +120,9 @@ def dsp_resources(c, uid, oid):
     if not ofr_allows(c, uid, oid, "equipment"):  # 2.187.0 C (#2476): office groups without the equipment area
         return {"people": people, "contacts": contacts, "equipment": [], "sets": []}
     eq = [{"kind": "equipment", "id": r["id"], "name": r["name"], "category": r["category"] or ""} for r in c.execute(
-        "SELECT id, name, category FROM office_equipment WHERE org_id=? AND archived=0 ORDER BY lower(category), lower(name), id", (oid,))]
+        f"SELECT id, name, category FROM office_equipment WHERE org_id=? AND archived=0 AND {live_sql()} ORDER BY lower(category), lower(name), id", (oid,))]
     sets = [{"kind": "set", "id": r["id"], "name": r["name"], "items": _set_items(r["items"])} for r in c.execute(
-        "SELECT id, name, items FROM office_sets WHERE org_id=? AND archived=0 ORDER BY lower(name), id", (oid,))]
+        f"SELECT id, name, items FROM office_sets WHERE org_id=? AND archived=0 AND {live_sql()} ORDER BY lower(name), id", (oid,))]
     return {"people": people, "contacts": contacts, "equipment": eq, "sets": sets}
 
 

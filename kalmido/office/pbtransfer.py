@@ -33,7 +33,7 @@ from datetime import timedelta
 from flask import g, jsonify, request
 
 from ..core.config import OFFICE_DIR, app
-from ..core.access import Denied, acx_drop
+from ..core.access import Denied, acx_drop, live_sql
 from ..core.db import body, bump, db, err, iso, now_utc, uset
 from ..core.i18n import N_, tr, trn
 from ..core.orgcrypt import FIELDS, JSON_KEYS, oc_dec_fields, oc_log_detail, oc_read_file, oc_write_file
@@ -234,7 +234,7 @@ def pbt_plan(c, uid, src, dst):
     if ab:
         notes.append(trn("{0} link to your private address book ends: the contact stays there",
                          "{0} links to your private address book end: the contacts stay there", ab))
-    if counts.get("office_texts") and c.execute("SELECT 1 FROM office_texts WHERE org_id=? LIMIT 1", (dst,)).fetchone():
+    if counts.get("office_texts") and c.execute(f"SELECT 1 FROM office_texts WHERE org_id=? AND {live_sql()} LIMIT 1", (dst,)).fetchone():
         notes.append(trn("{0} text block is added to those of the organisation (the same text can show twice there)",
                          "{0} text blocks are added to those of the organisation (the same text can show twice there)", counts["office_texts"]))
     # only the text blocks every office gets on its first use: nothing to move
@@ -304,7 +304,7 @@ def pbt_reseal(c, t, r, src, dst):
 def pb_letter_links(c, src):
     """The links of the letters of personal office src to documents: link rows + filed letter PDFs (review A2, 2.153.0).
     A personal office links only the owner's private documents, which stay private when the office moves."""
-    links = c.execute("SELECT COUNT(*) FROM office_letter_links WHERE org_id=?", (src,)).fetchone()[0]
+    links = c.execute(f"SELECT COUNT(*) FROM office_letter_links WHERE org_id=? AND {live_sql()}", (src,)).fetchone()[0]  # 2.905.0 (#5414): not the trash
     pdfs = c.execute("SELECT COUNT(*) FROM office_letters WHERE org_id=? AND node_id IS NOT NULL", (src,)).fetchone()[0]
     return links + pdfs
 

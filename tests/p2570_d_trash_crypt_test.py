@@ -14,6 +14,8 @@ freelancer-matrix: office
  - a person without an organisation: the same in the personal office
  - 2.570.0 (#4716 review F6): decrypt-all also opens a copy whose only protected value is a cost_enc left plain
  - 2.570.0 (#4716 review F4): encrypt-all counts a copy whose purchase price is no number as failed, migrated_at stays empty
+ - 2.905.0 (#5414): a device goes into the core's trash now (the row stays and is migrated as any other); the device's copy
+   here is made as before 2.905 (old_copy) - such old copies stay in office_trash until their period ends
 usage: p2570_d_trash_crypt_test.py <datadir>"""
 import base64
 import json
@@ -49,6 +51,17 @@ def cli(*args):
     r = subprocess.run(["docker", "exec", "-i", CT, "python", "-m", "kalmido.admin.orgcrypt_cli", *args],
                        capture_output=True, text=True, timeout=600)
     return r.returncode, r.stdout, r.stderr
+
+
+def old_copy(oid, eid):
+    """2.905.0 (#5414): device eid as a copy in office_trash and the row deleted, as office_delete did before 2.905 -> trash id."""
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    row = json.loads(c.execute("SELECT CAST(row_to_json(e) AS TEXT) FROM office_equipment e WHERE id=?", (eid,)).fetchall()[0][0])
+    snap = json.dumps({"rows": [["office_equipment", [{k: v for k, v in row.items() if k not in ("deleted_at", "deleted_by", "rev", "created_by", "updated_by")}]]], "nulls": []})
+    c.execute("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?)",
+              (oid, "equipment", "", eid, row.get("name") or "", snap, None, "2026-11-09T10:00:00.000Z"))
+    c.execute("DELETE FROM office_equipment WHERE id=?", (eid,))
+    return c.execute("SELECT MAX(id) FROM office_trash WHERE ref_id=? AND kind='equipment'", (eid,)).fetchall()[0][0]
 
 
 def snap_rows(tid):
@@ -94,8 +107,7 @@ def put_trash(s, who, tag):
                                            "purchase_date": "2025-03-01"})
     check(r.status_code in (200, 201) and r.json().get("id"), f"{who} {tag}: setup device {r.status_code} {r.text[:200]}")
     eid = r.json()["id"]
-    r = s.delete(B + O + f"/equipment/{eid}")
-    tid_e = r.json().get("trash_id") if r.ok else None
+    tid_e = old_copy({"alice": ORG, "frida": PERS}[who], eid)  # 2.905.0 (#5414): an old copy (the core's trash keeps the row itself)
     r = s.post(B + D, json={"kind": "invoice", "client_id": CL[who], "service_from": "2026-03-01", "service_to": "2026-03-02",
                             "items": [{"title": f"Schnitt {tag}", "qty": 1, "rate": 100, "cost": 40}]})
     check(r.status_code == 201, f"{who} {tag}: setup draft {r.status_code} {r.text[:200]}")

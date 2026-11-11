@@ -29,6 +29,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from .calc import calc_code, calc_lang, dec, money, fmt_money, fmt_qty
 from .doclang import doc_trans
+from ..core.access import live_sql  # 2.905.0 (#5414): the master data in the trash stay out
 
 IND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "packs", "industry")
 DK_BLOCKS = ("staff", "share", "km", "meals", "hotel", "set", "free")
@@ -317,7 +318,7 @@ def _role(c, oid, rid):
         rid = int(rid)
     except (TypeError, ValueError):
         return None
-    r = c.execute("SELECT id, name_de, name_en, trans, rate_day, intext, markup_pct FROM office_roles WHERE id=? AND org_id=? AND kind='crew'",
+    r = c.execute(f"SELECT id, name_de, name_en, trans, rate_day, intext, markup_pct FROM office_roles WHERE {live_sql()} AND id=? AND org_id=? AND kind='crew'",
                   (rid, oid)).fetchone()
     return dict(r) if r else None
 
@@ -327,7 +328,7 @@ def _service(c, oid, sid):
         sid = int(sid)
     except (TypeError, ValueError):
         return None
-    r = c.execute("SELECT id, name_de, name_en, trans, daily_rate FROM office_services WHERE id=? AND org_id=? AND intext='shooting'",
+    r = c.execute(f"SELECT id, name_de, name_en, trans, daily_rate FROM office_services WHERE {live_sql()} AND id=? AND org_id=? AND intext='shooting'",
                   (sid, oid)).fetchone()
     return dict(r) if r else None
 
@@ -338,7 +339,7 @@ def _set_items(c, oid, set_id):
         set_id = int(set_id)
     except (TypeError, ValueError):
         return None
-    r = c.execute("SELECT id, name, discount_pct, items FROM office_sets WHERE id=? AND org_id=?", (set_id, oid)).fetchone()
+    r = c.execute(f"SELECT id, name, discount_pct, items FROM office_sets WHERE {live_sql()} AND id=? AND org_id=?", (set_id, oid)).fetchone()
     if not r:
         return None
     try:
@@ -359,7 +360,7 @@ def _equipment(c, oid, eid):
         eid = int(eid)
     except (TypeError, ValueError):
         return None
-    e = c.execute("SELECT id, name, name_en, trans, daily_rate FROM office_equipment WHERE id=? AND org_id=?", (eid, oid)).fetchone()
+    e = c.execute(f"SELECT id, name, name_en, trans, daily_rate FROM office_equipment WHERE {live_sql()} AND id=? AND org_id=?", (eid, oid)).fetchone()
     if not e:
         return None
     return {"equipment_id": e["id"], "name": e["name"], "name_en": e["name_en"] or "", "name_tr": _tr_names(e), "qty": 1, "rate": _n(e["daily_rate"], 0)}

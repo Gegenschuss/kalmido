@@ -3,13 +3,14 @@ Every route: office_gate (no agents, no kids, feature on) + office_org (the orga
 Writes to settings / master data / import need the organisation's admin; members read. No /api/v1 and no MCP tool in
 stage 1 (before the security audit): agents never reach this module."""
 import json
+from datetime import timedelta
 
 from flask import g, jsonify, request, Response
 
 from ..core.config import app
-from ..core.i18n import tr, lg_base
-from ..core.db import body, bump, db, err, uset
-from ..core.access import Denied, acx_drop
+from ..core.i18n import N_, tr, lg_base
+from ..core.db import body, bump, err, parse_iso, uset
+from ..core.access import Denied, acx_drop, live_sql
 from ..core.errors import BadInput
 from .packs import office_features, office_pack, office_pack_codes, office_pack_for, office_pack_validate, pack_features, pack_retention
 from .model import (
@@ -38,6 +39,8 @@ from ..core.conflict import ccf_check  # 2.528.0 (#4305 A3)
 from .model import oxa_settings_at  # 2.528.0 (#4305 A3)
 from .model import MD  # noqa: E402  2.747.0 (#5246)
 from .owrite import ow_write  # noqa: E402  2.747.0 (#5246): the master data on the core's write layer
+from .okern import ofk_register  # noqa: E402  2.905.0 (#5414): the master data in the core's trash
+from .model import OMD_KIND, _row_dict  # noqa: E402  2.905.0 (#5414)
 
 
 @app.get("/api/office/settings")
@@ -79,14 +82,14 @@ def of_used(c, oid):
     of Money only once used. Existence checks only (LIMIT 1), nothing decrypted."""
     from .books import bk_ws
     one = lambda q, *a: c.execute(q + " LIMIT 1", a).fetchone() is not None  # noqa: E731
-    fixed = one("SELECT 1 FROM office_fixed_costs WHERE org_id=?", oid)
+    fixed = one(f"SELECT 1 FROM office_fixed_costs WHERE org_id=? AND {live_sql()}", oid)  # 2.905.0 (#5414): not the trash
     return {"invoice": one("SELECT 1 FROM office_docs WHERE org_id=? AND kind='invoice'", oid),
             "receipt": one("SELECT 1 FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
                            "WHERE d.ws=? AND n.deleted_at IS NULL", bk_ws(c, oid)),
             "inquiry": one("SELECT 1 FROM office_deals WHERE org_id=? AND deleted_at IS NULL", oid),
             "meal": one("SELECT 1 FROM office_meals WHERE org_id=? AND deleted_at IS NULL", oid),
             "travel": one("SELECT 1 FROM office_trips WHERE org_id=?", oid),
-            "sub": fixed and one("SELECT 1 FROM office_fixed_costs WHERE org_id=? AND sub=1", oid),
+            "sub": fixed and one(f"SELECT 1 FROM office_fixed_costs WHERE org_id=? AND sub=1 AND {live_sql()}", oid),
             "fixed": fixed or one("SELECT 1 FROM office_cf_start WHERE org_id=?", oid)}
 
 
@@ -396,7 +399,48 @@ def office_row_delete(kind, rid):
     ofx_log(c, oid, "delete" if res == "deleted" else "archive", target=kind, detail={"id": old["id"], "before": _ltx_log(old)})
     bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
-    return jsonify(ok=True, result=res, **({"trash_id": g.otb_id} if res == "deleted" and g.get("otb_id") else {}))  # 2.272.0 E2 (#3038)
+    # 2.905.0 (#5414): trash = the row in the core's trash (the toast's undo: POST /api/office/trash/core/<kind>/<id>/restore?undo=1)
+    tk = g.get("ofk_trash") if res == "deleted" else None
+    return jsonify(ok=True, result=res, **({"trash": {"kind": tk[0], "id": tk[1]}} if tk else {}))
+
+
+# 2.905.0 (#5414, stage 4c of the core's trash): the master data's kinds of the core's trash (office/okern.py): deleted by
+# office/model.py office_delete, shown and restored in the office trash (office/otrash.py), deleted for good after the period
+# by the core's retention run. Area / level = what deleting the row asks of a person ruled by groups (office/rights.py).
+_OMD_AREA = {"office_services": "services", "office_equipment": "equipment", "office_sets": "equipment", "office_texts": "texts",
+             "office_contracts": "contracts", "office_roles": "equipment"}
+
+
+def _omd_ui(table):
+    if table == "office_roles":  # one table, two masters
+        return lambda row: "crew" if row.get("kind") == "crew" else "roles"
+    return next(k for k in MD_KINDS if MD[k]["table"] == table)
+
+
+def _omd_label(table):
+    def label(c, oid, row):
+        kind = _omd_ui(table)(row) if table == "office_roles" else _omd_ui(table)
+        return str(_row_dict(kind, row, c, oid).get(MD[kind]["label"]) or "")  # decrypted as the list shows it (a letter block's name)
+    return label
+
+
+def _omd_back(table):
+    def back(c, oid, row):
+        if table == "office_equipment":  # 2.558.0 C (#4591): a restored device starts its warranty / maintenance tasks again
+            from .eqcare import eqc_sync
+            eqc_sync(c, oid, row["id"], revive=True)
+        if table == "office_contracts" and row.get("deleted_at"):  # 2.272.0 F (#3038, review E2-M3): its PDF files come back too
+            since = parse_iso(str(row["deleted_at"])) - timedelta(seconds=2)
+            for f in c.execute("SELECT id, deleted_at FROM office_contract_files WHERE org_id=? AND contract_id=? AND deleted_at IS NOT NULL",
+                               (oid, int(row["id"]))).fetchall():
+                if parse_iso(f["deleted_at"]) >= since:
+                    c.execute("UPDATE office_contract_files SET deleted_at=NULL WHERE id=?", (f["id"],))
+    return back
+
+
+for _t, _k in OMD_KIND.items():
+    ofk_register(_k, _t, N_("Master data"), _OMD_AREA[_t], need="edit",
+                 view={"kind": _omd_ui(_t), "label": _omd_label(_t), "ctx": lambda: _ctx(admin=True), "back": _omd_back(_t)})
 
 
 # ---- import / export of the master data (JSON file)

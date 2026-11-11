@@ -7,6 +7,7 @@ an English text keeps its German text with the note "no English text stored". Fi
 import json
 
 from ..core.i18n import LANGS, N_, tr
+from ..core.access import live_sql  # 2.905.0 (#5414): the master data in the trash stay out
 from .model import office_settings, pb_cl_sql
 
 FIELD_TXT = {"intro": N_("Introduction"), "closing": N_("Closing text"), "time": N_("Duration of use"), "territory": N_("Territory"),
@@ -196,7 +197,7 @@ def _block(c, oid, tid, lang):
     from .docs import _iid
     if not tid:
         return None, False
-    r = c.execute("SELECT text_de, text_en, trans FROM office_texts WHERE id=? AND org_id=?", (_iid(tid), oid)).fetchone()
+    r = c.execute(f"SELECT text_de, text_en, trans FROM office_texts WHERE {live_sql()} AND id=? AND org_id=?", (_iid(tid), oid)).fetchone()
     if not r:
         return None, False
     return doc_own(r, lang, "text")  # 2.460.0 (#3767)
@@ -212,7 +213,7 @@ def _offer_block_missing(c, oid, s, kind, lang):
         t, miss = _block(c, oid, tid, lang)
         if t is not None:
             return miss
-    r = c.execute("SELECT text_de, text_en, trans FROM office_texts WHERE org_id=? AND archived=0 AND kind=? ORDER BY sort, id LIMIT 1", (oid, kind)).fetchone()
+    r = c.execute(f"SELECT text_de, text_en, trans FROM office_texts WHERE {live_sql()} AND org_id=? AND archived=0 AND kind=? ORDER BY sort, id LIMIT 1", (oid, kind)).fetchone()
     return doc_own(r, lang, "text")[1] if r else False
 
 
@@ -270,7 +271,7 @@ def _note_texts(c, oid, ct, lang):
         if t:
             cands.add(t)
             first, miss = t, m
-    r = c.execute("SELECT text_de, text_en, trans FROM office_texts WHERE org_id=? AND archived=0 AND kind='note' ORDER BY sort, id LIMIT 1", (oid,)).fetchone()
+    r = c.execute(f"SELECT text_de, text_en, trans FROM office_texts WHERE {live_sql()} AND org_id=? AND archived=0 AND kind='note' ORDER BY sort, id LIMIT 1", (oid,)).fetchone()
     if r:
         t, m = doc_own(r, lang, "text")
         cands.add(t)
@@ -346,7 +347,7 @@ def fd_lang_swap(c, oid, cur, b, f):
         for it in doc_items(c, cur["id"], oid) + tp_part_items_all(c, oid, cur["id"]):
             if not it.get("service_id") or it.get("kind") != "service":
                 continue
-            sv = c.execute("SELECT name_de, name_en, trans FROM office_services WHERE id=? AND org_id=?", (it["service_id"], oid)).fetchone()
+            sv = c.execute(f"SELECT name_de, name_en, trans FROM office_services WHERE id=? AND org_id=? AND {live_sql()}", (it["service_id"], oid)).fetchone()
             if not sv:
                 continue
             on = doc_own(sv, old_lang, "name")[0] or sv["name_de"]
@@ -384,7 +385,7 @@ def fd_lang_gaps(c, oid, r, items):
         if not sid or sid in seen or it.get("kind") != "service":
             continue
         seen.add(sid)
-        sv = c.execute("SELECT name_de, name_en, trans FROM office_services WHERE id=? AND org_id=?", (sid, oid)).fetchone()
+        sv = c.execute(f"SELECT name_de, name_en, trans FROM office_services WHERE id=? AND org_id=? AND {live_sql()}", (sid, oid)).fetchone()
         if sv:
             t, miss = doc_own(sv, lang, "name")
             if miss and _norm(it.get("title")) == _norm(t):

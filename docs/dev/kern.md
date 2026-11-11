@@ -183,6 +183,16 @@ c.commit()
   `wka_tick`, table files `shk_tick`, held versions `wkx_tick`), deleted table rows / columns, and the followers that put
   a table / page into the trash with a folder (`sheets/shfolder.py`, `wiki/wkfolder.py`): they write `deleted_at` directly,
   the core's run deletes them all the same.
+- 2.905.0 (#5414, stage 4c): the master data (`omd_services`, `omd_equipment`, `omd_sets`, `omd_texts`, `omd_contracts`,
+  `omd_roles` for roles and crew), the rights groups (`orgroup`, `base=` = who manages the office rights, checked after the
+  office gates of #5418), the fixed costs and an import of them taken back (`ofixed`, one row each), the cash flow's
+  corrections (`oadjust`) and a letter's links (`oletlink`; linking the same document again takes the row of the trash
+  back) moved onto the core's trash. `view=` in `ofk_register` shows such a kind in the office trash (`GET
+  /api/office/trash` lists its rows with `core` = the kind; `POST /api/office/trash/core/<kind>/<id>/restore`, `DELETE
+  .../core/<kind>/<id>`; `?undo=1` = the toast's undo with the module's rights, the person's own step). A delete answers
+  `trash: {kind, id}`. Still on the office trash of copies: drafts, parts, trips, card lines, the start balance (no id
+  column) and the sign-offs (`office_signoffs`, rows without an organisation); copies of the moved kinds made before 2.905
+  stay restorable there until their period ends (no data move).
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
   `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).

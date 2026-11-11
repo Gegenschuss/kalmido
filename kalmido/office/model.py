@@ -15,10 +15,10 @@ from datetime import date
 from flask import g, has_request_context, request
 
 from ..core.i18n import LANGS, N_, tr
-from ..core.pg import DatabaseError, insert_id, like_escape, table_columns, system_ctx, write_lock
+from ..core.pg import DatabaseError, insert_id, like_escape, qi, table_columns, system_ctx, write_lock
 from ..core.db import db, iso, local_now, now_utc, usettings
 from ..accounts.session import me
-from ..core.access import Denied, acx_drop
+from ..core.access import Denied, acx_drop, live_sql
 from ..core.rls import rls_org_open  # 2.602.0 (#4729)
 from ..core.errors import BadInput, DeniedKey
 from .packs import office_pack, office_pack_codes, office_pack_for, office_feature_on, office_path_feature
@@ -393,7 +393,7 @@ def pb_info(c, uid, oid):
     adm = [o for o in orgs if org_role(c, uid, o) == "admin"]
     move["move_orgs"] = [{"id": r["id"], "name": r["name"]} for r in c.execute(
         f"SELECT id, name FROM orgs WHERE id IN ({','.join('?' * len(adm))}) AND personal_of IS NULL ORDER BY lower(name)", adm)] if adm else []
-    used = c.execute("SELECT 1 FROM office_docs WHERE org_id=? UNION ALL SELECT 1 FROM office_services WHERE org_id=? LIMIT 1", (oid, oid)).fetchone()
+    used = c.execute(f"SELECT 1 FROM office_docs WHERE org_id=? UNION ALL SELECT 1 FROM office_services WHERE org_id=? AND {live_sql()} LIMIT 1", (oid, oid)).fetchone()  # 2.905.0 (#5414): not the trash
     if used or not orgs:
         return {"personal": 1, "org_offices": [], **move}
     return {"personal": 1, "org_offices": [{"id": w["id"], "name": w["name"]} for w in workspaces_for(c, uid)], **move}
@@ -490,7 +490,7 @@ def _id_or_none(c, v, table, oid, name):
         i = int(v)
     except (TypeError, ValueError):
         raise BadInput(tr("Invalid value: {0}", name))
-    if not c.execute(f"SELECT 1 FROM {table} WHERE id=? AND org_id=?", (i, oid)).fetchone():
+    if not c.execute(f"SELECT 1 FROM {qi(table, MD_TABLES)} WHERE id=? AND org_id=? AND {live_sql()}", (i, oid)).fetchone():  # 2.905.0 (#5414): not one in the trash
         raise BadInput(tr("Invalid value: {0}", name))
     return i
 
@@ -731,11 +731,11 @@ def fe_office_rules_migrate(c):
     orgs = {r[0] for r in c.execute("SELECT org_id FROM office_settings UNION SELECT org_id FROM office_services UNION SELECT org_id FROM office_docs "
                                     "UNION SELECT org_id FROM office_contracts").fetchall()}
     for oid in sorted(orgs):
-        prod = c.execute("SELECT 1 FROM office_services WHERE org_id=? AND producing=1 UNION ALL SELECT 1 FROM office_doc_items i JOIN office_docs d "
+        prod = c.execute(f"SELECT 1 FROM office_services WHERE org_id=? AND producing=1 AND {live_sql()} UNION ALL SELECT 1 FROM office_doc_items i JOIN office_docs d "
                          "ON d.id=i.doc_id WHERE d.org_id=? AND i.producing=1 LIMIT 1", (oid, oid)).fetchone()
-        raw = c.execute("SELECT 1 FROM office_services WHERE org_id=? AND raw_fee=1 UNION ALL SELECT 1 FROM office_doc_items i JOIN office_docs d "
+        raw = c.execute(f"SELECT 1 FROM office_services WHERE org_id=? AND raw_fee=1 AND {live_sql()} UNION ALL SELECT 1 FROM office_doc_items i JOIN office_docs d "
                         "ON d.id=i.doc_id WHERE d.org_id=? AND i.raw_fee=1 AND d.raw_mode!='none' UNION ALL SELECT 1 FROM office_contracts "
-                        "WHERE org_id=? AND raw_included=1 LIMIT 1", (oid, oid, oid)).fetchone()
+                        f"WHERE org_id=? AND raw_included=1 AND {live_sql()} LIMIT 1", (oid, oid, oid)).fetchone()
         office_settings_lock(c, oid)  # 2.269.0 B (#3014)
         r = c.execute("SELECT data FROM office_settings WHERE org_id=?", (oid,)).fetchone()
         try:
@@ -1149,6 +1149,10 @@ MD = {
                       "archived": ("int01", False, None), "trans": ("trans", False, (("name",), NAME_MAX))}},
 }
 MD_KINDS = tuple(MD)
+MD_TABLES = frozenset(m["table"] for m in MD.values())  # 2.905.0 (#5414): the allowlist of their names in SQL text (core/pg.py qi)
+# 2.905.0 (#5414): table -> the kind of the core's trash (office/okern.py; roles and crew share office_roles)
+OMD_KIND = {"office_services": "omd_services", "office_equipment": "omd_equipment", "office_sets": "omd_sets",
+            "office_texts": "omd_texts", "office_contracts": "omd_contracts", "office_roles": "omd_roles"}
 SR_COSTS = {"cost_day": "day", "cost_hour": "hour"}  # 2.47.0 (#1649): field -> key in office_roles.costs
 JSON_COLS = {"items", "rates"}
 
@@ -1197,7 +1201,7 @@ def office_rows(c, oid, kind, archived=True, q="", letters=False):
     """letters: 2.470.0 (#3596) texts with the letter blocks: only for the callers that checked the correspondence right (office/web.py)
     and the block routes; everyone else (documents, agents, export, reseed) never sees these rows."""
     m = MD[kind]
-    sql = f"SELECT * FROM {m['table']} WHERE org_id=?"
+    sql = f"SELECT * FROM {qi(m['table'], MD_TABLES)} WHERE org_id=? AND {live_sql()}"  # 2.905.0 (#5414): a row in the core's trash is gone here
     args = [oid]
     if m.get("kind"):  # 2.47.0 (#1649): office_roles holds two masters
         sql += " AND kind=?"
@@ -1236,7 +1240,7 @@ def office_row(c, oid, kind, rid):
         rid = int(rid)
     except (TypeError, ValueError):
         raise Denied(404)
-    r = c.execute(f"SELECT * FROM {MD[kind]['table']} WHERE id=? AND org_id=?", (rid, oid)).fetchone()
+    r = c.execute(f"SELECT * FROM {qi(MD[kind]['table'], MD_TABLES)} WHERE id=? AND org_id=? AND {live_sql()}", (rid, oid)).fetchone()  # 2.905.0 (#5414): the trash = 404
     if not r or (MD[kind].get("kind") and r["kind"] != MD[kind]["kind"]):  # 2.47.0 (#1649): a crew id is no freelancer role
         raise Denied(404)
     return _row_dict(kind, r, c, oid)
@@ -1276,7 +1280,7 @@ def _clean_col(c, oid, kind, k, v):
             if not c.execute(f"SELECT 1 FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (i,)).fetchone():
                 raise BadInput(tr("Invalid value: {0}", k))
             pb_cl_live(c, oid, i)
-        elif not c.execute(f"SELECT 1 FROM {spec} WHERE id=? AND org_id=?", (i, oid)).fetchone():
+        elif not c.execute(f"SELECT 1 FROM {qi(spec, MD_TABLES)} WHERE id=? AND org_id=? AND {live_sql()}", (i, oid)).fetchone():  # 2.905.0 (#5414)
             raise BadInput(tr("Invalid value: {0}", k))
         return i
     if typ == "cost":  # 2.47.0 (#1649): a purchase price (stored by _sr_costs)
@@ -1288,7 +1292,7 @@ def _clean_col(c, oid, kind, k, v):
             i = int(v)
         except (TypeError, ValueError):
             raise BadInput(tr("Invalid value: {0}", k))
-        if not c.execute("SELECT 1 FROM office_roles WHERE id=? AND org_id=? AND kind=?", (i, oid, spec)).fetchone():
+        if not c.execute(f"SELECT 1 FROM office_roles WHERE id=? AND org_id=? AND kind=? AND {live_sql()}", (i, oid, spec)).fetchone():
             raise BadInput(tr("Invalid value: {0}", k))
         return i
     if typ == "money":  # 2.92.0 B (#1931): an amount kept as text "1234.50" ('' = none; encrypted by _md_crypt)
@@ -1340,7 +1344,7 @@ def _clean_col(c, oid, kind, k, v):
                 eid = int(it.get("equipment_id"))
             except (TypeError, ValueError):
                 raise BadInput(tr("Invalid value: {0}", k))
-            if not c.execute("SELECT 1 FROM office_equipment WHERE id=? AND org_id=?", (eid, oid)).fetchone():
+            if not c.execute(f"SELECT 1 FROM office_equipment WHERE id=? AND org_id=? AND {live_sql()}", (eid, oid)).fetchone():
                 raise BadInput(tr("Invalid value: {0}", k))
             out.append({"equipment_id": eid, "qty": _num(it.get("qty", 1), k, 0, 1e6)})
         return json.dumps(out)
@@ -1373,7 +1377,7 @@ def _clean_col(c, oid, kind, k, v):
                 i = int(sid)
             except (TypeError, ValueError):
                 raise BadInput(tr("Invalid value: {0}", k))
-            if not c.execute("SELECT 1 FROM office_services WHERE id=? AND org_id=?", (i, oid)).fetchone():
+            if not c.execute(f"SELECT 1 FROM office_services WHERE id=? AND org_id=? AND {live_sql()}", (i, oid)).fetchone():
                 raise BadInput(tr("Invalid value: {0}", k))
             if rate in (None, ""):
                 continue
@@ -1533,7 +1537,7 @@ def sr_role_cost(c, oid, role_id, unit):
         return None
     if not k:
         return None
-    r = c.execute("SELECT * FROM office_roles WHERE id=? AND org_id=? AND kind='freelancer' AND archived=0", (rid, oid)).fetchone()
+    r = c.execute(f"SELECT * FROM office_roles WHERE id=? AND org_id=? AND kind='freelancer' AND archived=0 AND {live_sql()}", (rid, oid)).fetchone()
     if not r:
         return None
     v = _row_dict("roles", r, c, oid).get("cost_" + k)
@@ -1554,17 +1558,17 @@ def office_in_use(c, kind, rid, oid):
         # 2.42.0 (#828): the rates may be encrypted -> compared after decrypting (an organisation has few contracts)
         return any(str(rid) in (x.get("rates") or {}) for x in office_rows(c, oid, "contracts"))
     if kind == "equipment":
-        return bool(c.execute("SELECT 1 FROM office_sets WHERE org_id=? AND items ILIKE ? LIMIT 1", (oid, f'%"equipment_id": {rid},%')).fetchone()
-                    or c.execute("SELECT 1 FROM office_sets WHERE org_id=? AND items ILIKE ? LIMIT 1", (oid, f'%"equipment_id": {rid}}}%')).fetchone())
+        return bool(c.execute(f"SELECT 1 FROM office_sets WHERE org_id=? AND items ILIKE ? AND {live_sql()} LIMIT 1", (oid, f'%"equipment_id": {rid},%')).fetchone()
+                    or c.execute(f"SELECT 1 FROM office_sets WHERE org_id=? AND items ILIKE ? AND {live_sql()} LIMIT 1", (oid, f'%"equipment_id": {rid}}}%')).fetchone())
     if kind == "texts":
-        if c.execute("SELECT 1 FROM office_contracts WHERE org_id=? AND (rights_time_id=? OR rights_territory_id=? OR rights_media_id=?) LIMIT 1",
+        if c.execute(f"SELECT 1 FROM office_contracts WHERE org_id=? AND (rights_time_id=? OR rights_territory_id=? OR rights_media_id=?) AND {live_sql()} LIMIT 1",
                      (oid, rid, rid, rid)).fetchone():
             return True
         return False
     if kind == "contracts":
         return bool(c.execute("SELECT 1 FROM office_docs WHERE contract_id=? AND org_id=? LIMIT 1", (rid, oid)).fetchone())
     if kind == "roles":  # 2.47.0 (#1649): a role services point to is archived (the services then have none)
-        return bool(c.execute("SELECT 1 FROM office_services WHERE role_id=? AND org_id=? LIMIT 1", (rid, oid)).fetchone())
+        return bool(c.execute(f"SELECT 1 FROM office_services WHERE role_id=? AND org_id=? AND {live_sql()} LIMIT 1", (rid, oid)).fetchone())
     return False
 
 
@@ -1581,12 +1585,15 @@ def office_delete(c, oid, kind, rid):
             olk_rc_keep(c, r["receipt_node_id"])
         c.execute(f"UPDATE {m['table']} SET archived=1 WHERE id=? AND org_id=?", (r["id"], oid))
         return "archived"
-    from .otrash import otb_put  # 2.272.0 E2 (#3038): into the office trash first (restore); circular (otrash reads office_ctx)
-    otb_put(c, oid, me(), kind, m["table"], r["id"], str(r.get(m["label"]) or ""))
     if kind == "equipment" and r.get("receipt_node_id"):  # 2.490.0 (#3796): deleting the asset keeps its receipt's lock
         from ..receipts.suggest import olk_rc_keep
         olk_rc_keep(c, r["receipt_node_id"])
-    c.execute(f"DELETE FROM {m['table']} WHERE id=? AND org_id=?", (r["id"], oid))
+    # 2.905.0 (#5414, stage 4c): into the core's trash (deleted_at; office/okern.py, kinds OMD_KIND registered by office/web.py)
+    # instead of a copy in office_trash and the row deleted; restore / delete for good / the period: the core's
+    from .okern import ofk_trash  # circular (okern reads office_role / pb_owner here)
+    ofk_trash(c, me(), OMD_KIND[m["table"]], r["id"])
+    if has_request_context():
+        g.ofk_trash = (OMD_KIND[m["table"]], r["id"])  # the route's answer names it (the toast's undo)
     if kind == "contracts":  # 2.117.0 B (#2285): its PDF files go into the trash (purged after DMA_PURGE_DAYS)
         from .contractfiles import dma_trash_contract
         dma_trash_contract(c, oid, r["id"])
@@ -1757,7 +1764,7 @@ def _i(v):
 # ---------------------------------------------------------------- starter texts from the pack (first use of an organisation)
 def office_seed_texts(c, oid):
     """Copies the pack's rights catalogue + intro / closing into office_texts when the organisation has none yet."""
-    if c.execute(f"SELECT 1 FROM office_texts WHERE org_id=? AND kind<>'{LTX_KIND}' LIMIT 1", (oid,)).fetchone():  # 2.470.0 (#3596): letter blocks are no catalogue
+    if c.execute(f"SELECT 1 FROM office_texts WHERE org_id=? AND kind<>'{LTX_KIND}' AND {live_sql()} LIMIT 1", (oid,)).fetchone():  # 2.470.0 (#3596): letter blocks are no catalogue
         return 0
     pack = office_pack_for(office_settings(c, oid))
     if not pack:

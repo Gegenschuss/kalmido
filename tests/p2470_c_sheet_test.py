@@ -19,15 +19,26 @@ from decimal import Decimal
 N = os.path.dirname(os.path.abspath(__file__))
 SRC = os.environ.get("KALMIDO_SRC") or os.path.join(N, "..")
 # load kalmido/office/sheet.py (and calc.py) without the app package
-pkg = types.ModuleType("dkoffice")
+# 2.905.0 (#5414): sheet.py takes live_sql from ..core.access (the master data in the trash stay out), so the stand-in office
+# package sits below a stand-in top package "dk" with a dk.core.access that holds only live_sql (the real one needs the app)
+top = types.ModuleType("dk")
+top.__path__ = []
+sys.modules["dk"] = top
+core = types.ModuleType("dk.core")
+core.__path__ = []
+sys.modules["dk.core"] = core
+acc = types.ModuleType("dk.core.access")
+acc.live_sql = lambda a="", col="deleted_at": f"{a + '.' if a else ''}{col} IS NULL"
+sys.modules["dk.core.access"] = acc
+pkg = types.ModuleType("dk.office")
 pkg.__path__ = [os.path.join(SRC, "kalmido", "office")]
-sys.modules["dkoffice"] = pkg
+sys.modules["dk.office"] = pkg
 # 2.460.0 (#3767): sheet.py also takes doc_trans from doclang.py, which needs the app package; this suite never reads a master
 # row's trans, so a stand-in with the same answer for a row without it
-dl = types.ModuleType("dkoffice.doclang")
+dl = types.ModuleType("dk.office.doclang")
 dl.doc_trans = lambda row: {}
-sys.modules["dkoffice.doclang"] = dl
-S = importlib.import_module("dkoffice.sheet")
+sys.modules["dk.office.doclang"] = dl
+S = importlib.import_module("dk.office.sheet")
 from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 

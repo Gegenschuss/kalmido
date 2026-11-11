@@ -17,7 +17,7 @@ from datetime import date
 from ..core.config import PUBLIC_URL
 from ..core.db import iso, local_now, now_utc
 from ..core.i18n import N_, lang, tr
-from ..core.access import my_inbox, wr_sql
+from ..core.access import live_sql, my_inbox, wr_sql
 from ..core.errors import BadInput
 from ..accounts.session import me
 from ..tasks.validation import log_act, log_changes, rr_problem
@@ -146,7 +146,7 @@ def eqc_sync(c, oid, eid, before=None, revive=False, uid=None):
     2.558.0 D (#4591, review F1): an unchanged maintenance takes "next" from its open task (done -> it moved on); a task made
     again for a revived device (archive, office trash) starts at the latest of next, the old task's date and today, never
     overdue. uid: whose inbox gets new tasks (default the person saving; the org import passes the importing admin)."""
-    r = c.execute("SELECT id, name, archived, warranty_until, warranty_task_id, maint FROM office_equipment WHERE id=? AND org_id=?",
+    r = c.execute(f"SELECT id, name, archived, warranty_until, warranty_task_id, maint FROM office_equipment WHERE id=? AND org_id=? AND {live_sql()}",
                   (eid, oid)).fetchone()
     if not r:
         return

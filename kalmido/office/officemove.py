@@ -37,7 +37,7 @@ from datetime import timedelta
 from flask import jsonify
 
 from ..core.config import OFFICE_DIR, app
-from ..core.access import Denied
+from ..core.access import Denied, live_sql, trash_sql
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.i18n import N_, tr, trn
 from ..core.merges import mg_fk_refs
@@ -444,7 +444,7 @@ def ofm_letter_links(c, p):
     """2.356.1 (#3344): {letter id: [office_letter_links rows]} of the moving letter drafts."""
     out = {}
     for r in p["letters"]:
-        rows = c.execute("SELECT * FROM office_letter_links WHERE letter_id=? ORDER BY id", (r["id"],)).fetchall()
+        rows = c.execute(f"SELECT * FROM office_letter_links WHERE letter_id=? AND {live_sql()} ORDER BY id", (r["id"],)).fetchall()  # 2.905.0 (#5414)
         if rows:
             out[r["id"]] = rows
     return out
@@ -470,7 +470,7 @@ def ofm_plan_sets(c, src, rows, p):
     """2.356.1 (#3345): p["sets"] = [{row, mode: move | copy}], p["set_devs"] = [{row, mode}] (each device once)."""
     ids = {r["id"] for r in rows}
     other = set()  # the devices of the sets that stay in the old office
-    for x in c.execute("SELECT id, items FROM office_sets WHERE org_id=?", (src,)).fetchall():
+    for x in c.execute(f"SELECT id, items FROM office_sets WHERE org_id=? AND {live_sql()}", (src,)).fetchall():  # 2.905.0 (#5414, review): not the trash's
         if x["id"] not in ids:
             other |= {ofm_set_eid(i) for i in ofm_set_items(x["items"])}
     devs = {}
@@ -484,7 +484,7 @@ def ofm_plan_sets(c, src, rows, p):
             if eid in devs:
                 devs[eid]["mode"] = "copy" if mode == "copy" else devs[eid]["mode"]
                 continue
-            d = c.execute("SELECT * FROM office_equipment WHERE id=? AND org_id=?", (eid, src)).fetchone() if eid else None
+            d = c.execute(f"SELECT * FROM office_equipment WHERE id=? AND org_id=? AND {live_sql()}", (eid, src)).fetchone() if eid else None  # 2.905.0 (#5414): not one in the trash
             if not d:
                 continue
             used = mode == "copy" or eid in other or bool(ofm_refs(c, "office_equipment", eid)) or c.execute(
@@ -573,7 +573,7 @@ def ofm_plan_simple(c, what, src, rows, p):
     kts = {k[0] for k in OFM_SIMPLE[what][1]}
     in_sets = set()
     if what == "equipment":  # the sets name their devices in a JSON list (no foreign key)
-        for x in c.execute("SELECT items FROM office_sets WHERE org_id=?", (src,)).fetchall():
+        for x in c.execute(f"SELECT items FROM office_sets WHERE org_id=? AND {live_sql()}", (src,)).fetchall():  # 2.905.0 (#5414, review)
             try:
                 in_sets |= {int(i.get("equipment_id") or 0) for i in json.loads(x["items"] or "[]") if isinstance(i, dict)}
             except (TypeError, ValueError):
@@ -654,7 +654,7 @@ def ofm_plan_office(c, uid, src, p):
     for w, t in OFM_OFFICE:
         if w == "contracts":  # no creator of their own: the framework contracts of the clients that move as a whole
             cids = [x["row"]["id"] for x in p["clients"] if x["mode"] == "move"] or [0]
-            rows = c.execute(f"SELECT * FROM office_contracts WHERE org_id=? AND client_id IN ({','.join('?' * len(cids))}) ORDER BY id",
+            rows = c.execute(f"SELECT * FROM office_contracts WHERE org_id=? AND client_id IN ({','.join('?' * len(cids))}) AND {live_sql()} ORDER BY id",
                              (src, *cids)).fetchall()
         else:
             q = "SELECT * FROM clients WHERE org_id=? AND created_by=? AND archived=0 ORDER BY id" if w == "clients" else \
@@ -1022,6 +1022,8 @@ def ofm_move_space():
             for lk in p["letter_links"].get(r["id"], ()):
                 rec.append({"t": "office_letter_links", "id": lk["id"], "gone": {k: lk[k] for k in ("letter_id", "node_id", "kind", "created_by", "agent_id", "created_at")}})
                 c.execute("DELETE FROM office_letter_links WHERE id=?", (lk["id"],))
+            # 2.905.0 (#5414): its links in the core's trash cannot come back in the old office once the letter moved: gone for good
+            c.execute(f"DELETE FROM office_letter_links WHERE letter_id=? AND {trash_sql()}", (r["id"],))
             ofm_move_row(c, rec, "office_letters", r, src, dst, dst, {**{k: None for k in OFM_LETTER_CLEAR}, "updated_at": ts})
         detail = {"src": src, "dst": dst, "what": what, "ids": ids, "copy": 1 if copy else 0, "rows": rec, "made": made, "at": ts}
         mid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES(?,?,?,?,?,?,?)",
@@ -1294,11 +1296,11 @@ def rmv_texts(c, r, src, dst, tmap, made):
         if not tid:
             continue
         if tid not in tmap:
-            t = c.execute("SELECT * FROM office_texts WHERE id=? AND org_id=?", (tid, src)).fetchone()
+            t = c.execute(f"SELECT * FROM office_texts WHERE id=? AND org_id=? AND {live_sql()}", (tid, src)).fetchone()
             if not t:
                 tmap[tid] = None
             else:
-                same = c.execute("SELECT id FROM office_texts WHERE org_id=? AND kind=? AND text_de=? AND text_en=? ORDER BY archived, id LIMIT 1",
+                same = c.execute(f"SELECT id FROM office_texts WHERE org_id=? AND kind=? AND text_de=? AND text_en=? AND {live_sql()} ORDER BY archived, id LIMIT 1",
                                  (dst, t["kind"], t["text_de"], t["text_en"])).fetchone()
                 if same:
                     tmap[tid] = same["id"]
@@ -1375,7 +1377,7 @@ def rmv_unmake(c, m, dst, gone):
     if t in ("office_equipment", "office_sets") and (c.execute(
             "SELECT 1 FROM hub_bookings WHERE org_id=? AND resource_kind=? AND resource_id=? AND deleted_at IS NULL LIMIT 1",
             (dst, "equipment" if t == "office_equipment" else "set", rid)).fetchone() or t == "office_equipment" and any(
-            rid in {ofm_set_eid(i) for i in ofm_set_items(x["items"])} for x in c.execute("SELECT items FROM office_sets WHERE org_id=?", (dst,)).fetchall())):
+            rid in {ofm_set_eid(i) for i in ofm_set_items(x["items"])} for x in c.execute(f"SELECT items FROM office_sets WHERE org_id=? AND {live_sql()}", (dst,)).fetchall())):
         return 0
     if ofm_refs(c, t, rid):
         return 1 if t == "office_contracts" else 0  # used in the target since: it stays

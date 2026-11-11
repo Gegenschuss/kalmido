@@ -12,7 +12,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
 from ..core.db import usettings, uset  # 2.356.0 B (#2932)
 from ..accounts.session import me
-from ..core.access import Denied, acx_drop, acx_warm_register, acx_lists_sql, joined_lists_sql, dlg_gone, plists, pvis, qn_private, token_lists
+from ..core.access import Denied, acx_drop, acx_warm_register, acx_lists_sql, joined_lists_sql, dlg_gone, live_sql, plists, pvis, qn_private, token_lists
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file, rck_admin_gone, rck_org_admins  # 2.149.0 G (#2517): pulled up from functions; 2.539.0 (#4373): rck_*
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -198,7 +198,7 @@ def _office_keep_on_join(c, uid):
         pid = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()
         if not pid:
             return False
-        used = c.execute("SELECT 1 FROM office_docs WHERE org_id=? UNION ALL SELECT 1 FROM office_services WHERE org_id=? "
+        used = c.execute(f"SELECT 1 FROM office_docs WHERE org_id=? UNION ALL SELECT 1 FROM office_services WHERE org_id=? AND {live_sql()} "  # 2.905.0 (#5414): not the trash
                          "UNION ALL SELECT 1 FROM office_purchases WHERE org_id=? UNION ALL SELECT 1 FROM office_bank_tx WHERE org_id=? "
                          "UNION ALL SELECT 1 FROM office_cash_entries WHERE org_id=? "
                          "UNION ALL SELECT 1 FROM clients WHERE org_id IS NULL AND created_by=? LIMIT 1", (pid[0],) * 5 + (uid,)).fetchone()

@@ -26,7 +26,7 @@ from datetime import date as _date
 from flask import Response, jsonify, request
 
 from ..core.config import app, MAX_FILE_MB, OFFICE_DIR
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import N_, tr
@@ -59,7 +59,8 @@ def dma_path(oid, file):
 
 
 def dma_contract(c, oid, cid):
-    r = c.execute("SELECT id, name FROM office_contracts WHERE id=? AND org_id=?", (int(cid), oid)).fetchone()
+    # 2.905.0 (#5414, review): a contract in the trash takes no files (its files went to the files' trash with it)
+    r = c.execute(f"SELECT id, name FROM office_contracts WHERE id=? AND org_id=? AND {live_sql()}", (int(cid), oid)).fetchone()
     if not r:
         raise Denied(404)
     return r

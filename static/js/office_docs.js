@@ -1341,8 +1341,8 @@ function ofd_fltHtml() {
 }
 
 // 2.272.0 E2 (#3038): the office trash - deleted drafts and master data, restore or delete for good, the trash period
-async function otb_restore(tid, after) {
-  let j; try { j = await api('POST', `/api/office/trash/${tid}/restore`); } catch (x) { ofcErr(x); return; }
+async function otb_restore(tid, after, core) {  // 2.905.0 (#5414): core = the kind of a row in the core's trash (tid = its id)
+  let j; try { j = await api('POST', core ? `/api/office/trash/core/${core}/${tid}/restore` : `/api/office/trash/${tid}/restore`); } catch (x) { ofcErr(x); return; }
   toast(j.note || tr('Restored'));  // 2.552.0 (#4561 B19): a draft whose client is gone for good comes back without one
   if (j.kind === 'trip' || j.kind === 'trip_item') { if (typeof RK !== 'undefined') RK.data = null; }  // 2.530.0 C (#4315)
   if (j.kind === 'trip_import' && typeof RK !== 'undefined') RK.data = null;  // 2.567.0 (#4707): the kinds of the cash flow / imports
@@ -1355,7 +1355,7 @@ async function otb_restore(tid, after) {
 }
 async function otb_open() {
   let d; try { d = await api('GET', '/api/office/trash'); } catch (x) { ofcErr(x); return; }
-  const row = x => `<li data-id="${x.id}"><span class="an">${esc(x.kind === 'doc' ? ofdKindName(x.sub, true) : x.kind === 'trip' ? tr('Trip') : x.kind === 'trip_item' ? tr('Receipt') : x.kind === 'cc_line' ? tr('Credit card position') : ({part: tr('Part'), rgroup: tr('Rights group'), signoff: tr('Video sign-off'), fixed_cost: tr('Fixed cost'), fixed_import: tr('Fixed costs'), cf_start: tr('Starting balance'), cf_adjust: tr('Correction'), letter_link: tr('Letter'), trip_import: tr('Trips')})[x.kind] || tr('Master data'))}${x.label ? ' · ' + esc(x.label) : ''}</span> <span class="muted">${esc(fmtDayAbs(x.deleted_at.slice(0, 10)))}</span>
+  const row = x => `<li data-id="${x.id}"${x.core ? ` data-core="${esc(x.core)}"` : ''}><span class="an">${esc(x.kind === 'doc' ? ofdKindName(x.sub, true) : x.kind === 'trip' ? tr('Trip') : x.kind === 'trip_item' ? tr('Receipt') : x.kind === 'cc_line' ? tr('Credit card position') : ({part: tr('Part'), rgroup: tr('Rights group'), signoff: tr('Video sign-off'), fixed_cost: tr('Fixed cost'), fixed_import: tr('Fixed costs'), cf_start: tr('Starting balance'), cf_adjust: tr('Correction'), letter_link: tr('Letter'), trip_import: tr('Trips')})[x.kind] || tr('Master data'))}${x.label ? ' · ' + esc(x.label) : ''}</span> <span class="muted">${esc(fmtDayAbs(x.deleted_at.slice(0, 10)))}</span>
     <button type="button" class="linkbtn" data-m="restore">${esc(tr('Restore'))}</button> <button type="button" class="linkbtn" data-m="purge">${esc(tr('Delete permanently'))}</button></li>`;
   const md = modal(`<h3>${esc(tr('Trash'))}</h3>${d.items.length ? `<ul class="atrash otblist">${d.items.map(row).join('')}</ul>` : `<p class="muted">${esc(tr('The trash is empty'))}</p>`}
     <p class="muted">${esc(trashNote(tr('Items in the trash are deleted permanently after {0} days.', d.days)))}</p><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
@@ -1363,10 +1363,10 @@ async function otb_open() {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     const li = b.closest('li'), id = +li?.dataset.id; if (!id) return;
-    if (b.dataset.m === 'restore') { md.remove(); await otb_restore(id); return; }
+    if (b.dataset.m === 'restore') { md.remove(); await otb_restore(id, null, li.dataset.core); return; }
     if (b.dataset.m === 'purge') {
       if (!await askConfirm(tr('Delete “{0}” permanently?', li.querySelector('.an')?.textContent || ''), tr('This cannot be undone.'), {ok: tr('Delete permanently'), danger: true})) return;
-      try { await api('DELETE', `/api/office/trash/${id}`); li.remove(); } catch (x) { ofcErr(x); }
+      try { await api('DELETE', li.dataset.core ? `/api/office/trash/core/${li.dataset.core}/${id}` : `/api/office/trash/${id}`); li.remove(); } catch (x) { ofcErr(x); }
     }
   });
 }

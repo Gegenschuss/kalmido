@@ -13,7 +13,7 @@ from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, uset
 from ..core.retention import ret_days
 from ..accounts.session import me
 from ..accounts.orgroles import need_org_write
-from ..core.access import Denied, MANAGE_ROLES, list_role, need_feat, tvis, vis_sql
+from ..core.access import Denied, MANAGE_ROLES, list_role, live_sql, need_feat, tvis, vis_sql
 from ..core.errors import BadInput
 from ..core.numtext import server_num
 from ..accounts.orgs import INSTANCE_ENV, user_orgs, is_org_admin, ws_chosen_org  # 2.369.5 (#2517): pulled up from functions
@@ -580,7 +580,9 @@ CL_HOLD = ("office_docs", "office_contracts", "office_archive", "office_drives",
 # 2.223.3 B (#2878): of these only finalised documents hold a client (not drafts, not trial documents), trips only with
 # receipt items; contracts, the archive and the logbook (it prints the client's name from here) as before
 CL_HOLD_WHERE = {"office_docs": "x.locked_at IS NOT NULL AND x.trial=0",
-                 "office_trips": "x.id IN (SELECT trip_id FROM office_trip_items)"}
+                 "office_trips": "x.id IN (SELECT trip_id FROM office_trip_items)",
+                 # 2.905.0 (#5414, review): a framework contract in the office trash (soft delete since 4c) holds nobody
+                 "office_contracts": live_sql("x")}
 
 
 def cl_hold_sql(t="clients"):

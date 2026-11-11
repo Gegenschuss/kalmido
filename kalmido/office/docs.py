@@ -16,7 +16,7 @@ from ..core.pg import insert_id, like_escape, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_item_store, oc_json_store
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.errors import BadInput, BadKey, DeniedKey
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
 from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, calc_tax_day, dec, fmt_money, fmt_rate, inv_calc, office_calc
@@ -156,7 +156,7 @@ def doc_items(c, did, oid, part=None):
 
 
 def _texts(c, oid, kind=None):
-    sql = "SELECT * FROM office_texts WHERE org_id=? AND archived=0"
+    sql = f"SELECT * FROM office_texts WHERE org_id=? AND archived=0 AND {live_sql()}"  # 2.905.0 (#5414): not the trash
     args = [oid]
     if kind:
         sql += " AND kind=?"
@@ -175,7 +175,7 @@ def _iid(v):
 def _text_of(c, oid, tid, lang):
     if not tid:
         return None
-    r = c.execute("SELECT text_de, text_en, trans FROM office_texts WHERE id=? AND org_id=?", (_iid(tid), oid)).fetchone()
+    r = c.execute(f"SELECT text_de, text_en, trans FROM office_texts WHERE id=? AND org_id=? AND {live_sql()}", (_iid(tid), oid)).fetchone()
     if not r:
         return None
     return doc_own(r, lang, "text")[0] or r["text_de"] or r["text_en"] or ""  # 2.460.0 (#3767): its own language, else English (doc_own)
@@ -184,7 +184,7 @@ def _text_of(c, oid, tid, lang):
 def _contract(c, oid, cid):
     if not cid:
         return None
-    r = c.execute("SELECT * FROM office_contracts WHERE id=? AND org_id=?", (_iid(cid), oid)).fetchone()
+    r = c.execute(f"SELECT * FROM office_contracts WHERE id=? AND org_id=? AND {live_sql()}", (_iid(cid), oid)).fetchone()
     if not r:
         return None
     d = oc_dec_fields(c, oid, "office_contracts", r)  # 2.42.0 (#828)
@@ -195,7 +195,7 @@ def _contract(c, oid, cid):
 def _service(c, oid, sid):
     if not sid:
         return None
-    r = c.execute("SELECT * FROM office_services WHERE id=? AND org_id=?", (_iid(sid), oid)).fetchone()
+    r = c.execute(f"SELECT * FROM office_services WHERE id=? AND org_id=? AND {live_sql()}", (_iid(sid), oid)).fetchone()
     return dict(r) if r else None
 
 

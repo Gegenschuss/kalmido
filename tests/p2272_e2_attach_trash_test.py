@@ -142,9 +142,10 @@ def office_case(s, who):
     check(s.post(B + f"/api/office/trash/{tid}/restore").status_code == 404, f"{who}: a second restore: 404")
     sv = s.post(B + "/api/office/services", json={"name_de": f"Schnitt {who}", "daily_rate": 400}).json()["id"]
     r = s.delete(B + f"/api/office/services/{sv}")
-    st = r.json().get("trash_id")
-    check(r.ok and r.json().get("result") == "deleted" and st, f"{who}: a service into the office trash {r.text[:160]}")
-    check(s.post(B + f"/api/office/trash/{st}/restore").ok and s.get(B + f"/api/office/services/{sv}").json().get("daily_rate") == 400,
+    # 2.905.0 (#5414): a service lies in the core's trash (trash = {kind, id}), the office trash lists it, restore through core/
+    st = r.json().get("trash") or {}
+    check(r.ok and r.json().get("result") == "deleted" and st.get("id") == sv, f"{who}: a service into the office trash {r.text[:160]}")
+    check(s.post(B + f"/api/office/trash/core/{st.get('kind')}/{sv}/restore").ok and s.get(B + f"/api/office/services/{sv}").json().get("daily_rate") == 400,
           f"{who}: the service is back")
     # into the trash again, made old
     did_tid = s.delete(B + f"/api/office/docs/{did}").json().get("trash_id")
