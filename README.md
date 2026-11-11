@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.900.0** (2026-11-11):
-- **Documents**: "Optimise PDF" turns a scan into a small, searchable new version; the original stays as an older version.
-- **Office**: receipts list comes first, one upload button, hints only for real gaps.
-- **Split view**: the right half is the full app with navigation, offered from about 1440 px.
-- **Project lock**: undo copies and history rows of locked projects no longer keep plain texts.
+**2.941.0** (2026-11-11):
+- **Sharing**: team chat rooms, calendars and address books now share only through the shared core.
+- **Calm view**: the screen no longer jumps after a redraw; pictures in knowledge pages and bookmarks keep their size while loading.
+- **Files**: the left panel uses the same calm row grid as Projects.
+- **Agents**: undoing an applied proposal takes the whole proposal back.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 

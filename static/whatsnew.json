@@ -1,6 +1,16 @@
 {
  "versions": [
   {
+   "version": "2.941.0",
+   "date": "2026-11-11",
+   "items": [
+    {
+     "de": "Die linke Leiste von Dateien hat jetzt dasselbe ruhige Zeilenraster wie Projekte.",
+     "en": "The left panel of Files now has the same calm row grid as Projects."
+    }
+   ]
+  },
+  {
    "version": "2.910.0",
    "date": "2026-11-11",
    "items": [
