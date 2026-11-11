@@ -3,6 +3,9 @@
 #   static/i18n/<code>.json  merged by key (tools/i18n_merge.py): two packages that add different texts never conflict
 #   static/sw.js             precache lists rebuilt from index.html + lazyload.js when only they conflict (tools/sw_lists.py)
 #   tests/skip.txt, tests/selfstart.txt   line set merge (tools/lines_merge.py, 2.358.0 #3394: git's union brought deleted lines back)
+#   tools/*_baseline.json    by JSON value (tools/baseline_merge.py, 2.928.0 #5597): two packages lowering counts never conflict
+#   docs/dev/kern.md, docs/API.md, docs/OFFICE.md   paragraphs both sides added at one place are both kept (tools/doc_merge.py)
+# A tree without the driver's script yet (a branch from before it) gets git's own line merge: registering early is harmless.
 set -euo pipefail
 cd "$(dirname "$(realpath "$0")")/.."
 git config merge.i18n.name "Kalmido translations by key"
@@ -12,4 +15,8 @@ git config merge.swlists.driver "python3 tools/sw_lists.py %O %A %B"
 git config merge.lines.name "Kalmido line lists (deleted stays deleted)"
 # a tree without tools/lines_merge.py yet (a branch from before 2.358.0): git's union as before
 git config merge.lines.driver "python3 tools/lines_merge.py %O %A %B 2>/dev/null || git merge-file --union -q %A %O %B"
+git config merge.baseline.name "Kalmido lint baselines by JSON value"
+git config merge.baseline.driver 'if [ -f tools/baseline_merge.py ]; then python3 tools/baseline_merge.py %O %A %B; else git merge-file -q %A %O %B; fi'
+git config merge.docs.name "Kalmido developer docs (added paragraphs kept)"
+git config merge.docs.driver 'if [ -f tools/doc_merge.py ]; then python3 tools/doc_merge.py %O %A %B; else git merge-file -q %A %O %B; fi'
 echo "git merge drivers registered in $(git rev-parse --show-toplevel)"
