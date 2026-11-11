@@ -186,12 +186,14 @@ cur = requests.get(V + "/agent/events?since=latest", headers=FBH).json()["cursor
 check(F.post(B + f"/api/agent-schedules/{SID}/run").ok, "#5684: Run now")
 ev = [e for e in events(FBH, cur) if e["event"] == "scheduled_job"]
 check(len(ev) == 1 and ev[0]["data"].get("review") is True and ev[0]["data"]["title"] == "Weekly audit", f"#5684: scheduled_job with review: true {ev}")
-r = F.patch(B + f"/api/agent-schedules/{SID}", json={"action": "chat"})
+r = F.post(B + f"/api/agents/{FB}/schedules", json={"title": "Morning", "prompt": "Plan my day", "freq": "daily", "time": "07:00"})
+SID2 = r.json().get("id")  # another plan: Run now waits a few minutes per plan (SCHED_RUN_GAP_S)
 cur = requests.get(V + "/agent/events?since=latest", headers=FBH).json()["cursor"]
-F.post(B + f"/api/agent-schedules/{SID}/run")
+F.post(B + f"/api/agent-schedules/{SID2}/run")
 ev = [e for e in events(FBH, cur) if e["event"] == "scheduled_job"]
-check(r.ok and len(ev) == 1 and ev[0]["data"].get("review") is False, f"#5684: a chat plan: review false {ev}")
-F.delete(B + f"/api/agent-schedules/{SID}")
+check(r.status_code == 201 and len(ev) == 1 and ev[0]["data"].get("review") is False, f"#5684: a chat plan: review false {ev}")
+for x in (SID, SID2):
+    F.delete(B + f"/api/agent-schedules/{x}")
 _, G = freelancer(B, A, name="gero")
 check(G.get(B + f"/api/my/agents/{FB}/model-usage").status_code == 404, "#5684: another person without an organisation: 404")
 check(G.patch(B + f"/api/my/agents/{FB}", json={"runtime": {"rotate_runs": 20}}).status_code in (403, 404), "another person: not theirs")
