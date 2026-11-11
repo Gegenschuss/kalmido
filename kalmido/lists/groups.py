@@ -7,7 +7,7 @@ from ..core.pg import insert_id, st_ids, system_ctx
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
-from ..core.access import Denied, dlg_gone, my_max_sort, need_collab, need_list, qn_private, ROLES, task_visible
+from ..core.access import Denied, dlg_gone, live_sql, my_max_sort, need_collab, need_list, qn_private, ROLES, task_visible
 from ..lists.lists import clean_folder
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgroles import org_role_key  # 2.568.0 (#4739)
@@ -74,7 +74,7 @@ def grp_folder_rows(c, owner=None, gid=None, nids=None):
     (a folder not in the trash, not expired; its owner and path: lffolder.lf_node_folder)."""
     from .lffolder import lf_node_folder
     from ..files.store import _now
-    q, a = ["n.kind='folder'", "n.deleted_at IS NULL", "s.group_id IS NOT NULL", "COALESCE(s.list_own, 0)=0",
+    q, a = ["n.kind='folder'", live_sql("n"), "s.group_id IS NOT NULL", "COALESCE(s.list_own, 0)=0",
             "(s.expires_at IS NULL OR s.expires_at > ?)"], [_now()]
     if owner is not None:
         q.append("n.owner_id=?")

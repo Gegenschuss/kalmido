@@ -482,6 +482,7 @@ Lists and projects: folders, sections, fields, formulas, templates, sprints, sha
 - `kalmido/lists/listhead.py` (`o3c`) - The header strip of a list (and of an owner's folder)
 - `kalmido/lists/lists.py` (`agent`) - Lists: create, change, share (people + agents)
 - `kalmido/lists/listtrash.py` (`otr`) - The trash of deleted lists
+- `kalmido/lists/lkretire.py` (`lk`) - Stage 7d of the shared core: folder_people and group_shares go at the start
 - `kalmido/lists/lmcore.py` (`lmc`) - Stage 6 of the shared core
 - `kalmido/lists/lmove.py` - A project into another workspace
 - `kalmido/lists/lpundo.py` - Undo across devices for a project's plain settings (PATCH /api/lists/<id>)

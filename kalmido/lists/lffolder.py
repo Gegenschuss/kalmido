@@ -50,7 +50,7 @@ import threading
 from flask import has_app_context, jsonify
 
 from ..core.config import app
-from ..core.access import Denied, acx_of, joined_lists_sql, qn_is, reading_ids, reading_sql  # 2.477.0 (#3881): + qn_is
+from ..core.access import Denied, acx_of, joined_lists_sql, live_sql, qn_is, reading_ids, reading_sql  # 2.477.0 (#3881): + qn_is
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc, uset, usettings
 from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx, table_exists
@@ -507,7 +507,7 @@ def lf_people_rows(c, owner=None, uid=None):
     and person the highest list role of the live shares (not expired, a folder not in the trash, no group's share, not the
     folder owner's own), owner = only the folders of that person, uid = only the shares with that person / agent. Read at
     runtime from fs_shares, so an expiry ends it at once (no tick needed)."""
-    q, a = ["n.kind='folder'", "n.deleted_at IS NULL", "s.group_id IS NULL", "COALESCE(s.list_own, 0)=0",
+    q, a = ["n.kind='folder'", live_sql("n"), "s.group_id IS NULL", "COALESCE(s.list_own, 0)=0",
             "(s.expires_at IS NULL OR s.expires_at > ?)"], [_now()]
     if owner is not None:
         q.append("n.owner_id=?")
