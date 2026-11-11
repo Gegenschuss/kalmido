@@ -107,7 +107,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(clk('[data-cd="yes"]'));
     check(await ready(ev, `${getJ('/api/office/trips?year=2025')}.then(j => j.trips.length === 3)`), 'the copy is deleted');
     // CI of 2.307.7: the own toast before its button (an older toast and its Undo can still be there on a slow runner)
-    check(await ready(ev, `!document.querySelector('#toast').classList.contains('hidden') && /Deleted/.test(document.querySelector('#toast').textContent) && !!document.querySelector('#toast button:not(.tx)')`), 'the delete toast with undo');
+    check(await ready(ev, `!document.querySelector('#toast').classList.contains('hidden') && /Deleted|Moved to the trash/.test(document.querySelector('#toast').textContent) && !!document.querySelector('#toast button:not(.tx)')`), 'the delete toast with undo');
     await ev(clk('#toast button'));
     check(await ready(ev, `${getJ('/api/office/trips?year=2025')}.then(j => j.trips.length === 4)`), 'one undo step brings it back');
 

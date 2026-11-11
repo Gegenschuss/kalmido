@@ -152,7 +152,7 @@ async function round(who, ck) {
   check(await until(() => w.__held.length === 2), `${who}: the second Delete is held`);
   w.__held[1].go();
   check(await until(async () => !(await trips()).some(t => t.dest === 'Bremen')), `${who}: the server deleted it`);
-  check(await until(() => toastHas(/Deleted/) && !rowOf(/Bremen/)), `${who}: "Deleted" with undo after the answer`);
+  check(await until(() => toastHas(/Deleted|Moved to the trash/) && !rowOf(/Bremen/)), `${who}: "Deleted" with undo after the answer`);  // 2.925.0 (#5454): the trash says so
   unhold(w);
   await sleep(300);  // a reload the actions might start would be on its way by now
   check(!stateFetches(w).length, `${who}: no action fetched the whole state again: ` + stateFetches(w).join(' | ') + ' (all: ' + w.__sent.join(' ; ') + ')');

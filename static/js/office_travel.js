@@ -46,7 +46,7 @@ const rk_tripOut = id => () => {
 async function rk_tripDel(t) {  // after the question: gone at once, the undo after the answer
   let j; try { j = await optWrite(rk_tripOut(t.id), () => api('DELETE', `/api/office/trips/${t.id}`), ofcDraw, {mod: true}); } catch { return; }
   rk_refresh();
-  toast(tr('Deleted'), async () => { const r = await (j.trash_id ? api('POST', `/api/office/trips/trash/${j.trash_id}/restore`) : api('POST', '/api/office/trips', j.trip)); rk_refresh(); if (r?.restore_note) toast(r.restore_note); });  // 2.530.0 C (#4315): from the office trash; 2.560.0 (#4667): the sentence when its client is gone for good
+  toast(j.trash_id ? tr('Moved to the trash') : tr('Deleted') /* 2.925.0 (#5454): says where it went */, async () => { const r = await (j.trash_id ? api('POST', `/api/office/trips/trash/${j.trash_id}/restore`) : api('POST', '/api/office/trips', j.trip)); rk_refresh(); if (r?.restore_note) toast(r.restore_note); });  // 2.530.0 C (#4315): from the office trash; 2.560.0 (#4667): the sentence when its client is gone for good
 }
 const rk_cat = k => (RK.data?.categories || []).find(c => c.key === k)?.label || k;
 const rk_home = () => RK.data?.currency || ofcCur();
@@ -362,7 +362,7 @@ function rk_itemModal(t, i) {
         md.remove();
         let j; try { j = await optWrite(rk_itemsPut(t.id, its => its.filter(x => x.id !== i.id)), () => api('DELETE', `/api/office/trips/${t.id}/items/${i.id}`), ofcDraw, {mod: true}); } catch { return; }
         rk_tripSet(j.trip); rk_refresh();
-        const o = j.item; toast(tr('Deleted'), async () => { if (j.trash_id) { await api('POST', `/api/office/trips/trash/${j.trash_id}/restore`); rk_refresh(); return; } await api('POST', `/api/office/trips/${t.id}/items`, {date: o.date, category: o.category, amount: o.amount, currency: o.currency, fx_rate: o.fx_rate, amount_home: o.amount_home, text: o.text, datev: o.datev, datev_no: o.datev_no, vat_pct: o.vat_pct ?? null}); rk_refresh(); });
+        const o = j.item; toast(j.trash_id ? tr('Moved to the trash') : tr('Deleted') /* 2.925.0 (#5454): says where it went */, async () => { if (j.trash_id) { await api('POST', `/api/office/trips/trash/${j.trash_id}/restore`); rk_refresh(); return; } await api('POST', `/api/office/trips/${t.id}/items`, {date: o.date, category: o.category, amount: o.amount, currency: o.currency, fx_rate: o.fx_rate, amount_home: o.amount_home, text: o.text, datev: o.datev, datev_no: o.datev_no, vat_pct: o.vat_pct ?? null}); rk_refresh(); });
         return;
       }
       const v = id => $(id, md)?.value ?? '';
