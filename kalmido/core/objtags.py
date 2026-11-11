@@ -27,7 +27,7 @@ the content of a task. tests/p2925_c_tags_core_test.py holds this.
 import re
 
 from .db import now_utc
-from .pg import insert_id
+from .pg import insert_id, st_ids
 
 OTG_SCOPES = ("user", "list", "org", "ws")
 OTG_PROJECT = ("list", "org")  # the scopes a task's project gives it (this stage)
@@ -326,9 +326,10 @@ def otg_user_of(c, uid, ids=None):
     q = f"""SELECT k.obj_id, ot.name FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id
             WHERE k.kind='task' AND ot.scope_kind='user' AND ot.scope_id=CAST(CAST(? AS BIGINT) AS TEXT)
             {"AND k.obj_id = ANY(CAST(? AS BIGINT[]))" if ids is not None else ""} ORDER BY ot.name, k.obj_id"""
-    args = (int(uid),) if ids is None else (int(uid), sorted({int(x) for x in ids if x}))
-    if ids is not None and not args[1]:
+    ids = None if ids is None else sorted({int(x) for x in ids if x})
+    if ids is not None and not ids:
         return out
+    args = (int(uid),) if ids is None else (int(uid), st_ids(ids))  # one array literal (2.65.0 #1505)
     for r in c.execute(q, args):
         out.setdefault(r[0], []).append(r[1])
     return out

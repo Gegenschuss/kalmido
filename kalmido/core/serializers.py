@@ -117,7 +117,7 @@ def task_dict(r, tags, full_snips=False):
 def tags_for(c, ids=None, uid=None):
     uid = uid or me()
     # 2.955.0 (#5276): the personal tags of the core (obj_tags scope user; were task_tags); 2.65.0 (#1505): only these tasks
-    return otg_user_of(c, uid, None if ids is None else st_ids(set(ids)))
+    return otg_user_of(c, uid, ids)
 
 
 ST_NOTE_MAX = 200  # 2.280.0 A (#3108): a longer note is not in the start state (lean_notes)
