@@ -12,7 +12,8 @@ freelancer-matrix: office
    a letter sample fills the client / company / today; legal samples are marked
  - #2285: upload (only PDF, magic %PDF-, size limit), list, open (the same bytes, a download), date change, replace (the old
    one into the trash), remove + restore (undo), the paper clip count in the contracts list, the file sealed at rest
-   (0600); deleting the contract puts its files into the trash; the purge after 30 days removes row and file
+   (0600); deleting the contract puts its files into the trash; the purge after 30 days removes row and file (2.993.0
+   #5413: the core's retention run, kind ocfile)
  - rights: an organisation member with the office reads but cannot write (403); a member without the office module 403;
    an agent 403; another organisation 404 (its contract and file ids); a person without organisation (personal office)
    uses everything
@@ -236,7 +237,12 @@ rows = sql("SELECT id, deleted_at FROM office_contract_files WHERE contract_id=?
 check(len(rows) == 3 and all(x[1] for x in rows), f"#2285: its files are in the trash {rows}")
 check(A.get(B + F).status_code == 404, "#2285: the deleted contract's files 404")
 sql("UPDATE office_contract_files SET deleted_at='2020-01-01T00:00:00Z' WHERE contract_id=?", (C1,), write=True)
-A.get(B + O + "/contracts")
+# 2.993.0 (#5413): the files' trash is the core's (kind ocfile): its retention run purges them, no more the read of the list
+CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+out = subprocess.run(["docker", "exec", "-e", "KALMIDO_PURGE_TRASH=1", CT, "python", "-c",
+                      "import json, app\nfrom kalmido.core.writes import obj_trash_tick\nc = app.connect()\n"
+                      "try:\n    print(json.dumps(obj_trash_tick(c, force=True)))\nfinally:\n    c.close()"], capture_output=True, text=True)
+check(out.returncode == 0 and '"ocfile": 3' in out.stdout, f"#5413: the core's run purges the three files {out.stdout[-300:]} {out.stderr[-400:]}")
 check(sql("SELECT COUNT(*) FROM office_contract_files WHERE contract_id=?", (C1,))[0][0] == 0, "#2285: purged after the trash period")
 try:
     check(not os.path.exists(p), "#2285: the stored file is deleted for good")

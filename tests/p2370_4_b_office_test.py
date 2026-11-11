@@ -215,8 +215,13 @@ M2 = run("INSERT INTO office_meals(org_id, date, status, approved_at, created_by
 run("INSERT INTO office_meal_log(org_id, meal_id, action, at) VALUES(?,?,?,?)", (PO, M2, "approve", NOW))
 run("INSERT INTO office_meal_files(org_id, meal_id, name, file, created_by, created_at, deleted_at) VALUES(?,?,?,?,?,?,?)",
     (PO, M2, "old-bill.pdf", "p23704b-old.pdf", FID, OLD, OLD))
-out = box("from kalmido.office import meals as M\nM.BW_TICK['at'] = 0\nprint('dry', M.bw_purge_tick(c))")
-check("dry 1" in out, f"N12: the dry run counts the trashed meal, not the bill kept by law {out[-300:]}")
+# 2.993.0 (#5413): the meals' run is the core's retention run (office/meals.py on office/okern.py: kinds omeal / omealfile)
+out = box("import json\nimport kalmido.office.meals\nfrom kalmido.core.writes import obj_trash_tick\nprint('dry', json.dumps(obj_trash_tick(c, True)))")
+try:
+    dry = json.loads(out.rsplit("dry ", 1)[1].splitlines()[0])
+except (IndexError, ValueError):
+    dry = {}
+check(dry.get("omeal", 0) >= 1 and dry.get("omealfile_kept", 0) >= 1, f"N12: the dry run counts the trashed meal, the bill kept by law as kept {out[-300:]}")
 check(one("SELECT COUNT(*) FROM office_meals WHERE id IN (?,?)", (M1, M2)) == 2, "N12: the dry run deletes nothing")
 
 # ================================================================== roles: delete / restore a client of an organisation

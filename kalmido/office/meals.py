@@ -10,7 +10,10 @@ with the right undoes the approval (POST .../unlock {reason?}). Every approval a
 (who, when, reason) that stays whatever happens later (also in the office log, ofx_log target "meals"). The approval is
 the host's digital confirmation (name + time instead of a signature on paper).
 
-Deleting: drafts only, into the trash (deleted_at, undo = POST .../restore), purged with the files after BW_PURGE_DAYS.
+Deleting: drafts only, into the trash (deleted_at, undo = POST .../restore), purged with the files after the trash period.
+2.993.0 (#5413): the core's trash (office/okern.py ofk_register, kinds omeal / omealfile, shown in the office trash): the
+core's retention run purges a meal with its bills and log and a removed bill, the stored files after the commit
+(obj_on_purge); its keep hook leaves what bw_kept still holds (bw_purge / bw_purge_tick went).
 A meal that was ever approved is kept for BW_KEEP_YEARS after the end of its year (retention of receipts, 409 before).
 The PDF (Eigenbeleg, GET .../pdf), the evaluation of the approved meals (GET /api/office/meals/report: gross, input VAT
 100 %, net 70 % deductible / 30 % not, the tip without VAT counted in) with the filters of the travel expenses (person =
@@ -36,7 +39,6 @@ from flask import Response, jsonify, request
 from ..core.access import Denied
 from ..core.config import MAX_FILE_MB, OFFICE_DIR, app
 from ..core.db import body, bump, iso, local_now, local_stamp, now_utc
-from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import N_, csv_dialect, tr
 from ..personal.timesheet import tz_of
 from ..core.orgcrypt import oc_dec_col, oc_dec_fields, oc_enc_fields, oc_read_file, oc_write_file
@@ -54,6 +56,8 @@ from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from func
 from .mealpdf import bw_meal_pdf_data, bw_report_pdf  # 2.369.5 (#2517): pulled up from functions
 from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
 from .years import ofc_years, ofc_years_sql  # 2.593.0 (#4891): the years with data
+from .okern import ofk_purge, ofk_register, ofk_restore, ofk_trash  # 2.993.0 (#5413): meals and their bills in the core's trash
+from ..core.writes import obj_on_purge  # 2.993.0 (#5413): the keep hook + the stored files
 
 ow_kind("office_meal", "office_meals")
 ow_kind("office_meal_choice", "office_meal_choices")
@@ -65,7 +69,6 @@ BW_CHOICE_KINDS = ("place", "person")
 BW_MAX_GUESTS = 40
 BW_MAX_LINES = 20
 BW_MAX_CHOICES = 500
-BW_PURGE_DAYS = 30
 BW_KEEP_YEARS = 8  # receipts: 8 years after the end of the year (since 2025); 2.147.0 (#2459): the DE pack's value, see bw_years
 BW_BILL_HINT = dec(250)  # 2.296.0 A (#3176): above 250 EUR gross the bill must name the company (up to 250 EUR: small-amount invoice)
 BW_SHARE = dec("0.7")  # deductible share of the net amount
@@ -383,75 +386,92 @@ def _need_draft(r):
         raise Denied(409, tr(BW_LOCKED))
 
 
-def bw_purge(c, oid, paths, dry=False):
-    """Trashed meals older than BW_PURGE_DAYS and trashed files: the rows go for good, the stored files' paths are added to
-    `paths` (caller commits, then bw_rm(paths)). 2.272.0 A (#3026): only with ret_on("trash") (off = nothing goes), period
-    ret_trash_cut; the files after the commit (they went before the rows and the commit). 2.370.4 (#3089) N12: dry = only
-    count what would go, with the same rules (the bills kept by law are not counted)."""
-    if not ret_on("trash") and not dry:
-        return 0
-    old = ret_trash_cut()
-    gone = c.execute("SELECT id FROM office_meals WHERE org_id=? AND deleted_at IS NOT NULL AND deleted_at<?", (oid, old)).fetchall()
-    ids = [r["id"] for r in gone]
-    q = ",".join("?" * len(ids)) or "NULL"
-    files = c.execute(f"SELECT id, meal_id, file FROM office_meal_files WHERE org_id=? AND ((deleted_at IS NOT NULL AND deleted_at<?) OR meal_id IN ({q}))",
-                      [oid, old] + ids).fetchall()
-    n, today, kept, years = 0, local_now().date().isoformat(), {}, bw_years(c, oid)
-    for f in files:
-        # 2.119.0 (#2288, review): a removed / replaced bill of an ever approved meal stays as long as the meal is kept
-        if f["meal_id"] not in ids:
-            if f["meal_id"] not in kept:
-                m = c.execute("SELECT date FROM office_meals WHERE id=? AND org_id=?", (f["meal_id"], oid)).fetchone()
-                k = bw_kept(c, oid, f["meal_id"], m["date"], years) if m else None
-                kept[f["meal_id"]] = bool(k and today < k)
-            if kept[f["meal_id"]]:
-                continue
-        n += 1
-        if dry:
-            continue
+def bw_keep_sql(a, files=False):
+    """2.993.0 (#5413): obj_register trash_keep of the meals (a = the table's alias) and of their bills (files=True) -- (sql, args)
+    true for a row whose meal was ever approved and is kept by the shortest retention (BW_KEEP_YEARS from the later of its date
+    and an approval, bw_keep_until); a longer one of the office's country pack (bw_years) is the purge hook's check
+    (_bw_need_gone: Denied = kept)."""
+    y = local_now().year - BW_KEEP_YEARS
+    if files:
+        return (f"EXISTS (SELECT 1 FROM office_meal_log l JOIN office_meals m ON m.id = l.meal_id AND m.org_id = l.org_id "
+                f"WHERE l.meal_id = {a}.meal_id AND l.action = 'approve' AND GREATEST(m.date, substr(l.at, 1, 10)) >= ?)", (f"{y}-01-01",))
+    return (f"EXISTS (SELECT 1 FROM office_meal_log l WHERE l.meal_id = {a}.id AND l.org_id = {a}.org_id AND l.action = 'approve' "
+            f"AND GREATEST({a}.date, substr(l.at, 1, 10)) >= ?)", (f"{y}-01-01",))
+
+
+def _bw_need_gone(c, oid, mid):
+    """2.993.0 (#5413): the keep hook of the core's purge -- Denied(409) while meal mid of office oid is kept (ever approved,
+    bw_kept with the office's retention): the retention run counts it as locked, the office trash's delete refuses it."""
+    m = c.execute("SELECT date FROM office_meals WHERE id=? AND org_id=?", (int(mid), oid)).fetchone()
+    k = bw_kept(c, oid, mid, m["date"]) if m else None
+    if k and local_now().date().isoformat() < k:
+        raise Denied(409, tr(BW_KEPT, k))
+
+
+def _bw_unlink(p):
+    def rm():  # after the commit (core/serializers.py unlink_files): OFFICE_DIR is not below ATT_DIR
+        try:
+            os.remove(p)
+        except FileNotFoundError:
+            pass
+    return rm
+
+
+def _bw_files_gone(c, oid, rows):
+    """The rows of office_meal_files go, their stored files after the commit (callables for obj_purge_after)."""
+    out = []
+    for f in rows:
         c.execute("DELETE FROM office_meal_files WHERE id=? AND org_id=?", (f["id"], oid))
         p = bw_path(oid, f["file"])
         if p:
-            paths.append(p)
-    for mid in ids:  # dry: its files above all go, so the meal goes too
-        if dry or not c.execute("SELECT 1 FROM office_meal_files WHERE meal_id=? AND org_id=? LIMIT 1", (mid, oid)).fetchone():
-            if not dry:
-                c.execute("DELETE FROM office_meal_log WHERE meal_id=? AND org_id=?", (mid, oid))
-                c.execute("DELETE FROM office_meals WHERE id=? AND org_id=?", (mid, oid))
-            n += 1
-    return n
+            out.append(_bw_unlink(p))
+    return out
 
 
-def bw_rm(paths):
-    """2.272.0 A (#3026): the stored files of purged rows, after the commit."""
-    for p in paths:
-        try:
-            if os.path.isfile(p):
-                os.remove(p)
-        except OSError:
-            pass
+def bw_meal_purge(c, mid):
+    """2.993.0 (#5413): obj_on_purge of a meal (the core deletes it for good after the trash period or from the office
+    trash): kept while bw_kept runs (Denied), else its bills (live or in the trash) go on the core's way (ofk_purge: their
+    history and their own hook, bw_file_purge, with the stored file after the commit) and its approval log with it."""
+    with system_ctx(c):  # no person in the retention run: the meal's own office area (ids only)
+        r = c.execute("SELECT org_id FROM office_meals WHERE id=?", (int(mid),)).fetchone()
+        if r is None:
+            return None
+        oid = r["org_id"]
+        _bw_need_gone(c, oid, mid)
+        for f in c.execute("SELECT id FROM office_meal_files WHERE meal_id=? AND org_id=? ORDER BY id", (int(mid), oid)).fetchall():
+            ofk_purge(c, BW_FILE_KIND, f["id"])
+        c.execute("DELETE FROM office_meal_log WHERE meal_id=? AND org_id=?", (int(mid), oid))
+    return None
 
 
-def bw_purge_tick(c):
-    """Watchdog: the trash goes after BW_PURGE_DAYS also in office areas nobody opens."""
-    import time
-    if time.time() - BW_TICK["at"] < 6 * 3600:
-        return 0
-    BW_TICK["at"] = time.time()
-    old, purge, paths = ret_trash_cut(), ret_on("trash"), []
-    with system_ctx(c):  # trashed rows of every office area (ids and stored names only, no content is read)
-        oids = {r["org_id"] for r in c.execute("SELECT DISTINCT org_id FROM office_meals WHERE deleted_at IS NOT NULL AND deleted_at<? "
-                                               "UNION SELECT DISTINCT org_id FROM office_meal_files WHERE deleted_at IS NOT NULL AND deleted_at<?",
-                                               (old, old)).fetchall()}
-        # 2.272.0 A (#3026): switch off = dry run; 2.370.4 (#3089) N12: with the rules of the real run (bills kept by law not counted)
-        n = sum(bw_purge(c, oid, paths, dry=not purge) for oid in oids)
-        ret_report(c, "trash", {"meals": n}, purge, run="meals")
-    c.commit()
-    bw_rm(paths)
-    return n
+def bw_file_purge(c, fid):
+    """2.993.0 (#5413): obj_on_purge of a removed / replaced bill: kept as long as its meal is (2.119.0 review: a bill of an
+    ever approved meal stays), else the row goes and its stored file after the commit."""
+    with system_ctx(c):
+        f = c.execute("SELECT id, org_id, meal_id, file FROM office_meal_files WHERE id=?", (int(fid),)).fetchone()
+        if f is None:
+            return None
+        _bw_need_gone(c, f["org_id"], f["meal_id"])
+        return _bw_files_gone(c, f["org_id"], [f])
 
 
-BW_TICK = {"at": 0.0}
+BW_KIND = "omeal"  # 2.993.0 (#5413): a meal in the core's trash (the office trash, POST /api/office/trash/core/omeal/<id>/restore)
+BW_FILE_KIND = "omealfile"  # its removed / replaced bill (restorable through the meal's own route, POST .../file/<fid>/restore)
+BW_TRASH = "meal"  # the app's name of it in the office trash
+
+
+def _bw_label(c, oid, row):
+    d = oc_dec_fields(c, oid, "office_meals", row)
+    return " · ".join(x for x in (d.get("date") or "", d.get("place_name") or "", d.get("occasion") or "") if x)
+
+
+ofk_register(BW_KIND, "office_meals", N_("Entertainment receipt"), "meals", need="own",
+             view={"kind": BW_TRASH, "label": _bw_label, "ctx": _ctx}, step=False, trash_keep=bw_keep_sql)
+ofk_register(BW_FILE_KIND, "office_meal_files", N_("Restaurant bill"), "meals", need="own", step=False,
+             trash_keep=lambda a: bw_keep_sql(a, files=True))
+# step=False: no step in the person's undo list -- a redo through /api/undo would skip the approval lock of the routes (409)
+obj_on_purge(BW_KIND, bw_meal_purge)
+obj_on_purge(BW_FILE_KIND, bw_file_purge)
 
 
 # ---------------------------------------------------------------- the choice lists
@@ -590,10 +610,6 @@ def bw_meals_get():
     y = request.args.get("year") or ""
     if y and not re.fullmatch(r"\d{4}", y):
         raise BadInput(tr("Invalid value: {0}", "year"))
-    paths = []
-    if bw_purge(c, oid, paths):
-        c.commit()
-        bw_rm(paths)
     return jsonify(meals=bw_rows(c, oid, year=y or None), people=bw_people(c, oid, uid), choices=bw_choices(c, oid),
                    currency=rk_home_cur(c, oid), me=uid, company=bw_company(c, oid), my_sig=1 if bw_sig_raw(c, oid, uid) else 0,
                    years=bw_years_span(c, oid))  # 2.593.0 (#4891)
@@ -680,20 +696,20 @@ def bw_meal_delete(mid):
     if keep:
         if local_now().date().isoformat() < keep:
             raise Denied(409, tr(BW_KEPT, keep))
-    ts = iso(now_utc())
-    c.execute("UPDATE office_meals SET deleted_at=?, updated_at=? WHERE id=? AND org_id=?", (ts, ts, mid, oid))
+    ofk_trash(c, uid, BW_KIND, mid)  # 2.993.0 (#5413): the core's trash (deleted_at / deleted_by), purged by the core's retention run
     ofx_log(c, oid, "delete", target="meals", detail={"id": mid})
     bump(c)
     c.commit()
-    return jsonify(ok=True, id=mid)
+    return jsonify(ok=True, id=mid, trash={"kind": BW_KIND, "id": mid})
 
 
 @app.post("/api/office/meals/<int:mid>/restore")
 def bw_meal_restore(mid):
     c, uid, oid = _ctx()
+    write_lock(c, f"office_meal_{int(mid)}")
     r = _meal(c, oid, mid, deleted=True)
     if r["deleted_at"]:
-        c.execute("UPDATE office_meals SET deleted_at=NULL, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), mid, oid))
+        ofk_restore(c, uid, BW_KIND, mid)  # 2.993.0 (#5413): out of the core's trash; past the trash period: gone (404)
         ofx_log(c, oid, "restore", target="meals", detail={"id": mid})
         bump(c)
         c.commit()
@@ -879,7 +895,8 @@ def bw_file_post(mid):
     ts = iso(now_utc())
     try:
         old = [x["id"] for x in c.execute("SELECT id FROM office_meal_files WHERE meal_id=? AND org_id=? AND deleted_at IS NULL", (mid, oid))]
-        c.execute("UPDATE office_meal_files SET deleted_at=? WHERE meal_id=? AND org_id=? AND deleted_at IS NULL", (ts, mid, oid))
+        for x in old:  # 2.993.0 (#5413): the replaced bill into the core's trash
+            ofk_trash(c, uid, BW_FILE_KIND, x)
         fid = insert_id(c, "INSERT INTO office_meal_files(org_id, meal_id, name, file, size, mime, sha256, created_by, created_at) VALUES(?,?,?,?,?,?,?,?,?)",
                         (oid, mid, name, file, len(data), kind[1], hashlib.sha256(data).hexdigest(), uid, ts))
         sc_after_store(c, "omf", fid, oid, {"scan": scan})  # 2.190.0 D (#2561): scanner not reachable = checked later
@@ -930,8 +947,7 @@ def bw_file_delete(mid, fid):
     write_lock(c, f"office_meal_{int(mid)}")  # 2.119.0 (#2288, review): no change slips past a parallel approval
     _need_draft(_meal(c, oid, mid))
     _file(c, oid, mid, fid)
-    ts = iso(now_utc())
-    c.execute("UPDATE office_meal_files SET deleted_at=? WHERE id=? AND org_id=?", (ts, fid, oid))
+    ofk_trash(c, uid, BW_FILE_KIND, fid)  # 2.993.0 (#5413): the core's trash, purged by its retention run (kept with an approved meal)
     bump(c)
     c.commit()
     return jsonify(_one(c, oid, mid))
@@ -943,10 +959,10 @@ def bw_file_restore(mid, fid):
     c, uid, oid = _ctx()
     write_lock(c, f"office_meal_{int(mid)}")  # 2.119.0 (#2288, review): no change slips past a parallel approval
     _need_draft(_meal(c, oid, mid))
-    _file(c, oid, mid, fid, deleted=True)
-    ts = iso(now_utc())
-    c.execute("UPDATE office_meal_files SET deleted_at=? WHERE meal_id=? AND org_id=? AND deleted_at IS NULL AND id<>?", (ts, mid, oid, fid))
-    c.execute("UPDATE office_meal_files SET deleted_at=NULL WHERE id=? AND org_id=?", (fid, oid))
+    if _file(c, oid, mid, fid, deleted=True)["deleted_at"]:  # 2.993.0 (#5413): through the core's trash
+        ofk_restore(c, uid, BW_FILE_KIND, fid)  # first: one past the trash period commits its purge alone and answers 404
+        for x in c.execute("SELECT id FROM office_meal_files WHERE meal_id=? AND org_id=? AND deleted_at IS NULL AND id<>?", (mid, oid, fid)).fetchall():
+            ofk_trash(c, uid, BW_FILE_KIND, x["id"])
     bump(c)
     c.commit()
     return jsonify(_one(c, oid, mid))

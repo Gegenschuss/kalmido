@@ -19,7 +19,8 @@ from ..core.access import Denied, trash_sql
 from ..core.objects import OBJ, obj_register, obj_row
 from ..core.pg import qi, system_ctx
 from ..core.retention import ret_on, ret_trash_cut
-from ..core.writes import _purge_rows, obj_restore, obj_trash, obj_trash_prune
+from ..core.writes import _purge_rows, obj_purge_after, obj_restore, obj_trash, obj_trash_prune  # 2.993.0 (#5413): + obj_purge_after
+from ..core.serializers import unlink_files  # 2.993.0 (#5413): an overdue row's stored files after the commit (ofk_restore)
 from ..core.objects import obj_forget  # 2.809.0 (#5418)
 from ..core.pg import write_lock  # 2.809.0 (#5418)
 from .model import office_on, office_role, pb_owner
@@ -78,7 +79,7 @@ def _space_of(table):
     return space
 
 
-def ofk_register(kind, table, label, area, need="manage", children=(), base=None, view=None, step=True):
+def ofk_register(kind, table, label, area, need="manage", children=(), base=None, view=None, step=True, trash_keep=None):
     """Registers an office kind on the core's trash (module docstring); area = its rights area (office/rights.py), need =
     the level its route needs to delete a row (an "own" level: the route checks the row is the person's own).
     2.905.0 (#5414): base(c, uid, row) -> 'manage' | None replaces the area's level (the rights groups: who manages the
@@ -86,11 +87,13 @@ def ofk_register(kind, table, label, area, need="manage", children=(), base=None
     () -> (c, uid, oid) for the toast's undo, "back": fn(c, oid, row) after a restore} shows it in the office trash.
     2.905.0 (#5414, review): step=False = no step in the person's undo list (GET /api/undo): a kind whose route does more
     than the core on trash / restore (in-use checks, members out, the view's back hook) is only taken back through its
-    own routes (the toast's undo, the office trash), never by the core's undo / redo that would skip them."""
+    own routes (the toast's undo, the office trash), never by the core's undo / redo that would skip them.
+    2.993.0 (#5413): trash_keep = obj_register trash_keep (rows of the trash kept by law, the retention run leaves them; the
+    exact check stays the kind's obj_on_purge hook, Denied = kept)."""
     OFK[kind] = {"table": table, "area": area, "need": need, "base": base, "view": view, "step": step}
     return obj_register(kind, table, label=label, fields={}, area="office", routes=False, listed=False, fsref=False,
                         space=_space_of(table), base_role=_base_of(kind), visible=_visible_of(table), cap=lambda c, uid, rid: None,
-                        scopes=("office", "office"), children=children, trash_prune=True)
+                        scopes=("office", "office"), children=children, trash_prune=True, trash_keep=trash_keep)
 
 
 def ofk_trash(c, uid, kind, rid):
@@ -108,8 +111,14 @@ def ofk_restore(c, uid, kind, rid, undo=False):
         with system_ctx(c):
             due = c.execute(f"SELECT 1 FROM {qi(OBJ[kind]['table'], _tables())} WHERE id=? AND deleted_at<?", (int(rid), ret_trash_cut())).fetchone()
         if due:
-            obj_trash_prune(c, kind, purge=True, ids=[int(rid)])
+            with obj_purge_after(keep_locked=True) as box:  # 2.993.0 (#5413): its stored files (obj_on_purge) after the commit
+                obj_trash_prune(c, kind, purge=True, ids=[int(rid)])
             c.commit()
+            unlink_files(box["after"])
+            with system_ctx(c):
+                kept = c.execute(f"SELECT 1 FROM {qi(OBJ[kind]['table'], _tables())} WHERE id=?", (int(rid),)).fetchone()
+            if kept:  # kept by law (a receipt: trash_keep / the hook's Denied): it stays in the trash and comes back as any other
+                return obj_restore(c, uid, kind, rid, undo=undo, step=OFK.get(kind, {}).get("step", True))
             raise Denied(404)
     return obj_restore(c, uid, kind, rid, undo=undo, step=OFK.get(kind, {}).get("step", True))  # 2.905.0 (#5414, review): ofk_register step
 

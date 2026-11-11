@@ -6,6 +6,7 @@ POST   /api/office/contracts/<cid>/files                 multipart file (a PDF),
 GET    /api/office/contracts/<cid>/files/<fid>           the PDF (a download; the app shows it in its PDF viewer)
 PATCH  /api/office/contracts/<cid>/files/<fid>           {date}
 DELETE /api/office/contracts/<cid>/files/<fid>           -> the trash (deleted_at), the undo is .../restore
+                                                         (2.993.0 #5413: the core's trash, also in the office trash)
 POST   /api/office/contracts/<cid>/files/<fid>/restore
 
 Rights like the contracts themselves (office/web.py): reading for who works in the office area (members of the organisation
@@ -14,8 +15,8 @@ or file of another office area is 404. Only PDFs (magic %PDF-), at most MAX_FILE
 quota. The files lie flat below <data dir>/office/<org_id>/ like the stored quotation PDFs (backups, organisation export),
 sealed with the office area's key at rest (oc_write_file; a personal office has its own orgs row = own key), served
 decrypted (oc_read_file). Deleting the contract puts its files into the trash (model.office_delete -> dma_trash_contract);
-trashed files are purged with their file after DMA_PURGE_DAYS (on the next read of the contracts of that office area, like
-office/agreements.py)."""
+trashed files are purged with their file after the trash period -- 2.993.0 (#5413): by the core's retention run (office/okern.py
+ofk_register kind ocfile, obj_on_purge dma_file_purge: the stored file after the commit; dma_purge / dma_purge_tick went)."""
 import hashlib
 import os
 import re
@@ -28,7 +29,6 @@ from flask import Response, jsonify, request
 from ..core.config import app, MAX_FILE_MB, OFFICE_DIR
 from ..core.access import Denied, live_sql
 from ..core.db import body, bump, db, iso, local_now, now_utc
-from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_read_file, oc_write_file
 from ..core.pg import insert_id, system_ctx
@@ -37,8 +37,9 @@ from ..files.scan import sc_after_store, sc_guard, sc_scan  # 2.190.0 D (#2561):
 from .ledger import ofx_log
 from .oftref import oft_dropped  # 2.351.0 F (#2749)
 from .model import office_gate, office_org
+from .okern import ofk_register, ofk_restore, ofk_trash  # 2.993.0 (#5413): the files in the core's trash
+from ..core.writes import obj_on_purge  # 2.993.0 (#5413): the stored file after the commit
 
-DMA_PURGE_DAYS = 30
 DMA_MAX_FILES = 50  # per contract (contract + addenda)
 DMA_NOT_PDF = N_("Only PDF files can be attached")
 
@@ -79,62 +80,49 @@ def dma_public(r):
             "created_at": r["created_at"]}
 
 
-def dma_purge(c, oid, paths):
-    """Trashed files older than the trash period: the row goes for good, the stored file's path is added to `paths` -- the
-    caller commits, then dma_rm(paths). -> how many. 2.272.0 A (#3026): only with ret_on("trash") (off = nothing goes),
-    period ret_trash_cut; the file after the commit (it went before the row and the commit)."""
-    if not ret_on("trash"):
-        return 0
-    rows = c.execute("SELECT id, file FROM office_contract_files WHERE org_id=? AND deleted_at IS NOT NULL AND deleted_at<?",
-                     (oid, ret_trash_cut())).fetchall()
-    for r in rows:
-        c.execute("DELETE FROM office_contract_files WHERE id=? AND org_id=?", (r["id"], oid))
-        oft_dropped(c, "contract_file", r["id"])  # 2.351.0 F (#2749, review N2): its node in a folder goes too
-        p = dma_path(oid, r["file"])
-        if p:
-            paths.append(p)
-    return len(rows)
-
-
-def dma_rm(paths):
-    """2.272.0 A (#3026): the stored files of purged rows, after the commit."""
-    for p in paths:
+def _dma_unlink(p):
+    def rm():  # after the commit (core/serializers.py unlink_files): OFFICE_DIR is not below ATT_DIR
         try:
-            if os.path.isfile(p):
-                os.remove(p)
-        except OSError:
+            os.remove(p)
+        except FileNotFoundError:
             pass
+    return rm
 
 
-def dma_purge_tick(c):
-    """Watchdog (review 2.117.0): the trash goes after DMA_PURGE_DAYS also in office areas nobody opens."""
-    import time
-    if time.time() - DMA_TICK["at"] < 6 * 3600:
-        return 0
-    DMA_TICK["at"] = time.time()
-    old, purge, paths = ret_trash_cut(), ret_on("trash"), []
-    with system_ctx(c):  # trashed rows of every office area (ids and stored names only, no content is read)
-        if purge:
-            oids = [r["org_id"] for r in c.execute("SELECT DISTINCT org_id FROM office_contract_files WHERE deleted_at IS NOT NULL "
-                                                   "AND deleted_at<?", (old,)).fetchall()]
-            n = sum(dma_purge(c, oid, paths) for oid in oids)
-        else:  # 2.272.0 A (#3026): dry run
-            n = c.execute("SELECT COUNT(*) FROM office_contract_files WHERE deleted_at IS NOT NULL AND deleted_at<?", (old,)).fetchone()[0]
-        ret_report(c, "trash", {"contract_files": n}, purge, run="contract_files")
-    c.commit()
-    dma_rm(paths)
-    return n
+def dma_file_purge(c, fid):
+    """2.993.0 (#5413): obj_on_purge of a contract file (the core deletes it for good after the trash period or from the
+    office trash): its node in a folder goes (2.351.0 F review N2), the stored file after the commit."""
+    with system_ctx(c):  # no person in the retention run (ids and stored names only)
+        r = c.execute("SELECT id, org_id, file FROM office_contract_files WHERE id=?", (int(fid),)).fetchone()
+    if r is None:
+        return None
+    oft_dropped(c, "contract_file", r["id"])
+    p = dma_path(r["org_id"], r["file"])
+    return [_dma_unlink(p)] if p else None
 
 
-DMA_TICK = {"at": 0.0}
+def _dma_label(c, oid, row):
+    k = c.execute("SELECT name FROM office_contracts WHERE id=? AND org_id=?", (row["contract_id"], oid)).fetchone()
+    return " · ".join(x for x in ((k["name"] if k else "") or "", row.get("name") or "") if x)
+
+
+def _dma_back(c, oid, row):
+    """The office trash's restore of a file: only into a contract that is not in the trash (409 before the commit: else the
+    file would be live under a contract nobody sees, and outlive its purge)."""
+    if not c.execute(f"SELECT 1 FROM office_contracts WHERE id=? AND org_id=? AND {live_sql()}", (row["contract_id"], oid)).fetchone():
+        raise Denied(409, tr(DMA_CONTRACT_GONE))
+
+
+DMA_KIND = "ocfile"  # 2.993.0 (#5413): a contract file in the core's trash (office/okern.py; restorable in the office trash too)
+DMA_CONTRACT_GONE = N_("The contract is in the trash; restore it first")
+ofk_register(DMA_KIND, "office_contract_files", N_("Contract (PDF)"), "contracts", need="edit",
+             view={"kind": "contract_file", "label": _dma_label, "ctx": lambda: _ctx(admin=True), "back": _dma_back}, step=False)
+obj_on_purge(DMA_KIND, dma_file_purge)
 
 
 def dma_counts(c, oid, rows):
-    """The contracts list (office/web.py): files = the number of live PDFs per contract (the paper clip); purges the trash."""
-    paths = []
-    if dma_purge(c, oid, paths):
-        c.commit()
-        dma_rm(paths)
+    """The contracts list (office/web.py): files = the number of live PDFs per contract (the paper clip). 2.993.0 (#5413): the
+    trash is purged by the core's retention run, no more on reading."""
     n = {r["contract_id"]: r["n"] for r in c.execute("SELECT contract_id, COUNT(*) AS n FROM office_contract_files WHERE org_id=? "
                                                       "AND deleted_at IS NULL GROUP BY contract_id", (oid,))}
     for r in rows:
@@ -142,7 +130,8 @@ def dma_counts(c, oid, rows):
 
 
 def dma_trash_contract(c, oid, cid):
-    """The contract is deleted: its files go into the trash (purged with the files after DMA_PURGE_DAYS)."""
+    """The contract is deleted: its files go into the trash (2.993.0 #5413: the core's, kind ocfile, purged by its retention run
+    after the trash period; the contract's restore brings them back, office/web.py _omd_back)."""
     c.execute("UPDATE office_contract_files SET deleted_at=? WHERE org_id=? AND contract_id=? AND deleted_at IS NULL",
               (iso(now_utc()), oid, int(cid)))
 
@@ -216,7 +205,7 @@ def dma_files_post(cid):
                            "VALUES(?,?,?,?,?,?,?,?,?)", (oid, cid, name, file, len(data), hashlib.sha256(data).hexdigest(), day, uid, ts))
         sc_after_store(c, "ocf", fid, oid, {"scan": scan})  # 2.190.0 D (#2561): scanner not reachable = checked later
         if old is not None:
-            c.execute("UPDATE office_contract_files SET deleted_at=? WHERE id=? AND org_id=?", (ts, old["id"], oid))
+            ofk_trash(c, uid, DMA_KIND, old["id"])  # 2.993.0 (#5413): the replaced file into the core's trash
         ofx_log(c, oid, "update", target="contracts", detail={"id": ct["id"], "file_added": name, "file_replaced": old["name"] if old else None})
         bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
@@ -268,7 +257,7 @@ def dma_file_delete(cid, fid):
     c, uid, oid = _ctx(admin=True)
     ct = dma_contract(c, oid, cid)
     r = dma_file(c, oid, cid, fid)
-    c.execute("UPDATE office_contract_files SET deleted_at=? WHERE id=? AND org_id=?", (iso(now_utc()), r["id"], oid))
+    ofk_trash(c, uid, DMA_KIND, r["id"])  # 2.993.0 (#5413): the core's trash (deleted_at / deleted_by), purged by its retention run
     ofx_log(c, oid, "update", target="contracts", detail={"id": ct["id"], "file_removed": r["name"]})
     bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
@@ -280,7 +269,8 @@ def dma_file_restore(cid, fid):
     c, uid, oid = _ctx(admin=True)
     dma_contract(c, oid, cid)
     r = dma_file(c, oid, cid, fid, deleted=True)
-    c.execute("UPDATE office_contract_files SET deleted_at=NULL WHERE id=? AND org_id=?", (r["id"], oid))
+    if r["deleted_at"]:
+        ofk_restore(c, uid, DMA_KIND, r["id"])  # 2.993.0 (#5413): out of the core's trash; past the trash period: gone (404)
     bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(dma_public(dma_file(c, oid, cid, fid)))

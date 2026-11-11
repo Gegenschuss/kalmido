@@ -18278,6 +18278,7 @@
   "From the client file or free text": "Depuis la fiche client ou texte libre",
   "Client: free text": "Client : texte libre",
   "Agency: free text": "Agence : texte libre",
+  "The contract is in the trash; restore it first": "Le contrat est dans la corbeille ; restaurez-le d'abord",
   "For reviews": "Pour les vérifications",
   "Like messages and decisions": "Comme messages et décisions",
   "Your messages, buttons, reactions and comments and every run that may need a decision use the first model; reviews (a review you ask it for, a planned job of the kind Review, a scheduled check of a project) the second, empty = the first; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign the third. When in doubt the first.": "Tes messages, boutons, réactions et commentaires et chaque exécution qui peut demander une décision utilisent le premier modèle ; les vérifications (une relecture que tu lui demandes, une tâche planifiée du type Vérification, un contrôle planifié d’un projet) le deuxième, vide = le premier ; les réveils silencieux, les nouvelles tâches, les relances et les tâches planifiées sans signe d’alerte le troisième. En cas de doute, le premier.",

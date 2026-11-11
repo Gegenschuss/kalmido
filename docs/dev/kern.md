@@ -201,6 +201,14 @@ c.commit()
   the import run, review 2.905); they come back only through the toast's undo and the office trash. Still on the office trash of copies: drafts, parts, trips, card lines, the start balance (no id
   column) and the sign-offs (`office_signoffs`, rows without an organisation); copies of the moved kinds made before 2.905
   stay restorable there until their period ends (no data move).
+- 2.993.0 (#5413, stage 4b): the entertainment receipts (`omeal`, in the office trash), their removed / replaced restaurant
+  bills (`omealfile`, back through the meal's own route) and the PDF files of framework contracts (`ocfile`, in the office
+  trash; restored only into a contract that is not in the trash, 409) moved onto the core's trash, all `step=False` (a redo
+  through `/api/undo` would skip the approval lock). Their `obj_on_purge` hooks delete the stored files below `OFFICE_DIR`
+  after the commit (callables for `obj_purge_after`); a receipt kept by law stays: `ofk_register(trash_keep=)` leaves what
+  the shortest retention holds (`BW_KEEP_YEARS`), the hook refuses what the office's country pack holds longer (`Denied` =
+  counted as locked). `bw_purge_tick` / `dma_purge_tick` and their purges on reading are gone. The office trash's delete for
+  good and `ofk_restore`'s purge of an overdue row collect the files with `obj_purge_after` too.
 - 2.947.0 (#5367, stage 5 of the trash): the calendar (`evcal`) has its events as `children` and `trash_prune=True`:
   `op_cal_delete` cancels the invitations and calls `obj_trash` (a step of the person's list, so it can be taken back),
   `op_cal_restore` `obj_restore`; `ev_cal_trash` / `ev_cal_restore` / `ev_cal_trash_purge` are gone and the events' run

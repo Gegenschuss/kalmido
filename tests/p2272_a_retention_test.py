@@ -189,9 +189,9 @@ n = json.loads(box("from kalmido.core.writes import obj_trash_tick\nprint(json.d
 check(not exists("wiki_pages", WP) and not os.path.exists(WFP), f"#3026: switch on: the page goes with its stored file {n}")
 
 # ---------------------------------------------------------------- the other runs report too (dry run)
-box("from kalmido.sheets.shkinds import shk_tick\nshk_tick(c, force=True)\nfrom kalmido.office.contractfiles import dma_purge_tick\n"
-    "dma_purge_tick(c)\nfrom kalmido.office.meals import bw_purge_tick\nbw_purge_tick(c)\n"
-    "print('ok')")  # 2.981.0 (#5273): vdr_trash_prune is gone (the review comments go with the core's run of every comment)
+# 2.993.0 (#5413): the contract files and the entertainment receipts go through the core's run (obj_trash) now;
+# 2.981.0 (#5273): vdr_trash_prune is gone (the review comments go with the core's run of every comment)
+box("from kalmido.sheets.shkinds import shk_tick\nshk_tick(c, force=True)\nprint('ok')")
 # 2.936.0 (#5364): the runs lists / tasks are the core's obj_trash now
 check({"obj_trash", "wiki_files"} <= set(runs()), f"#3026: GET /api/admin/retention lists the runs {sorted(runs())}")  # 2.809.0 (#5365): wiki -> obj_trash
 

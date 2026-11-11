@@ -28,7 +28,8 @@ from .rights import ofr_admin_or, ofr_group_restored
 from .eqcare import eqc_sync
 from .okern import OFK, ofk_restore, ofk_trash_items  # 2.905.0 (#5414): the kinds that moved onto the core's trash
 from ..core.objects import obj_row
-from ..core.writes import obj_purge
+from ..core.writes import obj_purge, obj_purge_after  # 2.993.0 (#5413): + obj_purge_after
+from ..core.serializers import unlink_files  # 2.993.0 (#5413)
 
 OTB_REFS = {}  # table -> [(child table, column, 'c' cascade | 'n' set null)]
 OTB_DEPTH = 3
@@ -326,8 +327,10 @@ def otb_core_delete(kind, rid):
     _core_kind(c, uid, oid, kind, rid)
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this workspace can do this"))
-    obj_purge(c, uid, kind, rid)
+    with obj_purge_after() as box:  # 2.993.0 (#5413): the kind's stored files (obj_on_purge) after the commit; a receipt kept by law = 409
+        obj_purge(c, uid, kind, rid)
     c.commit()
+    unlink_files(box["after"])
     return jsonify(ok=True)
 
 
