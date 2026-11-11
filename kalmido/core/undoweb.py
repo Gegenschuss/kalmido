@@ -3,6 +3,8 @@
 GET  /api/undo?limit=100       the own groups, newest first (heads only, no copies; the label in the reader's language)
 POST /api/undo/to/<gid>        every own group from the newest down to gid back ("bis hierher")
 POST /api/undo/<gid>/redo      the way forward of one undone group again (until a new step of the person ends it)
+2.905.0 (#5255): a write that recorded its step in a group answers with the header X-Kalmido-Undo-Gid: <group id> (undo_gid_header),
+so the app's arrow, Ctrl/Cmd+Z and the toast's "Undo" take back exactly that group (static/js/undo.js); no copy in the browser.
 People only: an agent gets 403 (it records no steps either); not in API v1 / MCP. Another person's group = 404.
 
 Taking back: newest group first, each group in ONE transaction (committed after it), each part under write_lock of its object
@@ -40,6 +42,7 @@ UG_UNDONE = N_("{0} of {1} steps undone")
 UG_REDONE = N_("{0} of {1} steps redone")
 UG_KEPT = N_("Changed elsewhere, not undone: {0}")  # 2.774.0 (#5251): the fields of a diff part that stayed
 UG_KEPT_REDO = N_("Changed elsewhere, not redone: {0}")
+UNDO_GID_HDR = "X-Kalmido-Undo-Gid"  # 2.905.0 (#5255)
 
 
 def undo_need_reg(kind, fn):
@@ -278,3 +281,12 @@ def undo_to_route(gid):
 def undo_redo_route(gid):
     c, uid = db(), me()
     return jsonify(undo_group_redo(c, uid, gid))
+
+
+@app.after_request
+def undo_gid_header(resp):
+    """2.905.0 (#5255): the step group a successful write of a person recorded (core/undogroups.py ug_current, kept in g)."""
+    cur = g.get("undo_group")
+    if cur and resp.status_code < 400 and request.method != "GET":
+        resp.headers[UNDO_GID_HDR] = str(int(cur["id"]))
+    return resp

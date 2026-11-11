@@ -120,7 +120,8 @@ const three = tag => [['Kita Beispiel', 'Elternbrief ' + tag, 'Datum 01.09.2026'
   // undo (the app's Undo, one step - the toast may be gone by now): version 1 on top again
   check(w.eval('HIST.undo[HIST.undo.length - 1]?.label') === 'Pages of “elternbrief.pdf” changed', 'the step on top of Undo: "Pages of … changed"');
   await w.eval(`histStep('undo')`);
-  check(await until(async () => (await call('GET', `/api/files/nodes/${D}`)).version === 3, 100), 'Undo: a new version 3 with the content of version 1');
+  // 2.905.0 (#5255): the server's step (files/fsundo.py) points the document back at version 1 (was: a new version 3 made by the browser)
+  check(await until(async () => (await call('GET', `/api/files/nodes/${D}`)).version === 1, 100), 'Undo: version 1 on top again');
   check(await until(async () => (await call('GET', `/api/docs/${D}`)).pages === 3, 150), '... recognised again at once: 3 pages');
   await settled(D);
   if (strip()) click(w, btn('cancel'));
@@ -139,17 +140,22 @@ const three = tag => [['Kita Beispiel', 'Elternbrief ' + tag, 'Datum 01.09.2026'
   click(w, btn('right'));
   check(await until(() => pg(1)?.querySelector('.dpg-th')?.style.getPropertyValue('--dpg-r') === '90deg' && /turned by 90°/.test(pg(1).getAttribute('aria-label'))), 'turn right: page 1 shown turned by 90');
   click(w, btn('save'));
-  check(await until(async () => (await call('GET', `/api/files/nodes/${D}`)).version === 4, 100), '... saved as version 4');
+  let vt = 0;
+  check(await until(async () => (vt = (await call('GET', `/api/files/nodes/${D}`)).version) >= 3, 100), `... saved as a new version (${vt})`);
   await settled(D);
 
-  // review F1: meanwhile a newer version from elsewhere (version 5) - Undo does not skip it: a calm hint, the step dropped
+  // review F1: meanwhile a newer version from elsewhere - Undo never skips it. 2.905.0 (#5255): a version saved by the same
+  // person on another device is that person's newest step: Undo takes it back first, then the turn (the server's order)
   check(w.eval(`(window.__dpgE = HIST.undo[HIST.undo.length - 1])?.label`) === 'Pages of “elternbrief.pdf” changed', 'the turn is the step on top of Undo');
-  check((await call('POST', `/api/docs/${D}/pages`, {rotate: {'2': 90}, expect_version: 4})).version === 5, 'elsewhere: version 5 saved');
+  const ve = (await call('POST', `/api/docs/${D}/pages`, {rotate: {'2': 90}, expect_version: vt})).version;
+  check(ve > vt, `elsewhere: a newer version saved (${ve})`);
   await settled(D);
   await w.eval(`histStep('undo')`);
-  check(await until(() => /There is a newer version by now - this step was dropped/.test(d.querySelector('#toast')?.textContent || '')), 'Undo after a newer version: the hint ' + (d.querySelector('#toast')?.textContent || ''));
-  check((await call('GET', `/api/files/nodes/${D}`)).version === 5, '... nothing restored: version 5 stays on top');
-  check(w.eval('!HIST.undo.includes(window.__dpgE) && !HIST.redo.includes(window.__dpgE)'), '... the step is dropped (not in Undo, not in Redo)');
+  check(await until(async () => (await call('GET', `/api/files/nodes/${D}`)).version === vt, 100), '... Undo: the newer version from elsewhere goes back first (not skipped)');
+  check(w.eval('HIST.undo.includes(window.__dpgE)'), '... the turn is still there to undo');
+  await w.eval(`histStep('undo')`);
+  check(await until(async () => (await call('GET', `/api/files/nodes/${D}`)).version === 1, 100), '... Undo again: the turn');
+  check(w.eval('!HIST.undo.includes(window.__dpgE) && HIST.redo.includes(window.__dpgE)'), '... the turn is on the redo side');
 
   // review F7 / F4: more pages than the server changes, or no right to write (a locked month): a hint instead of the strip
   w.eval(`window.__dpgApi = api; api = (m, u, b) => window.__dpgApi(m, u, b).then(j => m === 'GET' && String(u).endsWith('/pages') ? {...j, ...window.__dpgOver} : j)`);

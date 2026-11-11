@@ -58,8 +58,11 @@ def lpu_label(r):
     return LPU_LABEL, [ua_plain(r.get("name"), r.get("id"))]
 
 
+# 2.905.0 (#5255): undo_free kind - the project's type (lists.kind) is one of the core's fixed columns (UNDO_FIXED, the
+# object kind elsewhere): without it the step was listed and "undone", but the type stayed (the app's arrow goes through
+# the server since stage 7)
 obj_track(LPU_KIND, "lists", area="tasks", undo_keep={"lists": AllBut(LPU_COLS)},
-          undo_nofp={"lists": AllBut(LPU_COLS | LPU_E2E)}, undo_label=lpu_label)
+          undo_nofp={"lists": AllBut(LPU_COLS | LPU_E2E)}, undo_label=lpu_label, undo_free=("kind",))
 GONE[LPU_KIND] = "lists"  # an account's deletion takes its history / undo rows of the projects that went (core/objhooks.py)
 
 

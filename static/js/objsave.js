@@ -2,27 +2,21 @@
 // 2.558.0 (#4709): the browser side of the shared core's write path (kalmido/core/writes.py, docs/dev/kern.md), loaded on
 // demand (lazyload.js LD_MODS objsave). One way for every dialog that saves an object of an area built on the core:
 //   objOpen(md, url, open, key)  the dialog md opened with object `open`: unsaved input comes back (formguard fdDialog, base =
-//                                its updated_at), an undo session starts for url (header X-Kalmido-Undo, core.js rawFetch0
-//                                asks obj_hdr) and dlgStale watches the version: someone else saved meanwhile -> a calm bar
+//                                its updated_at) and dlgStale watches the version: someone else saved meanwhile -> a calm bar
+//                                (2.905.0, #5255: no undo session of its own any more; every save is a step of the server's history)
 //   saveDialog(url, open, now)   sends ONLY the fields that differ from `open`, with expect_updated_at = open.updated_at ->
 //                                the saved object; 409 -> {conflict: {cur, theirs, both}} (objMerge draws the bar: the fields
 //                                someone else changed are marked, the next save goes against cur)
 //   undoWrite(url, old, seenAt)  an undo as a second write: core.js (2.566.0, #4704: shared by every toast / history undo)
-//   objUndo(url, op)             the server's session undo of the dialog (POST <url>/undo, op undo | redo | all | redoall)
 //   objSess / objSaved           2.747.0 (#5246): "… saved · Undo" of a dialog that saves once and closes (below)
-//   objClose(url)                the dialog is gone: its session ends
+//   objClose(url)                the dialog is gone: its version watch ends
 const OBS = {s: {}};
-const objTok = () => [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
 const objSame = (a, b) => (a ?? '') === (b ?? '') || JSON.stringify(a) === JSON.stringify(b);
 /** @param {any} open @param {any} now */
 function objDiff(open, now) {
   /** @type {Record<string, any>} */ const d = {};
   for (const k of Object.keys(now || {})) if (!objSame(open?.[k], now[k])) d[k] = now[k];
   return d;
-}
-/** @param {string} method @param {string} url */
-function obj_hdr(method, url) {
-  return method === 'PATCH' ? OBS.s[String(url).split('?')[0]]?.tok || '' : '';
 }
 // 2.565.0 (#4705): o (all optional) for the areas not on the core yet (contacts, events; #4712 moves them):
 //   o.exp   the body key of the version (default expect_updated_at; contacts / events: expect)
@@ -133,37 +127,25 @@ function dlgStale(md, url, base, onTake) {
 }
 /** @param {HTMLElement} md @param {string} url @param {any} open @param {string} [key] */
 function objOpen(md, url, open, key) {
-  OBS.s[url] = {tok: objTok(), seen: open.updated_at};
+  OBS.s[url] = {seen: open.updated_at};
   if (typeof fdDialog === 'function') fdDialog(md, key || url, open.updated_at || '');
   const stop = dlgStale(md, url, () => OBS.s[url]?.seen || open.updated_at);
   if (typeof onRemove === 'function') onRemove(md, () => { stop(); objClose(url); });
 }
 /** @param {string} url */
 function objClose(url) { delete OBS.s[url]; }
-/** @param {string} url @param {string} [op] @param {string} [tok] */
-async function objUndo(url, op = 'undo', tok) {  // 2.747.0 (#5246): tok = the token of a session ended already (objSaved)
-  const s = OBS.s[url], t = tok || s?.tok; if (!t) throw new Error(tr('Nothing to undo'));
-  const j = await rawFetch('POST', url + '/undo', {sess: t, op});
-  if (s) s.seen = j.updated_at;
-  return j;
-}
-// 2.747.0 (#5246): the "… saved · Undo" of a dialog that saves at once and closes (office master data, clients; was
-// office_undo.js oun_saved): objSess(url, seen) before the save gives its write the header X-Kalmido-Undo, objSaved(url,
-// name, after) after it ends the session and puts ONE entry into the history whose undo / redo is the server's session undo
-// (objUndo, op all | redoall); after(j) redraws. false = no session (nothing to show)
+// 2.747.0 (#5246); 2.905.0 (#5255): the "… saved · Undo" of a dialog that saves at once and closes (office master data, clients):
+// objSess(url, seen) before the save, objSaved(url, name, after) after it: ONE entry for the server's step of that save (its
+// group, undo.js histAdd) with the toast; after() redraws once it went back or forth. false = the server recorded no step
 /** @param {string} url @param {string} [seen] */
-function objSess(url, seen) { OBS.s[url] = {tok: objTok(), seen}; }
-/** @param {string} url @param {string} name @param {(j: any) => any} [after] */
+function objSess(url, seen) { OBS.s[url] = {seen}; }
+/** @param {string} url @param {string} name @param {() => any} [after] */
 function objSaved(url, name, after) {
-  const s = OBS.s[url]; if (!s || typeof histAdd !== 'function') return false;
+  if (!OBS.s[url] || typeof histAdd !== 'function') return false;
   objClose(url);
+  if (!HIST.fresh.some(f => Date.now() - f.at < HIST_FRESH_MS)) return false;  // no step on the server (nothing changed, an agent)
   const msg = tr('{0} saved', name || tr('Saved'));
-  const run = async (/** @type {string} */ op) => {
-    let j; try { j = await objUndo(url, op, s.tok); } catch (x) { toast(/** @type {any} */ (x).message || tr('unknown')); throw x; }
-    if (after) await after(j);
-    return {skipped: []};
-  };
-  const e = histAdd({label: msg, ids: [], snaps: [], lids: [], srv: true, undo: () => run('all'), redo: () => run('redoall')});  // 2.773.0 (#5250): srv = the server's list "Recent steps" has its steps
+  const e = histAdd({label: msg, ids: [], lids: [], post: () => after?.()});
   histToast(msg, e, 10000);
   return true;
 }

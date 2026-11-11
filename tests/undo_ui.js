@@ -4,6 +4,8 @@
 // never inside text fields), redo cleared by a new action, one step per text editing session, the conflict skip (a
 // second session changes a field in between), the offline outbox (cancel, queue, pending state), the view-only refusal,
 // the trash guard, and the history menu (right-click / long-press) that jumps several steps.
+// 2.905.0 (#5255): the task steps are the server's (Ctrl+Z = the person's newest step of any device, a step the server has
+// is not queued offline); sections / list settings keep this device's own steps.
 const {boot, errs, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -139,13 +141,15 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await w.eval(`patchTask(${t2}, {priority: 1})`);
   await until(() => !w.eval('OUT.q.length')); await sleep(100);  // 2.599.0: the own change has reached the server before the other device writes (under load the outbox left after it: a server conflict instead of the undo's report)
   await call('PATCH', `/api/tasks/${t2}`, {priority: 3});  // the same user on another device (API)
+  // 2.905.0 (#5255, undo across devices stage 7): the other device's change is the person's newest step: Ctrl+Z takes it
+  // back first (was: refused as "changed elsewhere"), then the own one; a change of ANOTHER person stays (bob, below)
   await key('z');
-  check((await get(t2)).priority === 3, 'undo does not overwrite the change made elsewhere');
-  check(/Changed elsewhere, not undone: “Call bank”: Priority/.test(toastText(d)), `conflict reported: ${toastText(d)}`);
-  // redo after a conflict: again only if the value is still the expected one
-  check(hl('redo') >= 1, 'the step went to the redo side (partly done)');
+  check((await get(t2)).priority === 1, 'Ctrl+Z: the newer step of the other device goes back first');
+  await key('z');
+  check((await get(t2)).priority === 5, 'Ctrl+Z again: the own step of this window');
+  check(hl('redo') >= 1, 'the own step went to the redo side');
   await key('y');
-  check((await get(t2)).priority === 3 && /Changed elsewhere, not redone/.test(toastText(d)), 'redo respects the conflict too');
+  check((await get(t2)).priority === 1, 'redo: the own step again');
   // another member: title in a shared list
   await w.eval(`go('l/${SH}')`); await sleep(300);
   await w.eval(`patchTask(${s1}, {title: 'Plan the trip'})`); await sleep(100);
@@ -170,7 +174,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await sleep(1100);
   await call('PATCH', `/api/tasks/${s2}`, {title: 'Book the hotel'}, BK);
   await key('y');
-  check((await get(s2)).deleted_at === null && /changed by someone else/.test(toastText(d)), `redo delete refused: ${toastText(d)}`);
+  check((await get(s2)).deleted_at === null && /changed by someone else/i.test(toastText(d)), `redo delete refused: ${toastText(d)}`);  // 2.905.0 (#5255): the server's sentence
   check(hl('redo') === 0, 'the refused step left the history');
   const cr = await w.eval(`createTask({title: 'Rent car', list_id: ${SH}})`);
   await sleep(1100);
@@ -259,24 +263,17 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // ================= history menu: jump several steps
   await w.eval(`go('l/${WORK}')`); await sleep(300);
   const j1 = await mk('Jump', WORK); await w.eval('load().then(render)'); await sleep(200);
-  for (const p of [1, 3, 5, 0]) { await w.eval(`patchTask(${j1}, {priority: ${p}})`); await sleep(60); }
-  // 2.773.0 (#5250): a right-click on ← opens the list "Recent steps" (undolist.js): this browser's task steps are rows
-  // "only this device" with "Back up to here" (was: a menu of the last 10 steps, "Undo up to here")
-  // #3860 (CI red of 2.848.0): the server records these task steps too (2.774.0, #5251), its times are whole seconds; with
-  // all four on the server before the list opens, its twins of them must stay out (else they sorted in between this browser's
-  // rows by the second, "Back up to here" took the change back twice and the toast counted only a part)
-  check(await until(() => w.eval('!OUT.q.some(q => !q.done)')), 'the four priority changes reached the server');
+  for (const p of [1, 3, 5, 0]) { await w.eval(`patchTask(${j1}, {priority: ${p}})`); await until(() => w.eval('OUT.q.length') === 0 && !w.eval('OUT.flushing')); }  // 2.905.0 (#5255): one server step each (edits still waiting together are one request)
+  // 2.773.0 (#5250): a right-click on ← opens the list "Recent steps" (undolist.js); 2.905.0 (#5255): the task steps are the
+  // server's rows of this device (no "only this device" twin), "Back up to here" takes them back on the server
   btn('undo').dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
-  const items = await until(() => { const r = [...d.querySelectorAll('#pop:not(.hidden) .ulbody .ulrow.ul-l')]; return r.length >= 4 && w.eval('UL.items !== null') && r; });
-  check(items && items.length >= 4 && items.every(r => /only this device/.test(r.textContent)) && /Recent steps/.test(d.querySelector('#pop .ulhead')?.textContent || ''), `right-click: the list "Recent steps" with this browser's steps (${items && items.length})`);
-  check(/Priority of “Jump”: None/.test(items[0]?.textContent) && /Priority of “Jump”: High/.test(items[1]?.textContent), 'newest first');
-  const tw = JSON.parse(w.eval(`JSON.stringify({srv: (UL.items || []).filter(g => g.kind === 'task' && +g.ref_id === ${j1} && g.device === histDevice()).length,
-    rows: ul_rows().filter(r => r.kind === 's' && r.g.kind === 'task' && +r.g.ref_id === ${j1} && r.g.device === histDevice()).map(r => r.label)})`));
-  check(tw.srv >= 4 && tw.rows.length === 0, `the server's twins of this browser's steps are not listed twice: ${JSON.stringify(tw)}`);
+  const items = await until(() => { const r = [...d.querySelectorAll('#pop:not(.hidden) .ulbody .ulrow.ul-s')].filter(x => /Edited.*Jump/.test(x.textContent)); return r.length >= 4 && w.eval('UL.items !== null') && r; });
+  check(items && items.length >= 4 && items.every(r => /This device/.test(r.textContent)) && /Recent steps/.test(d.querySelector('#pop .ulhead')?.textContent || ''), `right-click: the list "Recent steps" with the steps of this device (${items && items.length})`);
+  check(![...d.querySelectorAll('#pop .ulbody .ulrow.ul-l')].some(r => /Jump/.test(r.textContent)), 'no second row "only this device"');
   const before = hl('undo');
   items[2].querySelector('[data-ul-go]').click(); await sleep(50); await idle(); await until(() => !w.eval('UL.busy'));
-  check((await get(j1)).priority === 1 && hl('undo') === before - 3 && hl('redo') >= 3, 'third entry: three steps undone in order');
-  check(/3 steps undone/.test(toastText(d)), `toast counts the steps: ${toastText(d)}`);
+  check(await until(async () => (await get(j1)).priority === 1) && hl('undo') === before - 3 && hl('redo') >= 3, `third entry: three steps undone in order (${hl('undo')} of ${before})`);
+  check(await until(() => /3 steps undone/.test(toastText(d))), `toast counts the steps: ${toastText(d)}`);  // 2.905.0 (#5255): the list says it after its reload
   // long-press (touch) opens the same menu
   const tev = type2 => { const e = new w.Event(type2, {bubbles: true, cancelable: true}); e.touches = type2 === 'touchend' ? [] : [{clientX: 5, clientY: 5}]; btn('redo').dispatchEvent(e); return e; };
   w.eval('closePop()');
@@ -299,14 +296,14 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(w.eval('OUT.q.length') === 1 && w.eval(`S.tasks.get(${o1}).status`) === 2 && btn('undo').classList.contains('pend'), 'redo offline: queued again');
   w.__offline = false; await w.eval('flush()'); await sleep(300);
   check((await get(o1)).status === 2, 'synced: completed on the server');
-  await w.eval(`patchTask(${o1}, {priority: 5})`); await sleep(100);
+  await w.eval(`patchTask(${o1}, {priority: 5})`); await until(() => w.eval('OUT.q.length') === 0 && !w.eval('OUT.flushing'));
   w.__offline = true;
   await key('z');
-  check(w.eval('OUT.q.length') === 1 && w.eval(`S.tasks.get(${o1}).priority`) === 0 && btn('redo').classList.contains('pend'), 'undo offline: the reverse is queued, → pending');
-  check(/sent as soon as you are online/.test(toastText(d)), 'toast says it waits');
-  check((await get(o1)).priority === 5, 'not on the server yet');
-  w.__offline = false; await w.eval('flush()'); await sleep(300);
-  check((await get(o1)).priority === 0 && !btn('redo').classList.contains('pend'), 'online: the queued undo arrived');
+  // 2.905.0 (#5255): a step the server has goes back on the server only, never queued for later (analysis #5249: an undo of
+  // yesterday must not arrive hours later unchecked): offline it is said and the step stays
+  check(w.eval('OUT.q.length') === 0 && /Offline/.test(toastText(d)) && (await get(o1)).priority === 5, `undo offline: said, nothing queued (${toastText(d)})`);
+  w.__offline = false; await key('z');
+  check((await get(o1)).priority === 0, 'online again: undone on the server');
   // sections need a connection: offline they stay in the history
   const nu = hl('undo');
   await w.eval(`sectionCreate(${WORK}, 'Offline test')`);

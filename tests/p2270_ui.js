@@ -280,11 +280,8 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
     if (m === 'GET') return window.__api(m, u, b, ...x);
     window.__calls.push({m, u, b}); return {count: 0, errors: [], conflicts: window.__cf || []}; }`);
   const sent = () => w.eval('JSON.stringify(window.__calls.splice(0))');
-  await w.eval(`(async () => { const e = histDone('x', [991], [{id: 991, due: '2027-01-05', due_time: '15:00', repeat: 'FREQ=DAILY;TIMES=09:00,15:00'}], {}); await e.redo(e); })()`);
-  await w.eval(`(async () => { const e = histDone('x', [992], [{id: 992, due: '2027-01-05', due_time: '15:00', repeat: 'FREQ=DAILY'}], {}); await e.redo(e); })()`);
-  const rd = JSON.parse(await sent());
-  check(JSON.stringify(rd[0].b.data.expect) === '{"991":{"due":"2027-01-05","due_time":"15:00"}}', '#3126: the redo of a several-times-a-day task names the time ' + JSON.stringify(rd[0].b));
-  check(JSON.stringify(rd[1].b.data.expect) === '{"992":"2027-01-05"}', '#3126: another series only its date');
+  // 2.905.0 (#5255): a task's redo is the server's step now (kalmido/tasks/tundo.py, tests/p2774_a_task_undo_test.py);
+  // the browser keeps no copy to send an expect with, so the #3126 redo checks moved there
   await w.eval(`(async () => { window.__cf = [{field: 'sort_mode', server: 'date'}]; await sortSet('title'); })()`);
   const so = JSON.parse(await sent());
   check(so[0].b.sort_mode === 'title' && so[0].b._prev?.sort_mode === '', '#3126: the sort with the one seen ' + JSON.stringify(so[0].b));

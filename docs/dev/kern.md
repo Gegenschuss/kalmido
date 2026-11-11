@@ -209,7 +209,7 @@ c.commit()
   (`oub_barrier` -> `undo_barrier`): listed, "bis hierher" stops there. `office/undogrp.py` maps every tracked office
   kind: its own check, `UGO_ADMIN` (the office's admin) or `UGO_NOACCESS` on purpose (rows with locks / approvals of
   their own). A document's undo takes the lock of its saves and of finalising (`office_doc_<id>`). The editor session
-  (`X-Kalmido-Undo`) stays; in the browser a barrier ends it as an entry of the history (`office_undo.js` `oun_bar`).
+  (`X-Kalmido-Undo`) stays on the server for other clients; the app no longer sends it since stage 7 (2.905.0, #5255).
 - Undo across devices, stage 3 (2.774.0, #5251): diff parts (`core/undodiff.py`, `obj_undo.mode = 'diff'`): an area that
   changes its objects field by field and in masses keeps only what a step changed and takes it back through its own
   write path (`undo_diff_reg(kind, run, area)`). The tasks (`tasks/tundo.py`, kind `task`): an edit (`apply_update`, also
@@ -231,6 +231,17 @@ c.commit()
   clean-up removed cannot come back (409); `FSU_VERSION_HOOKS` let an area refresh what it derived from the content.
   The browser's own steps (`histAdd`) stay until stages 2 / 7. Not yet: CalDAV / CardDAV and API v1 writes, budget,
   settings.
+- Undo across devices, stage 7 (2.905.0, #5255): the browser keeps no copies and no undo functions for areas whose writes
+  record a step. A write that recorded one answers with `X-Kalmido-Undo-Gid: <group>` (`core/undoweb.py`
+  `undo_gid_header`); `static/js/undo.js` `histAdd` puts the group into the entry (`gids`; a change still in the outbox:
+  its entry's answer later), the arrow / Ctrl+Z take back the person's newest group (any device, `GET /api/undo`) or this
+  window's newest entry, the toast's "Undo" exactly its own entry (`POST /api/undo/to/<oldest gid of the entry>`), redo
+  `POST /api/undo/<gid>/redo`. `histGroup` sends one `X-Kalmido-Undo-Group` token for its writes. A change not sent yet
+  is taken out of the outbox instead. The editor sessions of the browser are gone (`X-Kalmido-Undo` is no longer sent by
+  the app: no "everything since opening" entry, no table sessions; the server routes stay for other clients). Areas
+  whose writes record no step yet (#5476 moves them one by one) keep their own undo / redo functions in the entry
+  (listed as "only this device") until they record steps; the old flag `srv` of an entry means nothing any more, the
+  group in its answer decides.
 - Stage 2b (2.576.0, #4794): a 409 of `ow_write` carries the current state under `current` only (the old keys `row` /
   `letter` / `client` went). Every office row on `ow_write` has its history route `GET <its save path>/history`
   (`ow_history_answer`; e.g. `/api/office/trips/<id>/history`, `/api/clients/<id>/history`): the route runs the rights
@@ -255,11 +266,10 @@ know these routes already (kind `obj`); an area's own extra routes need their en
 `static/js/objsave.js` loads on demand (`await loadModule('objsave')`):
 
 ```js
-objOpen(md, url, obj);                         // unsaved input comes back, undo session, version watch
+objOpen(md, url, obj);                         // unsaved input comes back, version watch
 const r = await saveDialog(url, obj, values);  // only the changed fields + expect_updated_at
 if (r.conflict) objMerge(md, r.conflict, cur => { obj = cur; });   // fields someone else changed are marked
 else obj = r;
-await objUndo(url);                            // the server's undo of this dialog's own steps
 ```
 
 A dialog that saves a whole form (the office's rows, the clients; 2.576.0, #4794) uses the two wrappers around it:

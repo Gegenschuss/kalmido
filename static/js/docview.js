@@ -288,7 +288,7 @@ function dcv_detailsHtml(d, w, nb) {  // 2.736.0 (#5212): nb = a neighbour drawn
     d.asn || d.scan || d.asn_taken ? field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>${typeof dc_asnTakenHtml === 'function' ? dc_asnTakenHtml(d) : '' /* 2.591.0 B (#4863) */}`) : '',
     ...(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)), typeof pmeta_takenHtml === 'function' ? pmeta_takenHtml(d) : ''].join('');
   const n = [d.due, d.amount, d.asn].filter(Boolean).length + (d.custom_fields || []).filter(f => f.value != null && f.value !== '').length;
-  return `${busy}${sugHtml}${task}${typeof rx_html === 'function' ? rx_html(d) : ''}${typeof rc_slot === 'function' ? (nb ? `${rc_alsoHtml(d)}<div class="rc-slot"></div><p class="rc-cb muted" hidden></p>` : rc_slot(d)) : ''}${typeof ltd_slot === 'function' ? (nb ? `<div class="ltd" data-nid="${d.id}"></div>` : ltd_slot(d)) : '' /* 2.736.0 (#5212): a neighbour drawn ahead: their frames only (they keep one document's state each) */}${typeof ast_docSlot === 'function' ? ast_docSlot(d) : '' /* 2.126.1 A (#2123) */}
+  return `${busy}${sugHtml}${task}${typeof rx_html === 'function' ? rx_html(d) : ''}${typeof rc_slot === 'function' ? (nb ? `${rc_alsoHtml(d)}<div class="rc-slot"></div><p class="rc-cb muted" hidden></p>` : rc_slot(d)) : ''}${/*html-ok*/ typeof ltd_slot === 'function' ? (nb ? `<div class="ltd" data-nid="${d.id}"></div>` : ltd_slot(d)) : '' /* 2.736.0 (#5212): a neighbour drawn ahead: their frames only (they keep one document's state each); html-ok: ltd_slot builds its markup from escaped parts (letterdoc.js), 2.905.0 (#5255) */}${typeof ast_docSlot === 'function' ? ast_docSlot(d) : '' /* 2.126.1 A (#2123) */}
     <div class="dc-form">${main}</div>
     <details class="dv-more"${DVW.more ? ' open' : ''}><summary>${ic('chev', 's dc-chev')}<span>${tr('More fields')}</span>${n ? `<span class="muted dv-cnt">${esc(tr('{0} filled in', n))}</span>` : ''}</summary><div class="dc-form">${rare}</div></details>
     <div class="dc-notes" data-fl-fill></div>${w ? `<p class="muted dv-hint">${tr('Every change saves at once, with undo.')}</p>` : ''}`;
@@ -375,7 +375,7 @@ async function dcv_undo() {
   const s = $('.dv-view .dv-saved'); if (s) s.textContent = '';
   if (!he) return;
   await histIdle();
-  if (HIST.undo[HIST.undo.length - 1] === he) histStep('undo');
+  if (HIST.undo[HIST.undo.length - 1] === he) histStep('undo', 1, [he]);  // 2.905.0 (#5255): exactly this step
 }
 // the list changed (loaded again, the next page, a field saved): the counter and the strip follow (docs.js dc_navSync)
 function dcv_sync() {

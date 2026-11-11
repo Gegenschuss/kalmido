@@ -1194,7 +1194,7 @@ document.addEventListener('click', e => {
   const g = e.target.closest?.('#ofc-set [data-ostgo]'); if (g) { e.preventDefault(); ost_show(g.dataset.ostgo); return; }  // 2.147.0 (#2460): "Change country"
   const u = e.target.closest?.('#ofc-set [data-ost-undo]'); if (!u) return;
   e.preventDefault(); const m = u.closest('.ostok');
-  if (m?._e && HIST.undo[HIST.undo.length - 1] === m._e) { m.classList.remove('on'); histStep('undo'); }
+  if (m?._e && HIST.undo[HIST.undo.length - 1] === m._e) { m.classList.remove('on'); histStep('undo', 1, [m._e]); }  // 2.905.0 (#5255): exactly this step
 });
 document.addEventListener('change', e => { if (e.target.closest?.('#ofc-set')) ost_save(e.target); });
 document.addEventListener('mousedown', e => { if (e.target.closest?.('#ofc-set [data-ofc="bb"]')) e.preventDefault(); });  // a building block keeps the scheme field focused (no save in between)

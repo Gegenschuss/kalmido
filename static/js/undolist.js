@@ -9,7 +9,7 @@
        sent, paid ...) or a group too big for copies is greyed and so is everything older (the server stops there); a group
        nothing of which may be changed any more is greyed with its reason
      - the steps of this browser in areas that are not on the server's history yet (undo.js HIST, label "only this device");
-       the steps the server lists itself (office documents, the core dialogs: e.srv) are not shown twice
+       the entries the server keeps (2.905.0, #5255: undo.js histSrv - their group, or their change on its way) are not shown twice
    "Undo up to here" takes back every row above it and the row, newest first: runs of this browser's steps go through
    undo.js histStep(only), runs of server groups through /api/undo/to; a conflict leaves that part and names it (the rest of
    the group goes back, the server decides), a barrier ends the run. Live: the person's own "self" counter of the 4-s poll
@@ -21,7 +21,7 @@ const UL = {items: null, err: '', undo: undefined, busy: false, note: '', t: 0, 
 const UL_MAX = 100;
 
 const ul_key = e => { if (!e.ulk) e.ulk = ++UL.n; return 'l:' + e.ulk; };
-const ul_qOf = e => !!e && (e.parts ? e.parts.flatMap(ul_qOf) : e.q ? [e.q] : []);
+const ul_qOf = e => !e ? [] : e.parts ? e.parts.flatMap(ul_qOf) : e.qs || [];  // 2.905.0 (#5255): an entry's outbox entries
 function ul_qLabel(q) {
   const m = String(q.url || '').match(/^\/api\/tasks\/(-?\d+)/), t = m ? S.tasks.get(+m[1]) : null, title = t?.title || q.body?.title || '';
   return title ? tr('Edited {0}', qn(String(title).slice(0, 40))) : trn('{0} change waiting', '{0} changes waiting', 1);
@@ -38,20 +38,11 @@ function ul_time(ms) {
   return d.toLocaleString(LOCALE(), /** @type {any} */ (o));
 }
 // the rows (see the head of the file); off = cannot be undone from here, why = the reason shown under it
-// the tasks a step of this browser changed (a bundled step: its parts too)
-const ul_tids = e => !e ? [] : [...(e.snaps || []), ...(e.after || [])].map(x => +rid(x.id)).filter(Boolean).concat((e.parts || []).flatMap(ul_tids));
 function ul_rows() {
   const linked = new Set(HIST.undo.flatMap(ul_qOf));
   const pend = OUT.q.filter(q => !q.done && !linked.has(q)).map(q => ({key: 'q:' + q.k, kind: 'q', label: ul_qLabel(q), at: 0, off: true, why: tr('Not sent yet')}));
-  const loc = HIST.undo.filter(e => !e.srv).map(e => ({key: ul_key(e), kind: 'l', e, label: e.label, at: e.at || 0, area: e.area, pend: histPending(e)}));
-  // #3860 (CI red of 2.848.0, undo_ui): since 2.774.0 (#5251) the server records every task step too (kind 'task', "Edited …"); a
-  // step this browser still holds in its own history is listed once, as its own row: the server's twin of it (same device, same
-  // task, not older than the own step's second - the server's times are whole seconds) stays out, else both rows interleaved by
-  // the second and "Back up to here" took the change back twice
-  const mine = new Map();
-  for (const e of HIST.undo) if (!e.srv) for (const id of ul_tids(e)) mine.set(id, Math.min(mine.get(id) ?? Infinity, Math.floor((e.at || 0) / 1000) * 1000));
-  const twin = g => g.kind === 'task' && !!g.device && g.device === histDevice() && mine.has(+g.ref_id) && (Date.parse(g.at) || 0) >= /** @type {number} */ (mine.get(+g.ref_id));
-  const srv = (UL.items || []).filter(g => !twin(g)).map(g => ({key: 's:' + g.id, kind: 's', g, label: g.label || tr('Change'), at: Date.parse(g.at) || 0, area: g.area, dev: g.device, state: g.state}));
+  const loc = HIST.undo.filter(e => !histSrv(e)).map(e => ({key: ul_key(e), kind: 'l', e, label: e.label, at: e.at || 0, area: e.area, pend: histPending(e)}));
+  const srv = (UL.items || []).map(g => ({key: 's:' + g.id, kind: 's', g, label: g.label || tr('Change'), at: Date.parse(g.at) || 0, area: g.area, dev: g.device, state: g.state}));
   const rows = [...loc, ...srv].sort((a, b) => b.at - a.at).slice(0, UL_MAX);
   let wall = '';
   for (const r of rows) {
@@ -163,6 +154,7 @@ async function ul_go(key) {
       srv = true;
       const a = await api('POST', `/api/undo/to/${todo[todo.length - 1].g.id}`);
       n += (a.undone || []).length + (a.partial || []).length;
+      histMark([...(a.undone || []), ...(a.partial || [])], 'undo');  // 2.905.0 (#5255): this window's entries of those groups go to the redo side
       stayed.push(...ul_stayed(a.stayed || [], items));
       if (a.stopped) { msg.push(tr('Stopped before a step that cannot be undone: {0}', a.stopped.label || '')); break; }
     }
@@ -184,6 +176,7 @@ async function ul_redo(gid) {
   UL.busy = true; UL.note = ''; ul_draw();
   try {
     const a = await api('POST', `/api/undo/${+gid}/redo`);
+    if (a.redone) histMark([+gid], 'redo');  // 2.905.0 (#5255)
     const st = ul_stayed(a.stayed || [], UL.items || []);
     UL.note = [a.text, st.length ? tr('Stayed as it is: {0}', st.slice(0, 5).join('; ')) : ''].filter(Boolean).join(' ');
     try { if (OUT.online && !OUT.q.length) await load(); render(); } catch { /* the page may be gone */ }

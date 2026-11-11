@@ -1,12 +1,13 @@
 // 2.111.0 UI tests, part A (#2233, office: saved at once, undo when leaving), own container (start.sh), Firefox. Invented
 // names only.
 // - a quotation opened and left without a change: no hint
-// - a field changed: Ctrl+Z (focus outside the field) takes that step back; two more changes, then "Back": the hint
-//   "… saved · Undo" for 10 seconds, its button brings back the values from the opening
-// - left again after a change, then someone else changes it: the button refuses with the reason, their change stays
-// - "Finalise" ends the way back (no hint when leaving); 2.747.0 (#5252): the history shows it as a barrier, Undo there names why
-// - a table: a changed cell, leaving shows the hint, its button empties the cell again
-// - the client dialog: after "Save" the same hint, its button brings back the old name
+// - a field changed: Ctrl+Z (focus outside the field) takes that step back
+// 2.905.0 (#5255, undo across devices stage 7): no editor session any more - every save is a step of the server's history:
+// - two more changes, then "Back": no hint (nothing is folded); Ctrl+Z twice brings back both values, one step each
+// - a change here, then one of another session of the person: Ctrl+Z takes the newest (the other one) back first
+// - a finalised invoice (on the server) is a barrier: Ctrl+Z names it, the change before it stays
+// - a table: a changed cell, Ctrl+Z empties it again
+// - the client dialog: after "Save" the hint "… saved · Undo", its button brings back the old name
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -18,6 +19,9 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2111A_NOSTART && !process.env.KMT_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
 const FEAT = 'cal,comments,collab,office,clients,sheets';
+const COMPANY = {name: 'Beispiel Film GmbH', street: 'Musterweg 1', zip: '12345', city: 'Musterstadt', country: 'DE', email: 'hallo@beispiel.example', vat_id: 'DE123456789',
+  iban: 'DE02120300000000202051', bic: 'BYLADEM1001', bank_name: 'Beispielbank', tax_number: '12/345/67890'};  // 2.905.0 (#5255): an invoice to finalise
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 (async () => {
   await sleep(600);
@@ -41,6 +45,8 @@ const FEAT = 'cal,comments,collab,office,clients,sheets';
   const toastOn = `(() => { const t = document.getElementById('toast'); return !!t && !t.classList.contains('hidden') && /saved/i.test(t.textContent) && !!t.querySelector('button:not(.tx)'); })()`;
   const open = async (ev, nav) => { await nav(B + `#office/offers/${doc.id}`); return ready(ev, `!!document.getElementById('ofd-project_title')`, 80); };
   const back = ev => ev(`(() => { document.querySelector('[data-ofd="back"]').click(); return 1; })()`);
+  const ctrlZ = ev => ev(`(() => { document.activeElement?.blur?.(); document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true})); return 1; })()`);
+  const idle = ev => ready(ev, `!HIST.busy`);
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await nav(B + 'static/icon.svg');
@@ -58,52 +64,56 @@ const FEAT = 'cal,comments,collab,office,clients,sheets';
     await ev(`(() => { document.activeElement?.blur?.(); document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true})); return 1; })()`);
     check(await until(async () => (await docGet()).project_title === 'Alpha film'), 'Ctrl+Z: the step back');
     check(await ready(ev, `document.getElementById('ofd-project_title')?.value === 'Alpha film'`), 'Ctrl+Z: the editor shows the old title');
-    // two changes, then Back: the hint with Undo; its button brings back the opening
+    // 2.905.0 (#5255): two changes, then Back: no hint (the steps stay single); Ctrl+Z twice -> both values from before
+    await idle(ev);
     await setField(ev, 'ofd-project_title', 'Gamma film');
     await until(async () => (await docGet()).project_title === 'Gamma film');
     await setField(ev, 'ofd-project_ref', 'REF-7');
     check(await until(async () => (await docGet()).project_ref === 'REF-7'), 'the second field is saved');
     await back(ev);
-    check(await ready(ev, toastOn), 'Back after a change: "… saved · Undo"');
+    await sleep(1200);
+    check(!await ev(toastOn), 'Back after a change: no folded hint any more');
     await shot('p2111-a-hint.png');
-    await ev(`(() => { document.querySelector('#toast button:not(.tx)').click(); return 1; })()`);
-    check(await until(async () => { const d = await docGet(); return d.project_title === 'Alpha film' && d.project_ref === ''; }), 'Undo: the values from the opening');
-    // someone else changed it after leaving: refused with the reason
+    await ctrlZ(ev);
+    check(await until(async () => { const d = await docGet(); return d.project_title === 'Gamma film' && d.project_ref === ''; }), 'Ctrl+Z: the newest step back (the reference)');
+    await idle(ev);
+    await ctrlZ(ev);
+    check(await until(async () => (await docGet()).project_title === 'Alpha film'), 'Ctrl+Z again: the title from before');
+    // across devices: a change in this window, then one of another session of alice (the API) - Ctrl+Z takes back the
+    // person's newest step first (the other session's), then the one of this window
     check(await open(ev, nav), 'opened a third time');
+    await idle(ev);
     await setField(ev, 'ofd-project_title', 'Delta film');
     await until(async () => (await docGet()).project_title === 'Delta film');
     await back(ev);
-    check(await ready(ev, toastOn), 'the hint again');
-    await call(CA, 'PATCH', `/api/office/docs/${doc.id}`, {project_title: 'Changed elsewhere'});  // no undo header = someone else
-    await ev(`(() => { document.querySelector('#toast button:not(.tx)').click(); return 1; })()`);
-    check(await ready(ev, `/someone else|changed elsewhere/i.test(document.getElementById('toast').textContent)`), 'refused with the reason ' + await ev(`document.getElementById('toast').textContent`));
-    check((await docGet()).project_title === 'Changed elsewhere', 'the other change stays');
-    // finalising ends the way back: no hint when leaving
-    check(await open(ev, nav), 'opened a fourth time');
-    await setField(ev, 'ofd-project_ref', 'REF-8');
-    await until(async () => (await docGet()).project_ref === 'REF-8');
-    // 2.747.0 (#5252): what the finalise request does to the session - the header first, its answer then (oun_ok): the
-    // session ends once it went through and the history shows the step as a barrier
-    await ev(`(() => { oun_hdr('POST', '/api/office/docs/${doc.id}/finalize'); oun_ok('POST', '/api/office/docs/${doc.id}/finalize', {id: ${doc.id}, kind: 'offer', number: 'A-2026-1'}); return 1; })()`);
-    await back(ev);
-    await sleep(1200);
-    check(!await ev(toastOn), 'after finalising: no hint');
-    check(await ev(`HIST.undo.at(-1)?.barrier ? HIST.undo.at(-1).label : ''`) === 'Finalised: A-2026-1', 'the history shows the barrier ' + await ev(`HIST.undo.at(-1)?.label || ''`));
-    await ev(`(() => { histStep('undo'); return 1; })()`);
-    check(await ready(ev, `/Finalised or sent/.test(document.getElementById('toast')?.textContent || '')`), 'Undo on the barrier: the reason, nothing undone ' + await ev(`document.getElementById('toast')?.textContent || ''`));
-    check((await docGet()).project_ref === 'REF-8', 'the change before finalising stays');
-    // a table: a cell, then leaving -> the hint, Undo -> the cell is empty again
+    await call(CA, 'PATCH', `/api/office/docs/${doc.id}`, {project_title: 'Changed elsewhere'});
+    await idle(ev);
+    await ctrlZ(ev);
+    check(await until(async () => (await docGet()).project_title === 'Delta film'), 'Ctrl+Z: the other session\'s newer step goes back first');
+    await idle(ev);
+    await ctrlZ(ev);
+    check(await until(async () => (await docGet()).project_title === 'Alpha film'), 'Ctrl+Z again: the step of this window');
+    // finalising (on the server): a barrier
+    const s0 = await call(CA, 'PUT', '/api/office/settings', {company_fields: COMPANY});
+    const cl2 = await call(CA, 'POST', '/api/clients', {name: 'Kunde Beta GmbH', street: 'Weg 2', zip: '10115', city: 'Berlin', country: 'DE', email: 'kunde-beta@example.com', org_id: org.id});
+    const inv = await call(CA, 'POST', '/api/office/docs', {kind: 'invoice', client_id: cl2.id, service_from: today(), items: [{title: 'Schnitt', qty: 1, rate: 100}]});
+    const fin = await call(CA, 'POST', `/api/office/docs/${inv.id}/finalize`, {});
+    check(s0.http === 200 && fin.http === 200, `an invoice finalised (${s0.http} ${fin.http} ${fin.error || ''})`);
+    await idle(ev);
+    await ctrlZ(ev);
+    check(await ready(ev, `/Stopped before a step that cannot be undone/.test(document.getElementById('toast')?.textContent || '')`), 'Ctrl+Z on the barrier: named, nothing undone ' + await ev(`document.getElementById('toast')?.textContent || ''`));
+    check((await call(CA, 'GET', `/api/office/docs/${inv.id}`)).number, 'the invoice stays finalised');
+    // a table: a cell, Ctrl+Z empties it again
     const sh = await call(CA, 'POST', '/api/sheets', {title: 'Budget sheet'});
     check(sh.http === 201, 'a table ' + sh.http);
     const cellOf = async () => ((await call(CA, 'GET', `/api/sheets/${sh.id}`)).cells || []).find(c => c.raw === 'Forty-two');
     await nav(B + `#sheets/${sh.id}`);
-    check(await ready(ev, `typeof SHV !== 'undefined' && SHV.sh?.id === ${sh.id} && typeof oun_tag === 'function'`, 80), 'the table opens');
+    check(await ready(ev, `typeof SHV !== 'undefined' && SHV.sh?.id === ${sh.id}`, 80), 'the table opens');
     await ev(`shvPut([{row_id: SHV.sh.rows[0].id, col_id: SHV.sh.columns[0].id, raw: 'Forty-two'}]).then(() => 1)`);
     check(await until(async () => !!await cellOf()), 'the cell is saved');
-    await ev(`(() => { go('office/offers'); return 1; })()`);
-    check(await ready(ev, toastOn), 'leaving the table: "… saved · Undo"');
-    await ev(`(() => { document.querySelector('#toast button:not(.tx)').click(); return 1; })()`);
-    check(await until(async () => !await cellOf()), 'Undo: the cell is empty again');
+    check(await ready(ev, `HIST.undo.length > 0 && histGids(HIST.undo.at(-1)).length > 0`), 'the step names its server group');
+    await ctrlZ(ev);
+    check(await until(async () => !await cellOf()), 'Ctrl+Z: the cell is empty again');
     // the client dialog: "Save" -> the hint, Undo -> the old name
     await nav(B + '#office/offers');
     await ready(ev, `typeof clientModal === 'function' && (S.clients || []).some(c => c.id === ${cl.id})`, 80);

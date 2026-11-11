@@ -1303,7 +1303,7 @@ function settingsModal(focus) {
       else { const j = i + +b.dataset.tmove; if (j < 0 || j >= ids.length) return; [ids[i], ids[j]] = [ids[j], ids[i]]; }
       tabSet(ids); $$('[data-tab]', md).find(r => r.dataset.tab === trow.dataset.tab)?.querySelector(`[data-tmove="${b.dataset.tmove}"]`)?.focus(); return;
     }
-    if (b.dataset.m === 's-undo') { const el = $('.ssaved', md); if (el?._e && HIST.undo[HIST.undo.length - 1] === el._e) { el.classList.remove('on'); histStep('undo'); } return; }
+    if (b.dataset.m === 's-undo') { const el = $('.ssaved', md); if (el?._e && HIST.undo[HIST.undo.length - 1] === el._e) { el.classList.remove('on'); histStep('undo', 1, [el._e]); } return; }  // 2.905.0 (#5255): exactly this step
     if (b.dataset.m === 'tab-reset') { tabSet(null); return; }
     if (b.dataset.m === 'tab-add') { tabAddSheet(id => { tabSet([...tabIds(), id]); $('#s-tabadd', md)?.focus(); }); return; }  // 2.122.2 (#2329)
     if (b.dataset.m === 'sync-now') { b.disabled = true; try { if (OUT.q.length) await flush(); await refreshNow(); } finally { b.disabled = false; const st = $('#s-synced', md); if (st) st.textContent = syncedTxt(); } return; }  // 2.25.0 (UX-56)

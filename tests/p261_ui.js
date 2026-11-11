@@ -89,12 +89,19 @@ const HEAD = `(() => {
   const n2 = w.eval('HIST.undo.length');
   click(w, pop.querySelector('[data-q="revert"]')); await until(async () => (await getT(T)).due === day(5)); await idle(w);
   check((await getT(T)).due === day(5) && pop.classList.contains('hidden') && w.eval('HIST.undo.length') === n2, 'Undo in the foot: back, closed, no extra step');
+  // 2.905.0 (#5255): the foot takes the visit's own server step back (POST /api/undo/to) instead of a new change; a new change
+  // would be the person's newest step and a later Ctrl+Z brought "Today" again
+  const ug = ((await call('GET', '/api/undo?limit=1')).items || [])[0];
+  check(ug && ug.state === 'undone', 'Undo in the foot: the newest own step on the server is the undone visit, no new step ' + JSON.stringify(ug));
   // closing with Esc / outside also keeps it (the change is already saved)
   w.eval(`datePop(document.querySelector('#top h1'), ${T})`); await sleep(100);
-  click(w, d.querySelector('#pop [data-q="w"]')); await sleep(200);
+  // 2.905.0 (#5255): the tap must change the date - on a Wednesday "Next week" (next Monday) is day(5) already, no step is
+  // recorded and the server-wide Ctrl+Z below would rightly take back the newest step (the foot's Undo) instead: Tomorrow then
+  const wk = w.eval('nextWeekday(1)') === day(5) ? '1' : 'w', wkDay = wk === '1' ? day(1) : w.eval('nextWeekday(1)');
+  click(w, d.querySelector(`#pop [data-q="${wk}"]`)); await sleep(200);
   d.body.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); await sleep(900);
-  check((await getT(T)).due === w.eval('nextWeekday(1)'), 'Esc right after a tap: still saved (sent on close)');
-  await w.eval(`histStep('undo')`); await sleep(600);
+  check((await getT(T)).due === wkDay, 'Esc right after a tap: still saved (sent on close)');
+  await w.eval(`histStep('undo')`); await until(async () => (await getT(T)).due === day(5));  // 2.905.0 (#5255): a state, not 600 ms
   check((await getT(T)).due === day(5), 'Ctrl+Z / ← undoes it');
   // the setting
   w.eval(`settingsModal('general')`); await idle(w);

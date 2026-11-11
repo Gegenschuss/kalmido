@@ -105,7 +105,7 @@ function ln_wipe() {
 // no plain copy stays in this tab: undo steps that carry the old note of this task go (the lock itself is the one new step),
 // the offline copy of the state follows
 function ln_forget(tid) {
-  const hit = e => !!e && ((e.parts || []).some(hit) || [...(e.snaps || []), ...(e.after || [])].some(s => s && s.id === tid) || (e.ids || []).includes(tid));
+  const hit = e => !!e && ((e.parts || []).some(hit) || [...(e.snaps || []), ...(e.after || []), ...(e.pairs || []).flat()].some(s => s && s.id === tid) || (e.ids || []).includes(tid));
   HIST.undo = HIST.undo.filter(e => !hit(e)); HIST.redo = HIST.redo.filter(e => !hit(e));
   if (typeof renderHist === 'function') renderHist();
   // 2.48.0 review (L7): an edit conflict about this note keeps both texts in localStorage: it goes

@@ -10,8 +10,8 @@
 //  - "Back up to here" on the second row takes TWO groups back (the service's rate as before them); both rows say "Undone"
 //    and offer "Redo", which brings one forward again
 //  - a conflict answer of the server: the panel names what stayed (the rest went back, the server decides)
-//  - this browser's own write is listed with "This device" (the header of core.js rawFetch0); a task step that is not on
-//    the server's history yet is a row "only this device"; a change waiting in the outbox without a step of its own is on top
+//  - this browser's own write is listed with "This device" (the header of core.js rawFetch0); a task step is the server's
+//    row of this device (2.905.0, #5255: no "only this device" twin); a change waiting in the outbox without a step of its own is on top
 //    ("Not sent yet")
 //  - the account menu's "Recent steps" opens the same list as a page (#steps): the same rows and buttons; Back (the phone's
 //    system Back = history.back) returns to the view before
@@ -106,7 +106,9 @@ const rate = async (ck, sv) => (await call(ck, 'GET', `/api/office/services/${sv
   const T = (await call(CA, 'POST', '/api/tasks', {title: 'Pay invoice', list_id: L})).id;
   await w.eval('load().then(render)');
   await w.eval(`patchTask(${T}, {priority: 5})`);
-  check(await until(() => [...d.querySelectorAll('#pop .ulbody .ulrow.ul-l')].some(r => /Priority of “Pay invoice”/.test(r.textContent) && /only this device/.test(r.textContent))), 'a task step of this browser: a row "only this device"');
+  // 2.905.0 (#5255): the task step is on the server now: listed once, as the server's row of this device (no "only this device" twin)
+  check(await until(() => [...d.querySelectorAll('#pop .ulbody .ulrow.ul-s')].some(r => /Pay invoice/.test(r.textContent) && /This device/.test(r.textContent))), 'a task step of this browser: the server\'s row of "This device"');
+  check(![...d.querySelectorAll('#pop .ulbody .ulrow.ul-l')].some(r => /Pay invoice/.test(r.textContent)), 'no second row "only this device" for it');
   await until(() => w.eval('OUT.q.length') === 0);
   w.__offline = true;
   await w.eval(`enqueue('PATCH', '/api/tasks/${T}', {title: 'Pay invoice today'})`);

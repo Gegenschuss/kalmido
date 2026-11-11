@@ -25,7 +25,7 @@ from flask import g
 from ..collab.liste2e import le2a_moving, le2a_subtree, le2e_is_cipher
 from ..collab.reactions import ltag_names
 from ..core.access import need_list, need_task
-from ..core.db import bump
+from ..core.db import bump, iso_ms, now_utc
 from ..core.errors import Denied
 from ..core.i18n import N_, tr
 from ..core.pg import write_lock
@@ -55,6 +55,7 @@ TU_GONE = N_("Changed in the meantime, nothing to undo")
 TU_SEC = N_("Section renamed to {0}")
 TU_SEC_SET = N_("Section {0}")
 TU_SEC_ORDER = N_("Sections reordered")
+TU_OTHER = N_("Changed by someone else in the meantime")  # 2.905.0 (#5255): the key exists (objsave.js)
 
 
 def _marks(c):
@@ -200,7 +201,11 @@ def _flush(c, m):
             if keys and _plain_under_lock(c, row, b):
                 skip.add(tid)
             elif keys:
-                d = {"op": "fields", "b": b, "a": {k: after.get(k) for k in keys}}
+                a = {k: after.get(k) for k in keys}
+                if "fields" in b:  # 2.905.0 (#5255): per field, a value that was not there (or is gone) is None, so it goes back empty
+                    ids = [i for i in sorted(set(b["fields"] or {}) | set(a.get("fields") or {})) if _js((b["fields"] or {}).get(i)) != _js((a.get("fields") or {}).get(i))]
+                    b["fields"], a["fields"] = {i: (b["fields"] or {}).get(i) for i in ids}, {i: (a.get("fields") or {}).get(i) for i in ids}
+                d = {"op": "fields", "b": b, "a": a}
                 kept = _kept_move(c, row, b)
                 if kept:
                     d["keep"] = kept
@@ -342,8 +347,12 @@ def tu_run(c, uid, tid, data, redo):
     elif op == "reopen":
         out = _reopen(c, tid, data, redo)
     elif op in ("delete", "restore"):
-        _trash(c, tid, (op == "delete") == redo)
-        out = (data, [])
+        out_ = (op == "delete") == redo
+        # 2.905.0 (#5255, was the browser's guard): back into the trash only while nobody else changed it since it came out
+        if out_ and _created_changed(c, uid, tid, data.get("back_at")):
+            raise Denied(409, tr(TU_OTHER))
+        _trash(c, tid, out_)
+        out = ({**data, "back_at": iso_ms(now_utc())} if not out_ else data, [])
     elif op == "create":
         if not redo and _created_changed(c, uid, tid, data.get("at")):
             raise Denied(409, tr(TU_GONE))

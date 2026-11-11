@@ -625,7 +625,7 @@ async function rawFetch0(method, url, body, key, osp) {
   if (key) opt.headers['Idempotency-Key'] = key;  // 2.270.0 C (#3022): a replay the server already applied comes back as its first answer
   const dev = wpDevHeader(url); if (dev) opt.headers['X-Kalmido-Device'] = dev;
   if (method !== 'GET' && S.me && S.me.kind !== 'agent') opt.headers['X-Kalmido-Device-Name'] = histDevice();  // 2.773.0 (#5250): the device of a step in the list "Recent steps" (undo.js)
-  const un = (typeof oun_hdr === 'function' ? oun_hdr(method, url) : '') || (typeof obj_hdr === 'function' ? obj_hdr(method, url) : ''); if (un) opt.headers['X-Kalmido-Undo'] = un;  // 2.111.0 A (#2233): office_undo.js; 2.558.0 (#4709): objsave.js
+  if (method !== 'GET' && HIST.gtok) opt.headers['X-Kalmido-Undo-Group'] = HIST.gtok;  // 2.905.0 (#5255): the writes of one step (undo.js histGroup) are one server group
   if (body instanceof FormData) opt.body = body;
   else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
   let r;
@@ -666,6 +666,8 @@ async function rawFetch0(method, url, body, key, osp) {
     if (j.code === 'support_session') e.message = tr('Not possible in a support session') + (j.error ? ': ' + j.error : '');  // 2.538.0 (#4365)
     if (j.pin && S.me?.kid) { e.shown = true; kd_pinClosed(); }  // 2.49.0 (#1551): the PIN time ran out: ask again
     throw e; }
+  const ug = method !== 'GET' ? +(r.headers.get('X-Kalmido-Undo-Gid') || 0) : 0;  // 2.905.0 (#5255): the server's step group of this write (undo.js)
+  if (ug) { if (j && typeof j === 'object') Object.defineProperty(j, '_ugid', {value: ug, configurable: true}); if (!(OUT.flushing && key)) histUgid(ug); }  // an outbox entry's group: through its answer (e.res)
   if (method !== 'GET' && typeof oun_ok === 'function') oun_ok(method, url, j);  // 2.111.0 A (#2233)
   if (method !== 'GET' && typeof lpOwnNote === 'function') lpOwnNote(r.headers.get('X-Kalmido-Lv'));  // 2.280.0 A (#3109): liveparts.js
   return j;

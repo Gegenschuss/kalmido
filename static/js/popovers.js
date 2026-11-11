@@ -235,7 +235,7 @@ function datePop(anchor, id) {
     ...(st.due ? {deadline: st.deadline, nag: st.nag} : {deadline: 0, nag: ''}), remind_at: st.remind_at || null});
   const msgOf = () => st.due ? tr('Date: {0}', dayLabel(st.due)) : tr('Date removed');
   // instant mode: what was sent last, the running request chain, the dependent tasks the server moved along (first prev)
-  const I = {sig: JSON.stringify(body()), timer: null, chain: Promise.resolve(), saved: false, shifted: new Map(), done: false, last: null, later: Promise.resolve()};  // 2.537.0 (#4568): later = the outbox's answers still to come
+  const I = {sig: JSON.stringify(body()), timer: null, chain: Promise.resolve(), saved: false, shifted: new Map(), done: false, last: null, later: Promise.resolve(), qs: new Set(), gids: new Set()};  // 2.537.0 (#4568): later = the outbox's answers still to come; 2.905.0 (#5255): qs / gids = the visit's outbox entries / server groups, its one step
   const send = () => {
     clearTimeout(I.timer); I.timer = null;
     const b = body(), sig = JSON.stringify(b);
@@ -244,6 +244,7 @@ function datePop(anchor, id) {
     I.chain = I.chain.then(async () => {
       const r = await patchTask(id, b, true);
       I.saved = true; I.last = r;
+      if (r?._q) I.qs.add(r._q); if (r?._ugid) I.gids.add(r._ugid);
       const shAdd = sh => { for (const x of sh || []) { const o = I.shifted.get(x.id); I.shifted.set(x.id, o ? {...x, prev_start: o.prev_start, prev_due: o.prev_due} : x); } };
       shAdd(r?.shifted);
       if (r?._q) I.later = Promise.all([I.later, outLater(r._q).then(j => { shAdd(j?.shifted); if (j?.chain) I.lastChain = j.chain; })]);  // 2.537.0 (#4568): in the outbox, its answer follows
@@ -261,12 +262,20 @@ function datePop(anchor, id) {
     const cur = S.tasks.get(id) || I.last, known = new Set(I.shifted.keys());
     // 2.537.0 (#4568): the dependent tasks the outbox's answers move along join the step afterwards
     const later = I.later.then(() => ({id, shifted: [...I.shifted.values()].filter(x => !known.has(x.id)), chain: I.lastChain}));
-    shiftUndo(before, cur ? {...cur, id, shifted: [...I.shifted.values()]} : null, msgOf(), later);
+    shiftUndo(before, cur ? {...cur, id, shifted: [...I.shifted.values()]} : null, msgOf(), later, {qs: [...I.qs], gids: [...I.gids]});
   };
   const revert = async () => {
     I.done = true; clearTimeout(I.timer);
     await I.chain; await I.later;  // 2.537.0 (#4568): + the answers of the outbox (the dependent tasks to put back)
     if (!I.saved) return;
+    // 2.905.0 (#5255): the visit's own server groups go back (POST /api/undo/to, the dependent tasks with them), so no new
+    // step is recorded that a later Ctrl+Z would take back (the date came again); without a group (offline) as before
+    const gids = [...I.gids, ...[...I.qs].map(q => q.res?._ugid)].filter(g => g > 0);
+    if (gids.length) {
+      try { await api('POST', `/api/undo/to/${Math.min(...gids)}`); } catch { return; }
+      if (typeof histMark === 'function') histMark(gids, 'undo');
+      await load().catch(() => {}); render(); toast(tr('Changes undone')); return;
+    }
     const back = {}; for (const k of ['due', 'due_time', 'reminders', 'repeat', 'repeat_from', 'start', 'duration', 'deadline', 'nag', 'remind_at']) back[k] = before[k] ?? (k === 'reminders' || k === 'repeat' || k === 'nag' ? '' : k === 'deadline' ? 0 : null);
     try { await patchTask(id, back, true); } catch { return; }
     // dependent tasks the server moved along: back to where they were

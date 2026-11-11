@@ -466,7 +466,7 @@ async function listPatch(id, body, label, o = {}) {
     if (e) { HIST.undo = HIST.undo.filter(x => x !== e); renderHist(); }
     run(); return false;
   }
-  if (e && res?.undo_group) e.srv = true;  // 2.809.0 (#5476): the server lists the step ("Recent steps" shows its row, not "only this device")
+  if (e && res?.undo_group) histOwn(e, +res.undo_group);  // 2.809.0 (#5476): the server lists the step; 2.905.0 (#5255): and takes it back (its group)
   const cf = (res?.conflicts || []).map(c => c.field);  // 2.270.0 A (#3019): changed elsewhere meanwhile: kept, said, not in the undo step
   if (cf.length) {
     for (const k of cf) { delete before[k]; delete after[k]; }
@@ -1328,7 +1328,7 @@ function listModal(id, folder = '', o = {}) {
       try { await api('DELETE', `/api/lists/${id}/members/${S.me.id}`); } catch { return; }
       md.remove(); await load(); go(START_KEY); return;
     }
-    if (b.dataset.m === 'l-undo') { const el = $('.ssaved', md); if (el?._e && HIST.undo[HIST.undo.length - 1] === el._e) { el.classList.remove('on'); histStep('undo'); } return; }
+    if (b.dataset.m === 'l-undo') { const el = $('.ssaved', md); if (el?._e && HIST.undo[HIST.undo.length - 1] === el._e) { el.classList.remove('on'); histStep('undo', 1, [el._e]); } return; }  // 2.905.0 (#5255): exactly this step
     if (b.dataset.c !== undefined) { $$('#l-col button', md).forEach(x => x.classList.remove('on')); b.classList.add('on'); if (id) autosave(); }
     if (b.id === 'l-emo') { $('#l-emogrid', md).classList.toggle('hidden'); return; }
     if (b.dataset.licon) {  // 2.0.2: a picture instead of the emoji (the emoji leaves the name)

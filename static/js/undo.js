@@ -2,32 +2,34 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-// ------------------------------------------------------------------ undo / redo history (D4)
-// Per device and session, in memory only (gone after a reload): up to HIST_MAX steps back (the ← button, Ctrl/Cmd+Z,
-// the toast's "Undo") and forward again (→, Ctrl/Cmd+Shift+Z, Ctrl+Y); a right-click / long-press on ← (or →) lists
-// the last steps to jump several at once. A new action clears the steps forward. A step has a label, how to go back and
-// forth (undo(e) / redo(e) -> {skipped, q, none}) and the task copies from before (snaps) and after (after).
-// Conflict safety: task fields carry _prev (the values the step left), sections / lists their expected state, so a change
-// made elsewhere in the meantime stays and is reported ("Changed elsewhere, not undone: …"); every task step goes to
-// /api/tasks/batch, one transaction however many tasks it touches. Offline: a step whose operation still waits in the
-// outbox is taken out of the queue and the local state restored (never sent); otherwise task steps are queued like
-// any other change (the buttons show the pending state). Steps on lists that became view-only refuse.
+// ------------------------------------------------------------------ undo / redo (D4)
+// 2.905.0 (#5255, undo across devices stage 7): the steps live on the server, per person and across devices (the step groups
+// of kalmido/core/undogroups.py, the list "Recent steps" of undolist.js). This file only holds the buttons (← / →), the
+// keyboard (Ctrl/Cmd+Z back, Ctrl/Cmd+Shift+Z or Ctrl+Y forward), the toasts' "Undo" and the short list of this window's
+// own steps: an entry (histAdd) is a label plus the group(s) the server recorded for it (gids: the header X-Kalmido-Undo-Gid
+// of the write's answer, core.js rawFetch0 -> histUgid) or the outbox entries still on their way (qs); no copies, no
+// functions of their own. Undo takes back the person's newest step (ul: the server's newest group, any device) with POST
+// /api/undo/to/<id>; the toast's "Undo" exactly its own entry; redo POST /api/undo/<id>/redo. A change still waiting in the
+// outbox is taken out of the queue (never sent); the server checks rights, conflicts and barriers and names what stayed.
+// Areas whose writes record no server step yet keep their own undo / redo functions in the entry (label "only this device"
+// in the list) until their area records steps (#5255: named in the result, a task for the rest).
 const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype', 'deadline', 'nag', 'assignee_group_id', 'plan_start', 'ms', 'milestone_id', 'locked'];  // 2.18.0: ms, milestone_id (#430)  // 2.11.0: plan_start  // 2.10.0: assignee_group_id  // 2.4.0: ttype (#340), 2.7.0: deadline, nag
 UNDO_FIELDS.push('remind_at');  // 2.111.0 C (#2057): the fixed-time reminder
 const HIST_FIELDS = [...UNDO_FIELDS, 'title', 'content', 'url', 'tags', 'fields'];
 const HIST_MAX = 100, HIST_MENU = 100;  // 2.773.0 (#5250, #5242): 100 steps (was 30), the → menu lists them all (was 10) and scrolls
-const HIST = {undo: [], redo: [], busy: false, group: null, gToast: null, toastE: null, sess: 0, ids: {}, secmap: new Map()};
+// fresh: the step groups of answers no entry took yet (histUgid); gtok: the bundling token of histGroup (X-Kalmido-Undo-Group)
+const HIST = {undo: [], redo: [], busy: false, group: null, gToast: null, toastE: null, sess: 0, ids: {}, secmap: new Map(), fresh: [], gtok: ''};
+const HIST_FRESH_MS = 8000;  // 2.905.0 (#5255): an answer's group older than this is no longer taken by a new entry
 const snapTask = t => t ? JSON.parse(JSON.stringify(t)) : null;
 const withKids = id => { const out = [], walk = x => { for (const k of children(x)) { out.push(snapTask(k)); walk(k.id); } }; out.push(snapTask(taskById(id))); walk(id); return out.filter(Boolean); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const rid = id => (+id < 0 && HIST.ids[id]) || +id;  // a task created offline: its real id once the outbox was sent
 const secId = sid => { let s = sid; for (let i = 0; i < 50 && s && HIST.secmap.has(s); i++) s = HIST.secmap.get(s); return s; };  // re-created sections
 const cancellable = e => { const i = OUT.q.indexOf(e); return i >= 0 && !e.sending && !(OUT.flushing && i === 0); };  // 2.126.0 D (#1989): sending = on its way (any tab)
-const histPending = e => !!e && (e.parts ? e.parts.some(histPending) : !!(e.q && !e.q.done && OUT.q.includes(e.q)));
+const histPending = e => !!e && (e.parts ? e.parts.some(histPending) : (e.qs || []).some(q => !q.done && OUT.q.includes(q)));
 const nv = v => v === '' || v === undefined ? null : v;
 const qn = s => tr('“{0}”', s);  // a name in quotes, as the language writes them
-// field changes: reverse of what actually changed; _prev = the values after, so a change made elsewhere in the
-// meantime is not overwritten (reported instead). reverseOf(after, before) is the way forward again.
+// field changes: reverse of what actually changed (the label and whether a change happened at all; the server keeps the step)
 function reverseOf(before, after, fields = UNDO_FIELDS) {
   const back = {}, prev = {};
   for (const k of fields) {
@@ -45,15 +47,39 @@ function reverseOf(before, after, fields = UNDO_FIELDS) {
   }
   return Object.keys(back).length ? {...back, _prev: prev} : null;
 }
+// ---- the server's step groups
+// core.js rawFetch0: a write's answer named the group its step went into (X-Kalmido-Undo-Gid); the next entry takes it
+function histUgid(gid) {
+  if (!(gid > 0)) return;
+  HIST.fresh.push({gid, at: Date.now()});
+  if (HIST.fresh.length > 50) HIST.fresh.shift();
+}
+// the groups of an entry: its own, the ones of its outbox entries' answers, its parts'
+function histGids(e) {
+  if (!e) return [];
+  const g = e.parts ? e.parts.flatMap(histGids) : [...(e.gids || []), ...(e.qs || []).map(q => q.res?._ugid)];
+  return [...new Set(g.filter(x => x > 0))];
+}
+// an entry the server keeps (or will: a change still waiting in the outbox); else it is this device's own (local undo / redo)
+const histSrv = e => !!e && (histGids(e).length > 0 || (e.parts ? e.parts.some(histSrv) : !!(e.qs || []).length));
 // ---- building steps
+// e: {label, res?, ids?, lids?, area?, post?(dir), undo?/redo? (only areas without server steps), ...}; snaps / after / pairs
+// are not kept (no copies in the browser, #5255)
 function histAdd(e) {
-  if (typeof oun_tag === 'function') oun_tag(e);  // 2.111.0 A (#2233): a table's steps (office_undo.js)
-  e.snaps = e.snaps || [];
-  const ids = [...new Set([...e.snaps.map(s => s.id), ...(e.ids || [])])];
-  if (!e.after) e.after = ids.map(id => snapTask(S.tasks.get(id)) || {id, _gone: true});
-  e.lids = [...new Set([...(e.lids || []), ...e.snaps.map(s => s.list_id), ...e.after.map(s => s.list_id)].filter(Boolean))];
+  e.lids = [...new Set([...(e.lids || []), ...(e.snaps || []).map(s => s?.list_id)].filter(Boolean))];
   if (e.q === undefined) e.q = e.res?._q || null;
-  if (!e.at) { e.at = Date.now(); e.area = e.area || (e.sett ? 'self' : S.route?.mod || 'tasks'); }  // 2.773.0 (#5242): time and area for the list "Recent steps" (undolist.js)
+  e.qs = e.qs || (e.q ? [e.q] : []);
+  // only while its change still waits in the outbox: the tasks as they were, to show them again when it is taken out
+  // (offline); gone once it was sent (histFree)
+  e.local = e.qs.some(q => !q.done) && e.snaps?.length ? e.snaps : null;
+  e.snaps = []; e.after = [];
+  histFree();
+  const now = Date.now(), own = e.res?._ugid || +(e.res?.undo_group || 0);  // 2.905.0 (#5255): the header's group, or the answer's own field (#5476 areas)
+  e.gids = [...(e.gids || []), ...(own ? [own] : [])];
+  if (!e.parts && !e.qs.length && !own && !e.gids.length) e.gids.push(...HIST.fresh.filter(f => now - f.at < HIST_FRESH_MS).map(f => f.gid));
+  HIST.fresh = [];
+  if (!e.at) { e.at = now; e.area = e.area || (e.sett ? 'self' : S.route?.mod || 'tasks'); }
+  if (!e.parts && !e.gids.length && !e.qs.length && !e.undo) return e;  // nothing to take back (a change that joined one still waiting in the outbox: that entry has it)  // 2.773.0 (#5242): time and area for the list "Recent steps" (undolist.js)
   if (HIST.group) { HIST.group.push(e); return e; }
   HIST.undo.push(e);
   if (HIST.undo.length > HIST_MAX) HIST.undo.shift();
@@ -62,83 +88,81 @@ function histAdd(e) {
   renderHist();
   return e;
 }
-// several recorded steps of one user action (e.g. a drop that makes a subtask standalone and moves it) become one
+// 2.905.0 (#5255): an entry recorded before its write answered (optimistic, dialogs.js listPatch) takes the group of that
+// answer afterwards; without it the group stayed in HIST.fresh (the next entry took it) and the entry went back on its own,
+// as a new server step that Ctrl+Z then took back (the change came again)
+function histOwn(e, gid) {
+  if (!e || !(gid > 0)) return;
+  e.gids = [...new Set([...(e.gids || []), gid])];
+  HIST.fresh = HIST.fresh.filter(f => f.gid !== gid);
+  renderHist();
+}
+// the waiting copies of entries whose change reached the server go (histAdd keeps them only while it waits)
+function histFree() { for (const x of [...HIST.undo, ...HIST.redo]) if (x.local && !histPending(x)) x.local = null; }
+// the server took these groups back (undo) or forward (redo) - also from the list "Recent steps": this window's entries
+// made only of them change sides
+function histMark(ids, dir) {
+  if (!ids?.length) return;
+  const from = dir === 'undo' ? 'undo' : 'redo', to = dir === 'undo' ? 'redo' : 'undo';
+  for (const x of [...HIST[from]]) { const g = histGids(x); if (g.length && g.every(id => ids.includes(id))) { HIST[from] = HIST[from].filter(y => y !== x); HIST[to].push(x); } }
+  renderHist();
+}
+// several recorded steps of one user action (e.g. a drop that makes a subtask standalone and moves it) become one; its
+// writes carry one token (X-Kalmido-Undo-Group), so the server bundles them into one group too
 async function histGroup(fn, label) {
   if (HIST.group) return fn();
   const g = HIST.group = [];
   HIST.gToast = null;
+  HIST.gtok = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
   try { return await fn(); } finally {
-    HIST.group = null;
+    HIST.group = null; HIST.gtok = '';
     const msg = HIST.gToast; HIST.gToast = null;
-    const e = g.length === 1 ? g[0] : g.length ? {label: label || g[g.length - 1].label, parts: g, snaps: [], after: [], q: null, lids: g.flatMap(x => x.lids)} : null;
+    const e = g.length === 1 ? g[0] : g.length ? {label: label || g[g.length - 1].label, parts: g, lids: g.flatMap(x => x.lids), at: g[0].at, area: g[0].area} : null;
     if (e) { e.group = true; histAdd(e); if (msg) histToast(msg, e); }
   }
 }
-// the toast with "Undo" for a step (a shortcut to the newest history entry)
+// the toast with "Undo" for a step: takes back exactly that entry
 function histToast(msg, e, ms = 6000) {  // 2.58.0 (#1810): ms = a longer toast for a big step
   if (!e) { toast(msg); return; }
   if (HIST.group && HIST.group.includes(e)) { HIST.gToast = msg; return; }
-  toast(msg, async () => { await histIdle(); if (HIST.undo[HIST.undo.length - 1] === e) histStep('undo'); }, ms);
+  toast(msg, async () => { await histIdle(); if (HIST.undo.includes(e)) histStep('undo', 1, [e]); }, ms);
   HIST.toastE = e;
 }
 // 2.489.0 (#4013): an Undo pressed while an earlier step still finishes (its reload, its message) waits for it instead of being
 // dropped by histStep's busy guard (a quick delete right after an undo under load: the delete stayed)
 async function histIdle() { while (HIST.busy) await sleep(50); }
-// task field steps: [before, after, fields?] per task -> one batch request each way
+// task steps: the label and the changed fields only (histText joins typing), the server keeps the step
+const histSlim = ([b, a, f]) => {
+  const keys = Object.keys(reverseOf(b, a, f || HIST_FIELDS) || {}).filter(k => k !== '_prev');
+  const pick = x => ({id: x.id, title: x.title, list_id: x.list_id, ...Object.fromEntries(keys.map(k => [k, x[k]]))});
+  return [pick(b), pick(a), f];
+};
+// task field steps: [before, after, fields?] per task (null when nothing changed)
 function histFields(label, pairs, o = {}) {
   pairs = pairs.filter(p => p[0] && p[1] && reverseOf(p[0], p[1], p[2] || o.fields || HIST_FIELDS));
   if (!pairs.length) return null;
-  const go = back => () => {
-    const items = {};
-    for (const [b, a, f] of pairs) { const x = back ? reverseOf(b, a, f || o.fields || HIST_FIELDS) : reverseOf(a, b, f || o.fields || HIST_FIELDS); if (x) items[b.id] = x; }
-    return histBatch('patch_each', Object.keys(items), {items});
-  };
-  return histAdd({label, pairs, undo: go(true), redo: go(false), snaps: pairs.map(p => p[0]), after: pairs.map(p => ({...(snapTask(S.tasks.get(p[1].id)) || {}), ...p[1]})),
-    res: o.res, lids: pairs.flatMap(p => [p[0].list_id, p[1].list_id]), text: o.text, sess: o.sess});
+  return histAdd({label, pairs: pairs.map(histSlim), res: o.res, lids: pairs.flatMap(p => [p[0].list_id, p[1].list_id]), text: o.text, sess: o.sess,
+    ...(o.qs?.length ? {qs: o.qs} : {}), ...(o.gids?.length ? {gids: o.gids} : {})});
 }
-// 2.537.0 (#4568): more task pairs for a step recorded already (the dependent tasks the server moved along, its answer came
-// after the step: attachments.js shiftLate); label = a part for its name ("2 dependent tasks moved")
+// 2.537.0 (#4568): the dependent tasks the server moved along with a step recorded already (its answer came after the step:
+// attachments.js shiftLate) are in the same server group; label = a part for its name ("2 dependent tasks moved")
 function histExtend(e, pairs, label) {
   pairs = (pairs || []).filter(p => p[0] && p[1] && reverseOf(p[0], p[1], p[2] || HIST_FIELDS) && !e?.pairs?.some(q => q[0].id === p[0].id));
   if (!e?.pairs || !pairs.length) return false;
-  e.pairs.push(...pairs); e.snaps.push(...pairs.map(p => p[0]));
-  e.after.push(...pairs.map(p => ({...(snapTask(S.tasks.get(p[1].id)) || {}), ...p[1]})));
-  e.lids = [...new Set([...e.lids, ...pairs.map(p => S.tasks.get(p[0].id)?.list_id)].filter(Boolean))];
+  e.pairs.push(...pairs.map(histSlim));
   if (label && !e.label.includes(label)) e.label = [e.label, label].filter(Boolean).join(' · ');
   renderHist();
   return true;
 }
-// completion / won't do (status) of ids; res = the answer of the forward request (signed undo payloads)
-function histDone(label, ids, snaps, res, status = 2) {
-  const toks = r => { const u = r?.undo; return !u ? {} : u.sig ? {[ids[0]]: u} : u; };
-  // 2.370.0 (#3126): with the time for a several-times-a-day rule, as toggleDone
-  const expect = Object.fromEntries(ids.map(id => { const s = snaps.find(x => x.id === id); return [id, /TIMES=/.test(s?.repeat || '') ? {due: s.due ?? null, due_time: s.due_time ?? null} : s?.due ?? null]; }));
-  return histAdd({label, snaps, ids, res,
-    undo: e => { const t = toks(e.res); return Object.keys(t).length ? histBatch('undo', Object.keys(t), {items: t}) : {skipped: [], none: true}; },
-    redo: async e => { const r = await histBatch('complete', ids, {status, expect}); e.res = r.res; return r; }});
-}
-// reopened (a done task back to open): undo = complete it again with its old completion data
-function histReopen(label, id, snaps, res) {
-  return histAdd({label, snaps, ids: [id], res,
-    undo: e => { const u = e.res?.undo; return !u ? {skipped: [], none: true} : histBatch('undo', [id], {items: {[id]: u.sig ? u : u[id]}}); },
-    redo: async e => { const r = await histBatch('reopen', [id], {}); e.res = r.res; return r; }});
-}
-// moved to the trash; the way forward again only while nobody else changed them after the undo
-function histTrash(label, ids, snaps, res) {
-  return histAdd({label, snaps, ids, res,
-    undo: async e => { const r = await histBatch('restore', ids, {}); e.since = r.res?.now; return r; },
-    redo: e => histBatch('delete', ids, e.since ? {guard: Object.fromEntries(ids.map(i => [i, e.since]))} : {})});
-}
-// created: undo = to the trash (not if someone else changed it since), redo = back from the trash
-function histCreate(label, t, extra = {}) {
-  const id = t.id;
-  return histAdd({label, snaps: [{id, _gone: true}], ids: [id], res: t, lids: [t.list_id], ...extra,
-    undo: e => { const since = e.since || e.res?.created_at; return histBatch('delete', [id], since ? {guard: {[id]: since}} : {}); },
-    redo: async e => { const r = await histBatch('restore', [id], {}); e.since = r.res?.now; return r; }});
-}
-// ---- sending
+// completion / won't do, reopened, to the trash, created: the server's step of the request (res = its answer)
+function histDone(label, ids, snaps, res) { return histAdd({label, snaps, ids, res}); }
+function histReopen(label, id, snaps, res) { return histAdd({label, snaps, ids: [id], res}); }
+function histTrash(label, ids, snaps, res) { return histAdd({label, snaps, ids, res}); }
+function histCreate(label, t, extra = {}) { return histAdd({label, ids: [t.id], res: t, lids: [t.list_id], ...extra}); }
+// ---- going back and forth
 const histFieldName = f => f.startsWith('field:') ? fieldById(+f.slice(6))?.name || tr('Custom field') : FIELD_NAMES[f] ? tr(FIELD_NAMES[f]) : {status: tr('Status'), changed: tr('changed by someone else'), order: tr('Order'), name: tr('Name'), section: tr('Section'), folder: tr('Folder')}[f] || f;
 const histTitle = (id, t) => qn(String(t || S.tasks.get(rid(id))?.title || '').slice(0, 30));
+// a task batch (the undo / redo functions of areas without server steps, popovers.js, projects.js, related.js)
 async function histBatch(action, ids, data) {
   const d = {...data};
   for (const k of ['items', 'expect', 'guard']) {
@@ -155,77 +179,128 @@ function histSecFix(v) {
   if (o._prev && o._prev.section_id) o._prev = {...o._prev, section_id: secId(o._prev.section_id)};
   return o;
 }
-// local copies back (outbox cancelled / queued offline): merged, so partial copies (dates only) keep the rest
-function histLocal(state) {
-  for (const s of state || []) {
-    const id = rid(s.id);
-    if (s._gone) S.tasks.delete(id);
-    else if (s.title !== undefined || S.tasks.has(id)) S.tasks.set(id, {...(S.tasks.get(id) || {}), ...snapTask(s), id});
-  }
+// a change taken out of the outbox before it was sent: the page shows the state before it (online: the reload does it)
+function histUnq(q, local) {
+  for (const t of local || []) if (t?.id) S.tasks.set(rid(t.id), {...(S.tasks.get(rid(t.id)) || {}), ...snapTask(t), id: rid(t.id)});
+  const m = String(q.url || '').match(/^\/api\/tasks\/(-?\d+)$/);
+  if (q.method === 'POST' && q.tmp) S.tasks.delete(q.tmp);
+  else if (m && q.method === 'PATCH' && q.body?._prev && S.tasks.has(+m[1])) S.tasks.set(+m[1], {...S.tasks.get(+m[1]), ...q.body._prev});
 }
-async function histRun(e, dir) {
-  if (e.parts) {
-    const out = {skipped: [], queued: false};
-    for (const p of dir === 'undo' ? [...e.parts].reverse() : e.parts) { const r = await histRun(p, dir); out.skipped.push(...r.skipped); out.queued = out.queued || r.queued; out.note = out.note || r.note; }
-    return out;
-  }
-  const q = e.q;
-  if (q) {  // the last operation of this step went through the outbox: cancel it if it has not left yet, else wait for its answer
+// the outbox entries of a step: on their way -> wait for the answer; not sent yet (undo) -> out of the queue (kept for redo)
+async function histQ(e, dir) {
+  let cut = 0;
+  for (const q of e.qs || []) {
     for (let n = 0; n < 400 && !q.done && !cancellable(q); n++) await sleep(150);
-    if (!q.done && cancellable(q)) {
+    if (dir === 'undo' && !q.done && cancellable(q)) {
       outSave(() => { OUT.q = OUT.q.filter(x => x !== q); });  // 2.126.0 D (#1989): the shared queue
-      histLocal(dir === 'undo' ? e.snaps : e.after);
-      e.q = null; renderTop();
-      return {skipped: [], local: true};
+      histUnq(q, e.local); (e.cut = e.cut || []).push(q); cut++;
     }
-    e.q = null;
-    if (q.done && q.res) e.res = q.res;
   }
-  const r = await e[dir](e) || {};
-  if (r.q) { e.q = r.q; histLocal(dir === 'undo' ? e.snaps : e.after); }  // queued offline: show where it is going
-  return {skipped: r.skipped || [], queued: !!r.q, none: !!r.none, note: r.note};  // 2.560.0 (#4667): note = a sentence instead of "Undone: …"
+  e.qs = (e.qs || []).filter(q => !(e.cut || []).includes(q));
+  if (cut) renderTop();
+  return cut;
+}
+// the server's answer of an undo / redo -> {skipped, note, none, undone: [gids]}
+// the server names the fields that stayed by their keys ("field:3", "priority"): the names this person reads
+const histReason = r => String(r).replace(/: ([a-z_:0-9]+(?:, [a-z_:0-9]+)*)$/, (m, l) => ': ' + l.split(', ').map(histFieldName).join(', '));
+function histSrvRes(a, dir) {
+  const stayed = (a?.stayed || []).map(x => x.reason).filter(Boolean).map(histReason);
+  const moved = dir === 'undo' ? (a?.undone || []).length + (a?.partial || []).length : +(a?.redone || 0);
+  const st = stayed.slice(0, 4).join('; ') + (stayed.length > 4 ? ' …' : '');
+  const note = [a?.stopped ? tr('Stopped before a step that cannot be undone: {0}', a.stopped.label || '') : '',
+    stayed.length ? (moved ? tr('Stayed as it is: {0}', st) : st) : ''].filter(Boolean).join(' ');  // nothing went: the server's reason alone
+  return {skipped: [], note, none: !moved && !!(stayed.length || a?.stopped), undone: [...(a?.undone || []), ...(a?.partial || [])]};
+}
+// one entry back or forth: its outbox entries first, then its server groups, then (areas without server steps) its own functions
+async function histDo(e, dir) {
+  const out = {skipped: [], queued: false, note: '', none: false, srv: false, undone: []};
+  const parts = e.parts ? (dir === 'undo' ? [...e.parts].reverse() : e.parts) : [e];
+  let cut = 0;
+  for (const p of parts) cut += await histQ(p, dir);
+  if (dir === 'redo') for (const p of parts) for (const q of p.cut || []) { const r = await api(q.method, q.url, q.body); cut++; if (r?._q) p.qs = [...(p.qs || []), r._q]; out.queued = out.queued || !!r?._q; }  // the change taken out goes again
+  for (const p of parts) if (dir === 'redo') p.cut = [];
+  const gids = histGids(e).sort((a, b) => a - b);
+  if (gids.length) {
+    out.srv = true;
+    if (dir === 'undo') Object.assign(out, histSrvRes(await api('POST', `/api/undo/to/${gids[0]}`), dir), {srv: true});
+    else {
+      let n = 0;
+      for (const g of gids) { try { const r = histSrvRes(await api('POST', `/api/undo/${g}/redo`), dir); if (!r.none) n++; out.note = out.note || r.note; } catch (x) { if (x?.status !== 409) throw x; } }
+      out.none = !n && !cut;
+    }
+  }
+  for (const p of parts) {
+    if (histSrv(p) || (p.cut || []).length || !p[dir]) continue;  // the server (or the outbox) had it
+    const r = await p[dir](p) || {};
+    HIST.fresh = [];  // 2.905.0 (#5255): a group its own write recorded belongs to no new entry
+    out.skipped.push(...(r.skipped || [])); out.note = out.note || r.note || ''; out.none = out.none || !!r.none; out.queued = out.queued || !!r.q;  // 2.560.0 (#4667): note = a sentence instead of "Undone: …"
+  }
+  if (!gids.length && !cut && !parts.some(p => p[dir] && !histSrv(p))) out.none = true;  // nothing the server or this device could take back
+  return out;
+}
+// the person's newest step: this window's newest entry, unless the server has a newer group (another device, a write
+// without an entry here) -> an entry or {label, gids, row} of that group
+async function histNext() {
+  const top = HIST.undo[HIST.undo.length - 1];
+  if (top && histPending(top)) return top;  // just made, its change still on its way: it is the newest
+  let g = null;
+  if (histListable()) { try { g = ((await rawFetch('GET', '/api/undo?limit=20')).items || []).find(x => x.state !== 'undone') || null; } catch { g = null; } }
+  if (!g) return top || null;
+  const tg = histGids(top);
+  if (top && (tg.length ? Math.max(...tg) >= g.id : (top.at || 0) >= (Date.parse(g.at) || 0))) return top;
+  return HIST.undo.find(x => histGids(x).includes(g.id)) || {label: g.label || tr('Change'), gids: [g.id], row: g, lids: [], at: Date.parse(g.at) || 0};
+}
+const HIST_OFF = ['barrier', 'toobig', 'noaccess'];  // the server's groups that cannot go back (and hold the older ones)
+// after an undo / redo: the views show the state again (tasks, an open office document, an open table)
+async function histRedraw(srv) {
+  if (OUT.online && !OUT.q.length) await load().catch(() => {});
+  render();
+  if (S.sel) { if (taskById(S.sel)) renderDetail(); else closeDetail(); }
+  if (!srv) return;
+  if (typeof OFD !== 'undefined' && typeof ofdLoadDoc === 'function' && OFD.doc?.id) { OFD.list = null; await ofdLoadDoc(OFD.doc.id, true).catch(() => {}); }  // lazy-ok: an open office document
+  else if (typeof ofcReload === 'function' && S.route?.mod === 'office') ofcReload();  // lazy-ok
+  if (typeof SHV !== 'undefined' && SHV.sh && typeof shvReload === 'function') await shvReload().catch(() => {});  // lazy-ok: an open table
 }
 // n steps back (undo) or forward (redo), one after the other
-// 2.773.0 (#5250): only = these entries of HIST[dir] (newest first) instead of the newest n (the list "Recent steps" skips the
-// steps the server's list shows itself); -> {done, stop} (how many went, whether it stopped before the end)
+// 2.773.0 (#5250): only = these entries (newest first) instead of the newest n (the toast's own entry, the list "Recent
+// steps"); -> {done, stop} (how many went, whether it stopped before the end)
 async function histStep(dir, n = 1, only = null) {
   if (HIST.busy) return {done: 0, stop: true};
   if (only) n = only.length;
   HIST.busy = true; renderHist();
   const done = [], skipped = [];
-  let queued = false, stop = false, dropped = null, note = '';
+  let queued = false, stop = false, dropped = null, note = '', srv = false;
+  const other = dir === 'undo' ? 'redo' : 'undo';
+  const out = e => { HIST.undo = HIST.undo.filter(x => x !== e); HIST.redo = HIST.redo.filter(x => x !== e); };
   try {
     await flushSaves();
     for (let i = 0; i < n && !stop; i++) {
-      const from = HIST[dir], e = only ? only[i] : from[from.length - 1]; if (!e || !from.includes(e)) break;
-      if (only) { from.splice(from.indexOf(e), 1); from.push(e); }  // 2.773.0 (#5250): to the top, so the pops below take it
-      if (e.barrier) {  // 2.747.0 (#5252): finalised / sent / paid (office_undo.js oun_bar): one Undo names why and takes the entry off, "up to here" stops before it
-        if (i === 0 && n === 1) from.pop();
-        toast(e.barrier); stop = true; break;
-      }
-      if (e.lids.some(l => listById(l) && !canAddTo(l))) {  // the list became view-only in the meantime (participants: the server checks each task)
-        from.pop(); stop = true;
+      const e = only ? only[i] : dir === 'undo' ? await histNext() : HIST.redo[HIST.redo.length - 1];
+      if (!e || (only && !HIST[dir].includes(e))) break;
+      if (e.row && HIST_OFF.includes(e.row.state)) { toast(e.row.state === 'noaccess' ? tr('You may not change it any more, so it cannot be undone') : tr('Stopped before a step that cannot be undone: {0}', e.label)); stop = true; break; }
+      if (e.lids.some(l => listById(l) && !canAddTo(l))) {  // the list became view-only in the meantime (the server checks again)
+        out(e); stop = true;
         toast(dir === 'undo' ? tr('Read-only: “{0}” can no longer be undone', e.label) : tr('Read-only: “{0}” can no longer be redone', e.label));
         break;
       }
       let r;
-      try { r = await histRun(e, dir); } catch (x) {
-        if (!(x instanceof Offline) && x.message !== 'auth') { from.pop(); dropped = e; }  // gone or no rights: api() said why
+      try { r = await histDo(e, dir); } catch (x) {
+        if (!(x instanceof Offline) && x.message !== 'auth') { out(e); dropped = e; }  // gone or no rights: api() said why
         stop = true; break;
       }
-      from.pop();
-      if (r.none && !r.skipped.length) r.skipped.push(e.label);
+      out(e);
+      if (dir === 'undo') histMark(r.undone, 'undo');  // newer groups went with it (the server's order)
+      if (r.none && !r.skipped.length && !r.note) r.skipped.push(e.label);
       if (r.none) dropped = e;  // nothing could be applied (changed elsewhere): out of the history
-      else HIST[dir === 'undo' ? 'redo' : 'undo'].push(e);
-      done.push(e); skipped.push(...r.skipped); queued = queued || r.queued; note = note || r.note || '';
+      else if (!e.row) HIST[other].push(e);
+      else if (dir === 'undo') HIST.redo.push(e);
+      done.push(e); skipped.push(...r.skipped); queued = queued || r.queued; note = note || r.note || ''; srv = srv || r.srv;
       if (r.none) stop = true;
     }
   } finally {
     try {  // the page may be gone meanwhile (closed tab, tests)
       if (done.length || dropped) {
-        if (OUT.online && !OUT.q.length) await load().catch(() => {});
-        render();
-        if (S.sel) { if (taskById(S.sel)) renderDetail(); else closeDetail(); }
+        await histRedraw(srv);
         for (const x of done) { try { x.post?.(dir); } catch (err) { console.warn('history post', err); } }
       }
       if (done.length && !(HIST.toastE && !done.includes(HIST.toastE))) {  // 2.489.0 (#4013): a newer step's Undo message stays
@@ -233,7 +308,7 @@ async function histStep(dir, n = 1, only = null) {
         else {
           const what = done.length > 1 ? (dir === 'undo' ? trn('{0} step undone', '{0} steps undone', done.length) : trn('{0} step redone', '{0} steps redone', done.length))
             : dir === 'undo' ? tr('Undone: {0}', done[0].label) : tr('Redone: {0}', done[0].label);
-          toast(note || (queued ? what + ' · ' + tr('sent as soon as you are online') : what));  // 2.560.0 (#4667): e.g. restored without its client
+          toast(note || (queued ? what + ' · ' + tr('sent as soon as you are online') : what), null, note ? 10000 : undefined);  // 2.560.0 (#4667): e.g. restored without its client
         }
       }
     } catch (x) { console.warn('history', x); }
