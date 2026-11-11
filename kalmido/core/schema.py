@@ -4265,7 +4265,7 @@ CREATE INDEX IF NOT EXISTS git_branches_task ON git_branches(task_id) WHERE task
 CREATE INDEX IF NOT EXISTS tasks_done ON tasks(list_id, completed_at) WHERE status<>0 AND deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS tasks_due ON tasks(due) WHERE due IS NOT NULL AND status=0 AND deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS events_range ON events(cal_id, first_day) WHERE deleted_at IS NULL;
--- 2.149.0 C (#2515): the few tasks with code snippets directly; 2.981.0 (#5278): the trigram indexes tasks_trgm_* of the
+-- 2.149.0 C (#2515): the few tasks with code snippets directly. 2.981.0 (#5278): the trigram indexes tasks_trgm_* of the
 -- main search went (core/state.py search_tasks reads the shared search index obj_search, core/objsearch.py osr_move drops them)
 CREATE INDEX IF NOT EXISTS tasks_snippets ON tasks(id) WHERE snippets IS NOT NULL;
 -- 2.155.0 A (#2079): one CalDAV collection name per owner
