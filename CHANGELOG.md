@@ -19,7 +19,31 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.990.0] - 2026-11-11
+## [2.994.0] - 2026-11-11
+
+Package 2.991 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: A).
+
+### Fixed
+- Project lock: taking a time entry back (or forward) into a locked project no longer leaves its note in other undo steps or in its history; this also holds for a move and a note in one save and for notes written in an editor session (#5634)
+- The quote of the day on the sign-in page and on Today uses the line heights and spacing of the type scale (#5530)
+
+### Changed
+- The type and spacing scale of the stylesheets is a step of the Lint job (`tools/check_css_scale.py`), so a size outside the scale is red in the build already, not only in the full CI (#5530)
+- The SQLite move test names the gone tables from the move report and checks they are really missing in Postgres, instead of a hand-kept list (#5404)
+
+Package 2.988.0 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Projects (industry Film & Video, module Disposition): a new tab "Call sheets" next to List / Kanban / Project page lists every call sheet of the project as a row (day, shoot day number, location, PDF button); a tap opens the call sheet. "New call sheet" asks for the day, adds the shoot day to the disposition in the background (one open place for the crew, titled "Shoot day") and opens the new call sheet with the next shoot day number. Read-only members see the rows without the button. The way through Disposition > shoot day > "Call sheet" stays as it was (#5651).
+
+### Fixed
+- Call sheets opened only when Film & Video was the first industry of the area; now also as a second one (#5651).
+- Sharing a calendar or address book: a person whose share has expired is no longer treated as a member, so the visibility and workspace checks run again before the share comes back (a person who left the organisation is refused) (#5604).
+- Sharing a calendar or address book with the same person twice at the same moment no longer creates a second share row (the share is written under a lock per object; taking a person out uses the same order) (#5604).
+
+Package 2.977 (Bündel: Kern-Querschnitt Q7b: Playbooks und Verfahrensdoku).
+### Changed
+- #5282 Shared core Q7b: the Playbooks of projects and folders and the procedure documentation of the office keep only a head row (`playbooks`, `office_procdocs`, one per Playbook / office area); every version is a row of the core's `obj_versions` (kind `playbook` / `procdoc`, new column `source`). At start the old version rows move there (numbers kept, the procedure documentation's encrypted text resealed for the new place, a version without an author becomes the owner's, a deleted author stays foreign for agents), the old columns are dropped (one-way: versions before 2.977 no longer start on that database); an office whose encrypted text cannot be opened keeps its old columns until a later start (server log, admin alert). Routes, agent answers and the export / import files (lists/playbooks.json, office/procdocs.json, the retention CSV) stay as they were; moving the personal office into an organisation takes the versions along.
 
 Package 2.831 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 
@@ -277,6 +301,10 @@ Package 2.955 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Fixed
 - Retention export: a check that the sign-off CSV carries no token columns (#3811)
 
+## [2.990.0] - 2026-11-11
+
+Not released (the CI of this version was red); its changes are listed under 2.994.0.
+
 ## [2.974.0] - 2026-11-11
 
 Not released (the CI of this version was red); its changes are listed under 2.990.0.
@@ -432,7 +460,8 @@ Package 2.900 (Bündel: Projekt-Sperre: Rückgängig-Kopien von Zeiteinträge, P
 
 Not released (the CI of this version was red); its changes are listed under 2.902.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.990.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.994.0...HEAD
+[2.994.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.994.0
 [2.990.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.990.0
 [2.974.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.974.0
 [2.962.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.962.0

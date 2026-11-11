@@ -890,7 +890,10 @@ RUNTIME_DEFAULTS = {"model": "", "autocompact": True, "autocompact_pct": None, "
                     # 2.974.0 (#5668): the model per run. model_split on = the host picks per run: model_decide for the person's
                     # own messages and runs that may need a decision, model_routine for routine (quiet wakes, new tasks,
                     # follow-ups, planned jobs without a sign); '' = the host's default for that kind. Off = model as before.
-                    "model_split": False, "model_decide": "", "model_routine": ""}
+                    "model_split": False, "model_decide": "", "model_routine": "",
+                    # 2.992.0 (#5684): a third kind, reviews (a review the agent is asked for, a planned job of the kind
+                    # review, a list check); '' = like model_decide
+                    "model_review": ""}
 DISPATCH_MODES = ("", "dry", "on")
 # 2.396.0 A (#3386): the git author the agent's host sets for its commits (public in GitHub). '' = the neutral default;
 # git_coauthor: whether the AI appends a Co-Authored-By line. A project with a repo may override name / mail (git_author_of).
@@ -971,7 +974,7 @@ def runtime_clean(cur, b):
         if m and (len(m) > RUNTIME_MODEL_MAX or not RUNTIME_MODEL_RE.fullmatch(m)):
             raise BadInput(tr("Invalid value: {0}", "model"))
         out["model"] = m
-    for k in ("model_decide", "model_routine"):  # 2.974.0 (#5668): same rules as model
+    for k in ("model_decide", "model_routine", "model_review"):  # 2.974.0 (#5668), 2.992.0 (#5684): same rules as model
         if k in b:
             m = b[k] if b[k] is not None else ""
             if not isinstance(m, str):
@@ -1553,6 +1556,8 @@ def agent_public(c, a, uid=None, pre=None):
             # 2.32.0 (#1079): what its host reports it really runs with (model as the host names it, the mode of the current
             # run, the host's own default); the runtime's wished model next to it (set: … · runs: …)
             "host": _host_info(a), "runtime_model": _rt_model_shown(a),
+            # 2.992.0 (#5684): the model per run is on - the header shows "runs with <model of the last run>"
+            "model_split": bool(agent_runtime(a).get("model_split")),
             # 2.33.0 (#1045): its plan usage (the ring in the chat header; null = never reported)
             "quota": _quota(a),
             # 2.407.0 B (#3493): its costs (API-key agents: the ring against its cost limit; amounts only for owner / admins)
@@ -1664,7 +1669,7 @@ def agent_unshared_view(d):
     contact times (status always "idle"). Used by agents_for and the chat (agents/chat.py agent_chat_get). Changes d, returns it."""
     d.update(shared=False, status="idle", status_text="", status_at=None, status_key="", status_key_at="", status_task=None,
              paused=False, pause_reason="", job_tasks=[], running=0, waiting=0, my_job=False, typing=0, limit_reached=False,
-             last_poll_at=None, poll_age=None, contact_age=None, pending_age=None, no_service=False, host=None, runtime_model="", permission_mode="",
+             last_poll_at=None, poll_age=None, contact_age=None, pending_age=None, no_service=False, host=None, runtime_model="", model_split=False, permission_mode="",
              may_set_mode=False, quota=None, cost=None, flows=None, approvals_open=0)
     return d
 

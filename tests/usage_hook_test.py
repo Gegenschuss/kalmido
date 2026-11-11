@@ -5,6 +5,9 @@ model, synthetic messages and broken lines are skipped, no text of the transcrip
 new messages next time, a half-written last line waits), the cost from a price table, the task of the agent's status,
 a task that is gone (report without it), Kalmido unreachable (state kept, sent later), the env file, a hook that never
 fails (exit 0 on bad input), and two runs of the same turn at once counted once (2.306.0, #2927).
+2.992.0 (#5684): the kind and the id of the run from the runner's environment (KALMIDO_RUN_CLASS / KALMIDO_RUN_ID) go along as
+run_class / run_id (an unknown kind: neither); a server before 2.992 refuses them (400): sent again without them, also
+together with a task that is gone.
 usage: usage_hook_test.py"""
 import io
 import json
@@ -23,7 +26,7 @@ import claude_usage_hook as hook  # noqa: E402
 
 from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 REQS = []
-STATE = {"agent": {"status": "idle", "status_task": None}, "bad_task": False, "slow": 0}
+STATE = {"agent": {"status": "idle", "status_task": None}, "bad_task": False, "slow": 0, "old_server": False}
 TOKEN = "abk_test_hook_token"
 
 
@@ -51,6 +54,8 @@ class Stub(BaseHTTPRequestHandler):
             time.sleep(STATE["slow"])
         if STATE["bad_task"] and "task_id" in b:
             return self._send(400, {"error": {"code": "bad_request", "message": "Invalid value: task_id"}})
+        if STATE["old_server"] and ("run_class" in b or "run_id" in b):  # 2.992.0 (#5684): a server before the fields
+            return self._send(400, {"error": {"code": "unknown_fields", "message": "Unknown field: run_class"}})
         self._send(201, {"id": len(REQS)})
 
 
@@ -84,7 +89,7 @@ check(s.get("input_tokens") == 15 and s.get("output_tokens") == 160 and s.get("c
 check(by.get("claude-haiku-4-5", {}).get("input_tokens") == 800 and by["claude-haiku-4-5"]["output_tokens"] == 60, "haiku")
 check(all(r["p"] == "/api/v1/agent/usage" and r["auth"] == "Bearer " + TOKEN for r in p), "POST /api/v1/agent/usage with the token")
 check(all("cost_usd" not in r["b"] and "task_id" not in r["b"] for r in p), "no price table: no cost; idle agent: no task")
-check(all(set(r["b"]) <= {"model", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "note", "cost_usd", "task_id"} for r in p),
+check(all(set(r["b"]) <= {"model", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "note", "cost_usd", "task_id"} for r in p),  # (#5684: run_class / run_id only with the runner's environment)
       "only numbers + ids")
 check("SECRET" not in json.dumps(REQS), "no transcript text is ever sent")
 check(s.get("note", "").startswith("claude-code sess-123") and len(s["note"]) <= 200, f"short note: {s.get('note')}")
@@ -126,6 +131,42 @@ with open(tr, "a", encoding="utf-8") as f:
 hook.run(HOOK, {**ENV, "KALMIDO_URL": "http://127.0.0.1:9"})
 p = run()
 check(len(p) == 1 and p[0]["b"]["input_tokens"] == 11, "unreachable: sent on the next run")
+
+# 2.992.0 (#5684): the kind and the id of the run (the reference runner sets them per run while the model per run is on)
+n_msg = [12]
+
+
+def turn():
+    n_msg[0] += 1
+    with open(tr, "a", encoding="utf-8") as f:
+        f.write('{"type":"assistant","message":{"id":"msg_r%d","model":"claude-sonnet-4-5","usage":{"input_tokens":5,"output_tokens":1}}}\n' % n_msg[0])
+
+
+RUNENV = {**ENV, "KALMIDO_RUN_CLASS": "review", "KALMIDO_RUN_ID": "9f2c41d07a3b55e1"}
+turn()
+p = run(RUNENV)
+check(len(p) == 1 and p[0]["b"].get("run_class") == "review" and p[0]["b"].get("run_id") == "9f2c41d07a3b55e1", f"#5684: run_class + run_id sent: {[r['b'] for r in p]}")
+turn()
+p = run({**ENV, "KALMIDO_RUN_CLASS": "big", "KALMIDO_RUN_ID": "x"})
+check(len(p) == 1 and "run_class" not in p[0]["b"] and "run_id" not in p[0]["b"], "#5684: an unknown kind: neither field")
+turn()
+p = run({**ENV, "KALMIDO_RUN_CLASS": "routine", "KALMIDO_RUN_ID": "bad id!"})
+check(len(p) == 1 and p[0]["b"].get("run_class") == "routine" and "run_id" not in p[0]["b"], "#5684: a bad run id is left out, the kind stays")
+turn()
+p = run()
+check(len(p) == 1 and "run_class" not in p[0]["b"], "#5684: without the environment: no kind (as before)")
+STATE["old_server"] = True
+turn()
+p = run(RUNENV)
+check(len(p) == 2 and "run_class" in p[0]["b"] and "run_class" not in p[1]["b"] and "run_id" not in p[1]["b"],
+      f"#5684: a server before 2.992 (400): sent again without the fields {[r['b'] for r in p]}")
+check(run(RUNENV) == [], "#5684: and counted (the state moved on)")
+STATE.update(bad_task=True, agent={"status": "working", "status_task": 42})
+turn()
+p = run(RUNENV)
+check(len(p) == 3 and "task_id" in p[1]["b"] and "task_id" not in p[2]["b"] and "run_class" not in p[2]["b"],
+      f"#5684: an old server and a task that is gone: the third try without both {[r['b'] for r in p]}")
+STATE.update(old_server=False, bad_task=False, agent={"status": "idle", "status_task": None})
 # a fixed task, an env file, the CLI (always exit 0), dry run
 envf = os.path.join(tmp, "agent.env")
 with open(envf, "w", encoding="utf-8") as f:

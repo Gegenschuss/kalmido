@@ -1101,6 +1101,8 @@ ROUTES = {
     # 2.44.0 (#1517): one-command setup of an agent on a computer (one-time code, the computers = the agent's tokens)
     "POST /api/my/agents/{}/setup-code": "agent", "GET /api/my/agents/{}/machines": "agent",
     "GET /api/my/agents/{}/audit": "agent",  # 2.361.4 (#2928): the owner's log of their personal agent
+    "GET /api/my/agents/{}/model-usage": "agent",  # 2.992.0 (#5684): usage per kind of run; p2233_b_runtime_rotate_test.py
+    "GET /api/admin/agents/{}/model-usage": "admin",  # 2.992.0 (#5684)
     "DELETE /api/my/agents/{}/machines/{}": "agent", "POST /api/admin/agents/{}/setup-code": "admin",
     "GET /api/admin/agents/{}/machines": "admin", "DELETE /api/admin/agents/{}/machines/{}": "admin",
     "POST /api/agent-setup/redeem": "auth", "POST /api/agent-setup/remove": "auth",

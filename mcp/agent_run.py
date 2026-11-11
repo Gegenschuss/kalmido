@@ -1480,6 +1480,12 @@ def wake_still(text):
 # hosted service of the Kalmido team (#3931, sharpened in #4083: a wake needs a HARD sign, a word alone does not).
 MODEL_STUCK_S = 3600  # after a failed switch the conversation stays on its model this long
 ROUTINE_EVENTS = ("task_added", "tasks_added", "tidy", "stale_tasks", "followup_due")
+# 2.992.0 (#5684): the third kind, reviews (runtime model_review, empty = the decide model). Only what the trigger SAYS it is
+# counts, never words in a text (a word rule put 53 of 54 wakes in the wrong kind, #4083): a review the agent is asked for
+# (review_requested) and a planned job that is a review (scheduled_job with review: true - the plan's kind "Review" in
+# Kalmido, and every scheduled check of a project, list_check). One event that needs a decision in the same run wins.
+REVIEW_EVENTS = ("review_requested",)
+RUN_CLASSES = ("decide", "review", "routine")
 # an open decision of the person (English and German; quoted words and code are named, not said)
 HARD_DECIDE_RE = re.compile(r"\b(?:needs you|waits for you|you (?:need|have) to decide"
                             r"|(?:your|open|pending) decision(?!s?\s+(?:from (?:yesterday|today|\d)|of (?:yesterday|\d)|was\b|is (?:done|noted|in)\b))"
@@ -1536,29 +1542,43 @@ def wake_hard_reason(x):
     return hard_sign(text)
 
 
-def model_choice(evs, decide, routine):
-    """2.974.0 (#5668): (model, reason) of one run of these events. A group with one event that needs a decision runs on
-    decide; every event routine = routine."""
-    if decide == routine:
-        return decide, "one model"
-    why = []
+def run_kind(evs):
+    """2.974.0 (#5668), 2.992.0 (#5684): (kind, reason) of one run of these events, kind = decide | review | routine. One event
+    that needs a decision makes the whole group decide; else one review makes it review; every event routine = routine."""
+    why, rev = [], []
     for ev in evs or []:
         kind, x = ev.get("event"), ev.get("data") or {}
         if kind in ROUTINE_EVENTS:
             why.append(f"routine ({kind})")
+        elif kind in REVIEW_EVENTS:
+            rev.append(f"review ({kind})")
         elif kind == "job_wake":
             hard = wake_hard_reason(x)
             if hard:
-                return decide, "hard: " + hard
+                return "decide", "hard: " + hard
             why.append("job wake without a hard sign")
         elif kind == "scheduled_job":
+            if x.get("review") is True or x.get("list_check") is True:  # 2.992.0 (#5684): the plan says it is a review
+                rev.append("planned review" if x.get("review") is True else "planned check of a project")
+                continue
             m = PLANNED_SIGN_RE.search(f"{x.get('title') or ''}\n{x.get('prompt') or ''}")
             if m:
-                return decide, f"planned job with '{m.group(0)}'"
+                return "decide", f"planned job with '{m.group(0)}'"
             why.append("planned job, routine")
         else:
-            return decide, f"{kind or 'event'}"
-    return (routine, why[0]) if why else (decide, "no event")
+            return "decide", f"{kind or 'event'}"
+    if rev:
+        return "review", rev[0]
+    return ("routine", why[0]) if why else ("decide", "no event")
+
+
+def model_choice(evs, decide, routine, review=None):
+    """2.974.0 (#5668): (model, reason) of one run of these events (run_kind). 2.992.0 (#5684): review None = decide."""
+    review = decide if review is None else review
+    if decide == routine == review:
+        return decide, "one model"
+    kind, why = run_kind(evs)
+    return {"decide": decide, "review": review, "routine": routine}[kind], why
 
 
 def model_pair(rt):
@@ -1571,11 +1591,21 @@ def model_pair(rt):
     return str(rt.get("model_decide") or "").strip() or base, str(rt.get("model_routine") or "").strip() or base
 
 
+def model_review(rt):
+    """2.992.0 (#5684): the model of a review run with the model per run on (runtime model_review; empty = the decide model)."""
+    pair = model_pair(rt)
+    return (str((rt or {}).get("model_review") or "").strip() or pair[0]) if pair else None
+
+
 def session_model_key(rt):
     """2.974.0 (#5668): what a conversation is bound to -- the one model, or "decide/routine" with the model per run (the
-    model changes per run inside one conversation; a new one only when this changes)."""
+    model changes per run inside one conversation; a new one only when this changes). 2.992.0 (#5684): "/review" only when
+    the review model is not the decide model (the key of a conversation of 2.974 stays)."""
     pair = model_pair(rt)
-    return "%s/%s" % pair if pair else str((rt or {}).get("model") or "")
+    if not pair:
+        return str((rt or {}).get("model") or "")
+    rv = model_review(rt)
+    return "%s/%s" % pair + ("/" + rv if rv != pair[0] else "")
 
 
 def with_model(args, model):
@@ -2908,6 +2938,10 @@ class Runner:
                    KALMIDO_RUN_LABEL=("chat" if uid else f"task {tid}" if tid else "event"))
         if tid:  # 2.619.0 (#3467): a task run commits as the task's repo.git_author (both launchers: they start this runner)
             env.update(git_author_env(getattr(self, "run_repo", None)))
+        for k in ("KALMIDO_RUN_CLASS", "KALMIDO_RUN_ID"):  # 2.992.0 (#5684): never inherited
+            env.pop(k, None)
+        if getattr(self, "run_cls", None):  # the usage hook reports the kind of run and its id (usage per kind in Kalmido)
+            env.update(KALMIDO_RUN_CLASS=self.run_cls, KALMIDO_RUN_ID=self.run_rid)
         return env
 
     # kalmido-capability: perm_user_choice (2.312.0, #3266)
@@ -2949,13 +2983,16 @@ class Runner:
         command is not Claude Code). After a failed switch in this conversation it stays on its model for MODEL_STUCK_S."""
         if self.refresh_due:  # a runtime_changed before a task run (a chat run read it in session_start)
             self.refresh_agent()
-        pair = model_pair((self.agent or {}).get("runtime"))
+        rt = (self.agent or {}).get("runtime")
+        pair = model_pair(rt)
+        self.run_cls = None  # 2.992.0 (#5684): the kind of this run for the usage hook (KALMIDO_RUN_CLASS), None = not told
         if not pair or not self.is_claude():
             return None, "one model"
+        self.run_cls = run_kind(evs)[0]
         stuck = (self.state.data.get("model_stuck") or {}).get(key) if key else None
         if stuck and stuck.get("model") is not None and time.time() < float(stuck.get("until") or 0):
             return stuck["model"], "the conversation stays on its model after a failed switch"
-        return model_choice(evs, *pair)
+        return model_choice(evs, *pair, review=model_review(rt))
 
     def run_args(self, args):
         """--settings with the hook file when the command is Claude Code and has no --settings of its own."""
@@ -3128,6 +3165,7 @@ class Runner:
                                                if isinstance((ev.get("data") or {}).get("repo"), dict)), None)
         self.mode_args([])  # 2.437.0 (#2931): the status names the mode of this run
         self.status_say("working", what, task_id=tid, host=self.host())
+        self.run_cls = None  # 2.992.0 (#5684): a summary run before it (session_start) reports without a kind
         key = self.session_start(uid, args, what)  # 2.44.0 (#1446): the conversation of this chat goes on
         if not self.agent:  # 2.46.6 (#1715): the rules block names the owner and the language (--once-event: not read yet)
             self.refresh_agent()
@@ -3139,6 +3177,7 @@ class Runner:
         prompt = self.make_prompt(evs, uid, self.prompt_extra(uid, key)
                                   + self.workflow_hint(uid if any(e.get("event") == "chat" for e in evs) else None))
         model, mwhy = self.run_model(evs, key)  # 2.974.0 (#5668): the model per run
+        self.run_rid = os.urandom(8).hex()  # 2.992.0 (#5684): one id per run (both tries), the usage hook reports it
         if model is not None:
             args = with_model(args, model)
         self.run_model_used = model

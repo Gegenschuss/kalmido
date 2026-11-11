@@ -44,7 +44,9 @@ SCHED_FIELDS = ("title", "prompt", "freq", "days", "time", "tz", "list_id", "ena
 # the same limits and rights), job_request with scheduled: true; the person finds the card in the morning. An empty basket
 # sends nothing (last_state empty); an open proposal of the plan not decided yet sends nothing new (pending).
 SCHED_FIELDS += ("action",)
-SCHED_ACTIONS = ("chat", "triage")
+# 2.992.0 (#5684): review = a job in the chat like chat that is a review (an audit, a check, reading something over): its
+# scheduled_job carries review: true, so a host with the model per run takes its review model (runtime model_review)
+SCHED_ACTIONS = ("chat", "triage", "review")
 SCHED_TRIAGE_ERR = {"empty": N_("The basket is empty"), "pending": N_("The last proposal of this plan is still open"),
                     "busy": N_("You have {0} open proposal requests: apply or discard some first")}
 SCHED_TRIAGE_PROMPT = N_("Sort my basket: propose for every item the project (and column) where it belongs.")
@@ -259,6 +261,7 @@ def sched_fire(c, r, now, manual=False, manual_by=None):
             "by": {"id": uid, "name": name}, "user": {"id": uid, "name": name}, "chat_with": uid,
             "rhythm": {"freq": r["freq"], "days": sched_days(r), "time": r["at_time"], "tz": r["tz"]},
             "due_at": due, "late": late, "manual": manual,
+            "review": bool(r["list_check"]) or ("action" in r.keys() and r["action"] == "review"),  # 2.992.0 (#5684): a review run
             "manual_by": {"id": manual_by, "name": user_names(c, [manual_by]).get(manual_by, "")} if manual_by else None,
             "hint": "A planned job of this person. Do what the prompt says (only with lists shared with you) and answer in "
                     "your chat with them (send_chat user_id = by.id), starting with the job's title. Nothing goes to anyone else."}
@@ -534,7 +537,8 @@ def sched_spec(paths, schemas, op, ok, errs, ref, pid, nul):
         "list_id": nul("integer"), "list_name": nul("string"), "list": nul("object"), "enabled": {"type": "boolean"},
         "action": {"type": "string", "enum": list(SCHED_ACTIONS), "description": "2.126.1: chat = the event scheduled_job (answer in the "
                    "chat); triage = Sort the basket: no scheduled_job, a job_request of kind triage with scheduled: true and schedule_id "
-                   "(answer it like any triage request with your proposal)"},
+                   "(answer it like any triage request with your proposal)"
+                   "; 2.992.0: review = like chat, a review job (its scheduled_job carries review: true)"},
         "list_check": {"type": "boolean", "description": "2.39.0: a scheduled check of the list against its Playbook (event scheduled_job "
                                                          "with list_check: true, open_task_ids and playbook)"},
         "next_at": nul("string", format="date-time"), "last_at": nul("string", format="date-time"),

@@ -168,7 +168,7 @@ ROUTES = {
     "DELETE /api/admin/agents/{}": "admin", "DELETE /api/admin/agents/{}/machines/{}": "admin",
     "DELETE /api/admin/alerts": "admin", "DELETE /api/admin/backups/{}": "admin", "DELETE /api/admin/groups/{}": "admin",
     "DELETE /api/admin/groups/{}/avatar": "admin", "GET /api/admin/agent-policy": "admin", "GET /api/admin/agents": "admin",
-    "GET /api/admin/agents/audit": "admin", "GET /api/admin/agents/{}/audit": "admin",
+    "GET /api/admin/agents/audit": "admin", "GET /api/admin/agents/{}/audit": "admin", "GET /api/admin/agents/{}/model-usage": "admin",  # 2.992.0 (#5684)
     "GET /api/admin/mcp-grants": "admin", "DELETE /api/admin/mcp-grants/{}": "admin",  # 2.674.0 (#4028): the apps of team agents
     "GET /api/admin/agents/{}/machines": "admin", "GET /api/admin/alerts": "admin", "GET /api/admin/assistant": "admin",
     "GET /api/admin/backups": "admin", "GET /api/admin/backups/{}/download": "admin", "POST /api/admin/backups/{}/download": "admin", "GET /api/admin/client-ip": "admin",
@@ -269,7 +269,8 @@ ROUTES = {
     # 2.96.0 C (#2015): job cards in the agent chat
     "GET /api/agents/{}/meeting-proposals": "agents", "GET /api/agents/{}/schedules": "agents",
     "GET /api/agents/{}/share": "agents", "GET /api/assistant": "agents", "GET /api/assistant/log": "agents",
-    "GET /api/my/agents": "agents", "GET /api/my/agents/{}/audit": "agents", "GET /api/my/agents/{}/machines": "agents", "GET /api/proposals/agents": "agents",
+    "GET /api/my/agents": "agents", "GET /api/my/agents/{}/audit": "agents", "GET /api/my/agents/{}/model-usage": "agents",  # 2.992.0 (#5684)
+    "GET /api/my/agents/{}/machines": "agents", "GET /api/proposals/agents": "agents",
     "GET /api/proposals/{}": "agents", "GET /api/v1/agent": "agents", "GET /api/v1/agent/chats": "agents",
     "GET /api/v1/agent/events": "agents", "GET /api/v1/agent/jobs": "agents", "GET /api/v1/agent/jobs/{}": "agents",
     "GET /api/v1/agent/quota": "agents", "GET /api/v1/agent/schedules": "agents", "GET /api/v1/agent/usage": "agents",

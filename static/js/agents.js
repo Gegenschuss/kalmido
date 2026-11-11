@@ -1057,7 +1057,7 @@ const SCHED_LAST = {sent: N_('sent'), late: N_('sent late'), manual: N_('run by 
   no_access: N_('switched off: you no longer reach the agent'), no_list: N_('switched off: the project is no longer shared with the agent'),
   empty: N_('skipped: the basket was empty'), pending: N_('skipped: the last proposal is still open'), busy: N_('skipped: too many open proposal requests')};  // 2.126.1 B (#2126)
 // 2.126.1 B (#2126): what a plan does -- a job in the chat (as before) or "Sort the basket": a proposal card in the morning
-const SCHED_ACT = {chat: N_('Job in the chat'), triage: N_('Sort the basket (proposal)')};
+const SCHED_ACT = {chat: N_('Job in the chat'), review: N_('Review in the chat'), triage: N_('Sort the basket (proposal)')};  // 2.992.0 (#5684): review = a job in the chat that is a review (the agent's review model)
 // the templates point at the data tools of the agent API / MCP; the text is the person's to change
 const SCHED_TPL = [
   {k: 'brief', t: N_('Morning briefing'), freq: 'weekdays', time: '08:00',
@@ -1087,7 +1087,7 @@ const schedLists = aid => (S.lists || []).filter(l => !l.archived && !l.is_inbox
 function schedRowHtml(s) {
   const last = s.last_state ? tr(SCHED_LAST[s.last_state] || s.last_state) + (s.last_at ? ' · ' + schedWhen(s.last_at) : '') : '';
   return `<div class="schedrow ${s.enabled ? '' : 'off'}" data-sid="${s.id}"><div class="schedi"><b>${esc(s.title)}</b>
-      <small class="muted">${s.action === 'triage' ? esc(tr('Sort the basket')) + ' · ' : ''}${esc(schedRhythm(s))}${s.list_name ? ' · ' + esc(s.list_name) : ''}${s.mine ? '' : ' · ' + esc(tr('by {0}', s.by_name))}</small>
+      <small class="muted">${esc(s.action === 'triage' ? tr('Sort the basket') + ' · ' : s.action === 'review' ? tr('Review|kind of a planned job') + ' · ' : '')}${esc(schedRhythm(s))}${s.list_name ? ' · ' + esc(s.list_name) : ''}${s.mine ? '' : ' · ' + esc(tr('by {0}', s.by_name))}</small>
       <small class="${s.enabled ? '' : 'muted'}">${esc(schedNext(s))}${last ? ` <span class="muted">· ${esc(tr('last: {0}', last))}</span>` : ''}</small></div>
     <div class="schedb"><label class="chkl schedon" title="${esc(tr('Active'))}"><input type="checkbox" data-sm="toggle" ${s.enabled ? 'checked' : ''} aria-label="${esc(tr('Active: {0}', s.title))}"></label>
       <button type="button" class="btn sm" data-sm="run" ${s.enabled ? '' : 'disabled'}>${ic('play', 's')} ${tr('Run now')}</button>

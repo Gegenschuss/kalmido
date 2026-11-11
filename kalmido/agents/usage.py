@@ -65,7 +65,11 @@ USAGE_KEEP_DAYS = _env_int("KALMIDO_USAGE_DAYS", 400)     # rows older than this
 USAGE_RANGE_MAX = 366                                    # days of GET /api/v1/agent/usage
 USAGE_PERIODS, USAGE_METRICS, USAGE_GROUPS = ("day", "month"), ("tokens", "cost"), ("day", "task", "list", "model")
 USAGE_FIELDS = ("model", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "cost_usd", "task_id",
-                "list_id", "job_id", "note")
+                "list_id", "job_id", "note", "run_class", "run_id")
+# 2.992.0 (#5684): the kind of run a report belongs to (the model per run: runtime model_decide / model_review / model_routine)
+# and the starter's id of that run (letters, digits, - and _, at most USAGE_RUN_ID_MAX); the section Model counts per kind
+USAGE_RUN_CLASSES, USAGE_RUN_ID_MAX, USAGE_RUN_DAYS = ("decide", "review", "routine"), 40, 7
+USAGE_RUN_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
 USAGE_EXEMPT = {("POST", "agent/usage"), ("GET", "agent/usage"), ("PUT", "agent/status"), ("GET", "agent"),
                 ("PUT", "agent/quota"), ("GET", "agent/quota"), ("DELETE", "agent/quota")}  # 2.33.0 (#1045)
 USAGE_SUM = """COUNT(*) AS calls, COALESCE(SUM(input_tokens),0) AS input, COALESCE(SUM(output_tokens),0) AS output,
@@ -423,6 +427,11 @@ def v1_agent_usage_post():
     note = b.get("note") or ""
     if not isinstance(note, str) or len(note) > USAGE_NOTE_MAX:
         raise BadInput(tr("The note may have at most {0} characters", USAGE_NOTE_MAX))
+    rcls, rid_ = b.get("run_class") or "", b.get("run_id") or ""  # 2.992.0 (#5684)
+    if rcls and rcls not in USAGE_RUN_CLASSES:
+        raise BadInput(tr("Invalid value: {0}", "run_class"))
+    if rid_ and (not isinstance(rid_, str) or len(rid_) > USAGE_RUN_ID_MAX or not USAGE_RUN_ID_RE.fullmatch(rid_)):
+        raise BadInput(tr("Invalid value: {0}", "run_id"))
     c = db()
     tid, lid, jid = b.get("task_id"), b.get("list_id"), b.get("job_id")
     for k, v in (("task_id", tid), ("list_id", lid), ("job_id", jid)):
@@ -442,16 +451,46 @@ def v1_agent_usage_post():
     ts = iso(now_utc())
     day = local_now().date().isoformat()
     rid = insert_id(c, """INSERT INTO agent_usage(agent_id,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,
-                       cost_usd,task_id,list_id,job_id,note,day,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                       cost_usd,task_id,list_id,job_id,note,day,created_at,run_class,run_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (aid, model.strip(), f["input_tokens"], f["output_tokens"], f["cache_read_tokens"], f["cache_write_tokens"],
-                     None if cost is None else float(cost), tid, lid, jid, note.strip(), day, ts))
+                     None if cost is None else float(cost), tid, lid, jid, note.strip(), day, ts, rcls, rid_))
     usage_alerts(c, aid)
     budget_alerts(c, aid)  # 2.236.0 B (#2904)
     if tid:
         bump(c)  # the task panel's "AI usage" line
     c.commit()
     return jsonify(id=rid, created_at=ts, day=day, model=model.strip(), **f, cost_usd=cost, task_id=tid, list_id=lid, job_id=jid,
-                   note=note.strip(), limit=usage_state(c, agent_row(c, aid))), 201
+                   note=note.strip(), run_class=rcls, run_id=rid_, limit=usage_state(c, agent_row(c, aid))), 201
+
+
+def usage_by_class(c, aid):
+    """2.992.0 (#5684): the agent's usage of the last USAGE_RUN_DAYS days (today included) per kind of run ->
+    {days, classes: [{run_class, runs, tokens, input, output, cache_read, cache_write, cost, calls}] (decide, review, routine,
+    then '' = reports without a kind), cost: whether any report had a cost}. runs = the distinct run ids its starter told
+    (reports without one count as no run); tokens as everywhere: input + output + cache writes. Nothing is estimated."""
+    since = (local_now().date() - timedelta(days=USAGE_RUN_DAYS - 1)).isoformat()
+    rows = {r["run_class"]: r for r in c.execute(
+        f"""SELECT run_class, COUNT(DISTINCT NULLIF(run_id, '')) AS runs, {USAGE_SUM} FROM agent_usage
+            WHERE agent_id=? AND day>=? GROUP BY run_class""", (aid, since))}
+    out = [{"run_class": k, "runs": int(rows[k]["runs"]) if k in rows else 0, **usage_totals(rows.get(k))}
+           for k in (*USAGE_RUN_CLASSES, "") if k in rows or k]
+    return {"days": USAGE_RUN_DAYS, "classes": out, "cost": any(x["cost"] is not None for x in out)}
+
+
+@app.get("/api/admin/agents/<int:aid>/model-usage")
+def admin_agent_model_usage(aid):
+    """2.992.0 (#5684): the usage per kind of run of the last 7 days (the section Model of the admin's dialog)."""
+    c = db()
+    need_agent_admin(c, aid)
+    return jsonify(usage_by_class(c, aid))
+
+
+@app.get("/api/my/agents/<int:aid>/model-usage")
+def my_agent_model_usage(aid):
+    """2.992.0 (#5684): the same for the owner of a personal agent (its permissions dialog, section Model)."""
+    c = db()
+    need_own_agent(c, aid)
+    return jsonify(usage_by_class(c, aid))
 
 
 @app.get("/api/v1/agent/usage")
@@ -1330,7 +1369,12 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                                                            "cache_write_tokens")},
                                           "cost_usd": nul("number"), "task_id": {"type": "integer"},
                                           "list_id": {"type": "integer", "description": "Taken from the task when missing"},
-                                          "job_id": {"type": "integer"}, "note": {"type": "string", "maxLength": USAGE_NOTE_MAX}}}),
+                                          "job_id": {"type": "integer"}, "note": {"type": "string", "maxLength": USAGE_NOTE_MAX},
+                                          # 2.992.0 (#5684): the kind of run with the model per run, and the starter's id of the run
+                                          "run_class": {"type": "string", "enum": ["", *USAGE_RUN_CLASSES], "description":
+                                                        "2.992.0: decide | review | routine - the kind of run (model per run); counted per kind in the section Model"},
+                                          "run_id": {"type": "string", "maxLength": USAGE_RUN_ID_MAX, "pattern": "^[A-Za-z0-9_-]*$",
+                                                     "description": "2.992.0: your own id of the run (the section Model counts distinct ids as runs)"}}}),
             "get": op("The agent's own usage, grouped", AG, ok(ref("UsagePage")) | errs("400", "403"),
                       [q("from", "First local day (YYYY-MM-DD), default 29 days before `to`"), q("to", "Last local day, default today"),
                        q("group", "day (default), task, list or model", {"type": "string", "enum": list(USAGE_GROUPS)})])},

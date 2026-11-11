@@ -10,6 +10,10 @@ model_split, model_decide, model_routine):
  - end to end with a fake claude in PATH: a chat run on the decide model, a task event on the routine model, a job wake in
    the same conversation (resumed, other model), a failed switch runs once more on the previous model and the conversation
    stays on it; switch off = the command's own --model, untouched
+ - 2.992.0 (#5684): the third kind, reviews (run_kind, model_review): only what the trigger says (review_requested, a planned
+   job with review: true or a list check), never a word; a decision in the same run wins; the review model empty = the decide
+   model; the conversation key of 2.974 stays; every run hands its kind and id to the usage hook (KALMIDO_RUN_CLASS / _ID),
+   a summary run and the switch off none
 Pure Python, no container."""
 import importlib.util
 import json
@@ -115,6 +119,29 @@ check(ar.model_pair({"model": "opus", "model_split": True}) == ("opus", "opus"),
 check(ar.model_pair({"model": "", "model_split": True, "model_decide": "opus", "model_routine": " sonnet "}) == ("opus", "sonnet"), "both fields")
 check(ar.session_model_key({"model": "opus"}) == "opus" and ar.session_model_key({"model_split": True, "model_decide": "a", "model_routine": "b"}) == "a/b",
       "the conversation is bound to the setting, not to one run's model")
+# 2.992.0 (#5684): reviews - what the trigger says, never a word in the text
+V = "fable"
+pv = lambda *evs: ar.model_choice(list(evs), D, R, review=V)  # noqa: E731
+check(pv(ev("review_requested", task={"id": 5})) == (V, "review (review_requested)"), f"#5684: a review the agent is asked for: review {pv(ev('review_requested'))}")
+check(pv(ev("scheduled_job", title="Audit", prompt="Read the code", review=True))[0] == V, "#5684: a planned job of the kind Review: review")
+check(pv(ev("scheduled_job", title="Check the project", prompt="x", list_check=True))[0] == V, "#5684: a scheduled check of a project: review")
+check(pv(ev("scheduled_job", title="Review the week", prompt="review and audit everything"))[0] == R,
+      "#5684: the word review / audit in a plain planned job is no review (routine)")
+check(pv(ev("chat", user={"id": 7}, message={"body": "please review this"}))[0] == D, "#5684: the word in a chat is no review (decide)")
+check(pv(ev("scheduled_job", title="Approve the invoices", prompt="x", review=True))[0] == V, "#5684: a review plan stays review (no sign words counted)")
+check(pv(ev("review_requested"), ev("chat", user={"id": 7}))[0] == D, "#5684: a decision in the same run wins")
+check(pv(ev("review_requested"), ev("task_added"))[0] == V, "#5684: a review with routine: review")
+check(pv(ev("review_requested"), wake(state="failed"))[0] == D, "#5684: a review with a hard job wake: decide")
+check(pv(ev("scheduled_job", title="x", prompt="y", review="yes"))[0] == R, "#5684: only a real true counts")
+check(ar.model_choice([ev("review_requested")], D, R) == (D, "review (review_requested)"), "#5684: no review model given = the decide model")
+check(ar.model_choice([ev("review_requested")], "opus", "opus", "opus") == ("opus", "one model"), "#5684: all three the same: one model")
+check(ar.run_kind([ev("task_added")]) == ("routine", "routine (task_added)") and ar.run_kind([]) == ("decide", "no event"), "#5684: run_kind")
+check(ar.model_review({"model_split": True, "model_decide": "opus"}) == "opus" and ar.model_review({"model_split": True, "model_review": " fable "}) == "fable"
+      and ar.model_review({"model": "x"}) is None, "#5684: model_review: empty = the decide model, off = None")
+check(ar.session_model_key({"model_split": True, "model_decide": "a", "model_routine": "b", "model_review": ""}) == "a/b"
+      and ar.session_model_key({"model_split": True, "model_decide": "a", "model_routine": "b", "model_review": "a"}) == "a/b"
+      and ar.session_model_key({"model_split": True, "model_decide": "a", "model_routine": "b", "model_review": "c"}) == "a/b/c",
+      "#5684: the conversation key of 2.974 stays; a review model of its own adds /c")
 check(ar.with_model(["claude", "-p", "--model", "x", "--model=y", "--verbose"], "z") == ["claude", "-p", "--verbose", "--model", "z"],
       "with_model replaces every --model")
 check(ar.with_model(["claude", "--model", "x"], "") == ["claude"], "empty = the command's default (no --model)")
@@ -130,7 +157,8 @@ args = sys.argv[1:]
 prompt = sys.stdin.read()
 model = args[args.index("--model") + 1] if "--model" in args else ""
 with open(os.environ["FAKE_SEEN"], "a") as f:
-    f.write(json.dumps({"args": args, "model": model, "resume": args[args.index("--resume") + 1] if "--resume" in args else ""}) + "\n")
+    f.write(json.dumps({"args": args, "model": model, "resume": args[args.index("--resume") + 1] if "--resume" in args else "",
+                        "cls": os.environ.get("KALMIDO_RUN_CLASS", ""), "rid": os.environ.get("KALMIDO_RUN_ID", "")}) + "\n")
 if model and model == os.environ.get("FAKE_FAIL_MODEL") and "--resume" in args:
     sys.stderr.write("model not available for this session\n")
     sys.exit(1)
@@ -201,6 +229,23 @@ check(len(s) == 1 and s[0]["model"] == "opus" and s[0]["resume"] == "sess-5668",
 sess = r.state.data["sessions"].get("chat:7") or {}
 check(sess.get("model") == "opus/sonnet" and sess.get("last_model") == "opus", f"the conversation keeps the setting and its last model: {sess}")
 
+# 2.992.0 (#5684): the usage hook learns the kind and the id of every run (the child's environment)
+os.environ.update(KALMIDO_RUN_CLASS="routine", KALMIDO_RUN_ID="inherited")  # never inherited from the launcher's environment
+s = go([ev("chat", user={"id": 7, "name": "Ann"}, message={"id": 13, "body": "hi"})])
+s2 = go([ev("task_added", task={"id": 8, "title": "New"})])
+RT.update(model_review="fable")
+r.refresh_due = True
+s3 = go([ev("review_requested", task={"id": 9, "title": "Check it"})])
+check(len(s) == 1 and s[0]["cls"] == "decide" and len(s[0]["rid"]) == 16 and len(s2) == 1 and s2[0]["cls"] == "routine"
+      and s2[0]["rid"] not in ("", "inherited", s[0]["rid"]), f"#5684: each run hands its kind and a new id to the hook: {s} {s2}")
+check(len(s3) == 1 and s3[0]["model"] == "fable" and s3[0]["cls"] == "review", f"#5684: a review the agent is asked for: the review model, kind review: {s3}")
+RT.update(model_review="")
+r.refresh_due = True
+s3 = go([ev("review_requested", task={"id": 9, "title": "Check it"})])
+check(len(s3) == 1 and s3[0]["model"] == "opus" and s3[0]["cls"] == "review", f"#5684: no review model = the decide model, still kind review: {s3}")
+for k in ("KALMIDO_RUN_CLASS", "KALMIDO_RUN_ID"):
+    os.environ.pop(k)
+
 # a switch that fails early: once more on the previous model, the conversation stays on it
 os.environ["FAKE_FAIL_MODEL"] = "sonnet"
 s = go([wake()])
@@ -230,4 +275,5 @@ RT.update(model_split=False)
 r.refresh_due = True
 s = go([ev("task_added", task={"id": 7})])
 check(len(s) == 1 and s[0]["model"] == "base" and s[0]["args"].count("--model") == 1, f"off: the launcher's --model, untouched: {s}")
+check(s[0]["cls"] == "" and s[0]["rid"] == "", f"#5684: off = no kind for the usage hook: {s}")
 sys.exit(done("p5668_model_per_run"))

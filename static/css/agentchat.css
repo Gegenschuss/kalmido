@@ -565,3 +565,14 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
   .chstep+.chstep{display:none}  /* the older lines only when opened: the block keeps its height with every new status */
   .chsteps.open .chstep{display:block;-webkit-line-clamp:unset;line-clamp:unset;overflow:visible}
 }
+/* 2.992.0 (#5684): "runs with <model>" in the header's second line while the model per run is on (the owner / an admin taps it:
+   the section Model); never wider than its room, ends in … */
+.chl2 .chrunm{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2);font:inherit;font-size:var(--fs-xs);background:none;border:0;padding:0}
+.chl2 .chrunm::before{content:"·";margin-right:.375rem;color:var(--muted)}
+.chl2 button.chrunm{cursor:pointer;text-decoration:underline dotted;text-underline-offset:.125rem}
+.chl2 button.chrunm:hover,.chl2 button.chrunm:focus-visible{color:var(--accent)}
+/* the usage per kind of run of the last 7 days in the section Model (agentrotate.js agmu_load) */
+.agmu{margin-top:.5rem}
+.agmu .agmul{list-style:none;margin:0;padding:0;display:grid;gap:.25rem}
+.agmu .agmul li{display:flex;flex-wrap:wrap;gap:.25rem .5rem;font-size:var(--fs-s)}
+.agmu .agmuk{font-weight:600}

@@ -216,6 +216,9 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    applies them. 2.974.0: *Select the model per run* gives the person's own messages and decisions one model and routine
    (quiet job wakes, new tasks, follow-ups) another, e.g. a bigger and a cheaper one; the runner picks it per run
    ([AGENTS.md](AGENTS.md#runtime-settings)). The owner of a personal agent finds it in its permissions dialog, section *Model*.
+   2.992.0: a third model *For reviews* (a review it is asked for, a planned job of the kind *Review in the chat*, a scheduled
+   check of a project; empty = the first) and the usage of the last 7 days per kind; while it is on the chat header shows
+   *runs with <model>*, a tap opens the section.
 6. Optional, **Office & finance** (2.51.0): an agent that drafts quotations, invoices and reminders and suggests payments
    needs three switches, all off by default: the permission *Office drafts* (scope `office`), its own switch *May draft
    office documents* in its dialog (an admin of its office area; in a private office the person) and *Agents may read
