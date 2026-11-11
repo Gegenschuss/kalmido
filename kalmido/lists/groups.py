@@ -131,7 +131,16 @@ def grp_shares_of_lists(c, rows):
     for r in grp_own_rows(c, ids):
         out.setdefault(r["list_id"], []).append((r["group_id"], r["role"], "list"))
     below = {}
-    for r in grp_folder_rows(c):
+    # Fable review F8: only the folders above these lists (one upward walk from their nodes), not every folder group share of
+    # the instance; lf_lists_below then maps each to the lists below it (the trash included, as before)
+    with system_ctx(c):
+        up = [x[0] for x in c.execute("""WITH RECURSIVE up(id, parent_id, kind, lvl) AS (
+                                            SELECT id, parent_id, kind, 0 FROM fs_nodes WHERE kind='ref' AND ref_kind='list'
+                                            AND ref_id = ANY(CAST(? AS BIGINT[]))
+                                            UNION SELECT n.id, n.parent_id, n.kind, up.lvl + 1 FROM fs_nodes n JOIN up ON n.id=up.parent_id
+                                            WHERE up.lvl < 64)
+                                          SELECT DISTINCT id FROM up WHERE kind='folder'""", (st_ids(sorted(ids)),)).fetchall()]
+    for r in (grp_folder_rows(c, nids=up) if up else []):
         if r["node_id"] not in below:
             below[r["node_id"]] = lf_lists_below(c, r["node_id"])
         for lid in below[r["node_id"]]:
