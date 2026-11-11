@@ -174,6 +174,7 @@ const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewConta
   sht_pic: ['shoot'], sht_bar: ['shoot'],  // 2.636.0 (#4565): the board of a shoot (calendar.js viewKanban)
   ms_clView: ['clientpage', 1],  // 2.563.0 (#4742): Office > Clients (clients.js viewClients)
   mr_open: ['minerules'],  // 2.823.0 (#4773): My tasks > Rules…
+  viewProjCs: ['callsheet', 1],  // 2.988.0 (#5651): the tab "Call sheets" of a project (projects.js)
   viewSteps: ['undolist', 1]};  // 2.773.0 (#5250): the page "Recent steps"
 // 2.556.0 (#4685) "New for you": once per new version (the version seen last is a user setting, accounts/whatsnew.py) the
 // server is asked what is new since then; only when there is something the dialog's module loads (whatsnew.js). Nothing at

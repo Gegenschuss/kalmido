@@ -182,7 +182,7 @@ function fileListTarget(e) {
   const sr = e.target.closest?.('#side .srow[data-drop]');
   if (sr) { const k = sr.dataset.drop, l = k === 'inbox' ? inbox() : k.startsWith('l:') ? listById(+k.slice(2)) : null; return l && !l.archived && canAddTo(l.id) ? {l, el: sr} : null; }
   const v = e.target.closest?.('#view'); if (!v || e.target.closest('#pov-files, .chview, .pov, input, textarea')) return null;
-  const l = routeList(); if (!l || l.archived || !canAddTo(l.id) || curView(l) === 'overview') return null;
+  const l = routeList(); if (!l || l.archived || !canAddTo(l.id) || ['overview', 'callsheets'].includes(curView(l))) return null;  // 2.988.0 (#5651): + call sheets
   return {l, el: v};
 }
 function fileDropHint(t) {
