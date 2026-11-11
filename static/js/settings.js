@@ -1174,7 +1174,7 @@ function settingsModal(focus) {
   $('.snav', md).addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) stp_nav(() => { show(b.dataset.sec); if (md.classList.contains('sidx')) { idx(false); setTimeout(() => $('.spane:not(.hidden) h4, .spane:not(.hidden) button, .spane:not(.hidden) input', md)?.focus?.({preventScroll: true}), 0); } }); });
   // 2.736.0 (#5214): the arrow = Back (one view back, through its history entry on a touch screen); without a view before: the overview
   md.addEventListener('click', e => { if (!e.target.closest('[data-m="s-index"]')) return;
-    if (md._stk.length) { if (isTouch() && typeof f8d_bk !== 'undefined' && f8d_bk.pushed) history.back(); else md._back(); }
+    if (md._stk.length) f8d_stepBack(md);  // 2.956.0 (#5230): the shared helper (backclose.js), same way as before
     else stp_nav(() => idx(true));
     if (md.classList.contains('sidx')) $('.snav [data-sec]', md)?.focus(); });
   // 2.13.0 (#453 P20): search every tab's headings, labels and options; a hit opens its tab and scrolls to it

@@ -1851,6 +1851,7 @@ function go(hash, rep = false) {  // 2.743.0 (#5235): rep = replace the current 
 function goNow(hash, rep = false) { const was = location.hash; if (was !== '#' + hash) { if (rep) { if (typeof BN === 'object') BN.nt = 'replace'; location.replace('#' + hash); } else location.hash = hash; if (location.hash === was) route(); } else route(); }  // 2.619.0 (#4943): the same address in another spelling (a browser that keeps the hash decoded) fires no hashchange: route() itself (it closes the drawer)
 async function route() {
   vm_leave();  // 2.413.0 A (#3439): the view left keeps its place (viewmem.js)
+  if (typeof f8d_viewNav === 'function') f8d_viewNav();  // 2.956.0 (#5230): another page empties the views of the page before (backclose.js)
   const r = parseHash();
   if (r.lsGo) history.replaceState(null, '', '#' + r.lsGo);  // 2.609.0 (#4613): the address says the area, not the hidden project
   if (S.me?.kid && r.mod !== 'family' && !r.complete && !r.snooze) { r.mod = 'family'; r.key = 'family'; }  // 2.19.0 (#653): a kid's home

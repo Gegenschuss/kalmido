@@ -676,11 +676,14 @@ function tourStart(mod) {
   // 1.8.0: first start of an account: "Create a sample project" on the first card (preticked for project setups)
   TOUR.sample = !mod && S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid && !tourHasProjects() && !tourOrg(); TOUR.sampleOn = false; TOUR.industry = indCodes(S.industry);  /* 2.578.0 (#4573); 2.828.0 (#5511): the codes ticked */  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
   let el = $('.tour');
+  if (el) el._stk = [];  // 2.956.0 (#5230): a restarted tour starts without steps of Back
   if (!el) { el = document.createElement('div'); el.className = 'tour'; el.innerHTML = '<div class="tring"></div><div class="tcard" role="dialog" aria-live="polite"></div>'; document.body.appendChild(el); }
   el.addEventListener('click', e => {
     const b = e.target.closest('[data-tour]'); if (!b) return;
     const a = b.dataset.tour;
-    if (a === 'next') tourGo(TOUR.i + 1); else if (a === 'back') tourGo(TOUR.i - 1); else tourEnd(true);
+    // 2.956.0 (#5230): every card shown by Next is one step of Back (backclose.js f8d_step); its Back button = that Back
+    if (a === 'next') { const was = TOUR.i; tourGo(was + 1); if (TOUR.on && TOUR.i > was) f8d_step(el, () => tourGo(was)); }
+    else if (a === 'back') { if (!f8d_stepBack(el)) tourGo(TOUR.i - 1); } else tourEnd(true);
   });
   el.addEventListener('change', e => { if (e.target.id === 't-sample') TOUR.sampleOn = e.target.checked; if (e.target.id === 't-ptype') TOUR.ptype = e.target.value; if (e.target.id === 't-more') TOUR.more = e.target.checked; if (e.target.closest?.('#t-industry')) { TOUR.industry = indPicked($('#t-industry', el)); tourGo(TOUR.i); } });  /* 2.828.0 (#5511): boxes */  // 2.578.0 (#4573): the sample's text follows the industry
   el.addEventListener('click', e => { const b = e.target.closest('[data-tpurpose]'); if (!b) return; TOUR.purpose = TOUR.purpose === b.dataset.tpurpose ? '' : b.dataset.tpurpose; tourGo(TOUR.i); $(`.tour [data-tpurpose="${b.dataset.tpurpose}"]`)?.focus(); });  // 2.19.0 (#653)

@@ -6,43 +6,73 @@
    opens. Back closes exactly the topmost level and pushes nothing anew: an entry pushed in the popstate handler (without a tap)
    is skipped by Chrome's Back, so the second Back of document preview -> full view left the app instead of closing the preview. */
 const f8d_bk = {pushed: 0, skip: false, queued: false, url: '', at: '', after: /** @type {Array<() => void>} */ ([]), t: 0};  // after / t: f8d_defer; at: the address our entries were pushed on (#5322)
-const f8d_open = () => {
-  if ($('.palette:not(.an-out)')) return 'palette';
-  if ($('.lightbox')) return 'lightbox';
-  const pop = $('#pop');
-  if (pop && !pop.classList.contains('hidden')) return 'pop';
+// 2.956.0 (#5230): one mechanism for every level, from the top down: [kind, its open elements (bottom to top), close one].
+// Each level element may carry views of its own (el._stk = the views before the shown one, el._back() shows the last of them;
+// f8d_step below): every view is one step of Back, only the last Back closes the level (#5214 had this for dialogs only).
+// The page itself is the lowest level ('view', #view): its _stk holds views of a page without an address of their own, it never
+// closes, a route change empties it (f8d_viewNav). New since #5230: the tour (it sits on top; paused it is below everything
+// else), the date picker (#dpop) and the sidebar as a drawer (#side.open).
+const f8d_one = (/** @type {any} */ el) => el ? [el] : [];
+const f8d_tourEls = (/** @type {boolean} */ paused) => typeof TOUR === 'object' && TOUR.on && !!TOUR.paused === paused ? f8d_one($('.tour')) : [];
+/** @type {Array<[string, () => any[], (el: any) => void]>} */
+const F8D_LV = [
+  ['tour', () => f8d_tourEls(false), () => tourEnd(true)],
+  ['palette', () => f8d_one($('.palette:not(.an-out)')), () => closePalette()],
+  ['dpop', () => typeof DP === 'object' && DP.el ? [DP.el] : [], () => dpClose(true)],
+  ['lightbox', () => $$('.lightbox'), el => el.remove()],
+  ['pop', () => { const pop = $('#pop'); return pop && !pop.classList.contains('hidden') ? [pop] : []; }, () => closePop()],
   // 2.497.0 (#4040): shopping mode has its own history entry (family.js): a second one here stayed behind after closing it (a dead Back)
-  if ($('.modal:not(.authscreen):not(.an-out):not(.shopmode)')) return 'modal';
+  ['modal', () => $$('.modal:not(.authscreen):not(.an-out):not(.shopmode)'), el => modalClose(el)],
   // 2.619.0 (#4943): the quick add sheet on its own (was 'pop': closePop only closed it through popOnClose, which a menu opened
-  // in the sheet (list, template) had taken over: Back then closed nothing); a sheet still folding away (an-out) is closed already
-  if ($('.qadd.sheet:not(.an-out)')) return 'qsheet';
-  if ($('.tsheet')) return 'tsheet';
-  return '';
-};
-// 2.766.0 (#5322): nav = a new view (another address), not a Back: a dialog with views of its own closes whole, it does not step back
+  // in the sheet (list, template) had taken over: Back then closed nothing); a sheet still folding away (an-out) is closed already;
+  // closing: the scrim + whoever holds popOnClose, then the sheet (popovers.js)
+  ['qsheet', () => f8d_one($('.qadd.sheet:not(.an-out)')), () => { closePop(); tch_overlaysClose(); }],
+  ['tsheet', () => f8d_one($('.tsheet')), el => $('[data-ts="close"]', el)?.click()],
+  ['tourp', () => f8d_tourEls(true), () => tourEnd(true)],
+  // the sidebar as a drawer (phone, rail): Back closes it instead of leaving the page (it went one page back before #5230)
+  ['side', () => f8d_one($('#side.open')), () => closeSide()],
+  ['view', () => { const v = $('#view'); return v?._stk?.length ? [v] : []; }, el => f8d_stepsClear(el)],
+];
+const f8d_top = () => { for (const [k, els, close] of F8D_LV) { const e = els(); if (e.length) return {k, el: e[e.length - 1], close}; } return null; };
+const f8d_open = () => f8d_top()?.k || '';
+// 2.766.0 (#5322): nav = a new view (another address), not a Back: a level with views of its own closes whole, it does not step back
 function f8d_closeTop(nav = false) {
-  const k = f8d_open();
-  if (k === 'palette') closePalette();
-  else if (k === 'lightbox') $('.lightbox').remove();
-  else if (k === 'pop') closePop();
-  else if (k === 'qsheet') { closePop(); tch_overlaysClose(); }  // 2.619.0 (#4943): the scrim + whoever holds popOnClose, then the sheet (popovers.js)
-  else if (k === 'modal') { const m = $$('.modal:not(.authscreen):not(.an-out)').pop(); if (nav || !(m?._stk?.length && m._back?.())) modalClose(m); }  // 2.736.0 (#5214): a view inside the dialog first (settings areas)
-  else if (k === 'tsheet') $('[data-ts="close"]', $('.tsheet'))?.click();
+  const t = f8d_top(); if (!t) return;
+  if (!nav && t.el._stk?.length && t.el._back?.()) { f8d_queue(); return; }  // 2.736.0 (#5214), all levels since #5230: a view inside the level first
+  t.close(t.el);
 }
-// 2.736.0 (#5214): a dialog with views of its own (md._stk = the views before the shown one, md._back() shows the last of them,
-// e.g. the areas of the settings) counts one level per view: Back steps back through them, only the last Back closes it.
-// The dialog calls f8d_queue() itself when it adds a view (no node is added or removed then); see settings.js stp_nav.
+// 2.736.0 (#5214): a level with views of its own counts one step per view: Back steps back through them, only the last Back closes
+// it. The level calls f8d_queue() itself when it adds a view (no node is added or removed then); see settings.js stp_nav, f8d_step.
 // 2.652.0 (#5070): how many overlay levels are open (a dialog under a lightbox under a menu = 3); one history entry each
-const f8d_depth = () => {
-  const pop = $('#pop');
-  return ($('.palette:not(.an-out)') ? 1 : 0) + $$('.lightbox').length + (pop && !pop.classList.contains('hidden') ? 1 : 0)
-    + $$('.modal:not(.authscreen):not(.an-out):not(.shopmode)').reduce((n, m) => n + 1 + (m._stk?.length || 0), 0) + ($('.qadd.sheet:not(.an-out)') ? 1 : 0) + ($('.tsheet') ? 1 : 0);
-};
+const f8d_depth = () => F8D_LV.reduce((n, [k, els]) => n + els().reduce((m, el) => m + (k === 'view' ? 0 : 1) + (el._stk?.length || 0), 0), 0);
+// 2.956.0 (#5230): the helpers for a level (or the page, $('#view')) with views of its own.
+// f8d_step(el, back) = one view more: back() shows the view before it again (Back on a touch screen, the level's ‹ through f8d_stepBack)
+function f8d_step(/** @type {any} */ el, /** @type {() => void} */ back) {
+  if (!el) return;
+  (el._stk ||= []).push(back);
+  if (el.id === 'view') el._stkAt = location.hash;
+  el._back ||= () => { const f = el._stk?.pop(); if (!f) return false; f(); return true; };
+  if (typeof isTouch === 'function' && isTouch()) f8d_queue();
+}
+// a visible ‹ of the level: on a touch screen through its history entry (the entry goes too), else the view before directly
+function f8d_stepBack(/** @type {any} */ el) {
+  if (!el?._stk?.length) return false;
+  if (typeof isTouch === 'function' && isTouch() && f8d_bk.pushed) history.back(); else el._back();
+  return true;
+}
+// the level's views are gone (it was drawn anew, the page changed): their history entries go with the next sync
+function f8d_stepsClear(/** @type {any} */ el) { if (!el?._stk?.length) return; el._stk = []; f8d_queue(); }
+// route() (core.js): another page empties the views of the page before it
+function f8d_viewNav() { const v = $('#view'); if (v?._stk?.length && v._stkAt !== location.hash) f8d_stepsClear(v); }
 const f8d_lvl = () => { const v = history.state?.f8d; return typeof v === 'number' ? v : 0; };
 function f8d_sync() {
   f8d_bk.queued = false;
   if (f8d_bk.skip) return;  // our own history.back() is still on its way
   const n = f8d_depth();
+  // 2.956.0 (#5230): Back landed on one of our entries while nothing was open (the drawer reopened by Back, core.js; an overlay
+  // that a new address had closed): the levels opening now take that entry over instead of pushing one more above it (that
+  // second entry made the next Back a dead one: it landed on our old entry and closed nothing)
+  if (n > f8d_bk.pushed && !f8d_bk.pushed && f8d_lvl() > 0 && f8d_lvl() <= n) { f8d_bk.pushed = f8d_lvl(); f8d_bk.at = location.href; }
   if (n > f8d_bk.pushed) { f8d_bk.at = location.href; while (f8d_bk.pushed < n) history.pushState({f8d: ++f8d_bk.pushed}, '', location.href); }
   else if (n < f8d_bk.pushed) {
     f8d_bk.pushed = n;
@@ -83,4 +113,5 @@ window.addEventListener('popstate', e => {
 if (typeof isTouch === 'function' && isTouch()) {
   new MutationObserver(f8d_queue).observe(document.body, {childList: true, subtree: true});
   const pop = document.getElementById('pop'); if (pop) new MutationObserver(f8d_queue).observe(pop, {attributes: true, attributeFilter: ['class']});
+  const side = document.getElementById('side'); if (side) new MutationObserver(f8d_queue).observe(side, {attributes: true, attributeFilter: ['class']});  // 2.956.0 (#5230): the drawer
 }
