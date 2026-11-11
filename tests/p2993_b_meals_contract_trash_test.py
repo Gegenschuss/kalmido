@@ -188,8 +188,8 @@ n = tick()
 check(n.get("ocfile") == 1 and frow(K1, "office_contract_files") is None and not stored(ORG, KN1), f"past the period: row and stored file gone {n}")
 
 # ---------------------------------------------------------------- a person without an organisation (her personal office)
-PB = dbx("SELECT id FROM orgs WHERE personal_of=?", (FID,))[0][0]
 MF = meal(Fr, place_name="Example Bistro")
+PB = dbx("SELECT id FROM orgs WHERE personal_of=?", (FID,))[0][0]  # made when her office opens first
 FF = bill(Fr, MF)
 _, _, FNF = frow(FF)
 check(A.delete(M + f"/{MF}").status_code == 404, "someone else: 404 on her meal")
