@@ -1317,14 +1317,12 @@ DELETE /api/family/contacts/{}
 DELETE /api/family/kids/{}/pin
 DELETE /api/family/rewards/{}
 DELETE /api/folders/agents
-DELETE /api/folders/groups/{}
 DELETE /api/forms/{}
 DELETE /api/hubmail/address
 DELETE /api/layouts/saved/{}
 DELETE /api/life/karakeep
 DELETE /api/list-checks/{}
 DELETE /api/lists/{}/favorite
-DELETE /api/lists/{}/groups/{}
 DELETE /api/lists/{}/icon
 DELETE /api/lists/{}/milestones/{}
 DELETE /api/lists/{}/public-link
@@ -1455,7 +1453,6 @@ POST /api/family/rewards/{}/request
 POST /api/favorites/suggestion
 POST /api/folders/delete
 POST /api/folders/playbook/restore
-POST /api/folders/rename
 POST /api/folders/repos
 POST /api/hubmail/mailbox/check
 POST /api/hubmail/mails/{}/assign
@@ -1550,8 +1547,6 @@ POST /api/sheets/{}/to-offer
 POST /api/sprints/{}/close
 POST /api/sprints/{}/start
 POST /api/supporter/{}/swap
-POST /api/tags/delete
-POST /api/tags/restore
 POST /api/tasks/similar
 POST /api/tasks/{}/chain/pull
 POST /api/tasks/{}/editing
@@ -1652,7 +1647,6 @@ PUT /api/disc
 PUT /api/family/kids/{}/pin
 PUT /api/folder-heads
 PUT /api/folders/agents
-PUT /api/folders/groups/{}
 PUT /api/folders/playbook
 PUT /api/folders/public-links
 PUT /api/life/karakeep
