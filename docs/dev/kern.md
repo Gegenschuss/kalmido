@@ -627,6 +627,17 @@ the new text) and `web` (the generic routes below). Reading in the old shape: `o
   the clean-up of #5263 stay out); a SQLite file brings them in the old tables (`admin/migrate.py LEGACY_Q4B`). One-way: the
   old tables are dropped (`5273_a.py`); a backup restores them.
 
+#### The team chat's helpers and git comments (stage Q4c, 2.981.0, #5274, in part)
+
+The team chat keeps its message stream (`tchat_msgs`: reads, threads, pins, seals, files) and takes the core's helpers: kind
+`tchat` of `ocm_kind` (helpers only, no rows) with the hooks `people` (the room's members: the one mention parser
+`ocm_mentions_clean`, was `tchat_clean_mentions`) and `say` (the area's say rule `tchat_say_refusal`: `ocm_need_say(c, "tchat",
+room)`, was `need_room_say`). A comment imported from a repository (`integrations/git_sync.py`, `git_issues.py`) belongs to no
+account: `user_id` NULL, `ext_name` = the remote author, `extra.source` = `git` (the app names it "(from the repository)"); the
+deletion of the account that connected / imported it no longer takes its kept text in the trash (decided 08.11.2026, question
+7, B4). Still open: the team chat's trash text (`tchat_trash_text` into `obj_comment_trash`, whose key is a comment's id today)
+and one "edited" event for agents (`med_comment_edited` / `med_team_edited`).
+
 ### Versions of tables (stage Q7c, 2.800.0, #5283)
 
 Checked against the core's versions and undo steps, the two change tables of the tables area stay, each for its own logic:
