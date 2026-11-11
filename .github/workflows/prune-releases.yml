@@ -3,7 +3,7 @@ name: Prune releases
 # 2.641.0 (#5011): thins out old GitHub release objects and ghcr image versions. What stays (tools/weekly_release.py prune): the
 # newest latest-ok version of each ISO week (weeks before the first latest-ok tag: the newest release of the week) for the last 4
 # weeks only (2.750.0 #5247: older week versions go, each can be built again from its tag), the current latest release, the newest
-# latest-ok version and all above it, everything younger than 14 days; of the images only tagged versions whose tags are all X.Y.Z can go (never
+# latest-ok version and all above it, everything younger than 3 days (2.929.0 #5598: was 14; input 'days' by hand); of the images only tagged versions whose tags are all X.Y.Z can go (never
 # :latest, never the untagged platform parts of a kept image; 2.658.0 #5042: the untagged parts of a manifest that goes go with it
 # when no kept manifest names them, read with imagetools inspect --raw). Standard: a dry run that only writes the list into the log; it
 # deletes only with dry_run false (by hand) or when weekly-release.yml calls it with the repository variable
@@ -17,11 +17,18 @@ on:
         description: "Only list what would go (nothing is deleted)"
         type: boolean
         default: true
+      days:
+        description: "Keep everything younger than this many days (standard 3)"
+        type: number
+        default: 3
   workflow_call:
     inputs:
       dry_run:
         type: boolean
         default: true
+      days:
+        type: number
+        default: 3
 
 permissions:
   contents: read
@@ -42,8 +49,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          KEEP_DAYS: ${{ inputs.days }}
         run: |
           set -euo pipefail
+          # 2.929.0 (#5598): the input 'days' reaches the shell only as an env value and must be a whole number >= 0
+          days="${KEEP_DAYS:-3}"
+          case "$days" in ''|*[!0-9]*) echo "::error title=prune::input days must be a whole number >= 0, got '$days'"; exit 1 ;; esac
           latest=$(gh release view --json tagName --jq .tagName)
           git for-each-ref refs/tags/latest-ok --format '%(refname:strip=2) %(creatordate:iso-strict)' > tags.txt
           gh api --paginate "repos/$GH_REPO/releases?per_page=100" --jq '.[] | {id, tag_name, created_at, draft}' > releases.jsonl
@@ -70,7 +81,7 @@ jobs:
           # latest-ok tag, no latest release): nothing is deleted, a warning; any other error stays red with its message.
           rc=0
           python3 tools/weekly_release.py prune --tags tags.txt --latest "$latest" --releases releases.jsonl --images images.jsonl \
-            --repo "$GH_REPO" --packages "$pkg" --children children.jsonl --plan delete.txt 2> plan.txt || rc=$?
+            --repo "$GH_REPO" --packages "$pkg" --children children.jsonl --days "$days" --plan delete.txt 2> plan.txt || rc=$?
           cat plan.txt
           { echo '### Prune plan'; echo; sed 's/^/    /' plan.txt; } >> "$GITHUB_STEP_SUMMARY"
           why=$(tail -n 1 plan.txt | tr -d '\r' | cut -c1-400)

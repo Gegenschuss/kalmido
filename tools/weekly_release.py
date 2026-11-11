@@ -4,7 +4,7 @@
     python3 tools/weekly_release.py pick  --tags TAGS --latest vX.Y.Z [--today YYYY-MM-DD] [--notes notes.md] [CHANGELOG ...]
     python3 tools/weekly_release.py prune --tags TAGS --latest vX.Y.Z --releases R.jsonl --images I.jsonl
                                           --repo OWNER/NAME --packages users/OWNER/packages/container/NAME
-                                          [--today YYYY-MM-DD] [--days 14] [--plan delete.txt] [--children C.jsonl]
+                                          [--today YYYY-MM-DD] [--days 3] [--plan delete.txt] [--children C.jsonl]
 
 TAGS: one line per tag "latest-ok/X.Y.Z <ISO date>" (git for-each-ref --format '%(refname:strip=2) %(creatordate:iso-strict)').
 The tag latest-ok/X.Y.Z (pushed by the live train after the device test) only CHOOSES a version; the release itself hangs on
@@ -40,7 +40,8 @@ SEMVER = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 HEAD = re.compile(r"^## \[(\d+\.\d+\.\d+)\]")
 ACTION = re.compile(r"^\s{0,3}(#{1,6})\s*action needed\b.*$", re.I)
 HEADING = re.compile(r"^\s{0,3}(#{1,6})\s")
-KEEP_DAYS = 14
+KEEP_DAYS = 3  # 2.929.0 (#5598): was 14 - nearly every version of the last two weeks stayed; 3 days still leave the way back
+# after a bad live update (the live version and all above it stay anyway); the workflow input 'days' overrides it
 KEEP_WEEKS = 4  # 2.750.0 (#5247): the checked version of a week stays only this long (by its date); older ones go, their tags stay
 SAFE = (re.compile(r"^repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/releases/\d+$"),
         re.compile(r"^(?:users|orgs)/[A-Za-z0-9_.-]+/packages/container/[A-Za-z0-9_.-]+/versions/\d+$"))

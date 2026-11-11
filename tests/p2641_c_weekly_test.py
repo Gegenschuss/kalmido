@@ -5,7 +5,7 @@
   text holds all CHANGELOG sections since the last weekly release, their "Action needed" sections collected on top under ONE
   level-2 heading (the update hint reads only up to the next one), the change list below it
 - tools/weekly_release.py prune: the newest latest-ok version of each ISO week stays, the current latest, everything younger than
-  14 days, the newest release of each week before the first latest-ok tag; images only when all tags are X.Y.Z (never :latest,
+  3 days (2.929.0 #5598: was 14, workflow input 'days'), the newest release of each week before the first latest-ok tag; images only when all tags are X.Y.Z (never :latest,
   never untagged parts); no latest-ok tag or no latest = refusal; the plan holds only release / package version paths, never a
   git ref or tag (safe_path and the delete loop of the workflow)
 - the workflows: release.yml makes no release page any more, weekly-release.yml publishes on vX.Y.Z (--verify-tag, latest),
@@ -139,8 +139,19 @@ img_gone = sorted(x[1] for x in plan if x[0] == "image")
 check((2, 630, 0) in keep and (2, 629, 0) not in keep, f"the newest latest-ok of each ISO week stays, an older one of it goes {sorted(keep)}")
 # 2.750.0 (#5247): the week versions of September / August are older than 4 weeks now - they go (their tags stay)
 check(not keep & {(2, 501, 0), (2, 500, 0), (2, 490, 0)}, f"#5247: week versions older than 4 weeks no longer stay {sorted(keep)}")
-check(rel_gone == ["2.490.0", "2.500.0", "2.501.0", "2.629.0"], f"releases that go {rel_gone}")
-check("2.631.0" not in rel_gone and "2.635.0" not in rel_gone, "younger than 14 days stays (even without latest-ok)")
+# 2.929.0 (#5598): the standard window is 3 days (was 14) - 2.631.0 (10 days) and 2.635.0 (5 days; the week version of
+# its ISO week is 2.639.0) go now, the live version stays
+check(wr.KEEP_DAYS == 3, f"#5598: standard window 3 days {wr.KEEP_DAYS}")
+check(rel_gone == ["2.490.0", "2.500.0", "2.501.0", "2.629.0", "2.631.0", "2.635.0"], f"releases that go {rel_gone}")
+check("2.639.0" not in rel_gone and "2.630.0" not in rel_gone, "the live version and the week version of an older week stay")
+_rel5 = REL + [{"id": 40, "tag_name": "v2.637.0", "created_at": "2026-11-03T21:00:00Z"},
+               {"id": 41, "tag_name": "v2.638.0", "created_at": "2026-11-07T10:00:00Z"}]
+_gone5 = sorted(x[1] for x in wr.prune_plan(TG, "v2.639.0", _rel5, IMG, "o/r", "users/o/packages/container/kalmido", NOW)[1]
+                if x[0] == "release")
+check("2.637.0" in _gone5 and "2.638.0" not in _gone5, f"#5598: 5 days old, no week version -> goes; 1 day old stays {_gone5}")
+_gone14 = sorted(x[1] for x in wr.prune_plan(TG, "v2.639.0", _rel5, IMG, "o/r", "users/o/packages/container/kalmido", NOW, days=14)[1]
+                 if x[0] == "release")
+check(_gone14 == ["2.490.0", "2.500.0", "2.501.0", "2.629.0"], f"#5598: days=14 (the workflow input) keeps the last 14 days {_gone14}")
 check(img_gone == ["2.490.0", "2.500.0", "2.501.0", "2.629.0"], f"images that go {img_gone}")
 # before the first latest-ok tag (inside the 4 weeks): the newest release of each week stays
 keep4 = wr.keep_set(TG, REL, "v2.639.0", d("2026-09-12T10:00:00Z"))
@@ -292,6 +303,12 @@ check("uses: ./.github/workflows/prune-releases.yml" in wj["prune"] and "dry_run
 check(re.search(r"dry_run:\n(?:        .*\n)*?        default: true", pr) is not None and "workflow_dispatch:" in pr and "workflow_call:" in pr,
       "prune-releases.yml: by hand and called, a dry run by default")
 pj = jobs(pr)
+# 2.929.0 (#5598): input 'days' (by hand and when called, standard 3), handed to the script only through env and checked
+check(re.search(r"workflow_dispatch:\n    inputs:\n(?:      .*\n)*?      days:\n(?:        .*\n)*?        default: 3\n", pr) is not None
+      and re.search(r"workflow_call:\n    inputs:\n(?:      .*\n)*?      days:\n(?:        .*\n)*?        default: 3\n", pr) is not None,
+      "#5598: prune-releases.yml has the input days (standard 3) by hand and when called")
+check("KEEP_DAYS: ${{ inputs.days }}" in pj["plan"] and '--days "$days"' in pj["plan"] and "*[!0-9]*" in pj["plan"],
+      "#5598: the plan step hands days to the script through env, only a whole number")
 check("write" not in pj["plan"] and "tools/weekly_release.py prune" in pj["plan"], "the plan job reads only")
 check("inputs.dry_run == false" in pj["delete"] and pj["delete"].count("uses:") == 1 and "actions/download-artifact@" in pj["delete"],
       "the delete job runs only when asked and only download-artifact")
@@ -313,7 +330,7 @@ if _sh:  # run the decision part of the step with a stand-in script: the message
         msg = {2: "refused: no latest-ok tag listed", 1: "Traceback\nValueError: boom", 0: "keep (1): 2.630.0"}[code_]
         with open(os.path.join(TMP, "msg.txt"), "w") as f:
             f.write(msg + "\n")
-        script = ("set -euo pipefail\nGITHUB_STEP_SUMMARY=summary.md latest=v2.630.0 GH_REPO=o/r pkg=users/o/packages/container/kalmido\n"
+        script = ("set -euo pipefail\nGITHUB_STEP_SUMMARY=summary.md days=3 latest=v2.630.0 GH_REPO=o/r pkg=users/o/packages/container/kalmido\n"
                   f"fake_prune() {{ echo repos/o/r/releases/9 > delete.txt; cat msg.txt >&2; return {code_}; }}\n" + _blk)
         r = subprocess.run([_sh, "-c", script], cwd=TMP, capture_output=True, text=True, timeout=30)
         dl = open(os.path.join(TMP, "delete.txt")).read()

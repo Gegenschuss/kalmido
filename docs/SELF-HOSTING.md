@@ -2160,7 +2160,8 @@ stay blocked until you allow them.
 - **One release per week** *(since 2.641.0, #5011)*: GitHub gets one release page per ISO week, on the tag `vX.Y.Z` of the
   newest version of that week that passed all checks; its text collects the changes and the "Action needed" sections of all
   versions since the release before. The latest release and the image `:latest` move together with it. Versions in between
-  have no release page, so the installer and `update.sh` stop for them (`Nothing was changed`); their image stays for 14 days.
+  have no release page, so the installer and `update.sh` stop for them (`Nothing was changed`); their image stays for 3 days
+  (14 days before 2.929.0, #5598).
   Of older weeks only the weekly release and its image stay. The git tags of all versions stay. Pin a version that has a
   release page (the list: the Releases page of the repository).
 
