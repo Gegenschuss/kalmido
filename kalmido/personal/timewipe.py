@@ -236,7 +236,7 @@ def tzw_lock_tasks(c, ents):
     first is seen. A task deleted for good meanwhile is not there to hold (accepted rest risk, decision #5583). Also keeps the
     order tasks -> copy's lock, so bw_check at the end cannot deadlock against the mover."""
     ids = sorted({e["task_id"] for e in ents if isinstance(e, dict) and isinstance(e.get("task_id"), int)
-                  and not isinstance(e.get("task_id"), bool)}) if isinstance(ents, list) else []
+                  and not isinstance(e.get("task_id"), bool) and 0 < e["task_id"] < 2 ** 63}) if isinstance(ents, list) else []
     if ids:
         c.execute("SELECT id FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) ORDER BY id FOR SHARE", (st_ids(ids),)).fetchall()
 

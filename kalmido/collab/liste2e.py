@@ -479,8 +479,9 @@ def le2a_field_back(c, lid, vals):
     key generation (as le2e_guard; a plain value of a copy made before the lock stays behind). While the lock switches: 409
     busy, the copy stays in the trash (the switch's finish empties it, le2a_finish). Review 1: the project's row is held
     (FOR UPDATE), so a finish of a switch waits for this restore and empties the trash after it."""
-    r = c.execute("SELECT e2e, e2e_gen FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
+    r = c.execute("SELECT e2e, e2e_gen, e2e_reenc FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
     mode, gen = ((r[0] or None), int(r[1] or 0)) if r else (None, 0)
+    reenc = bool(r and int(r[2] or 0))
     if mode is None:
         return [v for v in vals if not le2e_is_cipher(v[1])]
     if mode != "on":
@@ -488,6 +489,8 @@ def le2a_field_back(c, lid, vals):
             raise LE2EDenied("list_e2e_busy")
         return vals
     out = [v for v in vals if le2e_is_cipher(v[1]) and le2a_value_ok(v[1], gen)]
+    if reenc:  # Fable review (finding 3): a key change under way may be counted as done already - only the new key's values
+        out = [v for v in out if (le2e_parse(v[1]) or {}).get("g") == gen]
     if any((le2e_parse(v[1]) or {}).get("g", gen) < gen for v in out):
         le2a_reenc_again(c, lid)  # an older key generation: the re-encryption is due again (as le2e_guard)
     return out

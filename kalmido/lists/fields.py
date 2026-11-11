@@ -674,10 +674,28 @@ def field_trash_restore(tid):
     return jsonify(ok=True, field=field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c), values=n)
 
 
+def fd_back_lock(c, r):
+    """#5565 (Fable review, finding 1/2, the class of #5583): before a field copy r comes back (fd_back, and the undo way
+    lists/fieldundo.py fdu_life_run before the field's lock) its project's row (FOR UPDATE: a switch / key change finish of the
+    lock waits) and the tasks its values name (FOR SHARE, id order: a move of such a task into a locked project waits, or is
+    seen when it came first) are held - the order of le2a_finish and le2a_move: project, tasks, then the field's lock.
+    Holding them twice in one transaction is a no-op."""
+    c.execute("SELECT 1 FROM lists WHERE id=? FOR UPDATE", (r["list_id"],)).fetchone()
+    held = ftr_parts(r)[1]
+    ids = sorted({v[0] for v in held.get("vals") or [] if isinstance(v, list) and v and isinstance(v[0], int)
+                  and not isinstance(v[0], bool) and 0 < v[0] < 2 ** 63})
+    if ids:
+        c.execute("SELECT id FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) ORDER BY id FOR SHARE", (st_ids(ids),)).fetchall()
+
+
 def fd_back(c, r):
     """2.809.0 (#5476, from field_trash_restore): copy r of the field trash (list_part_trash, kind FIELD_KIND) back as the field
     (its id, its values that still fit) -> (field id, values); the copy goes. Denied 409 when the field exists, BadInput at the
     limit of fields; the caller checked the rights (ftr_row), bumps and commits."""
+    fd_back_lock(c, r)  # #5565 review: project row, then the tasks named, then (part_copy_back) the field's lock
+    r = c.execute("SELECT * FROM list_part_trash WHERE id=? AND kind=?", (r["id"], FIELD_KIND)).fetchone()  # as a mover left it
+    if not r:
+        raise Denied(404)
     lid, fid = r["list_id"], r["ref_id"]
     snap, held = ftr_parts(r)
     ftype = str(snap.get("type") or "")

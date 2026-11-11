@@ -30,7 +30,7 @@ from ..core.undodiff import ug_diff_add, undo_diff_reg, undo_person
 from ..core.undogroups import UG_LABEL
 from ..core.undoweb import undo_need_reg
 from ..core.writes import obj_track
-from .fields import FIELD_KIND, FIELD_PINNED_MAX, fd_back, fd_trash, fields_pinned_ok, ftr_person, need_field
+from .fields import FIELD_KIND, FIELD_PINNED_MAX, fd_back, fd_back_lock, fd_trash, fields_pinned_ok, ftr_person, need_field
 
 FDU_KIND = "list_field"
 FDU_LIFE = "field_life"
@@ -107,6 +107,11 @@ def fdu_life_run(c, uid, fid, data, redo):
     """Back / forward: there = the field should exist after this run (create / restore forward, a delete back)."""
     ftr_person()
     there = (data.get("op") == "delete") != bool(redo)
+    if there:  # #5565 review (finding 2): project row and tasks before the field's lock, as le2a_finish / le2a_move take them
+        tr0 = c.execute("SELECT * FROM list_part_trash WHERE id=? AND kind=? AND ref_id=?",
+                        (int(data.get("trash") or 0), FIELD_KIND, int(fid))).fetchone()
+        if tr0 is not None:
+            fd_back_lock(c, tr0)
     write_lock(c, f"field-{int(fid)}")
     row = c.execute("SELECT * FROM list_fields WHERE id=?", (int(fid),)).fetchone()
     if there:

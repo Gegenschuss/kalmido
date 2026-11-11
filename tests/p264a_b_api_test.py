@@ -579,6 +579,16 @@ finally:
 check(r.status_code == 409 and r.json().get("code") == "list_e2e_busy" and dbx("SELECT 1 FROM list_part_trash WHERE id=?", (TR4,))
       and not dbx("SELECT 1 FROM list_fields WHERE id=?", (F4,)),
       f"#5565: restore while the lock switches 409, the copy stays {r.status_code} {r.text[:200]}")
+# Fable review (finding 3): during a key change only values of the new key come back (its finish may have counted already)
+F6, TR6, _ = fld_copy(L, {T: cipher(47)})
+G6 = dbx("SELECT e2e_gen, e2e_reenc FROM lists WHERE id=?", (L,))[0]
+dbx("UPDATE lists SET e2e_gen=?, e2e_reenc=1 WHERE id=?", (int(G6[0] or 0) + 1, L), write=True)
+try:
+    r = A.post(B + f"/api/fields/trash/{TR6}/restore")
+finally:
+    dbx("UPDATE lists SET e2e_gen=?, e2e_reenc=? WHERE id=?", (G6[0], G6[1], L), write=True)
+check(r.ok and r.json().get("values") == 0 and fld_vals(F6) == [],
+      f"#5565: during a key change an older key's value stays behind {r.status_code} {r.text[:200]} {fld_vals(F6)}")
 
 # the once-run at the start (core/db.py migr_e2etrashsec5565 -> liste2eguard.py le2b_trash_section_fit): a task in the trash of
 # the locked project with a plain section name (left by a version before #5552), one of the open project with a ciphertext
@@ -651,6 +661,38 @@ r = A.post(B + f"/api/lists/{L3}/time/restore", json={"wipe": W4})
 check(r.status_code == 404 and dbx("SELECT COUNT(*) FROM time_entries WHERE list_id=?", (L3,))[0][0] == N3,
       f"#5574: a second Undo by the copy doubles nothing {r.status_code} {r.text[:200]}")
 
+
+def hold_tx(*lines):
+    """#5583: a transaction of the app (a mover) in the container that has run lines and holds its locks until race() lets it
+    commit. Returns the process; its first output line is 'held'."""
+    code = ("import os, sys; os.environ['TASKS_WATCHDOG']='0'\nimport app\nfrom kalmido.core.pg import system_ctx\nc=app.connect()\n"
+            "with system_ctx(c):\n" + "".join("    " + x + "\n" for x in lines) + "print('held', flush=True)\nsys.stdin.readline()\n"
+            "c.commit()\nprint('done', flush=True)")
+    return subprocess.Popen(["docker", "exec", "-i", CT, "python", "-c", code], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True)
+
+
+def race(hold, call):
+    """#5583: call() in a thread while hold keeps its transaction open -> (response, the call waited for a row lock (FOR SHARE),
+    hold's output). Waits for a real state: hold is 'held', then the call's backend waits on a lock or the call is done."""
+    held_ = hold.stdout.readline().strip()
+    res = {}
+    th = threading.Thread(target=lambda: res.update(r=call()))
+    th.start()
+    w_, t_end = False, time.time() + 30
+    while held_ == "held" and th.is_alive() and time.time() < t_end:
+        if dbx("SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%FOR SHARE%'"):
+            w_ = True
+            break
+        time.sleep(0.1)
+    hold.stdin.write("\n")
+    hold.stdin.flush()
+    out_ = hold.communicate(timeout=60)
+    th.join(60)
+    check(held_ == "held" and "done" in out_[0], f"#5583 setup: the mover held its transaction and committed {held_} {out_}")
+    return res.get("r"), w_, out_
+
+
 # ================================================================== 2.909.0 (#5583): "Delete all times" restored while a move of
 # the task into the locked project is under way (the mover holds the task, has emptied its time entries and not committed):
 # the restore waits for the move and then writes no title / note; without the task lock it read the lock state of before the
@@ -662,34 +704,27 @@ check(r.ok, f"#5583: a time entry with a note {r.text[:200]}")
 r = A.post(B + f"/api/lists/{L3}/time/delete-all", json={"confirm": "Other open"})
 W8, N8 = (r.json().get("wipe"), len(r.json().get("entries") or [])) if r.ok else (None, 0)
 check(r.ok and W8 and N8, f"#5583: delete all times {r.status_code} {r.text[:200]}")
-HOLD = subprocess.Popen(
-    ["docker", "exec", "-i", CT, "python", "-c",
-     "import os, sys; os.environ['TASKS_WATCHDOG']='0'\nimport app\nfrom kalmido.core.pg import system_ctx\nc=app.connect()\n"
-     "with system_ctx(c):\n"
-     f"    c.execute('UPDATE tasks SET list_id=?, title=? WHERE id=?', ({L}, {cipher(46)!r}, {T8}))\n"
-     f"    c.execute(\"UPDATE time_entries SET task_title='', note='' WHERE task_id=?\", ({T8},))\n"
-     "print('held', flush=True)\nsys.stdin.readline()\nc.commit()\nprint('done', flush=True)"],
-    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-held = HOLD.stdout.readline().strip()
-RES = {}
-RT = threading.Thread(target=lambda: RES.update(r=A.post(B + f"/api/lists/{L3}/time/restore", json={"wipe": W8})))
-RT.start()
-waited, t_end = False, time.time() + 30
-while RT.is_alive() and time.time() < t_end:  # a real state: the restore's backend waits for a row lock, or the restore is done
-    if dbx("SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%FOR SHARE%'"):
-        waited = True
-        break
-    time.sleep(0.1)
-HOLD.stdin.write("\n")
-HOLD.stdin.flush()
-hold_out = HOLD.communicate(timeout=60)
-RT.join(60)
-r = RES.get("r")
+HOLD = hold_tx(f"c.execute('UPDATE tasks SET list_id=?, title=? WHERE id=?', ({L}, {cipher(46)!r}, {T8}))",
+               f"c.execute(\"UPDATE time_entries SET task_title='', note='' WHERE task_id=?\", ({T8},))")
+r, waited, _ = race(HOLD, lambda: A.post(B + f"/api/lists/{L3}/time/restore", json={"wipe": W8}))
 plain = dbx("SELECT note, task_title FROM time_entries WHERE note LIKE ? OR task_title LIKE ?", (f"%{MK}Race%", f"%{MK}Race%"))
-check(held == "held" and "done" in hold_out[0], f"#5583 setup: the move held and committed {held} {hold_out}")
 check(waited, "#5583: the restore waits for the move of its task (task rows held before the lock state is read)")
 check(r is not None and r.ok and r.json().get("restored") == N8 and not plain,
       f"#5583: the restore after the move into the locked project writes no plain title / note {plain} {r.text[:200] if r is not None else None}")
+
+# Fable review of #5565 (finding 1, the class of #5583): a deleted text field of the open project L3 restored while a task with
+# a plain value moves into the locked project (the mover holds the task and has taken the value out of the copy, as
+# le2b_scrub_trash_tasks does): the restore waits and brings no plain value to the moved task
+TF = A.post(B + "/api/tasks", json={"list_id": L3, "title": "Field race task"}).json()["id"]
+TF2 = A.post(B + "/api/tasks", json={"list_id": L3, "title": "Field race stays"}).json()["id"]
+F9, TR9, _ = fld_copy(L3, {TF: MK + "RaceField", TF2: "StaysOpen"})
+H9 = json.dumps({"vals": [[TF2, "StaysOpen"]], "n": 1, "grouped": 0})
+HOLD = hold_tx(f"c.execute('UPDATE tasks SET list_id=?, title=? WHERE id=?', ({L}, {cipher(48)!r}, {TF}))",
+               f"c.execute('UPDATE list_part_trash SET held=? WHERE id=?', ({H9!r}, {TR9}))")
+r, waited, _ = race(HOLD, lambda: A.post(B + f"/api/fields/trash/{TR9}/restore"))
+check(waited, "#5565 review: the field restore waits for the move of a task its values name")
+check(r is not None and r.ok and fld_vals(F9) == ["StaysOpen"],
+      f"#5565 review: no plain field value for the task moved into the locked project {fld_vals(F9)} {r.text[:200] if r is not None else None}")
 
 print(f"\n{OKS[0]} checks ok, {len(FAILS)} failed", flush=True)
 if FAILS:
