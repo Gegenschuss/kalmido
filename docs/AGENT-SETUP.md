@@ -213,7 +213,9 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    as a `job_request` of kind `cleanup` and answers with one proposal (merge, rename, move, close) that the person
    applies ([AGENTS.md](AGENTS.md#tidy-up-a-list-2390)); the reference launcher runs it like any other event.
 5. *Runtime* in the agent's dialog (admins): model, auto-compact, a nightly fresh restart. The launcher in step 9
-   applies them.
+   applies them. 2.974.0: *Select the model per run* gives the person's own messages and decisions one model and routine
+   (quiet job wakes, new tasks, follow-ups) another, e.g. a bigger and a cheaper one; the runner picks it per run
+   ([AGENTS.md](AGENTS.md#runtime-settings)). The owner of a personal agent finds it in its permissions dialog, section *Model*.
 6. Optional, **Office & finance** (2.51.0): an agent that drafts quotations, invoices and reminders and suggests payments
    needs three switches, all off by default: the permission *Office drafts* (scope `office`), its own switch *May draft
    office documents* in its dialog (an admin of its office area; in a private office the person) and *Agents may read
@@ -729,7 +731,8 @@ chat messages of one person that arrive together: one run). It does what a hoste
   conversation (`--resume`) instead of starting fresh; task events and other commands still run fresh, and every person
   has a conversation of their own. A new one starts at the limits of the agent's runtime section *Interim summary*
   (2.233.0: session size, runs, minutes of pause; default 150000 tokens, 60 runs, 45 minutes), on a new day (from the
-  *Daily summary* time `nightly_reset` on, else midnight), when the model changes or after *Reset now*; with an older
+  *Daily summary* time `nightly_reset` on, else midnight), when the model changes (2.974.0: with *Select the model per run*
+  the setting, not the model of one run: the model changes per run inside the conversation) or after *Reset now*; with an older
   Kalmido `KALMIDO_SESSION_MAX_TOKENS` (default 150000), `KALMIDO_SESSION_MAX_RUNS` (60) and `KALMIDO_SESSION_IDLE_MIN`
   (120) apply. Before the change the agent writes a short summary (one short extra run; not after a
   reset) that the first prompt of the new conversation carries fenced as context only; the chat shows a notice *New

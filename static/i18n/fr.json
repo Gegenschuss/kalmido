@@ -18244,8 +18244,8 @@
   "The key of this folder was changed meanwhile.": "La clé de ce dossier a été changée entre-temps.",
   "These people get the new key: {0}": "Ces personnes reçoivent la nouvelle clé : {0}",
   "Model per run": "Modèle par exécution",
-  "Choose the model per run": "Choisir le modèle à chaque exécution",
-  "For your messages and decisions": "Pour vos messages et décisions",
+  "Select the model per run": "Choisir le modèle à chaque exécution",
+  "For your messages and decisions": "Pour tes messages et décisions",
   "For routine": "Pour la routine",
-  "Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.": "Vos messages, boutons, réactions et commentaires ainsi que toute exécution qui peut demander une décision utilisent le premier modèle ; les réveils silencieux, nouvelles tâches, relances et tâches planifiées sans signe d’alerte utilisent le second. En cas de doute, le premier."
+  "Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.": "Tes messages, boutons, réactions et commentaires ainsi que toute exécution qui peut demander une décision utilisent le premier modèle ; les réveils silencieux, nouvelles tâches, relances et tâches planifiées sans signe d’alerte utilisent le second. En cas de doute, le premier."
 }

@@ -66,8 +66,8 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   w.eval(`agModal(${JSON.stringify(await adm(ag.id))}, null)`);
   md = await until(() => d.querySelector('#ag-model')?.closest('.modal'));
   const msw = md.querySelector('#ag-msplit'), msr = () => [...md.querySelectorAll('.ag-msr')];
-  check(msw && !msw.checked && msw.closest('.row').previousElementSibling?.querySelector('#ag-model') && /Choose the model per run/.test(msw.closest('.row').textContent),
-    '#5668: the switch "Choose the model per run" right below Model, off');
+  check(msw && !msw.checked && msw.closest('.row').previousElementSibling?.querySelector('#ag-model') && /Select the model per run/.test(msw.closest('.row').textContent),
+    '#5668: the switch "Select the model per run" right below Model, off');
   check(msr().length === 3 && msr().every(x => x.hidden), '#5668: the two model fields are hidden while it is off');
   msw.checked = true; msw.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(msr().every(x => !x.hidden) && /For your messages and decisions/.test(md.textContent) && /For routine/.test(md.textContent) && /When in doubt the first/.test(md.textContent),

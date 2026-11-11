@@ -97,7 +97,7 @@ check(r.ok and rt["model_split"] is True and rt["model_decide"] == "opus" and rt
 ev = [e for e in events(CLH, cur) if e["event"] == "runtime_changed"]
 check(len(ev) == 1 and ev[0]["data"]["runtime"]["model_split"] is True and ev[0]["data"]["runtime"]["model_routine"] == "claude-haiku-5-5",
       f"#5668: runtime_changed carries it: {ev}")
-hdr = next(a for a in A.get(B + "/api/agents").json()["agents"] if a["id"] == CL)
+hdr = next(a for a in A.get(B + "/api/admin/agents").json()["agents"] if a["id"] == CL)
 check(hdr.get("runtime_model") == "", f"#5668: the chat header has no single set model while it is on: {hdr.get('runtime_model')!r}")
 for bad, what in (({"model_split": "yes"}, "split as text"), ({"model_split": 1}, "split as number"), ({"model_decide": "a b"}, "space in a model"),
                   ({"model_routine": "x" * 101}, "model too long"), ({"model_routine": 5}, "model as number"), ({"model_decide": "-opus"}, "leading dash")):
@@ -108,7 +108,7 @@ check(Bo.patch(B + f"/api/admin/agents/{CL}", json={"runtime": {"model_split": F
 r = A.patch(B + f"/api/admin/agents/{CL}", json={"runtime": {"model_split": False, "model_decide": None}})
 rt = requests.get(V + "/agent", headers=CLH).json()["runtime"]
 check(r.ok and rt["model_split"] is False and rt["model_decide"] == "" and rt["model_routine"] == "claude-haiku-5-5", f"#5668: off again, null = empty: {rt}")
-hdr = next(a for a in A.get(B + "/api/agents").json()["agents"] if a["id"] == CL)
+hdr = next(a for a in A.get(B + "/api/admin/agents").json()["agents"] if a["id"] == CL)
 check(hdr.get("runtime_model") == "sonnet", f"#5668: off = the header compares with the one model again: {hdr.get('runtime_model')!r}")
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "robo", "runtime": {"rotate_idle_min": 90}})
 check(r.ok and rot(r.json()["runtime"])["rotate_idle_min"] == 90, "created with an interim-summary value " + r.text[:120])

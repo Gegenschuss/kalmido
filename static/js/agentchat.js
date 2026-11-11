@@ -1936,7 +1936,7 @@ function agRtFields(a) {
   return `<h4 id="ag-rt-h">${tr('Runtime')}</h4>
     <div class="shint">${tr('Kalmido never runs the agent: its host reads these settings (GET /api/v1/agent) and applies them at the next start. See “Runtime settings” in docs/AGENTS.md.')}</div>
     <div class="row"><label for="ag-model">${tr('Model')}</label><input id="ag-model" list="ag-models" value="${esc(rt.model || '')}" maxlength="100" placeholder="${esc(tr('Agent default'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><datalist id="ag-models">${AG_MODELS.map(m => `<option value="${m}"></option>`).join('')}</datalist></div>
-    ${agSplitFields(rt)}
+    ${/*html-ok*/ agSplitFields(rt)}${''/* 2.974.0 (#5668): built with esc() */}
     <div class="row"><label for="ag-ac">${tr('Auto-compact')}</label><label class="chkl"><input type="checkbox" id="ag-ac" ${rt.autocompact !== false ? 'checked' : ''}> ${tr('On')}</label><span class="agpct"><input id="ag-acp" type="number" min="10" max="100" step="1" inputmode="numeric" value="${rt.autocompact_pct ?? ''}" placeholder="${esc(tr('default'))}" aria-label="${esc(tr('Compact at (% of the context)'))}" ${rt.autocompact !== false ? '' : 'disabled'}><span class="muted">%</span></span></div>
     <div class="row"><label>${tr('Nightly fresh restart')}</label>${timeIn('ag-nr', rt.nightly_reset || '', {label: tr('Nightly fresh restart'), empty: tr('Off')})}</div>
     <div class="row"><label for="ag-pm">${tr('Approvals')}</label><select id="ag-pm"${a?.host?.permission_fixed ? ` disabled title="${esc(tr('Set on its computer'))}"` : ''}>${Object.entries(AG_PMODES).map(([k, v]) => `<option value="${k}" ${(rt.permission_mode || '') === k ? 'selected' : ''}>${esc(tr(v))}</option>`).join('')}</select></div>
@@ -1948,10 +1948,10 @@ function agRtFields(a) {
 // 2.974.0 (#5668): the model per run - a bigger model for the person's own messages and decisions, a smaller one for
 // routine; the host (mcp/agent_run.py) picks it per run. Off = the one model above, as before.
 function agSplitFields(rt) {
-  const on = !!rt.model_split, mi = (id, v, ph) => `<input id="${id}" list="ag-models" value="${esc(v || '')}" maxlength="100" placeholder="${esc(ph)}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
-  return `<div class="row"><label for="ag-msplit">${tr('Model per run')}</label><label class="chkl"><input type="checkbox" id="ag-msplit" ${on ? 'checked' : ''}> ${tr('Choose the model per run')}</label></div>
-    <div class="row ag-msr" ${on ? '' : 'hidden'}><label for="ag-mdec">${tr('For your messages and decisions')}</label>${mi('ag-mdec', rt.model_decide, tr('Agent default'))}</div>
-    <div class="row ag-msr" ${on ? '' : 'hidden'}><label for="ag-mrou">${tr('For routine')}</label>${mi('ag-mrou', rt.model_routine, tr('Agent default'))}</div>
+  const on = !!rt.model_split, mi = (id, v, ph) => `<input id="${esc(id)}" list="ag-models" value="${esc(v || '')}" maxlength="100" placeholder="${esc(ph)}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+  return `<div class="row"><label for="ag-msplit">${tr('Model per run')}</label><label class="chkl"><input type="checkbox" id="ag-msplit" ${on ? 'checked' : ''}> ${tr('Select the model per run')}</label></div>
+    <div class="row ag-msr" ${on ? '' : 'hidden'}><label for="ag-mdec">${tr('For your messages and decisions')}</label>${/*html-ok*/ mi('ag-mdec', rt.model_decide, tr('Agent default'))}</div>
+    <div class="row ag-msr" ${on ? '' : 'hidden'}><label for="ag-mrou">${tr('For routine')}</label>${/*html-ok*/ mi('ag-mrou', rt.model_routine, tr('Agent default'))}</div>
     <div class="shint ag-msr" ${on ? '' : 'hidden'}>${tr('Your messages, buttons, reactions and comments and every run that may need a decision use the first model; quiet wake-ups, new tasks, follow-ups and planned jobs without a warning sign use the second. When in doubt the first.')}</div>`;
 }
 function agRtBody(md) {

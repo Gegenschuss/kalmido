@@ -2864,6 +2864,7 @@ agent accordingly.
 | Setting | Meaning | API (`runtime`) |
 |---|---|---|
 | Model | e.g. `opus`, `sonnet`, `haiku` or a full model id; empty = the agent's default | `model` (string, `""`) |
+| Model per run (2.974.0) | *Select the model per run*: off (default) = the one model above for every run. On = the host picks per run: *For your messages and decisions* (the person's chat messages, buttons, reactions, comments, team messages, unknown events, a job wake with a hard sign, a planned job that names a decision / approval / warning / failure) and *For routine* (job wakes without a hard sign, new tasks, tidy, follow-ups, other planned jobs); an empty field = *Model*. Same rules for the names as *Model*. Shown in the admin's *Runtime* and in the owner's permissions dialog of a personal agent (section *Model*, saved at once). While it is on the chat header shows only the model of the last run | `model_split` (bool, default `false`), `model_decide`, `model_routine` (string, `""`; 400 otherwise) |
 | Auto-compact | summarize the conversation when this much of the context is used; off = never | `autocompact` (bool), `autocompact_pct` (10-100 or `null` = the agent's default) |
 | Nightly fresh restart | a new session every night at this time, in the server's time zone; 2.233.0: shown as *Daily summary* in the section *Interim summary* (a host that keeps chat conversations writes the day's summary then and starts the next day's conversation) | `nightly_reset` (`"HH:MM"`, `""` = off / the host's default), `timezone` |
 | Interim summary (2.233.0) | when a host that keeps a chat conversation going (`--resume`) ends it with a short summary and starts a fresh one: at a session size *small / medium / large*, after so many runs (10-500), after so many minutes of pause (5-1440, 0 = never; a pause counts only from the small size on). Defaults = the former fixed values. Saves cost; the new conversation can forget details | `rotate_size` (`"small"`, `"medium"`, `"large"`), `rotate_runs` (default 60), `rotate_idle_min` (default 45); read-only, always filled in: `rotate_mb` (0.4 / 0.8 / 1.5, the session file in MB), `rotate_tokens` (80000 / 150000 / 250000 context tokens), `rotate_idle_mb` (0.4) |
@@ -2881,6 +2882,18 @@ host reads it before every run (Claude Code: `--permission-mode` with `default` 
 `KALMIDO_PERMISSION_MODE`, win over the switch; the same goes for a command that is not Claude Code. The host then reports
 `permission_fixed: true`, and the switch shows "Set on its computer" and is locked.
 
+2.974.0 (#5668): the model per run. Kalmido only stores the three keys; the reference starter (`mcp/agent_run.py`, both
+launchers, capability `model_per_run`) applies them to a Claude Code command: every run gets `--model` of its kind instead
+of the launcher's one (another command keeps its own model). A **job wake** takes the decide model only for a hard sign:
+the job did not end *done*, messages for it came after its end, its result is not (completely) in the chat, it asks
+something or carries an approval card, an open decision of the person (*needs you*, *waits for you*, *your decision*), or a
+hard red in a line that tells the present (*failed*, *blocked*, a security finding) - not in a story (*failed first, fixed
+now*), not soft (*soft*, *flaky*), not negated (*nothing failed*), not in quotes or code. A chat keeps ONE conversation; the
+model changes per run inside it, a new conversation starts only when the setting changes. A switch that fails early (no
+tool call, under 2 minutes) runs once more on the conversation's previous model, which then stays for an hour. The runner
+logs every run's model and the reason (`model sonnet (job wake without a hard sign)`). A host of your own may use the
+same keys with rules of its own.
+
 2.312.0: *Permission questions go to* is offered in the runtime section of a team agent (the people come from
 `GET /api/agents/{id}/perm-users` -> `{team, current, people: [{id, name}]}`, for instance admins and the owner of a personal
 agent). Saving checks the person (400 `perm_user` for an agent account, a disabled account, someone the agent does not reach
@@ -2894,7 +2907,8 @@ GET /api/v1/agent   -> {…, "runtime": {"model": "sonnet", "autocompact": true,
                                         "rotate_size": "medium", "rotate_runs": 60, "rotate_idle_min": 45,
                                         "rotate_mb": 0.8, "rotate_tokens": 150000, "rotate_idle_mb": 0.4,
                                         "git_author_name": "", "git_author_email": "", "git_coauthor": false,
-                                        "git_author": "Kalmido <noreply@kalmido.com>", "dispatch": ""}}
+                                        "git_author": "Kalmido <noreply@kalmido.com>", "dispatch": "",
+                                        "model_split": false, "model_decide": "", "model_routine": ""}}
 PATCH /api/admin/agents/{id}  {"runtime": {"model": "opus", "autocompact_pct": 80}}   (admins; only the given keys change)
 POST  /api/admin/agents/{id}/reset                                                     (admins; 409 while paused)
 ```

@@ -1474,6 +1474,126 @@ def wake_still(text):
     return False, text
 
 
+# kalmido-capability: model_per_run (2.974.0, #5668): with runtime model_split on, every run gets its own model --
+# model_decide for the person's own messages and every run that may need a decision, model_routine for routine (the job
+# wakes without a hard sign, new tasks, follow-ups, planned jobs without a sign). Unknown events: decide. Like the
+# hosted service of the Kalmido team (#3931, sharpened in #4083: a wake needs a HARD sign, a word alone does not).
+MODEL_STUCK_S = 3600  # after a failed switch the conversation stays on its model this long
+ROUTINE_EVENTS = ("task_added", "tasks_added", "tidy", "stale_tasks", "followup_due")
+# an open decision of the person (English and German; quoted words and code are named, not said)
+HARD_DECIDE_RE = re.compile(r"\b(?:needs you|waits for you|you (?:need|have) to decide"
+                            r"|(?:your|open|pending) decision(?!s?\s+(?:from (?:yesterday|today|\d)|of (?:yesterday|\d)|was\b|is (?:done|noted|in)\b))"
+                            r"|decision (?:from you|is missing|is pending|pending))\b"
+                            r"|[Bb]raucht dich|[Ww]artet auf dich"
+                            r"|(?:[Dd]eine|[Oo]ffene|[Aa]usstehende) Entscheidung(?!\s+(?:vom|von (?:gestern|heute|\d)|aus |war\b|ist (?:umgesetzt|eingetragen)))"
+                            r"|Entscheidung (?:von dir|fehlt|steht aus)|musst du entscheiden|entscheiden musst", re.I)
+HARD_DECIDE_NOT_RE = re.compile(r"\b(?:without|no|not|ohne|kein\w*|nicht)\s+(?:\S+\s+){0,2}(?:decision|Entscheidung|needs you|braucht dich)", re.I)
+# a hard red in a line that tells the present: failed / blocked / a security finding; not a story, not soft, not negated
+HARD_RED_RE = re.compile(r"\b(?:failed|fails|failing|blocked|is stuck|security (?:issue|hole|finding|problem)|data leak|vulnerability"
+                         r"|fehlgeschlagen|gescheitert|scheitert|blockiert|Sicherheitslücke|Sicherheitsfund|Sicherheitsproblem|Datenleck)\b", re.I)
+HARD_NOT_RE = re.compile(r"\b(?:not|no|nothing|without|never|nicht|nichts|kein\w*|ohne)\s+(?:more\s+|mehr\s+)?(?:\S+\s+)?"
+                         r"(?:failed|fails|failing|blocked|stuck|fehlgeschlagen|gescheitert|scheitert|blockiert)\b", re.I)
+HARD_SOFT_RE = re.compile(r"\bsoft\b|[Ww]eich|flaky", re.I)
+HARD_STORY_RE = re.compile(r"\b(?:was|were|had|fixed|resolved|before|earlier|first|yesterday|if|when|unless|once|reason|why"
+                           r"|war|waren|wäre|wurde|wurden|behoben|gefixt|vorher|zuerst|anfangs|gestern|wenn|falls|sobald|Ursache|[Ww]arum)\b|^\W*\|", re.I)
+HARD_QUOTE_RE = re.compile(r"„[^“\n]{0,160}“|\"[^\"\n]{0,160}\"|`[^`\n]*`")
+# a planned job: its own words say it may need a decision (as the hosted service: any such word counts there)
+PLANNED_SIGN_RE = re.compile(r"\b(?:decid\w*|decision|approv\w*|warning|failed|blocked|red)\b|Entscheid\w*|Freigabe|Warnung"
+                             r"|fehlgeschlagen|gescheitert|blockiert|\b[Rr]ot\b|⚠️", re.I)
+
+
+def hard_sign(text):
+    """2.974.0 (#5668): the first hard sign in a job's result text, "" = none."""
+    if "```approval" in str(text or ""):
+        return "approval card"
+    text = HARD_QUOTE_RE.sub("…", re.sub(r"```.*?(?:```|\Z)", "", str(text or ""), flags=re.S))  # code blocks are data
+    for ln in text.splitlines():
+        m = None if HARD_DECIDE_NOT_RE.search(ln) else HARD_DECIDE_RE.search(ln)
+        if m:
+            return f"open decision ({m.group(0)})"
+    for ln in HARD_NOT_RE.sub("", text).splitlines():
+        if HARD_SOFT_RE.search(ln) or HARD_STORY_RE.search(ln):
+            continue
+        m = HARD_RED_RE.search(ln)
+        if m:
+            return f"hard red ({m.group(0)})"
+    return ""
+
+
+def wake_hard_reason(x):
+    """2.974.0 (#5668): why a job wake needs the big model, "" = routine: the job did not end done, messages for it came too
+    late, its result is not (completely) in the chat, it asks something, or a hard sign in its result."""
+    st = ((x or {}).get("job") or {}).get("state") or "done"
+    if st != "done":
+        return f"job {st}"
+    if [it for it in (x.get("late") or []) if isinstance(it, dict)]:
+        return "messages for the job came too late"
+    if not wake_posted(x):
+        return "result not in the chat"
+    text = str(x.get("text") or "")
+    if asks_without_card(text)[0]:
+        return "the job asks something"
+    return hard_sign(text)
+
+
+def model_choice(evs, decide, routine):
+    """2.974.0 (#5668): (model, reason) of one run of these events. A group with one event that needs a decision runs on
+    decide; every event routine = routine."""
+    if decide == routine:
+        return decide, "one model"
+    why = []
+    for ev in evs or []:
+        kind, x = ev.get("event"), ev.get("data") or {}
+        if kind in ROUTINE_EVENTS:
+            why.append(f"routine ({kind})")
+        elif kind == "job_wake":
+            hard = wake_hard_reason(x)
+            if hard:
+                return decide, "hard: " + hard
+            why.append("job wake without a hard sign")
+        elif kind == "scheduled_job":
+            m = PLANNED_SIGN_RE.search(f"{x.get('title') or ''}\n{x.get('prompt') or ''}")
+            if m:
+                return decide, f"planned job with '{m.group(0)}'"
+            why.append("planned job, routine")
+        else:
+            return decide, f"{kind or 'event'}"
+    return (routine, why[0]) if why else (decide, "no event")
+
+
+def model_pair(rt):
+    """2.974.0 (#5668): (decide, routine) when the model per run is on, else None. An empty field = the agent's model
+    (runtime model; empty too = the command's own default, "")."""
+    rt = rt or {}
+    if rt.get("model_split") is not True:
+        return None
+    base = str(rt.get("model") or "").strip()
+    return str(rt.get("model_decide") or "").strip() or base, str(rt.get("model_routine") or "").strip() or base
+
+
+def session_model_key(rt):
+    """2.974.0 (#5668): what a conversation is bound to -- the one model, or "decide/routine" with the model per run (the
+    model changes per run inside one conversation; a new one only when this changes)."""
+    pair = model_pair(rt)
+    return "%s/%s" % pair if pair else str((rt or {}).get("model") or "")
+
+
+def with_model(args, model):
+    """2.974.0 (#5668): args with --model MODEL instead of any --model the command or the launcher put in ("" = none)."""
+    out, skip = [], False
+    for a in args:
+        if skip:
+            skip = False
+            continue
+        if a == "--model":
+            skip = True
+            continue
+        if a.startswith("--model="):
+            continue
+        out.append(a)
+    return out + (["--model", model] if model else [])
+
+
 def team_hint(x):
     """2.46.1 (#1639): a message in a list's team chat channel: an @mention (or an answer to the agent's message), or -- where
     the agent listens in on the list -- any message of a person. The final text of this run is posted nowhere."""
@@ -2824,6 +2944,19 @@ class Runner:
     def mode_fixed(self):
         return permission_fixed(self.cmd) or not self.is_claude()
 
+    def run_model(self, evs, key):
+        """2.974.0 (#5668): (model or None, reason) of this run. None = the command's own --model (the switch is off, the
+        command is not Claude Code). After a failed switch in this conversation it stays on its model for MODEL_STUCK_S."""
+        if self.refresh_due:  # a runtime_changed before a task run (a chat run read it in session_start)
+            self.refresh_agent()
+        pair = model_pair((self.agent or {}).get("runtime"))
+        if not pair or not self.is_claude():
+            return None, "one model"
+        stuck = (self.state.data.get("model_stuck") or {}).get(key) if key else None
+        if stuck and stuck.get("model") is not None and time.time() < float(stuck.get("until") or 0):
+            return stuck["model"], "the conversation stays on its model after a failed switch"
+        return model_choice(evs, *pair)
+
     def run_args(self, args):
         """--settings with the hook file when the command is Claude Code and has no --settings of its own."""
         args = self.mode_args(args)
@@ -3005,8 +3138,13 @@ class Runner:
                 rp["full"] = full
         prompt = self.make_prompt(evs, uid, self.prompt_extra(uid, key)
                                   + self.workflow_hint(uid if any(e.get("event") == "chat" for e in evs) else None))
+        model, mwhy = self.run_model(evs, key)  # 2.974.0 (#5668): the model per run
+        if model is not None:
+            args = with_model(args, model)
+        self.run_model_used = model
         log(f"run: {'+'.join(str(e.get('event')) for e in evs)} ({'chat ' + str(uid) if uid else 'task event'}), prompt {len(prompt)} chars"
-            + (", resumed" if key and key in self.state.data["sessions"] else ""))
+            + (", resumed" if key and key in self.state.data["sessions"] else "")
+            + (f", model {model or 'default'} ({mwhy})" if model is not None else ""))
         st, rc, why = self.attempt_runs(args, prompt, uid, what, tid, key)
         if st is not None and st.aborted:  # kalmido-capability: abort (2.144.0, #2412)
             self.session_done(key, st)
@@ -3097,6 +3235,7 @@ class Runner:
         st, rc, why = None, -1, ""
         for n in (1, 2):
             sess = self.state.data["sessions"].get(key) if key else None
+            t0 = time.time()
             st, rc = self._exec(self.run_args(self.session_args(args, sess["id"] if sess else None)), prompt, uid, what, tid)
             if st is not None and st.rules_added:  # 2.235.0 C (#2903): its own new rule is in the next prompt's rules block
                 self.refresh_agent()
@@ -3110,9 +3249,20 @@ class Runner:
             log(f"try {n} failed: {'cannot start' if st is None else 'time limit' if st.timed_out else f'exit {rc}'}")
             if st is not None and (st.timed_out or st.tools):
                 break
+            prev, cur = (sess or {}).get("last_model"), getattr(self, "run_model_used", None)
+            if n == 1 and st is not None and cur is not None and prev is not None and prev != cur and time.time() - t0 < 120:
+                # 2.974.0 (#5668): switching the model of a going conversation failed early: once more on its previous
+                # model, and the conversation stays on it for MODEL_STUCK_S (a switch that does not work costs one try an hour)
+                log(f"switch {prev or 'default'} -> {cur or 'default'} failed: again on {prev or 'default'}")
+                with self.state.lock:
+                    self.state.data.setdefault("model_stuck", {})[key] = {"model": prev, "until": time.time() + MODEL_STUCK_S}
+                    self.state.save()
+                args, self.run_model_used = with_model(args, prev), prev
+                continue
             if sess:
                 with self.state.lock:
                     self.state.data["sessions"].pop(key, None)
+                    self.state.data.get("model_stuck", {}).pop(key, None)  # 2.974.0 (#5668)
                     self.state.save()
                 log("the conversation cannot be resumed: the next try starts a fresh one")
         return st, rc, why
@@ -3145,12 +3295,14 @@ class Runner:
         if why:
             log(f"conversation of chat {uid} ends: {why}")
             if why != "reset":
-                st, _ = self._exec(self.run_args(self.session_args(args, s["id"])), SUMMARY_PROMPT.format(why=why), uid, what, None, steps=False)
+                sargs = with_model(args, s["last_model"]) if s.get("last_model") is not None and self.is_claude() else args  # 2.974.0 (#5668)
+                st, _ = self._exec(self.run_args(self.session_args(sargs, s["id"])), SUMMARY_PROMPT.format(why=why), uid, what, None, steps=False)
                 t = result_text(st) if st else ""
                 if t:
                     self.state.data["summaries"][key] = {"text": redact(t)[:6000], "at": time.time()}
             with self.state.lock:
                 self.state.data["sessions"].pop(key, None)
+                self.state.data.get("model_stuck", {}).pop(key, None)  # 2.974.0 (#5668): binds only the conversation it happened in
                 self.state.save()
             self.api.notice(uid, self.say("notice_session", self.say("why_" + why)))
         return key
@@ -3159,7 +3311,8 @@ class Runner:
         rt = (self.agent or {}).get("runtime") or {}
         if rt.get("reset_seq") is not None and s.get("reset_seq") is not None and int(rt["reset_seq"]) != int(s["reset_seq"]):
             return "reset"
-        if rt.get("model") and s.get("model") and rt["model"] != s["model"]:
+        mk = session_model_key(rt)  # 2.974.0 (#5668): with the model per run "decide/routine"
+        if mk and s.get("model") and mk != s["model"]:
             return "model changed"
         if s.get("day") != session_day(rt):
             return "a new day"
@@ -3180,8 +3333,10 @@ class Runner:
             s = self.state.data["sessions"].get(key) or {}
             if s.get("id") != st.session_id:
                 s = {"id": st.session_id, "day": session_day(rt), "runs": 0, "started": time.time(),
-                     "model": rt.get("model") or "", "reset_seq": rt.get("reset_seq")}
+                     "model": session_model_key(rt), "reset_seq": rt.get("reset_seq")}
             s.update(runs=int(s.get("runs") or 0) + 1, last=time.time(), tokens=st.context_tokens or s.get("tokens") or 0)
+            if getattr(self, "run_model_used", None) is not None:  # 2.974.0 (#5668): the model of its last run
+                s["last_model"] = self.run_model_used
             self.state.data["sessions"][key] = s
             self.state.save()
 

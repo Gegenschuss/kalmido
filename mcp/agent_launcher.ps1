@@ -119,6 +119,7 @@ if (-not $AgentProfile) {
 # kalmido-capability: receipt_read (2.299.0: a receipt read by the agent from the file itself as a proposal, in mcp/agent_run.py)
 # kalmido-capability: card_statement_read (2.469.0: a credit card statement read by the agent from the PDF itself as a proposal, in mcp/agent_run.py)
 # kalmido-capability: dispatcher (2.481.0, #3662: the list worked off mechanically when switched on, in mcp/agent_run.py + mcp/agent_dispatch.py)
+# kalmido-capability: model_per_run (2.974.0, #5668: the model per run when switched on in Kalmido, in mcp/agent_run.py)
 # kalmido-capability: abort (2.144.0: Stop in the chat ends the running command and confirms it, in mcp/agent_run.py)
 # kalmido-capability: contract_notice (2.70.0: a contract's notice deadline -> ONE propose_contract_notice, in mcp/agent_run.py)
 # kalmido-capability: perm_user_choice (2.312.0, #3266: the person for permission questions chosen in Kalmido before KALMIDO_PERM_USER, in mcp/agent_run.py)
