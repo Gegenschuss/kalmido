@@ -1,6 +1,16 @@
 {
  "versions": [
   {
+   "version": "2.994.0",
+   "date": "2026-11-11",
+   "items": [
+    {
+     "de": "Projekte der Branche Film & Video haben einen Reiter „Call Sheets“ mit allen Call Sheets und legen neue direkt an.",
+     "en": "Film & Video projects have a \"Call sheets\" tab listing every call sheet and creating new ones right there."
+    }
+   ]
+  },
+  {
    "version": "2.990.0",
    "date": "2026-11-11",
    "items": [
