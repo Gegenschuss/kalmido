@@ -246,5 +246,13 @@ r2 = Fr.post(B + f"{D_}/{rid}/fee", json={"state": ""})
 check(r1.status_code == 409 and r2.status_code == 409, f"the paid day in a locked month: moving and opening again 409 ({r1.status_code} {r2.status_code})")
 check(kt.dbx("SELECT reminder_fee_paid_at, reminder_fee_state FROM office_docs WHERE id=?", (rid,))[0] == (f"{Y}-04-20", "paid"),
       "the locked fee day stays")
+# 2.990.0 (#5484): a fee paid before 2.545 has no day and counts on the reminder's date (April, locked): opening it again or
+# moving it to an open month is refused too (was: the empty day skipped the period check)
+kt.dbx("UPDATE office_docs SET reminder_fee_paid_at=NULL WHERE id=?", (rid,))
+r1 = Fr.post(B + f"{D_}/{rid}/fee", json={"state": "paid", "day": f"{Y}-06-02"})
+r2 = Fr.post(B + f"{D_}/{rid}/fee", json={"state": ""})
+check(r1.status_code == 409 and r2.status_code == 409, f"an old fee without day in a locked month: moving and opening again 409 ({r1.status_code} {r2.status_code})")
+check(kt.dbx("SELECT COALESCE(reminder_fee_paid_at, ''), reminder_fee_state FROM office_docs WHERE id=?", (rid,))[0] == ("", "paid"),
+      "the old fee stays paid without day")
 
 sys.exit(kt.done("muster_gmbh_jahr"))

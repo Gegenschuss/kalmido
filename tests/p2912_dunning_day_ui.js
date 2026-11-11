@@ -5,7 +5,8 @@
 // AND as a person without organisation:
 // - "Fee paid" opens a dialog with a date field (default today); Cancel = nothing happens (fee stays open, no day)
 // - a chosen day is sent: the editor shows "paid" with that day, the stored day is it, the journal books the fee on it
-//   (organisation, balance sheet: 1590 to 2700) / the income statement of the year counts it (person without organisation)
+//   (organisation, balance sheet: 1590 to 2700) / the income statement of the year counts it and its posting stands on that
+//   day (person without organisation, 2.990.0 #5484)
 // - "Change date" opens the dialog with the stored day; a new day moves the fee to it (shown, stored, booked)
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -113,10 +114,13 @@ async function run(user, ck, who, booked) {
   await call(CF, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   check(((await call(CF, 'GET', '/api/state')).me?.workspaces || []).length === 0, 'frida is in no organisation');
   await call(CF, 'PUT', '/api/office/settings', {lang: 'de', currency: 'EUR', company_fields: comp('Frida Beispiel')});
+  // 2.990.0 (#5484): the income statement only sums the year; the day it counts on is checked in the postings it is made of
+  // (the journal of the personal office, the same paid fees: books.bk_fees_paid) - was: only the stored day and the year
+  const onDay = journal(CF);
   const euer = async (rid, day) => {
     if (feeDay(rid)[1] !== day) return false;
     const e = await call(CF, 'GET', `/api/office/books/euer?year=${day.slice(0, 4)}`);
-    return (e.income || []).some(x => x.key === 'fee' && x.gross === '5.00');
+    return (e.income || []).some(x => x.key === 'fee' && x.gross === '5.00') && await onDay(rid, day);
   };
   await run('frida', CF, 'freelancer', euer);
 

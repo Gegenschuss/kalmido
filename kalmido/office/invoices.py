@@ -1892,7 +1892,8 @@ def fd_fee_post(did):
     if st != before or (st == "paid" and b.get("day") and paid_day != (_col(r, "reminder_fee_paid_at") or "")):
         if before == "paid":  # 2.784.0 (#5387 review): the day it leaves must lie in an open month too (else 409)
             from .periodlock import period_need_open
-            period_need_open(c, oid, _col(r, "reminder_fee_paid_at"))
+            # 2.990.0 (#5484): a fee paid before 2.545 has no day and counts on the reminder's date (books.bk_fees_paid)
+            period_need_open(c, oid, _col(r, "reminder_fee_paid_at") or r["date"])
         # 2.545.0 (#4387): the day it was paid -- the income statement, key figures and cash flow count it then (books.bk_fees_paid)
         c.execute("UPDATE office_docs SET reminder_fee_state=?, reminder_fee_paid_at=? WHERE id=? AND org_id=?", (st, paid_day, did, oid))
         ofx_log(c, oid, "reminder_fee", doc_id=did, detail={"before": before, "after": st, "fee": dstr(money(dec(r["reminder_fee"]))),
