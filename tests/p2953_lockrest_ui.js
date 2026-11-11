@@ -112,7 +112,7 @@ const raw = async id => Buffer.from(await (await fetch(B + `api/files/nodes/${id
     const r2 = await ev(`fslStart(${TEAM}).then(x => ({x}), e => ({err: e.message}))`);
     check(r2 && r2.x === true, 'the team box is locked, the key wrapped for bob too ' + JSON.stringify(r2));
     check(((await call('GET', `/api/files/lock/${TEAM}`)).j.members || []).find(m => m.user_id === BOB)?.key_gens?.includes(1), 'bob holds generation 1');
-    await ev(`(async () => { await fsl_upload([new File(['ZQWteam words'], 'team.txt', {type: 'text/plain'})], ${TEAM}); return 1; })()`);
+    await ev(`(async () => { await fsl_upload([new File(['ZQWteam words'], 'team.txt', {type: 'text/plain'})], ${TEAM}, ${TEAM}); ab_reload(); return 1; })()`);  // the view of before the lock: the lock given
     check(await waitFor(`(AB.data?.items || []).some(x => x.name === 'team.txt')`), 'an encrypted file in the team box');
     check((await call('DELETE', `/api/files/shares/${sh.j.id}`)).status === 200, 'the share of bob taken back');
     check((await call('GET', `/api/files/lock/${TEAM}`)).j.rotate === 1, 'the folder asks its owner for a new key');
