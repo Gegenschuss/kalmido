@@ -27,6 +27,7 @@ from ..core.db import body, bump, db, err, insert_id, iso, now_utc
 from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..core.pg import IntegrityError, system_ctx
+from ..core.objhooks import REVOKE  # 2.953 (#3348): fsl_user_purge
 from ..accounts.session import me
 from ..collab.comments import user_names
 from ..collab.e2e import e2e_blob, e2e_keys_of, e2e_reauth
@@ -803,12 +804,19 @@ def fsl_rotate(nid):
     return jsonify(fsl_info(c, nid, uid))
 
 
-def fsl_user_purge(c, uid):
-    """Account deletion (accounts/users.py user_purge, before the cascade takes its key rows): the locked folders whose key the
-    person held get a new key (e2e_rotate) -- afterwards no row would tell. Across organisations (an instance admin deletes)."""
+def fsl_user_purge(c, uid, org=None, reason="", heir=None, role=None):
+    """Account deletion (accounts/users.py _user_purge -> core/objhooks.person_revoked, before the cascade takes its key rows):
+    the locked folders whose key the person held get a new key (e2e_rotate) -- afterwards no row would tell. Across
+    organisations (an instance admin deletes). Leaving an organisation or losing a share needs no mark: fsl_stale sees it."""
+    if reason != "delete":
+        return {}
     with system_ctx(c):
-        c.execute("UPDATE fs_locks SET e2e_rotate=e2e_gen WHERE e2e IS NOT NULL AND node_id IN (SELECT node_id FROM fs_lock_keys WHERE user_id=?)",
-                  (uid,))
+        n = c.execute("UPDATE fs_locks SET e2e_rotate=e2e_gen WHERE e2e IS NOT NULL AND node_id IN "
+                      "(SELECT node_id FROM fs_lock_keys WHERE user_id=?)", (uid,)).rowcount
+    return {"fs_locks_rotate": n} if n else {}
+
+
+REVOKE.append(fsl_user_purge)  # 2.953 (#3348): the hook of the shared core, no import of the file store in accounts/
 
 
 @app.post("/api/files/lock/<int:nid>/keys")

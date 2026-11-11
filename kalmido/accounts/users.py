@@ -638,8 +638,6 @@ def _user_purge(c, uid, made):
     files += tx_user_files(c, uid)  # 2.363.3 (#3134): the files of its templates
     from ..wiki.wikie2e import wke_user_purge
     wke_user_purge(c, uid)  # 2.64.3 A (#1817): knowledge spaces with the lock whose key the person held: rotation pending
-    from ..files.fslock import fsl_user_purge
-    fsl_user_purge(c, uid)  # 2.953 (#3348): the same for the locked folders of the file store
     av = (c.execute("SELECT avatar FROM users WHERE id=?", (uid,)).fetchone() or [None])[0]
     if av:  # 2.152.0 (#2164): the own photo goes after the commit for every caller (also the re-delete after a restore)
         files.append(lambda: avatar_drop_file(uid, av))
