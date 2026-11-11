@@ -128,6 +128,15 @@ check(Fr.delete(B + "/api/office/logo").ok, "the office logo removed")
 lg2 = logos(Fr, JOB, PERS)
 check(set(lg2) == {1, 2} and lg2[1] == lg[1] and lg2[2] == lg[2], f"no production logo: agency and client where they were {lg2}")
 
+# ------------------------------------------------------------ fable F3: a huge contact photo (CardDAV / import: only type and
+# length checked there) is no logo of the PDF - it would be decoded for every call sheet
+big = kt.dbx("SELECT photo FROM contacts WHERE id=?", (AGY,))[0][0]
+kt.dbx("UPDATE contacts SET photo=? WHERE id=?", (uri(png(2100, 2000, (90, 90, 90))), AGY))
+lg3 = logos(Fr, JOB, PERS)
+check(set(lg3) == {2} and lg3[2] == lg[2], f"fable F3: a photo over 4 megapixels is left out, the client keeps its place {lg3}")
+kt.dbx("UPDATE contacts SET photo=? WHERE id=?", (big, AGY))
+check(set(logos(Fr, JOB, PERS)) == {1, 2}, "the agency's logo back")
+
 # ------------------------------------------------------------ rights: another person
 check(Gr.put(B + "/api/industry", json={"industry": "film"}).ok, "greta chooses Film & Video too")
 check(Gr.get(B + f"/api/team/dispo/callsheet/{JOB}/logo?org={PERS}").status_code == 404, "greta: frida's logo 404")

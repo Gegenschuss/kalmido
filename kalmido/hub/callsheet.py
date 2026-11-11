@@ -678,8 +678,22 @@ def cs_pdf_logos(c, oid, a):
     for k in ("agency_contact", "client_contact"):
         x = a.get(k)
         got = cs_photo_bytes(c, x["id"]) if x and x.get("photo") else None
-        out.append(got[0] if got else None)
+        out.append(got[0] if got and cs_logo_small(got[0]) else None)
     return out
+
+
+CS_LOGO_MAX_PX = 4_000_000  # 2.993.0 (#5650, fable F3): a contact photo larger than this is no logo of the PDF
+
+
+def cs_logo_small(raw):
+    """2.993.0 (#5650, fable F3): True when the contact photo's header names at most CS_LOGO_MAX_PX pixels. A photo that came
+    by the contacts API, CardDAV or an import is checked only for its type and length there; a small PNG of many megapixels
+    would be decoded for every call sheet PDF. Only the header is read (PIL opens lazily); unreadable = no logo."""
+    try:
+        with Image.open(io.BytesIO(raw)) as im:
+            return im.width * im.height <= CS_LOGO_MAX_PX
+    except Exception:  # noqa: BLE001 - any broken image is just no logo
+        return False
 
 
 # ---------------------------------------------------------------- the PDF
