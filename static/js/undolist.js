@@ -167,9 +167,8 @@ async function ul_go(key) {
   } catch (x) { console.warn('recent steps', x); /* api() said why */ } finally {
     UL.busy = false;
   }
-  if (srv) {
-    try { if (OUT.online && !OUT.q.length) await load(); render(); } catch { /* the page may be gone */ }
-    if (typeof ofdDraw === 'function' && typeof OFD !== 'undefined' && OFD.doc) { OFD.list = null; ofdDraw(); }  // lazy-ok: an open office document shows what came back
+  if (srv) {  // 2.979.0 (#5667): the same redraw as the arrows (undo.js histRedraw: the state, an open office document / table, the areas with their own store)
+    try { await histRedraw(true); } catch { /* the page may be gone */ }
   }
   await ul_fetch();
   const head = trn('{0} step undone', '{0} steps undone', n);
@@ -185,7 +184,7 @@ async function ul_redo(gid) {
     if (a.redone) histMark([+gid], 'redo');  // 2.905.0 (#5255)
     const st = ul_stayed(a.stayed || [], UL.items || []);
     UL.note = [a.text, st.length ? tr('Stayed as it is: {0}', st.slice(0, 5).join('; ')) : ''].filter(Boolean).join(' ');
-    try { if (OUT.online && !OUT.q.length) await load(); render(); } catch { /* the page may be gone */ }
+    try { await histRedraw(true); } catch { /* the page may be gone */ }  // 2.979.0 (#5667)
   } catch { /* api() said why */ } finally { UL.busy = false; }
   await ul_fetch();
   ul_draw();
