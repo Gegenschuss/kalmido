@@ -108,8 +108,9 @@ window.addEventListener('popstate', e => {
   // a link): the settings opened into an area closed before #5214 and stayed open on their overview after it
   const nav = typeof v !== 'number' && !!f8d_bk.at && location.href !== f8d_bk.at;
   // 2.956.0 (#5230): an area icon in the phone's drawer changes the page and keeps the drawer open (areas.js sbm_go, the route
-  // asks sbm_hold): that new address is no Back - the drawer stays our level with its entry, Back from there closes it
-  if (nav && f8d_open() === 'side' && typeof SBM === 'object' && SBM.keep) return;
+  // asks sbm_hold): that new address is no Back - the drawer stays our level with its entry, Back from there closes it. Also when
+  // the new address equals the one the drawer opened on (location.replace back to the area's kept page): not only on nav
+  if (typeof v !== 'number' && f8d_open() === 'side' && typeof SBM === 'object' && SBM.keep) return;
   f8d_bk.pushed -= close; e.stopImmediatePropagation();
   for (let i = 0; i < close && f8d_open(); i++) f8d_closeTop(nav);
   f8d_queue();
