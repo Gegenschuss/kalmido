@@ -23,6 +23,7 @@ from ..core.serializers import load_tasks, rel_of
 from ..core.instance import semver, update_state
 from ..core.state import search_tasks, visible_lists, visible_sections
 from ..lists.lists import clean_folder, clean_list_value, list_create, LIST_KIND_ALIASES, LIST_KINDS, list_update
+from ..lists.groups import grp_own_rows  # 2.958.0 (#5245): the project's own group shares (group_shares is gone)
 from ..lists.groups import (
     groups_for, grp_dict, grp_of_user, list_group_del, list_group_set, list_groups_get, need_group, task_take_web,
 )
@@ -2068,7 +2069,6 @@ def v1_list_group_del(lid, group_id):
     v1_args(())
     c = db()
     need_list(c, lid, write=False, manage=True)
-    from ..lists.groups import grp_own_rows  # 2.958.0 (#5245): the project's own group shares (group_shares is gone)
     gr = c.execute("SELECT name FROM groups WHERE id=?", (_v1_gid(group_id),)).fetchone() \
         if grp_own_rows(c, [lid], gid=_v1_gid(group_id)) else None  # 2.86.0 (N29): only a group the list is shared with
     if gr:

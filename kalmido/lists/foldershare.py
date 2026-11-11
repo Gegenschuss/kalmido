@@ -23,6 +23,7 @@ from ..api.common import v1_call  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.lists import FOLDER_SEP, folder_under, clean_folder, list_agent_set  # 2.369.5 (#2517): pulled up from functions
 from ..lists.folders import folder_props_of, folder_lists, _list_agent as la, folder_apply, _clean_props  # 2.369.5 (#2517): pulled up from functions
 from ..lists.ownership import owner_transfer  # 2.369.5 (#2517): pulled up from functions
+from ..lists.groups import grp_folder_rows  # 2.958.0 (#5245): the folder nodes' group shares (group_shares is gone)
 
 
 def sh_folder_agents(c, owner, folder):
@@ -365,7 +366,6 @@ def sh_folder_shares(c, uid):
     from .lffolder import lf_people_rows  # 2.958.0 (#5245): the shares of the folders' nodes (folder_people is gone)
     for r in lf_people_rows(c, uid):
         slot(r["folder"])["people"] += 1
-    from .groups import grp_folder_rows  # 2.958.0 (#5245): the folder nodes' group shares (group_shares is gone)
     for f in {(r["folder"], r["group_id"]) for r in grp_folder_rows(c, owner=uid)}:
         slot(f[0])["groups"] += 1
     for r in c.execute("""SELECT a.folder, u.display_name, u.username FROM folder_agents a JOIN users u ON u.id=a.agent_id

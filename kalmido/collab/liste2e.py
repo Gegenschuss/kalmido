@@ -35,6 +35,7 @@ from ..tasks.tasks import can_move  # 2.369.5 (#2517): pulled up from functions
 from .comments import task_people, user_names, MAX_COMMENT  # 2.369.5 (#2517): pulled up from functions
 from ..lists.lists import _in_folder  # 2.369.5 (#2517): pulled up from functions
 from ..lists.groups import grp_shares_of_list  # 2.369.5 (#2517): pulled up from functions
+from ..lists.lffolder import lf_people_rows  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
 from ..tasks.validation import CONTENT_MAX, TITLE_MAX  # 2.369.5 (#2517): pulled up from functions
 from .news import news_add  # 2.369.5 (#2517): pulled up from functions
 
@@ -667,7 +668,6 @@ def le2a_blockers(c, lr, agents):
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND role='participant' LIMIT 1", (lid,)).fetchone() or \
             any(role == "participant" for _gid, role, _via in grp_shares_of_list(c, lid)):
         add("participant")
-    from ..lists.lffolder import lf_people_rows  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
     if lr["folder"] and any(_in_folder(lr["folder"], r["folder"]) for r in lf_people_rows(c, lr["owner_id"]) if r["role"] == "participant"):
         add("folder_participant")
     if c.execute("SELECT 1 FROM task_note_locks n JOIN tasks t ON t.id=n.task_id WHERE t.list_id=? LIMIT 1", (lid,)).fetchone():

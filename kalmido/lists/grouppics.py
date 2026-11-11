@@ -14,6 +14,7 @@ from ..accounts.pictures import ALL_PRESETS, AVATAR_DIR, AVATAR_MAX_MB, avatar_p
 from ..lists.groups import need_group
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.groups import grp_visible  # 2.369.5 (#2517): pulled up from functions
+from ..lists.groups import grp_folder_rows, grp_own_rows  # 2.958.0 (#5245): the nodes' shares (group_shares is gone)
 
 
 # ---- 2.46.0 (#1605): groups.avatar = '' (the group symbol, as before) | 'p:<preset>' (the presets of the profile pictures) |
@@ -60,7 +61,6 @@ def fg_may_see(c, gid):
         return False
     if grp_visible(c, r):
         return True
-    from .groups import grp_folder_rows, grp_own_rows  # 2.958.0 (#5245): the nodes' shares (group_shares is gone)
     from .lffolder import lf_lists_below
     if any(list_role(c, s["list_id"]) for s in grp_own_rows(c, gid=gid)):
         return True

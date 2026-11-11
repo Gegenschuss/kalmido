@@ -29,6 +29,7 @@ from ..core.access import Denied, list_role, need_collab
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_call, v1_view
 from ..lists.lists import FOLDER_SEP, _in_folder, clean_folder, folder_under  # 2.369.5 (#2517): pulled up from functions
+from ..lists.lffolder import lf_people, lf_people_rows  # 2.958.0 (#5245): the folders' shares (folder_people is gone)
 
 NOTIF_TPLS = ("read", "work", "all", "custom")
 # the events an owner can choose for "custom" (rows of the notification settings, see collab/news.py NOTIF_ROWS)
@@ -206,7 +207,6 @@ def list_tpl_info(c, lid):
 def folder_tpl_info(c, owner, f):
     own = {r["user_id"]: r for r in c.execute("SELECT user_id, tpl, custom FROM folder_notif WHERE owner_id=? AND folder=?", (owner, f))}
     inh = _inherited(c, owner, f, skip_first=True)
-    from ..lists.lffolder import lf_people_rows  # 2.958.0 (#5245): the shares of the folder's nodes (folder_people is gone)
     people = []
     for p in lf_people_rows(c, owner):
         r = c.execute("SELECT id, username, display_name FROM users WHERE id=? AND COALESCE(kind,'')!='agent'",
@@ -290,7 +290,6 @@ def list_tpl_put(lid):
 
 
 def _fpeople(c, owner, f):
-    from ..lists.lffolder import lf_people
     return lf_people(c, owner, f)
 
 
@@ -359,7 +358,6 @@ def notif_ask_state(c, uid, s):
     question is open (setting notif_tpl_ask = "1"); else []."""
     if (s or {}).get("notif_tpl_ask") != "1":
         return []
-    from ..lists.lffolder import lf_people_rows  # 2.958.0 (#5245): the folders' shares with people (folder_people is gone)
     alls = {r[0] for r in c.execute("SELECT folder FROM folder_notif WHERE owner_id=? AND user_id=0 AND tpl='all'", (uid,))}
     people = sorted({p["folder"] for p in lf_people_rows(c, uid) if p["folder"] in alls and c.execute(
         "SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'')!='agent'", (p["user_id"],)).fetchone()})
@@ -385,7 +383,6 @@ def notif_tpl_migrate(c):
     are asked once. A list in a shared folder of its owner follows the folder (only the folder gets the row)."""
     now = iso(now_utc())
     folders = {}
-    from ..lists.lffolder import lf_people_rows  # 2.958.0 (#5245): the folders' shares (folder_people is gone)
     for r in sorted({(p["owner_id"], p["folder"]) for p in lf_people_rows(c) if c.execute(
             "SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'')!='agent'", (p["user_id"],)).fetchone()}):  # shared with people (only agents: nothing to ask)
         folders.setdefault(r[0], []).append(r[1])

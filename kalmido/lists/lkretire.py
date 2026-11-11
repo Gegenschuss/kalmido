@@ -28,6 +28,7 @@ from ..core.i18n import N_
 from ..core.kernretire import kern_retire
 from ..core.pg import system_ctx, table_exists
 from ..notify.alerts import aa_now
+from .groups import grp_sync
 from .lffolder import LF_KIND, LIST_ROLES, _now, _parts, lf_folder_ensure, lf_folder_nodes, lf_place
 
 FP_OLD = "folder_people"
@@ -93,7 +94,6 @@ def lk_grp_copy(c):
                           (f["id"], g["group_id"], fr, role, g["added_by"] or g["owner_id"], g["added_at"] or _now()))
                 out["folder"] += 1
         if out["own"] or out["folder"]:
-            from .groups import grp_sync
             lids = [r[0] for r in c.execute("SELECT id FROM lists WHERE is_inbox=0 ORDER BY id")]
             grp_sync(c, lids, actor=0)  # the folders' group shares are folder roles now (frole instead of grole)
     if any(out.values()):

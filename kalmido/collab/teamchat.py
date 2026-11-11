@@ -28,6 +28,7 @@ from ..collab.comments import mention_names  # 2.369.5 (#2517): pulled up from f
 from .cmttrash import tcx_trash, tcx_restore
 from ..core.objreact import orx_of, orx_set, orx_toggle  # 2.763.0 (#5269): the reactions of the shared core
 from ..core.objhooks import NOTIFY_READERS  # 2.891.0 (#5270): the reader of a direct message for the send decision
+from ..lists.groups import grp_own_rows  # 2.958.0 (#5245): the projects' own group shares (group_shares is gone)
 
 
 # ---------------------------------------------------------------- 2.17.0 (#419): team chat
@@ -97,7 +98,6 @@ def tchat_members_of(c, lids):
     for (lid, u), role in mem.items():
         if role != "participant":
             cand[lid].add(u)
-    from ..lists.groups import grp_own_rows  # 2.958.0 (#5245): the projects' own group shares (group_shares is gone)
     gsh = [x for x in grp_own_rows(c, ids) if x["role"] != "participant"]
     for x in gsh:
         for r in c.execute("SELECT user_id FROM group_members WHERE group_id=?", (x["group_id"],)):

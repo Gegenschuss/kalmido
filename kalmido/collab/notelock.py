@@ -24,6 +24,8 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso_ms, now_utc
 from ..core.pg import st_ids
 from ..core.access import Denied, need_task, ov_open
+from ..lists.groups import grp_shares_of_list  # 2.958.0 (#5245): the project's and its folders' group shares
+from ..lists.lffolder import lf_people  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
 from ..tasks.validation import CONTENT_MAX, log_act
 from .e2e import E2E_NOTE_MAX, e2e_blob, e2e_has_keys, e2e_person
 
@@ -53,9 +55,7 @@ def ln_list_problem(c, lid, uid):
         return tr("Notes can only be locked in your own projects.")
     people = c.execute("""SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id
                           WHERE m.list_id=? AND m.user_id<>? AND COALESCE(u.kind, '')<>'agent' LIMIT 1""", (lid, uid)).fetchone()
-    from ..lists.groups import grp_shares_of_list  # 2.958.0 (#5245): the project's and its folders' group shares
     groups = bool(grp_shares_of_list(c, lid))
-    from ..lists.lffolder import lf_people  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
     folder = (r["folder"] or "") and lf_people(c, uid, r["folder"])
     if people or groups or folder or ov_open(r):
         return tr("Notes can only be locked in projects that are not shared.")
