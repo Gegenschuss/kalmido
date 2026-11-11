@@ -205,6 +205,7 @@ OSR_COLS = "kind, ref_id, org_ref, owner_id, node_id, pkind, pid, title, names, 
 OSR_INSERT = "INSERT INTO obj_search(" + OSR_COLS + ")"
 OSR_TABLES = {s["table"] for s in OSR_SOURCES.values()}
 OSR_SET = ", ".join(f"{x}=EXCLUDED.{x}" for x in OSR_COLS.split(", ")[2:]) + ", updated_at=CURRENT_TIMESTAMP"
+OSR_UPSERT = "ON CONFLICT (kind, ref_id) DO UPDATE SET " + OSR_SET
 
 
 def _fn(kind):
@@ -219,7 +220,7 @@ BEGIN
     DELETE FROM obj_search WHERE kind = '{kind}' AND ref_id = NEW.id;  -- the start fills the row (an IF: no subtransaction per row)
   ELSE
     {OSR_INSERT} VALUES ({_values(kind, 'NEW')})
-      ON CONFLICT (kind, ref_id) DO UPDATE SET {OSR_SET};
+      {OSR_UPSERT};
   END IF;
   PERFORM set_config('app.role', COALESCE(prev, ''), true);
   RETURN NULL;
@@ -241,9 +242,9 @@ def _triggers(c, kind):
 
 def osr_fill(c, kind):
     """The rows of kind's table without an index row get one; index rows whose source is gone go. Returns the rows added."""
-    t = qi(OSR_SOURCES[kind]["table"], OSR_TABLES)
-    c.execute(f"DELETE FROM obj_search s WHERE s.kind='{kind}' AND NOT EXISTS (SELECT 1 FROM {t} r WHERE r.id=s.ref_id)")
-    return c.execute(f"{OSR_INSERT} SELECT {_values(kind, 'r')} FROM {t} r "
+    t = OSR_SOURCES[kind]["table"]
+    c.execute(f"DELETE FROM obj_search s WHERE s.kind='{kind}' AND NOT EXISTS (SELECT 1 FROM {qi(t, OSR_TABLES)} r WHERE r.id=s.ref_id)")
+    return c.execute(f"{OSR_INSERT} SELECT {_values(kind, 'r')} FROM {qi(t, OSR_TABLES)} r "
                      f"WHERE NOT EXISTS (SELECT 1 FROM obj_search s WHERE s.kind='{kind}' AND s.ref_id=r.id) "
                      "ON CONFLICT (kind, ref_id) DO NOTHING").rowcount
 
