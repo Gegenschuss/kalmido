@@ -251,6 +251,7 @@ const secName = sid => sid ? (S.sections.find(x => x.id === sid)?.name || '') : 
 // 2.958.0 (#3911): a completed / rejected task moved into a column of that meaning: the move changed no status (a drag out by hand still undoes)
 function dnd_kindStayed(before, after) {
   if (!before || !after || !before.status || before.status !== after.status || before.list_id !== after.list_id) return false;
+  if ((before.section_id || null) === (after.section_id || null) || before.due !== after.due || (before.due_time || null) !== (after.due_time || null) || before.priority !== after.priority || (before.parent_id || null) !== (after.parent_id || null)) return false;  // 2.958.0 (#3911, review F2): only the section changed; any other change keeps its Undo
   const k = S.sections.find(x => x.id === after.section_id)?.kind;
   return before.status === 2 ? k === 'done' : before.status === -1 && k === 'rejected';
 }
