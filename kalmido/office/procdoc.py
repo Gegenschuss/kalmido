@@ -47,6 +47,8 @@ PD_VERSIONS_MAX = 500
 PD_KIND = "procdoc"  # 2.977.0 (#5282, stage Q7b): the kind of the versions in obj_versions (ref_id = the area's head row)
 PD_GAP = {"de": "[ ... ausfüllen ]", "en": "[ ... to fill in ]"}
 PD_NO_VERSION = N_("This version does not exist")
+# 2.977.0 (#5282, Fable review F3 / F4): an area whose old versions wait for the move (pd_retire: its key is missing now)
+PD_WAITING = N_("The procedure documentation of this office still waits for its move to the new storage (its key is missing). Try again after the next start.")
 
 # the outline: section key -> (number, title de, title en, fields); field = (key, title de, title en, need own text)
 PD_OUTLINE = (
@@ -319,6 +321,15 @@ def pd_head(c, oid, make=False):
     return insert_id(c, "INSERT INTO office_procdocs(org_id) VALUES(?)", (oid,))
 
 
+def pd_waiting(c, oid):
+    """2.977.0 (#5282, Fable review F3 / F4): True while old version rows of area oid wait in office_procdocs (pd_retire kept
+    them: the area's key is missing). No new version then (its number would come before the old ones) and no transfer of the
+    office (the old rows would move unsealed or be taken for an empty head)."""
+    if "version" not in table_columns(c, "office_procdocs"):
+        return False
+    return c.execute("SELECT 1 FROM office_procdocs WHERE org_id=? AND version IS NOT NULL LIMIT 1", (oid,)).fetchone() is not None
+
+
 def pd_latest(c, oid):
     h = pd_head(c, oid)
     r = obj_version_last(c, PD_KIND, h) if h else None
@@ -413,6 +424,8 @@ def pd_put():
     own = _own_clean(b.get("own") or {})
     L = _lg(b.get("lang"))
     write_lock(c, f"office_procdoc_{int(oid)}")
+    if pd_waiting(c, oid):  # 2.977.0 (#5282, Fable review F4)
+        raise Denied(409, tr(PD_WAITING))
     head = pd_head(c, oid, make=True)  # 2.977.0 (#5282)
     latest = pd_latest(c, oid)
     n = (latest["version"] if latest else 0) + 1

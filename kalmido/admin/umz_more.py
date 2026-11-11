@@ -312,10 +312,14 @@ def _folder_pbs(c, run, uid, me_old, data):
             src = r.get("source") if r.get("source") in PB_SOURCES else "import"
             # the author: me when it was me or nobody (the owner's own text); another person of the old server stays foreign (NULL:
             # for the playbooks a version without an author is a gone author's text, never the owner's own, 2.977.0 #5282)
-            a = _oid(r.get("author_id"))
-            obj_version_add(c, PB_KIND, head, None, uid, "", text, len(text.encode("utf-8")), uid if a is None or a == me_old else None,
+            # 0 = an author who was gone already (2.977.0 export, Fable review F1): foreign
+            a = r.get("author_id")
+            mine = a is None or (a != 0 and _oid(a) == me_old)
+            obj_version_add(c, PB_KIND, head, None, uid, "", text, len(text.encode("utf-8")), uid if mine else None,
                             r.get("created_at") if _iso_ts(r.get("created_at")) else iso(now_utc()), source=src)
-        _more(run, "playbooks", head)
+        # Fable review F6: the head with the highest number this import made (a version above it is newer work: the undo keeps it)
+        _more(run, "playbooks", {"id": head, "no": c.execute("SELECT COALESCE(MAX(no), 0) FROM obj_versions WHERE kind=? AND ref_id=?",
+                                                              (PB_KIND, head)).fetchone()[0]})
     if here:
         run.warning(N_("Folders that have a playbook here already keep it: {0}"), ", ".join(here[:UMZ_NAMES_MAX]))
 
@@ -406,8 +410,13 @@ def umz_more_undo(c, uid, cr, since, plan):
                 # 2.977.0 (#5282): the import recorded the folder's head; its versions are in obj_versions (the import's keep the
                 # archive's times, a version saved since is newer than the import)
                 r = c.execute(f"SELECT id FROM playbooks WHERE id=? AND {mine}", (v, uid)).fetchone()
-                gone = r is not None and not any(imp_undo_after(x["created_at"], since) for x in c.execute(
-                    "SELECT created_at FROM obj_versions WHERE kind=? AND ref_id=?", (PB_KIND, v)))
+                top = key.get("no") if isinstance(key, dict) else None
+                if top is not None:  # Fable review F6: by the numbers this import made (a merge or a save since adds higher ones)
+                    gone = r is not None and not c.execute("SELECT 1 FROM obj_versions WHERE kind=? AND ref_id=? AND no>?",
+                                                           (PB_KIND, v, int(top))).fetchone()
+                else:  # a run recorded before: by the times
+                    gone = r is not None and not any(imp_undo_after(x["created_at"], since) for x in c.execute(
+                        "SELECT created_at FROM obj_versions WHERE kind=? AND ref_id=?", (PB_KIND, v)))
                 kept += r is not None and not gone
             else:  # 2.765.0 (fable F5): a budget row is never deleted on its own - its list goes into the trash with all its rows,
                 # or stays whole when anything in it was written since (importers.imp_undo_lists, imp_budget_touched)

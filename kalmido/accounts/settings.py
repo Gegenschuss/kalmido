@@ -1100,7 +1100,8 @@ def umz_export_queries(uid):
         "agent_schedules": ("SELECT * FROM agent_schedules WHERE user_id=?", (uid,)),  # 2.34.0 (#272): my planned agent jobs
         # 2.39.0 (#1168): the Playbooks of my lists and folders (every version) and the agents' proposals for my lists
         # 2.977.0 (#5282, stage Q7b): the versions are rows of obj_versions on the Playbook's head; the file keeps its columns
-        "playbooks": ("SELECT v.id, p.list_id, p.owner_id, p.folder, v.no AS version, v.body, v.source, v.created_by AS author_id, "
+        # (author_id 0 = an author who is gone, foreign; NULL in the file means the owner's own text, Fable review F1)
+        "playbooks": ("SELECT v.id, p.list_id, p.owner_id, p.folder, v.no AS version, v.body, v.source, COALESCE(v.created_by, 0) AS author_id, "
                       "v.created_at FROM playbooks p JOIN obj_versions v ON v.kind='playbook' AND v.ref_id=p.id "
                       f"WHERE p.list_id IN {own} OR (p.list_id IS NULL AND p.owner_id=?) ORDER BY p.list_id, p.folder, v.no",
                       (uid, uid)),

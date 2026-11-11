@@ -216,6 +216,9 @@ mv = pbv("p.list_id=?", (L2,))
 check([(x[0], x[1], x[3]) for x in mv] == [(4, "Alt vier", "proposal"), (3, "Alt drei", "edit")] and len(sql("SELECT 1 FROM playbooks WHERE list_id=?", (L2,))) == 1,
       f"the old rows moved with their numbers and sources onto one head {mv}")
 check(mv[1][2] == ALICE and mv[0][2] is None, f"author NULL -> the owner (#1978), a gone account -> NULL (foreign, B-M7) {mv}")
+# Fable review F1: the account export names a gone author 0 (NULL there means the owner's own text, an import would follow it)
+ex = [p for p in A.get(B + "/api/export.json").json().get("playbooks", []) if p.get("list_id") == L2]
+check(sorted((p["version"], p["author_id"]) for p in ex) == [(3, ALICE), (4, 0)], f"F1: the export marks the gone author with 0 {ex}")
 d = A.get(B + f"/api/lists/{L2}/playbook").json()
 check(d.get("version") == 4 and d.get("text") == "Alt vier", f"the moved Playbook reads as before {d}")
 check([(x[0], x[1]) for x in pbv("p.list_id IS NULL AND p.owner_id=? AND p.folder='Archiv'", (ALICE,))] == [(1, "Archiv-Regel")],
@@ -234,6 +237,9 @@ A.patch(B + "/api/settings", json={"workspace": f"org:{ORG3}"})
 d2 = A.get(PD, params={"version": "2"}).json()
 check(d2.get("viewing") == 2 and field(d2, "company")["own"] == "Alter versiegelter Stand", f"and reads as before {str(d2)[:200]}")
 check(field(A.get(PD, params={"version": "1"}).json(), "company")["own"] == "Alter Klartext", "the plain old version too")
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG4}"})
+r = A.put(PD, json={"own": {"company": "zu frueh"}})
+check(r.status_code == 409, f"F4: the area whose old versions wait saves nothing new (409) {r.status_code} {r.text[:160]}")
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 check(A.get(PD).json().get("version") == 2, "an area saved by the new code meanwhile is untouched")
 # the row that cannot be opened goes (the way out): the next start drops the columns

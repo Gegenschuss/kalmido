@@ -258,9 +258,10 @@ def pb_move_old(c):
             if r["list_id"]:
                 heads[key] = c.execute("SELECT MAX(id) FROM playbooks WHERE list_id=?", (r["list_id"],)).fetchone()[0]
             else:
-                heads[key] = c.execute("SELECT MAX(id) FROM playbooks WHERE list_id IS NULL AND owner_id=? AND folder=?",
+                heads[key] = c.execute("SELECT MAX(id) FROM playbooks WHERE list_id IS NULL AND owner_id IS NOT DISTINCT FROM ? "
+                                       "AND folder IS NOT DISTINCT FROM ?",
                                        (r["owner_id"], r["folder"])).fetchone()[0]
-        head, body = heads[key], r["body"] or ""
+        head, body = heads[key] or r["id"], r["body"] or ""  # Fable review F5: a folder row without owner / folder is its own head
         at = obj_version_old_ts(r["created_at"], now)
         c.execute("INSERT INTO obj_versions(kind,ref_id,no,org_id,owner_id,title,body,size,created_by,created_at,updated_at,source) "
                   "VALUES(?,?,?,NULL,?,'',?,?,?,?,?,?)",
@@ -288,7 +289,7 @@ def _pb_prune(c):
     """The rows besides the heads (the newest row of each Playbook); their versions are in obj_versions on the head."""
     return c.execute("DELETE FROM playbooks p WHERE EXISTS (SELECT 1 FROM playbooks x WHERE x.id>p.id AND "
                      "((p.list_id IS NOT NULL AND x.list_id=p.list_id) OR (p.list_id IS NULL AND x.list_id IS NULL AND "
-                     "x.owner_id=p.owner_id AND x.folder=p.folder)))").rowcount
+                     "x.owner_id IS NOT DISTINCT FROM p.owner_id AND x.folder IS NOT DISTINCT FROM p.folder)))").rowcount
 
 
 def pb_retire(c):

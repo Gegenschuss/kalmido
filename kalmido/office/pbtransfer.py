@@ -42,6 +42,7 @@ from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from .ledger import ofx_log, ofx_release  # 2.542.0 (#4598): + ofx_release
 from .model import office_gate, office_org, pb_owner
 from .officemove import ofm_reseal
+from .procdoc import PD_WAITING, pd_waiting  # 2.977.0 (#5282)
 from .payonline import POL_EXPIRE_S
 from .periodlock import pl_lock, pl_through  # 2.355.0 B (#2845)
 from ..files.fsmove import fsm_apply, fsm_plan  # 2.356.0 A (#2926)
@@ -147,6 +148,8 @@ def pbt_plan(c, uid, src, dst):
     since = iso(now_utc() - timedelta(seconds=POL_EXPIRE_S))
     if c.execute("SELECT 1 FROM office_pay_sessions WHERE org_id=? AND (state='pending' OR (state IN ('new', 'open') AND created_at>=?)) LIMIT 1", (src, since)).fetchone():
         conflicts.append(tr("An online payment is under way; please wait until it has arrived"))
+    if pd_waiting(c, src) or pd_waiting(c, dst):  # 2.977.0 (#5282, Fable review F3): old versions wait for their move
+        conflicts.append(tr(PD_WAITING))
     if c.execute("SELECT 1 FROM office_pay_links WHERE org_id=? LIMIT 1", (src,)).fetchone():
         notes.append(tr("Pay links already sent or printed work again once the organisation has set up online payment"))
     for t in tables:

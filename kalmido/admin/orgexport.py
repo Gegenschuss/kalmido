@@ -238,7 +238,7 @@ def _clean(c, oid, table, r):
 def ox_objv_row(c, oid, row):
     """2.977.0 (#5282): a row of the core's versions (obj_versions) as the archive file of its kind has it since before the core:
     wiki/versions.json the columns of wiki_versions (2.958.0, #5281), lists/playbooks.json those of playbooks (list_id, owner_id,
-    folder, version, body, source, author_id, created_at), office/procdocs.json those of office_procdocs (org_id, version, data
+    folder, version, body, source, author_id = 0 for an author who is gone, created_at), office/procdocs.json those of office_procdocs (org_id, version, data
     = the JSON text, created_by, created_at). The sealed text opened first (its context is obj_versions.body)."""
     row = _ox_dec_row(c, oid, "obj_versions", row)
     kind = row.get("kind")
@@ -246,7 +246,8 @@ def ox_objv_row(c, oid, row):
         h = c.execute("SELECT list_id, owner_id, folder FROM playbooks WHERE id=?", (row["ref_id"],)).fetchone()
         return {"id": row["id"], "list_id": h["list_id"] if h else None, "owner_id": h["owner_id"] if h else None,
                 "folder": h["folder"] if h else None, "version": row["no"], "body": row["body"], "source": row.get("source") or "edit",
-                "author_id": row["created_by"], "created_at": row["created_at"]}
+                # Fable review F1: an author who is gone (NULL, foreign) is 0 in the file -- NULL there means the owner's own text
+                "author_id": row["created_by"] if row["created_by"] is not None else 0, "created_at": row["created_at"]}
     if kind == "procdoc":
         return {"id": row["id"], "org_id": row["org_id"], "version": row["no"], "data": row["body"] or "{}",
                 "created_by": row["created_by"], "created_at": row["created_at"]}
