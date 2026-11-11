@@ -238,13 +238,17 @@ check(CT1 and A.delete(B + f"/api/comments/{CT1}").ok and dbx("SELECT 1 FROM obj
 # (list_part_trash); a field without a ciphertext value (a select field: values stay readable) stays
 for kind_, ref_, snap_, held_ in (("section", 9905563, {"name": ct(1), "sort": 1}, {}),
                                   ("list_field", 9905564, {"name": ct(1), "type": "text"}, {"vals": [[T1, ct(1)]], "n": 1, "grouped": 0}),
-                                  ("list_field", 9905565, {"name": ct(1), "type": "select"}, {"vals": [[T1, "a"]], "n": 1, "grouped": 0})):
+                                  ("list_field", 9905565, {"name": ct(1), "type": "select"}, {"vals": [[T1, "a"]], "n": 1, "grouped": 0}),
+                                  # #5588 (c): a text field without a ciphertext value (le2b_trash_cipher_purge keeps it) goes
+                                  # through fields.py fd_trash_purge_text at the end of the key change
+                                  ("list_field", 9905566, {"name": ct(1), "type": "text"}, {"vals": [], "n": 0, "grouped": 0})):
     dbx("INSERT INTO list_part_trash(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
         (L, kind_, ref_, json.dumps(snap_), json.dumps(held_), 1, "2026-11-01T00:00:00Z"))
 r = A.post(B + f"/api/lists/{L}/e2e/finish")
 check(r.ok and r.json()["mode"] == "on" and tuple(dbx("SELECT e2e, e2e_reenc FROM lists WHERE id=?", (L,))[0]) == ("on", 0), "finish: re-encryption done " + r.text[:200])
-check([x[0] for x in dbx("SELECT ref_id FROM list_part_trash WHERE list_id=? AND ref_id IN (9905563, 9905564, 9905565)", (L,))] == [9905565],
-      "#5563: the end of the key change dropped the trash copies with old ciphertexts (section, text field), the select field stays")
+check([x[0] for x in dbx("SELECT ref_id FROM list_part_trash WHERE list_id=? AND ref_id IN (9905563, 9905564, 9905565, 9905566)", (L,))] == [9905565],
+      "#5563: the end of the key change dropped the trash copies with old ciphertexts (section, text field), the select field stays"
+      " (2.986.0 (#5588): and a text field without values, fd_trash_purge_text)")
 # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
 check(not dbx("SELECT 1 FROM obj_comment_trash WHERE comment_id=?", (CT1,)), "finish: the kept text of the trash went with the key change")
 check(A.post(B + f"/api/lists/{L}/e2e/finish").status_code == 409, "finish: only once")

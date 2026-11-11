@@ -11,7 +11,7 @@ from ..core.access import Denied, list_people, list_role, need_list, need_task, 
 from ..tasks.validation import (
     as_int, clean_task, log_act, log_changes, RR_OCC_PER_TASK, RR_OCC_SECONDS, RR_OCC_TOTAL, rr_rule,
 )
-from ..tasks.tasks import check_move, dep_shift, move_subtree, ms_cleanup, one_task
+from ..tasks.tasks import check_move, dep_shift, move_lock_subtree, move_subtree, ms_cleanup, one_task
 from ..tasks.oneway import irr_guard
 from ..tasks.lifecycle import PD_OWN, _norm, apply_update, complete_stale, do_complete, do_delete, restore_task, rsn_clear, signed, undo_status
 from ..tasks.attachments import need_attachment
@@ -75,7 +75,7 @@ def task_reorder():
     2.270.0 D (#3028): _prev {field: value the client saw} = a field changed elsewhere meanwhile stays (answer: conflicts)."""
     c = db()
     ts = iso(now_utc())
-    items, conflicts = [], []
+    items, conflicts, moving = [], [], []
     if len(body().get("items") or []) > BATCH_MAX:  # 2.126.0 D (#1992 A8)
         return err(tr("At most {0} tasks at once", BATCH_MAX))
     for it in body().get("items", []):
@@ -104,7 +104,10 @@ def task_reorder():
             from ..collab.liste2e import LE2EDenied, le2a_moving
             if le2a_moving(c, r[0], int(it["list_id"])):  # 2.64.1 (#1817): into / out of a list with the lock only with the texts (PATCH)
                 raise LE2EDenied("list_e2e_move")
+            moving.append(int(it["id"]))  # #5588 (review F3): move_subtree runs for every item with a list_id, same project too
         items.append(it)
+    # #5588 (a): the rows this drag writes (and the subtrees it moves) in id order first, as the restore of "Delete all times" holds them
+    move_lock_subtree(c, moving, along=[int(it["id"]) for it in items])
     shifted = []
     for it in items:
         f = clean_task({k: v for k, v in it.items()
@@ -220,6 +223,10 @@ def task_batch():
     if action in ("patch", "patch_each"):  # review 2.528 (Fable 3): the row locks in id order first, two batches never cross
         for tid in sorted(set(ids)):
             write_lock(c, f"task-{tid}")
+        # #5588 (review F4): a batch that moves (list_id, or parent_id: an indent takes the parent's list) holds all its tasks
+        # and their subtrees in id order before the first one is written, not task by task in the client's order
+        move_lock_subtree(c, [t for t in ids if any(isinstance(d, dict) and ("list_id" in d or "parent_id" in d)
+                                                    for d in ([data] if action == "patch" else [per.get(str(t))]))])
     for n, tid in enumerate(ids):
         if n:
             c.execute("RELEASE SAVEPOINT batch_one")

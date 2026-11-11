@@ -625,6 +625,16 @@ def le2b_trash_section_fit(c):
                      "AND ((l.e2e='on' AND left(t.trash_section, 5)<>'e2e1:') OR (l.e2e IS NULL AND left(t.trash_section, 5)='e2e1:'))").rowcount
 
 
+def le2b_trash_sec_plain(c):
+    """#5588 (b) (core/db.py, once; was migrations.d/5552_a.py with a fixed cut-off, which missed an instance updating later):
+    the copies of sections in the trash of a locked project ('on') that kept their plain name from before #5552 go. A ciphertext
+    name ("e2e1:...") stays; the snapshot is json.dumps text (core/objparts.py part_copy), read as text so no cast can fail a
+    start. A switch still running empties its section trash at its finish (lists/parttrash.py lpt_section_purge_list).
+    Idempotent, the caller commits. Returns the copies dropped. One way: those sections cannot be restored any more."""
+    return c.execute("DELETE FROM list_part_trash WHERE kind='section' AND list_id IN (SELECT id FROM lists WHERE e2e='on') "
+                     """AND position('"name": "e2e1:' in snap)=0""").rowcount
+
+
 def _trash_plain(r):
     """Does copy r (a section or a custom field of list_part_trash) hold plain text of the encrypted fields?"""
     try:

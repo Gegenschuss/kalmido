@@ -748,6 +748,241 @@ check(waited, "#5565 review: the field restore waits for the move of a task its 
 check(r is not None and r.ok and fld_vals(F9) == ["StaysOpen"],
       f"#5565 review: no plain field value for the task moved into the locked project {fld_vals(F9)} {r.text[:200] if r is not None else None}")
 
+
+# ================================================================== #5588 (c): the races above with the app's own mover (tasks/lifecycle.py
+# apply_update -> collab/liste2e.py le2a_move, move_lock_subtree, le2b_scrub_tasks) instead of SQL written by the test: the
+# restore waits for it and brings no plain text to the moved task
+
+
+def mover(tid, lid, title):
+    """Lines for hold_tx: alice moves task tid into list lid (its title as a ciphertext) the way PATCH /api/tasks does, in a
+    request context of the web app that stays open until the transaction commits."""
+    return ("from flask import g", "from kalmido.core.config import app as fa", "from kalmido.tasks.lifecycle import apply_update",
+            f"rq = fa.test_request_context('/api/tasks/{tid}', method='PATCH')", "rq.push()",
+            "g.db, g.pushes, g.auth_via = c, [], 'session'", "g.user = c.execute('SELECT * FROM users WHERE id=1').fetchone()",
+            f"e = apply_update(c, {tid}, {{'list_id': {lid}, 'title': {title!r}}}, lock=True)",
+            "assert not e, e")
+
+
+T10 = A.post(B + "/api/tasks", json={"list_id": L3, "title": MK + "MoverTitle"}).json()["id"]
+r = A.post(B + "/api/time/entries", json={"task_id": T10, "start": (datetime.now() - timedelta(hours=14)).isoformat(timespec="seconds"),
+                                         "minutes": 10, "note": MK + "MoverNote"})
+check(r.ok, f"#5588: a time entry with a note {r.text[:200]}")
+r = A.post(B + f"/api/lists/{L3}/time/delete-all", json={"confirm": "Other open"})
+W10, N10 = (r.json().get("wipe"), len(r.json().get("entries") or [])) if r.ok else (None, 0)
+check(r.ok and W10 and N10, f"#5588: delete all times {r.status_code} {r.text[:200]}")
+HOLD = hold_tx(*mover(T10, L, cipher(51)))
+r, waited, out_ = race(HOLD, lambda: A.post(B + f"/api/lists/{L3}/time/restore", json={"wipe": W10}))
+plain = dbx("SELECT note, task_title FROM time_entries WHERE note LIKE ? OR task_title LIKE ?", (f"%{MK}Mover%", f"%{MK}Mover%"))
+check(dbx("SELECT list_id FROM tasks WHERE id=?", (T10,))[0][0] == L, f"#5588: the app's mover moved the task {out_}")
+check(waited, "#5588: the restore waits for the app's mover (le2a_move)")
+check(r is not None and r.ok and r.json().get("restored") == N10 and not plain,
+      f"#5588: after the app's move into the locked project the restore writes no plain title / note {plain} {r.text[:200] if r is not None else None}")
+TF3 = A.post(B + "/api/tasks", json={"list_id": L3, "title": "Field mover task"}).json()["id"]
+TF4 = A.post(B + "/api/tasks", json={"list_id": L3, "title": "Field mover stays"}).json()["id"]
+F11, TR11, _ = fld_copy(L3, {TF3: MK + "MoverField", TF4: "StaysOpen2"})
+HOLD = hold_tx(*mover(TF3, L, cipher(52)))
+r, waited, out_ = race(HOLD, lambda: A.post(B + f"/api/fields/trash/{TR11}/restore"))
+check(waited and dbx("SELECT list_id FROM tasks WHERE id=?", (TF3,))[0][0] == L, f"#5588: the field restore waits for the app's mover {out_}")
+check(r is not None and r.ok and fld_vals(F11) == ["StaysOpen2"],
+      f"#5588: no plain field value for the task the app's mover took into the locked project {fld_vals(F11)} {r.text[:200] if r is not None else None}")
+
+# #5588 (c): while the lock is being switched on ('encrypting') a field restore is refused with 409 too, and the undo way of
+# the delete leaves the step (it stays, the copy stays in the trash, no field comes back)
+F12, TR12, UG12 = fld_copy(L, {T: cipher(53)})
+dbx("UPDATE lists SET e2e='encrypting' WHERE id=?", (L,), write=True)
+try:
+    r = A.post(B + f"/api/fields/trash/{TR12}/restore")
+    ru = A.post(B + f"/api/undo/to/{UG12}") if UG12 else None
+finally:
+    dbx("UPDATE lists SET e2e='on' WHERE id=?", (L,), write=True)
+check(r.status_code == 409 and r.json().get("code") == "list_e2e_busy", f"#5588: restore while the lock is switched on 409 {r.status_code} {r.text[:200]}")
+check(ru is not None and ru.ok and UG12 in [x.get("group") for x in ru.json().get("stayed") or []]
+      and dbx("SELECT 1 FROM list_part_trash WHERE id=?", (TR12,)) and not dbx("SELECT 1 FROM list_fields WHERE id=?", (F12,)),
+      f"#5588: undo of the delete while the lock is switched on: the step stays, the copy too {ru.status_code if ru is not None else UG12} "
+      f"{ru.text[:300] if ru is not None else ''}")
+
+# ================================================================== #5588 (a): a move takes the rows of its subtree in id order (FOR UPDATE)
+# before it writes any of them, as the restore of "Delete all times" holds its tasks (personal/timewipe.py tzw_lock_tasks). A
+# restore holding a subtask with a lower id than its parent: the move waits for it BEFORE it wrote the parent. Before, the move
+# wrote the parent first and then waited for the subtask, while a restore holding the subtask waited for the parent: deadlock (500).
+# The deadlock itself is not forced here; the test shows the order: while the mover waits, its parent row is still free.
+TC = A.post(B + "/api/tasks", json={"list_id": L3, "title": "Order child"}).json()["id"]
+TP = A.post(B + "/api/tasks", json={"list_id": L3, "title": "Order parent"}).json()["id"]
+check(A.patch(B + f"/api/tasks/{TC}", json={"parent_id": TP}).ok and TC < TP, "#5588 setup: a subtask with a lower id than its parent")
+L5 = A.post(B + "/api/lists", json={"name": "Move target", "org_id": None}).json()["id"]
+HOLD = hold_tx("from kalmido.personal.timewipe import tzw_lock_tasks", f"tzw_lock_tasks(c, [{{'task_id': {TC}}}])")
+held_ = HOLD.stdout.readline().strip()
+res = {}
+th = threading.Thread(target=lambda: res.update(r=A.patch(B + f"/api/tasks/{TP}", json={"list_id": L5})))
+th.start()
+wq, t_end = None, time.time() + 30
+while held_ == "held" and th.is_alive() and time.time() < t_end:
+    w_ = dbx("SELECT query FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%tasks%' AND query NOT LIKE '%pg_stat_activity%'")
+    if w_:
+        wq = w_[0][0]
+        break
+    time.sleep(0.1)
+try:
+    free = dbx("SELECT id FROM tasks WHERE id=? FOR UPDATE NOWAIT", (TP,)) == [(TP,)] if wq else None
+except dbxm.DbError as ex:
+    free = f"locked: {str(ex)[:120]}"
+HOLD.stdin.write("\n")
+HOLD.stdin.flush()
+out_ = HOLD.communicate(timeout=60)
+th.join(60)
+r = res.get("r")
+check(held_ == "held" and "done" in out_[0], f"#5588 setup: the restore side held the subtask {held_} {out_}")
+check(wq is not None and free is True,
+      f"#5588 (a): the mover waits for the subtask before it wrote its parent (subtree locked in id order) waiting={(wq or '')[:120]!r} parent={free}")
+check(r is not None and r.ok and [x[0] for x in dbx("SELECT list_id FROM tasks WHERE id IN (?, ?) ORDER BY id", (TC, TP))] == [L5, L5],
+      f"#5588 (a): after the restore the move goes through, the subtask along {r.status_code if r is not None else None}")
+
+# ================================================================== #5588 (d): "Delete all times" restored from an older window (entries)
+# after its task moved into a locked project of ANOTHER organisation: row-level security hides that task from the person, the
+# lock state is read across organisations (system_ctx, only the state) -- before, the hidden task counted as open and its plain
+# title / note came back
+ORG2 = dbx("INSERT INTO orgs(name,icon,created_at) VALUES('Other Example','','2026-10-01T00:00:00Z') RETURNING id")[0][0]
+LX = A.post(B + "/api/lists", json={"name": "Foreign locked", "org_id": None}).json()["id"]
+T11 = A.post(B + "/api/tasks", json={"list_id": L3, "title": MK + "ForeignTitle"}).json()["id"]
+r = A.post(B + "/api/time/entries", json={"task_id": T11, "start": (datetime.now() - timedelta(hours=16)).isoformat(timespec="seconds"),
+                                         "minutes": 10, "note": MK + "ForeignNote"})
+check(r.ok, f"#5588 (d): a time entry with a note {r.text[:200]}")
+r = A.post(B + f"/api/lists/{L3}/time/delete-all", json={"confirm": "Other open"})
+ENTS11 = r.json().get("entries") if r.ok else None
+check(r.ok and ENTS11, f"#5588 (d): delete all times {r.status_code} {r.text[:200]}")
+dbx("UPDATE lists SET org_id=?, e2e='on' WHERE id=?", (ORG2, LX), write=True)
+dbx("UPDATE tasks SET list_id=?, title=? WHERE id=?", (LX, cipher(54), T11), write=True)  # moved there by someone of both organisations
+check(dbx("SELECT org_id FROM tasks WHERE id=?", (T11,))[0][0] == ORG2 and A.get(B + f"/api/tasks/{T11}").status_code in (403, 404),
+      "#5588 (d) setup: the task is in the other organisation's locked project, alice does not see it")
+r = A.post(B + f"/api/lists/{L3}/time/restore", json={"entries": ENTS11})
+plain = dbx("SELECT note, task_title FROM time_entries WHERE note LIKE ? OR task_title LIKE ?", (f"%{MK}Foreign%", f"%{MK}Foreign%"))
+check(r.ok and r.json().get("restored") == len(ENTS11) and not plain,
+      f"#5588 (d): the restore writes no plain title / note of a task moved into another organisation's locked project {plain} {r.text[:200]}")
+
+# ================================================================== #5588 (b): the once-run at the start (core/db.py migr_e2etrashsec5588 ->
+# liste2eguard.py le2b_trash_sec_plain) replaces migrations.d/5552_a.py's fixed cut-off: a plain-named section copy in the trash of
+# a locked project goes whatever its date, a ciphertext name stays, an open project's plain copy stays
+SC = []
+for lid, name in ((L, "PlainLate"), (L, cipher(55)), (L2, "OpenPlain")):
+    SC.append(dbx("INSERT INTO list_part_trash(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?) RETURNING id",
+                  (lid, "section", 9955880 + len(SC), json.dumps({"name": name, "sort": 1}), "{}", 1, "2026-12-01T00:00:00Z"))[0][0])
+rc, out, er = py("from kalmido.collab.liste2eguard import le2b_trash_sec_plain\nfrom kalmido.core.pg import system_ctx\n"
+                 "c=app.connect()\nwith system_ctx(c):\n    n=le2b_trash_sec_plain(c)\nc.commit()\nprint(n)")
+left = [x[0] for x in dbx("SELECT id FROM list_part_trash WHERE id IN (?, ?, ?) ORDER BY id", tuple(SC))]
+check(rc == 0 and left == SC[1:], f"#5588 (b): the once-run drops the plain section copy of the locked project after any cut-off {left} {SC} {out} {er}")
+
+# ================================================================== #5588 review F1/F2: a restore by entries (older window) holds
+# and reads the lock state across organisations only for sealed entries. An own entry needs no seal, so its task_id is free: an
+# entry without a seal naming a task of another organisation is held / read under the person's rights as before -- the foreign
+# row stays free (the restore does not wait for a lock on it) and the answer carries no bit about its lock state (the title the
+# person sent comes back; with the cross-organisation read it came back empty because the foreign project is locked)
+PROBE = {"user_id": ENTS11[0]["user_id"] if ENTS11 else None, "task_id": T11, "task_title": "ProbeTitle5588", "note": "",
+         "start": (datetime.now() - timedelta(hours=18)).isoformat(timespec="seconds"),
+         "end": (datetime.now() - timedelta(hours=17, minutes=59)).isoformat(timespec="seconds"), "seconds": 60}
+HOLD = hold_tx(f"c.execute('SELECT id FROM tasks WHERE id=? FOR NO KEY UPDATE', ({T11},)).fetchall()")
+r, waited, _ = race(HOLD, lambda: A.post(B + f"/api/lists/{L3}/time/restore", json={"entries": [PROBE]}, timeout=60))
+check(not waited and r is not None and r.ok and r.json().get("restored") == 1,
+      f"#5588 review F1: an unsealed entry naming another organisation's task does not hold it (no wait) waited={waited} "
+      f"{r.text[:200] if r is not None else None}")
+check(dbx("SELECT task_title, task_id FROM time_entries WHERE start=? AND list_id=?", (PROBE["start"], L3)) == [("ProbeTitle5588", None)],
+      f"#5588 review F2: no lock state bit about a foreign task for an unsealed entry "
+      f"{dbx('SELECT task_title, task_id FROM time_entries WHERE start=? AND list_id=?', (PROBE['start'], L3))}")
+
+
+def order_race(child, parent, call):
+    """#5588 (a) / review F3, F4: the restore side holds task child (lower id) as tzw_lock_tasks does; call() writes parent and
+    child. -> (the call waited on a task row, parent was still free while it waited, the response, hold's output)."""
+    hold = hold_tx("from kalmido.personal.timewipe import tzw_lock_tasks", f"tzw_lock_tasks(c, [{{'task_id': {child}}}])")  # system_ctx: held whatever the trust
+    held_, res = hold.stdout.readline().strip(), {}
+    th = threading.Thread(target=lambda: res.update(r=call()))
+    th.start()
+    wq, t_end = None, time.time() + 30
+    while held_ == "held" and th.is_alive() and time.time() < t_end:
+        w_ = dbx("SELECT query FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%tasks%' AND query NOT LIKE '%pg_stat_activity%'")
+        if w_:
+            wq = w_[0][0]
+            break
+        time.sleep(0.1)
+    try:
+        free = dbx("SELECT id FROM tasks WHERE id=? FOR UPDATE NOWAIT", (parent,)) == [(parent,)] if wq else None
+    except dbxm.DbError as ex:
+        free = f"locked: {str(ex)[:120]}"
+    hold.stdin.write("\n")
+    hold.stdin.flush()
+    out_ = hold.communicate(timeout=60)
+    th.join(60)
+    check(held_ == "held" and "done" in out_[0], f"#5588 setup: the restore side held task {child} {held_} {out_}")
+    return wq is not None, free, res.get("r"), out_
+
+
+def sub_pair(name):
+    """A subtask with a lower id than its parent, both in L3."""
+    ch = A.post(B + "/api/tasks", json={"list_id": L3, "title": name + " child"}).json()["id"]
+    pa = A.post(B + "/api/tasks", json={"list_id": L3, "title": name + " parent"}).json()["id"]
+    check(A.patch(B + f"/api/tasks/{ch}", json={"parent_id": pa}).ok and ch < pa, f"#5588 setup: {name}: subtask id below its parent")
+    return ch, pa
+
+
+# review F7 / (a) for the drag (task_reorder) into another project: the subtree in id order before the parent is written
+TC2, TP2 = sub_pair("Drag move")
+wt, free, r, _ = order_race(TC2, TP2, lambda: A.post(B + "/api/tasks/reorder", json={"items": [{"id": TP2, "sort": 3, "list_id": L5}]}))
+check(wt and free is True, f"#5588 (a): a drag into another project waits for the subtask before it wrote its parent {wt} {free}")
+check(r is not None and r.ok and [x[0] for x in dbx("SELECT list_id FROM tasks WHERE id IN (?, ?) ORDER BY id", (TC2, TP2))] == [L5, L5],
+      f"#5588 (a): the drag goes through after the restore, the subtask along {r.status_code if r is not None else None}")
+# review F3: a drag within the same project that sends list_id (move_subtree writes the subtree then too) takes the same order
+TC3, TP3 = sub_pair("Drag same")
+wt, free, r, _ = order_race(TC3, TP3, lambda: A.post(B + "/api/tasks/reorder", json={"items": [{"id": TP3, "sort": 4, "list_id": L3}]}))
+check(wt and free is True, f"#5588 review F3: a drag in the same project with list_id waits for the subtask before it wrote its parent {wt} {free}")
+check(r is not None and r.ok, f"#5588 review F3: the drag goes through after the restore {r.status_code if r is not None else None}")
+# review F3: an indent (parent_id sets the parent's list, same project) by PATCH
+TC4, TP4 = sub_pair("Indent")
+TQ4 = A.post(B + "/api/tasks", json={"list_id": L3, "title": "Indent new parent"}).json()["id"]
+wt, free, r, _ = order_race(TC4, TP4, lambda: A.patch(B + f"/api/tasks/{TP4}", json={"parent_id": TQ4}))
+check(wt and free is True, f"#5588 review F3: an indent in the same project waits for the subtask before it wrote the task {wt} {free}")
+check(r is not None and r.ok, f"#5588 review F3: the indent goes through after the restore {r.status_code if r is not None else None}")
+# review F4: a batch that moves [higher id, lower id] holds both in id order before it writes the first
+TB1 = A.post(B + "/api/tasks", json={"list_id": L3, "title": "Batch low"}).json()["id"]
+TB2 = A.post(B + "/api/tasks", json={"list_id": L3, "title": "Batch high"}).json()["id"]
+wt, free, r, _ = order_race(TB1, TB2, lambda: A.post(B + "/api/tasks/batch", json={"ids": [TB2, TB1], "action": "patch", "data": {"list_id": L5}}))
+check(wt and free is True, f"#5588 review F4: a moving batch waits for the lower id before it wrote the higher one {wt} {free}")
+check(r is not None and r.ok and [x[0] for x in dbx("SELECT list_id FROM tasks WHERE id IN (?, ?) ORDER BY id", (TB1, TB2))] == [L5, L5],
+      f"#5588 review F4: the batch goes through after the restore {r.status_code if r is not None else None} {r.text[:200] if r is not None else ''}")
+
+# review F7: the switch migr_e2etrashsec5588 in init_db (the start runs the once-run, then never again), and the copies of a
+# project whose lock is being switched on / off ('encrypting' / 'decrypting') stay: their finish empties the section trash
+LE = A.post(B + "/api/lists", json={"name": "Switching on", "org_id": None}).json()["id"]
+LD = A.post(B + "/api/lists", json={"name": "Switching off", "org_id": None}).json()["id"]
+dbx("UPDATE lists SET e2e='encrypting' WHERE id=?", (LE,), write=True)
+dbx("UPDATE lists SET e2e='decrypting' WHERE id=?", (LD,), write=True)
+SW = []
+for lid, name in ((L, "PlainSwitch"), (LE, "PlainEncrypting"), (LD, "PlainDecrypting")):
+    SW.append(dbx("INSERT INTO list_part_trash(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?) RETURNING id",
+                  (lid, "section", 9955890 + len(SW), json.dumps({"name": name, "sort": 1}), "{}", 1, "2026-12-02T00:00:00Z"))[0][0])
+rc, out, er = py("from kalmido.collab.liste2eguard import le2b_trash_sec_plain\nfrom kalmido.core.pg import system_ctx\n"
+                 "c=app.connect()\nwith system_ctx(c):\n    n=le2b_trash_sec_plain(c)\nc.commit()\nprint(n)")
+left = [x[0] for x in dbx("SELECT id FROM list_part_trash WHERE id IN (?, ?, ?) ORDER BY id", tuple(SW))]
+check(rc == 0 and left == SW[1:], f"#5588 review F7: the once-run leaves the copies of projects being switched ('encrypting' / 'decrypting') {left} {SW} {er}")
+SW2 = dbx("INSERT INTO list_part_trash(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?) RETURNING id",
+          (L, "section", 9955899, json.dumps({"name": "PlainAtStart", "sort": 1}), "{}", 1, "2026-12-03T00:00:00Z"))[0][0]
+check(dbx("SELECT value FROM settings WHERE key='migr_e2etrashsec5588'") == [("1",)], "#5588 review F7: the container's start set the switch")
+# the switch set: a start leaves the copy (the once-run ran)
+for _ in range(4):  # importing the app runs init_db next to the running server: now and then a deadlock of this helper (calendars_test.py)
+    rc, out, er = py("print('started')")
+    if "deadlock detected" not in er:
+        break
+    time.sleep(2)
+check(rc == 0 and dbx("SELECT 1 FROM list_part_trash WHERE id=?", (SW2,)), f"#5588 review F7: with the switch set a start runs nothing {rc} {er}")
+dbx("DELETE FROM settings WHERE key='migr_e2etrashsec5588'", write=True)
+for _ in range(4):
+    rc, out, er = py("print('started')")
+    if "deadlock detected" not in er:
+        break
+    time.sleep(2)
+check(rc == 0 and not dbx("SELECT 1 FROM list_part_trash WHERE id=?", (SW2,)) and dbx("SELECT 1 FROM list_part_trash WHERE id IN (?, ?)", tuple(SW[1:]))
+      and dbx("SELECT value FROM settings WHERE key='migr_e2etrashsec5588'") == [("1",)],
+      f"#5588 review F7: without the switch the start runs the once-run once and sets it {rc} {er}")
+dbx("UPDATE lists SET e2e=NULL WHERE id IN (?, ?)", (LE, LD), write=True)
 print(f"\n{OKS[0]} checks ok, {len(FAILS)} failed", flush=True)
 if FAILS:
     print("FAILED:\n - " + "\n - ".join(FAILS))

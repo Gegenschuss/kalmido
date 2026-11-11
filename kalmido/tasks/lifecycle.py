@@ -23,7 +23,7 @@ from ..tasks.validation import (
 )
 from ..tasks.oneway import irr_guard
 from ..tasks.tasks import (
-    check_assignee, check_move, hard_delete, move_subtree, ms_cleanup, ms_target, my_tags, one_task,
+    check_assignee, check_move, hard_delete, move_lock_subtree, move_subtree, ms_cleanup, ms_target, my_tags, one_task,
     participant_assignee, set_tags,
 )
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -182,6 +182,8 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
             need_list(c, f["list_id"])  # moving out needs write on the source (caller), in on the target
             irr_guard(c, tid)  # 2.392.0 (#3370)
             check_move(c, cur["list_id"], f["list_id"])
+    if "list_id" in f:  # #5588 (a, review F3): on the same condition as move_subtree below, which writes the subtree also
+        move_lock_subtree(c, [tid])  # within the same project (an indent sets the parent's list): its rows in id order first
     lid = f.get("list_id", cur["list_id"])
     le2_post = le2a_task_write(c, tid, cur, f, b, lid)  # 2.64.1 (#1817): the texts of a list with the lock (ciphertexts only, moves via the app)
     if f.get("section_id") and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (f["section_id"], lid)).fetchone():
