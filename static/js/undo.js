@@ -308,7 +308,7 @@ async function histStep(dir, n = 1, only = null) {
         else {
           const what = done.length > 1 ? (dir === 'undo' ? trn('{0} step undone', '{0} steps undone', done.length) : trn('{0} step redone', '{0} steps redone', done.length))
             : dir === 'undo' ? tr('Undone: {0}', done[0].label) : tr('Redone: {0}', done[0].label);
-          toast(note || (queued ? what + ' · ' + tr('sent as soon as you are online') : what), null, note ? 10000 : undefined);  // 2.560.0 (#4667): e.g. restored without its client
+          toast(note || (queued && !OUT.online ? what + ' · ' + tr('sent as soon as you are online') : what), null, note ? 10000 : undefined);  // 2.560.0 (#4667): e.g. restored without its client; 2.951.0 (#5638): the hint only offline (online the outbox sends it at once)
         }
       }
     } catch (x) { console.warn('history', x); }

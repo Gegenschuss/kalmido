@@ -104,6 +104,28 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   check(await until(() => w.eval(`(() => { const x = (document.querySelector('#d-note-wait')?.textContent || '').trim(); return !!x && x !== tr('Loading…') && !TKN_WAIT.has(987654); })()`)), 'the refused load finished');
   check(w.eval(`(document.querySelector('#d-note-wait')?.textContent || '').trim() !== tr('Only available online.')`), '#3108 F a refused note load is not "Only available online.": ' + w.eval(`document.querySelector('#d-note-wait')?.textContent`));
   w.eval(`closeDetail(); S.tasks.delete(987654)`);
+
+  // 2.951.0 (#5638): the undo takes a change out of the outbox before it is sent, the redo sends it again through the
+  // outbox. Online the message is the plain "Redone: …" (was: "· sent as soon as you are online" although the device is
+  // online and the change goes at once); offline the hint stays.
+  const hint = w.eval(`tr('sent as soon as you are online')`), redone = w.eval(`tr('Redone: {0}', '')`);
+  const toastText = () => w.eval(`document.querySelector('#toast span')?.textContent || ''`);
+  await w.eval(`patchTask(${TS}, {due: '2032-04-05'})`);
+  await w.eval(`histStep('undo')`);
+  await w.eval(`histStep('redo')`);
+  const ron = toastText();
+  check(w.eval('OUT.online') && ron.startsWith(redone) && !ron.includes(hint), '#5638 online: the redo says "Redone: …" without the offline hint: ' + ron);
+  check(await until(async () => (await call('GET', `/api/tasks/${TS}`)).due === '2032-04-05'), '#5638 online: the redone change reaches the server');
+  w.__offline = true;
+  w.eval('setOnline(false)');
+  await w.eval(`patchTask(${TS}, {due: '2033-05-06'})`);
+  await w.eval(`histStep('undo')`);
+  await w.eval(`histStep('redo')`);
+  const roff = toastText();
+  check(!w.eval('OUT.online') && roff.startsWith(redone) && roff.includes(hint), '#5638 offline: the redo keeps the hint "sent as soon as you are online": ' + roff);
+  w.__offline = false;
+  w.dispatchEvent(new w.Event('online'));
+  check(await until(async () => w.eval('OUT.q.length') === 0 && (await call('GET', `/api/tasks/${TS}`)).due === '2033-05-06'), '#5638 back online: the redone change is sent');
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));
   w.close();
   console.log(`p2280_e_ui: ${ok} ok, ${F.length} failed`);
