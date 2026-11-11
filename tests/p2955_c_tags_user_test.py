@@ -161,8 +161,8 @@ A.put(B + f"/api/lists/{L}/members", json={"user_id": AG, "role": "edit"})
 ver = requests.get(B + f"/api/v1/tasks/{T1}", headers=HG).json().get("updated_at")
 r = requests.patch(B + f"/api/v1/tasks/{T1}", headers=HG, json={"tags": ["Bot-Privat", "bot-privat"], "expect_updated_at": ver})
 check(r.ok and r.json().get("tags") == ["Bot-Privat"], f"the agent sets its own tag {r.status_code} {r.text[:200]}")
-check(utags(AG) == [("Bot-Privat", [T1])] and dbx("SELECT k.src FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id WHERE ot.scope_id=?",
-                                                    (str(AG),)) == [("agent",)], f"scope user of the agent, src agent {utags(AG)}")
+src = dbx("SELECT k.src FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id WHERE ot.scope_kind='user' AND ot.scope_id=?", (str(AG),))
+check(utags(AG) == [("Bot-Privat", [T1])] and src == [("agent",)], f"scope user of the agent, src agent {utags(AG)} {src}")
 check(tags_of(A, T1) == ["Kunde"], "alice does not see the agent's tag")
 check(requests.get(B + f"/api/v1/tasks/{T1}", headers=HG).json().get("tags") == ["Bot-Privat"], "the agent reads only its own tag")
 
