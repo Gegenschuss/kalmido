@@ -103,10 +103,12 @@ def wat_note(c, tid, kind, actor):
     from ..collab.liste2e import le2e_mode, le2e_neutral
     t = c.execute("SELECT id, title, list_id, created_by, assigned_by FROM tasks WHERE id=?", (tid,)).fetchone()
     ags = agent_ids(c)
-    agent_emit, agent_task_data = _ag("agent_emit", "agent_task_data")
+    agent_emit, agent_task_data, cap = _ag("agent_emit", "agent_task_data", "AGENT_CHANGED_MAX")
+    sent = g.setdefault("wat_agent_sent", {}) if has_request_context() else {}  # review N1: a bulk change, like task_changed
     for aid in sorted((ids & ags) - {actor, None}):  # 2.983.0 (#3915): the watching agents
-        if task_visible(c, tid, aid, full=True):
-            agent_emit(c, aid, "status_changed", agent_task_data(c, tid, aid, full=True, status=WAT_AGENT_STATUS[kind], watching=True))
+        if sent.get(aid, 0) < cap and task_visible(c, tid, aid, full=True):
+            if agent_emit(c, aid, "status_changed", agent_task_data(c, tid, aid, full=True, status=WAT_AGENT_STATUS[kind], watching=True)):
+                sent[aid] = sent.get(aid, 0) + 1
     ids = ids - ags - {actor, None}
     if kind == "complete":  # they hear of it through task_event
         ids -= {t["created_by"], t["assigned_by"]} | bell_all_users(c, t["list_id"], "complete")
