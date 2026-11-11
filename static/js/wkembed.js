@@ -56,8 +56,10 @@ function wem_put(p, h, ems) {
     const e = ems[+i]; if (!e) return '';
     wem_need(p, 'f', e.id);
     const x = w.files[e.id];
-    if (!x) return `<span class="wemna" role="img" aria-label="${esc(tr('File not available'))}">${ic('file', 's')}<span>${esc(w.got.has('f' + e.id) ? tr('File not available') : tr('Loading…'))}</span></span>`;
-    return e.img && x.image ? `<a href="${esc(x.url)}" target="_blank" rel="noopener"><img class="wkimg" src="${esc(x.url)}" alt="${esc(e.label)}" loading="lazy"></a>`
+    // #5227: a picture still asked for already holds the box it will get (.wemph = the size of .wkph), nothing moves when it comes
+    if (!x) return `<span class="wemna${e.img && !w.got.has('f' + e.id) ? ' wemph' : ''}" role="img" aria-label="${esc(tr('File not available'))}">${ic('file', 's')}<span>${esc(w.got.has('f' + e.id) ? tr('File not available') : tr('Loading…'))}</span></span>`;
+    // #5227: a file of the file store keeps no size -> the fixed 4:3 box (.wkph), no jump when it loads
+    return e.img && x.image ? `<a href="${esc(x.url)}" target="_blank" rel="noopener"><img class="wkimg wkph" src="${esc(x.url)}" alt="${esc(e.label)}" loading="lazy"></a>`  // sprung-ok: fixed .wkph box (#5227)
       : `<a href="${esc(x.url)}" target="_blank" rel="noopener" class="wklink wemlink">${ic('file', 's')}${esc(e.label || x.name)}</a>`;
   });
   // the state of a linked task (#123): done = struck through (shown only; the page text does not change)

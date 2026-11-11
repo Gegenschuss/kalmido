@@ -676,7 +676,7 @@ def wsh_shared_page(pid):
     return jsonify(id=pid, path=shown, body=d["body"], attrs=d["attrs"], updated_at=r["updated_at"], updated_by_name=names.get(r["updated_by"], ""),
                    owner_name=names.get(r["owner_id"], ""), shared=True, role=_shared_role(c, uid, r, info),  # 2.200.0 B (#2747)
                    html=wsh_md(d["body"], lambda p: f"#wsh/{same[p.lower()]}" if p.lower() in same else None,
-                               lambda fid: (wsh_file_url("/api/wiki/shared/files/", files[fid]), files[fid]["mime"].startswith("image/")) if fid in files else None,
+                               lambda fid: (wsh_file_url("/api/wiki/shared/files/", files[fid]), files[fid]["mime"].startswith("image/"), wsh_wh(files[fid])) if fid in files else None,
                                node=lambda nid: f"/api/wiki/shared/pages/{pid}/img/{nid}" if nid in imgs else None),
                    files=[{"id": f["id"], "name": f["name"], "mime": f["mime"], "size": f["size"], "image": f["mime"].startswith("image/"),
                            "url": wsh_file_url("/api/wiki/shared/files/", f)} for f in own])
@@ -742,6 +742,13 @@ def wsh_files_of(c, page_ids):
         return {}
     q = ",".join("?" * len(page_ids))
     return {f["id"]: f for f in c.execute(f"SELECT * FROM wiki_files WHERE page_id IN ({q}) AND deleted_at IS NULL ORDER BY id LIMIT 5000", page_ids)}
+
+
+def wsh_wh(f):
+    """#5227: ' width="…" height="…"' of a page's picture whose size is known (wiki_files.img_w / img_h), else the class of the
+    fixed 4:3 box -- either way the shared page keeps its place while the picture loads."""
+    w, h = f.get("img_w"), f.get("img_h")
+    return f' width="{int(w)}" height="{int(h)}"' if w and h else ' class="wshph"'
 
 
 def wsh_file_url(base, f):
@@ -861,7 +868,7 @@ def wsh_pub_page(token, pid=None):
         return pub_gone(lg)
     imgs = wsh_img_nodes(c, [s], r, d["body"])  # 2.380 H (#2356)
     md = wsh_md(d["body"], lambda p: f"{base}/p/{same[p.lower()]}" if p.lower() in same else None,
-                lambda fid: (f"{base}/file/{fid}", files[fid]["mime"].startswith("image/")) if fid in files else None,
+                lambda fid: (f"{base}/file/{fid}", files[fid]["mime"].startswith("image/"), wsh_wh(files[fid])) if fid in files else None,
                 node=lambda nid: f"{base}/img/{pid}/{nid}" if nid in imgs else None)
     own = [f for f in files.values() if f["page_id"] == pid]
     back = f'<p class="wkpback"><a href="{e(base)}">{e(s["path"].split("/")[-1])}</a></p>' if s["is_folder"] else ""
@@ -934,13 +941,13 @@ def wsh_inline(s, link, file, depth=0, node=None):
                 got = file(int(fm.group(1)))
                 if not got:
                     out.append(e(label or ""))
-                elif m.group(2) and got[1]:
-                    out.append(f'<img src="{e(got[0])}" alt="{e(label)}" loading="lazy">')
+                elif m.group(2) and got[1]:  # #5227: its size reserves the box (else the fixed 4:3 box, app.css .wshph)
+                    out.append(f'<img src="{e(got[0])}" alt="{e(label)}" loading="lazy"{got[2] if len(got) > 2 else ' class="wshph"'}>')
                 else:
                     out.append(f'<a href="{e(got[0])}?dl=1" rel="nofollow">{wsh_inline(label, link, file, depth + 1, node) or e(addr.rsplit("/", 1)[-1])}</a>')
             elif m.group(2) and node and WSH_NODE_RE.match(addr) and node(int(WSH_NODE_RE.match(addr).group(1))):
                 # 2.380 H (#2356): a picture of the file store the share shows (its switch, wsh_img_nodes)
-                out.append(f'<img src="{e(node(int(WSH_NODE_RE.match(addr).group(1))))}" alt="{e(label)}" loading="lazy">')
+                out.append(f'<img src="{e(node(int(WSH_NODE_RE.match(addr).group(1))))}" alt="{e(label)}" loading="lazy" class="wshph">')  # #5227
             elif re.match(r"(?i)(https?:|mailto:)", addr):
                 out.append(f'<a href="{e(addr)}" rel="nofollow noopener noreferrer">{wsh_inline(label, link, file, depth + 1, node) if label else e(addr)}</a>')
             else:

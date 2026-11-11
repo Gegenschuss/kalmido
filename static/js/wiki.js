@@ -571,7 +571,7 @@ function wk_render(p, ctx = {seen: new Set([p.id]), d: 0}) {
   if (typeof wkt_linkHtml === 'function') h = wkt_linkHtml(h, p.space);  // 2.371 (#3150): #tags as links to their list
   h = h.replace(/(?:<p>)?\u2063WKT(\d+)\u2063(?:<\/p>)?/g, (_, n) => wk_tocHtml(p.space, tcs[+n] || ''));  // 2.376 (#3294)
   h = h.replace(/(?:<p>)?\u2063WKQ(\d+)\u2063(?:<\/p>)?/g, (_, n) => wkq_html(p, qs[+n] || ''));  // 2.371 (#3150)
-  h = wem_put(p, wka_put(h.replace(/(?:<p>)?MM(\d+)(?:<\/p>)?/g, (_, i) => typeof mm_blockHtml === 'function' ? mm_blockHtml(mms[+i] || '') : `<pre class="mdpre">${esc(mms[+i] || '')}</pre>`), fls), ems);  // 2.123.0 C (#2103, #2108)
+  h = wem_put(p, wka_put(h.replace(/(?:<p>)?MM(\d+)(?:<\/p>)?/g, (_, i) => typeof mm_blockHtml === 'function' ? mm_blockHtml(mms[+i] || '') : `<pre class="mdpre">${esc(mms[+i] || '')}</pre>`), fls, p), ems);  // 2.123.0 C (#2103, #2108); #5227: p (the sizes of its pictures)
   return pgs.length ? h.replace(/(?:<p>)?\u2063WKE(\d+)\u2063(?:<\/p>)?/g, (_, n) => pgs[+n] ? wem_pgHtml(p, pgs[+n], ctx) : '') : h;  // 2.371.2 (#3151)
 }
 // 2.619.0 (#4947): [[#123]] / [[#123|label]] -- the task link of a page: the task's link with its title for who may see it
@@ -618,11 +618,15 @@ function wk_tocHtml(sp, t) {
 const WKA_RE = /(!?)\[([^\[\]\n]*)\]\(\/api\/wiki\/files\/(\d{1,15})(?:\/([^\s()]*))?\)/g;
 const wka_cut = (src, out) => src.replace(WKA_RE, (_, bang, label, id, name) => { out.push({img: !!bang, label, id, name: name || ''}); return `\u2063WKA${out.length - 1}\u2063`; });
 const wka_dec = n => { try { return decodeURIComponent(n); } catch { return n; } };
-function wka_put(h, fls) {
+// #5227: a picture keeps its place while it loads -- width / height of the page's file (the server reads them on upload) let
+// the browser reserve the box from their ratio; unknown (another page's file, a file from before): the fixed 4:3 box (.wkph)
+function wk_imgWH(w, h) { return w > 0 && h > 0 ? ` width="${Math.round(w)}" height="${Math.round(h)}"` : ''; }
+function wka_put(h, fls, p) {
+  const own = new Map((p?.files || []).map(f => [String(f.id), f]));
   return h.replace(/\u2063WKA(\d+)\u2063/g, (m, i) => {
     const f = fls[+i]; if (!f) return '';
-    const url = `/api/wiki/files/${f.id}/${encodeURIComponent(wka_dec(f.name))}`;
-    return f.img ? `<a href="${esc(url)}" target="_blank" rel="noopener"><img class="wkimg" src="${esc(url)}" alt="${esc(f.label)}" loading="lazy"></a>`
+    const url = `/api/wiki/files/${f.id}/${encodeURIComponent(wka_dec(f.name))}`, d = own.get(String(f.id)), wh = wk_imgWH(d?.w, d?.h);
+    return f.img ? `<a href="${esc(url)}" target="_blank" rel="noopener"><img class="wkimg${wh ? '' : ' wkph'}" src="${esc(url)}" alt="${esc(f.label)}" loading="lazy"${/*html-ok*/ wh}></a>`  // sprung-ok: width/height or the fixed .wkph box (#5227)
       : `<a href="${esc(url)}" target="_blank" rel="noopener" class="wklink">${esc(f.label || wka_dec(f.name))}</a>`;
   });
 }
@@ -630,7 +634,7 @@ function wka_html(p, may, edit) {  // 2.750.0 (#5229): attach, drop and delete o
   const fs = p.files || [], open = !wk_e2e(p.space);
   if (!fs.length && !(may && open && edit)) return '';
   return `<section class="wkfiles" aria-label="${esc(tr('Files'))}"><h4>${ic('file', 's')}${tr('Files')}${fs.length ? ` · ${fs.length}` : ''}<span class="spacer"></span>${may && open && edit ? `<input type="file" id="wka-file" multiple accept="${WKA_ACCEPT}" hidden><button type="button" class="btn" data-wka="add">${ic('upload', 's')}${tr('Attach files')}</button>` : ''}</h4>
-    ${fs.length ? `<ul>${fs.map(f => `<li><a class="wkfile" href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${f.image ? `<img src="${esc(f.url)}" alt="" loading="lazy">` : ic('pdf')}<span class="an">${esc(f.name)}</span><span class="as">${fmtSize(f.size)}</span></a>
+    ${fs.length ? `<ul>${fs.map(f => `<li><a class="wkfile" href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${f.image ? `<img src="${esc(f.url)}" alt="" loading="lazy">${''/* sprung-ok: fixed 2.5rem box, wiki.css .wkfile img (#5227) */}` : ic('pdf')}<span class="an">${esc(f.name)}</span><span class="as">${fmtSize(f.size)}</span></a>
       <button type="button" class="iconbtn" data-wka="copy" data-id="${f.id}" title="${esc(tr('Copy link'))}" aria-label="${esc(tr('Copy link'))}">${ic('link')}</button>${may && edit ? `<button type="button" class="iconbtn" data-wka="del" data-id="${f.id}" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash')}</button>` : ''}</li>`).join('')}</ul>` : ''}</section>`;
 }
 const wka_md = f => `${f.image ? '!' : ''}[${f.name.replace(/[[\]]/g, '')}](${f.url})`;

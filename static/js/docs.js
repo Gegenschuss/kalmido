@@ -514,7 +514,7 @@ function dc_nbThumb(x) {
 }
 function dc_nbHtml(x) {
   const u = dc_nbThumb(x), meta = [x.type?.name, x.date ? dc_day(x.date) : ''].filter(Boolean).join(' · ');
-  return `<div class="lhdr dc-nbh"><h3>${esc(x.name || x.sender?.name || '')}</h3></div>${meta ? `<p class="dc-nbm muted">${esc(meta)}</p>` : ''}<div class="dc-nbv">${u ? `<img src="${esc(u)}" alt="">` : ''}</div>`;
+  return `<div class="lhdr dc-nbh"><h3>${esc(x.name || x.sender?.name || '')}</h3></div>${meta ? `<p class="dc-nbm muted">${esc(meta)}</p>` : ''}<div class="dc-nbv">${u ? `<img src="${esc(u)}" alt="">` : ''}</div>`;  // sprung-ok: fixed box, docs.css .dc-nbv (aspect-ratio, max-height, #5227)
 }
 // the new document is drawn into the body that still stands where its neighbour snapped in: its parts back in place at once,
 // the neighbours laid in by the swipe (swipenav.js, 2.882.0 #5557) out of it (a body drawn ahead waits on, dc_swBack)

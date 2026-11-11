@@ -11,6 +11,11 @@ needs the comment `// sprung-ok: <reason>` on its line (or alone on the line bef
 A focus() counts as "in a dialog" in static/js/dialogs.js or when the line or the eight lines before it name a modal /
 dialog (modal(, .modal, dlg, dialog): a dialog lies over the page, its focus does not move the page.
 
+#5227 (same product rule): a picture that loads must not grow from nothing and push the text below it. Every `<img` in a
+template of static/js/**/*.js carries width= and height= (the browser reserves the box from their ratio) -- or it sits in a
+fixed CSS box (a class with a set height / aspect-ratio), which the line says with `// sprung-ok: <reason>` (kind "img",
+receiver = its first class or "?"). Lines that are comments do not count.
+
 The calls that were there before the rule are the baseline (tools/scrolljump_baseline.json, "file|kind|receiver" -> count,
 no line numbers, so moving code is no finding). It only ever shrinks: a NEW place is red (exit 1); --update writes the lower
 counts (never adds; without a baseline file it writes the first one). Pattern of tools/check_lazy_calls.py (its reader that
@@ -37,6 +42,9 @@ PATS = [("scrollIntoView", re.compile(r"\.scrollIntoView" + CALL)),
         ("scrollTop", re.compile(r"\.scrollTop\s*[-+]?=(?!=)")),
         ("focus", re.compile(r"\.focus" + CALL))]
 OPEN, CLOSE = "([{", ")]}"
+IMG_RE = re.compile(r"<img\b(?:=>|[^>])*>")  # an arrow function inside the tag's ${…} is no end
+IMG_WH = re.compile(r"\swidth=.*\sheight=|\sheight=.*\swidth=", re.S)
+IMG_CLS = re.compile(r"""\sclass=["']([\w-]*)""")
 
 
 def receiver(b, raw, dot):
@@ -99,6 +107,14 @@ def scan(src, rel=""):
                 if dialogs or any(DLG_RE.search(lines[j]) for j in range(max(0, k - 8), k + 1)):
                     continue
             out.append((k + 1, kind, receiver(b, src, m.start())))
+    for m in IMG_RE.finditer(src):  # #5227: in the raw text (blank() empties the templates the tag lives in)
+        k = line_of(m.start())
+        if lines[k].lstrip().startswith(("//", "*", "/*")) or IMG_WH.search(m.group(0)):
+            continue
+        if OK_RE.search(lines[k]) or (k and lines[k - 1].strip().startswith("//") and OK_RE.search(lines[k - 1])):
+            continue
+        cl = IMG_CLS.search(m.group(0))
+        out.append((k + 1, "img", (cl.group(1) if cl else "") or "?"))
     return sorted(out)
 
 
@@ -113,10 +129,13 @@ def collect():
 
 def selftest():
     bad = ["el.scrollIntoView({block: 'nearest'});", "box.scrollTop = box.scrollHeight;", "$('#view').scrollTop += d;",
-           "window.scrollTo(0, 0);", "e.scrollIntoView?.({block: 'start'});", "q?.focus?.();", "v.scrollBy({top: 9});", "inp.focus();", "x.focus({focusVisible: true});"]
+           "window.scrollTo(0, 0);", "e.scrollIntoView?.({block: 'start'});", "q?.focus?.();", "v.scrollBy({top: 9});", "inp.focus();", "x.focus({focusVisible: true});",
+           "h = `<img class=\"wkimg\" src=\"${u}\" loading=\"lazy\">`;", "h = `<img src=\"${xs.map(x => x.u)[0]}\" alt=\"\">`;"]
     good = ["el.scrollIntoView(); // sprung-ok: the hit the person searched for", "inp.focus({preventScroll: true});",
             "const y = el.scrollTop;", "if (el.scrollTop == 0) go();", "// el.scrollTop = 0;", "s = 'x.scrollTop = 1';",
-            "// sprung-ok: a link the person tapped\nrow.scrollIntoView();", "m = modal(h);\nm.querySelector('input').focus();"]
+            "// sprung-ok: a link the person tapped\nrow.scrollIntoView();", "m = modal(h);\nm.querySelector('input').focus();",
+            "h = `<img src=\"${u}\" width=\"${w}\" height=\"${h}\" alt=\"\">`;", "h = `<img class=\"av\" src=\"${u}\">`;  // sprung-ok: fixed 2rem box",
+            "// a comment: <img src=x>"]
     f = 0
     for s in bad:
         if not scan(s):
@@ -149,6 +168,10 @@ def main(argv):
         if n > base.get(k, 0):
             f, kind, rc = k.split("|", 2)
             lines = ", ".join(str(x) for x in found[k])
+            if kind == "img":  # #5227
+                out.append(f"{f}:{lines}: <img class=\"{rc}\"> without width= / height= grows when it loads and pushes the text - "
+                           f"give it its size, or a fixed CSS box: `// sprung-ok: <reason>` ({n} > {base.get(k, 0)} in the baseline)")
+                continue
             out.append(f"{f}:{lines}: {rc}.{kind} moves the view - keepReading / preventScroll, or a jump the person "
                        f"asked for: `// sprung-ok: <reason>` ({n} > {base.get(k, 0)} in the baseline)")
     stale = sorted(k for k, n in base.items() if cnt.get(k, 0) < n)

@@ -162,10 +162,31 @@ const call = async (method, url, body, h = {}) => { const r = await fetch(B + ur
     // the picture above gets a tall one now (it "loads later": the page grows above what is read)
     const grown = await ev(`new Promise(res => { const i = document.querySelector('#wk-md img.wkimg'); if (!i) return res(false); const h0 = i.getBoundingClientRect().height; i.removeAttribute('loading');
       i.onload = () => requestAnimationFrame(() => requestAnimationFrame(() => res(i.getBoundingClientRect().height - h0))); i.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="900"><rect width="300" height="900" fill="#8a6"/></svg>'); })`);
-    check(grown > 100, `${tag}: wiki: the picture above grew by ${grown} px`);
+    // 2.941.0 (#5227): the page's picture carries width/height 40 now (its box is reserved), the tall one grows it to 40 x 120
+    check(grown > 60, `${tag}: wiki: the picture above grew by ${grown} px`);
     const d1 = await atP();
     same(d0, d1, 'wiki: a picture loads above - the paragraph read');
     check(/^Paragraph 30:/.test(d1?.text || ''), `${tag}: wiki: the paragraph read shows its text`);
+    // #5227: a picture holds its place BEFORE its bytes arrive - the page's own picture carries the size the server read on
+    // upload (40 x 40 here); one of unknown size (another page's file, the file store) a fixed 4:3 box; a file-store picture
+    // still asked for a box of the same size. Measured at once after drawing (no answer can have come yet): without the
+    // size an unloaded picture is only its alt text high.
+    check(await ev(`(() => { const i = document.querySelector('#wk-md img.wkimg'); return i?.getAttribute('width') === '40' && i?.getAttribute('height') === '40'; })()`),
+      `${tag}: wiki: the page's own picture carries its size (width / height 40)`);
+    const box = await ev(`(() => { const md = document.getElementById('wk-md'), t = document.createElement('div'), W = '\\u2063WKA0\\u2063';
+      const ws = {files: {77: {url: '/api/files/nodes/77/content', image: true, name: 'n.png'}}, links: {}, asked: new Set(['f77', 'f78']), got: new Set(['f77']), qf: new Set(), ql: new Set(), t: 0};
+      t.innerHTML = '<div class="k1">' + wka_put(W, [{img: true, id: 987654, name: 'n.png', label: 'known'}], {files: [{id: 987654, w: 400, h: 300}]}) + '</div>'
+        + '<div class="k2">' + wka_put(W, [{img: true, id: 987655, name: 'm.png', label: 'unknown'}], {files: []}) + '</div>'
+        + '<div class="k3">' + wem_put({id: 0, _emb: true, _wem: ws}, '\u2063WEM0\u2063', [{img: true, id: '77', label: 'store'}]) + '</div>'
+        + '<div class="k4">' + wem_put({id: 0, _emb: true, _wem: ws}, '\u2063WEM0\u2063', [{img: true, id: '78', label: 'asked'}]) + '</div>';
+      md.prepend(t);
+      const h = s => Math.round(t.querySelector(s)?.getBoundingClientRect().height || 0), w = Math.round(t.getBoundingClientRect().width);
+      const r = {w, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), known: h('.k1 img'), unknown: h('.k2 img'), store: h('.k3 img'), asked: h('.k4 .wemna')};
+      t.remove(); return r; })()`);
+    const want = Math.min(400, box?.w || 0) * 0.75, ph = Math.min((box?.w || 0) * 0.75, 24 * (box?.rem || 16));
+    check(box && Math.abs(box.known - want) <= 2, `${tag}: wiki: a picture of known size holds its box before it loads (${box?.known} px, want ${want}) ${JSON.stringify(box)}`);
+    check(box && Math.abs(box.unknown - ph) <= 2 && Math.abs(box.store - ph) <= 2, `${tag}: wiki: a picture of unknown size holds the 4:3 box (${box?.unknown} / ${box?.store} px, want ${ph})`);
+    check(box && Math.abs(box.asked - ph) <= 2, `${tag}: wiki: a file-store picture still asked for holds the same box (${box?.asked} px, want ${ph})`);
     await shot(`p2924c-${tag}-wiki.png`);
 
     // ============ 5. a banner appears on Today

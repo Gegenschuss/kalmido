@@ -177,7 +177,7 @@ async function bm_detail(id) {
   const ro = !x.can_edit, u = bm_href(x.url);
   const text = x.text ? `<details class="bmtext"><summary>${ic('book', 's')} ${tr('Reading text')}</summary><div class="bmtextb">${x.text.split(/\n{2,}/).slice(0, 2000).map(p => `<p>${esc(p)}</p>`).join('')}</div></details>` : '';
   const md = modal(`<div class="lhdr"><h3 id="bmd-t">${ic('bookmark', 's')} ${tr('Bookmark')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
-    ${x.image ? `<img class="bmdpic" src="${esc(x.image)}" alt="">` : ''}
+    ${x.image ? `<img class="bmdpic" src="${esc(x.image)}" alt="">` : ''/* sprung-ok: fixed 12rem box, bookmarks.css .bmdpic (#5227) */}
     <div class="row"><label for="bmd-title">${tr('Title')}</label><input id="bmd-title" maxlength="300" value="${esc(x.title)}" ${ro ? 'readonly' : ''}></div>
     <div class="row"><label for="bmd-url">${tr('Link')}</label><input id="bmd-url" type="url" inputmode="url" maxlength="2000" value="${esc(x.url)}" ${ro ? 'readonly' : ''}></div>
     <div class="row"><label for="bmd-desc">${tr('Description')}</label><textarea id="bmd-desc" rows="2" maxlength="1000" ${ro ? 'readonly' : ''}>${esc(x.description)}</textarea></div>

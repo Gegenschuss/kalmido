@@ -36,6 +36,7 @@ from ..core.errors import BadInput, BadKey, err_stored
 from ..tasks.attachments import file_ext, safe_name, send_stored
 from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_fit_paths, wiki_path_parts, wiki_frontmatter, wiki_insert, wiki_need,
                     wiki_set_links, wiki_space, wiki_space_key, wiki_space_sql)
+from ..docs.pagesize import PG_MAX, pg_of  # #5227: a picture's size from its header
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from .wikie2e import wke_mode, wke_page_mode  # 2.369.5 (#2517): pulled up from functions; 2.637.0 (#4745): wke_mode
 
@@ -101,6 +102,8 @@ def wka_dict(r, marks=None):
     d = {"id": r["id"], "page_id": r["page_id"], "name": r["name"], "mime": r["mime"], "size": r["size"],
          "created_by": r["created_by"], "created_at": r["created_at"], "url": wka_url(r["id"], r["name"]),
          "image": r["mime"].startswith("image/")}
+    if r["mime"].startswith("image/") and r.get("img_w") and r.get("img_h"):
+        d["w"], d["h"] = r["img_w"], r["img_h"]  # #5227: the client reserves the picture's box from them (wiki.js wka_put)
     if marks and r["id"] in marks:
         d["up"] = marks[r["id"]]  # 2.61.0 marks (unchecked / infected), like the other file lists
     return d
@@ -185,6 +188,38 @@ def wka_check(name, data):
     return want, data
 
 
+SVG_ROOT = re.compile(rb"<svg\b[^>]*>", re.I)
+SVG_ATTR = re.compile(rb"""\s(width|height|viewBox)\s*=\s*["']([^"']*)["']""", re.I)
+SVG_LEN = re.compile(rb"^\s*([0-9]+(?:\.[0-9]+)?)\s*(?:px)?\s*$")
+
+
+def wka_dims(mime, data):
+    """#5227: (width, height) in pixels of a picture for its <img> (the browser reserves the box from the ratio before it
+    loads), (None, None) when its header tells nothing. PNG / JPEG / GIF / WebP from the header only (docs/pagesize.py,
+    decodes nothing; a JPEG's EXIF turn like the browser); an SVG from its root's width / height in px (or plain numbers),
+    else its viewBox."""
+    if not mime.startswith("image/"):
+        return None, None
+    if mime == SVG:
+        m = SVG_ROOT.search(data[:8192])
+        if not m:
+            return None, None
+        at = {k.decode().lower(): v for k, v in SVG_ATTR.findall(m.group(0))}
+        w, h = (SVG_LEN.match(at.get(k, b"")) for k in ("width", "height"))
+        if w and h:
+            wh = [float(w.group(1)), float(h.group(1))]
+        else:
+            vb = re.split(rb"[\s,]+", at.get("viewbox", b"").strip())
+            try:
+                wh = [float(vb[2]), float(vb[3])] if len(vb) == 4 else []
+            except ValueError:
+                wh = []
+        wh = [round(x) for x in wh]
+        return (wh[0], wh[1]) if len(wh) == 2 and all(0 < x < PG_MAX for x in wh) else (None, None)
+    pg = pg_of(data, "image")
+    return (int(pg[0]), int(pg[1])) if pg else (None, None)
+
+
 def wka_store(c, page, name, mime, data, uid, saved):
     """Store one checked file for a page (the caller checked the rights and commits; `saved` gets the relative path).
     Returns the new id; UploadRefused (virus) or QuotaExceeded raise on."""
@@ -199,10 +234,11 @@ def wka_store(c, page, name, mime, data, uid, saved):
     os.makedirs(os.path.dirname(full), exist_ok=True)
     oc_write_file(c, wka_space(page), full, data, fresh=True)  # sealed at rest like task files (#828 / #1864), also private
     saved.append(rel)
-    fid = insert_id(c, "INSERT INTO wiki_files(page_id,org_id,owner_id,name,mime,size,path,sha256,created_by,created_at) "
-                       "VALUES(?,?,?,?,?,?,?,?,?,?)",
+    w, h = wka_dims(mime, data)  # #5227: the picture's size, so its place is kept while it loads
+    fid = insert_id(c, "INSERT INTO wiki_files(page_id,org_id,owner_id,name,mime,size,path,sha256,created_by,created_at,img_w,img_h) "
+                       "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                     (page["id"], page["org_id"], page["owner_id"], name, mime, len(data), rel, hashlib.sha256(data).hexdigest(),
-                     uid, iso_ms(now_utc())))
+                     uid, iso_ms(now_utc()), w, h))
     up_after_store(c, "wiki", fid, page["org_id"], info)
     return fid
 

@@ -124,6 +124,24 @@ check(r.ok and f'href="#wsh/{intro}"' in h and "the secret page" in h and f"#wsh
 check(f'src="/api/wiki/shared/files/{pic}/sketch.png"' in h and f"/files/{spdf}" not in h and "secret file" in h,
       "#2104: the shared page's picture through the guest route, a file of another page only as text " + h[:400])
 check("<script" not in h and 'href="javascript' not in h and "&lt;script&gt;" in h, "#2104: the text is escaped, no script address " + h[:400])
+# #5227: a picture keeps its place while it loads -- its size read on upload goes onto the <img> (the 1 x 1 PNG), a picture
+# of unknown size (a file from before: no size stored) gets the fixed 4:3 box class; the page's file list hands the size on
+check(re.search(rf'<img src="/api/wiki/shared/files/{pic}/sketch.png" alt="Sketch" loading="lazy" width="1" height="1">', h),
+      "#5227: the shared page's picture carries its size " + h[:400])
+r = A.get(B + f"/api/wiki/pages/{plan}")
+fl = {f["id"]: f for f in (r.json().get("files") or [])} if r.ok else {}
+check(fl.get(pic, {}).get("w") == 1 and fl.get(pic, {}).get("h") == 1, "#5227: the page's file list names the picture's size " + str(fl)[:300])
+pics = page(A, "private", "Zz 5227/Pictures", "")
+svg = upload(A, pics, "frame.svg", b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="10" height="10"/></svg>', "image/svg+xml")
+svg2 = upload(A, pics, "box.svg", b'<svg xmlns="http://www.w3.org/2000/svg" width="120px" height="80" viewBox="0 0 9 9"/>', "image/svg+xml")
+fl = {f["id"]: f for f in (A.get(B + f"/api/wiki/pages/{pics}").json().get("files") or [])}
+check((fl[svg].get("w"), fl[svg].get("h"), fl[svg2].get("w"), fl[svg2].get("h")) == (640, 360, 120, 80),
+      "#5227: an SVG's size from its viewBox, else from width / height " + str([fl[svg], fl[svg2]])[:300])
+sql("UPDATE wiki_files SET img_w=NULL, img_h=NULL WHERE id=?", (pic,), write=True)
+h = Da.get(B + f"/api/wiki/shared/pages/{plan}").json().get("html", "")
+check(f'<img src="/api/wiki/shared/files/{pic}/sketch.png" alt="Sketch" loading="lazy" class="wshph">' in h,
+      "#5227: a picture of unknown size gets the fixed box " + h[:400])
+check("w" not in (A.get(B + f"/api/wiki/pages/{plan}").json().get("files") or [{}])[0], "#5227: no size stored -> none handed out")
 check(j.get("owner_name") == "Alice Admin" and [f["id"] for f in j.get("files", [])] == [pic], "#2104: owner name and the page's files " + str(j)[:300])
 r = Da.get(B + f"/api/wiki/shared/pages/{intro}")
 check(r.ok and 'type="checkbox" disabled checked' in r.json().get("html", "") and "<strong>customer</strong>" in r.json().get("html", ""),
