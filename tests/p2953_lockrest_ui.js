@@ -82,8 +82,11 @@ const raw = async id => Buffer.from(await (await fetch(B + `api/files/nodes/${id
     await ev(`(() => { const q = document.querySelector('#fsl-q'); q.value = ''; q.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
 
     // ---- a folder with content moves in (one question) and out again, every id kept
-    const mv = await ev(`(async () => { const keep = askConfirm; askConfirm = async () => true;
-      try { const n = await rawFetch('GET', '/api/files/nodes/${OUT}'); return await fsl_moveHook(n, ${BOX}); } catch (e) { return 'err ' + e.message; } finally { askConfirm = keep; } })()`);
+    // the one question is answered with its button (as a person does), the move runs on
+    await ev(`(window.__mv = null, rawFetch('GET', '/api/files/nodes/${OUT}').then(n => fsl_moveHook(n, ${BOX})).then(x => { window.__mv = x; }, e => { window.__mv = 'err ' + e.message; }), 1)`);
+    check(await waitFor(`!!document.querySelector('.modal [data-m="ok"]')`), 'one question before the move');
+    await ev(`(document.querySelector('.modal [data-m="ok"]').click(), 1)`);
+    const mv = await waitFor(`window.__mv`, 240);
     check(mv === true, 'the folder with content moved into the locked folder ' + mv);
     const inBox = await kids(BOX);
     check(inBox.length === 2 && inBox.some(x => x.id === OUT) && inBox.every(x => x.name.startsWith('e2e1:')), 'Outside lies in the box with its own id, no helper folder is left, ciphers only ' + inBox.map(x => x.name.slice(0, 8)).join(','));
@@ -95,8 +98,10 @@ const raw = async id => Buffer.from(await (await fetch(B + `api/files/nodes/${id
     await boot(`#ablage/${BOX}`); await unlock(); await ev('ab_reload(), 1');
     check(await waitFor(`[...document.querySelectorAll('.abrow .abname')].map(x => x.textContent).includes('Outside')`), 'the view shows the moved folder by its name');
     await shot('p2953-moved-in.png');
-    const back = await ev(`(async () => { const keep = askConfirm; askConfirm = async () => true;
-      try { const n = AB.data.items.find(x => x.name === 'Outside'); return await fsl_moveHook(n, null); } catch (e) { return 'err ' + e.message; } finally { askConfirm = keep; } })()`);
+    await ev(`(window.__mv = null, fsl_moveHook(AB.data.items.find(x => x.name === 'Outside'), null).then(x => { window.__mv = x; }, e => { window.__mv = 'err ' + e.message; }), 1)`);
+    check(await waitFor(`!!document.querySelector('.modal [data-m="ok"]')`), 'one question before moving out');
+    await ev(`(document.querySelector('.modal [data-m="ok"]').click(), 1)`);
+    const back = await waitFor(`window.__mv`, 240);
     check(back === true, 'and out again to the top ' + back);
     check((await kidsOf(OUT)).sort().join() === 'Inside,top.txt' && (await kidsOf(IN)).join() === 'inner.txt', 'plain names on the server again, ids kept');
     check((await raw(INF)).toString() === 'ZQWinner words', 'the plain bytes on the server again');
