@@ -444,6 +444,7 @@ Home & life: bookmarks, household budget, feeds (RSS), reading list, trips.
 - `kalmido/life/budundo.py` - Undo across devices for household budget entries (change, trash, restore)
 - `kalmido/life/devlink.py` (`dl`) - A private device <-> a piece of office equipment
 - `kalmido/life/karakeep.py` (`kk`) - Home & life: "Read later" from Karakeep (a person's own connection: bookmarks -> tasks of a reading list, archive back)
+- `kalmido/life/lfkern.py` - Bookmarks and feeds on the one trash of the core (kinds bookmark_link / rss_feed, no routes, node or listing)
 - `kalmido/life/model.py` (`journal`) - Home & life contracts, devices + upkeep, staying in touch, health, the review + journal, trips (the model)
 - `kalmido/life/reading.py` (`rl`) - Reading -- the view "Read later"
 - `kalmido/life/rss.py` (`rss`) - Reading: feeds (RSS 2.0, Atom 1.0, RSS 1.0 / RDF)
@@ -776,6 +777,7 @@ Video sign-offs (review links and media).
 
 - `kalmido/videos/review.py` (`vdr`) - Video sign-off with comments at a timecode (tables video_reviews / video_versions / video_comments)
 - `kalmido/videos/v1.py` (`vdr`) - Video sign-offs for agents and scripts (API v1; scopes read / comments)
+- `kalmido/videos/vdkern.py` - Video sign-offs on the one trash of the core (kind video_review, no routes, node or listing)
 - `kalmido/videos/vdlink.py` (`vdl`) - The customer link of a sign-off for clients without an account, on the approval links of office/signoff.py (kind video; no table and no token way of its own)
 - `kalmido/videos/vdmedia.py` (`vdm`) - The sign-off (videos/review.py)
 - `kalmido/videos/vdrescue.py` - Video sign-offs survive the hard delete of their task, project or client

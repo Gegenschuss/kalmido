@@ -26,8 +26,8 @@ def rfu_label(r):
     return UG_LABEL, [ua_plain(r.get("title") or r.get("url"), r.get("id"))]
 
 
-obj_track(RFU_KIND, "rss_feeds", undo_keep={"rss_feeds": {"user_id", "url", *RFU_FETCH}}, undo_nofp={"rss_feeds": set(RFU_FETCH)},
-          undo_label=rfu_label, undo_free=("deleted_at",))
+obj_track(RFU_KIND, "rss_feeds", undo_keep={"rss_feeds": {"user_id", "url", *RFU_FETCH}}, undo_nofp={"rss_feeds": {"deleted_by", *RFU_FETCH}},
+          undo_label=rfu_label, undo_free=("deleted_at", "deleted_by"))  # 2.925.0 (#5367): deleted_by of the core's trash, not in the fingerprint (steps of before keep theirs)
 GONE[RFU_KIND] = "rss_feeds"  # an account's deletion takes its history / undo rows (core/objhooks.py)
 
 

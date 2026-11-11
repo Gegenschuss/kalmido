@@ -47,10 +47,9 @@ TP_PLAIN = (
     # deals, letters ... set null); never one records (kept by law) point to since -- team/clients.py CL_HOLD
     # 2.223.3 (#2878): the hold rule is team/clients.py cl_hold_sql() (finalised documents only), filled in at the run
     ("clients", "clients", None),
-    # 2.272.0 E1 (#3038): contacts (contact_care notes, contact_tasks, contact_occ cascade), address books (their contacts
-    # cascade; merge undo data expires with mg_prune) and list notes
+    # 2.272.0 E1 (#3038): contacts (contact_care notes, contact_tasks, contact_occ cascade) and list notes; 2.925.0 (#5367):
+    # the address books are the core's trash (core/writes.py obj_trash_tick, their purge hook contacts/ctkern.py bk_purge_prep)
     ("contacts", "contacts", ""),
-    ("books", "books", ""),
     ("notes", "notes", ""),
     # 2.223.3 A (#2879): absences, disposition bookings, scheduling polls (their options and votes cascade), appointment types
     # (their bookings keep the time, type_id set null) and file requests (the link goes with the row; files received stay in
@@ -124,12 +123,8 @@ def tp_tick(c, force=False):
                 with c.savepoint():
                     w = f"FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at<?{extra}"
                     if purge:
-                        if table in ("contacts", "books"):  # 2.351.0 B (#2749): their folder nodes (contacts/ctfolder.py) go with them
-                            c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='{'contact' if table == 'contacts' else 'address_book'}' "
-                                      f"AND ref_id IN (SELECT id {w})", (cut,))
-                        if table == "books":  # 2.272.0 F (#3038, review N7): the merge undo data goes with it, like op_book_purge
-                            c.execute("UPDATE merge_runs SET snapshot='{}' WHERE kind='contact' AND book_id IN "
-                                      f"(SELECT id {w})", (cut,))
+                        if table == "contacts":  # 2.351.0 B (#2749): their folder nodes (contacts/ctfolder.py) go with them
+                            c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='contact' AND ref_id IN (SELECT id {w})", (cut,))
                         if table == "clients":  # 2.530.0 D (#4316, audit B18): their video sign-offs go to the video trash, not by cascade
                             from ..videos.vdrescue import vdr_rescue
                             counts["clients_videos"] = vdr_rescue(c, client_ids=[r[0] for r in c.execute(f"SELECT id {w}", (cut,))])

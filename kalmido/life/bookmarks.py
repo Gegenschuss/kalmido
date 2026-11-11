@@ -15,9 +15,9 @@ from flask import g, has_request_context, jsonify, request
 from ..core.config import app, ATT_DIR, APP_NAME, APP_VERSION
 from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, connect, db, iso, iso_ms, now_utc
-from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
+from ..core.writes import obj_restore, obj_trash  # 2.925.0 (#5367): the core's trash (life/lfkern.py)
 from ..core.pg import insert_id, write_lock
-from ..core.access import Denied
+from ..core.access import Denied, live_sql  # 2.925.0 (#5367): live_sql
 from ..core.conflict import ccf_check  # 2.570.0 (#4770)
 from ..core.orgcrypt import oc_copy_file, oc_send_file, oc_user_space, oc_write_file
 from ..accounts.session import bg_here, me
@@ -56,6 +56,7 @@ BM_HTML_MAX = 1024 * 1024
 BM_IMG_MAX = 1024 * 1024
 BM_TIMEOUT, BM_DEADLINE = 8, 10
 BM_PAGE = 60
+BM_KIND = "bookmark_link"  # 2.925.0 (#5367): the kind of the core's trash (life/lfkern.py; its undo kind is "bookmark")
 BM_TRASH_DAYS = 7          # a deleted bookmark (undo possible) is purged after this
 BM_TICK = 20               # pending previews the watchdog queues per tick
 BM_STATES = ("unread", "read", "archived")
@@ -637,7 +638,8 @@ def _bm_worker():
 
 def _wd_bookmarks(c, users, S, LG, now):  # noqa: ARG001
     """Watchdog: queues previews still pending (a restart, a full queue, Karakeep's new bookmarks) of people with the module
-    on, and purges bookmarks deleted longer than BM_TRASH_DAYS ago (with their pictures)."""
+    on. 2.925.0 (#5367): the bookmarks in the trash are the core's run (life/lfkern.py: trash_prune, their pictures through its
+    purge hook)."""
     on = [u for u in users if "reading" in (S[u].get("features") or "").split(",")]
     if on:
         # 2.97.0 review (M1): at most 3 per person and tick, so one person's many links never hold up the others
@@ -647,22 +649,6 @@ def _wd_bookmarks(c, users, S, LG, now):  # noqa: ARG001
                                        (*on, BM_TICK)).fetchall()]
         if ids:
             bm_kick(ids)
-    if not ret_due("bookmarks"):  # 2.272.0 A (#3026): hourly, trash period + switch like every retention run (off = count only)
-        return
-    old, purge = ret_trash_cut(), ret_on("trash")
-    if not purge:
-        ret_report(c, "trash", {"bookmarks": c.execute("SELECT COUNT(*) FROM bookmarks WHERE deleted_at IS NOT NULL AND deleted_at<?",
-                                                       (old,)).fetchone()[0]}, False, run="bookmarks")
-        c.commit()
-        return
-    gone = c.execute("SELECT id, image FROM bookmarks WHERE deleted_at IS NOT NULL AND deleted_at<? LIMIT 500", (old,)).fetchall()
-    ret_report(c, "trash", {"bookmarks": len(gone)}, True, run="bookmarks")
-    c.commit()
-    if gone:
-        c.execute(f"DELETE FROM bookmarks WHERE id IN ({','.join('?' * len(gone))})", [r[0] for r in gone])
-        c.commit()
-        for r in gone:
-            bm_rm_file(r[1])
 
 
 # ---- moving between workspaces (2.96.0 rules: accounts/spacemove.py)
@@ -816,13 +802,13 @@ def bookmark_patch(bid):
 
 @app.delete("/api/bookmarks/<int:bid>")
 def bookmark_delete(bid):
-    """Deleted (undo: POST /api/bookmarks/<id>/restore within BM_TRASH_DAYS)."""
+    """Deleted (undo: POST /api/bookmarks/<id>/restore within the trash period). 2.925.0 (#5367): the core's trash."""
     c, uid = db(), me()
     bm_need(c, uid)
     write_lock(c, f"bookmarks-{int(bid)}")  # 2.809.0 (#5476): the lock of its saves around its step
     bm_get(c, uid, bid, write=True)
     _bm_step(c, uid, bid, "delete")
-    c.execute("UPDATE bookmarks SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), bid))
+    obj_trash(c, uid, BM_KIND, bid, step=False)  # 2.925.0 (#5367): the core's trash; the step is the bookmarks' own (above)
     bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     _bm_done(c)
     c.commit()
@@ -835,11 +821,11 @@ def bookmark_restore(bid):
     bm_need(c, uid)
     write_lock(c, f"bookmarks-{int(bid)}")  # 2.809.0 (#5476)
     r = bm_get(c, uid, bid, write=True, deleted=True)
-    if c.execute("SELECT 1 FROM bookmarks WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND url_key=? AND deleted_at IS NULL",
+    if c.execute(f"SELECT 1 FROM bookmarks WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND url_key=? AND {live_sql()}",
                  (r["user_id"], r["org_id"], r["url_key"])).fetchone():
         raise Denied(409, tr("This link is already saved"))
     _bm_step(c, uid, bid, "restore")
-    c.execute("UPDATE bookmarks SET deleted_at=NULL WHERE id=?", (bid,))
+    obj_restore(c, uid, BM_KIND, bid, step=False)  # 2.925.0 (#5367): the core's trash
     bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     _bm_done(c)
     c.commit()

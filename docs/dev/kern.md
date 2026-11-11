@@ -199,6 +199,20 @@ c.commit()
   the import run, review 2.905); they come back only through the toast's undo and the office trash. Still on the office trash of copies: drafts, parts, trips, card lines, the start balance (no id
   column) and the sign-offs (`office_signoffs`, rows without an organisation); copies of the moved kinds made before 2.905
   stay restorable there until their period ends (no data move).
+- 2.925.0 (#5367, stage 5 of the trash): the calendar (`evcal`) has its events as `children` and `trash_prune=True`:
+  `op_cal_delete` cancels the invitations and calls `obj_trash` (a step of the person's list, so it can be taken back),
+  `op_cal_restore` `obj_restore`; `ev_cal_trash` / `ev_cal_restore` / `ev_cal_trash_purge` are gone and the events' run
+  keeps only the events deleted on their own. The address books (`address_book`) go into the core's trash with
+  `step=False` (their restore route makes the birthday tasks again and links the clients' contact persons); their purge
+  hook `contacts/ctkern.py bk_purge_prep` takes their contacts' folder nodes and core rows and the merge undo data. Bookmarks
+  (`bookmark_link`, `life/lfkern.py`, purge hook = their stored picture), feeds (`rss_feed`) and video sign-offs
+  (`video_review`, `videos/vdkern.py`) are kinds without routes, node or listing (like the office kinds); their routes keep
+  their checks and call `obj_trash` / `obj_restore` with `step=False`. Bookmarks and feeds keep their own undo step of
+  #5476 (`life/bmundo.py` kind `bookmark`, `life/rssundo.py` kind `feed`: a tracked kind and a core kind never share a
+  name, `_reg` would find the tracked one), which writes `deleted_at` and `deleted_by` back. All five are `trash_prune`
+  kinds: the own runs of the bookmarks, feeds, video sign-offs (reviews; comments deleted on their own stay there), the
+  calendars and the address books' line of `tp_tick` are gone. The rows in the trash before 2.925.0 are the core's trash as
+  they are (`deleted_by` empty: only who manages them restores them).
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
   `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).
@@ -336,7 +350,8 @@ organisations + a private person, read-only, guest, a group, an agent, an expire
   (`admin/purgeshare.py`; people who reached a book through a folder of the deleted person get a share of the node). A workspace move checks the node's shares (`accounts/orgs.py obj_org_set`): a
   person or agent who does not fit the new workspace, or a group's share, is a 409.
 - The calendar's settings are written by `obj_write`, the calendar goes into the core's trash with its events
-  (`ev_cal_trash`, restore `POST /api/evcals/<id>/restore`, purged with the events' trash run). Events are no kind of their
+  (2.925.0, #5367: `obj_trash` with its events as children, restore `POST /api/evcals/<id>/restore`, purged by the core's
+  run). Events are no kind of their
   own (their series, attendees and iCalendar have rules of their own): every change runs under the series lock
   `write_lock('obj-event-<id>')` with the row read again (`ev_lock`), CalDAV's If-Match under the same lock.
 

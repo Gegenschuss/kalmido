@@ -13,9 +13,9 @@ from html.parser import HTMLParser
 from ..core.config import APP_NAME, APP_VERSION
 from ..core.i18n import N_, tr
 from ..core.db import connect, iso, now_utc, parse_iso
-from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
+from ..core.writes import obj_restore, obj_trash  # 2.925.0 (#5367): the core's trash (life/lfkern.py)
 from ..core.pg import IntegrityError, insert_id, write_lock
-from ..core.access import Denied, task_visible
+from ..core.access import Denied, live_sql, task_visible  # 2.925.0 (#5367): live_sql
 from ..accounts.orgs import is_org_admin, user_orgs
 from ..accounts.orgroles import need_org_area, org_writes
 from ..tasks.validation import as_int, TITLE_MAX
@@ -48,6 +48,7 @@ RSS_SUMMARY_MAX = 500
 RSS_TITLE_MAX = 300
 RSS_URL_MAX = 2000
 RSS_PAGE = 50
+RSS_KIND = "rss_feed"     # 2.925.0 (#5367): the kind of the core's trash (life/lfkern.py; its undo kind is "feed", life/rssundo.py)
 RSS_TRASH_DAYS = 7         # a deleted feed (undo possible) is purged after this
 RSS_UA = {"Accept": "application/rss+xml, application/atom+xml, application/rdf+xml, application/xml, text/xml;q=0.9, */*;q=0.5",
           # 2.172.0 B (#2678): an own sender for feeds (the calendar one stays for calendars)
@@ -429,7 +430,8 @@ def rss_add(c, uid, b):
     new, code = rss_fetch(c, f)
     if code:
         if old:
-            c.execute("UPDATE rss_feeds SET deleted_at=? WHERE id=?", (old["deleted_at"], fid))
+            # 2.925.0 (#5367): back into the trash as it was (the core's deleted_by with it)
+            c.execute("UPDATE rss_feeds SET deleted_at=?, deleted_by=? WHERE id=?", (old["deleted_at"], old["deleted_by"], fid))
         else:
             c.execute("DELETE FROM rss_feeds WHERE id=?", (fid,))
         raise BadInput(rss_err_text(code))
@@ -449,14 +451,15 @@ RSS_STEP = {}  # 2.809.0 (#5476): {pre, post} of the feeds' undo steps (life/rss
 
 
 def rss_delete(c, uid, fid):
-    """Deleted with its articles hidden; POST .../restore brings it back (purged after RSS_TRASH_DAYS)."""
+    """Deleted with its articles hidden; POST .../restore brings it back (2.925.0 #5367: the core's trash, deleted for good by
+    the core's run after the trash period)."""
     rss_need(c, uid)
     f = rss_own(c, uid, fid, manage=True)
     if not f["deleted_at"]:
         write_lock(c, f"rss_feeds-{int(fid)}")  # 2.809.0 (#5476): the person's step (life/rssundo.py) under its lock
         if RSS_STEP:
             RSS_STEP["pre"](c, uid, fid, "delete")
-        c.execute("UPDATE rss_feeds SET deleted_at=? WHERE id=?", (iso(now_utc()), fid))
+        obj_trash(c, uid, RSS_KIND, fid, step=False)  # 2.925.0 (#5367): the core's trash; the step is the feeds' own (above)
         if RSS_STEP:
             RSS_STEP["post"](c)
     return {"ok": True}
@@ -468,15 +471,18 @@ def rss_restore(c, uid, fid):
     if f["deleted_at"]:
         oid = f["org_id"]
         w, a = _fw(oid, uid, "rss_feeds")
-        if c.execute(f"SELECT 1 FROM rss_feeds WHERE {w} AND url=? AND deleted_at IS NULL", (*a, f["url"])).fetchone():
+        if c.execute(f"SELECT 1 FROM rss_feeds WHERE {w} AND url=? AND {live_sql()}", (*a, f["url"])).fetchone():
             raise BadInput(tr("You already follow this feed"))
         if _count(c, uid, oid) >= RSS_MAX_FEEDS:
             raise BadInput(tr("At most {0} feeds", RSS_MAX_FEEDS))
         write_lock(c, f"rss_feeds-{int(fid)}")  # 2.809.0 (#5476): the person's step (life/rssundo.py) under its lock
         if RSS_STEP:
             RSS_STEP["pre"](c, uid, fid, "restore")
-        if not rg4_feed_restore(c, fid):  # 2.122.4 A (#1906): followed again in parallel
-            raise BadInput(tr("You already follow this feed"))
+        try:  # 2.925.0 (#5367): the core's restore; 2.122.4 A (#1906): followed again in parallel (the unique index)
+            with c.savepoint():
+                obj_restore(c, uid, RSS_KIND, fid, step=False)
+        except IntegrityError:
+            raise BadInput(tr("You already follow this feed")) from None
         if RSS_STEP:
             RSS_STEP["post"](c)
     return {"feed": rss_feed_out(rss_own(c, uid, fid))}
@@ -602,10 +608,11 @@ def rss_opml_export(c, uid, oid=None):
 
 def rg4_feed_restore(c, fid):
     """2.122.4 A (#1906): a deleted feed comes back -> False when the same address is followed again meanwhile (the unique
-    index rss_feeds_live refuses a second live row)."""
+    index rss_feeds_live refuses a second live row). 2.925.0 (#5367): following the same address again (add / OPML import),
+    not the trash's restore (rss_restore, the core's obj_restore)."""
     try:
         with c.savepoint():
-            c.execute("UPDATE rss_feeds SET deleted_at=NULL WHERE id=?", (fid,))
+            c.execute("UPDATE rss_feeds SET deleted_at=NULL, deleted_by=NULL WHERE id=?", (fid,))
         return True
     except IntegrityError:
         return False
@@ -718,16 +725,12 @@ _RSS_RUN = threading.Lock()
 def _wd_feeds(c, users, S, LG, now):  # noqa: ARG001
     """Watchdog: starts the fetch of due feeds of people with the module on in a thread of its own (2.85.0 review: a slow
     feed server never holds up reminders and the other sections; at most one run at a time) and cleans up old articles
-    and deleted feeds."""
+    (2.925.0 #5367: the deleted feeds go with the core's trash run, life/lfkern.py trash_prune=True)."""
     on = [u for u in users if "feeds" in (S[u].get("features") or "").split(",")]
     if on and _RSS_RUN.acquire(blocking=False):
         threading.Thread(target=_rss_run, args=(on,), daemon=True).start()
     nu = now_utc()
     c.execute("DELETE FROM rss_items WHERE published<?", (iso(nu - timedelta(days=RSS_KEEP_DAYS)),))
-    if ret_due("feeds"):  # 2.272.0 A (#3026): deleted feeds hourly, trash period + switch (off = count only); articles = cache
-        w, purge = "FROM rss_feeds WHERE deleted_at IS NOT NULL AND deleted_at<?", ret_on("trash")
-        n = c.execute(f"DELETE {w}", (ret_trash_cut(),)).rowcount if purge else c.execute(f"SELECT COUNT(*) {w}", (ret_trash_cut(),)).fetchone()[0]
-        ret_report(c, "trash", {"feeds": n}, purge, run="feeds")
     c.commit()
 
 

@@ -9,7 +9,6 @@ from flask import jsonify, request, Response
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from ..core.config import app
-from ..core.objhooks import obj_rows_drop, obj_rows_drop_many  # 2.578.0 (#4796)
 from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, connect, db, err, iso, iso_ms, now_utc
 from ..core.pg import system_ctx, write_lock  # 2.269.0 B (#3034); 2.370.3 (#2760): system_ctx
@@ -39,6 +38,9 @@ from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from 
 from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 from ..core.conflict import Conflict  # 2.564.0 (#4701/#4702)
 from ..core.conflict import ccf_check, kern_version_seed, take_version  # 2.657.0 (#5052)
+from ..core.writes import obj_purge, obj_restore, obj_trash  # 2.925.0 (#5367): the core's trash (contacts/ctkern.py)
+from ..core.access import live_sql, trash_sql  # 2.925.0 (#5367)
+from .ctfolder import CTF_BOOK  # 2.925.0 (#5367): the kind of the core
 
 # 2.41.0 (#1437): never above the request limit (MAX_CONTENT_LENGTH answers 413 before the route), whole MB for the message
 VCF_MAX = min(50, (app.config.get("MAX_CONTENT_LENGTH") or 0) // (1024 * 1024) or 50) * 1024 * 1024
@@ -73,11 +75,11 @@ def ctt_days():
 def op_books_trash(c, uid):
     """2.272.0 E1 (#3038): the address books in the trash that uid may restore (owner / the organisation's admin)."""
     oids = user_orgs(c, uid)
-    rows = c.execute("SELECT * FROM books WHERE deleted_at IS NOT NULL AND ((owner_id=? AND owner_org_id IS NULL)"
+    rows = c.execute(f"SELECT * FROM books WHERE {trash_sql()} AND ((owner_id=? AND owner_org_id IS NULL)"
                      + (f" OR owner_org_id IN ({','.join('?' * len(oids))})" if oids else "") + ") ORDER BY deleted_at DESC, id",
                      [uid, *oids]).fetchall()
     return [{"id": b["id"], "name": b["name"], "color": b["color"], "deleted_at": b["deleted_at"],
-             "count": c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND kind!='group' AND deleted_at IS NULL", (b["id"],)).fetchone()[0]}
+             "count": c.execute(f"SELECT COUNT(*) FROM contacts WHERE book_id=? AND kind!='group' AND {live_sql()}", (b["id"],)).fetchone()[0]}
             for b in rows if book_role(c, uid, b, trash=True) == "owner"]
 
 
@@ -139,7 +141,8 @@ def op_book_edit(c, uid, bid, b):
 
 def op_book_delete(c, uid, bid):
     """2.272.0 E1 (#3038): the address book goes to the trash with its contacts (restore within ctt_days, then deleted for
-    good by files/trashpurge.py); the undo data of merges into it stays while it can come back. -> {contacts: n}."""
+    good by the core's run); the undo data of merges into it stays while it can come back. -> {contacts: n}.
+    2.925.0 (#5367): the core's trash (obj_trash, its node with it; contacts/ctkern.py)."""
     b, _ = need_book(c, bid, manage=True)
     from ..api.scopes import need_approval  # 2.148.1 D (#2495): an agent deleting a whole address book waits for a person
     need_approval(c, N_("Delete the address book “{0}” with all its contacts"), ((b["name"] or "")[:80],))
@@ -147,11 +150,11 @@ def op_book_delete(c, uid, bid):
     nls_keep(c, [r["id"] for r in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND nl_status IN ({','.join('?' * len(NWL_BLOCKED))})",
                                              (bid, *NWL_BLOCKED))])
     # 2.272.0 E1 (#3038): its birthday tasks go to the trash (made again on restore)
-    live = [r[0] for r in c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NULL", (bid,)).fetchall()]
+    live = [r[0] for r in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND {live_sql()}", (bid,)).fetchall()]
     bk_occ_drop(c, uid, live)
     ctt_unlink(c, live)  # clients' contact persons: unlinked as before
-    n = c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND kind!='group' AND deleted_at IS NULL", (bid,)).fetchone()[0]
-    c.execute("UPDATE books SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), bid))
+    n = c.execute(f"SELECT COUNT(*) FROM contacts WHERE book_id=? AND kind!='group' AND {live_sql()}", (bid,)).fetchone()[0]
+    obj_trash(c, uid, CTF_BOOK, bid, step=False)  # step=False: the restore route makes the birthday tasks again (ctkern)
     bump(c)
     c.commit()
     return {"contacts": n, "trash_days": ctt_days()}
@@ -163,9 +166,9 @@ def op_book_restore(c, uid, bid):
     if b["deleted_at"]:
         if not b["owner_org_id"]:  # 2.370.4 (#3089, review N4): the trash does not count against BOOKS_MAX, a restore does
             bk_max_check(c, b["owner_id"])
-        c.execute("UPDATE books SET deleted_at=NULL WHERE id=?", (bid,))
-        ctt_relink(c, [r[0] for r in c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NULL", (bid,)).fetchall()])  # 2.272.0 F (M8)
-        for (cid,) in c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NULL AND (bday!='' OR anniversary!='')",
+        obj_restore(c, uid, CTF_BOOK, bid, step=False)  # 2.925.0 (#5367): the core's trash, its node with it
+        ctt_relink(c, [r[0] for r in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND {live_sql()}", (bid,)).fetchall()])  # 2.272.0 F (M8)
+        for (cid,) in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND {live_sql()} AND (bday!='' OR anniversary!='')",
                                 (bid,)).fetchall():
             occ_sync(c, cid)
         book_touch(c, bid)
@@ -179,14 +182,10 @@ def op_book_purge(c, uid, bid):
     b, _ = need_book(c, bid, manage=True, trash=True)
     if not b["deleted_at"]:
         raise Denied(409, tr("Only what is in the trash can be deleted permanently"))
-    cts = [r[0] for r in c.execute("SELECT id FROM contacts WHERE book_id=?", (bid,)).fetchall()]  # review 2.578 F2: they go along
-    c.execute("DELETE FROM books WHERE id=?", (bid,))
-    from .ctfolder import CTF_BOOK, CTF_CONTACT, ctf_dropped
-    obj_rows_drop(c, CTF_BOOK, bid)  # 2.578.0 (#4796): its history / undo rows of the core go with it
-    obj_rows_drop_many(c, CTF_CONTACT, cts, gone="contacts")  # review 2.578 F2: + those of its contacts (cascade over book_id)
-    ctf_dropped(c, CTF_BOOK, bid)  # 2.351.0 B (#2749): its folder node goes
-    # 2.66.0 (#1835): the undo data of merges into this book goes with it (the history line stays)
-    c.execute("UPDATE merge_runs SET snapshot='{}' WHERE kind='contact' AND book_id=?", (bid,))
+    # 2.925.0 (#5367): the core's delete for good (obj_purge: its node, history / undo rows, the row -- its contacts by cascade);
+    # its purge hook takes first what the core does not know (contacts/ctkern.py bk_purge_prep: its contacts' nodes and core
+    # rows, review 2.578 F2; 2.66.0 #1835: the undo data of merges into it)
+    obj_purge(c, uid, CTF_BOOK, bid)
     bump(c)
     c.commit()
 

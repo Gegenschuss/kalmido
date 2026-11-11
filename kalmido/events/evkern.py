@@ -9,14 +9,13 @@ The calendar (ev_cals) is the object kind 'evcal' of core/objects.py:
 - losing access is the core's: obj_revoke_person takes the shares of the node when a person leaves the organisation and when
   it retires (#4697), restorable 30 days (obj_revoked; GET /api/obj/evcal/<id>/shares, POST .../shares/<rid>/restore).
 - its settings (name, colour, description) are written by obj_write (lock, version expect_updated_at, history, rev) and the
-  calendar goes into the core's trash (obj_trash, #4707) with its events; restoring it brings them back.
+  calendar goes into the core's trash (obj_trash, #4707) with its events (children, 2.925.0 #5367); restoring it brings them back.
 - the file store: its node may lie in folders; as for the address books (files/fsref.py 2.199.0 F) filing it and sharing its
   folder stay with its owner (fs base role 'edit' only for 'manage', a member 'view'), so a member cannot pass it on.
 The kind has no generic routes (routes=False): the calendar's own routes (events/web.py) call these functions; agents keep
 their calendar API (events/v1.py, docs/AGENTS.md)."""
 import re
 
-from ..core.db import iso_ms, now_utc
 from ..core.errors import BadInput, Denied  # 2.924.0 (#5069): Denied for ev_kern_drop
 from ..core.i18n import N_, tr
 from ..collab.news import news_add  # 2.924.0 (#5069): _share_back
@@ -26,10 +25,9 @@ from ..collab.tcxcore import TCX_RETIRE_WAITS  # 2.924.0 (#5069): the one text o
 from ..core.objects import obj_node, obj_node_follow, obj_node_person_drop, obj_node_person_put, obj_register, obj_role, obj_visible_sql
 from ..core import objhooks
 from ..core.pg import qi, system_ctx, ts_canon, write_lock  # 2.940.0 (#5605): ts_canon
-from ..core.writes import obj_restore, obj_trash, obj_trash_prune, obj_write
-from .invite import evi_cal_cancel
+from ..core.writes import obj_restore, obj_trash, obj_write
 from ..contacts.model import BK_KERN
-from .model import EV_KIND, KERN, _ev_role, cal_touch, ev_tell
+from .model import EV_KIND, KERN, _ev_role, cal_touch
 
 
 def _cal(c, cid):
@@ -72,12 +70,13 @@ def _fs_space(c, cid):
 
 def _fs_on_trash(c, uid, cid, restore):
     """Its node came back out of the file store's trash while the calendar is in the core's trash: its owner restores the
-    calendar with its events (ev_cal_restore), anyone else leaves both in the trash."""
+    calendar with its events (obj_restore, 2.925.0 #5367), anyone else leaves both in the trash."""
     cal = _cal(c, cid)
     if not restore or cal is None or not cal["deleted_at"]:
         return None
     if uid and _ev_role(c, uid, cal) == "owner":
-        ev_cal_restore(c, uid, cid)
+        obj_restore(c, uid, EV_KIND, cid, step=False)  # 2.925.0 (#5367): the core's way, its events (children) with it
+        cal_touch(c, cid)
         return None
     c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE kind='ref' AND ref_kind=? AND ref_id=?",
               (cal["deleted_at"], cal["deleted_by"], EV_KIND, int(cid)))
@@ -123,44 +122,17 @@ obj_register(EV_KIND, "ev_cals", label=N_("Calendar"), fields={"name": _f_name, 
              title=lambda c, rid: (_cal(c, rid) or {"name": ""})["name"], base_role=_base, visible=_visible, area="calendar",
              scopes=("calendar", "calendar"), dl_area="calendar", routes=False, node_shares=True, on_share_back=_share_back,
              open_url=lambda rid: "cal", fs_hooks={"base_role": _fs_base, "on_trash": _fs_on_trash,
-                                                  "space": _fs_space})  # 2.940.0 (#5605): _fs_space
+                                                  "space": _fs_space},  # 2.940.0 (#5605): _fs_space
+             children=(("events", "cal_id"),), trash_prune=True)  # 2.947.0 (#5367)
 
 
 # ---------------------------------------------------------------- the trash (#4707)
-def ev_cal_trash(c, uid, cid):
-    """The calendar into the core's trash (its owner, obj_trash): its live events go with it (the same deleted_at, so the
-    restore knows them) and the people invited to them learn they are cancelled. Returns the external invitations' mails
-    (events/invite.py evi_cal_cancel) for the caller to send after the commit."""
-    mails = evi_cal_cancel(c, uid, cid)  # 2.111.0 B (#2056): its invited external attendees learn the events are gone
-    rows = c.execute("SELECT * FROM events WHERE cal_id=? AND deleted_at IS NULL", (int(cid),)).fetchall()
-    for r in rows:
-        ev_tell(c, r, "cancelled")  # 2.367.2 (#2969): the people of the server too
-    row = obj_trash(c, uid, EV_KIND, cid, step=False)  # 2.773.0 (#5292): no undo step until the events move onto the core trash (children)
-    c.execute("UPDATE events SET deleted_at=?, updated_at=? WHERE cal_id=? AND deleted_at IS NULL", (row["deleted_at"], iso_ms(now_utc()), int(cid)))
-    cal_touch(c, cid)
-    return mails
-
-
-def ev_cal_restore(c, uid, cid):
-    """Out of the trash (its owner): the calendar and the events that went with it (not the ones deleted before)."""
-    cal = _cal(c, cid)
-    at = cal["deleted_at"] if cal is not None else None
-    row = obj_restore(c, uid, EV_KIND, cid, step=False)  # 2.773.0 (#5292): see ev_cal_trash
-    if at:
-        c.execute("UPDATE events SET deleted_at=NULL, updated_at=? WHERE cal_id=? AND deleted_at=?", (iso_ms(now_utc()), int(cid), at))
-    cal_touch(c, cid)
-    return row
-
-
-def ev_cal_trash_purge(c, cut, purge, old=None):
-    """The calendars in the trash longer than the trash period (events/model.py ev_reminders' retention run): deleted for
-    good with their events and node (purge False: only counted). Returns their number. old: their ids when the caller
-    has read them already (2.582.0, #4810: _wd_events reads them with the events in one statement)."""
-    # 2.773.0 (#5292): the core trash's own run (core/writes.py obj_trash_prune: node, history, undo steps with their groups)
-    return obj_trash_prune(c, EV_KIND, cut, purge, ids=old)
-
-
-KERN.update(trash=ev_cal_trash, restore=ev_cal_restore, purge=ev_cal_trash_purge)
+# 2.925.0 (#5367, stage 5 of the core's trash): the calendar's events are children of the kind (obj_register children):
+# obj_trash / obj_restore take them into the trash and back (the ones deleted on their own before keep their time), the
+# person's step can be taken back (/api/undo) and the core's hourly run (obj_trash_tick, trash_prune=True) deletes a calendar
+# past the trash period with its events -- the calendar's own trash / restore / purge ways (ev_cal_trash, ev_cal_restore,
+# ev_cal_trash_purge) are gone. The cancellations of its invitations stay with the route (events/web.py op_cal_delete).
+KERN.update(trash=obj_trash, restore=obj_restore)
 
 
 # ---------------------------------------------------------------- 2.924.0 (#5069): stage 7b, the old member tables go
@@ -206,7 +178,7 @@ def _old_triggers_drop(c, out):
 def _node_trash_as_cal(c, n, cid):
     """2.940.0 (#5605): the node ev_kern_drop just made for a calendar in the core's trash goes into the file store's trash
     with it, as obj_trash puts it (review F7: no live node of a calendar in the trash) -- the same point in time, so
-    obj_restore (ev_cal_restore) brings it back and its shares count at once."""
+    obj_restore brings it back and its shares count at once."""
     cal = _cal(c, cid)
     if cal is not None and cal["deleted_at"]:
         c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?",  # the node made just now

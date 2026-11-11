@@ -51,6 +51,8 @@ from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_tar
 from .vdmedia import vdm_body, vdm_files_ok, vdm_has_files, vdm_marks, vdm_media, vdm_need_movable, vdm_pos, vdm_pos_dict, vdm_pos_text, vdm_send, vdm_version_row  # 2.641.0 (#4769)
 from .vdmedia import vdm_pub_send  # 2.658.0 (#5015)
 from .vdmedia import vdm_pub_pos, vdm_pub_stage  # 2.764.0 (#5040)
+from ..core.writes import obj_restore, obj_trash  # 2.925.0 (#5367): the core's trash (videos/vdkern.py)
+from ..core.access import trash_sql  # 2.925.0 (#5367)
 
 VDR_URL_MAX, VDR_TITLE_MAX, VDR_BODY_MAX, VDR_NAME_MAX = 2000, 200, 2000, 120
 VDR_AT_MAX = 86400.0                     # a timecode lies within 24 hours
@@ -58,6 +60,7 @@ VDR_PUB_RATE, VDR_PUB_HOUR = 10, 60      # customer comments per client address 
 VDR_MEDIA_LINK_RATE = 600               # 2.658.0 (Fable review): requests for one link's audio file per minute over all addresses
 VDR_MEDIA_RATE = 240                     # 2.658.0 (#5015): requests for the customer page's audio file per client address and minute (seeking = ranges)
 VDR_STATES = ("open", "approved", "changes")
+VDR_KIND = "video_review"  # 2.925.0 (#5367): the kind of the core's trash (videos/vdkern.py)
 VDR_FILE_RE = re.compile(r"\.(mp4|m4v|webm|mov)$", re.I)
 # 2.633.0 (#4777): audio over a direct https link -- recognised by the file name only (Kalmido fetches no foreign URL), played by
 # the browser's own <audio> element (no script, no SoundCloud / Spotify); comments at a second like a video file
@@ -466,11 +469,11 @@ def vdr_patch(vid):
 
 @app.delete("/api/videos/<int:vid>")
 def vdr_delete(vid):
-    """To the trash (deleted_at; restore = the undo); its open customer link stops at once."""
+    """To the trash (deleted_at; restore = the undo); its open customer link stops at once. 2.925.0 (#5367): the core's
+    trash (obj_trash; step=False: the app's undo is the restore route with its place check)."""
     c, uid = db(), me()
     vdr_need(c, vid, write=True)
-    ts = iso(now_utc())
-    c.execute("UPDATE video_reviews SET deleted_at=? WHERE id=?", (ts, vid))
+    ts = obj_trash(c, uid, VDR_KIND, vid, step=False)["deleted_at"]
     c.execute("UPDATE office_signoffs SET revoked_at=? WHERE video_id=? AND state='open' AND revoked_at IS NULL", (ts, vid))
     c.commit()
     return jsonify(ok=True)
@@ -489,7 +492,7 @@ def vdr_trash():
     # on a hosted instance other tenants' rows could have pushed the own ones out (the trash is pruned, so it stays small)
     orgs = [int(o) for o in user_orgs(c, uid)]
     org_sql = f"org_id IN ({','.join('?' * len(orgs))})" if orgs else "1=0"
-    rows = c.execute("SELECT * FROM video_reviews WHERE deleted_at IS NOT NULL AND (" + org_sql + " OR (org_id IS NULL AND (owner_id=? "
+    rows = c.execute(f"SELECT * FROM video_reviews WHERE {trash_sql()} AND (" + org_sql + " OR (org_id IS NULL AND (owner_id=? "
                      "OR created_by=? OR task_id IS NOT NULL OR list_id IS NOT NULL OR client_id IS NOT NULL))) ORDER BY deleted_at DESC, id DESC",
                      (*orgs, uid, uid)).fetchall()
     out = []
@@ -524,7 +527,7 @@ def vdr_restore(vid):
         if (o or None) != (r["org_id"] or None):
             raise Denied(409, tr("Invalid value: {0}", "list_id"))  # another workspace: that is "Move to another workspace"
         c.execute("UPDATE video_reviews SET list_id=? WHERE id=?", (lid, vid))
-    c.execute("UPDATE video_reviews SET deleted_at=NULL WHERE id=?", (vid,))
+    obj_restore(c, uid, VDR_KIND, vid, step=False)  # 2.925.0 (#5367): the core's trash
     c.commit()
     return jsonify(vdr_dict(c, vdr_reload(c, vid), uid, full=True))
 
@@ -1131,16 +1134,17 @@ VDR_PRUNE = {"at": 0.0}
 
 
 def vdr_trash_prune(c):
-    """2.99.1 review M3: reviews and comments in the trash longer than VDR_TRASH_DAYS go for good (versions and comments of a
-    review with it, FK cascade; its approval records stay with video_id NULL, 2.148.1 C #2493: admins / the creator see and
-    delete them, office/signoff.sig_gone_list). The watchdog calls it, at most hourly (system context: every workspace)."""
+    """2.99.1 review M3: comments in the trash longer than the trash period go for good. The watchdog calls it, at most hourly
+    (system context: every workspace). 2.925.0 (#5367): the reviews are the core's trash (videos/vdkern.py, trash_prune=True):
+    the core's hourly run deletes them (versions and comments with them, FK cascade; their approval records stay with
+    video_id NULL, 2.148.1 C #2493: admins / the creator see and delete them, office/signoff.sig_gone_list); this run keeps only
+    the comments deleted on their own (no kind of the core)."""
     import time
     if time.time() - VDR_PRUNE["at"] < 3600:
         return
     VDR_PRUNE["at"] = time.time()
-    cut, purge, counts = ret_trash_cut(), ret_on("trash"), {}  # 2.272.0 A (#3026): trash period + switch (off = count only)
-    for key, table in (("comments", "video_comments"), ("reviews", "video_reviews")):
-        w = f"FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at<?"
-        counts[key] = c.execute(f"DELETE {w}", (cut,)).rowcount if purge else c.execute(f"SELECT COUNT(*) {w}", (cut,)).fetchone()[0]
-    ret_report(c, "trash", counts, purge, run="videos")
+    cut, purge = ret_trash_cut(), ret_on("trash")  # 2.272.0 A (#3026): trash period + switch (off = count only)
+    w = f"FROM video_comments WHERE {trash_sql()} AND deleted_at<?"
+    n = c.execute(f"DELETE {w}", (cut,)).rowcount if purge else c.execute(f"SELECT COUNT(*) {w}", (cut,)).fetchone()[0]
+    ret_report(c, "trash", {"comments": n}, purge, run="videos")
     c.commit()

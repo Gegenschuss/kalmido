@@ -16,7 +16,7 @@ tenant-matrix: office
  - 3 the last hard deletes of #4707 go into the office trash and come back: a quotation part with its positions (DELETE
    .../parts/<id> answers trash_id; restore brings part and positions back and names the quotation), an office rights group
    (its definition comes back, its members do not), an orphaned video sign-off record (the trash of its office)
- - 4 events/evkern.py ev_cal_trash_purge: a calendar in the trash with members, events, a feed, history, an undo step and a
+ - 4 the calendars' trash run (2.925.0 #5367: obj_trash_prune, kind evcal; was events/evkern.py ev_cal_trash_purge): a calendar in the trash with members, events, a feed, history, an undo step and a
    revoked share is deleted for good with all of them and its node; purge False only counts; a calendar not in the trash stays
 The same for a person without an organisation (freelancer_fixture: the personal office, her private files and calendar).
 usage: p2747_a_buero_test.py <datadir>"""
@@ -217,8 +217,9 @@ def cal_purge(who, s, agid):
     have = {t: sql(f"SELECT COUNT(*) FROM {t} WHERE kind='evcal' AND ref_id=?", (k,))[0][0] for t in ("obj_history", "obj_undo", "obj_revoked")}
     check(node and all(have.values()), f"4 {who}: setup: a node, history, an undo step and a revoked share {node} {have}")
     check(s.delete(B + f"/api/evcals/{k}").ok, f"4 {who}: the calendar into the trash")
-    code = "from kalmido.core.pg import system_ctx\nfrom kalmido.events.evkern import ev_cal_trash_purge\nwith system_ctx(c):\n" \
-           "    print('n', ev_cal_trash_purge(c, '9999', {0}))\nc.commit()"
+    # 2.925.0 (#5367): ev_cal_trash_purge is gone - the calendars' trash is the core's run (obj_trash_prune, kind evcal)
+    code = "from kalmido.core.pg import system_ctx\nfrom kalmido.core.writes import obj_trash_prune\nwith system_ctx(c):\n" \
+           "    print('n', obj_trash_prune(c, 'evcal', '9999', {0}))\nc.commit()"
     out = in_app(code.format("False"))
     check("n " in out and "Traceback" not in out and sql("SELECT 1 FROM ev_cals WHERE id=?", (k,)), f"4 {who}: purge off: only counted, still there {out[-300:]}")
     out = in_app(code.format("True"))

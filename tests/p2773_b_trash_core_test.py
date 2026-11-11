@@ -202,10 +202,12 @@ c.commit()""")
 check("PURGED 1" in out and gone(O2) and parts(O2) == {} and not gone(O3) and len(parts(O3)) == 3,
       f"switch on: the old one with its children gone, the young one stays {out[-300:]}")
 
-# ---- the calendars' run goes the same core way (events/evkern.py ev_cal_trash_purge -> obj_trash_prune)
-out = in_app("""from kalmido.events.evkern import ev_cal_trash_purge
-print("CAL", ev_cal_trash_purge(c, "2000-01-01T00:00:00+00:00", False))""")
-check("CAL 0" in out, f"the calendars' retention run answers through the core {out[-300:]}")
+# ---- the calendars' run goes the same core way
+# 2.925.0 (#5367): ev_cal_trash_purge is gone - the calendars are a trash_prune kind of the core's run itself
+out = in_app("""from kalmido.core.objects import OBJ
+from kalmido.core.writes import obj_trash_prune
+print("CAL", obj_trash_prune(c, "evcal", "2000-01-01T00:00:00+00:00", False), OBJ["evcal"]["trash_prune"])""")
+check("CAL 0 True" in out, f"the calendars' retention run answers through the core {out[-300:]}")
 
 # ---------------------------------------------------------------- live_sql / trash_sql
 out = in_app("""from kalmido.core.access import live_sql, trash_sql, otr_live

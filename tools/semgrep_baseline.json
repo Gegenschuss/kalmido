@@ -3566,14 +3566,6 @@
    "date": "2026-11-05"
   },
   {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/videos/review.py",
-   "code": "w = f\"FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at<?\"",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
    "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
    "file": "kalmido/wiki/pages.py",
    "code": "for r in c.execute(f\"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE deleted_at IS NULL AND {ws} \"",
