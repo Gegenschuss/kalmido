@@ -88,6 +88,7 @@ def run(s, who):
 
 run(A, "Alice")
 run(Fr, "Frida")
-check(bool(kt.dbx("SELECT 1 FROM pg_indexes WHERE indexname='obj_undo_kind_ref'")), "#5582 c) the index obj_undo(kind, ref_id) exists")
+# 2.936.0: the index came with #5564 (migrations.d/5564_a.py, obj_undo_ref), #5582 needs no own one
+check(bool(kt.dbx("SELECT 1 FROM pg_indexes WHERE indexname='obj_undo_ref'")), "#5582 c) the index obj_undo(kind, ref_id) exists (#5564)")
 
 sys.exit(done("p2936_c_lock_rest"))
