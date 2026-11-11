@@ -77,12 +77,17 @@ def otr_need(c, lid):
     return r
 
 
-def otr_hard(c, lid):
-    """Deletes the (deleted) list lid for good with all its tasks. Returns (icon, file paths) to drop after the commit."""
+def otr_hard(c, lid, early=False):
+    """Deletes the (deleted) list lid for good with all its tasks. Returns (icon, file paths) to drop after the commit.
+    early = the custodian deletes a project kept by law before the end of its period (otr_held, checked by the caller);
+    without it a project kept by law stays (None)."""
     from ..tasks.tasks import hard_delete
     # 2.102.0 review F1: lock the row and look again - a restore committed meanwhile wins (it waits on this lock, then finds nothing)
-    r = c.execute("SELECT deleted_at FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
+    r = c.execute("SELECT deleted_at, retain_until FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
     if not r or not r[0]:
+        return None
+    # 2.992.0 (#5635): retain_until looked at under the row lock too (set meanwhile = kept by law), like ttp_purge for tasks
+    if not early and (r[1] or "") >= now_utc().date().isoformat():
         return None
     files = hard_delete(c, [x[0] for x in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))], lists={lid})
     icon, lfiles = list_purge(c, lid, None)  # no task is left to move: list_purge only drops the list row + its files
@@ -156,8 +161,8 @@ def otr_delete(lid):
         return err(tr("Type the project name to confirm"), 409)
     if not early and (r["retain_until"] or "") >= now_utc().date().isoformat():  # 2.186.0 A (#2566): kept by law until then
         return err(tr("This project keeps receipts by law until {0}: it can be deleted permanently after that.", r["retain_until"]), 409)
-    got = otr_hard(c, lid)
-    if got is None:  # 2.102.0 review F1: restored meanwhile
+    got = otr_hard(c, lid, early=early)
+    if got is None:  # 2.102.0 review F1: restored meanwhile; 2.992.0 (#5635): or kept by law meanwhile
         raise Denied(404)
     icon, files = got
     if r["org_id"]:
@@ -189,7 +194,7 @@ def otr_core_purge(c, lid):
     files after its commit. Denied(409) = it stays (restored meanwhile). An error undoes this project only (the core's
     savepoint), it waits for the next run and the run reports it as list_err (core/writes.py _purge_area). otr_prune went."""
     got = otr_hard(c, lid)
-    if got is None:  # 2.102.0 review F1: restored meanwhile
+    if got is None:  # 2.102.0 review F1: restored meanwhile; 2.992.0 (#5635): or kept by law meanwhile
         raise Denied(409)
     icon, files = got
     return [lambda: otr_drop_files(lid, icon, files)]
