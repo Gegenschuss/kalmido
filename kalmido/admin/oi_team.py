@@ -852,7 +852,7 @@ def _oi_have(c, run, src, kind, table, cond, args, most):
 def _ttype(c, run, src, d, ctx):
     """An own ticket type: key as tasks.ttype stores it (tasks keep their type by the key, nothing to map), never a built-in one."""
     key = src.get("key")
-    if not isinstance(key, str) or not TT_KEY_RE.match(key) or key in TICKET_TYPES or key == "none":
+    if not isinstance(key, str) or not TT_KEY_RE.fullmatch(key) or key in TICKET_TYPES or key == "none":
         return None
     try:
         f = tt_clean({"name": src.get("name"), "icon": src.get("icon") or "", "color": src.get("color") or "",
@@ -875,7 +875,7 @@ def _ofield(c, run, src, d, ctx):
     try:
         opts = json.loads(src["options"]) if isinstance(src.get("options"), str) else src.get("options")
         name, ftype, opts = field_clean_def({"name": src.get("name"), "type": src.get("type"), "options": opts if isinstance(opts, dict) else {}})
-    except (BadInput, ValueError):
+    except (BadInput, ValueError, TypeError, RecursionError):  # review F6: a deeply nested options text skips the row only
         return None
     if ftype in OF_TYPES_OFF:
         return None

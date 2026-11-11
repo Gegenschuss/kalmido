@@ -116,4 +116,12 @@ assert F.patch(B + f"/api/tasks/{TD}", json={"title": "Plan the offsite (draft)"
 check(not evs(TA, s0, "task_changed", TD) and evs(TA, s0, "assigned", TD),
       f"#4030 review: delegated in the same request: assigned, no task_changed {[e.get('event') for e in events(TA, s0)]}")
 
+# review F2: a bulk change of more tasks than AGENT_CHANGED_MAX (50) announces at most 50 to the agent
+TB = [task(F, L, f"Bulk item {i}", assignee_id=AG) for i in range(53)]
+s0 = last(TA)
+r = F.post(B + "/api/tasks/batch", json={"ids": TB, "action": "patch", "data": {"priority": 5}})
+check(r.ok, f"(setup) a bulk change of 53 tasks {r.status_code} {r.text[:160]}")
+n = len([e for e in events(TA, s0) if e.get("event") == "task_changed"])
+check(n == 50, f"#4030 review F2: at most 50 task_changed per agent and request, got {n}")
+
 sys.exit(done("p2959_l_api"))

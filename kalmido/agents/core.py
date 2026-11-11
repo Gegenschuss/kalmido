@@ -267,7 +267,8 @@ def agent_changed_events(c, diffs):
     if not ag:
         return 0
     from .workstyle import ws_get  # loaded after this module
-    n, styles = 0, {}
+    n, styles, sent = 0, {}, {}
+    actor = wh_actor(c) if getattr(g, "user", None) else None  # review F3: its own change is skipped before the data is built
     for tid, d in sorted(diffs.items()):
         row = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
         if not row:
@@ -276,6 +277,8 @@ def agent_changed_events(c, diffs):
         dlg0 = (g.get("agent_dlg0") or {}).get(tid, row["delegate_agent_id"])  # the delegate before this request
         lo = d.get("list_id")
         for aid in sorted(({row["assignee_id"], row["delegate_agent_id"]} | watch) & ag):
+            if (actor and actor["id"] == aid) or sent.get(aid, 0) >= AGENT_CHANGED_MAX:
+                continue  # review F2: a bulk change brings an agent at most AGENT_CHANGED_MAX of them (its queue keeps the rest)
             if aid in (d.get("assignee_id") or ()) or (aid == row["delegate_agent_id"] and aid != dlg0):
                 continue  # assigned / delegated to it (or taken away) in this request: its event assigned / unassigned says it
             if aid not in styles:
@@ -291,7 +294,11 @@ def agent_changed_events(c, diffs):
             extra = {"diff": dv, "assigned": aid in (row["assignee_id"], row["delegate_agent_id"]), "watching": aid in watch}
             if agent_emit(c, aid, "task_changed", agent_task_data(c, tid, aid, full=True, **extra)):
                 n += 1
+                sent[aid] = sent.get(aid, 0) + 1
     return n
+
+
+AGENT_CHANGED_MAX = 50  # 2.959.0 (#4030, review F2): task_changed per agent and request (a bulk change of hundreds of tasks)
 
 
 def _agent_sees_list(c, aid, lid):

@@ -109,7 +109,8 @@ def docs_merge():
         fs_area_before(c, uid, n)
         pl_tree_need_open(c, n["id"])
     first = ids[0]
-    write_lock(c, f"fs_version:{int(first)}")  # the same lock as an upload / docs/pages.py
+    for i in sorted(ids):  # review F1: every document's lock (the same as an upload / docs/pages.py), sorted against a deadlock;
+        write_lock(c, f"fs_version:{int(i)}")  # _pdf_doc below reads each one again under it (a merge in reverse order waits)
     fs_web_expect(c, first, b.get("expect_version"))
     parts, size, total, was = [], 0, 0, None
     for i in ids:
