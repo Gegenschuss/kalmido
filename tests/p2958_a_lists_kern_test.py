@@ -13,7 +13,6 @@ the shares of their nodes (kalmido/lists/lffolder.py, groups.py, lkretire.py). I
    dropped; a folder_people row without a share holds the table back (the start check), without it the table goes
 freelancer-matrix: lists (a person without an organisation shares a private folder with a person and lists her)
 usage: p2958_a_lists_kern_test.py <datadir>"""
-import json
 import os
 import subprocess
 import sys
@@ -23,7 +22,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
-from kt import B, CT, check, dbx, docker_logs_on_first_fail, done, fresh, sess  # noqa: E402
+from kt import B, CT, check, dbx, docker_logs_on_first_fail, done, fresh, sess, until  # noqa: E402
 
 fresh(prefix="P2958A")
 docker_logs_on_first_fail()
@@ -150,33 +149,42 @@ dbx("INSERT INTO group_shares(group_id,list_id,role,added_by,added_at) VALUES(?,
 dbx("INSERT INTO group_shares(group_id,owner_id,folder,role,added_by,added_at) VALUES(?,?,?,?,?,?)",
     (G, ALICE, "Old", "edit", ALICE, "2026-10-01T08:00:00Z"))
 dbx("INSERT INTO folder_people(owner_id,folder,user_id,role,created_at) VALUES(?,?,?,?,?)", (ALICE, "Old", uid["carl"], "view", "2026-10-01T08:00:00Z"))
-RUN = ("import app, json\nfrom kalmido.core.db import connect\nfrom kalmido.lists.lkretire import lk_grp_copy, lk_retire\n"
-       "c = connect()\n{}\nc.commit()\nprint(json.dumps(n, default=str))")
+dbx("DELETE FROM settings WHERE key='migr_grp5245'")  # an older database: the copy has not run yet
 
 
-def run(code):
-    p = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", RUN.format(code)],
-                       capture_output=True, text=True)
+def logs():
+    r = subprocess.run(["docker", "logs", CT], capture_output=True, text=True)
+    return r.stdout + r.stderr
+
+
+def _health():
     try:
-        return json.loads((p.stdout.strip().splitlines() or ["null"])[-1])
-    except ValueError:
-        return {"error": (p.stdout + p.stderr)[-600:]}
+        return requests.get(B + "/api/health", timeout=3).ok
+    except requests.RequestException:
+        return False
 
 
-n = run("n = [lk_grp_copy(c), lk_retire(c)]")
-check(isinstance(n, list) and n[0] == {"own": 1, "folder": 1}, f"the forward copy: one project row, one folder row {n}")
-check(isinstance(n, list) and n[1].get("group_shares", {}).get("dropped") == 1 and n[1].get("folder_people", {}).get("left") == 1,
-      f"group_shares dropped, folder_people held back by the start check (a row without a share) {n}")
-check(not table("group_shares") and table("folder_people"), "the tables after the first start")
+def restart():
+    """The next start of the server (core/db.py init_db runs lists/lkretire.py lk_grp_copy once, then lk_retire)."""
+    subprocess.run(["docker", "restart", CT], capture_output=True)
+    check(until(_health, timeout=90), "the server is up again after the restart")
+
+
+restart()
+A = sess("alice")
+check(not table("group_shares") and table("folder_people"),
+      "first start: group_shares copied forward and dropped, folder_people held back by the start check (a row without a share)")
+check("projects, stage 7d (#5245): folder_people: 1 old row(s) of folder_people have no share in the shared core" in logs(),
+      "the log names the row left")
 check(lgroups(LM) == [(G, "admin", "list")] and lgroups(LO) == [(G, "edit", "Old")], f"the copies answer as before {lgroups(LM)} {lgroups(LO)}")
 check(member(LM, uid["dora"])[2] == "admin" and member(LO, uid["dora"])[3] == "edit",
       f"dora: the project's group role (grole), the folder's as a folder role (frole) {member(LM, uid['dora'])} {member(LO, uid['dora'])}")
+check(sees(sess("dora"), LM) and sees(sess("dora"), LO), "dora sees both projects")
 dbx("DELETE FROM folder_people")
-n = run("n = lk_retire(c)")
-check(n == {"folder_people": {"dropped": 1, "revoked": 0}}, f"without the row the next start drops folder_people {n}")
-check(not table("folder_people"), "folder_people is gone")
-check(run("n = [lk_grp_copy(c), lk_retire(c)]") == [{}, {}], "nothing left to do: a no-op")
+restart()
+check(not table("folder_people") and not table("group_shares"), "without the row the next start drops folder_people")
 bf = dbx("SELECT value FROM kalmido_meta WHERE key='back_floor'")
 check(bf and bf[0][0], f"the back limit was raised (an older image would rebuild the tables empty) {bf}")
+check(lgroups(LM) == [(G, "admin", "list")], "the group share stays after the drop")
 
 sys.exit(done("p2958_a_lists_kern"))
