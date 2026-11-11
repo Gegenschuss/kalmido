@@ -78,6 +78,7 @@ const AUDIT = `(() => { ${VIS}
   const blank = (e, w) => { const s = getComputedStyle(e, w); if (s.display === 'none' || !/^(none|normal|""|'')$/.test(s.content)) return false;
     return clear(s.backgroundColor) && s.backgroundImage === 'none' && s.boxShadow === 'none' && !parseFloat(s.borderTopWidth) && !parseFloat(s.borderLeftWidth) && !parseFloat(s.borderRightWidth) && !parseFloat(s.borderBottomWidth) && (s.outlineStyle === 'none' || !parseFloat(s.outlineWidth)); };
   for (const b of btns) { if (b.scrollWidth <= b.clientWidth + 1) continue;
+    if (b.matches('.cal .cev, .week .cev') && getComputedStyle(b).textOverflow === 'ellipsis') continue;  // 2.884.0 (#5469): a month / week chip is role=button now (keyboard); its title ends in "…" on purpose (full title in its tooltip)
     const ps = [b, ...b.querySelectorAll('*')], marks = [];
     // the status dot and the agent mark of an avatar sit on its edge on purpose (a badge, not cut content)
     for (const e of ps) { if (e !== b && (ghost(e) || e.matches('.avb .adot, .avb .abot-b'))) { e.classList.add('p2765-nps'); marks.push([e, 'p2765-nps']); continue; } if (blank(e, '::before')) { e.classList.add('p2765-npb'); marks.push([e, 'p2765-npb']); } if (blank(e, '::after')) { e.classList.add('p2765-npa'); marks.push([e, 'p2765-npa']); } }

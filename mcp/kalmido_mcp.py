@@ -1702,7 +1702,7 @@ TOOLS += [
      lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/take")),
     ("list_watchers", "2.473.0: who watches a task.", _obj({"task_id": S_ID}, ["task_id"]),
      lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/watchers")),
-    ("watch_task", "2.473.0: watch a task: its comments reach you as events (2.959.0: also task_changed). Without user_id yourself; somebody else: only project "
+    ("watch_task", "2.473.0: watch a task: its comments reach you as events (2.959.0: also task_changed; 2.983.0: status_changed). Without user_id yourself; somebody else: only project "
      "owners / admins.", _obj({"task_id": S_ID, "user_id": S_ID}, ["task_id"]),
      lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/watchers", body=_pick(a, ("user_id",)))),
     ("unwatch_task", "2.473.0: stop watching a task (user_id = your own id from get_agent; somebody else: only project owners / admins).",

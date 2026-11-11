@@ -2255,4 +2255,6 @@ async function templatesDraw(md) {
   box.innerHTML = ts.map(tp => `<div class="mrow" data-tpl="${tp.id}"><span class="tplic">${ic(tp.kind === 'list' ? 'list' : 'copy', 's')}</span><span class="n">${esc(tp.name)} <span class="muted">${tp.kind === 'list' ? (tp.data?.rel ? tr('Project') : tr('Project')) : tr('Task')} · ${trn('{0} task', '{0} tasks', tp.count)}${tp.org_id ? ' · ' + esc(wsName('org:' + tp.org_id)) : ''}</span></span><button class="iconbtn" data-tpl-use title="${tr('Use template')}">${ic('plus', 's')}</button>${tp.can_edit !== false ? `${tpl_adminOrgs().length ? `<button class="iconbtn" data-tpl-space title="${esc(tr('Who sees the template'))}">${ic('users', 's')}</button>` : ''}<button class="iconbtn" data-tpl-edit title="${tr('Edit template')}">${ic('edit', 's')}</button>` : ''}</div>`).join('')
     || `<div class="muted mhint">${tr('No templates yet. Save one from a task menu (…) or the project dialog: “Save as template”.')}</div>`;
 }
+// 2.979.0 (#5667): a template's delete the server took back by its group: the open settings' template list fetches again
+histReloader('templates', () => { const md = $$('.smodal').pop(); if (md && $('#s-tpls', md)) return templatesDraw(md); });
 

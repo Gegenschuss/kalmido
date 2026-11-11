@@ -7,16 +7,24 @@ invitations' sequence and the import marks stay as they are on undo (undo_keep);
 (their answers are theirs). Taking back (core/undoweb.py): the person needs write on the event NOW (need_event), and on the
 calendar the copy puts it back into; coming out of / going into the trash runs the calendar's own restore / delete
 (cal_touch, bump; ev_delete tells the invited people of the server). No mails from an undo: a restored event does not invite
-its external attendees again (the forward restore does). Steps of CalDAV and API v1 writes: not yet (stage 6 rest)."""
+its external attendees again (the forward restore does).
+2.985.0 (#5394, stage 6 rest): a change / delete through CalDAV (events/dav.py PUT / DELETE) records its step the same way
+(API v1 shares the web's op_event_*); a whole calendar into the trash and out of it (events/web.py op_cal_delete /
+op_cal_restore) is a trash step of the core kind "evcal" taken back the calendar's way (core/undoweb.py undo_trash_reg):
+back = cal_restore_do (manage, the calendars' limit, its events with it), forward = evu_cal_away (the core's obj_trash with
+its events, 2.947.0 #5367; the people of the server told; no mails to external attendees from an undo)."""
 from ..accounts.orgs import ws_fit_problem
+from ..core.access import live_sql  # 2.985.0 (#5394)
 from ..core.errors import Denied
 from ..core.undoareas import ua_plain, ua_trash_fix
-from ..core.undogroups import UG_LABEL
-from ..core.undoweb import undo_need_reg
+from ..core.undogroups import UG_LABEL, undo_label  # 2.985.0 (#5394): undo_label
+from ..core.undoweb import undo_need_reg, undo_trash_reg  # 2.985.0 (#5394): undo_trash_reg
 from ..core.objhooks import GONE
-from ..core.writes import obj_track
+from ..core.writes import UG_RESTORED, obj_track  # 2.985.0 (#5394): UG_RESTORED
 from ..core.db import bump, iso_ms, now_utc
-from .model import cal_touch, ev_delete, need_evcal, need_event
+from ..core.i18n import tr  # 2.985.0 (#5394)
+from ..core.pg import system_ctx  # 2.985.0 (#5394)
+from .model import EV_CALS_MAX, EV_KIND, KERN, cal_touch, ev_delete, ev_tell, need_evcal, need_event  # 2.985.0 (#5394): EV_CALS_MAX, EV_KIND, KERN, ev_tell
 
 EVU_KIND = "event"
 EVU_KEEP = {"events": {"uid", "href", "seq", "imp_at", "imp_rev", "created_by"}}
@@ -65,3 +73,35 @@ def evu_need(c, uid, rid, oid):
 
 
 undo_need_reg(EVU_KIND, evu_need)
+
+
+def cal_restore_do(c, uid, cid, step=False, undo=False):
+    """2.985.0 (#5394): the restore of events/web.py op_cal_restore without its commit (also the undo of a calendar's trash step)."""
+    cal, _ = need_evcal(c, cid, manage=True, trash=True, uid=uid)
+    with system_ctx(c):
+        n = c.execute(f"SELECT COUNT(*) FROM ev_cals WHERE owner_id=(SELECT owner_id FROM ev_cals WHERE id=?) AND {live_sql()}", (cid,)).fetchone()[0]
+    if n >= EV_CALS_MAX:
+        raise Denied(409, tr("At most {0} calendars", EV_CALS_MAX))
+    if step:
+        undo_label(c, UG_RESTORED, ua_plain(cal["name"], cid))
+    KERN["restore"](c, uid, EV_KIND, cid, step=step, undo=undo)  # 2.947.0 (#5367): the core's way, its events (children) with it
+    cal_touch(c, cid)
+
+
+def evu_cal_back(c, uid, cid):
+    """2.985.0 (#5394): a calendar's trash step taken back = its restore (cal_restore_do, no step of its own)."""
+    cal_restore_do(c, uid, cid, undo=True)
+    bump(c)
+
+
+def evu_cal_away(c, uid, cid):
+    """A calendar's restore step taken back / its trash step forward again = into the trash with its events (no mails)."""
+    need_evcal(c, cid, manage=True, uid=uid)
+    for r in c.execute(f"SELECT * FROM events WHERE cal_id=? AND {live_sql()}", (int(cid),)).fetchall():
+        ev_tell(c, r, "cancelled")  # 2.367.2 (#2969): the people of the server learn it; review F3: no mails made, none counted
+    KERN["trash"](c, uid, EV_KIND, cid, step=False)  # 2.947.0 (#5367): the core's trash with its events (children)
+    cal_touch(c, cid)
+    bump(c)
+
+
+undo_trash_reg(EV_KIND, evu_cal_back, evu_cal_away)

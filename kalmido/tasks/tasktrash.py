@@ -11,18 +11,17 @@ number or ON DELETE SET NULL (time entries); none of them cascades from a task, 
 task attachments. Deleting a task therefore never removes an office record. A file path another row still uses is kept.
 2.272.0 A (#3026): tasks of a project kept by law (lists.retain_until in the future, lists.list_keep) stay until its end --
 also as subtasks of a due task elsewhere (detached) -- and are counted as tasks_kept.
+2.936.0 (#5364, stage 2a of the core's trash): the run is the core's (core/writes.py obj_trash_tick over the light kind task
+of core/objlight.py: trash_prune, trash_keep=ttp_keep, its obj_on_purge hook ttp_core_purge): one retention run for every
+trash of the core, its report run "obj_trash" with the numbers task / task_kept / task_locked; ttp_tick went.
 """
-import time
-
-from ..core.db import bump, now_utc
-from ..core.serializers import unlink_files
-from ..core.retention import ret_days, ret_on, ret_report, ret_trash_cut, ret_trash_days  # 2.152.0: core/retention.py is here (its fallback went)
+from ..core.access import Denied, trash_sql  # 2.936.0 (#5364): no handwritten trash filter
+from ..core.db import now_utc
+from ..core.retention import ret_trash_cut, ret_trash_days  # 2.152.0: core/retention.py is here (its fallback went)
 from .tasks import hard_delete
-from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from .validation import descendants  # 2.369.5 (#2517): pulled up from functions
 
-TTP_TICK = {"at": 0.0}
-TTP_BATCH = 500  # tasks per run; the rest follows in the next hour
+TTP_BATCH = 500  # tasks per run; the rest follows in the next hour (obj_register trash_batch of the kind task)
 
 
 def ttp_days():
@@ -48,7 +47,7 @@ def ttp_purge(c, ids, cut):
     own period. -> (number deleted, attachment paths to unlink after the commit)."""
     q = ",".join("?" * len(ids))
     today = ttp_today()
-    due = [r[0] for r in c.execute(f"SELECT id FROM tasks WHERE id IN ({q}) AND deleted_at IS NOT NULL AND deleted_at<? "
+    due = [r[0] for r in c.execute(f"SELECT id FROM tasks WHERE id IN ({q}) AND {trash_sql()} AND deleted_at<? "
                                    f"AND NOT {TTP_KEPT.format('tasks')} ORDER BY id FOR UPDATE", (*ids, cut, today))]
     if not due:
         return 0, []
@@ -74,34 +73,17 @@ def ttp_purge(c, ids, cut):
     return len(due), files
 
 
-def ttp_tick(c, force=False):
-    """The watchdog (at most hourly): trashed tasks older than the period -- counted, and deleted when the switch is on.
-    Returns the counts (tests call it with force=True)."""
-    if not force and time.time() - TTP_TICK["at"] < 3600:
-        return {}
-    TTP_TICK["at"] = time.time()
-    if ret_days("trash") < 1:  # 2.116.0 review F1: a period of 0 switches the run off instead of emptying every trash
-        return {}
-    purge, cut, counts, files = ret_on("trash"), ttp_cut(), {}, []
-    # the trash of every organisation and private space (row-level security); nothing is handed to a person, rows only go
-    with system_ctx(c):
-        today = ttp_today()
-        kept = c.execute(f"SELECT COUNT(*) FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at<? AND {TTP_KEPT.format('tasks')}",
-                         (cut, today)).fetchone()[0]
-        if purge:
-            ids = [r[0] for r in c.execute("SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at<? "
-                                           f"AND NOT {TTP_KEPT.format('tasks')} ORDER BY deleted_at, id LIMIT ?", (cut, today, TTP_BATCH))]
-            n, files = ttp_purge(c, ids, cut) if ids else (0, [])
-            counts = {"tasks": n, "attachments": len(files), "tasks_kept": kept}
-            if n:
-                bump(c)  # clients drop the rows from their trash view (dl_changes of this transaction)
-        else:
-            counts = {"tasks": c.execute("SELECT COUNT(*) FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at<? "
-                                         f"AND NOT {TTP_KEPT.format('tasks')}", (cut, today)).fetchone()[0],
-                      "attachments": c.execute("SELECT COUNT(*) FROM attachments a JOIN tasks t ON t.id=a.task_id "
-                                               f"WHERE t.deleted_at IS NOT NULL AND t.deleted_at<? AND NOT {TTP_KEPT.format('t')}",
-                                               (cut, today)).fetchone()[0], "tasks_kept": kept}
-        ret_report(c, "trash", counts, purge, run="tasks")
-    c.commit()
-    unlink_files(files)  # after the commit: a failed commit keeps the rows and their files
-    return counts
+def ttp_keep(a):
+    """2.936.0 (#5364): obj_register trash_keep of the kind task -- the tasks of a project kept by law stay (TTP_KEPT)."""
+    return TTP_KEPT.format(a), (ttp_today(),)
+
+
+def ttp_core_purge(c, tid):
+    """2.936.0 (#5364): the obj_on_purge hook of the kind task -- the core's retention run (core/writes.py obj_trash_prune, system
+    context, the id checked again under its lock) deletes the task here the way "Empty trash" does (ttp_purge: subtasks not
+    due are detached, attachments); the files go after its commit. Denied(409) = kept (restored or kept by law meanwhile):
+    the run counts it as task_locked and the row stays."""
+    n, files = ttp_purge(c, [int(tid)], ttp_cut())
+    if not n:
+        raise Denied(409)
+    return files

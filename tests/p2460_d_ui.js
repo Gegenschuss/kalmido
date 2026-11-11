@@ -61,7 +61,7 @@ const FEAT = 'cal,comments,collab';
   check(pr && !back(pr), '#1604: the folder settings on their own say "Done"');
   click(w, footBtn(pr, '[data-m="people"]'));
   md = await until(() => d.querySelector('.modal.fshmodal #fsh-members .mrow[data-uid]')?.closest('.modal'));
-  check(md && back(md) && vis().length === 1 && hid().length === 1, '#1604: Share from the settings says "Back"');  // 2.910.0 (#5442): the folder's Share dialog moves to "Done" in #5587
+  check(md && done(md) && !back(md) && vis().length === 1 && hid().length === 1, '#1604: Share from the settings says "Done"');  // 2.913.0 (#5587): the folder's Share dialog on the shared frame (was "Back")
   click(w, footBtn(md, '[data-m="fsh-props"]'));
   await sleep(300);
   check(vis().length === 1 && vis()[0] === pr && hid().length === 0, '#1604: "Folder settings…" in a Share dialog with Back returns, does not stack');

@@ -37,6 +37,7 @@ from ..core import objhooks  # 2.565.0: START (core/db.init_db runs the forward 
 from ..files.fsref import fs_ref_node, fs_unshare_hooks  # 2.623.0 (#4778)
 from ..core.config import app, EMAIL_RE
 from ..core.access import Denied, acx_of, acx_org_ok, collab_all, need_feat, trash_sql
+from ..core.access import addr_account  # 2.983.0 (#5643)
 from ..core.dlock import dl_list_locked  # 2.560.0 B (#4699)
 from ..core.db import body, bump, db, err, iso_ms, now_utc
 from ..core.i18n import N_, tr
@@ -564,14 +565,19 @@ def _by_email(c, r, uid, em, role):
         aid = insert_id(c, "INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at,email_seal,email_key) "
                            "VALUES(?,?,NULL,?,?,?,?,?)", (sid, r["org_id"], role, uid, ts, seal(c, SHS_SEAL, em), key))
     bound = old["user_id"] if old else None
-    if bound and shs_fits(c, bound, r):
+    x = addr_account(c, em)  # 2.983.0 (#5643): only a proved address; else the row stays open until shs_redeem at sign-in
+    if bound and x == bound and shs_fits(c, bound, r):
         shs_put(c, uid, r, bound, role)  # the bound row comes back / changes role: its core share follows
     else:
         if bound:  # 2.937.0 (#5244): its account may no longer hold it: open again
             c.execute("UPDATE sheet_shares SET user_id=NULL WHERE id=?", (aid,))
-        x = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'", (em,)).fetchone()
+            s = shs_core_of(c, sid, bound) if x != bound else None
+            if s is not None:  # 2.983.0 (#5643, Fable F1): bound before the proof counted, or the address changed since:
+                from ..core.objects import obj_node_unshare  # the core share it held through this address ends too
+                n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (s["node_id"],)).fetchone()
+                obj_node_unshare(c, uid, n, s["id"], kind=SHS_KIND, ref_id=sid, org=r["org_id"], reason="unshare")
         if x:
-            _bind(c, r, aid, x[0], uid)
+            _bind(c, r, aid, x, uid)
     shs_drop_cache()
     return _answer(c, sid, 201, by_email=True)
 

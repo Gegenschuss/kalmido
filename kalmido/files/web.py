@@ -522,6 +522,8 @@ def fs_web_expect(c, nid, v):
         v = int(v.strip())
     if isinstance(v, bool) or not isinstance(v, int):
         raise BadInput(tr("Invalid value: {0}", "expect_version"))
+    from .fslock import fsl_chain_ids, fsl_hold
+    fsl_hold(c, fsl_chain_ids(c, nid))  # 2.970 (#5653, Fable review): first the locked folders' locks, then the version's (one order)
     write_lock(c, f"fs_version:{int(nid)}")  # the lock of the new number (store.py _store_version): no upload between check and write
     if c.execute("SELECT cur_version FROM fs_nodes WHERE id=?", (nid,)).fetchone()[0] != v:
         raise Conflict("current", files_node_get(nid).get_json())
@@ -564,8 +566,9 @@ def files_version_restore(nid, no):
     v = fs_version_row(c, nid, no)
     if n["kind"] != "file" or not v:
         raise Denied(404)
+    from .fslock import fsl_chain_ids, fsl_denied, fsl_hold, fsl_of, fsl_restore_version
+    fsl_hold(c, fsl_chain_ids(c, nid))  # 2.970 (#5653, review N-b): the lock's state read below holds until this is committed
     fs_web_expect(c, nid, (request.get_json(silent=True) or {}).get("expect_version", request.args.get("expect_version")))  # 2.577.0 (#4708 3)
-    from .fslock import fsl_of, fsl_denied, fsl_restore_version
     lk = fsl_of(c, nid)
     if lk is not None and lk["e2e"] != "on":  # 2.953 (#3348, review N7): not while the folder switches (a file of either format)
         raise fsl_denied("fs_locked_busy")
@@ -892,11 +895,17 @@ def files_share_add(nid):
     if role not in ("view", "edit"):
         return err(tr("Invalid value: {0}", "role"))
     exp = _expiry(b.get("expires_at"), b.get("tz"))  # 2.58.0 (#1787): tz = the person's zone
+    lists = fs_area_of(c, nid) == "lists"
+    key = next((k for k in ("user_id", "group_id", "agent_id") if b.get(k)), None)
+    lr_ = b.get("list_role") if lists else None  # 2.352.0 A (#2748): a projects folder's share may carry the list role (admin | participant ...)
+    if lr_ is not None:  # 2.866.0 (#5302 F6): resolved before the core writes the row and its log line, which then name the final role
+        if lr_ not in ("admin", "edit", "participant", "view") or (lr_ == "admin" and key == "agent_id"):
+            return err(tr("Invalid value: {0}", "list_role"))
+        role = "edit" if lr_ in ("admin", "edit") else "view"
     fs_ref_need_share(c, me(), n, role)  # 2.199.0 F (#2742, review): passing filed documents on needs that role on them
-    if fs_area_of(c, nid) == "lists":  # 2.352.0 F (#2748, review H1): a projects folder's share hands out list roles -- its owner / an admin of every list below
+    if lists:  # 2.352.0 F (#2748, review H1): a projects folder's share hands out list roles -- its owner / an admin of every list below
         fs_ref_need_move(c, me(), n)
     t = _share_targets(c, n)
-    key = next((k for k in ("user_id", "group_id", "agent_id") if b.get(k)), None)
     if not key:
         return err(tr("Expected {0}", "user_id | group_id | agent_id"))
     if key == "agent_id":
@@ -917,13 +926,10 @@ def files_share_add(nid):
     # the members dialog's rows of a list stay apart, list_own); it writes the log line
     sid = obj_node_share(c, me(), n, key, tid, role, exp, org=n["org_id"] or None, checked=True,
                          match=(" AND COALESCE(list_own, 0)=0", ()))
-    lr_ = b.get("list_role")  # 2.352.0 A (#2748): a projects folder's share may carry the list role (admin | participant ...)
-    if lr_ is None and old and fs_area_of(c, nid) == "lists":
+    if lr_ is None and old and lists:
         c.execute("UPDATE fs_shares SET list_role=NULL WHERE id=?", (sid,))
-    elif lr_ is not None and fs_area_of(c, nid) == "lists":
-        if lr_ not in ("admin", "edit", "participant", "view") or (lr_ == "admin" and key == "agent_id"):
-            return err(tr("Invalid value: {0}", "list_role"))
-        c.execute("UPDATE fs_shares SET list_role=?, role=? WHERE id=?", (lr_, "edit" if lr_ in ("admin", "edit") else "view", sid))
+    elif lr_ is not None:
+        c.execute("UPDATE fs_shares SET list_role=? WHERE id=?", (lr_, sid))
     if key == "agent_id" and not old:
         _agent_event(c, tid, n, role)
     bump(c)

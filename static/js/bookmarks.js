@@ -42,6 +42,8 @@ function bm_draw() {
   const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('bookmarks', viewBookmarks())));
 }
 const bm_reload = () => bm_load(false);
+// 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the shown list comes again, a list not shown is old (the next view fetches)
+histReloader('bookmarks', () => { if (!BM.done) return; if (S.route.mod === 'bookmarks') return bm_reload(); BM.at = 0; });
 // a preview still being fetched: look again (2 s, then slower; at most 12 times per pending batch)
 function bm_poll() {
   clearTimeout(BM.pollT);

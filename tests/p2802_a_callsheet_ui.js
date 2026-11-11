@@ -4,6 +4,8 @@
 //   (lazyload.js) and opens the dialog of that shoot day: the crew of the booking is listed with the contact's phone
 // - the day details typed in (location, a call time, important, a cast line) are saved, the dialog opened again shows them
 //   (the content, not only the fields); "PDF" is there; the address gets the link "Open in maps"
+// - 2.986.0 (#5649): an old free-text agency stays shown; the agency chosen from the contacts shows company, person, phone and
+//   e-mail, is saved, and a new call sheet of the same project starts with it
 // - without Film & Video the booking sheet has no "Call sheet" button
 // P2802AUI_NOSTART=1 = the server already runs.
 const path = require('path');
@@ -83,6 +85,53 @@ async function sheetOf(D) {
   check(md?.querySelector('#cs-loc_name')?.value === 'Studio Nord' && md?.querySelector('#cs-important')?.value === 'Bitte leise am Set', 'opened again: location and important are shown');
   check(md?.querySelector('.csrow[data-k="cast"] input[data-c="name"]')?.value === 'Max Beispiel', 'opened again: the cast line');
   check(md?.querySelector('.csrow[data-k="calls"] input[data-c="time"]')?.value === '06:30', 'opened again: the call time');
+  w.close();
+
+  // ================= 2.986.0 (#5649): client and agency from the contacts
+  // an older call sheet with the agency as free text keeps it (the select stays on "Free text", the text is shown)
+  const cur = (await call('GET', `/api/team/dispo/callsheet/${job}?org=${org}`)).callsheet;
+  const old = await call('PUT', `/api/team/dispo/callsheet/${job}?org=${org}`, {data: {...cur.data, agency: 'Agentur Freitext Alt'}, expect_updated_at: cur.updated_at});
+  check(old.callsheet?.data?.agency === 'Agentur Freitext Alt', 'setup: an agency as free text');
+  [w, d, sh] = await sheetOf(D);
+  sh?.querySelector('[data-m="callsheet"]')?.click();
+  md = await until(() => d.querySelector('.modal.csmd #cs-agency_contact') && d.querySelector('.modal.csmd'));
+  check(md?.querySelector('#cs-agency_contact')?.value === '' && md?.querySelector('.csfree[data-ct="agency"]')?.hidden === false
+    && md?.querySelector('#cs-agency')?.value === 'Agentur Freitext Alt', 'the old free text of the agency stays and is shown');
+  w.close();
+  const anja = await call('POST', '/api/contacts', {book_id: bk.id, fn: 'Anja Agentur', org: 'Werbe Beispiel GmbH', emails: [{value: 'anja@example.com'}], phones: [{value: '0170 1212121', type: ['cell']}]});
+  const proj = await call('POST', '/api/lists', {name: 'Kampagne Fruehjahr'});
+  const D2 = dstr(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 10)), D3 = dstr(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 20));
+  const b2 = await call('POST', '/api/team/dispo/bookings', {title: 'Dreh Tag 1', start: D2, end: D2, status: 'firm', list_id: proj.id, resources: [{kind: 'contact', id: ct.id}]});
+  check(anja.id && proj.id && b2.status === 201, 'setup: an agency contact, a project, its shoot day ' + JSON.stringify(b2).slice(0, 160));
+  const job2 = b2.bookings?.[0]?.job;
+  [w, d, sh] = await sheetOf(D2);
+  sh?.querySelector('[data-m="callsheet"]')?.click();
+  md = await until(() => d.querySelector('.modal.csmd #cs-agency_contact') && d.querySelector('.modal.csmd'));
+  const sel = md?.querySelector('#cs-agency_contact');
+  const opt = [...(sel?.options || [])].find(o => /Anja Agentur/.test(o.textContent));
+  check(opt && /Werbe Beispiel GmbH/.test(opt.textContent) && sel.value === '', 'the agency can be chosen from the contacts (person and company), nothing chosen yet');
+  if (sel && opt) { sel.value = opt.value; sel.dispatchEvent(new w.Event('change', {bubbles: true})); }
+  const card = () => md?.querySelector('.csct[data-ct="agency"]');
+  check(card() && !card().hidden && /Werbe Beispiel GmbH/.test(card().textContent) && /Anja Agentur/.test(card().textContent) && /0170 1212121/.test(card().textContent)
+    && /anja@example\.com/.test(card().textContent) && md.querySelector('.csfree[data-ct="agency"]')?.hidden === true,
+    'chosen: company, person, phone and e-mail of the contact are shown, the free text is put away: ' + (card()?.textContent || ''));
+  md?.querySelector('[data-cs="save"]')?.click();
+  const s2 = await until(async () => { const j = await call('GET', `/api/team/dispo/callsheet/${job2}?org=${org}`); return j.callsheet?.data?.agency_contact === anja.id && j.callsheet; });
+  check(s2 && s2.auto?.agency_contact?.company === 'Werbe Beispiel GmbH', 'saved: the agency contact of the call sheet ' + JSON.stringify(s2?.data || {}).slice(0, 160));
+  await until(() => md.querySelector('#cs-agency_contact')?.value === String(anja.id));
+  check(/Anja Agentur/.test(card()?.textContent || '') && !card()?.hidden, 'after saving the dialog still shows the agency');
+  w.close();
+  // the next call sheet of the same project starts with the agency
+  const b3 = await call('POST', '/api/team/dispo/bookings', {title: 'Dreh Tag 2', start: D3, end: D3, status: 'firm', list_id: proj.id, resources: [{kind: 'contact', id: ct.id}]});
+  const job3 = b3.bookings?.[0]?.job;
+  [w, d, sh] = await sheetOf(D3);
+  sh?.querySelector('[data-m="callsheet"]')?.click();
+  md = await until(() => d.querySelector('.modal.csmd #cs-agency_contact') && d.querySelector('.modal.csmd'));
+  check(md && /Dreh Tag 2|Kampagne/.test(md.querySelector('h3')?.textContent || '') && md.querySelector('#cs-agency_contact')?.value === String(anja.id)
+    && /Werbe Beispiel GmbH/.test(card()?.textContent || ''), 'a new call sheet of the project: the agency is filled in already');
+  md?.querySelector('[data-cs="save"]')?.click();
+  const s3 = await until(async () => { const j = await call('GET', `/api/team/dispo/callsheet/${job3}?org=${org}`); return j.callsheet?.data?.agency_contact === anja.id && j.callsheet; });
+  check(s3, 'saved with the agency filled in');
   w.close();
 
   // ================= without Film & Video: no button

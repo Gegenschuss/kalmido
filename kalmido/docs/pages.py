@@ -135,7 +135,9 @@ def dp_clean(b, n):
         gone.add(p)
     turn = {}
     for k, v in rt.items():
-        p = int(k) if isinstance(k, str) and k.isdigit() else None
+        # 2.976.0 (#5657, review 2.959 F9): only ASCII digits ("²".isdigit() is True and int() then fails with a 500)
+        # review: at most 6 digits (a key of thousands of digits passes isdigit and int() refuses it with a ValueError)
+        p = int(k) if isinstance(k, str) and len(k) <= 6 and k.isascii() and k.isdigit() else None
         if p is None or not 1 <= p <= n or isinstance(v, bool) or not isinstance(v, int) or v % 360 not in (0, *DP_TURNS):
             raise BadInput(tr("Invalid value: {0}", "rotate"))
         if v % 360 and p not in gone:

@@ -61,6 +61,12 @@ Interface (signatures fixed; stages 2 / 3 and the first areas #1958 #1957 #4675 
                  it (only the ones that went with it) and are deleted for good with it
       trash_prune True: the core's retention run (obj_trash_tick) deletes the kind's trash after the trash period; False
                  (default): the area keeps its own run until its stage moves it onto the core
+      2.936.0 (#5364, stage 2a of the core's trash: tasks and projects) -- the area's part of the delete for good is its
+      obj_on_purge hook (core/writes.py); the registration adds:
+      trash_keep f(alias) -> (sql, args): the objects of the trash the retention run leaves (kept by law); counted as
+                 <kind>_kept in its report
+      trash_batch the most objects one run takes of the kind (default OBJ_PRUNE_BATCH; the rest follows in the next hour)
+                 A light kind may have trash_prune too (retention only: its trash and restore stay its area's routes).
       2.754.0 (#5268, Q0b of the cross-section audit #3563) -- a light kind of an old area (task, event, hub_mail, client):
       node       False: the kind has no reference node at all (no fs_ref_register, no shares, no folder, no routes -- routes=
                  is ignored --, no fields, no write path of the core: obj_reg_node refuses it with 404, obj_visible_sql / obj_rows with ValueError -- the
@@ -197,7 +203,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
                  fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True, node_shares=False,
                  fs_hooks=None, org_join="member", children=(), trash_prune=False, node=True, agent_own=False,
-                 on_share_back=None):
+                 on_share_back=None, trash_keep=None, trash_batch=None):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload).
     2.565.0 (#4719): listed=False = the object's reference node only carries its shares (files/fsref.py): it lies in no
     folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take.
@@ -243,9 +249,11 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
     kids = tuple(tuple(x) for x in (children or ()))  # 2.773.0 (#5292)
     if any(len(x) != 2 or not all(_TABLE.fullmatch(y or "") for y in x) or x[0] == table for x in kids):
         raise ValueError(f"obj_register {kind}: children must be ((table, key column), ...) of other tables")
-    if not node and (kids or trash_prune):  # a light kind (2.754.0, #5268) has no trash of the core (2.773.0, #5292)
-        raise ValueError(f"obj_register {kind}: a kind without node has no children / trash_prune")
-    reg.update(children=kids, trash_prune=bool(trash_prune))
+    # a light kind (2.754.0, #5268) has no trash of the core (2.773.0, #5292); 2.936.0 (#5364): only the retention run
+    if not node and kids:
+        raise ValueError(f"obj_register {kind}: a kind without node has no children")
+    reg.update(children=kids, trash_prune=bool(trash_prune), trash_keep=trash_keep,
+               trash_batch=int(trash_batch) if trash_batch else None)  # 2.936.0 (#5364)
     OBJ[kind] = reg
     if not fsref:
         return reg  # 2.568.0 (#4739): the area's own registration in files/fsref.py stays
@@ -805,18 +813,25 @@ def obj_node_unshare(c, uid, n, sid, kind=None, ref_id=None, org=None, reason="u
     return out
 
 
-def obj_node_reshare(c, revoked_id):
+def obj_node_reshare(c, revoked_id, *, owner, org):
     """2.937.0 (#5244, stage 7c): put the share row of obj_revoked revoked_id (src fs_shares, obj_node_unshare) back on its
     node under its OLD id -- obj_share_restore's step for a share of a node no kind names (a knowledge folder), after the
     area checked who may and that the person may still have it. The same id keeps an Undo / Redo of the area's dialog on
     one share. -> (share id, the row as it was) | None when the row, its node (in the trash too) or its person is gone, or the
-    node holds a share of that person / group / agent by now (the obj_revoked row goes then). The caller commits."""
+    node holds a share of that person / group / agent by now (the obj_revoked row goes then). The caller commits.
+    2.969.0 (#5644, Fable review 2.937 F7): owner / org = whose node the caller checked (org None = owner's private space): the
+    node must lie in that space today -- and the obj_revoked row must have been written there -- else Denied 409 (nothing
+    written, the row stays). Before, only the caller's check of the main share held this, and a pair id from the stored card
+    went back unchecked; it was tight only because a page that moves loses its node."""
     r = c.execute("SELECT * FROM obj_revoked WHERE id=? AND src='fs_shares'", (int(revoked_id),)).fetchone()
     if r is None:
         return None
     s = json.loads(r["row_json"])
     key = next((k for k in ("user_id", "group_id", "agent_id") if s.get(k)), None)
-    n = c.execute("SELECT id, deleted_at FROM fs_nodes WHERE id=?", (int(s.get("node_id") or 0),)).fetchone()
+    n = c.execute("SELECT id, deleted_at, owner_id, org_id FROM fs_nodes WHERE id=?", (int(s.get("node_id") or 0),)).fetchone()
+    if (org is None and owner is None) or (r["org_id"] or None) not in (None, org or None) or (
+            n is not None and ((n["org_id"] or None) != (org or None) or (org is None and n["owner_id"] != owner))):
+        raise Denied(409, tr("Changed in the meantime"))  # review: the row's space checked also when its node went
     taken = key and n is not None and c.execute(f"SELECT 1 FROM fs_shares WHERE node_id=? AND {key}=?", (n["id"], int(s[key]))).fetchone()
     gone = not key or n is None or n["deleted_at"] or c.execute("SELECT 1 FROM fs_shares WHERE id=?", (int(s["id"]),)).fetchone()
     who = key and (c.execute("SELECT 1 FROM groups WHERE id=?", (int(s[key]),)) if key == "group_id" else

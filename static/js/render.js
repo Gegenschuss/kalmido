@@ -616,6 +616,7 @@ function renderTop0() {
   if (m === 'msv') title = msvvTitle();  // 2.73.0 C (#661)
   if (mg_title(m) && !S.me?.kid && !(sbb_on() && mg_areaOf(m)?.[0] !== 'office')) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below; 2.152.2 (#2618): sidebar B has no tabs, the part's own name (the office's page has its own heading)
   if (sbb_on() && mg_areaOf(m)?.[0] === 'office' && !S.me?.kid && typeof ofm_cur === 'function') { const oit = ofm_all().find(i => i.key === ofm_cur(m)); if (oit) title = tr(oit.name); }  // 2.224.0 B (#2816): the big heading of an office page = its name ("Office" stands above the panel)
+  if (m === 'office' && !isMobile() && !S.me?.kid && typeof ofd_docTitle === 'function' && ofd_docTitle()) title = ofd_docTitle();  // 2.936.0 (#5448): an open document: its number, not "Quotations"
   let acts = '';
   if (m === 'tasks' && k === 'projects') acts += `<button class="btn sm pri tnewp" data-act="list-new" aria-haspopup="menu" title="${esc(tr('New project'))}" aria-label="${esc(tr('New project'))}">${ic('plus', 's')}<span>${tr('New project')}</span></button>`;  // 2.417.0 A (#3559): the start page of Projects; 2.498.0 (#3854): a narrow phone: the symbol
   if (m === 'tasks' && (k.startsWith('l:') || k === 'inbox')) {

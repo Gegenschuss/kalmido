@@ -30,6 +30,8 @@ async function oinvDraw(box) {
 // 2.148.1 A (#2480): an organisation admin's answer carries no account id: the new invitation is found in the open ones (its ref)
 const oinvUid = (r, email) => r.user_id || ((r.invites || []).find(v => (v.email || '').toLowerCase() === String(email || '').toLowerCase()) || {}).ref;
 const oinvRedraw = () => { const md = $('#s-ws')?.closest('.modal') || document; if (typeof wsPaneDraw === 'function') wsPaneDraw(md); };
+// 2.979.0 (#5667): an undo / redo the server did: the shown invitations come again
+histReloader('org-invites', () => { if ($('#s-ws')) oinvRedraw(); });
 async function oinvSend(oid, email, role) {
   const r = await api('POST', `/api/orgs/${oid}/invites`, {email, role});
   if (r.invited && r.invitation) inviteResult(r.invitation, email);

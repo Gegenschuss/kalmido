@@ -452,10 +452,11 @@ def otg_move_user(c):
     transaction. Returns the number of tags made."""
     if not _otg_has(c, "task_tags"):
         return 0
-    norm = r"ltrim(regexp_replace(g.tag, '^\s+|\s+$', '', 'g'), '#')"
+    trim = r"regexp_replace({}, '^\s+|\s+$', '', 'g')"  # \s = Python's strip(): tabs and line breaks too
+    norm = trim.format(f"ltrim({trim.format('g.tag')}, '#')")  # 2.973.0 (#5656): trimmed again after the '#', as otg_uname
     c.execute(f"""CREATE TEMP TABLE otg_tt ON COMMIT DROP AS
-                  SELECT g.task_id, g.user_id, btrim({norm}) AS name FROM task_tags g
-                  WHERE (g.user_id = 0 OR EXISTS (SELECT 1 FROM users u WHERE u.id=g.user_id)) AND btrim({norm}) <> ''""")
+                  SELECT g.task_id, g.user_id, {norm} AS name FROM task_tags g
+                  WHERE (g.user_id = 0 OR EXISTS (SELECT 1 FROM users u WHERE u.id=g.user_id)) AND {norm} <> ''""")
     n = c.execute("""INSERT INTO obj_tags(scope_kind, scope_id, name, color, sort, created_by, created_at)
                      SELECT DISTINCT ON (x.user_id, lower(x.name)) 'user', CAST(x.user_id AS TEXT), x.name, '', 0, NULLIF(x.user_id, 0),
                             CURRENT_TIMESTAMP

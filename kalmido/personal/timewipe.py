@@ -229,16 +229,36 @@ def tz_delete_all(lid):
     return jsonify(ok=True, deleted=len(ids), seconds=prev["seconds"], billed=prev["billed"], entries=back, wipe=wid)
 
 
-def tzw_lock_tasks(c, ents):
+def tzw_lock_tasks(c, ents, lid=None, trust=False):
     """#5583 (finding of the review of #5574): the tasks the entries name, held (FOR SHARE, in id order) until tz_restore commits.
     A move of such a task into a locked project (collab/liste2e.py le2a_move -> le2b_scrub_tasks) waits for the restore, so the
     restore never reads the lock state of before the move while the move's scrub misses the entries it writes; a move done
     first is seen. A task deleted for good meanwhile is not there to hold (accepted rest risk, decision #5583). Also keeps the
-    order tasks -> copy's lock, so bw_check at the end cannot deadlock against the mover."""
-    ids = sorted({e["task_id"] for e in ents if isinstance(e, dict) and isinstance(e.get("task_id"), int)
-                  and not isinstance(e.get("task_id"), bool) and 0 < e["task_id"] < 2 ** 63}) if isinstance(ents, list) else []
-    if ids:
+    order tasks -> copy's lock, so bw_check at the end cannot deadlock against the mover.
+    #5588 (d, review F1/F2/F6): a task moved into a project of another organisation is held and its lock state read across
+    organisations (system_ctx: row lock and lock state only, no content) -- but only for task ids the server vouches for: all
+    of the server's copy (trust) or an entry with an intact seal of list lid (h6b_sig covers lid + task_id). Any other id (an
+    own entry needs no seal, its task_id is free) is held under the person's rights as before, so a request cannot hold or
+    probe tasks of other organisations. Returns {task id: lock state} of the vouched ids (one query), for tz_restore."""
+    def tid_ok(e):
+        t = e.get("task_id") if isinstance(e, dict) else None
+        return isinstance(t, int) and not isinstance(t, bool) and 0 < t < 2 ** 63
+    ents = [e for e in ents if tid_ok(e)] if isinstance(ents, list) else []
+    sure = {e["task_id"] for e in ents if trust or (isinstance(e.get("sig"), str) and e["sig"].isascii() and lid is not None
+                                                     and hmac.compare_digest(e["sig"], h6b_sig(c, lid, e)))}
+    rest = sorted({e["task_id"] for e in ents} - sure)
+    if rest:  # the person's view decides which of the other ids are held (read only, no lock yet)
+        rest = [r[0] for r in c.execute("SELECT id FROM tasks WHERE id = ANY(CAST(? AS BIGINT[]))", (st_ids(rest),))]
+    ids = sorted(sure | set(rest))
+    if not ids:
+        return {}
+    modes = {}
+    with system_ctx(c):  # one statement over both sets, so the id order holds across them (move_lock_subtree takes it too)
         c.execute("SELECT id FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) ORDER BY id FOR SHARE", (st_ids(ids),)).fetchall()
+        if sure:
+            modes = {r[0]: (r[1] or None) for r in c.execute("SELECT t.id, l.e2e FROM tasks t JOIN lists l ON l.id=t.list_id "
+                                                             "WHERE t.id = ANY(CAST(? AS BIGINT[]))", (st_ids(sorted(sure)),))}
+    return {t: modes.get(t) for t in sure}
 
 
 @app.post("/api/lists/<int:lid>/time/restore")
@@ -259,7 +279,7 @@ def tz_restore(lid):
         w = tz_wipe_row(c, lid, uid, wid)
         if not w:
             raise Denied(404)
-        tzw_lock_tasks(c, json.loads(w["entries"] or "[]"))
+        tzw_lock_tasks(c, json.loads(w["entries"] or "[]"), lid, trust=True)
         write_lock(c, TZW_LOCK.format(id=wid))  # #5574: one change of the copy at a time (le2b_scrub_trash_tasks takes it too)
         w = tz_wipe_row(c, lid, uid, wid)
         if not w:
@@ -269,7 +289,7 @@ def tz_restore(lid):
         ents = b.get("entries")
     if not isinstance(ents, list) or len(ents) > TZ_MAX_RESTORE:
         raise Denied(400, tr("Invalid value: {0}", "entries"))
-    tzw_lock_tasks(c, ents)  # #5583: before the lock state and the task of each entry are read (again for the copy: its entries now)
+    tmode = tzw_lock_tasks(c, ents, lid, trust=w is not None)  # #5583: before the lock state and the task of each entry are read (again for the copy: its entries now)
     ts, n, left, came = iso(now_utc()), 0, [], set()  # #5574: came = (person, start, end) of what is back now
     for e in ents:
         if not isinstance(e, dict) or not e.get("start") or not e.get("end"):
@@ -307,7 +327,10 @@ def tz_restore(lid):
         cid, pid = n43_restore_ids(c, owner, e)
         lk_ = le2e_mode(c, lid)  # #5549 (review 1): an older window's entries after the lock: no plain task title either
         ot = e.get("task_id")  # #5574: the task moved into a locked project since the delete: its title / note neither
-        lk_ = lk_ or (isinstance(ot, int) and not isinstance(ot, bool) and le2e_task_mode(c, ot))
+        if not lk_ and isinstance(ot, int) and not isinstance(ot, bool):
+            # #5588 (d, review F2/F6): the lock state of a vouched task across organisations, read once in tzw_lock_tasks; any
+            # other id only as far as the person sees it (no bit about a foreign task)
+            lk_ = tmode[ot] if ot in tmode else le2e_task_mode(c, ot)
         insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,client_id,pomo_id,
                                                  reminded,auto_stopped,created_at,updated_at)
                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",

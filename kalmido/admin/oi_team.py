@@ -993,8 +993,10 @@ SPECS = [
         label=N_("Absences and bookings"), prep=_person("user_id", member=True)),
     OiT("hub/bookings.json", "hub_bookings", refs={"list_id": "lists", "event_id": "events"}, people={"created_by": "null"},
         fixed={"resource_id": 0}, private="office", label=N_("Absences and bookings"), prep=_booking),
-    OiT("hub/callsheets.json", "hub_callsheets", people={"created_by": "null"}, private="office", label=N_("Absences and bookings"),
-        prep=_callsheet),  # 2.855.0 (#1956)
+    # 2.855.0 (#1956); 2.872.0 (#5532): + the core's columns (owner_id, updated_by, deleted_by)
+    OiT("hub/callsheets.json", "hub_callsheets",
+        people={"created_by": "null", "owner_id": "null", "updated_by": "null", "deleted_by": "null"},
+        private="office", label=N_("Absences and bookings"), prep=_callsheet),
     OiT("hub/leave_quota.json", "hub_leave_quota", people={"user_id": "null", "updated_by": "null"}, private="office", label=N_("Absences and bookings"),
         prep=_person("user_id", member=True)),
     OiT("hub/mails.json", "hub_mails", refs={"client_id": "clients", "list_id": "lists", "eml_id": "fs_nodes", "folder_id": "fs_nodes"},
@@ -1019,18 +1021,34 @@ SPECS = [
 FIXES = [OiFix("tasks", "tasks", "sprint_id", "sprints")]  # the sprint of a task
 
 
-def _opt_ids(raw):
+def _opt_names(raw):
+    """2.976.0 (#5657, review 2.959 F7): {option id: name} of a select field's options (the name too: the same id under
+    another name is another value, its sync would rename the project's)."""
     try:
         d = json.loads(raw) if isinstance(raw, str) else raw
     except ValueError:
-        return set()
-    return {o.get("id") for o in (d or {}).get("options") or [] if isinstance(o, dict)} if isinstance(d, dict) else set()
+        return {}
+    if not isinstance(d, dict):
+        return {}
+    opts = [o for o in d.get("options") or [] if isinstance(o, dict)]
+    if any(not isinstance(o.get("id"), (str, int)) or isinstance(o.get("id"), bool) for o in opts):
+        return None  # review: an option without a usable id cannot be matched (the caller leaves the field unlinked)
+    return {o["id"]: str(o.get("name") or "").strip() for o in opts}
+
+
+def _opts_fit(mine, theirs):
+    """Every option of the project field (mine) is in the schema field (theirs) with the same id AND the same name."""
+    a, b = _opt_names(mine), _opt_names(theirs)
+    if a is None or b is None:
+        return False
+    return all(k in b and b[k] == v for k, v in a.items())
 
 
 def _schema_links(c, run, uid, data, who):
     """2.959.0 (#4031): a project field linked to the schema, on the target's rows -- only for rows this run created (an earlier
     import's row keeps what people did with it since), only inside the list's own workspace (lists/orgfields.py of_for_list), the
-    same type and (select) every option of the project field in the schema field (else its sync would prune the values), and one
+    same type and (select) every option of the project field in the schema field, same id and name (else its sync would prune or
+    rename the values; 2.976.0 #5657), and one
     link per list and schema row (as of_list_switch)."""
     for src in data.get("list_fields") or []:
         fid, ofid = run.m("list_fields", src.get("id")), run.m("org_fields", src.get("org_field_id"))
@@ -1040,7 +1058,7 @@ def _schema_links(c, run, uid, data, who):
         o = c.execute("SELECT org_id, owner_id, type, options FROM org_fields WHERE id=?", (ofid,)).fetchone()
         if not f or not o or (o["org_id"] != f["org_id"] or (not o["org_id"] and o["owner_id"] != f["owner_id"])):
             continue
-        if o["type"] != f["type"] or (f["type"] in ("select", "multiselect") and not _opt_ids(f["options"]) <= _opt_ids(o["options"])) \
+        if o["type"] != f["type"] or (f["type"] in ("select", "multiselect") and not _opts_fit(f["options"], o["options"])) \
                 or c.execute("SELECT 1 FROM list_fields WHERE list_id=? AND org_field_id=? AND id<>?", (f["list_id"], ofid, fid)).fetchone():
             run.warning(N_("A project field does not match the field of the organisation and stays unlinked: {0}"), str(src.get("name") or ""))
             continue

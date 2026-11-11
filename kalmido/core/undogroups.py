@@ -55,6 +55,8 @@ UG_STATES = ("done", "undone", "partial", "barrier", "toobig", "noaccess")
 UG_HOLD = ("barrier", "toobig")  # rows without copies: never empty, they hold the way back
 UG_LABEL = N_("Changed: {0}")
 UG_LABEL_PLAIN = N_("Change")
+UG_BUNDLED = N_("Several changes")  # 2.985.0 (#5394, review F6): a bundle of several requests (undo_bundle)
+UNDO_DAV_BUNDLE_S = 600  # 2.985.0 (#5394, review F6): one group per app password and area for 10 minutes (calendars/caldav.py)
 UG_PRUNE = {"at": 0.0}
 UG_PRUNE_S = 3600
 
@@ -76,7 +78,7 @@ def ug_device():
     subscription's endpoint / id, notify/push.py), printable, at most 80 characters; "" without."""
     if not has_request_context():
         return ""
-    v = request.headers.get(UNDO_DEVNAME_HDR) or ""
+    v = request.headers.get(UNDO_DEVNAME_HDR) or g.get("undo_device") or ""  # 2.985.0 (#5394): a device of CalDAV / CardDAV
     if not v.strip():
         v = request.headers.get(UNDO_DEVICE_HDR) or ""
         v = "" if re.match(r"\s*(https?:|\d+\s*$)", v) else v  # the device header of the push routes: never a name
@@ -92,10 +94,36 @@ def _q(ids):
     return ",".join("?" * len(ids))
 
 
+class _Busy(Exception):
+    """ug_free: a group another transaction holds (its savepoint is rolled back, which lets go of what it locked)."""
+
+
+def ug_free(c, gids):
+    """2.866.0 (#5302 F9): of the groups gids the ones whose row and parts this transaction locks now without waiting (FOR
+    UPDATE SKIP LOCKED). A write runs ug_new_step / ug_cap while it holds its object's lock; a parallel "bis hierher" of the
+    same person (core/undoweb.py) holds the parts of the group it takes back and waits for the objects -- waiting for those
+    rows here closed the circle (a deadlock, 500 on one device). A group in use is left as it is (the next step tidies it);
+    the locks taken on its other parts go with its savepoint, so the run that holds it never waits for this write."""
+    out = []
+    for gid in sorted({int(x) for x in gids if x}):
+        try:
+            with c.savepoint():
+                if c.execute("SELECT id FROM undo_groups WHERE id=? FOR UPDATE SKIP LOCKED", (gid,)).fetchone() is None:
+                    raise _Busy
+                got = len(c.execute("SELECT id FROM obj_undo WHERE group_id=? ORDER BY id FOR UPDATE SKIP LOCKED", (gid,)).fetchall())
+                if got != c.execute("SELECT COUNT(*) FROM obj_undo WHERE group_id=?", (gid,)).fetchone()[0]:
+                    raise _Busy
+            out.append(gid)
+        except _Busy:
+            pass
+    return out
+
+
 def ug_new_step(c, uid):
     """A new step of uid: the way forward of the undone groups ends (an undone group goes, a partial one keeps the parts
-    that stayed). A part that belongs to an editor session too stays there (unlinked)."""
-    gids = [r[0] for r in c.execute("SELECT id FROM undo_groups WHERE user_id=? AND state IN ('undone','partial')", (int(uid),)).fetchall()]
+    that stayed). A part that belongs to an editor session too stays there (unlinked). 2.866.0 (#5302 F9): only the groups
+    no other transaction holds (ug_free)."""
+    gids = ug_free(c, [r[0] for r in c.execute("SELECT id FROM undo_groups WHERE user_id=? AND state IN ('undone','partial')", (int(uid),)).fetchall()])
     if not gids:
         return
     q = _q(gids)
@@ -122,12 +150,24 @@ def ug_drop(c, where, args=()):
 def ug_cap(c, uid):
     """At most UNDO_GROUPS_MAX groups per person: the oldest go."""
     old = [r[0] for r in c.execute("SELECT id FROM undo_groups WHERE user_id=? ORDER BY id DESC OFFSET ?", (int(uid), UNDO_GROUPS_MAX)).fetchall()]
+    old = ug_free(c, old)  # 2.866.0 (#5302 F9): it runs inside a write too
     if old:
         ug_drop_ids(c, old)
 
 
-def _open(c, uid, area, org_id, label, state="done", token=""):
-    ug_new_step(c, uid)
+def undo_bundle(token, secs, keep_redo=False, newest=False, relabel=True):
+    """2.985.0 (#5394, review F6): the parts of this request join the person's group of the same token (+ area) opened within
+    secs seconds -- a server-side bundle without the header (a device's CalDAV / CardDAV sync per app password, a setting
+    changed again and again). keep_redo: a new group of it does not end the way forward of the undone groups (a sync is no
+    step of the person's own). newest: only while that group is still the person's newest. relabel: a joined group is
+    labelled UG_BUNDLED (its first label named one object). The header X-Kalmido-Undo-Group still wins."""
+    if has_request_context():
+        g.undo_bundle = {"token": str(token), "secs": int(secs), "keep": bool(keep_redo), "newest": bool(newest), "relabel": bool(relabel)}
+
+
+def _open(c, uid, area, org_id, label, state="done", token="", keep_redo=False):
+    if not keep_redo:  # 2.985.0 (#5394, review F6): a device's sync keeps the way forward
+        ug_new_step(c, uid)
     lk, la = label
     ts = _now()
     gid = insert_id(c, "INSERT INTO undo_groups(user_id, org_id, area, label_key, label_args, device, token, state, parts, bytes, "
@@ -139,25 +179,44 @@ def _open(c, uid, area, org_id, label, state="done", token=""):
     return gid
 
 
-def ug_current(c, uid, area, org_id, label):
+def ug_current(c, uid, area, org_id, label, obj=None):
     """The group of this request for uid: the one already open in g, a bundled one (token within UNDO_BUNDLE_S seconds), or a
-    new one. label = (key, [values]) unless undo_label set one. None outside a request."""
+    new one. label = (key, [values]) unless undo_label set one. None outside a request. 2.985.0 (#5394, review F6): obj =
+    (kind, id) of a copy part -- a server-side bundle that holds a step of that object already is not joined (two copy
+    steps of one object in one group do not go back through each other's trash / restore side effects)."""
     if not has_request_context() or g.get("undo_own"):
         return None
     cur = g.get("undo_group")
-    if cur and cur["uid"] == int(uid):
+    # 2.866.0 (#5302 N2, review): a group stays in one workspace - a barrier holds only the groups of its org_id, so a part of
+    # another workspace (private / another organisation) opens its own group instead of slipping past that barrier in a mixed one
+    if cur and cur["uid"] == int(uid) and cur.get("org") == org_id:
         return cur
     tok = ug_token()
+    bun = None if tok else g.get("undo_bundle")  # 2.985.0 (#5394, review F6): a server-side bundle (undo_bundle)
     row = None
     if tok:
-        row = c.execute("SELECT id, state, parts, bytes FROM undo_groups WHERE user_id=? AND token=? AND updated_at>=? ORDER BY id DESC LIMIT 1",
+        row = c.execute("SELECT id, state, parts, bytes, org_id FROM undo_groups WHERE user_id=? AND token=? AND updated_at>=? ORDER BY id DESC LIMIT 1",
                         (int(uid), tok, iso(now_utc() - timedelta(seconds=UNDO_BUNDLE_S)))).fetchone()
-        if row is not None and row["state"] not in ("done", "toobig"):
-            row = None  # undone meanwhile: a new step
+        if row is not None and (row["state"] not in ("done", "toobig") or row["org_id"] != org_id):
+            row = None  # undone meanwhile, or another workspace (#5302 N2): a new step
+    elif bun:  # a fixed window from the group's start (a sync that never pauses still opens a new group every secs seconds)
+        tok = f"{bun['token']}|{area or lv_area()}"[:200]
+        row = c.execute("SELECT id, state, parts, bytes, org_id FROM undo_groups WHERE user_id=? AND token=? AND created_at>=? ORDER BY id DESC LIMIT 1",
+                        (int(uid), tok, iso(now_utc() - timedelta(seconds=bun["secs"])))).fetchone()
+        if row is not None and (row["state"] != "done" or row["org_id"] != org_id or (bun["newest"] and row["id"] != c.execute(
+                "SELECT MAX(id) FROM undo_groups WHERE user_id=?", (int(uid),)).fetchone()[0])):
+            row = None  # undone / partial meanwhile, another workspace (#5302 N2), or another step came after it: a new group
+        if row is not None and obj and c.execute("SELECT 1 FROM obj_undo WHERE group_id=? AND kind=? AND ref_id=? LIMIT 1",
+                                                 (row["id"], obj[0], int(obj[1]))).fetchone():
+            row = None  # one copy step per object in a bundle (obj = (kind, id) of a copy part): a second one = a new group
+        if row is not None and bun["relabel"]:
+            c.execute("UPDATE undo_groups SET label_key=?, label_args='[]' WHERE id=?", (UG_BUNDLED, row["id"]))
+            g.undo_label = (UG_BUNDLED, [])
     if row is None:
-        gid = _open(c, uid, area or lv_area(), org_id, g.get("undo_label") or label, token=tok)
+        gid = _open(c, uid, area or lv_area(), org_id, g.get("undo_label") or label, token=tok, keep_redo=bool(bun and bun["keep"]))
         row = {"id": gid, "state": "done", "parts": 0, "bytes": 0}
-    cur = {"uid": int(uid), "id": row["id"], "state": row["state"], "parts": int(row["parts"]), "bytes": int(row["bytes"])}
+    cur = {"uid": int(uid), "id": row["id"], "state": row["state"], "parts": int(row["parts"]), "bytes": int(row["bytes"]),
+           "org": org_id}  # 2.866.0 (#5302 N2): the workspace of the group
     g.undo_group = cur
     return cur
 
@@ -171,9 +230,13 @@ def ug_own():
         g.undo_own = True
 
 
-def _save(c, grp):
-    c.execute("UPDATE undo_groups SET state=?, parts=?, bytes=?, updated_at=? WHERE id=?",
-              (grp["state"], grp["parts"], grp["bytes"], _now(), grp["id"]))
+def _save(c, grp, n):
+    """2.985.0 (#5394, review F8): one part of n bytes counted relative to the row (two requests of one bundle at once, e.g. a
+    device's parallel DAV writes, both count) and the request's copy brought to the row's numbers; toobig is never undone."""
+    r = c.execute("UPDATE undo_groups SET state=CASE WHEN state='toobig' THEN 'toobig' ELSE ? END, parts=parts+1, bytes=bytes+?, "
+                  "updated_at=? WHERE id=? RETURNING state, parts, bytes", (grp["state"], int(n), _now(), grp["id"])).fetchone()
+    if r is not None:
+        grp.update(state=r["state"], parts=int(r["parts"]), bytes=int(r["bytes"]))
 
 
 def ug_fits(c, grp, n):
@@ -185,16 +248,12 @@ def ug_fits(c, grp, n):
         c.execute("DELETE FROM obj_undo WHERE group_id=? AND sess=''", (grp["id"],))
         c.execute("UPDATE obj_undo SET group_id=NULL WHERE group_id=?", (grp["id"],))
         grp["state"] = "toobig"
-    grp["parts"] += 1
-    grp["bytes"] += n
-    _save(c, grp)
+    _save(c, grp, n)
     return False
 
 
 def ug_added(c, grp, n):
-    grp["parts"] += 1
-    grp["bytes"] += n
-    _save(c, grp)
+    _save(c, grp, n)
 
 
 def ug_gids(c, where, args=()):
@@ -264,6 +323,8 @@ def undo_prune(c, force=False):
 
 
 UG_TRACKED = {}  # kind -> table of core/writes.py obj_track (filled there; this module is below writes.py)
+UG_LIFE = {}  # 2.983.0 (#5589): kind -> the kind of the undo part that can still bring a deleted row back (personal/timeundo.py:
+#              time_entry -> time_life); ug_drop_orphans keeps the row's history while such a part exists
 
 
 def ug_drop_orphans(c):
@@ -281,7 +342,11 @@ def ug_drop_orphans(c):
         ug_gc(c, gids)
         # 2.777.0 (#5254, review F4): their history rows too (an undo / redo writes one: an event's title and text) -- a
         # purged event, file node, habit, office row or client leaves no history behind (one-way, the row is gone for good)
-        n += c.execute(f"DELETE FROM obj_history WHERE {cond.replace('obj_undo.', 'obj_history.')}", (kind,)).rowcount
+        # 2.983.0 (#5589): not while a part of UG_LIFE can bring the row back (a deleted time entry's "time_life"): its history
+        # goes with the run after that part ran out (as collab/liste2eguard.py le2b_hist_gone at a lock)
+        life = " AND NOT EXISTS (SELECT 1 FROM obj_undo u WHERE u.kind=? AND u.ref_id=obj_history.ref_id)" if kind in UG_LIFE else ""
+        n += c.execute(f"DELETE FROM obj_history WHERE {cond.replace('obj_undo.', 'obj_history.')}{life}",
+                       (kind, UG_LIFE[kind]) if life else (kind,)).rowcount
     return n
 
 

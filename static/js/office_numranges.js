@@ -26,6 +26,8 @@ async function onumLoad() {
   onumRedraw();
 }
 function onumRedraw() { const box = $('#onum-box'); if (box) box.outerHTML = onumHtml(); }
+// 2.979.0 (#5667): an undo / redo the server did: the shown number ranges come again
+histReloader('numranges', () => { if (!ONUM.ranges) return; if ($('#onum-box')) return onumLoad(); ONUM.ranges = null; });
 
 // the block of the settings page (office.js ofcSettingsHtml calls it below the number schemes); admins only
 function onumHtml() {

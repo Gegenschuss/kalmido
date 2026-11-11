@@ -1533,7 +1533,7 @@ def org_member_put(oid, ghost=False):
             return jsonify(ok=True, by_email=True)  # dropped: an invitation into a company of its own only to people one may see
         if silent:
             from .orginvite import ojn_silent
-            ojn_silent(c, oid, uid, role)
+            ojn_silent(c, oid, uid, role, em)  # 2.985.0 (#4922, review F1): the address typed
             bump(c)
             c.commit()
             return jsonify(ok=True, by_email=True)

@@ -1848,6 +1848,16 @@ function go(hash, rep = false) {  // 2.743.0 (#5235): rep = replace the current 
   if (typeof f8d_defer === 'function' && f8d_defer(() => goNow(hash, rep))) return;  // #3506: after the Back of a closed menu on its way (backclose.js)
   goNow(hash, rep);
 }
+// 2.979.0 (#5667): areas that keep their data in the browser (their own store besides the state) register here how they fetch
+// it again. Since #5255 the server takes a step back by its group (histDo, /api/undo/to) and the entry's own undo / redo
+// function (which also re-fetched the area) no longer runs: the page kept the newer data (a deleted card stayed away, the next
+// edit sent an old version -> 409). After every undo / redo the server did, each registered area runs its function; it decides
+// itself whether its data is loaded / shown (a cheap check) and fetches it again. One registration per area instead of a post
+// hook on every histAdd (the entry's own post stays for what only that step needs, e.g. opening a page again).
+// (in core.js: start files loaded before undo.js register at their top level too; the redraw is undo.js histRedraw)
+// histReloader(name, fn): name = the area's key (a second registration replaces the first: a module loaded again)
+const HIST_RELOAD = new Map();
+function histReloader(name, fn) { if (name && typeof fn === 'function') HIST_RELOAD.set(name, fn); }
 function goNow(hash, rep = false) { const was = location.hash; if (was !== '#' + hash) { if (rep) { if (typeof BN === 'object') BN.nt = 'replace'; location.replace('#' + hash); } else location.hash = hash; if (location.hash === was) route(); } else route(); }  // 2.619.0 (#4943): the same address in another spelling (a browser that keeps the hash decoded) fires no hashchange: route() itself (it closes the drawer)
 async function route() {
   vm_leave();  // 2.413.0 A (#3439): the view left keeps its place (viewmem.js)

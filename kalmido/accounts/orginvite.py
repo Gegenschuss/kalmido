@@ -54,6 +54,10 @@ OJN_DAYS = 14  # 2.148.1 A (#2480): an invitation of an existing account stays o
 OJN_LIVE = "j.silent=0 AND (j.created_at>? OR EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite' AND v.used_at>? AND v.created_at>=j.created_at))"
 OINV_REF = "org-invite"  # 2.360.2 M (#2561): purpose of the sealed row reference
 
+# 2.985.0 (#4922, review F1): the address of an org_joins row as the list shows it: a silent row the one typed (it never follows
+# the account's later address, which the admin must not learn), an ordinary one the account's
+OJN_ADDR = "CASE WHEN j.silent=1 THEN COALESCE(NULLIF(j.email, ''), u.email) ELSE COALESCE(u.email, j.email) END"
+
 
 def oinv_on(c):
     return gsetting(c, "org_invites") != "0"
@@ -119,8 +123,13 @@ def oinv_list(c, oid):
     keep_id = g.user["is_admin"]  # an instance admin sees every account anyway (and gets the id in the answer of an invitation)
     since = iso(now_utc() - timedelta(days=OJN_DAYS))
     with system_ctx(c):  # the invited person is no member yet; the caller checked the organisation admin
-        joins = {r["user_id"]: r for r in c.execute("""SELECT j.id, j.user_id, j.role, j.created_at, u.email FROM org_joins j JOIN users u ON u.id=j.user_id WHERE j.org_id=?
-                             AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id AND m.user_id=j.user_id)""", (oid,)).fetchall()}
+        # 2.985.0 (#4922): + the neutral rows of a deleted account's silent invitation (user_id NULL, the address kept on the row)
+        # 2.985.0 (#4922, review F1): a silent row shows the address the admin typed (j.email), the account's own only for an old row without it
+        found = c.execute(f"""SELECT j.id, j.user_id, j.role, j.created_at, {OJN_ADDR} AS email FROM org_joins j LEFT JOIN users u ON u.id=j.user_id
+                             WHERE j.org_id=? AND (j.user_id IS NOT NULL OR j.silent=1)
+                             AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id AND m.user_id=j.user_id)""", (oid,)).fetchall()
+    joins = {r["user_id"]: r for r in found if r["user_id"] is not None}
+    neutral = [r for r in found if r["user_id"] is None]
     rows = c.execute("""SELECT i.user_id, i.role, i.created_at, u.email, u.display_name, u.username FROM org_invites i
                         JOIN users u ON u.id=i.user_id WHERE i.org_id=? ORDER BY i.created_at DESC""", (oid,)).fetchall()
     for r in rows:
@@ -136,7 +145,7 @@ def oinv_list(c, oid):
                         "state": invite_state(c, r["user_id"]) or "expired"})
     # 2.148.1 H (#2480): the open invitations of existing accounts are listed, too (same form, no account id)
     out += [{"ref": oinv_ref(c, oid, "j", r["id"]), "user_id": None, "email": oinv_addr(r), "name": oinv_addr(r), "role": r["role"],
-             "created_at": r["created_at"], "state": "invited" if r["created_at"] > since else "expired"} for r in joins.values()]
+             "created_at": r["created_at"], "state": "invited" if r["created_at"] > since else "expired"} for r in list(joins.values()) + neutral]
     out.sort(key=lambda v: v["created_at"] or "", reverse=True)
     return out
 
@@ -180,6 +189,8 @@ def org_invite_new(oid):
         code = r[1] if isinstance(r, tuple) else r.status_code  # 2.148.1 H (#2480): err() answers (body, code)
         if code >= 400:
             return r
+        ojn_neutral_drop(c, oid, email)  # 2.985.0 (#4922): the address has an account (again): its row stands for it now
+        c.commit()
         return jsonify(ok=True, by_email=True, invites=oinv_list(c, oid))  # 2.148.1 A (#2480): the same answer as a new account
     name = re.sub(r"\s+", " ", str(b.get("name") or "")).strip()[:60]
     username = _username(c, email)
@@ -190,6 +201,7 @@ def org_invite_new(oid):
     lg = b.get("lang") or usettings(c, me()).get("lang") or "en"
     uset(c, uid, "lang", lg if lg in LANGS else "en")
     ensure_inbox(c, uid)
+    ojn_neutral_drop(c, oid, email)  # 2.985.0 (#4922)
     direct = g.user["is_admin"] and not _operator_apart()  # 2.453.0 (#3780): the same test as org_member_put for an existing account
     if direct:
         org_member_add(c, oid, uid, role)
@@ -224,7 +236,9 @@ def _no_link_if_sent(inv, uid=None):
 def _join(c, oid, jid):
     """2.360.2 M (#2561): the open org_joins row jid of organisation oid with the address (404: none)."""
     with system_ctx(c):  # the invited person is no member yet; the caller checked the organisation admin
-        r = c.execute("""SELECT j.id, j.user_id, j.role, j.silent, u.email FROM org_joins j JOIN users u ON u.id=j.user_id WHERE j.id=? AND j.org_id=?
+        # 2.985.0 (#4922): a neutral row (user_id NULL, silent) the same way: its address is on the row
+        r = c.execute(f"""SELECT j.id, j.user_id, j.role, j.silent, {OJN_ADDR} AS email FROM org_joins j LEFT JOIN users u ON u.id=j.user_id
+                         WHERE j.id=? AND j.org_id=? AND (j.user_id IS NOT NULL OR j.silent=1)
                          AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id AND m.user_id=j.user_id)""", (jid, oid)).fetchone()
     if not r:
         raise Denied(404)
@@ -244,7 +258,9 @@ def org_invite_resend(oid, ref):
     if hit_limit(f"oinv-resend-u:{oid}:{kind}{uid}", OINV_RESEND_DAY, 86400):  # 2.148.1 A (#2486): per invitation
         return err(tr("This invitation was sent again too often today (at most {0}). Try again tomorrow.", OINV_RESEND_DAY), 429)
     if kind == "j":
-        if r["silent"] and ojn_hidden(c, oid, r["user_id"]):  # 2.593.0 (#3570): starts again for the list only, the person still hears nothing
+        # 2.593.0 (#3570): starts again for the list only, the person still hears nothing. 2.985.0 (#4922): so does a neutral
+        # row (no account any more: ojn_hidden says hidden) - the answer is the same as for a silent one
+        if r["silent"] and ojn_hidden(c, oid, r["user_id"]):
             with system_ctx(c):  # the row of a person who is no member
                 c.execute("UPDATE org_joins SET created_at=? WHERE id=?", (iso(now_utc()), r["id"]))
         else:
@@ -326,6 +342,10 @@ def ojn_invite(c, oid, uid, role, by=None):
     now = now_utc()
     by = by or me()
     old = c.execute("SELECT created_at, silent FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
+    with system_ctx(c):  # 2.985.0 (#4922, review F4): every way of inviting (members, import): the address's neutral row gives way
+        addr = c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone()
+    if addr and addr[0]:
+        ojn_neutral_drop(c, oid, addr[0])
     c.execute("""INSERT INTO org_joins(org_id,user_id,role,created_by,created_at) VALUES(?,?,?,?,?)
                  ON CONFLICT(org_id, user_id) DO UPDATE SET role=excluded.role, created_by=excluded.created_by, created_at=excluded.created_at, silent=0""",
               (oid, uid, role, by, iso(now)))
@@ -343,17 +363,45 @@ def ojn_invite(c, oid, uid, role, by=None):
     print("organisation", oid, "invited account", uid, "to join, by", login_log_who(by), flush=True)
 
 
-def ojn_silent(c, oid, uid, role):
+def ojn_silent(c, oid, uid, role, email=None):
     """2.593.0 (#3570): the invitation of an existing account the inviting admin may not see (org_member_put, a company of its
     own): an org_joins row with silent=1 -- in the list of open invitations like any other, nothing for the person (no News item,
     mail or push; ojn_open / ojn_mine / ojn_waiting skip it). An ordinary invitation stays as it is (review F5: an expired one
-    is not opened again without the person hearing of it - like a new address invited again). The caller commits."""
+    is not opened again without the person hearing of it - like a new address invited again). The caller commits.
+    2.985.0 (#4922, review F1): email = the address the admin typed, kept on the row (the list shows it, never a later one of the
+    account; a deletion keeps it, ojn_neutral). Review F4: the address's neutral row gives way."""
     with system_ctx(c):  # the row of a person who is no member and whom the admin may not see
-        c.execute("""INSERT INTO org_joins(org_id,user_id,role,created_by,created_at,silent) VALUES(?,?,?,?,?,1)
-                     ON CONFLICT(org_id, user_id) DO UPDATE SET role=excluded.role, created_by=excluded.created_by, created_at=excluded.created_at
-                     WHERE org_joins.silent=1""",
-                  (oid, uid, role, me(), iso(now_utc())))
+        email = (email or (c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0] or "").strip().lower() or None
+        if email:
+            ojn_neutral_drop(c, oid, email)
+        c.execute("""INSERT INTO org_joins(org_id,user_id,role,created_by,created_at,silent,email) VALUES(?,?,?,?,?,1,?)
+                     ON CONFLICT(org_id, user_id) DO UPDATE SET role=excluded.role, created_by=excluded.created_by, created_at=excluded.created_at,
+                     email=excluded.email WHERE org_joins.silent=1""",
+                  (oid, uid, role, me(), iso(now_utc()), email))
     print("organisation", oid, "invitation of an account the admin may not see kept silent, by", login_log_who(g.user), flush=True)
+
+
+def ojn_neutral(c, uid):
+    """2.985.0 (#4922): before account uid is deleted (accounts/users.py _user_purge: its own deletion, the clean-up of unconfirmed
+    registrations, an instance admin, a restore deleting it again): its silent invitations (ojn_silent) become neutral rows
+    without an account - user_id NULL, the address as the list showed it (review F1: the one typed, kept since ojn_silent), the role, the time (they run out like any other and
+    stay until an admin withdraws them). Else the row went with the account (ON DELETE CASCADE) while a new address's row
+    stays: an admin could tell an account. Not for a row of an organisation the person is a member of (the list does not show
+    it, it must not appear now); ordinary invitations go with the account as before. The caller commits."""
+    with system_ctx(c):  # the rows of organisations the person is no member of
+        n = c.execute("""UPDATE org_joins j SET user_id=NULL, email=COALESCE(NULLIF(j.email, ''), lower(trim(COALESCE(u.email, '')))), pending_lists=''
+                         FROM users u WHERE u.id=j.user_id AND j.user_id=? AND j.silent=1
+                         AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id AND m.user_id=j.user_id)""", (uid,)).rowcount
+    if n:
+        print("organisation invitation: kept", n, "silent invitation(s) of a deleted account as neutral rows", flush=True)
+    return n
+
+
+def ojn_neutral_drop(c, oid, email):
+    """2.985.0 (#4922): the address is invited again: its neutral row (ojn_neutral) gives way to the new invitation, as a silent
+    one is renewed in place when the account is invited again - one row per address in the list. The caller commits."""
+    with system_ctx(c):  # the row of no account
+        c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id IS NULL AND email=lower(trim(?))", (oid, email))
 
 
 def ojn_hidden(c, oid, uid):

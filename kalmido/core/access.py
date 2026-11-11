@@ -47,6 +47,19 @@ def need_collab():
         raise Denied(403, tr("Collaboration is switched off on this server (an admin can switch it on)"))
 
 
+def addr_account(c, em):
+    """2.983.0 (#5643, Fable 2.937 F9): the account a share typed in as an e-mail address goes to -- only an active person
+    whose address is proved (users.email_proved: a mailed link, a verified OIDC claim, a confirmed sign-up) and still the
+    same; None otherwise (no account, an agent, disabled, or an address an admin typed in that nobody proved). Shares by
+    address ask this one place (tables, wiki); the caller answers the same either way."""
+    em = str(em or "").strip().lower()[:200]
+    if not em:
+        return None
+    r = c.execute("SELECT id FROM users WHERE lower(email)=? AND email_proved=? AND disabled=0 AND COALESCE(kind,'user')!='agent' "
+                  "ORDER BY id LIMIT 1", (em, em)).fetchone()
+    return r[0] if r else None
+
+
 # Time tracking for everyone (admin switch, settings.time_all), same pattern: off = the time endpoints refuse,
 # no timers, no focus -> time entries, no timer pushes; entries stay. Timers running at that moment are stopped
 # (end = the moment of switching off), so nothing keeps counting unseen.

@@ -94,6 +94,9 @@ const raw = async id => Buffer.from(await (await fetch(B + `api/files/nodes/${id
     // the one question is answered with its button (as a person does), the move runs on
     await ev(`(window.__mv = null, rawFetch('GET', '/api/files/nodes/${OUT}').then(n => fsl_moveHook(n, ${BOX})).then(x => { window.__mv = x; }, e => { window.__mv = 'err ' + e.message; }), 1)`);
     check(await waitFor(`!!document.querySelector('[data-cd="yes"]')`), 'one question before the move');
+    // 2.970.0 (#5653, review N-i): moving a folder, the question says where its trash goes
+    check(await waitFor(`(document.querySelector('#cdlg-b')?.textContent || '').includes('What lies in the trash of a folder stays on this side')`),
+      'the question says that the trash of the folder stays on this side');
     await ev(`(document.querySelector('[data-cd="yes"]').click(), 1)`);
     const mv = await waitFor(`window.__mv`, 240);
     check(mv === true, 'the folder with content moved into the locked folder ' + mv);

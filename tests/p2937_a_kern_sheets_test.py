@@ -109,6 +109,7 @@ for u, role in (("bob", "member"), ("gina", "guest")):
     S[u] = sess(u)
     S[u].patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
 BOB, GINA, Gi = uid["bob"], uid["gina"], S["gina"]
+dbx("UPDATE users SET email_proved=lower(email) WHERE id=?", (GINA,))  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); here set directly
 A.patch(B + "/api/settings", json={"workspace": f"org:{K}"})
 SP = f"org:{K}"
 
@@ -169,6 +170,7 @@ check(not dbx("SELECT 1 FROM obj_revoked WHERE src='fs_shares' AND kind='sheet' 
 # ================================================================ a person without an organisation (freelancer-matrix: sheets)
 FID, Fr = freelancer(B, A, "frida", features=FEAT)
 FIO, Fi = freelancer(B, A, "fiona", features=FEAT)
+dbx("UPDATE users SET email_proved=lower(email) WHERE id=?", (FIO,))  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); here set directly
 P1 = table(Fr, "Own rates", "private")
 # two people without organisation see each other only by address (no shared list): bound to her account at once
 r = Fr.post(B + f"/api/sheets/{P1}/shares", json={"email": "fiona@example.com", "role": "read"})

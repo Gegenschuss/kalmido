@@ -192,6 +192,7 @@ def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=
         space = int(lr["org_id"]) if lr["org_id"] else (oc.oc_user_space(lr["owner_id"]) or 0)
         active = bool(space) and oc.oc_active_for(c, space)
         changed = 0
+        resealed = []
         with system_ctx(c):  # orgcrypt: the rows of one budget list, resealed for its space
             for table in BUD_TABLES:
                 for r in c.execute(f"SELECT * FROM {table} WHERE list_id=? ORDER BY id", (lid,)).fetchall():
@@ -225,6 +226,8 @@ def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=
                     upd = c.execute(f"UPDATE {table} SET {', '.join(k + '=?' for k in cols)} WHERE id=? AND "
                                     + " AND ".join(f"{k} IS NOT DISTINCT FROM ?" for k in same), [sets[k] for k in cols] + [r["id"]] + [r[k] for k in same])
                     changed += 1 if upd.rowcount else 0
+                    if upd.rowcount and table == "budget_entries":  # 2.985.0 (#5394, review F2): its undo copies / history go
+                        resealed.append(r["id"])
                     if not upd.rowcount and plain and _bud_still_sealed(c, table, r["id"], plain):
                         # 2.662.0 (#4939): the way back left this row sealed (it changed meanwhile) -- counted, not silent
                         print("[orgcrypt] budget row left sealed:", table, r["id"], flush=True)
@@ -232,6 +235,9 @@ def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=
                             failed.append((table, r["id"]))
                     if not upd.rowcount and commit and not plain and force_from is None and lid not in left:
                         left.append(lid)  # 2.611.0 (#4865): changed meanwhile -- a later pass looks at the row again
+        if resealed:  # 2.985.0 (#5394, review F2): a copy in another space's state (plain, or an old key) never outlives the reseal
+            from ..core.writes import obj_undo_forget
+            obj_undo_forget(c, "budget_entry", resealed)
         if commit:
             c.commit()  # 2.585.0 (#4836): also when nothing changed -- ends the list's FOR SHARE
             n += changed

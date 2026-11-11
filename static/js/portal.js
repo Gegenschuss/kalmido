@@ -33,6 +33,8 @@ function ptl_draw() {
   const w = $('#c-ptl'); if (w) w.innerHTML = ptl_switchHtml(t);
   const m = $('#c-mrep'); if (m) m.innerHTML = mrep_switchHtml(t);  // 2.393.2 B (#3375)
 }
+// 2.979.0 (#5667): an undo / redo the server did: the ticket of the open task comes again with its timeline (drawTimeline calls ptl_draw)
+histReloader('portal', () => { const id = S.sel; if (id > 0 && S.tl?.id === id && S.tl.ticket && $('#d-ptl, #c-ptl')) return loadTimeline(id); });
 // sendComment: the flag of the comment being sent (then the switch goes back to internal)
 function ptl_take(tid) { const on = !!PTL.on[tid] && !!S.tl.ticket && S.tl.id === tid; delete PTL.on[tid]; return on; }
 document.addEventListener('click', async e => {

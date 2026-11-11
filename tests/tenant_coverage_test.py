@@ -1301,6 +1301,7 @@ ROUTES = {
     "PUT /api/team/dispo/callsheet/{}": "hub",  # 2.855.0 (#1956): p2802_a_callsheet_test.py
     "GET /api/team/dispo/callsheet/{}/pdf": "hub",  # 2.855.0 (#1956): p2802_a_callsheet_test.py
     "GET /api/team/dispo/callsheet/{}/sketch": "hub",  # 2.855.0 (#1956): p2802_a_callsheet_test.py
+    "GET /api/team/dispo/callsheet/{}/history": "hub",  # 2.872.0 (#5532): the call sheet's history of the core (p5532_a_dispokern_test.py)
     # 2.51.0 C (#1352 #1353 #1355): agents on the pin board, time check / proposals, the disposition + shoot proposals (p251_c_api_test.py)
     "GET /api/v1/lists/{}/notepads": "list", "POST /api/v1/lists/{}/notepads": "list", "PATCH /api/v1/notepads/{}": "list",
     "DELETE /api/v1/notepads/{}": "list", "PUT /api/v1/lists/{}/status-pad": "list", "GET /api/v1/lists/{}/weekly-status": "list",

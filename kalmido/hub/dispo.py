@@ -224,8 +224,11 @@ def _row(c, bid):
 
 def _may_change(c, uid, rows):
     """2.360.0 C (#2496): other people's bookings only by an admin of the area (rls lets every member reach them).
-    2.502.0 (#4308): nothing at all with a role that changes nothing in the organisation, the own bookings neither."""
-    need_org_write(c, uid, rows[0]["org_id"])
+    2.502.0 (#4308): nothing at all with a role that changes nothing in the organisation, the own bookings neither.
+    2.872.0 (#5532): that floor is the shared core's role of the shoot day (hub/dspkern.py obj_need, was need_org_write); the
+    rule of who saved it / an admin stays the area's own logic."""
+    from .dspkern import dsk_need_day
+    dsk_need_day(c, uid, rows[:1])
     if any(r["created_by"] != uid for r in rows) and not abs_admin(c, uid, rows[0]["org_id"]):
         raise Denied(403, tr("Only who saved it or an admin of the organisation can change it"))
 
@@ -513,6 +516,8 @@ def dsp_delete(bid):
         _dsp_step(c, uid, x, "delete")  # 2.809.0 (#5476): one part per booking (hub/dspundo.py)
         c.execute("UPDATE hub_bookings SET deleted_at=? WHERE id=?", (now, x))
         _dsp_done(c)
+    if ids:
+        _dsp_sync(c, uid, {(r["org_id"], r["job"])})  # 2.872.0 (#5532): the last live booking gone -> the call sheet to the trash
     bump(c)
     c.commit()
     return jsonify(ids=ids)
@@ -525,18 +530,20 @@ def dsp_restore():
     ids = body().get("ids")
     if not isinstance(ids, list) or len(ids) > 500:
         raise BadInput(tr("Invalid data"))
-    n = 0
+    n, days = 0, set()
     for x in ids:
         try:
             r = _row(c, int(x))
         except (TypeError, ValueError):
             raise BadInput(tr("Invalid data")) from None
         _may_change(c, uid, [r])
+        days.add((r["org_id"], r["job"]))
         if r["deleted_at"]:  # 2.809.0 (#5476): the person's step (hub/dspundo.py) under the booking's lock
             write_lock(c, f"hub_bookings-{r['id']}")
             _dsp_step(c, uid, r["id"], "restore")
         n += c.execute("UPDATE hub_bookings SET deleted_at=NULL WHERE id=? AND deleted_at IS NOT NULL", (r["id"],)).rowcount
         _dsp_done(c)
+    _dsp_sync(c, uid, days)  # 2.872.0 (#5532): a booking back -> its call sheet out of the trash
     bump(c)
     c.commit()
     return jsonify(restored=n)
@@ -551,6 +558,13 @@ def _dsp_step(c, uid, bid, what=None):
 def _dsp_done(c):
     from .dspundo import dsu_post
     dsu_post(c)
+
+
+def _dsp_sync(c, uid, days):
+    """2.872.0 (#5532): the call sheets of the shoot days {(org_id, job)} follow their bookings into / out of the core's trash."""
+    from .dspkern import dsk_sync
+    for oid, job in sorted(days):
+        dsk_sync(c, uid, oid, job)
 
 
 @app.get("/api/team/bookings/mine")

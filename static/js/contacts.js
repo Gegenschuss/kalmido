@@ -63,6 +63,15 @@ async function ctLoad(q) {  // 2.431.0 C (#3602): q = quietly for ct_live (no dr
   if (S.route.mod === 'contacts' && !q) ctDraw();
   if (fresh && !q) for (const w of [$('#view .ctlistw'), $('#view')]) if (w) w.scrollTop = 0;  // 2.119.1 A (#2081): another search starts at the top (not at the end, which would load page two)
 }
+// 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the shown contacts and the open card come again (like ct_live), contacts not shown are fetched on the next view (ctRoute)
+histReloader('contacts', async () => {
+  if (!CT.items) return;
+  if (S.route.mod !== 'contacts') { CT.items = null; return; }
+  if (CT.trash) return;
+  const sel = CT.sel;
+  await Promise.allSettled([ctLoad(1), sel > 0 && rawFetch('GET', `/api/contacts/${sel}`).then(c => { if (CT.sel === sel && c) CT.card = c; })]);
+  if (S.route.mod === 'contacts') ctDraw();
+});
 async function ctRoute(id) {
   // 2.351.0 B (#2749): #contacts/f/<folder> filters by a folder (ctfold.js), #contacts/b/<book> by an address book; the plain
   // #contacts ends the folder filter, opening a contact keeps it

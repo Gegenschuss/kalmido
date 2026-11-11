@@ -461,6 +461,7 @@ def sheets_tabs_add(sid):
     from .core import sh_touch
     c = db()
     first, uid = _need_book(c, sid, write=True)
+    write_lock(c, "sheet:" + str(first["id"]))  # 2.884.0 (#5479, review F7): the count of sheets under the table's lock (as sheets_tabs_patch)
     b = body()
     after = b.get("after_id")
     if after is not None and (isinstance(after, bool) or not isinstance(after, int)):
@@ -548,6 +549,8 @@ def sheets_tabs_restore(sid, tid):
     from .core import sh_touch
     c = db()
     first, uid = _need_book(c, sid, write=True)
+    for x in sorted({first["id"], tid}):  # 2.884.0 (#5479, review F7): the count / names under the locks of sheets_tabs_patch
+        write_lock(c, "sheet:" + str(x))
     r = _need_tab(c, first, tid, deleted=True)
     tabs = shb_rows(c, first["id"])
     if len(tabs) >= SHB_TABS_MAX:

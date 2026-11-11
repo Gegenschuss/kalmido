@@ -142,6 +142,9 @@ async function rel_load(id) {
   try { const j = await rawFetch('GET', `/api/tasks/${id}/relations`); if (S.sel === id) { REL.id = id; REL.items = j.relations || []; REL.err = null; rel_draw(); } }
   catch (e) { if (e.message !== 'auth' && S.sel === id) { REL.id = id; REL.items = null; REL.err = e instanceof Offline ? 'offline' : e.message; rel_draw(); } }
 }
+// 2.979.0 (#5667): after an undo / redo the server took back by its group (the step's own undo with rel_load no longer runs):
+// the relations of the open task read again
+histReloader('relations', () => { if (REL.id > 0 && S.sel === REL.id && $('#d-rels')) return rel_load(REL.id); });
 function rel_draw() { const el = $('#d-rels'), t = taskById(S.sel); if (el && t) el.innerHTML = rel_html(t); }
 function rel_secHtml(t) {
   if (!t || !(t.id > 0) || t.context) return '';

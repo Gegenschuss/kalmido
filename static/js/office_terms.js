@@ -19,6 +19,8 @@ async function agbLoad(force) {
 function agbRedraw() {
   const box = $('#agb-box'); if (box) box.outerHTML = agbSettingsHtml();
 }
+// 2.979.0 (#5667): an undo / redo the server did: the shown terms section comes again
+histReloader('terms', () => { if (!AGB.data) return; if ($('#agb-box')) return agbLoad(true); AGB.data = null; });
 const agbFileUrl = (lg, inline) => `/api/office/terms/${lg}/file${inline && !/; wv\)/.test(navigator.userAgent || '') ? '?inline=1' : ''}`;
 function agbRowHtml(lg, name, t, adm) {
   const info = t ? [t.name, tr('as of {0}', fmtDateLoc(t.date))].filter(Boolean).join(' · ') : tr('No terms and conditions yet');

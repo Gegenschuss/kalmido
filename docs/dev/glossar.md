@@ -11,8 +11,9 @@ Bedeutungen bekommt einen Kontext (`Event|calendar`, `People|event`).
 | Ereignis in Benachrichtigungen/Agenten | Ereignis | (dort richtig, kein Termin) |
 | Von außen eingebundener Kalender (ICS) | Abonnierter Kalender | Abo, Kalender-Abo, Kalender-Abonnement |
 | Eigener Export-Link des Kalenders | Kalender-Link | Kalender-Abo, Öffentlicher Kalender-Link |
-| Rolle lesend / schreibend | kann ansehen / kann bearbeiten | Nur lesen (im Kalender) |
-| Zustand ohne Schreibrecht | nur ansehen | nur lesen (im Kalender) |
+| Rolle lesend / schreibend (Kalender, in Sätzen) | kann ansehen / kann bearbeiten | Nur lesen |
+| Rolle lesend in Projekten/Organisationen (Auswahl neben Admin/Mitglied) | Nur ansehen | Nur lesen, Betrachter |
+| Zustand ohne Schreibrecht | nur ansehen | nur lesen |
 | Frei/Belegt | belegt | beschäftigt |
 | Eigene Wiederholung | Eigene… | Benutzerdefiniert |
 | Zusage zu einem Termin | Zusagen / Vielleicht / Ablehnen; Status Zugesagt | Annehmen |
@@ -23,12 +24,18 @@ Bedeutungen bekommt einen Kontext (`Event|calendar`, `People|event`).
 | Aufgabe selbst nehmen | Selbst übernehmen | Übernehmen |
 | Vorschlag/Einstellung anwenden | Übernehmen | |
 | Board-Zeilen | Gruppieren nach | Zeilen, Swimlanes |
+| Block der Projektseite mit Durchlauf-/Zykluszeit | Durchlauf | Fluss, Flow |
+| Teil „Projekt bearbeiten“ mit Projekttyp, Tickets, Sprints, Feldern | Was das Projekt kann | Projekt-Funktionen |
+| Teil „Projekt bearbeiten“ mit Formularen, Software, Webhooks, Regeln | Formulare, Regeln & Anbindungen | Formulare & Software |
+| Eigenschaften ohne eigene Abweichung | Wie vom Projekttyp vorgegeben | Wie der Projekttyp |
 | Entfernen mit Rückgängig | Löschen (Papierkorb: „In den Papierkorb“) | Entfernen, Gelöscht/Archiviert für dasselbe |
 | Neues Element | Hinzufügen (in Listen mit Feld: „hinzufügen“, mit Knopf: „anlegen“ nur für Konten/Projekte) | übernehmen |
 
-Fachwörter (Kanban, Swimlanes, WIP, Backlog) stehen nur dort, wo die Funktion eingeschaltet ist.
+Fachwörter (Kanban, Swimlanes, WIP, Backlog) stehen nur dort, wo die Funktion eingeschaltet ist: die Ansicht
+„Kanban“ erscheint nur mit dem Modul Kanban, WIP-Grenzen nur an Spalten mit Grenze, Backlog nur mit Sprints und als Abschnitt im Software-Projekt.
+„Mindmap“ und „Zeitstrahl“ gelten als Alltagswörter (#5481).
 Technikwörter (ICS, iCal, CalDAV, Basis-URL, „Erlaubte interne Hosts“, IANA-Zonen) nur in den
 Einstellungen für Fortgeschrittene.
 
-Offen: Rollen in Projekten/Organisationen heißen noch „Nur lesen“ (Test p2364_c_admin_ui); mit Büro #5454
-gemeinsam entscheiden, ob sie auf „kann ansehen“ gehen.
+Rollen (#5481, 2.831): die Leserolle in Projekten und Organisationen heißt „Nur ansehen“, im Kalender in Sätzen
+„kann ansehen“; „Nur lesen“ gibt es in der deutschen Oberfläche der Listen nicht mehr.

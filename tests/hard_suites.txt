@@ -57,6 +57,27 @@ pw*
 *tenancy*
 *rights*
 
+# 2.936.0 (#5599: only hard suites hold build and live): the areas the live train added by hand
+# (its own extra list) - now here, so the CI sorts them onto the hard shards too
+# encryption (end-to-end lists, crypt / crypto helpers)
+*crypt*
+*e2e*
+# rights and roles
+*perm*
+*roles*
+# import (data import, bank statements)
+*import*
+*mt940*
+*camt*
+# migrations and the database guards (foreign keys, their indexes and comments)
+*migrat*
+check_fk_comment
+*fkindex*
+p2103_c_api
+# a person without an organisation and the no-sham guard
+p287b_a_freelancer_api
+p2501_a_nosham
+
 # security scanners (unsure = hard)
 *audit*
 *gitleaks*

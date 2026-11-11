@@ -1,6 +1,62 @@
 {
  "versions": [
   {
+   "version": "2.990.0",
+   "date": "2026-11-11",
+   "items": [
+    {
+     "de": "Termine im Kalender lassen sich mit der Tastatur öffnen und am Handy leichter treffen.",
+     "en": "Calendar events open with the keyboard and are easier to hit on a phone."
+    },
+    {
+     "de": "Beim Markieren einer Mahngebühr als bezahlt fragt Kalmido nach dem Tag, an dem das Geld kam; das Datum lässt sich später ändern.",
+     "en": "Marking a reminder fee as paid now asks for the day the money came; the date can be changed later."
+    },
+    {
+     "de": "Am Handy zeigt ein offenes Angebot oder eine Rechnung oben nur noch eine schlanke Zeile, weitere Schritte stehen im Mehr-Menü.",
+     "en": "On a phone an open quote or invoice shows one slim line at the top, further steps are in the more menu."
+    },
+    {
+     "de": "„Letzte Schritte“ nimmt jetzt auch Einstellungen, Budget-Einträge, Änderungen vom Handy-Kalender/-Adressbuch und gelöschte ganze Kalender zurück.",
+     "en": "\"Recent steps\" now also takes back settings, budget entries, changes from your phone's calendar/contacts and whole deleted calendars."
+    },
+    {
+     "de": "Auf dem Call Sheet wählst du Kunde und Agentur jetzt aus deinen Kontakten, die Agentur merkt sich das Projekt.",
+     "en": "On the call sheet you now pick client and agency from your contacts, and the project remembers the agency."
+    }
+   ]
+  },
+  {
+   "version": "2.974.0",
+   "date": "2026-11-11",
+   "items": [
+    {
+     "de": "Die Zurück-Taste am Handy geht in Threads, Papierkörben, Karten und Reisen eine Ansicht zurück, statt die Seite zu verlassen.",
+     "en": "The Back key on your phone now goes one view back in threads, trashes, cards and trips instead of leaving the page."
+    },
+    {
+     "de": "Zurück beendet am Handy zuerst eine laufende Auswahl und bleibt auf der Seite.",
+     "en": "On your phone, Back now ends a running selection first and keeps you on the page."
+    },
+    {
+     "de": "In der Dokument-Ansicht lassen sich PDF-Seiten per Ziehen umsortieren.",
+     "en": "In the document view you can reorder PDF pages by dragging them."
+    },
+    {
+     "de": "Mehrere PDFs lassen sich über „Mehr“ zu einem Dokument zusammenfügen.",
+     "en": "Several PDFs can be merged into one document via \"More\"."
+    },
+    {
+     "de": "Agenten können melden lassen, wenn sich ihre Aufgaben ändern (Arbeitsweise).",
+     "en": "Agents can be told when their tasks change (work style)."
+    },
+    {
+     "de": "In den Agenten-Einstellungen kannst du ein Modell für deine Nachrichten und Entscheidungen und ein günstigeres für Routine wählen.",
+     "en": "In the agent settings you can pick one model for your messages and decisions and a cheaper one for routine."
+    }
+   ]
+  },
+  {
    "version": "2.962.0",
    "date": "2026-11-11",
    "items": [

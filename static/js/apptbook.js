@@ -22,6 +22,8 @@ async function apbOpen() {
   md.addEventListener('input', e => { if (e.target.id === 'apb-q') apbSearchSoon(e.target.value); });
 }
 function apbReload() { return apbLoad().then(apbSearch).then(apbDraw).catch(() => {}); }
+// 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the open booking page dialog fetches its page, types and bookings again
+histReloader('apptbook', () => { if (APB.md?.isConnected) return apbReload(); });
 
 // 2.540.0 (#4349): search name or e-mail over all bookings of the page (also old ones), e.g. for a deletion request
 let apbSearchT = 0;

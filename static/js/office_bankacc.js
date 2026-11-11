@@ -24,6 +24,8 @@ async function bka_setCount(n) {
   if (had !== !!n) { await ofcInfo(true); ofcDraw(); }
 }
 const bka_reload = bka_load;
+// 2.979.0 (#5667): an undo / redo the server did: the shown accounts section comes again, else it reads again when it is drawn (oid)
+histReloader('bank-accounts', () => { if (BACC.items === undefined) return; if ($('.bkaset')) return bka_load(); BACC.oid = -1; });
 
 // ---- the area in the office settings
 function bka_rowHtml(r) {

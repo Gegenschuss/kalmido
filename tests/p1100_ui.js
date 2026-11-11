@@ -146,7 +146,7 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   w.eval(`shareModal(${L})`); await sleep(900);
   md = [...d.querySelectorAll('.modal')].at(-1);
-  check([...md.querySelector(`[data-mrole="${id.pete}"]`).options].map(o => o.textContent).join() === 'Admin,Mitglied,Teilnehmer,Nur lesen', 'German role names');  // 2.364.0 C (#3041)
+  check([...md.querySelector(`[data-mrole="${id.pete}"]`).options].map(o => o.textContent).join() === 'Admin,Mitglied,Teilnehmer,Nur ansehen', 'German role names');  // 2.364.0 C (#3041); 2.831.0 (#5481): Nur ansehen
   check(/Sieht nur die eigenen, zugewiesenen Aufgaben/.test(md.querySelector('.rolehelp').textContent), 'German explanations');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   check(w.eval(`listMenuItems(${L}, document.body)`).some(x => x.label === 'Angezeigte Felder…'), 'German: Spalten… (2.14.0, was the assignee column toggle)');

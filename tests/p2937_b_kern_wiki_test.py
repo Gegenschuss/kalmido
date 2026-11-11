@@ -24,7 +24,7 @@ import dbx as dbxm  # noqa: E402
 import kt  # noqa: E402
 import requests  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
-from kt import B, DATA, check, sess, until  # noqa: E402
+from kt import B, DATA, check, dbx, sess, until  # noqa: E402
 
 FEAT = "wiki,files,collab,comments"
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
@@ -98,6 +98,7 @@ def cols():
 A = kt.setup()
 FID, Fr = freelancer(B, A, "frida", features=FEAT)
 FIO, Fi = freelancer(B, A, "fiona", features=FEAT)
+dbx("UPDATE users SET email_proved=lower(email) WHERE id=?", (FIO,))  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); here set directly
 
 # ================================================================== the dialog on the core, "Shared with me"
 WD = page(Fr, "Docs", "the index of the docs")
@@ -144,6 +145,32 @@ check(r.ok and r.json().get("id") == fold.get("id") and r.json().get("images") i
 check(text_of(Fi, WI) == "the intro text" and text_of(Fi, WD) == "the index of the docs", "... fiona reads again (the pair too)")
 check(Fr.delete(B + f"/api/wiki/shares/{fold.get('id')}").ok and Fr.post(B + f"/api/wiki/shares/{fold.get('id')}/restore").ok,
       "Redo and Undo again work on the same id")
+# 2.969.0 (#5644, Fable review 2.937 F7): the Undo puts a share back only on a node that is still frida's private one -- the
+# pair's id comes from the stored card, so its node is checked too (else 409 and nothing comes back, the rows stay)
+PAIR = pair[0][0] if pair else 0
+PN = (sql("SELECT node_id FROM fs_shares WHERE id=?", (PAIR,)) or [(0,)])[0][0]
+PO = (sql("SELECT owner_id FROM fs_nodes WHERE id=?", (PN,)) or [(0,)])[0][0]
+check(PN and Fr.delete(B + f"/api/wiki/shares/{fold.get('id')}").ok, "F7 setup: frida revokes the folder share again")
+sql("UPDATE fs_nodes SET owner_id=? WHERE id=?", (FIO, PN), write=True)
+r = Fr.post(B + f"/api/wiki/shares/{fold.get('id')}/restore")
+check(r.status_code == 409 and not sql("SELECT 1 FROM fs_shares WHERE id IN (?, ?)", (FOLD, PAIR)) and text_of(Fi, WI) is None,
+      f"F7: the pair's node is someone else's by now -- the Undo is refused, neither share comes back {r.status_code} {r.text[:160]}")
+check(len(sql("SELECT 1 FROM obj_revoked WHERE src='fs_shares' AND (CAST(row_json AS JSONB)->>'id') IN (?, ?)", (str(FOLD), str(PAIR)))) == 2,
+      "F7: ... both obj_revoked rows stay")
+sql("UPDATE fs_nodes SET owner_id=? WHERE id=?", (PO, PN), write=True)
+r = Fr.post(B + f"/api/wiki/shares/{fold.get('id')}/restore")
+check(r.ok and text_of(Fi, WI) == "the intro text" and text_of(Fi, WD) == "the index of the docs",
+      f"F7: the node frida's again -- the Undo brings both back, fiona reads again {r.status_code}")
+# #5644 review: a revoked row written in another workspace does not come back on frida's private node either
+OX = (sql("SELECT id FROM orgs ORDER BY id LIMIT 1") or [(None,)])[0][0]
+if OX:
+    check(Fr.delete(B + f"/api/wiki/shares/{fold.get('id')}").ok, "F7 org setup: revoked once more")
+    sql("UPDATE obj_revoked SET org_id=? WHERE src='fs_shares' AND (CAST(row_json AS JSONB)->>'id')=?", (OX, str(PAIR)), write=True)
+    r = Fr.post(B + f"/api/wiki/shares/{fold.get('id')}/restore")
+    check(r.status_code == 409 and not sql("SELECT 1 FROM fs_shares WHERE id IN (?, ?)", (FOLD, PAIR)),
+          f"F7: the pair's row names a workspace -- refused, nothing comes back {r.status_code}")
+    sql("UPDATE obj_revoked SET org_id=NULL WHERE src='fs_shares' AND (CAST(row_json AS JSONB)->>'id')=?", (str(PAIR),), write=True)
+    check(Fr.post(B + f"/api/wiki/shares/{fold.get('id')}/restore").ok and text_of(Fi, WI) == "the intro text", "F7: ... and back once the row fits")
 check(Fr.patch(B + f"/api/wiki/shares/{note.get('id')}", json={"images": True}).ok
       and next((x["images"] for x in dialog(Fr) if x["id"] == note.get("id")), None) is True, "the switch of the page share goes on")
 check(Fi.delete(B + f"/api/wiki/shares/{note.get('id')}").status_code == 404, "fiona cannot end frida's share")

@@ -46,6 +46,7 @@ def person(name, role, org=ORG):
 Bo, Gi, Ca = person("bob", "member"), person("gina", "guest"), person("carl", "member")
 FID, Fr = freelancer(B, A, "frida")
 FIO, Fi = freelancer(B, A, "fiona")
+dbx("UPDATE users SET email_proved=lower(email) WHERE id=?", (FIO,))  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); here set directly
 for s in (Fr, Fi):
     s.patch(B + "/api/settings", json={"features": FEAT})
 BOB, GINA, CARL = uid["bob"], uid["gina"], uid["carl"]

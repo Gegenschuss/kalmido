@@ -215,6 +215,15 @@ c.commit()
   kinds: the own runs of the bookmarks, feeds, video sign-offs (reviews; comments deleted on their own stay there), the
   calendars and the address books' line of `tp_tick` are gone. The rows in the trash before 2.947.0 are the core's trash as
   they are (`deleted_by` empty: only who manages them restores them).
+- 2.936.0 (#5364, stage 2a of the trash: tasks and projects): their trash period is the core's run too. The kind `list`
+  (`lists/lmcore.py`) and the light kind `task` (`core/objlight.py`; a light kind may have `trash_prune`, retention only)
+  delete through their `obj_on_purge` hooks (`lists/listtrash.py otr_core_purge`: the project with its tasks and files;
+  `tasks/tasktrash.py ttp_core_purge`: the task with its subtasks and attachments, subtasks not due are detached).
+  `obj_register(trash_keep=f(alias) -> (sql, args))` = what the run leaves (kept by law: `lists.retain_until`), checked again
+  under the lock and reported as `<kind>_kept`; `trash_batch=n` = at most n per run (projects 50, tasks 500). A hook that
+  fails keeps its object for the next run and counts as `<kind>_err` (one savepoint per kind; the run raises after its
+  commit, the watchdog reports it). The runs `ttp_tick` and `otr_prune` are gone; the report run is `obj_trash` (`task`,
+  `task_kept`, `list`, `list_kept`).
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
   `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).
@@ -231,7 +240,7 @@ c.commit()
   table `undo_groups`; the header `X-Kalmido-Undo-Group` bundles several requests within 10 seconds, `X-Kalmido-Device`
   names the device). 30 days, 300 groups per person, 256 KB per part, 2 MB or 1000 parts per group (above: listed as
   `toobig`, no copy). `core/undoweb.py`: `GET /api/undo`, `POST /api/undo/to/<id>` (newest first, the rights of now,
-  a part that changed since stays and is named, a barrier stops), `POST /api/undo/<id>/redo`; `undo_barrier` for
+  a part that changed since stays and is named, a barrier stops the older groups of its own workspace only - same org_id, 2.866.0 #5302 N2; a group too big stops all), `POST /api/undo/<id>/redo`; `undo_barrier` for
   finalising / sending; a tracked kind registers who may take its steps back (`undo_need_reg`, the office in
   `office/undo.py`), a kind without one is never written back. People only (agents 403).
 - Undo across devices, stage 4 (2.747.0, #5252): the office's step groups have area `office` and a label naming the object
@@ -261,8 +270,26 @@ c.commit()
   its own restore / trash (`ua_trash_fix`) and re-checks the target the copy puts the row into (calendar, address book,
   folder). A file's content is never copied: its step holds the version it pointed at (`cur_version`); a version the
   clean-up removed cannot come back (409); `FSU_VERSION_HOOKS` let an area refresh what it derived from the content.
-  The browser's own steps (`histAdd`) stay until stages 2 / 7. Not yet: CalDAV / CardDAV and API v1 writes, budget,
-  settings.
+  The browser's own steps (`histAdd`) stay until stages 2 / 7.
+- Undo across devices, stage 6 rest (2.985.0, #5394): CalDAV / CardDAV PUT and DELETE of an event / a card record the same
+  steps as the app (the device = the app password's name, `g.undo_device`); API v1 shares the app's write functions, so a
+  person's token records them too. A whole calendar / address book into the trash and out of it is a trash step of its core
+  kind taken back the area's own way (`core/undoweb.py` `undo_trash_reg`: the calendar with its events, the book with its
+  contacts' links and birthday tasks; an undo sends no mails). Settings are key-value rows without id or version: one diff
+  part per changed key (`accounts/setundo.py`, kind `setting`, area `self`, recorded before the commit; view state such as
+  folded folders or the shown workspace is no step), the reset of the settings one group. Budget entries
+  (`life/budundo.py`, kind `budget_entry`) carry their sealed values as stored; `obj_track(undo_spaces=)` names the spaces
+  whose keys sealed the copy, and `_undo_rekeyed` refuses it (409, before the fingerprint) when such a key was rotated
+  since or the list's space is not the copy's any more (moved, encryption switched) -- a copy is never written back under
+  another key. Not yet: budget categories and templates, the project settings.
+  Review of #5394 (same release): a device's DAV writes join one group per app password and area for 10 minutes
+  (`core/undogroups.py` `undo_bundle`, label "Several changes") and never end the person's way forward; a setting changed
+  again from the same device within 10 minutes joins its step while that is the newest. Privacy choices (push channel,
+  "title only", sharing defaults, photo metadata, video players, read receipts, own mails, quiet hours, busy times) are
+  no step; `su_run` checks the key again and writes through `clean_setting`. A reset's step brings the view state and the
+  active saved arrangement back and empties the app's own "undo the reset". `obj_track(hist_skip=)` keeps sealed columns
+  out of `obj_history`; a budget list resealed (`bud_settle`) drops its entries' undo copies and history rows
+  (`core/writes.py` `obj_undo_forget`), so no plain copy outlives switching the encryption on.
 - Undo across devices, stage 7 (2.905.0, #5255): the browser keeps no copies and no undo functions for areas whose writes
   record a step. A write that recorded one answers with `X-Kalmido-Undo-Gid: <group>` (`core/undoweb.py`
   `undo_gid_header`); `static/js/undo.js` `histAdd` puts the group into the entry (`gids`; a change still in the outbox:
@@ -425,7 +452,8 @@ Stage 7c, knowledge pages (2.937.0, #5244, one-way): the person rows of `wiki_sh
 A person share of the knowledge dialog is only its share on the node (+ the "pair" on the page of the folder's name); its
 card data (folder, pictures, the address typed in, the pair) lives in `wiki_share_cards` (`fs_share_id`, ON DELETE CASCADE),
 the dialog's id is `p<fs_shares id>`. Revoking = `obj_node_unshare` of both shares, the card rides in the obj_revoked row
-(`wiki_card`); the Undo puts them back under the same ids (`obj_node_reshare`, for a node no kind names). The start
+(`wiki_card`); the Undo puts them back under the same ids (`obj_node_reshare`, for a node no kind names; since 2.969.0, #5644,
+it takes the owner / workspace the caller checked and refuses with 409 when the node lies elsewhere today). The start
 (wiki/wkshare.py `wsh_retire`, `kern_retire_rows`) copies the last rows forward, checks, then deletes the person rows, drops
 the two columns, moves the times to TIMESTAMPTZ and `is_folder` to BOOLEAN and raises the back limit. `wiki_shares` = public
 links only.
@@ -467,6 +495,28 @@ routes, no fields and no write path of the core (`obj_reg_node` refuses it with 
   `mailhub/<id>`, `client/<id>`) and `obj_space`.
 Nothing of the areas moved: their routes, rights and tables stay as they are. Test containers have
 `GET /api/test/objrole/<kind>/<id>` (tests/p2754_d_kinds_api_test.py).
+
+## The disposition: shoot day and call sheet (2.872.0, #5532)
+
+`kalmido/hub/dspkern.py` puts the disposition's shoot day and its call sheet on the core (decision of #5532: both kinds of the
+core, the call sheet a part of its shoot day with the same rights and a history of its own, no new rights table):
+- `shoot_day` is a light kind (`node=False`) on `hub_bookings`: a shoot day is the bookings made together (`job`), its id the id
+  of any of its bookings. The disposition's routes ask `obj_need(shoot_day, ...)` (`dsk_need_day`, also for a booking in the
+  trash) instead of `need_org_write`; "a member changes only the bookings they saved" stays the area's rule on top. The
+  bookings keep their routes and their steps of the step groups (`hub/dspundo.py`, kind `booking`).
+- `callsheet` is a kind with the core's columns on `hub_callsheets` (`migrations.d/5532_a.py`) without routes, node or listing
+  (the pattern of `sheets/shkern.py`): `hub/callsheet.py` saves the day details through `obj_write` (the field `data`, sealed
+  with the organisation's key when its encryption is on -- the history keeps the sealed text, as `ow_write`), the sketch
+  through the adapter `obj_history_add` (a mark, never the picture, see `undo_skip` below). `GET /api/team/dispo/callsheet/<job>/history` lists the core's history (who, when, which details).
+- `undo_skip(table, *columns)` (core/writes.py): columns no undo copy holds -- the sketch (up to 4 MB) would make every step
+  of the call sheet too big for its step group (`ug_fits`, a barrier of "back to here"). They are not in the copy or its
+  fingerprint, and taking a step back leaves them as they are; a change of the sketch alone records no step, its history
+  entry is the mark `picture:<8 hex of its SHA-256>`.
+- The role of both: the person may enter the area with the module on (`abs_org`) -> `manage` when the organisation role
+  writes, `view` read-only; agents and kid accounts nothing; `cap` gives nothing (no shares).
+- The trash: the shoot day's last live booking deleted -> `obj_trash` of the call sheet, a booking back (the route, or the
+  step list's undo / redo through `dsu_need`'s fix) -> `obj_restore` (`dsk_sync`); the core's run deletes it after the period
+  (`trash_prune=True`), the bookings' trash run deletes a call sheet without any booking the core's way (`dsk_orphans`).
 
 ## Cross-cutting parts (2.755.0, #5267)
 

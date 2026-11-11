@@ -100,6 +100,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "abort",  # 2.144.0 A (#2412): the person pressed Stop in its chat (user, job_id?): end the running answer / the job's step
                 "letter_draft_requested",  # 2.153.0 (#2031): an office admin asks the agent to draft an answer to a shared document
                 "task_changed",  # 2.959.0 (#4030): a task assigned / delegated to the agent or watched by it changed: diff {field: {old, new}}
+                "status_changed",  # 2.983.0 (#3915): a task the agent watches was completed, closed or reopened (status)
                 )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop", "message")  # 2.56.0 (#1791): message = text to a running job, no state change
@@ -274,6 +275,13 @@ def agent_changed_events(c, diffs):
         row = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
         if not row:
             continue
+        # 2.976.0 (#5657, review 2.959 F4): only what the stored row says now -- a change taken back later in the request (a
+        # savepoint rolled back, a value set back) never reaches an agent as "new"
+        # review: a value written again later without log_changes is told as the row has it; back on the old one = no change
+        d = {k: v if k not in row.keys() or _ac_same(row[k], v[1]) else [v[0], row[k]] for k, v in d.items()
+             if k not in row.keys() or not _ac_same(row[k], v[0])}
+        if not d:
+            continue
         watch = wat_users(c, tid)
         dlg0 = (g.get("agent_dlg0") or {}).get(tid, row["delegate_agent_id"])  # the delegate before this request
         lo = d.get("list_id")
@@ -297,6 +305,11 @@ def agent_changed_events(c, diffs):
                 n += 1
                 sent[aid] = sent.get(aid, 0) + 1
     return n
+
+
+def _ac_same(a, b):
+    """2.976.0 (#5657): the same task value as tasks/lifecycle.py _norm sees it ("" = None, compared as text)."""
+    return (None if a in ("", None) else str(a)) == (None if b in ("", None) else str(b))
 
 
 AGENT_CHANGED_MAX = 50  # 2.959.0 (#4030, review F2): task_changed per agent and request (a bulk change of hundreds of tasks)
@@ -1123,7 +1136,8 @@ def is_approver(c, t, uid, agent=None, assignee=True):
 # POST /api/proposals, chat: agent_shares, job: job_may_act). An agent's actions never reach another agent unless the list
 # had agent_peers on; 2.40.0 (#1373): never (every event).
 AGENT_GATED = ("mention", "comment", "assigned", "unassigned", "reaction", "team_message", "wake",
-               "task_changed")  # 2.959.0 (#4030): a person without the agent switch reaches it neither by a change
+               "task_changed",  # 2.959.0 (#4030): a person without the agent switch reaches it neither by a change
+               "status_changed")  # 2.983.0 (#3915): ... nor by a status change
 AGENT_UNGATED = ("job", "ping", "runtime_changed", "reset", "followup_due")
 # 2.26.0 (#928): the SQL condition "list l is open to person ? for agent ?": owner, list admin (own role), the list
 # belongs to that agent (it shared the list itself); parameters (person, agent, person) or the owner switched on "Members may see and use the agent"

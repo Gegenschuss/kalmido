@@ -16,8 +16,10 @@ Expired credentials (sessions, tokens, codes past their end) are no data of a pe
 2.272.0 A (#3026): the runs that delete for good (watchdog notify/push.py, backup loop). Trash periods all use ret_trash_cut()
 (ret_days("trash"), floor 1 day). "kept" = lists.retain_until / legal locks are honoured. run = ret_report slot.
   run (module)                          kind     period            what goes / note
-  tasks (tasks/tasktrash.py)            trash    trash             trashed tasks + attachments; lists kept by law stay (tasks_kept)
-  lists (lists/listtrash.py otr_prune)  trash    trash             trashed lists with tasks + files; retain_until waits
+  obj_trash (core/writes.py)            trash    trash             the core's kinds with trash_prune; 2.936.0 (#5364): + task
+                                                                    (tasks/tasktrash.py: + attachments, lists kept by law stay:
+                                                                    task_kept) and list (lists/listtrash.py: with tasks + files,
+                                                                    retain_until waits: list_kept) -- the runs tasks / lists went
   obj_trash (core/writes.py)            trash    trash             2.773.0 (#5292): the core kinds with trash_prune; 2.809.0 (#5365):
                                                                     + fs nodes (fs_entry, receipts locked: fs_entry_locked), knowledge
                                                                     pages with their files (wiki_page), tables (sheet_table)

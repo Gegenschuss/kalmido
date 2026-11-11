@@ -50,8 +50,9 @@ TOK = "ab12" * 8
 DEV = {"X-Kalmido-Device": "Laptop (Test)"}
 
 
-def groups(u):
-    return dbx("SELECT id, state, parts, bytes, device, area, label_key, label_args, token FROM undo_groups WHERE user_id=? ORDER BY id", (u,))
+def groups(u):  # 2.985.0 (#5394): the settings' steps of the setup (area self, accounts/setundo.py) are not this suite's topic
+    return dbx("SELECT id, state, parts, bytes, device, area, label_key, label_args, token FROM undo_groups WHERE user_id=? AND area<>'self' "
+               "ORDER BY id", (u,))
 
 
 def parts(gid):
@@ -68,9 +69,9 @@ def patch(s, oid, headers=None, **kw):
     return r.json()
 
 
-def items(s):
+def items(s):  # 2.985.0 (#5394): without the settings' steps of the setup (area self)
     r = s.get(B + "/api/undo")
-    return r.json()["items"] if r.ok else r.status_code
+    return [x for x in r.json()["items"] if x.get("area") != "self"] if r.ok else r.status_code
 
 
 def self_ver(u):  # #5407: the own "undo" counter (was "self": every write reloaded the whole state of the other devices)
@@ -173,7 +174,7 @@ from kalmido.core.config import app as fa
 from kalmido.core.undogroups import undo_barrier
 with fa.test_request_context('/api/office/docs/1/finalise', method='POST'):
     g.user = {{"id": {BOB}}}
-    print('BARRIER', undo_barrier(c, {BOB}, 'office', 'Change', ()))
+    print('BARRIER', undo_barrier(c, {BOB}, 'office', 'Change', (), org_id={ORG}))  # 2.866.0 (#5302 N2): a barrier holds its own workspace's steps (O1 is ORG's)
     c.commit()""")
 check("BARRIER" in out and groups(BOB)[-1]["state"] == "barrier", f"undo_barrier: a row of its own {out[-300:]}")
 GB = groups(BOB)[-1]["id"]

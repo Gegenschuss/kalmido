@@ -8,6 +8,8 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
+// 2.979.0 (#5667): a template's delete the server took back by its group: the open dialog fetches its templates again
+histReloader('sectpl', () => /** @type {any} */ ($('.sctmodal'))?._reload?.());
 async function sct_open(lid) {
   const l = listById(lid); if (!l) return;
   const secs = S.sections.filter(s => s.list_id === lid);
@@ -31,6 +33,7 @@ async function sct_open(lid) {
       || `<p class="muted">${esc(tr('No section templates yet.'))}</p>`;
     cur = ts;
   };
+  /** @type {any} */ (md)._reload = draw;  // 2.979.0 (#5667): histReloader above sct_open
   md.addEventListener('click', async e => {
     const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-m]'); if (!b) return;
     const m = b.getAttribute('data-m');

@@ -18,11 +18,11 @@ from ..tasks.validation import as_int
 from ..core.errors import BadInput, UnknownFields
 from ..contacts.model import (
     book_create, book_fields, book_member_set, book_public, book_role, book_touch, books_for, contact_brief, contact_dict, contact_fields,
-    bk_max_check, contact_copy, contact_store, contacts_query, ct_room, CT_KEYS, default_book, import_vcards, link_remove, link_set, my_book_ids, need_book, need_contact,
+    contact_copy, contact_store, contacts_query, ct_room, CT_KEYS, default_book, import_vcards, link_remove, link_set, my_book_ids, need_book, need_contact,
     occ_sync, render_vcard, split_vcards, CONTACTS_PER_BOOK, IMPORT_BATCH, VC_BAD_MAX,
 )
 from ..core.retention import ret_days
-from ..contacts.bulk import bk_occ_drop, ctt_relink, ctt_restore, ctt_trash, ctt_unlink  # 2.272.0 E1 (#3038)
+from ..contacts.bulk import ctt_restore, ctt_trash  # 2.272.0 E1 (#3038); 2.985.0 (#5394): the book's trash in contacts/ctundo.py
 from ..accounts.orgs import user_orgs
 from ..accounts.bgjobs import bgj_active, bgj_add, bgj_busy, bgj_current, bgj_fn, bgj_progress, bgj_state  # 2.370.3 (#2760)
 from ..core.zipread import base_name, is_zip, zip_read, ZipLimit  # 2.149.0 G (#2517): pulled up from functions
@@ -31,14 +31,14 @@ from ..contacts.model import BK_KERN  # 2.566.0 (#4712): the shared core (contac
 from ..contacts.model import VC_BEGIN_RE  # 2.630.0 (#4593)
 from ..core.pages import too_large  # 2.369.5 (#2517): pulled up from functions
 from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_post, ua_pre  # 2.777.0 (#5254)
-from .ctundo import CTU_KIND, ctu_name  # 2.777.0 (#5254)
+from .ctundo import CTU_KIND, bk_restore, bk_trash, ctu_name  # 2.777.0 (#5254); 2.985.0 (#5394): a book's trash and restore
 from ..accounts.orgs import obj_org_set  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
 from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 from ..core.conflict import Conflict  # 2.564.0 (#4701/#4702)
 from ..core.conflict import ccf_check, kern_version_seed, take_version  # 2.657.0 (#5052)
-from ..core.writes import obj_purge, obj_restore, obj_trash  # 2.947.0 (#5367): the core's trash (contacts/ctkern.py)
+from ..core.writes import obj_purge  # 2.947.0 (#5367): the core's delete for good (contacts/ctkern.py); trash / restore in contacts/ctundo.py
 from ..core.access import live_sql, trash_sql  # 2.947.0 (#5367)
 from .ctfolder import CTF_BOOK  # 2.947.0 (#5367): the kind of the core
 
@@ -146,15 +146,7 @@ def op_book_delete(c, uid, bid):
     b, _ = need_book(c, bid, manage=True)
     from ..api.scopes import need_approval  # 2.148.1 D (#2495): an agent deleting a whole address book waits for a person
     need_approval(c, N_("Delete the address book “{0}” with all its contacts"), ((b["name"] or "")[:80],))
-    from ..newsletter.sync import NWL_BLOCKED, nls_keep  # 2.186.0 C (#2602): the unsubscriptions outlive the address book
-    nls_keep(c, [r["id"] for r in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND nl_status IN ({','.join('?' * len(NWL_BLOCKED))})",
-                                             (bid, *NWL_BLOCKED))])
-    # 2.272.0 E1 (#3038): its birthday tasks go to the trash (made again on restore)
-    live = [r[0] for r in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND {live_sql()}", (bid,)).fetchall()]
-    bk_occ_drop(c, uid, live)
-    ctt_unlink(c, live)  # clients' contact persons: unlinked as before
-    n = c.execute(f"SELECT COUNT(*) FROM contacts WHERE book_id=? AND kind!='group' AND {live_sql()}", (bid,)).fetchone()[0]
-    obj_trash(c, uid, CTF_BOOK, bid, step=False)  # step=False: the restore route makes the birthday tasks again (ctkern)
+    n = bk_trash(c, uid, bid, step=True)
     bump(c)
     c.commit()
     return {"contacts": n, "trash_days": ctt_days()}
@@ -164,14 +156,7 @@ def op_book_restore(c, uid, bid):
     """2.272.0 E1 (#3038): the address book comes back out of the trash with its contacts (and their birthday tasks)."""
     b, _ = need_book(c, bid, manage=True, trash=True)
     if b["deleted_at"]:
-        if not b["owner_org_id"]:  # 2.370.4 (#3089, review N4): the trash does not count against BOOKS_MAX, a restore does
-            bk_max_check(c, b["owner_id"])
-        obj_restore(c, uid, CTF_BOOK, bid, step=False)  # 2.947.0 (#5367): the core's trash, its node with it
-        ctt_relink(c, [r[0] for r in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND {live_sql()}", (bid,)).fetchall()])  # 2.272.0 F (M8)
-        for (cid,) in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND {live_sql()} AND (bday!='' OR anniversary!='')",
-                                (bid,)).fetchall():
-            occ_sync(c, cid)
-        book_touch(c, bid)
+        bk_restore(c, uid, bid, step=True)
         bump(c)
         c.commit()
     return book_public(c, c.execute("SELECT * FROM books WHERE id=?", (bid,)).fetchone(), uid)

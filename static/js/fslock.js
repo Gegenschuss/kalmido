@@ -296,7 +296,7 @@ async function fsl_moveHook(n, target) {
   if (n.kind === 'folder' && n.lock_id === n.id) return false;  // the locked folder itself (the server refuses nesting)
   let block; try { block = await fslMoveCheck(n, target); } catch (x) { if (!x.shown) fslToast(x); return true; }
   if (block) { toast(block); return true; }
-  if (!await fslAskMove(to, n.name, 1)) return true;
+  if (!await fslAskMove(to, n.name, 1, n.kind === 'folder')) return true;
   try { await fslMoveNode(n, from, to, target); } catch (x) { if (!x.shown) fslToast(x); ab_reload(); return true; }
   ab_reload(); toast(tr('“{0}” moved', n.name));
   return true;
@@ -319,13 +319,17 @@ async function fslLockAt(target) {
 }
 const fslFrom = n => n.locked && n.lock_id !== n.id ? n.lock_id : null;
 // one question for one or several nodes crossing the border (to: the target's lock, null = out of the locked folder)
-function fslAskMove(to, name, k) {
+// 2.970 (#5653, review N-i): folders among them -- the dialog says where their trash goes (fsl_move leaves it on this side)
+function fslAskMove(to, name, k, folders) {
   return askConfirm(to ? tr('Move into a locked folder?') : tr('Move out of the locked folder?'),
-    k === 1 && name ? (to ? tr('“{0}” is encrypted in your browser and moved. Its earlier versions are removed; the server and agents can no longer read it.', name)
+    fslAskText(to, name, k) + (folders ? ' ' + tr('What lies in the trash of a folder stays on this side: restored, it goes into the folder the moved folder lay in before.') : ''),
+    {ok: tr('Move')});
+}
+function fslAskText(to, name, k) {
+  return k === 1 && name ? (to ? tr('“{0}” is encrypted in your browser and moved. Its earlier versions are removed; the server and agents can no longer read it.', name)
       : tr('“{0}” is decrypted in your browser and stored readable for the server again. Its earlier encrypted versions are removed.', name))
       : (to ? trn('{0} item is encrypted in your browser and moved, folders with their content. Earlier versions are removed; the server and agents can no longer read them.', '{0} items are encrypted in your browser and moved, folders with their content. Earlier versions are removed; the server and agents can no longer read them.', k)
-        : trn('{0} item is decrypted in your browser and stored readable for the server again, folders with their content. Earlier encrypted versions are removed.', '{0} items are decrypted in your browser and stored readable for the server again, folders with their content. Earlier encrypted versions are removed.', k)),
-    {ok: tr('Move')});
+        : trn('{0} item is decrypted in your browser and stored readable for the server again, folders with their content. Earlier encrypted versions are removed.', '{0} items are decrypted in your browser and stored readable for the server again, folders with their content. Earlier encrypted versions are removed.', k));
 }
 // one file / an empty folder across the border: re-encrypted here (POST /api/files/lock/move)
 async function fslMoveOne(n, from, to, target) {
@@ -382,7 +386,7 @@ async function fsl_moveMany(xs, target) {
   const to = await fslLockAt(target);
   const cross = xs.filter(x => !(x.kind === 'folder' && x.lock_id === x.id) && fslFrom(x) !== to && (x.parent_id ?? null) !== (target || null));
   if (!cross.length) return null;
-  if (!await fslAskMove(to, cross[0].name, cross.length)) return {cancel: true};
+  if (!await fslAskMove(to, cross[0].name, cross.length, cross.some(x => x.kind === 'folder'))) return {cancel: true};
   let moved = 0, skip = 0, done = 0;
   const prog = () => { if (++done % 10 === 0) toast(tr('{0}: {1} done', tr('Moving'), done)); };
   for (const x of cross) {
@@ -426,6 +430,7 @@ async function fslMigrate(lid, onProg) {
       fd.append('name', name);
       if (r.kind === 'file') {
         const buf = await fslFetch({id: r.id, lock_id: lid});
+        if (r.version) fd.append('version', r.version);  // 2.970 (#5653, review N-g): a newer version saved meanwhile -> 409, taken again
         if (dec || r.gen) {
           const f = await fslFileDec(lid, buf);
           if (dec) { fd.append('file', new Blob([f.data]), 'file'); fd.append('type', f.type); }

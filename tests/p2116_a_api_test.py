@@ -2,6 +2,8 @@
 """2.116.0 API tests, part A (#2063): the trash period of tasks, own container (start.sh). Invented names only.
  - the run (tasks/tasktrash.py ttp_tick, called in the container with force=True like the watchdog does hourly):
    switch off (default) = nothing deleted, the counts are right (tasks, attachments)
+   2.936.0 (#5364): the run is the core's (core/writes.py obj_trash_tick, kind task): its count "task"; the attachment
+   files are checked on disk (the core's report has no "attachments" count)
  - switch on (KALMIDO_PURGE_TRASH=1 for that run): a task older than the period goes with its comment, field value,
    subtask and the attachment file on disk; 29 days old stays; restored stays; a task in another owner's shared list goes
    too; an organisation task goes; a time entry of a deleted task stays (only the link goes); a subtask restored on its
@@ -46,10 +48,11 @@ c = dbx.connect(DATA)
 
 
 def tick(on):
-    """One run of the task trash, as the watchdog does it (force: no hourly wait). -> the counts."""
+    """One run of the task trash, as the watchdog does it (force: no hourly wait). -> the counts.
+    2.936.0 (#5364): the core's retention run (obj_trash_tick); "tasks" = its count of the kind task."""
     env = ["-e", "KALMIDO_PURGE_TRASH=1"] if on else []
-    code = ("import json, app\nfrom kalmido.tasks.tasktrash import ttp_tick\nc = app.connect()\n"
-            "try:\n    print(json.dumps(ttp_tick(c, force=True)))\nfinally:\n    c.close()")
+    code = ("import json, app\nfrom kalmido.core.writes import obj_trash_tick\nc = app.connect()\n"
+            "try:\n    n = obj_trash_tick(c, force=True)\n    print(json.dumps({'tasks': n.get('task', 0), 'tasks_kept': n.get('task_kept', 0)}))\nfinally:\n    c.close()")
     out = subprocess.run(["docker", "exec", *env, CT, "python", "-c", code], capture_output=True, text=True)
     check(out.returncode == 0, f"the run works {out.stdout[-200:]} {out.stderr[-600:]}")
     try:
@@ -117,12 +120,13 @@ check(j.get("days") == 30, f"#2063: the trash says the period: {j.get('days')}")
 
 # ---------------------------------------------------------------- switch off (default): count only
 n = tick(False)
-check(n.get("tasks") == 4 and n.get("attachments") == 1, f"#2063: dry run counts OLD + SUB + FOREIGN + ORGT and 1 file: {n}")
+# 2.936.0 (#5364): the core's run counts the tasks; the file is checked on disk below (no "attachments" count)
+check(n.get("tasks") == 4, f"#2063: dry run counts OLD + SUB + FOREIGN + ORGT: {n}")
 check(all(exists(t) for t in (OLD, SUB, YOUNG, BACK, FOREIGN, ORGT, LIVE)) and os.path.isfile(AFILE), "#2063: dry run deletes nothing")
 
 # ---------------------------------------------------------------- switch on
 n = tick(True)
-check(n.get("tasks") == 4 and n.get("attachments") == 1, f"#2063: the run deletes 4 tasks and 1 file: {n}")
+check(n.get("tasks") == 4, f"#2063: the run deletes 4 tasks: {n}")  # 2.936.0 (#5364): the file on disk below
 check(not exists(OLD) and not exists(SUB), "#2063: the old task and its subtask are gone")
 check(not os.path.isfile(AFILE), "#2063: the attachment file is gone from disk")
 # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)

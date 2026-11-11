@@ -75,8 +75,16 @@ class _NotOwn:
     """2.800.0 (#5409): every column of the sheets row but its own fields -- not part of the copy step's check (a chart, a
     colour rule, the sheet's place changed since do not stop the title's way back)."""
 
+    def __init__(self, own=SHH_OWN):
+        self.own = own
+
     def __contains__(self, k):
-        return k not in SHH_OWN and k != "deleted_at"
+        return k not in self.own and k != "deleted_at"
+
+    def of_row(self, row):
+        """2.884.0 (#5479): a further sheet's project follows the first sheet (shbook.py shb_sync): not part of its check, so a
+        change of the table's project does not stop the way back of a sheet's own name (core/writes.py _fp)."""
+        return _NotOwn(("title", "tab_name")) if isinstance(row, dict) and row.get("book_id") else self
 
 
 def _label(main):

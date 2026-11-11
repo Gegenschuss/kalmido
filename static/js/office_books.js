@@ -53,6 +53,8 @@ async function bkLoadUstva() {
   ofcDraw();
 }
 const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RSB === 'object') RSB.inRows = null; if (typeof RKF === 'object') RKF.data = null; if (typeof rclReload === 'function') rclReload(); ofcDraw(); };  // 2.276.0 A (#3039): + the receipts list; 2.356.0 D (#3129): + handed in  // 2.114.1 B (#2018): receipts count in the cash flow
+// 2.979.0 (#5667): an undo / redo the server did: an open receipt sheet (bkRxAfter), the books, the tax forms, the checks and the comparison come again
+histReloader('books', () => { const sh = $('.bk-sheet[data-rxid]'); if (sh) bkRxAfter(+sh.dataset.rxid); if (!BK.info && !BK.euer && !TF.d && !TC.d && !BKC.d) return; BK.ustva = null; TF.d = null; TC.d = null; BKC.src = null; bkReload(); });
 // 2.559.0 (#4659): a change of a receipt shows at once (optWrite): the rows of the receipt in the lists on screen (this month,
 // all receipts) get the new values, the requests run behind it; afterwards the lists are fetched again in the background (the
 // rows stay until the fresh ones are there: sums and the income statement are the server's)

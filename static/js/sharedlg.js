@@ -5,15 +5,16 @@
 // The agent switches (members may use it, follows up, tidying) stay in the folder settings; they link here and back.
 const FSH_HID = {grp: 'fsh-grp-h', ag: 'fsh-ag-h', pub: 'fsh-pub-h', own: 'fsh-own-h', ntf: 'fp-ntf-h'};
 const fshId = k => k === 'ntf' ? 'fp' : 'fsh';  // the notifications part keeps the ids of the former "Share folder" dialog (fp-sec-ntf)
-const fshSec = (k, title, inner, open = false) => `<details class="shsec" id="${fshId(k)}-sec-${k}" ${open ? 'open' : ''}><summary><h4 id="${FSH_HID[k]}">${title}</h4><span class="shsecst muted" id="${fshId(k)}-st-${k}"></span>${ic('chev', 's shchev')}</summary>${inner}</details>`;
+const FSH_ADP = {sec: k => `${fshId(k)}-sec-${k}`, st: k => `${fshId(k)}-st-${k}`, hid: FSH_HID};  // 2.913.0 (#5587): the folder's adapter of the shared block (dialogs.js shSecHtml / shFrameHtml)
+const fshSec = (k, title, inner, open = false) => shSecHtml(FSH_ADP, k, title, inner, false, open);
 const fshGrey = (txt, why) => `<div class="fshgrey" aria-disabled="true"><span>${esc(txt)}</span><small class="muted">${esc(why)}</small></div>`;
 function folderShareModal(f, opt = {}) {
   if (!collab()) return null;
   const own = folderLists(f).some(l => isOwner(l)) || !folderLists(f).length;
-  const md = modal(`<div class="lhdr"><h3>${esc(tr('Share folder “{0}”', fDisp(f)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
+  const md = modal(shFrameHtml({title: tr('Share folder “{0}”', fDisp(f)), setAct: 'fsh-props', setIcon: 'sliders', setLabel: tr('Folder settings…'), body: `
     <div class="shint lhint">${tr('All projects in the folder are shared, also ones added later.')}</div>
     <div class="shws" id="fsh-ws"></div>
-    <h4 id="fsh-people-h">${tr('People')}</h4><div class="members fpl" id="fsh-members" aria-labelledby="fsh-people-h"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <h4 id="fsh-people-h">${tr('People')}</h4><div class="members fpl shppl" id="fsh-members" aria-labelledby="fsh-people-h">${/*html-ok*/ loadingHtml()}</div>
     ${S.peopleVis === 'contacts' || S.instanceMode === 'workspaces' ? `<div class="row shmail"><input id="fsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="fsh-mail">${ic('send', 's')} ${tr('Add')}</button></div>` : ''}
     <details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>
     ${(S.groups || []).length ? fshSec('grp', tr('Groups'), `<div class="members" id="fsh-grp"><div class="muted mhint">${tr('Loading…')}</div></div>`, opt.focus === 'grp') : ''}
@@ -23,12 +24,12 @@ function folderShareModal(f, opt = {}) {
     ${fshSec('ntf', tr('Notifications for members'), `<div id="fp-ntf"><div class="muted mhint">${tr('Loading…')}</div></div>`, opt.focus === 'ntf')}
     ${pubOn('lists') ? fshSec('pub', tr('Public link'), `<div id="fsh-pub"><div class="muted mhint">${tr('Loading…')}</div></div>`) : ''}
     ${fshSec('own', tr('Owner'), `<div id="fsh-own"></div>`)}
-    <div class="foot"><button class="btn" data-m="fsh-props">${ic('sliders', 's')} ${tr('Folder settings…')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${opt.back ? ic('back', 's') + ' ' + tr('Back') : tr('Done')}</button></div>`);
+`}));  // 2.913.0 (#5587): the shared frame (shFrameHtml in dialogs.js), "Done" also when opened from the folder settings (was "Back")
   md.classList.add('shmodal', 'fshmodal');
   md.dataset.folder = f;
   let users = null, have = [], ags = null;
   const st = (k, t) => { const e = $(`#${fshId(k)}-st-${k}`, md); if (e) e.textContent = t || ''; };
-  const roleSel = (attr, cur, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
+  const roleSel = shRoleSel;  // 2.913.0 (#5587): the shared role choice (dialogs.js)
   const fws = () => { const e = folderEff(f); if ('org_id' in e) return e.org_id || null; const m = folderLists(f).find(l => isOwner(l)); return m ? m.org_id || null : wsDefaultOrg(f); };  // the folder's workspace, else its lists'
   const agFits = u => !wsOn() || (u.org_id || null) === fws();  // the agents of the folder's workspace, as in a list (agFits)
   const drawPeople = () => {
@@ -181,7 +182,7 @@ async function fg_askRoles(url, who) {
   return new Promise(res => {
     let done = false;
     const md = modal(`<h3 id="fg-rq-t">${esc(tr('Replace the roles set per project?'))}</h3><div class="cdlg-b" id="fg-rq-b">${esc(trn('In {0} project {1} has a role of its own ({2}).', 'In {0} projects {1} has a role of its own ({2}).', ls.length, who, shown))}</div>
-      <div class="foot fgrqf"><button type="button" class="btn" data-fgrq="x">${esc(tr('Cancel'))}</button><span class="spacer"></span><button type="button" class="btn" data-fgrq="new">${esc(tr('Only new projects'))}</button><button type="button" class="btn pri" data-fgrq="all">${esc(tr('Set everywhere'))}</button></div>`);
+      <div class="foot fgrqf"><button type="button" class="btn" data-fgrq="new">${esc(tr('Only new projects'))}</button><span class="spacer"></span><button type="button" class="btn" data-fgrq="x">${esc(tr('Cancel'))}</button><button type="button" class="btn pri" data-fgrq="all">${esc(tr('Set everywhere'))}</button></div>`);  // 2.913.0 (#5587): Cancel right next to the main button, the other choice on the left
     md.classList.add('fgrqdlg');
     md.setAttribute('role', 'alertdialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'fg-rq-t'); md.setAttribute('aria-describedby', 'fg-rq-b');
     const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); };

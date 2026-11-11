@@ -213,7 +213,14 @@ const absOk = async (w, d) => { const b = await until(() => d.querySelector('.mo
     for (const [st, pri] of [['sent', false], ['accepted', true]]) {
       if (st === 'accepted') await call('POST', `/api/office/docs/${doc3.id}/status`, {status: 'accepted'});
       await nav(B + `?p=${st}#office/offers/${doc3.id}`);  // a new query = a fresh load (the status changed behind its back)
-      check(await ready(ev, fit, 80), `#2572 phone (${st}): "Create invoice" visible in the bar, nothing wider than the screen`);
+      // 2.936.0 (#5448): before acceptance "Create invoice" waits in "…" on a phone (one line for the head); accepted = the main button in the bar
+      if (pri) check(await ready(ev, fit, 80), `#2572 phone (${st}): "Create invoice" visible in the bar, nothing wider than the screen`);
+      else {
+        check(await ready(ev, `(() => { const b = document.querySelector('.ofdhead [data-ofd="to-invoice"]'); return !!b && getComputedStyle(b).display === 'none' && document.documentElement.scrollWidth <= innerWidth; })()`, 80), `#5448 phone (${st}): "Create invoice" not in the bar, nothing wider than the screen`);
+        await ev(`(() => { document.querySelector('.ofdhead [data-ofd="more"]').click(); return 1; })()`);
+        check(await ready(ev, `[...document.querySelectorAll('#pop [role="menuitem"]')].some(b => /Create invoice/.test(b.textContent))`, 40), `#5448 phone (${st}): "…" offers "Create invoice"`);
+        await ev(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`);
+      }
       check(await ev(`document.querySelector('.ofdhead [data-ofd="to-invoice"]').classList.contains('pri')`) === pri, `#2572 phone (${st}): main button only once accepted`);
       await shot(`p2144-7-phone-${st}.png`);
     }

@@ -662,6 +662,8 @@ def _user_purge(c, uid, made):
     for f in USER_GONE:  # 2.972.0 (#5272): the comments' core (core/objcomments.py ocm_purge_user: its trash texts, its mentions)
         f(c, uid)
     # 2.981.0 (#5274): the team chat's kept texts are kind 'tchat' of the core's trash (collab/cmttrash.py tcx_purge_user, USER_GONE)
+    from ..accounts.orginvite import ojn_neutral
+    ojn_neutral(c, uid)  # 2.985.0 (#4922): its silent invitations stay in their organisation's list as neutral rows
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     obj_gone_drop(c, gone)  # 2.578.0 (#4796): the objects went with the account (cascade): their history / undo rows too
     return files

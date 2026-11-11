@@ -16,7 +16,7 @@ from flask import request, Response
 from ..core.config import APP_NAME
 from ..core.db import bump, parse_iso
 from ..core.pg import write_lock  # 2.273.0 C (#3048)
-from ..core.access import collab_all
+from ..core.access import collab_all, live_sql, trash_sql  # 2.985.0 (#5394, review F1): live_sql; review F9: trash_sql
 from ..calendars.caldav import (
     _el, _privs, _xe, A_, CR_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
     dav_response, dav_xml, DAV_MAX_BODY, DAV_NAME_RE, DavError, dav_color, dav_report_props,
@@ -29,6 +29,8 @@ from ..contacts.model import (
 )
 from ..events.dav import sync_save as _save, sync_load  # 2.369.5 (#2517): pulled up from functions
 from ..contacts.model import book_touch  # 2.369.5 (#2517): pulled up from functions
+from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_post, ua_pre  # 2.985.0 (#5394): the steps of a device's changes
+from .ctundo import CTU_KIND, ctu_name  # 2.985.0 (#5394)
 
 # 2.21.0 (#658): /dav/addressbooks/<user>/ is the address book home (RFC 6352), b<id>/ one address book, <name>.vcf one
 # contact. Same login (app passwords), rate limits, sync-collection (dav_sync2, coll b<id>) and ETag rules as the CalDAV
@@ -284,7 +286,11 @@ def card_now(c, book, name, lock=False):
         return r, _etag(text), text
     if lock:
         write_lock(c, f"carddav:{book['id']}:{name}")
-    r = c.execute("SELECT * FROM contacts WHERE book_id=? AND href=? AND deleted_at IS NULL" + (" FOR UPDATE" if lock else ""), (book["id"], name)).fetchone()
+    r = c.execute("SELECT * FROM contacts WHERE book_id=? AND href=? AND deleted_at IS NULL", (book["id"], name)).fetchone()
+    if r and lock:  # 2.985.0 (#5394, review F1): the contact's lock first, then the row (as the app and the undo: no deadlock)
+        write_lock(c, f"contact-{int(r['id'])}")
+        r = c.execute(f"SELECT * FROM contacts WHERE id=? AND book_id=? AND href=? AND {live_sql()} FOR UPDATE",
+                      (r["id"], book["id"], name)).fetchone()  # review N5: still this book's card of that name
     if not r:
         return None
     text = dav_vcard(r)
@@ -420,7 +426,9 @@ def ab_put(c, u, book, name):
             if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND uid=? AND id!=? AND deleted_at IS NULL", (book["id"], v["uid"], have[0]["id"])).fetchone():
                 raise DavError(403, "This UID exists already", "<CR:no-uid-conflict/>")
             f["uid"] = v["uid"]
+        ua_pre(c, u["id"], CTU_KIND, have[0]["id"])
         contact_store(c, u["id"], book["id"], f, cid=have[0]["id"], extra=v["extra"], version=v["version"])
+        ua_post(c)
         c.commit()
         return Response(status=204)
     dup = c.execute("SELECT href FROM contacts WHERE book_id=? AND uid=? AND deleted_at IS NULL", (book["id"], v["uid"])).fetchone()
@@ -430,12 +438,23 @@ def ab_put(c, u, book, name):
     # 2.272.0 E1 (#3038): the same card again (its name or UID) takes the row out of the trash: notes and links come back with it
     old = c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NOT NULL AND (href=? OR uid=?) ORDER BY href=? DESC, id DESC "
                     "LIMIT 1", (book["id"], name, v["uid"], name)).fetchone()
+    orow = None
     if old:
         ct_room(c, book["id"])  # 2.370.4 (#3089, review N4): the limit as for a new card
+        write_lock(c, f"contact-{int(old[0])}")  # 2.985.0 (#5394): out of the trash = a step of the person
+        # 2.985.0 (#5394, review F9): read again under the lock - still in the trash, still this book (restored or deleted for
+        # good meanwhile: a new card, as card_now does)
+        orow = c.execute(f"SELECT * FROM contacts WHERE id=? AND book_id=? AND {trash_sql()}", (old[0], book["id"])).fetchone()
+        if orow is None and c.execute(f"SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?) AND {live_sql()}",
+                                      (book["id"], v["uid"], name)).fetchone():
+            raise DavError(412, "The resource was changed meanwhile")  # brought back by the app meanwhile: never a second card
+    if orow is not None:
+        ua_pre(c, u["id"], CTU_KIND, old[0], UA_RESTORED, ctu_name(orow))
         contact_store(c, u["id"], book["id"], {**f, "uid": v["uid"], "href": name, "deleted_at": None}, cid=old[0], extra=v["extra"],
                       version=v["version"])
         from ..contacts.bulk import ctt_relink
         ctt_relink(c, [old[0]])  # 2.370.4 (#3089): the clients' contact persons come back, as with the restore in the app
+        ua_post(c)
     else:
         contact_store(c, u["id"], book["id"], f, uid_=v["uid"], href=name, extra=v["extra"], version=v["version"])
     c.commit()
@@ -518,9 +537,11 @@ def abdav(m, c, u, p):
             raise DavError(412, "The resource was changed meanwhile")
         # 2.272.0 E1 (#3038): into the trash as in the app (a device deletes without asking; restore in the address book)
         from ..contacts.bulk import ctt_trash  # 2.58.0 (#1656): its birthday / anniversary tasks go as in the app
+        ua_pre(c, u["id"], CTU_KIND, have[0]["id"], UA_DELETED, ctu_name(have[0]))
         ctt_trash(c, u["id"], [have[0]["id"]])
         book_touch(c, book["id"])
         bump(c)
+        ua_post(c)
         c.commit()
         return Response(status=204)
     if m == "PROPPATCH":

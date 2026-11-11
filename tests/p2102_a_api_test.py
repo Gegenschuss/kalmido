@@ -201,8 +201,8 @@ Fr.delete(B + f"/api/lists/{LK}")
 old = (datetime.now(timezone.utc) - timedelta(days=31)).isoformat(timespec="seconds")
 sql("UPDATE lists SET deleted_at=? WHERE id=?", (old, LW), write=True)
 out = subprocess.run(["docker", "exec", "-e", "KALMIDO_PURGE_TRASH=1", CT, "python", "-c",  # 2.272.0 (#3026): the trash runs delete only with the switch on
-                      "import app\nfrom kalmido.core.db import connect\nfrom kalmido.lists.listtrash import otr_prune\n"
-                      "c = connect()\nprint('purged', otr_prune(c, True))\nc.close()"], capture_output=True, text=True)
+                      "import app\nfrom kalmido.core.db import connect\nfrom kalmido.core.writes import obj_purge_after, obj_trash_prune\nfrom kalmido.core.serializers import unlink_files\n"  # 2.936.0 (#5364): the core's run
+                      "c = connect()\nwith obj_purge_after(True) as a:\n    n = obj_trash_prune(c, 'list', purge=True)\nc.commit()\nunlink_files(a['after'])\nprint('purged', n)\nc.close()"], capture_output=True, text=True)
 check("purged 1" in out.stdout, "watchdog: one list purged " + (out.stdout + out.stderr)[-400:])
 check(not sql("SELECT 1 FROM lists WHERE id=?", (LW,)) and not sql("SELECT 1 FROM tasks WHERE id=?", (TW,))
       # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)

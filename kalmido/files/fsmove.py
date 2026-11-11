@@ -468,8 +468,10 @@ def fsm_memo(c, plan, to, uid):
         q = ",".join("?" * len(part))
         for x in c.execute(f"SELECT * FROM fs_shares WHERE node_id IN ({q})", part).fetchall():
             if x["id"] in ends:
-                at(x["node_id"])["shares"].append({k: x[k] for k in ("node_id", "user_id", "group_id", "agent_id", "role", "expires_at",
-                                                                      "created_by", "created_at")})
+                # 2.866.0 (#5302 F7): id (its obj_revoked row of the move goes on the move back) and by_role (the role of who
+                # made it, not of who moves it back) go along
+                at(x["node_id"])["shares"].append({k: x[k] for k in ("id", "node_id", "user_id", "group_id", "agent_id", "role", "expires_at",
+                                                                      "created_by", "created_at", "by_role")})
         for x in c.execute(f"SELECT node_id, list_id FROM rc_receipts WHERE node_id IN ({q}) AND list_id IS NOT NULL", part).fetchall():
             if not fsm_list_ok(c, x["list_id"], to, uid):
                 at(x["node_id"])["receipts"][str(x["node_id"])] = x["list_id"]
@@ -521,8 +523,12 @@ def fsm_memo_apply(c, back, to, uid):
                 if key and x.get("role") in ("view", "edit"):
                     from ..core.objects import obj_node_share  # core/objects.py loads the file store (files/web.py) at its top
                     # 2.747.0 (#5246): the share comes back through the core (the move back checked who may; no agent event)
+                    ext = {"created_by": x["created_by"], "created_at": x["created_at"]}
+                    if "by_role" in x:  # 2.866.0 (#5302 F7): a memo from before 2.866 has none: the core's value of now stays
+                        ext["by_role"] = x["by_role"]
                     obj_node_share(c, uid, {"id": x["node_id"]}, key, x[key], x["role"], x["expires_at"], org=to or None,
-                                   event=False, checked=True, extra={"created_by": x["created_by"], "created_at": x["created_at"]})
+                                   event=False, checked=True, extra=ext)
+                    fsm_revoked_back(c, x)
                     n += 1
         for nid, lid in (d.get("receipts") or {}).items():
             if fsm_list_ok(c, lid, to, uid):
@@ -543,6 +549,23 @@ def fsm_memo_apply(c, back, to, uid):
         d["restored"] = _now()
         c.execute("UPDATE space_moves SET detail=? WHERE id=?", (json.dumps(d, separators=(",", ":"), default=str), mid))
     return n
+
+
+def fsm_revoked_back(c, x):
+    """2.866.0 (#5302 F7): memo share x is on its node again -- its obj_revoked row of the move (src fs_shares, reason move,
+    the same share id) goes, so the share is not offered for a restore a second time."""
+    if not x.get("id"):
+        return
+    sid = int(x["id"])
+    # the id inside the stored row, not a text pattern (a column order or JSON spacing must not hide the row, review 2.866)
+    for r in c.execute("SELECT id, row_json FROM obj_revoked WHERE src='fs_shares' AND reason='move' "
+                       "AND (row_json::jsonb->>'id')::bigint=?", (sid,)).fetchall():
+        try:
+            d = json.loads(r["row_json"])
+        except (TypeError, ValueError):
+            continue
+        if d.get("id") == sid and d.get("node_id") == x["node_id"]:
+            c.execute("DELETE FROM obj_revoked WHERE id=?", (r["id"],))
 
 
 def _rm(paths):

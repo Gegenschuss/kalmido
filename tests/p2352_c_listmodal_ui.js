@@ -120,7 +120,7 @@ const st = (md, k) => md.querySelector(`#lm-sec-${k} .shsecst`)?.textContent || 
   w.eval(`listModal(${P})`);
   md = await until(() => d.querySelector('.modal.lmodal'));
   const heads = [...(md?.querySelectorAll('details.lmsec > summary h4') || [])].map(x => x.textContent).join('|');
-  check(/Zeit & Abrechnung/.test(heads) && /Anzeige & Verhalten/.test(heads) && /Projekt-Funktionen/.test(heads) && /Aktionen/.test(heads), 'de: the parts ' + heads);
+  check(/Zeit & Abrechnung/.test(heads) && /Anzeige & Verhalten/.test(heads) && /Was das Projekt kann/.test(heads) && /Aktionen/.test(heads), 'de: the parts ' + heads);  // 2.831.0 (#5481)
   w.close();
 
   // ================= the real layout (Firefox): computer and phone, the folded parts, a click on a part's line opens it

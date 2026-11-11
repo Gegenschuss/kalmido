@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.962.0** (2026-11-11):
-- **Files**: locked folders get a new key when someone loses access, are searchable in subfolders and accept folders moved in and out; receipts matched in Credit cards / Bank file themselves into month folders.
-- **Sharing**: tables and knowledge pages share only through the shared core; tags (project, organisation, personal) run on the shared core.
-- **Phones**: Back goes exactly one step in menus, windows, drawer, date picker and tour.
-- **Boards and Today**: done / rejected columns show completed tasks; a Dada quote of the day.
+**2.990.0** (2026-11-11):
+- **Undo**: "Recent steps" now also takes back settings, budget entries, phone calendar / contacts changes and whole deleted calendars; undo shows its result at once in every area.
+- **Disposition**: pick client and agency on the call sheet from your contacts.
+- **Office**: reminder fees ask for the day the money came; slimmer document head on a phone.
+- **Sharing**: sharing by e-mail address reaches an account only once its address is proved.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 

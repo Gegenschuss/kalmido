@@ -71,6 +71,8 @@ function ctf_after() {
   CTF.v = -1; ctf_load(true);
   if (S.route.mod === 'contacts') { if (S.route.ctf) ctLoad(); else ctDraw(); }
 }
+// 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the folders of the address books come again (the side bar draws them), else on their next use (ctf_data)
+histReloader('ctfold', () => { if (!CTF.d) return; CTF.v = -1; if (S.route.mod === 'contacts') return ctf_load(true); });
 const ctf_req = async (m, url, b) => { try { const r = await rawFetch(m, url, b); ctf_after(); return r || true; } catch (e) { toast(e.message); return null; } };
 async function ctf_newFolder(sp, pid) {
   const v = await askDialog({title: tr('New folder'), input: {value: '', placeholder: tr('Folder name'), max: 120}, ok: tr('Create'), cancel: undefined, after: undefined});

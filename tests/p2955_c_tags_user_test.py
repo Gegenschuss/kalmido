@@ -14,6 +14,7 @@ obj_tag_links kind task; core/objtags.py). Own container. Invented names only.
  - an agent keeps its own private tags (scope user of the agent, src agent; question 12)
  - the account export still has the file task_tags (task_id, user_id, tag); an account deleted for good takes its tags along
  - a person without an organisation: personal tags work in her own project
+ - 2.973.0 (#5656): a task deleted for good leaves no personal tag without a task; '#<tab>name' moves as 'name'
 freelancer-matrix: tasks
 usage: p2955_c_tags_user_test.py <datadir>"""
 import os
@@ -97,7 +98,8 @@ check(not table_there("task_tags"), "task_tags is gone (fragment 5276_a)")
 dbx("""CREATE TABLE task_tags (task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, user_id BIGINT NOT NULL DEFAULT 0,
        tag TEXT NOT NULL, PRIMARY KEY (task_id, user_id, tag))""")
 for tid, u, tag in ((T1, ALICE, "Kunde"), (T2, ALICE, "kunde"), (T3, ALICE, " #Kunde"), (T4, ALICE, "Kunde"), (T1, ALICE, "kunde"),
-                    (T1, BOB, "kunde"), (T2, 0, "Altlast"), (T3, 999999, "Waise"), (T4, ALICE, "  "), (T2, ALICE, "Intern")):
+                    (T1, BOB, "kunde"), (T2, 0, "Altlast"), (T3, 999999, "Waise"), (T4, ALICE, "  "), (T2, ALICE, "Intern"),
+                    (T3, ALICE, "#\tKunde\n")):  # 2.973.0 (#5656): tab / line break after the '#' go as in otg_uname
     dbx("INSERT INTO task_tags(task_id, user_id, tag) VALUES(?,?,?)", (tid, u, tag))
 box("pass")  # the next start of the app
 check(not table_there("task_tags"), "the start dropped task_tags made again")
@@ -123,6 +125,19 @@ got = sorted(x["id"] for x in requests.get(B + "/api/v1/tasks", params={"tag": "
 check(got == [T3, T4], f"API v1 ?tag=neu finds both tasks {got}")
 r = A.patch(B + f"/api/tasks/{T3}", json={"tags": []})
 check(r.ok and tags_of(A, T3) == [] and utags(ALICE)[-1] == ("Neu", [T4]), f"taken off one task, the tag stays on the other {utags(ALICE)}")
+
+# 2.973.0 (#5656): a task deleted for good (trash emptied) takes along the personal tags only it carried, of every person
+T5 = task(A, L, "Einmalig")
+check(A.patch(B + f"/api/tasks/{T5}", json={"tags": ["Nur-hier", "Kunde"]}).ok and Bo.patch(B + f"/api/tasks/{T5}", json={"tags": ["Bobs-eins"]}).ok,
+      "tags on the task that goes")
+check(("Nur-hier", [T5]) in utags(ALICE) and utags(BOB) == [("Bobs-eins", [T5]), ("kunde", [T1])], f"both tags there {utags(ALICE)} {utags(BOB)}")
+check(A.delete(B + f"/api/tasks/{T5}").ok, "the task into the trash")
+check(("Nur-hier", [T5]) in utags(ALICE), "in the trash the task keeps its tags (a restore brings them back)")
+r = A.delete(B + "/api/trash")
+check(r.ok and not dbx("SELECT 1 FROM tasks WHERE id=?", (T5,)), f"the trash emptied: the task is gone for good {r.status_code} {r.text[:200]}")
+check(not dbx("SELECT 1 FROM obj_tags ot WHERE ot.scope_kind='user' AND NOT EXISTS (SELECT 1 FROM obj_tag_links k WHERE k.tag_id=ot.id)"),
+      f"no personal tag is left without a task {utags(ALICE)} {utags(BOB)}")
+check(("Kunde", [T1, T2, T4]) in utags(ALICE) and utags(BOB) == [("kunde", [T1])], f"the tags on other tasks stay {utags(ALICE)} {utags(BOB)}")
 j = A.post(B + "/api/tags/delete", json={"tag": "neu"}).json()
 check(j.get("ids") == [T4] and j.get("count") == 1 and not any(x[0] == "Neu" for x in utags(ALICE)),
       f"deleting the tag (any case): its tasks for the undo, the tag row goes {j}")

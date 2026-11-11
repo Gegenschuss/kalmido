@@ -33,6 +33,8 @@ function oft_get(area) {
   if (!d || d.key !== oft_key() || (d.v !== S.v && Date.now() - d.at > 4000)) oft_load(area);
   return d && d.key === oft_key() ? d : null;
 }
+// 2.979.0 (#5667): an undo / redo the server did: the folder trees of the office come again (shown: at once, else on the next look, oft_get)
+histReloader('office-tree', () => { const as = Object.keys(OFT.d).filter(a => OFT.d[a]); as.forEach(a => { OFT.d[a].at = 0; OFT.d[a].v = -1; }); if (as.length && S.route.mod === 'office') return Promise.all(as.map(oft_load)).then(() => ofcDraw()); });
 const oft_folder = (area, id) => (OFT.d[area]?.folders || []).find(f => f.id === +id) || null;
 const oft_doc = (area, id) => (OFT.d[area]?.docs || []).find(x => x.id === +id) || null;
 const oft_canW = f => !!f && (f.role === 'edit' || f.role === 'owner');

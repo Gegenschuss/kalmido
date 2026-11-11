@@ -5,6 +5,8 @@
    switch on = the old list goes with its task and the attachment file on disk; a young one stays
  - the task trash (tasks/tasktrash.py ttp_tick): tasks of a project kept by law (lists.retain_until in the future) stay,
    also as the subtask of a due task in another list (detached), and are counted as tasks_kept
+   2.936.0 (#5364): both runs are the core's one run (core/writes.py obj_trash_tick, kinds list / task, report run
+   "obj_trash" with list / list_kept / task / task_kept); otr_prune and ttp_tick went
  - wiki: restoring a page brings its files back from the trash; the page run (wiki_trash_tick) and the files run (wka_tick)
    only count while the switch is off and delete the stored file with the switch on
  - GET /api/admin/retention lists the new runs
@@ -76,6 +78,11 @@ def attach(s, tid):
     return os.path.join(DATA, "attachments", p) if p else ""
 
 
+# 2.936.0 (#5364): the lists' and the tasks' trash runs are the core's one run (core/writes.py obj_trash_tick, kinds list and
+# task, report run "obj_trash": list / list_kept / task / task_kept)
+TICK = "from kalmido.core.writes import obj_trash_tick\nprint(json.dumps(obj_trash_tick(c, force=True)))"
+
+
 def runs(kind="trash"):
     r = A.get(B + "/api/admin/retention")
     return ((r.json().get("kinds") or {}).get(kind) or {}).get("runs") or {} if r.ok else {}
@@ -101,16 +108,16 @@ list_to_trash(A, LO)
 list_to_trash(A, LY)
 c.execute("UPDATE lists SET deleted_at=? WHERE id=?", (OLD, LO))
 c.execute("UPDATE tasks SET deleted_at=? WHERE list_id=? AND deleted_at IS NOT NULL", (OLD, LO))
-box("from kalmido.lists.listtrash import otr_prune\nprint(otr_prune(c, True))")
+box(TICK)
 check(exists("lists", LO) and exists("tasks", TO) and FO and os.path.isfile(FO), "#3026: switch off: the old list, its task and file stay")
-last = runs().get("lists") or {}
-check(last.get("purged") is False and (last.get("counts") or {}).get("lists") == 1 and (last.get("counts") or {}).get("tasks") == 1,
+last = runs().get("obj_trash") or {}  # 2.936.0 (#5364): the core's run, kinds list / task
+check(last.get("purged") is False and (last.get("counts") or {}).get("list") == 1 and (last.get("counts") or {}).get("task") == 1,
       f"#3026: switch off: the list run reports what it would delete {last}")
-out = box("from kalmido.lists.listtrash import otr_prune\nprint(otr_prune(c, True))", on=True)
-check(out == "1" and not exists("lists", LO) and not exists("tasks", TO), f"#3026: switch on: the old list goes with its task ({out})")
+out = box(TICK, on=True)
+check(json.loads(out or "{}").get("list") == 1 and not exists("lists", LO) and not exists("tasks", TO), f"#3026: switch on: the old list goes with its task ({out})")
 check(not os.path.exists(FO), "#3026: switch on: the attachment file is gone from disk")
 check(exists("lists", LY), "#3026: the young list stays in the trash")
-check((runs().get("lists") or {}).get("purged") is True, "#3026: the list run reports the purge")
+check((runs().get("obj_trash") or {}).get("purged") is True, "#3026: the list run reports the purge")
 
 # ---------------------------------------------------------------- tasks of a project kept by law
 LK = A.post(B + "/api/lists", json={"name": "Kept project", "org_id": None}).json()["id"]
@@ -124,17 +131,17 @@ list_to_trash(A, LK)
 check(A.delete(B + f"/api/tasks/{PN}").ok, "setup: the parent into the trash")
 c.execute("UPDATE tasks SET deleted_at=? WHERE id IN (?, ?, ?)", (OLD, TK, SK, PN))
 c.execute("UPDATE lists SET deleted_at=?, retain_until='2099-12-31' WHERE id=?", (OLD, LK))
-n = json.loads(box("from kalmido.tasks.tasktrash import ttp_tick\nprint(json.dumps(ttp_tick(c, force=True)))") or "{}")
-check(n.get("tasks_kept") == 2 and n.get("tasks") == 1, f"#3026: dry run: the kept tasks are counted apart {n}")
-n = json.loads(box("from kalmido.tasks.tasktrash import ttp_tick\nprint(json.dumps(ttp_tick(c, force=True)))", on=True) or "{}")
+n = json.loads(box(TICK) or "{}")
+check(n.get("task_kept") == 2 and n.get("task") == 1 and n.get("list_kept") == 1, f"#3026: dry run: the kept tasks are counted apart {n}")
+n = json.loads(box(TICK, on=True) or "{}")
 check(not exists("tasks", PN), f"#3026: the due parent in the normal list goes {n}")
 check(exists("tasks", TK) and FK and os.path.isfile(FK), "#3026: the task of the kept project stays with its file")
 r = c.execute("SELECT parent_id, list_id FROM tasks WHERE id=?", (SK,)).fetchone()
 check(r is not None and r["parent_id"] is None and r["list_id"] == LK, f"#3026: the kept subtask stays, detached {dict(r) if r else None}")
-box("from kalmido.lists.listtrash import otr_prune\nprint(otr_prune(c, True))", on=True)
+box(TICK, on=True)
 check(exists("lists", LK) and exists("tasks", TK), "#3026: the kept project waits for its end (list run)")
 c.execute("UPDATE lists SET retain_until='2020-12-31' WHERE id=?", (LK,))
-n = json.loads(box("from kalmido.tasks.tasktrash import ttp_tick\nprint(json.dumps(ttp_tick(c, force=True)))", on=True) or "{}")
+n = json.loads(box(TICK, on=True) or "{}")
 check(not exists("tasks", TK) and not os.path.exists(FK), f"#3026: after its end the kept task goes with its file {n}")
 
 # ---------------------------------------------------------------- wiki: restore brings the files back; the runs
@@ -182,7 +189,8 @@ check(not exists("wiki_pages", WP) and not os.path.exists(WFP), f"#3026: switch 
 box("from kalmido.sheets.shkinds import shk_tick\nshk_tick(c, force=True)\nfrom kalmido.office.contractfiles import dma_purge_tick\n"
     "dma_purge_tick(c)\nfrom kalmido.office.meals import bw_purge_tick\nbw_purge_tick(c)\n"
     "print('ok')")  # 2.981.0 (#5273): vdr_trash_prune is gone (the review comments go with the core's run of every comment)
-check({"lists", "tasks", "obj_trash", "wiki_files"} <= set(runs()), f"#3026: GET /api/admin/retention lists the runs {sorted(runs())}")  # 2.809.0 (#5365): wiki -> obj_trash
+# 2.936.0 (#5364): the runs lists / tasks are the core's obj_trash now
+check({"obj_trash", "wiki_files"} <= set(runs()), f"#3026: GET /api/admin/retention lists the runs {sorted(runs())}")  # 2.809.0 (#5365): wiki -> obj_trash
 
 # ---------------------------------------------------------------- freelancer: a private list in the trash
 FIDF, Fr = freelancer(B, A, features=FEAT)
@@ -191,9 +199,9 @@ FT = task(Fr, FL, "Own task")
 list_to_trash(Fr, FL)
 c.execute("UPDATE lists SET deleted_at=? WHERE id=?", (OLD, FL))
 c.execute("UPDATE tasks SET deleted_at=? WHERE list_id=? AND deleted_at IS NOT NULL", (OLD, FL))
-box("from kalmido.lists.listtrash import otr_prune\nprint(otr_prune(c, True))")
+box(TICK)
 check(exists("lists", FL) and exists("tasks", FT), "freelancer: switch off: the private list stays")
-box("from kalmido.lists.listtrash import otr_prune\nprint(otr_prune(c, True))", on=True)
+box(TICK, on=True)
 check(not exists("lists", FL) and not exists("tasks", FT), "freelancer: switch on: the private list goes")
 
 # ---------------------------------------------------------------- 2.272.0 F (#3026, review M4): the runs inside a request

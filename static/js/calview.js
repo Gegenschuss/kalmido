@@ -30,7 +30,8 @@ async function calsDraw(md, j) {
   if (typeof intr_st === 'function') intr_st('cals', j.subs.length > 0);  // 2.625.0 (#4489): the state on its folded row in Settings > Integrations
   S.calendars = {...(S.calendars || {}), enabled: j.enabled, subs: j.subs.filter(x => x.visible).length};
   calInvalidate();
-  box.innerHTML = j.subs.length ? j.subs.map(x => `<div class="calsub ${x.visible ? '' : 'off'}" data-cal="${x.id}" style="--cc:${cssColor(x.color) || '#94a3b8'}">
+  // 2.884.0 (#5469): cssColor() passes only a checked colour, the fallback is a fixed variable; the day list below is built from taskRow() (esc inside) - both html-ok
+  box.innerHTML = j.subs.length ? j.subs.map(x => `<div class="calsub ${x.visible ? '' : 'off'}" data-cal="${x.id}" style="--cc:${/*html-ok*/ cssColor(x.color) || 'var(--muted)'}">
       <button class="cswatch" data-calact="color" title="${tr('Colour')}" aria-label="${tr('Colour')}"></button>
       <div class="calsub-main"><b>${esc(x.name)}</b><small class="muted">${esc(x.kind === 'caldav' ? `CalDAV · ${x.username}` : x.url_hint)} · ${calStatus(x)}${x.write && x.can_write ? ' · ' + esc(tr('writable')) : ''}</small></div>
       <label class="calvis" title="${tr('Show')}"><input type="checkbox" data-calact="vis" ${x.visible ? 'checked' : ''} aria-label="${tr('Show')}"></label>
@@ -145,7 +146,7 @@ function calAddModal(done) {
       const auth = {url: $('#ca-srv', md).value.trim(), username: $('#ca-user', md).value.trim(), password: $('#ca-pw', md).value};
       if (!found) {
         found = (await calReq('POST', '/api/calendars/discover', auth)).calendars;
-        $('#ca-cals', md).innerHTML = `<div class="shint keep">${tr('Which calendars should be shown?')}</div>` + found.map((c, i) => `<label class="wide"><input type="checkbox" data-ci="${i}" checked><span><i class="cevdot" style="--cc:${cssColor(c.color) || '#94a3b8'}"></i> ${esc(c.name)}</span></label>`).join('');
+        $('#ca-cals', md).innerHTML = `<div class="shint keep">${tr('Which calendars should be shown?')}</div>` + found.map((c, i) => `<label class="wide"><input type="checkbox" data-ci="${i}" checked><span><i class="cevdot" style="--cc:${/*html-ok*/ cssColor(c.color) || 'var(--muted)'}"></i> ${esc(c.name)}</span></label>`).join('');
         b.textContent = tr('Add'); return;
       }
       const cals = found.filter((_, i) => $(`[data-ci="${i}"]`, md)?.checked);
@@ -224,10 +225,10 @@ function viewCal() {
   const selEv = evOn ? cevOn(S.calSel).sort(cevSort) : [];
   return `${calBar(`${MON[m - 1]} ${y}`)}
     <div class="cal calv">${wdOrder().map(i => `<div class="wd">${WD[i]}</div>`).join('')}${cells}</div>
-    <div class="agenda"><h3>${dayLabel(S.calSel, true)}${S.calSel !== t0 && dayLabel(S.calSel, true) === WDL[pd(S.calSel).getDay()] ? '' : ''} <span class="muted" style="font-weight:400;font-size:var(--fs-m)">${fmtDate(S.calSel)}</span></h3>
+    <div class="agenda"><h3>${dayLabel(S.calSel, true)}<span class="muted agdate"> ${fmtDate(S.calSel)}</span></h3>
       ${selEv.length ? `<div class="cevlist">${selEv.map(e => cevRow(e, S.calSel)).join('')}</div>` : ''}
       ${qaddBox()}
-      ${sel.length ? sel.map(t => taskRow(t, {showList: true, drag: false})).join('') : `<div class="muted" style="padding:.5rem .25rem">${tr('No tasks on this day.')}</div>`}
+      ${/*html-ok*/ sel.length ? sel.map(t => taskRow(t, {showList: true, drag: false})).join('') : `<div class="muted agnone">${tr('No tasks on this day.')}</div>`}
       ${msvvCalDay(S.calSel)}
     </div>`;
 }
@@ -255,7 +256,7 @@ function viewWeek() {
     const blocks = lay.map(it => {
       const t = it.t, top = it.s / 60 * H, h = Math.max((it.e - it.s) / 60 * H, 20), cls = `${h >= two ? ' w2' : ''}${it.n >= 3 ? ' wn3' : ''}`;
       const more = it.n >= 3 && it.cl[0] === it ? `<button type="button" class="wmore" data-calday="${/*html-ok*/ d /* a date */}" style="top:${Math.round(top)}px" aria-label="${esc(trn('{0} event', '{0} events', it.cl.length))}" title="${esc(trn('{0} event', '{0} events', it.cl.length))}">+${it.cl.length}</button>` : '';
-      if (it.c) return `<div class="wcev${/*html-ok*/ cls /* constant classes */}${ap_draftCls(it.c)}${cg_canDrag(it.c) ? ' cgok' : ''}" data-cev="${it.c.id}" style="--cc:${cevColor(it.c)};top:${top}px;height:${h}px;${/*html-ok*/ lane(it) /* numbers */}">${/*html-ok*/ cevSubMark(it.c)}<b>${it.c.d0 === d ? fmtTimeAt(it.c.s) : '…'}</b> <span class="wct">${esc(cevTitle(it.c))}</span></div>${/*html-ok*/ more /* built above with esc() */}`;  // 2.52.0 (#1016): cgok = may be moved / resized (caldrag.js)
+      if (it.c) return `<div class="wcev${/*html-ok*/ cls /* constant classes */}${ap_draftCls(it.c)}${cg_canDrag(it.c) ? ' cgok' : ''}" data-cev="${it.c.id}" role="button" tabindex="0" title="${esc(cevTitle(it.c))}" style="--cc:${cevColor(it.c)};top:${top}px;height:${h}px;${/*html-ok*/ lane(it) /* numbers */}">${/*html-ok*/ cevSubMark(it.c)}<b>${it.c.d0 === d ? fmtTimeAt(it.c.s) : '…'}</b> <span class="wct">${esc(cevTitle(it.c))}</span></div>${/*html-ok*/ more /* built above with esc() */}`;  // 2.52.0 (#1016): cgok = may be moved / resized (caldrag.js)
       return `<div class="wev${/*html-ok*/ cls /* constant classes */} p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}${lp_cls(t)}" data-id="${t.id}" draggable="${t.status || t.ghost || isTouch() || !canEdit(t) ? 'false' : 'true'}" style="${lp_sty(t) ? lp_sty(t) + ';' : '' /* 2.53.0 (#1426) */}top:${top}px;height:${h}px;${/*html-ok*/ lane(it) /* numbers */}">${msGlyph(t)}<b>${esc(fmtTimeLoc(t.due_time))}</b> <span class="wct">${mdTitleNL(t.title)}</span></div>${/*html-ok*/ more /* built above with esc() */}`;
     }).join('');
     return `<div class="wcol ${d === t0 ? 'today' : ''}" data-day="${d}">${blocks}${d === t0 ? `<i class="nowline" style="top:${nowTop}px"></i>` : ''}</div>`;

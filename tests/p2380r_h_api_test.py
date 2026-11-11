@@ -165,6 +165,7 @@ for u in ("bob", "carol"):
     assert r.ok, r.text
     uid[u] = r.json()["id"]
 Bo, Ca = usess("bob"), usess("carol")
+dbx("UPDATE users SET email_proved=lower(email) WHERE id=?", (uid["bob"],))  # 2.983.0 (#5643): a share by address binds only a proved address (a mailed link / OIDC); here set directly
 FID, Fr = freelancer(B, A)
 Fr.patch(B + "/api/settings", json={"lang": "en", "features": FEATURES, "tour": "done"})
 D = (date.today() + timedelta(days=5)).isoformat()

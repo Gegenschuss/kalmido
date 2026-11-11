@@ -12,6 +12,9 @@ computing -- never derived from Kalmido code. The suite
    the balance sheet (office/ledger_dbl.py) and the advance VAT returns per quarter and year (books.bk_ustva) to the cent;
    a difference names account / field, expected and actual
  - prints the named gaps (LUECKEN): what a real GmbH year needs and Kalmido does not do (yet); nothing is silently left out
+ - 2.912.0 (#5419): a deferral case with both sides (prepaid expenses 0980 / deferred income 0990, section 250 HGB): the
+   expected figures again by hand, the fixture check recomputes them from the periods; the VAT returns compare strictly (every
+   expected field must be in Kalmido's answer)
  - 2.784.0 (#5387 fix): a reminder fee paid in an earlier month is marked paid with that day (was: always today -- a fee paid
    in December and marked in January landed in the wrong year); a day in the future or before the reminder is refused
 Freelancer parity: the changed fee route also in a personal office.
@@ -53,9 +56,11 @@ LUECKEN = [
     "Lohnbuchhaltung (Gehälter, Sozialversicherung, Lohnsteuer-Anmeldung): nicht in Kalmido, darum hat die Muster GmbH kein Personal",
     "Zusammenfassende Meldung und Umsatzsteuer-Jahreserklärung: nur die Zahlen der Voranmeldungen, kein Formular",
     "Rückstellungen, Abgrenzungen und das Ausbuchen der Zahlungen an das Finanzamt (1780) macht Kalmido nicht selbst: Umbuchung "
-    "von Hand (U1-U5), Bankzeilen ohne Beleg laufen über das Verrechnungskonto 1590",
+    "von Hand (U1-U7; die Rechnungsabgrenzungen 0980 / 0990 rechnet Kalmido nicht aus Leistungszeiträumen), Bankzeilen ohne Beleg laufen über das Verrechnungskonto 1590",
     "Personenkonten: Kalmido bucht alle Kunden auf das Sammelkonto 10000 und alle Lieferanten auf 70000 (ohne Kundennummer); "
     "offene Posten je Kunde/Lieferant stehen nicht in der Saldenliste",
+    "Umsatzsteuer bei Dauerleistungen (Soll-Versteuerung): die Voranmeldung nimmt das Rechnungsdatum, nicht Leistungszeitraum "
+    "oder Anzahlung (§ 13 Abs. 1 Nr. 1a UStG); RE7 stimmt nur, weil Rechnung und Vorauszahlung im selben Quartal liegen",
     "Reisekostenabrechnung: es gibt keinen Zahlweg für die Erstattung an die reisende Person (Umbuchung U3 von Hand)",
 ]
 
@@ -114,6 +119,13 @@ for f in FIELDS:
 tax = sum((bal.get(a, D(0)) for a in ("1571", "1576", "1771", "1776", "1780")), D(0))
 check(-tax == D(uq["q4"]["83"]) == bs["P.C.8"], f"fixture: VAT accounts net = the open return of Q4 {-tax}")
 check(D(uq["y"]["83"]) == -(bal["1776"] + bal["1771"]) - (bal["1576"] + bal["1571"]), "fixture: the year's VAT = VAT accounts - input tax accounts")
+# 2.912.0 (#5419): the deferrals from their periods (months after the balance sheet day / months of the period x net amount)
+_rap = {u["key"]: u for u in FX["umbuchungen"]}
+_b04 = next(b for b in FX["belege"] if b["key"] == "B04")
+_re7 = next(r for r in FX["rechnungen"] if r["key"] == "RE7")
+check(D(_rap["U6"]["betrag"]) == D(_b04["brutto"]) * 3 / 12 == bs["C"] == bal["0980"], "fixture: prepaid expenses = 3 of 12 months of B04 (2026-01 to 03)")
+check(D(_rap["U7"]["betrag"]) == sum((D(x["preis"]) * x["menge"] for x in _re7["positionen"]), D(0)) * 11 / 12 == bs["P.D"] == -bal["0990"],
+      "fixture: deferred income = 11 of 12 months of RE7 net (2026-01 to 11), the VAT stays out")
 
 # the demo loader never writes to the live instance: only local hosts and the hosts of KALMIDO_DEMO_ALLOW, never the live domain
 for url, allow, ok in (("https://app.kalmido.com", "app.kalmido.com", False), ("https://x.kalmido.com.", "", False), ("http://127.0.0.1:3048", "", True),
@@ -160,8 +172,8 @@ for q in ("q1", "q2", "q3", "q4", "y"):
     r = A.get(B + OFC + f"/books/ustva?year={Y}&period={q}")
     kz = r.json().get("kz", {}) if r.ok else {}
     check(r.ok and r.json().get("basis") == "soll", f"VAT return {q}: VAT on invoicing {r.status_code} {r.text[:120] if not r.ok else r.json().get('basis')}")
-    for f in FIELDS:
-        check(D(kz.get(f) or "0") == D(uq[q][f]), f"VAT return {q} field {f}: expected {uq[q][f]}, Kalmido {kz.get(f)}")
+    for f in FIELDS:  # 2.912.0 (#5419): strict - a field missing in Kalmido's answer is a difference, not 0
+        check(f in kz and D(kz[f]) == D(uq[q][f]), f"VAT return {q} field {f}: expected {uq[q][f]}, Kalmido {kz.get(f, 'missing')}")
     check(r.ok and r.json().get("missing_vat") == 0, f"VAT return {q}: no receipt without a VAT rate {r.json().get('missing_vat') if r.ok else ''}")
 
 # the gap of section 13b in the journal is real (the pair is not booked) -- so it stays named, not silently fine
@@ -234,5 +246,13 @@ r2 = Fr.post(B + f"{D_}/{rid}/fee", json={"state": ""})
 check(r1.status_code == 409 and r2.status_code == 409, f"the paid day in a locked month: moving and opening again 409 ({r1.status_code} {r2.status_code})")
 check(kt.dbx("SELECT reminder_fee_paid_at, reminder_fee_state FROM office_docs WHERE id=?", (rid,))[0] == (f"{Y}-04-20", "paid"),
       "the locked fee day stays")
+# 2.990.0 (#5484): a fee paid before 2.545 has no day and counts on the reminder's date (April, locked): opening it again or
+# moving it to an open month is refused too (was: the empty day skipped the period check)
+kt.dbx("UPDATE office_docs SET reminder_fee_paid_at=NULL WHERE id=?", (rid,))
+r1 = Fr.post(B + f"{D_}/{rid}/fee", json={"state": "paid", "day": f"{Y}-06-02"})
+r2 = Fr.post(B + f"{D_}/{rid}/fee", json={"state": ""})
+check(r1.status_code == 409 and r2.status_code == 409, f"an old fee without day in a locked month: moving and opening again 409 ({r1.status_code} {r2.status_code})")
+check(kt.dbx("SELECT COALESCE(reminder_fee_paid_at, ''), reminder_fee_state FROM office_docs WHERE id=?", (rid,))[0] == ("", "paid"),
+      "the old fee stays paid without day")
 
 sys.exit(kt.done("muster_gmbh_jahr"))

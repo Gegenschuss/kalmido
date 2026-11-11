@@ -616,6 +616,7 @@ ORDER = (
     "core.objlight",  # 2.754.0 (#5268): the light kinds task, event, hub_mail, client of the shared core (after their areas)
     "core.objnotify",  # 2.891.0 (#5270): THE send decision (obj_role >= view of every recipient), after the kinds it asks
     "files.fskern", "wiki.wkkern", "sheets.shkern",  # 2.809.0 (#5365): file-store nodes, knowledge pages, tables on the core's trash
+    "hub.dspkern",  # 2.872.0 (#5532): the shoot day and its call sheet as kinds of the shared core (after hub.callsheet)
     "events.evundo", "contacts.ctundo", "files.fsundo", "personal.habitundo",  # 2.777.0 (#5254): their steps in the step groups (who may take them back)
     "lists.lpundo",  # 2.809.0 (#5476): a project's settings in the step groups
     "lists.secundo",  # 2.809.0 (#5476): creating / deleting / restoring a section in the step groups
@@ -624,7 +625,7 @@ ORDER = (
     "lists.ruleundo",  # 2.809.0 (#5476): a project's rules in the step groups (after lists.rules)
     "lists.tplundo",  # 2.809.0 (#5476): renaming / trashing a template in the step groups
     "lists.sprundo",  # 2.809.0 (#5476): a project's sprints in the step groups
-    "life.budundo",  # 2.809.0 (#5476): the budget's entries in the step groups
+    "life.budundo",  # 2.809.0 (#5476): the budget's entries in the step groups (2.985.0 #5394: the lock per list space)
     "lists.foldundo",  # 2.809.0 (#5476): renaming / moving a sidebar folder in the step groups
     "admin.supporter",  # 2.74.0 (#338): the supporter licence (self-hosted only, a badge, unlocks nothing)
     "admin.operator",  # 2.144.0 D (#797): the hosting operator's interface (off unless a token file is configured)
@@ -635,6 +636,7 @@ ORDER = (
     "admin.worker",  # 2.102.0 D (#1994 / #1997): health numbers, the process role, one runner per background loop
     # -- sorted block (2.624.0, #3941): a new module WITHOUT an order need goes here, one per line, sorted by name (tools/check_layout.py)
     # (it loads after every module above, so it may use their names at import time; one with an order need goes above instead)
+    "accounts.setundo",  # 2.985.0 (#5394): the settings' undo steps (one diff part per key, no routes)
     "collab.recent",  # 2.769.0 (#5352): "Recently edited" over Knowledge, Files and Reading (GET /api/recent)
     "core.undodiff",  # 2.774.0 (#5251): the diff parts of the step groups (no routes)
     "life.lfkern",  # 2.947.0 (#5367): bookmarks and feeds on the core's trash (no routes)

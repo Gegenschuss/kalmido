@@ -7,12 +7,14 @@ freelancer-matrix: agents
    change, not for its own (un)assignment, not for a task it neither has nor watches, not from a member it is not open to,
    not while its work style says task_changed: false (default true, GET / PATCH /api/agents/<id>/work-style)
 usage: p2959_l_api_test.py <datadir>      (KMT_NOSTART=1 / P2959L_NOSTART=1: a running server)"""
+import json
+import subprocess
 import sys
 
 import requests
 
 from freelancer_fixture import freelancer
-from kt import B, check, done, fresh, sess, setup
+from kt import B, CT, check, done, fresh, sess, setup
 
 fresh(env={"KALMIDO_API_RATE": "5000"}, prefix="P2959L")
 A = setup()
@@ -123,5 +125,57 @@ r = F.post(B + "/api/tasks/batch", json={"ids": TB, "action": "patch", "data": {
 check(r.ok, f"(setup) a bulk change of 53 tasks {r.status_code} {r.text[:160]}")
 n = len([e for e in events(TA, s0) if e.get("event") == "task_changed"])
 check(n == 50, f"#4030 review F2: at most 50 task_changed per agent and request, got {n}")
+
+# 2.976.0 (#5657, review 2.959 F4): the diff says only what the stored row says now. A request whose change was taken back
+# (a savepoint rolled back after log_changes) still holds that change in g.wh_diff: agent_changed_events checks each field
+# against the row read fresh -- the title that never got stored stays out, the priority that did comes (red before: both)
+row = F.get(B + f"/api/tasks/{TC}").json()
+
+
+def tail_seq(t, s=0):
+    """The newest event's seq, page by page (events() returns one page: after the bulk change above, last() stays behind)."""
+    while True:
+        ev = events(t, s)
+        if not ev or max(e.get("seq", 0) for e in ev) <= s:
+            return s
+        s = max(e.get("seq", 0) for e in ev)
+
+
+
+CODE = """
+from flask import g
+from kalmido.core.config import app as kapp
+from kalmido.core.db import connect
+from kalmido.core.pg import system_ctx
+from kalmido.agents.core import agent_changed_events
+c = connect()
+with kapp.test_request_context('/api/tasks'):
+    with system_ctx(c):
+        n = agent_changed_events(c, {TID: {"title": [TITLE, "A title that was rolled back"], "priority": [OLDP, PRIO]}})
+        c.commit()
+print(json.dumps(n))
+"""
+s0 = tail_seq(TA)
+r = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", "import app, json\n" + CODE.replace(
+    "TID", str(TC)).replace("TITLE", json.dumps(row["title"])).replace("OLDP", str(0 if row["priority"] else 1)).replace("PRIO", str(row["priority"]))], capture_output=True, text=True)
+check(r.returncode == 0, f"(setup) agent_changed_events in the app {r.stderr[-400:]}")
+ev = evs(TA, s0, "task_changed", TC)
+d = ev[0]["data"].get("diff") if ev else {}
+check(len(ev) == 1 and "title" not in d and "priority" in d,
+      f"#5657: a change taken back in the request stays out of the diff, the stored one comes {d}")
+s1 = tail_seq(TA, s0)
+r = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", "import app, json\n" + CODE.replace(
+    "TID", str(TC)).replace("TITLE", json.dumps(row["title"])).replace("OLDP", str(row["priority"])).replace("PRIO", str(9 if row["priority"] != 9 else 1))],
+    capture_output=True, text=True)
+check(r.returncode == 0 and not evs(TA, s1, "task_changed", TC),
+      f"#5657: nothing of it stored: no task_changed at all {r.stdout[-200:]} {r.stderr[-300:]} {evs(TA, s1, 'task_changed', TC)} {row.get('priority')}")
+# review: a field written again later in the request without log_changes: the agent gets the value the row has
+s2 = tail_seq(TA, s1)
+r = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", "import app, json\n" + CODE.replace(
+    "TID", str(TC)).replace("TITLE", json.dumps(row["title"])).replace("OLDP", "5").replace("PRIO", "1")], capture_output=True, text=True)
+ev = evs(TA, s2, "task_changed", TC)
+d = ev[0]["data"].get("diff") if ev else {}
+check(r.returncode == 0 and len(ev) == 1 and d.get("priority") == {"old": "high", "new": "medium"} and "title" not in d,
+      f"#5657 review: written again later: the stored value as new {d} {r.stderr[-300:]}")
 
 sys.exit(done("p2959_l_api"))

@@ -12,7 +12,8 @@ literal values, no import, no code.
 2.509.0 (#4285): and only additive steps, so the version before can still run on the database and a step cannot fail on rows that
 only the live database has: a MIGRATIONS step adds exactly its column, nullable or with a DEFAULT; AFTER creates indexes, or adds a
 column with ADD COLUMN IF NOT EXISTS under the same rules as a step (a table that core/schema.py makes after the steps, #4300);
-SCHEMA only creates. A UNIQUE index on a table the fragment does not create itself can fail on existing rows: it needs the line
+SCHEMA only creates. 2.985.0 (#4922): AFTER may let a NOT NULL go (ALTER TABLE t ALTER COLUMN c DROP NOT NULL) with the
+line `# nullable-ok <table>.<column>: <why the version before copes with empty values>`. A UNIQUE index on a table the fragment does not create itself can fail on existing rows: it needs the line
 `# unique-ok <index>: <why no two rows can collide>` in the fragment.
 
 2.574.0 (#3779): one way back out: a table of a feature that was taken out goes with `DROP TABLE IF EXISTS <table>` in AFTER
@@ -59,6 +60,10 @@ PURGE_TRASH = re.compile(r"\bWHERE\b.*\bdeleted_at\s+(?:IS\s+NOT\s+NULL\b|<)", r
 PURGE_OK = re.compile(r"^[ \t]*#[ \t]*purge-ok[ \t]+(\w+)[ \t]*:[ \t]*\S", re.M)
 DEFAULT_KW = re.compile(r"\bDEFAULT\b", re.I)  # 2.771.0 (#5333)
 DEFAULT_END = re.compile(r"(?:NOT|NULL|REFERENCES|CHECK|PRIMARY|UNIQUE|CONSTRAINT|GENERATED|COLLATE)\b", re.I)
+# 2.985.0 (#4922): a NOT NULL that goes (a column that may be empty from now on) - the version before must cope with the empty
+# rows, so it needs the line # nullable-ok <table>.<column>: <why the version before copes>; runs at every start (a no-op then)
+DROP_NN = re.compile(r"ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)\s+ALTER\s+COLUMN\s+(\w+)\s+DROP\s+NOT\s+NULL", re.I)
+NULLABLE_OK = re.compile(r"^[ \t]*#[ \t]*nullable-ok[ \t]+(\w+\.\w+)[ \t]*:[ \t]*\S", re.M)
 
 
 def fragments(root=ROOT):
@@ -236,6 +241,7 @@ def content_findings(n, values, src):
         drop = DROP_TABLE.fullmatch(sql_bare(x).strip().rstrip(";").strip())
         dcol = DROP_COLUMN.fullmatch(sql_bare(x).strip().rstrip(";").strip())
         purge = PURGE.fullmatch(sql_bare(x).strip().rstrip(";").strip())
+        dnn = DROP_NN.fullmatch(sql_bare(x).strip().rstrip(";").strip())  # 2.985.0 (#4922)
         if col:  # a column on a table made after the steps (#4300): AFTER runs at every start, so IF NOT EXISTS
             why = step_finding(col.group(1), col.group(2), x)
             if not why and not re.search(r"ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\b", x, re.I):
@@ -258,6 +264,10 @@ def content_findings(n, values, src):
                 if cut.group(1) > datetime.date.today().isoformat() else \
                 None if purge.group(1) in set(PURGE_OK.findall(src)) else \
                 f"DELETE is a one-way step (its rows are lost): needs a line # purge-ok {purge.group(1)}: <why>"
+        elif dnn:  # 2.985.0 (#4922): a column that may be empty from now on, with a reason
+            key = f"{dnn.group(1)}.{dnn.group(2)}"
+            why = None if key in set(NULLABLE_OK.findall(src)) else \
+                f"DROP NOT NULL lets the version before meet empty values: needs a line # nullable-ok {key}: <why it copes>"
         else:
             why = index_finding(x, own, ok)
         why = why or default_call_finding(x)  # 2.771.0 (#5333)

@@ -1,6 +1,6 @@
 // kalmido-suite: fresh
 // 2.356.0 B (#2932) UI test, jsdom: the office header always names its workspace.
-// - a person without an organisation: "Private" as plain text in the office header (no switch to offer)
+// - a person without an organisation: no area in the office header (2.936.0, #5448: one office = no chip; was "Private" as text)
 // - the same person with an own office joins an organisation: the office stays "Private", the header now carries the
 //   workspace switch itself (data-act ws-menu); switching to the organisation shows its name there and ONE hint
 //   ("This office belongs to the workspace …", setting office_ws_hint), switching back shows no second hint
@@ -27,8 +27,9 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
 
   // ================= no organisation: the area as text
   let w = await boot({user: 'frida', hash: 'office/offers'}), d = w.document;
-  const a0 = await until(() => d.querySelector('.office .ofchead .ofcws'));
-  check(a0 && a0.tagName === 'SPAN' && /Private/.test(a0.textContent), 'without an organisation: "Private" in the office header ' + (a0 && a0.outerHTML));
+  // 2.936.0 (#5448): one office only: no area name in the header (was the text "Private"); the role without a leading dot
+  const h0 = await until(() => d.querySelector('.office .ofchead .ofcorg'));
+  check(h0 && !d.querySelector('.office .ofchead .ofcws') && /^Admin/.test(h0.textContent.trim()), 'without an organisation: no area chip, the header starts with the role ' + d.querySelector('.office .ofchead')?.outerHTML);
   w.close();
 
   // ================= joins an organisation (made with her as its admin): the office stays private, the header is the switch

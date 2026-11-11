@@ -25,6 +25,8 @@ function ccStmtShow(id) { CC.sid = id; CC.sheet = null; f8d_viewStep('ccs', ccSt
 function ccStmtClose() { CC.sid = null; CC.sheet = null; CC.pick = null; CC.bank = null; CC.stmts = null; f8d_viewDrop('ccs'); ofcDraw(); }
 // a write changes the receipts' payment days too: the bookkeeping's loaded figures go
 const ccStale = () => { CC.sheet = null; CC.stmts = null; CC.data = null; CC.pick = null; CC.cand = null; CC.bank = null; if (typeof bfbBooksStale === 'function') bfbBooksStale(); ofcDraw(); };
+// 2.979.0 (#5667): an undo / redo the server did: the card statements and the reminder setting come again
+histReloader('cards', () => { if (CC.data || CC.sheet || CC.stmts) ccStale(); if (CC.rem) { if ($('#ccn-every')) ccn_load(); else CC.rem = null; } });
 const ccName = k => `${k.provider_name} ·· ${k.last4}`;
 const ccMon = m => typeof bnr_mon === 'function' ? bnr_mon(m) : m;
 

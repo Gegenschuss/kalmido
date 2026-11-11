@@ -77,7 +77,7 @@ const kindOf = async id => ((await call('GET', '/api/state')).lists || []).find(
   await until(() => w.eval('typeof tr') === 'function' && w.eval("tr('New project')") === 'Neues Projekt', 40);
   w.eval('listModal()'); await sleep(250);
   md = lastModal(d);
-  check(/Neues Projekt/.test(md.querySelector('h3')?.textContent || '') && /Projekt-Funktionen/.test(md.querySelector('#lm-sec-proj summary')?.textContent || ''), 'de: Neues Projekt, Projekt-Funktionen (2.352.0)');
+  check(/Neues Projekt/.test(md.querySelector('h3')?.textContent || '') && /Was das Projekt kann/.test(md.querySelector('#lm-sec-proj summary')?.textContent || ''), 'de: Neues Projekt, Was das Projekt kann (2.352.0)');  // 2.831.0 (#5481)
   check(!/Einfache Liste|Neue Liste/.test(md.textContent), 'de: no Einfache Liste / Neue Liste left in the dialog');
   w.close();
 

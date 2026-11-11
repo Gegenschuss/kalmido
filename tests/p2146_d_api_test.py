@@ -374,7 +374,8 @@ if not os.environ.get("P2146D_NOHOSTED"):
 
     def prune():
         out = subprocess.run(["docker", "exec", "-e", "KALMIDO_PURGE_TRASH=1", CT, "python", "-c", "import app\nfrom kalmido.core.db import connect\n"  # 2.272.0 (#3026): the trash runs delete only with the switch on
-                              "from kalmido.lists.listtrash import otr_prune\nc = connect()\nprint('pruned', otr_prune(c, True))\nc.close()"],
+                              "from kalmido.core.writes import obj_purge_after, obj_trash_prune\nfrom kalmido.core.serializers import unlink_files\nc = connect()\nwith obj_purge_after(True) as a:\n    n = obj_trash_prune(c, 'list', purge=True)\nc.commit()\n"  # 2.936.0 (#5364): the core's run
+                              "unlink_files(a['after'])\nprint('pruned', n)\nc.close()"],
                              capture_output=True, text=True)
         return out.stdout + out.stderr
     sql("UPDATE lists SET deleted_at='2020-01-01T00:00:00+00:00' WHERE id=?", (PL,), write=True)  # far past the trash days

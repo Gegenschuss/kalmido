@@ -134,6 +134,10 @@ FILL_EXTRA = {"undo_groups": {"state": "barrier"}}  # 2.780.0 (#5386): columns w
 # 2.972.0 (#5272): obj_comments.ref_id has no foreign key (kind names the table): a task comment on a task of the organisation
 FILL_REF = {("obj_comments", "ref_id"): "tasks"}
 FILL_VAL = {("obj_comments", "kind"): "task"}
+# 2.982.0 (#5386): obj_tags.scope_kind has a CHECK (user / list / org / ws, #5275 in 2.947.0): the made-up text broke the insert
+# (red in CI v2.962.0): the row of each organisation is a label of that organisation (scope org, scope_id = its id)
+FILL_VAL[("obj_tags", "scope_kind")] = "org"
+FILL_VAL[("obj_tags", "scope_id")] = lambda org: str(org)
 
 
 def fill_row(t, org):
@@ -144,6 +148,7 @@ def fill_row(t, org):
         ref = FK.get((t, name)) or FILL_REF.get((t, name))
         if (t, name) in FILL_VAL:
             v = FILL_VAL[(t, name)]
+            v = v(org) if callable(v) else v
         elif ref:
             has_org = sql("SELECT 1 FROM information_schema.columns WHERE table_name=? AND column_name='org_id'", (ref,))
             r = sql(f"SELECT MIN(id) FROM {ref}" + (" WHERE org_id=?" if has_org and ref != "orgs" else ""), (org,) if has_org and ref != "orgs" else ())

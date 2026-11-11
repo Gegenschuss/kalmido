@@ -13,7 +13,8 @@ step left it). The rights are checked at the moment of taking back, never the on
 (obj_need), a tracked kind of an old area the check its area registered (undo_need_reg: the office in office/undo.py); a kind
 without one is never written back (noaccess). A part that cannot go back (changed since, moved, no right) stays and is named
 in the answer, the other parts of the group go back anyway (decision of #5249): the group becomes partial (or noaccess when
-nothing of it may be changed). A barrier or a group too big for copies stops the run there. Barriers are per person like the list (decision 2 of
+nothing of it may be changed). A barrier or a group too big for copies stops the run there -- 2.866.0 (#5302 N2): a barrier
+only for the groups of its own workspace (org_id; a finalised invoice does not hold a task step or another office's step). Barriers are per person like the list (decision 2 of
 #5249: only own steps): a barrier of someone else does not stop a person's run; a finalised document is frozen anyway."""
 import json
 
@@ -35,6 +36,7 @@ from .writes import UNDO_CONFLICT, obj_restore, obj_trash  # 2.773.0 (#5292): tr
 
 UNDO_NEED = {}  # kind -> fn(c, uid, rid, oid) -> {"fix": fn(c), "keep": {table: {column}}, "lock": name}; Denied = may not
 TRASH_MODES = ("trash", "restore")  # 2.773.0 (#5292): obj_undo.mode of a step without a copy (core/writes.py _trash_step)
+UNDO_TRASH = {}  # 2.985.0 (#5394): kind -> {"restore": fn(c, uid, rid), "trash": fn(c, uid, rid)} (undo_trash_reg)
 UG_NOACCESS = N_("You may not change it any more, so it cannot be undone")
 UG_GONE = N_("It is no longer there, so it cannot be undone")
 UG_STOP = N_("Stopped before a step that cannot be undone: {0}")
@@ -50,6 +52,14 @@ def undo_need_reg(kind, fn):
     (403 / 404 = no access, 409 = its own reason) or returns {"fix", "keep"} as obj_undo_run takes them, and "lock" when
     the kind's saves take another write_lock than obj-<kind>-<id> (ow_write lock=)."""
     UNDO_NEED[kind] = fn
+
+
+def undo_trash_reg(kind, restore, trash):
+    """2.985.0 (#5394): a core kind whose area puts it into / takes it out of the trash its own way (a calendar with its
+    events, an address book with its contacts' links and birthday tasks): a trash step of it goes back through restore(c,
+    uid, rid) / trash(c, uid, rid) -- each checks the person's rights of now and raises Denied -- instead of obj_restore /
+    obj_trash. Neither commits nor sends mails (the group commits; an undo sends no mails)."""
+    UNDO_TRASH[kind] = {"restore": restore, "trash": trash}
 
 
 def _need(c, uid, kind, rid, oid):
@@ -113,13 +123,17 @@ def _trash_part(c, uid, kind, rid, p, redo):
     st = c.execute("SELECT * FROM obj_undo WHERE id=?", (p["id"],)).fetchone()
     if st is None or st["state"] != ("undone" if redo else "done"):
         raise Denied(409, tr(UNDO_NOTHING))
+    write_lock(c, f"obj-{kind}-{int(rid)}")  # 2.985.0 (#5394, review F10): the trash state read under the lock of obj_trash / obj_restore
     row = obj_row(c, kind, rid)
     if row is None:
         raise Denied(404, tr(UG_GONE))
     back = (st["mode"] == "trash") != bool(redo)  # undo of a trash / redo of a restore = out of the trash
     if bool(row["deleted_at"]) != back:
         raise Denied(409, tr(UNDO_CONFLICT))
-    if back:  # 2.778.0 (#5371): the own step back with the role of putting it in (trash_role 'edit' = write), not 'manage'
+    hook = UNDO_TRASH.get(kind)  # 2.985.0 (#5394): the area's own way (calendars, address books)
+    if hook:
+        hook["restore" if back else "trash"](c, uid, rid)
+    elif back:  # 2.778.0 (#5371): the own step back with the role of putting it in (trash_role 'edit' = write), not 'manage'
         obj_restore(c, uid, kind, rid, step=False, undo=True)
     else:
         obj_trash(c, uid, kind, rid, step=False)
@@ -205,10 +219,17 @@ def undo_group_to(c, uid, gid):
     groups = c.execute("SELECT * FROM undo_groups WHERE user_id=? AND id>=? AND state<>'undone' ORDER BY id DESC", (int(uid), int(gid))).fetchall()
     out = {"undone": [], "partial": [], "stayed": [], "stopped": None}
     total = 0
+    held = set()  # 2.866.0 (#5302 N2): the workspaces (org_id, None = private) a barrier holds from here down
     for grp in groups:
-        if grp["state"] in ("barrier", "toobig"):
-            out["stopped"] = {"id": grp["id"], "state": grp["state"], "label": _label(grp)[0]}
+        if grp["state"] == "barrier":  # it holds only the steps of its own workspace; the others go on (another org, private)
+            out["stopped"] = out["stopped"] or {"id": grp["id"], "state": grp["state"], "label": _label(grp)[0]}
+            held.add(grp["org_id"])
+            continue
+        if grp["state"] == "toobig":  # no copies: nothing older may go back past it
+            out["stopped"] = out["stopped"] or {"id": grp["id"], "state": grp["state"], "label": _label(grp)[0]}
             break
+        if grp["org_id"] in held:
+            continue
         total += 1
         moved, stayed = _run_group(c, uid, grp, False)
         out["stayed"] += stayed

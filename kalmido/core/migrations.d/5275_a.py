@@ -11,6 +11,7 @@ none, as list_tags had none -- the project's own check (need_list) guards them. 
 
 No foreign key on the polymorphic columns: kalmido_otg_gone deletes a project's tags when the project row is deleted for good
 (what ON DELETE CASCADE of list_tags did) and a task's links when the task row is deleted for good (task_list_tags' cascade);
+2.973.0 (#5656): a personal tag (scope user) left without any link then goes as well (task_tags' cascade took the tag itself);
 an organisation's labels go with the organisation (org_id ON DELETE CASCADE).
 
 Review F1 / F6 (2.947.0): a project that changes its organisation -- any way that writes lists.org_id (the list dialog, a folder,
@@ -53,11 +54,16 @@ CREATE TABLE IF NOT EXISTS obj_tag_links (  -- 2.947.0 (#5275): a tag on an obje
 CREATE INDEX IF NOT EXISTS ix5275_obj_tag_links_obj ON obj_tag_links(kind, obj_id);
 CREATE INDEX IF NOT EXISTS ix5275_obj_tag_links_created_by ON obj_tag_links(created_by) WHERE created_by IS NOT NULL;
 CREATE OR REPLACE FUNCTION kalmido_otg_gone() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE gone BIGINT[];
 BEGIN
   IF TG_ARGV[0] = 'scope' THEN
     DELETE FROM obj_tags WHERE scope_kind = TG_ARGV[1] AND scope_id = OLD.id::text;
   ELSE
-    DELETE FROM obj_tag_links WHERE kind = TG_ARGV[1] AND obj_id = OLD.id;
+    WITH d AS (DELETE FROM obj_tag_links WHERE kind = TG_ARGV[1] AND obj_id = OLD.id RETURNING tag_id)
+      SELECT array_agg(tag_id) INTO gone FROM d;
+    -- 2.973.0 (#5656): a personal tag lives on its tasks (core/objtags.py otg_user_prune): the last link gone, the tag goes
+    DELETE FROM obj_tags ot WHERE ot.id = ANY(gone) AND ot.scope_kind = 'user'
+      AND NOT EXISTS (SELECT 1 FROM obj_tag_links k WHERE k.tag_id = ot.id);
   END IF;
   RETURN NULL;
 END $$;

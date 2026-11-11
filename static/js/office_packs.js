@@ -47,6 +47,8 @@ async function pkc_load(refresh) {
   if (seq !== PKC.seq || oid !== PKC.oid) return;
   PKC.loading = false; PKC.data = j; pkc_paint();
 }
+// 2.979.0 (#5667): an undo / redo the server did: the shown catalogue comes again (with the packs and the office settings), else it reads again when it opens
+histReloader('packs', () => { if (!PKC.data) return; if ($('#pkc')) return pkc_after(); PKC.data = null; });
 // ---- drawing
 function pkc_html() {
   pkc_sync();

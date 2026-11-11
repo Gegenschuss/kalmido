@@ -76,7 +76,7 @@
 .tpo-link input{min-height:2.5rem;font:var(--fs-xs) var(--mono)}
 .tpo-link input.tpo-off{opacity:.55}
 .tpo-qr{display:flex;justify-content:center;margin:.5rem 0}
-.tpo-qr img{width:11rem;height:11rem;border-radius:.375rem;background:#fff}
+.tpo-qr img{width:11rem;height:11rem;border-radius:.375rem;background:var(--qr-bg)}  /* a QR code needs a light ground in every theme */
 .tpo-desc{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text2);margin:.5rem 0}
 .tpo-opts{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.5rem}
 .tpo-o{border:1px solid var(--line2);border-radius:var(--radius);padding:.625rem .75rem;display:flex;flex-direction:column;gap:.375rem;background:var(--bg2)}
@@ -203,3 +203,18 @@ button.cyd:hover{background:var(--bg2)}
   .calbar.cbm .calmore{order:2}
   .calbar.cbm .evnew{display:none}
 }
+/* 2.884.0 (#5469): keyboard focus, finger targets (44 px through ::after like .ib), the draw-length handle, tidy-ups */
+.cal .cev:focus-visible,.week .cev:focus-visible,.wcev:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* the all-day chips of the week are buttons now: at least 24 px high (WCAG 2.5.8, axe target-size in p2210_ui) */
+.week .wad .cev{min-height:1.5rem}
+.rrwd{display:flex}
+.agdate{font-weight:400;font-size:var(--fs-m)}
+.agnone{padding:.5rem .25rem}
+.cswatch,.calvis,.cpal button,.cal .more{position:relative}
+@media (pointer:coarse){
+  .cal .cev,.week .cev,.wcev,.cswatch,.calvis,.cpal button,button.cyd,.cal .more{position:relative}
+  .cal .cev::after,.week .cev::after,.cswatch::after,.calvis::after,.cpal button::after,button.cyd::after,.cal .more::after{content:'';position:absolute;left:50%;top:50%;right:auto;bottom:auto;width:max(100%,2.75rem);height:max(100%,2.75rem);transform:translate(-50%,-50%)}
+  .wcev::before{content:'';position:absolute;left:0;right:0;top:100%;height:.75rem}
+  .wcev.cgok::after{opacity:.7;height:.25rem;bottom:2px;left:30%;right:30%}
+}
+:root{--qr-bg:#fff}

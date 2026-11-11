@@ -1,83 +1,144 @@
-"""2.809.0 (#5476): undo across devices -- the household budget's entries in the core's step groups (core/undoareas.py).
+"""2.809.0 (#5476) / 2.985.0 (#5394): undo across devices -- budget entries in the core's step groups (core/undoareas.py).
 
-A budget entry (table budget_entries) is the tracked kind "budget_entry" (obj_track): a change (PATCH
-/api/budget/entries/<id>), putting it into the trash (DELETE) and taking it out (POST .../restore) record a snap step of the
-person under the entry's lock (budget_entries-<id>, budget.py _ccf_lock), labelled with its title (a value sealed at rest:
-its number). The copy holds the encrypted columns with their space (sid), so they go back together; a key rotation since
-rewrote the row (changed since: 409). Its link to a recurring entry (recurring_id, rmonth, trash_rec_id) is never written
-back from the copy -- a month booked again meanwhile would collide; coming out of / going into the trash links / unlinks it
-the area's way (entry_restore / entry_delete). Taking back with the rules of today (core/undoweb.py): the budget module on,
-the right to change the budget list (bud_need_list), never an agent.
+A budget entry (table budget_entries) is the tracked kind "budget_entry" (core/writes.py obj_track): a change (PATCH
+/api/budget/entries/<id>), putting it into the trash and taking it out record a snap step of the person under the entry's
+lock (budget_entries-<id>, life/budget.py _ccf_lock), labelled with its title when it is plain, else with its day (a sealed
+title never goes into a label). The copy holds the row AS STORED: the amount, title, note and counterpart sealed with the key
+of the list's space (sid, core/orgcrypt.py), nothing decrypted.
 
-Interface:
-  bdu_pre(c, uid, eid, what=None)   after the route's checks are possible: rights, lock, the step ("delete" | "restore")
-  bdu_post(c) -> group id | None    right before the commit"""
+The lock per list space (decision of 08.11.2026): a copy is only written back with the key it was sealed with. undo_spaces
+(core/writes.py _undo_rekeyed) refuses a step (409, "the key of its space was changed") when
+  - the copy's space (sid) is no longer the one of the entry's list now (the list moved into another space, the encryption
+    was switched on or off: the rows were resealed meanwhile), or
+  - the key of that space was rotated after the step or a rotation runs now (an organisation's key, admin/orgcrypt_cli.py);
+    an account's own key is never rotated.
+That is checked before the fingerprint, so the answer names the key change.
+
+Taking back (core/undoweb.py): the person needs the right to change the list NOW (bud_need_list write; agents and tokens
+without "private" never see a budget). The template link (recurring_id / trash_rec_id), the month it books (rmonth), its
+source and import marks stay as they are (undo_keep): coming out of the trash runs the entry's own restore (entry_restore:
+the template month again unless it was booked since), going into it the entry's own delete (entry_delete); a day moved back
+into another month of a booked template keeps the link only while that month is free (409 otherwise, as the PATCH).
+The receipts (budget_files) are not part of the copy."""
+from ..core import orgcrypt as oc
 from ..core.access import live_sql
+from ..core.db import IntegrityError
 from ..core.errors import Denied
-from ..core.objhooks import GONE
-from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_done, ua_plain, ua_pre
+from ..core.i18n import N_, tr
+from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_done, ua_plain, ua_pre, ua_trash_fix
 from ..core.undogroups import UG_LABEL
-from ..core.undoweb import undo_need_reg
-from ..core.writes import obj_track
-from .budget import _booked, _ccf_lock, bud_need_list, bud_need_on
+from ..core.undoweb import UG_GONE, undo_need_reg
+from ..core.objhooks import GONE
+from ..core.writes import UNDO_SPACE_REKEYED, obj_track, obj_undo_forget
+from .budget import _booked, _ccf_lock, bud_need_list, bud_need_on, bud_sid, entry_delete, entry_restore
 
 BDU_KIND = "budget_entry"
+BDU_ENTRY = N_("Budget entry of {0}")
+BDU_REKEYED = UNDO_SPACE_REKEYED  # the same answer as a rotation of that space's key (core/writes.py)
+BDU_BOOKED = N_("This item is already booked in this month")  # the key exists (life/budget.py)
+BDU_SEALED = N_("The list was encrypted since then, so it cannot be undone")  # 2.985.0 (#5394, review F7): a plain copy
+BDU_KEEP = {"budget_entries": {"list_id", "recurring_id", "trash_rec_id", "rmonth", "source", "import_run", "rkeys", "ikey",
+                               "created_by", "created_at", "trash_cat_id"}}  # 2.809.0 (#5476): created_at, trash_cat_id
+BDU_NOFP = {"budget_entries": {"recurring_id", "rmonth", "trash_rec_id"}}  # 2.809.0 (#5476): the link is not "changed since"
 BDU_WHAT = {"delete": UA_DELETED, "restore": UA_RESTORED}
 
 
+def bdu_name(r):
+    """A label value: the plain title, else [the entry of its day] (a sealed title never)."""
+    r = dict(r) if r is not None else {}
+    t = ua_plain(r.get("title"), r.get("id"))
+    return [BDU_ENTRY, str(r.get("day") or "")] if t.startswith("#") else t
+
+
 def bdu_label(r):
-    return UG_LABEL, [ua_plain(r.get("title"), r.get("id"))]
+    return UG_LABEL, [bdu_name(r)]
 
 
-obj_track(BDU_KIND, "budget_entries", area="budget",
-          undo_keep={"budget_entries": {"list_id", "created_at", "created_by", "recurring_id", "rmonth", "trash_rec_id",
-                                         "trash_cat_id", "source", "import_run", "ikey", "rkeys"}},
-          undo_nofp={"budget_entries": {"recurring_id", "rmonth", "trash_rec_id"}}, undo_label=bdu_label,
-          undo_free=("deleted_at", "deleted_by"))
-GONE[BDU_KIND] = "budget_entries"
+def bdu_spaces(c, snap):
+    """The spaces whose keys sealed the copy (core/writes.py undo_spaces); 409 when one is not its list's space now. Checked
+    before anything is written back, so also: the copy's category must still exist (deleted for good since = 409, never a
+    broken reference)."""
+    out = []
+    for r in (snap or {}).get("budget_entries") or []:
+        sid = int(r.get("sid") or 0)
+        now = bud_sid(c, r["list_id"])
+        if sid != now:  # review F7: a plain copy of a list that is sealed now says so
+            raise Denied(409, tr(BDU_SEALED if not sid and now else BDU_REKEYED))
+        # review F7: a category in the trash counts as gone too (never written back onto a deleted one)
+        if r.get("cat_id") and not c.execute(f"SELECT 1 FROM budget_cats WHERE id=? AND {live_sql()}", (int(r["cat_id"]),)).fetchone():
+            raise Denied(409, tr(UG_GONE))
+        if sid:
+            out.append(sid)
+    return out
+
+
+obj_track(BDU_KIND, "budget_entries", area="budget", undo_keep=BDU_KEEP, undo_nofp=BDU_NOFP, undo_label=bdu_label,
+          undo_free=("deleted_at", "deleted_by"), undo_spaces=bdu_spaces, hist_skip=oc.FIELDS["budget_entries"] + ("dkey", "sid"))
+GONE[BDU_KIND] = "budget_entries"  # an account's deletion takes its history / undo rows of the entries that went (core/objhooks.py)
 
 
 def bdu_pre(c, uid, eid, what=None):
-    """The step before the route's write; nothing when the entry is not there (the route answers 404 then)."""
+    """The person's step before the route's write of entry eid; what = delete | restore names it so. 2.809.0 (#5476) calls it
+    from the routes (life/budget_web.py): the rights and the entry's lock first, as its writes; nothing when the entry is not
+    there (the route answers 404 then)."""
     try:
         eid = int(eid)
     except (TypeError, ValueError):
         return
-    r = c.execute("SELECT list_id, title FROM budget_entries WHERE id=?", (eid,)).fetchone()
+    r = c.execute("SELECT id, list_id, title, day, sid FROM budget_entries WHERE id=?", (eid,)).fetchone()
     if r is None:
         return
+    from flask import g, has_request_context
+    if has_request_context():  # 2.985.0 (#5394, review F2): the space that sealed the copy (bdu_post compares)
+        g.bdu_sid = (eid, int(r["sid"] or 0))
     bud_need_on(c, uid)
     bud_need_list(c, uid, r["list_id"], True)
     _ccf_lock(c, "budget_entries", eid)  # first the area's lock, then the row's (obj_undo_pre), as its writes
     key = BDU_WHAT.get(what or "")
-    ua_pre(c, uid, BDU_KIND, eid, *((key, ua_plain(r["title"], eid)) if key else ()))
+    if key:
+        ua_pre(c, uid, BDU_KIND, eid, key, bdu_name(r))
+    else:
+        ua_pre(c, uid, BDU_KIND, eid)
 
 
 def bdu_post(c):
+    """-> the request's group id when the step stayed (ua_done: a save of the same values leaves none), else None.
+    2.985.0 (#5394, review F2): the write sealed the entry with another space's key than the copy (the encryption switched on or
+    the list moved before bud_settle reached the row): the step goes, and with it every older copy and the history of the
+    entry (obj_undo_forget) - bud_settle finds nothing left to reseal, so a plain copy would otherwise stay up to 30 days."""
+    from flask import g, has_request_context
+    was = g.pop("bdu_sid", None) if has_request_context() else None
+    if was:
+        now = c.execute("SELECT sid FROM budget_entries WHERE id=?", (was[0],)).fetchone()
+        if now is not None and int(now["sid"] or 0) != was[1]:
+            ua_done(c, drop=True)
+            obj_undo_forget(c, BDU_KIND, [was[0]])
+            return None
     return ua_done(c)
 
 
 def bdu_need(c, uid, rid, oid):
-    bud_need_on(c, uid)
-    was = c.execute("SELECT * FROM budget_entries WHERE id=?", (int(rid),)).fetchone()
-    if was is None:
+    """Who may take an entry's step back now (module docstring)."""
+    r = c.execute("SELECT * FROM budget_entries WHERE id=?", (int(rid),)).fetchone()
+    if r is None:
         raise Denied(404)
-    bud_need_list(c, uid, was["list_id"], True)
+    bud_need_on(c, uid)
+    bud_need_list(c, uid, r["list_id"], True)
+    trash = ua_trash_fix("budget_entries", rid, r["deleted_at"], lambda c, x: entry_restore(c, uid, x["id"]),
+                         lambda c, x: entry_delete(c, uid, x["id"]), cols=("deleted_at", "deleted_by"))
 
     def fix(c):
-        now = c.execute("SELECT * FROM budget_entries WHERE id=?", (int(rid),)).fetchone()
-        if bool(now["deleted_at"]) == bool(was["deleted_at"]):
-            return
-        if now["deleted_at"]:  # into the trash again: its booked month is free (entry_delete)
-            c.execute("UPDATE budget_entries SET trash_rec_id=COALESCE(recurring_id, trash_rec_id), recurring_id=NULL WHERE id=?", (int(rid),))
-            return
-        rec = now["trash_rec_id"]  # out of the trash: the link back while its month is free (entry_restore)
-        if rec and c.execute(f"SELECT 1 FROM budget_recurring WHERE id=? AND {live_sql()}", (rec,)).fetchone():
-            if now["rmonth"] and not _booked(c, rec, now["rmonth"]):
-                c.execute("UPDATE budget_entries SET recurring_id=?, trash_rec_id=NULL WHERE id=?", (rec, int(rid)))
-            else:
-                c.execute("UPDATE budget_entries SET trash_rec_id=NULL, rmonth='' WHERE id=?", (int(rid),))
-    return {"fix": fix, "lock": f"budget_entries-{int(rid)}"}
+        trash(c)
+        n = c.execute("SELECT id, day, recurring_id, rmonth, deleted_at FROM budget_entries WHERE id=?", (int(rid),)).fetchone()
+        if n["recurring_id"] and not n["deleted_at"] and n["rmonth"] != str(n["day"])[:7]:
+            if _booked(c, n["recurring_id"], str(n["day"])[:7], but=n["id"]):
+                raise Denied(409, tr(BDU_BOOKED))
+            try:  # review F8: a parallel booking of that month between the check and the write (unique index), as entry_update
+                with c.savepoint():
+                    c.execute("UPDATE budget_entries SET rmonth=? WHERE id=?", (str(n["day"])[:7], n["id"]))
+            except IntegrityError:
+                raise Denied(409, tr(BDU_BOOKED)) from None
+    return {"fix": fix, "lock": f"budget_entries-{int(rid)}"}  # life/budget.py _ccf_lock
 
 
 undo_need_reg(BDU_KIND, bdu_need)

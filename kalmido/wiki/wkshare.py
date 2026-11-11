@@ -44,6 +44,7 @@ from ..core.db import body, bump, db, iso, local_day, local_now, now_utc
 from ..core.pg import insert_id, system_ctx
 from ..core.kernretire import kern_retire_due, kern_retire_rows  # 2.937.0 (#5244): stage 7c at the start (wsh_retire)
 from ..core.access import Denied, acx_anon_bind, live_sql
+from ..core.access import addr_account  # 2.983.0 (#5643)
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..collab.comments import user_names
 from ..core.errors import BadInput
@@ -326,7 +327,8 @@ def wsh_end(c, uid, fid, reason="unshare"):
     if k is not None and k["pair_id"]:
         pn = _wsh_node(c, k["pair_id"])
         if pn is not None:
-            pair = obj_node_unshare(c, uid, pn, k["pair_id"], kind="wiki", ref_id=pn["ref_id"] if pn["kind"] == "ref" else None, reason=reason)
+            pair = obj_node_unshare(c, uid, pn, k["pair_id"], kind="wiki", ref_id=pn["ref_id"] if pn["kind"] == "ref" else None,
+                                    org=pn["org_id"] or None, reason=reason)  # 2.969.0 (#5644): the pair's row names its space too
     rv = obj_node_unshare(c, uid, n, fid, kind="wiki", ref_id=n["ref_id"] if n["kind"] == "ref" else None, org=n["org_id"] or None, reason=reason)
     if rv:  # Fable F2: a share without a card (listed as a page share) gets an empty one, so its Undo works the same way
         x = c.execute("SELECT row_json FROM obj_revoked WHERE id=?", (rv,)).fetchone()
@@ -616,9 +618,8 @@ def wsh_person(c, uid, b):
     """The person of {user_id} (404 when unknown / not visible / an agent / oneself) or {email} (None when there is no such
     person: the answer must not reveal it)."""
     if b.get("email") and not b.get("user_id"):
-        em = str(b["email"]).strip().lower()[:200]
-        r = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'", (em,)).fetchone()
-        return r[0] if r and r[0] != uid else None
+        r = addr_account(c, b["email"])  # 2.983.0 (#5643): an address nobody proved is answered like an unknown one
+        return r if r and r != uid else None
     try:
         who = int(b.get("user_id") or 0)
     except (TypeError, ValueError):
@@ -699,11 +700,11 @@ def wsh_restore(sid):
         rv = wsh_revoked(c, n)
         k = json.loads(rv["row_json"]).get("wiki_card") or {}
         from ..core.objects import obj_node_reshare
-        back = obj_node_reshare(c, rv["id"])
+        back = obj_node_reshare(c, rv["id"], owner=uid, org=None)  # 2.969.0 (#5644): the node must still be uid's private one
         if back is None:  # the person has a share of that node again (or the node went): nothing to bring back
             c.commit()
             raise Denied(409, tr("Already shared"))
-        pair = obj_node_reshare(c, k["pair"]) if k.get("pair") else None
+        pair = obj_node_reshare(c, k["pair"], owner=uid, org=None) if k.get("pair") else None  # #5644: the pair too (else 409, all rolled back)
         c.execute("INSERT INTO wiki_share_cards(fs_share_id,folder,pair_id,images,email) VALUES(?,?,?,?,?) ON CONFLICT (fs_share_id) DO NOTHING",
                   (n, bool(k.get("folder")), pair[0] if pair else None, bool(k.get("images")), k.get("email") or ""))
         bump(c)

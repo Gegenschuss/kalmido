@@ -108,7 +108,7 @@ const FEAT = 'cal,comments,collab,agents';
     await ev(`(() => { document.querySelector('.modal [data-m="people"]').click(); return 1; })()`);
     await ready(ev, `!!document.querySelector('.modal.fshmodal')`);
     const pp = await ev(`(() => { const ms = [...document.querySelectorAll('.modal')]; const props = ms.find(x => x.querySelector('#fs-am')); return {n: ms.length, hidden: props && getComputedStyle(props).display === 'none', back: document.querySelector('.modal.fshmodal .foot .btn.pri')?.textContent.trim()}; })()`);
-    check(pp.n === 2 && pp.hidden && pp.back === 'Back', '#1158: the Share dialog opens over the folder dialog with Back ' + JSON.stringify(pp));
+    check(pp.n === 2 && pp.hidden && pp.back === 'Done', '#1158: the Share dialog opens over the folder dialog with Done (2.913.0, #5587: was Back) ' + JSON.stringify(pp));
     await ev(`(() => { document.querySelector('.modal.fshmodal .foot .btn.pri').click(); return 1; })()`);
     await ready(ev, `!document.querySelector('.modal.fshmodal')`);
     const bk = await ev(`(() => { const p = document.querySelector('.modal #fs-am')?.closest('.modal'); return {there: !!p, shown: p && getComputedStyle(p).display !== 'none', am: p && p.querySelector('#fs-am').checked}; })()`);

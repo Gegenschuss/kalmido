@@ -26,13 +26,13 @@ from ..core.config import app, ATT_DIR, MAX_FILE_MB
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc
 from ..core.i18n import N_, tr
 from ..core.access import Denied, live_sql, trash_sql
-from ..core.pg import IntegrityError, system_ctx
+from ..core.pg import IntegrityError, system_ctx, write_lock
 from ..core.objhooks import REVOKE  # 2.953 (#3348): fsl_user_purge
 from ..accounts.session import me
 from ..collab.comments import user_names
 from ..collab.e2e import e2e_blob, e2e_keys_of, e2e_reauth
 from ..collab.liste2e import LE2EDenied, le2e_is_cipher, le2e_parse, le2e_writer_ok
-from .store import (fs_chain, fs_deleted, fs_log_add, fs_read, fs_role, fs_space, fs_subtree, fs_version_row, need_node, safe_fs_name,
+from .store import (fs_chain, fs_deleted, fs_log_add, fs_read, fs_role, fs_roles_many, fs_space, fs_subtree, fs_version_row, need_node, safe_fs_name,
                     _free_name, _mime_of, _store_version, _now, DEPTH_MAX)
 from .fsroots import fs_area_of
 from .web import _items, _move, fs_node_json, fs_web_expect
@@ -133,16 +133,31 @@ def fsl_need_reach(c, chain):
         raise Denied(404)
 
 
-def fsl_hold(c, ids, shared=True):
+FSL_LOCK_CLASS = 21022  # 2.970 (#5653, review N-f): the first key of fsl_hold's two-key advisory locks -- a key space of its own
+# next to write_lock's one-key hashtext locks (core/pg.py), admin/worker.py (21020) and core/ephem.py (21021)
+
+
+def fsl_hold(c, ids, shared=True, excl=()):
     """2.953 (#3348, review N11): the switch of a locked folder and the writes into it exclude each other until the transaction
     ends -- a plain write below a folder (shared, on every folder of its chain) is either committed before the folder starts to
     lock (the browser then converts it) or sees the lock; a write into a locked folder finishes before its switch ends (finish,
-    stop, rotate: exclusive on the folder) or sees the new state. Shared holders never wait for each other."""
-    ids = [int(i) for i in ids if i]
-    if not ids:
+    stop, rotate: exclusive on the folder) or sees the new state. Shared holders never wait for each other.
+    2.970 (#5653): excl -- ids held exclusively in the same call (an id in both: exclusive). All of one call are taken in the order
+    of their ids (review N-e: two callers holding overlapping sets in another order never wait for each other in a circle), in a
+    key space of their own (review N-f: no needless wait behind an unrelated write_lock)."""
+    want = {int(i): shared for i in ids if i}
+    want.update({int(i): False for i in excl if i})
+    if not want:
         return
-    fn = "pg_advisory_xact_lock_shared" if shared else "pg_advisory_xact_lock"
-    c.execute(f"SELECT {fn}(hashtext('fsl:' || v)) FROM (VALUES {','.join(['(?)'] * len(ids))}) t(v)", [str(i) for i in ids]).fetchall()
+    order = sorted(want)
+    c.execute("SELECT CASE WHEN t.s THEN pg_advisory_xact_lock_shared(?::int, t.k::int) ELSE pg_advisory_xact_lock(?::int, t.k::int) END "
+              f"FROM (VALUES {','.join(['(?::bigint, ?::boolean, ?::int)'] * len(order))}) t(k, s, o) ORDER BY t.o",
+              [FSL_LOCK_CLASS, FSL_LOCK_CLASS] + [x for o, i in enumerate(order) for x in (i % 2147483648, want[i], o)]).fetchall()
+
+
+def fsl_chain_ids(c, nid):
+    """The ids of node nid and every folder above it ([] for None: the top of a space)."""
+    return [r["id"] for r in fs_chain(c, nid)] if nid else []
 
 
 def fsl_need_plain(c, parent_id):
@@ -157,8 +172,13 @@ def fsl_need_plain(c, parent_id):
 
 
 def fsl_need_unlocked(c, nid, code="fs_locked"):
-    """The node lies in no locked folder (else 409 code)."""
-    if fsl_of(c, nid) is not None:
+    """The node lies in no locked folder (else 409 code). 2.970 (#5653, review N-b): held on its chain like fsl_need_plain -- a
+    plain write on it (a new version, tags, a page of a document) is committed before a folder above starts to lock or sees it."""
+    if not nid:
+        return
+    chain = fs_chain(c, nid)
+    fsl_hold(c, [r["id"] for r in chain])
+    if fsl_of_chain(c, chain) is not None:
         raise fsl_denied(code)
 
 
@@ -175,8 +195,10 @@ def fsl_move_guard(c, n, tid):
     """files/web.py _move: node n moves into folder tid (None: the top). Inside one locked folder: fine (same key). Across its
     border (in, out, from one to another): 409 fs_locked_move (the browser re-encrypts through /api/files/lock/move). A
     locked folder never moves into another one (409 fs_locked_nest)."""
-    if tid:
-        fsl_hold(c, [r["id"] for r in fs_chain(c, tid)])  # 2.953 (#3348, review N11): as fsl_need_plain
+    # 2.953 (#3348, review N11): as fsl_need_plain; 2.970 (#5653, review N-b / N-e): the node's own chain too (it does not leave
+    # a folder starting to lock at this moment), both in one call (one order of the ids)
+    # (from the row: the undo has put parent_id back already, fsundo._target)
+    fsl_hold(c, [n["id"]] + fsl_chain_ids(c, n["parent_id"]) + fsl_chain_ids(c, tid))
     if not _fsl_any(c):
         return
     lt = fsl_of(c, tid) if tid else None
@@ -410,11 +432,18 @@ def _fsl_replace(c, n, data, mime, gen, uid, made=None):
     return old
 
 
-def _fsl_rekey(c, n, data, uid, made):
+def _fsl_rekey(c, n, data, uid, made, base=None):
     """2.953 (#3348): the current version of encrypted file row n in the new generation: stored as the next version, the version
     it replaces goes; the earlier versions stay in their generation (the people keeping the folder keep those keys; who lost access
-    could read them before). -> the stored file to unlink after the commit."""
-    old = c.execute("SELECT no, path FROM fs_versions WHERE node_id=? AND no=?", (n["id"], n["cur_version"])).fetchone()
+    could read them before). -> the stored file to unlink after the commit.
+    2.970 (#5653, review N-g): only while the current version is still the one the browser encrypted again (base, the todo's
+    version; else the one of row n) -- a new version uploaded meanwhile stays the current one: 409 without a code, the browser
+    takes the node again from the next todo (fsl_version keeps its old generation, _fsl_gen_after)."""
+    write_lock(c, f"fs_version:{int(n['id'])}")  # the lock of _store_version: an upload running now is committed first, a later one waits
+    cur = c.execute("SELECT cur_version FROM fs_nodes WHERE id=?", (n["id"],)).fetchone()[0]
+    if cur != n["cur_version"] or cur != base:  # Fable review 2.970: required (an old browser sends none: 409, it loads again)
+        raise Denied(409, tr("Someone saved a newer version meanwhile. Reload to see it."))
+    old = c.execute("SELECT no, path FROM fs_versions WHERE node_id=? AND no=?", (n["id"], cur)).fetchone()
     no = _store_version(c, n["id"], fs_space(n["org_id"], n["owner_id"]), data, FSL_MIME, uid)
     made.append(c.execute("SELECT path FROM fs_versions WHERE node_id=? AND no=?", (n["id"], no)).fetchone()[0])
     if not old:
@@ -515,7 +544,12 @@ def fsl_start(nid):
     c = db()
     b = body()
     uid, n = _fsl_folder(c, nid, manage=True)
-    fsl_hold(c, [nid], shared=False)  # 2.953 (#3348, review N11): plain writes below it finish first (they are converted then)
+    # 2.953 (#3348, review N11): plain writes below it finish first (they are converted then). 2.970 (#5653, review N-c): exclusive
+    # on the folders above too -- a start on a folder above or below at this moment waits and then sees this lock (_fsl_start_block)
+    up = fsl_chain_ids(c, nid)
+    fsl_hold(c, [], excl=up)
+    if fsl_chain_ids(c, nid) != up:  # Fable review 2.970: moved meanwhile -- the folders held are not its chain any more
+        return err(tr("The folders changed meanwhile. Try again."), 409)
     lk = fsl_row(c, nid)
     if lk and lk["e2e"]:
         return err(tr("The folder is already locked."), 409)
@@ -674,7 +708,7 @@ def fsl_convert(nid, fid):
                 if not f:
                     raise ValueError(tr("File missing"))
                 if mode == "on":  # 2.953 (#3348): the new key -- only the current version is encrypted again, the earlier ones stay
-                    gone = _fsl_rekey(c, n, _fsl_data(f, gen), uid, made)
+                    gone = _fsl_rekey(c, n, _fsl_data(f, gen), uid, made, request.form.get("version", type=int))
                 else:
                     gone = _fsl_replace(c, n, _fsl_data(f, gen), FSL_MIME, gen, uid, made)
                 c.execute("UPDATE fs_nodes SET mime=? WHERE id=?", (FSL_MIME, fid))
@@ -1006,6 +1040,10 @@ def fsl_movecheck(fid):
         f"WITH RECURSIVE dn(id, lvl) AS (SELECT id, 0 FROM fs_nodes WHERE parent_id=? AND {live_sql()} UNION ALL "
         f"SELECT x.id, dn.lvl + 1 FROM fs_nodes x JOIN dn ON x.parent_id=dn.id WHERE {live_sql('x')} AND dn.lvl < {DEPTH_MAX * 2}) "
         "SELECT id FROM dn", (fid,))]
+    # 2.970 (#5653, review N-h): the count names only the nodes the person sees (their own role on each); the reasons below stay
+    # over the whole subtree -- they are about what may enter a locked folder, a generic message, no name of a hidden node
+    roles = fs_roles_many(c, ids, me()) if ids else {}
+    seen = [i for i in ids if roles.get(i, (False, None))[1]]
     block = None
     if fsl_subtree_locked(c, fid):
         block = tr(FSL_MSG["fs_locked_nest"])
@@ -1013,7 +1051,7 @@ def fsl_movecheck(fid):
         block = tr(FSL_MSG["fs_locked_busy"])
     elif lt and (ls["node_id"] if ls else None) != lt["node_id"]:
         block = _fsl_inner_block(c, [fid, *ids])
-    return jsonify(block=block, count=len(ids))
+    return jsonify(block=block, count=len(seen))
 
 
 def fsl_restore_version(c, n, no):
@@ -1039,9 +1077,9 @@ def fsl_move(fid):
     tid = request.form.get("parent_id", type=int) or None
     if tid:
         need_node(c, tid)  # 2.353.0 F (#2758, review N4): a folder the person does not see: 404 before anything about its lock
-    fsl_hold(c, [r["id"] for r in fs_chain(c, n["parent_id"])] if n["parent_id"] else [])  # 2.953 (#3348, review N11)
-    fsl_hold(c, [r["id"] for r in fs_chain(c, tid)] if tid else [])
-    fsl_hold(c, [fid], shared=False)  # Fable review N-a: no write into this node (a folder) while it crosses the border
+    # 2.953 (#3348, review N11) both chains shared; Fable review N-a: this node (a folder) exclusively -- no write into it while it
+    # crosses the border. 2.970 (#5653, review N-e): in ONE call, ordered by id (two moves the other way round wait, not in a circle)
+    fsl_hold(c, fsl_chain_ids(c, n["parent_id"]) + fsl_chain_ids(c, tid), excl=[fid])
     ls = fsl_of(c, n["parent_id"]) if n["parent_id"] else None
     lt = fsl_of(c, tid) if tid else None
     if (ls["node_id"] if ls else None) == (lt["node_id"] if lt else None):

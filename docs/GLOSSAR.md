@@ -71,6 +71,7 @@ People and organisations: sign-in, sessions, workspaces, roles, invitations, per
 - `kalmido/accounts/settings.py` (`push`) - Per-user settings, the data export and Web Push subscriptions
 - `kalmido/accounts/setupcode.py` (`sh`) - One-time code for the first setup
 - `kalmido/accounts/sharedefs.py` (`sd`) - The sharing defaults of a workspace
+- `kalmido/accounts/setundo.py` (`su`) - Undo across devices, stage 6 rest -- a person's settings in the core's step groups (core/undoareas.py)
 - `kalmido/accounts/sideviews.py` - Saved views of the sidebar ("On the road", "Planning")
 - `kalmido/accounts/signup.py` (`signup`) - Self-registration on the login page and sign-in links / QR codes for family members without e-mail
 - `kalmido/accounts/spacemove.py` (`smv`) - The shared rules for moving data between the private space and an organisation (both ways)
@@ -408,6 +409,7 @@ The mail hub: filed e-mails, mailboxes and rules, absences, holidays and dispatc
 - `kalmido/hub/agentdispo.py` (`adz`) - Shoot planning by an agent
 - `kalmido/hub/callsheet.py` (`cs`) - The call sheet of a shoot day (Film & Video): day details per disposition job, saved sealed, and the PDF for everybody on the day
 - `kalmido/hub/dispo.py` (`dsp`) - Resources and disposition -- booking crew and equipment for shoot days, seeing who and what is free per day, spotting double bookings
+- `kalmido/hub/dspkern.py` (`dsk`) - The disposition on the shared core: the shoot day (light kind) and its call sheet (kind with history, undo and trash)
 - `kalmido/hub/dspundo.py` - Undo across devices for dispatch bookings (one part per booking, delete and restore)
 - `kalmido/hub/hmv1.py` (`hmv`) - The filed e-mails in the REST API v1 + MCP
 - `kalmido/hub/holidays.py` (`hol`) - 2.461 public holidays per country
@@ -449,7 +451,7 @@ Home & life: bookmarks, household budget, feeds (RSS), reading list, trips.
 - `kalmido/life/bookmarks.py` (`bm`) - Bookmarks -- links with a preview (title, description, picture)
 - `kalmido/life/budget.py` (`bud`) - The household budget of "At home"
 - `kalmido/life/budget_web.py` (`budget`) - The household budget -- the web API (the model is life/budget.py)
-- `kalmido/life/budundo.py` - Undo across devices for household budget entries (change, trash, restore)
+- `kalmido/life/budundo.py` (`bdu`) - Undo across devices -- budget entries in the core's step groups (core/undoareas.py)
 - `kalmido/life/devlink.py` (`dl`) - A private device <-> a piece of office equipment
 - `kalmido/life/karakeep.py` (`kk`) - Home & life: "Read later" from Karakeep (a person's own connection: bookmarks -> tasks of a reading list, archive back)
 - `kalmido/life/lfkern.py` - Bookmarks and feeds on the one trash of the core (kinds bookmark_link / rss_feed, no routes, node or listing)

@@ -17,6 +17,9 @@ security); participants and the task visibility (tvis) stay the area's own. What
   project role through a group, lists/groups.py grp_org_limited)
 - the history of a project's settings (PATCH /api/lists/<id>: columns, col_sums, kpis, props, ticket_tpl, agent_members) in
   obj_history (lmc_history; GET /api/lists/<id>/history)
+- 2.936.0 (#5364): the trash period of a project in the trash (lists/listtrash.py) is the core's retention run
+  (obj_trash_tick: trash_prune, trash_keep=otr_keep, obj_on_purge hook otr_core_purge, 50 per run); its trash, restore and
+  delete stay the routes of listtrash.py
 The rule "one agent per project" stays the area's (core/access.py list_other_agent, checked by member_set).
 
 Interface:
@@ -40,11 +43,13 @@ from ..core.i18n import N_, tr
 from ..core.objects import obj_register, obj_share, obj_share_restore, obj_shares, obj_unshare
 from ..core.pg import system_ctx
 from ..core.writes import obj_history, obj_history_add
+from ..core.writes import obj_on_purge  # 2.936.0 (#5364)
 from ..api.common import v1_call
 from .groups import grp_list_ids, grp_of_user, grp_sync
 from .lffolder import lf_own_stale, lf_place
 from ..core.objhooks import SETTLE
 from .lists import member_set
+from .listtrash import otr_core_purge, otr_keep  # 2.936.0 (#5364): the kind list's retention hooks
 
 LMC_KIND = "list"
 LMC_HIST = ("columns", "col_sums", "kpis", "props", "ticket_tpl", "agent_members")  # the settings with a history
@@ -211,7 +216,11 @@ def lmc_history(c, uid, lid, before, after):
 
 obj_register(LMC_KIND, "lists", label=N_("Project"), fields={}, open_url=lambda lid: f"list/{int(lid)}", title=_title,
              base_role=_base, visible=_visible, area="tasks", routes=False, fsref=False, share_cols=("list_role", "list_own"),
-             on_restore=_on_restore, on_revoke=_on_revoke, list_col="id")
+             on_restore=_on_restore, on_revoke=_on_revoke, list_col="id",
+             # 2.936.0 (#5364): the projects' trash period runs in the core's retention run (lists/listtrash.py); 50 per run:
+             # a project goes with all its tasks and files (2.817.0 review F4)
+             trash_prune=True, trash_keep=otr_keep, trash_batch=50)
+obj_on_purge(LMC_KIND, otr_core_purge)  # 2.936.0 (#5364)
 
 
 @app.get("/api/lists/<int:lid>/shares")

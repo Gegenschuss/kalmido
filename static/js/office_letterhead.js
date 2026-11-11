@@ -8,6 +8,8 @@ async function bp_load() {
   try { const j = await api('GET', '/api/office/letterhead'); BPL.st = j.letterhead; } catch { BPL.st = BPL.st || {on: false}; }
   bp_draw();
 }
+// 2.979.0 (#5667): an undo / redo the server did: the shown letterhead section comes again, else it reads again when it is drawn (oid)
+histReloader('letterhead', () => { if (!BPL.st) return; if ($('#bpset')) return bp_load(); BPL.oid = -1; });
 // 2.469.0 (#3352): "The letterhead is A4 ..." when its page format is not the chosen paper size (no blocking, no converting); '' when fine or unknown
 function bp_paperHint(paper) {
   const f = BPL.st?.on ? BPL.st.paper : '', p = paper === 'letter' ? 'letter' : 'a4';

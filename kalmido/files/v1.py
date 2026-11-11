@@ -24,6 +24,7 @@ from .store import (fs_chain, fs_log_add, fs_mail_rows, fs_new_version, fs_put, 
 from .fsroots import fs_area_folder_name, fs_area_of  # 2.200.0 A (#2747, review 6)
 from .fsref import fs_ref_content  # 2.199.0 A (#2742)
 from .fstags import DT_HITS, dt_attach, dt_where  # 2.443.0 (#2338)
+from .fslock import fsl_chain_ids, fsl_hold  # 2.970 (#5653)
 from .web import fs_agent_folder, fs_node_json, _crumbs, _items, _send, _versions
 from ..tasks.attachtext import text_of_bytes  # 2.369.5 (#2517): pulled up from functions
 from ..core.db import insert_id  # 2.369.5 (#2517): pulled up from functions
@@ -270,6 +271,7 @@ def fs_version_check(c, nid, b):
         return
     if isinstance(ev, bool) or not isinstance(ev, int):
         raise BadInput(tr("Invalid value: {0}", "expect_version"))
+    fsl_hold(c, fsl_chain_ids(c, nid))  # 2.970 (#5653, Fable review): first the locked folders' locks, then the version's (one order)
     write_lock(c, f"fs_version:{int(nid)}")  # the same lock as the new number (the check and the write see no upload between)
     if c.execute("SELECT cur_version FROM fs_nodes WHERE id=?", (nid,)).fetchone()[0] != ev:
         raise Conflict("current", _v1_node(c, need_node(c, nid)))

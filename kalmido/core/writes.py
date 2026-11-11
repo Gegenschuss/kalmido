@@ -76,6 +76,7 @@ NEED_VERSION = N_("Send expect_updated_at (the updated_at you read): agents chan
 UNDO_CONFLICT = N_("Changed by someone else in the meantime, so it cannot be undone")
 UNDO_MOVED = N_("Moved to another workspace in the meantime, so it cannot be undone")
 UNDO_REKEYED = N_("The organisation's key was changed since then, so it cannot be undone")  # 2.747.0 (#5249, review F1)
+UNDO_SPACE_REKEYED = N_("The key of its space was changed since then, so it cannot be undone")  # 2.985.0 (#5394): obj_track undo_spaces
 UNDO_NOTHING = N_("Nothing to undo")
 PURGE_FIRST = N_("Put it into the trash first")
 UG_TRASHED = N_("Moved to the trash: {0}")  # 2.773.0 (#5292): the label of a trash step (core/undogroups.py)
@@ -88,16 +89,24 @@ MOVE_SHARED = N_("It is shared with people or agents: remove those shares first"
 OBJ_TRACK = {}  # 2.567.0 (#4711): kind -> {table, area, undo_scope, undo_keep, undo_nofp, fields: None} (obj_track)
 
 
-def obj_track(kind, table, *, area="other", undo_scope=None, undo_keep=None, undo_nofp=None, undo_label=None, undo_free=None):
+def obj_track(kind, table, *, area="other", undo_scope=None, undo_keep=None, undo_nofp=None, undo_label=None, undo_free=None,
+              undo_spaces=None, hist_skip=None):
     """2.567.0 (#4711): an old area's kind for the history and the undo only (module docstring). undo_keep / undo_nofp:
     {table: {column}} never written back on undo / never part of the fingerprint (a number drawn since, cached sums).
     2.747.0 (#5252): undo_label(main row as stored) -> (i18n key, [values]) = the label of its step group (obj_undo_pre).
     2.777.0 (#5254): undo_free = columns of UNDO_FIXED the undo writes back on the MAIN row all the same (deleted_at,
-    deleted_by: a step "into the trash" goes back; the area's fix then does what its own restore / trash does besides)."""
+    deleted_by: a step "into the trash" goes back; the area's fix then does what its own restore / trash does besides).
+    2.985.0 (#5394): undo_spaces(c, snap) -> [space ids] whose keys sealed the copy about to be written back (core/orgcrypt.py:
+    an organisation > 0, an account < 0); a rotation of one since the step (or one running) refuses it like the
+    organisation's own (_undo_rekeyed). The function itself raises Denied(409) when the copy's space is not the one its rows
+    belong to now (a list moved into another space, its encryption switched) -- life/budundo.py.
+    2.985.0 (#5394, review F2): hist_skip = main-row columns never written into obj_history by an undo / redo (obj_undo_hist:
+    the sealed columns of a budget entry -- a plain copy there would outlive the encryption)."""
     UG_TRACKED[kind] = table  # 2.747.0 (#5249, review F2): undogroups.py ug_drop_orphans
     OBJ_TRACK[kind] = {"kind": kind, "table": table, "area": area, "undo_scope": undo_scope, "fields": None,
                        "undo_keep": dict(undo_keep or {}), "undo_nofp": dict(undo_nofp or {}), "undo_label": undo_label,
-                       "undo_free": frozenset(undo_free or ())}
+                       "undo_free": frozenset(undo_free or ()), "undo_spaces": undo_spaces,
+                       "hist_skip": frozenset(hist_skip or ())}
     return OBJ_TRACK[kind]
 
 
@@ -389,7 +398,7 @@ def obj_purge_after(keep_locked=False):
     """2.809.0 (#5365): collects the after-commit work of the purges within ({"after": [...], "locked": n}); the caller commits
     and then calls unlink_files(box["after"]). keep_locked: a Denied of an area's hook keeps that object (counted) instead of
     refusing (the retention run)."""
-    box = {"after": [], "locked": 0, "keep": bool(keep_locked)}
+    box = {"after": [], "locked": 0, "err": [], "keep": bool(keep_locked)}  # 2.936.0 (#5364, review): err
     tok = _PURGE_BOX.set(box)
     try:
         yield box
@@ -410,6 +419,14 @@ def _purge_area(c, kind, rid):
         if box is None or not box["keep"]:
             raise
         box["locked"] += 1
+        return False
+    except Exception as e:  # noqa: BLE001 - 2.936.0 (#5364): in the retention run one object that fails (its savepoint undone)
+        # waits for the next run instead of holding every other one back hour after hour; it is no lock -- counted as
+        # <kind>_err with its message, and obj_trash_tick raises after its commit so the watchdog reports it (_wd_section)
+        if box is None or not box["keep"]:
+            raise
+        print("obj purge:", kind, int(rid), "kept for the next run:", type(e).__name__, str(e)[:200], flush=True)
+        box["err"].append(f"{kind} {int(rid)}: {type(e).__name__}")
         return False
     if out and box is not None:
         box["after"] += list(out)
@@ -448,6 +465,12 @@ def _trash_step(c, uid, kind, rid, oid, op):
                  "group_id, mode, bytes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
               (oid, uid, "", kind, int(rid), 1, "done", "{}", "", "", iso(now_utc()), grp["id"], op, 0))
     ug_added(c, grp, 0)
+
+
+def obj_trash_step(c, uid, kind, rid, oid, op):
+    """2.985.0 (#5394): the trash / restore step of an area that puts a core kind into its trash its own way (an address book:
+    contacts/web.py bk_trash); taken back through the area's own way (core/undoweb.py undo_trash_reg). op trash | restore."""
+    _trash_step(c, uid, kind, rid, oid, op)
 
 
 def obj_trash(c, uid, kind, rid, step=True):
@@ -519,19 +542,50 @@ def obj_purge(c, uid, kind, rid):
 OBJ_PRUNE_BATCH = 500  # 2.809.0 (#5365, review): at most so many objects per kind and run (one lock each); the rest next hour
 
 
+def _reg_trash(kind):
+    """2.936.0 (#5364): the registration of a core kind for the retention run -- a kind with a node, or a light kind with
+    trash_prune (its area's obj_on_purge hook deletes it: tasks); Denied(404) for any other light kind."""
+    reg = obj_reg(kind)
+    if not reg.get("node", True) and not reg.get("trash_prune"):
+        raise Denied(404)  # 2.754.0 (#5268): a light kind has no trash of the core
+    return reg
+
+
+def _keep(reg, a):
+    """2.936.0 (#5364): (' AND NOT (...)', args) of the kind's objects the retention run leaves (trash_keep), else ('', ())."""
+    if reg.get("trash_keep") is None:
+        return "", ()
+    sql, args = reg["trash_keep"](a)
+    return f" AND NOT ({sql})", tuple(args)
+
+
 def obj_trash_due(c, kind, cut=None, limit=None):
     """2.773.0 (#5292): the ids of the kind's objects in the trash longer than the trash period (core/retention.py ret_trash_cut).
     2.783.0 (#5368): a side object of core/objparts.py (part_kind trash_prune=True) the same way.
-    2.809.0 (#5365, review): limit = at most so many (the oldest ids first; core kinds only)."""
+    2.809.0 (#5365, review): limit = at most so many (the oldest ids first; core kinds only).
+    2.936.0 (#5364): without the ones its trash_keep leaves (kept by law)."""
     if kind in PART_KINDS and kind not in OBJ:
         with system_ctx(c):
             return part_trash_due(c, kind, cut or ret_trash_cut())
-    reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no trash of the core
+    reg = _reg_trash(kind)
     t = reg["table"]
+    kq, ka = _keep(reg, qi(t, (t,)))
     with system_ctx(c):  # the retention run reads every workspace's trash (ids only, no content)
         lim = f" LIMIT {int(limit)}" if limit else ""
-        return [r[0] for r in c.execute(f"SELECT id FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<? ORDER BY id{lim}",
-                                        (cut or ret_trash_cut(),)).fetchall()]
+        return [r[0] for r in c.execute(f"SELECT id FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<?{kq} ORDER BY id{lim}",
+                                        (cut or ret_trash_cut(), *ka)).fetchall()]
+
+
+def obj_trash_kept(c, kind, cut=None):
+    """2.936.0 (#5364): how many of the kind's objects past the trash period its trash_keep leaves (kept by law); 0 without."""
+    reg = _reg_trash(kind)
+    if reg.get("trash_keep") is None:
+        return 0
+    t = reg["table"]
+    sql, args = reg["trash_keep"](qi(t, (t,)))
+    with system_ctx(c):  # the retention run counts every workspace's kept trash (a number only, no content)
+        return c.execute(f"SELECT COUNT(*) FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<? AND ({sql})",
+                         (cut or ret_trash_cut(), *args)).fetchone()[0]
 
 
 def obj_trash_prune(c, kind, cut=None, purge=None, ids=None, paths=None):
@@ -540,7 +594,10 @@ def obj_trash_prune(c, kind, cut=None, purge=None, ids=None, paths=None):
     report (ret_report run obj_<kind>). ids: read already by the caller. Returns their number; the caller commits.
     2.783.0 (#5368): a side object kind (core/objparts.py part_kind trash_prune=True: webhooks, chat messages, member memos,
     the copies of list_part_trash) goes through part_trash_purge; the files it names land in paths (the caller unlinks them
-    after its commit: files/store.py fs_purge_files)."""
+    after its commit: files/store.py fs_purge_files).
+    2.936.0 (#5364): the kind's trash_keep (kept by law) stays, also when checked again under the lock; trash_batch per kind;
+    when deleting, the number is the objects deleted (also one that went with another of the run, e.g. a subtask with its
+    parent), not the ones restored or kept meanwhile."""
     purge = ret_on("trash") if purge is None else bool(purge)
     if kind in PART_KINDS and kind not in OBJ:
         old = obj_trash_due(c, kind, cut) if ids is None else [int(x) for x in ids]
@@ -550,29 +607,37 @@ def obj_trash_prune(c, kind, cut=None, purge=None, ids=None, paths=None):
             if paths is not None:
                 paths += got
         return len(old)
-    reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no trash of the core
+    reg = _reg_trash(kind)  # 2.936.0 (#5364): a light kind with trash_prune too (tasks)
     # 2.809.0 (#5365, review): a batch per run - every file-store node runs here now, and thousands of advisory locks in one
     # transaction would break the whole tick (max_locks_per_transaction) hour after hour
-    old = obj_trash_due(c, kind, cut, limit=OBJ_PRUNE_BATCH) if ids is None else [int(x) for x in ids]
+    old = obj_trash_due(c, kind, cut, limit=reg.get("trash_batch") or OBJ_PRUNE_BATCH) if ids is None else [int(x) for x in ids]
     if old and purge:
         t, cut = reg["table"], cut or ret_trash_cut()
+        kq, ka = _keep(reg, qi(t, (t,)))
+        n = 0
         with system_ctx(c):  # no person: the period ran out (the rights were checked when it went into the trash)
             for rid in old:
                 write_lock(c, f"obj-{kind}-{int(rid)}")
                 # 2.784.0 (#5366 review): checked again under the lock - a restore (e.g. via /api/undo) between reading the
                 # ids and the lock keeps its row alive instead of losing it for good
-                if not c.execute(f"SELECT 1 FROM {qi(t, (t,))} WHERE id=? AND {trash_sql()} AND deleted_at<?",
-                                 (int(rid), cut)).fetchone():
+                if not c.execute(f"SELECT 1 FROM {qi(t, (t,))} WHERE id=? AND {trash_sql()} AND deleted_at<?{kq}",
+                                 (int(rid), cut, *ka)).fetchone():
+                    # 2.936.0 (#5364): gone = it went with another one of this run (a subtask with its parent): counted
+                    if not c.execute(f"SELECT 1 FROM {qi(t, (t,))} WHERE id=?", (int(rid),)).fetchone():
+                        n += 1
                     continue
                 _purge_rows(c, kind, reg, rid)
+                n += 1
         obj_forget()
         bump(c, _area(reg))
+        return n
     return len(old)
 
 
 def obj_trash_tick(c, force=False):
     """2.773.0 (#5292): the watchdog's hourly run over the kinds registered with trash_prune=True (the others keep their
-    area's run until their stage moves them onto the core)."""
+    area's run until their stage moves them onto the core). 2.936.0 (#5364): + <kind>_kept (trash_keep, kept by law); tasks
+    and projects run here too (the runs ttp_tick / otr_prune went)."""
     if not ret_due("obj_trash", force=force):
         return {}
     purge, cut, out = ret_on("trash"), ret_trash_cut(), {}
@@ -580,12 +645,27 @@ def obj_trash_tick(c, force=False):
     with obj_purge_after(keep_locked=True) as box:  # 2.809.0 (#5365): the areas' stored files after the commit, receipts locked
         for kind, reg in sorted(OBJ.items()):
             if reg.get("trash_prune"):
-                n0 = box["locked"]
-                n = obj_trash_prune(c, kind, cut, purge)
+                n0, a0, e0 = box["locked"], len(box["after"]), len(box["err"])
+                try:  # 2.936.0 (#5364, review): one savepoint per kind -- a kind that fails holds back no other one
+                    with c.savepoint():
+                        n = obj_trash_prune(c, kind, cut, purge)
+                except Exception as e:  # noqa: BLE001 - this kind waits for the next run, the watchdog hears of it below
+                    del box["after"][a0:]  # its rows stay, so do their files
+                    box["locked"] = n0
+                    del box["err"][e0:]
+                    box["err"].append(f"{kind}: {type(e).__name__}")
+                    print("core trash:", kind, type(e).__name__, str(e)[:200], flush=True)
+                    out[kind + "_err"] = 1
+                    continue
+                er = len(box["err"]) - e0
+                if er:
+                    out[kind + "_err"] = er
                 lk = box["locked"] - n0
-                out[kind] = n - lk  # 2.809.0 (#5365, review): a locked receipt counts as locked, not as deleted
+                out[kind] = n - lk - er  # 2.809.0 (#5365, review): a locked receipt counts as locked, not as deleted (2.936.0: nor an error)
                 if lk:
                     out[kind + "_locked"] = lk
+                if reg.get("trash_keep") is not None:  # 2.936.0 (#5364)
+                    out[kind + "_kept"] = obj_trash_kept(c, kind, cut)
         for kind, k in sorted(PART_KINDS.items()):  # 2.783.0 (#5368): the side objects (core/objparts.py), one savepoint each
             if k["trash_prune"] and kind not in OBJ:
                 got = []
@@ -605,6 +685,8 @@ def obj_trash_tick(c, force=False):
     unlink_files(box["after"])  # 2.809.0 (#5365): after the commit (a failed commit keeps the rows and their files)
     if paths:  # after the commit: a failed commit keeps the rows and their files
         fs_purge_files([], paths)
+    if box["err"]:  # 2.936.0 (#5364, review): after the commit -- the watchdog (notify/push.py _wd_section) reports it
+        raise RuntimeError("core trash run: " + "; ".join(box["err"][:10]))
     return out
 
 
@@ -627,18 +709,48 @@ def undo_scope(kind, rid, oid):
     return [(reg["table"], "id=?", (int(rid),), False)]
 
 
+UNDO_SKIP = {}  # 2.872.0 (#5532): table -> {column}: never copied into an undo step (undo_skip)
+
+
+def undo_skip(table, *cols):
+    """2.872.0 (#5532): columns of table that no undo copy holds (a picture of megabytes would make every step of the object
+    too big for its step group, core/undogroups.py ug_fits): they are not in the copy, not in its fingerprint, and taking a
+    step back leaves them as they are now (the area records no step for a change of such a column alone)."""
+    UNDO_SKIP.setdefault(table, set()).update(cols)
+
+
 def _snap(c, sc):
     out = {}
     for t, where, args, _many in sc:
         rows = c.execute(f"SELECT * FROM {t} WHERE {where} ORDER BY id", args).fetchall()
-        out[t] = [{k: _val(r[k]) for k in r.keys()} for r in rows]
+        skip = UNDO_SKIP.get(t, ())
+        out[t] = [{k: _val(r[k]) for k in r.keys() if k not in skip} for r in rows]
     return out
 
 
-def _fp(snap, nofp=None):
+def _fp(snap, nofp=None, rows=True):
     nofp = nofp or {}
-    s = {t: [{k: v for k, v in r.items() if k not in UNDO_NO_FP and k not in nofp.get(t, ())} for r in rows] for t, rows in snap.items()}
+
+    def skip(t, r):  # 2.884.0 (#5479): an entry with of_row(row) names the columns left out per row (sheets/shhist.py _NotOwn)
+        x = nofp.get(t, ())
+        return x.of_row(r) if rows and hasattr(x, "of_row") else x
+    s = {}
+    for t, rows in snap.items():
+        s[t] = []
+        for r in rows:
+            sk = skip(t, r)
+            s[t].append({k: v for k, v in r.items() if k not in UNDO_NO_FP and k not in sk})
     return hashlib.sha256(json.dumps(s, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def _fp_is(snap, nofp, want):
+    """2.884.0 (#5479, review F8): snap still has the fingerprint want -- also the one without the per-row columns (of_row) a
+    step written before 2.884.0 noted."""
+    if not want:
+        return False
+    if _fp(snap, nofp) == want:
+        return True
+    return any(hasattr(x, "of_row") for x in (nofp or {}).values()) and _fp(snap, nofp, rows=False) == want
 
 
 def _lock_rows(c, sc):
@@ -709,7 +821,7 @@ def obj_undo_pre(c, uid, kind, rid, oid=None):
     label = (UG_LABEL, [[reg["label"]]]) if reg.get("label") else (UG_LABEL_PLAIN, [])
     if callable(reg.get("undo_label")):  # 2.747.0 (#5252): a tracked kind names its object (office/oubar.py)
         label = reg["undo_label"](main) or label
-    grp = ug_current(c, uid, _area(reg), main.get("org_id"), label)
+    grp = ug_current(c, uid, _area(reg), main.get("org_id"), label, obj=(kind, int(rid)))  # 2.985.0 (#5394, review F6)
     gid = grp["id"] if grp is not None and ug_fits(c, grp, n) else None
     if not tok and gid is None:
         return  # a group too big for copies: listed, nothing to keep
@@ -751,26 +863,32 @@ def _main_org(snap, sc):
     return ((snap.get(sc[0][0]) or [{}])[0]).get("org_id")
 
 
-def _undo_rekeyed(c, st):
+def _undo_rekeyed(c, st, reg=None, snap=None):
     """2.747.0 (#5249, review F1): a copy holds the sealed values (kenc1:) as they were; after a key rotation of the
     organisation (or while one runs) the old key is gone or going, so writing the copy back would leave unreadable text.
-    A step older than the rotation (or any step during one) is refused with 409, never written back."""
+    A step older than the rotation (or any step during one) is refused with 409, never written back.
+    2.985.0 (#5394): + the spaces the kind names for the copy snap (obj_track undo_spaces: a budget row's list space); checked
+    before the fingerprint, so the answer names the key change and not "changed by someone else" (a rotation reseals rows)."""
     oid = st["org_id"] if "org_id" in st.keys() else None
-    if not oid:
-        return
-    with system_ctx(c):  # org_keys is infrastructure (core/orgcrypt.py reads it as "system"); only the two times are read
-        k = c.execute("SELECT rot_started_at, rotated_at FROM org_keys WHERE org_id=?", (int(oid),)).fetchone()
-    if k and (k["rot_started_at"] or (k["rotated_at"] and str(st["created_at"] or "") < str(k["rotated_at"]))):
-        raise Denied(409, tr(UNDO_REKEYED))
+    spaces = {int(oid)} if oid else set()
+    fn = (reg or {}).get("undo_spaces")
+    extra = {int(x) for x in (fn(c, snap or {}) or ()) if x} if callable(fn) else set()
+    for sp in sorted(spaces | extra):
+        if sp <= 0:
+            continue  # an account's key is never rotated (core/orgcrypt.py: only re-wrapped under a new server key)
+        with system_ctx(c):  # org_keys is infrastructure (core/orgcrypt.py reads it as "system"); only the two times are read
+            k = c.execute("SELECT rot_started_at, rotated_at FROM org_keys WHERE org_id=?", (sp,)).fetchone()
+        if k and (k["rot_started_at"] or (k["rotated_at"] and str(st["created_at"] or "") < str(k["rotated_at"]))):
+            raise Denied(409, tr(UNDO_REKEYED if sp in spaces else UNDO_SPACE_REKEYED))
 
 
 def _undo_one(c, sc, st, uid, reg, fix=None):
     nofp = reg.get("undo_nofp") or {}
     cur = _snap(c, sc)
-    if not st["fp_after"] or _fp(cur, nofp) != st["fp_after"]:
-        raise Denied(409, tr(UNDO_CONFLICT))
-    _undo_rekeyed(c, st)
     old = json.loads(st["snap"])
+    _undo_rekeyed(c, st, reg, old)  # 2.985.0 (#5394): before the fingerprint (a rotation reseals the rows it compares)
+    if not _fp_is(cur, nofp, st["fp_after"]):
+        raise Denied(409, tr(UNDO_CONFLICT))
     if _main_org(old, sc) != _main_org(cur, sc):
         raise Denied(409, tr(UNDO_MOVED))
     _write_back(c, sc, old, uid, reg.get("undo_keep"), reg.get("undo_free") or ())
@@ -784,10 +902,10 @@ def _undo_one(c, sc, st, uid, reg, fix=None):
 def _redo_one(c, sc, st, uid, reg, fix=None):
     nofp = reg.get("undo_nofp") or {}
     cur = _snap(c, sc)
-    if not st["fp_undone"] or _fp(cur, nofp) != st["fp_undone"] or not st["redo"]:
+    new = json.loads(st["redo"]) if st["redo"] else None
+    _undo_rekeyed(c, st, reg, new)  # 2.985.0 (#5394): the spaces of the copy written forward, before the fingerprint
+    if not _fp_is(cur, nofp, st["fp_undone"]) or not new:
         raise Denied(409, tr(UNDO_CONFLICT))
-    _undo_rekeyed(c, st)
-    new = json.loads(st["redo"])
     if _main_org(new, sc) != _main_org(cur, sc):
         raise Denied(409, tr(UNDO_MOVED))
     _write_back(c, sc, new, uid, reg.get("undo_keep"), reg.get("undo_free") or ())
@@ -858,8 +976,36 @@ def obj_undo_hist(c, uid, kind, rid, oid, reg, sc, first, last, action):
     t = sc[0][0]
     b0, a0 = (first.get(t) or [{}])[0], (last.get(t) or [{}])[0]
     keys = reg["fields"] if reg["fields"] is not None else [k for k in {**b0, **a0} if k not in UNDO_FIXED and k not in UNDO_NO_FP]
-    diff = [k for k in keys if not _same(b0.get(k), a0.get(k))]
+    skip = reg.get("hist_skip") or ()  # 2.985.0 (#5394, review F2): sealed columns stay out of the history
+    diff = [k for k in keys if k not in skip and not _same(b0.get(k), a0.get(k))]
     obj_history_add(c, uid, kind, rid, {k: b0.get(k) for k in diff}, {k: a0.get(k) for k in diff}, action=action, org_id=oid, agent=False)
+
+
+def obj_undo_forget(c, kind, ids):
+    """2.985.0 (#5394, review F2): the undo copies (every step of the kind's rows ids, also of an editor session) and the history
+    rows of those rows go -- their values are about to be sealed, a plain copy must not outlive that. A group left without
+    parts goes (core/undogroups.py ug_gc); one that keeps other parts gets the plain label "Change" (its label could name a
+    value of these rows); review F7: so do the toobig groups of the kind's area. Inside the caller's transaction, as the system (a background pass)."""
+    ids = sorted({int(x) for x in ids or () if x})
+    if not ids:
+        return
+    with system_ctx(c):  # the undo / history rows of the resealed rows only: nothing is read out
+        for at in range(0, len(ids), 500):
+            part = ids[at:at + 500]
+            q = ",".join("?" * len(part))
+            gone = ug_gids(c, f"kind=? AND ref_id IN ({q})", (kind, *part))
+            c.execute(f"DELETE FROM obj_undo WHERE kind=? AND ref_id IN ({q})", (kind, *part))
+            ug_gc(c, gone)
+            if gone:
+                c.execute(f"UPDATE undo_groups SET label_key=?, label_args='[]' WHERE id IN ({','.join('?' * len(gone))})",
+                          (UG_LABEL_PLAIN, *gone))
+            c.execute(f"DELETE FROM obj_history WHERE kind=? AND ref_id IN ({q})", (kind, *part))
+        # 2.985.0 (#5394, review F7): a toobig group lost its parts (ug_fits), so ug_gids cannot find it - its label could still
+        # name a plain value of these rows: every toobig group of the kind's area gets the plain label (rare, only the label goes)
+        area = (OBJ_TRACK.get(kind) or {}).get("area") or ""
+        if area and area != "other":
+            c.execute("UPDATE undo_groups SET label_key=?, label_args='[]' WHERE area=? AND state='toobig' AND label_args<>'[]'",
+                      (UG_LABEL_PLAIN, area))
 
 
 def obj_cols_ok(c, kind):

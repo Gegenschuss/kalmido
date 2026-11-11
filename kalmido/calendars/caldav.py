@@ -1577,6 +1577,10 @@ def dav(p):
             return dav_401()
         u, pw_row = who
         g.user, g.auth_via = u, "dav"
+        g.undo_device = (pw_row["name"] if pw_row is not None else "") or "CalDAV / CardDAV"  # 2.985.0 (#5394): its steps name the device
+        from ..core.undogroups import UNDO_DAV_BUNDLE_S, undo_bundle  # 2.985.0 (#5394, review F6): one group per app password
+        undo_bundle(f"dav:{pw_row['id'] if pw_row is not None else 'u' + str(u['id'])}", UNDO_DAV_BUNDLE_S, keep_redo=True,
+                    newest=True)  # 2.985.0 (#5394, review F6): only while it is the person's newest group, as the settings
         c = db()
         dav_inst(c)
         if m in ("MKCALENDAR", "MKCOL"):  # 2.155.0 A (#2079): a new event calendar from a device

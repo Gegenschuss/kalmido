@@ -102,6 +102,22 @@ async function dc_load() {
   dc_draw();
   dc_pollSet();
 }
+// 2.979.0 (#5667): after an undo / redo the server took back by its group (the step's own undo no longer runs): the open
+// document (DC.doc, the view / sheet .dc-md) reads itself again and draws only when it changed (a calm view); a file follows a
+// new version / name like after its own restore (docview.js dcv_verAfter). The list: undo.js histRedraw (ab_relist), viewDocs
+// loads it on every opening
+histReloader('docs', async () => {
+  const d = DC.doc, md = $('.dc-md'); if (!d?.id || !md) return;
+  const x = await rawFetch('GET', d.file ? `/api/files/nodes/${d.id}` : `/api/docs/${d.id}`).catch(() => null);
+  if (!x || DC.doc?.id !== d.id) return;
+  if (d.file) {
+    if ((x.version !== d.version || x.name !== d.name || (x.parent_id ?? null) !== (d.parent_id ?? null)) && typeof dcv_verAfter === 'function') await dcv_verAfter(d.id, x.version !== d.version);
+    return;
+  }
+  const own = o => JSON.stringify(Object.entries(o).filter(([k]) => !k.startsWith('_')));  // without the view's own marks (_fv)
+  if (own(x) === own(d)) return;
+  DC.doc = {...x, _fv: d._fv}; dc_mdDraw($('.dc-md'));
+});
 // 2.476.0 (#3935): the next page of the list (scrolled to its end, the button there, swiped past the last loaded document);
 // one at a time, an answer for a list loaded anew in between is dropped. Resolves true when documents were added.
 const dc_key = p => { const q = new URLSearchParams(p); q.delete('limit'); q.delete('offset'); return q.toString(); };

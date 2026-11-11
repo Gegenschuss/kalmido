@@ -129,6 +129,8 @@ async function ab2_delete(it) {
 }
 
 function ab2_reload() { AB2.data = null; lv_reset(); if (S.route.mod === 'workload') { WLV.data = null; ab2_load(); } }
+// 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the absences and holiday accounts (leave.js) come again when shown, else they are fetched on the next view
+histReloader('absence', () => { if (AB2.data || (typeof LV !== 'undefined' && LV.data)) ab2_reload(); });
 
 
 // assigning: a warning when the person is away on the task's day (the assignment stays)

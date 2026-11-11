@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from flask import g, has_request_context, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app, APP_NAME, APP_VERSION, PUB_PREFIX, TZ
-from ..core.pg import insert_id, like_escape, st_ids, system_ctx
+from ..core.pg import insert_id, like_escape, st_ids, system_ctx, write_lock  # 2.985.0 (#5394, review F11): write_lock
 from ..core.i18n import lang, N_, tr
 from ..core.numtext import user_num
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, test_seconds, uset, usettings
@@ -722,7 +722,11 @@ def v1_notif_update():
         raise UnknownFields(unknown)
     c, uid = db(), me()
     if "events" in b:
-        for k, v in notif_update(usettings(c, uid), b["events"]).items():
+        write_lock(c, f"usettings-{int(uid)}")  # 2.985.0 (#5394, review F11): the lock of PATCH /api/settings and of its undo
+        nv = notif_update(usettings(c, uid), b["events"])
+        from ..accounts.setundo import su_mark  # 2.985.0 (#5394): a person's change is a step of "Recent steps" (an agent: none)
+        su_mark(c, uid, list(nv))
+        for k, v in nv.items():
             uset(c, uid, k, v)
     if "lists" in b:
         if not isinstance(b["lists"], dict) or len(b["lists"]) > 1000:

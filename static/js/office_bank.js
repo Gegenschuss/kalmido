@@ -34,6 +34,8 @@ const bfbBooksStale = () => {
   if (typeof OFD === 'object') OFD.list = null;
 };
 const bnkReload = () => { BNK.data = null; BNK.imports = BNK.showImp ? BNK.imports : null; BNK.other = null; BNK.cand = null; bfbBooksStale(); ofcDraw(); };
+// 2.979.0 (#5667): an undo / redo the server did: the bank bookings and imports come again (with the books, cash flow and key figures)
+histReloader('bank', () => { if (!BNK.data && !BNK.imports) return; BNK.imports = null; bnkReload(); });
 const bnkAmt = v => `${+v > 0 ? '+' : '−'}${ofcMoney(Math.abs(+v))}`;
 
 // 2.855.0 (#5456): the page links the bank accounts (IBAN, default account: Settings › Company & office › Bank & taxes)

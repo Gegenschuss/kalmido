@@ -172,7 +172,7 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   w.eval(`listModal(${L.id})`); await idle(w);
   // 2.152.2 (#2624): project instead of list (the type segment became the switch "Fortschritt und Status")
   // 2.352.0 C (#2751): no switch any more; the folding parts in German
-  check(/Projekt-Funktionen/.test(d.querySelector('.modal #lm-sec-proj summary')?.textContent || '') && /Erledigte unten anzeigen/.test(d.querySelector('.modal').textContent) && /Teilen…/.test(d.querySelector('.modal').textContent), 'German: list dialog');
+  check(/Was das Projekt kann/.test(d.querySelector('.modal #lm-sec-proj summary')?.textContent || '') && /Erledigte unten anzeigen/.test(d.querySelector('.modal').textContent) && /Teilen…/.test(d.querySelector('.modal').textContent), 'German: list dialog');  // 2.831.0 (#5481): Was das Projekt kann
   d.querySelector('.modal').remove();
   w.eval(`shareModal(${L.id})`); await idle(w);
   check(/Öffentlicher Link/.test(d.querySelector('.modal.shmodal')?.textContent || ''), 'German: Share dialog');

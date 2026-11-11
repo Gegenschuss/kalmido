@@ -83,6 +83,25 @@ def check_move(c, src, dst):
             oc_settle_kick([dst])
 
 
+def move_lock_subtree(c, tids, along=()):
+    """#5588 (a): the rows of the tasks tids and all their subtasks locked (FOR NO KEY UPDATE) in id order before a move writes the first
+    of them. Every other writer that holds several task rows takes them in id order too (personal/timewipe.py tzw_lock_tasks for
+    the restore of "Delete all times"); the move used to write the parent first and then its subtasks level by level, so a
+    restore holding a subtask with a lower id deadlocked against it (500, no wrong data). Called by the callers of move_subtree
+    before they write the moved task; a subtask added meanwhile is still moved (its row is then not taken in order). along = more
+    task ids written in the same transaction (a drag of several tasks), taken in the same order, without their subtasks."""
+    done, level, n = set(), [int(t) for t in tids if t], 0
+    while level and n < MAX_DEPTH + 7:
+        done.update(level)
+        level = [r[0] for r in c.execute("SELECT id FROM tasks WHERE parent_id = ANY(CAST(? AS BIGINT[]))", (st_ids(level),))
+                 if r[0] not in done]
+        n += 1
+    ids = done | {int(t) for t in along if t}
+    if ids:
+        # review F5: FOR NO KEY UPDATE as the UPDATE takes it (FOR UPDATE would also stop inserts that reference the tasks)
+        c.execute("SELECT id FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) ORDER BY id FOR NO KEY UPDATE", (st_ids(sorted(ids)),)).fetchall()
+
+
 def move_subtree(c, tid, lid):
     """Subtasks follow their parent into list lid (all levels). A subtask in another list that the current
     user may not move out of (subtask of a foreign parent) stays in its list and becomes top level there."""

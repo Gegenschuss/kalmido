@@ -5,7 +5,7 @@
 // - ONE invitation dialog: by e-mail, or (server admins only, as before) by link: a new account in the organisation with
 //   the chosen role, the link to copy. An organisation admin who is no server admin gets no link choice.
 // - The recovery key / export of an organisation once (Organisation > Data), not again under People or the server switch.
-// - One role word: the project role "view" reads "Read-only" (German "Nur lesen"), the server admin box "Manage the server".
+// - One role word: the project role "view" reads "Read-only" (German "Nur ansehen" since 2.831.0, #5481), the server admin box "Manage the server".
 // - #3882: an organisation admin approves a waiting registration in the person's row.
 // - A member sees no sub-tabs and no invitation; a person without an organisation keeps their own settings (P4).
 // - #3044: Settings > Access is listed only with an own API token / webhook, else it waits under Integrations > "For advanced
@@ -117,7 +117,7 @@ const subs = (md, sec) => [...md.querySelectorAll(`[data-pane="${sec}"] [data-ad
   const navs = [...md.querySelectorAll('.snav [data-sec] span')].map(s => s.textContent);
   check(navs.includes('Organisation') && navs.includes('Server') && !navs.includes('Verwaltung'), 'German: Organisation + Server, no Verwaltung: ' + navs.join('|'));
   const ros = [...md.querySelectorAll('#s-ws select[data-wsrole] option')].map(o => o.textContent);
-  check(w.eval(`tr(ROLES.find(r => r[0] === 'view')[1])`) === 'Nur lesen' && ros.includes('Nur lesen') && !ros.some(t => /Betrachter|Read-only/.test(t)), 'German: "Nur lesen" for projects and organisations: ' + [...new Set(ros)].join('|'));
+  check(w.eval(`tr(ROLES.find(r => r[0] === 'view')[1])`) === 'Nur ansehen' && ros.includes('Nur ansehen') && !ros.some(t => /Betrachter|Read-only/.test(t)), 'German: "Nur ansehen" for projects and organisations: ' + [...new Set(ros)].join('|')); // 2.831.0 (#5481): Nur ansehen
   check(/Personen einladen/.test(md.querySelector('#s-ws').textContent), 'German: "Personen einladen"');
   // #3044: everyday words (old -> new in the report); 2.800.0 (#5441): 'Swimlanes' is 'Gruppieren nach' (was 'Zeilen')
   const W = {'Tab bar': 'Leiste unten', 'Swimlanes': 'Gruppieren nach', 'Block': 'Kachel', 'Lying idle': 'Unberührt', 'Host default': 'Vorgabe des Servers', 'Show the celebration': 'Kleine Feier zeigen',

@@ -36,6 +36,8 @@ async function rc_cbHint(id, seq) {
 }
 const rc_cbText = (cb = RC.cb) => (cb || []).map(e => tr('In the cash book {0} no. {1}', e.book, e.no)).join(' · ');
 function rc_draw() { const el = rc_el('.rc-slot'); if (el) el.innerHTML = rc_html(); }
+// 2.979.0 (#5667): an undo / redo the server did: the receipt sheet of the open document comes again
+histReloader('receipt-sheet', () => { if (!RC.id || !RC.d) return; if (rc_el('.rc-slot')) return rc_load(); RC.id = null; });
 // 2.755.0 (#5236): the open document's slot, never the one of a neighbour drawn ahead (docview.js: .dc-nb, it may lie inside the open body mid-swipe)
 const rc_el = sel => $$(sel).find(x => !x.closest('.dc-nb')) || null;
 // 2.755.0 (#5236): nb = a neighbour drawn ahead ({id, d, doc}: its own receipt and document, RC stays the open one's)

@@ -11,12 +11,16 @@
    "Open in maps" as a URI action, the crew list with the contact's phone, the cast, the transport ("Own arrangement"),
    the shots of the chosen shot list day, the sketch as an image of its own page, the footer "As of" + "Page n of N"
  - 2.855.0 review: a sketch over 12 megapixels 400; phone / mail never from a shared book outside the area (F2)
+ - 2.986.0 (#5649): client and agency chosen from the contacts (only the area's readable ones; a shared / foreign book's id 400 and,
+   smuggled into the stored details, shown nowhere, PDF included), the agency remembered at the project and offered on its next
+   call sheet, the free text kept as the fallback
  - rights: another person's job 404 (with and without ?org=), an agent 403, the module Disposition off 409, Film & Video
    switched off again 404
 freelancer-matrix: hub (frida has no organisation: her own area, her own office, her own industry)
 tenant-matrix: hub (greta, another person's area: frida's call sheet 404 for reading, the PDF and saving)
 usage: p2802_a_callsheet_test.py <datadir>"""
 import base64
+import json
 import re
 import struct
 import zlib
@@ -193,6 +197,88 @@ crew = {p["name"]: p for p in Fr.get(B + f"/api/team/dispo/callsheet/{JOB}?org={
 check("0170 9990000" not in str(crew), f"the number of greta's shared book is not on frida's call sheet {crew.get('Frida')}")
 kt.dbx("UPDATE contacts SET emails=? WHERE fn='Frida Selbst'", ('[{"value": "frida@example.com"}]',))
 
+# ------------------------------------------------------------ 2.986.0 (#5649): client and agency from the contacts
+r = Fr.post(B + "/api/contacts", json={"book_id": BK, "fn": "Anja Agentur", "org": "Werbe Beispiel GmbH", "emails": [{"value": "anja@example.com"}],
+                                       "phones": [{"value": "0170 1212121", "type": ["cell"]}]})
+check(r.status_code == 201, "an agency person " + r.text[:120])
+ANJA = r.json()["id"]
+r = Fr.post(B + "/api/contacts", json={"book_id": BK, "kind": "org", "fn": "Kundenfirma Beispiel KG", "emails": [{"value": "info@example.com"}],
+                                       "phones": [{"value": "030 3434343", "type": ["work"]}]})
+check(r.status_code == 201, "a client company " + r.text[:120])
+KUNDE = r.json()["id"]
+FOREIGN = kt.dbx("SELECT id FROM contacts WHERE fn='Frida privat'")[0][0]  # greta's book, shared with frida, not a book of the area
+GB2 = Gr.post(B + "/api/books", json={"name": "Gretas zweites Buch", "org_id": None}).json()["id"]
+r = Gr.post(B + "/api/contacts", json={"book_id": GB2, "fn": "Gerd Geheim", "phones": [{"value": "0170 8080808", "type": ["cell"]}]})
+check(r.status_code == 201, "a contact only greta reads (her book, not shared) " + r.text[:120])
+SECRET = r.json()["id"]
+a = Fr.get(B + f"/api/team/dispo/callsheet/{JOB2}?org={PERS}").json()["callsheet"]["auto"]
+ids = {x["id"]: x for x in a.get("contacts") or []}
+check(ANJA in ids and KUNDE in ids and ids[ANJA]["company"] == "Werbe Beispiel GmbH" and ids[ANJA]["person"] == "Anja Agentur"
+      and ids[KUNDE]["company"] == "Kundenfirma Beispiel KG" and ids[KUNDE]["person"] == "", f"the choice: the area's people and companies {ids.get(ANJA)}")
+check(FOREIGN not in ids and SECRET not in ids and "Frida privat" not in str(a) and "Gerd Geheim" not in str(a),
+      "the choice never holds a contact of another book (shared or not)")
+check(a.get("agency_default") is None and a.get("agency_contact") is None, "nothing remembered at the project yet")
+for k, x in (("agency_contact", FOREIGN), ("agency_contact", SECRET), ("client_contact", SECRET), ("agency_contact", "abc"), ("agency_contact", True)):
+    r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB2}?org={PERS}", json={"data": {"loc_name": "Kueche Ost", k: x}})
+    check(r.status_code == 400, f"{k}={x!r} (not a readable contact of the area): 400 ({r.status_code})")
+check(kt.dbx("SELECT cs_agency_id FROM lists WHERE id=?", (L,))[0][0] is None, "... and nothing remembered")
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB2}?org={PERS}", json={"data": {"loc_name": "Kueche Ost", "shot_day": day1["name"], "client": "Alter Kundentext",
+                                                                         "client_contact": KUNDE, "agency_contact": str(ANJA)}})
+check(r.ok, "client and agency chosen from the contacts " + r.text[:160])
+cs = r.json()["callsheet"]
+check(cs["data"].get("agency_contact") == ANJA and cs["data"].get("client_contact") == KUNDE and cs["data"].get("client") == "Alter Kundentext",
+      f"the ids stored as numbers, the free text kept as the fallback {cs['data']}")
+ag = cs["auto"].get("agency_contact") or {}
+check(ag.get("company") == "Werbe Beispiel GmbH" and ag.get("person") == "Anja Agentur" and ag.get("phone") == "0170 1212121"
+      and ag.get("email") == "anja@example.com", f"the agency: company, person, phone, e-mail of the contact {ag}")
+check((cs["auto"].get("client_contact") or {}).get("company") == "Kundenfirma Beispiel KG", "the client: the company chosen")
+check(kt.dbx("SELECT cs_agency_id FROM lists WHERE id=?", (L,))[0][0] == ANJA, "the agency is remembered at the project")
+txt = pdf_text(Fr.get(B + f"/api/team/dispo/callsheet/{JOB2}/pdf?org={PERS}").content)
+for x in ("Werbe Beispiel GmbH", "Anja Agentur", "anja@example.com", "0170 1212121", "Kundenfirma Beispiel KG", "030 3434343", "info@example.com", "Agency"):
+    check(has(txt, x), f"the PDF names the chosen contact: {x!r}")
+check(not has(txt, "Alter Kundentext"), "the PDF: the contact chosen comes before the free text")
+check(has(txt, "Distribution: Carla Kamera, Anja Agentur"), "the agency's person is on the distribution line")
+# a new call sheet of the same project starts with the remembered agency; one with only a free text keeps it
+r = Fr.post(B + "/api/team/dispo/bookings", json={"title": "Dreh Tag 2", "start": "2027-04-06", "end": "2027-04-06", "status": "option", "org": PERS,
+                                                  "list_id": L, "resources": [{"kind": "contact", "id": CARLA}]})
+check(r.status_code == 201, "a third shoot day of the project " + r.text[:160])
+JOB3 = r.json()["bookings"][0]["job"]
+cs = Fr.get(B + f"/api/team/dispo/callsheet/{JOB3}?org={PERS}").json()["callsheet"]
+check(cs["data"] == {} and (cs["auto"].get("agency_default") or {}).get("id") == ANJA, f"the new call sheet: the agency of the project offered {cs['auto'].get('agency_default')}")
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB3}?org={PERS}", json={"data": {"agency": "Freitext Agentur Alt\nZweite Zeile"}})
+check(r.ok and r.json()["callsheet"]["auto"].get("agency_contact") is None, "an agency as free text only")
+txt = pdf_text(Fr.get(B + f"/api/team/dispo/callsheet/{JOB3}/pdf?org={PERS}").content)
+check(has(txt, "Freitext Agentur Alt") and not has(txt, "Werbe Beispiel GmbH"), "the free text stays the agency of that call sheet (fallback)")
+# an id smuggled into the stored details (not through the API) is shown nowhere
+raw = kt.dbx("SELECT data FROM hub_callsheets WHERE org_id=? AND job=?", (PERS, JOB3))[0][0]
+check(raw.startswith("{"), "frida's personal area keeps the details in plain JSON (the test can write into them)")
+kt.dbx("UPDATE hub_callsheets SET data=? WHERE org_id=? AND job=?", ('{"agency_contact": %d, "client_contact": %d}' % (SECRET, FOREIGN), PERS, JOB3))
+a = Fr.get(B + f"/api/team/dispo/callsheet/{JOB3}?org={PERS}").json()["callsheet"]["auto"]
+check(a.get("agency_contact") is None and a.get("client_contact") is None and "Gerd" not in str(a) and "Frida privat" not in str(a),
+      f"a smuggled id: no contact in the dialog {a.get('agency_contact')} {a.get('client_contact')}")
+txt = pdf_text(Fr.get(B + f"/api/team/dispo/callsheet/{JOB3}/pdf?org={PERS}").content)
+check(not has(txt, "Gerd Geheim") and not has(txt, "0170 8080808") and not has(txt, "Frida privat") and not has(txt, "0170 9990000"),
+      "a smuggled id: nothing of the contact in the PDF (neither the columns, the crew list nor the distribution line)")
+# review F1/F3 (2.986.0, #5649): a contact this person cannot read is not handed out in data, and a save of the dialog (which
+# then sends no id) keeps it instead of dropping it silently; the same id sent back passes, another unreadable one is 400
+d_ = Fr.get(B + f"/api/team/dispo/callsheet/{JOB3}?org={PERS}").json()["callsheet"]["data"]
+check("agency_contact" not in d_ and "client_contact" not in d_, f"an unreadable contact id is not handed out {d_}")
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB3}?org={PERS}", json={"data": {"loc_name": "Neuer Ort"}})
+check(r.ok, "a save without the unreadable ids " + r.text[:160])
+raw = json.loads(kt.dbx("SELECT data FROM hub_callsheets WHERE org_id=? AND job=?", (PERS, JOB3))[0][0])
+check(raw.get("agency_contact") == SECRET and raw.get("client_contact") == FOREIGN and raw.get("loc_name") == "Neuer Ort",
+      f"... keeps the contacts somebody else chose {raw}")
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB3}?org={PERS}", json={"data": {"agency_contact": SECRET, "client_contact": FOREIGN}})
+check(r.ok, "the same unreadable ids sent back: no 400 " + r.text[:160])
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB3}?org={PERS}", json={"data": {"agency_contact": FOREIGN}})
+check(r.status_code == 400, f"another unreadable id instead: 400 ({r.status_code})")
+check(kt.dbx("SELECT cs_agency_id FROM lists WHERE id=?", (L,))[0][0] == ANJA, "a kept unreadable agency is not remembered at the project")
+# a contact gone to the trash is not shown any more either
+check(Fr.delete(B + f"/api/contacts/{ANJA}").ok, "the agency contact into the trash")
+a = Fr.get(B + f"/api/team/dispo/callsheet/{JOB2}?org={PERS}").json()["callsheet"]["auto"]
+check(a.get("agency_contact") is None and a.get("agency_default") is None, "a contact in the trash: no agency shown")
+check(Fr.post(B + f"/api/contacts/{ANJA}/restore").ok, "... and back")
+
 # ------------------------------------------------------------ rights
 check(Gr.put(B + "/api/industry", json={"industry": "film"}).ok, "greta chooses Film & Video too")
 check(Gr.get(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}").status_code == 404, "greta: frida's area by ?org= 404")
@@ -210,6 +296,7 @@ check(Fr.patch(B + "/api/settings", json={"features": FEAT.replace(",dispo", "")
 check(Fr.get(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}").status_code == 409, "the module off: 409 like the disposition")
 check(Fr.patch(B + "/api/settings", json={"features": FEAT}).ok and Fr.put(B + "/api/industry", json={"industry": ""}).ok, "the module on, Film & Video off")
 check(Fr.get(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}").status_code == 404, "Film & Video off again: 404")
-check(kt.dbx("SELECT COUNT(*) FROM hub_callsheets WHERE org_id=?", (PERS,))[0][0] == 2, "the stored call sheets stay (only hidden)")
+# 2.986.0 (#5649): three now (the third shoot day of the contact block)
+check(kt.dbx("SELECT COUNT(*) FROM hub_callsheets WHERE org_id=?", (PERS,))[0][0] == 3, "the stored call sheets stay (only hidden)")
 
 raise SystemExit(kt.done("p2802_a_callsheet"))

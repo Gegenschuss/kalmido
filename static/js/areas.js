@@ -252,13 +252,14 @@ function ofm_detail(mod) {
   let p = null;
   if (mod === 'clients' && S.route.client && S.route.client !== 'mailhub' && typeof CLV !== 'undefined' && CLV.id === S.route.client && CLV.data?.name) p = [tr('Clients'), CLV.data.name];
   else if (mod === 'contacts' && typeof CT !== 'undefined' && CT.sel && CT.card) p = [tr('Address book'), CT.card.fn || CT.card.org || '?'];
-  else if (mod === 'office' && S.route.id && typeof ofd_openDoc === 'function' && ofd_openDoc()?.id === S.route.id) p = [tr(ofd_openDoc().kind === 'offer' ? 'Quotations' : 'Invoices'), `${ofdKindName(ofd_openDoc().kind, true)} ${ofd_openDoc().number || tr('Draft')}`];  // 2.356.0 C (#3004): the open document, never the one before
+  else if (mod === 'office' && S.route.id && typeof ofd_openDoc === 'function' && ofd_openDoc()?.id === S.route.id && !(typeof ofd_phoneDoc === 'function' && ofd_phoneDoc())) p = [tr(ofd_openDoc().kind === 'offer' ? 'Quotations' : 'Invoices'), `${ofdKindName(ofd_openDoc().kind, true)} ${ofd_openDoc().number || tr('Draft')}`];  // 2.356.0 C (#3004): the open document, never the one before
   else if (mod === 'office' && S.route.tab === 'travel' && typeof RK !== 'undefined' && RK.open && typeof rk_trip === 'function' && rk_trip(RK.open)) p = [tr('Travel expenses'), rk_trip(RK.open).dest || tr('Trip')];
   return p ? `<nav class="ofmcrumb" aria-label="${esc(tr('Path'))}">${p.map(x => `<span>${esc(x)}</span>`).join('<span aria-hidden="true">›</span>')}</nav>` : '';
 }
 function ofm_menuHtml(mod) {
   const cur = ofm_cur(mod), its = ofm_items(), crumb = ofm_detail(mod);
   if (its.length < 2 || cur === 'start') return crumb;  // the start page's list is the menu
+  if (typeof ofd_phoneDoc === 'function' && ofd_phoneDoc()) return '';  // 2.936.0 (#5448): an open document: one line on top, its own head (back + number + status)
   const grp = g => its.filter(i => i.group === g[0]);
   // 2.98.0 C (#2180): a phone's sub page = "< Office · group" (back to the start list) and the group's points as one row
   // of underlined tabs that never wraps (it scrolls sideways; ofr_after shows the active one)
@@ -287,10 +288,22 @@ function ofr_key(e) {
 document.addEventListener('keydown', e => { if (ofr_key(e)) e.stopPropagation(); }, true);
 // after a draw: the active tab of a phone's row in sight (the row scrolls sideways)
 function ofr_after(root) {
+  ofr_fade(root);  // 2.936.0 (#5448)
   const b = $('.ofpb .ofpt2.on', root || document); if (!b) return;
   const row = b.parentElement, r = row.getBoundingClientRect(), x = b.getBoundingClientRect();  // sideways only, the page stays
   if (x.left < r.left || x.right > r.right) row.scrollLeft += x.left - r.left - Math.max(0, (r.width - x.width) / 2);
 }
+// 2.936.0 (#5448): a tab row that scrolls sideways (the office's points, the document kinds) fades out at the side where more
+// follows instead of cutting a word ("Reminder" shown as "Remindr"); office.css .ofx-l / .ofx-r, kept on scroll and resize
+const OFX_ROWS = '.ofpb .ofpts, .office .ofdkinds';
+function ofr_fadeOne(row) {
+  const m = row.scrollWidth - row.clientWidth;
+  row.classList.toggle('ofx-l', m > 1 && row.scrollLeft > 1);
+  row.classList.toggle('ofx-r', m > 1 && row.scrollLeft < m - 1);
+}
+function ofr_fade(root) { for (const r of $$(OFX_ROWS, root?.closest?.('#view') || document)) ofr_fadeOne(r); }
+document.addEventListener('scroll', e => { const t = /** @type {any} */ (e.target); if (t?.matches?.(OFX_ROWS)) ofr_fadeOne(t); }, true);
+window.addEventListener('resize', () => ofr_fade());
 // the office start page (office/start, a phone's way in): the figures (admins), then per group a small caps heading and a
 // card with one row per point (2.98.0 C, #2180: one column, was a tile per group)
 function ofm_startHtml() {
