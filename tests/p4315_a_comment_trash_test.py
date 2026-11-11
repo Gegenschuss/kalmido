@@ -161,7 +161,8 @@ FP = one("SELECT path FROM tchat_files WHERE id=?", (FID_,))[0]
 check(A.delete(B + f"/api/team/messages/{MID}").ok, "the list owner deletes bob's message")
 row = one("SELECT body, deleted_at FROM tchat_msgs WHERE id=?", (MID,))
 check(row and row[0] == "" and row[1], f"the message looks deleted as before {row}")
-check(one("SELECT body FROM tchat_trash_text WHERE message_id=?", (MID,)) == (CHAT,), "#4315: its text is kept in the trash")
+# 2.981.0 (#5274): the kept text is kind 'tchat' of the core's obj_comment_trash (tchat_trash_text is gone)
+check(one("SELECT body FROM obj_comment_trash WHERE kind='tchat' AND comment_id=?", (MID,)) == (CHAT,), "#4315: its text is kept in the trash")
 check(dbx("SELECT 1 FROM tchat_files WHERE id=?", (FID_,)) and disk(FP) in (True, None), "#4315: its file row and file stay")
 for who, s in (("bob", Bo), ("dave", Da)):
     ms = s.get(B + f"/api/team/rooms/{RID}/messages")
@@ -182,7 +183,7 @@ check(Bo.delete(B + f"/api/team/messages/{MID}").ok, "deleted again")
 write("UPDATE tchat_msgs SET deleted_at=? WHERE id=?", (OLD, MID))
 # 2.783.0 (#5368): the tombstones are the core's (core/writes.py obj_trash_tick), no longer tp_tick's
 box("from kalmido.core.writes import obj_trash_tick\nprint(json.dumps(obj_trash_tick(c, force=True)))")
-check(not dbx("SELECT 1 FROM tchat_msgs WHERE id=?", (MID,)) and not dbx("SELECT 1 FROM tchat_trash_text WHERE message_id=?", (MID,))
+check(not dbx("SELECT 1 FROM tchat_msgs WHERE id=?", (MID,)) and not dbx("SELECT 1 FROM obj_comment_trash WHERE kind='tchat' AND comment_id=?", (MID,))  # 2.981.0 (#5274)
       and not dbx("SELECT 1 FROM tchat_files WHERE id=?", (FID_,)), "the trash run removes the message, its text and its file row")
 check(disk(FP) in (False, None), "the trash run removes the message's file from disk")
 

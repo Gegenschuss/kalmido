@@ -1197,41 +1197,65 @@ def agent_chat_edit(aid, mid):
     return jsonify(chat_one(c, m, edits=True))
 
 
-def med_comment_edited(c, t, k, old_body):
-    """A comment was edited (comments.py, before its new mentions are sent): message_edited to every agent that got it as
-    an event and still sees the task with its comments (agent_emit blocks health lists and lists outside an agent's limit)."""
-    old, new = comment_plain(c, old_body), comment_plain(c, k["body"])
-    if old == new:
-        return
-    uid = k["user_id"]
-    who = {"id": uid, "name": user_names(c, [uid]).get(uid, "")}
-    for aid in sorted({r["agent_id"] for r, _ in med_queued_events(c, None, ("comment", "mention", "assigned"), "comment", k["id"])}):
-        # still sees the task; the person may still address it there (like the event 'comment', AGENT_GATED)
-        if not task_visible(c, t["id"], aid, full=True) or not agent_usable(c, aid, uid, t["list_id"]):
-            continue
-        agent_emit(c, aid, "message_edited", agent_task_data(
-            c, t["id"], aid, kind="comment", comment={"id": k["id"], "task_id": t["id"], "created_at": k["created_at"], "edited_at": k["edited_at"]},
-            old=old[:AGENT_EVENT_COMMENT_CHARS], new=new[:AGENT_EVENT_COMMENT_CHARS], user=who, list_id=t["list_id"]))
+# 2.981.0 (#5274, stage Q4c, med_changed of the brief): ONE "edited" event for agents. An edited comment (core/objcomments.py
+# ocm_edit) and an edited team chat message (collab/teamchat.py tchat_edit) both call med_changed with their kind; what each
+# kind sends is unchanged (event message_edited, data kind 'comment' with the task / 'team' with the room). Was the two
+# functions med_comment_edited / med_team_edited.
+def _medc_comment(c, t, k):
+    """kind 'comment' (t = the task, k = the comment after the edit): -> (events, key, may(aid), data(aid, old, new, who))."""
+    def may(aid):  # still sees the task; the person may still address it there (like the event 'comment', AGENT_GATED)
+        return task_visible(c, t["id"], aid, full=True) and agent_usable(c, aid, k["user_id"], t["list_id"])
+
+    def data(aid, old, new, who):
+        return agent_task_data(c, t["id"], aid, kind="comment", comment={"id": k["id"], "task_id": t["id"], "created_at": k["created_at"],
+                                                                         "edited_at": k["edited_at"]},
+                               old=old, new=new, user=who, list_id=t["list_id"])
+    return ("comment", "mention", "assigned"), "comment", may, data
 
 
-def med_team_edited(c, r, m, old_body):
-    """A team chat message was edited: message_edited to the agents that got it as team_message and are still in the room."""
+def _medc_team(c, r, m):
+    """kind 'team' (r = the room, m = the message after the edit): the agents that got it as team_message and are still in the room."""
     from ..collab.teamchat import tchat_room_members
-    old, new = comment_plain(c, old_body), comment_plain(c, m["body"])
+    members = []
+
+    def may(aid):
+        if not members:
+            members.append(set(tchat_room_members(c, r)))
+        if aid not in members[0]:
+            return False
+        return not r["list_id"] or agent_usable(c, aid, m["user_id"], r["list_id"])  # like team_message (AGENT_GATED)
+
+    def data(aid, old, new, who):
+        return {"kind": "team", "room": {"id": r["id"], "kind": r["kind"], "list_id": r["list_id"]},
+                "message": {"id": m["id"], "user_id": m["user_id"], "task_id": m["task_id"], "created_at": m["created_at"],
+                            "edited_at": m["edited_at"]},
+                "old": old, "new": new, "user": who}
+    return ("team_message",), "message", may, data
+
+
+MED_CHANGED = {"comment": _medc_comment, "team": _medc_team}
+
+
+def med_changed(c, kind, obj, row, old_body):
+    """A comment / message was edited: message_edited to every agent that got it as an event (kind's events) and may still
+    see it (kind's may). kind 'comment': obj = the task, row = the comment; 'team': obj = the room, row = the message (both
+    after the edit). Same text after cleaning (comment_plain): nothing. -> the agents told."""
+    old, new = comment_plain(c, old_body), comment_plain(c, row["body"])
     if old == new:
-        return
-    ags = {x["agent_id"] for x, _ in med_queued_events(c, None, ("team_message",), "message", m["id"])}
-    if not ags:
-        return
-    members, uid = tchat_room_members(c, r), m["user_id"]
-    for aid in sorted(ags & set(members)):
-        if r["list_id"] and not agent_usable(c, aid, uid, r["list_id"]):  # like team_message (AGENT_GATED)
+        return []
+    events, key, may, data = MED_CHANGED[kind](c, obj, row)
+    aids = sorted({x["agent_id"] for x, _ in med_queued_events(c, None, events, key, row["id"])})
+    if not aids:
+        return []
+    uid = row["user_id"]
+    who = {"id": uid, "name": user_names(c, [uid]).get(uid, "")}
+    told = []
+    for aid in aids:
+        if not may(aid):
             continue
-        agent_emit(c, aid, "message_edited", {
-            "kind": "team", "room": {"id": r["id"], "kind": r["kind"], "list_id": r["list_id"]},
-            "message": {"id": m["id"], "user_id": uid, "task_id": m["task_id"], "created_at": m["created_at"], "edited_at": m["edited_at"]},
-            "old": old[:AGENT_EVENT_COMMENT_CHARS], "new": new[:AGENT_EVENT_COMMENT_CHARS],
-            "user": {"id": uid, "name": user_names(c, [uid]).get(uid, "")}})
+        agent_emit(c, aid, "message_edited", data(aid, old[:AGENT_EVENT_COMMENT_CHARS], new[:AGENT_EVENT_COMMENT_CHARS], who))
+        told.append(aid)
+    return told
 
 
 # ---- 2.152.0 D (#2175): a person deletes a message of their conversation with an agent, or the whole history, for good (the

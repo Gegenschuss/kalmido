@@ -3,7 +3,5 @@
 # row goes with the comment / message) or a restore puts it back. The files stay as rows (attachments.deleted_at = the
 # comment's deleted_at; tchat_files unchanged, hidden with their deleted message). New tables only: older versions ignore them.
 # 2.972.0 (#5272): comment_trash_text became obj_comment_trash of the comments' core (migrations.d/5272_a.py, dropped there).
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS tchat_trash_text (
-  message_id BIGINT PRIMARY KEY REFERENCES tchat_msgs(id) ON DELETE CASCADE, body TEXT NOT NULL DEFAULT '', enc TEXT);
-"""
+# 2.981.0 (#5274): tchat_trash_text became kind 'tchat' of obj_comment_trash (migrations.d/5274_a.py, dropped there).
+SCHEMA = ""

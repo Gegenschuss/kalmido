@@ -1162,8 +1162,8 @@ def vdr_home(c, r, uid):
 def _vdc_trash(c, cid, ts):
     """The answers of a comment go into the trash with it (the same time; they were deleted with it by ON DELETE CASCADE)."""
     for (i,) in c.execute(f"SELECT id FROM obj_comments WHERE kind='{VDC_KIND}' AND parent_id=? AND {live_sql()}", (int(cid),)).fetchall():
-        c.execute("INSERT INTO obj_comment_trash(comment_id, body, mentions) SELECT id, body, mentions FROM obj_comments WHERE id=? "
-                  "ON CONFLICT(comment_id) DO UPDATE SET body=excluded.body, mentions=excluded.mentions", (i,))
+        c.execute("INSERT INTO obj_comment_trash(kind, comment_id, body, mentions) SELECT 'comment', id, body, mentions FROM obj_comments "
+                  "WHERE id=? ON CONFLICT(kind, comment_id) DO UPDATE SET body=excluded.body, mentions=excluded.mentions", (i,))  # 2.981.0 (#5274): kind
         c.execute("UPDATE obj_comments SET body='', mentions='{}', deleted_at=? WHERE id=?", (ts, i))
 
 

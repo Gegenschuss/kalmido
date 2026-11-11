@@ -17,11 +17,15 @@ the thread rule of before (a thread's first message stays while replies point at
 unlinked after the commit); files/trashpurge.py no longer has a run of its own for them.
 2.972.0 (#5272): the comments of tasks are rows of the comments' core: their trash (obj_comment_trash, the files with the same
 time) is core/objcomments.py ocm_trash / ocm_restore with the task's hooks of collab/comments.py; comment_trash_text is gone.
-The team chat keeps its own trash text here until stage Q4c."""
+2.981.0 (#5274, stage Q4c): the team chat's kept text too -- obj_comment_trash, kind 'tchat' (core/objcomments.py
+ocm_trash_keep / ocm_trash_take / ocm_trash_forget); tchat_trash_text is gone. The reactions of a deleted message stay in
+obj_reactions until the trash run (kalmido_orx_gone deletes them with the row), so a restore brings them back (decided
+08.11.2026, question 5)."""
 from ..core.db import iso_ms, now_utc
 from ..core.objparts import part_kind  # 2.783.0 (#5368)
 from ..core.access import live_sql  # 2.783.0 (#5368)
-from ..core.objcomments import ocm_trash_drop  # 2.972.0 (#5272)
+from ..core.objcomments import ocm_trash_drop, ocm_trash_forget, ocm_trash_keep, ocm_trash_take  # 2.972.0 (#5272); 2.981.0 (#5274)
+from ..core.objhooks import USER_GONE  # 2.981.0 (#5274)
 
 
 def tcx_trash(c, mid):
@@ -30,20 +34,19 @@ def tcx_trash(c, mid):
     if not m:
         return None
     ts = iso_ms(now_utc())
-    c.execute("INSERT INTO tchat_trash_text(message_id, body, enc) VALUES(?,?,?) ON CONFLICT(message_id) DO UPDATE "
-              "SET body=excluded.body, enc=excluded.enc", (mid, m["body"] or "", m["enc"]))
+    ocm_trash_keep(c, "tchat", mid, m["body"] or "", enc=m["enc"])  # 2.981.0 (#5274): the core's trash, kind 'tchat'
     c.execute("UPDATE tchat_msgs SET deleted_at=?, edited_at=?, body='', enc=NULL WHERE id=?", (ts, ts, mid))
     return ts
 
 
 def tcx_restore(c, mid):
     """A team chat message from the trash back. -> True / False (nothing kept). edited_at moves on: open chats reload it."""
-    r = c.execute("SELECT x.body, x.enc FROM tchat_msgs m JOIN tchat_trash_text x ON x.message_id=m.id "
-                  "WHERE m.id=? AND m.deleted_at IS NOT NULL FOR UPDATE OF m", (mid,)).fetchone()
+    if not c.execute("SELECT 1 FROM tchat_msgs WHERE id=? AND deleted_at IS NOT NULL FOR UPDATE", (mid,)).fetchone():
+        return False
+    r = ocm_trash_take(c, "tchat", mid)  # 2.981.0 (#5274): only the kind 'tchat' (a comment may have the same id)
     if not r:
         return False
     c.execute("UPDATE tchat_msgs SET body=?, enc=?, deleted_at=NULL, edited_at=? WHERE id=?", (r["body"], r["enc"], iso_ms(now_utc()), mid))
-    c.execute("DELETE FROM tchat_trash_text WHERE message_id=?", (mid,))
     return True
 
 
@@ -68,8 +71,17 @@ def ctt_purge_list(c, lid):
     w = "deleted_at IS NOT NULL AND room_id IN (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id=?)"
     paths = tcx_trash_paths(c, w, (lid,))
     c.execute(f"DELETE FROM tchat_files WHERE message_id IN (SELECT id FROM tchat_msgs WHERE {w})", (lid,))
-    c.execute(f"DELETE FROM tchat_trash_text WHERE message_id IN (SELECT id FROM tchat_msgs WHERE {w})", (lid,))
+    ocm_trash_forget(c, "tchat", f"SELECT id FROM tchat_msgs WHERE {w}", (lid,))  # 2.981.0 (#5274)
     return paths
+
+
+def tcx_purge_user(c, uid):
+    """2.981.0 (#5274): an account is deleted (accounts/users.py, core/objhooks.py USER_GONE): the kept texts of its deleted
+    team chat messages go (nobody may bring its words back; the rows stay with user_id NULL). Only kind 'tchat'. Caller commits."""
+    ocm_trash_forget(c, "tchat", "SELECT id FROM tchat_msgs WHERE user_id=? AND deleted_at IS NOT NULL", (uid,))
+
+
+USER_GONE.append(tcx_purge_user)
 
 
 TCX_MSG_KIND = "tchat_msg"  # 2.783.0 (#5368): the core's retention run of the team chat's tombstones (module docstring)

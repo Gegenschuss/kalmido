@@ -89,7 +89,8 @@ DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", 
 DOC_WS = {
     ("obj_comments", "body"): "(SELECT m.ws FROM doc_meta m WHERE obj_comments.kind = 'doc_note' AND m.node_id = obj_comments.ref_id)",
     ("obj_comment_trash", "body"): ("(SELECT m.ws FROM obj_comments k JOIN doc_meta m ON m.node_id = k.ref_id "
-                                    "WHERE k.id = obj_comment_trash.comment_id AND k.kind = 'doc_note')"),
+                                    "WHERE obj_comment_trash.kind = 'comment' AND k.id = obj_comment_trash.comment_id "
+                                    "AND k.kind = 'doc_note')"),  # 2.981.0 (#5274): only the comments' kept texts (not a team chat message's)
 }
 
 
@@ -609,7 +610,8 @@ def docs_pass(c, enc, stop=None):
                             out["failed"] += 1
                             continue
                     if new != r["v"]:
-                        out["changed"] += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {col}=?", (new, r["rid"], r["v"])).rowcount
+                        # 2.981.0 (#5274): AND the workspace -- obj_comment_trash's id is unique only with its kind
+                        out["changed"] += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {wx} IS NOT NULL AND {col}=?", (new, r["rid"], r["v"])).rowcount
             c.commit()
             if len(rows) < BATCH:
                 break
@@ -646,7 +648,7 @@ def docs_settle(c, account, stop=None):
                     if is_acct == account or (account and S._acct_key(c, r["ws"], True) is None):
                         continue
                     new = S.doc_seal_as(c, r["ws"], ctx, plain, account)
-                    out["changed"] += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {col}=?", (new, r["rid"], r["v"])).rowcount
+                    out["changed"] += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {wx} IS NOT NULL AND {col}=?", (new, r["rid"], r["v"])).rowcount  # 2.981.0 (#5274)
             c.commit()
             if len(rows) < BATCH:
                 break

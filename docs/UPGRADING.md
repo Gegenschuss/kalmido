@@ -67,4 +67,5 @@ large instance: a few minutes).
 
 The same release's first start also moves the comments of video / picture reviews and
 the notes on documents into the same shared table (`obj_comments`), drops the old tables and raises the database's limit to the
-minor of that release. An older version would make them again empty. Go back only by restoring a backup made before the update.
+minor of that release. An older version would make them again empty. Go back only by restoring a backup made before the update. It also moves the kept texts of deleted team chat messages into the comments' trash
+(`obj_comment_trash`, which gets a kind and a new key) and drops `tchat_trash_text`.

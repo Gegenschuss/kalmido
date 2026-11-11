@@ -393,8 +393,8 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths, df_define=None):
     for r in c.execute("SELECT id, body FROM obj_comments WHERE kind='doc_note' AND ref_id=?", (nid,)).fetchall():
         c.execute("UPDATE obj_comments SET org_id=?, body=? WHERE id=?",
                   (to, S.doc_seal(c, new, "doc_notes.text", fsm_open(c, old, "doc_notes.text", r["body"]) or "") if r["body"] else "", r["id"]))
-        for x in c.execute("SELECT body FROM obj_comment_trash WHERE comment_id=?", (r["id"],)).fetchall():
-            c.execute("UPDATE obj_comment_trash SET body=? WHERE comment_id=?",
+        for x in c.execute("SELECT body FROM obj_comment_trash WHERE kind='comment' AND comment_id=?", (r["id"],)).fetchall():  # 2.981.0 (#5274)
+            c.execute("UPDATE obj_comment_trash SET body=? WHERE kind='comment' AND comment_id=?",
                       (S.doc_seal(c, new, "doc_notes.text", fsm_open(c, old, "doc_notes.text", x["body"]) or "") if x["body"] else "", r["id"]))
     S.doc_index(c, nid, new, S.index_text(c, dict(S.meta_row(c, nid)), name, text))
     for r in c.execute("SELECT * FROM rc_receipts WHERE node_id=?", (nid,)).fetchall():

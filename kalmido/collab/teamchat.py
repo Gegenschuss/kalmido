@@ -16,7 +16,7 @@ from ..accounts.orgroles import FULL_READ, org_say_refusal, role_known
 from ..accounts.orgs import INSTANCE_ENV
 from ..tasks.validation import as_int
 from ..collab.comments import collab_on, comment_plain, lang_of, push_gate, push_gate_due, push_gate_reset, user_names
-from ..core.objcomments import OCM_MENTION_RE, ocm_kind, ocm_mentions_clean, ocm_need_say  # 2.972.0 (#5272): the one mention token / name rule of the core; 2.981.0 (#5274): + the parser
+from ..core.objcomments import OCM_MENTION_RE, ocm_kind, ocm_may_delete, ocm_mentions_clean, ocm_need_say  # 2.972.0 (#5272): the one mention token / name rule of the core; 2.981.0 (#5274): + the parser
 from ..collab.news import list_bells
 from ..core.errors import reject_unknown, BadInput
 from ..core.conflict import ccf_check, take_version  # 2.564.0 D (#4701); 2.638.0 (#4775): take_version
@@ -503,7 +503,29 @@ def _tchat_say(c, rid, uid):
     return tchat_say_refusal(c, r, uid) if r is not None else None
 
 
-ocm_kind("tchat", people=_tchat_people, say=_tchat_say)
+def _tchat_rank(c, uid, rid):
+    """2.981.0 (#5274): the role of uid in room rid for the core's delete rule (ocm_may_delete: the author or 'manage') --
+    'manage' = an owner / admin of the list of a list's channel, the creator / an organisation admin of a channel
+    (teamchan.py tcx_can_manage); 'view' = a member; None = outside. The same people as need_tmsg before, never more."""
+    r = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (int(rid),)).fetchone()
+    if r is None:
+        return None
+    if r["kind"] in TCX_KINDS:
+        from ..core.objects import obj_role
+        if not obj_role(c, uid, "tchat_room", r["id"]):
+            return None
+    elif not tchat_room_ok(c, r, uid):
+        return None
+    if r["kind"] == "list" and list_role(c, r["list_id"], uid) in MANAGE_ROLES:
+        return "manage"
+    if r["kind"] == "channel":  # 2.113.1 (#2059): its creator / an organisation admin (a group: nobody beyond the author)
+        from .teamchan import tcx_can_manage
+        if tcx_can_manage(c, r, uid):
+            return "manage"
+    return "view"
+
+
+ocm_kind("tchat", people=_tchat_people, say=_tchat_say, role=_tchat_rank)  # 2.981.0 (#5274): + role (the delete rule)
 
 
 @app.get("/api/team")
@@ -881,12 +903,10 @@ def need_tmsg(c, mid, edit=False):
         raise Denied(404)
     r = need_room(c, m["room_id"])
     if edit and m["user_id"] != me():
-        if edit == "delete" and r["kind"] == "list" and list_role(c, r["list_id"]) in MANAGE_ROLES:
+        # 2.981.0 (#5274): the core's one delete rule -- the author or 'manage' on the room (_tchat_rank: a list's owner /
+        # admin, a channel's creator / organisation admin; decided 08.11.2026, question 3)
+        if edit == "delete" and ocm_may_delete(c, {"user_id": m["user_id"], "kind": "tchat", "ref_id": r["id"]}, me()):
             return m, r
-        if edit == "delete" and r["kind"] == "channel":  # 2.113.1 (#2059): its creator / an organisation admin
-            from .teamchan import tcx_can_manage
-            if tcx_can_manage(c, r, me()):
-                return m, r
         raise Denied(403)
     return m, r
 
@@ -936,8 +956,8 @@ def tchat_edit(mid):
     text, mentions = ocm_mentions_clean(c, "tchat", r["id"], text.strip())  # 2.981.0 (#5274): the core's parser
     known = {int(x) for x in OCM_MENTION_RE.findall(m["body"] or "")}
     c.execute("UPDATE tchat_msgs SET body=?, edited_at=? WHERE id=?", (text, iso_ms(now_utc()), mid))
-    from ..agents.chat import med_team_edited  # 2.39.0 (#1179): agents that got it as team_message learn the change
-    med_team_edited(c, r, c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone(), m["body"])
+    from ..agents.chat import med_changed  # 2.39.0 (#1179): agents that got it as team_message learn the change
+    med_changed(c, "team", r, c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone(), m["body"])  # 2.981.0 (#5274): the one "edited" event
     new_m = [x for x in mentions if x not in known]
     if new_m:  # 2.367.5 (#2980): a mention added later is heard, like in a comment (comment_edit)
         tchat_notify(c, r, c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone(), new_m, only=new_m)

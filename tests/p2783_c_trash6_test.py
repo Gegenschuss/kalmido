@@ -156,7 +156,7 @@ r = F.post(B + "/api/team/channels", json={"name": "Pond 5368", "members": [GID]
 check(r.status_code == 201, "chat: own channel " + r.text[:160])
 CH = r.json().get("id")
 M1 = F.post(B + f"/api/team/rooms/{CH}/messages", json={"body": "Frogs seen"}).json()["id"]
-check(F.delete(B + f"/api/team/messages/{M1}").ok and one("SELECT body FROM tchat_trash_text WHERE message_id=?", (M1,)) == "Frogs seen",
+check(F.delete(B + f"/api/team/messages/{M1}").ok and one("SELECT body FROM obj_comment_trash WHERE kind='tchat' AND comment_id=?", (M1,)) == "Frogs seen",
       "chat: deleted, its text kept")
 check(G.post(B + f"/api/team/messages/{M1}/restore").status_code in (403, 404), "chat: gerda may not restore it")
 r = F.post(B + f"/api/team/messages/{M1}/restore")
@@ -195,7 +195,7 @@ check(not one("SELECT 1 FROM list_part_trash WHERE id=?", (TR2,)) and F.post(B +
 check(not one("SELECT 1 FROM list_part_trash WHERE id=?", (W2,)) and F.post(B + f"/api/lists/{L}/time/restore", json={"wipe": W2}).status_code == 404,
       "time: the old copy gone")
 check(not one("SELECT 1 FROM member_memos WHERE list_id=? AND user_id=?", (L, GID)), "memo: the old memo gone")
-check(not one("SELECT 1 FROM tchat_msgs WHERE id=?", (M1,)) and not one("SELECT 1 FROM tchat_trash_text WHERE message_id=?", (M1,)),
+check(not one("SELECT 1 FROM tchat_msgs WHERE id=?", (M1,)) and not one("SELECT 1 FROM obj_comment_trash WHERE kind='tchat' AND comment_id=?", (M1,)),
       "chat: the old tombstone and its kept text gone")
 check(one("SELECT 1 FROM tchat_msgs WHERE id=?", (ROOT,)), "chat: the thread's first message stays while its reply points at it")
 check(not one("SELECT 1 FROM list_part_trash WHERE kind='section' AND ref_id=?", (SEC,))

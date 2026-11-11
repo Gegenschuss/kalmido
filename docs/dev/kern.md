@@ -563,8 +563,8 @@ loses only versions nobody can open any more. The organisation export keeps `wik
 ### Comments (stage Q4a, 2.972.0, #5272)
 
 One table `obj_comments(id, kind, ref_id, org_id, user_id, ext_name, parent_id, body, mentions BIGINT[], extra JSONB,
-client_ref, created_at, edited_at, deleted_at, deleted_by)` holds the comments of every kind; `obj_comment_trash(comment_id,
-body, mentions, enc)` keeps the text of a comment in the trash. They replaced `comments` and `comment_trash_text`. Kinds today:
+client_ref, created_at, edited_at, deleted_at, deleted_by)` holds the comments of every kind; `obj_comment_trash(kind, comment_id,
+body, mentions, enc)` keeps the text of a comment in the trash (kind `comment`; a team chat message: `tchat`, Q4c). They replaced `comments` and `comment_trash_text`. Kinds today:
 `task` (a task's comments; `ref_id` = the task). Video / picture reviews and document notes follow with Q4b, the team chat takes
 the helpers with Q4c. `kalmido/core/objcomments.py`:
 - `ocm_add(c, kind, ref_id, uid, body, *, mentions, extra, ext_name, parent_id, client_ref, created_at, notify)` writes one
@@ -627,7 +627,7 @@ the new text) and `web` (the generic routes below). Reading in the old shape: `o
   the clean-up of #5263 stay out); a SQLite file brings them in the old tables (`admin/migrate.py LEGACY_Q4B`). One-way: the
   old tables are dropped (`5273_a.py`); a backup restores them.
 
-#### The team chat's helpers and git comments (stage Q4c, 2.981.0, #5274, in part)
+#### The team chat's helpers and git comments (stage Q4c, 2.981.0, #5274)
 
 The team chat keeps its message stream (`tchat_msgs`: reads, threads, pins, seals, files) and takes the core's helpers: kind
 `tchat` of `ocm_kind` (helpers only, no rows) with the hooks `people` (the room's members: the one mention parser
@@ -635,8 +635,22 @@ The team chat keeps its message stream (`tchat_msgs`: reads, threads, pins, seal
 room)`, was `need_room_say`). A comment imported from a repository (`integrations/git_sync.py`, `git_issues.py`) belongs to no
 account: `user_id` NULL, `ext_name` = the remote author, `extra.source` = `git` (the app names it "(from the repository)"); the
 deletion of the account that connected / imported it no longer takes its kept text in the trash (decided 08.11.2026, question
-7, B4). Still open: the team chat's trash text (`tchat_trash_text` into `obj_comment_trash`, whose key is a comment's id today)
-and one "edited" event for agents (`med_comment_edited` / `med_team_edited`).
+7, B4).
+- The trash: `obj_comment_trash` has a `kind` -- `comment` (a row of `obj_comments`, every kind of comment) or `tchat` (a team
+  chat message of `tchat_msgs`) -- and the key `(kind, comment_id)`: a message and a comment may share an id, every query names
+  the kind. A stream outside `obj_comments` keeps / takes its text with `ocm_trash_keep(c, kind, id, body, enc=)`,
+  `ocm_trash_take(c, kind, id)` and `ocm_trash_forget(c, kind, where, args)` (`collab/cmttrash.py tcx_trash` / `tcx_restore`,
+  a lock switch, an account's deletion through `USER_GONE` -- only its own messages). No foreign key: the triggers
+  `kalmido_oct_gone_comment` / `kalmido_oct_gone_tchat` delete a kept text with its row. The reactions of a deleted message stay
+  in `obj_reactions` until the trash run, a restore brings them back (question 5).
+- Deleting / restoring someone else's message: the one rule `ocm_may_delete` with the room's role hook (`role`: `manage` = an
+  owner / admin of a list's channel, the creator / an organisation admin of a channel; a group or a direct message: only the
+  author). The agent chat stays a final delete (question 4).
+- One "edited" event for agents: `agents/chat.py med_changed(c, kind, obj, row, old_body)` (kind `comment` from `ocm_edit`,
+  `team` from the team chat's edit; was `med_comment_edited` / `med_team_edited`); the event `message_edited` and its data
+  are unchanged.
+- The start changed the key and moved the rows of `tchat_trash_text` (`ocm_move_q4c`, `core/objhooks.py MOVE`); one-way: the
+  old table is dropped (`5274_a.py`), the back limit rises to this minor; a backup restores it.
 
 ### Versions of tables (stage Q7c, 2.800.0, #5283)
 

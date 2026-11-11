@@ -661,7 +661,7 @@ def _user_purge(c, uid, made):
     # rows keep user_id NULL, nobody may bring the person's words back afterwards; the files go with the trash run)
     for f in USER_GONE:  # 2.972.0 (#5272): the comments' core (core/objcomments.py ocm_purge_user: its trash texts, its mentions)
         f(c, uid)
-    c.execute("DELETE FROM tchat_trash_text WHERE message_id IN (SELECT id FROM tchat_msgs WHERE user_id=? AND deleted_at IS NOT NULL)", (uid,))
+    # 2.981.0 (#5274): the team chat's kept texts are kind 'tchat' of the core's trash (collab/cmttrash.py tcx_purge_user, USER_GONE)
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     obj_gone_drop(c, gone)  # 2.578.0 (#4796): the objects went with the account (cascade): their history / undo rows too
     return files

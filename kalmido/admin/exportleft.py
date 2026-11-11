@@ -36,8 +36,8 @@ UMZ_LEFT_TABLES = {
     "undo_groups": _DERIVED,  # 2.747.0 (#5249): the heads of a person's undo steps (30 days, working data like obj_undo)
     "doc_views": _VIEW,  # 2.579.0 (#4802): saved views of the documents search (their filters name label ids of this server)
     # 2.531.0 (#4317 x #4315): the kept text of deleted comments / team chat messages (working data until the trash period ends);
-    # 2.972.0 (#5272): the comments' one is the core's obj_comment_trash
-    "obj_comment_trash": _DERIVED, "tchat_trash_text": _DERIVED,
+    # 2.972.0 (#5272): the comments' one is the core's obj_comment_trash; 2.981.0 (#5274): the team chat's too (kind tchat)
+    "obj_comment_trash": _DERIVED,
     "hub_mailbox_rules": _LATER, "hub_mailbox_docs": _DERIVED,  # 2.581.0 (#4804): a mailbox's document rules (the mailbox itself is exported), which mails it took (Message-ID hashes)
     "doc_office_moves": _DERIVED,  # 2.547.0 (#4434): the undo of the receipts move into the office (30 days, ids and folders only)
     "field_trash": _DERIVED, "member_memos": _DERIVED,  # 2.550.0 (#4528): deleted fields / a removed member's ways back (until the trash period ends)

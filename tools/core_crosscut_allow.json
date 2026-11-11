@@ -56,7 +56,6 @@
   "task_offer_links": "own logic: the quotation position a task came from (offer data)",
   "task_people": "own logic: the people of a task (assignees)",
   "tchat_msgs": "own logic: the team chat's message stream (stage Q4 keeps it)",
-  "tchat_trash_text": "stage Q4 (comments) takes it down: the core's comments with the trash of #5249",
   "wiki_links": "own logic: derived from the page text (backlinks), rebuilt on save",
   "wiki_pages": "own logic: a page's text (body)",
   "wiki_shares": "public page links only (kind link, token_hash) - the area's share links without an account; person shares are core shares since stage 7c (#5244)"

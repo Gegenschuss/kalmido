@@ -41,7 +41,7 @@ TP_PLAIN = (
     ("series", "office_inv_series", ""),  # the invoices made stay (series_id is a plain number)
     # 2.783.0 (#5368): the tombstones of the team chat moved onto the core's run (collab/cmttrash.py TCX_MSG_KIND)
     # body is empty; reactions (trigger, #5269) and (2.530.0 A, #4315) the kept text go along; its files went through atr_tick above (same deleted_at)
-    ("comments", "obj_comments", ""),  # 2.972.0 (#5272): the core's table (the kept text, obj_comment_trash, cascades)
+    ("comments", "obj_comments", ""),  # 2.972.0 (#5272): the core's table (the kept text, obj_comment_trash, goes with it: trigger kalmido_oct_gone_comment, #5274)
     # 2.272.0 D (#3029): clients (contact persons, data protection sheets, mail-in addresses cascade -- video reviews go to their
     # own trash first, 2.530.0 D #4316; mails,
     # deals, letters ... set null); never one records (kept by law) point to since -- team/clients.py CL_HOLD

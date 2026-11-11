@@ -6,7 +6,8 @@ author (NULL = written from outside, ext_name), parent_id = the answered comment
 JSONB = what a kind adds (a task: suggestion, choices, choice, portal, rule_name), client_ref = the client's key of a comment
 sent again. obj_comment_trash keeps the text of a comment in the trash. Kinds today: 'task' (the comments of a task; the
 routes, files, answer buttons and pushes of collab/comments.py). Video / picture reviews and document notes follow with stage
-Q4b; the team chat keeps its stream and takes the helpers here with Q4c.
+Q4b; the team chat keeps its stream and takes the helpers here with Q4c (2.981.0 #5274: also the trash -- obj_comment_trash
+has a kind, 'comment' for a row of obj_comments, 'tchat' for a team chat message; every query names it).
 
 The rules exist once:
 - reading = obj_role(kind, ref_id) >= 'view' of the core (core/objects.py; a task: its project role, core/objlight.py)
@@ -42,6 +43,8 @@ Interface:
   ocm_notify(c, kind, cid, text, mentions, notify_mentions, nfiles, only=None, replied=None) -> pushes
   ocm_after(c, kind, cid, text, mentions, ...) -> pushes          ocm_purge_user(c, uid)
   ocm_move(c) -> rows moved (init_db, once)                       ocm_fk(c, table, col, action)
+  ocm_trash_keep(c, kind, rid, body, *, mentions, enc)            ocm_trash_take(c, kind, rid) -> row | None
+  ocm_trash_forget(c, kind, where, args)   (2.981.0 #5274: the kept text of a stream outside obj_comments, OCM_TRASH_KINDS)
 (A SQLite file of an older version brings its comments in the old table, admin/migrate.py LEGACY_COMMENTS; ocm_move takes them.)
 """
 import json
@@ -363,8 +366,8 @@ def ocm_edit(c, cid, uid, b, *, public=None):
     live = _hook(kind, "live")
     obj = live(c, ref) if live else None
     if obj is not None:  # 2.39.0 (#1179): agents that got this comment as an event learn the change (before new mentions)
-        from ..agents.chat import med_comment_edited
-        med_comment_edited(c, obj, after, r["body"])
+        from ..agents.chat import med_changed
+        med_changed(c, "comment", obj, after, r["body"])  # 2.981.0 (#5274): the one "edited" event (was med_comment_edited)
         if new_m:
             p = ocm_after(c, kind, cid, text, mentions, notify_mentions=new_m, only=new_m, created=False, author=uid)
             if p and has_request_context():
@@ -389,8 +392,9 @@ def ocm_trash(c, cid, uid, *, check=True):
     ts = iso_ms(now_utc())
     sealed = _hook(r["kind"], "sealed")
     enc = "e2e" if (r["body"] or "").startswith("e2e1:") or (sealed and sealed(c, r["ref_id"])) else None
-    c.execute("INSERT INTO obj_comment_trash(comment_id, body, mentions, enc) SELECT id, body, mentions, ? FROM obj_comments WHERE id=? "
-              "ON CONFLICT(comment_id) DO UPDATE SET body=excluded.body, mentions=excluded.mentions, enc=excluded.enc", (enc, r["id"]))
+    c.execute("INSERT INTO obj_comment_trash(kind, comment_id, body, mentions, enc) SELECT 'comment', id, body, mentions, ? FROM obj_comments "
+              "WHERE id=? ON CONFLICT(kind, comment_id) DO UPDATE SET body=excluded.body, mentions=excluded.mentions, enc=excluded.enc",
+              (enc, r["id"]))  # 2.981.0 (#5274): the kind of the kept text (OCM_TRASH_KINDS)
     tr_ = _hook(r["kind"], "trash")
     if tr_:
         tr_(c, r["id"], ts)
@@ -412,29 +416,63 @@ def ocm_restore(c, cid, uid, *, check=True):
         _need_read(c, r["kind"], r["ref_id"], uid)
         if not ocm_may_delete(c, r, uid):
             raise Denied(403, tr(OCM_DEL_TXT))
-    if not c.execute("SELECT 1 FROM obj_comment_trash WHERE comment_id=?", (r["id"],)).fetchone():
+    if not c.execute("SELECT 1 FROM obj_comment_trash WHERE kind='comment' AND comment_id=?", (r["id"],)).fetchone():
         return False
     rs = _hook(r["kind"], "restore")
     if rs:
         rs(c, r["id"], ocm_ts(r["deleted_at"]))  # the files went with the same time (ocm_trash)
     c.execute("UPDATE obj_comments k SET body=x.body, mentions=x.mentions, deleted_at=NULL, deleted_by=NULL FROM obj_comment_trash x "
-              "WHERE x.comment_id=k.id AND k.id=?", (r["id"],))
-    c.execute("DELETE FROM obj_comment_trash WHERE comment_id=?", (r["id"],))
+              "WHERE x.kind='comment' AND x.comment_id=k.id AND k.id=?", (r["id"],))
+    c.execute("DELETE FROM obj_comment_trash WHERE kind='comment' AND comment_id=?", (r["id"],))
     return True
 
 
 def ocm_trash_drop(c, kind, ref_ids):
     """The kept texts of the deleted comments of (kind, ref_ids) go for good (a project's lock switched: they were not
     converted, collab/cmttrash.py ctt_purge_list). Caller commits."""
-    c.execute("DELETE FROM obj_comment_trash WHERE comment_id IN (SELECT id FROM obj_comments WHERE kind=? AND ref_id = ANY(CAST(? AS BIGINT[])))",
+    c.execute("DELETE FROM obj_comment_trash WHERE kind='comment' AND comment_id IN (SELECT id FROM obj_comments WHERE kind=? "
+              "AND ref_id = ANY(CAST(? AS BIGINT[])))",
               (kind, st_ids(ref_ids)))
+
+
+
+# 2.981.0 (#5274, stage Q4c): the kept text of an object outside obj_comments -- the team chat's messages keep their stream
+# (tchat_msgs) and put the text of a deleted message here, under their own kind (a message and a comment may share an id: every
+# query names the kind). The stream's area decides who may (collab/teamchat.py, ocm_may_delete with its role hook).
+OCM_TRASH_KINDS = ("comment", "tchat")  # obj_comment_trash.kind: 'comment' = a row of obj_comments, 'tchat' = of tchat_msgs
+
+
+def ocm_trash_keep(c, kind, rid, body, *, mentions=(), enc=None):
+    """Keep the text (and the ciphertext / marker enc) of row rid of the stream kind in the trash. Caller commits."""
+    if kind not in OCM_TRASH_KINDS or kind == "comment":
+        raise ValueError(kind)  # a comment goes through ocm_trash
+    c.execute("INSERT INTO obj_comment_trash(kind, comment_id, body, mentions, enc) VALUES(?,?,?,CAST(? AS BIGINT[]),?) "
+              "ON CONFLICT(kind, comment_id) DO UPDATE SET body=excluded.body, mentions=excluded.mentions, enc=excluded.enc",
+              (kind, int(rid), body or "", st_ids(mentions), enc))
+
+
+def ocm_trash_take(c, kind, rid):
+    """The kept text of row rid of the stream kind, taken out of the trash -> row (body, mentions, enc) | None. Caller commits."""
+    if kind not in OCM_TRASH_KINDS or kind == "comment":
+        raise ValueError(kind)
+    return c.execute("DELETE FROM obj_comment_trash WHERE kind=? AND comment_id=? RETURNING body, mentions, enc",
+                     (kind, int(rid))).fetchone()
+
+
+def ocm_trash_forget(c, kind, where, args):
+    """The kept texts of the rows of the stream kind whose id is in (SELECT id ... where) go for good (a lock switched, an
+    account went). where = a sub-select of the stream's ids. Caller commits."""
+    if kind not in OCM_TRASH_KINDS or kind == "comment":
+        raise ValueError(kind)
+    c.execute(f"DELETE FROM obj_comment_trash WHERE kind=? AND comment_id IN ({where})", (kind, *args))
 
 
 def ocm_purge_user(c, uid):
     """An account is deleted (accounts/users.py): the kept texts of its deleted comments go (nobody may bring its words back;
     the rows stay with user_id NULL), and it leaves the mentions of other comments. Caller commits."""
     with system_ctx(c):  # every organisation's comments
-        c.execute("DELETE FROM obj_comment_trash WHERE comment_id IN (SELECT id FROM obj_comments WHERE user_id=? AND deleted_at IS NOT NULL)", (uid,))
+        c.execute("DELETE FROM obj_comment_trash WHERE kind='comment' AND comment_id IN (SELECT id FROM obj_comments WHERE user_id=? "
+                  "AND deleted_at IS NOT NULL)", (uid,))
         c.execute("UPDATE obj_comments SET mentions=array_remove(mentions, CAST(? AS BIGINT)) WHERE CAST(? AS BIGINT) = ANY(mentions)", (uid, uid))
 
 
@@ -718,6 +756,43 @@ def ocm_move_q4b(c):
     return n
 
 
+OCM_Q4C_HOW = ("the kept texts of deleted team chat messages moved into the shared core's trash (obj_comment_trash, kind tchat, "
+               "#5274) and the old table was dropped - an older version would make it again empty and lose the texts kept "
+               "meanwhile; go back only with a backup from before")
+
+
+def ocm_trash_key(c):
+    """2.981.0 (#5274): obj_comment_trash's key is (kind, comment_id) and it has no foreign key (a kind names its table; the
+    triggers kalmido_oct_gone_* of the fragment 5274_a delete a kept text with its row). Idempotent (every start): a table of
+    5272_a (key comment_id, foreign key on obj_comments) is changed once. -> True when it changed it."""
+    key = c.execute("""SELECT array_agg(a.attname::text ORDER BY a.attname) FROM pg_constraint con
+                       JOIN pg_attribute a ON a.attrelid=con.conrelid AND a.attnum = ANY(con.conkey)
+                       WHERE con.contype='p' AND con.conrelid=to_regclass('obj_comment_trash')""").fetchone()[0]
+    if key is None or sorted(key) == ["comment_id", "kind"]:
+        return False
+    for (name,) in c.execute("SELECT conname FROM pg_constraint WHERE conrelid=to_regclass('obj_comment_trash') AND contype IN ('p', 'f')").fetchall():
+        c.execute(f"ALTER TABLE obj_comment_trash DROP CONSTRAINT {qi(name, {name})}")
+    c.execute("ALTER TABLE obj_comment_trash ADD PRIMARY KEY (kind, comment_id)")
+    return True
+
+
+def ocm_move_q4c(c):
+    """2.981.0 (#5274, stage Q4c): the key of obj_comment_trash becomes (kind, comment_id) (ocm_trash_key), then the rows of
+    tchat_trash_text (the kept texts of deleted team chat messages, while that table is there) go into it as kind 'tchat' with
+    their message's id; a text whose message is gone or not deleted any more stays behind. The fragment 5274_a drops the old
+    table right after (one-way). -> rows moved."""
+    ocm_trash_key(c)
+    if not c.execute("SELECT to_regclass('tchat_trash_text')").fetchone()[0]:
+        return 0
+    n = c.execute("""INSERT INTO obj_comment_trash(kind, comment_id, body, enc)
+                     SELECT 'tchat', x.message_id, COALESCE(x.body, ''), x.enc FROM tchat_trash_text x
+                     JOIN tchat_msgs m ON m.id=x.message_id WHERE COALESCE(m.deleted_at, '') <> ''
+                     ON CONFLICT DO NOTHING""").rowcount
+    kern_retire_floor(c, how=OCM_Q4C_HOW)  # the minor of the image that moves (core/kernretire.py, as ocm_move)
+    return n
+
+
 MOVE.append(ocm_move)  # core/db.py init_db, before the fragments' AFTER (core/objhooks.py)
 MOVE.append(ocm_move_q4b)  # 2.981.0 (#5273): video_comments / doc_notes, after the task comments (their ids come first)
+MOVE.append(ocm_move_q4c)  # 2.981.0 (#5274): obj_comment_trash's key with a kind, tchat_trash_text into it
 USER_GONE.append(ocm_purge_user)  # accounts/users.py, before an account goes
