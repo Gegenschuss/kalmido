@@ -281,7 +281,7 @@ def jobs(t):
 
 
 check("gh release" not in code(rel) and "contents: write" not in rel, "release.yml makes no release page any more")
-check("ghcr.io/gegenschuss/kalmido:${{ steps.v.outputs.version }}" in rel, "release.yml still builds the image of every version")
+check("${{ steps.v.outputs.image }}:${{ steps.v.outputs.version }}" in rel, "release.yml still builds the image of every version")
 check(re.search(r"^  schedule:\n    - cron: \"[0-9]+ [0-9]+ \* \* 0\"", wk, re.M) is not None and "workflow_dispatch:" in wk,
       "weekly-release.yml runs on Sunday and by hand")
 wj = jobs(wk)
@@ -292,8 +292,17 @@ check("contents: write" in wj["publish"] and "packages: write" in wj["publish"] 
 pub = wj["publish"]
 check('gh release create "$tag"' in pub and "--verify-tag --latest " in pub and 'tag="v$VER"' in pub and "latest-ok" not in code(pub),
       "the release hangs on vX.Y.Z (never latest-ok/...), never creates a tag, becomes latest")
-check(pub.index("imagetools create -t ghcr.io/gegenschuss/kalmido:latest") < pub.index("gh release create"),
+check(pub.index('imagetools create -t "$image:latest" "$image@$digest"') < pub.index("gh release create"),
       "first :latest, then the mark the installers read")
+# 2.995.0 (#5686): GitHub move of the repository (#4007 package A) - no workflow names the image by hand; the name comes from
+# github.repository in lower case, so ghcr.io/gegenschuss/kalmido today and ghcr.io/kalmido/kalmido after the move
+for wf in ("release.yml", "promote.yml", "weekly-release.yml"):
+    t = code(read(".github", "workflows", wf))
+    check("ghcr.io/" in t and re.search(r"ghcr\.io/(?!\$\{GITHUB_REPOSITORY,,\})", t) is None, f"#5686: {wf} names no fixed image")
+check('echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"' in rel
+      and "subject-name: ${{ steps.v.outputs.image }}" in rel, "#5686: release.yml builds and attests the image named after the repository")
+check(code(wk).count('image="ghcr.io/${GITHUB_REPOSITORY,,}"') == 2 and 'imagetools inspect "$image:$VER"' in wk,
+      "#5686: the weekly release reads the digest from and sets :latest on the image named after the repository")
 check("--password-stdin" in pub, "the token does not stand on the command line")
 for a in ("SHA256SUMS", "image-digest.txt", "install.sh", "install.ps1", "kalmido-$VER.tar.gz", "kalmido-$VER.zip"):
     check(a in wj["pick"], f"the weekly release carries {a} as before")

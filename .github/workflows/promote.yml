@@ -33,9 +33,10 @@ jobs:
           tag="v$ver"
           have=$(gh api "repos/$GH_REPO/commits/$tag" --jq .sha)
           [ "$have" = "$GITHUB_SHA" ] || { echo "::error::$GITHUB_REF_NAME is on $GITHUB_SHA, $tag on $have"; exit 1; }
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"  # 2.995.0 (#5686): follows the repository name
           # release.yml may still be building the image
           i=0
-          until digest=$(docker buildx imagetools inspect "ghcr.io/gegenschuss/kalmido:$ver" --format '{{.Manifest.Digest}}' 2>/dev/null); do
+          until digest=$(docker buildx imagetools inspect "$image:$ver" --format '{{.Manifest.Digest}}' 2>/dev/null); do
             i=$((i + 1))
             [ "$i" -lt 100 ] || { echo "::error::image :$ver not there after 50 minutes"; exit 1; }
             sleep 30

@@ -55,7 +55,7 @@ st, why, _ = ci_base({"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/hot
 check(st is None, "a branch 'hotfixes' is no hotfix branch (%s)" % st)
 
 rel = read(".github", "workflows", "release.yml")
-check("ghcr.io/gegenschuss/kalmido:${{ steps.v.outputs.version }}" in rel, "the version image tag stays")
+check("${{ steps.v.outputs.image }}:${{ steps.v.outputs.version }}" in rel, "the version image tag stays")
 
 print("hotfix_lane: %d ok, %d failed" % (OKS[0], len(FAILS)))
 sys.exit(1 if FAILS else 0)

@@ -34,7 +34,7 @@ code = "\n".join(line for line in rel.splitlines() if not line.lstrip().startswi
 check("kalmido:latest" not in code, "release.yml does not touch the image :latest")
 check("gh release" not in code and "--latest" not in code, "2.641.0 (#5011): release.yml makes no release page, so marks nothing as latest")
 check("outputs.latest" not in code and "ls-remote" not in code, "no version comparison left in release.yml")
-check("ghcr.io/gegenschuss/kalmido:${{ steps.v.outputs.version }}" in code, "the image with its version stays")
+check("${{ steps.v.outputs.image }}:${{ steps.v.outputs.version }}" in code, "the image with its version stays")
 
 # ------------------------------------------------------------------ promote.yml: the frame
 check(re.search(r'^on:\n  push:\n    tags: \["latest-ok/\*\.\*\.\*"\]\n', pro, re.M) is not None, "promote.yml runs only on latest-ok/X.Y.Z")
@@ -81,7 +81,7 @@ def promote(ref="latest-ok/2.513.0", tag_sha=SHA, digest=DIG, cur="v2.512.0", mi
     d = tempfile.mkdtemp(dir=TMP)
     if os.path.exists(LOG):
         os.remove(LOG)
-    env = dict(os.environ, PATH=BIN + os.pathsep + os.environ["PATH"], GITHUB_REF_NAME=ref, GITHUB_SHA=SHA, GH_REPO="o/r", GH_TOKEN="t",
+    env = dict(os.environ, PATH=BIN + os.pathsep + os.environ["PATH"], GITHUB_REF_NAME=ref, GITHUB_SHA=SHA, GH_REPO="Gegen/Kalm", GITHUB_REPOSITORY="Gegen/Kalm", GH_TOKEN="t",
                GHCR_USER="u", T_LOG=LOG, T_DIR=d, T_TAG_SHA=tag_sha, T_DIGEST=digest, T_CUR=cur, T_MISSING=str(missing))
     r = subprocess.run(["bash", "-c", script], cwd=d, env=env, capture_output=True, text=True, timeout=60)
     log = ""
@@ -98,7 +98,8 @@ def moved(log):
 # 2.641.0 (#5011): the checks stay, the moves went to weekly-release.yml
 rc, log, out = promote()
 check(rc == 0 and not moved(log), f"the normal case passes and moves nothing ({rc} {out[:200]} {log})")
-check("imagetools inspect ghcr.io/gegenschuss/kalmido:2.513.0" in log, f"it asks for the image of the version: {log}")
+# 2.995.0 (#5686): the image name comes from the repository in lower case (GitHub move #4007), not from a fixed name
+check("imagetools inspect ghcr.io/gegen/kalm:2.513.0" in log, f"it asks for the image of the version, named after the repository: {log}")
 check("ready for the weekly release" in out and DIG in out, f"it says the version is ready for the weekly release: {out[:300]}")
 rc, log, _ = promote(ref="latest-ok/2.166.5", cur="v2.223.1")
 check(rc == 0 and not moved(log), f"a fix of an older line: checked, nothing moves ({rc} {log})")

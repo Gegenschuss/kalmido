@@ -93,7 +93,8 @@ jobs:
           git archive --format=zip --prefix="kalmido-$VER/" -o "dist/kalmido-$VER.zip" "v$VER"
           git show "v$VER:install.sh" > dist/install.sh
           git show "v$VER:install.ps1" > dist/install.ps1
-          digest=$(docker buildx imagetools inspect "ghcr.io/gegenschuss/kalmido:$VER" --format '{{.Manifest.Digest}}')
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"  # 2.995.0 (#5686): follows the repository name
+          digest=$(docker buildx imagetools inspect "$image:$VER" --format '{{.Manifest.Digest}}')
           printf '%s' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$' || { echo "::error::no usable image digest for :$VER: $digest"; exit 1; }
           printf '%s\n' "$digest" > dist/image-digest.txt
           # 2.742.0 (#5217): web-manifest-X.Y.Z.json - the full SHA-256 of every file the browser gets from this version (what
@@ -164,7 +165,8 @@ jobs:
           digest=$(tr -d '[:space:]' < dist/image-digest.txt)
           printf '%s' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$' || { echo "::error::no usable image digest: $digest"; exit 1; }
           printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-          docker buildx imagetools create -t ghcr.io/gegenschuss/kalmido:latest "ghcr.io/gegenschuss/kalmido@$digest"
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"  # 2.995.0 (#5686): follows the repository name
+          docker buildx imagetools create -t "$image:latest" "$image@$digest"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release edit "$tag" --notes-file notes.md
             gh release upload "$tag" dist/* --clobber
