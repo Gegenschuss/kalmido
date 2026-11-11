@@ -19,7 +19,57 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.962.0] - 2026-11-11
+## [2.974.0] - 2026-11-11
+
+Package 2.963 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Back on a phone goes one view back inside a page that has no address of its own: team chat thread -> room, contacts trash -> contacts, office card statement -> card -> card list, a trip -> trip list, notes trash -> notes; the visible ‹ takes the same way (#5233)
+- A subtask opened from a task's panel: Back and the panel's ‹ open the task above it again instead of closing the panel (no dead Back left behind); the X still closes the whole panel (#5233)
+- Back on a phone ends a selection mode first and stays on the page (task list, contacts, clients, documents, file store, knowledge, trip receipts); ending the selection another way takes its Back step away again (#5234)
+- Search > "Move to another project": Back returns to the normal search like Esc, the next Back closes it (#5234)
+
+### Fixed
+- The task panel no longer opens again when it was closed in the same frame it opened in (the ‹ right after Back) (#5233)
+- The notes card's markdown strip writes the backtick as \x60, so the innerHTML lint reads chat.js correctly again (#5233)
+
+Fix auf main: harte Suite p287b_a_freelancer_api (#5666).
+
+### Fixed
+- Tests: the freelancer API sweep knows an own folder for the new move check of locked folders (`GET /api/files/lock/movecheck/<id>`, #3348), so it stays at most 80 routes without a known id; the threshold is unchanged (#5666)
+
+Package 2.959 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2579_c_ui, CI-only rot: p2430_c_ui u. 1 weitere, Sammelpaket: A).
+
+### Added
+- Documents: in the document view's page strip, pages of a PDF can be reordered - drag with the mouse, hold and drag on the phone, or Move left / Move right (Ctrl+Shift+arrow); saving makes a new version, Undo brings the old order back (#4805)
+- Documents: select several PDF documents, then More > Merge PDFs: a dialog sets the order, the first document gets a new version with all pages, the others go into the trash; one Undo step brings everything back. Not for locked receipts or folders, at most 50 documents / 1000 pages / 100 MB (#4805)
+- Agents: new event `task_changed` with `diff` `{field: {old, new}}` (like the webhook `task.updated`) for tasks assigned or delegated to the agent or watched by it, changed by someone else; at most 50 per agent and request; switch `task_changed` in the agent's work style (on by default) (#4030)
+- Organisation export / import: the organisation's own ticket types and its field schema (`lists/org_fields.json`) travel along; imported project fields are linked to the target's schema field (same key and type), into the private space both become the importing person's own (#4031)
+
+### Fixed
+- Documents: dragging in the page strip on a phone no longer swipes to the next document; a document brought back by Undo shows in the list at once (#4805)
+
+Package 2.958 (Bündel: Gemeinsamer Kern Stufe 7d: Listen - folder_people , Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), USt-Jahreserkläru).
+### Changed
+- #5245 Shared core stage 7d: who sees a folder now comes only from the shares on its folder nodes (fs_shares); a group share of a project is a core row on the project node (fs_shares.group_id), a group share of a folder gives a folder role like a person's folder share. folder_people and group_shares are dropped at start after a forward copy and a start check (one-way: older versions no longer start on that database). The org export carries the projects' group shares as group ids in store/shares.json. A folder node created later in the same path takes over the folder's group shares, and group / folder shares now reach other open devices at once.
+- #5281 Shared core Q7a: obj_versions is the core's second table next to obj_history; knowledge page versions move there at start (sealed texts resealed, ids kept for undo), a hold becomes held_at, and wiki_versions is dropped once empty (one-way). The version list and a single version also return their number `no`.
+### Fixed
+- #3911 Moving a task that is already done into the done column (or a rejected task into the rejected column) no longer offers Undo - the move changed nothing, and Undo would have reopened the task. The toast "Moved to section …" stays.
+
+Package 2.974 (Bündel: Agenten-Einstellungen: Modellwahl je Lauf (großes ).
+
+### Added
+- Agent settings: "Select the model per run" below *Model* in the admin's *Runtime* section, and a section *Model* (field + switch, saved at once) in the permissions dialog of an own personal agent: one model for the person's own messages and decisions, one for routine; off by default = one model as before (runtime `model_split`, `model_decide`, `model_routine`) (#5668)
+- Reference starter (`mcp/agent_run.py`, both launchers, capability `model_per_run`): with the switch on every Claude Code run gets `--model` of its kind - chat messages, buttons, reactions, comments, unknown events and job wakes with a hard sign (not done, late messages, result not in the chat, a question or approval card, an open decision, a hard red that is not a story, soft or negated) on the first model; quiet job wakes, new tasks, tidy, follow-ups and planned jobs without a sign word on the second; one conversation per chat, a switch that fails early stays on the previous model for an hour; the log names model and reason per run (#5668)
+
+### Changed
+- The agent chat header shows only the model of the last run while the model per run is on (no "set: … · runs: …" mismatch) (#5668)
+
+Package 2.972 (Bündel: Kern-Querschnitt Q4a: Kommentar-Kern obj_comments , Kern-Querschnitt Q9a: Folgen obj_follow: Aufgaben-).
+### Changed
+- Comments are part of the shared core: task comments live in obj_comments (kind task) with their trash text in obj_comment_trash; one mention parser, one "who may say something" rule, delete by the author or whoever manages the task, pushes through obj_notify (only readers), the agent event once (core/objcomments.py). Routes, API v1, MCP and the export formats are unchanged. At the first start the rows move over with their ids; the tables comments and comment_trash_text are dropped - one-way: the start raises the database's back limit to this release's minor, back only through a backup (#5272)
+- Following is part of the shared core: task watchers and the task bell live in obj_follow (core/objfollow.py); obj_notify's follow step reads it; leaving a project or an organisation or deleting the account removes the person's rows. The tables task_watchers and task_bell are moved over and dropped at the first start - one-way, same back limit (#5285)
+- Rebuilt from package 2.903 (job/3948) on today's main; the back limit is no longer a fixed line in BACK_LIMITS but the minor of the image that moves (core/kernretire.py kern_retire_floor, Fable review of the rebuild) (#5272 #5285)
 
 Package 2.951 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 
@@ -102,6 +152,10 @@ Package 2.955 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 
 ### Fixed
 - Retention export: a check that the sign-off CSV carries no token columns (#3811)
+
+## [2.962.0] - 2026-11-11
+
+Not released (the CI of this version was red); its changes are listed under 2.974.0.
 
 ## [2.941.0] - 2026-11-11
 
@@ -250,7 +304,8 @@ Package 2.900 (Bündel: Projekt-Sperre: Rückgängig-Kopien von Zeiteinträge, P
 
 Not released (the CI of this version was red); its changes are listed under 2.902.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.962.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.974.0...HEAD
+[2.974.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.974.0
 [2.962.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.962.0
 [2.941.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.941.0
 [2.929.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.929.0
