@@ -318,8 +318,8 @@ organisations + a private person, read-only, guest, a group, an agent, an expire
 - The drop (core/migrations.d/5069_b.py, `events/evkern.py ev_kern_drop`, every start until done): every object with an old
   row and no node gets its node and every such row its share (the one-shot `migr_kern4712` of before, without a flag); a row
   of an object WITH a node and no share of that person is stale (the core said no) and is deleted; then a start check: an
-  old row still without a node keeps both tables AND the triggers (no half state; a log line "stage 7b (#5069) waits" with
-  the numbers and an admin alert of kind "storage"); else the triggers and functions go, then `DROP TABLE` and their rows in
+  old row still without a node keeps both tables AND the triggers (no half state; `core/kernretire.py kern_retire`, the helper
+  of stage 7 shared with the team chat: a log line with the number and an admin alert of kind "storage"); else the triggers and functions go, then `DROP TABLE` and their rows in
   `obj_revoked`. A share the core took back (`obj_revoke_person`) comes back through `POST /api/obj/<kind>/<id>/shares/<rid>/restore`
   like a file share; the kind's `on_share_back` hook then does what the dialog does for a new member (News, `cal_touch` /
   `book_touch`).

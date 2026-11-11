@@ -21,6 +21,8 @@ from ..core.errors import BadInput, Denied  # 2.924.0 (#5069): Denied for ev_ker
 from ..core.i18n import N_, tr
 from ..collab.news import news_add  # 2.924.0 (#5069): _share_back
 from ..notify.alerts import aa_now  # 2.924.0 (#5069): the admins' alert of ev_kern_drop (sent by the watchdog)
+from ..core.kernretire import KERN_RETIRE_LOCK, kern_retire  # 2.924.0 (#5069): stage 7's start check and DROP (part A)
+from ..collab.tcxcore import TCX_RETIRE_WAITS  # 2.924.0 (#5069): the one text of the admins' alert of stage 7
 from ..core.objects import obj_node, obj_node_follow, obj_node_person_drop, obj_node_person_put, obj_register, obj_role, obj_visible_sql
 from ..core import objhooks
 from ..core.pg import qi, system_ctx, write_lock
@@ -170,10 +172,6 @@ def ev_kern_left(c):
     return out
 
 
-# 2.924.0 (#5069, fable F1 of 2.661): what the admins read when old rows are left the core does not hold (the tables stay)
-EV_KERN_LEFT = N_("Shared core: {0} old member rows of calendars or address books have no node in the core yet, so the old tables stay. The server log names them; the next start checks again.")
-
-
 def _old_triggers_drop(c, out):
     """The sync triggers of stage 3 and their functions (no data in them). Only together with the tables (fable F1: no half
     state -- while the tables stay, the triggers keep them and the core in step as before)."""
@@ -211,7 +209,7 @@ def ev_kern_drop(c):
         if not have:
             _old_triggers_drop(c, out)  # a trigger on fs_nodes / fs_shares left without its tables (cheap: one catalog read)
             return out
-        write_lock(c, "kalmido-kern5069")  # one process of the instance at a time (the lock of stage 7a too, collab/tcxcore.py)
+        write_lock(c, KERN_RETIRE_LOCK)  # one process of the instance at a time (reentrant: kern_retire below takes it again)
         have = [x for x in OLD_TABLES if c.execute("SELECT to_regclass(?) IS NOT NULL", (x[0],)).fetchone()[0]]
         c.execute("UPDATE ev_cals SET updated_at=changed_at WHERE updated_at=''")  # what ev_kern_copy did (#4712)
         c.execute("UPDATE books SET updated_at=changed_at WHERE updated_at=''")
@@ -248,20 +246,16 @@ def ev_kern_drop(c):
                 out["stale"] = out.get("stale", 0) + gone
                 print(f"migrations: shared core stage 7b (#5069) - {gone} stale row(s) of {t} deleted (their node has no share of "
                       "that person: the core said no)", flush=True)
-        left = ev_kern_left(c)
-        if any(left.values()):
-            print("migrations: shared core stage 7b (#5069) waits - rows of the old member tables without a node of the core:",
-                  ", ".join(f"{t} {n}" for t, n in left.items()), "- the tables and triggers stay (core/migrations.d/5069_b.py)", flush=True)
-            out["left"] = sum(left.values())
-            aa_now("storage", "kern5069:left", EV_KERN_LEFT, [str(out["left"])])
-            return out
-        _old_triggers_drop(c, out)
-        for t, _col, _kind, _tb in have:
-            out["revoked"] = out.get("revoked", 0) + c.execute("DELETE FROM obj_revoked WHERE src=?", (t,)).rowcount
-            c.execute(f"DROP TABLE IF EXISTS {qi(t, _OLD_NAMES)}")
-            out["dropped"] = out.get("dropped", 0) + 1
-    print("migrations: shared core stage 7b (#5069) - the old member tables of calendars and address books are gone", flush=True)
+        # the start check and DROP: the shared helper of stage 7 (core/kernretire.py, the same one as the team chat's 7a);
+        # the triggers and functions go only together with the tables (fable F1: no half state)
+        out.update(kern_retire(c, [t for t, *_ in OLD_TABLES], lambda c: sum(ev_kern_left(c).values()),
+                               "calendars / address books, stage 7b (#5069)", drop=lambda c: _old_triggers_drop(c, out), alert=_retire_alert))
     return out
+
+
+def _retire_alert(n, tables):
+    """fable F1: the admins learn that the start check keeps the old tables (not only the container's log); the text of 7a."""
+    aa_now("storage", "kern5069:" + ",".join(tables), TCX_RETIRE_WAITS, (int(n), ", ".join(tables)))
 
 
 objhooks.START.append(("kern5069_b", False, ev_kern_drop))  # every start until done (cheap afterwards: three catalog reads)

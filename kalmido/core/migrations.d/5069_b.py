@@ -10,9 +10,9 @@ core/objhooks.START, every start until it is done, under the lock kalmido-kern50
    version wrote after a rollback comes along);
 2. a row of an object WITH a node and no share of that person is stale (the core said no) and is deleted, the log names the
    number (fable F1 / #5117, decided 08.11.2026, one way);
-3. start check: is an old row left the core does not hold (no node: events/evkern.py ev_kern_left), the tables AND the
-   triggers stay (no half state), the log says how many ("stage 7b (#5069) waits") and the admins get an alert (kind
-   "storage"); nothing is dropped, the next start checks again;
+3. start check (core/kernretire.py kern_retire, the helper of stage 7 shared with the team chat's 7a): is an old row left the
+   core does not hold (no node: events/evkern.py ev_kern_left), the tables AND the triggers stay (no half state), the log
+   says how many and the admins get an alert (kind "storage"); nothing is dropped, the next start checks again;
 4. else the triggers and functions go, then DROP TABLE IF EXISTS ev_cal_members, book_members, and their rows in obj_revoked
    (src = the old table).
 One way: the rows of the two tables are lost (the shares of the nodes hold the same people and roles). A version before 2.924

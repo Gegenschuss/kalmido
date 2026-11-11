@@ -18208,6 +18208,5 @@
   "Filter “{0}” changed": "Filter ‘{0}’ gewijzigd",
   "Edit filter…": "Filter bewerken…",
   "Words or the search syntax (tag:Name, \"exact text\", -word)": "Woorden of zoeksyntaxis (tag:Naam, \"exacte tekst\", -woord)",
-  "Shared core: {0} old member rows of calendars or address books have no node in the core yet, so the old tables stay. The server log names them; the next start checks again.": "Gedeelde kern: {0} oude ledenrijen van agenda's of adresboeken hebben nog geen knooppunt in de kern, daarom blijven de oude tabellen staan. Het serverlogboek noemt ze; de volgende start controleert opnieuw.",
   "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "Opschonen van de gedeelde kern wacht: {0} oude ledenregels in {1} hebben nog geen deling, de oude tabel blijft. Zie het serverlog."
 }

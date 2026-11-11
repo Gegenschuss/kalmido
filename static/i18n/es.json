@@ -18208,6 +18208,5 @@
   "Filter “{0}” changed": "Filtro «{0}» cambiado",
   "Edit filter…": "Editar filtro…",
   "Words or the search syntax (tag:Name, \"exact text\", -word)": "Palabras o sintaxis de búsqueda (tag:Nombre, \"texto exacto\", -palabra)",
-  "Shared core: {0} old member rows of calendars or address books have no node in the core yet, so the old tables stay. The server log names them; the next start checks again.": "Núcleo común: {0} filas antiguas de miembros de calendarios o libretas de direcciones aún no tienen nodo en el núcleo, por eso las tablas antiguas se mantienen. El registro del servidor las nombra; el próximo inicio vuelve a comprobarlo.",
   "Shared core clean-up waits: {0} old member rows of {1} have no share yet, the old table stays. See the server log.": "La limpieza del núcleo común espera: {0} filas antiguas de miembros en {1} aún no tienen permiso, la tabla antigua se mantiene. Consulta el registro del servidor."
 }

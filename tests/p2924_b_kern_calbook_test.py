@@ -137,13 +137,14 @@ check(node("evcal", KS) is None and node("address_book", BS) is None, "setup: ol
 out = box()
 # fable F1 (#5117, decided 08.11.2026): the stale row (a node without a share of that person) no longer holds the drop - it goes,
 # the log names the number, the tables are dropped in the same start
-check("stage 7b (#5069) waits" not in out, f"#5069 F1: a stale row does not hold the drop any more ({out[-300:]})")
+check("old row(s) of" not in out, f"#5069 F1: a stale row does not hold the drop any more ({out[-300:]})")
 check("1 stale row(s) of ev_cal_members deleted" in out, f"#5069 F1: the log names the number of stale rows deleted ({out[-300:]})")
 check(share("evcal", KS, GINA) and share("evcal", KS, GINA)[1] == "edit" and share("address_book", BS, BOB)[1] == "view",
       "#5069: the copy before the check gave the node-less calendar / book their nodes and the rows their shares")
 check(share("evcal", K, GINA) is None and K not in ids(Gi.get(B + "/api/evcals")),
       "#5069 F1: the stale row opens nothing and is not copied (the node says no)")
-check("old member tables of calendars and address books are gone" in out, f"#5069: the start drops them ({out[-300:]})")
+check("calendars / address books, stage 7b (#5069): every old row has its share in the shared core -- ev_cal_members, book_members dropped" in out,
+      f"#5069: the start drops them ({out[-300:]})")
 check(not table("ev_cal_members") and not table("book_members"), "#5069: both tables dropped")
 check(not sql("SELECT 1 FROM pg_trigger WHERE tgname LIKE 'kalmido_kern_%'") and not sql("SELECT 1 FROM pg_proc WHERE proname='kalmido_kern_mirror'"),
       "#5069: with the triggers and the function of the old tables")
@@ -164,14 +165,14 @@ out = box("import kalmido.events.evkern as e\nfrom kalmido.core.errors import De
           f"c.execute(\"INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES({int(KN)},{int(BOB)},'view','{TS}')\")\n"
           "e.obj_node = no\ntry:\n    print('result', e.ev_kern_drop(c))\nexcept Exception as x:\n    print('ERR', repr(x)[:300])\n"
           "print('alert', [x[1] for x in _AA['q']])")
-check("stage 7b (#5069) waits" in out and "ev_cal_members 1" in out, "#5069 F1: the start check holds the drop and the log names the row ("
+check("stage 7b (#5069): 1 old row(s) of ev_cal_members have no share in the shared core" in out, "#5069 F1: the start check holds the drop and the log names the row ("
       + out[-500:].replace("\n", " | ") + ")")
-check("kern5069:left" in out, f"#5069 F1: the admins get an alert, not only a log line ({out[-300:]})")
+check("kern5069:ev_cal_members" in out, f"#5069 F1: the admins get an alert, not only a log line ({out[-300:]})")
 check(table("ev_cal_members") and sql("SELECT 1 FROM pg_trigger WHERE tgname='kalmido_kern_mirror_cal'"),
       "#5069 F1: the table AND its trigger stay (no half state)")
 check(KN not in ids(Bo.get(B + "/api/evcals")), "#5069: the waiting old row opens nothing (no reader reads it)")
 out = box()
-check("old member tables of calendars and address books are gone" in out and not table("ev_cal_members")
+check("ev_cal_members dropped" in out and not table("ev_cal_members")
       and not sql("SELECT 1 FROM pg_trigger WHERE tgname='kalmido_kern_mirror_cal'") and not sql("SELECT 1 FROM pg_proc WHERE proname='kalmido_kern_mirror'"),
       f"#5069 F1: the next start places it and drops table, trigger and function ({out[-300:]})")
 check(share("evcal", KN, BOB) and share("evcal", KN, BOB)[1] == "view" and KN in ids(Bo.get(B + "/api/evcals")),
