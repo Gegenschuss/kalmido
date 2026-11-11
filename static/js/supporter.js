@@ -98,10 +98,9 @@ function sup_barSync() {
   let bar = $('#supbar');
   const on = sup_on() && (S.about.sup_nudge || S.supBarShown) && S.me?.is_admin && !S.me?.kid && !S.supBarOff
     && !S.about.supporter && !S.about.supporter_me;
-  if (!on) { bar?.remove(); return; }
-  if (!bar) { bar = document.createElement('div'); bar.id = 'supbar'; bar.className = 'annbar supbar'; bar.setAttribute('role', 'status'); const ab = $('#ntfask') || $('#annbar'); if (ab) ab.after(bar); else main.prepend(bar); }
+  if (!on) { if (bar) barKeep(() => bar.remove()); return; }  // 2.940.0 (#5226): barKeep (render.js) - the view does not move
   const html = `${ic('heart', 's')}<span class="annt">${esc(tr('Kalmido is free. If it helps you, a voluntary supporter licence helps its further development.'))}</span><button type="button" class="btn sm" data-sup="more">${esc(tr('Learn more'))}</button><button type="button" class="iconbtn" data-sup="hide" aria-label="${esc(tr('Hide this notice'))}" title="${esc(tr('Hide this notice'))}">${ic('x', 's')}</button>`;
-  if (bar.innerHTML !== html) bar.innerHTML = html;
+  if (!bar || bar.innerHTML !== html) barKeep(() => { if (!bar) { bar = document.createElement('div'); bar.id = 'supbar'; bar.className = 'annbar supbar'; bar.setAttribute('role', 'status'); const ab = $('#ntfask') || $('#annbar'); if (ab) ab.after(bar); else main.prepend(bar); } bar.innerHTML = html; });
   S.supBarShown = true;  // stays for this session until hidden (the server already counts it as shown)
   sup_seen();
 }

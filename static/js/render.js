@@ -30,12 +30,22 @@ function annSync() {
   const a = S.announce, main = $('#main'); if (!main) return;
   let bar = $('#annbar');
   const on = !!a && a.active !== false && !(LS.get('annHidden', '') === a.id) && !S.me?.kid;
-  if (!on) { bar?.remove(); return; }
-  if (!bar) { bar = document.createElement('div'); bar.id = 'annbar'; bar.setAttribute('role', 'status'); main.prepend(bar); }
+  if (!on) { if (bar) barKeep(() => bar.remove()); return; }  // 2.940.0 (#5226): barKeep
   const until = a.ends_at ? tr('until {0}', ((d) => `${WD[d.getDay()]} ${fmtTimeAt(d)}`)(new Date(a.ends_at))) : '';
   const html = `${ic(a.level === 'maintenance' ? 'alert' : 'bell', 's')}<span class="annt"><b>${esc(a.level === 'maintenance' ? tr('Maintenance') : tr('Notice'))}:</b> ${esc(a.text)}${until ? ` <span class="muted">· ${esc(until)}</span>` : ''}</span><button type="button" class="iconbtn" data-act="ann-hide" aria-label="${esc(tr('Hide this notice'))}" title="${esc(tr('Hide this notice'))}">${ic('x', 's')}</button>`;
-  bar.className = 'annbar ' + (a.level === 'maintenance' ? 'maint' : '');
-  if (bar.innerHTML !== html) bar.innerHTML = html;
+  const cls = 'annbar ' + (a.level === 'maintenance' ? 'maint' : '');
+  if (!bar || bar.innerHTML !== html || bar.className !== cls) barKeep(() => { if (!bar) { bar = document.createElement('div'); bar.id = 'annbar'; bar.setAttribute('role', 'status'); main.prepend(bar); } bar.className = cls; bar.innerHTML = html; });  // its class too: the padding counts
+}
+// ---- 2.940.0 (#5226): a bar above the view (notice, notifications question, encrypted list, supporter hint) that comes,
+// goes or changes its height on its own does not move what is read: #view.scrollTop takes the difference (rule 08.11.2026
+// "a calm view without jumps"). Not while the app loads and not on a change of the view (that view starts anew anyway).
+// #view is the scrolling box on the phone too (html, body overflow hidden). Hiding a bar by hand goes through here as well:
+// the content stays where it is, at the very top it moves up.
+function barKeep(fn) {
+  const v = $('#view');
+  if (!v || !S.booted || FL.vsig !== fl_sig() || !v.isConnected) return fn();
+  const t0 = v.getBoundingClientRect().top;
+  try { return fn(); } finally { const d = v.getBoundingClientRect().top - t0; if (Math.abs(d) >= 0.5) v.scrollTop += d; }  // sprung-ok: the height of a bar that came / went on its own (#5226)
 }
 document.addEventListener('click', e => { if (e.target.closest?.('[data-act="ann-hide"]') && S.announce) { LS.set('annHidden', S.announce.id); annSync(); } });
 // ---- 2.24.0 (#910): storage. From 80 % (and again from 95 %) a one-time hint per level and day; full: the dialog with

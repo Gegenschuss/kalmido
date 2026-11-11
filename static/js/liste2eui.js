@@ -104,12 +104,14 @@ function le2u_barSync() {
   const l = S.route?.mod === 'tasks' && typeof routeList === 'function' ? routeList() : null;
   const html = l && (l.e2e || LE2U.run[l.id]) ? le2u_barHtml(l) : '';
   let bar = $('#le2ubar');
-  if (!html) { bar?.remove(); return; }
-  if (!bar) {
-    bar = document.createElement('div'); bar.id = 'le2ubar'; bar.className = 'annbar le2ubar'; bar.setAttribute('role', 'region'); bar.setAttribute('aria-label', tr('Encrypted in the browser'));
-    const ab = $('#ntfask') || $('#annbar'); if (ab) ab.after(bar); else main.prepend(bar);
-  }
-  if (bar.innerHTML !== html) bar.innerHTML = html;
+  if (!html) { if (bar) barKeep(() => bar.remove()); return; }  // 2.940.0 (#5226): barKeep (render.js) - the view does not move
+  if (!bar || bar.innerHTML !== html) barKeep(() => {
+    if (!bar) {
+      bar = document.createElement('div'); bar.id = 'le2ubar'; bar.className = 'annbar le2ubar'; bar.setAttribute('role', 'region'); bar.setAttribute('aria-label', tr('Encrypted in the browser'));
+      const ab = $('#ntfask') || $('#annbar'); if (ab) ab.after(bar); else main.prepend(bar);
+    }
+    bar.innerHTML = html;
+  });
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-le2ubar]'); if (!b) return;

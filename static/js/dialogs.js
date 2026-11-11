@@ -889,10 +889,9 @@ async function ntfLoad(box, scope, key, onSync) {
 function ntfAskSync() {
   const main = $('#main'); if (!main) return;
   const items = S.notifAsk || []; let bar = $('#ntfask');
-  if (!items.length || S.me?.kid) { bar?.remove(); return; }
-  if (!bar) { bar = document.createElement('div'); bar.id = 'ntfask'; bar.className = 'annbar ntfask'; bar.setAttribute('role', 'region'); bar.setAttribute('aria-label', tr('Notifications for members')); const ab = $('#annbar'); if (ab) ab.after(bar); else main.prepend(bar); }
+  if (!items.length || S.me?.kid) { if (bar) barKeep(() => bar.remove()); return; }  // 2.940.0 (#5226): barKeep (render.js) - the view does not move
   const html = `${ic('bell', 's')}<span class="annt">${esc(tr('Your shared projects still notify everyone about everything. You can now limit that per project or folder.'))}</span><span class="ntfaskb"><button type="button" class="btn sm pri" data-act="ntfask-choose">${esc(tr('Select template'))}</button><button type="button" class="btn sm" data-act="ntfask-keep">${esc(tr('Keep as it is'))}</button></span>`;
-  if (bar.innerHTML !== html) bar.innerHTML = html;
+  if (!bar || bar.innerHTML !== html) barKeep(() => { if (!bar) { bar = document.createElement('div'); bar.id = 'ntfask'; bar.className = 'annbar ntfask'; bar.setAttribute('role', 'region'); bar.setAttribute('aria-label', tr('Notifications for members')); const ab = $('#annbar'); if (ab) ab.after(bar); else main.prepend(bar); } bar.innerHTML = html; });
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest?.('[data-act="ntfask-choose"], [data-act="ntfask-keep"]'); if (!b) return;
