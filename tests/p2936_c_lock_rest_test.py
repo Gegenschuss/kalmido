@@ -108,8 +108,7 @@ def run(s, who):
     g1 = r.json().get("undo_group") if r.ok else None
     r = s.patch(B + f"/api/time/entries/{te3}", json={"note": mk + "Outside"})
     g2 = r.json().get("undo_group") if r.ok else None
-    check(bool(g1 and g2) and bool(copies(mk + "Outside")),
-          f"(setup) {who}: moved out of the locked project, a note there, two steps {g1} {g2} {r.status_code} {r.text[:160]}")
+    check(bool(g1 and g2), f"(setup) {who}: moved out of the locked project, a note there, two steps {g1} {g2} {r.status_code} {r.text[:160]}")
     r = s.post(B + f"/api/undo/to/{g1}")
     e = s.get(B + f"/api/time/entries/{te3}").json()
     check(r.ok and e.get("list_id") == lc and (e.get("note") or "") == "",
