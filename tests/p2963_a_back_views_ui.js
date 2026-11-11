@@ -14,6 +14,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {sleep, B, login} = require('./boot');
+const DAY = require('./testclock').today();  // the travel tab lists the trips of this year
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2963_a_back_views_ui', check, shots: 'P2963A_SHOTS'});
@@ -65,7 +66,7 @@ const upload = async (ck, url, name, text) => { const fd = new FormData(); fd.ap
   const card = await call(CA, 'POST', '/api/office/cards', {holder_id: bob.id, last4: '4711'});
   const st = await upload(CA, `/api/office/cards/${card.id}/statements`, 'abrechnung.pdf', pdf(['Abrechnung vom 15.01.2025', 'Karte 5232 12XX XXXX 4711', '03.01. 04.01. Cafe Beispiel Berlin 12,50-', 'Neuer Saldo 12,50-']));
   check(st.http === 201, 'a card with a statement ' + st.http);
-  const trip = await call(CA, 'POST', '/api/office/trips', {date_from: '2025-03-14', dest: 'Kiel', people: [], items: [{date: '2025-03-14', category: 'train', amount: 40}]});
+  const trip = await call(CA, 'POST', '/api/office/trips', {date_from: DAY, dest: 'Kiel', people: [], items: [{date: DAY, category: 'train', amount: 40}]});
   check(trip.http === 201, 'a trip ' + trip.http);
   // notes: a list with a note and one in the trash; a task with a subtask
   const lst = await call(CA, 'POST', '/api/lists', {name: 'Garden plans'});
@@ -89,6 +90,7 @@ const upload = async (ck, url, name, text) => { const fd = new FormData(); fd.ap
     const at = (n, more = 'true') => wait(`!f8d_bk.skip && f8d_depth() === ${n} && f8d_bk.pushed === ${n} && (history.state?.f8d || 0) === ${n} && (${more})`, {timeout: 8000});
     // the page itself: #today below it, the page's own entry marked (a Back too many lands on #today, visibly)
     const page = async (hash, ready) => {
+      await go(B + 'static/icon.svg');  // a new load each time (a navigate to the same address with #today only changes the hash)
       await go(B + '#today');
       check(await wait(`typeof f8d_viewStep === 'function' && S.route?.key === 'today'`, {timeout: 20000}), `${hash}: the app is there`);
       await ev(`(location.hash = '${hash}', 1)`);
@@ -98,7 +100,6 @@ const upload = async (ck, url, name, text) => { const fd = new FormData(); fd.ap
     };
     const onPage = hash => `location.hash === '${hash}' && history.state?.p63 === 1 && f8d_bk.pushed === 0 && !f8d_bk.skip && !(document.querySelector('#view')._stk || []).length`;
     const leaves = async (hash, tag) => { await back(); check(await wait(`location.hash === '#today' && S.route?.key === 'today'`, {timeout: 8000}), `${tag}: the next Back leaves the page (no dead entry) ` + await ev(STATE)); };
-    check(await ev(`isTouch() && isMobile()`), 'a touch screen in phone width');
 
     // 1. team chat: room > thread
     {
@@ -108,6 +109,7 @@ const upload = async (ck, url, name, text) => { const fd = new FormData(); fd.ap
         check(await at(1, `/Monday works for me/.test(${txt('.tthview')}) && /Plant the beans/.test(${txt('.tthview')})`), `thread ${how}: the thread with its first message and answer, one step ` + await ev(STATE));
       };
       await page(h, roomOk);
+      check(await ev(`isTouch() && isMobile()`), 'a touch screen in phone width');
       await open('Back');
       await shot('p2963a-thread.png');
       await back();
