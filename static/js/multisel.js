@@ -113,6 +113,7 @@ function ms_merge(o) {
       <div class="aerr" role="alert"></div>
       <div class="foot"><button class="btn" data-m="back">${tr('Back')}</button><span class="spacer"></span><button class="btn pri" data-m="run">${tr('Merge')}</button></div>`;
   };
+  const back1 = () => { st.step = 1; draw1(); };  // 2.962.0 (#5232): the overview's Back = the choices again
   md.addEventListener('change', e => {
     const n = e.target.name || '';
     if (n === 'mg-t') { st.target = e.target.value; st.pick = {}; draw1(); }
@@ -122,11 +123,11 @@ function ms_merge(o) {
     const b = e.target.closest('[data-m]'); if (!b) return;
     const err = () => $('.aerr', md);
     if (b.dataset.m === 'close') { close(); return; }
-    if (b.dataset.m === 'back') { st.step = 1; draw1(); return; }
+    if (b.dataset.m === 'back') { f8d_backBtn(md, back1); return; }  // 2.962.0 (#5232): = Android Back
     b.disabled = true;
     try {
       const pick = Object.fromEntries(diff().map(f => [f.k, Number(st.pick[f.k])]));
-      if (b.dataset.m === 'next') { const r = await o.preview(Number(st.target), pick); st.step = 2; draw2(r); }
+      if (b.dataset.m === 'next') { const r = await o.preview(Number(st.target), pick); st.step = 2; draw2(r); f8d_step(md, back1); }
       else if (b.dataset.m === 'run' && await o.run(Number(st.target), pick)) { md.remove(); return; }
     } catch (x) { if (err()) err().textContent = x.message || ''; }
     b.disabled = false;

@@ -200,6 +200,8 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
     return fd;
   };
   const errEl = () => $('.aerr', md), err = m => { const e = errEl(); if (e) e.textContent = m || ''; };
+  const hasStart = typeof text !== 'string';  // 2.962.0 (#5232): opened without a statement = there is a start step to go back to
+  // foot(): built from tr() / esc() only (html-ok where its arguments changed in 2.962.0)
   const foot = (ok, back) => `<div class="aerr" role="alert"></div><div class="foot">${back ? `<button class="btn" data-bi="back">${tr('Back')}</button>` : ''}<span class="spacer"></span><button class="btn" data-bi="close">${tr('Cancel')}</button>${ok ? `<button class="btn pri" data-bi="next">${esc(ok)}</button>` : ''}</div>`;
   const sel = (id, label, val, opt) => `<div class="row"><label for="${id}">${esc(label)}</label><select id="${id}">${opt ? `<option value="">${tr('none')}</option>` : ''}${st.p.columns.map((c, i) => `<option value="${i}" ${val === i ? 'selected' : ''}>${esc(c || tr('Column {0}', i + 1))}</option>`).join('')}</select></div>`;
   const cols = () => {
@@ -214,7 +216,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
       <div class="row"><label for="bi-dec">${tr('Decimal separator')}</label><select id="bi-dec"><option value="," ${g.decimal !== '.' ? 'selected' : ''}>${tr('comma (1.234,56)')}</option><option value="." ${g.decimal === '.' ? 'selected' : ''}>${tr('point (1,234.56)')}</option></select></div>
       <div class="row"><label for="bi-df">${tr('Date format')}</label><select id="bi-df">${BNK_DATE_FORMATS.map(f => `<option ${g.date_format === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div>
       <div class="bgtblw"><table class="bgtbl"><thead><tr>${st.p.columns.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${st.p.sample.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
-      ${foot(tr('Preview'))}`;
+      ${/*html-ok*/ foot(tr('Preview'), hasStart)}`;  // 2.962.0 (#5232): Back to the start (there was no way back from the columns)
   };
   const mapOf = () => {
     const n = id => { const v = $(id, md)?.value; return v === '' || v == null ? null : +v; }, two = $('#bi-am [aria-checked="true"]', md)?.dataset.am === 'two';
@@ -236,9 +238,12 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
     const p = st.p, many = (p.files || 1) > 1;
     card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${esc(label())} · ${esc(tr('Import into: {0}', wsName(ofcWs())))/* 2.356.0 B (#2934) */} · ${esc([many && files.length === 1 ? trn('{0} file', '{0} files', p.files) : '', trn('{0} new', '{0} new', p.count), p.dup_count ? trn('{0} already there', '{0} already there', p.dup_count) : '', p.pending_count ? trn('{0} pending', '{0} pending', p.pending_count) : '', p.skipped ? trn('{0} with an error', '{0} with an error', p.skipped) : ''].filter(Boolean).join(' · '))}</p>
       ${p.camt052 ? bnk052Html() : ''}${cfb_prevHtml(p.balances)}${filesInfo(p)}${dvaBnkSkipHtml(p, many)}<ul class="ofclist bnkprev" role="list">${p.rows.slice(0, 200).map(r => `<li class="ofcrow ${r.error || r.dup || r.pending ? 'arch' : ''} ${r.pending ? 'pend' : ''}"><span class="ofcn"><b>${esc(r.counterpart || r.purpose || tr('Row {0}', r.n))}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.error || (r.pending ? tr('pending – not imported') : r.dup ? tr('already there') : r.purpose), many ? r.file : ''].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bnkamt ${+r.amount > 0 ? 'in' : 'out'}">${esc(bnkAmt(r.amount))}</span>` : ''}</li>`).join('')}</ul>
-      ${p.rows.length > 200 ? `<p class="muted">${tr('Showing the first 200 rows')}</p>` : ''}${foot(p.count ? trn('Import {0} booking', 'Import {0} bookings', p.count) : '', p.fmt === 'csv')}`;
+      ${p.rows.length > 200 ? `<p class="muted">${tr('Showing the first 200 rows')}</p>` : ''}${/*html-ok*/ foot(p.count ? trn('Import {0} booking', 'Import {0} bookings', p.count) : '', p.fmt === 'csv' || hasStart)}`;
   };
-  const preview = async mapping => {
+  // 2.962.0 (#5232): the views are steps of Back: start -> columns -> rows (CSV), start -> rows (CAMT / MT940)
+  const toStart = () => { files = []; Object.assign(st, {p: null, mapping: null}); start(); };
+  const backOne = () => st.p?.columns || st.p?.fmt !== 'csv' ? toStart() : preview(null);
+  const preview = async (mapping, fwd) => {
     try { st.p = await api('POST', '/api/office/bank/import/preview', form(mapping)); }
     catch (x) {
       if (st.p) err(x.message); else if (typeof text === 'string') { md.remove(); ofcErr(x); }
@@ -246,10 +251,12 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
       $$('button[data-bi]', md).forEach(b => { b.disabled = false; }); return;
     }
     if (st.p.columns) { st.banks = st.p.bank_accounts || []; cols(); } else rowsView();
+    if (fwd) f8d_step(md, backOne);
   };
   const take = fl => {
     files = [...(fl || [])]; if (!files.length) return;
-    Object.assign(st, {p: null, mapping: null}); card.innerHTML = botBusy(`<p class="muted">${tr('Loading…')}</p>`); preview(null);  // 2.161.2 (#2611): + the bot at work
+    const fwd = hasStart && !st.p;  // from the start step (files dropped onto the columns replace them: no new step)
+    Object.assign(st, {p: null, mapping: null}); card.innerHTML = botBusy(`<p class="muted">${tr('Loading…')}</p>`); preview(null, fwd);  // 2.161.2 (#2611): + the bot at work
   };
   md.addEventListener('click', async e => {
     const am = e.target.closest('#bi-am [data-am]');
@@ -257,11 +264,11 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
     const b = e.target.closest('button[data-bi]'); if (!b) return;
     if (b.dataset.bi === 'close') { md.remove(); return; }
     if (b.dataset.bi === 'pick') { $('#bi-file', md)?.click(); return; }  // 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js)
-    if (b.dataset.bi === 'back') { await preview(null); return; }
+    if (b.dataset.bi === 'back') { f8d_backBtn(md, backOne); return; }  // 2.962.0 (#5232): = Android Back
     if (st.p?.columns) {
       st.mapping = mapOf();
       if (st.banks.length && !st.bank) { err(tr('Select the bank account this statement belongs to')); $('#bi-bank', md)?.focus(); return; }  // 2.702.0 (#5183): never silently the default
-      b.disabled = true; await preview(st.mapping); return;
+      b.disabled = true; await preview(st.mapping, true); return;
     }
     // 2.356.0 B (#2934): the target before the start, in words: the office area of the account(s) + the account (#1940)
     const accts = [...new Set((st.p?.balances || []).map(x => x.account).filter(Boolean))].map(cfb_acct);

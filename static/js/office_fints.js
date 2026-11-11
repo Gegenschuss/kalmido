@@ -42,21 +42,23 @@ async function fnt_open() {
   const view = () => {
     const d = st.d, sub = `<p class="muted">${esc(d.account.label)} · … ${esc(d.account.iban_tail)} · ${esc(fmtDateLoc(d.from))} – ${esc(fmtDateLoc(d.to))}</p>`;
     if (d.state === 'mechanism') {
-      card.innerHTML = `${head}${sub}<p>${tr('Which TAN method do you use?')}</p><div class="fn-mech" role="radiogroup" aria-label="${esc(tr('TAN method'))}">${d.mechanisms.map((m, i) => `<label class="chk"><input type="radio" name="fn-mech" value="${esc(m.id)}" ${i ? '' : 'checked'}> ${esc(m.name)}</label>`).join('')}</div>${foot(tr('Next'))}`;
+      card.innerHTML = `${head}${sub}<p>${tr('Which TAN method do you use?')}</p><div class="fn-mech" role="radiogroup" aria-label="${esc(tr('TAN method'))}">${d.mechanisms.map((m, i) => `<label class="chk"><input type="radio" name="fn-mech" value="${esc(m.id)}" ${i ? '' : 'checked'}> ${esc(m.name)}</label>`).join('')}</div>${/*html-ok*/ foot(tr('Next'), true)}`;
     } else if (d.state === 'decoupled') {
-      card.innerHTML = `${head}${sub}<div class="fn-wait" role="status" aria-live="polite">${typeof botBusy === 'function' ? botBusy('') : ''}<p><b>${tr('Please approve in your banking app')}</b></p>${d.challenge ? `<p class="muted">${esc(d.challenge)}</p>` : ''}<p class="muted">${tr('Kalmido continues by itself once the bank has the approval.')}</p></div>${foot('')}`;
+      card.innerHTML = `${head}${sub}<div class="fn-wait" role="status" aria-live="polite">${typeof botBusy === 'function' ? botBusy('') : ''}<p><b>${tr('Please approve in your banking app')}</b></p>${d.challenge ? `<p class="muted">${esc(d.challenge)}</p>` : ''}<p class="muted">${tr('Kalmido continues by itself once the bank has the approval.')}</p></div>${/*html-ok*/ foot('', true)}`;
       poll();
     } else if (d.state === 'tan') {
       card.innerHTML = `${head}${sub}${d.challenge ? `<p>${esc(d.challenge)}</p>` : ''}${d.image ? `<p><img class="fn-tanimg" alt="${esc(tr('TAN code of the bank'))}" src="${esc(d.image)}"></p>` : ''}
-        <div class="row"><label for="fn-tan">${tr('TAN')}</label><input id="fn-tan" maxlength="64" autocomplete="one-time-code" inputmode="numeric" spellcheck="false"></div>${foot(tr('Next'))}`;
+        <div class="row"><label for="fn-tan">${tr('TAN')}</label><input id="fn-tan" maxlength="64" autocomplete="one-time-code" inputmode="numeric" spellcheck="false"></div>${/*html-ok*/ foot(tr('Next'), true)}`;
       $('#fn-tan', md)?.focus();
     } else if (d.state === 'preview') {
       const p = d.preview;
-      card.innerHTML = `${head}${sub}<p class="muted">${esc(tr('Import into: {0}', wsName(ofcWs())))}</p>${rowsHtml(p)}${foot(p.count ? trn('Import {0} booking', 'Import {0} bookings', p.count) : '')}`;
+      card.innerHTML = `${head}${sub}<p class="muted">${esc(tr('Import into: {0}', wsName(ofcWs())))}</p>${rowsHtml(p)}${/*html-ok*/ foot(p.count ? trn('Import {0} booking', 'Import {0} bookings', p.count) : '', true)}`;  // 2.962.0 (#5232): the Back was never shown
       if (!p.count) err(p.dup_count ? tr('Every booking of this period is there already.') : tr('The bank sent no bookings for this period.'));
     }
   };
-  const gone = (x) => { st.d = null; form(); err(ofcErrHere(x)); };  // the server ended the bank connection: start again
+  const gone = (x) => { st.d = null; f8d_stepDrop(md); form(); err(ofcErrHere(x)); };  // the server ended the bank connection: start again
+  const toForm = () => { end(); form(); };  // 2.962.0 (#5232): Back (also Android Back) = the form again, the bank connection ends
+  // foot(): built from tr() / esc() only (html-ok where its arguments changed in 2.962.0)
   const call = async (method, path, data) => {
     st.busy = true; $$('button[data-fn]', md).forEach(b => { b.disabled = true; });
     try { return await api(method, path, data); }
@@ -80,14 +82,14 @@ async function fnt_open() {
   md.addEventListener('click', async e => {
     const b = /** @type {any} */ (e.target).closest('button[data-fn]'); if (!b || st.busy) return;
     if (b.dataset.fn === 'close') { close(); return; }
-    if (b.dataset.fn === 'back') { end(); form(); return; }
+    if (b.dataset.fn === 'back') { f8d_backBtn(md, toForm); return; }
     err('');
     if (!st.d) {
       const pinEl = $('#fn-pin', md), req = {account_id: +$('#fn-acct', md).value, login: $('#fn-login', md).value.trim(), pin: pinEl.value,
         server: $('#fn-server', md).value.trim(), from: $('#fn-from', md).value || null, to: $('#fn-to', md).value || null, remember: $('#fn-rem', md).checked};
       if (!req.login || !req.pin || !req.server) { err(tr('Please fill in the sign-in name, the PIN and the server')); return; }
       pinEl.value = '';  // the PIN leaves the page with this one request
-      try { st.d = (await call('POST', '/api/office/bank/fints/start', req)).dialog; req.pin = ''; view(); }
+      try { st.d = (await call('POST', '/api/office/bank/fints/start', req)).dialog; req.pin = ''; view(); f8d_step(md, toForm); }
       catch (x) { req.pin = ''; err(ofcErrHere(x)); }
       return;
     }

@@ -4,6 +4,7 @@
 //       import under "Last imports" and takes it back after the question; a CSV with an S/H column pre-selects the mark
 // #2469 the office's bank import: the day-report hint, a pending row marked "pending – not imported", the start hint no
 //       longer says "Do not use" for CAMT.052
+// #5232 (2.962.0): Back in the CAMT preview and in the CSV columns leads to the start step (the columns had no way back)
 // Firefox 390 touch: the household preview with pending bookings fits the phone (no horizontal scrolling), screenshot.
 // Screenshots with P2146C_SHOTS=<dir>.
 // freelancer-matrix: n/a - nur Oberflaeche (die Person ohne Organisation prueft p2146_c_api_test.py)
@@ -98,6 +99,13 @@ const D2 = c052('R-2', [ntry('12.50', '2026-09-02', 'BOOK', 'REF-A1', 'Bakery ag
   const pr = [...md.querySelectorAll('.bnkprev .ofcrow.pend')];
   check(pr.length === 2 && pr.every(x => /pending – not imported/.test(x.textContent)), '#2469: pending rows marked ' + pr.length);
   check(/Import 2 bookings/.test(md.querySelector('[data-bi="next"]')?.textContent || ''), '#2469: 2 bookings to import (the duplicate and the pending ones left out) ' + (md.querySelector('[data-bi="next"]')?.textContent || ''));
+  // 2.962.0 (#5232): every view after the start has a way back to it (the CAMT preview and the CSV columns had none)
+  click(w, md.querySelector('[data-bi="back"]'));
+  check(await until(() => md.isConnected && md.querySelector('[data-bi="pick"]') && !md.querySelector('.bnkprev'), 40), '#5232: Back in the CAMT preview = the start step again, the dialog stays');
+  md.bnkTake([new w.File(['Date;Amount;Text\n02.03.2026;-12,50;Coffee beans\n03.03.2026;40,00;Invented refund\n'], 'konto.csv')]);
+  check(await until(() => md.querySelector('#bi-date'), 60), '#5232: a CSV from the start: the columns');
+  click(w, md.querySelector('[data-bi="back"]'));
+  check(await until(() => md.isConnected && md.querySelector('[data-bi="pick"]') && !md.querySelector('#bi-date'), 40), '#5232: Back in the columns = the start step (no way back before)');
   md.remove();
   w.close();
 

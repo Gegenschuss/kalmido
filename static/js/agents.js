@@ -1180,6 +1180,9 @@ function schedForm(md, a, s, done) {
     vis();
   });
   $('#sc-title', box).focus();
+  // 2.962.0 (#5232): the form is a step of Back over the plans: Back = Cancel, the list comes back; saving leaves the step
+  const back = () => { box.onclick = null; done(); };
+  f8d_step(md, back);
   box.onclick = async e => {
     const tb = e.target.closest('[data-tpl]');
     if (tb) {
@@ -1193,7 +1196,7 @@ function schedForm(md, a, s, done) {
       return;
     }
     const b = e.target.closest('[data-sf]'); if (!b) return;
-    if (b.dataset.sf === 'back') { box.onclick = null; done(); return; }
+    if (b.dataset.sf === 'back') { f8d_backBtn(md, back); return; }
     const f = $('#sc-freq', box).value;
     const d = {title: $('#sc-title', box).value.trim(), prompt: $('#sc-prompt', box).value.trim(), freq: f, time: $('#sc-time', box).value || '09:00',
       days: f === 'weekly' ? $$('[data-wd]:checked', box).map(x => +x.dataset.wd) : f === 'monthly' ? [Math.max(1, Math.min(31, +$('#sc-dom', box).value || 1))] : [],
@@ -1207,6 +1210,6 @@ function schedForm(md, a, s, done) {
     b.disabled = true;
     try { await rawFetch(isNew ? 'POST' : 'PATCH', isNew ? `/api/agents/${a.id}/schedules` : `/api/agent-schedules/${s.id}`, d); }
     catch (x) { b.disabled = false; return fail(x instanceof Offline ? tr('Only available online.') : x.message); }
-    toast(tr('Saved')); box.onclick = null; done();
+    toast(tr('Saved')); box.onclick = null; f8d_stepDrop(md); done();
   };
 }

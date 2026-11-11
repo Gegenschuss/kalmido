@@ -200,18 +200,19 @@ async function wsh_read(id, md) {
   m.addEventListener('click', async ev => {
     const t = /** @type {any} */ (ev.target);
     if (t.closest('[data-m="close"]')) { m.remove(); return; }
-    if (t.closest('[data-wsh-edit]')) { wsh_editIn(m, WSH.cur); return; }  // 2.200.0 B (#2747): an edit share
+    // 2.962.0 (#5232): the editor and a linked page are steps of Back: Back = Cancel / the page before
+    if (t.closest('[data-wsh-edit]')) { const c = WSH.cur; if (c) f8d_step(m, () => wsh_read(c.id, m)); wsh_editIn(m, c); return; }  // 2.200.0 B (#2747): an edit share
     const sv = t.closest('[data-wsh-save]');
     if (sv) {
       const c = WSH.cur, ta = /** @type {any} */ (m.querySelector('#wsh-ed')); if (!c || !ta) return;
       sv.disabled = true;
-      try { await calReq('PATCH', `/api/wiki/pages/${c.id}`, {body: ta.value, expect_updated_at: c.updated_at}); toast(tr('Saved')); WSH.v = -1; wsh_read(c.id, m); }
+      try { await calReq('PATCH', `/api/wiki/pages/${c.id}`, {body: ta.value, expect_updated_at: c.updated_at}); toast(tr('Saved')); WSH.v = -1; f8d_stepDrop(m); wsh_read(c.id, m); }
       catch (x) { sv.disabled = false; toast(x.message); }
       return;
     }
-    if (t.closest('[data-wsh-cancel]')) { if (WSH.cur) wsh_read(WSH.cur.id, m); return; }
+    if (t.closest('[data-wsh-cancel]')) { const c = WSH.cur; f8d_backBtn(m, () => { if (c) wsh_read(c.id, m); }); return; }
     const a = t.closest('a[href^="#wsh/"]');
-    if (a) { ev.preventDefault(); wsh_read(+a.getAttribute('href').slice(5), m); }
+    if (a) { ev.preventDefault(); const c = WSH.cur; if (c) f8d_step(m, () => wsh_read(c.id, m)); wsh_read(+a.getAttribute('href').slice(5), m); }
   });
 }
 // 2.200.0 B (#2747): the text of a page shared with 'edit' (Markdown, saved as a whole; someone else saving meanwhile = 409)

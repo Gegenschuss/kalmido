@@ -210,14 +210,16 @@ async function pbVersions(sc, j, done) {
       : `<div class="muted mhint">${tr('No versions yet.')}</div>`}</div>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-pv="close">${tr('Close')}</button></div>`;
   const one = async v => { try { return await api('GET', pbUrl(sc, '/versions/' + v)); } catch { return null; } };
+  const toList = () => { body.innerHTML = listHtml(); };
   body.innerHTML = listHtml();
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-pv]'); if (!b) return;
     const a = b.dataset.pv, v = +(b.closest('[data-v]')?.dataset.v || 0);
     if (a === 'close') { md.remove(); return; }
-    if (a === 'back') { body.innerHTML = listHtml(); return; }
+    if (a === 'back') { f8d_backBtn(md, toList); return; }  // 2.962.0 (#5232): = Android Back
     if (a === 'view' || a === 'cmp') {
       const x = await one(v); if (!x || !md.isConnected) return;
+      f8d_step(md, toList);  // 2.962.0 (#5232): the version is a step of Back, the list comes back
       body.innerHTML = `<h3>${esc(tr('Version {0}', v))}</h3><div class="muted pbmeta">${esc(pbWhen(x.created_at))}${x.by ? ' · ' : ''}${pbWho(x.by)} · ${esc(tr(PB_SRC[x.source] || x.source || ''))}</div>
         ${a === 'view' ? `<div class="pbprev"><div class="pbpart"><div class="md">${(x.text || '').trim() ? renderMd(x.text, true) : `<p class="muted">${tr('Empty text')}</p>`}</div></div></div>`
           : `<div class="shint keep lhint">${esc(tr('From version {0} to the current text:', v))}</div>${pbDiffHtml(x.text, j.text)}`}
@@ -332,10 +334,13 @@ function pbCheckForm(box, lid, j, c, done) {
     <div class="foot"><span class="spacer"></span><button class="btn" data-pf="back">${tr('Cancel')}</button><button class="btn pri" data-pf="save">${tr('Save')}</button></div>`;
   const vis = () => { const f = $('#pc-freq', box).value; $('#pc-wd', box).hidden = f !== 'weekly'; $('#pc-dom', box).hidden = f !== 'monthly'; };
   vis(); $('#pc-freq', box).addEventListener('change', vis);
+  // 2.962.0 (#5232): the form is a step of Back over the list: Back = Cancel, the list comes back; saving leaves the step
+  const md = box.closest('.modal'), back = () => { box.onclick = null; done(); };
+  f8d_step(md, back);
   box.onclick = async e => {
     const b = e.target.closest('[data-pf]'); if (!b) return;
     e.stopPropagation();
-    if (b.dataset.pf === 'back') { box.onclick = null; done(); return; }
+    if (b.dataset.pf === 'back') { f8d_backBtn(md, back); return; }
     const f = $('#pc-freq', box).value;
     const d = {agent_id: +$('#pc-ag', box).value, freq: f, time: $('#pc-time', box).value || '07:00', prompt: $('#pc-prompt', box).value.trim(), enabled: $('#pc-on', box).checked,
       days: f === 'weekly' ? $$('[data-wd]:checked', box).map(x => +x.dataset.wd) : f === 'monthly' ? [Math.max(1, Math.min(31, +$('#pc-dom', box).value || 1))] : []};
@@ -346,7 +351,7 @@ function pbCheckForm(box, lid, j, c, done) {
     b.disabled = true;
     try { await rawFetch(isNew ? 'POST' : 'PATCH', isNew ? `/api/lists/${lid}/checks` : `/api/list-checks/${c.id}`, d); }
     catch (x) { b.disabled = false; return fail(x instanceof Offline ? tr('Only available online.') : x.message); }
-    toast(tr('Saved')); box.onclick = null; done();
+    toast(tr('Saved')); box.onclick = null; f8d_stepDrop(md); done();
   };
 }
 

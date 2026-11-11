@@ -599,25 +599,27 @@ function bg_csvModal() {
       st.mapping = mapOf();
       if (st.mapping.date == null || st.mapping.title == null || (st.mapping.amount == null && st.mapping.amount_in == null && st.mapping.amount_out == null)) { err(tr('Please select the columns for date, amount and text')); return; }
       const j = await api('POST', `/api/budget/${lid}/import/parse`, form(st.mapping));
-      st.rows = j.rows || []; st.skipped = j.skipped || 0; st.p = {...st.p, ...j, columns: st.p.columns, sample: st.p.sample, guess: st.p.guess}; step3();
+      st.rows = j.rows || []; st.skipped = j.skipped || 0; st.p = {...st.p, ...j, columns: st.p.columns, sample: st.p.sample, guess: st.p.guess}; step3(); f8d_step(md, backOne);
     } catch (er) { err(er.message); } finally { const b2 = $('[data-cs="next"]', md); if (b2) b2.disabled = false; }
   };
+  // 2.962.0 (#5232): the view before (Back / Android Back): the columns again, or the start (CAMT has no column step)
+  const backOne = () => { if (st.rows && st.p?.columns) { st.rows = null; step2(); } else { st.rows = null; st.p = null; step1(); } };
   const take = async fl => {
     st.files = [...(fl || [])]; if (!st.files.length) return;
     if (st.files.reduce((n, f) => n + f.size, 0) > BG_UPLOAD_MAX) { err(tr('The upload is too large (at most {0} MB)', 20)); return; }
     Object.assign(st, {p: null, rows: null, mapping: null});
     try { st.p = await api('POST', `/api/budget/${lid}/import/parse`, form(null)); }
     catch (er) { err(er.message || tr('The file could not be read')); return; }
-    if (st.p.rows) { st.rows = st.p.rows; st.skipped = st.p.skipped || 0; step3(); return; }  // 2.140.0 B (#2134): CAMT -- the rows at once
+    if (st.p.rows) { st.rows = st.p.rows; st.skipped = st.p.skipped || 0; step3(); f8d_step(md, backOne); return; }  // 2.140.0 B (#2134): CAMT -- the rows at once
     if (!st.p.columns?.length) { err(tr('No columns found in the file')); return; }
-    step2();
+    step2(); f8d_step(md, backOne);  // 2.962.0 (#5232): a step of Back
   };
   md.addEventListener('click', async e => {
     const u = e.target.closest('[data-csundo]');
     if (u) { u.disabled = true; try { if (await bg_runUndo(lid, u.dataset.csundo)) step1(); } catch (er) { err(er.message); } finally { u.disabled = false; } return; }
     const b = e.target.closest('[data-cs]'); if (!b) return;
     if (b.dataset.cs === 'next') next();
-    else if (b.dataset.cs === 'back') { if (st.rows && st.p?.columns) { st.rows = null; step2(); } else { st.rows = null; st.p = null; step1(); } }  // 2.140.0 B (#2134): CAMT has no column step
+    else if (b.dataset.cs === 'back') f8d_backBtn(md, backOne);  // 2.962.0 (#5232): = Android Back (its history entry goes along)
   });
   md.addEventListener('change', e => {
     if (e.target.matches('[data-csr]')) { const b = $('[data-cs="next"]', md); if (b) b.textContent = okLabel(); return; }

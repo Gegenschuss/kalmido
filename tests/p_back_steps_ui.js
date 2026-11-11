@@ -11,6 +11,7 @@
 // - the views of a page (#view._stk, f8d_step): Back shows the view before; another page empties them (no stale entries)
 // - a lightbox over a dialog, the search palette: one Back each
 // - 2.962.0 (#5231): menus: a second level and a follow menu are steps (task menu, a chat header menu with Usage)
+// - 2.962.0 (#5232): windows with a second view (merge dialog, Settings > Server sub-tabs): Back = their own Back first
 // The settings' areas (#5214) stay in p2736_l_settings_back_ui.
 // P4: alice works without an organisation: the person without an organisation
 // freelancer-matrix: n/a - no route of its own, the Back key in the browser
@@ -176,6 +177,36 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
       await at(2);
       await ev(`(document.querySelector('#pop .tch-shx').click(), 1)`);
       check(await wait(`document.querySelector('#pop').classList.contains('hidden') && f8d_bk.pushed === 0 && !f8d_bk.skip && ${onToday}`, {timeout: 6000}), `${W}: the X closes the menu with its steps, no entry stays ` + await ev(STATE));
+
+      // 8. 2.962.0 (#5232): a window with a second view: Back = its own Back button, only then the window closes.
+      // The merge dialog (choices -> overview), then the sub-tabs of Settings > Server (a sub-tab chosen by hand is a step)
+      const MG = `{title: 'Merge contacts', recs: [{id: 1, label: 'Anna Beispiel'}, {id: 2, label: 'Anne Beispiel'}], fields: [{k: 'email', label: 'Email', vals: {1: 'anna@example.com', 2: 'anne@example.com'}}],
+        preview: async () => ({lines: ['2 notes move to Anna Beispiel']}), run: async () => true}`;
+      const mgTxt = `(document.querySelector('.modal.mgdlg:not(.an-out)')?.textContent || '')`;
+      await ev(`(ms_merge(${MG}), 1)`);
+      check(await at(1, `${mgTxt}.includes('anne@example.com')`), `${W}: the merge dialog shows its choices ` + await ev(STATE));
+      await ev(`(document.querySelector('.mgdlg [data-m="next"]').click(), 1)`);
+      check(await at(2, `${mgTxt}.includes('2 notes move to Anna Beispiel')`), `${W}: Next: the overview, a step of Back ` + await ev(STATE));
+      await back();
+      check(await at(1, `${mgTxt}.includes('anne@example.com') && !${mgTxt}.includes('2 notes move')`), `${W}: Back = the choices again, the dialog stays ` + await ev(STATE));
+      await ev(`(document.querySelector('.mgdlg [data-m="next"]').click(), 1)`);
+      await at(2, `${mgTxt}.includes('2 notes move')`);
+      await ev(`(document.querySelector('.mgdlg [data-m="back"]').click(), 1)`);
+      check(await at(1, `${mgTxt}.includes('anne@example.com') && !${mgTxt}.includes('2 notes move')`), `${W}: its Back button = the same step, its entry goes ` + await ev(STATE));
+      await back();
+      check(await wait(`!document.querySelector('.modal.mgdlg:not(.an-out)') && f8d_bk.pushed === 0 && !f8d_bk.skip && ${onToday}`, {timeout: 6000}), `${W}: the next Back closes the dialog, Today stays ` + await ev(STATE));
+      // Settings opened on Server > Sign-in (a phone opened into an area: one step to the overview, #5214)
+      const sub = k => `!!document.querySelector('.modal.smodal [data-admp="${k}"]:not([hidden])')`;
+      await ev(`(settingsModal('signin'), 1)`);
+      check(await at(2, `${sub('signin')} && !!document.querySelector('.modal.smodal [data-admsub="server"]')`, 10000), `${W}: Settings on Server > Sign-in ` + await ev(STATE));
+      await ev(`(document.querySelector('.modal.smodal [data-admsub="server"]').click(), 1)`);
+      check(await at(3, sub('server')), `${W}: the sub-tab Server, a step of Back ` + await ev(STATE));
+      await back();
+      check(await at(2, `${sub('signin')} && !document.querySelector('.modal.smodal').classList.contains('sidx')`), `${W}: Back = the sub-tab Sign-in again, the area stays ` + await ev(STATE));
+      await back();
+      check(await at(1, `document.querySelector('.modal.smodal').classList.contains('sidx')`), `${W}: the next Back = the overview of Settings ` + await ev(STATE));
+      await back();
+      check(await wait(`!document.querySelector('.modal.smodal:not(.an-out)') && f8d_bk.pushed === 0 && !f8d_bk.skip && ${onToday}`, {timeout: 6000}), `${W}: the last Back closes Settings, Today stays ` + await ev(STATE));
     }
   }, true);
 

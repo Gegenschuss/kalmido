@@ -7,6 +7,7 @@
 //   the target (importTargetConfirm) -> the two bookings are in the list; the PIN field is empty again after "Connect";
 //   the sign-in name is offered again the next time (never the PIN)
 // - 2.616.0 (#2473, Fable finding 4): another admin set the server address since -> the dialog says who and when
+// - 2.962.0 (#5232): the approval step has a Back (never shown before): the form again, the dialog stays
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -93,6 +94,12 @@ const PIN = 'UiPin-' + Math.random().toString(36).slice(2, 10);
     check(await ready(ev, `document.querySelector('.fntdlg #fn-login')?.value === 'decoupled' && document.querySelector('.fntdlg #fn-pin')?.value === '' && document.activeElement?.id === 'fn-pin'`, 60),
       'next time: the sign-in name is offered again, the PIN field is empty and has the focus');
     check(await ev(`document.querySelector('.fntdlg .fn-srvchg')?.textContent === ''`), 'own server address: no note in the dialog');
+    // 2.962.0 (#5232): the bank's steps have a Back (it was never shown): the form again, the dialog stays
+    await ev(set('#fn-pin', PIN));
+    await ev(click(`document.querySelector('.fntdlg [data-fn="next"]')`));
+    check(await ready(ev, `/Please approve in your banking app/.test(document.querySelector('.fntdlg')?.textContent || '') && !!document.querySelector('.fntdlg [data-fn="back"]')`, 40), '#5232: the approval step shows Back');
+    await ev(click(`document.querySelector('.fntdlg [data-fn="back"]')`));
+    check(await ready(ev, `!!document.querySelector('.fntdlg #fn-pin') && document.querySelector('.fntdlg #fn-login')?.value === 'decoupled' && !/Please approve/.test(document.querySelector('.fntdlg').textContent)`, 40), '#5232: Back = the form again, the dialog stays open');
     await ev(click(`document.querySelector('.fntdlg [data-fn="close"]')`));
     // 2.616.0 (#2473, Fable finding 4): Dave (another admin) fetches with another server address -> Alice's dialog names it
     check((await call(CA, 'POST', '/api/users', {username: 'dave', display_name: 'Dave Admin', password: 'password123', email: 'dave@example.com'})).http === 200, 'dave');

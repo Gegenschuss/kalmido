@@ -678,8 +678,16 @@ function segReveal(b) {
   requestAnimationFrame(go); setTimeout(go, 400);  // once more when the pane has loaded (a scrollbar of the dialog narrows the strip)
 }
 // shows one sub-tab and loads what it needs (save: remember it for this device)
+// 2.962.0 (#5232): a sub-tab chosen by hand (save) is a step of Back like the areas (#5214): Back shows the sub-tab before.
+// Not when the same tap changed the area too (a jump into the other area, a search hit): that area step is the one step.
+function stp_sub(md, was, now, again) {
+  if (!Array.isArray(md._stk) || !was || was === now || md._subBack || md._navTick) return;
+  md._stk.push(() => { md._subBack = 1; try { again(was); } finally { md._subBack = 0; } });
+  if (isTouch() && typeof f8d_queue === 'function') f8d_queue();
+}
 function aiSubShow(md, want, save) {
-  const k = aiSubCur(want); if (save) LS.set('aiSub', k);
+  const was = $('[data-aisub].on', md)?.dataset.aisub;
+  const k = aiSubCur(want); if (save) { LS.set('aiSub', k); stp_sub(md, was, k, w => aiSubShow(md, w, true)); }
   $$('[data-aisub]', md).forEach(b => { const on = b.dataset.aisub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
   segReveal($(`[data-aisub="${k}"]`, md));
   $$('[data-aisp]', md).forEach(p => { p.hidden = p.dataset.aisp !== k; });
@@ -716,7 +724,8 @@ function admSubShow(md, want, save, sec) {
   sec = sec || ad_subSec(want); if (!sec) return;
   const ks = $$('[data-admp]', md).map(p => p.dataset.admp).filter(k => ad_subSec(k) === sec); if (!ks.length) return;
   if (want && ad_subSec(want) === sec && $('.snav [data-sec].on', md)?.dataset.sec !== sec && md._show) { md._show(sec); md._idx?.(false); }  // the other area
-  const k = admSubCur(sec, ks, want); if (save) LS.set(ad_subKey(sec), k);
+  const was = $$('[data-admsub].on', md).find(b => ad_subSec(b.dataset.admsub) === sec)?.dataset.admsub;
+  const k = admSubCur(sec, ks, want); if (save) { LS.set(ad_subKey(sec), k); stp_sub(md, was, k, w => admSubShow(md, w, true, sec)); }
   $$('[data-admsub]', md).filter(b => ad_subSec(b.dataset.admsub) === sec).forEach(b => { const on = b.dataset.admsub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
   const sb = $(`[data-admsub="${k}"]`, md); if (sb) segReveal(sb);
   $$('[data-admp]', md).filter(p => ad_subSec(p.dataset.admp) === sec).forEach(p => { p.hidden = p.dataset.admp !== k; });
@@ -1033,7 +1042,7 @@ function settingsModal(focus) {
   // (backclose.js): md._stk holds the views before the shown one, Back and the arrow in the header show the last of them; folding
   // inside an area is none. A phone opened straight into an area has the overview below it (the arrow always led there), Back too.
   md._stk = isMobile() && focus ? [{k: cur, i: true}] : [];
-  md._back = () => { const v = md._stk.pop(); if (!v) return false; if (v.k !== cur) show(v.k); idx(v.i); return true; };
+  md._back = () => { const v = md._stk.pop(); if (!v) return false; if (typeof v === 'function') { v(); return true; } if (v.k !== cur) show(v.k); idx(v.i); return true; };  // 2.962.0 (#5232): a function = a sub-tab (stp_sub)
   // 2.13.2 (#478 F13): phones: a "More ›" at the right end of the cut tab strip while more tabs are hidden to the right
   { const nav = $('.snav', md); nav.insertAdjacentHTML('afterend', `<button type="button" class="snmore hidden" data-snmore tabindex="-1" aria-hidden="true">${tr('More')} ›</button>`);
     $('[data-snmore]', md).addEventListener('click', () => nav.scrollBy({left: nav.clientWidth * .7, behavior: reducedMotion() ? 'auto' : 'smooth'}));
@@ -1058,7 +1067,7 @@ function settingsModal(focus) {
   if (modFocus) setTimeout(() => { const r = $(`[data-pane="modules"] [data-modrow="${modFocus}"]`, md); if (!r) return; const gd = r.closest('details.modgrp'); if (gd) gd.open = true; const gp = r.closest('details.mgparts'); if (gp) gp.open = true; const o = $('details.mopt', r); if (o) o.open = true; r.scrollIntoView?.({block: 'start'}); r.classList.add('flash'); }, 0);
   // 2.736.0 (#5214): fn changes the shown view; a real change leaves the view before it as a step of Back
   const stp_nav = fn => { const a = {k: cur, i: md.classList.contains('sidx')}; fn(); if (a.k === cur && a.i === md.classList.contains('sidx')) return;
-    md._stk.push(a); if (isTouch() && typeof f8d_queue === 'function') f8d_queue(); };
+    md._stk.push(a); md._navTick = 1; queueMicrotask(() => { md._navTick = 0; }); if (isTouch() && typeof f8d_queue === 'function') f8d_queue(); };  // _navTick: 2.962.0 (#5232, stp_sub)
   const show = k => {
     cur = k; LS.set('settingsSec', k); head();
     $$('.snav button', md).forEach(b => { b.classList.toggle('on', b.dataset.sec === k); b.setAttribute('aria-selected', b.dataset.sec === k); });

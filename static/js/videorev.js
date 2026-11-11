@@ -589,9 +589,10 @@ function vdr_newFile(k, id, st) {
   md.addEventListener('click', e => {
     if (e.target.closest('[data-m="close"]')) { md.remove(); return; }
     const b = e.target.closest('[data-vdrf]'); if (!b) return;
-    if (b.dataset.vdrf === 'up') { ps.parent = list._up || null; load(); return; }
+    // 2.962.0 (#5232): a folder deeper is a step of Back; the list's own "Back" = that step
+    if (b.dataset.vdrf === 'up') { f8d_backBtn(md, () => { ps.parent = list._up || null; load(); }); return; }
     const x = (list._its || []).find(i => i.id === +b.dataset.vdrf); if (!x) return;
-    if (x.kind === 'folder') { ps.parent = x.id; load(); return; }
+    if (x.kind === 'folder') { const was = ps.parent; f8d_step(md, () => { ps.parent = was; load(); }); ps.parent = x.id; load(); return; }
     send(st ? {file_id: x.id} : {[k]: id, file_id: x.id, title: title()});
   });
   load();

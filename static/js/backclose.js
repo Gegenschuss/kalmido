@@ -61,6 +61,10 @@ function f8d_stepBack(/** @type {any} */ el) {
   if (typeof isTouch === 'function' && isTouch() && f8d_bk.pushed) history.back(); else el._back();
   return true;
 }
+// 2.962.0 (#5232): a window's own Back / Cancel button of a second view: one step of Back if the view is one, else back() at once
+function f8d_backBtn(/** @type {any} */ el, /** @type {() => void} */ back) { if (!f8d_stepBack(el)) back(); }
+// 2.962.0 (#5232): the level left its last view another way (saved, the server ended it): that step goes without being run
+function f8d_stepDrop(/** @type {any} */ el) { if (!el?._stk?.length) return; el._stk.pop(); f8d_queue(); }
 // the level's views are gone (it was drawn anew, the page changed): their history entries go with the next sync
 function f8d_stepsClear(/** @type {any} */ el) { if (!el?._stk?.length) return; el._stk = []; f8d_queue(); }
 // route() (core.js): another page empties the views of the page before it

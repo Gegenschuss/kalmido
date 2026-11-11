@@ -310,7 +310,7 @@ function wem_device(p, at) {
 const wem_md = n => `${(n.mime || '').startsWith('image/') ? '!' : ''}[${String(n.name).replace(/[[\]\n]/g, '')}](/api/files/nodes/${n.id}/content)`;
 // the file store of the page's space: browse folders or search, a click inserts the reference
 function wem_pick(p, at) {
-  const st = {parent: null, q: '', n: 0};
+  const st = {parent: null, q: '', n: 0, up: /** @type {Array<number|null>} */ ([])};  // up: 2.962.0 (#5232) the folders before (steps of Back)
   /** @type {any} */
   const md = modal(`<div class="lhdr"><h3>${ic('folder', 's')} ${esc(tr('From the file store'))}</h3><span class="spacer"></span><button type="button" class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="ctsearch">${ic('search', 's')}<input id="wem-q" type="search" placeholder="${esc(tr('Find a file'))}" aria-label="${esc(tr('Find a file'))}" autocomplete="off"></div>
@@ -331,14 +331,20 @@ function wem_pick(p, at) {
       : `<p class="muted">${esc(st.q ? tr('Nothing found') : tr('No files here yet.'))}</p>`;
     list._its = its;
   };
+  const wemUp = () => { st.parent = st.up.pop() ?? null; load(); };  // 2.962.0 (#5232): Back = the folder before
   let qt = 0;
   $('#wem-q', md).addEventListener('input', e => { clearTimeout(qt); qt = setTimeout(() => { st.q = e.target.value.trim(); load(); }, 250); });
   md.addEventListener('click', e => {
     if (/** @type {any} */ (e.target).closest('[data-m="close"]')) { modalClose(md); return; }
-    const c = /** @type {any} */ (e.target).closest('[data-wemc]'); if (c) { st.parent = +c.dataset.wemc || null; load(); return; }
+    const c = /** @type {any} */ (e.target).closest('[data-wemc]');
+    if (c) {  // 2.962.0 (#5232): a crumb further up: the steps of the folders between go (Back then goes on from there)
+      const to = +c.dataset.wemc || null, i = st.up.lastIndexOf(to);
+      if (i >= 0) while (st.up.length > i) { st.up.pop(); f8d_stepDrop(md); } else if (to !== st.parent) { st.up.push(st.parent); f8d_step(md, wemUp); }
+      st.parent = to; load(); return;
+    }
     const b = /** @type {any} */ (e.target).closest('[data-wemn]'); if (!b) return;
     const x = (list._its || []).find(i => i.id === +b.dataset.wemn); if (!x) return;
-    if (x.kind === 'folder') { st.parent = x.id; load(); return; }
+    if (x.kind === 'folder') { st.up.push(st.parent); f8d_step(md, wemUp); st.parent = x.id; load(); return; }  // 2.962.0 (#5232): a step of Back
     modalClose(md);
     wem_insert(wem_md(x), at);
   });

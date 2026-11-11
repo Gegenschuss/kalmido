@@ -61,9 +61,10 @@ async function wkh_dlg(p) {
     const a = /** @type {any} */ (e.target).closest('[data-wkh]'); if (!a) return;
     const k = a.dataset.wkh;
     if (k === 'close') modalClose(md);
-    else if (k === 'list') list();
+    else if (k === 'list') f8d_backBtn(md, list);  // 2.962.0 (#5232): = Android Back
     else if (k === 'open') {
       const v = vs.find(x => x.id === +a.dataset.id); if (!v) return;
+      f8d_step(md, list);  // 2.962.0 (#5232): the version is a step of Back, the list comes back
       box.innerHTML = `<div class="muted mhint">${tr('Loading…')}</div>`;
       let d; try { d = await rawFetch('GET', `/api/wiki/pages/${p.id}/versions/${v.id}`); } catch (er) { box.innerHTML = `<div class="muted mhint">${esc(er.message)}</div>`; return; }
       const cur = WK.pg?.id === p.id ? WK.pg : p;
