@@ -141,11 +141,15 @@ const rowBox = el => { el.getBoundingClientRect = () => ({top: 100, bottom: 140,
   check(await until(() => /1 task stays: its own subtasks would go deeper than 5 levels/.test(toastText(d))), '#1003: the message counts it: ' + toastText(d));
   // out onto a section header: standalone in "Later", order kept
   await w.eval('load().then(render)'); await sleep(300);
-  await call('PATCH', '/api/tasks/' + A1, {parent_id: PARENT}); await call('PATCH', '/api/tasks/' + A2, {parent_id: PARENT});
+  // 2.997.0 (#5616): with an order of their own under the report (A1 first): since #5255 stage 7 the undo above puts the exact
+  // sort back (the server's step), so "Draw charts" stood before "Collect numbers" (it came back to its old place, "Collect
+  // numbers" kept the one under "Chapter one") and "order kept" meant the other way round than the checks below assume
+  await call('PATCH', '/api/tasks/' + A1, {parent_id: PARENT, sort: 10}); await call('PATCH', '/api/tasks/' + A2, {parent_id: PARENT, sort: 11});
   await w.eval('load().then(render)'); await sleep(300);
   w.eval(`(() => { S.multi.clear(); [${A2}, ${A1}].forEach(i => S.multi.add(i)); renderMultiBar(); render(); })()`); await sleep(150);
   const head = sid => d.querySelector(`#view .ghead[data-section="${sid}"]`);
   check(row(A1) && head(SB), '#1003: subtasks and the section header are shown');
+  check(JSON.stringify(w.eval(`dgOrder([${A2}, ${A1}])`)) === JSON.stringify([A1, A2]), '#1003: on screen "Collect numbers" before "Draw charts"');
   dnd(w, row(A1), 'dragstart');
   dnd(w, head(SB), 'dragover'); dnd(w, head(SB), 'drop'); dnd(w, row(A1), 'dragend');
   check(await until(async () => { const a = await taskOf(A1), b = await taskOf(A2); return !a.parent_id && !b.parent_id && a.section_id === SB && b.section_id === SB && a.sort < b.sort; }), '#1003: standalone in "Later", order kept');
