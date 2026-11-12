@@ -27,7 +27,7 @@ from ..core.pg import write_lock  # 2.1048.0 (#5861)
 from ..core.errors import BadInput, reject_unknown
 from ..core.i18n import tr
 from ..core.conflict import need_version  # 2.564.0 (#4702)
-from ..core.mdedit import MdHeadingError, md_edit, md_edit_input, md_heading_answer, md_need_version, md_spec_body  # 2.1082.0 (#5830)
+from ..core.mdedit import MdHeadingError, md_edit, md_edit_input, md_heading_answer, md_spec_body, md_version  # 2.1082.0 (#5830)
 from ..core.dlock import dl_chain_cut  # 2.1045.0 (#5823)
 from ..accounts.session import me
 from ..api.common import V1Error, v1_args, v1_call, v1_err, v1_json, v1_out, v1_view
@@ -330,20 +330,19 @@ def _wkv_edit(pid, mode):
     uid = me()
     reject_unknown(b, ("text", "under", "expect_updated_at") if mode == "append" else ("heading", "text", "expect_updated_at"))
     text, head = md_edit_input(b, mode)
-    if mode == "replace":
-        md_need_version(b)
+    exp = md_version(b, mode == "replace")  # review F3: one normalised value, a string or None
     write_lock(c, f"wiki-{int(pid)}")  # the same lock as wiki_update (re-entrant there): read + save see no other save
     r, role, path = wkv_need(c, uid, pid, write=True)
-    exp = b.get("expect_updated_at") or (request.headers.get("If-Match") or "").strip().removeprefix("W/").strip('"') or None
-    if exp and exp != r["updated_at"]:
+    if exp is not None and exp != r["updated_at"]:
         return _conflict(c, uid, r, role, path)
     cur = wkh_body(c, r) or ""  # the plain text (a sealed private page opens with its key, like a read)
     try:
         new = md_edit(cur, mode, text, head)
     except MdHeadingError as e:
         return md_heading_answer(e, show=_reads())  # review F5 (2.1068.0): a write-only token reads no text
-    if new != cur:
-        v1_call(wiki_update, pid, body={"body": new, "expect_updated_at": r["updated_at"]})
+    if new == cur:  # review F4 / F7: nothing changes -- no save, no "write" in the node's history
+        return jsonify(_page(c, r, role, path, user_names(c, [r["updated_by"]]), full=True))
+    v1_call(wiki_update, pid, body={"body": new, "expect_updated_at": r["updated_at"]})
     r, role, path = wkv_need(c, uid, pid)
     _log(c, uid, r, "write")
     c.commit()

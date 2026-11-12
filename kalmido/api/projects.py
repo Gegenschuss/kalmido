@@ -1,14 +1,14 @@
 """The project overview in the token API."""
-from flask import jsonify, request
+from flask import jsonify
 
 from ..core.config import app, MAX_FILE_MB
 from ..core.db import db
 from ..core.access import Denied
 from ..tasks.validation import as_int
 from ..collab.comments import user_names
-from ..core.errors import BadInput, reject_unknown, UnknownFields
+from ..core.errors import reject_unknown, UnknownFields
 from ..core.i18n import tr
-from ..core.mdedit import MdHeadingError, md_edit, md_edit_input, md_heading_answer, md_need_version  # 2.1082.0 (#5830)
+from ..core.mdedit import MdHeadingError, md_edit, md_edit_input, md_heading_answer, md_version  # 2.1082.0 (#5830)
 from ..collab.liste2e import le2e_is_cipher
 from ..lists.projects import (
     list_file_delete, list_file_get, list_file_upload, ms_compat, ms_rows, need_overview, OV_DESC_MAX, ov_file_dict,
@@ -74,15 +74,10 @@ def _v1_ov_edit(lid, mode):
     b = v1_json()
     reject_unknown(b, ("text", "under", "expect_updated_at") if mode == "append" else ("heading", "text", "expect_updated_at"))
     text, head = md_edit_input(b, mode)
-    if mode == "replace" and b.get("expect_updated_at") is None:  # "" = read a description never saved (no stamp)
-        md_need_version(b)
+    exp = md_version(b, mode == "replace", empty_ok=True)  # "" = read a description never saved (no stamp); review F3
     c = db()
     need_overview(c, lid, write=True)
     r = c.execute("SELECT description, description_at FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
-    exp = b["expect_updated_at"] if b.get("expect_updated_at") is not None else \
-        ((request.headers.get("If-Match") or "").strip().removeprefix("W/").strip('"') or None)
-    if exp is not None and not isinstance(exp, str):
-        raise BadInput(tr("Invalid value: {0}", "expect_updated_at"))
     if exp is not None and exp != (r["description_at"] or ""):
         return v1_err(409, tr("Changed in the meantime"), current=v1_call(overview_get, lid))
     cur = r["description"] or ""

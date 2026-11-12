@@ -45,7 +45,7 @@ from ..personal.habits import habit_log, habit_times, need_habit
 from ..personal.timetrack import clean_day_hours, entry_out, time_create, time_rounding, time_rows, vis_ids
 from ..core.errors import BadInput, field_alias, reject_unknown, UnknownFields
 from ..core.conflict import need_version, version_rule, VersionRequired  # 2.564.0 (#4702)
-from ..core.mdedit import MdHeadingError, md_edit, md_edit_input, md_heading_answer, md_need_version  # 2.1082.0 (#5830)
+from ..core.mdedit import MdHeadingError, md_edit, md_edit_input, md_heading_answer, md_version  # 2.1082.0 (#5830)
 from ..collab.liste2e import le2e_is_cipher, le2e_mode  # 2.1082.0 (#5830)
 from ..core.objtags import obj_tag_sql, obj_utag_sql, otg_user_add, otg_user_drop, otg_user_names  # 2.947.0 (#5275); 2.955.0 (#5276): personal tags
 from ..lists.filterrules import filter_where, rule_kinds, rule_sort  # 2.577.0 (#3356)
@@ -1509,9 +1509,10 @@ def _v1_notes_edit(tid, mode):
     reject_unknown(b, ("text", "under", "expect_updated_at") if mode == "append" else ("heading", "text", "expect_updated_at"))
     text, head = md_edit_input(b, mode)
     if mode == "replace":
-        md_need_version(b)
+        md_version(b, True)
     c = db()
     _v1_live(c, tid)
+    write_lock(c, f"task-{tid}")  # review F2: the advisory lock first, the row second (the order of apply_update, complete, undo)
     r = c.execute("SELECT content, list_id FROM tasks WHERE id=? FOR UPDATE", (tid,)).fetchone()
     stale = v1_expect(c, tid, b)
     if stale:

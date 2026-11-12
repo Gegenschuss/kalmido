@@ -38,7 +38,7 @@ from ..collab.liste2e import le2e_is_cipher
 from ..core.objcomments import ocm_row
 from ..wiki.wkfolder import wkf_locked, wkf_role
 from ..wiki.wkhist import WikiUnreadable, wkh_body
-from ..core.mdedit import MdHeadingError, md_edit  # 2.1082.0 (#5830): the shared building block of targeted changes
+from ..core.mdedit import MdHeadingError, md_edit, md_edit_input  # 2.1082.0 (#5830): the shared building block of targeted changes
 
 APVD_CTX = 2  # lines of context around a change (#5831)
 APVD_SHORT_ROWS = 40  # rows of the first view; "Show everything" asks with full=1
@@ -100,10 +100,10 @@ def apvd_target(c, uid, kind, tid, piece, b):
     t = _apvd_text(c, uid, base, tid, piece)
     if t.get("hidden") or not mode:
         return t
-    hk = "under" if mode == "append" else "heading"
-    head = b.get(hk) if isinstance(b.get(hk), str) and b[hk].strip() else None
-    if mode == "replace" and head is None:
-        return {**t, "old": "", "new": piece, "no_heading": "?"}
+    try:  # review F5: the route's own check of the fields -- a step it would refuse with 400 shows no change
+        _, head = md_edit_input(b, mode)
+    except BadInput:
+        return {**t, "old": "", "new": "", "no_heading": ""}
     try:
         return {**t, "new": md_edit(t["old"], mode, piece, head)}
     except MdHeadingError:  # the step would answer 404 / 409 - show the piece alone

@@ -119,6 +119,9 @@ check(r.ok and notes(T) == want, f"replace the Risks section (to the end, the fe
 cur = api("GET", f"/tasks/{T}").json()
 r = api("POST", f"/tasks/{T}/notes/replace-section", json={"heading": "Plan", "text": "- one step", "expect_updated_at": cur["updated_at"]})
 check(r.ok and notes(T) == "# Spec\nintro\n\n## Plan\n\n- one step\n\n## Risks\n\n- the cache\n- the date\n", f"a middle section: the next heading stays {notes(T)!r}")
+T3 = task("Long", "# " + "a" * 2000 + "\nbody\n## Real\nx\n", FL)
+r = api("POST", f"/tasks/{T3}/notes/append", json={"text": "y", "under": "zzz"})
+check(r.status_code == 404 and err(r).get("headings") == ["Real"], f"review F1: a line over 1000 characters is no heading {r.text[:120]}")
 T2 = task("Twice", "## Plan\na\n## Plan\nb\n", FL)
 cur = api("GET", f"/tasks/{T2}").json()
 r = api("POST", f"/tasks/{T2}/notes/replace-section", json={"heading": "Plan", "text": "c", "expect_updated_at": cur["updated_at"]})
@@ -184,6 +187,13 @@ FOL = {f["path"]: f["id"] for f in F.get(B + "/api/wiki", params={"space": "priv
 check(F.post(B + f"/api/files/nodes/{FOL.get('Kit')}/shares", json={"agent_id": FA, "role": "edit"}).status_code == 201, "setup: folder shared")
 r = api("POST", f"/wiki/pages/{PID}/replace-section", json={"heading": "Setup", "text": "new"})
 check(r.status_code == 400 and err(r).get("code") == "version_required", "page: replace without a version 400")
+# review F3: a version that is no string, or an empty If-Match, is no version
+check(api("POST", f"/wiki/pages/{PID}/replace-section", json={"heading": "Setup", "text": "new", "expect_updated_at": False}).status_code == 400,
+      "page: expect_updated_at false: 400")
+r = api("POST", f"/wiki/pages/{PID}/replace-section", h={**FH, "If-Match": "W/"}, json={"heading": "Setup", "text": "new"})
+check(r.status_code == 400 and err(r).get("code") == "version_required", f"page: an empty If-Match is no version ({r.status_code})")
+r = api("POST", f"/lists/{FL}/overview/replace-section", h={**FH, "If-Match": '""'}, json={"heading": "Status", "text": "x"})
+check(r.status_code == 400 and err(r).get("code") == "version_required", f"description: an empty If-Match is no version ({r.status_code})")
 cur = api("GET", f"/wiki/pages/{PID}").json()
 r = api("POST", f"/wiki/pages/{PID}/replace-section", json={"heading": "Setup", "text": "pip install\nthen go", "expect_updated_at": cur["updated_at"]})
 check(r.ok and r.json().get("body") == "# Guide\n\n## Setup\n\npip install\nthen go\n\n## Use\nrun\n", f"page: Setup replaced {r.status_code} {r.text[:200]}")

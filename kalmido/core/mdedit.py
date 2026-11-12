@@ -27,6 +27,7 @@ MDE_APPEND_MAX = 20000  # one added piece (a link, a paragraph); the whole text 
 MDE_SECTION_MAX = 100000  # the new text of one section
 MDE_HEAD_MAX = 300
 MDE_HEADS_SHOWN = 100  # headings named in the error answer
+MDE_LINE_MAX = 1000  # review F1: a longer line is never a heading (the lazy heading pattern backtracks quadratically)
 MDE_HEAD_RX = re.compile(r"^\s{0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")  # "# C#" is "C#"; closing hashes go
 MDE_FENCE_RX = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
 
@@ -55,7 +56,7 @@ def md_headings(lines):
             elif f.group(1)[0] == fence[0] and len(f.group(1)) >= len(fence) and not x.strip()[len(f.group(1)):].strip():
                 fence = ""
             continue
-        m = None if fence else MDE_HEAD_RX.match(x)
+        m = None if fence or len(x) > MDE_LINE_MAX else MDE_HEAD_RX.match(x)
         if m:
             out.append((i, len(m.group(1)), (m.group(2) or "").strip()))
     return out
@@ -136,7 +137,7 @@ def md_edit_input(b, mode):
         raise BadInput(tr("Too long: {0} (at most {1} characters)", "text", cap))
     key = "under" if mode == "append" else "heading"
     head = b.get(key)
-    if (head is not None or mode != "append") and (not isinstance(head, str) or not _want(head) or len(head) > MDE_HEAD_MAX):
+    if (head is not None or mode != "append") and (not isinstance(head, str) or len(head) > MDE_HEAD_MAX or not _want(head)):
         raise BadInput(tr("Invalid value: {0}", key))
     return text, head
 
@@ -151,13 +152,21 @@ def md_edit(cur, mode, text, heading):
     return md_replace_section(cur, heading, text)
 
 
-def md_need_version(b):
-    """Replacing a section needs the version the caller read, from everyone (not only agents as core/conflict.py
-    need_version): expect_updated_at in the body or the header If-Match, else 400 version_required."""
+def md_version(b, required, empty_ok=False):
+    """The version the caller read: expect_updated_at in the body, else the header If-Match (W/"..." stripped) -> a string
+    or None. required (replacing a section, from everyone, not only agents as core/conflict.py need_version): None = 400
+    version_required. review F3: anything but a string is 400; an empty value counts as none (empty_ok: "" from the body
+    stays, a project description never saved has no stamp)."""
     from flask import request
     from .conflict import VersionRequired
-    if b.get("expect_updated_at") in (None, "") and not (request.headers.get("If-Match") or "").strip():
+    v = b.get("expect_updated_at")
+    if v is not None and not isinstance(v, str):
+        raise BadInput(tr("Invalid value: {0}", "expect_updated_at"))
+    if v is None or (v == "" and not empty_ok):
+        v = (request.headers.get("If-Match") or "").strip().removeprefix("W/").strip('"') or None
+    if required and v is None:
         raise VersionRequired(("expect_updated_at", "If-Match"))
+    return v
 
 
 def md_heading_answer(e, show=True):
