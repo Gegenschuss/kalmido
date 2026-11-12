@@ -85,7 +85,7 @@ LABELS = {
     "fx_note_any": N_("Exchange rate 1 {home} = {rate} {cur}|calc"),  # 2.189.0 (#2475): other pairs than EUR / USD
     "opt_optional": N_("Optional:|calc"), "opt_alternative": N_("Alternative:|calc"),  # 2.1041.0 (#5814)
     "opt_note": N_("Optional and alternative positions are not included in the total.|calc"),
-    "subtotal": N_("Subtotal {title}|calc"),  # 2.1041.0 (#5816)
+    "subtotal_section": N_("Subtotal {title}|calc"),  # 2.1041.0 (#5816; "subtotal" is a word of the packs already)
     "unit_day": N_("days|calc"), "unit_hour": N_("h|calc"), "unit_piece": N_("pcs|calc"), "unit_minute": N_("min|calc"), "unit_flat": N_("flat|calc"),
 }
 CALC_PROD_WORD = (N_("production day|calc"), N_("production days|calc"))  # 2.185.0 C (#2520)
@@ -550,7 +550,7 @@ def calc_subtotals(lines, pack, lang, currency, kinds=("item",)):
         if cur is not None and cur["n"]:
             out.append({"kind": "subtotal", "sec": cur["sec"], "title": cur["title"], "total": _num(cur["sum"]),
                         "total_text": fmt_money(cur["sum"], lang, currency),
-                        "label": label(pack, lang, "subtotal", title=cur["title"]).strip()})
+                        "label": label(pack, lang, "subtotal_section", title=cur["title"]).strip()})
     sec = -1
     for ln in lines:
         k = ln.get("kind")

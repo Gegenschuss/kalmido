@@ -1555,7 +1555,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 if flat_ and not ln.get("total_text"):  # 2.1041.0 (#5817): the model has no amount (never "0,00")
                     tot_s = ""
                 if ln.get("opt") and not np_:  # 2.1041.0 (#5814): set apart, not in the sum
-                    rate_s, tot_s = (f"({rate_s})" if rate_s else ""), (f"({tot_s})" if tot_s else "")
+                    tot_s = f"({tot_s})" if tot_s else ""
                 pos_s = str(ln.get("pos") or "") if k in ("item", "producing", "surcharge") else ""  # 2.114.4 A (#2276): producing numbered too; surcharges like it
                 tag = ln["part_id"] if ln.get("part_id") in pp_ids and k == "item" else None  # 2.438.0 B (#3622)
                 t_lines = pdf_wrap(t, body, c_title - 6 - (ov_tag_w if tag is not None else 0))
@@ -1750,7 +1750,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         if raw_opt.get("detail"):
             p3o[o_l] = str(raw_opt["detail"])
     # 2.114.5 (#2300): no "valid until" sentence below the table when the head names the date
-    notes = [str(x) for x in (tot.get("opt_note"), tot.get("vat_note"), m.get("vat_note_text"),  # 2.1041.0 (#5814): + opt_note tot.get("exempt_note"), tot.get("fx_line") or m.get("fx_note"),  # 2.296.0 B (#3169): + exempt_note
+    notes = [str(x) for x in (tot.get("opt_note"), tot.get("vat_note"), m.get("vat_note_text"), tot.get("exempt_note"), tot.get("fx_line") or m.get("fx_note"),  # 2.296.0 B (#3169): + exempt_note; 2.1041.0 (#5814): + opt_note
                               m.get("valid_note") if not m.get("valid_until") else None) if x and str(x).strip()]
     notes = list(dict.fromkeys(notes))
     note = "\n".join(notes)
