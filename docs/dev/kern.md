@@ -601,6 +601,17 @@ it takes the owner / workspace the caller checked and refuses with 409 when the 
 the two columns, moves the times to TIMESTAMPTZ and `is_folder` to BOOLEAN and raises the back limit. `wiki_shares` = public
 links only.
 
+Open shares by e-mail address (2.1071.0, #5658, decision of #5643): a share typed in as an address binds only an account that
+proved the address (`core/access.py` `addr_account`). Without one, projects, folders of projects and knowledge pages keep an
+open share in `obj_addr_shares` (`core/addrshare.py` `ads_open`: kind, object / owner + path, the request without the address,
+the address sealed + its keyed hash); the answer stays the one of every address. When the account of that address signs in
+with it proved, or proves it while signed in, `ads_redeem` runs once the request has committed (teardown) and replays each
+row through the area's own share route as the person who typed it in (`ads_kind(kind, view, args, may, gone)`; the route marks
+a share made by address with `ads_bound()`): bound, or the object / the right gone = the row goes; not fitting yet = it stays,
+at most 180 days. The dialogs list open rows as "invited" (`GET /api/addr-shares`, the knowledge dialog with id `a<n>`) and take
+them back (`DELETE /api/addr-shares/<id>`). A new area that shares by address registers its kind here instead of a table of
+its own. Tables keep their open rows in `sheet_shares` (`shs_redeem`).
+
 ## Stage 6b: the side objects of a project (2.610.0, #4762)
 
 Custom field options, the people of a task, waiting on, templates, comments, a sprint's dialog and the trash of sections,

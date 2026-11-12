@@ -9,7 +9,7 @@ import secrets
 import threading
 import time
 from datetime import timedelta
-from flask import g, jsonify, redirect, request
+from flask import g, has_request_context, jsonify, redirect, request
 from werkzeug.security import generate_password_hash
 
 from ..core.config import (
@@ -575,10 +575,14 @@ def _rate_fail(keys):
 
 
 def _shs_signin(c, u):
-    """2.360.2 M (#2561): tables shared with the address of the account that signs in (sheets/shshare.py)."""
+    """2.360.2 M (#2561): tables shared with the address of the account that signs in (sheets/shshare.py).
+    2.1071.0 (#5658): and the open shares by address of projects, folders and knowledge pages (core/addrshare.py), redeemed
+    once this request has finished (g.ads_redeem, read by its teardown: the replay needs the sign-in committed)."""
     from ..sheets.shshare import shs_redeem
     if u:
         shs_redeem(c, u)
+        if has_request_context():
+            g.ads_redeem = u["id"]
 
 
 def start_session(c, uid, remember, via="password"):

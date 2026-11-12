@@ -28,6 +28,8 @@ from ..accounts.orginvite import ojn_proved
 from ..accounts.session import me
 from ..admin.hosting import mail_budget
 from ..api.common import hit_limit
+from ..core.addrshare import ads_mark  # 2.1071.0 (#5658)
+from ..sheets.shshare import shs_redeem  # 2.1071.0 (#5658)
 from ..integrations.mail import MAIL_OUT_ON, mail_send
 
 EPF_NS = "eproof"
@@ -145,6 +147,15 @@ def eproof_confirm():
         except Exception as x:  # noqa: BLE001
             c.heal()
             print("address proved: waking the invitations failed:", type(x).__name__, flush=True)
+        # 2.1071.0 (#5658): what was shared with the address waits no longer for the next sign-in: tables now (sheets/shshare.py),
+        # projects, folders and knowledge pages once this request has committed the proof (core/addrshare.py)
+        try:
+            with c.savepoint():
+                shs_redeem(c, c.execute("SELECT id, email, email_proved, kind FROM users WHERE id=?", (me(),)).fetchone())
+        except Exception as x:  # noqa: BLE001  the proof stays; the next sign-in redeems
+            c.heal()
+            print("address proved: redeeming shared tables failed:", type(x).__name__, flush=True)
+        ads_mark(me())
         bump(c)
         c.commit()
         print("address proved by mail: account", me(), "woke", n, "invitation(s)", flush=True)

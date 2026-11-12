@@ -23,6 +23,7 @@ LAYER_OF = {"api.common": "core", "accounts.orgback": "domain",
             "core.objects": "domain", "core.writes": "domain", "core.objlight": "domain", "core.objnotify": "domain", "core.objcomments": "domain", "core.objsearch": "domain", "core.objwords": "domain", "core.objweb": "integrations", "core.objcmtweb": "integrations",
             "core.undoweb": "domain",  # 2.747.0 (#5249): the step groups' routes stand on the write path
             "core.undoareas": "domain",  # 2.777.0 (#5254): the areas' undo steps stand on the write path
+            "core.addrshare": "domain",  # 2.1071.0 (#5658): the open shares by address replay the areas' share routes
             "docs.mailnamed": "integrations"}  # 2.1034.0 (#5304): admin.migrate (the move from SQLite) is gone; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area; 2.558.0 (#4709): the shared core stands on the file store and accounts, its routes on the API
 
 ORDER = (
@@ -87,6 +88,7 @@ ORDER = (
     "core.merges",  # 2.66.0 (#1835): merging contacts / clients (reversible)
     "core.mt940",  # 2.299.0 A (#3190): MT940 / MT942 statements (after csvimport, before stmtfiles)
     "core.stmtfiles",  # 2.146.0 C (#2455): the uploaded statements of the bank imports (office + budget)
+    "core.addrshare",  # 2.1071.0 (#5658): open shares by e-mail address (projects, folders, knowledge pages), redeemed at sign-in
     "lists.lists",
     "lists.groups",
     "lists.grouppics",  # 2.46.0 (#1605)

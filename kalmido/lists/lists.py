@@ -13,6 +13,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
+from ..core.addrshare import ads_bound, ads_kind, ads_open  # 2.1071.0 (#5658)
 from ..core.access import acx_drop, addr_account, collab_all, Denied, dlg_gone, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES, list_state_sql, otr_live, list_set_archived, list_archived_sql, list_out
 from ..core.state import visible_lists
 from ..core.numtext import user_num  # 2.263.0 (#2976)
@@ -1003,10 +1004,16 @@ def member_set(lid):
         # proved is answered like an unknown one (lists keep no open address share)
         r = addr_account(c, b["email"])
         r = (r,) if r else None
+        if not r:  # 2.1071.0 (#5658): nobody proved the address (yet): an open share, made when its account signs in with it
+            ads_open(c, "list", me(), b["email"], b, ref_id=lid)  # proved (core/addrshare.py); the same answer as ever
+            c.commit()
+            return jsonify(ok=True, by_email=True)
         from ..accounts.orgs import ws_member_problem
-        if not r or r[0] == me() or r[0] == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0] or \
-                c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, r[0])).fetchone() or \
-                ws_member_problem(c, lid, r[0]) or _agent_bridge_blocks(c, lid, r[0]):  # 2.28.0 (#935): not of the list's workspace;
+        if r[0] == me() or r[0] == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0] or \
+                c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, r[0])).fetchone():
+            ads_bound()  # 2.1071.0 (#5658): has it already - an open share of the address is done
+            return jsonify(ok=True, by_email=True)
+        if ws_member_problem(c, lid, r[0]) or _agent_bridge_blocks(c, lid, r[0]):  # 2.28.0 (#935): not of the list's workspace;
             # 2.30.0 (#919): would connect lists with different people through the list's agent -> nothing happens, nothing is revealed
             return jsonify(ok=True, by_email=True)
         uid = r[0]
@@ -1063,6 +1070,8 @@ def member_set(lid):
         from ..lists.groups import grp_sync
         grp_sync(c, [lid])
     pend = [r[0] for r in c.execute("SELECT user_id FROM list_key_pending WHERE list_id=? AND user_id=?", (lid, uid))]  # 2.64.1 (#1817)
+    if by_mail:
+        ads_bound()  # 2.1071.0 (#5658): an open share by address is redeemed by this
     bump(c)
     c.commit()
     from ..lists.membermemo import mm_offer
@@ -1248,7 +1257,14 @@ def folder_people_put():
     if by_mail:  # 2.41.0 (#1423): share the folder by e-mail address, like a list (never says whether it has an account)
         r = addr_account(c, b["email"])  # 2.1001.0 (#5669): only a proved address, an unproved one is answered like an unknown one
         r = (r,) if r else None
-        if not r or r[0] == me():
+        from ..lists.lffolder import lf_folder_nodes
+        if not r:  # 2.1071.0 (#5658): an open share of the folder, made when the account of the address signs in with it proved
+            if lf_folder_nodes(c, me(), f) or any(_in_folder(x[1], f) for x in c.execute(
+                    "SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall()):
+                ads_open(c, "list_folder", me(), b["email"], b, owner_id=me(), path=f)
+                c.commit()
+            return jsonify(shared=0, updated=0, by_email=True)
+        if r[0] == me():
             return jsonify(shared=0, updated=0, by_email=True)
         # 2.1032.0 (#5788, review of 2.1017): the workspace check of member_set's address path -- without it the folder's share
         # was written for an account outside an organisation whose lists lie in the folder, and GET /api/folders/people showed
@@ -1256,7 +1272,6 @@ def folder_people_put():
         # an unknown address, nothing written
         # Review: the folder's own nodes too (an organisation's tree; lf_folder_share shares them all) and archived lists
         from ..accounts.orgs import ws_fit_problem, ws_member_problem
-        from ..lists.lffolder import lf_folder_nodes
         if any(ws_fit_problem(c, n["org_id"], r[0]) for n in lf_folder_nodes(c, me(), f) if n["org_id"]) or \
                 any(ws_member_problem(c, x[0], r[0]) for x in c.execute(
                     "SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0 ORDER BY id", (me(),)).fetchall() if _in_folder(x[1], f)):
@@ -1299,6 +1314,8 @@ def folder_people_put():
     upd = sum(1 for r in rows if r["id"] in had and r["id"] in now and had[r["id"]] != now[r["id"]])
     # the lists the share does not reach (a health / budget list for an agent, another workspace ...) are named in the answer
     skipped = [{"id": r["id"], "name": r["name"]} for r in rows if r["id"] not in now]
+    if by_mail:
+        ads_bound()  # 2.1071.0 (#5658): the folder's share is made: an open share of the address is done
     bump(c)
     c.commit()
     if by_mail:  # 2.41.0 (#1423): the same answer as for an unknown address
@@ -1611,3 +1628,29 @@ def member_remove(lid, uid):
     bump(c)
     c.commit()
     return jsonify(ok=True, **({"revoked_id": rev} if rev else {}))
+
+
+# ---- 2.1071.0 (#5658): open shares by e-mail address of projects and folders of projects (core/addrshare.py): redeemed by the
+# routes above, run as the person who typed the address in, once its account signs in with the address proved
+def _ads_list_may(c, uid, x):
+    """Who may see / take back an open share of a project: who manages its shares (owner, project admins)."""
+    try:
+        need_list(c, int(x["ref_id"] or 0), write=False, manage=True)
+    except Denied:
+        return False
+    return True
+
+
+def _ads_list_gone(c, x):
+    r = c.execute("SELECT deleted_at FROM lists WHERE id=?", (int(x["ref_id"] or 0),)).fetchone()
+    return r is None or bool(r["deleted_at"])
+
+
+def _ads_folder_gone(c, x):
+    from ..lists.lffolder import lf_folder_nodes
+    return not lf_folder_nodes(c, x["owner_id"], x["path"]) and not any(_in_folder(r[0], x["path"]) for r in c.execute(
+        "SELECT folder FROM lists WHERE owner_id=? AND is_inbox=0", (x["owner_id"],)).fetchall())
+
+
+ads_kind("list", member_set, lambda x: (int(x["ref_id"]),), _ads_list_may, _ads_list_gone)
+ads_kind("list_folder", folder_people_put, lambda x: (), lambda c, uid, x: x["owner_id"] == uid, _ads_folder_gone)

@@ -141,7 +141,9 @@ function wsh_fill(md, tgt, sp, folder, legacy) {
         const s = j.shares.find(x => String(x.id) === b.dataset.id); if (!s) return;
         if (s.kind === 'link' && !await askConfirm(tr('Turn the public link off?'), tr('It stops working at once.'), {ok: tr('Switch off'), danger: true})) return;
         await calReq('DELETE', `/api/wiki/shares/${s.id}`);
-        await changed(); step(s.kind === 'link' ? tr('Public link switched off') : tr('Stopped sharing with {0}', s.user?.name || '?'), s.id, false);
+        await changed();
+        if (String(s.id)[0] === 'a') toast(tr('Invitation taken back'));  // 2.1071.0 (#5658): an open share by address is not kept (no Undo)
+        else step(s.kind === 'link' ? tr('Public link switched off') : tr('Stopped sharing with {0}', s.user?.name || '?'), s.id, false);
       }
     } catch (x) { show(x.message); } finally { b.disabled = false; }
   });

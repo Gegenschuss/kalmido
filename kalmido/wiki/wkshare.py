@@ -45,6 +45,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.kernretire import kern_retire_due, kern_retire_rows  # 2.937.0 (#5244): stage 7c at the start (wsh_retire)
 from ..core.access import Denied, acx_anon_bind, live_sql
 from ..core.access import addr_account  # 2.983.0 (#5643)
+from ..core.addrshare import ads_bound, ads_dict, ads_drop, ads_kind, ads_open, ads_repath, ads_row, ads_rows  # 2.1071.0 (#5658)
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..collab.comments import user_names
 from ..core.errors import BadInput
@@ -154,6 +155,7 @@ def wsh_dict(c, r, names, target=None, gone=()):
 # wiki_shares). Revoking puts the share (and its pair) into obj_revoked with the card in its row ("wiki_card"); the Undo puts
 # them back under the same ids (core/objects.py obj_node_reshare). wiki_shares holds public links only.
 WSH_PID = re.compile(r"p([1-9]\d{0,17})")
+WSH_AID = re.compile(r"a([1-9]\d{0,17})")  # 2.1071.0 (#5658): an open share by address (core/addrshare.py obj_addr_shares)
 # Fable review of 2.937 F2: a share of a person on a page's node without a card of its own is listed too (as a page share) --
 # the pair of a folder share whose folder went to the trash / was deleted, a share made in the file store's dialog -- unless
 # it is the pair of a card listed anyway (its folder's node live): what opens a page stays visible and can be ended here.
@@ -252,6 +254,8 @@ def wsh_repath(c, oid, owner, old, new, folder):
         else:
             continue
         c.execute("UPDATE wiki_shares SET path=? WHERE id=?", (np, r["id"]))
+    if folder and not oid and owner:
+        ads_repath(c, "wiki", owner, old, new)  # 2.1071.0 (#5658): an open folder share by address follows (a page's names its id)
 
 
 def wsh_end_moved(c, oid, owner, paths, folder=None, dry=False):
@@ -477,6 +481,9 @@ def wsh_sid(sid):
     s = str(sid)
     if s.isdigit() and 0 < len(s) <= 18:
         return "link", int(s)
+    m = WSH_AID.fullmatch(s)
+    if m:
+        return "addr", int(m.group(1))
     m = WSH_PID.fullmatch(s)
     if not m:
         raise Denied(404)
@@ -488,6 +495,8 @@ def wsh_need(c, sid):
     asker's own private space (2.937.0 #5244: the node is theirs)."""
     kind, n = wsh_sid(sid)
     uid = me()
+    if kind == "addr":  # 2.1071.0 (#5658): an open share by address has its own steps (wsh_update, wsh_revoke), no restore
+        raise Denied(404)
     if kind == "person":
         r = next(iter(wsh_people(c, uid, live=False, fid=n)), None)
         if r is None:
@@ -520,6 +529,8 @@ def _wsh_revoked_entry(c, uid, fid):
 
 def wsh_one(c, sid):
     kind, n = wsh_sid(sid)
+    if kind == "addr":
+        raise Denied(404)
     if kind == "person":
         r = next(iter(wsh_people(c, me(), live=False, fid=n)), None) or _wsh_revoked_entry(c, me(), n)
         if r is None:
@@ -545,8 +556,9 @@ def wsh_list():
     names = user_names(c, ({r["created_by"] for r in rows} | {r["user_id"] for r in rows}) - {None})
     locked = wsh_locked(c, oid, owner)
     gone = wsh_gone(c, rows)
+    opened = [] if locked or oid or not owner else _wsh_open(c, owner, path, folder, None if folder or path is None else int(q["page_id"]))
     return jsonify(enabled=public_links_on(c, "wiki"), locked=locked, person=oid is None and not locked, space=wiki_space_key(oid),
-                   shares=[] if locked else [wsh_dict(c, r, names, (path, folder) if path is not None else None, gone) for r in rows])
+                   shares=[] if locked else [wsh_dict(c, r, names, (path, folder) if path is not None else None, gone) for r in rows] + opened)
 
 
 @app.post("/api/wiki/shares")
@@ -584,7 +596,13 @@ def wsh_create():
                            code="wiki_share_org"), 409
         who = wsh_person(c, uid, b)
         by_mail = bool(b.get("email") and not b.get("user_id"))
-        if who is None:  # by e-mail address: nothing happens, nothing is revealed
+        if who is None:  # by e-mail address: nothing is revealed
+            # 2.1071.0 (#5658): nobody proved the address (yet): an open share, made when its account signs in with it proved
+            # (core/addrshare.py); the dialog lists it like a share by address that found its account (Fable 2.965 F2)
+            if not addr_account(c, b["email"]):
+                ads_open(c, "wiki", uid, b["email"], {**b, "kind": "person"}, owner_id=uid, path=path)
+                bump(c)
+                c.commit()
             return jsonify(ok=True, by_email=True)
         # 2.937.0 (#5244, stage 7c): the share is a core share on the page's / folder's node (the tree first: a page made just
         # now), the card (folder, pictures, the address typed in) rides on it; the same person again: expiry / pictures change
@@ -607,11 +625,82 @@ def wsh_create():
         if not had:  # 2.126.2 B (#2355): the same live share again: no second News item
             # a News item for exactly that person (the sharing row of their settings; no push); only the path they may read now
             news_add(c, who, "wiki_shared", data={"path": path, "folder": bool(folder)})
+        if by_mail:
+            ads_bound()  # 2.1071.0 (#5658): an open share of the address is redeemed by this
     bump(c)
     c.commit()
     if kind != "link" and by_mail:  # the same answer as for an unknown address: whether an account exists stays hidden
         return jsonify(ok=True, by_email=True)
     return jsonify(wsh_one(c, sid)), 201
+
+
+# ---- 2.1071.0 (#5658): open shares by e-mail address of a private space (core/addrshare.py, kind "wiki"; id "a<n>")
+def _wsh_open_entry(c, x, page_paths):
+    d = ads_dict(c, x)
+    try:
+        b = json.loads(x["body"] or "{}")
+    except ValueError:
+        b = {}
+    pid = None if b.get("page_id") in (None, "") else int(b["page_id"])
+    path = page_paths.get(pid) if pid else x["path"]
+    if not path:
+        return None  # its page went to the trash / is gone: not listed (the replay drops the row)
+    exp = None
+    if b.get("expires"):
+        try:
+            dd = date.fromisoformat(str(b["expires"])) + timedelta(days=1)
+            exp = iso(datetime(dd.year, dd.month, dd.day, tzinfo=TZ))
+        except ValueError:
+            exp = None
+    return {"id": f"a{d['id']}", "kind": "person", "space": wiki_space_key(None), "path": path, "folder": pid is None,
+            "is_folder": pid is None, "page_id": pid, "expires_at": exp, "expired": bool(exp and exp <= iso(now_utc())), "revoked": False,
+            "created_at": d["created_at"], "created_by": x["created_by"], "created_by_name": "", "views": 0, "last_used_at": None,
+            "ended": False, "images": bool(b.get("images")), "user": {"id": None, "name": d["email"], "by_email": True}}
+
+
+def _wsh_open(c, owner, path, folder, pid):
+    """The open shares by address of owner's private space that cover the page / folder (all of them without a target), as
+    entries of the dialog: the address, read-only, like a share by address that found its account (nothing tells them apart)."""
+    rows = ads_rows(c, "wiki", owner_id=owner)
+    pids = [int(json.loads(x["body"] or "{}").get("page_id") or 0) for x in rows]
+    page_paths = {p["id"]: p["path"] for p in c.execute(f"SELECT id, path FROM wiki_pages WHERE id = ANY(CAST(? AS BIGINT[])) AND owner_id=? "
+                                                       f"AND org_id IS NULL AND {live_sql()}", ([i for i in pids if i], owner))} if any(pids) else {}
+    out = []
+    for x in rows:
+        e = _wsh_open_entry(c, x, page_paths)
+        if e is None:
+            continue
+        if path is not None:
+            if not (wsh_covers(e, path, pid) or (folder and e["path"].lower().startswith(path.lower() + "/"))):
+                continue
+            e["direct"] = e["path"].lower() == path.lower() and e["is_folder"] == bool(folder)
+        out.append(e)
+    return out
+
+
+def _wsh_open_need(c, n):
+    x = ads_row(c, n)
+    if x is None or x["kind"] != "wiki" or x["owner_id"] != me():
+        raise Denied(404)
+    return x
+
+
+def _wsh_ads_gone(c, x):
+    try:
+        b = json.loads(x["body"] or "{}")
+    except ValueError:
+        return True
+    if b.get("page_id") not in (None, ""):
+        return not c.execute(f"SELECT 1 FROM wiki_pages WHERE id=? AND owner_id=? AND org_id IS NULL AND {live_sql()}",
+                             (int(b["page_id"]), x["owner_id"])).fetchone()
+    return False  # a folder: wsh_target answers 404 when it holds no page any more (the replay drops the row then)
+
+
+def _wsh_ads_replay(x):
+    """The share route again, for the folder at the path the row has now (it follows renames, ads_repath)."""
+    if g.body.get("page_id") in (None, ""):
+        g.body = {**g.body, "folder": x["path"]}
+    return wsh_create()
 
 
 def wsh_person(c, uid, b):
@@ -634,6 +723,18 @@ def wsh_person(c, uid, b):
 def wsh_update(sid):
     """{expires: YYYY-MM-DD | null, images: bool}"""
     c = db()
+    if wsh_sid(sid)[0] == "addr":  # 2.1071.0 (#5658): an open share by address keeps them for its replay
+        x = _wsh_open_need(c, wsh_sid(sid)[1])
+        b, d = body(), json.loads(x["body"] or "{}")
+        if "expires" in b:
+            wsh_expiry(b.get("expires"))
+            d["expires"] = b.get("expires") or None
+        if "images" in b:
+            d["images"] = bool(wsh_images(b["images"]))
+        c.execute("UPDATE obj_addr_shares SET body=? WHERE id=?", (json.dumps(d, ensure_ascii=False), x["id"]))
+        bump(c)
+        c.commit()
+        return jsonify(next(iter(e for e in _wsh_open(c, me(), None, True, None) if e["id"] == sid), {}))
     r = wsh_need(c, sid)
     b = body()
     if r["revoked_at"]:
@@ -666,6 +767,11 @@ def wsh_revoke(sid):
     """Revoke: the link / the person's access ends at once (the app's Undo: POST /api/wiki/shares/<id>/restore)."""
     c = db()
     kind, n = wsh_sid(sid)
+    if kind == "addr":  # 2.1071.0 (#5658): an open share by address is not kept (typed in again = a new one)
+        ads_drop(c, _wsh_open_need(c, n)["id"])
+        bump(c)
+        c.commit()
+        return jsonify(id=sid, kind="person", revoked=True)
     if kind == "person" and not wsh_people(c, me(), live=False, fid=n) and _wsh_revoked_entry(c, me(), n):
         return jsonify(wsh_one(c, sid))  # ended already (the Undo's second press)
     r = wsh_need(c, sid)
@@ -1292,3 +1398,6 @@ def wsh_retire(c):
 
 objhooks.START.append(("kern5244_wiki", False, wsh_retire))  # 2.937.0 (#5244): every start until done (one catalog read afterwards)
 fs_unshare_hooks.append(wsh_fs_unshare)  # 2.623.0 (#4778)
+
+
+ads_kind("wiki", _wsh_ads_replay, lambda x: (x,), lambda c, uid, x: x["owner_id"] == uid, _wsh_ads_gone)  # 2.1071.0 (#5658)

@@ -54,6 +54,7 @@ from ..core.access import Denied, acx_of, joined_lists_sql, live_sql, qn_is, rea
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc, uset, usettings
 from ..core.i18n import N_, lang, tr
 from ..core.pg import st_ids, system_ctx, table_exists
+from ..core.addrshare import ads_repath  # 2.1071.0 (#5658)
 from ..accounts.orgroles import FULL_WRITE, org_role_key, org_writes
 from ..accounts.orgs import user_orgs, ws_member_problem
 from ..accounts.session import me
@@ -349,6 +350,7 @@ def lf_folder_repath(c, owner, old, new):
                 c.execute("UPDATE fs_nodes SET parent_id=?, name=?, updated_at=? WHERE id=?", (parent, nm, _now(), f["id"]))
                 _log(c, f["id"], "move", str(parent))
             n += 1
+        ads_repath(c, "list_folder", owner, old, new)  # 2.1071.0 (#5658): the folder's open shares by address follow it
     return n
 
 

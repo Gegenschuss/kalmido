@@ -708,6 +708,15 @@ async function mmAsk(lid, uid, name, offer, after) {
   toast(tr('Restored: {0}.', mmText(j.restored) || '0') + (j.skipped ? ' ' + trn('{0} item stayed as it is (taken over or gone since).', '{0} items stayed as they are (taken over or gone since).', j.skipped) : ''));
   if (n) await after?.();
 }
+// 2.1071.0 (#5658): the open shares by e-mail address of a project / folder (nobody confirmed the address yet, core/addrshare.py):
+// the address and "invited", with a button to take it back; the share is made once the address is confirmed
+async function adsFill(box, q) {
+  if (!box) return;
+  let j; try { j = await rawFetch('GET', '/api/addr-shares?' + q); } catch { box.innerHTML = ''; return; }
+  if (!box.isConnected) return;
+  box.innerHTML = (j.open || []).map(x => `<div class="mrow"><span class="n">${esc(x.email || '?')} <span class="muted">${esc(tr('Invited: gets access once the address is confirmed'))}</span></span><button type="button" class="iconbtn" data-adsrm="${esc(x.id)}" title="${esc(tr('Take back the invitation to {0}', x.email || '?'))}" aria-label="${esc(tr('Take back the invitation to {0}', x.email || '?'))}">${ic('x', 's')}</button></div>`).join('');
+  box.onclick = async e => { const b = /** @type {any} */ (e.target).closest('[data-adsrm]'); if (!b) return; e.stopPropagation(); try { await api('DELETE', `/api/addr-shares/${b.dataset.adsrm}`); } catch { return; } toast(tr('Invitation taken back')); adsFill(box, q); };
+}
 function shareModal(id, opt = {}) {
   const l0 = listById(id); if (!shareOk(l0)) return;
   const own = isOwner(l0);
@@ -715,7 +724,7 @@ function shareModal(id, opt = {}) {
     ${collab() ? `<div class="shws" id="sh-ws"></div>` : ''}
     ${collab() ? `<h4 id="sh-people-h">${tr('People')}</h4><div class="members shppl" id="l-members" aria-labelledby="sh-people-h">${/*html-ok*/ loadingHtml()}</div>` : ''}${dsc_on() ? `<button type="button" class="linkbtn dsc-sharelink" data-dsc-open>${tr('Find a person …')}</button>` : ''}${''/* 2.49.0 (#1106) */}
     ${collab() && typeof ln_shareHint === 'function' ? ln_shareHint(id) : ''}${''/* 2.48.0 (#1642): locked notes stay unreadable */}
-    ${collab() && (S.peopleVis === 'contacts' || S.instanceMode === 'workspaces') && canManage(l0) ? `<div class="row shmail"><input id="sh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="share-mail">${ic('send', 's')} ${tr('Share')}</button></div>` : ''}
+    ${collab() && (S.peopleVis === 'contacts' || S.instanceMode === 'workspaces') && canManage(l0) ? `<div class="row shmail"><input id="sh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="share-mail">${ic('send', 's')} ${tr('Share')}</button></div><div class="members shopen" id="sh-open"></div>` : ''}
     ${collab() ? shSec('grp', tr('Groups'), `<div id="sh-grpwrap"></div>`, true) : ''}
     ${collab() && agentsOn() ? shSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the projects shared with it, nothing else. Stopping the sharing ends its access at once.')}</div><div id="sh-agwrap"></div>`, !canManage(l0) && !listPeople(l0).some(p => p.agent || agentById(p.user_id))) : ''}${''/* 2.910.0 (#5442): shown from the start where it will be (no step when the people have loaded) */}
     ${own && collab() ? shSec('ntf', tr('Notifications for members'), `<div id="sh-ntf"><div class="muted mhint">${tr('Loading…')}</div></div>`, false, opt.focus === 'ntf') : ''}
@@ -775,6 +784,7 @@ function shareModal(id, opt = {}) {
       : j.mode === 'takeover' ? `<div class="shint keep lhint">${esc(why)}</div><div class="row owrow"><button class="btn sm" data-m="own-xfer">${ic('user', 's')} ${tr('Take over…')}</button></div>` : '') + hist;
   };
   draw(); drawOwner();
+  adsFill($('#sh-open', md), 'kind=list&ref=' + id);  // 2.1071.0 (#5658)
   if (own && pubOn('lists') && !l0.e2e) pubWire(md, id);
   if (own && collab() && $('#sh-ntf', md)) ntfLoad($('#sh-ntf', md), 'list', id, j => { shSecSet('ntf', true, ntfName(j.effective?.tpl)); if (opt.focus === 'ntf' && !md._ntfs) { md._ntfs = 1; $('#sh-sec-ntf', md)?.scrollIntoView?.({block: 'start'}); } });  // 2.33.0 (#927)
   if (collab()) {
@@ -804,7 +814,7 @@ function shareModal(id, opt = {}) {
     if (m === 'share-mail') {  // 2.22.0 (#752): mode "own contacts": share by address; the answer never says whether it has an account
       const em = $('#sh-email', md).value.trim(); if (!em) { $('#sh-email', md).focus(); return; }
       try { await api('PUT', `/api/lists/${id}/members`, {email: em, role: 'edit'}); } catch { return; }
-      $('#sh-email', md).value = ''; toast(tr('If there is an account with this address, the project is now shared with it.')); await load(); render(); return;
+      $('#sh-email', md).value = ''; toast(tr('If there is an account with this address, the project is now shared with it.')); adsFill($('#sh-open', md), 'kind=list&ref=' + id); await load(); render(); return;
     }
     if (m === 'share' || m === 'share-ag') {
       const [us, rs] = m === 'share' ? ['#l-adduser', '#l-addrole'] : ['#sh-addagent', '#sh-agrole'];

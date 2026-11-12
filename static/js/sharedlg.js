@@ -15,7 +15,7 @@ function folderShareModal(f, opt = {}) {
     <div class="shint lhint">${tr('All projects in the folder are shared, also ones added later.')}</div>
     <div class="shws" id="fsh-ws"></div>
     <h4 id="fsh-people-h">${tr('People')}</h4><div class="members fpl shppl" id="fsh-members" aria-labelledby="fsh-people-h">${/*html-ok*/ loadingHtml()}</div>
-    ${S.peopleVis === 'contacts' || S.instanceMode === 'workspaces' ? `<div class="row shmail"><input id="fsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="fsh-mail">${ic('send', 's')} ${tr('Add')}</button></div>` : ''}
+    ${S.peopleVis === 'contacts' || S.instanceMode === 'workspaces' ? `<div class="row shmail"><input id="fsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="fsh-mail">${ic('send', 's')} ${tr('Add')}</button></div><div class="members shopen" id="fsh-open"></div>` : ''}
     <details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>
     ${(S.groups || []).length ? fshSec('grp', tr('Groups'), `<div class="members" id="fsh-grp"><div class="muted mhint">${tr('Loading…')}</div></div>`, opt.focus === 'grp') : ''}
     ${agentsOn() ? fshSec('ag', tr('Agents'), `<div class="shint lhint">${tr('An agent sees only what is shared with it; ending the sharing ends its access at once. At most one per project (the first is the default).')}</div><div id="fsh-ag"><div class="muted mhint">${tr('Loading…')}</div></div>
@@ -86,6 +86,8 @@ function folderShareModal(f, opt = {}) {
   };
   const reload = async () => { try { have = (await api('GET', '/api/folders/people?folder=' + encodeURIComponent(f))).people; } catch { have = []; } drawPeople(); st('people', ''); };
   api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled && S.me && u.id !== S.me.id).map(u => ({id: u.id, display_name: u.display_name, agent: !!(u.agent || u.kind === 'agent'), orgs: u.orgs || [], org_id: u.org_id ?? null})); drawPeople(); drawAgents(); }).catch(() => { users = []; drawPeople(); drawAgents(); });
+  const openQ = 'kind=list_folder&folder=' + encodeURIComponent(f);  // 2.1071.0 (#5658): open shares by address (dialogs.js adsFill)
+  adsFill($('#fsh-open', md), openQ);
   reload(); drawGroups(); if (agentsOn()) loadAgents(); if (pubOn('lists')) loadPub(); drawOwn();
   ntfLoad($('#fp-ntf', md), 'folder', f, j => { st('ntf', ntfName(j.effective?.tpl)); if (opt.focus === 'ntf' && !md._ntfs) { md._ntfs = 1; $('#fp-sec-ntf', md)?.scrollIntoView?.({block: 'start'}); } });
   if (opt.focus === 'agents' || opt.focus === 'grp') setTimeout(() => $(opt.focus === 'grp' ? '#fsh-sec-grp' : '#fsh-sec-ag', md)?.scrollIntoView?.({block: 'start'}), 0);
@@ -123,7 +125,7 @@ function folderShareModal(f, opt = {}) {
     if (m === 'fsh-mail') {
       const em = $('#fsh-email', md).value.trim(); if (!em) { $('#fsh-email', md).focus(); return; }
       try { await api('PUT', '/api/folders/people', {folder: f, email: em, role: 'edit'}); } catch { return; }
-      $('#fsh-email', md).value = ''; toast(tr('If there is an account with this address, the folder is now shared with it.')); await reload(); await done(); return;
+      $('#fsh-email', md).value = ''; toast(tr('If there is an account with this address, the folder is now shared with it.')); adsFill($('#fsh-open', md), openQ); await reload(); await done(); return;
     }
     if (b.dataset.rm) {
       const uid = +b.dataset.rm, nm = have.find(x => x.user_id === uid)?.name || users?.find(x => x.id === uid)?.display_name || '?';
