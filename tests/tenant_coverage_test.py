@@ -805,6 +805,7 @@ ROUTES = {
     "DELETE /api/fields/{}": "list", "GET /api/fields/{}/count": "list", "POST /api/lists/{}/folder-reset": "list", "GET /api/lists/{}/folder-preview": "list", "GET /api/lists/{}/groups": "list",
     "PUT /api/lists/{}/groups/{}": "list", "DELETE /api/lists/{}/groups/{}": "list", "POST /api/lists": "list",
     "PATCH /api/lists/{}": "list", "POST /api/lists/reorder": "list", "DELETE /api/lists/{}": "list",
+    "GET /api/addr-shares": "list", "DELETE /api/addr-shares/{}": "list",  # 2.1071.0 (#5658): a project's open shares by address (its managers only; p5658_a_api_test.py: a stranger 404)
     "PUT /api/lists/{}/members": "list", "DELETE /api/lists/{}/members/{}": "list", "GET /api/lists/{}/owner": "list",
     "GET /api/lists/{}/shares": "list", "POST /api/lists/{}/shares/{}/restore": "list", "GET /api/lists/{}/history": "list",  # 2.568.0 (#4739): p2568_a_lists_core_test.py
     "POST /api/lists/{}/owner": "list", "PUT /api/lists/{}/bell": "list", "POST /api/lists/{}/status": "list",

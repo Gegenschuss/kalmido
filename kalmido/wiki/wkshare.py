@@ -45,7 +45,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.kernretire import kern_retire_due, kern_retire_rows  # 2.937.0 (#5244): stage 7c at the start (wsh_retire)
 from ..core.access import Denied, acx_anon_bind, live_sql
 from ..core.access import addr_account  # 2.983.0 (#5643)
-from ..core.addrshare import ads_bound, ads_dict, ads_drop, ads_kind, ads_open, ads_repath, ads_row, ads_rows  # 2.1071.0 (#5658)
+from ..core.addrshare import ads_bound, ads_dict, ads_drop, ads_kind, ads_open, ads_repath, ads_row  # 2.1071.0 (#5658)
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..collab.comments import user_names
 from ..core.errors import BadInput
@@ -662,7 +662,7 @@ def _wsh_open_entry(c, x, page_paths):
 def _wsh_open(c, owner, path, folder, pid):
     """The open shares by address of owner's private space that cover the page / folder (all of them without a target), as
     entries of the dialog: the address, read-only, like a share by address that found its account (nothing tells them apart)."""
-    rows = ads_rows(c, "wiki", owner_id=owner)
+    rows = c.execute("SELECT * FROM obj_addr_shares WHERE kind='wiki' AND owner_id=? ORDER BY id LIMIT 500", (owner,)).fetchall()  # pages and folders
     pids = [int(json.loads(x["body"] or "{}").get("page_id") or 0) for x in rows]
     page_paths = {p["id"]: p["path"] for p in c.execute(f"SELECT id, path FROM wiki_pages WHERE id = ANY(CAST(? AS BIGINT[])) AND owner_id=? "
                                                        f"AND org_id IS NULL AND {live_sql()}", ([i for i in pids if i], owner))} if any(pids) else {}
