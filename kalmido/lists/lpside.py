@@ -40,6 +40,7 @@ LPS_KEYS = ("folder", "org_id", "ptype", "family", "life", "trip", "time_trackin
 # the agents a save names only through the project's agents (a member that went, a new project type's default): a step
 # keeps them only when the save set them itself or adopted a folder's (else its way back would name an agent gone since)
 LPS_DERIVED = ("listen_agent_ids", "tidy_agent_id")
+LPS_FIRST = ("org_id",)  # taken back before the other values (lps_run)
 # the plain settings a side effect may change too (a project type's defaults, a folder's), read and sent in the same form
 # (lp_current); the ones with their own cleaning (props, ticket templates and types) are not taken back by this step
 LPS_PLAIN = ("name", "color", "view", "kind", "dep_shift", "rate", "archived", "tickets", "nag", "day_hours", "checklist",
@@ -95,17 +96,30 @@ def lps_run(c, uid, lid, data, redo):
     stays (named); one already at the target is not written again."""
     role = need_list(c, lid, write=False)  # 404 without access now
     src, dst = (data.get("b") or {}, data.get("a") or {}) if redo else (data.get("a") or {}, data.get("b") or {})
-    now = lps_state(c, lid, role)
-    left, put = [], {}
-    for k, v in dst.items():
-        if k not in now or _norm(now[k]) == _norm(v):
-            continue  # already as the step left it before
-        if _norm(now[k]) != _norm(src.get(k)):
-            left.append(k)  # changed elsewhere since: stays
-            continue
-        put[k] = v
-    if not put:
+    left, went = [], False
+    # the workspace first, on its own: its way back (lmm_restore) brings back what the move ended (a private client); the
+    # rest after it, read again (a client back already is not written twice, one of the workspace now fits)
+    for phase in (LPS_FIRST, None):
+        now = lps_state(c, lid, role)
+        put = {}
+        for k, v in dst.items():
+            if (k in LPS_FIRST) != (phase is not None) or k not in now or _norm(now[k]) == _norm(v):
+                continue  # another phase, or already as the step left it before
+            if _norm(now[k]) != _norm(src.get(k)):
+                left.append(k)  # changed elsewhere since: stays
+                continue
+            put[k] = v
+        if put:
+            left += _apply(c, lid, put, src)
+            went = True
+    if not went:
         raise Denied(409, tr(UG_KEPT_REDO if redo else UG_KEPT, ", ".join(left)) if left else tr(LPS_GONE))
+    return data, left
+
+
+def _apply(c, lid, put, src):
+    """list_apply of the values put (_prev = the step's values) -> the fields that stayed; its refusal = Denied (403 / 404
+    kept, else 409)."""
     out = list_apply(c, lid, {**put, "_prev": {k: src.get(k) for k in put}})
     if not isinstance(out, dict):
         try:
@@ -114,8 +128,7 @@ def lps_run(c, uid, lid, data, redo):
         except (AttributeError, IndexError, TypeError):
             msg, code = None, 409
         raise Denied(code if code in (403, 404) else 409, msg if isinstance(msg, str) else tr(LPS_GONE))
-    left += [x["field"] for x in out.get("conflicts") or []]
-    return data, left
+    return [x["field"] for x in out.get("conflicts") or []]  # changed elsewhere meanwhile (lp_prev_conflicts): stays, named
 
 
 undo_diff_reg(LPS_KIND, lps_run, LPS_AREA)
