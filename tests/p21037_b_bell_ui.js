@@ -34,7 +34,10 @@ const berlinDay = () => new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Berl
   const L = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
   await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});
   const D0 = berlinDay();
-  const T1 = (await call('POST', '/api/tasks', {title: 'Write the homepage text', list_id: L})).id;
+  // 2.1079.0 (#5905): #5806 - a person's comment on a task I created / that is assigned to me is "For you"; the plain-comment
+  // task T1 is bob's own and alice only watches it, so its comment stays history and the bell keeps mention + deadline line
+  const T1 = (await call('POST', '/api/tasks', {title: 'Write the homepage text', list_id: L}, CB)).id;
+  check((await call('POST', `/api/tasks/${T1}/watchers`, {})).status === 200, 'setup: alice watches bob\'s task');
   const T2 = (await call('POST', '/api/tasks', {title: 'Call the printer', list_id: L, due: D0})).id;
   await call('POST', `/api/tasks/${T1}/comments`, {body: 'First draft is in'}, CB);  // not for me: history
   await call('POST', `/api/tasks/${T2}/comments`, {body: '<@1> can you call them?'}, CB);  // for me
