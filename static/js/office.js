@@ -536,8 +536,8 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-numat', tr('Quotation number'), ofcSel('os-numat', s.offer_number_at || 'create', [['create', tr('when the quotation is created (drafts leave gaps)')], ['finalize', tr('when it is finalised')]]))}${ofcII('numat')}
     ${ofcRowF('os-counter', tr('Counter for quotations'), ofcSel('os-counter', s.offer_counter || 'org', [['org', OFC.info.personal ? tr('one for all quotations') : tr('per organisation')], ['client', tr('per client')], ['project', tr('per project')]]))}${ofcII('counter')}
     ${ofcRowF('os-valid', tr('Quotation valid for'), `<span class="lacts"><input id="os-valid" value="${esc(String(s.offer_valid_days ?? 30))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('valid')}
-    ${ofcChk('os-oexp-on', tr('Tell me when a sent quotation runs out without an answer'), +(s.offer_exp_notice ?? 1))}${/* 2.1064.0 (#5818): the bell, office/offerexp.py */ ''}
-    ${ofcRowF('os-oexp-days', tr('Notice before it runs out'), `<span class="lacts"><input id="os-oexp-days" value="${esc(String(s.offer_exp_days ?? 3))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}
+    ${/*html-ok*/ ofcChk('os-oexp-on', tr('Tell me when a sent quotation runs out without an answer'), +(s.offer_exp_notice ?? 1)) /* 2.1064.0 (#5818): the bell, office/offerexp.py */}
+    ${/*html-ok*/ ofcRowF('os-oexp-days', tr('Notice before it runs out'), `<span class="lacts"><input id="os-oexp-days" value="${esc(String(s.offer_exp_days ?? 3))}" inputmode="numeric" class="numin" ${/*html-ok*/ dis}><span class="muted">${tr('days')}</span></span>`)}
     ${ofcChk('os-accept-on', tr('Print the order confirmation with signature line'), s.accept_on ?? 1)}
     <div class="row"><button type="button" class="btn sm" data-ltm="sig">${ic('edit', 's')} ${tr('E-mail signature…')}</button></div>
     ${ofcChk('os-sign-offers', tr('Signature under quotations and payment reminders'), s.sign_offers)}<p class="muted ofchint">${esc(tr('The signature picture of the person who finalises the document (Correspondence > Signature); drafts stay without.'))}</p>
