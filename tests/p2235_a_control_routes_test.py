@@ -88,6 +88,7 @@ ROUTES = {
     "PATCH /api/v1/tasks/{}": "change", "PATCH /api/v1/team/messages/{}": "change", "PATCH /api/v1/team/rooms/{}": "change",
     "PATCH /api/v1/templates/{}": "change", "PATCH /api/v1/time/entries/{}": "change",
     "PATCH /api/v1/videos/{}/comments/{}": "change", "PATCH /api/v1/wiki/pages/{}": "change",
+    "POST /api/v1/wiki/pages/{}/append": "change",  # 2.1048.0 (#5861)
     "POST /api/v1/address-books": "change", "POST /api/v1/address-books/{}/import": "change", "POST /api/v1/clients": "change",
     "POST /api/v1/clients/bulk": "change", "POST /api/v1/contacts": "change", "POST /api/v1/contacts/bulk": "change",
     "POST /api/v1/documents": "change", "POST /api/v1/event-calendars": "change",

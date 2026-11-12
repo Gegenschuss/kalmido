@@ -1511,6 +1511,14 @@ TOOLS += [
                    "(400 version_required without).",
      _obj({"page_id": S_ID, "body": {"type": "string", "maxLength": 500000}, "expect_updated_at": {"type": "string"}}, ["page_id", "body", "expect_updated_at"]),
      lambda api, a: api.call("PATCH", f"/wiki/pages/{_id(a, 'page_id')}", body=_pick(a, ("body", "expect_updated_at")))),
+    ("wiki_append", "2.1048.0 (scope wiki:write): add text at the END of a knowledge page shared with you to edit (role edit; view "
+                    "only = 403), without reading and sending the whole page - for a link, a list item or a paragraph. text (Markdown, at "
+                    "most 20000 characters) comes after the page's text, with a line break first when the page does not end with one; "
+                    "start text with an empty line for a new paragraph. expect_updated_at is optional (appending overwrites nothing; "
+                    "given and someone saved in between: 409 with the current page). One entry of the page's history, like wiki_write. "
+                    "To change or remove text elsewhere in the page use wiki_write.",
+     _obj({"page_id": S_ID, "text": {"type": "string", "maxLength": 20000}, "expect_updated_at": {"type": "string"}}, ["page_id", "text"]),
+     lambda api, a: api.call("POST", f"/wiki/pages/{_id(a, 'page_id')}/append", body=_pick(a, ("text", "expect_updated_at")))),
     ("wiki_create", "2.200.0 (scope wiki:write): a new knowledge page in a knowledge folder shared with you to edit: folder_id (the "
                     "folder's id from list_files, which shows knowledge folders only with files:read AND wiki:read: a folder below a shared "
                     "knowledge folder, or the shared folder itself), name (no "
@@ -2923,7 +2931,7 @@ TOOL_SCOPES["sheets:write"] = ("sheet_create", "sheet_update", "sheet_set_cells"
 TOOL_SCOPES["sheets:read"] += ("propose_sheet_tasks",)  # 2.126.1 B (#2125)
 TOOL_SCOPES["comments"] += ("set_video_comment_done",)  # 2.99.1 C (#1959); 2.981.0 (#5273): add_video_comment -> add_comment kind video
 TOOL_SCOPES["wiki:read"] = ("wiki_list", "wiki_read", "wiki_files", "wiki_read_file")  # 2.200.0 C (#1781); 2.488.0 B (#2209): + files
-TOOL_SCOPES["wiki:write"] = ("wiki_write", "wiki_create")
+TOOL_SCOPES["wiki:write"] = ("wiki_write", "wiki_create", "wiki_append")  # 2.1048.0 (#5861): + wiki_append
 # 2.306.0 E (#2741): the scope of the route each of these calls (tools/list hid nothing for them on a read token)
 TOOL_SCOPES["structure"] += ("set_deployment", "duplicate_list", "set_task_sprint", "set_list_review")
 TOOL_SCOPES["tasks:write"] += ("review_task", "set_working", "end_working")  # 2.407.0 (#3513): the working mark writes to the task

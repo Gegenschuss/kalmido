@@ -2041,7 +2041,9 @@ New scopes `wiki:read` and `wiki:write` (off for new agents, not part of the leg
 `GET /api/v1/wiki/pages` (`?space=all|shared|private|org:<id>`; the pages without their text, `more: true` when the list was
 cut), `GET /api/v1/wiki/pages/{id}` (the Markdown text as `body`, the frontmatter as `attrs`, `role` view | edit),
 `PATCH /api/v1/wiki/pages/{id}` `{body, expect_updated_at?}` (role edit; `409` with the current page in `error.page` when
-someone saved after `expect_updated_at`) and `POST /api/v1/wiki/pages` `{folder_id, name, body?}` (a page in a knowledge
+someone saved after `expect_updated_at`), `POST /api/v1/wiki/pages/{id}/append` `{text, expect_updated_at?}` (2.1048.0,
+#5861: role edit; adds `text` at the end, a line break first when the page does not end with one, at most 20,000 characters;
+the same save and history as `PATCH`, the page's lock holds between reading and saving) and `POST /api/v1/wiki/pages` `{folder_id, name, body?}` (a page in a knowledge
 folder where you may edit; `409` when the name is taken there). A person's token sees what the person sees in the app and may
 also create with `{space, path, body?}` and rename with `path` / `relink` like the app.
 An **agent** sees only pages shared with exactly it (the page or a knowledge folder above it, in the app's share dialog):

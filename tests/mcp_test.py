@@ -303,6 +303,10 @@ check(res["isError"] is False and rq["p"] == "/api/v1/agent/chats/1" and rq["b"]
       and b'name="file"; filename="a.png"\r\nContent-Type: image/png' in rq["b"]["multipart"] and PNG in rq["b"]["multipart"],
       "send_chat with files -> multipart (body, task_id, file)")
 check(call(s, "send_chat", {"user_id": 1, "files": [{"name": "x", "base64": "%%%"}]})["isError"] is True, "send_chat: bad base64 -> isError")
+# 2.1048.0 (#5861): wiki_append sends only the added text (POST /wiki/pages/{id}/append), never a body
+res = call(s, "wiki_append", {"page_id": 4, "text": "- a link"})
+check(res["isError"] is False and last()["m"] == "POST" and last()["p"] == "/api/v1/wiki/pages/4/append" and last()["b"] == {"text": "- a link"},
+      f"wiki_append: POST /wiki/pages/4/append with the text only {last()}")
 # 2.488.0 (#2209): wiki_files lists a page's files; wiki_read_file reads one as text (a PDF) or the bytes (a picture: an image item)
 res = call(s, "wiki_files", {"page_id": 4})
 check(res["isError"] is False and last()["p"] == "/api/v1/wiki/pages/4/files" and last()["m"] == "GET", "wiki_files: GET /wiki/pages/4/files")

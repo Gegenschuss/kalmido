@@ -23,6 +23,7 @@ from flask import g, jsonify, request
 from ..core.config import app, ATT_DIR
 from ..core.access import Denied, acx_of
 from ..core.db import bump, db, insert_id, iso_ms, now_utc
+from ..core.pg import write_lock  # 2.1048.0 (#5861)
 from ..core.errors import BadInput, reject_unknown
 from ..core.i18n import tr
 from ..core.conflict import need_version  # 2.564.0 (#4702)
@@ -290,6 +291,40 @@ def wkv_update(pid):
     return jsonify(_page(c, r, role, path, user_names(c, [r["updated_by"]]), full=True))
 
 
+WKV_APPEND_MAX = 20000  # 2.1048.0 (#5861): one appended piece (a link, a paragraph); the whole page stays bound by wiki_body
+
+
+@app.post("/api/v1/wiki/pages/<int:pid>/append")
+@v1_view
+def wkv_append(pid):
+    """2.1048.0 (#5861): {text, expect_updated_at?} -- adds text at the end of the page (role edit) without sending the whole
+    page: the page's text, a line break when it does not end with one, then text. The same save as PATCH (wiki_update: the
+    size, the frontmatter, the history, the word index, the links); the page's lock holds between reading the text and
+    saving it, so nothing saved in between is lost. expect_updated_at is optional here (appending overwrites nothing): when
+    given and the page changed since, 409 with the current page like PATCH."""
+    b = v1_json()
+    c = db()
+    uid = me()
+    reject_unknown(b, ("text", "expect_updated_at"))
+    text = b.get("text")
+    if not isinstance(text, str) or not text.strip():
+        raise BadInput(tr("Invalid value: {0}", "text"))
+    if len(text) > WKV_APPEND_MAX:
+        raise BadInput(tr("Too long: {0} (at most {1} characters)", "text", WKV_APPEND_MAX))
+    write_lock(c, f"wiki-{int(pid)}")  # the same lock as wiki_update (re-entrant there): read + save see no other save
+    r, role, path = wkv_need(c, uid, pid, write=True)
+    exp = b.get("expect_updated_at") or (request.headers.get("If-Match") or "").strip().removeprefix("W/").strip('"') or None
+    if exp and exp != r["updated_at"]:
+        return _conflict(c, uid, r, role, path)
+    cur = wkh_body(c, r) or ""  # the plain text (a sealed private page opens with its key, like a read)
+    new = cur + ("" if not cur or cur.endswith("\n") else "\n") + text
+    v1_call(wiki_update, pid, body={"body": new, "expect_updated_at": r["updated_at"]})
+    r, role, path = wkv_need(c, uid, pid)
+    _log(c, uid, r, "write")
+    c.commit()
+    return jsonify(_page(c, r, role, path, user_names(c, [r["updated_by"]]), full=True))
+
+
 def _may_add(c, uid, agent, chain, oid, owner):
     """'edit' on a new page in the folder of chain: the area's own right (private: its person; an organisation: who writes
     there) or an edit share of the chain (a read-only member: at most view, like fsref)."""
@@ -497,6 +532,15 @@ def wkv_spec(paths, schemas, op, ok, errs, ref, pid, q):
                         "path": {"type": "string", "description": "People's tokens only: rename / move (the full path)"},
                         "relink": {"type": "boolean", "description": "People's tokens only, with path (default true)"}}},
                     scope="wiki:write", desc="Needs the role edit (403 otherwise). Every save is one entry of the page's history in the app.")}
+    paths["/wiki/pages/{id}/append"] = {  # 2.1048.0 (#5861)
+        "post": op("Add text at the end of a knowledge page (2.1048.0)", T, ok(ref("WikiPage")) | errs("400", "403", "404", "409"), [wid],
+                   body={"type": "object", "required": ["text"], "properties": {
+                       "text": {"type": "string", "maxLength": WKV_APPEND_MAX, "description": "Markdown added after the page's text "
+                                "(a line break first when the page does not end with one; start it with an empty line for a new paragraph)"},
+                       "expect_updated_at": {"type": "string", "description": "Optional: the updated_at you read; 409 with the current "
+                                                                              "page (error.page) when someone saved in between"}}},
+                   scope="wiki:write", desc="Needs the role edit (403 otherwise). For a link or a paragraph: you need not read and send "
+                                            "the whole page. One entry of the page's history, like PATCH.")}
     # 2.488.0 B (#2209): the files of a page (PDFs and pictures), read only
     schemas["WikiFile"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "page_id": {"type": "integer"}, "name": {"type": "string"}, "mime": {"type": "string"},
