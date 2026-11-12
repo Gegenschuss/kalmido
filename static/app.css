@@ -6626,6 +6626,7 @@ button.lnph:hover{border-color:var(--accent)}
 .abmeta{flex:0 1 auto;font-size:var(--fs-b);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:16rem}
 .abbadges{display:inline-flex;align-items:center;gap:.25rem;color:var(--muted)}
 .abbadge{display:inline-flex}
+.abscan{color:var(--muted);vertical-align:middle;margin-left:.25rem}  /* 2.1048.0 (#5821): a folder with a scan inbox (docscan.js dsc_folderBadge) */
 .abver{font-size:var(--fs-s);padding:0 .375rem;border:1px solid var(--line);border-radius:99rem}
 .abempty{padding:2rem 1rem}
 .abemptyhint{display:block;max-width:32rem;margin:.5rem auto 0;font-size:var(--fs-m)}

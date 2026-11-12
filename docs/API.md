@@ -1825,8 +1825,9 @@ folder and file `recog_on` (own switch: `recog`), each document `doc: {state, re
 *Since 2.207.0.*
 
 A scan inbox is a key with the one scope `docs:upload` ("Only upload documents"), bound to one place: a person's own
-documents or an organisation's, optionally one folder of it. People make and revoke it in Documents > Settings > *Scans from
-your computer* (web session only, never an agent); it shows in Settings > Access > API tokens too (revocable there, its permissions
+documents or an organisation's, optionally one folder of it. People make and revoke it in Settings > Integrations > *Documents:
+inboxes* (web session only, never an agent; 2.1048.0, #5821: also from the menu of a folder of the documents, *Scan inbox for this
+folder…*, which opens that form with the folder and its name set, or *Show scan inbox* when the folder has one); it shows in Settings > Access > API tokens too (revocable there, its permissions
 cannot be changed). It counts against the 20 tokens per person. `docs:upload` is never offered for ordinary tokens
 (`POST /api/me/tokens` answers `400`) and never for agents (agents upload with `files:write`). An admin's limit for personal
 tokens (Settings > Organisation > Agents) can untick it; a limit saved before 2.207 leaves it allowed. Rate limit, address

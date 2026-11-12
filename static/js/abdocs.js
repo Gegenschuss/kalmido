@@ -45,7 +45,8 @@ function abd_card(n) {
   const img = n.kind === 'file' && !abd_locked(n) && ab_isImg(n) && !upLocked(n) ? (typeof ts_img === 'function' ? ts_img(abd_thumbUrl(n), abd_thumbUrl(n) + '&size=l') /* 2.583.0 (#4812) */ : `<img src="${esc(abd_thumbUrl(n))}" alt="" loading="lazy">`) : '';
   const meta = abd_locked(n) ? '' : [n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(n.updated_at)].filter(Boolean).join(' · ');
   // 2.583.0 (#4832): the same card function as the documents (docs.js dc_card), a file opens the document view (ablage.js ab_openFile)
-  return dc_card(n, {file: {thumb: img || `<span class="dc-ph">${ab_icon(n)}</span>`, meta, attrs: `data-ab="open" data-id="${n.id}"${n.kind === 'folder' ? ` data-abdrop="${n.id}"` : ''}`, after: menuBtn + sh}});
+  const scan = typeof dsc_folderBadge === 'function' ? dsc_folderBadge(n) : '';  // 2.1048.0 (#5821): a folder with a scan inbox
+  return dc_card(n, {file: {thumb: img || `<span class="dc-ph">${ab_icon(n)}${scan}</span>`, meta, attrs: `data-ab="open" data-id="${n.id}"${n.kind === 'folder' ? ` data-abdrop="${n.id}"` : ''}`, after: menuBtn + sh}});
 }
 // 2.477.0 (#3936): a picture card shows the server's small preview, never the original (the version keeps the browser's copy fresh)
 const abd_thumbUrl = n => `/api/files/nodes/${n.id}/thumb?v=${encodeURIComponent(n.version || 1)}`;
@@ -135,7 +136,7 @@ const abd_lCells = c => ABD_COLS.slice(1).map(([k], i) => `<span role="cell" cla
 function abd_lRow(n) {
   const day = n.kind === 'folder' ? '' : ab_when(n.updated_at);
   const box = AB.selOn ? dc_selMark(n) : '', on = AB.selOn && AB.sel.has(n.id);  // 2.768.0 (#4888): the area's one selection
-  return `<div class="abdlrow${on ? ' dc-on' : ''}" role="row" data-abid="${n.id}"><span role="cell" class="abdl-title">${box}<button type="button" class="abdlopen" data-ab="open" data-id="${n.id}"${n.kind === 'folder' ? ` data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${day ? `<span class="abdlsub muted">${esc(day)}</span>` : ''}</span></button></span>${abd_lCells(['', '', day ? `<span class="muted">${esc(day)}</span>` : '', '', ''])}${abd_lMenu(n)}</div>`;
+  return `<div class="abdlrow${on ? ' dc-on' : ''}" role="row" data-abid="${n.id}"><span role="cell" class="abdl-title">${box}<button type="button" class="abdlopen" data-ab="open" data-id="${n.id}"${n.kind === 'folder' ? ` data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}${typeof dsc_folderBadge === 'function' ? dsc_folderBadge(n) : '' /* 2.1048.0 (#5821) */}</span>${day ? `<span class="abdlsub muted">${esc(day)}</span>` : ''}</span></button></span>${abd_lCells(['', '', day ? `<span class="muted">${esc(day)}</span>` : '', '', ''])}${abd_lMenu(n)}</div>`;
 }
 // a document: its recognised fields (a locked one: the name only, as its card)
 function abd_lDocRow(doc) {

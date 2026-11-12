@@ -18355,5 +18355,9 @@
   "No API key is stored for this agent yet, so the provider’s models cannot be listed.": "Aucune clé API n’est encore enregistrée pour cet agent, la liste des modèles du fournisseur ne peut donc pas être affichée.",
   "Add an API key": "Ajouter une clé API",
   "A change applies from its next message; the conversation stays.": "Le changement s’applique dès son prochain message ; la conversation est conservée.",
-  "Model changed to {0}; applies from the next message": "Modèle changé pour {0} ; s’applique dès le prochain message"
+  "Model changed to {0}; applies from the next message": "Modèle changé pour {0} ; s’applique dès le prochain message",
+  "Scan inbox for this folder…": "Boîte de numérisation pour ce dossier…",
+  "Show scan inbox": "Afficher la boîte de numérisation",
+  "Scan inboxes file only into folders of the documents": "Les boîtes de numérisation ne classent que dans les dossiers des documents",
+  "Scan inbox: {0}": "Boîte de numérisation : {0}"
 }

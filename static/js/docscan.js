@@ -2,7 +2,7 @@
 // 2.207.0 A (#2763): "Scans from your computer" in the document settings (docs.js dc_sDraw): the folder watcher (downloads,
 // the scan inboxes of this workspace, a new inbox shows its setup code once) and the forwarding address with a copy button and
 // the note, shown big once per person, that mail is not end-to-end encrypted.
-const DSCN = {code: '', ws: '', md: null, es: /** @type {any} */ (null), edit: 0};  // edit: the inbox whose edit form is open (#4886)  // the setup code just made: only while this settings dialog is open
+const DSCN = {code: '', ws: '', md: null, es: /** @type {any} */ (null), edit: 0, want: /** @type {any} */ (null)};  // edit: the inbox whose edit form is open (#4886)  // the setup code just made: only while this settings dialog is open
 // 2.353.0 B (#2773): the folder watcher lives in Settings > Integrations (dsc_integrDraw)
 // 2.365.2 B (#2789): the whole block "Documents: inboxes" is there now (the folder of the file store, the folder watcher with
 // the scan inboxes, the forwarding address); the document settings only point to it
@@ -13,11 +13,13 @@ function dsc_integrHtml(fx = true) {  // 2.625.0 (#4489): Settings > Integration
 async function dsc_integrDraw(md) {
   if (typeof fx_draw === 'function') fx_draw(md);  // 2.425.0 C (#3453)
   const box = md.querySelector('#s-scan'); if (!box) return;
-  const cur = typeof wsCur === 'function' ? wsCur() : 'private', ws = cur.startsWith('org:') ? cur : 'private';
+  const cur = typeof wsCur === 'function' ? wsCur() : 'private', want = DSCN.want, ws = want?.ws || (cur.startsWith('org:') ? cur : 'private');  // 2.1048.0 (#5821): want = from a folder's menu
+  DSCN.want = null;
   try { DSCN.es = await api('GET', `/api/docs/settings?ws=${encodeURIComponent(ws)}`); } catch { box.innerHTML = ''; return; }
   if (DSCN.es?.mail?.enabled) DSCN.es.named = await dsc_namedLoad(ws);  // 2.577.0 C (#4466)
   if (!box.isConnected) return;
   dsc_embedDraw(box);
+  if (want) dsc_wantApply(box, want);
 }
 function dsc_embedDraw(box) {
   const s = DSCN.es; if (!s || !box) return;
@@ -122,6 +124,7 @@ async function dsc_namedSave(md, a, patch) {  // PATCH with the version read; ch
 }
 async function dsc_reload(md) {
   const s = DSCN.es; if (!s) return;
+  for (const e of Object.values(DSCF)) e.at = 0;  // 2.1048.0 (#5821): the folders' menus and marks ask again
   try { s.scan = await api('GET', `/api/docs/scan-keys?ws=${encodeURIComponent(s.ws)}`); } catch { return; }
   dsc_embedDraw(md);
 }
@@ -226,3 +229,65 @@ document.addEventListener('change', async e => {  // 2.365.2 B (#2789): the fold
   const l = tr('Changed setting: {0}', tr('Folder in the file store'));
   histToast(l, histAdd({label: l, sett: true, undo: put(!el.checked), redo: put(el.checked)}));
 });
+
+// 2.1048.0 (#5821): the menu of a folder of the documents (the file store's "…", right click, long press; ablage.js ab_menuItems):
+// "Scan inbox for this folder…" opens Settings > Integrations > Documents: inboxes with "New scan inbox" open, this folder chosen
+// and its name as the inbox's name - the same form and the same route as there, nothing else; "Create inbox" shows the setup
+// code as always. A folder with an inbox of mine already: "Show scan inbox" jumps to its row there (extend / revoke), and its
+// row in the file list carries a small scanner mark. Not offered: without the right to add files, a folder of an agent, a locked
+// folder, the trash, another person's private folder, a folder outside the documents, the API switched off on the server.
+// What a workspace offers (the API, the documents' folders, my inboxes) is /api/docs/settings, kept 5 minutes per workspace.
+const DSCF = {};  // ws -> {at, s, p}
+const DSCF_TTL = 5 * 60 * 1000;
+const dsc_fWs = n => n?.org_id ? 'org:' + n.org_id : 'private';
+function dsc_fLoad(ws) {
+  const e = DSCF[ws] || (DSCF[ws] = {at: 0, s: null, p: null});
+  if (e.p) return e.p;
+  if (e.s && Date.now() - e.at < DSCF_TTL) return Promise.resolve(e.s);
+  e.p = rawFetch('GET', `/api/docs/settings?ws=${encodeURIComponent(ws)}`).then(s => s, () => null).then(s => {
+    const had = (e.s?.scan?.keys || []).map(k => k.parent_id).join(), has = (s?.scan?.keys || []).map(k => k.parent_id).join();
+    e.s = s; e.at = Date.now(); e.p = null;
+    if (had !== has && typeof ab_draw === 'function') ab_draw();  // the scanner marks of the list
+    return s;
+  });
+  return e.p;
+}
+// null = not known yet (asked now), {ok: false}, or {ok: true, pid (null = the documents' folder itself), key (my inbox there)}
+function dsc_fState(n) {
+  if (!n || n.kind !== 'folder' || n.agent_id || n.locked || n._enc || n.in_trash || n.deleted_at || S.me?.kid || !feat('docs')) return {ok: false};
+  if (!(n.role === 'owner' || n.role === 'edit') || (!n.org_id && n.owner_id && n.owner_id !== S.me?.id)) return {ok: false};
+  const ws = dsc_fWs(n), e = DSCF[ws];
+  if (!e?.s || Date.now() - e.at >= DSCF_TTL) dsc_fLoad(ws);
+  const s = e?.s; if (!s) return e?.at ? {ok: false} : null;
+  if (!s.scan?.api) return {ok: false};
+  const pid = n.id === s.root_id ? null : (s.folders || []).some(f => f.id === n.id) ? n.id : undefined;
+  if (pid === undefined) return {ok: false};
+  return {ok: true, pid, key: (s.scan.keys || []).find(k => (k.parent_id || null) === pid) || null};
+}
+function dsc_folderItems(n) {
+  const st = dsc_fState(n); if (st && !st.ok) return [];
+  return [st?.key ? {label: tr('Show scan inbox'), icon: 'printer', fn: () => dsc_fGo(n)} : {label: tr('Scan inbox for this folder…'), icon: 'printer', fn: () => dsc_fGo(n)}];
+}
+async function dsc_fGo(n) {
+  const ws = dsc_fWs(n), s = await dsc_fLoad(ws), st = dsc_fState(n);  // not known when the menu opened: decided now
+  if (!st?.ok) { toast(s && !s.scan?.api ? tr('The API is switched off on this server, so there are no scan inboxes.') : tr('Scan inboxes file only into folders of the documents')); return; }
+  DSCN.want = {ws, pid: st.pid, name: n.name, key: st.key ? st.key.id : 0};
+  settingsModal('scans');
+}
+function dsc_wantApply(box, w) {
+  const flash = el => { el.scrollIntoView?.({block: 'center'}); el.classList.add('sflash'); setTimeout(() => el.classList.remove('sflash'), 1600); };
+  if (w.key) { const r = box.querySelector(`[data-dsc="edit:${w.key}"]`)?.closest('li'); if (r) flash(r); return; }
+  const d = /** @type {HTMLDetailsElement|null} */ (box.querySelector('details.dsc-new')); if (!d) return;
+  d.open = true;
+  const nm = /** @type {HTMLInputElement|null} */ (box.querySelector('#dsc-name')), fo = /** @type {HTMLSelectElement|null} */ (box.querySelector('#dsc-folder'));
+  if (nm) nm.value = String(w.name || '').slice(0, 60) || tr('Scanner');
+  if (fo && fo.querySelector(`option[value="${w.pid || 0}"]`)) fo.value = String(w.pid || 0);
+  setTimeout(() => { flash(d); nm?.focus(); nm?.select(); }, 80);  // after the settings' own jump to the heading (settings.js focus 'scans')
+}
+// the small scanner mark of a folder row with an inbox of mine (ablage.js ab_rowHtml)
+function dsc_folderBadge(n) {
+  if (n?.kind !== 'folder') return '';
+  const k = dsc_fState(n)?.key; if (!k) return '';
+  const t = tr('Scan inbox: {0}', k.name);
+  return `<span class="abbadge abscan" title="${esc(t)}" aria-label="${esc(t)}">${ic('printer', 's')}</span>`;
+}

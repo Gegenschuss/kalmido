@@ -18355,5 +18355,9 @@
   "No API key is stored for this agent yet, so the provider’s models cannot be listed.": "Voor deze agent is nog geen API-sleutel opgeslagen, daarom kunnen de modellen van de aanbieder niet worden getoond.",
   "Add an API key": "API-sleutel toevoegen",
   "A change applies from its next message; the conversation stays.": "Een wijziging geldt vanaf het volgende bericht; het gesprek blijft bewaard.",
-  "Model changed to {0}; applies from the next message": "Model gewijzigd naar {0}; geldt vanaf het volgende bericht"
+  "Model changed to {0}; applies from the next message": "Model gewijzigd naar {0}; geldt vanaf het volgende bericht",
+  "Scan inbox for this folder…": "Scan-inbox voor deze map…",
+  "Show scan inbox": "Scan-inbox tonen",
+  "Scan inboxes file only into folders of the documents": "Scan-inboxen leggen alleen af in mappen van de documenten",
+  "Scan inbox: {0}": "Scan-inbox: {0}"
 }

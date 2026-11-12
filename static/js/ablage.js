@@ -276,7 +276,8 @@ function ab_rowHtml(n, trash) {
     + (n.version > 1 ? `<span class="abver" title="${esc(tr('Version {0}', n.version))}">v${n.version}</span>` : '')
     + upMarkHtml(n.up)  // 2.61.0 (#1818): not checked by the virus scanner yet / locked
     + (typeof xl_badge === 'function' ? xl_badge(n) : '')  // 2.112.1 B (#2058): a live external link
-    + (typeof abd_badge === 'function' ? abd_badge(n) : '');  // 2.353.0 D (#2759): a document (being recognised / to review)
+    + (typeof abd_badge === 'function' ? abd_badge(n) : '')  // 2.353.0 D (#2759): a document (being recognised / to review)
+    + (typeof dsc_folderBadge === 'function' ? dsc_folderBadge(n) : '');  // 2.1048.0 (#5821): a folder with a scan inbox
   const main = trash ? `<span class="abopen">${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></span>`
     : `<button type="button" class="abopen" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button>`;  // abmeta2: the details below the name on phones
   const acts = trash ? `<button type="button" class="btn sm" data-ab="restore" data-id="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button>${n.role === 'owner' ? `<button type="button" class="btn sm danger" data-ab="purge" data-id="${n.id}">${ic('trash', 's')} ${tr('Delete permanently')}</button>` : ''}`  // 2.589.0 (#4875): + for good (owners)
@@ -458,6 +459,7 @@ function ab_menuItems(n, tree) {
     typeof xl_menuItem === 'function' && !n.locked ? xl_menuItem(n) : null,  // 2.112.1 B (#2058); 2.353.0 A (#2758): no links for externals
     typeof fsl_menuItem === 'function' ? fsl_menuItem(n) : null,  // 2.353.0 A (#2758): lock / the lock's dialog
     ...(typeof abd_menuItems === 'function' ? abd_menuItems(n) : []),  // 2.353.0 D (#2759): Recognise / Recognition…
+    ...(typeof dsc_folderItems === 'function' ? dsc_folderItems(n) : []),  // 2.1048.0 (#5821): Scan inbox for this folder… (docscan.js)
     '-',
     w && n.kind === 'file' ? {label: tr('Upload a new version…'), icon: 'upload', fn: () => ab_newVersion(n)} : null,
     w && !ref ? {label: tr('Rename…'), icon: 'edit', fn: () => ab_rename(n)} : null,

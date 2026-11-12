@@ -18355,5 +18355,9 @@
   "No API key is stored for this agent yet, so the provider’s models cannot be listed.": "Für diesen Agenten ist noch kein API-Schlüssel hinterlegt, darum lassen sich die Modelle des Anbieters nicht anzeigen.",
   "Add an API key": "API-Schlüssel hinterlegen",
   "A change applies from its next message; the conversation stays.": "Ein Wechsel gilt ab der nächsten Nachricht; das Gespräch bleibt erhalten.",
-  "Model changed to {0}; applies from the next message": "Modell gewechselt zu {0}; gilt ab der nächsten Nachricht"
+  "Model changed to {0}; applies from the next message": "Modell gewechselt zu {0}; gilt ab der nächsten Nachricht",
+  "Scan inbox for this folder…": "Scan-Eingang für diesen Ordner…",
+  "Show scan inbox": "Scan-Eingang anzeigen",
+  "Scan inboxes file only into folders of the documents": "Scan-Eingänge legen nur in Ordner der Dokumente ab",
+  "Scan inbox: {0}": "Scan-Eingang: {0}"
 }
