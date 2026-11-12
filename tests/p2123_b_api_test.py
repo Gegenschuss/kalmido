@@ -157,7 +157,16 @@ r = Da.get(B + f"/api/wiki/pages/{plan}")
 check(r.ok and r.json().get("path") == "Customer A/Plan" and Da.get(B + f"/api/wiki/files/{pic}").ok,
       "#2104 / #4717: the shared page and its file through the app's routes " + r.text[:160])
 check(Da.get(B + f"/api/wiki/pages/{secret}").status_code == 404, "#2104 / #4717: ... a page not shared not")
-check(not Da.get(B + "/api/search?kind=wiki", params={"q": "customer"}).json().get("pages"), "#2104: the guest's search does not find shared pages")
+# 2.1060.0 (#5833): since 2.1002.0 (#5279, question 15, d647085c90) the search also finds the pages a share of the core opens
+# (wiki/wksearch.py wks_find shared=) -- never more than opening them: the shared folder's pages, not the owner's other ones
+# ("Customer AB/Note" has the word too, "Secret" is linked from the shared page)
+r = Da.get(B + "/api/search?kind=wiki", params={"q": "customer"})
+hits = {p["id"]: p["path"] for p in (r.json().get("pages") or [])} if r.ok else {}
+check(r.ok and intro in hits and ab not in hits and secret not in hits
+      and all(x == "Customer A" or x.startswith("Customer A/") for x in hits.values()),
+      "#2104 / #5279: the guest's search finds the shared folder's pages only " + str(hits)[:300])
+r = Da.get(B + "/api/search?kind=wiki", params={"q": "internal"})
+check(r.ok and not r.json().get("pages"), "#2104 / #5279: ... never a page not shared " + r.text[:200])
 check(not Da.get(B + "/api/wiki", params={"space": "private"}).json().get("pages"), "#2104: the guest's own index stays his own")
 check(Bo.get(B + f"/api/wiki/shared/pages/{plan}").status_code == 404 and not shared(Bo), "#2104: somebody else sees nothing")
 # the mark in the owner's index and on the page
