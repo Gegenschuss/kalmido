@@ -99,9 +99,9 @@ function shw_tick() {
 
 /** @param {any} st @param {string} state */
 function shw_draw(st, state) {
-  const el = SHW.el, card = $('.tcard', el), n = SHW.steps.length, last = SHW.i === n - 1;
+  const el = SHW.el, card = $('.tcard', el), n = SHW.steps.length, last = SHW.i === n - 1, pos = `${SHW.i + 1}/${n}`;
   el.dataset.target = st.target || ''; el.dataset.state = state; el.dataset.step = String(SHW.i);
-  card.innerHTML = `<div class="tstep"><span>${SHW.i + 1}/${n}</span><span class="tdots">${SHW.steps.map((_, j) => `<i class="${j === SHW.i ? 'on' : j < SHW.i ? 'past' : ''}"></i>`).join('')}</span></div>
+  card.innerHTML = `<div class="tstep"><span>${esc(pos)}</span><span class="tdots">${SHW.steps.map((_, j) => `<i class="${j === SHW.i ? 'on' : j < SHW.i ? 'past' : ''}"></i>`).join('')}</span></div>
     <h3>${esc(st.label || '')}</h3>${st.text ? `<p>${esc(st.text)}</p>` : ''}
     ${state === 'missing' ? `<p class="shw-miss" role="status">${esc(tr('Not on the screen here: on a phone, without the right or with the area switched off it does not show.'))}</p>` : ''}
     <div class="tfoot"><button type="button" class="btn sm tskip" data-shw="close">${tr('Close')}</button><span class="spacer"></span>${SHW.i ? `<button type="button" class="btn sm" data-shw="back">${tr('Back')}</button>` : ''}<button type="button" class="btn sm pri" data-shw="next">${last ? tr('Done') : tr('Next')}</button></div>`;
