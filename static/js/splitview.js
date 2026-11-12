@@ -11,7 +11,7 @@
 // layNow / panelMax, the popovers) measures the room it really has. The grip in between: drag (applied on release, the view
 // does not jump while dragging), arrow keys (Shift: 4 rem), Home / End, Enter or a double click = half and half; each side
 // keeps only its minimum (rule #4830). The width (rem) and the right route are the person's (LOOK_KEYS splW / splR).
-const SPL = {el: null, fr: null, px: 0, iw: null, drag: false};
+const SPL = {el: null, fr: null, px: 0, iw: null, drag: false, dr: ''};
 const SPL_MIN_L = 40, SPL_MIN_R = 26;  // rem: the left app (bar, sidebar, list) / the right copy keep at least this
 const spl_vw = () => document.documentElement.clientWidth;
 const spl_std = () => Math.round(spl_vw() / spl_rem() / 2 * 4) / 4;  // half and half
@@ -122,3 +122,44 @@ function spl_grip(g) {
     g.addEventListener('pointermove', mv2); g.addEventListener('pointerup', up, {once: true}); g.addEventListener('pointercancel', up, {once: true});
   });
 }
+
+// 2.1035.0 (#5802): drag a list, a task, a document or a knowledge page from the left half onto the right half = open it there,
+// the same as "Open on the right" (spl_show). While such a drag runs, a field "Open here" lies over the top of the right half,
+// in this window above the iframe (the iframe itself never sees this window's drag: its document gets its own events). Only
+// the field takes the drop; anywhere else the drag does what it always did (the sidebar's sorting, a task moved, the
+// drops into the other half of refs.js below the field). Never over the grip, never on the left. Keyboard: the menu's entry.
+function spl_dragRoute(t) {  // the right half's route of what a drag in the left app starts on, else ''
+  if (!t?.closest || t.closest('#splitpane')) return '';
+  let r;
+  if ((r = t.closest('#side .srow[data-list], .pstart .psrow[data-list]')) && +r.dataset.list > 0) return '#l/' + +r.dataset.list;
+  if ((r = t.closest('.trow[data-id], .cal .ev[data-id], .week .ev[data-id], .wev[data-id]')) && +r.dataset.id > 0) return '#t/' + +r.dataset.id;
+  if ((r = t.closest('.dc-card')?.querySelector('[data-dco]')) && /^\d+$/.test(r.dataset.dco)) return '#docs/' + r.dataset.dco;  // a document card (docs.js, the file store's fold)
+  const go = t.closest('#side .sbbt[data-sbbns="wk"]')?.querySelector(':scope > .sbbtn')?.dataset.go || '';  // a knowledge page in the sidebar's tree (wiki.js)
+  return /^wiki\/\d+$/.test(go) ? '#' + go : '';
+}
+function spl_dropOff() {
+  SPL.dr = ''; SPL.el?.querySelector('.spldrop')?.remove();
+}
+// the drop effect the source allows (a list / task drag allows only "move"; a mismatch would refuse the drop)
+const spl_eff = ea => { const a = String(ea || '').toLowerCase(); return a === 'all' || a === 'uninitialized' || a.includes('link') ? 'link' : a.includes('copy') ? 'copy' : 'move'; };
+window.addEventListener('dragstart', e => {
+  spl_dropOff();
+  const r = spl_route(spl_dragRoute(e.target)); if (!r || !SPL.el || !spl_on()) return;
+  SPL.dr = r;
+  // after dragstart: a layout change inside it can end the drag (dnd.js does the same)
+  setTimeout(() => {
+    if (SPL.dr !== r || !SPL.el || SPL.el.querySelector('.spldrop')) return;
+    const z = document.createElement('div'); z.className = 'spldrop';
+    z.innerHTML = `<span class="spldropt">${ic('panel')}${esc(tr('Open here'))}</span>`;
+    const over = ev => { if (!SPL.dr) return; ev.preventDefault(); ev.stopPropagation(); if (ev.dataTransfer) ev.dataTransfer.dropEffect = spl_eff(ev.dataTransfer.effectAllowed); z.classList.add('on'); };
+    z.addEventListener('dragenter', over); z.addEventListener('dragover', over);
+    z.addEventListener('dragleave', ev => { if (!z.contains(/** @type {Node} */ (ev.relatedTarget))) z.classList.remove('on'); });
+    z.addEventListener('drop', ev => {
+      const to = SPL.dr; ev.preventDefault(); ev.stopPropagation(); spl_dropOff();
+      if (to) spl_show(to);
+    });
+    SPL.el.appendChild(z);
+  }, 0);
+}, true);
+window.addEventListener('dragend', () => spl_dropOff(), true);
+window.addEventListener('drop', e => { if (!/** @type {Element} */ (e.target)?.closest?.('.spldrop')) spl_dropOff(); }, true);

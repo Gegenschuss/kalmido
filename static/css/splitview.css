@@ -9,3 +9,8 @@ html.split-on body{width:calc(100% - var(--splW,50vw));contain:layout}
 .splgrip:focus-visible{outline:none}
 html.spl-drag .splitfr{pointer-events:none}
 html.spl-drag,html.spl-drag *{cursor:col-resize!important;user-select:none}
+/* 2.1035.0 (#5802): while a list / task / document / knowledge page of the left half is dragged: "Open here" over the top of
+   the right half (splitview.js); beside the grip, the rest of the right half keeps its own drops */
+.spldrop{position:absolute;top:.5rem;left:.75rem;right:.5rem;height:min(7rem,30%);z-index:3;display:flex;align-items:center;justify-content:center;border:2px dashed var(--accent);border-radius:.75rem;background:color-mix(in srgb,var(--bg) 88%,var(--accent));box-shadow:0 .25rem 1rem rgb(0 0 0/.12)}
+.spldrop.on{border-style:solid;background:color-mix(in srgb,var(--bg) 78%,var(--accent))}
+.spldropt{display:flex;align-items:center;gap:.5rem;font-weight:600;color:var(--accent);pointer-events:none}
