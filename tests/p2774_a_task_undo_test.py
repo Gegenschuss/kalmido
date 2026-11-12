@@ -81,11 +81,12 @@ r = A.patch(B + f"/api/tasks/{t1}", json={"title": "Water the tulips", "priority
 check(r.ok, f"edited {r.status_code}")
 g = last(AL)
 p = parts(g["id"])
-check(g["label_key"] == "Edited {0}" and json.loads(g["label_args"]) == ["Water the tulips"], f"the edit's label {g}")
+# 2.1074.0 (#5493): the title in quotes, as the app names it
+check(g["label_key"] == "Edited {0}" and json.loads(g["label_args"]) == [["“{0}”", "Water the tulips"]], f"the edit's label {g}")
 check(len(p) == 1 and p[0][3] == {"op": "fields", "b": {"title": "Water the roses", "priority": 1},
                                   "a": {"title": "Water the tulips", "priority": 3}}, f"only the changed fields are kept {p}")
 items = A.get(B + "/api/undo").json()["items"]
-check(items[0]["id"] == g["id"] and items[0]["label"] == "Edited Water the tulips" and items[0]["kind"] == "task"
+check(items[0]["id"] == g["id"] and items[0]["label"] == "Edited “Water the tulips”" and items[0]["kind"] == "task"
       and items[0]["ref_id"] == t1, f"listed with its label, kind and task {items[:1]}")
 n = ngroups(AL)
 res = undo(A, g["id"])

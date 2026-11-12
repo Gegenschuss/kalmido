@@ -20,6 +20,7 @@ of the step too -- since stage 7 the browser keeps no copy, so without them "Cod
 way back (the arrow took back an older step instead).
 Not here: creating / deleting a section and a project's settings (a step of their own later)."""
 import json
+from datetime import date
 
 from flask import g
 
@@ -28,8 +29,9 @@ from ..collab.reactions import ltag_names
 from ..core.access import need_list, need_task
 from ..core.db import bump, iso_ms, now_utc
 from ..core.errors import Denied
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, short_day, tr
 from ..core.pg import write_lock
+from ..core.undoareas import ua_plain
 from ..core.undodiff import ug_diff_add, undo_diff_reg, undo_person
 from ..core.undogroups import UG_TRACKED
 from ..core.undoweb import UG_KEPT, UG_KEPT_REDO
@@ -224,7 +226,10 @@ def _flush(c, m):
         last = parts[-1][0]
         # 2.787.0 (#5417, review): a list that is locking itself (e2e set, task not converted yet) names no plain title
         ttl = [TU_TASK] if _tu_locked(c, last["list_id"]) else _title(last["title"])
-        label = (TU_LABEL.get(parts[0][1]["op"], TU_EDIT), [ttl])
+        # 2.1074.0 (#5493): the title in quotes, as the app's history writes it (undo.js qn)
+        label = (TU_LABEL.get(parts[0][1]["op"], TU_EDIT), [[TU_Q, ttl] if isinstance(ttl, str) else ttl])
+        if len(parts) == 1 and parts[0][1]["op"] == "fields":  # 2.1074.0 (#5493): what changed, as the app names it
+            label = _fields_label(c, parts[0][1], ttl) or label
     else:
         label = (TU_MANY, [len(tids)])
     orgs = {}
@@ -233,6 +238,76 @@ def _flush(c, m):
         if lid not in orgs:
             orgs[lid] = _org(c, lid)
         ug_diff_add(c, m["uid"], TU_KIND, row["id"], orgs[lid], TU_AREA, label, data)
+
+
+TU_Q = N_("“{0}”")  # the key exists (static/js/undo.js qn)
+TU_PRIO = (N_("None"), N_("Low"), "", N_("Medium"), "", N_("High"), "", N_("Urgent"))
+
+
+def _name(v, rid=None):
+    """A name for a label: never a ciphertext (a locked project's section / field / list name: its number then)."""
+    return ua_plain(v if isinstance(v, str) and not le2e_is_cipher(v) else "", rid)
+
+
+def _fields_label(c, d, ttl):
+    """2.1074.0 (#5493): the label of one task's field step as the app's history names it (static/js/undo.js histLabel):
+    "Priority of “Jump”: High" instead of "Edited Jump". None = the general one."""
+    b, a = d.get("b") or {}, d.get("a") or {}
+    ch = set(a) | set(b)
+    n = [TU_Q, ttl] if isinstance(ttl, str) else ttl
+    one = len(ch) == 1
+    if ch == {"locked"}:
+        return (N_("Locked {0}") if a.get("locked") else N_("Unlocked {0}"), [n])
+    if "list_id" in ch:
+        r = c.execute("SELECT name FROM lists WHERE id=?", (a.get("list_id"),)).fetchone() if a.get("list_id") else None
+        return (N_("Moved {0} to {1}"), [n, _name(r["name"], a.get("list_id")) if r else "?"])
+    if "parent_id" in ch:
+        return (N_("{0} is now a subtask") if a.get("parent_id") else N_("{0} is now a main task"), [n])
+    if one and "title" in ch:
+        return (N_("Renamed {0}"), [n])
+    if one and "content" in ch:
+        return (N_("Description of {0}"), [n])
+    if one and "priority" in ch:
+        try:
+            p = TU_PRIO[int(a.get("priority") or 0)] or TU_PRIO[0]
+        except (IndexError, TypeError, ValueError):
+            p = TU_PRIO[0]
+        return (N_("Priority of {0}: {1}"), [n, [p]])
+    if one and "tags" in ch:
+        return (N_("Tags of {0}"), [n])
+    if one and "assignee_id" in ch:
+        if not a.get("assignee_id"):
+            return (N_("{0} unassigned"), [n])
+        r = c.execute("SELECT display_name, username FROM users WHERE id=?", (a["assignee_id"],)).fetchone()
+        return (N_("{0} assigned to {1}"), [n, (r["display_name"] or r["username"]) if r else "?"])
+    if one and "fields" in ch:
+        ids = list((a.get("fields") or {}).keys() | (b.get("fields") or {}).keys())
+        if len(ids) != 1:
+            return (N_("Custom fields of {0}"), [n])
+        r = c.execute("SELECT name FROM list_fields WHERE id=?", (int(ids[0]),)).fetchone()
+        return (N_("{0} of {1}"), [_name(r["name"], ids[0]) if r else [N_("Custom field")], n])
+    if one and "pinned" in ch:
+        return (N_("Pinned {0}") if a.get("pinned") else N_("Unpinned {0}"), [n])
+    if one and "url" in ch:
+        return (N_("Link of {0}"), [n])
+    if one and "section_id" in ch:
+        r = c.execute("SELECT name FROM sections WHERE id=?", (a.get("section_id"),)).fetchone() if a.get("section_id") else None
+        return (N_("Moved {0} to section {1}"), [n, _name(r["name"], a.get("section_id")) if r else "?"])
+    if "plan_start" in ch and "due" not in ch:
+        return (N_("Planned {0}") if a.get("plan_start") else N_("Unplanned {0}"), [n])
+    if ch & {"due", "start", "due_time"}:
+        if not a.get("due"):
+            return (N_("Date of {0} removed"), [n])
+        try:
+            day = short_day(date.fromisoformat(str(a["due"])[:10]))
+        except ValueError:
+            day = str(a["due"])[:10]
+        return (N_("Date of {0}: {1}"), [n, day])
+    if ch & {"repeat", "repeat_from"}:
+        return (N_("Repeat of {0}"), [n])
+    if ch & {"reminders", "remind_at"}:
+        return (N_("Reminder of {0}"), [n])
+    return (TU_EDIT, [n])
 
 
 def _org(c, lid):

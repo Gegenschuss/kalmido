@@ -12,6 +12,8 @@ kind listside, a diff part taken back through the project's own write path). Inv
  - a write with X-Kalmido-Undo-Own (a device's own way back of a step without a server group) records no step and keeps
    the way forward of an undone step
  - another person neither lists nor takes back the step (404)
+ - a task's step is labelled as the app's history names it: "Priority of “X”: High", "Renamed “X”", "Date of “X”: 4 Mar"
+   (was "Edited X")
 freelancer-matrix: undo (a person without an organisation: her project's folder and time tracking go back and forward)
 usage: p21074_a_lpside_test.py <datadir>"""
 import os
@@ -132,6 +134,21 @@ r = A.post(B + f"/api/undo/{ugk}/redo")
 check(r.ok and lrow(A, P).get("ticket_key") == "ALP", f"... and the undone step keeps its way forward {r.status_code} {r.text[:120]}")
 r = A.patch(B + f"/api/lists/{P}", json={"color": "#3366cc"})
 check(r.ok and r.json().get("undo_group"), "(control) the same write without the header is a step")
+
+# ---------------------------------------------------------------- task steps: labelled as the app names them
+r = Fr.post(B + "/api/tasks", json={"title": "Sprung Beispiel", "list_id": FL})
+T = r.json()["id"]
+Fr.patch(B + f"/api/tasks/{T}", json={"priority": 5})
+g = newest(Fr)
+check(g.get("kind") == "task" and g.get("label") == "Priority of “Sprung Beispiel”: High", f"a priority step says which priority (was 'Edited …') {g.get('label')}")
+Fr.patch(B + f"/api/tasks/{T}", json={"title": "Sprung Neu"})
+check(newest(Fr).get("label") == "Renamed “Sprung Neu”", f"a rename says so {newest(Fr).get('label')}")
+Fr.patch(B + f"/api/tasks/{T}", json={"due": "2026-03-04"})
+check(newest(Fr).get("label") == "Date of “Sprung Neu”: 4 Mar", f"a date step names the day {newest(Fr).get('label')}")
+Fr.patch(B + f"/api/tasks/{T}", json={"title": "Sprung Zwei", "priority": 1})
+check(newest(Fr).get("label") == "Edited “Sprung Zwei”", f"several fields: 'Edited' with the title in quotes {newest(Fr).get('label')}")
+Fr.post(B + f"/api/tasks/{T}/complete")
+check(newest(Fr).get("label") == "Completed “Sprung Zwei”", f"completing: the title in quotes {newest(Fr).get('label')}")
 
 # another person
 check(Fr.post(B + f"/api/undo/to/{ugk}").status_code == 404 and not [y for y in lst(Fr) if y["id"] == ugk],
