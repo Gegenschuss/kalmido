@@ -80,9 +80,14 @@ const FEAT = 'cal,comments,collab,agents';
   w.close();
 
   // ================= carol (reviewer): News, Approve, undo
-  w = await boot({user: 'carol', hash: 'news'}); d = w.document; await sleep(600);
-  check(/Bob asks you to review .*Login form/.test(d.body.textContent), '#1512: carol reads the News item');
-  w.eval(`openDetail(${T1})`); await until(() => d.querySelector('#detail .rvwbar [data-rvw="approve"]'));
+  // 2.1079.0 (#5911): #5808 -- News show one way, bundled per task: a single entry is ONE line (the task, Bob's picture,
+  // "review"), no longer the sentence "Bob asks you to review …"; a tap on the line opens the task (was openDetail)
+  w = await boot({user: 'carol', hash: 'news'}); d = w.document;
+  const rvG = () => [...d.querySelectorAll('#view .nsect.me .ngroup')].find(g => /Login form/.test(g.querySelector('.ngt')?.textContent || ''));
+  await until(() => rvG());
+  check(rvG() && /review/.test(rvG().querySelector('.ngs')?.textContent || '') && rvG().querySelector('.ngav .avatar') && rvG().querySelector('[data-act="news-gread"]'), '#1512: carol reads the News item (For you: Login form, review) ' + (d.querySelector('#view')?.textContent || '-').replace(/\s+/g, ' ').slice(0, 900));
+  click(w, rvG().querySelector('.ngmain[data-act="news-open"]')); await until(() => d.querySelector('#detail .rvwbar [data-rvw="approve"]'));
+  check(d.querySelector('#detail .rvwbar [data-rvw="approve"]'), '#1512: a tap on the News line opens the task with the review bar');
   check(d.querySelector('#detail .rvwbar [data-rvw="changes"]'), '#1512: the reviewer has Approve and Back');
   check(d.querySelector('#detail .rvwbar [data-rvw="approve"] .thumb'), '#1512: thumbs as with agent pull requests');
   click(w, d.querySelector('#detail .rvwbar [data-rvw="approve"]'));
