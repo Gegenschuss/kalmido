@@ -50,11 +50,32 @@ EXCEPT = {
     ("core/objtags.py", "FROM list_tags"): "2.947.0 (#5275): otg_move reads the old project tags only while the table exists (_otg_has); the fragment drops it, so the fresh schema has none",
     ("core/objtags.py", "FROM org_tags"): "2.947.0 (#5275): otg_move reads the old labels only while the table exists (_otg_has); dropped by the fragment",
     ("core/objtags.py", "FROM task_list_tags"): "2.947.0 (#5275): otg_move reads the old tag links only while the table exists (_otg_has); dropped by the fragment",
+    ("core/objtags.py", "FROM otg_tt"): "2.955.0 (#5276): otg_tt is the TEMP table otg_move makes right before (ON COMMIT DROP); it never exists outside that transaction",
+    ("admin/orgcrypt_cli.py", "WHERE TRUE LIKE 'u%'"): "2.981.0 (#5273): {wx} is the workspace text expression of _dws(); the stand-in TRUE makes it boolean LIKE text",
     ("core/dlock.py", "IN (SELECT id FROM s)"):"2.235.0 B2 (#2902): a base part of the recursive query whose WITH s(...) is built around it",
 }
 
 def excepted(rel, sql):
     return next((why for (f, piece), why in EXCEPT.items() if f == rel and piece in sql), None)
+
+# 2.997.0 (#4949): a table / column a fragment drops carries "# drop-ok <table>" / "# drop-ok <table>.<column>" in
+# kalmido/core/migrations.d (tools/check_migrations.py). The one-way moves (pd_retire, pb_retire, wkh_retire, lk_retire,
+# osn_move, ofl_move, ...) read them only while they are there (to_regclass / table_columns); the fresh schema here has them
+# no more. Only "does not exist" of exactly such a name is taken as known - any other error of the statement still fails.
+DROPPED_T, DROPPED_C = set(), set()
+for fn in sorted(os.listdir(os.path.join(ROOT, "core", "migrations.d"))):
+    if fn.endswith(".py"):
+        for m in re.finditer(r"^# drop-ok ([a-z0-9_]+)(?:\.([a-z0-9_]+))?\b", open(os.path.join(ROOT, "core", "migrations.d", fn), encoding="utf-8").read(), re.M):
+            (DROPPED_C.add(m.groups()) if m.group(2) else DROPPED_T.add(m.group(1)))
+
+def retired(state, msg, sql):
+    m = re.search(r'(?:relation|column) "?([a-z0-9_]+)\.?([a-z0-9_]*)"?(?: of relation "([a-z0-9_]+)")? does not exist', msg)
+    if not m:
+        return False
+    if state == "42P01":
+        return m.group(1) in DROPPED_T
+    col = m.group(2) or m.group(1)
+    return state == "42703" and any(c == col and (m.group(3) in (None, t)) and re.search(rf"\b{t}\b", sql) for t, c in DROPPED_C)
 
 def fstr(n):
     out = []
@@ -90,6 +111,10 @@ for dp, _, fns in os.walk(ROOT):
                   and getattr(n.func, "id", getattr(n.func, "attr", "")) == "tr"}
         # 2.742.0 (#4949): the arguments of str.replace() are pieces of a statement (q.replace("SELECT *", "SELECT id", 1)), not one
         inner |= {id(a) for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "replace" for a in n.args}
+        # 2.997.0 (#4949): a literal joined with + to code ("SELECT DISTINCT n.ref_id, s.user_id " + _NODE_SHARES.format(...)) is
+        # a piece of a statement, not one (accounts/tenancy.py: "missing FROM-clause entry for table n")
+        inner |= {id(x) for n in ast.walk(tree) if isinstance(n, ast.BinOp) and isinstance(n.op, ast.Add)
+                  for x, y in ((n.left, n.right), (n.right, n.left)) if isinstance(x, ast.Constant) and not isinstance(y, ast.Constant)}
         for n in ast.walk(tree):
             if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in inner:
                 s, is_f = n.value, False
@@ -116,7 +141,7 @@ for dp, _, fns in os.walk(ROOT):
                     continue
                 if is_f and state not in STRICT:
                     continue
-                why = excepted(rel, s)
+                why = excepted(rel, s) or (state in ("42P01", "42703") and retired(state, msg, s))
                 if why:
                     n_exc += 1
                     continue
