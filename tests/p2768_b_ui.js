@@ -81,19 +81,22 @@ async function upload(name, text, parent) {
   check(await until(() => hist().querySelectorAll('.abvrow').length === 3 && row(3) && /current/.test(row(3).textContent)), '... the tab follows: three versions, v3 the current one');
   check(w.eval('HIST.undo.length') === u0 + 1 && w.eval('HIST.undo[HIST.undo.length - 1].label') === 'Restore version 1', '... ONE undo step "Restore version 1"');
   check(/v=3/.test(d.querySelector('.dv-view .dv-dl')?.getAttribute('href') || ''), '... the download of the view gets the new version ' + d.querySelector('.dv-view .dv-dl')?.getAttribute('href'));
+  // 2.997.0 (#5622): the undo is the server's step (#5255 stage 7, files/fsundo.py): the file points at the version before
+  // again (v2 the current one, no new version v4); the versions stay, the tab follows
   await w.eval(`histStep('undo')`);
-  check(await until(async () => (await call('GET', `/api/files/nodes/${NID}`)).version === 4) && await content(NID) === 'second!', 'Undo: the version before (v2) is the newest again (as v4)');
-  check(await until(() => hist().querySelectorAll('.abvrow').length === 4), '... the tab follows');
+  check(await until(async () => (await call('GET', `/api/files/nodes/${NID}`)).version === 2) && await content(NID) === 'second!', 'Undo: the version before (v2) is the current one again');
+  check(await until(() => hist().querySelectorAll('.abvrow').length === 3 && /current/.test(row(2)?.textContent || '') && !/current/.test(row(3)?.textContent || '')), '... the tab follows: v2 marked current');
 
   // a new version through the fixed input of the tab
   const inp = hist().querySelector('#abd-verfile');
   Object.defineProperty(inp, 'files', {value: [new w.File(['third one'], 'note.txt', {type: 'text/plain'})], configurable: true});
   inp.dispatchEvent(new w.Event('change', {bubbles: true}));
-  check(await until(async () => (await call('GET', `/api/files/nodes/${NID}`)).version === 5) && await content(NID) === 'third one', 'a new version through the tab: v5');
-  check(await until(() => hist().querySelectorAll('.abvrow').length === 5), '... the tab follows');
-  check(/New version of “note\.txt”/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), '... ONE undo step ' + w.eval('HIST.undo[HIST.undo.length - 1].label'));
+  check(await until(async () => (await call('GET', `/api/files/nodes/${NID}`)).version === 4) && await content(NID) === 'third one', 'a new version through the tab: v4');  // 2.997.0 (#5622): was v5
+  check(await until(() => hist().querySelectorAll('.abvrow').length === 4 && /current/.test(row(4)?.textContent || '')), '... the tab follows');
+  check(/New version of “note\.txt”/.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label')), '... ONE undo step ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
   await w.eval(`histStep('undo')`);
-  check(await until(async () => (await call('GET', `/api/files/nodes/${NID}`)).version === 6) && await content(NID) === 'second!', 'Undo of the new version: v4 is the newest again (as v6)');
+  check(await until(async () => (await call('GET', `/api/files/nodes/${NID}`)).version === 2) && await content(NID) === 'second!', 'Undo of the new version: v2 is the current one again');  // 2.997.0 (#5622): was "v4 as v6"
+  check(await until(() => /current/.test(row(2)?.textContent || '') && !/current/.test(row(4)?.textContent || '')), '... the tab follows the undo');
 
   // the view's actions
   const acts = () => [...d.querySelectorAll('.dv-view .dv-amenu [data-dc]')].map(b => b.dataset.dc);
@@ -124,7 +127,7 @@ async function upload(name, text, parent) {
   check(await until(() => db.querySelector('.dv-view [data-dvtab="hist"]')), 'a reader: the view has the tab History');
   click(wb, db.querySelector('.dv-view [data-dvtab="hist"]'));
   const bh = () => db.querySelector('.dv-view #dv-p-hist');
-  check(await until(() => bh()?.querySelectorAll('.abvrow').length === 6), '... the versions ' + (bh()?.querySelectorAll('.abvrow').length));
+  check(await until(() => bh()?.querySelectorAll('.abvrow').length === 4), '... the versions ' + (bh()?.querySelectorAll('.abvrow').length));  // 2.997.0 (#5622): an undo adds no version (was 6)
   check(bh().querySelector('.abvrow a[download]') && bh().querySelector('[data-abvv]'), '... to download and to view');
   check(!bh().querySelector('[data-abv]') && !bh().querySelector('#abd-verfile') && !bh().querySelector('[data-abd="ver"]'), '... no Restore, no upload');
   check(!db.querySelector('.dv-view [data-dc="dvnewver"], .dv-view [data-dc="dvmove"], .dv-view [data-dc="dvren"], .dv-view [data-dc="del"]'), '... no actions that write');
