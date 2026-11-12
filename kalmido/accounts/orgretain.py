@@ -389,7 +389,7 @@ def odl_retire(c, oid, until, gone=None):
 
 
 def _kids_first(c, oid):
-    """2.1032.0 (#5788, review F4 of 2.1017): the UPDATE of the calendars / address books of organisation oid carries org_id
+    """2.1032.0 (#5788, review F4 of 2.1017): the UPDATE of the calendars / address books of the given organisation carries org_id
     into their events / contacts (trigger core/orgrows.py kalmido_orw_carry): the object's row, then its children -- the
     trash (core/writes.py obj_trash) and a child's own save (an event: its row, then cal_touch on the calendar; a contact:
     its row, then book_touch on the book) take the children first, so one of two could get a deadlock. Now the calendars'
