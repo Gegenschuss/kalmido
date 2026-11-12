@@ -20,6 +20,41 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.1075.0] - 2026-11-12
+
+Package 2.1069 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Listen-Zustand: Kern-Papierkorb-Schreiber absicher).
+### Changed
+- #5412: "Optimise PDF" runs in a thread of its own next to the documents queue, so a long run (up to 30 minutes) no longer holds up the text recognition of newly uploaded documents (a new run starts once no document waits for its recognition); the queue serves the workspaces in turn, and besides the limit per person at most 200 runs wait per workspace (the automatic runs of new scans count only against the person) (then "Too many documents wait for optimising"), a selection skips the documents of a full workspace.
+- #5416: the core's trash is guarded for every kind with the generic routes or the retention run (`obj_trash_cols_missing()`: a kind whose table lacks deleted_at / deleted_by is named by its suite); the lint `tools/check_list_state.py` also counts a handwritten compare on a project's state marker `lists.state` (only `core/access.py` writes it).
+
+Package 2.1060 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Weich rot: p2100_ui, Weich rot: p2106_b_ui u. 18 weitere, Bündel: Bündel: Sam).
+### Fixed
+- Search in bookmarks, tasks, contacts, notes, events, letters and messages: words typed without a space between them (`page.html`, `anna@firma.de`, `Kick-off`) must stand next to each other again, as before the shared search index; with a space each word may stand anywhere (#5878).
+- Quotations: a draft moved into the trash takes its open approval links with it, so a restored draft never brings back an old link; signing waits for the quotation's lock (the trash's order), a link decided meanwhile keeps the quotation out of the trash, a link gone with the draft redirects instead of an error (#5869).
+- Agent approvals without a task: one News entry in the bell instead of two (#5870).
+- Start state: the lean tasks filled back on the device carry exactly the fields of the whole state again (`rev`, `updated_by`, `deleted_by` no longer added) (#5875, #5184).
+- Organisation invitations: the clean-up of expired invitations is one plain statement the schema check covers in full (#4949).
+- Office and split view: the last pixel sizes in the style sheets are rem (#5676).
+- Test suites follow the intended behaviour since earlier packages: the toast's Undo takes back exactly its own step (roadmap_ui #5625, p1_ui #5868), a deleted reminder draft lies in the trash (#5871), a guest's search finds the pages of the folder shared with them and never others (#5833), the install script's backup block (#5874), the service worker's language parts (#5877), the drag receivers of the favourites row and the split view (#5876), a docstring the rowid guard read as SQL (#5682).
+
+Package 2.1075 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- #5496: the retention report of the core's trash run (Settings > Data retention, run "obj_trash") counts what it really deleted: side objects (inbound webhooks, team chat tombstones, member memos, the copies of fields / sections / "Delete all times") are read again under a row lock before they go, so one restored between reading and deleting stays (it was deleted before) and is not counted; the attachments of deleted tasks are named again (`task_attachments`, with the switch off the ones that would go).
+
+Package 2.1071 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- #5658 Sharing by e-mail address: a project, a folder of projects or a knowledge page shared with an address that has no account with a confirmed address yet is kept as an open invitation (the shared core's `obj_addr_shares`, `kalmido/core/addrshare.py`). It becomes the share as soon as the account of that address signs in with the address confirmed (or confirms it while signed in), made as the person who typed it in would make it then (their rights and the project's / folder's rules at that moment). The Share dialogs of a project and a folder list such invitations under the address field ("Invited: gets access once the address is confirmed") with a button to remove them (`GET /api/addr-shares`, `DELETE /api/addr-shares/{id}`); the knowledge page dialog lists them as a card with the address, like a share by address that found its account. The answer of the share stays the same for every address, also when a confirmed account does not fit (yet), e.g. outside the project's organisation: then the invitation waits the same way. Invitations nobody redeems go after 180 days; at most 50 per address.
+### Security
+- #5658 (Fable review 2.965 F2): the Share dialog of a knowledge page no longer shows a card only when the address belongs to a confirmed account (that told whether the address has an account): every address typed in shows its card.
+- #5658 (Fable review 2.983 N2): changing the role of a table's share by address no longer lifts the role of an account the row was bound to before the address had to be confirmed: the row opens again and is redeemed at the next sign-in with the address confirmed.
+- #5658: a table shared by address is redeemed right after the address is confirmed by its mailed link too, not only at the next sign-in.
+
+Package 2.1074 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- #5493: undo across devices, stage 3c - a project's settings with side effects are server steps too (kind `listside`, `kalmido/lists/lpside.py`): folder (with the folder's adopted defaults), workspace, project type, agents (listening, tidying up, members' access, follow-up), client, Home & life (and a trip's dates), time tracking, ticket key and visibility in the organisation; ticket templates / types and properties saved together with them go back too. The step keeps the values before / after (also the ones the save changed as a side effect) and goes back through the project's own write path (`list_apply`, was the route body of `PATCH /api/lists/<id>`), so a workspace change brings back what it ended (client, links); a value changed elsewhere since stays and is named. "Recent steps" lists them on every device; the project dialog's Undo, Ctrl+Z and the workspace toast take back that server step (no second browser entry any more).
+- #5493: a device's own undo / redo of a step without a server group sends `X-Kalmido-Undo-Own: 1` and records no new server step, so the way forward (redo) of the person's undone steps stays.
+- #5493: the server labels a task's step as the app's history does ("Priority of “Jump”: High", "Renamed …", "Date of …: 4 Mar", "Moved …", the title in quotes; was "Edited Jump"); no project, section or field name goes into a label (a project locked later would keep it there).
+
 ## [2.1067.0] - 2026-11-12
 
 Package 2.1029 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -394,7 +429,8 @@ Not released (the CI of this version was red); its changes are listed under 2.10
 
 Not released (the CI of this version was red); its changes are listed under 2.1007.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1067.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1075.0...HEAD
+[2.1075.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1075.0
 [2.1067.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1067.0
 [2.1040.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1040.0
 [2.1024.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1024.0
