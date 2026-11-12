@@ -3367,6 +3367,12 @@ run it from the card after the Yes:
    on a run: the target changed since the card - read it again, ask with a new card), `used` (the card is in use right now or
    has run, `used_at` when it ran - check the result instead of reporting a failure), `unanswered`, `rejected`, `withdrawn`, `no_step`,
    `one_way`, `approver_rights`, `approver_shares`, `not_found` (run: 404), `format`, `nested`.
+4. **Uploads (2.1078.0, #5866):** the run from the card sends JSON only. A refused upload (multipart with files) says so with
+   `error.run: "header"`: ask with the card as above, then after the Yes send the same upload again with the files and the
+   header `X-Kalmido-Approval: <id of the card>` (MCP: `use_approval`, then the call). The MCP server keeps a refused step
+   for the access of the connection (a refreshed access token keeps its `step_ref`); a step whose body is longer than a card
+   binds (32,000 characters) gets no `step_ref`: split the change. A card path that still holds a `%` after decoding is
+   refused with `400`.
 
 **What the person sees (2.1068.0, #5831).** A card whose step replaces or adds to a text - a knowledge page
 (`PATCH /wiki/pages/{id}` `body`, `POST /wiki/pages/{id}/append`), a task's notes (`PATCH /tasks/{id}` `notes`), a project's

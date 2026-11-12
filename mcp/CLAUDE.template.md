@@ -419,7 +419,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - A write the level does not allow answers `409 approval_required` and names a `step_ref`: ask with `request_chat_approval`
   and that `step_ref` - never type method, path or body yourself (`recommend` yes / no when you have a view, `one_way` true
   for a one-way step); after the Yes call `run_approved_step` with the card's message id - the server runs exactly the
-  card's step once (the older way, `use_approval` and the same call again, still works). A refusal names its reason: `used` = in use right now or it already ran (check the result, do not report a failure),
+  card's step once (the older way, `use_approval` and the same call again, still works; an upload with files only goes that
+  older way: its refusal says so). A refusal names its reason: `used` = in use right now or it already ran (check the result, do not report a failure),
   `stale` = the target changed since the card (read it again, ask anew). Never work around a refusal.
 - 2.1068.0: a card that changes a text (knowledge page, task notes, project description, comment) shows the person the
   lines it removes and adds, reckoned by the server - so keep a step to what you mean to change: for an addition to a
