@@ -487,15 +487,16 @@ def oinv_due(c, uid=None):
     return [dict(r, made=parse_iso(r["made"]), last=parse_iso(r["last"]), warned=parse_iso(r["warned"]) if r["warned"] else None) for r in rows]
 
 
-def oinv_expire(c, now, budget):
+def oinv_expire(c, now, budget, send=None):
     """2.1062.0 (#5786, decided 12.11.2026): the daily clean-up (admin/dataretention.py lgc_tick) withdraws a never used account
     an organisation's invitation set up, like the button Withdraw (user_purge), OJN_DAYS + OJN_PURGE_DAYS days after its newest
     invitation (never under OINV_MIN_DAYS after it was made) - the day its invitation rows fall (ojn_purge), so silent, neutral
     and these rows all go alike. OINV_WARN_DAYS before, a warning goes to the account's address with the day and a link to set
     the account up (signing in keeps it); without a delivered warning nothing is withdrawn (never silently gone: no outgoing
     mail = the account stays, the warning is tried again the next day) and the withdrawal waits OINV_WARN_DAYS after it.
-    A warning counts only while no invitation is newer. budget = admin/hosting.py mail_budget (the daily mail limits; passed in by
-    the clean-up, which lives above this module). Commits per account. -> (warned, withdrawn)."""
+    A warning counts only while no invitation is newer. budget = admin/hosting.py mail_budget (the daily mail limits), send =
+    integrations/mail.py mail_send or None while no outgoing mail is set up (both passed in by the clean-up, which lives above
+    this module). Commits per account. -> (warned, withdrawn)."""
     keep, warn = timedelta(days=OJN_DAYS + OJN_PURGE_DAYS), timedelta(days=OINV_WARN_DAYS)
     with system_ctx(c):
         oinv_mark(c)
@@ -506,7 +507,7 @@ def oinv_expire(c, now, budget):
         if now < due - warn:
             continue
         if not u["warned"] or u["warned"] < u["last"]:
-            warned += oinv_warn(c, u, max(due, now + warn), now, budget)
+            warned += oinv_warn(c, u, max(due, now + warn), now, budget, send)
             continue
         if now < max(due, u["warned"] + warn):
             continue
@@ -530,12 +531,11 @@ def oinv_expire(c, now, budget):
     return warned, gone
 
 
-def oinv_warn(c, u, at, now, budget):
+def oinv_warn(c, u, at, now, budget, send):
     """The warning of oinv_expire: a new link (the invitation's, valid until the day) and the mail, sent right here - only a
     mail the server took counts (users.oinv_warned_at). -> 1 sent, 0 not (no outgoing mail, no address, the day's limit, an
     error)."""
-    from ..integrations.mail import MAIL_OUT_ON, mail_send
-    if not MAIL_OUT_ON or not (u["email"] or "").strip():
+    if not send or not (u["email"] or "").strip():
         return 0
     try:
         with system_ctx(c):  # nobody signed in: the account's own rows
@@ -547,7 +547,7 @@ def oinv_warn(c, u, at, now, budget):
             tok = hashlib.sha256(inv["link"].rsplit("/", 1)[-1].encode()).hexdigest()  # invite.py _hash
             subject, text, body_html = oinv_warn_mail(c, u, inv["link"], at, days)
             c.commit()  # the link is stored before the mail goes out (as invite_new does)
-        mail_send(u["email"].strip(), subject, text, body_html, from_name=APP_NAME)
+        send(u["email"].strip(), subject, text, body_html, from_name=APP_NAME)
         with system_ctx(c):
             # a mailed link proves the address - review F5: only this link (not one an admin made meanwhile to copy)
             if not c.execute("UPDATE user_invites SET sent_at=? WHERE user_id=? AND token_hash=?", (iso(now_utc()), u["id"], tok)).rowcount:

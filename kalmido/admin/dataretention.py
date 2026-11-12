@@ -34,6 +34,7 @@ from .hosting import hosted, mail_budget  # 2.552.0 (#4596, review); 2.1062.0 (#
 from .offsite import bko_former_expire, bko_former_live  # 2.662.0 (#4587)
 from ..core.config import ATT_DIR  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import FS_VERSIONS_KEEP  # 2.369.5 (#2517): pulled up from functions
+from ..integrations.mail import MAIL_OUT_ON, mail_send  # 2.1062.0 (#5786): passed down to oinv_expire (accounts stands below)
 from ..accounts.orginvite import oinv_expire, ojn_purge  # 2.1005.0 (#5118): expired organisation invitations; 2.1062.0 (#5786): never used accounts
 
 # 2.239.0 D (#2874): file store nodes that are office records (receipts assigned or not, filed letters, cash book / equipment /
@@ -219,7 +220,7 @@ def lgc_tick(c, force=False):
     # system context: the clean-up works across organisations by design and shows no content to anybody
     with system_ctx(c):
         try:  # 2.1062.0 (#5786): never used accounts of organisation invitations (warned, then withdrawn) before their rows go below
-            oinv_expire(c, now, mail_budget)
+            oinv_expire(c, now, mail_budget, mail_send if MAIL_OUT_ON else None)
         except Exception as e:  # noqa: BLE001  they must not stop the clean-up of the logs
             lgc_failed(c, "oinv_expire", e)
         lgc_expired(c, now)
