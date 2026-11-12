@@ -65,6 +65,8 @@ ROUTES = {
     "POST /api/office/docs/{}/number": ("refused", "the number is frozen", [KS, {}]),
     "POST /api/office/docs/{}/finalize": ("refused", "finalised once; again = 409, nothing written anew", [{}]),
     "POST /api/office/docs/{}/unlock": ("refused", "an invoice is never taken back (only a quotation never sent)", [{}]),
+    "POST /api/office/docs/{}/reprice": ("refused", "2.1040.0 (#5812): only a quotation draft is repriced; an invoice 409 / a bad body 400",
+                                         [{"mode": "pct", "value": 10}, KS]),
     "POST /api/office/docs/{}/valid-until": ("refused", "2.1064.0 (#5818): only a sent quotation gets a new date; an invoice 409",
                                              [{"valid_until": "2099-01-01"}, KS]),
     "POST /api/office/docs/{}/status": ("allowed", "sent / paid only, never back to draft (odoc_set_status); the status is a mark",
