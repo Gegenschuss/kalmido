@@ -2127,6 +2127,8 @@ A `reply_to` of another place, an unknown id or a deleted message is refused wit
   only when it carries `reply_to` on their comment, comes right after their comment on that task, or @mentions them.
   Answer a person's comment with `reply_to` so the answer arrives.
   Since 2.66.1 the comments that reach a person count at their bell (*For you*); other agent actions stay *Activity*.
+  Since 2.1049.0 a proposal the person asked the agent for (and a Playbook proposal) that is ready, and the watchdog's
+  finding that a job of the person's agent stalled, count at their bell too (*For you*).
   Since 2.1043.0 the same setting (*From agents: only what needs me*) also keeps an agent's new tasks, completions and
   project status changes out of that person's News and pushes (unless the task is assigned to them or marked Urgent by them):
   to get something in front of a person, assign it, @mention them, or ask with a question / approval card.
