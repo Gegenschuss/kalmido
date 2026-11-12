@@ -712,7 +712,15 @@ def settings_update():
             if v is not None:
                 vals[k] = v
     from .setundo import su_mark  # 2.985.0 (#5394): the changed keys are steps of the list "Recent steps" (after this module)
-    su_mark(c, me(), list(vals), bundle=True)  # review F6: the same keys again from the same device within 10 min = one step
+    marked = list(vals)
+    # 2.997.0 (#5607 #5615 #5702): the first look of the account ('' = never stored) is the device's own appearance uploaded
+    # by the app itself (static/js/dialogs.js lookAdopt), not a step of the person; as one it was the newest group right after
+    # sign-in, and an entry with its own way back made within seconds took it over (undo.js histAdd HIST.fresh): its undo
+    # took back the look instead of the time wipe / the deadline task / the proposal
+    if "look" in vals and not (usettings(c, me()).get("look") or ""):
+        marked.remove("look")
+    if marked:
+        su_mark(c, me(), marked, bundle=True)  # review F6: the same keys again from the same device within 10 min = one step
     if "show_done_views" in vals:  # 2.46.1 (#1422): an own choice against a folder's "Hide completed" is marked
         rs_done_sync(c, me(), usettings(c, me()).get("show_done_views"), vals["show_done_views"])  # 2.593.0 (#4590): one import for both
     if "show_progress" in vals:  # 2.757.0 (#4501): an own choice against a folder's "Show the progress bar" is marked

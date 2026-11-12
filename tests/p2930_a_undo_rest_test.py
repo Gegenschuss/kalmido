@@ -145,6 +145,16 @@ def waits(name, call, during=None):
 
 
 # ================================================================ settings
+# 2.997.0 (#5702 #5607 #5615): the first look of the account (the app uploads the device's own appearance by itself,
+# dialogs.js lookAdopt) is no step of the person - as one it was the newest group right after sign-in and an entry with its
+# own way back took it over (its undo took back the look); a change of the look afterwards is a step as before
+check(not (setting(ALICE, "look") or ""), f"(setup) the account has no look yet {setting(ALICE, 'look')}")
+n0 = newest(A).get("id")
+r = A.patch(B + "/api/settings", json={"look": json.dumps({"theme": "light"})})
+check(r.ok and "light" in (setting(ALICE, "look") or "") and newest(A).get("id") == n0, f"the first look is stored, no step {r.status_code} {newest(A)}")
+r = A.patch(B + "/api/settings", json={"look": json.dumps({"theme": "dark"})})
+g = newest(A)
+check(r.ok and g.get("id") != n0 and g.get("kind") == "setting" and "Colour scheme" in (g.get("label") or ""), f"a later change of the look is a step {g}")
 r = A.patch(B + "/api/settings", json={"fav_only": "1"}, headers=LAP)
 check(r.ok and setting(ALICE, "fav_only") == "1", f"(setup) the laptop shows only the favourites {r.status_code}")
 g = newest(PHONE)
