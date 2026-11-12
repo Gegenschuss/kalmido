@@ -56,7 +56,8 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   click(w, md.querySelector('[data-m="ok"]'));
   const sent = await until(() => w.eval('window.__sent'));
   const want = {display_name: 'Robo', note: '', provider: '', proposals: 'shared', webhook_url: '', limits: null,
-    runtime: {model: '', autocompact: true, autocompact_pct: null, nightly_reset: '', permission_mode: ''},
+    // 2.997.0 (#5678): the runtime part also carries the model per run (#5668 / #5684) with its defaults (off, no models)
+    runtime: {model: '', model_split: false, model_decide: '', model_routine: '', model_review: '', autocompact: true, autocompact_pct: null, nightly_reset: '', permission_mode: ''},
     scopes: ['read', 'tasks:write', 'comments', 'files:read', 'files:write'], allowed_ips: '', owner_id: null, org_id: org.id, username: 'robo'};
   const norm = o => JSON.stringify(Object.keys(o || {}).sort().reduce((a, k) => ({...a, [k]: o[k]}), {}));
   check(norm(sent) === norm(want), 'sent exactly as before ' + norm(sent));
