@@ -827,9 +827,10 @@ ROUTES = {
     "POST /api/lists/{}/checklist": "list", "POST /api/sections": "list", "PATCH /api/sections/{}": "list",
     "POST /api/lists/{}/sections/order": "list", "DELETE /api/sections/{}": "list", "POST /api/lists/{}/shift": "list",
     "POST /api/v1/lists": "list",
-    # ---- news (5)
+    # ---- news (5 + one own)
     "GET /api/v1/news": "news", "POST /api/v1/news/read": "news", "GET /api/news": "news",
     "POST /api/news/dismiss": "news", "POST /api/news/read": "news",
+    "POST /api/news/due-seen": "own",  # 2.1037.0 (#5801): the bell's due lines marked seen - a mark of the person's own (obj_seen kind due, user_id), no id of a row; added 2.1067.0
     # ---- org (13)
     "GET /api/admin/orgs": "org", "POST /api/admin/orgs/boundary/repair": "org",  # 2.46.0 (#1563)
      "POST /api/admin/orgs": "org", "PATCH /api/admin/orgs/{}": "org",
