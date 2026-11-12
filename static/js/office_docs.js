@@ -885,7 +885,7 @@ async function ofdChange0(e) {
     if (t.value === 'amount' && +d.discount_pct > 0) await ofdPatch({discount_pct: 0});
     else if (t.value !== 'amount' && +d.discount_amount > 0) await ofdPatch({discount_amount: null});
     else ofdDraw();
-    $('#ofd-' + (t.value === 'amount' ? 'discount_amount' : 'discount_pct'))?.focus();
+    $('#ofd-' + (t.value === 'amount' ? 'discount_amount' : 'discount_pct'))?.focus({preventScroll: true});
     return;
   }
   if (['fx_rate', 'raw_factor', 'prod_quotient', 'producing_rate', 'discount_pct', 'discount_amount', 'payment_days', 'reminder_level', 'reminder_fee', 'reminder_deadline_days', 'skonto_pct', 'skonto_days'].includes(f)) { const v = ofcNum(t.value, ['fx_rate', 'raw_factor', 'prod_quotient'].includes(f)); await ofdPatch({[f]: v}); return; }
@@ -1004,7 +1004,7 @@ async function ofdClick(e) {
     return;
   }
   if (a === 'it-del') { d.items.splice(+b.dataset.i, 1); await ofdPutItems(); return; }
-  if (a === 'it-pdisc') { const it = d.items[+b.dataset.i]; if (!it) return; it._pdisc = 1; ofdDraw(); $(`${sc}.ofdits [data-i="${b.dataset.i}"][data-k="discount_pct"]`)?.focus(); return; }  // 2.1042.0 (#5815)
+  if (a === 'it-pdisc') { const it = d.items[+b.dataset.i]; if (!it) return; it._pdisc = 1; ofdDraw(); $(`${sc}.ofdits [data-i="${b.dataset.i}"][data-k="discount_pct"]`)?.focus({preventScroll: true}); return; }  // 2.1042.0 (#5815)
   if (a === 'it-up' || a === 'it-down') { const i = +b.dataset.i, j = a === 'it-up' ? i - 1 : i + 1; if (j < 0 || j >= d.items.length) return; await ofdMoveItem(d, i, j); setTimeout(() => $(`${sc}.ofdits [data-ofd="${a}"][data-i="${j}"]`)?.focus(), 0); return; }
   if (a === 'client-new') { if (typeof clientModal === 'function') clientModal(null, {org_id: pb_clOrg(), stay: true, quick: true, done: r => ofdPatch({client_id: r.id})}); return; }  // 2.80.0 (#1842); 2.97.0 B (#1951): set as the document's client
   if (a === 'client-edit') { await cdn_editClient(d); return; }
