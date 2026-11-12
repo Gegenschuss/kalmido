@@ -1822,7 +1822,7 @@ folder and file `recog_on` (own switch: `recog`), each document `doc: {state, re
 
 ## Help for agents
 
-*Since 2.1050.0 (#5819).*
+*Since 2.1067.0 (#5819).*
 
 The user documentation (`docs/*.md`, shipped in the image; never `docs/dev/`) for tokens: `GET /help` (overview: the feature
 list per area in short form, the files with their second-rank headings and keys), `GET /search?kind=help&q=&limit=` (a word
@@ -1839,7 +1839,7 @@ pack catalogue, the privacy templates) only for an instance admin's token with `
 
 A scan inbox is a key with the one scope `docs:upload` ("Only upload documents"), bound to one place: a person's own
 documents or an organisation's, optionally one folder of it. People make and revoke it in Settings > Integrations > *Documents: inboxes* >
-*Folder watcher* > *New scan inbox* > *Create inbox* (2.1050.0: the path of the interface since 2.353; web session only, never an
+*Folder watcher* > *New scan inbox* > *Create inbox* (2.1067.0: the path of the interface since 2.353; web session only, never an
 agent: only a person can create one; 2.1048.0, #5821: also from the menu of a folder of the documents, *Scan inbox for this
 folder…*, which opens that form with the folder and its name set, or *Show scan inbox* when the folder has one); it shows in Settings > Access > API tokens too (revocable there, its permissions
 cannot be changed). It counts against the 20 tokens per person. `docs:upload` is never offered for ordinary tokens

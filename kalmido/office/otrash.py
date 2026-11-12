@@ -3,8 +3,8 @@
 2.1005.0 (#5415, stage 4d part E): every kind of the office deletes into the ONE trash of the core (office/okern.py
 ofk_register): GET /api/office/trash lists its rows of the kinds shown there (okern.ofk_trash_items), POST
 /api/office/trash/core/<kind>/<id>/restore and DELETE /api/office/trash/core/<kind>/<id> restore / delete them for good.
-2.1050.0 (#5789, stage 4e): the last kind of copies (the start balance of the cash flow, office/cfstart.py) is on the core's
-trash too; the copies of office_trash (otb_put before 2.1050), their routes (POST /api/office/trash/<id>/restore, DELETE
+2.1067.0 (#5789, stage 4e): the last kind of copies (the start balance of the cash flow, office/cfstart.py) is on the core's
+trash too; the copies of office_trash (otb_put before 2.1067), their routes (POST /api/office/trash/<id>/restore, DELETE
 /api/office/trash/<id>, the toast's undo POST /api/office/trash/undo/<kind>/<id>) and their purge run (otb_tick) are gone --
 okern.ofk_copies_back writes old copies back at the start. The table office_trash stays for one more version (an older
 version still reads it)."""
@@ -38,7 +38,7 @@ def otb_list():
     """The trash of the office area (admins / people who may manage documents): newest first."""
     c, uid, oid = _ctx_admin()
     # 2.905.0 (#5414): the rows of the kinds on the core's trash (office/okern.py view=), marked core = their kind; per kind
-    # (ofk_view_may, 2.1005.0): the admin, a document draft also who may manage documents. 2.1050.0 (#5789): no copies any more.
+    # (ofk_view_may, 2.1005.0): the admin, a document draft also who may manage documents. 2.1067.0 (#5789): no copies any more.
     items = ofk_trash_items(c, oid, uid)
     items.sort(key=lambda x: (str(x["deleted_at"] or ""), x["id"]), reverse=True)
     return jsonify(items=items[:500], days=max(1, ret_days("trash")))

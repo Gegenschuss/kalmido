@@ -1,11 +1,11 @@
-// 2.1050.0 (#5789, stage 4e of the core's trash) UI: the start balance of the cash flow, removed in the office settings, lies
+// 2.1067.0 (#5789, stage 4e of the core's trash) UI: the start balance of the cash flow, removed in the office settings, lies
 // kalmido-suite: fresh
 // in the core's trash and comes back (jsdom, invented data only). The way a person goes, by clicks:
 // - office settings, section "Cash flow": the start balance is shown; the amount emptied -> the toast "Saved" with Undo, the
 //   start balance is gone; Undo -> amount and day are back in the field (POST .../trash/core/ocfstart/<id>/restore?undo=1)
 // - emptied again -> the office trash (Offers, trash button) lists "Starting balance" with its day -> Restore -> the toast
 //   "Restored"; back in the office settings the field shows the amount again
-// freelancer-matrix: office (the person without an organisation: p21050_b_cfstart_trash_test.py; the settings section is the same)
+// freelancer-matrix: office (the person without an organisation: p21067_b_cfstart_trash_test.py; the settings section is the same)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, B, login, until, idle} = require('./boot');
@@ -71,6 +71,6 @@ const empty = (w, d) => { const x = field(d); x.value = ''; x.dispatchEvent(new 
   await idle(w);
   w.close();
 
-  console.log(`p21050_b_cfstart_trash_ui: ${ok} ok, ${F.length} failed`);
+  console.log(`p21067_b_cfstart_trash_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

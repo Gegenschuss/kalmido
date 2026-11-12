@@ -299,7 +299,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - A change that belongs to another topic (a project shared with you): send it with `propose_to_other_topic`; its owner decides.
   Never ask another agent to do it.
 
-### Questions about using Kalmido (2.1050.0)
+### Questions about using Kalmido (2.1067.0)
 - "Can Kalmido ...?", "How do I ...?", "Where do I find ...?": look it up before you answer, never guess a menu path.
   `help_overview` lists what exists per area, `search_help` (English words work best) finds the sections of the help of
   exactly this server's version, `read_help` (the key of a hit) reads one.

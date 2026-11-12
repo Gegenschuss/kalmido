@@ -387,7 +387,7 @@ function cfs_settingsHtml() {
     <div class="row"><label id="cfs-dayl">${tr('Reference date')}</label>${dateIn('cfs-day', st?.day || CFS.day || today(), {label: tr('Reference date'), clear: false})}</div>`}</section>`;
 }
 async function cfs_startSet(v, tid) {  // 2.567.0 (#4707): -> where a removed start balance lies; tid: its undo takes it back
-  let out = null;  // 2.1050.0 (#5789): in the core's trash ({kind, id}; the toast's undo = the core's restore ?undo=1)
+  let out = null;  // 2.1067.0 (#5789): in the core's trash ({kind, id}; the toast's undo = the core's restore ?undo=1)
   if (tid) CFS.st = (await api('POST', `/api/office/trash/core/${tid.kind}/${tid.id}/restore?undo=1`), (await api('GET', '/api/office/cashflow/start')).start);
   else CFS.st = v ? (await api('PUT', '/api/office/cashflow/start', {amount: v.amount, day: v.day})).start : (out = (await api('DELETE', '/api/office/cashflow/start')).trash || null, null);
   CFS.day = ''; RKF.data = null; const sec = $('.cfsset'); if (sec) sec.outerHTML = cfs_settingsHtml();

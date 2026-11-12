@@ -2909,17 +2909,17 @@ TOOLS += [  # 2.558.0 (#4709): objects of the areas built on the shared core (on
      lambda api, a: api.call("POST", f"/agent/objects/{str(a['kind'])}/{_id(a, 'object_id')}/proposals",
                              body=_pick(a, ("values", "expect_updated_at", "summary", "user_id")))),
 ]
-TOOLS += [  # 2.1050.0 (#5819): the help of the running version (docs/*.md on the server): look a question about using Kalmido up
-    ("help_overview", "2.1050.0: what Kalmido can do - the feature list per area in short form and the headings of every help file "
+TOOLS += [  # 2.1067.0 (#5819): the help of the running version (docs/*.md on the server): look a question about using Kalmido up
+    ("help_overview", "2.1067.0: what Kalmido can do - the feature list per area in short form and the headings of every help file "
                       "(each with a key for read_help). Call it first for \"can Kalmido ...?\", \"how do I ...?\", \"where do I find ...?\", "
                       "then search_help / read_help. The help is the documentation of exactly this server's version (English).",
      _obj({}), lambda api, a: api.call("GET", "/help")),
-    ("search_help", "2.1050.0: search the help (the user documentation of this server's version) by words, English works best "
+    ("search_help", "2.1067.0: search the help (the user documentation of this server's version) by words, English works best "
                     "(e.g. \"scan inbox folder\"): hits with key, file, title, path (headings) and snippet, best first; [] = nothing in "
                     "the help - then say so, never guess a menu path. Read a hit with read_help.",
      _obj({"q": {"type": "string", "minLength": 1, "maxLength": 200}, "limit": {"type": "integer", "minimum": 1, "maximum": 20}}, ["q"]),
      lambda api, a: api.call("GET", "/search", {"kind": "help", **_pick(a, ("q", "limit"))})),
-    ("read_help", "2.1050.0: read one section of the help by its key (from search_help or help_overview, e.g. "
+    ("read_help", "2.1067.0: read one section of the help by its key (from search_help or help_overview, e.g. "
                   "api#scan-inboxes-folder-watcher): text (Markdown, up to the next heading of the same rank; truncated = read its parts "
                   "one by one), path and ui_terms (the interface labels of the text in the person's language - use them when you "
                   "explain the clicks). Only keys work, never a file name or path (404).",

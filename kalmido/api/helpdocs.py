@@ -1,4 +1,4 @@
-"""2.1050.0 (#5819, decided 12.11.2026): the help of the running version for agents -- the user documentation (docs/*.md, shipped
+"""2.1067.0 (#5819, decided 12.11.2026): the help of the running version for agents -- the user documentation (docs/*.md, shipped
 in the image) searchable and readable through API v1 / MCP, so an agent looks a question about using Kalmido up instead of
 guessing a menu path.
 
@@ -36,8 +36,8 @@ HELP_DIR = os.path.join(APP_DIR, "docs")  # the image: /app/docs (Dockerfile), a
 # the operator's files: running a server, its settings and internals -- only for an instance admin
 HELP_OPERATOR = frozenset(("self-hosting", "env", "upgrading", "oidc", "architecture", "glossar", "packs", "privacy-template",
                            "privacy-assistant-template"))
-# review 2.1050.0 (F4): the user's files by name; a docs/*.md in neither set counts as an operator file (closed until named
-# here; tests/p21050_a_help_test.py turns red on such a file)
+# review 2.1067.0 (F4): the user's files by name; a docs/*.md in neither set counts as an operator file (closed until named
+# here; tests/p21067_a_help_test.py turns red on such a file)
 HELP_PUBLIC = frozenset(("about", "accessibility", "agent-security", "agent-setup", "agents", "api", "assistant", "bookmarks",
                          "budget", "caldav", "calendar", "code-verify", "features", "feeds", "files", "git", "home", "import",
                          "notifications", "office", "readme", "sheets", "tasks", "team", "wiki"))
@@ -286,7 +286,7 @@ def v1_help_search():
     return jsonify(data=hits[:n], more=len(hits) > n)
 
 
-srch_register("help", v1=v1_help_search)  # 2.1050.0 (#5819): no v1group -- ?kind=all stays the person's data
+srch_register("help", v1=v1_help_search)  # 2.1067.0 (#5819): no v1group -- ?kind=all stays the person's data
 
 
 @app.get("/api/v1/help")
@@ -313,11 +313,11 @@ def help_spec(paths, schemas, op, ok, errs, ref, q):
         "path": {"type": "array", "items": {"type": "string"}, "description": "The headings from the file's title down to the section"},
         "snippet": {"type": "string", "description": "Plain text around the first hit"}}}
     T = "Help"
-    paths["/help"] = {"get": op("Overview of the help (2.1050.0): the feature list per area in short form and the headings of every "
+    paths["/help"] = {"get": op("Overview of the help (2.1067.0): the feature list per area in short form and the headings of every "
                                 "documentation file", T, ok({"type": "object"}) | errs(),
                                 desc="Every token with read. The operator files (self-hosting, environment, ...) only for an instance "
                                      "admin with admin-read.")}
-    paths["/help/section"] = {"get": op("One section of the help by its key (2.1050.0)", T, ok({"type": "object", "properties": {
+    paths["/help/section"] = {"get": op("One section of the help by its key (2.1067.0)", T, ok({"type": "object", "properties": {
         "key": {"type": "string"}, "file": {"type": "string"}, "title": {"type": "string"},
         "path": {"type": "array", "items": {"type": "string"}}, "text": {"type": "string", "description": "Markdown up to the next heading "
                                                                                                             "of the same rank"},

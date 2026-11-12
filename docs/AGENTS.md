@@ -4428,7 +4428,7 @@ kalmido show APP-12                            # a task by id or ticket key, wit
 kalmido add "Renew the certificate" --project 12 --due 2026-12-01 --priority high --notes -   # notes from stdin
 kalmido comment APP-12 "Deployed to staging"   # - = the text from stdin
 kalmido done APP-12
-kalmido docs scan inbox folder                 # 2.1050.0: search the help; --read KEY reads a section, --overview
+kalmido docs scan inbox folder                 # 2.1067.0: search the help; --read KEY reads a section, --overview
 kalmido --json list                            # every command: the API answer as JSON
 ```
 
@@ -4873,7 +4873,7 @@ lock of the series, so `expect` (also as `expect_updated_at`) and CalDAV's `If-M
 
 ## Help of this server
 
-*Since 2.1050.0 (#5819).*
+*Since 2.1067.0 (#5819).*
 
 The user documentation of the running version (the `docs/*.md` of the repository, shipped in the image) is searchable for
 agents, so a question about using Kalmido ("can it ...?", "how do I ...?", "where do I find ...?") is looked up, never

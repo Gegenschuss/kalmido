@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
-"""2.1050.0 (#5789, stage 4e of the core's trash) API test: the start balance of the cash flow (office_cf_start, one row per
+"""2.1067.0 (#5789, stage 4e of the core's trash) API test: the start balance of the cash flow (office_cf_start, one row per
 office) goes into the ONE trash of the core (kind ocfstart, office/cfstart.py) instead of a copy in office_trash; the copies'
-routes are gone; an old copy (key org_id, made by hand as cfstart.py made it before 2.1050) is written back at the start.
+routes are gone; an old copy (key org_id, made by hand as cfstart.py made it before 2.1067) is written back at the start.
 Invented names and figures only.
 freelancer-matrix: office (a person without an organisation: every step in her personal office)
 tenant-matrix: office (another organisation: no undo, no restore, no delete for good of the start balance in the trash)
@@ -19,7 +19,7 @@ tenant-matrix: office (another organisation: no undo, no restore, no delete for 
    balance was set again meanwhile stays a copy and is never listed
  - the copies' routes are gone: POST /api/office/trash/undo/cf_start/<id>, POST /api/office/trash/<id>/restore,
    DELETE /api/office/trash/<id> answer 404 / 405
-usage: p21050_b_cfstart_trash_test.py <datadir>"""
+usage: p21067_b_cfstart_trash_test.py <datadir>"""
 import base64
 import json
 import os
@@ -64,9 +64,9 @@ def row(oid):
 
 
 def old_copy(oid, uid, when="2099-01-09T10:00:00.000Z"):
-    """2.1050.0 review (F1): dated after the row's last save, as a real copy is (the app's start revives a trashed row
+    """2.1067.0 review (F1): dated after the row's last save, as a real copy is (the app's start revives a trashed row
     saved after its delete, office/cfstart.py cfs_start_fix; in_app runs that start). The start balance of oid as a copy in office_trash and the row deleted, as cfstart.py (otrash.otb_put, key org_id) did
-    before 2.1050 -> the copy's id."""
+    before 2.1067 -> the copy's id."""
     raw = json.loads(dbx("SELECT CAST(row_to_json(x) AS TEXT) FROM office_cf_start x WHERE org_id=?", (oid,))[0][0])
     snap = {"rows": [["office_cf_start", [{k: v for k, v in raw.items() if k not in ("id", "deleted_at", "deleted_by", "rev")}]]],
             "nulls": [], "key": "org_id"}
@@ -160,7 +160,7 @@ def scenario(S, who, oid, uid, other, member=None):
     check(dbx("SELECT 1 FROM office_trash WHERE id=?", (tid2,)) and (start(S) or {}).get("amount") == "10.00" and not listed(S, oid),
           f"{who}: set again meanwhile: the copy stays a copy, the new value stays, nothing listed")
     dbx("DELETE FROM office_trash WHERE id=?", (tid2,))
-    # review 2.1050.0 (F1): an older version (after a step back) set the start balance again on a row of the trash - its
+    # review 2.1067.0 (F1): an older version (after a step back) set the start balance again on a row of the trash - its
     # upsert leaves deleted_at: at the next start the row is live again; a row deleted after its last save stays in the trash
     S.delete(ST)
     dbx("UPDATE office_cf_start SET deleted_at=deleted_at - interval '1 hour', updated_at=? WHERE org_id=?",
@@ -204,4 +204,4 @@ for s in (A, Ca, Fr):
 
 scenario(A, "alice", ORG, ALICE, Ca, member=Bo)
 scenario(Fr, "frida", PERS, FID, A)
-sys.exit(done("p21050_b_cfstart_trash"))
+sys.exit(done("p21067_b_cfstart_trash"))

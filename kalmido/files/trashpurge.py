@@ -103,8 +103,8 @@ def tp_tick(c, force=False):
         fc, fp = atr_tick(c, cut, purge)  # 2.272.0 E2 (#3038): task / comment / project files (unlinked after the commit)
         counts.update(fc)
         paths += fp
-        # 2.1050.0 (#5789): the office's copies (otb_tick) are gone: every office kind is on the core's run (obj_trash_tick)
-        # review 2.1050.0 (F3): a copy ofk_copies_back left (its row there again) still goes after its period until the table goes
+        # 2.1067.0 (#5789): the office's copies (otb_tick) are gone: every office kind is on the core's run (obj_trash_tick)
+        # review 2.1067.0 (F3): a copy ofk_copies_back left (its row there again) still goes after its period until the table goes
         counts["office_trash"] = (c.execute("DELETE FROM office_trash WHERE deleted_at<?", (cut,)).rowcount if purge
                                   else c.execute("SELECT COUNT(*) FROM office_trash WHERE deleted_at<?", (cut,)).fetchone()[0])
         try:  # 2.567.0 A (#4707): household budget entries (with their receipts), templates, categories

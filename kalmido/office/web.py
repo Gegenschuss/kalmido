@@ -93,7 +93,7 @@ def of_used(c, oid):
             "meal": one("SELECT 1 FROM office_meals WHERE org_id=? AND deleted_at IS NULL", oid),
             "travel": one(f"SELECT 1 FROM office_trips WHERE org_id=? AND {live_sql()}", oid),  # 2.1005.0 (#5415): not the trash
             "sub": fixed and one(f"SELECT 1 FROM office_fixed_costs WHERE org_id=? AND sub=1 AND {live_sql()}", oid),
-            "fixed": fixed or one(f"SELECT 1 FROM office_cf_start WHERE org_id=? AND {live_sql()}", oid)}  # 2.1050.0 (#5789): not the trash
+            "fixed": fixed or one(f"SELECT 1 FROM office_cf_start WHERE org_id=? AND {live_sql()}", oid)}  # 2.1067.0 (#5789): not the trash
 
 
 def of_pack_choice(c, oid, role, cf):

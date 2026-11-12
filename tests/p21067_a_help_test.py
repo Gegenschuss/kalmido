@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
-"""2.1050.0 (#5819): the help of the running version for agents (kalmido/api/helpdocs.py, docs/*.md in the image). Invented names only.
+"""2.1067.0 (#5819): the help of the running version for agents (kalmido/api/helpdocs.py, docs/*.md in the image). Invented names only.
  - search: GET /api/v1/search?kind=help (the search registry's kind, not part of kind=all); "scan inbox folder" finds the
    section of docs/API.md with the path of the interface (Settings > Integrations > Documents: inboxes) and the note that
    only a person creates a scan inbox; the five questions of the decision (scan inbox, a knowledge folder shared with an
@@ -13,7 +13,7 @@
  - OpenAPI names the routes (scope read), the kind enum has help; any token reads it (every token has read)
  - MCP: help_overview / search_help / read_help (mcp/kalmido_mcp.py, toolset chat) and kalmido_cli.py docs against the server
  - freelancer-matrix: agents (a person without an organisation: her token and her own agent read the help)
-usage: p21050_a_help_test.py <datadir>"""
+usage: p21067_a_help_test.py <datadir>"""
 import importlib.util
 import io
 import os
@@ -124,7 +124,7 @@ check(ag.get(V + "/help/section").status_code == 404, "no key: 404")
 check(ag.get(V + "/help/section", params={"key": SCAN, "path": "/etc/passwd"}).status_code == 400, "an unknown parameter: 400")
 
 # the operator files: an instance admin's token with admin-read only
-# review 2.1050.0 (F4): every docs/*.md is named a user's file (HELP_PUBLIC) or an operator file (HELP_OPERATOR); a new one
+# review 2.1067.0 (F4): every docs/*.md is named a user's file (HELP_PUBLIC) or an operator file (HELP_OPERATOR); a new one
 # is closed until named - this turns red so that it gets named
 _src = open(os.path.join(ROOT, "kalmido", "api", "helpdocs.py"), encoding="utf-8").read()
 _named = set(re.findall(r'"([a-z0-9-]+)"', _src[_src.index("HELP_OPERATOR = frozenset"):_src.index("HELP_READ_MAX =")]))
@@ -202,4 +202,4 @@ for who, t in (("her token", bearer(token(Fl, ("read",)))), ("her own agent", be
     check(t.get(V + "/help").status_code == 200, f"{who}: the overview (GET /api/v1/help)")
     check(read(t, "self-hosting") == 404, f"{who}: no operator file")
 
-sys.exit(kt.done("p21050_a_help"))
+sys.exit(kt.done("p21067_a_help"))

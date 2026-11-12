@@ -1050,7 +1050,7 @@ the balance from the bank statement at the end of a month; the card shows the **
 Amounts and notes are encrypted at rest; the same for organisations and for freelancers in their private office.
 `GET/PUT/DELETE /api/office/cashflow/start` (`{amount, day}` -> `{start, prev}`), `POST /api/office/cashflow/adjust`
 (`{month, dir in|out, amount, note}`), `PATCH/DELETE /api/office/cashflow/adjust/<id>` (delete answers the row for the undo;
-2.1050: deleting the starting balance puts it into the office trash and answers `trash: {kind, id}`, the undo is the trash's
+2.1067: deleting the starting balance puts it into the office trash and answers `trash: {kind, id}`, the undo is the trash's
 `POST /api/office/trash/core/<kind>/<id>/restore?undo=1`; setting a new one deletes one in the trash for good),
 `PUT /api/office/cashflow/actual` (`{month, amount}`; null removes it). The cash flow answer adds `start`, `adjust` and per
 month `account`, `manual {in, out}`, `real`, `diff` - only when they are set.
@@ -1894,7 +1894,7 @@ Routes: `POST /api/office/docs/<id>/project`, `GET /api/lists/<id>/office-docs` 
 
 ### Tasks with a time budget from the quotation (post-calculation)
 
-*Since 2.537.0 (#3433); this page since 2.1050.0 (#5819).*
+*Since 2.537.0 (#3433); this page since 2.1067.0 (#5819).*
 
 Open the quotation in the office (*Office > Quotations*, the quotation's editor). In the row *Project* the button *Create
 tasks* opens a preview: each position becomes a task with its budget in hours (hour = the quantity, minute / 60, day = the

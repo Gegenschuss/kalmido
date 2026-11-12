@@ -102,7 +102,7 @@ def hc_bookings(c, oid):
                 # review: assets with a purchase price (depreciation), purchases, the cash flow's start and actual values
                 "SELECT 1 FROM office_equipment WHERE org_id=? AND purchase_net<>'' LIMIT 1",
                 "SELECT 1 FROM office_purchases WHERE org_id=? LIMIT 1",
-                "SELECT 1 FROM office_cf_start WHERE org_id=? LIMIT 1",  # 2.1050.0 (#5789): also one in the trash (it would come back in the old currency)
+                "SELECT 1 FROM office_cf_start WHERE org_id=? LIMIT 1",  # 2.1067.0 (#5789): also one in the trash (it would come back in the old currency)
                 "SELECT 1 FROM office_cf_actual WHERE org_id=? LIMIT 1",
                 "SELECT 1 FROM office_bank_balances WHERE org_id=? LIMIT 1"):
         if c.execute(sql, (oid,)).fetchone():

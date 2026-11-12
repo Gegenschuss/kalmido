@@ -432,7 +432,7 @@ QUERY = {
     "GET /api/wiki/query": {"page": "{wiki}", "q": "zeige: seiten"}, "GET /api/wiki/mentions": {"task": "{task}"}, "GET /api/forms/{}/client-link": {"client": "{client}"},
     "GET /api/files/collections/{}": {"space": "private"}, "GET /api/wiki/refs": {"file": "{node}"},
     "GET /api/team/dispo/callsheets": {"list": "{list}"},  # 2.988.0 (#5651): the call sheets of a project need ?list=
-    "GET /api/v1/help/section": {"key": "api#scan-inboxes-folder-watcher"},  # 2.1050.0 (#5819): one help section needs ?key= (job/4239)
+    "GET /api/v1/help/section": {"key": "api#scan-inboxes-folder-watcher"},  # 2.1067.0 (#5819): one help section needs ?key= (job/4239)
 }
 
 

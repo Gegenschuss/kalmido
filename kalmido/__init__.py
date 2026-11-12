@@ -244,7 +244,7 @@ ORDER = (
     "lists.kpis",  # 2.43.0 (#1328): sum row + key figures (web + token API)
     "lists.orgvis",  # 2.46.0 (#1603): organisation lists visible to the whole organisation
     "api.scopes",
-    "api.helpdocs",  # 2.1050.0 (#5819): the help (docs/*.md) for agents: search kind help, GET /api/v1/help(/section)
+    "api.helpdocs",  # 2.1067.0 (#5819): the help (docs/*.md) for agents: search kind help, GET /api/v1/help(/section)
     "api.v1setup",  # 2.391.0 (#3362): webhooks, API tokens, repository connections through /api/v1 (after git, gitbuild, webhooks, api.v1, api.scopes)
     "collab.notes",
     "wiki.pages",  # 2.49.0 C (#1199): knowledge pages
@@ -592,7 +592,7 @@ ORDER = (
     "office.owrite",  # 2.567.0 (#4711): the one write call of an office row on the core's write layer (lock, version, history, undo)
     "office.undo",  # 2.111.0 A (#2233): undo of the office editors (copies before each own change, restore with conflict check)
     "office.undogrp",  # 2.747.0 (#5249): who may take an office step back from the core's step groups (after office.undo)
-    "office.otrash",  # 2.272.0 E2 (#3038): the office trash's routes (2.1050.0, #5789: the core's rows only, the copies are gone)
+    "office.otrash",  # 2.272.0 E2 (#3038): the office trash's routes (2.1067.0, #5789: the core's rows only, the copies are gone)
     "tasks.atttrash",  # 2.272.0 E2 (#3038): the trash run of task / comment / project files (no routes)
     "office.numranges",  # 2.138.0 D (#2256): the next running number of every number series (office admin)
     "office.timebill",  # 2.144.6 A (#2053): time entries billable / billed by an invoice, never twice

@@ -9,7 +9,7 @@ tenant-matrix: office
    member 403, a second undo 404
  - a correction of the cash flow: the same through the undo route (cf_adjust); 2.905.0 (#5414): the core's trash (oadjust)
  - the start balance (a table without an id): DELETE answers trash_id, the office trash restores it; set again meanwhile:
-   409 and the new value stays. 2.1050.0 (#5789): the core's trash (kind ocfstart): DELETE answers trash {kind, id}; set again
+   409 and the new value stays. 2.1067.0 (#5789): the core's trash (kind ocfstart): DELETE answers trash {kind, id}; set again
    meanwhile: the one in the trash goes for good (the undo 404), the new value stays
  - a letter's link to a document: DELETE answers trash_id, the undo writes the link back; 2.905.0 (#5414): the core's
    trash (oletlink); linked again after a removal: the row of the trash is the link again
@@ -114,7 +114,7 @@ def scenario(S, who, ws, other, member=None):
     check(r.ok and r.json().get("id") == aid and sql("SELECT 1 FROM office_cf_adjust WHERE id=? AND deleted_at IS NULL", (aid,)), f"{who}: the undo brings the correction back {r.text[:200]}")
 
     # ------------------------------------------------------------ the start balance (one row per office)
-    # 2.1050.0 (#5789): the core's trash (kind ocfstart, id = the office's org_id) instead of a copy in office_trash; the undo
+    # 2.1067.0 (#5789): the core's trash (kind ocfstart, id = the office's org_id) instead of a copy in office_trash; the undo
     # is the core's restore ?undo=1; set again meanwhile: the one in the trash goes for good, the undo 404
     r = S.put(B + O + "/cashflow/start", json={"amount": "1500.00", "day": PM1})
     check(r.ok, f"{who}: setup start balance {r.text[:200]}")

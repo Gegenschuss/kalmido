@@ -1455,7 +1455,7 @@ function ofd_fltHtml() {
 
 // 2.272.0 E2 (#3038): the office trash - deleted drafts and master data, restore or delete for good, the trash period
 async function otb_restore(tid, after, core, undo) {  // 2.905.0 (#5414): core = the kind of a row in the core's trash (tid = its id); 2.1005.0 (#5415): undo = the toast's
-  let j; try { j = await api('POST', `/api/office/trash/core/${core}/${tid}/restore${undo ? '?undo=1' : ''}`); } catch (x) { ofcErr(x); return; }  // 2.1050.0 (#5789): every row lies in the core's trash
+  let j; try { j = await api('POST', `/api/office/trash/core/${core}/${tid}/restore${undo ? '?undo=1' : ''}`); } catch (x) { ofcErr(x); return; }  // 2.1067.0 (#5789): every row lies in the core's trash
   toast(j.note || tr('Restored'));  // 2.552.0 (#4561 B19): a draft whose client is gone for good comes back without one
   if (j.kind === 'trip' || j.kind === 'trip_item') { if (typeof RK !== 'undefined') RK.data = null; }  // 2.530.0 C (#4315)
   if (['fixed_cost', 'cf_start', 'cf_adjust'].includes(j.kind)) { if (typeof RKF !== 'undefined') RKF.data = null; if (typeof ABO !== 'undefined') ABO.data = null; if (j.kind === 'cf_start' && typeof CFS !== 'undefined') CFS.oid = null; }  /* cfs_settingsHtml loads it again */
@@ -1480,7 +1480,7 @@ async function otb_open() {
     if (b.dataset.m === 'restore') { md.remove(); await otb_restore(id, null, li.dataset.core); return; }
     if (b.dataset.m === 'purge') {
       if (!await askConfirm(tr('Delete “{0}” permanently?', li.querySelector('.an')?.textContent || ''), tr('This cannot be undone.'), {ok: tr('Delete permanently'), danger: true})) return;
-      try { await api('DELETE', `/api/office/trash/core/${li.dataset.core}/${id}`); li.remove(); } catch (x) { ofcErr(x); }  // 2.1050.0 (#5789)
+      try { await api('DELETE', `/api/office/trash/core/${li.dataset.core}/${id}`); li.remove(); } catch (x) { ofcErr(x); }  // 2.1067.0 (#5789)
     }
   });
 }

@@ -165,7 +165,7 @@ small **×** next to it (*Show progress* in the project's … menu or the projec
 
 ## Recurring tasks
 
-*This page since 2.1050.0 (#5819).*
+*This page since 2.1067.0 (#5819).*
 
 A task repeats from its date. Open the task, select its date (the date chip, *Change date*) and in the date popover the
 repeat row (the arrows icon, *Repeat*): *Daily*, *Weekdays*, *Weekly*, *Every 2 weeks*, *Monthly*, *Yearly* or *Custom…*

@@ -312,7 +312,7 @@ ROUTES = {
     # 2.272.0 E2 (#3038): the trash of task / project files and of the office (p2272_e2_attach_trash_test.py) - routes below this line
     "POST /api/attachments/{}/restore": "attachment", "POST /api/list-files/{}/restore": "attachment",
     "DELETE /api/attachments/{}/purge": "attachment", "DELETE /api/list-files/{}/purge": "attachment",  # 2.272.0 F (#3038, E2-H2)
-    "GET /api/office/trash": "office",  # 2.1050.0 (#5789): the copies' POST .../trash/<id>/restore and DELETE .../trash/<id> went
+    "GET /api/office/trash": "office",  # 2.1067.0 (#5789): the copies' POST .../trash/<id>/restore and DELETE .../trash/<id> went
     # (2.272.0 spacer E2)
     # 2.153.0 (#2028): letters (p2106_a_api_test.py) - routes below this line
     "GET /api/office/letters": "office", "POST /api/office/letters": "office", "GET /api/office/letters/recipients": "office",
@@ -482,7 +482,7 @@ ROUTES = {
     "POST /api/office/trips/{}/items": "office", "PATCH /api/office/trips/{}/items/{}": "office", "DELETE /api/office/trips/{}/items/{}": "office",
     # 2.1005.0 (#5415): trips, receipts and card positions out of the core's trash: p21005_d_trash_4d_test.py (another organisation 404)
     "POST /api/office/trips/{}/restore": "office", "POST /api/office/trips/{}/items/{}/restore": "office", "POST /api/office/cards/lines/{}/restore": "office",  # p21005_d_trash_4d_test.py
-    # 2.1050.0 (#5789): POST /api/office/trash/undo/<kind>/<id> went (the start balance is on the core's trash)
+    # 2.1067.0 (#5789): POST /api/office/trash/undo/<kind>/<id> went (the start balance is on the core's trash)
     "POST /api/office/trash/core/{}/{}/restore": "office", "DELETE /api/office/trash/core/{}/{}": "office",  # 2.905.0 (#5414): p2905_d_office_trash_4c_test.py (another organisation 404, member 403)
     "GET /api/office/trips/report": "office", "GET /api/office/trips/bill-docs": "office", "POST /api/office/trips/bill": "office", "GET /api/office/receipts/billed": "office", "POST /api/office/receipts/bill": "office",
     "POST /api/office/receipts/unbill": "office",
@@ -1116,7 +1116,7 @@ ROUTES = {
     # 2.89.0 C (#1916): tables as files and for agents
     "GET /api/sheets/{}/export.csv": "sheet_v1", "GET /api/sheets/{}/export.xlsx": "sheet_v1", "POST /api/sheets/import": "sheet_v1",
     "GET /api/v1/wiki/pages": "wiki_v1", "GET /api/v1/wiki/pages/{}": "wiki_v1",  # 2.200.0 C (#1781)
-    "GET /api/v1/help": "public", "GET /api/v1/help/section": "public",  # 2.1050.0 (#5819): the product's documentation, no data of anybody
+    "GET /api/v1/help": "public", "GET /api/v1/help/section": "public",  # 2.1067.0 (#5819): the product's documentation, no data of anybody
     "POST /api/v1/wiki/pages": "wiki_v1", "PATCH /api/v1/wiki/pages/{}": "wiki_v1",
     "POST /api/v1/wiki/pages/{}/append": "wiki_v1",  # 2.1048.0 (#5861): p21048_wiki_append_test.py
     "GET /api/v1/wiki/pages/{}/files": "wiki_v1", "GET /api/v1/wiki/files/{}": "wiki_v1", "GET /api/v1/wiki/files/{}/text": "wiki_v1",  # 2.488.0 (#2209)
@@ -1680,7 +1680,7 @@ check(route_suites('\nROUTES = {\n    # all below: p1_test.py\n    "GET /a": "x"
 
 LEGACY_FILE = os.path.join(N, "tenant_coverage_legacy.txt")
 LEGACY = [ln.strip() for ln in open(LEGACY_FILE, encoding="utf-8") if ln.strip() and not ln.startswith("#")]
-LEGACY_COUNT = 1422  # 2.1050.0 (#5789): 1424 -> 1422, the office trash's copy routes went; 2.1026.0 (#5280): 1426 -> 1424, /api/search/messages and /api/v1/files/search went into the one search route; 2.610.0 (#4010): 1429 -> 1426, the API v1 file routes proven by p2610_c_v1restore; 2.546.0 (#4291): the length of tenant_coverage_legacy.txt; lower it together with the file, never raise it
+LEGACY_COUNT = 1422  # 2.1067.0 (#5789): 1424 -> 1422, the office trash's copy routes went; 2.1026.0 (#5280): 1426 -> 1424, /api/search/messages and /api/v1/files/search went into the one search route; 2.610.0 (#4010): 1429 -> 1426, the API v1 file routes proven by p2610_c_v1restore; 2.546.0 (#4291): the length of tenant_coverage_legacy.txt; lower it together with the file, never raise it
 # 2.638.0 (#4641): 882 -> 1429 once, with the stricter proof (method + 403 / 404 probe, no comment-block suites); kalmido-livezug.py
 # einreihen compares it and the file with main and turns a rise red
 UNPROVEN = unproven(ROUTES, KINDS, open(__file__, encoding="utf-8").read())

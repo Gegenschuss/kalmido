@@ -21,7 +21,7 @@ freelancer-matrix: office
  - 2.1005.0 (#5415, part E): such old copies (device, draft) are written back into their tables as rows of the core's trash at
    the next start (okern.ofk_copies_back; run here by hand, as the start does): encrypt-all / decrypt-all migrate them as rows,
    the core's restore reads them. The copies still made (the start balance of the cash flow, office/otrash.py OTB_KINDS) are
-   migrated in office_trash.snap as before. 2.1050.0 (#5789): the start balance goes into the core's trash too (its row is
+   migrated in office_trash.snap as before. 2.1067.0 (#5789): the start balance goes into the core's trash too (its row is
    migrated as any other), no copy is made any more. The copy cases of a draft's positions (review F6 / F4) left with the copies of drafts.
 usage: p2570_d_trash_crypt_test.py <datadir>"""
 import base64
@@ -93,7 +93,7 @@ def copies_back():
 
 
 def cfs_copy(s, who, amount):
-    """2.1005.0 (#5415): the start balance of the cash flow deleted -> the trash id. 2.1050.0 (#5789): into the core's trash
+    """2.1005.0 (#5415): the start balance of the cash flow deleted -> the trash id. 2.1067.0 (#5789): into the core's trash
     (kind ocfstart, its row stays with deleted_at; id = the office's org_id), no copy any more."""
     check(s.put(B + O + "/cashflow/start", json={"amount": amount, "day": "2026-01-02"}).ok, f"{who}: setup start balance")
     r = s.delete(B + O + "/cashflow/start")
@@ -103,7 +103,7 @@ def cfs_copy(s, who, amount):
 
 
 def cfs_snap(tid):
-    """2.1050.0 (#5789): the stored amount of the start balance in the core's trash (was: in the copy's snap)."""
+    """2.1067.0 (#5789): the stored amount of the start balance in the core's trash (was: in the copy's snap)."""
     return one("SELECT amount FROM office_cf_start WHERE id=? AND deleted_at IS NOT NULL", (tid,))
 
 
@@ -204,7 +204,7 @@ for s, who, oid in WHO:
           and float(one("SELECT cost FROM office_doc_items WHERE doc_id=?", (did,)) or 0) == 40, f"{who}: the draft's purchase price in the trash is plain")
     check(cfs_snap(CFS[who]) == "1500.00", f"{who}: the start balance in the trash is plain after decrypt-all {cfs_snap(CFS[who])}")
     restore_reads(s, who, "a", eid, tid_e, did, tid_d)
-    r = s.post(B + O + f"/trash/core/ocfstart/{CFS[who]}/restore")  # 2.1050.0 (#5789): the core's trash
+    r = s.post(B + O + f"/trash/core/ocfstart/{CFS[who]}/restore")  # 2.1067.0 (#5789): the core's trash
     st = s.get(B + O + "/cashflow/start").json().get("start") or {}
     check(r.ok and st.get("amount") == "1500.00", f"{who}: the start balance reads as before after the restore {r.text[:200]} {st}")
 
@@ -225,7 +225,7 @@ for s, who, oid in WHO:
     check(sealed(one("SELECT cost_enc FROM office_doc_items WHERE doc_id=?", (did,))), f"{who}: the draft's purchase price in the trash is sealed")
     check(sealed(cfs_snap(CFS[who])), f"{who}: the start balance in the trash is sealed after encrypt-all")
     restore_reads(s, who, "b", eid, tid_e, did, tid_d)
-    r = s.post(B + O + f"/trash/core/ocfstart/{CFS[who]}/restore")  # 2.1050.0 (#5789): the core's trash
+    r = s.post(B + O + f"/trash/core/ocfstart/{CFS[who]}/restore")  # 2.1067.0 (#5789): the core's trash
     st = s.get(B + O + "/cashflow/start").json().get("start") or {}
     check(r.ok and st.get("amount") == "900.00", f"{who}: the start balance reads as before after the restore {r.text[:200]} {st}")
 

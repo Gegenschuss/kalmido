@@ -14,7 +14,7 @@ Commands (a task is its id 42 or its ticket key APP-12):
                                                (without --project: your inbox)
   kalmido_cli.py comment TASK TEXT|-           "-" reads the text from stdin
   kalmido_cli.py done TASK
-  kalmido_cli.py docs WORDS... | --read KEY | --overview   the help of the server (2.1050.0, #5819): search, one section, overview
+  kalmido_cli.py docs WORDS... | --read KEY | --overview   the help of the server (2.1067.0, #5819): search, one section, overview
 Every command takes --json: the API answer as JSON instead of the readable text.
 Exit codes: 0 done, 1 the API refused or cannot be reached (the message on stderr), 2 wrong use / no configuration.
 Tip: alias kalmido='python3 /path/to/kalmido_cli.py'. See mcp/README.md and docs/AGENTS.md."""
@@ -145,7 +145,7 @@ def cmd_done(api, a):
 
 
 def cmd_docs(api, a):
-    """2.1050.0 (#5819): the help of the server -- search (words), one section (--read KEY) or the overview."""
+    """2.1067.0 (#5819): the help of the server -- search (words), one section (--read KEY) or the overview."""
     if a.overview:
         r = api.call("GET", "/help")
         if a.json:
@@ -207,7 +207,7 @@ def parser():
     p = sub.add_parser("done", parents=[common], help="complete a task")
     p.add_argument("task", help="id or ticket key (APP-12)")
     p.set_defaults(fn=cmd_done)
-    p = sub.add_parser("docs", parents=[common], help="search or read the help of the server (2.1050.0)")
+    p = sub.add_parser("docs", parents=[common], help="search or read the help of the server (2.1067.0)")
     p.add_argument("words", nargs="*", help="words to search for (English works best)")
     p.add_argument("--read", metavar="KEY", help="one section by its key (from a search hit)")
     p.add_argument("--overview", action="store_true", help="the feature list per area and the help files")

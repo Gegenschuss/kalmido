@@ -19,7 +19,7 @@ from .events.model import migrate_family_events
 from .core.env import env_bool
 from .office.model import onc_long_report  # 2.312.0 C (#3265)
 from .office.okern import ofk_copies_back  # 2.1005.0 (#5415)
-from .office.cfstart import cfs_start_fix  # review 2.1050.0 (F1, #5789)
+from .office.cfstart import cfs_start_fix  # review 2.1067.0 (F1, #5789)
 
 
 # 2.42.0 (#828): `python -m kalmido.admin.orgcrypt_cli ...` loads the package too: no background threads in that process
@@ -40,7 +40,7 @@ try:
         _c.commit()
         if any(_n.values()):
             print(f"office trash: copies back into their tables {_n['back']}, left as copies {_n['kept']}", flush=True)
-        if cfs_start_fix(_c):  # review 2.1050.0 (F1, #5789): a start balance set by an older version on a trashed row
+        if cfs_start_fix(_c):  # review 2.1067.0 (F1, #5789): a start balance set by an older version on a trashed row
             _c.commit()
     except Exception as _e:  # noqa: BLE001
         _c.rollback()
