@@ -394,15 +394,24 @@ function fv2_dragOut(key) {
 }
 // 2.441.0 (#3592): anything with an address dragged into the row becomes a favourite (a sidebar row, a link)
 function fv2_dragKey(e) {
+  // 2.1038.0 (#5809): a folder of the file store too - its node in the sidebar's tree, its row or card in the open folder
+  const ab = e.target?.closest?.('#side .sbbt[data-sbbns="ab"][data-sbbid], .abview .abrow[data-abid], .abview .dc-card');
+  if (ab) { const id = ab.classList.contains('dc-card') ? ab_cardId(ab) : +(ab.dataset.sbbid || ab.dataset.abid); return id ? fv2_hashKey('ablage/' + id) : ''; }
   const el = e.target?.closest?.('[data-list],[data-go],.fhead[data-folder],a[href^="#"]'); if (!el || el.closest('.fv2bar')) return '';
   const h = el.getAttribute('href');
   if (h?.startsWith('#')) { try { return fv2_hashKey(decodeURIComponent(h.slice(1))); } catch { return ''; } }
   return fv2_rowKey(el);
 }
 function fv2_addEnd() { FV2.add = ''; $$('.fv2bar.fv2-drop').forEach(b => b.classList.remove('fv2-drop')); fv2_mark(null, 0); }
+// 2.1038.0 (#5809): what is dragged INTO the row is seen on window in the capture phase - the sidebar's tree (areas.js, a
+// project folder, a folder of the file store) stops its dragstart on document, so a folder never reached the row before
+window.addEventListener('dragstart', e => {
+  FV2.add = '';
+  if (e.target.closest?.('.fv2bar [data-fv2][draggable="true"]')) return;
+  FV2.add = fv2_dragKey(e); if (FV2.add) $$('.fv2bar').forEach(b => b.classList.add('fv2-drop'));
+}, true);
 document.addEventListener('dragstart', e => {
-  const t = e.target.closest?.('.fv2bar [data-fv2][draggable="true"]');
-  if (!t) { FV2.add = fv2_dragKey(e); if (FV2.add) $$('.fv2bar').forEach(b => b.classList.add('fv2-drop')); return; }
+  const t = e.target.closest?.('.fv2bar [data-fv2][draggable="true"]'); if (!t) return;
   FV2.drag = t.dataset.fv2; FV2.out = null; e.dataTransfer.effectAllowed = 'move';
   try { e.dataTransfer.setData('text/plain', 'fav:' + FV2.drag); } catch { /* old browsers */ }
   requestAnimationFrame(() => t.classList.add('dragging'));
