@@ -34,7 +34,7 @@ A.patch(B + "/api/settings", json={"lang": "en", "features": FEATURES + ",wiki,f
 ME = A.get(B + "/api/state").json()["me"]
 ALICE, ORG = ME["id"], ME["workspaces"][0]["id"]
 FID, F = freelancer(B, A, features=FEATURES + ",wiki,files")
-OID, O = freelancer(B, A, "otto", features=FEATURES + ",wiki,files")
+OID, OTTO = freelancer(B, A, "otto", features=FEATURES + ",wiki,files")
 
 
 def bearer(tok):
@@ -103,7 +103,7 @@ check(F.post(B + f"/api/files/nodes/{ROOT}/shares", json={"agent_id": TA, "role"
       "an organisation's agent never gets the private area (409)")
 check(F.post(B + f"/api/files/nodes/{ROOT}/shares", json={"agent_id": OA, "role": "view"}).status_code == 409,
       "another person's agent: 409")
-check(O.post(B + f"/api/files/nodes/{ROOT}/shares", json={"agent_id": OA, "role": "view"}).status_code in (403, 404),
+check(OTTO.post(B + f"/api/files/nodes/{ROOT}/shares", json={"agent_id": OA, "role": "view"}).status_code in (403, 404),
       "another person cannot share her area")
 check(F.patch(B + f"/api/files/nodes/{ROOT}", json={"name": "Renamed"}).status_code == 409, "the root still cannot be renamed")
 
@@ -181,9 +181,9 @@ check(lock(F, DA).json()["data_lock"]["wiki_folders"][0]["name"] == "Hidden", "t
 PNODE = F.get(B + f"/api/wiki/pages/{P_ONE}").json()["node_id"]
 for bad, why in (([ROOT], "the root"), (["x"], "not an id"), ([PNODE], "a page's node"), ([10 ** 9], "nothing")):
     check(lock(F, DA, "patch", json={"wiki_folders": bad}).status_code == 400, f"invalid exclusion ({why}): 400")
-_, OF = (page(O, "Otto/Page"), index(O))
+_, OF = (page(OTTO, "Otto/Page"), index(OTTO))
 check(lock(F, DA, "patch", json={"wiki_folders": [OF[1]["Otto"]]}).status_code == 400, "another person's folder: 400")
-check(lock(O, DA, "patch", json={"wiki_folders": []}).status_code == 404, "another person cannot change the exclusions")
+check(lock(OTTO, DA, "patch", json={"wiki_folders": []}).status_code == 404, "another person cannot change the exclusions")
 
 # 2.1045.0 review M2 + N5: an exclusion on a folder the editor sees only through a share on it (bob, a colleague in Alpha,
 # shares "Docs" under "ZQXGeheim/Intern" with alice): the gear and "Sees now" name it without the folders above; she
@@ -260,8 +260,8 @@ L = listed(ta)
 check(Q1 in L and P_ONE not in L and L[Q1] == "Knowledge/Team/Handbook", f"the org agent: its area, nothing private {L}")
 check(ta.patch(V + f"/wiki/pages/{Q1}", json={"body": "x", "expect_updated_at": "x"}).status_code == 403, "view: no write")
 check(A.post(B + f"/api/files/nodes/{OROOT}/shares", json={"user_id": FID, "role": "view"}).status_code == 409, "org root: no person")
-check(O.get(B + "/api/wiki/area-share", params={"space": f"org:{ORG}"}).status_code == 404, "tenant-matrix: wiki -- another person: 404")
+check(OTTO.get(B + "/api/wiki/area-share", params={"space": f"org:{ORG}"}).status_code == 404, "tenant-matrix: wiki -- another person: 404")
 oa_ = area(A, f"org:{ORG}")
-check(oa_["may"] and [x["agent_id"] for x in oa_["shares"]] == [TA] and area(O)["shares"] == [], f"area-share per space: {oa_}")
+check(oa_["may"] and [x["agent_id"] for x in oa_["shares"]] == [TA] and area(OTTO)["shares"] == [], f"area-share per space: {oa_}")
 
 sys.exit(kt.done("p21045_b_wikiarea_test"))

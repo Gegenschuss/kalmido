@@ -40,7 +40,7 @@ from ..agents.datalock import _dl_lists_locked
 from ..agents.workstyle import ws_need_editor
 from ..files.fsroots import fs_area_root_of
 from ..files.store import _now, fs_chain, fs_deleted, fs_role
-from ..wiki.wkfolder import WKF_AREA, WKF_KIND, _root_of_chain, _space_locked, _subtree, _walk, wkf_root
+from ..wiki.wkfolder import WKF_KIND, _root_of_chain, _space_locked, _subtree, _walk, wkf_root
 from ..wiki.wkfolder import wkf_chain_path  # 2.1045.0 (review M2): the path from the asker's own highest role
 
 AGS_MAX = 500          # rows of one kind in an answer (shares, options)

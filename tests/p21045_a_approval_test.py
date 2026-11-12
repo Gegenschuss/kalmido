@@ -36,7 +36,7 @@ A = setup()
 A.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
 FID, F = freelancer(B, A)
-OID, O = freelancer(B, A, "otto")
+OID, OTTO = freelancer(B, A, "otto")
 SCOPES = ["read", "tasks:write", "comments", "wiki:read", "wiki:write", "calendar", "contacts", "sheets:read", "sheets:write",
           "structure"]  # 2.1045.0 (#5827, N2): its own project for a step that waits for a person
 
@@ -56,7 +56,7 @@ def agent(s, name):
 
 
 FA, FH, FTOK = agent(F, "fridabot")
-OA, OH, _ = agent(O, "ottobot")
+OA, OH, _ = agent(OTTO, "ottobot")
 check((F.get(B + f"/api/agents/{FA}/control").json().get("control") or {}).get("level") == "approve_all", "the agent starts with approve_all")
 FL = F.post(B + "/api/lists", json={"name": "Frida work"}).json()["id"]
 check(F.put(B + f"/api/lists/{FL}/members", json={"user_id": FA, "role": "edit"}).ok, "setup: the project is shared with the agent")
