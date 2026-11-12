@@ -487,7 +487,7 @@ function wk_panelHtml() {
   const r = S.route, onW = r.mod === 'wiki';
   const pa = onW && r.wid ? wk_pgAt(r.wid) : null;
   const at = (onW && r.wdir != null ? r.wdir : pa && pa.space === sp ? wk_dirOf(pa.path) : '').toLowerCase();  // the open folder (a page: its folder)
-  const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path), ...(n.page ? {ichtml: wk_dirIcon(n)} : {}), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };  // 2.319 (#3287): a page's own folder is open
+  const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path), ...(n.page ? {ichtml: wk_dirIcon(n)} : {}), on: !!at && at === lp || !!pa && !!n.page && n.page.id === pa.id, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };  // 2.319 (#3287): a page's own folder is open
   const top = `<div class="sgroup sbbp">${/*html-ok*/ sbb_row('wiki', 'book', wk_rootName(sp), onW && !r.wid && !r.wdir, `data-wkarea="${esc(sp)}"` /* 2.1045.0 (#5823): its right-click, wkarea.js */)}</div>`;  // 2.200.0 A (#2747, audit B 1)
   if (!d?.pages) return top + `<p class="muted sbbtl">${esc(d?.err || tr('Loading…'))}</p>`;
   const ds = wk_subNodes(sp, wk_treeOf(sp), node);  // 2.200.0 A (#2747): folders AND pages, dragged / sorted / with a menu
@@ -503,7 +503,7 @@ function wk_panelAllHtml() {
     const d = WK.idx[sp], lock = wk_locked(sp), here = op === sp;
     const pa = here && r.wid ? wk_pgAt(r.wid) : null;  // 2.319 (#3287)
     const at = here ? (r.wdir != null ? r.wdir : pa ? wk_dirOf(pa.path) : '').toLowerCase() : '';
-    const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path, sp), ...(n.page ? {ichtml: wk_dirIcon(n)} : {}), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };
+    const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path, sp), ...(n.page ? {ichtml: wk_dirIcon(n)} : {}), on: !!at && at === lp || !!pa && !!n.page && n.page.id === pa.id, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };
     const root = {k: 'wk:' + sp + ':', name: wk_rootName(sp), icon: lock ? 'lock' : 'book', go: 'wiki/s/' + sp, on: here && !r.wid && !r.wdir,
       kids: !lock && !(d?.pages && !wk_kidsN(wk_treeOf(sp))), open: here, attrs: `data-wksp="${esc(sp)}"`,  // the open space shows its folders
       ...(d?.root && !wk_e2e(sp) && d.mayWrite !== false ? {ns: 'wk', id: d.root, par: 'wk:', drop: true, menu: typeof wkar_rootItems === 'function' /* 2.1045.0 (#5823) */} : {}),  // 2.200.0 A (#2747): dropped on = to the top

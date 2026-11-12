@@ -67,6 +67,7 @@ if (!process.env.P21081A_NOSTART) execFileSync('bash', [path.join(__dirname, 'st
     // "Edit" opens the page itself
     await ev(`(() => { document.querySelector('#view .wkdpage .wkdpbar a.btn').click(); return 1; })()`);
     check(await until(`S.route.wid === ${P.script} && document.querySelector('#view .wkpage h2')?.textContent.trim().startsWith('Script')`, {timeout: 10000}), '#5907 "Edit" opens the page "Script"');
+    check(await until(`[...document.querySelectorAll('#side .sbbtree .sbbt.on .sbbtn')].some(b => b.textContent.trim() === 'Script')`, {timeout: 10000}), '#5907 the panel marks the folder row "Script" while its page is open');
 
     // 3) a link [[Script]] still opens the page
     await nav(B + '?w=1280#wiki/' + P.loose);
