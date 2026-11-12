@@ -1071,6 +1071,7 @@ ROUTES = {
     "POST /api/wiki/e2e/newid": "wiki", "POST /api/team/rooms/{}/msgid": "team",  # 2.640.0 (#3388): AAD v2 ids (p2640_b_aad_test.py)
     "POST /api/wiki/folders": "wiki",  # 2.200.0 A (#2747): an empty knowledge folder (p2200_a_wiki_folder_test.py)
     "GET /api/wiki/tags": "wiki", "GET /api/wiki/query": "wiki",  # 2.371 (#3150): tags + the abfrage block (p2371_wiki_tags_test.py)
+    "GET /api/wiki/area-share": "wiki",  # 2.1045.0 (#5823): a whole knowledge area shared with her agent (p21045_b_wikiarea_test.py)
     # 2.200.0 C (#1781): API v1 (p2200_c_wiki_agent_test.py: her token and her own agent in the private workspace)
     "GET /api/v1/wiki/pages": "wiki", "GET /api/v1/wiki/pages/{}": "wiki", "POST /api/v1/wiki/pages": "wiki", "PATCH /api/v1/wiki/pages/{}": "wiki",
     "GET /api/v1/wiki/pages/{}/files": "wiki", "GET /api/v1/wiki/files/{}": "wiki", "GET /api/v1/wiki/files/{}/text": "wiki",  # 2.488.0 (#2209)

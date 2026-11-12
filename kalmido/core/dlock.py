@@ -12,7 +12,16 @@ One place for every read path of an agent; core/access.py calls it at its centra
 The lock only ever narrows what an agent sees: the tenant boundary and the fixed rules (health, budget, read later, the
 journal with its mood: never an agent's since 2.22.0 / 2.72.0 / 2.172.1) stay as they are and cannot be opened here.
 
-Stored in agents.data_lock: JSON {areas: {key: bool}, lists: [list ids], tags: [names]}; '' = the defaults (DL_DEFAULT)."""
+Stored in agents.data_lock: JSON {areas: {key: bool}, lists: [list ids], tags: [names], wiki_folders: [node ids]}; '' = the
+defaults (DL_DEFAULT).
+
+2.1045.0 (#5823): wiki_folders = knowledge folders (fs_nodes ids) kept out of what a share ABOVE them gives the agent -- above
+all the share of a whole knowledge area (its root "Knowledge"). THE rule (dl_chain_cut): of a node's chain (node first) only
+the shares on the deepest excluded folder and below it count; the folders above it (the area's root included) give nothing
+there. So the exclusion covers the folder and everything below it, also what is added later, it stays with the folder's id
+when it is renamed / moved, and an explicit share on the folder itself or on a folder / page inside it wins (who shares it on
+its own means it). Applied in files/store.py _shares_role (every role check of the file store and the knowledge pages) and
+fs_visible_sql_c (listings), wiki/wkfolder.py wkf_shared (the pages, the search), wiki/wkv1.py _shared_top (the paths)."""
 import json
 from contextlib import nullcontext
 
@@ -32,6 +41,7 @@ DL_AREAS = DL_ALWAYS + DL_SWITCH
 DL_DEFAULT = {"mail": True, "contracts": False, "home": False, "travel": False,  # private e-mails locked for every agent
               "calendar": False, "contacts": False}
 DL_LISTS_MAX, DL_TAGS_MAX, DL_TAG_LEN = 200, 50, 50
+DL_WIKI_MAX = 200  # 2.1045.0 (#5823): excluded knowledge folders per agent
 DL_INLINE_MAX = 500  # 2.235.0 B2 (#2902): locked task ids written inline into a query, more = one array constant
 
 
@@ -51,7 +61,8 @@ def dl_parse(raw):
     areas = {k: (ar[k] if isinstance(ar.get(k), bool) else v) for k, v in DL_DEFAULT.items()}
     lists = [int(x) for x in d.get("lists") or [] if isinstance(x, int) and not isinstance(x, bool) and x > 0][:DL_LISTS_MAX]
     tags = [dl_tag(x) for x in d.get("tags") or [] if isinstance(x, str) and dl_tag(x)][:DL_TAGS_MAX]
-    return {"areas": areas, "lists": lists, "tags": tags}
+    wkf = [int(x) for x in d.get("wiki_folders") or [] if isinstance(x, int) and not isinstance(x, bool) and x > 0][:DL_WIKI_MAX]
+    return {"areas": areas, "lists": lists, "tags": tags, "wiki_folders": wkf}  # 2.1045.0 (#5823): + wiki_folders
 
 
 def _dl_eff(raw):
@@ -61,7 +72,33 @@ def _dl_eff(raw):
     d["_mail"] = d["areas"]["mail"]
     d["_tags"] = tuple(sorted({t.lower() for t in d["tags"]}))
     d["_mods"] = frozenset(k for k in DL_MOD_AREAS if d["areas"][k])
+    d["_wkf"] = frozenset(d["wiki_folders"])  # 2.1045.0 (#5823)
     return d
+
+
+def dl_wiki_folders(c, uid):
+    """2.1045.0 (#5823): the knowledge folders (node ids) excluded for account uid -- empty for people and agents without."""
+    d = dl_of(c, uid)
+    return d["_wkf"] if d else frozenset()
+
+
+def dl_chain_cut(c, uid, ids):
+    """2.1045.0 (#5823): THE exclusion rule (module docstring). ids = a node's chain (node first, then its folders up to the
+    root): the part whose shares still count for account uid -- up to and with the deepest excluded folder, else ids."""
+    ex = dl_wiki_folders(c, uid)
+    if not ex:
+        return list(ids)
+    for i, x in enumerate(ids):
+        if int(x) in ex:
+            return list(ids[:i + 1])
+    return list(ids)
+
+
+def dl_wiki_step_sql(c, uid, a="n"):
+    """2.1045.0 (#5823): SQL condition (no ? params, starting with AND) for the step of a listing that walks down from shared
+    nodes (files/store.py fs_visible_sql_c): an excluded folder is entered only as a shared node itself; '' when none."""
+    ex = dl_wiki_folders(c, uid)
+    return f" AND {a}.id NOT IN ({','.join(str(int(x)) for x in sorted(ex))})" if ex else ""
 
 
 def dl_forget():

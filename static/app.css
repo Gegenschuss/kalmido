@@ -6522,6 +6522,10 @@ a.wkitem:hover{background:var(--bg3)}
 /* 2.123.0 B (#2104): shares of knowledge pages (wkshare.js): the mark, "Shared with me", the read-only page */
 .wshmark{display:inline-flex;align-items:center;margin-left:.375rem;color:var(--accent);vertical-align:middle}
 .wkitem .wshmark{margin-left:auto;flex:none}
+/* 2.1045.0 (#5823): a folder excluded from an agent's share of the whole knowledge area; the dialog's section (wkarea.js) */
+.wkamark{display:inline-flex;align-items:center;gap:.25rem;margin-left:.5rem;font-size:.8125rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.wkaex{display:flex;flex-direction:column;gap:.25rem;padding:.5rem 0;border-top:1px solid var(--line)}
+.wkapick{display:flex;flex-direction:column;gap:.375rem;max-height:50vh;overflow:auto;margin-top:.5rem}
 .wshside{margin-top:1rem;padding-top:.5rem;border-top:1px solid var(--line)}
 .wshside h4{display:flex;align-items:center;gap:.375rem;margin:.75rem .5rem .375rem;font-size:var(--fs-b);font-weight:600;color:var(--muted)}
 .wshside .wkitem small{margin-left:auto;flex:none;font-size:var(--fs-s)}

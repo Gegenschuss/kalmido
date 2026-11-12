@@ -28,6 +28,7 @@ from .fsref import (FSR, fs_ref_content, fs_ref_json, fs_ref_need_move, fs_ref_n
 from .fsroots import fs_area_root_need_free, fs_area_root_of  # 2.199.0 F (#2742, review G1)
 from .fsroots import fs_area_after, fs_area_before, fs_area_folder_name, fs_area_need_fit, fs_area_of, fs_area_open  # 2.200.0 A (#2747)
 from .fsroots import fs_area_share  # 2.200.0 B (#2747)
+from .fsroots import fs_area_root_shares  # 2.1045.0 (#5823)
 from .fsref import fs_unshare_hooks  # 2.623.0 (#4778)
 from .fsviews import fsv_collections, fsv_drop, fsv_hidden  # 2.429.0 (#3580): the file store shows only its own folders
 from ..core.conflict import Conflict, need_version, version_rule  # 2.577.0 (#4708 3)
@@ -371,9 +372,15 @@ def _shares(c, nid, own=False):
 def _inherited_shares(c, chain):
     """Shares of the folders above (shown read-only in the dialog: they apply here too)."""
     out = []
-    for r in chain[1:]:
+    for i, r in enumerate(chain[1:], 1):
+        area = bool(fs_area_root_shares(c, r["id"]))  # 2.1045.0 (#5823): "shared via: whole knowledge area"
         for s in _shares(c, r["id"]):
-            out.append({**s, "from_id": r["id"], "from": r["name"]})
+            x = {**s, "from_id": r["id"], "from": r["name"], **({"area": True} if area else {})}
+            if s["agent_id"]:  # 2.1045.0 (#5823): an excluded folder between cuts this share for its agent
+                from ..core.dlock import dl_chain_cut
+                if r["id"] not in dl_chain_cut(c, s["agent_id"], [y["id"] for y in chain[:i + 1]]):
+                    x["excluded"] = True
+            out.append(x)
     return out
 
 
@@ -854,6 +861,9 @@ def _share_targets(c, n, uid=None):
     from .fslock import fl_is_locked
     if fl_is_locked(c, n["id"]):
         agents = []  # 2.353.0 A (#2758): a locked folder is never shared with agents
+    rs = fs_area_root_shares(c, n["id"])
+    if rs:  # 2.1045.0 (#5823): the root of a whole area offers only the targets its rule allows (knowledge: agents)
+        people, groups = (people if "user_id" in rs else []), (groups if "group_id" in rs else [])
     return {"people": people, "groups": groups, "agents": agents}
 
 
@@ -890,14 +900,15 @@ def files_share_add(nid):
     n = _need_share_node(c, nid, strict=True)  # 2.200.0 B (#2747)
     if acx_of(c, me()).role == "agent":
         raise Denied(403)
-    fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
     b = body()
+    key = next((k for k in ("user_id", "group_id", "agent_id") if b.get(k)), None)
+    if key not in fs_area_root_shares(c, nid):  # 2.1045.0 (#5823): a whole knowledge area: its root, with agents only
+        fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
     role = b.get("role") or "view"
     if role not in ("view", "edit"):
         return err(tr("Invalid value: {0}", "role"))
     exp = _expiry(b.get("expires_at"), b.get("tz"))  # 2.58.0 (#1787): tz = the person's zone
     lists = fs_area_of(c, nid) == "lists"
-    key = next((k for k in ("user_id", "group_id", "agent_id") if b.get(k)), None)
     lr_ = b.get("list_role") if lists else None  # 2.352.0 A (#2748): a projects folder's share may carry the list role (admin | participant ...)
     if lr_ is not None:  # 2.866.0 (#5302 F6): resolved before the core writes the row and its log line, which then name the final role
         if lr_ not in ("admin", "edit", "participant", "view") or (lr_ == "admin" and key == "agent_id"):

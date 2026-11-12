@@ -81,6 +81,7 @@ async function wk_load(sp, force) {
   if (d.v !== S.v && d.mk !== mk0) return wk_load(sp, true);  // 2.519.0 (#3715): marked while loading - load once more (it draws then)
   if (S.route.mod === 'wiki') wk_redraw();
   if (typeof sbb_sync === 'function') sbb_sync('wiki');  // 2.152.3 B (#2620): the panel's folders
+  if (typeof wkar_load === 'function' && d.root && !d.off) wkar_load(sp);  // 2.1045.0 (#5823): the whole area's agent shares (wkarea.js)
 }
 // 2.979.0 (#5667): after an undo / redo the server took back by its group (the step's own undo with wk_after no longer runs):
 // every space's index and the open page are old (wk_after's marks); the page being written in stays (wk_loadPage)
@@ -404,6 +405,7 @@ document.addEventListener('click', e => {  // 2.428.0 A (#3581): Ctrl / Cmd / Sh
 }, true);
 kb_on('view:wiki', 'Escape', () => { if (!(WK.selOn && S.route.mod === 'wiki' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden'))) return false; wk_selEnd(); renderView(); }); // 2.630.0 (#4510): key registry (keys.js), after the open dialogs / menus
 function wk_nodeItems(nid, anchor) {  // the menu of a folder / a page (the row's "…", the tree's right-click / long press)
+  const ar = typeof wkar_rootItems === 'function' && wkar_rootItems(nid); if (ar) return ar;  // 2.1045.0 (#5823): the root "Knowledge"
   const x = wk_nodeInfo(nid); if (!x) return [];
   // 2.200.0 F (#2747, review 11): Share… (the one dialog, wkshare.js; an encrypted space gets its hint there)
   const share = t => typeof wkfs_share === 'function' && WK.idx[x.sp]?.mayWrite !== false && !S.me?.kid ? [{label: tr('Share…|wiki'), icon: 'users', fn: () => wkfs_share(nid, t)}] : [];
@@ -411,7 +413,7 @@ function wk_nodeItems(nid, anchor) {  // the menu of a folder / a page (the row'
     const f = x.folder;
     return [{label: tr('New page'), icon: 'plus', fn: () => wk_new('', f.path + '/', x.sp)}, {label: tr('New folder…'), icon: 'folder', fn: () => wk_newFolder(x.sp, f.id)},
       {label: tr('Rename…'), icon: 'edit', fn: () => wk_fRename(x.sp, f)}, {label: tr('Move to…'), icon: 'arrow', fn: () => wk_moveTo(nid, anchor)},
-      ...share({space: x.sp, path: f.path, folder: true}), '-', {label: tr('Move to the trash'), icon: 'trash', cls: 'flag-5', fn: () => wk_fTrash(x.sp, f)}];
+      ...share({space: x.sp, path: f.path, folder: true}), ...(typeof wkar_folderItems === 'function' ? wkar_folderItems(x.sp, f.id) : []) /* 2.1045.0 (#5823) */, '-', {label: tr('Move to the trash'), icon: 'trash', cls: 'flag-5', fn: () => wk_fTrash(x.sp, f)}];
   }
   const p = {...x.page, space: x.sp};
   return [{label: tr('Open'), icon: 'note', fn: () => go('wiki/' + p.id)}, ...(typeof spl_item === 'function' ? spl_item('#wiki/' + p.id) : []) /* 2.742.0 (#4858) */, ...fv2_menuRow('r:wiki:' + p.id) /* 2.441.0 (#3592) */, {label: tr('Rename…'), icon: 'edit', fn: () => wk_rename(p)},
@@ -449,7 +451,7 @@ function wk_deskHtml(sp, d, id, cur, sel, op) {
   else {
     const ps = wk_leaves(n);  // 2.200.0 A (#2747): rows like the file store's -- sorted by hand, the date, the menu "…"
     const box = (nid, nm) => wk_selBox(sp, nid, nm), rc = WK.selOn ? 'wkrow wkselrow' : 'wkrow';  // 2.353.0 C (#2829): Select
-    const rows = wk_dirs(n).map(k => `<li class="${rc}">${box(k.fid, k.name)}<a href="#${esc(wk_dirGo(k.path, sp))}" class="wkitem wkdrow">${ic('folder', 's')}<span>${esc(k.name)}</span></a>${wk_rowMore(sp, k.fid, '')}</li>`).join('')
+    const rows = wk_dirs(n).map(k => `<li class="${rc}">${box(k.fid, k.name)}<a href="#${esc(wk_dirGo(k.path, sp))}" class="wkitem wkdrow">${ic('folder', 's')}<span>${esc(k.name)}</span>${typeof wkar_mark === 'function' ? wkar_mark(sp, k.fid) : '' /* 2.1045.0 (#5823) */}</a>${wk_rowMore(sp, k.fid, '')}</li>`).join('')
       + ps.map(k => `<li class="${rc}">${box(k.page.node_id, k.name)}<a href="#wiki/${k.page.id}" class="wkitem">${ic(wk_isTpl(k.path) ? 'copy' : 'note', 's')}<span>${esc(k.name)}</span>${k.page.shared && typeof wsh_markHtml === 'function' ? wsh_markHtml(1) : ''}</a>${wk_rowMore(sp, k.page.node_id, k.page.updated_at)}</li>`).join('');
     body = rows ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${rows}</ul>` : `<div class="empty">${tr('This folder is empty')}</div>`;
   }
@@ -464,7 +466,7 @@ function wk_panelHtml() {
   const pa = onW && r.wid ? wk_pgAt(r.wid) : null;
   const at = (onW && r.wdir != null ? r.wdir : pa && pa.space === sp ? wk_dirOf(pa.path) : '').toLowerCase();  // the open folder (a page: its folder)
   const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };  // 2.319 (#3287): a page's own folder is open
-  const top = `<div class="sgroup sbbp">${sbb_row('wiki', 'book', wk_rootName(sp), onW && !r.wid && !r.wdir)}</div>`;  // 2.200.0 A (#2747, audit B 1)
+  const top = `<div class="sgroup sbbp">${sbb_row('wiki', 'book', wk_rootName(sp), onW && !r.wid && !r.wdir, `data-wkarea="${esc(sp)}"` /* 2.1045.0 (#5823): its right-click, wkarea.js */)}</div>`;  // 2.200.0 A (#2747, audit B 1)
   if (!d?.pages) return top + `<p class="muted sbbtl">${esc(d?.err || tr('Loading…'))}</p>`;
   const ds = wk_subNodes(sp, wk_treeOf(sp), node);  // 2.200.0 A (#2747): folders AND pages, dragged / sorted / with a menu
   const tg = typeof wkt_panelNode === 'function' && wkt_panelNode(sp); if (tg) ds.push(tg);  // 2.371 (#3150): the group "Tags"
@@ -482,7 +484,7 @@ function wk_panelAllHtml() {
     const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path, sp), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };
     const root = {k: 'wk:' + sp + ':', name: wk_rootName(sp), icon: lock ? 'lock' : 'book', go: 'wiki/s/' + sp, on: here && !r.wid && !r.wdir,
       kids: !lock && !(d?.pages && !wk_kidsN(wk_treeOf(sp))), open: here, attrs: `data-wksp="${esc(sp)}"`,  // the open space shows its folders
-      ...(d?.root && !wk_e2e(sp) && d.mayWrite !== false ? {ns: 'wk', id: d.root, par: 'wk:', drop: true} : {}),  // 2.200.0 A (#2747): dropped on = to the top
+      ...(d?.root && !wk_e2e(sp) && d.mayWrite !== false ? {ns: 'wk', id: d.root, par: 'wk:', drop: true, menu: typeof wkar_rootItems === 'function' /* 2.1045.0 (#5823) */} : {}),  // 2.200.0 A (#2747): dropped on = to the top
       sub: () => { if (!d || d.v === -1) wk_load(sp); const tg = d?.pages && typeof wkt_panelNode === 'function' && wkt_panelNode(sp); return d?.pages ? [...wk_subNodes(sp, wk_treeOf(sp), node), ...(tg ? [tg] : [])] : d?.err ? [] : null; }};  // 2.371 (#3150): + the group "Tags\"
     const h = sbb_treeHtml([root]), mark = ic('book');  // 2.406.0 A (#3492): the tree draws full-size symbols
     return lock ? h : h.replace(mark, () => wk_spIcon(sp));  // the space's own symbol (the shared tree takes icon names only)
@@ -1037,7 +1039,7 @@ function w299_areaItems() {
   return [{head: tr('Workspace')}, {label: tr('Export as ZIP'), icon: 'download', fn: wk_export}, ...(WK.idx[wk_cur()]?.mayWrite !== false ? [{label: tr('Import ZIP…'), icon: 'upload', fn: wk_import}, {label: tr('Trash'), icon: 'trash', fn: () => wk_trashDlg()}] : []),  // 2.143.0 B (#2211): + Trash
     ...(typeof wkeDlg === 'function' && S.me?.kind !== 'agent' && globalThis.crypto?.subtle ? [{label: tr('Encryption…'), icon: 'lock', fn: () => wkeDlg(wk_cur())}] : []),
     ...(typeof wkst_items === 'function' && WK.idx[wk_cur()]?.may_style ? wkst_items({space: wk_cur()}) : []),
-    ...(typeof wkoffItems === 'function' ? wkoffItems(wk_cur()) : [])];  // 2.637.0 (#4745): "Offline available" (wikioff.js)  // 2.371.3 (#3152): the space's reading style
+    ...(typeof wkoffItems === 'function' ? wkoffItems(wk_cur()) : []), ...(typeof wkar_items === 'function' ? wkar_items(wk_cur()) : []) /* 2.1045.0 (#5823) */];  // 2.637.0 (#4745): "Offline available" (wikioff.js)  // 2.371.3 (#3152): the space's reading style
 }
 // ---- events (own listeners: data-wk)
 document.addEventListener('click', async e => {

@@ -1128,6 +1128,7 @@ ROUTES = {
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
     "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: a stranger 404, a member 403)
     "POST /api/wiki/folders": "wiki",  # 2.200.0 A (#2747): an empty knowledge folder (p2200_a_wiki_folder_test.py)
+    "GET /api/wiki/area-share": "wiki",  # 2.1045.0 (#5823): a whole area's share (p21045_b_wikiarea_test.py: no org agent on a private area)
     # 2.200.0 B (#2747): a page / folder in a folder shared with me (p2200_b_wiki_share_test.py)
     "POST /api/wiki/shared/pages": "wiki", "POST /api/wiki/shared/folders": "wiki",
     # 2.177.0 (#2685): large knowledge ZIP imports in pieces, unpacked in the background (p2177_a_api_test.py)

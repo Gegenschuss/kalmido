@@ -48,6 +48,9 @@ path that mirrors the tree). The file store's routes ask these generic hooks; th
       of the area although the file store's rule (owners: need_node(manage=True)) says no -- the knowledge area: who may
       write in the space; strict = a share is being made: raise Denied(409) when the area forbids sharing n (a locked space)
   fs_area_share(c, uid, n, strict=False) -> bool   the rule's share hook (False outside / without one)
+  2.1045.0 (#5823): fs_area_rule(..., root_share=("agent_id",)) -- the area's root folder itself may be shared with these
+      target kinds (a whole knowledge area with agents; still no organisation access, rename, move, trash):
+  fs_area_root_shares(c, nid) -> tuple            the allowed target kinds on root nid (() elsewhere)
 """
 import re
 
@@ -131,10 +134,19 @@ def fs_area_root_of(c, nid):
 FS_AREA_RULES = {}
 
 
-def fs_area_rule(area, *, kinds, org_open=False, name=None, before=None, after=None, share=None):
+def fs_area_rule(area, *, kinds, org_open=False, name=None, before=None, after=None, share=None, root_share=()):
     """Register the rule of a closed area (module docstring); again = replace (a module reload)."""
     FS_AREA_RULES[area] = {"kinds": {(k, r) for k, r in kinds}, "org_open": bool(org_open), "name": name, "before": before,
-                           "after": after, "share": share}
+                           "after": after, "share": share, "root_share": tuple(root_share)}
+
+
+def fs_area_root_shares(c, nid):
+    """2.1045.0 (#5823): the share targets ("agent_id" ...) the area allows on its root folder nid (fs_area_rule root_share:
+    the knowledge area shares as a whole with agents only); () for any other node -- every other area root stays closed
+    (fs_area_root_need_free)."""
+    r = fs_area_root_of(c, nid)
+    rule = FS_AREA_RULES.get(r[1]) if r else None
+    return rule["root_share"] if rule else ()
 
 
 def fs_area_of(c, nid):

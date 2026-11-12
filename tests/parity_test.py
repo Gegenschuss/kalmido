@@ -505,7 +505,8 @@ APP_ONLY = [
       "=POST /api/wiki/move", "* /api/wiki/folders", "=GET /api/wiki/mentions", "=GET /api/wiki/refs",
       "=DELETE /api/wiki/files/{}", "* /api/wiki/share", "=GET /api/wiki/export", "* /api/wiki/import", "* /api/wiki/e2e",
       "=POST /api/outline/parse", "=PUT /api/wiki/style", "=GET /api/wiki/tags",
-      "=GET /api/wiki/query", "=GET /api/wiki/space-files")),
+      "=GET /api/wiki/query", "=GET /api/wiki/space-files",
+      "=GET /api/wiki/area-share")),  # 2.1045.0 (#5823): the dialog's facts of a whole area's share (sharing stays with people)
     ("2.50.0 (#1195, #1194): entering absences (the kind is health data), the public holiday state, the assign check and the "
      "disposition (booking crew and equipment): people only; agents read GET /absences (\"away\" only)",
      ("POST /api/team/absences", "PATCH /api/team/absences/", "DELETE /api/team/absences/", "PUT /api/team/absences/",

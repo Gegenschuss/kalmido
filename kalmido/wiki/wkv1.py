@@ -27,6 +27,7 @@ from ..core.pg import write_lock  # 2.1048.0 (#5861)
 from ..core.errors import BadInput, reject_unknown
 from ..core.i18n import tr
 from ..core.conflict import need_version  # 2.564.0 (#4702)
+from ..core.dlock import dl_chain_cut  # 2.1045.0 (#5823)
 from ..accounts.session import me
 from ..api.common import V1Error, v1_args, v1_call, v1_err, v1_json, v1_out, v1_view
 from ..collab.comments import user_names
@@ -73,6 +74,8 @@ def _shared_top(c, uid, chain):
     """Index in chain (node first) of the highest node shared with uid (an agent: with exactly it; a person: with them or a
     group of theirs), None without one. Expired shares do not count."""
     ids = [int(x["id"]) for x in chain]
+    if ids and _is_agent(c, uid):  # 2.1045.0 (#5823): the shares above an excluded knowledge folder give nothing there
+        ids = dl_chain_cut(c, uid, ids)
     if not ids:
         return None
     q = ",".join(str(i) for i in ids)

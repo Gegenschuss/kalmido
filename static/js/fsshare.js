@@ -50,7 +50,7 @@ async function fs_shareDialog(id, opts = {}) {
   const draw = () => {
     const box = $('#ab-shl', md); if (!box) return;
     box.innerHTML = shares.map(s => `<div class="mrow" data-sid="${s.id}">${s.agent_id ? av(s.agent_id, s.name) : s.group_id ? ic('users') : av(s.user_id, s.name)}<span class="n">${esc(s.name)}${s.agent_id ? agentBadge(s.agent_id) : ''}${s.expires_at ? ` <small class="muted">${esc(tr('until {0}', ab_when(s.expires_at)))}</small>` : ''}</span>${roleSel(`data-absr="${s.id}"`, opts.listRole ? s.list_role || s.role : s.role, !!s.agent_id)}<button class="iconbtn" data-absx="${s.id}" title="${esc(tr('Stop sharing'))}" aria-label="${esc(tr('Stop sharing with {0}', s.name))}">${ic('x', 's')}</button></div>`).join('')
-      + inh.map(s => `<div class="mrow abinh"><span class="n">${esc(s.name)} <small class="muted">${esc(tr('from the folder “{0}”', s.from))}</small></span><span class="muted">${esc(ab_role(s.role))}</span></div>`).join('')
+      + inh.map(s => `<div class="mrow abinh"><span class="n">${esc(s.name)} <small class="muted">${esc(s.area ? tr('shared via: whole knowledge area') : tr('from the folder “{0}”', s.from))}${s.excluded ? ' · ' + esc(tr('excluded here')) : ''}</small></span><span class="muted">${esc(s.excluded ? '–' : ab_role(s.role))}</span></div>`).join('')  // 2.1045.0 (#5823): s.area, s.excluded
       || `<div class="muted mhint">${tr('Not shared yet')}</div>`;
     if (opts.listRole) { const sel = $('#ab-sht', md); if (sel) sel.innerHTML = tgtOpts(shares); }
   };
@@ -65,6 +65,7 @@ async function fs_shareDialog(id, opts = {}) {
     if (e.target.closest('[data-abs="add"]')) {
       const tg = $('#ab-sht', md).value; if (!tg) { $('#ab-sht', md).focus(); return; }
       const role = $('#ab-shr', md).value, exp = $('#ab-she', md).value;
+      if (typeof opts.confirm === 'function' && !(await opts.confirm(tg, role))) return;  // 2.1045.0 (#5823): an area's own question first
       const nm = $(`#ab-sht option[value="${tg}"]`, md)?.textContent || '';  // before the add (a projects folder's list drops it)
       let sid; try { sid = await add(tg, role, exp); } catch { return; }
       $('#ab-sht', md).value = '';

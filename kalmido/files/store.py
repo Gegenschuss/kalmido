@@ -89,6 +89,9 @@ def fs_trash_root(chain):
 
 
 def _shares_role(c, ids, uid, agent, pre=None):
+    if agent and ids:  # 2.1045.0 (#5823): an agent's excluded knowledge folders cut the shares above them (core/dlock.py)
+        from ..core.dlock import dl_chain_cut
+        ids = dl_chain_cut(c, uid, ids)
     if not ids:
         return None
     if pre is not None:  # 2.546.0 (#4186): the shares of a whole listing, read once (fs_roles_many)
@@ -465,8 +468,12 @@ def fs_visible_sql_c(c, uid):
             seed += (f" OR n.id IN (SELECT node_id FROM fs_shares WHERE (user_id = {uid} OR group_id IN "
                      f"(SELECT group_id FROM group_members WHERE user_id = {uid})) AND (expires_at IS NULL OR expires_at > '{now}') "
                      f"AND COALESCE(list_own, 0)=0)")  # 2.568.0 (#4739, review F6): not "Shared with me" through a project's own row
+    step = ""
+    if agent:  # 2.1045.0 (#5823): an excluded knowledge folder is listed only when it (or a node below it) is shared itself
+        from ..core.dlock import dl_wiki_step_sql
+        step = dl_wiki_step_sql(c, uid)
     return (f"(WITH RECURSIVE fv(id) AS (SELECT n.id FROM fs_nodes n WHERE ({seed}) AND ({orgs}) "
-            f"UNION SELECT n.id FROM fs_nodes n JOIN fv ON n.parent_id = fv.id WHERE ({orgs})), "
+            f"UNION SELECT n.id FROM fs_nodes n JOIN fv ON n.parent_id = fv.id WHERE ({orgs}){step}), "
             f"fd(id) AS (SELECT id FROM fs_nodes WHERE deleted_at IS NOT NULL "
             f"UNION SELECT n.id FROM fs_nodes n JOIN fd ON n.parent_id = fd.id) "
             f"SELECT id FROM fv WHERE id NOT IN (SELECT id FROM fd){_mail_hidden(c, uid)}{_receipts_hidden_sql(c, uid, ctx.org_ids)}"  # 2.187.1 A (#2735): agents too
@@ -529,6 +536,10 @@ def fs_mail_rows(c, uid, rows):
     if any("kind" in r.keys() and r["kind"] == "ref" for r in out):
         from .fsref import fs_ref_rows
         out = fs_ref_rows(c, uid, out)  # 2.199.0 A (#2742): reference nodes the asker may not reach
+    from ..core.dlock import dl_wiki_folders
+    ex = dl_wiki_folders(c, uid)
+    if ex and any(r["id"] in ex for r in out):  # 2.1045.0 (#5823): an agent's excluded knowledge folder is not there for it
+        out = [r for r in out if r["id"] not in ex or fs_role(c, r["id"], uid)]  # (unless it is shared with it on its own)
     return out
 
 

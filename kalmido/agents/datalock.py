@@ -5,7 +5,11 @@ areas (private e-mails, contracts, home, private trips; the journal with its moo
 locked anyway), projects (list ids) and tags. Stored in agents.data_lock; the server enforces it in every read path of the
 agent through ONE check (core/dlock.py, called by core/access.py). The agent learns WHAT is locked (GET /api/v1/agent
 "data_lock", event data_lock_changed): the area keys, the list ids and the number of locked tags - never names it could not
-see anyway."""
+see anyway.
+2.1045.0 (#5823): + wiki_folders -- knowledge folders kept out of a share above them (the share of a whole knowledge area),
+core/dlock.py dl_chain_cut. The gear's GET names them ({id, name, path}: only for who may see the folder, else name / path
+null); PATCH {wiki_folders: [ids]} adds only folders the editor may share (a folder of a knowledge tree, not its root); the
+agent reads only how many (wiki_folders_count)."""
 import json
 
 from flask import g, jsonify
@@ -19,6 +23,7 @@ from ..lists.orglabels import olb_full  # 2.947.0 (#5275, review F4): the labels
 from ..core.dlock import (
     DL_ALWAYS, DL_DEFAULT, DL_LISTS_MAX, DL_SWITCH, DL_TAG_LEN, DL_TAGS_MAX, dl_forget, dl_list_hidden, dl_of, dl_parse, dl_tag, dl_tasks_locked,
 )
+from ..core.dlock import DL_WIKI_MAX  # 2.1045.0 (#5823)
 from ..core.errors import BadInput, Denied, UnknownFields
 from ..accounts.session import me
 from ..agents.core import agent_emit, agent_row
@@ -35,17 +40,24 @@ def dl_public(c, a):
     the fixed ones among them, the locked list ids and how many tags are locked (their names stay with the owner)."""
     d = dl_get(a)
     return {"areas": list(DL_ALWAYS) + [k for k in DL_SWITCH if d["areas"][k]], "always": list(DL_ALWAYS),
-            "list_ids": d["lists"], "tags_count": len(d["tags"])}
+            "list_ids": d["lists"], "tags_count": len(d["tags"]),
+            "wiki_folders_count": len(d["wiki_folders"])}  # 2.1045.0 (#5823): never their names
 
 
 def dl_clean(cur, b):
     """A partial change b ({areas: {key: bool}, lists: [ids], tags: [names]}) over the current lock cur -> the new lock."""
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid value: {0}", "data_lock"))
-    unknown = set(b) - {"areas", "lists", "tags"}
+    unknown = set(b) - {"areas", "lists", "tags", "wiki_folders"}
     if unknown:
         raise UnknownFields(sorted(unknown))
-    new = {"areas": dict(cur["areas"]), "lists": list(cur["lists"]), "tags": list(cur["tags"])}
+    new = {"areas": dict(cur["areas"]), "lists": list(cur["lists"]), "tags": list(cur["tags"]), "wiki_folders": list(cur["wiki_folders"])}
+    if "wiki_folders" in b:  # 2.1045.0 (#5823)
+        wf = b["wiki_folders"]
+        if not isinstance(wf, list) or len(wf) > DL_WIKI_MAX or \
+                any(not isinstance(x, int) or isinstance(x, bool) or x <= 0 for x in wf):
+            raise BadInput(tr("Invalid value: {0}", "wiki_folders"))
+        new["wiki_folders"] = list(dict.fromkeys(wf))
     if "areas" in b:
         ar = b["areas"]
         if not isinstance(ar, dict):
@@ -85,11 +97,14 @@ def dl_set(c, a, b):
     for lid in set(new["lists"]) - set(cur["lists"]):
         if not list_role(c, lid, me()):
             raise BadInput(tr("Invalid value: {0}", "lists"))
+    for nid in set(new["wiki_folders"]) - set(cur["wiki_folders"]):  # 2.1045.0 (#5823): a folder the editor may share
+        if not _wkf_ok(c, nid):
+            raise BadInput(tr("Invalid value: {0}", "wiki_folders"))
     if new != cur or not a["data_lock"]:
         c.execute("UPDATE agents SET data_lock=? WHERE user_id=?", (json.dumps(new, ensure_ascii=False), a["user_id"]))
         dl_forget()
         agent_emit(c, a["user_id"], "data_lock_changed", {"data_lock": dl_public(c, agent_row(c, a["user_id"]))})
-        print("agent", a["user_id"], "data lock", ",".join(k for k in ("areas", "lists", "tags") if new[k] != cur[k]) or "-",
+        print("agent", a["user_id"], "data lock", ",".join(k for k in ("areas", "lists", "tags", "wiki_folders") if new[k] != cur[k]) or "-",
               "by", g.user["username"], flush=True)
     return new
 
@@ -105,10 +120,37 @@ def _dl_view(c, a):
     tags = otg_user_list(c, uid, 500)  # 2.955.0 (#5276): the core's personal tags (were task_tags)
     tags += [r[0] for r in c.execute(f"""SELECT DISTINCT ot.name FROM obj_tags ot JOIN lists l ON {otg_list_sql(full=olb_full(c, uid))}
                                          WHERE l.id IN {vis_sql()} ORDER BY ot.name LIMIT 500""", (uid, uid))]  # 2.947.0 (#5275): + the labels
-    return jsonify(data_lock={"areas": d["areas"], "lists": [{"id": x, "name": names.get(x)} for x in d["lists"]], "tags": d["tags"]},
+    return jsonify(data_lock={"areas": d["areas"], "lists": [{"id": x, "name": names.get(x)} for x in d["lists"]], "tags": d["tags"],
+                              "wiki_folders": _wkf_names(c, d["wiki_folders"])},  # 2.1045.0 (#5823)
                    always=list(DL_ALWAYS), defaults=DL_DEFAULT,
                    options={"lists": [{"id": k, "name": v} for k, v in names.items()],
                             "tags": sorted({t for t in tags if t}, key=str.lower)})
+
+
+def _wkf_ok(c, nid):
+    """2.1045.0 (#5823): may the signed-in editor exclude node nid -- a live folder of a knowledge tree (not its root, not
+    of a locked space) whose shares they may manage (wiki/wkfolder.py _share)?"""
+    from ..files.fsroots import fs_area_share
+    from ..files.store import fs_chain, fs_deleted
+    from ..wiki.wkfolder import _root_of_chain
+    chain = fs_chain(c, nid)
+    if not chain or chain[0]["kind"] != "folder" or len(chain) < 2 or fs_deleted(chain) or _root_of_chain(c, chain) is None:
+        return False
+    return fs_area_share(c, me(), chain[0])
+
+
+def _wkf_names(c, ids):
+    """2.1045.0 (#5823): [{id, name, path}] of the excluded folders -- name / path only for who may see the folder (the
+    path below "Knowledge", the area's name first); a folder gone or out of sight: null (it stays on the list)."""
+    from ..files.store import fs_chain, fs_deleted, fs_role
+    from ..wiki.wkfolder import _root_of_chain
+    out = []
+    for nid in ids:
+        chain = fs_chain(c, nid)
+        ok = bool(chain) and not fs_deleted(chain) and _root_of_chain(c, chain) is not None and fs_role(c, nid, me(), chain=chain)
+        out.append({"id": nid, "name": chain[0]["name"] if ok else None,
+                    "path": "/".join(x["name"] for x in reversed(chain)) if ok else None})
+    return out
 
 
 def dl_job_input(c, aid, kind, inp, tid=None, lid=None, strict=True):
@@ -159,7 +201,7 @@ def dl_route_get(aid):
 
 @app.patch("/api/agents/<int:aid>/data-lock")
 def dl_route_patch(aid):
-    """{areas?: {key: bool}, lists?: [ids], tags?: [names]} -- changes only what is given (autosave)."""
+    """{areas?: {key: bool}, lists?: [ids], tags?: [names], wiki_folders?: [node ids] (2.1045.0 #5823)} -- changes only what is given (autosave)."""
     c = db()
     a = ws_need_editor(c, aid)
     dl_set(c, a, body())

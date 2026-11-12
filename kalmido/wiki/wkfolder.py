@@ -66,6 +66,12 @@ Interface (signatures fixed; parts B / C use them):
                                                    uid all its content) or a share (wkf_shared). Agents: shares only.
   Who manages the shares of a knowledge folder / page: who may write in its space (as the wiki_shares), besides the file
   store's owners (fs_area_rule share hook); a locked space shares nothing (409), its old nodes give nothing (above).
+2.1045.0 (#5823), a whole area at once: the root "Knowledge" itself may carry agent shares (fs_area_rule root_share; people,
+  groups and organisation access stay refused there, 409) -- _share_starts reads them for agents like a folder share, so every
+  page below it counts, also later ones; the paths start at "Knowledge". Such pages are not cut by WKF_SHARED_MAX (the
+  tree is read whole, at most WKF_TREE_MAX nodes); wkf_visible_sql then passes the ids as one array constant. The agent's
+  excluded folders (data_lock wiki_folders, core/dlock.py dl_chain_cut) are left out of every share above them (_cut_below);
+  a share on such a folder or inside it is a start of its own. The dialog's facts: wiki/wkarea.py.
 """
 import re
 
@@ -74,6 +80,7 @@ from flask import g, has_request_context, jsonify
 from ..core.config import app
 from ..core.access import Denied, acx_of, collab_all
 from ..core.db import body, bump, db, insert_id, iso_ms, now_utc
+from ..core.dlock import dl_wiki_folders  # 2.1045.0 (#5823)
 from ..core.errors import BadInput
 from ..core.i18n import N_, lang, tr
 from ..core.pg import IntegrityError, like_escape, system_ctx, write_lock
@@ -601,7 +608,7 @@ def _share(c, uid, n, strict):
 
 
 fs_area_rule(WKF_AREA, kinds={("folder", None), ("ref", WKF_KIND)}, org_open=True, name=wkf_name, before=_before, after=_after,
-             share=_share)  # 2.200.0 B (#2747): share
+             share=_share, root_share=("agent_id",))  # 2.200.0 B (#2747): share; 2.1045.0 (#5823): the whole area with agents
 
 
 # ---------------------------------------------------------------- routes
@@ -649,14 +656,16 @@ def _share_starts(c, uid):
         return []
     who = "(s.agent_id=? OR s.user_id=?)" if agent else "(s.user_id=? OR s.group_id IN (SELECT group_id FROM group_members WHERE user_id=?))"
     rows = c.execute(f"""SELECT DISTINCT n.* FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE {who}
-                         AND (s.expires_at IS NULL OR s.expires_at > ?) AND n.deleted_at IS NULL
+                         AND (s.expires_at IS NULL OR s.expires_at > ?) AND n.deleted_at IS NULL AND COALESCE(s.list_own, 0)=0
                          AND (n.kind='folder' OR (n.kind='ref' AND n.ref_kind=?)) ORDER BY n.id LIMIT 2000""",
                      (uid, uid, _now(), WKF_KIND)).fetchall()
     out = []
     for n in rows:
         chain = fs_chain(c, n["id"])
-        if not chain or fs_deleted(chain) or _root_of_chain(c, chain) is None or chain[-1]["id"] == n["id"]:
+        if not chain or fs_deleted(chain) or _root_of_chain(c, chain) is None:
             continue
+        if chain[-1]["id"] == n["id"] and not agent:
+            continue  # 2.1045.0 (#5823): the share of a whole knowledge area (its root) is for agents only (wkf_area_ok)
         if not fs_role(c, n["id"], uid, chain=chain):
             continue  # the organisation boundary (an agent of another organisation, a person who left it)
         out.append((n, chain))
@@ -669,20 +678,24 @@ def wkf_shared(c, uid):
         return {}
     starts = _share_starts(c, uid)
     ids = {n["id"] for n, _ in starts}
-    out = {}
+    ex = dl_wiki_folders(c, uid)  # 2.1045.0 (#5823): the agent's excluded folders (core/dlock.py dl_chain_cut)
+    out, area = {}, set()
     for n, chain in starts:
-        if any(x["id"] in ids for x in chain[1:]):
-            continue  # a folder above is shared too: its pages come through that one
+        if any(x["id"] in ids and not any(y["id"] in ex for y in chain[:j]) for j, x in enumerate(chain) if j):
+            continue  # a folder above is shared too (and no excluded folder lies between): its pages come through that one
         if n["kind"] == "ref":
             refs = [(n, "")]
         else:
             rows = _subtree(c, n["id"])
             fp = _walk(rows, n["id"])
+            cut = _cut_below(rows, n["id"], ex)
             refs = [(r, n["name"] + ("/" + fp[r["id"]][0] if fp[r["id"]][0] else "")) for r in rows
-                    if r["kind"] == "ref" and r["ref_kind"] == WKF_KIND and r["id"] in fp and not fp[r["id"]][1]]
+                    if r["kind"] == "ref" and r["ref_kind"] == WKF_KIND and r["id"] in fp and not fp[r["id"]][1] and r["id"] not in cut]
         for r, folder in refs:
             if r["ref_id"] not in out:
                 out[r["ref_id"]] = {"node": r, "top": n, "folder": folder}
+                if chain[-1]["id"] == n["id"]:
+                    area.add(r["ref_id"])  # 2.1045.0 (#5823): through the share of the whole area
     if not out:
         return {}
     q = ",".join(str(int(x)) for x in out)
@@ -693,9 +706,15 @@ def wkf_shared(c, uid):
     if acx_of(c, uid).role == "agent":
         a = c.execute("SELECT owner_id FROM agents WHERE user_id=?", (int(uid),)).fetchone()
         agent_own = int(a["owner_id"]) if a and a["owner_id"] else 0
+    n_area = 0
     for pid, x in out.items():
         p, nd = pages.get(pid), x["node"]
-        if p is None or len(keep) >= WKF_SHARED_MAX:
+        if p is None:
+            continue
+        if pid in area:  # 2.1045.0 (#5823): a whole area is not cut by WKF_SHARED_MAX (its tree is read whole, WKF_TREE_MAX)
+            if n_area >= WKF_TREE_MAX:
+                continue
+        elif len(keep) - n_area >= WKF_SHARED_MAX:
             continue
         if p["org_id"] and (nd["org_id"] or None) != p["org_id"]:
             continue  # a node left in another workspace's tree gives nothing (fsref _same_space)
@@ -704,7 +723,20 @@ def wkf_shared(c, uid):
         if not p["org_id"] and agent_own is not None and p["owner_id"] != agent_own:
             continue  # 2.200.0 F (#1781, review 1): an agent gets a private page only of the person who owns it
         keep[pid] = x
+        n_area += pid in area
     return keep
+
+
+def _cut_below(rows, top, ex):
+    """2.1045.0 (#5823): the ids of the subtree rows (parents first, _subtree) that lie in an excluded folder below top (the
+    folder itself and everything in it) -- what a share of top does not give; set() without exclusions."""
+    if not ex:
+        return set()
+    cut = set()
+    for r in rows:
+        if r["id"] != top and (r["id"] in ex or r["parent_id"] in cut):
+            cut.add(r["id"])
+    return cut
 
 
 def wkf_shown_path(c, uid, r, info=None, path=None):
@@ -735,6 +767,8 @@ def wkf_visible_sql(c, uid, alias="p"):
         if orgs:
             parts.append(f"{a}.org_id IN ({','.join(map(str, orgs))})")
     ids = wkf_shared_ids(c, uid)
-    if ids:
+    if len(ids) > WKF_SHARED_MAX:  # 2.1045.0 (#5823): a whole shared area: one array constant, not thousands of literals
+        parts.append(f"{a}.id = ANY(CAST('{{{','.join(str(int(x)) for x in sorted(ids))}}}' AS BIGINT[]))")
+    elif ids:
         parts.append(f"{a}.id IN ({','.join(str(int(x)) for x in sorted(ids))})")
     return "(" + " OR ".join(parts) + ")" if parts else "FALSE"
