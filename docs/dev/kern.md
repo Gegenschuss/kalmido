@@ -316,6 +316,15 @@ c.commit()
   format. A trash rule (`trash_can`) judges the `uid` it is asked for, never the request's person (`otr_can`: the agent
   through `acx_of`, the token limit only for the request's own person). `task_dict` leaves out the core's columns `rev`,
   `updated_by`, `deleted_by` (server only).
+- 2.1029.0 (#5537, stage 1): a project (lists) carries ONE state marker `lists.state` = `live` | `archived` | `trash`
+  (`migrations.d/5537_a.py`). The trigger `kalmido_list_state` keeps it equal to `archived` / `deleted_at` on every INSERT and
+  every UPDATE naming them, so the write paths stay as they are and a copy of all columns cannot write a wrong marker; the
+  rows of before got theirs once at the start (`core/db.py`, flag `migr_liststate5537`). Reads ask through
+  `list_state_sql(alias, *states)` of `core/access.py` (no state = `live`: neither archived nor in the trash);
+  `otr_live(alias)` = live or archived. A handwritten `archived=0` / `deleted_at IS NULL` on lists is red in
+  `tools/check_list_state.py` (baseline `tools/list_state_baseline.json`, only shrinks; it reads line by line). Reading the
+  value (`SELECT archived` for the API) stays. Stage 2 (one way, #5537's follow-up): the write paths set `state`, the API /
+  MCP / exports derive `archived` / `archived_at` / `deleted_at`, the old columns go.
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
   `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).

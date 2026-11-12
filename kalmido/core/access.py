@@ -487,11 +487,29 @@ def trash_sql(a="", col="deleted_at"):
     return live_sql(a, col).replace(" IS NULL", " IS NOT NULL")
 
 
+LIST_STATES = ("live", "archived", "trash")  # 2.1029.0 (#5537): the values of lists.state (migrations.d/5537_a.py)
+
+
+def list_state_sql(a="", *states):
+    """2.1029.0 (#5537): THE condition on a project's state marker lists.state for SQL on lists (a = the table name or its
+    alias, "" without one; states = one or more of LIST_STATES, none = "live"). 'live' = neither archived nor in the trash,
+    'archived' = archived and not in the trash, 'trash' = in the trash (archived or not). Instead of a handwritten
+    archived=0 / deleted_at test on lists (tools/check_list_state.py, its baseline only shrinks): an active project
+    is list_state_sql("l"), one not in the trash otr_live("l"), the archive list_state_sql("l", "archived")."""
+    states = states or ("live",)
+    if any(s not in LIST_STATES for s in states) or (a and not _LIVE_ALIAS.fullmatch(a)):
+        raise ValueError(f"list_state_sql: invalid alias / state {a!r} {states!r}")
+    col = f"{a + '.' if a else ''}state"
+    if len(states) == 1:
+        return f"{col}='{states[0]}'"
+    return f"{col} IN ({', '.join(repr(s) for s in sorted(set(states), key=LIST_STATES.index))})"
+
+
 def otr_live(a="l"):
     """2.102.0 A (#1988): THE condition "the list is not in the trash" (lists.deleted_at, see lists/listtrash.py) for SQL on
     lists (a = the alias, "" without one). A deleted list is invisible everywhere except the trash's own routes.
-    2.773.0 (#5292): through the core's live_sql."""
-    return live_sql(a)
+    2.773.0 (#5292): through the core's live_sql. 2.1029.0 (#5537): on the state marker (live or archived)."""
+    return list_state_sql(a, "live", "archived")
 
 
 def acx_lists_sql(write=False, req=True, ov=True):

@@ -45,6 +45,7 @@ from ..core.objects import obj_register, obj_share, obj_share_locks, obj_share_r
 from ..core.pg import system_ctx
 from ..core.writes import obj_history, obj_history_add
 from ..core.writes import obj_on_purge  # 2.936.0 (#5364)
+from ..core.writes import undo_skip  # 2.1029.0 (#5537)
 from ..api.common import v1_call
 from .groups import grp_list_ids, grp_of_user, grp_sync
 from .lffolder import lf_own_stale, lf_place
@@ -237,6 +238,9 @@ def lmc_history(c, uid, lid, before, after):
         obj_history_add(c, uid, LMC_KIND, int(lid), b, {k: after[k] for k in b})
 
 
+# 2.1029.0 (#5537): the state marker follows archived / deleted_at (trigger kalmido_list_state, migrations.d/5537_a.py) -- no
+# undo copy holds it, so taking a step back writes the old columns and the trigger sets the marker from them
+undo_skip("lists", "state")
 obj_register(LMC_KIND, "lists", label=N_("Project"), fields={}, open_url=lambda lid: f"list/{int(lid)}", title=_title,
              base_role=_base, visible=_visible, area="tasks", routes=False, fsref=False, share_cols=("list_role", "list_own"),
              on_restore=_on_restore, on_revoke=_on_revoke, list_col="id",
