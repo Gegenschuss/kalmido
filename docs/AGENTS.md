@@ -421,7 +421,11 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
 | `POST /api/agents/<id>/server/starter` | `{items: ["briefing", "tidy", "docs", "meetings", "followup", "office"], followup_days?: 5}` -> `{items: [{item, state: created / exists / skipped / waiting, id, reason}]}`; the same item twice changes nothing; `waiting` (2.777.0, #5378): a plan made switched off until a project is shared with the agent |
 
 Who may: the owner of a personal agent; for a team agent an admin of its organisation or an instance admin (everyone else
-404). An agent is created as
+404). 2.1044.0 (#5824): the same people choose its model from the agent chat's "…" menu ("Model": the provider's live list by
+name, the server default marked, saved at once with `PUT …/server {model}` and used from the next message; without a key a
+way to add one); everyone else sees the model only. 2.1044.0 (#5825): the agent's card on the page "Agents" has a gear (and
+picture / name as one button, a right click or long press opens its menu) into its settings for the same people (an instance
+admin: "Edit agent", the owner: Settings > Agents > Set up, an organisation's admin: the server settings). An agent is created as
 before (`POST /api/my/agents` or `POST /api/admin/agents`) with `provider: "kalmido-server"`. Not in this first stage:
 coding agents, building files, own tools.
 
