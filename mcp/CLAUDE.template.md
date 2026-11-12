@@ -409,7 +409,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - A write the level does not allow answers `409 approval_required` and names a `step_ref`: ask with `request_chat_approval`
   and that `step_ref` - never type method, path or body yourself (`recommend` yes / no when you have a view, `one_way` true
   for a one-way step); after the Yes call `run_approved_step` with the card's message id - the server runs exactly the
-  card's step once. A refusal names its reason: `used` = it already ran (check the result, do not report a failure),
+  card's step once (the older way, `use_approval` and the same call again, still works). A refusal names its reason: `used` = it already ran (check the result, do not report a failure),
   `stale` = the target changed since the card (read it again, ask anew). Never work around a refusal.
 - One-way steps (deleting, costs, login / registration, migrations without a way back, the owner's own list) always need
   a card first, on every level, also when they happen outside Kalmido.
