@@ -128,9 +128,13 @@ check(link(Bo, "task", T1, "task", T3, note="x" * 501).status_code == 400, "a no
 lk = links(Ri, "task", T1)
 check(isinstance(lk, list) and len(lk) == 1, f"rita (read-only) reads the links {lk}")
 check(link(Ri, "task", T1, "task", T3).status_code == 403, "rita (read-only) cannot link: 403")
+# tenant: GET /api/obj/{}/{}/links
 check(links(Ol, "task", T1) == 404, "olga (another organisation): the list 404")
 OT = Ol.post(B + "/api/tasks", json={"title": "Olga's own"}).json().get("id")
+# tenant: POST /api/obj/{}/{}/links
 check(OT and link(Ol, "task", OT, "task", T1).status_code == 404, "olga links her task to bob's: 404 (the target is not hers to see)")
+check(link(Ol, "task", T1, "task", T2).status_code == 404 and not sql("SELECT 1 FROM obj_links WHERE created_by=?", (OLGA,)),
+      "olga links from bob's task: 404, nothing written")
 check(Ol.delete(B + f"/api/obj/links/{L12}").status_code == 404, "olga removes bob's link: 404")
 # two workspaces: bob's private task with his organisation's task
 BP = Bo.post(B + "/api/lists", json={"name": "Bob private", "org_id": None}).json()["id"]
@@ -176,8 +180,12 @@ r = requests.post(V + f"/agent/objects/task/{T3}/links", headers=AGH, json={"kin
 check(r.status_code == 201, "planbot links two tasks of the shared project " + r.text[:200])
 AL = r.json().get("id")
 check(sql("SELECT agent_id, created_by, rel FROM obj_links WHERE id=?", (AL,)) == [(AG, AG, "blocks")], "the agent's link carries the agent")
+# tenant: GET /api/v1/agent/objects/{}/{}/links
 check(requests.get(V + f"/agent/objects/task/{T1}/links", headers=AG2H).status_code == 404, "lonebot (no share): 404")
+# tenant: POST /api/v1/agent/objects/{}/{}/links
 check(requests.post(V + f"/agent/objects/task/{T1}/links", headers=AG2H, json={"kind": "task", "id": T2}).status_code == 404, "lonebot links: 404")
+# tenant: DELETE /api/v1/agent/objects/{}/{}/links/{}
+check(requests.delete(V + f"/agent/objects/task/{T1}/links/{L12}", headers=AG2H).status_code == 404 and live(L12), "lonebot unlinks: 404, the link stays")
 check(requests.get(V + f"/agent/objects/task/{T1}/links", headers=hdr("x" * 40)).status_code in (401, 403), "no valid token: refused")
 check(requests.delete(V + f"/agent/objects/task/{T1}/links/{AL}", headers=AGH).status_code == 404, "unlink through an object it does not hang on: 404")
 r = requests.delete(V + f"/agent/objects/task/{T3}/links/{AL}", headers=AGH)
