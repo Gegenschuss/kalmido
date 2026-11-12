@@ -259,7 +259,7 @@ OFL_MODE_CHECK = "mode IN (" + ", ".join(f"'{m}'" for m in OFL_MODES) + ")"
 def ofl_modes(c):
     """2.981.0 (#5287): obj_follow.mode allows the modes of every kind (OFL_MODES) -- an older table (fragment 5285_a, only the
     task's) gets its CHECK replaced, once (a constraint is no step a fragment may change, tools/check_migrations.py)."""
-    have = [r[0] for r in c.execute("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'obj_follow'::regclass "
+    have = [r[0] for r in c.execute("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'obj_follow'::regclass "  # pg-ok: pg_catalog
                                     "AND conname = 'obj_follow_mode_check'").fetchall()]
     if have and all(f"'{m}'" in have[0] for m in OFL_MODES):
         return False

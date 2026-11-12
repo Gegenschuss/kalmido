@@ -1,6 +1,6 @@
 """2.958.0 (#5281, stage Q7a of the cross-cutting core, analysis #3563, decided 08.11.2026): versions exist once, in the shared
 core. obj_versions is the core's second table next to obj_history (kalmido/core/objversions.py, docs/dev/kern.md "Versions"):
-obj_history keeps field changes (who changed which field, merged within ten minutes), obj_versions keeps numbered whole states
+obj_history keeps field changes: who changed which field, merged within ten minutes; obj_versions keeps numbered whole states
 of an object's content (a page's text). Undo stays the session / step thing of obj_undo (#5249); a version is a numbered state.
 
 kind + ref_id = the object (no FK: kalmido_ov_gone deletes a page's versions when its row is deleted for good, what ON DELETE

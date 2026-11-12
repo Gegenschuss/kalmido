@@ -108,7 +108,7 @@ def osr_cond(raw, alias="s", names=False):
         wq = osr_word_query(t)
         if not wq:
             continue
-        parts.append(f"({alias}.tsv @@ to_tsquery('simple'::regconfig, ?) OR {alias}.names LIKE ANY(CAST(? AS TEXT[])))")
+        parts.append(f"({alias}.tsv @@ to_tsquery('simple'::regconfig, ?) OR {alias}.names LIKE ANY(CAST(? AS TEXT[])))")  # pg-ok: names and the variants are both folded (kalmido_fold), LIKE on purpose
         args += [wq, ["%" + like_escape(v) + "%" for v in _alnum_variants(t)]]
     return " AND ".join(parts), args
 
@@ -315,7 +315,7 @@ def osr_move(c):
     # by 2.972); a jump over 2.972 runs this MOVE before 5272_a's AFTER drops comments, so the triggers were still there and
     # DROP FUNCTION failed. No CASCADE: a dependency nobody expected should stop the start, not vanish silently.
     for tg, tb in c.execute("""SELECT t.tgname::text, k.relname::text FROM pg_trigger t
-                               JOIN pg_class k ON k.oid=t.tgrelid JOIN pg_proc p ON p.oid=t.tgfoid
+                               JOIN pg_class k ON k.oid=t.tgrelid JOIN pg_proc p ON p.oid=t.tgfoid  -- pg-ok: pg_catalog
                                WHERE NOT t.tgisinternal AND k.relnamespace=current_schema()::regnamespace
                                  AND p.pronamespace=current_schema()::regnamespace AND p.proname IN (?, ?)""",  # pg-ok: pg_catalog
                             OSR_OLD_FUNCS).fetchall():
