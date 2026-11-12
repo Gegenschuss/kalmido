@@ -18320,6 +18320,8 @@
   "Address confirmed. {0} invitation waits for you.": ["Dirección confirmada. Te espera {0} invitación.", "Dirección confirmada. Te esperan {0} invitaciones."],
   "Address confirmed: {0}": "Dirección confirmada: {0}",
   "Your address is not confirmed yet: e-mails from it become tasks only after you confirm it.": "Tu dirección aún no está confirmada: los correos desde ella solo se convierten en tareas cuando la confirmes.",
+  "Confirm {0} as your address?": "¿Confirmar {0} como tu dirección?",
+  "Signed in as {0}. Invitations to this address and e-mails from it then belong to this account.": "Sesión iniciada como {0}. Las invitaciones a esta dirección y los correos desde ella pertenecerán a esta cuenta.",
   "Empty|folder": "Vacía",
   "Could not load the folder": "No se pudo cargar la carpeta",
   "Travel receipt": "Comprobante de viaje",

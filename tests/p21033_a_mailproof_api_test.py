@@ -13,6 +13,7 @@ freelancer-matrix: own
  - the link a second time: 404; "Confirm address" once proved: proved, no new mail
  - GET /api/me/mail names the own address again (it was swallowed by a comment since 2.49.0) and email_proved
  - the address changed after the mail was sent: 409, nothing proved (the link proves the old address only)
+ - review F3: the woken row keeps its date
  - all of it as a person without an organisation (P4)
 usage: p21033_a_mailproof_api_test.py <datadir>"""
 import email
@@ -103,6 +104,8 @@ check(dbx("SELECT org_id, silent, email FROM org_joins WHERE user_id=? ORDER BY 
       "two silent rows with the typed address")
 check(Fr.get(B + "/api/orgs").json().get("joins") == [] and "orgjoin" not in news_kinds(Fr), "nothing for Fiona yet")
 
+AT0 = dbx("SELECT created_at FROM org_joins WHERE user_id=? AND org_id=?", (FID, ORG))[0][0]
+
 # ---- the proof mail
 r = Fr.post(B + "/api/me/email/proof")
 check(r.ok and r.json().get("sent") is True and r.json().get("email") == "fiona@example.com", "POST /api/me/email/proof sends the mail " + r.text[:200])
@@ -128,6 +131,8 @@ check(Fr.get(B + "/api/me/email").json().get("proved") is True and Fr.get(B + "/
 joins = Fr.get(B + "/api/orgs").json().get("joins") or []
 check([x["org_id"] for x in joins] == [ORG] and joins[0]["by"] == "Bob", "the invitation of Alpha is open for Fiona now, in Bob's name " + json.dumps(joins)[:300])
 check("orgjoin" in news_kinds(Fr), "a News item for the invitation")
+check(dbx("SELECT created_at FROM org_joins WHERE user_id=? AND org_id=?", (FID, ORG))[0][0] == AT0,
+      "review F3: the woken row keeps its date (Bob's list does not tell when the address was proved)")
 check(dbx("SELECT org_id, silent FROM org_joins WHERE user_id=? ORDER BY org_id", (FID,)) == [(ORG, 0), (SELF, 1)],
       "the company of its own keeps its row silent (#3570: its admin may not see Fiona)")
 check(Fr.post(B + f"/api/orgs/{SELF}/join").status_code == 404, "... and Fiona cannot accept that one")
@@ -149,4 +154,4 @@ r = Cr.post(B + "/api/me/email/proof/confirm", json={"token": ct[-1] if ct else 
 check(r.status_code == 409 and not proved(CID), "the old address's link after the change: 409, nothing proved " + r.text[:200])
 check(Cr.get(B + "/api/me/email").json() == {"email": "cleo.new@example.com", "proved": False, "mail_out": True}, "Cleo's new address is not proved")
 
-done("p21033_a_mailproof_api")
+sys.exit(done("p21033_a_mailproof_api"))

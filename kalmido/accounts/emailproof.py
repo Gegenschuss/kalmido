@@ -14,7 +14,7 @@ registration or a verified OIDC claim - an account the admin typed in (the first
    address (org_joins.silent with org_joins.email, #5775 / #4922) wake up as ordinary ones (orginvite.ojn_proved): the person
    hears of them now, unless the rule of a company of its own (#3570) keeps one silent.
 Never for an agent (its address is its owner's business); a person without an organisation proves the address the same way."""
-from flask import jsonify
+from flask import g, jsonify
 
 from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.db import body, bump, db, err
@@ -31,6 +31,15 @@ EPF_PER_HOUR = 3  # proof mails per account and hour (each counts in the daily m
 EPF_TRIES = 10  # wrong / old links per account and hour
 
 
+def _person():
+    """Review F1: only the person in the web app (a cookie session or the sign-in proxy) - never an agent, never an API token
+    (a leaked token could otherwise spend the mail budget and replace the pending link again and again)."""
+    need_person(403)
+    if g.get("auth_via") not in ("session", "proxy"):
+        return err(tr("Not allowed"), 403)
+    return None
+
+
 def _addr(u):
     return (u["email"] or "").strip().lower()
 
@@ -38,7 +47,9 @@ def _addr(u):
 @app.get("/api/me/email")
 def eproof_get():
     from ..integrations.mail import MAIL_OUT_ON
-    need_person(403)
+    e = _person()
+    if e:
+        return e
     c = db()
     u = c.execute("SELECT email, email_proved FROM users WHERE id=?", (me(),)).fetchone()
     em = _addr(u)
@@ -68,7 +79,9 @@ def eproof_send():
     import secrets
     from ..admin.hosting import mail_budget
     from ..integrations.mail import MAIL_OUT_ON, mail_send
-    need_person(403)
+    e = _person()
+    if e:
+        return e
     c = db()
     u = c.execute("SELECT id, username, display_name, email, email_proved FROM users WHERE id=?", (me(),)).fetchone()
     em = _addr(u)
@@ -84,16 +97,17 @@ def eproof_send():
         c.rollback()
         return err(tr("Today's e-mail limit is reached. Try again tomorrow."), 429)
     tok = secrets.token_urlsafe(32)
-    if not eph_put(EPF_NS, tok, seal(c, f"eproof:{me()}", em), EPF_HOURS * 3600, uid=me(), caps={"uid": 1}):  # one link per account
-        c.rollback()
-        return err(tr("The e-mail could not be sent. Try again later."), 503)
+    sealed = seal(c, f"eproof:{me()}", em)
     c.commit()  # the mail count; no transaction stays open while the mail server is asked
     subject, text, body_html = eproof_mail(c, u, f"{PUBLIC_URL}/#mailproof/{tok}")
     try:
         mail_send(u["email"], subject, text, body_html, from_name=APP_NAME)
-    except Exception as e:  # noqa: BLE001 -- the mail server said no: the link is of no use, the person may try again
-        print("address proof mail failed:", type(e).__name__, flush=True)
+    except Exception as x:  # noqa: BLE001 -- the mail server said no: the person may try again
+        print("address proof mail failed:", type(x).__name__, flush=True)
         return err(tr("The e-mail could not be sent. Try again later."), 502)
+    # review F5: stored once the mail is out - a failed mail leaves the link of an earlier one working (one link per account)
+    if not eph_put(EPF_NS, tok, sealed, EPF_HOURS * 3600, uid=me(), caps={"uid": 1}):
+        return err(tr("The e-mail could not be sent. Try again later."), 503)
     print("address proof mail sent to account", me(), flush=True)
     return jsonify(ok=True, sent=True, email=u["email"])
 
@@ -102,7 +116,9 @@ def eproof_send():
 def eproof_confirm():
     """{token}: the link of the proof mail, opened signed in as its account -> {ok, proved, invitations: n woken}."""
     from ..accounts.orginvite import ojn_proved
-    need_person(403)
+    e = _person()
+    if e:
+        return e
     tok = body().get("token")
     bad = err(tr("This link is invalid or has expired. Ask for a new one."), 404)
     if hit_limit(f"eproof-try:{me()}", EPF_TRIES, 3600):
@@ -124,7 +140,12 @@ def eproof_confirm():
     n = 0
     if (u["email_proved"] or "") != em:
         c.execute("UPDATE users SET email_proved=? WHERE id=?", (em, me()))
-        n = ojn_proved(c, me(), em)
+        try:  # review F6: the link is used up already - a failure while waking keeps the proof (Resend still wakes a row)
+            with c.savepoint():
+                n = ojn_proved(c, me(), em)
+        except Exception as x:  # noqa: BLE001
+            c.heal()
+            print("address proved: waking the invitations failed:", type(x).__name__, flush=True)
         bump(c)
         c.commit()
         print("address proved by mail: account", me(), "woke", n, "invitation(s)", flush=True)

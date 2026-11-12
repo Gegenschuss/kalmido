@@ -18320,6 +18320,8 @@
   "Address confirmed. {0} invitation waits for you.": ["Adres bevestigd. Er wacht {0} uitnodiging op je.", "Adres bevestigd. Er wachten {0} uitnodigingen op je."],
   "Address confirmed: {0}": "Adres bevestigd: {0}",
   "Your address is not confirmed yet: e-mails from it become tasks only after you confirm it.": "Je adres is nog niet bevestigd: e-mails ervandaan worden pas taken nadat je het hebt bevestigd.",
+  "Confirm {0} as your address?": "{0} als je adres bevestigen?",
+  "Signed in as {0}. Invitations to this address and e-mails from it then belong to this account.": "Aangemeld als {0}. Uitnodigingen aan dit adres en e-mails ervandaan horen dan bij dit account.",
   "Empty|folder": "Leeg",
   "Could not load the folder": "De map kon niet worden geladen",
   "Travel receipt": "Reisbon",

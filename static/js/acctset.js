@@ -167,6 +167,10 @@ async function epvDraw(md) {
 }
 // the link of the proof mail (main.js: #mailproof/<token>, after the sign-in): confirms the address of the signed-in account
 async function epv_link(tok) {
+  // review F4: asked first, naming the address and the account - a link someone forwarded is never confirmed by just opening it
+  let j; try { j = await api('GET', '/api/me/email'); } catch { return; }
+  if (!j.email) return;
+  if (!await askConfirm(tr('Confirm {0} as your address?', j.email), tr('Signed in as {0}. Invitations to this address and e-mails from it then belong to this account.', S.me?.username || ''), {ok: tr('Confirm address')})) return;
   try {
     const r = await api('POST', '/api/me/email/proof/confirm', {token: tok});
     toast(r.invitations ? trn('Address confirmed. {0} invitation waits for you.', 'Address confirmed. {0} invitations wait for you.', r.invitations) : tr('Address confirmed: {0}', r.email), null, 6000);

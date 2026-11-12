@@ -456,11 +456,14 @@ def ojn_proved(c, uid, email):
     this address (the one the admin typed, org_joins.email since #4922) that are still open become ordinary ones (ojn_invite in
     the name of the admin who invited: News item, mail, push). One stays silent when the #3570 rule holds - a company of its own
     whose inviting admin may not see the person - or when that admin is no admin of the organisation any more (Resend by a
-    current admin wakes it as before, ojn_hidden). Rows silent for another address are not touched. -> how many woke.
+    current admin wakes it as before, ojn_hidden). Rows silent for another address are not touched; a woken row keeps its date
+    (it runs out as it would have). -> how many woke.
     The caller commits."""
+    from .orgs import instance_mode
     cut = iso(now_utc() - timedelta(days=OJN_DAYS))
     em = (email or "").strip().lower()
-    if not em:
+    # review F2: like Resend (_need, org_member_put): not with inviting by e-mail switched off, only in workspaces mode
+    if not em or not oinv_on(c) or instance_mode(c) != "workspaces":
         return 0
     with system_ctx(c):  # the person is no member of these organisations yet
         rows = c.execute("""SELECT j.org_id, j.role, j.created_by, o.self_made FROM org_joins j JOIN orgs o ON o.id=j.org_id
@@ -475,7 +478,13 @@ def ojn_proved(c, uid, email):
                 continue
             if r["self_made"] and not may_see(c, by, uid):  # #3570: a company of its own reaches only people its admin may see
                 continue
+            # review F7: the row is locked and still silent (an admin withdrawing it meanwhile: nothing comes back)
+            row = c.execute("SELECT created_at FROM org_joins WHERE org_id=? AND user_id=? AND silent=1 FOR UPDATE", (r["org_id"], uid)).fetchone()
+            if not row:
+                continue
             ojn_invite(c, r["org_id"], uid, r["role"], by=by)
+            # review F3: the row keeps its date - the admin's list must not tell when (or that) the address was proved
+            c.execute("UPDATE org_joins SET created_at=? WHERE org_id=? AND user_id=?", (row["created_at"], r["org_id"], uid))
             n += 1
     return n
 

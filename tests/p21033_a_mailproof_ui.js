@@ -3,7 +3,7 @@
 // - Settings > Account: the row "E-mail address" shows the own address, "not confirmed", the button "Confirm address" and why
 // - the button sends the proof mail (the SMTP stub gets it) and the hint says where to open the link
 // - the link opened while signed out: the token leaves the address bar, the sign-in page shows; after the sign-in the app
-//   confirms the address (message "Address confirmed"), the account row then says "confirmed" without a button
+//   asks (naming the address) and confirms it (message "Address confirmed"), the account row then says "confirmed" without a button
 // freelancer-matrix: own (frida has no organisation, P4)
 // P21033A_NOSTART=1 = the server already runs. Screenshots: P21033A_SHOTS.
 const fs = require('fs');
@@ -83,6 +83,11 @@ const proofs = () => { try { return JSON.parse(execFileSync('python3', ['-I', '-
     check(db('SELECT email_proved FROM users WHERE username=?', ['frida'])[0]?.email_proved === '', 'not confirmed before the sign-in');
     check(await signIn(ev) === 200, 'frida signs in again');
     await nav(B);  // the sign-in page reloads the app the same way (location.replace)
+    // review F4: asked first, naming the address
+    check(await ready(ev, `(document.querySelector('#cdlg-t')?.textContent || '').includes('frida@example.com')`, 80), 'the question names the address');
+    check(db('SELECT email_proved FROM users WHERE username=?', ['frida'])[0]?.email_proved === '', 'nothing confirmed before the answer');
+    await shot('p21033a-ask.png');
+    await ev(`(document.querySelector('[data-cd="yes"]').click(), 1)`);
     check(await ready(ev, `(document.querySelector('#toast')?.textContent || '').includes('Address confirmed')`, 80), 'the message "Address confirmed"');
     check(db('SELECT email_proved FROM users WHERE username=?', ['frida'])[0]?.email_proved === 'frida@example.com', 'the address is confirmed');
     check(await ev(`sessionStorage.getItem('kalmido.epv') === null`), 'the token is used up in the tab');
