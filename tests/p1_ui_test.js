@@ -107,7 +107,14 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await call('PATCH', `/api/tasks/${t4.id}`, {due: addD(today(), 5)});
   await until(() => toastBtn());
   await toastClick();
-  check(await until(async () => (await get(t4.id)).due === today()), 'undo takes the other device\'s newer step back first, then its own (#5255)');
+  // 2.1060.0 (#5868): since #5637 (3b5aff9c1e) the toast's Undo takes back exactly its own step (POST /api/undo/<group>/undo):
+  // the due date the other device changed since stays and is named; the arrow / Ctrl+Z (POST /api/undo/to) then takes back the
+  // person's newest step, the other device's (the own step is used up by the toast: the field it held stayed)
+  const tt = () => d.querySelector('#toast').textContent;
+  check(await until(() => !w.eval('HIST.busy') && /Changed (elsewhere|by someone else)/.test(tt())), 'the toast\'s Undo names the date changed on the other device: ' + tt());
+  check((await get(t4.id)).due === addD(today(), 5), 'the toast\'s Undo leaves the other device\'s newer step (#5637)');
+  await w.eval(`histStep('undo')`);
+  check(await until(async () => (await get(t4.id)).due === addD(today(), 2)), 'the arrow takes the other device\'s newer step back first (#5255)');
   await until(() => !w.eval('HIST.busy'));
   // batch
   await w.eval('go("l/' + HOME + '")'); await until(() => d.querySelector(`.trow[data-id="${b1.id}"]`));
