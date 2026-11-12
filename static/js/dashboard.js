@@ -35,6 +35,7 @@ function newsSummaryLine(g) {
   L.budgetwarn = () => tr('Budget');  // 2.555.0 (#4570)
   L.offerexp = n => trn('{0} quotation without an answer', '{0} quotations without an answer', n);  // 2.1064.0 (#5818)
   L.chatmention = n => trn('{0} mention', '{0} mentions', n);  // 2.1037.0 (#5800)
+  L.agentask = () => tr('waits for your answer');  // 2.1066.0 (#5873): an agent's question says what it wants, not only the time
   return Object.entries(c).map(([k, n]) => (L[k] || (() => ''))(n)).filter((t, i, a) => t && a.indexOf(t) === i).join(' · ');  // 2.183.0 A (#2623): unknown kinds say nothing
 }
 function newsGroupHtml(g, pop, calm) {  // 2.1037.0 (#5807): calm = a bundle of the history (no unread look, no count, no tick)
