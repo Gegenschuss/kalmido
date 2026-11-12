@@ -149,7 +149,7 @@ async function epvDraw(md) {
   const st = !j.email ? `<span class="muted">${tr('none set')}</span>`
     : `<span class="epvaddr">${esc(j.email)}</span> ${j.proved ? `<span class="epvok">${ic('check', 's')} ${tr('confirmed')}</span>`
       : `<span class="muted">${tr('not confirmed')}</span>${j.mail_out ? ` <button type="button" class="btn sm" data-epv="send">${ic('send', 's')} ${tr('Confirm address')}</button>` : ''}`}`;
-  box.innerHTML = `<label>${tr('E-mail address')}</label><span class="epv">${st}</span>`;
+  box.innerHTML = `<label>${tr('E-mail address')}</label><span class="epv">${/*html-ok*/ st}</span>`;
   if (j.email && !j.proved) box.insertAdjacentHTML('afterend', `<div class="shint" id="a-epv-h" role="status">${esc(j.mail_out ? tr('Confirm your address so that invitations of organisations to it reach you and e-mails from it can become tasks.') : tr('E-mail sending is not set up on this server'))}</div>`);
   else $('#a-epv-h', md)?.remove();
   if (box._wired) return;
