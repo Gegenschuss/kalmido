@@ -96,22 +96,46 @@ def osr_query(terms):
     return " & ".join(p for p in (osr_word_query(t) for t in terms) if p)
 
 
+def osr_groups(q):
+    """2.1060.0 (#5878): the words of a query (as osr_terms, the same first OSR_TERMS words) grouped by what the person typed
+    without a space: "page.html", "anna@firma.de" or "Kick-off" is one group, its words must stand next to each other in the
+    text (the index reads punctuation as a space, _vec), as an ILIKE over the address found them before 2.1026.0 (#5280)."""
+    out, n = [], 0
+    for chunk in (q or "").split():
+        ws = [w[:64] for w in re.findall(r"[^\W_]+", chunk)][:OSR_TERMS - n]
+        if ws:
+            out.append(ws)
+            n += len(ws)
+        if n >= OSR_TERMS:
+            break
+    return out
+
+
+def osr_group_query(ws):
+    """to_tsquery text of one group: each word a prefix in its variants, the words next to each other (<->)."""
+    ps = [p for p in (osr_word_query(t) for t in ws) if p]
+    return ps[0] if len(ps) == 1 else ("(" + " <-> ".join(ps) + ")" if ps else "")
+
+
 def osr_cond(raw, alias="s", names=False):
     """(SQL condition on the obj_search row alias, its parameters) for the query raw, or (None, []) when it has no word.
-    names=True: a word may also stand anywhere in alias.names (part of a name or a number; question 14)."""
-    terms = osr_terms(raw)
-    tsq = osr_query(terms)
+    names=True: a word may also stand anywhere in alias.names (part of a name or a number; question 14).
+    2.1060.0 (#5878): words typed without a space between them (osr_groups) stand next to each other in the text; in names
+    each of them anywhere, as before."""
+    groups = osr_groups(raw)
+    tsq = " & ".join(p for p in (osr_group_query(ws) for ws in groups) if p)
     if not tsq:
         return None, []
     if not names:
         return f"{alias}.tsv @@ to_tsquery('simple'::regconfig, ?)", [tsq]
     parts, args = [], []
-    for t in terms:
-        wq = osr_word_query(t)
-        if not wq:
+    for ws in groups:
+        gq = osr_group_query(ws)
+        if not gq:
             continue
-        parts.append(f"({alias}.tsv @@ to_tsquery('simple'::regconfig, ?) OR {alias}.names LIKE ANY(CAST(? AS TEXT[])))")  # pg-ok: names and the variants are both folded (kalmido_fold), LIKE on purpose
-        args += [wq, ["%" + like_escape(v) + "%" for v in _alnum_variants(t)]]
+        nm = " AND ".join(f"{alias}.names LIKE ANY(CAST(? AS TEXT[]))" for _t in ws)  # pg-ok: names and the variants are both folded (kalmido_fold), LIKE on purpose
+        parts.append(f"({alias}.tsv @@ to_tsquery('simple'::regconfig, ?) OR ({nm}))")
+        args += [gq, *[["%" + like_escape(v) + "%" for v in _alnum_variants(t)] for t in ws]]
     return " AND ".join(parts), args
 
 

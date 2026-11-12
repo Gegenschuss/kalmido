@@ -200,6 +200,10 @@ Bo.patch(B + f"/api/bookmarks/{P1}", json={"note": "for the weekend, ask Carol"}
 check([x["id"] for x in lst(Bo, q="zebrafish")["items"]] == [P1], "search in the reading text")
 check([x["id"] for x in lst(Bo, q="weekend carol")["items"]] == [P1], "search in the note (all words)")
 check([x["id"] for x in lst(Bo, q="page.html")["items"]] == [P1], "search in the link")
+# 2.1060.0 (#5878): since the shared index (#5280) "page.html" is two words that must stand together (core/objsearch.py
+# osr_groups) -- plain.html's text has "page" and its link "html" apart; with a space between them each word may stand anywhere
+check(P1 in [x["id"] for x in lst(Bo, q="html page")["items"]] and len(lst(Bo, q="html page")["items"]) > 1,
+      "words with a space between them: each anywhere (word start)")
 check([x["id"] for x in lst(Bo, tag="news")["items"]] == [P1] and lst(Bo, tag="new")["items"] == [], "the tag filter (whole tags only)")
 check({"tag": "news", "n": 1} in lst(Bo)["tags"], "the tags with their counts")
 # 2.97.0 review (L3, L1): a tag with umlauts is found; a port that is no number is refused (400, no 500)
