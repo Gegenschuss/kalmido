@@ -170,7 +170,9 @@ for dump in DUMPS:
     empty = fill_old_tables()  # 2.509.0 (#4285)
     check(not empty, f"{tag}: every old table has a row before the start: {empty}")
     before = kt.dbx(OLD_TASKS)[0][0]
-    mig_before = {r[0]: r[1:] for r in kt.dbx("SELECT id, applied_at, note FROM kalmido_migrations WHERE id NOT LIKE 'flag:%'")}  # 2.1084.0 (#5916)
+    # 2.1084.0 (#5916): the recorded steps before the start; a dump before 2.102.0 (2.101.0) has no kalmido_migrations yet
+    has_migs = int(kt.dbx("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='kalmido_migrations'")[0][0]) > 0
+    mig_before = {r[0]: tuple(r[1:]) for r in kt.dbx("SELECT id, applied_at, note FROM kalmido_migrations WHERE id NOT LIKE 'flag:%'")} if has_migs else {}
     try:
         os.environ["START_WAIT_S"] = "150"  # #3506: every migration since the dump runs at this first start
         kt.fresh(keep=True)
@@ -195,8 +197,10 @@ for dump in DUMPS:
     # 2.1084.0 (#5916): a short jump (the live state of the upgrade probe, 2.1067 -> 2.1075) may bring only new tables (SCHEMA of a
     # fragment) and no MIGRATIONS column step - then core/db.py mig_apply prints nothing and that is right. The log line has to
     # match the steps recorded as applied at this start: N of them = "migrations: N step(s) applied", none = no such line.
-    fresh_steps = sum(1 for mid, at, note in kt.dbx("SELECT id, applied_at, note FROM kalmido_migrations WHERE id NOT LIKE 'flag:%'")
-                      if note in ("applied", "again") and mig_before.get(mid) != (at, note))
+    # (core/moneycol.py records its column type changes as "type:table.column" with a log line of their own, not in this count)
+    fresh_steps = sum(1 for mid, at, note in kt.dbx("SELECT id, applied_at, note FROM kalmido_migrations WHERE id NOT LIKE 'flag:%' "
+                                                    "AND id NOT LIKE 'type:%'")
+                      if note in ("applied", "again") and mig_before.get(mid) != tuple((at, note)))
     m = re.search(r"migrations: (\d+) step\(s\) applied", log1)
     check((int(m.group(1)) if m else 0) == fresh_steps,
           f"{tag}: the migrations ran: log says {m.group(0) if m else 'no step applied'}, {fresh_steps} step(s) newly recorded as applied")
