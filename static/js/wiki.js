@@ -451,7 +451,7 @@ function wk_deskHtml(sp, d, id, cur, sel, op) {
   else {
     const ps = wk_leaves(n);  // 2.200.0 A (#2747): rows like the file store's -- sorted by hand, the date, the menu "…"
     const box = (nid, nm) => wk_selBox(sp, nid, nm), rc = WK.selOn ? 'wkrow wkselrow' : 'wkrow';  // 2.353.0 C (#2829): Select
-    const rows = wk_dirs(n).map(k => `<li class="${rc}">${box(k.fid, k.name)}<a href="#${esc(wk_dirGo(k.path, sp))}" class="wkitem wkdrow">${ic('folder', 's')}<span>${esc(k.name)}</span>${typeof wkar_mark === 'function' ? wkar_mark(sp, k.fid) : '' /* 2.1045.0 (#5823) */}</a>${wk_rowMore(sp, k.fid, '')}</li>`).join('')
+    const rows = wk_dirs(n).map(k => `<li class="${rc}">${box(k.fid, k.name)}<a href="#${esc(wk_dirGo(k.path, sp))}" class="wkitem wkdrow">${ic('folder', 's')}<span>${esc(k.name)}</span>${/*html-ok*/ typeof wkar_mark === 'function' ? wkar_mark(sp, k.fid) : '' /* 2.1045.0 (#5823) */}</a>${wk_rowMore(sp, k.fid, '')}</li>`).join('')
       + ps.map(k => `<li class="${rc}">${box(k.page.node_id, k.name)}<a href="#wiki/${k.page.id}" class="wkitem">${ic(wk_isTpl(k.path) ? 'copy' : 'note', 's')}<span>${esc(k.name)}</span>${k.page.shared && typeof wsh_markHtml === 'function' ? wsh_markHtml(1) : ''}</a>${wk_rowMore(sp, k.page.node_id, k.page.updated_at)}</li>`).join('');
     body = rows ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${rows}</ul>` : `<div class="empty">${tr('This folder is empty')}</div>`;
   }
@@ -466,7 +466,7 @@ function wk_panelHtml() {
   const pa = onW && r.wid ? wk_pgAt(r.wid) : null;
   const at = (onW && r.wdir != null ? r.wdir : pa && pa.space === sp ? wk_dirOf(pa.path) : '').toLowerCase();  // the open folder (a page: its folder)
   const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };  // 2.319 (#3287): a page's own folder is open
-  const top = `<div class="sgroup sbbp">${sbb_row('wiki', 'book', wk_rootName(sp), onW && !r.wid && !r.wdir, `data-wkarea="${esc(sp)}"` /* 2.1045.0 (#5823): its right-click, wkarea.js */)}</div>`;  // 2.200.0 A (#2747, audit B 1)
+  const top = `<div class="sgroup sbbp">${/*html-ok*/ sbb_row('wiki', 'book', wk_rootName(sp), onW && !r.wid && !r.wdir, `data-wkarea="${esc(sp)}"` /* 2.1045.0 (#5823): its right-click, wkarea.js */)}</div>`;  // 2.200.0 A (#2747, audit B 1)
   if (!d?.pages) return top + `<p class="muted sbbtl">${esc(d?.err || tr('Loading…'))}</p>`;
   const ds = wk_subNodes(sp, wk_treeOf(sp), node);  // 2.200.0 A (#2747): folders AND pages, dragged / sorted / with a menu
   const tg = typeof wkt_panelNode === 'function' && wkt_panelNode(sp); if (tg) ds.push(tg);  // 2.371 (#3150): the group "Tags"
@@ -477,7 +477,7 @@ function wk_panelHtml() {
 // loads then: "Loading…"); a locked space has the lock and no folders until it is unlocked on its page
 function wk_panelAllHtml() {
   const r = S.route, onW = r.mod === 'wiki', op = onW ? wk_open() : null;
-  return `<div class="sgroup sbbp sbbtree" role="group" aria-label="${esc(tr('Workspaces'))}">${wk_spaces().map(sp => {
+  return `<div class="sgroup sbbp sbbtree" role="group" aria-label="${esc(tr('Workspaces'))}">${/*html-ok*/ wk_spaces().map(sp => {
     const d = WK.idx[sp], lock = wk_locked(sp), here = op === sp;
     const pa = here && r.wid ? wk_pgAt(r.wid) : null;  // 2.319 (#3287)
     const at = here ? (r.wdir != null ? r.wdir : pa ? wk_dirOf(pa.path) : '').toLowerCase() : '';

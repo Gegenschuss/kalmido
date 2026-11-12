@@ -64,10 +64,10 @@ const wkar_fname = (sp, id) => (WK.idx[sp]?.folders || []).find(f => f.id === id
 function wkar_extra(box, sp) {
   const a = WKAR[sp]; if (!box || !a) return;
   const lim = a.limit ? `<div class="shint lhint keep">${ic('alert', 's')} ${esc(tr('This knowledge area is very large: not every page can be reached through the share.'))}</div>` : '';
-  box.innerHTML = lim + `<h4>${esc(tr('Agents with the whole knowledge area'))}</h4>` + ((a.shares || []).length ? (a.shares || []).map(s => `<div class="wkaex" data-wka-agent="${s.agent_id}">
+  box.innerHTML = lim + `<h4>${esc(tr('Agents with the whole knowledge area'))}</h4>` + ((a.shares || []).length ? (a.shares || []).map(s => `<div class="wkaex" data-wka-agent="${esc(s.agent_id)}">
       <div><b>${esc(s.name)}</b> <small class="muted">${esc(tr('{0} folders / {1} pages', a.folders, a.pages))}</small></div>
-      <div class="muted">${esc(tr('Excluded:'))} ${s.excluded.length ? s.excluded.map(id => `<span class="wkaexf">${esc(wkar_fname(sp, id))}${s.editable ? ` <button type="button" class="linkbtn" data-wka-in="${id}" aria-label="${esc(tr('Include again'))}" title="${esc(tr('Include again'))}">${ic('x', 's')}</button>` : ''}</span>`).join(', ') : esc(tr('nothing'))}</div>
-      ${s.editable ? `<button type="button" class="btn sm" data-wka-pick="${s.agent_id}">${ic('eyeoff', 's')} ${esc(tr('Exclude folders…'))}</button>` : `<small class="muted">${esc(tr('Only who may change this agent can exclude folders.'))}</small>`}</div>`).join('')
+      <div class="muted">${esc(tr('Excluded:'))} ${s.excluded.length ? s.excluded.map(id => `<span class="wkaexf">${esc(wkar_fname(sp, id))}${s.editable ? ` <button type="button" class="linkbtn" data-wka-in="${esc(id)}" aria-label="${esc(tr('Include again'))}" title="${esc(tr('Include again'))}">${ic('x', 's')}</button>` : ''}</span>`).join(', ') : esc(tr('nothing'))}</div>
+      ${s.editable ? `<button type="button" class="btn sm" data-wka-pick="${esc(s.agent_id)}">${ic('eyeoff', 's')} ${esc(tr('Exclude folders…'))}</button>` : `<small class="muted">${esc(tr('Only who may change this agent can exclude folders.'))}</small>`}</div>`).join('')
     : `<div class="muted mhint">${esc(tr('No agent sees the whole knowledge area yet.'))}</div>`);
   if (box._wka) return; box._wka = 1;
   box.addEventListener('click', async e => {
@@ -85,7 +85,7 @@ async function wkar_pick(sp, s) {
   if (!fs.length) { toast(tr('There is no folder left to exclude.')); return null; }
   let picked = /** @type {number[]} */ ([]);
   const ok = await /** @type {any} */ (askDialog)({title: tr('Exclude folders for {0}', s.name), ok: tr('Exclude'),
-    html: `<p class="muted">${esc(tr('The agent no longer sees these folders and everything in them, also what is added later. A folder or page inside that you share with it on its own stays visible.'))}</p><div class="wkapick">${fs.map(f => `<label class="chk"><input type="checkbox" value="${f.id}"> ${esc(f.path)}</label>`).join('')}</div>`,
+    html: `<p class="muted">${esc(tr('The agent no longer sees these folders and everything in them, also what is added later. A folder or page inside that you share with it on its own stays visible.'))}</p><div class="wkapick">${fs.map(f => `<label class="chk"><input type="checkbox" value="${esc(f.id)}"> ${esc(f.path)}</label>`).join('')}</div>`,
     submit: () => { picked = $$('.wkapick input:checked').map(x => +(/** @type {any} */ (x)).value); return picked.length ? true : false; }});
   return ok ? picked : null;
 }

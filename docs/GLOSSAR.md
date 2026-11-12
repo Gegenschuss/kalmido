@@ -812,6 +812,7 @@ Knowledge pages (wiki): pages, history, sharing, search, tags, folders and the l
 - `kalmido/wiki/wikie2e.py` (`wke`) - The lock per knowledge space
 - `kalmido/wiki/wkembed.py` (`wem`) - Files of the file store ("Ablage")
 - `kalmido/wiki/wkfolder.py` (`wkf`) - Knowledge pages in folders of the file store
+- `kalmido/wiki/wkarea.py` (`wka`) - A whole knowledge area shared with an agent at once: the facts of its Share dialog (GET /api/wiki/area-share; #5823)
 - `kalmido/wiki/wkfshare.py` (`wkfs`) - Knowledge pages for people who reach them only through a share of their folder / page node
 - `kalmido/wiki/wkhist.py` (`wkh`) - Knowledge pages -- the text sealed at rest and the history of a page
 - `kalmido/wiki/wkkern.py` - Knowledge pages on the one trash of the core (stage 3): registration, their files as children
@@ -1162,6 +1163,7 @@ The start-up module.
 - `static/js/wkhist.js` (`wks`) - The history of a knowledge page and the text search of the page list
 - `static/js/wkimport.js` (`wki`) - The ZIP import of knowledge pages for large archives (wiki.js wk_import)
 - `static/js/wklive.js` (`wklv`) - Slash commands of the knowledge editor, the task search, reading styles
+- `static/js/wkarea.js` (`wkar`) - The whole knowledge area shared with an agent: Share whole knowledge area…, Exclude folders…, the marks (#5823)
 - `static/js/wkshare.js` (`wsh`) - Read-only shares of knowledge pages (wiki.js)
 - `static/js/wktags.js` (`wkt`) - 2.371 tags of knowledge pages and the `
 - `static/js/workspace.js` (`ws`) - Workspaces: "Private" and the organisations a person belongs to, and the sidebar switch that shows one of them or all

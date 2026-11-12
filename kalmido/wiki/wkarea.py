@@ -19,7 +19,7 @@ its person's own agents, an organisation's area only with its agents). Single fo
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.db import db
 from ..core.dlock import dl_wiki_folders
 from ..core.errors import BadInput
@@ -58,7 +58,7 @@ def _live_pages(c, rows):
     live = set()
     for i in range(0, len(ids), 1000):
         part = ids[i:i + 1000]
-        live |= {x[0] for x in c.execute(f"SELECT id FROM wiki_pages WHERE id IN ({','.join('?' * len(part))}) AND deleted_at IS NULL", part)}
+        live |= {x[0] for x in c.execute(f"SELECT id FROM wiki_pages WHERE id IN ({','.join('?' * len(part))}) AND {live_sql()}", part)}
     return live
 
 
