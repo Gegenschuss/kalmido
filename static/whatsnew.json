@@ -1,6 +1,32 @@
 {
  "versions": [
   {
+   "version": "2.1024.0",
+   "date": "2026-11-12",
+   "items": [
+    {
+     "de": "Im Dokument findest du unter „Aktionen“ jetzt „Neue Aufgabe“, „Mit Aufgabe verknüpfen“ und den Favoriten-Stern.",
+     "en": "In a document, \"Actions\" now offers \"New task\", \"Link with a task\" and the favourite star."
+    },
+    {
+     "de": "Gelöschte Freigaben (Video, Bild, PDF, Audio) lassen sich über „Rückgängig“ und „Letzte Schritte“ zurückholen.",
+     "en": "Deleted approvals (video, image, PDF, audio) can be brought back with \"Undo\" and \"Recent steps\"."
+    },
+    {
+     "de": "Die Suche findet Wörter jetzt am Wortanfang und mit ae/oe/ue genauso wie mit Umlauten.",
+     "en": "Search now matches at the start of a word and treats ae/oe/ue like umlauts."
+    },
+    {
+     "de": "Die Wiki-Suche findet auch Text in Seiten, die mit dir geteilt sind.",
+     "en": "The knowledge search also finds text in pages shared with you."
+    },
+    {
+     "de": "Das Zitat des Tages steht nur noch einmal da, in deiner Sprache, darunter der Autor.",
+     "en": "The quote of the day now appears once, in your language, with its author below."
+    }
+   ]
+  },
+  {
    "version": "2.1020.0",
    "date": "2026-11-12",
    "items": [
@@ -1275,60 +1301,6 @@
     {
      "de": "Die Suche in der Kopfleiste macht zuerst Platz, wenn viele Favoriten dazukommen.",
      "en": "The search in the head bar makes room first when you add many favourites."
-    }
-   ]
-  },
-  {
-   "version": "2.570.0",
-   "date": "2026-11-06",
-   "items": [
-    {
-     "de": "Gelöschte Budget-Einträge, Vorlagen, Abschnitte, Sprints und Projekt-Links landen jetzt 30 Tage im Papierkorb und lassen sich wiederherstellen.",
-     "en": "Deleted budget entries, templates, sections, sprints and project links now stay in the trash for 30 days and can be restored."
-    },
-    {
-     "de": "Im Büro kommen gelöschte Fixkosten, Startsalden, Brief-Links und zurückgenommene Importe in den Büro-Papierkorb.",
-     "en": "In the office, deleted fixed costs, start balances, letter links and imports taken back go into the office trash."
-    },
-    {
-     "de": "Die Kalmido-KI kann dir Rechnungsentwürfe aus erfasster Zeit vorbereiten - festschreiben und versenden bleibt bei dir.",
-     "en": "The Kalmido AI can prepare invoice drafts from tracked time for you - finalising and sending stay with you."
-    },
-    {
-     "de": "Neuer Startpunkt \"Fällige Abrechnungen\": die Kalmido-KI erinnert dich montags an nicht abgerechnete Zeit.",
-     "en": "New starter item \"Due billing\": the Kalmido AI reminds you on Mondays of unbilled time."
-    },
-    {
-     "de": "Wenn jemand anderes inzwischen gespeichert hat, überschreibt dein Dialog das nicht mehr still, sondern zeigt den aktuellen Stand.",
-     "en": "If someone else saved in the meantime, your dialog no longer overwrites it silently but shows the current state."
-    },
-    {
-     "de": "Agenten müssen beim Ändern sagen, welchen Stand sie gelesen haben, damit deine Änderungen nicht verloren gehen.",
-     "en": "Agents now have to say which version they read when they change something, so your edits are not lost."
-    },
-    {
-     "de": "Erreicht die erfasste Zeit 80 % des Budgets einer Aufgabe oder eines Projekts, warnt Kalmido, ab 100 % zeigt es \"über Budget\".",
-     "en": "When tracked time reaches 80 % of a task's or project's budget, Kalmido warns you, from 100 % it shows \"over budget\"."
-    },
-    {
-     "de": "Formulare in der Seitenleiste zeigen die Beschriftung über dem Feld, alle Felder sind gleich breit.",
-     "en": "Forms in the sidebar show the label above the field, all fields have the same width."
-    },
-    {
-     "de": "Auf breiten Bildschirmen zeigen die Einstellungen zwei Spalten, Rechnungen den Kopf neben den Positionen.",
-     "en": "On wide screens the settings show two columns and invoices show the head beside the positions."
-    },
-    {
-     "de": "Antwort-Knöpfe im Agenten-Chat zeigen jetzt längere Texte vollständig, ohne Abschneiden.",
-     "en": "Answer buttons in the agent chat now show longer texts in full, without cutting them off."
-    },
-    {
-     "de": "Bei der Kalmido-KI lässt sich für jeden Ablauf ein eigenes Modell wählen.",
-     "en": "The Kalmido AI can use a model of its own for each routine."
-    },
-    {
-     "de": "Speichern Kontakt oder Termin gleichzeitig woanders, zeigt der Dialog die Änderungen und behält deine Eingaben.",
-     "en": "If a contact or event was saved elsewhere at the same time, the dialog shows the changes and keeps your input."
     }
    ]
   }
