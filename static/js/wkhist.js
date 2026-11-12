@@ -33,7 +33,7 @@ function wkh_diffHtml(a, b) {
   const rows = [];
   d.forEach((x, i) => { if (near[i]) rows.push(x); else if (rows[rows.length - 1]?.[0] !== '…') rows.push(['…', '']); });
   // 2.1068.0 (#5831): the rows are drawn by the shared txtDiffHtml (choicecard.js), also used by the approval card
-  return `<div class="muted wkhsum">${esc(tr('Lines: {0} added, {1} removed', add, del))}</div>${txtDiffHtml(rows)}`;
+  return `<div class="muted wkhsum">${esc(tr('Lines: {0} added, {1} removed', add, del))}</div>${/*html-ok*/ /* txtDiffHtml escapes every line */ txtDiffHtml(rows)}`;
 }
 // ---- the page menu entry and the dialog
 const wkh_items = p => S.me?.kind === 'agent' ? [] : [{label: tr('History'), icon: 'clock', fn: () => wkh_dlg(p)}];

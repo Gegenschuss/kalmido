@@ -5,14 +5,14 @@
 // an approval card stays open until answered). attrs(id) = the data attributes of a button (who handles the press).
 function ccApvHead(ap, open, src = '') {
   return (open ? `<div class="apvh">${ic('lock', 's')}<span>${esc(tr('Approval needed'))}</span></div>` : '')
-    + (ap ? `<div class="apvt">${esc(ap.title)}</div>${ap.what ? `<div class="apvw">${esc(tr('If yes: {0}', ap.what))}</div>` : ''}${ccApvStep(ap, src && !open ? src + '|d' : src)}` : '');  // a decided card: its own entry (the state at the answer)
+    + (ap ? `<div class="apvt">${esc(ap.title)}</div>${ap.what ? `<div class="apvw">${esc(tr('If yes: {0}', ap.what))}</div>` : ''}${/*html-ok*/ /* escaped inside */ ccApvStep(ap, src && !open ? src + '|d' : src)}` : '');  // a decided card: its own entry (the state at the answer)
 }
 // 2.1068.0 (#5831): a line diff as rows [[op, line]] (op ' ' / '+' / '-' / '…' = a gap) -- one rendering for the knowledge
 // history (wkhist.js) and the approval card; + / − in front, not only the colour
 function txtDiffHtml(rows) {
   const h = rows.map(([t, x]) => t === '…' ? `<div class="wkhd gap" aria-hidden="true">…</div>`
     : `<div class="wkhd ${t === '+' ? 'add' : t === '-' ? 'del' : ''}"><span class="wkhdm" aria-hidden="true">${t === '+' ? '+' : t === '-' ? '−' : ''}</span><span class="sr">${t === '+' ? tr('added:') : t === '-' ? tr('removed:') : ''}</span><span>${esc(x) || '&nbsp;'}</span></div>`).join('');
-  return `<div class="wkhdiff" role="group" aria-label="${esc(tr('Changes'))}">${h}</div>`;
+  return `<div class="wkhdiff" role="group" aria-label="${esc(tr('Changes'))}">${/*html-ok*/ /* rows built with esc() above */ h}</div>`;
 }
 // 2.1068.0 (#5831): the steps whose change the server shows as a diff (agents/apvdiff.py APVD_STEPS)
 const ccApvTextStep = st => !!st && (
@@ -67,7 +67,7 @@ function ccApvStep(ap, src = '') {
   if (st) {
     const dv = !!src && ccApvTextStep(st), c = dv ? S.apvd[src] : null, d = c?.d;
     const sum = dv ? (d ? ccApvdWords(d) : d === null ? tr('Step details') : tr('Loading…')) : w ? tr('Step: {0}', w) : tr('Step details');
-    fold = `<details class="apvdet" ${dv ? `data-apvd="${esc(src)}"` : ''}><summary><span data-apvd-words>${esc(sum)}</span></summary>${dv ? `<div data-apvd-body>${d ? ccApvdBody(d, src) : ''}</div>` : ''}<div class="apvw" data-apv-step>${esc(tr('Step: {0}', t))}</div></details>`;
+    fold = `<details class="apvdet" ${dv ? `data-apvd="${esc(src)}"` : ''}><summary><span data-apvd-words>${esc(sum)}</span></summary>${dv ? `<div data-apvd-body>${/*html-ok*/ /* escaped inside */ d ? ccApvdBody(d, src) : ''}</div>` : ''}<div class="apvw" data-apv-step>${esc(tr('Step: {0}', t))}</div></details>`;
     if (dv && (!c || c.d === undefined)) setTimeout(() => ccApvdLoad(src), 0);
   }
   return fold
@@ -122,7 +122,7 @@ function ccCommentHtml(c, ro = false) {
     const t = ans ? ((ans.ids || []).includes('yes') ? tr('{0} from {1}, {2}', ccApvLbl(ch, 'yes'), who, ccWhen(ans.at)) : tr('{0} from {1}, {2}', ccApvLbl(ch, 'no'), who, ccWhen(ans.at))) : '';
     // 2.144.5 A (#2001): only an approver decides (the server's choice_can: a manager of the list, the assignee, an admin)
     const dec = can && c.choice_can !== false, wait = can ? tr('Waiting for a decision by the project’s managers, the assignee or an admin') : tr('Waiting for an answer');
-    return `<div class="cccard apv${open ? ' apvopen' : ''}" role="group" aria-label="${esc(tr('Approval needed'))}">${ccApvHead(ch.approval, open, 'comment:' + c.id)}${open ? (dec ? ccApvBtns(ch, attrs, `data-ccpen="${c.id}" data-ch="yes"`) : `<div class="cpermst exp"><span>${esc(wait)}</span></div>`) : ccApvState(ch, ans, st, t)}</div>`;
+    return `<div class="cccard apv${open ? ' apvopen' : ''}" role="group" aria-label="${esc(tr('Approval needed'))}">${/*html-ok*/ /* the card's head, its texts escaped inside */ ccApvHead(ch.approval, open, 'comment:' + c.id)}${open ? (dec ? ccApvBtns(ch, attrs, `data-ccpen="${c.id}" data-ch="yes"`) : `<div class="cpermst exp"><span>${esc(wait)}</span></div>`) : ccApvState(ch, ans, st, t)}</div>`;
   }
   if (st !== 'open' && st !== 'answered') return '';  // expired / withdrawn: gone, as in the chat
   if (st === 'open' && !can) return '';
