@@ -923,6 +923,10 @@ push; the caller builds the text in their language (an end-to-end list's push ca
   (`news_add(list_id=…)`, the event invitations / changes) and the job push of `agents/api.py job_notify` follow in task #5512
   (stage Q2 rest), as does the team chat's held-back room push `collab/teamchat.py tchat_push_tick` ("N new messages";
   it still asks `tchat_room_members`, which does not know an own share that ran out, #5050 - found in the review of 2.891.0).
+- No new send path beside it (2.1077.0, #5459): a direct call of `notif_ok(` or `news_put(` outside `core/objnotify.py` and
+  `collab/news.py` is red in `tools/check_notify_calls.py`; the existing ones (the "still on their own check" paths above, the
+  account / organisation notices) stand per file in `tools/notify_calls_baseline.json`, which only shrinks (`--update` lowers
+  it when a path moves to `obj_notify`).
 
 ### Read marks (stage Q8a, 2.905.0, #5284)
 

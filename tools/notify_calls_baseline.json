@@ -1,0 +1,31 @@
+{
+ "about": "tools/check_notify_calls.py (#5459): direct notif_ok( / news_put( calls outside obj_notify per file; only shrinks",
+ "total": 35,
+ "files": {
+  "kalmido/accounts/orginvite.py": 1,
+  "kalmido/accounts/signup.py": 1,
+  "kalmido/admin/hosting.py": 1,
+  "kalmido/agents/api.py": 1,
+  "kalmido/agents/proposals.py": 2,
+  "kalmido/agents/usage.py": 2,
+  "kalmido/agents/watch.py": 1,
+  "kalmido/assistant/web.py": 1,
+  "kalmido/calendars/apptbook.py": 2,
+  "kalmido/collab/comments.py": 3,
+  "kalmido/collab/integfail.py": 2,
+  "kalmido/core/objcomments.py": 1,
+  "kalmido/docs/fetcher.py": 2,
+  "kalmido/docs/flows.py": 1,
+  "kalmido/events/model.py": 2,
+  "kalmido/files/filereq.py": 1,
+  "kalmido/hub/leave.py": 1,
+  "kalmido/lists/public.py": 1,
+  "kalmido/notify/push.py": 1,
+  "kalmido/office/dunning.py": 1,
+  "kalmido/office/signoff.py": 1,
+  "kalmido/personal/budgetwarn.py": 2,
+  "kalmido/personal/timesheet.py": 1,
+  "kalmido/team/portal.py": 2,
+  "kalmido/videos/review.py": 1
+ }
+}
