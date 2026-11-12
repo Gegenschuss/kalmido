@@ -73,18 +73,30 @@ const upload = async (url, field, name, text, extra) => {
 
     // one place: start the selection -> one entry; Back ends it, the page and its entries stay; again and the bar's X
     // ends it -> its entry goes too (no dead Back); the next Back leaves the page for #inbox
-    const place = async (name, {hash, ready, prep, start, on, bar, close, content}) => {
+    // 2.997.0 (#5681): inner = a view of the page that is a Back step of its own (#5233, 2.979.0: an open trip) and holds the
+    // selection: opened first (one entry), the selection one more; Back ends the selection, the next Back closes the view
+    // (the page stays), the one after leaves the page
+    const place = async (name, {hash, ready, prep, inner, start, on, bar, close, content}) => {
       if (!await open(hash, ready, prep)) return;
+      const b = inner ? 1 : 0, here = inner ? `(${inner.on})` : onPage;
+      if (inner) {
+        await ev(inner.start);
+        check(await at(1, inner.on), `${name}: ${inner.what} opens, one entry ` + await ev(STATE));
+      }
       await ev(start);
-      check(await at(1, `(${on}) && !!document.querySelector(${JSON.stringify(bar)})`), `${name}: the selection starts, one entry ` + await ev(STATE));
+      check(await at(b + 1, `(${on}) && !!document.querySelector(${JSON.stringify(bar)})`), `${name}: the selection starts, one entry ` + await ev(STATE));
       await shot(`p2963b-${name}-sel.png`);
       await back();
-      check(await at(0, `!(${on}) && !document.querySelector(${JSON.stringify(bar)}) && ${onPage}`), `${name}: Back ends the selection, the page stays ` + await ev(STATE));
+      check(await at(b, `!(${on}) && !document.querySelector(${JSON.stringify(bar)}) && ${here}`), `${name}: Back ends the selection, the page stays ` + await ev(STATE));
       check(await wait(content, {timeout: 6000}), `${name}: the page still shows its entries after Back`);
       await ev(start);
-      await at(1, on);
+      await at(b + 1, on);
       check(await click(close), `${name}: the bar has its X`);
-      check(await at(0, `!(${on}) && ${onPage}`), `${name}: the X ends the selection and takes its entry with it ` + await ev(STATE));
+      check(await at(b, `!(${on}) && ${here}`), `${name}: the X ends the selection and takes its entry with it ` + await ev(STATE));
+      if (inner) {
+        await back();
+        check(await at(0, `!(${inner.on}) && ${onPage}`), `${name}: the next Back closes ${inner.what}, the page stays ` + await ev(STATE));
+      }
       await back();
       check(await wait(`location.hash === '#inbox' && S.route?.key === 'inbox' && !f8d_bk.skip`, {timeout: 8000}), `${name}: the next Back leaves the page as usual (no dead Back) ` + await ev(STATE));
     };
@@ -110,8 +122,11 @@ const upload = async (url, field, name, text, extra) => {
     await place('wiki', {hash: '#wiki', ready: `typeof WK === 'object' && ${rowWith('#view .wkrow', 'Loose')} && !!document.querySelector('#view [data-wksel="mode"]')`,
       start: `(document.querySelector('#view [data-wksel="mode"]').click(), 1)`, on: `WK.selOn`, bar: '#wk-sbar', close: '#wk-sbar [data-wksel="close"]', content: rowWith('#view .wkrow', 'Loose') + ' && ' + rowWith('#view .wkrow', 'Other')});
     // 7. the receipts of a trip (RK.sel): a tick starts it
-    await place('travel', {hash: '#office/travel', prep: `typeof RK === 'object' && !!RK.data && (RK.year = '', RK.open = ${trip.id}, rk_reload(), true)`,
-      ready: `document.querySelectorAll('#view [data-rk="sel"]').length === 2`,
+    // 2.997.0 (#5681): the trip is opened by its row (a Back step of its own since #5233), the receipts' selection lies above it
+    await place('travel', {hash: '#office/travel', prep: `typeof RK === 'object' && !!RK.data && (RK.year === '' || (RK.year = '', rk_reload(), true))`,
+      ready: `!!document.querySelector('#view .rklist [data-rk="open"][data-id="${trip.id}"]')`,
+      inner: {what: 'the trip', start: `(document.querySelector('#view .rklist [data-rk="open"][data-id="${trip.id}"]').click(), 1)`,
+        on: `RK.open === ${trip.id} && document.querySelectorAll('#view [data-rk="sel"]').length === 2`},
       start: `(document.querySelector('#view [data-rk="sel"]').click(), 1)`, on: `RK.sel.size > 0`, bar: '#rk-sbar', close: '#rk-sbar [data-rk="close"]', content: `document.querySelectorAll('#view [data-rk="sel"]').length === 2 && ${rowWith('#view', 'Example Town')}`});
 
     // 8. the search palette: "Move to another project" is one step; Back = the plain search, the next Back closes it
