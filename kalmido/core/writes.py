@@ -700,8 +700,9 @@ def obj_trash_prune(c, kind, cut=None, purge=None, ids=None, paths=None):
     # transaction would break the whole tick (max_locks_per_transaction) hour after hour
     lim = reg.get("trash_batch") or OBJ_PRUNE_BATCH
     old = obj_trash_due(c, kind, cut, limit=lim, start=_PRUNE_FROM.get(kind)) if ids is None else [int(x) for x in ids]
-    if ids is None:  # 2.1031.0 (#5538): a full batch = the next run begins behind its last id (ids that keep failing or are
-        _PRUNE_FROM[kind] = old[-1] + 1 if len(old) >= lim else None  # locked never hold back the ones behind them)
+    # 2.1031.0 (#5538): a full batch = the next run begins behind its last id (ids that keep failing or are locked never hold
+    # back the ones behind them); set after the batch ran (review: a kind whose savepoint rolled back keeps its place)
+    nxt = (old[-1] + 1 if len(old) >= lim else None) if ids is None else _PRUNE_FROM.get(kind)
     if old and purge:
         t, cut = reg["table"], cut or ret_trash_cut()
         kq, ka = _keep(reg, qi(t, (t,)))
@@ -721,7 +722,9 @@ def obj_trash_prune(c, kind, cut=None, purge=None, ids=None, paths=None):
                 n += 1
         obj_forget()
         bump(c, _area(reg))
+        _PRUNE_FROM[kind] = nxt
         return n
+    _PRUNE_FROM[kind] = nxt
     return len(old)
 
 
