@@ -24,7 +24,7 @@ import re
 import threading
 import unicodedata
 
-from flask import g, jsonify, request
+from flask import g, jsonify
 
 from ..core.config import app, APP_DIR, APP_VERSION
 from ..core.errors import BadInput, Denied
