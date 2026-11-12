@@ -458,7 +458,7 @@ def list_apply(c, lid, b):
     from ..tasks.validation import clean_ticket_tpl
     from ..personal.timetrack import clean_day_hours
     from ..lists.templates import list_ptype_set
-    from ..agents.core import list_listen_update
+    from ..agents.core import is_agent, list_agent_access_update, list_listen_update  # one local import (2.1074.0, #5493: layers budget)
     from ..collab.reactions import list_tidy_update
     from ..lists.folders import lm_folder_moved, list_own_mark
     role = need_list(c, lid, write=False)
@@ -498,7 +498,6 @@ def list_apply(c, lid, b):
         if b.get("kind") == "project":  # 2.352.0 G (#2752, review N15): the stored kind is no longer read (an old project may become a family list)
             return err(tr("A project with progress and status cannot be a family project"))
     if "agent_members" in b or "agent_peers" in b:  # 2.26.0 (#928)
-        from ..agents.core import list_agent_access_update
         try:
             list_agent_access_update(c, lid, b)
         except BadInput as e:
@@ -669,7 +668,6 @@ def list_apply(c, lid, b):
     else:
         # 2.39.1 (#1188): a list admin archives / restores (deleting needs the archive); 2.40.0 (#1431): and renames / recolours it
         adm = ("archived", "name", "color") if role == "admin" else ()
-        from ..agents.core import is_agent
         if adm and is_agent(g.user):  # 2.82.0 (#1467): agents never rename / recolour / archive a list (#1431 is for people)
             adm = ()
         adm += ("checklist",) if role == "admin" else ()  # 2.410.0 (#3440): "Show completed at the bottom", like done_in_section
