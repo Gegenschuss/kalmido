@@ -80,6 +80,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     await ev(`document.querySelector('[data-m="s-splmin-std"]').click(), 1`);
     const s3 = await until(`(() => { const f = document.querySelector('#s-splmin'), i = document.querySelector('#s-splinfo').textContent; return f.value === '' && LS.get('splMin', null) == null && !spl_offer() && i.includes('Split from 1440 px.') ? i : null; })()`);
     check(!!s3, 'Default: the field is empty, the standard applies again (not offered at 1200 px) ' + JSON.stringify(s3));
+    const lkStd = await (async () => { for (let i = 0; i < 40; i++) { const s = (await call('GET', '/api/state')).settings || {}; try { if (JSON.parse(s.look || '{}').splMin == null) return true; } catch { /* not yet */ } await sleep(250); } return false; })();
+    check(lkStd, 'Default reached the account (no splMin)');
 
     // ---- 2800 px: the switch, off = nothing loaded
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 2800, height: 1100}});
@@ -109,6 +111,10 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     check(await ev(`location.hash === '#today' && localStorage.getItem('tasks.lastKey') === ${JSON.stringify(lk0)}`), 'the right copy leaves the main window\'s lastKey alone ' + JSON.stringify(await ev(`[location.hash, localStorage.getItem('tasks.lastKey')]`)));
     check(await until(`LS.get('splR', '') === '#l/${L}'`), 'the right route is remembered (splR)');
     await shot('p2742a-split-list.png');
+    // 2.1040.0 (#5813): the account has a look since the threshold part above, and a reload adopts the account's (lookAdopt):
+    // wait until "on" and the right route have reached it (the look goes out after a short pause)
+    const lkOn = await (async () => { for (let i = 0; i < 40; i++) { const s = (await call('GET', '/api/state')).settings || {}; try { const o = JSON.parse(s.look || '{}'); if (o.split === true && o.splR === '#l/' + L) return true; } catch { /* not yet */ } await sleep(250); } return false; })();
+    check(lkOn, 'on and the right route reached the account before the reload');
     await load('#l/' + L); await booted();
     check(await until(`(() => { const d = ${frDoc}; return !!(d && d.querySelector('#view')); })()`, {timeout: 30000}), 'after a reload the right half comes back');
     check(await ev(`${frHash} === '#l/${L}'`), 'after a reload the right half shows the remembered route');
