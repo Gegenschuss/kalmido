@@ -8,6 +8,8 @@
  - exclusion = the agent's data lock wiki_folders (PATCH /api/agents/<id>/data-lock): the folder and everything below it is
    gone for the agent (list, read 404, search, the file store's API, a page made there later, a new page there 404); the
    gear names it, the agent only counts it; a folder inside shared on its own wins; renamed it stays excluded; invalid ids 400
+ - review M2 / N5: an excluded folder the editor sees only through a share on it is named without the folders above
+   (gear and "Sees now"); taking an exclusion off needs the same right as adding it (a folder that is gone: always)
  - GET /api/wiki/area-share: counts, the agent shares with their exclusions, the preview of the dialog's question
  - ending the share: nothing at once; an organisation's area with its own agent (and not the private one)
  - freelancer-matrix: wiki (a person without an organisation and her own agent)
@@ -182,6 +184,58 @@ for bad, why in (([ROOT], "the root"), (["x"], "not an id"), ([PNODE], "a page's
 _, OF = (page(O, "Otto/Page"), index(O))
 check(lock(F, DA, "patch", json={"wiki_folders": [OF[1]["Otto"]]}).status_code == 400, "another person's folder: 400")
 check(lock(O, DA, "patch", json={"wiki_folders": []}).status_code == 404, "another person cannot change the exclusions")
+
+# 2.1045.0 review M2 + N5: an exclusion on a folder the editor sees only through a share on it (bob, a colleague in Alpha,
+# shares "Docs" under "ZQXGeheim/Intern" with alice): the gear and "Sees now" name it without the folders above; she
+# cannot take it off (N5)
+import json  # noqa: E402
+r = A.post(B + "/api/users", json={"orgs": [ORG], "username": "bob", "display_name": "Bob", "password": "password123",
+                                   "email": "bob@example.com"})
+check(r.ok, f"setup: bob {r.status_code} {r.text[:160]}")
+Bo = sess("bob")
+Bo.patch(B + "/api/settings", json={"lang": "en", "features": FEATURES + ",wiki,files", "tour": "done"})
+AA, aa = agent("alicebot", owner=ALICE)
+P_DOC = page(Bo, "ZQXGeheim/Intern/Docs/Plan", text="plan")
+DOCS = index(Bo)[1]["ZQXGeheim/Intern/Docs"]
+r = Bo.post(B + f"/api/files/nodes/{DOCS}/shares", json={"user_id": ALICE, "role": "view"})
+check(r.status_code == 201, f"setup: Docs shared with alice {r.status_code} {r.text[:200]}")
+check(A.get(B + f"/api/wiki/pages/{P_DOC}").ok, "setup: alice reads the page through the share")
+page(A, "Mine/Note")
+MINE = index(A)[1]["Mine"]
+check(lock(A, AA, "patch", json={"wiki_folders": [MINE]}).ok, "setup: alice excludes her own folder")
+check(lock(A, AA, "patch", json={"wiki_folders": [MINE, DOCS]}).status_code == 400, "N5 setup: she may not add Docs herself (400)")
+
+
+def set_wf(ids):  # the lock as another editor left it (stored directly)
+    cur = json.loads(dbx("SELECT data_lock FROM agents WHERE user_id=?", (AA,))[0][0] or "{}")
+    dbx("UPDATE agents SET data_lock=? WHERE user_id=?", (json.dumps({**cur, "wiki_folders": ids}), AA))
+
+
+set_wf([MINE, DOCS])
+r = lock(A, AA)
+wf = {x["id"]: x for x in r.json()["data_lock"]["wiki_folders"]}
+check(wf.get(DOCS, {}).get("path") == "Docs" and wf.get(MINE, {}).get("path") == "Knowledge/Mine",
+      f"M2: the gear names Docs from the share down, her own folder from Knowledge {wf}")
+check("ZQXGeheim" not in r.text and "Intern" not in r.text, "M2: no folder above the share in the gear")
+r = A.get(B + f"/api/agents/{AA}/sees")
+ex = {x["id"]: x for x in r.json().get("except", [])} if r.ok else {}
+check(r.ok and ex.get(DOCS, {}).get("path") == "Docs" and "ZQXGeheim" not in r.text and "Intern" not in r.text,
+      f"M2: 'Sees now' names the exclusion without the folders above {r.status_code} {ex}")
+dbx("INSERT INTO fs_shares(node_id,agent_id,role,created_by,created_at) VALUES(?,?,?,?,?)", (DOCS, AA, "view", ME["id"], "2026-11-12T00:00:00Z"))
+r = A.get(B + f"/api/agents/{AA}/sees")
+it = [x for x in r.json().get("items", []) if x.get("node_id") == DOCS] if r.ok else []
+check(r.ok and "ZQXGeheim" not in r.text and "Intern" not in r.text, f"M2: 'Sees now' names no folder above a shared one {r.status_code}")
+if it:
+    check(it[0].get("path") == "Docs", f"M2: the shared folder's path starts at it {it[0]}")
+else:
+    print("NOTE: M2: the share of Docs with the agent is not listed (the agent does not reach it) - path checked through the text only")
+dbx("DELETE FROM fs_shares WHERE node_id=? AND agent_id=?", (DOCS, AA))
+check(lock(A, AA, "patch", json={"wiki_folders": [MINE]}).status_code == 400, "N5: she cannot take off an exclusion she may not set")
+check(DOCS in [x["id"] for x in lock(A, AA).json()["data_lock"]["wiki_folders"]], "N5: it stays")
+set_wf([MINE, DOCS, 10 ** 9])
+check(lock(A, AA, "patch", json={"wiki_folders": [MINE, DOCS]}).ok, "N5: a folder that is gone can be taken off")
+check(lock(A, AA, "patch", json={"wiki_folders": []}).status_code == 400, "N5: Docs still not")
+set_wf([])
 
 # included again
 check(lock(F, DA, "patch", json={"wiki_folders": []}).ok and P_SEC in listed(da), "included again: visible again")

@@ -751,6 +751,21 @@ def wkf_shown_path(c, uid, r, info=None, path=None):
     return f"{x['folder']}/{name}" if x and x["folder"] else name
 
 
+def wkf_chain_path(c, uid, chain):
+    """2.1045.0 (#5822 / #5823, review M2): the path of node chain[0] (chain = fs_chain, the node first) as uid may see it --
+    like wkf_shown_path from the highest node of the chain uid has a role on (own area: from "Knowledge"; a share: from the
+    shared node down), nothing about the folders above it. Used by agents/agsees.py and agents/datalock.py."""
+    top = 0
+    for i in range(len(chain) - 1, 0, -1):
+        try:
+            if fs_role(c, chain[i]["id"], uid, chain=chain[i:]):
+                top = i
+                break
+        except Denied:
+            continue
+    return "/".join(x["name"] for x in reversed(chain[:top + 1]))
+
+
 def wkf_shared_ids(c, uid):
     return set(wkf_shared(c, uid))
 

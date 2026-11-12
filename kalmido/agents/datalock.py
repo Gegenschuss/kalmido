@@ -100,6 +100,9 @@ def dl_set(c, a, b):
     for nid in set(new["wiki_folders"]) - set(cur["wiki_folders"]):  # 2.1045.0 (#5823): a folder the editor may share
         if not _wkf_ok(c, nid):
             raise BadInput(tr("Invalid value: {0}", "wiki_folders"))
+    for nid in set(cur["wiki_folders"]) - set(new["wiki_folders"]):  # review N5: taking one off too (or it is gone)
+        if not _wkf_ok(c, nid) and _wkf_live(c, nid):
+            raise BadInput(tr("Invalid value: {0}", "wiki_folders"))
     if new != cur or not a["data_lock"]:
         c.execute("UPDATE agents SET data_lock=? WHERE user_id=?", (json.dumps(new, ensure_ascii=False), a["user_id"]))
         dl_forget()
@@ -139,17 +142,24 @@ def _wkf_ok(c, nid):
     return fs_area_share(c, me(), chain[0])
 
 
+def _wkf_live(c, nid):
+    """2.1045.0 (#5823, review N5): does node nid still exist (not deleted, not in the trash)?"""
+    from ..files.store import fs_chain, fs_deleted
+    chain = fs_chain(c, nid)
+    return bool(chain) and not fs_deleted(chain)
+
+
 def _wkf_names(c, ids):
     """2.1045.0 (#5823): [{id, name, path}] of the excluded folders -- name / path only for who may see the folder (the
     path below "Knowledge", the area's name first); a folder gone or out of sight: null (it stays on the list)."""
     from ..files.store import fs_chain, fs_deleted, fs_role
-    from ..wiki.wkfolder import _root_of_chain
+    from ..wiki.wkfolder import _root_of_chain, wkf_chain_path
     out = []
     for nid in ids:
         chain = fs_chain(c, nid)
         ok = bool(chain) and not fs_deleted(chain) and _root_of_chain(c, chain) is not None and fs_role(c, nid, me(), chain=chain)
         out.append({"id": nid, "name": chain[0]["name"] if ok else None,
-                    "path": "/".join(x["name"] for x in reversed(chain)) if ok else None})
+                    "path": wkf_chain_path(c, me(), chain) if ok else None})  # review M2: nothing above the editor's own role
     return out
 
 
