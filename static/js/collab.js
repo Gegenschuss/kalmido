@@ -31,7 +31,6 @@ function newsChipsHtml(items, attr) {
   return `<div class="nchips" role="group" aria-label="${esc(tr('Show only'))}"><button type="button" class="nchip ${k ? '' : 'on'}" ${da} ${attr}="" aria-pressed="${!k}">${tr('All')}${/*html-ok*/ cn(newsMeCount())}</button>${have.map(([v, i, n, kinds]) => `<button type="button" class="nchip ${k === v ? 'on' : ''}" ${da} ${attr}="${v}" aria-pressed="${k === v}">${ic(i, 's')}${tr(n)}${/*html-ok*/ cn(wait(kinds))}</button>`).join('')}</div>`;
 }
 function newsKindSet(k) { S.nf.kind = !k || S.nf.kind === k ? '' : k; LS.set('newsKind', S.nf.kind); }
-const BELL_N = 8;
 // 2.28.0 (#987): the unread direct messages (people writing to me) as rows at the top of "For you"
 const dmRows = () => teamOn() ? (S.tc.rooms || []).filter(r => (r.kind === 'dm' || r.kind === 'group') && r.unread && !r.muted) : [];  // 2.1037.0 (#5800): groups too (they count at the bell like DMs)
 const dmRowHtml = r => r.kind === 'group' ? tcm_groupRowHtml(r) : `<a class="nitem unread k-dm ndm" href="#team/${r.id}" aria-label="${esc(trn('{0} new message from {1}', '{0} new messages from {1}', r.unread, r.name))}">${av(r.user_id, r.name, 'avatar', '', `<i class="nk">${ic('comment', 's')}</i>`)}<div class="nmain"><div class="ntext">${trn('{0} new message from {1}', '{0} new messages from {1}', r.unread, `<b>${esc(r.name)}</b>`)}</div>${r.last ? `<div class="nexc">${esc(mdBrief(r.last.text))}</div>` : ''}</div>${r.last_at ? `<time>${relTime(r.last_at)}</time>` : ''}</a>`;
@@ -59,10 +58,10 @@ const newsHistOpen = () => LS.get('newsHist', false) === true;
 // (count: a room's mentions (#5800), comments grouped by the server); the bell itself counts each of them once
 const newsMeCount = () => bellCount() + (S.nf.items || []).filter(it => !it.read && newsForMe(it)).reduce((a, it) => a + Math.max(0, (it.count || 1) - 1), 0);
 const newsMeEmpty = () => `<div class="nmeempty muted">${tr('Nothing waits for you')}</div>`;
-function newsHistHtml(has, body, h2) {
+function newsHistHtml(has, body) {  // 2.1052.0 (#5808): only the bundled sections (the plain list is gone)
   if (!has) return '';
   const o = newsHistOpen(), btn = `<button type="button" class="nhisth" data-act="news-hist" aria-expanded="${esc(o)}">${ic('chev', 's')}<span>${tr('History')}</span></button>`;
-  return h2 ? `<section class="nsect nhist ${o ? 'open' : ''}"><h2 class="nsh">${/*html-ok*/ btn}</h2>${/*html-ok*/ o ? body : ''}</section>` : `<div class="nhist ${o ? 'open' : ''}"><div class="nsec hist">${/*html-ok*/ btn}</div>${/*html-ok*/ o ? body : ''}</div>`;
+  return `<section class="nsect nhist ${o ? 'open' : ''}"><h2 class="nsh">${/*html-ok*/ btn}</h2>${/*html-ok*/ o ? body : ''}</section>`;
 }
 // the bell's window / sheet, the News view and the start page drawn again in place (the list keeps its scroll position)
 function newsRedraw() {
@@ -76,14 +75,6 @@ document.addEventListener('click', e => {
   if (a.dataset.act === 'due-seen') { dueSeen(a.dataset.line); return; }
   LS.set('newsHist', !newsHistOpen()); newsRedraw(); $(`#pop [data-act="news-hist"], #view [data-act="news-hist"]`)?.focus({preventScroll: true});
 }, true);
-const newsSecHead = (k, n, first) => `<div class="nsec ${k} ${first ? 'first' : ''}">${k === 'me' ? ic('at', 's') : k === 'read' ? ic('check', 's') : ic('pulse', 's')}<span>${k === 'me' ? tr('For you') : k === 'read' ? tr('Read|section') : tr('Also new')}</span>${n ? `<span class="c ${k === 'me' ? 'nunread' : ''}">${n}</span>` : ''}</div>`;
-// 2.138.2 D (#2405): the plain list in sections; one grouping for bell, sheet and view. 2.1037.0 (#5807): For you (unread + to me)
-// always on top (empty: "Nothing waits for you"), everything else one folded history without the unread look
-const newsSecs = pairs => ({me: pairs.filter(([it]) => !it.read && newsForMe(it)), hist: pairs.filter(([it]) => it.read || !newsForMe(it))});
-function newsPlainHtml(shown, dms, pop, dmHtml) {
-  const s = newsSecs(shown), row = ([it, i]) => newsItemHtml(it, i, pop), calm = ([it, i]) => newsItemHtml(it, i, pop, true), me = dmHtml + s.me.map(row).join('');
-  return newsSecHead('me', newsMeCount(), true) + (me || newsMeEmpty()) + newsHistHtml(s.hist.length, s.hist.map(calm).join(''));
-}
 function bellPopHtml() {
   const mine = S.nf.items && S.nf.f === S.nf.filter ? S.nf.items : null, n = bellCount(), nAll = S.news?.unread || 0;
   if (teamOn() && S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; }); }
@@ -91,14 +82,12 @@ function bellPopHtml() {
   const forMe = all0.filter(([it]) => newsForMe(it)), act = all0.filter(([it]) => !newsForMe(it));
   const all = [...forMe, ...act];  // "For you" first, then the activity
   const kOk = all.filter(([it]) => newsKindOk(it)), kMe = kOk.filter(([it]) => !it.read && newsForMe(it));
-  const shown = [...kMe, ...kOk.filter(([it]) => it.read || !newsForMe(it)).slice(0, BELL_N)];  // 2.1037.0 (#5807): every entry for me, the history cut
   const dms = dmRows(), pre = dueRowsHtml() + dms.map(dmRowHtml).join('');  // 2.1037.0 (#5801): + the deadline lines
   const head = `<div class="bphead"><button type="button" class="bphl" data-bp="news" title="${esc(tr('Show all'))}"><b id="bp-h">${tr('News')}</b><span class="bpchev" aria-hidden="true">›</span></button>${n ? `<span class="bpnew">${esc(tr('{0} for you', n))}</span>` : ''}<span class="spacer"></span>${nAll ? `<button type="button" class="btn sm bpread" data-bp="readall" title="${esc(tr('Mark all as read'))}" aria-label="${esc(tr('Mark all as read'))}">${ic('check', 's')}<span>${tr('All read')}</span></button>` : ''}<button type="button" class="iconbtn" data-bp="settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
   let body;
   if (!mine) body = `<div class="empty bpempty">${S.nf.err === 'offline' ? tr('News are only available online.') : S.nf.err ? esc(S.nf.err) : tr('Loading…')}</div>`;
-  else if (newsBundled()) body = `<div class="nlist bplist nbund">${/*html-ok*/ newsBundledHtml([...kMe, ...kOk.filter(([it]) => it.read || !newsForMe(it)).slice(0, 40)], true, pre)}</div>`;  // 2.17.0 (#452); 2.1037.0 (#5807): the 40 cut only the history
-  else body = `<div class="nlist bplist">${/*html-ok*/ newsPlainHtml(shown, dms, true, pre)}</div>`;  // 2.138.2 D (#2405); 2.1037.0 (#5807): For you + history
-  if (!mine && pre) body = `<div class="nlist bplist">${/*html-ok*/ newsSecHead('me', newsMeCount(), true)}${/*html-ok*/ pre}</div>`;
+  else body = `<div class="nlist bplist nbund">${/*html-ok*/ newsBundledHtml([...kMe, ...kOk.filter(([it]) => it.read || !newsForMe(it)).slice(0, 40)], true, pre)}</div>`;  // 2.17.0 (#452); 2.1037.0 (#5807): the 40 cut only the history; 2.1052.0 (#5808): the one way
+  if (!mine && pre) body = `<div class="nlist bplist nbund">${/*html-ok*/ newsBundledHtml([], true, pre)}</div>`;  // 2.1052.0 (#5808): the same For you while loading
   const grab = isMobile() ? `<div class="bpgrab" data-bpgrab role="button" tabindex="0" aria-label="${esc(tr('Drag up for more room, tap for full height'))}" title="${esc(tr('Drag up for more room, tap for full height'))}"><i></i></div>`
     : `<button type="button" class="bpgrip" data-bpgrip aria-label="${esc(tr('Resize (arrow keys; double-click: default size)'))}" title="${esc(tr('Drag to resize · double-click: default size'))}"></button>`;
   return `<div class="bpop" role="dialog" aria-labelledby="bp-h">${isMobile() ? grab : ''}${head}${mine ? newsChipsHtml(all.map(x => x[0]), 'data-bpk') : ''}${body}<div class="bpfoot"><button type="button" class="btn pri" data-bp="all">${tr('Show all')}</button></div>${isMobile() ? '' : grab}</div>`;
@@ -396,7 +385,7 @@ function news_body() {
   // 2.13.0 (#453 P9): ONE filter row: "All" (clears both), "Mentions & assigned to me" (server filter) and the kinds
   const k0 = S.nf.kind, fchips = (items) => { const h = newsChipsHtml(items || [], 'data-nk').replace(/^<div class="nchips"[^>]*>/, '').replace(/<\/div>$/, '').replace(/<button type="button" class="nchip [^"]*" data-act="news-kind" data-nk="" aria-pressed="[^"]*">.*?<\/button>/, '');
     return `<div class="nchips nfrow" role="group" aria-label="${esc(tr('Show only'))}"><button type="button" class="nchip ${f || k0 ? '' : 'on'}" data-act="news-filter" data-f="" data-nk="" aria-pressed="${!f && !k0}">${tr('All')}${newsMeCount() ? `<span class="c nchipn">${esc(newsMeCount() > 99 ? '99+' : newsMeCount())}</span>` : ''}</button><button type="button" class="nchip ${f ? 'on' : ''}" data-act="news-filter" data-f="me" data-fme aria-pressed="${!!f}">${ic('at', 's')}${tr('Mentions & assigned to me')}</button>${h}</div>`; };
-  const bar0 = `<div class="nbar"><button class="btn sm ntog ${S.nf.unread ? 'on' : ''}" data-act="news-unread" aria-pressed="${S.nf.unread}" title="${esc(tr('Hide news you have already read'))}">${ic('eye', 's')}${tr('Unread only')}</button><button class="btn sm ntog ${newsBundled() ? 'on' : ''}" data-act="news-bundle" aria-pressed="${newsBundled()}" title="${esc(tr('Group by task, what needs you first'))}">${ic('columns', 's')}${tr('Bundled')}</button><span class="spacer"></span>${S.news?.unread && (S.agents || []).some(x => x.enabled) ? `<button class="btn sm" data-act="news-sum" aria-haspopup="menu" title="${esc(tr('An agent summarises your unread news in its chat'))}">${ic('bot', 's')}${tr('Summarise')}</button>` : ''}${S.news?.unread ? `<button class="btn sm" data-act="news-readall" title="${esc(tr('Mark all as read'))}">${ic('check', 's')}${tr('All read')}</button>` : ''}<button class="iconbtn" data-act="news-settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
+  const bar0 = `<div class="nbar"><button class="btn sm ntog ${S.nf.unread ? 'on' : ''}" data-act="news-unread" aria-pressed="${S.nf.unread}" title="${esc(tr('Hide news you have already read'))}">${ic('eye', 's')}${tr('Unread only')}</button><span class="spacer"></span>${S.news?.unread && (S.agents || []).some(x => x.enabled) ? `<button class="btn sm" data-act="news-sum" aria-haspopup="menu" title="${esc(tr('An agent summarises your unread news in its chat'))}">${ic('bot', 's')}${tr('Summarise')}</button>` : ''}${S.news?.unread ? `<button class="btn sm" data-act="news-readall" title="${esc(tr('Mark all as read'))}">${ic('check', 's')}${tr('All read')}</button>` : ''}<button class="iconbtn" data-act="news-settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
   const mine0 = S.nf.items && S.nf.f === f ? S.nf.items : null;
   // 2.28.0 (#987): "For you" (people: mentions, assignments, replies, direct messages) | "Activity" (changes, agents) | All
   const tab = newsTab(), nMe = newsMeCount(), nAct = 0;  // 2.1037.0 (#5807): only what waits for me has a number (the bell's), Activity none
@@ -411,19 +400,17 @@ function news_body() {
   const vis = (mine || []).map((it, i) => [it, i]).filter(([it]) => (!S.nf.unread || !it.read || it.keep) && inTab(it));
   const dms = tab === 'act' ? [] : dmRows().filter(r => !S.nf.unread || r.unread);
   const pre = (tab === 'act' ? '' : dueRowsHtml()) + dms.map(dmRowHtml).join('');  // 2.1037.0 (#5801): + the deadline lines
-  const dmh = pre ? `<div class="nlist ndms">${/*html-ok*/ pre}</div>` : '';
   const chips = '';  // 2.13.0: in the one filter row of the bar
   const shown = vis.filter(([it]) => newsKindOk(it));
-  const meEmpty = () => bar + `<div class="nlist">${/*html-ok*/ newsSecHead('me', 0, true)}${/*html-ok*/ newsMeEmpty()}</div>`;  // 2.1037.0 (#5807): For you always shows
+  const meEmpty = () => bar + `<div class="nbund">${/*html-ok*/ newsBundledHtml([], false)}</div>`;  // 2.1037.0 (#5807): For you always shows; 2.1052.0 (#5808): as the one way draws it
   if (tab !== 'act' && !pre && !vis.length) return meEmpty();
   if (mine && mine.length && !vis.length && !pre) return bar + `<div class="empty nempty">${ic('bell')}<b>${tab === 'me' ? tr('Nothing for you right now') : tr('All read.')}</b><span>${tab === 'me' ? tr('Mentions, assignments, replies and direct messages from people land here.') : tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
   if ((!mine || !mine.length) && !pre) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No news')}</b><span>${f ? tr('No mentions or assignments.') : esc(newsWhat())}</span></div>`;
   if (!shown.length && !pre) return bar + chips + `<div class="empty nempty">${ic('bell')}<b>${tr('Nothing of this kind.')}</b></div>` + newsMoreHtml();
   // 2.28.0 (#987): "All" shows the two sections, what people sent me first, the activity behind it
   // 2.1037.0 (#5807): All / For you: For you on top (the deadline lines and direct messages in it), the rest a folded history; Activity: a calm list
-  const listHtml = () => { if (newsBundled()) return `<div class="nbund">${/*html-ok*/ newsBundledHtml(shown, false, pre, tab === 'act')}</div>`; if (tab === 'act') return `<div class="nlist">${/*html-ok*/ shown.map(([it, i]) => newsItemHtml(it, i, false, true)).join('')}</div>`;
-    return `<div class="nlist">${newsPlainHtml(shown, dms, false, dmh)}</div>`; };
-  return bar + chips + listHtml() + newsMoreHtml() + `${newsBundled() ? '' : hintOnce('nswipe', tr('Swipe an item sideways to remove it.'), 'nswipe')}`;
+  // 2.1052.0 (#5808): bundled per task is the one way (Activity: only the calm bundles)
+  return bar + chips + `<div class="nbund">${/*html-ok*/ newsBundledHtml(shown, false, pre, tab === 'act')}</div>` + newsMoreHtml();
 }
 // 2.331.0 A (#3300): bell and list both cover ALL workspaces; an item from another workspace than the current one gets a small label
 function newsWsLabel(it) {

@@ -225,11 +225,10 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
   if (!allWs && /^office(\/|$)/.test(hash)) await exports.officeWs(proxy ? {'Remote-User': proxy} : {Cookie: cookie});  // 2.543.0 (#4606)
   // 1.8.1: the start view is the Inbox; the suites written before start on Today as a device that was there last
   // (pass ls: {'tasks.lastKey': null} for a real first start, p181_ui.js)
-  // 2.17.0 (#452): News are bundled per task by default; the suites written before test the plain list (that device
-  // setting), p2170_ui passes ls: {'tasks.newsBundle': null} for the bundled default
+  // 2.1052.0 (#5808): News are always bundled per task (the plain list and its device setting newsBundle are gone)
   // 2.1037.0 (#5807): the history of the News (what does not wait for me) is folded by default; the suites written before see
   // it open (that device setting), p21037_b_bell_ui passes ls: {'tasks.newsHist': null} for the folded default
-  const store = Object.assign(shared ? shared.store : {}, {'tasks.newsBundle': 'false', 'tasks.newsHist': 'true', ...(hash || 'tasks.lastKey' in ls ? {} : {'tasks.lastKey': '"today"'}), ...ls});
+  const store = Object.assign(shared ? shared.store : {}, {'tasks.newsHist': 'true', ...(hash || 'tasks.lastKey' in ls ? {} : {'tasks.lastKey': '"today"'}), ...ls});
   for (const k of Object.keys(store)) if (store[k] === null) delete store[k];
   const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (lateAppError(e.detail)) { exports.lateErrs++; return; }  /* 2.577.0 (#3356): a MutationObserver callback queued before w.close() ends here, not in unhandledRejection (vm_try, p170_ui) */ if (!/navigation|Not implemented/.test(e.message)) { exports.errs.push(e.message); console.log('script error:', String((e.detail && e.detail.stack) || e.stack || '').split('\n').slice(0, 4).join(' | ')); } });
   const dom = await JSDOM.fromURL(B + path + (hash ? '#' + hash : ''), {runScripts: 'dangerously', resources: new PooledLoader(), pretendToBeVisual: true, virtualConsole: vc,

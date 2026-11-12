@@ -5,10 +5,10 @@
 // ------------------------------------------------------------------ #452 News bundled
 // News grouped per task (or list / kind) with one line of what happened ("3 comments · completed"), "Needs you"
 // (approvals, proposals, mentions, assignments, follow-ups) above "For your information", "Mark read" per group, and
-// "Summarize": the unread items go to an agent's chat, which answers with a short summary. Per device: bundled or the
-// plain list (the toggle in the bar).
-const NEWS_NEEDS = ['approval', 'proposal', 'mention', 'assign', 'take', 'followup'];  // 2.1037.0 (#5807): no longer decides "For you" (the server's to_me does)
-const newsBundled = () => LS.get('newsBundle', true) !== false;
+// "Summarize": the unread items go to an agent's chat, which answers with a short summary.
+// 2.1052.0 (#5808): the ONE way News shows (bell, sheet, News view): "For you" is what the server marks for me (it.to_me,
+// the entries the bell counts), no list of kinds in the browser; the plain list and its toggle "Bundled" are gone
+// (the device setting newsBundle is no longer read)
 function newsGroups(items) {
   const groups = new Map();
   for (const [it, i] of items) {
@@ -17,8 +17,7 @@ function newsGroups(items) {
       key = key0 + (it.read ? 'r' : 'u');
     if (!groups.has(key)) groups.set(key, {key, items: [], needs: false, unread: 0, at: it.created_at});
     const g = groups.get(key);
-    // 2.66.1 (#1943): what the server marks "For you" (the bell's number: replies to me, an agent's comments that reach me) needs me
-    // 2.1037.0 (#5807): "For you" = what the server marks for me (it.to_me, the bell's number; follow-ups and proposals too since #5801)
+    // 2.1052.0 (#5808): a bundle stands under "For you" when at least one unread entry in it is to_me (the bell's number)
     g.items.push([it, i]); if (!it.read && it.to_me) g.needs = true; if (!it.read) g.unread++;  // 2.138.2 D (#2405): only unread bundles need me
   }
   // 2.102.0 B (#2197): unread lines first (the sort is stable: the server's order stays inside)
@@ -61,7 +60,7 @@ function newsBundledHtml(vis, pop, pre = '', noMe = false) {
   if (noMe) return hist.map(g => newsGroupHtml(g, pop, true)).join('');
   const sect = (id, title, n, body, cls) => `<section class="nsect ${cls}" aria-labelledby="${id}"><h2 id="${id}" class="nsh">${title}${n ? `<span class="c">${n}</span>` : ''}</h2>${body}</section>`;
   return sect('ns-need', tr('For you'), newsMeCount(), (pre + needs.map(g => newsGroupHtml(g, pop)).join('')) || newsMeEmpty(), 'me')
-    + newsHistHtml(hist.length, hist.map(g => newsGroupHtml(g, pop, true)).join(''), true);
+    + newsHistHtml(hist.length, hist.map(g => newsGroupHtml(g, pop, true)).join(''));
 }
 async function newsGroupRead(ids) {
   try { await rawFetch('POST', '/api/news/read', {ids}); } catch (e) { toast(e.message); return; }
@@ -85,14 +84,13 @@ function newsSummarize(anchor) {
   else menu(anchor, ags.map(a => ({label: tr('Ask {0}', a.name), icon: 'bot', fn: () => send(a)})));
 }
 document.addEventListener('click', e => {
-  const a = e.target.closest?.('[data-act="news-gread"],[data-act="news-group"],[data-act="news-bundle"],[data-act="news-sum"]'); if (!a) return;
+  const a = e.target.closest?.('[data-act="news-gread"],[data-act="news-group"],[data-act="news-sum"]'); if (!a) return;
   e.preventDefault(); e.stopPropagation();
   if (a.dataset.act === 'news-gread') {  // 2.17.2: the focus moves on to the group in the same place (or the last one)
     const gs = $$('#view .ngroup, .bplist .ngroup'), gi = gs.indexOf(a.closest('.ngroup')), inPop = !!a.closest('.bplist');
     newsGroupRead(a.dataset.ids.split(',').map(Number)).then(() => { if (!document) return; const n = $$((inPop ? '.bplist' : '#view') + ' .ngroup .ngmain'); (n[Math.min(gi, n.length - 1)] || $('#view h1, #top h1'))?.focus?.(); });
   }
   else if (a.dataset.act === 'news-group') { S.nf.openG = S.nf.openG === a.dataset.g ? null : a.dataset.g; render(); if ($('#pop .bpop')) { const p = $('#pop'); p.innerHTML = bellPopHtml(); } }
-  else if (a.dataset.act === 'news-bundle') { LS.set('newsBundle', !newsBundled()); render(); if ($('#pop .bpop')) $('#pop').innerHTML = bellPopHtml(); }
   else if (a.dataset.act === 'news-sum') newsSummarize(a);
 }, true);
 document.addEventListener('keydown', e => { const g = e.target.closest?.('.ngmain[data-act="news-group"]'); if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); g.click(); } });
