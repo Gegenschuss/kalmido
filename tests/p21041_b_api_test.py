@@ -210,6 +210,19 @@ sv = [x for x in inv.get("items") or [] if x["kind"] == "service"]
 check(len(sv) == 1 and sv[0]["qty"] == 1 and sv[0]["unit"] == "flat" and inv["totals"]["net"] == "3960.00" and sv[0]["cost"] == 900,
       "#5817: the invoice from a flat price quotation: one position per tax rate, same net, the purchase on it " + str(sv)[:300])
 
+# ---------------------------------------------------------------- 2.1051.0: together with #5815 (a position's own discount)
+QD = new(A)
+j = items(A, QD["id"], [svc("Konzept", 2, 1000, discount_pct=10), svc("Moodfilm", 1, 400, "optional", discount_pct=50)])
+il = {x.get("title"): x for x in lines(j, "item")}
+check(j["totals"]["net"] == 1800 and il["Moodfilm"].get("opt") == "optional" and il["Moodfilm"].get("line_discount") == 200 and il["Moodfilm"]["total"] == 200,
+      "#5815 + #5814: an optional position shows its own discount and still counts in no sum " + str((j["totals"]["net"], il["Moodfilm"])))
+j = A.patch(B + f"{D}/{QD['id']}", json={"flat_print": 1}).json()
+rd = A.get(B + f"{D}/{QD['id']}/render").json()
+il = {x.get("title"): x for x in rd["lines"] if x["kind"] == "item"}
+check(not any(k in il["Konzept"] for k in ("discount_pct", "list_total", "line_discount")) and not any(k in il["Moodfilm"] for k in ("discount_pct", "list_total", "line_discount")),
+      "#5815 + #5817: a flat price leaves a position's own discount out of the print model (it names the list price) " + str(il))
+check(rd["totals"]["net"] == 1800, "#5815 + #5817: the net stays " + str(rd["totals"]["net"]))
+
 # ---------------------------------------------------------------- with parts (review F1 / F2): no part sums in a flat price, "Optional:" on a part page
 QT = new(A)
 r = A.post(B + f"{D}/{QT['id']}/parts", json={"title": "Modul"})
