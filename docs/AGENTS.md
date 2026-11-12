@@ -4857,6 +4857,10 @@ object's history, marked as an agent's. Creating, deleting, the trash and sharin
 the light kinds `task`, `event`, `hub_mail`, `client`. `GET .../links` lists every link of an object you see: `dir` (`out` = from
 it, `in` = to it), `rel` (what it means), `note`, and `other` = the other side `{kind, id, state, title, open_url}`; `state` is
 `ok`, or `gone` once that object is deleted or in the trash (then without title); a side you may not see is left out.
+Review 2.1076: a side in the trash shows as `gone` only when you may restore it (else it is left out); a side deleted for good
+is `{state: gone}` without `kind` and `id` unless you made the link. Your token needs the read scope of the other side too
+(an event: `calendar`; a contact: `contacts`): linking to a kind you may not read is `403`, such sides are left out of the list,
+and removing a link needs the write scope of its source. The workspace of a file, a knowledge page or a table is its own row's.
 `POST .../links` with `{kind, id, rel?, note?}` links the object (you need write on it: your share `edit`, the kind's write
 scope) with another one you see in the **same workspace**; `rel` is a short name (default `related`), `note` at most 500
 characters; the same pair and `rel` again returns the same link. `409`: another workspace, an end-to-end locked project on
