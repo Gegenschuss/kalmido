@@ -6,6 +6,7 @@
    key / entry is a 400 and nothing changes
  - a folder rename running next to a set_delta add keeps both (the account's settings lock)
  - a person without an organisation (freelancer-matrix: office): the same in the personal office
+ - 2.1013.0 (#5519): PATCH /api/settings with sec_devices (the known browsers of the security mail) changes nothing
 usage: p2269_b_settings_test.py <datadir>      (KMT_NOSTART=1 / P2269B_NOSTART=1: a running server)"""
 import json
 import sys
@@ -105,6 +106,11 @@ def delta_suite(s1, s2, who):
     # the notification matrix as a partial change (the web app's switch)
     r = s1.patch(B + "/api/settings", json={"notify": {"assign": {"push": 0}}})
     check(r.ok and json.loads(settings(s1)["notify"] or "{}").get("assign", {}).get("push") == 0, f"{who}: one switch of the matrix ({r.status_code} {r.text[:100]})")
+    # 2.1013.0 (#5519): sec_devices is server-only - a session cannot silence the mail "new device" by planting hashes
+    sd0 = settings(s1).get("sec_devices")
+    r = s1.patch(B + "/api/settings", json={"sec_devices": json.dumps(["planted"])})
+    check(r.ok and settings(s1).get("sec_devices") == sd0 and "planted" not in str(settings(s1).get("sec_devices")),
+          f"{who}: #5519 a PATCH of sec_devices changes nothing ({r.status_code} {settings(s1).get('sec_devices')!r})")
 
 
 # ---------------------------------------------------------------- an organisation's office
