@@ -40,7 +40,7 @@ from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_lis
 from ..accounts.session import me
 from ..core.errors import BadInput, reject_unknown
 from ..api.common import v1_args, v1_err, v1_json, v1_view
-from ..tasks.tasks import can_move, check_assignee  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.tasks import can_move, check_assignee, move_lock_subtree  # 2.369.5 (#2517): pulled up; 2.1019.0 (#5633): + lock
 from .fields import field_value, field_act  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import user_names, send_pushes  # 2.369.5 (#2517): pulled up from functions
 from ..core.objcomments import ocm_add, ocm_after, ocm_mentions_clean  # 2.972.0 (#5272): the comments' core
@@ -895,6 +895,8 @@ def rul_exec(c, r, tid):
             try:
                 with c.savepoint():
                     did = False
+                    if any(k == "move" for k, _a in rul_acts(r)):  # 2.1019.0 (#5633): the task and its subtasks in id order before
+                        move_lock_subtree(c, [tid])  # an earlier action of the chain writes the task (as tasks/batch.py task_batch)
                     for k, a in rul_acts(r):
                         if k == "comment":
                             rul_comment(c, r, tid, a["text"])

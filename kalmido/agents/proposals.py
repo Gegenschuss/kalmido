@@ -20,7 +20,7 @@ from ..core.access import (
 from ..core.state import visible_lists, visible_sections
 from ..lists.lists import list_created, clean_folder, FOLDER_MAX
 from ..tasks.validation import as_int, check_parent, DURATION_MAX, log_act, PRIORITIES, TITLE_MAX, valid_date, valid_hm
-from ..tasks.tasks import my_tags
+from ..tasks.tasks import my_tags, move_lock_subtree  # 2.1019.0 (#5633): move_lock_subtree
 from ..tasks.lifecycle import apply_update, do_delete, restore_task
 from ..tasks.attachments import need_attachment, send_stored
 from ..collab.comments import collab_user, lang_of, task_event, user_names
@@ -916,6 +916,8 @@ def prop_run(c, j, sel, ed, extra):
     # triage: moves / edits of the person's inbox items (normal changes: apply_update checks every move)
     stale = []  # 2.528.0 (#4305 A8): tasks changed since the proposal
     oxa_prop_locks(c, prop)
+    prop_move_lock(c, [(it["task_id"], edits.get(str(i), {}).get("list_id") if "list_id" in edits.get(str(i), {}) else it["list_id"])
+                       for i, it in enumerate(prop["items"]) if str(i) in selected])  # 2.1019.0 (#5633): the lid of the loop below
     for i, it in enumerate(prop["items"]):
         if str(i) not in selected:
             continue
@@ -977,6 +979,16 @@ def oxa_prop_base(c, kind, p):
     p["base"] = {str(r["id"]): {k: r[k] for k in fields} for r in c.execute(
         f"SELECT id, {', '.join(fields)} FROM tasks WHERE id IN ({','.join('?' * len(ids))})", ids)} if ids else {}
     return p
+
+
+def prop_move_lock(c, items):
+    """2.1019.0 (#5633): items = [(task id, it moves)] of one apply / undo / redo: the rows of the moving tasks and all their
+    subtasks, and the rows of the other tasks it writes, in id order BEFORE the first apply_update (tasks/tasks.py
+    move_lock_subtree, as tasks/batch.py task_batch). One by one in the proposal's order, a move held a task while the restore of
+    "Delete all times" held another in id order: deadlock (500, no wrong data)."""
+    items = [(int(t), bool(m)) for t, m in items if str(t).isdigit()]
+    if items:
+        move_lock_subtree(c, [t for t, m in items if m], along=[t for t, _m in items])
 
 
 def oxa_prop_locks(c, prop):
@@ -1154,6 +1166,7 @@ def proposal_undo(jid):
             c.rollback()
             raise
     elif j["kind"] in ("triage", "dayplan"):
+        prop_move_lock(c, [(tid, "list_id" in ch["before"]) for tid, ch in rec["changes"].items()])  # 2.1019.0 (#5633)
         for tid, ch in rec["changes"].items():
             try:
                 need_task(c, int(tid))
@@ -1277,6 +1290,7 @@ def proposal_redo(jid):
             raise
         rec.update(undone=False)
     elif j["kind"] in ("triage", "dayplan"):
+        prop_move_lock(c, [(tid, "list_id" in ch["after"]) for tid, ch in rec["changes"].items()])  # 2.1019.0 (#5633)
         for tid, ch in rec["changes"].items():
             try:
                 need_task(c, int(tid))
