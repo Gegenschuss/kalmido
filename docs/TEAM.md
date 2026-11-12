@@ -139,18 +139,21 @@ task as a push at the highest priority, even if the project is quiet.
   "As the project" for you.
 - **Honest limit**: on Android (ntfy) an urgent push comes through. On an iPhone the web app cannot break through Focus or
   silent mode; there it is a prominent push, not an alarm.
-## Comments by agents: only replies to me
+## From agents: only what needs me
 
-*Since 2.62.0.*
+*Since 2.62.0 (comments), since 2.1043.0 also new tasks, completions and status.*
 
-*Settings > Notifications > Comments by agents* decides which comments of connected agents reach you (News and push):
-**All** (default, as before) or **Only replies to me**. With "only replies" an agent's comment reaches you only when it
+*Settings > Notifications > From agents* decides what connected agents bring into your bell (News and push):
+**All** (default, as before) or **Only what needs me**. With "only what needs me" an agent's comment reaches you only when it
 answers one of your comments (reply), comes right after your comment on that task, or @mentions you.
 
 - A task marked **Urgent** for you still brings every comment of that task; a project bell **All** does not override "only replies" for agents.
 - Approval cards, questions with buttons and suggestions of an agent always arrive: they wait for your answer.
 - A project bell **All** and a task marked **Urgent** for you still bring every comment of that project / task.
-- Pushes about other things agents do (new tasks, completions) keep their own switch.
+- **Since 2.1043.0** an agent's new tasks, completions (also closing / reopening) and project status changes stay quiet with
+  "only what needs me": no News entry, no push, also not through a project bell **All** / **Custom**. They still arrive when
+  the task is assigned to you or marked **Urgent** for you; what the agent assigns to you arrives as an assignment.
+- With **All**, pushes about other things agents do (new tasks, completions) keep their own switch.
 - **The bell (2.66.1)**: the agent comments that reach you count in the bell's number and under *For you* - with "only
   replies" its replies and mentions plus what reaches you anyway (approval cards and questions waiting for you, comments on
   a task marked **Urgent** for you), with **All** every agent comment. Other things agents do (completions, status,

@@ -15,7 +15,8 @@ not optional:
   2. account  the person's settings: S[uid] when the caller read them for many (the watchdog, the team chat), else
               collab_user (enabled account, collaboration on)
   3. News     news = {kind, task_id, list_id, comment_id, data, actor}: the entry is written for everyone after step 2 whose
-              notification settings want it (collab/news.py news_put: notif_ok 'news', the list bell)
+              notification settings want it (collab/news.py news_put: notif_ok 'news', the list bell;
+              2.1043.0 #5792: agent_event_ok -- an agent's routine event for a person with "only what needs me")
   4. follow   the core's obj_follow (2.972.0, #5285, core/objfollow.py ofl_quiet): follow="quiet" = no push while the
               person's bell of the object is muted or urgent (urgent pushes on its own), follow="unmuted" = no push only while
               it is muted; done_ok = an urgency "until completed" still counts for the completion itself. Or a function

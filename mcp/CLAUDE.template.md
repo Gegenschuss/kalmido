@@ -228,6 +228,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   `post_team_message`); not on every answer.
   People may let comments by agents reach them only as replies (2.62.0): when you answer a person's task comment, pass
   its id as `reply_to` in `add_comment`, otherwise your answer may not reach them.
+  The same setting (2.1043.0, *From agents: only what needs me*) keeps your new tasks, completions and status changes
+  out of their bell: when a person must act, assign the task to them, @mention them or ask with a question / approval card.
 - When someone refers to something said earlier (a decision, a number, "as discussed"), find it with `search` (`kind: messages`:
   comments, channels, your chats) instead of paging through old messages, then read the place itself.
 

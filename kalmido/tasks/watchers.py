@@ -120,7 +120,7 @@ def wat_note(c, tid, kind, actor):
                         news={"kind": "complete", "task_id": tid, "actor": actor if actor is not None else 0,
                               "data": None if kind == "complete" else {"st": kind}},
                         follow="quiet", done_ok=kind == "complete",  # 2.972.0 (#5285): the bell of obj_follow (muted: no push; urgent: pushed by tbl_note)
-                        gate=lambda uid, s: push_reachable(c, uid, s) and agent_push_ok(c, uid, s, actor) and
+                        gate=lambda uid, s: push_reachable(c, uid, s) and agent_push_ok(c, uid, s, actor, "complete", tid) and  # 2.1043.0 (#5792): row
                         burst_gate(c, uid, tid, event=True, kind="complete"))
     for uid, s in pushes.items():
         lg = lang_of(s)

@@ -98,15 +98,16 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-pmeta': ['photo_meta_strip', N_('Remove location data from photos'), 'chk'],  // 2.61.0 B (#1819)
   's-kbda': ['chat_kbd_agent', N_('Close the keyboard after sending (agent chat)'), 'chk'], 's-kbdt': ['chat_kbd_team', N_('Close the keyboard after sending (team chat)'), 'chk'],  // 2.235.0 D (#2899)
   's-vext': ['video_ext_ok', N_('Load YouTube and Vimeo videos without asking'), 'chk'],  // 2.240.0 D (#2886)
-  's-bl9ac': ['agent_comments', N_('Comments by agents'), 'sel'],  // 2.62.0 (#1854)
+  's-bl9ac': ['agent_comments', N_('From agents'), 'sel'],  // 2.62.0 (#1854); 2.1043.0 (#5792): wider than comments
   's-asst-on': ['assistant_on', N_('Use the assistant'), 'chk'],  // 2.75.0 (#1411)
   's-wkst': ['week_start', N_('First day of the week'), 'sel'], 's-tfmt': ['time_format', N_('Time format'), 'sel'], 's-dord': ['date_order', N_('Date format'), 'sel'],  // 2.368.0 B (#2982)
   's-trd': ['chat_read_receipts', N_('Send read receipts'), 'chk'],  // 2.139.0 A (#2129)
   's-mview': ['member_view', N_('View as member'), 'chk'],  // 2.436.0 (#3620): core.js mvResp
 };
 // 2.62.0 (#1854): comments by agents: all | only replies to me (people's comments stay as the matrix says)
-const bl9SetHtml = (s, hint) => collab() && feat('agents') ? `<div class="row"><label for="s-bl9ac">${tr('Comments by agents')}</label><select id="s-bl9ac">${[['all', N_('All')], ['replies', N_('Only replies to me')]].map(([v, n]) => `<option value="${v}" ${(s.agent_comments || 'all') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-      ${hint(tr('Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.'))}` : '';
+// 2.1043.0 (#5792): "replies" = only what needs me: an agent's new tasks, completions and status changes stay quiet too
+const bl9SetHtml = (s, hint) => collab() && feat('agents') ? `<div class="row"><label for="s-bl9ac">${tr('From agents')}</label><select id="s-bl9ac">${[['all', N_('All')], ['replies', N_('Only what needs me')]].map(([v, n]) => `<option value="${v}" ${(s.agent_comments || 'all') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+      ${hint(tr('Only what needs me: from agents you get (News and push) their questions, approval cards and proposals, mentions of you, replies to your comment and what they assign to you. Their other comments, new tasks, completions and status changes stay quiet, unless the task is assigned to you or set to Urgent by you. What people do is not affected.'))}` : '';
 const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'ws_accent', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'week_start', 'time_format', 'date_order', 'agents_hidden', 'side_people', 'side_agents'];
 const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)

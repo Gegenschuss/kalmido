@@ -7,6 +7,9 @@
  - comments by people always reach me as before; "all" brings every agent comment as before; a list bell "All" does not outrank it (leader decision), the task's "Urgent" does
  - 2.66.1 (#1943): the bell (unread_me) counts the agent's comments that reach me (replies / mentions; with "all" every
    comment), a bundle counts when any unread item in it is for me; an agent's completion / assignment has no number
+ - 2.1043.0 (#5792): with "replies" (only what needs me) an agent's new task and completion write no News entry, also not
+   through a list bell "All"; the same events by a person still come; a task assigned to me or with my "Urgent" still
+   brings the agent's completion; someone with "all" still gets them; a person without an organisation the same way
 usage: p262_b_api_test.py <datadir>"""
 import os
 import dbx as dbxm
@@ -183,6 +186,56 @@ check(A.patch(B + "/api/settings", json={"agent_comments": "all"}).ok, "back to 
 says(Bo, T2, "bob")
 c = agent_says(T2, "a plain agent note")
 check(news_for(ALICE, c) and unread_me(A) == 1, "#1943: with 'all' a plain agent comment counts at the bell")
+
+# ================================================================== 2.1043.0 (#5792): an agent's routine events with "replies"
+
+
+def news_task(uid, tid, kind):
+    return dbx("SELECT id FROM notifications WHERE user_id=? AND task_id=? AND kind=?", (uid, tid, kind))
+
+
+def agent_task(lid, title, **kw):
+    r = requests.post(V + "/tasks", headers=CLH, json={"title": title, "list_id": lid, **kw})
+    assert r.status_code in (200, 201), r.text
+    return r.json()["id"]
+
+
+def agent_done(tid):
+    check(requests.post(V + f"/tasks/{tid}/complete", headers=CLH).ok, "#5792: the agent completes task " + str(tid))
+
+
+check(A.patch(B + "/api/settings", json={"agent_comments": "replies"}).ok, "#5792: alice back to 'only what needs me'")
+check(A.put(B + f"/api/lists/{W['id']}/bell", json={"mode": "all"}).ok and Bo.put(B + f"/api/lists/{W['id']}/bell", json={"mode": "all"}).ok,
+      "#5792: alice and bob: list bell 'All' (every new task and completion)")
+T5 = agent_task(W["id"], "Agent made this")
+check(not news_task(ALICE, T5, "newtask"), "#5792: an agent's new task writes no News entry for 'only what needs me', not even with the bell 'All'")
+check(news_task(BOB, T5, "newtask"), "#5792: bob with 'all' still gets the agent's new task (bell 'All')")
+agent_done(T5)
+check(not news_task(ALICE, T5, "complete"), "#5792: an agent's completion writes no News entry for 'only what needs me'")
+check(news_task(BOB, T5, "complete"), "#5792: bob with 'all' still gets the agent's completion")
+T6 = Bo.post(B + "/api/tasks", json={"title": "Bob made this", "list_id": W["id"]}).json()["id"]
+check(news_task(ALICE, T6, "newtask"), "#5792: a person's new task still comes with the bell 'All'")
+check(Bo.post(B + f"/api/tasks/{T6}/complete").ok and news_task(ALICE, T6, "complete"), "#5792: a person's completion still comes")
+# what needs me: a task assigned to me, a task I set to "Urgent"
+T7 = agent_task(W["id"], "For alice", assignee_id=ALICE)
+check(dbx("SELECT 1 FROM notifications WHERE user_id=? AND task_id=? AND kind='assign'", (ALICE, T7)), "#5792: the agent's assignment to me still comes")
+agent_done(T7)
+check(news_task(ALICE, T7, "complete"), "#5792: the agent's completion of a task assigned to me still comes")
+T8 = agent_task(W["id"], "Watch this")
+check(A.put(B + f"/api/tasks/{T8}/bell", json={"level": "urgent"}).ok, "#5792: alice sets 'Urgent' on the agent's task")
+agent_done(T8)
+check(news_task(ALICE, T8, "complete"), "#5792: the agent's completion of a task with my 'Urgent' still comes")
+A.put(B + f"/api/lists/{W['id']}/bell", json={"mode": "default"})
+# a person without an organisation, the same rule (freelancer-matrix: tasks)
+FRED = state(Fr)["me"]["id"]
+P = A.post(B + "/api/lists", json={"name": "Side"}).json()
+check(A.put(B + f"/api/lists/{P['id']}/members", json={"user_id": FRED, "role": "edit"}).ok and
+      A.put(B + f"/api/lists/{P['id']}/members", json={"user_id": CL, "role": "edit"}).ok, "#5792: share a project with fred and the agent")
+check(Fr.put(B + f"/api/lists/{P['id']}/bell", json={"mode": "all"}).ok, "#5792: fred: bell 'All'")
+T9 = agent_task(P["id"], "Agent for fred's project")
+check(not news_task(FRED, T9, "newtask"), "#5792: freelancer with 'only what needs me': no News entry for the agent's new task")
+T10 = A.post(B + "/api/tasks", json={"title": "Alice for fred's project", "list_id": P["id"]}).json()["id"]
+check(news_task(FRED, T10, "newtask"), "#5792: freelancer: a person's new task still comes")
 
 print(f"p262_b_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

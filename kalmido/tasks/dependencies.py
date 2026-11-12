@@ -177,7 +177,7 @@ def newtask_events(c, tid):
         got = obj_notify(c, "task", tid, [uid], row="newtask", lid=t["list_id"],
                           news={"kind": "newtask", "task_id": tid, "actor": actor},
                           gate=lambda u, s: push_reachable(c, u, s) and burst_gate(c, u, tid, event=True) and
-                          agent_push_ok(c, u, s, actor))  # 2.28.0 (#987)
+                          agent_push_ok(c, u, s, actor, "newtask", tid))  # 2.28.0 (#987); 2.1043.0 (#5792): row
         if uid not in got:
             continue
         s = got[uid]

@@ -638,7 +638,7 @@ def task_event(c, tid, kind, prev_assignee=None, skip=None):
         if not notif_ok(c, uid, s, KIND_ROW[kind], "push", t["list_id"]) or not push_reachable(c, uid, s) or \
                 not burst_gate(c, uid, tid, event=True, kind=kind):
             continue
-        if kind == "complete" and not agent_push_ok(c, uid, s, actor):  # 2.28.0 (#987)
+        if kind == "complete" and not agent_push_ok(c, uid, s, actor, "complete", tid):  # 2.28.0 (#987); 2.1043.0 (#5792): row
             continue
         lg = lang_of(s)
         who = name if actor else tr("Someone via the public link", lg=lg)

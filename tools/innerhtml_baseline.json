@@ -5779,7 +5779,7 @@
 "static/js/settings.js|hint(tr('One file per project in a ZIP: Todoist CSV for the import of Todoist, Markdown as checklists for any notes app. Projects locked with a password stay out.'))": 1,
 "static/js/settings.js|hint(tr('One push with the numbers of your briefing (the first block of Today).'))": 1,
 "static/js/settings.js|hint(tr('Only on a wide screen: “Open on the right” in the menu of a project, task, document, knowledge page or calendar shows it there. The grip between the two halves changes their widths.'))": 1,
-"static/js/settings.js|hint(tr('Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.'))": 1,
+"static/js/settings.js|hint(tr('Only what needs me: from agents you get (News and push) their questions, approval cards and proposals, mentions of you, replies to your comment and what they assign to you. Their other comments, new tasks, completions and status changes stay quiet, unless the task is assigned to you or set to Urgent by you. What people do is not affected.'))": 1,
 "static/js/settings.js|hint(tr('Only you can chat with it; it runs on your own computer.'))": 1,
 "static/js/settings.js|hint(tr('Per person and day (at most 5 a day to one address). Over the limit the link is shown to copy.'))": 1,
 "static/js/settings.js|hint(tr('Private to you. Save from a task’s menu (…) or the project dialog; use via the template button or Projects > +.'))": 1,

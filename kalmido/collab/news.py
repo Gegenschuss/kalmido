@@ -114,13 +114,41 @@ def news_to_me(kind, actor_id, data, agents, s=None):
     return kind == "comment" and bool((data or {}).get("reply"))
 
 
-def agent_push_ok(c, uid, s, actor):
+def agent_push_ok(c, uid, s, actor, row=None, task_id=None):
     """2.28.0 (#987): a push about what an AGENT did (its comments, completions, new tasks, status) only when the person
-    switched "Pushes for what agents do" on (setting agent_push); mentions by agents, approval requests and (2.367.2, #2968) their questions on a task are not affected."""
+    switched "Pushes for what agents do" on (setting agent_push); mentions by agents, approval requests and (2.367.2, #2968) their questions on a task are not affected.
+    2.1043.0 (#5792): row = the event; an agent's routine event (AGENT_ROUTINE_ROWS) is held back by agent_event_ok too."""
     from ..agents.core import agent_ids
     if not actor or actor not in agent_ids(c):
         return True
+    if row and not agent_event_ok(c, uid, s, row, actor, task_id):
+        return False
     return (s or {}).get("agent_push") == "1"
+
+
+# 2.1043.0 (#5792): what an agent does without needing the person -- a new task, a completion / closing / reopening, a
+# project status. With agent_comments = replies ("From agents: only what needs me") these write no News entry and send no
+# push, also not through a list bell "All" / "custom". What still comes: questions with buttons, approval cards, proposals,
+# mentions, replies to my comment (rows of their own), and these events on a task assigned to me or with my bell "Urgent".
+AGENT_ROUTINE_ROWS = ("newtask", "complete", "status")
+
+
+def agent_event_ok(c, uid, s, row, actor, task_id=None):
+    """2.1043.0 (#5792): False = uid chose "only what needs me" and this is an agent's routine event (AGENT_ROUTINE_ROWS)
+    about something not assigned to uid and without uid's "Urgent" -- no News entry (news_put), no push (agent_push_ok)."""
+    if row not in AGENT_ROUTINE_ROWS or not actor or (s or {}).get("agent_comments") != "replies":
+        return True
+    from ..agents.core import agent_ids
+    if actor not in agent_ids(c):
+        return True
+    if task_id:
+        t = c.execute("SELECT assignee_id FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if t and t[0] == uid:
+            return True
+        from ..notify.taskbell import tbl_level
+        if tbl_level(c, uid, task_id, s, done_ok=True) == "urgent":
+            return True
+    return False
 
 
 def bl9_agent_comment_ok(s, uid, author, agents, prev, replied, mentioned):
@@ -432,7 +460,7 @@ def list_push(c, uid, row, lid, title_fn, msg_fn, click=None):
     if not uid or uid == me() or uid in agent_ids(c):
         return
     s = collab_user(c, uid, lid)
-    if not s or not notif_ok(c, uid, s, row, "push", lid) or not push_reachable(c, uid, s) or not agent_push_ok(c, uid, s, me()):
+    if not s or not notif_ok(c, uid, s, row, "push", lid) or not push_reachable(c, uid, s) or not agent_push_ok(c, uid, s, me(), row):  # 2.1043.0 (#5792): row
         return
     lg = lang_of(s)
     g.pushes.append((uid, title_fn(lg), msg_fn(lg), click or f"{PUBLIC_URL}/#l/{lid}", push_prio(s), {"scope": f"l:{lid}"}))  # 2.240.0 B2 (#2867)
@@ -468,6 +496,8 @@ def news_put(c, uid, kind, task_id=None, list_id=None, comment_id=None, data=Non
         lr = c.execute("SELECT list_id FROM tasks WHERE id=?", (task_id,)).fetchone()
         lid = lr[0] if lr else None
     if not notif_ok(c, uid, s, row or KIND_ROW.get(kind, kind), "news", lid):
+        return
+    if not own and not agent_event_ok(c, uid, s, row or KIND_ROW.get(kind, kind), actor, task_id):  # 2.1043.0 (#5792)
         return
     if not actor and not own:
         data = {**(data or {}), "via": "public_link"}
