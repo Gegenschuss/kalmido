@@ -1820,13 +1820,27 @@ from, root}, added}`; a locked folder: `409`. 2.558.0 (#4693): `GET /api/files` 
 folder and file `recog_on` (own switch: `recog`), each document `doc: {state, review}` (`&docs=1`: the document as in `GET
 /api/docs`, for the cards). `GET /api/search?kind=files` (2.1026.0, formerly `/api/files/search`) also finds documents by sender, type and tags (`hit: doc`).
 
+## Help for agents
+
+*Since 2.1050.0 (#5819).*
+
+The user documentation (`docs/*.md`, shipped in the image; never `docs/dev/`) for tokens: `GET /help` (overview: the feature
+list per area in short form, the files with their second-rank headings and keys), `GET /search?kind=help&q=&limit=` (a word
+search over headings and text: `{data: [{key, file, title, path, snippet}], more}`; not part of `kind=all`) and `GET
+/help/section?key=&lang=` (one section up to the next heading of the same rank, at most 16,000 characters: `{key, file,
+title, path, text, truncated, parts, ui_terms}`). Only keys of the index are read: a file name, a path or an unknown key is
+`404`. Scope `read`; the operator files (self-hosting, environment, upgrading, single sign-on, architecture, glossary, the
+pack catalogue, the privacy templates) only for an instance admin's token with `admin-read`. Details:
+[AGENTS.md](AGENTS.md#help-of-this-server).
+
 ## Scan inboxes: folder watcher
 
 *Since 2.207.0.*
 
 A scan inbox is a key with the one scope `docs:upload` ("Only upload documents"), bound to one place: a person's own
-documents or an organisation's, optionally one folder of it. People make and revoke it in Settings > Integrations > *Documents:
-inboxes* (web session only, never an agent; 2.1048.0, #5821: also from the menu of a folder of the documents, *Scan inbox for this
+documents or an organisation's, optionally one folder of it. People make and revoke it in Settings > Integrations > *Documents: inboxes* >
+*Folder watcher* > *New scan inbox* > *Create inbox* (2.1050.0: the path of the interface since 2.353; web session only, never an
+agent: only a person can create one; 2.1048.0, #5821: also from the menu of a folder of the documents, *Scan inbox for this
 folder…*, which opens that form with the folder and its name set, or *Show scan inbox* when the folder has one); it shows in Settings > Access > API tokens too (revocable there, its permissions
 cannot be changed). It counts against the 20 tokens per person. `docs:upload` is never offered for ordinary tokens
 (`POST /api/me/tokens` answers `400`) and never for agents (agents upload with `files:write`). An admin's limit for personal

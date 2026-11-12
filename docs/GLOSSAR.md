@@ -167,6 +167,7 @@ Connected agents: the agent API, proposals, quotas, locks, schedules, chat and t
 The REST API v1: shared helpers, scopes (token rights) and the OpenAPI description.
 
 - `kalmido/api/common.py` (`v1`) - The helpers of the /api/v1 routes (error format, view wrapper, body and argument checks, cursors, rate counter)
+- `kalmido/api/helpdocs.py` (`hlp`) - The help for agents: the user documentation (docs/*.md) as search kind help, one section by its key, the overview (2.1050.0)
 - `kalmido/api/openapi.py` - The OpenAPI 3.1 document of /api/v1 (served at /api/v1/openapi.json, built once)
 - `kalmido/api/projects.py` (`v1`) - The project overview in the token API
 - `kalmido/api/scopes.py` (`v1`) - Token scopes, approvals and the complete agent API (the routes the web client has)

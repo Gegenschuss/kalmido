@@ -51,6 +51,8 @@ WORKDIR /app
 COPY app.py VERSION mcp/starter_sha256.tx[t] mcp/kalmido_mcp.p[y] /app/
 COPY kalmido /app/kalmido
 COPY static /app/static
+# 2.1050.0 (#5819): the user documentation (docs/*.md, not docs/dev/) - agents search and read it (api/helpdocs.py)
+COPY docs/*.md /app/docs/
 COPY --from=staticpack /out/ /app/static_packed/
 # 2.207.0 B (#2763): the folder watcher downloads (KALMIDO_FOLDERWATCH_DIR overrides the folder)
 COPY --from=folderwatch /out/ /app/folderwatch/

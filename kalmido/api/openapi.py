@@ -794,11 +794,11 @@ def openapi_spec():
                               [{**q("q", "Search text (words; case, accents and ä/ae do not matter; each word matches word beginnings, "
                                     "names and numbers also a part of them)"), "required": True},
                                q("kind", "tasks (default) | messages | contacts (scope contacts: the answer of GET /contacts) | notes "
-                                 "(the answer of GET /notes) | files (scope files:read: {data: [file node + hit name|text|doc]}, was "
+                                 "(the answer of GET /notes) | help (2.1050.0: the documentation, {data: [{key, file, title, path, snippet}], more}; not in all) | files (scope files:read: {data: [file node + hit name|text|doc]}, was "
                                  "GET /files/search) | wiki (scope wiki:read: {data: [{id, path, name, space, role, url, snippet?, marks?}], "
                                  "more}) | events (scope calendar: {data: [event + snippet?, marks?]}) | all ({groups: {kind: [at most "
                                  "limit (default 5) entries of that kind's answer]}}, only the kinds the token may read)",
-                                 {"type": "string", "enum": ["tasks", "messages", "contacts", "notes", "files", "wiki", "events", "all"]}),
+                                 {"type": "string", "enum": ["tasks", "messages", "contacts", "notes", "files", "wiki", "events", "help", "all"]}),  # 2.1050.0 (#5819): + help
                                q("scope", "the older name of kind=messages (tasks | messages)", {"type": "string", "enum": ["tasks", "messages"]}),
                                q("book_id", "contacts: only this address book", {"type": "integer"}), q("group", "contacts: only this group"),
                                q("trash", "contacts: 1 = the contacts in the trash", {"type": "integer"}),
@@ -882,6 +882,8 @@ def openapi_spec():
     docs_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1111)
     from ..sheets.v1 import sheets_spec
     sheets_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.89.0 C (#1916)
+    from ..api.helpdocs import help_spec
+    help_spec(paths, schemas, op, ok, errs, ref, q)  # 2.1050.0 (#5819): the help for agents
     from ..wiki.wkv1 import wkv_spec
     wkv_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.200.0 C (#1781)
     from ..personal.v1focus import v1f_spec

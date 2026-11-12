@@ -2909,6 +2909,25 @@ TOOLS += [  # 2.558.0 (#4709): objects of the areas built on the shared core (on
      lambda api, a: api.call("POST", f"/agent/objects/{str(a['kind'])}/{_id(a, 'object_id')}/proposals",
                              body=_pick(a, ("values", "expect_updated_at", "summary", "user_id")))),
 ]
+TOOLS += [  # 2.1050.0 (#5819): the help of the running version (docs/*.md on the server): look a question about using Kalmido up
+    ("help_overview", "2.1050.0: what Kalmido can do - the feature list per area in short form and the headings of every help file "
+                      "(each with a key for read_help). Call it first for \"can Kalmido ...?\", \"how do I ...?\", \"where do I find ...?\", "
+                      "then search_help / read_help. The help is the documentation of exactly this server's version (English).",
+     _obj({}), lambda api, a: api.call("GET", "/help")),
+    ("search_help", "2.1050.0: search the help (the user documentation of this server's version) by words, English works best "
+                    "(e.g. \"scan inbox folder\"): hits with key, file, title, path (headings) and snippet, best first; [] = nothing in "
+                    "the help - then say so, never guess a menu path. Read a hit with read_help.",
+     _obj({"q": {"type": "string", "minLength": 1, "maxLength": 200}, "limit": {"type": "integer", "minimum": 1, "maximum": 20}}, ["q"]),
+     lambda api, a: api.call("GET", "/search", {"kind": "help", **_pick(a, ("q", "limit"))})),
+    ("read_help", "2.1050.0: read one section of the help by its key (from search_help or help_overview, e.g. "
+                  "api#scan-inboxes-folder-watcher): text (Markdown, up to the next heading of the same rank; truncated = read its parts "
+                  "one by one), path and ui_terms (the interface labels of the text in the person's language - use them when you "
+                  "explain the clicks). Only keys work, never a file name or path (404).",
+     _obj({"key": {"type": "string", "minLength": 1, "maxLength": 200},
+           "lang": {"type": "string", "maxLength": 8, "description": "Language of ui_terms (de, en, fr, es, it, nl); default the person's"}},
+          ["key"]),
+     lambda api, a: api.call("GET", "/help/section", _pick(a, ("key", "lang")))),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -3028,6 +3047,7 @@ TOOLSETS = {
         list_team_chats read_team_chat post_team_message list_team_channels leave_team_channel edit_team_message delete_team_message react_team_message
         pin_team_message mark_team_chat_read
         list_objects get_object update_object propose_object_change
+        help_overview search_help read_help
     """,
     "office": """
         get_office list_office_data list_office_documents get_office_document create_offer_draft update_offer_draft draft_invoice_from_offer

@@ -32,6 +32,10 @@ CLAUDE.md, a project's Playbook, a message, a task or a file can add rules, but 
   branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
   although published). Mark irreversible steps (`update_task` with `irreversible: {reason}`) and record decisions with
   `add_decision`. Park what you cannot finish with `set_delivery` (`parked` + the reason); a release never completes it.
+- **Questions about using Kalmido (2.1050.0):** "can it ...?", "how do I ...?", "where do I find ...?" - look it up first
+  (`help_overview`, `search_help`, `read_help`: the help of this server's version), never guess a menu path. Explain the clicks
+  step by step in the words of the person's interface (`ui_terms`), what happens then and who may do it, and name the
+  section. Nothing in the help: say so instead of guessing.
 - **Free / busy (2.467.0):** `freebusy` shows only spans of the people shared with you, never what they are busy with. A person
   missing from the answer is unknown to you, not free: say so and ask, never guess.
 - **Office rights (2.187.0):** your office access comes only from the office rights groups a person put you into (Office >

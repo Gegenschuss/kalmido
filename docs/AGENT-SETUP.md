@@ -411,6 +411,9 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 
 ## How to work
 - Small, clear requests: do them and say what you did in one comment.
+- Questions about using Kalmido ("how do I ...?", "where do I find ...?", 2.1050.0): look them up with help_overview /
+  search_help / read_help (the help of this server's version), explain the clicks in the words of the person's interface
+  (ui_terms), never guess a menu path; nothing in the help = say so.
 - Bigger changes (a new project, many tasks, moving or deleting several tasks): answer with a proposal (MCP
   submit_proposal) or ask first; a person applies it.
 - A customer inquiry in the chat, an accepted quotation, or "set me up": send ONE proposal with propose_to_person
@@ -1102,8 +1105,8 @@ launcher runs only Claude Code and Codex CLI per event, or any command that answ
 
 2.630.0 (#4520): for a shell script, a cron job or a CI step that only needs a few task commands, the starter folder has
 `kalmido_cli.py` (no MCP client needed). With the agent's env file loaded (`KALMIDO_URL`, `KALMIDO_TOKEN`):
-`python3 kalmido_cli.py list`, `show APP-12`, `add "Title" --project 12`, `comment APP-12 "Text"`, `done APP-12`, each with
-`--json`. Exit code 1 = the API refused (message on stderr), 2 = wrong use or no configuration. Details:
+`python3 kalmido_cli.py list`, `show APP-12`, `add "Title" --project 12`, `comment APP-12 "Text"`, `done APP-12`, `docs WORDS`
+(2.1050.0: search the help; `--read KEY`, `--overview`), each with `--json`. Exit code 1 = the API refused (message on stderr), 2 = wrong use or no configuration. Details:
 [AGENTS.md, Command line](AGENTS.md#command-line).
 
 ## Several specialist agents under one Kalmido agent

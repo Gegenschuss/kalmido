@@ -163,6 +163,19 @@ small **×** next to it (*Show progress* in the project's … menu or the projec
 | <img src="fields.png" alt="Project timeline with blocked tasks; task panel with custom fields (phase, budget, effort, preview link) and tracked time"> | <img src="overview.png" alt="Where is it stuck overview: overdue by assignee, waiting and unassigned tasks per project"> |
 | Custom fields, dependencies, progress and status | *Where is it stuck?* |
 
+## Recurring tasks
+
+*This page since 2.1050.0 (#5819).*
+
+A task repeats from its date. Open the task, select its date (the date chip, *Change date*) and in the date popover the
+repeat row (the arrows icon, *Repeat*): *Daily*, *Weekdays*, *Weekly*, *Every 2 weeks*, *Monthly*, *Yearly* or *Custom…*
+(every n days / weeks / months, the weekdays, several times a day; *Advanced · rule text (RRULE)* for any rule). *Ends*
+sets an end date or a count. A task without a date has no repeat row: pick a day first. Every change saves at once.
+Quick add understands it too: `Water plants every monday`, `Report every 2 weeks`, `Miete monatlich`.
+Checking a recurring task off moves it to its next date (one step per check-off, also when two devices check it at the
+same time); *Skip this occurrence* in its menu moves on without checking it off. Anyone who may edit the task may change its repeat;
+templates keep it. Through the API it is the task field `repeat` (an RRULE, e.g. `FREQ=WEEKLY;BYDAY=MO`).
+
 ## Templates, undo, statistics
 
 - **Templates:** *Save as template* in a task's menu (the task with its subtasks, priority, tags, notes, repeat and

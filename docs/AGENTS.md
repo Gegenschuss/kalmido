@@ -4428,6 +4428,7 @@ kalmido show APP-12                            # a task by id or ticket key, wit
 kalmido add "Renew the certificate" --project 12 --due 2026-12-01 --priority high --notes -   # notes from stdin
 kalmido comment APP-12 "Deployed to staging"   # - = the text from stdin
 kalmido done APP-12
+kalmido docs scan inbox folder                 # 2.1050.0: search the help; --read KEY reads a section, --overview
 kalmido --json list                            # every command: the API answer as JSON
 ```
 
@@ -4869,6 +4870,32 @@ ends your access at once; the data lock `calendar` / `contacts` applies through 
 trash period (no agent route). Every change of an event (the series or one occurrence; app, API, CalDAV) runs under one
 lock of the series, so `expect` (also as `expect_updated_at`) and CalDAV's `If-Match` compare with what is really stored
 (`409` / `412` when it changed meanwhile).
+
+## Help of this server
+
+*Since 2.1050.0 (#5819).*
+
+The user documentation of the running version (the `docs/*.md` of the repository, shipped in the image) is searchable for
+agents, so a question about using Kalmido ("can it ...?", "how do I ...?", "where do I find ...?") is looked up, never
+guessed. The rules (`mcp/CLAUDE.template.md`, `mcp/agent_rules.md`): overview / search first, then explain the clicks step
+by step in the words of the person's interface, what happens afterwards and who may do it, and name the section; nothing
+found = say so.
+
+| What | Endpoint | MCP tool |
+|---|---|---|
+| What exists: the feature list (`FEATURES.md`) per area in short form and the second-rank headings of every help file, each with its key | `GET /api/v1/help` | `help_overview` |
+| Search by words (English works best; word beginnings, case and accents do not matter): `{data: [{key, file, title, path, snippet}], more}`, best first; nothing = `[]` | `GET /api/v1/search?kind=help&q=&limit=` (1-20, default 8; not part of `kind=all`) | `search_help` |
+| One section by its key, up to the next heading of the same rank: `{key, file, title, path, text, truncated, parts, ui_terms}`; at most 16,000 characters, then `truncated` and its sub-sections in `parts` | `GET /api/v1/help/section?key=api%23scan-inboxes-folder-watcher&lang=` | `read_help` |
+
+- **Keys only:** a section is read by the key of the index built from the files (`<file>#<heading>`, e.g.
+  `api#scan-inboxes-folder-watcher`; a file's title: `api`); a file name, a path or an unknown key answers `404`.
+- **ui_terms:** the interface labels the section names (`*Label*`, the parts of `Settings > Integrations > ...`) with the same
+  label in `lang` (default the token's person), from the app's own translations: the help is English, the agent explains in
+  the words the person sees.
+- **Rights:** no scope of its own, every token with `read` (also an agent of a person without an organisation). The
+  operator files (SELF-HOSTING, ENV, UPGRADING, OIDC, ARCHITECTURE, GLOSSAR, PACKS and the privacy templates) only for an
+  instance admin's token with `admin-read`; for everyone else they do not exist (never a hit, `404`).
+- A plain word search on the server, no language model. The built-in assistant does not use it yet.
 
 ## Knowledge pages
 

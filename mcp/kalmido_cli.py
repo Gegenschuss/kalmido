@@ -14,6 +14,7 @@ Commands (a task is its id 42 or its ticket key APP-12):
                                                (without --project: your inbox)
   kalmido_cli.py comment TASK TEXT|-           "-" reads the text from stdin
   kalmido_cli.py done TASK
+  kalmido_cli.py docs WORDS... | --read KEY | --overview   the help of the server (2.1050.0, #5819): search, one section, overview
 Every command takes --json: the API answer as JSON instead of the readable text.
 Exit codes: 0 done, 1 the API refused or cannot be reached (the message on stderr), 2 wrong use / no configuration.
 Tip: alias kalmido='python3 /path/to/kalmido_cli.py'. See mcp/README.md and docs/AGENTS.md."""
@@ -143,6 +144,37 @@ def cmd_done(api, a):
     return f"done {_label(t)}  {t.get('title') or ''}"
 
 
+def cmd_docs(api, a):
+    """2.1050.0 (#5819): the help of the server -- search (words), one section (--read KEY) or the overview."""
+    if a.overview:
+        r = api.call("GET", "/help")
+        if a.json:
+            return r
+        rows = [f"Kalmido {r.get('version') or ''} - features per area:"]
+        for ar in r.get("features") or []:
+            rows += [f"{ar['area']}  ({ar['key']})"] + [f"  - {x}" for x in ar.get("items") or []]
+        rows += ["", "Help files (read a section: docs --read KEY):"]
+        for f in r.get("files") or []:
+            rows.append(f"{f['key']:<16} {f['title']}")
+        return "\n".join(rows)
+    if a.read:
+        r = api.call("GET", "/help/section", {"key": a.read})
+        if a.json:
+            return r
+        more = ["", "(truncated; parts: " + ", ".join(p["key"] for p in r["parts"]) + ")"] if r.get("truncated") else []
+        return "\n".join([" > ".join(r.get("path") or []), "", r.get("text") or ""] + more)
+    q = " ".join(a.words).strip()
+    if not q:
+        raise Usage("give words to search for, --read KEY or --overview")
+    r = api.call("GET", "/search", {"kind": "help", "q": q, "limit": a.limit})
+    if a.json:
+        return r
+    hits = r.get("data") or []
+    if not hits:
+        return "nothing in the help"
+    return "\n".join(f"{h['key']}\n  {' > '.join(h.get('path') or [])}\n  {h.get('snippet') or ''}" for h in hits)
+
+
 def parser():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the API answer as JSON")
@@ -175,6 +207,12 @@ def parser():
     p = sub.add_parser("done", parents=[common], help="complete a task")
     p.add_argument("task", help="id or ticket key (APP-12)")
     p.set_defaults(fn=cmd_done)
+    p = sub.add_parser("docs", parents=[common], help="search or read the help of the server (2.1050.0)")
+    p.add_argument("words", nargs="*", help="words to search for (English works best)")
+    p.add_argument("--read", metavar="KEY", help="one section by its key (from a search hit)")
+    p.add_argument("--overview", action="store_true", help="the feature list per area and the help files")
+    p.add_argument("--limit", type=int, default=8, help="at most this many hits (1-20, default 8)")
+    p.set_defaults(fn=cmd_docs)
     return ap
 
 

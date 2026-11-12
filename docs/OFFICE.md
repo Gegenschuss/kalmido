@@ -1892,6 +1892,22 @@ the deal too when the deal has none. The project page shows "Quotations & invoic
 the document) only to people with office rights in the project's area; other project members see nothing of it.
 Routes: `POST /api/office/docs/<id>/project`, `GET /api/lists/<id>/office-docs` ([API.md](API.md)).
 
+### Tasks with a time budget from the quotation (post-calculation)
+
+*Since 2.537.0 (#3433); this page since 2.1050.0 (#5819).*
+
+Open the quotation in the office (*Office > Quotations*, the quotation's editor). In the row *Project* the button *Create
+tasks* opens a preview: each position becomes a task with its budget in hours (hour = the quantity, minute / 60, day = the
+quantity x the project's hours per day; piece and flat rate take a value you type), a part of the quotation becomes a
+section, a shoot part one task per crew function. Untick what you do not want, change the hours, then *Create tasks*. No
+prices go into the tasks. A quotation without a project gets a new one first (named "Client – project title").
+The hours land in the project's number field *Budget h*; the project header then shows the time tracked against the budget
+(the budget bar) - that is the post-calculation: quoted hours against the hours booked on the tasks. Later versions of the
+quotation: the same button reads *Update budget from the quotation* and shows new positions, changed budgets (a budget
+changed by hand is kept) and positions no longer there (only marked, never deleted).
+Who may: people with office rights for quotations; creating or changing the tasks also needs the right to change the project.
+Routes: `GET` / `POST /api/office/docs/<id>/tasks` (web session).
+
 ### Finalised documents in the database
 
 *Since 2.542.0 (#4598).* Next to the app's own checks (`409` "This document is finalised ..."), the database trigger

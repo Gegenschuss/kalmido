@@ -1116,6 +1116,7 @@ ROUTES = {
     # 2.89.0 C (#1916): tables as files and for agents
     "GET /api/sheets/{}/export.csv": "sheet_v1", "GET /api/sheets/{}/export.xlsx": "sheet_v1", "POST /api/sheets/import": "sheet_v1",
     "GET /api/v1/wiki/pages": "wiki_v1", "GET /api/v1/wiki/pages/{}": "wiki_v1",  # 2.200.0 C (#1781)
+    "GET /api/v1/help": "public", "GET /api/v1/help/section": "public",  # 2.1050.0 (#5819): the product's documentation, no data of anybody
     "POST /api/v1/wiki/pages": "wiki_v1", "PATCH /api/v1/wiki/pages/{}": "wiki_v1",
     "POST /api/v1/wiki/pages/{}/append": "wiki_v1",  # 2.1048.0 (#5861): p21048_wiki_append_test.py
     "GET /api/v1/wiki/pages/{}/files": "wiki_v1", "GET /api/v1/wiki/files/{}": "wiki_v1", "GET /api/v1/wiki/files/{}/text": "wiki_v1",  # 2.488.0 (#2209)

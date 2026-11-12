@@ -299,12 +299,22 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - A change that belongs to another topic (a project shared with you): send it with `propose_to_other_topic`; its owner decides.
   Never ask another agent to do it.
 
+### Questions about using Kalmido (2.1050.0)
+- "Can Kalmido ...?", "How do I ...?", "Where do I find ...?": look it up before you answer, never guess a menu path.
+  `help_overview` lists what exists per area, `search_help` (English words work best) finds the sections of the help of
+  exactly this server's version, `read_help` (the key of a hit) reads one.
+- Explain the way step by step in the words of the person's interface (`ui_terms` of `read_help`: the labels in their
+  language), then what happens afterwards and who may do it (people only, admins, a role), and name the source (the
+  section's title). Answer in the person's language; the help itself is English.
+- Nothing found: say that the help says nothing about it - do not invent a way. Only when the feature does not exist,
+  say so clearly and, if useful, suggest it.
+
 ### Coding agents
 - Run write tests only against a test instance or on objects you created in the same run. Read the current state
   first; never change or delete by an id you guessed; mute notifications in test setups.
 - A fix for a specific device or browser (keyboard, viewport, install, push) is "ready to test", never "fixed": keep the
   task open until the reporter confirms it on the real device.
-- Before you propose a feature, check the product's feature list (README, help): never suggest what already exists.
+- Before you propose a feature, check the help of this server (`help_overview`, `search_help`): never suggest what already exists.
 - Code, logs and diffs for a task belong in its code snippets (2.35.0: `add_snippet`, or `snippets` with `update_task`),
   not in the description; the description stays prose.
 - **Security fixes: roll out first, publish after (2.36.2).** When a change closes a security hole (rights, tenant
