@@ -109,14 +109,16 @@ def dl_forget():
 
 
 def dl_of(c, uid):
-    """The effective lock of account uid when it is an agent (see _dl_eff), else None. An agent whose settings row cannot be
-    read in this context gets the defaults (never less locked). Cached per request."""
+    """The effective lock of account uid when it is an agent (see _dl_eff), else None. Cached per request. 2.1078.0 (#5866,
+    N6): the row is read as system, so a context that cannot see the agent's organisation still gets its real lock."""
     if not uid:
         return None
     cache = g.setdefault("_dl", {}) if has_request_context() else None
     if cache is not None and uid in cache:
         return cache[uid]
-    r = c.execute("SELECT u.kind, a.data_lock FROM users u LEFT JOIN agents a ON a.user_id=u.id WHERE u.id=?", (int(uid),)).fetchone()
+    with system_ctx(c):  # 2.1078.0 (#5866, N6): the agents row of another organisation's context too -- a defaults fallback
+        # left wiki_folders empty (the open side); only the lock of this one account, never content handed to a person
+        r = c.execute("SELECT u.kind, a.data_lock FROM users u LEFT JOIN agents a ON a.user_id=u.id WHERE u.id=?", (int(uid),)).fetchone()
     out = _dl_eff(r[1]) if r and r[0] == "agent" else None
     if cache is not None:
         cache[uid] = out

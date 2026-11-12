@@ -10,16 +10,18 @@
    all ids, plus search / filter queries and the agent's events: the marker shows up nowhere. Writes to locked tasks / lists
    are 404. Then the lock is opened: the same scan finds every marker again (the counter-check that the scan sees them).
  - a team agent (set by the instance admin): a locked project, the same scan, then opened
+ - 2.1078.0 (#5866, N6): its lock read in the context of a person outside its organisation is the real lock, not the defaults
 usage: p2235_b_datalock_test.py <datadir>      (KMT_NOSTART=1 / P2235B_NOSTART=1: a running server)"""
 import itertools
 import os
 import re
+import subprocess
 import sys
 
 import requests
 
 from freelancer_fixture import freelancer
-from kt import B, check, done, dbx, fresh, setup
+from kt import B, CT, check, done, dbx, fresh, setup
 
 V = B + "/api/v1"
 MARKS = ("ZQXPROJ", "ZQXMAIL", "ZQXTAG", "ZQXCONTR")
@@ -197,4 +199,20 @@ check(not found, f"team agent: nothing of the locked project {found}")
 check(lock(A, TA, "patch", json={"lists": []}).status_code == 200, "the admin opens it")
 found = scan(TH, [L_T, T_T])
 check("ZQXPROJ" in found, "team agent counter-check: the opened project is visible again")
+
+# ---------------------------------------------------------------- 2.1078.0 (#5866, N6): the lock in a context that cannot see the agent
+# dl_of read the agents row in the caller's context: a person outside the team agent's organisation saw no row and got the
+# defaults (wiki_folders / lists empty = the open side). Now read as system: the real lock in every context.
+check(lock(A, TA, "patch", json={"lists": [L_T]}).status_code == 200, "N6 setup: the project locked again")
+if not dbx("SELECT org_id FROM agents WHERE user_id=?", (TA,))[0][0]:  # the team's workspace: an organisation Frida is not in
+    dbx("UPDATE agents SET org_id=(SELECT id FROM orgs ORDER BY id LIMIT 1) WHERE user_id=?", (TA,))
+code = ("import os; os.environ['TASKS_WATCHDOG']='0'\nimport app\nfrom flask import g\nfrom kalmido.core.config import app as fl\n"
+        "from kalmido.core.dlock import dl_of\nc=app.connect()\nwith fl.test_request_context('/p21078n6'):\n"
+        f"  g.db = c\n  g.user = {{'id': {FID}, 'kind': 'user'}}\n"
+        f"  seen = c.execute('SELECT count(*) FROM agents WHERE user_id=?', ({TA},)).fetchone()[0]\n"
+        f"  d = dl_of(c, {TA})\n  print('N6', seen, sorted((d or {{}}).get('_lids') or []), flush=True)\n  c.rollback()\n")
+pr = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", code], capture_output=True, text=True, timeout=120)
+out = next((x.split() for x in pr.stdout.splitlines() if x.startswith("N6 ")), [])
+check(out[1:2] == ["0"], f"N6 setup: Frida's context does not see the team agent's row {pr.stdout[-200:]} {pr.stderr[-300:]}")
+check(" ".join(out[2:]) == f"[{L_T}]", f"N6: dl_of in her context gives the real lock (the locked project) {out} {pr.stderr[-300:]}")
 sys.exit(done("p2235_b_datalock"))
