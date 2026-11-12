@@ -29,6 +29,7 @@ from .fsroots import fs_area_root_need_free, fs_area_root_of  # 2.199.0 F (#2742
 from .fsroots import fs_area_after, fs_area_before, fs_area_folder_name, fs_area_need_fit, fs_area_of, fs_area_open  # 2.200.0 A (#2747)
 from .fsroots import fs_area_share  # 2.200.0 B (#2747)
 from .fsroots import fs_area_root_shares  # 2.1045.0 (#5823)
+from ..core.dlock import dl_chain_cut  # 2.1045.0 (#5823)
 from .fsref import fs_unshare_hooks  # 2.623.0 (#4778)
 from .fsviews import fsv_collections, fsv_drop, fsv_hidden  # 2.429.0 (#3580): the file store shows only its own folders
 from ..core.conflict import Conflict, need_version, version_rule  # 2.577.0 (#4708 3)
@@ -377,7 +378,6 @@ def _inherited_shares(c, chain):
         for s in _shares(c, r["id"]):
             x = {**s, "from_id": r["id"], "from": r["name"], **({"area": True} if area else {})}
             if s["agent_id"]:  # 2.1045.0 (#5823): an excluded folder between cuts this share for its agent
-                from ..core.dlock import dl_chain_cut
                 if r["id"] not in dl_chain_cut(c, s["agent_id"], [y["id"] for y in chain[:i + 1]]):
                     x["excluded"] = True
             out.append(x)

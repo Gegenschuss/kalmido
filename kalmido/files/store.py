@@ -30,6 +30,7 @@ from flask import g, has_request_context
 from ..core.config import ATT_DIR, MAX_FILE_MB
 from ..core.i18n import N_, tr
 from ..core.db import insert_id, iso, now_utc, write_lock, db
+from ..core.dlock import dl_chain_cut, dl_wiki_folders, dl_wiki_step_sql  # 2.1045.0 (#5823)
 from ..core.access import Denied, acx_of, collab_all
 from ..core.orgcrypt import oc_read_file, oc_write_file, oc_user_space
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
@@ -90,7 +91,6 @@ def fs_trash_root(chain):
 
 def _shares_role(c, ids, uid, agent, pre=None):
     if agent and ids:  # 2.1045.0 (#5823): an agent's excluded knowledge folders cut the shares above them (core/dlock.py)
-        from ..core.dlock import dl_chain_cut
         ids = dl_chain_cut(c, uid, ids)
     if not ids:
         return None
@@ -470,7 +470,6 @@ def fs_visible_sql_c(c, uid):
                      f"AND COALESCE(list_own, 0)=0)")  # 2.568.0 (#4739, review F6): not "Shared with me" through a project's own row
     step = ""
     if agent:  # 2.1045.0 (#5823): an excluded knowledge folder is listed only when it (or a node below it) is shared itself
-        from ..core.dlock import dl_wiki_step_sql
         step = dl_wiki_step_sql(c, uid)
     return (f"(WITH RECURSIVE fv(id) AS (SELECT n.id FROM fs_nodes n WHERE ({seed}) AND ({orgs}) "
             f"UNION SELECT n.id FROM fs_nodes n JOIN fv ON n.parent_id = fv.id WHERE ({orgs}){step}), "
@@ -536,7 +535,6 @@ def fs_mail_rows(c, uid, rows):
     if any("kind" in r.keys() and r["kind"] == "ref" for r in out):
         from .fsref import fs_ref_rows
         out = fs_ref_rows(c, uid, out)  # 2.199.0 A (#2742): reference nodes the asker may not reach
-    from ..core.dlock import dl_wiki_folders
     ex = dl_wiki_folders(c, uid)
     if ex and any(r["id"] in ex for r in out):  # 2.1045.0 (#5823): an agent's excluded knowledge folder is not there for it
         out = [r for r in out if r["id"] not in ex or fs_role(c, r["id"], uid)]  # (unless it is shared with it on its own)
