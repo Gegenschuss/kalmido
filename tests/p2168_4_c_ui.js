@@ -34,9 +34,12 @@ const prep = async u => { CK = await login(u); const st = await call('GET', '/ap
   check(!d.querySelector('.dc-shared'), 'no mark on the card before sharing');
   w.eval(`dc_open(${DOC})`);
   await until(() => d.querySelector('.dc-md [data-dc="view"]'));
-  check(d.querySelector('.dc-md [data-dc="share"]'), 'owner: "Share…" in the sheet');
-  check(d.querySelector('.dc-md [data-dc="xlink"]'), 'owner: "Link for external people…" in the sheet');
-  d.querySelector('.dc-md [data-dc="share"]').click();
+  // 2.1011.0 (#5688): the entries of the shared menu "Actions" (menu(), #pop)
+  const mi = lab => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(b => b.querySelector('.ml')?.firstChild?.textContent === lab);
+  d.querySelector('.dc-md [data-dc="actsmore"]').click();
+  check(await until(() => mi('Share…')), 'owner: "Share…" in the sheet');
+  check(mi('Link for external people…'), 'owner: "Link for external people…" in the sheet');
+  mi('Share…').click();
   check(await until(() => d.querySelector('.abshdlg')), 'click opens the file store share dialog');
   const r = await call('POST', `/api/files/nodes/${DOC}/shares`, {user_id: bob, role: 'view'});
   check(r.status < 300, 'share with bob: ' + r.status);
@@ -53,6 +56,8 @@ const prep = async u => { CK = await login(u); const st = await call('GET', '/ap
   await until(() => d.querySelector(`[data-dco="${DOC}"]`), 60);
   w.eval(`dc_open(${DOC})`);
   await until(() => d.querySelector('.dc-md [data-dc="view"]'));
-  check(!d.querySelector('.dc-md [data-dc="share"]') && !d.querySelector('.dc-md [data-dc="xlink"]'), 'recipient: neither Share nor external link');
+  d.querySelector('.dc-md [data-dc="actsmore"]').click();
+  const mi2 = lab => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(b => b.querySelector('.ml')?.firstChild?.textContent === lab);
+  check(await until(() => d.querySelector('#pop:not(.hidden) [role="menuitem"]')) && !mi2('Share…') && !mi2('Link for external people…'), 'recipient: neither Share nor external link');
   console.log(F.length ? 'FAILED ' + F.length : 'OK ' + ok); process.exit(F.length ? 1 : 0);
 })().catch(e => { console.log('ERR', e); process.exit(1); });

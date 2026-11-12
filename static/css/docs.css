@@ -71,12 +71,8 @@
 .dc-card.dc-cur>button:not(.dc-selmark){border-color:var(--accent);box-shadow:0 0 0 .125rem var(--accent)}
 .dc-acts{display:flex;flex-wrap:wrap;align-items:stretch;gap:.375rem}
 /* 2.497.0 A (#4046): the row of actions; the rarer ones fold out on a line of their own, Delete apart at the end */
-.dc-ag{display:flex;flex-wrap:wrap;gap:.375rem}
-.dc-amore{flex-basis:100%}
 .dc-adel{margin-left:auto;color:var(--danger)}
 .dc-acts .iconbtn{width:2.5rem;height:2.5rem;padding:0}
-.dc-acts [data-dc="actsmore"] .dc-chev{transition:transform .15s}
-.dc-acts [data-dc="actsmore"][aria-expanded="true"] .dc-chev{transform:rotate(180deg)}
 .dc-acts .btn{min-height:2.5rem}
 .dc-state{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.25rem 0;color:var(--muted);font-size:var(--fs-s)}
 .dc-state.failed{color:var(--danger)}
@@ -135,7 +131,7 @@
   .dc-body .dc-f>.dc-auto,.dc-body .dc-f>.dc-tsug{grid-column:1;grid-row:2;justify-self:start}
   .dc-optbtn{margin-left:calc(var(--dc-lw,8.5rem) + .625rem)}
 }
-@media (prefers-reduced-motion:reduce){ .dc-text .dc-chev,.dc-acts [data-dc="actsmore"] .dc-chev{transition:none} }
+@media (prefers-reduced-motion:reduce){ .dc-text .dc-chev{transition:none} }
 /* 2.869.0 (#5531): "Suggest title" (.dc-tsug) looks and sits like the "automatic" mark but is no mark, so it has its own class */
 .dc-auto,.dc-tsug{margin-left:.375rem;padding:.125rem .5rem;border:1px solid var(--line);border-radius:99rem;background:var(--bg3);color:var(--muted);font-size:var(--fs-xs);cursor:pointer;white-space:nowrap}
 .dc-auto:hover,.dc-auto:focus-visible,.dc-tsug:hover,.dc-tsug:focus-visible{border-color:var(--accent);color:var(--text)}

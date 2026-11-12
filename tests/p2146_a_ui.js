@@ -54,10 +54,12 @@ const UBL = `<?xml version="1.0" encoding="UTF-8"?>
     check(await ready(ev, `!!document.querySelector('#dc-file')`, 80), 'the documents area');
     check(await ev(`/\\.xml/.test(document.querySelector('#dc-file').accept)`), 'the documents picker takes .xml ' + await ev(`document.querySelector('#dc-file')?.accept`));
     await nav(B + `#docs/${id}`);
-    check(await ready(ev, `!!document.querySelector('.dc-md .dc-einv')`, 80), 'the document sheet offers the readable view');
+    // 2.1011.0 (#5688): "Readable view" is an entry of the shared menu "Actions" (menu(), #pop), it opens per fn
+    check(await ready(ev, `!!document.querySelector('.dc-md [data-dc="actsmore"]')`, 80) && await ev(`(document.querySelector('.dc-md [data-dc="actsmore"]').click(), 1)`) && await ready(ev, `!!([...document.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(b => b.querySelector('.ml')?.firstChild?.textContent === tr('Readable view')))`, 40), 'the document sheet offers the readable view');
     check(await ev(`/E-invoice/.test(document.querySelector('.dc-md .dc-state')?.textContent || '')`), 'the state names the e-invoice ' + await ev(`document.querySelector('.dc-md .dc-state')?.textContent.replace(/\\s+/g, ' ')`));
     check(await ev(`document.querySelector('#dc-sender')?.value === 'Beispiel Papier GmbH'`), 'the sender from the XML');
-    check(await ev(`document.querySelector('.dc-md .dc-einv').getAttribute('href') === '/api/docs/${id}/einvoice' && document.querySelector('.dc-md .dc-einv').target === '_blank'`), 'the link opens the view in a new tab');
+    await ev(`(() => { window.__wo = []; window.open = (u, t) => { window.__wo.push([u, t]); return null; }; ([...document.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(b => b.querySelector('.ml')?.firstChild?.textContent === tr('Readable view'))).click(); return 1; })()`);
+    check(await ev(`JSON.stringify(window.__wo) === JSON.stringify([['/api/docs/${id}/einvoice', '_blank']])`), 'the entry opens the view in a new tab ' + await ev(`JSON.stringify(window.__wo)`));
     await shot('p2146-a-doc.png');
     // the bookkeeping: the receipt button takes .xml, the receipt sheet links the view
     await nav(B + '#office/books');

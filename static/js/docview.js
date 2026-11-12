@@ -75,7 +75,7 @@ function dcv_close(v) {
 function dcv_left() {
   const id = DC.doc?.id ?? DC.opening ?? DVW.back?.id;
   if (DC.doc) DC.lastId = DC.doc.id;
-  DC.doc = null; DC.opening = null; DC.actsMore = null; DC.navSrc = null; dcv_free();
+  DC.doc = null; DC.opening = null; DC.navSrc = null; dcv_free();
   if (typeof dc_nbStop === 'function') dc_nbStop();  // 2.736.0 (#5212): the neighbours drawn ahead go along
   DVW.back = {...(DVW.back || {}), id, pushed: false, restore: true};
 }
@@ -228,22 +228,33 @@ function dcv_headHtml(d, w) {
     <span class="dv-saved" role="status" data-fl-fill></span><span class="dv-hacts">${dcv_actsHtml(d, w)}</span></div></header>`;
 }
 // 2.497.0 A (#4046) moved to the head: Download, the rarer actions behind "Actions", Delete apart as the last
+// 2.1011.0 (#5688): "Actions" is the shared menu() (a sheet with title and X on a phone) instead of a fold-out of its own
 function dcv_actsHtml(d, w) {
-  const more = [d.einvoice ? `<a class="btn sm dc-einv" href="/api/docs/${d.id}/einvoice" target="_blank" rel="noopener">${ic('receipt', 's')} ${tr('Readable view')}</a>` : '',  // 2.146.0 A (#2451)
-    typeof dsp_actBtn === 'function' && !d.file ? dsp_actBtn(d, w) : '',  // 2.154.0 A (#1111): split a stack
-    typeof po_actBtns === 'function' ? po_actBtns(d, w) : '',  // 2.892.0 (#4873, #4806): Optimise PDF, the searchable PDF and the original (pdfopt.js)
-    d.parent_id ? `<a class="btn sm" href="#ablage/${d.parent_id}">${ic('folder', 's')} ${tr('Show in the file store')}</a>` : '',
-    d.role === 'owner' && typeof ab_share === 'function' ? `<button type="button" class="btn sm" data-dc="share">${ic('users', 's')} ${tr('Share…')}</button>` : '',
-    d.role === 'owner' && typeof xl_newDlg === 'function' ? `<button type="button" class="btn sm" data-dc="xlink">${ic('link', 's')} ${tr('Link for external people…')}</button>` : '',  // 2.210 C (#2761)
-    // 2.768.0 (#4888): the file store's actions of the node (ablage.js ab_newVersion / ab_moveDlg / ab_rename; a document's title is its field)
-    w && typeof ab_newVersion === 'function' ? `<button type="button" class="btn sm" data-dc="dvnewver">${ic('upload', 's')} ${tr('Upload a new version…')}</button>` : '',
-    w && typeof ab_moveDlg === 'function' ? `<button type="button" class="btn sm" data-dc="dvmove">${ic('arrow', 's')} ${tr('Move to…')}</button>` : '',
-    w && d.file && typeof ab_rename === 'function' ? `<button type="button" class="btn sm" data-dc="dvren">${ic('edit', 's')} ${tr('Rename…')}</button>` : '',
-    w && !d.file && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${ic('tag', 's')} ${tr('Assign archive number')}</button>` : '',  // 2.781.0 (#5390): every document, a scan or not
-    w && !d.file && smv_can(d.org_id) ? `<button type="button" class="btn sm" data-dc="space">${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''].filter(Boolean);
-  const open = DC.actsMore === d.id;
-  return `<a class="btn sm dv-dl" href="${dcv_fileUrl(d, true)}" download title="${esc(tr('Download'))}">${ic('download', 's')} <span>${tr('Download')}</span></a>${more.length ? `<span class="dv-actw"><button type="button" class="btn sm" data-dc="actsmore" aria-expanded="${open}" aria-controls="dc-amore" aria-haspopup="true">${tr('Actions')}${ic('chev', 's dc-chev')}</button><div class="dc-ag dc-amore dv-amenu" id="dc-amore" ${open ? '' : 'hidden'}>${more.join('')}</div></span>` : ''}${w ? `<button type="button" class="btn sm danger dc-adel" data-dc="del" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')} <span>${tr('Delete')}</span></button>` : ''}`;
+  return `<a class="btn sm dv-dl" href="${dcv_fileUrl(d, true)}" download title="${esc(tr('Download'))}">${ic('download', 's')} <span>${tr('Download')}</span></a><button type="button" class="btn sm" data-dc="actsmore" aria-haspopup="menu">${tr('Actions')}${ic('chev', 's dc-chev')}</button>${w ? `<button type="button" class="btn sm danger dc-adel" data-dc="del" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')} <span>${tr('Delete')}</span></button>` : ''}`;
 }
+// a link of the menu as a download (no <a> in a menu)
+const dcv_dlGo = url => { const a = document.createElement('a'); a.href = url; a.download = ''; document.body.append(a); a.click(); a.remove(); };
+// 2.1011.0 (#5688): the entries of "Actions": the task (new / link / open) and the star first, then the rarer actions
+function dcv_actItems(d, w, b) {
+  const md = b.closest('.dc-md'), tid = d.task?.id || d.task_id;
+  return [tid ? {label: tr('Open task'), icon: 'check', act: 'dv-taskopen', fn: () => (S.tasks.get(tid) ? openDetail(tid) : go('t/' + tid))}
+    : w ? {label: tr('New task'), icon: 'plus', act: 'dv-tasknew', fn: () => dc_newTask(d, md)} : null,
+  !tid && w && typeof dsp_pick === 'function' ? {label: tr('Link with a task…'), icon: 'link', act: 'dv-tasklink', fn: () => dsp_pick(d)} : null,
+  ...(typeof fv2_menuRow === 'function' ? fv2_menuRow(fv2_routeKey()) : []), '-',
+  d.einvoice ? {label: tr('Readable view'), icon: 'receipt', fn: () => window.open(`/api/docs/${d.id}/einvoice`, '_blank', 'noopener')} : null,  // 2.146.0 A (#2451)
+  typeof dsp_actItem === 'function' && !d.file ? dsp_actItem(d, w) : null,  // 2.154.0 A (#1111): split a stack
+  ...(typeof po_actItems === 'function' ? po_actItems(d, w) : []),  // 2.892.0 (#4873, #4806): Optimise PDF, the searchable PDF and the original (pdfopt.js)
+  d.parent_id ? {label: tr('Show in the file store'), icon: 'folder', fn: () => go('ablage/' + d.parent_id)} : null,
+  d.role === 'owner' && typeof ab_share === 'function' ? {label: tr('Share…'), icon: 'users', fn: async () => { await ab_share(d.id); const dlg = $('.abshdlg'); if (dlg) onRemove(dlg, () => dc_c168Refresh(d.id)); }} : null,
+  d.role === 'owner' && typeof xl_newDlg === 'function' ? {label: tr('Link for external people…'), icon: 'link', fn: () => xl_newDlg(d.id, () => dc_c168Refresh(d.id))} : null,  // 2.210 C (#2761)
+  // 2.768.0 (#4888): the file store's actions of the node (ablage.js ab_newVersion / ab_moveDlg / ab_rename; a document's title is its field)
+  w && typeof ab_newVersion === 'function' ? {label: tr('Upload a new version…'), icon: 'upload', fn: () => dcv_nodeAct('dvnewver', d)} : null,
+  w && typeof ab_moveDlg === 'function' ? {label: tr('Move to…'), icon: 'arrow', next: 1, fn: () => dcv_nodeAct('dvmove', d)} : null,
+  w && d.file && typeof ab_rename === 'function' ? {label: tr('Rename…'), icon: 'edit', fn: () => dcv_nodeAct('dvren', d)} : null,
+  w && !d.file && !d.asn ? {label: tr('Assign archive number'), icon: 'tag', fn: () => dc_patch(d.id, {asn: 'next'}, tr('Archive number of {0}', d.name))} : null,  // 2.781.0 (#5390)
+  w && !d.file && smv_can(d.org_id) ? {label: tr('Move to another workspace…'), icon: 'building', fn: async () => { if (await dc_smvMove(new Map([[d.id, d.org_id || null]]), `“${d.name}”`)) md?.remove(); }} : null];
+}
+function dcv_actsMenu(b, d, w) { menu(b, dcv_actItems(d, w, b), null, null, tr('Actions')); }
 const dcv_gripHtml = (which, label) => `<button type="button" class="dv-grip" data-dvgrip="${which}" aria-label="${esc(label + ': ' + tr('Resize (arrow keys; double-click: default size)'))}" title="${esc(tr('Drag to resize · double-click: default size'))}"></button>`;
 // the strip: the neighbours in the list as shown (31 entries around the open one), the open one marked; a document outside the list alone.
 // 2.940.0 (#5601): the window stays where it is while the open document lies in it (DVW.sw, its first entry): a click on a small
@@ -638,17 +649,15 @@ document.addEventListener('wheel', e => {
 
 // ---- events of the view: the clicks of the fields and buttons are docs.js dc_mdClick (data-dc), the view's own ones here
 document.addEventListener('click', e => {
-  const v = /** @type {any} */ (e.target).closest?.('.dv-view'); if (!v) { if (DC.actsMore && !/** @type {any} */ (e.target).closest?.('.dv-actw')) dcv_menuClose(); return; }
+  const v = /** @type {any} */ (e.target).closest?.('.dv-view'); if (!v) return;
   const g = /** @type {any} */ (e.target).closest('[data-dvgo]');
   if (g) { const to = +g.dataset.dvgo, i = (DC.docs || []).findIndex(x => x.id === to), j = dc_navIdx(DC.doc); if (DC.doc && to !== DC.doc.id) dc_goTo(to, i > j ? 1 : -1); return; }
   const t = /** @type {any} */ (e.target).closest('[data-dvtab]');
   if (t) { dcv_tab(v, t.dataset.dvtab); return; }
-  if (DC.actsMore && !/** @type {any} */ (e.target).closest('.dv-actw')) dcv_menuClose();
   const hp = /** @type {any} */ (e.target).closest('#dv-p-hist');  // 2.768.0 (#4888): the versions (ablage.js ab_verClick)
   if (hp && DC.doc && DVW.node?.id === DC.doc.id && DVW.node.n && typeof ab_verClick === 'function' && ab_verClick(DVW.node.n, e, hp)) return;
   const b = /** @type {any} */ (e.target).closest('[data-dc]'); if (!b) return;
   const a = b.dataset.dc;
-  if ((a === 'dvnewver' || a === 'dvmove' || a === 'dvren') && DC.doc) { dcv_menuClose(); dcv_nodeAct(a, DC.doc); return; }  // 2.768.0 (#4888)
   if (a.startsWith('dvz:')) {
     const box = $('.dv-pages', v), k = a.slice(4); if (!box?._s) return;
     dcv_zoomSet(box, k === 'in' ? box._s * 1.25 : k === 'out' ? box._s / 1.25 : k);
@@ -671,7 +680,6 @@ document.addEventListener('click', e => {
     dcv_tab(v, 'details'); const m = f.closest('.dv-more'); if (m && !m.open) { m.open = true; DVW.more = true; }
     f.focus(); return;
   }
-  if (DC.actsMore && b.closest('.dv-amenu')) dcv_menuClose();  // an action of the menu: the menu closes
   dc_mdClick(e);
 });
 document.addEventListener('change', e => {
@@ -681,18 +689,12 @@ document.addEventListener('change', e => {
   dc_mdChange(e);
 });
 document.addEventListener('toggle', e => { if (/** @type {any} */ (e.target)?.classList?.contains('dv-more')) DVW.more = /** @type {any} */ (e.target).open; }, true);
-function dcv_menuClose() {
-  DC.actsMore = null;
-  const b = $('.dv-view [data-dc="actsmore"]'); if (b) b.setAttribute('aria-expanded', 'false');
-  const m = $('.dv-view #dc-amore'); if (m) m.hidden = true;
-}
 // 2.655.0 (#4998): the view's keys sit in the key registry (keys.js, scope view:docs): an open dialog / menu (the stack) has
 // them first; returning false hands the key on (selection, detail, global)
 const dcv_keyView = (/** @type {any} */ e) => { const v = $('.dv-view'); return v && S.route.mod === 'docs' && dc_hashId() && !e.altKey && !e.ctrlKey && !e.metaKey && !$('.modal') && !$('.lightbox') && !$('#pop:not(.hidden)') && !e.target?.closest?.('[data-dvgrip]') ? v : null; };
 kb_on('view:docs', 'Escape', e => {
   const v = dcv_keyView(e); if (!v) return false;
   const t = /** @type {any} */ (e.target);
-  if (DC.actsMore) { dcv_menuClose(); $('.dv-view [data-dc="actsmore"]')?.focus(); return; }
   if (dcv_in(t)) { t.blur(); return; }  // the first Esc leaves the field (it saves), the next one the view
   dcv_close(v);
 });

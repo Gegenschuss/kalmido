@@ -106,13 +106,14 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     let g = JSON.parse(await ev(acts));
     check(g.last === 'del' && g.cl, 'Delete is the last action ' + JSON.stringify(g));
     check(g.lines <= 1 && g.apart, '2.583.0 (#4835): one line of actions in the head, Delete at its right edge ' + JSON.stringify(g));
-    check(await ev(`document.querySelector('[data-dc="share"]')?.getClientRects().length === 0`), 'the rarer actions are folded behind More');
+    // 2.1011.0 (#5688): "Actions" is the shared menu() (#pop): the rarer actions are its entries, not buttons in the head
+    check(await ev(`!document.querySelector('.dv-hacts [data-dc="share"]')`), 'the rarer actions are folded behind Actions');
     await ev(`document.querySelector('[data-dc="actsmore"]')?.click()`);
-    check(await ready(ev, `document.querySelector('[data-dc="actsmore"]')?.getAttribute('aria-expanded') === 'true' && document.querySelector('[data-dc="share"]')?.getClientRects().length > 0 && document.querySelector('[data-dc="xlink"]')?.getClientRects().length > 0`), 'More shows them');
+    check(await ready(ev, `!!([...document.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(b => b.querySelector('.ml')?.firstChild?.textContent === tr('Share…'))) && !!([...document.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(b => b.querySelector('.ml')?.firstChild?.textContent === tr('Link for external people…')))`), 'Actions shows them');
     g = JSON.parse(await ev(acts));
-    check(g.last === 'del', 'More open: Delete stays the last action ' + JSON.stringify(g));
+    check(g.last === 'del', 'Actions open: Delete stays the last action ' + JSON.stringify(g));
     await shot('p2497-a-letter-more-desktop.png');
-    await ev(`document.querySelector('[data-dc="actsmore"]')?.click()`);
+    await ev(`(closePop(), 1)`);
     // the chips and the section
     // 2.583.0 (#4835): the rare fields wait under "More fields" (the chips per field gave way to it), the text in the tab Content
     check(await ev(`!document.querySelector('[data-dc^="showopt"]') && !!document.querySelector('.dv-more #dc-due') && !!document.querySelector('.dv-more #dc-amount')`), 'due date and amount under "More fields"');
@@ -138,8 +139,8 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     // 2.836.0 (#5390): a digital document without the field gets its number from "Assign archive number" under Actions; then the field shows it
     check(await open(nav, ev, P) && await ev(`!document.querySelector('#dc-asn')`), '#5390: the moved letter has no archive number field');
     await ev(`document.querySelector('[data-dc="actsmore"]')?.click()`);
-    check(await ready(ev, `document.querySelector('.dv-amenu [data-dc="asnnext"]')?.getClientRects().length > 0`), '#5390: Actions offers "Assign archive number"');
-    await ev(`document.querySelector('.dv-amenu [data-dc="asnnext"]')?.click()`);
+    check(await ready(ev, `!!([...document.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(b => b.querySelector('.ml')?.firstChild?.textContent === tr('Assign archive number')))`), '#5390: Actions offers "Assign archive number"');  // 2.1011.0 (#5688): an entry of menu()
+    await ev(`([...document.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(b => b.querySelector('.ml')?.firstChild?.textContent === tr('Assign archive number')))?.click()`);
     check(await ready(ev, `Number(document.querySelector('#dc-asn')?.value) > 0`), '#5390: after "Assign archive number" the field shows the new number');
 
     // ---- a receipt, an invoice with recognised values: the part at once
@@ -166,7 +167,7 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     const sl = await ev(noSide); check(flat(sl), 'phone 320 px, a letter: no sideways scrolling ' + sl);
     await ev(`document.querySelector('[data-dc="actsmore"]')?.click()`);
     const sm = await ev(noSide); check(flat(sm), 'phone 320 px, More open: no sideways scrolling ' + sm);
-    await ev(`document.querySelector('[data-dc="actsmore"]')?.click()`);
+    await ev(`(closePop(), 1)`);  // 2.1011.0 (#5688): the sheet of menu()
     check(await ev(`[...document.querySelectorAll('.dv-hacts .btn, .dv-hacts .iconbtn')].pop().dataset.dc === 'del'`), 'phone: Delete is the last action');  // 2.583.0 (#4835): the head
     await ev(`document.querySelector('.dv-hacts').scrollIntoView()`);
     await shot('p2497-a-letter-phone.png');

@@ -1,7 +1,7 @@
 // @ts-check
 /* Kalmido web client: "Optimise PDF" (2.892.0, #4873, includes #4806). A scanned PDF becomes smaller and searchable (a text
    layer): the result is a NEW VERSION of its file, the original stays as the older version (tab History; "Download original").
-   (1) The action in the document view's "Actions" (docview.js dcv_actsHtml asks po_actBtns): the dialog with the level
+   (1) The action in the document view's "Actions" (docview.js dcv_actItems asks po_actItems): the dialog with the level
    (Automatic / Black and white / Greyscale), the switch "Remove blank pages" (on in Automatic) and, measured first in the
    background, the list of the pages that would go; then "Optimise" and the sizes before / after ("2.4 MB → 160 KB"), or "not
    smaller - the file stays as it is". An office receipt: only this button, with the hint that the original stays.
@@ -21,13 +21,14 @@ const po_size = n => typeof fmtSize === 'function' ? fmtSize(+n || 0) : `${+n ||
 const po_fromTo = j => `${po_size(j.before)} → ${po_size(j.after)}`;
 
 // ---- (1) the document view's actions: optimise, and the two downloads of an optimised document (#4806)
-function po_actBtns(d, w) {
-  const p = d?.pdfopt; if (!p || d.file) return '';
+// 2.1011.0 (#5688): entries of the shared menu (the downloads per fn, no link in a menu)
+function po_actItems(d, w) {
+  const p = d?.pdfopt; if (!p || d.file) return [];
   const out = [];
-  if (w && p.can) out.push(`<button type="button" class="btn sm" data-po="open">${ic('file', 's')} ${tr('Optimise PDF…')}</button>`);
-  if (p.orig) out.push(`<a class="btn sm po-dlsearch" href="/api/docs/${esc(+d.id)}/file?dl=1" download>${ic('download', 's')} ${tr('Download searchable PDF')}</a>`,
-    `<a class="btn sm po-dlorig" href="/api/files/nodes/${esc(+d.id)}/content?v=${esc(+p.orig)}&dl=1" download>${ic('download', 's')} ${tr('Download original')}</a>`);
-  return out.join('');
+  if (w && p.can) out.push({label: tr('Optimise PDF…'), icon: 'file', act: 'po-open', fn: () => po_open(d)});
+  if (p.orig) out.push({label: tr('Download searchable PDF'), icon: 'download', act: 'po-dlsearch', fn: () => dcv_dlGo(`/api/docs/${+d.id}/file?dl=1`)},
+    {label: tr('Download original'), icon: 'download', act: 'po-dlorig', fn: () => dcv_dlGo(`/api/files/nodes/${+d.id}/content?v=${+p.orig}&dl=1`)});
+  return out;
 }
 
 function po_dlgHtml(many) {
@@ -159,9 +160,3 @@ document.addEventListener('change', async e => {
   try { DC.set = await api('PUT', '/api/docs/settings', {ws: s.ws, pdf_opt_auto: on}); toast(tr('Saved')); } catch { t.checked = !on; }
 });
 
-// the action in the view's menu: the menu closes, the dialog opens (docview.js hands only data-dc to docs.js)
-document.addEventListener('click', e => {
-  const b = /** @type {any} */ (e.target).closest?.('.dv-view [data-po="open"]'); if (!b || typeof DC === 'undefined' || !DC.doc) return;
-  if (typeof dcv_menuClose === 'function') dcv_menuClose();
-  po_open(DC.doc);
-});

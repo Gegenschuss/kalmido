@@ -71,9 +71,10 @@ const up = async (ck, name, data) => {
     await nav(B + `#ablage/${DID}`);
     check(await wait(`!!document.querySelector('.dv-view [data-dc="actsmore"]') && DC.doc?.id === ${DID}`), 'the document view with "Actions"');
     await press('.dv-view [data-dc="actsmore"]', 'Actions');
-    check(await wait(`!!document.querySelector('.dv-view #dc-amore:not([hidden]) [data-po="open"]')`), 'Actions: "Optimise PDF…" ' + await ev(`document.querySelector('.dv-view #dc-amore')?.textContent?.slice(0, 300) || '-'`));
-    check(await ev(`!document.querySelector('.dv-view .po-dlorig')`), 'not optimised yet: no "Download original"');
-    await press('.dv-view [data-po="open"]', 'Optimise PDF…');
+    // 2.1011.0 (#5688): "Actions" is the shared menu() (#pop); its entries carry data-act
+    check(await wait(`!!document.querySelector('#pop:not(.hidden) [data-act="po-open"]')`), 'Actions: "Optimise PDF…" ' + await ev(`document.querySelector('#pop')?.textContent?.slice(0, 300) || '-'`));
+    check(await ev(`!document.querySelector('#pop [data-act="po-dlorig"]')`), 'not optimised yet: no "Download original"');
+    await press('#pop [data-act="po-open"]', 'Optimise PDF…');
     check(await wait(`!!document.querySelector('.po-md')`), 'the dialog opens');
     check(await ev(`document.querySelector('.po-md input[name="po-lv"]:checked')?.value === 'auto' && document.querySelector('.po-md [data-po="blank"]').checked`), 'Automatic chosen, "Remove blank pages" on');
     check(await wait(`/Pages that go: Page 2/.test(document.querySelector('.po-md .po-pages')?.textContent || '')`, 600), 'the pages measured: page 2 goes ' + await ev(`document.querySelector('.po-md .po-pages')?.textContent || '-'`));
@@ -95,12 +96,15 @@ const up = async (ck, name, data) => {
     // the view read the document again: the downloads of #4806 in "Actions"
     check(await wait(`DC.doc?.pdfopt?.orig === 1`, 80), 'the view knows the original');
     await press('.dv-view [data-dc="actsmore"]', 'Actions again');
-    check(await wait(`!!document.querySelector('.dv-view #dc-amore:not([hidden]) .po-dlorig') && !!document.querySelector('.dv-view .po-dlsearch')`), 'Actions: "Download searchable PDF" and "Download original"');
-    check(await ev(`/content\\?v=1&dl=1$/.test(document.querySelector('.dv-view .po-dlorig').getAttribute('href'))`), 'the original is version 1');
+    check(await wait(`!!document.querySelector('#pop:not(.hidden) [data-act="po-dlorig"]') && !!document.querySelector('#pop [data-act="po-dlsearch"]')`), 'Actions: "Download searchable PDF" and "Download original"');
+    // 2.1011.0 (#5688): the entry downloads per fn (no link in a menu): the address it asks for, caught instead of the download
+    await ev(`(() => { window.__dl = []; const c = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { if (this.hasAttribute('download')) { window.__dl.push(this.getAttribute('href')); return; } return c.call(this); }; return 1; })()`);
+    await press('#pop [data-act="po-dlorig"]', 'Download original');
+    check(await wait(`/content\\?v=1&dl=1$/.test(window.__dl?.[0] || '')`, 20), 'the original is version 1 ' + await ev(`JSON.stringify(window.__dl || [])`));
     const orig = await fetch(B + `api/files/nodes/${DID}/content?v=1&dl=1`, {headers: {Cookie: CF}});
     check(orig.ok && (await orig.arrayBuffer()).byteLength === j.before, 'the original downloads unchanged');
     // the tab History: the new version on top (current), the original below it; "Restore" brings the original back
-    await ev(`(typeof dcv_menuClose === 'function' && dcv_menuClose(), 1)`);
+    await ev(`(closePop(), 1)`);  // 2.1011.0 (#5688)
     await press('.dv-view [data-dvtab="hist"]', 'tab History');
     check(await wait(`document.querySelectorAll('.dv-view #dv-p-hist .abvrow').length === 2`, 80), 'History: two versions ' + await ev(`document.querySelector('.dv-view #dv-p-hist')?.textContent?.slice(0, 300) || '-'`));
     check(await ev(`(() => { const r = [...document.querySelectorAll('.dv-view #dv-p-hist .abvrow')].map(x => x.textContent); return /v2/.test(r[0]) && /current/.test(r[0]) && /v1/.test(r[1]) && !/current/.test(r[1]); })()`), 'History: v2 (current) above v1');

@@ -804,11 +804,7 @@ async function dc_mdClick(e) {
     else window.open(dc_fileUrl(d), '_blank', 'noopener');
     return;
   }
-  if (a === 'actsmore') {  // 2.497.0 A (#4046): the rarer actions; stays open through redraws of the same document
-    const on = DC.actsMore !== d.id; DC.actsMore = on ? d.id : null;
-    b.setAttribute('aria-expanded', String(on)); $('#dc-amore', md).hidden = !on;
-    return;
-  }
+  if (a === 'actsmore') { dcv_actsMenu(b, d, d.role !== 'view'); return; }  // 2.1011.0 (#5688): the shared menu (docview.js)
   if (a.startsWith('showopt:')) {  // 2.497.0 A (#4046): the chip of one optional field (due date / amount) opens it
     const f = a.slice(8);
     if (DC.optOpen?.id !== d.id) DC.optOpen = {id: d.id};

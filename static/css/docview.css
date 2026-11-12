@@ -21,13 +21,6 @@
 .dv-hacts{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
 .dv-hacts .btn{min-height:2.5rem}
 .dv-hacts .dc-adel{margin-left:0;color:var(--danger);border-color:color-mix(in srgb,var(--danger) 55%,var(--line))}
-.dv-actw{position:relative}
-.dv-actw [data-dc="actsmore"] .dc-chev{transition:transform .15s}
-.dv-actw [data-dc="actsmore"][aria-expanded="true"] .dc-chev{transform:rotate(180deg)}
-.dv-amenu{position:absolute;right:0;top:calc(100% + .25rem);z-index:30;display:flex;flex-direction:column;align-items:stretch;gap:.125rem;min-width:16rem;padding:.375rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);box-shadow:var(--shadow)}
-.dv-amenu[hidden]{display:none}
-.dv-amenu>.btn{justify-content:flex-start;border-color:transparent;background:none;white-space:nowrap}
-.dv-amenu>.btn:hover,.dv-amenu>.btn:focus-visible{background:var(--bg3)}
 /* the three columns */
 .dv-cols{flex:1;min-height:0;display:grid;grid-template-columns:var(--dv-sw,7rem) .75rem var(--dv-mw,clamp(20rem,30%,28rem)) .75rem minmax(0,1fr);align-items:stretch}
 .dv-cols.dv-nostrip{grid-template-columns:2.75rem var(--dv-mw,clamp(20rem,30%,28rem)) .75rem minmax(0,1fr);column-gap:.75rem}
@@ -95,7 +88,7 @@
 .dv-pg.dv-thumb img{object-fit:contain}  /* 2.882.0 (#5557): the page already has its final size (docview.js dcv_phSize) */
 .dv-pgcol>.dc-ph{margin:3rem auto;color:#c8cbce}
 .dv-pgcol>.dc-ph svg{width:3rem;height:3rem}
-@media (prefers-reduced-motion:reduce){ .dv-more .dc-chev,.dv-actw .dc-chev{transition:none} }
+@media (prefers-reduced-motion:reduce){ .dv-more .dc-chev{transition:none} }
 /* phones: one column, the preview on top, the fields below; a sideways swipe on the preview leafs (docs.js) */
 @media (max-width:767px){
   .dv-view{height:auto;min-height:0;padding-top:.25rem}
@@ -114,7 +107,6 @@
   .dv-pages.dc-zoomed{touch-action:none;overflow:hidden}
   .dv-pgcol{gap:.5rem}
   .dv-mask{overflow:visible;padding:.25rem 0 0;border:0;background:none}
-  .dv-amenu{min-width:min(16rem,calc(100vw - 2rem))}
 }
 /* 2.765.0 (#5331): a narrow view is one column like a phone, whatever the window's width (the Fold 8 open at 840 px beside the
    side bar and the file tree leaves the view about 500 px: strip + fields took it all, the preview was 16 px). Below 48rem of the

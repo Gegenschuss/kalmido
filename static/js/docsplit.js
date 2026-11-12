@@ -32,8 +32,9 @@ function dsp_sheetHtml(d, w) {
   return out.join('');
 }
 // the button in the sheet's actions: any PDF of two pages or more may be split by hand
-const dsp_actBtn = (d, w) => w && !d.split?.stack && d.state === 'done' && (d.pages || 0) >= 2 && dc_isPdf(d)
-  ? `<button type="button" class="btn sm" data-dsp="open">${ic('scissors', 's')} ${tr('Split stack…')}</button>` : '';
+// 2.1011.0 (#5688): an entry of the view's menu "Actions" (docview.js dcv_actItems)
+const dsp_actItem = (d, w) => w && !d.split?.stack && d.state === 'done' && (d.pages || 0) >= 2 && dc_isPdf(d)
+  ? {label: tr('Split stack…'), icon: 'scissors', fn: () => dsp_open(d)} : null;
 
 const dsp_redraw = async id => {
   for (const k of Object.keys(DLK)) delete DLK[k];  // the task side (detail.js) asks again

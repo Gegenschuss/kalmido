@@ -99,13 +99,18 @@ async function upload(name, text, parent) {
   check(await until(() => /current/.test(row(2)?.textContent || '') && !/current/.test(row(4)?.textContent || '')), '... the tab follows the undo');
 
   // the view's actions
-  const acts = () => [...d.querySelectorAll('.dv-view .dv-amenu [data-dc]')].map(b => b.dataset.dc);
-  check(['dvnewver', 'dvmove', 'dvren'].every(a => acts().includes(a)), 'Actions: Upload a new version… / Move to… / Rename… ' + acts().join());
+  // 2.1011.0 (#5688): "Actions" is the shared menu() in #pop; its entries by their label
+  const mitems = () => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')], mi = lab => mitems().find(b => b.querySelector('.ml')?.firstChild?.textContent === lab);
+  const acts = () => mitems().map(b => b.querySelector('.ml')?.firstChild?.textContent);
+  click(w, d.querySelector('.dv-view [data-dc="actsmore"]'));
+  check(await until(() => mi('Upload a new version…') && mi('Move to…') && mi('Rename…')), 'Actions: Upload a new version… / Move to… / Rename… ' + acts().join());
   w.prompt = () => 'note-renamed.txt';
-  click(w, d.querySelector('.dv-view [data-dc="dvren"]'));
+  click(w, mi('Rename…'));
   check(await until(async () => (await call('GET', `/api/files/nodes/${NID}`)).name === 'note-renamed.txt'), 'Rename… from the view renames the file');
   check(await until(() => d.querySelector('.dv-view #dc-h')?.textContent === 'note-renamed.txt'), '... the title of the view follows');
-  click(w, d.querySelector('.dv-view [data-dc="dvmove"]'));
+  click(w, d.querySelector('.dv-view [data-dc="actsmore"]'));
+  await until(() => mi('Move to…'));
+  click(w, mi('Move to…'));
   check(await until(() => [...d.querySelectorAll('#pop button, #pop [role="menuitem"]')].some(b => /Archiv/.test(b.textContent))), 'Move to… from the view: the folders to choose (Archiv)');
   const tgt = [...d.querySelectorAll('#pop button, #pop [role="menuitem"]')].find(b => /Archiv/.test(b.textContent));
   if (tgt) click(w, tgt);
@@ -130,7 +135,10 @@ async function upload(name, text, parent) {
   check(await until(() => bh()?.querySelectorAll('.abvrow').length === 4), '... the versions ' + (bh()?.querySelectorAll('.abvrow').length));  // 2.997.0 (#5622): an undo adds no version (was 6)
   check(bh().querySelector('.abvrow a[download]') && bh().querySelector('[data-abvv]'), '... to download and to view');
   check(!bh().querySelector('[data-abv]') && !bh().querySelector('#abd-verfile') && !bh().querySelector('[data-abd="ver"]'), '... no Restore, no upload');
-  check(!db.querySelector('.dv-view [data-dc="dvnewver"], .dv-view [data-dc="dvmove"], .dv-view [data-dc="dvren"], .dv-view [data-dc="del"]'), '... no actions that write');
+  check(!db.querySelector('.dv-view [data-dc="del"]'), '... no Delete');
+  click(wb, db.querySelector('.dv-view [data-dc="actsmore"]'));  // 2.1011.0 (#5688): the entries of menu()
+  const bacts = () => [...db.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].map(b => b.querySelector('.ml')?.firstChild?.textContent);
+  check(await until(() => bacts().length) && !bacts().some(x => ['Upload a new version…', 'Move to…', 'Rename…', 'New task', 'Link with a task…'].includes(x)), '... no actions that write ' + bacts().join());
   wb.close();
 
   console.log(`p2768_b_ui: ${ok} passed, ${F.length} failed`);
