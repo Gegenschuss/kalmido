@@ -600,7 +600,8 @@ def task_update(tid):
     return jsonify({**one_task(c, tid), "conflicts": conflicts, "shifted": shifted, **sk_answer([tid]),
                     "chain": dch_chain(shifted, skipped, dch_days(old["due"], new_due)),
                     **({"move_ended": mv["ended"]} if mv.get("ended") else {}),
-                    **({"move_restored": mv["restored"]} if mv.get("restored") else {})})
+                    **({"move_restored": mv["restored"]} if mv.get("restored") else {}),
+                    **({"move_ttype": mv["ttype"]} if mv.get("ttype") else {})})  # 2.1010.0 (#4033)
 
 
 # "Move dependent tasks along" (list setting dep_shift, package D2). 2.67.0 B (#1865): the whole chain moves by the same

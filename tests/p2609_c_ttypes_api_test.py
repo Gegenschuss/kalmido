@@ -46,6 +46,8 @@ def case(s, who):
     r = s.post(B + "/api/ticket-types", json={"key": "epic"})
     check(r.ok and r.json()["name"] == "Epic" and r.json()["icon"] == "flag" and r.json()["enabled"], f"{who}: epic switched on {r.text[:200]}")
     EPIC = r.json()["id"]
+    for nm in ("", "   "):  # 2.1010.0 (#4033): a suggestion's key with an empty name is refused, not stored without a name
+        check(s.post(B + "/api/ticket-types", json={"key": "story", "name": nm}).status_code == 400, f"{who}: story with name {nm!r} = 400")
     r = s.post(B + "/api/ticket-types", json={"name": "Incident", "icon": "zap", "color": "#AA3300", "template": "**Impact**\n"})
     check(r.ok and r.json()["key"] == "incident" and r.json()["color"] == "#aa3300", f"{who}: an own type from a name {r.text[:200]}")
     INC = r.json()["id"]
@@ -85,6 +87,14 @@ def case(s, who):
     check(s.patch(B + f"/api/lists/{L}", json={"def_ttype": "story"}).status_code == 400, f"{who}: an unknown default type = 400")
     check(s.patch(B + f"/api/lists/{L}", json={"ttypes": ["Bad Key"]}).status_code == 400, f"{who}: a bad pick = 400")
     s.patch(B + f"/api/lists/{L}", json={"ttypes": []})
+    # 2.1010.0 (#4033): moved into a project without its own type: the task keeps it and the answer says so (move_ttype)
+    L2 = s.post(B + "/api/lists", json={"name": "Other " + who, "tickets": True}).json()["id"]
+    check(s.patch(B + f"/api/lists/{L2}", json={"ttypes": ["bug"]}).ok, f"{who}: a second project offers bug only")
+    r = s.patch(B + f"/api/tasks/{T}", json={"list_id": L2})
+    check(r.ok and r.json().get("move_ttype") == "incident" and r.json()["ttype"] == "incident",
+          f"{who}: moved, the type stays and the answer names it {r.status_code} {r.text[:160]}")
+    r = s.patch(B + f"/api/tasks/{T}", json={"list_id": L})
+    check(r.ok and "move_ttype" not in r.json() and r.json()["ttype"] == "incident", f"{who}: back where it is offered: no hint {r.text[:160]}")
 
     # switched off: not offered, the tasks keep it
     r = s.patch(B + f"/api/ticket-types/{INC}", json={"enabled": False})

@@ -9,10 +9,12 @@ relations per task. Only relations whose other task the reader sees are shown, o
 GET .../relations, API v1, MCP); tasks in the trash drop out while they are there; an agent never sees one to a task its data
 lock covers (core/serializers.rel_of).
 "Duplicate of" does not close by itself: close=true (the app's "Close as duplicate") marks the task as won't do with a comment
-"Duplicate of #X" and answers a signed undo (tasks/lifecycle.py undo_status): the undo opens the task again and removes the
+"Duplicate of X" (2.1010.0, #4033: ticket key or #id, plus the title where every reader sees it) and answers a signed undo (tasks/lifecycle.py undo_status): the undo opens the task again and removes the
 relation and the comment. The computed similar tasks (tasks/related.py) stay a suggestion apart; they say which of them is
 saved already (saved = the kind).
 """
+import re
+
 from flask import jsonify
 
 from ..core.config import app
@@ -114,6 +116,25 @@ def rel_add(c, tid, b):
     return rel_info(c, tid), undo
 
 
+def _dup_text(c, tid, other):
+    """2.1010.0 (#4033): the comment of "Close as duplicate" names the other task: in the same list by its ticket key (APP-12,
+    else #id) and its title, but the title only when every reader of tid sees the other task too (no participant or agent
+    with a data lock who sees tid but not it; the comment is stored once for all readers). In another list only #id."""
+    from .ticketkey import tk_key
+    o = c.execute("SELECT id, list_id, ticket_no, title FROM tasks WHERE id=?", (other,)).fetchone()
+    if c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0] != o["list_id"]:
+        return tr("Duplicate of {0}", f"#{other}")
+    ref = tk_key(c, o) or f"#{other}"
+    some = [r[0] for r in c.execute("""SELECT m.user_id FROM list_members m JOIN users u ON u.id=m.user_id
+                                       WHERE m.list_id=? AND (m.role='participant' OR u.kind='agent') LIMIT 201""", (o["list_id"],))]
+    if len(some) > 200 or any(task_visible(c, tid, u) and not task_visible(c, other, u) for u in some):
+        return tr("Duplicate of {0}", ref)
+    title = re.sub(r"\s+", " ", o["title"] or "").strip()[:200]
+    # shown as Markdown: the title stays plain text (no link, no formatting; "<@5" would still become a mention chip there)
+    title = re.sub(r"([\\`*_\[\]()!|~])", r"\\\1", title.replace("<@", "< @"))
+    return tr("Duplicate of {0}: {1}", ref, title) if title else tr("Duplicate of {0}", ref)
+
+
 def rel_close_dup(c, tid, other, rid):
     """Closes tid as won't do, a duplicate of other (a comment says so, outside a list with the lock): the signed undo record.
     rid = the relation this request added (the undo removes it), None when it was there before (it stays).
@@ -127,7 +148,7 @@ def rel_close_dup(c, tid, other, rid):
     push_handled(c, me(), [tid])
     cid = None
     if not le2e_task_mode(c, tid):  # a project encrypted in the browser: no plain text from the server
-        cid = ocm_add(c, "task", tid, me(), tr("Duplicate of #{0}", other))  # 2.972.0 (#5272): the core's comment
+        cid = ocm_add(c, "task", tid, me(), _dup_text(c, tid, other))  # 2.972.0 (#5272): the core's comment; 2.1010.0 (#4033): key / title
     undo["dup"] = {"other": other, "rel": rid, "cm": cid}
     return signed(tid, undo)
 

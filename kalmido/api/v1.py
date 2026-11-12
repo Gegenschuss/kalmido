@@ -1472,7 +1472,7 @@ def v1_task_update(tid):
         out["chain"] = ch  # 2.67.0 B (#1865): the dependent tasks moved along / left in place
     if (r or {}).get("conflicts"):  # 2.270.0 D (#3028): fields changed by someone else meanwhile (kept, not overwritten)
         out["conflicts"] = [{**x, "field": _V1_FIELD_OUT.get(x["field"], x["field"])} for x in r["conflicts"]]
-    for k in ("move_ended", "move_restored"):  # 2.273.0 B (#3042): what the move ended / a move back brought back
+    for k in ("move_ended", "move_restored", "move_ttype"):  # 2.273.0 B (#3042): what the move ended / a move back brought back; 2.1010.0 (#4033): kept type not offered
         if (r or {}).get(k):
             out[k] = r[k]
     return jsonify(out)

@@ -309,6 +309,10 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         ended = tmm_after(c, tid, tmm, me() if has_request_context() and getattr(g, "user", None) else None, set(b))
         if has_request_context():
             g.tmm = {**(getattr(g, "tmm", None) or {}), tid: {k: v for k, v in (("ended", ended), ("restored", back)) if v}}
+    if f and "list_id" in f and f["list_id"] != cur["list_id"] and has_request_context():
+        tk = f.get("ttype") or ("ttype" not in f and cur["ttype"])  # 2.1010.0 (#4033): an own type the new project does not offer
+        if tk and tt_check(c, f["list_id"], tk):  # stays on the task (no silent loss), the answer says so (move_ttype)
+            g.tmm = {**(getattr(g, "tmm", None) or {}), tid: {**((getattr(g, "tmm", None) or {}).get(tid) or {}), "ttype": tk}}
     if "ltags" in b:
         try:
             set_ltags(c, tid, b["ltags"])

@@ -104,7 +104,8 @@ j = r.json() if r.ok else {}
 check(r.ok and j.get("undo") and j["task"]["status"] == -1, f"close as duplicate: won't do, with undo {r.status_code} {r.text[:200]}")
 # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
 cm = kt.dbx("SELECT body FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL", (T3,))
-check([x[0] for x in cm] == [f"Duplicate of #{T1}"], f"close as duplicate: the comment points at the other task {cm}")
+# 2.1010.0 (#4033): the comment names the other task's title too (both in the same list)
+check([x[0] for x in cm] == [f"Duplicate of #{T1}: Alpha task 1"], f"close as duplicate: the comment points at the other task {cm}")
 r = A.post(B + "/api/tasks/batch", json={"ids": [T3], "action": "undo", "data": {"items": {str(T3): j.get("undo")}}})
 check(r.ok and A.get(B + f"/api/tasks/{T3}").json()["status"] == 0, f"undo: the task is open again {r.status_code} {r.text[:200]}")
 # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)
@@ -218,5 +219,33 @@ check(Fr.post(B + f"/api/tasks/{F1}/relations", json={"other_id": T1}).status_co
       "freelancer: never to someone else's task")
 check(Fr.get(B + f"/api/tasks/{T1}/relations").status_code == 404, "freelancer: someone else's relations 404")
 check(Fr.delete(B + f"/api/tasks/{F1}/relations/{F2}").ok and rels(Fr, F1) == (200, {}), "freelancer: removes it")
+
+# ---------------------------------------------------------------- 2.1010.0 (#4033): the duplicate comment names key / title
+
+
+def dupc(t):
+    return [x[0] for x in kt.dbx("SELECT body FROM obj_comments WHERE kind='task' AND ref_id=? AND deleted_at IS NULL ORDER BY id", (t,))]
+
+
+TP2 = mk(A, LP, "Alice private twin")
+check(A.post(B + f"/api/tasks/{TP2}/relations", json={"other_id": T2, "kind": "duplicate", "close": True}).ok, "another list: closed as duplicate")
+check(dupc(TP2) == [f"Duplicate of #{T2}"], f"another list: only the number, no title of a task the readers may not see {dupc(TP2)}")
+r = A.patch(B + f"/api/lists/{LP}", json={"ticket_key": "ALP"})
+check(r.ok, f"setup: the private project gets a ticket key {r.status_code} {r.text[:120]}")
+K1, K2 = mk(A, LP, "Login  broken"), mk(A, LP, "Login broken again")
+no = kt.dbx("SELECT ticket_no FROM tasks WHERE id=?", (K1,))[0][0]
+check(A.post(B + f"/api/tasks/{K2}/relations", json={"other_id": K1, "kind": "duplicate", "close": True}).ok, "keyed: closed as duplicate")
+check(dupc(K2) == [f"Duplicate of ALP-{no}: Login broken"], f"keyed: the ticket key and the title {dupc(K2)}")
+K3 = mk(A, LP, "See [here](https://example.com) <@1> *now*")
+K4 = mk(A, LP, "Twin of the link")
+check(A.post(B + f"/api/tasks/{K4}/relations", json={"other_id": K3, "kind": "duplicate", "close": True}).ok, "markdown title: closed")
+check(dupc(K4) == [f"Duplicate of ALP-{no + 2}: See \\[here\\]\\(https://example.com\\) < @1> \\*now\\*"],
+      f"markdown title: plain text, no link, no mention chip {dupc(K4)}")
+# review: a participant who sees the closed task but not the other one never reads its title
+check(A.put(B + f"/api/lists/{LA}/members", json={"user_id": uid["bob"], "role": "participant"}).ok, "setup: bob a participant in Alpha plan")
+T7, T8 = mk(A, LA, "Secret original"), mk(A, LA, "Visible copy")
+check(A.patch(B + f"/api/tasks/{T8}", json={"assignee_id": uid["bob"]}).ok, "setup: bob sees the copy only")
+check(A.post(B + f"/api/tasks/{T8}/relations", json={"other_id": T7, "kind": "duplicate", "close": True}).ok, "participant: closed")
+check(dupc(T8) == [f"Duplicate of #{T7}"], f"participant: no title of a task a reader may not see {dupc(T8)}")
 
 sys.exit(kt.done("p2576_d_links_api"))

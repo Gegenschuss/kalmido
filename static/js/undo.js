@@ -434,6 +434,7 @@ function histLabel(b, a) {
 // 2.273.0 B (#3042): what a move ended (people coming along, further projects, subtasks left behind, ...); the server keeps
 // it, so Undo or moving the task back within a day brings it back
 function tmm_msg(msg, r) {
+  if (r?.move_ttype) msg = `${msg || tr('Moved')} · ${tr('This project does not offer the type {0}; the task keeps it.', ttInfo(r.move_ttype, r.list_id)?.name || r.move_ttype)}`;  // 2.1010.0 (#4033)
   const x = r?.move_ended; if (!x) return msg;
   const p = [x.people && trn('{0} person coming along', '{0} people coming along', x.people), x.links && trn('{0} further project', '{0} further projects', x.links),
     x.subtasks && trn('{0} subtask stays in its project', '{0} subtasks stay in their projects', x.subtasks), x.assignee && tr('Assignee'), x.group && tr('Group'),

@@ -1257,7 +1257,8 @@ sprint, project tags the target lacks, its "also in" projects of the old workspa
 caller may not move out of. The answer then carries `move_ended` with the counts (`people`, `assignee`, `group`, `milestone`,
 `sprint`, `ltags`, `links`, `subtasks`; 2.530.0: `watchers`, `delegate` for watchers and a delegated agent who do not reach the
 target; only the ones above 0) - tell the person. Moving the task back within a day restores
-what still fits there; that answer carries `move_restored` with the same keys.
+what still fits there; that answer carries `move_restored` with the same keys. 2.1010.0: a ticket type the target project does not offer
+stays on the task; the answer names it in `move_ttype` (the type key) - tell the person.
 
 ### Imports and values set by hand
 
@@ -4141,7 +4142,7 @@ with the scope it needs). The tools:
   `unlink_task_from_list` (2.71.0: a task also in another project, see below), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
 - saved relations (2.576.0): `list_relations`, `add_relation` (kind `relates` or `duplicate`; a duplicate does not close the task,
-  `close: true` also closes it as won't do with a comment "Duplicate of #X", the person can undo it in the app), `remove_relation`;
+  `close: true` also closes it as won't do with a comment "Duplicate of X" naming the other task by its ticket key or #id, plus its title where every reader sees it, the person can undo it in the app), `remove_relation`;
   only relations whose other task you may see, also in a task's `relations` (`[{id, kind}]`, kind `relates` / `duplicate_of` /
   `has_duplicate`; `GET/POST /api/v1/tasks/{id}/relations`, `DELETE /api/v1/tasks/{id}/relations/{other_id}`). `related_tasks`
   stays the computed suggestion; its items carry `saved` when the relation is saved already; at most 50 relations per task,
