@@ -20,6 +20,8 @@ EXEMPT = {
     'pl_openSettings': 'opens Settings > Integrations (the main settings dialog, searched anyway)',
     'ltSigSettings': 'opens the letter signature dialog from Settings > Account (its button is searched there)',
     'ofmSigSettings': 'opens the mail signature dialog from Settings > Account (its button is searched there)',
+    # 2.1079.0 (#5910): 2.1044.0 (#5825) named the card's router ag_settings; it draws nothing of its own
+    'ag_settings': 'opens the dialog of ONE agent from its card (agModal, Settings > Agents > Set up or the server settings; those are searched there)',
 }
 NAME = r'[A-Za-z_$][\w$]*?(?:_settings|Settings|_settingsHtml|SettingsHtml|_sDraw)'
 DEF = re.compile(r'(?:function\s+(' + NAME + r')\s*\(|(?:const|let)\s+(' + NAME + r')\s*=\s*(?:async\s*)?\()')
