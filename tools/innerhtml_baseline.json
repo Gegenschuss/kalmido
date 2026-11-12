@@ -591,7 +591,6 @@
 "static/js/agents.js|rows || `<div class=\"muted mhint\">${esc(tr('No agent accessed this project in that time.'))}</div>`": 1,
 "static/js/agents.js|rs.map(pill).join('')": 1,
 "static/js/agents.js|rxName(r.emoji)": 1,
-"static/js/agents.js|s.action === 'triage' ? esc(tr('Sort the basket')) + ' · ' : ''": 1,
 "static/js/agents.js|s.id": 2,
 "static/js/agents.js|secOpts(t.section)": 1,
 "static/js/agents.js|show.map(a => hdot(agentHst(a), agentHstLine(a))).join('')": 1,
