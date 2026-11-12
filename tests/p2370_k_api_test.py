@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """2.37.0 API tests (part 2, agent K: #1150 review points of the database layer), own container (start.sh).
- - task search takes the text literally: a backslash, % and _ are no pattern characters ("C:\\Users\\x" is found, "50%_rabatt"
-   finds only itself, "%" alone does not find every task); web search and REST API
+ - task search takes the text literally: a backslash, % and _ are no pattern characters ("C:\\Users\\x" is found, "%" alone
+   does not find every task, "0%_rabatt" nothing); web search and REST API. 2.997.0 (#5720): words of the shared index obj_search
+   (#5278): "50%_rabatt" = the words 50* and rabatt*
  - a value the database refuses (a number out of range) is a 400 with a short message, not a crash, in the web API and in
    the REST API (its own error format); the next request on the same server works normally
 usage: p2370_k_api_test.py <datadir>"""
@@ -40,18 +41,26 @@ def web(q):
 BS = "C:\\Users\\x"
 got = web(BS)
 check(got == [ids[BS]], f"a backslash is text: {BS!r} found ({got})")
-check(web("\\U") == [ids[BS]], "a lone backslash sequence is text too")
-for q, what in (("50%_rabatt", "finds only itself, not '500 rabatt'"), ("%", "alone does not find every task"),
-                ("_", "alone does not find every task")):
+# 2.997.0 (#5720): since 2.981.0 (#5278, stage Q6a) the search goes through the shared word index
+# obj_search: every word of letters / digits is the start of a word, \\ % _ separate words and are never pattern characters
+check(web("\\U") == sorted([ids[BS], ids["Users x"]]), "a lone backslash sequence is text too: the word U at a word start")
+got = web("50%_rabatt")
+check(got == sorted([ids["50%_rabatt"], ids["500 rabatt"]]), f"'50%_rabatt' = the words 50* and rabatt* ({got})")
+got = web("0%_rabatt")
+check(got == [], f"'%' is no wildcard: '0%_rabatt' finds nothing (no word starts with 0) ({got})")
+for q in ("%", "_"):
     got = web(q)
-    check(got == [ids["50%_rabatt"]], f"{q!r} {what} ({got})")
+    check(got == [], f"{q!r} alone does not find every task ({got})")
 check(web("rabatt") == sorted([ids["50%_rabatt"], ids["500 rabatt"]]), "a plain word still finds every task containing it")
 
 tok = A.post(B + "/api/me/tokens", json={"name": "k", "scopes": ["read", "write"]}).json().get("token")
 check(bool(tok), "setup: API token")
 TH = {"Authorization": "Bearer " + (tok or "")}
 r = requests.get(B + "/api/v1/search", params={"q": "50%_rabatt"}, headers=TH)
-check(r.ok and sorted(t["id"] for t in r.json().get("data", [])) == [ids["50%_rabatt"]], f"REST search: literal too ({r.text[:200]})")
+check(r.ok and sorted(t["id"] for t in r.json().get("data", [])) == sorted([ids["50%_rabatt"], ids["500 rabatt"]]),
+      f"REST search: the same words ({r.text[:200]})")  # 2.997.0 (#5720): word index (#5278), as the web search
+r = requests.get(B + "/api/v1/search", params={"q": "%"}, headers=TH)
+check(r.ok and not r.json().get("data"), f"REST search: '%' alone finds nothing ({r.text[:200]})")
 r = requests.get(B + "/api/v1/search", params={"q": "C:\\Users"}, headers=TH)
 check(r.ok and sorted(t["id"] for t in r.json().get("data", [])) == [ids["C:\\Users\\x"]], f"REST search: backslash ({r.text[:200]})")
 
