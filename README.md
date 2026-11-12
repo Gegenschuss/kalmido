@@ -19,9 +19,9 @@
 
 ## What's new
 
-**2.1063.0** (2026-11-12):
-- **Office**: quotations with optional / alternative positions, subtotals per section, flat price print and repricing (x %, target total, target surplus).
-- **Agents**: approved steps run from the card (`run_approved_step`); "Sees now" in the agent dialog; a whole knowledge area can be shared with an agent, folders excluded per agent; `wiki_append` adds text to a knowledge page.
+**2.1067.0** (2026-11-12):
+- **Office**: sent quotations without an answer ring the bell before and after "Valid until" (extend, follow up or mark rejected); quotations with optional / alternative positions, subtotals per section, flat price print and repricing.
+- **Agents**: approved steps run from the card (`run_approved_step`); "Sees now" in the agent dialog; a whole knowledge area can be shared with an agent; `wiki_append`; help tools (`help_overview`, `search_help`, `read_help`).
 - **Organisations**: never used invited accounts are withdrawn automatically after 44 days, with a warning mail a week before.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).

@@ -1,6 +1,92 @@
 {
  "versions": [
   {
+   "version": "2.1067.0",
+   "date": "2026-11-12",
+   "items": [
+    {
+     "de": "Steht unter Einstellungen > Benachrichtigungen „Von Agenten: Nur, was mich braucht“, erscheinen neue Aufgaben und Erledigtes von Agenten nicht mehr in der Glocke.",
+     "en": "With Settings > Notifications \"From agents: Only what needs me\", new tasks and completions by agents no longer show in the bell."
+    },
+    {
+     "de": "Angebote: Rabatt jetzt auch als fester Betrag (z. B. 500 € Nachlass) und je Position in Prozent.",
+     "en": "Quotations: a discount as a fixed amount (e.g. 500 € off) and in percent per position."
+    },
+    {
+     "de": "Auf der Seite „Agenten“ öffnet das Zahnrad oder ein Tipp auf Bild und Name die Einstellungen des Agenten.",
+     "en": "On the Agents page the gear or a tap on picture and name opens the agent's settings."
+    },
+    {
+     "de": "Bei einem Agenten auf dem Kalmido-Server wählst du das Modell direkt im Chat-Menü.",
+     "en": "For an agent on the Kalmido server you pick its model right in the chat menu."
+    },
+    {
+     "de": "Code-Blöcke im Wissen-Editor sehen aus wie ein Block und haben oben rechts einen Knopf zum Kopieren.",
+     "en": "Code blocks in the knowledge editor look like a block and have a copy button at their top right."
+    },
+    {
+     "de": "Die Glocke zeigt jetzt nur, was auf dich wartet: Erwähnungen im Team-Chat und heute fällige oder überfällige Aufgaben stehen unter „Für dich“, alles andere in einem eingeklappten Verlauf.",
+     "en": "The bell now shows only what waits for you: team chat mentions and tasks due today or overdue are under \"For you\", everything else in a folded history."
+    },
+    {
+     "de": "Die geteilte Ansicht lässt sich auf großen Bildschirmen mit dem Symbol neben der Glocke oder mit Shift+V ein- und ausschalten.",
+     "en": "On large screens the split view switches on and off with the button next to the bell or with Shift+V."
+    },
+    {
+     "de": "Im Menü eines Dokumente-Ordners richtest du mit „Scan-Eingang für diesen Ordner…“ direkt einen Scan-Eingang für genau diesen Ordner ein.",
+     "en": "In the menu of a documents folder, \"Scan inbox for this folder…\" sets up a scan inbox for exactly that folder."
+    },
+    {
+     "de": "Die Glocke zählt jetzt auch Termin-Einladungen, „Laut“-Markierungen für dich, Kommentare auf deine Aufgaben und fertige Agenten-Vorschläge.",
+     "en": "The bell now also counts event invitations, Urgent marks for you, comments on your tasks and ready agent proposals."
+    },
+    {
+     "de": "In Angeboten lassen sich alle Preise um x % oder auf eine Zielsumme nachkalkulieren, ohne Rabattzeile.",
+     "en": "Quotations can be repriced by x % or to a target total, without a discount line."
+    },
+    {
+     "de": "Angebotspositionen können optional oder alternativ sein: Sie stehen mit Preis im Angebot, zählen aber nicht zur Summe.",
+     "en": "Quotation positions can be optional or alternatives: they show their price but do not count towards the total."
+    },
+    {
+     "de": "Zwischensummen je Abschnitt und Angebote als Pauschale drucken (nur die Endsumme sichtbar).",
+     "en": "Subtotals per section, and quotations printed as a flat price (only the total visible)."
+    },
+    {
+     "de": "Neuigkeiten erscheinen überall gleich, gebündelt je Aufgabe; unter „Für dich“ steht genau das, was die Zahl an der Glocke zählt.",
+     "en": "News look the same everywhere, bundled per task; \"For you\" holds exactly what the number on the bell counts."
+    },
+    {
+     "de": "Freigegebene Schritte deines Agenten laufen jetzt genau so, wie du sie bestätigt hast - auch Änderungen an Wissensseiten.",
+     "en": "Steps you approve for your agent now run exactly as confirmed - including changes to knowledge pages."
+    },
+    {
+     "de": "Unter Agent bearbeiten siehst du in „Sieht aktuell“, was mit dem Agenten geteilt ist, und teilst dort direkt mehr.",
+     "en": "In Edit agent, \"Sees now\" shows what is shared with the agent, and you can share more right there."
+    },
+    {
+     "de": "Du kannst deinen ganzen Wissensbereich mit einem Klick mit deinem Agenten teilen und einzelne Ordner ausnehmen.",
+     "en": "You can share your whole knowledge area with your agent in one click and exclude single folders."
+    },
+    {
+     "de": "Die PDF-Vorschau passt sich jetzt dem hellen und dunklen Design an, auf dem Handy steht ihre Leiste in einer Zeile.",
+     "en": "The PDF preview now follows the light and dark theme, and on a phone its bar fits in one row."
+    },
+    {
+     "de": "Verbundene Agenten schlagen Bedienfragen in der Hilfe deiner Kalmido-Version nach und erklären den Klickweg.",
+     "en": "Connected agents look up how-to questions in the help of your Kalmido version and explain the click path."
+    },
+    {
+     "de": "Ein gelöschter Anfangsbestand der Liquidität liegt im Papierkorb und lässt sich dort oder über „Letzte Schritte“ zurückholen.",
+     "en": "A deleted starting balance of the cash flow lies in the trash and comes back from there or from \"Recent steps\"."
+    },
+    {
+     "de": "Läuft ein gesendetes Angebot ohne Antwort ab, meldet sich die Glocke vorher und am Tag danach - im Angebot verlängerst du die Gültigkeit, fasst nach oder markierst es als abgelehnt.",
+     "en": "When a sent quotation runs out without an answer, the bell tells you before and the day after - from the quotation you extend it, follow up or mark it rejected."
+    }
+   ]
+  },
+  {
    "version": "2.1040.0",
    "date": "2026-11-12",
    "items": [
@@ -1295,36 +1381,6 @@
     {
      "de": "Dokumente: Suchen und Filter lassen sich als Ansicht mit Namen speichern, mit Zähler in der Seitenleiste, als Favorit und auf Heute.",
      "en": "Documents: searches and filters can be saved as a named view, with a count in the sidebar, as a favourite and on Today."
-    }
-   ]
-  },
-  {
-   "version": "2.575.0",
-   "date": "2026-11-06",
-   "items": [
-    {
-     "de": "Die Kalmido-KI kann je Ablauf nur lesend im Web recherchieren und USt-IdNr. prüfen; jede Änderung braucht dann deine Freigabe.",
-     "en": "The Kalmido AI can research the web read-only per routine and check VAT IDs; every change then needs your approval."
-    },
-    {
-     "de": "Langes Drücken oder Rechtsklick öffnet jetzt auch bei Chat-Nachrichten, Kommentaren und Abschnittsköpfen das Menü.",
-     "en": "A long press or right click now opens the menu on chat messages, comments and section heads too."
-    },
-    {
-     "de": "Unter Einstellungen > Module legst du eigene Modul-Karten an; Org-Admins weisen Karten Personen zu.",
-     "en": "In Settings > Modules you create your own module cards; organisation admins assign cards to people."
-    },
-    {
-     "de": "Rechtsklick oder langes Drücken auf ein Bereichs-Symbol öffnet ein Menü: verschieben, ausblenden, Startbereich.",
-     "en": "Right click or long press on an area symbol opens a menu: move, hide, start area."
-    },
-    {
-     "de": "Aufgaben können die Priorität „Dringend“ bekommen, über „Hoch“.",
-     "en": "Tasks can get the priority \"Urgent\", above \"High\"."
-    },
-    {
-     "de": "Der Speichern-Knopf im Browser legt Seiten auf Wunsch unter „Später lesen“ ab, privat oder fürs Team.",
-     "en": "The save button in the browser can put pages into \"Read later\", private or for the team."
     }
    ]
   }
