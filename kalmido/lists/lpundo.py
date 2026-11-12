@@ -6,8 +6,8 @@ stays the one of the shares and the trash): a change of its plain settings recor
 project's lock (obj-list-<id>, lists.py lv_check), labelled with its name. Plain = a column of the row itself without side
 effects elsewhere (LPU_COLS: name, colour, view, archive, sort, grouping, columns, sums, key figures, properties, ticket
 templates, hourly rate, hours per day ...). A save that also changes something with side effects (folder, workspace,
-project type, agents, client, family / Home & life, time tracking, ticket key, visibility, a member's own view) records no
-step: the browser keeps its own way back for it (static/js/dialogs.js listPatch) until those get a step of their own.
+project type, agents, client, family / Home & life, time tracking, ticket key, visibility) records no copy step here: since
+2.1074.0 (#5493) it is a diff step of lists/lpside.py (kind "listside"), taken back through the project's own write path.
 Only the plain columns go back (undo_keep = every other column), and only they and the lock's generation count for "changed
 since" (undo_nofp): a new sidebar order or a description written meanwhile does not block the undo of a rename.
 Taking back (core/undoweb.py): the person needs the role of today that may change those columns -- owner, or a project admin
@@ -21,6 +21,7 @@ from ..core.access import _list_role, list_out
 from ..core.errors import Denied
 from ..core.objhooks import GONE
 from ..core.undoareas import ua_done, ua_plain, ua_pre
+from ..core.undodiff import undo_quiet
 from ..core.undoweb import undo_need_reg
 from ..core.writes import obj_track
 from ..core.errors import BadInput
@@ -90,7 +91,7 @@ def _same(r, b):
 
 
 def lpu_pre(c, uid, lid, b, role):
-    if role not in ("owner", "admin") or not lpu_plain(b):
+    if undo_quiet() or role not in ("owner", "admin") or not lpu_plain(b):  # 2.1074.0 (#5493): not while a step goes back (lpside.py runs list_apply)
         return
     r = c.execute("SELECT * FROM lists WHERE id=?", (int(lid),)).fetchone()
     r = r and list_out(r)  # 2.1061.0 (#5867, stage 3): archived from the state marker, not the old column

@@ -439,22 +439,35 @@ def qn_shares(b):
 
 @app.patch("/api/lists/<int:lid>")
 def list_update(lid):
+    from ..tasks.tasks import WEB_LIST_EDIT
+    b = web_fields(body(), WEB_LIST_EDIT, "PATCH /api/lists/{lid}")
+    b = {k: v for k, v in b.items() if k != "agent_peers"}  # 2.40.0 (#1373): fixed off, still accepted from old clients, ignored
+    c = db()
+    out = list_apply(c, lid, b)
+    if not isinstance(out, dict):
+        return out  # an error answer (nothing committed)
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, **out)
+
+
+def list_apply(c, lid, b):
+    """The write of PATCH /api/lists/<id> without its commit (2.1074.0, #5493: also the way back / forward of a settings step
+    with side effects, lists/lpside.py). -> the answer's fields (dict) or an error answer (err / jsonify, status >= 400)."""
     from ..lists.groups import grp_touch
     from ..tasks.validation import clean_ticket_tpl
-    from ..tasks.tasks import WEB_LIST_EDIT
     from ..personal.timetrack import clean_day_hours
     from ..lists.templates import list_ptype_set
     from ..agents.core import list_listen_update
     from ..collab.reactions import list_tidy_update
     from ..lists.folders import lm_folder_moved, list_own_mark
-    b = web_fields(body(), WEB_LIST_EDIT, "PATCH /api/lists/{lid}")
-    b = {k: v for k, v in b.items() if k != "agent_peers"}  # 2.40.0 (#1373): fixed off, still accepted from old clients, ignored
-    c = db()
     role = need_list(c, lid, write=False)
     lv0 = lv_check(c, lid, role, b)  # 2.657.0 (#5052): the settings' version under the project's lock
     b = {k: v for k, v in b.items() if k != "expect_updated_at"}
     from .lpundo import lpu_post, lpu_pre
+    from .lpside import lps_post, lps_pre
     lpu_pre(c, me(), lid, b, role)  # 2.809.0 (#5476): a change of plain settings is a step of the person's undo list
+    lps0 = lps_pre(c, lid, role, b)  # 2.1074.0 (#5493): a change with side effects too (folder, workspace, type, agents ...)
     if qn_is(c, lid) and qn_shares(b):  # 2.477.0 (#3881): the list "Notes" stays private (no workspace, folder, agents, family)
         qn_private(c, lid)
     pz_has, pz_prev, pz_out = False, None, {}  # 2.528.0 B (#4305, A10): the properties merged key by key (oxb_props_merge)
@@ -708,10 +721,8 @@ def list_update(lid):
     if lh0 is not None:  # 2.568.0 (#4739): before / after in the core's history (an agent's change is marked)
         lmc_history(c, me(), lid, lh0, lmc_snap(c, lid, lh_keys))
     lv1 = lv_after(c, lid, lv0)  # 2.657.0 (#5052): a new version when the project's row changed
-    ug = lpu_post(c)  # 2.809.0 (#5476): the server lists the step (the app marks its own entry srv)
-    bump(c)
-    c.commit()
-    return jsonify(ok=True, conflicts=conflicts, updated_at=lv1, **pt_out, **pz_out, **({"undo_group": ug} if ug else {}))
+    ug = lpu_post(c) or lps_post(c, lid, role, lps0)  # 2.809.0 (#5476): the server lists the step (the app marks its own entry srv)
+    return {"conflicts": conflicts, "updated_at": lv1, **pt_out, **pz_out, **({"undo_group": ug} if ug else {})}
 
 
 @app.post("/api/lists/reorder")

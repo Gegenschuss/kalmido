@@ -365,7 +365,7 @@ async function setListPtype(id, pt, o = {}) {  // o.post: runs after an undo / r
     const res = await api('PATCH', '/api/lists/' + id, {...pick(to), _prev: pick(from)});
     return {skipped: (res.conflicts || []).length ? [`${qn(lname(listById(id)) || '')}: ${tr('Project type')}`] : []};
   };
-  const e = histAdd({label: tr('Project type of {0}: {1}', qn(lname(x)), ptypeName(pt)), undo: go(before, after), redo: go(after, before), lids: [id], post: o.post});
+  const e = histAdd({label: tr('Project type of {0}: {1}', qn(lname(x)), ptypeName(pt)), res: r, undo: go(before, after), redo: go(after, before), lids: [id], post: o.post});  // 2.1074.0 (#5493): res = its server step
   return {e, missing: r.ptype_missing || {sections: [], fields: []}};
 }
 // after a type change: offer (never force) the type's sections the list does not have yet; added = one undo step
@@ -467,20 +467,22 @@ async function listPatch(id, body, label, o = {}) {
     run(); return false;
   }
   if (e && res?.undo_group) histOwn(e, +res.undo_group);  // 2.809.0 (#5476): the server lists the step; 2.905.0 (#5255): and takes it back (its group)
+  // 2.1074.0 (#5493): a save with side effects only (workspace, time tracking, agents ...) is a server step too: its entry
+  else if (!e && res?.undo_group) { e = histAdd({label: label || ('org_id' in body ? tr('Workspace of {0}', qn(lname(l))) : tr('Settings of {0}', qn(lname(l)))), res, lids: [id], post: o.post}); o.step?.(e); }
   const cf = (res?.conflicts || []).map(c => c.field);  // 2.270.0 A (#3019): changed elsewhere meanwhile: kept, said, not in the undo step
   if (cf.length) {
     for (const k of cf) { delete before[k]; delete after[k]; }
-    if (e && !Object.keys(before).length) { HIST.undo = HIST.undo.filter(x => x !== e); renderHist(); e = null; }
+    if (e && !Object.keys(before).length && !histGids(e).length) { HIST.undo = HIST.undo.filter(x => x !== e); renderHist(); e = null; }  // 2.1074.0 (#5493): a server step stays (it holds what did change)
   }
   // what only changes the list itself needs no GET /api/state; folder, type, archive and time tracking have side effects
   // on the server (sharing, modules, hidden tasks): 2.46.2 (#1659) the reload for them runs behind; a conflict reloads too
   // (what stayed replaces the optimistic value)
   try { if (cf.length || !Object.keys(body).every(k => k === '_prev' || LIST_LOCAL.includes(k))) { await load(); render(); } } finally { run(); }
   if (cf.length) { o.conflicts?.(res.conflicts); toast(`${tr('Changed elsewhere in the meantime')}: ${cf.map(lp_fieldName).join(', ')}`); }
-  if ('org_id' in body && !cf.includes('org_id') && res?.move_ended) {  // 2.273.0 B (#3042): what the workspace change ended; its Undo brings it back
-    const put = org => async () => { await api('PATCH', '/api/lists/' + id, {org_id: org}); await load(); render(); return {}; };
-    offerUndo(tmm_msg('', res), histAdd({label: tr('Workspace of {0}', qn(lname(listById(id)) || '')), undo: put(ws0), redo: put(body.org_id || null)}));
-  } else if ('org_id' in body && !cf.includes('org_id')) wsc_listMoved(id, ws0, body.org_id || null);  // 2.53.0 (#1474): moved into an organisation: who sees it now
+  // 2.273.0 B (#3042): what the workspace change ended; its Undo brings it back. 2.1074.0 (#5493): the Undo is the save's own
+  // server step (lists/lpside.py takes the workspace back with what the move ended), no second entry with its own write
+  if ('org_id' in body && !cf.includes('org_id') && res?.move_ended) offerUndo(tmm_msg('', res), e);
+  else if ('org_id' in body && !cf.includes('org_id')) wsc_listMoved(id, ws0, body.org_id || null, e);  // 2.53.0 (#1474): moved into an organisation: who sees it now
   return e;
 }
 // per user and project: the progress bar is off by default (2.40.0, #1190) and switched on in the list options / settings

@@ -170,12 +170,12 @@ function wsc_moveMsg(fromList, toList, msg) {
   if (!wsOn() || !a || !b || (a.org_id && !a.is_inbox) || !b.org_id || b.is_inbox) return msg;
   return tr('Will be visible to everyone in {0}', wsLabel(b.org_id));
 }
-// a list moved into an organisation (list dialog): the hint with its own Undo (back to Private)
-function wsc_listMoved(id, was, now) {
+// a list moved into an organisation (list dialog): the hint with the save's Undo (back to Private). 2.1074.0 (#5493): e = the
+// save's entry (its server step, lists/lpside.py), no entry of its own any more
+function wsc_listMoved(id, was, now, e) {
   if (!wsOn() || was || !now) return;
-  const put = org => async () => { await api('PATCH', '/api/lists/' + id, {org_id: org}); await load(); render(); return {}; };
   const msg = tr('Will be visible to everyone in {0}', wsLabel(now));
-  offerUndo(msg, histAdd({label: tr('Workspace of {0}', qn(lname(listById(id)) || '')), undo: put(null), redo: put(now)}));
+  if (e) offerUndo(msg, e); else toast(msg);
 }
 
 // ---- after every render: the open list's workspace colour on the list view (header stripe, quick add frame) and the

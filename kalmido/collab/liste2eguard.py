@@ -380,7 +380,7 @@ def le2b_scrub_undo_free(c, lid):
                         OR (kind='notepad' AND ref_id IN (SELECT id FROM list_notepads WHERE list_id=?))""", (lid, lid, lid, lid)).rowcount
     return {"history_copies": hist,
             "undo_time_copies": _scrub_undo_ids(c, le2b_undo_copies(c, ("time_entry", "time_life"), [lid], tids)),
-            "undo_settings": le2b_scrub_undo(c, "kind='listset' AND ref_id=?", (lid,)),  # #5551
+            "undo_settings": le2b_scrub_undo(c, "kind IN ('listset', 'listside') AND ref_id=?", (lid,)),  # #5551; 2.1074.0 (#5493): + listside (its values before / after name the project)
             "undo_notepads": le2b_scrub_undo(c, "kind='notepad' AND ref_id IN (SELECT id FROM list_notepads WHERE list_id=?)", (lid,))
             + _scrub_undo_ids(c, le2b_undo_copies(c, ("notepad",), [lid], ()))}  # #5551
 

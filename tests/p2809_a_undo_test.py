@@ -20,7 +20,7 @@ Invented names only.
  - folders (lists/foldundo.py): a rename goes back from the phone and forward; a merge into an existing folder records no step
  - a project's settings (lists/lpundo.py): a rename + colour on the laptop is listed on the phone (area tasks, kind listset,
    label with the old name, device, the answer names its group) and goes back from there; redo; archiving -> undo -> out of
-   the archive; a save of the same values and a save with a folder (side effects) record no step; a new sidebar order since
+   the archive; a save of the same values records no step (2.1074.0, #5493: a save with a folder is a listside step); a new sidebar order since
    does not block the undo; a rename by someone else since stays (named); a project admin takes back her own rename, but not
    after she became an editor (noaccess); another person neither lists nor takes back the step (404)
 freelancer-matrix: undo (a person without an organisation: her project's colour, her new section and field and her deleted time entry go back from the list)
@@ -102,8 +102,9 @@ before = newest(A).get("id")
 r = A.patch(B + f"/api/lists/{L}", json={"name": "Projekt Neu"})
 check(r.ok and not r.json().get("undo_group") and newest(A).get("id") == before, f"a save of the same name records no step {newest(A)}")
 r = A.patch(B + f"/api/lists/{L}", json={"name": "Projekt Mappe", "folder": "Ablage Beispiel"})
-check(r.ok and not r.json().get("undo_group") and newest(A).get("id") == before,
-      f"a save that moves it into a folder (side effects) records no server step (the browser keeps its own) {newest(A)}")
+# 2.1074.0 (#5493): a save with side effects is a server step too (lists/lpside.py, kind listside; was: no step, the browser's own)
+check(r.ok and r.json().get("undo_group") and newest(A).get("kind") == "listside",
+      f"a save that moves it into a folder (side effects) is a server step of its own kind {newest(A)}")
 A.patch(B + f"/api/lists/{L}", json={"folder": ""})
 
 # a new sidebar order since does not block; a rename by someone else since does
