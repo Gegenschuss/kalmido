@@ -109,7 +109,8 @@ check(F.delete(B + f"/api/addr-shares/{NOBL}").ok and [x["email"] for x in F.get
 # ================================================================ a project in the trash before the proof: nothing comes of it
 LT = project("Old draft")
 F.put(B + f"/api/lists/{LT}/members", json={"email": "uma@example.com", "role": "edit"})
-check(F.delete(B + f"/api/lists/{LT}").ok, "(setup) the project goes to the trash")
+check(F.patch(B + f"/api/lists/{LT}", json={"archived": True}).ok and F.delete(B + f"/api/lists/{LT}").ok,
+      "(setup) the project is archived and deleted (deleting only from the archive)")
 
 # ================================================================ review F1: a folder renamed before the proof - the open share follows
 LS2 = project("Lookbook", "Studio")
