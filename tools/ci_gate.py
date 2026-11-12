@@ -28,6 +28,13 @@ live; v2.883, v2.897, v2.902 had all hard shards green and got no image). A hard
 it finished is no green one = no image. The soft red parts are printed (step summary) and
 --report lists them for the release notes (weekly-release.yml).
   python3 tools/ci_gate.py --sha SHA --report   markdown of the soft red parts of SHA's newest finished full run ("" = green)
+#5787 (decision 12.11.2026): the required check of the merge queue, ci.yml job "Merge queue gate":
+  python3 tools/ci_gate.py --queue-gate        (env NEEDS = toJSON(needs), GITHUB_EVENT_NAME, GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT)
+judges the run it runs in, by SUITES (not by shards: a hard shard carries the soft suites of its groups, runs 43149840388,
+43127929985, 43107949743 had a red hard shard with only soft suites red): green when Lint and PR lint (a queue entry: + the plan
+and semgrep) are green, no hard suite is red (every red shard names its red suites, none hard; a cancelled shard = unknown =
+hard) and no hard job (e-invoice validators, ZAP ...) is red. A pull request is green on Lint and PR lint alone (no shards).
+Exit 0 green, 1 red; the soft red parts are printed (a task + collective fix, like the soft red parts of the release push).
 Env: GITHUB_TOKEN (or GH_TOKEN), GITHUB_REPOSITORY, GITHUB_SHA, GITHUB_API_URL (all set on GitHub Actions)."""
 import argparse
 import fnmatch
@@ -48,6 +55,8 @@ SCAN_PREP = ("install scanners*", "pinned dependencies*")
 # fable 2.940.0 M2 (#5600): a red Lint is soft only when these scanner steps are THERE and green (positive check: a Lint
 # cancelled mid-way may list only the steps it began)
 LINT_MUST = ("pinned dependencies*", "install scanners*", "bandit*", "pip-audit (image*")
+QUEUE_SHARD_RE = re.compile(r"^Test suites (\d+)/\d+ (full|push|queue)( hart)?\b")  # #5787: + the queue stage of a merge queue entry
+QUEUE_GATE = "Merge queue gate"  # #5787: the job name of ci.yml - a required check of the ruleset, keep it as it is
 SOFT_CONCL = ("failure", "cancelled")  # #5600: the run conclusions judge_soft looks at (cancelled = a newer push cut the run)
 
 
@@ -196,6 +205,58 @@ def judge_soft(jobs, suites_of, pats, grp):
     return True, "; ".join(parts) or "no red part named", info
 
 
+def judge_queue(event, needs, jobs, suites_of, pats, grp):
+    """#5787: the merge queue gate (see the head comment). event = GITHUB_EVENT_NAME, needs = {job id: {"result": ...}} of the
+    gate job, jobs = the jobs of the own run (dicts: id, name, status, conclusion, steps), suites_of(job) -> its red suites
+    (None = not readable). -> (green?, text, soft red parts)."""
+    must = ["checks", "pr-lint"] + (["plan", "semgrep"] if event == "merge_group" else [])
+    for k in must:
+        res = (needs.get(k) or {}).get("result")
+        if res != "success":
+            return False, "%s: %s" % (k, res or "missing"), []
+    if event == "pull_request":
+        return True, "Lint and PR lint green (a pull request runs no test shards)", []
+    if event != "merge_group":
+        return False, "not a pull request / merge queue entry: %s" % (event or "?"), []
+    if not pats:
+        return False, "no tests/hard_suites.txt (unknown = hard)", []
+    tres = (needs.get("tests") or {}).get("result")
+    if tres not in ("success", "failure", "cancelled"):
+        return False, "test shards: %s (none ran)" % (tres or "missing"), []
+    shards = [j for j in jobs if QUEUE_SHARD_RE.match(j.get("name") or "")]
+    if not shards:
+        return False, "no test shard in the job list of the run (unknown = hard)", []
+    soft = []
+    for j in shards:
+        c = j.get("conclusion")
+        if c in ("success", "skipped"):
+            continue
+        if c != "failure":  # cancelled / timed out / not finished: its suites are untested = unknown = hard
+            return False, "shard not finished: %s (%s)" % (j.get("name"), c or j.get("status")), soft
+        su = suites_of(j)
+        if su is None:
+            return False, "the red suites of %s are not readable (unknown = hard)" % j.get("name"), soft
+        if not su:
+            return False, "%s red without a named suite (unknown = hard)" % j.get("name"), soft
+        for x in su:
+            if hard_suite(x, pats, grp):
+                return False, "hard suite red: %s (%s)" % (x, j.get("name")), soft
+            soft.append(x)
+    for j in jobs:
+        name = j.get("name") or ""
+        if name == QUEUE_GATE or QUEUE_SHARD_RE.match(name) or j.get("conclusion") in ("success", "skipped", "neutral"):
+            continue
+        if j.get("status") not in (None, "completed") or j.get("conclusion") is None:
+            if hard_job(j, pats) and not name.lower().startswith("lint"):
+                return False, "hard job not finished: %s (%s)" % (name, j.get("status")), soft
+            continue
+        if hard_job(j, pats):
+            return False, "hard job red: %s (%s)" % (name, j.get("conclusion")), soft
+        soft.append(name)
+    soft = sorted(set(soft))
+    return True, ("soft red (a task, no hold): " + ", ".join(soft)) if soft else "Lint, PR lint, semgrep and every test shard green", soft
+
+
 def report_md(version, run_id, info, url=""):
     """The section for the release notes: the soft red parts of the version (empty info = nothing)."""
     if not (info.get("suites") or info.get("jobs") or info.get("cut")):
@@ -241,6 +302,57 @@ def api(path):
         return json.load(f)
 
 
+def queue_gate(tree):
+    """#5787: ci.yml job "Merge queue gate" - the jobs of the own run (this attempt) and their annotations, judge_queue."""
+    repo, rid = os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GITHUB_RUN_ID", "")
+    att = os.environ.get("GITHUB_RUN_ATTEMPT", "") or "1"
+    ev = os.environ.get("GITHUB_EVENT_NAME", "")
+    try:
+        needs = json.loads(os.environ.get("NEEDS") or "{}")
+    except ValueError:
+        needs = None
+    if not isinstance(needs, dict):
+        print("queue gate: NEEDS is no JSON object (unknown = red)")
+        return 1
+    jobs = []
+    if ev == "merge_group":
+        if not (repo and rid):
+            print("queue gate: GITHUB_REPOSITORY / GITHUB_RUN_ID missing")
+            return 1
+        try:
+            for page in range(1, 6):
+                d = api("/repos/%s/actions/runs/%s/attempts/%s/jobs?per_page=100&page=%d" % (repo, rid, att, page))
+                more = d.get("jobs", [])
+                jobs += more
+                if not more or len(jobs) >= int(d.get("total_count") or 0):
+                    break
+        except Exception as e:  # noqa: BLE001 - no job list = unknown = red
+            print("queue gate: no job list of the run: %s" % e)
+            return 1
+
+    def suites_of(job):
+        try:
+            anns = api("/repos/%s/check-runs/%s/annotations?per_page=100" % (repo, job["id"]))
+        except Exception:  # noqa: BLE001 - not readable = unknown = hard
+            return None
+        titles = [(x.get("title") or "").strip() for x in anns or []]
+        if any(t.startswith("suite ") and not SUITE_ANN_RE.match(t) for t in titles):
+            return None
+        return [m.group(1) for m in map(SUITE_ANN_RE.match, titles) if m]
+
+    ok, txt, soft = judge_queue(ev, needs, jobs, suites_of, patterns(tree), groups(tree) if ev == "merge_group" else {})
+    print("queue gate (%s): %s - %s" % (ev, "green" if ok else "red", txt), flush=True)
+    summ = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summ:
+        with open(summ, "a", encoding="utf-8") as f:
+            f.write("### Merge queue gate: %s\n\n%s\n" % ("green" if ok else "red", txt))
+            if soft:
+                f.write("\nSoft red (they hold nothing; a task + collective fix): %s\n" % ", ".join(soft))
+    if soft and ok:
+        print("::warning title=soft red in the queue entry::%s" % ", ".join(soft)[:900])
+    return 0 if ok else 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sha", default=os.environ.get("GITHUB_SHA", ""))
@@ -250,7 +362,10 @@ def main():
     ap.add_argument("--tree", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."),
                     help="#5324: checkout of the TAGGED commit (its tests/hard_suites.txt and test groups); default: this checkout")
     ap.add_argument("--report", metavar="VERSION", help="#5324: print the release-notes section of the soft red parts and exit")
+    ap.add_argument("--queue-gate", action="store_true", help="#5787: judge the own run (ci.yml job \"Merge queue gate\")")
     a = ap.parse_args()
+    if a.queue_gate:
+        return queue_gate(a.tree)
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     if not (a.sha and repo):
         print("ci_gate: GITHUB_SHA / GITHUB_REPOSITORY missing"); return 1

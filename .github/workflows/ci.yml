@@ -13,6 +13,10 @@ on:
   # (tests/stages.py: against the queue's base commit); the release commit (VERSION changed) still gets the full run there.
   # The job "pr-lint" checks the commits of a pull request / queue entry. The concurrency group hangs on github.ref: every
   # queue entry has its own gh-readonly-queue/... ref, so entries never cancel each other.
+  # #5787 (decision 12.11.2026, "only hard suites hold build and live"): a queue entry runs its own lean stage "queue" = the
+  # hard suites (tests/hard_suites.txt) + the suites it touches, beside Lint, PR lint and semgrep; the required check is the job
+  # "Merge queue gate" (green when those are green and no HARD suite is red - a soft red suite holds nothing, it is a task like
+  # in the release push's full run). A pull request runs only Lint and PR lint (no test shards, nothing twice).
   merge_group:
     types: [checks_requested]
   # 2.180.0 A (#2695): the nightly full run (23:30 UTC = 01:30 / 00:30 in Berlin, the window of the night flakes) and runs by
@@ -51,6 +55,7 @@ concurrency:
 jobs:
   plan:
     name: Shard plan (stage, suite times of the last runs)
+    if: github.event_name != 'pull_request'  # #5787: a pull request runs no test shards (Lint and PR lint only)
     runs-on: ubuntu-latest
     # CI fix of 2.351.0: 8 instead of 5 min; tests/stages.py (150 s) and each download of suite times (60 s) have their own
     # limit below, so a slow step costs a full run instead of a cancelled plan (a cancelled plan skips every shard)
@@ -82,7 +87,8 @@ jobs:
           out=$(timeout 150 python3 tests/stages.py --ci --groups-out /tmp/push-groups.txt) || out=$'stage=full\nreason=tests/stages.py failed or took over 150 s - full run'
           stage=$(sed -n 's/^stage=//p' <<<"$out"); reason=$(sed -n 's/^reason=//p' <<<"$out")
           if [ "$stage" = push ] && ! [ -s /tmp/push-groups.txt ]; then stage=full; reason="no groups for the push stage - full run"; fi
-          [ "$stage" = push ] || stage=full
+          if [ "$stage" = queue ] && ! [ -s /tmp/push-groups.txt ]; then stage=full; reason="no groups for the queue stage - full run"; fi
+          [ "$stage" = push ] || [ "$stage" = queue ] || stage=full  # #5787: queue = a merge queue entry (hard + touched suites)
           { echo "stage=$stage"; echo "reason=$reason"; } >> "$GITHUB_OUTPUT"
       # 2.166.0 CI fix: the times of the last THREE finished runs, the newer wins per group (tools/shards.py: the last file
       # wins). With one run only, the groups a shard did not reach (cancelled at the 45 min limit) counted as 20 s per
@@ -120,7 +126,7 @@ jobs:
         run: |
           t=$(while read -r id; do [ -z "$id" ] || find "/tmp/timings/$id" -name timings.csv; done < /tmp/timings/order.txt)
           stage=$STAGE
-          if [ "$stage" = push ]; then
+          if [ "$stage" = push ] || [ "$stage" = queue ]; then  # #5787: the queue stage is cut like the push stage
             python3 tools/shards.py --shards 20 --only /tmp/push-groups.txt $t | sed -n 1p || true
             python3 tools/shards.py --shards 20 --target-min 15 --hard-target-min 9 --only /tmp/push-groups.txt --assign $t > shard-plan.txt \
               || { stage=full; REASON="push stage plan failed - full run"; }
@@ -161,6 +167,7 @@ jobs:
     # The cache rather than an artifact: shared across runs, nothing to download when it misses; a failed save only costs
     # the next run its own builds.
     name: Image (build once, cache)
+    if: github.event_name != 'pull_request'  # #5787: a pull request runs no test shards
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -325,6 +332,7 @@ jobs:
     # 2.546.0 B (#4289): also the files of the real finalising (tests/p2546_b_einvoice_api_test.py starts the server with the
     # app image, makes the invoices through its routes and takes the stored PDF + XML), with a minimum number of them
     name: E-invoice validators (veraPDF, KoSIT)
+    if: github.event_name != 'pull_request'  # #5787: a hard job - it runs for a queue entry (the gate waits for it), not for a pull request
     runs-on: ubuntu-latest
     timeout-minutes: 30  # 2.546.0 B (#4289): was 15; the image build on a cache miss comes on top
     steps:
@@ -397,6 +405,7 @@ jobs:
     # 2.12.0 (#436): the browser demo builds from the current sources and runs without a server (jsdom smoke test + Firefox
     # layout when the runner has one), and quick add understands all six languages (on the demo build, no container)
     name: Browser demo + quick add languages
+    if: github.event_name != 'pull_request' && github.event_name != 'merge_group'  # #5787: soft - not in the merge queue / a pull request (the release push runs it)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -437,6 +446,7 @@ jobs:
     # pull request = against its base, push = against the push's "before"; nightly / by hand always; no base to compare
     # (a new branch, a rewritten history) = run. Skipped = "skipped", the required "Test suites" check does not need it.
     name: Windows launcher needed (mcp/ changed)
+    if: github.event_name != 'pull_request' && github.event_name != 'merge_group'  # #5787: soft - not in the merge queue / a pull request (the release push runs it)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -494,6 +504,7 @@ jobs:
     # vulnerability database never turns the run of "CI" red. Trivy runs as its pinned image (tag + digest), no
     # third-party action. The image of the job "image" (same key) when it is in the cache, else built here like ZAP does.
     name: Trivy image scan (reporting only)
+    if: github.event_name != 'pull_request' && github.event_name != 'merge_group'  # #5787: reporting only - not in the merge queue / a pull request
     runs-on: ubuntu-latest
     timeout-minutes: 20
     continue-on-error: true
@@ -542,6 +553,7 @@ jobs:
     # code line, reason, date; SECURITY.md "Scanner exception lists"); tools/semgrep_baseline.py compares the JSON output
     # against it. A real gap gets a task and is fixed, not only listed.
     name: semgrep
+    if: github.event_name != 'pull_request'  # #5787: Lint and PR lint only for a pull request; a queue entry runs it (the gate needs it)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -755,20 +767,49 @@ jobs:
 
   tests-done:
     # one required check for all shards (branch protection / the overall result): green only if every shard passed
+    # #5787: for push / schedule / workflow_dispatch as before; a pull request / queue entry has the job "Merge queue gate" instead
     name: Test suites (API, UI, security)
     runs-on: ubuntu-latest
     needs: tests
-    if: always()
+    if: always() && github.event_name != 'pull_request' && github.event_name != 'merge_group'
     timeout-minutes: 5
     steps:
       - run: |
           echo "shards: ${{ needs.tests.result }}"
           test "${{ needs.tests.result }}" = "success"
 
+  queue-gate:
+    # #5787 (decision 12.11.2026, rule 11.11.2026 "only hard suites hold build and live"): the required check of the merge
+    # queue (ruleset); keep the job name. A queue entry: green when Lint, PR lint, the plan and semgrep are green, no HARD suite
+    # is red (judged by suite from the shards' annotations "suite X failed", tests/hard_suites.txt + the test groups - a hard
+    # shard carries soft suites of its groups) and no hard job (e-invoice validators, ZAP) is red; a soft red suite holds
+    # nothing (a task + collective fix, as in the release push's full run). A pull request: Lint and PR lint.
+    # tools/ci_gate.py --queue-gate (judge_queue); the release commit does not go through the queue (the train's direct push).
+    name: Merge queue gate
+    needs: [plan, checks, pr-lint, semgrep, einvoice, zap, tests]
+    if: always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read  # the jobs of the own run
+      checks: read  # the annotations naming the red suites
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Judge the queue entry (tools/ci_gate.py --queue-gate)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEEDS: ${{ toJSON(needs) }}
+        run: python3 tools/ci_gate.py --queue-gate
+
   zap:
     # 2.543.0 (#4625): red for NEW alerts only. .zap/rules.tsv names the reviewed alerts (IGNORE with the reason and date,
     # SECURITY.md "Scanner exception lists"); the scan runs without -I, so every other alert fails the job.
     name: OWASP ZAP baseline
+    if: github.event_name != 'pull_request'  # #5787: a hard job - it runs for a queue entry (the gate waits for it), not for a pull request
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

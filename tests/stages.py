@@ -29,6 +29,8 @@ test files and the changed files, nothing is started; Python standard library on
   python3 tests/stages.py --ci                       CI mode (ci.yml job "plan"): the stage from the event (environment:
                      GITHUB_EVENT_NAME, CI_BEFORE, CI_BASE_SHA, CI_INPUT_STAGE, CI_MESSAGE) and the changed files; prints "stage=" /
                      "reason=" lines, writes the groups of the push stage to --groups-out
+                     #5787: a merge queue entry (merge_group) gets the stage "queue" = the groups of the hard suites
+                     (tests/hard_suites.txt) + the suites it touches (--touched), never the push stage or the full run
 
 With a separate test runner, only the suites a branch touches (exit 3 = the change needs the full run):
   s=$(python3 tests/stages.py --suites --changed origin/main) && <test runner> run $s
@@ -650,6 +652,39 @@ def touched(repo, files, base=None, head=None):
     return [s for _, s, _ in repo.rows if s in why], why, unmapped
 
 
+HARD_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hard_suites.txt")
+
+
+def hard_groups(repo, path=HARD_FILE):
+    """#5787: the groups of the hard areas - a group whose first suite or any of its suites matches a pattern of
+    tests/hard_suites.txt (the same rule as tools/shards.py is_hard, the list the release tooling reads too); {} = no list."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            pats = [ln.strip().lower() for ln in f if ln.strip() and not ln.lstrip().startswith("#")]
+    except OSError:
+        return {}
+    out = {}
+    for g, s, _ in repo.rows:
+        if any(fnmatch.fnmatch(s.lower(), p) for p in pats):
+            out.setdefault(g, []).append(f"{s}: hard area")
+    return out
+
+
+def queue(repo, files, base=None, head=None):
+    """#5787 (decision 12.11.2026): a merge queue entry runs the groups of the hard suites and the suites the entry touches
+    (touched(), as the train's check before it lands), never the whole push stage (1442 of 2176 groups for a README change)
+    and never the full run - the release push of the train keeps that. -> (reason, {group: [why...]})."""
+    groups = hard_groups(repo)
+    nh = len(groups)
+    order, why, unmapped = touched(repo, files, base, head) if files else ([], {}, [])
+    for x in order:
+        if x in repo.group_of:
+            groups.setdefault(repo.group_of[x], []).append(f"{x}: {why.get(x, 'touched')}")
+    reason = (f"merge queue entry: {nh} hard groups + the touched suites ({len(order)}) = {len(groups)} of {len(repo.first)} groups"
+              f" ({len(files)} changed files" + (f", {len(unmapped)} without a suite" if unmapped else "") + ")")
+    return reason, groups
+
+
 def git_ok(*args):
     try:
         return subprocess.run(["git", "-C", ROOT, *args], capture_output=True, text=True, check=True).stdout.strip()
@@ -762,6 +797,9 @@ def main(argv=None):
         return 0
     if pre:
         stage, groups, why = pre, {}, {}
+    elif a.ci and os.environ.get("GITHUB_EVENT_NAME", "") == "merge_group":  # #5787: the queue's own lean stage
+        r, groups = queue(repo, files, base, head)
+        stage, reason = ("queue", r) if groups else ("full", f"{r} - no group, full run")
     else:
         stage, r, groups, why = select(repo, files, base, head)
         reason = r if not a.ci else f"{reason}: {r}"
@@ -769,7 +807,7 @@ def main(argv=None):
         print(f"stage={stage}\nreason={' '.join(reason.split())[:900]}")
     if a.groups_out:
         with open(a.groups_out, "w", encoding="utf-8") as f:
-            for g in sorted(groups) if stage == "push" else []:
+            for g in sorted(groups) if stage in ("push", "queue") else []:  # #5787: + the queue stage
                 f.write(repo.first[g] + "\n")
     if a.suites:
         if stage == "full":
