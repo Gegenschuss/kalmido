@@ -2368,8 +2368,8 @@ quotation stays "sent". Quotations without a date, trial documents and dates mor
 
 The quotation list marks a sent quotation past its date "expired"; the quotation itself shows a note with three answers:
 **Extend validity** (`POST /api/office/docs/<id>/valid-until` with `{valid_until}`, today or later, sent quotations only:
-the new date is written on the finalised quotation without a new version, logged as `valid_until` in the office log; the PDF
-shows the new date, and an open approval link no longer fits what it was made for - the answer's `links_void` counts them,
+the new date is written on the finalised quotation without a new version, logged as `valid_until` in the office log; its
+stored PDF is stored anew with the new date (the log keeps the old checksum), and an open approval link no longer fits what it was made for - the answer's `links_void` counts them,
 create a new one), **Follow up** (the send dialog with a follow-up subject and text) and **Mark as rejected**.
 
 ### GiroCode

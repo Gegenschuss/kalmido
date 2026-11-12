@@ -84,9 +84,9 @@ def until(did, v):
 
 def run(s, who, cl, answer):
     # ---- soon: one entry, counted in the bell, once
+    _, me0 = news(s)  # before the date is set: whichever run rings it (the server's watchdog or tick()), the bell gains one
     did = sent_offer(s, cl, "Imagefilm " + who)
     until(did, day(3))
-    _, me0 = news(s)
     tick()
     its, me1 = news(s, did)
     d = its[0].get("data") if its else {}
@@ -115,6 +115,8 @@ def run(s, who, cl, answer):
     check(r.ok and j.get("valid_until") == day(20) and j.get("number") == num and j.get("locked") and j.get("status") == "sent" and not j.get("offer_exp"),
           f"{who}: 'Extend validity' sets the new date on the finalised quotation {r.status_code} {r.text[:300]}")
     check(not news(s, did)[0], f"{who}: extended -> the entry leaves the bell {news(s, did)[0]}")
+    r = s.get(B + f"{D}/{did}/pdf")
+    check(r.status_code == 200 and r.content[:4] == b"%PDF", f"{who}: the stored PDF is served after the extension (stored anew, its checksum fits) {r.status_code}")
     rows = s.get(B + D, params={"kind": "offer"}).json().get("docs") or []
     check(not next((x for x in rows if x["id"] == did), {}).get("expired"), f"{who}: extended -> no mark 'expired' in the list")
     log = s.get(B + O + "/log", params={"limit": 50}).json().get("log") or []

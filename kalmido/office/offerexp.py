@@ -15,7 +15,8 @@ The entry shows (news_items, ofe_news_live) while the person is still in that of
 trash and its date is still the one it rang for: accepted / declined / superseded / extended = gone from the bell.
 "Extend validity" (POST /api/office/docs/<id>/valid-until): a new date on a sent quotation without a new version; the
 database holds a finalised row (core/migrations.d/4598.py), so the one column is written inside ledger.ofx_release, logged
-in the office log (action valid_until, before / after). The printed quotation shows the new date from then on; an open
+in the office log (action valid_until, before / after). The stored PDF of a finalised quotation (pdfweb.epdf_store,
+the file the app serves and mails) is stored anew with the new date (the office log keeps the old checksum); an open
 approval link of the quotation no longer fits what it was made for (its hash covers the date, signoff.sig_check) - the
 answer counts those links (links_void) so the app can say a new one is needed. The marks of the old date go: the new date
 rings again.
@@ -37,7 +38,7 @@ from ..tasks.validation import valid_date
 from ..collab.news import news_add
 from .model import office_ctx as _ctx, office_role, office_settings
 from .fixedimport import fci_people
-from .ledger import ofx_log
+from .ledger import ofx_locked, ofx_log
 from .dunning import dun_priv_hidden
 
 OFE_SOON, OFE_GONE = -1, -2   # office_dunning_marks.level: "the bell told that it expires soon / has expired"
@@ -221,6 +222,9 @@ def ofe_extend(did):
     if v != old:
         with ofx_release(c):  # a finalised quotation: this one column, deliberately (core/migrations.d/4598.py)
             c.execute("UPDATE office_docs SET valid_until=?, updated_at=? WHERE id=? AND org_id=?", (v, iso_ms(now_utc()), did, oid))
+            if ofx_locked(r) and (r["pdf_sha256"] if "pdf_sha256" in r.keys() else ""):
+                from .pdfweb import epdf_store  # the stored PDF is what the app serves and mails: stored anew with the new date
+                epdf_store(c, oid, did, log_extra={"valid_until": v})
         c.execute("DELETE FROM office_dunning_marks WHERE org_id=? AND doc_id=? AND level IN (?, ?)", (oid, did, OFE_SOON, OFE_GONE))
         ofx_log(c, oid, "valid_until", doc_id=did, detail={"before": {"valid_until": old}, "after": {"valid_until": v}})
     void = c.execute("SELECT COUNT(*) FROM office_signoffs WHERE org_id=? AND doc_id=? AND kind='offer' AND state='open' AND revoked_at IS NULL "
