@@ -52,7 +52,9 @@ def otr_run(c, uid, lid, data, redo):
             raise Denied(404)
         if otr_held(r, uid):
             raise Denied(409, tr(OTR_HELD))
-        otr_back(c, r)
+        # 2.997.2 (#5609 #5709): rights and trash stamp checked above under the row lock; otr_back takes the person since
+        # #5491 (the core's restore) - the old call without her failed every undo of a delete (TypeError, a 500)
+        otr_back(c, r, uid, checked=True)
     else:
         if r["deleted_at"] or not r["archived"] or r["is_inbox"]:
             raise Denied(409, tr(UNDO_CONFLICT))
