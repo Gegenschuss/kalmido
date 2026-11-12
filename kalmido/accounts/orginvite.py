@@ -418,6 +418,28 @@ OJN_PURGE_DAYS = 30  # 2.1005.0 (#5118): an expired invitation stays in the admi
 OJN_TS = "CASE WHEN pg_input_is_valid({0}, 'timestamptz') THEN {0}::timestamptz END"
 
 
+# 2.1060.0 (#4949): the purge statement written out (OJN_TS for each of the three columns) as one plain literal, not an f-string:
+# tests/pg_prepare_test.py PREPAREs it as it stands against the schema; in an f-string every {OJN_TS.format(..)} became the
+# stand-in TRUE (boolean < timestamptz), so the check failed on its own stand-in and never saw the real types
+OJN_PURGE_SQL = """DELETE FROM org_joins j
+  WHERE CASE WHEN pg_input_is_valid(j.created_at, 'timestamptz') THEN j.created_at::timestamptz END < ?::timestamptz
+    AND NOT EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite'
+          AND CASE WHEN pg_input_is_valid(v.used_at, 'timestamptz') THEN v.used_at::timestamptz END >= ?::timestamptz
+          AND CASE WHEN pg_input_is_valid(v.created_at, 'timestamptz') THEN v.created_at::timestamptz END
+              >= CASE WHEN pg_input_is_valid(j.created_at, 'timestamptz') THEN j.created_at::timestamptz END)"""
+# 2.1060.0 (#4949) with 2.1062.0 (#5786): the org_invites clean-up after the org_joins purge, written out the same way
+# (OJN_TS for i.created_at, OINV_UNUSED for i.user_id) so pg_prepare checks the real types
+OINV_PURGE_SQL = """DELETE FROM org_invites i
+  WHERE CASE WHEN pg_input_is_valid(i.created_at, 'timestamptz') THEN i.created_at::timestamptz END < ?::timestamptz
+    AND NOT EXISTS (SELECT 1 FROM org_joins j WHERE j.org_id=i.org_id AND j.user_id=i.user_id)
+    AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=i.org_id AND m.user_id=i.user_id)
+    AND (NOT (EXISTS (SELECT 1 FROM users x WHERE x.id=i.user_id AND x.password_hash IS NULL AND x.proxy_login IS NULL
+                      AND x.oidc_subject IS NULL AND NOT x.oinv_used AND COALESCE(x.kind, 'user')<>'agent'
+                      AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id=x.id)
+                      AND NOT EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=x.id AND v.used_at IS NOT NULL)))
+         OR EXISTS (SELECT 1 FROM org_members o WHERE o.user_id=i.user_id AND o.org_id<>i.org_id))"""
+
+
 def ojn_purge(c, now):
     """2.1005.0 (#5118, review F2 of 2.985.0): the daily clean-up (admin/dataretention.py lgc_expired, no switch: an
     invitation is no data of a person once it ran out) deletes the org_joins rows expired OJN_PURGE_DAYS ago (made more than
@@ -433,18 +455,10 @@ def ojn_purge(c, now):
     cut = now - timedelta(days=OJN_DAYS + OJN_PURGE_DAYS)
     with system_ctx(c):  # rows of every organisation; nobody sees anything
         oinv_mark(c)  # 2.1062.0 (#5786): the mark first - the org_invites row of a set-up account may go below
-        n = c.execute(f"""DELETE FROM org_joins j WHERE {OJN_TS.format('j.created_at')} < ?::timestamptz
-                          AND NOT EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite'
-                                          AND {OJN_TS.format('v.used_at')} >= ?::timestamptz
-                                          AND {OJN_TS.format('v.created_at')} >= {OJN_TS.format('j.created_at')})""",
-                      (iso(cut), iso(cut))).rowcount or 0
+        n = c.execute(OJN_PURGE_SQL, (iso(cut), iso(cut))).rowcount or 0
         # 2.1062.0 (#5786): the org_invites row of an account that was set up and whose invitation row went: nothing for the
         # list any more (tenancy.py boundary_check would read it as a crossing once the person belongs to another organisation)
-        c.execute(f"""DELETE FROM org_invites i WHERE {OJN_TS.format('i.created_at')} < ?::timestamptz
-                      AND NOT EXISTS (SELECT 1 FROM org_joins j WHERE j.org_id=i.org_id AND j.user_id=i.user_id)
-                      AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=i.org_id AND m.user_id=i.user_id)
-                      AND (NOT ({OINV_UNUSED.format('i.user_id')})
-                           OR EXISTS (SELECT 1 FROM org_members o WHERE o.user_id=i.user_id AND o.org_id<>i.org_id))""", (iso(cut),))  # review F8: kept by another organisation
+        c.execute(OINV_PURGE_SQL, (iso(cut),))  # review F8: kept by another organisation
     if n:
         print("organisation invitation: deleted", n, "invitation(s) expired more than", OJN_PURGE_DAYS, "days ago", flush=True)
     return n
