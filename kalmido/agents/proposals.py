@@ -721,6 +721,8 @@ def prop_insert(c, aid, lid, ts, title, notes="", section_id=None, parent_id=Non
                     (lid, section_id, parent_id, title[:TITLE_MAX], notes or "", priority or 0, due, start if due else None, duration,
                      sort, ts, ts, uid, assignee_id, uid if assignee_id else None))
     log_act(c, tid, "created", {"agent": aid, "proposal": True})
+    from ..tasks.tundo import tu_op
+    tu_op(c, tid, "create", {"at": ts})  # 2.997.0 (#5611): the server's undo step of an idea taken over (none inside a proposal's apply: ug_own)
     if parent_id:
         log_act(c, parent_id, "subtask", {"id": tid, "title": title[:200]})
     if assignee_id:
