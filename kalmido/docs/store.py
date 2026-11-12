@@ -305,8 +305,10 @@ def _jseal(c, ws, ctx, value):
 _IKEYS = {}
 
 
-def _index_key(c, ws):
-    base = _ws_key(c, ws) or hashlib.sha256(b"kalmido-docs-index-without-server-key").digest()
+def _index_key(c, ws, create=True):
+    """The HMAC key of ws's word index (core/objwords.py). 2.1002.0 (#5279): create=False on the search's path -- a search never
+    makes an organisation's key (an organisation without one has no indexed word: the fallback finds nothing)."""
+    base = _ws_key(c, ws, create=create) or hashlib.sha256(b"kalmido-docs-index-without-server-key").digest()
     k = _IKEYS.get((ws, base))  # 2.138.0 C (#1972): per key too - a renewed org key (orgcrypt_cli rotate) indexes with the new one at once
     if k is None:
         for x in [x for x in _IKEYS if x[0] == ws]:

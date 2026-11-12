@@ -95,8 +95,8 @@ def osw_terms(raw):
 OSW_KEY = []  # f(c, ws) -> the workspace's index key: docs/store.py registers _index_key (a later module, no import upward)
 
 
-def _key(c, ws):
-    return OSW_KEY[0](c, ws)
+def _key(c, ws, create=True):
+    return OSW_KEY[0](c, ws, create=create)
 
 
 def _h(key, s):
@@ -172,7 +172,7 @@ def osw_term_hits(c, kind, ws, ids, terms, opened, late=None):
     prefix). late = {id: set of words} of objects read just now (not indexed yet): matched on their words, not on the index."""
     late = late or {}
     ids = set(ids) - set(late)
-    key = _key(c, ws) if ids else None
+    key = _key(c, ws, create=False) if ids else None  # a search never makes a key
     out, need = [], {}
     for ti, vs in enumerate(terms):
         sure, maybe = set(), {}
