@@ -25,6 +25,8 @@ sys.path.insert(0, N)
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 from kt import B, check, dbx, done, fresh, sess  # noqa: E402
 from obj_probe import in_app  # noqa: E402
+import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402
 
 fresh(prefix="P21054A")
 
@@ -99,19 +101,20 @@ BEGIN
 END $$;"""
 P3 = plist(Fr, "Example Old Workshop")
 Fr.patch(B + f"/api/lists/{P3}", json={"archived": True})
-out = in_app(f"c.executescript({OLD!r})\nc.commit()\nprint('OLDFN ok')")
-check("OLDFN ok" in out, f"setup: the trigger of stage 1 back (a version before) {out[-300:]}")
+# the suite's own session (the app's account may not create functions): the trigger function as a version before has it
+dbxm.connect(os.path.join(kt.DATA, "tasks.db")).executescript(OLD + "\n")
+check("NOT IN ('0', '') THEN 'archived' ELSE 'live' END;\n  RETURN NEW" in (dbx("SELECT prosrc FROM pg_proc WHERE proname='kalmido_list_state'") or [[""]])[0][0],
+      "setup: the trigger of stage 1 back (a version before)")
 check(row(P3)[:2] == ("archived", 1), f"a row this version archived reads archived for the version before {row(P3)}")
 dbx("UPDATE lists SET archived=0, archived_at=NULL WHERE id=?", (P3,))
 check(row(P3)[:3] == ("live", 0, None), f"the version before restores it its way: the marker follows {row(P3)}")
-out = in_app("""import os
 ns = {}
-p = os.path.join(os.path.dirname(__import__("kalmido.core.db", fromlist=["x"]).__file__), "migrations.d", "5537_a.py")
-exec(compile(open(p, encoding="utf-8").read(), p, "exec"), ns)
-c.executescript(ns["SCHEMA"])
-c.commit()
-print("NEWFN ok")""")
-check("NEWFN ok" in out, f"setup: the trigger of this version again (its start) {out[-300:]}")
+FRAG = os.path.join(N, "..", "kalmido", "core", "migrations.d", "5537_a.py")
+with open(FRAG, encoding="utf-8") as f:
+    exec(compile(f.read(), FRAG, "exec"), ns)  # nosec: a file of this repository, data only
+dbxm.connect(os.path.join(kt.DATA, "tasks.db")).executescript(ns["SCHEMA"] + "\n")
+check("NEW.state IS DISTINCT FROM OLD.state" in (dbx("SELECT prosrc FROM pg_proc WHERE proname='kalmido_list_state'") or [[""]])[0][0],
+      "setup: the trigger of this version again (as its start writes it)")
 r = Fr.patch(B + f"/api/lists/{P3}", json={"archived": True})
 check(r.ok and row(P3)[:2] == ("archived", 1), f"forward again: the route archives through the marker {r.status_code} {row(P3)}")
 
@@ -130,7 +133,9 @@ check("SET False" in in_app("from kalmido.core.access import list_set_archived\n
       "list_set_archived of a project that does not exist: False")
 
 # ---------------------------------------------------------------- the organisation admin's archive and the quick notes
-OID = (dbx("SELECT id FROM orgs ORDER BY id LIMIT 1") or [[None]])[0][0]
+r = A.post(B + "/api/orgs", json={"name": "Example Board Studio"})
+OID = r.json().get("id") if r.ok else None
+check(OID is not None, f"setup: an organisation of alice {r.status_code} {r.text[:120]}")
 P5 = plist(A, "Example Studio Board", OID)
 r = A.post(B + "/api/users", json={"orgs": [{"id": OID, "role": "member"}], "username": "bob", "display_name": "Bob",
                                    "password": "password123", "email": "bob@example.com"})
