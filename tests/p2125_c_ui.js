@@ -53,10 +53,21 @@ const call = async (method, url, body) => {
   // ---- the XLSX buttons
   w.location.hash = '#time'; await sleep(1000);
   // 2.489.0 (#2798): the export links sit in the menu "Export"
-  d.querySelector('[data-act="tv-export"]')?.click(); await until(() => d.querySelector('#pop a[href^="/api/time/export.xlsx"]'));
-  const a1 = d.querySelector('#pop a[href^="/api/time/export.xlsx"]'), c1 = d.querySelector('#pop a[href^="/api/time/export.csv"]');
-  check(a1 && c1 && a1.getAttribute('href').split('?')[1] === c1.getAttribute('href').split('?')[1], 'time view: XLSX button with the query of the CSV button');
-  check(a1 && /Excel/.test(a1.textContent), 'time view: the label says Excel');
+  // 2.1047.0 (#5834): since 2.1011.0 (#5691) the menu is the shared menu() - CSV / Excel are buttons that build the download
+  // link on the click (no link in the menu); the test catches the link's href instead of reading it from the menu
+  let dl = ''; const aClick = w.HTMLAnchorElement.prototype.click; w.HTMLAnchorElement.prototype.click = function () { dl = this.getAttribute('href'); };
+  const item = re => [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => re.test(b.textContent));
+  const pick = async re => {
+    dl = ''; await until(() => d.querySelector('.timev [data-act="tv-export"]'));
+    d.querySelector('.timev [data-act="tv-export"]').click(); const b = await until(() => item(re));
+    const label = b ? b.textContent : ''; if (b) b.click(); await until(() => dl); w.eval('closePop()');
+    return {href: dl, label};
+  };
+  const c1 = await pick(/CSV/), a1 = await pick(/Excel/);
+  w.HTMLAnchorElement.prototype.click = aClick;
+  check(/^\/api\/time\/export\.xlsx\?/.test(a1.href) && /^\/api\/time\/export\.csv\?/.test(c1.href) && a1.href.split('?')[1] === c1.href.split('?')[1],
+    `time view: XLSX button with the query of the CSV button ${a1.href} ${c1.href}`);
+  check(/Excel/.test(a1.label), 'time view: the label says Excel ' + a1.label);
   w.close();
   w = await boot({user: 'alice', hash: 'workload'}); d = w.document;
   for (let i = 0; i < 20 && !d.querySelector('a[href^="/api/workload/export.xlsx"]'); i++) await sleep(300);
