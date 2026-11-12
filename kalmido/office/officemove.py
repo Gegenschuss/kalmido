@@ -63,6 +63,7 @@ from .pdfweb import _render, epdf_name, epdf_stored  # 2.369.5 (#2517): pulled u
 from .meals import bw_file_copy, bw_path  # 2.369.5 (#2517): pulled up from functions
 from .letterlinks import LTL_KIND  # 2.990.0 (#5539): a letter link ends on the core's way
 from .okern import ofk_purge  # 2.990.0 (#5539)
+from .okern import ofk_kind_of  # 2.1004.0 (#5494)
 
 OFM_WHAT = ("clients", "drafts", "travel", "templates", "meals")  # 2.119.0 A (#2288): + entertainment receipts (drafts)
 OFM_TABLE = {"drafts": "office_docs", "travel": "office_trips", "templates": "office_doc_templates", "meals": "office_meals"}
@@ -413,7 +414,7 @@ def ofm_plan(c, uid, what, src, rows, own=False):
                 elif not why:
                     docs.append(d)
             # 2.356.1 (#3343): the client's deals (not in the trash) go along and hold it no longer (a plain member: only the own)
-            deals = [x for x in c.execute("SELECT * FROM office_deals WHERE org_id=? AND (client_id=? OR lead_client_id=?) AND deleted_at IS NULL ORDER BY id",
+            deals = [x for x in c.execute(f"SELECT * FROM office_deals WHERE org_id=? AND (client_id=? OR lead_client_id=?) AND {live_sql()} ORDER BY id",
                                           (src, r["id"], r["id"])).fetchall() if not own or x["created_by"] == uid]
             refs = ofm_refs(c, "clients", r["id"], skip=("office_client_contacts",),
                             skip_ids={"office_docs": [d["id"] for d in docs], "office_deals": [x["id"] for x in deals]})
@@ -478,7 +479,7 @@ def ofm_plan_sets(c, src, rows, p):
             other |= {ofm_set_eid(i) for i in ofm_set_items(x["items"])}
     devs = {}
     for r in rows:
-        booked = c.execute("SELECT 1 FROM hub_bookings WHERE org_id=? AND resource_kind='set' AND resource_id=? AND deleted_at IS NULL LIMIT 1",
+        booked = c.execute(f"SELECT 1 FROM hub_bookings WHERE org_id=? AND resource_kind='set' AND resource_id=? AND {live_sql()} LIMIT 1",
                            (src, r["id"])).fetchone()
         mode = "copy" if booked else "move"
         p["sets"].append({"row": r, "mode": mode})
@@ -491,7 +492,7 @@ def ofm_plan_sets(c, src, rows, p):
             if not d:
                 continue
             used = mode == "copy" or eid in other or bool(ofm_refs(c, "office_equipment", eid)) or c.execute(
-                "SELECT 1 FROM hub_bookings WHERE org_id=? AND resource_kind='equipment' AND resource_id=? AND deleted_at IS NULL LIMIT 1", (src, eid)).fetchone()
+                f"SELECT 1 FROM hub_bookings WHERE org_id=? AND resource_kind='equipment' AND resource_id=? AND {live_sql()} LIMIT 1", (src, eid)).fetchone()
             devs[eid] = {"row": d, "mode": "copy" if used else "move"}
     p["set_devs"] = list(devs.values())
 
@@ -1190,7 +1191,7 @@ def rmv_undo_run(c, uid, mid, files):
         if t == "office_contracts" and not r.get("src"):
             # 2.119.1 review F8 (#2298): PDFs added in the target since go back with the contract (copied into the source's
             # folder with its key); the deleted ones stay in the target's trash, where its purge removes them
-            for f in c.execute("SELECT * FROM office_contract_files WHERE org_id=? AND contract_id=? AND deleted_at IS NULL ORDER BY id",
+            for f in c.execute(f"SELECT * FROM office_contract_files WHERE org_id=? AND contract_id=? AND {live_sql()} ORDER BY id",
                                (dst, rid)).fetchall():
                 if f["id"] in cfiles:
                     continue
@@ -1261,7 +1262,7 @@ def rmv_plan(c, p, rows):
                 issued += 1
             else:
                 drafts += 1
-        files = c.execute("SELECT * FROM office_contract_files WHERE org_id=? AND contract_id=? AND deleted_at IS NULL ORDER BY id",
+        files = c.execute(f"SELECT * FROM office_contract_files WHERE org_id=? AND contract_id=? AND {live_sql()} ORDER BY id",
                           (r["org_id"], r["id"])).fetchall()
         copy = issued or ofm_refs(c, "office_contracts", r["id"], skip=("office_docs",))
         p["ctr"].append({"row": r, "mode": "copy" if copy else "move", "issued": issued, "drafts": 0 if copy else drafts, "files": files})
@@ -1387,13 +1388,17 @@ def rmv_unmake(c, m, dst, gone):
         return 0
     # 2.356.1 (#3345, review): a device / set copy the target has put into a set or booked since stays (no foreign key there)
     if t in ("office_equipment", "office_sets") and (c.execute(
-            "SELECT 1 FROM hub_bookings WHERE org_id=? AND resource_kind=? AND resource_id=? AND deleted_at IS NULL LIMIT 1",
+            f"SELECT 1 FROM hub_bookings WHERE org_id=? AND resource_kind=? AND resource_id=? AND {live_sql()} LIMIT 1",
             (dst, "equipment" if t == "office_equipment" else "set", rid)).fetchone() or t == "office_equipment" and any(
             rid in {ofm_set_eid(i) for i in ofm_set_items(x["items"])} for x in c.execute(f"SELECT items FROM office_sets WHERE org_id=? AND {live_sql()}", (dst,)).fetchall())):
         return 0
     if ofm_refs(c, t, rid):
         return 1 if t == "office_contracts" else 0  # used in the target since: it stays
     if t == "office_contracts":  # files the target added since go into its trash (purged with the files later)
-        c.execute("UPDATE office_contract_files SET deleted_at=? WHERE org_id=? AND contract_id=? AND deleted_at IS NULL", (iso(now_utc()), dst, rid))
-    c.execute(f"DELETE FROM {t} WHERE id=?", (rid,))
+        c.execute(f"UPDATE office_contract_files SET deleted_at=? WHERE org_id=? AND contract_id=? AND {live_sql()}", (iso(now_utc()), dst, rid))
+    kind = ofk_kind_of(t)  # 2.1004.0 (#5494): a copy of a core kind (master data, a set) goes the core's way: its history /
+    if kind:  # trash state from the target leave no obj_history / obj_undo behind
+        ofk_purge(c, kind, rid)
+    else:
+        c.execute(f"DELETE FROM {t} WHERE id=?", (rid,))
     return 0

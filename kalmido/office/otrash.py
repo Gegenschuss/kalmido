@@ -27,6 +27,7 @@ from .model import office_ctx, office_role
 from .rights import ofr_admin_or, ofr_group_restored
 from .eqcare import eqc_sync
 from .okern import OFK, ofk_restore, ofk_trash_items  # 2.905.0 (#5414): the kinds that moved onto the core's trash
+from .okern import ofk_office_of  # 2.1004.0 (#5494)
 from ..core.objects import obj_row
 from ..core.writes import obj_purge, obj_purge_after  # 2.993.0 (#5413): + obj_purge_after
 from ..core.serializers import unlink_files  # 2.993.0 (#5413)
@@ -295,7 +296,7 @@ def _core_kind(c, uid, oid, kind, rid):
     if not k or not k.get("view"):
         raise Denied(404)
     row = obj_row(c, kind, rid)
-    if row is None or row["org_id"] != oid or not row["deleted_at"]:
+    if row is None or ofk_office_of(c, kind, row) != oid or not row["deleted_at"]:  # 2.1004.0 (#5494): + a personal kind's row
         raise Denied(404)
     return k, dict(row)
 

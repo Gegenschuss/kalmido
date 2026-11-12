@@ -198,9 +198,19 @@ c.commit()
   .../core/<kind>/<id>`; `?undo=1` = the toast's undo with the module's rights, the person's own step). A delete answers
   `trash: {kind, id}`. `step=False` in `ofk_register` (master data, rights groups, fixed costs): no step in the person's
   undo list - the core's undo / redo would skip what their routes do besides (in-use check, contract files, members out,
-  the import run, review 2.905); they come back only through the toast's undo and the office trash. Still on the office trash of copies: drafts, parts, trips, card lines, the start balance (no id
-  column) and the sign-offs (`office_signoffs`, rows without an organisation); copies of the moved kinds made before 2.905
-  stay restorable there until their period ends (no data move).
+  the import run, review 2.905); they come back only through the toast's undo and the office trash. Still on the office trash of copies: drafts, parts, trips, card lines and the start balance (no id
+  column); copies of the moved kinds made before 2.905 stay restorable there until their period ends (no data move).
+- 2.1004.0 (#5494, stage 4c rest): the approval records of deleted video reviews (`osignoff`, `office_signoffs`) moved onto
+  the core's trash too. A private one has no organisation: `ofk_register(personal="created_by")` names the column of its
+  person, and `ofk_office_of` puts such a row into that person's personal office (gates, role, the office trash's list,
+  restore and delete); a person without a personal office deletes it for good on the core's way (`ofk_purge`).
+  `ofk_register(limit=fn(c, oid, row))` checks a kind's maximum after a restore (the office trash, the toast's undo and the
+  person's undo list through `undo_trash_reg`): the fixed costs (`MAX_FIXED`) and the corrections per month
+  (`CFS_MAX_MONTH`) answer 409 instead of passing it by delete, add anew, restore. A hard delete of a row of an office kind
+  (an undone move's copies, `ofk_kind_of(table)`; the account's private records at its end) runs through `ofk_purge`, so
+  no `obj_history` / `obj_undo` is left behind. Readers that look at the trash on purpose (the careful side): the
+  booking conflicts read sets in the trash too (`hub/dispo.py`), the retention of a received letter / device receipt too
+  (`receipts/suggest.py`).
 - 2.993.0 (#5413, stage 4b): the entertainment receipts (`omeal`, in the office trash), their removed / replaced restaurant
   bills (`omealfile`, back through the meal's own route) and the PDF files of framework contracts (`ocfile`, in the office
   trash; restored only into a contract that is not in the trash, 409) moved onto the core's trash, all `step=False` (a redo

@@ -28,6 +28,8 @@ from ..core.access import acx_anon_bind, Denied, FULL_ROLES, list_role, need_lis
 from ..core.orgcrypt import OrgCryptError, oc_dec, oc_dec_fields, oc_enc, oc_enc_fields, oc_is_enc, oc_log_detail
 from .model import office_role, pb_owner
 from .model import pb_personal  # 2.747.0 (#5246)
+from .okern import ofk_purge, ofk_register, ofk_trash  # 2.1004.0 (#5494)
+from ..core.access import live_sql  # 2.1004.0 (#5494)
 from .rights import NO_RIGHT, ofr_admin_or, ofr_allows
 from ..accounts.orgroles import OFFICE_READ
 from ..accounts.orgs import user_orgs
@@ -132,7 +134,7 @@ def sig_list_tasks(c, r):
         sql, args = "section_id=? AND parent_id IS NULL", (r["section_id"],)
     else:
         sql, args = "parent_id IS NULL", ()
-    return [dict(t) for t in c.execute(f"SELECT id, title, status FROM tasks WHERE list_id=? AND deleted_at IS NULL AND status <> -1 AND ({sql}) "
+    return [dict(t) for t in c.execute(f"SELECT id, title, status FROM tasks WHERE list_id=? AND {live_sql()} AND status <> -1 AND ({sql}) "
                                        "ORDER BY sort, id LIMIT 500", (r["list_id"], *args))]
 
 
@@ -408,8 +410,9 @@ def sig_gone_out(c, r):
 def sig_gone_rows(c, uid):
     orgs = [o for o in user_orgs(c, uid) if office_role(c, uid, o) == "admin"]
     inorg = f"org_id IN ({','.join('?' * len(orgs))}) OR " if orgs else ""
+    # 2.1004.0 (#5494): the ones in the core's trash are not listed (office trash)
     return c.execute(f"""SELECT * FROM office_signoffs WHERE kind='video' AND video_id IS NULL AND ({inorg}(org_id IS NULL AND created_by=?))
-                         ORDER BY id DESC LIMIT {SIG_GONE_MAX}""", (*orgs, uid)).fetchall()
+                         AND {live_sql()} ORDER BY id DESC LIMIT {SIG_GONE_MAX}""", (*orgs, uid)).fetchall()
 
 
 def sig_no_agent():
@@ -439,16 +442,37 @@ def sig_gone_delete(sid):
         raise Denied(409, tr("This record is kept until {0} by law", kept))
     if kept:  # 2.545.0 (#4595): the switch "Extend the lock" of its office keeps it after the period too
         olk_need_unheld(c, r["org_id"] or olk_person_office(c, r["created_by"]))
-    from .otrash import otb_put  # 2.747.0 (#5246, #4707): into the trash of its office (a person's: their personal office)
-    # a person without a personal office has no office trash (and none is made here: an office turns the record into a business
-    # record with a legal period, sig_gone_kept): their record goes as before
+    # 2.747.0 (#5246, #4707): into the trash of its office (a person's: their personal office). 2.1004.0 (#5494): the core's
+    # trash (office/okern.py, kind SIG_KIND) instead of a copy in office_trash and the row deleted; the office trash lists it
+    # (a private one in its creator's personal office, ofk_register personal=), restores it and deletes it for good.
+    # A person without a personal office has no office trash (and none is made here: an office turns the record into a
+    # business record with a legal period, sig_gone_kept): their record goes for good as before, on the core's way (no
+    # history or undo step of the core left behind)
     office = r["org_id"] or pb_personal(c, r["created_by"], create=False)
-    tid = otb_put(c, office, uid, "signoff", "office_signoffs", sid, r["title"] or "") if office else None
-    c.execute("DELETE FROM office_signoffs WHERE id=?", (sid,))
+    if office:
+        ofk_trash(c, uid, SIG_KIND, sid)
+    else:
+        ofk_purge(c, SIG_KIND, sid)
     if r["org_id"]:
         ofx_log(c, r["org_id"], "signoff_delete", target="video", detail={"signoff": sid})
     c.commit()
-    return jsonify(ok=True, **({"trash_id": tid} if tid else {}))
+    return jsonify(ok=True, **({"trash": {"kind": SIG_KIND, "id": sid}} if office else {}))
+
+
+def _sig_trash_base(c, uid, row):
+    """2.1004.0 (#5494): the core's role of an approval record of a deleted video review (after the office gates of okern):
+    an organisation's for its office admins, a private one for its creator -- who may delete it (sig_gone_rows)."""
+    if row["org_id"]:
+        return "manage" if office_role(c, uid, row["org_id"]) == "admin" else None
+    return "manage" if row["created_by"] == uid else None
+
+
+# 2.1004.0 (#5494, stage 4c rest of the core's trash): the approval records of deleted video reviews (sig_gone_delete) on
+# the core's trash; a private one (org_id NULL) belongs to its creator's personal office (personal=). No undo step of the
+# person: the route checks the legal period and the office's lock before (a redo through /api/undo would skip them).
+SIG_KIND = "osignoff"
+ofk_register(SIG_KIND, "office_signoffs", N_("Video sign-off"), "settings", base=_sig_trash_base, personal="created_by",
+             view={"kind": "signoff", "label": lambda c, oid, row: row.get("title") or ""}, step=False)
 
 
 # acceptance of a list (the owner of the list; from the list dialog > Public link)
@@ -457,7 +481,7 @@ def sig_list_target(c, lid, b):
     sec, tid = b.get("section_id"), b.get("task_id")
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
     if tid is not None:
-        t = c.execute("SELECT id, title FROM tasks WHERE id=? AND list_id=? AND deleted_at IS NULL AND ms=1", (tid if isinstance(tid, int) else -1, lid)).fetchone()
+        t = c.execute(f"SELECT id, title FROM tasks WHERE id=? AND list_id=? AND {live_sql()} AND ms=1", (tid if isinstance(tid, int) else -1, lid)).fetchone()
         if not t:
             raise BadInput(tr("Invalid value: {0}", "task_id"))
         return None, t["id"], f"{lname}: {t['title']}"
@@ -482,7 +506,7 @@ def sig_list_list(lid):
     need_list(c, lid, owner=True)
     sig_list_rights(c, lid, "view")
     rows = c.execute("SELECT * FROM office_signoffs WHERE list_id=? AND kind='acceptance' ORDER BY id DESC LIMIT 50", (lid,)).fetchall()
-    ms = [{"id": r["id"], "title": r["title"]} for r in c.execute("SELECT id, title FROM tasks WHERE list_id=? AND ms=1 AND deleted_at IS NULL ORDER BY sort, id LIMIT 100", (lid,))]
+    ms = [{"id": r["id"], "title": r["title"]} for r in c.execute(f"SELECT id, title FROM tasks WHERE list_id=? AND ms=1 AND {live_sql()} ORDER BY sort, id LIMIT 100", (lid,))]
     secs = [{"id": r["id"], "name": r["name"]} for r in c.execute("SELECT id, name FROM sections WHERE list_id=? ORDER BY sort, id", (lid,))]
     return jsonify(signoffs=[sig_public(c, r) for r in rows], milestones=ms, sections=secs, enabled=public_links_on(c, "signoff"))
 

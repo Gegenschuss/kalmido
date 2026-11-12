@@ -143,6 +143,7 @@ def dsp_units(b, sets):
 def dsp_conflicts(c, oid, rows, first, last):
     """{booking id: {"double": [other booking ids], "away": bool}} for rows (dicts) against every booking of the area in
     [first, last] and the absences of the booked people (the kind never)."""
+    # 2.1004.0 (#5494): sets in the core's trash too, on purpose: a booking of such a set still holds its devices (careful side)
     sets = {r["id"]: _set_items(r["items"]) for r in c.execute("SELECT id, items FROM office_sets WHERE org_id=?", (oid,))}
     allb = [dict(r) for r in c.execute("SELECT id, start, \"end\", resource_kind, resource_id FROM hub_bookings WHERE org_id=? "
                                         "AND deleted_at IS NULL AND start<=? AND \"end\">=?", (oid, last.isoformat() + "T99", first.isoformat()))]

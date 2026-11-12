@@ -35,8 +35,18 @@ OTB_UNDO[CFS_TRASH_START] = _ctx  # the toast's undo: the office admin, as delet
 # 2.905.0 (#5414): a correction lies in the core's trash (kind oadjust; toast's undo POST /api/office/trash/core/oadjust/<id>/restore?undo=1).
 # The start balance stays on the office trash: office_cf_start has no id (one row per office, key org_id), the core's trash needs one.
 CFS_ADJ_KIND = "oadjust"
+
+
+def _cfs_adj_limit(c, oid, row):
+    """2.1004.0 (#5494, review 2.905): a correction back from the trash counts against CFS_MAX_MONTH of its month as a new one
+    (under the area's lock of cfs_adjust_post); 409, the restore rolls back."""
+    write_lock(c, f"office_cfs_{int(oid)}")
+    if c.execute(f"SELECT COUNT(*) FROM office_cf_adjust WHERE org_id=? AND month=? AND {live_sql()}", (oid, row["month"])).fetchone()[0] > CFS_MAX_MONTH:
+        raise Denied(409, tr("Too many entries"))
+
+
 ofk_register(CFS_ADJ_KIND, "office_cf_adjust", N_("Correction"), "cashflow", need="edit",
-             view={"kind": CFS_TRASH_ADJ, "label": lambda c, oid, row: row.get("month") or "", "ctx": _ctx})
+             view={"kind": CFS_TRASH_ADJ, "label": lambda c, oid, row: row.get("month") or "", "ctx": _ctx}, limit=_cfs_adj_limit)
 from .cashflow import rk_cashflow  # 2.369.5 (#2517): pulled up from functions
 from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 D (#4711): the corrections save through the core's write layer
 

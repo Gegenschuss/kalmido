@@ -59,9 +59,16 @@ def _rk_fixed_back(c, oid, row):
                   (row["import_run_id"], oid))
 
 
+def _rk_fixed_limit(c, oid, row):
+    """2.1004.0 (#5494, review 2.905): a fixed cost back from the trash counts against MAX_FIXED as a new one (delete, add
+    anew, restore passed it); 409, the restore rolls back."""
+    if c.execute(f"SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=? AND {live_sql()}", (oid,)).fetchone()[0] > MAX_FIXED:
+        raise Denied(409, tr("Too many entries"))
+
+
 ofk_register(RK_FIXED_KIND, "office_fixed_costs", N_("Fixed cost"), "cashflow", need="edit",
              view={"kind": RK_FIXED_TRASH, "label": lambda c, oid, row: row.get("label") or "", "ctx": _ctx, "back": _rk_fixed_back},
-             step=False)  # 2.905.0 (#5414, review): the import run's back hook runs only on its routes
+             step=False, limit=_rk_fixed_limit)  # 2.905.0 (#5414, review): the import run's back hook runs only on its routes
 
 ow_kind("office_fixed_cost", "office_fixed_costs")
 
@@ -512,7 +519,7 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
     # receipts are no documents (never twice); a purchase or fixed cost entered as well for the same thing does count twice
     from .books import bk_receipts
     bfb_paid = {}
-    for t in c.execute("SELECT match_id, amount, currency FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND match_kind='receipt'", (oid,)):
+    for t in c.execute(f"SELECT match_id, amount, currency FROM office_bank_tx WHERE org_id=? AND {live_sql()} AND match_kind='receipt'", (oid,)):
         t = oc_dec_fields(c, oid, "office_bank_tx", t)
         if (t["currency"] or home).upper() == home:
             bfb_paid[t["match_id"]] = abs(dec(t["amount"], "0"))

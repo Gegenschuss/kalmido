@@ -20,6 +20,8 @@ from flask import g, has_request_context
 
 from ..core.objhooks import FOLLOW, OBJ, person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
 from ..core.access import Denied
+from ..core.access import live_sql  # 2.1004.0 (#5494)
+from ..core.objhooks import obj_rows_drop_many  # 2.1004.0 (#5494)
 from ..core.db import iso, local_now, now_utc  # 2.488.0 (#4004): local_now knows the test clock
 from ..core.i18n import N_, tr, trn
 from ..core.merges import mg_fk_refs
@@ -70,8 +72,8 @@ ODL_LEGAL = (
 )
 # what goes along with an organisation without legal data: shown before (409), deleted only with ?confirm=1
 ODL_CONTENT = (
-    ("wiki_pages", "SELECT COUNT(*) FROM wiki_pages WHERE org_id=? AND deleted_at IS NULL"),
-    ("tables", "SELECT COUNT(*) FROM sheets WHERE org_id=? AND deleted_at IS NULL"),
+    ("wiki_pages", f"SELECT COUNT(*) FROM wiki_pages WHERE org_id=? AND {live_sql()}"),
+    ("tables", f"SELECT COUNT(*) FROM sheets WHERE org_id=? AND {live_sql()}"),
     ("office_documents", "SELECT COUNT(*) FROM office_docs WHERE org_id=?"),
     ("office_archive", "SELECT COUNT(*) FROM office_archive WHERE org_id=?"),
     ("trips", "SELECT COUNT(*) FROM office_trips WHERE org_id=?"),
@@ -611,8 +613,10 @@ def upg_rest(c, uid):
         from ..personal.timesheet import tsl_user_gone
         tsl_user_gone(c, uid)  # 2.360.2 D (#2561): before the entries lose the person (its hours are noted on the month)
         # 2.360.2 D (#2561): private approval records have nobody else: the left-overs of deleted reviews, those of its own reviews (cascade below)
-        c.execute("""DELETE FROM office_signoffs WHERE kind='video' AND org_id IS NULL AND ((video_id IS NULL AND created_by=?)
-                     OR video_id IN (SELECT id FROM video_reviews WHERE owner_id=? AND org_id IS NULL))""", (uid, uid))
+        gone = [r[0] for r in c.execute("""DELETE FROM office_signoffs WHERE kind='video' AND org_id IS NULL AND ((video_id IS NULL AND created_by=?)
+                     OR video_id IN (SELECT id FROM video_reviews WHERE owner_id=? AND org_id IS NULL)) RETURNING id""", (uid, uid)).fetchall()]
+        # 2.1004.0 (#5494): a record of the core's trash (kind osignoff, office/signoff.py) leaves no core history behind
+        obj_rows_drop_many(c, "osignoff", gone)
         c.execute("UPDATE time_entries SET user_id=NULL WHERE user_id=? AND list_id IN (SELECT id FROM lists WHERE org_id IS NOT NULL)", (uid,))
         # 2.152.0 review F4: a direct room whose partner is gone already (or a note to oneself) goes with its messages
         c.execute("DELETE FROM tchat_rooms WHERE kind='dm' AND ((a=? AND (b IS NULL OR b=?)) OR (b=? AND a IS NULL))", (uid, uid, uid))

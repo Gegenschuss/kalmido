@@ -14,7 +14,11 @@ trips, card lines, ...) until their stage moves them here.
 2.905.0 (#5414, stage 4c): the master data (office/model.py MD), the rights groups, the fixed costs (and
 an import of them taken back), the cash flow's corrections and a letter's links moved here. view= shows such a kind in the
 office trash (GET /api/office/trash, restore / delete for good through POST/DELETE /api/office/trash/core/<kind>/<id>, the
-toast's undo through ?undo=1); old copies of these kinds already in office_trash stay restorable there until their period ends."""
+toast's undo through ?undo=1); old copies of these kinds already in office_trash stay restorable there until their period ends.
+2.1004.0 (#5494, stage 4c rest): a kind whose rows may have no organisation (the approval records of deleted video reviews,
+office_signoffs: a private one has org_id NULL) registers with personal= the column naming its person; such a row belongs to
+that person's personal office (office/model.py pb_personal, never made here) for the gates, the role, the trash list and
+the office trash's restore / delete (ofk_office_of)."""
 from ..core.access import Denied, trash_sql
 from ..core.objects import OBJ, obj_register, obj_row
 from ..core.pg import qi, system_ctx
@@ -22,13 +26,14 @@ from ..core.retention import ret_on, ret_trash_cut
 from ..core.writes import _purge_rows, obj_purge_after, obj_restore, obj_trash, obj_trash_prune  # 2.993.0 (#5413): + obj_purge_after
 from ..core.serializers import unlink_files  # 2.993.0 (#5413): an overdue row's stored files after the commit (ofk_restore)
 from ..core.objects import obj_forget  # 2.809.0 (#5418)
+from ..core.undoweb import undo_trash_reg  # 2.1004.0 (#5494): a kind with a limit takes its undo step back through it
 from ..core.pg import write_lock  # 2.809.0 (#5418)
-from .model import office_on, office_role, pb_owner
+from .model import office_on, office_role, pb_owner, pb_personal  # 2.1004.0 (#5494): + pb_personal
 from ..accounts.orgroles import is_write_request, office_allowed  # 2.809.0 (#5418)
 from ..accounts.supportgrant import sga_org_foreign  # 2.809.0 (#5418)
 from .rights import office_can  # 2.905.0 (#5414): rights.py never imports this module at its top (its trash kind is registered in office/web.py)
 
-OFK = {}  # kind -> {table, area, need, base, view}
+OFK = {}  # kind -> {table, area, need, base, view, step, personal}
 
 
 def _tables():
@@ -36,12 +41,23 @@ def _tables():
     return {k["table"] for k in OFK.values()}
 
 
+def ofk_office_of(c, kind, row):
+    """2.1004.0 (#5494): the office area of a row of an office kind: its organisation, or for a kind registered with personal=
+    a row without one: the personal office of the person its column names (None while that person has none)."""
+    if row is None:
+        return None
+    if row["org_id"]:
+        return row["org_id"]
+    col = OFK.get(kind, {}).get("personal")
+    return pb_personal(c, row[col], create=False) if col and row[col] else None
+
+
 def _base_of(kind):
     def base(c, uid, rid):
         row = obj_row(c, kind, rid)
-        if row is None or not row["org_id"]:
+        oid = ofk_office_of(c, kind, row)  # 2.1004.0 (#5494): + a personal kind's row without an organisation
+        if not oid:
             return None
-        oid = row["org_id"]
         # 2.809.0 (#5418): the same gates as the office routes (office_gate / office_org) also on the core's way (/api/undo,
         # the trash): the office switched on for the person, the organisation role may write there (office_allowed: no
         # read-only, accounting or guest), and a support session writes into no foreign organisation (sga_org_foreign)
@@ -61,11 +77,12 @@ def _base_of(kind):
     return base
 
 
-def _visible_of(table):
+def _visible_of(table, personal=None):
     def visible(c, uid):  # the candidates only (cap hook: obj_role decides each row)
         u = int(uid)
+        own = f" OR (org_id IS NULL AND {qi(personal, (personal,))} = {u})" if personal else ""  # 2.1004.0 (#5494)
         return (f"(SELECT id FROM {qi(table, _tables())} WHERE org_id IN (SELECT id FROM orgs WHERE personal_of = {u}) "
-                f"OR org_id IN (SELECT org_id FROM org_members WHERE user_id = {u}))")
+                f"OR org_id IN (SELECT org_id FROM org_members WHERE user_id = {u}){own})")
     return visible
 
 
@@ -79,7 +96,8 @@ def _space_of(table):
     return space
 
 
-def ofk_register(kind, table, label, area, need="manage", children=(), base=None, view=None, step=True, trash_keep=None):
+def ofk_register(kind, table, label, area, need="manage", children=(), base=None, view=None, step=True, trash_keep=None,
+                 personal=None, limit=None):
     """Registers an office kind on the core's trash (module docstring); area = its rights area (office/rights.py), need =
     the level its route needs to delete a row (an "own" level: the route checks the row is the person's own).
     2.905.0 (#5414): base(c, uid, row) -> 'manage' | None replaces the area's level (the rights groups: who manages the
@@ -89,10 +107,17 @@ def ofk_register(kind, table, label, area, need="manage", children=(), base=None
     than the core on trash / restore (in-use checks, members out, the view's back hook) is only taken back through its
     own routes (the toast's undo, the office trash), never by the core's undo / redo that would skip them.
     2.993.0 (#5413): trash_keep = obj_register trash_keep (rows of the trash kept by law, the retention run leaves them; the
-    exact check stays the kind's obj_on_purge hook, Denied = kept)."""
-    OFK[kind] = {"table": table, "area": area, "need": need, "base": base, "view": view, "step": step}
+    exact check stays the kind's obj_on_purge hook, Denied = kept).
+    2.1004.0 (#5494): personal = the column naming the person of a row without an organisation (ofk_office_of); limit =
+    fn(c, oid, row) after a restore (ofk_restore, the office trash, the toast's undo and - for a kind with a step - the
+    person's undo list): raises Denied(409) when the row back would pass the kind's maximum (delete, add anew, restore)."""
+    OFK[kind] = {"table": table, "area": area, "need": need, "base": base, "view": view, "step": step, "personal": personal,
+                 "limit": limit}
+    if limit and step:  # 2.1004.0 (#5494): the person's undo list takes a trash step back through the limit too
+        undo_trash_reg(kind, lambda c, uid, rid: _restored(c, uid, kind, rid, undo=True, step=False),
+                       lambda c, uid, rid: obj_trash(c, uid, kind, rid, step=False))
     return obj_register(kind, table, label=label, fields={}, area="office", routes=False, listed=False, fsref=False,
-                        space=_space_of(table), base_role=_base_of(kind), visible=_visible_of(table), cap=lambda c, uid, rid: None,
+                        space=_space_of(table), base_role=_base_of(kind), visible=_visible_of(table, personal), cap=lambda c, uid, rid: None,
                         scopes=("office", "office"), children=children, trash_prune=True, trash_keep=trash_keep)
 
 
@@ -120,9 +145,18 @@ def ofk_restore(c, uid, kind, rid, undo=False):
             if kept and box["err"]:  # 2.993.0 (#5413, fable F2): the purge failed (not a lock) - no restore of a half-checked row,
                 raise Denied(409)  # the next retention run tries again
             if kept:  # kept by law (a receipt: trash_keep / the hook's Denied): it stays in the trash and comes back as any other
-                return obj_restore(c, uid, kind, rid, undo=undo, step=OFK.get(kind, {}).get("step", True))
+                return _restored(c, uid, kind, rid, undo=undo, step=OFK.get(kind, {}).get("step", True))
             raise Denied(404)
-    return obj_restore(c, uid, kind, rid, undo=undo, step=OFK.get(kind, {}).get("step", True))  # 2.905.0 (#5414, review): ofk_register step
+    return _restored(c, uid, kind, rid, undo=undo, step=OFK.get(kind, {}).get("step", True))  # 2.905.0 (#5414, review): ofk_register step
+
+
+def _restored(c, uid, kind, rid, undo, step):
+    """obj_restore, then 2.1004.0 (#5494) the kind's limit (ofk_register limit=; Denied rolls the restore back)."""
+    row = obj_restore(c, uid, kind, rid, undo=undo, step=step)
+    lim = OFK.get(kind, {}).get("limit")
+    if lim and row is not None:
+        lim(c, ofk_office_of(c, kind, row), dict(row))
+    return row
 
 
 def ofk_purge(c, kind, rid):
@@ -134,16 +168,25 @@ def ofk_purge(c, kind, rid):
     obj_forget()
 
 
+def ofk_kind_of(table):
+    """2.1004.0 (#5494): the office kind registered here for table (None: not on the core's trash) -- for a hard delete of a
+    row that may be one (ofk_purge instead of a DELETE, so no obj_history / obj_undo is left behind)."""
+    return next((k for k, v in sorted(OFK.items()) if v["table"] == table), None)
+
+
 def ofk_trash_items(c, oid):
     """2.905.0 (#5414): the rows of office area oid in the core's trash of the kinds shown in the office trash (view=), in the
     shape of the office trash's list (GET /api/office/trash) plus core = the core's kind; id = the row's id."""
-    out = []
+    out, owner = [], pb_owner(c, oid)
     for kind, k in sorted(OFK.items()):
         v = k.get("view")
         if not v:
             continue
-        for r in c.execute(f"SELECT * FROM {qi(k['table'], _tables())} WHERE org_id=? AND {trash_sql()} "
-                           "ORDER BY deleted_at DESC, id DESC LIMIT 500", (oid,)).fetchall():  # review 2.905.0: bounded per kind
+        # 2.1004.0 (#5494): a personal office lists the rows without an organisation of its owner too (personal=)
+        mine, args = (f"(org_id=? OR (org_id IS NULL AND {qi(k['personal'], (k['personal'],))}=?))", (oid, owner)) \
+            if k.get("personal") and owner is not None else ("org_id=?", (oid,))
+        for r in c.execute(f"SELECT * FROM {qi(k['table'], _tables())} WHERE {mine} AND {trash_sql()} "
+                           "ORDER BY deleted_at DESC, id DESC LIMIT 500", args).fetchall():  # review 2.905.0: bounded per kind
             row = dict(r)
             out.append({"id": row["id"], "core": kind, "kind": v["kind"](row) if callable(v["kind"]) else v["kind"], "sub": "",
                         "ref_id": row["id"], "label": (v["label"](c, oid, row) or "")[:300], "deleted_by": row.get("deleted_by"),

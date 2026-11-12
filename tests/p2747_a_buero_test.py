@@ -191,11 +191,15 @@ def signoff(who, s, uid, org):
     sid = sql("SELECT id FROM office_signoffs WHERE token_hash=?", (f"p2747a-{who}",))[0][0]
     check(any(x["id"] == sid for x in s.get(B + "/api/videos/signoffs/orphaned").json().get("signoffs") or []), f"3 {who}: setup: an orphaned record")
     r = s.delete(B + f"/api/videos/signoffs/orphaned/{sid}")
-    tid = r.json().get("trash_id") if r.ok else None
-    check(r.ok and tid and not sql("SELECT 1 FROM office_signoffs WHERE id=?", (sid,)), f"3 {who}: the record goes, a trash copy {r.text[:200]}")
-    check(in_trash(s, tid, "signoff"), f"3 {who}: the trash of its office lists it")
-    r = s.post(B + OFF + f"/trash/{tid}/restore")
-    check(r.ok and sql("SELECT title, org_id FROM office_signoffs WHERE id=?", (sid,)) == [(f"Rohschnitt {who}", org)], f"3 {who}: restored as it was {r.text[:200]}")
+    # 2.1004.0 (#5494): the core's trash (deleted_at) instead of a copy in office_trash and the row deleted
+    tr_ = r.json().get("trash") if r.ok else None
+    check(r.ok and tr_ == {"kind": "osignoff", "id": sid} and sql("SELECT deleted_at IS NOT NULL FROM office_signoffs WHERE id=?", (sid,)) == [(True,)]
+          and not sql("SELECT 1 FROM office_trash WHERE kind='signoff' AND ref_id=?", (sid,)), f"3 {who}: the record goes into the core's trash {r.text[:200]}")
+    check(not any(x["id"] == sid for x in s.get(B + "/api/videos/signoffs/orphaned").json().get("signoffs") or []), f"3 {who}: no longer listed")
+    check(in_trash(s, sid, "signoff"), f"3 {who}: the trash of its office lists it")
+    r = s.post(B + OFF + f"/trash/core/osignoff/{sid}/restore")
+    check(r.ok and sql("SELECT title, org_id, deleted_at FROM office_signoffs WHERE id=?", (sid,)) == [(f"Rohschnitt {who}", org, None)], f"3 {who}: restored as it was {r.text[:200]}")
+    check(any(x["id"] == sid for x in s.get(B + "/api/videos/signoffs/orphaned").json().get("signoffs") or []), f"3 {who}: listed again")
 
 
 # ================================================================ 4 ev_cal_trash_purge

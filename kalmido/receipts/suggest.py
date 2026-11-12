@@ -19,6 +19,7 @@ from ..core.db import body, bump, db, err, insert_id, iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import system_ctx
 from ..core.access import Denied, list_role
+from ..core.access import live_sql  # 2.1004.0 (#5494)
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
@@ -539,7 +540,7 @@ def rc_on_done(c, nid, first):
         return
     from ..agents.core import agent_emit
     m = S.meta_row(c, nid)
-    n = c.execute("SELECT id, name, org_id FROM fs_nodes WHERE id=? AND deleted_at IS NULL", (nid,)).fetchone()
+    n = c.execute(f"SELECT id, name, org_id FROM fs_nodes WHERE id=? AND {live_sql()}", (nid,)).fetchone()
     if not m or not n:
         return
     for aid in rc_doc_agents(c, nid):
@@ -591,6 +592,7 @@ def olk_fs_locked(c, node_id, arrival=False, hold=False):
         ends.append(olk_until(e["day"], "receipt"))
     # 2.530.0 C (#4316, B31): a received business letter (linked to a letter of the office, office/letterlinks.py) is kept
     # like a receipt: 6 years from the end of the year it came in (section 257 HGB, RET_LEGAL_YEARS "letter")
+    # 2.1004.0 (#5494): a link or device in the core's trash counts too (the careful side: restorable, so still kept)
     lk = c.execute("SELECT MIN(created_at) FROM office_letter_links WHERE node_id=?", (nid,)).fetchone()
     if lk and lk[0]:
         m = c.execute("SELECT doc_date FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
