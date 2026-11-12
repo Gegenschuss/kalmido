@@ -139,6 +139,8 @@ def otk_rows(c, oid, r, dh):
                     "unit": unit, "qty": float(qty), "qty_text": fmt_qty(qty, lg), "hours": hours})
 
     for it in doc_items(c, r["id"], oid):
+        if it.get("opt"):
+            continue  # 2.1041.0 (#5814, review F6): an optional / alternative position is not ordered
         if it["kind"] == "service":
             add(f"i:{it['origin_id'] or it['id']}", "", "", it["title"], it["detail"], it["unit"], it["qty"], _h(it["unit"], it["qty"], dh))
         elif it["kind"] == "part" and it["ref_part_id"] in parts:
@@ -152,7 +154,7 @@ def otk_rows(c, oid, r, dh):
                     add(f"s:{pk}:{s['uid']}", sec, pk, s["name"], "", "day", days, _h("day", days, dh))
             else:
                 for pit in doc_items(c, r["id"], oid, part=p["id"]):
-                    if pit["kind"] == "service":
+                    if pit["kind"] == "service" and not pit.get("opt"):  # 2.1041.0 (#5814, review F6)
                         add(f"i:{pit['origin_id'] or pit['id']}", sec, pk, pit["title"], pit["detail"], pit["unit"], pit["qty"],
                             _h(pit["unit"], pit["qty"], dh, mult))
     return out

@@ -131,7 +131,7 @@ def _pk2_offer(c, uid, oid, did):
     if r["status"] != "accepted":
         raise BadInput(tr("Only an accepted quotation can become a project"))
     cl = c.execute("SELECT id, name FROM clients WHERE id=?", (r["client_id"],)).fetchone() if r["client_id"] else None
-    items = c.execute(f"SELECT title, detail, qty, unit, kind FROM office_doc_items WHERE doc_id=? AND {live_sql()} ORDER BY sort, id", (did,)).fetchall()  # 2.1005.0 (#5415): not the trash
+    items = c.execute(f"SELECT title, detail, qty, unit, kind FROM office_doc_items WHERE doc_id=? AND COALESCE(opt, '')='' AND {live_sql()} ORDER BY sort, id", (did,)).fetchall()  # 2.1041.0 (#5814, review F11): not the optional ones  # 2.1005.0 (#5415): not the trash
     try:
         total = (json.loads(r["totals"] or "{}") or {}).get("gross")
     except ValueError:

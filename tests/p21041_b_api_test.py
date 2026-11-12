@@ -210,6 +210,25 @@ sv = [x for x in inv.get("items") or [] if x["kind"] == "service"]
 check(len(sv) == 1 and sv[0]["qty"] == 1 and sv[0]["unit"] == "flat" and inv["totals"]["net"] == "3960.00" and sv[0]["cost"] == 900,
       "#5817: the invoice from a flat price quotation: one position per tax rate, same net, the purchase on it " + str(sv)[:300])
 
+# ---------------------------------------------------------------- with parts (review F1 / F2): no part sums in a flat price, "Optional:" on a part page
+QT = new(A)
+r = A.post(B + f"{D}/{QT['id']}/parts", json={"title": "Modul"})
+check(r.status_code in (200, 201), "a part " + r.text[:120])
+PT = r.json().get("id") or (r.json().get("part") or {}).get("id")
+r = A.put(B + f"{D}/{QT['id']}/parts/{PT}/items", json={"items": [svc("Animation", 2, 700), svc("Extra", 1, 333, "optional")]})
+check(r.ok, "the part's positions " + r.text[:160])
+rd = A.get(B + f"{D}/{QT['id']}/render").json()
+pl = [x for p_ in rd.get("parts") or [] for x in p_.get("lines") or [] if x.get("kind") == "item"]
+check(any(x.get("opt_label") == "Optional:" and x.get("title") == "Extra" for x in pl) and rd["totals"].get("opt_note"),
+      "review F2: the part page labels its optional position, the note below the sums " + str([(x.get("title"), x.get("opt_label")) for x in pl]))
+A.patch(B + f"{D}/{QT['id']}", json={"flat_print": 1})
+rd = A.get(B + f"{D}/{QT['id']}/render").json()
+money_ = [str(v) for p_ in rd.get("parts") or [] for x in (p_.get("lines") or []) if not x.get("opt") for k, v in x.items() if k.endswith("_text") and "€" in str(v)]
+check(not money_ and all(not (p_.get("totals") or {}).get("rows") for p_ in rd.get("parts") or []), "review F1: a flat price prints no part sums or line prices " + str(money_)[:200])
+txt = pdf_text(A, QT["id"])
+if txt is not None:
+    check("700,00" not in txt and "(333,00 €)" in txt, "review F1: the PDF of a flat price with a part " + txt[:900].replace("\n", " | "))
+
 # ---------------------------------------------------------------- a person without an organisation (freelancer-matrix: office)
 FID, Fr = freelancer(B, A, "fiona")
 QP = new(Fr)

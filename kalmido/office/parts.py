@@ -433,7 +433,8 @@ def tp_clean_item(c, oid, r, it, i, prev):
     return {"sort": i, "kind": "part", "service_id": None, "ref_part_id": pid, "title": title,
             "detail": _text(it.get("detail"), "items.detail", 4000), "qty": 1 if qty is None else qty, "unit": unit, "rate": net,
             "tax": (prev or {}).get("tax") or "standard", "raw_fee": 0, "producing": 0, "intext": "intern", "cost": 0,
-            "discountable": 0 if it.get("discountable") in (0, False, "0", "false") else 1}
+            "discountable": 0 if it.get("discountable") in (0, False, "0", "false") else 1,
+            "opt": ""}  # 2.1041.0 (#5814, review F10): a part line is never optional (a reused id keeps no old mark)
 
 
 def tp_line_titles(c, oid, r, rows):
@@ -591,6 +592,8 @@ def tp_render(c, oid, r, m, pack, lang, locked):
                 ln["total_text"] = fmt_money(ln["total"], lang, cur)
                 if ln.get("rate") is not None:
                     ln["rate_text"] = fmt_rate(ln["rate"], lang, cur)  # 2.354.0 A (#2831): up to 4 places
+            if ln.get("opt"):  # 2.1041.0 (#5814, review F2): "Optional:" on a part's page too
+                ln["opt_label"] = label(pack, lang, "opt_" + ln["opt"])
             lines.append(ln)
         labels = pc.get("labels") or {}
         rows = [[L.get("net_total", labels.get("net") or label(pack, lang, "net")), fmt_money(pc.get("net") or 0, lang, cur)]]
@@ -598,7 +601,8 @@ def tp_render(c, oid, r, m, pack, lang, locked):
             rows.append([L.get("incl_raw", labels.get("net_incl_raw") or label(pack, lang, "net_incl_raw")), fmt_money(pc["net_incl_raw"], lang, cur)])
         if pc.get("net_excl_raw") is not None:
             rows.append([L.get("excl_raw", labels.get("net_excl_raw") or label(pack, lang, "net_excl_raw")), fmt_money(pc["net_excl_raw"], lang, cur)])
-        out.append({"id": p["id"], "kind": "items", "title": p["title"], "head": [], "lines": lines, "totals": {"rows": rows}})
+        out.append({"id": p["id"], "kind": "items", "title": p["title"], "head": [], "lines": lines, "totals": {"rows": rows},
+                    **({"opt_note": pc["opt_note"]} if pc.get("opt_note") else {})})  # 2.1041.0 (#5814, review F2): docs.odoc_render takes it
     m["parts"] = out
     m["part_label"] = L.get("part") or tr("Part|document", lg=lang)  # 2.149.0 A (#2520)
     for ln in m.get("lines") or []:

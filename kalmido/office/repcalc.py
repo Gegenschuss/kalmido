@@ -112,13 +112,17 @@ def orp_solve(ev, items, sel, prod_rate, mode, value, rnd="cent", rest=False, sc
             out["deviation"] = None if m is None else value - m
         return out
 
-    if not any(dec(items[i].get("rate")) != 0 for i in sel) and not (scale_prod and prod_rate):
-        return res(Decimal(1), items, prod_rate, False, "nothing", before)
+    if not any(dec(items[i].get("rate")) != 0 and not items[i].get("opt") for i in sel) and not (scale_prod and prod_rate):
+        return res(Decimal(1), items, prod_rate, False, "nothing", before)  # review F9: optional ones alone move no target
     if mode == "pct":
         f = 1 + value / 100
         if f <= 0:
             return res(Decimal(1), items, prod_rate, False, "negative", before)
+        if f > ORP_MAX_FACTOR:  # review F5: like the target modes
+            return res(Decimal(1), items, prod_rate, False, "too_high", before)
         its, pr = build(f)
+        if orp_too_big(its, pr):
+            return res(Decimal(1), items, prod_rate, False, "too_high", before)
         return res(f, its, pr)
 
     memo = {}
@@ -141,8 +145,8 @@ def orp_solve(ev, items, sel, prod_rate, mode, value, rnd="cent", rest=False, sc
     if hi > ORP_MAX_FACTOR:
         return res(Decimal(1), items, prod_rate, False, "too_high", before)
     for _ in range(ORP_ITER):
-        if g(hi)[0] == value:
-            break
+        if g(hi)[0] == value or hi - lo < Decimal("1e-9") or (g(lo)[1] == g(hi)[1] and g(lo)[2] == g(hi)[2]):
+            break  # review F4: hit, or both ends give the same rounded prices (no step in between changes anything)
         mid = (lo + hi) / 2
         m = g(mid)[0]
         if m is None or m < value:
@@ -156,7 +160,17 @@ def orp_solve(ev, items, sel, prod_rate, mode, value, rnd="cent", rest=False, sc
     _m, its, pr, t = g(f)
     if rest and _m != value:
         its, t = orp_rest(ev, its, pr, sel, mode, value)
+    if orp_too_big(its, pr):  # review F5: a price the positions could not be saved with any more
+        return res(Decimal(1), items, prod_rate, False, "too_high", before)
     return res(f, its, pr, after=t)
+
+
+ORP_PRICE_MAX = Decimal("1e8")  # docs.clean_items: items.rate within -1e8..1e8; producing_rate up to 1e7
+
+
+def orp_too_big(its, pr):
+    """review F5: a unit price beyond what clean_items takes, or a producing day rate beyond its limit."""
+    return any(abs(dec(x.get("rate"))) > ORP_PRICE_MAX for x in its if orp_scalable(x)) or abs(dec(pr)) > Decimal("1e7")
 
 
 def _orp_near(ev, its, pr, k, mode, value):

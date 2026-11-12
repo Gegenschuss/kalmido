@@ -18366,6 +18366,7 @@
   "Alternative": "Alternatief",
   "Print as a flat price": "Als vaste prijs afdrukken",
   "The client sees only the total: no quantities or prices per position in the PDF and on the approval page.": "De klant ziet alleen het totaal: geen aantallen of prijzen per positie in de pdf en op de goedkeuringspagina.",
+  "The quotation is printed as a flat price; one position per VAT rate keeps the line prices out of the invoice.": "De offerte wordt als vaste prijs afgedrukt; één positie per btw-tarief houdt de regelprijzen uit de factuur.",
   "Discount as": "Korting als",
   "The discount is higher than the sum of the discountable positions ({0})": "De korting is hoger dan de som van de posten met korting ({0})",
   "fixed net amount on the marked positions": "vast nettobedrag op de gemarkeerde posten",

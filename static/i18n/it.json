@@ -18367,6 +18367,7 @@
   "Alternative": "Alternativa",
   "Print as a flat price": "Stampa come forfait",
   "The client sees only the total: no quantities or prices per position in the PDF and on the approval page.": "Il cliente vede solo il totale: nessuna quantità o prezzo per posizione nel PDF e nella pagina di approvazione.",
+  "The quotation is printed as a flat price; one position per VAT rate keeps the line prices out of the invoice.": "Il preventivo è stampato come forfait; una posizione per aliquota IVA tiene i prezzi delle righe fuori dalla fattura.",
   "Discount as": "Sconto come",
   "The discount is higher than the sum of the discountable positions ({0})": "Lo sconto supera la somma delle voci scontabili ({0})",
   "fixed net amount on the marked positions": "importo netto fisso sulle voci contrassegnate",

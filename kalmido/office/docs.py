@@ -1186,7 +1186,8 @@ def ofp_flat(m):
     m["lines"] = strip(m.get("lines"))
     for p in m.get("parts") or []:
         if isinstance(p, dict):
-            p["lines"] = strip(p.get("lines"))
+            p["lines"] = [x for x in strip(p.get("lines")) if not (isinstance(x, dict) and x.get("bold"))]  # a shoot sheet's sum rows
+            p["totals"] = {**(p.get("totals") or {}), "rows": [], "raw_opt": None}  # review F1: no part sums either
     m["flat"] = True
     return m
 
@@ -1311,8 +1312,9 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         inv_render(c, oid, r, m, t, pack, L, lang, _fd)
     from .terms import agb_print_line
     m["terms_line"] = agb_print_line(c, oid, r, _fd)  # 2.113.2 (#2253): quotations with terms only
-    if t.get("opt_note"):  # 2.1041.0 (#5814): only then (the print model of every other document stays as it was: signoff hash)
-        m["totals"]["opt_note"] = t["opt_note"]
+    opt_note = t.get("opt_note") or next((x.get("opt_note") for x in m.get("parts") or [] if isinstance(x, dict) and x.get("opt_note")), None)
+    if opt_note:  # 2.1041.0 (#5814): only then (the print model of every other document stays as it was: signoff hash); review F2: + parts
+        m["totals"]["opt_note"] = opt_note
     if r["kind"] == "offer" and dict(r).get("flat_print"):  # 2.1041.0 (#5817): after the parts, the prices leave the model itself
         ofp_flat(m)
     return m if keep_detail else prd_strip_detail(m)  # 2.113.1 (#2251): keep_detail only for the signoff hash

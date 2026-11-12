@@ -18366,6 +18366,7 @@
   "Alternative": "Alternative",
   "Print as a flat price": "Imprimer comme forfait",
   "The client sees only the total: no quantities or prices per position in the PDF and on the approval page.": "Le client ne voit que le total : ni quantités ni prix par position dans le PDF et sur la page d'acceptation.",
+  "The quotation is printed as a flat price; one position per VAT rate keeps the line prices out of the invoice.": "Le devis est imprimé comme forfait ; une position par taux de TVA garde les prix des lignes hors de la facture.",
   "Discount as": "Remise en",
   "The discount is higher than the sum of the discountable positions ({0})": "La remise dépasse la somme des postes remisables ({0})",
   "fixed net amount on the marked positions": "montant net fixe sur les postes marqués",

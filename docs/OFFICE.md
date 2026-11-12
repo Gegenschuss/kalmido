@@ -1871,7 +1871,9 @@ margin 403 for members and 400 without external costs, an unreachable target 409
   calculation lines (producing, surcharges, included raw data, discount); net, tax and gross, the subtotals and the
   optional raw data stay, optional positions keep their amount. The editor shows every price with the hint that the client
   sees only the total. An invoice made from a flat price quotation has one position per tax rate (the summary form of
-  quotations with parts, titled like it), with the same net and gross.
+  quotations with parts, titled like it), with the same net and gross (in a foreign currency a cent may differ, as with that
+  summary: the invoice rounds once per tax rate, the quotation per position). A flat price quotation with parts prints no part sums
+  either; the invoice dialog preselects the summary form.
 
 ### The project of a document
 

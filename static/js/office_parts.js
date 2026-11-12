@@ -187,10 +187,10 @@ function tpInvoiceDialog(d) {
   const s = OFC.info?.settings || {}, lg = ofdLang(d);
   const modes = [['full', tr('Like the quotation: title page and every printed part with its positions')], ['title', tr('Title page only: every part as one position with its amount')],
     ['summary', tr('Everything in one position (one per VAT rate)')]];
-  const cur = s.parts_invoice_mode || 'full';
+  const cur = d?.flat_print ? 'summary' : s.parts_invoice_mode || 'full';  // 2.1041.0 (#5817, review F7): a flat price quotation shows no line prices
   // 2.449.0 (#3766): empty in nl / fr / es / it (ofdLang is 'en' there): the server picks the title for the document's language
   const own = lg === 'de' || d?.lang === 'en' ? s['parts_summary_title_' + lg] : '';
-  ofdDlg(tr('Create invoice'), `<fieldset class="tpmodes"><legend class="muted">${tr('This quotation has parts. What should the invoice show?')}</legend>${modes.map(([v, n]) => `<label class="tpmode"><input type="radio" name="tp-mode" value="${v}" ${v === cur ? 'checked' : ''}> <span>${esc(n)}</span></label>`).join('')}</fieldset>
+  ofdDlg(tr('Create invoice'), `<fieldset class="tpmodes"><legend class="muted">${tr('This quotation has parts. What should the invoice show?')}</legend>${modes.map(([v, n]) => `<label class="tpmode"><input type="radio" name="tp-mode" value="${v}" ${v === cur ? 'checked' : ''}> <span>${esc(n)}</span></label>`).join('')}</fieldset>${d?.flat_print ? `<p class="shint">${esc(tr('The quotation is printed as a flat price; one position per VAT rate keeps the line prices out of the invoice.'))}</p>` : ''}
     ${ofdF('tp-sum-title', tr('Title of the position'), `<input id="ofd-tp-sum-title" maxlength="300" value="${esc(own || '')}" placeholder="${esc(tr('Services|document'))}">`)}`,
     tr('Create invoice'), async md => {
       const mode = $('input[name="tp-mode"]:checked', md)?.value || cur;
