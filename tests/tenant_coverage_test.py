@@ -120,7 +120,8 @@ KINDS = {
     # 2.89.0 (#1916): tables belong to one organisation (every member) or one person (org_id NULL, owner_id); attached to a list
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
     "obj": ("matrix", "obj_core_test.py, obj_write_test.py, p2579_c_api_test.py (2.579.0: saved document views, their counts / hits / sharing): a core object (2.558.0, core/objects.py) of another organisation / person: 404 for the person and her agent (read, list, change, trash, restore, delete, history, undo, shares); shares only to the same workspace"),
-    "undo": ("matrix", "p2747_b_undo_core_test.py (2.747.0, #5249): another person's step group: not listed, 404 on undo / redo; an agent 403"),
+    "undo": ("matrix", "p2747_b_undo_core_test.py (2.747.0, #5249): another person's step group: not listed, 404 on undo / redo; an agent 403; "
+                     "p21005_a_undo_one_test.py (2.1005.0, #5637): the single group's undo the same way"),
     "sheet": ("matrix", "p2528_c_sheets_test.py (the trash of tables), p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
                         "trash, presence, completion); a formula's source of another workspace cannot be chosen and shows no value"),
     # 2.124.0 C (#2113): one table shared with single people / agents (sheets/shshare.py): only people / agents of the table's

@@ -82,6 +82,7 @@ r = Bo.post(B + f"/api/undo/{GX}/redo")
 check(r.ok and get(Bo, O1)["note"] == "a2" and get(Bo, O2)["note"] == "b2", f"redo of the single undo ({r.status_code} {r.text[:200]})")
 
 # ---------------------------------------------------------------- rights: another person 404, an agent 403
+# tenant: POST /api/undo/{}/undo
 r, _ = one(Ca, GY)
 check(r.status_code == 404 and get(Bo, O2)["note"] == "b2", f"another person's group: 404, nothing written ({r.status_code})")
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
