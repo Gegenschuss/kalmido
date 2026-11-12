@@ -62,7 +62,7 @@ const svc = (title, qty, rate, opt = '') => ({kind: 'service', title, qty, rate,
     await press('#ofd-subtotals', 'Subtotal under every section');
     check(await wait(`document.querySelectorAll('.ofdits .ofdsub').length === 2`), '#5816: two subtotal rows');
     const subs = await ev(`[...document.querySelectorAll('.ofdits .ofdsub')].map(x => x.textContent.replace(/\\s+/g, ' ').trim()).join(' / ')`);
-    check(/Subtotal Pre-production .*2,000\.00/.test(subs) && /Subtotal Shoot .*2,400\.00/.test(subs), '#5816: each with its section and amount (the optional one not in it): ' + subs);
+    check(/Subtotal Pre-production\s*€?2,000\.00/.test(subs) && /Subtotal Shoot\s*€?2,400\.00/.test(subs), '#5816: each with its section and amount (the optional one not in it): ' + subs);
     check(await ev(`(() => { const l = [...document.querySelectorAll('.ofdits > li')]; const s = l.findIndex(x => x.classList.contains('ofdsub')); return s > 0 && l[s + 1]?.classList.contains('ofdhd'); })()`),
       '#5816: the first subtotal stands right before the next heading');
     check(/4,400\.00/.test(await ev(net)), '#5816: the net total stays 4,400.00');
