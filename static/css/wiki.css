@@ -263,3 +263,14 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .ntwrap.wkdesk.wkpgo > .ntedit > .wkedwrap > .ntbody{resize:none}
 .ntwrap.wkdesk.wkpgo .wkcm .cm-content{min-height:max(8rem,calc(100dvh - 30rem))}  /* inside its own scroll box: about its free height */
 .ntwrap.wkdesk.wkpgo > .ntedit > :is(.wkfiles,.wkback) > ul{max-height:8rem;overflow-y:auto}  /* many files / links: the card keeps its edge */
+/* 2.1081.0 (#5907): a folder that has a page of the same name shows once (folder list, panel): the folder symbol with a small
+   page mark; its folder view shows the page's text on top (wiki.js wk_dirPageHtml), the subfolders and subpages below */
+.wkpgdir{position:relative;display:inline-flex;flex:none;line-height:0}
+.wkpgdm{position:absolute;right:-.3125rem;bottom:-.25rem;display:grid;place-items:center;border-radius:.1875rem;background:var(--bg2);color:var(--accent);line-height:0}
+.wkpgdm svg{width:.625rem;height:.625rem}
+#side .sbbtn>.wkpgdir>svg.i{width:var(--ic);height:var(--ic)}
+.wkdpage{margin:0 0 1rem;padding:.75rem 1rem;border:1px solid var(--line);border-radius:var(--r-l);background:var(--bg2)}
+.wkdpbar{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;min-width:0}
+.wkdpbar>.muted{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wkdpbar .spacer{flex:1}
+.wkdpmd{max-width:var(--w-lesen)}

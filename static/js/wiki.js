@@ -217,7 +217,11 @@ function wk_node(root, path) {
   return n;
 }
 const wk_dirs = n => [...n.kids.values()].filter(wk_isDir).sort((a, b) => wk_sortBy(a, b, k => k.fsort));  // 2.200.0 A (#2747): + empty folders, sorted by hand
-const wk_leaves = n => [...n.kids.values()].filter(k => k.page).sort((a, b) => wk_sortBy(a, b, k => k.page.sort_no));
+// 2.1081.0 (#5907): a page "A" with subpages "A/…" (or a folder "A") shares its node with the folder: in the folder list and in
+// the panel it shows ONCE, as the folder row with the page mark (wk_dirIcon); the folder view shows the page's text on top
+// (wk_dirPageHtml). The tree of the narrow view (wk_treeHtml) keeps its one row whose name opens the page.
+const wk_leaves = n => [...n.kids.values()].filter(k => k.page && !wk_isDir(k)).sort((a, b) => wk_sortBy(a, b, k => k.page.sort_no));
+const wk_dirIcon = (k, sz) => k.page ? `<span class="wkpgdir" role="img" title="${esc(tr('Folder with its page'))}" aria-label="${esc(tr('Folder with its page'))}">${ic('folder', sz)}<b class="wkpgdm">${ic('note', 's')}</b></span>` : ic('folder', sz);
 // ---- 2.200.0 A (#2747): the folders are folders of the file store (wkfolder.py): the panel's tree shows folders AND pages,
 // dragged (moved / sorted) and with a menu (sbb_treeReg 'wk'); the lists get the row's date and "…"; "New folder" in the bar.
 // Moving / renaming / the trash go through the file store's routes, the server writes the pages' paths (and their links).
@@ -451,12 +455,30 @@ function wk_deskHtml(sp, d, id, cur, sel, op) {
   else {
     const ps = wk_leaves(n);  // 2.200.0 A (#2747): rows like the file store's -- sorted by hand, the date, the menu "…"
     const box = (nid, nm) => wk_selBox(sp, nid, nm), rc = WK.selOn ? 'wkrow wkselrow' : 'wkrow';  // 2.353.0 C (#2829): Select
-    const rows = wk_dirs(n).map(k => `<li class="${rc}">${box(k.fid, k.name)}<a href="#${esc(wk_dirGo(k.path, sp))}" class="wkitem wkdrow">${ic('folder', 's')}<span>${esc(k.name)}</span>${/*html-ok*/ typeof wkar_mark === 'function' ? wkar_mark(sp, k.fid) : '' /* 2.1045.0 (#5823) */}</a>${wk_rowMore(sp, k.fid, '')}</li>`).join('')
+    const rows = wk_dirs(n).map(k => `<li class="${rc}">${box(k.fid, k.name)}<a href="#${esc(wk_dirGo(k.path, sp))}" class="wkitem wkdrow">${wk_dirIcon(k, 's')}<span>${esc(k.name)}</span>${/*html-ok*/ typeof wkar_mark === 'function' ? wkar_mark(sp, k.fid) : '' /* 2.1045.0 (#5823) */}</a>${wk_rowMore(sp, k.fid, '')}</li>`).join('')
       + ps.map(k => `<li class="${rc}">${box(k.page.node_id, k.name)}<a href="#wiki/${k.page.id}" class="wkitem">${ic(wk_isTpl(k.path) ? 'copy' : 'note', 's')}<span>${esc(k.name)}</span>${k.page.shared && typeof wsh_markHtml === 'function' ? wsh_markHtml(1) : ''}</a>${wk_rowMore(sp, k.page.node_id, k.page.updated_at)}</li>`).join('');
-    body = rows ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${rows}</ul>` : `<div class="empty">${tr('This folder is empty')}</div>`;
+    body = (n.page && parts.length ? wk_dirPageHtml(n.page) : '') + (rows ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${rows}</ul>` : n.page && parts.length ? '' : `<div class="empty">${tr('This folder is empty')}</div>`);
   }
   if (!hits) body = `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${body}</nav>${wk_selBar(sp)}`;
   return `<div class="ntwrap wkwrap wkdesk">${bar}<section class="wkfolder" aria-label="${esc(tr('Folder'))}">${hits ? '' : head}${body}${!parts.length && !hits && typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</section></div>`;
+}
+// 2.1081.0 (#5907): the page that shares its node with the open folder, read on top of the folder's list: its text (loaded once
+// per data version into WK.dpg, never WK.pg: the page being written in stays), its fields; "Edit" opens the page itself (editor,
+// menu, history as usual). Ticks are only shown here (the page saves them), links work.
+function wk_dirPageHtml(pg) {
+  const c = WK.dpg;
+  if (!c || c.id !== pg.id || c.v !== S.v) {
+    if (!c || c.id !== pg.id || !c.busy) {
+      const v0 = S.v; WK.dpg = {id: pg.id, v: v0, busy: true, p: c && c.id === pg.id ? c.p : null};
+      (async () => { let p; try { p = await rawFetch('GET', '/api/wiki/pages/' + pg.id); if (typeof wkePage === 'function') await wkePage(p); } catch (e) { p = e instanceof Offline && typeof wko_page === 'function' ? await wko_page(pg.id).catch(() => null) : null; }
+        if (WK.dpg?.id !== pg.id) return; WK.dpg = {id: pg.id, v: v0, busy: false, p: p || null, err: !p}; if (S.route.mod === 'wiki' && S.route.wdir != null) wk_redraw(); })();
+    }
+  }
+  const p = WK.dpg?.id === pg.id ? WK.dpg.p : null;
+  const may = WK.idx[pg.space]?.mayWrite !== false;
+  const txt = !p ? `<p class="muted">${esc(WK.dpg?.err ? tr('This page does not exist or you cannot see it.') : tr('Loading…'))}</p>`
+    : p._wke ? '' : wk_bodyStrip(p.body).trim() ? wk_render(p).replace(/<input([^>]*\bdata-wkcb)/g, '<input disabled$1') : `<p class="muted">${tr('Empty page.')}</p>`;
+  return `<article class="wkdpage" aria-label="${esc(wk_base(pg.path))}"><div class="wkdpbar">${ic('note', 's')}<span class="muted">${esc(wk_base(pg.path))}</span><span class="spacer"></span><a class="btn sm" href="#wiki/${pg.id}">${ic(may ? 'edit' : 'note', 's')}${esc(may ? tr('Edit') : tr('Open'))}</a></div>${p ? wk_attrsHtml(p.attrs, p.space) : ''}<div class="md ntmd wkmd wkdpmd">${txt}</div></article>`;
 }
 // the panel: "All pages" (the top of the space), then the top folders; subfolders are drawn only when opened (sbb_treeHtml)
 function wk_panelHtml() {
@@ -465,7 +487,7 @@ function wk_panelHtml() {
   const r = S.route, onW = r.mod === 'wiki';
   const pa = onW && r.wid ? wk_pgAt(r.wid) : null;
   const at = (onW && r.wdir != null ? r.wdir : pa && pa.space === sp ? wk_dirOf(pa.path) : '').toLowerCase();  // the open folder (a page: its folder)
-  const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };  // 2.319 (#3287): a page's own folder is open
+  const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path), ...(n.page ? {ichtml: wk_dirIcon(n)} : {}), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };  // 2.319 (#3287): a page's own folder is open
   const top = `<div class="sgroup sbbp">${/*html-ok*/ sbb_row('wiki', 'book', wk_rootName(sp), onW && !r.wid && !r.wdir, `data-wkarea="${esc(sp)}"` /* 2.1045.0 (#5823): its right-click, wkarea.js */)}</div>`;  // 2.200.0 A (#2747, audit B 1)
   if (!d?.pages) return top + `<p class="muted sbbtl">${esc(d?.err || tr('Loading…'))}</p>`;
   const ds = wk_subNodes(sp, wk_treeOf(sp), node);  // 2.200.0 A (#2747): folders AND pages, dragged / sorted / with a menu
@@ -481,7 +503,7 @@ function wk_panelAllHtml() {
     const d = WK.idx[sp], lock = wk_locked(sp), here = op === sp;
     const pa = here && r.wid ? wk_pgAt(r.wid) : null;  // 2.319 (#3287)
     const at = here ? (r.wdir != null ? r.wdir : pa ? wk_dirOf(pa.path) : '').toLowerCase() : '';
-    const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path, sp), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };
+    const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path, sp), ...(n.page ? {ichtml: wk_dirIcon(n)} : {}), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };
     const root = {k: 'wk:' + sp + ':', name: wk_rootName(sp), icon: lock ? 'lock' : 'book', go: 'wiki/s/' + sp, on: here && !r.wid && !r.wdir,
       kids: !lock && !(d?.pages && !wk_kidsN(wk_treeOf(sp))), open: here, attrs: `data-wksp="${esc(sp)}"`,  // the open space shows its folders
       ...(d?.root && !wk_e2e(sp) && d.mayWrite !== false ? {ns: 'wk', id: d.root, par: 'wk:', drop: true, menu: typeof wkar_rootItems === 'function' /* 2.1045.0 (#5823) */} : {}),  // 2.200.0 A (#2747): dropped on = to the top
