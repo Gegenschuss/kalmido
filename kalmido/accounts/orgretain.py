@@ -18,7 +18,7 @@ import re
 
 from flask import g, has_request_context
 
-from ..core.objhooks import FOLLOW, OBJ, person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
+from ..core.objhooks import FOLLOW, KIDS_FIRST, OBJ, person_revoked  # 2.1032.0 (#5788): KIDS_FIRST; 2.558.0 (#4709): the shared core without importing the domain layer
 from ..core.access import Denied, live_sql
 from ..core.objhooks import obj_rows_drop_many  # 2.1004.0 (#5494)
 from ..core.db import iso, local_now, now_utc  # 2.488.0 (#4004): local_now knows the test clock
@@ -370,6 +370,7 @@ def odl_retire(c, oid, until, gone=None):
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         odl_public_off(c, oid)  # 2.360.4 (#3243)
         odl_members_off(c, oid)  # 2.560.0 (#4697): before org_id=NULL (then the organisation's boundary no longer holds)
+        _kids_first(c, oid)  # 2.1032.0 (#5788, review F4): the calendars' / books' children locked before the UPDATEs below
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))
         obj_nodes_follow(c, oid)  # 2.566.0 (#4712, review F1): their nodes follow them into the owners' private trees
@@ -385,6 +386,22 @@ def odl_retire(c, oid, until, gone=None):
             c.execute("UPDATE fs_nodes SET owner_id=? WHERE org_id=?", (keeper, oid))
         c.execute("UPDATE orgs SET retired_at=?, retain_until=?, domains='', retired_admins=? WHERE id=?", (iso(now_utc()), until, ",".join(adm), oid))
     print(f"organisation {oid} retired: kept until {until} (legal retention, #2167)", flush=True)
+
+
+def _kids_first(c, oid):
+    """2.1032.0 (#5788, review F4 of 2.1017): the UPDATE of the calendars / address books of organisation oid carries org_id
+    into their events / contacts (trigger core/orgrows.py kalmido_orw_carry): the object's row, then its children -- the
+    trash (core/writes.py obj_trash) and a child's own save (an event: its row, then cal_touch on the calendar; a contact:
+    its row, then book_touch on the book) take the children first, so one of two could get a deadlock. Now the calendars'
+    locks and their events (obj_kids_first), then the books' contacts, all before the UPDATEs."""
+    ids = [r[0] for r in c.execute("SELECT id FROM ev_cals WHERE org_id=? ORDER BY id", (int(oid),)).fetchall()]
+    for reg in OBJ.values():  # the calendar's kind as the core registered it (events/evkern.py; no import of the events layer)
+        if reg.get("table") == "ev_cals" and ids:
+            for f in KIDS_FIRST:  # core/writes.obj_kids_first (the hook: core.writes stands above the accounts layer)
+                f(c, reg["kind"], ids)
+    # address books have no children in the core (obj_register): their contacts locked here the same way (book id order)
+    for (bid,) in c.execute("SELECT id FROM books WHERE org_id=? ORDER BY id", (int(oid),)).fetchall():
+        c.execute("SELECT id FROM contacts WHERE book_id=? ORDER BY id FOR NO KEY UPDATE", (bid,)).fetchall()
 
 
 def odl_tchat_files(c, oid):
@@ -416,6 +433,7 @@ def odl_dismantle(c, oid):
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         person_revoked(c, None, oid, "retire")  # 2.566.0 (#4712): the core closes the calendars' and books' shares (as odl_retire)
         odl_members_off(c, oid)  # 2.560.0 (#4697): as odl_retire
+        _kids_first(c, oid)  # 2.1032.0 (#5788, review F4): as odl_retire
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))  # 2.52.0 C (#1438)
         obj_nodes_follow(c, oid)  # 2.566.0 (#4712, review F1): as odl_retire (fs_org_purge removed the top nodes already)

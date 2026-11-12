@@ -21,6 +21,7 @@ START = []
 REVOKE = []
 SETTLE = []  # 2.568.0 (#4739): f(c, kind, rid) -- an area's own core rows follow its member table again (lists/lmcore.py)
 FOLLOW = []
+KIDS_FIRST = []  # 2.1032.0 (#5788): core/writes.obj_kids_first (f(c, kind, ids)) for accounts/orgretain.py without an upward import
 NOTIFY_READERS = {}  # 2.891.0 (#5270): filled by collab/teamchat.py ('tchat_dm')
 NOTIFY_TICK = {}  # 2.891.0 (#5270): kind -> f(c, uid, id, memo) -> bool, obj_role >= view of a person in a run without a request
 #                   with the per-project answers kept in the tick's memo (core/objlight.py: 'task', the watchdog's reminders)

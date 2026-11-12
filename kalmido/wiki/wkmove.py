@@ -271,6 +271,11 @@ def wkm_place(c, oid, owner, uid, rows, new_paths, old_paths, strict=True):
     plain = {r["id"]: wkh_body(c, r) for r in rows}
     moves = [(r, wkm_free(r["path"], taken)) for r in rows]
     ren, ids, ts = {r["path"].lower(): n for r, n in moves if r["path"] != n}, [r["id"] for r in rows], iso_ms(now_utc())
+    from ..core.writes import obj_kids_first
+    from .wkkern import WKK_KIND
+    # 2.1032.0 (#5788, review F4 of 2.1017): the pages' locks and their files (wiki_files) before the pages' rows: the
+    # UPDATE below and wka_move_files wrote the page, then its files -- the trash (obj_trash) takes the files first
+    obj_kids_first(c, WKK_KIND, ids)
     for r, n in moves:
         c.execute("UPDATE wiki_pages SET org_id=NULL, owner_id=?, path=?, updated_by=?, updated_at=?, brought_by=NULL WHERE id=?", (uid, n, uid, ts, r["id"]))
     wka_move_files(c, ids, None, uid, new_paths, old_paths, strict=strict)  # 2.528.0 (#4306 B25): strict = a broken file stops it

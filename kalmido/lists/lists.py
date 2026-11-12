@@ -965,7 +965,7 @@ def member_set(lid):
     role = b.get("role", "edit")
     if role not in ROLES:
         return err(tr("Role must be admin, edit, participant or view"))
-    from .lmcore import _KEEP, lmc_share
+    from .lmcore import _KEEP, lmc_share, lmc_share_lock  # 2.1032.0 (#5788): lmc_share_lock
     exp = _KEEP
     if "expires_at" in b:  # 2.568.0 (#4739): a share that runs out (the core's row; grp_sync / the watchdog end the role)
         from ..files.web import _expiry
@@ -1031,6 +1031,7 @@ def member_set(lid):
         bridge_check(c, lid, uid, ok=b.get("bridge_ok") is True)
     if is_kid(c, uid):  # 2.19.0 (#653): a kid only ever takes part (sees what is assigned to it / where it comes along)
         role = "participant"
+    lmc_share_lock(c, lid, uid)  # 2.1032.0 (#5788, review F3): the share's bucket before the member row (lffolder's order)
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
     old = c.execute("SELECT role, grole, frole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
     from ..collab.liste2e import le2a_member_problem
@@ -1246,6 +1247,15 @@ def folder_people_put():
         r = addr_account(c, b["email"])  # 2.1001.0 (#5669): only a proved address, an unproved one is answered like an unknown one
         r = (r,) if r else None
         if not r or r[0] == me():
+            return jsonify(shared=0, updated=0, by_email=True)
+        # 2.1032.0 (#5788, review of 2.1017): the workspace check of member_set's address path -- without it the folder's share
+        # was written for an account outside an organisation whose lists lie in the folder, and GET /api/folders/people showed
+        # its name to the sharer (an address told that it has an account). A list of the folder it cannot be in: the answer of
+        # an unknown address, nothing written
+        from ..accounts.orgs import ws_member_problem
+        if any(ws_member_problem(c, x[0], r[0]) for x in c.execute(
+                "SELECT id, folder FROM lists WHERE owner_id=? AND archived=0 AND is_inbox=0 ORDER BY id", (me(),)).fetchall()
+               if _in_folder(x[1], f)):
             return jsonify(shared=0, updated=0, by_email=True)
         uid = r[0]
     elif not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() or personal_agent_foreign(c, uid, me()) \

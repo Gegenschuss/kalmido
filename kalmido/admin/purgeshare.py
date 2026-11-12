@@ -332,16 +332,23 @@ def _books(c, items):
     """2.924.0 (#5069): the book keeps its node (no ctf_dropped any more: the node's shares are its members now): the node
     leaves the deleted person's tree (and its folders) for the heir's, the people who reached it through a folder of that
     tree keep their role as a share of the node (obj_node_person_put; one with a share keeps the one it has)."""
-    for x in sorted(items, key=lambda x: int(x["id"])):  # 2.1017.0 (#5645): in id order, the people too (two hand-ons never cross)
+    items = sorted(items, key=lambda x: int(x["id"]))  # 2.1017.0 (#5645): in id order, the people too (two hand-ons never cross)
+    # 2.1032.0 (#5788, review F2 of 2.1017): every book's row first, then the share buckets -- one book after the other held
+    # the bucket of book 1's share while it asked for book 2's row, and the members dialog of book 2 (contacts/model.py
+    # book_member_set: the book's row, then the bucket) the other way round: one of the two got a deadlock
+    for x in items:
         obk_hand_on(c, x["id"], x["heir"])
         obj_node_follow(c, CTF_BOOK, x["id"])
+        book_touch(c, x["id"])
+    puts = []
+    for x in items:
         if x["others"]:
             n = bk_node_ensure(c, x["heir"], x["id"])
             have = {m["user_id"] for m in book_members_of(c, x["id"], live=True)}
-            for u, role in sorted(x["others"].items()):
-                if u not in have:
-                    obj_node_person_put(c, x["heir"], n, u, role)
-        book_touch(c, x["id"])
+            puts += [(x["heir"], n, u, role) for u, role in sorted(x["others"].items()) if u not in have]
+    obj_share_locks(c, [(n["id"], u) for _h, n, u, _r in puts])  # their buckets in ascending order (two purges never cross)
+    for heir, n, u, role in puts:
+        obj_node_person_put(c, heir, n, u, role)
 
 
 def _sheet_put(c, heir, r, who, role, expires_at=None):

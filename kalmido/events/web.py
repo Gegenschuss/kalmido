@@ -34,6 +34,7 @@ from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_plain, ua_post, ua_pre 
 from .evundo import EVU_KIND, cal_restore_do  # 2.777.0 (#5254); 2.985.0 (#5394): cal_restore_do
 from ..core.undogroups import undo_label  # 2.985.0 (#5394)
 from ..core.writes import UG_TRASHED  # 2.985.0 (#5394): the label of a calendar's trash step
+from ..core.writes import obj_kids_first  # 2.1032.0 (#5788)
 from ..core.srchreg import srch_q, srch_register  # 2.1026.0 (#5280)
 from ..collab.msgsearch import find_marks, msg_terms, snippet  # 2.1026.0 (#5280): the snippets of the one search
 from .model import ev_find  # 2.1026.0 (#5280)
@@ -70,6 +71,7 @@ def op_cal_edit(c, uid, cid, b):
         cal = kern_version_seed(c, "ev_cals", cid)
         ccf_check(b, cal["updated_at"], "current", lambda: cal_public(c, cal, uid))
     if "org_id" in b:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
+        obj_kids_first(c, EV_KIND, [cid])  # 2.1032.0 (#5788): its events before its row (the org_id trigger writes them after it)
         if obj_org_set(c, "ev_cals", cid, b["org_id"], "cal"):
             KERN["follow"](c, EV_KIND, cid)  # 2.566.0 (#4712): its node (and the shares on it) follow
             cal_touch(c, cid)

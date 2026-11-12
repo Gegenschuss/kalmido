@@ -50,7 +50,7 @@ from .db import bump, insert_id, iso, iso_ms, now_utc
 from .undogroups import UG_LABEL, UG_LABEL_PLAIN, UNDO_KEEP_D, UG_TRACKED, ug_added, ug_current, ug_fits, ug_gc, ug_gids  # 2.747.0 (#5249)
 from .errors import BadInput, UnknownFields
 from .i18n import N_, tr
-from .objhooks import OBJ  # 2.773.0 (#5292): obj_trash_tick
+from .objhooks import KIDS_FIRST, OBJ  # 2.773.0 (#5292): obj_trash_tick; 2.1032.0 (#5788): KIDS_FIRST
 from .objparts import PART_KINDS, part_trash_due, part_trash_purge  # 2.783.0 (#5368): the side objects' trash run
 from .objects import OBJ_COLS, obj_need, obj_node_follow, obj_public, obj_reg, obj_row, obj_title, obj_forget
 from .objects import obj_reg_node  # 2.754.0 (#5268): the write paths refuse a light kind
@@ -374,6 +374,24 @@ def _kids_lock(c, reg, rid):
     so the two could deadlock (500, no wrong data)."""
     for t, col in _kids(reg):
         c.execute(f"SELECT id FROM {qi(t, (t,))} WHERE {qi(col, (col,))}=? ORDER BY id FOR NO KEY UPDATE", (int(rid),)).fetchall()
+
+
+def obj_kids_first(c, kind, ids):
+    """2.1032.0 (#5788, review F4 of 2.1017): for a writer that changes the rows of objects of kind outside the core's write
+    paths and whose change reaches their children (a trigger carrying org_id from ev_cals to events, a page move writing
+    wiki_files after wiki_pages): what obj_trash takes before the object's row -- the object's lock obj-<kind>-<id> (all
+    of them first, in id order) and then their child rows (_kids_lock). Call BEFORE the objects' own rows are written; the
+    order is then that of obj_trash and of a child's own save (child row, then the object's row), no deadlock with either.
+    A kind without children takes only the object locks."""
+    reg = obj_reg_node(kind)
+    ids = sorted({int(i) for i in ids})
+    for i in ids:
+        write_lock(c, f"obj-{kind}-{i}")
+    for i in ids:
+        _kids_lock(c, reg, i)
+
+
+KIDS_FIRST.append(obj_kids_first)
 
 
 def _kids_trash(c, reg, rid, ts):
