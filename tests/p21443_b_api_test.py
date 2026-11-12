@@ -127,7 +127,9 @@ def pdf_has_code(s, did):
 
 
 def reminders(s, inv_id=None, drafts=None):
-    rows = [x for x in dbx("SELECT id, ref_doc_ids, reminder_level, locked_at, org_id FROM office_docs WHERE kind='reminder' ORDER BY id")]
+    # 2.1060.0 (#5871): since #5415 (e594c82687) a deleted draft goes into the core's trash (deleted_at) instead of the row
+    # going: a reminder in the trash is no reminder (the app's readers skip it with live_sql)
+    rows = [x for x in dbx("SELECT id, ref_doc_ids, reminder_level, locked_at, org_id FROM office_docs WHERE kind='reminder' AND deleted_at IS NULL ORDER BY id")]
     out = []
     for rid, refs, lvl, locked, oid in rows:
         ids = [int(i) for i in re.findall(r"\d+", refs or "")]
