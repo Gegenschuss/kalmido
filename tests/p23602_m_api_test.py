@@ -292,8 +292,30 @@ check(r.ok and r.json().get("email") == "twice@example.com" and r.json().get("ro
 check(dbx("SELECT 1 FROM users WHERE id=?", (twice,)), "#3843: the account stays")
 check(dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (BETA, twice)), "#3843: the other organisation's invitation stays")
 check(not dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (ORG, twice)) and not dbx("SELECT 1 FROM org_invites WHERE org_id=? AND user_id=?", (ORG, twice)), "#3843: only this invitation ends")
-check(not dbx("SELECT 1 FROM user_invites WHERE user_id=?", (twice,)), "#3843: the link of this invitation ends with it")
+# 2.1062.0 (#5864): the link stays while another organisation's ordinary invitation is open (the only way in to accept it)
+check(dbx("SELECT 1 FROM user_invites WHERE user_id=? AND used_at IS NULL", (twice,)), "#5864: the link stays, the other invitation is open")
 check("twice@example.com" not in {x["email"] for x in inv()["invites"]} and "twice@example.com" in {x["email"] for x in inv(Er, BETA)["invites"]}, "#3843: gone here, open there")
+# 2.1062.0 (#5864): the mark "made by an organisation invitation" outlives the withdrawal: a later invitation stays ordinary
+r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "twice@example.com", "role": "member"})  # the undo of the withdrawal
+check(r.ok and dbx("SELECT silent FROM org_joins WHERE org_id=? AND user_id=?", (ORG, twice)) in ([(0,)], [(False,)]),
+      "#5864: invited again after withdrawing: an ordinary invitation, not a silent one " + str(dbx("SELECT silent FROM org_joins WHERE org_id=? AND user_id=?", (ORG, twice))))
+r = A.post(B + "/api/admin/orgs", json={"name": "Gamma", "admin_id": uid["dora"]})
+GAMMA = r.json()["id"]
+check(Do.post(B + f"/api/orgs/{GAMMA}/invites", json={"email": "twice@example.com", "role": "member"}).ok
+      and dbx("SELECT silent FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, twice)) in ([(0,)], [(False,)]), "#5864: a third organisation: ordinary as well")
+# Resend (ojn_hidden) knows the same exception: a row left silent from before wakes on Resend
+dbx("UPDATE org_joins SET silent=1 WHERE org_id=? AND user_id=?", (GAMMA, twice))
+ref = {x["email"]: x for x in inv(Do, GAMMA)["invites"]}["twice@example.com"]["ref"]
+r = Do.post(B + f"/api/orgs/{GAMMA}/invites/{ref}/resend")
+check(r.ok and dbx("SELECT silent FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, twice)) in ([(0,)], [(False,)]), "#5864: Resend makes it an ordinary invitation " + r.text[:200])
+# ... and with only a silent invitation elsewhere the account stays but the link ends (nothing open to accept with it)
+Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "quiet@example.com", "role": "member"})
+quiet = dbx("SELECT id FROM users WHERE email='quiet@example.com'")[0][0]
+dbx("INSERT INTO org_joins(org_id, user_id, role, created_by, created_at, silent, email) VALUES(?,?,?,?,?,1,?)",
+    (BETA, quiet, "member", uid["erin"], kt.now().isoformat(), "quiet@example.com"))
+ref = {x["email"]: x for x in inv()["invites"]}["quiet@example.com"]["ref"]
+check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{ref}").ok and dbx("SELECT 1 FROM users WHERE id=?", (quiet,)), "#3843: a silent row elsewhere keeps the account")
+check(not dbx("SELECT 1 FROM user_invites WHERE user_id=?", (quiet,)), "#5864: no ordinary invitation open elsewhere: the link ends")
 # ... an expired one does not keep the account alive
 Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "thrice@example.com", "role": "member"})
 Er.post(B + f"/api/orgs/{BETA}/invites", json={"email": "thrice@example.com", "role": "member"})

@@ -39,7 +39,7 @@ from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from function
 from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
-from ..accounts.orgs import _need_org_admin, ORG_ROLES, _operator_apart, instance_mode, may_see, org_member_add, org_member_put  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import _need_org_admin, _oinv_pending, ORG_ROLES, _operator_apart, instance_mode, may_see, org_member_add, org_member_put  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.invite import invite_state, invite_new  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.users import user_purge  # 2.369.5 (#2517): pulled up from functions
 from ..core.objhooks import person_revoked  # 2.649.0 (#5051)
@@ -195,7 +195,7 @@ def org_invite_new(oid):
     name = re.sub(r"\s+", " ", str(b.get("name") or "")).strip()[:60]
     username = _username(c, email)
     uid = create_user(c, username, name or username, None, onboard=True, ask_purpose=me())  # 2.364.0 A (#3032)
-    c.execute("UPDATE users SET email=? WHERE id=?", (email, uid))
+    c.execute("UPDATE users SET email=?, oinv_made_at=now() WHERE id=?", (email, uid))  # 2.1062.0 (#5864): made by an organisation invitation
     fs = [x for x in (gsetting(c, "default_features") or USER_DEFAULTS["features"]).split(",") if x]
     uset(c, uid, "features", ",".join(fs + ([] if "agents" in fs else ["agents"])))  # like a new account of the admins
     lg = b.get("lang") or usettings(c, me()).get("lang") or "en"
@@ -322,8 +322,15 @@ def org_invite_withdraw(oid, ref):
             c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid))
             person_revoked(c, uid, oid, "leave")  # 2.649.0 (#5051): what the membership opened goes through the core (obj_revoked)
             c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
+            # 2.1062.0 (#5864): the mark "made by an organisation invitation" outlives this row (orgs.py _oinv_pending): a later
+            # invitation of the never used account stays an ordinary one (else the undo, a third organisation's went silent)
+            c.execute("UPDATE users SET oinv_made_at=COALESCE(oinv_made_at, ?::timestamptz) WHERE id=?", (r["created_at"], uid))
             c.execute("DELETE FROM org_invites WHERE org_id=? AND user_id=?", (oid, uid))
-            c.execute("DELETE FROM user_invites WHERE user_id=? AND used_at IS NULL", (uid,))  # review: this invitation's link ends with it
+            # review: this invitation's link ends with it - 2.1062.0 (#5864): unless another organisation's ordinary invitation is
+            # still open (OJN_LIVE): the link is the only way into the account to accept that one
+            if not c.execute(f"SELECT 1 FROM org_joins j JOIN orgs o ON o.id=j.org_id WHERE j.user_id=? AND j.org_id!=? AND {OJN_LIVE} AND o.retired_at IS NULL",
+                             (uid, oid, cut, cut)).fetchone():
+                c.execute("DELETE FROM user_invites WHERE user_id=? AND used_at IS NULL", (uid,))
         else:
             files = user_purge(c, uid)
     bump(c)
@@ -444,8 +451,10 @@ def ojn_hidden(c, oid, uid, email=None):
     if g.user["is_admin"] and not _operator_apart():
         return False
     # 2.1021.0 (#5775): an address nobody proved stays silent on Resend (org_member_put); review 2: the address the admin typed
-    # (the row's, kept since #4922) must be the proved one - not a later address of the account
-    if (u["email_proved"] or "") != ((email or u["email"] or "").strip().lower()):
+    # (the row's, kept since #4922) must be the proved one - not a later address of the account. 2.1062.0 (#5864): the same
+    # exception as org_member_put - an account an organisation invitation set up that never signed in (its only address is
+    # the typed one) - also once that first invitation was withdrawn (users.oinv_made_at)
+    if (u["email_proved"] or "") != ((email or u["email"] or "").strip().lower()) and not _oinv_pending(c, uid):
         return True
     selfm = c.execute("SELECT self_made FROM orgs WHERE id=?", (oid,)).fetchone()
     return bool(selfm and selfm[0]) and not may_see(c, me(), uid)
