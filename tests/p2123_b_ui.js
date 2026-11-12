@@ -23,6 +23,9 @@ const FEAT = 'cal,comments,collab,wiki';
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   await call('POST', '/api/users', {username: 'dave', display_name: 'Dave Customer', password: 'password123', email: 'dave@example.com'});
+  // 2.997.0 (#5698): a share by address binds only a proved address (2.983.0 #5643: a mailed link / OIDC; the API suites set it
+  // the same way): Dave proved his - else the folder share by his address is answered like an unknown one (no row, nothing shared)
+  execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE users SET email_proved=lower(email) WHERE username='dave'"]);
   const DK = await login('dave');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, DK);
   const PG = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Customer/Guide', body: '# Start\n\nRead **this** first.\n\n- [x] kick-off\n- [ ] sign-off\n\nSee [[Customer/Prices]] and [[Internal]].'})).id;
