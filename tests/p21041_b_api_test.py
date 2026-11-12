@@ -214,7 +214,7 @@ check(len(sv) == 1 and sv[0]["qty"] == 1 and sv[0]["unit"] == "flat" and inv["to
 QT = new(A)
 r = A.post(B + f"{D}/{QT['id']}/parts", json={"title": "Modul"})
 check(r.status_code in (200, 201), "a part " + r.text[:120])
-PT = r.json().get("id") or (r.json().get("part") or {}).get("id")
+PT = (r.json().get("part") or {}).get("id")
 r = A.put(B + f"{D}/{QT['id']}/parts/{PT}/items", json={"items": [svc("Animation", 2, 700), svc("Extra", 1, 333, "optional")]})
 check(r.ok, "the part's positions " + r.text[:160])
 rd = A.get(B + f"{D}/{QT['id']}/render").json()
