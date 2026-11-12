@@ -810,8 +810,8 @@ def ctl_card_extra(v):
         if st.get("if_match") not in (None, "") and (not isinstance(st["if_match"], str) or not re.fullmatch(r"[^\x00-\x1f\x7f]{1,200}", st["if_match"])):
             raise bad  # 2.1045.0 (#5827): the If-Match of the refused request (a version), sent along by .../run
         p = ctl_norm_path(st["path"])
-        if not p.startswith("/") or re.search(r"[\s?#]", p):
-            raise bad
+        if not p.startswith("/") or re.search(r"[\s?#%]", p):  # 2.1078.0 (#5866, N7): + "%": the run decodes the path once more
+            raise bad  # (%2541 -> %41 stored -> A on the run): a card that looked other than its target
         out["step"] = {"method": st["method"], "path": p if p.startswith(API_PREFIX) else API_PREFIX.rstrip("/") + p}
         if st.get("body") not in (None, {}, []):
             if not isinstance(st["body"], (dict, list)) or len(ctl_canon(st["body"])) > CTL_BODY_MAX:

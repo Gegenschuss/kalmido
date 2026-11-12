@@ -112,6 +112,7 @@ r = card({"method": "PUT", "path": f"/wiki/pages/{PID}", "body": {"body": "x", "
 check("PATCH" in err(r).get("message", "") and "does not exist" in err(r).get("message", ""), f"PUT on a page: 400 names PATCH {r.text[:300]}")
 r = card({"method": "POST", "path": "/no/such/route"}, want=400)
 check("does not exist" in err(r).get("message", ""), f"a path that does not exist: 400 {r.text[:200]}")
+r = card({"method": "DELETE", "path": f"/lists/{FL}/members/%2541"}, want=400)  # 2.1078.0 (#5866, N7): decoded twice on the run
 check(not kt.dbx("SELECT 1 FROM agent_chat WHERE agent_id=? AND choices->'approval' IS NOT NULL", (FA,)), "no card was stored")
 
 # ================================================================== 2.1078.0 (#5866, N4): an upload names the header way
