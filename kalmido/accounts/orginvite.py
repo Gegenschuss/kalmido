@@ -39,7 +39,7 @@ from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from function
 from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
-from ..accounts.orgs import _need_org_admin, ORG_ROLES, _operator_apart, may_see, org_member_add, org_member_put  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import _need_org_admin, ORG_ROLES, _operator_apart, instance_mode, may_see, org_member_add, org_member_put  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.invite import invite_state, invite_new  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.users import user_purge  # 2.369.5 (#2517): pulled up from functions
 from ..core.objhooks import person_revoked  # 2.649.0 (#5051)
@@ -459,7 +459,6 @@ def ojn_proved(c, uid, email):
     current admin wakes it as before, ojn_hidden). Rows silent for another address are not touched; a woken row keeps its date
     (it runs out as it would have). -> how many woke.
     The caller commits."""
-    from .orgs import instance_mode
     cut = iso(now_utc() - timedelta(days=OJN_DAYS))
     em = (email or "").strip().lower()
     # review F2: like Resend (_need, org_member_put): not with inviting by e-mail switched off, only in workspaces mode
