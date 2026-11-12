@@ -55,6 +55,7 @@ from ..api.openapi import openapi_spec
 from ..agents.core import agent_emit, agent_row, is_agent, job_dict, JOB_LOG_MAX
 from ..agents.admin import personal_agent_foreign
 from ..agents.api import job_notify
+from ..agents.chatnews import acn_job_has_entry  # 2.1060.0 (#5870)
 from ..accounts.orgs import may_see, ws_member_problem  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import h6r_shared_people  # 2.369.5 (#2517): pulled up from functions
 
@@ -393,7 +394,9 @@ def need_approval(c, title, args=(), list_id=None, task_id=None, detail=None):
                     (aid, task_id, approver, ttl[:300], ts, ts, json.dumps({**spec, "key": key, "tok": (g.get("token") or {"id": None})["id"]}), list_id))
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
     job_notify(c, j, None)
-    if approver and not task_id:  # job_notify only adds News for task jobs: the approver hears of it anyway
+    # job_notify only added News for task jobs (since 2.1039.0, #5804, for a job without a task too): the approver hears of it
+    # anyway, once -- 2.1060.0 (#5870): not a second entry when job_notify wrote it (the bell counted the approval twice)
+    if approver and not task_id and not acn_job_has_entry(c, approver, jid):
         s = collab_user(c, approver, None)
         if s:
             news_add(c, approver, "approval", list_id=list_id, data={"title": j["title"][:200], "job": jid}, actor=aid, s=s)
