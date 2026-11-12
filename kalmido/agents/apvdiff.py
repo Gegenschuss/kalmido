@@ -194,8 +194,8 @@ def apvd_build(c, uid, ap, created_at, limit):
     exp = b.get("expect_updated_at") or (ap.get("step") or {}).get("if_match")
     stamp = str(t.get("stamp") or "")
     changed = bool(stamp) and (exp != stamp if isinstance(exp, str) and exp else bool(created_at) and stamp > str(created_at))
-    return {**out, "name": t["name"], "ref": t["ref"], "added": sum(1 for x in d if x[0] == "+"),
-            "removed": sum(1 for x in d if x[0] == "-"), "rows": rows, "more": more, "changed": changed,
+    return {**out, "name": t["name"], "ref": t["ref"], "added": sum(1 for x in d if x[0] == "+" and x[1].strip()),
+            "removed": sum(1 for x in d if x[0] == "-" and x[1].strip()),  # an empty line is no line in words "rows": rows, "more": more, "changed": changed,
             **({"no_heading": t["no_heading"]} if t.get("no_heading") else {}), **({"sealed": True} if t.get("sealed") else {})}
 
 
