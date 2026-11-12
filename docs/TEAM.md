@@ -837,6 +837,11 @@ anybody else, and for a disabled account, it stays silent: it stands in the list
 News item, mail or push and cannot answer it. *Add by e-mail address* in such a company adds nobody its admin may not see,
 with the same answer.
 
+Since 2.1062 expired invitations leave the list 30 days after they ran out, every kind alike (an ordinary, a silent and a new
+account's); a new account nobody ever used is withdrawn on that day by itself, after a warning mail to its address a week
+before (setting the account up keeps it). Withdrawing one organisation's invitation no longer makes a later invitation of
+the same never used account silent.
+
 Related changes in the same release:
 
 - A new project without a chosen workspace (from an import, the REST API, a template or a proposal) goes to the organisation

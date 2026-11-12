@@ -28,9 +28,10 @@ from datetime import timedelta
 
 from flask import g, jsonify
 
-from ..core.config import PUBLIC_URL, app, EMAIL_RE
-from ..core.i18n import LANGS, tr
-from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, iso, iso_ms, now_utc, uset, usettings, write_lock
+from ..core.config import APP_NAME, PUBLIC_URL, app, EMAIL_RE
+from ..core.i18n import LANGS, N_, lang, short_day, tr
+from ..core.mailframe import mail_html  # 2.1062.0 (#5786)
+from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, iso, iso_ms, local_now, now_utc, uset, usettings, write_lock
 from ..core.access import Denied
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
@@ -418,27 +419,154 @@ OJN_TS = "CASE WHEN pg_input_is_valid({0}, 'timestamptz') THEN {0}::timestamptz 
 
 def ojn_purge(c, now):
     """2.1005.0 (#5118, review F2 of 2.985.0): the daily clean-up (admin/dataretention.py lgc_expired, no switch: an
-    invitation is no data of a person once it ran out) deletes the ordinary org_joins rows (silent=0, an account the admin may
-    see) expired OJN_PURGE_DAYS ago (made more than OJN_DAYS + OJN_PURGE_DAYS days ago), unless the row is still open for the
-    person (OJN_LIVE: a new account's link used within the period) or belongs to a new account this organisation made
-    (org_invites: the row keeps that never used account in the list, where withdrawing deletes it).
-    Review of 2.1005.0 (Fable F1): a silent row (ojn_silent) and a neutral row (ojn_neutral) STAY. They stand in the admin's
-    list like the row of a new account (expired until withdrawn); deleting them while that one stays would tell the admin that
-    the typed address has an account (and deleting only the neutral ones that it was deleted). Their end waits for a decision
-    on the never used new accounts (the follow-up task named in the package's changelog).
+    invitation is no data of a person once it ran out) deletes the org_joins rows expired OJN_PURGE_DAYS ago (made more than
+    OJN_DAYS + OJN_PURGE_DAYS days ago), unless the row is still open for the person (OJN_LIVE: a new account's link used within
+    the period).
+    2.1062.0 (#5786): every kind alike - an ordinary row, a silent one (ojn_silent), a neutral one (ojn_neutral) and the row of
+    a never used new account this organisation made (org_invites). Before, silent and neutral rows stayed for ever because the
+    new account's row stayed until withdrawn (2.1005.0 review F1: deleting only some would tell the admin that a typed address
+    has an account, or had one). Now the never used account itself is withdrawn after the same period, with a warning first
+    (oinv_expire), so all rows fall on the same day; the account keeps its mark (users.oinv_made_at) until then.
     An open (younger) invitation and an accepted one (the row is gone, the membership stays untouched) are not affected.
     Returns the number of rows deleted; the caller commits."""
     cut = now - timedelta(days=OJN_DAYS + OJN_PURGE_DAYS)
     with system_ctx(c):  # rows of every organisation; nobody sees anything
+        oinv_mark(c)  # 2.1062.0 (#5786): the mark first - the org_invites row of a set-up account may go below
         n = c.execute(f"""DELETE FROM org_joins j WHERE {OJN_TS.format('j.created_at')} < ?::timestamptz
-                          AND j.silent=0 AND (NOT EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite'
-                                                          AND {OJN_TS.format('v.used_at')} >= ?::timestamptz
-                                                          AND {OJN_TS.format('v.created_at')} >= {OJN_TS.format('j.created_at')})
-                                              AND NOT EXISTS (SELECT 1 FROM org_invites i WHERE i.org_id=j.org_id AND i.user_id=j.user_id))""",
+                          AND NOT EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite'
+                                          AND {OJN_TS.format('v.used_at')} >= ?::timestamptz
+                                          AND {OJN_TS.format('v.created_at')} >= {OJN_TS.format('j.created_at')})""",
                       (iso(cut), iso(cut))).rowcount or 0
+        # 2.1062.0 (#5786): the org_invites row of an account that was set up and whose invitation row went: nothing for the
+        # list any more (tenancy.py boundary_check would read it as a crossing once the person belongs to another organisation)
+        c.execute(f"""DELETE FROM org_invites i WHERE {OJN_TS.format('i.created_at')} < ?::timestamptz
+                      AND NOT EXISTS (SELECT 1 FROM org_joins j WHERE j.org_id=i.org_id AND j.user_id=i.user_id)
+                      AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=i.org_id AND m.user_id=i.user_id)
+                      AND NOT ({OINV_UNUSED.format('i.user_id')})""", (iso(cut),))
     if n:
         print("organisation invitation: deleted", n, "invitation(s) expired more than", OJN_PURGE_DAYS, "days ago", flush=True)
     return n
+
+
+# ---- 2.1062.0 (#5786): a never used account an organisation's invitation set up is withdrawn after the invitation's period
+OINV_WARN_DAYS = 7  # the warning mail goes this long before (and the withdrawal waits at least this long after it went)
+OINV_MIN_DAYS = 30  # never sooner after the invitation, whatever OJN_DAYS / OJN_PURGE_DAYS say
+# the account {0} never signed in (oinv_pending in SQL: no password, SSO link or session, no link used, no agent)
+OINV_UNUSED = """EXISTS (SELECT 1 FROM users x WHERE x.id={0} AND x.password_hash IS NULL AND x.proxy_login IS NULL AND x.oidc_subject IS NULL
+                 AND COALESCE(x.kind, 'user')<>'agent' AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id=x.id)
+                 AND NOT EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=x.id AND v.used_at IS NOT NULL))"""
+
+
+def oinv_mark(c):
+    """users.oinv_made_at of an account an organisation's invitation set up before the mark existed (#5864): from its
+    org_invites row. Daily, idempotent; the caller holds the system context and commits."""
+    c.execute(f"""UPDATE users u SET oinv_made_at={OJN_TS.format('i.created_at')} FROM org_invites i
+                  WHERE i.user_id=u.id AND u.oinv_made_at IS NULL AND {OJN_TS.format('i.created_at')} IS NOT NULL""")
+
+
+def oinv_due(c, uid=None):
+    """The never used accounts an organisation's invitation set up that may be withdrawn by themselves (uid: only that one):
+    [{id, email, username, by, made, warned, last}]. Not: a disabled account (an admin's decision), one that belongs to an
+    organisation other than the one that made it (the button Withdraw refuses that, too) or owns projects. last = the newest
+    invitation on it (made, the org_invites row, any organisation's org_joins row - a Resend renews them): the period runs from it."""
+    with system_ctx(c):  # accounts of every organisation; the clean-up shows nothing to anybody
+        return c.execute(f"""SELECT u.id, u.email, u.username, u.oinv_made_at AS made, u.oinv_warned_at AS warned,
+                   (SELECT i.created_by FROM org_invites i WHERE i.user_id=u.id) AS by,
+                   GREATEST(u.oinv_made_at, (SELECT MAX({OJN_TS.format('i.created_at')}) FROM org_invites i WHERE i.user_id=u.id),
+                            (SELECT MAX({OJN_TS.format('j.created_at')}) FROM org_joins j WHERE j.user_id=u.id)) AS last
+                   FROM users u WHERE u.oinv_made_at IS NOT NULL AND u.disabled=0 AND {OINV_UNUSED.format('u.id')}
+                   {"AND u.id=?" if uid else ""}
+                   AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.user_id=u.id
+                                   AND NOT EXISTS (SELECT 1 FROM org_invites i WHERE i.user_id=u.id AND i.org_id=m.org_id))
+                   AND NOT EXISTS (SELECT 1 FROM lists l WHERE l.owner_id=u.id AND l.is_inbox=0)
+                   ORDER BY u.id""", (uid,) if uid else ()).fetchall()
+
+
+def oinv_expire(c, now, budget):
+    """2.1062.0 (#5786, decided 12.11.2026): the daily clean-up (admin/dataretention.py lgc_tick) withdraws a never used account
+    an organisation's invitation set up, like the button Withdraw (user_purge), OJN_DAYS + OJN_PURGE_DAYS days after its newest
+    invitation (never under OINV_MIN_DAYS after it was made) - the day its invitation rows fall (ojn_purge), so silent, neutral
+    and these rows all go alike. OINV_WARN_DAYS before, a warning goes to the account's address with the day and a link to set
+    the account up (signing in keeps it); without a delivered warning nothing is withdrawn (never silently gone: no outgoing
+    mail = the account stays, the warning is tried again the next day) and the withdrawal waits OINV_WARN_DAYS after it.
+    A warning counts only while no invitation is newer. budget = admin/hosting.py mail_budget (the daily mail limits; passed in by
+    the clean-up, which lives above this module). Commits per account. -> (warned, withdrawn)."""
+    keep, warn = timedelta(days=OJN_DAYS + OJN_PURGE_DAYS), timedelta(days=OINV_WARN_DAYS)
+    with system_ctx(c):
+        oinv_mark(c)
+        c.commit()
+    warned = gone = 0
+    for u in oinv_due(c):
+        due = max(u["last"] + keep, u["made"] + timedelta(days=OINV_MIN_DAYS))
+        if now < due - warn:
+            continue
+        if not u["warned"] or u["warned"] < u["last"]:
+            warned += oinv_warn(c, u, max(due, now + warn), now, budget)
+            continue
+        if now < max(due, u["warned"] + warn):
+            continue
+        files = []
+        try:
+            with system_ctx(c):  # the never used account and what it holds (its inbox, settings, the invitation rows)
+                write_lock(c, "accounts")
+                if oinv_due(c, u["id"]):  # still never used (a sign-in meanwhile keeps it)
+                    with c.savepoint():
+                        files = user_purge(c, u["id"])
+                    gone += 1
+            c.commit()
+        except Exception as e:  # noqa: BLE001  one account must not stop the others (tried again the next day)
+            c.heal()
+            print("organisation invitation: never used account not withdrawn:", type(e).__name__, flush=True)
+            continue
+        unlink_files(files)
+        print("organisation invitation: never used account", u["id"], "withdrawn after its period", flush=True)
+    return warned, gone
+
+
+def oinv_warn(c, u, at, now, budget):
+    """The warning of oinv_expire: a new link (the invitation's, valid until the day) and the mail, sent right here - only a
+    mail the server took counts (users.oinv_warned_at). -> 1 sent, 0 not (no outgoing mail, no address, the day's limit, an
+    error)."""
+    from ..integrations.mail import MAIL_OUT_ON, mail_send
+    if not MAIL_OUT_ON or not (u["email"] or "").strip():
+        return 0
+    try:
+        with system_ctx(c):  # nobody signed in: the account's own rows
+            if not budget(c, None, u["email"]):
+                c.rollback()
+                return 0
+            days = max(OINV_WARN_DAYS, (at - now).days)
+            inv = invite_new(c, u["id"], u["by"], send=False, days=days)
+            subject, text, body_html = oinv_warn_mail(c, u, inv["link"], at, days)
+            c.commit()  # the link is stored before the mail goes out (as invite_new does)
+        mail_send(u["email"].strip(), subject, text, body_html, from_name=APP_NAME)
+        with system_ctx(c):
+            c.execute("UPDATE user_invites SET sent_at=? WHERE user_id=?", (iso(now_utc()), u["id"]))  # a mailed link proves the address
+            c.execute("UPDATE users SET oinv_warned_at=? WHERE id=?", (now, u["id"]))
+            c.commit()
+        print("organisation invitation: never used account", u["id"], "warned before its withdrawal", flush=True)
+        return 1
+    except Exception as e:  # noqa: BLE001  not delivered: nothing is withdrawn, tried again the next day
+        c.heal()
+        print("organisation invitation: warning mail failed:", type(e).__name__, flush=True)
+        return 0
+
+
+def oinv_warn_mail(c, u, link, at, days):
+    """(subject, text, html) of the warning in the account's language (days: how long the link works)."""
+    lg = lang(c, u["id"])
+    t = lambda s, *a: tr(s, *a, lg=lg)  # noqa: E731
+    tz = local_now().tzinfo
+    day, made = (short_day(x.astimezone(tz).date(), lg, year=True) for x in (at, u["made"]))
+    by = c.execute("SELECT display_name, username FROM users WHERE id=?", (u["by"],)).fetchone() if u["by"] else None
+    who = (by["display_name"] or by["username"]) if by else t(N_("An admin"))
+    subject = f"{APP_NAME}: " + t(N_("Your unused account will be removed on {0}"), day)
+    lines = [t(N_("{0} created the account {1} for you on {2} with an invitation. It has not been used so far."), who, u["username"], made),
+             t(N_("Unless you set it up by {0}, it will be removed automatically on that day, together with the invitation."), day),
+             t(N_("Setting up the account once keeps it. If you do not need it, there is nothing to do."))]
+    button, valid = t(N_("Set up your account")), t(N_("The link works once and for {0} days."), days)
+    text = "\n\n".join(lines) + f"\n\n{button}: {link}\n{valid}\n"
+    return subject, text, mail_html(subject, lines, button, link, lang=lg, note=valid, logo=False)
 
 
 def ojn_hidden(c, oid, uid, email=None):

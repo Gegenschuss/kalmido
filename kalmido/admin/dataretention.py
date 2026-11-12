@@ -7,7 +7,8 @@
   the run just counts (dry run, GET /api/admin/retention). The office logs (office_doc_log, office_drive_log,
   office_archive_log) are never touched here (GoBD). Expired sessions, API tokens, invitations / reset links and agent setup
   codes are no data of a person any more and go without the switch; 2.1005.0 (#5118): so do organisation invitations
-  (org_joins) expired more than OJN_PURGE_DAYS ago (accounts/orginvite.py ojn_purge).
+  (org_joins) expired more than OJN_PURGE_DAYS ago (accounts/orginvite.py ojn_purge); 2.1062.0 (#5786): a never used account
+  an organisation's invitation set up is withdrawn after the same period, with a warning mail first (oinv_expire).
 - orf_tick (kind "files"): see below.
 - ckd_tick (kind "chat", 2.186.0 C #2602): the day limit of the agent chat, daily.
 
@@ -29,11 +30,11 @@ from ..core.retention import ret_days, ret_on, ret_report
 from ..core.serializers import unlink_files
 from ..team.portal import _PT_EDITS
 from .backup import BK_DIR, BK_KEEP_WEEKLY_CAP, bk_parse_name  # 2.312.0 B (#3264)
-from .hosting import hosted  # 2.552.0 (#4596, review)
+from .hosting import hosted, mail_budget  # 2.552.0 (#4596, review); 2.1062.0 (#5786): mail_budget
 from .offsite import bko_former_expire, bko_former_live  # 2.662.0 (#4587)
 from ..core.config import ATT_DIR  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import FS_VERSIONS_KEEP  # 2.369.5 (#2517): pulled up from functions
-from ..accounts.orginvite import ojn_purge  # 2.1005.0 (#5118): expired organisation invitations
+from ..accounts.orginvite import oinv_expire, ojn_purge  # 2.1005.0 (#5118): expired organisation invitations; 2.1062.0 (#5786): never used accounts
 
 # 2.239.0 D (#2874): file store nodes that are office records (receipts assigned or not, filed letters, cash book / equipment /
 # DATEV receipts, a kept lock): their file log and their versions stay while the node exists (it goes after its period)
@@ -217,6 +218,10 @@ def lgc_tick(c, force=False):
     counts = {}
     # system context: the clean-up works across organisations by design and shows no content to anybody
     with system_ctx(c):
+        try:  # 2.1062.0 (#5786): never used accounts of organisation invitations (warned, then withdrawn) before their rows go below
+            oinv_expire(c, now, mail_budget)
+        except Exception as e:  # noqa: BLE001  they must not stop the clean-up of the logs
+            lgc_failed(c, "oinv_expire", e)
         lgc_expired(c, now)
         c.commit()  # 2.644.0 (#4192): the batches below commit on their own; a failed one rolls back only itself
         for table, col, cond, days in LGC_LOGS:

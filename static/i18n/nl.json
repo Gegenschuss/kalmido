@@ -18477,5 +18477,9 @@
   "Scan inbox for this folder…": "Scan-inbox voor deze map…",
   "Show scan inbox": "Scan-inbox tonen",
   "Scan inboxes file only into folders of the documents": "Scan-inboxen leggen alleen af in mappen van de documenten",
-  "Scan inbox: {0}": "Scan-inbox: {0}"
+  "Scan inbox: {0}": "Scan-inbox: {0}",
+  "Your unused account will be removed on {0}": "Je ongebruikte account wordt op {0} verwijderd",
+  "{0} created the account {1} for you on {2} with an invitation. It has not been used so far.": "{0} heeft op {2} met een uitnodiging de account {1} voor je aangemaakt. Hij is nog niet gebruikt.",
+  "Unless you set it up by {0}, it will be removed automatically on that day, together with the invitation.": "Als je hem niet uiterlijk {0} instelt, wordt hij op die dag samen met de uitnodiging automatisch verwijderd.",
+  "Setting up the account once keeps it. If you do not need it, there is nothing to do.": "Stel je de account één keer in, dan blijft hij bestaan. Heb je hem niet nodig, dan hoef je niets te doen."
 }

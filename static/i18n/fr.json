@@ -18477,5 +18477,9 @@
   "Scan inbox for this folder…": "Boîte de numérisation pour ce dossier…",
   "Show scan inbox": "Afficher la boîte de numérisation",
   "Scan inboxes file only into folders of the documents": "Les boîtes de numérisation ne classent que dans les dossiers des documents",
-  "Scan inbox: {0}": "Boîte de numérisation : {0}"
+  "Scan inbox: {0}": "Boîte de numérisation : {0}",
+  "Your unused account will be removed on {0}": "Ton compte inutilisé sera supprimé le {0}",
+  "{0} created the account {1} for you on {2} with an invitation. It has not been used so far.": "{0} a créé le compte {1} pour toi le {2} avec une invitation. Il n’a pas encore été utilisé.",
+  "Unless you set it up by {0}, it will be removed automatically on that day, together with the invitation.": "Si tu ne le configures pas d’ici le {0}, il sera supprimé automatiquement ce jour-là, avec l’invitation.",
+  "Setting up the account once keeps it. If you do not need it, there is nothing to do.": "Configurer le compte une fois suffit pour le garder. Si tu n’en as pas besoin, tu n’as rien à faire."
 }

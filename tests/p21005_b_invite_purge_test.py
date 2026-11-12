@@ -6,13 +6,18 @@ accounts/orginvite.py ojn_purge) deletes organisation invitations (org_joins) th
 Invented names only (example.com).
  - frida (no organisation) has companies of her own (orgs.self_made); paula and dora have accounts frida may not see: their
    invitations are kept silent (ojn_silent); paula deletes her account: her rows become neutral (ojn_neutral)
- - a silent row and a neutral row stay, past the period too (2.1005.0 review F1: the row of a new account this company made
-   stays until withdrawn; were silent / neutral rows deleted while it stays, the vanishing would tell the admin that the
-   typed address has an account, or had one)
- - an ordinary invitation past the period goes; one just within it stays; one whose new-account link was used lately stays
-   (still open, OJN_LIVE); a new account this company made (org_invites) stays in the list (withdrawing deletes it)
+ - 2.1062.0 (#5786): every kind of row alike - silent, neutral, ordinary and the row of a new account this company made:
+   past the period they go, just within it they stay (before, 2.1005.0 review F1, silent / neutral rows stayed for ever
+   because the new account's row did)
+ - one whose new-account link was used lately stays (still open, OJN_LIVE)
  - an open (fresh) invitation stays, an accepted one keeps its membership
+ - 2.1062.0 (#5786): the never used account itself: OINV_WARN_DAYS before its day a warning mail with the date and a link;
+   withdrawn (deleted) only on its day and OINV_WARN_DAYS after a delivered warning; not one without an address (no warning
+   delivered), one set up meanwhile, one that belongs to another organisation, or a fresh one
 usage: p21005_b_invite_purge_test.py <datadir>"""
+import email
+import email.policy
+import json
 import os
 import shutil
 import subprocess
@@ -115,7 +120,7 @@ write("UPDATE org_joins SET created_at=? WHERE org_id=? AND email=? AND user_id 
 write("UPDATE org_joins SET created_at=? WHERE org_id=? AND email=? AND user_id IS NULL", (EDGE, O2, "paula@example.com"))
 write("UPDATE org_joins SET created_at=? WHERE org_id=? AND user_id=?", (OLD, O1, DID))
 write("UPDATE org_joins SET created_at=? WHERE org_id=? AND user_id=?", (EDGE, O2, DID))
-write("UPDATE org_joins SET created_at=? WHERE org_id=? AND user_id=?", (OLD, O1, NID))  # the new account's row: old, stays
+write("UPDATE org_joins SET created_at=? WHERE org_id=? AND user_id=?", (OLD, O1, NID))  # the new account's row: old, goes (#5786)
 write("UPDATE org_joins SET created_at=? WHERE org_id=? AND user_id=?", (OLD, O1, HID))  # ordinary, old: goes
 write("UPDATE org_joins SET created_at=? WHERE org_id=? AND user_id=?", (EDGE, O2, HID))  # ordinary, just within: stays
 # ida: an old ordinary row whose new-account link (made after it) was used 20 days ago: kept by the OJN_LIVE test (a used link
@@ -132,20 +137,21 @@ check("rows" in out and "Traceback" not in out, "the daily clean-up ran " + out[
 
 # silent and neutral alike
 # 2.1005.0 (#5118, review F1): kept like the new account's row (no account oracle)
-check(bool(joins(O1, "paula@example.com")), "(#5118) a neutral row (deleted account) past the period stays")
-check(bool(joins(O1, "dora@example.com")), "(#5118) a silent row (living account) past the period stays the same way")
+# 2.1062.0 (#5786): past the period every kind goes alike, just within it every kind stays
+check(not joins(O1, "paula@example.com"), "(#5786) a neutral row (deleted account) past the period goes")
+check(not joins(O1, "dora@example.com"), "(#5786) a silent row (living account) past the period goes the same way")
 check(bool(joins(O2, "paula@example.com")), "(#5118) a neutral row just within the period stays")
 check(bool(joins(O2, "dora@example.com")), "(#5118) a silent row just within the period stays the same way")
 after1, after2 = emails(O1), emails(O2)
-check("paula@example.com" in after1 and "dora@example.com" in after1 and "neu@example.com" in after1,
-      f"(#5118) both stand in the admins' list like the new account's row {after1}")
+check("paula@example.com" not in after1 and "dora@example.com" not in after1 and "neu@example.com" not in after1,
+      f"(#5786) silent, neutral and the new account's row left the admins' list on the same day {after1}")
 check("paula@example.com" in after2 and "dora@example.com" in after2, f"(#5118) both stand in the other list {after2}")
 # ordinary rows
 check(not dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (O1, HID)), "(#5118) an ordinary invitation past the period is deleted")
 check(bool(dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (O2, HID))), "(#5118) an ordinary invitation just within it stays")
 check(bool(dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (O1, IID))), "(#5118) an old invitation still open (link used lately) stays")
-check(bool(dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (O1, NID))) and "neu@example.com" in after1,
-      f"(#5118) the new account this company made stays in the list (withdrawing deletes it) {after1}")
+check(not dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (O1, NID)),
+      "(#5786) the row of the new account this company made goes on the same day as the others")
 # open and accepted
 check(bool(dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=? AND silent=1", (O1, GID))) and "gerda@example.com" in after1,
       "(#5118) an open (fresh) silent invitation stays")
@@ -157,5 +163,80 @@ check(bool(dbx("SELECT 1 FROM users WHERE id IN (?,?,?)", (DID, HID, IID))) and 
 n = dbx("SELECT COUNT(*) FROM org_joins")[0][0]
 out = py_in_app("from kalmido.admin.dataretention import lgc_tick\nprint('rows', lgc_tick(c, True))")
 check(dbx("SELECT COUNT(*) FROM org_joins")[0][0] == n, "(#5118) a second run changes nothing " + out[-200:])
+
+# ================================================================ 2.1062.0 (#5786): the never used account itself
+WARN_DAYS, PERIOD = 7, OJN_DAYS + PURGE_DAYS  # accounts/orginvite.py OINV_WARN_DAYS
+
+
+def ago(days):
+    return (NOW - timedelta(days=days)).isoformat(timespec="seconds")
+
+
+def new_account(email, age_days):
+    """A new account frida's company made, its invitation (account, org_invites, org_joins) age_days old."""
+    invite(O1, email)
+    uid = dbx("SELECT id FROM users WHERE email=?", (email,))[0][0]
+    t = ago(age_days)
+    write("UPDATE users SET oinv_made_at=?::timestamptz WHERE id=?", (t, uid))
+    write("UPDATE org_invites SET created_at=? WHERE user_id=?", (t, uid))
+    write("UPDATE org_joins SET created_at=? WHERE user_id=?", (t, uid))
+    return uid
+
+
+def mails_to(addr):
+    return sum(1 for m in mails() if addr in m.get("to", []))
+
+
+def mails():
+    try:
+        return [json.loads(x) for x in open(os.path.join(DATA, "mail", "out.jsonl"), encoding="utf-8")]
+    except OSError:
+        return []
+
+
+def alive(uid):
+    return bool(dbx("SELECT 1 FROM users WHERE id=?", (uid,)))
+
+
+GONE = new_account("gone@example.com", PERIOD + 1)        # its day is past: warned now, withdrawn a warning period later
+SOON = new_account("soon@example.com", PERIOD - 3)        # its day in 3 days: warned now, not withdrawn before the day
+FRESH = new_account("fresh@example.com", 1)               # nothing yet
+KEPT = new_account("kept@example.com", PERIOD + 1)        # warned, then set up: stays
+NOMAIL = new_account("noaddr@example.com", PERIOD + 1)    # no address: no warning delivered, never withdrawn
+OTHER = new_account("other@example.com", PERIOD + 1)      # belongs to another organisation: stays like Withdraw refuses it
+write("UPDATE users SET email=NULL WHERE id=?", (NOMAIL,))
+write("INSERT INTO org_members(org_id, user_id, role) VALUES(?,?,?)", (O2, OTHER, "member"))
+check(dbx("SELECT COUNT(*) FROM users WHERE oinv_made_at IS NOT NULL AND id IN (?,?,?)", (GONE, SOON, FRESH))[0][0] == 3, "setup: (#5864) the mark of an account made by an invitation")
+check(bool(until(lambda: all(mails_to(f"{a}@example.com") >= 1 for a in ("gone", "soon", "fresh", "kept", "other")), 30)),
+      "setup: the invitation mails went")
+before = {a: mails_to(f"{a}@example.com") for a in ("gone", "soon", "fresh", "kept", "other")}
+
+out = py_in_app("from kalmido.admin.dataretention import lgc_tick\nprint('rows', lgc_tick(c, True))")
+check("rows" in out and "Traceback" not in out, "(#5786) the clean-up ran " + out[-300:])
+warned = {a: mails_to(f"{a}@example.com") - before[a] for a in before}
+check(warned["gone"] == 1 and warned["soon"] == 1 and warned["kept"] == 1, f"(#5786) a warning mail before the day {warned}")
+check(warned["fresh"] == 0 and warned["other"] == 0, f"(#5786) none for a fresh account or one of another organisation {warned}")
+w = email.message_from_string([m for m in mails() if "soon@example.com" in m.get("to", [])][-1]["raw"], policy=email.policy.default)
+w = w.get_body(preferencelist=("plain",)).get_content()
+check("#invite/" in w and "kept" not in w and "soon" in w, "(#5786) the warning names the account and carries a link to set it up " + w[:300])
+check(all(alive(u) for u in (GONE, SOON, FRESH, KEPT, NOMAIL, OTHER)), "(#5786) nothing is withdrawn on the day of the warning")
+check(dbx("SELECT oinv_warned_at IS NOT NULL FROM users WHERE id=?", (GONE,)) in ([(True,)], [(1,)]), "(#5786) the delivered warning is noted")
+check(dbx("SELECT oinv_warned_at FROM users WHERE id=?", (NOMAIL,)) == [(None,)], "(#5786) no address: no warning noted")
+check(not dbx("SELECT 1 FROM org_joins WHERE user_id IN (?,?)", (GONE, KEPT)), "(#5786) its invitation row went with the others of its day")
+
+# a warning period later: the person of KEPT set the account up meanwhile (its link used)
+for u in (GONE, SOON, KEPT, NOMAIL, OTHER):
+    write("UPDATE users SET oinv_warned_at=oinv_warned_at - interval '8 days' WHERE id=? AND oinv_warned_at IS NOT NULL", (u,))
+write("UPDATE user_invites SET used_at=? WHERE user_id=?", (NOW.isoformat(timespec="seconds"), KEPT))
+out = py_in_app("from kalmido.admin.dataretention import lgc_tick\nprint('rows', lgc_tick(c, True))")
+check("rows" in out and "Traceback" not in out, "(#5786) the clean-up ran again " + out[-300:])
+check(not alive(GONE), "(#5786) warned, its day past: the never used account is withdrawn")
+check(not dbx("SELECT 1 FROM org_invites WHERE user_id=?", (GONE,)), "(#5786) ... with its invitation")
+check(alive(SOON), "(#5786) warned, but its day has not come: stays")
+check(alive(KEPT), "(#5786) set up after the warning: stays")
+check(alive(NOMAIL), "(#5786) without a delivered warning: never withdrawn")
+check(alive(OTHER), "(#5786) a member of another organisation: stays")
+check(alive(FRESH), "(#5786) a fresh one stays")
+check(mails_to("soon@example.com") - before["soon"] == 1, "(#5786) one warning, not one a day")
 
 sys.exit(kt.done("p21005_b_invite_purge"))

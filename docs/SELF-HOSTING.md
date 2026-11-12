@@ -181,7 +181,11 @@ an instance admin also gets it on the screen when no mail went. An address that 
 invitation in their News (after choosing a password), in the chosen role, so the member list does not tell the two apart.
 An instance admin still adds directly (on a hosted instance the operator invites, too). Open invitations are listed below
 with *Resend* (a new link and two more weeks, the old link stops working) and *Withdraw* (deletes the account, only while it
-never signed in and belongs to this organisation alone). Limits: 20 new invitations per inviting person and
+never signed in and belongs to this organisation alone). Since 2.1062 the daily clean-up does the same by itself: an
+account created this way that was never used is withdrawn 44 days after its newest invitation (the two weeks plus 30 days,
+never sooner than 30 days), after a warning mail a week before with the date and a link to set it up - setting it up keeps
+the account; without a delivered warning (no outgoing mail, no address) nothing is withdrawn. On the same day every expired
+invitation row of the list goes alike. Limits: 20 new invitations per inviting person and
 day, plus the daily mail budget. Instance admins switch it off under *Settings > Server > Sign-in > Registration on the sign-in page*
 (*Organisation admins may invite new people by e-mail*, on by default); adding existing accounts stays possible.
 
