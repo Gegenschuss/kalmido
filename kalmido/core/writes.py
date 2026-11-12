@@ -410,15 +410,21 @@ def _kids_restore(c, reg, rid, gone):
 
 
 OBJ_PURGE = {}  # 2.809.0 (#5365): kind -> f(c, rid) of obj_on_purge
+OBJ_PURGE_LOCK = {}  # 2.1047.0 (#5835): kind -> f(c, rid) of obj_on_purge(lock=...), run before the object's row lock
 _PURGE_BOX = ContextVar("obj_purge_box", default=None)
 
 
-def obj_on_purge(kind, f):
+def obj_on_purge(kind, f, lock=None):
     """2.809.0 (#5365): the area's part of the delete for good of an object of kind (_purge_rows runs it first): f(c, rid) cleans
     what the core does not know (stored files, scan / text rows, folder nodes) and returns what must happen after the commit
     (paths relative to ATT_DIR or callables, core/serializers.py unlink_files) or None; Denied = the object is kept (a receipt
-    under the legal retention, files/store.py fs_on_delete): obj_purge refuses, the retention run counts it as locked."""
+    under the legal retention, files/store.py fs_on_delete): obj_purge refuses, the retention run counts it as locked.
+    2.1047.0 (#5835): lock = f(c, rid) that locks the area's rows a concurrent writer takes BEFORE the object's row (the file
+    store's documents: a recognition run writes its document row, then a row pointing at the node); _purge_rows runs it before
+    its own row lock, else the purge held the node and waited for the document while the run waited for the node: deadlock."""
     OBJ_PURGE[kind] = f
+    if lock is not None:
+        OBJ_PURGE_LOCK[kind] = lock
 
 
 @contextmanager
@@ -481,6 +487,8 @@ def _purge_rows(c, kind, reg, rid):
     (obj_on_purge); one that keeps the object (legal retention) leaves it in the trash."""
     # 2.1015.0 (#5675, review): the row first, its history after - the order of every writer and of okern.ofk_purge_many
     # (row locks, then the history); history first here waited the other way round and made a deadlock with a mass purge
+    if kind in OBJ_PURGE_LOCK:  # 2.1047.0 (#5835): the area's rows that come before the object's row in its writers' order
+        OBJ_PURGE_LOCK[kind](c, int(rid))
     c.execute(f"SELECT 1 FROM {qi(reg['table'], (reg['table'],))} WHERE id=? FOR UPDATE", (int(rid),)).fetchall()
     if not _purge_area(c, kind, rid):
         return

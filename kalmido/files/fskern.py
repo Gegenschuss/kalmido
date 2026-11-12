@@ -19,7 +19,7 @@ from ..core.access import live_sql
 from ..core.i18n import N_
 from ..core.objects import obj_register
 from ..core.writes import obj_on_purge, obj_purge, obj_restore, obj_trash
-from .store import fs_chain, fs_purge_files, fs_purge_prep, fs_role, fs_trash_root
+from .store import fs_chain, fs_purge_files, fs_purge_lock, fs_purge_prep, fs_role, fs_subtree, fs_trash_root
 
 FSK_KIND = "fs_entry"
 
@@ -59,7 +59,7 @@ def _fsk_purge(c, rid):
 
 obj_register(FSK_KIND, "fs_nodes", label=N_("File"), fields={}, area="other", routes=False, listed=False, fsref=False,
              space=_space, base_role=_base, visible=_visible, cap=lambda c, uid, rid: None, trash_prune=True)
-obj_on_purge(FSK_KIND, _fsk_purge)
+obj_on_purge(FSK_KIND, _fsk_purge, lock=lambda c, rid: fs_purge_lock(c, fs_subtree(c, rid)))  # 2.1047.0 (#5835)
 
 
 def fsk_trash(c, uid, nid):
@@ -78,6 +78,7 @@ def fsk_purge(c, uid, nid):
     the trash carries no mark of its own: it gets the folder's first, so the core's purge (only from the trash) takes it alone."""
     r = _row(c, nid)
     if r is not None and not r["deleted_at"]:
+        fs_purge_lock(c, fs_subtree(c, nid))  # 2.1047.0 (#5835): its documents before the node row's first write
         top = fs_trash_root(fs_chain(c, nid))
         if top is not None:
             c.execute(f"UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=? AND {live_sql()}",

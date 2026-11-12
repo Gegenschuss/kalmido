@@ -871,6 +871,18 @@ def fs_purge_prep(c, nid):
     """2.809.0 (#5365): everything of fs_purge before the row goes (also the core trash's hook, files/fskern.py): the documents
     locked, the hooks of fs_on_delete (Denied = legal retention: nothing may go), the stored versions -> (ids, paths)."""
     ids = fs_subtree(c, nid)
+    fs_purge_lock(c, ids)
+    paths = []
+    for i in ids:
+        for f in fs_on_delete:
+            paths += f(c, i) or []  # 2.306.0 D3 (#2875): a hook may return its stored files (relative to ATT_DIR) for after the commit
+        paths += [r[0] for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (i,))]
+    return ids, paths
+
+
+def fs_purge_lock(c, ids):
+    """The documents of the nodes ids locked before the purge's first write (fs_purge_prep; 2.1047.0 #5835: also the core's
+    purge before it locks the node row, files/fskern.py obj_on_purge lock=)."""
     with system_ctx(c):  # 2.493.0 (#4034): the documents going along locked before the first write, in one order (#3090): a
         # recognition run (docs/store.process, its first write is the document's own row) ends first or waits - else the
         # purge held the node row while the run held the document row: deadlock, 500
@@ -878,12 +890,6 @@ def fs_purge_prep(c, nid):
         for k in range(0, len(srt), 500):
             part = srt[k:k + 500]
             c.execute(f"SELECT node_id FROM doc_meta WHERE node_id IN ({','.join('?' * len(part))}) ORDER BY node_id FOR UPDATE", part).fetchall()
-    paths = []
-    for i in ids:
-        for f in fs_on_delete:
-            paths += f(c, i) or []  # 2.306.0 D3 (#2875): a hook may return its stored files (relative to ATT_DIR) for after the commit
-        paths += [r[0] for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (i,))]
-    return ids, paths
 
 
 def fs_purge_files(ids, paths):

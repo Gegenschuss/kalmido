@@ -180,7 +180,9 @@ c.commit()
   and returns the work for after the commit (paths or callables); `Denied` keeps the object (a receipt under the legal
   retention): `obj_purge` refuses, the retention run counts it as `<kind>_locked` and leaves it in the trash. Purges that
   may meet such a hook run inside `obj_purge_after()` and call `unlink_files(box["after"])` after their commit
-  (`obj_trash_tick` does). File-store nodes (`files/fskern.py`, kind `fs_entry`), knowledge pages with their files
+  (`obj_trash_tick` does). 2.1047.0 (#5835): `obj_on_purge(kind, f, lock=g)` - `g(c, id)` runs before `_purge_rows` locks
+  the object's row and locks the area's rows its writers take first (the file store: the documents, `fs_purge_lock`, else a
+  recognition run and the purge wait for each other). File-store nodes (`files/fskern.py`, kind `fs_entry`), knowledge pages with their files
   (`wiki/wkkern.py`, `wiki_page`, children `wiki_files`) and tables (`sheets/shkern.py`, `sheet_table`) are core kinds
   without routes, node or listing: their routes check the area's rights, then call `obj_trash` / `obj_restore` / `obj_purge`
   (no core step: the areas keep their own undo); `base_role` mirrors the area's rule of deleting / restoring, the space hook
