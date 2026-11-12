@@ -3083,7 +3083,7 @@ TOOLSETS = {
         list_polls get_poll create_poll
     """,
     "wiki": """
-        wiki_list wiki_read wiki_write wiki_create wiki_files wiki_read_file list_notes get_note create_note update_note delete_note restore_note
+        wiki_list wiki_read wiki_write wiki_create wiki_append wiki_files wiki_read_file list_notes get_note create_note update_note delete_note restore_note
     """,
     "life": """
         list_habits create_habit update_habit delete_habit check_in_habit get_habit_stats get_family add_occasion list_deadline_types add_deadline
