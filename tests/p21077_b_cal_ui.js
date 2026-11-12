@@ -65,11 +65,11 @@ const nEv = w => w.__log.filter(k => /^GET \/api\/calendars\/events/.test(k)).le
   // ================= a failed fetch: an error with "Try again", never an empty month, no loop of fetches
   w.eval(`LS.set('calev', {})`);  // no saved copy
   w.__fail = /^GET \/api\/calendars\/events/;
-  w.eval('calInvalidate(); renderView()');
+  w.eval('calInvalidate(); S.cal.items = []; renderView()');  // a range not loaded yet (a range loaded before keeps its events while it loads again)
   const err = await until(() => d.querySelector('#view .calst .eerr'));
   check(err && /Events could not be loaded/.test(txt(err)) && err.querySelector('[data-esretry]'), '#5461: a failed load says so with "Try again": ' + txt(err));
   check(err?.getAttribute('class').includes('es-row') && st()?.getAttribute('aria-live') === 'polite', '#5461: the shared block (row size), announced');
-  check(!chip('Standup'), '#5461: the month has no events from nowhere (the error is said, not hidden)');
+  check(!chip('Standup'), '#5461: a range that never loaded has no events and says why (not an empty month without a word)');
   const n1 = nEv(w);
   w.eval('renderView(); renderView(); renderView()'); await sleep(300);
   check(nEv(w) === n1 && d.querySelector('#view .calst .eerr'), '#5461: drawing again does not fetch again by itself (no loop), the error stays ' + (nEv(w) - n1));
