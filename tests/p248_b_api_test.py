@@ -393,7 +393,9 @@ check(r.status_code == 201, f"a file into Dokumente/Eingang ({r.text[:120]})")
 inb = r.json()["items"][0]["id"] if r.ok else 0
 d = until(lambda: (lambda x: x.json() if x.ok and x.json()["state"] == "done" else None)(doc(A, inb)), 60)
 check(d and d["date"] == "2026-10-05", f"the inbox file became a document ({d and d['state']})")
-check(d and d["parent_id"] == root, "recognised: it moves on into the documents folder")
+# 2.1047.0 (#5839): red once in the CI (v2.1024.0) only - the answer names where it lies and what moved it (the file's log)
+check(d and d["parent_id"] == root, f"recognised: it moves on into the documents folder (parent {d and d['parent_id']}, documents "
+      f"{root}, inbox {fid}, auto {d and d.get('auto')}, log {dbx('SELECT action, detail FROM fs_log WHERE node_id=? ORDER BY id', (inb,))})")
 
 # ---- forwarding address
 r = A.post(B + "/api/docs/mail", json={"ws": "private"})
