@@ -593,6 +593,8 @@ def start_session(c, uid, remember, via="password"):
               (_token_hash(tok), uid, iso(now_utc()), iso(now_utc() + timedelta(days=days)), via, iso(now_utc()),
                ses_ua() if has_request_context() else ""))
     c.execute("UPDATE users SET op_made_by=NULL WHERE id=? AND op_made_by IS NOT NULL", (uid,))  # 2.480.0 (#3944, F8): signed in = the client's own
+    # 2.1062.0 (#5786, review F2): signed in once - never withdrawn as a never used account (accounts/orginvite.py oinv_expire)
+    c.execute("UPDATE users SET oinv_used=TRUE WHERE id=? AND oinv_made_at IS NOT NULL AND NOT oinv_used", (uid,))
     if via == "link":  # 2.485.0 (#3939): a sign-in link the operator made through support access: no longer than that access
         from .supportgrant import sga_session_cap
         sga_session_cap(c, uid, _token_hash(tok))

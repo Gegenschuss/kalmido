@@ -187,6 +187,12 @@ def mails_to(addr):
     return sum(1 for m in mails() if addr in m.get("to", []))
 
 
+def warnings_to(addr):
+    """The warning mails (#5786) to addr: the subject tells them from the invitation mail."""
+    return [m for m in mails() if addr in m.get("to", [])
+            and "will be removed on" in str(email.message_from_string(m["raw"], policy=email.policy.default)["Subject"])]
+
+
 def mails():
     try:
         return [json.loads(x) for x in open(os.path.join(DATA, "mail", "out.jsonl"), encoding="utf-8")]
@@ -204,22 +210,23 @@ FRESH = new_account("fresh@example.com", 1)               # nothing yet
 KEPT = new_account("kept@example.com", PERIOD + 1)        # warned, then set up: stays
 NOMAIL = new_account("noaddr@example.com", PERIOD + 1)    # no address: no warning delivered, never withdrawn
 OTHER = new_account("other@example.com", PERIOD + 1)      # belongs to another organisation: stays like Withdraw refuses it
+USED = new_account("used@example.com", PERIOD + 1)        # signed in once (review F2: its session and link are gone by now)
 write("UPDATE users SET email=NULL WHERE id=?", (NOMAIL,))
 write("INSERT INTO org_members(org_id, user_id, role) VALUES(?,?,?)", (O2, OTHER, "member"))
+write("UPDATE users SET oinv_used=TRUE WHERE id=?", (USED,))  # the durable mark start_session sets (accounts/session.py)
 check(dbx("SELECT COUNT(*) FROM users WHERE oinv_made_at IS NOT NULL AND id IN (?,?,?)", (GONE, SOON, FRESH))[0][0] == 3, "setup: (#5864) the mark of an account made by an invitation")
-check(bool(until(lambda: all(mails_to(f"{a}@example.com") >= 1 for a in ("gone", "soon", "fresh", "kept", "other")), 30)),
+check(bool(until(lambda: all(mails_to(f"{a}@example.com") >= 1 for a in ("gone", "soon", "fresh", "kept", "other", "used")), 30)),
       "setup: the invitation mails went")
-before = {a: mails_to(f"{a}@example.com") for a in ("gone", "soon", "fresh", "kept", "other")}
 
 out = py_in_app("from kalmido.admin.dataretention import lgc_tick\nprint('rows', lgc_tick(c, True))")
 check("rows" in out and "Traceback" not in out, "(#5786) the clean-up ran " + out[-300:])
-warned = {a: mails_to(f"{a}@example.com") - before[a] for a in before}
+warned = {a: len(warnings_to(f"{a}@example.com")) for a in ("gone", "soon", "fresh", "kept", "other", "used")}
 check(warned["gone"] == 1 and warned["soon"] == 1 and warned["kept"] == 1, f"(#5786) a warning mail before the day {warned}")
-check(warned["fresh"] == 0 and warned["other"] == 0, f"(#5786) none for a fresh account or one of another organisation {warned}")
-w = email.message_from_string([m for m in mails() if "soon@example.com" in m.get("to", [])][-1]["raw"], policy=email.policy.default)
+check(warned["fresh"] == 0 and warned["other"] == 0 and warned["used"] == 0, f"(#5786) none for a fresh account, one of another organisation or one used once {warned}")
+w = email.message_from_string(warnings_to("soon@example.com")[-1]["raw"], policy=email.policy.default)
 w = w.get_body(preferencelist=("plain",)).get_content()
 check("#invite/" in w and "kept" not in w and "soon" in w, "(#5786) the warning names the account and carries a link to set it up " + w[:300])
-check(all(alive(u) for u in (GONE, SOON, FRESH, KEPT, NOMAIL, OTHER)), "(#5786) nothing is withdrawn on the day of the warning")
+check(all(alive(u) for u in (GONE, SOON, FRESH, KEPT, NOMAIL, OTHER, USED)), "(#5786) nothing is withdrawn on the day of the warning")
 check(dbx("SELECT oinv_warned_at IS NOT NULL FROM users WHERE id=?", (GONE,)) in ([(True,)], [(1,)]), "(#5786) the delivered warning is noted")
 check(dbx("SELECT oinv_warned_at FROM users WHERE id=?", (NOMAIL,)) == [(None,)], "(#5786) no address: no warning noted")
 check(not dbx("SELECT 1 FROM org_joins WHERE user_id IN (?,?)", (GONE, KEPT)), "(#5786) its invitation row went with the others of its day")
@@ -237,6 +244,7 @@ check(alive(KEPT), "(#5786) set up after the warning: stays")
 check(alive(NOMAIL), "(#5786) without a delivered warning: never withdrawn")
 check(alive(OTHER), "(#5786) a member of another organisation: stays")
 check(alive(FRESH), "(#5786) a fresh one stays")
-check(mails_to("soon@example.com") - before["soon"] == 1, "(#5786) one warning, not one a day")
+check(alive(USED), "(#5786, review F2) signed in once: stays though its session and link are gone")
+check(len(warnings_to("soon@example.com")) == 1, "(#5786) one warning, not one a day")
 
 sys.exit(kt.done("p21005_b_invite_purge"))

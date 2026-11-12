@@ -22,6 +22,7 @@ org_invites switch (its admins still see and end what is open).
 disabled account or an agent gets no invitation: a silent org_joins row (ojn_silent) stands in the list like any other (the
 answer, the list, Resend and Withdraw stay the same as for a new address), the person never hears of it. The day limit counts
 before the address is looked up, for both kinds."""
+import hashlib
 import json
 import re
 from datetime import timedelta
@@ -31,7 +32,7 @@ from flask import g, jsonify
 from ..core.config import APP_NAME, PUBLIC_URL, app, EMAIL_RE
 from ..core.i18n import LANGS, N_, lang, short_day, tr
 from ..core.mailframe import mail_html  # 2.1062.0 (#5786)
-from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, iso, iso_ms, local_now, now_utc, uset, usettings, write_lock
+from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso, uset, usettings, write_lock
 from ..core.access import Denied
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
@@ -67,7 +68,7 @@ def oinv_on(c):
 def oinv_pending(c, uid):
     """The account never signed in: no password, no SSO link, no session, its invitation link unused."""
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    if not u or u["password_hash"] or u["proxy_login"] or u["oidc_subject"] or (u["kind"] or "user") == "agent":
+    if not u or u["password_hash"] or u["proxy_login"] or u["oidc_subject"] or (u["kind"] or "user") == "agent" or u["oinv_used"]:  # 2.1062.0 (#5786, review F2)
         return False
     if c.execute("SELECT 1 FROM sessions WHERE user_id=?", (uid,)).fetchone():
         return False
@@ -442,7 +443,8 @@ def ojn_purge(c, now):
         c.execute(f"""DELETE FROM org_invites i WHERE {OJN_TS.format('i.created_at')} < ?::timestamptz
                       AND NOT EXISTS (SELECT 1 FROM org_joins j WHERE j.org_id=i.org_id AND j.user_id=i.user_id)
                       AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=i.org_id AND m.user_id=i.user_id)
-                      AND NOT ({OINV_UNUSED.format('i.user_id')})""", (iso(cut),))
+                      AND (NOT ({OINV_UNUSED.format('i.user_id')})
+                           OR EXISTS (SELECT 1 FROM org_members o WHERE o.user_id=i.user_id AND o.org_id<>i.org_id))""", (iso(cut),))  # review F8: kept by another organisation
     if n:
         print("organisation invitation: deleted", n, "invitation(s) expired more than", OJN_PURGE_DAYS, "days ago", flush=True)
     return n
@@ -451,9 +453,10 @@ def ojn_purge(c, now):
 # ---- 2.1062.0 (#5786): a never used account an organisation's invitation set up is withdrawn after the invitation's period
 OINV_WARN_DAYS = 7  # the warning mail goes this long before (and the withdrawal waits at least this long after it went)
 OINV_MIN_DAYS = 30  # never sooner after the invitation, whatever OJN_DAYS / OJN_PURGE_DAYS say
-# the account {0} never signed in (oinv_pending in SQL: no password, SSO link or session, no link used, no agent)
+# the account {0} never signed in (oinv_pending in SQL: no password, SSO link or session, no link used, no agent; review F2:
+# users.oinv_used, the durable mark of a sign-in - sessions and used links are deleted later)
 OINV_UNUSED = """EXISTS (SELECT 1 FROM users x WHERE x.id={0} AND x.password_hash IS NULL AND x.proxy_login IS NULL AND x.oidc_subject IS NULL
-                 AND COALESCE(x.kind, 'user')<>'agent' AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id=x.id)
+                 AND NOT x.oinv_used AND COALESCE(x.kind, 'user')<>'agent' AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id=x.id)
                  AND NOT EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=x.id AND v.used_at IS NOT NULL))"""
 
 
@@ -470,7 +473,7 @@ def oinv_due(c, uid=None):
     organisation other than the one that made it (the button Withdraw refuses that, too) or owns projects. last = the newest
     invitation on it (made, the org_invites row, any organisation's org_joins row - a Resend renews them): the period runs from it."""
     with system_ctx(c):  # accounts of every organisation; the clean-up shows nothing to anybody
-        return c.execute(f"""SELECT u.id, u.email, u.username, u.oinv_made_at AS made, u.oinv_warned_at AS warned,
+        rows = c.execute(f"""SELECT u.id, u.email, u.username, u.oinv_made_at AS made, u.oinv_warned_at AS warned,
                    (SELECT i.created_by FROM org_invites i WHERE i.user_id=u.id) AS by,
                    GREATEST(u.oinv_made_at, (SELECT MAX({OJN_TS.format('i.created_at')}) FROM org_invites i WHERE i.user_id=u.id),
                             (SELECT MAX({OJN_TS.format('j.created_at')}) FROM org_joins j WHERE j.user_id=u.id)) AS last
@@ -480,6 +483,8 @@ def oinv_due(c, uid=None):
                                    AND NOT EXISTS (SELECT 1 FROM org_invites i WHERE i.user_id=u.id AND i.org_id=m.org_id))
                    AND NOT EXISTS (SELECT 1 FROM lists l WHERE l.owner_id=u.id AND l.is_inbox=0)
                    ORDER BY u.id""", (uid,) if uid else ()).fetchall()
+    # review F1: a TIMESTAMPTZ reads as ISO text (core/pg.py _TsLoader): times to compute with
+    return [dict(r, made=parse_iso(r["made"]), last=parse_iso(r["last"]), warned=parse_iso(r["warned"]) if r["warned"] else None) for r in rows]
 
 
 def oinv_expire(c, now, budget):
@@ -509,13 +514,15 @@ def oinv_expire(c, now, budget):
         try:
             with system_ctx(c):  # the never used account and what it holds (its inbox, settings, the invitation rows)
                 write_lock(c, "accounts")
+                c.execute("SELECT 1 FROM users WHERE id=? FOR UPDATE", (u["id"],))  # review F6: a sign-in on a path without the lock waits
                 if oinv_due(c, u["id"]):  # still never used (a sign-in meanwhile keeps it)
                     with c.savepoint():
                         files = user_purge(c, u["id"])
                     gone += 1
+                    bump(c)  # review F9: clients refresh (a member row of the inviting organisation went)
             c.commit()
         except Exception as e:  # noqa: BLE001  one account must not stop the others (tried again the next day)
-            c.heal()
+            c.rollback()  # review F4: nothing half done stays in the transaction (and the lock goes)
             print("organisation invitation: never used account not withdrawn:", type(e).__name__, flush=True)
             continue
         unlink_files(files)
@@ -537,17 +544,21 @@ def oinv_warn(c, u, at, now, budget):
                 return 0
             days = max(OINV_WARN_DAYS, (at - now).days)
             inv = invite_new(c, u["id"], u["by"], send=False, days=days)
+            tok = hashlib.sha256(inv["link"].rsplit("/", 1)[-1].encode()).hexdigest()  # invite.py _hash
             subject, text, body_html = oinv_warn_mail(c, u, inv["link"], at, days)
             c.commit()  # the link is stored before the mail goes out (as invite_new does)
         mail_send(u["email"].strip(), subject, text, body_html, from_name=APP_NAME)
         with system_ctx(c):
-            c.execute("UPDATE user_invites SET sent_at=? WHERE user_id=?", (iso(now_utc()), u["id"]))  # a mailed link proves the address
-            c.execute("UPDATE users SET oinv_warned_at=? WHERE id=?", (now, u["id"]))
+            # a mailed link proves the address - review F5: only this link (not one an admin made meanwhile to copy)
+            if not c.execute("UPDATE user_invites SET sent_at=? WHERE user_id=? AND token_hash=?", (iso(now_utc()), u["id"], tok)).rowcount:
+                c.rollback()
+                return 0
+            c.execute("UPDATE users SET oinv_warned_at=?::timestamptz WHERE id=?", (iso(now), u["id"]))
             c.commit()
         print("organisation invitation: never used account", u["id"], "warned before its withdrawal", flush=True)
         return 1
     except Exception as e:  # noqa: BLE001  not delivered: nothing is withdrawn, tried again the next day
-        c.heal()
+        c.rollback()  # review F4: no counted mail or replaced link of an unsent warning stays
         print("organisation invitation: warning mail failed:", type(e).__name__, flush=True)
         return 0
 
