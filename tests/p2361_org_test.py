@@ -25,7 +25,7 @@ from freelancer_fixture import FEATURES, freelancer, org_join  # noqa: E402
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # noqa: E402
+from kt import FAILS, OKS, check, proved, sess  # noqa: E402
 
 if os.environ.get("P2361_NOSTART") != "1":
     env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces")
@@ -75,6 +75,7 @@ def table(s, oid, title):
 
 
 # ================================================================ #2922 leaving
+proved()  # 2.1047.0 (#5838): since 2.1021.0 (#5775) an organisation admin invites by address only an account that proved it
 ORG = setup("Alpha", BOB, ("carol", "dave"))
 Bo, Ca, Da = sess("bob"), user("carol", ORG), user("dave", ORG)
 r = Ca.post(B + "/api/lists", json={"name": "Carols own", "org_id": None})
