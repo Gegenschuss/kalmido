@@ -208,7 +208,10 @@ c.commit()
   person's undo list through `undo_trash_reg`): the fixed costs (`MAX_FIXED`) and the corrections per month
   (`CFS_MAX_MONTH`) answer 409 instead of passing it by delete, add anew, restore. A hard delete of a row of an office kind
   (an undone move's copies, `ofk_kind_of(table)`; the account's private records at its end) runs through `ofk_purge`, so
-  no `obj_history` / `obj_undo` is left behind. Readers that look at the trash on purpose (the careful side): the
+  no `obj_history` / `obj_undo` is left behind. 2.1015.0 (#5675): many rows of one kind in one transaction (an import's undo,
+  a moving office's letter links) go through `ofk_purge_many(c, kind, ids)`: one advisory lock per kind and the rows' own row
+  locks in id order instead of one advisory lock per row (thousands break the transaction at `max_locks_per_transaction`).
+  Readers that look at the trash on purpose (the careful side): the
   booking conflicts read sets in the trash too (`hub/dispo.py`), the retention of a received letter / device receipt too
   (`receipts/suggest.py`).
 - 2.993.0 (#5413, stage 4b): the entertainment receipts (`omeal`, in the office trash), their removed / replaced restaurant
