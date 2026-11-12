@@ -43,13 +43,13 @@ for i in range(${N}):
     if i % 25 == 7:
         c.execute("INSERT INTO tasks(list_id, parent_id, title, sort, created_at, updated_at, created_by) VALUES(?,?,?,?,?,?,1)", (${BIG}, t, f"Sub of {i:05d}", 0, now, now))
 for i in range(450):
-    c.execute("INSERT INTO contacts(book_id, uid, href, fn, search, created_at, updated_at) VALUES(?,?,?,?,?,?,?)", (${BK}, f"u{i}", f"u{i}.vcf", f"Person {i:03d}", f"person {i:03d}", now, now))
+    c.execute("INSERT INTO contacts(book_id, uid, href, fn, created_at, updated_at) VALUES(?,?,?,?,?,?)", (${BK}, f"u{i}", f"u{i}.vcf", f"Person {i:03d}", now, now))
 for i in range(200):
     c.execute("INSERT INTO tasks(list_id, title, priority, sort, created_at, updated_at, created_by) VALUES(?,?,0,?,?,?,1)", (${SMALL}, f"Small {i:03d}", i, now, now))
 c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version'")
 c.commit()
 c.close()
-`], {stdio: 'ignore'});
+`], {stdio: ['ignore', 'ignore', 'inherit']});  // 2.1003.0 (#5723): the setup's Python error goes into the log
 
   for (const [vw, vh, touch] of [[1440, 900, false], [390, 844, true]]) await firefox(async ({cmd, ev, ctx, nav}) => {
     const tag = String(vw);
