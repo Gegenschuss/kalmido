@@ -1974,6 +1974,13 @@ def odoc_trash(c, oid, uid, r, checked=False):
         # its number and series place are free while it lies in the trash; the device's request id (client_ref) goes for good
         c.execute("UPDATE office_docs SET number='', series_id=NULL, client_ref=NULL, trash_refs=? WHERE id=? AND org_id=?",
                   (json.dumps(refs), did, oid))
+    # 2.1060.0 (#5869): its OPEN approval links go for good, as the delete's ON DELETE CASCADE did before 2.1005.0 (#5415) --
+    # a link must not come back with the draft (restored, sent again unchanged = the same doc_hash, sig_check would let it
+    # sign again); a decided one keeps the quotation out of the trash (odoc_delete 409). The decision's lock per link first
+    # (signoff.py sig_decide): deleting and signing never cross
+    for s in c.execute("SELECT id FROM office_signoffs WHERE doc_id=? AND org_id=? AND state='open' ORDER BY id", (did, oid)).fetchall():
+        write_lock(c, f"office_signoff_{int(s['id'])}")
+    c.execute("DELETE FROM office_signoffs WHERE doc_id=? AND org_id=? AND state='open'", (did, oid))
     ofk_trash(c, uid, ODOC_KIND, did, checked=checked)
     from .docref import ofd_deleted
     ofd_deleted(c, did)  # 2.199.0 B (#2742): its folder entry goes, as on a delete
