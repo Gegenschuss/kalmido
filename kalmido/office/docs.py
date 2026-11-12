@@ -1980,6 +1980,8 @@ def odoc_trash(c, oid, uid, r, checked=False):
     # (signoff.py sig_decide): deleting and signing never cross
     for s in c.execute("SELECT id FROM office_signoffs WHERE doc_id=? AND org_id=? AND state='open' ORDER BY id", (did, oid)).fetchall():
         write_lock(c, f"office_signoff_{int(s['id'])}")
+    if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (did, oid)).fetchone():
+        raise Denied(409, tr("The client has signed this quotation; the record is kept"))  # 2.1060.0 (#5869, review): decided meanwhile
     c.execute("DELETE FROM office_signoffs WHERE doc_id=? AND org_id=? AND state='open'", (did, oid))
     ofk_trash(c, uid, ODOC_KIND, did, checked=checked)
     from .docref import ofd_deleted

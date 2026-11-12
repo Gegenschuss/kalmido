@@ -864,9 +864,11 @@ def sig_decide(token):
             return sig_page(c, r, token, lg, tr("There is a newer version. Please look at it first.", lg=lg), 409)
     if do == "accept" and request.form.get("ok") != "1":
         return sig_page(c, r, token, lg, tr("Please tick the box to sign.", lg=lg) if r["kind"] == "document" else tr("Please tick the box to accept.", lg=lg), 400)
+    if r["doc_id"]:  # 2.1060.0 (#5869, review): the quotation's lock first, as its delete / trash (docs.py odoc_delete) takes it
+        write_lock(c, f"office_doc_{int(r['doc_id'])}")  # before the link's: never a deadlock, never signed while it goes to the trash
     write_lock(c, f"office_signoff_{int(r['id'])}")  # two decisions at once: the second sees the first
     cur = c.execute("SELECT * FROM office_signoffs WHERE id=?", (r["id"],)).fetchone()
-    if cur["state"] != "open" or cur["revoked_at"] or sig_check(c, cur):
+    if not cur or cur["state"] != "open" or cur["revoked_at"] or sig_check(c, cur):  # 2.1060.0 (#5869): a trashed draft's link is gone
         c.rollback()
         return redirect(SIG_PREFIX + token, 303)
     if r["kind"] == "video":  # 2.99.1 (#1959) review L1: a version added meanwhile (its lock) -> the newer one first
