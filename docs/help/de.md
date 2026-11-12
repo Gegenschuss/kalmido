@@ -2,7 +2,7 @@
 of the English text it was translated from. **Bold** = the label exactly as the German interface shows it.
 Check: python3 tools/check_userhelp.py (prints the current src of a changed English section). -->
 
-<!-- help: files#how-to-set-up-a-scan-inbox src=64eddd039b -->
+<!-- help: files#how-to-set-up-a-scan-inbox src=b33c638618 -->
 ## Scan-Eingang einrichten
 
 Ein Scan-Eingang schickt neue Scans aus einem Ordner auf deinem Computer (oder von deinem Scanner) direkt in deine Dokumente.
@@ -18,7 +18,7 @@ Was dann passiert: Jede neue Datei in diesem Ordner wird hochgeladen, gelesen un
 Programm legt sie danach in den Unterordner „Uploaded“. Den Eingang findest du an derselben Stelle wieder - dort kannst du
 den Ordner ändern, ihn um ein Jahr verlängern oder ihn widerrufen. Einen Scan-Eingang legst nur du an, nie ein Agent.
 
-<!-- help: files#how-to-add-documents-and-find-them-again src=75bd3485cd -->
+<!-- help: files#how-to-add-documents-and-find-them-again src=4520b96808 -->
 ## Dokumente hinzufügen und wiederfinden
 
 1. Öffne **Dateien** > **Dokumente**.
@@ -30,7 +30,7 @@ Was dann passiert: Kalmido liest jedes Dokument und trägt Datum, Betrag und Abs
 das Dokument unter **Zu prüfen**: öffne es, korrigiere, was nicht stimmt, und tippe auf **Geprüft**
 (oder **Alle übernehmen** für die Vorschläge).
 
-<!-- help: files#how-to-share-a-folder src=2b0b00ac10 -->
+<!-- help: files#how-to-share-a-folder src=f6f99fa88e -->
 ## Einen Ordner teilen
 
 1. Öffne **Dateien** und das Menü **Mehr** (⋯) des Ordners, dann **Teilen…**.
@@ -40,7 +40,7 @@ das Dokument unter **Zu prüfen**: öffne es, korrigiere, was nicht stimmt, und 
 Was dann passiert: Die Person sieht den Ordner mit allem, was darin liegt - auch mit dem, was später dazukommt. Am Ordner
 steht, mit wem er geteilt ist. Teilen kann nur, wem der Ordner gehört.
 
-<!-- help: agent-setup#how-to-create-your-personal-agent src=c5dbd2659a -->
+<!-- help: agent-setup#how-to-create-your-personal-agent src=55f8406267 -->
 ## Deinen persönlichen Agenten anlegen
 
 Ein Agent ist ein Assistent (zum Beispiel Claude), der mit einem eigenen Konto in Kalmido arbeitet und nur sieht, was du mit
@@ -57,7 +57,7 @@ Was dann passiert: Der Agent steht unter **Deine persönlichen Agenten**. Er sie
 Ordner (siehe „Einem Agenten Zugriff auf ein Projekt oder einen Ordner geben“). Der Befehl gilt nur einmal und nur wenige
 Minuten; **Einrichten** in der Zeile des Agenten erzeugt einen neuen.
 
-<!-- help: agent-setup#how-to-give-an-agent-access-to-a-project-or-folder src=2e7c802506 -->
+<!-- help: agent-setup#how-to-give-an-agent-access-to-a-project-or-folder src=aaf357fa82 -->
 ## Einem Agenten Zugriff auf ein Projekt oder einen Ordner geben
 
 Ein Projekt:
@@ -74,7 +74,7 @@ Ein Ordner in Dateien oder Wissen:
 Was dann passiert: Der Agent arbeitet in diesem Projekt oder Ordner - und nur dort. Jeder Zugriff eines Agenten steht im
 Verlauf des Ordners; einen gesperrten Ordner kann man nie mit einem Agenten teilen.
 
-<!-- help: agent-setup#how-to-approve-what-an-agent-asks-for src=c440cd682e -->
+<!-- help: agent-setup#how-to-approve-what-an-agent-asks-for src=dfbe19a2e9 -->
 ## Freigeben, worum ein Agent bittet
 
 1. Braucht ein Agent dein Ja, erscheint eine Karte „… wartet auf dich“ (in Heute und im Bereich Agenten).
@@ -82,7 +82,7 @@ Verlauf des Ordners; einen gesperrten Ordner kann man nie mit einem Agenten teil
 
 Was dann passiert: Der Agent macht mit dem weiter, was du freigegeben hast; ein abgelehnter Schritt passiert nicht.
 
-<!-- help: office#how-to-write-a-quotation src=8abb747cdd -->
+<!-- help: office#how-to-write-a-quotation src=c3eae76ef0 -->
 ## Ein Angebot schreiben
 
 1. Öffne **Büro** > **Angebote** und tippe auf **Neues Angebot**. Der Entwurf öffnet sich sofort.
@@ -95,7 +95,7 @@ Was dann passiert: Das Angebot steht in der Liste. Markiere es als versendet und
 aus einem angenommenen Angebot wird mit einem Schritt die Rechnung. Einen Entwurf siehst du dir mit **Vorschau** an (mit
 dem Vermerk ENTWURF).
 
-<!-- help: office#how-to-turn-a-quotation-into-an-invoice src=b1c09e308f -->
+<!-- help: office#how-to-turn-a-quotation-into-an-invoice src=faeae491ab -->
 ## Aus einem Angebot eine Rechnung machen
 
 1. Öffne das angenommene Angebot und tippe auf **Rechnung erstellen**.
@@ -108,7 +108,7 @@ oder eine aus einem Angebot.
 Was dann passiert: Die Rechnung bekommt ihre Nummer beim Festschreiben - lückenlos. Sie bleibt offen, bis eine Zahlung
 erfasst ist.
 
-<!-- help: office#how-to-record-a-payment src=c83bb01e09 -->
+<!-- help: office#how-to-record-a-payment src=6663fe7a8c -->
 ## Eine Zahlung erfassen
 
 1. Öffne die festgeschriebene Rechnung und tippe auf **Zahlung erfassen**.
@@ -120,7 +120,7 @@ passt, mit **Übernehmen** bestätigen.
 Was dann passiert: Die Rechnung gilt als bezahlt (oder als teilweise bezahlt, mit dem offenen Rest). Zahlungen erfasst nur
 ein Admin der Organisation.
 
-<!-- help: tasks#how-to-add-a-task-with-a-date src=c89121e185 -->
+<!-- help: tasks#how-to-add-a-task-with-a-date src=8a3685b666 -->
 ## Eine Aufgabe mit Datum anlegen
 
 1. Tippe unten im Projekt in **Aufgabe hinzufügen…** (am Handy: auf den Plus-Knopf).
@@ -132,7 +132,7 @@ Was dann passiert: Die Aufgabe landet im offenen Projekt (oder im **Eingang**) m
 **Heute**. Um das Datum später zu ändern, öffne die Aufgabe und tippe auf ihr Datum: **Heute**, **Morgen**,
 **Nächste Woche** oder ein Tag im Kalender.
 
-<!-- help: tasks#how-to-make-a-task-repeat src=7fb71b25d1 -->
+<!-- help: tasks#how-to-make-a-task-repeat src=b22f5f0a3c -->
 ## Eine Aufgabe wiederholen lassen
 
 Eine wiederkehrende Aufgabe kommt von selbst wieder - jeden Tag, jede Woche oder nach deiner eigenen Regel.
@@ -144,7 +144,7 @@ Eine wiederkehrende Aufgabe kommt von selbst wieder - jeden Tag, jede Woche oder
 Was dann passiert: Hakst du die Aufgabe ab, erscheint die nächste mit dem nächsten Datum. Du kannst es auch gleich mit
 eintippen, zum Beispiel „Blumen gießen jeden Montag“.
 
-<!-- help: tasks#how-to-assign-a-task-or-share-a-project src=26bbda819e -->
+<!-- help: tasks#how-to-assign-a-task-or-share-a-project src=d8a87df384 -->
 ## Eine Aufgabe zuweisen oder ein Projekt teilen
 
 1. Projekt teilen: Öffne sein Menü (⋯) > **Teilen…**, wähle die Person bei **Teilen mit…**, eine Rolle (zum Beispiel
@@ -154,7 +154,7 @@ eintippen, zum Beispiel „Blumen gießen jeden Montag“.
 Was dann passiert: Die Person sieht das Projekt und bekommt die Aufgabe in ihre eigene Liste. Zuweisen kann man nur Personen,
 die im Projekt sind.
 
-<!-- help: calendar#how-to-create-an-event src=a00f1c721d -->
+<!-- help: calendar#how-to-create-an-event src=5f4ebe03b3 -->
 ## Einen Termin anlegen
 
 1. Öffne **Kalender** und tippe auf **Termin** (am Handy: auf den Plus-Knopf). Oder zieh in der Wochen- oder Tagesansicht
@@ -165,7 +165,7 @@ die im Projekt sind.
 Was dann passiert: Der Termin steht im Kalender und auf deinem Handy, wenn es verbunden ist (siehe „Kalmido auf dem Handy
 zeigen“).
 
-<!-- help: calendar#how-to-subscribe-to-another-calendar src=a8d8302f42 -->
+<!-- help: calendar#how-to-subscribe-to-another-calendar src=9f0cf2e56c -->
 ## Einen anderen Kalender abonnieren
 
 1. Öffne **Kalender** > **Kalender** > **Abonnierte Kalender…** (oder **Einstellungen** > **Integrationen** > **Kalender**).
@@ -176,7 +176,7 @@ zeigen“).
 Was dann passiert: Seine Termine erscheinen in deinem Kalender und in Heute - nur zum Ansehen und nur für dich sichtbar;
 Kalmido holt sie regelmäßig neu.
 
-<!-- help: calendar#how-to-show-kalmido-on-your-phone src=e055eae2f6 -->
+<!-- help: calendar#how-to-show-kalmido-on-your-phone src=73923b0417 -->
 ## Kalmido auf dem Handy zeigen
 
 1. Öffne **Kalender** > **Kalender** > **Auf dem Handy…** (oder **Einstellungen** > **Integrationen** > **Kalender-Apps (CalDAV)**).

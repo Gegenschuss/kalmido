@@ -2,7 +2,7 @@
 of the English text it was translated from. **Bold** = the label exactly as the interface shows it.
 Check: python3 tools/check_userhelp.py. -->
 
-<!-- help: files#how-to-set-up-a-scan-inbox src=64eddd039b -->
+<!-- help: files#how-to-set-up-a-scan-inbox src=b33c638618 -->
 ## Configurare una casella di scansione
 
 Una casella di scansione invia le nuove scansioni da una cartella del tuo computer direttamente nei tuoi documenti.
@@ -16,7 +16,7 @@ Una casella di scansione invia le nuove scansioni da una cartella del tuo comput
 Poi: ogni nuovo file di quella cartella viene caricato, letto e archiviato nei tuoi documenti. Ritrovi la casella nello stesso
 posto per cambiare cartella, prolungarla di un anno o revocarla. Solo tu crei una casella di scansione, mai un agente.
 
-<!-- help: files#how-to-add-documents-and-find-them-again src=75bd3485cd -->
+<!-- help: files#how-to-add-documents-and-find-them-again src=4520b96808 -->
 ## Aggiungere documenti e ritrovarli
 
 1. Apri **File** > **Documenti**.
@@ -27,7 +27,7 @@ posto per cambiare cartella, prolungarla di un anno o revocarla. Solo tu crei un
 Poi: Kalmido legge ogni documento e compila data, importo e mittente. Ciò di cui non è sicuro aspetta in **Da verificare**:
 aprilo, correggi e tocca **Verificato** (oppure **Accetta tutto** per i suggerimenti).
 
-<!-- help: files#how-to-share-a-folder src=2b0b00ac10 -->
+<!-- help: files#how-to-share-a-folder src=f6f99fa88e -->
 ## Condividere una cartella
 
 1. Apri **File** e il menu **Altro** (⋯) della cartella, poi **Condividi…**.
@@ -37,7 +37,7 @@ aprilo, correggi e tocca **Verificato** (oppure **Accetta tutto** per i suggerim
 Poi: la persona vede la cartella e tutto il suo contenuto, anche ciò che verrà aggiunto. Solo il proprietario può condividere
 una cartella.
 
-<!-- help: agent-setup#how-to-create-your-personal-agent src=c5dbd2659a -->
+<!-- help: agent-setup#how-to-create-your-personal-agent src=55f8406267 -->
 ## Creare il tuo agente personale
 
 Un agente è un assistente (per esempio Claude) che lavora in Kalmido con un proprio account e vede solo ciò che condividi con lui.
@@ -50,7 +50,7 @@ Un agente è un assistente (per esempio Claude) che lavora in Kalmido con un pro
 Poi: l'agente compare in **I tuoi agenti personali**. Non vede ancora nulla: dagli un progetto o una cartella. Il comando vale
 una volta e per pochi minuti; **Configura** nella riga dell'agente ne crea uno nuovo.
 
-<!-- help: agent-setup#how-to-give-an-agent-access-to-a-project-or-folder src=2e7c802506 -->
+<!-- help: agent-setup#how-to-give-an-agent-access-to-a-project-or-folder src=aaf357fa82 -->
 ## Dare a un agente accesso a un progetto o una cartella
 
 Un progetto:
@@ -66,7 +66,7 @@ Una cartella in File o Conoscenza:
 Poi: l'agente lavora in quel progetto o in quella cartella, e solo lì. Ogni accesso di un agente resta nella cronologia; una
 cartella bloccata non si condivide mai con un agente.
 
-<!-- help: agent-setup#how-to-approve-what-an-agent-asks-for src=c440cd682e -->
+<!-- help: agent-setup#how-to-approve-what-an-agent-asks-for src=dfbe19a2e9 -->
 ## Approvare ciò che chiede un agente
 
 1. Quando un agente ha bisogno del tuo sì, compare una scheda "… ti aspetta" (in Oggi e in Agenti).
@@ -74,7 +74,7 @@ cartella bloccata non si condivide mai con un agente.
 
 Poi: l'agente prosegue con ciò che hai approvato; un passo rifiutato non avviene.
 
-<!-- help: office#how-to-write-a-quotation src=8abb747cdd -->
+<!-- help: office#how-to-write-a-quotation src=c3eae76ef0 -->
 ## Scrivere un preventivo
 
 1. Apri **Ufficio** > **Preventivi** e tocca **Nuovo preventivo**. La bozza si apre subito.
@@ -86,7 +86,7 @@ Poi: l'agente prosegue con ciò che hai approvato; un passo rifiutato non avvien
 Poi: il preventivo è nella lista. Segnalo come inviato e poi come **Accettato** o rifiutato; da un preventivo accettato nasce
 la fattura in un passo. Una bozza si guarda con **Anteprima**.
 
-<!-- help: office#how-to-turn-a-quotation-into-an-invoice src=b1c09e308f -->
+<!-- help: office#how-to-turn-a-quotation-into-an-invoice src=faeae491ab -->
 ## Trasformare un preventivo in fattura
 
 1. Apri il preventivo accettato e tocca **Crea fattura**.
@@ -97,7 +97,7 @@ Una fattura senza preventivo: **Ufficio** > **Fatture** > **Nuova fattura**.
 
 Poi: la fattura riceve il suo numero quando la blocchi, senza buchi. Resta aperta finché non si registra un pagamento.
 
-<!-- help: office#how-to-record-a-payment src=c83bb01e09 -->
+<!-- help: office#how-to-record-a-payment src=6663fe7a8c -->
 ## Registrare un pagamento
 
 1. Apri la fattura bloccata e tocca **Registra pagamento**.
@@ -107,7 +107,7 @@ Oppure con l'estratto conto: **Ufficio** > **Banca** > **Importa estratto conto*
 
 Poi: la fattura risulta pagata (o pagata in parte). Solo un amministratore dell'organizzazione registra i pagamenti.
 
-<!-- help: tasks#how-to-add-a-task-with-a-date src=c89121e185 -->
+<!-- help: tasks#how-to-add-a-task-with-a-date src=8a3685b666 -->
 ## Aggiungere un'attività con una data
 
 1. Tocca **Aggiungi attività…** in fondo al progetto (sul telefono: il pulsante +).
@@ -117,7 +117,7 @@ Poi: la fattura risulta pagata (o pagata in parte). Solo un amministratore dell'
 Poi: l'attività finisce nel progetto aperto (o nella **Raccolta**) con la sua data e compare quel giorno in **Oggi**. Per
 cambiare la data apri l'attività e tocca la data: **Oggi**, **Domani**, **Prossima settimana** o un giorno del calendario.
 
-<!-- help: tasks#how-to-make-a-task-repeat src=7fb71b25d1 -->
+<!-- help: tasks#how-to-make-a-task-repeat src=b22f5f0a3c -->
 ## Ripetere un'attività
 
 Un'attività ricorrente torna da sola: ogni giorno, ogni settimana o con una regola tua.
@@ -128,7 +128,7 @@ Un'attività ricorrente torna da sola: ogni giorno, ogni settimana o con una reg
 
 Poi: quando completi l'attività compare la successiva con la prossima data.
 
-<!-- help: tasks#how-to-assign-a-task-or-share-a-project src=26bbda819e -->
+<!-- help: tasks#how-to-assign-a-task-or-share-a-project src=d8a87df384 -->
 ## Assegnare un'attività o condividere un progetto
 
 1. Condividere il progetto: il suo menu (⋯) > **Condividi…**, scegli la persona in **Condividi con …**, un ruolo (per esempio
@@ -137,7 +137,7 @@ Poi: quando completi l'attività compare la successiva con la prossima data.
 
 Poi: la persona vede il progetto e riceve l'attività. Si può assegnare solo a persone del progetto.
 
-<!-- help: calendar#how-to-create-an-event src=a00f1c721d -->
+<!-- help: calendar#how-to-create-an-event src=5f4ebe03b3 -->
 ## Creare un evento
 
 1. Apri **Calendario** e tocca **Evento** (sul telefono: il pulsante +).
@@ -146,7 +146,7 @@ Poi: la persona vede il progetto e riceve l'attività. Si può assegnare solo a 
 
 Poi: l'evento è nel calendario e sul tuo telefono, se è collegato.
 
-<!-- help: calendar#how-to-subscribe-to-another-calendar src=a8d8302f42 -->
+<!-- help: calendar#how-to-subscribe-to-another-calendar src=9f0cf2e56c -->
 ## Abbonarsi a un altro calendario
 
 1. Apri **Calendario** > **Calendari** > **Abbonamenti…** (oppure **Impostazioni** > **Integrazioni** > **Calendari**).
@@ -155,7 +155,7 @@ Poi: l'evento è nel calendario e sul tuo telefono, se è collegato.
 
 Poi: i suoi eventi compaiono nel tuo calendario, in sola lettura e solo per te.
 
-<!-- help: calendar#how-to-show-kalmido-on-your-phone src=e055eae2f6 -->
+<!-- help: calendar#how-to-show-kalmido-on-your-phone src=73923b0417 -->
 ## Vedere Kalmido sul telefono
 
 1. Apri **Calendario** > **Calendari** > **Sul telefono…** (oppure **Impostazioni** > **Integrazioni** > **App calendario (CalDAV)**).

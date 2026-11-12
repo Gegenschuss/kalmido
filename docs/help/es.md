@@ -2,7 +2,7 @@
 of the English text it was translated from. **Bold** = the label exactly as the interface shows it.
 Check: python3 tools/check_userhelp.py. -->
 
-<!-- help: files#how-to-set-up-a-scan-inbox src=64eddd039b -->
+<!-- help: files#how-to-set-up-a-scan-inbox src=b33c638618 -->
 ## Configurar una bandeja de escaneo
 
 Una bandeja de escaneo envía los escaneos nuevos de una carpeta de tu ordenador directamente a tus documentos.
@@ -16,7 +16,7 @@ Una bandeja de escaneo envía los escaneos nuevos de una carpeta de tu ordenador
 Qué pasa después: cada archivo nuevo de esa carpeta se sube, se lee y se ordena en tus documentos. Encuentras la bandeja en el
 mismo lugar para cambiar la carpeta, prolongarla un año o revocarla. Solo tú creas una bandeja de escaneo, nunca un agente.
 
-<!-- help: files#how-to-add-documents-and-find-them-again src=75bd3485cd -->
+<!-- help: files#how-to-add-documents-and-find-them-again src=4520b96808 -->
 ## Añadir documentos y volver a encontrarlos
 
 1. Abre **Archivos** > **Documentos**.
@@ -26,7 +26,7 @@ mismo lugar para cambiar la carpeta, prolongarla un año o revocarla. Solo tú c
 Qué pasa después: Kalmido lee cada documento y rellena fecha, importe y remitente. Lo que no tiene claro espera en
 **Por revisar**: ábrelo, corrige lo que falle y pulsa **Revisado** (o **Aceptar todo** para las sugerencias).
 
-<!-- help: files#how-to-share-a-folder src=2b0b00ac10 -->
+<!-- help: files#how-to-share-a-folder src=f6f99fa88e -->
 ## Compartir una carpeta
 
 1. Abre **Archivos** y el menú **Más** (⋯) de la carpeta, luego **Compartir…**.
@@ -36,7 +36,7 @@ Qué pasa después: Kalmido lee cada documento y rellena fecha, importe y remite
 Qué pasa después: la persona ve la carpeta y todo lo que contiene, también lo que se añada más tarde. Solo el propietario
 puede compartir una carpeta.
 
-<!-- help: agent-setup#how-to-create-your-personal-agent src=c5dbd2659a -->
+<!-- help: agent-setup#how-to-create-your-personal-agent src=55f8406267 -->
 ## Crear tu agente personal
 
 Un agente es un asistente (por ejemplo Claude) que trabaja en Kalmido con su propia cuenta y solo ve lo que compartes con él.
@@ -49,7 +49,7 @@ Un agente es un asistente (por ejemplo Claude) que trabaja en Kalmido con su pro
 Qué pasa después: el agente aparece en **Tus agentes personales**. Todavía no ve nada: dale un proyecto o una carpeta. El
 comando sirve una vez y solo unos minutos; **Configurar** en la fila del agente crea uno nuevo.
 
-<!-- help: agent-setup#how-to-give-an-agent-access-to-a-project-or-folder src=2e7c802506 -->
+<!-- help: agent-setup#how-to-give-an-agent-access-to-a-project-or-folder src=aaf357fa82 -->
 ## Dar a un agente acceso a un proyecto o una carpeta
 
 Un proyecto:
@@ -65,7 +65,7 @@ Una carpeta en Archivos o Conocimiento:
 Qué pasa después: el agente trabaja en ese proyecto o carpeta, y solo allí. Cada acceso de un agente queda en el historial;
 una carpeta bloqueada nunca se comparte con un agente.
 
-<!-- help: agent-setup#how-to-approve-what-an-agent-asks-for src=c440cd682e -->
+<!-- help: agent-setup#how-to-approve-what-an-agent-asks-for src=dfbe19a2e9 -->
 ## Aprobar lo que pide un agente
 
 1. Cuando un agente necesita tu sí, aparece una tarjeta "… te espera" (en Hoy y en Agentes).
@@ -73,7 +73,7 @@ una carpeta bloqueada nunca se comparte con un agente.
 
 Qué pasa después: el agente sigue con lo que aprobaste; un paso rechazado no ocurre.
 
-<!-- help: office#how-to-write-a-quotation src=8abb747cdd -->
+<!-- help: office#how-to-write-a-quotation src=c3eae76ef0 -->
 ## Escribir un presupuesto
 
 1. Abre **Oficina** > **Presupuestos** y pulsa **Nuevo presupuesto**. El borrador se abre enseguida.
@@ -85,7 +85,7 @@ Qué pasa después: el agente sigue con lo que aprobaste; un paso rechazado no o
 Qué pasa después: el presupuesto está en la lista. Márcalo como enviado y luego como **Aceptado** o rechazado; de un
 presupuesto aceptado sale la factura en un paso. Un borrador se ve con **Vista previa**.
 
-<!-- help: office#how-to-turn-a-quotation-into-an-invoice src=b1c09e308f -->
+<!-- help: office#how-to-turn-a-quotation-into-an-invoice src=faeae491ab -->
 ## Convertir un presupuesto en factura
 
 1. Abre el presupuesto aceptado y pulsa **Crear factura**.
@@ -96,7 +96,7 @@ Una factura sin presupuesto: **Oficina** > **Facturas** > **Nueva factura**.
 
 Qué pasa después: la factura recibe su número al cerrarla, sin huecos. Sigue abierta hasta que se registra un pago.
 
-<!-- help: office#how-to-record-a-payment src=c83bb01e09 -->
+<!-- help: office#how-to-record-a-payment src=6663fe7a8c -->
 ## Registrar un pago
 
 1. Abre la factura cerrada y pulsa **Registrar pago**.
@@ -106,7 +106,7 @@ O con el extracto: **Oficina** > **Banco** > **Importar extracto bancario** y ac
 
 Qué pasa después: la factura figura como pagada (o pagada en parte). Solo un administrador de la organización registra pagos.
 
-<!-- help: tasks#how-to-add-a-task-with-a-date src=c89121e185 -->
+<!-- help: tasks#how-to-add-a-task-with-a-date src=8a3685b666 -->
 ## Añadir una tarea con fecha
 
 1. Pulsa en **Añadir tarea…** al pie del proyecto (en el móvil: el botón +).
@@ -116,7 +116,7 @@ Qué pasa después: la factura figura como pagada (o pagada en parte). Solo un a
 Qué pasa después: la tarea queda en el proyecto abierto (o en la **Cesta**) con su fecha y aparece ese día en **Hoy**. Para
 cambiar la fecha, abre la tarea y pulsa su fecha: **Hoy**, **Mañana**, **Próxima semana** o un día del calendario.
 
-<!-- help: tasks#how-to-make-a-task-repeat src=7fb71b25d1 -->
+<!-- help: tasks#how-to-make-a-task-repeat src=b22f5f0a3c -->
 ## Repetir una tarea
 
 Una tarea recurrente vuelve sola: cada día, cada semana o según tu propia regla.
@@ -127,7 +127,7 @@ Una tarea recurrente vuelve sola: cada día, cada semana o según tu propia regl
 
 Qué pasa después: al completar la tarea aparece la siguiente con la próxima fecha.
 
-<!-- help: tasks#how-to-assign-a-task-or-share-a-project src=26bbda819e -->
+<!-- help: tasks#how-to-assign-a-task-or-share-a-project src=d8a87df384 -->
 ## Asignar una tarea o compartir un proyecto
 
 1. Compartir el proyecto: su menú (⋯) > **Compartir…**, elige la persona en **Compartir con…**, un rol (por ejemplo
@@ -136,7 +136,7 @@ Qué pasa después: al completar la tarea aparece la siguiente con la próxima f
 
 Qué pasa después: la persona ve el proyecto y recibe la tarea. Solo se puede asignar a personas del proyecto.
 
-<!-- help: calendar#how-to-create-an-event src=a00f1c721d -->
+<!-- help: calendar#how-to-create-an-event src=5f4ebe03b3 -->
 ## Crear un evento
 
 1. Abre **Calendario** y pulsa **Evento** (en el móvil: el botón +).
@@ -145,7 +145,7 @@ Qué pasa después: la persona ve el proyecto y recibe la tarea. Solo se puede a
 
 Qué pasa después: el evento está en el calendario y en tu móvil, si está conectado.
 
-<!-- help: calendar#how-to-subscribe-to-another-calendar src=a8d8302f42 -->
+<!-- help: calendar#how-to-subscribe-to-another-calendar src=9f0cf2e56c -->
 ## Suscribirse a otro calendario
 
 1. Abre **Calendario** > **Calendarios** > **Suscripciones…** (o **Ajustes** > **Integraciones** > **Calendarios**).
@@ -154,7 +154,7 @@ Qué pasa después: el evento está en el calendario y en tu móvil, si está co
 
 Qué pasa después: sus eventos aparecen en tu calendario, solo para leer y solo para ti.
 
-<!-- help: calendar#how-to-show-kalmido-on-your-phone src=e055eae2f6 -->
+<!-- help: calendar#how-to-show-kalmido-on-your-phone src=73923b0417 -->
 ## Ver Kalmido en el móvil
 
 1. Abre **Calendario** > **Calendarios** > **En el móvil…** (o **Ajustes** > **Integraciones** > **Apps de calendario (CalDAV)**).

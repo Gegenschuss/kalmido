@@ -84,7 +84,7 @@ def sections(path):
 
 def src(sec):
     t = sec["title"] + "\n" + sec["text"]
-    return hashlib.sha1(re.sub(r"\s+", " ", t).strip().encode("utf-8")).hexdigest()[:10]
+    return hashlib.sha256(re.sub(r"\s+", " ", t).strip().encode("utf-8")).hexdigest()[:10]
 
 
 def tr_blocks(path):

@@ -146,7 +146,7 @@ def hlp_src(lines, s):
     """The short fingerprint of a user's section's English title + text: a translation names it (src=), so a changed English
     text shows (tools/check_userhelp.py)."""
     text = s["title"] + "\n" + hlp_user_text(lines, s)
-    return hashlib.sha1(re.sub(r"\s+", " ", text).strip().encode("utf-8")).hexdigest()[:10]
+    return hashlib.sha256(re.sub(r"\s+", " ", text).strip().encode("utf-8")).hexdigest()[:10]
 
 
 def hlp_tr_parse(text):

@@ -2,7 +2,7 @@
 of the English text it was translated from. **Bold** = the label exactly as the interface shows it.
 Check: python3 tools/check_userhelp.py. -->
 
-<!-- help: files#how-to-set-up-a-scan-inbox src=64eddd039b -->
+<!-- help: files#how-to-set-up-a-scan-inbox src=b33c638618 -->
 ## Configurer une boîte de scans
 
 Une boîte de scans envoie les nouveaux scans d'un dossier de ton ordinateur directement dans tes documents.
@@ -16,7 +16,7 @@ Une boîte de scans envoie les nouveaux scans d'un dossier de ton ordinateur dir
 Ensuite : chaque nouveau fichier de ce dossier est envoyé, lu et classé dans tes documents. Tu retrouves la boîte au même
 endroit pour changer le dossier, la prolonger d'un an ou la révoquer. Toi seul crées une boîte de scans, jamais un agent.
 
-<!-- help: files#how-to-add-documents-and-find-them-again src=75bd3485cd -->
+<!-- help: files#how-to-add-documents-and-find-them-again src=4520b96808 -->
 ## Ajouter des documents et les retrouver
 
 1. Ouvre **Fichiers** > **Documents**.
@@ -27,7 +27,7 @@ endroit pour changer le dossier, la prolonger d'un an ou la révoquer. Toi seul 
 Ensuite : Kalmido lit chaque document et remplit date, montant et expéditeur. Ce qui est incertain attend dans **À vérifier** :
 ouvre-le, corrige et touche **Vérifié** (ou **Tout accepter** pour les suggestions).
 
-<!-- help: files#how-to-share-a-folder src=2b0b00ac10 -->
+<!-- help: files#how-to-share-a-folder src=f6f99fa88e -->
 ## Partager un dossier
 
 1. Ouvre **Fichiers** et le menu **Plus** (⋯) du dossier, puis **Partager…**.
@@ -37,7 +37,7 @@ ouvre-le, corrige et touche **Vérifié** (ou **Tout accepter** pour les suggest
 Ensuite : la personne voit le dossier et tout son contenu, aussi ce qui sera ajouté plus tard. Seul le propriétaire peut
 partager un dossier.
 
-<!-- help: agent-setup#how-to-create-your-personal-agent src=c5dbd2659a -->
+<!-- help: agent-setup#how-to-create-your-personal-agent src=55f8406267 -->
 ## Créer ton agent personnel
 
 Un agent est un assistant (par exemple Claude) qui travaille dans Kalmido avec son propre compte et ne voit que ce que tu
@@ -51,7 +51,7 @@ partages avec lui.
 Ensuite : l'agent apparaît sous **Tes agents personnels**. Il ne voit encore rien : donne-lui un projet ou un dossier. La
 commande ne sert qu'une fois et quelques minutes ; **Configurer** dans la ligne de l'agent en crée une nouvelle.
 
-<!-- help: agent-setup#how-to-give-an-agent-access-to-a-project-or-folder src=2e7c802506 -->
+<!-- help: agent-setup#how-to-give-an-agent-access-to-a-project-or-folder src=aaf357fa82 -->
 ## Donner à un agent l'accès à un projet ou un dossier
 
 Un projet :
@@ -67,7 +67,7 @@ Un dossier dans Fichiers ou Connaissances :
 Ensuite : l'agent travaille dans ce projet ou ce dossier, et seulement là. Chaque accès d'un agent figure dans l'historique ;
 un dossier verrouillé n'est jamais partagé avec un agent.
 
-<!-- help: agent-setup#how-to-approve-what-an-agent-asks-for src=c440cd682e -->
+<!-- help: agent-setup#how-to-approve-what-an-agent-asks-for src=dfbe19a2e9 -->
 ## Approuver ce que demande un agent
 
 1. Quand un agent a besoin de ton accord, une carte « … t'attend » apparaît (dans Aujourd'hui et dans Agents).
@@ -75,7 +75,7 @@ un dossier verrouillé n'est jamais partagé avec un agent.
 
 Ensuite : l'agent continue avec ce que tu as approuvé ; une étape refusée n'a pas lieu.
 
-<!-- help: office#how-to-write-a-quotation src=8abb747cdd -->
+<!-- help: office#how-to-write-a-quotation src=c3eae76ef0 -->
 ## Rédiger un devis
 
 1. Ouvre **Bureau** > **Devis** et touche **Nouveau devis**. Le brouillon s'ouvre aussitôt.
@@ -87,7 +87,7 @@ Ensuite : l'agent continue avec ce que tu as approuvé ; une étape refusée n'a
 Ensuite : le devis est dans la liste. Marque-le comme envoyé, puis comme **Accepté** ou refusé ; d'un devis accepté, la
 facture naît en une étape. Un brouillon se regarde avec **Aperçu**.
 
-<!-- help: office#how-to-turn-a-quotation-into-an-invoice src=b1c09e308f -->
+<!-- help: office#how-to-turn-a-quotation-into-an-invoice src=faeae491ab -->
 ## Transformer un devis en facture
 
 1. Ouvre le devis accepté et touche **Créer une facture**.
@@ -98,7 +98,7 @@ Une facture sans devis : **Bureau** > **Factures** > **Nouvelle facture**.
 
 Ensuite : la facture reçoit son numéro en étant figée, sans trou. Elle reste ouverte jusqu'à ce qu'un paiement soit saisi.
 
-<!-- help: office#how-to-record-a-payment src=c83bb01e09 -->
+<!-- help: office#how-to-record-a-payment src=6663fe7a8c -->
 ## Saisir un paiement
 
 1. Ouvre la facture figée et touche **Saisir un paiement**.
@@ -108,7 +108,7 @@ Ou avec le relevé : **Bureau** > **Banque** > **Importer un relevé bancaire**,
 
 Ensuite : la facture est payée (ou payée en partie). Seul un administrateur de l'organisation saisit les paiements.
 
-<!-- help: tasks#how-to-add-a-task-with-a-date src=c89121e185 -->
+<!-- help: tasks#how-to-add-a-task-with-a-date src=8a3685b666 -->
 ## Ajouter une tâche avec une date
 
 1. Touche **Ajouter une tâche…** en bas du projet (sur le téléphone : le bouton +).
@@ -119,7 +119,7 @@ Ensuite : la tâche arrive dans le projet ouvert (ou dans le **Panier**) avec sa
 **Aujourd'hui**. Pour changer la date, ouvre la tâche et touche sa date : **Aujourd'hui**, **Demain**, **Semaine prochaine**
 ou un jour du calendrier.
 
-<!-- help: tasks#how-to-make-a-task-repeat src=7fb71b25d1 -->
+<!-- help: tasks#how-to-make-a-task-repeat src=b22f5f0a3c -->
 ## Répéter une tâche
 
 Une tâche récurrente revient toute seule : chaque jour, chaque semaine ou selon ta propre règle.
@@ -130,7 +130,7 @@ Une tâche récurrente revient toute seule : chaque jour, chaque semaine ou selo
 
 Ensuite : quand tu termines la tâche, la suivante apparaît avec la prochaine date.
 
-<!-- help: tasks#how-to-assign-a-task-or-share-a-project src=26bbda819e -->
+<!-- help: tasks#how-to-assign-a-task-or-share-a-project src=d8a87df384 -->
 ## Attribuer une tâche ou partager un projet
 
 1. Partager le projet : son menu (⋯) > **Partager…**, choisis la personne sous **Partager avec…**, un rôle (par exemple
@@ -139,7 +139,7 @@ Ensuite : quand tu termines la tâche, la suivante apparaît avec la prochaine d
 
 Ensuite : la personne voit le projet et reçoit la tâche. On ne peut attribuer qu'aux personnes du projet.
 
-<!-- help: calendar#how-to-create-an-event src=a00f1c721d -->
+<!-- help: calendar#how-to-create-an-event src=5f4ebe03b3 -->
 ## Créer un événement
 
 1. Ouvre **Calendrier** et touche **Événement** (sur le téléphone : le bouton +).
@@ -148,7 +148,7 @@ Ensuite : la personne voit le projet et reçoit la tâche. On ne peut attribuer 
 
 Ensuite : l'événement est dans le calendrier et sur ton téléphone, s'il est connecté.
 
-<!-- help: calendar#how-to-subscribe-to-another-calendar src=a8d8302f42 -->
+<!-- help: calendar#how-to-subscribe-to-another-calendar src=9f0cf2e56c -->
 ## S'abonner à un autre calendrier
 
 1. Ouvre **Calendrier** > **Calendriers** > **Abonnements…** (ou **Paramètres** > **Intégrations** > **Calendriers**).
@@ -157,7 +157,7 @@ Ensuite : l'événement est dans le calendrier et sur ton téléphone, s'il est 
 
 Ensuite : ses événements apparaissent dans ton calendrier, en lecture seule et pour toi seul.
 
-<!-- help: calendar#how-to-show-kalmido-on-your-phone src=e055eae2f6 -->
+<!-- help: calendar#how-to-show-kalmido-on-your-phone src=73923b0417 -->
 ## Voir Kalmido sur le téléphone
 
 1. Ouvre **Calendrier** > **Calendriers** > **Sur le téléphone…** (ou **Paramètres** > **Intégrations** > **Apps de calendrier (CalDAV)**).

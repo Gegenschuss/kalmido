@@ -2,7 +2,7 @@
 of the English text it was translated from. **Bold** = the label exactly as the interface shows it.
 Check: python3 tools/check_userhelp.py. -->
 
-<!-- help: files#how-to-set-up-a-scan-inbox src=64eddd039b -->
+<!-- help: files#how-to-set-up-a-scan-inbox src=b33c638618 -->
 ## Een scan-inbox instellen
 
 Een scan-inbox stuurt nieuwe scans uit een map op je computer meteen naar je documenten.
@@ -16,7 +16,7 @@ Een scan-inbox stuurt nieuwe scans uit een map op je computer meteen naar je doc
 Daarna: elk nieuw bestand in die map wordt geüpload, gelezen en in je documenten gezet. Je vindt de inbox op dezelfde plek
 terug om de map te wijzigen, hem een jaar te verlengen of in te trekken. Alleen jij maakt een scan-inbox, nooit een agent.
 
-<!-- help: files#how-to-add-documents-and-find-them-again src=75bd3485cd -->
+<!-- help: files#how-to-add-documents-and-find-them-again src=4520b96808 -->
 ## Documenten toevoegen en terugvinden
 
 1. Open **Bestanden** > **Documenten**.
@@ -27,7 +27,7 @@ terug om de map te wijzigen, hem een jaar te verlengen of in te trekken. Alleen 
 Daarna: Kalmido leest elk document en vult datum, bedrag en afzender in. Waar het niet zeker van is, wacht in
 **Te controleren**: open het, verbeter wat niet klopt en tik op **Gecontroleerd** (of **Alles overnemen** voor de voorstellen).
 
-<!-- help: files#how-to-share-a-folder src=2b0b00ac10 -->
+<!-- help: files#how-to-share-a-folder src=f6f99fa88e -->
 ## Een map delen
 
 1. Open **Bestanden** en het menu **Meer** (⋯) van de map, dan **Delen…**.
@@ -36,7 +36,7 @@ Daarna: Kalmido leest elk document en vult datum, bedrag en afzender in. Waar he
 
 Daarna: de persoon ziet de map en alles erin, ook wat later wordt toegevoegd. Alleen de eigenaar kan een map delen.
 
-<!-- help: agent-setup#how-to-create-your-personal-agent src=c5dbd2659a -->
+<!-- help: agent-setup#how-to-create-your-personal-agent src=55f8406267 -->
 ## Je persoonlijke agent aanmaken
 
 Een agent is een assistent (bijvoorbeeld Claude) die met een eigen account in Kalmido werkt en alleen ziet wat je met hem deelt.
@@ -49,7 +49,7 @@ Een agent is een assistent (bijvoorbeeld Claude) die met een eigen account in Ka
 Daarna: de agent staat onder **Je persoonlijke agents**. Hij ziet nog niets: geef hem een project of een map. De opdracht werkt
 één keer en maar een paar minuten; **Instellen** in de rij van de agent maakt een nieuwe.
 
-<!-- help: agent-setup#how-to-give-an-agent-access-to-a-project-or-folder src=2e7c802506 -->
+<!-- help: agent-setup#how-to-give-an-agent-access-to-a-project-or-folder src=aaf357fa82 -->
 ## Een agent toegang geven tot een project of map
 
 Een project:
@@ -65,7 +65,7 @@ Een map in Bestanden of Kennis:
 Daarna: de agent werkt in dat project of die map, en alleen daar. Elke toegang van een agent staat in de geschiedenis; een
 vergrendelde map wordt nooit met een agent gedeeld.
 
-<!-- help: agent-setup#how-to-approve-what-an-agent-asks-for src=c440cd682e -->
+<!-- help: agent-setup#how-to-approve-what-an-agent-asks-for src=dfbe19a2e9 -->
 ## Goedkeuren wat een agent vraagt
 
 1. Heeft een agent je ja nodig, dan verschijnt een kaart "… wacht op je" (in Vandaag en bij Agents).
@@ -73,7 +73,7 @@ vergrendelde map wordt nooit met een agent gedeeld.
 
 Daarna: de agent gaat verder met wat je hebt goedgekeurd; een afgewezen stap gebeurt niet.
 
-<!-- help: office#how-to-write-a-quotation src=8abb747cdd -->
+<!-- help: office#how-to-write-a-quotation src=c3eae76ef0 -->
 ## Een offerte schrijven
 
 1. Open **Kantoor** > **Offertes** en tik op **Nieuwe offerte**. Het concept opent meteen.
@@ -85,7 +85,7 @@ Daarna: de agent gaat verder met wat je hebt goedgekeurd; een afgewezen stap geb
 Daarna: de offerte staat in de lijst. Markeer hem als verzonden en later als **Geaccepteerd** of afgewezen; van een
 geaccepteerde offerte maak je in één stap de factuur. Een concept bekijk je met **Voorbeeld**.
 
-<!-- help: office#how-to-turn-a-quotation-into-an-invoice src=b1c09e308f -->
+<!-- help: office#how-to-turn-a-quotation-into-an-invoice src=faeae491ab -->
 ## Van een offerte een factuur maken
 
 1. Open de geaccepteerde offerte en tik op **Factuur maken**.
@@ -96,7 +96,7 @@ Een factuur zonder offerte: **Kantoor** > **Facturen** > **Nieuwe factuur**.
 
 Daarna: de factuur krijgt haar nummer bij het vastleggen, zonder gaten. Ze blijft open tot er een betaling is vastgelegd.
 
-<!-- help: office#how-to-record-a-payment src=c83bb01e09 -->
+<!-- help: office#how-to-record-a-payment src=6663fe7a8c -->
 ## Een betaling vastleggen
 
 1. Open de vastgelegde factuur en tik op **Betaling vastleggen**.
@@ -106,7 +106,7 @@ Of via het afschrift: **Kantoor** > **Bank** > **Bankafschrift importeren** en n
 
 Daarna: de factuur staat als betaald (of deels betaald). Alleen een beheerder van de organisatie legt betalingen vast.
 
-<!-- help: tasks#how-to-add-a-task-with-a-date src=c89121e185 -->
+<!-- help: tasks#how-to-add-a-task-with-a-date src=8a3685b666 -->
 ## Een taak met datum toevoegen
 
 1. Tik onderaan het project in **Taak toevoegen…** (op de telefoon: de +-knop).
@@ -116,7 +116,7 @@ Daarna: de factuur staat als betaald (of deels betaald). Alleen een beheerder va
 Daarna: de taak komt in het open project (of in de **Mand**) met haar datum en verschijnt die dag in **Vandaag**. Om de datum
 te wijzigen open je de taak en tik je op de datum: **Vandaag**, **Morgen**, **Volgende week** of een dag in de kalender.
 
-<!-- help: tasks#how-to-make-a-task-repeat src=7fb71b25d1 -->
+<!-- help: tasks#how-to-make-a-task-repeat src=b22f5f0a3c -->
 ## Een taak laten herhalen
 
 Een terugkerende taak komt vanzelf terug: elke dag, elke week of volgens je eigen regel.
@@ -127,7 +127,7 @@ Een terugkerende taak komt vanzelf terug: elke dag, elke week of volgens je eige
 
 Daarna: als je de taak afvinkt, verschijnt de volgende met de volgende datum.
 
-<!-- help: tasks#how-to-assign-a-task-or-share-a-project src=26bbda819e -->
+<!-- help: tasks#how-to-assign-a-task-or-share-a-project src=d8a87df384 -->
 ## Een taak toewijzen of een project delen
 
 1. Project delen: het menu (⋯) > **Delen…**, kies de persoon bij **Delen met …**, een rol (bijvoorbeeld **Lid**) en tik op
@@ -136,7 +136,7 @@ Daarna: als je de taak afvinkt, verschijnt de volgende met de volgende datum.
 
 Daarna: de persoon ziet het project en krijgt de taak. Je kunt alleen mensen uit het project toewijzen.
 
-<!-- help: calendar#how-to-create-an-event src=a00f1c721d -->
+<!-- help: calendar#how-to-create-an-event src=5f4ebe03b3 -->
 ## Een afspraak maken
 
 1. Open **Agenda** en tik op **Afspraak** (op de telefoon: de +-knop).
@@ -145,7 +145,7 @@ Daarna: de persoon ziet het project en krijgt de taak. Je kunt alleen mensen uit
 
 Daarna: de afspraak staat in de agenda en op je telefoon, als die verbonden is.
 
-<!-- help: calendar#how-to-subscribe-to-another-calendar src=a8d8302f42 -->
+<!-- help: calendar#how-to-subscribe-to-another-calendar src=9f0cf2e56c -->
 ## Op een andere agenda abonneren
 
 1. Open **Agenda** > **Agenda's** > **Abonnementen…** (of **Instellingen** > **Integraties** > **Agenda's**).
@@ -154,7 +154,7 @@ Daarna: de afspraak staat in de agenda en op je telefoon, als die verbonden is.
 
 Daarna: de afspraken verschijnen in je agenda, alleen te lezen en alleen voor jou.
 
-<!-- help: calendar#how-to-show-kalmido-on-your-phone src=e055eae2f6 -->
+<!-- help: calendar#how-to-show-kalmido-on-your-phone src=73923b0417 -->
 ## Kalmido op je telefoon zien
 
 1. Open **Agenda** > **Agenda's** > **Op de telefoon…** (of **Instellingen** > **Integraties** > **Agenda-apps (CalDAV)**).
