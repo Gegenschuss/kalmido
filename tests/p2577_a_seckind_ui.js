@@ -40,7 +40,12 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   check(await until(() => w.eval(`S.sections.find(s => s.id === ${b.id}).kind === 'done'`)), 'the client too');
   await undoToast(w, /Meaning of/);
   check(await until(async () => (await call('GET', '/api/state')).sections.find(s => s.id === b.id)?.kind === ''), 'Undo takes it back');
+  // 2.997.0 (#5620): the Undo is the server's step (#5255 stage 7); the app learns the old meaning by its reload (histRedraw) -
+  // wait for that end state before setting it again, else sk_set still sees 'done' and sends nothing (the drop below then
+  // does not complete the card)
+  check(await until(() => w.eval(`!HIST.busy && S.sections.find(s => s.id === ${b.id}).kind === ''`)), 'the client shows it taken back');
   await w.eval(`sk_set(${b.id}, 'done')`);
+  check(await until(async () => (await call('GET', '/api/state')).sections.find(s => s.id === b.id)?.kind === 'done'), 'set again: the server has it');  // 2.997.0 (#5620)
   // ---- the filter
   check(w.eval(`filterMatch(S.tasks.get(${t.id}), {kinds: ['open']})`), 'an open task in a column without a meaning counts as open');
   check(!w.eval(`filterMatch(S.tasks.get(${t.id}), {kinds: ['done']})`), '... not as done');
