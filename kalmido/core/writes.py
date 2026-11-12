@@ -545,14 +545,7 @@ def obj_restore(c, uid, kind, rid, step=True, undo=False, checked=False):
     # 2.760.0 (#5311): the node's deleted_at is TEXT, the object's may be TIMESTAMPTZ (read canonically, pg.py ts_canon):
     # compare both canonically, not as text (a TIMESTAMPTZ table's restore left its node in the trash)
     gone = ts_canon(row["deleted_at"])
-    if not light:
-        n = next((x for x in c.execute(f"SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=? AND {trash_sql()}",
-                                       (kind, int(rid))).fetchall() if ts_canon(x["deleted_at"]) == gone), None)
-        if n is not None:  # review F7: the node obj_trash put into the trash comes back (not one the file store's own trash holds)
-            nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"])
-            c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, n["id"]))
-        _kids_restore(c, reg, rid, gone)  # 2.773.0 (#5292)
-    ts = _now()
+    ts = _now()  # 2.1002.0 (#5491, review): the row first - its node and children come back only when the row did
     # 2.1002.0 (#5491): only a row still in the trash -- a second restore at the same time (or the retention run that deleted
     # it meanwhile) changes nothing and runs no hook, no history
     if not c.execute(f"UPDATE {qi(reg['table'], (reg['table'],))} SET deleted_at=NULL, deleted_by=NULL, rev=rev+1, updated_at=?, "
@@ -561,6 +554,13 @@ def obj_restore(c, uid, kind, rid, step=True, undo=False, checked=False):
         if not checked:
             raise Denied(404)
         return obj_row(c, kind, rid)
+    if not light:
+        n = next((x for x in c.execute(f"SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=? AND {trash_sql()}",
+                                       (kind, int(rid))).fetchall() if ts_canon(x["deleted_at"]) == gone), None)
+        if n is not None:  # review F7: the node obj_trash put into the trash comes back (not one the file store's own trash holds)
+            nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"])
+            c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, n["id"]))
+        _kids_restore(c, reg, rid, gone)  # 2.773.0 (#5292)
     if not light:
         obj_history_add(c, uid, kind, rid, {}, {}, action="restore")
         if step:
