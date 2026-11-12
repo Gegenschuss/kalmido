@@ -136,7 +136,7 @@ function wkcm_ext(p) {
     C.EditorView.contentAttributes.of({'aria-label': tr('Text') + ': ' + wk_base(p.path), spellcheck: 'true', autocapitalize: 'sentences', autocorrect: 'on'}),
     C.placeholder(tr('Write … ([[Page]], [[#123]], / for commands)')),
     // files pasted / dropped: uploaded by wkembed.js (its document listener), CodeMirror must not insert their text
-    C.Prec.highest(C.EditorView.domEventHandlers({mousedown: wkcm_down, click: wkcm_click,
+    C.Prec.highest(C.EditorView.domEventHandlers({mousedown: wkcm_down, click: wkcm_click, mouseover: wkcm_hov, mouseleave: (_e, v) => { v.dom.querySelector('.cm-wkhov')?.classList.remove('cm-wkhov'); return false; },
       paste: e => !!e.clipboardData?.files?.length, drop: e => !!e.dataTransfer?.files?.length})),
     C.Prec.high(C.keymap.of([{key: 'Enter', run: wkcm_enter}, {key: 'Tab', run: v => wkcm_indent(v, 1)}, {key: 'Shift-Tab', run: v => wkcm_indent(v, -1)}])),
     C.keymap.of([...C.historyKeymap, ...C.searchKeymap, ...C.defaultKeymap.filter(k => !WKCM_NOKEY.has(k.key) && !WKCM_NOKEY.has(k.mac))]),
@@ -256,6 +256,17 @@ function wkcm_defs() {
     ignoreEvent() { return true; }
     get estimatedHeight() { return 32 * this.t.rows.length; }
   }
+  class Copy extends C.WidgetType {  // 2.1046.0 (#5828): "Copy code" at a code block (the read view's button, events.js copies)
+    eq() { return true; }
+    toDOM() {
+      const s = document.createElement('span'); s.className = 'cm-wkcopy';
+      s.innerHTML = `<button type="button" class="iconbtn mdcopy" data-mdcopy aria-label="${esc(tr('Copy code'))}" title="${esc(tr('Copy code'))}">${ic('copy', 's')}</button>`;
+      s.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });  // the cursor stays where it is
+      s.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); /** @type {any} */ (e.target).closest?.('button')?.click(); } });  // inside the editable text a button gets no click from its keys
+      return s;
+    }
+    ignoreEvent() { return true; }
+  }
   // 2.574.0 (#4681): vp = the part on screen as last told (wkcm_vpFx), r = the part the decorations cover (null = all of it)
   WKCM_FIELD = C.StateField.define({
     create: st => { const vp = {from: 0, to: 0}, r = wkcm_rng(st, vp); return {foc: false, vp, r, d: wkcm_build(st, false, r)}; },
@@ -267,7 +278,7 @@ function wkcm_defs() {
     },
     provide: f => C.EditorView.decorations.from(f, x => x.d),
   });
-  WKCM.defs = {Html, Box, Txt, Table};
+  WKCM.defs = {Html, Box, Txt, Table, Copy};
   return WKCM.defs;
 }
 // a widget's own Markdown drawn by the page renderer (cached by its text)
@@ -375,8 +386,7 @@ function wkcm_build(st, foc, r) {  // 2.574.0 (#4681): r = {from, to}: only the 
       if (!near(a, z)) for (const c of n.node.getChildren(k === 'Strikethrough' ? 'StrikethroughMark' : 'EmphasisMark')) hide(c.from, c.to);
       return;
     }
-    if (k === 'FencedCode') { lines(a, z, 'cm-wkcode'); return false; }
-    if (k === 'CodeBlock') { lines(a, z, 'cm-wkcode'); return false; }
+    if (k === 'FencedCode' || k === 'CodeBlock') { wkcm_pre(st, n.node, a, z, foc && near(doc.lineAt(a).from, doc.lineAt(z).to), out); return false; }
     if (k === 'InlineCode') { mark(a, z, 'cm-wkc'); if (!near(a, z)) for (const c of n.node.getChildren('CodeMark')) hide(c.from, c.to); return false; }
     if (k === 'Link' || k === 'Image') {
       if (inside(a, z, wl)) return false;
@@ -426,6 +436,47 @@ function wkcm_build(st, foc, r) {  // 2.574.0 (#4681): r = {from, to}: only the 
     out.push(D.replace({widget: new W.Html(wkcm_md(m[0], true), false, 'cm-wkmath')}).range(a, z));
   }
   try { return D.set(out, true); } catch (e) { console.error(e); return D.none; }  // overlapping ranges: drawn plain rather than not at all
+}
+// 2.1046.0 (#5828): a code block is drawn as a block (cm-wkpre: one background over all its lines, round corners at the first /
+// last line, cm-wkpre1 / cm-wkprez); the fence lines ```sh hide while the cursor is outside the block (muted while it is inside),
+// like the other marks. The first line carries the "Copy code" button of the read view (attachments.js .mdcopy, events.js
+// data-mdcopy): a widget beside the text (absolute, it moves no letter and is no stop of the cursor), it copies wkcm_code()
+function wkcm_pre(st, node, a, z, on, out) {
+  const D = wkcm_C().Decoration, doc = st.doc, l0 = doc.lineAt(a), l1 = doc.lineAt(z), fenced = node.name === 'FencedCode';
+  const marks = fenced ? node.getChildren('CodeMark') : [], closed = marks.length > 1 && doc.lineAt(marks[marks.length - 1].from).number === l1.number && l1.number > l0.number;
+  for (let n = l0.number; n <= l1.number; n++) {
+    const l = doc.line(n), fence = fenced && (n === l0.number || (closed && n === l1.number));
+    out.push(D.line({class: 'cm-wkpre' + (n === l0.number ? ' cm-wkpre1' + (on ? ' cm-wkpreon' : '') : '') + (n === l1.number ? ' cm-wkprez' : '') + (fence ? ' cm-wkfence' : '')}).range(l.from));
+    if (fence && l.to > l.from) out.push(on ? D.mark({class: 'cm-wksrc'}).range(l.from, l.to) : D.replace({}).range(l.from, l.to));
+  }
+  out.push(D.widget({widget: new (wkcm_defs().Copy)(), side: 1}).range(l0.to));
+}
+// the text of the code block at that place, without the fences / the indent of an indented block (what the read view's <pre> holds)
+function wkcm_code(v, at) {
+  const st = v.state, doc = st.doc;
+  for (let n = wkcm_C().syntaxTree(st).resolveInner(Math.min(at, doc.length), -1); n; n = n.parent) {
+    if (n.name !== 'FencedCode' && n.name !== 'CodeBlock') continue;
+    const l0 = doc.lineAt(n.from).number, l1 = doc.lineAt(n.to).number, ls = [];
+    if (n.name === 'CodeBlock') { for (let i = l0; i <= l1; i++) ls.push(doc.line(i).text.replace(/^( {1,4}|\t)/, '')); return ls.join('\n'); }
+    const ms = n.node.getChildren('CodeMark'), end = ms.length > 1 && l1 > l0 && doc.lineAt(ms[ms.length - 1].from).number === l1 ? l1 - 1 : l1;
+    for (let i = l0 + 1; i <= end; i++) ls.push(doc.line(i).text);
+    return ls.join('\n');
+  }
+  return '';
+}
+// events.js data-mdcopy: the button of a code block in the editor (null = not one of the editor)
+function wkcm_copyOf(b) {
+  const v = WKCM.view, w = b?.closest?.('.cm-wkcopy'); if (!v || !w || !v.dom.contains(w)) return null;
+  let at; try { at = v.posAtDOM(w); } catch { return null; }
+  return wkcm_code(v, at);
+}
+// the button shows while the mouse is over any line of its block (CSS :hover reaches only the first line)
+function wkcm_hov(e, v) {
+  const t = /** @type {any} */ (e.target);
+  let f = t?.closest?.('.cm-wkpre'); while (f && !f.classList.contains('cm-wkpre1')) f = f.previousElementSibling;
+  const o = v.dom.querySelector('.cm-wkhov'); if (o && o !== f) o.classList.remove('cm-wkhov');
+  if (f) f.classList.add('cm-wkhov');
+  return false;
 }
 // where a link opens (only what the read view would link: web, mail, the app's own addresses)
 function wkcm_href(u) {

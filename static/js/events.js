@@ -395,7 +395,7 @@ document.addEventListener('click', async e => {
   const mcd = e.target.closest('[data-mcard]');  // 2.4.2 (#389): a mention opens its card (also inside the description)
   if (mcd) { e.preventDefault(); e.stopPropagation(); mentionCard(mcd); return; }
   const mcp = e.target.closest('.md [data-mdcopy]');  // 2.18.0 (#408 G): "Copy" of a code block (never opens the editor)
-  if (mcp) { e.preventDefault(); e.stopPropagation(); copyText(mcp.closest('.mdcode')?.querySelector('pre')?.textContent || ''); return; }
+  if (mcp) { e.preventDefault(); e.stopPropagation(); copyText((typeof wkcm_copyOf === 'function' ? wkcm_copyOf(mcp) : null) ?? mcp.closest('.mdcode')?.querySelector('pre')?.textContent ?? ''); return; }  // 2.1046.0 (#5828): also the editor's code blocks (wkcm.js)
   if (e.target.closest('#d-md')) { tlkMdClick(e); return; }  // 2.36.0 (#1118): selecting text never opens the editor
   const cev = e.target.closest('#view [data-cev]');
   if (cev) { const v = cev.dataset.cev; cevPop(cev, /^\d+$/.test(v) ? +v : v); return; }  // 2.21.0: own events have ids k<n>

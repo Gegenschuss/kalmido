@@ -99,6 +99,10 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 .wkedwrap .wembar{flex-wrap:nowrap;gap:.125rem;max-width:100%;overflow-x:auto;scrollbar-width:none}
 .wkedwrap .wembar::-webkit-scrollbar{display:none}
 .wembar > *{flex:none}
+/* 2.1046.0 (#5828): "More information" (icons.js infoize, .ib.ibl before the .shint) on one line with the bar's buttons: the
+   height and type of a small button, no shifting margin (app.css .ib.ibl moves it up for hints under a field); narrow = the symbol */
+.wembar .ib.ibl{height:1.75rem;margin:0;padding:0 .375rem;font-size:var(--fs-s);line-height:1}
+@media (max-width:599px){ .wembar .ib.ibl{width:1.75rem;padding:0} .wembar .ib.ibl>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap} }
 .wemfmt{color:var(--text2)}
 .wemsep{width:1px;height:1.25rem;margin:0 .375rem;background:var(--line2)}
 @media (max-width:599px){.wembar .wemlbl{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
@@ -182,6 +186,24 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wkcm .cm-wkdone{color:var(--muted)}
 .wkcm .cm-wkc{padding:0 .2em;border-radius:.25rem;background:var(--bg3);font-family:var(--mono);font-size:.9em}
 .wkcm .cm-wkcode{background:var(--bg2);font-family:var(--mono);font-size:.9em}
+/* 2.1046.0 (#5828): a code block is one block like the read view's (pre.mdpre: --bg3, a line, round corners, inner space) -
+   --bg2 was the sheet's own colour (start-ntblatt-4808.css), the block had no visible background. The fence lines hide while
+   the cursor is outside (no margins: CodeMirror measures its lines; cm-wkfence stays as an empty first / last line = the block's inner space). "Copy code" top right:
+   always on touch, with the mouse over the block or on keyboard focus */
+.wkcm .cm-line.cm-wkpre{position:relative;padding:0 2.75rem 0 .625rem;background:var(--bg3);border-inline:1px solid var(--line);font-family:var(--mono);font-size:.9em}
+.wkcm .cm-line.cm-wkpre1{padding-top:.25rem;border-top:1px solid var(--line);border-radius:var(--r-s) var(--r-s) 0 0}
+.wkcm .cm-line.cm-wkprez{padding-bottom:.25rem;border-bottom:1px solid var(--line);border-radius:0 0 var(--r-s) var(--r-s)}
+.wkcm .cm-wkpre1.cm-wkprez{border-radius:var(--r-s)}
+.wkcm .cm-wkfence{color:var(--muted)}
+.wkcm .cm-wkcopy{position:absolute;top:.125rem;right:.125rem;font-family:var(--sans)}
+.wkcm .cm-wkcopy .mdcopy{opacity:.8;background:var(--bg2);border:1px solid var(--line)}
+.wkcm .cm-wkcopy .mdcopy:hover,.wkcm .cm-wkcopy .mdcopy:focus-visible{opacity:1}
+@media (hover:hover) and (pointer:fine){
+  .wkcm .cm-wkcopy{opacity:0;transition:opacity .15s}
+  .wkcm .cm-wkpre1:hover .cm-wkcopy,.wkcm .cm-wkhov .cm-wkcopy,.wkcm .cm-wkpreon .cm-wkcopy,.wkcm .cm-wkcopy:focus-within{opacity:1}
+}
+@media (pointer:coarse){ .wkcm .cm-wkcopy .mdcopy{min-width:2.75rem;min-height:2.75rem;justify-content:center;opacity:1} .wkcm .cm-line.cm-wkpre{padding-right:3.25rem} }
+@media (prefers-reduced-motion:reduce){ .wkcm .cm-wkcopy{transition:none} }
 .wkcm .cm-wkl{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
 .wkcm .cm-wkmiss{text-decoration-style:dashed}
 .wkcm [data-wkgo],.wkcm [data-wknew]{cursor:pointer}
