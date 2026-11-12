@@ -144,8 +144,8 @@ function cevCached(lo, hi) {
 async function ensureCalEv(lo, hi) {
   if (!calEvOn() && !feat('events')) { if (S.cal.items.length) S.cal = {key: '', loading: '', seq: S.cal.seq, items: [], subs: {}, evcals: {}}; return; }
   const key = `${lo}|${hi}`;
-  if (S.cal.key === key || S.cal.loading === key) return;
-  S.cal.loading = key;
+  if (S.cal.key === key || S.cal.loading === key || S.cal.err === key) return;  // 2.1077.0 (#5461): a failed range waits for "Try again" (calInvalidate), no loop of fetches
+  S.cal.loading = key; S.cal.err = '';
   const seq = S.cal.seq = (S.cal.seq || 0) + 1;  // 2.161.0: an answer that an invalidation overtook (calInvalidate) is dropped
   try {
     const j = await api('GET', `/api/calendars/events?from=${addDays(lo, -1)}&to=${addDays(hi, 1)}`);
@@ -158,12 +158,28 @@ async function ensureCalEv(lo, hi) {
   } catch {
     const hit = cevCached(lo, hi);  // offline: the last copy of this range
     if (S.cal.seq !== seq) return;
-    if (!hit || S.cal.loading !== key) { S.cal.loading = ''; return; }
-    cevApply(hit, key);
+    if (S.cal.loading !== key) { S.cal.loading = ''; return; }
+    // 2.1077.0 (#5461): a failed fetch is said in the view (calEvState), never an empty month; the saved copy is marked as one
+    if (!hit) { S.cal.loading = ''; S.cal.err = key; }
+    else { cevApply(hit, key); S.cal.cached = 1; }
   }
   if (S.route.mod === 'cal' || (S.route.mod === 'tasks' && S.route.key === 'today') || S.route.mod === 'home') renderView();  // 2.144.0 C (#2418): + the start page
 }
-function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; S.cal.seq = (S.cal.seq || 0) + 1; }
+function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; S.cal.err = ''; S.cal.seq = (S.cal.seq || 0) + 1; }
+// 2.1077.0 (#5461): the state of the events of the shown range for the calendar views (month, week, day, year, agenda), from the
+// shared block (render.js #5440): loading while nothing of this range is there yet, a failed fetch as an error with "Try again"
+// (never looks like an empty month), the saved copy of an offline fetch as such. It floats over the top of the grid (calendar.css
+// .calst), so the view does not jump when it comes and goes. lo / hi as given to ensureCalEv
+// none: the title of the quiet hint "nothing here" when the range has no entry and nothing else is to say
+function calEvState(lo, hi, none = '') {
+  const key = `${lo}|${hi}`, retry = () => { calInvalidate(); renderView(); }, on = calEvOn();
+  let h = '';
+  if (on && S.cal.err === key) h = errorState({size: 'row', title: tr('Events could not be loaded'), retry});
+  else if (on && S.cal.cached && S.cal.key === key) h = errorState({size: 'row', title: tr('Saved copy of the events'), retry, cls: 'calold'});
+  else if (on && S.cal.loading === key && S.cal.key !== key) h = loadingHtml('row');
+  if (!h && none) h = emptyState({icon: 'cal', title: none, size: 'row', cls: 'calnone'});
+  return h ? `<div class="calst" aria-live="polite">${/*html-ok*/ h /* the shared block of render.js */}</div>` : '';
+}
 // 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the events fetched (calendar, Today, Home) come again;
 // not shown = invalidated, the next view fetches (ensureCalEv). Here and not in calview.js: Today and Home use the events without it
 histReloader('calendar', () => { if (!S.cal?.key && !S.cal?.items?.length) return; calInvalidate(); if (S.route.mod === 'cal' || (S.route.mod === 'tasks' && S.route.key === 'today') || S.route.mod === 'home') renderView(); });

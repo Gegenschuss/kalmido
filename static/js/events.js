@@ -766,7 +766,11 @@ document.addEventListener('click', async e => {
       else if (S.calMode === 'year') S.calSel = `${+S.calSel.slice(0, 4) + dir}-${S.calSel.slice(5, 7)}-01`;  // 2.155.0 C (#2078)
       else if (S.calMode === 'agenda') S.calSel = addDays(S.calSel, 14 * dir);  // 2.21.0 (#659)
       else if (S.calMode === 'timeline') S.tlStart = addDays(S.tlStart, 14 * dir);
-      else { const [y, m] = S.calMonth.split('-').map(Number); S.calMonth = ds(new Date(y, m - 1 + dir, 1)).slice(0, 7); }
+      else {
+        const [y, m] = S.calMonth.split('-').map(Number); S.calMonth = ds(new Date(y, m - 1 + dir, 1)).slice(0, 7);
+        // 2.1077.0 (#5461): the day list under the month follows the page (it said "Today" under another month): today there, else the 1st
+        if (S.calSel?.slice(0, 7) !== S.calMonth) S.calSel = today().slice(0, 7) === S.calMonth ? today() : `${S.calMonth}-01`;
+      }
       renderView(); an_calSlide(dir); break;  // 2.46.1 (#1560): the page glides in from the side it comes from
     }
     case 'cal-today': S.calMonth = today().slice(0, 7); S.calSel = today(); S.tlStart = addDays(weekStartOf(today()), -7); renderView(); an_calSlide(0); break;

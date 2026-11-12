@@ -218,3 +218,11 @@ button.cyd:hover{background:var(--bg2)}
   .wcev.cgok::after{opacity:.7;height:.25rem;bottom:2px;left:30%;right:30%}
 }
 :root{--qr-bg:#fff}
+/* 2.1077.0 (#5461): loading / a failed fetch / nothing planned of the shown range (calendar.js calEvState): the shared block of
+   render.js floats over the top of the grid, so the view does not jump when it comes and goes */
+.calst{position:relative;height:0;z-index:5}
+.calst>.empty,.calst>.eload{position:absolute;top:.375rem;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 1rem);min-height:2.25rem;justify-content:center;padding:.25rem .75rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.calst>.eerr{color:var(--danger)}
+.calst>.eerr .btn{color:var(--text)}
+.calst>.calnone{pointer-events:none;color:var(--muted)}
+.calst .eacts{margin-top:0}

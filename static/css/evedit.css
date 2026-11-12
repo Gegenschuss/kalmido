@@ -10,3 +10,6 @@
 .evatp>span:not(.evps):not(.avatar){min-width:0;overflow:hidden;text-overflow:ellipsis}
 .evatp>.evps,.evatp>.avatar,.evatp>.iconbtn,.evatp>svg{flex:none}
 #ev-tzq{flex:1;min-width:0}
+/* 2.1077.0 (#5461): the editor that opened again after a failed save says so above its buttons */
+.evsaveerr{display:flex;align-items:center;gap:.375rem;margin:.5rem 0 0;padding:.5rem .75rem;border-radius:var(--r-s);color:var(--danger);background:color-mix(in srgb,var(--danger) 10%,transparent);font-size:var(--fs-s)}
+.evsaveerr svg{flex:none}

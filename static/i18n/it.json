@@ -18503,5 +18503,10 @@
   "Your unused account will be removed on {0}": "Il tuo account non utilizzato verrà rimosso il {0}",
   "{0} created the account {1} for you on {2} with an invitation. It has not been used so far.": "{0} ha creato l’account {1} per te il {2} con un invito. Finora non è stato usato.",
   "Unless you set it up by {0}, it will be removed automatically on that day, together with the invitation.": "Se non lo configuri entro il {0}, quel giorno verrà rimosso automaticamente insieme all’invito.",
-  "Setting up the account once keeps it. If you do not need it, there is nothing to do.": "Configurando l’account una volta, lo mantieni. Se non ti serve, non devi fare nulla."
+  "Setting up the account once keeps it. If you do not need it, there is nothing to do.": "Configurando l’account una volta, lo mantieni. Se non ti serve, non devi fare nulla.",
+  "Events could not be loaded": "Impossibile caricare gli eventi",
+  "Saved copy of the events": "Copia salvata degli eventi",
+  "Nothing planned on this day.": "Niente in programma in questo giorno.",
+  "Nothing planned in these days.": "Niente in programma in questi giorni.",
+  "Nothing planned in this year.": "Niente in programma quest'anno."
 }

@@ -355,6 +355,7 @@ async function evEditor(o = {}) {
       <div class="row"><label for="ev-url">${tr('Link')}</label><input id="ev-url" type="url" inputmode="url" value="${esc(st.url || '')}" placeholder="https://…" autocomplete="off"></div>
       ${st.task_id && taskById(st.task_id) ? `<div class="row"><span class="rlab">${tr('Preparation')}</span><button type="button" class="linkbtn" data-evm="task">${ic('done', 's')} ${esc(taskById(st.task_id).title)}</button><button type="button" class="iconbtn" data-evm="untask" aria-label="${esc(tr('Remove the link to the task'))}" title="${esc(tr('Remove the link to the task'))}">${ic('x', 's')}</button></div>` : ''}
     </details>
+    ${o.err ? `<div class="calerr evsaveerr" role="alert">${ic('alert', 's')} ${esc(tr('Not saved: {0}', o.err))}</div>` : ''/* 2.1077.0 (#5461): why the editor is open again */}
     <div class="foot">${ev && evWrite(evCal(ev.cal_id)) ? `<button class="btn danger" data-evm="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-evm="close">${tr('Cancel')}</button><button class="btn pri" data-evm="save">${tr('Save')}</button></div>`);
   md.classList.add('evmodal');
   // 2.484.0 (#3945): a changed date of a series shows the rows of "Only this date" (after dvw_rows, which shows them again)
@@ -394,10 +395,10 @@ async function evEditor(o = {}) {
     return body;
   };
   const srv = o.cf?.raw || ev, dlg = ev && !o.dvw && typeof saveDialog === 'function' ? {base: objBase(form(scope), o.cf?.mine)} : null;
-  const evAgain = (raw, mine, cf) => {  // the editor again on the current event, what was typed over it
+  const evAgain = (raw, mine, cf, err = '') => {  // the editor again on the current event, what was typed over it (err: why, #5461)
     const m = {...mine}; delete m.send_invites;
-    if (scope === 'one') { const ov = {rid: o.occ, ...evOccView(raw, o.occ), ...m}; delete ov.updated_at; return evEditor({ev: {...raw, overrides: [...(raw.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ, cf, unsaved: true}); }
-    return evEditor({ev: {...raw, ...m, ...(m.attendees ? {attendees: atts} : {})}, occ: o.occ, cf, unsaved: true});  // 2.846.0 (#5465): unsaved = closing asks
+    if (scope === 'one') { const ov = {rid: o.occ, ...evOccView(raw, o.occ), ...m}; delete ov.updated_at; return evEditor({ev: {...raw, overrides: [...(raw.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ, cf, unsaved: true, err}); }
+    return evEditor({ev: {...raw, ...m, ...(m.attendees ? {attendees: atts} : {})}, occ: o.occ, cf, unsaved: true, err});  // 2.846.0 (#5465): unsaved = closing asks
   };
   if (dlg) {  // lazy-ok-begin: dlg exists only once objsave.js is loaded (typeof saveDialog above, evEditor loads the module)
     const view = () => scope === 'one' ? (x => evOccView(x, o.occ)) : undefined, opened = () => scope === 'one' ? evOccView(srv, o.occ) : srv;
@@ -492,11 +493,13 @@ async function evEditor(o = {}) {
       let j;
       try { j = await evOpt(put, req, render); } catch (e) {  // nothing typed is lost (a conflict 409 too: api() said why)
         if (e?.cf) { toast(tr('Changed by someone else in the meantime')); evAgain(e.cf.raw, e.cf.mine, e.cf); return; }  // 2.565.0 (#4705)
-        if (dlg) { const mine = objDiff(dlg.base, body); evAgain(srv, mine, {raw: srv, cur: srv, mine, theirs: [], both: []}); return; }  // lazy-ok: dlg only with objsave.js loaded; what was typed stays "changed" for the next save
+        // 2.1077.0 (#5461): the editor that opens again says that it was not saved and why (a toast stood behind it or not at all)
+        const why = e instanceof Offline ? tr('You are offline') : String(e?.message || '') || tr('Check the connection and try again.');
+        if (dlg) { const mine = objDiff(dlg.base, body); evAgain(srv, mine, {raw: srv, cur: srv, mine, theirs: [], both: []}, why); return; }  // lazy-ok: dlg only with objsave.js loaded; what was typed stays "changed" for the next save
         // "Only this date": what was typed comes back as that date's own change (the editor then saves only it again)
         const ov = {rid: o.occ, title: body.title, location: body.location, description: body.description, all_day: body.all_day, start: body.start, end: body.end};
-        evEditor(!ev ? {...o, ...body, attendees: atts, unsaved: true} : scope === 'one' ? {ev: {...ev, overrides: [...(ev.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ, unsaved: true}
-          : {ev: {...ev, ...body, cal_id: body.cal_id ?? ev.cal_id, attendees: atts}, occ: o.occ, unsaved: true});
+        evEditor(!ev ? {...o, ...body, attendees: atts, unsaved: true, err: why} : scope === 'one' ? {ev: {...ev, overrides: [...(ev.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ, unsaved: true, err: why}
+          : {ev: {...ev, ...body, cal_id: body.cal_id ?? ev.cal_id, attendees: atts}, occ: o.occ, unsaved: true, err: why});
         return;
       }
       if (!ev && j?.id) {  // clickable before the range / the state come again
@@ -562,7 +565,9 @@ function viewAgenda() {
     h += `<section class="agday ${d === today() ? 'today' : ''}" aria-label="${esc(dayLabel(d, true) + ' ' + fmtDate(d))}"><h3>${esc(dayLabel(d, true))} <span class="muted">${esc(fmtDate(d))}</span></h3>
       ${evs.length ? `<div class="cevlist">${evs.map(e => cevRow(e, d)).join('')}</div>` : ''}${ts.map(t => taskRow(t, {showList: true, drag: false})).join('')}</section>`;
   }
-  return calBar(tr('Agenda') + ` <span class="muted agrange">${esc(fmtDayAbs(from))} – ${esc(fmtDayAbs(to))}</span>`) + `<div class="agenda agendav">${h || `<div class="empty">${ic('cal')}${tr('Nothing in the next two weeks.')}</div>`}</div>`;
+  // 2.1077.0 (#5461): loading / a failed fetch over the list; "nothing" only when the events are there (the shared block)
+  const st = calEvState(from, to), wait = calEvOn() && S.cal.key !== `${from}|${to}`;
+  return calBar(tr('Agenda') + ` <span class="muted agrange">${esc(fmtDayAbs(from))} – ${esc(fmtDayAbs(to))}</span>`) + st + `<div class="agenda agendav">${h || (wait ? '' : emptyState({icon: 'cal', title: tr('Nothing in the next two weeks.'), size: 'sec'}))}</div>`;
 }
 
 // ---- 2.624.0 (#3946): "Per project" in the Calendars window: the lists grouped by folder (sidebar.js folderNames, the own
@@ -608,10 +613,10 @@ async function evCalsModal() {
   // 2.828.0 (#5464): readable column heads (Calendar / Today / Plan, never cut), on a phone one switch "Show" per calendar and the
   // other two in its "…" menu; "Done" closes as the main button, the side paths are quiet links, "New calendar" and the trash
   // are rows at the end of my calendars, "Tasks with a date" a row like the others (its "…" opens the projects)
-  let users = [];
-  if (collab()) users = await evPeople();
+  // 2.1077.0 (#5461): the window opens at once (it said nothing while the people loaded); only "Share…" waits for them
+  const usersP = collab() ? evPeople() : Promise.resolve([]);
   await loadCss('calendar').catch(() => {});  // the window's styles (calendar.css), also when it opens outside the calendar
-  const md = modal(`<div class="lhdr"><h3>${ic('cal', 's')} ${tr('Calendars')}</h3><span class="spacer"></span><button class="iconbtn" data-evc="close" aria-label="${tr('Close')}">${ic('x')}</button></div><div id="evc-body"></div>
+  const md = modal(`<div class="lhdr"><h3>${ic('cal', 's')} ${tr('Calendars')}</h3><span class="spacer"></span><button class="iconbtn" data-evc="close" aria-label="${tr('Close')}">${ic('x')}</button></div><div id="evc-body">${/*html-ok*/ loadingHtml('sec') /* 2.1077.0 (#5461) */}</div>
     <div class="foot evcfoot"><span class="evclinks">${feat('events') ? `<button type="button" class="linkbtn" data-evc="phone">${tr('On the phone…')}</button>` : ''}${feat('events') && !S.me?.kid ? `<button type="button" class="linkbtn" data-evc="booking">${tr('Booking page…')}</button>` : ''}${S.calendars?.enabled ? `<button type="button" class="linkbtn" data-evc="subs">${tr('Subscriptions…')}</button>` : ''}</span><span class="spacer"></span><button type="button" class="btn pri" data-evc="done">${tr('Done')}</button></div>`);
   md.classList.add('evcmodal');
   const narrow = () => matchMedia('(max-width: 599px)').matches;  // a phone: one switch per row, Today / Plan in the menu
@@ -650,6 +655,7 @@ async function evCalsModal() {
     // 2.566.0 (#4707): the calendars in the trash (the shared core's trash): opened on demand, restore with their events
     const tr2 = !feat('events') ? '' : `<button type="button" class="evcrowbtn evctrbtn" data-evc="trash" aria-expanded="${!!st.trash}">${ic('trash', 's')}<span>${tr('Trash')}</span>${ic('right', 's')}</button>${!st.trash ? ''
       : st.trash.items.length ? `<ul class="evclist evctrash" aria-label="${esc(tr('Trash'))}">${st.trash.items.map(c => `<li class="evcrow" style="--cc:${cssColor(c.color) || 'var(--accent)'}"><i class="cevdot"></i><span class="evcn">${esc(c.name)}<span class="muted"> · ${esc(trn('{0} event', '{0} events', c.events))} · ${esc(tr('In the trash since {0}', fmtDate((c.deleted_at || '').slice(0, 10))))}</span></span><button type="button" class="btn sm" data-evctr="${c.id}">${ic('undo', 's')} ${tr('Restore')}</button></li>`).join('')}</ul>`
+      : st.trash.err ? errorState({size: 'row', retry: async () => { st.trash = await evcTrash(); draw(); }})  // 2.1077.0 (#5461): not "empty" when it failed
       : `<p class="muted">${tr('The trash is empty')}</p>`}${st.trash?.trash_days ? `<p class="muted">${esc(trashNote(tr('Calendars in the trash are deleted permanently after {0} days, with their events.', st.trash.trash_days)))}</p>` : ''}`;
     $('#evc-body', md).innerHTML = tl + own + tr2 + sb + (typeof abc_group === 'function' ? abc_group() : '');  // 2.155.0 B (#2076)
     cvf_filter(md, st.q);  // 2.624.0 (#3946)
@@ -693,7 +699,7 @@ async function evCalsModal() {
       menu(m, [...cvxNarrowItems(`e:${c.id}`, !c.hidden), own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the calendar'), c.name, {input: {max: 100}}); if (n && n.trim()) evCalRename(c.id, n.trim(), redraw); }},  // 2.46.2 (#1659): at once
         own && {label: tr('Colour…'), icon: 'palette', next: 1, fn: () => calColorPop(m, LCOLORS.filter(Boolean), c.color, async col => { try { await evcPatch(c.id, {color: col}); } catch { return; } refresh(); })},
         own && wsOn() && {label: tr('Workspace…'), icon: 'brief', next: 1, fn: () => wsMoveMenu(m, c.org_id, async org => { try { await evcPatch(c.id, {org_id: org}); } catch { return; } refresh(); })},
-        own && collab() && {label: tr('Share…'), icon: 'users', fn: () => evShareModal(c, users, refresh)},
+        own && collab() && {label: tr('Share…'), icon: 'users', fn: async () => evShareModal(c, await usersP, refresh)},
         evWrite(c) && {label: tr('Import a calendar file (ICS)…'), icon: 'upload', fn: () => evImport(c, refresh)},
         {label: tr('Export (ICS)'), icon: 'download', fn: () => { location.href = `/api/evcals/${c.id}/export.ics`; }},
         {label: tr('Subscription link…'), icon: 'link', fn: () => evf_modal(c)},  // 2.111.0 B (#2056): evinvite.js
@@ -711,7 +717,7 @@ async function evCalsModal() {
       toast(tr('Restored')); st.trash = null; calInvalidate(); await refresh(); renderView(); return;
     }
     const b = e.target.closest('[data-evc]'); if (!b) return;
-    if (b.dataset.evc === 'trash') { st.trash = st.trash ? null : await api('GET', '/api/evcals/trash').catch(() => ({items: []})); draw(); return; }
+    if (b.dataset.evc === 'trash') { st.trash = st.trash ? null : await evcTrash(); draw(); return; }
     if (b.dataset.evc === 'close' || b.dataset.evc === 'done') md.remove();
     if (b.dataset.evc === 'lists') { st.lists = !st.lists; draw(); }
     if (b.dataset.evc === 'phone') { md.remove(); settingsModal('caldav'); }  // 2.365.2 B (#2789): the steps live in Settings > Integrations
@@ -730,6 +736,8 @@ async function evCalsModal() {
   draw();
   loadModule('calabs').then(() => { abc_wire(md, draw); draw(); }).catch(() => {});  // 2.155.0 B (#2076): holidays + absences
 }
+// 2.1077.0 (#5461): the calendars in the trash; a failed fetch is marked (err), the window then says so with "Try again"
+const evcTrash = () => api('GET', '/api/evcals/trash').catch(() => ({items: [], err: 1}));
 function evShareModal(c, users, done) {
   // 2.800.0 (#5466): the X on top like every other dialog
   const md = modal(`<div class="lhdr"><h3>${tr('Share {0}', esc(c.name))}</h3><span class="spacer"></span><button class="iconbtn" data-evs="close" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x')}</button></div><div class="shws"></div><div id="evs-list"></div>

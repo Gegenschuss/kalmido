@@ -8,7 +8,7 @@ function calsHtml(chk, hint) {
   if (!S.calendars?.enabled) return `<h4 id="s-cals-h">${tr('Calendars')}</h4>${hintK(tr('Calendar subscriptions are switched off on this server'))}`;
   return `<h4 id="s-cals-h">${tr('Calendars')}</h4>
     ${hint(tr('Show events from Google Calendar, iCloud, Outlook or any CalDAV server next to your tasks: in the calendar, the timeline and on Today. Only you see them. Read-only, unless you allow writing for a CalDAV calendar (Edit).'))}
-    <div class="members" id="s-cals"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="members" id="s-cals">${/*html-ok*/ loadingHtml() /* 2.1077.0 (#5461): the shared block */}</div>
     <div class="row"><button class="btn sm pri" data-m="cal-add">${ic('plus', 's')} ${tr('Add calendar')}</button></div>
     ${feat('cal') ? `<div class="row"><label>${tr('Today')}</label>${chk('s-caltoday', S.settings.cal_today !== '0', tr('show today’s events at the top'))}</div>` : ''}
     <details class="shelp sdet"><summary>${tr('Where do I find the link?')}</summary><ul class="slist">
@@ -25,7 +25,8 @@ function calStatus(x) {
 }
 async function calsDraw(md, j) {
   const box = $('#s-cals', md); if (!box) return;
-  if (!j) { try { j = await api('GET', '/api/calendars'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; } }
+  // 2.1077.0 (#5461): a failed fetch says so with "Try again" (offline: "You are offline"), not always "Only available online."
+  if (!j) { try { j = await api('GET', '/api/calendars'); } catch { box.innerHTML = errorState({size: 'row', retry: () => { box.innerHTML = loadingHtml(); calsDraw(md); }}); return; } }
   box._j = j;
   if (typeof intr_st === 'function') intr_st('cals', j.subs.length > 0);  // 2.625.0 (#4489): the state on its folded row in Settings > Integrations
   S.calendars = {...(S.calendars || {}), enabled: j.enabled, subs: j.subs.filter(x => x.visible).length};
@@ -223,13 +224,15 @@ function viewCal() {
   }
   const sel = (byDay.get(S.calSel) || []).filter(t => !t.ghost);
   const selEv = evOn ? cevOn(S.calSel).sort(cevSort) : [];
-  return `${calBar(`${MON[m - 1]} ${y}`)}
+  // 2.1077.0 (#5461): the day list says "nothing" only when the day has neither tasks nor events (events alone: no line)
+  const selOther = msvvCalDay(S.calSel), none = !sel.length && !selEv.length && !selOther;
+  return `${calBar(`${MON[m - 1]} ${y}`)}${/*html-ok*/ calEvState(start, addDays(start, 41)) /* calendar.js: the shared block */}
     <div class="cal calv">${wdOrder().map(i => `<div class="wd">${WD[i]}</div>`).join('')}${cells}</div>
     <div class="agenda"><h3>${dayLabel(S.calSel, true)}<span class="muted agdate"> ${fmtDate(S.calSel)}</span></h3>
       ${selEv.length ? `<div class="cevlist">${selEv.map(e => cevRow(e, S.calSel)).join('')}</div>` : ''}
       ${qaddBox()}
-      ${/*html-ok*/ sel.length ? sel.map(t => taskRow(t, {showList: true, drag: false})).join('') : `<div class="muted agnone">${tr('No tasks on this day.')}</div>`}
-      ${msvvCalDay(S.calSel)}
+      ${/*html-ok*/ sel.length ? sel.map(t => taskRow(t, {showList: true, drag: false})).join('') : none ? `<div class="muted agnone">${tr('Nothing planned on this day.')}</div>` : ''}
+      ${/*html-ok*/ selOther /* msvv.js */}
     </div>`;
 }
 
@@ -265,7 +268,10 @@ function viewWeek() {
   // year of a week that spans two follow its middle (Thursday) where only one is shown
   const title = day ? fmtDay('long', pd(days[0])) : days.length === 7 && days[0] === weekStartOf(days[0]) ? weekTitle(days[0]) : calRangeTitle(days[0], days[days.length - 1]);
   CVW.start = {k: `${S.calMode}|${days[0]}|${days.length}`, m: first};
-  return `${calBar(title)}<div class="week calv ${day ? 'oneday' : ''}${live ? ' cgs-dz' : ''}${CAL_LIVE?.arm ? ' cgs-arm' : ''}" style="--cols:${days.length};--h:${H}px${live ? `;--nf:${nf}` : ''}">
+  // 2.1077.0 (#5461): nothing in the days shown = a quiet hint over the grid (the hours stay, for a tap that adds)
+  const empty = !days.some(d => (map.get(d) || []).length || evsOf(d).length || msvvCalChips(d).length);
+  const st = calEvState(days[0], days[days.length - 1], empty ? (day ? tr('Nothing planned on this day.') : tr('Nothing planned in these days.')) : '');
+  return `${calBar(title)}${/*html-ok*/ st /* calendar.js: the shared block */}<div class="week calv ${day ? 'oneday' : ''}${live ? ' cgs-dz' : ''}${CAL_LIVE?.arm ? ' cgs-arm' : ''}" style="--cols:${days.length};--h:${H}px${live ? `;--nf:${nf}` : ''}">
     <div class="whead"><div></div>${days.map(d => `<div class="wh ${d === t0 ? 'today' : ''}" data-day="${d}"><span>${WD[pd(d).getDay()]}</span><b>${pd(d).getDate()}</b></div>`).join('')}</div>
     <div class="wallday"><div class="wlbl" title="${esc(tr('All day'))}">${tr('all day|short')}</div>${days.map(d => `<div class="wad" data-day="${d}">${evsOf(d).filter(e => !cevTimed(e, d)).map(e => cevChip(e, d)).join('')}${(map.get(d) || []).filter(t => !t.due_time).map(chip).join('')}${msvvCalChips(d).join('') /* 2.73.0 C (#661): other servers, in the all-day row */}</div>`).join('')}</div>
     <div class="wbody" id="wbody" tabindex="0" role="region" aria-label="${esc(tr('Hours of the week'))}"><div class="wgutter">${[...Array(24)].map((_, h) => `<div class="wtime" style="top:${h * H}px">${esc(fmtTimeLoc(pad(h) + ':00'))}</div>`).join('')}</div>${cols}</div></div>`;

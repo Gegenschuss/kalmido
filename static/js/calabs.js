@@ -69,7 +69,7 @@ async function abc_feedModal() {
   /** @type {any} */
   const md = modal(`<div class="lhdr"><h3>${ic('link', 's')} ${esc(tr('Subscription link'))}</h3><span class="spacer"></span><button class="iconbtn" data-abf="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <p class="muted">${esc(tr('My absences and the public holidays of my state, for the calendar app of your phone. Nobody else’s absences are in it; a sick leave shows as “Away”.'))}</p>
-    <div id="abf-body"><div class="muted mhint">${esc(tr('Loading…'))}</div></div>
+    <div id="abf-body">${/*html-ok*/ loadingHtml() /* 2.1077.0 (#5461): the shared block */}</div>
     <p class="muted mhint">${esc(tr('Anyone who has the link sees your absences. Keep it to yourself.'))}</p>
     <div class="foot"><span class="spacer"></span><button class="btn" data-abf="close">${esc(tr('Close'))}</button></div>`);
   md.classList.add('evfmodal');
@@ -79,7 +79,9 @@ async function abc_feedModal() {
     box.innerHTML = `<div class="row icalrow"><input id="abf-url" readonly value="${esc(j.url)}" aria-label="${esc(tr('Subscription link'))}"><button class="btn pri" data-abf="copy">${ic('copy', 's')} ${esc(tr('Copy'))}</button></div>
       <div class="row evfbtns"><a class="btn" href="${esc(j.url.replace(/^https?:/, 'webcal:'))}">${ic('cal', 's')} ${esc(tr('Open in calendar app'))}</a><button class="btn" data-abf="rotate">${ic('key', 's')} ${esc(tr('New link'))}</button><button class="btn danger" data-abf="off">${esc(tr('Turn the link off'))}</button></div>`;
   };
-  try { draw(await api('GET', '/api/team/absences/feed')); } catch { $('#abf-body', md).innerHTML = `<div class="muted mhint">${esc(tr('Only available online.'))}</div>`; }
+  // 2.1077.0 (#5461): a failed fetch says so with "Try again" (offline: "You are offline"), not always "Only available online."
+  const load = async () => { try { draw(await api('GET', '/api/team/absences/feed')); } catch { const box = $('#abf-body', md); if (box) box.innerHTML = errorState({size: 'row', retry: () => { box.innerHTML = loadingHtml(); load(); }}); } };
+  await load();
   md.addEventListener('click', async e => {
     const b = /** @type {any} */ (e.target).closest('[data-abf]'); if (!b) return;
     const a = b.dataset.abf;

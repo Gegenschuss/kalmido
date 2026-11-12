@@ -40,7 +40,8 @@ function cyr_view() {
     requestAnimationFrame(() => { const sec = document.querySelector(`#cyear [data-cym="${mk}"]`)?.closest('.cymon'); if (sec && mk.slice(5) !== '01') sec.scrollIntoView?.({block: 'start'}); });
   }
   CYR.y = y;
-  return `${calBar(String(y))}<div class="cyear calv" id="cyear">${[...Array(12).keys()].map(m => cyr_month(y, m, cnt, t0)).join('')}</div>`;
+  const st = calEvState(lo, hi, cnt.size ? '' : tr('Nothing planned in this year.'));  // 2.1077.0 (#5461): loading / error / nothing, over the months
+  return `${calBar(String(y))}${/*html-ok*/ st /* calendar.js: the shared block */}<div class="cyear calv" id="cyear">${[...Array(12).keys()].map(m => cyr_month(y, m, cnt, t0)).join('')}</div>`;
 }
 document.addEventListener('click', e => {
   const b = /** @type {HTMLElement|null} */ (e.target instanceof Element ? e.target.closest('[data-cyd], [data-cym]') : null);
