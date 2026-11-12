@@ -477,8 +477,12 @@ OINV_UNUSED = """EXISTS (SELECT 1 FROM users x WHERE x.id={0} AND x.password_has
 def oinv_mark(c):
     """users.oinv_made_at of an account an organisation's invitation set up before the mark existed (#5864): from its
     org_invites row. Daily, idempotent; the caller holds the system context and commits."""
-    c.execute(f"""UPDATE users u SET oinv_made_at={OJN_TS.format('i.created_at')} FROM org_invites i
-                  WHERE i.user_id=u.id AND u.oinv_made_at IS NULL AND {OJN_TS.format('i.created_at')} IS NOT NULL""")
+    # 2.1060.0 (#4949): written out (OJN_TS for i.created_at) so pg_prepare checks the real type, not the stand-in TRUE
+    c.execute("""UPDATE users u
+                 SET oinv_made_at=CASE WHEN pg_input_is_valid(i.created_at, 'timestamptz') THEN i.created_at::timestamptz END
+                 FROM org_invites i
+                 WHERE i.user_id=u.id AND u.oinv_made_at IS NULL
+                   AND CASE WHEN pg_input_is_valid(i.created_at, 'timestamptz') THEN i.created_at::timestamptz END IS NOT NULL""")
 
 
 def oinv_due(c, uid=None):
