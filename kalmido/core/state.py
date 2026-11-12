@@ -704,7 +704,9 @@ def search_tasks(c, uid, raw, limit, files=True):
     rows = load_tasks(c, "list_id = ANY(CAST(? AS BIGINT[])) "
                          f"AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
                          f"AND ({'id IN ' + ids_sql + ' OR ' if ids_sql else ''}id = ANY(CAST(? AS BIGINT[]))) "
-                         "ORDER BY status, updated_at DESC LIMIT ?", (vis_search_lids(c, uid), *ids_args, list(fids), limit))
+                         # 2.1079.0 (#5655): + id DESC -- updated_at has whole seconds; without a last key the hits of one second
+                         # came in another order on every answer and the rows read jumped (p2924_c_ruhe_ui)
+                         "ORDER BY status, updated_at DESC, id DESC LIMIT ?", (vis_search_lids(c, uid), *ids_args, list(fids), limit))
     txt = set()
     if fhit and ids_sql:  # 2.61.0 (#1820): "in file <name>" when only a file's text matched (not the task's own words)
         txt = {r[0] for r in c.execute(f"SELECT t.id FROM tasks t WHERE t.id = ANY(CAST(? AS BIGINT[])) AND t.id IN {ids_sql}",
