@@ -845,6 +845,22 @@ def tidy_changed_since(updated_at, sent_at):
     return u >= sent_at if TIDY_QUIET_S > 0 else u > sent_at
 
 
+# 2.1011.0 (#5685, review F2): a change in the task's history after the event by a person - an account that is no agent, or
+# someone via a public link (user_id NULL, tasks/validation.py); the tidy agent's own entries (kind tidy) never count
+TIDY_PERSON_SQL = """FROM activity a LEFT JOIN users u ON u.id=a.user_id
+                     WHERE a.task_id=%s AND a.kind!='tidy' AND (a.user_id IS NULL OR COALESCE(u.kind,'')!='agent')
+                       AND substr(a.created_at,1,19) {op} substr(%s,1,19)"""
+
+
+def tidy_person_after(c, tid, sent_at):
+    """2.1011.0 (#5685): the person (no agent: neither the tidy agent nor any other) whose change of the task is in its history
+    after its tidy event went out - the newest one; 0 = someone via a public link; None when only agents (or nobody)
+    changed it. Whole seconds, as tidy_changed_since: the history keeps milliseconds, sent_at seconds."""
+    r = c.execute("SELECT COALESCE(a.user_id, 0) AS uid " + TIDY_PERSON_SQL.format(op=">=" if TIDY_QUIET_S > 0 else ">") % ("?", "?")
+                  + " ORDER BY a.id DESC LIMIT 1", (tid, sent_at)).fetchone()
+    return r["uid"] if r else None
+
+
 def tidy_tick(c):
     """Watchdog: sends the waiting 'tidy' events of tasks nobody touched for TIDY_QUIET_S and nobody edits right now."""
     now = now_utc()
@@ -852,12 +868,22 @@ def tidy_tick(c):
     c.execute("DELETE FROM tidy_pending WHERE sent_at IS NOT NULL AND sent_at<?", (iso(now - timedelta(days=2)),))
     # people changed the task after its event went out (the agent's tidy is refused then): it waits for quiet again and
     # gets a new event, so an agent is never stuck on "try again later"
-    c.execute("""UPDATE tidy_pending SET sent_at=NULL, created_at=? WHERE sent_at IS NOT NULL
+    # 2.1011.0 (#5685): only a PERSON's change (tidy_person_after) re-arms it, and the event then names that person; an
+    # agent's change (the dispatcher's fields and comments, the tidy agent itself) no longer sends the same tidy every few
+    # minutes in the name of whoever made the task (the agent's tidy is not refused for it either, v1 tidy)
+    for p in c.execute("""SELECT task_id, sent_at FROM tidy_pending WHERE sent_at IS NOT NULL
                  AND (SELECT updated_at FROM tasks WHERE id=tidy_pending.task_id) %s sent_at
                  AND NOT EXISTS (SELECT 1 FROM activity a WHERE a.task_id=tidy_pending.task_id AND a.kind='tidy' AND a.created_at>=tidy_pending.sent_at)
                  AND NOT EXISTS (SELECT 1 FROM obj_comments k WHERE k.kind='task' AND k.ref_id=tidy_pending.task_id AND COALESCE(k.extra->>'suggestion','')!=''
-                                 AND k.created_at>=tidy_pending.sent_at::timestamptz)""" % (">=" if TIDY_QUIET_S > 0 else ">"),  # 2.308.0 (#3274): as tidy_changed_since
-              (iso(now),))
+                                 AND k.created_at>=tidy_pending.sent_at::timestamptz)
+                 AND EXISTS (SELECT 1 %s)
+                 ORDER BY sent_at LIMIT 200""" % (">=" if TIDY_QUIET_S > 0 else ">",  # 2.308.0 (#3274): as tidy_changed_since
+                 # review F1: only tasks a person changed are candidates (an agent-only change no longer fills the 200)
+                 TIDY_PERSON_SQL.format(op=">=" if TIDY_QUIET_S > 0 else ">") % ("tidy_pending.task_id", "tidy_pending.sent_at"))).fetchall():
+        who = tidy_person_after(c, p["task_id"], p["sent_at"])
+        if who is not None:  # 0 = via a public link: the event keeps its actor
+            c.execute("UPDATE tidy_pending SET sent_at=NULL, created_at=?, actor_id=COALESCE(NULLIF(?, 0), actor_id) WHERE task_id=? AND sent_at=?",
+                      (iso(now), who, p["task_id"], p["sent_at"]))
     rows = c.execute("""SELECT p.*, t.updated_at, t.deleted_at, t.list_id, l.agent_tidy FROM tidy_pending p JOIN tasks t ON t.id=p.task_id
                         JOIN lists l ON l.id=t.list_id WHERE p.sent_at IS NULL ORDER BY p.created_at LIMIT 50""").fetchall()
     sent = 0

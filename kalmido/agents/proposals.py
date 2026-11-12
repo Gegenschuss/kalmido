@@ -45,7 +45,7 @@ from ..agents.chat import (
 from ..agents.chat import CHAT_UNSHARED_SQL  # 2.777.0 C (#5378)
 from ..agents.workstyle import ws_next_mark, ws_next_step  # 2.236.0 B (#2911)
 from ..agents.datalock import dl_job_input  # 2.235.0 B2 (#2902)
-from ..agents.core import agent_usable, agent_added_events, task_being_edited, tidy_changed_since  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import agent_usable, agent_added_events, task_being_edited, tidy_changed_since, tidy_person_after  # 2.369.5 (#2517): pulled up from functions
 from ..agents.core import agent_never_lids  # 2.582.0 (#4380)
 from ..agents.jobchat import JCD_KINDS, jcb_post  # 2.369.5 (#2517): pulled up from functions; 2.739.0 (#5216): jcb_post
 from ..agents.steps import steps_take  # 2.369.5 (#2517): pulled up from functions
@@ -1747,7 +1747,10 @@ def v1_task_tidy(tid):
     p = c.execute("SELECT sent_at FROM tidy_pending WHERE task_id=?", (tid,)).fetchone()
     # 2.308.0 (#3274): a task still waiting for quiet (sent_at NULL: new, or the watchdog re-queued it after a change) is
     # refused too; the agent gets a fresh event once it is quiet
-    if task_being_edited(tid) or (base is not None and base != t["updated_at"]) or (p and (not p["sent_at"] or tidy_changed_since(t["updated_at"], p["sent_at"]))):
+    # 2.1011.0 (#5685): changed since the event = by a person (tidy_person_after); an agent's change re-arms nothing, so it
+    # does not block the tidy either (base_updated_at still guards against an old read)
+    if task_being_edited(tid) or (base is not None and base != t["updated_at"]) or (p and (not p["sent_at"] or (
+            tidy_changed_since(t["updated_at"], p["sent_at"]) and tidy_person_after(c, tid, p["sent_at"]) is not None))):  # review F2: 0 = via a public link
         raise Denied(409, tr("Someone is working on this task right now: tidy it up later"))
     s = clean_suggestion(c, t, b)
     tidy_apply(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), s)

@@ -3910,6 +3910,9 @@ server while a field of the task panel has the focus). `POST /api/v1/tasks/{id}/
 the task, when people changed it after the event went out (2.308.0: also in the event's own second, and while the task still
 waits for its quiet time before the event), or when the body's `base_updated_at` (the task's `updated_at`
 you read) is no longer current: try again later, never overwrite. The original text always stays at the top of the notes.
+When a person changed the task after the event, a new `tidy` event follows once it is quiet again, with that person as
+`actor`. 2.1011.0 (#5685): only a person's change counts (its history entry names a person account) - a change by an
+agent (yours, the dispatcher's, any other) neither sends the event again nor makes the tidy answer `409`.
 
 The agent reads the mode from `GET /api/v1/lists` (`agent_tidy`, `tidy_agent_id`); the `tidy` event carries it too (`mode`, `list.agent_tidy`, `list.tidy_agent_id`), with the project's sections to pick from. People see and change the mode of all their projects at once in **Settings > Agents** (2.0.8), next to which agent sees which project and which one tidies it up.
 
