@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.995.0** (2026-11-12):
-- **Search**: finds umlauts in either spelling (Müller and Mueller) and knowledge pages shared with you; one shared search index for tasks, comments, contacts and chat.
-- **Review**: deleted video comments and document notes go to the trash and come back with undo.
-- **Agents**: a model of its own for reviews, and the last 7 days of usage per kind in the section Model.
-- **Shared core**: tags, comments, read marks and notification ceilings now live in core tables.
+**2.1024.0** (2026-11-12):
+- **Search**: one keyed word index for sealed content; umlauts match either way (ae/oe/ue) and words match at their start (one-way: old per-area word tables are dropped, older versions find no old sealed content until re-indexing).
+- **Undo**: deleting or restoring an approval (video, image, PDF, audio) is a step in "Recent steps" on every device.
+- **Menus**: the document "Actions", chat plus and time tracking menus use the shared app menu.
+- **Admin**: adding people by e-mail reaches only accounts with a proved address.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
