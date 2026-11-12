@@ -176,9 +176,20 @@ if (!MW_GUARD && typeof BroadcastChannel === 'function' && mw_nonce(true)) {  //
 // narrower window): no iframe, splitview.js is not even loaded. "Open on the right" in the menus of a list, task, document,
 // knowledge page and calendar (spl_item) shows only while the split view is on. The offline queue stays one: core.js flush()
 // replays it under the Web Lock "kalmido-outbox", which the iframe (same origin) shares with this window.
-const SPL_MIN_VW = 90;  // rem (2.891.0, #5358: 1440 px, was 160; each half keeps its minimum, splitview.js): from this window width the switch is offered
+const SPL_MIN_VW = 90;  // rem (2.891.0, #5358: 1440 px, was 160; each half keeps its minimum, splitview.js): from this window width the split view is on by default
+const SPL_MIN_L = 40, SPL_MIN_R = 26;  // rem: the left app (bar, sidebar, list) / the right copy keep at least this (splitview.js; here since 2.1040.0, #5813: the lower bound below)
+const SPL_MAX_PX = 3840;  // 2.1040.0 (#5813): the highest "split from window width" a person may type
 const spl_rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-const spl_offer = () => !MW_GUARD && mw_desk() && document.documentElement.clientWidth >= SPL_MIN_VW * spl_rem();  // clientWidth: innerWidth is the left half while it is on
+const spl_lo = () => Math.ceil((SPL_MIN_L + SPL_MIN_R) * spl_rem());  // px: below this neither half has its room (from the current font size)
+const spl_def = () => Math.round(SPL_MIN_VW * spl_rem());  // px: the standard threshold (1440 at 16 px)
+// 2.1040.0 (#5813): "Split from window width" (Settings > Appearance), the person's own threshold in px (LOOK_KEYS splMin), bounded
+function spl_from() {
+  const v = +LS.get('splMin', 0);
+  return v > 0 ? Math.max(spl_lo(), Math.min(SPL_MAX_PX, Math.round(v))) : spl_def();
+}
+const spl_vw = () => document.documentElement.clientWidth;  // clientWidth: innerWidth is the left half while it is on
+const spl_can = () => !MW_GUARD && mw_desk() && spl_vw() >= spl_lo();  // the settings show the split view (the threshold can be lowered to here)
+const spl_offer = () => spl_can() && spl_vw() >= spl_from();
 const spl_on = () => spl_offer() && LS.get('split', false) === true;
 const spl_item = route => spl_on() && route ? [{label: tr('Open on the right'), icon: 'panel', cls: 'msplit', fn: () => spl_open(route)}] : [];
 function spl_open(route) { return loadModule('splitview').then(() => spl_show(route)).catch(() => {}); }
@@ -186,5 +197,6 @@ function spl_open(route) { return loadModule('splitview').then(() => spl_show(ro
 function spl_check() {
   if (MW_GUARD) return;
   if (spl_on() || typeof spl_sync === 'function') loadModule('splitview').then(() => spl_sync()).catch(() => {});
+  if (typeof spl_setInfo === 'function') spl_setInfo();  // 2.1040.0 (#5813): "Your window: N px" in an open settings dialog
 }
 if (!MW_GUARD) window.addEventListener('resize', debounce(() => spl_check(), 150));  // core.js debounce (perf_budget: no new clearTimeout pairs)

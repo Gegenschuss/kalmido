@@ -8,6 +8,9 @@
 // - "Open on the right" in the menu of a project and of a task shows its route in the right half; off it is not in the menu
 // - the right copy does not overwrite the main window's UI state (lastKey); the right route is remembered (splR)
 // - the grip: a drag makes the right half wider, the width holds over a reload and goes to the account (setting look)
+// 2.1040.0 (#5813): the settings show the split view from the lowest threshold (66 rem, both halves' minimum; 1000 px: nothing),
+//   "Split from window width" in px moves the threshold (1200 px with 1100: offered), a smaller value is raised to the lower bound
+//   with a hint, Default empties it; the value is the person's (setting look splMin); the line between the halves is always visible
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -49,11 +52,34 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     const frHash = `(() => { try { return ${FR}.contentWindow.location.hash; } catch { return null; } })()`;
     const frDoc = `(() => { try { return ${FR}.contentDocument; } catch { return null; } })()`;
 
-    // ---- a window of 1200 px: no switch (2.891.0 (#5358): offered from 90 rem = 1440 px, was 160 rem; 1600 px has it now)
+    // ---- a window of 1000 px: no switch (2.891.0 (#5358): offered from 90 rem = 1440 px, was 160 rem; 1600 px has it now)
+    // 2.1040.0 (#5813): was 1200 px; the settings show it from the lowest threshold now (66 rem = 1056 px), 1000 px is below it
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1000, height: 1000}});
+    await load('#today'); await booted();
+    check(await openLook(), '1000 px: Settings > Appearance opens');
+    check(await ev(`!document.querySelector('#s-split') && !document.querySelector('#s-splmin') && spl_offer() === false`), '1000 px: no switch for the split view');
+
+    // ---- 2.1040.0 (#5813): 1200 px - the section with "Split from window width"; the standard 1440 px does not split here
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1200, height: 1000}});
     await load('#today'); await booted();
     check(await openLook(), '1200 px: Settings > Appearance opens');
-    check(await ev(`!document.querySelector('#s-split') && spl_offer() === false`), '1200 px: no switch for the split view');
+    const s0 = await until(`(() => { const f = document.querySelector('#s-splmin'), i = document.querySelector('#s-splinfo'), l = document.querySelector('label[for="s-splmin"]');
+      return f && i && l ? {val: f.value, ph: f.placeholder, info: i.textContent, label: l.textContent, offer: spl_offer(), sw: !!document.querySelector('#s-split'), vw: document.documentElement.clientWidth} : null; })()`);
+    check(s0 && s0.sw && s0.label === 'Split from window width' && s0.val === '' && s0.ph === '1440' && s0.offer === false, '1200 px: the switch and the empty field (standard 1440) show, not offered yet ' + JSON.stringify(s0));
+    check(s0 && s0.info.includes(`Your window: ${s0.vw} px`) && s0.info.includes('Split from 1440 px.'), '1200 px: the line says the window width and the threshold ' + JSON.stringify(s0));
+    const typeMin = v => ev(`(() => { const f = document.querySelector('#s-splmin'); f.focus(); f.value = ${JSON.stringify(v)}; f.dispatchEvent(new Event('input', {bubbles: true})); f.dispatchEvent(new Event('change', {bubbles: true})); f.blur(); return 1; })()`);
+    await typeMin('1100');
+    const s1 = await until(`(() => { const i = document.querySelector('#s-splinfo').textContent; return spl_offer() && LS.get('splMin', 0) === 1100 && !i.includes('Split from') ? {val: document.querySelector('#s-splmin').value, info: i} : null; })()`);
+    check(s1 && s1.val === '1100', '1100 px typed: the split view is offered at 1200 px ' + JSON.stringify(s1));
+    const lk = await (async () => { for (let i = 0; i < 40; i++) { const s = (await call('GET', '/api/state')).settings || {}; try { const o = JSON.parse(s.look || '{}'); if (o.splMin === 1100) return o; } catch { /* not yet */ } await sleep(250); } return null; })();
+    check(!!lk, 'the threshold is the person\'s (setting look splMin)');
+    await typeMin('800');
+    const s2 = await until(`(() => { const f = document.querySelector('#s-splmin'), i = document.querySelector('#s-splinfo').textContent, lo = spl_lo();
+      return f.value === String(lo) && LS.get('splMin', 0) === lo ? {lo, info: i} : null; })()`);
+    check(s2 && s2.lo >= 1050 && s2.lo <= 1060 && s2.info.includes(`At least ${s2.lo} px, otherwise neither half has enough room.`), 'a too small value becomes the lower bound with a hint ' + JSON.stringify(s2));
+    await ev(`document.querySelector('[data-m="s-splmin-std"]').click(), 1`);
+    const s3 = await until(`(() => { const f = document.querySelector('#s-splmin'), i = document.querySelector('#s-splinfo').textContent; return f.value === '' && LS.get('splMin', null) == null && !spl_offer() && i.includes('Split from 1440 px.') ? i : null; })()`);
+    check(!!s3, 'Default: the field is empty, the standard applies again (not offered at 1200 px) ' + JSON.stringify(s3));
 
     // ---- 2800 px: the switch, off = nothing loaded
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 2800, height: 1100}});
@@ -67,6 +93,9 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     check(up && /^\/\?split=1#/.test(up.src), 'on: the right half is an iframe /?split=1, the normal app (no mini mode) ' + JSON.stringify(up));  // 2.891.0 (#5358): was /?mini=1&split=1 in mini mode
     const lay = await ev(`(() => { const p = document.querySelector('#splitpane').getBoundingClientRect(), vw = document.documentElement.clientWidth;
       return {vw, iw: innerWidth, pane: Math.round(p.width), left: Math.round(p.left), body: Math.round(document.body.getBoundingClientRect().width), split: document.documentElement.classList.contains('split-on')}; })()`);
+    // 2.1040.0 (#5813): the line in the middle is always there (4 px, the border colour, not transparent), the grip around it wider
+    const ln = await ev(`(() => { const g = document.querySelector('#splitpane .splgrip'), a = getComputedStyle(g, '::after'); return {w: a.width, bg: a.backgroundColor, grip: g.getBoundingClientRect().width}; })()`);
+    check(ln.w === '4px' && !/rgba\(0, 0, 0, 0\)|transparent/.test(ln.bg) && ln.grip > 4, 'the line between the halves is visible without hovering ' + JSON.stringify(ln));
     check(lay.split && Math.abs(lay.pane - lay.vw / 2) <= 2 && Math.abs(lay.body + lay.pane - lay.vw) <= 2, 'on: half and half, the left app in the left half ' + JSON.stringify(lay));
     check(Math.abs(lay.iw - lay.body) <= 2, 'on: innerWidth of the main window is its half ' + JSON.stringify(lay));
     await ev(`document.querySelectorAll('.smodal').forEach(m => m.remove()), 1`);

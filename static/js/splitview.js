@@ -12,8 +12,7 @@
 // does not jump while dragging), arrow keys (Shift: 4 rem), Home / End, Enter or a double click = half and half; each side
 // keeps only its minimum (rule #4830). The width (rem) and the right route are the person's (LOOK_KEYS splW / splR).
 const SPL = {el: null, fr: null, px: 0, iw: null, drag: false, dr: ''};
-const SPL_MIN_L = 40, SPL_MIN_R = 26;  // rem: the left app (bar, sidebar, list) / the right copy keep at least this
-const spl_vw = () => document.documentElement.clientWidth;
+// SPL_MIN_L / SPL_MIN_R (rem, each half's minimum): miniwin.js since 2.1040.0 (#5813), the threshold's lower bound is their sum; spl_vw (the window width) too
 const spl_std = () => Math.round(spl_vw() / spl_rem() / 2 * 4) / 4;  // half and half
 const spl_max = () => Math.max(SPL_MIN_R, Math.floor((spl_vw() / spl_rem() - SPL_MIN_L) * 4) / 4);
 function spl_w() {  // the width of the right half in use (rem)

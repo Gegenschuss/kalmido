@@ -179,6 +179,25 @@ async function mvSet(on) {
   await mvAfter();
   toast(on ? tr('You now see Kalmido like a member. Your rights stay the same.') : tr('Administration is shown again'));
 }
+// 2.1040.0 (#5813): the split view's threshold (miniwin.js spl_from); the line under the field says the window's width and, after a
+// too small value, the lower bound
+function spl_info(low) {
+  const vw = spl_vw(), from = spl_from();
+  return [low ? tr('At least {0} px, otherwise neither half has enough room.', spl_lo()) : '', tr('Your window: {0} px', vw),
+    vw < from ? tr('Split from {0} px.', from) : ''].filter(Boolean).join(' ');
+}
+function spl_setInfo(low) { const el = $('#s-splinfo'); if (el) el.textContent = spl_info(low); }
+function spl_setMin(raw) {
+  const t = String(raw ?? '').trim(), n = Math.round(+t), low = t !== '' && n > 0 && n < spl_lo();
+  const to = t === '' || !(n > 0) || n === spl_def() ? null : Math.max(spl_lo(), Math.min(SPL_MAX_PX, n));
+  setLocal(tr('Split from window width'), () => LS.get('splMin', null), v => {
+    if (v == null) LS.del('splMin'); else LS.set('splMin', v);
+    const f = $('#s-splmin'); if (f) f.value = v == null ? '' : String(v);
+    spl_check(); spl_setInfo();
+  }, to);
+  const f = $('#s-splmin'); if (f) f.value = to == null ? '' : String(to);  // also when nothing changed (a too small value typed again)
+  spl_setInfo(low);
+}
 // local (per device) settings: appearance, tab bar
 function setLocal(label, get, set, to) {
   const from = get();
@@ -847,8 +866,10 @@ function settingsModal(focus) {
     // 2.418.0 (#3560): the editor of every area's menu and the tab bar (navmenu.js nav_pageDraw)
     nav: S.me?.kid ? '' : `<h4 id="s-nav-h">${tr('Menus')}</h4>${hint(tr('The order and the points of each menu, for you on every device. Minus hides a point (the search still finds it), Plus brings it back, drag by the grip.'))}<div id="s-navmenus"><div class="muted mhint">${tr('Loading…')}</div></div>`,
     look: `<div id="s-lookin">${lookHtml()}</div>
-      ${typeof spl_offer === 'function' && spl_offer() ? `<h4 id="s-split-h">${tr('Split view')}</h4><div class="row">${chk('s-split', LS.get('split', false) === true, tr('A second view of the app on the right'))}</div>
-      ${hint(tr('Only on a wide screen: “Open on the right” in the menu of a project, task, document, knowledge page or calendar shows it there. The grip between the two halves changes their widths.'))}` : '' /* 2.742.0 (#4858): miniwin.js spl_offer, splitview.js */}
+      ${typeof spl_can === 'function' && spl_can() ? `<h4 id="s-split-h">${tr('Split view')}</h4><div class="row">${chk('s-split', LS.get('split', false) === true, tr('A second view of the app on the right'))}</div>
+      <div class="row splminrow"><label for="s-splmin">${tr('Split from window width')}</label><input type="number" id="s-splmin" class="aanum wide" inputmode="numeric" min="${spl_lo()}" max="${SPL_MAX_PX}" placeholder="${spl_def()}" value="${+LS.get('splMin', 0) > 0 ? spl_from() : ''}"> <span class="muted">px</span> <button type="button" class="btn sm" data-m="s-splmin-std">${tr('Default')}</button></div>
+      <div class="shint" id="s-splinfo" aria-live="polite">${esc(spl_info())}</div>
+      ${hint(tr('Only on a wide screen: “Open on the right” in the menu of a project, task, document, knowledge page or calendar shows it there. The grip between the two halves changes their widths.'))}` : '' /* 2.742.0 (#4858): miniwin.js spl_offer, splitview.js; 2.1040.0 (#5813): shown from the lowest threshold (spl_can), the threshold field */}
       <h4 id="s-wacc-h">${tr('Colour of the workspace')}</h4><div class="row">${chk('s-wacc', s.ws_accent !== '0', tr('Interface in the colour of the workspace'))}</div>
       ${hint(tr('Main buttons, the active navigation, ticks, progress and focus take the colour of the workspace shown; Private keeps the accent colour. In “All workspaces” tasks and lists show the colour of their workspace, everything else the accent colour. Off: always the accent colour.')) /* 2.490.0 B (#4026) */}
       <h4 id="s-lemo-h">${tr('New projects')}</h4><div class="row">${chk('s-lemo', s.list_emoji !== '0', tr('Suggest icons for new projects'))}</div>
@@ -1257,6 +1278,9 @@ function settingsModal(focus) {
   if (S.me) { tfaWire(md); tokWire(md); apwWire(md); e2eWire(md); }  // 2.42.0 (#828): + end-to-end encryption
   if (S.me?.is_admin) oidcWire(md);
   if (S.me?.is_admin) { aaWire(md); bkWire(md); orphWire(md); }
+  md.addEventListener('change', e => {  // 2.1040.0 (#5813): "Split from window width" in px, bounded; empty = standard
+    if (e.target.id === 's-splmin') spl_setMin(e.target.value);
+  });
   md.addEventListener('change', e => {  // 2.742.0 (#4858): the split view (miniwin.js spl_check mounts / unmounts the right half)
     if (e.target.id !== 's-split') return;
     setLocal(tr('Split view'), () => LS.get('split', false) === true, v => { LS.set('split', v); const c = $('#s-split'); if (c) c.checked = v; spl_check(); }, e.target.checked);
@@ -1314,6 +1338,7 @@ function settingsModal(focus) {
     }
     if (b.dataset.m === 's-undo') { const el = $('.ssaved', md); if (el?._e && HIST.undo[HIST.undo.length - 1] === el._e) { el.classList.remove('on'); histStep('undo', 1, [el._e]); } return; }  // 2.905.0 (#5255): exactly this step
     if (b.dataset.m === 'tab-reset') { tabSet(null); return; }
+    if (b.dataset.m === 's-splmin-std') { spl_setMin(''); return; }  // 2.1040.0 (#5813): the split view's threshold back to the standard
     if (b.dataset.m === 'tab-add') { tabAddSheet(id => { tabSet([...tabIds(), id]); $('#s-tabadd', md)?.focus(); }); return; }  // 2.122.2 (#2329)
     if (b.dataset.m === 'sync-now') { b.disabled = true; try { if (OUT.q.length) await flush(); await refreshNow(); } finally { b.disabled = false; const st = $('#s-synced', md); if (st) st.textContent = syncedTxt(); } return; }  // 2.25.0 (UX-56)
     if (b.dataset.m === 'wp-on') { const c = $('#s-wpdev', md); if (c && !c.checked) c.click(); return; }  // 2.25.0 (UX-46)
