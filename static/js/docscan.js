@@ -275,14 +275,14 @@ async function dsc_fGo(n) {
   settingsModal('scans');
 }
 function dsc_wantApply(box, w) {
-  const flash = el => { el.scrollIntoView?.({block: 'center'}); el.classList.add('sflash'); setTimeout(() => el.classList.remove('sflash'), 1600); };
+  const flash = el => { el.scrollIntoView?.({block: 'center'}); el.classList.add('sflash'); setTimeout(() => el.classList.remove('sflash'), 1600); };  // sprung-ok: the person chose the folder's scan inbox in its menu
   if (w.key) { const r = box.querySelector(`[data-dsc="edit:${w.key}"]`)?.closest('li'); if (r) flash(r); return; }
   const d = /** @type {HTMLDetailsElement|null} */ (box.querySelector('details.dsc-new')); if (!d) return;
   d.open = true;
   const nm = /** @type {HTMLInputElement|null} */ (box.querySelector('#dsc-name')), fo = /** @type {HTMLSelectElement|null} */ (box.querySelector('#dsc-folder'));
   if (nm) nm.value = String(w.name || '').slice(0, 60) || tr('Scanner');
   if (fo && fo.querySelector(`option[value="${w.pid || 0}"]`)) fo.value = String(w.pid || 0);
-  setTimeout(() => { flash(d); nm?.focus(); nm?.select(); }, 80);  // after the settings' own jump to the heading (settings.js focus 'scans')
+  setTimeout(() => { flash(d); nm?.focus(); nm?.select(); }, 80);  // sprung-ok: the person asked for this form (after the settings' own jump to the heading, settings.js focus 'scans')
 }
 // the small scanner mark of a folder row with an inbox of mine (ablage.js ab_rowHtml)
 function dsc_folderBadge(n) {
