@@ -64,7 +64,8 @@ WRK_RETRY_S = 15  # a loop another process runs: asks again after this
 WRK_PING_S = 15  # the lock connection is checked at most this often
 WRK_HB_S = max(5, int(os.environ.get("KALMIDO_WORKER_HEARTBEAT", "") or 30))
 # the threads (by name) that take a loop lock: startup.py's loops + the queues their modules start on demand
-WRK_LAZY = ("filetext", "docs", "paperless", "paperless-zipcheck", "embed", "bgjobs")  # 2.193.0 D (#2220): + bgjobs
+# 2.1069.0 (#5412): + docs-pdfopt (Optimise PDF's own thread next to docs: one process per instance runs it)
+WRK_LAZY = ("filetext", "docs", "docs-pdfopt", "paperless", "paperless-zipcheck", "embed", "bgjobs")  # 2.193.0 D (#2220): + bgjobs
 WRK_LOOPS = {"watchdog", "update-check", "calendars", "backup", "webhooks", "mail-in", "mailboxes", "git", *WRK_LAZY}  # 2.141.0 A: + mailboxes; 2.142.0 C: + ntfy-inbox-users (2.574.0 #3779: the ntfy inboxes are gone)
 _HELD = set()
 _STATE = {}  # loop name -> "running" (this process holds its lock) / "waiting" (another process runs it) / "web"

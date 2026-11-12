@@ -289,6 +289,10 @@ with system_ctx(c):
     out["room_person"] = Q.po_room(c, ua, wa)
 c.rollback()
 c.close()
+I._Q["first"] = False  # review: no take-up of the server's running rows from this process
+with system_ctx(c := connect()):
+    out["waiting"] = c.execute("SELECT COUNT(*) FROM doc_meta WHERE state IN ('wait', 'run')").fetchone()[0]
+c.close()
 calls = []
 Q.po_queued = lambda c: calls.append("queued") or 1
 Q.po_take_up = lambda c: calls.append("take_up")
@@ -302,7 +306,7 @@ f = json.loads(py(FAIR, str(SID), str(GSID)).strip().splitlines()[-1])
 check(f.get("ws_count") == 1 and f.get("other_count") == 0, f"a queued run counts in its workspace, not in the other {f}")
 check(f.get("room_full") == 0 and f.get("room_other", 0) > 0, f"the workspace's limit: full there, room in the other workspace {f}")
 check(f.get("room_person") == 4, f"the person's limit still counts (5 - the one waiting) {f}")
-check(f.get("docs_step") == [], f"the recognition's step never runs an Optimise PDF (it waited up to 30 min behind one) {f}")
+check(f.get("waiting") == 0 and f.get("docs_step") == [], f"the recognition's step never runs an Optimise PDF (it waited up to 30 min behind one) {f}")
 check(f.get("po_step") == 1 and f.get("po_calls") == ["take_up", "queued"],
       f"the own thread's step: the cut-off runs first (once), then a run {f}")
 

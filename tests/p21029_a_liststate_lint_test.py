@@ -61,6 +61,7 @@ for text, want, what in [
     ('Q = "SELECT id FROM lists WHERE owner_id=? AND state=\'live\'"', 1, "state='live' after FROM lists"),
     ('Q = "SELECT id FROM lists l WHERE l.state IN (\'live\', \'archived\')"', 1, "l.state IN in a line that reads lists l"),
     ('Q = "AND lists.state<>\'trash\'"', 1, "lists.state compared anywhere"),
+    ('Q = "SELECT id FROM lists WHERE state IS DISTINCT FROM \'trash\'"', 1, "IS DISTINCT FROM after FROM lists"),
     ('c.execute("UPDATE lists SET state=\'archived\' WHERE id=?", (lid,))', 1, "a handwritten write of the marker"),
     ('Q = "SELECT 1 FROM agent_jobs WHERE state IN (\'running\') AND list_id IN (SELECT id FROM lists)"', 0,
      "another table's state before FROM lists"),

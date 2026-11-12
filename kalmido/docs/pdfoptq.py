@@ -251,6 +251,7 @@ def docs_pdfopt(nid):
     if why:
         return err(why, 409)
     pl_receipt_need_open(c, nid)  # a receipt of a closed month gets no new version (409, said at once)
+    write_lock(c, f"docs_pdfopt_ws_{m['ws']}")  # 2.1069.0 (#5412, review): counted and queued under the workspace's lock
     if po_room(c, me(), m["ws"]) <= 0:  # review F2; 2.1069.0 (#5412): the workspace's limit too
         return err(tr(PO_FULL), 429)
     if not _queue(c, nid, m, n, me(), mode, blank, bool(d.get("check"))):
@@ -290,6 +291,7 @@ def docs_pdfopt_many():
                 skip += 1
                 continue
             if m["ws"] not in ws_room:
+                write_lock(c, f"docs_pdfopt_ws_{m['ws']}")  # 2.1069.0 (#5412, review): held to the commit
                 ws_room[m["ws"]] = PO_WS_MAX - po_waiting_ws(c, m["ws"])
             if ws_room[m["ws"]] <= 0:  # 2.1069.0 (#5412): this workspace's queue is full, the others' go on
                 skip += 1
@@ -329,8 +331,8 @@ def po_on_done(c, nid, first):
         return
     if not n["owner_id"] or acx_of(c, n["owner_id"]).role == "agent":  # review F5: an agent's file is never optimised this way
         return
-    if po_room(c, n["owner_id"], m["ws"]) <= 0:  # review F2: the automatic runs count as well; 2.1069.0 (#5412): the workspace's too
-        return
+    if po_waiting(c, n["owner_id"]) >= PO_WAIT_MAX:  # review F2: the automatic runs count as well
+        return  # 2.1069.0 (#5412, review): not the workspace's limit - one member's full selection never stops the others' new scans
     po_put(c, nid, {"state": "wait", "mode": "auto", "blank": 0, "auto": 1, "by": n["owner_id"], "v": int(n["cur_version"] or 0),
                     "at": _now(), "tries": 0})
 
@@ -401,6 +403,11 @@ def po_queued(c):
         waiting.append(r)
     r = _pick(waiting)
     if r is None:
+        return 0
+    # 2.1069.0 (#5412, review F2/F5): a new measure / run starts only while no document waits for its recognition -- the
+    # recognition never waits for a run (own thread), and a run does not fight a backlog for the tools' slot (busy, the
+    # run's clock) nor overwrite the recognition of a version it is about to replace
+    if c.execute("SELECT 1 FROM doc_meta WHERE state IN ('wait', 'run') LIMIT 1").fetchone():
         return 0
     nid, old, v = r[0], r[1], po_get(r)
     _PQ["recent"] = [w for w in _PQ["recent"] if w != r["ws"]][-63:] + [r["ws"]]

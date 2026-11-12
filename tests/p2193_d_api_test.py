@@ -181,7 +181,7 @@ check(len(keys) == 4 and all(len(k[1]) == 64 and "example.com" not in k[1] for k
 start(keep=True, extra=" -e KALMIDO_ROLE=web")
 A = sess("alice")
 h = health(A)
-lazy = ("filetext", "docs", "paperless", "paperless-zipcheck", "embed", "bgjobs")
+lazy = ("filetext", "docs", "docs-pdfopt", "paperless", "paperless-zipcheck", "embed", "bgjobs")  # 2.1069.0 (#5412): + docs-pdfopt
 check(h.get("role") == "web" and not any(k in (h.get("loops") or {}) for k in lazy),
       f"role web: no queue thread (none of {lazy} in the health) {h.get('loops')}")
 n0 = len(backups(A)["items"])

@@ -57,7 +57,7 @@ WRITE = re.compile(r"\bUPDATE\s+lists\s+SET\b(?!_)[^\"']*?(?<![.\w])archived\s*=
 READ_Q = re.compile(r"\b(?:l|lists|lst)\.archived\b(?!\s*(?:=|<>|!=))", re.I)
 READ = re.compile(r"(?<![.\w'\"])(?<!AS )archived\b(?![_'\"])", re.I)
 # 2.1069.0 (#5416): a handwritten compare on the state marker lists.state (the helpers of STATE_HOME write it once)
-_CMP = r"\s*(?:=|<>|!=|\bIN\b|\bNOT\s+IN\b)"
+_CMP = r"\s*(?:=|<>|!=|\bIN\b|\bNOT\s+IN\b|\bIS\s+(?:NOT\s+)?DISTINCT\b|\b(?:NOT\s+)?LIKE\b)"  # another alias / a statement over several lines is not seen
 STATE_Q = re.compile(r"\b(?:lists|lst)\.state" + _CMP, re.I)
 STATE_L = re.compile(r"\bl\.state" + _CMP, re.I)
 STATE_B = re.compile(r"(?<![.\w'\"])state" + _CMP, re.I)
