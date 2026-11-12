@@ -19,7 +19,43 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.994.0] - 2026-11-11
+## [2.995.0] - 2026-11-12
+
+Package 2.992 (Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammel).
+
+### Added
+- Model per run, stage 2 (#5684): a third model *For reviews* next to *For your messages and decisions* and *For routine* (runtime `model_review`, empty = the first). A run is a review only when its trigger says so: a review the agent is asked for (`review_requested`), a planned job of the new kind *Review in the chat* (`action: "review"`, its `scheduled_job` carries `review: true`) and every scheduled check of a project; never because of words in a text. While the model per run is on, the agent chat's header shows *runs with <model of the last run>*; its owner (and admins for team agents) tap it to open the section *Model*. Below the models the section shows the usage of the last 7 days per kind: runs, tokens and the costs only when the agent's computer reports them. The reference starter hands each run's kind and id to the usage hook (`KALMIDO_RUN_CLASS`, `KALMIDO_RUN_ID`), the hook reports them as `run_class` / `run_id` (`POST /api/v1/agent/usage`, MCP `report_usage`; an older server gets the report again without them); new routes `GET /api/my/agents/{id}/model-usage` and `GET /api/admin/agents/{id}/model-usage`
+
+### Fixed
+- Trash of deleted projects: the final delete checks the legal retention date again after locking the project, so a project marked as kept by law in the meantime is never deleted by the clean-up run; the custodian's deliberate early delete still works (#5635)
+
+Package 2.981 (Bündel: Kern-Querschnitt Q6a: Such-Index obj_search, Kern-Querschnitt Q4b: Video-Kommentare und Doc-Not, Kern-Querschnitt Q4c: Team-Chat nut).
+### Added
+- One shared search index obj_search (core/objsearch.py, stage Q6a): tasks, comments of every kind (not the sealed document notes), notes, contacts, knowledge page names, team chat and agent chat messages; umlauts the same everywhere (Müller finds Mueller and back), word start everywhere, parts of words only in names and numbers (contact name, company, phone digits, ticket key, page name). /api/search also finds knowledge pages shared through the core (key `wiki`) and comments of reviews (key `comments`); rights are checked per hit against the source row (#5278)
+- Generic comment routes GET/POST /api/obj/<kind>/<id>/comments, PATCH/DELETE /api/obj/comments/<cid> and restore for the kinds video and doc_note; MCP add_comment takes kind (video) and replaces add_video_comment (#5273)
+- Document notes: restore route POST /api/docs/<id>/notes/<nid>/restore; undo in the app brings a deleted note back (#5273)
+### Changed
+- Video / picture review comments and document notes are comments of the shared core (obj_comments, kinds video and doc_note, with anchor and state): editing a review comment checks the version (409 with the comment) under a lock, deleting goes into the core's trash with its period (answers go along and come back), deleting a note is no longer final; delete by someone else = the author or whoever manages the object. Old routes, v1 and the export files stay (#5273)
+- Team chat uses the comments' core: the mention parser, the say rule, the trash text (obj_comment_trash with a kind; a restore brings the reactions back), one delete rule and one "edited" event for agents (med_changed) (#5274)
+- Comments synced from a git host belong to no account (author = the name on the host, shown as "from the repository"); deleting the account that connected the repository no longer removes them; agents see them with `source: "git"`, not as a customer (#5274)
+- Read marks of team chat rooms, threads and feed articles are rows of obj_seen (kinds tchat, tchat_thread, rss); muting a room and taking part in a thread are rows of obj_follow; leaving a channel or an organisation removes them; RSS has one model for private and organisation feeds (#5286)
+- The project bell is obj_follow kind list (it ends when the person leaves the project); the owner's notification ceilings of projects and folders are obj_notif_cap (core/objnotifcap.py) (#5287)
+### Removed
+- Tables task_fts, cmt_fts, contacts.search, the trigram indexes (#5278); video_comments, doc_notes (#5273); tchat_trash_text (#5274); tchat_reads, tchat_thread_reads, rss_reads, rss_items.read_at (#5286); list_bell, list_notif, folder_notif (#5287). The first start moves their rows into the core tables and drops them - one-way: the start raises the database's back limit to this release's minor, back only through a backup. The first start also builds the search index once (a few minutes on a large instance, see UPGRADING)
+### Fixed
+- Review of the package: answers of a review comment deleted before the update share its deletion in the move; a note's edit conflict answers with the note, not the raw row; the organisation export leaves review comments and notes in the trash out; a database made new with this version gets the back limit as well (#5273 #5274)
+- A fragment's DROP COLUMN IF EXISTS of a column already gone no longer takes an exclusive lock on every start (#5278)
+
+### Fixed
+- main: Drehplan-Zeilen im Projekt-Tab nutzen beim Überfahren das Farb-Token --bg3 statt des nicht definierten --hover (CI red of 2.994.0, p2602_b_tokens_ui).
+- main: Die Markierung beim Umsortieren von PDF-Seiten folgt der Schriftgröße (rem statt px, appearance_ui).
+- main: In der Willkommens-Tour merken sich auch Enter und die Pfeiltasten jeden Schritt; „Zurück“ geht danach genau eine Karte zurück (v11_ui).
+
+Package 2.995 (Bündel: GitHub-Umzug Paket A: Workflows leiten den Abbild-, Konto-Export/-Import: eigene Ticket-Typen und Feld).
+### Changed
+- The release workflows (release.yml, promote.yml, weekly-release.yml) derive the container image name from the repository name in lower case instead of a fixed name, so the image follows a move of the repository to another GitHub owner (#5686).
+### Fixed
+- The account export of a person without an organisation now carries their own ticket types and field schema; the account import rebuilds them in the private workspace and links the project fields to them again (a type or field with the same key stays; a second import of the same file still brings missing ones) (#5602).
 
 Package 2.991 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: A).
 
@@ -301,6 +337,10 @@ Package 2.955 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Fixed
 - Retention export: a check that the sign-off CSV carries no token columns (#3811)
 
+## [2.994.0] - 2026-11-11
+
+Not released (the CI of this version was red); its changes are listed under 2.995.0.
+
 ## [2.990.0] - 2026-11-11
 
 Not released (the CI of this version was red); its changes are listed under 2.994.0.
@@ -460,7 +500,8 @@ Package 2.900 (Bündel: Projekt-Sperre: Rückgängig-Kopien von Zeiteinträge, P
 
 Not released (the CI of this version was red); its changes are listed under 2.902.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.994.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.995.0...HEAD
+[2.995.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.995.0
 [2.994.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.994.0
 [2.990.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.990.0
 [2.974.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.974.0

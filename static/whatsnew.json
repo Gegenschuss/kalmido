@@ -1,6 +1,32 @@
 {
  "versions": [
   {
+   "version": "2.995.0",
+   "date": "2026-11-12",
+   "items": [
+    {
+     "de": "Mit „Modell je Lauf“ wählst du jetzt auch ein eigenes Modell für Prüfungen, und im Chat-Kopf steht, mit welchem Modell der Agent zuletzt lief.",
+     "en": "With \"Select the model per run\" you can now pick a model of its own for reviews, and the chat header shows which model the agent last ran with."
+    },
+    {
+     "de": "Im Abschnitt Modell siehst du den Verbrauch der letzten 7 Tage je Art: Läufe, Tokens und Kosten, wenn sie gemeldet werden.",
+     "en": "The section Model shows the usage of the last 7 days per kind: runs, tokens and costs when they are reported."
+    },
+    {
+     "de": "Die Suche findet Umlaute in jeder Schreibweise (Müller und Mueller) und jetzt auch freigegebene Wissensseiten.",
+     "en": "Search finds umlauts in either spelling (Müller and Mueller) and now also shared knowledge pages."
+    },
+    {
+     "de": "Gelöschte Dokument-Notizen und Video-Kommentare landen im Papierkorb und lassen sich mit Rückgängig zurückholen.",
+     "en": "Deleted document notes and video comments go to the trash and come back with undo."
+    },
+    {
+     "de": "Beim Umzug deines Kontos kommen deine eigenen Ticket-Typen und Feldvorlagen jetzt mit.",
+     "en": "Moving your account now takes your own ticket types and field templates along."
+    }
+   ]
+  },
+  {
    "version": "2.994.0",
    "date": "2026-11-11",
    "items": [
