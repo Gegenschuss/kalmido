@@ -1651,7 +1651,6 @@
 "static/js/custview.js|t.id": 1,
 "static/js/dashboard.js|!S.ly.phone": 1,
 "static/js/dashboard.js|!S.ly.std": 1,
-"static/js/dashboard.js|(() => { // 2.25.0 (UX-45): what was written, one line const ex = g.items.map(([it]) => it).find(it => (it.kind === 'mention' || it.kind === 'comment') && it.excerpt); return ex ? `<div class=\"nexc ngex\">${newsExcerpt(ex.excerpt, U)}</div>` : ''; })()": 1,
 "static/js/dashboard.js|A": 5,
 "static/js/dashboard.js|S.ly.phone": 1,
 "static/js/dashboard.js|S.ly.std": 1,
