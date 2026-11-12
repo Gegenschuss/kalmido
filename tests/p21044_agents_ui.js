@@ -120,6 +120,7 @@ const itemTx = d => items(d).map(b => b.textContent.replace(/\s+/g, ' ').trim())
   const L = (await call('POST', '/api/lists', {name: 'Office'}, CK)).id;
   await call('PUT', `/api/lists/${L}/members`, {user_id: TA, role: 'edit'}, CK);
   await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'}, CK);
+  await call('PATCH', `/api/lists/${L}`, {agent_members: true}, CK);  // members may see and use the project's agent (default off)
   w = await boot({user: 'alice', hash: 'agents'}); d = w.document;
   check(await until(() => card(d, TA)?.querySelector('.agsetb')), '#5825: the admin sees the gear on the team agent');
   click(w, card(d, TA).querySelector('.agsetb'));
