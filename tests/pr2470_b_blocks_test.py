@@ -61,7 +61,9 @@ def old(oid, name, text, archived=0):
 
 
 def letters(oid):
-    return dbx("SELECT id, key, body, text_de, text_en, archived FROM office_texts WHERE org_id=? AND kind='letter' ORDER BY id", (oid,))
+    # 2.997.0 (#5624): a deleted text lies in the core's trash (#5414, deleted_at) - only the live rows count
+    return dbx("SELECT id, key, body, text_de, text_en, archived FROM office_texts WHERE org_id=? AND kind='letter' AND deleted_at IS NULL "
+               "ORDER BY id", (oid,))
 
 
 def blocks(s, q=""):
@@ -97,6 +99,7 @@ T = next((x for x in tx if x["id"] == K), {})
 check(T.get("kind") == "letter" and T.get("key") == "Kündigung" and T.get("text_de") == "Hiermit kündige ich fristgerecht." and "body" not in T,
       f"the list Text blocks shows it in clear {T}")
 check(A.delete(B + f"{TX}/{rows[2][0]}").ok and len(letters(ORG)) == 2, "deleted in the texts")
+check(bool(dbx("SELECT 1 FROM office_texts WHERE id=? AND deleted_at IS NOT NULL", (rows[2][0],))), "... it lies in the trash")  # 2.997.0 (#5624)
 blocks(A)
 check(len(letters(ORG)) == 2, "a deleted block does not come back from the old table")
 
