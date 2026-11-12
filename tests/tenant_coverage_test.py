@@ -1671,7 +1671,7 @@ check(route_suites('\nROUTES = {\n    # all below: p1_test.py\n    "GET /a": "x"
 
 LEGACY_FILE = os.path.join(N, "tenant_coverage_legacy.txt")
 LEGACY = [ln.strip() for ln in open(LEGACY_FILE, encoding="utf-8") if ln.strip() and not ln.startswith("#")]
-LEGACY_COUNT = 1426  # 2.610.0 (#4010): 1429 -> 1426, the API v1 file routes proven by p2610_c_v1restore; 2.546.0 (#4291): the length of tenant_coverage_legacy.txt; lower it together with the file, never raise it
+LEGACY_COUNT = 1424  # 2.1026.0 (#5280): 1426 -> 1424, /api/search/messages and /api/v1/files/search went into the one search route; 2.610.0 (#4010): 1429 -> 1426, the API v1 file routes proven by p2610_c_v1restore; 2.546.0 (#4291): the length of tenant_coverage_legacy.txt; lower it together with the file, never raise it
 # 2.638.0 (#4641): 882 -> 1429 once, with the stricter proof (method + 403 / 404 probe, no comment-block suites); kalmido-livezug.py
 # einreihen compares it and the file with main and turns a rise red
 UNPROVEN = unproven(ROUTES, KINDS, open(__file__, encoding="utf-8").read())

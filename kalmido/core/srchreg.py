@@ -125,7 +125,9 @@ def srch_web():
     return jsonify({**r, **({"groups": groups} if groups else {})})
 
 
-def srch_v1():
+@app.get("/api/v1/search")
+@v1_view
+def v1_search():
     """GET /api/v1/search: ?kind = tasks (default) | messages | contacts | notes | files | wiki | events | all (scope=messages
     stays the older name of kind=messages). all: {groups: {kind: [at most ?limit (default 5) entries]}} of the kinds the
     token may read; never the office (question 16)."""
@@ -157,5 +159,3 @@ def srch_v1():
     finally:
         g.pop("srch_kind", None)  # review 2.1026 F2: never beyond this call (in-process calls may share g)
 
-
-app.add_url_rule("/api/v1/search", "v1_search", v1_view(srch_v1), methods=["GET"])

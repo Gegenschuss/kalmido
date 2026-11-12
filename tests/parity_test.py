@@ -1027,6 +1027,8 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "DELETE /team/rooms/{}/groups/{}": "2.565.0 (#4719): sharing a channel with a group is for its managers (people; agents 403)",
     "GET /focus": "2.116.0 (#2067): focus sessions are private to a person; agent tokens get 403, so no tool (scripts with a personal token use it)",
     "GET /focus/stats": "2.116.0 (#2067): as GET /focus",
+    "GET /contacts": "2.1026.0 (#5280): the MCP tool search kind contacts runs it through GET /search?kind=contacts (the same answer)",
+    "GET /notes": "2.1026.0 (#5280): the MCP tool search kind notes runs it through GET /search?kind=notes (the same answer)",
     "POST /focus/start": "2.116.0 (#2067): as GET /focus",
     "POST /focus/{}/stop": "2.116.0 (#2067): as GET /focus",
     "POST /focus/{}/pause": "2.116.0 (#2067): as GET /focus",
