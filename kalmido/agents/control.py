@@ -468,7 +468,8 @@ CTL_REASON_TEXT = {"not_found": N_("No approval card with this id of yours."),
                    "one_way": N_("A one-way step needs a card marked one_way and the Yes of a person."),
                    "approver_rights": N_("The person who said Yes may not change this project themselves."),
                    "approver_shares": N_("The person who said Yes shares no project with you."),
-                   "format": N_("The header must be the id of the card (a number).")}
+                   "format": N_("The header must be the id of the card (a number)."),
+                   "nested": N_("The step of a card cannot run a card.")}
 CTL_STATE_FIELDS = {"expect_updated_at", "prev", "_prev", "If-Match"}  # 2.1045.0 (#5827): fields that carry the state the step read
 
 
@@ -486,7 +487,9 @@ def ctl_reason_text(why):
         return tr("The body differs from the card in: {0}. Run the card with run_approved_step (POST /api/v1/agent/approvals/ID/run) instead of sending it again.",
                   ", ".join(why.get("fields") or []))
     if r == "used":
-        return tr("The card was already used: the step ran at {0}. Check the result instead of sending it again.", why.get("used_at", ""))
+        if why.get("used_at"):  # 2.1045.0 (#5827, N3): a parallel try that failed later frees the card again -- never "it ran" for sure
+            return tr("The card is in use right now or has run (at {0}): check the result instead of sending it again.", why["used_at"])
+        return tr("The card is in use right now or has run: check the result instead of sending it again.")
     return tr(CTL_REASON_TEXT.get(r, N_("The approval does not fit.")))
 
 
@@ -535,6 +538,8 @@ def ctl_claim(c, a, hdr, step, lids):
 
 
 CTL_RUN_TIMEOUT = 120  # 2.1045.0 (#5827): seconds the run of an approved step may take (as api/scopes.py approval_replay)
+CTL_RUN_ENV = "kalmido.ctl_run"  # 2.1045.0 (#5827, M1): set by ctl_run_replay; v1_agent_approval_run refuses a request carrying it
+CTL_RUN_HOLD = CTL_RUN_TIMEOUT + 30  # 2.1045.0 (#5827, M3): seconds a run holds its card (a run that never came back frees it)
 
 
 def ctl_run_replay(st, mid):
@@ -544,7 +549,7 @@ def ctl_run_replay(st, mid):
     nothing is looser: the body is the card's own. -> (status, body bytes, content type)."""
     import threading
     out = {}
-    env = {"REMOTE_ADDR": request.remote_addr or ""}
+    env = {"REMOTE_ADDR": request.remote_addr or "", CTL_RUN_ENV: str(mid)}  # 2.1045.0 (#5827, M1): a run inside a run -> 409
     if request.environ.get("kalmido.inproc"):  # a server agent's run in this process (v1.py srv_inproc reads it with the token name)
         env["kalmido.inproc"] = request.environ["kalmido.inproc"]
     hdrs = {"Authorization": request.headers.get("Authorization", ""), CTL_HEADER: str(mid),
@@ -578,6 +583,8 @@ def v1_agent_approval_run(mid):
     expect_updated_at / prev) gets reason stale. Only the token's own agent and its own cards."""
     v1_args(())
     aid = need_agent()
+    if request.environ.get(CTL_RUN_ENV):  # 2.1045.0 (#5827, M1): a card's step that runs a card (itself or another) never runs
+        return v1_err(409, tr(CTL_REASON_TEXT["nested"]), name="approval_invalid", message_id=mid, reason="nested")
     if request.get_data():
         raise BadInput(tr("The step comes from the card: send no body"))
     c = db()
@@ -589,13 +596,19 @@ def v1_agent_approval_run(mid):
         return v1_err(409, tr("This approval does not fit: it needs a person's Yes, exactly this method, path and body, and works once.")
                       + " " + ctl_reason_text(bad), name="approval_invalid", message_id=mid, **bad)
     st = ch["approval"]["step"]
-    c.commit()  # nothing of this request holds the card while the run claims it
+    if not ctl_run_hold(c, aid, mid):  # 2.1045.0 (#5827, M3): two runs at once -- one holds the card, the other is refused
+        bad = ctl_card_state(*ctl_card_row(c, aid, mid)) or {"reason": "used"}
+        return v1_err(409, tr("This approval does not fit: it needs a person's Yes, exactly this method, path and body, and works once.")
+                      + " " + ctl_reason_text(bad), name="approval_invalid", message_id=mid, **bad)
     status, raw, ctype = ctl_run_replay(st, mid)
-    if 200 <= status < 300:  # a step the gate let pass without the card (the level allows it now, no level, the agent's own
-        # channel) uses the card too: a card runs once, whatever the gate needed
+    if 200 <= status < 300 and status != 202:  # a step the gate let pass without the card (the level allows it now, no level,
+        # the agent's own channel) uses the card too: a card runs once, whatever the gate needed. 2.1045.0 (#5827, N2): 202 =
+        # the step waits for a person (need_approval), it did not run: the card stays usable (ctl_after frees a claimed one)
         c.execute("""UPDATE agent_chat SET choices=jsonb_set(choices, '{approval,used_at}', to_jsonb(CAST(? AS TEXT)))
                      WHERE id=? AND agent_id=? AND choices->'approval'->>'used_at' IS NULL""", (iso_ms(now_utc()), mid, aid))
-        c.commit()
+    if status != 504:  # a run that did not come back within CTL_RUN_TIMEOUT may still go on: its hold ends after CTL_RUN_HOLD
+        c.execute("UPDATE agent_chat SET choices=choices #- '{approval,run_at}' WHERE id=? AND agent_id=?", (mid, aid))
+    c.commit()
     if status == 409 and raw:
         try:
             j = json.loads(raw)
@@ -613,6 +626,19 @@ def v1_agent_approval_run(mid):
             return resp
     from flask import Response
     return Response(raw, status=status, content_type=ctype or "application/json")
+
+
+def ctl_run_hold(c, aid, mid):
+    """2.1045.0 (#5827, M3): marks card mid as running (approval.run_at = now, epoch seconds) -- atomic, only while it is unused
+    and no other run holds it (a hold older than CTL_RUN_HOLD seconds counts as gone). Commits. -> True = this run holds it."""
+    import time
+    now = time.time()
+    n = c.execute("""UPDATE agent_chat SET choices=jsonb_set(choices, '{approval,run_at}', to_jsonb(CAST(? AS DOUBLE PRECISION)))
+                     WHERE id=? AND agent_id=? AND choices->'approval'->>'used_at' IS NULL
+                     AND COALESCE(CAST(choices->'approval'->>'run_at' AS DOUBLE PRECISION), 0) < ?""",
+                  (now, mid, aid, now - CTL_RUN_HOLD)).rowcount
+    c.commit()
+    return bool(n)
 
 
 def ctl_unclaim(c, mid):
@@ -686,7 +712,7 @@ def ctl_after(resp):
     c = db()
     try:
         if resp.status_code >= 400 or resp.status_code == 202:  # 202 = it waits for a person (api/scopes.py need_approval)
-            if note["mid"] and resp.status_code >= 400:
+            if note["mid"]:  # 2.1045.0 (#5827, N2): also a 202 -- the step waits for a person, it did not run
                 ctl_unclaim(c, note["mid"])
                 c.commit()
             return resp
@@ -810,10 +836,13 @@ def ctl_card_route(st):
     and fell into the one-way branch of ctl_card_one_way."""
     adapter = app.url_map.bind("localhost")
     try:
-        adapter.match(st["path"], method=st["method"])
-        return
+        ep, _ = adapter.match(st["path"], method=st["method"])
     except Exception:  # noqa: BLE001  checked below: another method, or no such path
-        pass
+        ep = None
+    if ep is not None:
+        if app.view_functions.get(ep) is v1_agent_approval_run:  # 2.1045.0 (#5827, M1): a card that runs a card (a loop)
+            raise BadInput(tr(CTL_REASON_TEXT["nested"]))
+        return
     try:
         allowed = sorted(m for m in adapter.allowed_methods(st["path"]) if m in CTL_WRITE)
     except Exception:  # noqa: BLE001

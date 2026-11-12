@@ -11,6 +11,8 @@
  - the target changed between card and run: 409 conflict reason stale, the person's text stays, the card stays unused
  - one case per area through the run: task change (If-Match kept on the card), batch with _prev, comment, knowledge page,
    event, contact, table + cells with prev
+ - 2.1045.0 review: a card never runs a card (400 on the card, 409 nested on a run), two runs at once run once (M3), a
+   202 (the step waits for a person) leaves the card unused (N2), "used" says "in use right now or has run" (N3)
  - MCP: the 409 keeps the step as step_ref, request_chat_approval step_ref makes the card, run_approved_step runs it
 freelancer-matrix: agents (the personal agent belongs to a person without an organisation)
 usage: p21045_a_approval_test.py <datadir>      (KMT_NOSTART=1 / P21045A_NOSTART=1: a running server)"""
@@ -35,7 +37,8 @@ A.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
 FID, F = freelancer(B, A)
 OID, O = freelancer(B, A, "otto")
-SCOPES = ["read", "tasks:write", "comments", "wiki:read", "wiki:write", "calendar", "contacts", "sheets:read", "sheets:write"]
+SCOPES = ["read", "tasks:write", "comments", "wiki:read", "wiki:write", "calendar", "contacts", "sheets:read", "sheets:write",
+          "structure"]  # 2.1045.0 (#5827, N2): its own project for a step that waits for a person
 
 
 def err(r):
@@ -127,6 +130,8 @@ e = err(r)
 check(r.status_code == 409 and e.get("code") == "approval_invalid" and e.get("reason") == "used" and e.get("used_at"),
       f"second run: 409 used with the time it ran {r.status_code} {r.text[:200]}")
 check(e.get("used_at", "x")[:16] in e.get("message", ""), f"the message says when the step ran {e.get('message')}")
+# 2.1045.0 (#5827, N3): "used" may also be a run going on right now (it can still fail and free the card): never "it ran" for sure
+check("in use right now or has run" in e.get("message", ""), f"N3: used says 'in use right now or has run' {e.get('message')}")
 r = api("PATCH", f"/wiki/pages/{PID}", WMID, json={"body": LONG, "expect_updated_at": cur["updated_at"]})
 check(r.status_code == 409 and err(r).get("reason") == "used", f"the same request sent again with the header: used, not 'does not fit' {r.text[:200]}")
 dec = kt.dbx("SELECT via, message_id FROM agent_decisions WHERE agent_id=? AND message_id=?", (FA, WMID))
@@ -222,7 +227,80 @@ check(r.status_code == 409 and err(r).get("reason") == "used", f"free level: a s
 n = [x for x in F.get(B + f"/api/tasks/{T}/comments").json().get("comments", []) if x.get("body") == "Once only"] \
     if F.get(B + f"/api/tasks/{T}/comments").ok else None
 check(n is None or len(n) == 1, f"free level: one comment, not two {n}")
+
+# ---- 2.1045.0 (#5827, M3): two runs of one card at the same moment (level free: the gate claims nothing) -> one runs, one is "used"
+import threading  # noqa: E402
+
+
+def race(mid):
+    out, go = [], threading.Barrier(2)
+
+    def one():
+        go.wait()
+        out.append(run(mid))
+    ts = [threading.Thread(target=one) for _ in range(2)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join(150)
+    return sorted(x.status_code for x in out), [err(x).get("reason") for x in out if x.status_code == 409]
+
+
+for i in range(4):
+    body = f"Race {i}"
+    mid = card({"method": "POST", "path": f"/tasks/{T}/comments", "body": {"body": body}}).json()["id"]
+    answer(mid)
+    codes, why = race(mid)
+    check(codes == [201, 409] and why == ["used"], f"M3: two runs at once -> one 201, one 409 used ({i}) {codes} {why}")
+    cs = api("GET", f"/tasks/{T}/comments").json().get("data", [])
+    check(len([x for x in cs if x.get("body") == body]) == 1, f"M3: the step ran once ({i})")
+    check(not kt.dbx("SELECT 1 FROM agent_chat WHERE id=? AND choices->'approval'->>'run_at' IS NOT NULL", (mid,)), f"M3: the hold is gone after the run ({i})")
+
+# ---- 2.1045.0 (#5827, M3): a failed run frees its hold, the card runs again
+mid = card({"method": "POST", "path": f"/tasks/{T}/comments", "body": {"body": "After a failure"}}).json()["id"]
+answer(mid)
+kt.dbx("UPDATE agent_chat SET choices=jsonb_set(choices, '{approval,step,body}', CAST(? AS JSONB)) WHERE id=?", ('{"body": ""}', mid))
+r = run(mid)
+check(r.status_code >= 400, f"M3: an empty comment fails {r.status_code} {r.text[:200]}")
+check(not kt.dbx("SELECT 1 FROM agent_chat WHERE id=? AND (choices->'approval'->>'used_at' IS NOT NULL OR choices->'approval'->>'run_at' IS NOT NULL)", (mid,)),
+      "M3: a failed run leaves no hold and does not use the card")
+
+# ---- 2.1045.0 (#5827, N2): a 202 (the step waits for a person: an agent moves its own project into a folder) does not use the card
+r = api("POST", "/lists", json={"name": "Bot shelf"})
+check(r.status_code == 201, f"N2 setup: the agent makes its own project {r.status_code} {r.text[:200]}")
+BL = r.json().get("id")
+# the person who says Yes writes in the project (the level's cap, ctl_claim approver_rights); the agent sharing it would itself wait (202)
+kt.dbx("INSERT INTO list_members(list_id,user_id,role,sort,added_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
+       (BL, FID, "edit", 0, "2026-11-12T00:00:00Z"))
+
+
+def n2_case(what):
+    mid = card({"method": "PATCH", "path": f"/lists/{BL}", "body": {"folder": "Archive " + what}}).json()["id"]
+    answer(mid)
+    r = run(mid)
+    check(r.status_code == 202, f"N2 ({what}): the step waits for a person, 202 {r.status_code} {r.text[:200]}")
+    check(not kt.dbx("SELECT 1 FROM agent_chat WHERE id=? AND (choices->'approval'->>'used_at' IS NOT NULL OR choices->'approval'->>'run_at' IS NOT NULL)", (mid,)),
+          f"N2 ({what}): the 202 leaves the card unused")
+    r = run(mid)
+    check(r.status_code == 202, f"N2 ({what}): the card still runs (the same waiting request) {r.status_code} {r.text[:200]}")
+
+
+n2_case("free")  # the gate let it pass without the card: the run itself must not mark it used
 check(F.patch(B + f"/api/agents/{FA}/control", json={"level": "approve_all"}).ok, "setup: back to approve_all")
+n2_case("approve_all")  # the gate claimed the card (ctl_claim): ctl_after gives it back on 202
+
+# ---- 2.1045.0 (#5827, M1): a card whose step runs a card is refused; a run inside a run never runs (no loop)
+r = card({"method": "POST", "path": f"/agent/approvals/{WMID}/run"}, want=400)
+check(not kt.dbx("SELECT 1 FROM agent_chat WHERE agent_id=? AND right(choices->'approval'->'step'->>'path', 4)=?", (FA, "/run")),
+      f"M1: a card running a card is refused and not stored {r.text[:200]}")
+mid = card({"method": "POST", "path": f"/tasks/{T}/comments", "body": {"body": "Never"}}).json()["id"]
+answer(mid)
+kt.dbx("""UPDATE agent_chat SET choices=jsonb_set(choices, '{approval,step}', CAST(? AS JSONB)) WHERE id=?""",
+       ('{"method": "POST", "path": "/api/v1/agent/approvals/%d/run"}' % mid, mid))  # stored past the card check (an older card)
+r = run(mid)
+check(r.status_code == 409 and err(r).get("reason") == "nested", f"M1: a run inside a run is refused as nested {r.status_code} {r.text[:200]}")
+check(not kt.dbx("SELECT 1 FROM agent_chat WHERE id=? AND (choices->'approval'->>'used_at' IS NOT NULL OR choices->'approval'->>'run_at' IS NOT NULL)", (mid,)),
+      "M1: the refused run leaves the card unused and free")
 
 # ================================================================== MCP: step_ref and run_approved_step
 spec = importlib.util.spec_from_file_location("kalmido_mcp_p21045", os.path.join(HERE, "..", "mcp", "kalmido_mcp.py"))

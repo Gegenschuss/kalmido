@@ -3358,13 +3358,15 @@ run it from the card after the Yes:
    PATCH") - it is never stored as a card nobody can use.
 2. After the person's **Yes**: `POST /api/v1/agent/approvals/{id}/run` (no body; MCP `run_approved_step` with the card's
    `message_id`). The server sends exactly the card's method, path, body (and If-Match) once, as you, through the same
-   checks; the answer is the route's own answer. A failed run (4xx / 5xx) gives the approval back.
+   checks; the answer is the route's own answer. A failed run (4xx / 5xx) gives the approval back, and so does `202` (the
+   step waits for a person's approval, it did not run). Two runs of one card at once: one runs, the other gets `used`. A
+   card's step can never be `.../approvals/{id}/run` itself (`400` on the card, `409` reason `nested` on a run).
 3. Refused runs and refused header requests say why, in `error.reason` (and in words, never with a content of the card):
    `method` (`card_method`, `call_method`), `path` (`card_path`, `call_path`), `body` (`fields`: the top-level fields that
    differ), `stale` (only a state field such as `expect_updated_at` / `prev` differs, or the route answered `409 conflict`
-   on a run: the target changed since the card - read it again, ask with a new card), `used` (`used_at`: the step already
-   ran then - check the result instead of reporting a failure), `unanswered`, `rejected`, `withdrawn`, `no_step`,
-   `one_way`, `approver_rights`, `approver_shares`, `not_found` (run: 404), `format`.
+   on a run: the target changed since the card - read it again, ask with a new card), `used` (the card is in use right now or
+   has run, `used_at` when it ran - check the result instead of reporting a failure), `unanswered`, `rejected`, `withdrawn`, `no_step`,
+   `one_way`, `approver_rights`, `approver_shares`, `not_found` (run: 404), `format`, `nested`.
 
 The way to the approval: an approval card in the chat with the person (`POST /api/v1/agent/chats/{uid}`, MCP
 `request_chat_approval`) whose `approval.step` names exactly that request - `{"method": "PATCH", "path":

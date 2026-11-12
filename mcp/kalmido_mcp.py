@@ -1178,7 +1178,7 @@ TOOLS = [
           ["user_id", "title"]), t_request_chat_approval),
     ("run_approved_step", "2.1045.0: after the person answered Yes on your approval card with a step (request_chat_approval step_ref / step), "
                           "the server runs exactly the card's step once (method, path and body from the card) and returns the route's answer. "
-                          "Refused with the reason: unanswered / rejected / withdrawn / used (+ used_at: it already ran -- check the result, do not "
+                          "Refused with the reason: unanswered / rejected / withdrawn / used (in use right now or it already ran, + used_at -- check the result, do not "
                           "report a failure) / stale (the target changed since the card: read it again, ask with a new card).",
      _obj({"message_id": S_ID}, ["message_id"]), t_run_approved_step),
     ("use_approval", "2.235.0 (older way; prefer run_approved_step): after the person answered Yes on your approval card with a step (request_chat_approval step), "
