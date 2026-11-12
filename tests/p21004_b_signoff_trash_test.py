@@ -109,7 +109,7 @@ r = Fr.delete(ORPH + f"/{S2}")
 check(r.ok and r.json().get("trash") == {"kind": "osignoff", "id": S2} and deleted(S2) is True, f"freelancer: into the core's trash {r.text[:200]}")
 t = in_trash(Fr, "osignoff", S2)
 check(len(t) == 1 and t[0]["label"] == "Example Freelance Cut" and not in_trash(A, "osignoff", S2), f"freelancer: in her office trash only {t}")
-check(A.post(T + f"/core/osignoff/{S2}/restore").status_code == 404 and Gs.post(T + f"/core/osignoff/{S2}/restore").status_code in (403, 404),
+check(A.post(T + f"/core/osignoff/{S2}/restore").status_code == 404 and Ol.post(T + f"/core/osignoff/{S2}/restore").status_code == 404,
       "freelancer: nobody else restores it")
 check(Fr.post(T + f"/core/osignoff/{S2}/restore").ok and deleted(S2) is False and listed(Fr) == [S2], "freelancer: restored, listed again")
 check(Fr.delete(ORPH + f"/{S2}").ok, "freelancer: into the trash again")
