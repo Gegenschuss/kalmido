@@ -287,7 +287,7 @@ jobs:
         run: python tools/check_list_state.py
       # 2.1056.0 (#5863): two packages merged side by side changed a signature and added a caller (otr_back without uid, 2.1024
       # red in the full CI only); the Mac lint and the einreihen check replay this step
-      - name: Calls of module-level functions get all required parameters - '# arity-ok: <reason>' on the call (2.1056.0, #5863)
+      - name: "Calls of module-level functions get all required parameters - an arity-ok comment on the call excepts it (2.1056.0, #5863)"
         run: python tools/check_call_arity.py -v
       - name: ruff (E, F, BLE without E501; ruff.toml) red for new code only - tools/ruff_baseline.json (2.755.0, #5294)
         run: |
