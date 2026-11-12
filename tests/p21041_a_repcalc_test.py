@@ -142,5 +142,8 @@ check(D(str(r["after"]["gross"])) == 7000, f"#5815: target gross 7.000 with a po
 check(rp.orp_rest_index([it("a", 1, 5000, discount_pct=100), it("b", 1, 100)], {0, 1}) == 1, "#5815: rest never on a position with 100 % discount")
 check(rp.orp_rest_index([it("a", 1, 1000, discount_pct=50), it("b", 1, 800)], {0, 1}) == 1, "#5815: rest on the largest amount after its discount")
 
+r = solve(DOC, [it("Frei", 1, 900, discount_pct=100), it("Fest", 1, 500)], "net", 2000, sel={0})
+check(not r["reachable"] and r["reason"] == "nothing", f"#5815: only a position with 100 % own discount chosen -> nothing {r.get('reason')}")
+
 print(f"p21041_a_repcalc: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

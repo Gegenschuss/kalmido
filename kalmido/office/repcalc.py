@@ -114,8 +114,9 @@ def orp_solve(ev, items, sel, prod_rate, mode, value, rnd="cent", rest=False, sc
             out["deviation"] = None if m is None else value - m
         return out
 
-    if not any(dec(items[i].get("rate")) != 0 and not items[i].get("opt") for i in sel) and not (scale_prod and prod_rate):
-        return res(Decimal(1), items, prod_rate, False, "nothing", before)  # review F9: optional ones alone move no target
+    if not any(dec(items[i].get("rate")) != 0 and not items[i].get("opt") and dec(items[i].get("discount_pct")) < 100 for i in sel) and not (scale_prod and prod_rate):
+        # review F9: optional ones alone move no target; 2.1051.0 (#5815): neither do ones with 100 % own discount
+        return res(Decimal(1), items, prod_rate, False, "nothing", before)
     if mode == "pct":
         f = 1 + value / 100
         if f <= 0:
