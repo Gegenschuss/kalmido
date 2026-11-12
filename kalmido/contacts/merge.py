@@ -172,7 +172,7 @@ def ctm_lines(rows, f, refs, occ_names, unfit=0):
         if not rec.get("dup"):  # the doubles a move made are counted with the move already
             n[rec["t"]] = n.get(rec["t"], 0) + len(rec["moved"]) + len(rec["dropped"])
     lines = []
-    names = {"obj_links": N_("Task links: {0}"),  # 2.1076.0 (#5271): was contact_tasks "event_attendees": N_("Event attendances: {0}"),
+    names = {"obj_links": N_("Task links: {0}"), "event_attendees": N_("Event attendances: {0}"),  # 2.1076.0 (#5271): obj_links was contact_tasks
              "office_client_contacts": N_("Contact person at clients: {0}"), "contact_care": N_("Stay in touch: {0}"),
              "hub_bookings": N_("Bookings in the disposition: {0}")}
     other = 0

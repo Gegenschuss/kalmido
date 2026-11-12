@@ -317,6 +317,10 @@ with _pg.system_ctx(c):
             d = dict(r)
             out["seen"] += 1
             # (a table with an org_id: no row without one either, that is someone's private data)
+            # 2.1076.0 (#5271): a contact's task link (obj_links rel contact) has no workspace of its own, as contact_tasks had no
+            # org_id column: its query binds it to the organisation's address books and tasks
+            if table == "obj_links" and d.get("rel") == "contact" and d["org_id"] is None:
+                continue
             if ("org_id" in d and d["org_id"] != org) or (d.get("list_id") is not None and table != "lists" and d["list_id"] not in ours):
                 out["bad"].append([name, d.get("id"), d.get("org_id"), d.get("list_id")])
     out["foreign"] = c.execute("SELECT COUNT(*) FROM lists WHERE org_id IS DISTINCT FROM ?", (org,)).fetchone()[0]
