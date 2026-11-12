@@ -180,9 +180,14 @@ NORM = ("import json\nfrom kalmido.core.db import tg_norm\n"
         f"w = {WANT!r}\ns = {SAME!r}\no = {OTHER!r}\n"
         "print(json.dumps({'same': tg_norm(w) == tg_norm(s), 'none': tg_norm('DROP TRIGGER x') is None and tg_norm('') is None, "
         "'hit': [x for x in o if tg_norm(x) == tg_norm(w)], 'n': len({tg_norm(x) for x in o}),"
-        "'schema': tg_norm(w.replace(' ON t ', ' ON app.t '), 'app') == tg_norm(w)}))")
+        "'schema': tg_norm(w.replace(' ON t ', ' ON app.t '), 'app') == tg_norm(w),"
+        # 2.997.2 (#4841): a name quoted by pg.py qi ("t") is the bare name pg_get_triggerdef prints; a name that needs its
+        # quotes ("T") stays different
+        "'quoted': tg_norm(w.replace(' ON t ', ' ON \"t\" ')) == tg_norm(s),"
+        "'upper': tg_norm(w.replace(' ON t ', ' ON \"T\" ')) != tg_norm(s)}))")
 r = in_ct(NORM)
 check(r["same"] and r["none"] and r["schema"], f"#2731: the same statement in other spelling is equal {r}")
+check(r["quoted"] and r["upper"], f"#4841: a table name in plain double quotes equals the bare name {r}")
 check(r["hit"] == [] and r["n"] == len(OTHER), f"#2731: every real difference counts {r}")
 
 print(f"p2369_b: {OKS[0]} ok, {len(FAILS)} failed")

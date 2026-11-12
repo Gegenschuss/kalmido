@@ -803,6 +803,7 @@ def ix_ensure(c, sql, have=None):
 # trigger, so what cannot be read counts as different (a needless replace is only the lock of before)
 _TG_STR = re.compile(r"('(?:[^']|'')*')")
 _TG_DEF = re.compile(r"^create (?:or replace )?trigger (\S+) (before|after|instead of) (.+?) on (\S+) (.+)$", re.S)
+_TG_QUOTED = re.compile(r'"([a-z_][a-z0-9_$]*)"')
 _TG_LINE = re.compile(r"^[ \t]*CREATE[ \t]+OR[ \t]+REPLACE[ \t]+TRIGGER[ \t]+(\w+)\b[^;]*?\bON[ \t]+(\w+)\b[^;]*(?:;|\Z)", re.M)
 
 
@@ -812,7 +813,9 @@ def tg_norm(sql, schema="public"):
     sorted, the schema off the table and the function, EXECUTE PROCEDURE = FUNCTION. WHEN stays as written apart from that
     (only the pretty form drops its redundant brackets). None when it cannot be read."""
     parts = _TG_STR.split(sql.strip().rstrip(";").rstrip())
-    parts[::2] = [re.sub(r"\s*([(),])\s*", r"\1", re.sub(r"\s+", " ", p)).lower() for p in parts[::2]]
+    # 2.997.2 (#4841): a plain lower-case name in double quotes ("fs_nodes", from pg.py qi) is the bare name -
+    # pg_get_triggerdef quotes only where it must, so osw_init (#5279) replaced its four triggers at every start
+    parts[::2] = [re.sub(r"\s*([(),])\s*", r"\1", re.sub(r"\s+", " ", _TG_QUOTED.sub(r"\1", p))).lower() for p in parts[::2]]
     m = _TG_DEF.match("".join(parts))
     if not m:
         return None
