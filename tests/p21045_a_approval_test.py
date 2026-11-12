@@ -211,6 +211,19 @@ if SID:
     r = run(approved(api("PUT", f"/sheets/{SID}/cells", json={"cells": [{"cell": "B1", "raw": "9", "prev": "1"}]}), "cells"))
     check(r.ok and not r.json().get("conflicts"), f"cells with prev through the run {r.status_code} {r.text[:200]}")
 
+# ---- a step the level now allows without a card still uses the card: a card runs once
+check(F.patch(B + f"/api/agents/{FA}/control", json={"level": "free"}).ok, "setup: level free")
+mid = card({"method": "POST", "path": f"/tasks/{T}/comments", "body": {"body": "Once only"}}).json()["id"]
+answer(mid)
+r = run(mid)
+check(r.status_code == 201, f"free level: the card's step runs {r.status_code} {r.text[:200]}")
+r = run(mid)
+check(r.status_code == 409 and err(r).get("reason") == "used", f"free level: a second run is refused as used {r.status_code} {r.text[:200]}")
+n = [x for x in F.get(B + f"/api/tasks/{T}/comments").json().get("comments", []) if x.get("body") == "Once only"] \
+    if F.get(B + f"/api/tasks/{T}/comments").ok else None
+check(n is None or len(n) == 1, f"free level: one comment, not two {n}")
+check(F.patch(B + f"/api/agents/{FA}/control", json={"level": "approve_all"}).ok, "setup: back to approve_all")
+
 # ================================================================== MCP: step_ref and run_approved_step
 spec = importlib.util.spec_from_file_location("kalmido_mcp_p21045", os.path.join(HERE, "..", "mcp", "kalmido_mcp.py"))
 M = importlib.util.module_from_spec(spec)

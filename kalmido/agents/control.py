@@ -591,6 +591,11 @@ def v1_agent_approval_run(mid):
     st = ch["approval"]["step"]
     c.commit()  # nothing of this request holds the card while the run claims it
     status, raw, ctype = ctl_run_replay(st, mid)
+    if 200 <= status < 300:  # a step the gate let pass without the card (the level allows it now, no level, the agent's own
+        # channel) uses the card too: a card runs once, whatever the gate needed
+        c.execute("""UPDATE agent_chat SET choices=jsonb_set(choices, '{approval,used_at}', to_jsonb(CAST(? AS TEXT)))
+                     WHERE id=? AND agent_id=? AND choices->'approval'->>'used_at' IS NULL""", (iso_ms(now_utc()), mid, aid))
+        c.commit()
     if status == 409 and raw:
         try:
             j = json.loads(raw)
