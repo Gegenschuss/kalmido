@@ -52,8 +52,10 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   s3 = await call('GET', `/api/tasks/${TL3}`);
   check(!s3.due && s3.content === LONG3, '#3108 F undo of a direct change (patchTask history) keeps the long note: ' + JSON.stringify([s3.due, (s3.content || '').length]));
   await w.eval(`histStep('redo')`);
-  s3 = await call('GET', `/api/tasks/${TL3}`);
-  check(s3.due === '2031-02-03' && s3.content === LONG3, '#3108 F redo keeps the long note too');
+  // 2.997.0 (#5612): the undo took the change out of the outbox before it was sent (#5255 stage 7: no copy, the queue entry is
+  // the way back); the redo sends it again through the outbox, so the server has it once the outbox is through - wait for that
+  s3 = await until(async () => { const x = await call('GET', `/api/tasks/${TL3}`); return x.due === '2031-02-03' ? x : null; }) || await call('GET', `/api/tasks/${TL3}`);
+  check(s3.due === '2031-02-03' && s3.content === LONG3, '#3108 F redo keeps the long note too: ' + JSON.stringify([s3.due, (s3.content || '').length, w.eval('OUT.q.length')]));
 
   // 2.280.0 F (#3108): the reference card of a task whose long note is not loaded: from the local task (no fetch, offline the title)
   check(w.eval(`rf_get('t:${TL2}')?.name`) === 'Long note two', '#3108 F a reference card takes the local task (was: fetched, "…" offline)');
