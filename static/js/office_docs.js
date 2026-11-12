@@ -158,6 +158,32 @@ function ofdDraw() {
   const el = $('.office .ofcbody .pboffers') || $('.office .ofcbody'); if (el) ofdOffersTab(el);  // 2.47.3 (#1360): below the hint of an empty personal office
   ofd_crumbSync();
 }
+// 2.1004.0 (#5572): a phone's office list has ONE navigation line: the kinds of Quotations / Invoices follow their point in the
+// row of the office menu (areas.js ofm_menuHtml), the point itself is its first kind; the kind tabs of the body hide then
+// (app.css #view:has(.ofpb .ofpk)). The address carries the kind (ofd_kindHash), so a kind tab is a plain link.
+function ofd_navKind(sec, ks) {
+  const p = location.hash.slice(1).split('/');
+  if (p[0] === 'office' && p[1] === sec && ks.includes(p[2])) return p[2];
+  if (OFD.sec === sec && ks.includes(OFD.kind)) return OFD.kind;
+  return ks.includes(OFD.kindOf?.[sec]) ? OFD.kindOf[sec] : ks[0];
+}
+function ofd_navKindsHtml(cur, btn) {
+  if (!Object.hasOwn(OFD_SECS, cur) || S.route.id || S.route.tab !== cur) return btn;
+  const ks = ofd_kinds().map(x => x[0]); if (ks.length < 2) return btn;
+  const k = ofd_navKind(cur, ks), sub = k !== ks[0];
+  const pt = btn.replace(`data-go="office/${cur}"`, `data-go="office/${cur}/${ks[0]}"`).replace('class="ofpt2 ', `class="ofpt2 ${sub ? 'ofpsub ' : ''}`);
+  return pt + ofd_kinds().slice(1).map(([v, n], i) => `<button type="button" class="ofpt2 ofpk${i ? '' : ' ofpk1'}${v === k ? ' on' : ''}" data-go="office/${esc(cur)}/${esc(v)}" data-ofk="${esc(v)}"${v === k ? ' aria-current="true"' : ''}>${esc(tr(n))}</button>`).join('');
+}
+// after a draw of the list: the row follows a kind changed in place (reminder drafts, the cockpit; the address without a step)
+function ofd_navSync() {
+  const row = $('#view .ofpb .ofpts'), pt = row && $(`[data-ofm="${ofd_sec()}"]`, row); if (!pt) return;
+  if (!$('.ofpk', row)) {  // the row was drawn before this module had loaded (lazyload.js): the kinds join it now
+    const h = ofd_navKindsHtml(ofd_sec(), pt.outerHTML); if (h !== pt.outerHTML) { pt.outerHTML = h; if (typeof ofr_fade === 'function') ofr_fade(); }
+    return;
+  }
+  pt.classList.toggle('ofpsub', OFD.kind !== ofd_kinds()[0]?.[0]);
+  for (const b of $$('.ofpk', row)) { const on = b.dataset.ofk === OFD.kind; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); }
+}
 // a function, not typeof OFD in areas.js: the module comes later, and a typeof on a const of a later script can stay "undefined" in jsdom (p2380_b_buero_ui)
 function ofd_openDoc() { return OFD.doc; }
 // 2.936.0 (#5448): a phone on an open document: its head (back + number + status) is the page's only way back (areas.js
@@ -189,6 +215,7 @@ function ofdOffersTab(el) {
   } else { ofd_kindHash(); if (!OFD.list && !OFD.loading) setTimeout(ofdLoadList, 0); }
   keepFocus(el, () => fl_set(el, id ? ofd_pairHtml() : ofdListHtml()));  // 2.46.2 (#1718): morphed
   if (typeof ofr_fade === 'function') ofr_fade(el);  // 2.936.0 (#5448): the kind tabs of a narrow screen fade at a cut edge
+  if (!id) ofd_navSync();  // 2.1004.0 (#5572)
   const sl = id && $('.lsdl', el); if (sl && OFD.lsdTop) sl.scrollTop = OFD.lsdTop;  // 2.557.0 A (#4553): the list keeps its place when the next document opens
   if (id) el.querySelectorAll('textarea[data-grow-min]').forEach(t => ofcGrow(t, +t.dataset.grow || 3));  // 2.431.0 (#3594 review): a long subject wrapped by the field's width fits at once
   // 2.308.0 (#3251): the listeners sit on the tab body, not on a box inside it (the body and the box in it were both wired depending on timing: one click opened two dialogs)

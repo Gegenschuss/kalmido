@@ -113,15 +113,16 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(iv && iv.full && /Invoice/.test(iv.kind) && iv.line, '#5448 phone: the invoice head: kind word, full number, status on the line ' + JSON.stringify(iv));
     check(await ev(`/Record payment/.test(document.querySelector('.ofdhead [data-ofd="pay"]')?.innerText || '')`), '#5448 phone: "Record payment" keeps its word');
     await shot('p2936b-handy-rechnung.png');
+    // 2.1004.0 (#5572): the kinds sit in the office menu row now (one navigation line): that row is checked
     // the kind tabs of the invoices: wider than the phone, they fade at the cut edge, after scrolling at the other one
     await nav(B + '#office/invoices');
-    check(await until(`!!document.querySelector('.office .ofdkinds button')`, {timeout: 20000}), 'phone: the invoices with their kind tabs');
-    const k = await until(`(() => { const r = document.querySelector('.office .ofdkinds'); return r && r.scrollWidth > r.clientWidth + 1 ? {r: r.classList.contains('ofx-r'), l: r.classList.contains('ofx-l'), m: getComputedStyle(r).maskImage} : null; })()`, {timeout: 5000});
+    check(await until(`!!document.querySelector('#view .ofpb .ofpk')`, {timeout: 20000}), 'phone: the invoices with their kind tabs');
+    const k = await until(`(() => { const r = document.querySelector('#view .ofpb .ofpts'); if (r && r.scrollLeft) { r.scrollLeft = 0; return null; } return r && r.scrollWidth > r.clientWidth + 1 ? {r: r.classList.contains('ofx-r'), l: r.classList.contains('ofx-l'), m: getComputedStyle(r).maskImage} : null; })()`, {timeout: 5000});
     if (!k) console.log('p2936_b_head: the kind tabs fit the phone here, no fade to check');
     else {
       check(k.r && !k.l && k.m && k.m !== 'none', '#5448 phone: the cut kind tabs fade out on the right ' + JSON.stringify(k));
-      await ev(`(() => { const r = document.querySelector('.office .ofdkinds'); r.scrollLeft = r.scrollWidth; return 1; })()`);
-      check(await until(`(() => { const r = document.querySelector('.office .ofdkinds'); return r.classList.contains('ofx-l') && !r.classList.contains('ofx-r'); })()`), '#5448 phone: scrolled to the end: the fade moves to the left');
+      await ev(`(() => { const r = document.querySelector('#view .ofpb .ofpts'); r.scrollLeft = r.scrollWidth; return 1; })()`);
+      check(await until(`(() => { const r = document.querySelector('#view .ofpb .ofpts'); return r.classList.contains('ofx-l') && !r.classList.contains('ofx-r'); })()`), '#5448 phone: scrolled to the end: the fade moves to the left');
     }
     await shot('p2936b-handy-rechnungen-reiter.png');
   }, true);

@@ -104,6 +104,7 @@ const ofc_allUpHtml = () => ofc_sp() ? `<a href="#office" class="linkbtn ofcallu
 const ofc_wsKey = () => (typeof wsCur === 'function' ? wsCur() : '') + (ofc_sp() ? '>' + ofc_sp() : '');  // OFC.ws: the shown office (a workspace, or "All" + an area)
 // the office header: the area, the company, the role (2.936.0, #5448: without an area no leading dot, nothing = no line)
 function ofc_headHtml(ro) {
+  if (isMobile() && !wsOn()) return '';  // 2.1004.0 (#5572): a phone with one office: no line for the company and the role (the menu row is the only line)
   const area = ofc_allUpHtml() /* 2.543.0 (#4606) */ + ofcAreaHtml() /* 2.356.0 B (#2932) */;
   const org = (OFC.info.settings?.company?.name ? ` · ${esc(OFC.info.settings.company.name)}` : '') + (OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ro ? ` · ${esc(OFC.info.role === 'readonly' || ofr_grp() ? tr('Read-only') : tr('Accounting'))}` : '');
   return area + (org ? `<span class="muted ofcorg">${/*html-ok*/ area ? org : org.slice(3) /* escaped above */}</span>` : '');

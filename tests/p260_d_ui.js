@@ -67,7 +67,7 @@ const FEAT = 'cal,comments,collab,clients,office';
     const row = bar.querySelector('.ofpts'), rb = row && row.getBoundingClientRect(), on = bar.querySelector('[data-ofm].on, [data-ofm][aria-current="page"]'), ob = on && on.getBoundingClientRect();
     const k = document.querySelector('.office .ofdkinds'); const kb = k && k.getBoundingClientRect();
     return JSON.stringify({rail: bar.id === 'side', n: ts.length, inside: ts.every(r => r.left >= b.left - 1 && r.right <= b.right + 1 && r.width > 0), wrap: row ? getComputedStyle(row).flexWrap : '', ox: row ? getComputedStyle(row).overflowX : '',
-      rows: new Set(ts.map(r => Math.round(r.top))).size,  /* 2.152.2 (#2617): rail = the panel #side */ onSeen: !!ob && (!rb || ob.left >= rb.left - 1 && ob.right <= rb.right + 1), kinds: kb ? [...k.querySelectorAll('button')].every(x => { const r = x.getBoundingClientRect(); return r.right <= kb.right + 1 && r.width > 0; }) : true,
+      rows: new Set(ts.map(r => Math.round(r.top))).size,  /* 2.152.2 (#2617): rail = the panel #side */ onSeen: !!ob && (!rb || ob.left >= rb.left - 1 && ob.right <= rb.right + 1), kinds: kb && kb.width ? [...k.querySelectorAll('button')].every(x => { const r = x.getBoundingClientRect(); return r.right <= kb.right + 1 && r.width > 0; }) : !!row && !!row.querySelector('.ofpk') /* 2.1004.0 (#5572): a phone has the kinds in the menu row (it scrolls) */,
       over: document.documentElement.scrollWidth > window.innerWidth + 1}); })()`;
   await firefox(async o => {
     const {cmd, ev, ctx, shot} = o;

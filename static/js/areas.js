@@ -265,8 +265,12 @@ function ofm_menuHtml(mod) {
   // of underlined tabs that never wraps (it scrolls sideways; ofr_after shows the active one)
   const g = OFM_GROUPS.find(x => x[0] === ofm_all().find(i => i.key === cur)?.group); if (!g) return crumb;
   const lbl = `${esc(tr('Office|area'))} · ${esc(tr(g[2]))}`;
-  const home = officeOn() ? `<button type="button" class="ofpback" data-go="office/start">${ic('chev', 's')}<span>${lbl}</span></button>` : `<span class="ofpback">${lbl}</span>`;
-  return `<nav class="ofpb" aria-label="${esc(tr('Office|area'))}" data-mgtabs="office">${home}${grp(g).length > 1 ? `<div class="ofpts">${grp(g).map(i => ofm_btn(i, cur, 'ofpt2')).join('')}</div>` : ''}</nav>${crumb}`;
+  // 2.1004.0 (#5572): ONE line: the way back is the arrow before the tabs (its words stay as its name, office.css hides them),
+  // the document kinds of Quotations / Invoices follow their point in the same row (office_docs.js ofd_navKindsHtml)
+  const row = grp(g).length > 1, bl = row ? ` aria-label="${esc(tr('Back to {0}', `${tr('Office|area')} · ${tr(g[2])}`))}" title="${esc(tr('Back to {0}', `${tr('Office|area')} · ${tr(g[2])}`))}"` : '';
+  const home = officeOn() ? `<button type="button" class="ofpback"${/*html-ok*/ bl /* escaped above */} data-go="office/start">${ic('chev', 's')}<span>${lbl}</span></button>` : `<span class="ofpback">${lbl}</span>`;
+  const kinds = (i, b) => i.key === cur && typeof ofd_navKindsHtml === 'function' ? ofd_navKindsHtml(cur, b) : b;
+  return `<nav class="ofpb${row ? ' ofp1' : ''}" aria-label="${esc(tr('Office|area'))}" data-mgtabs="office">${home}${row ? `<div class="ofpts">${/*html-ok*/ grp(g).map(i => kinds(i, ofm_btn(i, cur, 'ofpt2'))).join('')}</div>` : ''}</nav>${crumb}`;
 }
 // ---- 2.98.0 C (#2180): the office on a computer: the page starts with its own heading (.ofpt), a detail page with its path
 // instead. 2.152.2 (#2617): the second column (the office rail) is gone, its groups and points are the office's panel of
@@ -289,8 +293,8 @@ document.addEventListener('keydown', e => { if (ofr_key(e)) e.stopPropagation();
 // after a draw: the active tab of a phone's row in sight (the row scrolls sideways)
 function ofr_after(root) {
   ofr_fade(root);  // 2.936.0 (#5448)
-  const b = $('.ofpb .ofpt2.on', root || document); if (!b) return;
-  const row = b.parentElement, r = row.getBoundingClientRect(), x = b.getBoundingClientRect();  // sideways only, the page stays
+  const b = $('.ofpb .ofpk.on', root || document) || $('.ofpb .ofpt2.on', root || document); if (!b) return;  // 2.1004.0 (#5572): + a document kind
+  const row = b.closest('.ofpts') || b.parentElement, r = row.getBoundingClientRect(), x = b.getBoundingClientRect();  // sideways only, the page stays
   if (x.left < r.left || x.right > r.right) row.scrollLeft += x.left - r.left - Math.max(0, (r.width - x.width) / 2);
 }
 // 2.936.0 (#5448): a tab row that scrolls sideways (the office's points, the document kinds) fades out at the side where more

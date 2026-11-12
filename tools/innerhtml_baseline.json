@@ -699,7 +699,6 @@
 "static/js/areas.js|fold": 1,
 "static/js/areas.js|g[0]": 2,
 "static/js/areas.js|gi.map(row).join('')": 1,
-"static/js/areas.js|grp(g).map(i => ofm_btn(i, cur, 'ofpt2')).join('')": 1,
 "static/js/areas.js|hdot(agentHst(x))": 1,
 "static/js/areas.js|head": 1,
 "static/js/areas.js|head(g)": 1,

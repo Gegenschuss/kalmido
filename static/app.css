@@ -6081,6 +6081,14 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .ofpt2 svg{width:var(--ic);height:var(--ic)}
 .ofpt2.on{color:var(--text);border-bottom-color:var(--accent)}
 .ofpt2.on svg{color:var(--accent)}
+.ofpb.ofp1{flex-direction:row;align-items:stretch}  /* 2.1004.0 (#5572): ONE line: the way back as an arrow before the tabs (its words are its name) */
+.ofp1 .ofpback{flex:none;justify-content:center;align-self:stretch;min-width:2.75rem;padding:0;margin-right:.25rem}
+.ofp1 .ofpback span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.ofp1 .ofpts{flex:1;min-width:0}
+.ofpk{font-size:var(--fs-s)}  /* the document kinds of Quotations / Invoices follow their point (office_docs.js ofd_navKindsHtml) */
+.ofpk1{position:relative}.ofpk1::before{content:'';position:absolute;left:-.625rem;top:30%;bottom:30%;border-left:1px solid var(--line)}
+.ofpt2.ofpsub.on{color:var(--text);border-bottom-color:transparent}
+#view:has(.ofpb .ofpk) .office .ofdkinds{display:none}
 .ofmcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem;max-width:var(--w-seite);margin:-.375rem auto .625rem;font-size:var(--fs-s);color:var(--muted);min-width:0}
 .ofmcrumb span:last-child{color:var(--text2)}
 .ofmstart{display:flex;flex-direction:column;gap:.875rem;max-width:var(--w-seite);margin:0 auto}
