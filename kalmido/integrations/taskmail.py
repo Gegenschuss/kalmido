@@ -204,7 +204,8 @@ def tmr_comment(c, msg, mid, tid, sender, uid):
         s = collab_user(c, u, t["list_id"])
         if s and task_visible(c, tid, u, full=True):
             news_add(c, u, "comment", task_id=tid, comment_id=cid, actor=uid or 0, s=s,
-                     data={"excerpt": text[:300], **({} if uid else {"ext_name": name or sender})})
+                     data={"excerpt": text[:300], **({} if uid else {"ext_name": name or sender}),
+                           **({"mine": 1} if u in (t["created_by"], t["assignee_id"]) else {})})  # 2.1049.0 (#5806)
     bump(c)
     return tid if whole else M.MailKept(tid)
 

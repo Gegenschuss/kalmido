@@ -96,6 +96,11 @@ NEWS_FOR_ME += ("chatmention",)  # 2.1037.0 (#5800)
 # 2.1037.0 (#5801, analysis #4204): a follow-up day (my own reminder, no actor) is a deadline like "due today", an agent's
 # proposal waits for my decision like an approval -- both stood under "For you" in the app (dashboard.js) but did not count
 NEWS_DUE_KINDS = ("followup", "proposal")
+# 2.1049.0 (#5806): these are "to me" whoever caused them (a person or an agent) and count in the bell:
+# an invitation to an event, a colleague marked a task "urgent" for me, a proposal I asked an agent for is ready, an
+# agent's Playbook proposal for my project, the watchdog found a job of my agent stalled. Before, they came as a push
+# while the bell stayed empty.
+NEWS_FOR_ME_ANY = ("evinvite", "tbl_urgent", "proposal", "playbook_proposal", "job_watch")
 
 
 def news_to_me(kind, actor_id, data, agents, s=None):
@@ -105,6 +110,13 @@ def news_to_me(kind, actor_id, data, agents, s=None):
     if kind in NEWS_DUE_KINDS:  # 2.1037.0 (#5801): a follow-up day / an agent's proposal waits on me (were "For you" in the app only)
         return True
     if kind in ("approval", "aprequest", "agentask"):  # 2.1039.0 (#5805): agentask; 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
+        return True
+    if kind in NEWS_FOR_ME_ANY:  # 2.1049.0 (#5806)
+        return True
+    # 2.1049.0 (#5806): a PERSON's comment on a task I created or that is assigned to me (data.mine, set when the entry
+    # is written) -- also without a reply or a mention; an agent's comments keep following agent_comments (#1854), and a
+    # comment on a task I only follow stays Activity
+    if kind == "comment" and (data or {}).get("mine") and actor_id not in agents:
         return True
     if kind == "review" and (data or {}).get("pr"):  # 2.367.2 (#2968): a linked pull request approved my task (no actor)
         return True

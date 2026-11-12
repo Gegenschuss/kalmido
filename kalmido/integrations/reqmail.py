@@ -205,7 +205,8 @@ def rq_comment(c, msg, mid, p, l, verified):
     for u in sorted(people - ag):
         s = collab_user(c, u, t["list_id"])
         if s and task_visible(c, tid, u, full=True):  # News only: the mail round has no request (no pushes)
-            news_add(c, u, "comment", task_id=tid, comment_id=cid, actor=0, s=s, data={"excerpt": text[:300], "ext_name": name, "portal": True})
+            news_add(c, u, "comment", task_id=tid, comment_id=cid, actor=0, s=s, data={"excerpt": text[:300], "ext_name": name, "portal": True,
+                                                                                         **({"mine": 1} if u in (t["created_by"], t["assignee_id"]) else {})})  # 2.1049.0 (#5806)
     M.agent_comment_events(c, t, cid, [], [])
     bump(c)
     return tid if whole else M.MailKept(tid)

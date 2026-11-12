@@ -1172,6 +1172,13 @@ tabs *For you | Activity | All*, and the start page shows *N messages for you* w
 what agents do (their comments, completions, new tasks, status) are off by default (*Settings > Notifications > Pushes
 for what agents do*); an agent's @mention of you and its approval requests push as before.
 
+2.1049.0 (#5806): *For you* also holds -- and the bell counts -- an invitation to an event, a task a colleague marked
+*Urgent* for you, a person's comment on a task you created or that is assigned to you (also without a reply or a
+mention), a proposal you asked an agent for (or an agent's Playbook proposal) that is ready, and a job of your agent
+the watchdog found stalled. Comments on tasks you only follow stay *Activity*; agents' comments still follow
+*Comments from agents*. The number at the bell is always "this many things wait for you", the same on every device
+and whatever filter is chosen.
+
 **Notification templates** (2.33.0, #927): the owner of a shared project or folder chooses in the share dialog how much
 the other people are notified at most -- *Read-only* (mentions, assignments, direct replies), *Collaborate* (+ comments
 on their tasks and due reminders), *Everything* or *Custom*, also per person. Members can set themselves quieter, never

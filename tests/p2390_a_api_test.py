@@ -231,6 +231,7 @@ for who, s in (("alice", A), ("bob", Bo)):
     items = nw.get("items", nw if isinstance(nw, list) else [])
     check(any(i.get("kind") == "playbook_proposal" and i.get("list_id") == W and (i.get("data") or {}).get("proposal_id") == P1 for i in items),
           f"#1168: {who} gets a News item " + str(items)[:200])
+    check(all(i.get("to_me") for i in items if i.get("kind") == "playbook_proposal"), f"2.1049.0 (#5806): {who}: the Playbook proposal is 'For you'")
 nw = Ca.get(B + "/api/news").json()
 check(not any(i.get("kind") == "playbook_proposal" for i in nw.get("items", [])), "#1168: the editor gets none")
 P2 = requests.post(P, headers=CLH, json={"text": "proposal two"}).json().get("id")

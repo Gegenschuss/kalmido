@@ -576,9 +576,11 @@ def ocm_notify(c, kind, cid, text, mentions, notify_mentions, nfiles, only=None,
                 return False  # 2.62.0 (#1854): with "only replies to me" a reply right after my comment pushes like one with reply_to
             return asks or burst_gate(c, u, t["id"], mentioned=mentioned)
         # 2.28.0 (#987): a reply to my comment (the one right before) is marked: it counts as "For you" in the News
+        nd = {"reply": 1} if not ment and (uid == prev or uid == replied) else {"reach": 1} if not ment and not p61_ok else {}  # 2.66.1 (#1943)
+        if not ment and uid in (t["assignee_id"], t["created_by"]):
+            nd["mine"] = 1  # 2.1049.0 (#5806): my task (created by me / assigned to me): a person's comment is "For you"
         news = {"kind": "mention" if ment else "comment", "task_id": t["id"], "comment_id": int(cid), "actor": author,
-                "data": {"reply": 1} if not ment and (uid == prev or uid == replied) else
-                {"reach": 1} if not ment and not p61_ok else None}  # 2.66.1 (#1943)
+                "data": nd or None}
         if not obj_notify(c, "task", t["id"], [uid], row=row, lid=t["list_id"], S={uid: s}, news=news, follow=follow, gate=gate):
             continue
         what = snippet or _files_txt(nfiles, lg)

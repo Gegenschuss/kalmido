@@ -353,7 +353,8 @@ def cv_fb_post(token):
         s = collab_user(c, uid, t["list_id"])
         if not s or not task_visible(c, tid, uid, full=True):
             continue
-        news_add(c, uid, "comment", task_id=tid, comment_id=cid, actor=0, s=s, data={"excerpt": text[:300], "ext_name": name})
+        news_add(c, uid, "comment", task_id=tid, comment_id=cid, actor=0, s=s, data={"excerpt": text[:300], "ext_name": name,
+                                                                                      **({"mine": 1} if uid in (t["created_by"], t["assignee_id"]) else {})})  # 2.1049.0 (#5806)
         lv = tbl_level(c, uid, tid, s)  # 2.53.0 C (#1424): the task's bell first (muted: no push; urgent: always, priority 5)
         if lv == "urgent" and tbl_sent(uid, tid):
             continue

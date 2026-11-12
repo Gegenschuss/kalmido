@@ -135,6 +135,8 @@ w = [x for x in F.get(B + "/api/inbox").json()["items"] if x["kind"] == "watch"]
 check(w["finding"] == "job_stalled" and w["job_id"] == JS and w["task_id"] == T[0], f"... job and task {w}")
 nw = dbx("SELECT COUNT(*) FROM notifications WHERE user_id=? AND kind='job_watch'", (FU,))[0][0]
 check(nw == 1, f"one News entry for the owner ({nw})")
+jw = [x for x in F.get(B + "/api/news").json()["items"] if x["kind"] == "job_watch"]
+check(jw and all(x["to_me"] for x in jw), f"2.1049.0 (#5806): the stalled job is 'For you' (the bell counts it) {jw}")
 check(len(dbx("SELECT 1 FROM job_watch WHERE kind='job_stalled' AND job_id=?", (JS,))) == 1, "one case")
 requests.patch(V + f"/agent/jobs/{JS}", headers=AH, json={"append_log": "still compiling"})
 check(until(lambda: dbx("SELECT cleared_at FROM job_watch WHERE job_id=?", (JS,))[0][0]), "progress ends the case")

@@ -218,6 +218,7 @@ check(r.json()["proposal"]["tasks"][1]["section"] == "Shoot" and r.json()["propo
 news = A.get(B + "/api/news").json()["items"]
 check(any(n["kind"] == "proposal" and n["data"].get("job") == J1 and n["actor_id"] == AG for n in news), "News: proposal ready")
 check(not any(n["kind"] == "proposal" for n in Bo.get(B + "/api/news").json()["items"]), "no News for others")
+check(all(n["to_me"] for n in news if n["kind"] == "proposal"), "2.1049.0 (#5806): the ready proposal is 'For you' (the bell counts it)")
 check(cl.post(f"/agent/jobs/{J1}/proposal", json=GOOD).status_code == 201, "resubmit replaces (until reviewed)")
 check(len([n for n in A.get(B + "/api/news").json()["items"] if n["kind"] == "proposal"]) == 1, "resubmit: no second News")
 pv = A.get(B + f"/api/proposals/{J1}").json()

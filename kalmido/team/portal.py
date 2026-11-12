@@ -355,7 +355,8 @@ def pt_team_news(c, t, cid, text, name):
         s = collab_user(c, uid, t["list_id"])
         if not s or not task_visible(c, t["id"], uid, full=True):
             continue
-        news_add(c, uid, "comment", task_id=t["id"], comment_id=cid, actor=0, s=s, data={"excerpt": text[:300], "ext_name": name, "portal": True})
+        news_add(c, uid, "comment", task_id=t["id"], comment_id=cid, actor=0, s=s, data={"excerpt": text[:300], "ext_name": name, "portal": True,
+                                                                                                **({"mine": 1} if uid in (t["created_by"], t["assignee_id"]) else {})})  # 2.1049.0 (#5806)
         lv = tbl_level(c, uid, t["id"], s)
         if lv == "urgent" and tbl_sent(uid, t["id"]):
             continue
