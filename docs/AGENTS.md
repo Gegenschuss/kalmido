@@ -4925,9 +4925,12 @@ for one agent ([data lock](#data-the-agent-never-sees) `wiki_folders`): they do 
 **Writing.** Role `view` reads only (`403`), `edit` writes. `wiki_write` replaces the whole text; send `expect_updated_at`
 (from `wiki_read`): when a person saved in between the answer is `409` with the current page in `error.page` - merge and
 send again. Every save is one entry of the page's history (the people restore an older text there). 2.1048.0:
-`wiki_append` adds `text` at the end of the page without sending the whole page (a line break first when the page does not
-end with one; `expect_updated_at` optional, given and outdated = `409` like `wiki_write`; at most 20,000 characters) - an
-approval card then binds only the added text. A new page
+`wiki_append` adds `text` at the end of the page without sending the whole page (2.1068.0: exactly one empty line in between;
+`expect_updated_at` optional, given and outdated = `409` like `wiki_write`; at most 20,000 characters) - an
+approval card then binds only the added text and shows the person the lines it adds. 2.1068.0: `under` (a heading of the
+page, case ignored) puts the text at the end of that heading's section instead; no such heading = `404`
+`heading_not_found` with the page's headings in `error.headings`, nothing is written. For additions use `wiki_append`,
+`wiki_write` only to change or remove text. A new page
 (`wiki_create`) needs a knowledge folder shared with the agent to edit (`folder_id`: the folder's id from `list_files`);
 `409` when a page of that name is already there. Renaming, moving, the trash, uploading / removing files of pages, shares,
 export / import and the encryption stay with people in the app.
@@ -4946,7 +4949,7 @@ not `path` / `relink` (`403`).
 | Pages you may read (no text) | `GET /api/v1/wiki/pages` | `wiki_list` | wiki:read |
 | One page with its Markdown text | `GET /api/v1/wiki/pages/{id}` | `wiki_read` | wiki:read |
 | Change a page's text | `PATCH /api/v1/wiki/pages/{id}` | `wiki_write` | wiki:write |
-| Add text at the end of a page (2.1048.0) | `POST /api/v1/wiki/pages/{id}/append` | `wiki_append` | wiki:write |
+| Add text at the end of a page or of a section (2.1048.0, `under` 2.1068.0) | `POST /api/v1/wiki/pages/{id}/append` | `wiki_append` | wiki:write |
 | A new page in a shared folder | `POST /api/v1/wiki/pages` | `wiki_create` | wiki:write |
 | The files of a page (2.488.0) | `GET /api/v1/wiki/pages/{id}/files` | `wiki_files` | wiki:read |
 | One file's bytes / text (2.488.0) | `GET /api/v1/wiki/files/{id}`, `GET /api/v1/wiki/files/{id}/text` | `wiki_read_file` | wiki:read |

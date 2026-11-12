@@ -17,6 +17,7 @@ Every read, write and creation by an agent is noted in the history of the page's
 """
 import json
 import os
+import re
 
 from flask import g, jsonify, request
 
@@ -295,32 +296,79 @@ def wkv_update(pid):
 
 
 WKV_APPEND_MAX = 20000  # 2.1048.0 (#5861): one appended piece (a link, a paragraph); the whole page stays bound by wiki_body
+WKV_HEAD_RX = re.compile(r"^\s{0,3}(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$")  # 2.1068.0 (#5829): an ATX heading (as wkembed.js wem_pgPart)
+WKV_FENCE_RX = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
+
+
+def wkv_headings(lines):
+    """2.1068.0 (#5829): [(line index, level, text)] of the Markdown headings, code fences skipped."""
+    out, fence = [], False
+    for i, x in enumerate(lines):
+        if WKV_FENCE_RX.match(x):
+            fence = not fence
+            continue
+        m = None if fence else WKV_HEAD_RX.match(x)
+        if m:
+            out.append((i, len(m.group(1)), m.group(2).strip()))
+    return out
+
+
+def wkv_append_text(cur, text, under=None):
+    """2.1068.0 (#5829): the page's text with text added -> the new text, or None when the heading under is not there.
+    Exactly one empty line between the page's text and the new text (none on an empty page); without under at the end of
+    the page, with under at the end of that heading's section (up to the next heading of the same or a higher level; the
+    first heading of that name, case ignored), an empty line before the next heading. The page's trailing line break stays."""
+    piece = text.strip("\r\n")
+    if under is None:
+        body = cur.rstrip("\r\n")
+        return (body + "\n\n" + piece if body else piece) + ("\n" if cur.endswith("\n") else "")
+    lines = cur.split("\n")
+    hs = wkv_headings(lines)
+    want = under.strip().casefold()
+    hit = next((k for k, h in enumerate(hs) if h[2].casefold() == want), None)
+    if hit is None:
+        return None
+    at, lvl = hs[hit][0], hs[hit][1]
+    end = next((h[0] for h in hs[hit + 1:] if h[1] <= lvl), len(lines))
+    last = end - 1
+    while last > at and not lines[last].strip():
+        last -= 1
+    rest = lines[end:]
+    tail = ([""] + rest) if rest else ([""] if end == len(lines) and cur.endswith("\n") else [])
+    return "\n".join(lines[:last + 1] + ["", *piece.split("\n")] + tail)
 
 
 @app.post("/api/v1/wiki/pages/<int:pid>/append")
 @v1_view
 def wkv_append(pid):
-    """2.1048.0 (#5861): {text, expect_updated_at?} -- adds text at the end of the page (role edit) without sending the whole
-    page: the page's text, a line break when it does not end with one, then text. The same save as PATCH (wiki_update: the
-    size, the frontmatter, the history, the word index, the links); the page's lock holds between reading the text and
-    saving it, so nothing saved in between is lost. expect_updated_at is optional here (appending overwrites nothing): when
-    given and the page changed since, 409 with the current page like PATCH."""
+    """2.1048.0 (#5861): {text, under?, expect_updated_at?} -- adds text to the page (role edit) without sending the whole
+    page. The same save as PATCH (wiki_update: the size, the frontmatter, the history, the word index, the links); the page's
+    lock holds between reading the text and saving it, so nothing saved in between is lost. expect_updated_at is optional
+    here (appending overwrites nothing): when given and the page changed since, 409 with the current page like PATCH.
+    2.1068.0 (#5829): exactly one empty line before the new text (wkv_append_text); under = a heading of the page: the text
+    goes to the end of that section; no such heading = 404 heading_not_found with the page's headings, nothing written."""
     b = v1_json()
     c = db()
     uid = me()
-    reject_unknown(b, ("text", "expect_updated_at"))
+    reject_unknown(b, ("text", "under", "expect_updated_at"))
     text = b.get("text")
     if not isinstance(text, str) or not text.strip():
         raise BadInput(tr("Invalid value: {0}", "text"))
     if len(text) > WKV_APPEND_MAX:
         raise BadInput(tr("Too long: {0} (at most {1} characters)", "text", WKV_APPEND_MAX))
+    under = b.get("under")
+    if under is not None and (not isinstance(under, str) or not under.strip() or len(under) > 300):
+        raise BadInput(tr("Invalid value: {0}", "under"))
     write_lock(c, f"wiki-{int(pid)}")  # the same lock as wiki_update (re-entrant there): read + save see no other save
     r, role, path = wkv_need(c, uid, pid, write=True)
     exp = b.get("expect_updated_at") or (request.headers.get("If-Match") or "").strip().removeprefix("W/").strip('"') or None
     if exp and exp != r["updated_at"]:
         return _conflict(c, uid, r, role, path)
     cur = wkh_body(c, r) or ""  # the plain text (a sealed private page opens with its key, like a read)
-    new = cur + ("" if not cur or cur.endswith("\n") else "\n") + text
+    new = wkv_append_text(cur, text, under)
+    if new is None:
+        heads = [h[2] for h in wkv_headings(cur.split("\n"))][:100]
+        return v1_err(404, tr("No heading {0} on this page", under.strip()), name="heading_not_found", headings=heads)
     v1_call(wiki_update, pid, body={"body": new, "expect_updated_at": r["updated_at"]})
     r, role, path = wkv_need(c, uid, pid)
     _log(c, uid, r, "write")

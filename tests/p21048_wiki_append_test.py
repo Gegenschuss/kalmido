@@ -2,8 +2,10 @@
 # kalmido-suite: fresh
 """2.1048.0 (#5861): an agent adds text at the end of a knowledge page without sending the whole page
 (POST /api/v1/wiki/pages/{id}/append, wiki/wkv1.py wkv_append; MCP wiki_append). Invented names only.
- - the text comes after the page's text with exactly one line break in between (none when the page ends with one); what the
-   agent sent arrives, the rest of the page stays as it was
+ - the text comes after the page's text with exactly one empty line in between (2.1068.0, #5829: was one line break); what
+   the agent sent arrives, the rest of the page stays as it was
+ - 2.1068.0 (#5829): under = a heading: the text goes to the end of that section (an empty line before the next heading);
+   an unknown heading = 404 heading_not_found with the page's headings, nothing written
  - the same save as PATCH: the page's history has the change, the editor is the agent
  - expect_updated_at is optional; given and outdated = 409 with the current page, nothing appended
  - an empty text, an unknown field, a text over the limit = 400; scope wiki:write (403 without); OpenAPI names the route
@@ -113,17 +115,19 @@ check(A.patch(B + f"/api/files/shares/{S1}", json={"role": "edit"}).ok, "setup: 
 v0 = versions(A, P1)
 r = append(ta, P1, text="- Lights: https://lights.example.com")
 check(r.status_code == 200, f"edit share: the agent appends ({r.status_code} {r.text[:200]})")
-want = "# Links\n- Shop: https://shop.example.com\n- Lights: https://lights.example.com"
-check(body_of(A, P1) == want, f"alice sees the old text plus one line break plus the new line: {body_of(A, P1)!r}")
+# 2.1068.0 (#5829): exactly one empty line between the page and the new text (was one line break)
+want = "# Links\n- Shop: https://shop.example.com\n\n- Lights: https://lights.example.com"
+check(body_of(A, P1) == want, f"alice sees the old text plus one empty line plus the new line: {body_of(A, P1)!r}")
 check(r.ok and r.json().get("body") == want, "the answer carries the whole page (wiki:read)")
 w = A.get(B + f"/api/wiki/pages/{P1}").json()
 check(w.get("updated_by") == TA, "the agent is the page's editor")
 check(versions(A, P1) > v0, f"the append is in the page's history ({v0} -> {versions(A, P1)})")
 r = append(ta, P2, text="\nA new paragraph")
-check(r.ok and body_of(A, P2) == "First line\n\nA new paragraph", f"a page ending with a line break: no second one added {body_of(A, P2)!r}")
+# 2.1068.0 (#5829): leading / trailing line breaks of text never add a second empty line; the page's last line break stays
+check(r.ok and body_of(A, P2) == "First line\n\nA new paragraph\n", f"a page ending with a line break: one empty line, no double {body_of(A, P2)!r}")
 check(append(ta, P2, text="Again", expect_updated_at=r.json()["updated_at"]).ok, "the current expect_updated_at: appends")
 r = append(ta, P2, text="Too late", expect_updated_at="2000-01-01T00:00:00.000Z")
-check(r.status_code == 409 and r.json().get("error", {}).get("page", {}).get("body", "").endswith("Again")
+check(r.status_code == 409 and r.json().get("error", {}).get("page", {}).get("body", "").endswith("Again\n")
       and "Too late" not in body_of(A, P2), f"an outdated expect_updated_at: 409 with the current page, nothing appended ({r.status_code})")
 check(append(ta, P1, text="   ").status_code == 400, "an empty text: 400")
 check(append(ta, P1, text="x", body="whole").status_code == 400, "an unknown field (body): 400")
@@ -131,6 +135,26 @@ check(append(ta, P1, text="x" * 20001).status_code == 400, "a text over 20000 ch
 check(body_of(A, P1) == want, "the refused calls changed nothing")
 check(dbx("SELECT COUNT(*) FROM fs_log l JOIN fs_nodes n ON n.id=l.node_id WHERE n.kind='ref' AND n.ref_kind='wiki' AND n.ref_id=? "
           "AND l.agent=1 AND l.action='write'", (P1,))[0][0] >= 1, "the agent's write is noted in the node's history")
+
+# ================================================================ 2.1068.0 (#5829): under a heading
+P4 = page(A, "Handbook/Overview", "# Overview\nintro\n\n## 2D\n- [Sketch](sketch)\n\n## 3D\n- [Model](model)\n```\n## Not a heading\n```\n")
+v0 = versions(A, P4)
+r = append(ta, P4, text="- [Lights](lights)", under="2d")
+check(r.ok and body_of(A, P4) == "# Overview\nintro\n\n## 2D\n- [Sketch](sketch)\n\n- [Lights](lights)\n\n## 3D\n- [Model](model)\n```\n## Not a heading\n```\n",
+      f"under 2D (case ignored): at the end of that section, one empty line before and before ## 3D ({r.status_code} {body_of(A, P4)!r})")
+check(versions(A, P4) > v0, "appending under a heading is a normal version of the page")
+r = append(ta, P4, text="- [Print](print)", under="3D")
+check(r.ok and body_of(A, P4).endswith("## 3D\n- [Model](model)\n```\n## Not a heading\n```\n\n- [Print](print)\n"),
+      f"the last section: at the end of the page, a heading inside a code fence does not end it {body_of(A, P4)!r}")
+r = append(ta, P4, text="- [Intro](intro)", under="Overview")
+check(r.ok and "- [Print](print)\n\n- [Intro](intro)\n" in body_of(A, P4), "a level-1 heading: its section runs over the level-2 ones to the end")
+before = body_of(A, P4)
+r = append(ta, P4, text="- x", under="4D")
+err = r.json().get("error", {}) if r.status_code == 404 else {}
+check(r.status_code == 404 and err.get("code") == "heading_not_found" and err.get("headings") == ["Overview", "2D", "3D"],
+      f"an unknown heading: 404 with the page's headings ({r.status_code} {r.text[:200]})")
+check(body_of(A, P4) == before, "the unknown heading wrote nothing")
+check(append(ta, P4, text="- x", under="  ").status_code == 400 and append(ta, P4, text="- x", under=3).status_code == 400, "an empty / not a text under: 400")
 
 # ================================================================ tenant-matrix: wiki_v1
 # tenant: POST /api/v1/wiki/pages/{}/append
@@ -145,7 +169,7 @@ Q1 = page(Fl, "Clients/Acme", "Contact: Jo", space="private")
 check(append(da, Q1, text="Phone: 555-0100").status_code == 404, "her own agent without a share: 404")
 fshare(Fl, folders(Fl, "private")["Clients"], agent_id=DA, role="edit")
 r = append(da, Q1, text="Phone: 555-0100")
-check(r.ok and body_of(Fl, Q1) == "Contact: Jo\nPhone: 555-0100", f"her agent with the folder share appends ({r.status_code} {body_of(Fl, Q1)!r})")
+check(r.ok and body_of(Fl, Q1) == "Contact: Jo\n\nPhone: 555-0100", f"her agent with the folder share appends ({r.status_code} {body_of(Fl, Q1)!r})")
 check(append(aa, Q1, text="x").status_code == 404 and append(ta, Q1, text="x").status_code == 404, "another person's / an organisation's agent: never")
 
 sys.exit(kt.done("p21048_wiki_append"))

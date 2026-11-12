@@ -1552,17 +1552,20 @@ TOOLS += [
                    "view only = 403). Read it first and send the WHOLE new text plus expect_updated_at from wiki_read: 409 (with "
                    "the current page in error.page) when a person saved in between - merge and try again. Every save is one entry "
                    "of the page's history the people can restore. At most 500000 characters. 2.564.0: expect_updated_at is required "
-                   "(400 version_required without).",
+                   "(400 version_required without). 2.1068.0: to add a link, a list item or a paragraph use wiki_append instead (only the new "
+                   "text, no whole page).",
      _obj({"page_id": S_ID, "body": {"type": "string", "maxLength": 500000}, "expect_updated_at": {"type": "string"}}, ["page_id", "body", "expect_updated_at"]),
      lambda api, a: api.call("PATCH", f"/wiki/pages/{_id(a, 'page_id')}", body=_pick(a, ("body", "expect_updated_at")))),
     ("wiki_append", "2.1048.0 (scope wiki:write): add text at the END of a knowledge page shared with you to edit (role edit; view "
                     "only = 403), without reading and sending the whole page - for a link, a list item or a paragraph. text (Markdown, at "
-                    "most 20000 characters) comes after the page's text, with a line break first when the page does not end with one; "
-                    "start text with an empty line for a new paragraph. expect_updated_at is optional (appending overwrites nothing; "
+                    "most 20000 characters) comes after the page's text with exactly one empty line in between (2.1068.0). under (a "
+                    "heading of the page, case ignored): the text goes to the end of that heading's section instead; no such heading = "
+                    "404 heading_not_found with the page's headings in error.headings, nothing written. expect_updated_at is optional (appending overwrites nothing; "
                     "given and someone saved in between: 409 with the current page). One entry of the page's history, like wiki_write. "
                     "To change or remove text elsewhere in the page use wiki_write.",
-     _obj({"page_id": S_ID, "text": {"type": "string", "maxLength": 20000}, "expect_updated_at": {"type": "string"}}, ["page_id", "text"]),
-     lambda api, a: api.call("POST", f"/wiki/pages/{_id(a, 'page_id')}/append", body=_pick(a, ("text", "expect_updated_at")))),
+     _obj({"page_id": S_ID, "text": {"type": "string", "maxLength": 20000}, "under": {"type": "string", "maxLength": 300},
+           "expect_updated_at": {"type": "string"}}, ["page_id", "text"]),
+     lambda api, a: api.call("POST", f"/wiki/pages/{_id(a, 'page_id')}/append", body=_pick(a, ("text", "under", "expect_updated_at")))),
     ("wiki_create", "2.200.0 (scope wiki:write): a new knowledge page in a knowledge folder shared with you to edit: folder_id (the "
                     "folder's id from list_files, which shows knowledge folders only with files:read AND wiki:read: a folder below a shared "
                     "knowledge folder, or the shared folder itself), name (no "

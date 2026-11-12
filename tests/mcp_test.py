@@ -307,6 +307,9 @@ check(call(s, "send_chat", {"user_id": 1, "files": [{"name": "x", "base64": "%%%
 res = call(s, "wiki_append", {"page_id": 4, "text": "- a link"})
 check(res["isError"] is False and last()["m"] == "POST" and last()["p"] == "/api/v1/wiki/pages/4/append" and last()["b"] == {"text": "- a link"},
       f"wiki_append: POST /wiki/pages/4/append with the text only {last()}")
+# 2.1068.0 (#5829): under (a heading) goes along
+res = call(s, "wiki_append", {"page_id": 4, "text": "- a link", "under": "Links"})
+check(res["isError"] is False and last()["b"] == {"text": "- a link", "under": "Links"}, f"wiki_append: under goes along {last()}")
 # 2.488.0 (#2209): wiki_files lists a page's files; wiki_read_file reads one as text (a PDF) or the bytes (a picture: an image item)
 res = call(s, "wiki_files", {"page_id": 4})
 check(res["isError"] is False and last()["p"] == "/api/v1/wiki/pages/4/files" and last()["m"] == "GET", "wiki_files: GET /wiki/pages/4/files")

@@ -18477,6 +18477,7 @@
   "Show scan inbox": "Scan-Eingang anzeigen",
   "Scan inboxes file only into folders of the documents": "Scan-Eingänge legen nur in Ordner der Dokumente ab",
   "Scan inbox: {0}": "Scan-Eingang: {0}",
+  "No heading {0} on this page": "Keine Überschrift {0} auf dieser Seite",
   "Only a quotation has a validity date": "Nur ein Angebot hat ein Gültigkeitsdatum",
   "Only a sent quotation without an answer can be extended": "Nur ein gesendetes Angebot ohne Antwort lässt sich verlängern",
   "The date must be today or later": "Das Datum muss heute oder später sein",
