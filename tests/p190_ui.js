@@ -149,22 +149,30 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
 
   // ---- News inbox
   await call('alice', 'POST', `/api/tasks/${T1}/comments`, {body: `<@${bob}> please check`});
-  await call('alice', 'POST', '/api/tasks', {title: 'Assigned to Bob', list_id: SH, assignee_id: bob});
+  const tBob = (await call('alice', 'POST', '/api/tasks', {title: 'Assigned to Bob', list_id: SH, assignee_id: bob})).id;
+  // 2.1052.0 (#5808): News show one way, bundled per task: two mentions on the assigned task make one bundle of several entries
+  // (x and swipe remove an entry of an unfolded bundle)
+  for (const b of [`<@${bob}> start today?`, `<@${bob}> the key is at the desk`]) await call('alice', 'POST', `/api/tasks/${tBob}/comments`, {body: b});
   const tb = (await call('bob', 'POST', '/api/tasks', {title: 'Bob made it', list_id: SH})).id;
   await call('alice', 'POST', `/api/tasks/${tb}/complete`, {});
   w = await boot({user: 'bob', hash: 'news'}); d = w.document;
   await sleep(600);
-  let items = [...d.querySelectorAll('#view .nitem')];
-  check(items.length >= 3 && items.every(i => i.querySelector('[data-act="news-dismiss"]')), 'every item has a remove button (desktop)');
-  check(items.some(i => i.classList.contains('k-complete')), 'default: completions by others show');  // 2.367.5 (#2980): like its push
-  check(d.querySelector('#view .nitem.unread') && /Unread/.test(d.querySelector('#view .nitem.unread').getAttribute('aria-label')), 'unread items marked (bold style + label)');
-  const n0 = items.length, u0 = w.eval('S.news.unread');
+  // 2.1052.0 (#5808): the items the shown bundles stand for; the bundle of the assigned task under "For you", unfolded by a click
+  const gIt = () => JSON.parse(w.eval(`JSON.stringify((() => { const gs = newsGroups((S.nf.items || []).map((it, i) => [it, i]));
+    return [...document.querySelectorAll('#view .ngroup')].flatMap(el => (gs.find(g => g.key === el.dataset.gk)?.items || []).map(([it]) => it.kind)); })())`));
+  const ab = () => d.querySelector(`#view .nsect.me .ngroup[data-gk="t${tBob}u"]`), unfold = async () => { ab()?.querySelector('.ngmain[data-act="news-group"]')?.click(); await idle(w); return [...(ab()?.querySelectorAll('.ngitems .nitem') || [])]; };
+  let items = await unfold();
+  const n0 = w.eval('S.nf.items.length'), m0 = items.length;
+  check(gIt().length === n0 && n0 >= 4 && m0 >= 3 && items.every(i => i.querySelector('[data-act="news-dismiss"]')), `every entry of an unfolded bundle has a remove button (desktop; ${m0} of ${n0})`);
+  check(gIt().includes('complete'), 'default: completions by others show');  // 2.367.5 (#2980): like its push
+  check(ab()?.classList.contains('unread') && /Unread/.test(items[0]?.getAttribute('aria-label')), 'unread items marked (bold style + label)');
+  const u0 = w.eval('S.news.unread');
   items[0].querySelector('[data-act="news-dismiss"]').click(); await sleep(800);
-  check(d.querySelectorAll('#view .nitem').length === n0 - 1 && w.eval('S.route.mod') === 'news' && w.eval('S.news.unread') === u0 - 1, 'x removes the item without opening it');
+  check(w.eval('S.nf.items.length') === n0 - 1 && ab()?.querySelectorAll('.ngitems .nitem').length === m0 - 1 && w.eval('S.route.mod') === 'news' && !w.eval('S.sel') && w.eval('S.news.unread') === u0 - 1, 'x removes the entry without opening it');
   check((await call('bob', 'GET', '/api/news')).items.length === n0 - 1, 'removed on the server too');
   d.querySelector('[data-act="news-filter"][data-f="me"]').click(); await idle(w);
-  const ks = [...d.querySelectorAll('#view .nitem')].map(i => [...i.classList].find(c => c.startsWith('k-')));
-  check(ks.length && ks.every(k => ['k-mention', 'k-assign', 'k-unassign'].includes(k)), 'filter Mentions & assigned to me: ' + ks);
+  const ks = gIt();
+  check(ks.length && ks.every(k => ['mention', 'assign', 'unassign'].includes(k)), 'filter Mentions & assigned to me: ' + ks);
   check(d.querySelector('[data-act="news-filter"][data-f="me"]').textContent.includes('Mentions & assigned to me'), 'filter label');
   d.querySelector('[data-act="news-filter"][data-f=""]').click(); await idle(w);
   d.querySelector('[data-act="news-settings"]').click(); await idle(w);
@@ -176,25 +184,28 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   w.close();
   // touch: swipe to remove
   w = await boot({user: 'bob', hash: 'news', mobile: true, setup: x => { x.ontouchstart = null; x.navigator.maxTouchPoints = 5; }}); d = w.document; await sleep(600);
-  items = [...d.querySelectorAll('#view .nitem')];
-  const n1 = items.length, first = items[0];
+  // 2.1052.0 (#5808): an entry of the unfolded bundle
+  items = await unfold();
+  const n1 = w.eval('S.nf.items.length'), m1 = items.length, first = items[0];
   const T = (type, x) => { const e = new w.Event(type, {bubbles: true}); e.touches = type === 'touchend' ? [] : [{clientX: x, clientY: 100}]; first.dispatchEvent(e); };
   T('touchstart', 300); T('touchmove', 250); T('touchmove', 120); T('touchend', 120); await sleep(900);
-  check(d.querySelectorAll('#view .nitem').length === n1 - 1, 'swipe removes an item (' + n1 + ' -> ' + d.querySelectorAll('#view .nitem').length + ')');
+  check(m1 >= 2 && w.eval('S.nf.items.length') === n1 - 1 && (ab()?.querySelectorAll('.nitem').length || 0) === (m1 - 1 > 1 ? m1 - 1 : 0) && ab()?.querySelector('.ngmain .ngt')?.textContent, 'swipe removes an item (' + n1 + ' -> ' + w.eval('S.nf.items.length') + ')');
   w.close();
 
   // ---- #246: no news = "No news", never an endless "Loading…" (also with collaboration off)
   await call('alice', 'POST', '/api/users', {username: 'erin', display_name: 'Erin', password: 'password123'});
   cks.erin = await login('erin');
   w = await boot({user: 'erin', hash: 'news'}); d = w.document; await sleep(800);
-  check(/No news/.test(d.querySelector('#view').textContent) && !/Loading/.test(d.querySelector('#view').textContent), 'empty feed: "No news": ' + d.querySelector('#view .empty')?.textContent);
+  // 2.1052.0 (#5808): since 2.1037.0 (#5807) "For you" always shows: an empty feed reads "Nothing waits for you" there (was "No news")
+  const meEmpty = () => /For you/.test(d.querySelector('#view .nsect.me h2')?.textContent) && /Nothing waits for you/.test(d.querySelector('#view .nsect.me .nmeempty')?.textContent) && !/Loading/.test(d.querySelector('#view').textContent);
+  check(meEmpty(), 'empty feed: "Nothing waits for you": ' + d.querySelector('#view').textContent.slice(0, 160));
   d.querySelector('[data-act="news-filter"][data-f="me"]').click(); await idle(w);
-  check(/No news/.test(d.querySelector('#view').textContent) && !/Loading/.test(d.querySelector('#view').textContent), 'empty filter: "No news" too');
+  check(meEmpty(), 'empty filter: "Nothing waits for you" too');  // 2.1052.0 (#5808): as above
   d.querySelector('[data-act="news-filter"][data-f=""]').click(); await sleep(300);
   w.eval('S.nf.items = null; S.nf.loading = true; renderView()');
   check(/Loading/.test(d.querySelector('#view').textContent), '"Loading…" while a request runs');
   w.eval('S.nf.loading = false'); await w.eval('loadNews()'); await sleep(300);
-  check(/No news/.test(d.querySelector('#view').textContent), 'after the request: "No news"');
+  check(meEmpty(), 'after the request: "Nothing waits for you"');  // 2.1052.0 (#5808): as above
   w.close();
   const st0 = await call('erin', 'GET', '/api/state');
   await call('erin', 'PATCH', '/api/settings', {features: st0.settings.features.split(',').filter(x => x !== 'collab').join(',')});

@@ -72,12 +72,17 @@ const textPdf = line => {  // a one-page PDF with a text layer, written by hand
   const T = [];
   for (const t of ['Job one', 'Job two', 'Job three']) { T.push((await call('alice', 'POST', '/api/tasks', {title: t, list_id: L, assignee_id: bob})).id); await sleep(1100); }
   w = await boot({user: 'bob', hash: 'news', mobile: true, setup: x => { x.ontouchstart = null; x.navigator.maxTouchPoints = 5; }}); d = w.document;
-  await until(() => d.querySelectorAll('#view .nitem').length >= 3);
+  // 2.1052.0 (#5808): News show one way, bundled per task: the three tasks are three bundles
+  const gOf = id => d.querySelector(`#view .ngroup[data-gk="t${id}u"]`);
+  await until(() => T.every(gOf));
   const unreadTasks = () => JSON.parse(w.eval(`JSON.stringify((S.nf.items || []).filter(x => !x.read && x.task_id).map(x => x.task_id))`));
   const order = unreadTasks();
   check(order.length >= 3 && T.every(t => order.includes(t)), 'three unread news with tasks ' + order.join(','));
-  const rows = [...d.querySelectorAll('#view .nitem')];
-  rows[0].dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
+  check(T.every(t => gOf(t)?.querySelector('.ngt')?.textContent), 'the three tasks are bundles with their titles');
+  // 2.1052.0 (#5808): the first unread's bundle: one entry opens from its head, several unfold first
+  let row0 = gOf(order[0])?.querySelector('.ngmain');
+  if (row0 && !row0.dataset.i) { row0.click(); row0 = await until(() => gOf(order[0])?.querySelector('.ngitems .nitem')); }
+  row0.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
   await until(() => w.eval('S.sel') === order[0]);
   check(w.eval('S.sel') === order[0] && w.eval('nswOn()'), 'opened from the news: the first unread, swipe on');
   const swipe = async (dx, target) => {

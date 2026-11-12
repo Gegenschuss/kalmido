@@ -110,7 +110,11 @@ const width = (w, px) => Object.defineProperty(w, 'innerWidth', {configurable: t
   CK = CA;
   const SH = (await call('POST', '/api/lists', {name: 'Shared yard'})).id;
   await call('PUT', `/api/lists/${SH}/members`, {user_id: bob, role: 'edit'});
-  for (const t of ['Paint the fence', 'Fix the gate', 'Clean the shed']) await call('POST', '/api/tasks', {title: t, list_id: SH, assignee_id: bob});
+  const NT = [];
+  for (const t of ['Paint the fence', 'Fix the gate', 'Clean the shed']) NT.push((await call('POST', '/api/tasks', {title: t, list_id: SH, assignee_id: bob})).id);
+  // 2.1052.0 (#5808): News show one way, bundled per task; an entry is swiped inside an unfolded bundle, so the fence gets two
+  // mentions too (one bundle of several entries)
+  for (const b of [`<@${bob}> white or green?`, `<@${bob}> the brushes are in the shed`]) await call('POST', `/api/tasks/${NT[0]}/comments`, {body: b});
   const CB = await login('bob');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'}, CB);
   const news = async () => ((await call('GET', '/api/news', null, CB)).items || []).length;
@@ -118,15 +122,20 @@ const width = (w, px) => Object.defineProperty(w, 'innerWidth', {configurable: t
   check(n0 >= 3, 'news: bob has the news of his three tasks (' + n0 + ')');
   w = await boot({user: 'bob', hash: 'news', mobile: true, media: TOUCH, setup: x => width(x, 390)}); d = w.document;
   // jsdom lays nothing out: an item 360 px wide (the threshold is 35 % of it, at most 120 px)
-  const items = () => [...d.querySelectorAll('#view .nitem')].map(n => (Object.defineProperty(n, 'offsetWidth', {configurable: true, value: 360}), n));
-  check(await until(() => items().length >= 3, 60), 'news: the items are shown');
+  // 2.1052.0 (#5808): the entries of the fence's bundle, unfolded by a tap on its head; nf = the items the app holds
+  const fence = () => d.querySelector(`#view .ngroup[data-gk="t${NT[0]}u"]`), nf = () => w.eval('(S.nf.items || []).length');
+  const items = () => [...(fence()?.querySelectorAll('.ngitems .nitem') || [])].map(n => (Object.defineProperty(n, 'offsetWidth', {configurable: true, value: 360}), n));
+  check(await until(() => NT.every(t => d.querySelector(`#view .ngroup[data-gk="t${t}u"] .ngt`)?.textContent), 60) && /Paint the fence/.test(fence()?.textContent), 'news: the bundles of the three tasks are shown');
+  fence().querySelector('.ngmain').click();
+  check(await until(() => items().length >= 3, 40) && nf() === n0, 'news: a tap on the fence\'s bundle unfolds its entries (' + items().length + ')');
+  const m0 = items().length;
   let it = items()[0]; s = await swipe(w, it, it, -40);
   check(s.mid === 'translateX(-40px)' && s.op && +s.op < 1, 'news: the item follows the finger and fades ' + JSON.stringify(s));
-  check(await until(() => !it.style.transform && !it.style.opacity, 20) && items().length === n0, 'news: a short swipe keeps it');
+  check(await until(() => !it.style.transform && !it.style.opacity, 20) && items().length === m0 && nf() === n0, 'news: a short swipe keeps it');
   it = items()[0]; s = await swipe(w, it, it, 200);
-  check(s.end === 'translateX(110%)' && await until(() => items().length === n0 - 1, 40), 'news: a swipe to the right removes the item ' + JSON.stringify(s));
+  check(s.end === 'translateX(110%)' && await until(() => items().length === m0 - 1 && nf() === n0 - 1, 40), 'news: a swipe to the right removes the item ' + JSON.stringify(s));
   it = items()[0]; s = await swipe(w, it, it, -200);
-  check(s.end === 'translateX(-110%)' && await until(() => items().length === n0 - 2, 40), 'news: a swipe to the left removes it too ' + JSON.stringify(s));
+  check(s.end === 'translateX(-110%)' && await until(() => nf() === n0 - 2 && items().length === (m0 - 2 > 1 ? m0 - 2 : 0), 40), 'news: a swipe to the left removes it too ' + JSON.stringify(s));
   check(await until(async () => (await news()) === n0 - 2, 40), 'news: removed on the server too');
 
   // ================= the helper's rules on a stand-in row (one side, rubber band, vibration, cancel, hold, rsw_later)

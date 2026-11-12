@@ -50,30 +50,38 @@ const call = async (u, method, url, body) => { const r = await fetch(B + url.rep
   check(n0.items.length >= 2 && t1item, `alice has news (${n0.items.length})`);
   await call('alice', 'POST', '/api/news/read', {ids: t1item.ids});
   w = await boot({user: 'alice', hash: 'news'}); d = w.document; await sleep(600);
-  let rows = [...d.querySelectorAll('#view .nitem')];
-  check(rows.length === n0.items.length && rows.some(r => !r.classList.contains('unread')), 'All: read and unread items');
+  // 2.1052.0 (#5808): News show one way, bundled per task (read and unread never share a bundle): the items the shown bundles stand for
+  const gIt = () => JSON.parse(w.eval(`JSON.stringify((() => { const gs = newsGroups((S.nf.items || []).map((it, i) => [it, i]));
+    return [...document.querySelectorAll('#view .ngroup')].flatMap(el => (gs.find(g => g.key === el.dataset.gk)?.items || []).map(([it, i]) => ({i, read: !!it.read}))); })())`));
+  const t1read = () => d.querySelector(`#view .ngroup[data-gk="t${T1}r"]`);
+  let rows = gIt();
+  check(rows.length === n0.items.length && rows.some(r => r.read) && t1read()?.querySelector('.ngt')?.textContent, 'All: read and unread items (the read bundle of T1 shows)');
   const tog = d.querySelector('#view .nbar [data-act="news-unread"]');
   check(tog && tog.textContent.trim() === 'Unread only' && tog.getAttribute('aria-pressed') === 'false', 'toggle "Unread only" next to the filter, off');
   tog.click(); await sleep(200);
-  rows = [...d.querySelectorAll('#view .nitem')];
-  check(rows.length === n0.items.length - 1 && rows.every(r => r.classList.contains('unread')), 'on: read items hidden');
+  rows = gIt();
+  check(rows.length === n0.items.length - 1 && rows.every(r => !r.read) && !t1read(), 'on: read items hidden');
   check(d.querySelector('[data-act="news-unread"]').classList.contains('on') && d.querySelector('[data-act="news-unread"]').getAttribute('aria-pressed') === 'true' && w.__store['tasks.newsUnread'] === 'true', 'on state, remembered per device');
-  const i0 = +rows[0].dataset.i, want = w.eval(`S.nf.items[${i0}].task_id`);
-  rows[0].dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(800);
+  // 2.1052.0 (#5808): the first bundle: one entry opens from its head, several unfold first
+  let row0 = d.querySelector('#view .ngroup .ngmain');
+  if (row0 && !row0.dataset.i) { row0.click(); await sleep(200); row0 = d.querySelector('#view .ngroup .ngitems .nitem'); }
+  const i0 = +row0.dataset.i, want = w.eval(`S.nf.items[${i0}].task_id`);
+  row0.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(800);
   check(w.eval('S.sel') === want, 'click on a filtered row opens the right task (index kept)');
   w.eval('closeDetail()'); await sleep(300);
-  check([...d.querySelectorAll('#view .nitem')].length === rows.length, 'the item opened just now stays until the next load');
+  check(gIt().length === rows.length && gIt().some(r => r.i === i0 && r.read), 'the item opened just now stays until the next load');  // 2.1052.0 (#5808): in its bundle
   d.querySelector('[data-act="news-filter"][data-f="me"]').click(); await sleep(700);
   check(d.querySelector('[data-act="news-unread"]').classList.contains('on'), 'combines with "Mentions & assigned to me"');
   d.querySelector('[data-act="news-filter"][data-f=""]').click(); await sleep(700);
   w.close();
   await call('alice', 'POST', '/api/news/read', {all: true});
   w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsUnread': 'true'}}); d = w.document; await sleep(600);
-  check(!d.querySelectorAll('#view .nitem').length && /All read\./.test(d.querySelector('#view').textContent), 'all read: "All read."');  // 2.298.0 (#3187): shorter
+  // 2.1052.0 (#5808): since 2.1037.0 (#5807) "For you" always shows: all read + "Unread only" reads "Nothing waits for you" there (was "All read.")
+  check(!d.querySelectorAll('#view .nitem, #view .ngroup').length && /Nothing waits for you/.test(d.querySelector('#view .nsect.me .nmeempty')?.textContent), 'all read: "Nothing waits for you": ' + d.querySelector('#view').textContent.slice(0, 160));  // 2.298.0 (#3187): shorter
   w.close();
   await call('alice', 'PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsUnread': 'true'}}); d = w.document; await sleep(600);
-  check(d.querySelector('[data-act="news-unread"]')?.textContent.trim() === 'Nur ungelesene' && /Alles gelesen\./.test(d.querySelector('#view').textContent), 'German: Nur ungelesene');
+  check(d.querySelector('[data-act="news-unread"]')?.textContent.trim() === 'Nur ungelesene' && /Nichts wartet auf dich/.test(d.querySelector('#view .nsect.me .nmeempty')?.textContent), 'German: Nur ungelesene');  // 2.1052.0 (#5808): as above
   w.close();
   await call('alice', 'PATCH', '/api/settings', {lang: 'en'});
 
