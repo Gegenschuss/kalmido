@@ -20,7 +20,29 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1075.0] - 2026-11-12
+## [2.1077.0] - 2026-11-12
+
+Package 2.1077 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: A).
+### Added
+- Lint `tools/check_notify_calls.py`: a new direct call of `notif_ok(` or `news_put(` outside `core/objnotify.py` and `collab/news.py` is red (send through `obj_notify`, rights first); the existing ones stand per file in `tools/notify_calls_baseline.json`, which only shrinks; CI step and suite `p21077_a_notifylint` (#5459).
+### Changed
+- Calendar: loading, empty and error states come from the shared block. While the shown range loads, a quiet "Loading…" floats over the grid; a failed load says "Events could not be loaded" with "Try again" instead of looking like an empty month (and is not fetched again on every drawing); offline with a saved copy the view says it shows the saved copy. An empty week, day or year says "Nothing planned …"; the agenda's "nothing" is the shared block (#5461).
+- Calendar month: the day list under the month no longer says "No tasks on this day" next to that day's events ("Nothing planned on this day." only when the day is empty), and turning the month moves it along (the 1st of the month, today in the current month) instead of showing "Today" under another month (#5461).
+### Fixed
+- Event editor: a refused save opens the editor again with what was typed and now says "Not saved: …" with the reason above its buttons (#5461).
+- Calendars window: opens at once instead of waiting silently for the people list (only "Share…" waits for it); a calendar trash that failed to load says so with "Try again" instead of "The trash is empty"; Settings > Calendars and the absences subscription link say a failed load with "Try again" instead of always "Only available online." (#5461).
+
+Package 2.1073 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- #5570: "Optimise PDF" goes page by page: each page (its measure, then the page with its text layer) is one step of its queue thread (#5412), the run's folder keeps the pages made so far between the steps. A restore no longer waits for the end of a long run, a restart between two pages no longer starts a run over, and a file put into the trash mid-run cleans up at once. The run's time limit counts over all its steps; GET `/api/docs/<id>/pdfopt` names how far a run got (`step: [done, all]`).
+- #5865: the old table of office trash copies (`office_trash`) is gone. Every start writes copies of an older database back into the shared trash first, then drops the table; copies that could not come back go with it (the log names their number). The key rotation, encrypt-all / decrypt-all and the terms clean-up no longer walk those copies.
+
+Package 2.1068 (Bündel: Freigabe-Karte eines Agenten zeigt bei Textänderun, Agenten-Werkzeug: Text an eine Wissensseite anhäng).
+### Added
+- #5831 An agent's approval card that changes a text (knowledge page, task notes, project description, comment) shows the change itself: folded one line in words ("Knowledge page Wiki/2D: 1 line added, nothing removed"), unfolded the removed and added lines with + / − and two lines around each change, "Show everything" for long ones. The server reckons it from the card's bound step against the text now, with the rights of the person who looks (`GET /api/approvals/diff`); a target changed since the card is marked, an unreadable or encrypted one shows no lines, and after the answer the card keeps the change as it was then. The technical "Step: …" line moved into the fold for every card.
+- #5829 `wiki_append` / `POST /api/v1/wiki/pages/{id}/append` takes `under` (a heading of the page): the text goes to the end of that section; an unknown heading answers 404 `heading_not_found` with the page's headings and writes nothing. `wiki_write` points to `wiki_append` for additions.
+### Changed
+- #5829 Appending puts exactly one empty line between the page and the new text (was one line break).
 
 Package 2.1069 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Listen-Zustand: Kern-Papierkorb-Schreiber absicher).
 ### Changed
@@ -54,6 +76,10 @@ Package 2.1074 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 - #5493: undo across devices, stage 3c - a project's settings with side effects are server steps too (kind `listside`, `kalmido/lists/lpside.py`): folder (with the folder's adopted defaults), workspace, project type, agents (listening, tidying up, members' access, follow-up), client, Home & life (and a trip's dates), time tracking, ticket key and visibility in the organisation; ticket templates / types and properties saved together with them go back too. The step keeps the values before / after (also the ones the save changed as a side effect) and goes back through the project's own write path (`list_apply`, was the route body of `PATCH /api/lists/<id>`), so a workspace change brings back what it ended (client, links); a value changed elsewhere since stays and is named. "Recent steps" lists them on every device; the project dialog's Undo, Ctrl+Z and the workspace toast take back that server step (no second browser entry any more).
 - #5493: a device's own undo / redo of a step without a server group sends `X-Kalmido-Undo-Own: 1` and records no new server step, so the way forward (redo) of the person's undone steps stays.
 - #5493: the server labels a task's step as the app's history does ("Priority of “Jump”: High", "Renamed …", "Date of …: 4 Mar", "Moved …", the title in quotes; was "Edited Jump"); no project, section or field name goes into a label (a project locked later would keep it there).
+
+## [2.1075.0] - 2026-11-12
+
+Not released (the CI of this version was red); its changes are listed under 2.1077.0.
 
 ## [2.1067.0] - 2026-11-12
 
@@ -429,7 +455,8 @@ Not released (the CI of this version was red); its changes are listed under 2.10
 
 Not released (the CI of this version was red); its changes are listed under 2.1007.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1075.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1077.0...HEAD
+[2.1077.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1077.0
 [2.1075.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1075.0
 [2.1067.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1067.0
 [2.1040.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1040.0
