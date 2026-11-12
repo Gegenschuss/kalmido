@@ -720,7 +720,10 @@ def settings_update():
     # took back the look instead of the time wipe / the deadline task / the proposal
     if "look" in vals and not (usettings(c, me()).get("look") or ""):
         marked.remove("look")
-    if marked:
+    # 2.1013.0 (#5773): a save the app makes by itself ({_auto: 1}: a view's block switches, a folder the list edit adds, a
+    # device's settings handed to the account once) is no step of the person: as the newest group it was what Ctrl+Z / the
+    # arrow took back first instead of the person's action right before (undo.js histNext)
+    if marked and not b.get("_auto"):
         su_mark(c, me(), marked, bundle=True)  # review F6: the same keys again from the same device within 10 min = one step
     if "show_done_views" in vals:  # 2.46.1 (#1422): an own choice against a folder's "Hide completed" is marked
         rs_done_sync(c, me(), usettings(c, me()).get("show_done_views"), vals["show_done_views"])  # 2.593.0 (#4590): one import for both

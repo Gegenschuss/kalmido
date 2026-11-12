@@ -1194,7 +1194,7 @@ function listModal(id, folder = '', o = {}) {
         const fa = await lmFolderAsk({[id]: diff.folder}); if (fa === null) { lsync(true); return; }
         if (fa.length) diff.folder_adopt = true;
       }
-      if (diff.folder && !folderNames().includes(diff.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [diff.folder]}}}).catch(() => {});  // 2.269.0 B (#3014): only the new folder
+      if (diff.folder && !folderNames().includes(diff.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [diff.folder]}}, _auto: 1}).catch(() => {});  // 2.269.0 B (#3014): only the new folder; 2.1013.0 (#5773): a part of the list edit, no undo step
       let cfl = null;
       // 2.527.0 (#4304 A5): kept until the server has it (the session ends during the save: sent after the sign-in, core.js fdWrite)
       const fk = fdWrite('PATCH', '/api/lists/' + id, {...diff, _prev: prev}, {slot: 'list.' + id, send: false});
@@ -1383,7 +1383,7 @@ function listModal(id, folder = '', o = {}) {
       }
       const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
-      if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [body.folder]}}});  // 2.269.0 B (#3014)
+      if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [body.folder]}}, _auto: 1});  // 2.269.0 B (#3014); 2.1013.0 (#5773): a part of the list edit, no undo step
       const {rate, nag, day_hours: _dh, ...b0} = body;
       const pt = $('.ptcard.on', md)?.dataset.pt || '';  // 2.352.0 C (#2752): every project may start from a type
       let n;
@@ -1495,17 +1495,17 @@ function lookQueue(k) {
   if (lookApplying || !LOOK_KEYS.includes(k) || typeof S === 'undefined' || !S.settings || lookLocal()) return;
   clearTimeout(lookTimer); lookTimer = setTimeout(lookPush, 800);
 }
-function lookPush() {
+function lookPush(auto) {  // 2.1013.0 (#5773): auto = the device's look handed to the account (lookAdopt), no undo step
   lookTimer = 0; if (lookLocal() || !S.settings) return;
   const v = JSON.stringify(lookSnap()); S.settings.look = v;
   // 2.997.0 (#5704): the app's own sync of the look is no step of an entry: its group (X-Kalmido-Undo-Gid) leaves HIST.fresh
   // at once - else the next entry of an area without server steps (a new event) took it and Ctrl+Z put the look back instead
-  api('PATCH', '/api/settings', {look: v}).then(r => { const g = r?._ugid; if (g && typeof HIST === 'object') HIST.fresh = HIST.fresh.filter(f => f.gid !== g); }).catch(() => {});
+  api('PATCH', '/api/settings', {look: v, ...(auto === true ? {_auto: 1} : {})}).then(r => { const g = r?._ugid; if (g && typeof HIST === 'object') HIST.fresh = HIST.fresh.filter(f => f.gid !== g); }).catch(() => {});
 }
 function lookAdopt() {  // after a state load: first time the account has none -> upload this device's; otherwise the account wins
   if (lookLocal() || lookTimer || !S.settings) return;
   const v = S.settings.look || '';
-  if (!v) { if (Object.keys(lookSnap()).length) lookPush(); return; }
+  if (!v) { if (Object.keys(lookSnap()).length) lookPush(true); return; }
   let o; try { o = JSON.parse(v); } catch { return; }
   if (!o || typeof o !== 'object' || JSON.stringify(o) === JSON.stringify(lookSnap())) return;
   lookApplying = true;

@@ -341,7 +341,7 @@ async function setListFolder(id, f) {
   if (f && !folderNames().includes(f)) S.settings.folders = JSON.stringify([...folderNames(), f]);
   const now = folderNowShared(id, f);  // 2.41.0 (#1428): into a shared folder -> "Now shared with …" + Undo
   const e = await saveListOrder(order, {[id]: f}, f ? tr('Moved {0} to folder {1}', qn(lname(l)), fDisp(f)) : tr('Took {0} out of its folder', qn(lname(l))));
-  if (f) await api('PATCH', '/api/settings', {folders: JSON.stringify(folderNames())});
+  if (f) await api('PATCH', '/api/settings', {folders: JSON.stringify(folderNames()), _auto: 1});  // 2.1013.0 (#5773): after the move (its own step), no undo step of its own
   if (e && now) { offerUndo(now, e); e._said = true; }
   return e;
 }

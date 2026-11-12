@@ -46,7 +46,7 @@ function o3c_ringsMigrate() {
   if (LS.get('rings', true) !== false) return;
   if (!S.settings || S.settings.side_progress === '0') { LS.del('rings'); return; }
   S.settings.side_progress = '0';  // the device key goes only once the account holds the value (offline: next load tries again)
-  api('PATCH', '/api/settings', {side_progress: '0'}).then(() => LS.del('rings')).catch(() => {});
+  api('PATCH', '/api/settings', {side_progress: '0', _auto: 1}).then(() => LS.del('rings')).catch(() => {});  // 2.1013.0 (#5773): saved by the app itself, no undo step (accounts/settings.py _auto)
 }
 function o3c_lookHtml() {
   return `<h4>${tr('Projects')}</h4>

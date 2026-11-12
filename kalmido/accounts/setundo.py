@@ -13,6 +13,8 @@ the folders' marks of show_done_views / show_progress and the active saved arran
 records (core/undodiff.py undo_person). SU_QUIET: keys a view changes by itself while one moves around (the folded
 folders, the shown workspace, column widths, the tour, ...) are no step: they would bury the real ones in the list; nor is a
 key that goes from no value to an empty one ('' / {} / []: the first save of a device's look).
+2.1013.0 (#5773): nor is a PATCH /api/settings the app sends by itself with {_auto: 1} (static/js: a view's block switches
+lyOptSet, a folder a list edit / move adds, a device's own settings handed to the account once): no step at all.
 
 2.985.0 (#5394, review F4-F6, F9):
 - a reset (POST /api/settings/reset) marks the view state too (SU_QUIET keys it puts back) and the active saved arrangement

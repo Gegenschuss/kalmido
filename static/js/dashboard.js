@@ -162,9 +162,9 @@ function lyChange(v, fn) {
 // saves go out one after the other (two quick changes must not arrive the wrong way round)
 let lyQ = Promise.resolve();
 const LY_PEND = {};
-function lyPatch(key, o) {
+function lyPatch(key, o, auto) {  // 2.1013.0 (#5773): auto = a block switch the view saves by itself (no undo step)
   LY_PEND[key] = o;
-  lyQueue(() => api('PATCH', '/api/settings', {[key]: o}).catch(() => { /* api() said it */ }).finally(() => { if (LY_PEND[key] === o) { delete LY_PEND[key]; if (S.settings) S.settings[key] = o; } }));
+  lyQueue(() => api('PATCH', '/api/settings', {[key]: o, ...(auto ? {_auto: 1} : {})}).catch(() => { /* api() said it */ }).finally(() => { if (LY_PEND[key] === o) { delete LY_PEND[key]; if (S.settings) S.settings[key] = o; } }));
 }
 const lyQueue = fn => (lyQ = lyQ.then(fn, fn));
 function lyStore(v, raw, std) {
@@ -179,7 +179,7 @@ function lyOptSet(v, b, n, x) {
   const raw = lyRaw(v); if ((raw.opts?.[b] || {})[n] === x) return;
   ((raw.opts ||= {})[b] ||= {})[n] = x;
   if (LY[v].save) { LY[v].save(JSON.stringify(raw), false); return; }
-  S.settings[LY[v].key] = JSON.stringify(raw); lyPatch(LY[v].key, JSON.stringify(raw));
+  S.settings[LY[v].key] = JSON.stringify(raw); lyPatch(LY[v].key, JSON.stringify(raw), true);  // 2.1013.0 (#5773): saved by the app itself, no undo step (accounts/settings.py _auto)
 }
 const lyAct = v => v === 'home' ? 'dash' : 'ly';
 // 2.43.0 (#1452): the blocks are changed at their "…" menu; the arranging list stays for keyboards and screen readers
