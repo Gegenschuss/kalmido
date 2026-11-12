@@ -8,8 +8,8 @@ container.
    stands before FROM lists in the line, list_state_sql() / otr_live(), the schema, the start's one-off fill (its flag)
  - the same number as the baseline: quiet; fewer / a file gone: a notice (--strict: red); --update only lowers
  - the repository: no finding, the baseline file is there
- - the fragment migrations.d/5537_a.py: additive column with a default, the trigger before INSERT / UPDATE of archived,
-   deleted_at, state; tools/check_migrations.py has no finding for it
+ - the fragment migrations.d/5537_a.py: additive column with a default, the trigger before every INSERT / UPDATE (no column
+   list: Postgres checks it when the trigger is made, before the column exists); tools/check_migrations.py has no finding for it
 usage: p21029_a_liststate_lint_test.py"""
 import os
 import shutil
@@ -104,9 +104,9 @@ steps = frag.get("MIGRATIONS", [])
 check(steps == [("lists", "state", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT 'live'")],
       f"one additive column with a default {steps}")
 sch = frag.get("SCHEMA", "")
-check("BEFORE INSERT OR UPDATE OF archived, deleted_at, state ON lists FOR EACH ROW" in sch and "GENERATED" not in sch.upper(),
-      "the trigger runs before every insert and every update of the three columns (no generated column)")
-for want in ("'trash'", "'archived'", "'live'", "NEW.deleted_at IS NOT NULL", "COALESCE(NEW.archived, 0) <> 0"):
+check("BEFORE INSERT OR UPDATE ON lists FOR EACH ROW" in sch and " UPDATE OF " not in sch and "GENERATED" not in sch.upper(),
+      "the trigger runs before every insert and update, without a column list (SCHEMA runs before the column exists; no generated column)")
+for want in ("'trash'", "'archived'", "'live'", "j->>'deleted_at'", "j->>'archived'", "IF NOT j ? 'state' THEN RETURN NEW"):
     check(want in sch, f"the trigger's rule names {want}")
 check(sch.index("'trash'") < sch.index("'archived'"), "the trash comes first: an archived project in the trash is 'trash'")
 r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_migrations.py")], capture_output=True, text=True)

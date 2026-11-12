@@ -1496,12 +1496,13 @@ def init_db(guard=True):
             # kalmido_offer_link_list (migrations.d/4586_a.py) follow their task's list once
             c.execute("UPDATE task_offer_links l SET list_id=t.list_id FROM tasks t WHERE t.id=l.task_id AND l.list_id<>t.list_id")
             gset(c, "migr_offerlist4586", "1")
-        if gsetting(c, "migr_liststate5537") != "1":  # 2.1029.0 (#5537): the projects of before get their state marker once
-            # (migrations.d/5537_a.py; from now on the trigger kalmido_list_state keeps it equal to archived / deleted_at)
-            with pg_system_ctx(c):  # every organisation's projects (row-level security)
-                c.execute("UPDATE lists SET state=state WHERE state IS DISTINCT FROM (CASE WHEN deleted_at IS NOT NULL THEN 'trash'"
-                          " WHEN archived <> 0 THEN 'archived' ELSE 'live' END)")
-            gset(c, "migr_liststate5537", "1")
+        # 2.1029.0 (#5537, migr_liststate5537): every start, the projects' state marker agrees with archived / deleted_at
+        # (migrations.d/5537_a.py; the trigger kalmido_list_state keeps it so; this reconcile covers the rows of before, a
+        # restored dump and a rollback that dropped the trigger -- review of 2.1029; touches only rows that differ)
+        with pg_system_ctx(c):  # every organisation's projects (row-level security)
+            c.execute("UPDATE lists SET state=state WHERE state IS DISTINCT FROM (CASE WHEN deleted_at IS NOT NULL THEN 'trash'"
+                      " WHEN archived <> 0 THEN 'archived' ELSE 'live' END)")
+        gset(c, "migr_liststate5537", "1")
         from .fkeys import fk_ensure
         fk_ensure(c)  # 2.152.0 C (#2174): the missing foreign keys (orphans cleaned first), every start, idempotent
         clk("fk_ensure")

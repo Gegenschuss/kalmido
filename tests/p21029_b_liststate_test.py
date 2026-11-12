@@ -7,7 +7,7 @@ list_state_sql() / otr_live(). Invented names only.
    the trash -> 'archived' again (it was archived); every way through the app's routes, nothing writes the marker itself
  - a write that names state with a wrong value (a copy of all columns, a hand-made statement) is corrected by the trigger;
    a write of other columns leaves it as it is
- - the whole table: no row whose marker differs from its columns (the start's one-off fill and the trigger)
+ - the whole table: no row whose marker differs from its columns (the reconcile at every start and the trigger)
  - taking the archive step back (Recent steps, POST /api/undo/to/<id>) brings the project back to 'live'
  - the helper: list_state_sql("l") = l.state='live', several states as IN (...), otr_live = live or archived, an unknown
    state / alias is refused
@@ -91,7 +91,7 @@ bad = dbx("""SELECT id, state, archived, deleted_at FROM lists WHERE state IS DI
              (CASE WHEN deleted_at IS NOT NULL THEN 'trash' WHEN archived <> 0 THEN 'archived' ELSE 'live' END)""")
 n = dbx("SELECT COUNT(*) FROM lists")[0][0]
 check(n >= 4 and not bad, f"every project's marker agrees with archived / deleted_at ({n} rows) {bad[:3]}")
-check(bool(dbx("SELECT 1 FROM settings WHERE key='migr_liststate5537' AND value='1'")), "the start's one-off fill is recorded")
+check(bool(dbx("SELECT 1 FROM settings WHERE key='migr_liststate5537' AND value='1'")), "the start's reconcile is recorded")
 
 # ---------------------------------------------------------------- the archive step taken back (Recent steps)
 P4 = plist(Fr, "Example Kitchen Shelves")
