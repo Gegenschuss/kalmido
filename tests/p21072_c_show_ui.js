@@ -22,6 +22,7 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
 const FEATS = 'cal,comments,collab,agents,office,clients,files,docs,events,time';
 
+// (the waits below wait for the ring to lie on the control: it glides there in 0.25 s, app.css .tring transition)
 // the spotlight as the person sees it: the step, its state, the ring, the card, the control of the step
 const SPOT = `(() => { const el = document.querySelector('.spot'); if (!el) return null;
   const ring = el.querySelector('.tring'), card = el.querySelector('.tcard'), rr = ring.getBoundingClientRect(), cr = card.getBoundingClientRect();
@@ -83,19 +84,19 @@ async function counts(ck) {
       check(b && b.text === 'Show me' && b.on && b.hit, `${p.who} desktop: the button "Show me" at the message, on the screen and reachable ` + JSON.stringify(b));
       const startHash = await ev('location.hash');
       await ev(`document.querySelector('#chat-msgs .cmsg[data-mid="a:${m1.id}"] [data-act="show-me"]').click()`);
-      let s = JSON.parse(await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).state === 'on' ? x : null; })()`) || 'null');
+      let s = JSON.parse(await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).state === 'on' && JSON.parse(x).inRing ? x : null; })()`) || 'null');
       check(s && s.hash === '#today' && s.target === 'tasks.new', `${p.who} desktop: the press opens the first step's view (#today) ` + JSON.stringify(s));
       check(s && s.ring && s.inRing && s.card, `${p.who} desktop: the ring lies on the task box, the card on the screen ` + JSON.stringify(s));
       check(s && /Type your task into this box\./.test(s.text) && /1\/2/.test(s.text) && s.h3 === 'Add a task', `${p.who} desktop: the card with the agent's line, the label and 1/2 ` + s?.text);
       check(s && s.through, `${p.who} desktop: the control still takes the person's press (the layer lets it through)`);
       await shot(`p21072c-${p.who}-desktop-1.png`);
       await ev(`document.querySelector('.spot [data-shw="next"]').click()`);
-      s = JSON.parse(await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).i === 1 && JSON.parse(x).state === 'on' ? x : null; })()`) || 'null');
+      s = JSON.parse(await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).i === 1 && JSON.parse(x).state === 'on' && JSON.parse(x).inRing ? x : null; })()`) || 'null');
       check(s && s.hash === '#cal' && s.target === 'calendar.new' && s.ring && s.inRing && /This button starts a new event\./.test(s.text) && /Done/.test(s.btns),
         `${p.who} desktop: Next goes to the calendar and rings "New event", the last step says Done ` + JSON.stringify(s));
       await shot(`p21072c-${p.who}-desktop-2.png`);
       await ev(`document.querySelector('.spot [data-shw="back"]').click()`);
-      s = JSON.parse(await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).i === 0 && JSON.parse(x).state === 'on' ? x : null; })()`) || 'null');
+      s = JSON.parse(await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).i === 0 && JSON.parse(x).state === 'on' && JSON.parse(x).inRing ? x : null; })()`) || 'null');
       check(s && s.hash === '#today' && s.inRing, `${p.who} desktop: Back comes back to the first step ` + JSON.stringify(s));
       await ev(`document.querySelector('.spot [data-shw="next"]').click()`);
       await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).i === 1; })()`);
@@ -108,12 +109,12 @@ async function counts(ck) {
       await ev(`loadModule('agentchat').then(() => { chatOpen(${p.ag.id}); return 1; })`);
       await until(BTN(m1.id));
       await ev(`document.querySelector('#chat-msgs .cmsg[data-mid="a:${m1.id}"] [data-act="show-me"]').click()`);
-      await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).state === 'on' ? x : null; })()`);
+      await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).state === 'on' && JSON.parse(x).inRing ? x : null; })()`);
       await ev(`document.querySelector('.spot [data-shw="close"]').click()`);
       check(await until(`!document.querySelector('.spot') && location.hash === ${JSON.stringify(startHash)}`), `${p.who} desktop: Close goes back to ${startHash}`);
       check(await until(`!document.querySelector('#achat')?.classList.contains('hidden') && !!document.querySelector('#chat-msgs .cmsg[data-mid="a:${m1.id}"]')`), `${p.who} desktop: the chat is there again`);
       await ev(`document.querySelector('#chat-msgs .cmsg[data-mid="a:${m1.id}"] [data-act="show-me"]').click()`);
-      await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).state === 'on' ? x : null; })()`);
+      await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).state === 'on' && JSON.parse(x).inRing ? x : null; })()`);
       await ev(`window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}))`);
       check(await until(`!document.querySelector('.spot') && location.hash === ${JSON.stringify(startHash)}`), `${p.who} desktop: Escape closes like Close`);
     }, false);
@@ -131,7 +132,7 @@ async function counts(ck) {
       check(b && b.on && b.hit, `${p.who} phone: the button on the screen and reachable ` + JSON.stringify(b));
       const chatHash = await ev('location.hash');
       await ev(`document.querySelector('#chat-msgs .cmsg[data-mid="a:${m2.id}"] [data-act="show-me"]').click()`);
-      let s = JSON.parse(await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).state === 'on' ? x : null; })()`) || 'null');
+      let s = JSON.parse(await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).state === 'on' && JSON.parse(x).inRing ? x : null; })()`) || 'null');
       check(s && s.hash === '#today' && s.ring && s.inRing && s.card && /Here you add a task\./.test(s.text), `${p.who} phone: the first step rings the way to a new task ` + JSON.stringify(s));
       await shot(`p21072c-${p.who}-phone-1.png`);
       await ev(`document.querySelector('.spot [data-shw="next"]').click()`);

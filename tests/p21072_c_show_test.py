@@ -123,7 +123,7 @@ pm = next((x for x in person_chat(A, AID) if x["id"] == m.get("id")), {})
 check((pm.get("show") or [{}])[0].get("label") == "Einstellungen öffnen", f"German: the label translated {pm.get('show', [{}])[:1]}")
 A.patch(B + "/api/settings", json={"lang": "en"})
 # the agent's own read of the chat: the stored form
-rows = ag.get(V + f"/agent/chats/{ME['id']}").json().get("data") or []
+rows = ag.get(V + "/agent/chats", params={"user_id": ME["id"]}).json().get("data") or []
 am = next((x for x in rows if x["id"] == m.get("id")), {})
 check(am.get("show") == m.get("show"), f"the agent reads its steps back as sent {am.get('show')}")
 
