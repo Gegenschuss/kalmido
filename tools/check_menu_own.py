@@ -29,7 +29,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHARED = os.path.join("static", "js", "popovers.js")
-OK = re.compile(r"menu-ok:\s*\S.{5,}")
+# the reason: words (at least ten letters / spaces), not just the comment end and the markup after it
+OK = re.compile(r"menu-ok:\s*[A-Za-z][\w ,.;()'-]{9,}")
 ROLE = re.compile(r"(?<!\[)\brole=\\?[\"']?menu(?:item(?:checkbox|radio)?)?\\?[\"'\s>]")
 DETAILS = re.compile(r"<summary\b([^>]*)>(.*?)</summary>", re.S)
 TAG = re.compile(r"<(?:button|a|div|span|summary)\b(?:[^<>$]|\$\{[^{}]*\})*>")
