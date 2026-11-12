@@ -20,6 +20,144 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.1067.0] - 2026-11-12
+
+Package 2.1029 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- #5537: projects carry one state marker `lists.state` (`live` / `archived` / `trash`), stage 1: an additive column the database keeps equal to `archived` / `deleted_at` (trigger `kalmido_list_state`, reconciled at every start); every filter on a project's state reads it through `list_state_sql()` / `otr_live()` of `core/access.py`, and the lint `tools/check_list_state.py` (baseline only shrinks) keeps new handwritten ones out. The API v1 and MCP answers are unchanged.
+### Fixed
+- #5537: a project in the trash that was not archived no longer shows up where only archived projects were left out (folder shares, sprints, the briefing, reminders and pickers of projects).
+
+Package 2.1043 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- The bell: with Settings > Notifications > "From agents: Only what needs me" (was "Comments by agents: Only replies to me", setting `agent_comments` = `replies`) an agent's new tasks, completions (also closing / reopening) and project status changes no longer write a News entry or send a push, also not through a project bell "All" / "Custom". Still arriving: questions with buttons, approval cards, proposals, mentions, replies to your comment, assignments to you, and completions of a task assigned to you or marked "Urgent" by you. The default "All" is unchanged. (#5792)
+
+Package 2.1042 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Quotations: the discount of the whole quotation as a fixed net amount instead of a percent (switch % / € next to the discount field in the calculation), spread over the VAT rates of the discountable positions by their share, the rest cent on the largest; never more than the discountable positions (#5815)
+- Quotations and invoices: a discount in percent per position ("Discount %" in the row), taken off before the quotation's discount; the row shows "2,000.00 less 10 % discount", the PDF prints it under the unit price, the approval page next to the quantity (#5815)
+### Changed
+- An invoice or credit note made from such a quotation keeps each position's discount; the e-invoice (ZUGFeRD / XRechnung CII and UBL) carries it as a line allowance with percent and basis (#5815)
+
+Package 2.1044 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- #5824 Agent chat, "…" menu > "Model" for an agent on the Kalmido server: the provider's models by name (current one chosen, the server default marked), saved at once and used from the next message; a link to the model per routine; without an API key a sentence with "Add an API key". Owner of a personal agent and admins of a team agent choose, everyone else sees the model.
+- #5825 Page "Agents": every card gets its settings - a gear next to "Chat" and "Plans", a tap on picture or name opens the same, a right click / long press opens the card's menu (Settings, Chat, Plans, Log and usage limit, Pause / Resume); only for who may change the agent (others keep the person card on the picture). The agent objects carry `server` (runs on the Kalmido server).
+### Fixed
+- #5826 Agent chat, "…" menu > "Permissions": the menu says what is in effect - head "Questions on actions", a line "In effect now: Auto" from the last run, "Host default: Auto" instead of the bare "Host default", "Host default: unknown" (the agent reports it with its next run) when the host never reported it; an agent on the Kalmido server (no host, the switch would do nothing) shows a fixed line "By its permissions in Kalmido".
+
+Package 2.1046 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- Knowledge editor: a code block (``` fences or indented) is drawn as one block with a background, a thin line and round corners in the light and the dark design (its lines had the sheet's own colour, so the block did not show); the fence lines like ```sh hide while the cursor is outside the block and show muted inside it (#5828).
+- Knowledge editor bar: "More information" stands on one line with the other buttons, the height and type of a small button; on a narrow screen only its symbol (#5828).
+### Added
+- Knowledge editor: every code block has the "Copy code" button of the read view at its top right (always on a phone, with the mouse while over the block or on keyboard focus); it copies only the block's content, without the fence lines, and leaves the cursor where it is (#5828).
+
+Package 2.997.2 (Teil 2/2: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpake).
+
+### Fixed
+- Undo of "Delete project" works again: one undo brings a deleted active project back active (an archived one back into the archive), on every device. The undo step from #5609 / #5709 still called the project restore the old way after #5491 had moved it onto the shared core, and every undo of a delete failed with a server error (#5609, #5709).
+- A server start no longer replaces the four delete triggers of the shared search word index (#5279) under a table lock every time: the trigger comparison now takes a quoted plain table name as the bare name Postgres prints (#4841).
+
+Package 2.1037 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Glocke: „Außerdem neu“ wird ein ruhiger, eingeklap).
+### Added
+- Split view: a button next to the bell switches it on and off with one click (pressed = on, only where the split view is offered, i.e. a wide screen with a mouse); Shift+V does the same, also with the focus in the right half; the command search has "Split view on / off"; "Open on the right" now always shows in the menu on a wide screen and switches the view on. The switch in Settings > Appearance shows the same state. (#5803)
+- Bell: an @mention in a team chat channel, group or project conversation is an entry under "For you" and counts at the bell and on the app icon (kind `chatmention`; several mentions in one room = one line with their number; read in the chat = read; encrypted messages without text; a muted room counts only the mention). Group conversations get their own line under "For you" like direct messages. (#5800)
+- Bell: "N tasks due today" and "N tasks overdue" as two computed lines at the top of "For you" (my open tasks: assigned to me or nobody's in my own list, on my clock); each line counts 1 at the bell and on the app icon, can be marked seen for today (comes back the next day or when more tasks fall due). New route `POST /api/news/due-seen`. Follow-up days and agents' proposals now count under "For you" too. (#5801)
+### Changed
+- Bell window, phone sheet, News view and start page card: "For you" always stands on top ("Nothing waits for you" when empty); "Also new" and "Read" are one folded "History" without the unread look (no blue ground, no tick, no number; open / closed is kept per device); no number at "Show all"; every filter chip shows its own waiting entries, the bell never follows a filter; the bell's label reads "Waiting for you: N". (#5807)
+### Fixed
+- The bell's window showed the number of unread direct messages and groups without their lines at the first open (the rooms arrived later); it draws again once they are there. (#5800)
+
+Package 2.1048 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- #5821 Files / Documents: the menu of a folder of the documents ("…", right click, long press on the phone) has "Scan inbox for this folder…": it opens Settings > Integrations > Documents: inboxes with "New scan inbox" open, the folder chosen and its name as the inbox's name; "Create inbox" shows the setup code as before. A folder with a scan inbox shows a small scanner mark and its menu says "Show scan inbox" (jumps to the inbox's row, extend / revoke there). Not offered for plain folders outside the documents, agent folders, locked folders, the trash, or when the server's API is off.
+- #5861 Agents: `POST /api/v1/wiki/pages/{id}/append` `{text, expect_updated_at?}` and the MCP tool `wiki_append` add text at the end of a knowledge page without sending the whole page (a line break first when the page does not end with one, at most 20,000 characters; same save, history and rights as `PATCH`; an approval card binds only the added text).
+### Fixed
+- #5637 follow-up: the single step group's undo route (`POST /api/undo/{id}/undo`) is listed in the parity and tenant coverage tests (both were red on main).
+
+Package 2.1049 (Bündel: Glocke: Termin-Einladung, „Laut für mich“, Komment).
+
+### Changed
+- #5806 The bell's "For you" (and its number) now also counts an invitation to an event, a task a colleague marked Urgent for you, a person's comment on a task you created or that is assigned to you (no reply or mention needed), a ready proposal you asked an agent for (and an agent's Playbook proposal) and a stalled job of your agent. Comments on tasks you only follow stay Activity; agents' comments keep following "Comments from agents".
+
+Package 2.1047 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Weich rot: p23602_d_api, Weich rot: p2273_b_move_ui u. 11 weitere).
+
+### Fixed
+- An organisation's invitation by e-mail address reaches an account that another organisation's invitation set up and that never signed in again as an ordinary invitation; the check could not see the other organisation's invitation and made it silent (#5837).
+- Deleting a file for good while its text recognition was still running could end in a server error (lock order of the core's purge and the file store's documents, #5835).
+- Deleting an orphaned video sign-off record from the settings works again without the office switched on (#5793).
+- Test suites brought up to date with the proved e-mail address rule and the time export menu (#5004, #5007, #5836, #5838, #5840, #5798, #5796, #5834), the merge queue gate test in a shallow clone (#5841), more diagnosis in p248_b_api (#5839).
+
+Package 2.1051.0 (Bündel: Angebote: gesamte Kalkulation um x % nachkalkulier, Angebote: optionale Positionen und Alternativen (m, Angebote: Zwischensumme je A).
+### Added
+- #5812 Quotations: "Adjust prices…" in the quotation's menu recalculates the draft's unit prices by x %, to a target total (net or gross) or to a target surplus (admins); rounding to cents, whole euros or 5 euros, the rest on one position (the largest after its own discount), a live preview, one undo step and a history entry; no discount line appears.
+- #5814 Quotations: a position can be optional or an alternative ("Kind of position" per row). It is printed with its amount in brackets and "Optional:" / "Alternative:" before the title, but counts in no sum (its own position discount is shown); a note below the totals says so. Invoices and delivery notes made from the quotation leave such positions out.
+- #5816 Quotations and invoices: "Subtotal under every section" shows the net of each section (heading to heading) in the editor, the PDF and on the approval page; display only, the totals and the e-invoice stay as they are. New office setting for the default.
+- #5817 Quotations: "Print as a flat price" leaves quantities, unit prices, a position's own discount and line amounts out of the PDF, the preview and the approval page (removed on the server, not hidden); net, tax and gross stay. An invoice made from it takes one position per tax rate.
+### Fixed
+- #5858 Tests: the undo suite calls POST /api/undo/<id>/undo for another person's group, so tenant_coverage is green again.
+
+Package 2.1054 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Projects: archiving and restoring a project is written on its state marker `lists.state` at every write path (the project's settings, a project admin, the organisation admin's overview, the quick-notes project, the account clean-up after the sample data, the import undo, a project kept by law) through one helper `list_set_archived()`; the database trigger `kalmido_list_state` now works both ways and keeps the old column `archived` written from the marker, so a version before can still run on the database. The trash stays on the core's `deleted_at` (the trash of every kind). API v1, MCP and exports keep `archived` / `archived_at` / `deleted_at` unchanged. The lint `tools/check_list_state.py` also counts a handwritten write of `lists.archived` (#5794).
+
+Package 2.1056 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- New lint step `tools/check_call_arity.py` in the CI job Lint (and so in the Mac lint and the einreihen check): every call of a module-level function of `kalmido/` and `app.py` gets all its required and keyword-only parameters, no extra positional argument and no unknown keyword; it follows `from ... import`, module aliases and re-exports and respects shadowing per function. A signature change merged next to a new caller (otr_back without uid, 2.1024) is now red in seconds; exceptions only with `# arity-ok: <reason>` on the call. Test `tests/check_call_arity_test.py`, CONTRIBUTING.md (#5863).
+
+Package 2.1055 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- #5791: An invoice draft restored from the trash never bills a receipt or time twice: positions whose travel receipt, outlay or time entry was billed on another live document meanwhile are taken out of the draft (the restore says how many), the other sources of such a position are open again, and sources still open are bound to the draft again. Drafts that went into the trash before this version come back as before.
+- #5791: The start-up step that writes old office trash copies back reads only the ids of the copies first and loads each copy on its own (never the start balance's copies kept there); a table's columns are asked once per run.
+
+Package 2.1052 (Bündel: Glocke: „Für dich“ hat eine einzige Definition vom).
+### Changed
+- #5808: News show one way - bundled per task - in the bell's window, the phone sheet and the News view. What stands under "For you" is decided by the server alone (`to_me`, the same entries the bell counts): a bundle stands there when at least one unread entry in it is for you; everything else is the folded history. The plain list, the browser's own list of kinds (`NEWS_NEEDS`) and the toggle "Bundled" are gone; the kept device setting `newsBundle` is no longer read.
+- #5808: a team chat mention's bundle shows the words of the message (the plain list did).
+
+Package 2.1045 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- #5827 An approved agent step runs from its card: `POST /api/v1/agent/approvals/{id}/run` and the MCP tool `run_approved_step` send exactly the method, path and body of the card (once, same binding as before); a refused write remembers its step as `step_ref`, `request_chat_approval step_ref=N` turns it into the card, so the agent never retypes a step. Follow-up for appending text to a page: #5861.
+- #5822 Agents > Edit agent (and Settings > Agents for a personal agent): section "Sees now" lists what is shared with exactly this agent (projects, knowledge folders / pages, the whole knowledge area, file folders, with role and folders excluded), "Share..." adds a share through the existing ways, a row's remove ends it; permissions that do nothing without a share show "Nothing shared yet" (`GET /api/agents/{id}/sees`; others' private shares only as "+ n more").
+- #5823 Knowledge: "Share entire knowledge area..." (menu "..." of the area, right click on "Knowledge" in the sidebar) shares the whole area with the own personal agent or an agent of the organisation, including everything added later; single folders can be excluded per agent ("Exclude folder...", folder menu "Exclude from the shared knowledge area", tag "not for <agent>"; data lock key `wiki_folders`), an own share inside an excluded folder still wins; encrypted areas never. `GET /api/wiki/area-share`. Persons as recipients: #5862.
+### Fixed
+- #5827 A card whose method and path match no route (e.g. PUT on a knowledge page, the route is PATCH) is refused when it is created (400 naming the allowed methods) instead of being stored as a one-way step that could never run; 409 approval_invalid names its reason (`error.reason`: method, path, body with the differing field names, stale, used with the time it ran, unanswered, rejected, approver rights ...), never contents.
+
+Package 2.1061 (Bündel: Bündel: Projekte (lists): Zustandsmarker Stufe 3 - Wertles).
+### Changed
+- Projects read their archive state from the state marker `lists.state` everywhere: `core/access.py` `list_archived_sql()` (SQL), `list_archived()` / `list_out()` (rows); 36 reads of the old column `lists.archived` in 24 files moved, `/api/state`, API v1, the organisation admin's project list and the 409 `current` keep the key `archived` (no change of shape). `tools/check_list_state.py` now also counts a read of the old column (#5867, stage 3a; dropping the column follows as its own one-way step).
+
+Package 2.1063 (Bündel: PDF-Vorschau: Grund und Leiste an die Design-Farbe, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- #5879: the document view's PDF preview follows the theme instead of fixed greys: its ground is a step darker than the card in the dark theme and a light grey in the light one, the white page stands out by a thin rim and its shadow; the preview bar and the page strip (Pages) look like the other toolbars (the card's surface, muted buttons, the pressed one like a chosen segment). On a phone the bar stays in one row: the page count may shorten, the percentage is narrow, Pages and Full screen sit in the row instead of under it.
+
+Package 2.1062 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- #5786: a never used account that an organisation's invitation by e-mail created is withdrawn by the daily clean-up (like *Withdraw*: deleted, only while it never signed in, belongs to no other organisation and owns no project) 44 days after its newest invitation (never sooner than 30 days). A week before, a warning mail goes to its address with the date and a link to set the account up; setting it up keeps it, and without a delivered warning nothing is withdrawn. On the same day every expired invitation row of the list goes alike - ordinary, silent, neutral and new-account rows - so the list tells nothing about whether a typed address has an account. New columns `users.oinv_warned_at`, `users.oinv_used` (signed in once).
+### Fixed
+- #5864: withdrawing an organisation's invitation of a never used new account no longer makes every later invitation of that account silent (the undo, another organisation's): the mark "made by an organisation invitation" (`users.oinv_made_at`) outlives the withdrawal, *Resend* knows the same exception, and the account's link stays while another organisation's invitation is still open.
+
+Package 2.1067 (Bündel: Agenten: Werkzeug „Hilfe durchsuchen“ - die Doku d, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- #5819 Agents can look up the help of the running version: `GET /api/v1/help` (overview: feature areas and the sections of each help file), `GET /api/v1/search?kind=help` (word search over headings and text, a kind of the search registry) and `GET /api/v1/help/section?key=` (one section by its index key, capped, with the interface words in the person's language). MCP tools `help_overview`, `search_help`, `read_help`; `kalmido_cli.py docs`. The image ships `docs/*.md` (not `docs/dev/`); operator files only for an instance admin's token with admin-read. Agent rules: a question about using Kalmido is looked up first, answered with the click path in the interface's words and its source, never guessed.
+- #5819 Help texts for recurring tasks (TASKS.md) and for tasks with a time budget from a quotation (OFFICE.md).
+### Changed
+- #5789 The start balance of the cash flow goes into the one trash of the core (office trash, recent steps, undo) instead of a copy; the office trash's copy routes are gone, old copies come back as rows of the trash at the start. The table office_trash goes in a later version (#5865).
+### Fixed
+- #5819 API.md: the path to a scan inbox for a folder (Settings > Integrations > Documents: inboxes > Folder watcher).
+- #5822 The agent dialog's Share... project list asks the project's state marker instead of the old archived column (lint red on main after #5867).
+- #5801 Tests: the tenant coverage lists `POST /api/news/due-seen` (a mark of the person's own; red on main since 2.1037).
+
+Package 2.1064 (Bündel: Angebote: Hinweis in „wartet auf dich“, wenn ein g).
+
+### Added
+- #5818: a sent quotation without an answer now rings the bell under "For you": once a few days before its "Valid until" ("Quotation AN-…, client expires in 3 days") and once the day after ("… has expired without an answer"). It goes to the person who sent it (else the office admins, a private office: its owner), News only, no push, one entry per quotation that counts 1 in the bell; it leaves the bell when the quotation is accepted, rejected, superseded or extended. Nothing changes by itself: the status stays "sent". Quotations without "Valid until" and trial documents never ring.
+- #5818: the quotation shows a note above the editor while it waits ("Valid until … - expires in N days" / "- expired without an answer") with **Extend validity** (a new date without a new version; the PDF shows the new date; an open approval link has to be created again), **Follow up** (the send dialog with a follow-up subject and text, finalised quotations) and **Mark as rejected**. The quotation list marks sent quotations past their date "expired". New route `POST /api/office/docs/<id>/valid-until` (sent quotations only, logged in the office log).
+- #5818: office settings > Documents: "Tell me when a sent quotation runs out without an answer" (default on) and "Notice before it runs out" (1-30 days, default 3); settings keys `offer_exp_notice`, `offer_exp_days`.
+
 ## [2.1040.0] - 2026-11-12
 
 Package 2.1026 (Bündel: Kern-Querschnitt Q6c: Suche im Browser und für Agenten).
@@ -256,7 +394,8 @@ Not released (the CI of this version was red); its changes are listed under 2.10
 
 Not released (the CI of this version was red); its changes are listed under 2.1007.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1040.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1067.0...HEAD
+[2.1067.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1067.0
 [2.1040.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1040.0
 [2.1024.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1024.0
 [2.1020.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1020.0
