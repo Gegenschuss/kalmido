@@ -19,11 +19,10 @@
 
 ## What's new
 
-**2.1061.0** (2026-11-12):
-- **Office**: quotations with optional / alternative positions, subtotals per section, flat price print and repricing (x %, target total, target surplus); discounts as a fixed amount and per position.
+**2.1063.0** (2026-11-12):
+- **Office**: quotations with optional / alternative positions, subtotals per section, flat price print and repricing (x %, target total, target surplus).
 - **Agents**: approved steps run from the card (`run_approved_step`); "Sees now" in the agent dialog; a whole knowledge area can be shared with an agent, folders excluded per agent; `wiki_append` adds text to a knowledge page.
-- **Bell**: "For you" shows exactly what the bell counts (mentions, due tasks, invitations); the rest is a folded history.
-- **Split view**: one-click switch next to the bell (Shift+V).
+- **Organisations**: never used invited accounts are withdrawn automatically after 44 days, with a warning mail a week before.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
