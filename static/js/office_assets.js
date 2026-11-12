@@ -117,7 +117,7 @@ function astBind(md, r) {
 // the receipt picker: documents of the office's document space; a choice proposes date, net price and vendor
 function astPick(md) {
   const pk = modal(`<h3>${tr('Take from receipt')}</h3><div class="ctsearch">${ic('search', 's')}<input id="ast-rq" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" autocomplete="off" enterkeyhint="search"></div>
-    <ul class="ast-rcl" role="list"><li class="muted">${tr('Loading…')}</li></ul><div class="foot"><span class="spacer"></span><button class="btn" data-ast="close">${tr('Cancel')}</button></div>`);
+    <ul class="ast-rcl" role="list"><li>${/*html-ok*/ loadingHtml('row')}</li></ul><div class="foot"><span class="spacer"></span><button class="btn" data-ast="close">${tr('Cancel')}</button></div>`);
   pk.classList.add('ast-pick');
   const list = $('.ast-rcl', pk);
   let seq = 0;
@@ -127,7 +127,7 @@ function astPick(md) {
       const j = await api('GET', `${AST_URL}/receipts?q=${encodeURIComponent(q || '')}`);
       if (n !== seq) return;
       list.innerHTML = (j.items || []).map(d => `<li><button type="button" class="ofcrow" data-ast="take" data-id="${d.id}"><span class="ofcn"><b>${esc(d.name)}</b><small class="muted">${esc([d.date ? fmtDateLoc(d.date) : '', d.sender, d.amount ? `${fmtNum(+d.amount, 2)} ${d.currency || ''}`.trim() : '', d.receipt ? tr('Receipt') : ''].filter(Boolean).join(' · '))}</small></span></button></li>`).join('')
-        || `<li class="muted">${q ? tr('Nothing matches.') : tr('No documents in this office yet.')}</li>`;
+        || `<li>${/*html-ok*/ q ? ofcNoHit('', 'row') : emptyState({title: tr('No documents in this office yet.'), size: 'row'})}</li>`;  // 2.1076.0 (#5450)
     } catch (x) { list.innerHTML = `<li class="aerr">${esc(ofcErrHere(x))}</li>`; }
   };
   let t;

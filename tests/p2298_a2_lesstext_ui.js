@@ -62,7 +62,7 @@ const behindI = (d, el) => !!el && el.classList.contains('iisrc') && !!d.querySe
 
     // bookkeeping: the tax note once per page
     go('#office/books');
-    await until(() => d.querySelector('#view .bk-sec') && !d.querySelector('#view .lempty'), 80);
+    await until(() => d.querySelector('#view .bk-sec') && !d.querySelector('#view .lempty, #view .eload'), 80);  // 2.1076.0 (#5450): + the shared loading block
     await sleep(300);
     const notes = (d.querySelector('#view')?.textContent.match(/No tax advice; figures without guarantee\./g) || []).length;
     check(notes === 1, tag + 'bookkeeping: the tax note once, not per part: ' + notes);

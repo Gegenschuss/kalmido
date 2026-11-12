@@ -23,7 +23,7 @@ function plSectionHtml() {
   if (PLK.oid !== OFC.info?.org_id) { PLK.oid = OFC.info?.org_id; PLK.data = null; }
   if (!PLK.data) { if (!PLK.loading) setTimeout(plLoad, 0); return '<section id="pl-sec" class="plsec"></section>'; }
   const d = PLK.data, y = String(BK.year || new Date().getFullYear()), cur = d.current || '';
-  if (d.error) return `<section id="pl-sec" class="plsec"><p class="muted">${esc(d.error)}</p></section>`;
+  if (d.error) return `<section id="pl-sec" class="plsec">${/*html-ok*/ errorState({sub: d.error, size: 'sec'})}</section>`;  // 2.1076.0 (#5450): the shared block (the settings window draws this part once: the reason, no button)
   const months = [];
   for (let i = 1; i <= 12; i++) {
     const m = `${y}-${String(i).padStart(2, '0')}`, on = !!d.through && m <= d.through;

@@ -62,11 +62,11 @@ const dtHint = () => `<p class="muted ofchint">${esc(tr('# heading, - list, vari
 // ---- the tab
 function dtTabHtml() {
   if (DT.oid !== OFC.info?.org_id) Object.assign(DT, {oid: OFC.info?.org_id, data: null, err: null, pv: null, sg: null, fClient: '', fList: '', fStatus: ''});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
-  if (DT.err) return `<div class="empty">${esc(DT.err)}</div>`;
-  if (!DT.data) { if (!DT.loading) setTimeout(dtLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (!ofcAdmin()) return ofcAdmOnly();  // 2.1076.0 (#5450)
+  if (DT.err) return ofcFail(DT.err, () => { DT.err = null; DT.data = null; });
+  if (!DT.data) { if (!DT.loading) setTimeout(dtLoad, 0); return loadingHtml('big'); }
   const id = S.route.tab === 'gendocs' ? S.route.id : null;
-  if (id) { const d = dtDoc(id); return d ? dtDocHtml(d) : `<div class="empty">${tr('This document does not exist or you cannot see it.')}</div>`; }
+  if (id) { const d = dtDoc(id); return d ? dtDocHtml(d) : noAccessState({title: tr('This document does not exist or you cannot see it.'), sub: ''}); }
   const seg = `<div class="seg" role="group" aria-label="${esc(tr('View'))}"><button type="button" data-dt="view" data-v="docs" class="${DT.view === 'docs' ? 'on' : ''}" aria-pressed="${DT.view === 'docs'}">${tr('Documents')}</button><button type="button" data-dt="view" data-v="templates" class="${DT.view === 'templates' ? 'on' : ''}" aria-pressed="${DT.view === 'templates'}">${tr('Templates')}</button></div>`;
   return DT.view === 'templates' ? dtTplsHtml(seg) : dtDocsHtml(seg) + (typeof oft_sharedHtml === 'function' ? oft_sharedHtml('gendocs') : '');  // 2.351.0 A (#2823): + shared through a folder
 }
@@ -79,7 +79,7 @@ function dtDocsHtml(seg) {
     ${lists.length ? `<select id="dt-fl" aria-label="${esc(tr('Project'))}"><option value="">${tr('All projects')}</option>${lists.map(l => `<option value="${l.id}" ${String(l.id) === DT.fList ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select>` : ''}
     <select id="dt-fs" aria-label="${esc(tr('Status'))}"><option value="">${tr('All states')}</option>${Object.entries(DT_ST).map(([k, n]) => `<option value="${k}" ${k === DT.fStatus ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>
     <span class="spacer"></span><button class="btn sm pri" data-dt="new">${ic('plus', 's')}<span>${tr('New document')}</span></button></div>`;
-  if (!docs.length) return bar + `<div class="empty nempty eact">${ic('file')}<span>${(d.docs || []).length ? tr('No documents match the filter.') : (d.templates || []).length ? tr('No documents yet. Create one from a template for a client.') : tr('No documents yet. Start with a template: add a sample under Templates.')}</span>${!(d.templates || []).length ? `<button class="btn" data-dt="view" data-v="templates">${tr('Templates')}</button>` : ''}</div>`;
+  if (!docs.length) return bar + ((d.docs || []).length ? ofcNoHit() : emptyState({icon: 'file', title: (d.templates || []).length ? tr('No documents yet. Create one from a template for a client.') : tr('No documents yet. Start with a template: add a sample under Templates.'), action: !(d.templates || []).length ? `<div class="eacts"><button class="btn" data-dt="view" data-v="templates">${tr('Templates')}</button></div>` : ''}));  // 2.1076.0 (#5450)
   return bar + `<ul class="ofclist dtp-list" role="list">${docs.map(x => `<li><button type="button" class="ofcrow" data-dt="open" data-id="${x.id}"><span class="ofcn"><b>${esc(x.title || x.kind_label)}${typeof tri_tag === 'function' ? tri_tag(x) : '' /* 2.144.10 C (#2576) */}</b>
     <small class="muted">${esc([cdn_name(x.client_id, x.client_name), x.list_name, x.kind_label, fmtDateLoc((x.final_at || x.created_at || '').slice(0, 10))].filter(Boolean).join(' · '))}</small></span>${dtStTag(x)}${ic('right', 's')}</button></li>`).join('')}</ul>`;
 }
@@ -87,7 +87,7 @@ function dtTplsHtml(seg) {
   const ts = DT.data.templates || [];
   const bar = `<div class="ofcbar dtp-bar">${seg}<span class="spacer"></span><button class="btn sm" data-dt="starters">${ic('copy', 's')}<span>${tr('Use sample')}</span></button><button class="btn sm pri" data-dt="tnew">${ic('plus', 's')}<span>${tr('New template')}</span></button></div>`;
   const rows = ts.map(t => `<li><button type="button" class="ofcrow" data-dt="topen" data-id="${t.id}"><span class="ofcn"><b>${esc(t.name)}</b><small class="muted">${esc([t.kind_label, (t.lang || '').toUpperCase(), t.sign ? tr('can be signed') : ''].filter(Boolean).join(' · '))}</small></span>${ic('right', 's')}</button></li>`).join('');
-  return bar + (rows ? `<ul class="ofclist dtp-list" role="list">${rows}</ul>` : `<div class="empty nempty eact">${ic('file')}<span>${tr('No templates yet. Add a sample (letter, reminder, contract and more) and adapt it.')}</span><button class="btn pri" data-dt="starters">${tr('Use sample')}</button></div>`)
+  return bar + (rows ? `<ul class="ofclist dtp-list" role="list">${rows}</ul>` : emptyState({icon: 'file', title: tr('No templates yet. Add a sample (letter, reminder, contract and more) and adapt it.'), action: `<div class="eacts"><button class="btn pri" data-dt="starters">${tr('Use sample')}</button></div>`}))
     + (rows ? '' : `<p class="muted ofchint">${esc(tr('These templates are for documents. Task templates stay in the projects.'))}</p>`);  // 2.298.0 A2 (#3186): only while empty
 }
 function dtDocHtml(d) {
@@ -110,7 +110,7 @@ function dtDocHtml(d) {
         <div class="aerr" role="alert" id="dt-err"></div>
         <div class="foot dtp-acts"><button class="btn danger ghost" data-dt="arch" data-id="${d.id}">${ic('archive', 's')}<span>${tr('Archive')}</span></button><span class="spacer"></span>
           <button class="btn" data-dt="save" data-id="${d.id}">${tr('Save')}</button><button class="btn pri" data-dt="final" data-id="${d.id}">${ic('check', 's')}<span>${tr('Finish')}</span></button></div></div>
-      <section class="dtp-pv" aria-label="${esc(tr('Preview'))}"><h4 class="muted">${tr('Preview')}</h4>${dtPvBtn(d.id)}${pv ? `${pv.missing.length ? `<p class="dtp-warn" role="status">${esc(tr('Missing details (left out in the PDF): {0}', (pv.missing_labels || pv.missing).join(', ')))}</p>` : ''}<div class="dtp-doc">${dtBlocksHtml(pv.blocks)}</div>` : `<p class="muted">${tr('Loading…')}</p>`}</section></div>`;
+      <section class="dtp-pv" aria-label="${esc(tr('Preview'))}"><h4 class="muted">${tr('Preview')}</h4>${dtPvBtn(d.id)}${pv ? `${pv.missing.length ? `<p class="dtp-warn" role="status">${esc(tr('Missing details (left out in the PDF): {0}', (pv.missing_labels || pv.missing).join(', ')))}</p>` : ''}<div class="dtp-doc">${dtBlocksHtml(pv.blocks)}</div>` : `${/*html-ok*/ loadingHtml('row')}`}</section></div>`;
   }
   const sg = d.sign && d.status !== 'draft' ? dtSigHtml(d) : '';
   return head + `<div class="dtp-doc dtp-final">${dtBlocksHtml(dtBlocks(d.body))}</div>
@@ -154,7 +154,7 @@ async function dtSignImage(x) {
 }
 // ---- signature by the customer (link)
 function dtSigHtml(d) {
-  if (!DT.sg || DT.sg.id !== d.id) { setTimeout(() => dtSigLoad(d.id), 0); return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the client')}</h3><p class="muted">${tr('Loading…')}</p></section>`; }
+  if (!DT.sg || DT.sg.id !== d.id) { setTimeout(() => dtSigLoad(d.id), 0); return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the client')}</h3>${/*html-ok*/ loadingHtml('row')}</section>`; }
   const rows = DT.sg.rows, live = rows.some(x => x.live), can = d.status === 'final' && !d.archived;
   const st = x => x.revoked_at && x.state === 'open' ? tr('Switched off') : !x.live && x.state === 'open' ? tr('Expired') : x.state === 'accepted' ? tr('Signed') : x.state === 'declined' ? tr('Rejected') : tr('Waiting for the client');
   const row = x => `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(st(x))}</b><small class="muted"> · ${esc(fmtWhen(x.created_at))}</small></div>

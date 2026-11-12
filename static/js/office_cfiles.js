@@ -15,7 +15,7 @@ const dmaIsPdf = f => f && (/\.pdf$/i.test(f.name || '') || f.type === 'applicat
 // the row of the dialog: r = the contract (null: a new one)
 function dmaRowHtml(r) {
   DMA.pending = [];
-  return `<div class="row dma-row"><label id="dma-lab">${tr('Contract (PDF)')}</label><div class="dma-box" id="dma-box" data-fg-skip data-cid="${r?.id || ''}" aria-labelledby="dma-lab">${r ? `<p class="muted">${tr('Loading…')}</p>` : dmaListHtml([], null)}</div></div>`;
+  return `<div class="row dma-row"><label id="dma-lab">${tr('Contract (PDF)')}</label><div class="dma-box" id="dma-box" data-fg-skip data-cid="${r?.id || ''}" aria-labelledby="dma-lab">${/*html-ok*/ r ? `${/*html-ok*/ loadingHtml('row')}` : dmaListHtml([], null)}</div></div>`;
 }
 function dmaListHtml(items, cid) {
   const adm = ofcAdmin();
@@ -23,7 +23,7 @@ function dmaListHtml(items, cid) {
       <span class="dma-d">${dateIn('dma-date-' + f.id, f.date, {label: tr('Date'), clear: false, ro: !adm, attrs: `data-dma="date" data-fid="${f.id}"`})}</span>
       ${adm ? `<span class="dma-acts"><button type="button" class="iconbtn" data-dma="file" data-fid="${f.id}" aria-haspopup="menu" title="${esc(tr('Move to folder…'))}" aria-label="${esc(tr('Move to folder…'))}: ${esc(f.name)}">${ic('folder', 's')}</button><button type="button" class="iconbtn" data-dma="replace" data-fid="${f.id}" title="${esc(tr('Replace'))}" aria-label="${esc(tr('Replace'))}: ${esc(f.name)}">${ic('upload', 's')}</button><button type="button" class="iconbtn" data-dma="rm" data-fid="${f.id}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}: ${esc(f.name)}">${ic('trash', 's')}</button></span>` : ''}</li>`).join('');
   const pend = cid ? '' : DMA.pending.map((f, i) => `<li class="dma-f"><span class="dma-open">${ic('file', 's')}<span class="dma-n">${esc(f.name)}</span><small class="muted">${esc(tr('is attached when you save'))}</small></span><span class="dma-acts"><button type="button" class="iconbtn" data-dma="unpick" data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}: ${esc(f.name)}">${ic('x', 's')}</button></span></li>`).join('');
-  const list = rows || pend ? `<ul class="dma-list" role="list">${rows}${pend}</ul>` : `<p class="muted dma-none">${tr('No PDF attached yet')}</p>`;
+  const list = rows || pend ? `<ul class="dma-list" role="list">${rows}${pend}</ul>` : emptyState({title: tr('No PDF attached yet'), size: 'row', cls: 'dma-none'});  // 2.1076.0 (#5450)
   return list + (adm ? `<input type="file" id="dma-file" accept="application/pdf,.pdf" multiple hidden><button type="button" class="btn sm dma-up" data-dma="up">${ic('upload', 's')}<span>${tr('Upload PDF')}</span></button>` : '');
 }
 async function dmaLoad(md) {

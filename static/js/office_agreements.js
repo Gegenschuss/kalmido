@@ -69,9 +69,9 @@ ms_rowMenu('.agr-li .ofcrow', r => {
 });
 function agrHtml() {
   if (AGR.oid !== OFC.info?.org_id) Object.assign(AGR, {oid: OFC.info?.org_id, data: null, err: null, opened: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
-  if (AGR.err) return `<div class="empty">${esc(AGR.err)}</div>`;
-  if (!AGR.data) { setTimeout(() => { if (!AGR.data) agrLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (!ofcAdmin()) return ofcAdmOnly();  // 2.1076.0 (#5450)
+  if (AGR.err) return ofcFail(AGR.err, () => { AGR.err = null; AGR.data = null; });
+  if (!AGR.data) { setTimeout(() => { if (!AGR.data) agrLoad(); }, 0); return loadingHtml('big'); }
   const all = AGR.data.items || [], kind = AGR.kind, items = kind === 'all' ? all : all.filter(a => agr_kindOf(a) === kind);
   const id = +S.route.id || 0;
   if (id && AGR.opened !== id) { AGR.opened = id; const a = all.find(x => x.id === id); if (a) setTimeout(() => agrModal(a), 0); }
@@ -79,7 +79,7 @@ function agrHtml() {
   const bar = `${items.length ? hintOnce('ofclp', tr('Hold a row to see what you can do with it.')) : ''}<div class="ofcbar agr-bar"><h3 class="ofcgrp">${tr('Contracts & subscriptions')}</h3><span class="spacer"></span>
     <label class="chkl"><input type="checkbox" data-agr="arch" ${AGR.arch ? 'checked' : ''}><span>${tr('Show archived')}</span></label>
     <button class="btn sm pri" data-agr="new">${ic('plus', 's')}<span>${tr('New contract')}</span></button></div>${agr_filterHtml(kind)}`;
-  if (!items.length) return bar + `<p class="muted lempty">${tr('No contracts yet, e.g. business liability insurance, office rent or a leasing contract.')}</p>` + subs;
+  if (!items.length) return bar + emptyState({icon: 'file', title: tr('No contracts yet, e.g. business liability insurance, office rent or a leasing contract.')}) + subs;  // 2.1076.0 (#5450)
   const sumM = items.filter(a => !a.archived && a.monthly != null).reduce((s, a) => s + +a.monthly, 0);
   const groups = AGR_KINDS.map(([k, n]) => {
     const rows = items.filter(a => a.kind === k); if (!rows.length) return '';
@@ -196,16 +196,16 @@ async function agrDelete(a) {
 function agrDocPick(done) {
   const ws = AGR.data?.doc_ws || 'private';
   const md = modal(`<h3>${tr('Select a document')}</h3><div class="row"><input id="agr-dq" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" maxlength="100"></div>
-    <ul class="ofclist agr-docs" role="list"><li class="muted">${tr('Loading…')}</li></ul><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button></div>`);
+    <ul class="ofclist agr-docs" role="list"><li>${/*html-ok*/ loadingHtml('row')}</li></ul><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button></div>`);
   md.classList.add('ofcdlg');
-  let seq = 0, docs = [];
+  let seq = 0, docs = [], err = '';
   const load = async () => {
     const s = ++seq, q = $('#agr-dq', md)?.value.trim() || '';
-    try { const j = await api('GET', `/api/docs?ws=${encodeURIComponent(ws)}&facets=0&limit=30${q ? '&q=' + encodeURIComponent(q) : ''}`); if (s !== seq) return; docs = j.docs || []; }
-    catch (x) { if (s === seq) docs = []; }
+    try { const j = await api('GET', `/api/docs?ws=${encodeURIComponent(ws)}&facets=0&limit=30${q ? '&q=' + encodeURIComponent(q) : ''}`); if (s !== seq) return; docs = j.docs || []; err = ''; }
+    catch (x) { if (s === seq) { docs = []; err = ofcErrHere(x); } }
     const ul = $('.agr-docs', md); if (!ul) return;
     ul.innerHTML = docs.length ? docs.map(d => `<li><button type="button" class="ofcrow" data-m="pick" data-id="${d.id}"><span class="ofcn"><b>${esc(d.name)}</b><small class="muted">${esc(fmtDateLoc((d.date || d.created_at || '').slice(0, 10)))}</small></span>${ic('right', 's')}</button></li>`).join('')
-      : `<li class="muted lempty">${tr('No documents found.')}</li>`;
+      : `<li>${/*html-ok*/ err ? errorState({sub: err, size: 'row', retry: load}) : ofcNoHit('', 'row')}</li>`;  // 2.1076.0 (#5450): a failure is no "nothing found"
   };
   let t = null;
   md.addEventListener('input', e => { if (e.target.id === 'agr-dq') { clearTimeout(t); t = setTimeout(load, 250); } });

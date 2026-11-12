@@ -32,8 +32,8 @@ const orr_reset = () => { ORR.data = null; ORR.log = null; ORR.err = null; ORR.l
 
 function orr_html() {
   if (ORR.oid !== OFC.info?.org_id) { ORR.oid = OFC.info?.org_id; orr_reset(); ORR.open.clear(); }
-  if (ORR.err) return `<div class="empty">${esc(ORR.err)}</div>`;
-  if (!ORR.data) { if (!ORR.busy) { ORR.busy = true; setTimeout(orr_load, 0); } return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (ORR.err) return ofcFail(ORR.err, () => { ORR.err = null; ORR.data = null; ORR.busy = false; });  // 2.1076.0 (#5450)
+  if (!ORR.data) { if (!ORR.busy) { ORR.busy = true; setTimeout(orr_load, 0); } return loadingHtml('big'); }
   const d = ORR.data, mg = d.mine?.manager;
   if (!mg) return `<div class="orr">${orr_mineHtml(d)}</div>`;
   const hint = d.personal ? tr('Here you are your own admin. Give your agents a group so they reach the office.')
@@ -142,8 +142,8 @@ async function orr_del(gid) {
 // ---- Log
 const ORR_ACT = {member_groups: N_('changed the groups of {0}'), group_create: N_('created the group {0}'), group_change: N_('changed the group {0}'), group_delete: N_('deleted the group {0}'), group_restore: N_('restored the group {0}')};
 function orr_logHtml(d) {
-  if (ORR.logErr) return `<div class="empty">${esc(ORR.logErr)}</div>`;
-  if (!ORR.log) { if (!ORR.logBusy) { ORR.logBusy = true; setTimeout(orr_logLoad, 0); } return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (ORR.logErr) return ofcFail(ORR.logErr, () => { ORR.logErr = null; ORR.log = null; ORR.logBusy = false; });  // 2.1076.0 (#5450)
+  if (!ORR.log) { if (!ORR.logBusy) { ORR.logBusy = true; setTimeout(orr_logLoad, 0); } return loadingHtml('big'); }
   if (!ORR.log.length) return `<p class="muted">${tr('No change of the office rights yet.')}</p>`;
   const when = iso => typeof ofdWhen === 'function' ? ofdWhen(iso) : iso;
   return `<ul class="orr-log" role="list">${ORR.log.map(x => {

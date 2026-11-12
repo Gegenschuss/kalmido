@@ -90,9 +90,9 @@ async function bw_load() {
 // ---- the tab
 function bw_html() {
   if (BW.oid !== OFC.info?.org_id) Object.assign(BW, {oid: OFC.info?.org_id, data: null, rep: null, err: null, person: '', occ: ''});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
-  if (BW.err) return `<div class="empty">${esc(BW.err)}</div>`;
-  if (!BW.data) { if (!BW.loading) setTimeout(bw_load, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (!ofcAdmin()) return ofcAdmOnly();  // 2.1076.0 (#5450)
+  if (BW.err) return ofcFail(BW.err, () => { BW.err = null; BW.data = null; });
+  if (!BW.data) { if (!BW.loading) setTimeout(bw_load, 0); return loadingHtml('big'); }
   const years = ofcYearOpts(BW.data.years, BW.year);  // 2.593.0 (#4891): the years of the meals (was this year +1 .. -3)
   const ps = bw_persons();
   const views = `<div class="seg" role="group" aria-label="${esc(tr('View'))}">${[['list', tr('Receipts')], ['report', tr('Evaluation')]].map(([k, n]) => `<button type="button" data-bw="view" data-v="${k}" class="${BW.view === k ? 'on' : ''}" aria-pressed="${BW.view === k}">${n}</button>`).join('')}</div>`;
@@ -105,8 +105,8 @@ function bw_html() {
 const bw_tag = m => m.locked ? `<span class="rotag bwok">${ic('lock', 's')}<span>${esc(tr('Approved|meal'))}</span></span>` : `<span class="rotag bwdraft">${esc(tr('Draft'))}</span>`;
 function bw_listHtml() {
   const ms = bw_shown();
-  if (!ms.length) return (BW.data.meals || []).length ? `<div class="empty nempty">${tr('No entertainment receipts for this filter.')}</div>`
-    : `<div class="empty nempty eact">${ic('meal')}<span>${tr('No entertainment receipts yet. Add the first one after a business meal.')}</span></div>`;
+  if (!ms.length) return (BW.data.meals || []).length ? ofcNoHit()  // 2.1076.0 (#5450)
+    : emptyState({icon: 'meal', title: tr('No entertainment receipts yet. Add the first one after a business meal.')});
   return `<ul class="ofclist rklist bwlist" role="list">${ms.map(m => `<li><button type="button" class="ofcrow" data-bw="open" data-id="${m.id}"><span class="ofcn"><b>${esc(bw_title(m))}</b>
     <small class="muted">${esc([fmtDateLoc(m.date), m.occasion, bw_ppl(m).map(p => p.name).join(', ')].filter(Boolean).join(' · '))}</small></span>
     ${bw_tag(m)}<span class="rksum">${bw_amt(m.calc.gross)}</span></button>${bw_rowBtn(m)}</li>`).join('')}</ul>`;
@@ -379,12 +379,12 @@ async function bw_loadReport() {
 }
 function bw_reportHtml() {
   const q = bw_q();
-  if (!BW.rep || BW.rep.q !== q) { setTimeout(bw_loadReport, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
-  const r = BW.rep; if (r.error) return `<div class="empty">${esc(r.error)}</div>`;
+  if (!BW.rep || BW.rep.q !== q) { setTimeout(bw_loadReport, 0); return loadingHtml('big'); }
+  const r = BW.rep; if (r.error) return ofcFail(r.error, () => { BW.rep = null; });  // 2.1076.0 (#5450)
   const t = r.total, dl = ext => ofr_noSp('meals', 'export') ? '' : `<a class="btn sm" href="${BW_U}/report?${esc(q)}&format=${ext}" download>${ic('download', 's')}<span>${ext.toUpperCase()}</span></a>`;
   const card = (lab, v, cls = '') => `<div class="bwcard ${cls}"><small class="muted">${esc(lab)}</small><b>${bw_amt(v)}</b></div>`;
   const drafts = r.drafts ? `<p class="muted ofchint">${esc(trn('{0} draft is not in the sums.', '{0} drafts are not in the sums.', r.drafts))}</p>` : '';
-  if (!r.count) return `<div class="ofcbar"><b>${tr('Evaluation')}</b><span class="spacer"></span>${dl('csv')}${dl('pdf')}</div><div class="empty nempty">${tr('No approved entertainment receipts in this period.')}</div>${drafts}`;
+  if (!r.count) return `<div class="ofcbar"><b>${tr('Evaluation')}</b><span class="spacer"></span>${dl('csv')}${dl('pdf')}</div>${/*html-ok*/ emptyState({icon: 'meal', title: tr('No approved entertainment receipts in this period.')})}${drafts}`;
   const kind = k => tr(BW_KINDS.find(x => x[0] === k)?.[1] || k);
   return `<div class="ofcbar"><b>${esc(trn('{0} approved receipt', '{0} approved receipts', r.count))}</b><span class="spacer"></span>${dl('csv')}${dl('pdf')}</div>
     <div class="bwcards">${card(tr('Gross'), t.gross)}${card(tr('Input VAT (100 %)'), t.vat)}${card(tr('Deductible 70 %'), t.deductible, 'bwmain')}${card(tr('Not deductible 30 %'), t.not_deductible)}</div><div class="shint">${tr('70 % of the net amount (incl. tip) is deductible as a business expense, the input VAT in full.')}</div>
@@ -441,7 +441,7 @@ function bw_settingsHtml() {
     <div class="lacts bwcadd"><input data-bwc-new="name" data-kind="${kind}" maxlength="120" autocomplete="off" placeholder="${esc(kind === 'place' ? tr('New place…') : tr('New person…'))}" aria-label="${esc(tr('Name'))}"><input data-bwc-new="extra" maxlength="200" autocomplete="off" placeholder="${esc(ph)}" aria-label="${esc(ph)}"><button type="button" class="btn sm" data-bwc="add" data-kind="${kind}">${ic('plus', 's')}<span>${tr('Add')}</span></button></div>`;
   return `<section class="rkpset bwcset" data-fg-skip aria-labelledby="bwc-h"><h3 id="bwc-h">${tr('Entertainment receipts')}</h3>
     <div class="shint">${tr('The choices for places and people. New ones are added when a receipt is approved; receipts keep what they have when you rename or remove one.')}</div>
-    ${!d ? `<p class="muted">${tr('Loading…')}</p>` : `<h4>${tr('Places')}</h4>${list('place', d.places, tr('Address'))}<h4>${tr('People')}</h4>${list('person', d.persons, tr('Company or function'))}`}</section>`;
+    ${!d ? `${/*html-ok*/ loadingHtml('row')}` : `<h4>${tr('Places')}</h4>${list('place', d.places, tr('Address'))}<h4>${tr('People')}</h4>${list('person', d.persons, tr('Company or function'))}`}</section>`;
 }
 async function bw_choiceAct(a, el) {
   const all = [...(BWC.data?.places || []), ...(BWC.data?.persons || [])];

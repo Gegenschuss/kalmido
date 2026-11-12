@@ -28,7 +28,7 @@ function pep_conf() {
 function pep_settingsHtml() {
   const s = pep_conf();
   const head = `<summary>${tr('E-invoices over the Peppol network')}</summary><p class="muted ofchint">${tr('Through your own Peppol access point provider (own account). The provider bills you directly; Kalmido only connects.')}</p>`;
-  if (!s) return `<details class="ofcfree pepset" id="pep-set" data-fg-skip>${head}<p class="muted">${tr('Loading…')}</p></details>`;
+  if (!s) return `<details class="ofcfree pepset" id="pep-set" data-fg-skip>${head}${/*html-ok*/ loadingHtml('row')}</details>`;
   const dis = s.can_edit ? '' : 'disabled', pv = (s.providers || []).find(p => p.id === s.provider);
   const st = s.check_state === 'ok' ? `<span class="pep-ok">${ic('check', 's')} ${tr('Connection works')}</span>` : s.check_text ? `<span class="pep-bad">${esc(s.check_text)}</span>` : '';
   return `<details class="ofcfree pepset" id="pep-set" data-fg-skip ${s.provider ? 'open' : ''}>${head}
@@ -88,7 +88,7 @@ function pep_viewHtml(d, v) {
     ${sends ? `<h4>${tr('Sends')}</h4><ul class="peplist" role="list">${sends}</ul>` : ''}${v.note ? `<p class="muted ofchint">${esc(v.note)}</p>` : ''}${v.can_mark_undelivered ? `<button type="button" class="btn sm" data-pepd="undelivered">${tr('Mark as not delivered')}</button>` : ''}`;
 }
 async function pep_dialog(d) {
-  const md = modal(`<h3>${esc(tr('Send e-invoice over the Peppol network'))}</h3><div class="ofddlg" id="pep-dlg"><p class="muted">${tr('Loading…')}</p></div>
+  const md = modal(`<h3>${esc(tr('Send e-invoice over the Peppol network'))}</h3><div class="ofddlg" id="pep-dlg">${/*html-ok*/ loadingHtml('row')}</div>
     <div class="foot"><span class="aerr" role="alert"></span><span class="spacer"></span><button type="button" class="btn" data-pepd="close">${tr('Close')}</button><button type="button" class="btn" data-pepd="refresh">${ic('sync', 's')}<span>${tr('Refresh')}</span></button><button type="button" class="btn pri" data-pepd="send" hidden>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`);
   const box = () => md.querySelector('#pep-dlg'), aerr = () => md.querySelector('.aerr');
   let v = null;

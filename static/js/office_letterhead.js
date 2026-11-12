@@ -26,7 +26,7 @@ function bp_marginsHtml(key, label, vals, dis) {
 function bp_settingsHtml(s, dis) {
   if (BPL.oid !== OFC.info?.org_id) { BPL.oid = OFC.info?.org_id; BPL.st = null; setTimeout(bp_load, 0); }
   const st = BPL.st, adm = !dis;
-  if (!st) return `<section class="bpset" id="bpset" data-fg-skip aria-labelledby="bp-h"><h3 id="bp-h">${tr('Letterhead')}</h3><p class="muted">${tr('Loading…')}</p></section>`;
+  if (!st) return `<section class="bpset" id="bpset" data-fg-skip aria-labelledby="bp-h"><h3 id="bp-h">${tr('Letterhead')}</h3>${/*html-ok*/ loadingHtml('row')}</section>`;
   const pages = st.pages === 1 ? tr('one page for all pages') : tr('page 1 for the first page, page 2 for the following pages');
   const file = st.on ? `<span>${ic('file', 's')} ${esc(st.name || tr('Letterhead'))} <span class="muted">· ${esc(pages)}</span>${upMarkHtml(st.up)}</span>` : `<span class="muted">${tr('No letterhead yet')}</span>`;
   const up = adm ? `<input type="file" id="bp-file" accept="application/pdf,.pdf" hidden><button type="button" class="btn sm" data-bp-act="pick" ${BPL.busy ? 'disabled' : ''}>${ic('upload', 's')} ${st.on ? tr('Replace') : tr('Upload PDF')}</button>` : '';

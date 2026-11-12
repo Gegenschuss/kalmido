@@ -13,7 +13,8 @@ async function bka_load() {
   try {
     const [j, a] = await Promise.all([api('GET', BKA_API), api('GET', `${BKA_API}?archived=1`)]);
     BACC.items = j.items || []; BACC.archived = a.items || []; await bka_setCount(j.count);
-  } catch (x) { BACC.items = null; }
+    BACC.err = null;
+  } catch (x) { BACC.items = x?.status === 403 ? null : []; BACC.err = x?.status === 403 ? null : ofcErrHere(x); }  // 2.1076.0 (#5450): only a refusal hides the area, a failure says so
   bka_draw();
 }
 function bka_draw() { const sec = $('.bkaset'); if (sec) sec.outerHTML = bka_settingsHtml(); }  // only this section: the settings form keeps what is typed there
@@ -40,13 +41,13 @@ function bka_settingsHtml() {
   if (BACC.oid !== OFC.info?.org_id) { BACC.oid = OFC.info?.org_id; BACC.items = undefined; setTimeout(bka_load, 0); }
   const it = BACC.items;
   if (it === null) return '<section class="bkaset" hidden></section>';  // no right to the bank data (the server said no)
-  const list = it === undefined ? `<p class="muted">${tr('Loading…')}</p>`
-    : !it.length ? `<p class="muted bkaempty">${tr('No bank account yet. Documents print the free bank lines until there is one.')}</p>`
+  const list = it === undefined ? loadingHtml('sec') : BACC.err ? errorState({sub: BACC.err, size: 'sec', retry: () => { BACC.err = null; BACC.items = undefined; bka_draw(); bka_load(); }})  // 2.1076.0 (#5450)
+    : !it.length ? emptyState({title: tr('No bank account yet. Documents print the free bank lines until there is one.'), size: 'sec', cls: 'bkaempty'})
       : `<ul class="ofclist bkalist" role="list">${it.map(bka_rowHtml).join('')}</ul>`;
   const old = BACC.archived.length ? `<details class="bkaold"><summary class="muted">${esc(trn('{0} archived', '{0} archived', BACC.archived.length))}</summary><ul class="ofclist" role="list">${BACC.archived.map(r => `<li class="ofcrow bkarow arch"><span class="ofcn"><b>${esc(r.label)}</b><small class="muted">${esc(bka_iban(r.iban))}</small></span><button type="button" class="btn sm ghost" data-bka="restore" data-id="${r.id}">${tr('Restore')}</button></li>`).join('')}</ul></details>` : '';
   return `<section class="bkaset" data-fg-skip aria-labelledby="bka-h"><h3 id="bka-h">${tr('Bank accounts')}</h3>
     <p class="muted ofchint">${tr('The default account is printed on documents and goes into the GiroCode and the DATEV export. Finished documents keep the account they were made with.')}</p>
-    ${list}${it ? `<div class="lacts"><button type="button" class="btn sm" data-bka="new">${ic('plus', 's')} ${tr('New bank account')}</button></div>` : ''}${old}</section>`;
+    ${list}${it && !BACC.err ? `<div class="lacts"><button type="button" class="btn sm" data-bka="new">${ic('plus', 's')} ${tr('New bank account')}</button></div>` : ''}${old}</section>`;
 }
 
 // ---- the editor (new / edit)

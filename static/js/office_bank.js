@@ -22,7 +22,7 @@ async function bnkLoad() {
   ofcDraw();
 }
 async function bnkImpLoad(draw = true) {
-  try { BNK.imports = (await api('GET', '/api/office/bank/imports')).items || []; } catch (x) { BNK.imports = []; }
+  try { BNK.imports = (await api('GET', '/api/office/bank/imports')).items || []; BNK.impErr = null; } catch (x) { BNK.imports = []; BNK.impErr = ofcErrHere(x); }  // 2.1076.0 (#5450): a failure is no "No imports yet"
   if (draw) ofcDraw();
 }
 // 2.114.1 B (#2016): every bank write (match, unmatch, their undo/redo, an import taken back / restored) changes the books, the cash
@@ -42,9 +42,9 @@ const bnkAmt = v => `${+v > 0 ? '+' : '−'}${ofcMoney(Math.abs(+v))}`;
 function bnkHtml() {
   if (BNK.oid !== OFC.info?.org_id) Object.assign(BNK, {oid: OFC.info?.org_id, data: null, imports: null, err: null, other: null, cand: null, fints: null});  // 2.616.0 (#2473): + fints  // another office area
   if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
-  if (BNK.err) return `<div class="empty">${esc(BNK.err)}</div>`;
+  if (BNK.err) return ofcFail(BNK.err, () => { BNK.err = null; BNK.data = null; });  // 2.1076.0 (#5450): the reason + "Try again"
   const norc = typeof BNR === 'object' && bnr_route() && BNK.state === 'norc';  // 2.299.0 C (#3192): #office/bank/norc (the reminder task's link)
-  if (!norc && (!BNK.data || BNK.q !== 'state=' + BNK.state)) { setTimeout(() => { if (BNK.q !== 'state=' + BNK.state || !BNK.data) bnkLoad(); }, 0); if (!BNK.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (!norc && (!BNK.data || BNK.q !== 'state=' + BNK.state)) { setTimeout(() => { if (BNK.q !== 'state=' + BNK.state || !BNK.data) bnkLoad(); }, 0); if (!BNK.data) return loadingHtml('big'); }
   const d = BNK.data || {}, n = d.counts || {};
   const segs = [['open', tr('Open|payment state'), n.open], ['matched', tr('Matched'), n.matched], ['all', tr('All'), null]];
   if (typeof BNR === 'object') segs.splice(1, 0, ['norc', tr('Without receipt'), BNR.data?.counts?.out]);  // 2.299.0 C (#3192)
@@ -54,7 +54,8 @@ function bnkHtml() {
   if (norc) return bar + (BNK.showImp ? bnkImpHtml() : '') + bnr_html();
   const items = d.items || [];
   const list = items.length ? `<ul class="bnklist" role="list">${items.map(bnkRow).join('')}</ul>`
-    : `<div class="empty">${ic('bank')}<span>${BNK.state === 'open' && (n.open || 0) + (n.matched || 0) ? tr('Every booking is matched.') : tr('No bookings yet. Import the statement you download from your bank (CSV, CAMT or MT940).')}</span></div>`;
+    : BNK.state === 'open' && (n.open || 0) + (n.matched || 0) ? emptyState({icon: 'check', title: tr('Every booking is matched.')})  // 2.1076.0 (#5450)
+      : emptyState({icon: 'bank', title: tr('No bookings yet. Import the statement you download from your bank (CSV, CAMT or MT940).'), action: `<div class="eacts"><button type="button" class="btn pri" data-bnk="imp">${ic('upload', 's')}<span>${tr('Import bank statement')}</span></button></div>`});
   // 2.809.0 (#5452): the hint for a missing receipt once above the list (was in every row without a suggestion)
   const miss = items.some(t => !t.match && +t.amount < 0 && !(t.suggestions || []).length) ? `<p class="muted bnkmiss bnkmiss1">${tr('Receipt missing? Upload it in the documents of the office, then match it here.')}</p>` : '';
   return bar + ofcSetLink('tax', tr('Bank accounts')) + (BNK.showImp ? bnkImpHtml() : '') + (typeof brl_sugHtml === 'function' ? brl_sugHtml() : '') + miss + list + `<div class="muted ofchint">${BNK.fints?.on ? tr('Bank access only when you fetch, with your PIN every time.') : tr('No bank access: only the file you download yourself.')/* 2.616.0 (#2473) */}<div class="shint">${tr('A match with an invoice records a payment; with a receipt it sets its payment day.')}</div></div>`;  // 2.298.0 A2 (#3186): the matching rule behind (i)
@@ -93,7 +94,7 @@ function bnkMoreMenu(anchor, tid) {
 function bnkOtherHtml(t) {
   const c = BNK.cand;
   if (+t.amount > 0 && BNK.split) return bnkSplitHtml(t, c);
-  const rows = !c ? `<p class="muted">${tr('Loading…')}</p>` : !c.length ? `<p class="muted">${tr('Nothing found')}</p>`
+  const rows = BNK.candErr ? ofcFail(BNK.candErr, () => { BNK.candErr = null; bnkCand(t.id); }, 'row') : !c ? loadingHtml('row') : !c.length ? ofcNoHit('', 'row')  // 2.1076.0 (#5450)
     : ocd_row(c.map(x => ocd_card({...x, label: x.label || tr(BNK_KIND[x.kind])}, {btn: `data-bnk="match" data-id="${t.id}" data-kind="${esc(x.kind)}" data-mid="${x.id}"`, sub: x.kind === 'invoice' ? (x.refund ? tr('refund open') : tr('open')) : ''})).join(''), 'ocdgrid');  // 2.778.0 (#5383): cards, not a text list
   const sp = +t.amount > 0 ? `<button type="button" class="btn sm ghost" data-bnk="split" data-id="${t.id}">${tr('Split across invoices…')}</button>` : '';
   return `<div class="bnkother"><input type="search" class="bnkq" data-bnk-q="${t.id}" value="${esc(BNK.candQ)}" placeholder="${esc(+t.amount > 0 ? tr('Number or client') : tr('Name of the receipt'))}" aria-label="${esc(tr('Search'))}">${rows}${sp}</div>`;
@@ -101,7 +102,7 @@ function bnkOtherHtml(t) {
 // 2.355.0 B (#2843): one booking on several invoices (a collective transfer) or more than the open amount: an amount per
 // invoice, the rest of the booking stays visible as overpaid (server: bank.py bnk_parts)
 function bnkSplitHtml(t, c) {
-  const rows = !c ? `<p class="muted">${tr('Loading…')}</p>` : !c.length ? `<p class="muted">${tr('Nothing found')}</p>`
+  const rows = BNK.candErr ? ofcFail(BNK.candErr, () => { BNK.candErr = null; bnkCand(t.id); }, 'row') : !c ? loadingHtml('row') : !c.length ? ofcNoHit('', 'row')  // 2.1076.0 (#5450)
     : `<ul class="ofclist" role="list">${c.map(x => `<li class="ofcrow"><span class="ofcn"><b>${esc(x.label)}</b><small class="muted">${esc(fmtDateLoc(x.date))} · ${tr('open')} ${ofcMoney(x.amount)}</small></span><input class="numin" inputmode="decimal" maxlength="16" data-bnk-part="${x.id}" data-open="${esc(x.amount)}" value="${esc(BNK.parts?.[x.id] ?? '')}" aria-label="${esc(tr('Amount for {0}', x.label))}" placeholder="${esc(ofcMoney(x.amount))}"></li>`).join('')}</ul>`;
   return `<div class="bnkother"><input type="search" class="bnkq" data-bnk-q="${t.id}" value="${esc(BNK.candQ)}" placeholder="${esc(tr('Number or client'))}" aria-label="${esc(tr('Search'))}">${rows}
     <div class="bnkacts"><span class="muted" data-bnk-rest="${t.id}" data-amount="${esc(t.amount)}">${esc(bnkSplitRest(t.amount))}</span><span class="spacer"></span><button type="button" class="btn sm ghost" data-bnk="split" data-id="${t.id}">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-bnk="splitgo" data-id="${t.id}">${tr('Assign match')}</button></div></div>`;
@@ -111,8 +112,9 @@ function bnkSplitRest(amount) {
   return tr('Assigned {0} · rest {1}', ofcMoney(Math.round(sum * 100) / 100), ofcMoney(Math.round((+amount - sum) * 100) / 100));
 }
 function bnkImpHtml() {
-  if (!BNK.imports) { setTimeout(() => bnkImpLoad(), 0); return `<p class="muted">${tr('Loading…')}</p>`; }
-  if (!BNK.imports.length) return `<p class="muted bnkimps">${tr('No imports yet.')}</p>`;
+  if (!BNK.imports) { setTimeout(() => bnkImpLoad(), 0); return loadingHtml('sec'); }
+  if (BNK.impErr) return ofcFail(BNK.impErr, () => { BNK.impErr = null; BNK.imports = null; }, 'sec');  // 2.1076.0 (#5450)
+  if (!BNK.imports.length) return emptyState({title: tr('No imports yet.'), size: 'sec', cls: 'bnkimps'});
   return `<ul class="ofclist bnkimps" role="list">${BNK.imports.map(i => `<li class="ofcrow ${i.undone_at ? 'arch' : ''}"><span class="ofcn"><b>${esc(i.filename || i.fmt.toUpperCase())}</b><small class="muted">${esc([fmtDateLoc(i.created_at.slice(0, 10)), trn('{0} booking', '{0} bookings', i.count), i.dup_count ? trn('{0} already there', '{0} already there', i.dup_count) : '', i.undone_at ? tr('undone') : ''].filter(Boolean).join(' · '))}</small></span>
     ${i.undone_at ? '' : `<button class="btn sm ghost" data-bnk="impundo" data-id="${i.id}">${tr('Undo|import')}</button>`}</li>`).join('')}</ul>`;
 }
@@ -149,8 +151,8 @@ async function bnkImpUndo(iid) {
 }
 async function bnkCand(tid) {
   const q = BNK.candQ;
-  try { const j = await api('GET', `/api/office/bank/tx/${tid}/candidates?q=${encodeURIComponent(q)}`); if (BNK.other === tid && BNK.candQ === q) BNK.cand = j.items || []; }
-  catch (x) { BNK.cand = []; }
+  try { const j = await api('GET', `/api/office/bank/tx/${tid}/candidates?q=${encodeURIComponent(q)}`); if (BNK.other === tid && BNK.candQ === q) { BNK.cand = j.items || []; BNK.candErr = null; } }
+  catch (x) { BNK.cand = []; BNK.candErr = ofcErrHere(x); }
   if (BNK.other === tid) { ofcDraw(); const i = $(`[data-bnk-q="${tid}"]`); if (i && q) { i.focus(); i.setSelectionRange(q.length, q.length); } }
 }
 

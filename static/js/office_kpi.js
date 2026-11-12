@@ -23,8 +23,8 @@ const kp_mon = ym => { const [y, m] = ym.split('-').map(Number); return new Date
 function kp_html() {
   if (KPS.oid !== OFC.info?.org_id) Object.assign(KPS, {oid: OFC.info?.org_id, data: null, err: null});  // another office area
   if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
-  if (KPS.err) return `<div class="empty">${esc(KPS.err)}</div>`;
-  if (!KPS.data || KPS.q !== (KPS.year ? `?year=${KPS.year}` : '')) { setTimeout(() => { if (!KPS.data || KPS.q !== (KPS.year ? `?year=${KPS.year}` : '')) kp_load(); }, 0); if (!KPS.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (KPS.err) return ofcFail(KPS.err, () => { KPS.err = null; KPS.data = null; });  // 2.1076.0 (#5450)
+  if (!KPS.data || KPS.q !== (KPS.year ? `?year=${KPS.year}` : '')) { setTimeout(() => { if (!KPS.data || KPS.q !== (KPS.year ? `?year=${KPS.year}` : '')) kp_load(); }, 0); if (!KPS.data) return loadingHtml('big'); }
   const d = KPS.data, r = d.revenue, y = d.year, thisY = +String(d.today).slice(0, 4);
   const bar = `<div class="ofcbar"><button class="iconbtn" data-kp="prev" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><b>${y}</b>${y < thisY ? `<button class="iconbtn" data-kp="next" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button><button class="btn sm ghost" data-kp="now">${tr('This year')}</button>` : ''}</div>`;
   const tile = (label, val, sub = '', go = '', extra = '') => `<${go ? `button type="button" data-kp="go" data-go="${go}"` : 'div'} class="kptile ${extra}"><small class="muted">${esc(label)}</small><b>${val}</b>${sub ? `<small class="muted">${sub}</small>` : ''}</${go ? 'button' : 'div'}>`;
@@ -44,8 +44,8 @@ function kp_html() {
   const h = v => Math.max(0, +v) / max;
   const chart = `<section class="kpchart" aria-labelledby="kp-rev"><div class="ofcbar"><h3 class="ofcgrp" id="kp-rev">${tr('Revenue per month (net, received)')}</h3><span class="spacer"></span>
     <span class="kplegend" aria-hidden="true"><span><i class="kpcur"></i>${y}</span><span><i class="kpprev"></i>${y - 1}</span></span></div>
-    ${max <= 1 ? `<p class="muted ofchint">${trh('No payments received in {0} and {1} yet.', y, y - 1)}</p>` : ''}<div class="kpbars" aria-hidden="true">${r.months.map(m => `<button type="button" class="kpm ${m.month === ym ? 'cur' : ''}" tabindex="-1" title="${esc(`${kp_mon(m.month)} ${y}: ${ofcMoney(m.amount)} · ${y - 1}: ${ofcMoney(m.prev)}`)}" data-kp="tip" data-t="${esc(`${kp_mon(m.month)}: ${ofcMoney(m.amount)} (${y - 1}: ${ofcMoney(m.prev)})`)}">
-      <span class="kpb"><i class="kpprev" style="transform:scaleY(${h(m.prev).toFixed(3)})"></i><i class="kpcur" style="transform:scaleY(${h(m.amount).toFixed(3)})"></i></span><small>${esc(kp_mon(m.month))}</small></button>`).join('')}</div>
+    ${/*html-ok*/ max <= 1 ? emptyState({icon: 'chart', title: tr('No payments received in {0} and {1} yet.', y, y - 1), size: 'sec', cls: 'kpnone'}) /* 2.1076.0 (#5450): no empty axis with a gap */ : `<div class="kpbars" aria-hidden="true">${r.months.map(m => `<button type="button" class="kpm ${m.month === ym ? 'cur' : ''}" tabindex="-1" title="${esc(`${kp_mon(m.month)} ${y}: ${ofcMoney(m.amount)} · ${y - 1}: ${ofcMoney(m.prev)}`)}" data-kp="tip" data-t="${esc(`${kp_mon(m.month)}: ${ofcMoney(m.amount)} (${y - 1}: ${ofcMoney(m.prev)})`)}">
+      <span class="kpb"><i class="kpprev" style="transform:scaleY(${h(m.prev).toFixed(3)})"></i><i class="kpcur" style="transform:scaleY(${h(m.amount).toFixed(3)})"></i></span><small>${esc(kp_mon(m.month))}</small></button>`).join('')}</div>`}
     <table class="sr"><caption>${tr('Revenue per month (net, received)')}</caption><thead><tr><th>${tr('Month')}</th><th>${y}</th><th>${y - 1}</th></tr></thead><tbody>${r.months.map(m => `<tr><th>${esc(kp_mon(m.month))}</th><td>${ofcMoney(m.amount)}</td><td>${ofcMoney(m.prev)}</td></tr>`).join('')}</tbody></table></section>`;
   const pct = (p, lvl) => p == null ? '' : `<span class="kpbud" aria-hidden="true"><i class="${lvl}" style="transform:scaleX(${Math.min(1, p / 100).toFixed(3)})"></i></span><small class="kppct ${lvl}">${p} %</small>`;
   const hrs = (v, b) => b ? tr('{0} of {1} h', fmtNum(v, 1), fmtNum(b, 1)) : tr('{0} h', fmtNum(v, 1));
@@ -56,7 +56,7 @@ function kp_html() {
       ${c.budget_amount ? `<div class="kprow"><span class="muted">${tr('Budget')}</span><span>${trh('{0} of {1}', ofcMoney(c.amount), ofcMoney(c.budget_amount))}</span>${pct(c.pct_amount, lvl)}</div>` : ''}
       <div class="kprow"><span class="muted">${trh('Invoiced {0}', y)}</span><span class="rksum">${ofcMoney(c.invoiced)}</span><span class="muted">${tr('Costs')} ${ofcMoney(c.costs)}</span></div>
       ${c.projects.map(p => `<div class="kprow kpproj"><a href="#l/${p.id}">${ic('brief', 's')}<span>${esc(p.name)}</span></a><span>${hrs(p.hours, p.budget_h)}</span>${pct(p.pct_h, p.pct_h >= 100 ? 'over' : p.pct_h >= 80 ? 'warn' : '')}</div>`).join('')}</li>`;
-  }).join('')}</ul>` : `<p class="muted lempty">${tr('No client with hours, a budget or invoices yet.')}</p>`;
+  }).join('')}</ul>` : emptyState({icon: 'users', title: tr('No client with hours, a budget or invoices yet.'), size: 'sec'});  // 2.1076.0 (#5450)
   // 2.298.0 A2 (#3186): the margin formula behind the (i) of the heading, only the revenue rule stays visible
   return bar + tiles + chart + `<h3 class="ofcgrp">${tr('Clients: budget and margin')}</h3><div class="shint">${tr('Margin = invoiced (net) minus purchases of accepted quotations and travel expenses of the client. Hours as you see them in the projects.')}</div>` + cl
     + `<p class="muted ofchint">${tr('Revenue = payments received on invoices, net.')}</p>`;
@@ -71,12 +71,14 @@ function kp_tile(card) {
       KPT.loading = true;
       rawFetch('GET', '/api/office/kpi').then(j => { KPT.data = j; KPT.at = Date.now(); }, () => { KPT.data = null; }).finally(() => { KPT.loading = false; if (S.route.mod === 'home') renderView(); else if (S.route.mod === 'office' && ofcTab() === 'start') ofcDraw(); });  // 2.87.9 (#1917): the office start page
     }
-    if (KPT.data === undefined) return '';
   }
-  const d = KPT.data;
-  if (!d) return '';
   const row = (label, v, extra = '') => `<li><span class="muted">${esc(label)}</span><span class="spacer"></span><b class="rksum ${extra}">${v}</b></li>`;
   const on = n => lyo_get('home', 'kpi', n, true);  // 2.55.0 (#1065): which figures (the block's settings, lyopts.js)
+  // 2.1076.0 (#5450): on the office start page the block keeps its place while it loads (its rows, the values still "…"),
+  // so the page does not jump when the figures arrive (the home page keeps its own rule: nothing until there is data)
+  if (KPT.data === undefined) return S.route.mod === 'office' ? card(`<ul class="kptl" role="status" aria-label="${esc(tr('Loading…'))}">${/*html-ok*/ on('rev') ? row(tr('Revenue this month'), '…') : ''}${/*html-ok*/ on('open') ? row(tr('Open items'), '…') : ''}${/*html-ok*/ on('pipe') ? row(tr('Pipeline, weighted'), '…') : ''}</ul><span class="linkbtn">${tr('All figures')}</span>`) : '';
+  const d = KPT.data;
+  if (!d) return '';
   return card(`<ul class="kptl" role="list">${on('rev') ? row(tr('Revenue this month'), ofcMoney(d.revenue.month)) : ''}${on('open') ? row(tr('Open items'), ofcMoney(d.invoices.open.amount)) : ''}
     ${on('over') && +d.invoices.overdue.count ? row(tr('Overdue|invoices'), ofcMoney(d.invoices.overdue.amount), 'neg') : ''}${on('pipe') ? row(tr('Pipeline, weighted'), ofcMoney(d.pipeline.weighted)) : ''}</ul>
     <a class="linkbtn" href="#office/kpi">${tr('All figures')}</a>`);

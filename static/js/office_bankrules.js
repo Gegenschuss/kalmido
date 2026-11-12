@@ -13,8 +13,8 @@ const brl_act = r => r.action === 'category' ? tr('Category {0}', r.category || 
 
 async function brl_load() {
   BRL.oid = OFC.info?.org_id;
-  try { const j = await api('GET', '/api/office/bank/rules'); BRL.items = j.items || []; BRL.cats = j.categories || []; BRL.max = j.max || 300; }
-  catch (x) { BRL.items = null; }
+  try { const j = await api('GET', '/api/office/bank/rules'); BRL.items = j.items || []; BRL.cats = j.categories || []; BRL.max = j.max || 300; BRL.err = null; }
+  catch (x) { BRL.items = x?.status === 403 ? null : []; BRL.err = x?.status === 403 ? null : ofcErrHere(x); }  // 2.1076.0 (#5450): only a refusal hides the area, a failure says so
   brl_draw();
 }
 function brl_draw() { const sec = $('.brlset'); if (sec) sec.outerHTML = brl_settingsHtml(); }  // only this section: the settings form keeps what is typed there
@@ -33,8 +33,8 @@ function brl_settingsHtml() {
   if (BRL.oid !== OFC.info?.org_id) { BRL.oid = OFC.info?.org_id; BRL.items = undefined; setTimeout(brl_load, 0); }
   const it = BRL.items;
   if (it === null) return '';  // no right to the bank (the server said no)
-  const list = it === undefined ? `<p class="muted">${tr('Loading…')}</p>`
-    : !it.length ? `<p class="muted brlempty">${tr('No rules yet. Mark a booking the same way twice and the bank list offers one.')}</p>`
+  const list = it === undefined ? loadingHtml('sec') : BRL.err ? errorState({sub: BRL.err, size: 'sec', retry: () => { BRL.err = null; BRL.items = undefined; brl_draw(); brl_load(); }})  // 2.1076.0 (#5450)
+    : !it.length ? emptyState({title: tr('No rules yet. Mark a booking the same way twice and the bank list offers one.'), size: 'sec', cls: 'brlempty'})
       : `${hintOnce('ofclp', tr('Hold a row to see what you can do with it.'))}<ul class="ofclist brllist" role="list">${it.map(r => `<li class="ofcrow brlrow ${r.active ? '' : 'arch'}" data-rule="${r.id}" data-brl="tap" data-id="${r.id}"><span class="ofcn"><b>${esc(r.name)}</b>
         <small class="muted">${esc(brl_cond(r))} → ${esc(brl_act(r))}${r.account ? ` (${esc(r.account)})` : ''}</small><small class="muted">${esc(trn('{0} hit', '{0} hits', r.hits))}${r.last_hit_at ? ` · ${esc(fmtDateLoc(r.last_hit_at.slice(0, 10)))}` : ''}</small></span>
         <label class="chkl swl" title="${esc(r.active ? tr('Active') : tr('Paused'))}"><span class="swc"><input type="checkbox" role="switch" data-brl-on="${r.id}" ${r.active ? 'checked' : ''} aria-label="${esc(tr('Active'))}"><span class="swt" aria-hidden="true"></span></span></label>
@@ -43,7 +43,7 @@ function brl_settingsHtml() {
         <button type="button" class="btn sm ghost icon" data-brl="del" data-id="${r.id}" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>`;
   return `<section class="brlset" data-fg-skip aria-labelledby="brl-h"><h3 id="brl-h">${tr('Bank rules')}</h3>
     <p class="muted ofchint">${tr('Rules mark bookings of a new statement on their own: private, ignore or no receipt needed – or name the category of the receipt. Invoices and receipts are never matched by a rule; a locked month stays as it is.')}</p>
-    ${list}${it && it.length < BRL.max ? `<div class="lacts"><button type="button" class="btn sm" data-brl="new">${ic('plus', 's')} ${tr('New rule')}</button></div>` : ''}</section>`;
+    ${list}${it && !BRL.err && it.length < BRL.max ? `<div class="lacts"><button type="button" class="btn sm" data-brl="new">${ic('plus', 's')} ${tr('New rule')}</button></div>` : ''}</section>`;
 }
 
 // ---- the editor (new / edit); init = the values of a new rule (a suggestion of the bank list)

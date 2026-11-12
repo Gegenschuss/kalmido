@@ -54,7 +54,7 @@ function onumHtml() {
   const dirty = onumDirty().length > 0;
   return `<div id="onum-box" class="onum" data-fg-skip><h4>${tr('Next running number')}</h4><div class="shint">${esc(tr('With a year in the scheme it applies to the current year.'))}</div>
     <p class="muted ofchint">${esc(tr('E.g. to continue your previous program. Only upwards.'))}</p>
-    ${ONUM.err ? `<p class="ofcpv err">${esc(ONUM.err)}</p>` : ''}${rows}
+    ${/*html-ok*/ ONUM.err ? errorState({sub: ONUM.err, size: 'row'}) /* 2.1076.0 (#5450) */ : ''}${rows}
     ${ONUM.ranges.some(r => !r.shared) ? `<div class="row onumfoot"><span class="lacts"><button type="button" class="btn sm pri" data-onum="apply" ${dirty && !ONUM.busy ? '' : 'disabled'}>${tr('Apply')}</button></span></div>` : ''}</div>`;
 }
 // 2.855.0 (#5456): the rows whose field differs from the stored next number (shared rows have no own counter)

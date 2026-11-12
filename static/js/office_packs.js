@@ -68,14 +68,14 @@ function pkc_html() {
 function pkc_paint() { const el = $('#pkc-body'); if (el) el.innerHTML = pkc_bodyHtml(); const b = $('#pkc .pkc-bar'); if (b && PKC.data?.can_manage && !$('[data-pkc="refresh"]', b)) ofcDraw(); }
 function pkc_bodyHtml() {
   const d = PKC.data;
-  if (!d) return `<p class="muted">${tr('Loading…')}</p>`;
+  if (!d) return `${loadingHtml('row')}`;
   const src = d.configured ? `<p class="muted pkc-src">${esc(d.fetched_at ? tr('Catalogue: {0}, as of {1}', d.source, pkc_when(d.fetched_at)) : tr('Catalogue: {0}', d.source))}${d.skipped ? ' · ' + esc(trn('{0} entry of the catalogue was skipped (not valid)', '{0} entries of the catalogue were skipped (not valid)', d.skipped)) : ''}</p>`
     : d.failed ? '' : `<p class="muted pkc-src">${tr('No catalogue set up – only the built-in packs are available.')}</p>`;
   const err = d.error ? `<p class="pkc-err" role="alert">${esc(d.error)}</p>` : '';
   const items = d.items || [];
   const list = items.length ? `<ul class="pkc-list" role="list">${items.map(pkc_itemHtml).join('')}</ul>`
     : `<p class="muted">${PKC.q || PKC.kind ? tr('No pack matches the search.') : tr('No packs yet.')}</p>`;
-  return src + err + list + (PKC.loading ? `<p class="muted pkc-wait">${tr('Loading…')}</p>` : '');
+  return src + err + list + (PKC.loading ? `${loadingHtml('row')}` : '');
 }
 const pkc_badge = b => b === 'verified' ? `<span class="pkc-badge ok">${ic('check', 's')} ${tr('Verified')}</span>`
   : `<span class="pkc-badge com" title="${esc(tr('Community packs are not checked by the Kalmido team. Check tax rates and texts before you send documents with it.'))}">${ic('alert', 's')} ${tr('Community')}</span>`;

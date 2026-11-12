@@ -103,7 +103,7 @@ const ym = TC.today().slice(0, 7);
     await shot('p267-a-cashflow-phone.png');
     // 2.122.2 (#2327): a reload after saving keeps the old content (no "Loading…" page) and the scroll position
     await ev(`(() => { const v = document.getElementById('view'); v.scrollTop = v.scrollHeight; window.__st = v.scrollTop; rk_cfReload(); return 1; })()`);
-    check(await ev(`!!document.querySelector('.office .rkcfms') && ![...document.querySelectorAll('.office p.lempty')].some(p => p.textContent === tr('Loading…'))`), 'the reload keeps the old content until the new data is there');
+    check(await ev(`!!document.querySelector('.office .rkcfms') && ![...document.querySelectorAll('.office p.lempty, .office .eload')].some(p => p.textContent === tr('Loading…'))`), 'the reload keeps the old content until the new data is there');
     check(await ready(ev, `!!RKF.data && document.getElementById('view').scrollTop === window.__st`), 'the scroll position stays after the reload ' + await ev(`document.getElementById('view').scrollTop + '/' + window.__st`));
   }, false);
 

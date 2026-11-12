@@ -98,8 +98,8 @@ async function dv_load() {
   const box = $('#dv-acc'); if (box) box.innerHTML = dv_accHtml();
 }
 function dv_accHtml() {
-  const a = DV.acc; if (!a) return `<p class="muted">${tr('Loading…')}</p>`;
-  if (a.error) return `<p class="muted">${esc(a.error)}</p>`;
+  const a = DV.acc; if (!a) return `${loadingHtml('row')}`;
+  if (a.error) return errorState({sub: a.error, size: 'sec'});  // 2.1076.0 (#5450): the shared block (the settings window draws this part once: the reason, no button)
   const num = (k, name, v, ph, label) => `<input value="${esc(v || '')}" inputmode="numeric" maxlength="8" class="numin" data-dv="${k}" data-name="${esc(name)}" placeholder="${esc(ph)}" aria-label="${esc(label)}">`;
   const cats = a.categories.length ? a.categories.map(c => `<div class="row"><label>${esc(c.name)}</label>${num('cat', c.name, c.account, c.default, tr('Expense account for {0}', c.name))}</div>`).join('')
     : `<p class="muted ofchint">${tr('No receipt categories yet.')}</p>`;

@@ -51,6 +51,7 @@ function rinListHtml() {
   if (RIN.listRef !== OFD.list && OFD.list) { RIN.listRef = OFD.list; if (RIN.items && !RIN.loading) setTimeout(rinReload, 0); }
   rinFresh();
   const items = RIN.items || [];
+  if (RIN.err && !items.length) return errorState({sub: RIN.err, size: 'row', retry: rinReload});  // 2.1076.0 (#5450): a failure is said above the invoices (was: no section, as if there were no series)
   if (!items.length && !RIN.showBin) return '';
   const row = s => `<li class="rin-it${s.active ? '' : ' rin-off'}" data-rin="tap" data-sid="${s.id}"><span class="ofcn"><b>${esc(s.title || tr('Invoice series'))}${s.template?.client ? ` · ${esc(s.template.client)}` : ''}</b>
     <small class="muted">${esc([rinEvery(s.every), rinWhen(s), s.auto_send ? tr('sent automatically') : tr('as a draft')].filter(Boolean).join(' · '))}</small></span>

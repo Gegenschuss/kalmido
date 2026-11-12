@@ -59,15 +59,15 @@ async function lbLoad() {
 // ---- the view
 function lbHtml() {
   if (LB.oid !== OFC.info?.org_id) Object.assign(LB, {oid: OFC.info?.org_id, base: null, drives: null, rep: null, err: null, vid: null});  // another office area
-  if (LB.err) return `<div class="empty">${esc(LB.err)}</div>`;
+  if (LB.err) return ofcFail(LB.err, () => { LB.err = null; });  // 2.1076.0 (#5450)
   const q = `year=${lbYear()}` + (LB.vid ? `&vehicle_id=${LB.vid}` : '');
   const ready = LB.base && (LB.view === 'report' ? LB.rep && LB.rep.year === +lbYear() : !LB.vid || (LB.drives && LB.q === q));
-  if (!ready) { if (!LB.loading) setTimeout(lbLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (!ready) { if (!LB.loading) setTimeout(lbLoad, 0); return loadingHtml('big'); }
   const vs = LB.base.vehicles, act = vs.filter(v => !v.archived || v.id === LB.vid);
   const years = ofcYearOpts(LB.base.years, lbYear());  // 2.593.0 (#4891): the years of the drives (was this year +1 .. -3)
   const note = `<details class="lgb-note"><summary>${ic('alert', 's')}<span>${tr('Note on the logbook')}</span></summary><p class="muted">${esc(LB.base.note)}</p></details>`;
-  if (!vs.length) return `<div class="empty nempty eact">${ic('car')}<span>${tr('No vehicle yet. Add the car you drive for business first.')}</span>
-    <button class="btn pri" data-lgb="vnew">${ic('plus', 's')}<span>${tr('Add vehicle')}</span></button></div>` + note;
+  if (!vs.length) return emptyState({icon: 'car', title: tr('No vehicle yet. Add the car you drive for business first.'),  // 2.1076.0 (#5450)
+    action: `<div class="eacts"><button class="btn pri" data-lgb="vnew">${ic('plus', 's')}<span>${tr('Add vehicle')}</span></button></div>`}) + note;
   const bar = `<div class="ofcbar lgb-bar"><select id="lgb-year" aria-label="${esc(tr('Year'))}">${years.map(y => `<option ${y === lbYear() ? 'selected' : ''}>${y}</option>`).join('')}</select>
     ${LB.view === 'drives' ? `<select id="lgb-veh" aria-label="${esc(tr('Vehicle'))}">${act.map(v => `<option value="${v.id}" ${v.id === LB.vid ? 'selected' : ''}>${esc(v.name + (v.plate ? ` (${v.plate})` : '') + (v.archived ? ` · ${tr('archived')}` : ''))}</option>`).join('')}</select>
     <button class="btn sm ghost" data-lgb="vedit" aria-label="${esc(tr('Edit vehicle'))}" title="${esc(tr('Edit vehicle'))}">${ic('edit', 's')}</button>` : ''}
@@ -79,7 +79,7 @@ function lbHtml() {
 }
 function lbListHtml() {
   const ds = LB.drives || [], v = lbVeh(LB.vid);
-  if (!ds.length) return `<div class="empty nempty">${ic('car')}<span>${tr('No drives in this year.')}</span></div>`;
+  if (!ds.length) return emptyState({icon: 'car', title: tr('No drives in this year.')});
   const sum = ds.reduce((a, d) => a + (+d.km || 0), 0);
   return `<p class="muted lgb-sum">${esc([v ? (v.kind === 'private' ? tr('Private car used for business') : tr('Company car')) : '', trn('{0} drive', '{0} drives', ds.length), tr('{0} km', lbKm(sum))].filter(Boolean).join(' · '))}</p>
     <ul class="ofclist lgb-list" role="list">${ds.map(d => `<li><button type="button" class="ofcrow lgb-row" data-lgb="open" data-id="${d.id}"><span class="ofcn"><b>${esc(lbRoute(d) || d.purpose || tr('Drive'))}</b>
@@ -98,7 +98,7 @@ function lbReportHtml() {
     <dt>${tr('Business share')}</dt><dd>${v.business_pct} %</dd>${v.kind === 'private' ? `<dt>${tr('Mileage allowance')}</dt><dd><b>${ofcMoney(v.allowance)}</b></dd>` : ''}</dl></div>`).join('');
   return `<div class="ofcbar"><b>${tr('Year report')} ${esc(y)}</b><span class="spacer"></span>
     ${ofr_noSp('logbook', 'export') ? '' : `<a class="btn sm ghost" href="/api/office/logbook.csv?year=${y}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/logbook.pdf?year=${y}" download>${ic('download', 's')}<span>PDF</span></a>`}</div>`
-    + (cards ? `<div class="lgb-cards">${cards}</div>` : `<div class="empty nempty">${tr('No drives in this year.')}</div>`)
+    + (cards ? `<div class="lgb-cards">${cards}</div>` : emptyState({icon: 'car', title: tr('No drives in this year.')}))
     + `<p class="lgb-total">${tr('Mileage allowance')} ${esc(y)}: <b>${ofcMoney(r.allowance)}</b></p><p class="muted ofchint">${tr('Goes into the income/expense statement as its own expense line.')}</p>` + (ofr_grp() && ofr_lvOf('logbook') !== 'manage' ? '' : rate);  // 2.187.1 B (#2735): files need "export", the rate "manage"
 }
 
@@ -164,7 +164,7 @@ function lbDriveModal(d, fix) {
     ${ofcProjSel('lgb-project', tr('Project'), src?.project, base.real_projects, base.projects)}
     ${ofcRowF('lgb-driver', tr('Driver'), ofcSel('lgb-driver', src?.user_id || base.me, base.people.map(p => [p.id, p.name])))}
     ${fix ? ofcRowF('lgb-fixnote', tr('Reason for the correction'), ofcIn('lgb-fixnote', '', {max: 500})) : ''}
-    ${d ? `<details class="lgb-hist" open><summary>${ic('clock', 's')}<span>${tr('History')}</span></summary><ol class="lgb-hlist"><li class="muted">${tr('Loading…')}</li></ol></details>` : ''}
+    ${d ? `<details class="lgb-hist" open><summary>${ic('clock', 's')}<span>${tr('History')}</span></summary><ol class="lgb-hlist"><li>${/*html-ok*/ loadingHtml('row')}</li></ol></details>` : ''}
     <div class="aerr" role="alert"></div>
     <div class="foot lgb-foot">${d ? `${ro ? '' : `<button class="btn danger" data-m="del">${tr('Delete')}</button>`}<button class="btn" data-m="log">${ic('clock', 's')}<span>${tr('History')}</span></button>` : ''}
     ${d && d.kind === 'business' ? `<button class="btn" data-m="trip">${ic('plane', 's')}<span>${d.trip_id ? tr('Open trip') : tr('Add to travel expenses')}</span></button>` : ''}

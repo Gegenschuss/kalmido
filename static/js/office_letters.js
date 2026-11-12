@@ -58,14 +58,14 @@ async function ltMakeFromHash(h) {
 function ltTabHtml() {
   if (LT.oid !== OFC.info?.org_id) Object.assign(LT, {oid: OFC.info?.org_id, data: null, cur: null, err: null, fStatus: '', fClient: '', q: ''});  // another office area
   // review A3 (2.153.0): the role accounting reads the bookkeeping, not the correspondence (the server answers 403)
-  if (OFC.info?.role !== 'admin') return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
-  if (/^#office\/letters\/new\b/.test(location.hash)) { setTimeout(() => ltMakeFromHash(location.hash), 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
-  if (LT.err) return `<div class="empty">${esc(LT.err)}</div>`;
-  if (!LT.data) { if (!LT.loading) setTimeout(ltLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (OFC.info?.role !== 'admin') return ofcAdmOnly();  // 2.1076.0 (#5450)
+  if (/^#office\/letters\/new\b/.test(location.hash)) { setTimeout(() => ltMakeFromHash(location.hash), 0); return loadingHtml('big'); }
+  if (LT.err) return ofcFail(LT.err, () => { LT.err = null; LT.data = null; });
+  if (!LT.data) { if (!LT.loading) setTimeout(ltLoad, 0); return loadingHtml('big'); }
   const id = S.route.tab === 'letters' ? S.route.id : null;
   if (id) {
-    if (!LT.cur || LT.cur.id !== id) { if (!LT.loading) setTimeout(() => ltOpen(id), 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
-    if (LT.cur.missing) return `<div class="empty">${tr('This letter does not exist or you cannot see it.')}</div>`;
+    if (!LT.cur || LT.cur.id !== id) { if (!LT.loading) setTimeout(() => ltOpen(id), 0); return loadingHtml('big'); }
+    if (LT.cur.missing) return noAccessState({title: tr('This letter does not exist or you cannot see it.'), sub: ''});  // 2.1076.0 (#5450)
     return LT.cur.status === 'draft' ? ltEditHtml(LT.cur) : ltViewHtml(LT.cur);
   }
   LT.cur = null;
@@ -81,7 +81,7 @@ function ltListHtml() {
     <select id="lt-fs" aria-label="${esc(tr('Status'))}"><option value="">${tr('All states')}</option>${Object.entries(LT_ST).map(([k, n]) => `<option value="${k}" ${k === LT.fStatus ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>
     ${cls.length ? `<select id="lt-fc" aria-label="${esc(tr('Client'))}"><option value="">${tr('All clients')}</option>${cls.map(c => `<option value="${c.id}" ${String(c.id) === LT.fClient ? 'selected' : ''}>${esc(c.display_name || c.name)}</option>`).join('')}</select>` : ''}
     <span class="spacer"></span><button class="btn sm ghost" data-lt="profile">${ic('edit', 's')}<span>${tr('Signature')}</span></button><button class="btn sm pri" data-lt="new">${ic('plus', 's')}<span>${tr('New letter')}</span></button></div>`;
-  const list = !rows.length ? `<div class="empty nempty eact">${ic('mail')}<span>${all.length ? tr('No letters match the filter.') : tr('No letters yet. Write one to an authority, an insurer or a client.')}</span>${all.length ? '' : `<button class="btn pri" data-lt="new">${tr('New letter')}</button>`}</div>`
+  const list = !rows.length ? (all.length ? ofcNoHit() : emptyState({icon: 'mail', title: tr('No letters yet. Write one to an authority, an insurer or a client.'), action: `<div class="eacts"><button class="btn pri" data-lt="new">${tr('New letter')}</button></div>`}))  /* 2.1076.0 (#5450) */
     : `<ul class="ofclist dtp-list lt-list" role="list">${rows.map(x => `<li><button type="button" class="ofcrow" data-lt="open" data-id="${x.id}"><span class="ofcn"><b>${esc(x.rcpt_name || tr('No recipient'))}</b>
     <small class="muted">${esc([fmtDateLoc(x.letter_date) || x.letter_date, x.subject, tr(LT_CH[x.channel] || x.channel)].filter(Boolean).join(' · '))}</small></span>${ltStTag(x)}${ic('right', 's')}</button></li>`).join('')}</ul>`;
   return bar + list + (typeof oft_sharedHtml === 'function' ? oft_sharedHtml('letters') : '') + ltHooks('sections', null);  // 2.351.0 A (#2823): + shared through a folder
@@ -145,7 +145,7 @@ async function ltRcLoad(q) {
   LT.rc = rows.slice(0, 12);
   const box = $('#lt-sug'); if (!box) return;
   box.innerHTML = LT.rc.length ? LT.rc.map((x, i) => `<li role="option"><button type="button" class="lt-sugb" data-lt="rc" data-i="${i}">${ic(x.kind === 'client' ? 'brief' : 'user', 's')}<span><b>${esc(x.label)}</b><small class="muted">${esc(x.sub || '')}</small></span></button></li>`).join('')
-    : `<li class="muted lt-sugn">${esc(tr('Nothing found'))}</li>`;
+    : `<li class="muted lt-sugn">${esc(tr('Nothing matches.'))}</li>`;  // 2.1076.0 (#5450): the one wording
   box.hidden = false;
 }
 function ltRcPick(x) {

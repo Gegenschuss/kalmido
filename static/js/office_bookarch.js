@@ -60,16 +60,16 @@ function bkaHtml() {
   if (BKA.oid !== OFC.info?.org_id) bkaReset();
   const back = `<a class="btn sm ghost" href="#office/books" data-navup>${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a>`;
   if (!ofcFeat('books.datev')) return `<div class="ofcbar">${back}</div><div class="empty">${tr('The DATEV function is switched off for this office.')}</div>`;
-  if (BKA.err) return `<div class="ofcbar">${back}</div><div class="empty">${esc(BKA.err)}</div>`;
-  if (!BKA.ov) { if (!BKA.loadingT) BKA.loadingT = setTimeout(() => { BKA.loadingT = 0; bkaLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (BKA.err) return `<div class="ofcbar">${back}</div>` + ofcFail(BKA.err, () => { BKA.err = null; BKA.ov = null; });  // 2.1076.0 (#5450)
+  if (!BKA.ov) { if (!BKA.loadingT) BKA.loadingT = setTimeout(() => { BKA.loadingT = 0; bkaLoad(); }, 0); return loadingHtml('big'); }
   const ov = BKA.ov, years = ov.years || [];
   const read = `<button type="button" class="btn sm" data-bka="read">${ic('upload', 's')}<span>${tr('Read DATEV data')}</span></button>`;
   const head = `<div class="ofcbar bka-bar">${back}<span class="spacer"></span>${years.length ? `<label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bka-year', BKA.year, years.map(y => [y.year, String(y.year)]))}</label>` : ''}${read}</div>
     <h2 class="bka-h">${tr('Booking archive')}</h2>`;
   const note = `<p class="muted bk-note bka-note">${esc(ov.note || '')}</p>`;
   if (!years.length) {
-    return head + `<div class="bka-empty"><p>${tr('The archive holds the complete DATEV data of past years: every booking, the account labels and the receipt images, read-only.')}</p>
-      <p class="muted">${tr('Ask your tax advisor for the DATEV export of each year (booking batch, account labels, receipt images as ZIP) and read it in here.')}</p><p>${read}</p></div>`
+    return head + emptyState({icon: 'archive', title: tr('The archive holds the complete DATEV data of past years: every booking, the account labels and the receipt images, read-only.'),  // 2.1076.0 (#5450)
+      sub: tr('Ask your tax advisor for the DATEV export of each year (booking batch, account labels, receipt images as ZIP) and read it in here.'), action: `<div class="eacts">${read}</div>`, cls: 'bka-empty'})
       + bkaRunsHtml() + note;
   }
   const y = years.find(x => x.year === BKA.year) || years[0];
@@ -91,24 +91,24 @@ function bkaListHtml() {
     <form class="bka-fgrid" data-bka-form>${BKA_FILTERS.map(inp).join('')}
     <div class="lacts"><button type="submit" class="btn sm pri">${ic('search', 's')}<span>${tr('Search')}</span></button>${active ? `<button type="button" class="btn sm ghost" data-bka="clear">${tr('Reset filters')}</button>` : ''}</div></form></details>`;
   const l = BKA.list;
-  if (!l) { setTimeout(() => { if (!BKA.list) bkaLoadList(false); }, 0); return filt + `<p class="muted bka-wait">${tr('Loading…')}</p>`; }
-  if (l.error) return filt + `<p class="aerr" role="alert">${esc(l.error)}</p>`;
+  if (!l) { setTimeout(() => { if (!BKA.list) bkaLoadList(false); }, 0); return filt + loadingHtml('sec'); }
+  if (l.error) return filt + ofcFail(l.error, () => { BKA.list = null; }, 'sec');  // 2.1076.0 (#5450)
   const any = f.any ? `<p class="muted bka-anyl">${esc(tr('Account {0}, either side', f.any))}</p>` : '';
   const sum = `<p class="bka-sum" aria-live="polite"><b>${esc(trn('{0} booking', '{0} bookings', l.total))}</b> · ${esc(tr('Debit {0} · Credit {1}', ofcMoney(l.debit), ofcMoney(l.credit)))}</p>`;
   const row = x => `<li><button type="button" class="ofcrow bka-row" data-bka="row" data-id="${x.id}"><span class="bka-day">${bkaDay(x.day)}</span>
     <span class="ofcn"><span class="bka-acc">${bkaAcct(x.account, x.account_label)}${x.counter ? ` <span class="muted">→</span> ${bkaAcct(x.counter, x.counter_label)}` : ''}</span>
     <small class="muted">${esc([x.doc1, x.text].filter(Boolean).join(' · '))}</small></span>
     ${x.doc_id ? `<span class="bka-doc" title="${esc(tr('Receipt image'))}">${ic('clip', 's')}<span class="sr">${tr('Receipt image')}</span></span>` : ''}<span class="rksum">${bkaAmt(x.amount, x.side)}</span></button></li>`;
-  const list = l.items.length ? `<ul class="ofclist bka-list" role="list">${l.items.map(row).join('')}</ul>` : `<p class="muted lempty bka-none">${tr('No bookings match the filter.')}</p>`;
+  const list = l.items.length ? `<ul class="ofclist bka-list" role="list">${l.items.map(row).join('')}</ul>` : ofcNoHit(Object.values(f).some(v => String(v).trim()) ? `<button type="button" class="btn sm" data-bka="clear">${tr('Reset filters')}</button>` : '', 'sec', 'bka-none');  // 2.1076.0 (#5450)
   const more = l.items.length < l.total ? `<p class="bka-more"><button type="button" class="btn ghost" data-bka="more"${l.loading ? ' disabled' : ''}>${esc(tr('Load more ({0} of {1})', l.items.length, l.total))}</button></p>` : '';
   return filt + any + sum + list + more;
 }
 
 function bkaSumsHtml() {
   const s = BKA.sums;
-  if (!s) { setTimeout(() => { if (!BKA.sums) bkaLoadSums(); }, 0); return `<p class="muted bka-wait">${tr('Loading…')}</p>`; }
-  if (s.error) return `<p class="aerr" role="alert">${esc(s.error)}</p>`;
-  if (!s.length) return `<p class="muted lempty">${tr('None')}</p>`;
+  if (!s) { setTimeout(() => { if (!BKA.sums) bkaLoadSums(); }, 0); return loadingHtml('sec'); }
+  if (s.error) return ofcFail(s.error, () => { BKA.sums = null; }, 'sec');  // 2.1076.0 (#5450)
+  if (!s.length) return emptyState({title: tr('None'), size: 'sec'});
   const th = `<thead><tr><th>${tr('Account')}</th><th class="num">${tr('Bookings|ledger')}</th><th class="num">${tr('Debit|side')}</th><th class="num">${tr('Credit|side')}</th><th class="num">${tr('Balance')}</th></tr></thead>`;
   const td = x => `<tr data-bka="acct" data-acct="${esc(x.account)}" tabindex="0"><th scope="row">${bkaAcct(x.account, x.label)}</th><td class="num" data-l="${esc(tr('Bookings|ledger'))}">${x.count}</td>
     <td class="num" data-l="${esc(tr('Debit|side'))}">${esc(ofcMoney(x.debit))}</td><td class="num" data-l="${esc(tr('Credit|side'))}">${esc(ofcMoney(x.credit))}</td><td class="num" data-l="${esc(tr('Balance'))}">${bkaAmt(x.balance, x.side)}</td></tr>`;
@@ -167,7 +167,7 @@ async function bkaCheck(input) {
   const fs = [...(input.files || [])]; BKA.files = fs.length ? fs : null;
   if (ok) ok.disabled = true;
   if (!fs.length || !pv) { if (pv) pv.innerHTML = ''; return; }
-  pv.innerHTML = `<p class="muted">${tr('Loading…')}</p>`;
+  pv.innerHTML = loadingHtml('row');
   const fd = new FormData(); for (const f of fs) fd.append('file', f);
   let j;
   try { j = await api('POST', `${BKA_URL}/check`, fd); } catch (x) { pv.innerHTML = `<p class="aerr" role="alert">${esc(ofcErrHere(x))}</p>`; BKA.files = null; return; }
@@ -190,7 +190,7 @@ function bkaPreviewHtml(j) {
   const errs = (j.errors || []).map(e => `<p class="aerr">${esc([e.file, e.error].filter(Boolean).join(': '))}</p>`).join('');
   return (years ? `<h4>${tr('Years')}</h4><ul class="ofclist bka-pyears" role="list">${years}</ul>` : '')
     + (files ? `<h4>${tr('Files')}</h4><ul class="ofclist bka-pfiles" role="list">${files}</ul>` : '') + docs + errs
-    + (j.ok ? '' : `<p class="muted bka-pnone">${tr('Nothing to import')}</p>`);
+    + (j.ok ? '' : emptyState({title: tr('Nothing to import'), size: 'row', cls: 'bka-pnone'}));  // 2.1076.0 (#5450)
 }
 
 const bkaReload = () => { BKA.ov = null; BKA.list = null; BKA.sums = null; ofcDraw(); };

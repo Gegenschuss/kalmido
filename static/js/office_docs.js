@@ -230,7 +230,7 @@ const ofd_pairOn = () => typeof lsd_wide === 'function' && lsd_wide() && OFD.kin
 function ofd_pairHtml() {
   const ed = ofdEditorHtml(); if (!ofd_pairOn()) return ed;
   const l = OFD.list ? ofdListHtml() : '', i = l.indexOf('<ul class="ofclist ofdlist"'), id = S.route.id;
-  const rows = i < 0 ? `<p class="muted lempty">${OFD.list ? '' : tr('Loading…')}</p>` : l.slice(i).replace(`data-ofd="open" data-id="${id}">`, `data-ofd="open" data-id="${id}" aria-current="true">`);
+  const rows = i < 0 ? (OFD.list ? '' : loadingHtml('sec')) /* 2.1076.0 (#5450) */ : l.slice(i).replace(`data-ofd="open" data-id="${id}">`, `data-ofd="open" data-id="${id}" aria-current="true">`);
   return `<div class="lsd2"><nav class="lsdl" aria-label="${esc(ofdKindName(OFD.kind))}">${rows}</nav><div class="lsdr">${ed}</div></div>`;
 }
 
@@ -290,8 +290,8 @@ function ofdListHtml() {
   const noTop = k === 'offer' && rows && !rows.length && !q && !OFD.status && !OFD.trial;
   const bar = kinds + `${rows?.length ? hintOnce('ofclp', tr('Hold a row to see what you can do with it.')) : ''}<div class="ofcbar ofdbar"><div class="ctsearch">${ic('search', 's')}<input id="ofd-q" type="search" value="${esc(OFD.q)}" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search documents'))}" autocomplete="off" enterkeyhint="search"></div>
     <select id="ofd-status" aria-label="${esc(tr('Status'))}"><option value="">${tr('All|status')}</option>${sts.map(([v, n]) => `<option value="${v}" ${OFD.status === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>${ofd_fltHtml()}${tri_filterHtml()}${lst_sortBtn(ofd_listKey(k))}<span class="spacer"></span>${ofcAdmin('offers') ? `<button type="button" class="btn sm" data-ofd="trash" title="${esc(tr('Trash'))}" aria-label="${esc(tr('Trash'))}">${ic('trash', 's')}</button>` : ''}${noTop ? '' : newBtn}</div>${tri_barHtml()}`;
-  if (!rows) return bar + `<p class="muted lempty">${tr('Loading…')}</p>`;
-  if (OFD.err && !rows.length) return bar + `<div class="empty">${esc(OFD.err)}</div>`;
+  if (!rows) return bar + loadingHtml('big');
+  if (OFD.err && !rows.length) return bar + ofcFail(OFD.err, () => { OFD.err = ''; OFD.list = null; ofdLoadList(true); });  // 2.1076.0 (#5450)
   const hit = r => !q || [r.number, r.recipient_name, r.project_title, r.project_ref].some(v => (v || '').toLowerCase().includes(q));
   const more = OFD.next ? `<p class="rcl-more"><button type="button" class="btn ghost" data-ofd="listmore" ${OFD.more ? 'disabled' : ''}>${tr('Load more')}</button></p>` : '';  // 2.369.0 A (#3200)
   const list = lst_sorted(rows.filter(hit), ofd_listKey(k), r => ({date: r.date, client: r.recipient_name, amount: inv ? r.gross : k === 'delivery' ? null : r.net, name: r.project_title || r.number}));  // 2.451.0 (#3834)
@@ -299,7 +299,7 @@ function ofdListHtml() {
     invoice: N_('No invoices yet. Make one from a quotation, from time entries or start empty.'),
     credit: N_('No credit notes yet. A credit note is made from a finalised invoice.'), reminder: N_('No payment reminders yet. Select open invoices in the invoice list.'),
     delivery: N_('No delivery notes yet. From a quotation, an invoice or empty – without prices.')};  // 2.120.0 D (#2089)
-  if (!list.length) return bar + `<div class="empty nempty eact">${ic('receipt')}<span>${q || OFD.status || OFD.trial || ofd_grpQs() ? tr('Nothing matches.') : tr(emptyTxt[k])}</span>${!q && !OFD.status && !OFD.trial && !ofd_grpQs() && k === 'offer' ? `<button class="btn pri" data-ofd="new">${ic('plus', 's')}<span>${tr('New quotation')}</span></button>` : ''}</div>` + more;
+  if (!list.length) return bar + (q || OFD.status || OFD.trial || ofd_grpQs() ? ofcNoHit() : emptyState({icon: 'receipt', title: tr(emptyTxt[k]), action: k === 'offer' ? `<div class="eacts"><button class="btn pri" data-ofd="new">${ic('plus', 's')}<span>${tr('New quotation')}</span></button></div>` : ''})) + more;  // 2.1076.0 (#5450)
   // 2.40.0 (#1368 point 9): settled reminders (all their invoices paid or cancelled) below the open ones
   const grp = k === 'reminder' && list.some(r => r.settled) && list.some(r => !r.settled);
   if (k === 'reminder') list.sort((a, b) => (a.settled ? 1 : 0) - (b.settled ? 1 : 0));
@@ -363,7 +363,7 @@ const ofdCanSend = d => !!d && !!d.locked && !d.via_folder && !ofr_noSp('offers'
 function ofdEditorHtml() {
   const d = OFD.doc && OFD.doc.id === S.route.id ? OFD.doc : null;
   const back = `<button type="button" class="btn sm ofdback" data-ofd="back" aria-label="${esc(tr('Back to {0}', ofdKindName(OFD.kind)))}" title="${esc(tr('Back to {0}', ofdKindName(OFD.kind)))}">${ic('left', 's')}<span>${ofdKindName(OFD.kind)}</span></button>`;  // 2.936.0 (#5448): a phone shows the arrow only (office.css)
-  if (!d) return `<div class="ofdhead">${back}</div>` + (OFD.err ? `<div class="empty">${ic('receipt')}<span>${esc(OFD.err)}</span></div>` : `<p class="muted lempty">${tr('Loading…')}</p>`);
+  if (!d) return `<div class="ofdhead">${back}</div>` + (OFD.err ? ofcFail(OFD.err, () => { OFD.err = ''; ofdLoadDoc(S.route.id, true); }) : loadingHtml('big'));  // 2.1076.0 (#5450)
   const adm = ofcAdmin(), t = d.totals || {};
   const txtOpt = kind => ofcTextOpts(kind, ofdTl(d));  // 2.40.0 (#1381): no silent German
   const contracts = ofcRows('contracts').filter(x => !x.archived || x.id === d.contract_id).map(x => [x.id, x.name]);
@@ -701,15 +701,16 @@ const ofdActText = (a, x) => a !== 'reprice' ? tr(OFD_ACTIONS[a] || a) : x?.deta
 const ofdWhen = iso => { const d = new Date(iso); return isNaN(+d) ? iso || '' : fmtStamp(d); };  // 2.368.0 B (#2982)
 function ofdLogHtml(d) {
   if (!OFD.open.log) return `<p class="muted">${tr('Open to load the history.')}</p>`;
-  if (OFD.logFor !== d.id || !OFD.log) { setTimeout(() => ofdLoadLog(d.id), 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
-  if (!OFD.log.length) return `<p class="muted">${tr('No entries yet.')}</p>`;
+  if (OFD.logFor !== d.id || !OFD.log) { setTimeout(() => ofdLoadLog(d.id), 0); return loadingHtml('sec'); }
+  if (OFD.logErr) return errorState({sub: OFD.logErr, size: 'sec', retry: () => { OFD.logErr = null; OFD.log = null; ofdDraw(); }});  // 2.1076.0 (#5450): a failure is no empty history
+  if (!OFD.log.length) return emptyState({title: tr('No entries yet.'), size: 'sec'});
   return `<ul class="ofdlog" role="list">${/*html-ok*/ OFD.log.map(x => { /* every value esc(), agbLogNote escapes too (2.1041.0 #5812) */ const ks = Object.keys(x.detail?.after || {}); return `<li><span class="muted">${esc(ofdWhen(x.at))}</span> <b>${esc(x.user_name || x.detail?.name || '?')}</b> ${esc(ofdActText(x.action, x))}${ks.length && x.action === 'update' ? ` <span class="muted">(${esc(ks.join(', '))})</span>` : ''}${typeof agbLogNote === 'function' ? agbLogNote(x) : ''}</li>`; }).join('')}</ul>`;
 }
 async function ofdLoadLog(id) {
   if (OFD.logLoading) return;
   OFD.logLoading = true;
-  try { const j = await api('GET', `/api/office/docs/${id}/log`); OFD.log = j.log || []; OFD.logFor = id; }
-  catch (x) { OFD.log = []; OFD.logFor = id; }
+  try { const j = await api('GET', `/api/office/docs/${id}/log`); OFD.log = j.log || []; OFD.logFor = id; OFD.logErr = null; }
+  catch (x) { OFD.log = []; OFD.logFor = id; OFD.logErr = ofcErrHere(x); }
   OFD.logLoading = false; ofdDraw();
 }
 
@@ -1247,10 +1248,10 @@ function tbill_html() {
   if (TBL.key !== key) { Object.assign(TBL, {key, data: null, err: ''}); setTimeout(tbill_load, 0); }
   const bar = `<div class="ofcbar"><h3 class="ofcgrp">${tr('Times to bill')}</h3><span class="spacer"></span>
     <span class="lacts">${dateIn('tbl-from', TBL.from, {label: tr('From'), clear: false})}${dateIn('tbl-to', TBL.to, {label: tr('Until'), clear: false, after: 'tbl-from'})}</span></div>`;
-  if (TBL.err) return bar + `<div class="empty">${esc(TBL.err)}</div>`;
-  if (!TBL.data) return bar + `<p class="muted lempty">${tr('Loading…')}</p>`;
+  if (TBL.err) return bar + ofcFail(TBL.err, () => { TBL.key = ''; });  // 2.1076.0 (#5450)
+  if (!TBL.data) return bar + loadingHtml('big');
   const j = TBL.data, cl = j.clients || [];
-  if (!cl.length) return bar + `<p class="muted lempty">${tr('No time entries in projects of a client in this period.')}</p>`;
+  if (!cl.length) return bar + emptyState({icon: 'clock', title: tr('No time entries in projects of a client in this period.')});
   const more = x => [x.billed_seconds ? tr('{0} h already billed', tbill_h(x.billed_seconds)) : '', x.unbillable_seconds ? tr('{0} h not billable', tbill_h(x.unbillable_seconds)) : ''].filter(Boolean).join(' · ');
   return bar + `<p class="ofchint" role="status">${esc(tr('Open billable: {0} h', tbill_h(j.open_seconds)))}</p>
     <ul class="ofdpick" role="list">${cl.map(x => `<li><span class="ofcn"><b>${esc(x.name || tr('Client'))}</b><small class="muted">${esc([tr('Open billable: {0} h', tbill_h(x.open_seconds)), more(x)].filter(Boolean).join(' · '))}</small></span></li>`).join('')}</ul>`;
@@ -1391,11 +1392,11 @@ function ofdServicePicker() {
     const groups = new Map(); for (const s of rows) { const k = s.category || tr('No category'); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(s); }
     $('#ofd-slist', md).innerHTML = rows.length ? [...groups].map(([k, ss]) => `<h4 class="ofcgrp">${esc(k)}</h4><ul class="ofclist" role="list">${ss.map(s => { const ct = d.contract?.rates?.[s.id]; const rate = ct ?? (s.unit === 'hour' && s.hourly_rate != null ? s.hourly_rate : s.daily_rate); return `<li><button type="button" class="ofcrow" data-sid="${s.id}"><span class="ofcn"><b>${esc(ofdSvcName(s, d))}</b><small class="muted">${esc([rate != null ? `${s.unit === 'percent' ? `${fmtNum(rate, 2)} %` : `${ofcMoney(rate)} / ${tr(OFC_UNITS.find(u => u[0] === s.unit)?.[1] || s.unit)}`}` : '', ct != null ? tr('contract rate') : '', ofcTax(s.tax)].filter(Boolean).join(' · '))}</small></span>${ic('plus', 's')}</button></li>`; }).join('')}</ul>`).join('')
       + (typeof tpPickerHtml === 'function' && !q ? tpPickerHtml(d) : '')  // 2.47.0 (#1215): after the services, the parts
-      : (typeof tpPickerHtml === 'function' && tpPickerHtml(d)) || `<p class="muted lempty">${ofcRows('services').length ? tr('Nothing matches.') : esc(tr('No services yet (tab {0}).', '\u0001')).replace('\u0001', `<a href="#office/services" data-m="tab">${esc(tr('Services'))}</a>`)}</p>`;  // 2.39.1 (#1220): the tab as a link
+      : (typeof tpPickerHtml === 'function' && tpPickerHtml(d)) || (ofcRows('services').length ? ofcNoHit('', 'row') : emptyState({title: tr('No services yet (tab {0}).', tr('Services')), size: 'row', action: `<a class="btn sm" href="#office/services" data-m="tab">${esc(tr('Services'))}</a>`}));  // 2.1076.0 (#5450): the shared block; the tab is the button  // 2.39.1 (#1220): the tab as a link
   };
   draw();
   if (!Array.isArray(OFC.data.services)) {  // the catalogue may still be loading: show it once it is there
-    $('#ofd-slist', md).innerHTML = `<p class="muted lempty">${tr('Loading…')}</p>`;
+    $('#ofd-slist', md).innerHTML = loadingHtml('row');
     (async () => { for (let i = 0; i < 60 && !Array.isArray(OFC.data.services) && md.isConnected; i++) { if (!OFC.loading.services) ofcLoad('services', true); await sleep(150); } if (md.isConnected) draw(); })();
   }
   md.addEventListener('input', e => { if (e.target.id === 'ofd-sq') draw(); });

@@ -6801,7 +6801,6 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .pipcol.over{border-color:var(--accent)}
 .pipcol header{display:flex;align-items:center;gap:.375rem;padding:.25rem .25rem .5rem}
 .ppcards{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.375rem}
-.ppnone{padding:.5rem .25rem;font-size:var(--fs-b)}
 .ppcard{display:flex;flex-direction:column;gap:.125rem;padding:.5rem .625rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg);cursor:pointer;min-height:2.75rem;user-select:none;transition:transform .15s ease,opacity .15s ease}
 .ppcard:hover,.ppcard:focus-visible{border-color:var(--accent)}
 .ppcard.dragging{opacity:.5}

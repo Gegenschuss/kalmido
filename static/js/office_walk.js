@@ -79,7 +79,7 @@ function wlk_draw() {
   if (it.done) body = `<p class="wlk-done"><span class="rotag bnkm">${ic('check', 's')} ${esc(it.done)}</span></p>`;
   else {
     const c = WLK.cands, many = WLK.search;
-    const cards = !c ? `<p class="muted wlk-wait">${tr('Loading…')}</p>` : !c.length ? `<p class="muted wlk-none">${out ? tr('No suitable receipt found. Search another one or upload it.') : tr('Nothing found')}</p>`
+    const cards = !c ? `${loadingHtml('row')}` : !c.length ? (out ? emptyState({title: tr('No suitable receipt found. Search another one or upload it.'), size: 'row', cls: 'wlk-none'}) : ofcNoHit('', 'row', 'wlk-none'))
       : ocd_row((many ? c : c.slice(0, 3)).map((d, k) => ocd_card(d, {btn: `data-wlk="take" data-k="${k}"`, key: fine && k < 3 ? k + 1 : '', on: k === WLK.sel})).join(''), 'wlk-cands');
     const search = many ? `<input type="search" class="wlk-q" data-wlk-q value="${esc(WLK.q)}" placeholder="${esc(bank && !out ? tr('Number or client') : tr('Search all receipts'))}" aria-label="${esc(tr('Search'))}">` : '';
     const acc = esc(bank ? BNK_ACCEPT_RC() : (typeof BK_ACCEPT === 'string' ? BK_ACCEPT : 'application/pdf,image/*'));

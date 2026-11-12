@@ -79,8 +79,8 @@ function bkTabHtml() {
   if (bkSub() === 'taxforms') return tfHtml();  // 2.467.0 (#3456): Anlage EUeR and annual VAT return
   if (bkSub() === 'taxcheck') return tcHtml();  // 2.589.0 (#3458): the tax check before filing (traffic light)
   if (bkSub() === 'ledger' && typeof ldbHtml === 'function') return ldbHtml();  // 2.666.0 (#3461): the balance sheet (office_ledger.js)
-  if (BK.err) return `<div class="empty">${esc(BK.err)}</div>`;
-  if (!BK.info || !BK.euer || !BK.ustva) { if (!BK.loadingT) BK.loadingT = setTimeout(() => { BK.loadingT = 0; bkLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (BK.err) return ofcFail(BK.err, () => { BK.err = null; BK.info = null; });  // 2.1076.0 (#5450)
+  if (!BK.info || !BK.euer || !BK.ustva) { if (!BK.loadingT) BK.loadingT = setTimeout(() => { BK.loadingT = 0; bkLoad(); }, 0); return loadingHtml('big'); }
   if (bkSub() === 'ustva' && !BK.jumped) { BK.jumped = true; setTimeout(() => $('#bk-ustva')?.scrollIntoView({block: 'start'}), 0); }
   const years = ofcYearOpts(BK.info?.years, BK.year, 1).map(y => [y, y]);  // 2.593.0 (#4891): the years with receipts / invoices + last year (was this year +1 .. -6)
   const head = `<div class="ofcbar bk-bar"><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bk-year', BK.year, years)}</label><span class="spacer"></span>
@@ -149,7 +149,7 @@ function bkReceiptsHtml() {
   const billable = rs.some(r => !BK.billed[r.node_id]);
   return `<section class="bk-sec" aria-labelledby="bk-rch"><h3 class="ofcgrp" id="bk-rch">${tr('Receipts this month')}</h3>${bkEinvHtml(d.einvoices || [])}${missHtml}
     ${billable ? `<p><button type="button" class="btn" data-bk="bill">${tr('Bill receipts on to a client …')}</button></p>` : ''}
-    ${rs.length ? `<ul class="ofclist" role="list">${rs.slice(-30).reverse().map(bkRcRow).join('')}</ul>` : `<p class="muted lempty">${tr('No receipts this month yet.')}</p>`}
+    ${/*html-ok*/ rs.length ? `<ul class="ofclist" role="list">${rs.slice(-30).reverse().map(bkRcRow).join('')}</ul>` : emptyState({icon: 'receipt', title: tr('No receipts this month yet.'), size: 'sec'})}
     <p class="bk-all"><a class="btn ghost" href="#office/books/receipts">${ic('list', 's')}<span>${tr('All receipts')}</span>${ic('right', 's')}</a></p></section>`;  // 2.153.0 (#2055)
 }
 
@@ -274,8 +274,8 @@ function tfHtml() {
   const back = `<a class="btn sm ghost" href="#office/books" data-navup>${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a>`;
   const tabs = `<div class="seg" role="group" aria-label="${esc(tr('Tax forms'))}">${[['euer', tr('Anlage EÜR')], ['ust', tr('Annual VAT return')]].map(([k, n]) => `<a class="btn sm${kind === k ? ' on' : ''}" href="#office/books/taxforms/${k}"${kind === k ? ' aria-current="page"' : ''}>${esc(n)}</a>`).join('')}</div>`;
   const bar = `<div class="ofcbar bk-bar">${back}${tabs}<a class="btn sm ghost" href="#office/books/taxcheck" data-bk-taxcheck>${ic('check', 's')}<span>${tr('Tax check')}</span></a><span class="spacer"></span><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('tf-year', TF.year, tfYears())}</label></div>`;  // 2.589.0 (#3458): + the tax check
-  if (TF.err) return bar + `<div class="empty">${esc(TF.err)}</div>`;
-  if (!TF.d) { if (!TF.t) TF.t = setTimeout(() => { TF.t = 0; tfLoad(); }, 0); return bar + `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (TF.err) return bar + ofcFail(TF.err, () => { TF.err = null; TF.d = null; });  // 2.1076.0 (#5450)
+  if (!TF.d) { if (!TF.t) TF.t = setTimeout(() => { TF.t = 0; tfLoad(); }, 0); return bar + loadingHtml('big'); }
   const d = TF.d, notes = d.notes.map(n => `<p class="muted bk-note">${esc(n)}</p>`).join('');
   if (!d.rows.length) return bar + `<p class="bk-warn">${esc(d.notes[0])}</p>` + d.notes.slice(1).map(n => `<p class="muted bk-note">${esc(n)}</p>`).join('');
   const dl = kind === 'euer' ? 'euer' : 'ust';
@@ -316,8 +316,8 @@ function tcHtml() {
   if (TC.oid !== OFC.info?.org_id) Object.assign(TC, {oid: OFC.info?.org_id, d: null, err: null, year: TC.year || new Date().getFullYear() - 1});
   const back = `<a class="btn sm ghost" href="#office/books/taxforms/euer" data-navup>${ic('back', 's')}<span>${tr('Tax forms')}</span></a>`;
   const bar = `<div class="ofcbar bk-bar">${back}<h3 class="ofcgrp">${tr('Tax check')}</h3><span class="spacer"></span><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('tc-year', TC.year, tfYears())}</label></div>`;
-  if (TC.err) return bar + `<div class="empty">${esc(TC.err)}</div>`;
-  if (!TC.d) { if (!TC.t) TC.t = setTimeout(() => { TC.t = 0; tcLoad(); }, 0); return bar + `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (TC.err) return bar + ofcFail(TC.err, () => { TC.err = null; TC.d = null; });  // 2.1076.0 (#5450)
+  if (!TC.d) { if (!TC.t) TC.t = setTimeout(() => { TC.t = 0; tcLoad(); }, 0); return bar + loadingHtml('big'); }
   const d = TC.d, n = d.counts;
   const sum = `<p class="tc-sum" role="status">${[['red', n.red], ['yellow', n.yellow], ['green', n.green]].map(([k, v]) => `<span class="tc-cnt tc-${k}"><span class="tc-dot" aria-hidden="true"></span>${v} ${esc(tr(TC_LBL[k]))}</span>`).join('')}</p>`;
   const groups = d.groups.map(([k, name]) => { const ps = d.points.filter(p => p.group === k); return ps.length ? `<section class="bk-sec"><h4 class="bk-h">${esc(name)}</h4><ul class="tc-list">${ps.map(tcRow).join('')}</ul></section>` : ''; }).join('');
@@ -502,8 +502,8 @@ async function bkBillModal(pre) {
   const md = modal(`<h3>${tr('Bill receipts on to a client')}</h3>
     <p class="muted">${tr('Each receipt becomes a position with the amount as purchase price (net where the receipt has a VAT rate).')}</p>
     ${pre ? '' : `<ul class="ofclist bk-pick" role="list">${list.map(r => `<li>${ofcChk('bkb-' + r.node_id, [r.title || tr('Receipt'), fmtDateLoc(r.date), ofcMoney(r.amount)].filter(Boolean).join(' · '), false)}</li>`).join('')}</ul>`}
-    ${docs.length ? ofcRowF('bkb-doc', tr('Quotation or invoice (draft)'), ofcSel('bkb-doc', docs[0].id, docs.map(d => [d.id, [kind(d), d.number || tr('Draft'), d.project_title].filter(Boolean).join(' · ')])))
-      : `<div class="empty nempty">${tr('There is no quotation or invoice in draft. Create one first.')}</div>`}
+    ${/*html-ok*/ docs.length ? ofcRowF('bkb-doc', tr('Quotation or invoice (draft)'), ofcSel('bkb-doc', docs[0].id, docs.map(d => [d.id, [kind(d), d.number || tr('Draft'), d.project_title].filter(Boolean).join(' · ')])))
+      : emptyState({icon: 'file', title: tr('There is no quotation or invoice in draft. Create one first.'), size: 'sec'})}
     ${ofcRowF('bkb-mk', tr('Markup in %'), ofcIn('bkb-mk', '', {num: true, ph: '0'}))}
     ${pre ? '' : ofcChk('bkb-one', tr('One position for all receipts'), false)}
     <div class="aerr" role="alert"></div>
@@ -616,8 +616,8 @@ const bkCmpPct = p => p == null ? '' : ` <small class="muted">(${p > 0 ? '+' : '
 function bkCmpHtml(e) {
   if (BKC.src !== e) { BKC.src = e; BKC.d = null; BKC.err = null; setTimeout(() => bkCmpLoad(e), 0); }
   const d = BKC.d, sec = (body, src = '') => `<section class="bk-sec bk-cmp" aria-labelledby="bk-cmph"${src ? ` data-bk-cmpsrc="${esc(src)}"` : ''}><div class="ofcbar"><h3 class="ofcgrp" id="bk-cmph">${tr('Comparison with the year before')}</h3></div>${body}</section>`;
-  if (BKC.err) return sec(`<p class="muted">${esc(BKC.err)}</p>`);
-  if (!d || d.year !== e.year) return sec(`<p class="muted lempty">${tr('Loading…')}</p>`);
+  if (BKC.err) return sec(ofcFail(BKC.err, () => { BKC.src = null; }, 'sec'));  // 2.1076.0 (#5450): bkCmpHtml loads again
+  if (!d || d.year !== e.year) return sec(loadingHtml('sec'));
   const arch = d.source === 'archive', mark = arch ? ` <small class="bk-cmpmark">${esc(d.archive.label)}</small>` : '';
   const th = `<thead><tr><th>${tr('Group')}</th><th class="num">${d.year}</th><th class="num">${d.prev_year}${mark}</th><th class="num">${tr('Deviation')}</th></tr></thead>`;
   const tr_ = (r, tot) => `<tr data-bk-cmp="${esc(r.key || 'vat_due')}"${tot ? ' class="bk-tot"' : ''}><th scope="row">${esc(r.label)}</th><td class="num" data-l="${d.year}">${bkCmpMoney(r.now)}</td>`

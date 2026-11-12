@@ -41,7 +41,7 @@ function dkSheetHtml(part, doc, adm) {
     .map(([n, v], i) => `<p class="dksum ${i > 2 || n === tr('Net total') ? 'dkstrong' : ''}"><span>${esc(n)}</span><b>${esc(m(v))}</b></p>`).join('');
   return `<div class="dksheet" data-pid="${part.id}">
     <details class="dkbox" open><summary>${tr('Shoot')}</summary><div class="dkgrid">${head}</div></details>
-    <section class="dkbox"><h4>${tr('Crew')}</h4><ul class="ofdits" role="list">${staff || `<li class="muted lempty">${tr('No crew yet.')}</li>`}</ul>
+    <section class="dkbox"><h4>${tr('Crew')}</h4><ul class="ofdits" role="list">${/*html-ok*/ staff || `<li>${/*html-ok*/ emptyState({title: tr('No crew yet.'), size: 'row'})}</li>`}</ul>
       <div class="ofdadd"><button type="button" class="btn sm pri" data-dka="role">${ic('plus', 's')}<span>${tr('Add crew')}</span></button></div></section>
     <section class="dkbox"><h4>${tr('Producing')}</h4><div class="dkgrid"><label class="chkl"><input type="checkbox" data-dk="producing.on" ${p.on ? 'checked' : ''}> ${tr('Producing share of the crew')}</label>${dkNum('producing.share', p.share, tr('Share'))}</div>${dkLine(c, 'share') ? `<p class="dksum"><span></span><b>${esc(tot('share'))}</b></p>` : ''}</section>
     <section class="dkbox"><h4>${tr('Travel')}</h4><div class="dkgrid">${dkNum('km.km', k.km, tr('Kilometres'))}${dkNum('km.rate', k.rate, tr('Rate per km'))}${dkNum('km.trips', k.trips, tr('Trips'))}</div>
@@ -127,7 +127,7 @@ function dkPick(kind, title, nameOf, subOf, onPick, filter) {
     const q = ($('#dk-q', md)?.value || '').trim().toLowerCase();
     const rows = ofcRows(kind).filter(r => !r.archived && (!filter || filter(r)) && (!q || String(nameOf(r) || '').toLowerCase().includes(q)));
     $('#dk-list', md).innerHTML = rows.length ? `<ul class="ofclist" role="list">${rows.map(r => `<li><button type="button" class="ofcrow" data-rid="${r.id}"><span class="ofcn"><b>${esc(nameOf(r) || '')}</b><small class="muted">${esc(subOf(r) || '')}</small></span>${ic('plus', 's')}</button></li>`).join('')}</ul>`
-      : `<p class="muted lempty">${Array.isArray(OFC.data[kind]) ? tr('Nothing matches.') : esc(OFC.data[kind]?.error || tr('Loading…'))}</p>`;
+      : Array.isArray(OFC.data[kind]) ? ofcNoHit('', 'row') : OFC.data[kind]?.error ? errorState({sub: OFC.data[kind].error, size: 'row'}) : loadingHtml('row');  // 2.1076.0 (#5450)
   };
   draw();
   if (!Array.isArray(OFC.data[kind])) (async () => { for (let i = 0; i < 60 && !Array.isArray(OFC.data[kind]) && !OFC.data[kind]?.error && md.isConnected; i++) { if (!OFC.loading[kind]) ofcLoad(kind, true); await sleep(150); } if (md.isConnected) draw(); })();

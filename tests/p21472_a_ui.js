@@ -67,7 +67,7 @@ const FEAT = 'comments,collab,office,clients';
   // ================= Firefox, phone: the office for read-only like for the admin
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 412, height: 783}});
-    const loaded = `(() => { const o = document.querySelector('#view .dash.office'); return !!o && !!o.querySelector('.ofcbody') && ![...o.querySelectorAll('p.lempty')].some(p => /Loading/.test(p.textContent)); })()`;
+    const loaded = `(() => { const o = document.querySelector('#view .dash.office'); return !!o && !!o.querySelector('.ofcbody') && ![...o.querySelectorAll('p.lempty, .eload')].some(p => /Loading/.test(p.textContent)); })()`;  // 2.1076.0 (#5450): + the shared loading block
     for (const u of ['rita', 'alice']) {
       for (const h of ['#office', '#office/offers']) {
         await nav(B + 'static/icon.svg');

@@ -29,7 +29,7 @@ function pol_heldHtml(rows, adm) {
 function pol_settingsHtml() {
   const s = pol_conf();
   const head = `<summary>${tr('Online payment of invoices')}</summary><p class="muted ofchint">${tr('Through your own provider account: the money goes directly to you, the provider bills its fees to you, Kalmido charges nothing.')}</p>`;
-  if (!s) return `<details class="ofcfree pepset" id="pol-set" data-fg-skip>${head}<p class="muted">${tr('Loading…')}</p></details>`;
+  if (!s) return `<details class="ofcfree pepset" id="pol-set" data-fg-skip>${head}${/*html-ok*/ loadingHtml('row')}</details>`;
   const dis = s.can_edit ? '' : 'disabled';
   const held = pol_heldHtml(s.held || [], s.can_edit);
   return `<details class="ofcfree pepset" id="pol-set" data-fg-skip ${s.provider ? 'open' : ''}>${head}

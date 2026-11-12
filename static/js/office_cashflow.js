@@ -14,7 +14,7 @@ async function rk_cfLoad() {
   const q = rk_cfQ(); RKF.q = q;
   try { const j = await api('GET', '/api/office/cashflow?' + q); if (RKF.q === q) { RKF.data = j; RKF.err = null; } }
   catch (x) { RKF.err = ofcErrHere(x); }
-  try { const fj = await api('GET', '/api/office/fixed-costs'); RKF.fixed = fj.items || []; RKF.agr = fj.agreements || []; } catch (x) { RKF.fixed = []; RKF.agr = []; }  // 2.92.0 A (#1925): agr
+  try { const fj = await api('GET', '/api/office/fixed-costs'); RKF.fixed = fj.items || []; RKF.agr = fj.agreements || []; RKF.fixErr = null; } catch (x) { RKF.fixed = []; RKF.agr = []; RKF.fixErr = ofcErrHere(x); }  // 2.92.0 A (#1925): agr; 2.1076.0 (#5450): + fixErr
   try { RKF.check = await api('GET', '/api/office/cashflow/check'); } catch (x) { RKF.check = null; }  // 2.67.0 (#1838)
   ofcDraw();
 }
@@ -27,8 +27,8 @@ function rk_cashflowHtml() {
   if (RKF.oid !== OFC.info?.org_id) Object.assign(RKF, {oid: OFC.info?.org_id, data: null, fixed: null, open: null, err: null});  // another office area
   if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
   if (!RKF.from) RKF.from = rk_ym();
-  if (RKF.err) return `<div class="empty">${esc(RKF.err)}</div>`;
-  if (!RKF.data || RKF.q !== rk_cfQ()) { setTimeout(() => { if (RKF.q !== rk_cfQ() || !RKF.data) rk_cfLoad(); }, 0); if (!RKF.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (RKF.err) return ofcFail(RKF.err, () => { RKF.err = null; RKF.data = null; });  // 2.1076.0 (#5450)
+  if (!RKF.data || RKF.q !== rk_cfQ()) { setTimeout(() => { if (RKF.q !== rk_cfQ() || !RKF.data) rk_cfLoad(); }, 0); if (!RKF.data) return loadingHtml('big'); }
   const d = RKF.data;
   const bar = `<div class="ofcbar rkcfbar"><button class="iconbtn" data-rkf="prev" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><b class="rkcfrange">${esc(rk_month(d.rows[0]?.month))} – ${esc(rk_month(d.rows[d.rows.length - 1]?.month))}</b><button class="iconbtn" data-rkf="next" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
     ${RKF.from !== rk_ym() ? `<button class="btn sm ghost" data-rkf="now">${tr('Today')}</button>` : ''}<span class="spacer"></span>
@@ -103,8 +103,8 @@ function rk_fixedHtml() {
   const cats = [...new Set(fx.map(f => f.category || ''))].sort((a, b) => !a - !b || a.localeCompare(b, undefined, {sensitivity: 'base'}));
   const row = f => `<li><button type="button" class="ofcrow" data-rkf="fixed" data-id="${f.id}"><span class="ofcn"><b>${esc(f.label)}${f.sub ? ` <span class="abo-tag">${tr('Subscription')}</span>` : ''}</b><small class="muted">${esc([rp(f.repeat), tr('from {0}', fmtDateLoc(f.start)), f.until ? tr('until {0}', fmtDateLoc(f.until)) : '', +f.vat_rate ? tr('VAT {0} %', f.vat_rate) : tr('without VAT')].filter(Boolean).join(' · '))}</small></span>${rk_fixedSum(f)}${ic('right', 's')}</button></li>`;
   return `<div class="ofcbar fcibar"><h3 class="ofcgrp">${tr('Fixed costs')}</h3><span class="spacer"></span>${fx.some(f => f.sub) ? `<a class="btn sm ghost" href="#office/subs" data-abo="go">${ic('repeat', 's')}<span>${tr('Subscriptions & tools')}</span></a>` : ''}<button class="btn sm pri" data-rkf="fnew">${ic('plus', 's')}<span>${tr('New fixed cost')}</span></button></div>`
-    + (fx.length ? cats.map(k => `${cats.length > 1 || k ? `<h4 class="fcicat">${esc(k || tr('Without category'))}${k ? `<button type="button" class="iconbtn fcicatren" data-rkf="fcat" data-k="${esc(k)}" title="${esc(tr('Rename category'))}" aria-label="${esc(tr('Rename category {0}', k))}">${ic('edit', 's')}</button>` : ''}</h4>` : ''}<ul class="ofclist" role="list">${fx.filter(f => (f.category || '') === k).map(row).join('')}</ul>`).join('')
-      : `<p class="muted lempty">${tr('No fixed costs yet, e.g. rent or software subscriptions.')}</p>`) + oim_link('fixed', !fx.length) + rk_agrFixedHtml();
+    + (RKF.fixErr && !fx.length ? ofcFail(RKF.fixErr, () => { RKF.fixErr = null; RKF.data = null; }, 'sec') : fx.length ? cats.map(k => `${cats.length > 1 || k ? `<h4 class="fcicat">${esc(k || tr('Without category'))}${k ? `<button type="button" class="iconbtn fcicatren" data-rkf="fcat" data-k="${esc(k)}" title="${esc(tr('Rename category'))}" aria-label="${esc(tr('Rename category {0}', k))}">${ic('edit', 's')}</button>` : ''}</h4>` : ''}<ul class="ofclist" role="list">${fx.filter(f => (f.category || '') === k).map(row).join('')}</ul>`).join('')
+      : emptyState({title: tr('No fixed costs yet, e.g. rent or software subscriptions.'), size: 'sec'})) + oim_link('fixed', !fx.length) + rk_agrFixedHtml();
 }
 // 2.581.0 (#4820): rename a category for all its fixed costs in one step (server: office/cashflow.py rk_fixed_cat_rename);
 // a name that is there already merges both groups (asked first), empty = without a category; one undo for the whole step
@@ -383,7 +383,7 @@ function cfs_settingsHtml() {
   const st = CFS.st;
   return `<section class="cfsset" data-fg-skip aria-labelledby="cfs-h"><h3 id="cfs-h">${tr('Cash flow')}</h3>
     <p class="muted ofchint">${tr('From this day the cash flow shows the account balance at the end of every month. Empty = off.')}</p>
-    ${st === undefined ? `<p class="muted">${tr('Loading…')}</p>` : `${ofcRowF('cfs-amount-set', tr('Starting balance'), `<span class="lacts">${ofcIn('cfs-amount-set', st ? fmtNum(+st.amount, 2) : '', {num: true, ph: tr('optional')})}<span class="muted">${ofcSym(ofcHome())}</span></span>`)}
+    ${/*html-ok*/ st === undefined ? loadingHtml('row') : `${ofcRowF('cfs-amount-set', tr('Starting balance'), `<span class="lacts">${ofcIn('cfs-amount-set', st ? fmtNum(+st.amount, 2) : '', {num: true, ph: tr('optional')})}<span class="muted">${ofcSym(ofcHome())}</span></span>`)}
     <div class="row"><label id="cfs-dayl">${tr('Reference date')}</label>${dateIn('cfs-day', st?.day || CFS.day || today(), {label: tr('Reference date'), clear: false})}</div>`}</section>`;
 }
 async function cfs_startSet(v, tid) {  // 2.567.0 (#4707): -> where a removed start balance lies; tid: its undo takes it back

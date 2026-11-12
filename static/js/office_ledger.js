@@ -60,8 +60,8 @@ function ldbHtml() {
   const back = `<a class="btn sm ghost" href="#office/books" data-navup>${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a>`;
   const years = ofcYearOpts(typeof BK === 'object' ? BK.info?.years : null, LDB.year, 1).map(y => [y, y]);
   const bar = `<div class="ofcbar bk-bar">${back}<h3 class="ofcgrp">${tr('Balance sheet')}</h3><span class="spacer"></span><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('ldb-year', LDB.year, years)}</label></div>`;
-  if (LDB.err) return bar + `<div class="empty">${esc(LDB.err)}</div>`;
-  if (!LDB.d || LDB.d.year !== LDB.year) { if (!LDB.loading) { LDB.loading = true; setTimeout(ldbLoad, 0); } return bar + `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (LDB.err) return bar + ofcFail(LDB.err, () => { LDB.err = null; LDB.d = null; });  // 2.1076.0 (#5450)
+  if (!LDB.d || LDB.d.year !== LDB.year) { if (!LDB.loading) { LDB.loading = true; setTimeout(ldbLoad, 0); } return bar + loadingHtml('big'); }
   const d = LDB.d;
   if (d.settings?.method !== 'balance') return bar + `<div class="empty">${esc(tr('Switch the profit determination to the balance sheet first.'))} ${ofcSetLink('tax', tr('Profit determination'))}</div>`;
   const ok = d.checks.balanced && +d.checks.difference === 0;

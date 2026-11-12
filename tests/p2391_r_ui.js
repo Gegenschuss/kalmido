@@ -58,8 +58,9 @@ const FEAT = 'cal,comments,collab,office,clients';
     await vp(700, 480); await sleep(400);
     const g2 = await ev(geo);
     check(g2.w === g2.iw && g2.h === g2.ih, '#1220: after the window got smaller: still the whole window ' + JSON.stringify(g2));
-    check(await ev(`!!document.querySelector('.modal.ofdpick .lempty a[href="#office/services"]')`), '#1220: the empty state names the Services tab as a link');
-    await ev(`(() => { document.querySelector('.modal.ofdpick .lempty a').click(); return 1; })()`);
+    // 2.1076.0 (#5450): the shared empty block (render.js emptyState), the tab as its button
+    check(await ev(`!!document.querySelector('.modal.ofdpick .empty a[href="#office/services"]')`), '#1220: the empty state names the Services tab as a link');
+    await ev(`(() => { document.querySelector('.modal.ofdpick .empty a').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal.ofdpick') && location.hash === '#office/services'`), '#1220: the link closes the picker and opens the tab');
     // every dialog keeps the full backdrop (same modal())
     await vp(1280, 900); await sleep(300);

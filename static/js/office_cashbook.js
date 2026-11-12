@@ -33,8 +33,8 @@ async function cbLoad() {
 function cbHtml() {
   if (CB.oid !== OFC.info?.org_id) Object.assign(CB, {oid: OFC.info?.org_id, base: null, list: null, err: null, bid: null, links: null});  // another office area
   if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
-  if (CB.err) return `<div class="empty">${esc(CB.err)}<p><button type="button" class="btn sm" data-cb="retry">${tr('Try again')}</button></p></div>`;  // 2.144.11 (#2354, N5)
-  if (!CB.base || !CB.list || CB.q !== `${CB.bid}:${CB.year}`) { if (!CB.loading) setTimeout(cbLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (CB.err) return ofcFail(CB.err, () => cbReload(true));  // 2.144.11 (#2354, N5); 2.1076.0 (#5450): the shared block
+  if (!CB.base || !CB.list || CB.q !== `${CB.bid}:${CB.year}`) { if (!CB.loading) setTimeout(cbLoad, 0); return loadingHtml('big'); }
   const bs = CB.base.books, act = bs.filter(b => !b.archived || b.id === CB.bid), b = cbBook(CB.bid);
   const years = ofcYearOpts(CB.list.years, CB.year);  // 2.593.0 (#4891): the years of the box's entries (was this year .. -4)
   const q = `book_id=${CB.bid}&year=${CB.year}`;
@@ -75,7 +75,7 @@ function cbRef(e) {
 }
 function cbListHtml() {
   const es = CB.list.entries;
-  if (!es.length) return `<div class="empty nempty">${ic('wallet')}<span>${tr('No entries in this year.')}</span></div>`;
+  if (!es.length) return emptyState({icon: 'wallet', title: tr('No entries in this year.'), size: 'sec'});  // 2.1076.0 (#5450)
   return `<ul class="ofclist cb-list" role="list">${es.map(e => `<li><button type="button" class="ofcrow cb-row${e.cancelled_by || e.storno_of ? ' cb-x' : ''}" data-cb="open" data-id="${e.id}">
     <span class="cb-no">${e.no}</span><span class="ofcn"><b>${esc(e.text)}</b>
     <small class="muted">${esc([fmtDateLoc(e.day), e.category, cbVat(e.vat_pct), e.node ? tr('Receipt') + ': ' + e.node.name : '', e.invoice ? tr('Invoice') + ' ' + e.invoice.number : ''].filter(Boolean).join(' · '))}</small>
@@ -85,7 +85,7 @@ function cbListHtml() {
 }
 function cbClosingsHtml() {
   const cs = (CB.list?.closings || []).slice().reverse();
-  if (!cs.length) return `<div class="empty nempty">${ic('check')}<span>${tr('No day closed in this year.')}</span></div>`;
+  if (!cs.length) return emptyState({icon: 'check', title: tr('No day closed in this year.'), size: 'sec'});
   return `<div class="lgb-cards cb-cards">${cs.map(x => `<div class="lgb-card"><h4>${esc(fmtDateLoc(x.day))}</h4><p class="muted">${esc([trn('{0} entry', '{0} entries', x.count), x.by].filter(Boolean).join(' · '))}</p>
     <dl class="lgb-dl"><dt>${tr('Opening balance')}</dt><dd>${ofcMoney(x.opening)}</dd><dt>${tr('Income')}</dt><dd>${ofcMoney(x.sum_in)}</dd>
     <dt>${tr('Expense')}</dt><dd>${ofcMoney(x.sum_out)}</dd><dt>${tr('Closing balance')}</dt><dd><b>${ofcMoney(x.closing)}</b></dd></dl></div>`).join('')}</div>`;
@@ -95,7 +95,7 @@ function cbClosingsHtml() {
 function cb_setHtml() {
   if (CB.oid !== OFC.info?.org_id) Object.assign(CB, {oid: OFC.info?.org_id, base: null, list: null, err: null, bid: null, links: null});  // another office area
   const head = `<h3 id="cbset-h">${tr('Cash boxes')}</h3><p class="muted ofchint">${tr('Name, opening balance and opening day of each cash box; the entries are in Office > Cash book.')}</p>`;
-  if (!CB.base) { if (!CB.loading && !CB.err) setTimeout(cbLoad, 0); return `<section class="cbset">${head}<p class="muted">${esc(CB.err || tr('Loading…'))}</p></section>`; }
+  if (!CB.base) { if (!CB.loading && !CB.err) setTimeout(cbLoad, 0); return `<section class="cbset">${head}${/*html-ok*/ CB.err ? errorState({sub: CB.err, size: 'sec'}) : loadingHtml('sec')}</section>`; }  // 2.1076.0 (#5450): (the settings window draws this part once; the cash book page has "Try again")
   return `<section class="cbset" aria-labelledby="cbset-h">${head}${cbBooksHtml()}</section>`;
 }
 function cbBooksHtml() {  // the settings of the cash boxes: sections like the general settings, saved on change

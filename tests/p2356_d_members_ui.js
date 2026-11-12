@@ -82,7 +82,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,docs,files';
 
     // ================= a locked page explains instead of a dead end
     await nav(B + '#office/cashbook');
-    check(await ready(ev, `!!document.querySelector('.office .ofclocked .ofcmbr [data-ofc-submit]')`, 60), '#3006: #office/cashbook explains and offers "Submit receipt"');
+    check(await ready(ev, `!!document.querySelector('.office .ofclocked [data-ofc-submit]')`, 60), '#3006: #office/cashbook explains and offers "Submit receipt"');  // 2.1076.0 (#5450): the one no-access block (noAccessState) carries the button
 
     // ================= Settings > Company: locked fields with a hint, the organisation's name
     await nav(B + '#office/settings');

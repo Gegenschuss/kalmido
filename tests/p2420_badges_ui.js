@@ -41,7 +41,8 @@ for (const c of ['pempty', 'bpempty', 'fempty', 'cmempty', 'stempty', 'povempty'
   const r = rule('.' + c);
   check(r.padding === '1.5rem 1rem' && r['font-size'] === 'var(--fs-m)', `side/popup empty .${c}: 1.5rem, --fs-m (${r.padding} / ${r['font-size']})`);
 }
-for (const c of ['rm-empty', 'abo-empty']) {
+// 2.1076.0 (#5450): abo-empty is the shared empty block now (render.js emptyState, the .empty rule above), no rule of its own
+for (const c of ['rm-empty']) {
   const r = rule('.' + c);
   check(r.padding === '3rem 1rem' && r['font-size'] === 'var(--fs-m)' && !/dashed/.test(r.border || ''), `page empty .${c}: 3rem, --fs-m, no dashed frame`);
 }

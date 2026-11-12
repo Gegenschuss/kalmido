@@ -600,7 +600,6 @@ ul.ofdpick .chkl{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75re
 .abo-cancel.soon{color:var(--danger,#c0392b);font-weight:500}
 .abo-per{display:flex;flex-direction:column;align-items:flex-end;flex:none;font-variant-numeric:tabular-nums}
 .abo-sw{flex:none;display:flex;align-items:center;gap:.375rem;min-width:0;padding:0 .5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);font-size:var(--fs-s)}
-.abo-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:.75rem;padding:3rem 1rem;color:var(--muted);font-size:var(--fs-m)}
 .abo-cand{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.375rem .625rem;border:1px dashed var(--line2);border-radius:var(--radius)}
 .abo-notice{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
 .abo-notice input[type=number]{width:5.5rem}
@@ -1145,7 +1144,6 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
    "Submit receipt" with the person's own receipts and their status */
 .ofcmbr{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem .625rem;margin:0 0 .75rem;font-size:var(--fs-s)}
 .ofcmbr>svg{flex:none}.ofcmbr>span{flex:1 1 16rem}
-.ofclocked .ofcmbr{justify-content:center;text-align:left;margin:0}
 .ofclockhint{display:flex;align-items:center;gap:.375rem;font-size:var(--fs-s);margin:0 0 .75rem}
 .ostp[disabled] :is(input,textarea,select){background:var(--bg2);color:var(--muted);border-style:dashed;cursor:not-allowed}
 .ofcnamesug{margin:-.25rem 0 .75rem}
@@ -1162,7 +1160,6 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .sbiz .ofcset>h3.sbizg:first-of-type{margin-top:.5rem}
 /* 2.414.0 A (#3502): the booking archive (office_bookarch.js) */
 .bka-h{margin:.75rem 0 .25rem}
-.bka-empty{margin:1rem 0}
 .bka-seg{margin:.5rem 0}
 .bka-filt{margin:.5rem 0}
 .bka-filt>summary{display:inline-flex;align-items:center;gap:.375rem;cursor:pointer;color:var(--muted)}

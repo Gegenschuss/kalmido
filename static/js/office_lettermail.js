@@ -53,7 +53,7 @@ async function ltmBlocksModal(pick) {
     $('.ltm-blocks', md).innerHTML = xs.length ? xs.map(b => `<li><div class="ofcrow ltm-row">
         <button type="button" class="ltm-pick ofcn" data-m="${pick ? 'ins' : 'edit'}" data-id="${b.id}"><b>${esc(b.name)}</b><small class="muted">${esc((b.body || '').slice(0, 120))}</small></button>
         ${pick ? `<button type="button" class="btn sm" data-m="edit" data-id="${b.id}" aria-label="${esc(tr('Edit'))}" title="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div></li>`).join('')
-      : `<li class="muted">${esc(q ? tr('Nothing found') : tr('No text blocks yet. Add a sample or write your own.'))}</li>`;
+      : `<li>${/*html-ok*/ q ? ofcNoHit('', 'row') : emptyState({title: tr('No text blocks yet. Add a sample or write your own.'), size: 'row'})}</li>`;  // 2.1076.0 (#5450)
   };
   const reload = async () => { try { blocks = (await api('GET', '/api/office/letter-blocks')).blocks || []; draw(); } catch (x) { /* the list stays */ } };
   draw();

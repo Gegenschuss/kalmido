@@ -26,8 +26,8 @@ async function dimp_supLoad() {
 }
 function dimp_supHtml() {
   const s = DIMP.sup;
-  if (!s) return `<p class="muted">${tr('Loading…')}</p>`;
-  if (s.error) return `<p class="muted">${esc(s.error)}</p>`;
+  if (!s) return `${loadingHtml('row')}`;
+  if (s.error) return errorState({sub: s.error, size: 'sec'});  // 2.1076.0 (#5450): the shared block (the settings window draws this part once: the reason, no button)
   if (!s.length) return `<p class="muted ofchint">${tr('No suppliers yet. They come with the creditors of a DATEV master data file.')}</p>`;
   return `<ul class="ofclist dimpsup" role="list">${s.map(x => `<li class="row" data-id="${x.id}"><label for="dimp-s-${x.id}" class="dimpacct">${esc(x.account_no)}</label>
     <span class="lacts"><input id="dimp-s-${x.id}" data-dimp-name="${x.id}" value="${esc(x.name)}" maxlength="80" aria-label="${esc(tr('Name of the supplier {0}', x.account_no))}">
@@ -81,7 +81,7 @@ async function dimp_check(input) {
   const f = input.files && input.files[0]; DIMP.file = f || null;
   if (ok) ok.disabled = true;
   if (!f || !pv) { if (pv) pv.innerHTML = ''; return; }
-  pv.innerHTML = `<p class="muted">${tr('Loading…')}</p>`;
+  pv.innerHTML = `${loadingHtml('row')}`;
   const fd = new FormData(); fd.append('file', f);
   let j;
   try { j = await api('POST', '/api/office/datev/import/check', fd); } catch (x) { pv.innerHTML = `<p class="aerr" role="alert">${esc(ofcErrHere(x))}</p>`; DIMP.file = null; return; }

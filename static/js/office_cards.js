@@ -15,14 +15,15 @@ async function ccLoad() {
   CC.loading = false;
   ofcDraw();
 }
-async function ccStmts() { try { CC.stmts = (await api('GET', `/api/office/cards/${CC.card}/statements`)).items || []; } catch (x) { CC.stmts = []; } ofcDraw(); }
-async function ccSheet() { try { CC.sheet = await api('GET', `/api/office/cards/statements/${CC.sid}`); } catch (x) { CC.sid = null; CC.sheet = null; f8d_viewDrop('ccs'); } ofcDraw(); }
+// 2.1076.0 (#5450): a failure is said where the list / the statement would be, with "Try again" (was: empty / back to the card)
+async function ccStmts() { try { CC.stmts = (await api('GET', `/api/office/cards/${CC.card}/statements`)).items || []; CC.stmtsErr = null; } catch (x) { CC.stmts = []; CC.stmtsErr = ofcErrHere(x); } ofcDraw(); }
+async function ccSheet() { try { CC.sheet = await api('GET', `/api/office/cards/statements/${CC.sid}`); CC.sheetErr = null; } catch (x) { CC.sheet = null; CC.sheetErr = ofcErrHere(x); } ofcDraw(); }
 // 2.963.0 (#5233): card and statement are views of the cards page without an address of their own: one step of Back each
 // (Back from the statement = its card, the next Back = the cards), their ‹ goes the same way (f8d_viewBack)
 function ccCardShow(id) { CC.card = id; CC.stmts = null; f8d_viewStep('ccc', ccCardClose); ofcDraw(); }
 function ccCardClose() { CC.card = null; f8d_viewDrop('ccc'); ofcDraw(); }
 function ccStmtShow(id) { CC.sid = id; CC.sheet = null; f8d_viewStep('ccs', ccStmtClose); ofcDraw(); }
-function ccStmtClose() { CC.sid = null; CC.sheet = null; CC.pick = null; CC.bank = null; CC.stmts = null; f8d_viewDrop('ccs'); ofcDraw(); }
+function ccStmtClose() { CC.sid = null; CC.sheet = null; CC.sheetErr = null; CC.pick = null; CC.bank = null; CC.stmts = null; f8d_viewDrop('ccs'); ofcDraw(); }
 // a write changes the receipts' payment days too: the bookkeeping's loaded figures go
 const ccStale = () => { CC.sheet = null; CC.stmts = null; CC.data = null; CC.pick = null; CC.cand = null; CC.bank = null; if (typeof bfbBooksStale === 'function') bfbBooksStale(); ofcDraw(); };
 // 2.979.0 (#5667): an undo / redo the server did: the card statements and the reminder setting come again
@@ -32,14 +33,14 @@ const ccMon = m => typeof bnr_mon === 'function' ? bnr_mon(m) : m;
 
 function ccHtml() {
   if (CC.oid !== OFC.info?.org_id) { Object.assign(CC, {oid: OFC.info?.org_id, data: null, err: null, card: null, stmts: null, sid: null, sheet: null, rem: null}); f8d_viewDrop('ccc'); f8d_viewDrop('ccs'); }
-  if (CC.err) return `<div class="empty">${esc(CC.err)}</div>`;
-  if (!CC.data) { setTimeout(ccLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (CC.err) return ofcFail(CC.err, () => { CC.err = null; CC.data = null; });  // 2.1076.0 (#5450)
+  if (!CC.data) { setTimeout(ccLoad, 0); return loadingHtml('big'); }
   if (CC.sid) return ccSheetHtml();
   if (CC.card) return ccCardHtml();
   const d = CC.data, items = d.items || [];
   const rows = items.length ? `<ul class="bnklist" role="list">${items.map(k => `<li class="bnkrow"><button type="button" class="ccopen" data-cc="card" data-id="${k.id}"><span class="bnkn"><b>${esc(k.holder || ccName(k))}</b><small class="muted">${esc([ccName(k), k.account && cfb_acct(k.account)].filter(Boolean).join(' · '))}</small></span>
     ${k.open ? `<span class="rotag">${esc(trn('{0} receipt missing', '{0} receipts missing', k.open))}</span>` : ''}${ic('right', 's')}</button></li>`).join('')}</ul>`
-    : `<div class="empty">${ic('card')}<span>${d.manage ? tr('No cards yet. Add a card, then upload its monthly statement as a PDF.') : tr('No card of yours here yet.')}</span></div>`;
+    : emptyState({icon: 'card', title: d.manage ? tr('No cards yet. Add a card, then upload its monthly statement as a PDF.') : tr('No card of yours here yet.')});  // 2.1076.0 (#5450)
   return `<div class="ofcbar">${d.manage && ofcCan('cards', 'edit') ? `<button class="btn pri" data-cc="add">${ic('plus', 's')}<span>${tr('Add card')}</span></button>` : ''}</div>${rows}
     <p class="muted ofchint">${tr('Only the total leaves the business account. Upload the statement and every position gets its receipt.')}</p>`;
 }
@@ -51,10 +52,10 @@ function ccReadHint() {
 function ccCardHtml() {
   const k = (CC.data.items || []).find(x => x.id === CC.card);
   if (!k) { CC.card = null; f8d_viewDrop('ccc'); return ccHtml(); }
-  if (CC.stmts === null) { setTimeout(ccStmts, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
-  const rows = CC.stmts.length ? `<ul class="bnklist" role="list">${CC.stmts.map(s => `<li class="bnkrow"><button type="button" class="ccopen" data-cc="stmt" data-id="${s.id}"><span class="bnkn"><b>${esc(ccMon(s.month))}</b><small class="muted">${esc(s.state === 'draft' ? tr('Waiting for confirmation') : s.open ? trn('{0} receipt missing', '{0} receipts missing', s.open) : tr('Every position has its receipt.'))}</small></span>
+  if (CC.stmts === null) { setTimeout(ccStmts, 0); return loadingHtml('big'); }
+  const rows = CC.stmtsErr ? ofcFail(CC.stmtsErr, () => { CC.stmtsErr = null; CC.stmts = null; }, 'sec') : CC.stmts.length ? /* 2.1076.0 (#5450) */ `<ul class="bnklist" role="list">${CC.stmts.map(s => `<li class="bnkrow"><button type="button" class="ccopen" data-cc="stmt" data-id="${s.id}"><span class="bnkn"><b>${esc(ccMon(s.month))}</b><small class="muted">${esc(s.state === 'draft' ? tr('Waiting for confirmation') : s.open ? trn('{0} receipt missing', '{0} receipts missing', s.open) : tr('Every position has its receipt.'))}</small></span>
     <span class="bnkamt">${ofcMoney(s.total)}</span>${ic('right', 's')}</button></li>`).join('')}</ul>`
-    : `<div class="empty">${ic('file')}<span>${tr('No statement yet. Upload the PDF of a month.')}</span></div>`;
+    : emptyState({icon: 'file', title: tr('No statement yet. Upload the PDF of a month.'), size: 'sec'});
   const edit = CC.data.manage && ofcCan('cards', 'edit');
   return `<div class="ofcbar"><button class="btn ghost" data-cc="back">${ic('back', 's')}<span>${tr('Back')}</span></button>
     <label class="btn pri">${ic('upload', 's')}<span>${tr('Upload statement')}</span><input type="file" data-cc-up="${k.id}" accept="application/pdf,.pdf" hidden></label><span class="spacer"></span>
@@ -63,7 +64,8 @@ function ccCardHtml() {
     <p class="muted ofchint" data-cc-hint="1">${esc(ccReadHint())}</p>`;
 }
 function ccSheetHtml() {
-  if (!CC.sheet) { setTimeout(ccSheet, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (CC.sheetErr) return `<div class="ofcbar"><button class="btn ghost" data-cc="tocard">${ic('back', 's')}<span>${tr('Back')}</span></button></div>` + ofcFail(CC.sheetErr, () => { CC.sheetErr = null; });  // 2.1076.0 (#5450)
+  if (!CC.sheet) { setTimeout(ccSheet, 0); return loadingHtml('big'); }
   const s = CC.sheet.statement, ls = CC.sheet.lines || [], draft = s.state === 'draft', lock = s.locked;
   const diff = +s.diff !== 0, priv = +s.private !== 0;
   const facts = `<dl class="ccfacts"><div><dt>${tr('Total of the statement')}</dt><dd>${s.total_missing ? esc(tr('Not found')) : ofcMoney(s.total)}${draft && !lock ? ` <button class="btn sm ghost" data-cc="total">${tr('Edit')}</button>` : ''}</dd></div>
@@ -101,12 +103,12 @@ function ccLine(x, s) {
 }
 function ccPickHtml(x) {
   const c = CC.cand;
-  const rows = !c ? `<p class="muted">${tr('Loading…')}</p>` : !c.length ? `<p class="muted">${tr('Nothing found')}</p>`
+  const rows = CC.candErr ? ofcFail(CC.candErr, () => { CC.candErr = null; CC.cand = null; ccCand(x.id); }, 'row') : !c ? loadingHtml('row') : !c.length ? ofcNoHit('', 'row')  // 2.1076.0 (#5450)
     : ocd_row(c.map(d => ocd_card(d, {btn: `data-cc="match" data-id="${x.id}" data-node="${d.id}"`})).join(''), 'ocdgrid');  // 2.778.0 (#5383): cards, not a text list
   return `<div class="bnkother"><input type="search" data-cc-q="${x.id}" value="${esc(CC.q)}" placeholder="${esc(tr('Search all receipts'))}" aria-label="${esc(tr('Search all receipts'))}">${rows}</div>`;
 }
 async function ccCand(lid) {
-  try { const j = await api('GET', `/api/office/cards/lines/${lid}/candidates?q=${encodeURIComponent(CC.q)}`); if (CC.pick === lid) CC.cand = j.items || []; } catch (x) { CC.cand = []; }
+  try { const j = await api('GET', `/api/office/cards/lines/${lid}/candidates?q=${encodeURIComponent(CC.q)}`); if (CC.pick === lid) { CC.cand = j.items || []; CC.candErr = null; } } catch (x) { CC.cand = []; CC.candErr = ofcErrHere(x); }
   if (CC.pick === lid) ofcDraw();
 }
 

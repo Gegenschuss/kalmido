@@ -115,7 +115,7 @@ function swRun(src, {failLazy = false} = {}) {
   check(!lazyTags().includes('settings') && !lazyTags().includes('office'), 'cold start #contacts: only contacts loaded');
   w.close();
   w = await boot({user: 'alice', lazy: true, hash: 'office'}); d = w.document; await ready(w);
-  await until(() => w.eval('typeof OFC') === 'object' && !/^\s*Loading…\s*$/.test(d.querySelector('#view .lempty')?.textContent || ''), 80);
+  await until(() => w.eval('typeof OFC') === 'object' && !/^\s*Loading…\s*$/.test(d.querySelector('#view .lempty, #view .eload')?.textContent || ''), 80);  // 2.1076.0 (#5450): + the shared loading block
   // 2.628.0 (#4984): the files of the module office (LD_MODS.office), not every LAZY file named office*: office_fints.js
   // (2.616.0, #2473) is its own module fints, loaded only by "Fetch from bank" - counting it made this red everywhere
   const ofMods = JSON.parse(w.eval('JSON.stringify(LD_MODS.office)'));

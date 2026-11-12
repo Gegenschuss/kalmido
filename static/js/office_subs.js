@@ -27,15 +27,16 @@ function aboSeatsShort(f) {
 
 function aboHtml() {
   if (ABO.oid !== OFC.info?.org_id) Object.assign(ABO, {oid: OFC.info?.org_id, data: null, err: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
-  if (ABO.err) return `<div class="empty">${esc(ABO.err)}</div>`;
-  if (!ABO.data) { setTimeout(aboLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (!ofcAdmin()) return ofcAdmOnly();  // 2.1076.0 (#5450)
+  if (ABO.err) return ofcFail(ABO.err, () => { ABO.err = null; ABO.data = null; });
+  if (!ABO.data) { setTimeout(aboLoad, 0); return loadingHtml('big'); }
   const d = ABO.data, t = d.totals, net = aboNet();
   const bar = `<div class="ofcbar abo-bar"><h3 class="ofcgrp">${tr('Subscriptions|office')}</h3><span class="spacer"></span>
     <div class="seg fcibasis" role="group" aria-label="${esc(tr('Amounts'))}">${[['net', tr('Net')], ['gross', tr('Gross')]].map(([k, n]) => `<button type="button" data-abo="basis" data-v="${k}" class="${ABO.basis === k ? 'on' : ''}" aria-pressed="${ABO.basis === k}">${esc(n)}</button>`).join('')}</div>
     ${d.items.length ? `<a class="btn sm ghost" href="/api/office/subs.csv" download>${ic('download', 's')}<span>CSV</span></a>` : ''}
     <button class="btn sm pri" data-abo="new">${ic('plus', 's')}<span>${tr('Subscription')}</span></button></div>`;
-  if (!d.items.length) return bar + `<div class="abo-empty"><p class="muted">${tr('No subscriptions yet. Mark fixed costs as a subscription to see their monthly and yearly cost.')}</p><button class="btn pri" data-abo="new">${ic('plus', 's')}<span>${tr('Add a subscription')}</span></button>${oim_link('fixed', true)}</div>` + aboCandHtml(d);  // 2.122.3 A (#2335): + the import link
+  if (!d.items.length) return bar + emptyState({icon: 'wallet', title: tr('No subscriptions yet. Mark fixed costs as a subscription to see their monthly and yearly cost.'), cls: 'abo-empty',  // 2.1076.0 (#5450)
+    action: `<div class="eacts"><button class="btn pri" data-abo="new">${ic('plus', 's')}<span>${tr('Add a subscription')}</span></button></div>${oim_link('fixed', true)}`}) + aboCandHtml(d);  // 2.122.3 A (#2335): + the import link
   const head = `<div class="abo-sums"><div class="abo-sum"><span class="muted">${tr('per month')}</span><b>${ofcMoney(net ? t.per_month_net : t.per_month)}</b></div><div class="abo-sum"><span class="muted">${tr('per year')}</span><b>${ofcMoney(net ? t.per_year_net : t.per_year)}</b></div></div>
     ${t.low_use_count ? `<button type="button" class="abo-low ${ABO.low ? 'on' : ''}" data-abo="lowf" aria-pressed="${ABO.low}">${ic('bulb', 's')}<span>${esc(trn('Hardly used: {0} subscription, {1} a year', 'Hardly used: {0} subscriptions, {1} a year', t.low_use_count, ofcMoney(net ? t.low_use_per_year_net : t.low_use_per_year)))}</span>${ABO.low ? `<small class="muted">${tr('show all')}</small>` : ''}</button>` : ''}
     <div class="muted ofchint">${net ? tr('Net, without VAT.') : tr('Gross, incl. VAT.')}<div class="shint">${tr('Quarterly and yearly amounts are spread over the months; one-off costs are not counted.')}</div></div>`;  // 2.298.0 A2 (#3186): the spreading rule behind (i)

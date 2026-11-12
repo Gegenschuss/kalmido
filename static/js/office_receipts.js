@@ -68,8 +68,16 @@ function rclHtml(own, pre) {  // 2.276.0 A (#3039): own = the page Office > Rece
     + rclToolsHtml(own) + (pre || '') + `
     <h3 class="ofcgrp" id="rcl-h">${tr('All receipts')}</h3>`;
   if (RCL.key !== rclQuery() && !RCL.loading) setTimeout(() => rclLoad(false), 0);
-  if (RCL.err) return back + rclFiltersHtml() + `<div class="empty">${esc(RCL.err)}</div>`;
-  if (!RCL.data) return back + rclFiltersHtml() + `<p class="muted lempty">${tr('Loading…')}</p>`;
+  // 2.1076.0 (#5450): failed = the reason + "Try again" (no filter block: nothing to filter); still loading = the shared block
+  if (RCL.err) return back + ofcFail(RCL.err, () => { RCL.err = null; RCL.key = ''; }, 'sec');
+  if (!RCL.data) return back + loadingHtml('big');
+  if (RCL.data.total?.count && OFC.info?.used) OFC.info.used.receipt = true;  // (an upload since the office was read)
+  // an office without a single receipt: a real empty state with the way to the first one, no filters for 0 receipts
+  if (!RCL.data.total?.count && OFC.info?.used && !OFC.info.used.receipt) {
+    RCL.sel = null;
+    return back + emptyState({icon: 'receipt', title: tr('No receipts yet.'), cls: 'rcl-empty rcl-none',
+      action: `<div class="eacts"><button type="button" class="btn pri" data-rcl="upfirst">${ic('upload', 's')}<span>${tr('Upload receipt')}</span></button></div>`});
+  }
   return back + rclFiltersHtml() + rclListHtml();
 }
 // 2.892.0 (#5453): the kinds of receipts with pages of their own (entertainment, travel expenses) on Office > Receipts
@@ -97,10 +105,11 @@ function rclMenu(b) {
     zip ? {label: tr('ZIP for the tax adviser'), icon: 'download', fn: () => zip.click()} : null], null, null, tr('All receipts'));
 }
 
+function rclFiltersN() { const f = RCL.f; return ['category', 'supplier', 'project', 'q'].filter(k => f[k]).length + (f.novat ? 1 : 0) + (f.hints ? 1 : 0) + (f.status !== 'all' ? 1 : 0) + (f.checked && f.checked !== 'all' ? 1 : 0); }
 function rclFiltersHtml() {
   const f = RCL.f, d = RCL.data || {}, all = tr('All');
   const opt = (list, cur, name) => { const o = list.map(x => [String(x.id ?? x), x.name ?? x]); if (cur && !o.some(([v]) => v === String(cur))) o.push([String(cur), name ?? String(cur)]); return o; };
-  const n = ['category', 'supplier', 'project', 'q'].filter(k => f[k]).length + (f.novat ? 1 : 0) + (f.hints ? 1 : 0) + (f.status !== 'all' ? 1 : 0) + (f.checked && f.checked !== 'all' ? 1 : 0);
+  const n = rclFiltersN();
   const seg = (k, opts) => `<div class="seg" role="group" aria-label="${esc(tr(k === 'status' ? 'Status' : k === 'checked' ? 'Checked' : 'Date by'))}">${opts.map(([v, t]) => `<button type="button" data-rcl="${k}" data-v="${v}" class="${f[k] === v ? 'on' : ''}" aria-pressed="${f[k] === v}">${esc(t)}</button>`).join('')}</div>`;
   return `<details class="rcl-filters" ${RCL.open ? 'open' : ''}><summary>${ic('filter', 's')}<span>${tr('Filters')}</span>${n ? `<span class="rotag">${n}</span>` : ''}</summary>
     <div class="rcl-grid">
@@ -196,7 +205,7 @@ async function rclCheckSel(on) {
 function rclListHtml() {
   const d = RCL.data, t = d.total;  // 2.892.0 (#5453): CSV / ZIP and "Select" moved into the tool row (rclToolsHtml)
   if (!t.count) RCL.sel = null;
-  if (!t.count) return `<p class="muted lempty rcl-empty">${tr('No receipts match these filters.')}</p>${bkNote()}`;
+  if (!t.count) return ofcNoHit(rclFiltersN() ? `<button type="button" class="btn sm" data-rcl="reset">${tr('Reset filters')}</button>` : '', 'sec', 'rcl-empty') + bkNote();  // 2.1076.0 (#5450): the one "nothing matches"
   // the mark "Not paid" only where payments are recorded at all (bank reconciliation) and the list mixes both
   RCL.paidMark = RCL.f.status === 'all' && RCL.rows.some(r => r.paid_at);
   return `<ul class="ofclist rcl-list${RCL.sel ? ' rcl-choosing' : ''}" role="list" aria-labelledby="rcl-h">${RCL.rows.map(rclRow).join('')}</ul>
@@ -239,6 +248,7 @@ document.addEventListener('click', e => {
   const k = b.dataset.rcl;
   if (k === 'rc') { rcl_open(+b.dataset.id); return; }  // 2.557.0 A (#4553): beside the list on a wide area
   if (k === 'more') { b.disabled = true; rclLoad(true); return; }
+  if (k === 'upfirst') { const u = $('.rcl-tools .bk-shot') || $('#bk-files'); if (u) u.click(); else go('office/receipts'); return; }  // 2.1076.0 (#5450): the empty office's way to the first receipt
   if (k === 'reset') { const d = rclDefault(); rclSet({category: '', supplier: '', project: '', novat: false, hints: false, q: '', status: d.status, checked: d.checked}); return; }
   // 2.420.0 C (#3448): the multiple choice
   if (k === 'sel') { RCL.sel = new Set(); ofcDraw(); return; }
@@ -266,14 +276,15 @@ function rcp_tabHtml() {
 const RCN = {key: '', rows: null, loading: false};
 async function rcn_load(key) {
   RCN.loading = true;
-  try { const j = await api('GET', '/api/docs?ws=all&area=office&unbooked=1&facets=0&limit=50'); if (RCN.key === key) RCN.rows = j.docs || []; }
-  catch { if (RCN.key === key) RCN.rows = []; }
+  try { const j = await api('GET', '/api/docs?ws=all&area=office&unbooked=1&facets=0&limit=50'); if (RCN.key === key) { RCN.rows = j.docs || []; RCN.err = null; } }
+  catch (x) { if (RCN.key === key) { RCN.rows = []; RCN.err = ofcErrHere(x); } }  // 2.1076.0 (#5450): a failure is said, not hidden
   RCN.loading = false; ofcDraw();
 }
 function rcn_html() {
   const key = String(OFC.info?.org_id || '');
   if (RCN.key !== key) Object.assign(RCN, {key, rows: null});
   if (RCN.rows === null) { if (!RCN.loading) setTimeout(() => rcn_load(key), 0); return ''; }
+  if (RCN.err) return `<section class="rcn"><h3 class="ofcgrp">${tr('New in the office')}</h3>${/*html-ok*/ ofcFail(RCN.err, () => { RCN.err = null; RCN.rows = null; }, 'row')}</section>`;
   if (!RCN.rows.length) return '';
   return `<section class="rcn" aria-labelledby="rcn-h"><h3 class="ofcgrp" id="rcn-h">${tr('New in the office')}</h3>
     <ul class="ofclist rcn-list" role="list">${RCN.rows.map(d => `<li class="ofcrow rcn-row"><a href="#docs/${d.id}" class="ofcn"><b>${esc(d.sender?.name || d.name)}</b><small class="muted">${esc([d.date ? fmtDateLoc(d.date) : '', d.amount ? curMoney(d.amount, d.currency) : ''].filter(Boolean).join(' · '))}</small></a></li>`).join('')}</ul></section>`;
@@ -368,8 +379,8 @@ function rsb_tabHtml() {
   if (RSB.oid !== OFC.info?.org_id) Object.assign(RSB, {oid: OFC.info?.org_id, rows: null, err: null});
   if (RSB.rows === null && !RSB.loading) setTimeout(rsb_load, 0);
   const st = r => `<span class="rotag rsb-st rsb-${esc(r.status)}">${esc(tr(RSB_STATE[r.status] || r.status))}</span>`;
-  const list = RSB.err ? `<div class="empty">${esc(RSB.err)}</div>` : RSB.rows === null ? `<p class="muted lempty">${tr('Loading…')}</p>`
-    : !RSB.rows.length ? `<p class="muted lempty rsb-empty">${tr('You have not handed in a receipt yet.')}</p>`
+  const list = RSB.err ? ofcFail(RSB.err, () => { RSB.err = null; RSB.rows = null; }, 'sec') : RSB.rows === null ? loadingHtml('sec')  // 2.1076.0 (#5450)
+    : !RSB.rows.length ? emptyState({icon: 'receipt', title: tr('You have not handed in a receipt yet.'), size: 'sec', cls: 'rsb-empty'})
     : `<ul class="ofclist rsb-list" role="list" aria-labelledby="rsb-mine">${RSB.rows.map(r => `<li class="ofcrow rsb-row"><span class="ofcn"><b>${esc(r.name || tr('Receipt'))}</b><small class="muted">${esc(fmtDateLoc(String(r.submitted_at || '').slice(0, 10)))}</small></span>${st(r)}</li>`).join('')}</ul>`;
   return `<div class="rsb"><h3 class="ofcgrp">${tr('Submit receipt')}</h3>
     <p class="muted rsb-hint">${tr('Photograph a receipt or upload the file: it goes to the bookkeeping. You only see your own receipts here.')}</p>

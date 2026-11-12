@@ -28,7 +28,7 @@ function ltkHtml() {
   const links = x.links.length ? `<ul class="ltk-list">${x.links.map(l => `<li><span class="ltk-k">${esc(tr(LTK_KIND[l.kind] || l.kind))}</span>
       <a href="${esc(l.href)}">${esc(l.title)}</a><span class="muted">${esc([l.sender, ltkDay(l.date)].filter(Boolean).join(' · '))}</span>
       <button type="button" class="iconbtn ltk-x" data-ltk="unlink:${l.node_id}:${l.kind}" aria-label="${esc(tr('Unlink'))}" title="${esc(tr('Unlink'))}">${ic('x', 's')}</button></li>`).join('')}</ul>`
-    : `<p class="muted ltk-none">${tr('No document linked yet.')}</p>`;
+    : emptyState({title: tr('No document linked yet.'), size: 'row', cls: 'ltk-none'});  // 2.1076.0 (#5450)
   const refBtn = !sent && x.ref_line && x.ref_line !== (d.ref_line || '') ? `<button type="button" class="btn sm" data-ltk="refline">${tr('Reference line from the reference')}</button>` : '';
   const acts = `<div class="ltk-acts"><button type="button" class="btn sm" data-ltk="pick:answers">${ic('link', 's')} ${tr('Select a reference')}</button>
     ${sent ? `<button type="button" class="btn sm" data-ltk="pick:reply">${ic('inbox', 's')} ${tr('Assign an answer')}</button>` : ''}${refBtn}</div>`;

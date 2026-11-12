@@ -38,7 +38,15 @@ function ofcCan(area, level = 'view', special = '') {
 // (GET /api/office/settings submit) -- the way to "Submit receipt"; on a locked page instead of the dead end
 const ofcNoBooks = () => !!OFC.info && !OFC.info.personal && !(ofr_grp() ? ofr_lvOf('books') !== 'none' : ['admin', 'accounting'].includes(OFC.info.role));
 const ofcMemberHint = () => !ofcNoBooks() ? '' : `<p class="muted ofcmbr">${ic('lock', 's')}<span>${OFC.info.submit ? tr('Bookkeeping, cash book and receipts are only seen by admins and the bookkeeping. You hand in receipts with “Submit receipt”.') : tr('Bookkeeping, cash book and receipts are only seen by admins and the bookkeeping.')}</span>${OFC.info.submit ? `<a class="btn sm" href="#office/receipts" data-ofc-submit>${ic('upload', 's')}<span>${tr('Submit receipt')}</span></a>` : ''}</p>`;
-const ofcLockedHtml = () => ofcNoBooks() ? `<div class="empty ofclocked">${ofcMemberHint()}</div>` : `<div class="empty">${tr('Only for admins of the office.')}</div>`;
+// 2.1076.0 (#5450): empty / loading / failed / no access of the office all come from the one block of render.js (#5440):
+// ofcAdmOnly = the one "no access" form (was three: ofcLockedHtml, "Only for admins" as plain text, lock + text);
+// ofcFail = a part that could not load says why and offers "Try again" (reset clears the part's error / data, the redraw
+// loads it again) instead of looking empty; ofcNoHit = the one "nothing matches" of the office (was eight wordings)
+const ofcAdmOnly = (size = 'big') => noAccessState({sub: tr('Only for admins of the office.'), size});
+const ofcFail = (sub, reset, size = 'big') => errorState({sub: sub || undefined, size, retry: reset ? () => { reset(); ofcDraw(); } : undefined});
+const ofcNoHit = (action = '', size = 'big', cls = '') => emptyState({icon: 'search', title: tr('Nothing matches.'), size, cls, action: action ? `<div class="eacts">${/*html-ok*/ action}</div>` : ''});
+const ofcSubmitBtn = () => OFC.info?.submit ? `<a class="btn sm" href="#office/receipts" data-ofc-submit>${ic('upload', 's')}<span>${tr('Submit receipt')}</span></a>` : '';
+const ofcLockedHtml = () => ofcNoBooks() ? noAccessState({sub: OFC.info.submit ? tr('Bookkeeping, cash book and receipts are only seen by admins and the bookkeeping. You hand in receipts with “Submit receipt”.') : tr('Bookkeeping, cash book and receipts are only seen by admins and the bookkeeping.'), action: ofcSubmitBtn() && `<div class="eacts">${/*html-ok*/ ofcSubmitBtn()}</div>`, cls: 'ofclocked'}) : ofcAdmOnly();
 // 2.147.0 (#2459, #2460): a function of the country pack is on (office_packs.js OCF_FEATS); unknown before the office is
 // loaded = on (as before). The server checks the same on every route
 const ofcFeat = k => !OFC.info?.features || OFC.info.features[k] !== false;
@@ -136,8 +144,9 @@ const OFCP = {key: null, t: 0, stale: false, replay: null};
 function ofcPaint(el, force) {
   const key = [OFC.info?.org_id ?? '-', S.route.tab || '', S.route.id || ''].join('|');
   const html = mg_wrap('office', viewOffice()), same = OFCP.key === key && !!el.querySelector('.dash.office .ofcbody');
-  const wait = `<p class="muted lempty">${tr('Loading…')}</p>`;
-  if (!force && same && html.includes(wait) && ![...el.querySelectorAll('.dash.office .ofcbody p.lempty')].some(p => p.textContent === tr('Loading…'))) {
+  // 2.1076.0 (#5450): "still loading" = the shared loading block of a whole page (render.js loadingHtml('big'): eload es-big);
+  // a part that loads inside a ready page (size sec / row) shows its own place and does not hold the old page
+  if (!force && same && html.includes('eload es-big') && !el.querySelector('.dash.office .ofcbody .eload.es-big')) {
     if (!OFCP.t) OFCP.t = setTimeout(() => { OFCP.t = 0; if (S.route.mod === 'office') { const v = $('#view'); if (v) keepFocus(v, () => ofcPaint(v, true)); } }, 4000);
     OFCP.stale = true; return;
   }
@@ -179,7 +188,7 @@ function ofc_setJump() {
     settingsModal('biz');
   }, 0);
 }
-const ofc_setBody = () => S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : `<p class="muted lempty">${tr('Loading…')}</p>`;
+const ofc_setBody = () => S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : loadingHtml('big');
 // 2.470.0 (#3596): the pages behind Settings (services, text blocks, rights) lead back there; was the tab row General | Templates
 // 2.855.0 (#5456): the button names where it leads (Settings › Company & office [› Texts & templates]), not just "Settings"
 const ofr_backHtml = tab => ofr_grp() && ofr_lvOf('settings') === 'none' ? '' : `<div class="ofcbar"><button type="button" class="btn sm" data-setgo="${tab === 'settings' ? 'biz' : 'biz-tpl'}">${ic('back', 's')} ${esc(tab === 'settings' ? tr('Settings › Company & office') : tr('Settings › Company & office › {0}', tr('Texts & templates')))}</button></div>`;
@@ -195,11 +204,11 @@ function viewOffice() {
   if (OFC.info) ofm_admSeen(OFC.info.role === 'admin', OFC.info.rights, OFC.info.used, OFC.info.settings?.menu_off);  // 2.276.0 A (#3039): + used; 2.440.0 (#3609): + the points switched off
   if (OFC.info && !OFC.infoErr && S.route.tab === 'settings' && tab === 'settings') ofc_setJump();
   let body;
-  if (OFC.infoErr) body = `<div class="empty nempty eact">${ic('building')}<span>${esc(OFC.infoErr)}</span><a class="btn" href="#settings">${tr('Settings')}</a></div>`;
-  else if (!OFC.info) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
+  if (OFC.infoErr) body = errorState({sub: OFC.infoErr, retry: () => { OFC.infoErr = null; ofcDraw(); }});  // 2.1076.0 (#5450): the reason + "Try again" (viewOffice loads the info again)
+  else if (!OFC.info) body = loadingHtml('big');
   else if (tab === 'start') body = (pb_hintHtml() || '') + ofcMemberHint() + ofm_startHtml();  // 2.87.9 (#1917); 2.356.0 D (#3006): + the members' line
   else if (tab === 'settings' && (S.route.tab === 'rights' || (ofr_grp() && ofr_lvOf('settings') === 'none')) && typeof orr_html === 'function') body = orr_html();  // 2.187.0 A (#2476): the page "Rights" (a person without the settings: only "My rights")
-  else if (ofr_grp() && ofr_area(tab) && ofr_lvOf(ofr_area(tab)) === 'none' && !(tab === 'receipts' && OFC.info.submit)) body = `<div class="empty">${ic('lock')}<span>${tr('Your office rights do not include this area')}</span>${ofcMemberHint()}</div>`;  // 2.356.0 D (#3006): + the way to hand in receipts  // 2.187.0 A (#2476): a direct link to a hidden area
+  else if (ofr_grp() && ofr_area(tab) && ofr_lvOf(ofr_area(tab)) === 'none' && !(tab === 'receipts' && OFC.info.submit)) body = noAccessState({sub: tr('Your office rights do not include this area'), action: ofcSubmitBtn() && `<div class="eacts">${/*html-ok*/ ofcSubmitBtn()}</div>`, cls: 'ofclocked'});  // 2.1076.0 (#5450): the one form  // 2.356.0 D (#3006): + the way to hand in receipts  // 2.187.0 A (#2476): a direct link to a hidden area
   else if (pb_hintHtml()) body = pb_hintHtml() + (ofcDocTab(tab) ? '<div class="pboffers"></div>' : tab === 'settings' ? ofc_setBody() : typeof OFC_TABS.find(t => t[0] === tab)?.[4] === 'function' ? OFC_TABS.find(t => t[0] === tab)[4]() : ofcListHtml(tab));  // 2.47.3 (#1360); 2.92.0 A (#1925): tabs of their own module here too
   else if (ofcDocTab(tab) && ofcMemberHint()) body = ofcMemberHint() + '<div class="pboffers"></div>';  // 2.356.0 D (#3006): the desktop start of members
   else if (ofcDocTab(tab)) body = typeof ofdOffersTab === 'function' ? '' : `<div class="empty">${ic('receipt')}<span>${tr('Quotations arrive with the next step of this module.')}</span></div>`;
@@ -252,8 +261,8 @@ function ofcListHtml(kind) {
   if (kind === 'equipment' && !OFC.data.sets && !OFC.loading.sets) setTimeout(() => ofcLoad('sets'), 0);
   if (kind === 'contracts' && !OFC.data.texts && !OFC.loading.texts) setTimeout(() => ofcLoad('texts'), 0);
   const d = OFC.data[kind];
-  if (!d) return `<p class="muted lempty">${tr('Loading…')}</p>`;
-  if (d.error) return `<div class="empty">${esc(d.error)}</div>`;
+  if (!d) return loadingHtml('big');
+  if (d.error) return ofcFail(d.error, () => { delete OFC.data[kind]; });  // 2.1076.0 (#5450)
   const adm = ofcAdmin();
   const bar = `<div class="ofcbar"><div class="ctsearch">${ic('search', 's')}<input id="ofc-q" type="search" value="${esc(OFC.q)}" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" autocomplete="off" enterkeyhint="search"></div>
     <label class="chkl"><input type="checkbox" id="ofc-arch" ${OFC.arch ? 'checked' : ''}> ${tr('Archived')}</label><span class="spacer"></span>
@@ -274,10 +283,10 @@ function ofcListBody(kind) {
     list = ofcGrouped(rows, r => r.category || tr('No category'), r => ofcRowBtn('equipment', r, r.name, [r.name_en, r.daily_rate != null ? `${ofcMoney(r.daily_rate)}/${tr('Day|unit')}` : '', ...(typeof astRowInfo === 'function' ? astRowInfo(r) : [])].filter(Boolean).join(' · ')));  // 2.45.1 (#1556): + English name; 2.92.0 B (#1931): + value
     list = (typeof astSummaryHtml === 'function' ? astSummaryHtml(d) : '') + list;  // 2.92.0 B (#1931): sums + insurance list export (admins); 2.92.3: office_assets.js may still be loading (a redraw follows)
     const sets = ofcRows('sets').filter(r => hit(r) && (OFC.arch || !r.archived));
-    list += `<h3 class="ofcgrp">${tr('Sets')}</h3>` + (sets.length ? `<ul class="ofclist" role="list">${sets.map(r => ofcRowBtn('sets', r, r.name, [trn('{0} device', '{0} devices', (r.items || []).length), r.discount_pct ? tr('{0} % discount', fmtNum(r.discount_pct, 1)) : ''].filter(Boolean).join(' · '))).join('')}</ul>` : `<p class="muted lempty">${tr('No sets yet. A set bundles devices with one discount.')}</p>`);
+    list += `<h3 class="ofcgrp">${tr('Sets')}</h3>` + (sets.length ? `<ul class="ofclist" role="list">${sets.map(r => ofcRowBtn('sets', r, r.name, [trn('{0} device', '{0} devices', (r.items || []).length), r.discount_pct ? tr('{0} % discount', fmtNum(r.discount_pct, 1)) : ''].filter(Boolean).join(' · '))).join('')}</ul>` : `${emptyState({title: tr('No sets yet. A set bundles devices with one discount.'), size: 'row'})}`);  // 2.1076.0 (#5450)
   } else if (kind === 'texts') list = ofcGrouped(rows, r => tr(OFC_TEXT_KINDS.find(k => k[0] === r.kind)?.[1] || r.kind), r => ofcRowBtn('texts', r, r.key ? (uiLang().slice(0, 2) === 'de' ? r.text_de || r.text_en : r.text_en || r.text_de) || r.key : (r.text_de || r.text_en).slice(0, 60), (r.text_de && !r.text_en && r.kind !== 'letter' ? tr('no English text stored') + ' · ' : '') + (r.key ? r.key : (r.text_en || '').slice(0, 80)))  /* 2.223.0 B (#2822): a keyed block shows its text as the title, the key small and grey below */, OFC_TEXT_KINDS.map(k => tr(k[1])));
   else list = rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn('contracts', r, r.name, [r.date ? fmtDateLoc(r.date) : '', r.raw_included ? tr('raw data included') : '', r.client_id && cdn_label((S.clients || []).find(c => c.id === r.client_id))].filter(Boolean).join(' · '), typeof dmaClip === 'function' ? dmaClip(r.files) : '')).join('')}</ul>` : '';
-  if (!rows.length && !list) list = `<div class="empty nempty eact">${ic(kind === 'texts' ? 'note' : 'list')}<span>${q ? tr('Nothing matches.') : kind === 'services' ? tr('No services yet.') : kind === 'equipment' ? tr('No equipment yet.') : tr('Nothing here yet.')}</span></div>`;
+  if (!rows.length && !list) list = q ? ofcNoHit() : emptyState({icon: kind === 'texts' ? 'note' : 'list', title: kind === 'services' ? tr('No services yet.') : kind === 'equipment' ? tr('No equipment yet.') : tr('Nothing here yet.')});  // 2.1076.0 (#5450)
   if (!q && (kind === 'services' || kind === 'equipment')) list += oim_link('master', !rows.length);  // 2.122.3 A (#2335)
   return list + (kind === 'services' ? sr_roleSections(hit) : '');  // 2.47.0 (#1649)
 }
@@ -289,7 +298,7 @@ function sr_roleSections(hit) {
   const sec = (k, title, hint, sub) => {
     const rows = ofcRows(k).filter(r => hit(r) && (OFC.arch || !r.archived));
     return `<h3 class="ofcgrp srhead">${esc(title)}<span class="c muted">${rows.length}</span>${adm ? `<button type="button" class="btn sm ghost" data-ofc="new" data-kind="${k}">${ic('plus', 's')}<span>${tr('Add')}</span></button>` : ''}</h3><p class="shint">${esc(hint)}</p>`
-      + (rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn(k, r, r.name_de, sub(r))).join('')}</ul>` : `<p class="muted lempty">${tr('Nothing here yet.')}</p>`);
+      + (rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn(k, r, r.name_de, sub(r))).join('')}</ul>` : emptyState({title: tr('Nothing here yet.'), size: 'row'}));  // 2.1076.0 (#5450)
   };
   return sec('roles', tr('Freelancer roles'), tr('Purchase price per day and hour; a service points to its role.'),
     r => [r.name_en, r.cost_day != null ? `${tr('Purchase')} ${day(r.cost_day)}` : '', r.cost_hour != null ? `${ofcMoney(r.cost_hour)}/${tr('h|unit')}` : ''].filter(Boolean).join(' · '))
@@ -632,7 +641,7 @@ function ofcSettingsHtml() {
 // also after its period; its own route (not a field of the settings form: data-fg-skip), each step in the office log
 function rthHtml() {
   setTimeout(() => rthLoad(), 0);
-  return `<h3 id="os-rth-h">${tr('Extend the lock')}</h3><div id="os-rth" data-fg-skip><div class="muted mhint">${tr('Loading…')}</div></div>`;
+  return `<h3 id="os-rth-h">${tr('Extend the lock')}</h3><div id="os-rth" data-fg-skip>${/*html-ok*/ loadingHtml('row')}</div>`;
 }
 async function rthLoad(j) {
   const box = $('#os-rth'); if (!box) return;
@@ -680,7 +689,7 @@ async function pb_transfer() {
   const ul = a => a?.length ? `<ul>${a.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
   const show = async md => {
     const box = $('#pbt-pv', md), ok = $('[data-cd="yes"]', md), want = org;
-    pv = null; ok.disabled = true; box.innerHTML = `<p class="muted">${esc(tr('Loading…'))}</p>`;
+    pv = null; ok.disabled = true; box.innerHTML = loadingHtml('row');
     let j; try { j = await api('GET', `/api/office/move/check?org=${encodeURIComponent(want)}`); } catch (x) { if (want === org) box.innerHTML = `<p class="aerr">${esc(ofcErrHere(x))}</p>`; return; }
     if (want !== org) return;
     pv = j;
@@ -964,7 +973,7 @@ function biz_paint() {
   const box = $('#s-biz'); if (!box) return;
   pb_wsFollow();
   if (OFC.infoErr) { box.innerHTML = `<p class="muted">${esc(OFC.infoErr)}</p>`; return; }
-  if (!OFC.info) { if (!OFC.infoLoading && !OFC.pbWait) setTimeout(ofcInfo, 0); box.innerHTML = `<div class="muted mhint">${tr('Loading…')}</div>`; return; }
+  if (!OFC.info) { if (!OFC.infoLoading && !OFC.pbWait) setTimeout(ofcInfo, 0); box.innerHTML = loadingHtml('row'); return; }
   const rights = typeof orr_html === 'function' && OFC.info.rights;  // 2.470.0 (#3596): members too, their "My rights" (was a tab of the old page)
   // 2.470.0 (#3596): the areas are put in order before the drawing: setHtml keeps input being typed, and a field moved afterwards would lose the focus
   const t = document.createElement('template');

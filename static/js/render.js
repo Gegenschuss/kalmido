@@ -1695,7 +1695,7 @@ function errorState(o = {}) {
   return emptyState({icon: 'alert', title: o.title || tr('Could not be loaded'), size: o.size, cls: 'eerr' + (o.cls ? ' ' + o.cls : ''), action: act,
     sub: o.sub ?? (navigator.onLine === false ? tr('You are offline') : tr('Check the connection and try again.'))});
 }
-const noAccessState = (o = {}) => emptyState({icon: 'lock', title: o.title || tr('No access'), sub: o.sub ?? tr('Ask the owner to share it with you.'), size: o.size, cls: 'enoacc' + (o.cls ? ' ' + o.cls : '')});
+const noAccessState = (o = {}) => emptyState({icon: 'lock', title: o.title || tr('No access'), sub: o.sub ?? tr('Ask the owner to share it with you.'), size: o.size, cls: 'enoacc' + (o.cls ? ' ' + o.cls : ''), action: o.action});  // 2.1076.0 (#5450): + action (the office's "Submit receipt")
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-esretry]'), f = b && ES_RETRY.get(b.dataset.esretry);
   if (!f) return;

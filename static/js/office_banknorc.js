@@ -30,8 +30,8 @@ histReloader('bank-noreceipt', () => { if (BNR.data) bnr_reload(); if (BNR.rem) 
 
 function bnr_html() {
   if (BNR.oid !== OFC.info?.org_id) Object.assign(BNR, {oid: OFC.info?.org_id, data: null, err: null, month: '', account: '', pick: null, cand: null, rules: undefined, rem: null});
-  if (BNR.err) return `<div class="empty">${esc(BNR.err)}</div>`;
-  if (!BNR.data || BNR.q !== bnr_q()) { setTimeout(() => { if (BNR.q !== bnr_q() || !BNR.data) bnr_load(); }, 0); if (!BNR.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (BNR.err) return ofcFail(BNR.err, () => { BNR.err = null; BNR.data = null; });  // 2.1076.0 (#5450)
+  if (!BNR.data || BNR.q !== bnr_q()) { setTimeout(() => { if (BNR.q !== bnr_q() || !BNR.data) bnr_load(); }, 0); if (!BNR.data) return loadingHtml('big'); }
   const d = BNR.data, n = d.counts || {}, out = BNR.dir === 'out';
   const segs = [['out', tr('Payments without a receipt'), n.out], ['in', tr('Income without an invoice'), n.in]];
   const months = d.months || [], accts = d.accounts || [];
@@ -40,7 +40,7 @@ function bnr_html() {
     ${accts.length ? `<select data-bnr-f="account" aria-label="${esc(tr('Account'))}"><option value="">${esc(tr('All accounts'))}</option>${accts.map(a => `<option value="${esc(a)}" ${a === BNR.account ? 'selected' : ''}>${esc(cfb_acct(a))}</option>`).join('')}</select>` : ''}</div>`;
   const items = d.items || [];
   const list = items.length ? `<ul class="bnklist" role="list">${items.map(bnr_row).join('')}</ul>`
-    : `<div class="empty">${ic('check')}<span>${out ? tr('Every payment has its receipt.') : tr('Every income has its invoice.')}</span></div>`;
+    : emptyState({icon: 'check', title: out ? tr('Every payment has its receipt.') : tr('Every income has its invoice.')});  // 2.1076.0 (#5450)
   const rc = out && !isMobile() && items.length ? bnr_rcHtml(d.receipts || []) : '';
   const miss = out ? bnv_missHtml(d.missing || []) : '';  // 2.425.0 B (#3451)
   return bar + miss + (rc ? `<div class="bnrcols"><div>${list}</div>${rc}</div>` : list)
@@ -60,7 +60,7 @@ function bnr_row(t) {
 }
 function bnr_pickHtml(t) {
   const c = BNR.cand;
-  const rows = !c ? `<p class="muted">${tr('Loading…')}</p>` : !c.length ? `<p class="muted">${tr('Nothing found')}</p>`
+  const rows = BNR.candErr ? ofcFail(BNR.candErr, () => { BNR.candErr = null; BNR.cand = null; bnr_cand(t.id); }, 'row') : !c ? loadingHtml('row') : !c.length ? ofcNoHit('', 'row')  // 2.1076.0 (#5450)
     : `<ul class="ofclist" role="list">${c.map(x => `<li><button type="button" class="ofcrow" data-bnr="match" data-id="${t.id}" data-kind="${x.kind}" data-mid="${x.id}"><span class="ofcn"><b>${esc(x.label || tr(BNK_KIND[x.kind]))}</b><small class="muted">${esc(fmtDateLoc(x.date))}</small></span><span class="rksum">${ofcMoney(x.amount)}</span></button></li>`).join('')}</ul>`;
   return `<div class="bnkother">${rows}</div>`;
 }
@@ -107,7 +107,7 @@ async function bnr_remember(tid) {
     redo: async () => { await api('POST', '/api/office/bank/rules', spec); bnr_reload(); }}));
 }
 async function bnr_cand(tid) {
-  try { const j = await api('GET', `/api/office/bank/tx/${tid}/candidates`); if (BNR.pick === tid) BNR.cand = j.items || []; } catch (x) { BNR.cand = []; }
+  try { const j = await api('GET', `/api/office/bank/tx/${tid}/candidates`); if (BNR.pick === tid) { BNR.cand = j.items || []; BNR.candErr = null; } } catch (x) { BNR.cand = []; BNR.candErr = ofcErrHere(x); }
   if (BNR.pick === tid) ofcDraw();
 }
 
@@ -162,9 +162,11 @@ function bnr_startHtml() {
   if (BNR.cnt === undefined || (Date.now() - BNR.cntAt > 60000 && !BNR.cntLoading)) {
     if (!BNR.cntLoading) {
       BNR.cntLoading = true;
-      rawFetch('GET', '/api/office/bank/noreceipt/count').then(j => { BNR.cnt = j; }, () => { BNR.cnt = null; }).finally(() => { BNR.cntLoading = false; BNR.cntAt = Date.now(); if (S.route.mod === 'office' && ofcTab() === 'start') ofcDraw(); });
+      rawFetch('GET', '/api/office/bank/noreceipt/count').then(j => { BNR.cnt = j; LS.set('bnrCnt.' + (OFC.info?.org_id ?? 'p'), +(j?.out || 0)); }, () => { BNR.cnt = null; }).finally(() => { BNR.cntLoading = false; BNR.cntAt = Date.now(); if (S.route.mod === 'office' && ofcTab() === 'start') ofcDraw(); });
     }
-    if (BNR.cnt === undefined) return '';
+    // 2.1076.0 (#5450): while the counter loads its row keeps its place (the start page jumped when it came), unless this
+    // office had no such booking the last time (then nothing comes, nothing to reserve)
+    if (BNR.cnt === undefined) return LS.get('bnrCnt.' + (OFC.info?.org_id ?? 'p'), 1) ? `<div class="oflr bnrcnt bnrwait">${/*html-ok*/ loadingHtml('row')}</div>` : '';
   }
   const n = BNR.cnt?.out || 0;
   if (!n) return '';

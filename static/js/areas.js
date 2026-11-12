@@ -87,7 +87,7 @@ const OFM_ITEMS = [
   // 2.152.2 (#2632): the parts of the office's own scripts too (their OFC_TABS entries only bring the tab's content), so the
   // menu / panel shows the same points on #clients, #contacts, #office and #time, before the office is loaded as after
   {key: 'gendocs', go: 'office/gendocs', icon: 'file', name: N_('Letters & contracts'), group: 'sell', on: ofm_ofc, adm: 1},  // 2.489.0 (#2664, decision #2646): Schreiben & Verträge, as the office's own tab
-  {key: 'letters', go: 'office/letters', icon: 'mail', name: N_('Correspondence'), group: 'sell', on: ofm_ofc, adm: 1},
+  {key: 'letters', go: 'office/letters', icon: 'mail', name: N_('Correspondence'), group: 'sell', on: ofm_ofc, adm: 1, admOnly: 1},  // 2.1076.0 (#5450): admOnly = only the admin role (the server's rule, letters.py lt_org), not the bookkeeping
   {key: 'bank', go: 'office/bank', icon: 'bank', name: N_('Bank'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'cards', go: 'office/cards', icon: 'card', name: N_('Credit cards'), group: 'money', on: ofm_ofc, get adm() { return ofm_cc() ? 0 : 1; }},  // 2.444.0 (#3447): also for the holder of a card
   {key: 'books', go: 'office/books', icon: 'book', name: N_('Bookkeeping'), group: 'money', on: ofm_ofc, adm: 1},
@@ -144,7 +144,7 @@ function ofm_lv() {
 // 2.436.0 (#3620): "View as member" in an organisation's office: no settings / contracts / bank; daily work stays
 const MV_OFM = ['settings', 'agreements', 'bank'];
 const mvOfc = () => mvOn() && (typeof OFC !== 'undefined' && OFC.info ? !OFC.info.personal : String(wsCur()).startsWith('org:'));
-const ofm_ok = i => { if (MV_OFM.includes(i.key) && mvOfc()) return false; const lv = ofm_lv(), k = i.lvk || i.key; return lv && k in lv ? i.key === 'settings' || lv[k] !== 'none' : !i.adm || ofm_adm() || ofm_legOwn(k); };  // 2.276.0 A (#3039): lvk; 2.545.0 (#4592): + ofm_legOwn
+const ofm_ok = i => { if (MV_OFM.includes(i.key) && mvOfc()) return false; if (i.admOnly && !ofm_adm()) return false; const lv = ofm_lv(), k = i.lvk || i.key; return lv && k in lv ? i.key === 'settings' || lv[k] !== 'none' : !i.adm || ofm_adm() || ofm_legOwn(k); };  // 2.276.0 A (#3039): lvk; 2.545.0 (#4592): + ofm_legOwn
 // 2.276.0 A (#3039): what the office already holds (GET /api/office/settings used: invoice, receipt, inquiry, meal, travel,
 // sub, fixed), per person and workspace like the role (LS ofmUsed); null = not known yet (everything as before)
 function ofm_used() { return typeof OFC !== 'undefined' && OFC.info ? OFC.info.used || null : (LS.get('ofmUsed', {}) || {})[ofm_ws()] || null; }

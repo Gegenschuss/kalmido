@@ -32,7 +32,7 @@ const oimClientOpts = cur => [['', tr('no client')], ...(OIM.clients || []).map(
 // ---- the page
 // 2.298.0 A2 (#3186): the formats of each part behind the (i) of its heading, the intro only says the safety net
 function oimHtml() {
-  if (!ofcAdmin()) return `<div class="empty">${ic('lock')}<span>${tr('Only for admins of the office.')}</span></div>`;
+  if (!ofcAdmin()) return ofcAdmOnly();  // 2.1076.0 (#5450)
   if (OIM.runs === null && !OIM.loading) { OIM.loading = true; setTimeout(async () => { await oimLoad(); OIM.loading = false; }, 0); }
   setTimeout(oim_jump, 0);  // 2.122.3 A (#2335)
   const back = `<div class="ofcbar"><button type="button" class="btn sm" data-setgo="biz">${ic('back', 's')} ${esc(tr('Settings › Company & office'))}</button></div>`;  // 2.855.0 (#5456): names where it leads
@@ -218,7 +218,7 @@ async function oimReadAddr(x) {
 
 function oimCounterHtml() {
   const c = OIM.counter;
-  if (!c) return `<p class="muted">${tr('Loading…')}</p>`;
+  if (!c) return `${loadingHtml('row')}`;
   return ['invoice', 'offer'].map(k => {
     const x = c[k];
     if (!x) return '';
@@ -243,7 +243,7 @@ function bk_runAreas(x) {
 
 function oimRunsHtml() {
   const r = OIM.runs;
-  if (r === null) return `<p class="muted">${tr('Loading…')}</p>`;
+  if (r === null) return `${loadingHtml('row')}`;
   if (!r.length) return `<p class="muted">${tr('No imports yet.')}</p>`;
   const kn = {data: N_('Master data'), archive: N_('Archive|documents'), datev: N_('DATEV data'), fixed_costs: N_('Fixed costs'), trips: N_('Trips'), leads: N_('Leads')};  // 2.148.0 D (#2458)
   return `<ul class="ofclist" role="list">${r.map(x => `<li class="oimrun"><span class="ofcn"><b>${esc(tr(kn[x.kind] || x.kind))} · ${esc(trn('{0} entry', '{0} entries', x.total || 0))}</b><small class="muted">${esc([typeof ofdWhen === 'function' ? ofdWhen(x.created_at) : x.created_at, x.user_name].filter(Boolean).join(' · '))}</small></span>
@@ -269,7 +269,7 @@ function oim_sumHtml(items) {
   return `<p class="muted oimsum">${esc(oim_secKind() === 'invoice' ? tr('Archived invoices: {0}, of which paid: {1}', ofcMoney(ct(own)), ofcMoney(ct(own.filter(r => r.paid)))) : tr('Archived quotations: {0}', ofcMoney(ct(own))))}</p>`;
 }
 function oimArchiveListHtml(q) {
-  if (!OIM.list) { setTimeout(oimLoadList, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (!OIM.list) { setTimeout(oimLoadList, 0); return loadingHtml('big'); }
   const inv = oim_secKind() === 'invoice', paid = inv ? OIM.paid || '' : '';
   const items = lst_sorted(oim_secItems().filter(r => (!q || [r.number, r.client, r.client_name, r.project].some(v => (v || '').toLowerCase().includes(q))) && (!OIM.cl || String(r.client_id) === OIM.cl)
     && (!paid || (paid === 'paid') === !!r.paid)), ofd_listKey('archive'), r => ({date: r.date, client: r.client || r.client_name, amount: r.amount, name: r.project || r.number || r.file_name}));  // 2.451.0 (#3834)
@@ -277,7 +277,7 @@ function oimArchiveListHtml(q) {
   const imp = ofcAdmin() ? `<a class="btn sm" href="#office/import/archive">${ic('upload', 's')} ${tr('Import legacy data')}</a>` : '';
   const pf = inv && oim_secItems().length ? `<div class="seg oimpaid" role="group" aria-label="${esc(tr('Status'))}">${OIM_PAID.map(([v, n]) => `<button type="button" data-oim-paid="${v}" aria-pressed="${v === paid}" class="${v === paid ? 'on' : ''}">${tr(n)}</button>`).join('')}</div>` : '';
   const sum0 = r81b_clFilter(pf) + sum;  // 2.81.0 (#1834): the client filter above the list
-  if (!items.length) return (OIM.cl || paid ? sum0 : '') + `<div class="empty nempty eact">${ic('archive')}<span>${q || OIM.cl || paid ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Company & office > Data > Import legacy data.')}</span>${q ? '' : imp}</div>`;
+  if (!items.length) return (OIM.cl || paid ? sum0 : '') + (q || OIM.cl || paid ? ofcNoHit(q ? '' : imp) : emptyState({icon: 'archive', title: tr('No archived documents. Old invoices and quotations are added under Settings > Company & office > Data > Import legacy data.'), action: imp}));  // 2.1076.0 (#5450)
   // 2.40.0 (#1366): the row shows the PDF in the browser, the button next to it downloads it
   return sum0 + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" data-arch="${r.id}" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener"${typeof pv_attr === 'function' ? pv_attr({url: `/api/office/legacy/archive/${r.id}/pdf`, name: (r.number || tr('Document')) + '.pdf', dlUrl: `/api/office/legacy/archive/${r.id}/pdf?download=1`, arch: isMobile() && !r.copy ? r.id : undefined /* 2.451.0 (#3834): the phone's way to Correct without a long press */}) : ''}>
     <span class="ofcn"><b>${esc(r.number || r.copy?.number || r.file_name)}${r.client || r.client_name ? ` · ${esc(r.client || r.client_name)}` : ''}</b><small class="muted">${oim_archTag(r, 'ofdst') /* 2.543.0 (#4473): phones: the label in the meta line */}${esc([r.kind === 'offer' ? tr('Quotation') : tr('Invoice'), r.project, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>

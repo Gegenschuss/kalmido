@@ -115,7 +115,7 @@ const ablageNames = d => [...d.querySelectorAll('#view .abrow .abname')].map(x =
     check(await until(() => rows(d).length === 2) && !d.querySelector('#view select[aria-label="Workspace"]'), `#4588: #${h}: the overview, no picker ` + rows(d).join('|'));
     d.querySelector('#view .spov [data-spov="private"]').click();
     check(await until(() => w.location.hash === `#${h}/s/private` && d.querySelector('#view ' + sel) && !rows(d).length), `#4588: #${h}: a tap opens Private ` + w.location.hash);
-    check(await until(() => d.querySelector('#view .spovc [data-spovup]') && !d.querySelector('#view .lempty')), `#4588: #${h}: the path back (also once loaded)`);
+    check(await until(() => d.querySelector('#view .spovc [data-spovup]') && !d.querySelector('#view .lempty, #view .eload')), `#4588: #${h}: the path back (also once loaded)`);  // 2.1076.0 (#5450): + the shared loading block
     w.close();
   }
   // one workspace shown above: as before

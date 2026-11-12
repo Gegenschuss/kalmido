@@ -36,8 +36,8 @@ function pdField(f) {
 
 function pdHtml() {
   if (PD.oid !== OFC.info?.org_id) pdReset();
-  if (PD.err) return `<div class="empty">${esc(PD.err)}</div>`;
-  if (!PD.data) { if (!PD.loadingT) PD.loadingT = setTimeout(() => { PD.loadingT = 0; pdLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (PD.err) return ofcFail(PD.err, () => { PD.err = null; PD.data = null; });  // 2.1076.0 (#5450)
+  if (!PD.data) { if (!PD.loadingT) PD.loadingT = setTimeout(() => { PD.loadingT = 0; pdLoad(); }, 0); return loadingHtml('big'); }
   const d = PD.data, q = PD.view ? `?version=${PD.view}` : '';
   const opts = [['0', tr('Current state')], ...(PD.versions || []).map(v => [String(v.version), tr('Version {0} from {1}', v.version, pdDay(v.created_at)) + (v.created_by ? ` · ${v.created_by}` : '')])];
   const state = PD.view ? tr('Version {0} from {1}, read-only', d.viewing, pdDay(d.saved_at))
