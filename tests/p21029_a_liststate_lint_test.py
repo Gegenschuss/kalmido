@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# kalmido-suite: after=p2773_b_livefilter nodata
+# kalmido-suite: after=p2501_a_nosham nodata
 """2.1029.0 (#5537, stage 1): tools/check_list_state.py and the migration fragment of the projects' state marker. Static, no
 container.
  - a handwritten filter on lists.archived / deleted_at is counted: archived=0 / =1 / deleted_at IS NULL after FROM / JOIN lists,
