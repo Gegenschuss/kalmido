@@ -364,12 +364,35 @@ def ctl_refuse(step, level, lid, d):
 
 
 def ctl_req_body():
-    """2.235.0 A2 (#2891): what an approval card binds of this request: its JSON body, else its form fields ({} = none;
-    uploaded files are not bound)."""
+    """2.235.0 A2 (#2891): what an approval card binds of this request: its JSON body, else its form fields ({} = none).
+    2.1085.0 (#5936): an upload binds its files too: field _files = [{name, sha256}] in the order sent, so a Yes to
+    "upload to X" holds for exactly these files (ctl_files)."""
     if request.is_json:
         j = request.get_json(silent=True)
         return j if j is not None else {}
-    return request.form.to_dict(flat=True) if request.form else {}
+    b = request.form.to_dict(flat=True) if request.form else {}
+    fs = ctl_files()
+    return {**b, CTL_FILES_KEY: fs} if fs else b
+
+
+CTL_FILES_KEY = "_files"  # 2.1085.0 (#5936): the field of a bound body holding the files of an upload
+
+
+def ctl_files():
+    """2.1085.0 (#5936): the files of a multipart request as [{name, sha256}] (the order sent); the stream of each file is
+    wound back after hashing, the route reads it whole. [] = no upload."""
+    import hashlib
+    if request.mimetype != "multipart/form-data" or not request.files:
+        return []
+    out = []
+    for _, f in request.files.items(multi=True):
+        h = hashlib.sha256()
+        f.stream.seek(0)
+        for chunk in iter(lambda: f.stream.read(1 << 16), b""):
+            h.update(chunk)
+        f.stream.seek(0)
+        out.append({"name": f.filename or "", "sha256": h.hexdigest()})
+    return out
 
 
 def ctl_canon(x):
@@ -472,7 +495,8 @@ CTL_REASON_TEXT = {"not_found": N_("No approval card with this id of yours."),
                    "approver_rights": N_("The person who said Yes may not change this project themselves."),
                    "approver_shares": N_("The person who said Yes shares no project with you."),
                    "format": N_("The header must be the id of the card (a number)."),
-                   "nested": N_("The step of a card cannot run a card.")}
+                   "nested": N_("The step of a card cannot run a card."),
+                   "upload": N_("The card approves an upload: send the upload again with the same files and the header X-Kalmido-Approval: ID of the card (MCP: use_approval) - the run from the card cannot send files.")}
 CTL_STATE_FIELDS = {"expect_updated_at", "prev", "_prev", "If-Match"}  # 2.1045.0 (#5827): fields that carry the state the step read
 
 
@@ -486,6 +510,8 @@ def ctl_reason_text(why):
     if r == "stale":
         return tr("The state field differs from the card ({0}): the target changed since the card, or you read it again. Read it again and ask with a new card.",
                   ", ".join(why.get("fields") or []))
+    if r == "body" and CTL_FILES_KEY in (why.get("fields") or []):  # 2.1085.0 (#5936): another file than the card's
+        return tr("The files differ from the card (names or content): the card approves exactly the files of the refused upload. Send exactly these files, or ask with a new card.")
     if r == "body":
         return tr("The body differs from the card in: {0}. Run the card with run_approved_step (POST /api/v1/agent/approvals/ID/run) instead of sending it again.",
                   ", ".join(why.get("fields") or []))
@@ -518,6 +544,8 @@ def ctl_claim(c, a, hdr, step, lids):
     if ctl_norm_path(str(st.get("path") or "")) != unicodedata.normalize("NFC", request.path):
         return None, {"reason": "path", "card_path": str(st.get("path") or "")[:300], "call_path": request.path[:300]}
     rb = ctl_req_body()
+    if request.is_json and isinstance(rb, dict) and CTL_FILES_KEY in rb:  # 2.1085.0 (#5936): the files of an upload card come
+        return None, {"reason": "body", "fields": [CTL_FILES_KEY]}  # only with the files themselves, never typed into a JSON body
     if ctl_canon(st.get("body")) != ctl_canon(rb):
         fields = ctl_body_diff(st.get("body"), rb)
         return None, {"reason": "stale" if fields and set(fields) <= CTL_STATE_FIELDS else "body", "fields": fields}
@@ -582,7 +610,7 @@ def v1_agent_approval_run(mid):
     """2.1045.0 (#5827): runs the step of approval card mid (method, path and body as stored on the card) once, after a person's
     Yes -- the agent never types the request a second time. The answer is the route's own answer (status and body). Refused
     with 409 approval_invalid + reason (ctl_reason_text): not_found, unanswered, rejected, withdrawn, no_step, used (+ used_at:
-    the step ran then), one_way, approver_rights, approver_shares; a route's 409 conflict (the target changed since the card:
+    the step ran then), one_way, approver_rights, approver_shares, upload (2.1085.0 #5936: an upload's card binds its files); a route's 409 conflict (the target changed since the card:
     expect_updated_at / prev) gets reason stale. Only the token's own agent and its own cards."""
     v1_args(())
     aid = need_agent()
@@ -599,6 +627,8 @@ def v1_agent_approval_run(mid):
         return v1_err(409, tr("This approval does not fit: it needs a person's Yes, exactly this method, path and body, and works once.")
                       + " " + ctl_reason_text(bad), name="approval_invalid", message_id=mid, **bad)
     st = ch["approval"]["step"]
+    if isinstance(st.get("body"), dict) and CTL_FILES_KEY in st["body"]:  # 2.1085.0 (#5936): an upload's card binds its files,
+        return v1_err(409, tr(CTL_REASON_TEXT["upload"]), name="approval_invalid", message_id=mid, reason="upload")  # the run has none
     if not ctl_run_hold(c, aid, mid):  # 2.1045.0 (#5827, M3): two runs at once -- one holds the card, the other is refused
         bad = ctl_card_state(*ctl_card_row(c, aid, mid)) or {"reason": "used"}
         return v1_err(409, tr("This approval does not fit: it needs a person's Yes, exactly this method, path and body, and works once.")

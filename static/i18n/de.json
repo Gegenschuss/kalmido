@@ -18524,5 +18524,7 @@
   "Nothing planned in these days.": "In diesen Tagen ist nichts geplant.",
   "Nothing planned in this year.": "In diesem Jahr ist nichts geplant.",
   "Your control level needs an approval for this upload: ask with an approval card in your chat (approval.step = method, path and body exactly as in this answer), then after the Yes send this request again with the files and the header X-Kalmido-Approval: ID of the card (MCP: use_approval) - the run from the card cannot send files.": "Deine Kontrollstufe braucht für diesen Upload eine Freigabe: Frag mit einer Freigabe-Karte in deinem Chat (approval.step = method, path und body genau wie in dieser Antwort), sende nach dem Ja diese Anfrage erneut mit den Dateien und dem Header X-Kalmido-Approval: ID der Karte (MCP: use_approval) - der Lauf aus der Karte kann keine Dateien senden.",
-  "One-way step.": "Einbahn-Schritt."
+  "One-way step.": "Einbahn-Schritt.",
+  "The files differ from the card (names or content): the card approves exactly the files of the refused upload. Send exactly these files, or ask with a new card.": "Die Dateien weichen von der Karte ab (Namen oder Inhalt): die Karte gibt genau die Dateien des abgelehnten Uploads frei. Sende genau diese Dateien oder frag mit einer neuen Karte.",
+  "The card approves an upload: send the upload again with the same files and the header X-Kalmido-Approval: ID of the card (MCP: use_approval) - the run from the card cannot send files.": "Die Karte gibt einen Upload frei: sende den Upload erneut mit denselben Dateien und dem Header X-Kalmido-Approval: ID der Karte (MCP: use_approval) - der Lauf aus der Karte kann keine Dateien senden."
 }

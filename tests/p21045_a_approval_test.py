@@ -16,8 +16,11 @@
  - MCP: the 409 keeps the step as step_ref, request_chat_approval step_ref makes the card, run_approved_step runs it
  - 2.1078.0 (#5866): an upload's 409 names the header way (run: header, MCP: use_approval), N4; a card path still holding a
    percent sign after decoding is refused, N7
+ - 2.1085.0 (#5936): an upload's card binds its files (approval.body._files = name + sha256): other content is refused
+   (reason body, field _files), a run from the card answers reason upload, the stored file is whole
 freelancer-matrix: agents (the personal agent belongs to a person without an organisation)
 usage: p21045_a_approval_test.py <datadir>      (KMT_NOSTART=1 / P21045A_NOSTART=1: a running server)"""
+import hashlib
 import importlib.util
 import os
 import sys
@@ -123,9 +126,21 @@ e = err(r)
 check(r.status_code == 409 and e.get("code") == "approval_required" and e.get("run") == "header"
       and "X-Kalmido-Approval" in e.get("message", "") and "/run" not in e.get("message", ""),
       f"N4: the refused upload names the header way {r.status_code} {r.text[:300]}")
+# 2.1085.0 (#5936): the card binds the files too: name and sha256 of each file in approval.body._files
+check((e.get("approval") or {}).get("body") == {"_files": [{"name": "plan.txt", "sha256": hashlib.sha256(b"shot list").hexdigest()}]},
+      f"#5936: the refused upload binds its file (name + sha256) {e.get('approval')}")
 mid = approved(r, "N4 upload")
+r = run(mid)
+check(r.status_code == 409 and err(r).get("reason") == "upload", f"#5936: an upload's card does not run from the card {r.status_code} {r.text[:200]}")
+r = api("POST", f"/tasks/{T}/attachments", mid=mid, files={"file": ("plan.txt", b"other content", "text/plain")})
+check(r.status_code == 409 and err(r).get("reason") == "body" and err(r).get("fields") == ["_files"]
+      and "files differ" in err(r).get("message", ""), f"#5936: another content under the same name is not approved {r.status_code} {r.text[:300]}")
+r = api("POST", f"/tasks/{T}/attachments", mid=mid, json={"_files": [{"name": "plan.txt", "sha256": hashlib.sha256(b"shot list").hexdigest()}]})
+check(r.status_code == 409 and err(r).get("fields") == ["_files"], f"#5936: the files typed into a JSON body are no upload {r.status_code} {r.text[:200]}")
 r = api("POST", f"/tasks/{T}/attachments", mid=mid, files=UP)
 check(r.status_code == 201, f"N4: after the Yes the same upload with the header goes through {r.status_code} {r.text[:200]}")
+new = (r.json().get("data") or [{}])[0] if r.status_code == 201 else {}
+check(new.get("size") == len(b"shot list"), f"#5936: the file stream is wound back after hashing, the whole file is stored {new}")
 r = api("POST", f"/tasks/{T}/comments", json={"body": "Plain"})
 check(r.status_code == 409 and "run" not in err(r) and "/run" in err(r).get("message", ""), f"N4: a JSON write keeps the run way {r.text[:200]}")
 
