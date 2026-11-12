@@ -1146,12 +1146,14 @@ def obj_undo_forget(c, kind, ids):
 def obj_trash_cols_missing(c):
     """2.1069.0 (#5416, review 2.781 F4): [(kind, table, missing columns)] of the kinds the core's trash writes on
     (obj_trash / obj_restore / obj_trash_due / the undo's _trash_part write deleted_at / deleted_by on reg["table"]): a kind
-    with a node, its generic routes or the retention run (trash_prune), and the side objects with trash_prune. Empty = every
+    with the generic routes (their trash / restore) or the retention run (trash_prune), and the side objects with
+    trash_prune. A kind without both reaches the core's trash only through its area's own call (the team chat's rooms are
+    archived, tchat_rooms has no deleted_by: not asked here). Empty = every
     such table has its trash columns; a table without them would break only at the first use ("column deleted_at does not
     exist"), so the suite p2773_b_trash_core asks this for every registered kind (obj_register runs at import, without a
     database, and cannot see the columns)."""
     out, both = [], ("deleted_at", "deleted_by")
-    kinds = [(k, r["table"], both) for k, r in sorted(OBJ.items()) if r.get("node", True) or r.get("routes") or r.get("trash_prune")]
+    kinds = [(k, r["table"], both) for k, r in sorted(OBJ.items()) if r.get("routes") or r.get("trash_prune")]
     # a side object's run reads deleted_at of its table (its copies stand in list_part_trash: no column of its own)
     kinds += [(k, r["table"], ("deleted_at",)) for k, r in sorted(PART_KINDS.items())
               if k not in OBJ and r.get("trash_prune") and not r.get("copy")]
