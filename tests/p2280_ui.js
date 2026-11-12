@@ -69,6 +69,10 @@ const V = B + 'api/v1';
   await fetch(V + `/tasks/${TW2}/comments`, {method: 'POST', headers: AGH, body: JSON.stringify({body: 'Stock levels noted.'})});
   const TAC = (await call('POST', '/api/tasks', {title: 'Check the backups', list_id: W1})).id;
   await fetch(V + `/tasks/${TAC}/complete`, {method: 'POST', headers: AGH});
+  // 2.1052.0 (#5808): an agent's completion stays quiet with agent_comments=replies since 2.1043.0 (#5792): the Activity
+  // below is a person's completion (Bob), not for me
+  const TBC = (await call('POST', '/api/tasks', {title: 'Renew the domain', list_id: W1})).id;
+  await call('POST', `/api/tasks/${TBC}/complete`, null, BCK);
   // a question with buttons in the chat
   const q = await (await fetch(V + '/agent/chats/1', {method: 'POST', headers: AGH, body: JSON.stringify({body: 'May I run the deploy?\n```\n./deploy.sh prod\n```', choices: [{id: 'go', label: 'Allow', style: 'primary'}, {id: 'stop', label: 'Deny', style: 'danger'}]})})).json();  // 2.30.0: ids allow / deny = a permission question (p2300_chat_ui)
   check(q.choices && q.choices.choices.length === 2, '#1005: the question with buttons is stored');
@@ -135,35 +139,40 @@ const V = B + 'api/v1';
   await until(() => d.querySelector('.dash'));
   await until(() => d.querySelector('.dtome'));
   const st = await call('GET', '/api/state');
-  check(st.news.unread_me === 2 && st.news.unread > st.news.unread_me, `#987: 2 for me (mention + assignment), more unread in all ${st.news.unread_me}/${st.news.unread}`);
-  check(d.querySelector('.dtome') && /Waiting for you: 2/.test(d.querySelector('.dtome h3').textContent), '#987: the start page banner "Waiting for you: 2" ' + d.querySelector('.dtome h3')?.textContent);  // 2.1037.0 (#5807): the bell's wording (was "2 messages for you")
-  check(d.querySelector('#kbar .bell .nbadge')?.textContent === '2', '#987: the bell counts only "For you" ' + d.querySelector('#kbar .bell .nbadge')?.textContent);  // 2.152.3 (#2619): the bell moved into the head bar
+  // 2.1052.0 (#5808): 3 = mention + assignment + the agent's open question in its chat (counted since 2.1039.0 #5805)
+  check(st.news.unread_me === 3 && st.news.unread > st.news.unread_me, `#987: 3 for me (mention + assignment + the agent's question), more unread in all ${st.news.unread_me}/${st.news.unread}`);
+  check(d.querySelector('.dtome') && /Waiting for you: 3/.test(d.querySelector('.dtome h3').textContent), '#987: the start page banner "Waiting for you: 3" ' + d.querySelector('.dtome h3')?.textContent);  // 2.1037.0 (#5807): the bell's wording (was "2 messages for you")
+  check(d.querySelector('#kbar .bell .nbadge')?.textContent === '3', '#987: the bell counts only "For you" ' + d.querySelector('#kbar .bell .nbadge')?.textContent);  // 2.152.3 (#2619): the bell moved into the head bar
   w.eval(`go('news')`); await until(() => d.querySelector('.ntabs'));
   const tabs = d.querySelector('.ntabs');
   check(tabs && tabs.querySelector('[data-tab="all"]').classList.contains('on') && /For you/.test(tabs.textContent) && /Activity/.test(tabs.textContent), '#987: the tabs All | For you | Activity, All first');
   // 2.138.2 (#2405): the 'Activity' section is now 'Also new'; a Read section comes below
-  const secs0 = [...d.querySelectorAll('#view .nsec:not(.read)')].map(x => x.textContent.trim());
-  check(secs0.length === 2 && /For you/.test(secs0[0]) && /History/.test(secs0[1]) /* 2.1037.0 (#5807): Also new + Read = the history */ && d.querySelector('#view .nsec.first').nextElementSibling.classList.contains('tome'), '#987: "All" = two sections, the items for me first ' + secs0.join('|'));
-  click(w, tabs.querySelector('[data-tab="me"]')); await until(() => d.querySelector('.ntabs [data-tab="me"].on') && [...d.querySelectorAll('#view .nitem')].every(x => x.classList.contains('tome')));
-  let items = [...d.querySelectorAll('#view .nitem')];
-  check(items.length === 2 && items.every(x => x.classList.contains('tome')) && items.some(x => /mentioned you/.test(x.textContent)) && items.some(x => /assigned a task to you/.test(x.textContent)), '#987: "For you" = the mention and the assignment ' + items.map(x => x.querySelector('.ntext')?.textContent).join('|'));
-  click(w, d.querySelector('.ntabs [data-tab="act"]')); await until(() => d.querySelector('.ntabs [data-tab="act"].on') && ![...d.querySelectorAll('#view .nitem')].some(x => x.classList.contains('tome')));
-  items = [...d.querySelectorAll('#view .nitem')];
-  check(items.length >= 1 && items.every(x => !x.classList.contains('tome')) && items.some(x => /Claude/.test(x.textContent)), '#987: "Activity" = the agent\'s completion (2.66.1 #1943: no longer its comments) ' + items.length);
-  click(w, d.querySelector('.ntabs [data-tab="all"]')); await until(() => d.querySelector('.ntabs [data-tab="all"].on') && d.querySelectorAll('#view .nsec:not(.read)').length === 2);
-  check(d.querySelectorAll('#view .nitem').length >= 3 && d.querySelectorAll('#view .nsec:not(.read)').length === 2, '#987: "All" shows everything in two sections');
+  // 2.1052.0 (#5808): News show only bundled per task: the sections are .nsect (h2), the rows bundles (.ngroup, "for me" = .needs)
+  const heads = root => [...d.querySelectorAll(root + ' .nsect > h2')].map(x => x.textContent.trim());
+  const vgs = () => [...d.querySelectorAll('#view .ngroup')], sumOf = g => g.querySelector('.ngs')?.textContent || '';
+  const secs0 = heads('#view');
+  check(secs0.length === 2 && /For you/.test(secs0[0]) && /History/.test(secs0[1]) /* 2.1037.0 (#5807): Also new + Read = the history */ && d.querySelector('#view .nsect.me .ngroup')?.classList.contains('needs'), '#987: "All" = two sections, the items for me first ' + secs0.join('|'));
+  click(w, tabs.querySelector('[data-tab="me"]')); await until(() => d.querySelector('.ntabs [data-tab="me"].on') && vgs().length && vgs().every(x => x.classList.contains('needs')));
+  let items = vgs();
+  check(items.length === 3 && items.every(x => x.classList.contains('needs')) && items.some(x => /mention/.test(sumOf(x))) && items.some(x => /assigned to you/.test(sumOf(x))) && items.some(x => x.querySelector('.ngav .avatar.agent')), '#987: "For you" = the mention, the assignment (+ the agent\'s question, #5805) ' + items.map(sumOf).join('|'));
+  click(w, d.querySelector('.ntabs [data-tab="act"]')); await until(() => d.querySelector('.ntabs [data-tab="act"].on') && vgs().length && !vgs().some(x => x.classList.contains('needs')));
+  items = vgs();
+  check(items.length >= 1 && items.every(x => !x.classList.contains('needs')) && !d.querySelector('#view .nsect') && items.some(x => /completed/.test(sumOf(x)) && /Renew the domain/.test(x.querySelector('.ngt')?.textContent || '')), '#987: "Activity" = Bob\'s completion (2.66.1 #1943: no longer the agent\'s comments; #5792: nor its completion) ' + items.map(sumOf).join('|'));
+  click(w, d.querySelector('.ntabs [data-tab="all"]')); await until(() => d.querySelector('.ntabs [data-tab="all"].on') && heads('#view').length === 2);
+  check(vgs().length >= 3 && heads('#view').length === 2, '#987: "All" shows everything in two sections ' + vgs().length);
   // the bell's dropdown: sections
   click(w, d.querySelector('.ntabs [data-tab="me"]')); await until(() => d.querySelector('.ntabs [data-tab="me"].on'));
-  click(w, d.querySelector('#kbar [data-act="bell-pop"]')); await until(() => d.querySelector('#pop .bpop .nitem'));  // 2.152.3 (#2619): the bell moved into the head bar
-  const secs = [...d.querySelectorAll('#pop .nsec:not(.read)')].map(x => x.textContent.trim());
+  click(w, d.querySelector('#kbar [data-act="bell-pop"]')); await until(() => d.querySelector('#pop .bpop .ngroup'));  // 2.152.3 (#2619): the bell moved into the head bar
+  const secs = heads('#pop');
   check(secs.length === 2 && /For you/.test(secs[0]) && /History/.test(secs[1]) /* 2.1037.0 (#5807) */, '#987: the dropdown: "For you" above "Activity" ' + secs.join('|'));
-  check(d.querySelector('#pop .bpop .nitem.tome') && d.querySelector('#pop .nsec.first').nextElementSibling.classList.contains('tome'), '#987: the items for me come first');
+  check(d.querySelector('#pop .bpop .nsect.me .ngroup.needs') && d.querySelector('#pop .bpop .ngroup')?.classList.contains('needs'), '#987: the items for me come first');
   w.eval('closePop()');
-  // reading one for me lowers the bell
-  w.eval(`go('news')`); await until(() => d.querySelector('#view .nitem.tome'));
-  click(w, d.querySelector('#view .nitem.tome'));
-  await until(async () => (await call('GET', '/api/news')).unread_me === 1);
-  check((await call('GET', '/api/news')).unread_me === 1, '#987: one read -> one left for me');
+  // reading one for me lowers the bell (2.1052.0 #5808: the mention's bundle of one opens its entry with its head; 3 -> 2, the agent's question stays)
+  const mentionG = () => vgs().find(g => g.classList.contains('needs') && /mention/.test(sumOf(g)))?.querySelector('.ngmain[data-act="news-open"]');
+  w.eval(`go('news')`); await until(() => mentionG());
+  click(w, mentionG());
+  await until(async () => (await call('GET', '/api/news')).unread_me === 2);
+  check((await call('GET', '/api/news')).unread_me === 2, '#987: one read -> one less for me');
   w.close();
 
   // ================= #1005 the buttons in the chat
@@ -231,7 +240,7 @@ const V = B + 'api/v1';
   // ================= Firefox: screenshots of the changed screens + #976 the real right-click next to the grip
   const ffLogin = async ({ev, nav}, theme = 'light', user = 'alice') => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); localStorage.setItem('tasks.newsBundle', 'false'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);  // 2.1052.0 (#5808): no tasks.newsBundle (News are always bundled)
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async o => { await o.until(`!!document.querySelector('#top h1')`); await o.idle(); };
@@ -270,10 +279,10 @@ const V = B + 'api/v1';
     check(await ev(`!document.body.classList.contains('modal-open')`), `${tag}: #976 back after the dialog`);
     await ev(`(() => { wsSet('all'); return 1; })()`); await wsAll();
     await o.nav(B + '#news'); await ready(o);
-    await o.until(`document.querySelectorAll('#view .nsec:not(.read)').length >= 2`);
-    check(await ev(`!!document.querySelector('.ntabs [data-tab="all"].on') && document.querySelectorAll('#view .nsec:not(.read)').length === 2`), `${tag}: #987 News opens with the two sections`)
+    await o.until(`document.querySelectorAll('#view .nsect > h2').length >= 2`);  // 2.1052.0 (#5808): the bundled sections
+    check(await ev(`!!document.querySelector('.ntabs [data-tab="all"].on') && document.querySelectorAll('#view .nsect > h2').length === 2 && !!document.querySelector('#view .nsect.me .ngroup')`), `${tag}: #987 News opens with the two sections`)
     await shot(`p2280-${th}-1440-news.png`);
-    await ev(`(() => { document.querySelector('#kbar [data-act="bell-pop"]').click(); return 1; })()`); await o.until(`!!document.querySelector('#pop .bpop .nitem')`); await o.idle();  // 2.152.3 (#2619): the bell moved into the head bar
+    await ev(`(() => { document.querySelector('#kbar [data-act="bell-pop"]').click(); return 1; })()`); await o.until(`!!document.querySelector('#pop .bpop .ngroup')`); await o.idle();  // 2.1052.0 (#5808): bundles; 2.152.3 (#2619): the bell moved into the head bar
     await shot(`p2280-${th}-1440-bell.png`);
     await ev(`(() => { closePop(); return 1; })()`);
     // the menu is gone and its history entry too (backclose.js: a late history.back() of the closed menu took the next page back to #news)

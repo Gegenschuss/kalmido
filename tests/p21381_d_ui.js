@@ -1,6 +1,6 @@
 // 2.138.2 D (#2405): the News bell as an inbox (2.1037.0 #5807: Also new + Read = one folded history, see tests/p21037_b_bell_ui.js): "For you" (unread + to me, the bell's number) / "Also new" (other unread) /
 // "Read" (below, muted). jsdom: bell number = "For you" number = header number, read bundles never above unread ones, read =
-// muted class, unread = stripe class and no dot; the same in the plain list. Firefox 390 / 1280, light + dark (P21381D_SHOTS=<dir>).
+// muted class, unread = stripe class and no dot (2.1052.0 #5808: the plain list is gone, only bundled). Firefox 390 / 1280, light + dark (P21381D_SHOTS=<dir>).
 // freelancer-matrix: n/a - nur Oberfläche
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -38,7 +38,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   await call('POST', `/api/tasks/${T[0]}/comments`, {body: 'Third part is in'}, CB);
 
   // ================= jsdom: bundled
-  let w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': null, 'tasks.newsHist': null}}), d = w.document;  // 2.1037.0 (#5807): the folded default
+  let w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsHist': null}}), d = w.document;  // 2.1037.0 (#5807): the folded default; 2.1052.0 (#5808): no tasks.newsBundle any more
   await until(() => d.querySelector('.nbund .ngroup'));
   const bell = +(d.querySelector('.bell .nbadge')?.textContent || 0);
   const meSec = d.querySelector('#ns-need')?.closest('.nsect');
@@ -48,22 +48,13 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   const hist = d.querySelector('.nbund .nhist');
   check(hist && !hist.querySelector('.ngroup') && hist.querySelector('[data-act="news-hist"][aria-expanded="false"]') && !d.querySelector('#ns-info, #ns-read') && !/Also new/.test(d.body.textContent), '#5807: the history is folded (was: Also new / Read)');
   w.close();
-  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': null, 'tasks.newsHist': true}}); d = w.document;
+  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsHist': true}}); d = w.document;
   await until(() => d.querySelector('.nbund .nhist .ngroup'));
   const hg = [...d.querySelectorAll('.nbund .nhist .ngroup')];
   check(hg.length >= 1 && hg.every(g => !g.classList.contains('unread') && !g.querySelector('.ngn, [data-act="news-gread"]')), '#5807: history bundles: no unread look, no count, no tick');
   const gs = [...d.querySelectorAll('.nbund .ngroup')], lastNeed = gs.map(g => g.classList.contains('needs') && g.classList.contains('unread')).lastIndexOf(true), firstH = gs.findIndex(g => g.closest('.nhist'));
   check(firstH > lastNeed, '#2405/#5807: For you above the history');
   w.close();
-  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': false, 'tasks.newsHist': true}}); d = w.document; await sleep(500);
-  await until(() => d.querySelector('.nlist .nitem'));
-  const sec = d.querySelector('.nsec.me .c.nunread');
-  check(sec && +sec.textContent === bell, '#2405: plain list: "For you" number = bell number');
-  const items = [...d.querySelectorAll('.nlist .nitem, .nlist .nsec')];
-  const iH = items.findIndex(x => x.matches('.nsec.hist')), lastU = items.map(x => x.classList.contains('unread')).lastIndexOf(true);
-  check(iH > lastU && items.filter((x, i) => i > iH && x.classList.contains('unread')).length === 0, '#2405/#5807: plain list: the history at the bottom, no unread look in it');
-  w.close();
-
   // ================= Firefox: layout + shots
   const OVER = `(() => ({o: document.documentElement.scrollWidth - innerWidth}))()`;
   const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(800); };
@@ -82,10 +73,25 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
     check(st.uShadow !== 'none' && st.uDot !== '""' && +st.rOp < 1 && +st.rW < +st.uW, `${tag}: unread stripe without dot, read muted ` + JSON.stringify(st));
     await shot(`p21381-d-${th}-${wd}-news.png`);
     await ev(`document.querySelector('[data-act="bell-pop"]').click()`); await sleep(700);
-    const bp = await ev(`(() => ({n: document.querySelectorAll('.bpop .nsect, .bpop .nsec').length, head: document.querySelector('.bpnew')?.textContent || ''}))()`);
+    const bp = await ev(`(() => ({n: document.querySelectorAll('.bpop .nsect').length /* 2.1052.0 (#5808): only the bundled sections */, head: document.querySelector('.bpnew')?.textContent || ''}))()`);
     check(bp.n >= 2 && /for you/.test(bp.head), `${tag}: bell panel has sections + "N for you" ` + JSON.stringify(bp));
     await shot(`p21381-d-${th}-${wd}-bell.png`);
   }, touch);
+
+  // 2.1052.0 (#5808): the plain list (tasks.newsBundle false) is gone - its two checks ("For you" number = bell, the history
+  // at the bottom without the unread look) are the bundled ones above; here (after Firefox, the click reads the mention): a click on the mention's bundle opens its task
+  w = await boot({user: 'alice', hash: 'news'}); d = w.document;
+  await until(() => d.querySelector('.nbund .nsect.me .ngroup.needs'));
+  {
+    const mg = [...d.querySelectorAll('.nbund .nsect.me .ngroup.needs')].find(g => /Call the printer/.test(g.querySelector('.ngt')?.textContent || ''));
+    check(mg && /can you call them/.test(mg.querySelector('.ngex')?.textContent || ''), '#5808: the mention\'s bundle under "For you" shows what was written');
+    // one entry: the head opens it; several: the head unfolds the bundle and a row opens
+    if (mg) { const one = mg.querySelector('.ngmain').dataset.act === 'news-open'; mg.querySelector('.ngmain').click();
+      if (!one) { await until(() => d.querySelector(`.ngroup[data-gk="${mg.dataset.gk}"] .ngitems .nitem`)); d.querySelector(`.ngroup[data-gk="${mg.dataset.gk}"] .ngitems .nitem`).click(); }
+      await until(() => w.eval('S.sel') === T[1]); }
+    check(w.eval('S.sel') === T[1], '#5808: a click on the bundle opens its task');
+  }
+  w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

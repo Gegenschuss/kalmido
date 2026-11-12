@@ -195,25 +195,32 @@ const HEAD = `(() => {
   check(bellB && bellB.dataset.act === 'bell-pop' && bellB.getAttribute('aria-haspopup') === 'dialog' && bellB.querySelector('.nbadge'), 'the bell is a popup button with its badge');
   click(w, bellB); await idle(w);
   pop = d.querySelector('#pop');
-  check(!pop.classList.contains('hidden') && pop.classList.contains('bellpop') && pop.querySelectorAll('.bpop .nitem').length === nb.length && w.eval('S.route.mod') === 'tasks',
-    'bell: a dropdown with the newest News, the list stays: ' + pop.querySelectorAll('.nitem').length);
+  // 2.1052.0 (#5808): News show bundled per task (the plain list is gone): one bundle per task, its title the task's
+  const gts = sel => [...d.querySelectorAll(sel + ' .ngroup')].map(g => { const t = g.querySelector('.ngt'); return t ? t.textContent.replace(t.querySelector('.ngn')?.textContent || '', '').trim() : ''; });  // without the unread count
+  const bellG = gts('#pop .bpop');
+  check(!pop.classList.contains('hidden') && pop.classList.contains('bellpop') && bellG.length >= 2 && bellG.some(t => /^Go live/.test(t)) && bellG.some(t => /^Bobs own/.test(t)) && w.eval('S.route.mod') === 'tasks',
+    'bell: a dropdown with the newest News (bundled per task), the list stays: ' + bellG.join('|'));
   check(pop.querySelector('.bpop [data-bp="all"]') && /Show all/.test(pop.querySelector('[data-bp="all"]').textContent) && pop.querySelector('[data-bp="readall"]'), '"Show all" + "Mark all as read"');
-  const chips = [...pop.querySelectorAll('.nchips [data-bpk]')].map(x => x.textContent.trim());
+  const chips = [...pop.querySelectorAll('.nchips [data-bpk]')].map(x => x.textContent.trim().replace(/\d+\+?$/, ''));  // 2.1052.0 (#5808): without the chips' "waits for you" count (2.1037.0 #5807)
   check(chips[0] === 'All' && chips.includes('Mentions') && chips.includes('Assignments') && !chips.includes('Status'), 'chips only for kinds that are there: ' + chips.join(','));
   click(w, pop.querySelector('[data-bpk="mention"]')); await sleep(100);
   pop = d.querySelector('#pop');
-  check([...pop.querySelectorAll('.bpop .nitem')].every(x => x.classList.contains('k-mention')) && pop.querySelectorAll('.bpop .nitem').length === 1 && w.eval(`LS.get('newsKind')`) === 'mention',
-    'chip "Mentions": only mentions (remembered on this device)');
+  // 2.1052.0 (#5808): the one bundle of the mention (was: one row k-mention)
+  check(gts('#pop .bpop').length === 1 && /^Bobs own/.test(gts('#pop .bpop')[0]) && /mention/.test(pop.querySelector('.bpop .ngroup .ngs')?.textContent || '') && w.eval(`LS.get('newsKind')`) === 'mention',
+    'chip "Mentions": only mentions (remembered on this device) ' + gts('#pop .bpop').join('|'));
   click(w, pop.querySelector('[data-bpk="mention"]')); await sleep(100);
-  check(d.querySelectorAll('#pop .bpop .nitem').length === nb.length && w.eval(`S.nf.kind`) === '', 'the same chip again: all');
+  check(gts('#pop .bpop').join('|') === bellG.join('|') && w.eval(`S.nf.kind`) === '', 'the same chip again: all');  // 2.1052.0 (#5808): the same bundles again
   key(w, d.body, 'Escape'); await sleep(100);
   check(d.querySelector('#pop').classList.contains('hidden') && w.eval('S.route.mod') === 'tasks', 'Esc closes, the list stays');
   click(w, d.querySelector('#kbar .bell')); await idle(w);  // 2.152.3 (#2619): the bell in the head bar
   click(w, d.querySelector('#scrim')); await sleep(100);
   check(d.querySelector('#pop').classList.contains('hidden'), 'a click outside closes');
   click(w, d.querySelector('#kbar .bell')); await idle(w);  // 2.152.3 (#2619): the bell in the head bar
-  const first = d.querySelector('#pop .bpop .nitem');
+  // 2.1052.0 (#5808): a bundle of one opens with its head; a bundle of several unfolds and its row opens
+  let first = d.querySelector('#pop .bpop .ngroup .ngmain[data-bp="open"]');
+  if (!first) { click(w, d.querySelector('#pop .bpop .ngroup .ngmain[data-act="news-group"]')); await until(() => d.querySelector('#pop .bpop .ngitems .nitem')); first = d.querySelector('#pop .bpop .ngitems .nitem'); }
   const tid = w.eval(`S.nf.items[${first.dataset.i}].task_id`);
+  check(tid > 0, 'a bundle leads to an entry with its task');
   click(w, first); await idle(w);
   check(d.querySelector('#pop').classList.contains('hidden') && w.eval('S.sel') === tid, 'an item opens its task, the dropdown closes');
   click(w, d.querySelector('#kbar .bell')); await idle(w);  // 2.152.3 (#2619): the bell in the head bar
@@ -223,9 +230,11 @@ const HEAD = `(() => {
   const vchips = [...d.querySelectorAll('#view .nchips [data-nk]')];
   check(vchips.length >= 3 && vchips[0].classList.contains('on'), 'News view: chips, "All" on');
   click(w, d.querySelector('#view .nchips [data-nk="assign"]')); await sleep(300);
-  check(d.querySelectorAll('#view .nitem').length >= 1 && [...d.querySelectorAll('#view .nitem')].every(x => /k-(assign|unassign)/.test(x.className)), 'News view: chip "Assignments"');
+  // 2.1052.0 (#5808): the bundles carry only the assignment in their summary line (was: rows k-assign)
+  check(gts('#view').length >= 1 && [...d.querySelectorAll('#view .ngroup .ngs')].every(x => /^(assigned to you|unassigned)$/.test(x.textContent.replace(x.querySelector('time')?.textContent || '', '').replace(/ · $/, '').trim())) && gts('#view').every(t => /^Go live/.test(t)), 'News view: chip "Assignments" ' + [...d.querySelectorAll('#view .ngroup .ngs')].map(x => x.textContent).join('|'));
   click(w, d.querySelector('#view .nchips [data-nk=""]')); await sleep(300);
-  check(d.querySelectorAll('#view .nitem').length === nb.length, 'News view: "All" again');
+  // 2.1052.0 (#5808): the bell's tasks again (the opened entry is read now: its task may stand once more in the history)
+  check([...new Set(gts('#view'))].sort().join('|') === [...new Set(bellG)].sort().join('|'), 'News view: "All" again ' + gts('#view').join('|'));
   w.close();
   // phone: a sheet from the bottom
   w = await boot({user: 'bob', mobile: true, hash: 'l/' + L}); d = w.document;

@@ -116,10 +116,13 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   const CKA = await login('anna');
   await call('POST', `/api/tasks/${T[5]}/comments`, {body: 'Looks good'}, CKA);
   w = await boot({user: 'alice', mobile: true, hash: 'l/' + P}); d = w.document;
-  await w.eval(`bellPop(document.querySelector('#top .bell'))`); await until(() => d.querySelectorAll('#pop .bplist .nitem').length >= 2);
-  const items = [...d.querySelectorAll('#pop .bplist .nitem')];
-  check(items.some(n => /Claude left 5 comments on 5 tasks/.test(n.textContent)), 'A5: the bell: "Claude left 5 comments on 5 tasks"');
-  const anna = items.find(n => /Anna commented/.test(n.textContent));
+  // 2.1052.0 (#5808): the bell shows the bundles per task (the plain list is gone): the agent's grouped comment is one
+  // bundle with its own line, Anna's comment the bundle of its task with what she wrote; a click on its head opens the task
+  await w.eval(`bellPop(document.querySelector('#top .bell'))`); await until(() => d.querySelectorAll('#pop .bplist .ngroup').length >= 2);
+  const items = [...d.querySelectorAll('#pop .bplist .ngroup')];
+  check(items.some(n => /Claude left 5 comments on 5 tasks/.test(n.querySelector('.ngt')?.textContent || '')), 'A5: the bell: "Claude left 5 comments on 5 tasks"');
+  const anna = items.find(n => /Looks good/.test(n.querySelector('.ngex')?.textContent || ''))?.querySelector('.ngmain[data-bp="open"]');
+  check(anna, 'A5: Anna\'s comment is a bundle of one that opens directly');
   click(w, anna); await until(() => w.eval('S.sel') === T[5]);
   check(w.eval('S.sel') === T[5] && d.querySelector('#pop').classList.contains('hidden'), 'A5: an item opens its task');
   // 2.358 (#3402): on a phone the bell opens 260 ms after closeDetail (detail.js), idle() may end before that
@@ -134,8 +137,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   closeAll(w); w.close();
   // P9: the News view has one filter row
   w = await boot({user: 'alice', hash: 'news'}); d = w.document;
-  await until(() => d.querySelector('#view .nitem'));
-  check(d.querySelectorAll('#view .nchips').length === 1 && !d.querySelector('#view .nbar .seg') && d.querySelectorAll('#view .nchips button').length >= 2 && [...d.querySelectorAll('#view .nchips button')].filter(b => /^All$/.test(b.textContent.trim())).length === 1, 'P9: News: one filter row, "All" once: ' + [...d.querySelectorAll('#view .nchips button')].map(b => b.textContent.trim()).join('|'));
+  await until(() => d.querySelector('#view .ngroup'));  // 2.1052.0 (#5808): the bundles (was: a row of the plain list)
+  check(d.querySelectorAll('#view .nchips').length === 1 && !d.querySelector('#view .nbar .seg') && d.querySelectorAll('#view .nchips button').length >= 2 && [...d.querySelectorAll('#view .nchips button')].filter(b => /^All(\d+\+?)?$/.test(b.textContent.trim())).length === 1 /* 2.1052.0 (#5808): "All" carries the "waits for you" count (2.1037.0 #5807) */, 'P9: News: one filter row, "All" once: ' + [...d.querySelectorAll('#view .nchips button')].map(b => b.textContent.trim()).join('|'));
   click(w, d.querySelector('#view [data-act="news-filter"][data-f="me"]')); await idle(w);
   check(w.eval('S.nf.filter') === 'me' && d.querySelector('#view [data-fme]').getAttribute('aria-pressed') === 'true', 'P9: "Mentions & assigned to me" is a chip in that row');
   click(w, d.querySelector('#view [data-fme]')); await idle(w);

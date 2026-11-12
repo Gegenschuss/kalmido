@@ -1,5 +1,6 @@
 // 2.147.1 C UI tests (#2405): News with an unread agent approval -- the bell number (S.news.unread_me) equals the count of
 // the section "For you" (one approval = 1), the divider of the read items reads "Read" (own key "Read|section", no suffix).
+// 2.1052.0 (#5808): News show only bundled per task: the checks read the section "For you" (.nsect.me) and the history's head.
 // freelancer-matrix: news (the same page without an organisation is covered by p21443_c_api_test.py).
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -39,13 +40,17 @@ const FEAT = 'comments,collab,agents';
     [ME.id, 'approval', T, ag.id, '{"title": "Prepare the offer"}', '2026-04-01T10:00:00Z', null],
     [ME.id, 'approval', T2, ag.id, '{"title": "Old thing"}', '2026-03-01T10:00:00Z', '2026-03-02T10:00:00Z']]);
   const w = await boot({user: 'alice', hash: 'news'}), d = w.document;
-  await until(() => d.querySelector('.nlist .nitem')); await sleep(300);
+  // 2.1052.0 (#5808): the one bundled view - wait for the approval's bundle under "For you" (was: a row of the plain list)
+  await until(() => d.querySelector('.nbund .nsect.me .ngroup.needs') && d.querySelector('.bell .nbadge'));
   const bell = +(d.querySelector('.bell .nbadge')?.textContent || 0);
   check(bell === 1, '#2405: the bell number counts the agent approval ' + bell);
-  const sec = d.querySelector('.nsec.me .c.nunread');
+  const me = d.querySelector('.nbund .nsect.me'), sec = me?.querySelector('.nsh .c');
   check(sec && +sec.textContent === bell, `#2405: section "For you" equals the bell number (${bell}) ` + sec?.textContent);
+  check(me && [...me.querySelectorAll('.ngroup')].length === 1 && /Prepare the offer/.test(me.querySelector('.ngroup .ngt')?.textContent || '') && /approval waits/.test(me.querySelector('.ngroup .ngs')?.textContent || ''),
+    '#2405/#5808: "For you" shows the waiting approval as its bundle: ' + (me?.textContent || '').replace(/\s+/g, ' ').slice(0, 120));
   // 2.1037.0 (#5807): "Read" became the history (Also new + Read, folded by default; boot opens it)
-  const rd = d.querySelector('.nsec.hist [data-act="news-hist"] span');
+  const rd = d.querySelector('.nsect.nhist [data-act="news-hist"] span');  // 2.1052.0 (#5808): the bundled history's head
+  check(/Old thing/.test(d.querySelector('.nsect.nhist .ngroup.read .ngt')?.textContent || ''), '#5808: the read approval stands in the open history');
   check(rd && rd.textContent.trim() === 'History', '#2405/#5807: the divider reads "History": ' + (rd && rd.textContent));
   w.close();
   console.log(`p21443_c_ui: ${ok} ok, ${F.length} failed`);
