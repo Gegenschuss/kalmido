@@ -722,6 +722,9 @@ none, everything else answers `404`. Paths start at the shared folder. Role `vie
 folder shared with you to edit (its id: `list_files`, the knowledge folders are folders of the file store; they show there
 only with `files:read` AND `wiki:read`). Encrypted
 knowledge spaces never reach you. Every save lands in the page's history, where people can restore an older text.
+2.1045.0: a person may share a whole knowledge area with you at once (paths then start at `Knowledge/`, a new page may go
+to the top: `folder_id` = the area's root from `list_files`). Folders the person excluded for you do not exist for you
+(`get_agent` `data_lock.wiki_folders_count` says how many); do not ask for or look for them.
 2.654.0: when your token is limited to selected projects, you reach no knowledge page at all (a page belongs to no
 project), and the message search finds no team chat channel or group messages (only those of your projects).
 2.488.0: `wiki_files` (`page_id`) lists the PDFs and pictures of such a page, `wiki_read_file` (`file_id`) reads one as text

@@ -233,6 +233,26 @@ releases it). Names in a locked target are compared in the browser. Undo moves t
 space. If a key changes between the check and the move, the server refuses it (`409`) and the browser tries once more. The
 server never sees a plain name or text of a locked space; the history of such a move keeps no page names.
 
+## Sharing the whole knowledge area with an agent
+
+*Since 2.1045.0 (#5823).*
+
+*Share whole knowledge area…* in the space's menu "…" (or a right-click on "Knowledge" at the top of the side panel)
+opens the usual Share dialog on the area itself: choose an agent and *Can view* / *Can edit*. Before the share is made
+the dialog says how many folders and pages become visible and how many folders are excluded. The share covers every
+folder and page of the area, also the ones added later; the agent's paths start at "Knowledge". Only agents: in the
+private space your own personal agent, in an organisation its agents; people keep getting single folders or pages. An
+area encrypted in the browser cannot be shared (a sentence instead of the dialog).
+
+Single folders can be kept out for one agent: in the dialog below the agent *Excluded:* with *Exclude folders…*
+(several at once), or in a folder's menu *Exclude from the area share* / *Include again*. The folder then shows
+"not for <agent>". An excluded folder with everything in it -- also pages added later -- does not exist for that agent
+(not listed, not found, not readable); renaming or moving the folder keeps the exclusion. A folder or page inside it
+that you share with the agent on its own stays visible. Folders and pages below a whole-area share show
+"shared via: whole knowledge area" in their Share dialog. The exclusions are part of the agent's data lock
+(see [AGENTS.md](AGENTS.md#data-the-agent-never-sees)); only who may change the agent sets them.
+Route of the dialog's facts: `GET /api/wiki/area-share?space=private|org:<id>[&agent_id=]`.
+
 ## Sharing a page or a folder, read only
 
 *Since 2.123.0.*

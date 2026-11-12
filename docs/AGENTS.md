@@ -3289,6 +3289,13 @@ team agent, an instance admin locks data for one agent in its settings (section 
   lists or `404`, the routes that change data or need the module answer `403`.
 - **Projects**: single lists.
 - **Tags**: tasks with one of these tags (a personal tag or a project tag), with all their subtasks.
+- **Knowledge folders** (*since 2.1045.0, #5823*): `wiki_folders` = folder ids of a knowledge tree. A share ABOVE such a
+  folder (above all the share of a whole knowledge area) gives the agent nothing in it: the folder and everything below
+  it, also pages added later, are not there for the agent (`404`, not in `wiki_list`, not in the search, not in the file
+  store's listings). The exclusion stays with the folder when it is renamed or moved. A share of the folder itself or of a
+  folder / page inside it wins (whoever shares it on its own means it). `PATCH {"wiki_folders": [ids]}` replaces the list
+  (at most 200; only folders the editor may share, never the area's root: else `400`); `GET` names them
+  (`[{id, name, path}]`, `name` / `path` `null` for a folder the editor no longer sees).
 
 The server enforces it in **every** read path of the agent with one check (lists, tasks, search, filters, calendar,
 comments, attachments, the roadmap, events, the chat context, the input of proposal requests such as *Sort the basket*,
@@ -3304,7 +3311,8 @@ The agent reads WHAT is locked, never the names of what it cannot see: `GET /api
 
 ```
 "data_lock": {"areas": ["journal", "mood", "health", "budget", "reading", "mail"],  // + "calendar", "contacts" when locked
-              "always": ["journal", "mood", "health", "budget", "reading"], "list_ids": [12], "tags_count": 1}
+              "always": ["journal", "mood", "health", "budget", "reading"], "list_ids": [12], "tags_count": 1,
+              "wiki_folders_count": 1}  // 2.1045.0: how many knowledge folders are excluded, never their names
 ```
 
 and the event `data_lock_changed` (`data.data_lock`, the same object) when the owner changes it. Nothing to do for the
@@ -4877,6 +4885,13 @@ organisation; a private page: the person's own agent). Pages of end-to-end encry
 the API (the server cannot read them). Stopping the share ends the access at once.
 The paths an agent gets start at the shared node (the shared folder's name, or the page's own name): nothing about the
 folders above it. A person's own token sees what the person sees in the app (full paths of their own spaces).
+**A whole area (2.1045.0, #5823).** A person can share the whole knowledge area of a workspace with an agent at once
+(*Share whole knowledge area…* at "Knowledge"): a share on the area's root node, so every folder and page counts, also
+the ones added later; the agent's paths then start at `Knowledge/…`, and the agent may add pages at the top
+(`folder_id` = the root's id, from `list_files`) with `edit`. Only agents get it: a private area only the person's own
+agent, an organisation's area only that organisation's agents, never an encrypted area. Single folders can be kept out
+for one agent ([data lock](#data-the-agent-never-sees) `wiki_folders`): they do not exist for it. `GET /api/v1/agent`
+`data_lock.wiki_folders_count` says how many are excluded.
 
 **Writing.** Role `view` reads only (`403`), `edit` writes. `wiki_write` replaces the whole text; send `expect_updated_at`
 (from `wiki_read`): when a person saved in between the answer is `409` with the current page in `error.page` - merge and
