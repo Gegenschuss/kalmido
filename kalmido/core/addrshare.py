@@ -142,7 +142,7 @@ def ads_repath(c, kind, owner_id, old, new):
 def ads_need(c, aid):
     x = ads_row(c, aid)
     k = ADS_KINDS.get(x["kind"]) if x else None
-    if not k or (x["created_by"] != me() and not k["may"](c, me(), x)):  # review F8: who typed it in may always take it back
+    if not k or (x["created_by"] != me() and not k["may"](c, me(), x)):  # review F8: who typed it in may always remove it
         raise Denied(404)
     return x
 
@@ -172,7 +172,7 @@ def ads_list_route():
 
 @app.delete("/api/addr-shares/<int:aid>")
 def ads_delete_route(aid):
-    """Take an open share by address back (it is not kept: typed in again = a new row)."""
+    """Remove an open share by address (it is not kept: typed in again = a new row)."""
     c = db()
     ads_drop(c, ads_need(c, aid)["id"])
     c.commit()

@@ -714,8 +714,8 @@ async function adsFill(box, q) {
   if (!box) return;
   let j; try { j = await rawFetch('GET', '/api/addr-shares?' + q); } catch { box.innerHTML = ''; return; }
   if (!box.isConnected) return;
-  box.innerHTML = (j.open || []).map(x => `<div class="mrow"><span class="n">${esc(x.email || '?')} <span class="muted">${esc(tr('Invited: gets access once the address is confirmed'))}</span></span><button type="button" class="iconbtn" data-adsrm="${esc(x.id)}" title="${esc(tr('Take back the invitation to {0}', x.email || '?'))}" aria-label="${esc(tr('Take back the invitation to {0}', x.email || '?'))}">${ic('x', 's')}</button></div>`).join('');
-  box.onclick = async e => { const b = /** @type {any} */ (e.target).closest('[data-adsrm]'); if (!b) return; e.stopPropagation(); try { await api('DELETE', `/api/addr-shares/${b.dataset.adsrm}`); } catch { return; } toast(tr('Invitation taken back')); adsFill(box, q); };
+  box.innerHTML = (j.open || []).map(x => `<div class="mrow"><span class="n">${esc(x.email || '?')} <span class="muted">${esc(tr('Invited: gets access once the address is confirmed'))}</span></span><button type="button" class="iconbtn" data-adsrm="${esc(x.id)}" title="${esc(tr('Remove the invitation to {0}', x.email || '?'))}" aria-label="${esc(tr('Remove the invitation to {0}', x.email || '?'))}">${ic('x', 's')}</button></div>`).join('');
+  box.onclick = async e => { const b = /** @type {any} */ (e.target).closest('[data-adsrm]'); if (!b) return; e.stopPropagation(); try { await api('DELETE', `/api/addr-shares/${b.dataset.adsrm}`); } catch { return; } toast(tr('Invitation removed')); adsFill(box, q); };
 }
 function shareModal(id, opt = {}) {
   const l0 = listById(id); if (!shareOk(l0)) return;
