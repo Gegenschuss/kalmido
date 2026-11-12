@@ -433,6 +433,7 @@ QUERY = {
     "GET /api/files/collections/{}": {"space": "private"}, "GET /api/wiki/refs": {"file": "{node}"},
     "GET /api/team/dispo/callsheets": {"list": "{list}"},  # 2.988.0 (#5651): the call sheets of a project need ?list=
     "GET /api/v1/help/section": {"key": "api#scan-inboxes-folder-watcher"},  # 2.1067.0 (#5819): one help section needs ?key= (job/4239)
+    "GET /api/addr-shares": {"kind": "list", "ref": "{list}"},  # #5658: the open shares by address of a project need ?kind=&ref= (job/4281)
 }
 
 
