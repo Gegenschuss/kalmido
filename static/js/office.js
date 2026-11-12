@@ -579,7 +579,7 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-sr', tr('Day rate'), `<input id="os-sr" value="${esc(fmtNum(s.share_rate ?? psh.rate, 2))}" inputmode="decimal" class="numin" ${dis}>`, `${ofcCur()} ${tr('per day')}`, {keep: 1})}
     </div>` : ''}
     ${ofcChk('os-raw-on', tr('Raw data surcharge'), s.raw_on)}
-    ${ofcChk('os-subtotals-on', tr('Subtotal under every section (new quotations and invoices)'), s.subtotals_on) /* 2.1041.0 (#5816) */}
+    ${/*html-ok*/ ofcChk('os-subtotals-on', tr('Subtotal under every section (new quotations and invoices)'), s.subtotals_on) /* 2.1041.0 (#5816) */}
     <div class="ofcrule" data-rule="raw">
     ${ofcRowF('os-rf', tr('Raw data factor'), `<input id="os-rf" value="${esc(fmtNum(s.raw_factor, 2))}" inputmode="decimal" class="numin" ${dis}>`)}${ofcII('rf', tr('raw data amount = sum of the raw data positions × factor'))}
     </div>
