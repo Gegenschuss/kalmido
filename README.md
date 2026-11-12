@@ -19,12 +19,11 @@
 
 ## What's new
 
-**2.1040.0** (2026-11-12):
-- **Search**: one search over every area (palette "Everywhere", `GET /api/search?kind=`, `GET /api/v1/search?kind=`, MCP tool `search`); calendar events are searchable.
-- **Accounts**: confirm your own e-mail address under Settings > Account (a mailed one-time link); invitations by address and e-mails from your own address count only for a confirmed address.
-- **Trash and undo**: quotation and invoice drafts, trips and card positions go to the shared trash; the toast's "Undo" takes back exactly its own step.
-- **Split view**: always visible dividing line, adjustable split width, drag onto "Open here".
-- **Backup**: backups from before 2.37 (`tasks.db`) are refused on restore (restore with 2.36, update through 2.37).
+**2.1061.0** (2026-11-12):
+- **Office**: quotations with optional / alternative positions, subtotals per section, flat price print and repricing (x %, target total, target surplus); discounts as a fixed amount and per position.
+- **Agents**: approved steps run from the card (`run_approved_step`); "Sees now" in the agent dialog; a whole knowledge area can be shared with an agent, folders excluded per agent; `wiki_append` adds text to a knowledge page.
+- **Bell**: "For you" shows exactly what the bell counts (mentions, due tasks, invitations); the rest is a folded history.
+- **Split view**: one-click switch next to the bell (Shift+V).
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
