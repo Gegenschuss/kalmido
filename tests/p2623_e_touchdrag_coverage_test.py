@@ -51,6 +51,8 @@ TD_SITES = {
     ("areas.js", "#side .sbbt"): ("drag.js", "areas.js"),
     ("favtiles.js", "const drag = isTouch()"): ("drag.js", "favtiles.js"),  # favourite tiles (see #4618); 2.655.0 (#5085): was isMobile()
     ("favtiles.js", ".fv2bar"): ("drag.js", "favtiles.js"),
+    # 2.1060.0 (#5876): #5809 reads on window what other places drag into the favourites row - a receiver, no drag of its own
+    ("favtiles.js", "FV2.add = '';"): ("kein", "a receiver of drags into the favourites row; the finger adds a favourite through the menu entry (fv2_menuRow)"),
     # 2.627.0 (#4961 #4962): a file onto a folder, the icons of the area rail
     ("ablage.js", 'class="abrow"'): ("drag.js", "ablage.js"),
     ("ablage.js", "ab_dragSrc(e.target)"): ("drag.js", "ablage.js"),  # 2.750.0 (#4879): the rows' and cards' dragstart (was .abrow[draggable)
@@ -74,6 +76,8 @@ TD_SITES = {
     ("refs.js", "rf_srcKey"): ("kein", "a reference dropped into a text box; the finger has the button Insert reference (refs.js)"),
     # 2.760.0 (#4859): dragging between the halves of the split view - the split view exists only on a wide screen with a mouse (splitview.js)
     ("refs.js", "includes(RF_MIME)) return;"): ("kein", "the drag between the split view's halves: the split view is mouse-only (splitview.js, #4858)"),
+    # 2.1060.0 (#5876): #5802 the split view's "Open here" field reads on window what is dragged from the page - a receiver, mouse-only like the split view
+    ("splitview.js", "spl_dropOff();"): ("kein", "a receiver: the split view's Open here field; the split view is mouse-only (splitview.js, #4858)"),
     ("refs.js", "b.hasAttribute('draggable')"): ("kein", "document cards draggable only with a mouse while the split view is on (#4859)"),
 }
 
