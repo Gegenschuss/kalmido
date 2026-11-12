@@ -821,6 +821,8 @@ function topFolded() {
 // view actions (select, sort), then the list's own menu or the filter
 function topMoreItems() {  // 2.99.0 B (#2183): + the knowledge pages' "Space" section
   const fv = fv2_topItems(), o0 = topMoreItems0(), out = fv.length ? [...fv, '-', ...o0] : o0;  // 2.441.0 (#3592): a phone: the star of a page (a list: its own menu has it)
+  const ha = !S.me?.kid && S.me?.kind !== 'agent' && out.length ? hlp_area() : '';  // 2.1072.0 (#5820): "Help for this area" where the "…" is shown anyway
+  if (ha) out.push('-', {label: tr('Help for this area'), icon: 'help', cls: 'mhlp', fn: () => go('help/area:' + ha)});
   if (S.route.mod !== 'wiki' || S.me?.kid || typeof w299_areaItems !== 'function') return out;
   return [...out, ...(out.length ? ['-'] : []), ...w299_areaItems()];
 }
@@ -1249,6 +1251,7 @@ function renderView0() {
   else if (S.route.key === 'archived') setHtml(el, viewArchived());
   else if (S.route.key === 'mine_wait') setHtml(el, viewMineWait());  // 2.392.0 D (#3369)
   else if (S.route.key === 'favorites') setHtml(el, viewFavPage());  // 2.441.0 (#3592)
+  else if (S.route.key === 'help') setHtml(el, viewHelp());  // 2.1072.0 (#5820): the page "Help" (helpview.js)
   else if (S.route.key === 'steps') setHtml(el, viewSteps());  // 2.773.0 (#5250): the page "Recent steps" (undolist.js)
   else if (S.route.key === 'projects') setHtml(el, viewProjStart());  // 2.417.0 A (#3559)
   else if (isRoadmap()) setHtml(el, viewRoadmap());
@@ -2237,7 +2240,7 @@ function viewListBody() {
       // (it nods, botNod); a list without tasks gets the symbol pattern
       : v.done.length ? o3c_empty(tr('All done.'), '', 'erledigt')
       : flt ? emptyState({icon: 'filter', title: tr('No tasks match the filter.'), sub: tr('A filter is active: {0}', flt.name), action: `<div class="eacts">${/*html-ok*/ flt.btn/* lst_emptyFilter */}</div>`, cls: 'efilt'})  // 2.891.0 (#5440)
-      : emptyState({icon: 'list', title: tr('No tasks.'), sub: rl && !ro ? (isMobile() && !tabletDock() ? tr('Add the first one with the + button.') : tr('Add the first one with the field below.')) : '', action: secBtn ? `<div class="eacts">${/*html-ok*/ secBtn/* the button above */}</div>` : ''});  // 2.25.0 (UX-27): what this device shows; 2.891.0 (#5440): "+ Section" right under the text
+      : emptyState({icon: 'list', title: tr('No tasks.'), sub: rl && !ro ? (isMobile() && !tabletDock() ? tr('Add the first one with the + button.') : tr('Add the first one with the field below.')) : '', action: secBtn || (rl && !ro) ? `<div class="eacts">${/*html-ok*/ secBtn/* the button above */}${/*html-ok*/ rl && !ro ? hlp_linkHtml('tasks') : ''/* 2.1072.0 (#5820): How it works */}</div>` : ''});  // 2.25.0 (UX-27): what this device shows; 2.891.0 (#5440): "+ Section" right under the text
   }
   let lastSub = '';
   // 2.17.0 (#649): a very long view renders its first ROW_CAP rows, then "Show more" (also by itself when it scrolls into

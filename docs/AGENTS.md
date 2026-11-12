@@ -4905,6 +4905,10 @@ found = say so.
 | Search by words (English works best; word beginnings, case and accents do not matter): `{data: [{key, file, title, path, snippet}], more}`, best first; nothing = `[]` | `GET /api/v1/search?kind=help&q=&limit=` (1-20, default 8; not part of `kind=all`) | `search_help` |
 | One section by its key, up to the next heading of the same rank: `{key, file, title, path, text, truncated, parts, ui_terms, show}`; at most 16,000 characters, then `truncated` and its sub-sections in `parts` | `GET /api/v1/help/section?key=api%23scan-inboxes-folder-watcher&lang=` | `read_help` |
 
+- **The user's how-tos first (2.1072.0, #5820):** the sections people read in the app's *Help* ("How to: ...", per area:
+  files, agents, office, tasks, calendar) come first in a search, marked `user: <area>`; their click paths name the labels
+  of the screen and are checked against it in CI. `read_help` of such a section also has `user`, `show` (the named place of
+  the app, "Show me") and `translated: {lang, title, text}` - the same text in the person's language: quote that one.
 - **Keys only:** a section is read by the key of the index built from the files (`<file>#<heading>`, e.g.
   `api#scan-inboxes-folder-watcher`; a file's title: `api`); a file name, a path or an unknown key answers `404`.
 - **ui_terms:** the interface labels the section names (`*Label*`, the parts of `Settings > Integrations > ...`) with the same

@@ -43,6 +43,7 @@ KNOWN = {
     "evopen": ("shared", {"contacts.js"}),
     "fslv": ("shared", {"ablage.js"}),
     "hbmopen": ("shared", {"hubmail.js"}),
+    "hlp": ("shared", {"settings.js"}),  # 2.1072.0 (#5820): Settings > Help opens the page Help like the links of palette.js hlp_linkHtml
     "imr": ("shared", {"office.js"}),
     "lead": ("shared", {"office_import.js"}),
     "lt": ("guarded", {"agents.js", "office.js", "office_letters.js"}),

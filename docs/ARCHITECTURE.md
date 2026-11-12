@@ -506,6 +506,14 @@ About shows the window size, pixel ratio, pointer, hover and both switches of th
   person's own `self` counter of the poll; rows are patched in place, the top row stays put. Every write of the app sends
   `X-Kalmido-Device-Name` (`undo.js histDevice`: browser + system + a short mark in localStorage), which
   `core/undogroups.py ug_device` stores as the group's device.
+- *2.1072.0 (the user's help, #5820):* the page *Help* (`static/js/helpview.js`, loaded on demand, `#help`,
+  `#help/area:<area>`, `#help/<key>`) shows the "How to" sections of `docs/*.md` (`<!-- user-help: <area> -->` below the
+  heading) per area, searchable, one section as Markdown. Server: `api/helpuser.py` (`GET /api/help`, `GET /api/help/section`,
+  the web side of the search kind `help`) on the index of `api/helpdocs.py`; the translations stand in `docs/help/<lang>.md`
+  (one block per section with the fingerprint of the English text). Ways in: the command search ("Help" + one entry per
+  section, palette.js `hlp_palItems`), "Help for this area" in the header's "…", "How it works" in empty states
+  (`hlp_linkHtml`), Settings > Help. `tools/check_userhelp.py` (CI): every **label** of a section is a text of `static/js`,
+  every language has a current translation whose labels are the screen's words.
 - Every answer carries `Server-Timing: app;dur=…, db;dur=…;desc="n=<statements>"` (`core/reqtime.py`, counted per
   thread in `core/pg.py`). A request slower than `KALMIDO_SLOW_REQUEST_MS` (default 500, 0 = off) logs one line with
   method, route pattern, duration, statements and database time; `GET /api/admin/health` has p50 / p95 / max of the

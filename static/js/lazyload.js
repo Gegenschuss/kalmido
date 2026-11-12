@@ -109,6 +109,7 @@ const LD_MODS = {
   quotes: ['quotes_dada'],  // 2.955.0 (#5239): the Dada quote of the day (the sign-in page, Today; account.js qd_slot)
   // 2.1030.0 (#5785): the quote's own texts of one interface language (after quotes, LD_NEED); only that language loads
   quotes_es: ['quotes_dada_es'], quotes_fr: ['quotes_dada_fr'], quotes_it: ['quotes_dada_it'], quotes_nl: ['quotes_dada_nl'],
+  helpview: ['helpview'],  // 2.1072.0 (#5820): the view "Help" (#help), the user's how-to sections
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
@@ -157,7 +158,7 @@ const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
 const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
   wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs', 'docview'] /* 2.583.0 (#4835) */, docviews: ['docviews'], life: ['life'],
-  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], fltdlg: ['fltdlg'], abscan: ['abscan'], ablage: ['ablage'] /* 2.558.0 (#4693) */, calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu'], whatsnew: ['whatsnew'], shoot: ['shoot'], splitview: ['splitview'] /* 2.742.0 (#4858) */, undolist: ['undolist'] /* 2.773.0 (#5250) */, evinvite: ['evedit'] /* 2.846.0 (#5465): the event editor */, callsheet: ['callsheet'] /* 2.855.0 (#1956) */};  /* 2.636.0 (#4565) */  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
+  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], fltdlg: ['fltdlg'], abscan: ['abscan'], ablage: ['ablage'] /* 2.558.0 (#4693) */, calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu'], whatsnew: ['whatsnew'], shoot: ['shoot'], splitview: ['splitview'] /* 2.742.0 (#4858) */, undolist: ['undolist'] /* 2.773.0 (#5250) */, evinvite: ['evedit'] /* 2.846.0 (#5465): the event editor */, callsheet: ['callsheet'] /* 2.855.0 (#1956) */, helpview: ['helpview'] /* 2.1072.0 (#5820) */};  /* 2.636.0 (#4565) */  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
 const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
   dpj_projHtml: ['office'],  // 2.168.0 A (#2665): a project page's quotations & invoices (only while the office is on)
   // 2.65.0 (#1823)
@@ -181,7 +182,8 @@ const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewConta
   ms_clView: ['clientpage', 1],  // 2.563.0 (#4742): Office > Clients (clients.js viewClients)
   mr_open: ['minerules'],  // 2.823.0 (#4773): My tasks > Rules…
   viewProjCs: ['callsheet', 1],  // 2.988.0 (#5651): the tab "Call sheets" of a project (projects.js)
-  viewSteps: ['undolist', 1]};  // 2.773.0 (#5250): the page "Recent steps"
+  viewSteps: ['undolist', 1],  // 2.773.0 (#5250): the page "Recent steps"
+  viewHelp: ['helpview', 1]};  // 2.1072.0 (#5820): the page "Help"
 // 2.556.0 (#4685) "New for you": once per new version (the version seen last is a user setting, accounts/whatsnew.py) the
 // server is asked what is new since then; only when there is something the dialog's module loads (whatsnew.js). Nothing at
 // all on a server without the feature (no whatsnew_seen), for agents, in a second window or the capture page.

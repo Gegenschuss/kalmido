@@ -302,7 +302,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 ### Questions about using Kalmido (2.1067.0)
 - "Can Kalmido ...?", "How do I ...?", "Where do I find ...?": look it up before you answer, never guess a menu path.
   `help_overview` lists what exists per area, `search_help` (English words work best) finds the sections of the help of
-  exactly this server's version, `read_help` (the key of a hit) reads one.
+  exactly this server's version, `read_help` (the key of a hit) reads one. Hits with `user` are the how-tos the person
+  also sees in the app's Help (2.1072.0): prefer them; `read_help` gives their text in the person's language (`translated`).
 - Explain the way step by step in the words of the person's interface (`ui_terms` of `read_help`: the labels in their
   language), then what happens afterwards and who may do it (people only, admins, a role), and name the source (the
   section's title). Answer in the person's language; the help itself is English.

@@ -256,7 +256,7 @@ function dc_bodyHtml(fold) {
     return before + grid + after + ab_selBar();  // 2.768.0 (#4888): the area's one bar (ablage.js)
   }
   if (!DC.docs) return `<p class="muted lempty">${tr('Loading…')}</p>`;
-  if (!DC.docs.length) return `<div class="empty nempty dc-empty">${ic('file')}<span>${active || DC.f.review ? tr('No documents found') : tr('Drop PDFs or photos of letters here, or add them with the button. Kalmido reads the text, finds date and amount and sorts them.')}</span></div>`;
+  if (!DC.docs.length) return `<div class="empty nempty dc-empty">${ic('file')}<span>${active || DC.f.review ? tr('No documents found') : tr('Drop PDFs or photos of letters here, or add them with the button. Kalmido reads the text, finds date and amount and sorts them.')}</span>${/*html-ok*/ active || DC.f.review ? '' : hlp_linkHtml('files')/* 2.1072.0 (#5820): How it works */}</div>`;
   return grid + ab_selBar();
 }
 // 2.768.0 (#4888): the choosing mark of every card (documents, files, folders): ablage.js ab_selPick

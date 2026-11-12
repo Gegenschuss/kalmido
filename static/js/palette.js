@@ -276,6 +276,7 @@ function palAll() {
   for (const [v, n, d, l] of LOOK.accent) add('a:accent-' + v, 'action', tr('Accent colour: {0}', tr(n)), 'palette', () => lookSet('accent', v), {qonly: true, sw: light ? l : d});
   add('a:look-reset', 'action', tr('Reset appearance to the defaults'), 'undo', () => { for (const k of LOOK_KEYS) LS.del(k); applyTheme(); applyDensity(); applyLook(); render(); }, {qonly: true});
   add('a:keys', 'action', tr('Keyboard shortcuts'), 'help', shortcutsModal, {keys: '?'});
+  if (S.me?.kind !== 'agent') hlp_palItems(add);  // 2.1072.0 (#5820)
   if (typeof spl_offer === 'function' && spl_offer()) add('a:split', 'action', tr('Split view on / off'), 'columns', () => spl_toggle(), {keys: 'Shift+V'});  // 2.1037.0 (#5803): miniwin.js
   add('a:tour', 'action', tr('Restart the welcome tour'), 'arrow', () => tourStart());
   if (S.sample) add('a:sample-rm', 'action', tr('Remove sample project'), 'trash', () => sampleRemove());
@@ -423,6 +424,34 @@ function palSubItems(add) {
   if (PALX.ws === wsCur()) for (const n of PALX.folders) add('abf:' + n.id, 'view', n.name, 'folder', () => go('ablage/' + n.id), {qonly: true, sub: tr('Files') + (n.many ? ' · ' + ab_spaceName(n.sp) : '')});
   if (PALX.ws === wsCur()) for (const x of PALX.sheets) add('sh:' + x.id, 'sheet', x.title || tr('Untitled table'), 'sheet', () => go('sheets/' + x.id), {qonly: true, sub: [tr('Tables'), x.shared_in ? tr('Shared with me') : x.list_title || ''].filter(Boolean).join(' · ')});  // 2.124.0 C (#2113)
 }
+// 2.1072.0 (#5820): the help (helpview.js, page #help). "Help" is one view of the search; its sections (titles in the person's
+// language, GET /api/help, once per language) are entries while typing: "Scan" finds "Set up a scan inbox". hlp_area = the
+// help area of the shown view (the header's "…", empty states); hlp_linkHtml = the link "How it works" of an empty state.
+const PALH = {list: /** @type {any} */ (null), lg: '', busy: false};
+function hlp_palSet(j) { PALH.list = j; PALH.lg = (typeof I18N !== 'undefined' && I18N.code) || 'en'; }
+function hlp_palLoad() {
+  const lg = (typeof I18N !== 'undefined' && I18N.code) || 'en';
+  if (PALH.busy || (PALH.list && PALH.lg === lg) || S.me?.kind === 'agent') return;
+  PALH.busy = true;
+  rawFetch('GET', '/api/help').then(j => { PALH.busy = false; hlp_palSet(j); if ($('.palette')) { PAL.all = null; if (PAL.q.trim()) palDraw(); } }, () => { PALH.busy = false; });
+}
+function hlp_palItems(add) {
+  add('v:help', 'view', tr('Help'), 'help', () => go('help'), {kw: tr('How it works')});
+  for (const a of PALH.list?.areas || []) for (const s of a.sections) add('hlp:' + s.key, 'view', s.title, 'help', () => go('help/' + encodeURIComponent(s.key)), {qonly: true, sub: tr('Help') + ' · ' + a.title});
+}
+function hlp_area() {
+  const m = S.route.mod;
+  return m === 'tasks' ? (S.route.key === 'help' ? '' : 'tasks') : m === 'cal' ? 'calendar' : m === 'ablage' || m === 'docs' ? 'files' : m === 'office' ? 'office' : m === 'agents' ? 'agents' : '';
+}
+const hlp_linkHtml = area => `<button type="button" class="linkbtn hlplink" data-hlp="${esc(area ? 'area:' + area : '')}">${ic('help', 's')} ${esc(tr('How it works'))}</button>`;
+document.addEventListener('click', e => {  // data-hlp: the help's links (hlp_linkHtml, Settings > Help)
+  const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-hlp]');
+  if (!b) return;
+  e.preventDefault();
+  b.closest('.modal')?.remove();  // Settings > Help: the dialog closes, the page opens
+  const v = b.getAttribute('data-hlp') || '';
+  go(v ? 'help/' + v : 'help');
+});
 const PAL_KIND = {note: N_('note|palette kind'), folder: N_('folder|palette kind'), action: N_('action'), task: N_('task|palette kind'), view: N_('view'), list: N_('project|palette kind'), filter: N_('filter'), tag: N_('tag'), setting: N_('setting'), tasks: N_('task|palette kind'), sheet: N_('table|palette kind')};  // 2.124.0 C (#2113): + sheet
 function palItems() {
   const q = PAL.q.trim();
@@ -507,7 +536,7 @@ function openPalette(mode = null) {
   const ret = document.activeElement && document.activeElement !== document.body && !document.activeElement.closest?.('.palette') ? document.activeElement : PAL.ret;
   closePalette(true); closePop(); PAL.ret = ret;
   PAL.q = ''; PAL.i = 0; PAL.mode = mode; PAL.all = null;
-  if (!mode) palSubLoad();  // 2.87.9 (#1934)
+  if (!mode) { palSubLoad(); hlp_palLoad(); }  // 2.87.9 (#1934); 2.1072.0 (#5820): + the help's topics
   const t = curTask();
   const md = document.createElement('div');
   md.className = 'modal palette';

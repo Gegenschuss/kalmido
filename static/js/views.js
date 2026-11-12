@@ -343,6 +343,7 @@ function titleFor(k) {
   if (SMART[k]) return tr(SMART[k].name);
   if (k === 'favorites') return tr('Favourites');  // 2.441.0 (#3592)
   if (k === 'steps') return tr('Recent steps');  // 2.773.0 (#5250)
+  if (k === 'help') return tr('Help');  // 2.1072.0 (#5820)
   if (k === 'projects') return tr('Projects');  // 2.417.0 A (#3559)
   if (k.startsWith('l:')) return lname(listById(+k.slice(2))) || tr('Project');
   if (k.startsWith('tag:')) return '#' + k.slice(4);
