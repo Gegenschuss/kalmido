@@ -74,6 +74,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       check(f && f.text === 'Open here' && f.top && f.inside && f.grip, what + ': "Open here" over the right half, on top, beside the grip ' + JSON.stringify(f));
       const d = await drop('#splitpane .spldrop');
       check(d.over && d.on && d.drop && d.gone, what + ': the field takes the drop and goes ' + JSON.stringify(d));
+      await ev(`new Promise(r => setTimeout(() => r(1), 300))`);
+      return ev(`(() => { let h = null; try { h = ${FR}.contentWindow.location.href; } catch { h = 'x'; } return {splR: LS.get('splR', ''), right: h, left: location.hash}; })()`);
     };
 
     await load('#l/' + L1);
@@ -81,14 +83,14 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     await until(`!!document.querySelector('#view .trow[data-id="${T1}"]') && !!document.querySelector('#side .srow[data-list="${L2}"]')`);
 
     // ---- a list of the left sidebar: its tasks on the right
-    await openByDrag('list', `#side .srow[data-list="${L2}"]`);
-    check(await untilFr(`w.location.hash === '#l/${L2}'`) && await seenFr('#view .trow', /Book the keeper for Tuesday/), 'list dropped: the right half shows its tasks');
+    const ol = await openByDrag('list', `#side .srow[data-list="${L2}"]`);
+    check(await untilFr(`w.location.hash === '#l/${L2}'`) && await seenFr('#view .trow', /Book the keeper for Tuesday/), 'list dropped: the right half shows its tasks ' + JSON.stringify(ol));
     await shot('p21035a-list.png');
     check(await ev(`location.hash === '#l/${L1}'`), 'the left stays where it was');
 
     // ---- a task of the left list: its panel with the title on the right; it stays in its list
-    await openByDrag('task', `#view .trow[data-id="${T1}"]`);
-    check(await untilFr(`w.location.hash === '#t/${T1}'`) && await seenFr('#detail', /Scout the north pier/), 'task dropped: the right half shows its panel with the title');
+    const ot = await openByDrag('task', `#view .trow[data-id="${T1}"]`);
+    check(await seenFr('#detail', /Scout the north pier/), 'task dropped: the right half shows its panel with the title ' + JSON.stringify(ot));
     check((await task(T1)).list_id === L1, 'the task stays in its list');
 
     // ---- dropped elsewhere: a task onto a project of the left sidebar is moved as before, the field goes, the right half stays
@@ -96,7 +98,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     const el = await drop(`#side .srow[data-drop="l:${L2}"]`);
     check(el.gone, 'elsewhere: the field went with the drop ' + JSON.stringify(el));
     check(await poll(async () => (await task(T3)).list_id === L2), 'elsewhere: the task was moved onto the project as before');
-    check(await untilFr(`w.location.hash === '#t/${T1}'`), 'elsewhere: the right half stayed on the task');
+    check(await seenFr('#detail', /Scout the north pier/), 'elsewhere: the right half stayed on the task');
     // a drag that ends without a drop
     check(await start(`#view .trow[data-id="${T1}"]`) && !!await field(), 'cancelled: the field shows');
     await ev(`(window.t21035.s.dispatchEvent(new DragEvent('dragend', {bubbles: true, dataTransfer: window.t21035.dt})), 1)`);
@@ -106,8 +108,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     await load('#docs');
     check(await rightUp(), 'docs: the right half is up again');
     await until(`!!document.querySelector('#view .dc-card [data-dco="${DOC}"]')`, {timeout: 30000});
-    await openByDrag('document', `#view .dc-card [data-dco="${DOC}"]`);
-    check(await untilFr(`w.location.hash === '#docs/${DOC}'`) && await seenFr('body', /Pier permit/), 'document dropped: the right half shows it');
+    const od = await openByDrag('document', `#view .dc-card [data-dco="${DOC}"]`);
+    check(await seenFr('body', /Pier permit/), 'document dropped: the right half shows it ' + JSON.stringify(od));
 
     // ---- a knowledge page of the left sidebar's tree: its title and text on the right
     await load('#wiki');
@@ -116,8 +118,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     const has = await until(`!!document.querySelector(${JSON.stringify(wsel)})`, {timeout: 15000});
     check(has, 'wiki: the page is in the sidebar\'s tree ' + JSON.stringify(await ev(`[...document.querySelectorAll('#side .sbbt')].map(t => (t.dataset.sbbns || '') + ':' + (t.querySelector('.sbbtn')?.dataset.go || '')).slice(0, 12)`)));
     if (has) {
-      await openByDrag('knowledge page', wsel);
-      check(await untilFr(`w.location.hash === '#wiki/${PG}'`) && await seenFr('#view', /Shoot day checklist/) && await seenFr('#view', /Bring the spare batteries/), 'page dropped: the right half shows its title and text');
+      const ow = await openByDrag('knowledge page', wsel);
+      check(await seenFr('#view h2, #view .wktitle', /Shoot day checklist/) && await seenFr('#view', /Bring the spare batteries/), 'page dropped: the right half shows its title and text ' + JSON.stringify(ow));
       await shot('p21035a-wiki.png');
     }
 

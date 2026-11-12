@@ -151,15 +151,28 @@ window.addEventListener('dragstart', e => {
     if (SPL.dr !== r || !SPL.el || SPL.el.querySelector('.spldrop')) return;
     const z = document.createElement('div'); z.className = 'spldrop';
     z.innerHTML = `<span class="spldropt">${ic('panel')}${esc(tr('Open here'))}</span>`;
-    const over = ev => { if (!SPL.dr) return; ev.preventDefault(); ev.stopPropagation(); if (ev.dataTransfer) ev.dataTransfer.dropEffect = spl_eff(ev.dataTransfer.effectAllowed); z.classList.add('on'); };
-    z.addEventListener('dragenter', over); z.addEventListener('dragover', over);
-    z.addEventListener('dragleave', ev => { if (!z.contains(/** @type {Node} */ (ev.relatedTarget))) z.classList.remove('on'); });
-    z.addEventListener('drop', ev => {
-      const to = SPL.dr; ev.preventDefault(); ev.stopPropagation(); spl_dropOff();
-      if (to) spl_show(to);
-    });
     SPL.el.appendChild(z);
   }, 0);
 }, true);
+// over and onto the field: on the window in the capture phase, before the page's own handlers on the document (sidebar.js
+// takes every drop of a dragged list there with stopImmediatePropagation); the field's drop stops here, so they never see it
+const spl_atField = e => SPL.dr ? /** @type {Element} */ (e.target)?.closest?.('#splitpane .spldrop') || null : null;
+const spl_over = e => {
+  if (!SPL.dr) return;
+  const z = spl_atField(e);
+  if (!z) { SPL.el?.querySelector('.spldrop.on')?.classList.remove('on'); return; }
+  e.preventDefault(); e.stopPropagation();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = spl_eff(e.dataTransfer.effectAllowed);
+  z.classList.add('on');
+};
+window.addEventListener('dragenter', spl_over, true);
+window.addEventListener('dragover', spl_over, true);
+window.addEventListener('dragleave', e => { const z = spl_atField(e); if (z && !z.contains(/** @type {Node} */ (e.relatedTarget))) z.classList.remove('on'); }, true);
+window.addEventListener('drop', e => {
+  const to = spl_atField(e) ? SPL.dr : '';
+  spl_dropOff();
+  if (!to) return;
+  e.preventDefault(); e.stopPropagation();
+  spl_show(to);
+}, true);
 window.addEventListener('dragend', () => spl_dropOff(), true);
-window.addEventListener('drop', e => { if (!/** @type {Element} */ (e.target)?.closest?.('.spldrop')) spl_dropOff(); }, true);
