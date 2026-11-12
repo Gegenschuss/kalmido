@@ -86,7 +86,8 @@ kt.fresh(prefix="P21002D")
 r = kt.sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"})
 assert r.ok, r.text
 A = kt.sess("alice")
-A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True})
+r = A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True, "modules": ["comments"]})
+assert r.ok, r.text
 A.patch(B + "/api/settings", json={"lang": "en", "features": FEATURES, "tour": "done"})
 ALICE = kt.me_id(A)
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
