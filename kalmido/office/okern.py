@@ -23,7 +23,7 @@ from ..core.access import Denied, trash_sql
 from ..core.objects import OBJ, obj_register, obj_row
 from ..core.pg import qi, system_ctx
 from ..core.retention import ret_on, ret_trash_cut
-from ..core.writes import _purge_rows, obj_purge_after, obj_restore, obj_trash, obj_trash_prune  # 2.993.0 (#5413): + obj_purge_after
+from ..core.writes import OBJ_PURGE, _kids, _purge_rows, obj_purge_after, obj_restore, obj_trash, obj_trash_prune  # 2.993.0 (#5413): + obj_purge_after
 from ..core.serializers import unlink_files  # 2.993.0 (#5413): an overdue row's stored files after the commit (ofk_restore)
 from ..core.objects import obj_forget  # 2.809.0 (#5418)
 from ..core.undoweb import undo_trash_reg  # 2.1004.0 (#5494): a kind with a limit takes its undo step back through it
@@ -181,6 +181,9 @@ def ofk_purge_many(c, kind, ids):
         return 0
     reg = OBJ[kind]
     t = reg["table"]
+    # review: a kind with children or an area's purge hook locks those before its row elsewhere (obj_restore) - one row at a time
+    if _kids(reg) or kind in OBJ_PURGE:
+        raise ValueError(f"ofk_purge_many: {kind} has children or a purge hook, use ofk_purge")
     write_lock(c, f"obj-{kind}-many")
     c.execute(f"SELECT id FROM {qi(t, _tables())} WHERE id = ANY(CAST(? AS BIGINT[])) ORDER BY id FOR UPDATE", (ids,)).fetchall()
     for rid in ids:

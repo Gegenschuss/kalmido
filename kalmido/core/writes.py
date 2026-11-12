@@ -444,6 +444,9 @@ def _purge_rows(c, kind, reg, rid):
     """THE delete for good of one object of the trash (obj_purge after its rights check, obj_trash_prune for the retention run):
     its reference node, history, undo steps, revoked shares and children go with it. 2.809.0 (#5365): the area's hook first
     (obj_on_purge); one that keeps the object (legal retention) leaves it in the trash."""
+    # 2.1015.0 (#5675, review): the row first, its history after - the order of every writer and of okern.ofk_purge_many
+    # (row locks, then the history); history first here waited the other way round and made a deadlock with a mass purge
+    c.execute(f"SELECT 1 FROM {qi(reg['table'], (reg['table'],))} WHERE id=? FOR UPDATE", (int(rid),)).fetchall()
     if not _purge_area(c, kind, rid):
         return
     fs_ref_drop(c, kind, rid)
