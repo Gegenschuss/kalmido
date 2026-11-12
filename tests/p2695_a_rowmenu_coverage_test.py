@@ -30,6 +30,8 @@ RM_LEFT = {
     ("bookmarks.js", "summary"): (1, "the page menu of the bookmarks (import / export)"),
     ("budget.js", "summary"): (1, "the page menu of a budget"),
     ("feeds.js", "summary"): (1, "the page menu of the feeds (OPML import / export)"),
+    # 2.997.0 (#5354): the merge dialog's drag handle (#4805, 0642f884bd) shows the dots icon; it is no button and opens no menu
+    ("docpages.js", 'class="dpm-grip"'): (1, "the drag handle of a row in Merge PDFs (aria-hidden, a press drags the row), no menu"),
     ("calabs.js", 'class="iconbtn abchid"'): (1, "an invisible stand-in (aria-hidden) that keeps the columns of the rows in line, no button"),
     ("calendar.js", 'data-act="section-menu"'): (1, "a kanban column head: its long press drags the column, held still it opens the head menu (dnd.js secHold, secdrag.js)"),
     ("calendar.js", 'data-act="cvx-today-menu"'): (1, "the head menu of the calendars on Today"),
