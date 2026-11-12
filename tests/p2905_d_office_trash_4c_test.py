@@ -288,7 +288,8 @@ check(not in_trash(Fr, "omd_services", IS[1]), "import undo: nothing of the run 
 # advisory lock per row until the commit (out of shared memory at max_locks_per_transaction); as a person without an organisation
 RUN2 = dbx("INSERT INTO office_import_runs(org_id, kind, counts, detail, created_by, created_at) VALUES(?, 'data', '{}', '{}', ?, ?) RETURNING id",
            (PBF, FID, "2026-01-02T03:04:05+00:00"))[0][0]
-dbx("INSERT INTO office_services(org_id, name_de, import_run_id) SELECT ?, 'Example Bulk ' || g, ? FROM generate_series(1, 3000) g", (PBF, RUN2))
+dbx("INSERT INTO office_services(org_id, name_de, import_run_id, created_at, updated_at) SELECT ?, 'Example Bulk ' || g, ?, ?, ? "
+    "FROM generate_series(1, 3000) g", (PBF, RUN2, "2026-01-02T03:04:05+00:00", "2026-01-02T03:04:05+00:00"))
 BULK = [x[0] for x in dbx("SELECT id FROM office_services WHERE import_run_id=? ORDER BY id", (RUN2,))]
 dbx("INSERT INTO obj_history(kind, ref_id, org_id, user_id, action, created_at, updated_at) SELECT 'omd_services', id, ?, ?, 'update', ?, ? "
     "FROM office_services WHERE import_run_id=?", (PBF, FID, "2026-01-02T03:04:05+00:00", "2026-01-02T03:04:05+00:00", RUN2))
@@ -299,7 +300,8 @@ check(not dbx("SELECT 1 FROM office_services WHERE import_run_id=? LIMIT 1", (RU
       and not dbx(f"SELECT 1 FROM obj_history WHERE kind='omd_services' AND ref_id IN ({','.join(map(str, BULK))}) LIMIT 1"),
       "big import undo: every row and its history gone")
 # the mechanism: before the commit the purging transaction holds ONE advisory lock, whatever the number of rows (was one per row)
-dbx("INSERT INTO office_services(org_id, name_de, import_run_id) SELECT ?, 'Example Lock ' || g, ? FROM generate_series(1, 300) g", (PBF, RUN2))
+dbx("INSERT INTO office_services(org_id, name_de, import_run_id, created_at, updated_at) SELECT ?, 'Example Lock ' || g, ?, ?, ? "
+    "FROM generate_series(1, 300) g", (PBF, RUN2, "2026-01-02T03:04:05+00:00", "2026-01-02T03:04:05+00:00"))
 r = subprocess.run(["docker", "exec", kt.CT, "python", "-c", "import app\nfrom kalmido.core.db import connect\nc = connect()\n"
                     "from kalmido.office.okern import ofk_purge_many\nfrom kalmido.core.pg import system_ctx\n"
                     "with system_ctx(c):\n"
@@ -308,7 +310,7 @@ r = subprocess.run(["docker", "exec", kt.CT, "python", "-c", "import app\nfrom k
                     "    k = c.execute(\"SELECT COUNT(*) FROM pg_locks WHERE locktype='advisory' AND pid=pg_backend_pid()\").fetchone()[0]\n"
                     "c.commit()\nprint('purged', n, 'advisory', k)"], capture_output=True, text=True, timeout=300)
 out = (r.stdout + r.stderr).strip()
-check(out.endswith("purged 300 advisory 1") and not dbx("SELECT 1 FROM office_services WHERE import_run_id=? LIMIT 1", (RUN2,)),
+check("purged 300 advisory 1\n" in out + "\n" and not dbx("SELECT 1 FROM office_services WHERE import_run_id=? LIMIT 1", (RUN2,)),
       f"ofk_purge_many: 300 rows, one advisory lock held until the commit (was 300) {out[-300:]}")
 
 sys.exit(done("p2905_d_office_trash_4c"))
