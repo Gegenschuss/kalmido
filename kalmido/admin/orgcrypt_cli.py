@@ -119,6 +119,7 @@ from ..lists.listhead import o3c_head_files  # 2.369.5 (#2517): pulled up from f
 from ..life import budget  # 2.369.5 (#2517): pulled up from functions
 from ..wiki import wkhist  # 2.369.5 (#2517): pulled up from functions
 from ..hub.hubmail import _index as hub_index  # 2.369.5 (#2517): pulled up from functions
+from ..core.objwords import osw_drop_sql  # 2.1002.0 (#5279): the shared word index
 from ..life.budget import bud_dec, bud_dkey  # 2.369.5 (#2517): pulled up from functions
 from ..office.ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 from ..wiki.wkhist import wkh_body  # 2.369.5 (#2517): pulled up from functions
@@ -1614,7 +1615,6 @@ def rot_indexes(c, oid):
             n += 1
         # 2.138.0 C (#1972): the word index of the knowledge pages (wiki/wksearch.py, keyed per space like the documents)
         # 2.1002.0 (#5279): the shared word index obj_search_words (kind 'wiki_page'; was wiki_words)
-        from ..core.objwords import osw_drop_sql
         osw_drop_sql(c, "wiki_page", "SELECT id FROM wiki_pages WHERE org_id=?", (oid,))
         for r in c.execute("SELECT id, org_id, owner_id, body, updated_at FROM wiki_pages WHERE org_id=? AND deleted_at IS NULL "
                            "AND left(path, 5)<>'e2e1:' ORDER BY id", (oid,)).fetchall():

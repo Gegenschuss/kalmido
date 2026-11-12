@@ -39,6 +39,7 @@ from ..core.access import _list_role  # 2.369.5 (#2517): pulled up from function
 from ..accounts.orgretain import odl_retired_prune  # 2.369.5 (#2517): pulled up from functions
 from ..lists.listhead import o3c_pic_tick  # 2.498.0 (#3884): module level, it sits in a lower layer
 from ..accounts.tenancy import boundary_tick  # 2.369.5 (#2517): pulled up from functions
+from ..core.objwords import osw_tick  # 2.1002.0 (#5279): the shared word index's catch-up
 from ..accounts.mailtok import mtk_reseal_tick  # 2.705.0 (#5151)
 
 
@@ -867,7 +868,6 @@ def _watchdog_tick(c):
     _wd_section(c, "security watch", sev_scan)  # 2.36.2 (#1133): new admins / org admins / agents / agent tokens
     from ..files.scan import sc_tick
     _wd_section(c, "virus scan", sc_tick)  # 2.61.0 (#1818): the uploads the scanner could not check yet
-    from ..core.objwords import osw_tick
     _wd_section(c, "sealed search index", osw_tick)  # 2.1002.0 (#5279): objects indexed again by the shared word index's rules
     from ..files.fsmove import fsm_orphans_gc
     _wd_section(c, "files cleanup", fsm_orphans_gc)  # 2.97.0 D (#2051): stored versions without a row, once a night

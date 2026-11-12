@@ -30,7 +30,7 @@ from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up fro
 from ..core.access import acx_of, Denied, live_sql  # 2.149.0 G (#2517): pulled up from functions; 2.981.0 (#5273): live_sql
 from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file, oc_seal_k, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked as _sc_locked  # 2.360.0 B (#2496)
-from ..core.objwords import osw_put, osw_register  # 2.1002.0 (#5279): the shared word index
+from ..core.objwords import OSW_KEY, osw_put, osw_register  # 2.1002.0 (#5279): the shared word index
 from ..files.store import fs_chain as _fs_chain, fs_deleted as _fs_deleted, fs_role as _fs_role  # 2.199.0 B (#2742); 2.351.0 A (#2823): fs_role
 from ..files.fslock import fl_is_locked, fsl_of_chain  # 2.353.0 F (#2758)
 from ..files.store import fs_visible_sql_c as _fs_visible_sql  # 2.360.0 B (#2496)
@@ -352,7 +352,8 @@ def doc_reindex(c, ids):
             osw_put(c, "doc", nid)  # nothing to index: the mark only (never asked again)
 
 
-osw_register("doc", "doc_meta", "node_id", "TRUE", doc_reindex)  # 2.1002.0 (#5279): the watchdog's catch-up (core/objwords.py)
+osw_register("doc", "doc_meta", "node_id", "TRUE", doc_reindex)
+OSW_KEY.append(_index_key)  # 2.1002.0 (#5279): the shared word index hashes with the workspace's key  # 2.1002.0 (#5279): the watchdog's catch-up (core/objwords.py)
 
 
 # ---- labels (senders, types, tags) ------------------------------------------------------------------------------------

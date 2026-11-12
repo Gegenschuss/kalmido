@@ -31,6 +31,7 @@ from collections import OrderedDict
 from flask import jsonify, request
 
 from ..accounts.session import me
+from ..core.objwords import osw_hash  # 2.1002.0 (#5279): the shared word index's hash (the same key and form)
 from ..core.access import Denied
 from ..core.config import app
 from ..core.db import db
@@ -90,7 +91,6 @@ def wkt_tags(text):
 
 
 def wkt_hash(c, ws, key):
-    from ..core.objwords import osw_hash  # 2.1002.0 (#5279): the shared word index's hash (the same key and form)
     return "t:" + osw_hash(c, ws, "t:" + key)
 
 

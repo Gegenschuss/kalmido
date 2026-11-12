@@ -25,12 +25,16 @@ the source tables take the rows along). The move (osw_move, core/objhooks.py MOV
 tables are copied first (same key, same hashes: the search works at once after an update, also after a jump over several
 releases), the fragment 5279_a drops them after, the back limit rises.
 """
+import hashlib
+import hmac
 import re
+import time
 import unicodedata
 
 from .db import trigger_ensure
 from .kernretire import kern_retire_floor
-from .objhooks import MOVE
+from .objhooks import MOVE, START
+from .objsearch import osr_variants
 from .pg import qi, system_ctx, table_exists
 
 OSW_PREFIXES = (2, 3, 4, 6, 8)  # prefix lengths kept per word (4 / 6 / 8 as the old indexes: their copied hashes stay valid)
@@ -78,7 +82,6 @@ def osw_words(text, cap=OSW_WORDS_MAX):
 def osw_terms(raw):
     """The words of a query, each as the list of its folded variants (osr_variants: as typed, ä -> ae, ae -> a) of 2+
     characters; a word without such a variant is left out. At most OSW_TERMS."""
-    from .objsearch import osr_variants
     out = []
     for t in re.findall(r"\w+", unicodedata.normalize("NFC", str(raw or ""))):
         vs = sorted({w for v in osr_variants(t[:40]) for w in re.findall(r"\w+", v) if len(w) >= 2})
@@ -89,14 +92,14 @@ def osw_terms(raw):
     return out
 
 
+OSW_KEY = []  # f(c, ws) -> the workspace's index key: docs/store.py registers _index_key (a later module, no import upward)
+
+
 def _key(c, ws):
-    from ..docs.store import _index_key  # a later module (kalmido/__init__.py ORDER): the workspace's key, at call time
-    return _index_key(c, ws)
+    return OSW_KEY[0](c, ws)
 
 
 def _h(key, s):
-    import hmac
-    import hashlib
     return hmac.new(key, s.encode(), hashlib.sha256).hexdigest()[:20]
 
 
@@ -221,7 +224,8 @@ END $fn$"""
 
 
 def osw_init(c):
-    """Called by init_db (inside its transaction, after the fragments): the delete trigger on every source table."""
+    """Every start (core/objhooks.py START, run by init_db inside its transaction after the fragments): the delete trigger on
+    every source table."""
     c.execute(OSW_GONE_FN)
     for kind, t in OSW_TABLES.items():
         if table_exists(c, t):
@@ -249,6 +253,7 @@ def osw_move(c):
 
 
 MOVE.append(osw_move)
+START.append(("osw_init", False, osw_init))
 
 
 # ---- the catch-up: objects without OSW_MARK ------------------------------------------------------------------------------
@@ -275,7 +280,6 @@ OSW_IDLE_S = 600  # a kind without late objects is asked again after so many sec
 def osw_tick(c, limit=OSW_TICK, force=False):
     """The watchdog (notify/push.py): up to limit objects per kind indexed again by this version's rules. {kind: n}.
     A kind that had none is skipped for OSW_IDLE_S (late objects come only from the move, a restore or an older image)."""
-    import time
     done = {}
     with system_ctx(c):  # every workspace's objects; nobody gets a text, only the hashes are written
         for kind, r in OSW_REINDEX.items():

@@ -28,6 +28,7 @@ from .wikie2e import wke_mode, wke_open_sql  # 2.369.5 (#2517): pulled up from f
 from .pages import wiki_may_read, wiki_space_key  # 2.981.0 (#5278)
 from ..core.objsearch import osr_ids_sql  # 2.981.0 (#5278)
 from ..core.access import live_sql  # 2.981.0 (#5278)
+from .wkfolder import wkf_shared_ids  # 2.1002.0 (#5279)
 from ..core.objwords import OSW_MARK, osw_drop, osw_put, osw_term_hits, osw_terms, osw_words  # 2.1002.0 (#5279)
 
 WKS_CATCH_UP = 300   # pages indexed again per space and search
@@ -209,7 +210,6 @@ def _wks_shared(c, uid, spaces, terms):
     """2.1002.0 (#5279, question 15): the hits among the pages outside spaces that a share of the shared core opens for uid
     (wkf_shared_ids: a shared folder or page), per space of the page; not in the trash, not of a space with the lock (the
     browser searches those), each hit checked with the page's own role (wiki_may_read) -- never more than opening it."""
-    from .wkfolder import wkf_shared_ids
     ids = sorted(int(x) for x in wkf_shared_ids(c, uid))
     if not ids:
         return []
