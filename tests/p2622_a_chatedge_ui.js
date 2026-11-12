@@ -61,6 +61,15 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
         check(g.msg.l >= g.chview.l + 8 && g.msg.r <= g.chview.r - 8, `${tag} the messages keep a padding at both sides (${JSON.stringify(g.msg)})`);
         check(g.msg.r - g.msg.l <= 736 + 1, `${tag} the messages stay within the reading width (${JSON.stringify(g.msg)})`);
         check(g.sx <= g.vw, `${tag} nothing sticks out sideways (${g.sx} > ${g.vw})`);
+        // the team chat the same: its list + room box from edge to edge of #view, no rounded side frame
+        await o.nav(B + '#team'); await idle();
+        const t = JSON.parse(await until(`(() => { const v = document.querySelector('#view'), e = document.querySelector('#view .tcview'); if (!e || !document.querySelector('#view .tcview .tclist')) return null;
+          const a = v.getBoundingClientRect(), b = e.getBoundingClientRect(); return JSON.stringify({vl: Math.round(a.left), vr: Math.round(a.left + v.clientWidth), l: Math.round(b.left), r: Math.round(b.right), txt: e.textContent.slice(0, 120)}); })()`) || 'null');
+        check(t && Math.abs(t.l - t.vl) <= 1 && Math.abs(t.r - t.vr) <= 1, `${tag} the team chat fills the view's width (${JSON.stringify(t)})`);
+        check(t && /conversation/i.test(t.txt), `${tag} the team chat shows its list and the hint to pick a conversation (${t && t.txt})`);
+        await o.nav(B + '#agents/' + ag.id); await idle();
+        await until(`!!document.querySelector('#view .chview .chcomp #chat-in')`);
+      }
       await shot(`p2622a-chat-${wd}.png`);
     }, touch);
   }
