@@ -2139,6 +2139,9 @@ button.tvr-task:hover{color:var(--accent)}
 .agcard .avatar.lg,.avatar.lg{width:2.5rem;height:2.5rem;font-size:var(--fs-b)}
 .agcard .avatar.lg .adot{width:.625rem;height:.625rem}
 .agi{display:flex;flex-direction:column;min-width:0;flex:1}.agi .muted{font-size:var(--fs-s)}
+/* 2.1044.0 (#5825): picture + name of an agent's card as one button into its settings (only for who may change it) */
+.agset{display:flex;align-items:center;gap:.75rem;flex:1;min-width:0;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:start;cursor:pointer;border-radius:var(--r-s)}
+.agset:hover .agi b{text-decoration:underline}
 .agb{display:flex;gap:.375rem;width:100%}.agb .btn{position:relative}.agb .nbadge{position:static;display:inline-block;margin-left:.25rem}
 .agjh{display:flex;align-items:center;gap:.5rem;margin-top:.5rem}.agjh h2{font-size:var(--fs-l);margin:0}
 .jobs{display:flex;flex-direction:column;gap:.5rem}

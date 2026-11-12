@@ -464,6 +464,7 @@ document.addEventListener('click', async e => {
     case 'sched-open': schedOpen(+a.dataset.aid); break;  // 2.34.0 (#272): planned agent jobs
     case 'chat-close': chatClose(); break;
     case 'chat-mode': chatModeMenu(a); break;  // 2.29.0 (#1029)
+    case 'ag-set': { const ag = agentById(a.dataset.aid); if (ag) ag_settings(ag); break; }  // 2.1044.0 (#5825): the card's settings
     case 'chat-runmodel': { const ag = agentById(S.chat.aid); if (ag && typeof agm_open === 'function') agm_open(ag); break; }  // 2.992.0 (#5684)
     case 'steps-always': stepsAlways(); break;  // 2.32.0 (#1081)
     case 'steps-live': stepsLive(a.dataset.on === '1'); break;

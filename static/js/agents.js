@@ -629,6 +629,15 @@ const agSteps = () => `<ol class="agfirst">${[N_('Create the agent'), N_('Share 
 // 2.777.0 C (#5378): a team agent's card says whether and how many projects are shared with it (a number; also for a member of its
 // organisation who shares none with it: then the chat explains how to share one)
 const ag_projTxt = a => a.owner_id || a.projects == null ? '' : a.projects ? trn('{0} project', '{0} projects', a.projects) : tr('No project shared');
+// 2.1044.0 (#5825): who gets "Settings" on an agent's card (the gear, a tap on its picture or name, the card's menu): the owner of
+// a personal agent; for a team agent an instance admin, or an admin of its organisation when it runs on the Kalmido server
+// (the server settings; agentchat.js ag_settings opens the right dialog). Everyone else keeps the picture's person card.
+const ag_mayEdit = a => !!a && !!S.me && (a.owner_id ? a.owner_id === S.me.id
+  : !!S.me.is_admin || (!!a.server && !!a.org_id && (S.me.workspaces || []).some(o => o.id === a.org_id && o.role === 'admin')));
+// picture + name + state as one real button that opens the settings (only on these cards; avBtn stays everywhere else)
+const ag_cardHead = (a, inner) => ag_mayEdit(a)
+  ? `<button type="button" class="agset" data-act="ag-set" data-aid="${esc(String(a.id))}" aria-label="${esc(tr('Settings of {0}', a.name))}" title="${esc(tr('Settings of {0}', a.name))}">${/*html-ok*/ av(a.id, a.name, 'avatar lg') + inner}</button>`
+  : avBtn(a.id, a.name, 'avatar lg') + inner;
 function viewAgents() {
   if (S.jobs.items === null) { S.jobs.items = []; S.jobs.older = []; S.jobs.next = S.jobs.more = null; loadJobs(); aiuLoad().then(() => { if (S.route.mod === 'agents') renderView(); }); }  // 2.1.1: the usage card
   if (S.route.agent && chatFull()) return chatViewHtml(S.route.agent);
@@ -642,10 +651,10 @@ function viewAgents() {
   if (agSort !== 'need') S.agNeedOrd = null;
   else if (!S.agNeedOrd || FL.vsig !== fl_sig()) S.agNeedOrd = agShow.map(a => a.id);
   else { const ix = new Map(S.agNeedOrd.map((id, i) => [id, i])); agShow.sort((a, b) => (ix.get(a.id) ?? 1e9) - (ix.get(b.id) ?? 1e9)); }
-  const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}" data-k="ag${a.id}"${acw_attr(a.org_id)}>${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
-      <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting), ag_projTxt(a)].filter(Boolean).join(' · '))}</span></div>
+  const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}" data-k="ag${a.id}" data-agc="${esc(String(a.id))}"${acw_attr(a.org_id)}>${/*html-ok*/ ag_cardHead(a, `<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
+      <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting), ag_projTxt(a)].filter(Boolean).join(' · '))}</span></div>`)}
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button>${a.approvals_open ? `<button class="btn sm apvcard" data-act="chat-open" data-aid="${a.id}">${ic('lock', 's')} ${esc(apvCount(a.approvals_open))}</button>` : ''}
-      ${a.shared === false ? '' : `<button class="btn sm" data-act="sched-open" data-aid="${a.id}" title="${esc(tr('Planned jobs'))}">${ic('clock', 's')} ${tr('Plans')}</button>`}</div>${av_listsHtml(a)}</div>`;  // 2.46.6 (#1708): its lists
+      ${a.shared === false ? '' : `<button class="btn sm" data-act="sched-open" data-aid="${a.id}" title="${esc(tr('Planned jobs'))}">${ic('clock', 's')} ${tr('Plans')}</button>`}${ag_mayEdit(a) ? `<button class="btn sm ib agsetb" data-act="ag-set" data-aid="${esc(String(a.id))}" title="${esc(tr('Settings of {0}', a.name))}" aria-label="${esc(tr('Settings of {0}', a.name))}">${ic('cog', 's')}</button>` : ''}</div>${av_listsHtml(a)}</div>`;  // 2.1044.0 (#5825): the gear  // 2.46.6 (#1708): its lists
   const items = S.jobs.items || [];
   if (ags.length) {  // 2.32.0 (#1063): the overview is built from blocks (Customize)
     const P = {agents: `<div class="agcards">${agShow.map(card).join('')}</div>`, usage: aiuCardHtml(),
@@ -1213,3 +1222,12 @@ function schedForm(md, a, s, done) {
     toast(tr('Saved')); box.onclick = null; f8d_stepDrop(md); done();
   };
 }
+// 2.1044.0 (#5825): a right click (computer) or a long press (touch) on an agent's card: its menu (agentchat.js ag_cardMenu: Settings,
+// Chat, Plans, Log and usage, Pause / Resume - each only what the person may do with this agent)
+const AG_CMENU = '#view .agcard[data-agc]';
+ms_rowMenu(AG_CMENU, c => ag_cardMenu(c, +c.dataset.agc));
+document.addEventListener('contextmenu', e => {
+  const c = e.target.closest?.(AG_CMENU); if (!c || e.shiftKey) return;
+  e.preventDefault(); if (e.pointerType === 'touch' || isTouch()) return;  // touch: the long press above
+  ag_cardMenu(c, +c.dataset.agc);
+});

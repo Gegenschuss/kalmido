@@ -1743,6 +1743,40 @@ function agNewChooser(anchor, done) {
     {label: tr('Personal agent'), sub: tr('Only you see and use it; others in your projects cannot address it.'), icon: 'user', fn: () => agModal(null, done, {kind: 'personal'})},
     {label: tr('Runs on the Kalmido server'), sub: tr('With your own API key of a model provider; no computer of your own.'), icon: 'cloud', fn: () => srv_newModal({admin: true, done})}]);  // 2.557.0 C (#4670)
 }
+// 2.1044.0 (#5825): "Settings" of an agent's card (agents.js: the gear, a tap on its picture or name, its menu). An instance admin
+// (a team agent or an own one): the dialog "Edit agent" (for a server agent with its button "On the Kalmido server"); the owner of
+// a personal agent without admin rights: its row in Settings > Agents > Set up (permissions, work style, server settings, log);
+// an organisation's admin for a team agent on the Kalmido server: its server settings
+async function ag_settings(a) {
+  const again = () => load().then(render).catch(() => {});
+  if (S.me?.is_admin && (!a.owner_id || a.owner_id === S.me.id)) {
+    let j; try { j = await api('GET', '/api/admin/agents'); } catch { return; }
+    const ag = (j.agents || []).find(x => x.id === a.id);
+    if (ag && !ag.restricted) { S.agOffer = j.scopes; S.agDefScopes = j.default_scopes; agModal(ag, again); return; }
+  }
+  if (a.owner_id && a.owner_id === S.me?.id) {
+    settingsModal('agentsetup');
+    pg_waitEl(`.smodal [data-myag="${a.id}"]`, r => { r.scrollIntoView?.({block: 'center'}); r.classList.add('flash'); setTimeout(() => r.classList.remove('flash'), 1600); });
+    return;
+  }
+  if (srv_may(a)) srv_editModal(a);
+}
+// the card's menu (right click / long press): only what the person may do with this agent
+function ag_cardMenu(anchor, aid) {
+  const a = agentById(aid); if (!a) return;
+  const own = !!a.owner_id && a.owner_id === S.me?.id, adm = !!S.me?.is_admin && (!a.owner_id || own);
+  const pause = async () => {
+    if (a.enabled && !await askConfirm(tr('Pause {0}?', a.name), tr('Its API token is refused and no events are sent until you resume it. Nothing is deleted.'), {ok: tr('Pause'), danger: true})) return;
+    try { await api('PATCH', own ? `/api/my/agents/${a.id}` : `/api/admin/agents/${a.id}`, {enabled: !a.enabled}); toast(a.enabled ? tr('Paused') : tr('Resumed')); } catch { return; }
+    load().then(render).catch(() => {});
+  };
+  menu(anchor, [
+    ...ag_mayEdit(a) ? [{label: tr('Settings'), icon: 'cog', act: 'agc-set', fn: () => ag_settings(a)}] : [],
+    ...a.enabled ? [{label: tr('Chat'), icon: 'comment', fn: () => chatOpen(a.id)}] : [],
+    ...a.shared === false ? [] : [{label: tr('Plans'), icon: 'clock', fn: () => schedOpen(a.id)}],
+    ...own ? [{label: tr('Log and usage limit'), icon: 'chart', fn: () => av_logModal(a, () => load().then(render).catch(() => {}))}] : [],
+    ...own || adm ? [{label: a.enabled ? tr('Pause|agent') : tr('Resume'), icon: a.enabled ? 'pause' : 'play', act: 'agc-pause', fn: pause}] : []]);
+}
 function agModal(a, done, o = {}) {
   const personal = a ? !!a.owner : o.kind === 'personal';
   // 2.364.0 D (#3035): "New team agent" preselects "Team agent" (both options carried selected before, the person won)

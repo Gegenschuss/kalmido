@@ -525,7 +525,6 @@
 "static/js/agents.js|ags.map(cell).join('')": 1,
 "static/js/agents.js|ags[0].id": 2,
 "static/js/agents.js|attrs": 1,
-"static/js/agents.js|avBtn(a.id, a.name, 'avatar lg')": 1,
 "static/js/agents.js|avBtn(id, a.name)": 1,
 "static/js/agents.js|av_listsHtml(a)": 1,
 "static/js/agents.js|bits.join(' · ')": 1,
