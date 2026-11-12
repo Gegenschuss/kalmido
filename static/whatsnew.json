@@ -1,6 +1,16 @@
 {
  "versions": [
   {
+   "version": "2.1009.0",
+   "date": "2026-11-12",
+   "items": [
+    {
+     "de": "Am Handy haben die Büro-Listen nur noch eine Navigationszeile: Pfeil zurück, Reiter und Belegarten in einer Reihe.",
+     "en": "On a phone, office lists have a single navigation line: back arrow, tabs and document kinds in one row."
+    }
+   ]
+  },
+  {
    "version": "2.996.0",
    "date": "2026-11-12",
    "items": [
@@ -1331,40 +1341,6 @@
     {
      "de": "Dialoge für Budget, Fahrtenbuch, Kontakte, Projektstatus, Reisekosten und mehr schließen sofort, ein Fehler setzt die Änderung zurück.",
      "en": "Dialogs for budget, logbook, contacts, project status, travel expenses and more close at once; an error takes the change back."
-    }
-   ]
-  },
-  {
-   "version": "2.560.0",
-   "date": "2026-11-05",
-   "items": [
-    {
-     "de": "Nach einem Update zeigt dir Kalmido einmal, was neu ist - abschaltbar unter Einstellungen > Hilfe.",
-     "en": "After an update Kalmido shows you once what is new - you can switch it off in Settings > Help."
-    },
-    {
-     "de": "Erledigte Kopien wiederholter Aufgaben zeigen, welche Unteraufgaben in dieser Runde fertig waren.",
-     "en": "Completed copies of recurring tasks show which subtasks were done in that round."
-    },
-    {
-     "de": "Agenten-Antworten brichst du jetzt mit Shift+Esc ab, ein einfaches Esc bricht nichts mehr ab.",
-     "en": "You now stop an agent's answer with Shift+Esc; a plain Esc no longer stops it."
-    },
-    {
-     "de": "Die Kalmido-KI läuft jetzt direkt auf dem Server: eigenen API-Schlüssel hinterlegen, Modell wählen, fertig - ohne eigenen Rechner.",
-     "en": "The Kalmido AI now runs right on the server: add your own API key, pick a model, done - no computer of your own needed."
-    },
-    {
-     "de": "Auf breiten Bildschirmen stehen Liste und Detail bei Kontakten, Kunden, Angeboten, Rechnungen und Belegen nebeneinander.",
-     "en": "On wide screens, list and detail sit side by side for contacts, clients, quotes, invoices and receipts."
-    },
-    {
-     "de": "Kalender und Kontakte lassen sich für einen Agenten jetzt einzeln sperren.",
-     "en": "Calendar and contacts can now be locked for an agent."
-    },
-    {
-     "de": "Hat jemand anderes einen Büro-Dialog inzwischen gespeichert, erscheint ein Hinweis zum Neuladen statt still zu überschreiben.",
-     "en": "If someone saved an office dialog meanwhile, you get a reload hint instead of a silent overwrite."
     }
    ]
   }

@@ -20,7 +20,28 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1007.0] - 2026-11-12
+## [2.1016.0] - 2026-11-12
+
+Package 2.1004 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- #5572: on a phone, the office list pages (quotations, invoices, reminders and the other office pages) show a single navigation line: the back arrow sits before the tabs, and the document kinds (credit notes, payment reminders, delivery notes, archive) follow their tab in the same row; with a single office the company and role line above the page is gone. The desktop stays as it was.
+- #5494: the approval records of deleted video reviews (Settings > Move and export everything) go into the core's trash and show in the office trash (a private one in its creator's personal office); restore and delete for good there. A person without a personal office deletes them for good as before, without leftovers in history or undo.
+### Fixed
+- #5494: restoring a fixed cost or a cash flow correction from the trash (office trash, the toast's undo, the undo list) no longer passes their maximum (500 fixed costs, 50 corrections per month): 409 instead.
+- #5494: undoing an office move deletes the target's copies of master data and sets on the core's way (no history or undo steps left behind); an account's end takes its private sign-off records' core history along.
+
+Package 2.1009 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Task panel on phones: while a comment is being edited, the bottom bar (comment box with Send, date / done) no longer sticks over the edited comment, so "Save" and "Cancel" stay visible and tappable with the keyboard up (iPhone) (#5772).
+
+Package 2.1003 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Weich rot: p2106_a_api, Weich rot: p21261_b_ui u. 15 weitere).
+### Fixed
+- #5716 #5722: Searching letter recipients and a client's address book contacts works again; both read the removed contacts search column and now search through the shared search index.
+- #5721: Document notes show their time in seconds again, as before their move into the shared comments core.
+- #5733: The shared comment routes are listed in the agent parity (review API or people only); the MCP tool add_comment answers with a clear error without a task id instead of failing.
+- #5718 #5724 #5725 #5726 #5727 #5728 #5729 #5730 #5731 #5732: The database's back limit names every step of a release that raised it, not only the first one; the start check of an older version lists all reasons.
+- #4839 #5717 #5719 #5723: Tests p230_ui (waits for the undo toast and the server state instead of fixed times), p21261_b_ui (the plan dialog's review kind), p2351_f_review (the core's trash retention) and p265_d_ui (no removed column in its setup, setup errors logged) follow the app.
 
 Package 2.997 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket: Aufgabe).
 
@@ -39,10 +60,25 @@ Package 2.1001 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Security
 - #5669: sharing a list or a list folder by e-mail address binds only an account that proved the address (the core helper used by tables and wiki since #5643); an address nobody proved is answered like an unknown address and reaches nobody. The address path is decided once per request, and its answer carries nothing account-specific.
 
+## [2.1014.0] - 2026-11-12
+
+Not released (the CI of this version was red); its changes are listed under 2.1016.0.
+
+## [2.1009.0] - 2026-11-12
+
+Not released (the CI of this version was red); its changes are listed under 2.1014.0.
+
+## [2.1007.0] - 2026-11-12
+
+Not released (the CI of this version was red); its changes are listed under 2.1009.0.
+
 ## [2.1001.0] - 2026-11-12
 
 Not released (the CI of this version was red); its changes are listed under 2.1007.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.1007.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1016.0...HEAD
+[2.1016.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1016.0
+[2.1014.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1014.0
+[2.1009.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1009.0
 [2.1007.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.1007.0
 [2.1001.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.1001.0
