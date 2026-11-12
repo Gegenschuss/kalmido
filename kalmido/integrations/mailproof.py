@@ -14,16 +14,21 @@ registration or a verified OIDC claim - an account the admin typed in (the first
    address (org_joins.silent with org_joins.email, #5775 / #4922) wake up as ordinary ones (orginvite.ojn_proved): the person
    hears of them now, unless the rule of a company of its own (#3570) keeps one silent.
 Never for an agent (its address is its owner's business); a person without an organisation proves the address the same way."""
+import secrets
+
 from flask import g, jsonify
 
 from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.db import body, bump, db, err
 from ..core.ephem import eph_put, eph_take
 from ..core.i18n import lang, N_, tr
+from ..core.mailframe import mail_html
 from ..accounts.login import seal, unseal
+from ..accounts.orginvite import ojn_proved
 from ..accounts.session import me
+from ..admin.hosting import mail_budget
 from ..api.common import hit_limit
-from ..agents.core import need_person
+from ..integrations.mail import MAIL_OUT_ON, mail_send
 
 EPF_NS = "eproof"
 EPF_HOURS = 48  # the link works this long (and once)
@@ -34,8 +39,8 @@ EPF_TRIES = 10  # wrong / old links per account and hour
 def _person():
     """Review F1: only the person in the web app (a cookie session or the sign-in proxy) - never an agent, never an API token
     (a leaked token could otherwise spend the mail budget and replace the pending link again and again)."""
-    need_person(403)
-    if g.get("auth_via") not in ("session", "proxy"):
+    u = g.get("user")
+    if not u or (u["kind"] or "user") == "agent" or g.get("auth_via") not in ("session", "proxy"):
         return err(tr("Not allowed"), 403)
     return None
 
@@ -46,7 +51,6 @@ def _addr(u):
 
 @app.get("/api/me/email")
 def eproof_get():
-    from ..integrations.mail import MAIL_OUT_ON
     e = _person()
     if e:
         return e
@@ -58,7 +62,6 @@ def eproof_get():
 
 def eproof_mail(c, u, link):
     """(subject, text, html) of the proof mail in the person's language (the shared mail frame)."""
-    from ..core.mailframe import mail_html
     lg = lang(c, u["id"])
     t = lambda s, *a: tr(s, *a, lg=lg)  # noqa: E731
     subject = t(N_("Confirm your e-mail address for {0}"), APP_NAME)
@@ -76,9 +79,6 @@ def eproof_mail(c, u, link):
 @app.post("/api/me/email/proof")
 def eproof_send():
     """A mail with a one-time link to the account's address (not when it is proved already: {ok, proved: true})."""
-    import secrets
-    from ..admin.hosting import mail_budget
-    from ..integrations.mail import MAIL_OUT_ON, mail_send
     e = _person()
     if e:
         return e
@@ -115,7 +115,6 @@ def eproof_send():
 @app.post("/api/me/email/proof/confirm")
 def eproof_confirm():
     """{token}: the link of the proof mail, opened signed in as its account -> {ok, proved, invitations: n woken}."""
-    from ..accounts.orginvite import ojn_proved
     e = _person()
     if e:
         return e

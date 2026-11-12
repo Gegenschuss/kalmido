@@ -452,7 +452,7 @@ def ojn_hidden(c, oid, uid, email=None):
 
 
 def ojn_proved(c, uid, email):
-    """2.1033.0 (#5790): account uid just proved its address email (accounts/emailproof.py): the silent invitations of exactly
+    """2.1033.0 (#5790): account uid just proved its address email (integrations/mailproof.py): the silent invitations of exactly
     this address (the one the admin typed, org_joins.email since #4922) that are still open become ordinary ones (ojn_invite in
     the name of the admin who invited: News item, mail, push). One stays silent when the #3570 rule holds - a company of its own
     whose inviting admin may not see the person - or when that admin is no admin of the organisation any more (Resend by a
