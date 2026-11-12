@@ -732,7 +732,7 @@ def wsh_update(sid):
             d["expires"] = b.get("expires") or None
         if "images" in b:
             d["images"] = bool(wsh_images(b["images"]))
-        c.execute("UPDATE obj_addr_shares SET body=? WHERE id=?", (json.dumps(d, ensure_ascii=False), x["id"]))
+        c.execute("UPDATE obj_addr_shares SET body=CAST(? AS JSONB) WHERE id=?", (json.dumps(d, ensure_ascii=False), x["id"]))
         bump(c)
         c.commit()
         return jsonify(next(iter(e for e in _wsh_open(c, me(), None, True, None) if e["id"] == sid), {}))

@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS obj_addr_shares (  -- 2.1071.0 (#5658): open shares b
   owner_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
   org_id BIGINT REFERENCES orgs(id) ON DELETE CASCADE,
   path TEXT NOT NULL DEFAULT '',
-  body TEXT NOT NULL DEFAULT '{}',
+  body JSONB NOT NULL DEFAULT '{}',
   email_seal TEXT NOT NULL,
   email_key TEXT NOT NULL,
   created_by BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -83,10 +83,10 @@ def ads_open(c, kind, by, em, body, ref_id=None, owner_id=None, path="", org_id=
     try:
         with c.savepoint():
             if old:
-                c.execute("UPDATE obj_addr_shares SET body=?, created_by=?, created_at=? WHERE id=?", (data, by, iso(now_utc()), old["id"]))
+                c.execute("UPDATE obj_addr_shares SET body=CAST(? AS JSONB), created_by=?, created_at=? WHERE id=?", (data, by, iso(now_utc()), old["id"]))
             else:
                 insert_id(c, "INSERT INTO obj_addr_shares(kind,ref_id,owner_id,org_id,path,body,email_seal,email_key,created_by,created_at) "
-                             "VALUES(?,?,?,?,?,?,?,?,?,?)", (kind, ref_id, owner_id, org_id, path or "", data, seal(c, ADS_SEAL, em), key, by,
+                             "VALUES(?,?,?,?,?,CAST(? AS JSONB),?,?,?,?)", (kind, ref_id, owner_id, org_id, path or "", data, seal(c, ADS_SEAL, em), key, by,
                                                             iso(now_utc())))
     except Exception:  # noqa: BLE001  the same address typed in twice at once: one row is enough (review #5658 F9)
         return False
