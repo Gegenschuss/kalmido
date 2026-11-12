@@ -320,10 +320,16 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
 
   // ================= bob (German): News for status + unblock, texts
   await call('POST', `/api/tasks/${t1}/complete`);
-  let wb = await boot({user: 'bob', hash: 'news'}); let db = wb.document; await until(() => /Alice hat Design erledigt/.test(db.querySelector('#view')?.textContent || '')); await idle(wb);  // 2.624.0 (#3943): News drawn
-  const nt = db.querySelector('#view').textContent;
-  check(/Alice hat Design erledigt: Deine Aufgabe ist nicht mehr blockiert/.test(nt), 'bob News: unblock (German)');
-  check(/Alice hat Work auf\s*Gefährdet gesetzt/.test(nt) && /Vendor is late/.test(nt), 'bob News: status update with note (German)');
+  let wb = await boot({user: 'bob', hash: 'news'}); let db = wb.document;
+  // 2.1079.0 (#4737): #5808 -- News show one way, bundled per task: the full sentence stands in the opened bundle (the line
+  // itself says "Build" / "unblocked", "Work" / "status changed"); bob opens the bundle and reads it
+  const nGroup = re => [...db.querySelectorAll('#view .ngroup')].find(g => re.test(g.querySelector('.ngt')?.textContent || '') && g.querySelector('.ngmain[data-act="news-group"]'));
+  const nOpen = async re => { await until(() => nGroup(re)); const g = nGroup(re); if (!g) return ''; g.querySelector('.ngmain[data-act="news-group"]').click();
+    return (await until(() => [...db.querySelectorAll('#view .ngroup')].find(x => x.dataset.gk === g.dataset.gk)?.querySelector('.ngitems')))?.textContent || ''; };
+  const ntB = await nOpen(/Build/); await idle(wb);
+  check(/Alice hat Design erledigt: Deine Aufgabe ist nicht mehr blockiert/.test(ntB), 'bob News: unblock (German) ' + ntB.replace(/\s+/g, ' ').slice(0, 600));
+  const ntW = await nOpen(/^\s*Work/); await idle(wb);
+  check(/Alice hat Work auf\s*Gefährdet gesetzt/.test(ntW) && /Vendor is late/.test(ntW), 'bob News: status update with note (German) ' + ntW.replace(/\s+/g, ' ').slice(0, 600));
   wb.location.hash = 'l/' + WORK; await until(() => db.querySelector('.lhead .stpill')); await idle(wb);  // 2.624.0 (#3943)
   check(/erledigt/.test(db.querySelector('.lhead').textContent) || /\d+ %?|\//.test(db.querySelector('.lhead .lprog').textContent), 'bob: header');
   check(/Gefährdet/.test(db.querySelector('.lhead .stpill').textContent), 'bob: German status label');
