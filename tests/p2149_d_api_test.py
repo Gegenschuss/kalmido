@@ -154,7 +154,10 @@ res = in_app("from kalmido.core.db import appver_check as a\n"
              " a('2.151.0', None, '0.0.0', '3.0.0')]))")
 check(res == json.dumps(["ok", "format", "format", "ok", "format", "ok"]), f"appver_check: format limit {res}")
 fl = dict(dbx("SELECT key, value FROM kalmido_meta WHERE key IN ('back_floor','back_floor_how')"))
-check(fl.get("back_floor") == "2.149.0" and "UPGRADING" in fl.get("back_floor_how", ""), f"the database keeps the format limit {fl}")
+# 2.1003.0 (#5718): since 2.981 (#5274, review D1) a fresh database starts on this image's minor (obj_comment_trash's key, its
+# reason names #5274); before that only the line of BACK_LIMITS (2.149.0, docs/UPGRADING.md)
+check((fl.get("back_floor") == "2.149.0" and "UPGRADING" in fl.get("back_floor_how", ""))
+      or (fl.get("back_floor") == f"{MAJ}.{MIN}.0" and "#5274" in fl.get("back_floor_how", "")), f"the database keeps the format limit {fl}")
 set_meta("back_floor", "99.0.0")
 set_meta("back_floor_how", "run the tool xyz")
 ok = start()

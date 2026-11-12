@@ -208,6 +208,9 @@ dbx("""CREATE FUNCTION p2958a_hold() RETURNS trigger LANGUAGE plpgsql AS $f$ BEG
        IF NEW.group_id = %d THEN RETURN NULL; END IF; RETURN NEW; END $f$""" % int(G2))
 dbx("CREATE TRIGGER p2958a_hold BEFORE INSERT ON fs_shares FOR EACH ROW EXECUTE FUNCTION p2958a_hold()")
 MINOR = ".".join(str(dbx("SELECT value FROM kalmido_meta WHERE key='app_version'")[0][0]).split(".")[:2] + ["0"])
+# 2.1003.0 (#5728): since 2.981 (#5274) a fresh database starts with the limit on this minor already; set it back so that the
+# rise with the copy (F3) is seen (as p2981_b_search)
+dbx("DELETE FROM kalmido_meta WHERE key IN ('back_floor', 'back_floor_how')")
 bf0 = dbx("SELECT value FROM kalmido_meta WHERE key='back_floor'")
 check([tuple(x) for x in bf0] != [(MINOR,)], f"setup: the back limit is not this minor yet {bf0} {MINOR}")
 
