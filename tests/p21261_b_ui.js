@@ -3,7 +3,7 @@
 //       (the agent's title over the cell's, the row number), a row without a title greyed out with its reason, the count
 //       "Apply 2 entries"; an edited title and an unticked row reach the server (one task, the edited title); the row then
 //       carries the mark "Carried over"
-// #2126 the plan dialog: the field Kind (Job in the chat | Sort the basket (proposal)); choosing "Sort the basket" fills
+// #2126 the plan dialog: the field Kind (Job in the chat | Review in the chat | Sort the basket (proposal)); choosing "Sort the basket" fills
 //       title, every working day, 07:30, hides the list, marks the text optional and shows its own hint; saving without a
 //       text works and the row reads "Sort the basket · …"
 const {execFileSync} = require('child_process');
@@ -73,7 +73,8 @@ const FEAT = 'cal,comments,collab,agents,sheets';
   const sm = await until(() => d.querySelector('.modal.schedmd'));
   click(w, sm.querySelector('[data-sm="new"]')); await until(() => d.getElementById('sc-act'));
   const act = d.getElementById('sc-act');
-  check(act && act.value === 'chat' && [...act.options].map(o => o.textContent).join('|') === 'Job in the chat|Sort the basket (proposal)', '#2126: Kind, default the chat');
+  // 2.1003.0 (#5717): 2.992.0 (#5684) added the kind "Review in the chat" between the two
+  check(act && act.value === 'chat' && [...act.options].map(o => o.textContent).join('|') === 'Job in the chat|Review in the chat|Sort the basket (proposal)', '#2126: Kind, default the chat');
   check(!d.getElementById('sc-listrow').hidden && d.querySelector('.schedopt').hidden, '#2126: chat: list shown, the text is needed');
   act.value = 'triage'; change(w, act); await sleep(50);
   check(d.getElementById('sc-title').value === 'Sort the basket' && d.getElementById('sc-freq').value === 'weekdays' && d.getElementById('sc-time').value === '07:30',
