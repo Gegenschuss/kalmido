@@ -200,9 +200,15 @@ def agent_task(lid, title, **kw):
     return r.json()["id"]
 
 
-def agent_done(tid):
-    r = requests.post(V + f"/tasks/{tid}/complete", headers=CLH)
+def agent_done(tid, h=None):
+    r = requests.post(V + f"/tasks/{tid}/complete", headers=h or CLH)
     check(r.ok, "#5792: the agent completes task " + str(tid) + " " + str(r.status_code) + r.text[:300])
+
+
+def bob_task(title, **kw):
+    r = Bo.post(B + "/api/tasks", json={"title": title, "list_id": W["id"], **kw})
+    assert r.ok, r.text
+    return r.json()["id"]
 
 
 check(A.patch(B + "/api/settings", json={"agent_comments": "replies"}).ok, "#5792: alice back to 'only what needs me'")
@@ -211,34 +217,43 @@ check(A.put(B + f"/api/lists/{W['id']}/bell", json={"mode": "all"}).ok and Bo.pu
 T5 = agent_task(W["id"], "Agent made this")
 check(not news_task(ALICE, T5, "newtask"), "#5792: an agent's new task writes no News entry for 'only what needs me', not even with the bell 'All'")
 check(news_task(BOB, T5, "newtask"), "#5792: bob with 'all' still gets the agent's new task (bell 'All')")
-agent_done(T5)
-check(not news_task(ALICE, T5, "complete"), "#5792: an agent's completion writes no News entry for 'only what needs me'")
-check(news_task(BOB, T5, "complete"), "#5792: bob with 'all' still gets the agent's completion")
-T6 = Bo.post(B + "/api/tasks", json={"title": "Bob made this", "list_id": W["id"]}).json()["id"]
+T6 = bob_task("Bob made this")
 check(news_task(ALICE, T6, "newtask"), "#5792: a person's new task still comes with the bell 'All'")
-check(Bo.post(B + f"/api/tasks/{T6}/complete").ok and news_task(ALICE, T6, "complete"), "#5792: a person's completion still comes")
+agent_done(T6)  # (a task an agent created is locked for completing, so the agent completes bob's)
+check(not news_task(ALICE, T6, "complete"), "#5792: an agent's completion writes no News entry for 'only what needs me', not even with the bell 'All'")
+check(news_task(BOB, T6, "complete"), "#5792: bob (creator, 'all') still gets the agent's completion")
+T6b = bob_task("Bob completes this")
+check(Bo.post(B + f"/api/tasks/{T6b}/complete").ok and news_task(ALICE, T6b, "complete"), "#5792: a person's completion still comes")
 # what needs me: a task assigned to me, a task I set to "Urgent"
-T7 = agent_task(W["id"], "For alice", assignee_id=ALICE)
-check(dbx("SELECT 1 FROM notifications WHERE user_id=? AND task_id=? AND kind='assign'", (ALICE, T7)), "#5792: the agent's assignment to me still comes")
+T7 = bob_task("For alice", assignee_id=ALICE)
 agent_done(T7)
 check(news_task(ALICE, T7, "complete"), "#5792: the agent's completion of a task assigned to me still comes")
-T8 = agent_task(W["id"], "Watch this")
-check(A.put(B + f"/api/tasks/{T8}/bell", json={"level": "urgent"}).ok, "#5792: alice sets 'Urgent' on the agent's task")
+T8 = bob_task("Watch this")
+check(A.put(B + f"/api/tasks/{T8}/bell", json={"level": "urgent"}).ok, "#5792: alice sets 'Urgent' on bob's task")
 agent_done(T8)
 check(news_task(ALICE, T8, "complete"), "#5792: the agent's completion of a task with my 'Urgent' still comes")
 A.put(B + f"/api/lists/{W['id']}/bell", json={"mode": "default"})
-# a person without an organisation, the same rule (freelancer-matrix: tasks)
+# a person without an organisation and her own agent, the same rule (freelancer-matrix: tasks)
 FRED = state(Fr)["me"]["id"]
-P = A.post(B + "/api/lists", json={"name": "Side"}).json()
-r = A.put(B + f"/api/lists/{P['id']}/members", json={"user_id": FRED, "role": "edit"})
-check(r.ok, "#5792: share a project with fred " + str(r.status_code) + r.text[:300])
-r = A.put(B + f"/api/lists/{P['id']}/members", json={"user_id": CL, "role": "edit"})
-check(r.ok, "#5792: share the project with the agent " + str(r.status_code) + r.text[:300])
-check(Fr.put(B + f"/api/lists/{P['id']}/bell", json={"mode": "all"}).ok, "#5792: fred: bell 'All'")
-T9 = agent_task(P["id"], "Agent for fred's project")
-check(not news_task(FRED, T9, "newtask"), "#5792: freelancer with 'only what needs me': no News entry for the agent's new task")
-T10 = A.post(B + "/api/tasks", json={"title": "Alice for fred's project", "list_id": P["id"]}).json()["id"]
-check(news_task(FRED, T10, "newtask"), "#5792: freelancer: a person's new task still comes")
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})  # personal agents allowed
+r = Fr.post(B + "/api/my/agents", json={"username": "fredbot", "display_name": "Fred's bot", "scopes": ["read", "tasks:write", "comments"]})
+check(r.status_code in (200, 201), f"#5792: freelancer: an own agent {r.status_code} {r.text[:200]}")
+FA = r.json()["id"]
+FH = {"Authorization": "Bearer " + Fr.post(B + f"/api/my/agents/{FA}/token").json()["token"]}
+P = Fr.post(B + "/api/lists", json={"name": "Side"}).json()["id"]
+check(Fr.put(B + f"/api/lists/{P}/members", json={"user_id": FA, "role": "edit"}).ok, "#5792: freelancer shares the project with the own agent")
+check(Fr.put(B + f"/api/lists/{P}/bell", json={"mode": "all"}).ok, "#5792: freelancer: bell 'All'")
+T9 = requests.post(V + "/tasks", headers=FH, json={"title": "Agent for fred", "list_id": P}).json()["id"]
+check(not news_task(FRED, T9, "newtask"), "#5792: freelancer with 'only what needs me': no News entry for the own agent's new task")
+T10 = Fr.post(B + "/api/tasks", json={"title": "Fred's own", "list_id": P}).json()["id"]
+agent_done(T10, FH)
+check(not news_task(FRED, T10, "complete"), "#5792: freelancer with 'only what needs me': no News entry for the agent's completion")
+check(Fr.patch(B + "/api/settings", json={"agent_comments": "all"}).ok, "#5792: freelancer back to 'all'")
+T11 = requests.post(V + "/tasks", headers=FH, json={"title": "Agent for fred again", "list_id": P}).json()["id"]
+check(news_task(FRED, T11, "newtask"), "#5792: freelancer with 'all': the own agent's new task comes (bell 'All')")
+T12 = Fr.post(B + "/api/tasks", json={"title": "Fred's second", "list_id": P}).json()["id"]
+agent_done(T12, FH)
+check(news_task(FRED, T12, "complete"), "#5792: freelancer with 'all': the agent's completion comes")
 
 print(f"p262_b_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
