@@ -915,7 +915,10 @@ and `contacts.search`. `kalmido/core/objsearch.py`:
 - No `org_id` column on purpose (`org_ref`): row-level security would stop the GIN index (`@@` is not leakproof, like ILIKE in
   #5116). So a row of `obj_search` never leaves without its source row: the helpers give ids for a join, nothing else.
 - The move: `osr_move` (`core/objhooks.py MOVE`) drops the old triggers / functions / trigram indexes and raises the back limit
-  before the fragment `5278_a` drops `task_fts`, `cmt_fts` and `contacts.search` (one-way).
+  before the fragment `5278_a` drops `task_fts`, `cmt_fts` and `contacts.search` (one-way). The triggers are read from the
+  catalog (every trigger that runs `kalmido_fts_task` / `kalmido_fts_cmt`, on whatever table), and the side tables' foreign
+  keys go first: a database that jumps over several stages in one start (2.941 -> 2.995 live) still has them on `comments`,
+  because all MOVE steps run before all fragments' AFTER (`tests/fixtures/upgrade/2.941.0.sql.gz` holds that state).
 
 ## Filter (2.846.0, #5520)
 

@@ -295,8 +295,8 @@ def osr_init(c):
 
 
 # ---- the move (stage Q6a, one-way): the old search structures go
-OSR_OLD_TRIGGERS = (("kalmido_fts_task_ins", "tasks"), ("kalmido_fts_task_upd", "tasks"),
-                    ("kalmido_fts_cmt_ins", "obj_comments"), ("kalmido_fts_cmt_upd", "obj_comments"))
+OSR_OLD_FUNCS = ("kalmido_fts_task", "kalmido_fts_cmt")  # the trigger functions of the side tables (tasks/ftsearch.py, 2.281.0)
+OSR_OLD_SIDE = ("task_fts", "cmt_fts")  # the side tables 5278_a drops (their foreign keys go first, see osr_move)
 OSR_OLD_INDEXES = ("msg_trgm_obj_comments", "msg_trgm_tchat_msgs", "msg_trgm_agent_chat", "msg_trgm_comments", "msg_trgm_chat",
                    "tasks_trgm_title", "tasks_trgm_content", "tasks_trgm_url", "fts_tasks", "fts_comments")
 OSR_FLOOR_HOW = ("the shared search index obj_search replaced the search side tables task_fts / cmt_fts and the column "
@@ -310,11 +310,23 @@ def osr_move(c):
     database's back limit is raised to the minor of this image the first time (an older image writes contacts.search)."""
     old = table_exists(c, "task_fts") or table_exists(c, "cmt_fts") or (
         table_exists(c, "contacts") and "search" in table_columns(c, "contacts"))
-    for name, t in OSR_OLD_TRIGGERS:
-        if table_exists(c, t):
-            c.execute(f"DROP TRIGGER IF EXISTS {name} ON {t}")
-    for fn in ("kalmido_fts_task", "kalmido_fts_cmt"):
-        c.execute(f"DROP FUNCTION IF EXISTS {fn}()")
+    # 2.995.1 (live update 2.941 -> 2.995 failed): every trigger that runs one of the old functions goes, on whatever table it
+    # sits - read from the catalog, not from a fixed list. 2.941 had kalmido_fts_cmt_* on comments (moved to obj_comments only
+    # by 2.972); a jump over 2.972 runs this MOVE before 5272_a's AFTER drops comments, so the triggers were still there and
+    # DROP FUNCTION failed. No CASCADE: a dependency nobody expected should stop the start, not vanish silently.
+    for tg, tb in c.execute("""SELECT t.tgname::text, k.relname::text FROM pg_trigger t
+                               JOIN pg_class k ON k.oid=t.tgrelid JOIN pg_proc p ON p.oid=t.tgfoid
+                               WHERE NOT t.tgisinternal AND k.relnamespace=current_schema()::regnamespace
+                                 AND p.pronamespace=current_schema()::regnamespace AND p.proname IN (?, ?)""",  # pg-ok: pg_catalog
+                            OSR_OLD_FUNCS).fetchall():
+        c.execute(f"DROP TRIGGER IF EXISTS {qi(tg, {tg})} ON {qi(tb, {tb})}")
+    # the side tables' foreign keys: cmt_fts.comment_id of 2.941 points at comments (ocm_fk moved it to obj_comments only up
+    # to 2.981) - left in place, 5272_a's DROP TABLE comments fails before 5278_a drops cmt_fts. Derived rows, the table goes.
+    for tb in OSR_OLD_SIDE:
+        for (con,) in c.execute("SELECT conname::text FROM pg_constraint WHERE contype='f' AND conrelid=to_regclass(?)", (tb,)).fetchall():
+            c.execute(f"ALTER TABLE {qi(tb, OSR_OLD_SIDE)} DROP CONSTRAINT {qi(con, {con})}")
+    for fn in OSR_OLD_FUNCS:
+        c.execute(f"DROP FUNCTION IF EXISTS {qi(fn, OSR_OLD_FUNCS)}()")
     for ix in OSR_OLD_INDEXES:
         c.execute(f"DROP INDEX IF EXISTS {ix}")
     if old:
