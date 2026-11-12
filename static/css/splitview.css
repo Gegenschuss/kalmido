@@ -4,9 +4,9 @@ html.split-on body{width:calc(100% - var(--splW,50vw));contain:layout}
 .splitpane{position:fixed;top:0;right:0;bottom:0;width:var(--splW,50vw);z-index:1;display:flex;background:var(--bg);border-left:1px solid var(--line)}
 .splitfr{flex:1;min-width:0;width:100%;height:100%;border:0;display:block;background:var(--bg)}
 .splgrip{position:absolute;left:-.3125rem;top:0;bottom:0;width:.625rem;z-index:2;cursor:col-resize;touch-action:none;display:flex;justify-content:center}
-/* 2.1040.0 (#5813): the line is always visible (4px, border colour), accent on hover / drag / focus; it lies on the edge (centred in the
+/* 2.1040.0 (#5813): the line is always visible (4px, a stronger border tone: --line2 was too faint on light themes), accent on hover / drag / focus; it lies on the edge (centred in the
    grip, which stays wider), so neither half changes its width */
-.splgrip::after{content:"";width:4px;height:100%;background:var(--line2);border-radius:2px}
+.splgrip::after{content:"";width:4px;height:100%;background:color-mix(in srgb,var(--text) 26%,var(--bg));border-radius:2px}
 .splgrip:hover::after,.splgrip:focus-visible::after,html.spl-drag .splgrip::after{background:var(--accent)}
 .splgrip:focus-visible{outline:none}
 html.spl-drag .splitfr{pointer-events:none}
