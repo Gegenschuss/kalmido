@@ -357,9 +357,13 @@ def t_add_decision(api, a):  # 2.392.0 C (#3370)
 def t_add_comment(api, a):
     if (a.get("kind") or "task") == "video":  # 2.981.0 (#5273): a comment on a video / picture sign-off (was add_video_comment)
         rid = a.get("id") if a.get("id") is not None else a.get("review_id")
+        if rid is None:  # 2.1003.0 (#5733)
+            raise ApiError(400, "id (the sign-off) is required for kind video")
         return api.call("POST", f"/videos/{int(rid)}/comments", body=_pick(a, ("body", "at_sec", "pos", "version_id", "parent_id")))
     if a.get("task_id") is None and a.get("id") is not None:
         a = {**a, "task_id": a["id"]}
+    if a.get("task_id") is None:  # 2.1003.0 (#5733): neither is required alone -- a clear answer instead of a KeyError
+        raise ApiError(400, "task_id (or id) is required")
     b = {"body": a["body"]}
     if a.get("suggestion"):
         b["suggestion"] = a["suggestion"]

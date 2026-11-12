@@ -280,6 +280,10 @@ APP_TO_API = {
     "GET /api/videos": ["GET /videos"], "GET /api/videos/{}": ["GET /videos/{}"], "GET /api/videos/{}/export": ["GET /videos/{}"],
     "POST /api/videos/{}/comments": ["POST /videos/{}/comments"], "PATCH /api/videos/{}/comments/{}": ["PATCH /videos/{}/comments/{}"],
     "GET /api/videos/{}/versions/{}/file": ["GET /videos/{}/versions/{}/file"],  # 2.641.0 (#4769): the image / PDF of a version
+    # 2.1003.0 (#5733): the generic address of the comments' core (core/objcmtweb.py, 2.981.0 #5273) for the kinds video and doc_note:
+    # agents reach a review's comments through the review's API routes (add_comment kind video, update_comment); doc notes see APP_ONLY
+    "GET /api/obj/{}/{}/comments": ["GET /videos/{}"], "POST /api/obj/{}/{}/comments": ["POST /videos/{}/comments"],
+    "PATCH /api/obj/comments/{}": ["PATCH /videos/{}/comments/{}"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
@@ -767,6 +771,10 @@ APP_ONLY = [
     ("2.635.0 (#4807): notes on a document are written and deleted by people in the app; agents read them as `notes` of "
      "GET /documents/{id} (same visibility as the document); agents writing notes is its own step of the agents list",
      ("=GET /api/docs/{}/notes", "=POST /api/docs/{}/notes", "=DELETE /api/docs/{}/notes/{}")),
+    ("2.1003.0 (#5733): a comment or document note in the core's trash (2.981.0 #5273) is deleted and restored by a person, like "
+     "a review's comments and the task comments above -- the generic address of the comments' core for the app; an agent's way to "
+     "a review's comments are its routes /videos/{}/comments, document notes stay with people (#4807)",
+     ("=DELETE /api/obj/comments/{}", "=POST /api/obj/comments/{}/restore", "=POST /api/docs/{}/notes/{}/restore")),
     ("2.146.0 A (#2451): the readable HTML view of a received e-invoice is for people in the browser; agents read the same values "
      "as `extracted` of GET /documents/{id} and the file itself", ("=GET /api/docs/{}/einvoice",)),
     # 2.121.0 (#2095): the hint on a receipt which cash entries point at it -- part of the cash book, which is office admins only
@@ -955,6 +963,7 @@ TOOL_VARIANTS = {  # extra arguments that reach other routes of the same tool
     **{t: [{"org_id": 1}] for t in ("list_webhooks", "create_webhook", "update_webhook", "delete_webhook", "rotate_webhook_secret",
                                     "test_webhook", "get_webhook_log")},
     "upload_attachment": [],
+    "add_comment": [{"kind": "video", "id": 1}],  # 2.1003.0 (#5733): 2.981.0 (#5273) a comment on a video / picture sign-off
 }
 rec = Rec()
 for name, _, schema, fn in mcp.TOOLS:
@@ -966,7 +975,7 @@ for name, _, schema, fn in mcp.TOOLS:
         base["base64"] = "eA=="
     if name == "send_chat":
         base["body"] = "x"
-    if name == "get_task":  # 2.390.0 (#3353): task_id or key - neither is required alone
+    if name in ("get_task", "add_comment"):  # 2.390.0 (#3353): task_id or key - neither is required alone; 2.1003.0 (#5733): add_comment task_id or id
         base["task_id"] = 1
     for extra in [{}] + TOOL_VARIANTS.get(name, []):
         rec.tool = name
