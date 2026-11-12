@@ -172,6 +172,7 @@ The REST API v1: shared helpers, scopes (token rights) and the OpenAPI descripti
 - `kalmido/api/openapi.py` - The OpenAPI 3.1 document of /api/v1 (served at /api/v1/openapi.json, built once)
 - `kalmido/api/projects.py` (`v1`) - The project overview in the token API
 - `kalmido/api/scopes.py` (`v1`) - Token scopes, approvals and the complete agent API (the routes the web client has)
+- `kalmido/api/showme.py` (`shw`) - "Show me": the named places of the app an agent's chat message may point at (docs/help-targets.json) (2.1072.0)
 - `kalmido/api/v1.py` (`v1`) - REST API /api/v1 with personal access tokens
 - `kalmido/api/v1setup.py` (`v1s`) - Setting up integrations through the REST API
 
@@ -1123,6 +1124,7 @@ The start-up module.
 - `static/js/sheetsio.js` (`shx`) - Tables to and from files: CSV / Excel import in the tables overview and CSV / .xlsx export in a table's menu
 - `static/js/sheetsize.js` (`shz`) - Tables, the frame. On a computer the frame of a table has a grip at its bottom right corner
 - `static/js/shoot.js` - The storyboard of a shoot, module "
+- `static/js/showme.js` (`shw`) - "Show me": the spotlight of the tour on the places of an agent's message, loaded on demand (2.1072.0)
 - `static/js/sidebar.js` (`folder`) - Multi-select bar, filter lists and the list order in the sidebar
 - `static/js/sideviews.js` (`sv`) - Saved views of the sidebar, e.g
 - `static/js/signoff.js` (`sg`) - Approval links with a simple electronic signature - on a sent quotation (office)
