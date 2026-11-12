@@ -1500,8 +1500,12 @@ def org_icon_get(oid, tok):
 
 
 def _oinv_pending(c, uid):
+    """2.1047.0 (#5837): an account an organisation invitation set up (org_invites) and that never signed in. Read in system_ctx:
+    the org_invites row belongs to the organisation that set the account up (row level security), so an admin of another
+    organisation saw none and its invitation went silent (org_member_put, #5775 review 1; #3843: then it kept the account)."""
     from .orginvite import oinv_pending  # orginvite imports this module
-    return oinv_pending(c, uid)
+    with system_ctx(c):  # structure, not content: whether any organisation's invitation set the account up
+        return bool(c.execute("SELECT 1 FROM org_invites WHERE user_id=?", (uid,)).fetchone()) and oinv_pending(c, uid)
 
 
 @app.put("/api/orgs/<int:oid>/members")
@@ -1538,7 +1542,7 @@ def org_member_put(oid, ghost=False):
         # account an organisation invitation set up that never signed in (its only address is the typed one, its link proves it)
         if (r is not None and not dead and r[0] != me() and (r["email_proved"] or "") != em and not (g.user["is_admin"] and not _operator_apart())
                 and not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, r[0])).fetchone()
-                and not (c.execute("SELECT 1 FROM org_invites WHERE user_id=?", (r[0],)).fetchone() and _oinv_pending(c, r[0]))):
+                and not _oinv_pending(c, r[0])):
             dead = True
         if not r or dead and not ghost:
             return jsonify(ok=True, by_email=True)

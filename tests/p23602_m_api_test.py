@@ -298,6 +298,9 @@ check("twice@example.com" not in {x["email"] for x in inv()["invites"]} and "twi
 Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "thrice@example.com", "role": "member"})
 Er.post(B + f"/api/orgs/{BETA}/invites", json={"email": "thrice@example.com", "role": "member"})
 thrice = dbx("SELECT id FROM users WHERE email='thrice@example.com'")[0][0]
+# 2.1047.0 (#5837): the account another organisation's invitation set up (never signed in) gets an ordinary invitation, not a
+# silent one (#5775 review 1) - the other organisation's row was out of sight of this admin (row level security)
+check(dbx("SELECT silent FROM org_joins WHERE org_id=? AND user_id=?", (BETA, thrice)) in ([(0,)], [(False,)]), "#3843: a never used account set up elsewhere: an ordinary invitation")
 dbx("UPDATE org_joins SET created_at='2020-01-01T00:00:00+00:00' WHERE org_id=? AND user_id=?", (BETA, thrice))
 ref = {x["email"]: x for x in inv()["invites"]}["thrice@example.com"]["ref"]
 check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{ref}").ok and not dbx("SELECT 1 FROM users WHERE id=?", (thrice,)), "#3843: only an expired invitation elsewhere: the account goes")
