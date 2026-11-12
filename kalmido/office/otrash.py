@@ -317,6 +317,8 @@ def otb_core_restore(kind, rid):
     ofk_restore(c, uid, kind, rid, undo=own)
     if k["view"].get("back"):
         k["view"]["back"](c, oid, row)
+    if kind == "orgroup":  # 2.997.0 (#5708): since 2.905.0 a rights group comes back here, not via otb_restore_route's "rgroup" branch -- the rights log names the restore again (#5302 F5)
+        ofr_group_restored(c, oid, uid, int(rid))
     ui = k["view"]["kind"](row) if callable(k["view"]["kind"]) else k["view"]["kind"]
     ofx_log(c, oid, "restore", target=ui, detail={"id": rid})
     c.commit()

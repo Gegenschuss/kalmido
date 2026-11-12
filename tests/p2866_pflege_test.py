@@ -71,9 +71,10 @@ def f5(who, s):
     check(r.status_code == 201, f"F5 {who}: setup: a rights group {r.text[:200]}")
     gid, levels = r.json()["id"], r.json()["levels"]
     r = s.delete(B + OFF + f"/rights/groups/{gid}")
-    tid = r.json().get("trash_id") if r.ok else None
-    check(r.ok and tid, f"F5 {who}: the group into the office trash {r.text[:200]}")
-    check(s.post(B + OFF + f"/trash/{tid}/restore").ok, f"F5 {who}: restored")
+    # 2.997.0 (#5708): since 2.905.0 (#5414) the group lies in the core's trash (kind orgroup, id = the group's id), no
+    # office_trash copy with a trash_id; it comes back over the office trash's core route
+    check(r.ok and r.json().get("trash") == {"kind": "orgroup", "id": gid}, f"F5 {who}: the group into the office trash {r.text[:200]}")
+    check(s.post(B + OFF + f"/trash/core/orgroup/{gid}/restore").ok, f"F5 {who}: restored")
     log = s.get(B + OFF + "/rights/log").json().get("items") or []
     mine = [x for x in log if x["group"] == f"g:{gid}"]
     check([x["action"] for x in mine][:2] == ["group_restore", "group_delete"],
