@@ -80,6 +80,7 @@ EXPECT_4XX = {
     "GET /api/team/dispo/callsheet/{}/photo/{}": (404, "the sweep's freelancer has no Film & Video and no shoot day (p2993_a_cslogos_test.py covers it)"),  # 2.993.0 (#5650)
     "GET /api/lists/{}/shotlist.pdf": (404, "the own list is no shoot (project type Shoot only with Film & Video; p2636_c_dreh_api_test.py covers it)"),  # 2.636.0 (#4565)
     "GET /api/v1/office/letters/{}": (404, "an agent reads only the letters it drafted itself; the freelancer wrote this one"),
+    "GET /api/approvals/diff": (400, "the sweep names no approval card (?chat= / ?comment= required, the same for every person; p21068_apvdiff_test.py covers it)"),  # 2.1068.0 (#5831)
     # 2.557.0 (#4670): the own agent has no provider key stored (the provider would be an outside service)
     "GET /api/agents/{}/server/models": (409, "no API key of a model provider stored for the own agent (an outside service)"),
     # 2.558.0 (#4709): no area on the shared core yet (see SUBST)
