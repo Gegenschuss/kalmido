@@ -310,7 +310,10 @@ c.commit()
   the app: no "everything since opening" entry, no table sessions; the server routes stay for other clients). Areas
   whose writes record no step yet (#5476 moves them one by one) keep their own undo / redo functions in the entry
   (listed as "only this device") until they record steps; the old flag `srv` of an entry means nothing any more, the
-  group in its answer decides.
+  group in its answer decides. 2.997.0 (#5699): an entry without a group of its own takes the groups of the answers just
+  before it (`histFresh`, 8 s) - but the group of a settings write (`/api/settings`, which the app also sends by itself:
+  the colour scheme of a new device, a view's arrangement) only when the entry is a setting's (`sett`); else Undo put
+  the setting back instead of the step.
 - Stage 2b (2.576.0, #4794): a 409 of `ow_write` carries the current state under `current` only (the old keys `row` /
   `letter` / `client` went). Every office row on `ow_write` has its history route `GET <its save path>/history`
   (`ow_history_answer`; e.g. `/api/office/trips/<id>/history`, `/api/clients/<id>/history`): the route runs the rights
