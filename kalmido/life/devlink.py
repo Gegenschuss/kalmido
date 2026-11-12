@@ -204,9 +204,9 @@ def dl_device_get(tid):
     offices: the office areas the device can go to (the own office, organisations as admin)}."""
     c, uid = db(), me()
     _device(c, uid, tid, write=False)
-    l = _dl_one(c, "src_id=? AND owner_id=?", (tid, uid))
-    taken = l is None and _dl_taken(c, tid)  # another person's link
-    return jsonify(link=dl_public(c, uid, l, "device") if l else None, offices=[] if l or taken else dl_offices(c, uid))
+    lk = _dl_one(c, "src_id=? AND owner_id=?", (tid, uid))
+    taken = lk is None and _dl_taken(c, tid)  # another person's link
+    return jsonify(link=dl_public(c, uid, lk, "device") if lk else None, offices=[] if lk or taken else dl_offices(c, uid))
 
 
 @app.post("/api/life/devices/<int:tid>/to-office")
@@ -252,8 +252,8 @@ def dl_equip_get(rid):
     from ..office.model import office_role, office_row
     c, uid, oid = _ectx()
     office_row(c, oid, "equipment", rid)  # 404 outside the area
-    l = _dl_one(c, "dst_id=? AND owner_id=?", (rid, uid))
-    return jsonify(link=dl_public(c, uid, l, "equipment") if l else None,
+    lk = _dl_one(c, "dst_id=? AND owner_id=?", (rid, uid))
+    return jsonify(link=dl_public(c, uid, lk, "equipment") if lk else None,
                    can_take=bool(feat_on(c, uid, "home") and office_role(c, uid, oid) == "admin"))
 
 
