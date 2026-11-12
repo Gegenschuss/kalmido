@@ -334,6 +334,11 @@ for _w in _ts_warn:
 import check_menu_next  # noqa: E402
 ERR += check_menu_next.errors()
 
+# 2.1024.0 (#5693): every menu goes through menu() of popovers.js, no fold-out / role="menu" of its own
+# (tools/check_menu_own.py); runs here so the CI lint and the Mac lint both have it
+import check_menu_own  # noqa: E402
+ERR += check_menu_own.errors()
+
 for e in ERR:
     print("ERROR:", e)
 print(f"check_layout: {len(tags)} client modules, {len(order)} server modules, {n_people} tables with people, {len(ERR)} error(s)")
