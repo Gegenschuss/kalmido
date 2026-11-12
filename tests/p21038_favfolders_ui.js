@@ -52,7 +52,7 @@ const favs = async () => JSON.parse((await call('GET', '/api/state')).settings.f
   // the content rows of the open menu (#5811) and all its labels
   const MENU = `JSON.stringify({kids: [...document.querySelectorAll('#pop .menu-list [data-act="fv2-kid"] .ml')].map(x => x.textContent), all: [...document.querySelectorAll('#pop .menu-list [role="menuitem"] .ml')].map(x => x.textContent)})`;
   const openMenu = key => `(() => { const t = document.querySelector('#kbar .fv2-tile[data-fv2=${JSON.stringify(key)}]'); if (!t) return false; const r = t.getBoundingClientRect(); t.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4})); return true; })()`;
-  const clickKid = label => `(() => { const b = [...document.querySelectorAll('#pop .menu-list [role="menuitem"]')].find(x => x.querySelector('.ml')?.textContent === ${JSON.stringify(label)}); if (!b) return false; b.click(); return true; })()`;
+  const clickKid = label => `(() => { const b = [...document.querySelectorAll('#pop .menu-list [role="menuitem"]')].find(x => x.querySelector('.ml')?.firstChild?.textContent === ${JSON.stringify(label)}); if (!b) return false; b.click(); return true; })()`;
 
   await firefox(async o => {
     const {ev, cmd, ctx, shot} = o;
@@ -92,7 +92,7 @@ const favs = async () => JSON.parse((await call('GET', '/api/state')).settings.f
     check(m1.all.indexOf('South client') < m1.all.indexOf('Open') && m1.all.includes('Remove from favourites'), '#5811: the content stands above the old entries ' + JSON.stringify(m1.all));
     await shot('p21038-folder-menu.png');
     check(await ev(clickKid('South client')), 'click a project in the menu');
-    check(await ready(ev, `S.route.key === 'l:${SUED}' && !document.querySelector('#pop .menu-list') && /South client/.test(document.querySelector('#view')?.textContent || '')`), '#5811: the project opens directly');
+    check(await ready(ev, `S.route.key === 'l:${SUED}' && document.querySelector('#pop').classList.contains('hidden') && /South client/.test(document.querySelector('#top h1')?.textContent || '')`), '#5811: the project opens directly ' + await ev(`JSON.stringify({key: S.route.key, hash: location.hash, pop: document.querySelector('#pop').className, h1: document.querySelector('#top h1')?.textContent})`));
     // more than ten: "Show all" opens the folder
     check(await ev(openMenu('folder:Many')), 'right click on "Many"');
     check(await ready(ev, `document.querySelectorAll('#pop [data-act="fv2-kid"]').length === 10`), '#5811: at most ten entries');
@@ -106,7 +106,7 @@ const favs = async () => JSON.parse((await call('GET', '/api/state')).settings.f
     const m2 = JSON.parse(await ev(MENU));
     check(m2.kids.length === 2 && m2.kids.includes('Receipts') && m2.kids.includes('Letters') && !m2.all.includes('Loading…'), '#5811: its subfolders, no "Loading…" left ' + JSON.stringify(m2));
     check(await ev(clickKid('Receipts')), 'click a subfolder');
-    check(await ready(ev, `location.hash === '#ablage/${REC}' && /Receipts/.test(document.querySelector('#view')?.textContent || '')`), '#5811: the subfolder opens directly');
+    check(await ready(ev, `location.hash === '#ablage/${REC}' && /Receipts/.test((document.querySelector('#top h1')?.textContent || '') + (document.querySelector('#view')?.textContent || ''))`), '#5811: the subfolder opens directly');
     // an empty folder
     check(await ev(openMenu('file:' + HOLLOW)), 'right click on the empty folder');
     check(await ready(ev, `[...document.querySelectorAll('#pop .menu-list [role="menuitem"] .ml')].some(x => x.textContent === 'Empty')`), '#5811: an empty folder says "Empty"');
