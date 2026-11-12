@@ -39,6 +39,26 @@ class _Dry(Exception):
     pass
 
 
+def ctm_links(c, others, to):
+    """2.1076.0 (#5271): the links of the merged contacts (obj_links src_kind contact, no foreign key: mg_fk_refs does not see
+    them) move to the target -- a link to a task the target links already (any state: one row per key) is dropped, as the
+    old primary key (contact_id, task_id) did in mg_repoint. The record of mg_repoint for mg_undo_refs."""
+    rec = {"t": "obj_links", "col": "src_id", "to": to, "moved": [], "dropped": []}
+    if not others:
+        return rec
+    rows = c.execute(f"SELECT * FROM obj_links WHERE src_kind='contact' AND src_id IN ({','.join('?' * len(others))}) ORDER BY id",
+                     [int(x) for x in others]).fetchall()
+    for r in rows:
+        if c.execute("SELECT 1 FROM obj_links WHERE src_kind='contact' AND src_id=? AND dst_kind=? AND dst_id=? AND rel=?",
+                     (to, r["dst_kind"], r["dst_id"], r["rel"])).fetchone():
+            c.execute("DELETE FROM obj_links WHERE id=?", (r["id"],))
+            rec["dropped"].append({k: (json.dumps(r[k]) if k == "extra" and not isinstance(r[k], str) else r[k]) for k in r.keys()})
+            continue
+        c.execute("UPDATE obj_links SET src_id=? WHERE id=?", (to, r["id"]))
+        rec["moved"].append({"id": r["id"], "_from": r["src_id"]})
+    return rec
+
+
 def ctm_key(k, it):
     """The comparison key of a list entry (doubles are dropped)."""
     if k == "groups":
@@ -152,7 +172,7 @@ def ctm_lines(rows, f, refs, occ_names, unfit=0):
         if not rec.get("dup"):  # the doubles a move made are counted with the move already
             n[rec["t"]] = n.get(rec["t"], 0) + len(rec["moved"]) + len(rec["dropped"])
     lines = []
-    names = {"contact_tasks": N_("Task links: {0}"), "event_attendees": N_("Event attendances: {0}"),
+    names = {"obj_links": N_("Task links: {0}"),  # 2.1076.0 (#5271): was contact_tasks "event_attendees": N_("Event attendances: {0}"),
              "office_client_contacts": N_("Contact person at clients: {0}"), "contact_care": N_("Stay in touch: {0}"),
              "hub_bookings": N_("Bookings in the disposition: {0}")}
     other = 0
@@ -205,6 +225,7 @@ def ctm_merge(c, uid, target, ids, pick=None, dry=False):
             t_occ = [r[0] for r in c.execute("SELECT kind FROM contact_occ WHERE contact_id=?", (t["id"],)).fetchall()]
             refs = [mg_repoint(c, tb_, col, others, t["id"]) for tb_, col, _ in mg_fk_refs(c, "contacts") if tb_ != "contact_occ"]
             refs += [mg_repoint(c, tb_, col, others, t["id"], where) for tb_, col, where in CTM_SOFT]
+            refs.append(ctm_links(c, others, t["id"]))  # 2.1076.0 (#5271): the contacts' task links (obj_links, was contact_tasks)
             refs = [r for r in refs if r["moved"] or r["dropped"]]
             refs.append(ctm_dedupe_attendees(c, t["id"]))
             unfit, unfit_rows = ctm_unfit_clients(c, refs, tb)

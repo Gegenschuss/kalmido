@@ -51,7 +51,8 @@ def merge(s, target, ids, pick=None, dry=False):
 
 
 def links(cid):
-    return sorted(r[0] for r in dbx("SELECT task_id FROM contact_tasks WHERE contact_id=?", (cid,)))
+    return sorted(r[0] for r in dbx("SELECT dst_id FROM obj_links WHERE src_kind='contact' AND src_id=? AND dst_kind='task' AND deleted_at IS NULL",
+                                    (cid,)))  # 2.1076.0 (#5271): obj_links (was contact_tasks)
 
 
 def att(eid):

@@ -1,4 +1,5 @@
-"""2.153.0 (#2028): letters <-> documents of the documents space (office_letter_links), the history ("Vorgang") per contact
+"""2.153.0 (#2028): letters <-> documents of the documents space (2.1076.0, #5271: links of the shared core, obj_links
+office_letter -> fs_entry, rel answers | reply; was office_letter_links), the history ("Vorgang") per contact
 and subject, the deadline found in an incoming document -> a task, the follow-up when no answer comes, the DIN 5008
 reference line made from the answered document. Rules: the decisions of 18.10.2026."""
 import re
@@ -21,9 +22,16 @@ from .letters import lt_book_ids, lt_jl, lt_lang, lt_public, lt_ctx, lt_row, lt_
 from ..core.pages import new_inbox_task  # 2.369.5 (#2517): pulled up from functions
 from ..core.access import my_inbox, need_task  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
-from .okern import ofk_register, ofk_trash  # 2.905.0 (#5414): a removed link goes into the core's trash
+from ..core.objlinks import olnk_drop, olnk_kind, olnk_put, olnk_rel  # 2.1076.0 (#5271): the links' core (was ofk_register / ofk_trash)
 
 LTL_KINDS = ("answers", "reply")  # answers = the letter answers the document; reply = the document answers the letter
+LTL_SRC, LTL_DST = "office_letter", "fs_entry"  # 2.1076.0 (#5271): obj_links office_letter -> fs_entry, rel = the kind
+LTL_ON = "src_kind='office_letter' AND dst_kind='fs_entry' AND rel IN ('answers', 'reply')"  # the letter links of obj_links
+
+
+def ltl_on(a):
+    """LTL_ON for table alias a."""
+    return " AND ".join(f"{a}.{x}" for x in LTL_ON.split(" AND "))
 
 
 def ltl_link(c, oid, letter_id, node_id, kind, uid=None, agent_id=None):
@@ -31,15 +39,9 @@ def ltl_link(c, oid, letter_id, node_id, kind, uid=None, agent_id=None):
     The caller has checked that the person / agent may see both. No commit."""
     if kind not in LTL_KINDS:
         raise ValueError(kind)
-    r = c.execute("SELECT id, deleted_at FROM office_letter_links WHERE letter_id=? AND node_id=? AND kind=? AND org_id=?",  # review: and the area
-                  (letter_id, node_id, kind, oid)).fetchone()
-    if r and r["deleted_at"]:  # 2.905.0 (#5414): one in the core's trash (one link per letter / document / kind) is the new link
-        c.execute("UPDATE office_letter_links SET deleted_at=NULL, deleted_by=NULL, rev=rev+1, created_by=?, agent_id=?, created_at=?, "
-                  "updated_at=NULL, updated_by=NULL WHERE id=? AND org_id=?", (uid, agent_id, iso(now_utc()), r["id"], oid))
-    if r:
-        return r[0]
-    return insert_id(c, "INSERT INTO office_letter_links(org_id, letter_id, node_id, kind, created_by, agent_id, created_at) VALUES(?,?,?,?,?,?,?)",
-                     (oid, letter_id, node_id, kind, uid, agent_id, iso(now_utc())))
+    # 2.1076.0 (#5271): a link of the shared core (one per letter / document / kind; one in its trash is the new link), the
+    # workspace of the office area
+    return olnk_put(c, uid, LTL_SRC, letter_id, LTL_DST, node_id, kind, org_id=oid, agent_id=agent_id)
 
 
 
@@ -366,7 +368,7 @@ def ltl_node_item(c, m, n):
 def ltl_links_of(c, oid, lid):
     """[{node_id, kind, title, date, sender, href}] of the documents linked to letter lid that the person sees."""
     out = []
-    for r in c.execute(f"SELECT node_id, kind FROM office_letter_links WHERE letter_id=? AND org_id=? AND {live_sql()} ORDER BY id", (lid, oid)).fetchall():
+    for r in c.execute(f"SELECT dst_id AS node_id, rel AS kind FROM obj_links WHERE {LTL_ON} AND src_id=? AND org_id=? AND {live_sql()} ORDER BY id", (lid, oid)).fetchall():
         ok = ltl_doc_ok(c, oid, r["node_id"])
         if ok:
             it = ltl_node_item(c, *ok)
@@ -377,8 +379,8 @@ def ltl_links_of(c, oid, lid):
 
 def ltl_answered(c, oid, lid):
     """Has letter lid an answer: a reply link to a document that is not in the bin?"""
-    return bool(c.execute(f"SELECT 1 FROM office_letter_links l JOIN fs_nodes n ON n.id=l.node_id WHERE l.letter_id=? AND l.org_id=? AND {live_sql('l')} "
-                          "AND l.kind='reply' AND n.deleted_at IS NULL LIMIT 1", (lid, oid)).fetchone())
+    return bool(c.execute(f"SELECT 1 FROM obj_links l JOIN fs_nodes n ON n.id=l.dst_id WHERE {ltl_on('l')} AND l.src_id=? AND l.org_id=? AND {live_sql('l')} "
+                          "AND l.rel='reply' AND n.deleted_at IS NULL LIMIT 1", (lid, oid)).fetchone())
 
 
 def ltl_followup(c, oid, d):
@@ -392,7 +394,7 @@ def ltl_followup(c, oid, d):
 
 def ltl_suggest_ref(c, oid, d):
     """The reference line made from the first document letter d answers ('' without one)."""
-    r = c.execute(f"SELECT node_id FROM office_letter_links WHERE letter_id=? AND org_id=? AND kind='answers' AND {live_sql()} ORDER BY id", (d["id"], oid)).fetchall()
+    r = c.execute(f"SELECT dst_id AS node_id FROM obj_links WHERE {LTL_ON} AND src_id=? AND org_id=? AND rel='answers' AND {live_sql()} ORDER BY id", (d["id"], oid)).fetchall()
     for x in r:
         ok = ltl_doc_ok(c, oid, x["node_id"])
         if ok:
@@ -412,7 +414,7 @@ def ltl_graph(c, oid, start_letters=(), start_nodes=()):
             if lid in letters:
                 continue
             letters.add(lid)
-            for r in c.execute(f"SELECT node_id FROM office_letter_links WHERE letter_id=? AND org_id=? AND {live_sql()}", (lid, oid)).fetchall():
+            for r in c.execute(f"SELECT dst_id FROM obj_links WHERE {LTL_ON} AND src_id=? AND org_id=? AND {live_sql()}", (lid, oid)).fetchall():
                 if r[0] not in nodes:
                     todo_n.append(r[0])
         else:
@@ -420,8 +422,8 @@ def ltl_graph(c, oid, start_letters=(), start_nodes=()):
             if nid in nodes or not ltl_doc_ok(c, oid, nid):
                 continue
             nodes.add(nid)
-            for r in c.execute("SELECT l.letter_id FROM office_letter_links l JOIN office_letters t ON t.id=l.letter_id "
-                               f"WHERE l.node_id=? AND l.org_id=? AND t.org_id=? AND t.archived=0 AND {live_sql('l')}", (nid, oid, oid)).fetchall():
+            for r in c.execute("SELECT l.src_id FROM obj_links l JOIN office_letters t ON t.id=l.src_id "
+                               f"WHERE {ltl_on('l')} AND l.dst_id=? AND l.org_id=? AND t.org_id=? AND t.archived=0 AND {live_sql('l')}", (nid, oid, oid)).fetchall():
                 if r[0] not in letters:
                     todo_l.append(r[0])
     return letters, nodes
@@ -446,18 +448,21 @@ def ltl_ctx():
     return lt_ctx()
 
 
-LTL_TRASH = "letter_link"  # 2.567.0 (#4707): kind of a removed letter link in the office trash (the app's name)
-LTL_KIND = "oletlink"  # 2.905.0 (#5414): its kind of the core's trash (toast's undo: POST /api/office/trash/core/oletlink/<id>/restore?undo=1)
+# 2.1076.0 (#5271): a removed link goes into the trash of the links' core with a step of the person's undo list (core/objlinks.py;
+# was the office trash's kind oletlink, 2.905.0 #5414, and before that a copy in office_trash, 2.567.0 #4707)
+def _ltl_may(c, uid, row):
+    """Who may take a removal of a letter link back now (core/objlinks.py olnk_rel): the person in the letter's office area
+    with the letters' rights of the routes (ltl_ctx), the letter and the document still there for them."""
+    _c, me_, oid = ltl_ctx()
+    if me_ != uid or row["org_id"] != oid:
+        raise Denied(404)
+    lt_row(c, oid, row["src_id"])
+    ltl_doc(c, oid, row["dst_id"])
 
 
-def _ltl_trash_label(c, oid, row):
-    """The letter's date (its subject is sealed), as the copy of before."""
-    r = c.execute("SELECT letter_date FROM office_letters WHERE id=? AND org_id=?", (row["letter_id"], oid)).fetchone()
-    return (r["letter_date"] if r else "") or ""
-
-
-ofk_register(LTL_KIND, "office_letter_links", N_("Letter"), "letters", need="edit",
-             view={"kind": LTL_TRASH, "label": _ltl_trash_label, "ctx": ltl_ctx})
+olnk_kind(LTL_SRC, table="office_letters")  # the file store's reference kind 'office_letter' answers role, title, address
+for _k in LTL_KINDS:
+    olnk_rel(_k, _ltl_may)
 
 
 def ltl_kind(v):
@@ -499,21 +504,22 @@ def ltl_links_post(lid):
 
 @app.delete("/api/office/letters/<int:lid>/links/<int:nid>")
 def ltl_links_del(lid, nid):
-    """Removes the link (?kind=answers|reply; without: both). 2.567.0 (#4707): into the trash. 2.905.0 (#5414): the core's
-    trash, each link removed (trash = {kind, id, ids}: the undo POST /api/office/trash/core/oletlink/<id>/restore?undo=1 per id)."""
+    """Removes the link (?kind=answers|reply; without: both). 2.567.0 (#4707): into the trash. 2.1076.0 (#5271): the trash of the
+    links' core, each link a step of the person's undo list (X-Kalmido-Undo-Gid); linking it again brings the same row back."""
     c, uid, oid = ltl_ctx()
     d = lt_row(c, oid, lid)
     kind = request.args.get("kind") or ""
     if kind:
         ltl_kind(kind)
-    ids = [r[0] for r in c.execute(f"SELECT id FROM office_letter_links WHERE letter_id=? AND org_id=? AND node_id=? AND {live_sql()}" + (" AND kind=?" if kind else "") + " ORDER BY id",
+    ids = [r[0] for r in c.execute(f"SELECT id FROM obj_links WHERE {LTL_ON} AND src_id=? AND org_id=? AND dst_id=? AND {live_sql()}" + (" AND rel=?" if kind else "") + " ORDER BY id",
                                    (d["id"], oid, nid, *((kind,) if kind else ()))).fetchall()]
     if not ids:
         raise Denied(404)
     for i in ids:
-        ofk_trash(c, uid, LTL_KIND, i)  # 2.905.0 (#5414): the core's trash (deleted_at), one undo step of the person
+        olnk_drop(c, uid, i)  # 2.1076.0 (#5271): the links' trash (deleted_at), one undo step of the person
+    bump(c)
     c.commit()
-    return jsonify(ok=True, links=ltl_links_of(c, oid, d["id"]), followup=ltl_followup(c, oid, d), trash={"kind": LTL_KIND, "id": ids[0], "ids": ids})
+    return jsonify(ok=True, links=ltl_links_of(c, oid, d["id"]), followup=ltl_followup(c, oid, d))
 
 
 @app.get("/api/office/letters/<int:lid>/thread")
@@ -568,8 +574,8 @@ def ltl_doc_get(nid):
         raise Denied(404) from None
     info = ltl_doc_info(c, m, n)
     letters = []
-    for r in c.execute("SELECT t.*, l.kind AS link_kind FROM office_letter_links l JOIN office_letters t ON t.id=l.letter_id "
-                       f"WHERE l.node_id=? AND l.org_id=? AND t.org_id=? AND t.archived=0 AND {live_sql('l')} ORDER BY t.letter_date, t.id", (n["id"], oid, oid)).fetchall():
+    for r in c.execute("SELECT t.*, l.rel AS link_kind FROM obj_links l JOIN office_letters t ON t.id=l.src_id "
+                       f"WHERE {ltl_on('l')} AND l.dst_id=? AND l.org_id=? AND t.org_id=? AND t.archived=0 AND {live_sql('l')} ORDER BY t.letter_date, t.id", (n["id"], oid, oid)).fetchall():
         it = ltl_letter_item(c, oid, r)
         letters.append({"id": it["id"], "subject": it["title"], "date": it["date"], "status": it["status"], "kind": r["link_kind"],
                         "href": it["href"]})
@@ -650,8 +656,8 @@ def ltl_followup_tick(c, force=False):
     # the watchdog works for every office area at once (row-level security); every task goes to a person of that area only
     with system_ctx(c):
         rows = c.execute("SELECT * FROM office_letters t WHERE t.status IN ('sent', 'delivered') AND t.archived=0 AND t.followup_due IS NOT NULL "
-                         "AND t.followup_due<=? AND t.followup_task_id IS NULL AND NOT EXISTS (SELECT 1 FROM office_letter_links l JOIN fs_nodes n "
-                         f"ON n.id=l.node_id WHERE l.letter_id=t.id AND l.kind='reply' AND n.deleted_at IS NULL AND {live_sql('l')}) ORDER BY t.org_id, t.id LIMIT 500",
+                         "AND t.followup_due<=? AND t.followup_task_id IS NULL AND NOT EXISTS (SELECT 1 FROM obj_links l JOIN fs_nodes n "
+                         f"ON n.id=l.dst_id WHERE {ltl_on('l')} AND l.src_id=t.id AND l.rel='reply' AND n.deleted_at IS NULL AND {live_sql('l')}) ORDER BY t.org_id, t.id LIMIT 500",
                          (today,)).fetchall()
         people = {}
         for r in rows:

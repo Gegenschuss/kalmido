@@ -7,7 +7,7 @@
    without an HTML part (or without its .eml) = 404 there and html false
  - mail -> task / event: the picks = lists / calendars of the mail's workspace I may write in; title without Re / Fwd,
    description = text start + sender; into another workspace 409, a list I may only read 404; the task / event remembers
-   the mail (hub_mail_links), the mail lists what was made from it; the mail of a task: subject only for who may read the
+   the mail (hub_mail_links; 2.1076.0 #5271: obj_links rel made), the mail lists what was made from it; the mail of a task: subject only for who may read the
    mail, else neither subject nor id
  - another organisation / agents: nothing (tenant-matrix: hubmail); a person without organisation in the private workspace
    (freelancer-matrix: hub)
@@ -249,7 +249,8 @@ check(r.status_code == 201 and js(Bo.get(B + f"/api/events/{js(r).get('event_id'
 check(js(Bo.get(B + f"/api/hubmail/links?event_id={EID}")).get("links") == [{"mail_id": HM, "subject": "Re: Fwd: Spring offer"}], "the event knows its mail")
 made = js(Bo.get(B + f"/api/hubmail/mails/{HM}")).get("made") or []
 check([x["kind"] for x in made] == ["task", "task", "event", "event"] and made[0]["id"] == TID and made[0]["title"] == "Spring offer", f"the mail lists what was made ({made})")
-check(len(dbx("SELECT id FROM hub_mail_links WHERE mail_id=? AND org_id=?", (HM, ORG))) == 4, "hub_mail_links rows in the mail's organisation")
+check(len(dbx("SELECT id FROM obj_links WHERE src_kind='hub_mail' AND src_id=? AND rel='made' AND org_id=?", (HM, ORG))) == 4,
+      "the link rows in the mail's organisation")  # 2.1076.0 (#5271): obj_links (was hub_mail_links)
 # a deleted task drops out of the mail's list; the deleted mail leaves only "E-mail"
 Bo.delete(B + f"/api/tasks/{TID}")
 check(TID not in [x["id"] for x in js(Bo.get(B + f"/api/hubmail/mails/{HM}")).get("made") or [] if x["kind"] == "task"], "a deleted task leaves the mail's list")

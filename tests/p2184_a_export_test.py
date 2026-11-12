@@ -235,7 +235,7 @@ check(gl and gl[1] and gl[1] != LPDF and gnode and gnode[0] == GAM, f"the filed 
 check(sql("SELECT COUNT(*) FROM office_letters WHERE org_id=? AND status='draft'", (GAM,))[0][0] == 1, "the draft came along")
 gd = one("SELECT n.id FROM fs_nodes n JOIN doc_meta m ON m.node_id=n.id WHERE n.org_id=? AND n.name='schreiben.txt'", (GAM,))
 GD = gd[0] if gd else 0
-lk = sql("SELECT node_id, kind FROM office_letter_links WHERE letter_id=?", (GL,))
+lk = sql("SELECT dst_id, rel FROM obj_links WHERE src_kind='office_letter' AND src_id=?", (GL,))  # 2.1076.0 (#5271): obj_links (was office_letter_links)
 check([tuple(x) for x in lk] == [(GD, "answers")], f"the letter answers the new document {lk} {GD}")
 bl = A.get(B + "/api/office/letter-blocks").json()
 bl = bl.get("blocks", bl) if isinstance(bl, dict) else bl

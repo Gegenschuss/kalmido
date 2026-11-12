@@ -864,6 +864,8 @@ def openapi_spec():
     polls_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.484.0 (#2200)
     from ..core.objweb import objects_spec
     objects_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.558.0 (#4709): the core objects for agents
+    from ..core.objlinkweb import links_spec
+    links_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.1076.0 (#5271): the links of the core objects
     contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.21.0 (#658)
     life_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.22.0 (#663)
     team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#419)

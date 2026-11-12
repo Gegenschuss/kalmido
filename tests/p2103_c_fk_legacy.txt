@@ -23,7 +23,6 @@ fs_log.user_id
 fs_nodes.ref_id
 git_closes.conn_id
 hub_bookings.resource_id
-hub_mail_links.ref_id
 kid_stars.by_id
 kid_stars.reward_id
 list_activity.user_id

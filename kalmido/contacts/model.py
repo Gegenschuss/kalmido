@@ -29,6 +29,8 @@ from ..family.family import _jparse, occ_create, occ_next, occ_rule  # 2.369.5 (
 from ..tasks.lifecycle import restore_task  # 2.370.4 (#3089)
 from ..collab.liste2e import le2a_gen_locked  # 2.369.5 (#2517): pulled up from functions
 from ..events.model import need_event  # 2.369.5 (#2517): pulled up from functions
+from ..core.objlinks import olnk_drop, olnk_extra, olnk_find, olnk_kind, olnk_put, olnk_rel, olnk_set_extra  # 2.1076.0 (#5271)
+from ..core.access import live_sql  # 2.1076.0 (#5271)
 
 
 # ---------------------------------------------------------------- 2.21.0 (#658): contacts
@@ -983,8 +985,9 @@ def contact_dict(c, r, uid=None, links=True):
     d["newsletter"] = nwl_contact_json(r)  # 2.55.0 (#1455): the newsletter consent (read only here, set via /api/newsletter/consent)
     if links and uid:
         d["tasks"] = [{"task_id": x["task_id"], "kind": x["kind"], "title": x["title"], "status": x["status"]}
-                      for x in c.execute("""SELECT l.task_id, l.kind, t.title, t.status FROM contact_tasks l JOIN tasks t ON t.id=l.task_id
-                                            WHERE l.contact_id=? AND t.deleted_at IS NULL ORDER BY t.status, t.due IS NULL, t.due""", (r["id"],))
+                      for x in c.execute(f"""SELECT l.dst_id AS task_id, COALESCE(l.extra->>'kind', 'about') AS kind, t.title, t.status
+                                             FROM obj_links l JOIN tasks t ON t.id=l.dst_id WHERE {CT_LINK_SQL} AND l.src_id=? AND {live_sql('l')}
+                                             AND {live_sql('t')} ORDER BY t.status, t.due IS NULL, t.due""", (r["id"],))
                       if task_visible(c, x["task_id"], uid)]
         d["events"] = []
         for e in c.execute("""SELECT e.id FROM events e WHERE e.id IN (SELECT a.event_id FROM event_attendees a WHERE a.contact_id=?)
@@ -1061,8 +1064,12 @@ def link_set(c, uid, cid, tid, kind):
     need_contact(c, cid, uid=uid)
     if not task_visible(c, tid, uid, write=True):
         raise Denied(404)
-    c.execute("INSERT INTO contact_tasks(contact_id,task_id,kind,added_by,added_at) VALUES(?,?,?,?,?) ON CONFLICT (contact_id,task_id) DO UPDATE SET kind=excluded.kind, added_by=excluded.added_by, added_at=excluded.added_at",
-              (cid, tid, kind, uid, iso(now_utc())))
+    # 2.1076.0 (#5271): a link of the shared core (obj_links contact -> task, rel contact, extra.kind; was contact_tasks): one
+    # per contact and task, linking again sets its kind (the E2E lock of the task's project: 409 in the core)
+    lid = olnk_put(c, uid, CT_LINK_SRC, cid, "task", tid, CT_LINK_REL, extra={"kind": kind})
+    row = c.execute("SELECT * FROM obj_links WHERE id=?", (lid,)).fetchone()
+    if olnk_extra(row).get("kind") != kind:
+        olnk_set_extra(c, uid, lid, {**olnk_extra(row), "kind": kind})
     c.execute("UPDATE tasks SET updated_at=? WHERE id=?", (iso(now_utc()), tid))
     bump(c)
 
@@ -1071,9 +1078,27 @@ def link_remove(c, uid, cid, tid):
     if not task_visible(c, tid, uid, write=True):
         raise Denied(404)
     need_contact(c, cid, uid=uid)
-    if not c.execute("DELETE FROM contact_tasks WHERE contact_id=? AND task_id=?", (cid, tid)).rowcount:
+    rows = olnk_find(c, CT_LINK_SRC, cid, "task", tid, CT_LINK_REL)
+    if not rows:
         raise Denied(404)
+    olnk_drop(c, uid, rows[0]["id"])  # 2.1076.0 (#5271): into the core's trash, a step of the person's undo list (was: deleted)
     bump(c)
+
+
+CT_LINK_SRC, CT_LINK_REL = "contact", "contact"  # 2.1076.0 (#5271): obj_links contact -> task
+CT_LINK_SQL = "l.src_kind='contact' AND l.dst_kind='task' AND l.rel='contact'"
+
+
+def _ct_link_may(c, uid, row):
+    """2.1076.0 (#5271): who may take a removal of a contact link back (core/objlinks.py olnk_rel): as linking -- sees the contact,
+    changes the task."""
+    need_contact(c, row["src_id"], uid=uid)
+    if not task_visible(c, row["dst_id"], uid, write=True):
+        raise Denied(404)
+
+
+olnk_kind(CT_LINK_SRC, table="contacts")  # the file store's reference kind 'contact' answers role, title, address
+olnk_rel(CT_LINK_REL, _ct_link_may)
 
 
 def task_contacts(c, uid, task_ids=None):
@@ -1085,12 +1110,14 @@ def task_contacts(c, uid, task_ids=None):
         return {}
     q = ",".join("?" * len(ids))
     out = {}
-    # 2.579.0 (#4184): with task_ids only their links (contact_tasks_task index), was: every link of the books, filtered here
+    # 2.579.0 (#4184): with task_ids only their links (2.1076.0 #5271: the index ix5271_obj_links_dst), was: every link of the books, filtered here
     one, extra = ("", []) if task_ids is None else (" AND l.task_id = ANY(CAST(? AS BIGINT[]))", [st_ids(sorted(task_ids))])
     if task_ids is not None and not task_ids:
         return out
-    for r in c.execute(f"""SELECT l.task_id, l.contact_id, l.kind, k.fn, k.org FROM contact_tasks l JOIN contacts k ON k.id=l.contact_id
-                           WHERE k.book_id IN ({q}) AND k.deleted_at IS NULL{one} ORDER BY l.added_at""", [*ids, *extra]):
+    for r in c.execute(f"""SELECT l.dst_id AS task_id, l.src_id AS contact_id, COALESCE(l.extra->>'kind', 'about') AS kind, k.fn, k.org
+                           FROM obj_links l JOIN contacts k ON k.id=l.src_id
+                           WHERE {CT_LINK_SQL} AND {live_sql('l')} AND k.book_id IN ({q}) AND k.deleted_at IS NULL{one.replace('l.task_id', 'l.dst_id')}
+                           ORDER BY l.created_at, l.id""", [*ids, *extra]):
         if task_ids is None or r[0] in task_ids:
             out.setdefault(r[0], []).append({"contact_id": r[1], "kind": r[2], "fn": r[3] or r[4]})
     return out

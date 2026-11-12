@@ -20,7 +20,7 @@ LAYERS = (
     ("agents", ("agents", "assistant", "startup")),
 )
 LAYER_OF = {"api.common": "core", "accounts.orgback": "domain",
-            "core.objects": "domain", "core.writes": "domain", "core.objlight": "domain", "core.objnotify": "domain", "core.objcomments": "domain", "core.objsearch": "domain", "core.objwords": "domain", "core.objweb": "integrations", "core.objcmtweb": "integrations",
+            "core.objects": "domain", "core.writes": "domain", "core.objlight": "domain", "core.objnotify": "domain", "core.objcomments": "domain", "core.objsearch": "domain", "core.objwords": "domain", "core.objweb": "integrations", "core.objcmtweb": "integrations", "core.objlinks": "domain", "core.objlinkweb": "integrations",
             "core.undoweb": "domain",  # 2.747.0 (#5249): the step groups' routes stand on the write path
             "core.undoareas": "domain",  # 2.777.0 (#5254): the areas' undo steps stand on the write path
             "core.addrshare": "domain",  # 2.1071.0 (#5658): the open shares by address replay the areas' share routes
@@ -618,6 +618,7 @@ ORDER = (
     "lists.rules",  # 2.71.0 A (#1457): rules of a list (When ... then ...), after api.v1
     "core.objects", "core.writes", "core.objweb",  # 2.558.0 (#4709): the shared core (register, roles, write path) and its generic routes
     "core.objcmtweb",  # 2.981.0 (#5273): the generic routes of the comments' core (/api/obj/<kind>/<id>/comments, /api/obj/comments/<cid>)
+    "core.objlinks", "core.objlinkweb",  # 2.1076.0 (#5271): the links' core (obj_links) and its routes (/api/obj/<kind>/<id>/links)
     "core.undogroups",  # 2.747.0 (#5249): the step groups per account (storage, limits, prune; no routes)
     "core.undoweb",  # 2.747.0 (#5249): undo across devices -- the own step groups listed and taken back (GET /api/undo)
     "core.undoareas",  # 2.777.0 (#5254): what the areas share to record and take back their steps (no routes)

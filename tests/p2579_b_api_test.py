@@ -200,12 +200,13 @@ clone("time_entries", ae, 4000, {})
 aev = dbx("SELECT id FROM events WHERE task_id=? LIMIT 1", (O1,))[0][0]
 clone("events", aev, 3000, {"uid": "md5(random()::text || g::text)"})
 OLD = [task(A, f"Archive {i}", L1) for i in range(40)]
-ac = dbx("SELECT contact_id FROM contact_tasks WHERE task_id=?", (O1,))[0][0]
-dbw("INSERT INTO contact_tasks(contact_id, task_id, kind, added_at) SELECT ?, id, 'about', ? FROM tasks WHERE id = ANY(CAST(? AS BIGINT[]))",
-    (ac, NOW.isoformat(), "{" + ",".join(map(str, OLD)) + "}"))
+# 2.1076.0 (#5271): the contacts' task links are rows of obj_links (contact -> task, rel contact; was contact_tasks)
+ac = dbx("SELECT src_id FROM obj_links WHERE src_kind='contact' AND dst_kind='task' AND dst_id=?", (O1,))[0][0]
+dbw("INSERT INTO obj_links(src_kind, src_id, dst_kind, dst_id, rel, created_at) SELECT 'contact', ?, 'task', id, 'contact', ? FROM tasks "
+    "WHERE id = ANY(CAST(? AS BIGINT[]))", (ac, NOW.isoformat(), "{" + ",".join(map(str, OLD)) + "}"))
 clone("contacts", ac, 120, {"uid": "md5(random()::text || g::text)", "href": "md5(random()::text || g::text) || '.vcf'",
                             "fn": "'Archive contact ' || g"})
-dbw("INSERT INTO contact_tasks(contact_id, task_id, kind, added_at) SELECT k.id, t.id, 'about', ? FROM contacts k, tasks t "
+dbw("INSERT INTO obj_links(src_kind, src_id, dst_kind, dst_id, rel, created_at) SELECT 'contact', k.id, 'task', t.id, 'contact', ? FROM contacts k, tasks t "
     "WHERE k.fn LIKE 'Archive contact %' AND t.id = ANY(CAST(? AS BIGINT[]))", (NOW.isoformat(), "{" + ",".join(map(str, OLD)) + "}"))  # 4.800 links
 psql("ANALYZE")
 A.patch(B + f"/api/tasks/{O1}", json={"title": "Older work (stamp)"})  # stamps the SQL rows above (before the delta's since)
@@ -240,9 +241,10 @@ Q = {
     "time_entries": (
         "SELECT task_id, SUM(seconds) FROM time_entries WHERE task_id IS NOT NULL AND \"end\" IS NOT NULL",
         " AND task_id = ANY(CAST(? AS BIGINT[]))", "time_entries", " GROUP BY task_id"),
-    "contact_tasks": (
-        f"SELECT l.task_id, l.contact_id FROM contact_tasks l JOIN contacts k ON k.id=l.contact_id WHERE k.book_id IN ({books}) "
-        "AND k.deleted_at IS NULL", " AND l.task_id = ANY(CAST(? AS BIGINT[]))", "contact_tasks"),
+    "obj_links (contacts)": (  # 2.1076.0 (#5271): was contact_tasks (index ix5271_obj_links_dst)
+        f"SELECT l.dst_id, l.src_id FROM obj_links l JOIN contacts k ON k.id=l.src_id WHERE l.src_kind='contact' AND l.dst_kind='task' "
+        f"AND l.rel='contact' AND l.deleted_at IS NULL AND k.book_id IN ({books}) AND k.deleted_at IS NULL",
+        " AND l.dst_id = ANY(CAST(? AS BIGINT[]))", "obj_links"),
     "events": (
         f"SELECT id, task_id FROM events WHERE cal_id IN ({cals}) AND task_id IS NOT NULL AND deleted_at IS NULL",
         " AND task_id = ANY(CAST(? AS BIGINT[]))", "events"),

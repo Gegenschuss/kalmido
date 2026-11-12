@@ -114,7 +114,6 @@ contact_care.updated_at time
 contact_srcs.created_at time
 contact_srcs.synced_at time
 contact_srcs.tried_at time
-contact_tasks.added_at time
 contacts.addresses json
 contacts.created_at time
 contacts.deleted_at time
@@ -258,7 +257,6 @@ hub_bookings.created_at time
 hub_bookings.deleted_at time
 hub_bookings.updated_at time
 hub_leave_quota.updated_at time
-hub_mail_links.created_at time
 hub_mailbox_rules.active bool
 hub_mailbox_rules.created_at time
 hub_mailbox_rules.last_hit_at time
@@ -296,8 +294,6 @@ kid_rewards.requested_at time
 kid_stars.created_at time
 kk_conns.created_at time
 kk_conns.synced_at time
-life_device_links.created_at time
-life_device_links.updated_at time
 life_trip_costs.created_at time
 list_activity.created_at time
 list_activity.data json
@@ -510,7 +506,6 @@ office_ledger_entries.updated_at time
 office_letter_blocks.archived bool
 office_letter_blocks.created_at time
 office_letter_blocks.updated_at time
-office_letter_links.created_at time
 office_letter_profiles.updated_at time
 office_letters.archived bool
 office_letters.created_at time

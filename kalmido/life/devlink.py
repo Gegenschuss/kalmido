@@ -2,8 +2,9 @@
 
 A device of "Home & life" is a task (fam kind device: name, model, bought, warranty, serial, price; the task's text = the
 note); office equipment is a row of office_equipment (office/model.py MD "equipment": name, serial_no, purchase_date,
-purchase_net ... admins only). Taking over COPIES the matching fields once and stores a link (life_device_links, the
-person's own row): no live mirror; "update from there" copies them again on request. Both sides show "linked with ..."
+purchase_net ... admins only). Taking over COPIES the matching fields once and stores a link (the person's own row; since
+2.1076.0, #5271: a link of the shared core, obj_links rel device: task -> omd_equipment, owner_id = the person, extra = origin +
+office): no live mirror; "update from there" copies them again on request. Both sides show "linked with ..."
 with a jump there, and the link can be removed.
 Rights like the normal way: a device needs the module "home" and the right to change its list; office equipment is made
 only in an office area where the person is admin (the own personal office, or an organisation as its admin) and never by an
@@ -29,8 +30,27 @@ from .model import _cost, _dump, _name, device_create, life_clean_fam, need_life
 from ..accounts.orgs import org_role, user_orgs  # 2.369.5 (#2517): pulled up from functions
 from .model import feat_on  # 2.369.5 (#2517): pulled up from functions
 from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import live_sql  # 2.1076.0 (#5271)
+from ..core.objlinks import olnk_drop, olnk_extra, olnk_put, olnk_rel  # 2.1076.0 (#5271): the link is one of the shared core
 
 DL_ORIGINS = ("device", "equipment")
+DL_REL, DL_SRC, DL_DST = "device", "task", "omd_equipment"  # 2.1076.0 (#5271): obj_links task -> omd_equipment
+DL_SQL = f"SELECT * FROM obj_links WHERE rel='{DL_REL}' AND src_kind='{DL_SRC}' AND dst_kind='{DL_DST}'"
+
+
+def _dl(r):
+    """2.1076.0 (#5271): a link row of the core in the shape of the old table (id, user_id, task_id, office_id, equipment_id,
+    origin, created_at, updated_at) -- the answers stay as they were."""
+    if r is None:
+        return None
+    ex = olnk_extra(r)
+    return {"id": r["id"], "user_id": r["owner_id"], "task_id": r["src_id"], "office_id": ex.get("office_id"),
+            "equipment_id": r["dst_id"], "origin": ex.get("origin") or "device", "created_at": r["created_at"],
+            "updated_at": r["updated_at"] or r["created_at"]}
+
+
+def _dl_one(c, where, args):
+    return _dl(c.execute(f"{DL_SQL} AND {live_sql()} AND {where} ORDER BY id LIMIT 1", args).fetchone())
 
 
 def _ts():
@@ -107,7 +127,7 @@ def _equip(c, uid, oid, eid):
 
 
 def _link(c, uid, lid):
-    r = c.execute("SELECT * FROM life_device_links WHERE id=? AND user_id=?", (lid, uid)).fetchone()
+    r = _dl_one(c, "id=? AND owner_id=?", (lid, uid))
     if not r:
         raise Denied(404)
     return r
@@ -150,10 +170,8 @@ def dl_public(c, uid, l, side):
 
 def _insert_link(c, uid, tid, oid, eid, origin):
     """The callers checked that neither side carries a link of the person yet (unique indexes as the floor)."""
-    ts = _ts()
-    c.execute("INSERT INTO life_device_links(user_id, task_id, office_id, equipment_id, origin, created_at, updated_at) VALUES(?,?,?,?,?,?,?)",
-              (uid, tid, oid, eid, origin, ts, ts))
-    return c.execute("SELECT * FROM life_device_links WHERE user_id=? AND task_id=?", (uid, tid)).fetchone()
+    lid = olnk_put(c, uid, DL_SRC, tid, DL_DST, eid, DL_REL, owner_id=uid, extra={"origin": origin, "office_id": oid})
+    return _dl_one(c, "id=?", (lid,))
 
 
 def _from_device(f, b=None):
@@ -186,8 +204,8 @@ def dl_device_get(tid):
     offices: the office areas the device can go to (the own office, organisations as admin)}."""
     c, uid = db(), me()
     _device(c, uid, tid, write=False)
-    l = c.execute("SELECT * FROM life_device_links WHERE task_id=? AND user_id=?", (tid, uid)).fetchone()
-    taken = l is None and c.execute("SELECT 1 FROM life_device_links WHERE task_id=?", (tid,)).fetchone()  # another person's link
+    l = _dl_one(c, "src_id=? AND owner_id=?", (tid, uid))
+    taken = l is None and _dl_taken(c, tid)  # another person's link
     return jsonify(link=dl_public(c, uid, l, "device") if l else None, offices=[] if l or taken else dl_offices(c, uid))
 
 
@@ -200,7 +218,7 @@ def dl_device_to_office(tid):
     c, uid = db(), me()
     office_gate(c)
     _t, f = _device(c, uid, tid)
-    if c.execute("SELECT 1 FROM life_device_links WHERE task_id=?", (tid,)).fetchone():  # also by another person of a shared list
+    if _dl_taken(c, tid):  # also by another person of a shared list
         raise BadInput(tr("This device is linked already"))
     b = body()
     if not isinstance(b, dict):
@@ -234,7 +252,7 @@ def dl_equip_get(rid):
     from ..office.model import office_role, office_row
     c, uid, oid = _ectx()
     office_row(c, oid, "equipment", rid)  # 404 outside the area
-    l = c.execute("SELECT * FROM life_device_links WHERE office_id=? AND equipment_id=? AND user_id=?", (oid, rid, uid)).fetchone()
+    l = _dl_one(c, "dst_id=? AND owner_id=?", (rid, uid))
     return jsonify(link=dl_public(c, uid, l, "equipment") if l else None,
                    can_take=bool(feat_on(c, uid, "home") and office_role(c, uid, oid) == "admin"))
 
@@ -247,7 +265,7 @@ def dl_equip_to_device(rid):
     c, uid, _oid = _ectx()
     oid = office_org(c, uid, admin=True)
     r = office_row(c, oid, "equipment", rid)
-    if c.execute("SELECT 1 FROM life_device_links WHERE office_id=? AND equipment_id=? AND user_id=?", (oid, rid, uid)).fetchone():
+    if _dl_one(c, "dst_id=? AND owner_id=?", (rid, uid)):
         raise BadInput(tr("This device is linked already"))
     b = body()
     if not isinstance(b, dict):
@@ -311,7 +329,7 @@ def dl_pull(lid):
         diff["before"].pop("updated_at", None)
         if diff["after"]:
             ofx_log(c, l["office_id"], "update", target="equipment", detail={"id": r["id"], **diff})
-    c.execute("UPDATE life_device_links SET updated_at=? WHERE id=?", (_ts(), lid))
+    c.execute("UPDATE obj_links SET updated_at=?, updated_by=?, rev=rev+1 WHERE id=?", (_ts(), uid, lid))
     l = _link(c, uid, lid)
     return _done(c, {"link": dl_public(c, uid, l, into)})
 
@@ -321,5 +339,22 @@ def dl_delete(lid):
     """Removes the own link (both entries stay as they are) -- also when the other side is out of reach."""
     c, uid = db(), me()
     _link(c, uid, lid)
-    c.execute("DELETE FROM life_device_links WHERE id=? AND user_id=?", (lid, uid))
+    olnk_drop(c, uid, lid)  # 2.1076.0 (#5271): into the core's trash, a step of the person's undo list (was: deleted)
     return _done(c, {"ok": True})
+
+
+def _dl_taken(c, tid):
+    """A live device link of task tid by anyone (one per device, the partial unique index of migrations.d/5271_a.py)."""
+    return bool(c.execute(f"SELECT 1 FROM obj_links WHERE rel='{DL_REL}' AND src_kind='{DL_SRC}' AND src_id=? AND {live_sql()} LIMIT 1",
+                          (tid,)).fetchone())
+
+
+def _dl_may(c, uid, row):
+    """2.1076.0 (#5271): taking a removal back (core/objlinks.py olnk_rel; the core checked it is uid's own link): the device
+    is still uid's to read, and neither the device nor the equipment carries another link of the person meanwhile (409)."""
+    _device(c, uid, row["src_id"], write=False)
+    if row["deleted_at"] and (_dl_taken(c, row["src_id"]) or _dl_one(c, "dst_id=? AND owner_id=?", (row["dst_id"], uid))):
+        raise Denied(409, tr("This device is linked already"))
+
+
+olnk_rel(DL_REL, _dl_may)

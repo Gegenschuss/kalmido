@@ -145,7 +145,8 @@ check(Fr.get(B + f"/api/contacts/{C1}").status_code == 404 and C1 not in live_id
 j = Fr.get(B + "/api/contacts", params={"trash": 1}).json()
 check([x["id"] for x in j["items"]] == [C1] and j["items"][0].get("deleted_at") and j.get("trash_days", 0) >= 1, f"trash: the deleted contact {j}")
 check(sql("SELECT COUNT(*) FROM contact_care WHERE contact_id=?", (C1,))[0][0] == 1
-      and sql("SELECT COUNT(*) FROM contact_tasks WHERE contact_id=?", (C1,))[0][0] == 1, "delete: its note and task link stay in the trash")
+      and sql("SELECT COUNT(*) FROM obj_links WHERE src_kind='contact' AND src_id=? AND deleted_at IS NULL", (C1,))[0][0] == 1,
+      "delete: its note and task link stay in the trash")  # 2.1076.0 (#5271): obj_links (was contact_tasks)
 st, have, gone, TOK1 = sync(TOK0)
 check(st == 207 and any(h.endswith(H1) for h in gone) and TOK1 != TOK0, f"CardDAV: the phone hears it is gone {gone}")
 check(dav("GET", AB + H1).status_code == 404, "CardDAV: GET of the card in the trash: 404")

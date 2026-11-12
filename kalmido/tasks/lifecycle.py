@@ -761,7 +761,7 @@ def ucp_touched(c, cid):
                         UNION ALL SELECT 1 FROM time_entries WHERE task_id=? UNION ALL SELECT 1 FROM pomos WHERE task_id=?
                         UNION ALL SELECT 1 FROM tasks WHERE parent_id=?
                         UNION ALL SELECT 1 FROM task_enc_notes WHERE task_id=? UNION ALL SELECT 1 FROM task_links WHERE task_id=?
-                        UNION ALL SELECT 1 FROM task_deps WHERE task_id=? OR blocker_id=? UNION ALL SELECT 1 FROM contact_tasks WHERE task_id=?
+                        UNION ALL SELECT 1 FROM task_deps WHERE task_id=? OR blocker_id=? UNION ALL SELECT 1 FROM obj_links WHERE src_kind='contact' AND dst_kind='task' AND dst_id=?
                         UNION ALL SELECT 1 FROM git_links WHERE task_id=? UNION ALL SELECT 1 FROM form_entries WHERE task_id=?
                         LIMIT 1""", (cid,) * 12).fetchone() is not None  # 2.272.0 F (#3025, review H2): notes, links, deps, contacts, git, form
 

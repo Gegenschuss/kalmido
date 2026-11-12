@@ -110,7 +110,7 @@ def node_of(mid):
 
 
 def reply_links(lid):
-    return [r[0] for r in dbx("SELECT node_id FROM office_letter_links WHERE letter_id=? AND kind='reply'", (lid,))]
+    return [r[0] for r in dbx("SELECT dst_id FROM obj_links WHERE src_kind='office_letter' AND src_id=? AND rel='reply'", (lid,))]  # 2.1076.0 (#5271): obj_links (was office_letter_links)
 
 
 # ---------------------------------------------------------------- setup: alice = admin of Alpha, bob a member, frank = Beta
@@ -232,12 +232,12 @@ assert r.ok, r.text
 m2 = deliver(r.json()["address"], MID, "Fremde Antwort")
 n2 = node_of(m2)
 check(n2 and n2 not in reply_links(L1), "the same Message-ID to Beta's document address: no link to Alpha's letter")
-check(not dbx("SELECT 1 FROM office_letter_links WHERE node_id=?", (n2,)), "Beta's document: no link at all")
+check(not dbx("SELECT 1 FROM obj_links WHERE dst_kind='fs_entry' AND dst_id=?", (n2,)), "Beta's document: no link at all")  # 2.1076.0 (#5271): obj_links (was office_letter_links)
 r = A.post(B + "/api/docs/mail", json={"ws": "private"})
 assert r.ok, r.text
 m3 = deliver(r.json()["address"], MID, "Private Antwort")
 n3 = node_of(m3)
-check(n3 and not dbx("SELECT 1 FROM office_letter_links WHERE node_id=?", (n3,)), "the same Message-ID to alice's private address: no link")
+check(n3 and not dbx("SELECT 1 FROM obj_links WHERE dst_kind='fs_entry' AND dst_id=?", (n3,)), "the same Message-ID to alice's private address: no link")  # 2.1076.0 (#5271): obj_links (was office_letter_links)
 
 # ---------------------------------------------------------------- text blocks
 r = A.get(B + BL + "/starters?lang=de")

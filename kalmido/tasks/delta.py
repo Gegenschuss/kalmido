@@ -40,7 +40,7 @@ DL_TABLES = {
     "obj_comments": ("ref_id",),  # 2.972.0 (#5272): the comments' core (kind 'task' only today: ref_id = the task)
     "obj_seen": ("ref_id",), "task_field_values": ("task_id",),  # 2.905.0 (#5284): obj_seen (kind task) was task_seen
     "task_deps": ("task_id", "blocker_id"), "agent_usage": ("task_id",), "git_links": ("task_id",), "git_closes": ("task_id",),
-    "task_people": ("task_id",), "events": ("task_id",), "contact_tasks": ("task_id",), "time_entries": ("task_id",),
+    "task_people": ("task_id",), "events": ("task_id",), "obj_links": ("dst_id",), "time_entries": ("task_id",),  # 2.1076.0 (#5271): obj_links (a task's contacts / e-mails) was contact_tasks
     "task_enc_notes": ("task_id",),  # 2.42.0 (#828): the encrypted note marker of a task
     "task_relations": ("task_id", "other_id"),  # 2.576.0 (#3371): saved relations (both tasks show them)
     "task_note_locks": ("task_id",),  # 2.48.0 (#1642): the locked note marker of a task
@@ -69,6 +69,8 @@ DECLARE k text; o bigint; n bigint; ol bigint; nl bigint; u bigint; jo jsonb; jn
 BEGIN
   -- 2.972.0 (#5272): the core's comments hang on any kind of object; only a task's change a task
   IF TG_TABLE_NAME = 'obj_comments' AND COALESCE(to_jsonb(NEW)->>'kind', to_jsonb(OLD)->>'kind') IS DISTINCT FROM 'task' THEN RETURN NULL; END IF;
+  -- 2.1076.0 (#5271): the links' core: only a link to a task changes that task (dst_id)
+  IF TG_TABLE_NAME = 'obj_links' AND COALESCE(to_jsonb(NEW)->>'dst_kind', to_jsonb(OLD)->>'dst_kind') IS DISTINCT FROM 'task' THEN RETURN NULL; END IF;
   IF TG_ARGV[0] = 'full' THEN  -- one unstamped "full" row is enough (it covers the scoped ones too)
     IF EXISTS (SELECT 1 FROM dl_changes WHERE ver IS NULL AND task_id IS NULL AND list_id IS NULL AND user_id IS NULL) THEN RETURN NULL; END IF;
     IF TG_NARGS < 2 OR (TG_TABLE_NAME = 'lists' AND TG_OP = 'DELETE') THEN

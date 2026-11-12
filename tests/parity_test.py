@@ -182,6 +182,9 @@ APP_TO_API = {
     "GET /api/agents": ["GET /agents"],
     # 2.558.0 (#4709): the core objects -- agents read and change them (only what is shared with them, with the version)
     "GET /api/obj/{}": ["GET /agent/objects/{}"], "GET /api/obj/{}/{}": ["GET /agent/objects/{}/{}"], "PATCH /api/obj/{}/{}": ["PATCH /agent/objects/{}/{}"],
+    # 2.1076.0 (#5271): the links of the core objects (core/objlinkweb.py)
+    "GET /api/obj/{}/{}/links": ["GET /agent/objects/{}/{}/links"], "POST /api/obj/{}/{}/links": ["POST /agent/objects/{}/{}/links"],
+    "DELETE /api/obj/links/{}": ["DELETE /agent/objects/{}/{}/links/{}"],
     # 2.17.0 (#442): notes
     "GET /api/lists/{}/notes": ["GET /lists/{}/notes"], "POST /api/lists/{}/notes": ["POST /lists/{}/notes"],
     "GET /api/notes": ["GET /notes"], "GET /api/notes/{}": ["GET /notes/{}"], "PATCH /api/notes/{}": ["PATCH /notes/{}"],

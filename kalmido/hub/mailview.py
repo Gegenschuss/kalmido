@@ -12,7 +12,7 @@ pictures become data: URLs (image types only, size capped); external pictures an
 (counted for the quiet hint). A broken or unreadable .eml, or a mail without an HTML part = no HTML (the text view stays).
 
 Mail -> task / event (#2139): a task in a list / an event in a calendar of the mail's workspace where the person may write;
-title = the subject without Re / Fwd, description = the start of the text + the sender. hub_mail_links remembers the mail
+title = the subject without Re / Fwd, description = the start of the text + the sender. obj_links remembers the mail
 (kind task | event, ref_id). The task / event shows "E-mail: <subject>" only to who may read the mail (else "E-mail" without
 subject or id); the mail shows its tasks / events to who may see them. Agents never reach these routes (the hub gate), the
 task itself is a normal task (its events as ever), the mail stays invisible for them."""
@@ -37,6 +37,7 @@ from ..events.model import can_write, my_cal_ids, need_event, need_evcal  # 2.36
 from ..collab.liste2eguard import le2b_list_locked  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
 from ..events.web import op_event_new  # 2.369.5 (#2517): pulled up from functions
+from ..core.objlinks import olnk_put, olnk_rel, olnk_rows  # 2.1076.0 (#5271): the links' core (rel made: hub_mail -> task | event)
 
 MH_HTML_MAX = 500000        # characters of an HTML part shown (like HBM_BODY_MAX, more room for the markup)
 MH_EML_MAX = 40 << 20       # a larger .eml is not opened for the HTML view (the text view stays)
@@ -349,24 +350,41 @@ def _cals(c, uid, org):
 def mh_made(c, mid):
     """The tasks / events made from mail mid that I see: [{kind, id, title}]."""
     out = []
-    for r in c.execute("SELECT kind, ref_id FROM hub_mail_links WHERE mail_id=? ORDER BY id", (mid,)).fetchall():
+    for r in olnk_rows(c, "hub_mail", mid, side="src", rel=MH_REL):  # 2.1076.0 (#5271): obj_links (was hub_mail_links)
         try:
-            if r["kind"] == "task":
-                need_task(c, r["ref_id"], write=False)
-                t = c.execute("SELECT title, deleted_at FROM tasks WHERE id=?", (r["ref_id"],)).fetchone()
+            if r["dst_kind"] == "task":
+                need_task(c, r["dst_id"], write=False)
+                t = c.execute("SELECT title, deleted_at FROM tasks WHERE id=?", (r["dst_id"],)).fetchone()
                 if t and not t["deleted_at"]:
-                    out.append({"kind": "task", "id": r["ref_id"], "title": t["title"]})
-            elif r["kind"] == "event":
-                e, _role = need_event(c, r["ref_id"])
-                out.append({"kind": "event", "id": r["ref_id"], "title": e["title"], "start": e["start"]})
+                    out.append({"kind": "task", "id": r["dst_id"], "title": t["title"]})
+            elif r["dst_kind"] == "event":
+                e, _role = need_event(c, r["dst_id"])
+                out.append({"kind": "event", "id": r["dst_id"], "title": e["title"], "start": e["start"]})
         except Denied:
             continue
     return out
 
 
+MH_REL = "made"  # 2.1076.0 (#5271): a task / an event made from a filed e-mail (obj_links hub_mail -> task | event)
+
+
 def _link(c, m, kind, ref):
-    c.execute("INSERT INTO hub_mail_links(mail_id, org_id, kind, ref_id, created_by, created_at) VALUES(?,?,?,?,?,?)",
-              (m["id"], m["org_id"], kind, ref, me(), iso(now_utc())))
+    """The task / event ref made from mail m (the routes checked both); the link has the mail's workspace, as before."""
+    olnk_put(c, me(), "hub_mail", m["id"], kind, ref, MH_REL, org_id=m["org_id"])
+
+
+def _mh_may(c, uid, row):
+    """Who may take a removal of such a link back (core/objlinks.py olnk_rel): reads the mail, changes the task / event."""
+    m = c.execute("SELECT * FROM hub_mails WHERE id=?", (row["src_id"],)).fetchone()
+    if m is None or m["deleted_at"] or not hbm_can(c, uid, m):
+        raise Denied(404)
+    if row["dst_kind"] == "task":
+        need_task(c, row["dst_id"], write=True)
+    else:
+        need_event(c, row["dst_id"], write=True, uid=uid)
+
+
+olnk_rel(MH_REL, _mh_may)
 
 
 @app.get("/api/hubmail/mails/<int:mid>/make")
@@ -475,8 +493,8 @@ def mh_links():
     else:
         raise Denied(400, tr("Invalid data"))
     out = []
-    for r in c.execute("SELECT DISTINCT mail_id FROM hub_mail_links WHERE kind=? AND ref_id=? ORDER BY mail_id", (kind, ref)).fetchall():
-        m = c.execute("SELECT * FROM hub_mails WHERE id=?", (r["mail_id"],)).fetchone()
+    for mail_id in sorted({r["src_id"] for r in olnk_rows(c, kind, ref, side="dst", rel=MH_REL) if r["src_kind"] == "hub_mail"}):
+        m = c.execute("SELECT * FROM hub_mails WHERE id=?", (mail_id,)).fetchone()
         if m and not m["deleted_at"] and hbm_can(c, uid, m):
             out.append({"mail_id": m["id"], "subject": _open(c, m)["subject"] or ""})
         else:

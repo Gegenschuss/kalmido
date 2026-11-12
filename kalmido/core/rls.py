@@ -59,7 +59,7 @@ TABLES = (
     "office_bookarch", "office_bookarch_accts", "office_bookarch_docs", "office_bookarch_files",  # 2.414.0 (#3502): the booking archive
     "office_datev_guids",  # 2.188.0 A (#2498): the GUIDs of the receipt images in the DATEV ZIP
     "office_rgroups", "office_rgroup_members", "office_rights_log",  # 2.187.0 (#2476): office access rights
-    "office_letters", "office_letter_links", "office_letter_blocks", "office_letter_profiles",  # 2.153.0 (#2028, #2030): correspondence
+    "office_letters", "office_letter_blocks", "office_letter_profiles",  # 2.153.0 (#2028, #2030): correspondence (2.1076.0 #5271: the links in obj_links)
     "office_drive_closed",  # 2.152.0 C (#2169): closed months of the logbook
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
@@ -101,7 +101,7 @@ TABLES = (
     "list_rules",  # 2.71.0 A (#1457): rules of a list (org_id follows the list, NULL = a private list)
     "office_pack_installs",  # 2.76.0 A (#1023): packs installed from the catalogue per office area
     "hub_tokens", "hub_mails",  # 2.84.0 A (#1198): hub mail addresses + filed mails (NULL = private, the app checks owner / client / list)
-    "hub_mail_links",  # 2.141.0 B (#2139): tasks / events made from a filed mail (org_id like the mail, NULL = private, the app checks)
+    "obj_links",  # 2.1076.0 (#5271): the links of the shared core (was hub_mail_links, office_letter_links; NULL = private, the app checks both sides)
     "hub_mailboxes",  # 2.141.0 A (#2141): the own mailbox of a workspace (NULL = a person's private space, the app checks owner_id)
     "office_archive_log",  # 2.81.0 B (#1834): the history of an archived document (org_id like the entry)
     "tchat_rooms", "tchat_files",  # 2.113.1 B (#2059): team chat channels of an organisation + their files (NULL = DMs, list channels, own space; the app checks members)

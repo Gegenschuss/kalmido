@@ -592,7 +592,7 @@ def olk_fs_locked(c, node_id, arrival=False, hold=False):
     # 2.530.0 C (#4316, B31): a received business letter (linked to a letter of the office, office/letterlinks.py) is kept
     # like a receipt: 6 years from the end of the year it came in (section 257 HGB, RET_LEGAL_YEARS "letter")
     # 2.1004.0 (#5494): a link or device in the core's trash counts too (the careful side: restorable, so still kept)
-    lk = c.execute("SELECT MIN(created_at) FROM office_letter_links WHERE node_id=?", (nid,)).fetchone()
+    lk = c.execute("SELECT MIN(created_at) FROM obj_links WHERE src_kind='office_letter' AND dst_kind='fs_entry' AND dst_id=?", (nid,)).fetchone()  # 2.1076.0 (#5271)
     if lk and lk[0]:
         m = c.execute("SELECT doc_date FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
         ends.append(olk_until((m and m["doc_date"]) or lk[0], "letter"))
@@ -630,7 +630,7 @@ def olk_fs_maybe(c, ids):
                                           AND (paid_at IS NOT NULL OR vat_pct IS NOT NULL OR billed_doc_id IS NOT NULL)
                                         UNION SELECT node_id FROM office_cash_entries WHERE node_id IN ({q})
                                         UNION SELECT receipt_node_id FROM office_equipment WHERE receipt_node_id IN ({q})
-                                        UNION SELECT node_id FROM office_letter_links WHERE node_id IN ({q})""", ids * 5)}
+                                        UNION SELECT dst_id FROM obj_links WHERE src_kind='office_letter' AND dst_kind='fs_entry' AND dst_id IN ({q})""", ids * 5)}
 
 
 def olk_fs_locked_many(c, ids):
@@ -660,7 +660,8 @@ def olk_fs_locked_many(c, ids):
             ends[i].append(olk_until(r["doc_date"] or r["billed_at"] or r["set_at"], "receipt"))
     for e in c.execute(f"SELECT node_id, day FROM office_cash_entries WHERE node_id IN ({q})", ids):
         ends[e["node_id"]].append(olk_until(e["day"], "receipt"))
-    for lk in c.execute(f"SELECT node_id, MIN(created_at) AS at FROM office_letter_links WHERE node_id IN ({q}) GROUP BY node_id", ids):
+    for lk in c.execute(f"SELECT dst_id AS node_id, MIN(created_at) AS at FROM obj_links WHERE src_kind='office_letter' AND dst_kind='fs_entry' "
+                        f"AND dst_id IN ({q}) GROUP BY dst_id", ids):  # 2.1076.0 (#5271)
         if lk["at"]:
             m = metas.get(lk["node_id"])
             ends[lk["node_id"]].append(olk_until((m and m["doc_date"]) or lk["at"], "letter"))

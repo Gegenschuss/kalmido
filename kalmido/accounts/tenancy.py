@@ -13,6 +13,7 @@ from ..core.db import gset, gsetting, iso, local_now, now_utc
 from ..accounts.orgs import PRIVATE_FOLDER_RE, _operator_apart, has_workspaces, op_foreign_account, op_foreign_org
 from ..core.pg import qi, system_ctx  # 2.149.0 G (#2517): pulled up from functions; 2.972.0 (#5285): qi
 from ..core.access import dlg_gone  # 2.473.0 (#3357)
+from ..core.access import live_sql  # 2.1076.0 (#5271)
 from ..core.objhooks import obj_boundary  # 2.649.0 (#5051)
 from ..core.objhooks import FOLLOW  # 2.924.0 (#5069): core/objects.py obj_node_follow
 from ..accounts.orgs import INSTANCE_ENV  # 2.369.5 (#2517): pulled up from functions
@@ -138,9 +139,11 @@ CHECKS = {
     "gen_doc_signoff": ("SELECT s.id, s.created_by FROM office_signoffs s JOIN office_gen_docs d ON d.id=s.gen_doc_id WHERE d.org_id IS DISTINCT FROM s.org_id"),
     # 2.153.0 (#2028): a letter linked with a document outside the documents space of its office area (an organisation's
     # space; a personal office: the owner's private documents), or a link row in another area than its letter
-    "letter_link": ("SELECT k.id, k.created_by FROM office_letter_links k JOIN office_letters t ON t.id=k.letter_id JOIN orgs o ON o.id=t.org_id "
-                    "JOIN fs_nodes n ON n.id=k.node_id WHERE k.org_id IS DISTINCT FROM t.org_id OR (o.personal_of IS NULL AND n.org_id IS DISTINCT FROM t.org_id) "
-                    "OR (o.personal_of IS NOT NULL AND (n.org_id IS NOT NULL OR n.owner_id IS DISTINCT FROM o.personal_of))"),
+    # 2.1076.0 (#5271): the letter links are rows of the links' core (obj_links office_letter -> fs_entry)
+    "letter_link": ("SELECT k.id, k.created_by FROM obj_links k JOIN office_letters t ON t.id=k.src_id JOIN orgs o ON o.id=t.org_id "
+                    f"JOIN fs_nodes n ON n.id=k.dst_id WHERE k.src_kind='office_letter' AND k.dst_kind='fs_entry' AND {live_sql('k')} AND "
+                    "(k.org_id IS DISTINCT FROM t.org_id OR (o.personal_of IS NULL AND n.org_id IS DISTINCT FROM t.org_id) "
+                    "OR (o.personal_of IS NOT NULL AND (n.org_id IS NOT NULL OR n.owner_id IS DISTINCT FROM o.personal_of)))"),
     # 2.184.0 B (#2585): a letter bound to a client of another office area (a personal office's letters: the owner's private
     # clients; counted only) -- (letter, creator)
     "letter_client": ("SELECT t.id, t.created_by FROM office_letters t JOIN orgs o ON o.id=t.org_id JOIN clients cl ON cl.id=t.client_id "
@@ -301,11 +304,24 @@ CHECKS = {
     # 2.190.0 C (#2496): a task / event made from a filed mail in another workspace than the mail, a file / log line of a contract
     # or of a business meal in another office area than its parent, an organisation's e-mail invitation of an account that is
     # no member of it any more but of another organisation (all counted only) -- (object, person)
-    "mail_link": ("SELECT k.mail_id, k.created_by FROM hub_mail_links k JOIN hub_mails m ON m.id=k.mail_id "
-                  "LEFT JOIN tasks t ON k.kind='task' AND t.id=k.ref_id LEFT JOIN lists l ON l.id=t.list_id "
-                  "LEFT JOIN events e ON k.kind='event' AND e.id=k.ref_id LEFT JOIN ev_cals ec ON ec.id=e.cal_id "
-                  "WHERE k.org_id IS DISTINCT FROM m.org_id OR (l.org_id IS NOT NULL AND l.org_id IS DISTINCT FROM m.org_id) "
-                  "OR (ec.org_id IS NOT NULL AND ec.org_id IS DISTINCT FROM m.org_id)"),  # 2.190.0 R (#2496): a target now private is no crossing
+    # 2.1076.0 (#5271): rows of obj_links (hub_mail -> task | event, rel made)
+    "mail_link": ("SELECT k.src_id, k.created_by FROM obj_links k JOIN hub_mails m ON m.id=k.src_id "
+                  "LEFT JOIN tasks t ON k.dst_kind='task' AND t.id=k.dst_id LEFT JOIN lists l ON l.id=t.list_id "
+                  "LEFT JOIN events e ON k.dst_kind='event' AND e.id=k.dst_id LEFT JOIN ev_cals ec ON ec.id=e.cal_id "
+                  f"WHERE k.src_kind='hub_mail' AND k.rel='made' AND {live_sql('k')} AND (k.org_id IS DISTINCT FROM m.org_id "
+                  "OR (l.org_id IS NOT NULL AND l.org_id IS DISTINCT FROM m.org_id) "
+                  "OR (ec.org_id IS NOT NULL AND ec.org_id IS DISTINCT FROM m.org_id))"),  # 2.190.0 R (#2496): a target now private is no crossing
+    # 2.1076.0 (#5271): a generic link of the core (people and agents) whose two sides lie in different workspaces, or whose
+    # own workspace is not the one of its source -- obj_link refuses both, so this counts a hand-made / moved row only. Only
+    # the kinds with a workspace column of their own are checked here (projects' tasks, events, filed mails, clients)
+    "obj_link": ("SELECT k.id, k.created_by FROM obj_links k "
+                 "LEFT JOIN tasks t1 ON k.src_kind='task' AND t1.id=k.src_id LEFT JOIN lists l1 ON l1.id=t1.list_id "
+                 "LEFT JOIN tasks t2 ON k.dst_kind='task' AND t2.id=k.dst_id LEFT JOIN lists l2 ON l2.id=t2.list_id "
+                 "LEFT JOIN hub_mails m2 ON k.dst_kind='hub_mail' AND m2.id=k.dst_id LEFT JOIN clients c2 ON k.dst_kind='client' AND c2.id=k.dst_id "
+                 f"WHERE k.owner_id IS NULL AND {live_sql('k')} AND k.rel NOT IN ('made', 'contact', 'answers', 'reply', 'device') "
+                 "AND ((l1.id IS NOT NULL AND l1.org_id IS DISTINCT FROM k.org_id) "
+                 "OR (l2.id IS NOT NULL AND l2.org_id IS DISTINCT FROM k.org_id) OR (m2.id IS NOT NULL AND m2.org_id IS DISTINCT FROM k.org_id) "
+                 "OR (c2.id IS NOT NULL AND c2.org_id IS DISTINCT FROM k.org_id))"),
     "contract_file": ("SELECT f.id, f.created_by FROM office_contract_files f JOIN office_contracts k ON k.id=f.contract_id "
                       "WHERE f.deleted_at IS NULL AND f.org_id<>k.org_id"),
     "meal_file": ("SELECT f.id, f.created_by FROM office_meal_files f JOIN office_meals m ON m.id=f.meal_id "

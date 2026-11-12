@@ -197,7 +197,6 @@ TENANT_EXEMPT = {
     "filters": _OWN, "user_settings": _OWN, "sessions": _OWN, "push_subs": _OWN, "templates": "2.905.0 (#5288): a kind of the shared core (owner_id; an organisation's read by its members, lists/templates.py)", "template_files": _OWN, "cal_subs": _OWN,
     "recovery_codes": _OWN, "webauthn_creds": _OWN, "api_tokens": _OWN,
     "imports": _OWN, "sample_items": _OWN, "app_passwords": _OWN, "dav_sync2": _OWN, "journal": _OWN, "contact_care": _OWN,
-    "life_device_links": _OWN + " (2.140.0 B #2136: the link of a private device with office equipment; each side is checked on reading)",
     "user_invites": "an invitation / password link of one account (admins only)", "folder_props": _OWN + " (the defaults of a folder; each list keeps its org_id)",
     "folder_heads": _OWN + " (2.83.0 #1427: the header strip style of an owner's folder; no content)",
     "rss_feeds": _OWN + " (2.85.0 #1162: a person's feeds, never shared, never an agent's; 2.172.0 B #2677: org_id added by MIGRATIONS = an organisation's feed)", "rss_items": _OWN + " (2.85.0 #1162: the articles of the own feeds)",

@@ -232,10 +232,38 @@ def _clean(c, oid, table, r):
         row.pop("created_by", None)
     if table == "obj_comments" and "ws" in row:  # 2.981.0 (#5273): a document's note, sealed with its workspace (as doc_notes was)
         row["text"] = _doc_open(c, row["ws"], "doc_notes.text", row["text"], default=None) if row.get("text") else row.get("text")
+    if table == "obj_links":  # 2.1076.0 (#5271): the old files' columns (an older archive reads the same)
+        return ox_link_row(row)
     if table == "obj_follow":  # 2.972.0 (#5285): tasks/watchers.json as before (task_id, user_id, created_at)
         row = {"task_id": row["ref_id"], "user_id": row["user_id"], "created_at": row["created_at"]}
     row.pop("legacy_aad", None)  # 2.278.0 C (#3091): a person's own move detail (old AAD), not the organisation's
     return _ox_dec_row(c, oid, table, row)
+
+
+OX_LETTER_LINKS = "src_kind='office_letter' AND dst_kind='fs_entry' AND rel IN ('answers', 'reply')"  # 2.1076.0 (#5271)
+
+
+def ox_link_row(row):
+    """2.1076.0 (#5271): a row of the links' core (obj_links) as the archive file of its area has it since before the core:
+    hub/mail_links.json the columns of hub_mail_links (id, mail_id, org_id, kind, ref_id, created_by, created_at),
+    books/contact_tasks.json those of contact_tasks (contact_id, task_id, kind, added_by, added_at), office/letter_links.json
+    those of office_letter_links (id, org_id, letter_id, node_id, kind, created_by, agent_id, created_at). The import
+    (admin/oi_team.py, admin/oi_store.py) writes them into obj_links again."""
+    ex = row.get("extra")
+    if isinstance(ex, str):
+        try:
+            ex = json.loads(ex)
+        except ValueError:
+            ex = {}
+    ex = ex if isinstance(ex, dict) else {}
+    if row.get("src_kind") == "hub_mail":
+        return {"id": row["id"], "mail_id": row["src_id"], "org_id": row.get("org_id"), "kind": row["dst_kind"], "ref_id": row["dst_id"],
+                "created_by": row.get("created_by"), "created_at": row.get("created_at")}
+    if row.get("src_kind") == "contact":
+        return {"contact_id": row["src_id"], "task_id": row["dst_id"], "kind": ex.get("kind") or "about", "added_by": row.get("created_by"),
+                "added_at": row.get("created_at")}
+    return {"id": row["id"], "org_id": row.get("org_id"), "letter_id": row["src_id"], "node_id": row["dst_id"], "kind": row["rel"],
+            "created_by": row.get("created_by"), "agent_id": row.get("agent_id"), "created_at": row.get("created_at")}
 
 
 def ox_objv_row(c, oid, row):
@@ -396,7 +424,8 @@ OX_AREAS = (
     ("books.json", "books", "org_id=?"),
     ("books/contacts.json", "contacts", "book_id IN (SELECT id FROM books WHERE org_id=?)"),
     # 2.362.0 (#3096): contacts on tasks of the lists (waiting for / responsible / about)
-    ("books/contact_tasks.json", "contact_tasks", f"contact_id IN (SELECT id FROM contacts WHERE book_id IN (SELECT id FROM books WHERE org_id=?)) AND task_id IN ({TSQ})"),
+    # 2.1076.0 (#5271): rows of the links' core (obj_links rel contact); the file keeps its columns (_clean: ox_link_row)
+    ("books/contact_tasks.json", "obj_links", f"src_kind='contact' AND dst_kind='task' AND rel='contact' AND src_id IN (SELECT id FROM contacts WHERE book_id IN (SELECT id FROM books WHERE org_id=?)) AND dst_id IN ({TSQ})"),
     # 2.362.0 (#3096): the booking pages on a calendar of the organisation (or billed by its office), their kinds of appointment
     # and bookings (the customers' data; never the confirm / cancel links); the booked appointments are events of the calendar
     ("bookings/pages.json", "appt_pages", f"user_id IN ({APQ})"),
@@ -478,7 +507,7 @@ OX_AREAS = (
     ("office/privacy_sheets.json", "office_privacy_sheets", "org_id=?"),  # 2.154.0 C (#2192): data protection sheets of a client
     # 2.184.0 A (#2579): the correspondence (letters decrypted; their filed PDFs come with the documents space, store/)
     ("office/letters.json", "office_letters", "org_id=?"),
-    ("office/letter_links.json", "office_letter_links", "org_id=?"),
+    ("office/letter_links.json", "obj_links", f"org_id=? AND {OX_LETTER_LINKS}"),  # 2.1076.0 (#5271): obj_links, the old columns (ox_link_row)
     ("office/letter_blocks.json", "office_letter_blocks", "org_id=?"),
     ("office/letter_profiles.json", "office_letter_profiles", "org_id=?"),
     ("office/vehicles.json", "office_vehicles", "org_id=?"),
@@ -532,7 +561,9 @@ OX_AREAS = (
     ("hub/callsheets.json", "hub_callsheets", "org_id=?"),  # 2.855.0 (#1956): call sheets of the shoot days (decrypted)
     ("hub/leave_quota.json", "hub_leave_quota", "org_id=?"),  # 2.125.0 A (#2117): vacation accounts
     ("hub/mails.json", "hub_mails", "org_id=?"),  # 2.84.0 A (#1198): filed e-mails (texts decrypted; not the addresses, not the word index)
-    ("hub/mail_links.json", "hub_mail_links", "org_id=?"),  # 2.362.0 (#3096): the tasks / events made from a filed e-mail
+    # 2.362.0 (#3096): the tasks / events made from a filed e-mail; 2.1076.0 (#5271): rows of obj_links (rel made), the old columns,
+    # the links of a mail in the trash stay out with it (was OX_GONE_WITH)
+    ("hub/mail_links.json", "obj_links", "org_id=? AND src_kind='hub_mail' AND rel='made' AND src_id NOT IN (SELECT id FROM hub_mails WHERE deleted_at IS NOT NULL)"),
     ("hub/mailbox.json", "hub_mailboxes", "org_id=?"),  # 2.144.5 B (#2410): the workspace mailbox (servers, user names, sender; never "secret")
     # 2.380 H (#2398): the organisation's scheduling polls (options, votes; never the link: the import makes a new one) and
     # bookmarks (their pictures under files/bookmarks/); a person's own ones (no organisation) go with the account export
@@ -619,7 +650,6 @@ OX_LEFT = {
 OX_KEEP_DELETED = ("office_drives",)
 OX_GONE_WITH = {  # table -> (parent table, column) pairs: a row goes when its parent row is deleted
     "tchat_files": (("tchat_msgs", "message_id"),),  # 2.362.0 (#3092)
-    "hub_mail_links": (("hub_mails", "mail_id"),),  # 2.362.0 (#3096)
     "event_attendees": (("events", "event_id"),),
     "contacts": (("books", "book_id"),),
     "office_client_contacts": (("clients", "client_id"),),
@@ -879,7 +909,7 @@ def ox_build(c, oid, out, by=None):
             rows = _rows(c, oid, table, where, (oid,) * where.count("?"))
             if table == "hub_mails" and hidden:
                 rows = (r for r in rows if r.get("id") not in hidden)
-            elif table == "hub_mail_links" and hidden:  # 2.362.0 (#3096): a hidden mail's links stay out with it
+            elif name == "hub/mail_links.json" and hidden:  # 2.362.0 (#3096): a hidden mail's links stay out with it
                 rows = (r for r in rows if r.get("mail_id") not in hidden)
             elif hnodes and table == "fs_nodes":  # 2.190.0 R (#2561): the filed mail's folder, its files and their rows go too
                 rows = (r for r in rows if r.get("id") not in hnodes)

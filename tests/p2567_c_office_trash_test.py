@@ -12,7 +12,7 @@ tenant-matrix: office
    409 and the new value stays. 2.1067.0 (#5789): the core's trash (kind ocfstart): DELETE answers trash {kind, id}; set again
    meanwhile: the one in the trash goes for good (the undo 404), the new value stays
  - a letter's link to a document: DELETE answers trash_id, the undo writes the link back; 2.905.0 (#5414): the core's
-   trash (oletlink); linked again after a removal: the row of the trash is the link again
+   trash (oletlink; 2.1076.0 #5271: the links' core and the person's undo list); linked again after a removal: the row of the trash is the link again
  - an import of fixed costs taken back (POST .../fixed-costs/delete): ONE entry in the office trash, restore brings every
    row back and the import run counts as not undone again
    2.905.0 (#5414): a fixed cost and the rows of an import taken back lie in the core's trash (kind ofixed, deleted_at): the
@@ -147,22 +147,23 @@ def scenario(S, who, ws, other, member=None):
     r = S.post(B + O + "/letters", json={"subject": "Ihr Schreiben", "answers": nid})
     check(r.status_code == 201, f"{who}: setup a letter answering the document {r.text[:200]}")
     lid = r.json()["id"]
-    link = sql("SELECT id FROM office_letter_links WHERE letter_id=? AND node_id=?", (lid, nid))
+    # 2.1076.0 (#5271): the link is a row of the links' core (obj_links); removed it goes into that trash with a step of the
+    # person's undo list (X-Kalmido-Undo-Gid), no longer into the office trash (kind oletlink, 2.905.0 #5414)
+    LQ = "SELECT id FROM obj_links WHERE src_kind='office_letter' AND src_id=? AND dst_id=?"
+    link = sql(LQ, (lid, nid))
     r = S.delete(B + f"{O}/letters/{lid}/links/{nid}?kind=answers")
-    # 2.905.0 (#5414): the core's trash (kind oletlink, the row stays with deleted_at)
-    tl = (r.json().get("trash") or {}).get("id") if r.ok else None
-    check(r.ok and link and tl == link[0][0] and not sql("SELECT 1 FROM office_letter_links WHERE letter_id=? AND deleted_at IS NULL", (lid,))
-          and not r.json().get("links"), f"{who}: the link goes into the trash {r.text[:200]}")
-    check(in_trash(S, tl, "letter_link"), f"{who}: the office trash lists the link")
-    r = S.post(B + f"/api/office/trash/core/oletlink/{tl}/restore?undo=1")
-    check(r.ok and r.json().get("ids") == [link[0][0]] and sql("SELECT 1 FROM office_letter_links WHERE id=?", (link[0][0],)),
-          f"{who}: the undo writes the link back {r.text[:200]}")
+    gid = r.headers.get("X-Kalmido-Undo-Gid") if r.ok else None
+    check(r.ok and link and gid and not sql(LQ + " AND deleted_at IS NULL", (lid, nid)) and not r.json().get("links")
+          and sql("SELECT 1 FROM obj_links WHERE id=? AND deleted_at IS NOT NULL", (link[0][0],)), f"{who}: the link goes into the trash {r.text[:200]}")
+    check(not in_trash(S, link[0][0] if link else 0, "letter_link"), f"{who}: the office trash does not list it any more")
+    r = S.post(B + f"/api/undo/{gid}/undo")
+    check(r.ok and sql(LQ + " AND deleted_at IS NULL", (lid, nid)) == link, f"{who}: the undo writes the link back {r.text[:200]}")
     check(any(x["node_id"] == nid for x in S.get(B + f"{O}/letters/{lid}/links").json().get("links") or []), f"{who}: the letter shows the link again")
     # 2.905.0 (#5414): removed again and linked again: the row of the trash is the link again (one link per letter / document / kind)
     check(S.delete(B + f"{O}/letters/{lid}/links/{nid}?kind=answers").ok, f"{who}: removed again")
     r = S.post(B + f"{O}/letters/{lid}/links", json={"node_id": nid, "kind": "answers"})
     check(r.status_code == 201 and any(x["node_id"] == nid for x in r.json().get("links") or [])
-          and sql("SELECT id FROM office_letter_links WHERE letter_id=? AND node_id=? AND deleted_at IS NULL", (lid, nid)) == link,
+          and sql(LQ + " AND deleted_at IS NULL", (lid, nid)) == link,
           f"{who}: linked again: the same row, live {r.status_code} {r.text[:200]}")
 
     # ------------------------------------------------------------ an import of fixed costs taken back

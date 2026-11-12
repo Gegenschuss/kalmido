@@ -218,7 +218,7 @@ def scenario(S, who, ws, other, member=None):
     n2 = upload(S, ws, f"brief-{who}.pdf")
     r = S.post(B + O + "/letters", json={"subject": "Ihr Schreiben", "answers": n2})
     check(r.status_code == 201, f"{who}: a letter answering the document {r.text[:200]}")
-    check(sql("SELECT 1 FROM office_letter_links WHERE node_id=?", (n2,)), f"{who}: the link")
+    check(sql("SELECT 1 FROM obj_links WHERE src_kind='office_letter' AND dst_id=?", (n2,)), f"{who}: the link")  # 2.1076.0 (#5271): obj_links
     to_trash_old(S, n2, who, "the received letter")
     r = S.delete(B + f"/api/files/nodes/{n2}?purge=1")
     check(r.status_code == 409 and "Kept by law until" in r.text, f"{who} B31: deleting the received letter for good 409 {r.text[:200]}")

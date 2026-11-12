@@ -45,6 +45,7 @@ from ..accounts.orgs import org_role  # 2.369.5 (#2517): pulled up from function
 from ..notify.alerts import aa_now  # 2.369.5 (#2517): pulled up from functions
 from ..office.books import bk_csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .orgexport import OX_AREAS, OX_PB_CLIENTS, _rows, ox_live, _safe_part, _under  # 2.369.5 (#2517): pulled up from functions
+from .orgexport import OX_LETTER_LINKS  # 2.1076.0 (#5271)
 from ..office.pdfweb import _render, _stored, epdf_name  # 2.369.5 (#2517): pulled up from functions
 from ..office.cashbook import cb_csv_text, cb_export_data, cb_pdf_bytes  # 2.369.5 (#2517): pulled up from functions
 
@@ -109,12 +110,13 @@ RX_TABLES = (
     ("logs/rights-log.csv", "office_rights_log"),  # 2.362.2 (#3105)
     ("logs/import-runs.csv", "office_import_runs"),
     ("letters/letters.csv", "office_letters"),  # 2.184.0 A (#2628): sent letters (business letters, 6 years; RX_WHERE)
-    ("letters/letter-links.csv", "office_letter_links"),  # 2.362.2 (#3105)
+    ("letters/letter-links.csv", "obj_links"),  # 2.362.2 (#3105); 2.1076.0 (#5271): the letter links of the core (RX_WHERE), old columns
 )
 RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'",  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'
             "obj_versions": "kind='procdoc' AND org_id=?",  # 2.977.0 (#5282): the procedure documentation's versions (not the wiki's)
             # 2.362.2 (#3105): the links of a draft stay out with the draft
-            "office_letter_links": "org_id=? AND letter_id IN (SELECT id FROM office_letters WHERE org_id=? AND status<>'draft')"}
+            # 2.1076.0 (#5271): rows of obj_links (admin/orgexport.py ox_link_row writes the old columns letter_id, node_id, kind)
+            "obj_links": f"org_id=? AND {OX_LETTER_LINKS} AND src_id IN (SELECT id FROM office_letters WHERE org_id=? AND status<>'draft')"}
 # 2.372.0 (#3316): the signature snapshot of a receipt stays on its PDF, not in the CSV
 RX_DROP = {"office_signoffs": ("ip", "user_agent"), "office_meals": ("sign_pic",)}  # 2.362.2 (#3105, review): a signer's network address is no business record
 # 2.619.0 (#3862): the office tables that are NOT in RX_TABLES, with the reason, are in admin/exportleft.py RX_LEFT_TABLES (one list;

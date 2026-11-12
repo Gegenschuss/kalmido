@@ -178,28 +178,30 @@ check(r.ok and (j.get("count") or {}).get("letters") == 1, f"letters: the previe
 check(any("sent letter stays" in n for n in j.get("notes") or []), f"letters: the sent letter stays (retention) {j.get('notes')}")
 check(any("loses its links" in n for n in j.get("notes") or []), f"letters: the preview names the links that end {j.get('notes')}")
 # 2.990.0 (#5539): the link that ends goes on the core's way - what the core keeps of it (its history) goes with it
-LK = sql("SELECT id FROM office_letter_links WHERE letter_id=?", (L1,))[0][0]
-sql("INSERT INTO obj_history(kind, ref_id, org_id, user_id, action, created_at, updated_at) VALUES('oletlink', ?, ?, ?, 'update', ?, ?)",
+# 2.1076.0 (#5271): the link is a row of obj_links, its undo entries kind obj_link (was office_letter_links / oletlink)
+LK = sql("SELECT id FROM obj_links WHERE src_kind='office_letter' AND src_id=?", (L1,))[0][0]
+sql("INSERT INTO obj_history(kind, ref_id, org_id, user_id, action, created_at, updated_at) VALUES('obj_link', ?, ?, ?, 'update', ?, ?)",
     (LK, PB, FID, "2026-01-02T03:04:05+00:00", "2026-01-02T03:04:05+00:00"))
 r = move(Fr, "letters", [L1, L2], TO)
 check(r.ok and r.json().get("ok"), "letters: the move " + r.text[:300])
-check(not sql("SELECT 1 FROM obj_history WHERE kind='oletlink' AND ref_id=?", (LK,)), "letters: no history of the ended link left behind (was: orphaned)")
+check(not sql("SELECT 1 FROM obj_history WHERE kind='obj_link' AND ref_id=?", (LK,)), "letters: no history of the ended link left behind (was: orphaned)")
 MID = r.json().get("move_id")
 check(sql("SELECT org_id, client_id FROM office_letters WHERE id=?", (L1,))[0] == (KAP, None), "letters: the draft is in the organisation without the client")
 check(sql("SELECT org_id FROM office_letters WHERE id=?", (L2,))[0][0] == PB, "letters: the sent letter stays")
-check(not sql("SELECT 1 FROM office_letter_links WHERE letter_id=?", (L1,)), "letters: the link to the private document ended")
+check(not sql("SELECT 1 FROM obj_links WHERE src_kind='office_letter' AND src_id=?", (L1,)), "letters: the link to the private document ended")
 ws(Fr, TO)
 r = Fr.get(B + O + f"/letters/{L1}")
 check(r.ok and r.json().get("subject") == "Widerspruch Entwurf", "letters: the draft opens in the organisation (sealed anew) " + r.text[:200])
 ws(Fr, "private")
+LKQ = "SELECT dst_id, org_id, deleted_at FROM obj_links WHERE src_kind='office_letter' AND src_id=?"
 # 2.990.0 (#5571): the same link made in the organisation since and removed into the core's trash there - the undo brings the
 # link back all the same (was: the row in the trash counted as "still there", the letter came back without its document)
-sql("INSERT INTO office_letter_links(org_id, letter_id, node_id, kind, created_by, created_at, deleted_at, deleted_by) "
-    "VALUES(?,?,?,'answers',?,now(),now(),?)", (KAP, L1, NODE, FID, FID))
+sql("INSERT INTO obj_links(org_id, src_kind, src_id, dst_kind, dst_id, rel, created_by, created_at, deleted_at, deleted_by) "
+    "VALUES(?,'office_letter',?,'fs_entry',?,'answers',?,now(),now(),?)", (KAP, L1, NODE, FID, FID))
 undo(Fr, MID)
 check(sql("SELECT org_id, client_id FROM office_letters WHERE id=?", (L1,))[0] == (PB, CLL), "letters: the undo brings the draft and its client back")
-check(sql("SELECT node_id, org_id FROM office_letter_links WHERE letter_id=? AND deleted_at IS NULL", (L1,)) == [(NODE, PB)],
-      f"letters: the undo links the document again, live in the personal office {sql('SELECT node_id, org_id, deleted_at FROM office_letter_links WHERE letter_id=?', (L1,))}")
+check(sql("SELECT dst_id, org_id FROM obj_links WHERE src_kind='office_letter' AND src_id=? AND deleted_at IS NULL", (L1,)) == [(NODE, PB)],
+      f"letters: the undo links the document again, live in the personal office {sql(LKQ, (L1,))}")
 check([x["node_id"] for x in (Fr.get(B + O + f"/letters/{L1}/links").json().get("links") or [])] == [NODE],
       "letters: the letter shows its document again " + Fr.get(B + O + f"/letters/{L1}/links").text[:200])
 r = Fr.get(B + O + f"/letters/{L1}")

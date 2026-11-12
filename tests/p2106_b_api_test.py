@@ -331,9 +331,9 @@ check(CTW < CTF and x.get("contact_id") == CTF and "Firmenweg 7" in (x.get("rcpt
 # ---- the nightly boundary check knows letter links across the boundary
 BC = "import json\nfrom kalmido.core.db import connect\nfrom kalmido.accounts.tenancy import boundary_check\nc = connect()\nprint(json.dumps(boundary_check(c)['kinds']))\nc.close()"
 check("letter_link" not in in_ct(BC), "boundary check: the links made here are fine")
-sql("INSERT INTO office_letter_links(org_id, letter_id, node_id, kind, created_at) VALUES(?,?,?,?,?)", (ORG, LB["id"], DC, "answers", "2026-10-19T00:00:00Z"), write=True)
+sql("INSERT INTO obj_links(org_id, src_kind, src_id, dst_kind, dst_id, rel, created_at) VALUES(?,'office_letter',?,'fs_entry',?,?,?)", (ORG, LB["id"], DC, "answers", "2026-10-19T00:00:00Z"), write=True)  # 2.1076.0 (#5271): obj_links (was office_letter_links)
 check(in_ct(BC).get("letter_link") == 1, "boundary check: a link to another organisation's document is counted")
-sql("DELETE FROM office_letter_links WHERE letter_id=? AND node_id=?", (LB["id"], DC), write=True)
+sql("DELETE FROM obj_links WHERE src_kind='office_letter' AND src_id=? AND dst_id=?", (LB["id"], DC), write=True)  # 2.1076.0 (#5271): obj_links (was office_letter_links)
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

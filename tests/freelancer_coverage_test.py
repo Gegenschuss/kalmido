@@ -962,6 +962,8 @@ ROUTES = {
     "POST /api/obj/{}/{}/shares": "obj", "DELETE /api/obj/{}/{}/shares/{}": "obj", "POST /api/obj/{}/{}/shares/{}/restore": "obj",
     "GET /api/v1/agent/objects/{}": "obj", "GET /api/v1/agent/objects/{}/{}": "obj", "PATCH /api/v1/agent/objects/{}/{}": "obj",
     "POST /api/v1/agent/objects/{}/{}/proposals": "obj",  # 2.623.0 (#4718): an agent's change proposal (p2623_c_objprop_test.py)
+    "GET /api/obj/{}/{}/links": "obj", "POST /api/obj/{}/{}/links": "obj", "DELETE /api/obj/links/{}": "obj",  # 2.1076.0 (#5271): the links' core (p21076_a_objlinks_test.py)
+    "GET /api/v1/agent/objects/{}/{}/links": "obj", "POST /api/v1/agent/objects/{}/{}/links": "obj", "DELETE /api/v1/agent/objects/{}/{}/links/{}": "obj",
     "GET /api/undo": "undo", "POST /api/undo/to/{}": "undo", "POST /api/undo/{}/redo": "undo", "POST /api/undo/{}/undo": "undo",  # 2.747.0 (#5249): the own step groups (p2747_b_undo_core_test.py, freelancer-matrix: undo)
     "GET /api/sheets/{}/export.csv": "sheets", "GET /api/sheets/{}/export.xlsx": "sheets",
     "GET /api/sheets/{}/links": "sheets", "GET /api/sheets/{}/vars": "sheets", "GET /api/v1/sheets": "sheets",

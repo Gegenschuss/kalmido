@@ -22,6 +22,7 @@ from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..api.common import hit_limit  # 2.367.5 (#2980)
 from .layouts import LAYOUT_KEYS
 from ..core.access import otr_live  # 2.1029.0 (#5537)
+from ..core.access import live_sql  # 2.1076.0 (#5271)
 
 
 # ---------------------------------------------------------------- settings / export (per user)
@@ -1145,7 +1146,10 @@ def umz_export_queries(uid):
         "journal": ("SELECT day, text, mood, mood_enc, updated_at FROM journal WHERE user_id=? ORDER BY day", (uid,)),  # 2.306.0 A (#2885): opened by jr_open
         "contact_care": ("SELECT contact_id, every_days, last, note, updated_at FROM contact_care WHERE user_id=?", (uid,)),
         # 2.140.0 B (#2136): my links of a private device with office equipment (ids only)
-        "device_links": ("SELECT task_id, office_id, equipment_id, origin, created_at, updated_at FROM life_device_links WHERE user_id=?", (uid,)),
+        # 2.1076.0 (#5271): the same columns from the links' core (obj_links rel device, the person's own; not the trash)
+        "device_links": ("SELECT src_id AS task_id, CAST(extra->>'office_id' AS BIGINT) AS office_id, dst_id AS equipment_id, "
+                         "COALESCE(extra->>'origin', 'device') AS origin, created_at, COALESCE(updated_at, created_at) AS updated_at "
+                         f"FROM obj_links WHERE owner_id=? AND rel='device' AND {live_sql()} ORDER BY id", (uid,)),
         # 2.66.0 A (#1835): my merges of contacts / clients (the history lines, without the undo snapshot)
         "merge_runs": ("SELECT id, kind, target_id, merged_ids, summary, created_at, undone_at FROM merge_runs WHERE user_id=?", (uid,)),
         "karakeep": ("SELECT url, list_id, source, archive, synced_at, created_at FROM kk_conns WHERE user_id=?", (uid,)),

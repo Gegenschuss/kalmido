@@ -48,8 +48,8 @@ from .periodlock import pl_lock, pl_through  # 2.355.0 B (#2845)
 from ..files.fsmove import fsm_apply, fsm_plan  # 2.356.0 A (#2926)
 from ..accounts.orgs import org_role  # 2.369.5 (#2517): pulled up from functions
 from .periodlock import pl_first_month, pl_hints, pl_label  # 2.369.5 (#2517): pulled up from functions
-from .letterlinks import LTL_KIND  # 2.990.0 (#5539): the letter links end on the core's way
-from .okern import ofk_purge_many  # 2.990.0 (#5539), 2.1015.0 (#5675): many rows, bounded locks
+from .letterlinks import LTL_ON  # 2.1076.0 (#5271): the letter links are links of the shared core (obj_links)
+from ..core.objlinks import olnk_purge_ids  # 2.1076.0 (#5271): they end on the core's way (was ofk_purge_many, #5539 / #5675)
 
 PBT_KEEP = ("office_settings", "office_company", "office_bank_accounts", "office_cf_start", "office_cf_actual", "office_numbers",
             "office_period_locks",  # 2.148.0 A (#2471): the locks of each area stay its own
@@ -308,7 +308,7 @@ def pbt_reseal(c, t, r, src, dst):
 def pb_letter_links(c, src):
     """The links of the letters of personal office src to documents: link rows + filed letter PDFs (review A2, 2.153.0).
     A personal office links only the owner's private documents, which stay private when the office moves."""
-    links = c.execute(f"SELECT COUNT(*) FROM office_letter_links WHERE org_id=? AND {live_sql()}", (src,)).fetchone()[0]  # 2.905.0 (#5414): not the trash
+    links = c.execute(f"SELECT COUNT(*) FROM obj_links WHERE {LTL_ON} AND org_id=? AND {live_sql()}", (src,)).fetchone()[0]  # 2.905.0 (#5414): not the trash
     pdfs = c.execute("SELECT COUNT(*) FROM office_letters WHERE org_id=? AND node_id IS NOT NULL", (src,)).fetchone()[0]
     return links + pdfs
 
@@ -318,8 +318,8 @@ def pb_letter_detach(c, src):
     documents and address books end -- only the links, the documents and contacts stay as they are (the frozen recipient
     of a letter stays). -> the number of document links ended."""
     n = 0  # 2.990.0 (#5539): the core's way (history / undo steps along), in the trash too
-    links = c.execute("SELECT id, deleted_at FROM office_letter_links WHERE org_id=? ORDER BY id", (src,)).fetchall()
-    ofk_purge_many(c, LTL_KIND, [lk["id"] for lk in links])  # 2.1015.0 (#5675)
+    links = c.execute(f"SELECT id, deleted_at FROM obj_links WHERE {LTL_ON} AND org_id=? ORDER BY id", (src,)).fetchall()
+    olnk_purge_ids(c, [lk["id"] for lk in links])  # 2.1076.0 (#5271): the links' core, in batches (was ofk_purge_many, #5675)
     n += sum(0 if lk["deleted_at"] else 1 for lk in links)  # the ones in the trash were ended before (pb_letter_links counts the live ones)
     n += c.execute("UPDATE office_letters SET node_id=NULL WHERE org_id=? AND node_id IS NOT NULL", (src,)).rowcount
     c.execute("UPDATE office_letters SET contact_id=NULL WHERE org_id=? AND contact_id IS NOT NULL", (src,))

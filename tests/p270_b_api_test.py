@@ -220,7 +220,8 @@ check(r.status_code == 409, f"only a changed group: 409, nothing merged ({r.stat
 r = Bo.post(B + f"/api/proposals/{J}/apply", json={"select": ["0", "2"], "edits": {"0": {"target_id": C2}}})
 check(r.status_code == 200 and r.json().get("merged") == 1 and r.json().get("skipped") == 1, f"apply: 1 merged, 1 skipped ({r.status_code} {r.text[:200]})")
 check(not dbx("SELECT 1 FROM contacts WHERE id=?", (C1,)) and dbx("SELECT 1 FROM contacts WHERE id=?", (C2,)), "C1 merged into C2")
-check([x[0] for x in dbx("SELECT contact_id FROM contact_tasks WHERE task_id=?", (T1,))] == [C2], "the task link moved to C2")
+CTQ = "SELECT src_id FROM obj_links WHERE src_kind='contact' AND dst_kind='task' AND dst_id=?"  # 2.1076.0 (#5271): was contact_tasks
+check([x[0] for x in dbx(CTQ, (T1,))] == [C2], "the task link moved to C2")
 em = [x["value"].lower() for x in json.loads(dbx("SELECT emails FROM contacts WHERE id=?", (C2,))[0][0])]
 check(em.count("erika@example.com") == 1 and "e.m@example.com" in em, "e-mails joined without doubles " + str(em))
 check(all(dbx("SELECT 1 FROM contacts WHERE id=?", (x,)) for x in (C3, C4, C5, C6)), "the other groups stay unchanged")
@@ -238,7 +239,7 @@ check(Bo.post(B + f"/api/proposals/{J}/apply", json={"select": ["0"]}).status_co
 check(Ca.post(B + f"/api/proposals/{J}/undo").status_code == 404, "another person cannot undo")
 r = Bo.post(B + f"/api/proposals/{J}/undo")
 check(r.ok and r.json().get("undone") == 1, f"undo: one merge back ({r.status_code} {r.text[:200]})")
-check(dbx("SELECT fn FROM contacts WHERE id=?", (C1,)) and [x[0] for x in dbx("SELECT contact_id FROM contact_tasks WHERE task_id=?", (T1,))] == [C1],
+check(dbx("SELECT fn FROM contacts WHERE id=?", (C1,)) and [x[0] for x in dbx(CTQ, (T1,))] == [C1],
       "undo: C1 is back with its task link")
 em = [x["value"] for x in json.loads(dbx("SELECT emails FROM contacts WHERE id=?", (C2,))[0][0])]
 check(em == ["ERIKA@example.com", "e.m@example.com"], "undo: C2 as before " + str(em))

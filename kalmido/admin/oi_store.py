@@ -842,6 +842,15 @@ def _finish(c, run, uid, data, who):
 
 
 _P = {"created_by": "null"}
+
+
+def _letter_link(c, run, src, d, ctx):
+    """2.1076.0 (#5271): the archive's kind is the link's relation (answers | reply); another value stays out."""
+    k = src.get("kind") or "answers"
+    if k not in ("answers", "reply"):
+        return False
+    d["rel"] = k
+    return d
 SPECS = [
     # file store: nodes (parents late), versions, shares, history
     OiT("store/nodes.json", "fs_nodes", people={"owner_id": "me", "created_by": "null", "deleted_by": "null"}, late={"parent_id": "fs_nodes", "hub_mail_id": "hub_mails"},  # 2.363.2 (#3106): the mark of a filed mail's nodes (the mail's reading rule)
@@ -876,8 +885,10 @@ SPECS = [
     # 2.635.0 (#4807 d): after the documents (doc_meta: their workspace); 2.981.0 (#5273): into obj_comments (kind doc_note)
     OiT("documents/notes.json", "obj_comments", kind="obj_comments_doc_note", refs={"ref_id": "fs_nodes"}, src={"ref_id": "node_id"},
         need=("ref_id",), people={"user_id": "null"}, prep=_doc_note, fixed={"kind": "doc_note"}),
-    OiT("office/letter_links.json", "office_letter_links", refs={"letter_id": "office_letters", "node_id": "fs_nodes"},
-        need=("letter_id", "node_id"), people={**_P, "agent_id": "null"}, private="office", label=N_("Letters")),
+    # 2.1076.0 (#5271): into obj_links (office_letter -> fs_entry, rel = the archive's kind answers | reply)
+    OiT("office/letter_links.json", "obj_links", kind="obj_links_letter", refs={"src_id": "office_letters", "dst_id": "fs_nodes"},
+        src={"src_id": "letter_id", "dst_id": "node_id"}, need=("src_id", "dst_id"), people={**_P, "agent_id": "null"}, private="office",
+        fixed={"src_kind": "office_letter", "dst_kind": "fs_entry"}, label=N_("Letters"), prep=_letter_link),
     # knowledge pages (text sealed in prep: enc off) and their files
     OiT("wiki/pages.json", "wiki_pages", people={"created_by": "null", "updated_by": "null"}, label=N_("Knowledge pages"), prep=_page,
         enc=False),

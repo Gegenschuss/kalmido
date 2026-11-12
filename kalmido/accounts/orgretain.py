@@ -134,12 +134,12 @@ ODL_MORE_SKIP = frozenset((
     "hub_callsheets",  # 2.855.0 (#1956): the call sheets go with the bookings of their shoot day
     "office_doc_items", "office_doc_parts", "office_doc_log", "office_payments", "office_signoffs", "office_dunning_marks",
     "office_sub_reminders", "office_contract_files", "office_trip_items", "office_trip_purposes", "office_meal_files",
-    "office_meal_choices", "office_meal_log", "office_letter_links", "office_drive_log", "office_drive_closed",
+    "office_meal_choices", "office_meal_log", "obj_links", "office_drive_log", "office_drive_closed",
     "office_archive_log", "office_cash_closings", "office_cash_log", "office_bank_imports", "office_bank_balances",
     "office_cc_cards", "office_cc_statements",  # 2.444.0 (#3447): their positions carry the years
     "office_cf_start", "office_cf_adjust", "office_cf_actual", "office_peppol_sends", "office_procdocs", "video_versions",
     "sheet_shares", "sheet_files", "wiki_files", "wiki_shares", "obj_versions", "tchat_files",
-    "hub_mail_links", "rc_suggest", "pl_imported", "pl_uploads", "doc_meta", "doc_field_values", "doc_mail", "nl_runs",
+    "rc_suggest", "pl_imported", "pl_uploads", "doc_meta", "doc_field_values", "doc_mail", "nl_runs",
     "doc_fetchers", "doc_fetch_portals",  # 2.425.0 C (#3453): a person's receipt fetchers (connections, not content)
 ))
 ODL_PRUNE = {"at": 0.0}

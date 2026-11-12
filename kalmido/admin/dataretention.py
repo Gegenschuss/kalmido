@@ -39,7 +39,7 @@ from ..accounts.orginvite import oinv_expire, ojn_purge  # 2.1005.0 (#5118): exp
 
 # 2.239.0 D (#2874): file store nodes that are office records (receipts assigned or not, filed letters, cash book / equipment /
 # DATEV receipts, a kept lock): their file log and their versions stay while the node exists (it goes after its period)
-DRT_OFFICE_NODES = ("SELECT node_id FROM rc_receipts UNION SELECT node_id FROM office_letter_links "
+DRT_OFFICE_NODES = ("SELECT node_id FROM rc_receipts UNION SELECT dst_id FROM obj_links WHERE src_kind='office_letter' AND dst_kind='fs_entry' "  # 2.1076.0 (#5271)
                     "UNION SELECT node_id FROM office_cash_entries WHERE node_id IS NOT NULL "
                     "UNION SELECT receipt_node_id FROM office_equipment WHERE receipt_node_id IS NOT NULL "
                     "UNION SELECT node_id FROM office_datev_guids WHERE node_id IS NOT NULL "

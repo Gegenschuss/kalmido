@@ -679,7 +679,17 @@ def _mail_link(c, run, src, d, ctx):
     new = run.m({"task": "tasks", "event": "events"}.get(kind, ""), src.get("ref_id")) if kind in ("task", "event") else None
     if not new:
         return False
-    d["kind"], d["ref_id"] = kind, new
+    d["dst_kind"], d["dst_id"] = kind, new  # 2.1076.0 (#5271): obj_links
+    return d
+
+
+def _contact_link(c, run, src, d, ctx):
+    """2.1076.0 (#5271): a contact's link to a task: its kind (waiting / responsible / about) into extra, added_at = when."""
+    kind = _txt(src.get("kind"), 20)
+    d["extra"] = json.dumps({"kind": kind if kind in ("waiting", "responsible", "about") else "about"})
+    at = _txt(src.get("added_at") or src.get("created_at"), 40)
+    if at:
+        d["created_at"] = at
     return d
 
 
@@ -1000,8 +1010,11 @@ SPECS = [
     # shares of calendars and address books (only with ticked people)
     OiT("calendars/members.json", "fs_shares", refs={"cal_id": "ev_cals"}, need=("cal_id",), people={"user_id": "member"}, space=(),
         rid=False, fixed={"node_id": 0}, label=N_("Calendars"), prep=_core_member),  # 2.647.0 (#5046); 2.924.0 (#5069): shares of the node
-    OiT("books/contact_tasks.json", "contact_tasks", refs={"contact_id": "contacts", "task_id": "tasks"}, need=("contact_id", "task_id"),
-        people={"added_by": "null"}, space=(), rid=False, label=N_("Contacts")),  # 2.362.0 (#3096)
+    # 2.362.0 (#3096); 2.1076.0 (#5271): into the links' core (obj_links contact -> task, rel contact); the archive keeps the old
+    # columns contact_id, task_id, kind, added_by, added_at (older ones too). No id: the link goes with its contact / task (trigger)
+    OiT("books/contact_tasks.json", "obj_links", kind="obj_links_contact", refs={"src_id": "contacts", "dst_id": "tasks"},
+        src={"src_id": "contact_id", "dst_id": "task_id"}, need=("src_id", "dst_id"), people={"created_by": "null"}, space=(), rid=False,
+        fixed={"src_kind": "contact", "dst_kind": "task", "rel": "contact"}, label=N_("Contacts"), prep=_contact_link),
     OiT("books/members.json", "fs_shares", refs={"book_id": "books"}, need=("book_id",), people={"user_id": "member"}, space=(),
         rid=False, fixed={"node_id": 0}, label=N_("Address books"), prep=_core_member),  # 2.647.0 (#5046); 2.924.0 (#5069): shares of the node
     # newsletter
@@ -1024,8 +1037,10 @@ SPECS = [
         prep=_person("user_id", member=True)),
     OiT("hub/mails.json", "hub_mails", refs={"client_id": "clients", "list_id": "lists", "eml_id": "fs_nodes", "folder_id": "fs_nodes"},
         people={"deleted_by": "null"}, fixed={"message_id": ""}, label=N_("E-mails"), prep=_mail, after=_mail_index),
-    OiT("hub/mail_links.json", "hub_mail_links", refs={"mail_id": "hub_mails"}, need=("mail_id",), people={"created_by": "null"},
-        fixed={"ref_id": 0}, label=N_("E-mails"), prep=_mail_link),  # 2.362.0 (#3096)
+    # 2.362.0 (#3096); 2.1076.0 (#5271): into obj_links (hub_mail -> task | event, rel made); the archive keeps mail_id, kind, ref_id
+    OiT("hub/mail_links.json", "obj_links", kind="obj_links_mail", refs={"src_id": "hub_mails"}, src={"src_id": "mail_id"}, need=("src_id",),
+        people={"created_by": "null"}, fixed={"src_kind": "hub_mail", "rel": "made", "dst_kind": "", "dst_id": 0}, label=N_("E-mails"),
+        prep=_mail_link),
     # 2.144.5 B (#2410): the workspace mailbox (into the private space: the importing person's own)
     OiT("hub/mailbox.json", "hub_mailboxes", people={"created_by": "null"}, label=N_("Mailbox"), prep=_mbx),
     # 2.380 H (#2398): scheduling polls with their options and votes (a new link), bookmarks with their pictures

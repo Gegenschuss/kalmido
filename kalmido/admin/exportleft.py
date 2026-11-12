@@ -48,7 +48,7 @@ UMZ_LEFT_TABLES = {
     "list_activity": _DERIVED, "list_ticket_seq": _DERIVED,
     "rc_suggest": _DERIVED, "rss_items": _DERIVED, "sheet_lastvals": _DERIVED, "task_vectors": _DERIVED,
     "budget_files": _FILES,
-    "chat_saves": _LATER, "contact_links": _LATER, "contact_tasks": _LATER, "ctr_notices": _LATER, "folder_heads": _LATER, "folder_props": _LATER,
+    "chat_saves": _LATER, "contact_links": _LATER, "ctr_notices": _LATER, "folder_heads": _LATER, "folder_props": _LATER,
     "fs_log": _LATER, "git_branches": _LATER, "git_folders": _LATER, "issue_reports": _LATER, "kid_rewards": _LATER, "life_trip_costs": _LATER,
     "list_rule_runs": _LATER, "sheet_links": _LATER, "shop_memory": _LATER,
     "wiki_spaces": _LATER, "obj_versions": _LATER,  # 2.958.0 (#5281): the versions of the core (was wiki_versions)
@@ -61,7 +61,7 @@ UMZ_LEFT_TABLES = {
     "doc_node_tags": _ORG, "space_moves": _SERVER, "push_tags": _SERVER, "notify_channel_queue": _SERVER,
     "webhook_queue": _SERVER, "webhook_log": _SERVER,
     "clients": _ORG, "doc_cfg": _ORG, "doc_fetch_portals": _ORG, "doc_field_values": _ORG, "doc_fields": _ORG, "doc_meta": _ORG, "doc_rules": _ORG, "doc_flow_runs": _DERIVED,
-    "doc_senders": _ORG, "doc_tags": _ORG, "doc_types": _ORG, "hub_bookings": _ORG, "hub_callsheets": _ORG, "hub_mail_links": _ORG, "nl_consent_log": _ORG,
+    "doc_senders": _ORG, "doc_tags": _ORG, "doc_types": _ORG, "hub_bookings": _ORG, "hub_callsheets": _ORG, "nl_consent_log": _ORG,
     "nl_members": _ORG, "nl_suppress": _ORG, "office_agreements": _ORG, "office_archive": _ORG, "office_archive_log": _ORG, "office_bank_balances": _ORG,
     "office_bank_accounts": _ORG, "office_bank_imports": _ORG, "office_bank_rule_nos": _ORG, "office_bank_rules": _ORG, "office_bank_tx": _ORG, "office_bank_vendors": _ORG,
     "office_bookarch": _ORG, "office_bookarch_accts": _ORG, "office_bookarch_docs": _ORG, "office_bookarch_files": _ORG, "office_cash_closings": _ORG,
@@ -70,7 +70,7 @@ UMZ_LEFT_TABLES = {
     "office_company": _ORG, "office_contract_files": _ORG, "office_contracts": _ORG, "office_datev_guids": _ORG, "office_deals": _ORG, "office_doc_items":
     _ORG, "office_doc_log": _ORG, "office_doc_parts": _ORG, "office_doc_templates": _ORG, "office_docs": _ORG, "office_drive_closed": _ORG,
     "office_drive_log": _ORG, "office_drives": _ORG, "office_dunning_marks": _ORG, "office_equipment": _ORG, "office_fixed_costs": _ORG,
-    "office_gen_docs": _ORG, "office_import_runs": _ORG, "office_inv_series": _ORG, "office_letter_blocks": _ORG, "office_letter_links": _ORG,
+    "office_gen_docs": _ORG, "office_import_runs": _ORG, "office_inv_series": _ORG, "office_letter_blocks": _ORG,
     "office_letter_profiles": _ORG, "office_letters": _ORG, "office_meal_choices": _ORG, "office_meal_files": _ORG, "office_meal_log": _ORG,
     "office_meals": _ORG, "office_numbers": _ORG, "office_opening_balances": _ORG, "office_ledger_entries": _ORG, "office_pack_installs": _ORG, "office_pay_props": _ORG,
     "office_payonline": _ORG, "office_pay_links": _ORG, "office_pay_sessions": _ORG, "office_pay_events": _ORG, "office_pay_payouts": _ORG,
@@ -108,7 +108,7 @@ UMZ_LEFT_TABLES = {
 UMZ_LATER_NAMES = {
     "hub_mailbox_rules": "document rules of mailboxes",  # 2.581.0 (#4804)
     "chat_files": "files of agent chats", "chat_saves": "chat messages saved as tasks", "contact_links": "birthday tasks of contacts",
-    "contact_tasks": "links between contacts and tasks", "ctr_notices": "notices of contracts", "folder_heads": "header strips of folders",
+    "ctr_notices": "notices of contracts", "folder_heads": "header strips of folders",
     "folder_props": "defaults of folders", "fs_log": "access history of private files", "git_branches": "branches of connected repositories",
     "git_folders": "repositories connected to folders", "issue_reports": "error reports of projects", "kid_rewards": "rewards of the family",
     "life_trip_costs": "costs of trips", "list_rule_runs": "runs of project rules",

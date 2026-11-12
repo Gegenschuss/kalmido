@@ -166,7 +166,10 @@ BK = ok(A.post(B + "/api/books", json={"name": "Team Kontakte", "org_id": ORG}),
 if not one("SELECT org_id FROM books WHERE id=?", (BK,)):
     dbx("UPDATE books SET org_id=?, owner_org_id=? WHERE id=?", (ORG, ORG, BK))  # the shape of the API is not what this suite checks
 CO = ok(A.post(B + "/api/contacts", json={"book_id": BK, "fn": "Kim Kontakt"}), "a contact").get("id")
-dbx("INSERT INTO contact_tasks(contact_id, task_id, kind, added_by, added_at) VALUES(?,?,?,?,?)", (CO, TK, "waiting", ALICE, "2026-10-20T10:00:00Z"))
+# 2.1076.0 (#5271): the contact's task link is a row of obj_links (rel contact, extra.kind; was contact_tasks), the archive keeps
+# books/contact_tasks.json with its old columns
+dbx("INSERT INTO obj_links(src_kind, src_id, dst_kind, dst_id, rel, extra, created_by, created_at) VALUES('contact',?,'task',?,'contact',"
+    "CAST(? AS JSONB),?,?)", (CO, TK, '{"kind": "waiting"}', ALICE, "2026-10-20T10:00:00Z"))
 # #3092: an open channel (member bob, a message with a file), bob's closed channel, a group of three
 CH = ok(A.post(B + "/api/team/channels", json={"name": "Allgemein Umzug", "org_id": ORG, "open": True, "members": [BOB]}), "open channel").get("id")
 FILE = b"Ablaufplan Umzug\n" * 20
@@ -249,7 +252,8 @@ st = dbx("SELECT owner_id, data FROM templates WHERE org_id=? AND kind='sections
 check(len(st) == 1 and st[0]["owner_id"] == ALICE and "Schnitt" in st[0]["data"], f"#3096: the section template {[dict(x) for x in st]}")
 NL = one("SELECT id FROM lists WHERE org_id=? AND name='Umzug Projekt'", (ORG3,))
 NTK = one("SELECT id FROM tasks WHERE list_id=? AND title='Drehplan'", (NL,))
-check(dbx("SELECT 1 FROM contact_tasks ct JOIN contacts c ON c.id=ct.contact_id WHERE ct.task_id=? AND ct.kind='waiting' AND c.id<>?", (NTK, CO)),
+check(dbx("SELECT 1 FROM obj_links ct JOIN contacts c ON c.id=ct.src_id WHERE ct.src_kind='contact' AND ct.dst_kind='task' AND ct.dst_id=? "
+          "AND ct.extra->>'kind'='waiting' AND c.id<>?", (NTK, CO)),
       "#3096: the contact hangs on the new task")
 check(dbx("SELECT 1 FROM nl_suppress WHERE ws=? AND org_id=? AND email_hash=?", (f"o{ORG3}", ORG3, HSUP)),
       "#3096: the unsubscribed address stays suppressed")

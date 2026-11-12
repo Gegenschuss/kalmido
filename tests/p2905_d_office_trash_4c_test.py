@@ -16,7 +16,7 @@ deleted. Invented names only.
    restore -> back without its members; the toast's undo of the manager
  - a fixed cost (kind ofixed): delete -> gone from the fixed costs, in the office trash -> restore -> back
  - a correction of the cash flow (kind oadjust): delete -> not counted in the cash flow, in the office trash -> restore
- - a letter's link (kind oletlink): p2567_c_office_trash_test.py (removed, listed, undo, linked again)
+ - a letter's link (kind oletlink; 2.1076.0 #5271: obj_links, the person's undo list): p2567_c_office_trash_test.py (removed, undo, linked again)
  - 2.990.0 (#5539): the undo of a data import removes the run's services (live and in the trash) with their history
 tenant-matrix: office (another organisation: 404 on a foreign row of the core's trash, restore and delete for good)
 freelancer-matrix: office (a person without an organisation: her service deleted, listed in her trash, restored, deleted for good)

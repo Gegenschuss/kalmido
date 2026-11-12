@@ -61,7 +61,8 @@ from .contractfiles import dma_path, dma_dir  # 2.369.5 (#2517): pulled up from 
 from ..team.clients import need_client  # 2.369.5 (#2517): pulled up from functions
 from .pdfweb import _render, epdf_name, epdf_stored  # 2.369.5 (#2517): pulled up from functions
 from .meals import bw_file_copy, bw_path  # 2.369.5 (#2517): pulled up from functions
-from .letterlinks import LTL_KIND  # 2.990.0 (#5539): a letter link ends on the core's way
+from .letterlinks import LTL_ON  # 2.1076.0 (#5271): the letter links are links of the shared core (obj_links)
+from ..core.objlinks import olnk_purge_ids, olnk_put  # 2.1076.0 (#5271): a letter link ends / comes back on the core's way
 from .okern import ofk_purge  # 2.990.0 (#5539)
 from .okern import ofk_kind_of  # 2.1004.0 (#5494)
 
@@ -448,10 +449,12 @@ def ofm_deal_clear(c, p, to):
 
 
 def ofm_letter_links(c, p):
-    """2.356.1 (#3344): {letter id: [office_letter_links rows]} of the moving letter drafts."""
+    """2.356.1 (#3344): {letter id: [letter link rows]} of the moving letter drafts (2.1076.0, #5271: obj_links in the old
+    columns letter_id, node_id, kind)."""
     out = {}
     for r in p["letters"]:
-        rows = c.execute(f"SELECT * FROM office_letter_links WHERE letter_id=? AND {live_sql()} ORDER BY id", (r["id"],)).fetchall()  # 2.905.0 (#5414)
+        rows = c.execute(f"SELECT id, org_id, src_id AS letter_id, dst_id AS node_id, rel AS kind, created_by, agent_id, created_at "
+                         f"FROM obj_links WHERE {LTL_ON} AND src_id=? AND {live_sql()} ORDER BY id", (r["id"],)).fetchall()  # 2.905.0 (#5414)
         if rows:
             out[r["id"]] = rows
     return out
@@ -1028,10 +1031,10 @@ def ofm_move_space():
         for r in p["letters"]:  # 2.356.1 (#3344): the links of letterlinks.py end first (the undo restores them after the letter)
             for lk in p["letter_links"].get(r["id"], ()):
                 rec.append({"t": "office_letter_links", "id": lk["id"], "gone": {k: lk[k] for k in ("letter_id", "node_id", "kind", "created_by", "agent_id", "created_at")}})
-                ofk_purge(c, LTL_KIND, lk["id"])  # 2.990.0 (#5539): the core's way (its history / undo steps go along)
-            # 2.905.0 (#5414): its links in the core's trash cannot come back in the old office once the letter moved: gone for good
-            for lk in c.execute(f"SELECT id FROM office_letter_links WHERE letter_id=? AND {trash_sql()} ORDER BY id", (r["id"],)).fetchall():
-                ofk_purge(c, LTL_KIND, lk["id"])  # 2.990.0 (#5539)
+                olnk_purge_ids(c, [lk["id"]])  # 2.1076.0 (#5271): the links' core (its undo steps go along; was ofk_purge, #5539)
+            # 2.905.0 (#5414): its links in the trash cannot come back in the old office once the letter moved: gone for good
+            olnk_purge_ids(c, [x[0] for x in c.execute(f"SELECT id FROM obj_links WHERE {LTL_ON} AND src_id=? AND {trash_sql()} ORDER BY id",
+                                                       (r["id"],)).fetchall()])
             ofm_move_row(c, rec, "office_letters", r, src, dst, dst, {**{k: None for k in OFM_LETTER_CLEAR}, "updated_at": ts})
         detail = {"src": src, "dst": dst, "what": what, "ids": ids, "copy": 1 if copy else 0, "rows": rec, "made": made, "at": ts}
         mid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES(?,?,?,?,?,?,?)",
@@ -1132,17 +1135,17 @@ def rmv_undo_run(c, uid, mid, files):
             gl = r["gone"]
             if c.execute("SELECT 1 FROM office_letters WHERE id=? AND org_id=?", (gl["letter_id"], src)).fetchone() \
                     and c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (gl["node_id"],)).fetchone():
-                had = c.execute("SELECT id, org_id, deleted_at FROM office_letter_links WHERE letter_id=? AND node_id=? AND kind=?",
+                had = c.execute(f"SELECT id, org_id, deleted_at FROM obj_links WHERE {LTL_ON} AND src_id=? AND dst_id=? AND rel=?",
                                 (gl["letter_id"], gl["node_id"], gl["kind"])).fetchone()
                 # 2.990.0 (#5571, review): the same link made in the target since - in the core's trash there or live with the
                 # target's org - gives way on the core's way (its history / trash step of the target go with it); the link
                 # comes back as it was (was: such a row counted as "still there", the letter came back without its document)
                 if had is not None and (had["deleted_at"] or had["org_id"] != src):
-                    ofk_purge(c, LTL_KIND, had["id"])
+                    olnk_purge_ids(c, [had["id"]])  # 2.1076.0 (#5271)
                     had = None
-                if had is None:
-                    c.execute("INSERT INTO office_letter_links(org_id, letter_id, node_id, kind, created_by, agent_id, created_at) VALUES(?,?,?,?,?,?,?)",
-                              (src, gl["letter_id"], gl["node_id"], gl["kind"], gl["created_by"], gl["agent_id"], gl["created_at"]))
+                if had is None:  # 2.1076.0 (#5271): the link of the core as it was (no history entry: an undo of the move)
+                    olnk_put(c, gl["created_by"], "office_letter", gl["letter_id"], "fs_entry", gl["node_id"], gl["kind"], org_id=src,
+                             agent_id=gl["agent_id"], created_at=gl["created_at"], history=False)
             continue
         cur = c.execute(f"SELECT * FROM {t} WHERE id=?", (rid,)).fetchone()
         if not cur:

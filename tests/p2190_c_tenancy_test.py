@@ -115,11 +115,13 @@ HM = dbx("SELECT id FROM hub_mails WHERE message_id='m2190r@example.com'")[0][0]
 LPV = A.post(B + "/api/lists", json={"name": "Now private", "org_id": None}).json()["id"]
 LB = A.post(B + "/api/lists", json={"name": "Beta work", "org_id": ORG2}).json()["id"]
 TPV, TB = task(A, LPV, "From the mail (private now)"), task(A, LB, "From the mail (other org)")
-dbx("INSERT INTO hub_mail_links(mail_id,org_id,kind,ref_id,created_by,created_at) VALUES(?,?,'task',?,1,'2026-10-23T00:00:00Z')", (HM, ORG, TPV), write=True)
+# 2.1076.0 (#5271): the mail links are rows of obj_links (hub_mail -> task, rel made; was hub_mail_links)
+MLI = "INSERT INTO obj_links(org_id,src_kind,src_id,dst_kind,dst_id,rel,created_by,created_at) VALUES(?,'hub_mail',?,'task',?,'made',1,'2026-10-23T00:00:00Z')"
+dbx(MLI, (ORG, HM, TPV), write=True)
 check(not kinds().get("mail_link"), "a task of a list that became private (a leave without heir) is no crossing " + str(kinds()))
-dbx("INSERT INTO hub_mail_links(mail_id,org_id,kind,ref_id,created_by,created_at) VALUES(?,?,'task',?,1,'2026-10-23T00:00:00Z')", (HM, ORG, TB), write=True)
+dbx(MLI, (ORG, HM, TB), write=True)
 check(kinds().get("mail_link") == 1, "a task in another organisation than the mail counts " + str(kinds()))
-dbx("DELETE FROM hub_mail_links WHERE mail_id=?", (HM,), write=True)
+dbx("DELETE FROM obj_links WHERE src_kind='hub_mail' AND src_id=?", (HM,), write=True)
 
 # ================================================================ #2496 health lists never get a public link
 HL = A.post(B + "/api/lists", json={"name": "Health"}).json()["id"]

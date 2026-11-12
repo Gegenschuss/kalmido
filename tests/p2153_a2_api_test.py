@@ -91,12 +91,12 @@ def private_letter(s, tag):
     r = s.patch(B + f"{LT}/{lid}", json={"contact_id": ct, "rcpt_name": f"Kontakt {tag} Beispiel", "subject": f"Antwort {tag}"})
     check(r.ok, f"setup {tag}: the private contact as recipient " + r.text[:200])
     sql("UPDATE office_letters SET node_id=? WHERE id=?", (d2, lid), write=True)  # the filed letter PDF
-    check(sql("SELECT COUNT(*) FROM office_letter_links WHERE letter_id=?", (lid,))[0][0] == 1, f"setup {tag}: the answer link")
+    check(sql("SELECT COUNT(*) FROM obj_links WHERE src_kind='office_letter' AND src_id=?", (lid,))[0][0] == 1, f"setup {tag}: the answer link")  # 2.1076.0 (#5271): obj_links (was office_letter_links)
     return lid, d1, d2, ct
 
 
 def detached(lid, docs, tag):
-    lk = sql("SELECT COUNT(*) FROM office_letter_links WHERE letter_id=?", (lid,))[0][0]
+    lk = sql("SELECT COUNT(*) FROM obj_links WHERE src_kind='office_letter' AND src_id=?", (lid,))[0][0]  # 2.1076.0 (#5271): obj_links (was office_letter_links)
     row = sql("SELECT node_id, contact_id FROM office_letters WHERE id=?", (lid,))[0]
     check(lk == 0 and row[0] is None and row[1] is None, f"{tag}: the letter's links to private documents and contacts ended {lk} {row}")
     for d in docs:

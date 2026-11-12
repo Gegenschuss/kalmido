@@ -18512,6 +18512,8 @@
   "{0} created the account {1} for you on {2} with an invitation. It has not been used so far.": "{0} creó la cuenta {1} para ti el {2} con una invitación. Hasta ahora no se ha usado.",
   "Unless you set it up by {0}, it will be removed automatically on that day, together with the invitation.": "Si no la configuras antes del {0}, se eliminará automáticamente ese día junto con la invitación.",
   "Setting up the account once keeps it. If you do not need it, there is nothing to do.": "Si configuras la cuenta una vez, se conserva. Si no la necesitas, no tienes que hacer nada.",
+  "Links stay inside one workspace": "Los vínculos se quedan dentro de un espacio de trabajo",
+  "This link belongs to its area: change it there": "Este vínculo pertenece a su área: cámbialo allí",
   "Help for this area": "Ayuda de esta área",
   "How it works": "Cómo funciona",
   "All help topics": "Todos los temas de ayuda",

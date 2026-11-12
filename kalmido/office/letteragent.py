@@ -21,7 +21,7 @@ from .rights import ofr_rights
 from ..files.store import fs_chain, fs_deleted, fs_role  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx, write_lock  # 2.369.5 (#2517): pulled up from functions
 from .letters import lt_row, lt_public, lt_create, LT_STATUS_KEYS, lt_update  # 2.369.5 (#2517): pulled up from functions
-from .letterlinks import ltl_link, ltl_prefill, LTL_KINDS  # 2.369.5 (#2517): pulled up from functions
+from .letterlinks import ltl_link, ltl_prefill, LTL_KINDS, LTL_ON  # 2.369.5 (#2517): pulled up from functions; 2.1076.0 (#5271): LTL_ON
 
 LTA_EVENT = "letter_draft_requested"
 LTA_FIELDS = ("client_id", "rcpt_name", "rcpt_address", "rcpt_email", "letter_date", "subject", "body", "ref_line", "greeting", "lang")
@@ -161,7 +161,7 @@ def lta_v1(c, oid, aid, d):
     out = lt_public(c, oid, d)
     out.pop("created_by", None)
     links = []
-    for r in c.execute(f"SELECT node_id, kind FROM office_letter_links WHERE letter_id=? AND org_id=? AND {live_sql()} ORDER BY id", (d["id"], oid)):  # 2.905.0 (#5414)
+    for r in c.execute(f"SELECT dst_id AS node_id, rel AS kind FROM obj_links WHERE {LTL_ON} AND src_id=? AND org_id=? AND {live_sql()} ORDER BY id", (d["id"], oid)):  # 2.905.0 (#5414); 2.1076.0 (#5271)
         if lta_agent_sees(c, r["node_id"], aid):
             links.append({"node_id": r["node_id"], "kind": r["kind"]})
     out["links"] = links
