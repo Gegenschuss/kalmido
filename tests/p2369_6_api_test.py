@@ -193,4 +193,11 @@ if L:
     check(L["after_commit"] == U, f"#3139 after a commit the next transaction opens as the person {L['after_commit']}")
     check(L["set_ctx"] == ["agent", "9"], f"#3139 a new context inside a transaction applies with the next statement {L['set_ctx']}")
 
+# 2.997.0 (#5137, review): /api/state probes fs_shares in the person's context (lists/groups.py grp_shares_any,
+# lists/lffolder.py lf_people_rows, core/state.py) and skips the system read when the probe finds nothing - that holds only
+# while fs_shares has no row-level policy; one there (e.g. an org_id column picked up by rls.apply) would hide other
+# workspaces' folder shares silently. Then move the probes into system_ctx() again.
+fs_rls = kt.dbx("SELECT relrowsecurity FROM pg_class WHERE relname='fs_shares' AND relnamespace='public'::regnamespace")
+check(fs_rls == [(False,)] or (fs_rls and not fs_rls[0][0]), f"#5137 fs_shares has no row-level security (the probes rely on it) {fs_rls}")
+
 sys.exit(kt.done("p2369_6_api"))
