@@ -9,7 +9,7 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-const HV = {list: /** @type {any} */ (null), lg: '', sec: /** @type {Record<string, any>} */ ({}), q: '', hits: /** @type {any} */ (null), err: false, tq: 0, n: 0, from: false};  // from: a topic was opened from the list (Back = the browser's back)
+const HV = {list: /** @type {any} */ (null), lg: '', sec: /** @type {Record<string, any>} */ ({}), q: '', hits: /** @type {any} */ (null), err: false, n: 0, from: false};  // from: a topic was opened from the list (Back = the browser's back)
 
 const hv_lang = () => (typeof I18N !== 'undefined' && I18N.code) || 'en';
 function hv_route() {
@@ -85,7 +85,7 @@ function hv_draw() {
 document.addEventListener('input', e => {
   const t = /** @type {HTMLInputElement} */ (e.target);
   if (t?.id !== 'hv-q') return;
-  clearTimeout(HV.tq); HV.tq = setTimeout(() => hv_search(t.value), 200);
+  hv_search(t.value);  // every key asks; HV.n drops the answers of older words (no hand-made delay)
 });
 document.addEventListener('click', e => {
   const t = /** @type {HTMLElement} */ (e.target);
