@@ -40,8 +40,10 @@ const D2 = c052('R-2', [ntry('12.50', '2026-09-02', 'BOOK', 'REF-A1', 'Bakery ag
   // ================= #2455 #2469 the household import: two day reports
   let w = await boot({user: 'alice', hash: `budget/${LID}`}), d = w.document;
   const dlg = () => d.querySelector('.modal.bgdlg');
-  await until(() => d.querySelector('[data-bg="csv"]'), 60);
-  click(w, d.querySelector('[data-bg="csv"]'));
+  // 2.1012.0 (#5690): the budget's "..." is the shared menu(): open it, pick "Import a CSV file"
+  const csvOpen = async () => { click(w, d.querySelector('.bgview [data-bg="more"]')); const b = await until(() => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(x => x.textContent.trim() === 'Import a CSV file'), 60); click(w, b); };
+  await until(() => d.querySelector('.bgview [data-bg="more"]'), 60);
+  await csvOpen();
   const inp = await until(() => dlg()?.querySelector('[data-cs-file]'));
   check(inp && inp.multiple && /\.zip/.test(inp.accept), '#2455: the file input takes several files and a ZIP');
   dlg().bgTake([new w.File([D1], 'tag1.xml'), new w.File([D2], 'tag2.xml')]);
@@ -61,7 +63,7 @@ const D2 = c052('R-2', [ntry('12.50', '2026-09-02', 'BOOK', 'REF-A1', 'Bakery ag
   const runs = (await call('GET', `/api/budget/${LID}/import/runs`)).items || [];
   check(runs.length === 1 && runs[0].count === 2, '#2455: one import run with 2 entries ' + JSON.stringify(runs));
   // the dialog lists the import and takes it back after the question
-  click(w, d.querySelector('[data-bg="csv"]'));
+  await csvOpen();
   const undo = await until(() => dlg()?.querySelector('.bgruns [data-csundo]'), 60);
   check(undo && /Undo this import/.test(undo.textContent), '#2455: "Last imports" offers to take the import back');
   let asked = '';
@@ -117,8 +119,12 @@ const D2 = c052('R-2', [ntry('12.50', '2026-09-02', 'BOOK', 'REF-A1', 'Bakery ag
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, '390: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await o.nav(B + `#budget/${LID}`);
-    for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('[data-bg="csv"]')`).catch(() => false)); i++) await sleep(300);
-    await ev(`(() => { document.querySelector('[data-bg="csv"]').click(); return 1; })()`);
+    // 2.1012.0 (#5690): the "..." is the shared menu(): open it, then its entry "Import a CSV file"
+    for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('.bgview [data-bg="more"]')`).catch(() => false)); i++) await sleep(300);
+    await ev(`(() => { document.querySelector('.bgview [data-bg="more"]').click(); return 1; })()`);
+    const csvMi = `[...document.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(x => x.textContent.trim() === 'Import a CSV file')`;
+    for (let i = 0; i < 30 && !(await ev(`!!${csvMi}`).catch(() => false)); i++) await sleep(300);
+    await ev(`(() => { ${csvMi}.click(); return 1; })()`);
     for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('.bgdlg [data-cs-file]')`).catch(() => false)); i++) await sleep(300);
     await ev(`(() => { document.querySelector('.modal.bgdlg').bgTake([new File([${JSON.stringify(D1)}], 'tag1.xml'), new File([${JSON.stringify(D2)}], 'tag2.xml')]); return 1; })()`);
     for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('.bgdlg .bgpend')`).catch(() => false)); i++) await sleep(300);

@@ -58,7 +58,9 @@ const PREV = (() => { const d = new Date(NOW.getFullYear(), NOW.getMonth() - 1, 
   const SPK = '"Auftragskonto";"Buchungstag";"Valutadatum";"Buchungstext";"Verwendungszweck";"Glaeubiger ID";"Mandatsreferenz";"Beguenstigter/Zahlungspflichtiger";"Kontonummer/IBAN";"BIC (SWIFT-Code)";"Betrag";"Waehrung";"Info"\n'
     + '"DE00123";"01.09.26";"01.09.26";"LASTSCHRIFT";"Strom";"";"";"Stadtwerke Beispiel";"DE89370400440532013000";"X";"-45,00";"EUR";""\n';
   const pick = async (name, text) => {
-    click(w, d.querySelector('[data-bg="csv"]'));
+    // 2.1012.0 (#5690): the budget's "..." is the shared menu(): open it, pick "Import a CSV file"
+    click(w, d.querySelector('.bgview [data-bg="more"]'));
+    click(w, await until(() => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(x => x.textContent.trim() === 'Import a CSV file')));
     await until(() => d.querySelector('.modal.bgdlg [data-cs-file]'));
     w.__csv = [new w.File([text], name, {type: 'text/plain'})];  // like p272_b_budget_ui.js
     w.eval(`(() => { const f = document.querySelector('.modal.bgdlg [data-cs-file]'); Object.defineProperty(f, 'files', {configurable: true, value: window.__csv}); f.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);

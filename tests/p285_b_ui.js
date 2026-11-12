@@ -72,8 +72,12 @@ const FEAT = 'cal,contracts,feeds';
   const a = items[0]?.querySelector('a[target="_blank"]');
   check(a && a.getAttribute('href') === 'https://example.com/fresh' && /noopener/.test(a.rel) && /noreferrer/.test(a.rel), '#1162: the link opens in a new tab with noopener noreferrer');
   check(!d.querySelector('.rssview img'), '#1162: no pictures');
-  check(d.querySelector('a[href^="/api/feeds/opml"]'), '#1162: the menu offers the OPML export');  // 2.172.0 (#2677): + ?space=
-  check(d.querySelector('[data-rss-opml]'), '#1162: … and the OPML import');
+  // 2.1012.0 (#5690): the "..." is the shared menu(): both entries are buttons (no link / label), the import clicks the hidden file field
+  click(w, d.querySelector('[data-rss="omenu"]')); await until(() => d.querySelector('#pop:not(.hidden) [role="menuitem"]'));
+  const rssMi = [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].map(b => b.textContent.trim());
+  check(rssMi.includes('Export OPML file') && rssMi.includes('Import OPML file') && !d.querySelector('#pop a, #pop label'), '#1162: the menu offers the OPML export and import (buttons) ' + rssMi.join('|'));  // 2.172.0 (#2677): + ?space=
+  check(d.querySelector('[data-rss-opml]'), '#1162: … the hidden file field stays');
+  w.eval('closePop()');
   check(w.eval(`HIST.undo.length`) >= 1 && /Follow feed/.test(w.eval(`HIST.undo[HIST.undo.length - 1].label`)), '#1162: following is one undo step');
 
   // ================= read later

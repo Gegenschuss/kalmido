@@ -27,9 +27,10 @@ from kt import FAILS, OKS, check  # noqa: E402
 RM_LEFT = {
     # 2.768.0 (#4888): + the bar above a folder with recognition (ab_foldTools, 2.752.0 #4887) - the count was stale since then
     ("ablage.js", 'data-ab="menu"'): (2, "the open folder's menu in the tool bar above the list and above a folder with recognition (page menus)"),
-    ("bookmarks.js", "summary"): (1, "the page menu of the bookmarks (import / export)"),
-    ("budget.js", "summary"): (1, "the page menu of a budget"),
-    ("feeds.js", "summary"): (1, "the page menu of the feeds (OPML import / export)"),
+    # 2.1012.0 (#5690): the page menus of bookmarks / budget / feeds are anchor buttons for the shared menu() now (no <details>)
+    ("bookmarks.js", 'data-bm="more"'): (1, "the page menu of the bookmarks (import / export)"),
+    ("budget.js", 'data-bg="more"'): (1, "the page menu of a budget"),
+    ("feeds.js", 'data-rss="omenu"'): (1, "the page menu of the feeds (OPML import / export)"),
     # 2.997.0 (#5354): the merge dialog's drag handle (#4805, 0642f884bd) shows the dots icon; it is no button and opens no menu
     ("docpages.js", 'class="dpm-grip"'): (1, "the drag handle of a row in Merge PDFs (aria-hidden, a press drags the row), no menu"),
     ("calabs.js", 'class="iconbtn abchid"'): (1, "an invisible stand-in (aria-hidden) that keeps the columns of the rows in line, no button"),

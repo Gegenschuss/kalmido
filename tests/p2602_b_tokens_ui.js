@@ -20,7 +20,7 @@ const rule = sel => {
 };
 const size = (o, k) => o[k] || (o.font || '').split(/\s+/).find(x => x.startsWith('var(--fs-'));
 
-for (const c of ['.abview', '.ablist', '.odban', '.stcard', '.povs', '.arow', '.sttiles div', '.dkbox', '.rkv-sec', '.rkv-card', '.bwcard', '.dpjdoc', '.vdrrow', '.fxk', '.week', '.cal', '.bgmenul']) {
+for (const c of ['.abview', '.ablist', '.odban', '.stcard', '.povs', '.arow', '.sttiles div', '.dkbox', '.rkv-sec', '.rkv-card', '.bwcard', '.dpjdoc', '.vdrrow', '.fxk', '.week', '.cal']) {
   const r = rule(c);
   check(r['border-radius'] === 'var(--r-l)', `card ${c}: radius var(--r-l) (${r['border-radius']})`);
   const b = r.border || r['border-top'] || '';
@@ -36,6 +36,6 @@ for (const c of ['.pvpct', '.dpvtab', '.dpvag', '.dpvtwrap', '.vdrtc', '.vdrat',
 }
 check(!/var\(--(r|r-m|hover)\s*[,)]/.test(css), 'no var(--r / var(--r-m / var(--hover left');
 check(/--radius:/.test(css) && /--r-s:/.test(css) && /--r-l:/.test(css) && /--line2:/.test(css) && /--bg3:/.test(css) && /--shadow:/.test(css), 'tokens defined in :root');
-check(rule('.bgmenul')['box-shadow'] === 'var(--shadow)', 'budget menu shadow via var(--shadow)');
+// 2.1012.0 (#5690): the budget menu is the shared menu() now (.bgmenul is gone)
 console.log(`${ok} ok, ${F.length} failed`);
 process.exit(F.length ? 1 : 0);

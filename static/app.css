@@ -7711,12 +7711,6 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .bghead{display:flex;align-items:center;gap:.5rem;min-width:0}
 .bgname{margin:0;font-size:var(--fs-l);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .bglist{max-width:100%;min-width:0;font-size:var(--fs-b)}
-.bgmenu{position:relative}
-.bgmenu>summary{list-style:none;cursor:pointer}
-.bgmenu>summary::-webkit-details-marker{display:none}
-.bgmenul{position:absolute;right:0;top:100%;z-index:20;min-width:14rem;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-l);padding:.25rem;box-shadow:var(--shadow);display:flex;flex-direction:column}
-.bgmenul button{display:flex;align-items:center;gap:.625rem;padding:.625rem .75rem;border-radius:var(--r-s);text-align:left;min-height:2.75rem}
-.bgmenul button:hover,.bgmenul button:focus-visible{background:var(--bg3)}
 .bgmonth{display:flex;align-items:center;justify-content:center;gap:.5rem;flex-wrap:wrap}
 .bgmonth .iconbtn{min-width:2.75rem;min-height:2.75rem}
 .bgmn{font-size:var(--fs-l);min-width:9rem;text-align:center}

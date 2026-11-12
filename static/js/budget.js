@@ -98,13 +98,8 @@ function viewBudget() {
   if (!d) return `<div class="bgview"><div class="empty nempty eact">${ic('wallet')}<span>${tr('What comes in, what goes out, and what is left at the end of the month. Shared with the family if you like.')}</span><button type="button" class="btn pri" data-bg="create">${ic('plus', 's')} ${tr('Create a budget')}</button></div></div>`;
   const w = d.can_write, t = d.totals, lists = (BG.home?.lists || []);
   const pick = lists.length > 1 ? `<select class="bglist" data-bg-list aria-label="${esc(tr('Budget'))}">${lists.map(l => `<option value="${l.id}" ${l.id === d.list_id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select>` : `<h2 class="bgname">${esc(d.name)}</h2>`;
-  const menu = `<details class="bgmenu"><summary class="iconbtn" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</summary><div class="bgmenul" role="menu">
-    ${w ? `<button type="button" role="menuitem" data-bg="cats">${ic('tag', 's')}<span>${tr('Categories')}</span></button>
-    <button type="button" role="menuitem" data-bg="rec">${ic('repeat', 's')}<span>${tr('Recurring entries')}</span></button>
-    ${feat('contracts') ? `<button type="button" role="menuitem" data-bg="contracts">${ic('file', 's')}<span>${tr('Add from contracts')}</span></button>` : ''}
-    <button type="button" role="menuitem" data-bg="csv">${ic('upload', 's')}<span>${tr('Import a CSV file')}</span></button>` : ''}
-    ${shareOk(listById(d.list_id)) ? `<button type="button" role="menuitem" data-bg="share">${ic('users', 's')}<span>${tr('Share')}</span></button>` : ''}
-    ${w ? `<button type="button" role="menuitem" data-bg="create">${ic('plus', 's')}<span>${tr('New budget')}</span></button>` : ''}</div></details>`;
+  // 2.1012.0 (#5690): the shared menu() (popovers.js), opened by the click handler below (data-bg="more")
+  const menu = !bg_moreItems(d).length ? '' : `<button type="button" class="iconbtn" data-bg="more" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button>`;
   const head = `<div class="bghead">${pick}<span class="spacer"></span>${menu}</div>
     <div class="bgmonth"><button type="button" class="iconbtn" data-bg="prev" aria-label="${esc(tr('Previous month'))}" title="${esc(tr('Previous month'))}">${ic('left')}</button><b class="bgmn" aria-live="polite">${esc(bg_monthName(d.month))}</b><button type="button" class="iconbtn" data-bg="next" aria-label="${esc(tr('Next month'))}" title="${esc(tr('Next month'))}">${ic('right')}</button>${d.month !== bg_month() ? `<button type="button" class="btn sm" data-bg="now">${tr('This month')}</button>` : ''}</div>`;
   const tile = (k, label, ist, soll) => `<div class="bgtile bg-${k}"><small class="muted">${esc(label)}</small><b>${esc(bg_money(ist))}</b>${soll != null ? `<small class="muted">${esc(tr('{0} planned', bg_money(soll)))}</small>` : ''}</div>`;
@@ -691,13 +686,31 @@ async function bg_create() {
   go(`budget/${j.list_id}`);
 }
 
+// 2.1012.0 (#5690): the "..." menu of the budget on the shared menu() (sheet with a title on the phone, Escape, arrow keys)
+// (read only and not shareable = no entries: the view then draws no "..." at all, never an empty menu)
+function bg_moreItems(d) {
+  const w = d.can_write;
+  return [
+    w ? {label: tr('Categories'), icon: 'tag', fn: () => bg_catsModal()} : null,
+    w ? {label: tr('Recurring entries'), icon: 'repeat', fn: () => bg_recModal()} : null,
+    w && feat('contracts') ? {label: tr('Add from contracts'), icon: 'file', fn: () => bg_contractsModal()} : null,
+    w ? {label: tr('Import a CSV file'), icon: 'upload', fn: () => bg_csvModal()} : null,
+    shareOk(listById(d.list_id)) ? {label: tr('Share'), icon: 'users', fn: () => shareModal(d.list_id)} : null,
+    w ? {label: tr('New budget'), icon: 'plus', fn: () => bg_create()} : null,
+  ].filter(Boolean);
+}
+function bg_moreMenu(anchor) {
+  const d = BG.data; if (!d) return;
+  const it = bg_moreItems(d); if (it.length) menu(anchor, it, null, null, tr('More'));
+}
+
 // ---- clicks
 document.addEventListener('click', async e => {
   const a = e.target.closest?.('[data-bg]'); if (!a || a.disabled) return;
   e.preventDefault();
-  a.closest('details.bgmenu')?.removeAttribute('open');
   const k = a.dataset.bg, id = +a.dataset.id || 0;
   if (k === 'create') bg_create();
+  else if (k === 'more') bg_moreMenu(a);
   else if (!BG.data) return;
   else if (k === 'prev' || k === 'next') { BG.month = bg_addMonth(BG.data.month, k === 'prev' ? -1 : 1); await bg_load(); $(`#view [data-bg="${k}"]`)?.focus(); }
   else if (k === 'now') { BG.month = bg_month(); await bg_load(); $('#view [data-bg="next"]')?.focus(); }
@@ -705,16 +718,9 @@ document.addEventListener('click', async e => {
   else if (k === 'entry' && id < 0) { const p = BG_PEND.get(id); if (p) p.then(rid => { const en = BG.data?.entries.find(x => x.id === rid); if (en) bg_entryModal(en); }, () => {}); }  // 2.559.0 (#4660): a new entry on its way opens once it has its id
   else if (k === 'entry') { const en = BG.data.entries.find(x => x.id === id); if (en) bg_entryModal(en); }
   else if (k === 'book') { a.disabled = true; await bg_book(id); }
-  else if (k === 'cats') bg_catsModal();
-  else if (k === 'rec') bg_recModal();
-  else if (k === 'contracts') bg_contractsModal();
-  else if (k === 'csv') bg_csvModal();
   else if (k === 'compare') bg_cmpModal();
-  else if (k === 'share') shareModal(BG.data.list_id);
 });
 document.addEventListener('change', e => {
   const s = e.target.closest?.('[data-bg-list]'); if (!s) return;
   go(`budget/${+s.value}`);
 });
-// the menu closes on a tap elsewhere
-document.addEventListener('click', e => { for (const d of $$('details.bgmenu[open]')) if (!d.contains(e.target)) d.removeAttribute('open'); });

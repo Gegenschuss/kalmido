@@ -118,8 +118,11 @@ const DE = d => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
   check(w.eval('BG.month') === MONTH, '#1333: back in this month');
 
   // ================= a category with a monthly limit: the bar, over the limit marked
-  await until(() => d.querySelector('[data-bg="cats"]'));
-  click(w, d.querySelector('[data-bg="cats"]')); await until(() => dlg()?.querySelector('#bg-cnew'));
+  // 2.1012.0 (#5690): the "..." menu is the shared menu(): open it, pick the entry by its word
+  const mi = () => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')];
+  const bgPick = async label => { click(w, d.querySelector('.bgview [data-bg="more"]')); await until(() => mi().find(b => b.textContent.trim() === label)); click(w, mi().find(b => b.textContent.trim() === label)); };
+  await until(() => d.querySelector('.bgview [data-bg="more"]'));
+  await bgPick('Categories'); await until(() => dlg()?.querySelector('#bg-cnew'));
   dlg().querySelector('#bg-cnew').value = 'Fun';
   dlg().querySelector('#bg-cnl').value = '100';
   click(w, dlg().querySelector('[data-cadd]'));
@@ -163,14 +166,14 @@ const DE = d => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
   await until(() => !d.querySelector(`[data-bg="book"][data-id="${REC.id}"]`));
   check(!d.querySelector(`[data-bg="book"][data-id="${REC.id}"]`), '#1333: ... and it is no longer open');
   // the recurring dialog lists it
-  click(w, d.querySelector('[data-bg="rec"]')); await until(() => dlg()?.querySelector('.bgrecs'));
+  await bgPick('Recurring entries'); await until(() => dlg()?.querySelector('.bgrecs'));
   check(/Rent/.test(dlg()?.querySelector('.bgrecs')?.textContent || '') && dlg().querySelector('#bg-rper') && dlg().querySelector('#bg-rs'), '#1333: the recurring entries with their form');
   click(w, dlg().querySelector('[data-m="close"]')); await until(() => !dlg());
 
   // ================= CSV import: German columns, one duplicate (the bakery entry), the mapping
   const csv = ['Buchungstag;Verwendungszweck;Beguenstigter/Zahlungspflichtiger;Betrag',
     `${DE(DAY)};Bakery;;-15,00`, `${DE(DAY)};Gehalt Oktober;Example GmbH;2.500,00`, `${DE(DAY)};Supermarkt;Example Markt;-42,30`].join('\r\n');
-  click(w, d.querySelector('[data-bg="csv"]')); await until(() => dlg()?.querySelector('[data-cs-file]'));
+  await bgPick('Import a CSV file'); await until(() => dlg()?.querySelector('[data-cs-file]'));
   check(/No bank access/.test(dlg()?.textContent || ''), '#1333: the import says: no bank access');
   w.__csv = [new w.File([csv], 'konto.csv', {type: 'text/csv'})];
   w.eval(`(() => { const f = document.querySelector('[data-cs-file]'); Object.defineProperty(f, 'files', {configurable: true, value: window.__csv}); f.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
@@ -208,7 +211,15 @@ const DE = d => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
   const wb = await boot({user: 'bob', hash: `budget/${LID}`}); const db = wb.document;
   await until(() => db.querySelector('.bgview .bgtiles'));
   check(db.querySelector('.bgview .bgtiles') && /Bakery/.test(db.querySelector('.bgview')?.textContent || ''), '#1333: bob sees the shared budget');
-  check(!db.querySelector('[data-bg="add"]') && !db.querySelector('[data-bg="book"]') && !db.querySelector('[data-bg="cats"]') && !db.querySelector('[data-bg="csv"]'), '#1333: read only: no write buttons');
+  check(!db.querySelector('[data-bg="add"]') && !db.querySelector('[data-bg="book"]'), '#1333: read only: no write buttons');
+  // 2.1012.0 (#5690): the "..." is the shared menu(): read only it offers no write entry (Share at most) and is never an empty menu
+  const bmore = db.querySelector('.bgview [data-bg="more"]');
+  if (bmore) {
+    click(wb, bmore); await until(() => db.querySelector('#pop:not(.hidden) [role="menuitem"]'));
+    const rl = [...db.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].map(b => b.textContent.trim());
+    check(rl.length && !rl.some(x => ['Categories', 'Recurring entries', 'Import a CSV file', 'New budget', 'Add from contracts'].includes(x)), '#5690: read only: the "..." menu holds no write entry ' + rl.join('|'));
+    wb.eval('closePop()');
+  }
   check(db.querySelector('.bgro'), '#1333: read only: the hint says so');
   const be = db.querySelector('[data-bg="entry"]'); click(wb, be); await until(() => db.querySelector('.modal.bgdlg'));
   check(db.querySelector('.modal.bgdlg') && !db.querySelector('.modal.bgdlg [data-bg-del]') && !db.querySelector('.modal.bgdlg [data-bgf-up]'), '#1333: read only: an entry opens without delete / upload');

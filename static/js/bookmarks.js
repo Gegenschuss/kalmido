@@ -57,9 +57,7 @@ function viewBookmarks() {
   if (rd_ovr()) return `<div class="bmview">${rd_ovrHtml('bookmarks')}</div>`;  // 2.540.0 (#4588): "All workspaces": the spaces first
   if (!BM.loading && (!BM.done || Date.now() - BM.at > 60000 || BM.sp !== bm_sp())) setTimeout(bm_reload, 0);  // 2.172.0 B (#2679): + another workspace shown
   const add = `<form class="bmadd" data-bm-form><label class="sr" for="bm-url">${tr('Link')}</label><input id="bm-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('Paste a link'))}" maxlength="2000"><button type="submit" class="btn pri" ${BM.busy ? 'disabled' : ''}>${ic('plus', 's')}<span>${tr('Add')}</span></button></form>`;
-  const menu = `<details class="bgmenu bmmenu"><summary class="iconbtn" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</summary><div class="bgmenul" role="menu">
-    <button type="button" role="menuitem" data-bm="bmlet">${ic('bookmark', 's')}<span>${tr('Save button for the browser')}</span></button>
-    <button type="button" role="menuitem" data-bm="kk">${ic('link', 's')}<span>${tr('Karakeep…')}</span></button></div></details>`;
+  const menu = `<button type="button" class="iconbtn" data-bm="more" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button>`;  // 2.1012.0 (#5690): shared menu()
   const view = bm_view();
   const bar = `<div class="bmbar"><input type="search" class="bmq" data-bm-q value="${esc(BM.q)}" placeholder="${esc(tr('Search bookmarks'))}" aria-label="${esc(tr('Search bookmarks'))}">
     <select data-bm-state aria-label="${esc(tr('Show'))}">${BM_STATES.map(([k, n]) => `<option value="${k}" ${k === BM.state ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>
@@ -278,10 +276,9 @@ document.addEventListener('click', async e => {
   const a = e.target.closest?.('[data-bm]'); if (!a || a.disabled) return;
   e.preventDefault();
   const k = a.dataset.bm, id = +a.dataset.id || 0, x = bm_item(id);
-  a.closest('details')?.removeAttribute('open');
   if (k === 'cards' || k === 'list') { LS.set('bmView', k); bm_draw(); return; }
-  if (k === 'bmlet') { bm_bookmarkletHelp(); return; }
-  if (k === 'kk') { settingsModal('karakeep'); return; }  // 2.365.2 B (#2789)
+  // 2.1012.0 (#5690): the "..." menu on the shared menu() (was a <details> of its own); Karakeep: 2.365.2 B (#2789)
+  if (k === 'more') { menu(a, [{label: tr('Save button for the browser'), icon: 'bookmark', fn: () => bm_bookmarkletHelp()}, {label: tr('Karakeep…'), icon: 'link', fn: () => settingsModal('karakeep')}], null, null, tr('More')); return; }
   if (k === 'open') { if (id > 0) bm_detail(id); return; }  // 2.559.0 (#4660): a card still on its way has no details yet
   a.disabled = true;
   try {

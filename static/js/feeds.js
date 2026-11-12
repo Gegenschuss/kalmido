@@ -64,10 +64,9 @@ function viewFeeds() {
   if (rd_ovr()) return `<div class="rssview">${rd_ovrHtml('feeds')}</div>`;  // 2.540.0 (#4588): "All workspaces": the spaces first
   if (rss_stale()) setTimeout(rss_reload, 0);
   const add = !RSS.manage ? `<p class="muted rssro">${ic('lock', 's')} ${esc(tr('The admins of the organisation select its feeds.'))}</p>` : `<form class="rssadd" data-rss-form><label class="sr" for="rss-url">${tr('Feed address')}</label><input id="rss-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('Feed address'))}" maxlength="2000"><button type="submit" class="btn pri" data-rss-addbtn ${RSS.busy ? 'disabled' : ''}>${ic('plus', 's')}<span>${tr('Follow')}</span></button></form>`;
-  const imp = RSS.manage ? `<label class="rssmi" role="menuitem" tabindex="0">${ic('upload', 's')}<span>${tr('Import OPML file')}</span><input type="file" accept=".opml,.xml,text/xml,application/xml,text/x-opml" data-rss-opml hidden></label>` : '';
-  const exp = (RSS.feeds || []).length ? `<a role="menuitem" href="/api/feeds/opml?space=${encodeURIComponent(rss_sp())}" download="kalmido-feeds.opml">${ic('download', 's')}<span>${tr('Export OPML file')}</span></a>` : '';
-  const menu = imp || exp ? `<details class="bgmenu rssmenu"><summary class="iconbtn" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</summary><div class="bgmenul" role="menu">
-    ${imp}${exp}</div></details>` : '';
+  // 2.1012.0 (#5690): the shared menu() (opened by data-rss="omenu" below); the hidden file field stays in the view, its entry clicks it
+  const imp = RSS.manage ? `<input type="file" accept=".opml,.xml,text/xml,application/xml,text/x-opml" data-rss-opml hidden tabindex="-1" aria-hidden="true">` : '';
+  const menu = RSS.manage || (RSS.feeds || []).length ? `<button type="button" class="iconbtn" data-rss="omenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button>${imp}` : '';
   const head = `${rd_crumb('feeds')}<div class="rsshead">${add}${menu}</div>`;
   if (!RSS.done) return `<div class="rssview">${head}<p class="muted lempty">${tr('Loading…')}</p></div>`;
   const feeds = RSS.feeds || [];
@@ -197,12 +196,15 @@ document.addEventListener('submit', async e => {
 });
 document.addEventListener('change', e => {
   if (e.target.matches?.('[data-rss-feed]')) { RSS.feed = +e.target.value || 0; RSS.items = []; rss_reload(); }
-  else if (e.target.matches?.('[data-rss-opml]') && e.target.files.length) { const fl = e.target.files[0]; e.target.closest('details')?.removeAttribute('open'); e.target.value = ''; rss_opml(fl); }
+  else if (e.target.matches?.('[data-rss-opml]') && e.target.files.length) { const fl = e.target.files[0]; e.target.value = ''; rss_opml(fl); }
 });
-document.addEventListener('keydown', e => {  // the label of the file input acts as a button
-  const l = e.target.closest?.('.rssmi'); if (!l || (e.key !== 'Enter' && e.key !== ' ')) return;
-  e.preventDefault(); $('input[type=file]', l)?.click();
-});
+// 2.1012.0 (#5690): the "..." menu of the feeds: import clicks the hidden file field, export downloads by fn (no link in the menu)
+function rss_omenu(anchor) {
+  menu(anchor, [
+    RSS.manage ? {label: tr('Import OPML file'), icon: 'upload', fn: () => $('[data-rss-opml]')?.click()} : null,
+    (RSS.feeds || []).length ? {label: tr('Export OPML file'), icon: 'download', fn: () => { const l = document.createElement('a'); l.href = `/api/feeds/opml?space=${encodeURIComponent(rss_sp())}`; l.download = 'kalmido-feeds.opml'; document.body.appendChild(l); l.click(); l.remove(); }} : null,
+  ].filter(Boolean), null, null, tr('More'));
+}
 document.addEventListener('click', async e => {
   const o = e.target.closest?.('[data-rss-open]');
   if (o) { const x = rss_item(+o.dataset.rssOpen); if (x && !x.read) rss_mark([x.id], true).catch(() => {}); return; }  // the link opens as usual
@@ -211,7 +213,8 @@ document.addEventListener('click', async e => {
   const k = a.dataset.rss, id = +a.dataset.id || 0;
   a.disabled = true;
   try {
-    if (k === 'only') { RSS.only = !RSS.only; RSS.items = []; await rss_reload(); }
+    if (k === 'omenu') rss_omenu(a);
+    else if (k === 'only') { RSS.only = !RSS.only; RSS.items = []; await rss_reload(); }
     else if (k === 'more') await rss_load(true);
     else if (k === 'allread') await rss_allRead();
     else if (k === 'read') { const x = rss_item(id); if (x) await rss_mark([id], !x.read); }
