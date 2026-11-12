@@ -6,8 +6,8 @@
 // - a letter (the toast's Undo): A saves the subject, B changes the reference line, A presses Undo -> B's reference line
 //   stays, A's subject stays (not undone), the toast says "Changed elsewhere, not undone"; without a change elsewhere the
 //   Undo takes the subject back as before
-// - a budget entry (the history step, Ctrl+Z): A saves the amount, B renames the entry, A undoes -> B's title stays, the
-//   amount is not undone, the message says so; without a change elsewhere the amount goes back
+// - a budget entry (the history step, Ctrl+Z): A saves the amount, B renames the entry, A undoes -> 2.997.0 (#5618): B's rename
+//   is the person's newest step (server steps, #5255 stage 7) and goes back first, then the own amount; the page follows
 // - the server checks that came with it: PATCH /api/polls/<id> and /api/appt/types/<id>, PUT /api/appt/page answer 409 with
 //   the current state for an old expect_updated_at and save with the current one
 const path = require('path');
@@ -85,19 +85,25 @@ async function round(who, ck) {
   const e1 = await entry();
   const o2 = await otherSave(ck, `/api/budget/entries/${rent.id}`, {title: 'Rent of B'}, e1.updated_at);
   check(o2?.title === 'Rent of B', `${who}: B renamed the same entry`);
+  // 2.997.0 (#5618): the budget's steps are the server's (#5255 stage 7): B's rename (the same person, another device) is the
+  // person's newest step, so Ctrl+Z takes it back first (was: refused as "changed elsewhere"; as undo_ui since 1be119b99c),
+  // the page shows it at once (histReloader 'budget', #5667); the next Ctrl+Z takes back the own amount. A change of ANOTHER
+  // person staying: undo_ui (bob)
   await w.eval(`histStep('undo')`);
-  check(await until(() => /Changed elsewhere, not undone/.test(msg())), `${who}: the undo says it was changed elsewhere: ${msg()}`);
+  check(await until(async () => (await entry()).title === 'Rent' && /Undone/.test(msg())), `${who}: Ctrl+Z takes back B's newer rename first: ${msg()}`);
   let en = await entry();
-  check(en.title === 'Rent of B', `${who}: B's title stays (not overwritten by the undo) ` + en.title);
-  check(+en.amount === 99, `${who}: the amount is not undone either ` + en.amount);
+  check(+en.amount === 99, `${who}: ... the own amount stays for the next step ` + en.amount);
+  check(await until(() => rowOf(/Rent/) && !rowOf(/Rent of B/)), `${who}: the page shows the title again (reloaded after the undo)`);
+  await w.eval(`histStep('undo')`);
+  check(await until(async () => +(await entry()).amount === 800), `${who}: Ctrl+Z again: the own amount goes back to 800`);
+  check(await until(() => /800/.test(rowOf(/Rent/)?.textContent || '')), `${who}: ... and the row shows it ` + rowOf(/Rent/)?.textContent);
   // without a change elsewhere: the undo works as before
-  check(await until(() => rowOf(/Rent of B/)), `${who}: the page shows B's title (reloaded after the undo)`);
-  await edit(/Rent of B/, '77');
+  await edit(/Rent/, '77');
   check(await until(async () => +(await entry()).amount === 77), `${who}: A saved the amount 77`);
   await w.eval(`histStep('undo')`);
-  check(await until(async () => +(await entry()).amount === 99), `${who}: undo without a change elsewhere takes the amount back to 99`);
+  check(await until(async () => +(await entry()).amount === 800), `${who}: undo without a change elsewhere takes the amount back to 800`);
   en = await entry();
-  check(en.title === 'Rent of B', `${who}: ... and leaves the title as it is ` + en.title);
+  check(en.title === 'Rent', `${who}: ... and leaves the title as it is ` + en.title);
   w.close();
 
   // ================= the server checks that came with it (an old version -> 409 with the current state, the current one saves)
