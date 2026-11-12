@@ -784,11 +784,11 @@
   const LBL = {de: {net: 'Summe Netto', gross: 'Gesamt Brutto', discount: 'Rabatt', producing: 'Producing', net_incl_raw: 'Summe netto mit Option Rohdaten', net_excl_raw: 'ohne Rohdaten',
     tax: p => `MwSt. ${p} %`, exempt: 'steuerfrei', vat_note: 'Alle Preise zuzüglich 7 % bzw. 19 % MwSt.', novat_note: 'Nicht im Inland steuerbar / Reverse-Charge-Verfahren.',
     units: {day: 'Tage', hour: 'Std.', piece: 'Stk.', minute: 'Min.', flat: 'pauschal'}, producing_detail: (d, q, k) => `${d} Tage = ${q} Produktionstage / ${k}, auf halbe Tage gerundet`,
-    raw_optional: 'Optional: Bereitstellung der Rohdaten', raw_included: 'Bereitstellung der Rohdaten', raw_detail: p => `${p} % der Positionen mit Rohdaten`, discount_detail: p => `${p} % auf die markierten Positionen`},
+    raw_optional: 'Optional: Bereitstellung der Rohdaten', raw_included: 'Bereitstellung der Rohdaten', raw_detail: p => `${p} % der Positionen mit Rohdaten`, discount_detail: p => `${p} % auf die markierten Positionen`, discount_amount: 'Fester Betrag auf die markierten Positionen'},
   en: {net: 'Net Total', gross: 'Gross Total', discount: 'Discount', producing: 'Producing', net_incl_raw: 'Net total with option raw data', net_excl_raw: 'excluding raw data',
     tax: p => `VAT ${p} %`, exempt: 'tax exempt', vat_note: 'All prices plus 7 % or 19 % VAT.', novat_note: 'Not taxable domestically / reverse charge.',
     units: {day: 'days', hour: 'h', piece: 'pcs', minute: 'min', flat: 'flat'}, producing_detail: (d, q, k) => `${d} days = ${q} production days / ${k}, rounded to half days`,
-    raw_optional: 'Optional: Delivery of raw data', raw_included: 'Delivery of raw data', raw_detail: p => `${p} % of the positions with raw data`, discount_detail: p => `${p} % on the marked positions`}};
+    raw_optional: 'Optional: Delivery of raw data', raw_included: 'Delivery of raw data', raw_detail: p => `${p} % of the positions with raw data`, discount_detail: p => `${p} % on the marked positions`, discount_amount: 'Fixed amount on the marked positions'}};
   const flag = v => ![null, undefined, 0, '0', '', false, 'false', 'off'].includes(v);
   // the calculator of quotations (office_calc) and of invoices / credit notes (inv_calc)
   function ofCalc(d, inv) {
@@ -796,7 +796,9 @@
     const novat = d.vat_mode === 'novat', rates = Object.fromEntries(Object.entries(TAX).map(([k, v]) => [k, novat ? 0 : v]));
     const conv = r => C(cur === 'USD' ? +((+r || 0) * fx).toFixed(2) : r);
     const its = d.items || [];
-    let ext = 0n; for (const it of its) if ((it.kind || 'service') === 'service' && it.unit !== 'percent' && it.intext === 'extern') ext += mulQ(it.qty ?? 1, conv(it.rate));
+    // 2.1042.0 (#5815): a position's own discount (percent of qty x rate) comes first
+    const ownDisc = (it, lst) => (+it.discount_pct > 0 ? pctOf(lst, Math.min(+it.discount_pct, 100)) : 0n);
+    let ext = 0n; for (const it of its) if ((it.kind || 'service') === 'service' && it.unit !== 'percent' && it.intext === 'extern') { const l = mulQ(it.qty ?? 1, conv(it.rate)); ext += l - ownDisc(it, l); }
     const base = {standard: 0n, reduced: 0n, exempt: 0n}, disc = {standard: 0n, reduced: 0n, exempt: 0n}, lines = [];
     let pos = 0, net = 0n, raw = 0n, prodQ = 0, costs = 0n;
     for (const it of its) {
@@ -806,6 +808,7 @@
       if (kind === 'discount' && !inv) continue;
       const pct = kind === 'service' && it.unit === 'percent' ? +it.rate || 0 : null, qty = pct == null ? (it.qty ?? 1) : 1;
       let total = pct == null ? mulQ(qty, conv(it.rate)) : pctOf(ext, pct);
+      const lst = total, ld = pct == null && kind === 'service' ? ownDisc(it, lst) : 0n; total -= ld;
       if (kind === 'discount') total = total < 0n ? total : -total;
       const tax = TAX[it.tax] != null ? it.tax : 'standard';
       pos++; net += total; base[tax] += total;
@@ -816,7 +819,8 @@
       const rate = pct == null ? conv(it.rate) : total, unit = it.unit || 'day';
       lines.push({kind: kind === 'discount' ? 'discount' : 'item', pos, id: it.id, service_id: it.service_id || null, title: it.title || (kind === 'discount' ? L.discount : ''), detail: it.detail || '',
         qty: +qty, qty_text: pct == null ? fmtQ(qty, lang) : fmtQ(pct, lang) + ' %', unit, unit_text: pct == null ? (L.units[unit] || unit) : '', ...(pct != null ? {pct, base: cn(ext)} : {}),
-        rate: cn(rate), rate_text: fmtM(rate, lang, cur), tax, tax_pct: rates[tax], total: cn(total), total_text: fmtM(total, lang, cur), net: cs(total), intext: it.intext || 'intern'});
+        rate: cn(rate), rate_text: fmtM(rate, lang, cur), tax, tax_pct: rates[tax], total: cn(total), total_text: fmtM(total, lang, cur), net: cs(total), intext: it.intext || 'intern',
+        ...(ld > 0n ? {discount_pct: Math.min(+it.discount_pct, 100), list_total: cn(lst), line_discount: cn(ld)} : {})});
     }
     let prodTotal = 0n, rawAmt = 0n, discount = 0n;
     const rawMode = inv ? 'none' : (['optional', 'included', 'none'].includes(d.raw_mode) ? d.raw_mode : 'optional');
@@ -827,8 +831,12 @@
       if (rawMode !== 'none') rawAmt = mulQ(+(d.raw_factor ?? 0.25), raw);
       if (rawMode !== 'none' && raw > 0n) { const incl = rawMode === 'included'; if (incl) { base.standard += rawAmt; net += rawAmt; }
         lines.push({kind: 'raw', optional: !incl, title: incl ? L.raw_included : L.raw_optional, qty: incl ? 1 : null, qty_text: incl ? '1' : '', unit: 'flat', unit_text: '', rate: cn(rawAmt), tax: 'standard', tax_pct: rates.standard, total: cn(rawAmt), total_text: fmtM(rawAmt, lang, cur), detail: L.raw_detail(fmtQ((+(d.raw_factor ?? 0.25)) * 100, lang))}); }
-      const dp = +d.discount_pct || 0;
-      if (dp > 0) { for (const k of Object.keys(base)) { const x = pctOf(disc[k], dp); base[k] -= x; discount += x; } net -= discount;
+      const dp = +d.discount_pct || 0, da = +d.discount_amount > 0 ? conv(d.discount_amount) : 0n;  // 2.1042.0 (#5815): + a fixed amount
+      if (da > 0n) { const ks = Object.keys(disc).filter(k => disc[k] > 0n), tot = ks.reduce((a, k) => a + disc[k], 0n), a = da > tot ? tot : da;
+        if (a > 0n) { const big = ks.reduce((x, k) => disc[k] > disc[x] ? k : x, ks[0]); let rest = a;
+          for (const k of ks) if (k !== big) { const x = divR(a * disc[k], tot); base[k] -= x; rest -= x; } base[big] -= rest; discount = a; net -= discount;
+          lines.push({kind: 'discount', title: L.discount, pct: null, amount: cn(a), total: cn(-a), total_text: fmtM(-a, lang, cur), detail: L.discount_amount}); } }
+      else if (dp > 0) { for (const k of Object.keys(base)) { const x = pctOf(disc[k], dp); base[k] -= x; discount += x; } net -= discount;
         if (discount > 0n) lines.push({kind: 'discount', title: L.discount, pct: dp, total: cn(-discount), total_text: fmtM(-discount, lang, cur), detail: L.discount_detail(fmtQ(dp, lang))}); }
     }
     const taxLines = []; let taxSum = 0n;
@@ -891,10 +899,11 @@
   // 2.97.0 B (#1951): the fixed address fields only (as the server)
   const recipientOf = cl => ({name: cl.name, lines: [cl.name, ...(cl.contacts || []).filter(k => k.is_default).map(k => k.name), cl.street || '', cl.address_extra || '', [cl.zip, cl.city].filter(Boolean).join(' ')].map(x => String(x || '').trim()).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i)});
   const DOC_FIELDS = ['lang', 'currency', 'fx_rate', 'vat_mode', 'vat_note', 'project_title', 'project_ref', 'date', 'valid_until', 'contract_id', 'raw_mode', 'raw_factor', 'prod_quotient', 'producing_rate',
-    'producing_on', 'discount_pct', 'intro', 'closing', 'rights', 'fields', 'service_from', 'service_to', 'order_ref', 'due_date', 'payment_days', 'einvoice_format', 'contact_id'];
+    'producing_on', 'discount_pct', 'discount_amount', 'intro', 'closing', 'rights', 'fields', 'service_from', 'service_to', 'order_ref', 'due_date', 'payment_days', 'einvoice_format', 'contact_id'];
   function patchDoc(d, b) {
     if (d.locked || d.status === 'sent') conflict('Sent documents cannot be changed; duplicate it for a new version.');
     for (const k of DOC_FIELDS) if (k in b) d[k] = b[k];
+    if (+b.discount_amount > 0) d.discount_pct = 0; else if (+b.discount_pct > 0) d.discount_amount = null;  // 2.1042.0 (#5815): one or the other
     if ('recipient' in b) d.recipient = {name: String(b.recipient?.name || ''), lines: (b.recipient?.lines || []).map(String)};
     if ('client_id' in b) { d.client_id = b.client_id ? +b.client_id : null; const cl = CL().find(c => c.id === d.client_id);
       if (cl) d.recipient = recipientOf(cl); if (cl && d.kind === 'invoice' && cl.payment_terms_days != null) d.payment_days = +cl.payment_terms_days; }
@@ -909,7 +918,7 @@
       return {id: it.id || nid('ofitem'), kind, service_id: s ? s.id : null, title: String(it.title ?? '') || (s ? (d.lang === 'en' ? s.name_en || s.name_de : s.name_de) : ''), detail: String(it.detail ?? ''),
         qty: it.qty == null || it.qty === '' ? 1 : +it.qty, unit, rate: it.rate == null || it.rate === '' ? (s ? +(svcRate(s, unit) || 0) : 0) : +it.rate, tax: it.tax || s?.tax || 'standard',
         raw_fee: flag(it.raw_fee) ? 1 : 0, producing: flag(it.producing) ? 1 : 0, intext: it.intext || s?.intext || 'intern', cost: it.cost == null || it.cost === '' ? 0 : +it.cost,
-        discountable: flag(it.discountable ?? 1) ? 1 : 0, ref_part_id: null};
+        discountable: flag(it.discountable ?? 1) ? 1 : 0, discount_pct: unit === 'percent' ? 0 : Math.max(0, Math.min(100, +it.discount_pct || 0)), ref_part_id: null};
     });
     d.updated_at = iso();
   }

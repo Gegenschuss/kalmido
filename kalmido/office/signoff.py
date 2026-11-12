@@ -624,6 +624,9 @@ def sig_offer_html(c, r, lg, token):
             rows.append(f'<tr class="tx"><td colspan="3">{e(ln.get("text") or "")}</td></tr>')
         elif k in ("item", "producing", "surcharge", "raw", "discount"):  # 2.113.1 (#2252): + surcharge
             q = " ".join(x for x in (ln.get("qty_text") or "", ln.get("unit_text") or "") if x)
+            if k == "item" and ln.get("line_discount") and ln.get("discount_pct"):  # 2.1042.0 (#5815): the position's own discount
+                from .calc import fmt_qty
+                q = f"{q} \u00b7 -{fmt_qty(ln['discount_pct'], dl)} %"
             rows.append(f'<tr><td>{e(ln.get("title") or "")}</td><td class="q">{e(q)}</td><td class="m">{e(ln.get("total_text") or "")}</td></tr>')
     t = m.get("totals") or {}
     sums = f'<tr class="sum"><td colspan="2">{e(tr("Net", lg=lg))}</td><td class="m">{e(t.get("net_text") or "")}</td></tr>'

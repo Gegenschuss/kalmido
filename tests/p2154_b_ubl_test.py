@@ -7,6 +7,7 @@ UBL and plain EN 16931 from the same print model as the CII, no server, no conta
  - round trip: UBL -> office/einvoice_in.py ei_parse -> the same number, date, net / tax / gross and lines as the CII
  - credit note (CreditNote, type 381, BT-25), USD (BT-6 + the second TaxTotal in EUR), reverse charge (AE + reason),
    a discount line (negative quantity, positive price) and a line whose rate does not give its net (price 4 places / qty 1)
+ - 2.1042.0 (#5815): a position's own discount as a line allowance (BG-27 with percent and basis), UBL and CII
  - XRechnung UBL without a buyer reference is refused like the CII; without Peppol ids the e-mail is the address (EM)
  - writes the EN 16931 / XRechnung variants to tests/.data/einvoice/ubl-*.xml for the KoSIT validator (CI job einvoice:
    the XRechnung configuration) and the Peppol variants ubl-*-peppol.xml (the OpenPeppol rules on top, scenarios added by
@@ -193,6 +194,25 @@ check(ein.ein_ubl_check(xd) == [], f"discount + odd rate check (R120): {ein.ein_
 check(tx(xd, "cac:LegalMonetaryTotal/cbc:LineExtensionAmount") == "800.00", "discount sums")
 write("ubl-invoice-discount-peppol.xml", xd)
 write("ubl-invoice-discount-en16931.xml", ein.ein_ubl_build(md, "en16931"))
+
+# 2.1042.0 (#5815): a position's own discount (calc.inv_calc: allowance / list_net) is a line allowance with its percent and
+# basis (BG-27: reason code 95), BT-131 = quantity x price - allowance (R120), price and quantity as on the PDF; CII alike
+la = [item(1, "Regie", "1000.00", 2, net="1800.00"), item(2, "Schnitt", "80.00", 12.5)]
+la[0].update(discount_pct=10, allowance="200.00", list_net="2000.00")
+ml = fixture(lines=la)
+xl = ein.ein_ubl_build(ml, "peppol", "9930:DE123456789", "0208:0123456749")
+l0 = ET.fromstring(xl).findall("cac:InvoiceLine", Q)[0]
+ac = l0.find("cac:AllowanceCharge", Q)
+check(ac is not None and ac.findtext("cbc:ChargeIndicator", "", Q) == "false" and ac.findtext("cbc:AllowanceChargeReasonCode", "", Q) == "95"
+      and ac.findtext("cbc:MultiplierFactorNumeric", "", Q) == "10" and ac.findtext("cbc:Amount", "", Q) == "200.00" and ac.findtext("cbc:BaseAmount", "", Q) == "2000.00"
+      and l0.findtext("cac:Price/cbc:PriceAmount", "", Q) == "1000.00" and l0.findtext("cbc:InvoicedQuantity", "", Q) == "2"
+      and l0.findtext("cbc:LineExtensionAmount", "", Q) == "1800.00", "#5815: the position's discount as a line allowance (10 %, 2000.00, 200.00), price 1000.00 x 2")
+check(ein.ein_ubl_check(xl) == [], f"#5815: line allowance check (R120): {ein.ein_ubl_check(xl)}")
+write("ubl-invoice-line-discount-peppol.xml", xl)
+write("ubl-invoice-line-discount-en16931.xml", ein.ein_ubl_build(ml, "en16931"))
+xc = ein.ein_build(ml, "zugferd")
+check(b"<ram:ActualAmount>200.00</ram:ActualAmount>" in xc and b"<ram:ReasonCode>95</ram:ReasonCode>" in xc and ein.ein_check(xc) == [],
+      f"#5815: the CII line allowance, own check: {ein.ein_check(xc)}")
 
 check(ein.ein_ubl_endpoint("0088:4000001000005") == ("0088", "4000001000005") and ein.ein_ubl_endpoint("DE123") is None, "endpoint parse")
 # the CII builder is unchanged by the UBL one

@@ -1307,3 +1307,12 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
   .bk-sheet .foot .btn{min-width:0}
 }
 .rck-list .rck-s{color:var(--muted)}
+/* 2.1042.0 (#5815): the discount as percent or fixed amount (field + switch side by side); a position's own discount */
+.ofdgrid .row .ofddiscin{display:inline-flex;gap:.375rem;align-items:center;flex:0 0 auto}
+.ofdgrid .row .ofddiscin input.numin{flex:0 0 7rem;width:7rem}
+.ofdgrid .row .shint.warn{color:var(--danger)}
+.ofdipd{display:inline-flex;align-items:center;gap:.25rem}
+.ofdipd input.ofdipct{width:3.5rem}
+.ofdipdn{display:block;font-size:var(--fs-s)}
+.ofdit .ofdflags .ofdipdb{background:none;border:0;color:var(--muted);padding:0 .25rem;min-height:1.75rem;font-size:var(--fs-s)}
+.ofdit .ofdflags .ofdipdb:hover,.ofdit .ofdflags .ofdipdb:focus-visible{color:var(--accent)}

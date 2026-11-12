@@ -493,10 +493,10 @@ def inv_items_from_offer(c, oid, r, parts_mode=None, parts_title=None):
     pct = {ln.get("id"): ln for ln in lines if ln.get("kind") == "item" and ln.get("pct") is not None}
     out = []
     for it in items:
-        row = {k: it.get(k) for k in ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "intext", "cost")}
+        row = {k: it.get(k) for k in ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "intext", "cost", "discount_pct")}  # 2.1042.0 (#5815): + its own discount
         row.update(raw_fee=0, producing=0, discountable=1)
         if it.get("unit") == "percent" and it.get("id") in pct:  # 2.47.0 (#1649): a percent position becomes its amount
-            row.update(qty=1, unit="flat", rate=pct[it["id"]]["total"])
+            row.update(qty=1, unit="flat", rate=pct[it["id"]]["total"], discount_pct=0)
         out.append(row)
     for ln in lines:
         if ln["kind"] == "producing":  # 2.113.1 (#2251): without its calculation (internal)
@@ -531,6 +531,7 @@ def _put_rows(c, oid, did, rows):
         row["qty"] = float(dec(row.get("qty"), "1"))
         row["rate"] = float(dec(row.get("rate"), "0"))
         row["cost"] = float(dec(row.get("cost"), "0"))
+        row["discount_pct"] = float(dec(row.get("discount_pct"), "0"))  # 2.1042.0 (#5815): the position's own discount, never NULL
         row = oc_item_store(c, oid, row)  # 2.42.0 (#828): the purchase price encrypted at rest
         c.execute(f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 

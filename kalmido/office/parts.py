@@ -20,7 +20,7 @@ from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_load, oc_json_store
 from ..core.errors import BadInput
-from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_tax_day, calc_lang, dec, fmt_money, fmt_qty, fmt_rate, label, money, office_calc, pack_tax, unit_text, _num
+from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_discount_split, calc_tax_day, calc_lang, dec, fmt_money, fmt_qty, fmt_rate, label, money, office_calc, pack_tax, unit_text, _num
 from .homecur import hc_home  # 2.189.0 (#2475)
 from .doclang import doc_txt
 from .model import PARTS_TITLE_FILM, UNITS, office_role, office_settings
@@ -176,7 +176,7 @@ def tp_part_calc(c, oid, r, p, pack, eur=False, home=None):
     settings; a shoot part through dk_sheet_calc (part C). Adds "bases" {rate key: net} and "kind"."""
     # the document's values unless the part has its own; not its discount: that one applies to the part lines of the title page
     home = _tp_home(c, oid, home)
-    doc = {**_doc_calc(r, eur, home), "discount_pct": 0, **(p.get("settings") or {})}
+    doc = {**_doc_calc(r, eur, home), "discount_pct": 0, "discount_amount": 0, **(p.get("settings") or {})}  # 2.1042.0 (#5815): the title page's amount stays there
     novat = str(doc.get("vat_mode") or "vat") == "novat"
     if p["kind"] == "shoot":
         fn = _dk("dk_sheet_calc")
@@ -325,15 +325,18 @@ def tp_doc_totals(c, oid, r, items, pack, eur=False, home=None):
                           "tax": "standard", "tax_pct": _num(rates["standard"]), "total": _num(amt), "detail": "", "parts": True})
     disc_pct = dec(doc.get("discount_pct"), "0")
     discount = D0
-    if disc_pct > 0:
-        for tk in TAX_KEYS:
-            d = money(disc_base[tk] * disc_pct / 100)
-            base[tk] -= d
-            discount += d
-        if discount > 0:
-            lines.append({"kind": "discount", "title": label(pack, lang, "discount"), "pct": _num(disc_pct), "total": _num(-discount),
-                          "detail": label(pack, lang, "discount_detail", pct=fmt_qty(disc_pct, lang)),
-                          "taxes": {tk: _num(money(disc_base[tk] * disc_pct / 100)) for tk in TAX_KEYS if disc_base[tk]}})
+    # 2.1042.0 (#5815): a fixed amount (home currency) spread over the tax keys like office_calc, else the percent as before
+    disc_amt = dec(doc.get("discount_amount"), "0")
+    amt_on = disc_amt > 0
+    _h, _c, fx, foreign = calc_cur(doc)
+    split, capped = calc_discount_split(disc_base, 0 if amt_on else disc_pct, money(disc_amt * fx if foreign else disc_amt) if amt_on else 0)
+    for tk, d in split.items():
+        base[tk] -= d
+        discount += d
+    if discount > 0:
+        lines.append({"kind": "discount", "title": label(pack, lang, "discount"), "pct": None if amt_on else _num(disc_pct), "total": _num(-discount),
+                      "detail": label(pack, lang, "discount_detail_amount") if amt_on else label(pack, lang, "discount_detail", pct=fmt_qty(disc_pct, lang)),
+                      "taxes": {tk: _num(v) for tk, v in split.items()}, **({"amount": _num(discount)} if amt_on else {})})
     net = sum(base.values(), D0)
     tax_lines, tax_sum = [], D0
     if not novat:
@@ -345,6 +348,7 @@ def tp_doc_totals(c, oid, r, items, pack, eur=False, home=None):
             tax_lines.append({"rate_key": tk, "pct": _num(rates[tk]), "base": _num(base[tk]), "amount": _num(amt),
                               "label": label(pack, lang, "tax_" + tk, pct=fmt_qty(rates[tk], lang))})
     out = dict(t)
+    out.update(discount_base=_num(sum(disc_base.values(), D0)), discount_capped=bool(amt_on and capped))  # 2.1042.0 (#5815): with the part lines
     out.update(lines=lines, items_net=_num(items_net), discount=_num(discount), net=_num(net), tax_lines=tax_lines, tax_total=_num(tax_sum),
                gross=_num(net + tax_sum), raw_amount=_num(raw_opt + raw_inc),
                net_incl_raw=_num(net + raw_opt) if raw_opt > 0 else None, net_excl_raw=_num(net - raw_inc) if raw_inc > 0 else None,
@@ -677,7 +681,7 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
             continue
         it = by_id.get(ln.get("id")) or {}
         if ln.get("part_id") is None:
-            row = {kk: it.get(kk) for kk in ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "intext", "cost")}
+            row = {kk: it.get(kk) for kk in ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "intext", "cost", "discount_pct")}  # 2.1042.0 (#5815): + its own discount
             row.update(raw_fee=0, producing=0, discountable=1)
             if ln.get("pct") is not None:  # 2.47.0 (#1649): a percent position becomes its amount (as invoices.inv_items_from_offer)
                 row.update(qty=1, unit="flat", rate=ln["total"])
@@ -706,7 +710,8 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
                 continue
             out.append({"kind": "service", "service_id": pit.get("service_id"), "title": pit.get("title") or "", "detail": pit.get("detail") or "",
                         "qty": _num(dec(pit.get("qty"), "1") * qty), "unit": pit.get("unit") or "day", "rate": pit.get("rate"), "tax": pit.get("tax") or "standard",
-                        "intext": pit.get("intext") or "intern", "cost": pit.get("cost") or 0, "raw_fee": 0, "producing": 0, "discountable": 1})
+                        "intext": pit.get("intext") or "intern", "cost": pit.get("cost") or 0, "raw_fee": 0, "producing": 0, "discountable": 1,
+                        "discount_pct": pit.get("discount_pct") or 0})  # 2.1042.0 (#5815)
         dl = next((x for x in pc["lines"] if x["kind"] == "discount"), None)
         if dl is not None:  # the part's discount per tax rate (office_calc keeps one line; the bases tell the rates)
             raw_lines = [x for x in pc["lines"] if x["kind"] != "discount"]

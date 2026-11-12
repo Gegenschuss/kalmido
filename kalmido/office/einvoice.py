@@ -353,6 +353,15 @@ def ein_build(model, fmt="zugferd"):
         _e(t, "ram:CategoryCode", lcat)
         if lcat != "O":  # BR-O-05: no rate for "not subject to VAT"
             _e(t, "ram:RateApplicablePercent", _pct(pct))
+        lac = _line_allowance(ln)
+        if lac:  # 2.1042.0 (#5815): the position's own discount as a line allowance (BG-27: BT-136 .. BT-140, schema order before BG-30's sum)
+            ac = _e(st, "ram:SpecifiedTradeAllowanceCharge")
+            _e(_e(ac, "ram:ChargeIndicator"), "udt:Indicator", "false")
+            _e(ac, "ram:CalculationPercent", _pct(lac[2]))
+            _e(ac, "ram:BasisAmount", _m(lac[1]))
+            _e(ac, "ram:ActualAmount", _m(lac[0]))
+            _e(ac, "ram:ReasonCode", "95")  # UNTDID 5189: discount
+            _e(ac, "ram:Reason", "Discount")
         _e(_e(st, "ram:SpecifiedTradeSettlementLineMonetarySummation"), "ram:LineTotalAmount", _m(net))
         line_sum += net
         by_rate[(lcat, pct)] = by_rate.get((lcat, pct), Decimal("0")) + net
@@ -659,6 +668,18 @@ def ein_ubl_endpoint(pid):
     return (m.group(1), m.group(2)) if m else None
 
 
+def _line_allowance(ln):
+    """2.1042.0 (#5815): (amount, basis, percent) of a position's own discount (calc.inv_calc: allowance = list_net - net), or
+    None. Only for a positive line whose price x quantity gives the list amount, so BT-131 = BT-129 x BT-146 - BT-136 holds."""
+    try:
+        a, b, p = _d(ln.get("allowance")), _d(ln.get("list_net")), _d(ln.get("discount_pct"))
+    except Exception:  # an unreadable value: no allowance, the line is fitted as before
+        return None
+    if a <= 0 or b <= 0 or p <= 0:
+        return None
+    return a.quantize(Q2, rounding=ROUND_HALF_UP), b.quantize(Q2, rounding=ROUND_HALF_UP), p
+
+
 def _ubl_lines(m, cat):
     """[(line dict, n, net, pct, qty, price, charge)] like ein_build's loop; price and quantity agree with the net amount
     (PEPPOL-EN16931-R120: net = quantity x price + line charges - line allowances, rounded to cents).
@@ -685,6 +706,10 @@ def _ubl_lines(m, cat):
         elif net < 0 and qty > 0:
             qty = -qty
         charge = Decimal("0")
+        lac = _line_allowance(ln)
+        if lac and qty > 0 and (qty * rate).quantize(Q2, rounding=ROUND_HALF_UP) == lac[1] and lac[1] - lac[0] == net:
+            out.append((ln, n, net, pct, qty, rate, -lac[0]))  # 2.1042.0 (#5815): the position's own discount, a line allowance
+            continue
         # a given rate with more than six places would be cut when written (_uprice), so it is fitted like an odd one
         if rate != rate.quantize(Decimal("0.000001")) or (qty * rate).quantize(Q2, rounding=ROUND_HALF_UP) != net:
             for places in (Decimal("0.0001"), Decimal("0.000001")):
@@ -905,7 +930,16 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
         _u(li, "cbc:ID", str(ln.get("pos") or n))
         _u(li, "cbc:CreditedQuantity" if credit else "cbc:InvoicedQuantity", _qty(qty), unitCode=UNIT_CODES.get(str(ln.get("unit") or ""), "C62"))
         _u(li, "cbc:LineExtensionAmount", _m(net), currencyID=cur)
-        if charge:  # 2.523.0 (#4082): the rounding gap of a sub-cent price (BG-27 / BG-28, schema order before cac:Item)
+        lac = _line_allowance(ln) if charge < 0 else None
+        if lac and -charge == lac[0]:  # 2.1042.0 (#5815): the position's own discount (BG-27 with its percent and basis)
+            ac = _u(li, "cac:AllowanceCharge")
+            _u(ac, "cbc:ChargeIndicator", "false")
+            _u(ac, "cbc:AllowanceChargeReasonCode", "95")
+            _u(ac, "cbc:AllowanceChargeReason", "Discount")
+            _u(ac, "cbc:MultiplierFactorNumeric", _pct(lac[2]))
+            _u(ac, "cbc:Amount", _m(lac[0]), currencyID=cur)
+            _u(ac, "cbc:BaseAmount", _m(lac[1]), currencyID=cur)
+        elif charge:  # 2.523.0 (#4082): the rounding gap of a sub-cent price (BG-27 / BG-28, schema order before cac:Item)
             ac = _u(li, "cac:AllowanceCharge")
             _u(ac, "cbc:ChargeIndicator", "true" if charge > 0 else "false")
             _u(ac, "cbc:AllowanceChargeReason", "Rounding")  # BR-41 / BR-42: a reason or a reason code

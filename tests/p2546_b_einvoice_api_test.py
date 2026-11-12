@@ -13,6 +13,7 @@ minimum number of these files (MIN_FILES) so that a case lost here cannot pass a
    as a person without an organisation (personal office)
  - each: finalised with a number, the own check (einvoice.ein_check) finds nothing, the PDF is PDF/A-3 (ZUGFeRD: with the
    XML embedded; XRechnung: without), the tax lines of the XML are the ones of the case (19 / 7, AE 0)
+ - 2.1042.0 (#5815): an invoice from a quotation with a position's own discount and a fixed amount off (XRechnung)
  - the files: tests/.data/einvoice/real-<case>.pdf / .xml (the data dir of the server is another one: start.sh wipes it)
 usage: p2546_b_einvoice_api_test.py <datadir>      (P2546E_NOSTART=1 / KMT_NOSTART=1: a running server)"""
 import importlib.util
@@ -147,6 +148,25 @@ check(r.status_code == 201, "06: a credit note draft on invoice 01 " + r.text[:1
 if r.status_code == 201:
     x = finalise(A, "org", "06-credit-note", r.json()["id"], "zugferd")
     check(text(x, "rsm:ExchangedDocument/ram:TypeCode") == "381", f"06: type 381 ({text(x, 'rsm:ExchangedDocument/ram:TypeCode')})")
+
+# 2.1042.0 (#5815): an invoice from a quotation with a position's own discount (10 %, a line allowance) and 500.00 off the
+# whole (one discount position per rate), as XRechnung: 2300.00 net, 338.43 tax, 2638.43 gross
+r = A.post(B + D, json={"client_id": CL["de"], "project_title": "Imagefilm 2026", "raw_mode": "none", "producing_on": 0,
+                        "service_from": "2026-05-01", "service_to": "2026-05-31"})
+check(r.status_code == 201, "08: the quotation " + r.text[:160])
+OQ = r.json().get("id")
+A.put(B + f"{D}/{OQ}/items", json={"items": [{"title": "Regie", "qty": 2, "unit": "day", "rate": 1000, "discount_pct": 10},
+                                              {"title": "Begleitbuch", "qty": 1, "unit": "flat", "rate": 1000, "tax": "reduced"}]})
+A.patch(B + f"{D}/{OQ}", json={"discount_amount": 500})
+r = A.post(B + f"{D}/{OQ}/invoice")
+check(r.status_code == 201, "08: the invoice from the quotation " + r.text[:160])
+if r.status_code == 201:
+    IQ = r.json()["id"]
+    A.patch(B + f"{D}/{IQ}", json={"einvoice_format": "xrechnung", "order_ref": "PO-77", "date": "2026-05-08", "payment_days": 14})
+    x = finalise(A, "org", "08-quote-discounts-xrechnung", IQ, "xrechnung")
+    gross = text(x, AG + "ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:GrandTotalAmount")
+    check(tax_lines(x) == [("S", 7.0), ("S", 19.0)] and gross == "2638.43" and b"<ram:ActualAmount>200.00</ram:ActualAmount>" in x,
+          f"08: 19 % and 7 %, the line allowance 200.00, gross 2638.43 ({gross}) {tax_lines(x)}")
 
 # ---------------------------------------------------------------- a person without an organisation
 FC = office(F, "freelancer")

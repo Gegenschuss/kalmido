@@ -141,7 +141,7 @@ def ofx_diff(before, after):
     return {"before": b, "after": a}
 
 
-ITEM_LOG_KEYS = ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "raw_fee", "producing", "discountable", "cost", "in_handling", "in_markup")  # 2.113.1 (#2252): + the surcharge flags
+ITEM_LOG_KEYS = ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "raw_fee", "producing", "discountable", "cost", "in_handling", "in_markup", "discount_pct")  # 2.113.1 (#2252): + the surcharge flags; 2.1042.0 (#5815): + its own discount
 
 
 def ofx_items_brief(rows):

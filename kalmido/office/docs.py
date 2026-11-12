@@ -382,6 +382,7 @@ def _calc_doc(r, home="EUR"):  # 2.189.0 (#2475): home = the office's home curre
     return {"home": home, "lang": r["lang"], "currency": r["currency"], "fx_rate": r["fx_rate"], "vat_mode": r["vat_mode"], "raw_mode": r["raw_mode"],
             "raw_factor": r["raw_factor"], "prod_quotient": r["prod_quotient"], "producing_rate": r["producing_rate"],
             "discount_pct": r["discount_pct"], "producing_on": dict(r).get("producing_on"),  # 2.47.0 (#1645)
+            "discount_amount": dict(r).get("discount_amount"),  # 2.1042.0 (#5815): a fixed amount instead of the percent
             "producing_mode": dict(r).get("producing_mode"), "share_label": dict(r).get("share_label"),  # 2.113.1 (#2251)
             **{k: dict(r).get(k) for k in PRD_DOC_KEYS},  # 2.113.1 (#2252): handling costs / markup
             "vat_note": dict(r).get("vat_note"),  # 2.47.3 (#1360): "small" prints the section 19 note
@@ -760,6 +761,7 @@ def clean_doc(c, oid, b, cur, admin):
         if k in b:
             v = _num(b.get(k), k, lo, hi)
             f[k] = dflt if v is None else v
+    ofd_discount_clean(c, oid, b, cur, f)  # 2.1042.0 (#5815)
     if f.get("producing_on") == 1 and cur and cur["kind"] == "offer" and not dict(cur).get("producing_mode") and not ofx_locked(cur):
         # 2.380.0 (#3420): a quotation made before a pack with "share by amount" was on switches it on like a new one
         pn = prd_new_doc(c, oid, office_settings(c, oid))
@@ -787,6 +789,26 @@ def clean_doc(c, oid, b, cur, admin):
                 raise Denied(409, tr("A credit note keeps the currency, exchange rate, client and VAT of its invoice"))
             f.pop(k, None)
     return f
+
+
+def ofd_discount_clean(c, oid, b, cur, f):
+    """2.1042.0 (#5815): the discount of a quotation as a percent (discount_pct) or a fixed net amount in the home currency
+    (discount_amount, empty / 0 = none); one excludes the other (a percent > 0 clears the amount, an amount > 0 sets the
+    percent to 0). An amount over the sum of the discountable positions is refused with that sum (BadInput), nothing saved."""
+    if cur["kind"] != "offer":
+        return
+    if "discount_amount" in b:
+        v = _num(b.get("discount_amount"), "discount_amount", 0, 1e8)
+        f["discount_amount"] = v if v else None
+        if v:
+            f["discount_pct"] = 0
+    elif f.get("discount_pct"):
+        f["discount_amount"] = None
+    if f.get("discount_amount") and cur["id"]:
+        t = doc_totals(c, oid, {**dict(cur), **f})
+        if t.get("discount_capped"):
+            raise BadInput(tr("The discount is higher than the sum of the discountable positions ({0})",
+                              fmt_money(t.get("discount_base") or 0, cur["lang"], t.get("currency") or cur["currency"])))
 
 
 # 2.354.0 D (#2838): the head fields a credit note takes from its invoice (inv_credit_of) and keeps
@@ -820,7 +842,8 @@ def clean_items(c, oid, r, items, admin, part=None):
         _choice(kind, "items.kind", ITEM_KINDS if r["kind"] == "offer" else INV_ITEM_KINDS)  # 2.38.0: discount positions on invoices
         row = {"sort": i, "kind": kind, "service_id": None, "title": _text(it.get("title"), "items.title", 500),
                "detail": _text(it.get("detail"), "items.detail", 4000), "qty": 1, "unit": "day", "rate": 0, "tax": "standard",
-               "raw_fee": 0, "producing": 0, "in_handling": 0, "in_markup": 0, "intext": "intern", "cost": 0, "discountable": 1}  # 2.113.1 (#2252)
+               "raw_fee": 0, "producing": 0, "in_handling": 0, "in_markup": 0, "intext": "intern", "cost": 0, "discountable": 1,  # 2.113.1 (#2252)
+               "discount_pct": 0}  # 2.1042.0 (#5815): a position's own discount (services only)
         prev = old.get(it.get("id")) if it.get("id") else None
         if prev and prev.get("list_id"):  # 2.144.5 C (#1523): a saved position keeps the list it was made from (server-side only)
             row["list_id"] = prev["list_id"]
@@ -862,6 +885,7 @@ def clean_items(c, oid, r, items, admin, part=None):
                 row[k] = 1 if v in (1, True, "1", "true") else 0
             row["intext"] = _choice(it.get("intext") or "intern", "items.intext", ("intern", "extern"))
             row["discountable"] = 0 if it.get("discountable") in (0, False, "0", "false") else 1
+            row["discount_pct"] = (_num(it.get("discount_pct"), "items.discount_pct", 0, 100) or 0) if row["unit"] != "percent" else 0  # 2.1042.0 (#5815)
             if admin:
                 row["cost"] = _num(it.get("cost"), "items.cost", 0, 1e8) or 0
             else:
@@ -1060,7 +1084,7 @@ def _put_items(c, oid, r, items, admin, flags=None, keep=False):
 
 # 2.269.0 A (#3012): the columns a kept position gets back to their default unless the save sets them (as a new row would)
 OFD_ITEM_RESET = {"service_id": None, "ref_part_id": None, "list_id": None, "agent_flag": "", "cost_enc": None, "tax_pct": None, "net": None,
-                  "tax_amount": None, "in_handling": 0, "in_markup": 0}
+                  "tax_amount": None, "in_handling": 0, "in_markup": 0, "discount_pct": 0}  # 2.1042.0 (#5815)
 
 
 def ofd_billed_items(c, oid, did, ids):

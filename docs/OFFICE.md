@@ -1811,6 +1811,18 @@ factor (optional, included via a framework contract, or none); discount in perce
 per position from the pack. Transfer of rights is printed as its own section (duration, territory, media) in the
 document's language.
 
+Discounts (2.1042.0, #5815): a position may carry its own discount in percent (`discount_pct` of the position, 0..100; not
+on a percent position): its amount is quantity x rate less that percent (each rounded to cents), shown and printed as unit
+price, discount and amount. The discount of the whole quotation comes after it, on what is left of the discountable
+positions: either in percent (`discount_pct` of the document, as before) or as a fixed net amount (`discount_amount`, in the
+home currency like the rates; `PATCH /api/office/docs/<id> {discount_amount}`). The two exclude each other: an amount sets
+the percent to 0, a percent clears the amount; an amount over the sum of the discountable positions is refused (400, the
+message names the sum). A fixed amount is spread over the tax rates of the discountable positions by their share, each part
+rounded to cents and the rest cent on the largest base, so the tax per rate stays exact. On a quotation with parts the fixed
+amount is taken off the title page (the part lines marked discountable count), never again inside a part; a part keeps
+its own percent. An invoice made from the quotation keeps each position's percent (an e-invoice line allowance, BG-27, with
+percent, basis and amount) and takes the document discount as one discount position per tax rate.
+
 Routes (members of the organisation; deleting needs its admin; costs and surplus only for the admin):
 `GET /api/office/docs?kind=offer&status=&q=&limit=&before=` (2.369.0: a page of `limit` rows, 1-500, default 500; `next_cursor` in the answer, null on the last page, is the `before` of the next page; the list loads 100 and has *Load more*; `status=open&client_id=` = the open invoices of one client, from the whole list), `POST /api/office/docs` (a new draft from the settings; the number of the
 scheme is reserved at once), `GET/PATCH/DELETE /api/office/docs/<id>` (PATCH changes the head and returns the totals;

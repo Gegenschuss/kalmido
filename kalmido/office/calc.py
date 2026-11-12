@@ -18,7 +18,11 @@ office_calc(doc, items, pack) -> dict reproduces the rules of the spreadsheet te
    doc["handling_label"] / doc["markup_label"] ({de, en} or the document's own text)
  - raw data: the sum of the totals of the positions flagged raw_fee times doc["raw_factor"]; raw_mode "optional" shows
    the line without counting it (net_incl_raw next to net), "included" counts it (net_excl_raw next to net), "none" omits it
- - discount: doc["discount_pct"] on the positions flagged discountable, one negative line
+ - discount: doc["discount_pct"] on the positions flagged discountable, one negative line; 2.1042.0 (#5815): or
+   doc["discount_amount"] (a fixed net amount in the home currency, like a rate), spread over the tax keys of the
+   discountable positions by their share (the rest cent to the largest base), never more than their sum
+ - 2.1042.0 (#5815): a position's own discount item["discount_pct"] (percent of its quantity x rate) comes first, the
+   document's discount then takes in what is left of the position
  - tax per position through the country pack (standard / reduced / exempt); vat_mode "novat" = no tax at all
 Money is Decimal, rounded half up to 2 places at every step the template rounds; the result holds floats (JSON).
 """
@@ -70,6 +74,7 @@ LABELS = {
     "surcharge_detail_stacked": N_("{pct} % on the marked positions and the handling costs|calc"),
     "raw_detail": N_("{pct} % of the positions with raw data|calc"), "discount": N_("Discount|calc"),
     "discount_detail": N_("{pct} % on the marked positions|calc"),
+    "discount_detail_amount": N_("Fixed amount on the marked positions|calc"),  # 2.1042.0 (#5815)
     "net": N_("Net Total|calc"), "net_incl_raw": N_("Net total with option raw data|calc"), "net_excl_raw": N_("excluding raw data|calc"),  # 2.114.4 A (#2275)
     "gross": N_("Gross Total|calc"),
     "tax_standard": N_("VAT {pct} %|calc"), "tax_reduced": N_("VAT {pct} %|calc"), "tax_exempt": N_("tax exempt|calc"),
@@ -286,6 +291,39 @@ def calc_fx_note(pack, lang, home, cur, fx):
     return label(pack, lang, "fx_note_any", home=home, cur=cur, rate=fmt_qty(fx, lang))
 
 
+def calc_line_amount(qty, rate, pct):
+    """2.1042.0 (#5815): (list amount, position discount, net) of a position: list = money(qty x rate), the discount =
+    money(list x pct / 100) for 0 < pct <= 100, net = list - discount (quotations and invoices alike)."""
+    lst = money(qty * rate)
+    p = dec(pct)
+    if p <= 0:
+        return lst, Decimal(0), lst
+    d = money(lst * min(p, Decimal(100)) / 100)
+    return lst, d, lst - d
+
+
+def calc_discount_split(disc_base, pct=0, amount=0):
+    """2.1042.0 (#5815): the document discount per tax key -> ({key: Decimal > 0}, capped). pct: pct of each key's
+    discountable base (as before); amount (> 0, in the document's currency): spread over the keys by their share of the
+    discountable sum, each share rounded, the rest cent to the largest base, so the parts add up to the amount exactly;
+    an amount over the discountable sum takes the sum (capped = True)."""
+    amount, pct = money(dec(amount)), dec(pct)
+    if amount > 0:
+        keys = [k for k in TAX_KEYS if disc_base.get(k, 0) > 0]
+        tot = sum((disc_base[k] for k in keys), Decimal(0))
+        if tot <= 0:
+            return {}, True
+        a = min(amount, tot)
+        big = max(keys, key=lambda k: disc_base[k])
+        out = {k: money(a * disc_base[k] / tot) for k in keys if k != big}
+        out[big] = a - sum(out.values(), Decimal(0))
+        return {k: v for k, v in out.items() if v}, amount > tot
+    if pct > 0:
+        out = {k: money(disc_base.get(k, 0) * pct / 100) for k in TAX_KEYS}
+        return {k: v for k, v in out.items() if v}, False
+    return {}, False
+
+
 def office_calc(doc, items, pack=None):
     """doc: {lang, currency, fx_rate, vat_mode, raw_mode, raw_factor, prod_quotient, producing_rate, discount_pct};
     items: [{kind: service|text|heading, title, detail, qty, unit, rate, tax, raw_fee, producing, intext, cost, discountable}]
@@ -300,6 +338,7 @@ def office_calc(doc, items, pack=None):
     quot = dec(doc.get("prod_quotient"), "3")
     prod_rate = dec(doc.get("producing_rate"), "600")
     disc_pct = dec(doc.get("discount_pct"), "0")
+    disc_amt = dec(doc.get("discount_amount"), "0")  # 2.1042.0 (#5815): a fixed amount (home currency) instead of the percent
     # 2.47.0 (#1645): producing switched on per document; None (rows of 2.46 and older, callers without it) = as before:
     # the flagged positions alone decide
     prod_on = doc.get("producing_on")
@@ -317,7 +356,7 @@ def office_calc(doc, items, pack=None):
     ext_base = Decimal(0)
     for it in items or []:
         if (it.get("kind") or "service") == "service" and it.get("unit") != "percent" and it.get("intext") == "extern":
-            ext_base += money(dec(it.get("qty"), "1") * conv(it.get("rate")))
+            ext_base += calc_line_amount(dec(it.get("qty"), "1"), conv(it.get("rate")), it.get("discount_pct"))[2]  # 2.1042.0 (#5815): after its own discount
 
     lines, pos = [], 0
     items_net = Decimal(0)
@@ -338,6 +377,7 @@ def office_calc(doc, items, pack=None):
             continue
         unit = it.get("unit") or "day"
         pct = None
+        lst, ldisc, ipct = None, Decimal(0), Decimal(0)
         if unit == "percent":  # 2.47.0 (#1649): shown as "5 %" x the extern sum
             pct = dec(it.get("rate"))
             qty, rate = Decimal(1), ext_base
@@ -345,7 +385,8 @@ def office_calc(doc, items, pack=None):
         else:
             qty = dec(it.get("qty"), "1")
             rate = conv(it.get("rate"))
-            total = money(qty * rate)
+            lst, ldisc, total = calc_line_amount(qty, rate, it.get("discount_pct"))  # 2.1042.0 (#5815): the position's own discount
+            ipct = min(dec(it.get("discount_pct")), Decimal(100)) if ldisc else Decimal(0)
         tax = it.get("tax") if it.get("tax") in TAX_KEYS else "standard"
         pos += 1
         items_net += total
@@ -370,7 +411,8 @@ def office_calc(doc, items, pack=None):
                       "rate": _num(rate), "tax": tax, "tax_pct": _num(rates[tax]), "total": _num(total),
                       "raw_fee": 1 if _flag(it.get("raw_fee")) else 0, "producing": 1 if _flag(it.get("producing")) else 0,
                       "in_handling": 1 if _flag(it.get("in_handling")) else 0, "in_markup": 1 if _flag(it.get("in_markup")) else 0,
-                      "intext": it.get("intext") or "intern", "discountable": 1 if _flag(it.get("discountable", 1)) else 0})
+                      "intext": it.get("intext") or "intern", "discountable": 1 if _flag(it.get("discountable", 1)) else 0,
+                      **({"discount_pct": _num(ipct), "list_total": _num(lst), "line_discount": _num(ldisc)} if ldisc else {})})  # 2.1042.0 (#5815)
 
     # Producing
     prod_rate_doc = money(conv(prod_rate))  # 2.354.0 A (#2831): the day rate stays a money amount, as before
@@ -423,16 +465,16 @@ def office_calc(doc, items, pack=None):
     # discount
     discount = Decimal(0)
     disc_by = {}  # 2.354.0 A (#2835): the discount per tax key (an invoice from the quotation takes one position per key)
-    if disc_pct > 0:
-        for k in TAX_KEYS:
-            d = money(disc_base[k] * disc_pct / 100)
-            base[k] -= d
-            discount += d
-            if d:
-                disc_by[k] = _num(d)
-        if discount > 0:
-            lines.append({"kind": "discount", "title": label(pack, lang, "discount"), "pct": _num(disc_pct), "total": _num(-discount),
-                          "detail": label(pack, lang, "discount_detail", pct=fmt_qty(disc_pct, lang)), "by_tax": disc_by})
+    amt_on = disc_amt > 0  # 2.1042.0 (#5815): a fixed amount comes before the percent (the editor keeps only one of them)
+    split, capped = calc_discount_split(disc_base, 0 if amt_on else disc_pct, money(conv(disc_amt)) if amt_on else 0)
+    for k, d in split.items():
+        base[k] -= d
+        discount += d
+        disc_by[k] = _num(d)
+    if discount > 0:
+        lines.append({"kind": "discount", "title": label(pack, lang, "discount"), "pct": None if amt_on else _num(disc_pct), "total": _num(-discount),
+                      "detail": label(pack, lang, "discount_detail_amount") if amt_on else label(pack, lang, "discount_detail", pct=fmt_qty(disc_pct, lang)),
+                      "by_tax": disc_by, **({"amount": _num(discount)} if amt_on else {})})
 
     net = items_net + prod_total + hu_total + mk_total + (raw_amount if raw_mode == "included" else Decimal(0)) - discount
     tax_lines, tax_sum = [], Decimal(0)
@@ -454,6 +496,8 @@ def office_calc(doc, items, pack=None):
         "handling_pct": _num(hu_pct), "handling_base": _num(hu_base), "handling_total": _num(hu_total),
         "markup_pct": _num(mk_pct), "markup_base": _num(mk_base), "markup_total": _num(mk_total), "raw_base": _num(raw_base), "raw_factor": _num(raw_factor), "raw_amount": _num(raw_amount),
         "discount_pct": _num(disc_pct), "discount": _num(discount),
+        # 2.1042.0 (#5815): the fixed amount as asked (home currency), the discountable sum it may take, whether it was cut to it
+        "discount_amount": _num(disc_amt) if amt_on else None, "discount_base": _num(sum(disc_base.values(), Decimal(0))), "discount_capped": bool(amt_on and capped),
         "net": _num(net), "tax_lines": tax_lines, "tax_total": _num(tax_sum), "gross": _num(gross),
         "net_incl_raw": _num(net + raw_amount) if raw_mode == "optional" and raw_base > 0 else None,
         "net_excl_raw": _num(net - raw_amount) if raw_mode == "included" and raw_base > 0 else None,
@@ -556,7 +600,7 @@ def inv_calc(doc, items, pack=None):
     ext_base = Decimal(0)  # 2.47.0 (#1649): the base of positions of unit "percent", like office_calc
     for it in items or []:
         if (it.get("kind") or "service") == "service" and it.get("unit") != "percent" and it.get("intext") == "extern":
-            ext_base += money(dec(it.get("qty"), "1") * conv(it.get("rate")))
+            ext_base += calc_line_amount(dec(it.get("qty"), "1"), conv(it.get("rate")), it.get("discount_pct"))[2]  # 2.1042.0 (#5815)
     for it in items or []:
         kind = it.get("kind") or "service"
         if kind == "heading":
@@ -567,7 +611,11 @@ def inv_calc(doc, items, pack=None):
             continue
         pct = dec(it.get("rate")) if kind == "service" and it.get("unit") == "percent" else None
         qty = dec(it.get("qty"), "1") if pct is None else Decimal(1)
-        total = money(qty * conv(it.get("rate"))) if pct is None else money(ext_base * pct / 100)
+        ldisc = Decimal(0)
+        if pct is None and kind == "service":  # 2.1042.0 (#5815): a position's own discount (EN 16931: a line allowance)
+            lst, ldisc, total = calc_line_amount(qty, conv(it.get("rate")), it.get("discount_pct"))
+        else:
+            total = money(qty * conv(it.get("rate"))) if pct is None else money(ext_base * pct / 100)
         rate = conv(it.get("rate")) if pct is None else total  # an invoice line stays qty x rate (EN 16931)
         if kind == "discount":
             total = -abs(total)
@@ -584,7 +632,10 @@ def inv_calc(doc, items, pack=None):
                       "unit_text": unit_text(pack, lang, unit, qty) if pct is None else "",
                       **({"pct": _num(pct), "base": _num(ext_base)} if pct is not None else {}),
                       "rate": _num(rate), "rate_text": fmt_rate(rate, lang, currency) if pct is None else fmt_money(rate, lang, currency), "tax": tax, "tax_pct": _num(rates[tax]),
-                      "total": _num(total), "total_text": fmt_money(total, lang, currency), "net": dstr(total), "intext": it.get("intext") or "intern"})
+                      "total": _num(total), "total_text": fmt_money(total, lang, currency), "net": dstr(total), "intext": it.get("intext") or "intern",
+                      # 2.1042.0 (#5815): the position's own discount; the e-invoice writes it as a line allowance (BG-27)
+                      **({"discount_pct": _num(min(dec(it.get("discount_pct")), Decimal(100))), "list_total": _num(lst), "line_discount": _num(ldisc),
+                          "allowance": dstr(ldisc), "list_net": dstr(lst)} if ldisc else {})})
     tax_lines, tax_sum = [], Decimal(0)
     if not novat:
         for k in TAX_KEYS:

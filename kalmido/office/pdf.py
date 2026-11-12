@@ -1536,13 +1536,21 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 tot_s = str(ln.get("total_text") or "") if ln.get("total_text") else money(ln.get("total") or 0)
                 if np_:
                     rate_s = vat_s = tot_s = ""
+                # 2.1042.0 (#5815): a position's own discount below its price ("Rabatt -10 %"); the amount column is after it
+                disc_s = ""
+                if k == "item" and not np_ and ln.get("line_discount") not in (None, "", 0) and ln.get("discount_pct") not in (None, "", 0):
+                    disc_s = f"{L['discount']} -{pdf_num(ln['discount_pct'], lang, fmt)} %"
+                    if pdf_text_width(disc_s, FS_SMALL) > c_rate - 3:
+                        disc_s = f"-{pdf_num(ln['discount_pct'], lang, fmt)} %"
                 pos_s = str(ln.get("pos") or "") if k in ("item", "producing", "surcharge") else ""  # 2.114.4 A (#2276): producing numbered too; surcharges like it
                 tag = ln["part_id"] if ln.get("part_id") in pp_ids and k == "item" else None  # 2.438.0 B (#3622)
                 t_lines = pdf_wrap(t, body, c_title - 6 - (ov_tag_w if tag is not None else 0))
                 d_lines = pdf_wrap(detail, FS_SMALL, c_title + c_qty + c_rate + c_vat + c_tot - 6) if detail else []
-                h = 8 + max(len(t_lines), len(q_lines)) * lh + (len(d_lines) * FS_SMALL * 1.42 + 2 if d_lines else 0)
+                n_top = max(len(t_lines), len(q_lines), 2 if disc_s else 1)  # 2.1042.0 (#5815): the discount takes the price column's second line
+                h = 8 + n_top * lh + (len(d_lines) * FS_SMALL * 1.42 + 2 if d_lines else 0)
 
-                def draw_row(p, y, t_lines=t_lines, d_lines=d_lines, pos_s=pos_s, q_lines=q_lines, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s, h=h, tag=tag):
+                def draw_row(p, y, t_lines=t_lines, d_lines=d_lines, pos_s=pos_s, q_lines=q_lines, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s, h=h, tag=tag,
+                             disc_s=disc_s, n_top=n_top):
                     yy = y + 4
                     p.text(x_pos + 3, yy + 1, pos_s, FS_SMALL, False, C_INK2)
                     for j, s in enumerate(t_lines):
@@ -1554,17 +1562,21 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     p.text(x_rate, yy, rate_s, FS_BODY, align="r", width=c_rate - 3)
                     p.text(x_vat, yy + 1, vat_s, FS_SMALL, False, C_INK2, align="c", width=c_vat)
                     p.text(x_tot, yy, tot_s, FS_BODY, align="r", width=c_tot - 3)
-                    dy = yy + max(len(t_lines), len(q_lines)) * lh
+                    if disc_s:
+                        p.text(x_rate, yy + lh + 1, disc_s, FS_SMALL, False, C_INK2, align="r", width=c_rate - 3)
+                    dy = yy + n_top * lh
                     for s in d_lines:
                         p.text(x_title + 3, dy, s, FS_SMALL, False, C_INK2)
                         dy += FS_SMALL * 1.42
                     p.line(PDF_L, y + h - 0.5, PDF_L + PDF_CW, y + h - 0.5, 0.5, C_RULE2)
                 if h > p3s_cap:  # 2.296.0 E (#3166): a row higher than a page: its title and detail lines one by one (the amounts on the first)
-                    rr = [(s_, body, C_INK) for s_ in t_lines] + [("", body, C_INK)] * (len(q_lines) - len(t_lines)) + [(s_, FS_SMALL, C_INK2) for s_ in d_lines]
-                    rs = [lh] * max(len(t_lines), len(q_lines)) + [FS_SMALL * 1.42] * len(d_lines)
+                    rr = [(s_, body, C_INK) for s_ in t_lines] + [("", body, C_INK)] * (n_top - len(t_lines)) + [(s_, FS_SMALL, C_INK2) for s_ in d_lines]
+                    rs = [lh] * n_top + [FS_SMALL * 1.42] * len(d_lines)
                     rb = 4 + (2 if d_lines else 0)
 
-                    def draw_row(p, y, r, q, n=len(rr), rs=rs, rb=rb, pos_s=pos_s, q_lines=q_lines, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s, tag=tag, nt=len(t_lines)):
+                    def draw_row(p, y, r, q, n=len(rr), rs=rs, rb=rb, pos_s=pos_s, q_lines=q_lines, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s, tag=tag, nt=len(t_lines), disc_s=disc_s):
+                        if q == 1 and disc_s:  # 2.1042.0 (#5815)
+                            p.text(x_rate, y + 1, disc_s, FS_SMALL, False, C_INK2, align="r", width=c_rate - 3)
                         if q == 0:
                             p.text(x_pos + 3, y + 1, pos_s, FS_SMALL, False, C_INK2)
                             for j, s_ in enumerate(q_lines):

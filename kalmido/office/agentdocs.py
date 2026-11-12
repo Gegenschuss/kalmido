@@ -316,7 +316,7 @@ def ofa_items(c, oid, r, items):
                     x["rate"] = pv["rate"]
                     kept.add(i)
                 x["unit"] = x["unit"] or pv["unit"]
-                x.update({k: pv[k] for k in ("tax", "raw_fee", "producing", "intext", "discountable") if k in pv})
+                x.update({k: pv[k] for k in ("tax", "raw_fee", "producing", "intext", "discountable", "discount_pct") if k in pv})  # 2.1042.0 (#5815): + a person's position discount
         out.append(x)
     base = clean_items(c, oid, r, [{**x, "rate": None} if x.get("service_id") else x for x in out], False)
     flags = []
