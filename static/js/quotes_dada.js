@@ -4,8 +4,10 @@
    Shown alone above the sign-in form (account.js authScreen) and below the greeting on Today (dashboard.js viewHome); the
    callers ask qd_slot() (account.js), which loads this file on first use. Only real quotes of authors who died before 1956
    (public domain), wording as in the original (spelling included); the translations are our own. The texts are data, no
-   i18n keys: the original stays as it is, below it the German or English translation (qd_tr) and the author; sound poems
-   are never translated. Work / year only as the tooltip of the author's name (none for Vaché and Pansaers).
+   i18n keys; the original's wording stays as it is. 2.1017.0 (#5784, replaces the original + translation of #5239): the quote
+   shows ONCE, in the interface language (qd_text): the original when it is in that language, else the German text for a
+   German interface and the English one for every other (French reads the French original or the English translation);
+   below it only the author. Sound poems are never translated. No text ends on a comma, semicolon or colon. Work / year only as the tooltip of the author's name (none for Vaché and Pansaers).
    The line changes once a day (the local date), the same on the sign-in page and on Today; redrawing keeps it. */
 'use strict';
 
@@ -39,9 +41,9 @@ const QD_LIST = [
   [26, "de", "Das ergibt keinen Sinn, aber es erzeugt Weltgefühl, und darauf kommt es an.", "", "That makes no sense, but it produces a feeling for the world, and that is what matters.", "Kurt Schwitters", "Anna Blume. Dichtungen, 1919", 0],
   [27, "de", "Zwölf Uhr uhren alle Uhren.", "", "Twelve o'clock, all the clocks are clocking.", "Kurt Schwitters", "Die rote Marie, 1919", 0],
   [29, "de", "Ich fliege in dem großen Raum. / Ich mische mich in jeden Traum", "", "I fly through the great space. / I mingle with every dream", "Emmy Hennings", "Die letzte Freude, 1913", 0],
-  [30, "de", "Eine Uhr schlägt langsam vier. / Und ich weiß von keiner Zeit,", "", "A clock slowly strikes four. / And I know of no time,", "Emmy Hennings", "Die letzte Freude, 1913", 0],
+  [30, "de", "Eine Uhr schlägt langsam vier. / Und ich weiß von keiner Zeit", "", "A clock slowly strikes four. / And I know of no time", "Emmy Hennings", "Die letzte Freude, 1913", 0],
   [31, "de", "Ich wehe durch weiße Wolken in offene Arme.", "", "I drift through white clouds into open arms.", "Emmy Hennings", "Die letzte Freude, 1913", 0],
-  [32, "de", "Irgendwo in der Ferne vergeht die Zeit,", "", "Somewhere in the distance, time passes,", "Emmy Hennings", "Die letzte Freude, 1913", 0],
+  [32, "de", "Irgendwo in der Ferne vergeht die Zeit", "", "Somewhere in the distance, time passes", "Emmy Hennings", "Die letzte Freude, 1913", 0],
   [33, "de", "Ein Hund ist eine Hängematte.", "", "A dog is a hammock.", "Walter Serner", "Letzte Lockerung. manifest dada, 1920", 0],
   [34, "de", "Ach die lieben weißen Porzellanteller!", "", "Oh, the dear white porcelain plates!", "Walter Serner", "Letzte Lockerung. manifest dada, 1920", 0],
   [35, "de", "Gegenwärtig schätze ich sehr die Vokabel ‚Rosinen‘.", "", "At present I greatly esteem the word 'raisins'.", "Walter Serner", "Letzte Lockerung. manifest dada, 1920", 0],
@@ -68,7 +70,7 @@ const QD_LIST = [
   [57, "fr", "Que faut-il pour être heureux? Un peu d'encre!", "Was braucht man zum Glücklichsein? Ein bisschen Tinte!", "What does it take to be happy? A little ink!", "Jacques Rigaut", "Lignes, 1922", 0],
   [58, "fr", "Il n'y a pas de fumée sans fil.", "Kein Rauch ohne Faden.", "There is no smoke without thread.", "Jacques Rigaut", "Lignes, 1922", 0],
   [59, "fr", "Prends la vie comme le vent, / Avec ton nez. / Reste tranquille.", "Nimm das Leben wie den Wind, / mit der Nase. / Bleib ganz ruhig.", "Take life like the wind, / With your nose. / Stay calm.", "Paul Éluard", "Les animaux et leurs hommes, les hommes et leurs animaux, 1920", 0],
-  [60, "fr", "Le poisson avance / Comme un doigt dans un gant,", "Der Fisch kommt voran / wie ein Finger im Handschuh,", "The fish moves on / Like a finger in a glove,", "Paul Éluard", "Les animaux et leurs hommes, les hommes et leurs animaux, 1920", 0],
+  [60, "fr", "Le poisson avance / Comme un doigt dans un gant", "Der Fisch kommt voran / wie ein Finger im Handschuh", "The fish moves on / Like a finger in a glove", "Paul Éluard", "Les animaux et leurs hommes, les hommes et leurs animaux, 1920", 0],
   [61, "fr", "Le monde rit, / Le monde est heureux, content et joyeux.", "Die Welt lacht, / die Welt ist glücklich, zufrieden und froh.", "The world laughs, / The world is happy, content and joyful.", "Paul Éluard", "Les animaux et leurs hommes, les hommes et leurs animaux, 1920", 0],
   [62, "fr", "Amour des fantaisies permises, / Du soleil, / Des citrons, / Du mimosa léger.", "Liebe zu erlaubten Launen, / zur Sonne, / zu Zitronen, / zur leichten Mimose.", "Love of permitted fancies, / Of the sun, / Of lemons, / Of light mimosa.", "Paul Éluard", "Les animaux et leurs hommes, les hommes et leurs animaux, 1920", 0],
   [63, "fr", "Il siffle comme tous les trains.", "Er pfeift wie alle Züge.", "He whistles like all trains.", "Paul Éluard", "Julot, 1920", 0],
@@ -101,20 +103,20 @@ function qd_pick(d = new Date()) {
   while (gcd(step, n) !== 1) step++;
   return QD_LIST[((qd_day(d) * step) % n + n) % n];
 }
-// the translation below the original for the interface language: none for a sound poem or an original in that language,
-// German for a German interface, English for every other one (Spanish, French, ... read the English one)
-function qd_tr(/** @type {[number, string, string, string, string, string, string, number]} */ q, /** @type {string} */ ui) {
-  const [, lang, , de, en, , , sound] = q;
-  if (sound || lang === ui) return '';
-  return ui === 'de' ? de : en;
+// 2.1017.0 (#5784): the one text for the interface language -> [text, its language]: the original in its own language and for
+// a sound poem; German for a German interface; English for every other one (es, it, nl, fr with a German original ...)
+function qd_text(/** @type {[number, string, string, string, string, string, string, number]} */ q, /** @type {string} */ ui) {
+  const [, lang, orig, de, en, , , sound] = q;
+  if (sound || lang === ui) return [orig, lang];
+  if (ui === 'de') return de ? [de, 'de'] : [orig, lang];
+  return lang !== 'en' && en ? [en, 'en'] : [orig, lang];
 }
-// the line as a node: <figure class="qd cls"><blockquote lang>original</blockquote><figcaption>translation — author</figcaption></figure>
+// the line as a node: <figure class="qd cls"><blockquote lang>text</blockquote><figcaption>— author</figcaption></figure>
 function qd_node(/** @type {string} */ cls, d = new Date()) {
-  const q = qd_pick(d), ui = typeof I18N !== 'undefined' ? I18N.code : 'en', tx = qd_tr(q, ui);
+  const q = qd_pick(d), ui = typeof I18N !== 'undefined' ? I18N.code : 'en', [tx, tl] = qd_text(q, ui);
   const fig = document.createElement('figure'), bq = document.createElement('blockquote'), cap = document.createElement('figcaption'), au = document.createElement('span');
   fig.className = 'qd' + (cls ? ' ' + cls : ''); fig.dataset.qdn = String(q[0]);
-  bq.className = 'qdo'; bq.lang = q[1]; bq.textContent = q[2];
-  if (tx) { const t = document.createElement('span'); t.className = 'qdt'; t.lang = ui === 'de' ? 'de' : 'en'; t.textContent = tx + ' '; cap.append(t); }
+  bq.className = 'qdo'; bq.lang = tl; bq.textContent = tx;
   au.className = 'qda'; au.textContent = '— ' + q[5];
   if (q[6]) au.title = q[6];
   cap.append(au); fig.append(bq, cap);
