@@ -1005,7 +1005,7 @@ function settingsModal(focus) {
       log: aaHtml(),
       backup: bkHtml() + stoHtml()}, ad_admFocus(focus)) : '',  // 2.582.0 (#4827): the server admins' backups (also without an organisation)
     help: `<h4>${tr('Getting started')}</h4>
-      <div class="row"><button type="button" class="btn sm" data-hlp="">${ic('help', 's')} ${tr('Help: how things work')}</button></div><!-- 2.1072.0 (#5820): the page Help (helpview.js) -->
+      <div class="row"><button type="button" class="btn sm" data-hlp="">${ic('help', 's')} ${tr('Help: how things work')}</button></div><!-- 2.1086.0 (#5820): the page Help (helpview.js) -->
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isTouch() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
       <div class="row"><button class="btn sm" data-m="practice-add">${ic('plus', 's')} ${tr('Create the practice project')}</button>${S.sample ? '' : `<button class="btn sm" data-m="sample-add">${ic('plus', 's')} ${tr('Create sample project')}</button>`}</div>
       <div class="row">${chk('s-wnew', s.whatsnew_on !== '0', tr('Show what is new after an update'))}</div><!-- 2.556.0 (#4685): the dialog "New for you" -->

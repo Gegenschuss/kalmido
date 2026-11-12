@@ -1,5 +1,5 @@
 // @ts-check
-/* Kalmido web client: "Show me" (2.1072.0, #5860). An agent that explains a way through the app puts the places of that way
+/* Kalmido web client: "Show me" (2.1086.0, #5860). An agent that explains a way through the app puts the places of that way
    under its chat message (message.show: [{target, text, route, sel, label}], the named places of docs/help-targets.json,
    checked by the server: api/showme.py). The button "Show me" (agentchat.js) loads this file; it opens the step's view
    (route) and lays the spotlight of the welcome tour (palette.js spotMake / spotPlace) over the control the person presses

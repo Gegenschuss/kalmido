@@ -256,7 +256,7 @@ jobs:
         run: python tools/check_links.py -v
       - name: Menu paths in the docs and the app's texts name settings that exist (2.512.0, #4175)
         run: python tools/check_menupaths.py -v
-      - name: The user's help names labels of the interface and is translated from today's text (2.1072.0, #5820)
+      - name: The user's help names labels of the interface and is translated from today's text (2.1086.0, #5820)
         run: python tools/check_userhelp.py -v
       - name: One data attribute, one meaning - or a guard in the document click listener (2.525.0, #4281)
         run: python tools/check_dataattr.py -v

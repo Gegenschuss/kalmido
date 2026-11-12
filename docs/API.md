@@ -1828,7 +1828,7 @@ The user documentation (`docs/*.md`, shipped in the image; never `docs/dev/`) fo
 list per area in short form, the files with their second-rank headings and keys), `GET /search?kind=help&q=&limit=` (a word
 search over headings and text: `{data: [{key, file, title, path, snippet}], more}`; not part of `kind=all`) and `GET
 /help/section?key=&lang=` (one section up to the next heading of the same rank, at most 16,000 characters: `{key, file,
-title, path, text, truncated, parts, ui_terms}`; 2.1072.0, #5820: the user's how-to sections come first and carry `user` (their
+title, path, text, truncated, parts, ui_terms}`; 2.1086.0, #5820: the user's how-to sections come first and carry `user` (their
 area), read with `show` and `translated: {lang, title, text}`). Only keys of the index are read: a file name, a path or an unknown key is
 `404`. Scope `read`; the operator files (self-hosting, environment, upgrading, single sign-on, architecture, glossary, the
 pack catalogue, the privacy templates) only for an instance admin's token with `admin-read`. Details:

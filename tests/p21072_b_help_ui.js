@@ -1,4 +1,4 @@
-// 2.1072.0 UI test, part B (#5820): the help in the app (static/js/helpview.js, loaded on demand), German interface.
+// 2.1086.0 UI test, part B (#5820): the help in the app (static/js/helpview.js, loaded on demand), German interface.
 // kalmido-suite: fresh
 // jsdom, fresh container. Invented names only. alice uses Kalmido in German:
 //  - the command search: "Hilfe" lists "Hilfe" and the help's topics; "Scan" finds "Scan-Eingang einrichten"; Enter opens it

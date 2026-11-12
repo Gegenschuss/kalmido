@@ -29,7 +29,7 @@ const F8D_LV = [
   // closing: the scrim + whoever holds popOnClose, then the sheet (popovers.js)
   ['qsheet', () => f8d_one($('.qadd.sheet:not(.an-out)')), () => { closePop(); tch_overlaysClose(); }],
   ['tsheet', () => f8d_one($('.tsheet')), el => $('[data-ts="close"]', el)?.click()],
-  ['spot', () => f8d_one($('.spot')), () => { if (typeof shw_end === 'function') shw_end('close'); }],  // 2.1072.0 (#5860): "Show me" (showme.js)
+  ['spot', () => f8d_one($('.spot')), () => { if (typeof shw_end === 'function') shw_end('close'); }],  // 2.1086.0 (#5860): "Show me" (showme.js)
   ['tourp', () => f8d_tourEls(true), () => tourEnd(true)],
   // the sidebar as a drawer (phone, rail): Back closes it instead of leaving the page (it went one page back before #5230)
   ['side', () => f8d_one($('#side.open')), () => closeSide()],

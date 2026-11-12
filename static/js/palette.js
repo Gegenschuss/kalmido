@@ -276,7 +276,7 @@ function palAll() {
   for (const [v, n, d, l] of LOOK.accent) add('a:accent-' + v, 'action', tr('Accent colour: {0}', tr(n)), 'palette', () => lookSet('accent', v), {qonly: true, sw: light ? l : d});
   add('a:look-reset', 'action', tr('Reset appearance to the defaults'), 'undo', () => { for (const k of LOOK_KEYS) LS.del(k); applyTheme(); applyDensity(); applyLook(); render(); }, {qonly: true});
   add('a:keys', 'action', tr('Keyboard shortcuts'), 'help', shortcutsModal, {keys: '?'});
-  if (S.me?.kind !== 'agent') hlp_palItems(add);  // 2.1072.0 (#5820)
+  if (S.me?.kind !== 'agent') hlp_palItems(add);  // 2.1086.0 (#5820)
   if (typeof spl_offer === 'function' && spl_offer()) add('a:split', 'action', tr('Split view on / off'), 'columns', () => spl_toggle(), {keys: 'Shift+V'});  // 2.1037.0 (#5803): miniwin.js
   add('a:tour', 'action', tr('Restart the welcome tour'), 'arrow', () => tourStart());
   if (S.sample) add('a:sample-rm', 'action', tr('Remove sample project'), 'trash', () => sampleRemove());
@@ -424,7 +424,7 @@ function palSubItems(add) {
   if (PALX.ws === wsCur()) for (const n of PALX.folders) add('abf:' + n.id, 'view', n.name, 'folder', () => go('ablage/' + n.id), {qonly: true, sub: tr('Files') + (n.many ? ' · ' + ab_spaceName(n.sp) : '')});
   if (PALX.ws === wsCur()) for (const x of PALX.sheets) add('sh:' + x.id, 'sheet', x.title || tr('Untitled table'), 'sheet', () => go('sheets/' + x.id), {qonly: true, sub: [tr('Tables'), x.shared_in ? tr('Shared with me') : x.list_title || ''].filter(Boolean).join(' · ')});  // 2.124.0 C (#2113)
 }
-// 2.1072.0 (#5820): the help (helpview.js, page #help). "Help" is one view of the search; its sections (titles in the person's
+// 2.1086.0 (#5820): the help (helpview.js, page #help). "Help" is one view of the search; its sections (titles in the person's
 // language, GET /api/help, once per language) are entries while typing: "Scan" finds "Set up a scan inbox". hlp_area = the
 // help area of the shown view (the header's "…", empty states); hlp_linkHtml = the link "How it works" of an empty state.
 const PALH = {list: /** @type {any} */ (null), lg: '', busy: false};
@@ -536,7 +536,7 @@ function openPalette(mode = null) {
   const ret = document.activeElement && document.activeElement !== document.body && !document.activeElement.closest?.('.palette') ? document.activeElement : PAL.ret;
   closePalette(true); closePop(); PAL.ret = ret;
   PAL.q = ''; PAL.i = 0; PAL.mode = mode; PAL.all = null;
-  if (!mode) { palSubLoad(); hlp_palLoad(); }  // 2.87.9 (#1934); 2.1072.0 (#5820): + the help's topics
+  if (!mode) { palSubLoad(); hlp_palLoad(); }  // 2.87.9 (#1934); 2.1086.0 (#5820): + the help's topics
   const t = curTask();
   const md = document.createElement('div');
   md.className = 'modal palette';
@@ -709,7 +709,7 @@ function tourStart(mod) {
   TOUR.sample = !mod && S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid && !tourHasProjects() && !tourOrg(); TOUR.sampleOn = false; TOUR.industry = indCodes(S.industry);  /* 2.578.0 (#4573); 2.828.0 (#5511): the codes ticked */  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
   let el = $('.tour');
   if (el) el._stk = [];  // 2.956.0 (#5230): a restarted tour starts without steps of Back
-  if (!el) el = spotMake('tour');  // 2.1072.0 (#5860): the shared spotlight
+  if (!el) el = spotMake('tour');  // 2.1086.0 (#5860): the shared spotlight
   el.addEventListener('click', e => {
     const b = e.target.closest('[data-tour]'); if (!b) return;
     const a = b.dataset.tour;
@@ -743,7 +743,7 @@ function tourPlace(r, vw, vh, mh) {  // mh: the card's measured height (2.5.2, K
   const left = Math.max(12, Math.min(vw - cw - 12, r.left > vw / 2 ? r.right - cw : r.left));
   return {ring, card: `width:${cw}px;left:${left}px;${below ? `top:${Math.min(vh - ch, r.bottom + 14)}px` : `bottom:${Math.max(12, vh - r.top + 14)}px`}`};
 }
-// 2.1072.0 (#5860): the spotlight as one piece for the tour and "Show me" (showme.js): spotMake(cls) = the layer with the ring
+// 2.1086.0 (#5860): the spotlight as one piece for the tour and "Show me" (showme.js): spotMake(cls) = the layer with the ring
 // and the card (class cls), spotPlace(el, r) = the ring around the rect r (null = no target: no ring, the card in the middle)
 // and the card next to it, kept inside the window
 function spotMake(cls) {
@@ -779,7 +779,7 @@ function tourGo(i) {
     ${last && !TOUR.mod && (S.agents || []).length ? pk2_setupHtml() : ''}
     ${last && !S.me?.kid ? `<label class="tsample"><input type="checkbox" id="t-more" ${TOUR.more ? 'checked' : ''}><span><b>${tr('Show more introductions')}</b></span></label>` : ''}
     <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
-  spotPlace(el, st.r && st.r());  // 2.1072.0 (#5860): the shared spotlight
+  spotPlace(el, st.r && st.r());  // 2.1086.0 (#5860): the shared spotlight
   if (last && TOUR.sample) TOUR.sampleShown = true;  // 2.25.0 (UX-24)
   if (last) TOUR.moreShown = true;
   $('[data-tour="next"]', card)?.focus();

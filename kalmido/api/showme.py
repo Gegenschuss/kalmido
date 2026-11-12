@@ -1,4 +1,4 @@
-"""2.1072.0 (#5860, decided 12.11.2026): "Show me" -- an agent that explains a way through the app (the help of #5819) puts a
+"""2.1086.0 (#5860, decided 12.11.2026): "Show me" -- an agent that explains a way through the app (the help of #5819) puts a
 button "Show me" under its chat message. A tap opens the view and highlights the control the person presses next (the
 spotlight of the welcome tour, static/js/showme.js), step by step with "Next". The agent shows, the person changes: the app
 only goes to the view and highlights, it never clicks, switches or saves anything.

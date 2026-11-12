@@ -1,5 +1,5 @@
 // @ts-check
-/* Kalmido web client: the view "Help" (2.1072.0, #5820). Loaded on demand (lazyload.js module helpview) by its page #help.
+/* Kalmido web client: the view "Help" (2.1086.0, #5820). Loaded on demand (lazyload.js module helpview) by its page #help.
    Short "How to" sections per area in everyday words with the click path, from the same source the agents search
    (docs/*.md, api/helpuser.py): GET /api/help = the topics per area in the person's language, GET /api/search?kind=help
    = the search, GET /api/help/section = one section (Markdown, drawn by renderMd of attachments.js, read-only).

@@ -1408,7 +1408,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .tour{position:fixed;inset:0;z-index:92}
 .tring{position:fixed;border-radius:var(--radius);box-shadow:0 0 0 2px var(--accent),0 0 0 9999px rgba(4,6,9,.62);transition:left .25s,top .25s,width .25s,height .25s;pointer-events:none}
 .tring.none{inset:0;border-radius:0;box-shadow:inset 0 0 0 9999px rgba(4,6,9,.62)}
-/* 2.1072.0 (#5860): "Show me" (showme.js): the tour's spotlight, every press goes through to the app (only the card takes one) */
+/* 2.1086.0 (#5860): "Show me" (showme.js): the tour's spotlight, every press goes through to the app (only the card takes one) */
 .spot{position:fixed;inset:0;z-index:92;pointer-events:none}
 .spot .tcard{pointer-events:auto}
 .spot .shw-miss{margin:-.375rem 0 .875rem;color:var(--warn,var(--text2));font-size:var(--fs-s)}

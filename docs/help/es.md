@@ -1,4 +1,4 @@
-<!-- Kalmido help, Spanish (2.1072.0, #5820). One block per "How to" section of docs/*.md: the key and the fingerprint (src)
+<!-- Kalmido help, Spanish (2.1086.0, #5820). One block per "How to" section of docs/*.md: the key and the fingerprint (src)
 of the English text it was translated from. **Bold** = the label exactly as the interface shows it.
 Check: python3 tools/check_userhelp.py. -->
 

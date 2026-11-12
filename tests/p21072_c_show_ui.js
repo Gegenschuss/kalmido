@@ -1,4 +1,4 @@
-// 2.1072.0 (#5860) UI test (Firefox, real layout): "Show me" under an agent's chat message (agentchat.js shw_btnHtml, showme.js)
+// 2.1086.0 (#5860) UI test (Firefox, real layout): "Show me" under an agent's chat message (agentchat.js shw_btnHtml, showme.js)
 // kalmido-suite: fresh
 // freelancer-matrix: agents (frida has no organisation and a personal agent; alice an organisation's agent)
 // Computer (1280 x 800, mouse): the agent's message with two steps (tasks.new, calendar.new) shows the button "Show me" on the

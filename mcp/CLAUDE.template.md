@@ -303,13 +303,13 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - "Can Kalmido ...?", "How do I ...?", "Where do I find ...?": look it up before you answer, never guess a menu path.
   `help_overview` lists what exists per area, `search_help` (English words work best) finds the sections of the help of
   exactly this server's version, `read_help` (the key of a hit) reads one. Hits with `user` are the how-tos the person
-  also sees in the app's Help (2.1072.0): prefer them; `read_help` gives their text in the person's language (`translated`).
+  also sees in the app's Help (2.1086.0): prefer them; `read_help` gives their text in the person's language (`translated`).
 - Explain the way step by step in the words of the person's interface (`ui_terms` of `read_help`: the labels in their
   language), then what happens afterwards and who may do it (people only, admins, a role), and name the source (the
   section's title). Answer in the person's language; the help itself is English.
 - Nothing found: say that the help says nothing about it - do not invent a way. Only when the feature does not exist,
   say so clearly and, if useful, suggest it.
-- "Show me" (2.1072.0): add the places of the way to your answer as `send_chat` `show: [{target, text}]` - `target` only a
+- "Show me" (2.1086.0): add the places of the way to your answer as `send_chat` `show: [{target, text}]` - `target` only a
   key of `show_targets` (`help_overview`) or of a section's `show` (`read_help`), `text` one short line per step in the
   person's language. The person gets a button "Show me"; the app goes there and highlights, it never clicks or changes
   anything. Never invent a key (`400`).

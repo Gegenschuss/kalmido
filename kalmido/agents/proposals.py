@@ -47,7 +47,7 @@ from ..agents.workstyle import ws_next_mark, ws_next_step  # 2.236.0 B (#2911)
 from ..agents.datalock import dl_job_input  # 2.235.0 B2 (#2902)
 from ..agents.core import agent_usable, agent_added_events, task_being_edited, tidy_changed_since, tidy_person_after  # 2.369.5 (#2517): pulled up from functions
 from ..agents.core import agent_never_lids  # 2.582.0 (#4380)
-from ..api.showme import shw_clean  # 2.1072.0 (#5860)
+from ..api.showme import shw_clean  # 2.1086.0 (#5860)
 from ..agents.jobchat import JCD_KINDS, jcb_post  # 2.369.5 (#2517): pulled up from functions; 2.739.0 (#5216): jcb_post
 from ..agents.steps import steps_take  # 2.369.5 (#2517): pulled up from functions
 from ..agents.chat import h6e_agent_push_ok, chat_choice_set  # 2.369.5 (#2517): pulled up from functions
@@ -1519,7 +1519,7 @@ def v1_agent_chat_post(uid):
     b = fb if fb is not None else v1_json()
     # 2.28.0 (#1005): answer buttons; 2.30.0 (#1041): permission questions (permission, expires_in)
     unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to",
-                                               "approval", "offer_save", "kind", "job_msg", "limit", "next_step", "source", "show"))  # 2.1072.0 (#5860): show; 2.388.0 (#3341): source; 2.236.0 B (#2909, #2911): limit, next_step; 2.96.0 C (#2015): job_msg; 2.33.0: reply_to; 2.35.0 (#1103): approval; 2.37.0 (#1159): offer_save
+                                               "approval", "offer_save", "kind", "job_msg", "limit", "next_step", "source", "show"))  # 2.1086.0 (#5860): show; 2.388.0 (#3341): source; 2.236.0 B (#2909, #2911): limit, next_step; 2.96.0 C (#2015): job_msg; 2.33.0: reply_to; 2.35.0 (#1103): approval; 2.37.0 (#1159): offer_save
     if unknown:
         raise UnknownFields(unknown)
     # 2.41.0 (#1206): kind = message (default) | notice (a small grey line, no push, never unread; older servers answer 400)
@@ -1527,7 +1527,7 @@ def v1_agent_chat_post(uid):
     if b.get("kind") not in (None, "", "message", "notice", "brief"):
         raise BadInput(tr("Invalid value: {0}", "kind"))
     src = chat_source(b.pop("source", None))  # 2.388.0 (#3341): who produced the message, the app can hide a source
-    shw = shw_clean(b.pop("show", None))  # 2.1072.0 (#5860): "Show me" -- named places only (api/showme.py), unknown = 400
+    shw = shw_clean(b.pop("show", None))  # 2.1086.0 (#5860): "Show me" -- named places only (api/showme.py), unknown = 400
     if shw and (b.get("kind") in ("notice", "brief") or b.get("approval") not in (None, "") or b.get("permission") not in (None, False, "", "0", "false")):
         raise BadInput(tr("Invalid value: {0}", "show"))  # a plain message only: no line, brief, approval or permission question
     if b.get("kind") == "brief":  # 2.739.0 (#5216): agents/jobchat.py jcb_post
@@ -1583,7 +1583,7 @@ def v1_agent_chat_post(uid):
     r = chat_set_source(c, chat_post(c, aid, uid, "agent", b, files), src)
     if nid:
         r = ws_next_mark(c, r, nid)
-    if shw:  # 2.1072.0 (#5860)
+    if shw:  # 2.1086.0 (#5860)
         c.execute("UPDATE agent_chat SET show_steps=? WHERE id=?", (shw, r["id"]))
         r = c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()
     if jid or offer:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
-"""2.1072.0 (#5860): "Show me" -- an agent's chat message names places of the app (show: [{target, text}]) from the fixed list
+"""2.1086.0 (#5860): "Show me" -- an agent's chat message names places of the app (show: [{target, text}]) from the fixed list
 docs/help-targets.json (kalmido/api/showme.py). Invented names only.
  - API v1 POST /api/v1/agent/chats/<uid>: an unknown key, a selector, an address, a wrong shape, too many steps, a too long
    text, an extra field -> 400 and no message; show on a notice / an approval / a permission question -> 400; a known key is

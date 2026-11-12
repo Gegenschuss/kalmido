@@ -1,4 +1,4 @@
-/* 2.1072.0 (#5820): the page "Help" (helpview.js, loaded with it): a search field, the topics per area as a list of links, one
+/* 2.1086.0 (#5820): the page "Help" (helpview.js, loaded with it): a search field, the topics per area as a list of links, one
    topic as a short text with numbered steps. Quiet: fixed widths, no jump while a part loads (es-sec of the shared block). */
 .hvpage{max-width:44rem;padding:.5rem 1rem 2rem}
 .hvsearch{margin:.25rem 0 .75rem}

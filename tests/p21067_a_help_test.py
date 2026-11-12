@@ -29,7 +29,7 @@ from freelancer_fixture import freelancer
 V = B + "/api/v1"
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 SCAN = "api#scan-inboxes-folder-watcher"
-USCAN = "files#how-to-set-up-a-scan-inbox"  # 2.1072.0 (#5820): the user's section on the scan inbox (docs/FILES.md)
+USCAN = "files#how-to-set-up-a-scan-inbox"  # 2.1086.0 (#5820): the user's section on the scan inbox (docs/FILES.md)
 
 kt.fresh()
 s0 = sess()
@@ -76,7 +76,7 @@ def keys(res, n=5):
 
 
 def dev_keys(res, n=5):
-    """2.1072.0 (#5820): the hits after the user's sections (they come first, with user = their area)."""
+    """2.1086.0 (#5820): the hits after the user's sections (they come first, with user = their area)."""
     return [h["key"] for h in (res.get("data") or []) if not h.get("user")][:n] if isinstance(res, dict) else res
 
 
@@ -87,7 +87,7 @@ adm_plain = bearer(token(A, ("read",)))
 
 # ---------------------------------------------------------------- search + read: the scan inbox (the occasion of #5819)
 res = search(ag, "scan inbox folder")
-# 2.1072.0 (#5820): the user's section first (user = files), then the section of API.md as the first of the others
+# 2.1086.0 (#5820): the user's section first (user = files), then the section of API.md as the first of the others
 check(keys(res, 1) == [USCAN] and res["data"][0].get("user") == "files", f"scan inbox folder: the user's section first ({keys(res)})")
 check(dev_keys(res, 1) == [SCAN], f"scan inbox folder: then the section of API.md ({keys(res)})")
 h = next((x for x in res.get("data") or [] if x["key"] == SCAN), {}) if isinstance(res, dict) else {}
@@ -106,7 +106,7 @@ check(read(ag, SCAN, lang="en").get("ui_terms") == {}, "lang en: no ui_terms (th
 check(read(ag, SCAN, lang="xx") == 400, "an unknown lang: 400")
 
 # ---------------------------------------------------------------- the five questions of the decision (#5819)
-# 2.1072.0 (#5820): the user's sections come first - each question's how-to is a fitting answer too
+# 2.1086.0 (#5820): the user's sections come first - each question's how-to is a fitting answer too
 FIVE = [("scan inbox folder watcher", {SCAN, USCAN}),
         # 2.1067.0: + the knowledge area section main added meanwhile (the whole area shared with an agent, a fitting answer)
         ("share knowledge folder with agent", {"agents#knowledge-pages", "wiki#sharing-a-page-or-a-folder-read-only",
@@ -185,7 +185,7 @@ api = mcp.Kalmido(B, AGT)
 check(all(mcp.TOOLSET_OF.get(n) == "chat" and mcp.tool_allowed(api, n) for n in ("help_overview", "search_help", "read_help")),
       "MCP: the three tools in the chat toolset, allowed for a read token")
 r = mcp.TOOL_MAP["search_help"][3](api, {"q": "scan inbox folder"})
-check(r["data"][0]["key"] == USCAN and dev_keys(r, 1) == [SCAN], "MCP search_help (2.1072.0 #5820: the user's section first)")
+check(r["data"][0]["key"] == USCAN and dev_keys(r, 1) == [SCAN], "MCP search_help (2.1086.0 #5820: the user's section first)")
 r = mcp.TOOL_MAP["read_help"][3](api, {"key": SCAN, "lang": "de"})
 check("Settings > Integrations" in r["text"] and r["ui_terms"].get("Folder watcher") == "Ordner-Wächter", "MCP read_help")
 check(mcp.TOOL_MAP["help_overview"][3](api, {})["features"], "MCP help_overview")
@@ -199,7 +199,7 @@ import kalmido_cli  # noqa: E402
 os.environ["KALMIDO_TOKEN"] = AGT
 out, err = io.StringIO(), io.StringIO()
 rc = kalmido_cli.main(["--url", B, "docs", "scan", "inbox", "folder"], out=out, err=err)
-check(rc == 0 and out.getvalue().startswith(USCAN) and SCAN in out.getvalue(),  # 2.1072.0 (#5820): the user's section first
+check(rc == 0 and out.getvalue().startswith(USCAN) and SCAN in out.getvalue(),  # 2.1086.0 (#5820): the user's section first
       f"kalmido_cli docs: the hits ({rc}, {err.getvalue()[:200]})")
 out = io.StringIO()
 rc = kalmido_cli.main(["--url", B, "docs", "frobnicate", "teleporter"], out=out, err=io.StringIO())
@@ -210,7 +210,7 @@ check(rc == 0 and "nothing in the help" in out.getvalue(), "kalmido_cli docs: no
 FID, Fl = freelancer(B, A)
 _, FAGT = agent("fridabot", owner=FID)
 for who, t in (("her token", bearer(token(Fl, ("read",)))), ("her own agent", bearer(FAGT))):
-    check(dev_keys(search(t, "scan inbox folder"), 1) == [SCAN], f"{who}: search_help (GET /api/v1/search?kind=help)")  # 2.1072.0 (#5820)
+    check(dev_keys(search(t, "scan inbox folder"), 1) == [SCAN], f"{who}: search_help (GET /api/v1/search?kind=help)")  # 2.1086.0 (#5820)
     check("Settings > Integrations" in read(t, SCAN).get("text", ""), f"{who}: read_help (GET /api/v1/help/section)")
     check(t.get(V + "/help").status_code == 200, f"{who}: the overview (GET /api/v1/help)")
     check(read(t, "self-hosting") == 404, f"{who}: no operator file")

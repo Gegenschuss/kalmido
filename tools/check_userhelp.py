@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The user's help (2.1072.0, #5820) names what is really on the screen and is translated from today's English text.
+"""The user's help (2.1086.0, #5820) names what is really on the screen and is translated from today's English text.
 
     python3 tools/check_userhelp.py [-v] [--src] [--docs DIR] [--js DIR] [--i18n DIR]
         exit 1 on a finding; --src prints every user's section with its key and the fingerprint (src=) a translation names

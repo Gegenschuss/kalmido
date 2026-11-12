@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
-"""2.1072.0 part B (#5820): the help for people in the app, from the same source as the agents' help (#5819). Invented names only.
+"""2.1086.0 part B (#5820): the help for people in the app, from the same source as the agents' help (#5819). Invented names only.
  - GET /api/help (signed in): the "How to" sections per area (files, agents, office, tasks, calendar) in the person's language,
    the area names in the words of the sidebar; GET /api/help/section: one section in German (the translation of
    docs/help/de.md, numbered steps with the screen's labels), English for an English person; only a user's section (a

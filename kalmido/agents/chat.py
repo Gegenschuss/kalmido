@@ -24,7 +24,7 @@ from ..tasks.attachments import safe_name, send_stored, unexec_name
 from ..collab.comments import user_names
 from ..core.errors import BadInput, UnknownFields, web_fields
 from ..core.objreact import orx_of, orx_set, orx_toggle  # 2.763.0 (#5269): the reactions of the shared core
-from ..api.showme import shw_out  # 2.1072.0 (#5860)
+from ..api.showme import shw_out  # 2.1086.0 (#5860)
 from ..notify.alerts import aa_count, aa_oserr
 from ..api.v1 import task_for
 from ..api.common import hit_limit, v1_args, v1_json, v1_view
@@ -245,7 +245,7 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
             "pinned_at": r["pinned_at"] if "pinned_at" in r.keys() else None,
             "pinned_by": r["pinned_by"] if "pinned_by" in r.keys() and r["pinned_at"] else None,
             **({"edits": med_edits(r)} if edits else {}),
-            # 2.1072.0 (#5860): "Show me" -- the steps of an agent's message (api/showme.py; null = none)
+            # 2.1086.0 (#5860): "Show me" -- the steps of an agent's message (api/showme.py; null = none)
             "show": shw_out(r["show_steps"] if "show_steps" in r.keys() and r["sender"] == "agent" else None, api),
             "attachments": [{**f, "url": (f"/api/v1/chat-attachments/{f['id']}" if api else f"/api/chat-files/{f['id']}")}
                             for f in (files or {}).get(r["id"], [])]}

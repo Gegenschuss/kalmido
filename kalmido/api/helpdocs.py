@@ -32,7 +32,7 @@ from ..core.errors import BadInput, Denied
 from ..core.i18n import lang, LANGS, md_plain, tr
 from ..core.srchreg import srch_q, srch_register
 from .common import v1_args, v1_view
-from .showme import shw_keys_in, shw_list  # 2.1072.0 (#5860)
+from .showme import shw_keys_in, shw_list  # 2.1086.0 (#5860)
 
 HELP_DIR = os.path.join(APP_DIR, "docs")  # the image: /app/docs (Dockerfile), a checkout: docs/
 # the operator's files: running a server, its settings and internals -- only for an instance admin
@@ -56,7 +56,7 @@ _FENCE = re.compile(r"^\s*(```|~~~)")
 _HEAD = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
 _BOLD_LINE = re.compile(r"^\*\*([^*]{2,80})\*\*\s*$")   # docs/FEATURES.md: an area as a bold line ("**Projects**")
 _WORD = re.compile(r"[a-z0-9]+")
-# 2.1072.0 (#5820): the user's help -- a "## How to: ..." section with <!-- user-help: <area> --> right below its heading
+# 2.1086.0 (#5820): the user's help -- a "## How to: ..." section with <!-- user-help: <area> --> right below its heading
 # (optional <!-- show: <target> --> = a named place of docs/help-targets.json); its translations in docs/help/<lang>.md, one
 # block per section: <!-- help: <key> src=<hlp_src of the English text> --> + "## <title>" + the text
 HELP_TR_DIR = os.path.join(HELP_DIR, "help")
@@ -124,7 +124,7 @@ def _hlp_parse(fkey, fname, text):
 
 
 def _hlp_mark(s, lines):
-    """2.1072.0 (#5820): a user's section: s["user"] = its area, s["show"] = its named place (the comment lines right below
+    """2.1086.0 (#5820): a user's section: s["user"] = its area, s["show"] = its named place (the comment lines right below
     the heading)."""
     for ln in lines[s["start"] + 1:min(s["own_end"], s["start"] + 4)]:
         m, w = _UH.match(ln.strip()), _SHOW.match(ln.strip())
@@ -189,7 +189,7 @@ def hlp_index():
         if _HELP["idx"] is not None:
             return _HELP["idx"]
         files, by_key, units, vocab = {}, {}, [], set()
-        trs = hlp_tr_load()  # 2.1072.0 (#5820): {lang: {key: {src, title, text}}}
+        trs = hlp_tr_load()  # 2.1086.0 (#5820): {lang: {key: {src, title, text}}}
         for fn in sorted(glob.glob(os.path.join(HELP_DIR, "*.md"))):
             fname = os.path.basename(fn)
             fkey = hlp_slug(fname[:-3])
@@ -203,14 +203,14 @@ def hlp_index():
                            "operator": fkey not in HELP_PUBLIC}
             for s in secs:
                 by_key[s["key"]] = s
-                _hlp_mark(s, lines)  # 2.1072.0 (#5820)
+                _hlp_mark(s, lines)  # 2.1086.0 (#5820)
                 body = "\n".join(lines[s["start"] + 1:s["own_end"]])
                 words = {}
                 for w in _WORD.findall(hlp_fold(body)):
                     words[w] = words.get(w, 0) + 1
                 head = set(_WORD.findall(hlp_fold(" ".join(s["path"]))))
                 own = set(_WORD.findall(hlp_fold(s["title"])))
-                if s.get("user"):  # 2.1072.0 (#5820): a question in the person's language finds the section too
+                if s.get("user"):  # 2.1086.0 (#5820): a question in the person's language finds the section too
                     for t in trs.values():
                         x = t.get(s["key"])
                         if x:
@@ -284,7 +284,7 @@ def hlp_search(q, n=HELP_HITS, admin=False, user_only=False):
             words += tw or list(hw)
         if got >= need:
             score /= 1 + 0.5 * max(0.0, math.log(max(1, len(u["body"])) / 3000))  # a long section (a whole route table) weighs less
-            ranked.append((0 if u["s"].get("user") else 1, -got, -score, u["s"]["level"], u["s"]["key"], u, words))  # 2.1072.0 (#5820): the user's sections first
+            ranked.append((0 if u["s"].get("user") else 1, -got, -score, u["s"]["level"], u["s"]["key"], u, words))  # 2.1086.0 (#5820): the user's sections first
     ranked.sort(key=lambda x: x[:5])
     return [{"key": u["s"]["key"], "file": u["s"]["file"], "title": u["s"]["title"], "path": u["s"]["path"],
              "snippet": _hlp_snippet(u["body"], words), **({"user": u["s"]["user"]} if u["s"].get("user") else {})}
@@ -327,8 +327,8 @@ def hlp_section(key, admin=False, lg="en"):
              if s["start"] < x["start"] < s["end"] and x["level"] == s["level"] + 1] if cut else []
     out = {"key": s["key"], "file": s["file"], "title": s["title"], "path": s["path"], "text": text.rstrip("\n"),
            "truncated": cut, "parts": parts, "ui_terms": hlp_ui_terms(text, lg),
-           "show": shw_keys_in(text)}  # 2.1072.0 (#5860): the places this section marks (<!-- show: key -->) for send_chat show
-    if s.get("user"):  # 2.1072.0 (#5820): a user's section: its area and the same text in the person's language
+           "show": shw_keys_in(text)}  # 2.1086.0 (#5860): the places this section marks (<!-- show: key -->) for send_chat show
+    if s.get("user"):  # 2.1086.0 (#5820): a user's section: its area and the same text in the person's language
         out["user"] = s["user"]
         t = idx["tr"].get(lg, {}).get(s["key"])
         if t:
@@ -358,7 +358,7 @@ def hlp_overview(admin=False):
               "sections": [{"key": s["key"], "title": s["title"]} for s in f["sections"] if s["level"] == 2]}
              for f in idx["files"].values() if admin or not f["operator"]]
     return {"version": APP_VERSION, "features": areas, "files": files,
-            "show_targets": shw_list(),  # 2.1072.0 (#5860): the named places of "Show me" (api/showme.py)
+            "show_targets": shw_list(),  # 2.1086.0 (#5860): the named places of "Show me" (api/showme.py)
             "how": "search_help (GET /search?kind=help&q=) finds sections; read_help (GET /help/section?key=) reads one. "
                    "The documentation is English; explain a path in the words of the person's interface (ui_terms of a section). "
                    "Add the places of the way as send_chat show: [{target, text}] (keys of show_targets) - the person gets 'Show me'. "
@@ -415,7 +415,7 @@ def help_spec(paths, schemas, op, ok, errs, ref, q):
         "truncated": {"type": "boolean"}, "parts": {"type": "array", "items": {"type": "object"}, "description": "truncated: the "
                                                                                                                  "sub-sections to read one by one"},
         "ui_terms": {"type": "object", "description": "English interface labels of the text -> the same label in lang"},
-        "show": {"type": "array", "items": {"type": "string"}, "description": "2.1072.0: the named places this section marks, for the "
+        "show": {"type": "array", "items": {"type": "string"}, "description": "2.1086.0: the named places this section marks, for the "
                                                                               "field show of a chat message ('Show me')"}}})
         | errs("400", "404"), [{**q("key", "The key of a hit of GET /search?kind=help or of GET /help"), "required": True},
                                q("lang", "Language of ui_terms (default: the token's person)")],

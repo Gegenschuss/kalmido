@@ -414,7 +414,7 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 - Questions about using Kalmido ("how do I ...?", "where do I find ...?", 2.1067.0): look them up with help_overview /
   search_help / read_help (the help of this server's version), explain the clicks in the words of the person's interface
   (ui_terms), never guess a menu path; nothing in the help = say so. Add the places of the way as send_chat show
-  [{target, text}] (keys of help_overview show_targets, 2.1072.0): the person gets a button "Show me", the app highlights them.
+  [{target, text}] (keys of help_overview show_targets, 2.1086.0): the person gets a button "Show me", the app highlights them.
 - Bigger changes (a new project, many tasks, moving or deleting several tasks): answer with a proposal (MCP
   submit_proposal) or ask first; a person applies it.
 - A customer inquiry in the chat, an accepted quotation, or "set me up": send ONE proposal with propose_to_person

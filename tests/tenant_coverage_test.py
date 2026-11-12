@@ -1119,7 +1119,7 @@ ROUTES = {
     # 2.89.0 C (#1916): tables as files and for agents
     "GET /api/sheets/{}/export.csv": "sheet_v1", "GET /api/sheets/{}/export.xlsx": "sheet_v1", "POST /api/sheets/import": "sheet_v1",
     "GET /api/v1/wiki/pages": "wiki_v1", "GET /api/v1/wiki/pages/{}": "wiki_v1",  # 2.200.0 C (#1781)
-    "GET /api/help": "public", "GET /api/help/section": "public",  # 2.1072.0 (#5820): the user's help in the app, no data of anybody
+    "GET /api/help": "public", "GET /api/help/section": "public",  # 2.1086.0 (#5820): the user's help in the app, no data of anybody
     "GET /api/v1/help": "public", "GET /api/v1/help/section": "public",  # 2.1067.0 (#5819): the product's documentation, no data of anybody
     "POST /api/v1/wiki/pages": "wiki_v1", "PATCH /api/v1/wiki/pages/{}": "wiki_v1",
     "POST /api/v1/wiki/pages/{}/append": "wiki_v1",  # 2.1048.0 (#5861): p21048_wiki_append_test.py

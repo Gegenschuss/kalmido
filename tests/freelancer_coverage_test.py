@@ -1078,7 +1078,7 @@ ROUTES = {
     # 2.200.0 C (#1781): API v1 (p2200_c_wiki_agent_test.py: her token and her own agent in the private workspace)
     "GET /api/v1/wiki/pages": "wiki", "GET /api/v1/wiki/pages/{}": "wiki", "POST /api/v1/wiki/pages": "wiki", "PATCH /api/v1/wiki/pages/{}": "wiki",
     "GET /api/v1/wiki/pages/{}/files": "wiki", "GET /api/v1/wiki/files/{}": "wiki", "GET /api/v1/wiki/files/{}/text": "wiki",  # 2.488.0 (#2209)
-    "GET /api/help": "public", "GET /api/help/section": "public",  # 2.1072.0 (#5820): the user's help in the app, the product's documentation (p21072_b_help_api_test.py also as a person without an organisation)
+    "GET /api/help": "public", "GET /api/help/section": "public",  # 2.1086.0 (#5820): the user's help in the app, the product's documentation (p21072_b_help_api_test.py also as a person without an organisation)
     "GET /api/v1/help": "agents", "GET /api/v1/help/section": "agents",  # 2.1067.0 (#5819): her agent reads the help (p21067_a_help_test.py)
     "POST /api/v1/wiki/pages/{}/append": "wiki",  # 2.1048.0 (#5861): p21048_wiki_append_test.py
     # 2.200.0 B (#2747): a page / folder in a folder shared with me (p2200_b_wiki_share_test.py)

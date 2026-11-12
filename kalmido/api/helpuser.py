@@ -1,4 +1,4 @@
-"""2.1072.0 (#5820, decided 12.11.2026): the help for people in the app -- per area short "How to" sections in everyday words
+"""2.1086.0 (#5820, decided 12.11.2026): the help for people in the app -- per area short "How to" sections in everyday words
 with the click path, from the same source the agents search (#5819, api/helpdocs.py): one guide that runs with the version.
 
 - Source: a "## How to: ..." section of docs/*.md with <!-- user-help: <area> --> below its heading (helpdocs.py _hlp_mark);
@@ -88,4 +88,4 @@ def uh_search_web():
     return {"data": out}
 
 
-srch_register("help", web=uh_search_web)  # 2.1072.0 (#5820): the web side of the kind (helpdocs.py registers the API's side)
+srch_register("help", web=uh_search_web)  # 2.1086.0 (#5820): the web side of the kind (helpdocs.py registers the API's side)

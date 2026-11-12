@@ -191,7 +191,7 @@ const updDot = () => !!(S.me?.is_admin && S.about?.available);
 const modOn = m => m === 'tasks' || m === 'home' || m === 'msv' || m === 'notes' || m === 'tags' || (m === 'team' ? teamOn() : m === 'agents' ? agentsTab() : m === 'news' ? collab() : m === 'overview' ? overviewOn() : m === 'time' ? timeOn() : m === 'family' ? feat(m) || !!S.me?.kid : m === 'life' ? lifeOn() : m === 'bookmarks' ? feat('reading') : m === 'workload' ? workloadOn() : m === 'office' ? officeOn() : m === 'ablage' ? ab_on() : m === 'docs' ? typeof viewDocs === 'function' && feat('docs') : feat(m));  // 2.48.0 (#1207, #1111); 2.97.0 A (#1950): bookmarks = module reading
 // no "+" button on views without tasks
 // views of the tasks module that are not a task list (no quick add, no selection, no open-count)
-const NOLIST_KEYS = ['done', 'trash', 'search', 'archived', 'projects', 'favorites', 'steps', 'help'];  // 2.1072.0 (#5820): + the page "Help"  // 2.773.0 (#5250): + the page "Recent steps"  // 2.417.0 A (#3559): + the start page of Projects
+const NOLIST_KEYS = ['done', 'trash', 'search', 'archived', 'projects', 'favorites', 'steps', 'help'];  // 2.1086.0 (#5820): + the page "Help"  // 2.773.0 (#5250): + the page "Recent steps"  // 2.417.0 A (#3559): + the start page of Projects
 // 2.0.6 (#188): tablets in portrait (phone layout, but >= 600 x 600 px) get the docked composer of the desktop instead of
 // the "+" button wherever a view has one; phones keep the "+"
 // 2.19.0 (#669, a regression of 2.7.2): the tablet layout with the docked "Add task" bar (600-899 px wide, 600 px high) is
@@ -1797,7 +1797,7 @@ function parseHash() {
   if (a === 't' && b) return {mod: 'tasks', key: th_ownKey(+b) || S.route.key || START_KEY, task: +b};
   if (a === 'home') return {mod: 'home', key: 'home'};  // 2.17.0 (#475): the dashboard (the logo)
   if (a === 'projects') return {mod: 'tasks', key: 'projects'};  // 2.417.0 A (#3559): the start page of Projects (render.js viewProjStart)
-  if (a === 'help') return {mod: 'tasks', key: 'help', help: h.slice(5)};  // 2.1072.0 (#5820): the page "Help" (helpview.js): help/<key> | help/area:<area>
+  if (a === 'help') return {mod: 'tasks', key: 'help', help: h.slice(5)};  // 2.1086.0 (#5820): the page "Help" (helpview.js): help/<key> | help/area:<area>
   if (a === 'steps') return {mod: 'tasks', key: 'steps'};  // 2.773.0 (#5250): the page "Recent steps" (undolist.js viewSteps)
   if (a === 'favorites') return {mod: 'tasks', key: 'favorites'};  // 2.441.0 (#3592): the page of a phone (favtiles.js viewFavPage)
   if (a === 'team') return {mod: 'team', key: 'team', rid: +b || null};  // 2.17.0 (#419)
@@ -1888,7 +1888,7 @@ async function route() {
   wsv_leave();  // 2.397.0 (#3404): the page being left stays its workspace's view
   if (r.mod === 'tasks' && wsOn()) wsFollow(r.key);  // 2.49.0 (#1770): a list of another workspace switches the filter along
   if (!r.task) S.bellBack = false;
-  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid, ...(r.aus ? {aus: r.aus} : {})} : r.mod === 'docs' ? {id: r.id, ...(r.dv ? {dv: r.dv} : {})} : {}), ...(r.mod === 'wiki' ? {wid: r.wid, ...(r.wdir != null ? {wdir: r.wdir} : {}), ...(r.wtag != null ? {wtag: r.wtag} : {}), ...(r.wsp ? {wsp: r.wsp} : {})} : {}), ...(r.wsp && r.mod !== 'wiki' ? {wsp: r.wsp} : {}), ...(r.zle ? {zle: true} : {}) /* 2.880.0 (#5561): <area>/recent */, ...(r.key === 'help' ? {help: r.help || ''} : {}) /* 2.1072.0 (#5820): help/<key> */, ...(r.mod === 'sheets' ? {sh: r.sh, shl: r.shl, shf: r.shf} : {}), ...(r.mod === 'msv' ? {sid: r.sid, lid: r.lid} : {}), ...(r.mod === 'contacts' && (r.ctf || r.ctb) ? {ctf: r.ctf, ctb: r.ctb} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>; 2.351.0 B (#2749): contacts/f|b/<id>
+  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid, ...(r.aus ? {aus: r.aus} : {})} : r.mod === 'docs' ? {id: r.id, ...(r.dv ? {dv: r.dv} : {})} : {}), ...(r.mod === 'wiki' ? {wid: r.wid, ...(r.wdir != null ? {wdir: r.wdir} : {}), ...(r.wtag != null ? {wtag: r.wtag} : {}), ...(r.wsp ? {wsp: r.wsp} : {})} : {}), ...(r.wsp && r.mod !== 'wiki' ? {wsp: r.wsp} : {}), ...(r.zle ? {zle: true} : {}) /* 2.880.0 (#5561): <area>/recent */, ...(r.key === 'help' ? {help: r.help || ''} : {}) /* 2.1086.0 (#5820): help/<key> */, ...(r.mod === 'sheets' ? {sh: r.sh, shl: r.shl, shf: r.shf} : {}), ...(r.mod === 'msv' ? {sid: r.sid, lid: r.lid} : {}), ...(r.mod === 'contacts' && (r.ctf || r.ctb) ? {ctf: r.ctf, ctb: r.ctb} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>; 2.351.0 B (#2749): contacts/f|b/<id>
   sbb_seen(r);  // 2.152.2 (#2622): the area keeps this page (sidebar B, areas.js)
   wsv_seen();  // 2.397.0 (#3404): and its workspace (workspace.js)
   if (r.mod === 'team') teamRoute(r.rid || null); else if (S.tc.rid) teamRoute(null);  // 2.17.0
