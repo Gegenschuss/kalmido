@@ -24,8 +24,8 @@ from freelancer_fixture import freelancer  # noqa: E402
 from kt import B, check, dbx, done, fresh, setup  # noqa: E402
 
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-O = "/api/office"
-D = O + "/docs"
+OFF = "/api/office"
+D = OFF + "/docs"
 FEAT = "cal,comments,collab,clients,office,docs,files,contacts"
 COMPANY = {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE",
            "email": "hallo@beispiel.example", "vat_id": "DE123456789", "iban": "DE02120300000000202051", "bic": "BYLADEM1001",
@@ -59,7 +59,7 @@ def news(s, did=None):
 
 
 def office(s, client):
-    assert s.put(B + O + "/settings", json={"lang": "de", "company_fields": COMPANY}).ok
+    assert s.put(B + OFF + "/settings", json={"lang": "de", "company_fields": COMPANY}).ok
     r = s.post(B + "/api/clients", json={"name": client, "street": "Marktweg 5", "zip": "50667", "city": "Koeln", "country": "DE"})
     assert r.status_code in (200, 201), r.text
     return r.json()["id"]
@@ -119,7 +119,7 @@ def run(s, who, cl, answer):
     check(r.status_code == 200 and r.content[:4] == b"%PDF", f"{who}: the stored PDF is served after the extension (stored anew, its checksum fits) {r.status_code}")
     rows = s.get(B + D, params={"kind": "offer"}).json().get("docs") or []
     check(not next((x for x in rows if x["id"] == did), {}).get("expired"), f"{who}: extended -> no mark 'expired' in the list")
-    log = s.get(B + O + "/log", params={"limit": 50}).json().get("log") or []
+    log = s.get(B + OFF + "/log", params={"limit": 50}).json().get("log") or []
     check(any(x.get("action") == "valid_until" for x in log), f"{who}: the extension stands in the office log {[x.get('action') for x in log][:10]}")
     # ---- answered: the entry leaves the bell
     d2 = sent_offer(s, cl, "Werbespot " + who)
@@ -138,14 +138,14 @@ def run(s, who, cl, answer):
     r = s.post(B + f"{D}/{r.json()['id']}/valid-until", json={"valid_until": day(10)})
     check(r.status_code == 409, f"{who}: a draft is changed in the editor, not extended {r.status_code}")
     # ---- the setting off: nothing rings
-    r = s.put(B + O + "/settings", json={"offer_exp_notice": 0})
-    check(r.ok and s.get(B + O + "/settings").json()["settings"].get("offer_exp_notice") == 0, f"{who}: the setting switches off {r.status_code}")
+    r = s.put(B + OFF + "/settings", json={"offer_exp_notice": 0})
+    check(r.ok and s.get(B + OFF + "/settings").json()["settings"].get("offer_exp_notice") == 0, f"{who}: the setting switches off {r.status_code}")
     d3 = sent_offer(s, cl, "Doku " + who, finalise=False)
     valid_to(d3, day(1))
     tick()
     check(not news(s, d3)[0], f"{who}: switched off -> no entry {news(s, d3)[0]}")
-    s.put(B + O + "/settings", json={"offer_exp_notice": 1, "offer_exp_days": 5})
-    check(s.get(B + O + "/settings").json()["settings"].get("offer_exp_days") == 5, f"{who}: the notice days are kept")
+    s.put(B + OFF + "/settings", json={"offer_exp_notice": 1, "offer_exp_days": 5})
+    check(s.get(B + OFF + "/settings").json()["settings"].get("offer_exp_days") == 5, f"{who}: the notice days are kept")
     tick()
     check(len(news(s, d3)[0]) == 1, f"{who}: switched on again -> the quotation rings {news(s, d3)[0]}")
     return did
