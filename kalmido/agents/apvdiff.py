@@ -5,7 +5,9 @@ adds to a text the person sees the change itself instead of "Fields: body": the 
 word is not to be trusted here) from the card's bound body against the target's text NOW, with the rights of the person
 who looks at the card. Targets (stage 1): a knowledge page (PATCH .../wiki/pages/{id} body, POST .../append text + under),
 a task's notes (PATCH .../tasks/{id} notes), a project's description (PATCH .../lists/{id}/overview description), a
-comment (PATCH .../comments/{id} body). Every other step: none (the card keeps its line).
+comment (PATCH .../comments/{id} body). 2.1082.0 (#5830): the targeted changes (POST .../append and .../replace-section
+of a page, a task's notes and a project's description; core/mdedit.py) show the change they make in the text now
+("append" / "section" in the answer). Every other step: none (the card keeps its line).
 
   GET /api/approvals/diff?chat=<message id> | ?comment=<comment id> [&full=1]
     -> {diff: null} (no text step) | {diff: {kind, name, ref, added, removed, rows, more, changed, hidden?, decided?, at?}}
@@ -36,7 +38,7 @@ from ..collab.liste2e import le2e_is_cipher
 from ..core.objcomments import ocm_row
 from ..wiki.wkfolder import wkf_locked, wkf_role
 from ..wiki.wkhist import WikiUnreadable, wkh_body
-from ..wiki.wkv1 import wkv_append_text
+from ..core.mdedit import MdHeadingError, md_edit, md_edit_input  # 2.1082.0 (#5830): the shared building block of targeted changes
 
 APVD_CTX = 2  # lines of context around a change (#5831)
 APVD_SHORT_ROWS = 40  # rows of the first view; "Show everything" asks with full=1
@@ -48,6 +50,12 @@ APVD_LCS_MAX = 100000  # lines x lines of the changed middle; above: the middle 
 APVD_STEPS = (  # (method, path below /api/v1, kind, the body's field with the new text)
     ("PATCH", re.compile(r"^wiki/pages/(\d+)$"), "wiki", "body"),
     ("POST", re.compile(r"^wiki/pages/(\d+)/append$"), "wiki_append", "text"),
+    # 2.1082.0 (#5830): the targeted changes of a page, a task's notes and a project's description (core/mdedit.py)
+    ("POST", re.compile(r"^wiki/pages/(\d+)/replace-section$"), "wiki_section", "text"),
+    ("POST", re.compile(r"^tasks/(\d+)/notes/append$"), "task_append", "text"),
+    ("POST", re.compile(r"^tasks/(\d+)/notes/replace-section$"), "task_section", "text"),
+    ("POST", re.compile(r"^lists/(\d+)/overview/append$"), "project_append", "text"),
+    ("POST", re.compile(r"^lists/(\d+)/overview/replace-section$"), "project_section", "text"),
     ("PATCH", re.compile(r"^tasks/(\d+)$"), "task", "notes"),
     ("PATCH", re.compile(r"^lists/(\d+)/overview$"), "project", "description"),
     ("PATCH", re.compile(r"^comments/(\d+)$"), "comment", "body"),
@@ -78,9 +86,33 @@ def _cipher(v):
     return le2e_is_cipher(v)
 
 
+def apvd_split(kind):
+    """2.1082.0 (#5830): a step's kind -> (the target's kind, mode None | append | replace)."""
+    base, _, mode = kind.partition("_")
+    return base, {"append": "append", "section": "replace"}.get(mode)
+
+
 def apvd_target(c, uid, kind, tid, piece, b):
-    """{name, ref, old, new, stamp} of the target for person uid, or {hidden: no_access | encrypted | gone}."""
-    if kind in ("wiki", "wiki_append"):
+    """{name, ref, old, new, stamp} of the target for person uid, or {hidden: no_access | encrypted | gone}. A targeted
+    change (append / replace a section, 2.1082.0 #5830) is reckoned against the text now with the same function as the
+    route (core/mdedit.py md_edit); its heading not (or twice) there: the piece alone and no_heading."""
+    base, mode = apvd_split(kind)
+    t = _apvd_text(c, uid, base, tid, piece)
+    if t.get("hidden") or not mode:
+        return t
+    try:  # review F5: the route's own check of the fields -- a step it would refuse with 400 shows no change
+        _, head = md_edit_input(b, mode)
+    except BadInput:
+        return {**t, "old": "", "new": "", "no_heading": ""}
+    try:
+        return {**t, "new": md_edit(t["old"], mode, piece, head)}
+    except MdHeadingError:  # the step would answer 404 / 409 - show the piece alone
+        return {**t, "old": "", "new": piece, "no_heading": head}
+
+
+def _apvd_text(c, uid, kind, tid, piece):
+    """{name, ref, old, new = piece, stamp} of target kind (wiki | task | project | comment) for person uid, or {hidden}."""
+    if kind == "wiki":
         r = c.execute("SELECT * FROM wiki_pages WHERE id=?", (tid,)).fetchone()
         if r is None or r["deleted_at"]:
             return {"hidden": "gone"}
@@ -92,15 +124,7 @@ def apvd_target(c, uid, kind, tid, piece, b):
             old = wkh_body(c, r) or ""
         except WikiUnreadable:
             return {"hidden": "encrypted"}
-        if kind == "wiki_append":
-            under = b.get("under") if isinstance(b.get("under"), str) and b["under"].strip() else None
-            new = wkv_append_text(old, piece, under)
-            if new is None:  # the heading is not there (any more): the step would answer 404 - show the piece alone
-                return {"name": r["path"].rsplit("/", 1)[-1], "ref": r["path"], "old": "", "new": piece, "stamp": r["updated_at"],
-                        "no_heading": under}
-        else:
-            new = piece
-        return {"name": r["path"].rsplit("/", 1)[-1], "ref": r["path"], "old": old, "new": new, "stamp": r["updated_at"],
+        return {"name": r["path"].rsplit("/", 1)[-1], "ref": r["path"], "old": old, "new": piece, "stamp": r["updated_at"],
                 "sealed": (r["body"] or "") != old}  # review F4: stored sealed at rest
     if kind == "task":
         r = c.execute("SELECT id, title, content, updated_at, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
@@ -121,7 +145,7 @@ def apvd_target(c, uid, kind, tid, piece, b):
         if _cipher(r["description"]) or _cipher(piece):
             return {"hidden": "encrypted"}
         return {"name": "" if _cipher(r["name"]) else r["name"], "ref": "", "old": r["description"] or "",
-                "new": piece.replace("\r\n", "\n").strip(), "stamp": r["description_at"]}
+                "new": piece, "stamp": r["description_at"]}
     if kind == "comment":
         r = ocm_row(c, tid, live=True)
         if r is None:
@@ -186,7 +210,10 @@ def apvd_build(c, uid, ap, created_at, limit):
         return None
     kind, tid, piece, b = hit
     t = apvd_target(c, uid, kind, tid, piece, b)
-    out = {"kind": "wiki" if kind == "wiki_append" else kind, "append": kind == "wiki_append"}
+    base, mode = apvd_split(kind)
+    if base == "project":  # the save trims the description (lists/projects.py overview_patch)
+        t = {**t, "new": t["new"].replace("\r\n", "\n").strip()} if "new" in t else t
+    out = {"kind": base, "append": mode == "append", **({"section": True} if mode == "replace" else {})}
     if t.get("hidden"):
         return {**out, "hidden": t["hidden"], "name": "", "ref": "", "added": 0, "removed": 0, "rows": [], "more": False, "changed": False}
     d = apvd_lines(t["old"], t["new"]) if t["old"] != t["new"] else []

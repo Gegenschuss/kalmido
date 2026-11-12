@@ -239,6 +239,8 @@ had been made in the app. Webhooks fire too.
 | `POST /tasks` | tasks:write | Create a task (default list: the user's inbox). 2.483.0 (#3916): without `type` it gets the list's default type when the list has ticket types on and one is set (the bug list of a software project: `bug`); an explicit `type` (also `null`) wins |
 | `GET /tasks/{id}` | read | One task. 2.390.0: `{id}` may also be a ticket key like `APP-12` (a current or an old one, see [Ticket keys](#ticket-keys)) |
 | `PATCH /tasks/{id}` | tasks:write | Change the fields you send |
+| `POST /tasks/{id}/notes/append` | tasks:write | 2.1082.0: `{text, under?, expect_updated_at?}` adds `text` to the notes (end, or end of the section `under` a heading; unknown heading `404` `heading_not_found` with `error.headings`) without sending the whole notes; same rights, lock and history as `PATCH` |
+| `POST /tasks/{id}/notes/replace-section` | tasks:write | 2.1082.0: `{heading, text, expect_updated_at}` replaces the notes below one heading (to the next heading of the same or a higher level); version required; heading missing `404` / twice `409` `heading_ambiguous` |
 | `DELETE /tasks/{id}` | delete | Move the task with its subtasks to the trash (204); restorable in the app |
 | `POST /tasks/{id}/complete` | tasks:write | Complete; recurring tasks move to their next date (`next_due`) |
 | `POST /tasks/{id}/reopen` | tasks:write | Reopen a completed task |
@@ -271,6 +273,8 @@ had been made in the app. Webhooks fire too.
 | `PATCH /lists/{id}/tags/{tag_id}` · `DELETE …` | structure | Rename / recolour · delete a list tag (removed from every task); a label of the organisation: no rename / recolour (409), `DELETE` takes it off the project's tasks only |
 | `GET /lists/{id}/overview` | read | 2.7.1: the overview of a project list: description, key links, milestones, project files, the files of its tasks, members, status history, tracked time (`409` for the basket; 2.555.0: `time.budget_level` `none` / `ok` / `warn` from 80 % / `over` from 100 % of `time.budget_h`, `time.budget_pct`) |
 | `PATCH /lists/{id}/overview` | structure | The description `{description}` (Markdown, at most 20000 characters; owner, list admins, members) |
+| `POST /lists/{id}/overview/append` | structure | 2.1082.0: `{text, under?, expect_updated_at?}` adds to the description without sending it whole (like the notes' append) |
+| `POST /lists/{id}/overview/replace-section` | structure | 2.1082.0: `{heading, text, expect_updated_at}` (= `description_at`, `""` when null) replaces the description below one heading |
 | `GET` · `POST /lists/{id}/links` | read · structure | Key links `{title?, url}` (http / https; at most 50) |
 | `PATCH` · `DELETE /lists/{id}/links/{link_id}`, `PUT /lists/{id}/links/order` | structure | Change · remove a link, reorder `{ids}` |
 | `GET` · `POST /lists/{id}/milestones`, `PATCH` · `DELETE /lists/{id}/milestones/{milestone_id}` | read · structure | Milestones `{name, day, done?}` (at most 100). 2.18.0: a compatibility layer on top of milestone tasks; the ids are task ids |
@@ -2060,7 +2064,9 @@ someone saved after `expect_updated_at`), `POST /api/v1/wiki/pages/{id}/append` 
 #5861: role edit; adds `text` at the end with exactly one empty line in between (2.1068.0, #5829), at most 20,000 characters;
 `under` = a heading of the page (case ignored): the end of that heading's section instead, an unknown heading = `404`
 `heading_not_found` with `error.headings`, nothing written;
-the same save and history as `PATCH`, the page's lock holds between reading and saving) and `POST /api/v1/wiki/pages` `{folder_id, name, body?}` (a page in a knowledge
+the same save and history as `PATCH`, the page's lock holds between reading and saving), `POST /api/v1/wiki/pages/{id}/replace-section`
+`{heading, text, expect_updated_at}` (2.1082.0, #5830: the text below one heading up to the next of the same or a higher
+level; version required; heading missing `404` `heading_not_found`, twice `409` `heading_ambiguous`) and `POST /api/v1/wiki/pages` `{folder_id, name, body?}` (a page in a knowledge
 folder where you may edit; `409` when the name is taken there). A person's token sees what the person sees in the app and may
 also create with `{space, path, body?}` and rename with `path` / `relink` like the app.
 An **agent** sees only pages shared with exactly it (the page or a knowledge folder above it, in the app's share dialog):

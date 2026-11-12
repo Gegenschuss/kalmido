@@ -37,7 +37,7 @@ and readable for agents. **Summarize**: in the preview of a task's file, when a 
 (with a confirmation naming the agent) posts a comment in your name that mentions the agent; the agent reads the file and
 answers with the summary. Kalmido calls no language model itself; undo removes the comment.
 
-**Knowledge folders** (2.200.0, #2747): knowledge pages live in the same folder tree as the file store (empty folders, drag to move or sort, a "…" menu). Share a folder or a page with people, groups or agents (read / edit, inherited). Agents reach pages through API v1 / MCP (`wiki_list`, `wiki_read`, `wiki_write`, `wiki_append`, `wiki_create`, scopes `wiki:read` / `wiki:write`), only those shared with them.
+**Knowledge folders** (2.200.0, #2747): knowledge pages live in the same folder tree as the file store (empty folders, drag to move or sort, a "…" menu). Share a folder or a page with people, groups or agents (read / edit, inherited). Agents reach pages through API v1 / MCP (`wiki_list`, `wiki_read`, `wiki_write`, `wiki_append`, `wiki_replace_section`, `wiki_create`, scopes `wiki:read` / `wiki:write`), only those shared with them.
 
 ## Offline knowledge, office projects, pictures
 
@@ -45,7 +45,7 @@ answers with the summary. Kalmido calls no language model itself; undo removes t
   connection; pages edited offline are sent once you are online again (a change made elsewhere meanwhile waits at the
   page: keep yours or take theirs). Encrypted spaces stay encrypted on the device, logging out deletes the copy (#2671).
 - **Knowledge in folders**: pages and folders live in a shared folder tree like the file store (drag, sort, empty folders); share a folder or a page with people, groups and agents, read or edit, inherited by subfolders.
-- **Agents and knowledge**: pages through API v1 / MCP (`wiki_list`, `wiki_read`, `wiki_write`, `wiki_append`, `wiki_create`) with the scopes `wiki:read` / `wiki:write`, only pages shared with that agent.
+- **Agents and knowledge**: pages through API v1 / MCP (`wiki_list`, `wiki_read`, `wiki_write`, `wiki_append`, `wiki_replace_section`, `wiki_create`) with the scopes `wiki:read` / `wiki:write`, only pages shared with that agent.
 - **Office documents belong to a project**: quotations, invoices and credit notes can be bound to a project (the client's
   projects on top, or *Create new project*), also later on finalised or sent documents; the project page lists
   *Quotations & invoices* for people with office rights only (#2665).

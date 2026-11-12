@@ -285,6 +285,11 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.1068.0 (#5831): the diff of an approval card is what the PERSON sees before answering; the agent never receives it",
+     ("=GET /api/approvals/diff",)),
+    ("2.1050.0 (#5658): open shares by e-mail address are listed and revoked by the sharing person in the Share dialogs",
+     ("=GET /api/addr-shares", "=DELETE /api/addr-shares/{}")),
+    ("2.1037.0 (#5803): the bell's \"deadline seen\" mark is the person's own reading state in the app", ("=POST /api/news/due-seen",)),
     # 2.593.0 (#4590): reset the look and comfort settings with one undo: only the person in the app, agents and API tokens never (decision 04.11.2026)
     ("resetting the own settings is the person's step only", ("POST /api/settings/reset",)),
     ("2.575.0 (#3778): module cards are how a person arranges Settings > Modules and how an organisation's admins cap the modules of its "

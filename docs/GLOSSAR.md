@@ -254,6 +254,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/csvimport.py` (`csv`) - The one reader of bank statements
 - `kalmido/core/ctx.py` - The request context of the signed-in person
 - `kalmido/core/db.py` (`skfp`) - Time helpers, the database connection, start-up checks and migrations (init_db, repair_data)
+- `kalmido/core/mdedit.py` - Change a Markdown text in a targeted way: append (at the end or under a heading) and replace the section below a heading; shared by knowledge pages, task notes and project descriptions (#5830)
 - `kalmido/core/dlock.py` (`dl`) - THE check "data an agent may never see"
 - `kalmido/core/env.py` (`env`) - The registry of the environment variables the server reads (name, default, one English sentence, group)
 - `kalmido/core/ephem.py` (`eph`) - Short-lived state in the database, so every web process of an instance sees it (later KALMIDO_WEB_PROCS, KALMIDO_REPLICAS, the roles of 2.102)

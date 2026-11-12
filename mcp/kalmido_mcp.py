@@ -813,13 +813,35 @@ TOOLS = [
                     "integrate / deploy requests stay open until a person said yes to that task. A new reason takes the yes back; "
                     "you cannot take a mark off (null: people only). 2.564.0: changing content (title, notes, dates, priority, repeat, "
                     "assignee, tags, people, fields, type, milestone, family, reviewer, url, points, snippets) REQUIRES "
-                    "expect_updated_at or _prev, else 400 version_required; moving, pin, lock, delivery need none.",
+                    "expect_updated_at or _prev, else 400 version_required; moving, pin, lock, delivery need none. 2.1082.0: notes "
+                    "replaces the WHOLE notes - to add to them use task_notes_append, to rework one part task_notes_replace_section "
+                    "(only the change, not the whole text).",
      _obj({"task_id": S_ID, **{k: v for k, v in TASK_FIELDS.items() if k != "parent_id"},
            "irreversible": {"type": ["object", "null"], "properties": {"reason": {"type": "string", "maxLength": 500}}, "additionalProperties": False,
                             "description": "2.392.0: {reason} marks the task as a one-way step, null takes the mark off (people only)"},
            "shift_chain": {"type": "boolean", "description": "false: the tasks waiting on this one stay (default true)"},
            "expect_updated_at": {"type": "string", "description": "updated_at of the task as you read it (2.564.0: required with a content change, or _prev)"},
            "_prev": {"type": "object", "description": "{field: the value you read} for the fields you send"}}, ["task_id"]), t_update_task),
+    # 2.1082.0 (#5830): targeted changes of a task's notes (only the change is sent; the same rights, lock and history as update_task)
+    ("task_notes_append", "2.1082.0 (scope tasks:write): add text to a task's notes without reading and sending the whole notes - "
+                          "a finding, a link, a list item, a paragraph. text (Markdown, at most 20000 characters) comes after the notes "
+                          "with exactly one empty line in between. under (a heading of the notes, case ignored): the text goes to the "
+                          "end of that heading's section instead; no such heading = 404 heading_not_found with the headings in "
+                          "error.headings, nothing written. expect_updated_at is optional (given and the task changed since: 409 with "
+                          "the current task). A locked task or a password-locked note refuses it like update_task (409). One entry of "
+                          "the task's history, undo like any edit.",
+     _obj({"task_id": S_ID, "text": {"type": "string", "maxLength": 20000}, "under": {"type": "string", "maxLength": 300},
+           "expect_updated_at": {"type": "string"}}, ["task_id", "text"]),
+     lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/notes/append", body=_pick(a, ("text", "under", "expect_updated_at")))),
+    ("task_notes_replace_section", "2.1082.0 (scope tasks:write): replace the part of a task's notes below one heading (up to the "
+                                   "next heading of the same or a higher level; the heading line stays) with text - only that section "
+                                   "is sent. heading names it (case ignored). expect_updated_at (the task's updated_at from get_task) is "
+                                   "REQUIRED: 409 with the current task when it changed since. The heading not there = 404 "
+                                   "heading_not_found, there more than once = 409 heading_ambiguous (both with error.headings), nothing "
+                                   "written. An empty text empties the section. Same rights, lock and history as update_task.",
+     _obj({"task_id": S_ID, "heading": {"type": "string", "maxLength": 300}, "text": {"type": "string", "maxLength": 100000},
+           "expect_updated_at": {"type": "string"}}, ["task_id", "heading", "text", "expect_updated_at"]),
+     lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/notes/replace-section", body=_pick(a, ("heading", "text", "expect_updated_at")))),
     ("add_snippet", "2.35.0: add one code snippet to a task (a diff, a log, a proposed change, an error message): plain code with a "
                     "language (no Markdown), optional file path + line. At most 20 per task, 20000 characters each. People see it in "
                     "the task's Code snippets section with highlighting and a Copy button.",
@@ -1553,7 +1575,7 @@ TOOLS += [
                    "the current page in error.page) when a person saved in between - merge and try again. Every save is one entry "
                    "of the page's history the people can restore. At most 500000 characters. 2.564.0: expect_updated_at is required "
                    "(400 version_required without). 2.1068.0: to add a link, a list item or a paragraph use wiki_append instead (only the new "
-                   "text, no whole page).",
+                   "text, no whole page); 2.1082.0: to rework one section use wiki_replace_section.",
      _obj({"page_id": S_ID, "body": {"type": "string", "maxLength": 500000}, "expect_updated_at": {"type": "string"}}, ["page_id", "body", "expect_updated_at"]),
      lambda api, a: api.call("PATCH", f"/wiki/pages/{_id(a, 'page_id')}", body=_pick(a, ("body", "expect_updated_at")))),
     ("wiki_append", "2.1048.0 (scope wiki:write): add text at the END of a knowledge page shared with you to edit (role edit; view "
@@ -1562,10 +1584,19 @@ TOOLS += [
                     "heading of the page, case ignored): the text goes to the end of that heading's section instead; no such heading = "
                     "404 heading_not_found with the page's headings in error.headings, nothing written. expect_updated_at is optional (appending overwrites nothing; "
                     "given and someone saved in between: 409 with the current page). One entry of the page's history, like wiki_write. "
-                    "To change or remove text elsewhere in the page use wiki_write.",
+                    "To rework one section use wiki_replace_section (2.1082.0), to change text elsewhere wiki_write.",
      _obj({"page_id": S_ID, "text": {"type": "string", "maxLength": 20000}, "under": {"type": "string", "maxLength": 300},
            "expect_updated_at": {"type": "string"}}, ["page_id", "text"]),
      lambda api, a: api.call("POST", f"/wiki/pages/{_id(a, 'page_id')}/append", body=_pick(a, ("text", "under", "expect_updated_at")))),
+    ("wiki_replace_section", "2.1082.0 (scope wiki:write): replace the text below one heading of a knowledge page shared with you to "
+                             "edit (up to the next heading of the same or a higher level; the heading line stays) - only that section "
+                             "is sent, not the whole page. heading names it (case ignored). expect_updated_at from wiki_read is "
+                             "REQUIRED: 409 with the current page when someone saved since. The heading not there = 404 "
+                             "heading_not_found, there more than once = 409 heading_ambiguous (both with error.headings), nothing "
+                             "written. An empty text empties the section. One entry of the page's history, like wiki_write.",
+     _obj({"page_id": S_ID, "heading": {"type": "string", "maxLength": 300}, "text": {"type": "string", "maxLength": 100000},
+           "expect_updated_at": {"type": "string"}}, ["page_id", "heading", "text", "expect_updated_at"]),
+     lambda api, a: api.call("POST", f"/wiki/pages/{_id(a, 'page_id')}/replace-section", body=_pick(a, ("heading", "text", "expect_updated_at")))),
     ("wiki_create", "2.200.0 (scope wiki:write): a new knowledge page in a knowledge folder shared with you to edit: folder_id (the "
                     "folder's id from list_files, which shows knowledge folders only with files:read AND wiki:read: a folder below a shared "
                     "knowledge folder, or the shared folder itself), name (no "
@@ -1929,9 +1960,29 @@ TOOLS += [
      lambda api, a: api.call("DELETE", f"/comments/{_id(a, 'comment_id')}")),
     # ---- project overview (write)
     ("set_project_overview", "Set the description (Markdown) of a project's overview. 2.270.0: expect_updated_at (description_at "
-     "from get_project_overview) refuses with 409 + the current overview when someone saved it since: merge and send again.",
+     "from get_project_overview) refuses with 409 + the current overview when someone saved it since: merge and send again. "
+     "2.1082.0: this replaces the WHOLE description - to add to it use project_overview_append, to rework one part "
+     "project_overview_replace_section (only the change).",
      _obj({"list_id": S_ID, "description": {"type": "string"}, "expect_updated_at": {"type": "string"}}, ["list_id", "description"]),
      lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}/overview", body=_pick(a, ("description", "expect_updated_at")))),
+    # 2.1082.0 (#5830): targeted changes of a project's description (same rights and history as set_project_overview)
+    ("project_overview_append", "2.1082.0 (scope structure): add text to a project's description without sending the whole "
+                                "description. text (Markdown, at most 20000 characters) comes after it with exactly one empty line in "
+                                "between; under (a heading of the description, case ignored): at the end of that heading's section "
+                                "instead, no such heading = 404 heading_not_found with error.headings, nothing written. "
+                                "expect_updated_at (description_at) is optional: given and saved since = 409 + the current overview.",
+     _obj({"list_id": S_ID, "text": {"type": "string", "maxLength": 20000}, "under": {"type": "string", "maxLength": 300},
+           "expect_updated_at": {"type": "string"}}, ["list_id", "text"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/overview/append", body=_pick(a, ("text", "under", "expect_updated_at")))),
+    ("project_overview_replace_section", "2.1082.0 (scope structure): replace the part of a project's description below one heading "
+                                         "(up to the next heading of the same or a higher level; the heading line stays) - only that "
+                                         "section is sent. expect_updated_at (description_at from get_project_overview; \"\" when it "
+                                         "is null) is REQUIRED: 409 + the current overview when saved since. The heading not there = 404 "
+                                         "heading_not_found, there more than once = 409 heading_ambiguous (both with error.headings), "
+                                         "nothing written. An empty text empties the section.",
+     _obj({"list_id": S_ID, "heading": {"type": "string", "maxLength": 300}, "text": {"type": "string", "maxLength": 100000},
+           "expect_updated_at": {"type": "string"}}, ["list_id", "heading", "text", "expect_updated_at"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/overview/replace-section", body=_pick(a, ("heading", "text", "expect_updated_at")))),
     ("add_project_link", "Add a key link to a project's overview.", _obj({"list_id": S_ID, "title": {"type": "string"}, "url": {"type": "string"}},
                                                                        ["list_id", "url"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/links", body=_without(a, "list_id"))),
@@ -2998,6 +3049,9 @@ TOOL_SCOPES["sheets:read"] += ("propose_sheet_tasks",)  # 2.126.1 B (#2125)
 TOOL_SCOPES["comments"] += ("set_video_comment_done",)  # 2.99.1 C (#1959); 2.981.0 (#5273): add_video_comment -> add_comment kind video
 TOOL_SCOPES["wiki:read"] = ("wiki_list", "wiki_read", "wiki_files", "wiki_read_file")  # 2.200.0 C (#1781); 2.488.0 B (#2209): + files
 TOOL_SCOPES["wiki:write"] = ("wiki_write", "wiki_create", "wiki_append")  # 2.1048.0 (#5861): + wiki_append
+TOOL_SCOPES["wiki:write"] += ("wiki_replace_section",)  # 2.1082.0 (#5830)
+TOOL_SCOPES["tasks:write"] += ("task_notes_append", "task_notes_replace_section")  # 2.1082.0 (#5830)
+TOOL_SCOPES["structure"] += ("project_overview_append", "project_overview_replace_section")  # 2.1082.0 (#5830)
 # 2.306.0 E (#2741): the scope of the route each of these calls (tools/list hid nothing for them on a read token)
 TOOL_SCOPES["structure"] += ("set_deployment", "duplicate_list", "set_task_sprint", "set_list_review")
 TOOL_SCOPES["tasks:write"] += ("review_task", "set_working", "end_working")  # 2.407.0 (#3513): the working mark writes to the task
@@ -3037,6 +3091,7 @@ TOOLSETS = {
         list_layout_blocks get_view_layout propose_layout set_wip_limit set_dwell_limits get_velocity list_flow propose_import propose_rule list_video_reviews get_video_review
         set_video_comment_done get_workload get_absences get_day_plan get_day_review
         list_views create_view set_section_kind set_task_state
+        task_notes_append task_notes_replace_section project_overview_append project_overview_replace_section
     """,
     "code": """
         list_repos list_build_status list_environments set_deployment request_merge_approval request_integration_approval request_deploy_approval
@@ -3075,6 +3130,7 @@ TOOLSETS = {
     """,
     "wiki": """
         wiki_list wiki_read wiki_write wiki_create wiki_files wiki_read_file list_notes get_note create_note update_note delete_note restore_note
+        wiki_append wiki_replace_section
     """,
     "life": """
         list_habits create_habit update_habit delete_habit check_in_habit get_habit_stats get_family add_occasion list_deadline_types add_deadline

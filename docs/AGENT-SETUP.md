@@ -259,7 +259,10 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    folder / page, view or edit). The agent sees nothing else of the knowledge area: no page through the workspace, never an
    encrypted space ([AGENTS.md](AGENTS.md#knowledge-pages)). 2.488.0: with *Read knowledge pages* it also reads the files of
    such pages (`wiki_files`, `wiki_read_file`). 2.1048.0: with *Write knowledge pages* it can also add text at the end of
-   a page (`wiki_append`) without sending the whole page (2.1068.0: also at the end of a section, `under` a heading). The reference starter needs no change.
+   a page (`wiki_append`) without sending the whole page (2.1068.0: also at the end of a section, `under` a heading);
+   2.1082.0: `wiki_replace_section` replaces one section, and a task's notes / a project's description take the same two
+   kinds (`task_notes_append`, `task_notes_replace_section`, `project_overview_append`, `project_overview_replace_section`;
+   scopes `tasks:write` / `structure`). The reference starter needs no change.
 13. **Filed e-mails** (2.483.0): with *Read* the agent reads the e-mails filed with a client or a project it sees
    (`list_filed_mails`, `get_filed_mail`): a project shared with it, a client through such a project. Never the mails *Not
    assigned*, never another organisation's; filing, assigning and sending stay with people

@@ -1122,6 +1122,11 @@ ROUTES = {
     "GET /api/v1/help": "public", "GET /api/v1/help/section": "public",  # 2.1067.0 (#5819): the product's documentation, no data of anybody
     "POST /api/v1/wiki/pages": "wiki_v1", "PATCH /api/v1/wiki/pages/{}": "wiki_v1",
     "POST /api/v1/wiki/pages/{}/append": "wiki_v1",  # 2.1048.0 (#5861): p21048_wiki_append_test.py
+    "POST /api/v1/wiki/pages/{}/replace-section": "wiki_v1",  # 2.1082.0 (#5830): p21082_mdedit_test.py
+    "POST /api/v1/tasks/{}/notes/append": "task",  # 2.1082.0 (#5830): p21082_mdedit_test.py
+    "POST /api/v1/tasks/{}/notes/replace-section": "task",  # 2.1082.0 (#5830): p21082_mdedit_test.py
+    "POST /api/v1/lists/{}/overview/append": "list",  # 2.1082.0 (#5830): p21082_mdedit_test.py
+    "POST /api/v1/lists/{}/overview/replace-section": "list",  # 2.1082.0 (#5830): p21082_mdedit_test.py
     "GET /api/v1/wiki/pages/{}/files": "wiki_v1", "GET /api/v1/wiki/files/{}": "wiki_v1", "GET /api/v1/wiki/files/{}/text": "wiki_v1",  # 2.488.0 (#2209)
     "GET /api/v1/sheets": "sheet_v1", "POST /api/v1/sheets": "sheet_v1", "GET /api/v1/sheets/{}": "sheet_v1",
     "PATCH /api/v1/sheets/{}": "sheet_v1", "PUT /api/v1/sheets/{}/cells": "sheet_v1", "POST /api/v1/sheets/{}/rows": "sheet_v1",
