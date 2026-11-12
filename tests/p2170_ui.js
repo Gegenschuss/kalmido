@@ -52,6 +52,12 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // News for Alice: comments and a mention by Bob on one task, an assignment
   await call('POST', `/api/tasks/${T[0]}/comments`, {body: 'First draft is in'}, CB);
   await call('POST', `/api/tasks/${T[0]}/comments`, {body: 'And the second part'}, CB);
+  // 2.1079.0 (#5477): #5806 -- a person's comment on a task alice created waits for her ("For you", the comments on T[0]
+  // above); plain comments in the history: bob's own task, alice only watches it
+  const T5 = (await call('POST', '/api/tasks', {title: 'Collect the shop texts', list_id: L}, CB)).id;
+  await call('POST', `/api/tasks/${T5}/watchers`, {});
+  await call('POST', `/api/tasks/${T5}/comments`, {body: 'Shop text one'}, CB);
+  await call('POST', `/api/tasks/${T5}/comments`, {body: 'Shop text two'}, CB);
   await call('POST', `/api/tasks/${T[2]}/comments`, {body: `<@1> can you call them?`}, CB);
   const T4 = (await call('POST', '/api/tasks', {title: 'Review the logo', list_id: L, assignee_id: 1}, CB)).id;
 
@@ -108,8 +114,11 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // 2.1037.0 (#5807): what does not wait for me stands in the history (open on the test devices, tests/boot.js), calm: no tick there
   const needs = d.querySelector('#ns-need')?.closest('.nsect'), info = d.querySelector('.nsect.nhist');
   check(needs && needs.textContent.includes('Call the printer') && needs.textContent.includes('Review the logo'), '#452: "Needs you": the mention and the assignment');
-  const g0 = [...d.querySelectorAll('.ngroup')].find(g => g.textContent.includes('Write the homepage text'));
+  // 2.1079.0 (#5477): #5806 -- the history group is the watched task of bob; the two comments on alice's own task are "Needs you"
+  const g0 = [...d.querySelectorAll('.ngroup')].find(g => g.textContent.includes('Collect the shop texts'));
   check(g0 && info?.contains(g0) && /2 comments/.test(g0.querySelector('.ngs').textContent) && !g0.querySelector('[data-act="news-gread"]'), '#452/#5807: two comments on one task = one group "2 comments" in the history, without a tick ' + (g0 && g0.querySelector('.ngs').textContent));
+  const gMine = [...d.querySelectorAll('.ngroup')].find(g => g.textContent.includes('Write the homepage text'));
+  check(gMine && needs?.contains(gMine) && /2 comments/.test(gMine.querySelector('.ngs').textContent) && gMine.querySelector('[data-act="news-gread"]'), '#5806: two comments of a person on my own task = one group "2 comments" under "Needs you", with "Mark read" ' + (gMine && gMine.querySelector('.ngs').textContent));
   const before = (await call('GET', '/api/news')).unread;
   const g1 = [...needs.querySelectorAll('.ngroup')].find(g => g.textContent.includes('Review the logo')), t1 = (await call('GET', '/api/news')).items.find(it => it.task_title === 'Review the logo')?.task_id;
   click(w, g1.querySelector('[data-act="news-gread"]'));
