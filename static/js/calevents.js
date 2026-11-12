@@ -567,7 +567,7 @@ function viewAgenda() {
   }
   // 2.1077.0 (#5461): loading / a failed fetch over the list; "nothing" only when the events are there (the shared block)
   const st = calEvState(from, to), wait = calEvOn() && S.cal.key !== `${from}|${to}`;
-  return calBar(tr('Agenda') + ` <span class="muted agrange">${esc(fmtDayAbs(from))} – ${esc(fmtDayAbs(to))}</span>`) + st + `<div class="agenda agendav">${h || (wait ? '' : emptyState({icon: 'cal', title: tr('Nothing in the next two weeks.'), size: 'sec'}))}</div>`;
+  return calBar(tr('Agenda') + ` <span class="muted agrange">${esc(fmtDayAbs(from))} – ${esc(fmtDayAbs(to))}</span>`) + st + `<div class="agenda agendav">${/*html-ok*/ h || (wait ? '' : emptyState({icon: 'cal', title: tr('Nothing in the next two weeks.'), size: 'sec'})) /* rows built with esc() above, the shared block */}</div>`;
 }
 
 // ---- 2.624.0 (#3946): "Per project" in the Calendars window: the lists grouped by folder (sidebar.js folderNames, the own
