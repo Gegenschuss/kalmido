@@ -2353,6 +2353,25 @@ invoice list shows "N payment reminders suggested" with a jump to the drafts (`G
 `dunning: {suggested, first}` for the invoice and reminder lists, the drafts carry `suggested: 1`); check and send them
 like any reminder. Switch: `dunning_suggest` (default on) in the office settings, section Invoices (admins only).
 
+### Quotations that run out without an answer
+
+*Since 2.1064.0.*
+
+A quotation in the status "sent" (no answer yet) with a date "Valid until" tells in the bell, under "For you": once from
+`offer_exp_days` days before that date on (*Notice before it runs out*, 1-30, default 3: "expires in 3 days") and once from
+the day after it ("has expired without an answer"). The entry goes to the person who marked it sent (by hand or by the
+mail, read from the office log) while they are still in the office, else to the office's admins (a private office: its
+owner); News only, no push (row "Payments and overdue invoices" of the notification settings). Each quotation is one entry
+and counts 1 in the bell; accepted, rejected, superseded or extended, it leaves the bell. Nothing happens by itself: the
+quotation stays "sent". Quotations without a date, trial documents and dates more than 14 days back never ring. Switch:
+`offer_exp_notice` (*Tell me when a sent quotation runs out without an answer*, default on), section Documents.
+
+The quotation list marks a sent quotation past its date "expired"; the quotation itself shows a note with three answers:
+**Extend validity** (`POST /api/office/docs/<id>/valid-until` with `{valid_until}`, today or later, sent quotations only:
+the new date is written on the finalised quotation without a new version, logged as `valid_until` in the office log; the PDF
+shows the new date, and an open approval link no longer fits what it was made for - the answer's `links_void` counts them,
+create a new one), **Follow up** (the send dialog with a follow-up subject and text) and **Mark as rejected**.
+
 ### GiroCode
 
 *Since 2.147.1.*
