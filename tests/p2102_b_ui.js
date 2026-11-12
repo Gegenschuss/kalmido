@@ -33,10 +33,15 @@ const css = f => { for (const base of [path.join(__dirname, '..', 'static'), pat
   const L = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
   await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${L}/agent`, {agent_id: ag.id});
-  const TA = (await call('POST', '/api/tasks', {title: 'Alpha task', list_id: L})).id;
-  const TB = (await call('POST', '/api/tasks', {title: 'Beta task', list_id: L})).id;
+  // 2.1079.0 (#5904): #5806 -- a person's comment on a task alice created / is assigned to counts "For you" (the bell); the
+  // history lines here need plain comments that do not wait for her: bob's own tasks, alice only watches them
+  const TA = (await call('POST', '/api/tasks', {title: 'Alpha task', list_id: L}, CB)).id;
+  const TB = (await call('POST', '/api/tasks', {title: 'Beta task', list_id: L}, CB)).id;
+  for (const t of [TA, TB]) await call('POST', `/api/tasks/${t}/watchers`, {});
+  const TC = (await call('POST', '/api/tasks', {title: 'Gamma task', list_id: L})).id;  // the counter case: alice's own task
   // alternating tasks: the server cannot merge them (only neighbours of one task bundle)
   for (const t of [TA, TB, TA, TB, TA]) await call('POST', `/api/tasks/${t}/comments`, {body: 'note on ' + t}, CB);
+  await call('POST', `/api/tasks/${TC}/comments`, {body: 'note on ' + TC}, CB);
 
   // ================= #2197 News
   const items = (await call('GET', '/api/news')).items.filter(it => it.kind === 'comment');
@@ -52,6 +57,9 @@ const css = f => { for (const base of [path.join(__dirname, '..', 'static'), pat
   check(gau && gar && gs.indexOf(gau) < gs.indexOf(gar), '#2197: the unread line stands above the read one');
   check(gau && !gau.querySelector('.ngn') && !gb[0].querySelector('.ngn') && !gau.classList.contains('unread'), '#2197/#5807: a line of the history has no unread number and no unread look');
   check(gar && !gar.querySelector('.ngn') && !gar.querySelector('[data-act="news-gread"]'), '#2197: a read line has no number and no "Mark read"');
+  // 2.1079.0 (#5904): #5806 -- the same plain comment on alice's own task waits for her: "For you" with the unread look
+  const gc = gs.find(g => g.querySelector('.ngt')?.textContent.includes('Gamma task'));
+  check(gc && !gc.closest('.nhist') && gc.querySelector('[data-act="news-gread"]'), '#5806: a person\'s comment on my own task stands under "For you" with "Mark read"');
   check(!/^\d+$/.test((gau?.querySelector('.ngs')?.textContent || '').trim()) && /2 comments/.test(gau?.querySelector('.ngs')?.textContent || ''), '#2197: the total only as text "2 comments"');
   // 2.1037.0 (#5807): the tabs count only what waits for me (the For you number); Activity has no number
   const bell = w.eval('newsMeCount()'), tabsum = +(d.querySelector('.ntabs [data-tab="all"] .nunread')?.textContent || 0);
