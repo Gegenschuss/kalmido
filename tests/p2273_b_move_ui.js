@@ -20,6 +20,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments,family'});
   const bob = await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'});
+  // 2.1047.0 (#5796): bob proved his address (2.1001.0 #5669 / 2.1021.0 #5775) - a share by address binds only a proved one
+  execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE users SET email_proved=lower(email) WHERE email_proved='' AND COALESCE(email, '')<>''"]);
   const L1 = (await call('POST', '/api/lists', {name: 'Shared'})).id, L2 = (await call('POST', '/api/lists', {name: 'Mine'})).id;
   await call('PUT', `/api/lists/${L1}/members`, {email: 'bob@example.com', role: 'edit'});
   const T = (await call('POST', '/api/tasks', {title: 'Picnic', list_id: L1})).id;
