@@ -53,8 +53,13 @@ const FEAT = 'cal,comments,collab,office,clients';
   const center = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({block: 'nearest', inline: 'center'}); const b = e.getBoundingClientRect(); return {x: b.left + b.width / 2, y: b.top + b.height / 2, seen: b.left >= 0 && b.right <= innerWidth}; })()`;
 
   // ================= #5572: a phone, 360 x 740, a finger
-  await firefox(async ({cmd, ev, ctx, nav, shot, until, drag}) => {
-    const tap = async (sel, what) => { const c = await until(center(sel)); check(c && c.seen, what + ': in sight ' + JSON.stringify(c)); if (c) await drag(c.x, c.y, 0, 0, 'touch'); };
+  await firefox(async ({cmd, ev, ctx, nav, shot, until}) => {
+    // a tap is a quick finger down and up at one point (#3506, CI red of 2.1020.0): drag(x, y, 0, 0, 'touch') held the finger for
+    // two moves of 120 ms; on a slow / cold Firefox (the CI) that press grew past the long-tap time and Firefox sent no click
+    // (pointerdown + touchstart, then nothing - the tab Invoices stayed on Quotations); a hold of 700 ms shows the same on the Mac
+    const tapAt = (x, y) => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'p1', parameters: {pointerType: 'touch'},
+      actions: [{type: 'pointerMove', x: Math.round(x), y: Math.round(y)}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]}).then(() => cmd('input.releaseActions', {context: ctx}));
+    const tap = async (sel, what) => { const c = await until(center(sel)); check(c && c.seen, what + ': in sight ' + JSON.stringify(c)); if (c) await tapAt(c.x, c.y); };
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 360, height: 740}});
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
