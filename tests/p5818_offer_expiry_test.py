@@ -159,7 +159,7 @@ FID, Fr = freelancer(B, A)
 run(Fr, "freelancer", office(Fr, "Privatkunde GmbH"), "accepted")
 
 # ---------------------------------------------------------------- the boundary: another person cannot extend it
-r = Fr.post(B + f"{D}/{A_DOC}/valid-until", json={"valid_until": day(40)})
+r = Fr.post(B + f"/api/office/docs/{A_DOC}/valid-until", json={"valid_until": day(40)})
 check(r.status_code in (403, 404), f"another person: the organisation's quotation is not hers to extend {r.status_code}")
 check(dbx("SELECT valid_until FROM office_docs WHERE id=?", (A_DOC,))[0][0] == day(20), "another person: the date stays as it was")
 
