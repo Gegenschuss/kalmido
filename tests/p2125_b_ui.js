@@ -40,6 +40,11 @@ const FEAT = 'time,collab,comments';
   d.querySelector('[data-act="tv-period"][data-k="lastmonth"]').click();
   const card = await until(() => d.querySelector('.tslcard:not(.tslrev)'));
   check(card && /Timesheet/.test(card.textContent) && /Open/.test(card.textContent), 'the month card: open ' + (card?.textContent || '').slice(0, 120));
+  // 2.997.0 (#5699, #5697): a setting the app saves by itself just before (the colour scheme of a new device, a view's
+  // arrangement) is a step of its own on the server (accounts/setundo.py); the month's entry must not take that group - it
+  // did, its own reopen never ran and Undo put the setting back instead (CI red of 2.994.0 / 2.996.0)
+  await w.eval(`api('PATCH', '/api/settings', {start_page: 'home'})`);
+  check(await until(() => w.eval('HIST.fresh.some(f => f.sett)')), 'a setting saved by the app: its step group came back (fresh)');
   card?.querySelector('[data-tsl="close"]')?.click();
   check(await until(async () => (await sheet()) === 'closed'), 'Close month: the server holds it closed');
   check(await until(() => d.querySelector('.tslcard [data-tsl="reopen"]')), 'the card offers Reopen');
@@ -48,8 +53,10 @@ const FEAT = 'time,collab,comments';
   const locked = r => r.querySelector('.tslock') && !r.querySelector('[data-act="te-edit"]') && !r.querySelector('[data-act="te-del"]');
   const row = await until(() => [...d.querySelectorAll('.timev .terow')].find(r => /survey/.test(r.textContent) && locked(r)));
   check(row && locked(row), 'the entry shows a lock, no edit / delete ' + ([...d.querySelectorAll('.timev .terow')].find(r => /survey/.test(r.textContent))?.innerHTML || '-').replace(/<svg.*?<\/svg>/g, '').slice(0, 300));
+  check(w.eval('HIST.undo.length && histGids(HIST.undo[HIST.undo.length - 1]).length === 0 && !!HIST.undo[HIST.undo.length - 1].undo'), 'the entry "Month closed" keeps its own undo, not the setting\'s group (#5699) ' + w.eval('JSON.stringify(HIST.undo.map(e => [e.label, histGids(e)]))'));
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await sheet()) === 'open'), 'Undo: open again (one step)');
+  check((await call('GET', '/api/state', null, BK)).settings?.start_page === 'home', '... and the setting saved before stays (#5699)');
   await w.eval(`histStep('redo')`);
   check(await until(async () => (await sheet()) === 'closed'), 'Redo: closed again');
   w.close();

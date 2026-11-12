@@ -143,7 +143,7 @@ function objSess(url, seen) { OBS.s[url] = {seen}; }
 function objSaved(url, name, after) {
   if (!OBS.s[url] || typeof histAdd !== 'function') return false;
   objClose(url);
-  if (!HIST.fresh.some(f => Date.now() - f.at < HIST_FRESH_MS)) return false;  // no step on the server (nothing changed, an agent)
+  if (!histFresh(null).length) return false;  // no step on the server (nothing changed, an agent); 2.997.0 (#5697): a setting the app saved by itself is not it
   const msg = tr('{0} saved', name || tr('Saved'));
   const e = histAdd({label: msg, ids: [], lids: [], post: () => after?.()});
   histToast(msg, e, 10000);

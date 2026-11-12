@@ -49,11 +49,17 @@ function reverseOf(before, after, fields = UNDO_FIELDS) {
 }
 // ---- the server's step groups
 // core.js rawFetch0: a write's answer named the group its step went into (X-Kalmido-Undo-Gid); the next entry takes it
-function histUgid(gid) {
+function histUgid(gid, url) {
   if (!(gid > 0)) return;
-  HIST.fresh.push({gid, at: Date.now()});
+  HIST.fresh.push({gid, at: Date.now(), sett: /^\/api\/settings(\/|\?|$)/.test(String(url || ''))});  // 2.997.0 (#5697 #5699 #5703 #5710): sett, see histFresh
   if (HIST.fresh.length > 50) HIST.fresh.shift();
 }
+// 2.997.0 (#5697, #5699, #5703, #5710): the fresh groups an entry without a group of its own takes. The app saves settings by
+// itself (the colour scheme of a new device, the arrangement of a view after drawing it) and the server records them as steps
+// (accounts/setundo.py); such a group only goes to an entry of a setting (sett), never to the next step of another area: that
+// entry took the setting's group, its own undo / redo no longer ran and Undo put the setting back instead (a receipt suggestion
+// stayed accepted, a closed month closed, the ticks "checked" stayed)
+const histFresh = (e, now = Date.now()) => HIST.fresh.filter(f => now - f.at < HIST_FRESH_MS && (!f.sett || e?.sett)).map(f => f.gid);
 // the groups of an entry: its own, the ones of its outbox entries' answers, its parts'
 function histGids(e) {
   if (!e) return [];
@@ -76,7 +82,7 @@ function histAdd(e) {
   histFree();
   const now = Date.now(), own = e.res?._ugid || +(e.res?.undo_group || 0);  // 2.905.0 (#5255): the header's group, or the answer's own field (#5476 areas)
   e.gids = [...(e.gids || []), ...(own ? [own] : [])];
-  if (!e.parts && !e.qs.length && !own && !e.gids.length) e.gids.push(...HIST.fresh.filter(f => now - f.at < HIST_FRESH_MS).map(f => f.gid));
+  if (!e.parts && !e.qs.length && !own && !e.gids.length) e.gids.push(...histFresh(e, now));  // 2.997.0 (#5697 ...): histFresh
   HIST.fresh = [];
   if (!e.at) { e.at = now; e.area = e.area || (e.sett ? 'self' : S.route?.mod || 'tasks'); }
   if (!e.parts && !e.gids.length && !e.qs.length && !e.undo) return e;  // nothing to take back (a change that joined one still waiting in the outbox: that entry has it)  // 2.773.0 (#5242): time and area for the list "Recent steps" (undolist.js)

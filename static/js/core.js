@@ -667,7 +667,7 @@ async function rawFetch0(method, url, body, key, osp) {
     if (j.pin && S.me?.kid) { e.shown = true; kd_pinClosed(); }  // 2.49.0 (#1551): the PIN time ran out: ask again
     throw e; }
   const ug = method !== 'GET' ? +(r.headers.get('X-Kalmido-Undo-Gid') || 0) : 0;  // 2.905.0 (#5255): the server's step group of this write (undo.js)
-  if (ug) { if (j && typeof j === 'object') Object.defineProperty(j, '_ugid', {value: ug, configurable: true}); if (!(OUT.flushing && key)) histUgid(ug); }  // an outbox entry's group: through its answer (e.res)
+  if (ug) { if (j && typeof j === 'object') Object.defineProperty(j, '_ugid', {value: ug, configurable: true}); if (!(OUT.flushing && key)) histUgid(ug, url); }  // an outbox entry's group: through its answer (e.res)
   if (method !== 'GET' && typeof oun_ok === 'function') oun_ok(method, url, j);  // 2.111.0 A (#2233)
   if (method !== 'GET' && typeof lpOwnNote === 'function') lpOwnNote(r.headers.get('X-Kalmido-Lv'));  // 2.280.0 A (#3109): liveparts.js
   return j;
