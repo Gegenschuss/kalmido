@@ -353,11 +353,14 @@ def ctl_refuse(step, level, lid, d):
         msg = tr("One-way step: ask with an approval card in your chat (approval.step = method, path, body and if_match exactly as in this answer), then after the Yes run it with POST /api/v1/agent/approvals/ID/run (MCP: run_approved_step) - the server sends exactly this step.")
     else:
         msg = tr("Your control level needs an approval for this step: ask with an approval card in your chat (approval.step = method, path, body and if_match exactly as in this answer), then after the Yes run it with POST /api/v1/agent/approvals/ID/run (MCP: run_approved_step) - the server sends exactly this step.")
+    files = request.mimetype == "multipart/form-data" and bool(request.files)
+    if files:  # 2.1078.0 (#5866, N4): the run from the card sends JSON only, an upload cannot run there: the header way
+        msg = tr("Your control level needs an approval for this upload: ask with an approval card in your chat (approval.step = method, path and body exactly as in this answer), then after the Yes send this request again with the files and the header X-Kalmido-Approval: ID of the card (MCP: use_approval) - the run from the card cannot send files.")
     rb = ctl_req_body()  # 2.235.0 A2 (#2891): the card binds the body too -- copy it into approval.step.body
     im = (request.headers.get("If-Match") or "").strip()[:200]  # 2.1045.0 (#5827): the version read, sent along when the card runs
     st = {"method": request.method, "path": request.path, **({"body": rb} if rb not in ({}, []) else {}), **({"if_match": im} if im else {})}
     return v1_err(409, msg, name="approval_required", step=step, level=level, project_id=lid,
-                  approval={**st, "header": CTL_HEADER})
+                  approval={**st, "header": CTL_HEADER}, **({"run": "header"} if files else {}))
 
 
 def ctl_req_body():

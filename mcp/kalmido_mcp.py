@@ -165,12 +165,12 @@ class Kalmido:
             if isinstance(er, dict) and er.get("reason"):
                 msg += f" [reason: {er['reason']}" + (f"; fields: {', '.join(map(str, er['fields']))}" if er.get("fields") else "") + "]"
             if isinstance(er, dict) and er.get("code") == "approval_required" and isinstance(er.get("approval"), dict):
-                msg += " " + self._keep_refused(er["approval"])
+                msg += " " + self._keep_refused(er["approval"], er.get("run") == "header")
         except (ValueError, AttributeError, TypeError):
             pass
         return msg
 
-    def _keep_refused(self, ap):
+    def _keep_refused(self, ap, header=False):
         """2.1045.0 (#5827): keeps the step of a 409 approval_required (method, path, body, if_match as the server sent them), so
         request_chat_approval takes it over by step_ref instead of the model typing it again -> the hint for the model."""
         st = {k: ap[k] for k in ("method", "path", "body", "if_match") if ap.get(k) not in (None, "", {}, [])}
@@ -182,6 +182,10 @@ class Kalmido:
         self.refused[ref] = st
         for old in sorted(self.refused)[:-20]:  # the newest 20
             del self.refused[old]
+        if header:  # 2.1078.0 (#5866, N4): an upload (files) cannot run from the card: after the Yes the same call again
+            return (f"The step is kept as step_ref={ref} ({st.get('method')} {st.get('path')}): ask with request_chat_approval "
+                    f"step_ref={ref}; after the Yes call use_approval with the card's message_id and then this upload again with the "
+                    "same files and fields (run_approved_step cannot send files).")
         return (f"The step is kept as step_ref={ref} ({st.get('method')} {st.get('path')}): ask with request_chat_approval "
                 f"step_ref={ref}; after the Yes call run_approved_step with the card's message_id (never send the request again yourself).")
 

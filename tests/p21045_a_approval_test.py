@@ -14,6 +14,8 @@
  - 2.1045.0 review: a card never runs a card (400 on the card, 409 nested on a run), two runs at once run once (M3), a
    202 (the step waits for a person) leaves the card unused (N2), "used" says "in use right now or has run" (N3)
  - MCP: the 409 keeps the step as step_ref, request_chat_approval step_ref makes the card, run_approved_step runs it
+ - 2.1078.0 (#5866): an upload's 409 names the header way (run: header, MCP: use_approval), N4; a card path still holding a
+   percent sign after decoding is refused, N7
 freelancer-matrix: agents (the personal agent belongs to a person without an organisation)
 usage: p21045_a_approval_test.py <datadir>      (KMT_NOSTART=1 / P21045A_NOSTART=1: a running server)"""
 import importlib.util
@@ -38,7 +40,8 @@ A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
 FID, F = freelancer(B, A)
 OID, OTTO = freelancer(B, A, "otto")
 SCOPES = ["read", "tasks:write", "comments", "wiki:read", "wiki:write", "calendar", "contacts", "sheets:read", "sheets:write",
-          "structure"]  # 2.1045.0 (#5827, N2): its own project for a step that waits for a person
+          "structure",  # 2.1045.0 (#5827, N2): its own project for a step that waits for a person
+          "attachments:write"]  # 2.1078.0 (#5866, N4): an upload
 
 
 def err(r):
@@ -110,6 +113,20 @@ check("PATCH" in err(r).get("message", "") and "does not exist" in err(r).get("m
 r = card({"method": "POST", "path": "/no/such/route"}, want=400)
 check("does not exist" in err(r).get("message", ""), f"a path that does not exist: 400 {r.text[:200]}")
 check(not kt.dbx("SELECT 1 FROM agent_chat WHERE agent_id=? AND choices->'approval' IS NOT NULL", (FA,)), "no card was stored")
+
+# ================================================================== 2.1078.0 (#5866, N4): an upload names the header way
+# the run from the card sends JSON only: the 409 of an upload (multipart with files) sends the agent to the header way, not to /run
+UP = {"file": ("plan.txt", b"shot list", "text/plain")}
+r = api("POST", f"/tasks/{T}/attachments", files=UP)
+e = err(r)
+check(r.status_code == 409 and e.get("code") == "approval_required" and e.get("run") == "header"
+      and "X-Kalmido-Approval" in e.get("message", "") and "/run" not in e.get("message", ""),
+      f"N4: the refused upload names the header way {r.status_code} {r.text[:300]}")
+mid = approved(r, "N4 upload")
+r = api("POST", f"/tasks/{T}/attachments", mid=mid, files=UP)
+check(r.status_code == 201, f"N4: after the Yes the same upload with the header goes through {r.status_code} {r.text[:200]}")
+r = api("POST", f"/tasks/{T}/comments", json={"body": "Plain"})
+check(r.status_code == 409 and "run" not in err(r) and "/run" in err(r).get("message", ""), f"N4: a JSON write keeps the run way {r.text[:200]}")
 
 # ================================================================== a knowledge page with a long body, run from the card
 cur = api("GET", f"/wiki/pages/{PID}").json()
@@ -330,5 +347,11 @@ try:
 except M.ApiError as e:
     check(e.status == 409 and "reason: used" in e.message, f"MCP: the second run says used {e.message[:300]}")
 check("run_approved_step" in M.TOOL_MAP and M.TOOL_SCOPE.get("run_approved_step") == "agent", "MCP: the tool exists with scope agent")
+try:  # 2.1078.0 (#5866, N4): an upload through MCP: the hint names use_approval, not run_approved_step
+    mc.call("POST", f"/tasks/{T}/attachments", multipart=({}, [("plan.txt", "text/plain", b"shot list")]))
+    check(False, "MCP N4: the upload is refused first")
+except M.ApiError as e:
+    check(e.status == 409 and "use_approval" in e.message and "step_ref=" in e.message, f"MCP N4: the upload hint names use_approval {e.message[:300]}")
+
 
 sys.exit(done("p21045_a_approval"))
