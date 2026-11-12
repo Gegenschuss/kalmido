@@ -60,9 +60,10 @@ for t in sorted(TABLES - DROPPED):
     check(t in with_org, f"core/rls.py TABLES: {t} has no org_id in schema.py (stale entry)")
 check(OWN == {"orgs", "org_members"}, "orgs and org_members have their own policies")
 
-# the module has no imports at module level: load it on its own and look at the rules it writes
+# load the module on its own and look at the rules it writes; 2.1079.0 (#5654): without its relative imports (from .pg import
+# qi, table_names for _lock_all) -- the rules need none of them, and importing the package would start the app
 ns = {}
-exec(compile(rls_src, "rls.py", "exec"), ns)  # noqa: S102 -- our own source, no imports
+exec(compile(re.sub(r"(?m)^from \.\w+ import .*$", "", rls_src), "rls.py", "exec"), ns)  # noqa: S102 -- our own source, no imports
 for nullable in (True, False):
     r = ns["rule"](nullable)
     check("NULLIF(current_setting('app.role', true), '') = 'system'" in r, f"rule({nullable}): system passes")

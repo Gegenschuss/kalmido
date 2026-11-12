@@ -20,6 +20,8 @@ org_id that is missing here still gets the policy at start-up (with a warning), 
 
 import time
 
+from .pg import qi, table_names  # 2.1079.0 (#5654): _lock_all
+
 APP_ROLE = "kalmido_app"
 
 # tables whose rows belong to an organisation (column org_id); orgs / org_members have their own policies below
@@ -184,7 +186,6 @@ def _lock_all(c, tables):
     lock one by one as before). True when locked."""
     if not tables:
         return True
-    from .pg import qi, table_names  # here, not at module level: tests/rls_static_test.py loads this module without imports
     ok = table_names(c)  # the allowlist of qi(): the names come from the catalog (org_tables) and OWN_RULES
     prev = c.execute("SELECT current_setting('lock_timeout')").fetchone()[0]
     done = False
