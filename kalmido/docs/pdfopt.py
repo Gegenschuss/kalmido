@@ -273,12 +273,19 @@ def po_tmp_clean(age=None):
 class _Pages:
     """The rendering + page worker of one PDF in a temp folder (one page image at a time lies there)."""
 
-    def __init__(self, data, n=1):
-        self.tmp = tempfile.mkdtemp(prefix="kpdo-")
+    def __init__(self, data, n=1, tmp=None, budget=None):
+        """tmp (2.1073.0, #5570): the folder of a stepwise run (po_begin wrote its in.pdf); it stays after the step, only
+        the worker ends. budget: the seconds of the run left (a run's time is counted over its steps)."""
+        self.keep = tmp is not None
+        self.tmp = tmp if self.keep else tempfile.mkdtemp(prefix="kpdo-")
         self.w = None
         self.n = n
-        self.end = time.monotonic() + PO_DOC_S
+        self.end = time.monotonic() + (PO_DOC_S if budget is None else max(0.0, float(budget)))
         self.src = os.path.join(self.tmp, "in.pdf")
+        if self.keep:
+            if not os.path.isfile(self.src):
+                raise PoError("failed")
+            return
         try:
             with open(self.src, "wb") as f:
                 f.write(data)
@@ -292,7 +299,8 @@ class _Pages:
                                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0, close_fds=True,
                                       env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
         except BaseException:  # review F9: __exit__ does not run when __enter__ fails
-            shutil.rmtree(self.tmp, ignore_errors=True)
+            if not self.keep:
+                shutil.rmtree(self.tmp, ignore_errors=True)
             raise
         return self
 
@@ -304,7 +312,8 @@ class _Pages:
                 pass
             self.w.kill()
             self.w.wait()
-        shutil.rmtree(self.tmp, ignore_errors=True)
+        if not self.keep:
+            shutil.rmtree(self.tmp, ignore_errors=True)
 
     def clock(self):
         if time.monotonic() > self.end:
@@ -369,24 +378,26 @@ def _check(data):
     return n
 
 
+def _ana_page(pg, i, langs):
+    """The measure of page i (1-based): {k, b, ink, c, m} (one heavy step: the slot)."""
+    with _Slot():
+        png = pg.render(i, PO_DPI_SCAN, False)
+        try:
+            a = pg.ask({"op": "ana", "p": png})
+            text = None
+            if float(a["ink"]) < SP_INK:  # only an almost empty page is read (the stack split's rule)
+                try:
+                    text = OCR._tess(png, OCR.OCR_PAGE_S, langs)
+                except (OSError, RuntimeError, subprocess.SubprocessError):
+                    text = None
+        finally:
+            _rm(png)
+    return {"k": po_kind("auto", a["ink"], a["color"], a["mid"]), "b": 1 if po_blank(a["ink"], text) else 0,
+            "ink": a["ink"], "c": a["color"], "m": a["mid"]}
+
+
 def _analyse(pg, n, langs):
-    out = []
-    for i in range(1, n + 1):
-        with _Slot():
-            png = pg.render(i, PO_DPI_SCAN, False)
-            try:
-                a = pg.ask({"op": "ana", "p": png})
-                text = None
-                if float(a["ink"]) < SP_INK:  # only an almost empty page is read (the stack split's rule)
-                    try:
-                        text = OCR._tess(png, OCR.OCR_PAGE_S, langs)
-                    except (OSError, RuntimeError, subprocess.SubprocessError):
-                        text = None
-            finally:
-                _rm(png)
-        out.append({"k": po_kind("auto", a["ink"], a["color"], a["mid"]), "b": 1 if po_blank(a["ink"], text) else 0,
-                    "ink": a["ink"], "c": a["color"], "m": a["mid"]})
-    return out
+    return [_ana_page(pg, i, langs) for i in range(1, n + 1)]
 
 
 def po_analyse(data, langs=None):
@@ -417,9 +428,33 @@ def _page_pdf(pg, i, k, langs):
         _rm(png, img)
 
 
+def po_page_kind(mode, p):
+    """The kind page p (its measure) becomes in mode (auto: the kind measured, in doubt colour)."""
+    if mode != "auto":
+        return po_kind(mode, p.get("ink"), p.get("c"), p.get("m"))
+    return p.get("k") if p.get("k") in PO_KINDS else "color"
+
+
+def _join(pg, parts):
+    """The page PDFs joined (pypdf in a limited child process): the PDF's bytes."""
+    if not parts:
+        raise PoError("unreadable")
+    pg.clock()
+    with _Slot():
+        try:
+            j = subprocess.run([sys.executable, "-I", "-c", JOIN_WORKER, json.dumps(parts)], capture_output=True,
+                               timeout=300, close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+        except subprocess.TimeoutExpired:
+            raise PoError("too_complex") from None
+    if j.returncode != 0 or j.stdout[:4] != b"%PDF":
+        raise PoError("failed")
+    return j.stdout
+
+
 def po_optimise(data, mode="auto", blank=True, langs=None, pages=None):
     """{"pdf": bytes, "pages": analysis, "drop": [1-based], "kinds": {bw, gray, color}} -- the optimised PDF with a text layer.
-    pages = an analysis of exactly these bytes made before (po_analyse: the list a person saw), else it is made here."""
+    pages = an analysis of exactly these bytes made before (po_analyse: the list a person saw), else it is made here.
+    In one go (a manual check, the tests); the queue goes page by page (po_begin / po_step_*, #5570)."""
     if mode not in PO_MODES:
         raise PoError("failed")
     n = _check(data)
@@ -432,23 +467,68 @@ def po_optimise(data, mode="auto", blank=True, langs=None, pages=None):
         for i in range(1, n + 1):
             if i in drop:
                 continue
-            p = pages[i - 1]
-            k = po_kind(mode, p.get("ink"), p.get("c"), p.get("m")) if mode != "auto" else (p.get("k") if p.get("k") in PO_KINDS else "color")
+            k = po_page_kind(mode, pages[i - 1])
             kinds[k] += 1
             with _Slot():  # review F2: the slot per page
                 parts.append(_page_pdf(pg, i, k, langs))
-        if not parts:
-            raise PoError("unreadable")
-        pg.clock()
+        return {"pdf": _join(pg, parts), "pages": pages, "drop": drop, "kinds": kinds}
+
+
+# ---- 2.1073.0 (#5570): the run page by page, one queue step per page ------------------------------------------------
+# A run of many pages held the documents queue (and its GATE.bg) for up to PO_DOC_S: no recognition of new scans, a restore
+# refused. Now the queue (docs/pdfoptq.py) makes one page per step: the run's folder (po_dir) keeps the PDF and the page
+# PDFs made so far between the steps, the state in doc_meta.pdf_opt notes how far it got; between two steps the queue
+# recognises waiting documents and leaves GATE. The run's time (PO_DOC_S) is counted over its steps (budget).
+PO_DIR_RE = re.compile(r"^[0-9]+-[0-9a-f]{8,32}$")
+
+
+def po_dir(key):
+    """The folder of one stepwise run: key = "<node id>-<the run's word>" (nothing else is accepted)."""
+    if not PO_DIR_RE.match(str(key or "")):
+        raise PoError("failed")
+    return os.path.join(tempfile.gettempdir(), PO_TMP[0] + "r" + str(key))
+
+
+def po_begin(data, tmp):
+    """A run's first step: the checks (PoError) and the PDF into its folder tmp (a new one). -> the number of pages."""
+    n = _check(data)
+    shutil.rmtree(tmp, ignore_errors=True)
+    os.makedirs(tmp, mode=0o700)
+    try:
+        with open(os.path.join(tmp, "in.pdf"), "wb") as f:
+            f.write(data)
+    except BaseException:  # review F9: a full disk leaves no folder behind
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+    return n
+
+
+def po_end(tmp):
+    """The run's folder goes (done, failed, put back)."""
+    if tmp:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def po_step_ana(tmp, n, i, langs=None, budget=None):
+    """One step: the measure of page i of the run in tmp (po_analyse's entry of that page)."""
+    with _Pages(None, n, tmp=tmp, budget=budget) as pg:
+        return _ana_page(pg, i, langs or OCR.OCR_LANGS)
+
+
+def po_step_page(tmp, n, i, k, langs=None, budget=None):
+    """One step: page i as kind k with its text layer, kept in tmp for the join."""
+    with _Pages(None, n, tmp=tmp, budget=budget) as pg:
         with _Slot():
-            try:
-                j = subprocess.run([sys.executable, "-I", "-c", JOIN_WORKER, json.dumps(parts)], capture_output=True,
-                                   timeout=300, close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
-            except subprocess.TimeoutExpired:
-                raise PoError("too_complex") from None
-        if j.returncode != 0 or j.stdout[:4] != b"%PDF":
-            raise PoError("failed")
-        return {"pdf": j.stdout, "pages": pages, "drop": drop, "kinds": kinds}
+            _page_pdf(pg, i, k, langs or OCR.OCR_LANGS)
+
+
+def po_step_join(tmp, n, keep, budget=None):
+    """The last step: the pages kept (1-based numbers, each made by po_step_page) joined -> the PDF's bytes."""
+    parts = [os.path.join(tmp, f"t{i:04d}.pdf") for i in keep]
+    if any(not os.path.isfile(p) for p in parts):
+        raise PoError("failed")
+    with _Pages(None, n, tmp=tmp, budget=budget) as pg:
+        return _join(pg, parts)
 
 
 if __name__ == "__main__":  # a manual check: python -m kalmido.docs.pdfopt FILE [auto|bw|gray]

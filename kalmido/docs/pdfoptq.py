@@ -19,7 +19,8 @@ need_node, AccessCtx: write for the run); the queue checks the write right of th
 it writes (fs_role), the version path checks the rest. The runs go through their own thread next to the documents queue
 (docs/ingest.py po_run_once, 2.1069.0 #5412: a run of up to PO_DOC_S never holds up the recognition of new documents; both
 share the tools' slot per page, ocr._SEM), one at a time, a workspace not served lately first, with the limits of
-docs/pdfopt.py and at most PO_WAIT_MAX waiting per person and PO_WS_MAX per workspace (429).
+docs/pdfopt.py and at most PO_WAIT_MAX waiting per person and PO_WS_MAX per workspace (429) -- since 2.1073.0 (#5570) one page per
+step of that thread, so a restore (GATE) comes in between the pages.
 
 doc_meta.pdf_opt (fragment 4873_a): JSON without any content of the document, only numbers and words of the state:
   queued / running ({"q": 1, ...} first: the queue's partial index): state check | scan (measuring) | wait | run (optimising)
@@ -28,6 +29,8 @@ doc_meta.pdf_opt (fragment 4873_a): JSON without any content of the document, on
   first optimisation and the optimised one, kept over later checks)."""
 import calendar
 import json
+import os
+import secrets
 import time
 
 from contextlib import nullcontext
@@ -60,8 +63,11 @@ PO_RUN = ("check", "scan", "wait", "run")
 PO_WAIT_MAX = P.OCR._env_int("KALMIDO_PDFOPT_WAIT", 200, 1, 100000)  # review F2: runs one person may have waiting at most
 # 2.1069.0 (#5412, review 2.781 F2): runs one workspace may have waiting at most (the person's limit above stays)
 PO_WS_MAX = P.OCR._env_int("KALMIDO_PDFOPT_WS_WAIT", 200, 1, 100000)
-_PQ = {"recent": [], "clean": True}  # review F2: the workspaces served last (round robin as docs/ingest.py DOCS_NEXT)
-PO_STALE = P.PO_DOC_S + 600          # s after which a run cut off (a restart) is taken up again
+_PQ = {"recent": [], "clean": 0.0}  # review F2: the workspaces served last (round robin as docs/ingest.py DOCS_NEXT)
+# 2.1073.0 (#5570, Fable F9): s after which a step cut off is taken up again -- one step is one page now (the slot's wait, the
+# render, the page worker, Tesseract; the join 300 s), not a whole run
+PO_STALE = min(P.PO_DOC_S, P.OCR.OCR_PAGE_S * 4 + P.PO_WORKER_S + 300) + 600
+PO_CLEAN_S = 3600                    # 2.1073.0 (Fable F6): the run folders are checked for orphans every hour
 PO_TRIES = 2
 PO_BULK = 200                        # documents of one selection at most
 PO_ERRORS = {
@@ -165,6 +171,8 @@ def po_view(c, m, n, full=True):
     out["fresh"] = int(v.get("to" if v.get("state") == "done" else "v") or 0) == int(n["cur_version"] or 0)
     if isinstance(v.get("pages"), list):
         out["pages"] = [{"k": p.get("k"), "b": p.get("b")} for p in v["pages"]]
+    if v.get("state") in ("scan", "run") and v.get("tot"):  # 2.1073.0 (#5570): how far a run page by page got [made, all]
+        out["step"] = [min(int(v.get("dn") or 0), int(v["tot"])), int(v["tot"])]
     e = v.get("error") or ""
     out["error"], out["error_text"] = e, tr(PO_ERRORS[e]) if e in PO_ERRORS else ""
     return out
@@ -349,11 +357,41 @@ def _age(v):
         return 1e9
 
 
+# 2.1073.0 (#5570): a run goes page by page, one queue step per page (docs/pdfopt.py po_begin / po_step_*). The keys of
+# a run under way (removed when it ends or is put back): tok (the word of its folder), sv (the version read), n (pages),
+# ana (the measures so far), bl (blank pages may go: the list a person saw), pg (the last page made), dn / tot (steps made
+# / all, GET .../pdfopt "step"), sec (seconds worked, PO_DOC_S over all steps), on (a step is working right now).
+PO_WK = ("tok", "sv", "n", "ana", "bl", "pg", "dn", "tot", "sec", "on")
+
+
+def _tmp(nid, v):
+    try:
+        return P.po_dir(f"{int(nid)}-{v.get('tok')}") if v.get("tok") else None
+    except P.PoError:
+        return None
+
+
+def _bare(v):
+    """The state without the keys of a run under way (its folder goes)."""
+    return {k: x for k, x in v.items() if k not in PO_WK}
+
+
+def _end(nid, v):
+    P.po_end(_tmp(nid, v))
+
+
 def _fail(c, nid, v, key):
-    po_put(c, nid, {**{k: x for k, x in v.items() if k not in ("q", "tries")}, "state": "skipped" if key == "office" else "failed",
+    _end(nid, v)
+    po_put(c, nid, {**{k: x for k, x in _bare(v).items() if k not in ("q", "tries")}, "state": "skipped" if key == "office" else "failed",
                     "error": key, "at": _now()})
     bump(c)
     c.commit()
+
+
+def _back(nid, v, st, t):
+    """A run cut off goes back to its start (check / wait), cut off t times."""
+    _end(nid, v)
+    return {**_bare(v), "state": "check" if st == "scan" else "wait", "tries": t, "at": _now()}
 
 
 def po_take_up(c):
@@ -363,26 +401,38 @@ def po_take_up(c):
     for r in rows:
         v = po_get(r)
         st = v.get("state")
+        if st in ("scan", "run") and v.get("tok") and not v.get("on"):
+            continue  # 2.1073.0 (#5570, Fable F7): a run waiting between two pages goes on (its folder; gone: it starts again)
         if st in ("scan", "run"):
             t = int(v.get("tries") or 0) + 1
             if t >= PO_TRIES:
-                po_put(c, r[0], {**{k: x for k, x in v.items() if k not in ("q", "tries")}, "state": "failed", "error": "failed", "at": _now()})
+                _end(r[0], v)
+                po_put(c, r[0], {**{k: x for k, x in _bare(v).items() if k not in ("q", "tries")}, "state": "failed", "error": "failed", "at": _now()})
             else:
-                po_put(c, r[0], {**v, "state": "check" if st == "scan" else "wait", "tries": t, "at": _now()})
+                po_put(c, r[0], _back(r[0], v, st, t))
 
 
 def _pick(rows):
     """Review F2: the next waiting row -- a workspace not served lately first (round robin as DOCS_NEXT), then the oldest."""
     rec = _PQ["recent"]
-    return min(rows, key=lambda r: (rec.index(r["ws"]) if r["ws"] in rec else -1, str(po_get(r).get("at") or ""), r[0]), default=None)
+    # 2.1073.0 (#5570): a run under way first (its folder holds a copy of the file: one run at a time, not one per waiting row)
+    return min(rows, key=lambda r: (0 if po_get(r).get("tok") else 1, rec.index(r["ws"]) if r["ws"] in rec else -1,
+                                    str(po_get(r).get("at") or ""), r[0]), default=None)
 
 
 def po_queued(c):
-    """One step: a waiting measure / run. Returns 1 when it did something. The caller runs it in system_ctx (the queue works
-    for every workspace; rights: the person who asked, checked here)."""
-    if _PQ["clean"]:  # review F9: temp folders of runs a killed process left behind (older than a run may take)
-        _PQ["clean"] = False
+    """One step: a waiting measure / run, or the next page of one under way (#5570). Returns 1 when it did something. The
+    caller runs it in system_ctx (the queue works for every workspace; rights: the person who asked, checked here)."""
+    if time.monotonic() - _PQ["clean"] > PO_CLEAN_S or not _PQ["clean"]:  # review F9: temp folders a killed process left
+        _PQ["clean"] = time.monotonic()  # behind; 2.1073.0 (Fable F6): every hour, a run under way touches its folder each step
         P.po_tmp_clean()
+    # 2.1073.0 (Fable F6): a run under way whose file went to the trash (or a folder above) is never picked below: it fails
+    # as "gone" here and its folder (a copy of the file) goes at once
+    for g in c.execute(f"SELECT d.node_id, d.pdf_opt FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {PO_Q} "
+                       f"AND NOT ({live_sql('n')})").fetchall():
+        if po_get(g).get("tok"):
+            _fail(c, g[0], po_get(g), "gone")
+            return 1
     # review F3: the rows an automatic run must leave for now are left out in SQL, no LIMIT before that
     rows = c.execute(f"SELECT d.node_id, d.pdf_opt, d.ws FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {PO_Q} "
                      f"AND {PO_PICK} AND {live_sql('n')}").fetchall()
@@ -390,13 +440,15 @@ def po_queued(c):
     for r in rows:
         v = po_get(r)
         st = v.get("state")
-        if st in ("scan", "run"):  # running: only a run cut off long ago (a restart) is taken up again
+        # a step working right now (or a run of the time before #5570 without a folder): only one cut off long ago (a
+        # restart) is taken up again
+        if st in ("scan", "run") and (v.get("on") or not v.get("tok")):
             if _age(v) > PO_STALE:
                 t = int(v.get("tries") or 0) + 1
                 if t >= PO_TRIES:
                     _fail(c, r[0], v, "failed")
                 else:
-                    po_put(c, r[0], {**v, "state": "check" if st == "scan" else "wait", "tries": t}, r[1])
+                    po_put(c, r[0], _back(r[0], v, st, t), r[1])
                     c.commit()
                 return 1
             continue
@@ -407,18 +459,19 @@ def po_queued(c):
     # 2.1069.0 (#5412, review F2/F5): a new measure / run starts only while no document waits for its recognition -- the
     # recognition never waits for a run (own thread), and a run does not fight a backlog for the tools' slot (busy, the
     # run's clock) nor overwrite the recognition of a version it is about to replace
-    if c.execute("SELECT 1 FROM doc_meta WHERE state IN ('wait', 'run') LIMIT 1").fetchone():
+    # 2.1073.0 (#5570): a run under way (tok) goes on page by page -- each page shares the slot with the recognition
+    if not po_get(r).get("tok") and c.execute("SELECT 1 FROM doc_meta WHERE state IN ('wait', 'run') LIMIT 1").fetchone():
         return 0
     nid, old, v = r[0], r[1], po_get(r)
     _PQ["recent"] = [w for w in _PQ["recent"] if w != r["ws"]][-63:] + [r["ws"]]
-    run = v["state"] == "wait"
-    v = {**v, "state": "run" if run else "scan", "at": _now()}
+    run = v["state"] in ("wait", "run")
+    v = {**v, "state": "run" if run else "scan", "on": 1, "at": _now()}
     if not po_put(c, nid, v, old):
         c.commit()
         return 1
     c.commit()
     try:
-        if _work(c, nid, v, run) == "busy":
+        if _step(c, nid, v, run) == "busy":
             return 0  # another heavy reader holds the tools (it waited OCR_PAGE_S * 2 already): the next tick
     except OperationalError:
         raise
@@ -428,14 +481,27 @@ def po_queued(c):
         m = S.meta_row(c, nid)
         if m and po_get(m).get("state") in ("scan", "run"):
             _fail(c, nid, po_get(m), "failed")
+        else:
+            _end(nid, v)
     return 1
 
 
-def _work(c, nid, v, run):
+def _save(c, nid, v, w):
+    """The state after a step (compare and set against the step's own; somebody else changed it: the run's folder goes)."""
+    if not po_put(c, nid, {k: x for k, x in w.items() if k != "on"}, _dump(v)):
+        _end(nid, v)
+    c.commit()
+
+
+def _step(c, nid, v, run):
+    """2.1073.0 (#5570): one step of a measure / run -- the first reads the file into the run's folder, then one page per
+    step (the measure, then the page with its text layer), the last joins the pages and writes the new version."""
     m = S.meta_row(c, nid)
     n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     if not m or not n or n["deleted_at"] or n["kind"] != "file" or fs_deleted(fs_chain(c, nid)):  # 2.892.0 (review): + a folder above in the trash
-        return _fail(c, nid, v, "gone") if m else None
+        if m:
+            return _fail(c, nid, v, "gone")
+        return _end(nid, v)
     uid = v.get("by")
     if not uid or fs_role(c, nid, uid) not in ("owner", "edit"):
         return _fail(c, nid, v, "denied")
@@ -444,38 +510,81 @@ def _work(c, nid, v, run):
     if int(n["size"] or 0) > P.PO_MAX:  # review F8: not read at all
         return _fail(c, nid, v, "too_big")
     ver = int(n["cur_version"] or 0)
-    data = fs_read(c, nid)
+    tmp = _tmp(nid, v)
+    if tmp and int(v.get("sv") or -1) != ver:  # a new version came between two steps
+        return _fail(c, nid, {**v, "v": ver}, "changed")
     try:
         langs = ocr_langs(_lang(c, uid=uid), base=S.cfg_get(c, m["ws"])["ocr_langs"] or None)[0]
     except Exception:  # noqa: BLE001 -- the language is a hint only
         langs = None
-    c.commit()  # no transaction stays open over the long work
-    pages = v.get("pages") if int(v.get("v") or 0) == ver else None
+    if not tmp or not os.path.isdir(tmp):  # the first step (or the folder went, a cleaning): the file into the run's folder
+        data = fs_read(c, nid)
+        c.commit()  # no transaction stays open over the work
+        tok = secrets.token_hex(8)
+        try:
+            npg = P.po_begin(data, P.po_dir(f"{int(nid)}-{tok}"))
+        except P.PoError as e:
+            return _fail(c, nid, {**v, "v": ver}, str(e))
+        seen = v.get("pages") if run and int(v.get("v") or 0) == ver else None
+        seen = seen if isinstance(seen, list) and len(seen) == npg else None
+        # review F5: pages only go with the list a person saw of this version (the check's "ready", _queue)
+        w = {**_bare(v), "tok": tok, "sv": ver, "n": npg, "ana": seen or [], "bl": 1 if v.get("blank") and seen is not None else 0,
+             "pg": 0, "dn": 0, "tot": (npg if seen is None else 0) + (npg if run else 0) + (1 if run else 0), "sec": 0,
+             "kinds": {k: 0 for k in P.PO_KINDS}, "before": len(data), "at": _now()}
+        return _save(c, nid, v, w)
+    c.commit()
+    npg, ana, sec = int(v.get("n") or 0), list(v.get("ana") or []), float(v.get("sec") or 0)
+    budget = P.PO_DOC_S - sec
+    t0 = time.monotonic()
+    drop = P.po_drop(ana, bool(v.get("bl"))) if len(ana) >= npg else []
     try:
-        if not run:
-            pages = P.po_analyse(data, langs)
+        if budget <= 0:
+            raise P.PoError("too_complex")
+        if len(ana) < npg:  # the measure of the next page
+            ana.append(P.po_step_ana(tmp, npg, len(ana) + 1, langs, budget))
+            w = {**v, "ana": ana}
+        elif not run:  # measured: the list for the person
+            base = {k: x for k, x in _bare(v).items() if k not in ("q", "tries", "error", "pages")}
+            _end(nid, v)
+            cur = S.meta_row(c, nid)
+            po_put(c, nid, {**base, "state": "ready", "v": ver, "pages": ana, "drop": P.po_drop(ana, bool(v.get("blank"))), "at": _now()},
+                   cur["pdf_opt"])
+            bump(c)
+            c.commit()
+            return None
+        elif int(v.get("pg") or 0) < npg:  # the next page kept, with its text layer (a page that goes is passed over)
+            i = int(v.get("pg") or 0) + 1
+            while i in drop and i < npg:
+                i += 1
+            kinds = {k: 0 for k in P.PO_KINDS}
+            kinds.update({k: int(x) for k, x in (v.get("kinds") or {}).items() if k in kinds})
+            if i not in drop:
+                k = P.po_page_kind(v.get("mode") or "auto", ana[i - 1])
+                P.po_step_page(tmp, npg, i, k, langs, budget)
+                kinds[k] += 1
+            w = {**v, "pg": i, "kinds": kinds, "dn": int(v.get("dn") or 0) + i - int(v.get("pg") or 0) - 1}  # + the pages passed over
         else:
-            # review F5: pages only go with the list a person saw of this version (the check's "ready", _queue)
-            res = P.po_optimise(data, v.get("mode") or "auto", bool(v.get("blank")) and pages is not None, langs, pages)
+            pdf = P.po_step_join(tmp, npg, [i for i in range(1, npg + 1) if i not in drop], budget)
+            return _finish(c, nid, v, ver, uid, pdf, ana, drop)
     except P.PoError as e:
         key = str(e)
-        m = S.meta_row(c, nid)
-        if key == "busy":  # another heavy reader: back into the queue, the next step tries again
-            po_put(c, nid, {**po_get(m), "state": "wait" if run else "check"})
-            c.commit()
+        if key == "busy":  # another heavy reader: the step goes back into the queue as it was, the next tick tries again
+            _save(c, nid, v, dict(v))  # Fable F8: the wait for the slot costs the run none of its time
             return "busy"
         return _fail(c, nid, {**v, "v": ver}, key)
-    base = {k: x for k, x in v.items() if k not in ("q", "tries", "error", "pages")}
-    if not run:
-        cur = S.meta_row(c, nid)
-        po_put(c, nid, {**base, "state": "ready", "v": ver, "pages": pages, "drop": P.po_drop(pages, bool(v.get("blank"))), "at": _now()},
-               cur["pdf_opt"])
-        bump(c)
-        c.commit()
-        return None
-    pdf = res["pdf"]
-    done = {**base, "v": ver, "pages": res["pages"], "drop": res["drop"], "kinds": res["kinds"], "before": len(data), "after": len(pdf), "at": _now()}
-    if not P.po_smaller(len(data), len(pdf)):
+    w["dn"] = int(w.get("dn", v.get("dn")) or 0) + 1
+    w["sec"] = round(sec + (time.monotonic() - t0), 1)
+    return _save(c, nid, v, w)
+
+
+def _finish(c, nid, v, ver, uid, pdf, ana, drop):
+    """The joined PDF: a new version when it is smaller (else "same"), the run's folder goes."""
+    _end(nid, v)
+    base = {k: x for k, x in _bare(v).items() if k not in ("q", "tries", "error", "pages")}
+    before = int(v.get("before") or 0)
+    done = {**base, "v": ver, "pages": ana, "drop": drop, "kinds": v.get("kinds") or {k: 0 for k in P.PO_KINDS}, "before": before,
+            "after": len(pdf), "at": _now()}
+    if not P.po_smaller(before, len(pdf)):
         po_put(c, nid, {**done, "state": "same"})
         bump(c)
         c.commit()

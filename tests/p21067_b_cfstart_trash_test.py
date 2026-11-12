@@ -31,6 +31,7 @@ sys.path.insert(0, N)
 import testclock  # noqa: E402
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 from kt import B, check, dbx, done, fresh, sess  # noqa: E402
+from office_trash_old import OLD_DDL, dropped, gone  # noqa: E402  2.1073.0 (#5865)
 from obj_probe import in_app  # noqa: E402
 
 KEY = base64.b64encode(os.urandom(32)).decode()
@@ -70,6 +71,7 @@ def old_copy(oid, uid, when="2099-01-09T10:00:00.000Z"):
     raw = json.loads(dbx("SELECT CAST(row_to_json(x) AS TEXT) FROM office_cf_start x WHERE org_id=?", (oid,))[0][0])
     snap = {"rows": [["office_cf_start", [{k: v for k, v in raw.items() if k not in ("id", "deleted_at", "deleted_by", "rev")}]]],
             "nulls": [], "key": "org_id"}
+    dbx(OLD_DDL)  # 2.1073.0 (#5865): the table as the versions before made it (every start of the app drops it again)
     tid = dbx("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
               (oid, "cf_start", "", oid, raw.get("day") or "", json.dumps(snap), uid, when))[0][0]
     dbx("DELETE FROM office_cf_start WHERE org_id=?", (oid,))
@@ -88,14 +90,13 @@ def scenario(S, who, oid, uid, other, member=None):
     check(r.ok and (start(S) or {}).get("amount") == "2500.00", f"{who}: setup start balance {r.text[:200]}")
     st0, acc0 = account(S)
     check(st0 and acc0 is not None, f"{who}: setup: the cash flow shows the account balance {st0} {acc0}")
-    n_copies = dbx("SELECT COUNT(*) FROM office_trash")[0][0]
     r = S.delete(ST)
     tr0 = (r.json().get("trash") or {}) if r.ok else {}
     check(r.ok and tr0 == {"kind": "ocfstart", "id": oid} and "trash_id" not in r.json() and (r.json().get("prev") or {}).get("amount") == "2500.00",
           f"{who}: DELETE answers where it lies in the core's trash {r.text[:200]}")
     rw = row(oid)
-    check(rw and rw[0] == oid and rw[1] and rw[2] == uid and dbx("SELECT COUNT(*) FROM office_trash")[0][0] == n_copies,
-          f"{who}: the row stays with deleted_at / deleted_by, no copy in office_trash {rw}")
+    check(rw and rw[0] == oid and rw[1] and rw[2] == uid and gone(dbx),
+          f"{who}: the row stays with deleted_at / deleted_by, no copy (2.1073.0 #5865: no table office_trash at all) {rw}")
     check(start(S) is None and account(S) == (None, None), f"{who}: the start balance and the account balance are gone {account(S)}")
     it = listed(S, oid)
     check(it and it[0]["kind"] == "cf_start" and it[0]["label"] == PM1, f"{who}: the office trash lists it with its day {it}")
@@ -140,11 +141,11 @@ def scenario(S, who, oid, uid, other, member=None):
     check(S.put(ST, json={"amount": "1234.56", "day": PM1}).ok, f"{who}: setup start balance for the old copy")
     sealed = dbx("SELECT amount FROM office_cf_start WHERE org_id=?", (oid,))[0][0]
     check(str(sealed).startswith("kenc1:"), f"{who}: setup: the amount is sealed at rest")
-    tid = old_copy(oid, uid)
+    old_copy(oid, uid)
     check(start(S) is None and not listed(S, oid), f"{who}: setup: an old copy (not listed any more)")
     out = copies_back()
     rw = row(oid)
-    check(not dbx("SELECT 1 FROM office_trash WHERE id=?", (tid,)) and rw and rw[0] == oid and rw[1] and rw[2] == uid
+    check(gone(dbx) and dropped(out) == 0 and rw and rw[0] == oid and rw[1] and rw[2] == uid
           and dbx("SELECT amount FROM office_cf_start WHERE org_id=?", (oid,))[0][0] == sealed,
           f"{who}: the copy is a row of the core's trash (deleted_by of the copy, sealed as stored) {rw} {out[-200:]}")
     it = listed(S, oid)
@@ -154,12 +155,12 @@ def scenario(S, who, oid, uid, other, member=None):
     st = start(S) or {}
     check(r.ok and st.get("amount") == "1234.56" and st.get("day") == PM1, f"{who}: restored: amount and day readable {r.text[:200]} {st}")
     # a copy whose start balance was set again meanwhile stays a copy, never listed
-    tid2 = old_copy(oid, uid)
+    old_copy(oid, uid)
     check(S.put(ST, json={"amount": "10.00", "day": PM2}).ok, f"{who}: setup: set again after the copy")
-    copies_back()
-    check(dbx("SELECT 1 FROM office_trash WHERE id=?", (tid2,)) and (start(S) or {}).get("amount") == "10.00" and not listed(S, oid),
-          f"{who}: set again meanwhile: the copy stays a copy, the new value stays, nothing listed")
-    dbx("DELETE FROM office_trash WHERE id=?", (tid2,))
+    out = copies_back()
+    # 2.1073.0 (#5865): it stays a copy in the run, then goes with the table
+    check(gone(dbx) and dropped(out) == 1 and (start(S) or {}).get("amount") == "10.00" and not listed(S, oid),
+          f"{who}: set again meanwhile: the copy is not written back (it goes with the table), the new value stays, nothing listed {out[-200:]}")
     # review 2.1067.0 (F1): an older version (after a step back) set the start balance again on a row of the trash - its
     # upsert leaves deleted_at: at the next start the row is live again; a row deleted after its last save stays in the trash
     S.delete(ST)

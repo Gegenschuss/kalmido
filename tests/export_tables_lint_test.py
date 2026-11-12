@@ -98,7 +98,8 @@ ik = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ik)
 keys = ik.reason_keys(ROOT)
 # 2.531.0 (#4317): + the readable names of the areas not yet in the account export (UMZ_LATER_NAMES)
-check({"not yet in the account export", "credentials", "the trash", "not yet in the export",
+# 2.1073.0 (#5865): "the trash" (office_trash) went with its table; "invitations" stands for the not_included ones
+check({"not yet in the account export", "credentials", "invitations", "not yet in the export",
        "history of knowledge pages"} <= set(keys) and not any("not_included" in k for k in keys), f"the reasons are read: {sorted(keys)[:5]}")
 with open(os.path.join(ROOT, "static", "i18n", "de.json"), encoding="utf-8") as f:
     de = json.load(f)

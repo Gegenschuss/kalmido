@@ -15444,7 +15444,6 @@
   "requests of one person, short-lived": "demandes d’une personne, de courte durée",
   "state of this server (keys, jobs, scanner, queues)": "état de ce serveur (clés, tâches de fond, analyseur, files d’attente)",
   "the lock of a space (client_encrypted names it)": "le verrou d’un espace (client_encrypted le nomme)",
-  "the trash": "la corbeille",
   "{0} file of a template": ["{0} fichier de modèle", "{0} fichiers de modèles"],
   "{0} registered with the address of your organisation and waits for approval": "{0} s’est inscrit·e avec l’adresse de ton organisation et attend l’approbation",
   "An online payment is under way; please wait until it has arrived": "Un paiement en ligne est en cours ; attends qu'il soit arrivé",

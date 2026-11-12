@@ -29,6 +29,7 @@ sys.path.insert(0, N)
 import testclock  # noqa: E402
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 from kt import B, check, dbx, done, fresh, sess  # noqa: E402
+from office_trash_old import gone  # noqa: E402  2.1073.0 (#5865)
 from obj_probe import in_app  # noqa: E402
 
 fresh(prefix="P21005D")
@@ -109,7 +110,7 @@ def scenario(S, who, me, member=None):
           f"{who}: the trip goes into the core's trash {r.text[:200]}")
     check(there("office_trips", trip) and not live("office_trips", trip) and not any(live("office_trip_items", i) for i in items)
           and all(there("office_trip_items", i) for i in items), f"{who}: the rows stay with deleted_at, the receipts with it")
-    check(not dbx("SELECT 1 FROM office_trash WHERE kind='trip' AND ref_id=?", (trip,)), f"{who}: no copy in office_trash any more")
+    check(gone(dbx), f"{who}: no copy in office_trash any more (2.1073.0 #5865: no such table at all)")
     lst = trip_ids(S, y)
     check(lst is not None and trip not in lst, f"{who}: gone from the list {lst}")
     check(S.get(T + f"/{trip}/history").status_code == 404 and S.patch(T + f"/{trip}", json={"dest": "X"}).status_code == 404,

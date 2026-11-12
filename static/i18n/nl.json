@@ -15444,7 +15444,6 @@
   "requests of one person, short-lived": "verzoeken van één persoon, kortstondig",
   "state of this server (keys, jobs, scanner, queues)": "status van deze server (sleutels, taken, scanner, wachtrijen)",
   "the lock of a space (client_encrypted names it)": "de vergrendeling van een ruimte (client_encrypted noemt die)",
-  "the trash": "de prullenbak",
   "{0} file of a template": ["{0} sjabloonbestand", "{0} sjabloonbestanden"],
   "{0} registered with the address of your organisation and waits for approval": "{0} heeft zich geregistreerd met het adres van je organisatie en wacht op goedkeuring",
   "An online payment is under way; please wait until it has arrived": "Er loopt nog een online betaling; wacht tot die is binnengekomen",

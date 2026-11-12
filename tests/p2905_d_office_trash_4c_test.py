@@ -32,6 +32,7 @@ from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 import kt  # noqa: E402
 from kt import B, check, dbx, done, fresh, sess  # noqa: E402
 from obj_probe import in_app  # noqa: E402
+from office_trash_old import OLD_DDL, gone  # noqa: E402  2.1073.0 (#5865)
 
 fresh(prefix="P2905D")
 OFC = B + "/api/office"
@@ -167,12 +168,13 @@ check(ex.ok and "example-intro" not in ex.text and "Example Tripod" not in ex.te
 OC = A.post(OFC + "/services", json={"name_de": "Example Old Copy"}).json()["id"]
 row = json.loads(dbx("SELECT CAST(row_to_json(s) AS TEXT) FROM office_services s WHERE id=?", (OC,))[0][0])
 snap = {"rows": [["office_services", [{k: v for k, v in row.items() if k not in ("deleted_at", "deleted_by", "rev", "created_by", "updated_by")}]]], "nulls": []}
+dbx(OLD_DDL)  # 2.1073.0 (#5865): the table as the versions before made it (every start of the app drops it again)
 TID = dbx("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
           (ORG, "services", "", OC, "Example Old Copy", json.dumps(snap), AID, "2026-11-09T10:00:00.000Z"))[0][0]
 dbx("DELETE FROM office_services WHERE id=?", (OC,))
 # 2.1005.0 (#5415): the copy goes back into its table as a row of the core's trash (the start runs it; here by hand)
 in_app("from kalmido.office.okern import ofk_copies_back\nprint(ofk_copies_back(c))\nc.commit()")
-check(not dbx("SELECT 1 FROM office_trash WHERE id=?", (TID,)) and drow("office_services", OC)[0] is not None, "the old copy is a row of the core's trash")
+check(gone(dbx) and drow("office_services", OC)[0] is not None, "the old copy is a row of the core's trash (2.1073.0 #5865: then the table goes)")
 check(in_trash(A, "omd_services", OC), "the old copy is listed (the core's kind)")
 check(A.post(T + f"/core/omd_services/{OC}/restore").ok and OC in ids(A, "services") and drow("office_services", OC) == (None, None), "the old copy comes back live")
 

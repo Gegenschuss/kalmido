@@ -2056,6 +2056,16 @@ def bk_restore(path, pw, admin, via, keep_purged=False):
                     if u and via == "session":
                         tok, _ = start_session(c, u["id"], True, "restore")  # 2.144.5 A2 (#2387, review R2): no password typed
                 c.commit()
+                # 2.1073.0 (#5865, Fable review F3): a backup from before 2.1067 brings office_trash with copies back: back
+                # into the core's trash, then the table goes, as at a start (never fails the restore)
+                try:
+                    from ..office.okern import ofk_trash_retire
+                    n = ofk_trash_retire(c)
+                    if n["dropped"] is not None or n["held"]:
+                        print(f"restore: office trash copies back {n['back']}, held {n['held']}, table dropped: {n['dropped'] is not None}", flush=True)
+                except Exception as e:  # noqa: BLE001
+                    c.rollback()
+                    print("restore: office trash copies back FAILED, the table stays (the next start tries again):", type(e).__name__, flush=True)
             finally:
                 c.close()
         except Exception:

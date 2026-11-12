@@ -588,8 +588,6 @@ office_texts.archived bool
 office_texts.created_at time
 office_texts.trans json
 office_texts.updated_at time
-office_trash.deleted_at time
-office_trash.snap json
 office_trip_items.billed_at time
 office_trip_items.created_at time
 office_trip_items.updated_at time

@@ -18,7 +18,7 @@ from .integrations.docflowhook import dfh_loop  # 2.581.0 (#4803)
 from .events.model import migrate_family_events
 from .core.env import env_bool
 from .office.model import onc_long_report  # 2.312.0 C (#3265)
-from .office.okern import ofk_copies_back  # 2.1005.0 (#5415)
+from .office.okern import ofk_trash_retire  # 2.1005.0 (#5415); 2.1073.0 (#5865): the copies back, then the table goes
 from .office.cfstart import cfs_start_fix  # review 2.1067.0 (F1, #5789)
 
 
@@ -36,15 +36,21 @@ try:
     # 2.1005.0 (#5415, one way, every start): the office trash's copies of the kinds on the core's trash back as rows of it
     # (office/okern.py; here and not in init_db: the office kinds are registered once the app's modules are loaded)
     try:  # review 2.1005.0 (F1): a copy the step cannot read never stops the app from starting
-        _n = ofk_copies_back(_c)
-        _c.commit()
-        if any(_n.values()):
-            print(f"office trash: copies back into their tables {_n['back']}, left as copies {_n['kept']}", flush=True)
+        _n = ofk_trash_retire(_c)  # 2.1073.0 (#5865, one way): the copies back, then the table office_trash goes
+        if any(v for k, v in _n.items() if k != "dropped"):
+            print(f"office trash: copies back into their tables {_n['back']}, left as copies {_n['kept']} (unreadable {_n['bad']}, "
+                  f"held {_n['held']})", flush=True)
+        if _n["dropped"] is not None:
+            print(f"office trash: the old table office_trash is gone ({_n['dropped']} copies that could not come back went with it)", flush=True)
+    except Exception as _e:  # noqa: BLE001
+        _c.rollback()
+        print(f"office trash: copies back / drop FAILED, the table stays ({type(_e).__name__}: {_e})", flush=True)
+    try:  # Fable review 2.1073.0 (F1): its own block -- a failure above never skips it
         if cfs_start_fix(_c):  # review 2.1067.0 (F1, #5789): a start balance set by an older version on a trashed row
             _c.commit()
     except Exception as _e:  # noqa: BLE001
         _c.rollback()
-        print(f"office trash: copies back FAILED, all stay copies ({type(_e).__name__}: {_e})", flush=True)
+        print(f"office trash: start balance check FAILED ({type(_e).__name__}: {_e})", flush=True)
 finally:
     _c.close()
 from .admin.worker import wrk_conn_check, wrk_start, WRK_ROLE

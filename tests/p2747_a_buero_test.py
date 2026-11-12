@@ -33,6 +33,7 @@ import dbx as dbxm  # noqa: E402
 import kt  # noqa: E402
 import requests  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
+from office_trash_old import gone  # noqa: E402  2.1073.0 (#5865)
 from kt import B, CT, DATA, check, sess, su_get  # noqa: E402
 
 FEAT = "cal,events,contacts,comments,collab,files,sheets,office,clients,docs"
@@ -195,7 +196,7 @@ def signoff(who, s, uid, org):
     # 2.1004.0 (#5494): the core's trash (deleted_at) instead of a copy in office_trash and the row deleted
     tr_ = r.json().get("trash") if r.ok else None
     check(r.ok and tr_ == {"kind": "osignoff", "id": sid} and sql("SELECT deleted_at IS NOT NULL FROM office_signoffs WHERE id=?", (sid,)) == [(True,)]
-          and not sql("SELECT 1 FROM office_trash WHERE kind='signoff' AND ref_id=?", (sid,)), f"3 {who}: the record goes into the core's trash {r.text[:200]}")
+          and gone(sql), f"3 {who}: the record goes into the core's trash, no copy (2.1073.0 #5865: no table office_trash) {r.text[:200]}")
     check(not any(x["id"] == sid for x in s.get(B + "/api/videos/signoffs/orphaned").json().get("signoffs") or []), f"3 {who}: no longer listed")
     check(in_trash(s, sid, "signoff"), f"3 {who}: the trash of its office lists it")
     r = s.post(B + OFF + f"/trash/core/osignoff/{sid}/restore")

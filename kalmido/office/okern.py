@@ -22,7 +22,9 @@ the office trash's restore / delete (ofk_office_of).
 2.1005.0 (#5415, stage 4d part 1): document drafts (odoc, office/docs.py) and quotation parts (opart, office/parts.py) moved here.
 2.1005.0 (#5415, part E): the old copies of office_trash of these kinds come back as rows of the core's trash (ofk_copies_back,
 every start). 2.1067.0 (#5789, stage 4e): the start balance of the cash flow (ocfstart, office/cfstart.py, one row per office,
-its id = its org_id) moved here as the last kind; its old copies (key org_id) come back the same way."""
+its id = its org_id) moved here as the last kind; its old copies (key org_id) come back the same way.
+2.1073.0 (#5865, one way): after that run the table office_trash itself goes (ofk_trash_drop, every start: a no-op once it is
+gone)."""
 import json  # 2.1005.0 (#5415): the copies written back (ofk_copies_back)
 
 from ..core.access import Denied, trash_sql
@@ -36,6 +38,8 @@ from ..core.objects import obj_forget  # 2.809.0 (#5418)
 from ..core.undoweb import undo_trash_reg  # 2.1004.0 (#5494): a kind with a limit takes its undo step back through it
 from ..core.pg import write_lock  # 2.809.0 (#5418)
 from ..core.pg import table_columns, table_exists, table_names  # 2.1005.0 (#5415)
+from ..core.pg import IntegrityError, connect_direct  # 2.1073.0 (#5865)
+from ..core.config import DATABASE_URL  # 2.1073.0 (#5865): the drop as the login role
 from .model import office_on, office_role, pb_owner, pb_personal  # 2.1004.0 (#5494): + pb_personal
 from ..accounts.orgroles import is_write_request, office_allowed  # 2.809.0 (#5418)
 from ..accounts.supportgrant import sga_org_foreign  # 2.809.0 (#5418)
@@ -302,9 +306,10 @@ def _dangling(c, table, row):
 # emptied references and billed time entries in trash_refs; a finalised quotation as a draft (its delete since 2.1005). A copy
 # whose row or a unique key is there again (restored meanwhile, a new text with its key) is left in office_trash and counted.
 # 2.1067.0 (#5789): such a copy is never listed or restored any more (the copies' routes and otb_tick are gone); it goes with
-# the table in the next version.
-# Every start (kalmido/startup.py after init_db, the app's modules loaded): a no-op once no copy of a core kind is left; the table stays for
-# one more version (an older version still reads it).
+# the table (2.1073.0, #5865: ofk_trash_drop right after this run).
+# Every start (kalmido/startup.py after init_db, the app's modules loaded): a no-op once the table is gone. It stays because a
+# database of a version before 2.1067 (a backup played in, a jump over versions) still holds copies: they come back first,
+# then the table goes.
 def _copy_insert(c, table, names, row, tc=table_columns):
     cols = tc(c, table)  # 2.1055.0 (#5791): tc = the run's cache of table_columns
     c.execute(f"INSERT INTO {qi(table, names)}({','.join(qi(k, cols) for k in row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
@@ -376,8 +381,12 @@ def _copy_back(c, kind, t, snap, names, tc=table_columns):
 
 
 def ofk_copies_back(c):
-    """The copies of office_trash of the kinds on the core's trash back into their tables (see above) -> {back, kept}."""
-    out = {"back": 0, "kept": 0}
+    """The copies of office_trash of the kinds on the core's trash back into their tables (see above) -> {back, kept, bad,
+    held}. 2.1073.0 (#5865, Fable review F2): kept = a real conflict (its row or key there again, another area: Denied /
+    IntegrityError), bad = a copy that cannot be read (no JSON object, no rows, a broken snapshot) -- both may go with the
+    table; held = a copy of a kind not on the core's trash or one that failed for another reason (a lock, a timeout, a bug):
+    while there is one, ofk_trash_drop keeps the table (the next start tries again)."""
+    out = {"back": 0, "kept": 0, "bad": 0, "held": 0}
     if not table_exists(c, "office_trash"):
         return out
     kinds = {k["table"]: kind for kind, k in OFK.items()}
@@ -393,7 +402,13 @@ def ofk_copies_back(c):
         # 2.1055.0 (#5791, F6): first only the ids of the copies, then each copy's snapshot on its own -- not every snapshot
         # of the table at once on every start. 2.1067.0 (#5789): the start balance's copies too (no kind is kept as a copy
         # any more, otrash.OTB_KINDS is gone); a copy whose kind is not on the core's trash still stays (the check below)
-        tids = [x[0] for x in c.execute("SELECT id FROM office_trash ORDER BY id")]
+        try:  # 2.1073.0 (Fable review F4): another process starting at once may have dropped it just now
+            with c.savepoint():
+                tids = [x[0] for x in c.execute("SELECT id FROM office_trash ORDER BY id")]
+        except Exception:  # noqa: BLE001
+            if table_exists(c, "office_trash"):
+                raise
+            return out
         for tid in tids:
             t = c.execute("SELECT * FROM office_trash WHERE id=?", (tid,)).fetchone()
             if not t:
@@ -401,10 +416,15 @@ def ofk_copies_back(c):
             try:  # review 2.1005.0 (F1): a copy that cannot be read stays a copy, the start goes on
                 snap = json.loads(t["snap"] or "{}")
                 rows = (snap.get("rows") or []) if isinstance(snap, dict) else []
-                kind = kinds.get(rows[0][0]) if rows else None  # 2.1067.0 (#5789): + a copy keyed by org_id (the start balance)
+                if not rows or not isinstance(rows[0], (list, tuple)) or not rows[0]:
+                    out["bad"] += 1
+                    continue
+                kind = kinds.get(rows[0][0])  # 2.1067.0 (#5789): + a copy keyed by org_id (the start balance)
                 if kind is None or rows[0][0] not in names or not {"deleted_at", "id", snap.get("key") or "id"} <= set(tc(c, rows[0][0])):
-                    continue  # a kind not on the core's trash: stays a copy (the table goes in a later version)
+                    out["held"] += 1  # a kind not on the core's trash: stays a copy, the table stays (2.1073.0)
+                    continue
             except (ValueError, TypeError, IndexError, KeyError, AttributeError):
+                out["bad"] += 1
                 continue
             try:
                 with c.savepoint():
@@ -413,7 +433,55 @@ def ofk_copies_back(c):
                         continue
                     _copy_back(c, kind, t, snap, names, tc)
                 out["back"] += 1
-            except Exception as e:  # noqa: BLE001  (a conflict: the copy stays, counted)
+            except (Denied, IntegrityError) as e:  # a conflict: the copy stays, counted
                 out["kept"] += 1
                 print(f"office trash: copy {t['id']} ({t['kind']}) stays a copy: {type(e).__name__}", flush=True)  # review F8
+            except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:  # 2.1073.0: a broken snapshot
+                out["bad"] += 1
+                print(f"office trash: copy {t['id']} ({t['kind']}) cannot be read: {type(e).__name__}", flush=True)
+            except Exception as e:  # noqa: BLE001  2.1073.0 (Fable review F2): any other reason -- the table stays for the next start
+                out["held"] += 1
+                print(f"office trash: copy {t['id']} ({t['kind']}) failed, the table stays: {type(e).__name__}", flush=True)
+    return out
+
+
+def ofk_trash_drop(c, url=None):
+    """2.1073.0 (#5865, one way; decided by the lead of 2.1005 / #5789): the table office_trash goes. Only through
+    ofk_trash_retire, right after ofk_copies_back committed with nothing held: every copy that could come back is a row of
+    the core's trash by then; a copy that could not (a real conflict, or unreadable) is never listed or restored since 2.1067
+    and goes with the table. -> the number of copies dropped with it, None when the table was gone already.
+    Fable review F1: the DROP needs the table's owner -- the pool's connections may run as the app role (core/pg.py
+    _rls_enter, no DDL rights), so it runs on a connection of the login role (connect_direct, as init_db). c only reads.
+    The table is made nowhere any more (core/schema.py; core/migrations.d/5865_a.py holds the drop-ok line). An older
+    version would make it again, empty -- nothing of it is read by a version since 2.1067, so the back limit stays."""
+    if not table_exists(c, "office_trash"):
+        return None
+    d = connect_direct(url or DATABASE_URL)
+    try:
+        write_lock(d, "office_trash_drop")  # a second process starting at once waits, then finds it gone
+        if not table_exists(d, "office_trash"):
+            d.rollback()
+            return None
+        with system_ctx(d):  # the count only: instance structure, nothing handed to a person
+            n = d.execute("SELECT COUNT(*) FROM office_trash").fetchone()[0]
+        d.execute("DROP TABLE IF EXISTS office_trash")  # one way (core/migrations.d/5865_a.py drop-ok)
+        d.commit()
+        return n
+    finally:
+        d.close()
+
+
+def ofk_trash_retire(c):
+    """2.1073.0 (#5865): every start (kalmido/startup.py) and every restore of a backup (admin/backup.py bk_restore, after
+    init_db: a backup from before 2.1067 brings copies back): the copies back (ofk_copies_back, committed), then the table
+    goes (ofk_trash_drop) -- not while a copy is held (another kind, a failure), then the table stays and the next start
+    tries again. -> {back, kept, bad, held, dropped} (dropped: None = nothing dropped)."""
+    out = ofk_copies_back(c)
+    c.commit()
+    out["dropped"] = None
+    if out["held"]:
+        print(f"office trash: {out['held']} copies could not come back for a reason other than a conflict - the table "
+              "office_trash stays, the next start tries again", flush=True)
+        return out
+    out["dropped"] = ofk_trash_drop(c)
     return out

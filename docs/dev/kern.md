@@ -262,6 +262,14 @@ c.commit()
   /api/office/trash/<id>`, `POST /api/office/trash/undo/<kind>/<id>`. `ofk_copies_back` writes a copy keyed by another
   column (`snap["key"]`, the start balance's `org_id`) back with that value as its id; a copy that cannot come back stays in
   `office_trash` unlisted until the table is dropped one version later.
+- 2.1073.0 (#5865, one way): `office_trash` is gone. `core/schema.py` no longer makes it; at every start
+  `kalmido/startup.py` runs `ofk_copies_back` first (a database from before 2.1067 still holds copies), commits, then
+  `okern.ofk_trash_drop` drops the table with the copies that could not come back (the log names their number; a no-op once
+  it is gone, never when the copies' run failed). Not in a fragment's AFTER: that runs in `init_db` before the copies' run
+  (`migrations.d/5865_a.py` holds the documentation and the drop-ok line). The readers of the copies went with it: the key
+  rotation / encrypt-all / decrypt-all over `office_trash.snap` (`admin/orgcrypt_cli.py`, the count `trash_unreadable`),
+  the terms files a copy named (`terms.dvb_trash_terms`), the purge run's count, the export lists and the row-level
+  security list. The back limit stays: an older version makes the table again, empty, and reads nothing of it since 2.1067.
 - 2.1002.0 (#5695): `_purge_rows` deletes the history / undo rows of every kind that names the purged row: the kind itself
   and each `obj_track` kind on the same table (`_purge_kinds`: an office row saved as `office_meal` / `office_fixed_cost`,
   trashed as `omeal` / `ofixed`) -- one place for every purge on the core's way, no area cleans its history itself.

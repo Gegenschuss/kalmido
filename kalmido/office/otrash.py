@@ -6,8 +6,8 @@ ofk_register): GET /api/office/trash lists its rows of the kinds shown there (ok
 2.1067.0 (#5789, stage 4e): the last kind of copies (the start balance of the cash flow, office/cfstart.py) is on the core's
 trash too; the copies of office_trash (otb_put before 2.1067), their routes (POST /api/office/trash/<id>/restore, DELETE
 /api/office/trash/<id>, the toast's undo POST /api/office/trash/undo/<kind>/<id>) and their purge run (otb_tick) are gone --
-okern.ofk_copies_back writes old copies back at the start. The table office_trash stays for one more version (an older
-version still reads it)."""
+okern.ofk_copies_back writes old copies back at the start. 2.1073.0 (#5865): right after that the table office_trash goes
+(okern.ofk_trash_drop, one way); a copy that could not come back goes with it."""
 from flask import jsonify, request
 
 from ..core.config import app

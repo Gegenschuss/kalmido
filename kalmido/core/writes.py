@@ -16,7 +16,7 @@ editor session (header X-Kalmido-Undo: <token>), written back only while the obj
 office's documents with their parts).
 2.747.0 (#5249): every write of a person records its step (not only with the header) as a part of the request's step group
 per account (core/undogroups.py, kept UNDO_KEEP_D days); core/undoweb.py lists the groups and takes them back (GET /api/undo).
-Adapters for write paths that do not go through obj_write yet (stage 2 ff., like office/otrash.py otb_put):
+Adapters for write paths that do not go through obj_write yet (stage 2 ff., like office/otrash.py otb_put before 2.1067):
   obj_undo_pre(c, uid, kind, id) / obj_undo_post(c)      record a step around an own write (in its transaction)
   obj_history_add(c, uid, kind, id, before, after, action) note a change in the history
   obj_touch(c, uid, kind, id)                             rev+1, updated_at, updated_by, bump (sh_touch for core objects)

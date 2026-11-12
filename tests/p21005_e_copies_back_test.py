@@ -17,6 +17,9 @@ travel costs never offer a draft of the trash. Invented names and figures only.
    receipt billed on it counts as open again, its project title is no project of the trip form
  - 2.1055.0 (#5791, fable 2.1005 F5): that receipt billed on another invoice meanwhile -> the draft's restore takes its position
    out (taken, note), the other invoice keeps it; a receipt billed nowhere else comes back bound to the draft's position
+ - 2.1073.0 (#5865): a new database has no office_trash; every start writes the copies back, then drops the table with
+   the copies that could not come back (the conflict, the unreadable and the foreign ones: the start's log names their number);
+   a copy held for another reason (a kind not on the core's trash) keeps the table until it is gone (Fable review F2)
  - 2.1055.0 (#5791, F6): the copies' run reads only ids first, loads each copy on its own, and asks the catalog for a table's
    columns once per run (2.1067.0, #5789: the start balance keeps no copies any more - its old copies are loaded and written
    back like every other kind, p21067_b_cfstart_trash_test.py)
@@ -34,6 +37,7 @@ import testclock  # noqa: E402
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 from kt import B, check, dbx, done, fresh, sess  # noqa: E402
 from obj_probe import in_app  # noqa: E402
+from office_trash_old import OLD_DDL, dropped, gone  # noqa: E402  2.1073.0 (#5865)
 
 fresh(prefix="P21005E")
 OFC = B + "/api/office"
@@ -73,6 +77,7 @@ def old_copy(oid, uid, kind, table, rid, label, children=(), sub="", when="2026-
     for t, col in children:
         rows.append([t, [{k: v for k, v in json.loads(x[0]).items() if k not in NEW}
                          for x in dbx(f"SELECT CAST(row_to_json(x) AS TEXT) FROM {t} x WHERE {col}=? ORDER BY id", (rid,))]])
+    dbx(OLD_DDL)  # 2.1073.0 (#5865): the table as the versions before made it (every start of the app drops it again)
     tid = dbx("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
               (oid, kind, sub, rid, label, json.dumps({"rows": rows, "nulls": []}), uid, when))[0][0]
     if delete:
@@ -81,7 +86,9 @@ def old_copy(oid, uid, kind, table, rid, label, children=(), sub="", when="2026-
 
 
 def copies_back():
-    """What every start does (kalmido/startup.py after init_db): here by hand, inside the server's container."""
+    """What every start does (kalmido/startup.py after init_db): here by hand, inside the server's container. 2.1073.0 (#5865):
+    loading the app is such a start already -- the copies come back and the table goes before the line below runs (its own
+    call then finds no table); the start's log lines are in the output."""
     out = in_app("from kalmido.office.okern import ofk_copies_back\nprint('BACK', ofk_copies_back(c))\nc.commit()")
     check("BACK" in out, f"the copies' run {out[-300:]}")
     return out
@@ -112,9 +119,9 @@ def scenario(S, who, oid, uid):
                         "items": [{"date": PM1, "category": "train", "amount": "59.90", "currency": "EUR"}]})
     check(r.status_code == 201, f"{who}: setup a trip {r.text[:200]}")
     trip, item = r.json()["id"], r.json()["items"][0]["id"]
-    tt = old_copy(oid, uid, "trip", "office_trips", trip, f"Example Harbour {who}", children=[("office_trip_items", "trip_id")])
+    old_copy(oid, uid, "trip", "office_trips", trip, f"Example Harbour {who}", children=[("office_trip_items", "trip_id")])
     svc = S.post(OFC + "/services", json={"name_de": f"Example Grading {who}"}).json()["id"]
-    ts = old_copy(oid, uid, "services", "office_services", svc, f"Example Grading {who}")
+    old_copy(oid, uid, "services", "office_services", svc, f"Example Grading {who}")
     # a conflict: its row is there again (restored meanwhile by hand) - the copy is left and never listed
     svc2 = S.post(OFC + "/services", json={"name_de": f"Example Colour {who}"}).json()["id"]
     tc = old_copy(oid, uid, "services", "office_services", svc2, f"Example Colour {who}", delete=False)
@@ -123,7 +130,8 @@ def scenario(S, who, oid, uid):
     check(S.post(OFC + f"/trash/{td}/restore").status_code == 404, f"{who}: the copies' restore of a draft is gone (404)")
 
     out = copies_back()
-    check(not dbx("SELECT 1 FROM office_trash WHERE id IN (?, ?, ?)", (td, tt, ts)), f"{who}: the three copies left office_trash {out[-200:]}")
+    # 2.1073.0 (#5865): the start writes the three copies back, then drops the table with the one copy that could not come back
+    check(gone(dbx) and dropped(out) == 1, f"{who}: the copies left office_trash, the table is gone with the conflict copy {out[-300:]}")
     for table, rid in (("office_docs", did), ("office_trips", trip), ("office_services", svc)):
         d = deleted(table, rid)
         check(d and d[0] and d[1] == uid, f"{who}: {table} {rid} is a row of the core's trash (deleted_at, deleted_by of the copy) {d}")
@@ -132,8 +140,8 @@ def scenario(S, who, oid, uid):
     check(sorted(x[0] for x in dbx("SELECT id FROM office_doc_items WHERE doc_id=? AND deleted_at IS NULL", (did,))) == its,
           f"{who}: the draft's positions are back with it (live, the draft hides them)")
     check(dbx("SELECT number FROM office_docs WHERE id=?", (did,))[0][0] == "", f"{who}: the number is free while it lies in the trash")
-    check(dbx("SELECT 1 FROM office_trash WHERE id=?", (tc,)) and not [x for x in trash(S) if x["id"] == tc and not x.get("core")],
-          f"{who}: the conflict copy is left, not listed")
+    check(dbx("SELECT 1 FROM office_services WHERE id=? AND deleted_at IS NULL", (svc2,)) and not [x for x in trash(S) if x["id"] == tc and not x.get("core")],
+          f"{who}: the conflict copy is never listed (gone with the table, 2.1073.0 #5865), its row stays live")
     check(S.get(OFC + f"/docs/{did}").status_code == 404 and trip not in [t["id"] for t in S.get(T, params={"year": PM1[:4]}).json().get("trips", [])],
           f"{who}: the draft and the trip are not in the office")
     lst = trash(S)
@@ -242,28 +250,39 @@ def scenario(S, who, oid, uid):
           f"{who}: (5791) its other time is open again (never billed without a position), the first stays on the other invoice")
 
 
+# 2.1073.0 (#5865): a new database has no office_trash any more (schema.py no longer makes it)
+check(gone(dbx), "(5865) a new database has no table office_trash")
 scenario(A, "alice", ORG, AID)
 scenario(Fr, "frida", PERS, FID)
 
 # ------------------------------------------------------------ review 2.1005.0 (F1, F2): hardening of the copies' step
 # a copy the step cannot read (valid JSON, but no object / no rows) stays a copy and never stops the run (nor the start)
+dbx(OLD_DDL)  # 2.1073.0 (#5865)
 bad = [dbx("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
            (ORG, "doc", "offer", 0, "broken", snap, AID, "2026-11-09T10:00:00.000Z"))[0][0] for snap in ("null", "[]", '{"rows": [["office_docs"]]}')]
 # a copy filed under another organisation than its row's: never written back into either area
 r = A.post(OFC + "/services", json={"name_de": "Example Foreign Grading"})
 fsvc = r.json()["id"]
 tf = old_copy(ORG2, OLGA, "services", "office_services", fsvc, "Example Foreign Grading")
+fsnap = dbx("SELECT snap FROM office_trash WHERE id=?", (tf,))[0][0]
 out = copies_back()
 check("Traceback" not in out and "BACK" in out, f"(F1) unreadable copies do not stop the run {out[-300:]}")
-check(len(dbx("SELECT id FROM office_trash WHERE id IN (?,?,?)", tuple(bad))) == 3, "(F1) the unreadable copies stay copies")
-check(not dbx("SELECT 1 FROM office_services WHERE id=?", (fsvc,)) and dbx("SELECT 1 FROM office_trash WHERE id=?", (tf,)),
-      f"(F2) a copy filed under another organisation is not written back (stays a copy) {out[-200:]}")
+# 2.1073.0 (#5865): the three unreadable copies and the foreign one stay copies in the run - and go with the table after it
+check(gone(dbx) and dropped(out) == 4, f"(F1) the unreadable copies stay copies until the table goes with them {out[-300:]}")
+check(not dbx("SELECT 1 FROM office_services WHERE id=?", (fsvc,)),
+      f"(F2) a copy filed under another organisation is not written back {out[-200:]}")
 check(not [x for x in trash(Ol) if x.get("id") == fsvc], "(F2) the other organisation's office trash does not list it")
 
 # ------------------------------------------------------------ 2.1055.0 (#5791, fable 2.1005 F6): the run on every start reads only
 # the ids of the copies first (never every snapshot of the table at once) and asks the catalog for a table's columns once per run
 # 2.1067.0 (#5789): the start balance's delete is a row of the core's trash now (no copy kept here to skip any more)
-out = in_app("""from kalmido.office.okern import ofk_copies_back
+# 2.1073.0 (#5865): the start of in_app dropped the table: the code makes it again with one copy (the foreign one above)
+out = in_app(f"""from kalmido.office.okern import ofk_copies_back
+c.execute("RESET ROLE")  # the pool may run as the app role (no DDL); the rollback below takes the table back
+c.execute({OLD_DDL!r})
+tf = c.execute("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
+               ({ORG2}, 'services', '', {fsvc}, 'Example Foreign Grading', {fsnap!r}, {OLGA}, '2026-11-09T10:00:00.000Z')).fetchone()[0]
+print('TF', tf)
 q = []
 class W:
     def __init__(s, c):
@@ -281,6 +300,7 @@ print('CATALOG', len(cat) == len(set(cat)))
 c.rollback()""")
 check("ALLSNAPS False" in out, f"(F6) never every snapshot of office_trash at once {out[-300:]}")
 ld = next((json.loads(x[7:]) for x in out.splitlines() if x.startswith("LOADED ")), None)
+tf = next((int(x[3:]) for x in out.splitlines() if x.startswith("TF ")), None)
 check(ld is not None and tf in ld, f"(F6) a copy left in office_trash is loaded on its own {out[-300:]}")
 check("CATALOG True" in out, f"(F6) a table's columns asked once per run {out[-300:]}")
 
@@ -300,7 +320,7 @@ def old_sig(org, by, title, filed):
 s_org, t_org = old_sig(ORG, AID, "Example Rough Cut", ORG)
 s_own, t_own = old_sig(None, FID, "Example Private Cut", PERS)
 out = copies_back()
-check(not dbx("SELECT 1 FROM office_trash WHERE id IN (?, ?)", (t_org, t_own)), f"(5494) both sign-off copies left office_trash {out[-200:]}")
+check(gone(dbx) and dropped(out) == 0, f"(5494) both sign-off copies left office_trash, the table went after them {out[-200:]}")
 d = deleted("office_signoffs", s_own)
 check(d and d[0] and d[1] == FID and dbx("SELECT org_id FROM office_signoffs WHERE id=?", (s_own,))[0][0] is None,
       f"(5494) the private record is a row of the core's trash, still without an organisation {d}")
@@ -309,4 +329,18 @@ check([x for x in trash(Fr, "osignoff") if x["id"] == s_own] and not [x for x in
 check([x for x in trash(A, "osignoff") if x["id"] == s_org], "(5494) the organisation's record is listed in its office trash")
 r = Fr.post(OFC + f"/trash/core/osignoff/{s_own}/restore")
 check(r.ok and deleted("office_signoffs", s_own) == (None, None), f"(5494) its creator restores it {r.text[:200]}")
+
+# ------------------------------------------------------------ 2.1073.0 (#5865, Fable review F2): a copy that could not come back
+# for another reason than a conflict (here: a kind not on the core's trash) keeps the table - nothing is dropped, the next start
+# tries again; once it is gone the start drops the table
+dbx(OLD_DDL)
+th = dbx("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
+         (ORG, "nokind", "", 1, "Example Unknown", json.dumps({"rows": [["office_no_such_kind", [{"id": 1}]]], "nulls": []}), AID,
+          "2026-11-09T10:00:00.000Z"))[0][0]
+out = copies_back()
+check(not gone(dbx) and dropped(out) is None and dbx("SELECT 1 FROM office_trash WHERE id=?", (th,)) and "the table office_trash stays" in out,
+      f"(5865 F2) a held copy keeps the table, the start says so {out[-300:]}")
+dbx("DELETE FROM office_trash WHERE id=?", (th,))
+out = copies_back()
+check(gone(dbx) and dropped(out) == 0, f"(5865 F2) without it the next start drops the table {out[-300:]}")
 sys.exit(done("p21005_e_copies_back"))

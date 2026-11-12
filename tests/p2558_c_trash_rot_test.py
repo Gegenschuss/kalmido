@@ -18,6 +18,8 @@ freelancer-matrix: office
    cash flow (the kind still kept as a copy, office/otrash.py OTB_KINDS)
  - 2.1067.0 (#5789): the start balance goes into the core's trash too (re-encrypted as a row, restored through the core); the
    unreadable copy case runs on an old copy of it that stays a copy (the start balance was set again meanwhile)
+ - 2.1073.0 (#5865): office_trash is gone (every start writes its copies back, then drops it): the rotation has no copies to
+   re-encrypt or count any more (no trash_unreadable); the unreadable copy case went with the table
 usage: p2558_c_trash_rot_test.py <datadir>"""
 import base64
 import json
@@ -31,6 +33,7 @@ import requests
 import dbx as dbxm
 from freelancer_fixture import freelancer
 from obj_probe import in_app  # 2.1005.0 (#5415)
+from office_trash_old import OLD_DDL, gone  # 2.1073.0 (#5865)
 from kt import FAILS, OKS, check, sess, B, H, DATA  # noqa: F401
 
 N = os.path.dirname(os.path.abspath(__file__))
@@ -60,6 +63,7 @@ def old_copy(oid, eid):
     try:
         row = json.loads(c.execute("SELECT CAST(row_to_json(e) AS TEXT) FROM office_equipment e WHERE id=?", (eid,)).fetchall()[0][0])
         snap = json.dumps({"rows": [["office_equipment", [{k: v for k, v in row.items() if k not in ("deleted_at", "deleted_by", "rev", "created_by", "updated_by")}]]], "nulls": []})
+        c.execute(OLD_DDL)  # 2.1073.0 (#5865): the table as the versions before made it (every start of the app drops it again)
         c.execute("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?)",
                   (oid, "equipment", "", eid, row.get("name") or "", snap, None, "2026-11-09T10:00:00.000Z"))
         c.execute("DELETE FROM office_equipment WHERE id=?", (eid,))
@@ -67,29 +71,6 @@ def old_copy(oid, eid):
         return c.execute("SELECT MAX(id) FROM office_trash WHERE ref_id=? AND kind='equipment'", (eid,)).fetchall()[0][0]
     finally:
         c.close()
-
-
-def cs_old_copy(oid):
-    """2.1067.0 (#5789): the start balance of oid as a copy in office_trash, as cfstart.py made it before 2.1067 (key org_id).
-    The row stays live, so the next start (okern.ofk_copies_back) keeps the copy (set again meanwhile) -> trash id."""
-    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-    try:
-        row = json.loads(c.execute("SELECT CAST(row_to_json(e) AS TEXT) FROM office_cf_start e WHERE org_id=?", (oid,)).fetchall()[0][0])
-        snap = json.dumps({"rows": [["office_cf_start", [{k: v for k, v in row.items() if k not in ("id", "deleted_at", "deleted_by", "rev")}]]],
-                           "nulls": [], "key": "org_id"})
-        c.execute("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?)",
-                  (oid, "cf_start", "", oid, row.get("day") or "", snap, None, "2026-11-09T10:00:00.000Z"))
-        c.commit()
-        return c.execute("SELECT MAX(id) FROM office_trash WHERE org_id=? AND kind='cf_start'", (oid,)).fetchall()[0][0]
-    finally:
-        c.close()
-
-
-def cs_copy_amount(tid):
-    """2.1005.0 (#5415): the stored amount in the start balance's copy (office_trash.snap)."""
-    snap = json.loads(one("SELECT snap FROM office_trash WHERE id=?", (tid,)) or "{}")
-    rows = dict((t, r) for t, r in snap.get("rows") or [])
-    return (rows.get("office_cf_start") or [{}])[0].get("amount")
 
 
 def snap_vals(tid):
@@ -146,7 +127,7 @@ def case(s, who, oid):
     rc, out, err = cli("rotate", "--org", str(oid))
     check(rc == 0 and "R2-" in out, f"{who}: rotation finished {rc} {out[-300:]} {err[-800:]}")
     s2 = one("SELECT serial_no FROM office_equipment WHERE id=? AND deleted_at IS NOT NULL", (eid,))
-    check(not one("SELECT 1 FROM office_trash WHERE id=?", (tid,)) and str(s2).startswith("kenc1:") and s2 != s1,
+    check(gone(one) and str(s2).startswith("kenc1:") and s2 != s1,
           f"{who}: the copy is a row of the core's trash now, re-encrypted with the new key {str(s2)[:12]}")
     r = s.post(B + O + f"/trash/core/omd_equipment/{eid}/restore")
     check(r.ok, f"{who}: restore after the rotation {r.status_code} {r.text[:200]}")
@@ -168,24 +149,12 @@ def case(s, who, oid):
     r = s.post(B + O + f"/trash/core/ocfstart/{tcs}/restore")
     st = s.get(B + O + "/cashflow/start").json().get("start") or {}
     check(r.ok and st.get("amount") == "1500.00", f"{who}: the start balance is readable after restore {r.status_code} {r.text[:200]} {st}")
-    # 2.558.0 D (#4669, review F2): a copy sealed before an earlier rotation (old stock) opens with neither key: counted on
-    # its own, the rotation still finishes (before the fix it stopped with "not finished" until --force). 2.1067.0 (#5789):
-    # an old copy of the start balance that stays a copy (the start balance was set again: ofk_copies_back keeps it)
-    tid2 = cs_old_copy(oid)
-    old = one("SELECT snap FROM office_trash WHERE id=?", (tid2,))
-    rc, out, err = cli("rotate", "--org", str(oid))
-    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-    try:
-        c.execute("UPDATE office_trash SET snap=? WHERE id=?", (old, tid2))  # back to the values of the key that is gone now
-        c.commit()
-    finally:
-        c.close()
+    # 2.1073.0 (#5865): the copies of the office trash are gone with their table: the rotation counts no trash copies any more
     rc, out, err = cli("rotate", "--org", str(oid))
     line = next((x for x in out.splitlines() if x.split("rotate:", 1)[-1].strip().startswith("{")), "")
     t = json.loads(line.split("rotate:", 1)[1]) if line else {}
-    check(rc == 0 and "R2-" in out and t.get("finished") and t.get("trash_unreadable", 0) >= 1 and t.get("unreadable") == 0,
-          f"{who}: an unreadable old trash copy is counted on its own, the rotation finishes {rc} {t} {out[-300:]} {err[-300:]}")
-    check(one("SELECT snap FROM office_trash WHERE id=?", (tid2,)) == old, f"{who}: the unreadable copy stays as it is")
+    check(rc == 0 and "R2-" in out and t.get("finished") and "trash_unreadable" not in t and t.get("unreadable") == 0 and gone(one),
+          f"{who}: the rotation finishes without a table office_trash, no trash count {rc} {t} {out[-300:]} {err[-300:]}")
 
 case(A, "alice", ORG)
 PERS = one("SELECT id FROM orgs WHERE personal_of=?", (FID,))

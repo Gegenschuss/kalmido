@@ -23,6 +23,8 @@ freelancer-matrix: office
    the core's restore reads them. The copies still made (the start balance of the cash flow, office/otrash.py OTB_KINDS) are
    migrated in office_trash.snap as before. 2.1067.0 (#5789): the start balance goes into the core's trash too (its row is
    migrated as any other), no copy is made any more. The copy cases of a draft's positions (review F6 / F4) left with the copies of drafts.
+ - 2.1073.0 (#5865): office_trash is gone: the start writes the old copies back, then drops it; encrypt-all / decrypt-all have
+   no copies to walk any more (the rows of the core's trash are migrated as any other)
 usage: p2570_d_trash_crypt_test.py <datadir>"""
 import base64
 import json
@@ -36,6 +38,7 @@ import requests
 import dbx as dbxm
 from freelancer_fixture import freelancer
 from obj_probe import in_app  # 2.1005.0 (#5415)
+from office_trash_old import OLD_DDL, gone  # 2.1073.0 (#5865)
 from kt import FAILS, OKS, check, sess, B, H, DATA  # noqa: F401
 
 N = os.path.dirname(os.path.abspath(__file__))
@@ -66,6 +69,7 @@ def old_copy(oid, eid):
     c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     row = json.loads(c.execute("SELECT CAST(row_to_json(e) AS TEXT) FROM office_equipment e WHERE id=?", (eid,)).fetchall()[0][0])
     snap = json.dumps({"rows": [["office_equipment", [{k: v for k, v in row.items() if k not in ("deleted_at", "deleted_by", "rev", "created_by", "updated_by")}]]], "nulls": []})
+    c.execute(OLD_DDL)  # 2.1073.0 (#5865): the table as the versions before made it (every start of the app drops it again)
     c.execute("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?)",
               (oid, "equipment", "", eid, row.get("name") or "", snap, None, "2026-11-09T10:00:00.000Z"))
     c.execute("DELETE FROM office_equipment WHERE id=?", (eid,))
@@ -80,6 +84,7 @@ def old_doc_copy(oid, did):
     row = json.loads(c.execute("SELECT CAST(row_to_json(d) AS TEXT) FROM office_docs d WHERE id=?", (did,)).fetchall()[0][0])
     its = [json.loads(x[0]) for x in c.execute("SELECT CAST(row_to_json(i) AS TEXT) FROM office_doc_items i WHERE doc_id=? ORDER BY id", (did,)).fetchall()]
     snap = json.dumps({"rows": [["office_docs", [{k: v for k, v in row.items() if k not in new}]], ["office_doc_items", its]], "nulls": []})
+    c.execute(OLD_DDL)  # 2.1073.0 (#5865): the table as the versions before made it (every start of the app drops it again)
     c.execute("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?)",
               (oid, "doc", row.get("kind") or "", did, row.get("project_title") or "", snap, None, "2026-11-09T10:00:00.000Z"))
     c.execute("DELETE FROM office_docs WHERE id=?", (did,))
@@ -187,16 +192,15 @@ for s, who, oid in WHO:
 copies_back()
 for s, who, oid in WHO:
     eid, tid_e, did, tid_d = BEFORE[who]
-    check(not one("SELECT 1 FROM office_trash WHERE id IN (?, ?)", (tid_e, tid_d)) and one("SELECT deleted_at FROM office_equipment WHERE id=?", (eid,))
+    check(gone(one) and one("SELECT deleted_at FROM office_equipment WHERE id=?", (eid,))
           and one("SELECT deleted_at FROM office_docs WHERE id=?", (did,)) and sealed(one("SELECT serial_no FROM office_equipment WHERE id=?", (eid,))),
           f"{who}: device and draft are rows of the core's trash now, sealed as stored")
-N_TRASH = one("SELECT COUNT(*) FROM office_trash")
 rc, out, err = cli("decrypt-all")
 check(rc == 0 and "still encrypted: 0" in out, f"decrypt-all finished {rc} {out[-400:]} {err[-600:]}")
 line = next((x for x in out.splitlines() if "decrypt-all:" in x), "")
 t = json.loads(line.split("decrypt-all:", 1)[1]) if line else {}
 check(t.get("failed") == 0, f"decrypt-all: nothing failed {t}")
-check(one("SELECT COUNT(*) FROM office_trash") == N_TRASH, "decrypt-all does not empty the office trash")
+check(gone(one), "decrypt-all runs without a table office_trash (2.1073.0 #5865: its copies are gone)")
 for s, who, oid in WHO:
     eid, tid_e, did, tid_d = BEFORE[who]
     check(one("SELECT serial_no FROM office_equipment WHERE id=?", (eid,)) == f"SN-{who}-a", f"{who}: the device in the trash is plain after decrypt-all")

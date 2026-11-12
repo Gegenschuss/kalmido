@@ -29,6 +29,7 @@ import kt
 from kt import B, check, sess
 import testclock
 from freelancer_fixture import freelancer
+from office_trash_old import gone  # 2.1073.0 (#5865)
 
 KEY = base64.b64encode(os.urandom(32)).decode()
 kt.fresh({"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_ORGCRYPT_DELAY": "0", "KALMIDO_SECRET_KEY": KEY})
@@ -122,7 +123,7 @@ def scenario(S, who, ws, other, member=None):
     tr0 = (r.json().get("trash") or {}) if r.ok else {}
     ts = tr0.get("id")
     check(r.ok and tr0.get("kind") == "ocfstart" and ts and "trash_id" not in r.json() and S.get(B + O + "/cashflow/start").json().get("start") is None
-          and sql("SELECT 1 FROM office_cf_start WHERE id=? AND deleted_at IS NOT NULL", (ts,)) and not sql("SELECT 1 FROM office_trash WHERE kind='cf_start'"),
+          and sql("SELECT 1 FROM office_cf_start WHERE id=? AND deleted_at IS NOT NULL", (ts,)) and gone(sql),  # 2.1073.0 (#5865): no table office_trash
           f"{who}: the start balance goes into the core's trash {r.text[:200]}")
     check(in_trash(S, ts, "cf_start"), f"{who}: the office trash lists the start balance")
     r = S.post(B + f"{O}/trash/core/ocfstart/{ts}/restore")

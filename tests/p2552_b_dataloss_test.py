@@ -22,6 +22,7 @@ import dbx as dbxm
 import kt
 from kt import B, DATA, check, done
 from freelancer_fixture import freelancer
+from office_trash_old import OLD_DDL, gone  # 2.1073.0 (#5865)
 
 O = "/api/office"
 K = O + "/cards"
@@ -73,8 +74,8 @@ def del_line():
 LIVE = "SELECT 1 FROM office_cc_lines WHERE id=? AND deleted_at IS NULL"
 TID = del_line()
 check(TID == LID, "B21: the answer of the delete names the position in the core's trash (trash)")
-check(sql("SELECT 1 FROM office_cc_lines WHERE id=? AND deleted_at IS NOT NULL", (LID,)) and not sql("SELECT 1 FROM office_trash WHERE kind='cc_line' AND ref_id=?", (LID,)),
-      "B21: the row stays in the core's trash, no copy in office_trash")
+check(sql("SELECT 1 FROM office_cc_lines WHERE id=? AND deleted_at IS NOT NULL", (LID,)) and gone(sql),
+      "B21: the row stays in the core's trash, no copy (2.1073.0 #5865: no table office_trash at all)")
 r = A.post(B + f"{K}/lines/{LID}/restore")
 check(r.status_code in (403, 404) and not sql(LIVE, (LID,)),
       f"B21: another organisation cannot restore it (403 / 404, nothing back) {r.status_code} {r.text[:120]}")
@@ -137,6 +138,7 @@ row = json.loads(json.dumps(sql("SELECT row_to_json(d) FROM office_docs d WHERE 
 row = json.loads(row) if isinstance(row, str) else row
 row["locked_at"] = D + "T00:00:00"  # the copy as a finalised quotation's (2.530.0)
 OID2 = row["org_id"]
+sql(OLD_DDL)  # 2.1073.0 (#5865): the table as the versions before made it (every start of the app drops it again)
 sql("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?)",
     (OID2, "doc", "offer", DID2, "Sommer Beispiel", json.dumps({"rows": [["office_docs", [row]]], "nulls": []}), FID, D + "T00:00:00.000Z"))
 sql("DELETE FROM office_docs WHERE id=?", (DID2,))
@@ -146,7 +148,7 @@ check(Fr.post(B + O + f"/trash/{TID3}/restore").status_code == 404, "2.1005.0: t
 from obj_probe import in_app  # noqa: E402
 in_app("from kalmido.office.okern import ofk_copies_back\nprint(ofk_copies_back(c))\nc.commit()")
 row = sql("SELECT locked_at, client_id, deleted_at FROM office_docs WHERE id=?", (DID2,))
-check(row and row[0][0] is None and row[0][1] is None and row[0][2] is not None and not sql("SELECT 1 FROM office_trash WHERE id=?", (TID3,)),
+check(row and row[0][0] is None and row[0][1] is None and row[0][2] is not None and gone(sql),
       f"B19 (review F1, 2.1005.0): the copy is a draft of the core's trash, without the client gone for good, not locked: {row}")
 r = Fr.post(B + O + f"/trash/core/odoc/{DID2}/restore")
 check(r.ok and "without a client" in (r.json().get("note") or ""), f"B19 (2.1005.0): it comes back as a draft, the answer says so {r.status_code} {r.text[:160]}")

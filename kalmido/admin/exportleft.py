@@ -77,7 +77,7 @@ UMZ_LEFT_TABLES = {
     "office_payments": _ORG, "office_peppol": _ORG, "office_peppol_sends": _ORG, "office_period_locks": _ORG, "office_privacy_sheets": _ORG,
     "office_procdocs": _ORG, "office_purchases": _ORG, "office_rgroup_members": _ORG, "office_rgroups": _ORG, "office_rights_log": _ORG, "office_roles":
     _ORG, "office_services": _ORG, "office_sets": _ORG, "office_settings": _ORG, "office_signoffs": _ORG, "office_sub_reminders": _ORG,
-    "office_suppliers": _ORG, "office_texts": _ORG, "office_trash": _ORG, "office_trip_items": _ORG, "office_trip_purposes": _ORG, "office_trips": _ORG,
+    "office_suppliers": _ORG, "office_texts": _ORG, "office_trip_items": _ORG, "office_trip_purposes": _ORG, "office_trips": _ORG,
     "office_vehicles": _ORG, "org_joins": _ORG, "support_grants": _SERVER, "org_members": _ORG, "rc_receipts": _ORG, "reading_orgs": _ORG, "tchat_files": _ORG,
     "tchat_rooms": _ORG,
     "abs_cal_feeds": _SECRET, "agent_setup_codes": _SECRET, "app_passwords": _SECRET, "contact_srcs": _SECRET, "disc_profiles": _SECRET, "disc_tokens":
@@ -140,7 +140,7 @@ RX_LEFT_TABLES = {
     "office_texts": _RX_MASTER, "office_trip_purposes": _RX_MASTER,
     "office_peppol": _RX_SECRET, "office_payonline": _RX_SECRET, "office_pay_links": _RX_SECRET,
     "office_pay_sessions": _RX_WORK, "office_pay_events": _RX_WORK, "office_pay_payouts": _RX_WORK,
-    "office_cf_actual": _RX_WORK, "office_cf_adjust": _RX_WORK, "office_cf_start": _RX_WORK, "office_trash": _RX_WORK,
+    "office_cf_actual": _RX_WORK, "office_cf_adjust": _RX_WORK, "office_cf_start": _RX_WORK,  # 2.1073.0 (#5865): office_trash is gone
     # 2.977.0 (#5282): the head only; the versions go as books/procedure-documentation.csv (obj_versions kind procdoc)
     "office_procdocs": "the head of the procedure documentation; its versions are books/procedure-documentation.csv",
 }

@@ -103,10 +103,8 @@ def tp_tick(c, force=False):
         fc, fp = atr_tick(c, cut, purge)  # 2.272.0 E2 (#3038): task / comment / project files (unlinked after the commit)
         counts.update(fc)
         paths += fp
-        # 2.1067.0 (#5789): the office's copies (otb_tick) are gone: every office kind is on the core's run (obj_trash_tick)
-        # review 2.1067.0 (F3): a copy ofk_copies_back left (its row there again) still goes after its period until the table goes
-        counts["office_trash"] = (c.execute("DELETE FROM office_trash WHERE deleted_at<?", (cut,)).rowcount if purge
-                                  else c.execute("SELECT COUNT(*) FROM office_trash WHERE deleted_at<?", (cut,)).fetchone()[0])
+        # 2.1067.0 (#5789): the office's copies (otb_tick) are gone: every office kind is on the core's run (obj_trash_tick);
+        # 2.1073.0 (#5865): the table office_trash itself is gone (office/okern.py ofk_trash_drop at the start)
         try:  # 2.567.0 A (#4707): household budget entries (with their receipts), templates, categories
             with c.savepoint():
                 bc, bp = bud_trash_tick(c, cut, purge)

@@ -24,6 +24,7 @@ sys.path.insert(0, N)
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 from kt import B, check, dbx, done, fresh, sess  # noqa: E402
 from obj_probe import in_app  # noqa: E402
+from office_trash_old import gone  # noqa: E402  2.1073.0 (#5865)
 
 fresh(prefix="P21004B")
 OFC = B + "/api/office"
@@ -86,7 +87,7 @@ check(S1 in (listed(A) or []), "org: setup, an orphaned record is listed")
 r = A.delete(ORPH + f"/{S1}")
 check(r.ok and r.json().get("trash") == {"kind": "osignoff", "id": S1} and "trash_id" not in r.json(), f"org: into the core's trash {r.text[:200]}")
 check(deleted(S1) is True and S1 not in (listed(A) or []), "org: the row carries deleted_at and is no longer listed")
-check(not dbx("SELECT 1 FROM office_trash WHERE kind='signoff'"), "org: no copy in office_trash any more")
+check(gone(dbx), "org: no copy in office_trash any more (2.1073.0 #5865: no such table at all)")
 t = in_trash(A, "osignoff", S1)
 check(len(t) == 1 and t[0]["kind"] == "signoff" and t[0]["label"] == "Example Rough Cut", f"org: the office trash lists it with its title {t}")
 check(Bo.post(T + f"/core/osignoff/{S1}/restore").status_code == 403, "org: a member may not restore it (403)")

@@ -20,6 +20,8 @@ tenant-matrix: document
  - 2.1069.0 (#5412): a queued run counts in its own workspace only, the workspace's limit (PO_WS_MAX) and the person's
    (PO_WAIT_MAX) both hold; the recognition's step (docs_run_once) never runs an "Optimise PDF", its own thread does
    (po_run_once: the cut-off runs taken up at its first step, then a run)
+ - 2.1073.0 (#5570): a run of six pages goes page by page (GET shows its steps), a scan uploaded meanwhile is recognised
+   before the run ends, the run's folder goes afterwards
 usage: p2892_c_pdfopt_test.py <datadir>   (P2892C_NOSTART=1: the container runs already)"""
 import base64
 import json
@@ -237,6 +239,31 @@ check(j and j.get("state") == "done" and j.get("mode") == "bw", f"selection: opt
 # 2.892.0 review F5: nobody saw a list of its pages -> "blank" is ignored, no page goes
 check(j and not j.get("drop") and j.get("kinds") == {"bw": 2, "gray": 0, "color": 0}, f"selection: no page removed without the list seen first {j}")
 check([v["no"] for v in versions(Go, GSID)] == [1], "selection: the other person's document untouched")
+
+# ================================================================ 2.1073.0 (#5570): a run goes page by page
+# a run of many pages held the documents queue until it was done: a new scan waited for its recognition (and a restore for
+# GATE). Now each page is one queue step: GET .../pdfopt shows how far it got ("step"), and a scan uploaded while the run is
+# under way is recognised before the run ends (the times in the database, no fixed wait).
+LONG = scan([f"text:Langer Bericht Seite {i}|Beispiel Archiv Verein|Zeile {i * 7}" for i in range(1, 7)])
+LID = up(Fr, "langer-bericht-scan.pdf", LONG)
+check(done(Fr, LID) is not None, "#5570: the long scan recognised")
+check(Fr.post(B + f"/api/docs/{LID}/pdfopt", json={"mode": "bw"}).status_code == 202, "#5570: the run of six pages queued")
+mid = until(lambda: (lambda j: j if (j.get("step") and 0 < j["step"][0] < j["step"][1]) or j.get("state") in ("done", "same", "failed")
+                     else None)(po(Fr, LID)), 600, step=0.3)
+check(mid and mid.get("state") == "run" and mid.get("step") and 0 < mid["step"][0] < mid["step"][1],
+      f"#5570: the run shows its steps while it goes (page by page, not in one go) {mid}")
+NID = up(Fr, "neuer-brief-scan.pdf", scan(["text:Neuer Brief Mitte|Beispiel Absender"]))
+j = po_until(Fr, LID, ("done", "same", "failed"))
+check(j and j.get("state") == "done" and j.get("kinds") == {"bw": 6, "gray": 0, "color": 0} and not j.get("drop"),
+      f"#5570: the run page by page ends as one: six bw pages, a new version {j}")
+check([v["no"] for v in versions(Fr, LID)] == [2, 1], "#5570: the long scan has its new version")
+nd = done(Fr, NID)
+check(nd and nd["state"] == "done", f"#5570: the scan uploaded meanwhile recognised {nd and nd['state']}")
+ta = kt.dbx("SELECT done_at FROM doc_meta WHERE node_id=?", (NID,))
+check(ta and ta[0][0] and j and str(ta[0][0]) < str(j.get("at")),
+      f"#5570: the new scan was recognised between two pages, before the run ended {ta} < {j and j.get('at')}")
+check(not py("import glob, tempfile; print(glob.glob(tempfile.gettempdir() + '/kpdo-r*'))").strip("[]\n "),
+      "#5570: the run's folder is gone after the run")
 
 # ================================================================ "Optimise new scans automatically", never the office's receipts
 r = Fr.put(B + "/api/docs/settings", json={"ws": "private", "pdf_opt_auto": True})
