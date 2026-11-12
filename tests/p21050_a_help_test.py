@@ -17,6 +17,7 @@ usage: p21050_a_help_test.py <datadir>"""
 import importlib.util
 import io
 import os
+import re
 import sys
 
 import requests
@@ -123,6 +124,13 @@ check(ag.get(V + "/help/section").status_code == 404, "no key: 404")
 check(ag.get(V + "/help/section", params={"key": SCAN, "path": "/etc/passwd"}).status_code == 400, "an unknown parameter: 400")
 
 # the operator files: an instance admin's token with admin-read only
+# review 2.1050.0 (F4): every docs/*.md is named a user's file (HELP_PUBLIC) or an operator file (HELP_OPERATOR); a new one
+# is closed until named - this turns red so that it gets named
+_src = open(os.path.join(ROOT, "kalmido", "api", "helpdocs.py"), encoding="utf-8").read()
+_named = set(re.findall(r'"([a-z0-9-]+)"', _src[_src.index("HELP_OPERATOR = frozenset"):_src.index("HELP_READ_MAX =")]))
+_files = {re.sub(r"[^a-z0-9]+", "-", f[:-3].lower()).strip("-") for f in os.listdir(os.path.join(ROOT, "docs")) if f.endswith(".md")}
+check(not (_files - _named), f"every docs/*.md is named public or operator in helpdocs.py: {sorted(_files - _named)}")
+check(read(ag, "about") != 404, "a user's file (ABOUT) is readable for an agent")
 check(read(adm_plain, "self-hosting") == 404, "an admin's token without admin-read: no operator file")
 r = read(adm, "self-hosting")
 check(isinstance(r, dict) and r.get("file") == "SELF-HOSTING.md", "an admin's token with admin-read reads SELF-HOSTING")

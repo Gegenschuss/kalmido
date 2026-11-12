@@ -36,6 +36,11 @@ HELP_DIR = os.path.join(APP_DIR, "docs")  # the image: /app/docs (Dockerfile), a
 # the operator's files: running a server, its settings and internals -- only for an instance admin
 HELP_OPERATOR = frozenset(("self-hosting", "env", "upgrading", "oidc", "architecture", "glossar", "packs", "privacy-template",
                            "privacy-assistant-template"))
+# review 2.1050.0 (F4): the user's files by name; a docs/*.md in neither set counts as an operator file (closed until named
+# here; tests/p21050_a_help_test.py turns red on such a file)
+HELP_PUBLIC = frozenset(("about", "accessibility", "agent-security", "agent-setup", "agents", "api", "assistant", "bookmarks",
+                         "budget", "caldav", "calendar", "code-verify", "features", "feeds", "files", "git", "home", "import",
+                         "notifications", "office", "readme", "sheets", "tasks", "team", "wiki"))
 HELP_READ_MAX = 16000   # characters of one section answer
 HELP_HITS = 8           # default hits of a search (?limit 1..20)
 HELP_HITS_MAX = 20
@@ -126,7 +131,7 @@ def hlp_index():
                 continue
             lines, secs = _hlp_parse(fkey, fname, text)
             files[fkey] = {"file": fname, "key": fkey, "title": secs[0]["title"] if secs else fname, "lines": lines, "sections": secs,
-                           "operator": fkey in HELP_OPERATOR}
+                           "operator": fkey not in HELP_PUBLIC}
             for s in secs:
                 by_key[s["key"]] = s
                 body = "\n".join(lines[s["start"] + 1:s["own_end"]])
@@ -150,7 +155,7 @@ def hlp_admin():
 
 
 def _hlp_open(s, admin):
-    return admin or s["fkey"] not in HELP_OPERATOR
+    return admin or s["fkey"] in HELP_PUBLIC
 
 
 def hlp_terms(q):
