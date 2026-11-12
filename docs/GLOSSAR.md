@@ -122,6 +122,7 @@ Connected agents: the agent API, proposals, quotas, locks, schedules, chat and t
 - `kalmido/agents/agenttime.py` (`atm`) - An agent checks time tracking and proposes entries from calendar events
 - `kalmido/agents/agsees.py` (`ags`) - What an agent sees right now - the section "Sees now" of the dialog "Edit agent" (#5822)
 - `kalmido/agents/api.py` (`v1`) - The REST API of an agent itself (token of an agent account)
+- `kalmido/agents/apvdiff.py` (`apvd`) - What the Yes of an approval card changes in a text -- the lines it removes and the lines it adds
 - `kalmido/agents/asstprop.py` (`ast`) - Texts drafted by a CONNECTED agent, on request of a person
 - `kalmido/agents/ccsread.py` (`ccs`) - A connected agent reads a credit card statement (kind card_statement_read, a request of agents/asstprop.py)
 - `kalmido/agents/chat.py` (`chat`) - What people see of agents: state, chat (files, reactions)
