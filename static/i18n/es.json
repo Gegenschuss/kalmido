@@ -18327,5 +18327,7 @@
   "Could not load the folder": "No se pudo cargar la carpeta",
   "Travel receipt": "Comprobante de viaje",
   "Card position": "Movimiento de tarjeta",
-  "The trip is in the trash; restore it first": "El viaje está en la papelera; restáuralo primero"
+  "The trip is in the trash; restore it first": "El viaje está en la papelera; restáuralo primero",
+  "{0} has a question for you": "{0} tiene una pregunta para ti",
+  "{1} has {0} question for you": ["{1} tiene {0} pregunta para ti", "{1} tiene {0} preguntas para ti"]
 }

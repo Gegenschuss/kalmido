@@ -18,7 +18,7 @@ function bellBtn() {
 const NEWS_CHIPS = [['mention', 'at', N_('Mentions'), ['mention']], ['comment', 'comment', N_('Comments'), ['comment']],
   ['assign', 'user', N_('Assignments'), ['assign', 'unassign', 'take']], ['newtask', 'plus', N_('New tasks'), ['newtask', 'errreport']],
   ['complete', 'check', N_('Completed'), ['complete', 'unblock']], ['status', 'pulse', N_('Status'), ['status']],
-  ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner', 'orgjoin', 'orgjoinres', 'orgrole', 'orgdelnotice', 'orggone', 'whorgcut', 'integfail']],
+  ['agents', 'bot', N_('Agents'), ['approval', 'agentask', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner', 'orgjoin', 'orgjoinres', 'orgrole', 'orgdelnotice', 'orggone', 'whorgcut', 'integfail']],
   ['followup', 'hourglass', N_('Follow-ups'), ['followup']]];
 const newsKindOk = (it, k = S.nf.kind) => { const c = k && NEWS_CHIPS.find(x => x[0] === k); return !c || c[3].includes(it.kind); };
 function newsChipsHtml(items, attr) {
@@ -272,6 +272,7 @@ function newsText(it, U) {
     case 'leavedecide': return (d.state === 'approved' ? tr('{0} approved your holiday ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : '') : tr('{0} rejected your holiday ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : ''));
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
     case 'approval': return d.title ? tr('{0} is waiting for your approval: {1}', who, q(d.title)) : tr('{0} is waiting for your approval', who);
+    case 'agentask': return it.count > 1 ? trn('{1} has {0} question for you', '{1} has {0} questions for you', it.count, who) : tr('{0} has a question for you', who);  // 2.1039.0 (#5805): one row per agent
     case 'job_watch': return d.kind === 'branch_stranded' ? tr('{0}: work lies on a branch without a merge ({1})', who, q(d.title || '')) : tr('{0}: a job makes no progress ({1})', who, q(d.title || ''));  // 2.392.2 (#3366): the watchdog  // 2.367.2 (#2968): a list-wide one has no task title
     case 'aprequest': return tr('Approval needed: {0} (from {1})', q(it.task_title || ''), who) + (d.note ? ': ' + q(d.note) : '');  // 2.367.2 (#2968)
     case 'signoff': return d.state === 'accepted' ? (d.sk === 'document' ? tr('{0} signed {1}', q(d.name || ''), q(d.title || '')) : tr('{0} approved {1}', q(d.name || ''), q(d.title || '')))
@@ -312,7 +313,7 @@ function newsText(it, U) {
   }
   return tr('{0} changed something', who);
 }
-const NEWS_ICON = {job_watch: 'clock', playbook_proposal: 'book', orglist: 'archive', mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot', e2e_key: 'key', wiki_e2e_key: 'key', orgkey: 'key'};  // 2.64.1 / 2.64.3 B (#1817)
+const NEWS_ICON = {job_watch: 'clock', playbook_proposal: 'book', orglist: 'archive', mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', agentask: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot', e2e_key: 'key', wiki_e2e_key: 'key', orgkey: 'key'};  // 2.64.1 / 2.64.3 B (#1817)
 /** @type {any} */ (NEWS_ICON).wiki_shared = 'book';  // 2.126.2 B (#2355)
 /** @type {any} */ (NEWS_ICON).orgdelnotice = /** @type {any} */ (NEWS_ICON).orggone = 'alert';  // 2.361.0 (#2920)
 /** @type {any} */ (NEWS_ICON).whorgcut = 'alert';  // 2.380 G (#3391)
@@ -461,7 +462,9 @@ rsw_attach({
 });
 async function newsOpen(i, opts) {
   const it = (S.nf.items || [])[i]; if (!it) return;
-  if (!it.read) { it.read = true; it.keep = true; if (it.to_me && S.news) { S.news.unread_me = Math.max(0, (S.news.unread_me || 0) - 1); renderTop(); } newsRead({ids: it.ids}); }
+  const acnCard = it.kind === 'approval' && it.data?.chat;  // 2.1039.0 (#5804): an approval card of the agent chat waits until it is decided
+  if (!it.read && !acnCard) { it.read = true; it.keep = true; if (it.to_me && S.news) { S.news.unread_me = Math.max(0, (S.news.unread_me || 0) - (it.kind === 'agentask' ? it.count || 1 : 1)); renderTop(); } newsRead({ids: it.ids}); }
+  if ((acnCard || it.kind === 'agentask') && feat('agents') && agentsOn()) { chatOpen(it.data?.agent || it.actor_id); return; }  // 2.1039.0 (#5804 #5805): into the agent's chat
   if (/comment|mention/.test(it.kind || '')) S.tlScroll = it.task_id;  // 2.0.6: opened for a comment: show the newest
   if (it.kind === 'proposal') { propOpen(it.data?.job); return; }  // 2.3.0
   if (it.kind === 'playbook_proposal') { pbNewsOpen(it); return; }  // 2.39.0 (#1168)

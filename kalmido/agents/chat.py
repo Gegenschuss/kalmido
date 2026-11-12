@@ -571,6 +571,8 @@ def chat_choice_answer(c, m, ch, ids, uid, via, collected=False):
     act once per message_id."""
     ans = {"ids": ids, "at": iso_ms(now_utc()), "user_id": uid, **({"via": via} if ch.get("permission") or ch.get("approval") else {})}
     c.execute("UPDATE agent_chat SET choice=? WHERE id=?", (json.dumps(ans), m["id"]))
+    from ..agents.chatnews import acn_read
+    acn_read(c, m["user_id"], mids=[m["id"]])  # 2.1039.0 (#5804 #5805): answered = out of the bell's "For you"
     m2 = c.execute("SELECT * FROM agent_chat WHERE id=?", (m["id"],)).fetchone()
     labels = [x["label"] for x in ch["choices"] if x["id"] in ids]
     who = {"id": uid, "name": user_names(c, [uid]).get(uid, "")}
@@ -632,6 +634,8 @@ def chat_choices_withdraw(c, m, outcome=None):
         raise Denied(409, tr("This question was answered already"))
     ch = {**ch, "withdrawn_at": iso_ms(now_utc()), **({"outcome": outcome} if outcome else {})}
     c.execute("UPDATE agent_chat SET choices=? WHERE id=?", (json.dumps(ch, ensure_ascii=False), m["id"]))
+    from ..agents.chatnews import acn_read
+    acn_read(c, m["user_id"], mids=[m["id"]])  # 2.1039.0 (#5804 #5805): taken back = out of the bell's "For you"
     bump(c)
     return c.execute("SELECT * FROM agent_chat WHERE id=?", (m["id"],)).fetchone()
 
@@ -915,6 +919,8 @@ def agent_chat_get(aid):
         brief = jcb_of(c, aid, me(), as_int(request.args["job"], "job", 1))  # 2.739.0 (#5216): the job's brief (null = none)
     if c.execute("UPDATE agent_chat SET read_at=? WHERE agent_id=? AND user_id=? AND sender='agent' AND read_at IS NULL",
                  (iso(now_utc()), aid, me())).rowcount:
+        from ..agents.chatnews import acn_read
+        acn_read(c, me(), aid=aid)  # 2.1039.0 (#5805): the chat opened = its questions read in the bell
         c.commit()
     rx, fs = chat_reactions_of(c, [r["id"] for r in rows]), chat_files_of(c, [r["id"] for r in rows])
     nw = chat_newest(c, aid, me())

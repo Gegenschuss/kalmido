@@ -18327,5 +18327,7 @@
   "Could not load the folder": "Impossible de charger le dossier",
   "Travel receipt": "Justificatif de voyage",
   "Card position": "Opération de carte",
-  "The trip is in the trash; restore it first": "Le voyage est dans la corbeille ; restaure-le d'abord"
+  "The trip is in the trash; restore it first": "Le voyage est dans la corbeille ; restaure-le d'abord",
+  "{0} has a question for you": "{0} a une question pour toi",
+  "{1} has {0} question for you": ["{1} a {0} question pour toi", "{1} a {0} questions pour toi"]
 }

@@ -1970,6 +1970,13 @@ keep 80); a list of strings works too (`id` = `label`). `"multi": true` lets the
 tick, then press *Send*). The message carries `choices` `{choices, multi}` and, once answered, `choice`
 `{ids, at, user_id}`; the buttons lock after the answer. MCP: `send_chat` with `choices` / `multi`.
 
+**In the person's bell (2.1039.0).** What the agent asks the person in the chat stands in the bell under *For you* and
+counts in its number (and on the app icon): every open **approval card** and **permission question** until it is answered,
+withdrawn or expired (a card of a waiting job counts once, together with the job), and every **question** -- a message
+with answer buttons (link buttons with `href` do not count) or a job message with `job_msg: "question"` -- until the person
+opens the chat or answers it; the questions of one agent show as one row. Results, `say` lines, notices and plain messages
+never count, so mark a real question as one (buttons or `job_msg: "question"`). The text is never judged.
+
 **Only the newest buttons are live (2.30.0).** As soon as a newer message comes into the conversation -- the agent's next
 message or one the person writes -- the open buttons of older messages expire: the app hides them (pressed ones stay as
 *Answered*), and a press from an old tab or an offline outbox answers `409` "This suggestion is no longer current". Every

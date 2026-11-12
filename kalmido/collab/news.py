@@ -65,6 +65,7 @@ NEWS_KINDS += ("orglogin", "orgjoinres", "orgrole")  # 2.367.4 (#2974): an organ
 NEWS_KINDS += ("integfail",)  # 2.367.3 (#2971): a channel, webhook, mailbox, git connection or inbox of mine stopped (row "integration", collab/integfail.py)
 NEWS_KINDS += ("job_watch",)  # 2.392.2 (#3366): the watchdog found a job of an agent stalled / its branch stranded (row "approval", agents/watch.py)
 NEWS_KINDS += ("docflow",)  # 2.581.0 (#4803): a document flow tells me about a document (row "docflow", docs/flows.py; News only)
+NEWS_KINDS += ("agentask",)  # 2.1039.0 (#5805): an agent asks me in its chat (row "approval", agents/chatnews.py; one row per agent)
 NEWS_KINDS += ("budgetwarn",)  # 2.555.0 (#4570): a project / task reached 80 % / 100 % of its "Budget h" (row "timebudget", personal/budgetwarn.py)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evchange", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
@@ -95,7 +96,7 @@ def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
     if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr", "evchange", "apbooking", "calsub", "integfail", "docoverdue", "orglogin", "budgetwarn", "docflow"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
-    if kind in ("approval", "aprequest"):  # 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
+    if kind in ("approval", "aprequest", "agentask"):  # 2.1039.0 (#5805): agentask; 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
         return True
     if kind == "review" and (data or {}).get("pr"):  # 2.367.2 (#2968): a linked pull request approved my task (no actor)
         return True
@@ -265,6 +266,7 @@ KIND_ROW["fetcherr"] = "fetcher"  # 2.425.0 C (#3453)
 KIND_ROW["ptlimit"] = KIND_ROW["apblimit"] = "limits"  # 2.453.0 (#3781): one row for both
 KIND_ROW["integfail"] = "integration"  # 2.367.3 (#2971)
 KIND_ROW["job_watch"] = "approval"  # 2.392.2 (#3366): the watchdog's finding about an agent's job ("An agent waits for me")
+KIND_ROW["agentask"] = "approval"  # 2.1039.0 (#5805): "an agent waits for me" (News on by default)
 KIND_ROW["budgetwarn"] = "timebudget"  # 2.555.0 (#4570)
 KIND_ROW["docflow"] = "docflow"  # 2.581.0 (#4803)
 KIND_ROW["wiki_shared"] = "share"  # 2.126.2 B (#2355): switched with the sharing row (News on, no push by default)
@@ -771,6 +773,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         elif kind == "budgetwarn" and r["task_id"] is None:  # 2.555.0 (#4570): a project's budget, while I see the project
             if not r["list_id"] or not sees(r["list_id"]):
                 continue
+        elif kind == "agentask":  # 2.1039.0 (#5805): the message, its state and the row per agent: agents/chatnews.acn_feed below
+            pass
         elif kind == "approval" and r["task_id"] is None:  # 2.367.2 (#2968): an agent asks about a whole list (or about none)
             if r["list_id"] and not sees(r["list_id"]):
                 continue
@@ -848,6 +852,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                     "read": read, "to_me": tome})
         if kind == "comment" and r["actor_id"] in agents:
             out[-1].update(agent=True, tasks=[{"id": r["task_id"], "title": r["t_title"]}])
+    from ..agents.chatnews import acn_feed
+    out = acn_feed(c, uid, out)  # 2.1039.0 (#5804 #5805): approval cards and questions of the agent chat judged again
     from ..collab.liste2eguard import le2b_news
     le2b_news(c, out)  # 2.64.1 B (#1817): items of lists with the lock: no title, no excerpt, enc + list_id (the app resolves)
     return out, user_names(c, uids)
@@ -873,7 +879,8 @@ def news_counts(c, uid):
 def news_unread_me(c, uid, s=None, items=None):
     """2.28.0 (#987): unread items from people for me (the bell's number)."""
     items = news_items(c, uid, s)[0] if items is None else items
-    return sum(1 for x in items if not x["read"] and x.get("to_me"))
+    # 2.1039.0 (#5805): the row of an agent's questions counts each open question (one row, as many things waiting)
+    return sum(x["count"] if x["kind"] == "agentask" else 1 for x in items if not x["read"] and x.get("to_me"))
 
 
 @app.get("/api/news")

@@ -18327,5 +18327,7 @@
   "Could not load the folder": "Der Ordner konnte nicht geladen werden",
   "Travel receipt": "Reisebeleg",
   "Card position": "Kartenposition",
-  "The trip is in the trash; restore it first": "Die Reise liegt im Papierkorb; stelle sie zuerst wieder her"
+  "The trip is in the trash; restore it first": "Die Reise liegt im Papierkorb; stelle sie zuerst wieder her",
+  "{0} has a question for you": "{0} hat eine Frage an dich",
+  "{1} has {0} question for you": ["{1} hat {0} Frage an dich", "{1} hat {0} Fragen an dich"]
 }

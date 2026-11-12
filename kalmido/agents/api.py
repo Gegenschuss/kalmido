@@ -475,10 +475,16 @@ def job_notify(c, j, old_state):
     if not s or not job_visible(c, j, uid):
         return
     lid = None
+    from ..agents.chatnews import acn_job_has_entry
+    once = acn_job_has_entry(c, uid, j["id"])  # 2.1039.0 (#5804): its approval card in the chat stands in the bell already: once
     if j["task_id"]:  # 2.1.0 (#317): "agent waits for me" as News (2.367.2, #2968: on by default) + the push per the settings
         lr = c.execute("SELECT list_id FROM tasks WHERE id=?", (j["task_id"],)).fetchone()
         lid = lr[0] if lr else None
-        news_add(c, uid, "approval", task_id=j["task_id"], data={"title": (j["title"] or "")[:200], "job": j["id"]}, actor=j["agent_id"], s=s)
+        if not once:
+            news_add(c, uid, "approval", task_id=j["task_id"], data={"title": (j["title"] or "")[:200], "job": j["id"]}, actor=j["agent_id"], s=s)
+    elif not once:  # 2.1039.0 (#5804): a job without a task waits too -- an entry about its project (or none), not only the push
+        lid = j["list_id"] if "list_id" in j.keys() else None
+        news_add(c, uid, "approval", list_id=lid, data={"title": (j["title"] or "")[:200], "job": j["id"]}, actor=j["agent_id"], s=s)
     if not notif_ok(c, uid, s, "approval", "push", lid):
         return
     if not h6e_agent_push_ok(j["agent_id"], uid):  # 2.86.0 (N31): daily push budget per agent and person

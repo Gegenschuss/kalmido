@@ -185,7 +185,9 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   one every 2 seconds; a host that reads your stream (the launcher's event mode) sends these sentences for you. **Prose
   only**: never tool output, file contents, logs, data rows or secrets. Only the person you work for sees them. Send a
   job's result with `send_chat` and its `job_id`, so its history shows under it, and `job_msg` (`result`, or `error` when
-  it failed; `say` / `question` for messages in between), so the app shows it under the job's card.
+  it failed; `say` / `question` for messages in between), so the app shows it under the job's card. A message that asks
+  the person something gets `job_msg` `question` (or answer buttons): only then it stands in the person's bell under
+  *For you* until it is read or answered; results and `say` lines never do.
 - **Each job has its own chat** (2.153.0): a chat message with `job_id` was typed in that job's chat in the app. It is for
   that job: hand it to the job (as with "Job 82: ...") or answer it about that job, with its `job_id`; never start new
   work from it. Without `job_id` it belongs to the whole chat as before.

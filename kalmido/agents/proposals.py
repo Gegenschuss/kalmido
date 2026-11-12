@@ -1583,6 +1583,8 @@ def v1_agent_chat_post(uid):
         if jid and jpar:  # 2.59.0 (#1827): the job keeps its leader (once set it stays), so all its messages share the colour
             c.execute("UPDATE agent_jobs SET parent_id=? WHERE id=? AND parent_id IS NULL", (jpar, jid))
         r = c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()
+    from ..agents.chatnews import acn_news
+    acn_news(c, r)  # 2.1039.0 (#5804 #5805): an approval card / a question of the agent stands in the bell's "For you"
     if not b.get("permission"):  # 2.32.0 (#1081): the answer takes the live steps of the run along (a permission question: the run goes on)
         steps_take(c, aid, uid, r["id"])
     text = r["body"] or " ".join(f"📎 {f['name']}" for f in chat_files_of(c, [r["id"]]).get(r["id"], []))

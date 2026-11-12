@@ -18328,5 +18328,7 @@
   "Could not load the folder": "Impossibile caricare la cartella",
   "Travel receipt": "Ricevuta di viaggio",
   "Card position": "Movimento della carta",
-  "The trip is in the trash; restore it first": "Il viaggio è nel cestino; ripristinalo prima"
+  "The trip is in the trash; restore it first": "Il viaggio è nel cestino; ripristinalo prima",
+  "{0} has a question for you": "{0} ha una domanda per te",
+  "{1} has {0} question for you": ["{1} ha {0} domanda per te", "{1} ha {0} domande per te"]
 }
