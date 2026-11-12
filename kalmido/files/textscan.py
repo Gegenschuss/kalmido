@@ -363,7 +363,10 @@ def _index(c, fid, ws, text):
 def ts_reindex(c, ids):
     """2.1002.0 (#5279): recognised texts indexed again by this version's rules (core/objwords.py osw_tick)."""
     for r in c.execute("SELECT id, ws, state, text FROM file_text WHERE id = ANY(CAST(? AS BIGINT[]))", (list(ids),)).fetchall():
-        _index(c, r["id"], r["ws"], S.doc_open(c, r["ws"], "file_text.text", r["text"]) if r["state"] == "found" else None)
+        text = S.doc_open(c, r["ws"], "file_text.text", r["text"], default=None) if r["state"] == "found" else None
+        if r["state"] == "found" and text is None:  # review of 2.1002: a key that cannot open it keeps its copied words
+            raise S.OrgCryptError(f"file_text {r['id']}: the text cannot be opened")
+        _index(c, r["id"], r["ws"], text)
 
 
 osw_register("file_text", "file_text", "id", "x.state='found'", ts_reindex)

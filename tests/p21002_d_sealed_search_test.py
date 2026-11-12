@@ -180,4 +180,14 @@ out = box("from kalmido.core.objwords import osw_tick\nprint(osw_tick(c, force=T
 check(dbx("SELECT 1 FROM obj_search_words WHERE kind='doc' AND ref_id=? AND h='v:2'", (D1,)),
       f"the catch-up indexed it again by the new rules ({out})")
 check(D1 in docs(A, "ab") and D1 in docs(A, "mueller"), "... and the new rules find it (2 characters, umlaut)")
+# review of 2.1002 (#5279): one object a key cannot open holds only itself in the catch-up, never the whole run, and keeps
+# the words it has (no mark, skipped in this process); the others of its kind are indexed in the same tick
+dbx("DELETE FROM obj_search_words WHERE kind='doc' AND ref_id IN (?, ?) AND h='v:2'", (D1, DF))
+out = box(f"from kalmido.core import objwords as W\nr = W.OSW_REINDEX['doc']\nreal = r['reindex']\n"
+          f"def bad(c, ids):\n    if {D1} in ids:\n        raise RuntimeError('no key')\n    real(c, ids)\n"
+          f"r['reindex'] = bad\nW.osw_tick(c, force=True)\nprint({D1} in W._BAD.get('doc', ()), {D1} in W.osw_late(c, 'doc'))")
+check(out.splitlines()[-1:] == ["True False"], f"the failing document is set aside, not asked again in the run ({out})")
+check(dbx("SELECT 1 FROM obj_search_words WHERE kind='doc' AND ref_id=? AND h='v:2'", (DF,)),
+      "the other document of the same tick got its mark")
+check(D1 in docs(A, "gaertnerei"), "the failing document keeps its words (still found)")
 sys.exit(kt.done("p21002_d_sealed_search"))

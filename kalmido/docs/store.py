@@ -349,7 +349,10 @@ def doc_reindex(c, ids):
         m = meta_row(c, nid)
         node = c.execute("SELECT name FROM fs_nodes WHERE id=?", (nid,)).fetchone()
         if m and node:
-            doc_index(c, nid, m["ws"], index_text(c, dict(m), node["name"], meta_text(c, m)))
+            text = doc_open(c, m["ws"], "doc_meta.text", m["text"], default=None)  # review of 2.1002: unopenable = keep
+            if text is None:  # its copied words, no mark (core/objwords.py osw_tick skips it until the next start)
+                raise OrgCryptError(f"doc {nid}: the text cannot be opened")
+            doc_index(c, nid, m["ws"], index_text(c, dict(m), node["name"], text))
         else:
             osw_put(c, "doc", nid)  # nothing to index: the mark only (never asked again)
 

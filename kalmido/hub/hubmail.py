@@ -496,7 +496,8 @@ def _index(c, mid, ws, d):
 def hbm_reindex(c, ids):
     """2.1002.0 (#5279): filed mails indexed again by this version's rules (core/objwords.py osw_tick)."""
     for m in c.execute("SELECT * FROM hub_mails WHERE id = ANY(CAST(? AS BIGINT[]))", (list(ids),)).fetchall():
-        _index(c, m["id"], m["ws"], _open(c, m))
+        sp = hbm_space(m)  # review of 2.1002: not _open -- a key that cannot open the mail raises and keeps its copied words
+        _index(c, m["id"], m["ws"], oc_dec_fields(c, sp, "hub_mails", m) if sp else dict(m))
 
 
 osw_register("hub_mail", "hub_mails", "id", "TRUE", hbm_reindex)

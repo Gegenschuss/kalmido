@@ -264,15 +264,18 @@ def osw_register(kind, table, id_col, where, reindex):
 
 
 def osw_late(c, kind, limit=OSW_TICK):
-    """The ids of kind's objects without OSW_MARK (at most limit)."""
+    """The ids of kind's objects without OSW_MARK (at most limit); not the ones whose catch-up failed in this process
+    (_BAD: a key that cannot open them -- they keep their copied words and wait for the next start)."""
     r = OSW_REINDEX[kind]
     t, col = r["table"], r["id"]
     return [x[0] for x in c.execute(
         f"SELECT x.{qi(col, {col})} FROM {qi(t, {t})} x WHERE {r['where']} AND NOT EXISTS (SELECT 1 FROM obj_search_words w "
-        f"WHERE w.kind=? AND w.ref_id=x.{qi(col, {col})} AND w.h=?) ORDER BY x.{qi(col, {col})} DESC LIMIT {int(limit)}",
-        (kind, OSW_MARK)).fetchall()]
+        f"WHERE w.kind=? AND w.ref_id=x.{qi(col, {col})} AND w.h=?) AND NOT (x.{qi(col, {col})} = ANY(CAST(? AS BIGINT[]))) "
+        f"ORDER BY x.{qi(col, {col})} DESC LIMIT {int(limit)}",
+        (kind, OSW_MARK, sorted(_BAD.get(kind, ())))).fetchall()]
 
 
+_BAD = {}  # 2.1002.0 (#5279, review): kind -> ids whose catch-up failed in this process (skipped until the next start)
 _IDLE = {}  # kind -> time.monotonic() when its catch-up last found nothing (this process)
 OSW_IDLE_S = 600  # a kind without late objects is asked again after so many seconds (every write sets the mark itself)
 
@@ -287,11 +290,17 @@ def osw_tick(c, limit=OSW_TICK, force=False):
                 continue
             ids = osw_late(c, kind, limit)
             if ids:
-                r["reindex"](c, ids)
-                done[kind] = len(ids)
+                n = 0
+                for i in ids:  # 2.1002.0 (#5279, review): one object a key cannot open holds only itself, not the run
+                    try:
+                        with c.savepoint():
+                            r["reindex"](c, [i])
+                        n += 1
+                    except Exception:  # noqa: BLE001 -- OrgCryptError and the like: its copied words stay, no mark
+                        _BAD.setdefault(kind, set()).add(int(i))
+                done[kind] = n
                 _IDLE.pop(kind, None)
+                c.commit()  # each kind's work stays, whatever the next kind does
             else:
                 _IDLE[kind] = time.monotonic()
-    if done:
-        c.commit()
     return done
