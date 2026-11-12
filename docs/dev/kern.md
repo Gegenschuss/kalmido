@@ -772,8 +772,7 @@ The task's routes stay where they are (`/api/tasks/<id>/comments`, `/api/comment
 second kind joins. `ref_id` has no foreign key: the trigger `kalmido_ocm_task_gone` deletes a task's comments when the task is
 deleted for good, `kalmido_orw_obj_comments` fills `org_id` from the task's project (row-level security), `kalmido_orx_gone`
 takes the reactions along. The start moved the old rows with their ids (`ocm_move`, through `core/objhooks.py MOVE` before
-the fragments' AFTER; `git_issue_comments` points at `obj_comments` since, `ocm_fk`; `cmt_fts` went with Q6a); a SQLite file of an older
-version brings its comments in the old table (`admin/migrate.py LEGACY_COMMENTS`), the same move takes them. One-way: the old
+the fragments' AFTER; `git_issue_comments` points at `obj_comments` since, `ocm_fk`; `cmt_fts` went with Q6a). One-way: the old
 tables are dropped; a backup restores them.
 
 #### Reviews and document notes (stage Q4b, 2.981.0, #5273)
@@ -802,7 +801,7 @@ the new text) and `web` (the generic routes below). Reading in the old shape: `o
   organisation export keeps `videos/comments.json` and `documents/notes.json` with their old columns (`admin/orgexport.py
   OX_KIND_COLS`); their import writes `obj_comments` (`admin/oi_store.py _video_comment`, `_doc_note`). The start moved the old
   rows with NEW ids (`ocm_move_q4b`, `core/objhooks.py MOVE`; an answer keeps its comment, the review comments deleted before
-  the clean-up of #5263 stay out); a SQLite file brings them in the old tables (`admin/migrate.py LEGACY_Q4B`). One-way: the
+  the clean-up of #5263 stay out). One-way: the
   old tables are dropped (`5273_a.py`); a backup restores them.
 
 #### The team chat's helpers and git comments (stage Q4c, 2.981.0, #5274)
@@ -905,7 +904,7 @@ marks adds its kind to `OSN_KINDS` and a trigger line in a fragment -- no table 
   high-water mark per feed: an article is marked unread on its own and articles arrive out of order. `rss_reads` and
   `rss_items.read_at` are gone (an article deleted takes its marks: `kalmido_osn_gone_rss`).
 - The move: `osn_move` (`osn_move_tchat`, `osn_move_rss`) before the fragment `5286_a` drops the old tables and the column
-  (one-way, the back limit is raised; a SQLite file's `tchat_reads` comes in through `admin/migrate.py legacy_tables`). Not in
+  (one-way, the back limit is raised). Not in
   the exports (a personal view state, as before).
 
 ### Templates (stage Q10, 2.905.0, #5288)
@@ -984,8 +983,7 @@ rule to `OFL_LEVEL` and a `kalmido_ofl_gone` trigger line in a fragment -- no ta
 - Exports keep their parts: the account export's `list_notif` / `folder_notif` have their old columns. A project bell was never
   exported (a personal view state).
 - The move: `ofl_setup` (`ofl_move`: `list_bell`) and `core/objhooks.MOVE` (`ncap_move`) before the fragment `5287_a` drops the
-  old tables (one-way, the back limit is raised like Q9a; a SQLite file's old tables come in through `admin/migrate.py
-  legacy_tables`).
+  old tables (one-way, the back limit is raised like Q9a).
 
 
 ### Search (stage Q6a, 2.981.0, #5278)

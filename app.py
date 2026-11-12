@@ -4,7 +4,7 @@
 Login: either a trusted reverse proxy that sends the user name in a header (AUTH_PROXY_HEADER, only
 honoured from AUTH_TRUSTED_PROXIES and, if set, only on AUTH_PROXY_PORT) or the built-in
 username/password login with a session cookie. The first start without users shows a setup page.
-Storage: SQLite at /data/tasks.db. Dates are LOCAL ($TZ, Europe/Berlin):
+Storage: PostgreSQL (DATABASE_URL), files in /data. Dates are LOCAL ($TZ, Europe/Berlin):
 tasks.due = 'YYYY-MM-DD', tasks.due_time = 'HH:MM' or NULL (all-day).
 
 Modules: lists (+ sections = kanban columns), tasks with subtasks, tags, priority, reminders,
@@ -22,15 +22,13 @@ allowed). Session cookies are HttpOnly + SameSite=Lax.
 
 Code layout: the server lives in the package kalmido/ (one module per area, see docs/ARCHITECTURE.md); this file is the
 entry point (`python app.py`, `python app.py set-password <user>`, `python app.py import <file> [user]`,
-`python app.py migrate-sqlite [--check] [--source /data/tasks.db]`, `python app.py worker`)."""
-import json as _json
+`python app.py worker`)."""
 import os as _os
 import sys as _sys
 
-# 2.37.0 (#1150): the move from SQLite runs inside the start-up check, before anything touches the database
-# (kalmido/admin/migrate.py mig_startup) and ends the process there
+# 2.1034.0 (#5304): the move from SQLite is gone; its old command must not start a web server instead
 if __name__ == "__main__" and len(_sys.argv) >= 2 and _sys.argv[1] == "migrate-sqlite":
-    _os.environ["KALMIDO_MIGRATE_CLI"] = _json.dumps(_sys.argv[2:])
+    _sys.exit("migrate-sqlite was removed (#5304): update an install from before 2.37 to 2.37.0 first (docs/UPGRADING.md)")
 # 2.102.0 D (#1997): `python app.py worker` = the background loops only (no web server); same as KALMIDO_ROLE=worker
 if __name__ == "__main__" and len(_sys.argv) >= 2 and _sys.argv[1] == "worker":
     _os.environ["KALMIDO_ROLE"] = "worker"

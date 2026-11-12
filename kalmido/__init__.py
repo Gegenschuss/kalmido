@@ -19,11 +19,11 @@ LAYERS = (
     ("integrations", ("integrations", "api", "admin", "paperless", "newsletter")),
     ("agents", ("agents", "assistant", "startup")),
 )
-LAYER_OF = {"admin.migrate": "core", "api.common": "core", "accounts.orgback": "domain",
+LAYER_OF = {"api.common": "core", "accounts.orgback": "domain",
             "core.objects": "domain", "core.writes": "domain", "core.objlight": "domain", "core.objnotify": "domain", "core.objcomments": "domain", "core.objsearch": "domain", "core.objwords": "domain", "core.objweb": "integrations", "core.objcmtweb": "integrations",
             "core.undoweb": "domain",  # 2.747.0 (#5249): the step groups' routes stand on the write path
             "core.undoareas": "domain",  # 2.777.0 (#5254): the areas' undo steps stand on the write path
-            "docs.mailnamed": "integrations"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area; 2.558.0 (#4709): the shared core stands on the file store and accounts, its routes on the API
+            "docs.mailnamed": "integrations"}  # 2.1034.0 (#5304): admin.migrate (the move from SQLite) is gone; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area; 2.558.0 (#4709): the shared core stands on the file store and accounts, its routes on the API
 
 ORDER = (
     "core.env",  # 2.149.0 D (#2511): the registry of the environment variables (no imports from the app)
@@ -56,7 +56,6 @@ ORDER = (
     "core.fkeys",  # 2.152.0 C (#2174): foreign keys of references that had none (orphans cleaned first)
     "core.moneycol",  # 2.755.0 (#5293): the plain money columns as NUMERIC(14,2) (mc_migrate in init_db, mc_text for the readers)
     "core.orgcrypt",  # 2.42.0 (#828): keys per organisation, encryption at rest
-    "admin.migrate",  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite), used by init_db
     "accounts.session",
     "accounts.setupcode",  # 2.45.0 (#1515): one-time code for the first setup
     "accounts.pictures",

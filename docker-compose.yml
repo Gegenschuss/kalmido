@@ -42,7 +42,7 @@ services:
         # 2.149.0 D (#2510): only while the profile "localdb" is on (Compose 2.20 or newer)
         required: false
     volumes:
-      # attachments, backups, office files; an old tasks.db here moves to PostgreSQL on the first start of 2.37
+      # attachments, backups, office files
       - ./data:/data
       # the server key (see KALMIDO_SECRET_FILE above); create the folder yourself (mkdir secret) so the container can write it
       - ./secret:/secret

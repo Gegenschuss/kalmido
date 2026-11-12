@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """2.0.0 (#279): Kalmido never creates a new, empty database on top of existing data. A data dir with the marker file,
-attachments or backups but an empty database (2.37.0: Postgres; or an old SQLite tasks.db not moved yet) makes the container REFUSE to start (exit code 3,
+attachments or backups but an empty database (2.37.0: Postgres) makes the container REFUSE to start (exit code 3,
 clear log line) instead of starting empty (whose first visitor would become the admin). An empty data dir starts fresh and
 gets the marker; an existing install without the marker (1.x) gets it on its first start. 2.37.0: a database whose schema
 version is newer than the image's is refused too (exit code 3).
@@ -72,8 +72,8 @@ tid = s.post(B + "/api/tasks", json={"title": "keep me"}).json()["id"]
 check(s.post(B + f"/api/tasks/{tid}/attachments", files={"file": ("a.txt", b"data")}, headers=H).ok, "an attachment")
 
 # 2.37.0 (#1150): the database is Postgres now. "tasks.db missing / empty" -> the Postgres database is empty (its schema
-# moved aside). 2.37: no SQLite file any more (the cases of a damaged / unreadable tasks.db are gone with it; an old tasks.db
-# next to an empty database is refused below, the move tool checks old files).
+# moved aside). 2.37: no SQLite file any more (the cases of a damaged / unreadable tasks.db are gone with it). 2.1034.0 (#5304):
+# an old tasks.db is not looked at any more (the move tool is gone): refused through the data dir's data, not as SQLite.
 def psql(sql):
     with open(os.path.join(DATA, ".kalmido-db"), encoding="utf-8") as f:
         dbc, dbn = f.read().split()
@@ -108,12 +108,14 @@ start()
 code, logs = exited()
 check(code == 3 and tables() == 0, f"empty database, no marker but attachments: refused (exit {code})")
 os.rename(MARK + ".away", MARK)
-# ---- a SQLite database from before 2.37 that was not moved yet next to an empty database: refuse
+# ---- 2.1034.0 (#5304): an old SQLite file next to an empty database: refused through the marker, nothing moved, no SQLite talk
 with open(DBF, "wb") as f:
     f.write(b"SQLite format 3\x00" + b"\x00" * 4096)
 start()
 code, logs = exited()
-check(code == 3 and "SQLite database from before 2.37" in logs and tables() == 0, f"old tasks.db + empty database: refused (exit {code})")
+check(code == 3 and "Kalmido data" in logs and "SQLite" not in logs and "migrate-sqlite" not in logs and tables() == 0,
+      f"old tasks.db + empty database: refused as Kalmido data, no move (exit {code})")
+check(os.path.exists(DBF) and not [n for n in os.listdir(DATA) if n.startswith("tasks.db.migrated")], "old tasks.db left alone")
 os.remove(DBF)
 
 # ---- the real one back: starts, data intact
@@ -140,6 +142,10 @@ stop()
 os.remove(MARK)
 start()
 check(up() and os.path.exists(MARK), "existing install without the marker: starts and writes it")
+# ---- 2.1034.0 (#5304): the old command of the SQLite move ends with a clear message, it does not start a second server
+r = subprocess.run(["docker", "exec", CT, "python", "app.py", "migrate-sqlite", "--check"], capture_output=True, text=True, timeout=120)
+check(r.returncode == 1 and "migrate-sqlite was removed" in r.stderr and "2.37.0" in r.stderr,
+      f"migrate-sqlite: refused with a note (exit {r.returncode}, {r.stderr[-200:]!r})")
 
 stop()
 subprocess.run(["docker", "rm", "-f", CT], capture_output=True)

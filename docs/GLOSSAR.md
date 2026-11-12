@@ -94,7 +94,6 @@ Operator tools: backup, export / import of accounts and organisations, retention
 - `kalmido/admin/dataretention.py` (`orf`) - The daily clean-up of old logs and expired credentials, and the weekly orphan-file sweep (no routes; the watchdog starts both, see notify/push.py watchdog_tick)
 - `kalmido/admin/exportleft.py` - What stays out of the exports on purpose, with the reason
 - `kalmido/admin/hosting.py` (`quota`) - Running Kalmido for others
-- `kalmido/admin/migrate.py` (`mig`) - The move from SQLite (Kalmido up to 2.36)
 - `kalmido/admin/offsite.py` (`bko`) - An off-site target for the backups (instance admins)
 - `kalmido/admin/oi_office.py` (`p`) - Organisation import -- the clients and the office
 - `kalmido/admin/oi_store.py` (`finish`) - Organisation import -- file store, documents, knowledge pages, tables and video sign-offs (admin/orgimport.py OiT)

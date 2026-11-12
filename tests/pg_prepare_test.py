@@ -32,7 +32,6 @@ STRICT = {"42803", "42804", "42883", "42702", "42P10", "42725", "42P18"}  # what
 # (file, a piece of the statement) -> why it may fail here
 EXCEPT = {
     ("core/access.py", "SELECT id FROM dn"): "the tail of a recursive query whose WITH part is built in front of it",
-    ("admin/migrate.py", "FROM sqlite_master"): "2.37 migrate-sqlite: runs against the old SQLite file, not Postgres",
     ("files/scan.py", "s.ver="): "2.61.0: ver={cur} is a number expression; the stand-in TRUE makes it bigint = boolean",
     ("files/scan.py", "AND ver="): "2.61.0: ver={cur} is a number expression; the stand-in TRUE makes it bigint = boolean",
     ("tasks/ftsearch.py", "ts_rank(TRUE, q)"): "2.139.1 (#2065): {TASK_VEC} / {CMT_VEC} is a tsvector expression; the stand-in TRUE makes it ts_rank(boolean, tsquery)",

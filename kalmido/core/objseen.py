@@ -111,10 +111,6 @@ OSN_OLD_RSS_ITEMS = """INSERT INTO obj_seen(kind, ref_id, user_id, seen_id, seen
     ON CONFLICT DO NOTHING"""
 
 
-# the old table of a SQLite file (admin/migrate.py legacy_tables), taken by osn_move_tchat, dropped by 5286_a
-OSN_TCHAT_LEGACY_DDL = """CREATE TABLE IF NOT EXISTS tchat_reads (
-  room_id BIGINT NOT NULL REFERENCES tchat_rooms(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  last_id BIGINT NOT NULL DEFAULT 0, muted BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (room_id, user_id))"""
 OSN_TCHAT_HOW = ("the read marks of the team chat moved into the shared core (obj_seen / obj_follow kind tchat and tchat_thread, #5286): "
                  "tchat_reads and tchat_thread_reads were dropped - an older version would show every message unread; go back only "
                  "with a backup from before")

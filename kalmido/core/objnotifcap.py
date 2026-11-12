@@ -93,15 +93,6 @@ NCAP_OLD_FOLDER = f"""INSERT INTO obj_notif_cap(kind, ref_id, path, user_id, tpl
     SELECT 'folder', n.owner_id, n.folder, n.user_id, {_NCAP_VAL}
     FROM folder_notif n JOIN users u ON u.id=n.owner_id
     ON CONFLICT DO NOTHING"""
-# the old tables of a SQLite file (admin/migrate.py legacy_tables), taken by ncap_move, dropped by 5287_a
-NCAP_LEGACY_DDL = """
-CREATE TABLE IF NOT EXISTS list_notif (
-  list_id BIGINT NOT NULL REFERENCES lists(id) ON DELETE CASCADE, user_id BIGINT NOT NULL DEFAULT 0,
-  tpl TEXT NOT NULL, custom TEXT, updated_at TEXT NOT NULL, PRIMARY KEY (list_id, user_id));
-CREATE TABLE IF NOT EXISTS folder_notif (
-  owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, folder TEXT NOT NULL, user_id BIGINT NOT NULL DEFAULT 0,
-  tpl TEXT NOT NULL, custom TEXT, updated_at TEXT NOT NULL, PRIMARY KEY (owner_id, folder, user_id));
-"""
 NCAP_FLOOR_HOW = ("the notification templates of projects and folders moved into the shared core (obj_notif_cap, #5287) and the old "
                   "tables were dropped - an older version would make them again empty and lose what it writes there; go back only "
                   "with a backup from before")

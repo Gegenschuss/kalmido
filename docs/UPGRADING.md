@@ -17,7 +17,7 @@ version you pass, and make a backup first. There is no need to stop at each vers
 
 | Version | What to do | Details |
 |---|---|---|
-| 2.37 | PostgreSQL is required: add the database service, set `POSTGRES_PASSWORD` and `DATABASE_URL`. The installer does it. | [Upgrade to 2.37](SELF-HOSTING.md#upgrade-to-237-postgresql-required) |
+| 2.37 | PostgreSQL is required: add the database service, set `POSTGRES_PASSWORD` and `DATABASE_URL`. The installer does it. An install still on SQLite (2.36 or older) must update to 2.37.0 first: the move from SQLite is not in newer versions any more (#5304). | [Installs from before 2.37](SELF-HOSTING.md#installs-from-before-237-sqlite) |
 | 2.45 | The server key moves into a file on its own folder: `mkdir secret && chown 1000 secret` next to `data`, then restart. The installer does it. | [The server key](SELF-HOSTING.md#first-setup-and-the-server-key) |
 | 2.46 | One kind of server: the instance mode is gone; its variable is only read for the row-level security check (see ENV.md). | CHANGELOG 2.46.0 |
 | 2.79 | Reverse proxy on the host in front of a published Docker port: `KALMIDO_TRUSTED_PROXIES` now defaults to loopback only, the Docker bridge gateway no longer counts: add it (`KALMIDO_TRUSTED_PROXIES=127.0.0.1,::1,172.17.0.1`). With a virus scanner an upload it could not check is held back (`KALMIDO_CLAMD_STRICT=0`: as before). | CHANGELOG 2.79.0 |

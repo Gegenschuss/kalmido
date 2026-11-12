@@ -243,45 +243,25 @@ choose_image() {
   fi
 }
 
-# before an update: consistent copy of the database (SQLite backup API inside the running container,
-# or a plain copy when it is stopped); the last 10 copies are kept in data/backups/
+# before an update: consistent copy of the database (pg_dump in the db service, custom format); the last 10 copies are
+# kept in data/backups/. 2.1034.0 (#5304): the copy of a SQLite tasks.db (installs before 2.37) is gone.
 backup_db() {
-  db="$DIR/data/tasks.db"
-  if [ ! -f "$db" ]; then
-    # 2.37+: PostgreSQL in the db service -> pg_dump (custom format) into data/backups/
-    # 2.512.0 (#4174): no copy possible: say so and leave time to stop, never go on in silence
-    (cd "$DIR" && dc ps -q db 2>/dev/null | grep -q .) || {
-      warn "No database service of this installation is running (an external DATABASE_URL, or Kalmido is stopped): no copy of the database was made. The update goes on in 15 seconds; press Ctrl+C to back up your database first."
-      sleep 15
-      return 0
-    }
-    step "Backing up your database"
-    mkdir -p "$DIR/data/backups"
-    name="kalmido-$(date +%Y%m%d-%H%M%S).dump"
-    (cd "$DIR" && dc exec -T db sh -c 'PGOPTIONS="-c app.role=system" pg_dump -Fc --enable-row-security -U "$POSTGRES_USER" -d "$POSTGRES_DB"') \
-      > "$DIR/data/backups/$name" && [ -s "$DIR/data/backups/$name" ] \
-      || { rm -f "$DIR/data/backups/$name"; die "Could not back up the database. Nothing was changed."; }
-    say "Saved data/backups/$name"
-    DBCOPY="data/backups/$name"
-    # shellcheck disable=SC2012
-    ls -1t "$DIR"/data/backups/kalmido-*.dump 2>/dev/null | tail -n +11 | while IFS= read -r old; do rm -f "$old"; done
+  # 2.512.0 (#4174): no copy possible: say so and leave time to stop, never go on in silence
+  (cd "$DIR" && dc ps -q db 2>/dev/null | grep -q .) || {
+    warn "No database service of this installation is running (an external DATABASE_URL, or Kalmido is stopped): no copy of the database was made. The update goes on in 15 seconds; press Ctrl+C to back up your database first."
+    sleep 15
     return 0
-  fi
+  }
   step "Backing up your database"
   mkdir -p "$DIR/data/backups"
-  name="tasks-$(date +%Y%m%d-%H%M%S).db"
-  if (cd "$DIR" && dc exec -T kalmido python -c "import sqlite3; s = sqlite3.connect('/data/tasks.db'); d = sqlite3.connect('/data/backups/$name'); s.backup(d); d.close()") >/dev/null 2>&1 \
-     && [ -s "$DIR/data/backups/$name" ]; then
-    say "Saved data/backups/$name (copy of the running database)"
-  else
-    cp "$db" "$DIR/data/backups/$name" || die "Could not back up $db. Nothing was changed."
-    if [ -f "$db-wal" ]; then cp "$db-wal" "$DIR/data/backups/$name-wal"; fi
-    say "Saved data/backups/$name"
-  fi
+  name="kalmido-$(date +%Y%m%d-%H%M%S).dump"
+  (cd "$DIR" && dc exec -T db sh -c 'PGOPTIONS="-c app.role=system" pg_dump -Fc --enable-row-security -U "$POSTGRES_USER" -d "$POSTGRES_DB"') \
+    > "$DIR/data/backups/$name" && [ -s "$DIR/data/backups/$name" ] \
+    || { rm -f "$DIR/data/backups/$name"; die "Could not back up the database. Nothing was changed."; }
+  say "Saved data/backups/$name"
+  DBCOPY="data/backups/$name"
   # shellcheck disable=SC2012
-  ls -1t "$DIR"/data/backups/tasks-*.db 2>/dev/null | tail -n +11 | while IFS= read -r old; do
-    rm -f "$old" "$old-wal"
-  done
+  ls -1t "$DIR"/data/backups/kalmido-*.dump 2>/dev/null | tail -n +11 | while IFS= read -r old; do rm -f "$old"; done
 }
 
 write_update_script() {

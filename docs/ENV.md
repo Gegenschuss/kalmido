@@ -18,7 +18,6 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_DB_WAIT` | `60` | Seconds the start waits for the database to answer. |
 | `KALMIDO_INSTANCE_MODE` | `(empty)` | Older switch of the instance mode (shared / workspaces); since 2.46 only read for the row-level security check. |
 | `KALMIDO_IOS_SHORTCUT_URL` | `(empty)` | Link to an iOS shortcut shown in Settings > Integrations (empty = hidden). |
-| `KALMIDO_MIGRATE_CLI` | `(empty)` | Internal: set by `python app.py migrate-sqlite` for the move from SQLite. |
 | `KALMIDO_ONBOARDING` | `1` | Switch: new accounts get a sample list and the welcome tour. |
 | `KALMIDO_ORG_NAME` | `(empty)` | Name of the first organisation created on a new server. |
 | `KALMIDO_PGBUS` | `auto` | Signals between the processes of one instance over Postgres (LISTEN / NOTIFY): `1` on, `0` off; by default on when `KALMIDO_REPLICAS` or `KALMIDO_WEB_PROCS` is above 1 or `KALMIDO_ROLE` is `web` / `worker`. |
@@ -39,7 +38,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `PORT` | `3040` | Port the web server listens on inside the container. |
 | `PUBLIC_URL` | `http://localhost:3040` | The address people use to open Kalmido (https://tasks.example.com). Used for links in notifications and mails, passkeys and the origin check; set it on every server. |
 | `TASKS_ATTACHMENTS` | `<data dir>/attachments` | Folder of the uploaded files. |
-| `TASKS_DB` | `/data/tasks.db` | Names the data directory (its folder holds attachments, office files, backups and the marker file) and an old SQLite file from before 2.37 that is moved to PostgreSQL on the first start. |
+| `TASKS_DB` | `/data/tasks.db` | Names the data directory: its folder holds attachments, office files, backups and the marker file (the file itself is not used). |
 | `TASKS_EXPORT_DIR` | `<data dir>/exports` | Folder of the organisation exports while they are offered for download. |
 | `TASKS_MAX_FILE_MB` | `50` | Largest upload in MB. |
 | `TASKS_OFFICE_DIR` | `<data dir>/office` | Folder of the office files (logos, documents); part of the backups. |

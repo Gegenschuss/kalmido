@@ -53,7 +53,6 @@ from ..core.retention import ret_days, ret_on, ret_report  # 2.369.5 (#2517): pu
 from ..accounts.users import user_purge  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgretain import odl_dismantle  # 2.369.5 (#2517): pulled up from functions
 from ..lists.lists import list_purge  # 2.369.5 (#2517): pulled up from functions
-from .migrate import is_kalmido_sqlite  # 2.369.5 (#2517): pulled up from functions
 from ..core.orgcrypt import oc_plain_size  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -1406,16 +1405,16 @@ def bk_scan_dump(dump):
 def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False, pack_dest=None):
     """Checks an archive completely; extracts the dump into work (and the attachments into att_dest, the office files into
     office_dest, the own industry packs into pack_dest, if given) and reads it through once. Returns (manifest, dump path). A format-1 archive (SQLite, before
-    2.37) is checked (members, checksums); for a restore its tasks.db is extracted (the returned path) for the move tool."""
+    2.37) is checked (members, checksums); 2.1034.0 (#5304): its restore is refused (the move tool is gone)."""
     zp, _ = bk_open(path, pw, work)
     try:
         with zipfile.ZipFile(zp) as z:
             man = bk_check_zip(z)
-            # 2.37.0 (#1150): a format-1 archive is restored through the move tool (admin/migrate.py), which reads its tasks.db
-            legacy_restore = man["_legacy"] and restore
-            dbp = os.path.join(work, BK_LEGACY if legacy_restore else BK_DUMP)
+            if man["_legacy"] and restore:  # 2.1034.0 (#5304): before anything is extracted
+                raise BackupError("legacy")
+            dbp = os.path.join(work, BK_DUMP)
             for i in z.infolist():
-                if i.filename == BK_DUMP or (legacy_restore and i.filename == BK_LEGACY):
+                if i.filename == BK_DUMP:
                     bk_extract(z, i, dbp, man["_listed"])
                 elif i.filename != "manifest.json":
                     m = BK_MEMBER_RE.fullmatch(i.filename)
@@ -1473,9 +1472,6 @@ def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False, p
     if not man["_legacy"]:
         man["db"] = bk_scan_dump(dbp)
         man["key_state"] = bk_key_state(man)  # 2.359.3 (#2893)
-    elif restore:
-        if not is_kalmido_sqlite(dbp):
-            raise BackupError("legacy")
     return man, dbp
 
 
@@ -2038,11 +2034,7 @@ def bk_restore(path, pw, admin, via, keep_purged=False):
             os.rename(off_new, OFFICE_DIR)
             oswapped = True
             swapped = True  # (from here on a failure restores the dump of before; pg_restore itself is all or nothing)
-            if man["_legacy"]:  # 2.37.0 (#1150): an archive of 2.36 or older: moved over from its tasks.db
-                from .migrate import mig_restore
-                mig_restore(dbp)
-            else:
-                _pg_restore(dbp)
+            _pg_restore(dbp)  # 2.1034.0 (#5304): a format-1 archive never gets here (bk_prepare refuses it)
             _reset_caches()
             init_db(guard=False)
             c = connect()

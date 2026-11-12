@@ -45,7 +45,6 @@ Interface:
   ocm_move(c) -> rows moved (init_db, once)                       ocm_fk(c, table, col, action)
   ocm_trash_keep(c, kind, rid, body, *, mentions, enc)            ocm_trash_take(c, kind, rid) -> row | None
   ocm_trash_forget(c, kind, where, args)   (2.981.0 #5274: the kept text of a stream outside obj_comments, OCM_TRASH_KINDS)
-(A SQLite file of an older version brings its comments in the old table, admin/migrate.py LEGACY_COMMENTS; ocm_move takes them.)
 """
 import json
 import re

@@ -365,7 +365,7 @@ def feats8(c, uid, fs):
 
 
 # 2.0.0 (#279): never start over on top of existing data. The data dir gets a marker on the first start (and on the first
-# start of 2.0 of an existing install); when the marker, attachments or backups are there but tasks.db is missing, empty,
+# start of 2.0 of an existing install); when the marker, attachments or backups are there but the database is missing, empty,
 # unreadable or damaged (e.g. I/O errors of a failing disk), the app REFUSES to start instead of creating a fresh, empty
 # database -- whose first visitor would become the admin. A new database is only created in a data dir without any data.
 DATA_MARKER = os.path.join(os.path.dirname(os.path.abspath(DB)), ".kalmido-initialized")
@@ -389,7 +389,8 @@ def startup_guard():
     """Raises DataDirError (exit code 3) when the database must not be (re)created or opened; returns True when this is a
     genuinely new install (an empty database and a data dir without Kalmido data), False for an existing database.
     2.37.0 (#1150): Postgres. Refused: no DATABASE_URL; the database unreachable; an empty database next to a data dir that
-    holds Kalmido data (the marker, attachments, backups) or a SQLite database from before 2.37 that was not moved yet."""
+    holds Kalmido data (the marker, attachments, backups). 2.1034.0 (#5304): a SQLite file from before 2.37 is no longer
+    looked at (the move tool is gone; such an install is refused through its marker / attachments like any other)."""
     from ..admin.backup import BK_DIR
     if not DATABASE_URL:
         raise DataDirError(_no_url())
@@ -418,20 +419,12 @@ def startup_guard():
     appver_guard(meta.get("app_version"), meta.get("app_version_prev"), meta.get("back_floor"), meta.get("back_floor_how"))
     if has_tables:
         secret_new_guard()
-    from ..admin.migrate import mig_startup
-    if mig_startup(has_tables):  # 2.37.0 (#1150): the tasks.db of 2.36 next to an empty database was moved over just now
-        return False
     if has_tables:
         return False
     data = [p for p, ok in ((DATA_MARKER, os.path.exists(DATA_MARKER)), (ATT_DIR, _has_files(ATT_DIR)),
                             (BK_DIR, _has_files(BK_DIR))) if ok]
-    try:
-        old = os.path.exists(DB) and os.path.getsize(DB) > 0
-    except OSError:
-        old = True
-    if old or data:
-        what = f"a SQLite database from before 2.37 ({DB})" if old else f"Kalmido data ({', '.join(data)})"
-        print(f"FATAL: the Postgres database is empty, but the data dir holds {what}. Refusing to start so that no new, empty "
+    if data:
+        print(f"FATAL: the Postgres database is empty, but the data dir holds Kalmido data ({', '.join(data)}). Refusing to start so that no new, empty "
               "database replaces it. Point DATABASE_URL at the database of this install (or move the old data first), "
               "then start again.", flush=True)
         raise DataDirError(3)
@@ -932,9 +925,8 @@ class StartClock:
 START_CLOCK = None  # 2.437.0 (#3729): set while init_db runs: a one-shot's flag (gset migr_*) ends its step
 
 
-def init_db(guard=True, load=None):
-    """load: admin/migrate.py -- load(c) copies an old SQLite database inside this transaction, after the tables and columns
-    exist and before the one-shot data migrations, triggers, indexes and row-level security."""
+def init_db(guard=True):
+    """2.1034.0 (#5304): without the load hook of the SQLite move tool (admin/migrate.py, gone)."""
     from ..core.access import _COLLAB_ALL, _TIME_ALL
     from ..lists.lists import folder_path_migration
     from ..lists.projects import ms_migrate
@@ -965,9 +957,6 @@ def init_db(guard=True, load=None):
         from ..office.signoff import sig_fk_migrate
         sig_fk_migrate(c)  # 2.148.1 C (#2493): video approval records stay when their review goes
         clk("sig_fk_migrate")
-        if load is not None:
-            load(c)  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite)
-            clk("load")
         # 2.10.0 (#441): member rows from before groups (or written by a path that sets no own_role) are personal shares
         # 2.352.0 A (#2748): not a row only a folder's share gives (frole)
         c.execute("UPDATE list_members SET own_role=role WHERE own_role IS NULL AND grole IS NULL AND frole IS NULL")
@@ -1529,8 +1518,7 @@ def init_db(guard=True, load=None):
                   "ELSE kalmido_meta.value END", (str(int(SCHEMA_VERSION)),))
         appver_stamp(c)  # 2.149.0 D (#2509): which version ran on this database (start check of the next start, restore)
         back_floor_stamp(c)  # 2.359.3 (#2896)
-        if guard or load is None:
-            skfp_check(c, restore=not guard)  # 2.190.0 B (#2592): the server key is the one of this database
+        skfp_check(c, restore=not guard)  # 2.190.0 B (#2592): the server key is the one of this database (2.1034.0, #5304: always, the SQLite load is gone)
         clk("stamps")
         c.commit()
         clk("commit")

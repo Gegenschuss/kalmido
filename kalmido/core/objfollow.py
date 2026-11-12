@@ -248,10 +248,6 @@ OFL_OLD_LIST_BELL = """INSERT INTO obj_follow(user_id, kind, ref_id, org_id, mod
            CASE WHEN pg_input_is_valid(b.custom, 'jsonb') AND left(ltrim(b.custom), 1) = '{' THEN b.custom::jsonb END
     FROM list_bell b JOIN lists l ON l.id=b.list_id JOIN users u ON u.id=b.user_id
     ON CONFLICT DO NOTHING"""
-# 2.981.0 (#5287): the old table of a SQLite file (admin/migrate.py legacy_tables), taken by ofl_move, dropped by 5287_a
-OFL_LIST_LEGACY_DDL = """CREATE TABLE IF NOT EXISTS list_bell (
-  user_id BIGINT NOT NULL, list_id BIGINT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
-  mode TEXT NOT NULL, custom TEXT, PRIMARY KEY(user_id, list_id))"""
 # 2.981.0 (#5287): the CHECK of obj_follow.mode with the modes of every kind (the table of 5285_a knows only the task's)
 OFL_MODE_CHECK = "mode IN (" + ", ".join(f"'{m}'" for m in OFL_MODES) + ")"
 

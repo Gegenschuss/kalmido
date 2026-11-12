@@ -160,30 +160,9 @@
   }
   Say 'Docker is running.'
 
-  # --- backup before an update: SQLite backup inside the running container, else a plain copy ---
-  $db = Join-Path $Dir 'data\tasks.db'
+  # --- backup before an update (2.1034.0, #5304: the copy of a SQLite tasks.db, installs before 2.37, is gone) ---
   $script:DbCopy = ''  # 2.359.2 (#2897): named at the end
-  if ($Update -and (Test-Path $db)) {
-    Step 'Backing up your database'
-    $bdir = Join-Path $Dir 'data\backups'
-    New-Item -ItemType Directory -Force -Path $bdir | Out-Null
-    $name = 'tasks-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.db'
-    Push-Location $Dir
-    try {
-      $py = "import sqlite3; s = sqlite3.connect('/data/tasks.db'); d = sqlite3.connect('/data/backups/$name'); s.backup(d); d.close()"
-      $live = if ($ComposeV2) { Quiet 'docker' @('compose', 'exec', '-T', 'kalmido', 'python', '-c', $py) } else { Quiet 'docker-compose' @('exec', '-T', 'kalmido', 'python', '-c', $py) }
-    } finally { Pop-Location }
-    $target = Join-Path $bdir $name
-    if ($live -and (Test-Path $target) -and ((Get-Item $target).Length -gt 0)) { Say "Saved data\backups\$name (copy of the running database)" }
-    else {
-      try { Copy-Item $db $target -Force; if (Test-Path "$db-wal") { Copy-Item "$db-wal" "$target-wal" -Force } }
-      catch { Fail "Could not back up $db. Nothing was changed." }
-      Say "Saved data\backups\$name"
-    }
-    Get-ChildItem -Path $bdir -Filter 'tasks-*.db' | Sort-Object LastWriteTime -Descending | Select-Object -Skip 10 |
-      ForEach-Object { Remove-Item -Force $_.FullName, "$($_.FullName)-wal" -ErrorAction SilentlyContinue }
-    $script:DbCopy = "data\backups\$name"
-  } elseif ($Update) {
+  if ($Update) {
     # 2.359.2 (#2897): 2.37+ (PostgreSQL in the db service): pg_dump into data\backups\ first, like update.sh. The dump is
     # written inside the container and copied out (a binary pipe through PowerShell 5.1 would change its bytes).
     Push-Location $Dir

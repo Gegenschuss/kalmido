@@ -20,7 +20,7 @@ def _v(name, default, doc, group):
 
 VARS = (
     # ---- core: data, database, address
-    _v("TASKS_DB", "/data/tasks.db", "Names the data directory (its folder holds attachments, office files, backups and the marker file) and an old SQLite file from before 2.37 that is moved to PostgreSQL on the first start.", "core"),
+    _v("TASKS_DB", "/data/tasks.db", "Names the data directory: its folder holds attachments, office files, backups and the marker file (the file itself is not used).", "core"),
     _v("DATABASE_URL", "", "PostgreSQL connection (postgresql://user:password@host:5432/db). Required.", "core"),
     _v("KALMIDO_DB_WAIT", "60", "Seconds the start waits for the database to answer.", "core"),
     _v("KALMIDO_DB_POOL_MAX", "", "Largest number of pooled database connections per process (empty = threads + 16); with KALMIDO_WEB_PROCS the number of the whole container, shared out (empty = each web process its threads + 16 for the first, + 8 for the others).", "core"),
@@ -53,7 +53,6 @@ VARS = (
     _v("KALMIDO_SEARCH_INDEX", "0", "Switch: allow search engines to index this server (public links and forms stay noindex).", "core"),
     _v("KALMIDO_ONBOARDING", "1", "Switch: new accounts get a sample list and the welcome tour.", "core"),
     _v("KALMIDO_IOS_SHORTCUT_URL", "", "Link to an iOS shortcut shown in Settings > Integrations (empty = hidden).", "core"),
-    _v("KALMIDO_MIGRATE_CLI", "", "Internal: set by `python app.py migrate-sqlite` for the move from SQLite.", "core"),
     _v("PATH", "", "Search path for the helper programs (pg_dump, tesseract); passed on to them unchanged.", "core"),
 
     # ---- login, accounts and proxy

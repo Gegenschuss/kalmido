@@ -16,7 +16,7 @@ addresses and paths to your setup.
 - [Reverse proxy and network](#reverse-proxy-and-network)
 - [Installed app (PWA) and push](#installed-app-pwa-and-push)
 - [Database (PostgreSQL)](#database-postgresql)
-- [Upgrade to 2.37 (PostgreSQL required)](#upgrade-to-237-postgresql-required)
+- [Installs from before 2.37 (SQLite)](#installs-from-before-237-sqlite)
 - [Backup and encryption](#backup-and-encryption)
 - [Deletion periods (2.152)](#deletion-periods)
 - [Encryption of organisation data](#encryption-of-organisation-data)
@@ -373,7 +373,7 @@ to *deny* and allow each app per group, so a new account does not open every app
 Since 2.37.0 Kalmido needs PostgreSQL 17 (`DATABASE_URL=postgresql://user:password@host:5432/db`); without it the app
 does not start and says why. The `docker-compose.yml` of the repository brings its own server (service `db`,
 `postgres:17`, data in `./pgdata`, password `POSTGRES_PASSWORD` in `.env`); nothing else is needed. Coming from an older
-version: [Upgrade to 2.37](#upgrade-to-237-postgresql-required).
+version: [Installs from before 2.37](#installs-from-before-237-sqlite).
 
 - **Password in the URL.** Use letters and digits only (`openssl rand -hex 24`): characters like `@`, `/`, `:` or `#`
   break the URL. `POSTGRES_PASSWORD` is only read when `./pgdata` is created; to change it later, also run
@@ -467,101 +467,20 @@ deleted from `docker-compose.yml`, which every update restored). Needs Docker Co
 - **One role for several databases.** `kalmido_app` belongs to the whole server; several Kalmido databases on one
   server share it, which is fine (the policies depend on the session, not on the role).
 
-## Upgrade to 2.37 (PostgreSQL required)
+## Installs from before 2.37 (SQLite)
 
-2.37 moves the data from the SQLite file `data/tasks.db` into PostgreSQL. On the first start Kalmido does this by
-itself, in one transaction, and checks the result (row counts and checksums per table) before it commits. Plan a short
-maintenance window: the app is offline while it copies (seconds for a family instance, a few minutes for large ones).
-
-1. **Back up first.** In the app: *Back up now* (Settings > Server > Backup) and copy the zip off the
-   server. Then stop Kalmido and keep a plain copy of the database file:
-
-   ```bash
-   docker compose stop kalmido
-   ```
-
-   ```bash
-   mkdir -p ../kalmido-before-2.37 && cp -p data/tasks.db* ../kalmido-before-2.37/
-   ```
-2. **Add the database service.** Take the `docker-compose.yml` of 2.37 (the `db` service, the `DATABASE_URL` line and
-   the `depends_on` block of the `kalmido` service); keep your own changes (ports, volumes) as they were.
-3. **Set the password and the version** in `.env`:
-
-   ```bash
-   echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" >> .env
-   ```
-
-   and `KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:2.37.0` (if you pin the version).
-4. **Fetch the images and start the database:**
-
-   ```bash
-   docker compose pull
-   ```
-
-   ```bash
-   docker compose up -d db
-   ```
-5. **Optional dry run.** It reads `tasks.db`, checks and counts everything, reports what it would correct and writes
-   nothing:
-
-   ```bash
-   docker compose run --rm kalmido python app.py migrate-sqlite --check
-   ```
-6. **Start Kalmido.** The move runs on this start:
-
-   ```bash
-   docker compose up -d
-   ```
-
-   ```bash
-   docker compose logs -f kalmido
-   ```
-
-   The lines starting with `migrate-sqlite:` show the progress and the result.
-7. **Check** that the app opens and the numbers look right (users, projects, tasks, attachments).
-
-What happens to the old files:
-
-- `data/tasks.db` is renamed to `data/tasks.db.migrated-<date-time>`; it is never deleted. Later starts ignore it.
-- `data/backups/pre-postgres-<date-time>.db` is a copy of the source taken before the move,
-  `data/backups/migration-report-<date-time>.json` the report (counts and checksums per table, corrections).
-- Backups from before 2.37 (zips with a `tasks.db`) can still be restored in the app; they go through the same move.
-- If the move fails, nothing is kept in PostgreSQL, `tasks.db` stays untouched and the container stops with exit code 3
-  and the reason (table and row) in the log; with `restart: unless-stopped` it keeps restarting and trying again
-  (no new files pile up: the copy of the old database is only made after a successful move, a failed one overwrites
-  `migration-report-failed.json`). Stop it (`docker compose stop kalmido`), fix the cause or go back (below), then
-  start again.
-
-**Going back to 2.36** (only if 2.37 does not work for you; everything entered since the move is lost):
-
-```bash
-docker compose down
-```
-
-Pin the previous version in `.env` (for example `KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:2.36.2`), then put the old
-file back and move the new database folder aside (a later upgrade needs an empty database again):
-
-```bash
-mv data/tasks.db.migrated-<date-time> data/tasks.db
-```
-
-```bash
-mv pgdata pgdata.unused-$(date +%Y%m%d)
-```
-
-```bash
-docker compose up -d kalmido
-```
-
-2.36 ignores `DATABASE_URL` and the `db` service; you can leave them in place for the next attempt.
+Kalmido runs on PostgreSQL since 2.37. The tool that moved the data of an older install out of the SQLite file
+`data/tasks.db` (`migrate-sqlite`) is gone (#5304): this version neither reads nor moves such a file, and an install with
+an empty PostgreSQL database next to old data refuses to start. If you still run 2.36 or older, update to 2.37.0 first and
+follow the upgrade notes of that version (it moves the data by itself), then update to the current version.
 
 ## Backup and encryption
 
 - **In-app backups (2.37.0).** *Back up now* and the automatic backups write a zip with a `pg_dump` of the database
   (`kalmido.dump`), the small attachments and office files and a manifest with checksums. Files from 64 KiB on lie once in
   `backups/.store` (format 3, 2.432.0), **the zip alone is not complete**: see *Disk space and passphrase* below; restoring runs in
-  maintenance mode with a safety backup first. Backups from before 2.37 (SQLite, a `tasks.db` in the zip) can
-  still be restored: the database file goes through the same move to PostgreSQL as an upgrade. Since 2.48 the archive
+  maintenance mode with a safety backup first. Backups from before 2.37 (SQLite, a `tasks.db` in the zip) are still
+  listed and checked, but no longer restored (#5304): restore such a zip with 2.36 and update through 2.37. Since 2.48 the archive
   also holds the file store (`attachments/files/<id>/`, every version) and the project files (`attachments/lists/<id>/`,
   which earlier archives left out); a server before 2.48 restores such an archive without them. 2.79.0: also the files of
   agent chats (`attachments/chat/`), the receipts of the household budget (`attachments/budget/<id>/`) and the document

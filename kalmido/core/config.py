@@ -64,7 +64,7 @@ from .env import env_bool  # 2.149.0 D (#2511): one reading of the switches
 
 DB = os.environ.get("TASKS_DB", "/data/tasks.db")
 # 2.37.0 (#1150): the database is Postgres (postgresql://user:password@host/db). TASKS_DB only names the data dir (its folder holds
-# attachments, office files, backups and the marker) and a SQLite file from before 2.37 that the move tool takes over.
+# attachments, office files, backups and the marker). 2.1034.0 (#5304): the file itself is not used any more (the move tool is gone).
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 TZ = ZoneInfo(os.environ.get("TZ", "Europe/Berlin"))
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")  # topic of the first admin (seed); other users: settings
