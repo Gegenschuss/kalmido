@@ -29,6 +29,8 @@ const orgOf = async id => (await call('GET', '/api/state')).lists.find(l => l.id
   await call('POST', `/api/orgs/${ORG}/join`);  // an added account accepts (2.148.1, #2480)
   check((await call('GET', '/api/state')).me.workspaces.some(x => x.id === ORG), 'setup: alice is in the organisation');
   await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'});
+  // 2.1047.0 (#5798): bob proved his address (2.1001.0 #5669 / 2.1021.0 #5775) - a share by address binds only a proved one
+  execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE users SET email_proved=lower(email) WHERE email_proved='' AND COALESCE(email, '')<>''"]);
   const W = (await call('POST', '/api/lists', {name: 'Website', org_id: ORG})).id;
   const CL = (await call('POST', '/api/clients', {name: 'Northwind Example GmbH', org_id: ORG})).id;
   await call('PATCH', `/api/lists/${W}`, {client_id: CL});
