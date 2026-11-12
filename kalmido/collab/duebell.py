@@ -13,7 +13,7 @@ from datetime import date
 
 from flask import jsonify
 
-from ..core.access import live_sql, tvis, vis_sql
+from ..core.access import list_state_sql, live_sql, tvis, vis_sql
 from ..core.config import app
 from ..core.db import body, db, err, usettings
 from ..core.i18n import tr
@@ -35,7 +35,7 @@ def due_counts(c, uid, s=None):
     r = c.execute(f"""SELECT COUNT(*) FILTER (WHERE substr(t.due,1,10)=?), COUNT(*) FILTER (WHERE substr(t.due,1,10)<?)
                       FROM tasks t JOIN lists l ON l.id=t.list_id
                       WHERE t.status=0 AND {live_sql('t')} AND t.due IS NOT NULL AND substr(t.due,1,10)<=?
-                        AND l.archived=0 AND t.list_id IN {vis_sql(ov=False)} AND {tvis(c, uid, 't.')}
+                        AND {list_state_sql('l')} AND t.list_id IN {vis_sql(ov=False)} AND {tvis(c, uid, 't.')}
                         AND t.id NOT IN (SELECT item_id FROM sample_items WHERE kind='task') AND {mine}""",
                   (day, day, day, uid, uid, uid, uid)).fetchone()
     return int(r[0] or 0), int(r[1] or 0), day
