@@ -170,6 +170,7 @@ for dump in DUMPS:
     empty = fill_old_tables()  # 2.509.0 (#4285)
     check(not empty, f"{tag}: every old table has a row before the start: {empty}")
     before = kt.dbx(OLD_TASKS)[0][0]
+    mig_before = {r[0]: r[1:] for r in kt.dbx("SELECT id, applied_at, note FROM kalmido_migrations WHERE id NOT LIKE 'flag:%'")}  # 2.1084.0 (#5916)
     try:
         os.environ["START_WAIT_S"] = "150"  # #3506: every migration since the dump runs at this first start
         kt.fresh(keep=True)
@@ -191,7 +192,14 @@ for dump in DUMPS:
         continue
     log1 = logs()
     check(not bad_lines(log1), f"{tag}: start log without traceback / error: {bad_lines(log1)[:5]}")
-    check("step(s) applied" in log1, f"{tag}: the migrations ran ('migrations: N step(s) applied' in the log)")
+    # 2.1084.0 (#5916): a short jump (the live state of the upgrade probe, 2.1067 -> 2.1075) may bring only new tables (SCHEMA of a
+    # fragment) and no MIGRATIONS column step - then core/db.py mig_apply prints nothing and that is right. The log line has to
+    # match the steps recorded as applied at this start: N of them = "migrations: N step(s) applied", none = no such line.
+    fresh_steps = sum(1 for mid, at, note in kt.dbx("SELECT id, applied_at, note FROM kalmido_migrations WHERE id NOT LIKE 'flag:%'")
+                      if note in ("applied", "again") and mig_before.get(mid) != (at, note))
+    m = re.search(r"migrations: (\d+) step\(s\) applied", log1)
+    check((int(m.group(1)) if m else 0) == fresh_steps,
+          f"{tag}: the migrations ran: log says {m.group(0) if m else 'no step applied'}, {fresh_steps} step(s) newly recorded as applied")
     meta = dict(kt.dbx("SELECT key, value FROM kalmido_meta"))
     check(meta.get("app_version") == VERSION, f"{tag}: kalmido_meta.app_version = {VERSION} ({meta.get('app_version')})")
     migs = dict(kt.dbx("SELECT note, COUNT(*) FROM kalmido_migrations WHERE id NOT LIKE 'flag:%' GROUP BY note"))
