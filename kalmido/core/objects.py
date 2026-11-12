@@ -744,6 +744,16 @@ def obj_share(c, uid, kind, rid, key, target, role="view", expires_at=None, extr
 OBJ_SHARE_LOCKS = 256  # Fable F4: the lock buckets of obj_node_share
 
 
+def obj_share_lock(c, nid, target):
+    """2.1017.0 (#5645): THE lock of every writer of fs_shares for person / group / agent target on node nid, until the
+    transaction ends (obj_node_share, obj_node_person_put, obj_member_put, obj_share_restore): their check-then-write (no row
+    yet -> insert) never runs twice at once for one pair -- fs_shares has no unique index there, two dialogs at once made two
+    rows. One of OBJ_SHARE_LOCKS buckets (Fable F4 of 2.937: a start-up step sharing many nodes in one transaction holds a
+    bounded number of advisory locks; two pairs in one bucket only wait for each other). A caller that holds an object's row
+    takes it after that row (the order of events/model.py cal_member_set)."""
+    write_lock(c, f"kalmido-fsshare-{(int(nid) * 7919 + int(target)) % OBJ_SHARE_LOCKS}")
+
+
 def obj_node_share(c, uid, n, key, target, role="view", expires_at=None, org=None, event=True, checked=False, match=None,
                    extra=None):
     """2.565.0 (#4717): the share row itself on reference node n (a row) -- obj_share's write, also for the old areas whose
@@ -760,7 +770,7 @@ def obj_node_share(c, uid, n, key, target, role="view", expires_at=None, org=Non
     # (fs_shares has no unique index there; ending one left the other open). The check-then-write runs under a lock of the
     # node and the person -- in one of OBJ_SHARE_LOCKS buckets, so a start-up step sharing many nodes in one transaction
     # holds a bounded number of advisory locks; two pairs in one bucket only wait for each other.
-    write_lock(c, f"kalmido-fsshare-{(int(n['id']) * 7919 + int(target)) % OBJ_SHARE_LOCKS}")
+    obj_share_lock(c, n["id"], target)  # 2.1017.0 (#5645): the one lock of all writers of fs_shares
     old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=?{mq}", (n["id"], int(target), *ma)).fetchone()
     if old:
         c.execute("UPDATE fs_shares SET role=?, expires_at=? WHERE id=?", (role, expires_at, old[0]))
@@ -880,6 +890,7 @@ def obj_share_restore(c, uid, kind, rid, revoked_id):
         raise Denied(409, tr("Only people, groups and agents of the same workspace can get a share"))
     extra = {k: s.get(k) for k in reg["share_cols"] if k in s}
     mq, ma = _share_match(reg, extra)
+    obj_share_lock(c, n["id"], s[key])  # 2.1017.0 (#5645): restored twice at once / with a share from a dialog: one row
     if c.execute(f"SELECT 1 FROM fs_shares WHERE node_id=? AND {key}=?{mq}", (n["id"], int(s[key]), *ma)).fetchone():
         c.execute("DELETE FROM obj_revoked WHERE id=?", (r["id"],))
         c.commit()  # 2.568.0 (#4739): the stale row goes for good (a refusal is not committed; both routes wrote nothing before)
@@ -965,6 +976,7 @@ def obj_member_put(c, by, kind, rid, key, target, role="edit"):
         raise BadInput(tr("Invalid data"))
     with system_ctx(c):  # the node of a room of an organisation / of another person's space is structure (the area checked)
         n = obj_node(c, by, kind, rid, make=True)
+        obj_share_lock(c, n["id"], target)  # 2.1017.0 (#5645): two adds of one member at once leave one row
         old = c.execute(f"SELECT id, role FROM fs_shares WHERE node_id=? AND {key}=?", (n["id"], int(target))).fetchone()
         if old:
             if old["role"] != role:
@@ -1010,7 +1022,7 @@ def obj_node_person_put(c, by, n, target, role):
     same time saw no row both and inserted two; now the second waits and changes the first one's row."""
     if role not in ("view", "edit"):
         raise BadInput(tr("Invalid data"))
-    write_lock(c, f"node-share-{int(n['id'])}")
+    obj_share_lock(c, n["id"], target)  # 2.1017.0 (#5645): the lock of every fs_shares writer (was node-share-<id>, its own)
     u = c.execute("SELECT kind FROM users WHERE id=?", (int(target),)).fetchone()
     key = "agent_id" if u is not None and (u[0] or "user") == "agent" else "user_id"
     now = iso(now_utc())

@@ -507,8 +507,10 @@ def lf_folder_share(c, owner, path, uid, role, group=False):
     key = "group_id" if group else "agent_id" if agent else "user_id"  # 2.958.0 (#5245): group = uid is a group (group_shares is gone)
     nodes = lf_folder_ensure(c, owner, path) if role else lf_folder_nodes(c, owner, path)
     lids = set()
+    from ..core.objects import obj_share_lock  # 2.1017.0 (#5645, review F3): the one lock of every fs_shares writer (local: core imports lists)
     with system_ctx(c):
-        for f in nodes:
+        for f in sorted(nodes, key=lambda n: n["id"]):  # node id order: two folder shares at once take their locks in one order
+            obj_share_lock(c, f["id"], uid)  # two devices / the files dialog at once: one row per pair, not two
             old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=? AND COALESCE(list_own, 0)=0", (f["id"], uid)).fetchone()
             if role is None:
                 if old:

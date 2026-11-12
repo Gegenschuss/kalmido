@@ -31,8 +31,10 @@ def obk_heir(c, oid, uid):
 
 
 def obk_hand_on(c, bid, heir):
-    obj_share_gone(c, "address_book", bid, heir)  # the manager needs no share of its own (2.924.0, #5069: its node's, was book_members)
+    # 2.1017.0 (#5645): the book's row first, then its share rows -- the order of the members dialog (contacts/model.py
+    # book_member_set); the other way round the two could deadlock
     c.execute("UPDATE books SET owner_id=? WHERE id=?", (heir, bid))
+    obj_share_gone(c, "address_book", bid, heir)  # the manager needs no share of its own (2.924.0, #5069: its node's, was book_members)
     # 2.52.0 review: a birthday list the new manager cannot write (e.g. the old manager's private list) is unset, so the
     # book shows "no birthday list" and an admin picks one, instead of occ_sync skipping silently
     r = c.execute("SELECT occ_list_id FROM books WHERE id=?", (bid,)).fetchone()

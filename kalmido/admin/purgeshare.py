@@ -317,10 +317,12 @@ def ush_info(c, uid):
 
 
 def _calendars(c, items):
-    for x in items:
+    for x in sorted(items, key=lambda x: int(x["id"])):  # 2.1017.0 (#5645): in id order (two hand-ons never cross)
         srt = (c.execute("SELECT MAX(sort) FROM ev_cals WHERE owner_id=?", (x["heir"],)).fetchone()[0] or 0) + 1  # its first calendar stays its default
-        obj_share_gone(c, EV_KIND, x["id"], x["heir"])  # 2.924.0 (#5069): the heir needs no share of its own (was its old member row)
+        # 2.1017.0 (#5645): the object's row first, then its share rows -- the order of the members dialog (events/model.py
+        # cal_member_set); the other way round the two could deadlock
         c.execute("UPDATE ev_cals SET owner_id=?, sort=?, changed_at=? WHERE id=?", (x["heir"], srt, iso_ms(now_utc()), x["id"]))
+        obj_share_gone(c, EV_KIND, x["id"], x["heir"])  # 2.924.0 (#5069): the heir needs no share of its own (was its old member row)
         # 2.924.0 (#5069): its node (with the other members' shares) leaves the deleted person's tree for the heir's -- the old
         # member rows that kept them when the tree went (kalmido_kern_node_gone) are gone
         obj_node_follow(c, EV_KIND, x["id"])
@@ -330,13 +332,13 @@ def _books(c, items):
     """2.924.0 (#5069): the book keeps its node (no ctf_dropped any more: the node's shares are its members now): the node
     leaves the deleted person's tree (and its folders) for the heir's, the people who reached it through a folder of that
     tree keep their role as a share of the node (obj_node_person_put; one with a share keeps the one it has)."""
-    for x in items:
+    for x in sorted(items, key=lambda x: int(x["id"])):  # 2.1017.0 (#5645): in id order, the people too (two hand-ons never cross)
         obk_hand_on(c, x["id"], x["heir"])
         obj_node_follow(c, CTF_BOOK, x["id"])
         if x["others"]:
             n = bk_node_ensure(c, x["heir"], x["id"])
             have = {m["user_id"] for m in book_members_of(c, x["id"], live=True)}
-            for u, role in x["others"].items():
+            for u, role in sorted(x["others"].items()):
                 if u not in have:
                     obj_node_person_put(c, x["heir"], n, u, role)
         book_touch(c, x["id"])
