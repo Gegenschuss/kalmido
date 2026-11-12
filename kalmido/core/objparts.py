@@ -227,12 +227,11 @@ def part_trash_purge(c, kind, ids, cut):
             n += c.execute(f"DELETE FROM {qi(PART_TRASH, (PART_TRASH,))} WHERE kind=? AND id = ANY(CAST(? AS BIGINT[])) "
                            "AND deleted_at<?", (kind, part, cut)).rowcount
             continue
-        t = qi(k["table"], (k["table"],))
-        part = [r[0] for r in c.execute(f"SELECT id FROM {t} WHERE id = ANY(CAST(? AS BIGINT[])) AND {trash_sql()} "
+        part = [r[0] for r in c.execute(f"SELECT id FROM {qi(k['table'], (k['table'],))} WHERE id = ANY(CAST(? AS BIGINT[])) AND {trash_sql()} "
                                         f"AND deleted_at<?{k['prune']} ORDER BY id FOR UPDATE", (part, cut)).fetchall()]
         if not part:
             continue
         if k["on_prune"] is not None:
             paths += list(k["on_prune"](c, "id = ANY(CAST(? AS BIGINT[]))", (part,)) or ())
-        n += c.execute(f"DELETE FROM {t} WHERE id = ANY(CAST(? AS BIGINT[]))", (part,)).rowcount
+        n += c.execute(f"DELETE FROM {qi(k['table'], (k['table'],))} WHERE id = ANY(CAST(? AS BIGINT[]))", (part,)).rowcount
     return paths, n
