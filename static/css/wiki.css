@@ -267,7 +267,7 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
    page mark; its folder view shows the page's text on top (wiki.js wk_dirPageHtml), the subfolders and subpages below */
 .wkpgdir{position:relative;display:inline-flex;flex:none;line-height:0}
 .wkpgdm{position:absolute;right:-.3125rem;bottom:-.25rem;display:grid;place-items:center;border-radius:.1875rem;background:var(--bg2);color:var(--accent);line-height:0}
-.wkpgdm svg{width:.625rem;height:.625rem}
+.wkpgdm svg.i{width:var(--ic-xs);height:var(--ic-xs)}
 #side .sbbtn>.wkpgdir>svg.i{width:var(--ic);height:var(--ic)}
 .wkdpage{margin:0 0 1rem;padding:.75rem 1rem;border:1px solid var(--line);border-radius:var(--r-l);background:var(--bg2)}
 .wkdpbar{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;min-width:0}
