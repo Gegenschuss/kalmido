@@ -398,7 +398,7 @@ def ofk_copies_back(c):
             cols[table] = table_columns(c, table)
         return cols[table]
 
-    with system_ctx(c):
+    with system_ctx(c):  # start-up work over every organisation's copies (no request, no person)
         # 2.1055.0 (#5791, F6): first only the ids of the copies, then each copy's snapshot on its own -- not every snapshot
         # of the table at once on every start. 2.1067.0 (#5789): the start balance's copies too (no kind is kept as a copy
         # any more, otrash.OTB_KINDS is gone); a copy whose kind is not on the core's trash still stays (the check below)

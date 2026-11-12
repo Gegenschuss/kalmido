@@ -131,6 +131,10 @@ TABLES = (
     "tasks", "events", "contacts",  # 2.662.0 (#4602): the parent's organisation, filled by triggers (core/orgrows.py; NULL = a private list / calendar / address book)
     "obj_comments",  # 2.972.0 (#5272): the comments' core (was comments; a task's comment: its project's organisation, core/orgrows.py)
 )
+# 2.1079.0 (#5683): tables still in TABLES that the start drops (no CREATE TABLE in the schema any more); they stay listed
+# until no database holds them, so the policy pass before the drop raises no warning (Fable F5 of 2.1073.0).
+# tests/rls_static_test.py accepts them without an org_id in the schema.
+DROPPED = ("office_trash",)  # 2.1073.0 (#5865): office/okern.py ofk_trash_drop
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"
 

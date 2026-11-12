@@ -51,9 +51,12 @@ for node in tree.body:
         except ValueError:
             pass
 TABLES, OWN = set(consts.get("TABLES", ())), set(consts.get("OWN_POLICY", ()))
+DROPPED = set(consts.get("DROPPED", ()))  # 2.1079.0 (#5683): dropped at the start, listed until then
 for t in sorted(with_org - OWN):
     check(t in TABLES, f"table {t} has an org_id: add it to core/rls.py TABLES (row-level security)")
-for t in sorted(TABLES):
+for t in sorted(DROPPED):
+    check(t in TABLES and t not in tables, f"core/rls.py DROPPED: {t} must be in TABLES and gone from the schema")
+for t in sorted(TABLES - DROPPED):
     check(t in with_org, f"core/rls.py TABLES: {t} has no org_id in schema.py (stale entry)")
 check(OWN == {"orgs", "org_members"}, "orgs and org_members have their own policies")
 

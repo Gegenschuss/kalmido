@@ -197,7 +197,7 @@ def ofe_news_live(c, uid, data):
         return False
     if not oid or not did or dun_priv_hidden(c, uid, oid) or office_role(c, uid, oid) not in OFFICE_READ:
         return False
-    with system_ctx(c):
+    with system_ctx(c):  # the office role above is checked; the quotation is read across the request's organisations
         r = c.execute(f"SELECT status, valid_until FROM office_docs WHERE id=? AND org_id=? AND kind='offer' AND {live_sql()}", (did, oid)).fetchone()
     return bool(r) and r["status"] == "sent" and (r["valid_until"] or "") == str(d.get("until") or "")
 
