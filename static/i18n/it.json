@@ -18308,6 +18308,8 @@
   "Budget category {0}": "Categoria del budget {0}",
   "Budget template": "Modello del budget",
   "All messages": "Tutti i messaggi",
+  "Empty|folder": "Vuota",
+  "Could not load the folder": "Impossibile caricare la cartella",
   "Travel receipt": "Ricevuta di viaggio",
   "Card position": "Movimento della carta",
   "The trip is in the trash; restore it first": "Il viaggio è nel cestino; ripristinalo prima"

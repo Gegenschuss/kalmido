@@ -18307,6 +18307,8 @@
   "Budget category {0}": "Budgetcategorie {0}",
   "Budget template": "Budgetsjabloon",
   "All messages": "Alle berichten",
+  "Empty|folder": "Leeg",
+  "Could not load the folder": "De map kon niet worden geladen",
   "Travel receipt": "Reisbon",
   "Card position": "Kaartpost",
   "The trip is in the trash; restore it first": "De reis staat in de prullenbak; zet hem eerst terug"

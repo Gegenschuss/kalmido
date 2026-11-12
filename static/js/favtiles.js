@@ -233,10 +233,12 @@ function fv2_goneKeys() {
   return fv2_keys().filter(k => { if (k.startsWith('sep:')) return false; if (fv2_isObj(k)) return FV2.gone.includes(k); try { return !fv2_tile(k, ctx); } catch { return true; } });
 }
 // open a favourite that lives in a workspace: the switch follows it (the office answers only for the workspace shown)
-async function fv2_open(b) {
-  const ws = b.dataset.fv2Ws, cur = wsCur();
-  if (ws && wsOn() && ws !== cur && wsOptions().includes(ws) && (cur !== 'all' || b.dataset.fv2.startsWith('r:office'))) await wsSet(ws);
-  go(b.dataset.fv2Go);
+async function fv2_open(b) { await fv2_goWs(b.dataset.fv2Ws, b.dataset.fv2Go, b.dataset.fv2.startsWith('r:office')); }
+// 2.1038.0 (#5811): the same for an entry of a folder tile's menu
+async function fv2_goWs(ws, to, office) {
+  const cur = wsCur();
+  if (ws && wsOn() && ws !== cur && wsOptions().includes(ws) && (cur !== 'all' || office)) await wsSet(ws);
+  go(to);
 }
 // the sidebar (renderSide via favSideHtml): no section "Favourites" in any layout -- a computer has them in the head bar, a phone in the row
 // over the tab bar (#favup, 2.572.0 #4747) or on the tab (2.552.0 #4618, takes back #4014); "Only favourites" is in the menu of a tile (fv2_onlyItem)
@@ -306,7 +308,8 @@ function fv2_tileMenu(b) {
   const key = b.dataset.fv2, box = b.closest('.fv2bar, .fv2side'), sh = box ? $$('[data-fv2]', box).map(x => x.dataset.fv2) : [], i = sh.indexOf(key), col = !!box?.classList.contains('fv2side'); if (i < 0) return;
   if (key.startsWith('sep:')) { menu(b, [{label: tr('Remove the divider'), icon: 'x', fn: () => fv2_set(key, false)}]); return; }
   const name = b.getAttribute('aria-label') || b.querySelector('.n')?.textContent || '', m = fv2_meta()[key] || {};
-  menu(b, [{label: name, dis: true, cls: 'mhead'}, '-',
+  const kids = fv2_folderKids(key), fileDir = kids === null;
+  const draw = rows => menu(b, [{label: name, dis: true, cls: 'mhead'}, '-', ...rows,
     {label: tr('Open'), icon: 'right', fn: () => b.click()},
     {label: col ? tr('Move up') : tr('Move left'), icon: col ? 'up' : 'left', dis: i === 0, fn: () => fv2_move(key, sh[i - 1], false)},
     {label: col ? tr('Move down') : tr('Move right'), icon: col ? 'down' : 'right', dis: i === sh.length - 1, fn: () => fv2_move(key, sh[i + 1], true)},
@@ -315,6 +318,42 @@ function fv2_tileMenu(b) {
     {label: tr('Symbol…'), icon: m.i || 'star', more: [{label: tr('Default'), on: !m.i, fn: () => fv2_metaSet(key, {i: ''})}, ...FV2_ICONS.map(x => ({label: tr(x[1]), icon: x[0], on: m.i === x[0], fn: () => fv2_metaSet(key, {i: x[0]})}))]},
     '-', {label: tr('Remove from favourites'), icon: 'star', fn: () => fv2_set(key, false)},
     ...(col ? [] : fv2_onlyItem())]);
+  if (!fileDir) { draw(kids ? fv2_kidRows(kids, b) : []); return; }
+  // a folder of the file store: its content is asked for now ("Loading…"); the answer redraws this menu while it is still open
+  draw([{label: tr('Loading…'), dis: true, act: 'fv2-kids-wait'}, '-']);
+  fv2_fileKids(+key.slice(5)).then(xs => {
+    if (!b.isConnected || !$('#pop [data-act="fv2-kids-wait"]')) return;
+    draw(fv2_kidRows(xs, b));
+  });
+}
+// 2.1038.0 (#5811): a folder tile's menu shows its content on top - a click opens the entry, "Show all" (more than FV2_KIDS) the
+// folder. Project folders: the projects in the sidebar's order (sideOrder: no archived ones), then the subfolders; what the
+// person sees is S.lists. undefined = no folder tile, null = a folder of the file store (asked for on opening, fv2_fileKids).
+const FV2_KIDS = 10;
+function fv2_folderKids(key) {
+  if (key.startsWith('folder:')) {
+    const f = key.slice(7);
+    return [...sideOrder().filter(l => l.folder === f).map(l => ({label: lname(l), lic: l, to: keyToHash('l:' + l.id), ws: wsOf(l)})),
+      ...folderSubs(f).map(s => ({label: fName(s), icon: 'folder', to: keyToHash('folder:' + s)}))];
+  }
+  return key.startsWith('file:') && FV2.res[key]?.folder ? null : undefined;
+}
+// a folder of the file store: its subfolders, then its files (the server answers only what the person may read; [] offline)
+async function fv2_fileKids(id) {
+  try {
+    const j = await rawFetch('GET', `/api/files?parent=${id}`);
+    if (typeof fsl_prep !== 'function' && typeof loadModule === 'function') await loadModule('fslock').catch(() => {});  // names of a locked folder
+    if (typeof fsl_prep === 'function') await fsl_prep(j);
+    const xs = (j.items || []).filter(n => !n.in_trash), ws = FV2.res['file:' + id]?.ws || '';
+    return [...xs.filter(n => n.kind === 'folder'), ...xs.filter(n => n.kind !== 'folder')]
+      .map(n => ({label: n.name, icon: n.kind === 'folder' ? 'folder' : n.kind === 'link' ? 'link' : 'file', to: 'ablage/' + n.id, ws}));
+  } catch { return {err: true}; }
+}
+function fv2_kidRows(xs, b) {
+  if (!Array.isArray(xs)) return [{label: tr('Could not load the folder'), dis: true}, '-'];
+  if (!xs.length) return [{label: tr('Empty|folder'), dis: true}, '-'];
+  return [...xs.slice(0, FV2_KIDS).map(x => ({label: x.label, ...(x.lic ? {lic: x.lic, icon: 'list'} : {icon: x.icon}), act: 'fv2-kid', fn: () => fv2_goWs(x.ws, x.to)})),
+    ...(xs.length > FV2_KIDS ? [{label: tr('Show all'), icon: 'right', sub: String(xs.length), fn: () => b.click()}] : []), '-'];
 }
 // a row without a menu of its own (Plan, views, areas, filters, tags, people, groups, agents): a small one with the star
 function fv2_rowMenu(r) {

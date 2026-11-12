@@ -18307,6 +18307,8 @@
   "Budget category {0}": "Budget-Kategorie {0}",
   "Budget template": "Budget-Vorlage",
   "All messages": "Alle Nachrichten",
+  "Empty|folder": "Leer",
+  "Could not load the folder": "Der Ordner konnte nicht geladen werden",
   "Travel receipt": "Reisebeleg",
   "Card position": "Kartenposition",
   "The trip is in the trash; restore it first": "Die Reise liegt im Papierkorb; stelle sie zuerst wieder her"
