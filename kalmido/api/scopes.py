@@ -55,7 +55,6 @@ from ..api.openapi import openapi_spec
 from ..agents.core import agent_emit, agent_row, is_agent, job_dict, JOB_LOG_MAX
 from ..agents.admin import personal_agent_foreign
 from ..agents.api import job_notify
-from ..agents.chatnews import acn_job_has_entry  # 2.1060.0 (#5870)
 from ..accounts.orgs import may_see, ws_member_problem  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import h6r_shared_people  # 2.369.5 (#2517): pulled up from functions
 
@@ -396,6 +395,7 @@ def need_approval(c, title, args=(), list_id=None, task_id=None, detail=None):
     job_notify(c, j, None)
     # job_notify only added News for task jobs (since 2.1039.0, #5804, for a job without a task too): the approver hears of it
     # anyway, once -- 2.1060.0 (#5870): not a second entry when job_notify wrote it (the bell counted the approval twice)
+    from ..agents.chatnews import acn_job_has_entry  # 2.1060.0 (#5870): layers (integrations -> agents only inside)
     if approver and not task_id and not acn_job_has_entry(c, approver, jid):
         s = collab_user(c, approver, None)
         if s:
