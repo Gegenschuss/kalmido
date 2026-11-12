@@ -116,6 +116,10 @@ const same = (a, b) => !!a && !!b && ['l', 't', 'w', 'h'].every(k => Math.abs(a[
   // one document: the preview's rectangle (its full file held back), then the full page's -> the same
   const measure = async (ev, wait, id, what, cached = false) => {
     check(await wait(thumbReady(id), 80), `${what}: the preview picture stands sized (${kind[id]} ${id})`);
+    // 2.965.0 (#5642): a PDF asks for its file only after pdf.js is loaded (docview.js dcv_pvDraw: loadModule, pv_load); on the
+    // slower CI the preview stood before that and was measured with nothing held yet - wait until the file is asked for
+    // (held back here), so the preview is measured while the full file waits, as meant
+    if (!cached) await wait('window.__g.held.length > 0', 80);
     const held = await ev('window.__g.held.length');
     const a = JSON.parse(await ev(RECT) || 'null');
     // "Whole page" reopens a document whose file this page already loaded (opened by its address): nothing is fetched again
