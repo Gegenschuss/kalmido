@@ -660,7 +660,7 @@ def mcpr_module():
 _CLS = {}
 
 
-_REFUSED = {}  # 2.1045.0 (#5827): access -> {step_ref: step} of InProc (Kalmido._keep_refused), the newest MCPR_REFUSED_TOKENS accesses.
+_REFUSED = {}  # 2.1045.0 (#5827): access -> {refused: {step_ref: step}, cards, approval, approval_step} of InProc (Kalmido._keep_refused), the newest MCPR_REFUSED_TOKENS accesses.
 # 2.1078.0 (#5866, N1): keyed by the access (grant id) of /mcp, so a refreshed access token keeps its step_ref and a revoked
 # access drops them (mcpr_revoke); a caller without an access (a server agent's run) keys by its token hash as before
 MCPR_REFUSED_TOKENS = 500
@@ -679,7 +679,13 @@ def _inproc_cls(mod):
             self.e = e
 
     class InProc(mod.Kalmido):
+        # 2.1078.0 (#5866, review): the approved card of use_approval lives with the access too (_REFUSED), not in one /mcp
+        # request: use_approval in one request and the upload in the next is the usual order of a client
+        approval = property(lambda s: s._st.get("approval"), lambda s, v: s._st.__setitem__("approval", v))
+        approval_step = property(lambda s: s._st.get("approval_step"), lambda s, v: s._st.__setitem__("approval_step", v))
+
         def __init__(self, token, ip, base_url, deadline=None, grant_id=None):
+            self._st = {}  # the base class sets approval / approval_step to None before the shared state is known
             super().__init__("http://kalmido.invalid", token, timeout=mod.WAIT_MAX + 30)
             self.me_cache = {"at": 0.0, "v": None}  # per call of /mcp, never shared between tokens
             self.ip, self.base_url = ip, base_url
@@ -690,7 +696,9 @@ def _inproc_cls(mod):
             with _RUN_LOCK:
                 if key not in _REFUSED and len(_REFUSED) >= MCPR_REFUSED_TOKENS:
                     _REFUSED.pop(next(iter(_REFUSED)))
-                self.refused = _REFUSED.setdefault(key, {})
+                st = _REFUSED.pop(key, None) or {"refused": {}, "cards": {}, "approval": None, "approval_step": None}
+                _REFUSED[key] = st  # 2.1078.0 (#5866, review): to the end, so the access used longest ago goes first
+                self._st, self.refused, self.cards = st, st["refused"], st["cards"]
 
         def call(self, method, path, query=None, body=None, timeout=None, multipart=None, binary_cap=None):
             # review F3: in the web process nothing waits: no sleeping before a call (rate limit) or between tries (429 / 503

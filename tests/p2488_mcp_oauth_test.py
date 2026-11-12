@@ -337,6 +337,14 @@ tk2 = j(token(grant_type="refresh_token", refresh_token=tk.get("refresh_token", 
 check(bool(tk2.get("access_token")), "N1: refreshed")
 bad, txt = call(tk2.get("access_token", ""), 2, "request_chat_approval", {"user_id": FID, "title": "May I?", "step_ref": 1})
 check(bad is False and "Needs a Yes" in txt, f"N1: after the refresh the card is made from step_ref=1 {txt[:300]}")
+# review: use_approval in one /mcp request and the call in the next (the approved card lives with the access too)
+MID = (json.loads(txt).get("result", {}).get("structuredContent") or {}).get("id") if bad is False else None
+check(Fr.post(B + f"/api/agents/{AID}/chat/{MID}/choice", json={"choice_ids": ["yes"]}).ok, "N1 review: the person says Yes")
+bad, txt = call(tk2.get("access_token", ""), 4, "use_approval", {"message_id": MID})
+check(bad is False, f"N1 review: use_approval {txt[:200]}")
+bad, txt = call(tk2.get("access_token", ""), 5, "create_task", {"title": "Needs a Yes", "list_id": L1})
+check(bad is False and dbx("SELECT 1 FROM tasks WHERE list_id=? AND title='Needs a Yes'", (L1,)),
+      f"N1 review: the next request carries the approved card {txt[:300]}")
 bad, txt = call(tk2.get("access_token", ""), 3, "create_task", {"title": "Long", "list_id": L1, "notes": "x" * 33000})
 check(bad and "step_ref" not in txt and "longer than an approval card can bind" in txt, f"N1: a too long body is not kept {txt[:300]}")
 check(Fr.patch(B + f"/api/agents/{AID}/control", json={"level": "free"}).ok, "N1: back to free")
