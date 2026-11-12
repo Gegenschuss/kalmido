@@ -3954,7 +3954,6 @@
 "static/js/office_docs.js|!vf && typeof dpj_rowHtml === 'function' ? dpj_rowHtml(d) : '' /* 2.168.0 A (#2665): outside the locked fieldset; 2.356.0 C (#3005): below the head (client first) */": 1,
 "static/js/office_docs.js|!vf && typeof tpPartsHtml === 'function' ? tpPartsHtml(d, adm) : ''": 1,
 "static/js/office_docs.js|+d.overpaid > 0 && !(d.credits_of || []).length ? `<b>${trh('To pay back: {0}', ofdMoney(d.overpaid, d))}</b>` /* 2.355.0 A (#2847); 2.354.0 D (#2837): with credit notes the refund line below says it, less the refunds booked */ : ''": 1,
-"static/js/office_docs.js|OFD.log.map(x => { const ks = Object.keys(x.detail?.after || {}); return `<li><span class=\"muted\">${esc(ofdWhen(x.at))}</span> <b>${esc(x.user_name || x.detail?.name || '?')}</b> ${esc(ofdActText(x.action))}${ks.length && x.action === 'update' ? ` <span class=\"muted\">(${esc(ks.join(', '))})</span>` : ''}${typeof agbLogNote === 'function' ? agbLogNote(x) : ''}</li>`; }).join('')": 1,
 "static/js/office_docs.js|acts.join('')": 1,
 "static/js/office_docs.js|addr": 1,
 "static/js/office_docs.js|addr || `<span class=\"muted\">${esc(tr('No client selected'))}</span>`": 1,
