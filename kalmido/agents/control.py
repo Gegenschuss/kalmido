@@ -603,7 +603,9 @@ def v1_agent_approval_run(mid):
             er = {**er, "reason": "stale", "message_id": mid, "fields": fields,
                   "message": ((er.get("message") or "") + " " + tr("The state field differs from the card ({0}): the target changed since the card, or you read it again. Read it again and ask with a new card.",
                                                                    ", ".join(fields))).strip()}
-            return jsonify(**{**j, "error": er}), 409
+            resp = jsonify(**{**j, "error": er})  # a Response with its status (v1_view turns a (body, 409) tuple into a plain message)
+            resp.status_code = 409
+            return resp
     from flask import Response
     return Response(raw, status=status, content_type=ctype or "application/json")
 

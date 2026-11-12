@@ -54,7 +54,7 @@ def agent(s, name):
 
 FA, FH, FTOK = agent(F, "fridabot")
 OA, OH, _ = agent(O, "ottobot")
-check(F.get(B + f"/api/agents/{FA}/control").json().get("level") == "approve_all", "the agent starts with approve_all")
+check((F.get(B + f"/api/agents/{FA}/control").json().get("control") or {}).get("level") == "approve_all", "the agent starts with approve_all")
 FL = F.post(B + "/api/lists", json={"name": "Frida work"}).json()["id"]
 check(F.put(B + f"/api/lists/{FL}/members", json={"user_id": FA, "role": "edit"}).ok, "setup: the project is shared with the agent")
 
@@ -196,11 +196,11 @@ r = run(approved(api("POST", f"/tasks/{T}/comments", json={"body": "Looks good"}
 check(r.status_code == 201 and r.json().get("body") == "Looks good", f"comment through the run {r.status_code} {r.text[:200]}")
 
 # event
-r = run(approved(api("POST", "/events", json={"title": "Shoot day", "start": "2027-03-04T09:00:00Z", "end": "2027-03-04T17:00:00Z"}), "event"))
+r = run(approved(api("POST", "/events", json={"title": "Shoot day", "start": "2027-03-04T09:00", "end": "2027-03-04T17:00"}), "event"))
 check(r.status_code in (200, 201) and r.json().get("title") == "Shoot day", f"event through the run {r.status_code} {r.text[:200]}")
 
 # contact
-r = run(approved(api("POST", "/contacts", json={"name": "Lena Lamp", "company": "Light Rental"}), "contact"))
+r = run(approved(api("POST", "/contacts", json={"given": "Lena", "family": "Lamp", "org": "Light Rental"}), "contact"))
 check(r.status_code in (200, 201), f"contact through the run {r.status_code} {r.text[:200]}")
 
 # table + cells with prev
@@ -240,4 +240,4 @@ except M.ApiError as e:
     check(e.status == 409 and "reason: used" in e.message, f"MCP: the second run says used {e.message[:300]}")
 check("run_approved_step" in M.TOOL_MAP and M.TOOL_SCOPE.get("run_approved_step") == "agent", "MCP: the tool exists with scope agent")
 
-sys.exit(done())
+sys.exit(done("p21045_a_approval"))
