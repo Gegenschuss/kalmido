@@ -23,7 +23,6 @@ import sys
 
 import requests
 
-import kt
 from freelancer_fixture import freelancer
 from kt import B, check, dbx, done, fresh, setup
 
