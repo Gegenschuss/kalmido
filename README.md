@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.990.0** (2026-11-11):
-- **Undo**: "Recent steps" now also takes back settings, budget entries, phone calendar / contacts changes and whole deleted calendars; undo shows its result at once in every area.
-- **Disposition**: pick client and agency on the call sheet from your contacts.
-- **Office**: reminder fees ask for the day the money came; slimmer document head on a phone.
-- **Sharing**: sharing by e-mail address reaches an account only once its address is proved.
+**2.995.0** (2026-11-12):
+- **Search**: finds umlauts in either spelling (Müller and Mueller) and knowledge pages shared with you; one shared search index for tasks, comments, contacts and chat.
+- **Review**: deleted video comments and document notes go to the trash and come back with undo.
+- **Agents**: a model of its own for reviews, and the last 7 days of usage per kind in the section Model.
+- **Shared core**: tags, comments, read marks and notification ceilings now live in core tables.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
