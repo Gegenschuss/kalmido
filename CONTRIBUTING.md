@@ -58,6 +58,11 @@ a test for what you change; security fixes need a regression test in `tests/secu
   cleaned). Fix a new finding (or mark a deliberate one with `# noqa: CODE -- reason`); after a reviewed clean-up or a
   ruff update `python3 tools/ruff_baseline.py /tmp/ruff.json --update` writes the list anew. A silent
   `except Exception: pass` names its reason after the `noqa` marker (`tests/p2755_d_ruff_baseline_test.py` checks it).
+- **Calls get all required parameters** (2.1056.0, #5863): `python3 tools/check_call_arity.py` reads every module-level
+  function of `kalmido/` and `app.py` with `ast` and checks its calls (same module, `from ... import`, module aliases,
+  re-exports): a missing required or keyword-only parameter, too many positional arguments or an unknown keyword is red in
+  the CI job Lint. It catches a signature change merged next to a new caller. A deliberate exception (a monkeypatched
+  name, a test double) gets `# arity-ok: <reason>` on a line of the call.
 - **SQL names only through `qi()`** (2.755.0, #5296): values always go as `?` parameters; where a table or column NAME
   varies, it goes through `qi(name, allowlist)` (`kalmido/core/pg.py`: a fixed set of the caller, `table_names(c)` or
   `table_columns(c, t)`; the name comes back double-quoted, anything else is a `ValueError`). The semgrep rule
