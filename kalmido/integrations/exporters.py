@@ -14,6 +14,7 @@ from ..core.db import db, local_now
 from ..core.objtags import otg_user_of  # 2.955.0 (#5276): the personal tags of the core (were task_tags)
 from ..core.serializers import csv_cell
 from ..accounts.session import me
+from ..core.access import otr_live  # 2.1029.0 (#5537)
 
 _WD = {"MO": "monday", "TU": "tuesday", "WE": "wednesday", "TH": "thursday", "FR": "friday", "SA": "saturday", "SU": "sunday"}
 TD_HEAD = ["TYPE", "CONTENT", "DESCRIPTION", "PRIORITY", "INDENT", "AUTHOR", "RESPONSIBLE", "DATE", "DATE_LANG", "TIMEZONE"]
@@ -66,7 +67,7 @@ def ex_file_name(name, used, ext):
 
 def ex_lists(c, uid):
     """(lists to export, names of the locked ones that stay out), the scope of export.json."""
-    rows = c.execute("SELECT * FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL) ORDER BY is_inbox DESC, sort, id", (uid,)).fetchall()
+    rows = c.execute(f"SELECT * FROM lists WHERE owner_id=? AND ({otr_live('')} OR org_id IS NULL) ORDER BY is_inbox DESC, sort, id", (uid,)).fetchall()
     return [r for r in rows if not r["e2e"]], [r["name"] for r in rows if r["e2e"]]
 
 

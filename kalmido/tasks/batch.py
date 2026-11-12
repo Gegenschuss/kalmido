@@ -7,7 +7,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..accounts.session import me
-from ..core.access import Denied, list_people, list_role, need_list, need_task, task_visible, tvis, vis_sql
+from ..core.access import Denied, list_people, list_role, need_list, need_task, task_visible, tvis, vis_sql, list_state_sql
 from ..tasks.validation import (
     as_int, clean_task, log_act, log_changes, RR_OCC_PER_TASK, RR_OCC_SECONDS, RR_OCC_TOTAL, rr_rule,
 )
@@ -380,7 +380,7 @@ def occurrences():
     a, z = datetime(lo.year, lo.month, lo.day), datetime(hi.year, hi.month, hi.day, 23, 59)
     for t in db().execute(f"""SELECT id, due, repeat FROM tasks WHERE status=0 AND deleted_at IS NULL
                               AND repeat!='' AND due IS NOT NULL AND due<=? AND list_id IN {vis_sql()}
-                              AND {tvis(db(), me(), write=True)} AND list_id NOT IN (SELECT id FROM lists WHERE archived=1)""",
+                              AND {tvis(db(), me(), write=True)} AND list_id NOT IN (SELECT id FROM lists WHERE {list_state_sql('', 'archived', 'trash')})""",
                           (hi.isoformat(), me(), me())):
         if len(out) >= RR_OCC_TOTAL or time.monotonic() - t0 > RR_OCC_SECONDS:
             break  # hard caps: count + time

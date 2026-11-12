@@ -8,7 +8,7 @@ from ..core.i18n import tr
 from ..core.db import db, iso, local_now, parse_iso, uset, usettings
 from ..core.usertz import tz_of_s, user_now
 from ..accounts.session import me
-from ..core.access import tvis, vis_sql
+from ..core.access import tvis, vis_sql, list_state_sql
 from ..tasks.validation import valid_hm, valid_plan_start
 from ..core.errors import BadInput
 from ..notify.push import _wd_fail, notify, push_prio
@@ -122,7 +122,7 @@ def dayplan_mine_sql(uid):
 def dayplan_tasks(c, uid, day):
     """Open tasks of uid in lists they see (not archived, not waiting, not blocked, no sample items)."""
     rows = c.execute(f"""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox FROM tasks t JOIN lists l ON l.id=t.list_id
-                         WHERE t.status=0 AND t.deleted_at IS NULL AND l.archived=0 AND t.list_id IN {vis_sql()}
+                         WHERE t.status=0 AND t.deleted_at IS NULL AND {list_state_sql('l')} AND t.list_id IN {vis_sql()}
                            AND {tvis(c, uid, 't.')} AND {dayplan_mine_sql(uid)} AND t.waiting_at IS NULL
                            AND t.id NOT IN (SELECT item_id FROM sample_items WHERE kind='task')
                            AND NOT EXISTS (SELECT 1 FROM task_deps d JOIN tasks b ON b.id=d.blocker_id

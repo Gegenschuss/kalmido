@@ -9,8 +9,8 @@ from ..core.db import body, db, err, iso, iso_ms, now_utc, usettings, usettings_
 from ..accounts.session import me
 from ..accounts.pictures import avatar_map
 from ..accounts.orgs import may_see
-from ..core.access import collab_all, Denied, FULL_ROLES, list_role, MANAGE_ROLES, task_visible, vis_sql, WRITE_ROLES
-from ..core.access import access_note, health_hidden, org_trips_hidden, otr_live, ov_open, reading_sql, token_lists  # 2.281.0 B (#3110)
+from ..core.access import collab_all, Denied, FULL_ROLES, list_role, MANAGE_ROLES, task_visible, vis_sql, WRITE_ROLES, list_state_sql
+from ..core.access import access_note, health_hidden, org_trips_hidden, ov_open, reading_sql, token_lists  # 2.281.0 B (#3110)
 from ..core.access import live_sql  # 2.783.0 (#5368): the trash filter of the core
 from ..accounts.orgroles import FULL_READ, org_say_refusal, role_known
 from ..accounts.orgs import INSTANCE_ENV
@@ -93,7 +93,7 @@ def tchat_members_of(c, lids):
         return out
     rows = {r["id"]: r for r in c.execute(
         f"SELECT l.id, l.owner_id, l.life, l.org_id, l.family, l.org_visibility, l.org_edit, {reading_sql()} AS rd FROM lists l "
-        f"WHERE l.id = ANY(CAST(? AS BIGINT[])) AND l.archived=0 AND {otr_live()}", (lids,))}
+        f"WHERE l.id = ANY(CAST(? AS BIGINT[])) AND {list_state_sql('l')}", (lids,))}
     if not rows:
         return out
     ids = sorted(rows)
@@ -176,7 +176,7 @@ def tchat_room_ok(c, r, uid):
     if r["kind"] != "list":
         return False
     return list_role(c, r["list_id"], uid) in FULL_ROLES and c.execute(
-        "SELECT 1 FROM lists WHERE id=? AND archived=0", (r["list_id"],)).fetchone() is not None
+        f"SELECT 1 FROM lists WHERE id=? AND {list_state_sql()}", (r["list_id"],)).fetchone() is not None
 
 
 def tchat_dm_open(c, r, uid):
@@ -241,7 +241,7 @@ def tchat_shared_lists(c, uid, mm=None):
     """The lists of uid that have a channel: shared (another person or an agent sees the whole list), not archived.
     2.281.0 B (#3110): mm = a dict that gets {list id: members} of every list (tchat_rooms reuses it)."""
     # 2.46.0 (#1603): channels of the joined lists (not of those seen only through "Everyone in the organisation")
-    ls = c.execute(f"SELECT id, name, is_inbox FROM lists WHERE id IN {vis_sql(ov=False)} AND archived=0 ORDER BY lower(name)", (uid, uid)).fetchall()
+    ls = c.execute(f"SELECT id, name, is_inbox FROM lists WHERE id IN {vis_sql(ov=False)} AND {list_state_sql()} ORDER BY lower(name)", (uid, uid)).fetchall()
     mem = tchat_members_of(c, [l["id"] for l in ls])  # 2.281.0 B (#3110): uid is a candidate of each (owner / member row)
     if mm is not None:
         mm.update(mem)

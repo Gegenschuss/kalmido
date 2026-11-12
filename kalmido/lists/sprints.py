@@ -21,7 +21,7 @@ from ..core.db import body, bump, db, err, iso, iso_ms, local_day, local_now, no
 from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..core.objparts import part_kind, part_write  # 2.610.0 (#4762): the core's write layer of side objects
 from ..accounts.session import me
-from ..core.access import Denied, is_project, list_role, need_list, pvis, WRITE_ROLES
+from ..core.access import Denied, is_project, list_role, need_list, pvis, WRITE_ROLES, list_state_sql
 from ..core.access import live_sql  # 2.783.0 (#5368)
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..tasks.validation import as_int  # 2.369.5 (#2517): pulled up from functions
@@ -303,7 +303,7 @@ def spr_tick(c):
     """Watchdog: an active sprint whose last day is over is closed (open tasks along with carry on, else to the backlog) and
     the next one starts; a list with sprints on but none active starts its due planned sprint / a new one."""
     today = spr_today()
-    for r in c.execute("SELECT id, sprint_cfg FROM lists WHERE sprint_cfg!='' AND archived=0").fetchall():
+    for r in c.execute(f"SELECT id, sprint_cfg FROM lists WHERE sprint_cfg!='' AND {list_state_sql()}").fetchall():
         cfg = spr_cfg(r["sprint_cfg"])
         if not cfg["on"]:
             continue

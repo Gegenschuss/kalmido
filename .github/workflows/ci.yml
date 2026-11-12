@@ -283,6 +283,8 @@ jobs:
         run: python tools/check_coltypes.py
       - name: No new handwritten trash filter - live_sql() of core/access.py; tools/live_filter_baseline.json only shrinks (2.773.0, #5292)
         run: python tools/check_live_filter.py
+      - name: No new handwritten project state filter - list_state_sql() / otr_live() of core/access.py; tools/list_state_baseline.json only shrinks (2.1029.0, #5537)
+        run: python tools/check_list_state.py
       - name: ruff (E, F, BLE without E501; ruff.toml) red for new code only - tools/ruff_baseline.json (2.755.0, #5294)
         run: |
           pip install ruff==0.17.4

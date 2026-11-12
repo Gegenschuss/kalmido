@@ -43,7 +43,7 @@ from ..core.config import app
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc
-from ..core.access import Denied, MANAGE_ROLES, WRITE_ROLES, acx_of, list_role, list_roles, need_list, reading_sql, vis_sql
+from ..core.access import Denied, MANAGE_ROLES, WRITE_ROLES, acx_of, list_role, list_roles, need_list, reading_sql, vis_sql, list_state_sql
 from ..core.orgcrypt import FIELDS, OrgCryptError, PREFIX, oc_active_for, oc_dec_fields, oc_enc_fields, oc_is_enc, oc_plain_safe
 from ..accounts.session import me
 from ..accounts.orgroles import need_org_write  # 2.674.0 (#4382 finding 3)
@@ -604,7 +604,7 @@ def hbm_targets():
         raise Denied(400, tr("Invalid value: {0}", "mail")) from None
     org = m["org_id"] or None
     cls = [{"id": r["id"], "name": r["name"]} for r in client_rows(c, uid, archived=False) if (r["org_id"] or None) == org]
-    lids = [r[0] for r in c.execute(f"SELECT l.id FROM lists l WHERE NOT {_NO_MAIL} AND l.archived=0 AND COALESCE(l.e2e,'')='' "
+    lids = [r[0] for r in c.execute(f"SELECT l.id FROM lists l WHERE NOT {_NO_MAIL} AND {list_state_sql('l')} AND COALESCE(l.e2e,'')='' "
                                     "AND l.org_id IS NOT DISTINCT FROM ? ORDER BY lower(l.name), l.id", (org,))]  # 2.352.0 G (review M5)
     pr = []
     for lid in lids:

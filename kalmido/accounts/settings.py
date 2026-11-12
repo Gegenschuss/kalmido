@@ -21,6 +21,7 @@ from ..core.errors import BadInput
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..api.common import hit_limit  # 2.367.5 (#2980)
 from .layouts import LAYOUT_KEYS
+from ..core.access import otr_live  # 2.1029.0 (#5537)
 
 
 # ---------------------------------------------------------------- settings / export (per user)
@@ -1059,10 +1060,10 @@ def umz_export_queries(uid):
     """2.73.0 B (#1473): the tables of "my data" (GET /api/export.json and the account export) -> {name: (sql, args)}."""
     from ..core.access import acx_lists_sql
     from ..core.objcomments import ocm_old_cols  # 2.972.0 (#5272): the task comments in the file's old columns
-    own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
+    own = f"(SELECT id FROM lists WHERE owner_id=? AND ({otr_live('')} OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
     task_ids = f"(SELECT id FROM tasks WHERE list_id IN {own})"
     q = {
-        "lists": ("SELECT * FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL)", (uid,)),
+        "lists": (f"SELECT * FROM lists WHERE owner_id=? AND ({otr_live('')} OR org_id IS NULL)", (uid,)),
         "list_members": (f"SELECT * FROM list_members WHERE list_id IN {own}", (uid,)),
         "sections": (f"SELECT * FROM sections WHERE list_id IN {own}", (uid,)),
         "list_envs": (f"SELECT id, list_id, name, sort, auto_close, created_at, deleted_at FROM list_envs WHERE list_id IN {own}", (uid,)),  # 2.60.0 (#1514): never the hook token

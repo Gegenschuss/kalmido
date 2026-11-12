@@ -9,7 +9,7 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.db import db, inbox_default, local_now, now_utc
 from ..core.i18n import tr
-from ..core.access import Denied, MANAGE_ROLES, WRITE_ROLES, list_role, need_list, tvis, vis_sql
+from ..core.access import Denied, MANAGE_ROLES, WRITE_ROLES, list_role, need_list, tvis, vis_sql, list_state_sql
 from ..accounts.session import me
 from ..api.common import v1_args, v1_view
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -57,7 +57,7 @@ def stale_tasks(c, uid, *, lids=None, limit=50, days=None):
                  t.wait_note, t.wait_until, {_LAST_SQL} AS last, {thr} AS thr
           FROM tasks t JOIN lists l ON l.id=t.list_id
           WHERE t.status=0 AND t.deleted_at IS NULL AND t.parent_id IS NULL AND t.ms=0 AND t.fam='' AND t.repeat=''
-            AND l.archived=0 AND l.family='' AND l.life=''
+            AND {list_state_sql('l')} AND l.family='' AND l.life=''
             AND (t.due IS NULL OR substr(t.due,1,10)<=?) AND (t.start IS NULL OR t.start='' OR substr(t.start,1,10)<=?)
             AND (t.waiting_at IS NULL OR t.wait_until IS NULL OR t.wait_until<?)
             AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.')}{where})
@@ -159,7 +159,7 @@ def _wd_stale(c, now):
     rows = c.execute("""SELECT DISTINCT a.user_id FROM agents a JOIN users u ON u.id=a.user_id AND u.kind='agent'
                         WHERE a.enabled=1 AND u.disabled=0 AND a.stale_sent!=?""", (today,)).fetchall()
     for (aid,) in rows:
-        lids = [r[0] for r in c.execute(f"""SELECT id FROM lists WHERE agent_followup=1 AND archived=0 AND life=''
+        lids = [r[0] for r in c.execute(f"""SELECT id FROM lists WHERE agent_followup=1 AND {list_state_sql()} AND life=''
                                              AND id IN {vis_sql()}""", (aid, aid))]
         a = agent_row(c, aid)
         if a is not None and a["list_ids"]:

@@ -28,7 +28,7 @@ from ..core.db import body, bump, db, err, uset
 from ..core.pg import st_ids
 from ..core.objnotifcap import ncap_drop, ncap_put, ncap_rows, ncap_rows_of  # 2.981.0 (#5287): the core's obj_notif_cap
 from ..accounts.session import me
-from ..core.access import Denied, list_role, need_collab
+from ..core.access import Denied, list_role, need_collab, list_state_sql
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_call, v1_view
 from ..lists.lists import FOLDER_SEP, _in_folder, clean_folder, folder_under  # 2.369.5 (#2517): pulled up from functions
@@ -357,8 +357,8 @@ def notif_ask_state(c, uid, s):
         "SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'')!='agent'", (p["user_id"],)).fetchone()})
     out = [{"kind": "folder", "folder": f, "name": f.split(_fsep())[-1]} for f in people]
     out += [{"kind": "list", "id": r["id"], "name": r["name"]} for r in c.execute(
-        """SELECT l.id, l.name FROM lists l JOIN obj_notif_cap n ON n.kind='list' AND n.ref_id=l.id AND n.path='' AND n.user_id=0
-           WHERE l.owner_id=? AND l.archived=0 AND n.tpl='all' AND EXISTS (SELECT 1 FROM list_members m JOIN users hu ON hu.id=m.user_id AND COALESCE(hu.kind,'')!='agent' WHERE m.list_id=l.id)
+        f"""SELECT l.id, l.name FROM lists l JOIN obj_notif_cap n ON n.kind='list' AND n.ref_id=l.id AND n.path='' AND n.user_id=0
+           WHERE l.owner_id=? AND {list_state_sql('l')} AND n.tpl='all' AND EXISTS (SELECT 1 FROM list_members m JOIN users hu ON hu.id=m.user_id AND COALESCE(hu.kind,'')!='agent' WHERE m.list_id=l.id)
            ORDER BY lower(l.name)""", (uid,))]
     return out[:20]
 

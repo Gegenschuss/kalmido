@@ -15,7 +15,7 @@ from ..accounts.pictures import avatar_drop_file, ALL_PRESETS
 from ..accounts.colors import ac_assign
 from ..accounts.orgs import has_workspaces, is_org_admin  # 2.361.4 (#2928)
 from ..accounts.login import seal, unseal
-from ..core.access import Denied, joined_lists_sql
+from ..core.access import Denied, joined_lists_sql, otr_live
 from ..core.serializers import unlink_files
 from ..core.state import visible_lists
 from ..lists.ownership import owner_transfer
@@ -872,7 +872,7 @@ def agent_perm_users(aid):
         if a["owner_id"]:
             ids = [a["owner_id"]]
         else:
-            its = f"SELECT id FROM lists WHERE deleted_at IS NULL AND id IN {joined_lists_sql()}"
+            its = f"SELECT id FROM lists WHERE {otr_live('')} AND id IN {joined_lists_sql()}"
             ids = [r[0] for r in c.execute(f"""SELECT user_id FROM list_members WHERE list_id IN ({its})
                                                UNION SELECT owner_id FROM lists WHERE id IN ({its})""", (aid, aid, aid, aid))]
             ids = [x for x in ids if x and x != aid and (x == me() or admin_sees(c, x)) and perm_user_ok(c, a, x)]

@@ -21,7 +21,7 @@ from ..core.pg import insert_id
 from ..core.objcomments import ocm_add, ocm_need_say, ocm_restore, ocm_trash  # 2.972.0 (#5272)
 from ..core.i18n import lang, tr
 from ..core.db import bump, db, iso, local_now, now_utc
-from ..core.access import Denied, list_role, need_task, task_visible
+from ..core.access import Denied, list_role, need_task, task_visible, list_state_sql
 from ..accounts.session import me
 from ..core.objseen import osn_mark  # 2.905.0 (#5284): the read marks of the core
 from ..core.errors import BadInput
@@ -103,9 +103,9 @@ def _agent_sees(c, a, t):
 def _contracts(c):
     """Open contracts with a last day to cancel from today on (not archived lists, never health lists)."""
     today = local_now().date()
-    rows = c.execute("""SELECT t.* FROM tasks t JOIN lists l ON l.id=t.list_id
+    rows = c.execute(f"""SELECT t.* FROM tasks t JOIN lists l ON l.id=t.list_id
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND t.due>=? AND t.due<=?
-                          AND t.fam ILIKE '%contract%' AND l.archived=0 AND l.life!='health'""",
+                          AND t.fam ILIKE '%contract%' AND {list_state_sql('l')} AND l.life!='health'""",
                      (today.isoformat(), (today + timedelta(days=366)).isoformat())).fetchall()
     out = []
     for t in rows:

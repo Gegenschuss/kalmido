@@ -11,7 +11,7 @@ from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, uset, usettings, write_lock
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
-from ..core.access import acx_drop, collab_all, list_role, my_max_sort, time_all, WRITE_ROLES
+from ..core.access import acx_drop, collab_all, list_role, my_max_sort, time_all, WRITE_ROLES, otr_live
 from ..core.serializers import unlink_files
 from ..core.errors import BadInput, Denied  # 2.578.0 (#4573)
 from ..core.conflict import ccf_check  # 2.578.0 (#4573)
@@ -369,7 +369,7 @@ def sample_remove(c, uid):
         c.execute("DELETE FROM sections WHERE id=? AND NOT EXISTS (SELECT 1 FROM tasks WHERE section_id=? AND deleted_at IS NULL)", (sid, sid))
     lists = kept_lists = 0
     for lid in rows("list"):
-        if c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=? AND deleted_at IS NULL", (lid, uid)).fetchone():
+        if c.execute(f"SELECT 1 FROM lists WHERE id=? AND owner_id=? AND {otr_live('')}", (lid, uid)).fetchone():
             if c.execute("SELECT 1 FROM tasks WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone():
                 kept_lists += 1
             else:  # into the projects' trash (archived, as a delete in the app): it comes back there with its tasks

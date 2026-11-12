@@ -15,7 +15,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, trigger_skip_present
 from ..accounts.session import me
-from ..core.access import Denied, list_role, need_list, need_task, task_visible, vis_sql, WRITE_ROLES
+from ..core.access import Denied, list_role, need_list, need_task, task_visible, vis_sql, WRITE_ROLES, otr_live
 from ..tasks.tasks import one_task  # 2.369.5 (#2517): pulled up from functions
 from .validation import as_int, log_act  # 2.369.5 (#2517): pulled up from functions
 
@@ -124,7 +124,7 @@ def ml_check(c, tid, lid):
         return tr("Locked projects cannot share tasks with other projects"), 400
     if x["archived"]:
         return tr("The project is archived"), 400
-    n = c.execute("SELECT COUNT(*) FROM task_links WHERE task_id=? AND list_id!=? AND list_id IN (SELECT id FROM lists WHERE deleted_at IS NULL)",
+    n = c.execute(f"SELECT COUNT(*) FROM task_links WHERE task_id=? AND list_id!=? AND list_id IN (SELECT id FROM lists WHERE {otr_live('')})",
                   (tid, lid)).fetchone()[0]  # 2.102.0 A (#1988): a further list in the trash does not count (its link comes back with it)
     if n >= ML_MAX:
         return tr("A task can be shown in at most {0} further projects", ML_MAX), 400

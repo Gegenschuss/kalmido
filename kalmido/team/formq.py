@@ -29,7 +29,7 @@ from ..core.i18n import N_, lang, tr, dec_comma
 from ..personal.timetrack import _csv_cell
 from ..core.errors import BadInput
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
-from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import Denied, list_state_sql  # 2.149.0 G (#2517): pulled up from functions
 from .forms import FRM_FILE_MAX, h6d_form_bytes, form_url, _gate, need_form_manager, _form_row  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachments import safe_name, unexec_name  # 2.369.5 (#2517): pulled up from functions
 from ..hub.hubmail import hbm_match  # 2.369.5 (#2517): pulled up from functions
@@ -385,8 +385,8 @@ def fq_client_forms(cid):
     c = db()
     _gate()
     cl = need_client(c, cid)
-    q = """SELECT f.*, l.org_id AS l_org, l.owner_id AS l_owner, l.name AS l_name FROM forms f JOIN lists l ON l.id=f.list_id
-           WHERE f.enabled=1 AND l.archived=0 AND """
+    q = f"""SELECT f.*, l.org_id AS l_org, l.owner_id AS l_owner, l.name AS l_name FROM forms f JOIN lists l ON l.id=f.list_id
+           WHERE f.enabled=1 AND {list_state_sql('l')} AND """
     rows = (c.execute(q + "l.org_id=? ORDER BY lower(l.name), f.id", (cl["org_id"],)) if cl["org_id"]
             else c.execute(q + "l.org_id IS NULL AND l.owner_id=? ORDER BY lower(l.name), f.id", (cl["created_by"],))).fetchall()
     out = []

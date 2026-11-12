@@ -24,7 +24,7 @@ from ..core.pg import system_ctx
 from ..core.usertz import hm_text, tz_gap, tz_of_s, user_now
 from ..core.db import bump, connect, DbError, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
 from ..accounts.session import GATE
-from ..core.access import list_role, pvis, task_visible, vis_sql
+from ..core.access import list_role, pvis, task_visible, vis_sql, list_state_sql
 from ..tasks.validation import NAG_HOUR_CAP, NAG_MINUTES, REM_MAX, REM_MIN, valid_hm
 from ..tasks.tasks import _wd_followups
 from ..collab.comments import collab_on, push_gate_tick, task_push_tick
@@ -909,7 +909,7 @@ def _wd_reminders(c, users, S, LG, now):
     rows = c.execute(f"""SELECT {WD_TASK_COLS}
                         FROM tasks t JOIN lists l ON l.id=t.list_id
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND t.due >= ? AND t.due <= ?
-                          AND t.reminders!='' AND l.archived=0""", (lo, hi)).fetchall()  # 1.5.1: none for archived lists
+                          AND t.reminders!='' AND {list_state_sql('l')}""", (lo, hi)).fetchall()  # 1.5.1: none for archived lists
     early, margin = wd_early_allday(S), WD_EARLY_MARGIN + tz_gap(S, now)  # 2.368.3 (#2985): + the distance to the people's clocks
     # 2.281.0 B (#3117): list roles / push settings per person, once per tick (a wave of 100 reminders)
     memo = {"bundle": {}}  # 2.367 (#2967): + the all-day reminders of this tick per person
@@ -1089,7 +1089,7 @@ def _wd_nags(c, users, S, LG, now):
     # (the nags begin with the first reminder at the earliest)
     rows = c.execute(f"""SELECT {WD_TASK_COLS}
                         FROM tasks t JOIN lists l ON l.id=t.list_id
-                        WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND t.due <= ? AND l.archived=0
+                        WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND t.due <= ? AND {list_state_sql('l')}
                           AND ((t.nag NOT IN ('', 'off')) OR (t.nag='' AND l.nag!=''))""", (wd_due_window(now)[1],)).fetchall()
     early, margin = wd_early_allday(S), WD_EARLY_MARGIN + tz_gap(S, now)  # 2.368.3 (#2985): + the distance to the people's clocks
     for t in rows:
@@ -1227,7 +1227,7 @@ def _wd_digest_user(c, uid, S, LG, now):
     c.commit()
     rows = c.execute(f"""SELECT t.title, t.due, t.due_time FROM tasks t JOIN lists l ON l.id=t.list_id
                          WHERE t.status=0 AND t.deleted_at IS NULL AND t.parent_id IS NULL
-                           AND t.due IS NOT NULL AND t.due<=? AND l.archived=0
+                           AND t.due IS NOT NULL AND t.due<=? AND {list_state_sql('l')}
                            AND t.id NOT IN (SELECT item_id FROM sample_items WHERE kind='task')
                            AND ((l.owner_id=? AND (t.assignee_id IS NULL OR t.assignee_id=?))
                                 OR (t.assignee_id=? AND t.list_id IN {vis_sql()}))

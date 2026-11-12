@@ -13,7 +13,7 @@ from ..core.conflict import Conflict  # 2.269.0 C (#3017)
 from ..core.i18n import csv_dialect, lang, N_, tr
 from ..core.db import iso, iso_ms, local_now, now_utc, usettings
 from ..core.usertz import user_now
-from ..core.access import Denied, health_hidden, my_max_sort, need_list, no_reading_sql, org_trips_hidden, tvis, vis_sql, wr_sql, FEAT_OFF
+from ..core.access import Denied, health_hidden, my_max_sort, need_list, no_reading_sql, org_trips_hidden, tvis, vis_sql, wr_sql, FEAT_OFF, list_state_sql
 from ..core.serializers import load_tasks, csv_cell
 from ..core.state import visible_lists
 from ..lists.lists import list_created, clean_folder, LIST_NAME_MAX
@@ -232,7 +232,7 @@ def _reminders(lead):
 # ---- the lists of the package
 def life_list(c, uid, kind, create=True):
     """The first not archived list of life kind `kind` the user may write (own first), created when missing (create)."""
-    r = c.execute(f"""SELECT id FROM lists WHERE life=? AND archived=0 AND e2e IS NULL AND id IN {wr_sql()}
+    r = c.execute(f"""SELECT id FROM lists WHERE life=? AND {list_state_sql()} AND e2e IS NULL AND id IN {wr_sql()}
                       ORDER BY owner_id!=?, id LIMIT 1""", (kind, uid, uid, uid)).fetchone()  # 2.64.1 review (M3): never a list with the lock
     if r:
         return r[0]
@@ -523,7 +523,7 @@ def life_overview(c, uid, oid=None):
         rl = [l for l in lists.values() if l.get("life") == "reading" and not l["archived"] and (l.get("org_id") or None) == (oid or None)]
         items = [{"task_id": t["id"], "list_id": t["list_id"], "title": t["title"], "url": t.get("url") or ""}
                  for t in load_tasks(c, f"list_id IN {vis_sql()} AND {sp_sql} AND deleted_at IS NULL AND status=0 AND parent_id IS NULL AND "
-                                        "list_id IN (SELECT id FROM lists WHERE life='reading' AND archived=0)", (uid, uid, oid or 0))]  # 2.330 (#3295)
+                                        f"list_id IN (SELECT id FROM lists WHERE life='reading' AND {list_state_sql()})", (uid, uid, oid or 0))]  # 2.330 (#3295)
         out["reading"] = {"lists": [l["id"] for l in rl], "items": items[:100], "count": len(items), "karakeep": kk_public(c, uid)}
     return out
 
@@ -871,7 +871,7 @@ def review(c, uid, period, day, journal=True, space=""):
     mine = dayplan_mine_sql(uid)
     still = [{"task_id": r["id"], "title": r["title"], "list_id": r["list_id"], "due": r["due"], "overdue": r["due"] < lo_s}
              for r in c.execute(f"""SELECT t.id, t.title, t.list_id, t.due FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.status=0
-                                    AND t.deleted_at IS NULL AND t.parent_id IS NULL AND l.archived=0 AND t.due IS NOT NULL AND t.due<=?
+                                    AND t.deleted_at IS NULL AND t.parent_id IS NULL AND {list_state_sql('l')} AND t.due IS NOT NULL AND t.due<=?
                                     AND t.list_id IN {vis_sql()} AND {tvt} AND {mine} ORDER BY t.due, t.id LIMIT 200""",
                                  (hi_s, uid, uid))]
     moved = [{"task_id": r["task_id"], "title": r["title"], "list_id": r["list_id"], "due": r["due"]} for r in c.execute(
@@ -881,7 +881,7 @@ def review(c, uid, period, day, journal=True, space=""):
     n0, n1 = (hi_d + timedelta(days=1)).isoformat(), (hi_d + timedelta(days=7)).isoformat()
     nxt = [{"task_id": r["id"], "title": r["title"], "list_id": r["list_id"], "due": r["due"], "time": r["due_time"]}
            for r in c.execute(f"""SELECT t.id, t.title, t.list_id, t.due, t.due_time FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.status=0
-                                  AND t.deleted_at IS NULL AND t.parent_id IS NULL AND l.archived=0 AND t.due>=? AND t.due<=?
+                                  AND t.deleted_at IS NULL AND t.parent_id IS NULL AND {list_state_sql('l')} AND t.due>=? AND t.due<=?
                                   AND t.list_id IN {vis_sql()} AND {tvt} AND {mine} ORDER BY t.due, t.due_time IS NULL, t.due_time, t.id LIMIT 100""",
                                 (n0, n1, uid, uid))]
     out = {"period": period, "from": lo_s, "to": hi_s, "done": done, "open": still, "moved": moved, "next": nxt}

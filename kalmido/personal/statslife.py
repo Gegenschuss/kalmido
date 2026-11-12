@@ -12,7 +12,7 @@ from collections import Counter
 from datetime import date, timedelta
 from decimal import Decimal
 
-from ..core.access import Denied, health_hidden, org_trips_hidden, vis_sql
+from ..core.access import Denied, health_hidden, org_trips_hidden, vis_sql, list_state_sql, otr_live
 from ..core.db import local_day, local_now
 from ..life.model import contract_end, feat_on, PER_MONTHS
 
@@ -53,7 +53,7 @@ def _mine_sql(tw):
     """Tasks t of lists l that are mine (assigned to me, or unassigned in my own list), not deleted, not in an archived,
     deleted or locked (e2e) project; tw = the workspace narrowing of stats.py. Four ? = uid: and only lists the request may
     see (vis_sql: the token's list allowlist, an agent's data lock, the organisation boundary - Fable review 2.630)."""
-    return f"""FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.deleted_at IS NULL AND l.archived=0 AND l.deleted_at IS NULL
+    return f"""FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.deleted_at IS NULL AND {list_state_sql('l')}
                AND l.e2e IS NULL AND (t.assignee_id=? OR (t.assignee_id IS NULL AND l.owner_id=?)) AND t.list_id IN {vis_sql()}{tw}"""
 
 
@@ -199,7 +199,7 @@ def stl_travel(c, uid, today, sq):
     if org_trips_hidden():
         where += " AND org_id IS NULL"
     trips = []
-    for r in c.execute(f"SELECT id, name, org_id, trip FROM lists WHERE life='travel' AND owner_id=? AND deleted_at IS NULL{where} ORDER BY id", (uid, uid, uid)):
+    for r in c.execute(f"SELECT id, name, org_id, trip FROM lists WHERE life='travel' AND owner_id=? AND {otr_live('')}{where} ORDER BY id", (uid, uid, uid)):
         t = _fam(r["trip"])
         try:
             a, z = date.fromisoformat(t["from"]).isoformat(), date.fromisoformat(t.get("to") or t["from"]).isoformat()

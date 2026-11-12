@@ -21,7 +21,7 @@ from ..core.i18n import lang, N_, tr
 from ..core.db import bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import me
 from ..lists.lists import list_created
-from ..core.access import collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_list, WRITE_ROLES, token_lists
+from ..core.access import collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_list, WRITE_ROLES, token_lists, list_state_sql
 from ..core.serializers import csv_uncell
 from ..core.pages import valid_url
 from ..lists.lists import FOLDER_MAX, folder_seg, LIST_NAME_MAX
@@ -2162,7 +2162,7 @@ def imp_run(c, uid, plan, opts, dry):
     s_all = usettings(c, uid)
     base_t = s_all.get("allday_time") or "09:00"
     own, space = {}, opts.get("space", False)
-    for r in c.execute("SELECT id, name, org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND deleted_at IS NULL AND e2e IS NULL ORDER BY id", (uid,)):
+    for r in c.execute(f"SELECT id, name, org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND {list_state_sql()} AND e2e IS NULL ORDER BY id", (uid,)):
         if space is False or r["org_id"] == space:  # 2.87.9 (#1940): a chosen workspace reuses only its own lists
             own.setdefault(r["name"], r["id"])  # 2.64.1 B (#1817): never into a list with the lock (a new list of that name instead)
     tl = token_lists()

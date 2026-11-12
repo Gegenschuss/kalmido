@@ -16,7 +16,7 @@ from ..core.ephem import eph_within  # 2.642.0 (#4975)
 from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, iso_ms, now_utc
 from ..accounts.session import me
-from ..core.access import acx_anon_bind, is_project, list_people, MANAGE_ROLES, need_list, list_role, tvis
+from ..core.access import acx_anon_bind, is_project, list_people, MANAGE_ROLES, need_list, list_role, tvis, list_state_sql
 from ..core.pages import valid_url
 from ..tasks.validation import CONTENT_MAX, log_act, ticket_template
 from ..collab.comments import lang_of
@@ -519,7 +519,7 @@ def cer_about(c, u):
     lid, _ = cer_list(c)
     d = {"client_errors": bool(lid)}
     if u and u["is_admin"]:
-        rows = c.execute("SELECT l.id, l.name FROM issue_hooks h JOIN lists l ON l.id=h.list_id WHERE l.archived=0 "
+        rows = c.execute(f"SELECT l.id, l.name FROM issue_hooks h JOIN lists l ON l.id=h.list_id WHERE {list_state_sql('l')} "
                          "ORDER BY lower(l.name)").fetchall()
         d["client_errors_list"] = lid
         d["client_errors_lists"] = [{"id": x["id"], "name": x["name"]} for x in rows if list_role(c, x["id"], u["id"]) in MANAGE_ROLES]

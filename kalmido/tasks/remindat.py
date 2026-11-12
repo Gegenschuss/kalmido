@@ -16,6 +16,7 @@ from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from function
 from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
 from ..core.usertz import hm_text, tz_gap, tz_of_s, user_now
 from ..notify.push import _wd_fail  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import list_state_sql  # 2.1029.0 (#5537)
 
 RAT_MISS_H = 6  # the same grace as the offset reminders
 
@@ -49,10 +50,10 @@ def rat_tick(c, users, S, LG, now):
     """Watchdog section: the fixed-time reminders that are due now."""
     gap = tz_gap(S, now) + timedelta(hours=2)  # 2.368.3 (#2985): a first look wide enough for everybody's clock, rat_fire decides
     cut, old = (now + gap).strftime("%Y-%m-%dT%H:%M"), (now - timedelta(hours=RAT_MISS_H) - gap).strftime("%Y-%m-%dT%H:%M")
-    rows = c.execute("""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner, l.nag AS list_nag
+    rows = c.execute(f"""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner, l.nag AS list_nag
                         FROM tasks t JOIN lists l ON l.id=t.list_id
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.remind_at IS NOT NULL AND t.remind_at<=? AND t.remind_at>=?
-                          AND l.archived=0""", (cut, old)).fetchall()  # older than the grace: never sent (like a missed offset)
+                          AND {list_state_sql('l')}""", (cut, old)).fetchall()  # older than the grace: never sent (like a missed offset)
     for t in rows:
         try:
             rat_fire(c, t, users, S, LG, now)

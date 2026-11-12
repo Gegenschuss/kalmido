@@ -37,7 +37,7 @@ from ..core.config import API_PREFIX, app, PUBLIC_URL
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..core.pg import insert_id
-from ..core.access import Denied, joined_lists_sql, list_role, task_visible, WRITE_ROLES
+from ..core.access import Denied, joined_lists_sql, list_role, task_visible, WRITE_ROLES, otr_live
 from ..core.errors import BadInput, UnknownFields
 from ..api.common import hit_limit, v1_args, v1_call, v1_err, v1_json, v1_view, V1Error
 from ..accounts.session import me
@@ -743,7 +743,7 @@ def ctl_decision_dict(c, r, names):
 def ctl_names(c, a):
     """The projects of agent a the person sees -> [{id, name, max_level}] (the offer of the settings, the names of the history)."""
     aid = a["user_id"]
-    rows = c.execute(f"""SELECT l.id, l.name FROM lists l WHERE l.deleted_at IS NULL AND l.id IN {joined_lists_sql()}
+    rows = c.execute(f"""SELECT l.id, l.name FROM lists l WHERE {otr_live('l')} AND l.id IN {joined_lists_sql()}
                         ORDER BY l.name, l.id""", (aid, aid)).fetchall()
     return [{"id": r["id"], "name": r["name"], "max_level": ctl_cap(c, a, r["id"])} for r in rows if list_role(c, r["id"], me())]
 

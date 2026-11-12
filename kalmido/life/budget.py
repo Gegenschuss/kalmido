@@ -27,7 +27,7 @@ from ..core.db import IntegrityError, iso, iso_ms, local_now, now_utc
 from ..core.conflict import ccf_check
 from ..core.i18n import lang, N_, tr
 from ..core.pg import insert_id, system_ctx, write_lock
-from ..core.access import Denied, health_hidden, list_role, vis_sql, WRITE_ROLES
+from ..core.access import Denied, health_hidden, list_role, vis_sql, WRITE_ROLES, list_state_sql, otr_live
 from ..core import orgcrypt as oc
 from ..core import mt940 as mt  # 2.299.0 A (#3190)
 from ..core import csvimport as cx  # 2.140.0 B (#2134): the shared statement reader
@@ -391,7 +391,7 @@ def bud_lists(c, uid):
         return []
     rows = c.execute(f"""SELECT id, name, color, owner_id, sort,
                                 EXISTS (SELECT 1 FROM list_members m WHERE m.list_id=lists.id) AS shared
-                         FROM lists WHERE life='budget' AND archived=0 AND id IN {vis_sql()}
+                         FROM lists WHERE life='budget' AND {list_state_sql()} AND id IN {vis_sql()}
                          ORDER BY owner_id!=?, sort, id""", (uid, uid, uid)).fetchall()
     out = []
     for r in rows:
@@ -1533,7 +1533,7 @@ def bud_import(c, uid, lid, b, task_of=None, step=None):
     fable F6: at most BUD_ROWS_MAX entries (like one bank import; more = rows left out), step() per row (the run's progress), the
     booked month of a template's entry from the file when it is one (else its day's).
     -> ([(table, new id)], rows left out)."""
-    if not c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=? AND life='budget' AND deleted_at IS NULL", (lid, uid)).fetchone():
+    if not c.execute(f"SELECT 1 FROM lists WHERE id=? AND owner_id=? AND life='budget' AND {otr_live('')}", (lid, uid)).fetchone():
         raise Denied(404)
     made, bad, cats, recs = [], 0, {}, {}
 

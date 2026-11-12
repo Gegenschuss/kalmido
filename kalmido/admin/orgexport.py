@@ -53,7 +53,7 @@ from ..core.pg import qi, system_ctx, table_names
 from ..core.objcomments import ocm_note_cols, ocm_old_cols, ocm_video_cols  # 2.972.0 (#5272); 2.981.0 (#5273): + video / note
 from ..docs.store import doc_open as _doc_open  # 2.981.0 (#5273): the notes on documents (obj_comments kind doc_note)
 from ..core.i18n import N_, lang, tr
-from ..core.access import Denied, live_sql
+from ..core.access import Denied, live_sql, otr_live
 from ..accounts.pictures import list_icon_path, org_icon_path, org_icon_tok  # 2.363.2 (#3106)
 from ..accounts.session import me
 from ..lists.listhead import o3c_head_rel  # 2.363.2 (#3106)
@@ -299,7 +299,7 @@ def _rows(c, oid, table, where, args, paged=True):
             yield _clean(c, oid, table, r)
 
 
-LSQ = "SELECT id FROM lists WHERE org_id=? AND is_inbox=0 AND deleted_at IS NULL"  # 2.102.0 A (#1988): not the list trash
+LSQ = f"SELECT id FROM lists WHERE org_id=? AND is_inbox=0 AND {otr_live('')}"  # 2.102.0 A (#1988): not the list trash
 TSQ = f"SELECT id FROM tasks WHERE list_id IN ({LSQ}) AND deleted_at IS NULL"  # 2.223.3 B (#2879): not the task trash
 DSQ = "SELECT id FROM office_docs WHERE org_id=?"
 # 2.362.0 (#3092): the organisation's channels (kind 'channel') the exporting admin reads in the app: the open ones (ox_csq: + the
@@ -685,7 +685,7 @@ def ox_lsq(by_id):
     or open to the organisation (the rule of accounts/orglists.py ol_shared), the admin's own lists and those shared with them."""
     u = int(by_id or 0)
     own = f" OR l.owner_id={u} OR l.id IN (SELECT list_id FROM list_members WHERE user_id={u})" if u else ""
-    return ("SELECT l.id FROM lists l WHERE l.org_id=? AND l.is_inbox=0 AND l.deleted_at IS NULL AND ("
+    return (f"SELECT l.id FROM lists l WHERE l.org_id=? AND l.is_inbox=0 AND {otr_live('l')} AND ("
             "(l.org_visibility='org' AND COALESCE(l.life,'')='' AND COALESCE(l.family,'')='') "
             "OR EXISTS (SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=l.id AND m.user_id!=l.owner_id "
             f"AND COALESCE(u.kind,'user')!='agent'){own})")

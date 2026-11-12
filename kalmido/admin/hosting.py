@@ -27,6 +27,7 @@ from ..notify.push import push_prio, push_reachable  # 2.369.5 (#2517): pulled u
 from ..collab.comments import lang_of  # 2.369.5 (#2517): pulled up from functions
 from ..core.errors import UnknownFields  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import instance_mode, main_org, ORG_NAME_ENV  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import otr_live  # 2.1029.0 (#5537)
 
 # ---- the kind of server (#905). KALMIDO_HOSTED=1: an instance run as a service for others (no private networks behind it):
 # integrations may only reach public HTTPS addresses (the admin's internal-host allow-list does not apply).
@@ -191,8 +192,8 @@ def _list_pic_bytes(c, uids, q, cached=False):
             _PIC_CACHE[key] = (now + PIC_CACHE_S, n)
         return n
     with system_ctx(c):  # the person may have left the list they uploaded to (see the docstring); only their own sum comes out
-        return (c.execute(f"SELECT COALESCE(SUM(icon_size),0) FROM lists WHERE deleted_at IS NULL AND icon LIKE 'u:%' AND (icon_by IN ({q}) OR (icon_by IS NULL AND owner_id IN ({q})))", [*uids, *uids]).fetchone()[0]  # pg-ok: prefix marker u: is case-exact
-                + c.execute(f"""SELECT COALESCE(SUM(header_size),0) FROM lists WHERE deleted_at IS NULL AND header_style='image' AND header_file<>''
+        return (c.execute(f"SELECT COALESCE(SUM(icon_size),0) FROM lists WHERE {otr_live('')} AND icon LIKE 'u:%' AND (icon_by IN ({q}) OR (icon_by IS NULL AND owner_id IN ({q})))", [*uids, *uids]).fetchone()[0]  # pg-ok: prefix marker u: is case-exact
+                + c.execute(f"""SELECT COALESCE(SUM(header_size),0) FROM lists WHERE {otr_live('')} AND header_style='image' AND header_file<>''
                                  AND (header_by IN ({q}) OR (header_by IS NULL AND owner_id IN ({q})))""", [*uids, *uids]).fetchone()[0])
 
 

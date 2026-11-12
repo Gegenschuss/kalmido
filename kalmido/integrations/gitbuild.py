@@ -8,7 +8,7 @@ from ..core.config import app
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..core.errors import BadInput, reject_unknown
 from ..core.i18n import tr
-from ..core.access import Denied, list_role, need_list, need_task, plists, pvis, task_visible
+from ..core.access import Denied, list_role, need_list, need_task, plists, pvis, task_visible, list_state_sql
 from ..core.pg import st_ids
 from ..core.objcomments import ocm_add  # 2.972.0 (#5272)
 from ..api.common import V1Error, v1_call, v1_json
@@ -551,7 +551,7 @@ def gb_close_released(c, r):
     """The pass of connection r in its poll. True = a task was completed. What it could not finish (a task waiting for its review
     approval, more than GB_CLOSE_MAX) comes again in the next poll."""
     lids = sorted(git_conn_lists(c, r))
-    on = [x["id"] for x in c.execute("SELECT id FROM lists WHERE id = ANY(CAST(? AS BIGINT[])) AND git_close_release=1 AND archived=0",
+    on = [x["id"] for x in c.execute(f"SELECT id FROM lists WHERE id = ANY(CAST(? AS BIGINT[])) AND git_close_release=1 AND {list_state_sql()}",
                                      (st_ids(lids),))] if lids else []
     if not on:
         return False

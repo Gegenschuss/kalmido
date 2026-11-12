@@ -19,7 +19,7 @@ from ..core.db import body, bump, db, err, iso, now_utc, usettings
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..accounts.bgjobs import bgj_add, bgj_fn
-from ..core.access import acx_anon_bind, Denied, list_role, MANAGE_ROLES, need_feat, need_list
+from ..core.access import acx_anon_bind, Denied, list_role, MANAGE_ROLES, need_feat, need_list, list_state_sql
 from ..tasks.validation import log_act
 from ..core.errors import BadInput
 from ..api.common import hit_budget, hit_limit
@@ -254,9 +254,8 @@ def _find(c, token):
     if not FORM_TOKEN_RE.fullmatch(token or ""):
         return None
     with system_ctx(c):  # 2.37.0 (#1150): resolve the token (one row) across organisations ...
-        r = c.execute("""SELECT f.*, l.owner_id AS l_owner, l.name AS l_name, l.org_id AS l_org FROM forms f JOIN lists l ON l.id=f.list_id
-                         JOIN users u ON u.id=l.owner_id WHERE f.token_hash=? AND f.enabled=1 AND u.disabled=0 AND l.archived=0
-                         AND l.deleted_at IS NULL""",  # 2.148.1 D (#2495): a list in the trash takes nothing in
+        r = c.execute(f"""SELECT f.*, l.owner_id AS l_owner, l.name AS l_name, l.org_id AS l_org FROM forms f JOIN lists l ON l.id=f.list_id
+                         JOIN users u ON u.id=l.owner_id WHERE f.token_hash=? AND f.enabled=1 AND u.disabled=0 AND {list_state_sql('l')}""",  # 2.148.1 D (#2495): a list in the trash takes nothing in (2.1029.0 #5537: in the state)
                       (_token_hash(token),)).fetchone()
     if r is not None and g.user and r["access"] == "public" and r["l_org"]:
         if r["l_org"] not in user_orgs_full(c, g.user["id"], write=True):  # 2.143.0 A (#2151, review): limited roles = visitor

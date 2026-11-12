@@ -30,7 +30,7 @@ from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 F (#30
 from ..core.i18n import N_, lang, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
-from ..core.access import Denied, list_role, list_roles, my_inbox, need_list, wr_sql
+from ..core.access import Denied, list_role, list_roles, my_inbox, need_list, wr_sql, list_state_sql
 from ..core.errors import BadInput
 from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
 from ..files.fsref import fs_ref_rename
@@ -398,7 +398,7 @@ def agr_cashflow_items(c, oid, today=None):
 def _lists(c, uid, oid=None):
     """The lists a deadline task can go to (the person may write them; never health / budget / locked lists)."""
     inbox = my_inbox(c, uid)
-    rows = c.execute(f"SELECT id, name FROM lists WHERE archived=0 AND e2e IS NULL AND COALESCE(life, '') NOT IN ('health', 'budget') "
+    rows = c.execute(f"SELECT id, name FROM lists WHERE {list_state_sql()} AND e2e IS NULL AND COALESCE(life, '') NOT IN ('health', 'budget') "
                      f"AND (org_id IS NULL OR org_id=?) AND id IN {wr_sql()} ORDER BY id<>?, lower(name), id", (oid or 0, uid, uid, inbox)).fetchall()
     roles = list_roles(c, uid, [r["id"] for r in rows])
     return [{"id": r["id"], "name": r["name"], "inbox": r["id"] == inbox} for r in rows

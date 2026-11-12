@@ -14,7 +14,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
 from ..core.db import usettings, uset  # 2.356.0 B (#2932)
 from ..accounts.session import me
-from ..core.access import Denied, acx_drop, acx_warm_register, acx_lists_sql, joined_lists_sql, dlg_gone, live_sql, plists, pvis, qn_private, token_lists
+from ..core.access import Denied, acx_drop, acx_warm_register, acx_lists_sql, joined_lists_sql, dlg_gone, live_sql, plists, pvis, qn_private, token_lists, otr_live
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file, rck_admin_gone, rck_org_admins  # 2.149.0 G (#2517): pulled up from functions; 2.539.0 (#4373): rck_*
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -1367,7 +1367,7 @@ def org_mine_dict(c, r, uid):
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"]),
                          **({"pending": True} if admin and m["signup"] == "pending" else {})} for m in mem],  # 2.464.0 (#3882)
-            "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=? AND deleted_at IS NULL", (r["id"],)).fetchone()[0] if full else 0,
+            "lists": c.execute(f"SELECT COUNT(*) FROM lists WHERE org_id=? AND {otr_live('')}", (r["id"],)).fetchone()[0] if full else 0,
             "limited": not full or not org_writes(c, uid, r["id"]),  # 2.143.0 A (#2151): guest / read-only / accounting
             "roles": roles_public(c)}  # 2.143.0 A (#2151): the roles an admin hands out, with their explanation
 

@@ -34,7 +34,7 @@ from ..accounts.session import (
     _DUMMY_HASH, _rate_blocked, _rate_fail, _rate_keys, _rate_reset, client_ip, FAIL_WINDOW, me,
 )
 from ..accounts.login import login_log_ip, login_log_name, RC_ALPHABET
-from ..core.access import acx_lists_sql, collab_all, Denied, ov_role, plists, pvis, task_visible, tvis, WRITE_ROLES
+from ..core.access import acx_lists_sql, collab_all, Denied, ov_role, plists, pvis, task_visible, tvis, WRITE_ROLES, list_state_sql
 from ..core.pages import valid_url
 from ..tasks.validation import (
     check_parent, CONTENT_MAX, lock_done_problem, REM_COUNT, REM_MAX, REM_MIN, rmd_split, rr_feasible, rr_norm, rr_problem, TITLE_MAX, valid_date,
@@ -684,7 +684,7 @@ def dav_lists(c, u):
     """{list id: row (+ role)} of the lists that are calendars for u: visible, not archived."""
     rows = c.execute(f"""SELECT l.id, l.name, l.color, l.sort, l.is_inbox, l.owner_id, l.created_at, m.role AS m_role
                          FROM lists l LEFT JOIN list_members m ON m.list_id=l.id AND m.user_id=?
-                         WHERE l.archived=0 AND l.id IN {acx_lists_sql(req=False)}
+                         WHERE {list_state_sql('l')} AND l.id IN {acx_lists_sql(req=False)}
                          ORDER BY l.is_inbox DESC, COALESCE(m.sort, l.sort), l.id""", (u["id"], u["id"], u["id"])).fetchall()
     out = {}
     for r in rows:

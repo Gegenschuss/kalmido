@@ -11,7 +11,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, now_utc, uset, usettings
 from ..core.pg import write_lock
-from ..core.access import Denied, need_list, vis_sql
+from ..core.access import Denied, need_list, vis_sql, list_state_sql
 from ..accounts.session import me
 from ..accounts.settings import FV2_MAX  # 2.369.5 (#2517): pulled up from functions
 from .lists import FOLDER_SEP  # 2.369.5 (#2517): pulled up from functions
@@ -214,7 +214,7 @@ def lc_fav_suggestion():
     since = iso(now_utc() - timedelta(days=LC_SUG_WINDOW))
     rows = c.execute(f"""SELECT t.list_id, COUNT(*) AS n, COUNT(DISTINCT substr(a.created_at, 1, 10)) AS d
                          FROM activity a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id
-                         WHERE a.user_id=? AND a.created_at>? AND l.archived=0 AND l.is_inbox=0 AND t.list_id IN {vis_sql()}
+                         WHERE a.user_id=? AND a.created_at>? AND {list_state_sql('l')} AND l.is_inbox=0 AND t.list_id IN {vis_sql()}
                          GROUP BY t.list_id ORDER BY COUNT(*) DESC, t.list_id""", (uid, since, uid, uid)).fetchall()
     for r in rows:
         if r["list_id"] in skip or r["n"] < LC_SUG_ACTS or r["d"] < LC_SUG_DAYS:

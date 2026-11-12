@@ -24,7 +24,7 @@ from ..tasks.validation import (
 from ..core.errors import BadInput, field_alias, UnknownFields, web_fields  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_enabled, oc_list_space  # 2.369.5 (#2517): pulled up from functions
 from ..videos.vdrescue import vdr_rescue  # 2.530.0 D (#4316)
-from ..core.access import _org_list_writes  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import _org_list_writes, list_state_sql  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.ttypes import tt_check  # 2.609.0 (#3372)
 from ..lists.seckind import sk_answer  # 2.577.0 (#3354)
 
@@ -525,10 +525,10 @@ def _wd_followups(c, users, S, LG, now):
     """The follow-up day of waiting tasks: push + News to the person it is for, followup_due to the following agents."""
     from ..notify.push import _wd_fail
     today = (now + timedelta(days=1)).date().isoformat()  # 2.368.3 (#2985): a clock ahead of the server's; _wd_followup decides
-    rows = c.execute("""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner FROM tasks t
+    rows = c.execute(f"""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner FROM tasks t
                         JOIN lists l ON l.id=t.list_id WHERE t.waiting_at IS NOT NULL AND t.wait_until IS NOT NULL
                         AND t.wait_until<=? AND t.wait_fired!=t.wait_until AND t.status=0 AND t.deleted_at IS NULL
-                        AND l.archived=0""", (today,)).fetchall()
+                        AND {list_state_sql('l')}""", (today,)).fetchall()
     for t in rows:
         try:
             _wd_followup(c, t, users, S, LG, now)

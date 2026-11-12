@@ -7,7 +7,7 @@ from ..core.pg import insert_id, st_ids, system_ctx
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
-from ..core.access import Denied, dlg_gone, live_sql, my_max_sort, need_collab, need_list, qn_private, ROLES, task_visible
+from ..core.access import Denied, dlg_gone, live_sql, my_max_sort, need_collab, need_list, qn_private, ROLES, task_visible, list_state_sql
 from ..lists.lists import clean_folder
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgroles import org_role_key  # 2.568.0 (#4739)
@@ -614,7 +614,7 @@ def fg_group_diff(c, owner, f, gid, role):
         return []
     own = {r["list_id"]: r["role"] for r in grp_own_rows(c, gid=gid)}
     return [{"list_id": r["id"], "name": r["name"], "role": own[r["id"]]} for r in c.execute(
-        """SELECT l.id, l.name, l.folder FROM lists l WHERE l.owner_id=? AND l.archived=0 AND l.is_inbox=0
+        f"""SELECT l.id, l.name, l.folder FROM lists l WHERE l.owner_id=? AND {list_state_sql('l')} AND l.is_inbox=0
            ORDER BY lower(l.name), l.id""", (owner,)).fetchall()
         if r["id"] in own and _in_folder(r["folder"], f) and own[r["id"]] != role]
 

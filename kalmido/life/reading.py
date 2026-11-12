@@ -10,7 +10,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.objsearch import osr_ids_sql  # 2.1026.0 (#5280)
 from ..core.pg import insert_id, write_lock
-from ..core.access import Denied, my_max_sort, vis_sql, wr_sql
+from ..core.access import Denied, my_max_sort, vis_sql, wr_sql, list_state_sql
 from ..core.errors import BadInput
 from ..accounts.session import me
 from ..lists.lists import LIST_NAME_MAX, list_created
@@ -39,8 +39,8 @@ def rl_need(c, uid):
 
 def _rl_org_list(c, oid):
     """The live project registered for organisation oid, or None (closed for the organisation or locked = a new one is made)."""
-    r = c.execute("""SELECT l.id FROM reading_orgs r JOIN lists l ON l.id=r.list_id WHERE r.org_id=? AND l.org_id=?
-                     AND l.deleted_at IS NULL AND l.archived=0 AND l.e2e IS NULL AND l.org_visibility='org'""", (oid, oid)).fetchone()
+    r = c.execute(f"""SELECT l.id FROM reading_orgs r JOIN lists l ON l.id=r.list_id WHERE r.org_id=? AND l.org_id=?
+                     AND {list_state_sql('l')} AND l.e2e IS NULL AND l.org_visibility='org'""", (oid, oid)).fetchone()
     return r[0] if r else None
 
 
@@ -48,7 +48,7 @@ def rl_list(c, uid, oid, create=True):
     """The read-later project of a space for a new entry: private = the person's first writable "Read later" project
     outside every organisation owned by the person (made when missing); an organisation's = its registered project (made on first use)."""
     if not oid:
-        r = c.execute(f"""SELECT id FROM lists WHERE life='reading' AND archived=0 AND e2e IS NULL AND org_id IS NULL AND owner_id=? AND id IN {wr_sql()}
+        r = c.execute(f"""SELECT id FROM lists WHERE life='reading' AND {list_state_sql()} AND e2e IS NULL AND org_id IS NULL AND owner_id=? AND id IN {wr_sql()}
                           ORDER BY id LIMIT 1""", (uid, uid, uid)).fetchone()  # 2.306.0 D4 (#2875): own project only, never a shared one
         if r:
             return r[0]
@@ -84,7 +84,7 @@ def rl_lists(c, uid, oid):
     else:
         own = _rl_org_list(c, oid)
         q, a = "l.org_id=? AND (l.life='reading' OR l.id=?)", [oid, own or 0]
-    return [r[0] for r in c.execute(f"""SELECT l.id FROM lists l WHERE {q} AND l.archived=0 AND l.e2e IS NULL AND l.deleted_at IS NULL
+    return [r[0] for r in c.execute(f"""SELECT l.id FROM lists l WHERE {q} AND {list_state_sql('l')} AND l.e2e IS NULL
                                         AND l.id IN {vis_sql()} ORDER BY l.id""", (*a, uid, uid)).fetchall()]
 
 

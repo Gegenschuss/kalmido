@@ -18,7 +18,7 @@ sizes and types only). No event "new mail filed" in this step (decision 30.10.20
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app
-from ..core.access import Denied, list_role, token_lists
+from ..core.access import Denied, list_role, token_lists, otr_live
 from ..core.dlock import dl_of
 from ..core.db import db
 from ..core.i18n import tr
@@ -62,9 +62,9 @@ def hmv_client(c, uid, cid):
     if not k or (not agent and not _visible_client(c, uid, cid)):
         return None
     if k["org_id"]:
-        lids = c.execute("SELECT id FROM lists WHERE client_id=? AND org_id=? AND deleted_at IS NULL ORDER BY id", (cid, k["org_id"])).fetchall()
+        lids = c.execute(f"SELECT id FROM lists WHERE client_id=? AND org_id=? AND {otr_live('')} ORDER BY id", (cid, k["org_id"])).fetchall()
     else:
-        lids = c.execute("SELECT id FROM lists WHERE client_id=? AND org_id IS NULL AND owner_id=? AND deleted_at IS NULL ORDER BY id",
+        lids = c.execute(f"SELECT id FROM lists WHERE client_id=? AND org_id IS NULL AND owner_id=? AND {otr_live('')} ORDER BY id",
                          (cid, k["created_by"])).fetchall()
     return k if any(list_role(c, r[0], uid) for r in lids) else None
 

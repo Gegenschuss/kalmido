@@ -6,7 +6,7 @@ from ..core.config import app, PUBLIC_URL
 from ..core.i18n import tr
 from ..core.db import bump, db, iso, iso_ms, now_utc
 from ..accounts.session import me
-from ..core.access import task_visible
+from ..core.access import task_visible, list_state_sql
 from ..core.errors import reject_unknown
 from ..notify.push import _wd_fail, notify, push_prio, wd_task_notify
 from ..api.v1 import _v1_live, v1_one
@@ -26,8 +26,8 @@ from ..family.web import (
 def _wd_rotations(c, users, S, LG, now):
     """Mode week: the turn moves on every Monday (missed weeks are skipped over); the next person gets a push."""
     wk = iso_week(now.date())
-    for t in c.execute("""SELECT t.* FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.rotation ILIKE '%"week"%' AND t.status=0
-                          AND t.deleted_at IS NULL AND l.archived=0""").fetchall():
+    for t in c.execute(f"""SELECT t.* FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.rotation ILIKE '%"week"%' AND t.status=0
+                          AND t.deleted_at IS NULL AND {list_state_sql('l')}""").fetchall():
         try:
             r = _jparse(t["rotation"]) or {}
             if r.get("mode") != "week" or r.get("wk") == wk or not r.get("who"):

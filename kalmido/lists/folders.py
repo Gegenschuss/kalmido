@@ -13,7 +13,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import Denied, need_collab, collab_all, need_list
+from ..core.access import Denied, need_collab, collab_all, need_list, list_state_sql
 from ..core.errors import BadInput
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.lists import folder_under  # 2.411.0 (#3516)
@@ -239,7 +239,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
 
 
 def folder_lists(c, owner, folder):
-    return [r for r in c.execute("SELECT id, name, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND quicknote=0 ORDER BY sort, id", (owner,))
+    return [r for r in c.execute(f"SELECT id, name, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND {list_state_sql()} AND quicknote=0 ORDER BY sort, id", (owner,))
             if folder_under(r["folder"] or "", folder)]
 
 
@@ -298,7 +298,7 @@ def folder_ptype(c, owner, folder):
     from ..lists.templates import PTYPES, ptype_ok
     if eff.get("ptype"):
         return eff["ptype"] if ptype_ok(c, owner, eff["ptype"]) else ""  # 2.636.0 (#4565): a shoot only with Film & Video
-    ts = [r[1] or "" for r in c.execute("SELECT folder, ptype FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND family=''", (owner,))
+    ts = [r[1] or "" for r in c.execute(f"SELECT folder, ptype FROM lists WHERE owner_id=? AND is_inbox=0 AND {list_state_sql()} AND family=''", (owner,))
           if folder_under(r[0] or "", folder)]
     typed = {t for t in ts if t}
     if len(typed) != 1 or 2 * sum(1 for t in ts if t) <= len(ts):

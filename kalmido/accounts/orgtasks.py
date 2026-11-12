@@ -18,7 +18,7 @@ from ..core.i18n import tr
 from ..core.db import db, iso, now_utc
 from ..accounts.session import me
 from ..core.errors import BadInput
-from ..core.access import Denied
+from ..core.access import Denied, otr_live
 from ..accounts.orgs import _need_org_admin
 from ..accounts.orglists import _ol_log, ol_shared
 
@@ -39,7 +39,7 @@ OT_STATUS = {0: "open", 2: "done", -1: "wont_do"}  # the names of API v1
 
 def ot_lists(c, oid):
     """The lists of organisation oid whose tasks its admins may read (rows)."""
-    rows = c.execute("""SELECT * FROM lists WHERE org_id=? AND is_inbox=0 AND deleted_at IS NULL AND e2e IS NULL
+    rows = c.execute(f"""SELECT * FROM lists WHERE org_id=? AND is_inbox=0 AND {otr_live('')} AND e2e IS NULL
                         AND COALESCE(life, '') NOT IN ('health', 'budget') ORDER BY lower(name), id""", (oid,)).fetchall()
     return [r for r in rows if ol_shared(c, r)]
 

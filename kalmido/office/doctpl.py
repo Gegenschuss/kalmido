@@ -27,7 +27,7 @@ from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
-from ..core.access import Denied, live_sql, need_list, vis_sql  # 2.1005.0 (#5415): live_sql
+from ..core.access import Denied, list_state_sql, live_sql, need_list, vis_sql  # 2.1005.0 (#5415): live_sql
 from ..core.errors import BadInput
 from .owrite import ow_crypt, ow_history_answer, ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
 from .model import office_gate, office_org, office_settings, pb_cl_live, pb_cl_sql, pb_owner, trial_flag
@@ -982,7 +982,7 @@ def dt_docs_list():
         out["clients"] = [{"id": r["id"], "name": r["name"]} for r in
                           c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name) LIMIT ?", (LIST_MAX,))]
         out["lists"] = [{"id": r["id"], "name": r["name"]} for r in
-                        c.execute(f"SELECT l.id, l.name FROM lists l WHERE l.id IN {vis_sql()} AND {lsql} AND l.archived=0 AND l.is_inbox=0 "
+                        c.execute(f"SELECT l.id, l.name FROM lists l WHERE l.id IN {vis_sql()} AND {lsql} AND {list_state_sql('l')} AND l.is_inbox=0 "
                                   "ORDER BY lower(l.name) LIMIT ?", (uid, uid, owner if owner is not None else oid, LIST_MAX))]
         out["offers"] = [{"id": r["id"], "number": r["number"] or "", "client_id": r["client_id"], "project_title": r["project_title"] or "",
                           "status": r["status"], "trial": bool(r["trial"])} for r in  # 2.144.10 A (#2576)

@@ -13,7 +13,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
-from ..core.access import acx_drop, addr_account, collab_all, Denied, dlg_gone, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES
+from ..core.access import acx_drop, addr_account, collab_all, Denied, dlg_gone, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES, list_state_sql, otr_live
 from ..core.state import visible_lists
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
@@ -1140,7 +1140,7 @@ def member_rejoin(c, oid, uid, rows):
     kid, back = is_kid(c, uid), []
     for lid, role in rows:
         role = "participant" if kid and role else role
-        if not c.execute("SELECT 1 FROM lists WHERE id=? AND org_id=? AND owner_id!=? AND deleted_at IS NULL", (lid, oid, uid)).fetchone() \
+        if not c.execute(f"SELECT 1 FROM lists WHERE id=? AND org_id=? AND owner_id!=? AND {otr_live('')}", (lid, oid, uid)).fetchone() \
                 or (role and (le2a_member_problem(c, lid, uid, role) or _agent_bridge_blocks(c, lid, uid))):
             continue
         back.append(lid)
@@ -1199,8 +1199,8 @@ def fg_people_diff(c, owner, f, uid, role):
         return []
     r2 = "participant" if is_kid(c, uid) else role
     out = []
-    for r in c.execute("""SELECT l.id, l.name, l.folder, m.own_role FROM lists l JOIN list_members m ON m.list_id=l.id AND m.user_id=?
-                          WHERE l.owner_id=? AND l.archived=0 AND l.is_inbox=0 AND m.own_role IS NOT NULL ORDER BY lower(l.name), l.id""",
+    for r in c.execute(f"""SELECT l.id, l.name, l.folder, m.own_role FROM lists l JOIN list_members m ON m.list_id=l.id AND m.user_id=?
+                          WHERE l.owner_id=? AND {list_state_sql('l')} AND l.is_inbox=0 AND m.own_role IS NOT NULL ORDER BY lower(l.name), l.id""",
                        (uid, owner)).fetchall():
         if _in_folder(r["folder"], f) and r["own_role"] not in (prev[0], r2):
             out.append({"list_id": r["id"], "name": r["name"], "role": r["own_role"]})
@@ -1278,7 +1278,7 @@ def folder_people_put():
     from ..lists.lffolder import lf_people  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
     prev = lf_people(c, me(), f).get(uid)
     prev = (prev,) if prev else None
-    rows = [r for r in c.execute("SELECT id, name, folder FROM lists WHERE owner_id=? AND archived=0 AND is_inbox=0", (me(),)).fetchall()
+    rows = [r for r in c.execute(f"SELECT id, name, folder FROM lists WHERE owner_id=? AND {list_state_sql()} AND is_inbox=0", (me(),)).fetchall()
             if _in_folder(r["folder"], f)]
     had = {r[0]: r[1] for r in c.execute("SELECT list_id, role FROM list_members WHERE user_id=?", (uid,))}
     # 2.352.0 A (#2748): the share is one of the folder (fs_shares of its nodes, lists/lffolder.py): no copy into the lists, it

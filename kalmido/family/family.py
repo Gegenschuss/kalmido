@@ -10,7 +10,7 @@ from ..core.i18n import lang, LANGS, N_, tr
 from ..core.numtext import parse_num, user_dec
 from ..core.db import iso, local_now, now_utc, uset, usettings
 from ..accounts.session import me, user_public
-from ..core.access import collab_all, Denied, list_people, my_max_sort, need_list, vis_sql, wr_sql, task_visible, time_all
+from ..core.access import collab_all, Denied, list_people, my_max_sort, need_list, vis_sql, wr_sql, task_visible, time_all, list_state_sql
 from ..core.serializers import load_tasks
 from ..core.state import visible_lists
 from ..lists.lists import list_created, clean_folder, LIST_NAME_MAX
@@ -522,7 +522,7 @@ def occ_rule(month, day):
 
 def fam_list(c, uid, kind, create=True):
     """The first list of family kind `kind` the user may write (own first), created when missing (create)."""
-    r = c.execute(f"""SELECT id FROM lists WHERE family=? AND archived=0 AND e2e IS NULL AND id IN {wr_sql()}
+    r = c.execute(f"""SELECT id FROM lists WHERE family=? AND {list_state_sql()} AND e2e IS NULL AND id IN {wr_sql()}
                       ORDER BY owner_id!=?, id LIMIT 1""", (kind, uid, uid, uid)).fetchone()  # 2.64.1 review (M3): never a list with the lock
     if r:
         return r[0]
@@ -1054,7 +1054,7 @@ def purpose_apply(c, uid, purpose, examples=False, all_mods=None, only=False):
     if purpose == "family":  # 2.46.1 (#1615): the two starter lists always, their examples with the switch (#1602)
         created = family_examples(c, uid, tasks=examples)
     elif examples:
-        if purpose == "software" and not c.execute("SELECT 1 FROM lists WHERE owner_id=? AND ptype='software' AND archived=0", (uid,)).fetchone():
+        if purpose == "software" and not c.execute(f"SELECT 1 FROM lists WHERE owner_id=? AND ptype='software' AND {list_state_sql()}", (uid,)).fetchone():
             lid, _ = ptype_create(c, uid, "software", tr(PTYPE_NAMES["software"], lg=lang(c, uid)))
             created.append(lid)
         elif purpose in ("team", "office") and not sample_state(c, uid):

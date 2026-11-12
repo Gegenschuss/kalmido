@@ -23,7 +23,7 @@ from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_col, oc_dec_fields, oc_enc_fields, oc_item_store
 from ..core.i18n import N_, csv_dialect, tr
 from ..core.db import body, bump, db, iso, now_utc
-from ..core.access import Denied, live_sql, trash_sql, vis_sql
+from ..core.access import Denied, list_state_sql, live_sql, trash_sql, vis_sql
 from ..core.errors import BadInput
 from .pdf import pdf_date
 from .calc import dec, dstr, money
@@ -450,7 +450,7 @@ def rk_real_projects(c, oid, uid):
     basket, archived, end-to-end encrypted (no readable name) or health / budget lists. [{id, name}]; the trip / drive keeps
     the chosen name as its text "project" (the free text stays the fallback, nothing new is stored)."""
     org = None if pb_owner(c, oid) is not None else oid
-    rows = c.execute(f"SELECT id, name FROM lists WHERE is_inbox=0 AND archived=0 AND e2e IS NULL AND COALESCE(life, '') NOT IN ('health', 'budget') "
+    rows = c.execute(f"SELECT id, name FROM lists WHERE is_inbox=0 AND {list_state_sql()} AND e2e IS NULL AND COALESCE(life, '') NOT IN ('health', 'budget') "
                      f"AND {'org_id IS NULL' if org is None else 'org_id=?'} AND id IN {vis_sql()} ORDER BY lower(name), id LIMIT 500",
                      ((uid, uid) if org is None else (org, uid, uid))).fetchall()
     return [{"id": r["id"], "name": r["name"]} for r in rows if (r["name"] or "").strip()]

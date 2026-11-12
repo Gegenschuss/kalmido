@@ -23,7 +23,7 @@ from ..core.db import body, bump, connect, db, err, inbox_default, iso, local_no
 from ..accounts.session import GATE, me
 from ..accounts.mailtok import mtk_new, mtk_plain, mtk_where  # 2.674.0 (#4382 finding 5)
 from ..accounts.bgjobs import bgj_fn
-from ..core.access import Denied, list_role, need_list, vis_sql, WRITE_ROLES
+from ..core.access import Denied, list_role, need_list, vis_sql, WRITE_ROLES, list_state_sql
 from ..core.pages import new_inbox_task, save_attachment_bytes, split_link, valid_url
 from ..tasks.validation import as_int, log_act
 from ..collab.news import news_unread
@@ -673,7 +673,7 @@ def digest_mail_content(c, uid, today):
     """(subject, text, html) of a person's daily summary: due today / overdue, tomorrow, what waits for them, unread."""
     lg = lang(c, uid)
     rows = c.execute(f"""SELECT t.id, t.title, t.due, t.due_time, t.priority, l.name AS lname, l.is_inbox, l.e2e AS le2e FROM tasks t JOIN lists l ON l.id=t.list_id
-                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.parent_id IS NULL AND t.due IS NOT NULL AND t.due<=? AND l.archived=0
+                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.parent_id IS NULL AND t.due IS NOT NULL AND t.due<=? AND {list_state_sql('l')}
                            AND ((l.owner_id=? AND (t.assignee_id IS NULL OR t.assignee_id=?)) OR (t.assignee_id=? AND t.list_id IN {vis_sql()}))
                          ORDER BY t.due, t.due_time IS NULL, t.due_time, t.priority DESC LIMIT 60""",
                      ((date.fromisoformat(today) + timedelta(days=1)).isoformat(), uid, uid, uid, uid, uid)).fetchall()

@@ -12,7 +12,7 @@ from ..core.i18n import LANGS, md_plain, tr
 from ..core.db import body, db, err, inbox_default, local_now, now_utc, parse_iso, usettings
 from ..core.tokenhash import tkh_match, tkh_set_ical
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip, me, rate_ip
-from ..core.access import tvis, vis_sql, acx_token_bind
+from ..core.access import tvis, vis_sql, acx_token_bind, list_state_sql
 from ..tasks.validation import rmd_export, rr_feasible, rr_norm
 from ..tasks.lifecycle import rr_count, rr_with_count
 
@@ -205,7 +205,7 @@ def ics_build(c, u):
     uid = u["id"]
     s = usettings(c, uid)
     lg = s.get("lang") if s.get("lang") in LANGS else "en"
-    where, args = (f"t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND l.archived=0 AND (t.list_id IN {vis_sql(ov=False)} "
+    where, args = (f"t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND {list_state_sql('l')} AND (t.list_id IN {vis_sql(ov=False)} "
                    f"OR (t.assignee_id=? AND t.list_id IN {vis_sql()})) "  # 2.83.0 (#1725): + my tasks of lists seen through the organisation
                    f"AND {tvis(c, uid, 't.', write=True)}"), [uid, uid, uid, uid, uid]  # 1.10.0: participants only their own tasks; 2.46.0 (#1603): joined lists
     if s.get("ical_scope") == "mine":

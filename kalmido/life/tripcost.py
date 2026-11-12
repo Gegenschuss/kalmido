@@ -13,7 +13,7 @@ from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import bump, db, iso, now_utc
 from ..core.pg import insert_id, write_lock
-from ..core.access import Denied, live_sql, vis_sql
+from ..core.access import Denied, live_sql, otr_live, vis_sql
 from ..accounts.session import me
 from ..accounts.orgroles import office_allowed
 from ..core.orgcrypt import oc_enc_fields
@@ -27,7 +27,7 @@ LTC_TAKEN = N_("Somebody already entered the travel expenses of this trip - ente
 
 def ltc_trip_list(c, uid, lid):
     """The trip project lid uid sees (id, name, org_id, trip dict), else 404."""
-    r = c.execute(f"""SELECT id, name, org_id, trip FROM lists WHERE id=? AND life='travel' AND deleted_at IS NULL
+    r = c.execute(f"""SELECT id, name, org_id, trip FROM lists WHERE id=? AND life='travel' AND {otr_live('')}
                       AND id IN {vis_sql()}""", (lid, uid, uid)).fetchone()
     try:
         trip = json.loads(r["trip"]) if r and r["trip"] else None

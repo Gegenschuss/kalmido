@@ -18,7 +18,7 @@ from ..core.config import app
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import system_ctx
-from ..core.access import Denied, list_role, live_sql
+from ..core.access import Denied, list_role, list_state_sql, live_sql  # 2.1004.0 (#5494): live_sql
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
@@ -227,7 +227,7 @@ def rc_projects(c, org_id, uid):
     lists of the receipt's area without inbox, archive, health, budget and locked ones; in the private area only the
     person's own lists (a private list another person shares carries the same name and is no project of hers). recent =
     the ids of the (up to 5) projects she last chose at receipts of this area, newest first."""
-    rows = c.execute("SELECT id, name FROM lists WHERE is_inbox=0 AND archived=0 AND e2e IS NULL AND life NOT IN ('health', 'budget') "
+    rows = c.execute(f"SELECT id, name FROM lists WHERE is_inbox=0 AND {list_state_sql()} AND e2e IS NULL AND life NOT IN ('health', 'budget') "
                      "AND org_id IS NOT DISTINCT FROM ? AND (org_id IS NOT NULL OR owner_id=?) ORDER BY lower(name)", (org_id, uid))
     projects = [{"id": x["id"], "name": x["name"]} for x in rows if list_role(c, x["id"], uid)][:300]
     ids, recent = {p["id"] for p in projects}, []

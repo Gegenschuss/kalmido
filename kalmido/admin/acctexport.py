@@ -49,7 +49,7 @@ from ..core.db import connect, db, err, iso, now_utc
 from ..core.objcomments import OCM_TS, ocm_video_cols  # 2.972.0 (#5272): the old time form of a comment; 2.981.0 (#5273): + video
 from ..core.pg import snapshot_level, system_ctx
 from ..core.i18n import N_, lang, tr
-from ..core.access import Denied, acx_lists_sql, acx_of
+from ..core.access import Denied, acx_lists_sql, acx_of, otr_live
 from ..accounts.orgout import oo_exported  # 2.362.3 (#3101)
 from ..accounts.pictures import avatar_path
 from ..accounts.session import me
@@ -297,7 +297,7 @@ def umz_email_hash(email, salt=None):
 
 def umz_people(c, uid, salt=None):
     """The people of my lists (members, comment authors, assignees) with name + e-mail hash: the mapping on import."""
-    own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
+    own = f"(SELECT id FROM lists WHERE owner_id=? AND ({otr_live('')} OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
     out = {}
     for r in c.execute(f"""SELECT m.user_id, m.list_id, m.role, u.display_name, u.username, u.email, COALESCE(u.kind,'user') AS kind
                            FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id IN {own}""", (uid,)):
@@ -317,7 +317,7 @@ def umz_people(c, uid, salt=None):
 
 
 def umz_extra_queries(uid):
-    own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
+    own = f"(SELECT id FROM lists WHERE owner_id=? AND ({otr_live('')} OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
     private = "(SELECT id FROM lists WHERE owner_id=? AND org_id IS NULL)"  # 2.360.2 (#2561): answers sent to an organisation stay there
     shared = "(SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.owner_id!=?)"
     sheets = "org_id IS NULL AND owner_id=?"
@@ -435,7 +435,7 @@ def umz_mine_queries(uid):
     """2.239.0 A (#2882): Art. 15 -- what I wrote or got outside my own lists, whatever my membership: only my own rows
     (author / assignee / recipient = me), never other people's content around them. Tasks of other lists and the task
     title of a comment only while I still see the list (acx_lists_sql); no secrets of sessions and push devices."""
-    own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"
+    own = f"(SELECT id FROM lists WHERE owner_id=? AND ({otr_live('')} OR org_id IS NULL))"
     shared = "(SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.owner_id!=?)"
     vis = acx_lists_sql(req=False)
     from ..collab.tcxcore import tcx_core_rooms_sql  # 2.924.0 (#5069): my channels / groups through the core alone
@@ -779,7 +779,7 @@ def umz_log_org_lists(c, uid):
     often they fetched it. 2.362.3 (#3101): a new row also tells the other admins (a re-import of the file into a private
     space is no second way out unseen; the lists stay in the file, they are the owner's). The caller commits."""
     with system_ctx(c):  # the organisation's history (also of one I left while I still own a list there)
-        rows = c.execute("SELECT id, name, org_id FROM lists WHERE owner_id=? AND org_id IS NOT NULL AND deleted_at IS NULL", (uid,)).fetchall()
+        rows = c.execute(f"SELECT id, name, org_id FROM lists WHERE owner_id=? AND org_id IS NOT NULL AND {otr_live('')}", (uid,)).fetchall()
         at = iso(now_utc())
         fresh = {}
         for r in rows:
