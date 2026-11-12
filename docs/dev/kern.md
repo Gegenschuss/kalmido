@@ -248,6 +248,23 @@ c.commit()
   fails keeps its object for the next run and counts as `<kind>_err` (one savepoint per kind; the run raises after its
   commit, the watchdog reports it). The runs `ttp_tick` and `otr_prune` are gone; the report run is `obj_trash` (`task`,
   `task_kept`, `list`, `list_kept`).
+- 2.1002.0 (#5491, stage 2b): `obj_register(trash_can=f(c, uid, row) -> bool)` = the kind's rule of its trash: for an object in
+  the trash its role is `manage` when the rule says so, else none (steps 1-4 do not apply there). Projects use it
+  (`otr_can`: the organisation's admins of shared projects, a kept project only its custodian, no agents) with
+  `children=(("tasks", "list_id"),)`: `POST /api/trash/lists/<id>/restore` runs `obj_restore(step=False)` (the tasks that
+  went with the project come back, `rev` / `updated_by` written, a history line) and `DELETE /api/trash/lists/<id>` runs
+  `obj_purge` inside `obj_purge_after` (the hook `otr_core_purge`, the custodian's early delete passed in `_OTR_EARLY`);
+  `otr_need` is `obj_need(trash=True)`. The routes keep their form and their area rules (a kept project: 409, the early
+  delete with the name). `lists` got `rev`, `updated_by`, `tasks` got `rev`, `updated_by`, `deleted_by`
+  (`migrations.d/5491_a.py`, additive). A task comes back through the core too: `tasks/lifecycle.py restore_task` (every
+  way: the route after `need_task`, batch, undo, proposals) runs `obj_restore(checked=True)` = the area checked the rights
+  itself (a light kind only so; no node, children, history, step or bump of the core) and
+  `obj_on_restore(kind, f(c, uid, id, row))` = the area's part after the row is back (`rt_back`: the subtasks that went with
+  it, a parent in the trash, the section, the log line, the task's undo step). `obj_restore` reads the row again under its
+  lock and changes only a row still in the trash (a second restore at the same time: 404). Still the area's: putting single
+  tasks into the trash and deleting them for good by hand (`do_delete`, `hard_delete`, "Empty trash" -> #5536), the copies
+  of sections / planned sprints (`lists/parttrash.py` on `part_copy`), the state marker of projects instead of `archived` /
+  `deleted_at` (-> #5537).
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
   `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).

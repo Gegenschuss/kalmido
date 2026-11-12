@@ -369,6 +369,9 @@ TD_DEFAULTS = {
     "wait_fired": "", "waiting_at": None, "wait_note": "", "wait_until": None,
     "tags": [], "ltags": [], "attachments": [], "comment_count": 0, "unread": 0, "fields": {}, "blocked": 0, "blockers": [],
     "blocking": 0,
+    # 2.1002.0 (#5491): the core's columns of migration 5491_a (every task row has them, SELECT *); unset they cost a big start
+    # set much (p3136_state_size)
+    "updated_by": None, "deleted_by": None, "rev": 1,
 }
 
 

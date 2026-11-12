@@ -11,9 +11,12 @@ back into the same place (archived, the same organisation or private space). Aft
 for good (tasks, comments, attachments with their files, fields, chat); time entries stay with list_id NULL (bookkeeping).
 2.936.0 (#5364, stage 2a of the core's trash): that run is the core's (core/writes.py obj_trash_tick over the kind list of
 lists/lmcore.py: trash_prune, trash_keep=otr_keep, its obj_on_purge hook otr_core_purge); otr_prune went.
+2.1002.0 (#5491, stage 2b): restore and delete for good run through the core too (core/writes.py obj_restore / obj_purge; the
+kind's trash rule trash_can = otr_can, its children = the tasks); the routes keep their form and the area's rules (a kept
+project, the early delete with the name).
 Lists with end-to-end encryption keep the immediate hard delete (lists.list_purge)."""
 from datetime import timedelta
-from flask import g, jsonify, request
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import N_, tr
@@ -22,6 +25,8 @@ from ..core.retention import ret_days, ret_on
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import collab_all, Denied, health_hidden, live_sql, token_lists, trash_sql  # 2.936.0 (#5364): live_sql, trash_sql
+from contextvars import ContextVar  # 2.1002.0 (#5491): _OTR_EARLY
+from ..core.serializers import unlink_files  # 2.1002.0 (#5491): the files of otr_core_purge after the commit
 from .lists import list_purge  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.pictures import list_icon_drop_file  # 2.369.5 (#2517): pulled up from functions
 
@@ -49,6 +54,8 @@ def otr_can(c, uid, r):
     from ..accounts.orgs import org_role
     if not r or not r["deleted_at"] or r["is_inbox"]:
         return False
+    if not has_request_context() or not getattr(g, "user", None):  # 2.1002.0 (#5491): the kind's trash rule (obj_role) outside
+        return False  # a request (a background run) gives nobody a role in the trash
     if is_agent(g.user) or (r["life"] in ("health", "budget") and health_hidden(c, uid)):
         return False
     tl = token_lists()
@@ -71,10 +78,10 @@ def otr_can(c, uid, r):
 
 
 def otr_need(c, lid):
-    r = c.execute(f"SELECT * FROM lists WHERE id=? AND {trash_sql()}", (lid,)).fetchone()
-    if not otr_can(c, me(), r):
-        raise Denied(404)
-    return r
+    """The deleted list lid for the current person, or Denied(404). 2.1002.0 (#5491): the core's check (core/objects.py obj_need
+    trash=True; otr_can is the kind list's trash_can rule, lists/lmcore.py)."""
+    from ..core.objects import obj_need  # a later module (kalmido/__init__.py ORDER)
+    return obj_need(c, me(), "list", lid, "manage", trash=True)[0]
 
 
 def otr_hard(c, lid, early=False):
@@ -133,13 +140,15 @@ def otr_held(r, uid):
 OTR_HELD = N_("A kept project cannot be restored: download it or delete it before the end of its period.")
 
 
-def otr_back(c, r):
+def otr_back(c, r, uid, checked=False):
     """2.997.0 (#5609): the deleted list row r back (archived, same organisation / private space) with the tasks of its trash
-    stamp (the restore below and the undo of a delete, lists/otrundo.py)."""
-    # 2.102.0 review F1/F7: only a list still in the trash comes back (not one purged or restored meanwhile)
-    if c.execute("UPDATE lists SET deleted_at=NULL, deleted_by=NULL WHERE id=? AND deleted_at=?", (r["id"], r["deleted_at"])).rowcount != 1:
-        raise Denied(404)
-    c.execute("UPDATE tasks SET deleted_at=NULL WHERE list_id=? AND deleted_at=?", (r["id"], r["deleted_at"]))
+    stamp (the restore below and the undo of a delete, lists/otrundo.py).
+    2.1002.0 (#5491): through the core's restore (core/writes.py obj_restore: the rule otr_can, the lock, the tasks that went
+    with it = the kind's children with the same time, rev / updated_by, a history line; no step of the undo list, as before).
+    checked=True: the caller checked rights and trash stamp under its own row lock (the undo, lists/otrundo.py)."""
+    from ..core.writes import obj_restore  # a later module (kalmido/__init__.py ORDER)
+    # 2.102.0 review F1/F7: only a list still in the trash comes back (not one purged or restored meanwhile): Denied(404)
+    obj_restore(c, uid, "list", r["id"], step=False, checked=checked)
     if r["org_id"]:
         from ..accounts.orglists import _ol_log
         _ol_log(c, r["org_id"], r, "undelete")
@@ -152,7 +161,7 @@ def otr_restore(lid):
     r = otr_need(c, lid)
     if otr_held(r, me()):  # 2.186.1 review M2: kept for the law, not taken over (download it or delete it before the end)
         return err(tr(OTR_HELD), 409)
-    otr_back(c, r)
+    otr_back(c, r, me())
     bump(c)
     c.commit()
     return jsonify(ok=True, id=lid)
@@ -170,10 +179,20 @@ def otr_delete(lid):
         return err(tr("Type the project name to confirm"), 409)
     if not early and (r["retain_until"] or "") >= now_utc().date().isoformat():  # 2.186.0 A (#2566): kept by law until then
         return err(tr("This project keeps receipts by law until {0}: it can be deleted permanently after that.", r["retain_until"]), 409)
-    got = otr_hard(c, lid, early=early)
-    if got is None:  # 2.102.0 review F1: restored meanwhile; 2.992.0 (#5635): or kept by law meanwhile
-        raise Denied(404)
-    icon, files = got
+    # 2.1002.0 (#5491): the core's delete for good (core/writes.py obj_purge: the rule otr_can, the lock, the project's hook
+    # otr_core_purge = otr_hard, with early for the custodian's early delete; its history and undo steps go with it); the
+    # files after the commit. Restored or kept by law meanwhile: the hook refuses (409 of the core -> 404 as before)
+    from ..core.writes import obj_purge, obj_purge_after  # a later module (kalmido/__init__.py ORDER)
+    tok = _OTR_EARLY.set(bool(early))
+    try:
+        with obj_purge_after() as box:
+            obj_purge(c, me(), "list", lid)
+    except Denied as e:
+        if e.code == 409:
+            raise Denied(404) from None
+        raise
+    finally:
+        _OTR_EARLY.reset(tok)
     if r["org_id"]:
         from ..accounts.orglists import _ol_log
         _ol_log(c, r["org_id"], r, "purge")
@@ -182,7 +201,7 @@ def otr_delete(lid):
         rx_log(c, {"key": f"list:{int(r['id'])}"}, "purge_early", {"name": r["name"], "until": r["retain_until"]})
     bump(c)
     c.commit()
-    otr_drop_files(lid, icon, files)
+    unlink_files(box["after"])  # otr_drop_files of otr_core_purge
     if early:  # 2.186.1 (#2732): the security log (like the account deletion, useradmin.ua8_audit)
         rx_alert(N_("{0} deleted the kept project {1} permanently before the end of its retention period ({2})."),
                  [g.user["username"], r["name"], r["retain_until"]])
@@ -196,13 +215,18 @@ def otr_keep(a):
     return f"COALESCE({a}.retain_until, '')>=?", (now_utc().date().isoformat(),)
 
 
+_OTR_EARLY = ContextVar("otr_early", default=False)  # 2.1002.0 (#5491): otr_delete's early delete for its obj_purge
+
+
 def otr_core_purge(c, lid):
     """2.936.0 (#5364): the obj_on_purge hook of the kind list (lists/lmcore.py) -- the core's retention run (core/writes.py
     obj_trash_tick: system context, the id checked again under its lock, the switch ret_on("trash"), its report run
     "obj_trash" with list / list_kept / list_err) deletes the project here with its tasks (otr_hard); the icon and the
     files after its commit. Denied(409) = it stays (restored meanwhile). An error undoes this project only (the core's
-    savepoint), it waits for the next run and the run reports it as list_err (core/writes.py _purge_area). otr_prune went."""
-    got = otr_hard(c, lid)
+    savepoint), it waits for the next run and the run reports it as list_err (core/writes.py _purge_area). otr_prune went.
+    2.1002.0 (#5491): also the route DELETE /api/trash/lists/<id> (core/writes.py obj_purge); its early delete of a kept
+    project (checked there) comes in _OTR_EARLY -- the retention run never sets it."""
+    got = otr_hard(c, lid, early=_OTR_EARLY.get())
     if got is None:  # 2.102.0 review F1: restored meanwhile; 2.992.0 (#5635): or kept by law meanwhile
         raise Denied(409)
     icon, files = got

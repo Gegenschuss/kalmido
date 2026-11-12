@@ -512,31 +512,64 @@ def obj_trash(c, uid, kind, rid, step=True):
     return obj_row(c, kind, rid)
 
 
-def obj_restore(c, uid, kind, rid, step=True, undo=False):
+OBJ_BACK = {}  # 2.1002.0 (#5491): kind -> f(c, uid, rid, row) of obj_on_restore
+
+
+def obj_on_restore(kind, f):
+    """2.1002.0 (#5491): the area's part of a restore from the core's trash (obj_restore runs it after the core put the row
+    back): f(c, uid, rid, row) with the row as it was in the trash (its deleted_at as stored) -- what the core does not know
+    (tasks: the subtasks that went with it, a parent still in the trash, the section, the area's log and undo step)."""
+    OBJ_BACK[kind] = f
+
+
+def obj_restore(c, uid, kind, rid, step=True, undo=False, checked=False):
     """Out of the trash ('manage'), with the children that went with it. step=False: no step of its own. 2.778.0 (#5371):
     undo=True is the person's own trash step taken back (core/undoweb.py _trash_part): the role of putting it in
     (_trash_need), so who may trash it may take that back -- only while it is still the trash uid put it in (deleted_by);
-    the trash's own restore stays at 'manage'."""
-    reg = obj_reg_node(kind)  # 2.754.0 (#5268)
-    row, _ = obj_need(c, uid, kind, rid, _trash_need(reg) if undo else "manage", trash=True, own_trash=undo)
-    write_lock(c, f"obj-{kind}-{int(rid)}")
+    the trash's own restore stays at 'manage'.
+    2.1002.0 (#5491): checked=True = the area checked the rights itself (its route's own rule, or its inner restore without a
+    person, uid may be None): no check of the core; an object not in the trash is left as it is (returns its row; unchecked:
+    one gone or restored meanwhile under the lock is Denied 404, as obj_need answers). A light kind
+    (node=False: tasks) is restored only so (Denied 404 otherwise), without node, children, history or undo step of the core
+    (its area keeps its own log). The area's hook obj_on_restore runs after the row is back; with checked the caller bumps."""
+    reg = obj_reg(kind) if checked else obj_reg_node(kind)  # 2.754.0 (#5268); 2.1002.0 (#5491): a light kind only checked
+    light = not reg.get("node", True)
+    if not checked:  # (an area's inner restore holds its own lock / runs in its own transaction, as before)
+        obj_need(c, uid, kind, rid, _trash_need(reg) if undo else "manage", trash=True, own_trash=undo)
+        write_lock(c, f"obj-{kind}-{int(rid)}")
+    row = obj_row(c, kind, rid)  # 2.1002.0 (#5491, review F3 of 2.851): read again under the lock (deleted_at of now)
+    if row is None or not row["deleted_at"]:  # gone or restored meanwhile: as obj_need would answer now
+        if checked:
+            return row
+        raise Denied(404)
     # 2.760.0 (#5311): the node's deleted_at is TEXT, the object's may be TIMESTAMPTZ (read canonically, pg.py ts_canon):
     # compare both canonically, not as text (a TIMESTAMPTZ table's restore left its node in the trash)
     gone = ts_canon(row["deleted_at"])
-    n = next((x for x in c.execute(f"SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=? AND {trash_sql()}",
-                                   (kind, int(rid))).fetchall() if ts_canon(x["deleted_at"]) == gone), None)
-    if n is not None:  # review F7: the node obj_trash put into the trash comes back (not one the file store's own trash holds)
-        nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"])
-        c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, n["id"]))
-    _kids_restore(c, reg, rid, gone)  # 2.773.0 (#5292)
+    if not light:
+        n = next((x for x in c.execute(f"SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=? AND {trash_sql()}",
+                                       (kind, int(rid))).fetchall() if ts_canon(x["deleted_at"]) == gone), None)
+        if n is not None:  # review F7: the node obj_trash put into the trash comes back (not one the file store's own trash holds)
+            nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"])
+            c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, n["id"]))
+        _kids_restore(c, reg, rid, gone)  # 2.773.0 (#5292)
     ts = _now()
-    c.execute(f"UPDATE {qi(reg['table'], (reg['table'],))} SET deleted_at=NULL, deleted_by=NULL, rev=rev+1, updated_at=?, updated_by=? WHERE id=?",
-              (ts, uid, int(rid)))
-    obj_history_add(c, uid, kind, rid, {}, {}, action="restore")
-    if step:
-        _trash_step(c, uid, kind, rid, row["org_id"] or None, "restore")
+    # 2.1002.0 (#5491): only a row still in the trash -- a second restore at the same time (or the retention run that deleted
+    # it meanwhile) changes nothing and runs no hook, no history
+    if not c.execute(f"UPDATE {qi(reg['table'], (reg['table'],))} SET deleted_at=NULL, deleted_by=NULL, rev=rev+1, updated_at=?, "
+                     "updated_by=? WHERE id=? AND deleted_at IS NOT NULL", (ts, uid, int(rid))).rowcount:
+        obj_forget()
+        if not checked:
+            raise Denied(404)
+        return obj_row(c, kind, rid)
+    if not light:
+        obj_history_add(c, uid, kind, rid, {}, {}, action="restore")
+        if step:
+            _trash_step(c, uid, kind, rid, row["org_id"] or None, "restore")
+    if kind in OBJ_BACK:  # 2.1002.0 (#5491)
+        OBJ_BACK[kind](c, uid, int(rid), row)
     obj_forget()
-    bump(c, _area(reg))
+    if not checked:  # 2.1002.0 (#5491): an area's inner restore (checked) leaves the bump to its caller, as before
+        bump(c, _area(reg))
     return obj_row(c, kind, rid)
 
 

@@ -193,8 +193,13 @@ def ret_report(c, kind, counts, purged, run=None):
               + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())), flush=True)
 
 
+# 2.1002.0 (#5491): runs that went into the core's run obj_trash -- their last stored result (settings ret_last_<kind>.<run>)
+# is old and no longer shown (the rows stay: an older version reads them again)
+RET_RUNS_GONE = {"trash": ("tasks", "lists", "wiki")}
+
+
 def ret_status(c):
-    """Every kind: switch, period, env names and the last result."""
+    """Every kind: switch, period, env names and the last result. 2.1002.0 (#5491): without the runs of RET_RUNS_GONE."""
     out = {}
     for k in RET_KINDS:
         runs = {}
@@ -203,7 +208,7 @@ def ret_status(c):
                 v = json.loads(r[1] or "null")
             except ValueError:
                 continue
-            if isinstance(v, dict):
+            if isinstance(v, dict) and r[0].partition(".")[2] not in RET_RUNS_GONE.get(k, ()):
                 runs[r[0].partition(".")[2] or k] = v
         last = max(runs.values(), key=lambda v: v.get("at") or "", default=None)
         out[k] = {"on": ret_on(k), "days": ret_days(k), "env_days": RET_ENV[k], "env_switch": f"KALMIDO_PURGE_{k.upper()}",

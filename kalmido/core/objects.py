@@ -67,6 +67,11 @@ Interface (signatures fixed; stages 2 / 3 and the first areas #1958 #1957 #4675 
                  <kind>_kept in its report
       trash_batch the most objects one run takes of the kind (default OBJ_PRUNE_BATCH; the rest follows in the next hour)
                  A light kind may have trash_prune too (retention only: its trash and restore stay its area's routes).
+      2.1002.0 (#5491, stage 2b: restore / delete for good of tasks and projects through the core) --
+      trash_can  f(c, uid, row) -> bool: THE rule of the kind's trash -- who may see, restore and delete for good an object
+                 in the trash (its role there is 'manage' or none: steps 1-4 do not apply to it). For an area whose trash
+                 rights differ from its live roles (projects: the organisation's admins of shared projects, a project kept by
+                 law only its custodian, lists/listtrash.py otr_can)
       2.754.0 (#5268, Q0b of the cross-section audit #3563) -- a light kind of an old area (task, event, hub_mail, client):
       node       False: the kind has no reference node at all (no fs_ref_register, no shares, no folder, no routes -- routes=
                  is ignored --, no fields, no write path of the core: obj_reg_node refuses it with 404, obj_visible_sql / obj_rows with ValueError -- the
@@ -203,7 +208,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
                  fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True, node_shares=False,
                  fs_hooks=None, org_join="member", children=(), trash_prune=False, node=True, agent_own=False,
-                 on_share_back=None, trash_keep=None, trash_batch=None):
+                 on_share_back=None, trash_keep=None, trash_batch=None, trash_can=None):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload).
     2.565.0 (#4719): listed=False = the object's reference node only carries its shares (files/fsref.py): it lies in no
     folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take.
@@ -253,7 +258,8 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
     if not node and kids:
         raise ValueError(f"obj_register {kind}: a kind without node has no children")
     reg.update(children=kids, trash_prune=bool(trash_prune), trash_keep=trash_keep,
-               trash_batch=int(trash_batch) if trash_batch else None)  # 2.936.0 (#5364)
+               trash_batch=int(trash_batch) if trash_batch else None,  # 2.936.0 (#5364)
+               trash_can=trash_can)  # 2.1002.0 (#5491)
     OBJ[kind] = reg
     if not fsref:
         return reg  # 2.568.0 (#4739): the area's own registration in files/fsref.py stays
@@ -463,7 +469,9 @@ def obj_role(c, uid, kind, rid, row=None, pre=None, own_trash=False):
         return cache[key]
     row = row if row is not None else obj_row(c, kind, rid)
     out = None
-    if row is not None and _gate(c, uid, reg, row):
+    if row is not None and row["deleted_at"] and reg.get("trash_can") is not None and not own_trash:
+        out = "manage" if reg["trash_can"](c, uid, row) else None  # 2.1002.0 (#5491): the kind's trash rule
+    elif row is not None and _gate(c, uid, reg, row):
         base = _base(c, uid, reg, row)
         # review F3: a share gives at most 'edit' -- the chain is read only when the area's own role is below it
         share = _share_role(c, uid, reg, row, pre=pre) if OBJ_RANK[base] < OBJ_RANK["edit"] and reg["fsref"] else None  # #4739

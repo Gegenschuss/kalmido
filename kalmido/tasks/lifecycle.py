@@ -15,6 +15,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, connect, db, err, gsetting, iso, local_now, now_utc, parse_iso
 from ..accounts.session import me
 from ..core.access import collab_all, Denied, list_people, list_role, need_list, need_task, wr_sql, WRITE_ROLES
+from ..core.access import live_sql, trash_sql  # 2.1002.0 (#5491): the core's trash filter
 from ..core.serializers import unlink_files
 from ..lists.groups import check_group_assignee, grp_assign_events, grp_name, grp_shares_of_list
 from ..tasks.validation import (
@@ -192,7 +193,7 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     if f.get("ms") and not cur["ms"]:
         if f.get("parent_id", cur["parent_id"]):
             return tr("A milestone cannot be a subtask")
-        if c.execute("SELECT 1 FROM tasks WHERE parent_id=? AND deleted_at IS NULL", (tid,)).fetchone():
+        if c.execute(f"SELECT 1 FROM tasks WHERE parent_id=? AND {live_sql()}", (tid,)).fetchone():
             return tr("A milestone cannot have subtasks")
     if f.get("ms", cur["ms"]):
         if cur["milestone_id"] or f.get("milestone_id"):
@@ -469,7 +470,7 @@ def rsn_take(c, tid):
     if not ids:
         return ""
     rows = c.execute(f"SELECT id, parent_id, title, status, sort FROM tasks WHERE id IN ({','.join('?' * len(ids))}) "
-                     "AND deleted_at IS NULL ORDER BY sort, id", ids).fetchall()
+                     f"AND {live_sql()} ORDER BY sort, id", ids).fetchall()
     kids = {}
     for r in rows:
         kids.setdefault(r["parent_id"], []).append(r)
@@ -745,7 +746,7 @@ def undo_status(c, tid, u):
         if isinstance(dup.get("rel"), int):
             c.execute("DELETE FROM task_relations WHERE id=? AND task_id=? AND kind='duplicate'", (dup["rel"], tid))
         if isinstance(dup.get("cm"), int) and c.execute("SELECT 1 FROM obj_comments WHERE id=? AND kind='task' AND ref_id=? AND user_id=? "
-                                                        "AND deleted_at IS NULL", (dup["cm"], tid, me())).fetchone():
+                                                        f"AND {live_sql()}", (dup["cm"], tid, me())).fetchone():
             ocm_trash(c, dup["cm"], me(), check=False)  # 2.972.0 (#5272): the core's trash (was: text wiped at once)
     log_act(c, tid, "reopen")
     return None
@@ -981,23 +982,42 @@ def task_restore(tid):
 
 
 def restore_task(c, tid):
-    r = c.execute("SELECT deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
-    if r:
-        c.execute("UPDATE tasks SET deleted_at=NULL WHERE id=?", (tid,))
-        top = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()["list_id"]
+    """A task (with the subtasks that went with it) out of the trash -- the inner restore of every way (the route after its
+    checks, the batch, the undo, agents' proposals, merges). 2.1002.0 (#5491): the row comes back through the core
+    (core/writes.py obj_restore checked=True: rev, updated_at / updated_by); the rest is the hook rt_back (core/objlight.py
+    obj_on_restore of the kind task). A live task only gets the clean-up of rt_back (a parent in the trash, its section)."""
+    r = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+    if not r:
+        return
+    if not r["deleted_at"]:
+        rt_back(c, None, tid, r)
+        return
+    from ..core.writes import obj_restore  # a later module (kalmido/__init__.py ORDER)
+    uid = me() if has_request_context() and getattr(g, "user", None) else None
+    obj_restore(c, uid, "task", tid, step=False, checked=True)  # runs rt_back
+
+
+def rt_back(c, uid, tid, r):
+    """2.1002.0 (#5491, from restore_task): the tasks area's part of a restore (obj_on_restore of the kind task): r = the row as
+    it lay in the trash. The subtasks deleted together with it come back too (in another list only with a write role there),
+    a parent still in the trash makes it top level, a deleted section is found again by its name; the log line and the
+    task's undo step."""
+    gone = r["deleted_at"]
+    top = r["list_id"]
+    if gone:
         for d in descendants(c, tid):  # children deleted together with it come back too
-            k = c.execute("SELECT list_id FROM tasks WHERE id=? AND deleted_at=?", (d, r["deleted_at"])).fetchone()
+            k = c.execute("SELECT list_id FROM tasks WHERE id=? AND deleted_at=?", (d, gone)).fetchone()
             if k and k["list_id"] != top and not rt_may(c, k["list_id"]):  # 2.272.0 F (#3045, review N10): like ddl_kids
                 continue
-            c.execute("UPDATE tasks SET deleted_at=NULL WHERE id=? AND deleted_at=?", (d, r["deleted_at"]))
-        # restoring a subtask whose parent is gone makes it top-level
-        c.execute("""UPDATE tasks SET parent_id=NULL WHERE id=? AND parent_id IN
-                     (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)""", (tid,))
-        rt_section(c, [tid, *descendants(c, tid)])
-        if r["deleted_at"]:
-            log_act(c, tid, "restore")
-            from ..tasks.tundo import tu_op
-            tu_op(c, tid, "restore")  # 2.774.0 (#5251)
+            c.execute("UPDATE tasks SET deleted_at=NULL WHERE id=? AND deleted_at=?", (d, gone))
+    # restoring a subtask whose parent is gone makes it top-level
+    c.execute(f"""UPDATE tasks SET parent_id=NULL WHERE id=? AND parent_id IN
+                 (SELECT id FROM tasks WHERE {trash_sql()})""", (tid,))
+    rt_section(c, [tid, *descendants(c, tid)])
+    if gone:
+        log_act(c, tid, "restore")
+        from ..tasks.tundo import tu_op
+        tu_op(c, tid, "restore")  # 2.774.0 (#5251)
 
 
 def rt_may(c, lid):
@@ -1011,7 +1031,7 @@ def rt_may(c, lid):
 def rt_section(c, ids):
     """2.272.0 E2 (#3038): restored tasks whose section was deleted while they lay in the trash go back into a section of
     that name in their list (the first one; made anew at the end when there is none)."""
-    for x in c.execute("SELECT id, list_id, trash_section FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) AND deleted_at IS NULL "
+    for x in c.execute(f"SELECT id, list_id, trash_section FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) AND {live_sql()} "
                        "AND trash_section IS NOT NULL", (list(ids),)).fetchall():
         if c.execute("SELECT section_id FROM tasks WHERE id=?", (x["id"],)).fetchone()[0] is None:
             write_lock(c, f"rt-section:{x['list_id']}")  # 2.370.4 (#3089 E2-N9): two restores at once make one section, not two
@@ -1054,7 +1074,7 @@ def purge_done():
     c = db()
     b = body() if isinstance(body(), dict) else {}
     uid = me()
-    base = "status!=0 AND deleted_at IS NULL AND list_id IN (SELECT id FROM lists WHERE owner_id=?)"
+    base = f"status!=0 AND {live_sql()} AND list_id IN (SELECT id FROM lists WHERE owner_id=?)"
     own = PD_OWN
     r = c.execute(f"SELECT COUNT(*) FILTER (WHERE {own}), COUNT(*) FROM tasks WHERE {base}", (uid, uid, uid)).fetchone()
     mine, others = r[0], r[1] - r[0]
@@ -1106,7 +1126,7 @@ def tre_plan(c, uid, wide=False):
     others (instance admins only: the other owners' trashed tasks only all=1 takes, 0 with wide)}."""
     ok = purge_lists(c, uid, wide=wide)
     ok -= tre_kept_lists(c, sorted(ok))
-    rows = c.execute(f"SELECT id, list_id FROM tasks WHERE deleted_at IS NOT NULL AND list_id IN {wr_sql()}", (uid, uid)).fetchall()
+    rows = c.execute(f"SELECT id, list_id FROM tasks WHERE {trash_sql()} AND list_id IN {wr_sql()}", (uid, uid)).fetchall()
     ids = [r["id"] for r in rows if r["list_id"] in ok]
     law = tre_kept_lists(c, sorted({r["list_id"] for r in rows}))
     kept_law = sum(1 for r in rows if r["list_id"] in law)
@@ -1197,7 +1217,7 @@ def tre_run(uid, ids, ok, wide=False):
             for i in range(0, len(ids), TRE_BATCH):
                 part = ids[i:i + TRE_BATCH]
                 q = ",".join("?" * len(part))
-                due = [r[0] for r in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({q}) AND deleted_at IS NOT NULL "
+                due = [r[0] for r in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({q}) AND {trash_sql()} "
                                                "ORDER BY id FOR UPDATE", part).fetchall() if r[1] in ok]
                 files = hard_delete(c, due, lists=ok) if due else []
                 gone = gone or bool(due)

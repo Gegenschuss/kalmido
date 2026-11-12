@@ -4,7 +4,7 @@ subtasks, comments, field values, history, index rows go by ON DELETE CASCADE; t
 
 The run is system-wide: tasks in shared lists of other owners go too (the manual "Empty" leaves those to the list owner),
 whoever moved them to the trash; organisation tasks are only deleted, never moved. Like every retention run it only
-counts while ret_on("trash") is off (the safe default) and reports the numbers with ret_report(..., run="tasks").
+counts while ret_on("trash") is off (the safe default) and reported the numbers with ret_report(..., run="tasks") (see below).
 
 Legal retention: office records (invoices, receipts, bookings, agreements, sign-offs, trip items) keep a plain task_id
 number or ON DELETE SET NULL (time entries); none of them cascades from a task, and receipts are file-store nodes, not

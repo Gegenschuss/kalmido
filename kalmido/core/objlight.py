@@ -28,6 +28,8 @@ core: nothing of the areas moves, no old way is taken down, nothing is stored tw
 An object in its area's trash: only 'manage' (step 4 of obj_role) -- the base roles above do not look at deleted_at.
 2.936.0 (#5364): the kind task hands its trash period to the core's retention run (obj_register trash_prune / trash_keep,
 obj_on_purge hook tasks/tasktrash.py ttp_core_purge; core/writes.py obj_trash_tick); its trash and restore stay the tasks' routes.
+2.1002.0 (#5491): a task comes back through the core (tasks/lifecycle.py restore_task -> core/writes.py obj_restore checked=True,
+the tasks' part in the hook rt_back); the routes keep their own checks (need_task, a project in the trash first).
 
 Interface: nothing of its own -- obj_role / obj_need / obj_title / obj_space / OBJ[kind]["open_url"] of core/objects.py with
 the kinds LT_TASK, LT_EVENT, LT_MAIL, LT_CLIENT.
@@ -51,7 +53,8 @@ from ..events.model import ev_role_of
 from ..hub.hmv1 import hmv_can
 from ..hub.hubmail import _open as hbm_open, hbm_can
 from ..team.clients import cl_may_delete, client_rows
-from .writes import obj_on_purge  # 2.936.0 (#5364)
+from .writes import obj_on_purge, obj_on_restore  # 2.936.0 (#5364); 2.1002.0 (#5491): obj_on_restore
+from ..tasks.lifecycle import rt_back  # 2.1002.0 (#5491): the tasks' part of a restore through the core
 from ..tasks.tasktrash import TTP_BATCH, ttp_core_purge, ttp_keep  # 2.936.0 (#5364): the task kind's retention hooks
 
 LT_TASK, LT_EVENT, LT_MAIL, LT_CLIENT = "task", "event", "hub_mail", "client"
@@ -214,6 +217,7 @@ obj_register(LT_TASK, "tasks", label=N_("Task"), fields={}, node=False, area="ta
              # 2.936.0 (#5364): the tasks' trash period runs in the core's retention run (tasks/tasktrash.py)
              trash_prune=True, trash_keep=ttp_keep, trash_batch=TTP_BATCH)
 obj_on_purge(LT_TASK, ttp_core_purge)  # 2.936.0 (#5364)
+obj_on_restore(LT_TASK, rt_back)  # 2.1002.0 (#5491): a task comes back through the core (tasks/lifecycle.py restore_task)
 NOTIFY_TICK[LT_TASK] = _task_tick  # 2.891.0 (#5270): the watchdog's reminders ask the task's readers with the tick's memo
 obj_register(LT_EVENT, "events", label=N_("Event"), fields={}, node=False, area="calendar", base_role=_ev_base, space=_ev_space,
              title=_ev_title, open_url=lambda eid: f"ev/{int(eid)}")
