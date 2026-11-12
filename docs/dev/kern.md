@@ -738,6 +738,45 @@ writes them into the old files (`comments/reactions.json` with `comment_id`, `ch
 older archives and new ones import the same way. A new area with reactions adds its kind to `ORX_KINDS` and a trigger line in
 a fragment -- no table of its own.
 
+### Links (stage Q3, 2.1076.0, #5271)
+
+One table `obj_links(id, org_id, owner_id, src_kind, src_id, dst_kind, dst_id, rel, note, extra JSONB, created_by, agent_id,
+created_at, rev, updated_at, updated_by, deleted_at, deleted_by)`, unique per `(src_kind, src_id, dst_kind, dst_id, rel)`, holds the
+links between objects (fragment `migrations.d/5271_a.py`); it replaced `hub_mail_links`, `life_device_links`, `contact_tasks` and
+`office_letter_links`. `org_id` = the workspace (row-level security; NULL = private, the app checks both sides), `owner_id` = a
+person's own link (only that person reads it), `extra` = what an area keeps on top (never a title: titles are read live).
+`kalmido/core/objlinks.py`:
+- The sides: a kind of the core's register (also the light kinds `task`, `event`, `hub_mail`, `client`; `fs_entry` for a file-store
+  node, `omd_equipment` for office equipment) or a kind registered with `olnk_kind(kind, table=...)` -- without hooks the file
+  store's reference kind of the same name answers role, title, address and space (`contact`, `office_letter`).
+- The rules exist once: `olnk_sealed` (no link to or from an object of an end-to-end locked project, 409), `olnk_state` ("target
+  deleted": its row gone or in the trash -> `gone`, without a title), `olnk_side` / `obj_links_of` (a side the reader may not see is
+  left out).
+- The generic API for people and agents: `obj_link(c, uid, src_kind, src_id, dst_kind, dst_id, rel, note)` ('write' on the source,
+  'view' on the target, the same workspace or both private, never one side twice; an entry `link` in the history of the source),
+  `obj_unlink(c, uid, lid)` ('write' on the source), `obj_links_of(c, uid, kind, id)`. Routes (`core/objlinkweb.py`):
+  `GET / POST /api/obj/<kind>/<id>/links`, `DELETE /api/obj/links/<lid>`; API v1 `GET / POST /api/v1/agent/objects/<kind>/<id>/links`,
+  `DELETE .../links/<lid>`; MCP `list_links`, `link_objects`, `unlink_objects`.
+- An area's own relation (`olnk_rel(rel, may)`) is written and removed only by the area's routes, which check their own rights
+  and call `olnk_put` / `olnk_drop`; the generic routes refuse it (409). Today: `made` (hub_mail -> task | event, hub/mailview.py),
+  `device` (task -> omd_equipment, `owner_id` = the person, extra origin + office, life/devlink.py), `contact` (contact -> task,
+  extra.kind, contacts/model.py), `answers` / `reply` (office_letter -> fs_entry, office/letterlinks.py; the follow-up tick reads
+  `reply`). Their answers and addresses stayed as they were.
+- Removing a link puts its row into the trash (`deleted_at`) and records a step of the person's undo list (tracked kind
+  `obj_link`, `core/undoweb.py`); taking it back asks the relation's `may` hook (an area) or the generic rule of now. Linking the
+  same key again brings the row of the trash back. The core's trash run deletes the rows after the trash period
+  (`part_kind(obj_link, trash_prune=True)`); `olnk_purge_ids` deletes for good with the undo steps (an office that moves).
+  The office trash of the letter links (kind `oletlink`, 2.905.0) is gone.
+- A link dies with its object: the trigger `kalmido_olnk_gone('<kind>')` on `tasks`, `events`, `hub_mails`, `contacts`,
+  `office_letters`, `fs_nodes` and `office_equipment` deletes the links of a row deleted for good (the old tables' ON DELETE
+  CASCADE); a contact merge moves them to the target (`contacts/merge.py ctm_links`).
+- Export: the files keep their old names and columns (`hub/mail_links.json`, `books/contact_tasks.json`,
+  `office/letter_links.json`, `letters/letter-links.csv` of the retention export; `admin/orgexport.py ox_link_row`); the imports
+  write into `obj_links`. A person's device links stay in the account export (`device_links`).
+- The move at the start (`olnk_move`, `core/objhooks.MOVE`) copies the old tables' rows, the fragment drops them (one-way; the back
+  limit rises). Not moved (decision of the analysis): `task_offer_links`, `sheet_links`, `task_links` (area logic), the derived
+  `wiki_links`, `git_*`, `contact_links`.
+
 ### Versions (stage Q7a, 2.958.0, #5281)
 
 `obj_versions` is the core's second table next to `obj_history` (core/objversions.py, core/migrations.d/5281_a.py): numbered

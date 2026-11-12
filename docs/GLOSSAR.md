@@ -280,6 +280,8 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/objnotifcap.py` (`ncap`) - The owner's notification ceilings of projects and folders in the shared core: one table obj_notif_cap; list_notif and folder_notif moved here and went (stage Q9b)
 - `kalmido/core/objhooks.py` (`obj`) - The two things of the shared core that the layer accounts needs, without importing upward
 - `kalmido/core/objcmtweb.py` (`ocw`) - The generic routes of the comments' core (/api/obj/<kind>/<id>/comments, /api/obj/comments/<cid>; 2.981.0)
+- `kalmido/core/objlinks.py` (`olnk`) - Links exist once, in the shared core: one table obj_links (src / dst kind and id, rel) with the E2E lock, "target deleted", undo of a removal and the area relations (2.1076.0)
+- `kalmido/core/objlinkweb.py` (`olw`) - The generic routes of the links' core (/api/obj/<kind>/<id>/links, /api/obj/links/<lid>, API v1 /agent/objects/<kind>/<id>/links; 2.1076.0)
 - `kalmido/core/objcomments.py` (`ocm`) - Comments exist once, in the shared core: one table obj_comments (kind, ref_id) with its trash obj_comment_trash, one mention parser, one say rule, one delete rule (stage Q4a)
 - `kalmido/core/objsearch.py` (`osr`) - The search index exists once, in the shared core: one table obj_search (kind, ref_id, tsv over kalmido_fold) for tasks, comments, notes, contacts, page names and messages, filled by triggers; rights per hit in the areas (stage Q6a)
 - `kalmido/core/objwords.py` (`osw`) - The keyed word index of the sealed texts exists once, in the shared core: one table obj_search_words (kind, ref_id, HMAC prefix hash per workspace) for documents, recognised file texts, knowledge pages and filed mails; rights per hit in the areas (stage Q6b)
@@ -624,7 +626,7 @@ Office & finance: quotations, invoices, bank, books, tax, DATEV, e-invoices, let
 - `kalmido/office/legacyimport.py` (`fi`) - Office & finance: the legacy import
 - `kalmido/office/letteragent.py` (`lta`) - Agents and letters: "Let the agent draft an answer"
 - `kalmido/office/letterhead.py` (`bp`) - The own letterhead of the office documents (a PDF behind every page of quotations, invoices, credit notes, reminders and every later kind of office.docs)
-- `kalmido/office/letterlinks.py` (`ltl`) - Letters <-> documents of the documents space (office_letter_links)
+- `kalmido/office/letterlinks.py` (`ltl`) - Letters <-> documents of the documents space (links of the core: obj_links rel answers | reply, since 2.1076.0 #5271)
 - `kalmido/office/lettermail.py` (`ltm`) - A letter sent by e-mail (its PDF attached, the Message-ID kept)
 - `kalmido/office/letters.py` (`lt`) - Letters of an office area ("Korrespondenz")
 - `kalmido/office/logbook.py` (`lb`) - The logbook: vehicles, drives, change log, year report, mileage allowance into the EUeR (filled by part B)

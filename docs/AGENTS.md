@@ -4843,12 +4843,27 @@ stays hidden. The kind (`kind`) is the area's name for its objects.
 | One object with its fields, `role` (`view` / `edit`) and `updated_at` | `GET /api/v1/agent/objects/{kind}/{id}` | `get_object` |
 | Change the fields sent (only those) | `PATCH /api/v1/agent/objects/{kind}/{id}` | `update_object` |
 | Propose a change a person accepts (2.623.0) | `POST /api/v1/agent/objects/{kind}/{id}/proposals` | `propose_object_change` |
+| The links of an object you see (2.1076.0) | `GET /api/v1/agent/objects/{kind}/{id}/links` | `list_links` |
+| Link it with another object (2.1076.0) | `POST /api/v1/agent/objects/{kind}/{id}/links` | `link_objects` |
+| Remove one of its links (2.1076.0) | `DELETE /api/v1/agent/objects/{kind}/{id}/links/{lid}` | `unlink_objects` |
 
 Changing always needs `expect_updated_at` = the `updated_at` of your last read: without it `400`, when a person changed the
 object since `409` with the current state in `error.current` (read it, merge, try again). An unknown field is `400`, a share
 with `view` is `403`, everything else `404`. The token needs the area's scopes (read / write; most areas: `read` and
 `tasks:write`; the MCP server lists `update_object` only for a token with `tasks:write`). Every change of yours is in the
 object's history, marked as an agent's. Creating, deleting, the trash and sharing stay with people.
+
+*Since 2.1076.0 (#5271):* **links** between objects exist once, in the shared core (`obj_links`). `kind` is also one of
+the light kinds `task`, `event`, `hub_mail`, `client`. `GET .../links` lists every link of an object you see: `dir` (`out` = from
+it, `in` = to it), `rel` (what it means), `note`, and `other` = the other side `{kind, id, state, title, open_url}`; `state` is
+`ok`, or `gone` once that object is deleted or in the trash (then without title); a side you may not see is left out.
+`POST .../links` with `{kind, id, rel?, note?}` links the object (you need write on it: your share `edit`, the kind's write
+scope) with another one you see in the **same workspace**; `rel` is a short name (default `related`), `note` at most 500
+characters; the same pair and `rel` again returns the same link. `409`: another workspace, an end-to-end locked project on
+either side, or one of the areas' own relations (`made`, `contact`, `answers`, `reply`, `device`: the tasks made from a filed
+e-mail, a contact's tasks, a letter's documents, a device's equipment - those stay with their area's endpoints, e.g.
+`link_contact`, `link_letter_document`). `DELETE .../links/{lid}` removes a link of this object (`204`; write on its source); a
+person can take it back from their undo list, you cannot. Every link and removal is in the history of its source.
 
 *Since 2.623.0 (#4718):* instead of changing an object you may **propose** the change:
 `POST /api/v1/agent/objects/{kind}/{id}/proposals` (MCP `propose_object_change`) with `values` (the fields and their new

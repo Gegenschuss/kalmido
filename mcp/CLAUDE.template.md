@@ -905,11 +905,11 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_object`, `get_office`, `get_office_document`, `get_office_subscriptions`, `get_plan_usage`, `get_queue`,
 `get_playbook`, `get_poll`, `get_project_overview`, `get_reply_style`, `get_review`, `get_roadmap`, `get_rules`, `get_stats`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
 `get_usage`, `get_velocity`, `get_video_review`, `get_view_layout`, `get_waiting`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
-`ingredients_to_shopping`, `link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_environments`,
+`ingredients_to_shopping`, `link_contact`, `link_letter_document`, `link_objects`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_environments`,
 `set_deployment`,
 `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,
 `list_events`, `list_fields`, `list_filed_mails`, `list_files`, `list_filters`, `list_flow`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_views`,
-`list_invoice_series`, `list_jobs`, `list_kids`, `list_layout_blocks`, `list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
+`list_invoice_series`, `list_jobs`, `list_kids`, `list_layout_blocks`, `list_letter_drafts`, `list_links`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
 `list_notepads`, `list_notes`, `list_objects`, `list_office_data`, `list_office_deals`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
 `list_payment_suggestions`, `list_polls`, `list_project_files`, `list_receipt_suggestions`, `list_relations`, `list_repos`, `list_rules`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`,
@@ -926,7 +926,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `set_office_deal_stage`, `set_project_overview`, `set_project_status`, `set_queue_order`, `set_section_kind`, `set_status`, `set_task_state`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `partial_task`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,
-`time_from_events`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,
+`time_from_events`, `unlink_contact`, `unlink_objects`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,
 `unshare_list_from_group`, `unwatch_task`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
 `update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
 `update_habit`, `update_job`, `update_letter_draft`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_object`, `update_notepad`,
@@ -936,5 +936,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 <!-- kalmido-tool-index:end -->
 
 2.558.0: areas built on the shared core (meetings, planners, team projects ...) share their objects with you through `list_objects` / `get_object` (a `kind` and the object's id); `update_object` changes only the fields you send and ALWAYS needs `expect_updated_at` from your last `get_object` (400 without it; 409 = a person changed it since: read it again, merge, retry). 2.623.0: `propose_object_change` (the same arguments plus `summary`, `user_id`) PROPOSES the change instead: a person accepts or declines it on a card, accepting writes it as them with your version; use it when a person should check the change or your share is view only (not with a read-only token). 2.579.0: kind `docview` = a saved view of the documents search a person shared with you (its `query` = the search; run it with `list_documents` and your own access).
+
+2.1076.0: links between objects exist once in the shared core: `list_links` (kind + object_id: the other side with title, `state` ok / gone; what you may not see is left out), `link_objects` (write on this object, view on the target, the same workspace; `rel` default related, `note`; 409 for a locked project, another workspace or an area's own relation - a contact's tasks, a letter's documents, a filed mail's tasks stay with `link_contact` / `link_letter_document` / their area), `unlink_objects` (link_id from `list_links`).
 
 2.391.0: the set-up tools `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `rotate_webhook_secret`, `test_webhook`, `get_webhook_log`, `list_api_tokens`, `create_api_token`, `revoke_api_token`, `add_repo_connection`, `update_repo_connection`, `remove_repo_connection`, `set_repo_version_field` need the scope `integrations`, which an agent never gets: they are for a person's own MCP client (toolset `integrations`), not for you - do not try them.

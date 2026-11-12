@@ -2931,6 +2931,21 @@ TOOLS += [  # 2.558.0 (#4709): objects of the areas built on the shared core (on
           ["kind", "object_id", "values", "expect_updated_at"]),
      lambda api, a: api.call("POST", f"/agent/objects/{str(a['kind'])}/{_id(a, 'object_id')}/proposals",
                              body=_pick(a, ("values", "expect_updated_at", "summary", "user_id")))),
+    # 2.1076.0 (#5271): the links of the shared core (one rule: write on this object, view on the other, one workspace)
+    ("list_links", "2.1076.0: the links of an object you see (kind task, event, hub_mail, client or an area's kind): the other side with "
+                   "its title and address; a deleted one is state gone, one you may not see is left out.",
+     _obj({"kind": {"type": "string", "minLength": 1, "maxLength": 24}, "object_id": S_ID}, ["kind", "object_id"]),
+     lambda api, a: api.call("GET", f"/agent/objects/{str(a['kind'])}/{_id(a, 'object_id')}/links")),
+    ("link_objects", "2.1076.0: link this object (write on it) with another one you see in the same workspace; rel = what it means "
+                     "(default related), note optional. 409 for an end-to-end locked project, another workspace or an area's own relation.",
+     _obj({"kind": {"type": "string", "minLength": 1, "maxLength": 24}, "object_id": S_ID,
+           "target_kind": {"type": "string", "minLength": 1, "maxLength": 24}, "target_id": S_ID,
+           "rel": {"type": "string", "maxLength": 24}, "note": {"type": "string", "maxLength": 500}}, ["kind", "object_id", "target_kind", "target_id"]),
+     lambda api, a: api.call("POST", f"/agent/objects/{str(a['kind'])}/{_id(a, 'object_id')}/links",
+                             body={"kind": a["target_kind"], "id": a["target_id"], **_pick(a, ("rel", "note"))})),
+    ("unlink_objects", "2.1076.0: remove a link (link_id from list_links) of this object (write on its source; an area's own relation: 409).",
+     _obj({"kind": {"type": "string", "minLength": 1, "maxLength": 24}, "object_id": S_ID, "link_id": S_ID}, ["kind", "object_id", "link_id"]),
+     lambda api, a: api.call("DELETE", f"/agent/objects/{str(a['kind'])}/{_id(a, 'object_id')}/links/{_id(a, 'link_id')}")),
 ]
 TOOLS += [  # 2.1067.0 (#5819): the help of the running version (docs/*.md on the server): look a question about using Kalmido up
     ("help_overview", "2.1067.0: what Kalmido can do - the feature list per area in short form and the headings of every help file "
@@ -3002,6 +3017,8 @@ TOOL_SCOPES["calendar"] += ("list_polls", "get_poll", "create_poll")  # 2.484.0 
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
 TOOL_SCOPES["agent"] += ("list_objects", "get_object")  # 2.558.0 (#4709): the agent routes of the core objects
 TOOL_SCOPES["agent"] += ("propose_object_change",)  # 2.623.0 (#4718): a proposal needs the kind's read scope only (the person writes)
+TOOL_SCOPES["agent"] += ("list_links",)  # 2.1076.0 (#5271): the links of the core objects (the kind's read scope)
+TOOL_SCOPES["tasks:write"] += ("link_objects", "unlink_objects")  # 2.1076.0 (#5271): the server asks the kind's write scope (most: tasks:write)
 TOOL_SCOPES["tasks:write"] += ("update_object",)  # 2.558.0 (#4709, review F9): the server asks the kind's write scope (most: tasks:write)
 TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
 TOOL_SCOPES["structure"] += ("set_dwell_limits",)  # 2.553.0 C (#3538)
@@ -3069,7 +3086,7 @@ TOOLSETS = {
         log_decision
         list_team_chats read_team_chat post_team_message list_team_channels leave_team_channel edit_team_message delete_team_message react_team_message
         pin_team_message mark_team_chat_read
-        list_objects get_object update_object propose_object_change
+        list_objects get_object update_object propose_object_change list_links link_objects unlink_objects
         help_overview search_help read_help
     """,
     "office": """
