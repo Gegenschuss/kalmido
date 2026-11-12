@@ -593,7 +593,9 @@ def ojn_hidden(c, oid, uid, email=None):
     # (the row's, kept since #4922) must be the proved one - not a later address of the account. 2.1062.0 (#5864): the same
     # exception as org_member_put - an account an organisation invitation set up that never signed in (its only address is
     # the typed one) - also once that first invitation was withdrawn (users.oinv_made_at)
-    if (u["email_proved"] or "") != ((email or u["email"] or "").strip().lower()) and not _oinv_pending(c, uid):
+    typed = (email or u["email"] or "").strip().lower()
+    # review F7: the exception only for the address the account still has (never reveal a later one by waking the row)
+    if (u["email_proved"] or "") != typed and not (typed == (u["email"] or "").strip().lower() and _oinv_pending(c, uid)):
         return True
     selfm = c.execute("SELECT self_made FROM orgs WHERE id=?", (oid,)).fetchone()
     return bool(selfm and selfm[0]) and not may_see(c, me(), uid)
