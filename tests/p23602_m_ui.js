@@ -25,6 +25,9 @@ const until = fn => require('./boot').until(fn, {timeout: 15000, step: 150});
   const ORG = (await call('GET', '/api/state')).me.workspaces[0].id, uid = {};
   for (const u of ['bob', 'carol']) uid[u] = (await call('POST', '/api/users', {username: u, display_name: u[0].toUpperCase() + u.slice(1) + ' Name', password: 'password123', email: `${u}@example.com`, orgs: u === 'bob' ? [ORG] : []})).id;
   await call('PUT', `/api/orgs/${ORG}/members`, {user_id: uid.bob, role: 'admin'});
+  // 2.997.0 (#5672): carol proved her address (2.983.0 #5643: only a proved address binds an account, as the API suite sets it), so
+  // the dialog still shows an address WITH an account behind it next to one without ("Invited" for both, no name)
+  execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE users SET email_proved=lower(email) WHERE username IN ('bob', 'carol')"]);
   const BK = await login('bob');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'sheets,collab,comments'}, BK);
   const S = await call('POST', '/api/sheets', {title: 'Holiday budget', space: 'private'}, BK);
@@ -46,11 +49,20 @@ const until = fn => require('./boot').until(fn, {timeout: 15000, step: 150});
   check(rows().length === 2 && rows().every(r => /Invited/.test(r.textContent)), 'both addresses read "Invited": ' + d.querySelector('#shs-list').textContent);
   check(!/Carol Name/.test(d.querySelector('#shs-list').textContent), 'never the name of the account behind an address');
   check(/With an account at this address/.test(d.querySelector('#toast')?.textContent || ''), 'the neutral notice');
+  const rm = rows()[1]?.querySelector('[data-shsx]')?.dataset.shsx;
   rows()[1].querySelector('[data-shsx]').click();
   await until(() => rows().length === 1);
-  check(rows().length === 1, 'an address row can be removed');
+  // 2.997.0 (#5672): diagnosis on red - the row's id, what the dialog shows and what the server lists
+  check(rows().length === 1, 'an address row can be removed' + (rows().length === 1 ? '' : ' ' + JSON.stringify({rm, ui: d.querySelector('#shs-list').textContent,
+    srv: ((await call('GET', `/api/sheets/${S.id}/shares`, null, BK)).shares || []).map(x => [x.id, x.email, x.state]), toast: d.querySelector('#toast')?.textContent || '', errs: errs?.slice?.(-3)})));
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await call('GET', `/api/sheets/${S.id}/shares`, null, BK)).shares?.length === 2), 'Undo: the address is back');
+  // 2.997.0 (#5672): an address row's id is negative (#5244); the app took it for a task created offline and refused the
+  // write ("The new task could not be created") - removing above and changing its role here reach the server
+  const sel = await until(() => rows().find(r => /carol@example\.com/.test(r.textContent))?.querySelector('[data-shsr]'));
+  if (sel) { sel.value = 'write'; sel.dispatchEvent(new w.Event('change', {bubbles: true})); }
+  check(await until(async () => ((await call('GET', `/api/sheets/${S.id}/shares`, null, BK)).shares || []).find(x => x.email === 'carol@example.com')?.role === 'write'),
+    'an address row\'s role can be changed (Can edit) ' + (d.querySelector('#toast')?.textContent || ''));
   w.close();
 
   // ================= open invitations

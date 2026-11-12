@@ -807,7 +807,11 @@ function mvResp(url, j) {
 }
 // 2.359.0 A (#3023): the address with a temporary id replaced: the real id once its create went out (this tab or another,
 // the service worker); null = its create still waits in the queue; false = no create waits for it (it failed)
+// 2.997.0 (#5672): a table share's address row has a negative id by design (2.937.0 #5244: minus its sheet_shares row, the
+// server's only signed route) - never a temporary id (removing / changing it was refused as "new task not created")
+const TMP_KEEP = /^\/api\/sheets\/\d+\/shares\/-\d+(?:\?|$)/;
 function tmpUrl(url) {
+  if (TMP_KEEP.test(url)) return url;
   const m = url.match(/\/(-\d+)(?=[/?]|$)/); if (!m) return url;
   const real = HIST.ids[m[1]] || LS.get('idmap', {})[m[1]];
   if (real) return url.replace(m[0], '/' + real);
