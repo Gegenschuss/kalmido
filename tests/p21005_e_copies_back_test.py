@@ -9,16 +9,17 @@ travel costs never offer a draft of the trash. Invented names and figures only.
    omd_services), restored through the core: the draft with its positions and its number, the trip with its receipt, the
    service live; another organisation 404
  - a copy whose row is there again (a conflict) is left in office_trash and counted, never listed; a copy of a kind not on
-   the core's trash (the start balance of the cash flow) stays a copy and is still listed and restored (2.1050.0, #5789: the
-   start balance is on the core's trash too, its copies come back the same way - p21050_b_cfstart_trash_test.py)
+   the core's trash (the start balance of the cash flow) stays a copy and is still listed and restored (2.1067.0, #5789: the
+   start balance is on the core's trash too, its copies come back the same way - p21067_b_cfstart_trash_test.py)
  - a written-back draft whose copy is older than the trash period: the core's retention run deletes it for good
  - the copies' routes of the other kinds are gone: POST /api/office/trash/<id>/restore of a draft's copy 404
  - travel costs (#5415 D, d_leser.md): a draft of the trash is never offered for billing (bill-docs), billing onto it 404, a
    receipt billed on it counts as open again, its project title is no project of the trip form
  - 2.1055.0 (#5791, fable 2.1005 F5): that receipt billed on another invoice meanwhile -> the draft's restore takes its position
    out (taken, note), the other invoice keeps it; a receipt billed nowhere else comes back bound to the draft's position
- - 2.1055.0 (#5791, F6): the copies' run reads only ids first, loads each copy on its own (never the start balance's), and asks
-   the catalog for a table's columns once per run
+ - 2.1055.0 (#5791, F6): the copies' run reads only ids first, loads each copy on its own, and asks the catalog for a table's
+   columns once per run (2.1067.0, #5789: the start balance keeps no copies any more - its old copies are loaded and written
+   back like every other kind, p21067_b_cfstart_trash_test.py)
 freelancer-matrix: office (a person without an organisation: every step in her personal office)
 tenant-matrix: office (another organisation: 404 on the restore of a written-back draft)
 usage: p21005_e_copies_back_test.py <datadir>"""
@@ -117,8 +118,8 @@ def scenario(S, who, oid, uid):
     # a conflict: its row is there again (restored meanwhile by hand) - the copy is left and never listed
     svc2 = S.post(OFC + "/services", json={"name_de": f"Example Colour {who}"}).json()["id"]
     tc = old_copy(oid, uid, "services", "office_services", svc2, f"Example Colour {who}", delete=False)
-    # 2.1050.0 (#5789): the start balance (the last kind of copies) is on the core's trash too: its old copy (key org_id) is
-    # written back the same way - tests/p21050_b_cfstart_trash_test.py
+    # 2.1067.0 (#5789): the start balance (the last kind of copies) is on the core's trash too: its old copy (key org_id) is
+    # written back the same way - tests/p21067_b_cfstart_trash_test.py
     check(S.post(OFC + f"/trash/{td}/restore").status_code == 404, f"{who}: the copies' restore of a draft is gone (404)")
 
     out = copies_back()
@@ -260,11 +261,8 @@ check(not dbx("SELECT 1 FROM office_services WHERE id=?", (fsvc,)) and dbx("SELE
 check(not [x for x in trash(Ol) if x.get("id") == fsvc], "(F2) the other organisation's office trash does not list it")
 
 # ------------------------------------------------------------ 2.1055.0 (#5791, fable 2.1005 F6): the run on every start reads only
-# the ids of the copies first (never every snapshot of the table at once, never the start balance's copies kept here) and asks
-# the catalog for a table's columns once per run
-check(A.put(OFC + "/cashflow/start", json={"amount": "400.00", "day": PM1}).ok and A.delete(OFC + "/cashflow/start").ok,
-      "(F6) setup: a start balance's copy kept in office_trash")
-cs = dbx("SELECT id FROM office_trash WHERE kind='cf_start' ORDER BY id DESC LIMIT 1")[0][0]
+# the ids of the copies first (never every snapshot of the table at once) and asks the catalog for a table's columns once per run
+# 2.1067.0 (#5789): the start balance's delete is a row of the core's trash now (no copy kept here to skip any more)
 out = in_app("""from kalmido.office.okern import ofk_copies_back
 q = []
 class W:
@@ -283,7 +281,7 @@ print('CATALOG', len(cat) == len(set(cat)))
 c.rollback()""")
 check("ALLSNAPS False" in out, f"(F6) never every snapshot of office_trash at once {out[-300:]}")
 ld = next((json.loads(x[7:]) for x in out.splitlines() if x.startswith("LOADED ")), None)
-check(ld is not None and cs not in ld and tf in ld, f"(F6) the start balance's copy is never loaded, a copy of another kind is {out[-300:]}")
+check(ld is not None and tf in ld, f"(F6) a copy left in office_trash is loaded on its own {out[-300:]}")
 check("CATALOG True" in out, f"(F6) a table's columns asked once per run {out[-300:]}")
 
 # ------------------------------------------------------------ 2.1005.0 (#5415, merge with #5494): an old sign-off record's copy
