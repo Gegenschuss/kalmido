@@ -18,6 +18,8 @@ import json
 
 from ..core.db import iso, now_utc
 from ..core.pg import st_ids
+from ..collab.news import news_add
+from ..agents.chat import choice_state
 
 ACN_EXCERPT = 300
 
@@ -57,7 +59,6 @@ def acn_job_has_entry(c, uid, jid):
 
 def acn_news(c, r, s=None):
     """After agent chat message r was posted (caller commits): the News entry of an approval card or a question."""
-    from ..collab.news import news_add
     k = acn_kind(r)
     if not k:
         return
@@ -96,7 +97,6 @@ def acn_read(c, uid, aid=None, mids=None):
 def acn_feed(c, uid, out):
     """news_items: judges the entries of chat messages again (a message gone = no item; a card no longer open, a question
     seen / answered = read) and folds the questions into one item per agent (newest first). Returns the new list."""
-    from ..agents.chat import choice_state
     mids = sorted({int(x["data"]["chat"]) for x in out if x["kind"] in ("approval", "agentask")
                    and str((x.get("data") or {}).get("chat") or "").isdigit()})
     if not mids:

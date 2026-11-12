@@ -36,6 +36,7 @@ from ..agents.agentrules import ar_public  # 2.235.0 C (#2903)
 from ..agents.steps import host_info_in, host_info_set, steps_end  # 2.369.5 (#2517): pulled up from functions
 from ..agents.jobchat import jcs_start_notice  # 2.369.5 (#2517): pulled up from functions
 from ..agents.chat import chat_unlink_trimmed, h6e_agent_push_ok  # 2.369.5 (#2517): pulled up from functions
+from ..agents.chatnews import acn_job_has_entry  # 2.1039.0 (#5804)
 from ..tasks.deliver import dv_job_ended, dv_job_started  # 2.392.2 (#3365)
 
 
@@ -475,7 +476,6 @@ def job_notify(c, j, old_state):
     if not s or not job_visible(c, j, uid):
         return
     lid = None
-    from ..agents.chatnews import acn_job_has_entry
     once = acn_job_has_entry(c, uid, j["id"])  # 2.1039.0 (#5804): its approval card in the chat stands in the bell already: once
     if j["task_id"]:  # 2.1.0 (#317): "agent waits for me" as News (2.367.2, #2968: on by default) + the push per the settings
         lr = c.execute("SELECT list_id FROM tasks WHERE id=?", (j["task_id"],)).fetchone()
