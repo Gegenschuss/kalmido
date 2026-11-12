@@ -35,6 +35,7 @@ from .pdf import PDF_ADDR_W, pdf_wrap  # 2.296.0 E (#3170)
 from .oftref import LT_KIND, lt_title, oft_renamed  # 2.351.0 A (#2823)
 from .doctpl import dt_lang, dt_fill, dt_miss_labels, dt_tpl, dt_values, dt_disposition, dt_kick, dt_tpl_public  # 2.369.5 (#2517): pulled up from functions
 from ..contacts.model import contacts_on, my_book_ids  # 2.369.5 (#2517): pulled up from functions
+from ..core.objsearch import osr_ids_sql  # 2.1003.0 (#5716)
 from .contacts_cl import fk_contacts  # 2.369.5 (#2517): pulled up from functions
 from .pdf import pdf_image_object  # 2.369.5 (#2517): pulled up from functions
 from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
@@ -266,9 +267,10 @@ def lt_recipients(c, oid, uid, q="", limit=20, clients=True):
     books = lt_book_ids(c, oid, uid)
     if books:
         sql, args = f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND kind!='group' AND deleted_at IS NULL", list(books)
-        for w in words:
-            sql += " AND search ILIKE ? ESCAPE '\\'"
-            args.append(lt_like(w))
+        if words:  # 2.1003.0 (#5716): contacts.search went in 2.981.0 (#5278) -- the shared search index (core/objsearch.py, kind 'contact')
+            ids_sql, x = osr_ids_sql("contact", " ".join(words), names=True)
+            sql += f" AND id IN {ids_sql}" if ids_sql else " AND false"
+            args += x
         for r in c.execute(sql + " ORDER BY lower(CASE WHEN family!='' THEN family ELSE fn END), lower(fn), id LIMIT ?", args + [limit]).fetchall():
             x = lt_contact_rcpt(r)
             out.append({"kind": "contact", "label": x["rcpt_name"], "sub": x["rcpt_address"].replace("\n", ", ") or x["rcpt_email"], **x})
