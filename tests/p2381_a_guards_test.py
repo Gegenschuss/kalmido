@@ -7,7 +7,8 @@ when a changed file mapped to them, so parity / pg_dialect / rls_static / the ag
 - ALWAYS_SUITES need no container (no data dir, no start.sh / test port) - the list stays a matter of seconds
 - every test script of the CI steps "MCP server + usage hook" and "New agents" is in ALWAYS_SUITES
 - --touched: a docs file brings ALWAYS_SUITES, a server / client file also p2661_b_ui (WS_VIEWS), a stylesheet also
-  p2419_scale (#5530, CSS_GUARD_SUITES), nothing changed = nothing
+  p2419_scale (#5530, CSS_GUARD_SUITES), schema.py / a migration fragment also rls_direct (#5674, SCHEMA_GUARD_SUITES),
+  nothing changed = nothing
 - #3505: a file --touched cannot map (core) comes back as an UNMAPPED line on stderr and in --unmapped-out, not silently"""
 import os
 import re
@@ -22,7 +23,7 @@ import stages  # noqa: E402
 from kt import FAILS, OKS, check  # noqa: E402
 
 rows = {s.name: (s.file, s.line or s.cmd or "") for s in suites.all_suites(N)[0] if s.name}
-for s in stages.ALWAYS_SUITES + stages.APP_GUARD_SUITES + stages.CSS_GUARD_SUITES:
+for s in stages.ALWAYS_SUITES + stages.APP_GUARD_SUITES + stages.CSS_GUARD_SUITES + stages.SCHEMA_GUARD_SUITES:  # 2.1011.0 (#5674): + rls_direct
     check(s in rows, f"{s} is a suite of tests/suites.py")
 for s in stages.ALWAYS_SUITES:
     fname, line = rows.get(s, (None, ""))
@@ -50,6 +51,15 @@ order, why, _ = stages.touched(repo, ["static/css/start-cal-2800.css"])
 check("p2419_scale" in order and why.get("p2419_scale") == "guard, always (#2853)", f"#5530: a stylesheet: + p2419_scale {order}")
 order, _, _ = stages.touched(repo, ["static/app.css"])
 check("p2419_scale" in order, f"#5530: app.css: + p2419_scale {order}")
+# 2.1011.0 (#5674, #5386): schema.py and a migration fragment bring rls_direct; db.py (fixed set db) and a client file do not
+order, why, _ = stages.touched(repo, ["kalmido/core/schema.py"])
+check("rls_direct" in order and why.get("rls_direct") == "guard, always (#2853)", f"#5674: schema.py: + rls_direct {order}")
+mig = sorted(f for f in os.listdir(os.path.join(os.path.dirname(N), "kalmido", "core", "migrations.d")) if f.endswith(".py"))[-1]
+order, _, _ = stages.touched(repo, ["kalmido/core/migrations.d/" + mig])
+check("rls_direct" in order, f"#5674: a migration fragment ({mig}): + rls_direct {order}")
+for f in ("kalmido/core/db.py", "static/js/app.js"):
+    order, _, _ = stages.touched(repo, [f])
+    check("rls_direct" not in order, f"#5674: {f}: no rls_direct (5-8 minutes) {order}")
 order, _, _ = stages.touched(repo, [])
 check(order == [], f"nothing changed = nothing to test: {order}")
 # 2.501.0 (#4016): schema.py has its fixed set now; the CI basics stay unmapped
