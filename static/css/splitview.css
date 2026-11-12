@@ -6,7 +6,7 @@ html.split-on body{width:calc(100% - var(--splW,50vw));contain:layout}
 .splgrip{position:absolute;left:-.3125rem;top:0;bottom:0;width:.625rem;z-index:2;cursor:col-resize;touch-action:none;display:flex;justify-content:center}
 /* 2.1040.0 (#5813): the line is always visible (4px, a stronger border tone: --line2 was too faint on light themes), accent on hover / drag / focus; it lies on the edge (centred in the
    grip, which stays wider), so neither half changes its width */
-.splgrip::after{content:"";width:4px;height:100%;background:color-mix(in srgb,var(--text) 26%,var(--bg));border-radius:2px}
+.splgrip::after{content:"";width:.25rem;height:100%;background:color-mix(in srgb,var(--text) 26%,var(--bg));border-radius:2px}
 .splgrip:hover::after,.splgrip:focus-visible::after,html.spl-drag .splgrip::after{background:var(--accent)}
 .splgrip:focus-visible{outline:none}
 html.spl-drag .splitfr{pointer-events:none}

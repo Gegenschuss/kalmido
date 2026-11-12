@@ -1332,6 +1332,6 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .orp .orp-prev{min-height:5.5rem;margin-top:.5rem}
 .orp .orp-prev.busy{opacity:.6}
 .orp .orp-sum{border-collapse:collapse;font-variant-numeric:tabular-nums}
-.orp .orp-sum th{text-align:left;font-weight:400;padding:2px 10px 2px 0}
-.orp .orp-sum td{padding:2px 4px;text-align:right}
+.orp .orp-sum th{text-align:left;font-weight:400;padding:2px .625rem 2px 0}
+.orp .orp-sum td{padding:2px .25rem;text-align:right}
 .orp .orp-dev.ok{color:var(--ok, inherit)}
