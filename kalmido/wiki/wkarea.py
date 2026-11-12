@@ -72,7 +72,7 @@ def _editable(c, aid):
 
 
 @app.get("/api/wiki/area-share")
-def wka_get():
+def wkarea_get():
     """The facts of a whole area's share (module docstring)."""
     c = db()
     uid = me()
