@@ -42,7 +42,7 @@ from ..collab.comments import user_names
 from ..contacts.ctfolder import CTF_BOOK
 from ..contacts.ctkern import bk_node_ensure  # 2.924.0 (#5069)
 from ..accounts.orgretain import obj_share_gone  # 2.924.0 (#5069)
-from ..core.objects import obj_node_follow, obj_node_person_put  # 2.924.0 (#5069)
+from ..core.objects import obj_node_follow, obj_node_person_put, obj_share_locks  # 2.924.0 (#5069); 2.1017.0 (#5645)
 from ..contacts.model import book_members_of, book_touch
 from ..contacts.orgbooks import obk_hand_on
 from ..core.access import Denied, list_role
@@ -399,6 +399,8 @@ def _wiki(c, uid, items, new_paths, old_paths):
         wkf_sync(c, heir, None)
         for pid, who in others.items():
             n = wkf_node_of(c, pid)
+            if n is not None:  # 2.1017.0 (#5645, review F5): the lock of every fs_shares writer, buckets in order
+                obj_share_locks(c, [(n["id"], u) for u in who])
             for u, role in who.items() if n is not None else ():
                 insert_id(c, "INSERT INTO fs_shares(node_id,user_id,role,created_by,created_at) VALUES(?,?,?,?,?)", (n["id"], u, role, heir, iso(now_utc())))
 
@@ -472,6 +474,7 @@ def _folders(c, uid, items, new_paths, old_paths, doomed=frozenset()):
         for col, want in (("user_id", x["others"]), ("group_id", x.get("groups") or {})):
             if not want:
                 continue
+            obj_share_locks(c, [(nid, k) for k in want])  # 2.1017.0 (#5645, review F5): before the check-then-write below
             # review #4347: an expired row of one who keeps a role is replaced (not raised and left expired)
             c.execute(f"DELETE FROM fs_shares WHERE node_id=? AND {col} IN ({','.join('?' * len(want))}) AND NOT {live}", (nid, *want, stamp))
             have = {r[0]: r[1] for r in c.execute(f"SELECT {col}, role FROM fs_shares WHERE node_id=? AND {col} IS NOT NULL AND {live}", (nid, stamp))}

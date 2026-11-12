@@ -754,6 +754,13 @@ def obj_share_lock(c, nid, target):
     write_lock(c, f"kalmido-fsshare-{(int(nid) * 7919 + int(target)) % OBJ_SHARE_LOCKS}")
 
 
+def obj_share_locks(c, pairs):
+    """2.1017.0 (#5645, review F1): obj_share_lock for many (node, target) pairs at once -- their buckets in ascending order,
+    each once: node id order is no bucket order (two transactions with other targets could cross), bucket order is."""
+    for b in sorted({(int(n) * 7919 + int(t)) % OBJ_SHARE_LOCKS for n, t in pairs}):
+        write_lock(c, f"kalmido-fsshare-{b}")
+
+
 def obj_node_share(c, uid, n, key, target, role="view", expires_at=None, org=None, event=True, checked=False, match=None,
                    extra=None):
     """2.565.0 (#4717): the share row itself on reference node n (a row) -- obj_share's write, also for the old areas whose
