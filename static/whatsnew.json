@@ -1,6 +1,20 @@
 {
  "versions": [
   {
+   "version": "2.1075.0",
+   "date": "2026-11-12",
+   "items": [
+    {
+     "de": "Teilst du ein Projekt, einen Ordner oder eine Wissensseite per E-Mail-Adresse, wartet die Einladung im Teilen-Dialog, bis die Person ihre Adresse bestätigt hat, und lässt sich dort zurücknehmen.",
+     "en": "When you share a project, a folder or a knowledge page by e-mail address, the invitation waits in the Share dialog until the person confirms their address, and you can take it back there."
+    },
+    {
+     "de": "Ordner, Arbeitsbereich, Projekttyp, Agenten und Zeiterfassung eines Projekts lassen sich jetzt auf jedem Gerät rückgängig machen, auch aus „Letzte Schritte“.",
+     "en": "A project's folder, workspace, project type, agents and time tracking can now be undone on every device, also from \"Recent steps\"."
+    }
+   ]
+  },
+  {
    "version": "2.1067.0",
    "date": "2026-11-12",
    "items": [
@@ -1359,28 +1373,6 @@
     {
      "de": "Die Branche ist jetzt ein Schalter für die ganze App; ohne Branche gibt es ein neutrales Beispielprojekt.",
      "en": "The industry is now one switch for the whole app; without one you get a neutral sample project."
-    }
-   ]
-  },
-  {
-   "version": "2.579.0",
-   "date": "2026-11-06",
-   "items": [
-    {
-     "de": "Aufgaben lassen sich als „hängt zusammen“ oder „Duplikat von“ verknüpfen und als Duplikat schließen.",
-     "en": "Tasks can be linked as \"relates to\" or \"duplicate of\" and closed as a duplicate."
-    },
-    {
-     "de": "Ändert jemand anderes gleichzeitig dasselbe, bleiben deine Eingaben in Dialogen erhalten und die geänderten Felder sind markiert.",
-     "en": "When someone else changes the same thing at the same time, your input in dialogs stays and their fields are marked."
-    },
-    {
-     "de": "Unter Büro > Belege stehen auch die noch nicht erfassten Büro-Dokumente.",
-     "en": "Office > Receipts also lists the office documents not recorded yet."
-    },
-    {
-     "de": "Dokumente: Suchen und Filter lassen sich als Ansicht mit Namen speichern, mit Zähler in der Seitenleiste, als Favorit und auf Heute.",
-     "en": "Documents: searches and filters can be saved as a named view, with a count in the sidebar, as a favourite and on Today."
     }
    ]
   }
