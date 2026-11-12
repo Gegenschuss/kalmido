@@ -1498,7 +1498,9 @@ function lookQueue(k) {
 function lookPush() {
   lookTimer = 0; if (lookLocal() || !S.settings) return;
   const v = JSON.stringify(lookSnap()); S.settings.look = v;
-  api('PATCH', '/api/settings', {look: v}).catch(() => {});
+  // 2.997.0 (#5704): the app's own sync of the look is no step of an entry: its group (X-Kalmido-Undo-Gid) leaves HIST.fresh
+  // at once - else the next entry of an area without server steps (a new event) took it and Ctrl+Z put the look back instead
+  api('PATCH', '/api/settings', {look: v}).then(r => { const g = r?._ugid; if (g && typeof HIST === 'object') HIST.fresh = HIST.fresh.filter(f => f.gid !== g); }).catch(() => {});
 }
 function lookAdopt() {  // after a state load: first time the account has none -> upload this device's; otherwise the account wins
   if (lookLocal() || lookTimer || !S.settings) return;

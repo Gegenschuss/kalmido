@@ -100,8 +100,12 @@ const ALL = 'cal,events,comments';
     check(pl && pl.start === `${W2}T16:00` && pl.end === `${W2}T17:00` && pl.cal_id === Wk.id && !pl.all_day, 'desktop: Enter saved it at 16:00-17:00 in the calendar ' + JSON.stringify(pl && [pl.start, pl.end, pl.cal_id]));
     await until(() => e(`!document.querySelector('#view .cgnew') && [...document.querySelectorAll('#view .wcev')].some(x => x.textContent.includes('Planning'))`));
     check(await e(`!document.querySelector('#view .cgnew')`), 'desktop: the block is gone, the event is drawn');
+    const h0 = await e(`JSON.stringify(HIST.undo.slice(-3).map(x => [x.label, histGids(x)]))`);
     await e(`histStep('undo').then(() => 1)`);
-    check(await until(async () => !(await find('Planning'))), 'desktop: Undo removes the new event');
+    const gone = await until(async () => !(await find('Planning')));
+    // 2.997.0 (#5704): diagnosis on red - this window's newest entries, the toast and the person's newest server groups
+    check(gone, 'desktop: Undo removes the new event' + (gone ? '' : ' ' + JSON.stringify({h0, toast: await e(`document.querySelector('#toast')?.textContent || ''`),
+      groups: ((await call('GET', '/api/undo?limit=6')).items || []).map(x => [x.id, x.state, x.area, x.label, x.device])})));
     // 2. Esc during a drag: nothing; an empty block goes with Esc
     p = await at(e, W3, 18 * 60 + 2);
     await cmd('input.performActions', {context: ctx, actions: [
