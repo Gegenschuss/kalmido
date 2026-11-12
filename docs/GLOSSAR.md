@@ -655,6 +655,8 @@ Office & finance: quotations, invoices, bank, books, tax, DATEV, e-invoices, let
 - `kalmido/office/rcsubmit.py` (`rsb`) - Members hand in receipts to the bookkeeping ("Submit receipt")
 - `kalmido/office/receiptlist.py` (`rcl`) - The receipts list of the bookkeeping over all months, with filters, and the export of exactly that list
 - `kalmido/office/recurring.py` (`rin`) - Invoice series -- a template invoice repeated every month / quarter / year (drafts or sent)
+- `kalmido/office/repcalc.py` (`orp`) - Repricing a quotation (Nachkalkulieren), the pure calculation: one factor on the unit prices, found through the real sums
+- `kalmido/office/reprice.py` (`orp`) - Repricing a quotation: the route POST /api/office/docs/<id>/reprice (preview / apply, one undo step)
 - `kalmido/office/rethold.py` (`rth`) - The switch "Extend the lock"
 - `kalmido/office/rights.py` (`ofr`) - Office access rights -- groups (roles)
 - `kalmido/office/search.py` - The office hits of the web search (GET /api/search, tasks/ftsearch.py)
@@ -1028,6 +1030,7 @@ The start-up module.
 - `static/js/office_procdoc.js` (`pd`) - The procedure documentation (GoBD)
 - `static/js/office_receipts.js` (`rcl`) - The receipts list of the bookkeeping over all months (#office/books/receipts, "All receipts" below "Receipts this month")
 - `static/js/office_recurring.js` (`rin`) - From a template invoice. The editor of an invoice offers "
+- `static/js/office_reprice.js` (`orp`) - The dialog "Adjust prices…" of a quotation draft (module "reprice")
 - `static/js/office_rights.js` (`orr`) - The page "Rights" of the office
 - `static/js/office_sheet.js` (`dk`) - The part editor (office_parts.js)
 - `static/js/office_subs.js` (`abo`) - Fixed costs marked as a subscription with price, repeat, notice period, users, "

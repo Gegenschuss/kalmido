@@ -1324,3 +1324,12 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .ofdipdn{display:block;font-size:var(--fs-s)}
 .ofdit .ofdflags .ofdipdb{background:none;border:0;color:var(--muted);padding:0 .25rem;min-height:1.75rem;font-size:var(--fs-s)}
 .ofdit .ofdflags .ofdipdb:hover,.ofdit .ofdflags .ofdipdb:focus-visible{color:var(--accent)}
+/* 2.1041.0 (#5812): the dialog "Adjust prices…" (office_reprice.js) */
+.orp .seg{margin-bottom:.5rem}
+.orp .orp-list{max-height:12rem;overflow:auto;margin:.25rem 0;padding:0;list-style:none}
+.orp .orp-prev{min-height:5.5rem;margin-top:.5rem}
+.orp .orp-prev.busy{opacity:.6}
+.orp .orp-sum{border-collapse:collapse;font-variant-numeric:tabular-nums}
+.orp .orp-sum th{text-align:left;font-weight:400;padding:2px 10px 2px 0}
+.orp .orp-sum td{padding:2px 4px;text-align:right}
+.orp .orp-dev.ok{color:var(--ok, inherit)}

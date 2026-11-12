@@ -406,6 +406,8 @@ ORDER = (
     "office.legacyimport",  # 2.39.1 (#1182): legacy import (clients / services / equipment from .xlsx, archive of old PDFs)
     "office.archiveedit",  # 2.81.0 B (#1834): correct an archived document afterwards (client, tax lines, paid) + its history
     "office.parts",  # 2.47.0 (#1215): parts of a quotation (Teilangebote): routes, title page calculation, invoice modes
+    "office.repcalc",  # 2.1041.0 (#5812): the repricing's calculation (pure, no routes)
+    "office.reprice",  # 2.1041.0 (#5812): repricing a quotation (Nachkalkulieren), the calculation in office/repcalc.py
     "office.years",  # 2.593.0 (#4891): the years with data of the office lists (no routes)
     "office.travel",  # 2.47.3 (#1022, part B): travel expenses (trips, receipts, evaluation, billing on)
     "office.outlays",  # 2.121.0 C (#2094): bill receipts of the bookkeeping on to a client (outlays)

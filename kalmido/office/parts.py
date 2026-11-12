@@ -171,9 +171,10 @@ def _bases(t, novat):
     return {k: v for k, v in b.items() if v}
 
 
-def tp_part_calc(c, oid, r, p, pack, eur=False, home=None):
+def tp_part_calc(c, oid, r, p, pack, eur=False, home=None, items=None):
     """The calculation of one part: office_calc over its positions with the document's values overridden by the part's
-    settings; a shoot part through dk_sheet_calc (part C). Adds "bases" {rate key: net} and "kind"."""
+    settings; a shoot part through dk_sheet_calc (part C). Adds "bases" {rate key: net} and "kind".
+    2.1041.0 (#5812): items = its positions as given (the repricing's trial prices), None = the stored ones."""
     # the document's values unless the part has its own; not its discount: that one applies to the part lines of the title page
     home = _tp_home(c, oid, home)
     doc = {**_doc_calc(r, eur, home), "discount_pct": 0, "discount_amount": 0, **(p.get("settings") or {})}  # 2.1042.0 (#5815): the title page's amount stays there
@@ -196,7 +197,7 @@ def tp_part_calc(c, oid, r, p, pack, eur=False, home=None):
                "net_excl_raw": None, "lines": t.get("lines") or [], "labels": t.get("labels") or {}, "sheet_calc": t}
         out["margin"] = _num(net - dec(out["costs"]))
     else:
-        out = office_calc(doc, _part_items(c, oid, r["id"], p["id"]), pack)
+        out = office_calc(doc, _part_items(c, oid, r["id"], p["id"]) if items is None else items, pack)
         base = _bases(out, novat)
     out["kind"] = p["kind"]
     out["bases"] = {k: _num(v) for k, v in base.items()}
@@ -241,16 +242,17 @@ def _dominant(bases):
     return max(bases, key=lambda k: abs(dec(bases[k]))) if bases else "standard"
 
 
-def tp_doc_totals(c, oid, r, items, pack, eur=False, home=None):
+def tp_doc_totals(c, oid, r, items, pack, eur=False, home=None, part_items=None):
     """The totals of quotation r with parts (None: it has none -> office_calc as before). items: its title page positions.
     Part lines (kind 'item' with part_id) carry the part's net x qty; producing of the title page counts only its direct
-    positions; the title page's discount takes in part lines marked discountable."""
+    positions; the title page's discount takes in part lines marked discountable.
+    2.1041.0 (#5812): part_items {part id: positions} = those parts computed with the given positions (repricing's trial)."""
     parts = tp_parts(c, oid, r["id"])
     if not parts:
         return None
     pmap = {p["id"]: p for p in parts}
     home = _tp_home(c, oid, home)  # 2.189.0 (#2475)
-    calcs = {p["id"]: tp_part_calc(c, oid, r, p, pack, eur, home) for p in parts}
+    calcs = {p["id"]: tp_part_calc(c, oid, r, p, pack, eur, home, (part_items or {}).get(p["id"])) for p in parts}
     doc = _doc_calc(r, eur, home)
     lang = calc_lang(doc.get("lang"))  # 2.185.0 C (#2520)
     currency = calc_cur(doc)[1]  # 2.189.0 (#2475)

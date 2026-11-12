@@ -1834,6 +1834,22 @@ print model as JSON: all texts, labels and amounts already in the document's lan
 `POST /api/office/docs/<id>/finalize`, `GET /api/office/docs/<id>/log`, `GET /api/office/log?limit=` and `GET /api/office/log/chain` (2.531, the hash chain check; organisation
 admins). The head also carries the period of service (`service_from`, `service_to`, dates; printed as one line).
 
+**Adjusting prices (Nachkalkulieren, 2.1041, #5812).** "Adjust prices…" in the "More" menu of a quotation draft changes the
+unit prices themselves (no discount or markup line): by x % (also negative), to a target sum (net or, with VAT, gross) or,
+for the organisation's admins, to a surplus of x % of the net (only with external costs). Rounding to the cent, to whole
+units or to 5 units of the home currency; the stored rate (home currency) is scaled, the target means the document's
+currency. Target sums are found through the real calculation (discount, markup, handling costs, raw data and producing
+count as in the document; positions that count in no sum stay out): one factor, then "put the rest on one position"
+moves the largest changed position by whole cents; what cannot be met to the cent (quantity > 1, VAT rounding) is shown as
+the deviation. The producing day rate goes along (tick, on by default). The dialog ticks the positions to change (all by
+default) and, with parts, whose prices (title page or one part; the target still means the whole quotation). Headings,
+texts, part lines and percentage positions are never scaled. One undo step; the office log says "prices changed by x %".
+`POST /api/office/docs/<id>/reprice` `{mode: pct|net|gross|margin, value, round: cent|euro|five, rest, producing,
+item_ids?, part_id?, apply, expect_updated_at?}` -> `{pct, factor, before, after, deviation, reachable, reason?, items,
+producing_rate?}` (+ `doc` after `apply`); `apply: false` is the preview and writes nothing. Draft quotations only (409),
+margin 403 for members and 400 without external costs, an unreachable target 409 on apply. No agent tool (decision of
+12.11.2026).
+
 ### The project of a document
 
 *Since 2.168.*
