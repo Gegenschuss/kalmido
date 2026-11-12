@@ -46,6 +46,13 @@ def _cfs_id(c, oid):
     c.execute("UPDATE office_cf_start SET id=org_id WHERE org_id=? AND id IS NULL", (oid,))
 
 
+def cfs_start_fix(c):
+    """Review 2.1050.0 (F1), every start: a start balance an older version (after a step back) set again on a row of the
+    core's trash (its upsert leaves deleted_at) is live again -> number of rows."""
+    return c.execute("UPDATE office_cf_start SET deleted_at=NULL, deleted_by=NULL "
+                     "WHERE deleted_at IS NOT NULL AND updated_at <> '' AND updated_at::timestamptz > deleted_at").rowcount
+
+
 def _cfs_adj_limit(c, oid, row):
     """2.1004.0 (#5494, review 2.905): a correction back from the trash counts against CFS_MAX_MONTH of its month as a new one
     (under the area's lock of cfs_adjust_post); 409, the restore rolls back."""
@@ -125,10 +132,11 @@ def cfs_start_put():
     if c.execute("SELECT 1 FROM office_cf_start WHERE org_id=? AND deleted_at IS NOT NULL", (oid,)).fetchone():
         # 2.1050.0 (#5789): one in the trash makes room (one row per office): deleted for good on the core's way (its undo
         # step and history go along); the new one is a row of its own (the copies' restore answered 409 here before)
+        _cfs_id(c, oid)  # review 2.1050.0 (F2): a row an older version wrote (no id yet) is found by the purge
         ofk_purge(c, CFS_START_KIND, oid)
     row = oc_enc_fields(c, oid, "office_cf_start", {"amount": amount})
     c.execute("INSERT INTO office_cf_start(org_id, id, amount, day, updated_by, updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(org_id) DO UPDATE SET "
-              "id=excluded.id, amount=excluded.amount, day=excluded.day, updated_by=excluded.updated_by, updated_at=excluded.updated_at, rev=office_cf_start.rev+1",
+              "id=excluded.id, deleted_at=NULL, deleted_by=NULL, amount=excluded.amount, day=excluded.day, updated_by=excluded.updated_by, updated_at=excluded.updated_at, rev=office_cf_start.rev+1",
               (oid, oid, row["amount"], day, uid, iso(now_utc())))
     bump(c)
     c.commit()

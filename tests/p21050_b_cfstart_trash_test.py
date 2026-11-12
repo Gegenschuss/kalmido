@@ -63,8 +63,9 @@ def row(oid):
     return r[0] if r else None
 
 
-def old_copy(oid, uid, when="2026-11-09T10:00:00.000Z"):
-    """The start balance of oid as a copy in office_trash and the row deleted, as cfstart.py (otrash.otb_put, key org_id) did
+def old_copy(oid, uid, when="2099-01-09T10:00:00.000Z"):
+    """2.1050.0 review (F1): dated after the row's last save, as a real copy is (the app's start revives a trashed row
+    saved after its delete, office/cfstart.py cfs_start_fix; in_app runs that start). The start balance of oid as a copy in office_trash and the row deleted, as cfstart.py (otrash.otb_put, key org_id) did
     before 2.1050 -> the copy's id."""
     raw = json.loads(dbx("SELECT CAST(row_to_json(x) AS TEXT) FROM office_cf_start x WHERE org_id=?", (oid,))[0][0])
     snap = {"rows": [["office_cf_start", [{k: v for k, v in raw.items() if k not in ("id", "deleted_at", "deleted_by", "rev")}]]],
@@ -147,7 +148,7 @@ def scenario(S, who, oid, uid, other, member=None):
           and dbx("SELECT amount FROM office_cf_start WHERE org_id=?", (oid,))[0][0] == sealed,
           f"{who}: the copy is a row of the core's trash (deleted_by of the copy, sealed as stored) {rw} {out[-200:]}")
     it = listed(S, oid)
-    check(it and it[0]["kind"] == "cf_start" and it[0]["label"] == PM1 and str(it[0]["deleted_at"]).startswith("2026-11-09"),
+    check(it and it[0]["kind"] == "cf_start" and it[0]["label"] == PM1 and str(it[0]["deleted_at"]).startswith("2099-01-09"),
           f"{who}: listed with the copy's day and time {it}")
     r = S.post(OFC + f"/trash/core/ocfstart/{oid}/restore")
     st = start(S) or {}
@@ -159,6 +160,20 @@ def scenario(S, who, oid, uid, other, member=None):
     check(dbx("SELECT 1 FROM office_trash WHERE id=?", (tid2,)) and (start(S) or {}).get("amount") == "10.00" and not listed(S, oid),
           f"{who}: set again meanwhile: the copy stays a copy, the new value stays, nothing listed")
     dbx("DELETE FROM office_trash WHERE id=?", (tid2,))
+    # review 2.1050.0 (F1): an older version (after a step back) set the start balance again on a row of the trash - its
+    # upsert leaves deleted_at: at the next start the row is live again; a row deleted after its last save stays in the trash
+    S.delete(ST)
+    dbx("UPDATE office_cf_start SET deleted_at=deleted_at - interval '1 hour', updated_at=? WHERE org_id=?",
+        ("2100-01-01T00:00:00.000Z", oid))
+    # the start of in_app's process runs cfs_start_fix already (kalmido/startup.py); the explicit call finds nothing left then
+    out = in_app("from kalmido.office.cfstart import cfs_start_fix\nprint('FIX', cfs_start_fix(c))\nc.commit()")
+    check("FIX" in out and (start(S) or {}).get("amount") == "10.00" and row(oid)[1] is None and not listed(S, oid),
+          f"{who}: a start balance an older version set on a trashed row is live again {out[-200:]}")
+    dbx("UPDATE office_cf_start SET updated_at=? WHERE org_id=?", ("2000-01-01T00:00:00.000Z", oid))  # its save before the delete
+    S.delete(ST)
+    out = in_app("from kalmido.office.cfstart import cfs_start_fix\nprint('FIX', cfs_start_fix(c))\nc.commit()")
+    check("FIX 0" in out and start(S) is None and listed(S, oid), f"{who}: a start balance deleted after its save stays in the trash {out[-200:]}")
+    S.post(OFC + f"/trash/core/ocfstart/{oid}/restore")
     S.delete(ST)
     S.delete(OFC + f"/trash/core/ocfstart/{oid}")
 
