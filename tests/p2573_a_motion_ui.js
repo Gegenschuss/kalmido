@@ -1,7 +1,7 @@
 // 2.573.0 (#4763) UI: from 768 px showing and hiding moves briefly like on a phone.
 // kalmido-suite: fresh
 // app.css block "2.573.0 (#4763)", sheetmotion.js an_desk / an_panelOut / an_play: the side panel slides in and out, the sidebar glides in when it unfolds, menus (#pop) and the
-// date picker (.dpop) pop up and fade, the toast slides in and fades, the rows of an opened task roll in. Closing keeps the node only
+// date picker (.dpop) pop up and fade (2.1081.0 #5901: menus glide a little from above), the toast slides in and fades, the rows of an opened task roll in. Closing keeps the node only
 // for its exit: gone after at most 300 ms (measured in the page, waiting for the state, never a fixed time). With reduced motion
 // nothing moves and closing removes at once. Own container (start.sh), Firefox at 1280 px with a mouse; alice (organisation) and
 // frida (no organisation) run every check.
@@ -92,9 +92,11 @@ const anim = sel => `(() => { const e = document.querySelector('${sel}'); return
 
     // 3) a menu and the date picker
     await ev(`(() => { openPop(document.querySelector('#view .trow[data-id="${P}"]'), '<button type="button">x</button>'); return 1; })()`);
-    check(await ev(anim('#pop')) === 'an_mpop', `${tag}: the menu pops up (${await ev(anim('#pop'))})`);
+    // 2.1081.0 (#5901): a menu glides down a little from its button and fades in (an_mdrop), it goes back up (an_mdropout)
+    check(await ev(anim('#pop')) === 'an_mdrop', `${tag}: the menu glides in (${await ev(anim('#pop'))})`);
+    check(await ev(`document.querySelector('#pop').textContent.trim() === 'x' && getComputedStyle(document.querySelector('#pop')).display === 'block'`), `${tag}: the menu shows its entry`);
     const pop = await ev(`(async () => { closePop(); await Promise.resolve(); const p = document.querySelector('#pop'); return {hid: p.classList.contains('hidden'), out: p.classList.contains('an-out'), disp: getComputedStyle(p).display, name: getComputedStyle(p).animationName}; })()`);
-    check(pop.hid && pop.out && pop.disp === 'block' && pop.name === 'an_mpopout', `${tag}: the closed menu fades out ${JSON.stringify(pop)}`);
+    check(pop.hid && pop.out && pop.disp === 'block' && pop.name === 'an_mdropout', `${tag}: the closed menu glides out ${JSON.stringify(pop)}`);
     const tP = await ev(GONE(`() => getComputedStyle(document.querySelector('#pop')).display === 'none'`));
     check(tP >= 0 && tP <= 300, `${tag}: the menu is gone after at most 300 ms (${tP} ms)`);
     await ev(`(() => { dpOpen(document.querySelector('#view .trow[data-id="${P}"]'), {kind: 'date', value: ''}); return 1; })()`);
@@ -118,9 +120,25 @@ const anim = sel => `(() => { const e = document.querySelector('${sel}'); return
     check(t.out && t.disp === 'flex', `${tag}: the hidden message fades out ${JSON.stringify(t)}`);
     const tT = await ev(GONE(`() => getComputedStyle(document.querySelector('#toast')).display === 'none'`));
     check(tT >= 0 && tT <= 300, `${tag}: the message is gone after at most 300 ms (${tT} ms)`);
+
+    // 7) 2.1081.0 (#5901): on a phone a menu is a sheet that slides up from the bottom (.2 s) and down again; opened again while it
+    // slides down it stays open (the new opening is not swallowed)
+    await o.cmd('browsingContext.setViewport', {context: o.ctx, viewport: {width: 390, height: 844}});
+    await until(`isMobile()`, {timeout: 3000});
+    await ev(`(() => { openPop(document.querySelector('#view .trow[data-id="${P}"]'), '<div class="menu-list"><button type="button">Sheet entry</button></div>'); return 1; })()`);
+    const sh = await ev(`(() => { const p = document.querySelector('#pop'), cs = getComputedStyle(p); return {sheet: p.classList.contains('sheet'), name: cs.animationName, dur: cs.animationDuration, txt: p.textContent.trim()}; })()`);
+    check(sh.sheet && sh.name === 'an_up' && sh.dur === '0.2s' && sh.txt === 'Sheet entry', `${tag}: phone, the menu slides up as a sheet with its entry ${JSON.stringify(sh)}`);
+    const shOut = await ev(`(async () => { closePop(); await Promise.resolve(); const p = document.querySelector('#pop'), cs = getComputedStyle(p); return {hid: p.classList.contains('hidden'), out: p.classList.contains('an-out'), disp: cs.display, name: cs.animationName}; })()`);
+    check(shOut.hid && shOut.out && shOut.disp === 'block' && shOut.name === 'an_down', `${tag}: phone, the closed sheet slides down ${JSON.stringify(shOut)}`);
+    const re = await ev(`(async () => { openPop(document.querySelector('#view .trow[data-id="${P}"]'), '<div class="menu-list"><button type="button">Again</button></div>'); await Promise.resolve(); const p = document.querySelector('#pop');
+      return {hid: p.classList.contains('hidden'), out: p.classList.contains('an-out'), txt: p.textContent.trim(), pe: getComputedStyle(p).pointerEvents}; })()`);
+    check(!re.hid && !re.out && re.txt === 'Again' && re.pe !== 'none', `${tag}: phone, opened again while sliding down, the menu stays open and usable ${JSON.stringify(re)}`);
+    await ev(`(() => { closePop(); return 1; })()`);
+    const tSh = await ev(GONE(`() => getComputedStyle(document.querySelector('#pop')).display === 'none'`));
+    check(tSh >= 0 && tSh <= 300, `${tag}: phone, the sheet is gone after at most 300 ms (${tSh} ms)`);
   }, false);
 
-  // ---- reduced motion: nothing moves, closing removes at once
+  // ---- reduced motion: nothing moves (2.1081.0 #5901: a menu fades in), closing removes at once
   for (const who of ['alice', 'frida']) await still(async o => {
     const {ev, until} = o, tag = `${who} 1280px reduced motion`;
     const {P} = await open(o, who);
@@ -130,6 +148,10 @@ const anim = sel => `(() => { const e = document.querySelector('${sel}'); return
     const d = await ev(`(() => { closeDetail(); const d = document.querySelector('#detail'); return {out: d.classList.contains('an-out'), pos: getComputedStyle(d).position}; })()`);
     check(!d.out && d.pos !== 'fixed', `${tag}: the panel does not wait for an exit ${JSON.stringify(d)}`);
     check(!!await until(`document.querySelector('#detail').classList.contains('hidden')`, {timeout: 1000}), `${tag}: the panel is hidden`);
+    // 2.1081.0 (#5901): with reduced motion a menu only fades in (no movement), closing stays at once
+    await ev(`(() => { openPop(document.querySelector('#view .trow[data-id="${P}"]'), '<button type="button">x</button>'); return 1; })()`);
+    check(await ev(anim('#pop')) === 'an_fadein', `${tag}: the menu only fades in (${await ev(anim('#pop'))})`);
+    await ev(`(() => { closePop(); return 1; })()`);
     const p = await ev(`(async () => { openPop(document.querySelector('#view .trow[data-id="${P}"]'), '<button type="button">x</button>'); closePop(); await Promise.resolve(); const p = document.querySelector('#pop'); return {out: p.classList.contains('an-out'), disp: getComputedStyle(p).display}; })()`);
     check(!p.out && p.disp === 'none', `${tag}: the menu is gone at once ${JSON.stringify(p)}`);
     const dp = await ev(`(() => { dpOpen(document.querySelector('#view .trow[data-id="${P}"]'), {kind: 'date', value: ''}); dpClose(false); return !!document.querySelector('.dpop'); })()`);
