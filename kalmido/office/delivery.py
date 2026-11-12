@@ -44,7 +44,7 @@ def ls_items(c, oid, src):
         rows = doc_items(c, src["id"], oid)
     out = []
     for it in rows:
-        if it.get("kind") not in ("service", "text", "heading") or it.get("unit") == "percent":
+        if it.get("kind") not in ("service", "text", "heading") or it.get("unit") == "percent" or it.get("opt"):  # 2.1041.0 (#5814): not ordered
             continue
         out.append({"kind": it["kind"], "service_id": None, "title": it.get("title") or "", "detail": it.get("detail") or "", "qty": it.get("qty"),
                     "unit": it.get("unit") or "", "rate": 0, "tax": it.get("tax") or "standard", "intext": it.get("intext") or "intern", "cost": 0,

@@ -131,6 +131,9 @@ inv = r.json()
 check(sorted(x["title"] for x in inv["items"] if x["kind"] == "service") == ["Kamera", "Konzept"] and inv["totals"]["net"] == "3960.00",
       "#5814: the invoice takes the normal positions only, same net " + str([x["title"] for x in inv["items"]]) + " " + str(inv["totals"]["net"]))
 check(not any(x.get("opt") for x in inv["items"]), "#5814: an invoice position is never optional")
+r = A.post(B + f"{D}/{Q['id']}/delivery", json={})
+check(r.status_code == 201 and sorted(x["title"] for x in r.json()["items"] if x["kind"] == "service") == ["Kamera", "Konzept"],
+      "#5814: a delivery note from the quotation leaves them out as well " + r.text[:200])
 # back to normal: counted at once
 cur = A.get(B + f"{D}/{Q['id']}").json()["items"]
 for x in cur:
