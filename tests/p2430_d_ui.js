@@ -52,9 +52,12 @@ const FEAT = 'comments,collab,time,progress';
     check(await until(`(async () => (await fetch('/api/time/entries?scope=all&lists=${L}').then(r => r.json())).entries.length === 0)()`), '#1434: the entries are gone');
     // Undo
     check(await until(`!![...document.querySelectorAll('#toast button, .toast button')].find(b => /Undo/i.test(b.textContent))`, 20), '#1434: an Undo offer');
+    // 2.997.0 (#5702): the newest step and the server's newest groups in the message (which step went back)
+    const top = await ev(`JSON.stringify((e => e ? {label: e.label, gids: histGids(e), fn: typeof e.undo} : null)(HIST.undo[HIST.undo.length - 1]))`);
+    const groups = await ev(`(async () => JSON.stringify(((await (await fetch('/api/undo?limit=5')).json()).items || []).map(x => [x.id, x.label, x.state, x.at])))()`);
     await ev(`[...document.querySelectorAll('#toast button, .toast button')].find(b => /Undo/i.test(b.textContent)).click()`);
     const undone = await until(`(async () => (await fetch('/api/time/entries?scope=all&lists=${L}').then(r => r.json())).entries.length === 2)()`);
-    check(undone, '#1434: Undo brings both entries back ' + await ev(`(async () => JSON.stringify([(await fetch('/api/time/entries?scope=all&lists=${L}').then(r => r.json())).entries.length, document.querySelector('#toast, .toast')?.textContent, HIST.undo.length, HIST.busy]))()`));
+    check(undone, '#1434: Undo brings both entries back ' + await ev(`(async () => JSON.stringify([(await fetch('/api/time/entries?scope=all&lists=${L}').then(r => r.json())).entries.length, document.querySelector('#toast, .toast')?.textContent, HIST.undo.length, HIST.busy]))()`) + ' ' + top + ' ' + groups);
 
     // ================= #1500
     await nav(B + '#l/' + L);

@@ -111,9 +111,13 @@ const FEAT = 'comments,collab,agents';
     check((await get(T['misc stuff'])).title === 'Sort the misc box', '#1151: renamed with the edited title');
     check((await get(T['Archive boxes'])).section_id === SEC && (await get(T['Old fair booth'])).status === -1, '#1151: moved, closed');
     check(await ev(`HIST.undo[HIST.undo.length - 1].label`) === 'Applied the proposal of Tidy', '#1151: one history step');
+    const top = await ev(`JSON.stringify((e => e ? {label: e.label, gids: histGids(e), at: e.at} : null)(HIST.undo[HIST.undo.length - 1]))`);
+    const groups = await ev(`(async () => JSON.stringify(((await (await fetch('/api/undo?limit=5')).json()).items || []).map(x => [x.id, x.label, x.state, x.at])))()`);
     await ev(`(async () => { await histStep('undo'); return 1; })()`); await sleep(800);
-    check((await get(T['Flyer order'])).title === 'Flyer order' && (await get(T['Order flyers'])).status === 0 && (await get(T['misc stuff'])).title === 'misc stuff'
-      && (await get(T['Archive boxes'])).section_id === null && (await get(T['Old fair booth'])).status === 0, '#1151: undo takes everything back');
+    // 2.997.0 (#5615): the toast and the values in the message (which step went back)
+    const ub = [(await get(T['Flyer order'])).title, (await get(T['Order flyers'])).status, (await get(T['misc stuff'])).title, (await get(T['Archive boxes'])).section_id, (await get(T['Old fair booth'])).status];
+    check(ub[0] === 'Flyer order' && ub[1] === 0 && ub[2] === 'misc stuff'
+      && ub[3] === null && ub[4] === 0, '#1151: undo takes everything back ' + JSON.stringify(ub) + ' ' + top + ' ' + groups + ' ' + await ev(`document.querySelector('#toast')?.textContent || ''`));
     await ev(`(async () => { await histStep('redo'); return 1; })()`); await sleep(800);
     check((await get(T['Order flyers'])).status === -1 && (await get(T['Archive boxes'])).section_id === SEC, '#1151: redo applies it again');
   }, true);

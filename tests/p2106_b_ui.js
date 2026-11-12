@@ -64,9 +64,12 @@ const TXT = 'Versicherung Beispiel AG\nDatum: 05.10.2026\nUnser Zeichen: VB-2026
     const task = t ? await call(CA, 'GET', `/api/tasks/${t}`) : {};
     check((task.due || '').slice(0, 10) === '2026-10-31' && /^Deadline: /.test(task.title || ''), 'create task: due on the deadline ' + task.due + ' ' + task.title);
     check(await ready(ev, `!document.querySelector('.ltd-dl')`), 'create task: the deadline row is gone');
+    // 2.997.0 (#5607): the newest step before the undo and the toast after it in the message (which step went back)
+    const top = await ev(`JSON.stringify((e => e ? {label: e.label, gids: histGids(e), fn: typeof e.undo} : null)(HIST.undo[HIST.undo.length - 1]))`);
+    const groups = await ev(`(async () => JSON.stringify(((await (await fetch('/api/undo?limit=5')).json()).items || []).map(x => [x.id, x.label, x.state, x.at])))()`);
     await ev(`(() => { histStep('undo'); return 1; })()`);
     let gone = false; for (let i = 0; i < 40 && !gone; i++) { gone = !(await tid()); if (!gone) await sleep(250); }
-    check(gone, 'undo: the task link is gone');
+    check(gone, 'undo: the task link is gone ' + top + ' ' + groups + ' ' + await ev(`document.querySelector('#toast')?.textContent || ''`));
     check((await call(CA, 'GET', `/api/tasks/${t}`)).http === 404 || (await call(CA, 'GET', `/api/tasks/${t}`)).deleted_at, 'undo: the task is deleted');
     // phone width
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
