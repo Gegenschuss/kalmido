@@ -14,6 +14,10 @@ travel costs never offer a draft of the trash. Invented names and figures only.
  - the copies' routes of the other kinds are gone: POST /api/office/trash/<id>/restore of a draft's copy 404
  - travel costs (#5415 D, d_leser.md): a draft of the trash is never offered for billing (bill-docs), billing onto it 404, a
    receipt billed on it counts as open again, its project title is no project of the trip form
+ - 2.1055.0 (#5791, fable 2.1005 F5): that receipt billed on another invoice meanwhile -> the draft's restore takes its position
+   out (taken, note), the other invoice keeps it; a receipt billed nowhere else comes back bound to the draft's position
+ - 2.1055.0 (#5791, F6): the copies' run reads only ids first, loads each copy on its own (never the start balance's), and asks
+   the catalog for a table's columns once per run
 freelancer-matrix: office (a person without an organisation: every step in her personal office)
 tenant-matrix: office (another organisation: 404 on the restore of a written-back draft)
 usage: p21005_e_copies_back_test.py <datadir>"""
@@ -179,6 +183,34 @@ def scenario(S, who, oid, uid):
     t = next((x for x in j.get("trips", []) if x["id"] == trip2), {})
     check([x.get("billed") for x in t.get("items") or []] == [None], f"{who}: its receipt counts as open (not billed on the trash) {t.get('items')}")
     check(f"Example Travel Bill {who}" not in (j.get("projects") or []), f"{who}: its project title is no project of the trip form {j.get('projects')}")
+    # ------------------------------------------------------------ 2.1055.0 (#5791, fable 2.1005 F5): never billed twice
+    # the open receipt goes onto another invoice meanwhile; the draft's restore takes its position out and says so
+    r = S.post(OFC + "/docs", json={"kind": "invoice", "lang": "en", "project_title": f"Example Second Bill {who}"})
+    inv2 = r.json()["id"]
+    r = S.post(T + "/bill", json={"doc_id": inv2, "item_ids": [rc]})
+    check(r.ok, f"{who}: (5791) the open receipt billed on another invoice {r.text[:200]}")
+    r = S.post(OFC + f"/trash/core/odoc/{inv}/restore")
+    j = r.json() if r.ok else {}
+    d = S.get(OFC + f"/docs/{inv}").json() if r.ok else {}
+    check(r.ok and j.get("taken") == 1 and "billed on another document" in (j.get("note") or ""),
+          f"{who}: (5791) the restore names the position taken out {r.text[:300]}")
+    check(r.ok and not [x for x in d.get("items") or [] if "Taxi" in (x.get("title") or "")] and float((d.get("totals") or {}).get("net") or 0) == 0,
+          f"{who}: (5791) the restored draft no longer carries the receipt's position (sums recalculated) {d.get('items')} {d.get('totals')}")
+    d2 = S.get(OFC + f"/docs/{inv2}").json()
+    check([x for x in d2.get("items") or [] if "Taxi" in (x.get("title") or "")], f"{who}: (5791) the other invoice keeps its position {d2.get('items')}")
+    check(dbx("SELECT billed_doc_id FROM office_trip_items WHERE id=?", (rc,))[0][0] == inv2, f"{who}: (5791) the receipt stays billed on the other invoice")
+    # a receipt still billed on the draft only: its position comes back with it, the receipt bound to it as before
+    r = S.post(T, json={"date_from": PM1, "date_to": PM1, "dest": f"Example Pier {who}",
+                        "items": [{"date": PM1, "category": "taxi", "amount": "23.00", "currency": "EUR"}]})
+    rc3 = r.json()["items"][0]["id"]
+    pos3 = (S.post(T + "/bill", json={"doc_id": inv, "item_ids": [rc3]}).json().get("positions") or [None])[0]
+    check(S.delete(OFC + f"/docs/{inv}").ok, f"{who}: (5791) the draft into the trash again")
+    r = S.post(OFC + f"/trash/core/odoc/{inv}/restore")
+    d = S.get(OFC + f"/docs/{inv}").json() if r.ok else {}
+    check(r.ok and not r.json().get("taken") and pos3 in [x["id"] for x in d.get("items") or []],
+          f"{who}: (5791) a position whose receipt is billed nowhere else comes back {r.text[:200]}")
+    check(dbx("SELECT billed_doc_id, billed_item_id FROM office_trip_items WHERE id=?", (rc3,))[0] == (inv, pos3),
+          f"{who}: (5791) its receipt is billed on the draft as before")
 
 
 scenario(A, "alice", ORG, AID)
@@ -198,6 +230,33 @@ check(len(dbx("SELECT id FROM office_trash WHERE id IN (?,?,?)", tuple(bad))) ==
 check(not dbx("SELECT 1 FROM office_services WHERE id=?", (fsvc,)) and dbx("SELECT 1 FROM office_trash WHERE id=?", (tf,)),
       f"(F2) a copy filed under another organisation is not written back (stays a copy) {out[-200:]}")
 check(not [x for x in trash(Ol) if x.get("id") == fsvc], "(F2) the other organisation's office trash does not list it")
+
+# ------------------------------------------------------------ 2.1055.0 (#5791, fable 2.1005 F6): the run on every start reads only
+# the ids of the copies first (never every snapshot of the table at once, never the start balance's copies kept here) and asks
+# the catalog for a table's columns once per run
+check(A.put(OFC + "/cashflow/start", json={"amount": "400.00", "day": PM1}).ok and A.delete(OFC + "/cashflow/start").ok,
+      "(F6) setup: a start balance's copy kept in office_trash")
+cs = dbx("SELECT id FROM office_trash WHERE kind='cf_start' ORDER BY id DESC LIMIT 1")[0][0]
+out = in_app("""from kalmido.office.okern import ofk_copies_back
+q = []
+class W:
+    def __init__(s, c):
+        s.c = c
+    def execute(s, sql, *a):
+        q.append((sql, a))
+        return s.c.execute(sql, *a)
+    def __getattr__(s, n):
+        return getattr(s.c, n)
+print('BACK', ofk_copies_back(W(c)))
+print('ALLSNAPS', any('FROM office_trash' in x and 'SELECT *' in x and 'WHERE id=' not in x for x, _a in q))
+print('LOADED', sorted(a[0][0] for x, a in q if x.startswith('SELECT * FROM office_trash WHERE id=') and a))
+cat = [a[0][0] for x, a in q if 'information_schema.columns' in x and a]
+print('CATALOG', len(cat) == len(set(cat)))
+c.rollback()""")
+check("ALLSNAPS False" in out, f"(F6) never every snapshot of office_trash at once {out[-300:]}")
+ld = next((json.loads(x[7:]) for x in out.splitlines() if x.startswith("LOADED ")), None)
+check(ld is not None and cs not in ld, f"(F6) the start balance's copy is never loaded {out[-300:]}")
+check("CATALOG True" in out, f"(F6) a table's columns asked once per run {out[-300:]}")
 
 # ------------------------------------------------------------ 2.1005.0 (#5415, merge with #5494): an old sign-off record's copy
 # (office/signoff.py sig_gone_delete before 2.1004 put an orphaned video review's record into office_trash, kind signoff): it

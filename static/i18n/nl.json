@@ -16216,6 +16216,7 @@
   "Columns, custom fields and project tags are taken from one of your projects. Fields and tags the projects lack are added; nothing is removed, the values of the tasks stay.": "Kolommen, eigen velden en projecttags worden overgenomen uit een van je projecten. Ontbrekende velden en tags komen erbij; er wordt niets verwijderd, de waarden van de taken blijven.",
   "Credit card position": "Creditcardpost",
   "Restored without a client: the client was deleted permanently meanwhile.": "Hersteld zonder klant: de klant is intussen definitief verwijderd.",
+  "Restored without {0} position: its receipt or time was billed on another document meanwhile.": ["Hersteld zonder {0} positie: de bon of tijd is intussen op een ander document gefactureerd.", "Hersteld zonder {0} posities: hun bonnen of tijden zijn intussen op een ander document gefactureerd."],
   "{0} task with a value was moved to another project: its value is deleted too.": ["{0} taak met een waarde is naar een ander project verplaatst: de waarde wordt ook verwijderd.", "{0} taken met een waarde zijn naar een ander project verplaatst: hun waarden worden ook verwijderd."],
   "{0} task moved to another project loses its values of this project’s fields.": ["{0} naar een ander project verplaatste taak verliest haar waarden uit de velden van dit project.", "{0} naar een ander project verplaatste taken verliezen hun waarden uit de velden van dit project."],
   "Its name was taken: restored as {0}": "De naam was bezet: hersteld als {0}",

@@ -302,8 +302,8 @@ def _dangling(c, table, row):
 # whose row or a unique key is there again (restored meanwhile, a new text with its key) is left in office_trash and counted.
 # Every start (kalmido/startup.py after init_db, the app's modules loaded): a no-op once no copy of a core kind is left; the table stays for
 # one more version (an older version still reads it).
-def _copy_insert(c, table, names, row):
-    cols = table_columns(c, table)
+def _copy_insert(c, table, names, row, tc=table_columns):
+    cols = tc(c, table)  # 2.1055.0 (#5791): tc = the run's cache of table_columns
     c.execute(f"INSERT INTO {qi(table, names)}({','.join(qi(k, cols) for k in row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 
 
@@ -320,11 +320,12 @@ def _doc_refs_row(row, snap, orig):
     return row
 
 
-def _copy_back(c, kind, t, snap, names):
-    """Copy t (a row of office_trash) of kind back; raises on a conflict (the caller's savepoint takes it all back)."""
+def _copy_back(c, kind, t, snap, names, tc=table_columns):
+    """Copy t (a row of office_trash) of kind back; raises on a conflict (the caller's savepoint takes it all back). tc: table_columns
+    or the run's cache of it (2.1055.0, #5791)."""
     ts, by = t["deleted_at"], t["deleted_by"]
     table, top = snap["rows"][0]
-    cols = table_columns(c, table)
+    cols = tc(c, table)
     ids = []
     for raw in top:
         row = {k: _unval(v) for k, v in raw.items() if k in cols}
@@ -339,13 +340,13 @@ def _copy_back(c, kind, t, snap, names):
         row.update(deleted_at=ts, **({"deleted_by": by} if "deleted_by" in cols else {}))
         if table == "office_docs":
             row = _doc_refs_row(row, snap, orig)
-        _copy_insert(c, table, names, row)
+        _copy_insert(c, table, names, row, tc)
         ids.append(row["id"])
     kids = OBJ[kind].get("children") or ()
     for table2, rows2 in snap["rows"][1:]:
         if table2 not in names:
             continue
-        cols2 = table_columns(c, table2)
+        cols2 = tc(c, table2)
         mine = [col for kt, col in kids if kt == table2]
         for raw in rows2:
             row = {k: _unval(v) for k, v in raw.items() if k in cols2}
@@ -355,12 +356,12 @@ def _copy_back(c, kind, t, snap, names):
                 row["deleted_at"] = ts  # a child of the kind: in the trash with it (core/writes.py _kids_trash)
             try:  # a row that cannot come back (its other parent is gone, a duplicate) is left out, as the copies' restore did
                 with c.savepoint():
-                    _copy_insert(c, table2, names, row)
+                    _copy_insert(c, table2, names, row, tc)
             except Exception:  # noqa: BLE001
                 continue
     if table != "office_docs":  # the references emptied on the delete point at it again (the row is there, in the trash)
         for table2, col, value, rids in snap.get("nulls") or []:
-            cols3 = table_columns(c, table2) if table2 in names else ()
+            cols3 = tc(c, table2) if table2 in names else ()
             if col in cols3:  # review 2.1005.0 (F2): only rows of the copy's area
                 area = " AND org_id=?" if "org_id" in cols3 else ""
                 c.execute(f"UPDATE {qi(table2, names)} SET {qi(col, cols3)}=? WHERE id = ANY(CAST(? AS BIGINT[])) "
@@ -374,14 +375,28 @@ def ofk_copies_back(c):
         return out
     kinds = {k["table"]: kind for kind, k in OFK.items()}
     names = table_names(c)
+    from .otrash import OTB_KINDS  # 2.1055.0 (#5791, fable 2.1005 F6): at call time (otrash imports this module)
+    cols = {}  # table -> its columns, once per run (was a catalog query per copy and row)
+
+    def tc(_c, table):
+        if table not in cols:
+            cols[table] = table_columns(c, table)
+        return cols[table]
+
     with system_ctx(c):
-        for t in c.execute("SELECT * FROM office_trash ORDER BY id").fetchall():
+        # 2.1055.0 (#5791, F6): first only the ids of the copies of the other kinds (never the start balance's copies kept
+        # here), then each copy's snapshot on its own -- not every snapshot of the table at once on every start
+        tids = [x[0] for x in c.execute("SELECT id FROM office_trash WHERE kind <> ALL(CAST(? AS TEXT[])) ORDER BY id", (list(OTB_KINDS),))]
+        for tid in tids:
+            t = c.execute("SELECT * FROM office_trash WHERE id=?", (tid,)).fetchone()
+            if not t:
+                continue  # taken by a second process starting at once
             try:  # review 2.1005.0 (F1): a copy that cannot be read stays a copy, the start goes on
                 snap = json.loads(t["snap"] or "{}")
                 rows = (snap.get("rows") or []) if isinstance(snap, dict) else []
                 kind = kinds.get(rows[0][0]) if rows and (snap.get("key") or "id") == "id" else None
-                if kind is None or rows[0][0] not in names or "deleted_at" not in table_columns(c, rows[0][0]):
-                    continue  # a kind not on the core's trash (the start balance): stays a copy
+                if kind is None or rows[0][0] not in names or "deleted_at" not in tc(c, rows[0][0]):
+                    continue  # a kind not on the core's trash: stays a copy
             except (ValueError, TypeError, IndexError, KeyError, AttributeError):
                 continue
             try:
@@ -389,7 +404,7 @@ def ofk_copies_back(c):
                     # review 2.1005.0 (F7): the copy is taken first -- a second process starting at once skips it
                     if not c.execute("DELETE FROM office_trash WHERE id=?", (t["id"],)).rowcount:
                         continue
-                    _copy_back(c, kind, t, snap, names)
+                    _copy_back(c, kind, t, snap, names, tc)
                 out["back"] += 1
             except Exception as e:  # noqa: BLE001  (a conflict: the copy stays, counted)
                 out["kept"] += 1

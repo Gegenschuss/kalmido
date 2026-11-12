@@ -16216,6 +16216,7 @@
   "Columns, custom fields and project tags are taken from one of your projects. Fields and tags the projects lack are added; nothing is removed, the values of the tasks stay.": "Les colonnes, les champs personnalisés et les tags de projet sont repris d’un de tes projets. Les champs et tags manquants sont ajoutés aux projets ; rien n’est supprimé, les valeurs des tâches restent.",
   "Credit card position": "Ligne de carte de crédit",
   "Restored without a client: the client was deleted permanently meanwhile.": "Restauré sans client : le client a été supprimé définitivement entre-temps.",
+  "Restored without {0} position: its receipt or time was billed on another document meanwhile.": ["Restauré sans {0} position : son justificatif ou son temps a été facturé entre-temps sur un autre document.", "Restauré sans {0} positions : leurs justificatifs ou temps ont été facturés entre-temps sur un autre document."],
   "{0} task with a value was moved to another project: its value is deleted too.": ["{0} tâche avec une valeur a été déplacée vers un autre projet : sa valeur est aussi supprimée.", "{0} tâches avec une valeur ont été déplacées vers un autre projet : leurs valeurs sont aussi supprimées."],
   "{0} task moved to another project loses its values of this project’s fields.": ["{0} tâche déplacée vers un autre projet perd ses valeurs des champs de ce projet.", "{0} tâches déplacées vers un autre projet perdent leurs valeurs des champs de ce projet."],
   "Its name was taken: restored as {0}": "Le nom était pris : restauré sous {0}",

@@ -14,7 +14,7 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.pg import insert_id, like_escape, qi, table_columns, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_item_store, oc_json_store
-from ..core.i18n import N_, lang, tr
+from ..core.i18n import N_, lang, tr, trn
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied, live_sql
 from ..core.errors import BadInput, BadKey, DeniedKey
@@ -1952,6 +1952,7 @@ def odoc_trash(c, oid, uid, r, checked=False):
     te = [x[0] for x in c.execute("SELECT id FROM time_entries WHERE billed_doc_id=?", (did,)).fetchall()]
     if te:  # bound again on restore while still open
         refs["nulls"].append(["time_entries", "billed_doc_id", te])
+    refs["billed"] = odoc_billed_sources(c, oid, did)  # 2.1055.0 (#5791): what its positions billed, checked on restore
     from .timebill import tbill_free
     tbill_free(c, did)  # 2.144.6 A (#2053): its time entries are open again
     odoc_replace_undo(c, oid, r, uid)  # 2.437.0 B (#3621)
@@ -1972,6 +1973,58 @@ def odoc_trash(c, oid, uid, r, checked=False):
     from .docref import ofd_deleted
     ofd_deleted(c, did)  # 2.199.0 B (#2742): its folder entry goes, as on a delete
     return did
+
+
+# 2.1055.0 (#5791, fable 2.1005 F5): receipts (travel / outlays) and time entries carry billed_doc_id without a foreign key; a
+# draft in the trash bills nothing (travel.py _billed_ok, outlays.py au_billed, timebill.tbill_free), so its sources may go onto
+# another document meanwhile. The draft remembers them in trash_refs["billed"]: [table, source id, position id]; its restore
+# takes back the positions whose source sits on another document by then (never billed twice) and names that in the answer.
+ODOC_BILLED = {"office_trip_items": "id", "rc_receipts": "node_id", "time_entries": "id"}
+
+
+def odoc_billed_sources(c, oid, did):
+    """[[table, source id, position id]] of the sources billed as a position of draft did (before odoc_trash frees any)."""
+    from .books import bk_ws
+    out = [["office_trip_items", x[0], x[1]] for x in c.execute(
+        "SELECT id, billed_item_id FROM office_trip_items WHERE org_id=? AND billed_doc_id=? AND billed_item_id IS NOT NULL ORDER BY id", (oid, did))]
+    out += [["rc_receipts", x[0], x[1]] for x in c.execute(
+        "SELECT node_id, billed_item_id FROM rc_receipts WHERE ws=? AND billed_doc_id=? AND billed_item_id IS NOT NULL ORDER BY node_id", (bk_ws(c, oid), did))]
+    out += [["time_entries", x[0], x[1]] for x in c.execute(
+        "SELECT id, billed_item_id FROM time_entries WHERE billed_doc_id=? AND billed_item_id IS NOT NULL ORDER BY id", (did,))]
+    return out
+
+
+def _odoc_billed_back(c, oid, did, billed):
+    """The restore's part of #5791: a source still open is bound to its position again; a position whose source sits on another
+    document by then is taken out of the draft (with the other sources of the same position, which are open again). -> the
+    number of positions taken out."""
+    from .books import bk_ws
+    ws, ts, taken = bk_ws(c, oid), iso(now_utc()), set()
+    for table, sid, pid in billed if isinstance(billed, list) else []:
+        if table not in ODOC_BILLED or not isinstance(sid, int) or not isinstance(pid, int):
+            continue
+        key = ODOC_BILLED[table]
+        area, args = {"office_trip_items": (" AND org_id=?", (oid,)), "rc_receipts": (" AND ws=?", (ws,))}.get(table, ("", ()))
+        cur = c.execute(f"SELECT billed_doc_id FROM {qi(table, ODOC_BILLED)} WHERE {qi(key, (key,))}=?{area}", (sid, *args)).fetchone()
+        if not cur:
+            continue  # the source is gone for good: its position stays as typed
+        if cur[0] is None:  # open: bound again while its position is still on the draft
+            upd = ", updated_at=?" if table != "rc_receipts" else ""
+            c.execute(f"UPDATE {qi(table, ODOC_BILLED)} SET billed_doc_id=?, billed_item_id=?, billed_at=?{upd} WHERE {qi(key, (key,))}=?{area} "
+                      "AND billed_doc_id IS NULL AND EXISTS (SELECT 1 FROM office_doc_items x WHERE x.id=? AND x.doc_id=?)",
+                      (did, pid, ts, *((ts,) if upd else ()), sid, *args, pid, did))
+        elif cur[0] != did:
+            taken.add(pid)  # billed on another document meanwhile
+    if not taken:
+        return 0
+    before = ofx_items_brief(doc_items(c, did, oid))
+    n = c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND id IN ({','.join('?' * len(taken))})",
+                  [did, oid, *sorted(taken)]).rowcount
+    ofd_free_receipts(c, oid, did)  # the other sources of a position taken out ("one position for all") are open again
+    if n:
+        ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": ofx_items_brief(doc_items(c, did, oid))})
+        recalc(c, oid, did)
+    return n
 
 
 def _odoc_refs(row):
@@ -1995,15 +2048,24 @@ def _odoc_back(c, oid, row):
                          (sid, refs.get("series_period") or "", did)).fetchone():
         sid = None  # the series made this period again meanwhile
     c.execute("UPDATE office_docs SET number=?, series_id=?, trash_refs=NULL WHERE id=? AND org_id=?", (num, sid, did, oid))
+    taken = _odoc_billed_back(c, oid, did, refs.get("billed"))  # 2.1055.0 (#5791): before the nulls below (a time entry with its position)
     with ofx_release(c):
         for table, col, ids in refs.get("nulls") or []:
             known = {t for t, _c, _k in ofk_fk_refs(c, "office_docs")} | {"time_entries"}
             if table in known and col in table_columns(c, table):
                 cols = table_columns(c, table)
                 c.execute(f"UPDATE {qi(table, known)} SET {qi(col, cols)}=? WHERE id = ANY(CAST(? AS BIGINT[])) AND {qi(col, cols)} IS NULL", (did, list(ids)))
+    out, notes = {}, []
     if refs.get("client_id") and not row.get("client_id"):  # 2.552.0 (#4561 B19): the client was purged meanwhile
-        return {"gone": ["client_id"], "note": tr("Restored without a client: the client was deleted permanently meanwhile.")}
-    return {}
+        out["gone"] = ["client_id"]
+        notes.append(tr("Restored without a client: the client was deleted permanently meanwhile."))
+    if taken:  # 2.1055.0 (#5791): never billed twice
+        out["taken"] = taken
+        notes.append(trn("Restored without {0} position: its receipt or time was billed on another document meanwhile.",
+                         "Restored without {0} positions: their receipts or times were billed on another document meanwhile.", taken))
+    if notes:
+        out["note"] = " ".join(notes)
+    return out
 
 
 def _odoc_label(c, oid, row):
@@ -2015,7 +2077,10 @@ def _odoc_label(c, oid, row):
 ofk_register(ODOC_KIND, "office_docs", N_("Document"), "offers", step=False,
              base=lambda c, uid, row: "manage" if _ofr_may(c, uid, row["org_id"], "manage") else None,
              view={"kind": "doc", "sub": lambda row: row["kind"], "label": _odoc_label, "ctx": _ctx, "back": _odoc_back,
-                   "lock": lambda oid, row: (f"office_doc_{int(row['id'])}", f"office_num_{int(oid)}"),  # as its saves, then _assign_number
+                   "lock": lambda oid, row: (f"office_doc_{int(row['id'])}", f"office_num_{int(oid)}",  # as its saves, then _assign_number
+                                             # 2.1055.0 (#5791): + the billings' locks (travel.py / outlays.py, after the document's
+                                             # as theirs): a billing never runs in between the check of _odoc_billed_back
+                                             f"office_trips_bill_{int(oid)}", f"office_receipts_bill_{int(oid)}"),
                    "who": lambda c, uid, oid: _ofr_may(c, uid, oid, "manage")})
 
 
