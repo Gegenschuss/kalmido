@@ -113,8 +113,10 @@ r = ag.get(V + "/search", params={"kind": "help", "q": "scan inbox folder"}).jso
 dev = [h["key"] for h in r["data"] if not h.get("user")]
 check(r["data"][0]["key"] == USCAN and dev[:1] == ["api#scan-inboxes-folder-watcher"], "English words: the user's section first, then the developer section")
 rd = ag.get(V + "/help/section", params={"key": USCAN, "lang": "de"}).json()
-check(rd.get("user") == "files" and rd.get("show") == "files.scan-inbox" and rd.get("translated", {}).get("text") == sec.get("text")
+check(rd.get("user") == "files" and "files.scan-inbox" in (rd.get("show") or []) and rd.get("translated", {}).get("text") == sec.get("text")
       and rd["translated"]["title"] == "Scan-Eingang einrichten", "read_help: the same German text as the app (translated)")
+# 2.1086.0 (#5820 #5860): read_help's show is the list of a section's named places (#5860, MCP schema: array), the
+# user's place among them - part B alone had a single key there
 check(rd.get("text", "").startswith("## How to: Set up a scan inbox") and "**Create inbox**" in rd["text"], "read_help: the English source with its labels")
 check("translated" not in ag.get(V + "/help/section", params={"key": USCAN, "lang": "en"}).json(), "lang en: no translated")
 o = ag.get(V + "/help").json()
