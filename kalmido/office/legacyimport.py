@@ -53,7 +53,7 @@ from .contacts_cl import fk_has_name, fk_add, fk_sync  # 2.369.5 (#2517): pulled
 from ..team.clients import clean_client  # 2.369.5 (#2517): pulled up from functions
 from .model import MD_TABLES, office_row  # 2.369.5 (#2517): pulled up from functions; 2.905.0 (#5414): MD_TABLES
 from .model import OMD_KIND  # 2.990.0 (#5539): the core's kind of a master data table (ofk_purge)
-from .okern import ofk_purge  # 2.990.0 (#5539)
+from .okern import ofk_purge_many  # 2.990.0 (#5539), 2.1015.0 (#5675): many rows, bounded locks
 from .model import office_settings_lock, office_settings_save  # 2.621.0 (#4600): the kept file name template
 from .sheet import dk_pack  # 2.636.0 (#4952): the industry's file name template
 from ..accounts.onboarding import ind_codes  # 2.636.0 (#4952)
@@ -1597,9 +1597,11 @@ def fi_undo(c, oid, uid, rid, kinds=None):
         kargs = (oid, rid, *((MD[kind]["kind"],) if extra else ()))
         # 2.990.0 (#5539): the run's rows in the core's trash go for good on the core's way (history / undo steps along),
         # unless still in use (they stay in the trash until its period ends); the readers below see only the live rows
-        for row in c.execute(f"SELECT id FROM {qi(table, MD_TABLES)} WHERE org_id=? AND import_run_id=?{extra} AND {trash_sql()} ORDER BY id", kargs).fetchall():
-            if not office_in_use(c, kind, row["id"], oid):
-                ofk_purge(c, OMD_KIND[table], row["id"])
+        # 2.1015.0 (#5675): collected and purged at once (ofk_purge_many: a few locks for thousands of rows, not one per row)
+        ofk_purge_many(c, OMD_KIND[table], [row["id"] for row in c.execute(
+            f"SELECT id FROM {qi(table, MD_TABLES)} WHERE org_id=? AND import_run_id=?{extra} AND {trash_sql()} ORDER BY id", kargs).fetchall()
+            if not office_in_use(c, kind, row["id"], oid)])
+        gone = []
         for row in c.execute(f"SELECT id FROM {qi(table, MD_TABLES)} WHERE org_id=? AND import_run_id=?{extra} AND {live_sql()} ORDER BY id", kargs).fetchall():
             if kind == "services" and s.get("producing_service_id") == row["id"]:  # the calculation rules' producing service stays active
                 kept[kind] += 1
@@ -1610,8 +1612,8 @@ def fi_undo(c, oid, uid, rid, kinds=None):
                 else:
                     kept[kind] += 1
                 continue
-            ofk_purge(c, OMD_KIND[table], row["id"])  # 2.990.0 (#5539): the core's way, no obj_history / obj_undo left behind
-            removed[kind] += 1
+            gone.append(row["id"])  # 2.990.0 (#5539): the core's way, no obj_history / obj_undo left behind
+        removed[kind] += ofk_purge_many(c, OMD_KIND[table], gone)  # 2.1015.0 (#5675)
     # 2.144.6 B (#2400 F1): the services the import renumbered get their old order back while nobody reordered them since
     order = detail.get("order") if "services" in todo and isinstance(detail.get("order"), dict) else {}
     for sid, (old, new) in ((k, v) for k, v in order.items() if str(k).isdigit() and isinstance(v, list) and len(v) == 2):

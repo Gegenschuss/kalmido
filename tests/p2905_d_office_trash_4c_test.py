@@ -22,11 +22,13 @@ freelancer-matrix: office (a person without an organisation: her service deleted
 usage: p2905_d_office_trash_4c_test.py <datadir>"""
 import json
 import os
+import subprocess
 import sys
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
+import kt  # noqa: E402
 from kt import B, check, dbx, done, fresh, sess  # noqa: E402
 from obj_probe import in_app  # noqa: E402
 
@@ -280,5 +282,33 @@ check(drow("office_services", IS[0]) is None and drow("office_services", IS[1]) 
 left = dbx(f"SELECT ref_id FROM obj_history WHERE kind='omd_services' AND ref_id IN ({IS[0]}, {IS[1]})")
 check(not left, f"import undo: no history of the removed services left behind (was: orphaned) {left}")
 check(not in_trash(Fr, "omd_services", IS[1]), "import undo: nothing of the run left in her trash")
+
+# ---------------------------------------------------------------- 2.1015.0 (#5675): the undo of a big import (3000 master data rows,
+# FI_ROWS_MAX is 2000 per sheet and four kinds) goes through: okern.ofk_purge_many holds a few locks for all of them, not one
+# advisory lock per row until the commit (out of shared memory at max_locks_per_transaction); as a person without an organisation
+RUN2 = dbx("INSERT INTO office_import_runs(org_id, kind, counts, detail, created_by, created_at) VALUES(?, 'data', '{}', '{}', ?, ?) RETURNING id",
+           (PBF, FID, "2026-01-02T03:04:05+00:00"))[0][0]
+dbx("INSERT INTO office_services(org_id, name_de, import_run_id) SELECT ?, 'Example Bulk ' || g, ? FROM generate_series(1, 3000) g", (PBF, RUN2))
+BULK = [x[0] for x in dbx("SELECT id FROM office_services WHERE import_run_id=? ORDER BY id", (RUN2,))]
+dbx("INSERT INTO obj_history(kind, ref_id, org_id, user_id, action, created_at, updated_at) SELECT 'omd_services', id, ?, ?, 'update', ?, ? "
+    "FROM office_services WHERE import_run_id=?", (PBF, FID, "2026-01-02T03:04:05+00:00", "2026-01-02T03:04:05+00:00", RUN2))
+r = Fr.post(OFC + f"/legacy/runs/{RUN2}/undo", json={"kinds": ["services"]})
+check(len(BULK) == 3000 and r.ok and (r.json().get("removed") or {}).get("services") == 3000,
+      f"big import undo: 3000 services removed in one go {len(BULK)} {r.status_code} {r.text[:200]}")
+check(not dbx("SELECT 1 FROM office_services WHERE import_run_id=? LIMIT 1", (RUN2,))
+      and not dbx(f"SELECT 1 FROM obj_history WHERE kind='omd_services' AND ref_id IN ({','.join(map(str, BULK))}) LIMIT 1"),
+      "big import undo: every row and its history gone")
+# the mechanism: before the commit the purging transaction holds ONE advisory lock, whatever the number of rows (was one per row)
+dbx("INSERT INTO office_services(org_id, name_de, import_run_id) SELECT ?, 'Example Lock ' || g, ? FROM generate_series(1, 300) g", (PBF, RUN2))
+r = subprocess.run(["docker", "exec", kt.CT, "python", "-c", "import app\nfrom kalmido.core.db import connect\nc = connect()\n"
+                    "from kalmido.office.okern import ofk_purge_many\nfrom kalmido.core.pg import system_ctx\n"
+                    "with system_ctx(c):\n"
+                    f"    ids = [x[0] for x in c.execute('SELECT id FROM office_services WHERE import_run_id=?', ({int(RUN2)},)).fetchall()]\n"
+                    "    n = ofk_purge_many(c, 'omd_services', ids)\n"
+                    "    k = c.execute(\"SELECT COUNT(*) FROM pg_locks WHERE locktype='advisory' AND pid=pg_backend_pid()\").fetchone()[0]\n"
+                    "c.commit()\nprint('purged', n, 'advisory', k)"], capture_output=True, text=True, timeout=300)
+out = (r.stdout + r.stderr).strip()
+check(out.endswith("purged 300 advisory 1") and not dbx("SELECT 1 FROM office_services WHERE import_run_id=? LIMIT 1", (RUN2,)),
+      f"ofk_purge_many: 300 rows, one advisory lock held until the commit (was 300) {out[-300:]}")
 
 sys.exit(done("p2905_d_office_trash_4c"))

@@ -168,6 +168,27 @@ def ofk_purge(c, kind, rid):
     obj_forget()
 
 
+def ofk_purge_many(c, kind, ids):
+    """2.1015.0 (#5675): ofk_purge for many rows of one kind in one transaction (a data import's undo, a moving office's letter
+    links, an agent import's undo). ofk_purge holds one advisory lock per row until the commit - a few thousand of them
+    (FI_ROWS_MAX 2000 per sheet, four kinds) break the transaction with "out of shared memory" (max_locks_per_transaction).
+    Here: ONE advisory lock for the kind's mass deletes (two of them one after the other) and the rows' own row locks
+    (SELECT ... FOR UPDATE, kept on the rows, not in the lock table) in id order - a single write (obj_write, obj_trash,
+    obj_restore) updates its row and so waits for this commit, as it waited for the row's advisory lock. Each row then goes
+    the core's way as in ofk_purge. -> the number of ids handed in."""
+    ids = sorted({int(i) for i in ids})
+    if not ids:
+        return 0
+    reg = OBJ[kind]
+    t = reg["table"]
+    write_lock(c, f"obj-{kind}-many")
+    c.execute(f"SELECT id FROM {qi(t, _tables())} WHERE id = ANY(CAST(? AS BIGINT[])) ORDER BY id FOR UPDATE", (ids,)).fetchall()
+    for rid in ids:
+        _purge_rows(c, kind, reg, rid)
+    obj_forget()
+    return len(ids)
+
+
 def ofk_kind_of(table):
     """2.1004.0 (#5494): the office kind registered here for table (None: not on the core's trash) -- for a hard delete of a
     row that may be one (ofk_purge instead of a DELETE, so no obj_history / obj_undo is left behind)."""

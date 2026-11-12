@@ -44,7 +44,7 @@ from .legacyimport import fi_norm, _client_used, bk_detail, fi_client_undo_check
 from ..team.clients import clean_client  # 2.369.5 (#2517): pulled up from functions
 from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
-from .okern import ofk_purge, ofk_register, ofk_restore, ofk_trash  # 2.784.0 (#5366), 2.809.0 (#5418): ofk_purge
+from .okern import ofk_purge_many, ofk_register, ofk_restore, ofk_trash  # 2.784.0 (#5366), 2.809.0 (#5418): ofk_purge; 2.1015.0 (#5675): _many
 
 DI_MAX = 10 * 1024 * 1024       # the uploaded file
 DI_ROWS_MAX = 20000             # data rows of one file
@@ -565,16 +565,15 @@ def di_undo(c, oid, uid, r):
             removed["filled"] += 1
     # 2.273.0 C (#3051): a supplier changed since the run (an IBAN filled in by a later run, renamed) stays; runs before
     # 2.273 have no fingerprint: there an unchanged row (updated_at = created_at) goes
-    made, n = detail.get("made_suppliers") or {}, 0
+    made, gone = detail.get("made_suppliers") or {}, []
     for r2 in c.execute("SELECT * FROM office_suppliers WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall():
         same = (_sup_fp(oid, oc_dec_fields(c, oid, "office_suppliers", r2)) == made[str(r2["id"])]) if str(r2["id"]) in made \
             else r2["updated_at"] == r2["created_at"]
         if same:
-            ofk_purge(c, DI_SUP_KIND, r2["id"])  # 2.809.0 (#5418): the core's way, no obj_undo / obj_history left behind
-            n += 1
+            gone.append(r2["id"])  # 2.809.0 (#5418): the core's way, no obj_undo / obj_history left behind
         else:
             kept["suppliers"] = kept.get("suppliers", 0) + 1
-    removed["suppliers"] = n
+    removed["suppliers"] = ofk_purge_many(c, DI_SUP_KIND, gone)  # 2.1015.0 (#5675): many rows, bounded locks
     for sid, fill in (detail.get("filled_suppliers") or {}).items():
         r2 = c.execute("SELECT * FROM office_suppliers WHERE id=? AND org_id=?", (int(sid), oid)).fetchone()
         if not r2:
