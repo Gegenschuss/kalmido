@@ -710,6 +710,8 @@ APP_ONLY = [
     ("2.235.0 B (#2902): the owner / an instance admin locks data for an agent in the app; the agent only reads what is locked "
      "in GET /agent (data_lock, event data_lock_changed) and never changes it",
      ("* /api/agents/{}/data-lock",)),
+    ("2.1045.0 (#5822): the agent dialog's 'Sees now' -- who edits an agent reads what is shared with it; the agent itself "
+     "reaches exactly that through its own reads, sharing stays with people", ("=GET /api/agents/{}/sees",)),
     ("2.235.0 C (#2903): the owner / an instance admin rewords, pauses, deletes or adds an agent's standing rules in the app; "
      "the agent has its own GET/POST /agent/rules",
      ("* /api/agents/{}/rules",)),
