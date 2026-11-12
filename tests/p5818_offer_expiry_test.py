@@ -78,7 +78,7 @@ def sent_offer(s, cl, title, finalise=True):
     return did
 
 
-def until(did, v):
+def valid_to(did, v):
     dbx("UPDATE office_docs SET valid_until=? WHERE id=?", (v, did))
 
 
@@ -86,7 +86,7 @@ def run(s, who, cl, answer):
     # ---- soon: one entry, counted in the bell, once
     _, me0 = news(s)  # before the date is set: whichever run rings it (the server's watchdog or tick()), the bell gains one
     did = sent_offer(s, cl, "Imagefilm " + who)
-    until(did, day(3))
+    valid_to(did, day(3))
     tick()
     its, me1 = news(s, did)
     d = its[0].get("data") if its else {}
@@ -97,7 +97,7 @@ def run(s, who, cl, answer):
     tick()
     check(len(news(s, did)[0]) == 1, f"{who}: a second run adds no second entry {news(s, did)[0]}")
     # ---- gone: the next step rings, the old one leaves; the list marks it, the editor carries the note
-    until(did, day(-1))
+    valid_to(did, day(-1))
     tick()
     its = news(s, did)[0]
     check([x["data"].get("state") for x in its] == ["gone"], f"{who}: the day after 'valid until' the entry says 'expired', the 'soon' one is gone {its}")
@@ -123,7 +123,7 @@ def run(s, who, cl, answer):
     check(any(x.get("action") == "valid_until" for x in log), f"{who}: the extension stands in the office log {[x.get('action') for x in log][:10]}")
     # ---- answered: the entry leaves the bell
     d2 = sent_offer(s, cl, "Werbespot " + who)
-    until(d2, day(2))
+    valid_to(d2, day(2))
     tick()
     check(len(news(s, d2)[0]) == 1, f"{who}: a second quotation rings {news(s, d2)[0]}")
     r = s.post(B + f"{D}/{d2}/status", json={"status": answer})
@@ -141,7 +141,7 @@ def run(s, who, cl, answer):
     r = s.put(B + O + "/settings", json={"offer_exp_notice": 0})
     check(r.ok and s.get(B + O + "/settings").json()["settings"].get("offer_exp_notice") == 0, f"{who}: the setting switches off {r.status_code}")
     d3 = sent_offer(s, cl, "Doku " + who, finalise=False)
-    until(d3, day(1))
+    valid_to(d3, day(1))
     tick()
     check(not news(s, d3)[0], f"{who}: switched off -> no entry {news(s, d3)[0]}")
     s.put(B + O + "/settings", json={"offer_exp_notice": 1, "offer_exp_days": 5})
