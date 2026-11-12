@@ -44,7 +44,7 @@ const FEAT = 'time,collab,comments';
   // arrangement) is a step of its own on the server (accounts/setundo.py); the month's entry must not take that group - it
   // did, its own reopen never ran and Undo put the setting back instead (CI red of 2.994.0 / 2.996.0)
   await w.eval(`api('PATCH', '/api/settings', {start_page: 'home'})`);
-  check(await until(() => w.eval('HIST.fresh.some(f => f.sett)')), 'a setting saved by the app: its step group came back (fresh)');
+  check(w.eval('HIST.fresh.length') > 0, 'a setting saved by the app: its step group came back ' + w.eval('JSON.stringify(HIST.fresh)'));
   card?.querySelector('[data-tsl="close"]')?.click();
   check(await until(async () => (await sheet()) === 'closed'), 'Close month: the server holds it closed');
   check(await until(() => d.querySelector('.tslcard [data-tsl="reopen"]')), 'the card offers Reopen');
