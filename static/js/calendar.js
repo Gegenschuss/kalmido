@@ -144,7 +144,9 @@ function cevCached(lo, hi) {
 async function ensureCalEv(lo, hi) {
   if (!calEvOn() && !feat('events')) { if (S.cal.items.length) S.cal = {key: '', loading: '', seq: S.cal.seq, items: [], subs: {}, evcals: {}}; return; }
   const key = `${lo}|${hi}`;
-  if (S.cal.key === key || S.cal.loading === key || S.cal.err === key) return;  // 2.1077.0 (#5461): a failed range waits for "Try again" (calInvalidate), no loop of fetches
+  // 2.1077.0 (#5461): a failed range is not fetched again on every drawing (no loop of fetches): "Try again" / calInvalidate at
+  // once, else a drawing after 30 s (Today and Home have no button; a short gap in the connection must not hide their events)
+  if (S.cal.key === key || S.cal.loading === key || (S.cal.err === key && Date.now() - (S.cal.errAt || 0) < 30e3)) return;
   S.cal.loading = key; S.cal.err = '';
   const seq = S.cal.seq = (S.cal.seq || 0) + 1;  // 2.161.0: an answer that an invalidation overtook (calInvalidate) is dropped
   try {
@@ -160,7 +162,7 @@ async function ensureCalEv(lo, hi) {
     if (S.cal.seq !== seq) return;
     if (S.cal.loading !== key) { S.cal.loading = ''; return; }
     // 2.1077.0 (#5461): a failed fetch is said in the view (calEvState), never an empty month; the saved copy is marked as one
-    if (!hit) { S.cal.loading = ''; S.cal.err = key; }
+    if (!hit) { S.cal.loading = ''; S.cal.err = key; S.cal.errAt = Date.now(); }
     else { cevApply(hit, key); S.cal.cached = 1; }
   }
   if (S.route.mod === 'cal' || (S.route.mod === 'tasks' && S.route.key === 'today') || S.route.mod === 'home') renderView();  // 2.144.0 C (#2418): + the start page
