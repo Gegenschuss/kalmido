@@ -36,6 +36,7 @@ from ..core.undoweb import UG_KEPT, UG_KEPT_REDO
 from ..lists.listtrash import otr_err_task
 from ..lists.sections import sec_apply
 from ..tasks.lifecycle import apply_update, need_live, restore_task, signed, trash_task, tsk_finish, tsk_reopen, undo_status
+from ..tasks.snippets import snip_parse
 from ..tasks.tasks import my_tags
 from ..tasks.validation import TASK_FIELDS
 
@@ -84,7 +85,6 @@ def _extra(c, tid, k):
 def _state(c, row, extras):
     st = {k: row[k] for k in TU_COLS if k in row.keys()}
     if isinstance(st.get("snippets"), str) and st["snippets"].startswith("["):  # 2.997.0 (#5613): the list (the way back writes a list)
-        from ..tasks.snippets import snip_parse
         st["snippets"] = snip_parse(st["snippets"])
     for k in extras:
         st[k] = _extra(c, row["id"], k)
