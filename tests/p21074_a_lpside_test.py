@@ -99,8 +99,10 @@ check(not res.get("undone") and res.get("stayed") and "folder" in str(res.get("s
       f"a value changed elsewhere since is not set back (named) {res}")
 
 # a trip's dates (stored as JSON text): a change goes back to the old dates (Fable review: the _prev compare never matched)
-r = Fr.post(B + "/api/lists", json={"name": "Reise Beispiel", "life": "travel", "trip": {"from": "2026-05-01", "to": "2026-05-08"}})
+r = Fr.post(B + "/api/lists", json={"name": "Reise Beispiel"})
 RL = r.json().get("id") if r.ok else None
+r = Fr.patch(B + f"/api/lists/{RL}", json={"life": "travel", "trip": {"from": "2026-05-01", "to": "2026-05-08"}})
+check(r.ok and (lrow(Fr, RL).get("trip") or {}).get("from") == "2026-05-01", f"(setup) a trip {r.status_code} {r.text[:160]}")
 r = Fr.patch(B + f"/api/lists/{RL}", json={"trip": {"from": "2026-06-01", "to": "2026-06-09", "where": "Lissabon"}})
 ugt = r.json().get("undo_group") if r.ok else None
 check(r.ok and ugt, f"(setup) new trip dates are a step {r.status_code} {r.text[:160]}")
