@@ -379,10 +379,12 @@ def obj_unlink(c, uid, lid, kind=None, rid=None):
         raise Denied(404)
     if kind is not None and (kind, int(rid)) not in ((r["src_kind"], r["src_id"]), (r["dst_kind"], r["dst_id"])):
         raise Denied(404)
-    if r["src_kind"] not in OBJ or not olnk_role(c, uid, r["src_kind"], r["src_id"]):
+    if not olnk_role(c, uid, r["src_kind"], r["src_id"]):  # who does not see its source learns nothing of the link (404)
         raise Denied(404)
     if r["rel"] in OLNK_RELS:
         raise Denied(409, tr(OLNK_AREA_MSG))
+    if r["src_kind"] not in OBJ:
+        raise Denied(404)
     obj_need(c, uid, r["src_kind"], r["src_id"], "write")
     return olnk_drop(c, uid, r["id"])
 
