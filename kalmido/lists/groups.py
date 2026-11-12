@@ -51,6 +51,15 @@ GS_OWN = """SELECT n.ref_id AS list_id, s.group_id, s.role, s.list_role, s.id, s
             WHERE n.kind='ref' AND n.ref_kind='list' AND s.group_id IS NOT NULL AND s.list_own=1"""
 
 
+def grp_shares_any(c, own):
+    """2.997.0 (#5137): whether fs_shares holds any group share at all (own: a project's own share, list_own 1; else a
+    folder's). fs_shares has no row-level policy (no org_id, not in core/rls.py TABLES), so this probe sees every row in the
+    person's context: the system_ctx() reads below run (and switch the transaction's context twice) only when there is
+    something to find -- /api/state of a workspace without group shares stays without a switch (tests/p2369_6_api_test.py)."""
+    return c.execute("SELECT 1 FROM fs_shares WHERE group_id IS NOT NULL AND "
+                     + ("list_own=1" if own else "COALESCE(list_own, 0)=0") + " LIMIT 1").fetchone() is not None
+
+
 def _grole(s):
     return s["list_role"] if s["list_role"] in ROLE_RANK else ("edit" if s["role"] == "edit" else "view")
 
@@ -64,6 +73,8 @@ def grp_own_rows(c, lids=None, gid=None):
     if gid is not None:
         q += " AND s.group_id=?"
         a.append(int(gid))
+    if not grp_shares_any(c, True):  # 2.997.0 (#5137): no group share of a project anywhere: nothing to read as "system"
+        return []
     with system_ctx(c):  # the node lies in the owner's tree, also when a list admin / another member asks
         return [{"list_id": r["list_id"], "group_id": r["group_id"], "role": _grole(r), "share_id": r["id"]}
                 for r in c.execute(q + " ORDER BY s.id", a).fetchall()]
@@ -86,6 +97,8 @@ def grp_folder_rows(c, owner=None, gid=None, nids=None):
         q.append("s.node_id = ANY(CAST(? AS BIGINT[]))")
         a.append(st_ids(sorted({int(x) for x in nids})))
     out, where = [], {}
+    if not grp_shares_any(c, False):  # 2.997.0 (#5137): no group share of a folder anywhere: nothing to read as "system"
+        return out
     with system_ctx(c):  # the folder group shares of every owner (another person's folder, the group's view); callers filter
         for s in c.execute(f"""SELECT s.id, s.node_id, s.group_id, s.role, s.list_role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id
                                WHERE {' AND '.join(q)} ORDER BY s.id""", a).fetchall():

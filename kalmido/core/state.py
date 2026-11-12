@@ -167,8 +167,10 @@ def visible_lists(c, uid, light=False):
     mss = milestones_of_lists(c, [r["id"] for r in rows if not r["is_inbox"] and r["id"] not in _pl])  # 2.7.1 (#410): timeline markers
     from ..lists.sprints import spr_of_lists
     sprs = spr_of_lists(c, [r for r in rows if not r["is_inbox"] and r["id"] not in _pl])  # 2.60.0 (#343); 2.352.0 G (review N14): like milestones
-    with system_ctx(c):  # 2.958.0 (#5245): a project's / folder's group share is a row of fs_shares (group_shares is gone)
-        has_groups = collab_all() and bool(c.execute("SELECT 1 FROM fs_shares WHERE group_id IS NOT NULL LIMIT 1").fetchone())
+    # 2.958.0 (#5245): a project's / folder's group share is a row of fs_shares (group_shares is gone)
+    # 2.997.0 (#5137): read in the person's context: fs_shares has no row-level policy (no org_id, not in core/rls.py TABLES),
+    # so it sees every row; a system_ctx() here cost two context switches in every /api/state (tests/p2369_6_api_test.py)
+    has_groups = collab_all() and bool(c.execute("SELECT 1 FROM fs_shares WHERE group_id IS NOT NULL LIMIT 1").fetchone())
     gshares, gnames = grp_shares_of_lists(c, rows) if has_groups else ({}, {})  # 2.280.0 B (#3116): all lists at once
     from ..lists.playbook import pb_flags
     pbs = pb_flags(c, rows)  # 2.39.0 (#1168): lists with an effective Playbook

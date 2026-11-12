@@ -541,6 +541,14 @@ def lf_people_rows(c, owner=None, uid=None):
         q.append("COALESCE(s.user_id, s.agent_id)=?")
         a.append(int(uid))
     out, where = {}, {}
+    # 2.997.0 (#5137): fs_shares has no row-level policy (no org_id, not in core/rls.py TABLES): a probe on it alone, in the
+    # person's context, skips the system_ctx() read (two context switches in every /api/state, tests/p2369_6_api_test.py)
+    # when no live person share outside the projects' own rows exists (for uid: none with that person / agent)
+    pq, pa = "s.group_id IS NULL AND COALESCE(s.list_own, 0)=0 AND (s.expires_at IS NULL OR s.expires_at > ?)", [a[0]]
+    if uid is not None:
+        pq, pa = pq + " AND COALESCE(s.user_id, s.agent_id)=?", pa + [int(uid)]
+    if c.execute(f"SELECT 1 FROM fs_shares s WHERE {pq} LIMIT 1", pa).fetchone() is None:
+        return []
     with system_ctx(c):  # the person shares of every owner's folders (another person's tree); owner / uid narrow it above
         for s in c.execute(f"""SELECT s.node_id, COALESCE(s.user_id, s.agent_id) AS who, s.role, s.list_role, s.created_at
                                FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE {' AND '.join(q)} ORDER BY s.id""", a).fetchall():
