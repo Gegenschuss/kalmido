@@ -73,9 +73,11 @@
 /* the preview: every page one below the other on its own ground (#4829: as large as its column).
    2.1063.0 (#5879): ground and bar follow the theme instead of fixed greys (the mid grey fell out of the dark theme): dark = a
    step darker than the card, light = a light grey; the white sheet stands out by its rim and shadow. The bar is a toolbar like
-   the others (the card's surface, muted buttons, the pressed one like a chosen segment). light-dark() follows color-scheme
-   (app.css sets it per theme); the line before it is the fallback of an older browser. */
-.dv-pv{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg3);background:light-dark(var(--bg3),var(--bg));color:var(--text)}
+   the others (the card's surface, muted buttons, the pressed one like a chosen segment). The ground is chosen by the theme's own
+   selectors (as app.css does): light-dark() would follow the OS, the dark theme sets no color-scheme of its own. */
+.dv-pv{--dv-pvbg:var(--bg);display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--line);border-radius:var(--radius);background:var(--dv-pvbg);color:var(--text)}
+:root[data-theme="light"] .dv-pv{--dv-pvbg:var(--bg3)}
+@media (prefers-color-scheme:light){ :root[data-theme="auto"] .dv-pv{--dv-pvbg:var(--bg3)} }
 .dv-pvbar{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;flex:none;padding:.375rem .5rem;border-bottom:1px solid var(--line);background:var(--bg2)}
 .dv-pvbar .btn,.dv-pvbar .iconbtn{min-height:2.25rem;border-color:transparent;background:none;color:var(--muted)}
 .dv-pvbar .btn:hover,.dv-pvbar .iconbtn:hover{background:var(--bg3);color:var(--text)}

@@ -195,12 +195,20 @@ const three = tag => [['Kita Beispiel', 'Elternbrief ' + tag, 'Datum 01.09.2026'
       // 2.1063.0 (#5879): ground and bar follow the theme (were fixed greys #52565a / #3d4145): dark = the theme's --bg (a step
       // under the card), light = --bg3; the bar is the card's surface --bg2; the page stays white. On the phone the bar is ONE row
       // with the page count, the zoom and the icons Pages and Full screen.
-      const col = await ev(`(() => { const out = {}, h = document.documentElement, was = h.dataset.theme;
-        const probe = v => { const p = document.createElement('div'); p.style.background = 'var(' + v + ')'; document.body.append(p); const c = getComputedStyle(p).backgroundColor; p.remove(); return c; };
-        for (const t of ['dark', 'light']) { h.dataset.theme = t; const pv = document.querySelector('.dv-view .dv-pv'), bar = pv.querySelector('.dv-pvbar');
-          out[t] = {pv: getComputedStyle(pv).backgroundColor, bar: getComputedStyle(bar).backgroundColor, btn: getComputedStyle(bar.querySelector('.iconbtn')).color,
-            pg: getComputedStyle(pv.querySelector('.dv-pg')).backgroundColor, bg: probe('--bg'), bg2: probe('--bg2'), bg3: probe('--bg3'), muted: probe('--muted')}; }
-        h.dataset.theme = was || ''; if (!was) delete h.dataset.theme; return out; })()`);
+      // the theme is switched, then the test waits for the preview to have changed (a theme switch may fade the colours)
+      const probe = `const probe = v => { const p = document.createElement('div'); p.style.background = 'var(' + v + ')'; document.body.append(p); const c = getComputedStyle(p).backgroundColor; p.remove(); return c; };`;
+      const col = {}, was = await ev(`document.documentElement.dataset.theme || ''`);
+      // dark is checked while the OS (headless Firefox) says light: the app's dark theme must win over the OS's scheme
+      for (const [t, want] of [['dark', '--bg'], ['light', '--bg3']]) {
+        await ev(`(document.documentElement.dataset.theme = ${JSON.stringify(t)}, 1)`);
+        await wait(`(() => { ${probe} const pv = document.querySelector('.dv-view .dv-pv'), bar = pv.querySelector('.dv-pvbar');
+          return getComputedStyle(pv).backgroundColor === probe('${want}') && getComputedStyle(bar).backgroundColor === probe('--bg2'); })()`, 40);
+        col[t] = await ev(`(() => { ${probe} const pv = document.querySelector('.dv-view .dv-pv'), bar = pv.querySelector('.dv-pvbar');
+          return {pv: getComputedStyle(pv).backgroundColor, bar: getComputedStyle(bar).backgroundColor, pg: getComputedStyle(pv.querySelector('.dv-pg')).backgroundColor,
+            bg: probe('--bg'), bg2: probe('--bg2'), bg3: probe('--bg3'),
+            anc: (() => { const o = []; for (let e = pv; e; e = e.parentElement) { const v = getComputedStyle(e).getPropertyValue('--bg2').trim(); if (o[o.length - 1]?.v !== v) o.push({e: e.tagName + (e.id ? '#' + e.id : '') + '.' + [...e.classList].slice(0, 2).join('.'), v}); } return o; })()}; })()`);
+      }
+      await ev(`(() => { const h = document.documentElement; if (${JSON.stringify(was)}) h.dataset.theme = ${JSON.stringify(was)}; else delete h.dataset.theme; return 1; })()`);
       const grey = ['rgb(82, 86, 90)', 'rgb(61, 65, 69)'];
       check(col && col.dark.pv === col.dark.bg && col.light.pv === col.light.bg3 && !grey.includes(col.dark.pv) && !grey.includes(col.dark.bar), `Firefox ${tag}: the preview's ground follows the theme (dark --bg, light --bg3), no fixed grey ` + JSON.stringify(col));
       check(col && col.dark.bar === col.dark.bg2 && col.light.bar === col.light.bg2 && col.light.pg === 'rgb(255, 255, 255)' && col.light.pv !== col.light.pg, `Firefox ${tag}: the bar is a toolbar on the card's surface, the white page stands out on the light ground`);
