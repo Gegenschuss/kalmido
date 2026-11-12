@@ -579,6 +579,7 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-sr', tr('Day rate'), `<input id="os-sr" value="${esc(fmtNum(s.share_rate ?? psh.rate, 2))}" inputmode="decimal" class="numin" ${dis}>`, `${ofcCur()} ${tr('per day')}`, {keep: 1})}
     </div>` : ''}
     ${ofcChk('os-raw-on', tr('Raw data surcharge'), s.raw_on)}
+    ${ofcChk('os-subtotals-on', tr('Subtotal under every section (new quotations and invoices)'), s.subtotals_on) /* 2.1041.0 (#5816) */}
     <div class="ofcrule" data-rule="raw">
     ${ofcRowF('os-rf', tr('Raw data factor'), `<input id="os-rf" value="${esc(fmtNum(s.raw_factor, 2))}" inputmode="decimal" class="numin" ${dis}>`)}${ofcII('rf', tr('raw data amount = sum of the raw data positions × factor'))}
     </div>
@@ -891,6 +892,7 @@ function ofcSettingsBody(form) {
     raw_factor: ofcNum(v('#os-rf'), true),  // 2.113.1 (#2251): producing only through an industry pack's option (below)
     ...($('#os-sf', form) ? {share_factor: ofcNum(v('#os-sf'), true), share_rate: ofcNum(v('#os-sr')), producing_service_id: +v('#os-ps') || null, producing_on: $('#os-prod-on', form)?.checked ? 1 : 0} : {}),
     raw_on: $('#os-raw-on', form)?.checked ? 1 : 0,
+    ...($('#os-subtotals-on', form) ? {subtotals_on: $('#os-subtotals-on', form).checked ? 1 : 0} : {}),  // 2.1041.0 (#5816)
     ...($('#os-ls-scheme', form) ? {delivery_scheme: v('#os-ls-scheme'), ...ost_closeBody('dl', v)} : {}),  // 2.434.0 B (#3608): hidden while delivery notes are off
     ...($('#os-accept-on', form) ? {accept_on: $('#os-accept-on', form).checked ? 1 : 0} : {}),  // 2.114.4 B (#2270)
     ...($('#os-sign-offers', form) ? {sign_offers: $('#os-sign-offers', form).checked ? 1 : 0} : {}),  // 2.357.0 C (#3158)
@@ -1017,7 +1019,7 @@ const OST_FLAT = {'os-color': 'color', 'os-lang': 'lang', 'os-currency': 'curren
   'os-ovd-on': 'overdue_notice', 'os-dun-on': 'dunning_suggest', 'os-dun-days': 'dunning_grace_days', 'os-girocode': 'girocode',  // 2.147.1 B (#2054): each saves alone
   'os-dun-int': 'dunning_interest', 'os-dun-flat': 'dunning_flat_fee', 'os-dun-base': 'base_rate', 'os-dun-kind': 'dunning_client_kind',  // 2.355.0 D (#2846)
   'os-sf': 'share_factor', 'os-sr': 'share_rate',  // 2.113.1 (#2251): producing by amount (film pack option)
-  'os-raw-on': 'raw_on', 'os-rf': 'raw_factor', 'os-pack': 'pack', 'os-parts-inv': 'parts_invoice_mode', 'os-parts-t-de': 'parts_summary_title_de',
+  'os-raw-on': 'raw_on', 'os-subtotals-on': 'subtotals_on', 'os-rf': 'raw_factor', 'os-pack': 'pack', 'os-parts-inv': 'parts_invoice_mode', 'os-parts-t-de': 'parts_summary_title_de',
   'os-parts-t-en': 'parts_summary_title_en', 'os-agents-read': 'agents_read', 'os-ret': 'retention_years'};  // 2.147.0 (#2461): os-ret
 const OST_SUB = {'os-intro-de': ['intro_text_id', 'de'], 'os-intro-en': ['intro_text_id', 'en'], 'os-closing-de': ['closing_text_id', 'de'], 'os-closing-en': ['closing_text_id', 'en'],
   'os-rt': ['rights_default', 'time_id'], 'os-rr': ['rights_default', 'territory_id'], 'os-rm': ['rights_default', 'media_id'],

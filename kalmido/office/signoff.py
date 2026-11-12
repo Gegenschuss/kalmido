@@ -630,12 +630,19 @@ def sig_offer_html(c, r, lg, token):
             if k == "item" and ln.get("line_discount") and ln.get("discount_pct"):  # 2.1042.0 (#5815): the position's own discount
                 from .calc import fmt_qty
                 q = f"{q} \u00b7 -{fmt_qty(ln['discount_pct'], dl)} %"
-            rows.append(f'<tr><td>{e(ln.get("title") or "")}</td><td class="q">{e(q)}</td><td class="m">{e(ln.get("total_text") or "")}</td></tr>')
+            ttl, amt = ln.get("title") or "", ln.get("total_text") or ""
+            if ln.get("opt"):  # 2.1041.0 (#5814): "Optional: …", the amount in brackets (not in the sum)
+                ttl, amt = f'{ln.get("opt_label") or ""} {ttl}'.strip(), f"({amt})" if amt else ""
+            rows.append(f'<tr{" class=opt" if ln.get("opt") else ""}><td>{e(ttl)}</td><td class="q">{e(q)}</td><td class="m">{e(amt)}</td></tr>')
+        elif k == "subtotal":  # 2.1041.0 (#5816): the net of the section above
+            rows.append(f'<tr class="sub"><td colspan="2">{e(ln.get("label") or "")}</td><td class="m">{e(ln.get("total_text") or "")}</td></tr>')
     t = m.get("totals") or {}
     sums = f'<tr class="sum"><td colspan="2">{e(tr("Net", lg=lg))}</td><td class="m">{e(t.get("net_text") or "")}</td></tr>'
     if t.get("tax_total") is not None and t.get("gross") is not None:
         sums += (f'<tr class="sum"><td colspan="2">{e(tr("VAT|printed", lg=lg))}</td><td class="m">{e(fmt_money(t["tax_total"], dl, cur))}</td></tr>'
                  f'<tr class="sum tot"><td colspan="2">{e(tr("Total", lg=lg))}</td><td class="m">{e(fmt_money(t["gross"], dl, cur))}</td></tr>')
+    if t.get("opt_note"):  # 2.1041.0 (#5814)
+        sums += f'<tr class="optn"><td colspan="3">{e(t["opt_note"])}</td></tr>'
     meta = " · ".join(e(f"{a}: {b}") for a, b in (m.get("meta") or []) if b)
     return (f'<header>{f"<div class=brand><span>{e(co)}</span></div>" if co else ""}<h1>{e(m.get("title") or "")} {e(m.get("number") or "")}</h1>'
             f'<p class="sub">{meta}</p></header>'

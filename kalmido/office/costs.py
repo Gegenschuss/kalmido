@@ -46,7 +46,7 @@ def ek_item_margins(d, its):
     tot, any_ = dec(0), False
     for it in its:
         ln = lines.get(it.get("id"))
-        if (it.get("kind") or "service") != "service" or not ln:
+        if (it.get("kind") or "service") != "service" or not ln or ln.get("opt"):  # 2.1041.0 (#5814): an optional one has no surplus
             continue
         m = money(dec(ln.get("total")) - money(dec(it.get("cost")) * dec(ln.get("qty"), "1") * fx))
         it["margin"] = _num(m)
@@ -81,7 +81,7 @@ def ek_purchases_write(c, oid, did):
         if it.get("kind") == "part" and it.get("ref_part_id") is not None:
             part_qty[it["ref_part_id"]] = part_qty.get(it["ref_part_id"], dec(0)) + dec(it.get("qty"), "1")
             continue
-        if (it.get("kind") or "service") != "service":
+        if (it.get("kind") or "service") != "service" or it.get("opt"):  # 2.1041.0 (#5814): an optional one is not bought
             continue
         qty = dec(1) if it.get("unit") == "percent" else dec(it.get("qty"), "1")
         amt = dec(it.get("cost")) * qty

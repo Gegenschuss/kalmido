@@ -62,6 +62,8 @@ except ImportError:  # 2.185.0 C (#2520): loaded as a single file (tests/office_
 Q2 = Decimal("0.01")
 TAX_KEYS = ("standard", "reduced", "exempt")
 RAW_MODES = ("optional", "included", "none")
+# 2.1041.0 (#5814): a position of a quotation that is printed with its amount but counted in no sum ('' = a normal one)
+OPT_KINDS = ("optional", "alternative")
 
 # the words of the document itself (its language, not the signed-in person's): the country pack may override them
 # (pack["labels"][lang][key]); these are the defaults so the calculator works without a pack
@@ -81,6 +83,9 @@ LABELS = {
     "vat_note": N_("All prices plus 7 % or 19 % VAT.|calc"), "novat_note": N_("Not taxable domestically / reverse charge.|calc"),
     "fx_note": N_("Exchange rate €1: ${rate}|calc"),
     "fx_note_any": N_("Exchange rate 1 {home} = {rate} {cur}|calc"),  # 2.189.0 (#2475): other pairs than EUR / USD
+    "opt_optional": N_("Optional:|calc"), "opt_alternative": N_("Alternative:|calc"),  # 2.1041.0 (#5814)
+    "opt_note": N_("Optional and alternative positions are not included in the total.|calc"),
+    "subtotal": N_("Subtotal {title}|calc"),  # 2.1041.0 (#5816)
     "unit_day": N_("days|calc"), "unit_hour": N_("h|calc"), "unit_piece": N_("pcs|calc"), "unit_minute": N_("min|calc"), "unit_flat": N_("flat|calc"),
 }
 CALC_PROD_WORD = (N_("production day|calc"), N_("production days|calc"))  # 2.185.0 C (#2520)
@@ -356,7 +361,7 @@ def office_calc(doc, items, pack=None):
     # positions marked extern of the same sheet; its quantity does not count
     ext_base = Decimal(0)
     for it in items or []:
-        if (it.get("kind") or "service") == "service" and it.get("unit") != "percent" and it.get("intext") == "extern":
+        if (it.get("kind") or "service") == "service" and it.get("unit") != "percent" and it.get("intext") == "extern" and not calc_opt(it):  # 2.1041.0 (#5814)
             ext_base += calc_line_amount(dec(it.get("qty"), "1"), conv(it.get("rate")), it.get("discount_pct"))[2]  # 2.1042.0 (#5815): after its own discount
 
     lines, pos = [], 0
@@ -390,6 +395,16 @@ def office_calc(doc, items, pack=None):
             ipct = min(dec(it.get("discount_pct")), Decimal(100)) if ldisc else Decimal(0)
         tax = it.get("tax") if it.get("tax") in TAX_KEYS else "standard"
         pos += 1
+        opt = calc_opt(it)
+        if opt:  # 2.1041.0 (#5814): printed with its amount, counted in no sum, no producing / surcharge / discount / purchase
+            lines.append({"kind": "item", "pos": pos, "id": it.get("id"), "service_id": it.get("service_id"), "title": it.get("title") or "",
+                          "detail": it.get("detail") or "", "qty": _num(qty), "qty_text": fmt_qty(qty, lang) if pct is None else fmt_qty(pct, lang) + " %",
+                          "unit": unit, "unit_text": unit_text(pack, lang, unit, qty) if pct is None else "",
+                          **({"pct": _num(pct), "base": _num(ext_base)} if pct is not None else {}),
+                          "rate": _num(rate), "tax": tax, "tax_pct": _num(rates[tax]), "total": _num(total), "opt": opt,
+                          "intext": it.get("intext") or "intern",
+                          **({"discount_pct": _num(ipct), "list_total": _num(lst), "line_discount": _num(ldisc)} if ldisc else {})})  # 2.1042.0 (#5815)
+            continue
         items_net += total
         base[tax] += total
         if _flag(it.get("raw_fee")):
@@ -511,7 +526,48 @@ def office_calc(doc, items, pack=None):
     }
     if not novat:
         out["vat_note"] = bwa_vat_note(out["vat_note"], [rates[k] for k in TAX_KEYS if base[k] != 0 and rates[k] > 0], lang)
+    if any(x.get("opt") for x in lines):  # 2.1041.0 (#5814): only then (the totals of every other document stay as they were)
+        out["opt_note"] = label(pack, lang, "opt_note")
+    if _flag(doc.get("subtotals")):  # 2.1041.0 (#5816)
+        calc_subtotals(lines, pack, lang, currency)
     return out
+
+
+def calc_opt(it):
+    """2.1041.0 (#5814): 'optional' / 'alternative' for such a position of a quotation, else ''."""
+    v = (it or {}).get("opt")
+    return v if v in OPT_KINDS else ""
+
+
+def calc_subtotals(lines, pack, lang, currency, kinds=("item",)):
+    """2.1041.0 (#5816): inserts after every section of lines (a heading up to the next heading or the first line the calculation
+    adds after the positions) a line {kind: subtotal, sec, title, label, total, total_text}: the net of its counted positions
+    (kinds; optional / alternative ones not). Positions before the first heading get none, a section without a counted position
+    neither. Display only: no sum changes. sec = the number of the heading (0 = the first), for the editor."""
+    out, cur = [], None
+
+    def close():
+        if cur is not None and cur["n"]:
+            out.append({"kind": "subtotal", "sec": cur["sec"], "title": cur["title"], "total": _num(cur["sum"]),
+                        "total_text": fmt_money(cur["sum"], lang, currency),
+                        "label": label(pack, lang, "subtotal", title=cur["title"]).strip()})
+    sec = -1
+    for ln in lines:
+        k = ln.get("kind")
+        if k == "heading":
+            close()
+            sec += 1
+            cur = {"sec": sec, "title": ln.get("title") or "", "sum": Decimal(0), "n": 0}
+        elif cur is not None and k not in kinds and k != "text":  # producing, surcharge, raw data, discount: after the positions
+            close()
+            cur = None
+        elif cur is not None and k in kinds and not ln.get("opt"):
+            cur["sum"] += dec(ln.get("total"))
+            cur["n"] += 1
+        out.append(ln)
+    close()
+    lines[:] = out
+    return lines
 
 
 def bwa_vat_note(note, pcts, lang="de"):
@@ -660,6 +716,8 @@ def inv_calc(doc, items, pack=None):
         "lines": lines,
         "labels": {k: label(pack, lang, k) for k in ("net", "gross", "discount")},
     }
+    if _flag(doc.get("subtotals")):  # 2.1041.0 (#5816): a discount position inside a section counts there
+        calc_subtotals(lines, pack, lang, currency, ("item", "discount"))
     if foreign:  # the tax (and the total) in the home currency as well, by the document's rate (2.189.0: keys keep "_eur")
         out["tax_eur"] = dstr(tax_sum / fx)
         out["gross_eur"] = dstr(gross / fx)

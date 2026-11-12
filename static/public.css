@@ -109,6 +109,9 @@ table.sig tr.hd td{font-weight:600;padding-top:1rem}
 table.sig tr.tx td{color:var(--text2)}
 table.sig tr.sum td{border-bottom:0;padding:.25rem}
 table.sig tr.tot td{font-weight:600;border-top:1px solid var(--line2)}
+table.sig tr.opt td{font-style:italic;color:var(--text2)}  /* 2.1041.0 (#5814): optional / alternative, not in the sum */
+table.sig tr.sub td{font-weight:600;border-bottom:1px solid var(--line2)}  /* 2.1041.0 (#5816): subtotal of a section */
+table.sig tr.optn td{border-bottom:0;color:var(--muted);font-size:.8125rem}
 a.pdf{display:inline-flex;align-items:center;min-height:2.75rem;color:var(--accent);font-weight:600;text-underline-offset:2px}
 .sigf{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line)}
 .sigf label.ok{display:flex;gap:.625rem;align-items:flex-start;color:var(--text);font-size:.9375rem;margin-top:1rem}

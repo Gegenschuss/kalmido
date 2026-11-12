@@ -474,7 +474,17 @@ rowd_attach(document, {kind: 'it', row: '.ofdit', move: (from, to, row, list) =>
 function ofdItemsHtml(d, adm) {
   const its = d.items || [], inv = ofdIsInv(d);
   const taxes = OFC_TAXES.map(([v, n]) => [v, ofcTax(v)]), gp = rowd_attr('it');  // 2.456.0 (#3837): the position symbol is the grip
+  const subs = {}, hd = {n: -1};  // 2.1041.0 (#5816): the subtotal lines of the calculation by their section (heading number)
+  for (const l of d.totals?.lines || []) if (l.kind === 'subtotal') subs[l.sec] = l;
+  const subRow = n => subs[n] ? `<li class="ofdit ofdsub"><span class="ofdpos muted">${ic('calc', 's')}</span><span class="ofcn">${esc(subs[n].label || '')}</span><b class="ofdlt">${esc(subs[n].total_text || ofdMoney(subs[n].total, d))}</b></li>` : '';
   const rows = its.map((it, i) => {
+    const pre = it.kind === 'heading' && bfaFilled(it) ? subRow(hd.n++) : '';
+    return pre + ofd_itRow(d, adm, it, i, its, inv, taxes, gp);
+  }).join('') + subRow(hd.n);
+  return ofd_itsWrap(d, rows, inv);
+}
+// 2.1041.0 (#5814): one position of the editor (was inside ofdItemsHtml)
+function ofd_itRow(d, adm, it, i, its, inv, taxes, gp) {
     const mv = `<span class="ofdmv">${rowd_arrows(`<button type="button" class="ib" data-ofd="it-up" data-i="${i}" ${i === 0 ? 'disabled' : ''} aria-label="${esc(tr('Move up'))}">${ic('up', 's')}</button><button type="button" class="ib" data-ofd="it-down" data-i="${i}" ${i === its.length - 1 ? 'disabled' : ''} aria-label="${esc(tr('Move down'))}">${ic('down', 's')}</button>`)}<button type="button" class="ib" data-ofd="it-del" data-i="${i}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></span>`;
     if (it.kind === 'heading') return `<li class="ofdit ofdhd"><span class="ofdpos muted rowgrip" ${gp}>${ic('list', 's')}</span><input data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(tr('Heading (category)'))}" aria-label="${esc(tr('Heading'))}">${mv}</li>`;
     if (it.kind === 'text') return `<li class="ofdit ofdtx"><span class="ofdpos muted rowgrip" ${gp}>${ic('note', 's')}</span><textarea data-i="${i}" data-k="detail" rows="2" maxlength="4000" placeholder="${esc(tr('Text block'))}" aria-label="${esc(tr('Text block'))}">${esc(it.detail)}</textarea>${mv}</li>`;
@@ -485,18 +495,30 @@ function ofdItemsHtml(d, adm) {
       <span class="ofdnums"><span class="muted">−</span><input data-i="${i}" data-k="rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(it.rate))}" aria-label="${esc(tr('Amount'))}"><span class="muted">${esc(ofcSym(ofcHome()))}</span>
       <select data-i="${i}" data-k="tax" aria-label="${esc(tr('VAT'))}">${taxes.map(([v, n]) => `<option value="${v}" ${it.tax === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
       <b class="ofdlt">${line ? esc(line.total_text || ofdMoney(line.total, d)) : ''}</b></span></div>${mv}</li>`;
-    return `<li class="ofdit${it.agent_flag ? ' oa_flag' : ''}${it.producing && !inv ? ' ofdprod' : ''}"><span class="ofdpos rowgrip" ${gp}>${line?.pos || ''}</span>
+    const opt = d.kind === 'offer' && it.opt ? it.opt : '';  // 2.1041.0 (#5814): marked, its amount in brackets (not in the sum)
+    return `<li class="ofdit${it.agent_flag ? ' oa_flag' : ''}${it.producing && !inv ? ' ofdprod' : ''}${opt ? ' ofdopt' : ''}"><span class="ofdpos rowgrip" ${gp}>${line?.pos || ''}</span>${opt ? `<span class="rotag ofdopttag">${esc(opt === 'optional' ? tr('Optional') : tr('Alternative'))}</span>` : ''}
       <div class="ofditb"><input class="ofdtt" data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(tr('Service'))}" aria-label="${esc(tr('Service'))}">
       <input class="ofddt" data-i="${i}" data-k="detail" value="${esc(it.detail)}" maxlength="4000" placeholder="${esc(tr('Detail (optional)'))}" aria-label="${esc(tr('Detail'))}">
       <span class="ofdnums">${it.unit === 'percent' ? ekUnitSel(it, i, d) + ekPctHtml(it, i, line, d) : `<input data-i="${i}" data-k="qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.qty))}" aria-label="${esc(tr('Quantity'))}">
       ${ekUnitSel(it, i, d)}
       <span class="muted">×</span><input data-i="${i}" data-k="rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(it.rate))}" aria-label="${esc(ofcHome() === 'EUR' ? tr('Rate (EUR)') : tr('Rate ({0})', ofcHome()))}"><span class="muted">${ofcSym(ofcHome())}</span>`}
       <select data-i="${i}" data-k="tax" aria-label="${esc(tr('VAT'))}">${taxes.map(([v, n]) => `<option value="${v}" ${it.tax === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
-      ${/*html-ok*/ ofdItDiscHtml(it, i, line, d)}<b class="ofdlt">${line ? esc(line.total_text || ofdMoney(line.total, d)) : ''}</b></span>
+      ${/*html-ok*/ ofdItDiscHtml(it, i, line, d)}<b class="ofdlt">${line ? esc(opt ? `(${line.total_text || ofdMoney(line.total, d)})` : line.total_text || ofdMoney(line.total, d)) : ''}</b></span>
       ${/*html-ok*/ ofdItDiscNote(it, line, d)}<span class="ofdflags">${/*html-ok*/ ofdItDiscBtn(it, i, d)}${inv ? '' : `<label class="chkl"><input type="checkbox" data-i="${i}" data-k="raw_fee" ${it.raw_fee ? 'checked' : ''}> ${tr('raw data')}</label>${prd_prodShown(d) ? `<label class="chkl ofdprodf${it.producing ? ' on' : ''}"><input type="checkbox" data-i="${i}" data-k="producing" ${it.producing ? 'checked' : ''}> ${d.producing_mode === 'amount' ? esc(prd_lbl(d.share_label, d) || tr('producing')) : tr('producing')}</label>` : ''}${PRD_SLOTS.filter(k => prd_slotShown(d, k)).map(k => `<label class="chkl"><input type="checkbox" data-i="${i}" data-k="in_${k}" ${it['in_' + k] ? 'checked' : ''}> ${esc(prd_slotName(d, k))}</label>`).join('')}<label class="chkl"><input type="checkbox" data-i="${i}" data-k="discountable" ${it.discountable ? 'checked' : ''}> ${tr('discount')}</label>`}
-      ${adm ? `<label class="chkl ofdcost">${tr('Purchase')} <input data-i="${i}" data-k="cost" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.cost))}" aria-label="${esc(tr('External cost per unit (internal)'))}"></label>${it.margin != null ? `<span class="ofdmargin${it.margin < 0 ? ' neg' : ''}">${esc(tr('Surplus {0}', ofdMoney(it.margin, d)))}</span>` : ''}` : ''}</span>${typeof oa_flagHtml === 'function' ? oa_flagHtml(it, i) : ''}</div>${mv}</li>`;  // 2.51.0 A (#1348): an agent's marks
-  }).join('');
-  return `<ul class="ofdits" role="list">${rows}</ul><div class="ofdadd"><button type="button" class="btn sm pri" data-ofd="it-svc">${ic('plus', 's')}<span>${tr('Add service')}</span></button><button type="button" class="btn sm" data-ofd="it-head">${ic('list', 's')}<span>${tr('Heading')}</span></button><button type="button" class="btn sm" data-ofd="it-text">${ic('note', 's')}<span>${tr('Text block')}</span></button>${inv && d.kind !== 'delivery' ? `<button type="button" class="btn sm" data-ofd="it-disc">${ic('calc', 's')}<span>${tr('Discount')}</span></button>` : ''}</div>`;
+      ${adm ? `<label class="chkl ofdcost">${tr('Purchase')} <input data-i="${i}" data-k="cost" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.cost))}" aria-label="${esc(tr('External cost per unit (internal)'))}"></label>${it.margin != null ? `<span class="ofdmargin${it.margin < 0 ? ' neg' : ''}">${esc(tr('Surplus {0}', ofdMoney(it.margin, d)))}</span>` : ''}` : ''}${d.kind === 'offer' ? ofd_optSel(it, i) : ''}</span>${typeof oa_flagHtml === 'function' ? oa_flagHtml(it, i) : ''}</div>${mv}</li>`;  // 2.51.0 A (#1348): an agent's marks
+}
+// 2.1041.0 (#5814): normal / optional / alternative per position of a quotation (counted in no sum, printed with its amount)
+const OFD_OPT = [['', N_('Normal position')], ['optional', N_('Optional position')], ['alternative', N_('Alternative position')]];
+const ofd_optSel = (it, i) => `<select class="ofdoptsel" data-i="${i}" data-k="opt" aria-label="${esc(tr('Kind of position'))}">${OFD_OPT.map(([v, n]) => `<option value="${v}" ${(it.opt || '') === v ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>`;
+// 2.1041.0 (#5816, #5817): the document's print switches below the positions (not inside a part: they belong to the document)
+function ofd_printSw(d) {
+  if (d.tpPart || !['offer', 'invoice'].includes(d.kind)) return '';
+  const sub = `<label class="chkl"><input type="checkbox" id="ofd-subtotals" data-f="subtotals" ${d.subtotals ? 'checked' : ''}> ${esc(tr('Subtotal under every section'))}</label>`;
+  const flat = d.kind === 'offer' ? `<label class="chkl"><input type="checkbox" id="ofd-flat_print" data-f="flat_print" ${d.flat_print ? 'checked' : ''}> ${esc(tr('Print as a flat price'))}</label>` : '';
+  return `<div class="ofdprintsw">${sub}${flat}${d.flat_print && d.kind === 'offer' ? `<p class="shint ofdflathint" role="note">${ic('info', 's')} ${esc(tr('The client sees only the total: no quantities or prices per position in the PDF and on the approval page.'))}</p>` : ''}</div>`;
+}
+function ofd_itsWrap(d, rows, inv) {
+  return `<ul class="ofdits" role="list">${rows}</ul>${ofd_printSw(d)}<div class="ofdadd"><button type="button" class="btn sm pri" data-ofd="it-svc">${ic('plus', 's')}<span>${tr('Add service')}</span></button><button type="button" class="btn sm" data-ofd="it-head">${ic('list', 's')}<span>${tr('Heading')}</span></button><button type="button" class="btn sm" data-ofd="it-text">${ic('note', 's')}<span>${tr('Text block')}</span></button>${inv && d.kind !== 'delivery' ? `<button type="button" class="btn sm" data-ofd="it-disc">${ic('calc', 's')}<span>${tr('Discount')}</span></button>` : ''}</div>`;
 }
 // 2.114.3 (#2266): which positions the producing switch counts; in a part whether its producing values are the document's or its own
 function ofdProdHint(d) {
@@ -581,7 +603,7 @@ function ofdTotalsHtml(d, t, adm) {
   for (const x of t.tax_lines || []) rows.push([x.label, ofdMoney(x.amount, d), 'tax']);
   if (d.vat_mode !== 'novat') rows.push([L.gross || tr('Gross total'), ofdMoney(t.gross || 0, d), 'gross']);
   return `<div class="ofdtotals" id="ofd-totals"><dl>${rows.map(([k, v, c]) => `<div class="ofdtr tr-${c}"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
-    <p class="muted ofdnote">${esc(t.vat_note || '')}${t.fx_note ? ` · ${esc(t.fx_note)}` : ''}</p>
+    ${t.opt_note ? `<p class="muted ofdnote ofdoptnote">${esc(t.opt_note)}</p>` : '' /* 2.1041.0 (#5814) */}<p class="muted ofdnote">${esc(t.vat_note || '')}${t.fx_note ? ` · ${esc(t.fx_note)}` : ''}</p>
     ${adm && t.costs != null ? `<p class="muted ofdint">${ic('eye', 's')} ${trh('Internal: external costs {0}, surplus {1}', ofdMoney(t.costs, d), ofdMoney(t.margin, d))}</p>` : ''}
     ${adm && d.items_margin != null ? `<p class="muted ofdint ofdmsum">${trh('Surplus of the positions: {0}', ofdMoney(d.items_margin, d))}</p>` : ''}</div>`;
 }
@@ -781,7 +803,8 @@ const ofdPatch = body => typeof tpView === 'function' && tpView() ? tpPatch(body
 const bfaFilled = it => it.id || !((it.kind === 'heading' || it.kind === 'text') && !(it.title || '').trim() && !(it.detail || '').trim());
 function ofdItemsBody() {
   return (OFD.doc.items || []).filter(bfaFilled).map(it => ({id: it.id, kind: it.kind, service_id: it.service_id, title: it.title, detail: it.detail, qty: it.qty, unit: it.unit, rate: it.rate, tax: it.tax,
-    raw_fee: it.raw_fee, producing: it.producing, in_handling: it.in_handling, in_markup: it.in_markup, intext: it.intext, cost: it.cost, discountable: it.discountable, discount_pct: it.discount_pct || 0, ref_part_id: it.ref_part_id, confirm: it.confirm || undefined}));  // 2.1042.0 (#5815): + discount_pct  // 2.47.0 (#1215): + ref_part_id; 2.51.0 A (#1348): + confirm (an agent's mark)
+    raw_fee: it.raw_fee, producing: it.producing, in_handling: it.in_handling, in_markup: it.in_markup, intext: it.intext, cost: it.cost, discountable: it.discountable, discount_pct: it.discount_pct || 0, ref_part_id: it.ref_part_id, confirm: it.confirm || undefined,
+    ...(OFD.doc.kind === 'offer' && it.kind !== 'heading' && it.kind !== 'text' ? {opt: it.opt || ''} : {})}));  // 2.1042.0 (#5815): + discount_pct; 2.1041.0 (#5814): optional / alternative  // 2.47.0 (#1215): + ref_part_id; 2.51.0 A (#1348): + confirm (an agent's mark)
 }
 // 2.47.0 (#1215): with a part open, positions and calculation values go to the part (office_parts.js)
 const ofdPutItems = () => typeof tpView === 'function' && tpView() ? tpPutItems() : ofdSave('PUT', `/api/office/docs/${OFD.doc.id}/items`, {items: ofdItemsBody(), ...(OFD.doc.kind === 'offer' ? {parts_known: (OFD.doc.parts || []).map(p => p.id)} : {})}, (OFD.doc.items || []).filter(bfaFilled));  // 2.138.0 A (#2239): + parts_known; 2.269.0 A (#3012): + the lines sent
@@ -877,6 +900,7 @@ async function ofdChange0(e) {
   if (f === 'client_id') { await ofdPatch({client_id: t.value ? +t.value : null, recipient_from_client: !!t.value}); return; }
   if (f === 'contract_id') { await ofdPatch({contract_id: t.value ? +t.value : null}); return; }
   if (f === 'producing_on') { await ofdPatch({producing_on: t.checked ? 1 : 0}); return; }  // 2.47.0 (#1645)
+  if (f === 'subtotals' || f === 'flat_print') { await ofdSave('PATCH', `/api/office/docs/${OFD.doc.id}`, {[f]: t.checked ? 1 : 0}); return; }  // 2.1041.0 (#5816, #5817): the document's, also with a part open
   if (f === 'accept_on') { await ofdPatch({accept_on: t.value === '' ? null : +t.value}); return; }  // 2.114.4 B (#2270)
   if (/^(handling|markup)_on$/.test(f)) { const k = f.slice(0, -3); await ofdPatch({[k + '_pct']: t.checked ? prd_opts()[k]?.pct ?? 0 : null}); return; }  // 2.113.1 (#2252)
   if (f === 'markup_stacked') { await ofdPatch({markup_stacked: t.checked ? 1 : 0}); return; }

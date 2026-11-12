@@ -20,7 +20,7 @@ from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_load, oc_json_store
 from ..core.errors import BadInput
-from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_discount_split, calc_line_amount, calc_tax_day, calc_lang, dec, fmt_money, fmt_qty, fmt_rate, label, money, office_calc, pack_tax, _num
+from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_discount_split, calc_line_amount, calc_subtotals, calc_tax_day, calc_lang, dec, fmt_money, fmt_qty, fmt_rate, label, money, office_calc, pack_tax, unit_text, _num
 from .homecur import hc_home  # 2.189.0 (#2475)
 from .doclang import doc_txt
 from .model import PARTS_TITLE_FILM, UNITS, office_role, office_settings
@@ -264,7 +264,7 @@ def tp_doc_totals(c, oid, r, items, pack, eur=False, home=None):
             ph.append({**it, "kind": "service", "id": key, "rate": 0, "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 0})
         else:
             ph.append(it)
-    t = office_calc(doc, ph, pack)
+    t = office_calc({**doc, "subtotals": None}, ph, pack)  # 2.1041.0 (#5816): the subtotals below, with the parts' amounts
     base = {k: D0 for k in TAX_KEYS}
     disc_base = {k: D0 for k in TAX_KEYS}
     items_net, costs = D0, dec(t["costs"])
@@ -297,6 +297,8 @@ def tp_doc_totals(c, oid, r, items, pack, eur=False, home=None):
                   "discountable": 1 if _flag(it.get("discountable", 1)) else 0, "intext": "intern", "raw_fee": 0, "producing": 0,
                   "counts": p is not None}
             items_net += total
+        elif k == "item" and ln.get("opt"):
+            pass  # 2.1041.0 (#5814): an optional / alternative position counts in no sum
         elif k == "item":
             items_net += dec(ln["total"])
             base[ln["tax"]] += dec(ln["total"])
@@ -348,6 +350,8 @@ def tp_doc_totals(c, oid, r, items, pack, eur=False, home=None):
             tax_sum += amt
             tax_lines.append({"rate_key": tk, "pct": _num(rates[tk]), "base": _num(base[tk]), "amount": _num(amt),
                               "label": label(pack, lang, "tax_" + tk, pct=fmt_qty(rates[tk], lang))})
+    if _flag(doc.get("subtotals")):  # 2.1041.0 (#5816): the title page's sections with the amounts of their part lines
+        calc_subtotals(lines, pack, lang, currency)
     out = dict(t)
     _db = max(sum(disc_base.values(), D0), D0)
     out.update(discount_base=_num(sum(disc_base.values(), D0)), discount_capped=bool(amt_on and capped),
@@ -680,7 +684,7 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
         if k in ("heading", "text"):
             out.append({**pos(ln.get("title") or "", 1, "day", 0, "standard", ln.get("text") or ""), "kind": k})
             continue
-        if k != "item":
+        if k != "item" or ln.get("opt"):  # 2.1041.0 (#5814): an optional / alternative position is not invoiced
             continue
         it = by_id.get(ln.get("id")) or {}
         if ln.get("part_id") is None:
@@ -702,6 +706,8 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
         out.append({**pos(ln["title"] + (f" × {fmt_qty(qty, lang)}" if qty != 1 else ""), 1, "day", 0, "standard"), "kind": "heading"})
         pct_lines = {x.get("id"): x for x in pc["lines"] if x["kind"] == "item" and x.get("pct") is not None}
         for pit in _part_items(c, oid, r["id"], p["id"]):
+            if pit.get("opt"):
+                continue  # 2.1041.0 (#5814): an optional / alternative position is not invoiced
             if (pit.get("kind") or "service") in ("heading", "text"):
                 out.append({**pos(pit.get("title") or "", 1, "day", 0, "standard", pit.get("detail") or ""), "kind": pit["kind"]})
                 continue

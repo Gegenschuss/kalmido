@@ -25,7 +25,8 @@ const tpCur = () => tpView() || OFD.doc;
 function tpPutItems() {
   const v = tpView();
   const src = (v.items || []).filter(bfaFilled), items = src.map(it => ({id: it.id, kind: it.kind, service_id: it.service_id, title: it.title, detail: it.detail, qty: it.qty, unit: it.unit, rate: it.rate, tax: it.tax,
-    raw_fee: it.raw_fee, producing: it.producing, in_handling: it.in_handling, in_markup: it.in_markup, intext: it.intext, cost: it.cost, discountable: it.discountable, markup_pct: it.markup_pct, discount_pct: it.discount_pct || 0}));  // 2.1042.0 (#5815)  // 2.113.1 (#2252): + the surcharge flags
+    raw_fee: it.raw_fee, producing: it.producing, in_handling: it.in_handling, in_markup: it.in_markup, intext: it.intext, cost: it.cost, discountable: it.discountable, markup_pct: it.markup_pct, discount_pct: it.discount_pct || 0,
+    ...(it.kind !== 'heading' && it.kind !== 'text' ? {opt: it.opt || ''} : {})}));  // 2.113.1 (#2252): + the surcharge flags; 2.1042.0 (#5815): + discount_pct; 2.1041.0 (#5814): + opt
   return ofdSave('PUT', `/api/office/docs/${OFD.doc.id}/parts/${v.tpPart.id}/items`, {items}, src);  // 2.269.0 A (#3012): + the lines sent (their new ids)
 }
 // a change of the calculation values while a part is open goes to the part's settings, everything else to the document

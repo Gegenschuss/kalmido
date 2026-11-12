@@ -95,6 +95,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.40.0 (#1379): producing (markup by production days) and the raw data surcharge are switched on per
                      # organisation; new organisations start without them, fe_office_rules_migrate keeps them for those using them
                      "producing_on": 0, "raw_on": 0,
+                     "subtotals_on": 0,  # 2.1041.0 (#5816): new quotations and invoices show a subtotal per section
                      "portal_docs": 0,  # 2.120.0 B (#2088): sent documents show in the customer portal (office/portaldocs.py)
                      "client_blocks_off": [],  # 2.435.0 A (#3600): blocks of the client card the office switched off (CLIENT_BLOCKS)
                      "accept_on": 1,  # 2.114.4 B (#2270): quotations print the order confirmation block (per document: docs.accept_on)
@@ -625,7 +626,7 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = v
         elif k == "dunning_grace_days":  # 2.147.1 B (#2054)
             out[k] = int(_num(v, k, 0, 90))
-        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs", "sign_offers", "credit_shared"):  # 2.433.0 (#3597): credit_shared  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
+        elif k in ("subtotals_on", "datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs", "sign_offers", "credit_shared"):  # 2.433.0 (#3597): credit_shared  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k.rsplit("_", 1)[0] in CLOSING_BASES:  # 2.460.0 (#3767): every language
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""

@@ -19,7 +19,7 @@ from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied, live_sql
 from ..core.errors import BadInput, BadKey, DeniedKey
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
-from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, calc_tax_day, dec, fmt_money, fmt_rate, inv_calc, office_calc
+from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, OPT_KINDS, RAW_MODES, TAX_KEYS, calc_tax_day, dec, fmt_money, fmt_rate, inv_calc, label, office_calc
 from .packs import office_pack_for
 from .doclang import DOC_LANGS, doc_client_lang, doc_lg, doc_own, doc_pack, fd_lang_gaps  # 2.185.0 C (#2520); 2.460.0 (#3767)
 from .sheet import dk_pack, dk_packs_on
@@ -386,6 +386,7 @@ def _calc_doc(r, home="EUR"):  # 2.189.0 (#2475): home = the office's home curre
             "producing_mode": dict(r).get("producing_mode"), "share_label": dict(r).get("share_label"),  # 2.113.1 (#2251)
             **{k: dict(r).get(k) for k in PRD_DOC_KEYS},  # 2.113.1 (#2252): handling costs / markup
             "vat_note": dict(r).get("vat_note"),  # 2.47.3 (#1360): "small" prints the section 19 note
+            "subtotals": dict(r).get("subtotals"),  # 2.1041.0 (#5816): the subtotal lines per section
             "date": dict(r).get("date"), "service_to": dict(r).get("service_to")}  # 2.531.0 (#4498): the rates of the day of service
 
 
@@ -753,6 +754,10 @@ def clean_doc(c, oid, b, cur, admin):
         f["raw_mode"] = _choice(b.get("raw_mode"), "raw_mode", RAW_MODES)
     if "producing_on" in b:  # 2.47.0 (#1645): producing per document (the office setting is only the default)
         f["producing_on"] = 0 if b.get("producing_on") in (0, False, "0", "false", None, "") else 1
+    if "subtotals" in b and cur["kind"] in ("offer", "invoice"):  # 2.1041.0 (#5816): display only
+        f["subtotals"] = b.get("subtotals") not in (0, False, "0", "false", None, "")
+    if "flat_print" in b and cur["kind"] == "offer":  # 2.1041.0 (#5817): quotations only (an invoice needs quantity and unit price)
+        f["flat_print"] = b.get("flat_print") not in (0, False, "0", "false", None, "")
     if "accept_on" in b:  # 2.114.4 B (#2270): order confirmation block per quotation (None = like the office setting)
         f["accept_on"] = None if b.get("accept_on") in (None, "", "default") else (0 if b.get("accept_on") in (0, False, "0", "false") else 1)
     share = (cur or {}).get("producing_mode") == "amount"  # 2.113.1 (#2251): prod_quotient is the factor (0.01..10) there
@@ -843,7 +848,7 @@ def clean_items(c, oid, r, items, admin, part=None):
         row = {"sort": i, "kind": kind, "service_id": None, "title": _text(it.get("title"), "items.title", 500),
                "detail": _text(it.get("detail"), "items.detail", 4000), "qty": 1, "unit": "day", "rate": 0, "tax": "standard",
                "raw_fee": 0, "producing": 0, "in_handling": 0, "in_markup": 0, "intext": "intern", "cost": 0, "discountable": 1,  # 2.113.1 (#2252)
-               "discount_pct": 0}  # 2.1042.0 (#5815): a position's own discount (services only)
+               "discount_pct": 0, "opt": ""}  # 2.1042.0 (#5815): a position's own discount (services only); 2.1041.0 (#5814)
         prev = old.get(it.get("id")) if it.get("id") else None
         if prev and prev.get("list_id"):  # 2.144.5 C (#1523): a saved position keeps the list it was made from (server-side only)
             row["list_id"] = prev["list_id"]
@@ -887,6 +892,8 @@ def clean_items(c, oid, r, items, admin, part=None):
             row["discountable"] = 0 if it.get("discountable") in (0, False, "0", "false") else 1
             # 2.1042.0 (#5815): absent = the position keeps its discount (a client or script that does not know the field)
             row["discount_pct"] = (_num(it.get("discount_pct", (prev or {}).get("discount_pct")), "items.discount_pct", 0, 100) or 0) if row["unit"] != "percent" else 0
+            if r["kind"] == "offer":  # 2.1041.0 (#5814): optional / alternative (quotations only; absent = as saved)
+                row["opt"] = _choice(items[i].get("opt", (prev or {}).get("opt")) or "", "items.opt", ("",) + OPT_KINDS)
             if admin:
                 row["cost"] = _num(it.get("cost"), "items.cost", 0, 1e8) or 0
             else:
@@ -949,6 +956,7 @@ def doc_create(c, oid, uid, b, admin, number=True):
            "producing_on": 1 if s.get("producing_on") else 0,  # 2.47.0 (#1645): the office setting is the default of a new quotation
            "raw_mode": "optional" if s.get("raw_on") else "none", "raw_factor": s.get("raw_factor") if s.get("raw_factor") is not None else 0.25,
            "prod_quotient": s.get("prod_quotient") or 3, "producing_rate": prod_rate, "discount_pct": 0,
+           "subtotals": bool(s.get("subtotals_on")),  # 2.1041.0 (#5816): the office setting is the default
            **prd_new_doc(c, oid, s),  # 2.113.1 (#2251, #2252): the options of the industry packs switched on
            "intro": _default_text(c, oid, s, "intro", lang), "closing": _default_text(c, oid, s, "closing", lang),
            "rights": json.dumps(rights, ensure_ascii=False), "fields": "[]", "totals": "{}", "created_by": uid, "created_at": ts,
@@ -1155,6 +1163,34 @@ def prd_strip_detail(m):
     return m
 
 
+# 2.1041.0 (#5817): what a flat price quotation leaves out of a position (the print model, so the PDF, the preview and the
+# approval page cannot show it); the lines the calculation adds (producing, surcharges, included raw data, discount) go as well
+OFP_DROP = ("qty", "qty_text", "unit", "unit_text", "rate", "rate_text", "tax_pct", "pct", "base", "taxes", "mixed_tax",
+            "discount_pct", "list_total", "line_discount")  # 2.1051.0 (#5815 + #5817): a position's own discount names its list price
+OFP_AUTO = ("producing", "surcharge", "discount")
+
+
+def ofp_flat(m):
+    """2.1041.0 (#5817): print model m as a flat price: positions with title and description only (an optional / alternative one
+    keeps its amount), no calculation lines; net, tax and gross, the subtotals and the optional raw data stay. m["flat"] = True."""
+    def strip(lines):
+        out = []
+        for ln in lines or []:
+            k = ln.get("kind") if isinstance(ln, dict) else None
+            if k in OFP_AUTO or (k == "raw" and not ln.get("optional")):
+                continue
+            if k == "item":
+                ln = {kk: v for kk, v in ln.items() if kk not in OFP_DROP and (ln.get("opt") or kk not in ("total", "total_text"))}
+            out.append(ln)
+        return out
+    m["lines"] = strip(m.get("lines"))
+    for p in m.get("parts") or []:
+        if isinstance(p, dict):
+            p["lines"] = strip(p.get("lines"))
+    m["flat"] = True
+    return m
+
+
 def odoc_render(c, doc_id, oid, keep_detail=False):
     """The print model of a document (dict, see docs/OFFICE.md and tests/fixtures): everything in the document's language
     and formats, nothing of the signed-in person. oid: the organisation the caller works in (required; foreign document =
@@ -1188,6 +1224,8 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
             ln["total_text"] = fmt_money(ln["total"], lang, cur)
             if ln.get("rate") is not None:
                 ln["rate_text"] = fmt_rate(ln["rate"], lang, cur)  # 2.354.0 A (#2831): up to 4 places
+        if ln.get("opt") in OPT_KINDS:  # 2.1041.0 (#5814): "Optional:" / "Alternative:" before the title, in the document's language
+            ln["opt_label"] = label(pack, lang, "opt_" + ln["opt"])
     rec = _j(r["recipient_snapshot"] if locked and r["recipient_snapshot"] else r["recipient"], {})
     if not locked:
         rec = cdn_doc_recipient(c, oid, r, rec)  # 2.97.0 B (#1951): a draft prints its client's address as it is now
@@ -1273,6 +1311,10 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         inv_render(c, oid, r, m, t, pack, L, lang, _fd)
     from .terms import agb_print_line
     m["terms_line"] = agb_print_line(c, oid, r, _fd)  # 2.113.2 (#2253): quotations with terms only
+    if t.get("opt_note"):  # 2.1041.0 (#5814): only then (the print model of every other document stays as it was: signoff hash)
+        m["totals"]["opt_note"] = t["opt_note"]
+    if r["kind"] == "offer" and dict(r).get("flat_print"):  # 2.1041.0 (#5817): after the parts, the prices leave the model itself
+        ofp_flat(m)
     return m if keep_detail else prd_strip_detail(m)  # 2.113.1 (#2251): keep_detail only for the signoff hash
 
 

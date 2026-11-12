@@ -161,6 +161,14 @@
 .ofdauto{display:flex;align-items:center;gap:.5rem;padding:.375rem .5rem;border-radius:var(--radius);background:var(--bg2);min-height:2.5rem}
 .ofdauto .ofdlt{font-variant-numeric:tabular-nums;white-space:nowrap}
 .ofdrules{margin-top:.5rem}
+/* 2.1041.0 (#5816): the subtotal of a section, (#5814) an optional / alternative position, (#5817) the print switches */
+.ofdsub{display:flex;align-items:center;gap:.5rem;padding:.375rem .5rem;border-top:1px solid var(--line2);min-height:2.5rem;font-weight:600}
+.ofdsub .ofcn{flex:1;min-width:0}
+.ofdsub .ofdlt{font-variant-numeric:tabular-nums;white-space:nowrap}
+.ofdopt .ofdlt{font-style:italic;color:var(--text2)}
+.ofdopttag{align-self:center}
+.ofdprintsw{display:flex;flex-wrap:wrap;gap:.25rem 1.25rem;margin:.5rem 0 0}
+.ofdprintsw .ofdflathint{flex-basis:100%;margin:0}
 /* 2.120.0 D (#2089): a delivery note shows no prices (rate, tax, line total) */
 .ofdls .ofdrate,.ofdls .ofdit .ofdlt,.ofdls .ofdnums>.muted,.ofdls .ofdnums select[data-k="tax"],.ofdls .ofdpctof{display:none}
 .ofdtotals{margin-top:.75rem;padding:.5rem .75rem;border-top:2px solid var(--accent)}

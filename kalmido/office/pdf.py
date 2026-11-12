@@ -1469,6 +1469,11 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # (review N4: the rates compared as numbers, so "19" and "19.0" are one)
     if len(p3v) <= 1:
         c_vat = 0
+    flat_ = bool(m.get("flat"))  # 2.1041.0 (#5817): a flat price quotation: no quantity, price or VAT column; the amount column
+    if flat_:  # only for optional / alternative positions, which keep their amount (the model has no other)
+        c_qty, c_rate, c_vat = 0, 0, 0
+        if not any(isinstance(x, dict) and x.get("kind") == "item" and x.get("total_text") for x in list(m.get("lines") or []) + [y for pt in (m.get("parts") or []) if isinstance(pt, dict) for y in (pt.get("lines") or [])]):
+            c_tot = 0
     c_title = PDF_CW - c_pos - c_qty - c_rate - c_vat - c_tot
     x_pos = PDF_L
     x_title = x_pos + c_pos
@@ -1482,12 +1487,15 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         yy = y + 4
         p.text(x_pos + 3, yy, L["pos"].upper(), FS_FOOT, True, C_INK2, spacing=0.6)
         p.text(x_title + 3, yy, L["service"].upper(), FS_FOOT, True, C_INK2, spacing=0.6)
-        p.text(x_qty, yy, L["qty"].upper(), FS_FOOT, True, C_INK2, align="r", width=c_qty - 3, spacing=0.6)
+        if c_qty:  # 2.1041.0 (#5817): none in a flat price quotation
+            p.text(x_qty, yy, L["qty"].upper(), FS_FOOT, True, C_INK2, align="r", width=c_qty - 3, spacing=0.6)
         if not np_:  # 2.120.0 D (#2089): no price columns on a delivery note
-            p.text(x_rate, yy, L["rate"].upper(), FS_FOOT, True, C_INK2, align="r", width=c_rate - 3, spacing=0.6)
+            if c_rate:
+                p.text(x_rate, yy, L["rate"].upper(), FS_FOOT, True, C_INK2, align="r", width=c_rate - 3, spacing=0.6)
             if c_vat:
                 p.text(x_vat, yy, L["vat"].upper(), FS_FOOT, True, C_INK2, align="c", width=c_vat, spacing=0.6)
-            p.text(x_tot, yy, L["total"].upper(), FS_FOOT, True, C_INK2, align="r", width=c_tot - 3, spacing=0.6)
+            if c_tot:
+                p.text(x_tot, yy, L["total"].upper(), FS_FOOT, True, C_INK2, align="r", width=c_tot - 3, spacing=0.6)
         p.line(PDF_L, y + thead_h - 1, PDF_L + PDF_CW, y + thead_h - 1, 1.1, C_INK)
 
     lines = [x for x in (m.get("lines") or []) if isinstance(x, dict)]
@@ -1499,7 +1507,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # (ov_plan); printed parts (their own pages): the row of the part on the title page carries it, the title page is the overview
     ov_tag_w = pdf_text_width(L["ov_page"].format(99).upper(), FS_FOOT, False, 0.8) + 6
     ov_tags, ov_at, ov_pg, line_at = [], {}, {}, {}  # (page, x, y, key) of the tags; key -> block; key -> (page, y); id(line) -> its first block
-    ov_on = (m.get("kind") or "offer") in PDF_OV_KINDS and not np_
+    ov_on = (m.get("kind") or "offer") in PDF_OV_KINDS and not np_ and not m.get("flat")  # 2.1041.0 (#5817): + not a flat price
     pp_ids = {pt.get("id") for pt in m.get("parts") or [] if isinstance(pt, dict) and pt.get("id") is not None} if ov_on else set()
 
     def ov_tag(p, x, y, key):
@@ -1527,6 +1535,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 t = str(ln.get("title") or (L["producing"] if k == "producing" else L["discount"] if k == "discount" else ""))
                 if k == "discount" and ln.get("pct") not in (None, "", 0):
                     t = f"{t} {pdf_num(ln['pct'], lang, fmt)} %"
+                if ln.get("opt") and ln.get("opt_label"):  # 2.1041.0 (#5814): "Optional: …" / "Alternative: …"
+                    t = f"{ln['opt_label']} {t}"
                 detail = str(ln.get("detail") or "") if k != "producing" else ""  # 2.114.4 A (#2276): the formula only in the app
                 qty_s = " ".join(x for x in qty_two(ln) if x).strip()
                 # 2.296.0 E (#3170): too wide for the column: number and unit on two lines (each wrapped to the column)
@@ -1538,10 +1548,14 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     rate_s = vat_s = tot_s = ""
                 # 2.1042.0 (#5815): a position's own discount below its price ("Rabatt -10 %"); the amount column is after it
                 disc_s = ""
-                if k == "item" and not np_ and ln.get("line_discount") not in (None, "", 0) and ln.get("discount_pct") not in (None, "", 0):
+                if k == "item" and not np_ and not flat_ and ln.get("line_discount") not in (None, "", 0) and ln.get("discount_pct") not in (None, "", 0):
                     disc_s = f"{L['discount']} -{pdf_num(ln['discount_pct'], lang, fmt)} %"
                     if pdf_text_width(disc_s, FS_SMALL) > c_rate - 3:
                         disc_s = f"-{pdf_num(ln['discount_pct'], lang, fmt)} %"
+                if flat_ and not ln.get("total_text"):  # 2.1041.0 (#5817): the model has no amount (never "0,00")
+                    tot_s = ""
+                if ln.get("opt") and not np_:  # 2.1041.0 (#5814): set apart, not in the sum
+                    rate_s, tot_s = (f"({rate_s})" if rate_s else ""), (f"({tot_s})" if tot_s else "")
                 pos_s = str(ln.get("pos") or "") if k in ("item", "producing", "surcharge") else ""  # 2.114.4 A (#2276): producing numbered too; surcharges like it
                 tag = ln["part_id"] if ln.get("part_id") in pp_ids and k == "item" else None  # 2.438.0 B (#3622)
                 t_lines = pdf_wrap(t, body, c_title - 6 - (ov_tag_w if tag is not None else 0))
@@ -1594,6 +1608,17 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     block(h, draw_row, table=True)
                 have_table = True
                 last_item_idx = len(blocks) - 1
+            elif k == "subtotal" and not np_:  # 2.1041.0 (#5816): the net of the section above, a row of its own
+                st_l = pb_wrap(str(ln.get("label") or ln.get("title") or ""), body, PDF_CW - c_pos - 100, True)
+                st_v = str(ln.get("total_text") or money(ln.get("total") or 0))
+
+                def draw_sub(p, y, st_l=st_l, st_v=st_v, h=8 + len(st_l) * lh):
+                    for j, s_ in enumerate(st_l):
+                        p.text(x_title + 3, y + 4 + j * lh, s_, body, True)
+                    p.text(PDF_L, y + 4 + (len(st_l) - 1) * lh, st_v, body, True, align="r", width=PDF_CW - 3)
+                    p.line(PDF_L, y + h - 0.5, PDF_L + PDF_CW, y + h - 0.5, 0.8, C_INK2)
+                block(8 + len(st_l) * lh, draw_sub, table=True)
+                have_table = True
     # -- 2.438.0 B (#3622): the overview of the part totals: slots of height 0 before the table, filled in by ov_fill when the
     # document has two pages or more without it (else it prints exactly as without an overview)
 
@@ -1610,7 +1635,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             if k == "heading":
                 head_, cur_ = x, None
                 continue
-            if k not in ("item", "producing", "surcharge", "raw", "discount") or (k == "raw" and x.get("optional")):
+            if k not in ("item", "producing", "surcharge", "raw", "discount") or (k == "raw" and x.get("optional")) or x.get("opt"):  # 2.1041.0 (#5814)
                 continue
             try:
                 amt = decimal.Decimal(str(x.get("total")))
@@ -1725,7 +1750,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         if raw_opt.get("detail"):
             p3o[o_l] = str(raw_opt["detail"])
     # 2.114.5 (#2300): no "valid until" sentence below the table when the head names the date
-    notes = [str(x) for x in (tot.get("vat_note"), m.get("vat_note_text"), tot.get("exempt_note"), tot.get("fx_line") or m.get("fx_note"),  # 2.296.0 B (#3169): + exempt_note
+    notes = [str(x) for x in (tot.get("opt_note"), tot.get("vat_note"), m.get("vat_note_text"),  # 2.1041.0 (#5814): + opt_note tot.get("exempt_note"), tot.get("fx_line") or m.get("fx_note"),  # 2.296.0 B (#3169): + exempt_note
                               m.get("valid_note") if not m.get("valid_until") else None) if x and str(x).strip()]
     notes = list(dict.fromkeys(notes))
     note = "\n".join(notes)
