@@ -52,7 +52,7 @@ def vfind(h, q):
 
 
 def afind(s, q):
-    r = s.get(B + "/api/search/messages", params={"q": q})
+    r = s.get(B + "/api/search?kind=messages", params={"q": q})
     return [(x.get("chat_type"), x.get("id")) for x in r.json().get("hits") or []] if r.ok else r.status_code
 
 

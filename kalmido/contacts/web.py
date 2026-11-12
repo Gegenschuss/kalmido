@@ -15,6 +15,7 @@ from ..core.pg import system_ctx, write_lock  # 2.269.0 B (#3034); 2.370.3 (#276
 from ..accounts.session import me
 from ..core.access import Denied, acx_of, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
+from ..core.srchreg import srch_q, srch_register  # 2.1026.0 (#5280)
 from ..core.errors import BadInput, UnknownFields
 from ..contacts.model import (
     book_create, book_fields, book_member_set, book_public, book_role, book_touch, books_for, contact_brief, contact_dict, contact_fields,
@@ -667,6 +668,16 @@ def books_export(bid):
 def contacts_get():
     need_feat("contacts")
     return jsonify(op_contacts(db(), me(), request.args))
+
+
+def ct_search_group(c, uid, q, n):
+    """2.1026.0 (#5280): the first n contacts matching q (the one search's kind contacts; the same as GET /api/contacts?q=)."""
+    need_feat("contacts")
+    return op_contacts(c, uid, {"q": q, "limit": n})["items"]
+
+
+srch_register("contacts", web=lambda: {"contacts": ct_search_group(db(), me(), srch_q(request.args), 50)}, group=ct_search_group,
+              scope="contacts", order=20)  # 2.1026.0 (#5280)
 
 
 @app.get("/api/contacts/<int:cid>")

@@ -203,7 +203,7 @@ check(A.post(B + "/api/files/lock/folder", json={"parent_id": SAFE, "name": "Pla
 check(A.post(B + f"/api/files/lock/rename/{F1}", json={"name": ct(1)}).ok, "encrypted rename")
 check(A.post(B + f"/api/files/lock/rename/{F1}", json={"name": "plain"}).status_code == 400, "encrypted rename: a plain name 400")
 check(A.get(B + f"/api/files/nodes/{F1}/preview").status_code == 409, "server preview of a locked file 409")
-hits = A.get(B + "/api/files/search", params={"q": "e2e1"}).json().get("items", [])
+hits = A.get(B + "/api/search?kind=files", params={"q": "e2e1"}).json().get("items", [])
 check(not [h for h in hits if h["id"] in (F1, F3, SUB)], "server search leaves the ciphertexts out")
 r = A.get(B + f"/api/files/lock/{SAFE}/raw/{F1}")
 check(r.ok and r.content[:5] == b"KENC\x02", "raw: the ciphertext for the browser")

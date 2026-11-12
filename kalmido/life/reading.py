@@ -8,6 +8,7 @@ from flask import g, has_request_context, jsonify, request
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, now_utc
+from ..core.objsearch import osr_ids_sql  # 2.1026.0 (#5280)
 from ..core.pg import insert_id, write_lock
 from ..core.access import Denied, my_max_sort, vis_sql, wr_sql
 from ..core.errors import BadInput
@@ -114,10 +115,11 @@ def rl_view(c, uid, a):
     w, args = f"t.list_id IN ({ph}) AND t.deleted_at IS NULL AND t.parent_id IS NULL", list(lids)
     q = (a.get("q") or "").strip()[:200]
     if q:
-        for word in q.split()[:8]:
-            lk = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-            w += " AND (t.title ILIKE ? ESCAPE '\\' OR COALESCE(t.url, '') ILIKE ? ESCAPE '\\' OR t.content ILIKE ? ESCAPE '\\')"
-            args += [lk] * 3
+        # 2.1026.0 (#5280, stage Q6c): the shared search index of the tasks (title, text, address: every word at a word start,
+        # umlauts as ae / oe / ue) instead of an ILIKE
+        ids, x = osr_ids_sql("task", q)
+        w += f" AND t.id IN {ids}" if ids else " AND FALSE"
+        args += x
     off = as_int(a.get("offset") or 0, "offset", 0, 1_000_000)
     n_open, n_done = c.execute(f"SELECT COUNT(*) FILTER (WHERE t.status=0), COUNT(*) FILTER (WHERE t.status<>0) FROM tasks t WHERE {w}",
                                args).fetchone()

@@ -10,11 +10,13 @@ No routes of its own; the agents' API (fts_v1) never asks for it."""
 import json
 import re
 
-from flask import g, has_request_context
+from flask import g, has_request_context, request
 
-from ..core.db import usettings
+from ..core.db import db, usettings
+from ..core.ctx import me  # 2.1026.0 (#5280)
 from ..core.pg import like_escape
 from ..core.errors import BadInput, Denied
+from ..core.srchreg import srch_q, srch_register  # 2.1026.0 (#5280)
 from ..accounts.orgroles import office_allowed, user_orgs_full
 from ..accounts.orgs import user_orgs
 from .model import office_on, office_where, pb_cl_sql, pb_owner, pb_personal
@@ -107,3 +109,12 @@ def bs_office_hits(c, uid, q):
         if n >= BS_LIMIT:
             break
     return out
+
+
+def bs_search_web():
+    """GET /api/search?kind=office (2.1026.0, #5280): {office: [...]} -- people only (question 16: never agents / tokens)."""
+    return {"office": bs_office_hits(db(), me(), srch_q(request.args))}
+
+
+# 2.1026.0 (#5280): the office in the one search -- web only, no API part (agents never get office hits, question 16)
+srch_register("office", web=bs_search_web, group=lambda c, uid, q, n: bs_office_hits(c, uid, q), order=10)

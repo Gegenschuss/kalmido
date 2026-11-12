@@ -33,7 +33,7 @@ def comment(s, tid, body):
 
 
 def find(s, text, **kw):
-    r = s.get(B + "/api/search/messages", params={"q": text, **kw})
+    r = s.get(B + "/api/search?kind=messages", params={"q": text, **kw})
     return sorted(f"{h['art']}{h['id']}" for h in r.json().get("hits", [])) if r.ok else r.status_code
 
 
@@ -82,10 +82,10 @@ check(find(A, "Teilwort") == [f"c{C6}"] and find(A, "wortsuche") == [], "Teilwor
 check(find(A, "ärger heute") == [f"c{C1}"] and find(A, "ärger morgen") == [], "several words: all of them")
 check(find(A, "100") == [f"c{C6}"] and find(A, "netto") == [f"c{C6}"], "numbers and words next to pattern characters")
 for bad in ("a+b", "(netto", "[x]", "100%"):
-    r = A.get(B + "/api/search/messages", params={"q": bad})
+    r = A.get(B + "/api/search?kind=messages", params={"q": bad})
     check(r.status_code == 200, "pattern characters are no error: " + bad + " " + str(r.status_code))
 check(find(A, "grosser") == [f"c{C1}"] and find(A, "Großer") == [f"c{C1}"], "ß = ss")
-h = A.get(B + "/api/search/messages", params={"q": "aerger"}).json()["hits"]
+h = A.get(B + "/api/search?kind=messages", params={"q": "aerger"}).json()["hits"]
 x = next(i for i in h if i["id"] == C1 and i["art"] == "c")
 check([x["snippet"][s:e] for s, e in x["marks"]] == ["Ärger"], "the mark covers the word as written " + str(x))
 

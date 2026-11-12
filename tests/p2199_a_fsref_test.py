@@ -235,7 +235,7 @@ R3 = R3["id"] if isinstance(R3, dict) else 0
 check(role(Bo, O3) == 404, f"F 2: owning the folder gives bob nothing on the object filed in it ({role(Bo, O3)})")
 k = kids(Bo, BF)
 check(isinstance(k, list) and R3 not in [x["id"] for x in k], f"F 2/3: bob lists his folder without the node {k}")
-r = Bo.get(B + "/api/files/search", params={"q": "invoice-3"})
+r = Bo.get(B + "/api/search?kind=files", params={"q": "invoice-3"})
 check(r.ok and R3 not in [x["id"] for x in r.json().get("items", [])], f"F 3: the search keeps the node from bob ({r.status_code})")
 r = Bo.post(B + f"/api/files/nodes/{BF}/shares", json={"user_id": uid["carl"], "role": "view"})
 check(r.status_code == 403 and "documents" in r.text, f"F 2: bob cannot pass the filed document on ({r.status_code} {r.text[:120]})")

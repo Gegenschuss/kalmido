@@ -23,16 +23,18 @@ import threading
 import time
 from datetime import timedelta
 
-from flask import jsonify, request
+from flask import request
 
 from ..core.config import app, ATT_DIR
 from ..core.db import connect, db, gsetting, gset, iso, now_utc
 from ..core.i18n import tr
-from ..core.pg import system_ctx, like_escape
+from ..core.pg import system_ctx
 from ..accounts.session import bg_here, me
 from ..accounts.orgretain import odl_before_delete
 from ..core.access import Denied, acx_of, vis_sql
 from ..docs import store as S
+from ..core.srchreg import srch_register  # 2.1026.0 (#5280)
+from ..core.objsearch import osr_name_cond  # 2.1026.0 (#5280)
 from ..core.objwords import osw_copy, osw_drop, osw_match, osw_put, osw_register, osw_terms  # 2.1002.0 (#5279)
 from ..core.env import env_bool
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
@@ -454,10 +456,6 @@ def ts_task_hits(c, uid, raw):
     return out
 
 
-def _like(raw):
-    return f"%{like_escape(raw)}%"
-
-
 def ts_files_find(c, uid, raw, space=""):
     """The Ablage nodes uid can see (not the trash) whose name or recognised text (documents: their text) matches raw,
     newest first: (rows, {id: "name" | "text"}). space = private | org:<id> | shared narrows it ("" = all)."""
@@ -473,8 +471,10 @@ def ts_files_find(c, uid, raw, space=""):
     elif space not in ("", "all"):
         raise Denied(400, tr("Invalid value: {0}", "space"))
     vis = f"n.id IN {fs_visible_sql_c(c, uid)} AND n.deleted_at IS NULL AND n.e2e_gen = 0" + where  # 2.353.0 A (#2758): the browser searches a locked folder
-    hit = {r[0]: "name" for r in c.execute(f"SELECT n.id FROM fs_nodes n WHERE {vis} AND n.name ILIKE ? ESCAPE '\\' ORDER BY n.id DESC LIMIT ?",
-                                           (*args, _like(raw), SEARCH_MAX))}
+    # 2.1026.0 (#5280, stage Q6c): a part of the name, umlauts as ae / oe / ue like every search (no ILIKE)
+    ncond, nargs = osr_name_cond("n.name", raw)
+    hit = {r[0]: "name" for r in c.execute(f"SELECT n.id FROM fs_nodes n WHERE {vis} AND {ncond} ORDER BY n.id DESC LIMIT ?",
+                                           (*args, *nargs, SEARCH_MAX))} if ncond else {}
     if ON and osw_terms(raw):
         cand, node = {}, {}
         for r in c.execute(f"""SELECT f.id, f.ws, f.node_id FROM file_text f JOIN fs_nodes n ON n.id=f.node_id
@@ -521,16 +521,20 @@ def ts_query():
     return raw
 
 
-@app.get("/api/files/search")
 def files_search():
-    """2.61.0 (#1820): the Ablage search -- ?q= over the names and the recognised text (documents: their text; 2.353.0 D
-    (#2759): + their sender, type and tags, hit "doc") of the
+    """GET /api/search?kind=files (2.1026.0, #5280: was /api/files/search). 2.61.0 (#1820): the Ablage search -- ?q= over the
+    names and the recognised text (documents: their text; 2.353.0 D (#2759): + their sender, type and tags, hit "doc") of the
     nodes the asker can see (not the trash), ?space=private | org:<id> | shared narrows it; plus project files of
     visible project lists. {items: [node + hit: name | text, folder], list_files: [{id, name, mime, size, list_id, list_name, hit}]}"""
     c = db()
     uid = me()
     raw = ts_query()
     space = (request.args.get("space") or "").strip()
+    return {"items": ts_items(c, uid, raw, space), "list_files": _list_file_hits(c, uid, raw) if space in ("", "all") else []}
+
+
+def ts_items(c, uid, raw, space=""):
+    """The file store's hits as the web lists them (node + hit + folder), newest first."""
     rows, hit = ts_files_find(c, uid, raw, space)
     rows = fsv_drop(c, rows)  # 2.429.0 (#3580): no folder / knowledge page / table of another area (the global search finds those)
     items = [x for x in _items(c, rows) if not x.get("no_access")]  # a link to an original the asker may not open
@@ -541,7 +545,11 @@ def files_search():
         x["hit"] = hit.get(x["id"], "name")
         x["folder"] = pnames.get(parents.get(x["id"]), "")
     items.sort(key=lambda x: -x["id"])
-    return jsonify(items=items, list_files=_list_file_hits(c, uid, raw) if space in ("", "all") else [])
+    return items
+
+
+srch_register("files", web=files_search, group=lambda c, uid, q, n: ts_items(c, uid, q)[:n], scope="files:read",
+              gate="/api/files/search", order=40)  # 2.1026.0 (#5280): gate = the file store's switches (modcards / wsareas)
 
 
 def _list_file_hits(c, uid, raw):

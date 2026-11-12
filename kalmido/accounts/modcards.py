@@ -20,6 +20,7 @@ import re
 from flask import g, jsonify, request
 
 from ..core.config import app
+from ..core.srchreg import SRCH_HOOKS  # 2.1026.0 (#5280)
 from ..core.conflict import ccf_check
 from ..core.db import body, bump, db, iso_ms, now_utc, usettings
 from ..core.errors import BadInput, Denied
@@ -164,11 +165,11 @@ def mc_check(c, uid, oid, mod):
 
 
 @app.before_request
-def mc_gate():
+def mc_gate(p=None):
     """The routes of a module outside the person's card cap answer 403 while that organisation is the workspace of the
     request (the office: the organisation of its own area; an object opened by id: its organisation). Agents and tokens are
     untouched as in wsa_gate: what they see is what is shared with them."""
-    p = request.path
+    p = p or request.path  # 2.1026.0 (#5280): p = the path of a search kind (core/srchreg.py srch_gate)
     if not p.startswith("/api/") or p.startswith("/api/v1/"):
         return None
     mod = next((m for pre, m in MC_PATHS if p.startswith(pre) and (pre.endswith("/") or len(p) == len(pre) or p[len(pre)] in "/?")), None)
@@ -413,3 +414,6 @@ def modcards_delete(cid):
     bump(c)
     c.commit()
     return jsonify(ok=True)
+
+
+SRCH_HOOKS["gates"].append(mc_gate)  # 2.1026.0 (#5280): the one search asks the gate for a kind's area (core/srchreg.py)

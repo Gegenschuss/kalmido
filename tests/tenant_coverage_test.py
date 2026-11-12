@@ -735,7 +735,6 @@ ROUTES = {
     "GET /api/v1/lists/{}/notify-template": "list", "POST /api/notify-templates/asked": "own",
     "GET /api/search": "aggregate",  # 2.116.0 B (#2065): full-text search, the visibility of the task search (p2116_b_api_test.py)
     "GET /api/fields/task-refs": "aggregate",  # 2.156.0 B (#2069): titles of linked tasks, only those the person may see (p2156_b_fields_test.py)
-    "GET /api/search/messages": "aggregate",  # 2.33.0 (#1080): only what the person may read (vis_sql, rooms, own agent chats)
     "GET /api/admin/client-ip": "admin",  # 2.33.0 (#834)
     "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): numbers only (pool, threads, role, loops), no user data
     "GET /api/admin/retention": "admin",  # 2.152.0 (#2165): the retention runs in numbers (switch, period, last result)
@@ -1119,7 +1118,7 @@ ROUTES = {
     "PATCH /api/v1/sheets/{}": "sheet_v1", "PUT /api/v1/sheets/{}/cells": "sheet_v1", "POST /api/v1/sheets/{}/rows": "sheet_v1",
     "POST /api/v1/sheets/{}/columns": "sheet_v1", "GET /api/v1/sheets/{}/vars": "sheet_v1",
     "POST /api/v1/sheets/{}/batches/{}/undo": "sheet_v1",
-    "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki", "GET /api/wiki/tags": "wiki", "GET /api/wiki/query": "wiki",  # 2.371 (#3150): p2371_wiki_tags_test.py
+    "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/tags": "wiki", "GET /api/wiki/query": "wiki",  # 2.371 (#3150): p2371_wiki_tags_test.py
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
     "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: a stranger 404, a member 403)
@@ -1260,7 +1259,6 @@ ROUTES = {
     "GET /api/docs/{}/einvoice": "document",  # 2.146.0 A (#2451): the readable view of an e-invoice
     "GET /api/files": "file", "GET /api/files/folders": "file",
     "GET /api/files/collections/{}": "file",  # 2.429.0 (#3580): "From <area>", the boundary tested in p2429_a_ablage_view_test.py (another space 404, another person's files none)
-    "GET /api/files/search": "file", "GET /api/v1/files/search": "file",  # 2.61.0 (#1820): names + recognised text, the boundary tested in p261_c_api_test.py
     "GET /api/files/nodes/{}": "file", "GET /api/files/nodes/{}/content": "file",
     "GET /api/files/nodes/{}/thumb": "file",  # 2.477.0 (#3936): p2477_ablagethumb_test.py: another person 404
     "GET /api/files/nodes/{}/share-targets": "file", "GET /api/paperless": "paperless",

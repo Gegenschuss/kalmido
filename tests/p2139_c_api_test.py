@@ -64,7 +64,7 @@ def marks(pid):
 
 
 def found(s, space, q):
-    r = s.get(B + "/api/wiki/search", params={"space": space, "q": q})
+    r = s.get(B + "/api/search?kind=wiki", params={"space": space, "q": q})
     assert r.ok, r.text
     return [p["id"] for p in r.json().get("pages", [])]
 

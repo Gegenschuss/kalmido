@@ -17,6 +17,7 @@ from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272
 from ..accounts.session import me
 from ..core.access import acx_org_ok, collab_all, Denied, task_visible, trash_sql  # 2.947.0 (#5367): trash_sql
 from ..core.dlock import dl_area_locked, dl_of, dl_tasks_locked  # 2.560.0 B (#4699)
+from ..core.objsearch import osr_ids_sql  # 2.1026.0 (#5280)
 from ..core.pages import valid_url
 from ..tasks.validation import (
     as_int, clean_reminders, rmd_export, rr_feasible, rr_norm, rr_problem, valid_date, valid_hm,
@@ -850,6 +851,36 @@ def ev_range(c, uid, lo, hi, cal=None):
             if len(out) >= 20000:
                 return out
     return out
+
+
+def ev_find(c, uid, raw, limit=20):
+    """2.1026.0 (#5280, stage Q6c: events searchable for the first time): [(event row, role)] uid sees -- its calendars (also
+    hidden ones; organisation and data lock as ev_range) and the events it is invited to -- whose title, place or description
+    (or a changed date's) has every word of raw at a word start (the shared index obj_search kind 'event', umlauts as ae / oe
+    / ue); not in the trash; the latest start first."""
+    if dl_area_locked(c, uid, "calendar"):
+        return []
+    ids, args = osr_ids_sql("event", raw)
+    if ids is None:
+        return []
+    cals = my_cal_ids(c, uid)
+    rows = []
+    if cals:
+        q = ",".join("?" * len(cals))
+        rows = [(r, cals[r["cal_id"]]) for r in c.execute(
+            f"SELECT * FROM events WHERE id IN {ids} AND cal_id IN ({q}) AND deleted_at IS NULL ORDER BY start DESC, id DESC LIMIT ?",
+            [*args, *cals, int(limit)]).fetchall()]
+    if collab_all():
+        for r in c.execute(f"""SELECT e.*, k.org_id AS cal_org FROM events e JOIN event_attendees a ON a.event_id=e.id AND a.user_id=?
+                               JOIN ev_cals k ON k.id=e.cal_id WHERE e.id IN {ids} AND e.deleted_at IS NULL
+                               ORDER BY e.start DESC, e.id DESC LIMIT ?""", [uid, *args, int(limit)]).fetchall():
+            if r["cal_id"] not in cals and ev_att_ok(c, uid, r["cal_org"]):  # 2.87.0 (#1983)
+                rows.append((r, "attendee"))
+    if dl_of(c, uid):
+        gone = dl_tasks_locked(c, uid, [r["task_id"] for r, _ in rows])
+        rows = [(r, role) for r, role in rows if r["task_id"] not in gone]
+    rows.sort(key=lambda x: (x[0]["start"], x[0]["id"]), reverse=True)
+    return rows[:limit]
 
 
 # ---- writing (web, API and CalDAV all end here)

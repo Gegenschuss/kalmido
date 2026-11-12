@@ -177,7 +177,7 @@ check(requests.post(B + f"/api/v1/team/rooms/{RO}/messages", headers=TH, json={"
 # search (also a plain leftover of 2.64.1 in the channel), save as a task
 dbx("INSERT INTO tchat_msgs(room_id,user_id,body,created_at) VALUES(?,?,?,?)", (RID, 1, "Leftover words", "2026-10-17T05:00:00.000Z"))
 A.post(B + f"/api/team/rooms/{RO}/messages", json={"body": "Leftover words in the open list"})
-r = A.get(B + "/api/search/messages", params={"q": "Leftover"})
+r = A.get(B + "/api/search?kind=messages", params={"q": "Leftover"})
 hits = r.json().get("hits", []) if r.ok else []
 check(r.ok and hits and not [h for h in hits if h.get("room_id") == RID], "search: the open channel yes, the locked one never " + r.text[:300])
 dbx("DELETE FROM tchat_msgs WHERE room_id=? AND body=?", (RID, "Leftover words"))

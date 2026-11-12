@@ -18,6 +18,7 @@ from ..accounts.session import me
 from ..core.access import Denied, acx_of
 from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
+from ..core.srchreg import srch_register  # 2.1026.0 (#5280)
 from ..docs.dsearch import dsr_ids
 from .store import (fs_chain, fs_log_add, fs_mail_rows, fs_new_version, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name,
                     _now, _place)
@@ -302,20 +303,16 @@ def v1_file_version(nid):
     return jsonify({**_v1_node(c, need_node(c, nid)), "version": no}), 201
 
 
-@app.get("/api/v1/files/search")
-@v1_view
-def v1_files_search():
-    """2.61.0 (#1820): files whose name or recognised text matches ?q= -- only what the asker may see (agents: what is shared
-    with them and their own folder); every hit an agent gets is in the file's history like a listing."""
+def v1_files_hits(c, uid, q, space="", limit=None):
+    """2.61.0 (#1820): files whose name or recognised text matches q -- only what the asker may see (agents: what is shared
+    with them and their own folder); every hit an agent gets is in the file's history like a listing. 2.1026.0 (#5280): the
+    part of GET /api/v1/search?kind=files (was GET /api/v1/files/search) and of kind=all."""
     from .textscan import ts_files_find
-    a = v1_args(("q", "space"))
-    q = (a.get("q") or "").strip()
-    if not q or len(q) > 200:
-        raise BadInput(tr("Invalid value: {0}", "q"))
-    c = db()
-    rows, hit = ts_files_find(c, me(), q, (a.get("space") or "").strip())
+    rows, hit = ts_files_find(c, uid, q, space)
     out = []
     for r in rows:
+        if limit is not None and len(out) >= limit:
+            break
         try:
             n = need_node(c, r["id"])
         except Denied:  # a link whose original the asker may not open
@@ -325,7 +322,19 @@ def v1_files_search():
         fs_log_add(c, r["id"], "list")
         out.append({**_v1_node(c, n), "hit": hit.get(r["id"], "name")})
     c.commit()
-    return jsonify(data=out, next_cursor=None)
+    return out
+
+
+def v1_files_search():
+    """GET /api/v1/search?kind=files: ?q, space -> {data: [node + hit], next_cursor: null}."""
+    a = v1_args(("q", "space"))
+    q = (a.get("q") or "").strip()
+    if not q or len(q) > 200:
+        raise BadInput(tr("Invalid value: {0}", "q"))
+    return jsonify(data=v1_files_hits(db(), me(), q, (a.get("space") or "").strip()), next_cursor=None)
+
+
+srch_register("files", v1=v1_files_search, v1group=lambda c, uid, q, n: v1_files_hits(c, uid, q, limit=n), scope="files:read")  # 2.1026.0 (#5280)
 
 
 def files_spec(paths, schemas, op, ok, errs, ref, pid, q):
@@ -365,11 +374,7 @@ def files_spec(paths, schemas, op, ok, errs, ref, pid, q):
                    body=new, scope="files:write",
                    desc="Needs the role edit on the folder (or an agent's own folder). A name that is taken gets \" (2)\"; an agent's "
                         "executable ending gets \".txt\".")}
-    paths["/files/search"] = {"get": op("Find files by name or recognised text (2.61.0)", T, ok(ref("FileNodePage")) | errs("400", "403", "404"),
-                                         [q("q", "Words (a word of 4+ letters also matches as a prefix)", {"type": "string"}),
-                                          q("space", "private | org:<id> | shared (default: all)", {"type": "string"})], scope="files:read",
-                                         desc="Names, the text of PDFs and the text the server recognised in scans and photos (local OCR). "
-                                              "Each item has hit: name | text | doc (2.353.0: sender, type or a tag of a document). Only files you may open; at most 100, newest first.")}
+    # 2.1026.0 (#5280): /files/search went into GET /search?kind=files (core/srchreg.py)
     paths["/files/{id}"] = {"get": op("A folder with its children or a file with its versions (2.48.0)", T, ok(ref("FileNode")) | errs("403", "404"),
                                       [nid], scope="files:read")}
     paths["/files/{id}/content"] = {"get": {**op("Download a file (2.48.0)", T, errs("400", "403", "404", "409"),

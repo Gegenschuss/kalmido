@@ -958,7 +958,7 @@ and `contacts.search`. `kalmido/core/objsearch.py`:
   not exported (`exportleft.py` `_DERIVED`), an import fills it through the triggers.
 - The rules of 08.11.2026: umlauts the same everywhere (`kalmido_fold`, every query word in its variants: "Müller" finds
   "Mueller" and back, question 13); every word at the start of a word, a part of a word only in `names` (question 14);
-  knowledge pages a share of the core opens are found by name (`wiki/wksearch.py wks_name_hits`, question 15).
+  knowledge pages a share of the core opens are found by name and text (`wiki/wksearch.py wks_find`, question 15).
 - Reading: `osr_cond(raw, alias, names=)` / `osr_ids_sql(kind, raw, names=)` give the condition / the id sub-select. **Rights are
   not in the index**: every reader joins the source row and applies the area's check -- tasks `_task_cond` (`tasks/ftsearch.py`,
   `core/state.py search_tasks`, v1 `q`), notes `notes_visible_sql`, contacts their books (`contacts_query`), pages `wiki_may_read`,
@@ -995,6 +995,28 @@ part of `wks_search`). `kalmido/core/objwords.py`:
 - Knowledge pages a share of the core opens are searched by text too (`wiki/wksearch.py wks_find`, question 15).
 - The move: `osw_move` (`core/objhooks.py MOVE`) copies the old tables' hashes (same keys, same hashes: the search works at
   once, also after a jump over several releases) before the fragment `5279_a` drops them (one-way), and raises the back limit.
+
+### One search (stage Q6c, 2.1026.0, #5280)
+
+One registry, one route per side: `kalmido/core/srchreg.py`. Every area search registers its kind with `srch_register(kind,
+web=, group=, v1=, v1group=, scope=, gate=)` when its module loads; `GET /api/search?kind=` (the web) and `GET
+/api/v1/search?kind=` (tokens, agents) only route to it. The old routes `/api/search/messages`, `/api/files/search`,
+`/api/wiki/search` and `/api/v1/files/search` went (no second way); `?kind=` answers what they answered.
+- Kinds: `tasks` (default), `office` (web only, never agents, question 16), `contacts`, `events` (searchable for the first time:
+  `obj_search` kind `event`, rights `events/model.py ev_find` like `ev_range`), `notes`, `wiki` (name and text), `files` (names,
+  recognised text, documents), `bookmarks` (web only; `obj_search` kind `bookmark`), `messages`, `comments`.
+- The first page of `GET /api/search` carries `groups: {kind: [hits]}` of every other kind (`group`, at most `?glimit`, default
+  5): the command palette's "Everywhere" finds what each area's own search finds, because both run the same function
+  (decision of 09.11.2026). `GET /api/v1/search?kind=all` gives the same overview from `v1group`, only the kinds the token's
+  scopes allow (`scope`: contacts, files:read, wiki:read, calendar).
+- `gate`: the path whose module / workspace switches cover a kind (`accounts/modcards.py mc_gate`, `accounts/wsareas.py
+  wsa_gate`, registered in `SRCH_HOOKS`): a switched-off area answers 403 for its kind and is left out of the groups.
+- The browser: `static/js/ftsearch.js SEARCH_SOURCES` -- the server's answer plus the sources of the end-to-end areas (locked
+  lists' comments, locked knowledge spaces), which only the browser can read. The message search (`msgSearch`) runs over the
+  same registry.
+- A new area with a search: register a kind here (and, end-to-end, a browser source) -- no route of its own. Names that are
+  not in `obj_search` (a file's name) use `osr_name_cond` (a part of the name, umlauts as ae / oe / ue); the last ILIKE searches
+  (bookmarks, the reading list, the organisation's task overview, file names) went with the stage.
 
 ## Filter (2.846.0, #5520)
 

@@ -333,8 +333,8 @@ ROUTES = {
     "GET /api/files/collections/{}": "files",  # 2.429.0 (#3580)
     "GET /api/files/folders": "files", "GET /api/files/nodes/{}": "files", "GET /api/files/nodes/{}/content": "files",
     "GET /api/files/nodes/{}/thumb": "files",  # 2.477.0 (#3936): p2477_ablagethumb_test.py without an organisation
-    "GET /api/files/nodes/{}/share-targets": "files", "GET /api/files/search": "files", "GET /api/v1/documents": "files",
-    "GET /api/v1/documents/{}": "files", "GET /api/v1/files": "files", "GET /api/v1/files/search": "files",
+    "GET /api/files/nodes/{}/share-targets": "files", "GET /api/v1/documents": "files",
+    "GET /api/v1/documents/{}": "files", "GET /api/v1/files": "files", 
     "GET /api/v1/files/{}": "files", "GET /api/v1/files/{}/content": "files", "GET /api/v1/files/{}/text": "files",
     "POST /api/docs/fields": "files", "PATCH /api/docs/fields/{}": "files", "DELETE /api/docs/fields/{}": "files",  # 2.153.0 (#2179)
     "PATCH /api/docs/labels/{}/{}": "files", "PATCH /api/docs/rules/{}": "files", "PATCH /api/docs/{}": "files",
@@ -869,7 +869,7 @@ ROUTES = {
     "GET /api/dayplan": "tasks", "GET /api/dayplan/review": "tasks", "GET /api/deps": "tasks", "GET /api/export.json": "tasks", "GET /api/export/todoist.zip": "tasks", "GET /api/export/markdown.zip": "tasks", 
     "GET /api/ical": "tasks", "GET /api/imports": "tasks", "GET /api/news": "tasks", "GET /api/notes": "tasks",
     "GET /api/notes/{}": "tasks", "GET /api/occurrences": "tasks", "GET /api/pomo/stats": "tasks", "GET /api/roadmap": "tasks",
-    "GET /api/search": "tasks", "GET /api/search/messages": "tasks", "GET /api/sprints/{}": "tasks", "GET /api/stale": "tasks", "GET /api/state": "tasks",
+    "GET /api/search": "tasks", "GET /api/sprints/{}": "tasks", "GET /api/stale": "tasks", "GET /api/state": "tasks",
     "GET /api/state/delta": "tasks", "GET /api/state/lists": "tasks", "GET /api/stats": "tasks", "GET /api/tags/count": "tasks", "GET /api/tasks": "tasks",
     "GET /api/tasks/{}/watchers": "tasks", "POST /api/tasks/{}/watchers": "tasks", "DELETE /api/tasks/{}/watchers/{}": "tasks",  # 2.473.0 (#3357)
     "GET /api/v1/tasks/{}/watchers": "tasks", "POST /api/v1/tasks/{}/watchers": "tasks", "DELETE /api/v1/tasks/{}/watchers/{}": "tasks",
@@ -1061,7 +1061,7 @@ ROUTES = {
     "GET /api/recent": "wiki",  # 2.769.0 (#5352): "Recently edited" over Knowledge, Files and Reading (p2769_d_recent_api_test.py)
     "DELETE /api/wiki/pages/{}": "wiki", "GET /api/wiki": "wiki", "GET /api/wiki/e2e": "wiki",
     "GET /api/wiki/e2e/todo": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki",
-    "GET /api/wiki/pages/{}": "wiki", "GET /api/wiki/search": "wiki", "PATCH /api/wiki/pages/{}": "wiki",
+    "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/e2e/bulk": "wiki", "POST /api/wiki/e2e/finish": "wiki", "POST /api/wiki/e2e/keys": "wiki",
     "POST /api/wiki/e2e/rotate": "wiki", "POST /api/wiki/e2e/start": "wiki", "POST /api/wiki/e2e/stop": "wiki",
     "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki", "POST /api/wiki/pages": "wiki",

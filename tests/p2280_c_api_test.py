@@ -5,7 +5,7 @@ freelancer-matrix: wiki
  - GET /api/wiki?offline=1&bodies=1&bn=<n>: the index with the first n texts and the cursor bnext; ?nolist=1&bafter=<cursor>
    the next texts only -- together exactly the texts of one answer without bn (also with since=); an open space without
    offline=1 gets no texts (400), a bad cursor 400, another organisation's space stays closed (403/404)
- - GET /api/wiki/search over pages whose word index is old (a folder renamed): the same hits as after the background job
+ - GET /api/search?kind=wiki over pages whose word index is old (a folder renamed): the same hits as after the background job
    indexed them; the statements do not grow with the number of such pages (before: the GET indexed up to 300 pages);
    the background job indexes every page of the space
  - POST /api/wiki/move of a folder with 300 pages: complete (every page under the new name, the links to them follow, the
@@ -54,7 +54,7 @@ def paged(s, sp, bn, **kw):
 
 
 def search(s, sp, q, **kw):
-    r = s.get(B + "/api/wiki/search", params={"space": sp, "q": q, "limit": "100", **kw})
+    r = s.get(B + "/api/search?kind=wiki", params={"space": sp, "q": q, "limit": "100", **kw})
     assert r.ok, r.text
     j = r.json()
     return [p["id"] for p in j["pages"]], j["total"], nstmt(r)

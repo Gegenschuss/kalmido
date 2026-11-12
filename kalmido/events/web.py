@@ -34,6 +34,9 @@ from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_plain, ua_post, ua_pre 
 from .evundo import EVU_KIND, cal_restore_do  # 2.777.0 (#5254); 2.985.0 (#5394): cal_restore_do
 from ..core.undogroups import undo_label  # 2.985.0 (#5394)
 from ..core.writes import UG_TRASHED  # 2.985.0 (#5394): the label of a calendar's trash step
+from ..core.srchreg import srch_q, srch_register  # 2.1026.0 (#5280)
+from ..collab.msgsearch import find_marks, msg_terms, snippet  # 2.1026.0 (#5280): the snippets of the one search
+from .model import ev_find  # 2.1026.0 (#5280)
 
 
 def _unknown(b, allowed):
@@ -448,3 +451,41 @@ def task_events(tid):
     return jsonify(items=op_task_events(db(), me(), tid))
 
 
+
+
+# ---- 2.1026.0 (#5280, stage Q6c): events in the one search (core/srchreg.py) -- searchable for the first time
+def ev_snip(r, q):
+    """{snippet, marks} of the event's description (or place) around the words of q, {} when they are only in the title."""
+    terms = msg_terms(q)
+    for text in (r["description"] or "", r["location"] or ""):
+        text = " ".join(text.split())
+        m = find_marks(text, terms) if text else None
+        if m:
+            sn, mk = snippet(text, m)
+            return {"snippet": sn, "marks": mk}
+        part = [x for t in terms for x in (find_marks(text, [t]) or [])] if text else []
+        if part:
+            sn, mk = snippet(text, sorted(part))
+            return {"snippet": sn, "marks": mk}
+    return {}
+
+
+def ev_hit(r, role, q):
+    return {"id": r["id"], "title": r["title"], "location": r["location"], "start": r["start"], "end": r["end"],
+            "all_day": bool(r["all_day"]), "tz": r["tz"], "cal_id": None if role == "attendee" else r["cal_id"],
+            "recurring": bool(r["rrule"]), "role": role, **ev_snip(r, q)}
+
+
+def ev_search_group(c, uid, q, n):
+    need_feat("events")
+    return [ev_hit(r, role, q) for r, role in ev_find(c, uid, q, n)]
+
+
+def ev_search_web():
+    """GET /api/search?kind=events: ?q, limit (1-50, default 20) -> {events: [{id, title, location, start, end, all_day, tz,
+    cal_id, recurring, role, snippet?, marks?}]}."""
+    a = request.args
+    return {"events": ev_search_group(db(), me(), srch_q(a), as_int(a.get("limit") or 20, "limit", 1, 50))}
+
+
+srch_register("events", web=ev_search_web, group=ev_search_group, scope="calendar", order=25)

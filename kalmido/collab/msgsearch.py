@@ -18,7 +18,6 @@ import re
 
 from flask import g, jsonify, request
 
-from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import db
 from ..accounts.session import me
@@ -32,6 +31,7 @@ from ..collab.teamchat import md_brief, tchat_on, tchat_room_ok
 from ..agents.core import agent_ids, agent_shares, is_agent
 from ..api.v1 import API_PAGE_MAX
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_view
+from ..core.srchreg import srch_register  # 2.1026.0 (#5280)
 from ..collab.teamchan import tcx_group_name  # 2.369.5 (#2517): pulled up from functions
 
 ARTS = {"c": 1, "t": 2, "a": 3}
@@ -246,9 +246,9 @@ def _filters(a):
     return q, arts, num
 
 
-@app.get("/api/search/messages")
 def msg_search_web():
-    """?q, art=c,t,a, sender, room, agent, task, limit (1-50), offset -- {hits, next_offset, total}."""
+    """GET /api/search?kind=messages (2.1026.0, #5280: was /api/search/messages): ?q, art=c,t,a, sender, room, agent, task,
+    limit (1-50), offset -- {hits, next_offset, total}."""
     a = request.args
     try:
         q, arts, num = _filters(a)
@@ -278,6 +278,14 @@ def v1_search_messages():
 
 
 v1_search_messages = v1_view(v1_search_messages)
+
+
+def msg_search_group(c, uid, q, n):
+    """The first n message hits (the palette's group, ?kind=all of the API)."""
+    return search_messages(c, uid, q, None)[:n]
+
+
+srch_register("messages", web=msg_search_web, group=msg_search_group, v1=v1_search_messages, v1group=msg_search_group, order=70)  # 2.1026.0 (#5280)
 
 
 def msgsearch_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):

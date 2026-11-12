@@ -9,6 +9,7 @@ import time
 from flask import g, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app
+from ..core.srchreg import SRCH_HOOKS  # 2.1026.0 (#5280)
 from ..core.pgbus import bus_active  # 2.622.0 (#3891)
 from ..core.ephem import eph_add, eph_total  # 2.622.0 (#3891)
 from ..core.pg import insert_id, st_ids
@@ -1672,3 +1673,6 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                         desc="Owner or project admin (2.39.1); archive it first (PATCH archived=true). Its tasks go to the owner's trash; "
                                              "the owner is told when an admin deletes it. "
                                              "Agents: waits for approval (202).")
+
+
+SRCH_HOOKS["scope_label"] = lambda s: tr(SCOPE_LABELS.get(s, s))  # 2.1026.0 (#5280): core/srchreg.py

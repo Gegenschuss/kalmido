@@ -12,6 +12,8 @@ from ..core.errors import BadInput, reject_unknown
 from ..api.v1 import v1_limit
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_json, v1_view
 from ..contacts.model import BOOK_ROLES, CT_KINDS, CT_LINKS, need_book, need_contact
+from ..core.srchreg import srch_register  # 2.1026.0 (#5280)
+from ..contacts.web import ct_search_group  # 2.1026.0 (#5280)
 from ..contacts.web import (
     _ct_uploads, ct_gather, op_book_delete, op_book_edit, op_book_member, op_book_member_rm, op_book_new, op_books, op_contact, op_contact_delete,
     op_contact_edit, op_contact_new, op_contacts, op_export, op_import, op_link, op_unlink, VCF_MAX,
@@ -118,6 +120,9 @@ def v1_contacts():
     if "trash_days" in res:  # 2.272.0 E1 (#3038): the contacts in the trash
         return jsonify(data=res["items"], next_cursor=nxt, total=res["total"], trash_days=res["trash_days"])
     return jsonify(data=res["items"], next_cursor=nxt, total=res["total"], groups=res["groups"])
+
+
+srch_register("contacts", v1=v1_contacts, v1group=ct_search_group)  # 2.1026.0 (#5280)
 
 
 @app.post("/api/v1/contacts")

@@ -125,7 +125,7 @@ check(unread in ([0], [None]), "the brief is never unread " + str(unread))
 qs = [m for m in chat(Bo).get("messages", []) if m["id"] == QID]
 check(qs and qs[0].get("choice_state") == "open", "the brief does not end the open buttons " + str(qs)[:300])
 check(Bo.post(B + f"/api/agents/{CL}/chat/{BID}/pin", json={"pinned": True}).status_code == 400, "the brief cannot be pinned")
-hits = Bo.get(B + "/api/search/messages", params={"q": "Zwiebelkuchen", "art": "a"}).json().get("hits", [])
+hits = Bo.get(B + "/api/search?kind=messages", params={"q": "Zwiebelkuchen", "art": "a"}).json().get("hits", [])
 ids = [h.get("id") for h in hits]
 check(PL in ids, "search control: the plain answer is found " + str(hits)[:300])
 check(BID not in ids, "the message search never finds the brief " + str(ids))

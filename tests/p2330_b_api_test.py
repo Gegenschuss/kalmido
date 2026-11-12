@@ -10,7 +10,7 @@
    (token): comments + channel of the lists shared with them and their own chats, never DMs, never another agent's chats
  - filters art / sender / room / agent / task (a foreign id finds nothing), paging (limit + cursor / offset), the snippet is
    plain text with marks (mentions as @name; a mention's id is not a hit; HTML stays text), 400 on bad input
- - GET /api/v1/search?scope=messages (people + agents), GET /api/search/messages (web client), OpenAPI
+ - GET /api/v1/search?scope=messages (people + agents), GET /api/search?kind=messages (web client), OpenAPI
 usage: p2330_b_api_test.py <datadir>"""
 import os
 import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
@@ -100,7 +100,7 @@ def comment(s, tid, body):
 
 
 def find(s, q, **kw):
-    r = s.get(B + "/api/search/messages", params={"q": q, **kw})
+    r = s.get(B + "/api/search?kind=messages", params={"q": q, **kw})
     return r.json().get("hits", []) if r.ok else r.status_code
 
 
@@ -184,7 +184,7 @@ check(keys(find(A, "arger", agent=CL)) == sorted([f"a{A1}", f"a{A2}"]), "agent="
 check(keys(find(A, "arger", sender=CL)) == [f"a{A2}"], "sender= (an agent's answers)")
 check(keys(find(A, "arger", task=TD)) == [f"c{C3}"], "task=")
 check(keys(vfind(CLH, "arger", agent=ALICE)) == sorted([f"a{A1}", f"a{A2}"]), "an agent: agent= names the person")
-r = A.get(B + "/api/search/messages", params={"q": "arger", "limit": 3})
+r = A.get(B + "/api/search?kind=messages", params={"q": "arger", "limit": 3})
 j = r.json()
 check(len(j["hits"]) == 3 and j["total"] == 7 and j["next_offset"] == 3, "web paging " + str({k: j[k] for k in ("total", "next_offset")}))
 r = requests.get(V + "/search", headers=CLH, params={"scope": "messages", "q": "arger", "limit": 2})
@@ -198,8 +198,8 @@ while True:
     r = requests.get(V + "/search", headers=CLH, params={"scope": "messages", "q": "arger", "limit": 2, "cursor": j["next_cursor"]})
 check(sorted(seen) == keys(vfind(CLH, "arger")) and pages == 3, f"v1 cursor pages ({pages}) " + str(seen))
 for bad in ({"q": ""}, {"q": "x" * 201}, {"q": "a", "art": "x"}, {"q": "a", "room": "abc"}):
-    check(A.get(B + "/api/search/messages", params=bad).status_code == 400, "400: " + str(bad)[:40])
-r = A.get(B + "/api/search/messages", params={"q": "%%%"})  # 2.38.0 (#1169): only special characters = no hits, no error
+    check(A.get(B + "/api/search?kind=messages", params=bad).status_code == 400, "400: " + str(bad)[:40])
+r = A.get(B + "/api/search?kind=messages", params={"q": "%%%"})  # 2.38.0 (#1169): only special characters = no hits, no error
 check(r.status_code == 200 and r.json()["hits"] == [], "only %%%: 200 with no hits " + str(r.status_code))
 check(requests.get(V + "/search", headers=CLH, params={"scope": "messages", "q": "a", "foo": 1}).status_code == 400, "v1: unknown parameter 400")
 check(requests.get(V + "/search", headers=CLH, params={"scope": "nope", "q": "a"}).status_code == 400, "v1: unknown scope 400")

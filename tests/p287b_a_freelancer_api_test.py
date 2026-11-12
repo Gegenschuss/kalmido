@@ -192,7 +192,7 @@ ok(F.patch(B + f"/api/wiki/pages/{IDS['wiki']}", json={"body": "lens list v2"}),
 r = F.post(B + f"/api/wiki/pages/{IDS['wiki']}/files", files=[("file", ("lenses.png", base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="), "image/png"))])
 check(r.ok and r.json().get("files"), f"wiki: a file on the own page -> {r.status_code} {r.text[:200]}")  # 2.488.0 (#2209)
 IDS["wikifile"] = (r.json().get("files") or [{}])[-1].get("id") if r.ok else None
-ok(F.get(B + "/api/wiki/search", params={"space": "private", "q": "lens"}), "wiki: search")
+ok(F.get(B + "/api/search?kind=wiki", params={"space": "private", "q": "lens"}), "wiki: search")
 
 # ================================================================== files + documents
 # freelancer-matrix: files
@@ -415,7 +415,7 @@ FROM_TO = {"from": "2030-03-01", "to": "2030-03-31"}
 QUERY = {
     "GET /api/calendars/events": FROM_TO, "GET /api/events": FROM_TO, "GET /api/occurrences": FROM_TO, "GET /api/v1/events": FROM_TO,
     "GET /api/events/freebusy": {"day": D, "users": "{me}"}, "GET /api/v1/events/freebusy": {"day": D, "users": "{me}"}, "GET /api/clients/usage": {"ids": "{client}"},
-    "GET /api/files/search": {"q": "plan"}, "GET /api/v1/files/search": {"q": "plan"}, "GET /api/files/tagged": {"tag": "1"},
+    "GET /api/search?kind=files": {"q": "plan"}, "GET /api/v1/search?kind=files": {"q": "plan"}, "GET /api/files/tagged": {"tag": "1"},
     "GET /api/files/zip": {"ids": "{node}"}, "GET /api/folders/agents": {"folder": "Work"},
     "GET /api/folders/notify-template": {"folder": "Work"}, "GET /api/folders/people/diff": {"folder": "Work", "role": "edit", "user_id": "{agent}"},
     "GET /api/folders/playbook": {"folder": "Work"}, "GET /api/folders/playbook/versions": {"folder": "Work"},
@@ -425,7 +425,7 @@ QUERY = {
     "GET /api/office/datev/extf": {"from": "2026-01-01", "to": "2026-12-31"}, "GET /api/office/datev/zip": {"from": "2026-01-01", "to": "2026-12-31"},
     "GET /api/office/letters/threads": {"client_id": "{client}"}, "GET /api/office/pack-switch": {"code": "XX"},
     "GET /api/office/time-open": {"from": "2026-09-01", "to": "2026-09-30"}, "GET /api/search": {"q": "trailer"},
-    "GET /api/search/messages": {"q": "trailer"}, "GET /api/v1/search": {"q": "trailer"}, "GET /api/tags/count": {"tag": "film"},
+    "GET /api/search?kind=messages": {"q": "trailer"}, "GET /api/v1/search": {"q": "trailer"}, "GET /api/tags/count": {"tag": "film"},
     "GET /api/team/absences/check": {"user": "{me}", "date": D}, "GET /api/team/dispo/free": {"date": D},
     "GET /api/v1/dispo/free": {"date": D}, "GET /api/videos": {"task_id": "{task}"}, "GET /api/v1/videos": {"task_id": "{task}"},
     "GET /api/office/books/archive/accounts": {"year": "2026"}, "GET /api/office/books/archive/bookings": {"year": "2026"},

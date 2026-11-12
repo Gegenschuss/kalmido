@@ -47,6 +47,7 @@ ORDER = (
     "core.pgbus",  # 2.622.0 (#3891): signals between the processes of an instance (pg_notify)
     "core.kernretire",  # 2.924.0 (#5069): stage 7 of the shared core, the start check and DROP of an old member table
     "api.common",  # 2.149.0 G (#2517): the /api/v1 route helpers (core layer, see LAYER_OF)
+    "core.srchreg",  # 2.1026.0 (#5280): the one registry of the searches + the routes /api/search and /api/v1/search
     "core.tokenhash",  # 2.138.0 C (#1907): upload / calendar tokens as hashes
     "core.ipallow",  # 2.705.0 (#5151): the address rule of a key (API tokens, receipt fetcher keys)
     "core.rls",  # 2.37.0 (#1150): row-level security, applied by init_db

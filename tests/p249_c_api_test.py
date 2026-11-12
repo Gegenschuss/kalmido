@@ -92,8 +92,8 @@ check(Da.delete(B + f"/api/wiki/pages/{P1}").status_code == 404, "another organi
 check(Da.get(B + "/api/wiki", params={"space": SP}).status_code == 404, "another organisation's space: 404")
 check(Da.post(B + "/api/wiki/pages", json={"space": SP, "path": "Intruder"}).status_code == 404, "no page in another organisation's space")
 check(Da.get(B + "/api/wiki/export", params={"space": SP}).status_code == 404, "no export of another organisation's space")
-check(not Da.get(B + "/api/wiki/search", params={"q": "Checklist"}).json()["pages"], "search: nothing of another organisation")
-check(any(p["id"] == P1 for p in Ca.get(B + "/api/wiki/search", params={"q": "checklist"}).json()["pages"]), "search: the member finds it")
+check(not Da.get(B + "/api/search?kind=wiki", params={"q": "Checklist"}).json()["pages"], "search: nothing of another organisation")
+check(any(p["id"] == P1 for p in Ca.get(B + "/api/search?kind=wiki", params={"q": "checklist"}).json()["pages"]), "search: the member finds it")
 idx = Ca.get(B + "/api/wiki", params={"space": SP}).json()
 check([p["path"] for p in idx["pages"]] == ["Processes/Shoot day/Checklist"] and "body" not in idx["pages"][0], "index: paths without text")
 check(Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": "processes/shoot day/checklist"}).status_code == 409, "a taken name (any case): 409")
@@ -105,7 +105,7 @@ check(r.status_code == 201 and r.json()["space"] == "private", "carol creates a 
 PP = r.json()["id"]
 check(Bo.get(B + f"/api/wiki/pages/{PP}").status_code == 404, "bob (same organisation) does not see carol's private page")
 check(all(p["id"] != PP for p in Bo.get(B + "/api/wiki", params={"space": "private"}).json()["pages"]), "bob's private workspace: not carol's page")
-check(not Bo.get(B + "/api/wiki/search", params={"q": "secret"}).json()["pages"], "search: not another person's private page")
+check(not Bo.get(B + "/api/search?kind=wiki", params={"q": "secret"}).json()["pages"], "search: not another person's private page")
 check(Bo.post(B + "/api/wiki/pages", json={"space": "private", "path": "Diary"}).status_code == 201, "the same name in another private workspace is fine")
 
 # ---- links, backlinks, rename

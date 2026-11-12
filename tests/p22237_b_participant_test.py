@@ -144,7 +144,7 @@ check(r.ok and r.json().get("pads") == [], f"carl: the layout route has no notep
 check(Ca.patch(B + f"/api/notepads/{PAD}", json={"title": "x"}).status_code == 404, "carl: changing the notepad: 404")
 check(Ca.post(B + f"/api/lists/{L1}/notepads", json={"title": "x"}).status_code == 404, "carl: a new notepad: 404")
 check(Ca.get(B + f"/api/list-files/{PF}").status_code == 404, "carl: the project file itself: 404")
-r = Ca.get(B + "/api/files/search", params={"q": "secretplan"})
+r = Ca.get(B + "/api/search?kind=files", params={"q": "secretplan"})
 check(r.ok and not r.json().get("list_files"), f"carl: the file search does not find the project file ({r.status_code} {r.text[:120]})")
 st = Ca.get(B + "/api/state").json()
 l1 = next((x for x in st.get("lists", []) if x["id"] == L1), {})
@@ -155,7 +155,7 @@ j = r.json() if r.ok else {}
 check(len(j.get("milestones") or []) == 1 and len(j.get("files") or []) == 1 and len(j.get("members") or []) >= 3
       and len(j.get("task_files") or []) == 3 and (j.get("layout") or {}).get("pads"), f"bert (member): the full overview ({r.status_code})")
 check(Bt.get(B + f"/api/list-files/{PF}").status_code != 404, "bert: the project file opens")
-r = Bt.get(B + "/api/files/search", params={"q": "secretplan"})
+r = Bt.get(B + "/api/search?kind=files", params={"q": "secretplan"})
 check(r.ok and len(r.json().get("list_files") or []) == 1, "bert: the file search finds it")
 # ---- the organisation's agent as participant (token API)
 r = requests.get(V + f"/lists/{L1}/overview", headers=GH)

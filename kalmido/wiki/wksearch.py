@@ -25,8 +25,7 @@ from ..core.orgcrypt import _kek, _kek_check, _row, OrgCryptError  # 2.149.0 G (
 from .wkhist import WikiUnreadable, wkh_body  # 2.280.0 C (#3114): loads before this module (kalmido/__init__.py ORDER)
 from .wkhist import wkh_sid, wsb_body_or  # 2.369.5 (#2517): pulled up from functions
 from .wikie2e import wke_mode, wke_open_sql  # 2.369.5 (#2517): pulled up from functions; 2.981.0 (#5278): + wke_open_sql
-from .pages import wiki_may_read, wiki_space_key  # 2.981.0 (#5278)
-from ..core.objsearch import osr_ids_sql  # 2.981.0 (#5278)
+from .pages import wiki_may_read  # 2.981.0 (#5278)
 from ..core.access import live_sql  # 2.981.0 (#5278)
 from .wkfolder import wkf_shared_ids  # 2.1002.0 (#5279)
 from ..core.objwords import OSW_MARK, osw_drop, osw_put, osw_term_hits, osw_terms, osw_words  # 2.1002.0 (#5279)
@@ -227,26 +226,6 @@ def _wks_shared(c, uid, spaces, terms):
         for x in _wks_rank(c, wks_ws(oid, owner), rs, terms, late):
             if wiki_may_read(c, uid, c.execute("SELECT * FROM wiki_pages WHERE id=?", (x[3],)).fetchone()):
                 out.append(x)
-    return out
-
-
-def wks_name_hits(c, uid, q, limit=10, cand=200):
-    """2.981.0 (#5278, question 15): knowledge pages whose name matches q (the shared index obj_search kind 'wiki_page': word
-    start, part of the name too) that uid may read -- through the space or a share of the shared core on the page / its folders
-    (wiki_may_read = wkf_role, also the pages of other spaces). Not in the trash, not of
-    a space with the lock (the browser searches those). The text: the shared word index of the sealed texts (core/objwords.py, wks_find).
-    [{id, path, space}] by name."""
-    ids, args = osr_ids_sql("wiki_page", q, names=True)
-    if ids is None:
-        return []
-    rows = c.execute(f"SELECT p.* FROM wiki_pages p WHERE p.id IN {ids} AND {live_sql('p')} AND {wke_open_sql('p')} "
-                     f"ORDER BY lower(p.path), p.id LIMIT {int(cand)}", args).fetchall()
-    out = []
-    for r in rows:
-        if wiki_may_read(c, uid, r):  # the page's own role per hit (never more than opening it)
-            out.append({"id": r["id"], "path": r["path"], "space": wiki_space_key(r["org_id"])})
-            if len(out) >= limit:
-                break
     return out
 
 

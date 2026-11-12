@@ -63,12 +63,12 @@ check(r.ok and r.json()["skipped"] == [] and r.json()["count"] == 1, "#1132: not
 c = A.post(B + f"/api/tasks/{T2}/comments", json={"body": "So viel Ärger mit dem 100% Rabatt"})
 check(c.ok, "setup: a comment " + c.text[:100])
 for q in ("%", "%%%", "_", "__", "% _ !?", "  %  ", "%_%", "..."):
-    r = A.get(B + "/api/search/messages", params={"q": q})
+    r = A.get(B + "/api/search?kind=messages", params={"q": q})
     check(r.status_code == 200 and r.json()["hits"] == [] and r.json()["total"] == 0, f"#1169: {q!r} -> 200, no hits ({r.status_code} {r.text[:80]})")
-check(A.get(B + "/api/search/messages", params={"q": ""}).status_code == 400, "#1169: an empty query stays 400")
-r = A.get(B + "/api/search/messages", params={"q": "aerger"})
+check(A.get(B + "/api/search?kind=messages", params={"q": ""}).status_code == 400, "#1169: an empty query stays 400")
+r = A.get(B + "/api/search?kind=messages", params={"q": "aerger"})
 check(r.ok and len(r.json()["hits"]) == 1, "the search still finds words (aerger -> Ärger) " + r.text[:120])
-r = A.get(B + "/api/search/messages", params={"q": "100%"})
+r = A.get(B + "/api/search?kind=messages", params={"q": "100%"})
 check(r.ok and len(r.json()["hits"]) == 1, "a word with % next to it still finds it " + r.text[:120])
 
 # ================================================================== #1155: fx2_mask_ip

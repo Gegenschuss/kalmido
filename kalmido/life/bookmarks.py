@@ -17,6 +17,8 @@ from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, connect, db, iso, iso_ms, now_utc
 from ..core.writes import obj_restore, obj_trash  # 2.947.0 (#5367): the core's trash (life/lfkern.py)
 from ..core.pg import insert_id, write_lock
+from ..core.objsearch import osr_ids_sql  # 2.1026.0 (#5280)
+from ..core.srchreg import srch_q, srch_register  # 2.1026.0 (#5280)
 from ..core.access import Denied, live_sql  # 2.947.0 (#5367): live_sql
 from ..core.conflict import ccf_check  # 2.570.0 (#4770)
 from ..core.orgcrypt import oc_copy_file, oc_send_file, oc_user_space, oc_write_file
@@ -246,11 +248,11 @@ def bm_list(c, uid, a):
         w += " AND b.state<>'archived'"
     q = (a.get("q") or "").strip()[:200]
     if q:
-        for word in q.split()[:8]:
-            lk = _like(word)
-            w += (" AND (b.title ILIKE ? ESCAPE '\\' OR b.description ILIKE ? ESCAPE '\\' OR b.note ILIKE ? ESCAPE '\\' "
-                  "OR b.url ILIKE ? ESCAPE '\\' OR b.text ILIKE ? ESCAPE '\\' OR b.tags ILIKE ? ESCAPE '\\' OR b.site ILIKE ? ESCAPE '\\')")
-            args += [lk] * 7
+        # 2.1026.0 (#5280, stage Q6c): every word at the start of a word (umlauts as ae / oe / ue), a part of the site's name
+        # anywhere -- the shared search index (core/objsearch.py kind 'bookmark'), no ILIKE
+        ids, x = osr_ids_sql("bookmark", q, names=True)
+        w += f" AND b.id IN {ids}" if ids else " AND FALSE"
+        args += x
     tag = (a.get("tag") or "").strip()[:BM_TAG_MAX]
     if tag:
         w += " AND b.tags ILIKE ? ESCAPE '\\'"
@@ -750,6 +752,16 @@ def bookmarks_get():
     c, uid = db(), me()
     bm_need(c, uid)
     return jsonify(bm_list(c, uid, request.args))
+
+
+def bm_search_group(c, uid, q, n):
+    """2.1026.0 (#5280): the bookmarks of every space uid sees matching q (also read / archived ones), newest first."""
+    bm_need(c, uid)
+    return bm_list(c, uid, {"q": q, "space": "all", "state": "all"})["items"][:n]
+
+
+srch_register("bookmarks", web=lambda: {"bookmarks": bm_search_group(db(), me(), srch_q(request.args), 50)}, group=bm_search_group,
+              gate="/api/bookmarks", order=60)  # 2.1026.0 (#5280): the reading area's links in the one search (web only)
 
 
 @app.post("/api/bookmarks")

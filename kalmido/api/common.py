@@ -144,6 +144,8 @@ def v1_json():
 
 
 def v1_args(allowed):
+    if g.get("srch_kind"):  # 2.1026.0 (#5280): an area's handler run by GET /api/v1/search?kind= (core/srchreg.py)
+        allowed = (*allowed, "kind", "scope")
     extra = sorted(k for k in request.args if k not in allowed)
     if extra:
         raise BadInput(tr("Unknown parameter: {0}", ", ".join(extra)[:200]))

@@ -177,10 +177,10 @@ if tid:
     t = Ca.get(B + f"/api/tasks/{tid}").json()
     check(len(t.get("attachments") or []) == 2, "save as task: the files are on the task " + str(t.get("attachments"))[:200])
 # search finds the channel's messages
-r = Ca.get(B + "/api/search/messages", params={"q": "Two files"})
+r = Ca.get(B + "/api/search?kind=messages", params={"q": "Two files"})
 hit = next((h for h in j(r).get("hits", []) if h.get("room_id") == GEN), None)
 check(hit is not None and hit["chat_type"] == "channel" and hit.get("chat_name") == "General", "search: a channel hit " + r.text[:300])
-check(not any(h.get("room_id") == GEN for h in Ev.get(B + "/api/search/messages", params={"q": "Two files"}).json().get("hits", [])), "search: not for eve")
+check(not any(h.get("room_id") == GEN for h in Ev.get(B + "/api/search?kind=messages", params={"q": "Two files"}).json().get("hits", [])), "search: not for eve")
 # deleting the message hides its files; 2.530.0 (#4315): they stay on disk in the trash until the trash run (was: both left the disk)
 disk = os.path.join(DATA, "attachments", "tchat", str(GEN)) if DATA else ""
 before = set(os.listdir(disk)) if disk and os.path.isdir(disk) else None

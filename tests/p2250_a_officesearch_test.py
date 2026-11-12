@@ -34,7 +34,7 @@ O = "/api/office"
 def office(s, q):
     r = s.get(B + "/api/search", params={"q": q})
     check(r.status_code == 200, f"search {q}: {r.status_code} {r.text[:160]}")
-    return r.json().get("office", []) if r.ok else []
+    return (r.json().get("groups") or {}).get("office", []) if r.ok else []  # 2.1026.0 (#5280): the kinds are in groups
 
 
 def has(hits, kind, iid):

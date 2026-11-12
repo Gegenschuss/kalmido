@@ -12,6 +12,9 @@ from ..core.errors import BadInput, reject_unknown
 from ..api.common import v1_args, v1_json, v1_view
 from ..events.model import EV_PARTSTAT, EV_ROLES, EV_STATUS, need_evcal, need_event
 from ..events.ics import ics_export, import_ics, IMPORT_MAX_BYTES
+from ..events.model import ev_dict, ev_find  # 2.1026.0 (#5280)
+from ..events.web import ev_snip  # 2.1026.0 (#5280)
+from ..core.srchreg import srch_register  # 2.1026.0 (#5280)
 from ..events.web import (
     occ_arg, op_cal_delete, op_cal_edit, op_cal_new, op_cals, op_event, op_event_delete, op_event_edit, op_event_new,
     op_event_restore, op_member_remove, op_member_set, op_prep_task, op_range, op_rsvp, op_task_events,
@@ -109,6 +112,24 @@ def v1_evcal_export(cid):
 def v1_events():
     a = v1_args(("from", "to", "calendar_id"))
     return _page(op_range(db(), me(), a))
+
+
+def v1_ev_group(c, uid, q, n):
+    """2.1026.0 (#5280): the first n events matching q as GET /api/v1/events/{id} answers them, + snippet / marks."""
+    need_feat("events")
+    return [{**ev_dict(c, r, uid, role), **ev_snip(r, q)} for r, role in ev_find(c, uid, q, n)]
+
+
+def v1_ev_find():
+    """GET /api/v1/search?kind=events: ?q, limit (1-100, default 20) -> {data: [event + snippet?, marks?], next_cursor: null}."""
+    a = v1_args(("q", "limit"))
+    q = (a.get("q") or "").strip()
+    if not q or len(q) > 200:
+        raise BadInput(tr("Invalid value: {0}", "q"))
+    return _page(v1_ev_group(db(), me(), q, as_int(a.get("limit") or 20, "limit", 1, 100)))
+
+
+srch_register("events", v1=v1_ev_find, v1group=v1_ev_group)  # 2.1026.0 (#5280)
 
 
 @app.post("/api/v1/events")

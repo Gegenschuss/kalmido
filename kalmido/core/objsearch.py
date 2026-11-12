@@ -7,7 +7,8 @@ One row per object (kind, ref_id): org_ref / owner_id / node_id (the container: 
 book, a team chat message's room, an agent chat's agent), pkind / pid (a comment's object), title, names (folded names and
 numbers for the part-of-a-word match) and tsv (the 'simple' configuration over kalmido_fold: title weight A, text B, more C).
 Kinds (OSR_SOURCES): task, comment (obj_comments of every kind but a document's sealed note, #5278), note, contact, wiki_page (the page's name only: its text is
-sealed and keeps its HMAC word index, wiki/wksearch.py), tchat (team chat messages without end-to-end text), agent_chat.
+sealed and keeps its HMAC word index, wiki/wksearch.py), tchat (team chat messages without end-to-end text), agent_chat;
+2.1026.0 (#5280): event (calendar events, searchable for the first time) and bookmark.
 
 Filled by triggers on the source tables (every write path, also the old ones and rows written straight into the tables), and
 at every start for the rows written while the triggers were missing (a restore, an older image); a new OSR_VERSION or fold
@@ -35,6 +36,7 @@ from .db import gset, gsetting, trigger_ensure
 from .kernretire import kern_retire_floor
 from .objhooks import MOVE
 from .pg import like_escape, qi, system_ctx, table_columns, table_exists
+from .srchreg import SRCH_HOOKS  # 2.1026.0 (#5280)
 
 OSR_VERSION = "1"        # a new version empties the index and builds it again at the next start
 OSR_FOLD_VERSION = "2"   # the fold function (was collab/msgsearch.py INDEX_VERSION, settings key msg_fts_v)
@@ -113,6 +115,19 @@ def osr_cond(raw, alias="s", names=False):
     return " AND ".join(parts), args
 
 
+def osr_name_cond(expr, raw):
+    """2.1026.0 (#5280): (SQL condition, parameters) -- every word of raw anywhere in the name expr (part of a name, question
+    14; umlauts as ae / oe / ue like the index), for a name that is not in obj_search (a file's name); (None, []) without a
+    word. No index: the caller narrows the rows first (the visible ones)."""
+    parts, args = [], []
+    for t in osr_terms(raw):
+        vs = _alnum_variants(t)
+        if vs:
+            parts.append(f"kalmido_fold({expr}) LIKE ANY(CAST(? AS TEXT[]))")  # pg-ok: both sides folded (kalmido_fold), LIKE on purpose
+            args.append(["%" + like_escape(v) + "%" for v in vs])
+    return (" AND ".join(parts), args) if parts else (None, [])
+
+
 def osr_ids_sql(kind, raw, names=False):
     """(SQL "ref_id IN (...)" sub-select of the objects of kind matching raw, its parameters), or (None, [])."""
     cond, args = osr_cond(raw, "s", names)
@@ -171,6 +186,18 @@ OSR_SOURCES = {
     # a message of the chat with an agent; node = the agent, owner = the person
     "agent_chat": {"table": "agent_chat", "org": "NULL::bigint", "owner": "{r}.user_id", "node": "{r}.agent_id",
                    "title": "NULL::text", "body": "{r}.body", "cols": ("body",)},
+    # 2.1026.0 (#5280, stage Q6c: events searchable for the first time): an event: title A, place and description B, the
+    # titles / places / descriptions of its changed dates C; node = its calendar. Rights: events/model.py ev_find
+    "event": {"table": "events", "org": "{r}.org_id", "owner": "{r}.created_by", "node": "{r}.cal_id",
+              "title": "{r}.title", "body": "concat_ws(' ', {r}.location, {r}.description)",
+              "more": "kalmido_osr_vals({r}.overrides, ARRAY['title', 'location', 'description'])",
+              "cols": ("title", "location", "description", "overrides", "cal_id", "org_id", "created_by")},
+    # 2.1026.0 (#5280): a bookmark (reading list's links): title A, description, note, site, tags B, address and the page's
+    # text C; names = the site (part of a word); was an ILIKE over these columns (life/bookmarks.py bm_list)
+    "bookmark": {"table": "bookmarks", "org": "{r}.org_id", "owner": "{r}.user_id", "node": "NULL::bigint",
+                 "title": "{r}.title", "body": "concat_ws(' ', {r}.description, {r}.note, {r}.site, kalmido_osr_vals({r}.tags, NULL))",
+                 "more": "concat_ws(' ', {r}.url, {r}.text)", "names": "{r}.site",
+                 "cols": ("title", "description", "note", "site", "tags", "url", "text", "org_id", "user_id")},
 }
 
 OSR_VALS_FN = """CREATE OR REPLACE FUNCTION kalmido_osr_vals(t text, keys text[], digits boolean DEFAULT false) RETURNS text
@@ -377,3 +404,6 @@ def osr_comment_hits(c, uid, raw, kinds=None, limit=20, cand=200):
             if len(out) >= limit:
                 break
     return out
+
+
+SRCH_HOOKS["task_ids"] = lambda raw, names=False: osr_ids_sql("task", raw, names)  # 2.1026.0 (#5280): accounts/orgtasks.py

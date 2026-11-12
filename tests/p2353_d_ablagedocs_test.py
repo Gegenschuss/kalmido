@@ -180,12 +180,12 @@ check(not sql("SELECT 1 FROM doc_meta WHERE node_id=?", (MF,)), "(c) the file in
 r = Fr.patch(B + f"/api/docs/{F1}", json={"sender": "Gamma Example Insurance", "type": "Policy", "tags": ["Yearly"]})
 check(r.ok, f"(d) setup: sender / type / tag set by hand ({r.status_code} {r.text[:120]})")
 for q in ("gamma example", "Policy", "yearly"):
-    j = Fr.get(B + "/api/files/search", params={"q": q}).json()
+    j = Fr.get(B + "/api/search?kind=files", params={"q": q}).json()
     hit = next((x for x in j["items"] if x["id"] == F1), None)
     check(hit is not None and hit["hit"] in ("doc", "name", "text"), f"(d) the file store's search finds the document by '{q}' ({hit and hit['hit']})")
-j = Fr.get(B + "/api/files/search", params={"q": "Gamma Example"}).json()
+j = Fr.get(B + "/api/search?kind=files", params={"q": "Gamma Example"}).json()
 check(next(x for x in j["items"] if x["id"] == F1)["hit"] == "doc", "(d) the hit is marked doc (sender)")
-check(not any(x["id"] == F1 for x in Bo.get(B + "/api/files/search", params={"q": "Gamma Example"}).json()["items"]),
+check(not any(x["id"] == F1 for x in Bo.get(B + "/api/search?kind=files", params={"q": "Gamma Example"}).json()["items"]),
       "(d) bob (no access) does not find it")
 j = listing(Fr, SUB, docs=True)
 d = next((x.get("doc") for x in j["items"] if x["id"] == F1), None) or {}

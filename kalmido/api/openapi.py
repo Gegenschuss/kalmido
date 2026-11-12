@@ -789,12 +789,21 @@ def openapi_spec():
                                  "post": op("Comment on a task (needs the Comments module; @mentions and notifications need collaboration)", C, ok(ref("Comment"), "Created", "201") | errs("400", "403", "404"),
                                             [pid()], body=ref("CommentInput"), scope="write")},
         "/tags": {"get": op("Your tags with task counts", S_, ok(ref("TagPage")) | errs())},
-        "/search": {"get": op("Search titles, notes, links and custom fields of tasks; 2.33.0 (#1080) scope=messages: task comments, "
-                              "team chat and agent chats you may read (MessageHit pages, newest first; agents: their own chats and the "
-                              "projects shared with them)", S_,
-                              ok({"oneOf": [ref("TaskPage"), page("MessageHit")]}) | errs("400", "503"),
-                              [{**q("q", "Search text (words; case, accents and ä/ae do not matter; each word matches word beginnings)"), "required": True},
-                               q("scope", "tasks (default) or messages", {"type": "string", "enum": ["tasks", "messages"]}),
+        "/search": {"get": op("The one search (2.1026.0): tasks by default; kind picks another area or all of them", S_,
+                              ok({"oneOf": [ref("TaskPage"), page("MessageHit"), {"type": "object"}]}) | errs("400", "403", "503"),
+                              [{**q("q", "Search text (words; case, accents and ä/ae do not matter; each word matches word beginnings, "
+                                    "names and numbers also a part of them)"), "required": True},
+                               q("kind", "tasks (default) | messages | contacts (scope contacts: the answer of GET /contacts) | notes "
+                                 "(the answer of GET /notes) | files (scope files:read: {data: [file node + hit name|text|doc]}, was "
+                                 "GET /files/search) | wiki (scope wiki:read: {data: [{id, path, name, space, role, url, snippet?, marks?}], "
+                                 "more}) | events (scope calendar: {data: [event + snippet?, marks?]}) | all ({groups: {kind: [at most "
+                                 "limit (default 5) entries of that kind's answer]}}, only the kinds the token may read)",
+                                 {"type": "string", "enum": ["tasks", "messages", "contacts", "notes", "files", "wiki", "events", "all"]}),
+                               q("scope", "the older name of kind=messages (tasks | messages)", {"type": "string", "enum": ["tasks", "messages"]}),
+                               q("book_id", "contacts: only this address book", {"type": "integer"}), q("group", "contacts: only this group"),
+                               q("trash", "contacts: 1 = the contacts in the trash", {"type": "integer"}),
+                               q("list_id", "notes: only this project", {"type": "integer"}),
+                               q("space", "files: private | org:<id> | shared; wiki: all | shared | private | org:<id>"),
                                q("fulltext", "2.116.0: 1 = ranked full-text search of tasks (title before notes) and their comments; "
                                  "each task once with match {where: title|notes|comment|field|file, snippet {text, marks}, comment_id}",
                                  {"type": "string", "enum": ["0", "1"]}),

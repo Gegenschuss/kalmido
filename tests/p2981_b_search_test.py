@@ -60,6 +60,7 @@ def fts(s, q):
     """(task id, where) of the full-text search /api/search, and its answer."""
     r = s.get(B + "/api/search", params={"q": q, "limit": 50})
     j = r.json() if r.ok else {}
+    j = {**j, **(j.get("groups") or {})}  # 2.1026.0 (#5280): the other kinds come as groups (wiki: the wiki's own search, name or text)
     return {(h["task"]["id"], h["where"]) for h in j.get("hits", [])}, j
 
 
@@ -74,7 +75,7 @@ def contacts_found(s, q):
 
 
 def msgs(s, q):
-    r = s.get(B + "/api/search/messages", params={"q": q})
+    r = s.get(B + "/api/search?kind=messages", params={"q": q})
     return {(h["art"], h["id"]) for h in r.json().get("hits", [])} if r.ok else {("error", r.status_code)}
 
 

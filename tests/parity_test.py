@@ -51,7 +51,6 @@ APP_TO_API = {
     "GET /api/state": ["GET /lists", "GET /tasks", "GET /habits", "GET /filters", "GET /me"],
     "GET /api/me/storage": ["GET /me/storage"],  # 2.24.0 (#910)
     "GET /api/tasks": ["GET /tasks", "GET /search", "GET /trash"],
-    "GET /api/search/messages": ["GET /search"],  # 2.33.0 (#1080): ?scope=messages
     "GET /api/search": ["GET /search"],  # 2.116.0 B (#2065): ?fulltext=1
     "GET /api/tasks/{}": ["GET /tasks/{}"],
     "POST /api/tasks": ["POST /tasks", "POST /tasks/{}/subtasks"],
@@ -244,7 +243,6 @@ APP_TO_API = {
     "GET /api/files": ["GET /files"], "GET /api/files/nodes/{}": ["GET /files/{}"], "GET /api/files/nodes/{}/content": ["GET /files/{}/content"],
     "POST /api/files/folders": ["POST /files"], "POST /api/files/upload": ["POST /files"], "POST /api/files/nodes/{}/versions": ["POST /files/{}/versions"],
     "GET /api/fsref/office_doc/{}": ["GET /office/docs/{}"], "GET /api/fsref/office_doc/{}/pdf": ["GET /office/docs/{}/pdf"],  # 2.199.0 B (#2742): a filed office document
-    "GET /api/files/search": ["GET /files/search"],  # 2.61.0 (#1820): names + recognised text
     # 2.92.0 C (#1926): the Word / Excel preview model of the web client; agents read the same files as text
     "GET /api/attachments/{}/preview": ["GET /attachments/{}/text"], "GET /api/files/nodes/{}/preview": ["GET /files/{}/text"],
     "GET /api/list-files/{}/preview": ["GET /lists/{}/files/{}"],
@@ -503,7 +501,7 @@ APP_ONLY = [
      "and the ```abfrage block are views of the panel / a page like search; 2.637.0 (#4745): the file list of a space feeds the "
      "device's offline copy of the web app (an agent reads a page's files through the mapped routes)",
      ("=DELETE /api/wiki/pages/{}", "* /api/wiki/pages/{}/", "* /api/wiki/trash", "=POST /api/wiki/restore", "=POST /api/wiki/purge",
-      "=POST /api/wiki/move", "* /api/wiki/folders", "=GET /api/wiki/search", "=GET /api/wiki/mentions", "=GET /api/wiki/refs",
+      "=POST /api/wiki/move", "* /api/wiki/folders", "=GET /api/wiki/mentions", "=GET /api/wiki/refs",
       "=DELETE /api/wiki/files/{}", "* /api/wiki/share", "=GET /api/wiki/export", "* /api/wiki/import", "* /api/wiki/e2e",
       "=POST /api/outline/parse", "=PUT /api/wiki/style", "=GET /api/wiki/tags",
       "=GET /api/wiki/query", "=GET /api/wiki/space-files")),

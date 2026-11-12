@@ -23,6 +23,7 @@ from ..core.serializers import load_tasks, rel_of
 from ..core.objfollow import OFL_WATCHING_SQL, ofl_bells_here  # 2.972.0 (#5285); 2.981.0 (#5287): a project's bell
 from ..core.instance import semver, update_state
 from ..core.state import search_tasks, visible_lists, visible_sections
+from ..core.srchreg import srch_register  # 2.1026.0 (#5280)
 from ..lists.lists import clean_folder, clean_list_value, list_create, LIST_KIND_ALIASES, LIST_KINDS, list_update
 from ..lists.groups import grp_own_rows  # 2.958.0 (#5245): the project's own group shares (group_shares is gone)
 from ..lists.groups import (
@@ -1862,20 +1863,15 @@ def v1_habit_checkin(hid):
     return jsonify({**v1_habit(c, c.execute("SELECT * FROM habits WHERE id=?", (hid,)).fetchone()), "date": day, "count": cnt})
 
 
-@app.get("/api/v1/search")
-@v1_view
-def v1_search():
-    if request.args.get("scope") == "messages":  # 2.33.0 (#1080): comments, team chat, agent chats
-        from ..collab.msgsearch import v1_search_messages
-        return v1_search_messages()
+def v1_search_tasks():
+    """GET /api/v1/search (kind tasks; 2.1026.0 #5280: the route is the search registry's, core/srchreg.py srch_v1): plain
+    (search_tasks), ranked with fulltext=1, or + similar tasks with semantic=1."""
     a = v1_args(("q", "limit", "cursor", "scope", "semantic", "fulltext"))  # 2.59.0 B (#1375): + semantic; 2.116.0 B: + fulltext
     if a.get("fulltext") not in (None, "", "0", "1"):
         raise BadInput(tr("Invalid value: {0}", "fulltext"))
-    if a.get("fulltext") == "1" and a.get("scope") in (None, "", "tasks"):  # 2.116.0 B (#2065): ranked, with comments
+    if a.get("fulltext") == "1":  # 2.116.0 B (#2065): ranked, with comments
         from ..tasks.ftsearch import fts_v1
         return fts_v1(a, v1_task)
-    if a.get("scope") not in (None, "", "tasks"):
-        raise BadInput(tr("Invalid value: {0}", "scope"))
     if a.get("semantic") not in (None, "", "0", "1"):
         raise BadInput(tr("Invalid value: {0}", "semantic"))
     q = (a.get("q") or "").strip()
@@ -1887,6 +1883,17 @@ def v1_search():
         from ..tasks.related import rt9_search_extend
         rows = rt9_search_extend(db(), me(), q, rows, len(rows) + 20)
     return v1_page([{**v1_task(d), **({"similar": True} if d.get("similar") else {})} for d in rows], cursor_dec("o", a.get("cursor")), v1_limit(a))
+
+
+def v1_search_tasks_group(c, uid, q, n):
+    """GET /api/v1/search?kind=all: the first n tasks of the plain search."""
+    files = g.get("auth_via") != "token" or "attachments:read" in (g.get("scopes") or set())
+    return [v1_task(d) for d in search_tasks(c, uid, q, n, files=files)]
+
+
+srch_register("tasks", v1=v1_search_tasks, v1group=v1_search_tasks_group)  # 2.1026.0 (#5280)
+
+
 
 
 @app.post("/api/v1/import/<source>")

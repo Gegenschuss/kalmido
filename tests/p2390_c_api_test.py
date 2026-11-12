@@ -156,9 +156,9 @@ check("edited_at" in spec["components"]["schemas"]["ChatMessage"]["properties"],
 check("message_edited" in requests.get(V + "/agent", headers=CLH).json()["events"], "GET /agent lists message_edited")
 
 # ================================================================== search
-h = A.get(B + "/api/search/messages", params={"q": "four", "art": "a"}).json().get("hits", [])
+h = A.get(B + "/api/search?kind=messages", params={"q": "four", "art": "a"}).json().get("hits", [])
 check(any(x["id"] == m1["id"] for x in h), "the search finds the new text")
-h = A.get(B + "/api/search/messages", params={"q": "three", "art": "a"}).json().get("hits", [])
+h = A.get(B + "/api/search?kind=messages", params={"q": "three", "art": "a"}).json().get("hits", [])
 check(not any(x["id"] == m1["id"] for x in h), "the old text is no hit any more")
 
 # ================================================================== comments

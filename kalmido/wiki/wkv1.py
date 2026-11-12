@@ -29,7 +29,9 @@ from ..core.conflict import need_version  # 2.564.0 (#4702)
 from ..accounts.session import me
 from ..api.common import V1Error, v1_args, v1_call, v1_err, v1_json, v1_out, v1_view
 from ..collab.comments import user_names
-from ..accounts.orgroles import org_role_key
+from ..accounts.orgroles import org_role_key, user_orgs_full
+from ..accounts.orgs import user_orgs  # 2.1026.0 (#5280)
+from .wksearch import wks_find, wks_snippets  # 2.1026.0 (#5280)
 from ..files.store import _shares_role, fs_chain, fs_deleted, fs_log_add, fs_role, _now
 from .pages import wiki_body, wiki_clean_path, wiki_insert, wiki_space_key, wiki_update, wiki_create
 from .wikie2e import wke_mode
@@ -44,6 +46,7 @@ from ..files.upsafe import up_marks
 from ..tasks.attachments import send_stored
 from ..tasks.attachtext import TEXT_CAP, TEXT_FILE_MB, text_of_bytes
 from ..tasks.validation import as_int
+from ..core.srchreg import srch_register  # 2.1026.0 (#5280)
 
 WKV_LIST_MAX = 2000  # pages of one list answer (more = "more": true; narrow it with space)
 WKV_FIELDS_AGENT = ("body", "expect_updated_at")
@@ -190,6 +193,48 @@ def wkv_list():
     out = out[:WKV_LIST_MAX]
     names = user_names(c, {x[1]["updated_by"] for x in out})
     return jsonify(data=[_page(c, r, role, path, names) for _, r, role, path in out], more=more)
+
+
+def wkv_hits(c, uid, q, space=None, limit=30):
+    """2.1026.0 (#5280): the knowledge pages uid may read whose name or text has the words of q (the wiki's own search,
+    wiki/wksearch.py wks_find: the spaces, the pages a share opens -- an agent only those), each checked with wkv_need like a
+    read; with snippet + marks where a word is in the text. -> ([page], more)."""
+    sp = _space_filter(space)
+    if isinstance(sp, tuple):
+        spaces = [sp[1]] if sp[1] in user_orgs(c, uid) or sp[1] is None else []
+    elif sp == "shared":
+        spaces = []
+    else:
+        spaces = [None, *[o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]]
+    rows, total = wks_find(c, uid, spaces, q, limit * 3, 0, shared=sp in (None, "shared"))
+    out = []
+    for r in rows:
+        try:
+            r2, role, path = wkv_need(c, uid, r["id"])
+        except Denied:
+            continue
+        out.append((r2, role, path))
+        if len(out) >= limit:
+            break
+    sn = wks_snippets(c, [x[0] for x in out], q)
+    names = user_names(c, {x[0]["updated_by"] for x in out})
+    pages = [{**_page(c, r2, role, path, names), **({"snippet": sn[r2["id"]][0], "marks": sn[r2["id"]][1]} if r2["id"] in sn else {})}
+             for r2, role, path in out]
+    return pages, len(out) >= limit and total > limit
+
+
+def wkv_find():
+    """GET /api/v1/search?kind=wiki: ?q, space (all | shared | private | org:<id>), limit (1-100, default 30) ->
+    {data: [page + snippet?, marks?], more}."""
+    a = v1_args(("q", "space", "limit"))
+    q = (a.get("q") or "").strip()
+    if not q or len(q) > 200:
+        raise BadInput(tr("Invalid value: {0}", "q"))
+    pages, more = wkv_hits(db(), me(), q, a.get("space"), as_int(a.get("limit") or 30, "limit", 1, 100))
+    return jsonify(data=pages, more=bool(more))
+
+
+srch_register("wiki", v1=wkv_find, v1group=lambda c, uid, q, n: wkv_hits(c, uid, q, None, n)[0])  # 2.1026.0 (#5280)
 
 
 @app.get("/api/v1/wiki/pages/<int:pid>")

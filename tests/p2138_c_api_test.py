@@ -445,7 +445,7 @@ r = A.post(B + "/api/wiki/pages", json={"space": f"org:{ORG}", "path": "Wartung/
 WP = r.json().get("id") if r.status_code == 201 else None
 rc, out, err_ = cli("encrypt-wiki")
 check(WP and rc == 0 and str(one("SELECT body FROM wiki_pages WHERE id=?", (WP,))).startswith("kenc1:"), f"knowledge page sealed {r.status_code} {rc} {out[-200:]}")
-ws_ = A.get(B + "/api/wiki/search", params={"q": "quittenhecke", "space": f"org:{ORG}"})
+ws_ = A.get(B + "/api/search?kind=wiki", params={"q": "quittenhecke", "space": f"org:{ORG}"})
 check(ws_.ok and [p["id"] for p in ws_.json().get("pages", [])] == [WP], "knowledge page found by a word before the rotation " + ws_.text[:150])
 # 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
 WW0 = {x[0] for x in dbx("SELECT h FROM obj_search_words WHERE kind='wiki_page' AND ref_id=?", (WP,))}
@@ -487,7 +487,7 @@ check(DW1 and not DW1 & DW0 and doc_hits(A, "zaunkoenigweg") == [DOC] and doc_hi
 WB1 = str(one("SELECT body FROM wiki_pages WHERE id=?", (WP,)))
 # 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
 WW1 = {x[0] for x in dbx("SELECT h FROM obj_search_words WHERE kind='wiki_page' AND ref_id=?", (WP,))}
-ws_ = A.get(B + "/api/wiki/search", params={"q": "quittenhecke", "space": f"org:{ORG}"})
+ws_ = A.get(B + "/api/search?kind=wiki", params={"q": "quittenhecke", "space": f"org:{ORG}"})
 check(WB1.startswith("kenc1:") and A.get(B + f"/api/wiki/pages/{WP}").json().get("body") == "Quittenhecke am Nordtor schneiden"
       and {x for x in WW1 if not x.startswith(("u:", "tv:", "v:"))} and not {x for x in WW1 & WW0 if not x.startswith(("u:", "tv:", "v:"))}
       and ws_.ok and [p["id"] for p in ws_.json().get("pages", [])] == [WP],

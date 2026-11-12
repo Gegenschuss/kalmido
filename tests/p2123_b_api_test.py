@@ -157,7 +157,7 @@ r = Da.get(B + f"/api/wiki/pages/{plan}")
 check(r.ok and r.json().get("path") == "Customer A/Plan" and Da.get(B + f"/api/wiki/files/{pic}").ok,
       "#2104 / #4717: the shared page and its file through the app's routes " + r.text[:160])
 check(Da.get(B + f"/api/wiki/pages/{secret}").status_code == 404, "#2104 / #4717: ... a page not shared not")
-check(not Da.get(B + "/api/wiki/search", params={"q": "customer"}).json().get("pages"), "#2104: the guest's search does not find shared pages")
+check(not Da.get(B + "/api/search?kind=wiki", params={"q": "customer"}).json().get("pages"), "#2104: the guest's search does not find shared pages")
 check(not Da.get(B + "/api/wiki", params={"space": "private"}).json().get("pages"), "#2104: the guest's own index stays his own")
 check(Bo.get(B + f"/api/wiki/shared/pages/{plan}").status_code == 404 and not shared(Bo), "#2104: somebody else sees nothing")
 # the mark in the owner's index and on the page

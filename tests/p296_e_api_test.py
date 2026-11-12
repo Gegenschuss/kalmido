@@ -133,7 +133,7 @@ def doc_ids(s, **params):
 
 
 def fsearch(s, q, space=None):
-    r = s.get(B + "/api/files/search", params={"q": q, **({"space": space} if space else {})})
+    r = s.get(B + "/api/search?kind=files", params={"q": q, **({"space": space} if space else {})})
     return [x["id"] for x in r.json()["items"]] if r.ok else []
 
 
@@ -270,7 +270,7 @@ for p in (f"/files/{AKTE}", f"/files/{FILE}", f"/files/{FILE}/content", f"/files
 lid = [x["id"] for x in v1(AGT, "/files").json().get("data") or []]
 check(not {AKTE, FILE, DOC} & set(lid), f"after: the agent's file list no longer shows them ({lid})")
 check(DOC not in [x["id"] for x in v1(AGT, "/documents").json().get("data") or []], "after: the agent's documents list no longer shows it")
-sr = v1(AGT, "/files/search", q=WORD_F.lower())
+sr = v1(AGT, "/search?kind=files", q=WORD_F.lower())
 check(not sr.ok or not {FILE, AKTE} & {x["id"] for x in sr.json().get("data") or []}, "after: the agent's file search finds nothing")
 # -- the database: no row of it left with Alpha
 check(one("SELECT COUNT(*) FROM fs_nodes WHERE id IN (?,?,?) AND org_id IS NOT NULL", (AKTE, FILE, DOC)) == 0, "db: the nodes are private")
@@ -354,7 +354,7 @@ def wpaths(s, space):
 
 
 def wsearch(s, q):
-    return [p["id"] for p in s.get(B + "/api/wiki/search", params={"q": q}).json()["pages"]]
+    return [p["id"] for p in s.get(B + "/api/search?kind=wiki", params={"q": q}).json()["pages"]]
 
 
 ANKER = wpage(Bo, "Anker", "Start here: [[Handbuch/Start]]", SP)
@@ -443,7 +443,7 @@ for who, s in (("carol", Ca), ("erin", Er)):
     check(gone(s.get(B + f"/api/attachments/{AID}")), f"after: {who} gets 404 on the file")
     sr = s.get(B + "/api/tasks", params={"scope": "search", "q": "Apfelernte"})
     check(not sr.ok or T not in [t["id"] for t in sr.json().get("tasks", [])], f"after: {who}'s task search finds nothing")
-    check(AID not in [x.get("id") for x in (s.get(B + "/api/files/search", params={"q": "quittengelee"}).json() or {}).get("items", [])],
+    check(AID not in [x.get("id") for x in (s.get(B + "/api/search?kind=files", params={"q": "quittengelee"}).json() or {}).get("items", [])],
           f"after: {who}'s file search finds nothing of the file")
 check(LINK and Ca.get(B + f"/api/files/nodes/{LINK}/content").status_code != 200, "after: carol's link in Alpha's file store no longer opens the file")
 for p in (f"/lists/{L}", f"/tasks/{T}", f"/tasks/{T}/comments", f"/tasks/{T}/attachments"):

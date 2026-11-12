@@ -207,7 +207,7 @@ check(A is not None, "(b) alice signs in with her old password")
 if A:
     r = A.get(B + "/api/state")
     check(r.ok and len(r.json().get("tasks", [])) > 1000, f"(b) /api/state ({r.status_code}, {len(r.json().get('tasks', [])) if r.ok else 0} tasks)")
-    r = A.get(B + "/api/search/messages", params={"q": "aerger"})
+    r = A.get(B + "/api/search?kind=messages", params={"q": "aerger"})
     check(r.ok and len(r.json().get("hits", [])) > 10, "(b) the message search finds old comments (Ärger as aerger) " + r.text[:120])
     lid = big["shared_list"]
     r = A.post(B + "/api/tasks", json={"title": "after the move", "list_id": lid})

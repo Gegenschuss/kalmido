@@ -140,7 +140,7 @@ for who in ("bob", "frida"):
           f"#4960 {who}: the tasks come through an index")
 
 # 2.972.0 (#5272): the comment search reads the core's obj_comments (collab/msgsearch.py)
-res = probe("bob", "/api/search/messages?q=rechnung", "FROM obj_comments m JOIN tasks t")
+res = probe("bob", "/api/search?kind=messages&q=rechnung", "FROM obj_comments m JOIN tasks t")
 print("info: comment search plan (bob):\n" + "\n".join((res.get("plans") or [[str(res)]])[0]), flush=True)
 check(res.get("status") == 200, f"the comment search request ran {str(res)[:200]}")
 cplan = (res.get("plans") or [[]])[0]

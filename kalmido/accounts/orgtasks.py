@@ -13,6 +13,7 @@ admins see in the history of "Projects of the organisation". A person without an
 from flask import jsonify, request
 
 from ..core.config import app
+from ..core.srchreg import SRCH_HOOKS  # 2.1026.0 (#5280)
 from ..core.i18n import tr
 from ..core.db import db, iso, now_utc
 from ..accounts.session import me
@@ -71,8 +72,11 @@ def oadm_tasks(oid):
         where.append("t.status!=0")
     q = (a.get("q") or "").strip()[:200]
     if q:
-        where.append("t.title ILIKE ?")
-        args.append("%" + q.lower().replace("\\", "").replace("%", "").replace("_", "") + "%")
+        # 2.1026.0 (#5280, stage Q6c): the shared search index (core/objsearch.py: a word start, umlauts as ae / oe / ue, a part
+        # of the ticket key anywhere) instead of an ILIKE on the title
+        ids, x = SRCH_HOOKS["task_ids"](q, names=True)  # the domain layer's index without an upward import
+        where.append(f"t.id IN {ids}" if ids else "FALSE")
+        args += x
     w = " AND ".join(where)
     total = c.execute(f"SELECT COUNT(*) FROM tasks t WHERE {w}", args).fetchone()[0]
     rows = c.execute(f"""SELECT t.id, t.list_id, t.parent_id, t.title, t.status, t.priority, t.due, t.due_time, t.assignee_id, t.ttype,

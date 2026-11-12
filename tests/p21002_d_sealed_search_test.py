@@ -43,7 +43,7 @@ def table_there(t):
 
 
 def wiki(s, q, **kw):
-    r = s.get(B + "/api/wiki/search", params={"q": q, **kw})
+    r = s.get(B + "/api/search?kind=wiki", params={"q": q, **kw})
     return [p["id"] for p in r.json().get("pages", [])] if r.ok else [("error", r.status_code)]
 
 
@@ -132,7 +132,7 @@ check(wiki(Gi, "kühlschrank") == [WP1], f"the guest finds the shared page by a 
 check(wiki(Gi, "zaunpfaehle") == [], "... not a page outside the share")
 r = Gi.get(B + f"/api/wiki/pages/{WP1}")
 check(r.ok and "Kühlschrank" in (r.json().get("body") or ""), "the hit opens for the guest (the way in)")
-j = Gi.get(B + "/api/wiki/search", params={"q": "kuehl"}).json()
+j = Gi.get(B + "/api/search?kind=wiki", params={"q": "kuehl"}).json()
 check(any(p["id"] == WP1 and "Kühlschrank" in (p.get("snippet") or "") for p in j.get("pages", [])),
       f"the hit carries its snippet with the word {str(j)[:200]}")
 check(wiki(Ca, "kühlschrank") == [], "carl (no share, other organisation): nothing")

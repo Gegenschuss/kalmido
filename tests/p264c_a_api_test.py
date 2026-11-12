@@ -228,9 +228,9 @@ r = A.get(B + "/api/wiki/export", params={"space": SP})
 check(r.status_code == 409 and code(r) == "wiki_e2e", "on: export 409")
 r = A.post(B + "/api/wiki/import", params={"space": SP}, files={"file": ("w.zip", b"PK\x05\x06" + b"\0" * 18)})
 check(r.status_code == 409 and code(r) == "wiki_e2e", "on: import 409")
-srch = Bo.get(B + "/api/wiki/search", params={"q": "e2e1"}).json()["pages"]
+srch = Bo.get(B + "/api/search?kind=wiki", params={"q": "e2e1"}).json()["pages"]
 check(not srch, "on: search leaves the space out " + str(srch)[:200])
-check([p["id"] for p in Bo.get(B + "/api/wiki/search", params={"q": "diary"}).json()["pages"]] == [OWN], "search still finds open spaces")
+check([p["id"] for p in Bo.get(B + "/api/search?kind=wiki", params={"q": "diary"}).json()["pages"]] == [OWN], "search still finds open spaces")
 mn = [p["id"] for p in A.get(B + "/api/wiki/mentions", params={"task": T}).json()["pages"]]
 check(PG["check"] not in mn, "on: mentions leave the space out")
 r = Bo.get(B + "/api/wiki", params={"space": SP})
@@ -353,7 +353,7 @@ check(r.ok and d["mode"] == "encrypting" and d["can_manage"] is True and [m["use
       "private: only its owner " + r.text[:200])
 check(A.get(B + "/api/wiki/e2e", params={"space": "private"}).json()["mode"] is None, "private: alice's own space stays open")
 check(Bo.get(B + "/api/wiki/e2e/todo", params={"space": "private"}).json()["left"]["pages"] == 1, "private: todo of bob's page")
-check(OWN not in [p["id"] for p in Bo.get(B + "/api/wiki/search", params={"q": "diary"}).json()["pages"]], "private encrypting: search leaves it out")
+check(OWN not in [p["id"] for p in Bo.get(B + "/api/search?kind=wiki", params={"q": "diary"}).json()["pages"]], "private encrypting: search leaves it out")
 
 # ---------------------------------------------------------------- 2.64.3 review 1 M1: no ciphertext-like values in open spaces
 import io as _io, zipfile as _zf

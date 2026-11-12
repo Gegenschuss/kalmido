@@ -18,6 +18,7 @@ import unicodedata
 from flask import jsonify, request
 
 from ..core.config import app
+from ..core.srchreg import srch_register  # 2.1026.0 (#5280)
 from ..core.pg import IntegrityError, insert_id, st_ids, write_lock
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
@@ -851,9 +852,8 @@ def wiki_purge_many():
     return jsonify(ok=True, ids=done, skipped=[x for x in ids if x not in set(done)])
 
 
-@app.get("/api/wiki/search")
-def wiki_search():
-    """?q=words -- pages of every space one may read whose name (or text) has all words; without their text. 2.123.0 A
+def wiki_find():
+    """GET /api/search?kind=wiki (2.1026.0, #5280: was /api/wiki/search): ?q=words -- pages of every space one may read whose name (or text) has all words; without their text. 2.123.0 A
     (#2106): over the word index (wksearch.py), ranked (words in the name, then in the text, then the newest); ?space=
     only that space, ?limit= (default 30, at most 100) &offset= the next ones -> {pages, total, more, offset}; 2.376 (#3292):
     a hit with a query word in its text has snippet (plain text, "…" where cut) + marks ([[start, end], ...] in code points)."""
@@ -876,6 +876,19 @@ def wiki_search():
     sn = wks_snippets(c, rows, q)  # 2.376 (#3292): the shown hits only, opened in memory (nothing stored or logged)
     return jsonify(pages=[{**wiki_dict(r, full=False), **({"snippet": sn[r["id"]][0], "marks": sn[r["id"]][1]} if r["id"] in sn else {})}
                           for r in rows], total=total, offset=offset, more=offset + len(rows) < total)
+
+
+def wiki_search_group(c, uid, q, n):
+    """2.1026.0 (#5280): the first n pages of every space uid reads (and those a share of the core opens) whose name or text
+    has the words, with their snippets -- the same entries as kind=wiki."""
+    from .wksearch import wks_find, wks_snippets
+    spaces = [None, *[o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]]
+    rows, _total = wks_find(c, uid, spaces, q, n, 0, shared=True)
+    sn = wks_snippets(c, rows, q)
+    return [{**wiki_dict(r, full=False), **({"snippet": sn[r["id"]][0], "marks": sn[r["id"]][1]} if r["id"] in sn else {})} for r in rows]
+
+
+srch_register("wiki", web=wiki_find, group=wiki_search_group, scope="wiki:read", gate="/api/wiki/search", order=35)  # 2.1026.0 (#5280)
 
 
 @app.get("/api/wiki/mentions")

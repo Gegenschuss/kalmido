@@ -47,7 +47,7 @@ def page(s, space, path, text=""):
 
 
 def search(s, q, **kw):
-    r = s.get(B + "/api/wiki/search", params={"q": q, **kw})
+    r = s.get(B + "/api/search?kind=wiki", params={"q": q, **kw})
     assert r.ok, r.text
     return r.json()
 
@@ -153,16 +153,16 @@ other = sql("SELECT body FROM wiki_pages WHERE id=?", (PC,))[0][0]  # sealed wit
 sql("UPDATE wiki_pages SET body=? WHERE id=?", (other, PU), write=True)
 # 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
 sql("DELETE FROM obj_search_words WHERE kind='wiki_page' AND ref_id=?", (PU,), write=True)  # its index is built again (as after a change elsewhere)
-r = Bo.get(B + "/api/wiki/search", params={"q": "zebrafink"})
+r = Bo.get(B + "/api/search?kind=wiki", params={"q": "zebrafink"})
 p = hit(r.json(), PU) if r.ok else None
 check(r.ok and p is not None and "snippet" not in p, "an unreadable page: found by its name, no snippet, no error " + r.text[:200])
 
 # a space with the lock: the server neither searches nor cuts (the browser does)
 P9 = page(Ca, SP2, "Notiz/Laub", "Herbstlaub im Hof")
 sql("INSERT INTO wiki_spaces(org_id, e2e, e2e_gen) VALUES(?, 'on', 1)", (ORG2,), write=True)
-r = Ca.get(B + "/api/wiki/search", params={"q": "herbstlaub"})
+r = Ca.get(B + "/api/search?kind=wiki", params={"q": "herbstlaub"})
 check(r.ok and r.json()["total"] == 0 and not any(x.get("snippet") for x in r.json()["pages"]), "a space with the lock: no hit and no snippet from the server, no error " + r.text[:200])
-r = Ca.get(B + "/api/wiki/search", params={"q": "herbstlaub", "space": SP2})
+r = Ca.get(B + "/api/search?kind=wiki", params={"q": "herbstlaub", "space": SP2})
 check(r.ok and r.json()["total"] == 0, "?space= of the locked space: answered without error, empty " + r.text[:200])
 
 # ================================================================ nothing stored or logged

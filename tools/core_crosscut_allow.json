@@ -71,14 +71,12 @@
   "kalmido/collab/teamchat.py:v1_tchat_react": "route only (the web / v1 address stays): the rule and the rows are the core's since stage Q1 (core/objreact.py orx_toggle, orx_set)"
  },
  "search_functions": {
-  "kalmido/accounts/servers.py:msv_search": "stage Q6 (search) moves it onto the shared search",
-  "kalmido/api/v1.py:v1_search": "stage Q6 (search) moves it onto the shared search",
+  "kalmido/accounts/servers.py:msv_search": "passes a search through to another Kalmido server (stays, analysis #3563: Fremdserver-Durchreiche)",
   "kalmido/collab/notes.py:notes_search": "reads the shared search index obj_search since stage Q6a (#5278); the area keeps its rights per hit and its answer",
   "kalmido/collab/notes.py:v1_notes_search": "reads the shared search index obj_search since stage Q6a (#5278); the area keeps its rights per hit and its answer",
-  "kalmido/files/textscan.py:files_search": "reads the shared word index obj_search_words since stage Q6b (#5279); the route itself goes in stage Q6c",
-  "kalmido/files/v1.py:v1_files_search": "reads the shared word index obj_search_words since stage Q6b (#5279); the route itself goes in stage Q6c",
-  "kalmido/tasks/ftsearch.py:fts_search": "reads the shared search index obj_search since stage Q6a (#5278); the area keeps its rights per hit and its answer",
-  "kalmido/wiki/pages.py:wiki_search": "stage Q6 (search) moves it onto the shared search"
+  "kalmido/files/textscan.py:files_search": "reads the shared word index obj_search_words since stage Q6b (#5279); the route went in stage Q6c (#5280): kind files of the one search (core/srchreg.py)",
+  "kalmido/files/v1.py:v1_files_search": "reads the shared word index obj_search_words since stage Q6b (#5279); the route went in stage Q6c (#5280): kind files of the one search (core/srchreg.py)",
+  "kalmido/tasks/ftsearch.py:fts_search": "reads the shared search index obj_search since stage Q6a (#5278); the area keeps its rights per hit and its answer"
  },
  "rights": {
   "kalmido/accounts/layouts.py:_wg_role": "a project page's part: asks need_overview (the core's need_list + project switch); no rule of its own",

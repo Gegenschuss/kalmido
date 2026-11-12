@@ -293,7 +293,7 @@ def vfind(h):
 
 
 check(A.put(B + f"/api/lists/{LW}/members", json={"user_id": BOB, "role": "edit"}).ok, "setup: bob in the list Work")
-got = Bo.get(B + "/api/search/messages", params={"q": "kolibri"})
+got = Bo.get(B + "/api/search?kind=messages", params={"q": "kolibri"})
 check(got.ok and M in [x.get("id") for x in got.json().get("hits") or []], "token: the app finds the channel's message")
 got = vfind(tok())
 check(isinstance(got, list) and M in got, f"token: bob's token without a limit finds it {got}")

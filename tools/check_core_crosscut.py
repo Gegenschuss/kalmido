@@ -20,7 +20,8 @@ fs_shares). A table is red as a share of its own when
     of them) and a role or perm* column (also one added later with ALTER TABLE ... ADD COLUMN); NOT_COLS do not count here.
 Code (outside kalmido/core/): a new MENTION_RE, need_*_say( or *_react( definition is red (the core's comment / reaction rules
 come once); a new def need_*( / *_role( / *_can( is red as a rights check of its own (allow section "rights"); a new
-def *_search( / *search_sql( is a hint only (the search stage Q6). Today's ones stand in the same file.
+def *_search( / *search_sql( is a hint only: since stage Q6c (2.1026.0, #5280) an area registers its search with the one
+registry (kalmido/core/srchreg.py srch_register) instead of a route of its own. Today's ones stand in the same file.
 Filters (2.857.0, #5523): conditions are read once, by the core's filter (kalmido/core/filters.py, static/js/fltkern.js,
 static/js/fltdlg.js; docs/dev/kern.md section "Filter"). Outside them a definition named like a filter evaluator or a condition
 dialog is red (allow section "filter") -- Python: def *filter(s)_sql / _where / _match / _rules / _cond(s), *_cond_ok,
@@ -251,7 +252,7 @@ def findings(root=ROOT, srcs=None, allow=None, code=True):
         for k, ln in sorted(hint.items()):
             if k not in ok_search:
                 f, n = k.rsplit(":", 1)
-                hints.append(f"hint: {n} ({f}:{ln}) is a search of its own - the shared search comes with stage Q6")
+                hints.append(f"hint: {n} ({f}:{ln}) is a search of its own - register it with the one search (kalmido/core/srchreg.py srch_register)")
         for k in sorted(set(ok_search) - set(hint)):
             bad.append(f"{ALLOW}: search_functions {k} is gone - take the line out")
         for k, ln in sorted(rights.items()):

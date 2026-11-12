@@ -507,7 +507,6 @@ GET /api/proposals/agents
 GET /api/proposals/{}
 GET /api/retention/org/{}
 GET /api/retention/org/{}/export.zip
-GET /api/search/messages
 GET /api/servers/{}/events
 GET /api/servers/{}/search
 GET /api/servers/{}/tasks/{}
@@ -575,7 +574,6 @@ GET /api/v1/events/freebusy
 GET /api/v1/events/{}
 GET /api/v1/export
 GET /api/v1/fetcher
-GET /api/v1/files/search
 GET /api/v1/files/{}/text
 GET /api/v1/folders
 GET /api/v1/groups

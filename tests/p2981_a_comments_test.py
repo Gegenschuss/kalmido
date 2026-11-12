@@ -160,10 +160,10 @@ TID = A.post(B + "/api/tasks", json={"title": "Aufgabe", "list_id": LID}).json()
 r = Bo.post(B + f"/api/videos/{VID}/comments", json={"body": "Kranichflug im Abspann", "at_sec": 40})
 CS = r.json().get("comment_id") if r.ok else 0
 r = Bo.get(B + "/api/search", params={"q": "kranichflug"})
-hits = [x for x in (r.json().get("comments") or []) if x.get("kind") == "video"] if r.ok else []
+hits = [x for x in ((r.json().get("groups") or {}).get("comments") or []) if x.get("kind") == "video"] if r.ok else []  # 2.1026.0 (#5280): groups
 check(r.ok and any(x["id"] == CS and x["ref_id"] == VID for x in hits), f"#5278: bob finds the review comment through /api/search {r.status_code} {r.text[:200]}")
 r = Do.get(B + "/api/search", params={"q": "kranichflug"})
-check(r.ok and not any(x.get("id") == CS for x in r.json().get("comments") or []), "#5278: dora (no member of the project) finds it not")
+check(r.ok and not any(x.get("id") == CS for x in (r.json().get("groups") or {}).get("comments") or []), "#5278: dora (no member of the project) finds it not")
 check(A.get(B + f"/api/obj/task/{TID}/comments").status_code == 404, "the task keeps its own routes (404 here)")
 
 # ================================================================== a document's note: trash instead of DELETE (B6)

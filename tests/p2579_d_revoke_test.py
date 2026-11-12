@@ -225,10 +225,10 @@ def probes(x, areas=("wiki", "cal", "book", "files", "list")):
         P["files: the file"] = lambda: ok(Bo.get(B + f"/api/files/nodes/{x['fn']}"))
         P["files: its content"] = lambda: has(Bo.get(B + f"/api/files/nodes/{x['fn']}/content"), fw)
         P["files: zip"] = lambda: ok(Bo.get(B + "/api/files/zip", params={"ids": str(x["fn"])}))
-        P["files: search"] = lambda: x["fn"] in ids(Bo.get(B + "/api/files/search", params={"q": fw}))
+        P["files: search"] = lambda: x["fn"] in ids(Bo.get(B + "/api/search?kind=files", params={"q": fw}))
         P["files: API v1 file (token)"] = lambda: ok(v1(f"/files/{x['fn']}"))
         P["files: API v1 content (token)"] = lambda: has(v1(f"/files/{x['fn']}/content"), fw)
-        P["files: API v1 search (token)"] = lambda: x["fn"] in ids(v1("/files/search", params={"q": fw}))
+        P["files: API v1 search (token)"] = lambda: x["fn"] in ids(v1("/search?kind=files", params={"q": fw}))
     if "list" in areas and x.get("list"):
         P["project: in the state"] = lambda: x["task"] in ids(Bo.get(B + "/api/state"), "tasks")
         P["project: the task"] = lambda: has(Bo.get(B + f"/api/tasks/{x['task']}"), lw)
@@ -246,7 +246,7 @@ def probes(x, areas=("wiki", "cal", "book", "files", "list")):
 
 
 # ways that never show something shared with bob (only his own or full-role spaces): checked after only, never before
-AFTER_ONLY = {"wiki: search": lambda x: x["ww"] in body(Bo.get(B + "/api/wiki/search", params={"q": x["ww"]})),
+AFTER_ONLY = {"wiki: search": lambda x: x["ww"] in body(Bo.get(B + "/api/search?kind=wiki", params={"q": x["ww"]})),
               "wiki: export": lambda x: x["ww"].encode() in (Bo.get(B + "/api/wiki/export", params={"space": "all"}).content or b"")}
 
 

@@ -18,7 +18,6 @@ import re
 
 from flask import g, has_request_context, jsonify, request
 
-from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import db
 from ..core.pg import st_ids
@@ -32,6 +31,7 @@ from ..core.objsearch import OSR_KINDS, osr_comment_hits, osr_query, osr_terms  
 from ..collab.teamchat import md_brief
 from ..tasks.validation import as_int
 from ..core.errors import BadInput
+from ..core.srchreg import srch_q, srch_register  # 2.1026.0 (#5280)
 from ..api.common import cursor_dec, cursor_enc  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.fields import search_field_ids  # 2.369.5 (#2517): pulled up from functions
 
@@ -186,19 +186,14 @@ def fts_obj_comments(c, uid, raw, limit=10):
     return out
 
 
-@app.get("/api/search")
 def fts_web():
-    """?q, limit (1-50), cursor -- {hits: [{task, where, snippet: {text, marks}, comment_id?}], next, office?}.
-    2.250.0 A (#2992): office: [{kind, id, label, sub, go}] (clients, quotations / invoices: office/search.py) on the first
-    page only, and only when the person sees the office -- an extra key, old clients read hits as before.
-    2.981.0 (#5278): wiki: [{id, path, space}] (knowledge pages by name, wiki/wksearch.py wks_name_hits) and comments: [{id,
-    kind, ref_id, snippet}] (comments of other objects, fts_obj_comments) on the first page, when there are any."""
+    """GET /api/search (kind tasks, core/srchreg.py): ?q, limit (1-50), cursor -- {hits: [{task, where, snippet: {text, marks},
+    comment_id?}], next}. 2.1026.0 (#5280): the other kinds (office, knowledge pages, comments of other objects, contacts,
+    notes, files, events, messages) come as `groups` of the first page from the registry (were the keys office / wiki /
+    comments here)."""
     a = request.args
-    try:
-        q, lim = fts_args(a)
-        off = cursor_dec("fs", a.get("cursor"))
-    except BadInput as e:
-        return jsonify(error=str(e)), 400
+    q, lim = fts_args(a)
+    off = cursor_dec("fs", a.get("cursor"))
     page, more = fts_page(db(), me(), q, off, lim)
     hits = []
     for (tid, where, snip, cid), t in page:
@@ -206,22 +201,16 @@ def fts_web():
         if cid:
             h["comment_id"] = cid
         hits.append(h)
-    extra = {}
-    if not off:
-        from ..office.search import bs_office_hits
-        office = bs_office_hits(db(), me(), q)
-        if office:
-            extra["office"] = office
-        # 2.981.0 (#5278): knowledge pages by name (also those a share of the shared core opens, question 15) and comments of
-        # the other kinds the search knows (core/objsearch.py OSR_KINDS: each checked with the object's role) -- extra keys
-        from ..wiki.wksearch import wks_name_hits
-        wiki = wks_name_hits(db(), me(), q)
-        if wiki:
-            extra["wiki"] = wiki
-        cm = fts_obj_comments(db(), me(), q)
-        if cm:
-            extra["comments"] = cm
-    return jsonify(hits=hits, next=cursor_enc("fs", off + lim) if more else None, **extra)
+    return {"hits": hits, "next": cursor_enc("fs", off + lim) if more else None}
+
+
+def fts_comments_web():
+    """GET /api/search?kind=comments: {comments: [{id, kind, ref_id, snippet}]} (comments of other objects than tasks)."""
+    return {"comments": fts_obj_comments(db(), me(), srch_q(request.args), 20)}
+
+
+srch_register("tasks", web=fts_web, order=0)  # the API side: api/v1.py
+srch_register("comments", web=fts_comments_web, group=lambda c, uid, q, n: fts_obj_comments(c, uid, q, n), order=80)
 
 
 def fts_v1(a, v1_task):

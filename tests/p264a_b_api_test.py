@@ -381,7 +381,7 @@ if tp.ok:
     check(r.status_code == 409, f"apply a template into the locked list 409 {r.status_code}")
 r = A.get(B + "/api/tasks?scope=search&q=e2e1")
 check(r.ok and T not in [x["id"] for x in r.json().get("tasks", [])], "web search: nothing of the locked list")
-r = A.get(B + "/api/search/messages?q=QQQQ")
+r = A.get(B + "/api/search?kind=messages&q=QQQQ")
 # 2.663.0 (#4341): msg_search_web: a valid q and no filters -> search_messages raises nothing -> 200
 check(r.status_code == 200 and "e2e1:" not in r.text, f"message search: 200, no ciphertext {r.status_code}")
 c2 = cipher(9)

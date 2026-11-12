@@ -14,6 +14,7 @@ import re
 from flask import g, request
 
 from ..core.config import app
+from ..core.srchreg import SRCH_HOOKS  # 2.1026.0 (#5280)
 from ..core.db import db, usettings
 from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, tr
@@ -133,10 +134,10 @@ def _req_org(c, uid, area):
 
 
 @app.before_request
-def wsa_gate():
+def wsa_gate(p=None):
     """The routes of an area its organisation's admins switched off answer 403 while that organisation is the workspace of
     the request. Agents (their tokens / the REST API) are untouched: what they see is what is shared with them."""
-    p = request.path
+    p = p or request.path  # 2.1026.0 (#5280): p = the path of a search kind (core/srchreg.py srch_gate)
     area = next((a for pre, a in WSA_PATHS if p.startswith(pre) and (pre.endswith("/") or len(p) == len(pre) or p[len(pre)] in "/?")), None)
     if area is None:
         return None
@@ -168,3 +169,6 @@ def wsa_gate():
     if oid:
         wsa_org_check(c, oid, area)
     return None
+
+
+SRCH_HOOKS["gates"].append(wsa_gate)  # 2.1026.0 (#5280): the one search asks the gate for a kind's area (core/srchreg.py)

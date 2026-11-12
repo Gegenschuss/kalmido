@@ -3,6 +3,7 @@ import re
 from flask import jsonify, request, Response
 
 from ..core.objsearch import osr_ids_sql  # 2.981.0 (#5278)
+from ..core.srchreg import srch_q, srch_register  # 2.1026.0 (#5280)
 from ..core.config import app
 from ..core.pg import IntegrityError, insert_id, write_lock
 from ..core.i18n import tr
@@ -357,6 +358,22 @@ def v1_notes_search():
     from .liste2e import le2e_modes
     lk = le2e_modes(c, [r["list_id"] for r in rows])  # 2.64.1 (#1817): notes of lists with the lock are not for the API
     return jsonify(data=[note_dict(r, full=False) for r in rows if r["list_id"] not in lk], next_cursor=None)
+
+
+def nt_search_group(c, uid, q, n):
+    """2.1026.0 (#5280): the first n notes matching q (the one search's kind notes; as GET /api/notes?q=)."""
+    return [note_dict(r, full=False) for r in notes_search(c, uid, q, None, n)]
+
+
+def nt_v1_group(c, uid, q, n):
+    from .liste2e import le2e_modes
+    rows = notes_search(c, uid, q, None, n)
+    lk = le2e_modes(c, [r["list_id"] for r in rows])  # 2.64.1 (#1817): notes of lists with the lock are not for the API
+    return [note_dict(r, full=False) for r in rows if r["list_id"] not in lk]
+
+
+srch_register("notes", web=lambda: {"notes": nt_search_group(db(), me(), srch_q(request.args), 50)}, group=nt_search_group,
+              v1=v1_notes_search, v1group=nt_v1_group, order=30)  # 2.1026.0 (#5280)
 
 
 @app.get("/api/v1/notes/<int:nid>")

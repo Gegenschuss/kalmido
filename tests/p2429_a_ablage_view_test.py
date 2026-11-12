@@ -82,9 +82,9 @@ check(f0.get("name") == "plan.png" and f0.get("kind") == "wiki" and f0.get("url"
 check(Fr.get(B + f0.get("url", "/x")).ok, "#3580: the file opens through the knowledge route")
 
 # the search and the move targets
-hits = [x["name"] for x in Fr.get(B + "/api/files/search", params={"q": "Start"}).json().get("items", [])]
+hits = [x["name"] for x in Fr.get(B + "/api/search?kind=files", params={"q": "Start"}).json().get("items", [])]
 check("Start" not in hits, f"#3580: the search shows no reference to the knowledge page {hits}")
-hits = [x["id"] for x in Fr.get(B + "/api/files/search", params={"q": "Customers"}).json().get("items", [])]
+hits = [x["id"] for x in Fr.get(B + "/api/search?kind=files", params={"q": "Customers"}).json().get("items", [])]
 check(SHF not in hits, f"#3580: the search shows no folder of the tables {hits}")
 fs = [x["id"] for x in Fr.get(B + "/api/files/folders", params={"ablage": "1"}).json()["folders"]]
 check(OWN in fs and SHF not in fs, f"#3580: 'Move to…' of the file store lists only its own folders {fs}")

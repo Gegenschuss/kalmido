@@ -3,7 +3,7 @@
  - a PDF with a text layer as a task file: recognised in the background (file_text found), the task search finds the
    task by a word of the file (whole word and prefix) with file_hit = the file's name
  - an image with text (drawn here with Pillow) in an organisation's task and in the Ablage: recognised by OCR (only when
-   the image has Tesseract), found in the task search and in the Ablage search (GET /api/files/search, hit "text")
+   the image has Tesseract), found in the task search and in the Ablage search (GET /api/search?kind=files, hit "text")
  - a project file: found by the Ablage search (list_files)
  - the same content in the same workspace takes the text over; a HEIC file gets no mark (state skip)
  - the boundary: another person (no organisation) and a person of another organisation find nothing; the search route
@@ -107,7 +107,7 @@ def fsearch(s, q, space=None):
     p = {"q": q}
     if space:
         p["space"] = space
-    return s.get(B + "/api/files/search", params=p)
+    return s.get(B + "/api/search?kind=files", params=p)
 
 
 # ---------------------------------------------------------------------------------------------------------- setup
@@ -226,7 +226,7 @@ check(not any(x["id"] == NF for x in fsearch(Bo, "zitronenbaum", "private").json
 check(not fsearch(Zo, "zitronenbaum").json().get("items") and not fsearch(Er, "zitronenbaum").json().get("items"),
       "#1820: the Ablage search shows nothing of another organisation / to a person without it")
 check(fsearch(Zo, "zitronenbaum", f"org:{ORG}").status_code == 404, "#1820: a foreign organisation's space: 404")
-check(Bo.get(B + "/api/files/search").status_code == 400, "#1820: an empty query: 400")
+check(Bo.get(B + "/api/search?kind=files").status_code == 400, "#1820: an empty query: 400")
 
 
 def v1(s, path, scopes=("read", "files:read")):
@@ -234,10 +234,10 @@ def v1(s, path, scopes=("read", "files:read")):
     return requests.get(B + "/api/v1" + path, headers={"Authorization": "Bearer " + (tok.get("token") or tok.get("value") or "")})
 
 
-j = v1(Bo, "/files/search?q=zitronenbaum").json()
+j = v1(Bo, "/search?kind=files&q=zitronenbaum").json()
 check(any(x["id"] == NF and x["hit"] == "text" and x.get("url") for x in j.get("data", [])), f"#1820 API: GET /files/search finds the file by its text {str(j)[:200]}")
-check(v1(Zo, "/files/search?q=zitronenbaum").json().get("data") == [], "#1820 API: another organisation finds nothing")
-check(v1(Bo, "/files/search").status_code == 400, "#1820 API: q is needed")
+check(v1(Zo, "/search?kind=files&q=zitronenbaum").json().get("data") == [], "#1820 API: another organisation finds nothing")
+check(v1(Bo, "/search?kind=files").status_code == 400, "#1820 API: q is needed")
 # 2.81.0 (#1856): the API's task search names the file whose text matched, like the app
 j = v1(Bo, "/search?q=wolkenkratzer", ("read", "attachments:read")).json()
 hit = [x for x in j.get("data", []) if x["id"] == T1]

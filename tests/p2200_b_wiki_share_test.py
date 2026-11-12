@@ -124,7 +124,7 @@ check(any(b["id"] == SECRET for b in A.get(B + f"/api/wiki/pages/{P1}").json().g
 check(Gi.get(B + f"/api/wiki/pages/{SECRET}").status_code == 404, "a page outside the shared folder stays hidden")
 check(Gi.patch(B + f"/api/wiki/pages/{P1}", json={"body": "changed"}).status_code == 403, "view: no change")
 check(Gi.post(B + "/api/wiki/shared/pages", json={"folder_id": FA, "name": "New"}).status_code == 403, "view: no new page")
-sr = Gi.get(B + "/api/wiki/search", params={"q": "Secret"})
+sr = Gi.get(B + "/api/search?kind=wiki", params={"q": "Secret"})
 check(sr.status_code == 200 and SECRET not in [p["id"] for p in sr.json().get("pages", [])], f"search finds no hidden page {sr.status_code}")  # 2.501.0 (#4296): was `in (200, 404)`
 # edit
 check(A.patch(B + f"/api/files/shares/{SID}", json={"role": "edit"}).ok, "the share becomes edit")

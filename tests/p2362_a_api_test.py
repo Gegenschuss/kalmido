@@ -160,7 +160,7 @@ def sees_nothing(u, what):
     r = s.get(B + "/api/books")
     check(r.ok and MARK not in r.text, f"{what}: address book gone")
     check(s.get(B + f"/api/contacts/{CTA}").status_code == 404, f"{what}: contact 404")
-    r = s.get(B + "/api/search/messages", params={"q": MARK})
+    r = s.get(B + "/api/search?kind=messages", params={"q": MARK})
     check(MARK not in r.text, f"{what}: search shows nothing ({r.status_code})")
     check(s.get(B + "/api/export.json").ok and MARK not in s.get(B + "/api/export.json").text, f"{what}: own export without Alpha content")
     check(s.post(B + f"/api/comments/0/decide", json={"decision": "approve"}).status_code == 404, f"{what}: unknown comment 404")

@@ -73,7 +73,7 @@ def save(s, pid, text, **kw):
 
 
 def search(s, q, **kw):
-    r = s.get(B + "/api/wiki/search", params={"q": q, **kw})
+    r = s.get(B + "/api/search?kind=wiki", params={"q": q, **kw})
     assert r.ok, r.text
     return r.json()
 
