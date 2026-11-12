@@ -150,7 +150,8 @@ check(p and bold(p) == ["Holunderblüten"], "the own private page: with its snip
 PU = page(Bo, SP, "Kaputt/Zebrafink", "Zebrafink im Garten")
 other = sql("SELECT body FROM wiki_pages WHERE id=?", (PC,))[0][0]  # sealed with Beta's key: Alpha's cannot open it
 sql("UPDATE wiki_pages SET body=? WHERE id=?", (other, PU), write=True)
-sql("DELETE FROM wiki_words WHERE page_id=?", (PU,), write=True)  # its index is built again (as after a change elsewhere)
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+sql("DELETE FROM obj_search_words WHERE kind='wiki_page' AND ref_id=?", (PU,), write=True)  # its index is built again (as after a change elsewhere)
 r = Bo.get(B + "/api/wiki/search", params={"q": "zebrafink"})
 p = hit(r.json(), PU) if r.ok else None
 check(r.ok and p is not None and "snippet" not in p, "an unreadable page: found by its name, no snippet, no error " + r.text[:200])
@@ -168,7 +169,8 @@ logs = subprocess.run(["docker", "logs", CT], capture_output=True, text=True, ti
 lg = (logs.stdout or "") + (logs.stderr or "")
 check(lg and not any(w in lg for w in ("Kühlschrank", "Sternfrucht", "Quittenmus", "Laternenpfahl", "Fischotter", "Holunderbl")),
       "the server's log holds no word of a text or a snippet")
-check(not sql("SELECT 1 FROM wiki_words WHERE h LIKE '%hlschrank%' OR h LIKE '%ternfrucht%'"), "the word index holds only hashes")
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+check(not sql("SELECT 1 FROM obj_search_words WHERE kind='wiki_page' AND h LIKE '%hlschrank%' OR h LIKE '%ternfrucht%'"), "the word index holds only hashes")
 check(sql("SELECT body FROM wiki_pages WHERE id=?", (P1,))[0][0].startswith("kenc1:"), "the text stays sealed after the searches")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")

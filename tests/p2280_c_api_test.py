@@ -65,8 +65,9 @@ def stale(ids):
     if not ids:
         return 0
     q = ",".join(str(int(i)) for i in ids)
-    return dbx(f"SELECT COUNT(*) FROM wiki_pages p WHERE p.id IN ({q}) AND NOT EXISTS (SELECT 1 FROM wiki_words x "
-               "WHERE x.page_id=p.id AND x.h = 'u:' || p.updated_at)")[0][0]
+    # 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+    return dbx(f"SELECT COUNT(*) FROM wiki_pages p WHERE p.id IN ({q}) AND NOT EXISTS (SELECT 1 FROM obj_search_words x "
+               "WHERE x.kind='wiki_page' AND x.ref_id=p.id AND x.h = 'u:' || p.updated_at)")[0][0]
 
 
 fresh({"KALMIDO_INSTANCE_MODE": "workspaces"}, "P2280C")
@@ -167,7 +168,8 @@ check(not set(h) & set(fm), "freelancer: another account's search never finds th
 # and a waiting job of one space must not swallow the job of another space (once per space).
 sealed = page(A, SP, "Sealed/One", "plain papaya")
 dbx("UPDATE wiki_pages SET body=? WHERE id=?", ("e2e1:QUJDREVGR0g=", sealed))
-dbx("DELETE FROM wiki_words WHERE page_id=?", (sealed,))
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+dbx("DELETE FROM obj_search_words WHERE kind='wiki_page' AND ref_id=?", (sealed,))
 dbx("DELETE FROM bg_jobs WHERE kind='wiki:index'")
 search(A, SP, "papaya")
 check(until(lambda: dbx("SELECT COUNT(*) FROM bg_jobs WHERE kind='wiki:index' AND state IN ('wait', 'run')")[0][0] == 0
@@ -178,7 +180,8 @@ check(sealed not in hs, f"a sealed-looking text gives no search words ({ts})")
 dbx("DELETE FROM bg_jobs WHERE kind='wiki:index'")
 dbx("INSERT INTO bg_jobs(kind, org_id, user_id, payload, state, attempts, run_after, created_at) "
     "VALUES('wiki:index', ?, NULL, '', 'wait', 0, '2999-01-01T00:00:00', '2026-01-01T00:00:00')", (ORG2,))
-dbx("DELETE FROM wiki_words WHERE page_id=?", (ids[0],))
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+dbx("DELETE FROM obj_search_words WHERE kind='wiki_page' AND ref_id=?", (ids[0],))
 search(A, SP, "papaya")
 check(dbx("SELECT COUNT(*) FROM bg_jobs WHERE kind='wiki:index' AND org_id=?", (ORG,))[0][0] >= 1,
       "a waiting index job of another space does not swallow this space's job")

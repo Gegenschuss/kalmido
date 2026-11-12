@@ -4,10 +4,10 @@ A tag is a word after "#" in the text that starts with a letter (#projekt, #kund
 inside a word, an address, code or a [[link]] is no tag) or an entry of "tags:" / "tag:" in the frontmatter ([a, b], "a, b"
 or "a b", the # optional). Tags are compared in lower case; the first spelling found is the one shown.
 
-The server keeps no tag in plain text: the word index (wksearch.py wiki_words) gets one HMAC hash per tag ('t:' + the
+The server keeps no tag in plain text: the word index (wksearch.py; 2.1002.0 #5279: the shared obj_search_words) gets one HMAC hash per tag ('t:' + the
 same keyed hash as the words, per space) on every save, so "pages with tag X" is found without opening a text. The names
 of the tag list are read from the texts of the pages that have a tag hash, in memory only (like the search's snippets),
-never stored or logged. Pages whose index is older than the page (or older than this release: the row 'tv:1' is missing)
+never stored or logged. Pages whose index is older than the page (or older than this release: the mark 'tv:1', since 2.1002.0 the shared index's 'v:2', is missing)
 are read at once and indexed again by the background job (wks_job_add). Spaces with the lock: the server has neither
 texts nor hashes -- the browser does the same with the texts it opened (wktags.js, same rules).
 
@@ -90,8 +90,8 @@ def wkt_tags(text):
 
 
 def wkt_hash(c, ws, key):
-    from ..docs.store import _h, _index_key
-    return "t:" + _h(_index_key(c, ws), "t:" + key)
+    from ..core.objwords import osw_hash  # 2.1002.0 (#5279): the shared word index's hash (the same key and form)
+    return "t:" + osw_hash(c, ws, "t:" + key)
 
 
 def wkt_hashes(c, ws, text):
@@ -129,9 +129,10 @@ def wkt_space_rows(c, oid, owner, uid, keys=None, late=None):
     ws = wks_ws(oid, None if oid else owner)
     if keys:
         hs = [wkt_hash(c, ws, k) for k in keys]
-        cond = " AND ".join(["EXISTS (SELECT 1 FROM wiki_words x WHERE x.page_id=p.id AND x.h=?)"] * len(hs))
+        # 2.1002.0 (#5279): the shared word index obj_search_words (kind 'wiki_page'; was wiki_words)
+        cond = " AND ".join(["EXISTS (SELECT 1 FROM obj_search_words x WHERE x.kind='wiki_page' AND x.ref_id=p.id AND x.h=?)"] * len(hs))
     else:
-        hs, cond = [], "EXISTS (SELECT 1 FROM wiki_words x WHERE x.page_id=p.id AND left(x.h, 2)='t:')"
+        hs, cond = [], "EXISTS (SELECT 1 FROM obj_search_words x WHERE x.kind='wiki_page' AND x.ref_id=p.id AND left(x.h, 2)='t:')"
     vis = wkf_visible_sql(c, uid)
     sql = (f"SELECT p.* FROM wiki_pages p WHERE p.deleted_at IS NULL AND {w} AND left(p.path, 5)<>'e2e1:' AND {vis} AND ")
     rows = {r["id"]: r for r in c.execute(sql + f"({cond}) ORDER BY lower(p.path) LIMIT {WIKI_INDEX_MAX}", [*a, *hs])

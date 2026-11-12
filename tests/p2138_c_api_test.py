@@ -437,7 +437,8 @@ for _ in range(90):
         break
     time.sleep(1)
 check(DOC and doc_hits(A, "zaunkoenigweg") == [DOC], f"document of the organisation found by a word before the rotation {r.status_code} {r.text[:150]}")
-DW0 = {x[0] for x in dbx("SELECT h FROM doc_words WHERE node_id=?", (DOC,))}
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+DW0 = {x[0] for x in dbx("SELECT h FROM obj_search_words WHERE kind='doc' AND ref_id=? AND h<>'v:2'", (DOC,))}
 
 # 2.138.0 C (#1972): a knowledge page of the organisation, sealed (encrypt-wiki) and found by its words (keyed with the org key)
 r = A.post(B + "/api/wiki/pages", json={"space": f"org:{ORG}", "path": "Wartung/Zaun", "body": "Quittenhecke am Nordtor schneiden"})
@@ -446,7 +447,8 @@ rc, out, err_ = cli("encrypt-wiki")
 check(WP and rc == 0 and str(one("SELECT body FROM wiki_pages WHERE id=?", (WP,))).startswith("kenc1:"), f"knowledge page sealed {r.status_code} {rc} {out[-200:]}")
 ws_ = A.get(B + "/api/wiki/search", params={"q": "quittenhecke", "space": f"org:{ORG}"})
 check(ws_.ok and [p["id"] for p in ws_.json().get("pages", [])] == [WP], "knowledge page found by a word before the rotation " + ws_.text[:150])
-WW0 = {x[0] for x in dbx("SELECT h FROM wiki_words WHERE page_id=?", (WP,))}
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+WW0 = {x[0] for x in dbx("SELECT h FROM obj_search_words WHERE kind='wiki_page' AND ref_id=?", (WP,))}
 
 # ---------------------------------------------------------------- rotate: aborted after the switch, then finished
 WR0 = one("SELECT wrapped FROM org_keys WHERE org_id=?", (ORG,))
@@ -478,14 +480,16 @@ rot_news = [x for x in news(Bo) if x["data"].get("action") == "rotated"]
 check(rot_news and rot_news[0]["to_me"] and [x for x in news(A) if x["data"].get("action") == "rotated"], "News: rotated (all admins)")
 r = show(A, ORG)
 check(r.ok and r.json().get("recovery_key") == RN, "after the rotation the new recovery key is shown")
-DW1 = {x[0] for x in dbx("SELECT h FROM doc_words WHERE node_id=?", (DOC,))}
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+DW1 = {x[0] for x in dbx("SELECT h FROM obj_search_words WHERE kind='doc' AND ref_id=? AND h<>'v:2'", (DOC,))}
 check(DW1 and not DW1 & DW0 and doc_hits(A, "zaunkoenigweg") == [DOC] and doc_hits(A, "wartungsv") == [DOC],
       f"after the rotation: the word index made with the new key, the document found again ({len(DW0)} / {len(DW1)})")
 WB1 = str(one("SELECT body FROM wiki_pages WHERE id=?", (WP,)))
-WW1 = {x[0] for x in dbx("SELECT h FROM wiki_words WHERE page_id=?", (WP,))}
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+WW1 = {x[0] for x in dbx("SELECT h FROM obj_search_words WHERE kind='wiki_page' AND ref_id=?", (WP,))}
 ws_ = A.get(B + "/api/wiki/search", params={"q": "quittenhecke", "space": f"org:{ORG}"})
 check(WB1.startswith("kenc1:") and A.get(B + f"/api/wiki/pages/{WP}").json().get("body") == "Quittenhecke am Nordtor schneiden"
-      and {x for x in WW1 if not x.startswith(("u:", "tv:"))} and not {x for x in WW1 & WW0 if not x.startswith(("u:", "tv:"))}
+      and {x for x in WW1 if not x.startswith(("u:", "tv:", "v:"))} and not {x for x in WW1 & WW0 if not x.startswith(("u:", "tv:", "v:"))}
       and ws_.ok and [p["id"] for p in ws_.json().get("pages", [])] == [WP],
       "after the rotation: the knowledge page re-encrypted, its word index made with the new key, found again")
 # 2.138.0 C (#1972): finishing a rotation that no longer runs: an error, no recovery key that is stored nowhere

@@ -476,7 +476,8 @@ check(one("SELECT COUNT(*) FROM nl_members WHERE seg_id=?", (seg[0]["id"] if seg
 # filed e-mails: the one with client + project yes (new workspace), dora's private one not
 hm = dbx("SELECT ws, owner_id, client_id, list_id FROM hub_mails WHERE org_id=?", (ORG3,))
 check(len(hm) == 1 and hm[0]["ws"] == f"o{ORG3}" and hm[0]["list_id"] == NL and hm[0]["owner_id"] == ALICE, f"filed e-mails {hm}")
-check(one("SELECT COUNT(*) FROM hub_words w JOIN hub_mails m ON m.id=w.mail_id WHERE m.org_id=?", (ORG3,)) > 0, "the mail search index is rebuilt")
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+check(one("SELECT COUNT(*) FROM obj_search_words w JOIN hub_mails m ON m.id=w.ref_id AND w.kind='hub_mail' WHERE m.org_id=?", (ORG3,)) > 0, "the mail search index is rebuilt")
 # sprint + task in a further list
 NSP = one("SELECT id FROM sprints WHERE list_id=?", (NL,))
 check(NSP and one("SELECT sprint_id FROM tasks WHERE id=?", (NT,)) == NSP, "the sprint and the task's sprint")

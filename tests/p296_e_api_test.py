@@ -231,8 +231,10 @@ check(v1(AGT, f"/files/{AKTE}").ok and v1(AGT, f"/documents/{DOC}").ok and v1(AG
       "before: Alpha's agent reads folder, document, text")
 OLD_V = versions(FILE) + versions(DOC)
 OLD_TH = one("SELECT thumb FROM doc_meta WHERE node_id=?", (DOC,))
-OLD_DW = {r[0] for r in dbx("SELECT h FROM doc_words WHERE node_id=?", (DOC,))}
-OLD_FW = {r[0] for r in dbx("SELECT w.h FROM file_words w JOIN file_text f ON f.id=w.ft_id WHERE f.kind='fs' AND f.node_id=?", (FILE,))}
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+OLD_DW = {r[0] for r in dbx("SELECT h FROM obj_search_words WHERE kind='doc' AND ref_id=? AND h<>'v:2'", (DOC,))}
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+OLD_FW = {r[0] for r in dbx("SELECT w.h FROM obj_search_words w JOIN file_text f ON f.id=w.ref_id AND w.kind='file_text' AND w.h<>'v:2' WHERE f.kind='fs' AND f.node_id=?", (FILE,))}
 LOG_BEFORE = {(x["action"], x.get("at")) for x in Ca.get(B + f"/api/files/nodes/{AKTE}").json().get("log") or []}
 check(all(head_space(p) == ORG for p in OLD_V) and OLD_DW and OLD_FW, "before: sealed for Alpha, word indexes there")
 
@@ -276,11 +278,13 @@ check(one("SELECT ws FROM doc_senders WHERE id=?", (m[2],)) == U and one("SELECT
       "db: sender and type are labels of carol's workspace")
 tg = dbx("SELECT t.ws FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id WHERE nt.node_id=?", (DOC,))
 check(tg and all(x[0] == U for x in tg), f"db: the tags are labels of carol's workspace ({tg})")
-NEW_DW = {r[0] for r in dbx("SELECT h FROM doc_words WHERE node_id=?", (DOC,))}
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+NEW_DW = {r[0] for r in dbx("SELECT h FROM obj_search_words WHERE kind='doc' AND ref_id=? AND h<>'v:2'", (DOC,))}
 check(NEW_DW and not NEW_DW & OLD_DW, "db: the document's word index is new (keyed for carol's workspace, no hash of Alpha's key left)")
 ft = dbx("SELECT ws, org_id, state, id FROM file_text WHERE kind='fs' AND node_id=?", (FILE,))
 check(ft and ft[0][0] == U and ft[0][1] is None, f"db: file_text of the plain file in carol's workspace ({ft})")
-NEW_FW = {r[0] for r in dbx("SELECT h FROM file_words WHERE ft_id=?", (ft[0][3],))} if ft else set()
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+NEW_FW = {r[0] for r in dbx("SELECT h FROM obj_search_words WHERE kind='file_text' AND ref_id=? AND h<>'v:2'", (ft[0][3],))} if ft else set()
 check(NEW_FW and not NEW_FW & OLD_FW, "db: the file's word index is new")
 check(dbx("SELECT ws, org_id, list_id FROM rc_receipts WHERE node_id=?", (DOC,)) == [] or
       [tuple(x) for x in dbx("SELECT ws, org_id, list_id FROM rc_receipts WHERE node_id=?", (DOC,))] == [(U, None, None)],

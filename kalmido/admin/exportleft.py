@@ -55,8 +55,9 @@ UMZ_LEFT_TABLES = {
     "chat_files": _LATER, "kid_pins": _SECRET, "kid_pin_open": _SECRET, "conn_requests": _ASK,
     "agent_bridges": _AGENT, "agent_events": _AGENT, "sheet_changes": _AGENT,
     "cal_events": _DERIVED, "cal_dav_res": _DERIVED, "git_commits": _DERIVED, "git_issue_comments": _DERIVED, "git_issue_gone": _DERIVED,
-    "git_prs": _DERIVED, "git_tags": _DERIVED, "wiki_links": _DERIVED, "doc_words": _DERIVED, "file_words": _DERIVED, "hub_words": _DERIVED,
-    "wiki_words": _DERIVED, "doc_node_tags": _ORG, "space_moves": _SERVER, "push_tags": _SERVER, "notify_channel_queue": _SERVER,
+    "git_prs": _DERIVED, "git_tags": _DERIVED, "wiki_links": _DERIVED,
+    "obj_search_words": _DERIVED,  # 2.1002.0 (#5279): the shared word index (was doc_words, file_words, hub_words, wiki_words)
+    "doc_node_tags": _ORG, "space_moves": _SERVER, "push_tags": _SERVER, "notify_channel_queue": _SERVER,
     "webhook_queue": _SERVER, "webhook_log": _SERVER,
     "clients": _ORG, "doc_cfg": _ORG, "doc_fetch_portals": _ORG, "doc_field_values": _ORG, "doc_fields": _ORG, "doc_meta": _ORG, "doc_rules": _ORG, "doc_flow_runs": _DERIVED,
     "doc_senders": _ORG, "doc_tags": _ORG, "doc_types": _ORG, "hub_bookings": _ORG, "hub_callsheets": _ORG, "hub_mail_links": _ORG, "nl_consent_log": _ORG,

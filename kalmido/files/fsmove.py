@@ -25,6 +25,7 @@ from flask import jsonify
 
 from ..core.config import app, ATT_DIR
 from ..core.db import body, bump, db, now_utc, parse_iso
+from ..core.objwords import osw_drop  # 2.1002.0 (#5279)
 from ..core.retention import ret_days, ret_on, ret_report  # 2.272.0 A (#3026)
 from ..core.i18n import N_, short_day, tr, trn
 from ..core.access import Denied
@@ -437,7 +438,7 @@ def fsm_text(c, nid, to, owner):
         if v is _BAD:
             c.execute("""UPDATE file_text SET state='wait', tries=0, error='', method='', text='', pages=0, truncated=0, sha256='',
                          org_id=?, ws=?, updated_at=? WHERE id=?""", (to, new, _now(), r["id"]))
-            c.execute("DELETE FROM file_words WHERE ft_id=?", (r["id"],))
+            osw_drop(c, "file_text", [r["id"]])  # 2.1002.0 (#5279): the shared word index
             continue
         c.execute("UPDATE file_text SET ws=?, org_id=?, text=?, updated_at=? WHERE id=?",
                   (new, to, S.doc_seal(c, new, "file_text.text", v or ""), _now(), r["id"]))

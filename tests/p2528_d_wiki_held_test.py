@@ -160,7 +160,8 @@ check(len(HELD) == 1 and HELD[0][0], f"#4306: every version is held from the swi
 holds = json.loads(sql("SELECT wkx_holds FROM wiki_spaces WHERE org_id=?", (ORG,))[0][0])
 BOB = Bo.get(B + "/api/state").json()["me"]["id"]
 check(sorted(holds.get(HELD[0][0], [])) == sorted([ALICE, BOB]), f"#4306: the people of the space then are named {holds}")
-check(sql("SELECT COUNT(*) FROM wiki_words WHERE page_id=?", (P,))[0][0] == 0, "the word index of the space still goes (derived)")
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+check(sql("SELECT COUNT(*) FROM obj_search_words WHERE kind='wiki_page' AND ref_id=?", (P,))[0][0] == 0, "the word index of the space still goes (derived)")
 
 # ---------------------------------------------------------------- locked: nobody sees them
 check(A.get(B + f"/api/wiki/pages/{P}/versions").json() == {"versions": [], "e2e": True}, "#4306: locked = no history shown")

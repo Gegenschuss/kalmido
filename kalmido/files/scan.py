@@ -27,6 +27,7 @@ from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.env import env_bool
+from ..core.objwords import osw_put  # 2.1002.0 (#5279)
 from ..accounts.users import need_admin  # 2.369.5 (#2517): pulled up from functions
 
 SC_CHUNK = 64 * 1024      # bytes per INSTREAM chunk
@@ -625,7 +626,7 @@ def sc_tick(c, force=False):
                     from .textscan import ts_forget  # the recognised text of a locked file is never searchable
                     ts_forget(c, r["kind"], r["ref_id"])
                     if r["kind"] == "fs" and sc_locked(c, "fs", r["ref_id"]):  # 2.360.0 B (#2496): the current version: out of the document search
-                        c.execute("DELETE FROM doc_words WHERE node_id=?", (r["ref_id"],))
+                        osw_put(c, "doc", r["ref_id"])  # 2.1002.0 (#5279): no words in the shared word index, its mark only
                     changed = True
                     print(f"virus scan: {sig} found in a stored file ({r['kind']} {r['ref_id']}), locked", flush=True)
                 else:  # clamd could not scan it: again later, waiting longer each time (at most a day)

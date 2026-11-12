@@ -1513,6 +1513,9 @@ def init_db(guard=True, load=None):
         from .objsearch import osr_init
         osr_init(c)  # 2.981.0 (#5278): the shared search index obj_search (kalmido_fold, the source triggers, the missing rows);
         clk("osr_init")  # was msg_index_init (2.37.0, trigram indexes) and fts_index_init (2.116.0 B, task_fts / cmt_fts)
+        from .objwords import osw_init
+        osw_init(c)  # 2.1002.0 (#5279): the delete triggers of the shared word index obj_search_words
+        clk("osw_init")
         from .rls import apply as rls_apply, OFF_HELP
         rls_on = rls_apply(c)  # 2.37.0 (#1150): row-level security per organisation (policies + the app role)
         clk("rls_apply")

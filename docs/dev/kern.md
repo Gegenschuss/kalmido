@@ -973,6 +973,29 @@ and `contacts.search`. `kalmido/core/objsearch.py`:
   keys go first: a database that jumps over several stages in one start (2.941 -> 2.995 live) still has them on `comments`,
   because all MOVE steps run before all fragments' AFTER (`tests/fixtures/upgrade/2.941.0.sql.gz` holds that state).
 
+### Sealed texts (stage Q6b, 2.1002.0, #5279)
+
+One table `obj_search_words(kind, ref_id, h)` is the keyed word index of the sealed texts; it replaced `doc_words`,
+`file_words`, `wiki_words` and `hub_words` and their four look-ups (`search_ids`, `ts_match`, the mail hub's `_search`, the body
+part of `wks_search`). `kalmido/core/objwords.py`:
+- Kinds: `doc` (a document's `fs_nodes` id), `file_text` (the recognised text of a file), `wiki_page`, `hub_mail`. `h` = an
+  HMAC-SHA256 prefix hash (2, 3, 4, 6, 8 characters) of a folded word, keyed per workspace (`docs/store.py _index_key`), or a
+  mark of the area (a page's `u:` / `x:` / tag `t:` rows). No plain word is stored. One place decides: open text ->
+  `obj_search` (tsvector), sealed -> `obj_search_words` (HMAC), end-to-end -> the browser.
+- Writing: `osw_put(c, kind, ref_id, ws, text, more=())` (replaces the object's rows, sets the mark `OSW_MARK`), `osw_drop`,
+  `osw_copy` (the same content in the same workspace). Rows go with their object through the delete triggers
+  `kalmido_osw_gone` (`osw_init`, no foreign key). An area registers its re-index (`osw_register`); the watchdog's
+  `osw_tick` indexes objects without the mark again (after the move, a restore, an older image).
+- Reading: `osw_match(c, kind, {ws: ids}, q, opened)` / `osw_term_hits(...)`. The same rules as `obj_search`: umlauts either
+  way (a word with ä is indexed folded and as ae), every query word of 2+ characters at a word start; a longer word is found by
+  its longest prefix and checked against the opened text (`opened(c, ws, ids)` of the area). **Rights are not in the index**:
+  the caller hands in only the ids it may read (documents `fs_visible_sql_c` / the documents' query, files their lists and
+  folders, mails `hbm_can`, pages their space or `wkf_shared_ids` + `wiki_may_read` per hit). The documents' search syntax
+  (`tag:`, `absender:`, `datum:`, phrases, `-word`) is a filter layer over it (`docs/dsearch.py`).
+- Knowledge pages a share of the core opens are searched by text too (`wiki/wksearch.py wks_find`, question 15).
+- The move: `osw_move` (`core/objhooks.py MOVE`) copies the old tables' hashes (same keys, same hashes: the search works at
+  once, also after a jump over several releases) before the fragment `5279_a` drops them (one-way), and raises the back limit.
+
 ## Filter (2.846.0, #5520)
 
 A saved filter, a shared view, a segment: an area that lets people pick its items by conditions builds **no condition logic

@@ -1127,6 +1127,9 @@ carry only the number `snippets_n` -- read the task itself for the code:
   shared index. A query word matches the start of a word (`plan` finds "Planung", not "Quartalsplanung"; umlauts either way:
   "Müller" = "Mueller"); a part of a word counts only in names and numbers (a contact's names, company and phone numbers, a
   task's ticket key). You still find only what you may read: the projects shared with you.
+- 2.1002.0: `search_files` (`GET /api/v1/files/search`, the recognised text of files and documents) follows the same rules
+  over a keyed word index (no plain word is stored): a word start of 2+ characters (`ab` finds "Abendessen"), umlauts either
+  way; a file's name still matches a part of it.
 
 ### Locked tasks
 

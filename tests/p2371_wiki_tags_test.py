@@ -149,9 +149,12 @@ check(tagged(Fr, "private", "fehlt") == [], "an unknown tag: no page")
 check(Fr.get(B + "/api/wiki/tags", params={"space": "private", "tag": "12"}).status_code == 400, "a tag starting with a digit is refused (a task)")
 
 # ================================================================ nothing in plain text
-check(not sql("SELECT 1 FROM wiki_words WHERE h LIKE '%rojekt%' OR h LIKE '%enchel%' OR h LIKE '%Nord%'"), "the word index holds hashes only")
-check(len(sql("SELECT 1 FROM wiki_words WHERE page_id=? AND h LIKE 't:%'", (PA,))) == 3, "one hash per tag of the page")
-check(sql("SELECT 1 FROM wiki_words WHERE page_id=? AND h='tv:1'", (PA,)), "the page is marked as indexed with its tags")
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+check(not sql("SELECT 1 FROM obj_search_words WHERE kind='wiki_page' AND h LIKE '%rojekt%' OR h LIKE '%enchel%' OR h LIKE '%Nord%'"), "the word index holds hashes only")
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+check(len(sql("SELECT 1 FROM obj_search_words WHERE kind='wiki_page' AND ref_id=? AND h LIKE 't:%'", (PA,))) == 3, "one hash per tag of the page")
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+check(sql("SELECT 1 FROM obj_search_words WHERE kind='wiki_page' AND ref_id=? AND h='v:2'", (PA,)), "the page is marked as indexed with its tags")
 check(sql("SELECT body FROM wiki_pages WHERE id=?", (PA,))[0][0].startswith("kenc1:"), "the text stays sealed")
 
 # ================================================================ a change, an old index
@@ -159,15 +162,18 @@ r = Fr.patch(B + f"/api/wiki/pages/{PA}", json={"body": TA.replace("#kunde/Nord"
 check(r.ok, "setup: the page changed")
 t = tags(Fr, "private")
 check("kunde/Nord" not in t and t.get("Projekt") == 3, "a removed tag is gone at once " + str(t))
-sql("DELETE FROM wiki_words WHERE page_id=? AND (h LIKE 't:%' OR h='tv:1')", (PB,), write=True)  # as indexed before 2.371
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+sql("DELETE FROM obj_search_words WHERE kind='wiki_page' AND ref_id=? AND (h LIKE 't:%' OR h='v:2')", (PB,), write=True)  # as indexed before 2.371
 check("Kunden/Süd" in tagged(Fr, "private", "intern"), "an index made before the tags: the page is read at once")
 ok = False
 for _ in range(60):  # the background job indexes it again (a real state: its marker row)
-    if sql("SELECT 1 FROM wiki_words WHERE page_id=? AND h='tv:1'", (PB,)):
+    # 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+    if sql("SELECT 1 FROM obj_search_words WHERE kind='wiki_page' AND ref_id=? AND h='v:2'", (PB,)):
         ok = True
         break
     time.sleep(0.25)
-check(ok and len(sql("SELECT 1 FROM wiki_words WHERE page_id=? AND h LIKE 't:%'", (PB,))) == 2, "and indexed again in the background")
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+check(ok and len(sql("SELECT 1 FROM obj_search_words WHERE kind='wiki_page' AND ref_id=? AND h LIKE 't:%'", (PB,))) == 2, "and indexed again in the background")
 
 # ================================================================ 2.469.0 (#3546): the list in the process's memory
 SKIP = "wiki page unreadable, skipped "
@@ -213,11 +219,13 @@ check(Fr.delete(B + f"/api/wiki/pages/{PW}").ok, "setup: a page into the trash")
 check("schnelld" not in tags(Fr, "private"), "a page in the trash is gone from the list")
 check(Fr.post(B + "/api/wiki/restore", json={"ids": [PW]}).ok, "setup: restored")
 check(tags(Fr, "private").get("schnelld") == 1, "a restored page is back, though updated_at did not move")
-sql("DELETE FROM wiki_words WHERE page_id=? AND h='tv:1'", (PW,), write=True)  # late: nothing stored, nothing answered from memory
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+sql("DELETE FROM obj_search_words WHERE kind='wiki_page' AND ref_id=? AND h='v:2'", (PW,), write=True)  # late: nothing stored, nothing answered from memory
 sql("UPDATE wiki_pages SET body=? WHERE id=?", ("#spaet", PW), write=True)
 check(tags(Fr, "private").get("spaet") == 1, "a page not indexed yet: read now, not from memory")
 for _ in range(60):
-    if sql("SELECT 1 FROM wiki_words WHERE page_id=? AND h='tv:1'", (PW,)):
+    # 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+    if sql("SELECT 1 FROM obj_search_words WHERE kind='wiki_page' AND ref_id=? AND h='v:2'", (PW,)):
         break
     time.sleep(0.25)
 check(tags(Fr, "private").get("spaet") == 1, "and the list stays right once it is indexed")
@@ -281,7 +289,8 @@ def index_jobs():
     return sql("SELECT COUNT(*) FROM bg_jobs WHERE kind='wiki:index' AND org_id=?", (ORG,))[0][0]
 
 
-sql("DELETE FROM wiki_words WHERE page_id=? AND h='tv:1'", (P2,), write=True)  # as indexed before 2.371: the page is late
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+sql("DELETE FROM obj_search_words WHERE kind='wiki_page' AND ref_id=? AND h='v:2'", (P2,), write=True)  # as indexed before 2.371: the page is late
 before = index_jobs()
 r = query(Gi, P1, "tag: kunde")
 check(r.ok and len(r.json()["pages"]) == 1, "#3546: the share reader still gets a page not indexed yet " + r.text[:200])
@@ -289,7 +298,8 @@ check(index_jobs() == before, "#3546: and starts no index job of that space")
 tags(Bo, SP)
 check(index_jobs() > before, "#3546: a person of the space does (the check above can fail)")
 for _ in range(60):  # the background job: a real state, its marker row
-    if sql("SELECT 1 FROM wiki_words WHERE page_id=? AND h='tv:1'", (P2,)):
+    # 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+    if sql("SELECT 1 FROM obj_search_words WHERE kind='wiki_page' AND ref_id=? AND h='v:2'", (P2,)):
         break
     time.sleep(0.25)
 

@@ -867,6 +867,8 @@ def _watchdog_tick(c):
     _wd_section(c, "security watch", sev_scan)  # 2.36.2 (#1133): new admins / org admins / agents / agent tokens
     from ..files.scan import sc_tick
     _wd_section(c, "virus scan", sc_tick)  # 2.61.0 (#1818): the uploads the scanner could not check yet
+    from ..core.objwords import osw_tick
+    _wd_section(c, "sealed search index", osw_tick)  # 2.1002.0 (#5279): objects indexed again by the shared word index's rules
     from ..files.fsmove import fsm_orphans_gc
     _wd_section(c, "files cleanup", fsm_orphans_gc)  # 2.97.0 D (#2051): stored versions without a row, once a night
     # 2.993.0 (#5413): trashed contract PDFs and entertainment receipts go through the core's run ("core trash", office/okern.py)

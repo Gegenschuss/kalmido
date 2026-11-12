@@ -25,7 +25,7 @@ from ..core.i18n import tr
 from ..core.errors import BadInput
 from ..tasks.validation import as_int
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_view
-from .hubmail import HBM_LIST_COLS, HBM_PAGE, _search, _visible_client, hbm_can, hbm_list_read, hbm_public
+from .hubmail import HBM_LIST_COLS, HBM_PAGE, _hbm_q_rows, _visible_client, hbm_can, hbm_list_read, hbm_public
 
 HMV_ORDER = "ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT 2000"
 HMV_LIMIT, HMV_LIMIT_MAX = 100, 500  # like api/v1.py API_PAGE_DEFAULT / API_PAGE_MAX
@@ -133,7 +133,7 @@ def v1_hub_mails():
     rows = [m for m in rows if hmv_can(c, uid, m, memo)]
     q = (a.get("q") or "").strip()[:200]
     if q:
-        rows = _search(c, rows, q)
+        rows = _hbm_q_rows(c, rows, q)  # 2.1002.0 (#5279): the shared word index
     off, n = cursor_dec("o", a.get("cursor")), min(as_int(a.get("limit", HMV_LIMIT), "limit", 1, HMV_LIMIT_MAX), HBM_PAGE)
     out = [hmv_public(c, m, memo=memo) for m in rows[off:off + n]]
     return jsonify(data=out, next_cursor=cursor_enc("o", off + n) if len(rows) > off + n else None)

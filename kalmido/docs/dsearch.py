@@ -8,7 +8,8 @@ type", and a search syntax in the search field (German and English keys):
 Several tag: = every one of them, several absender: / typ: = one of them. Names match without regard to case (the whole
 name first, else a part of it), only names of the workspaces whose documents the person sees (sender names are sealed:
 they are opened per workspace as in the filters). A name nobody has = no hit. The rest of the words go to the word index
-(docs/store.py search_ids); exact phrases and excluded words / phrases are checked against the opened text and the name.
+(2.1002.0 #5279: the shared word index, core/objwords.py osw_match -- this syntax is a filter layer over it); exact
+phrases and excluded words / phrases are checked against the opened text and the name.
 Nothing here reads a document the caller does not already filter by visibility (docs/web.py doc_query)."""
 import os
 import re
@@ -18,6 +19,7 @@ from . import rules as RU
 from ..core.pg import st_ids  # 2.772.0 (#4890): the documents of a custom field's value as one array parameter
 from ..files.store import fs_role  # 2.306.0 D3 (#2875)
 from . import store as S
+from ..core.objwords import osw_match  # 2.1002.0 (#5279)
 
 DSR_KEYS = {"tag": "tag", "tags": "tag", "absender": "sender", "sender": "sender", "von": "sender", "from": "sender",
             "typ": "type", "type": "type", "art": "type", "datum": "date", "date": "date", "eingang": "added", "added": "added"}
@@ -281,17 +283,23 @@ def dsr_filters(c, args, where, params, base_where, base_params):
     return p["words"].strip()[:200], {"phrases": p["phrases"], "not_words": p["not_words"], "not_phrases": p["not_phrases"]}
 
 
+def dsr_words(c, by_ws, q):
+    """2.1002.0 (#5279): the documents among by_ws ({ws: node ids the caller sees}) with every word of q at a word start (the
+    shared word index, core/objwords.py; was docs/store.py search_ids); None for a query without a word."""
+    return osw_match(c, "doc", by_ws, q, S.doc_opened)
+
+
 def dsr_text(c, by_ws, hit, text):
     """hit (a set of node ids, None = every one of by_ws) narrowed by the exact phrases and the excluded words / phrases
     of text -> a set (None when there is nothing to narrow)."""
     if not any(text.values()):
         return hit
     for ph in text["phrases"]:  # the words of a phrase via the index first, then the phrase itself in the text
-        got = S.search_ids(c, by_ws, ph)
+        got = dsr_words(c, by_ws, ph)
         if got is not None:
             hit = got if hit is None else hit & got
     for w in text["not_words"]:
-        got = S.search_ids(c, by_ws, w)
+        got = dsr_words(c, by_ws, w)
         if got:
             hit = (set(i for ids in by_ws.values() for i in ids) if hit is None else hit) - got
     if hit is None:
@@ -320,7 +328,7 @@ def dsr_hits(c, sql, params, q, text):
     by_ws = {}
     for r in c.execute(f"SELECT d.node_id, d.ws {sql}", params):
         by_ws.setdefault(r[1], []).append(r[0])
-    hit = S.search_ids(c, by_ws, q) if q else None
+    hit = dsr_words(c, by_ws, q) if q else None
     for ws_, ids_ in by_ws.items() if q else ():  # an archive serial number ("ASN00042", "42"): its document as well
         pre = re.escape(S.cfg_get(c, ws_)["asn_prefix"])
         n = re.fullmatch(rf"\s*(?:{pre})?\s*[:#-]?\s*0*(\d{{1,9}})\s*", q, re.I)

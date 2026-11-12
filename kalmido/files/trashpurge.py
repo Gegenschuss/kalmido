@@ -76,7 +76,7 @@ def tp_cut():
 
 
 def tp_hubmail(c, cut, purge):
-    """Hub mails in the trash since before cut: the row goes (hub_words cascade), the folder with the .eml and the
+    """Hub mails in the trash since before cut: the row goes (its words in obj_search_words by the delete trigger, 2.1002.0 #5279), the folder with the .eml and the
     attachments goes into the file store's trash (it is deleted there after the same period)."""
     rows = c.execute("SELECT id, folder_id, eml_id, files FROM hub_mails WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,)).fetchall()
     if not purge:

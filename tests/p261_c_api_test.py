@@ -144,7 +144,8 @@ st = settled("att", A1)
 check(st and st[0] == "found" and st[2] == "pdf", f"#1820: the PDF's text layer is read in the background ({st})")
 att = {x["name"]: x for x in Bo.get(B + f"/api/tasks/{T1}").json().get("attachments", [])}.get("bill.pdf") or {}
 check((att.get("up") or {}).get("text") == "found", f"#1820 (with #1818's marks): the task file carries up.text found ({att.get('up')})")
-n_words = dbx("SELECT COUNT(*) FROM file_words w JOIN file_text f ON f.id=w.ft_id WHERE f.kind='att' AND f.ref_id=?", (A1,))[0][0]
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+n_words = dbx("SELECT COUNT(*) FROM obj_search_words w JOIN file_text f ON f.id=w.ref_id AND w.kind='file_text' WHERE f.kind='att' AND f.ref_id=?", (A1,))[0][0]
 # 2.81.0 (#1856): the nightly boundary check counts a recognised text kept for another workspace than its file's list
 FT_ORG = dbx("SELECT org_id FROM file_text WHERE kind='att' AND ref_id=?", (A1,))[0][0]
 dbx("UPDATE file_text SET org_id=? WHERE kind='att' AND ref_id=?", (None if FT_ORG else ORG, A1), write=True)
@@ -262,7 +263,8 @@ check(not fsearch(Zo, "kirschgarten").json().get("list_files"), "#1820: another 
 check(Bo.delete(B + f"/api/attachments/{A2}").ok, "#1820: a task file deleted")
 # 2.272.0 (#3038): the file lies in the trash (restorable): its text row stays until the purge, the search leaves it out
 check(ft("att", A2) is not None, "#1820: its text row stays while the file is in the trash")
-check(not dbx("SELECT 1 FROM file_words w WHERE NOT EXISTS (SELECT 1 FROM file_text f WHERE f.id=w.ft_id)"), "#1820: no index words without their row")
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+check(not dbx("SELECT 1 FROM obj_search_words w WHERE w.kind='file_text' AND NOT EXISTS (SELECT 1 FROM file_text f WHERE f.id=w.ref_id)"), "#1820: no index words without their row")
 check(Bo.delete(B + f"/api/list-files/{PF}").ok and ft("list", PF) is not None and not any(x["id"] == PF for x in fsearch(Bo, "kirschgarten").json().get("list_files", [])),
       "#1820: a project file in the trash keeps its text row (2.272.0, #3038), the search leaves it out")
 check(Bo.delete(B + f"/api/files/nodes/{NF}").ok, "#1820: an Ablage file into the trash")

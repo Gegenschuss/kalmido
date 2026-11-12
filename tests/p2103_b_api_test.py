@@ -185,7 +185,8 @@ sql("INSERT INTO hub_mails(org_id, owner_id, ws, message_id, subject, created_at
 HM = one("SELECT id FROM hub_mails WHERE message_id='old-1@example.com'")
 # 2.549.0 (#4637): the folder is stamped with its mail, as hbm_file does for a fresh folder
 sql("UPDATE fs_nodes SET hub_mail_id=? WHERE id=?", (HM, HF), write=True)
-sql("INSERT INTO hub_words(mail_id, h) VALUES(?, 'abc123')", (HM,), write=True)
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+sql("INSERT INTO obj_search_words(kind, ref_id, h) VALUES('hub_mail', ?, 'abc123')", (HM,), write=True)
 sql("INSERT INTO hub_mails(org_id, owner_id, ws, message_id, created_at, deleted_at) VALUES(NULL,?,?,?,?,?)",
     (FID, f"u{FID}", "fresh-1@example.com", ago(0), ago(0)), write=True)
 
@@ -266,7 +267,8 @@ check(not os.path.exists(TF_PATH) and not sql("SELECT 1 FROM sheet_files WHERE i
       and not sql("SELECT 1 FROM upload_scan WHERE kind='sheet' AND ref_id=?", (TF,)), "tables: the further sheet's file, text and scan rows gone with the table")
 check(sql("SELECT deleted_at IS NOT NULL FROM sheet_files WHERE id=?", (RF,)) == [(1,)], "tables: the purged row's file is in the files' trash")
 check(sql("SELECT deleted_at IS NULL FROM sheet_files WHERE id=?", (KF,)) == [(1,)], "tables: the live row's file stays")
-check(not sql("SELECT 1 FROM hub_mails WHERE id=?", (HM,)) and not sql("SELECT 1 FROM hub_words WHERE mail_id=?", (HM,)), "hub mail: row and word index gone")
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+check(not sql("SELECT 1 FROM hub_mails WHERE id=?", (HM,)) and not sql("SELECT 1 FROM obj_search_words WHERE kind='hub_mail' AND ref_id=?", (HM,)), "hub mail: row and word index gone")
 check(sql("SELECT deleted_at IS NOT NULL FROM fs_nodes WHERE id=?", (HF,)) == [(1,)], "hub mail: its folder is in the file store's trash now")
 check(sql("SELECT 1 FROM hub_mails WHERE message_id='fresh-1@example.com'"), "hub mail: deleted today stays")
 check(sql("SELECT title FROM office_deals WHERE org_id=?", (ORG,)) == [("Live deal",)], "pipeline: the old deal gone, the live one stays")

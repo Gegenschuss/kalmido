@@ -59,7 +59,8 @@ def raw(pid):
 
 
 def marks(pid):
-    return sorted(h for (h,) in sql("SELECT h FROM wiki_words WHERE page_id=? AND (h LIKE 'u:%' OR h LIKE 'x:%')", (pid,)))
+    # 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+    return sorted(h for (h,) in sql("SELECT h FROM obj_search_words WHERE kind='wiki_page' AND ref_id=? AND (h LIKE 'u:%' OR h LIKE 'x:%')", (pid,)))
 
 
 def found(s, space, q):
@@ -132,7 +133,8 @@ check(raw(lost).startswith("kenc1:") and "Kumquat" not in raw(lost), "setup: the
 sealed = raw(lost)
 check(found(A, SP, "Kumquat") == [lost], "setup: the text is found while the key is there")
 saved = key_take("org_keys", "org_id", ORG)
-sql("DELETE FROM wiki_words WHERE page_id=?", (lost,), write=True)  # its index is built again (as after a change elsewhere)
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+sql("DELETE FROM obj_search_words WHERE kind='wiki_page' AND ref_id=?", (lost,), write=True)  # its index is built again (as after a change elsewhere)
 check(found(A, SP, "Kumquat") == [], "key missing: the text is not found")
 check(found(A, SP, "Lost") == [lost], "key missing: the page is found by its name")
 m1 = marks(lost)
@@ -222,7 +224,8 @@ FID, Fr = freelancer(B, A, features="cal,comments,collab,wiki")
 fp = page(Fr, "private", "Diary", "Papaya private notes")
 check(raw(fp).startswith("kenc1:"), "freelancer: the private page text is sealed (setup)")
 fsaved = key_take("user_keys", "user_id", FID)
-sql("DELETE FROM wiki_words WHERE page_id=?", (fp,), write=True)
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+sql("DELETE FROM obj_search_words WHERE kind='wiki_page' AND ref_id=?", (fp,), write=True)
 r = Fr.get(B + f"/api/wiki/pages/{fp}")
 e = r.json().get("error", "") if r.status_code == 409 else ""
 check(r.status_code == 409 and r.json().get("code") == "wiki_unreadable" and "server key" in e and "only be deleted" in e and "organisation" not in e,

@@ -173,7 +173,8 @@ for who, (s, ws, nid) in BAD.items():
     check(nid not in hits(s, WORD, ws), f"{who}: a file found infected leaves the word search")
     check(nid not in hits(s, f'"Zauberwort {WORD}"', ws), f"{who}: and the phrase search")
     check(s.get(B + f"/api/docs/{nid}/file").status_code == 403, f"{who}: the file itself stays locked")
-check(not sql("SELECT 1 FROM doc_words WHERE node_id IN (?, ?)", tuple(x[2] for x in BAD.values())), "the index words of the locked files are gone")
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+check(not sql("SELECT 1 FROM obj_search_words WHERE kind='doc' AND ref_id IN (?, ?) AND h<>'v:2'", tuple(x[2] for x in BAD.values())), "the index words of the locked files are gone")
 
 # the scanner answers again: letterhead / terms are taken
 for who, s in (("organisation", A), ("personal office", Fr)):

@@ -1,16 +1,17 @@
 """2.123.0 A (#2106): the search of the knowledge pages over a word index instead of ILIKE on the text (the text is sealed
-since #2105). wiki_words holds HMAC hashes of the folded words of a page's text plus prefix hashes of 4, 6 and 8 characters
--- the same functions and per-space keys as the documents (docs/store.py: the space 'o<org>' / 'u<owner>' of doc_ws) --
-and one row 'u:<updated_at>' = the state the index was built from. A save indexes its page at once; pages saved elsewhere
+since #2105). 2.1002.0 (#5279): the shared word index obj_search_words (core/objwords.py, kind 'wiki_page'; was wiki_words)
+holds HMAC prefix hashes of the folded words of a page's text -- the same functions and per-space keys as the documents
+(docs/store.py: the space 'o<org>' / 'u<owner>' of doc_ws) -- and one row 'u:<updated_at>' = the state the index was built from. A save indexes its page at once; pages saved elsewhere
 (an older version of the app, a [[link]] renamed, a move, an import) are indexed again by the next search that covers
 their space (at most WKS_CATCH_UP per space and search). Spaces with the lock are searched in the browser (wikie2e.js).
 2.139.0 C (#2386): a page whose text cannot be opened (its key is missing) is found by its name only and marked
 'x:<updated_at>:<key state>' instead -- the next search reads it again once the key state of its space changed (a key
 restored with the recovery key, a rotation, another server key), never at every search while the key stays missing.
 
-A page matches when every query word is in its name (part of a word, as before) or in its text (a whole word, or a word
-starting with it: like the documents' search, a word of 4+ characters is found by its longest stored prefix and checked
-against the opened text). Ranking: words in the name first, then words in the text, then the newest.
+A page matches when every query word is in its name (part of a word, as before) or in its text (2.1002.0 #5279: at the
+start of a word, any length of 2+, umlauts with ae / oe / ue the same, core/objwords.py). Ranking: words in the name first,
+then words in the text, then the newest. 2.1002.0 (#5279, question 15): pages a share of the shared core opens (a folder or a
+page shared with the person, wkf_shared_ids) are searched by name and text too, not only the spaces of the person.
 2.376 (#3292): the hits of the page shown (offset / limit) carry a short plain text snippet around the first word found in
 the text (wks_snippets): opened in memory only, never stored, indexed or logged; spaces with the lock cut theirs in the
 browser (wkhist.js wks_snip, same rules).
@@ -27,6 +28,7 @@ from .wikie2e import wke_mode, wke_open_sql  # 2.369.5 (#2517): pulled up from f
 from .pages import wiki_may_read, wiki_space_key  # 2.981.0 (#5278)
 from ..core.objsearch import osr_ids_sql  # 2.981.0 (#5278)
 from ..core.access import live_sql  # 2.981.0 (#5278)
+from ..core.objwords import OSW_MARK, osw_drop, osw_put, osw_term_hits, osw_terms, osw_words  # 2.1002.0 (#5279)
 
 WKS_CATCH_UP = 300   # pages indexed again per space and search
 WKS_LIMIT, WKS_LIMIT_MAX = 30, 100
@@ -56,21 +58,17 @@ def wks_key_state(c, oid, owner):
 
 def wks_index(c, pid, oid, owner, text, at, unreadable=None):
     """The word index of page pid (plain text, the page's updated_at after the save). unreadable = the key state of the space
-    when the text could not be opened (2.139.0 C #2386): no words, the mark 'x:' to try it again after a key event."""
-    from ..docs.store import index_words, word_hashes
-    c.execute("DELETE FROM wiki_words WHERE page_id=?", (pid,))
+    when the text could not be opened (2.139.0 C #2386): no words, the mark 'x:' to try it again after a key event.
+    2.1002.0 (#5279): in the shared word index (core/objwords.py osw_put, kind 'wiki_page')."""
     if unreadable is not None:
-        c.execute("INSERT INTO wiki_words(page_id, h) VALUES (?,?) ON CONFLICT DO NOTHING", (pid, f"x:{at}:{unreadable}"))
+        osw_put(c, "wiki_page", pid, more={f"x:{at}:{unreadable}"})
         return
     if le2e_is_cipher(text):
+        osw_drop(c, "wiki_page", [pid])
         return
-    from .wktags import wkt_hashes  # 2.371 (#3150): the tags as hashes too; 'tv:1' = indexed with its tags
+    from .wktags import wkt_hashes  # 2.371 (#3150): the tags as hashes too
     ws = wks_ws(oid, owner)
-    hs = sorted(word_hashes(c, ws, index_words(text or "")) | wkt_hashes(c, ws, text)) + ["u:" + str(at), "tv:1"]
-    for i in range(0, len(hs), 500):
-        part = hs[i:i + 500]
-        c.execute("INSERT INTO wiki_words(page_id, h) VALUES " + ",".join(["(?,?)"] * len(part)) + " ON CONFLICT DO NOTHING",
-                  [x for h in part for x in (pid, h)])
+    osw_put(c, "wiki_page", pid, ws, text or "", more=wkt_hashes(c, ws, text) | {"u:" + str(at)})
 
 
 def wks_catch_up(c, w, a, limit=WKS_CATCH_UP, oid=None, owner=None):
@@ -90,12 +88,13 @@ def wks_catch_up(c, w, a, limit=WKS_CATCH_UP, oid=None, owner=None):
 def wks_unindexed(c, w, a, ks, limit=WKS_CATCH_UP):
     """2.280.0 C (#3114): the pages of a space (w / a on wiki_pages p) whose word index is missing or older than the page
     (or that could not be read under an earlier key state ks) -- the rows wks_catch_up indexes. 2.371 (#3150): an index
-    without the row 'tv:1' (made before the tags) counts as missing: those pages are indexed once more, with their tags."""
+    without the row 'tv:1' (made before the tags) counts as missing; 2.1002.0 (#5279): without the shared index's mark
+    OSW_MARK (made before its rules: umlauts with ae, short word starts), so those pages are indexed once more."""
     return c.execute(f"SELECT p.id, p.org_id, p.owner_id, p.body, p.updated_at FROM wiki_pages p WHERE p.deleted_at IS NULL AND {w} "
-                     "AND left(p.path, 5)<>'e2e1:' AND NOT EXISTS (SELECT 1 FROM wiki_words x WHERE x.page_id=p.id AND "
-                     "(x.h='x:' || p.updated_at || ':' || CAST(? AS text) OR x.h='u:' || p.updated_at AND EXISTS "
-                     "(SELECT 1 FROM wiki_words y WHERE y.page_id=p.id AND y.h='tv:1'))) "  # 2.371 (#3150): older ones lack the tags
-                     f"ORDER BY p.id LIMIT {int(limit)}", [*a, ks]).fetchall()
+                     "AND left(p.path, 5)<>'e2e1:' AND NOT EXISTS (SELECT 1 FROM obj_search_words x WHERE x.kind='wiki_page' "
+                     "AND x.ref_id=p.id AND (x.h='x:' || p.updated_at || ':' || CAST(? AS text) OR x.h='u:' || p.updated_at "
+                     "AND EXISTS (SELECT 1 FROM obj_search_words y WHERE y.kind='wiki_page' AND y.ref_id=p.id AND y.h=?))) "
+                     f"ORDER BY p.id LIMIT {int(limit)}", [*a, ks, OSW_MARK]).fetchall()
 
 
 def wks_job_add(oid, owner):
@@ -126,68 +125,75 @@ def wks_job(oid, owner):
         c.close()
 
 
-def wks_search(c, uid, spaces, q, limit=WKS_LIMIT, offset=0):
+def _wks_late(c, w, a, oid, owner):
+    """{page id: its words} of the pages (w / a) whose index is missing or old, read now (at most WKS_CATCH_UP); the
+    background job of the space is queued for them. 2.280.0 (#3114): sealed text = no words, as wks_index; unreadable =
+    found by its name only."""
+    late = {}
+    for r in wks_unindexed(c, w, a, wks_key_state(c, oid, owner)):
+        try:
+            t = wkh_body(c, r)
+            late[r["id"]] = set() if le2e_is_cipher(t) else set(osw_words(t))
+        except WikiUnreadable:
+            late[r["id"]] = set()
+    if late:
+        wks_job_add(oid, owner)
+    return late
+
+
+def _wks_opened(c, ws, ids):
+    """{page id: its text} for the word index's check of a longer word (2.126.2 B #2358: unreadable = '')."""
+    out = {}
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        for r in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE id IN ({','.join('?' * len(part))})", part):
+            out[r["id"]] = wsb_body_or(c, r)
+    return out
+
+
+def _wks_rank(c, ws, rows, terms, late):
+    """[(words in the name, words in the text, updated_at, id, row)] of rows (one space ws) that have every query term in
+    the name (part of a word) or at a word start of the text (core/objwords.py osw_term_hits)."""
+    from ..docs.rules import fold
+    titles = {r["id"]: fold(r["path"]) for r in rows}
+    inbody = osw_term_hits(c, "wiki_page", ws, list(titles), terms, _wks_opened, late)
+    out = []
+    for r in rows:
+        pid, t = r["id"], titles[r["id"]]
+        nt = nb = 0
+        for ti, vs in enumerate(terms):
+            in_t, in_b = any(v in t for v in vs), pid in inbody[ti]
+            if not in_t and not in_b:
+                break
+            nt += in_t
+            nb += in_b
+        else:
+            out.append((nt, nb, r["updated_at"], pid, r))
+    return out
+
+
+def wks_find(c, uid, spaces, q, limit=WKS_LIMIT, offset=0, shared=False):
     """(page rows ranked, total) of the open spaces (org ids, None = the private one of uid) for the query q; an empty query
     = the pages changed last. 2.280.0 C (#3114): the search writes nothing -- pages not indexed yet are read here (at most
     WKS_CATCH_UP per space, as the catch-up before) and indexed by a background job; only the names are read for every page,
-    the full rows only for the hits of the answer."""
-    from ..docs.rules import fold
-    from ..docs.store import index_words, query_hashes
-    words = index_words(q)[:8]
+    the full rows only for the hits of the answer. 2.1002.0 (#5279): was wks_search with a look-up of its own; the text part is
+    the shared word index now (core/objwords.py osw_term_hits), this keeps the spaces, the names and the ranking; shared = also
+    the pages of other spaces a share of the shared core opens for uid (question 15), each checked with wiki_may_read."""
+    terms = osw_terms(q)
     hits = []
     for oid in spaces:
         if wke_mode(c, oid, uid)[0]:
             continue  # a space with the lock: searched in the browser
         w, a = ("p.org_id=?", [oid]) if oid else ("p.org_id IS NULL AND p.owner_id=?", [uid])
-        late = {}  # page id -> its words, read now (its index is missing or old)
-        if words:
-            ks = wks_key_state(c, oid, None if oid else uid)
-            for r in wks_unindexed(c, w, a, ks):
-                try:
-                    t = wkh_body(c, r)  # 2.280.0 (#3114): sealed text = no words, as wks_index
-                    late[r["id"]] = set() if le2e_is_cipher(t) else set(index_words(t))
-                except WikiUnreadable:  # as the catch-up: unreadable = found by its name only
-                    late[r["id"]] = set()
-            if late:
-                wks_job_add(oid, None if oid else uid)
+        late = _wks_late(c, w, a, oid, None if oid else uid) if terms else {}
         rows = c.execute(f"SELECT p.id, p.path, p.updated_at "
                          f"FROM wiki_pages p WHERE p.deleted_at IS NULL AND {w} AND left(p.path, 5)<>'e2e1:'", a).fetchall()
-        if not words:
+        if not terms:
             hits += [(0, 0, r["updated_at"], r["id"], r) for r in rows]
             continue
-        ws = wks_ws(oid, uid)
-        titles = {r["id"]: fold(r["path"]) for r in rows}
-        inbody, check = {}, []
-        for wd in words:
-            h, exact = query_hashes(c, ws, wd)
-            inbody[wd] = {x[0] for x in c.execute(f"SELECT x.page_id FROM wiki_words x JOIN wiki_pages p ON p.id=x.page_id "
-                                                   f"WHERE x.h=? AND p.deleted_at IS NULL AND {w}", [h, *a]) if x[0] not in late}
-            # the pages read now: a whole word, or (4+ characters) a word starting with it -- what the index finds
-            inbody[wd] |= {pid for pid, ws_ in late.items() if (wd in ws_ if len(wd) < 4 else any(x.startswith(wd) for x in ws_))}
-            if not exact:
-                check.append(wd)
-        cand = [r for r in rows if all(wd in titles[r["id"]] or r["id"] in inbody[wd] for wd in words)]
-        need = {r["id"] for r in cand if r["id"] not in late and any(wd not in titles[r["id"]] for wd in check)}
-        have = {}
-        if need:  # prefix hits: checked against the opened text
-            ids = sorted(need)
-            for i in range(0, len(ids), 500):
-                part = ids[i:i + 500]
-                for r in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE id IN ({','.join('?' * len(part))})", part):
-                    have[r["id"]] = index_words(wsb_body_or(c, r))  # 2.126.2 B (#2358)
-        for r in cand:
-            pid, t = r["id"], titles[r["id"]]
-            ok, nt, nb = True, 0, 0
-            for wd in words:
-                in_t = wd in t
-                in_b = pid in inbody[wd] and (wd not in check or pid not in have or any(x.startswith(wd) for x in have[pid]))
-                if not in_t and not in_b:
-                    ok = False
-                    break
-                nt += in_t
-                nb += in_b
-            if ok:
-                hits.append((nt, nb, r["updated_at"], pid, r))
+        hits += _wks_rank(c, wks_ws(oid, uid), rows, terms, late)
+    if shared and terms:
+        hits += _wks_shared(c, uid, spaces, terms)
     hits.sort(key=lambda x: (x[0], x[1], x[2], x[3]), reverse=True)
     ids = [x[3] for x in hits[offset:offset + limit]]
     full = {}
@@ -199,11 +205,36 @@ def wks_search(c, uid, spaces, q, limit=WKS_LIMIT, offset=0):
     return [full[i] for i in ids if i in full], len(hits)
 
 
+def _wks_shared(c, uid, spaces, terms):
+    """2.1002.0 (#5279, question 15): the hits among the pages outside spaces that a share of the shared core opens for uid
+    (wkf_shared_ids: a shared folder or page), per space of the page; not in the trash, not of a space with the lock (the
+    browser searches those), each hit checked with the page's own role (wiki_may_read) -- never more than opening it."""
+    from .wkfolder import wkf_shared_ids
+    ids = sorted(int(x) for x in wkf_shared_ids(c, uid))
+    if not ids:
+        return []
+    mine = {o for o in spaces if o}
+    rows = c.execute(f"SELECT p.id, p.org_id, p.owner_id, p.path, p.updated_at FROM wiki_pages p WHERE p.id = ANY(CAST(? AS BIGINT[])) "
+                     f"AND {live_sql('p')} AND left(p.path, 5)<>'e2e1:' AND {wke_open_sql('p')}", (ids,)).fetchall()
+    by = {}
+    for r in rows:
+        if r["org_id"] in mine or (not r["org_id"] and r["owner_id"] == uid and None in spaces):
+            continue  # searched with its space already
+        by.setdefault((r["org_id"] or None, None if r["org_id"] else r["owner_id"]), []).append(r)
+    out = []
+    for (oid, owner), rs in by.items():
+        late = _wks_late(c, "p.id = ANY(CAST(? AS BIGINT[]))", [[r["id"] for r in rs]], oid, owner)
+        for x in _wks_rank(c, wks_ws(oid, owner), rs, terms, late):
+            if wiki_may_read(c, uid, c.execute("SELECT * FROM wiki_pages WHERE id=?", (x[3],)).fetchone()):
+                out.append(x)
+    return out
+
+
 def wks_name_hits(c, uid, q, limit=10, cand=200):
     """2.981.0 (#5278, question 15): knowledge pages whose name matches q (the shared index obj_search kind 'wiki_page': word
     start, part of the name too) that uid may read -- through the space or a share of the shared core on the page / its folders
-    (wiki_may_read = wkf_role, also the pages wks_search leaves out because their space is not uid's). Not in the trash, not of
-    a space with the lock (the browser searches those). The text stays with the sealed word index (wks_search).
+    (wiki_may_read = wkf_role, also the pages of other spaces). Not in the trash, not of
+    a space with the lock (the browser searches those). The text: the shared word index of the sealed texts (core/objwords.py, wks_find).
     [{id, path, space}] by name."""
     ids, args = osr_ids_sql("wiki_page", q, names=True)
     if ids is None:
@@ -255,15 +286,15 @@ def _folded(text):
 
 def wks_snippet(text, words, size=WKS_SNIP):
     """(snippet, [[start, end], ...] relative to it, in code points) around the first word of words (folded query words) in
-    the plain text of a page -- a word of 4+ characters also at the beginning of a longer word, a shorter one whole, like
-    the index; None when no word is in the text."""
+    the plain text of a page -- at the beginning of a word (2.1002.0 #5279: any length, like the index); None when no
+    word is in the text."""
     t = wks_plain(text)
     if not t or not words:
         return None
     ft, pos = _folded(t)
     marks = []
     for wd in words:
-        rx = re.compile(r"(?<!\w)" + re.escape(wd) + (r"(?!\w)" if len(wd) < 4 else ""))
+        rx = re.compile(r"(?<!\w)" + re.escape(wd))  # 2.1002.0 (#5279): a word start, any length (question 14)
         for m in rx.finditer(ft):
             marks.append([pos[m.start()], pos[m.end() - 1] + 1])
             if len(marks) > 400:
@@ -298,8 +329,7 @@ def wks_snippets(c, rows, q):
     """{page id: (snippet, marks)} for the hit rows of one result page (the ones shown, at most WKS_LIMIT_MAX): their texts
     opened in memory only; a page that cannot be opened, of a space with the lock or without a word in its text has none.
     Nothing is kept, indexed or logged."""
-    from ..docs.store import index_words
-    words = index_words(q)[:8]
+    words = sorted({v for vs in osw_terms(q) for v in vs}, key=len, reverse=True)  # 2.1002.0 (#5279): every variant of a word
     ids = [r["id"] for r in rows if not str(r["path"]).startswith("e2e1:")]
     if not words or not ids:
         return {}

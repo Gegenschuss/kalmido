@@ -5,7 +5,8 @@ The upload only adds a file_text row (state wait, ts_after_store) and wakes the 
 recognition. The queue is one thread in the server process (like docs/ingest.py): it takes the waiting files one by one,
 reads them through the app's readers (sealed files decrypted), recognises their text with the documents' tools
 (docs/ocr.py doc_text: the PDF text layer first, else Tesseract -- same limits, same semaphore, nothing leaves the
-container) and keeps the text sealed with the workspace key plus a keyed word index (file_words, like doc_words). Documents
+container) and keeps the text sealed with the workspace key plus a keyed word index (2.1002.0 #5279: the shared word index
+obj_search_words, kind 'file_text', core/objwords.py; was file_words). Documents
 go first: while the documents queue has work, the files wait. The same content in the same workspace (sha256) takes the
 text over instead of a second recognition. A slow catch-up (backfill) queues files stored before this release: at most one
 every BACKFILL_S seconds, only when both queues are idle, newest first, its position kept in the settings (a restart goes
@@ -32,6 +33,7 @@ from ..accounts.session import bg_here, me
 from ..accounts.orgretain import odl_before_delete
 from ..core.access import Denied, acx_of, vis_sql
 from ..docs import store as S
+from ..core.objwords import osw_copy, osw_drop, osw_match, osw_put, osw_register, osw_terms  # 2.1002.0 (#5279)
 from ..core.env import env_bool
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from .fslock import fl_is_locked  # 2.353.0 A (#2758)
@@ -129,7 +131,7 @@ def _enqueue(c, kind, ref_id, ref):
                       org_id=excluded.org_id, ws=excluded.ws,
                       truncated=0, sha256='', updated_at=excluded.updated_at RETURNING id""",
                   (kind, ref_id, ref_id, ref["org_id"], ref["ws"], "wait", ts, ts)).fetchone()
-    c.execute("DELETE FROM file_words WHERE ft_id=?", (r[0],))  # the old version's words go at once
+    osw_drop(c, "file_text", [r[0]])  # the old version's words go at once (2.1002.0 #5279: the shared word index)
 
 
 def ts_marks(c, kind, ids):
@@ -234,9 +236,7 @@ def _rehome(c, org_id=None):
         moved += [r[0] for r in c.execute(
             f"""UPDATE file_text f SET state='wait', tries=0, error='', method='', text='', pages=0, truncated=0, sha256='',
                 org_id=w.org_id, ws={ws}, updated_at=? {src} AND f.ws <> {ws}{more} RETURNING f.id""", (_now(), *args)).fetchall()]
-    for i in range(0, len(moved), 500):
-        part = moved[i:i + 500]
-        c.execute(f"DELETE FROM file_words WHERE ft_id IN ({','.join('?' * len(part))})", part)
+    osw_drop(c, "file_text", moved)  # 2.1002.0 (#5279): the shared word index
 
 
 def ts_org_rehome(c, oid):
@@ -336,8 +336,7 @@ def _process(c, row):
                         AND state IN ('found', 'none') ORDER BY id DESC LIMIT 1""", (row["ws"], sha, fid)).fetchone()
     if same:  # the same content in the same workspace: take its text over (same key, same index words)
         _set(c, fid, same["state"], text=same["text"], method=same["method"], pages=same["pages"], truncated=same["truncated"], sha256=sha)
-        c.execute("DELETE FROM file_words WHERE ft_id=?", (fid,))
-        c.execute("INSERT INTO file_words(ft_id, h) SELECT ?, h FROM file_words WHERE ft_id=? ON CONFLICT DO NOTHING", (fid, same["id"]))
+        osw_copy(c, "file_text", same["id"], fid)  # 2.1002.0 (#5279): the shared word index
         return
     if mime == "office":  # 2.92.0 C (#1926): the text of the preview model (the same limits as a PDF)
         r = dpv_model(data, office)
@@ -358,12 +357,16 @@ def _process(c, row):
 
 
 def _index(c, fid, ws, text):
-    c.execute("DELETE FROM file_words WHERE ft_id=?", (fid,))
-    hs = sorted(S.word_hashes(c, ws, S.index_words(text)))
-    for i in range(0, len(hs), 500):
-        part = hs[i:i + 500]
-        c.execute("INSERT INTO file_words(ft_id, h) VALUES " + ",".join(["(?,?)"] * len(part)) + " ON CONFLICT DO NOTHING",
-                  [x for h in part for x in (fid, h)])
+    osw_put(c, "file_text", fid, ws, text)  # 2.1002.0 (#5279): the shared word index (core/objwords.py)
+
+
+def ts_reindex(c, ids):
+    """2.1002.0 (#5279): recognised texts indexed again by this version's rules (core/objwords.py osw_tick)."""
+    for r in c.execute("SELECT id, ws, state, text FROM file_text WHERE id = ANY(CAST(? AS BIGINT[]))", (list(ids),)).fetchall():
+        _index(c, r["id"], r["ws"], S.doc_open(c, r["ws"], "file_text.text", r["text"]) if r["state"] == "found" else None)
+
+
+osw_register("file_text", "file_text", "id", "x.state='found'", ts_reindex)
 
 
 # ---- the catch-up of files stored before 2.61.0 -----------------------------------------------------------------------------
@@ -416,61 +419,33 @@ def _backfill(c):
 
 
 # ---- search -----------------------------------------------------------------------------------------------------------------
-def ts_match(c, cand, query):
-    """The file_text ids among cand ({ws: set of file_text ids}) whose recognised text has every word of query (words of
-    4+ characters as a prefix). None for a query without words."""
-    words = S.index_words(query)[:8]
-    if not words:
-        return None
-    hits = set()
-    for ws, ids in cand.items():
-        ids = set(ids)
-        check = []
-        for w in words:
-            h, exact = S.query_hashes(c, ws, w)
-            ids &= {r[0] for r in c.execute("SELECT w.ft_id FROM file_words w JOIN file_text f ON f.id=w.ft_id WHERE w.h=? AND f.ws=?",
-                                            (h, ws))}
-            if not exact:
-                check.append(w)
-            if not ids:
-                break
-        if ids and check:
-            ok = set()
-            for r in c.execute(f"SELECT id, text FROM file_text WHERE id IN ({','.join('?' * len(ids))})", tuple(ids)):
-                have = set(S.index_words(S.doc_open(c, ws, "file_text.text", r["text"]) or ""))
-                if all(any(x.startswith(w) for x in have) for w in check):
-                    ok.add(r["id"])
-            ids = ok
-        hits |= ids
-    return hits
+def _ts_opened(c, ws, ids):
+    """{file_text id: its recognised text} for the word index's check of a longer word."""
+    return {r["id"]: S.doc_open(c, ws, "file_text.text", r["text"]) or ""
+            for r in c.execute("SELECT id, text FROM file_text WHERE id = ANY(CAST(? AS BIGINT[]))", (list(ids),))}
 
 
 def ts_task_hits(c, uid, raw):
     """{task id: file name} of tasks in lists uid can see whose task / comment file text matches raw (the caller's task
     query applies the task visibility on top). Browser-encrypted files and files of deleted comments never count."""
-    words = S.index_words(raw or "")[:8]
-    if not ON or not words:
+    if not ON or not osw_terms(raw or ""):
         return {}
-    # 2.209.0 D (#1856): only the files whose word index has the query's words (per workspace of the visible lists),
-    # instead of every recognised file; ts_match below decides as before
+    # 2.1002.0 (#5279): the recognised files of the visible lists per workspace, narrowed by the shared word index
     rows = []
     for (ws,) in c.execute(f"SELECT DISTINCT {_WS_SQL.format('l')} FROM lists l WHERE l.id IN {vis_sql()}", (uid, uid)).fetchall():
         if S.ws_org(ws) and S.SECRET_KEY and not S.oc_key(c, S.ws_org(ws), create=False):
             continue  # an organisation without its key yet has no indexed file (a search never makes a key)
-        hs = [S.query_hashes(c, ws, w)[0] for w in words]
         rows += c.execute(f"""SELECT f.id, f.ws, a.task_id, a.name FROM file_text f JOIN attachments a ON a.id=f.att_id
                               JOIN tasks t ON t.id=a.task_id LEFT JOIN obj_comments cm ON cm.id=a.comment_id
                               WHERE f.kind='att' AND f.state='found' AND f.ws=? AND a.enc=0 AND a.deleted_at IS NULL AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()}
-                              AND (a.comment_id IS NULL OR (cm.id IS NOT NULL AND cm.deleted_at IS NULL))
-                              AND f.id IN (SELECT w.ft_id FROM file_words w WHERE w.h=?)
-                              {' AND EXISTS (SELECT 1 FROM file_words w WHERE w.ft_id=f.id AND w.h=?)' * (len(hs) - 1)}""",
-                          (ws, uid, uid, *hs)).fetchall()
+                              AND (a.comment_id IS NULL OR (cm.id IS NOT NULL AND cm.deleted_at IS NULL))""",
+                          (ws, uid, uid)).fetchall()
     cand, by = {}, {}
     for r in rows:
         cand.setdefault(r["ws"], set()).add(r["id"])
         by[r["id"]] = (r["task_id"], r["name"])
     out = {}
-    for fid in sorted(ts_match(c, cand, raw) or ()):
+    for fid in sorted(osw_match(c, "file_text", cand, raw, _ts_opened) or ()):
         tid, name = by[fid]
         out.setdefault(tid, name)
     return out
@@ -497,19 +472,19 @@ def ts_files_find(c, uid, raw, space=""):
     vis = f"n.id IN {fs_visible_sql_c(c, uid)} AND n.deleted_at IS NULL AND n.e2e_gen = 0" + where  # 2.353.0 A (#2758): the browser searches a locked folder
     hit = {r[0]: "name" for r in c.execute(f"SELECT n.id FROM fs_nodes n WHERE {vis} AND n.name ILIKE ? ESCAPE '\\' ORDER BY n.id DESC LIMIT ?",
                                            (*args, _like(raw), SEARCH_MAX))}
-    if ON and S.index_words(raw):
+    if ON and osw_terms(raw):
         cand, node = {}, {}
         for r in c.execute(f"""SELECT f.id, f.ws, f.node_id FROM file_text f JOIN fs_nodes n ON n.id=f.node_id
                                WHERE f.kind='fs' AND f.state='found' AND {vis}""", args):
             cand.setdefault(r["ws"], set()).add(r["id"])
             node[r["id"]] = r["node_id"]
-        for fid in ts_match(c, cand, raw) or ():
+        for fid in osw_match(c, "file_text", cand, raw, _ts_opened) or ():  # 2.1002.0 (#5279): the shared word index
             hit.setdefault(node[fid], "text")
     docs = {}
     for r in c.execute(f"SELECT d.node_id, d.ws FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {vis}", args):
         docs.setdefault(r["ws"], []).append(r["node_id"])
-    if ON and S.index_words(raw):
-        for nid in S.search_ids(c, docs, raw) or ():
+    if ON and osw_terms(raw):
+        for nid in osw_match(c, "doc", docs, raw, S.doc_opened) or ():  # 2.1002.0 (#5279): the shared word index
             hit.setdefault(nid, "text")
     for nid in _doc_label_hits(c, docs, raw):  # 2.353.0 D (#2759): sender, document type, tags of the documents (before "text":
         if hit.get(nid) != "name":              # the word index holds the sender too)
@@ -576,7 +551,7 @@ def _list_file_hits(c, uid, raw):
     for r in rows:
         if r["ft_id"] and r["state"] == "found":
             cand.setdefault(r["ws"], set()).add(r["ft_id"])
-    texts = (ts_match(c, cand, raw) or set()) if ON else set()
+    texts = (osw_match(c, "file_text", cand, raw, _ts_opened) or set()) if ON else set()
     out, ok = [], {}
     for r in rows:
         h = "name" if low in (r["name"] or "").casefold() else ("text" if r["ft_id"] in texts else None)

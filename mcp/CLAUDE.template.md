@@ -842,6 +842,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 
 Searching (2.981.0): `search_tasks`, `search_notes`, `search_contacts` and `search_messages` match the start of a word
 (umlauts either way, "Müller" = "Mueller"); a part of a word only in names and phone numbers of contacts and in ticket keys.
+2.1002.0: `search_files` the same in the recognised text of files and documents (a word start, umlauts either way).
 
 Related tasks (2.59.0): task events may carry `task.related` = up to 5 tasks close in meaning `[{id, title, score}]` (only
 tasks you may see; missing while the server has not computed the task yet or runs without its embedding service). Before

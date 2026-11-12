@@ -1168,9 +1168,7 @@ CREATE TABLE IF NOT EXISTS doc_models (
   feature TEXT NOT NULL, data TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE (ws, feature));
 CREATE TABLE IF NOT EXISTS doc_cfg (
   ws TEXT PRIMARY KEY, org_id BIGINT REFERENCES orgs(id) ON DELETE CASCADE, data TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS doc_words (
-  node_id BIGINT NOT NULL REFERENCES fs_nodes(id) ON DELETE CASCADE, h TEXT NOT NULL, PRIMARY KEY (node_id, h));
-CREATE INDEX IF NOT EXISTS doc_words_h ON doc_words(h);
+-- 2.1002.0 (#5279): doc_words went into the shared word index obj_search_words (core/objwords.py, migrations.d/5279_a.py)
 -- 2.153.0 (#2179): custom fields of the documents of a workspace (docs/fields.py): defined when someone needs them, nothing
 -- preset. type text | number | money | date | checkbox | select | url; options = select {options: [{id, name}]}. One value per
 -- document and field, sealed with the workspace key like the document's text (ws in the context). Additive: 2.152 runs on
@@ -1787,8 +1785,7 @@ CREATE TABLE IF NOT EXISTS file_text (
   state TEXT NOT NULL DEFAULT 'wait', error TEXT NOT NULL DEFAULT '', method TEXT NOT NULL DEFAULT '', text TEXT NOT NULL DEFAULT '',
   pages BIGINT NOT NULL DEFAULT 0, truncated BIGINT NOT NULL DEFAULT 0, tries BIGINT NOT NULL DEFAULT 0,
   sha256 TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE (kind, ref_id));
-CREATE TABLE IF NOT EXISTS file_words (
-  ft_id BIGINT NOT NULL REFERENCES file_text(id) ON DELETE CASCADE, h TEXT NOT NULL, PRIMARY KEY (ft_id, h));
+-- 2.1002.0 (#5279): file_words went into the shared word index obj_search_words (core/objwords.py)
 -- 2.63.0 (#1513): a customer's report through a form and the customer portal (team/portal.py). One row per reported task:
 -- the reporter (name; e-mail sealed + its keyed hash, the portal's sign-in looks it up), the status link (token sealed +
 -- SHA-256), the space it belongs to (org_id, or owner_id for a list without organisation), the client (office module) and
@@ -1998,8 +1995,7 @@ CREATE TABLE IF NOT EXISTS hub_mails (
   folder_id BIGINT REFERENCES fs_nodes(id) ON DELETE SET NULL, created_at TEXT NOT NULL, deleted_at TEXT, deleted_by BIGINT);
 CREATE INDEX IF NOT EXISTS ix2281_hub_mails_eml_id ON hub_mails(eml_id) WHERE eml_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix2281_hub_mails_folder_id ON hub_mails(folder_id) WHERE folder_id IS NOT NULL;
-CREATE TABLE IF NOT EXISTS hub_words (
-  mail_id BIGINT NOT NULL REFERENCES hub_mails(id) ON DELETE CASCADE, h TEXT NOT NULL, PRIMARY KEY (mail_id, h));
+-- 2.1002.0 (#5279): hub_words went into the shared word index obj_search_words (core/objwords.py)
 -- 2.81.0 B (#1834): the history of an archived document (office_archive): who changed its client, amount / tax lines or
 -- paid flag when, the old and the new value (JSON text). New table only; removed with its entry
 CREATE TABLE IF NOT EXISTS office_archive_log (
@@ -2250,9 +2246,7 @@ CREATE INDEX IF NOT EXISTS ix2281_wiki_shares_owner_id ON wiki_shares(owner_id) 
 -- 2.123.0 A (#2106): the word index of the knowledge pages (wiki/wksearch.py): HMAC hashes of the words of a page's text
 -- (keyed per space like doc_words) plus one row 'u:<updated_at>' = the state the index was built from (a page saved since
 -- -- also by an older version -- is indexed again on the next search).
-CREATE TABLE IF NOT EXISTS wiki_words (
-  page_id BIGINT NOT NULL REFERENCES wiki_pages(id) ON DELETE CASCADE, h TEXT NOT NULL, PRIMARY KEY (page_id, h));
-CREATE INDEX IF NOT EXISTS wiki_words_h ON wiki_words(h);
+-- 2.1002.0 (#5279): wiki_words went into the shared word index obj_search_words (core/objwords.py)
 -- 2.121.0 B (#2095): the cash book (office/cashbook.py). Cash boxes of an office area: name, opening balance (decimal text,
 -- office currency) on opening_day; is_default = the box made on the first look; archived instead of deleted.
 -- New tables only: 2.120 and older ignore them.
@@ -4114,7 +4108,6 @@ CREATE INDEX IF NOT EXISTS file_text_sha ON file_text(ws, sha256) WHERE sha256 <
 CREATE INDEX IF NOT EXISTS file_text_att ON file_text(att_id) WHERE att_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS file_text_lf ON file_text(list_file_id) WHERE list_file_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS file_text_node ON file_text(node_id) WHERE node_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS file_words_h ON file_words(h);
 -- 2.62.0 A (#1848): the pinned messages of a conversation
 CREATE INDEX IF NOT EXISTS tchat_msgs_pinned ON tchat_msgs(room_id) WHERE pinned_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS agent_chat_pinned ON agent_chat(agent_id, user_id) WHERE pinned_at IS NOT NULL;
@@ -4153,7 +4146,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS hub_mails_msg ON hub_mails(ws, message_id);
 CREATE INDEX IF NOT EXISTS hub_mails_client ON hub_mails(client_id) WHERE client_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS hub_mails_list ON hub_mails(list_id) WHERE list_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS hub_mails_owner ON hub_mails(owner_id);
-CREATE INDEX IF NOT EXISTS hub_words_h ON hub_words(h);
 -- 2.81.0 B (#1834): the history of one archived document
 CREATE INDEX IF NOT EXISTS office_archive_log_entry ON office_archive_log(archive_id, id);
 -- 2.85.0 B (#1162): the feeds of a person, the articles newest first, the 30-day clean-up

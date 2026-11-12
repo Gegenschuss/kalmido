@@ -15,8 +15,9 @@ several clients = "Not assigned" (only the recipient sees it and assigns it by h
 hub_mails keeps the headers and the plain text (subject, sender, recipients and text sealed with the organisation's key
 like the other office texts, core/orgcrypt.py FIELDS; 2.306.0 A (#2885): a private one with the account key); the original .eml and the attachments go into the file store
 (folder "E-Mails / <client> / <date> <subject>" of the workspace, fs_put: scan, quota, sealing). A virus find leaves the
-attachment out, a full quota all of them (a note on the mail). The search uses hashed words (hub_words, the documents'
-index key per workspace, docs/store.py), never a plain index.
+attachment out, a full quota all of them (a note on the mail). The search uses hashed words (2.1002.0 #5279: the shared word
+index obj_search_words, kind 'hub_mail', core/objwords.py; was hub_words -- the documents' index key per workspace), never a
+plain index.
 
 Visibility (strict): a project's mail = whoever may edit the list (2.395.0 #3380: owner, admin, edit; guests -- participant,
 view, an organisation reader -- only with the project's switch lists.mail_guests, default off, set by a project admin; agents
@@ -49,6 +50,7 @@ from ..accounts.orgroles import need_org_write  # 2.674.0 (#4382 finding 3)
 from ..accounts.mailtok import mtk_new, mtk_plain, mtk_row_where, mtk_where  # 2.674.0 (#4382 finding 5); 2.705.0 (#5151): mtk_row_where
 from ..files.fslock import fsl_need_plain  # 2.353.0 F (#2758)
 from ..accounts.orgs import is_org_admin
+from ..core.objwords import osw_match, osw_put, osw_register  # 2.1002.0 (#5279): the shared word index
 
 HBM_BODY_MAX = 200000   # characters of the plain text kept
 HBM_FILES = 20          # attachments of one mail at most
@@ -464,45 +466,40 @@ def hbm_public(c, m, full=False, memo=None):
     return out
 
 
-def _search(c, rows, q):
-    """The rows whose subject / sender / text hold every word of q (hashed index, prefixes checked against the opened row)."""
-    from ..docs import store as DS
-    words = DS.index_words(q)[:8]
-    if not words or not rows:
-        return rows
+_HBM_WORDS = ("subject", "from_name", "from_addr", "body")
+
+
+def _hbm_opened(c, ws, ids):
+    """{mail id: subject, sender and text} opened, for the word index's check of a longer word (2.525.0 #4195: the list rows
+    carry no text, HBM_LIST_COLS: the whole rows of the candidates only)."""
+    out = {}
+    for m in c.execute("SELECT * FROM hub_mails WHERE id = ANY(CAST(? AS BIGINT[]))", (list(ids),)).fetchall():
+        d = _open(c, m)
+        out[m["id"]] = " ".join(str(d[k] or "") for k in _HBM_WORDS)
+    return out
+
+
+def _hbm_q_rows(c, rows, q):
+    """2.1002.0 (#5279): the rows (all readable, hbm_can) whose subject / sender / text hold every word of q at a word start --
+    the shared word index (core/objwords.py osw_match; was _search over hub_words)."""
     by_ws = {}
     for m in rows:
         by_ws.setdefault(m["ws"], []).append(m["id"])
-    keep = set()
-    for ws, ids in by_ws.items():
-        cand, check = set(ids), []
-        for w in words:
-            h, exact = DS.query_hashes(c, ws, w)
-            part = sorted(cand)
-            cand = {r[0] for r in c.execute(f"SELECT mail_id FROM hub_words WHERE h=? AND mail_id IN ({','.join('?' * len(part))})",
-                                            (h, *part))} if part else set()
-            if not exact:
-                check.append(w)
-        keep |= cand
-        if check and cand:
-            # 2.525.0 (#4195): the list rows carry no text (HBM_LIST_COLS): the whole rows of the candidates only
-            part = sorted(cand)
-            for m in c.execute(f"SELECT * FROM hub_mails WHERE id IN ({','.join('?' * len(part))})", part).fetchall():
-                d = _open(c, m)
-                have = set(DS.index_words(" ".join(str(d[k] or "") for k in ("subject", "from_name", "from_addr", "body"))))
-                if not all(any(x.startswith(w) for x in have) for w in check):
-                    keep.discard(m["id"])
-    return [m for m in rows if m["id"] in keep]
+    keep = osw_match(c, "hub_mail", by_ws, q, _hbm_opened)
+    return rows if keep is None else [m for m in rows if m["id"] in keep]
 
 
 def _index(c, mid, ws, d):
-    from ..docs import store as DS
-    c.execute("DELETE FROM hub_words WHERE mail_id=?", (mid,))
-    hs = sorted(DS.word_hashes(c, ws, DS.index_words(" ".join(str(d.get(k) or "") for k in ("subject", "from_name", "from_addr", "body")))))
-    for i in range(0, len(hs), 500):
-        part = hs[i:i + 500]
-        c.execute("INSERT INTO hub_words(mail_id, h) VALUES " + ",".join(["(?,?)"] * len(part)) + " ON CONFLICT DO NOTHING",
-                  [x for h in part for x in (mid, h)])
+    osw_put(c, "hub_mail", mid, ws, " ".join(str(d.get(k) or "") for k in _HBM_WORDS))  # 2.1002.0 (#5279)
+
+
+def hbm_reindex(c, ids):
+    """2.1002.0 (#5279): filed mails indexed again by this version's rules (core/objwords.py osw_tick)."""
+    for m in c.execute("SELECT * FROM hub_mails WHERE id = ANY(CAST(? AS BIGINT[]))", (list(ids),)).fetchall():
+        _index(c, m["id"], m["ws"], _open(c, m))
+
+
+osw_register("hub_mail", "hub_mails", "id", "TRUE", hbm_reindex)
 
 
 @app.get("/api/hubmail/mails")
@@ -539,7 +536,7 @@ def hbm_mails():
     rows = [m for m in rows if hbm_can(c, uid, m, memo=memo)]
     q = (request.args.get("q") or "").strip()
     if q:
-        rows = _search(c, rows, q)
+        rows = _hbm_q_rows(c, rows, q)
     from .mailbox import mbx_can_send  # 2.141.0 A (#2138): "New e-mail" from a client's / project's filing
     org = cl["org_id"] if a.get("client_id") else l["org_id"] if a.get("list_id") else None
     send = bool(can) and not request.args.get("unassigned") and mbx_can_send(c, org or None, uid)
@@ -566,7 +563,7 @@ def hbm_inbox():
     rows = [m for m in rows if hbm_can(c, uid, m, memo=memo)]
     q = (request.args.get("q") or "").strip()
     if q:
-        rows = _search(c, rows, q)
+        rows = _hbm_q_rows(c, rows, q)
     return jsonify(enabled=hbm_on(), spaces=spaces if hbm_on() else [], total=len(rows), mails=[hbm_public(c, m, memo=memo) for m in rows[:HBM_PAGE]])
 
 

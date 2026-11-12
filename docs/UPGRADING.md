@@ -69,3 +69,10 @@ The same release's first start also moves the comments of video / picture review
 the notes on documents into the same shared table (`obj_comments`), drops the old tables and raises the database's limit to the
 minor of that release. An older version would make them again empty. Go back only by restoring a backup made before the update. It also moves the kept texts of deleted team chat messages into the comments' trash
 (`obj_comment_trash`, which gets a kind and a new key) and drops `tchat_trash_text`.
+
+**Never go back before the release with package 2.1002** (the CHANGELOG names it): its first start copies the keyed word
+indexes of documents, recognised file texts, knowledge pages and filed mails (`doc_words`, `file_words`, `wiki_words`,
+`hub_words`) into one shared table (`obj_search_words`), drops the four old tables and raises the database's limit to the
+minor of that release. An older version would make them again empty and find nothing in those texts. Go back only by restoring
+a backup made before the update. The search works at once with the copied entries; in the background the server indexes every
+such text once more by the new rules (umlauts with ae / oe / ue, short word starts) - a large instance: some minutes to hours.

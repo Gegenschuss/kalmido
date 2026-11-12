@@ -44,6 +44,7 @@ from ..core.objversions import (OBJV_CTX, obj_version_add, obj_version_drop, obj
                                 obj_version_merge, obj_version_prune, obj_version_rows)
 from ..core.retention import ret_due, ret_report, ret_trash_cut  # 2.528.0 D (#4306)
 from ..core.serializers import unlink_files  # 2.528.0 D (#4306)
+from ..core.objwords import osw_drop, osw_drop_sql  # 2.1002.0 (#5279): the shared word index
 from ..core.access import Denied
 from ..accounts.session import me
 from ..collab.comments import user_names
@@ -294,7 +295,7 @@ def wkx_hold_space(c, sp, users, ts):
     people users. -> {versions, files} held. The caller commits."""
     oid, owner = sp["org_id"], sp["owner_id"]
     w, a = _wkx_where(oid, owner)
-    c.execute(f"DELETE FROM wiki_words WHERE page_id IN (SELECT id FROM wiki_pages WHERE {w})", a)
+    osw_drop_sql(c, "wiki_page", f"SELECT id FROM wiki_pages WHERE {w}", a)  # 2.1002.0 (#5279): the shared word index
     # 2.571.0 (#4766): the names of its pages in the core's history are plain words too
     c.execute(f"DELETE FROM obj_history WHERE kind='wiki' AND ref_id IN (SELECT id FROM wiki_pages WHERE {w})", a)
     row = c.execute("SELECT wkx_holds FROM wiki_spaces WHERE id=?", (sp["id"],)).fetchone()
@@ -365,7 +366,7 @@ def wkh_move(c, rows, to, uid, keep=True):
     if not ids:
         return
     q = ",".join("?" * len(ids))
-    c.execute(f"DELETE FROM wiki_words WHERE page_id IN ({q})", ids)
+    osw_drop(c, "wiki_page", ids)  # 2.1002.0 (#5279): the shared word index (was wiki_words)
     if not keep:
         obj_version_drop(c, WKH_KIND, ids)  # 2.958.0 (#5281)
         return

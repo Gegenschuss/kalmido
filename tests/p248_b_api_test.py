@@ -167,7 +167,7 @@ AGS = tok(PAGT)
 
 cols = dbx("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name LIKE 'doc\\_%'")
 check({x[0] for x in cols} >= {"doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_node_tags", "doc_rules", "doc_models", "doc_cfg",
-                               "doc_words", "doc_mail"}, f"the new tables ({sorted(x[0] for x in cols)})")
+                               "doc_mail"}, f"the new tables ({sorted(x[0] for x in cols)})")
 OCR = A.get(B + "/api/docs/settings", params={"ws": "private"}).json().get("ocr")
 if not OCR:
     print("NOTE: this image has no Tesseract (deu+eng) -- the OCR checks are skipped (build the image from the Dockerfile)", flush=True)
@@ -193,7 +193,8 @@ else:
     check(d2 and d2["state"] == "failed" and d2["error"] == "no_ocr", f"without Tesseract: a clear failure, no 500 ({d2})")
 row = dbx("SELECT text, amount FROM doc_meta WHERE node_id=?", (D1,))[0]
 check(row[0].startswith("kenc1:") and row[1].startswith("kenc1:"), "text and amount sealed in the database")
-check(not any("haftpflicht" in (x[0] or "").lower() for x in dbx("SELECT h FROM doc_words WHERE node_id=?", (D1,))), "word index holds hashes only")
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+check(not any("haftpflicht" in (x[0] or "").lower() for x in dbx("SELECT h FROM obj_search_words WHERE kind='doc' AND ref_id=?", (D1,))), "word index holds hashes only")
 check(A.get(B + f"/api/docs/{D1}/file").content[:4] == b"%PDF", "the file itself")
 # 2.48.0 review (L3): the preview of a private document is sealed on disk like its text, the route opens it
 th = dbx("SELECT thumb FROM doc_meta WHERE node_id=?", (D1,))[0][0]
@@ -359,7 +360,8 @@ if r.status_code == 202:
         meta = [x for x in names if x.endswith("documents/meta.json")]
         body = z.read(meta[0]).decode() if meta else ""
         check(meta and "Sonnenblume" in body and "kenc1:" not in body, "export: the documents with their text in plain")
-        check(not any("doc_models" in x or "doc_words" in x or "documents/mail" in x for x in names), "export: no models, no word index, no mail token")
+        # 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+        check(not any("doc_models" in x or "obj_search_words" in x or "documents/mail" in x for x in names), "export: no models, no word index, no mail token")
 else:
     check(False, f"org export could not start ({r.status_code} {r.text[:120]})")
 

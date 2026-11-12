@@ -10,9 +10,9 @@ Encryption at rest: documents are the most sensitive data. The recognised text, 
 suggestions are sealed (AES-256-GCM, "kenc1:") with the workspace key: the organisation's key (core/orgcrypt.py) or, for a
 person's own documents, a key derived from the server key per person (the text of a private document is sealed like
 the text cache of attachments; 2.64.0 (#1864): its file itself with the owner's account key, core/orgcrypt.py). Without
-a server key / with org_encrypt=0 the values stay plain, as everywhere. The full-text search uses no plain index: doc_words holds HMAC-SHA256 hashes (keyed per workspace)
-of the folded words plus prefix hashes of 4, 6 and 8 characters; a query word is looked up by its hash (or by its longest
-stored prefix and then checked against the opened text)."""
+a server key / with org_encrypt=0 the values stay plain, as everywhere. The full-text search uses no plain index: the shared word index obj_search_words (core/objwords.py, kind 'doc'; 2.1002.0
+#5279, was doc_words) holds HMAC-SHA256 prefix hashes of the folded words (keyed per workspace, _index_key); a query word is
+looked up by its prefix hash (or by its longest stored prefix and then checked against the opened text, doc_opened)."""
 import hashlib
 import hmac
 import json
@@ -30,6 +30,7 @@ from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up fro
 from ..core.access import acx_of, Denied, live_sql  # 2.149.0 G (#2517): pulled up from functions; 2.981.0 (#5273): live_sql
 from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file, oc_seal_k, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked as _sc_locked  # 2.360.0 B (#2496)
+from ..core.objwords import osw_put, osw_register  # 2.1002.0 (#5279): the shared word index
 from ..files.store import fs_chain as _fs_chain, fs_deleted as _fs_deleted, fs_role as _fs_role  # 2.199.0 B (#2742); 2.351.0 A (#2823): fs_role
 from ..files.fslock import fl_is_locked, fsl_of_chain  # 2.353.0 F (#2758)
 from ..files.store import fs_visible_sql_c as _fs_visible_sql  # 2.360.0 B (#2496)
@@ -65,8 +66,6 @@ def is_inbox(name):
 def folder_in_sql(col, names):
     """SQL "lower(col) IN (?, ...)" for folder_names() (the arguments are the names)."""
     return f"lower({col}) IN ({', '.join('?' * len(names))})"
-PREFIXES = (4, 6, 8)        # prefix lengths kept in the word index
-WORDS_MAX = 4000            # distinct words of one document in the index
 NAME_MAX = 120
 TITLE_MAX = 200  # 2.750.0 (#4876): a document's own title (doc_meta.title)
 # 2.750.0 (#4876): the endings a title leaves off when it comes from the file name ("Brief.pdf" -> "Brief")
@@ -317,98 +316,43 @@ def _index_key(c, ws):
     return k
 
 
-def index_words(text):
-    """The distinct folded words of a text for the index (letters and digits, 2+ characters)."""
-    out, seen = [], set()
-    for w in re.findall(r"\w+", RU.fold(text)):
-        if len(w) < 2 or len(w) > 40 or w in seen:
-            continue
-        seen.add(w)
-        out.append(w)
-        if len(out) >= WORDS_MAX:
-            break
+def doc_index(c, nid, ws, text):
+    """2.1002.0 (#5279): the words of document nid in the shared word index (core/objwords.py, kind 'doc'; was doc_words)."""
+    # 2.360.0 B (#2496): a locked file stays out of the search (no words, only the mark: not indexed again)
+    osw_put(c, "doc", nid, ws, None if _sc_locked(c, "fs", nid) else text)
+
+
+def doc_opened(c, ws, ids):
+    """2.1002.0 (#5279): {node id: everything the index holds of the document} (name, text, sender, archive number, custom
+    field values, notes; 2.153.0 #2179, 2.184.0 B #2580, 2.635.0 #4807 d) for the word index's check of a longer word,
+    in portions of 5000 (the database takes a limited number of parameters per statement)."""
+    from .fields import df_index_texts
+    out = {}
+    ids = sorted(int(i) for i in ids)
+    for i in range(0, len(ids), 5000):
+        part = ids[i:i + 5000]
+        qm = ",".join("?" * len(part))
+        names = {x[0]: x[1] for x in c.execute(f"SELECT id, name FROM fs_nodes WHERE id IN ({qm})", tuple(part))}
+        cfs = df_index_texts(c, ws, part)
+        nts = notes_texts(c, ws, part)
+        for r in c.execute(f"SELECT * FROM doc_meta WHERE node_id IN ({qm})", tuple(part)).fetchall():
+            out[r["node_id"]] = index_text(c, dict(r), names.get(r["node_id"]) or "", doc_open(c, ws, "doc_meta.text", r["text"]),
+                                           cf=cfs.get(r["node_id"], ""), notes=nts.get(r["node_id"], ""))
     return out
 
 
-def _h(key, s):
-    return hmac.new(key, s.encode(), hashlib.sha256).hexdigest()[:20]
+def doc_reindex(c, ids):
+    """2.1002.0 (#5279): documents indexed again by this version's rules (core/objwords.py osw_tick)."""
+    for nid in ids:
+        m = meta_row(c, nid)
+        node = c.execute("SELECT name FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+        if m and node:
+            doc_index(c, nid, m["ws"], index_text(c, dict(m), node["name"], meta_text(c, m)))
+        else:
+            osw_put(c, "doc", nid)  # nothing to index: the mark only (never asked again)
 
 
-def word_hashes(c, ws, words):
-    key = _index_key(c, ws)
-    hs = set()
-    for w in words:
-        hs.add(_h(key, "w:" + w))
-        for n in PREFIXES:
-            if len(w) >= n:
-                hs.add(_h(key, f"p{n}:" + w[:n]))
-    return hs
-
-
-def query_hashes(c, ws, word):
-    """(hash, exact) for one query word: the whole word (exact), else the longest stored prefix (to be checked)."""
-    key = _index_key(c, ws)
-    if len(word) < PREFIXES[0]:
-        return _h(key, "w:" + word), True
-    n = max(p for p in PREFIXES if p <= len(word))
-    return _h(key, f"p{n}:" + word[:n]), n == len(word)
-
-
-def doc_index(c, nid, ws, text):
-    c.execute("DELETE FROM doc_words WHERE node_id=?", (nid,))
-    if _sc_locked(c, "fs", nid):  # 2.360.0 B (#2496): a locked file stays out of the search
-        return
-    hs = sorted(word_hashes(c, ws, index_words(text)))
-    for i in range(0, len(hs), 500):
-        part = hs[i:i + 500]
-        c.execute("INSERT INTO doc_words(node_id, h) VALUES " + ",".join(["(?,?)"] * len(part)) + " ON CONFLICT DO NOTHING",
-                  [x for h in part for x in (nid, h)])
-
-
-def search_ids(c, ws_nodes, query):
-    """The node ids of ws_nodes ({ws: [node ids]}) whose indexed text has every word of query (a prefix for words of 4+
-    characters). Returns a set."""
-    words = index_words(query)[:8]
-    if not words:
-        return None
-    hits = set()
-    for ws, ids in ws_nodes.items():
-        if not ids:
-            continue
-        cand = set(ids)
-        check = []
-        for w in words:
-            h, exact = query_hashes(c, ws, w)
-            ids_ = sorted(cand)
-            cand = set()
-            for i in range(0, len(ids_), 5000):  # the database takes a limited number of parameters per statement
-                part = ids_[i:i + 5000]
-                cand |= {r[0] for r in c.execute(f"SELECT node_id FROM doc_words WHERE h=? AND node_id IN ({','.join('?' * len(part))})",
-                                                 (h, *part))}
-            if not exact:
-                check.append(w)
-            if not cand:
-                break
-        if cand and check:
-            ok = set()
-            ids_ = sorted(cand)
-            for i in range(0, len(ids_), 5000):  # 2.126.0 A (#1979 L3): in portions like above
-                part = ids_[i:i + 5000]
-                # 2.184.0 B (#2580): names and custom field values once per portion, not one query per document
-                qm = ",".join("?" * len(part))
-                names = {x[0]: x[1] for x in c.execute(f"SELECT id, name FROM fs_nodes WHERE id IN ({qm})", tuple(part))}
-                from .fields import df_index_texts
-                cfs = df_index_texts(c, ws, part)
-                nts = notes_texts(c, ws, part)  # 2.635.0 (#4807 d): the notes count like the rest of the index
-                for r in c.execute(f"SELECT * FROM doc_meta WHERE node_id IN ({qm})", tuple(part)).fetchall():
-                    # 2.153.0 (#2179): everything the index holds (also sender, archive number, custom field values), not only text + name
-                    have = set(index_words(index_text(c, dict(r), names.get(r["node_id"]) or "", doc_open(c, ws, "doc_meta.text", r["text"]),
-                                                      cf=cfs.get(r["node_id"], ""), notes=nts.get(r["node_id"], ""))))
-                    if all(any(x.startswith(w) for x in have) for w in check):
-                        ok.add(r["node_id"])
-            cand = ok
-        hits |= cand
-    return hits
+osw_register("doc", "doc_meta", "node_id", "TRUE", doc_reindex)  # 2.1002.0 (#5279): the watchdog's catch-up (core/objwords.py)
 
 
 # ---- labels (senders, types, tags) ------------------------------------------------------------------------------------

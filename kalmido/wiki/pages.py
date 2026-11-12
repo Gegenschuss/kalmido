@@ -857,7 +857,7 @@ def wiki_search():
     (#2106): over the word index (wksearch.py), ranked (words in the name, then in the text, then the newest); ?space=
     only that space, ?limit= (default 30, at most 100) &offset= the next ones -> {pages, total, more, offset}; 2.376 (#3292):
     a hit with a query word in its text has snippet (plain text, "…" where cut) + marks ([[start, end], ...] in code points)."""
-    from .wksearch import WKS_LIMIT, WKS_LIMIT_MAX, wks_search, wks_snippets
+    from .wksearch import WKS_LIMIT, WKS_LIMIT_MAX, wks_find, wks_snippets  # 2.1002.0 (#5279): was wks_search
     c = db()
     uid = me()
     q = (request.args.get("q") or "").strip()[:200]
@@ -866,11 +866,13 @@ def wiki_search():
         offset = max(0, min(100_000, int(request.args.get("offset") or 0)))
     except ValueError:
         raise BadInput(tr("Invalid value: {0}", "limit"))
-    if request.args.get("space") not in (None, ""):
+    one = request.args.get("space") not in (None, "")
+    if one:
         spaces = [wiki_space(c, uid, request.args.get("space"))]
     else:
         spaces = [None, *[o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]]  # 2.143.0 A (#2151)
-    rows, total = wks_search(c, uid, spaces, q, limit, offset)
+    # 2.1002.0 (#5279, question 15): without ?space= also the pages a share of the shared core opens
+    rows, total = wks_find(c, uid, spaces, q, limit, offset, shared=not one)
     sn = wks_snippets(c, rows, q)  # 2.376 (#3292): the shown hits only, opened in memory (nothing stored or logged)
     return jsonify(pages=[{**wiki_dict(r, full=False), **({"snippet": sn[r["id"]][0], "marks": sn[r["id"]][1]} if r["id"] in sn else {})}
                           for r in rows], total=total, offset=offset, more=offset + len(rows) < total)

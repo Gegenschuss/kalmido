@@ -307,7 +307,7 @@ def df_index_text(c, nid, ws):
 
 def df_index_texts(c, ws, nids):
     """2.184.0 B (#2580): df_index_text of many documents of ws at once ({node id: text}): the fields read once, the values
-    in one query (the search's check of word prefixes, docs/store.py search_ids)."""
+    in one query (the search's check of word prefixes, docs/store.py doc_opened)."""
     rows = {r["id"]: r for r in df_rows(c, ws)}
     vals = {int(n): [] for n in nids}
     if not rows or not vals:

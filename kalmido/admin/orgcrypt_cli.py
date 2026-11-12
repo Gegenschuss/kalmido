@@ -1613,7 +1613,9 @@ def rot_indexes(c, oid):
             c.execute("UPDATE budget_entries SET dkey=? WHERE id=?", (bud_dkey(c, d["list_id"], oid, d["day"], d["amount"], d["kind"], d["title"]), r["id"]))
             n += 1
         # 2.138.0 C (#1972): the word index of the knowledge pages (wiki/wksearch.py, keyed per space like the documents)
-        c.execute("DELETE FROM wiki_words WHERE page_id IN (SELECT id FROM wiki_pages WHERE org_id=?)", (oid,))
+        # 2.1002.0 (#5279): the shared word index obj_search_words (kind 'wiki_page'; was wiki_words)
+        from ..core.objwords import osw_drop_sql
+        osw_drop_sql(c, "wiki_page", "SELECT id FROM wiki_pages WHERE org_id=?", (oid,))
         for r in c.execute("SELECT id, org_id, owner_id, body, updated_at FROM wiki_pages WHERE org_id=? AND deleted_at IS NULL "
                            "AND left(path, 5)<>'e2e1:' ORDER BY id", (oid,)).fetchall():
             try:

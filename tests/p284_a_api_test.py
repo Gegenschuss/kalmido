@@ -145,7 +145,8 @@ AG = requests.Session()
 AG.headers.update({"Authorization": "Bearer " + AGT})
 
 cols = dbx("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name LIKE 'hub\\_%'")
-check({x[0] for x in cols} >= {"hub_tokens", "hub_mails", "hub_words"}, f"the new tables ({sorted(x[0] for x in cols)})")
+# 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+check({x[0] for x in cols} >= {"hub_tokens", "hub_mails"}, f"the new tables ({sorted(x[0] for x in cols)})")
 
 ACME = Bo.post(B + "/api/clients", json={"name": "Acme", "org_id": ORG, "email": "acme@example.com",
                                          "contacts": [{"name": "Lisa", "email": "lisa@example.com"}]}).json()["id"]
