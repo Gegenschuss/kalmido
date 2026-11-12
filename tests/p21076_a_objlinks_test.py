@@ -336,9 +336,9 @@ v = json.loads(h[0][0]) if h and isinstance(h[0][0], str) else (h[0][0] if h els
 check(v == {"link": "related:task"}, f"F4: the history entry of the link without the target's id {v}")
 
 # F6: the boundary check sees a crossing link of every kind with a workspace (here a folder and a page of two organisations)
-sql(f"INSERT INTO obj_links(org_id, src_kind, src_id, dst_kind, dst_id, rel, created_by) VALUES({O2}, 'fs_entry', {FA}, 'wiki_page', {WB}, 'related', {ALICE})",
+sql(f"INSERT INTO obj_links(org_id, src_kind, src_id, dst_kind, dst_id, rel, created_by) VALUES({O2}, 'fs_entry', {FA}, 'wiki_page', {WB}, 'probe', {ALICE})",
     write=True)
-XL = sql("SELECT id FROM obj_links WHERE src_kind='fs_entry' AND src_id=? AND dst_kind='wiki_page' AND dst_id=?", (FA, WB))[0][0]
+XL = sql("SELECT id FROM obj_links WHERE src_kind='fs_entry' AND src_id=? AND dst_kind='wiki_page' AND dst_id=? AND rel='probe'", (FA, WB))[0][0]
 out = in_app("from kalmido.accounts.tenancy import CHECKS\nprint('CROSS', sorted(r[0] for r in c.execute(CHECKS['obj_link']).fetchall()))")
 check(f"CROSS [{XL}]" in out, f"F6: the boundary check counts the crossing link, and only it {out[-400:]}")
 sql("DELETE FROM obj_links WHERE id=?", (XL,), write=True)
