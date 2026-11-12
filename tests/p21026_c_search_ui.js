@@ -107,7 +107,7 @@ const W = 'zinnoberwal';  // the word, only in the contents
 
   // ---- a browser source (the shape the locked areas register with): its hits join the group, a failing one does not stop the rest
   w.eval(`SEARCH_SOURCES.push({id: 'test-device', kinds: ['wiki'], search: async q => ({wiki: [{id: 987654, path: 'Locked/Diary', space: 'private', e2e: true}]})},
-    {id: 'test-broken', search: async () => { throw new Error('boom'); }})`);
+    {id: 'test-broken', search: async () => { throw new Error('boom'); }}); FTSP.q = ''`);  // the same word again: the palette keeps the last answer per word, so ask anew
   await pal();
   const loc = await until(() => inGroup('Knowledge pages', 'Diary'));
   check(loc && visible(loc), 'a browser source of the registry: its page in the group "Knowledge pages"');
