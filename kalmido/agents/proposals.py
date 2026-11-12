@@ -47,7 +47,7 @@ from ..agents.workstyle import ws_next_mark, ws_next_step  # 2.236.0 B (#2911)
 from ..agents.datalock import dl_job_input  # 2.235.0 B2 (#2902)
 from ..agents.core import agent_usable, agent_added_events, task_being_edited, tidy_changed_since, tidy_person_after  # 2.369.5 (#2517): pulled up from functions
 from ..agents.core import agent_never_lids  # 2.582.0 (#4380)
-from ..agents.showme import shw_clean  # 2.1072.0 (#5860)
+from ..api.showme import shw_clean  # 2.1072.0 (#5860)
 from ..agents.jobchat import JCD_KINDS, jcb_post  # 2.369.5 (#2517): pulled up from functions; 2.739.0 (#5216): jcb_post
 from ..agents.steps import steps_take  # 2.369.5 (#2517): pulled up from functions
 from ..agents.chat import h6e_agent_push_ok, chat_choice_set  # 2.369.5 (#2517): pulled up from functions
@@ -1527,7 +1527,7 @@ def v1_agent_chat_post(uid):
     if b.get("kind") not in (None, "", "message", "notice", "brief"):
         raise BadInput(tr("Invalid value: {0}", "kind"))
     src = chat_source(b.pop("source", None))  # 2.388.0 (#3341): who produced the message, the app can hide a source
-    shw = shw_clean(b.pop("show", None))  # 2.1072.0 (#5860): "Show me" -- named places only (agents/showme.py), unknown = 400
+    shw = shw_clean(b.pop("show", None))  # 2.1072.0 (#5860): "Show me" -- named places only (api/showme.py), unknown = 400
     if shw and (b.get("kind") in ("notice", "brief") or b.get("approval") not in (None, "") or b.get("permission") not in (None, False, "", "0", "false")):
         raise BadInput(tr("Invalid value: {0}", "show"))  # a plain message only: no line, brief, approval or permission question
     if b.get("kind") == "brief":  # 2.739.0 (#5216): agents/jobchat.py jcb_post

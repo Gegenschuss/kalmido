@@ -32,7 +32,7 @@ from ..core.errors import BadInput, Denied
 from ..core.i18n import lang, LANGS, md_plain, tr
 from ..core.srchreg import srch_q, srch_register
 from .common import v1_args, v1_view
-from ..agents.showme import shw_keys_in, shw_list  # 2.1072.0 (#5860)
+from .showme import shw_keys_in, shw_list  # 2.1072.0 (#5860)
 
 HELP_DIR = os.path.join(APP_DIR, "docs")  # the image: /app/docs (Dockerfile), a checkout: docs/
 # the operator's files: running a server, its settings and internals -- only for an instance admin
@@ -358,7 +358,7 @@ def hlp_overview(admin=False):
               "sections": [{"key": s["key"], "title": s["title"]} for s in f["sections"] if s["level"] == 2]}
              for f in idx["files"].values() if admin or not f["operator"]]
     return {"version": APP_VERSION, "features": areas, "files": files,
-            "show_targets": shw_list(),  # 2.1072.0 (#5860): the named places of "Show me" (agents/showme.py)
+            "show_targets": shw_list(),  # 2.1072.0 (#5860): the named places of "Show me" (api/showme.py)
             "how": "search_help (GET /search?kind=help&q=) finds sections; read_help (GET /help/section?key=) reads one. "
                    "The documentation is English; explain a path in the words of the person's interface (ui_terms of a section). "
                    "Add the places of the way as send_chat show: [{target, text}] (keys of show_targets) - the person gets 'Show me'. "

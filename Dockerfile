@@ -53,7 +53,7 @@ COPY kalmido /app/kalmido
 COPY static /app/static
 # 2.1067.0 (#5819): the user documentation (docs/*.md, not docs/dev/) - agents search and read it (api/helpdocs.py)
 COPY docs/*.md /app/docs/
-# 2.1072.0 (#5860): the named places of "Show me" (agents/showme.py)
+# 2.1072.0 (#5860): the named places of "Show me" (api/showme.py)
 COPY docs/help-targets.json /app/docs/
 # 2.1072.0 (#5820): the translations of the user's help (docs/help/<lang>.md, api/helpuser.py)
 COPY docs/help/ /app/docs/help/

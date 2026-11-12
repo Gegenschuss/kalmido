@@ -195,7 +195,7 @@ ORDER = (
     "agents.chat",
     "agents.jobchat",  # 2.56.0 A (#1791 / #1793)
     "agents.chatprefs",  # 2.233.0 A (#2848): chat settings per person and agent, collected suggestions
-    "agents.showme",  # 2.1072.0 (#5860): "Show me" -- the named places an agent's message may point at
+    "api.showme",  # 2.1072.0 (#5860): "Show me" -- the named places an agent's message may point at
     "agents.chatnews",  # 2.1039.0 (#5804 #5805): approval cards and questions of the agent chat in the bell's "For you"
     "agents.steps",  # 2.32.0 (#1081 / #1079)
     "agents.quota",  # 2.33.0 (#1045)

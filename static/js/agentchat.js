@@ -354,7 +354,7 @@ function chatChoicesHtml(m, shelf = false) {
     send: `data-act="chat-choice-send" data-mid="${m.id}"`,
     pen: c => `<button type="button" class="cchpen" data-chpen="${m.id}" data-cid="${esc(c.id)}" title="${esc(tr('Edit before sending'))}" aria-label="${esc(tr('Edit before sending: {0}', c.label))}">${ic('edit', 's')}</button>`});
 }
-// 2.1072.0 (#5860): "Show me" under an agent's message with show steps (the named places, agents/showme.py): a press loads
+// 2.1072.0 (#5860): "Show me" under an agent's message with show steps (the named places, api/showme.py): a press loads
 // showme.js, which opens the view and highlights the control to press next; it never clicks or changes anything
 const shw_btnHtml = m => m.from === 'agent' && Array.isArray(m.show) && m.show.length ? `<div class="cchoices shwb" role="group"><button type="button" class="cchb st-primary" data-act="show-me" data-mid="${m.id}">${ic('eye', 's')}<span>${esc(tr('Show me'))}</span></button></div>` : '';
 document.addEventListener('click', e => {

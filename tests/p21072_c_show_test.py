@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
 """2.1072.0 (#5860): "Show me" -- an agent's chat message names places of the app (show: [{target, text}]) from the fixed list
-docs/help-targets.json (kalmido/agents/showme.py). Invented names only.
+docs/help-targets.json (kalmido/api/showme.py). Invented names only.
  - API v1 POST /api/v1/agent/chats/<uid>: an unknown key, a selector, an address, a wrong shape, too many steps, a too long
    text, an extra field -> 400 and no message; show on a notice / an approval / a permission question -> 400; a known key is
    stored: the answer gives show back as sent ([{target, text}]), the person's chat (GET /api/agents/<id>/chat) each step
@@ -135,7 +135,7 @@ sec = ag.get(V + "/help/section", params={"key": "api#scan-inboxes-folder-watche
 check(isinstance(sec.get("show"), list) and all(k in TARGETS for k in sec["show"]), f"read_help: show = the section's marks (known keys) {sec.get('show')}")
 
 # ---------------------------------------------------------------- the list itself
-src = open(os.path.join(ROOT, "kalmido", "agents", "showme.py"), encoding="utf-8").read()
+src = open(os.path.join(ROOT, "kalmido", "api", "showme.py"), encoding="utf-8").read()
 de = json.load(open(os.path.join(ROOT, "static", "i18n", "de.json"), encoding="utf-8"))
 web = "".join(open(p, encoding="utf-8").read() for p in glob.glob(os.path.join(ROOT, "static", "js", "*.js")) + [os.path.join(ROOT, "static", "index.html")])
 for k, t in TARGETS.items():
