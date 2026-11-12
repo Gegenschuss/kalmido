@@ -630,6 +630,7 @@ Office & finance: quotations, invoices, bank, books, tax, DATEV, e-invoices, let
 - `kalmido/office/model.py` (`office`) - Office & finance: the gate, the organisation one works in, the module
 - `kalmido/office/numranges.py` (`onum`) - Office & finance, the number ranges
 - `kalmido/office/offerdispo.py` (`odp`) - Shoot days from a quotation as pencilled-in bookings of the disposition
+- `kalmido/office/offerexp.py` (`ofe`) - A sent quotation without an answer rings the bell before and after its "valid until"; extend its validity
 - `kalmido/office/offerlink.py` (`oil`) - The link between a quotation and the invoices made from it (office_docs.source_doc_id)
 - `kalmido/office/offertasks.py` (`otk`) - Tasks in the project from a quotation, with a time budget per position
 - `kalmido/office/officemove.py` (`ofm`) - Office data between the personal office and an organisation
