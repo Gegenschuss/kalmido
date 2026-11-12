@@ -86,7 +86,7 @@ def grp_folder_rows(c, owner=None, gid=None, nids=None):
         q.append("s.node_id = ANY(CAST(? AS BIGINT[]))")
         a.append(st_ids(sorted({int(x) for x in nids})))
     out, where = [], {}
-    with system_ctx(c):
+    with system_ctx(c):  # the folder group shares of every owner (another person's folder, the group's view); callers filter
         for s in c.execute(f"""SELECT s.id, s.node_id, s.group_id, s.role, s.list_role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id
                                WHERE {' AND '.join(q)} ORDER BY s.id""", a).fetchall():
             if s["node_id"] not in where:
@@ -108,7 +108,7 @@ def grp_shares_of_list(c, lid):
     if not lr or lr["is_inbox"]:
         return []
     out = [(r["group_id"], r["role"], "list") for r in grp_own_rows(c, [lid])]
-    with system_ctx(c):
+    with system_ctx(c):  # the list's node and its folder chain may lie in the owner's tree, the asker need not see it
         n = fs_ref_node(c, LF_KIND, lid)
         chain = fs_chain(c, n["id"]) if n is not None and not n["deleted_at"] else []
     fids = [x["id"] for x in chain[1:] if x["kind"] == "folder"]

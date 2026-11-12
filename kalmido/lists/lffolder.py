@@ -541,7 +541,7 @@ def lf_people_rows(c, owner=None, uid=None):
         q.append("COALESCE(s.user_id, s.agent_id)=?")
         a.append(int(uid))
     out, where = {}, {}
-    with system_ctx(c):
+    with system_ctx(c):  # the person shares of every owner's folders (another person's tree); owner / uid narrow it above
         for s in c.execute(f"""SELECT s.node_id, COALESCE(s.user_id, s.agent_id) AS who, s.role, s.list_role, s.created_at
                                FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE {' AND '.join(q)} ORDER BY s.id""", a).fetchall():
             if s["node_id"] not in where:
