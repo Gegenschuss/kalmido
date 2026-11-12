@@ -213,6 +213,9 @@ const RO = /read-only/, GU = /does not include this/;
   const CT = process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test';
   const py = code => { try { return execFileSync('docker', ['exec', '-i', CT, 'python', '-c', 'import app\nfrom kalmido.core.db import connect\nc = connect()\n' + code + '\nc.close()\n'], {encoding: 'utf8', timeout: 120000}).trim().split('\n').pop(); } catch (e) { return 'ERR ' + String(e.stderr || e).slice(-300); } };
   const who = (tid, addr, u = 0) => py(`from kalmido.integrations.taskmail import tmr_who\nprint(tmr_who(c, ${tid}, ${JSON.stringify(addr)}, ${u}))`);
+  // 2.1047.0 (#5840): the accounts proved their addresses (2.1021.0, #5775) - a mailed reply binds only a proved address,
+  // so the role is what says no for rita / gina below, not an unproved address
+  execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE users SET email_proved=lower(email) WHERE email_proved='' AND COALESCE(email, '')<>''"]);
   let m = who(T2, 'rita@example.com', uid.rita);
   check(m === '(False, None)', `mail reply, read-only (signed address of her account): no comment ${m}`);
   m = who(T2, 'gina@example.com');
