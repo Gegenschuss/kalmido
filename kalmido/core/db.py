@@ -1204,11 +1204,11 @@ def init_db(guard=True, load=None):
                 lids = set()
                 with pg_system_ctx(c):  # every owner's lists and folders (as lf_migrate)
                     for fp in lf_people_rows(c):
-                        for l in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(folder,'')!='' AND created_at>?",
+                        for lr in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(folder,'')!='' AND created_at>?",
                                            (fp["owner_id"], fp["created_at"])).fetchall():
-                            if _in_folder(l["folder"], fp["folder"]) and not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?",
-                                                                                       (l["id"], fp["user_id"])).fetchone():
-                                lids.add(l["id"])
+                            if _in_folder(lr["folder"], fp["folder"]) and not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?",
+                                                                                       (lr["id"], fp["user_id"])).fetchone():
+                                lids.add(lr["id"])
                     lf_resync(c, lids, 0)
                 n = len(lids)
             gset(c, "migr_folder931", "1")
