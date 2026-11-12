@@ -131,5 +131,16 @@ check(rp.orp_round(D("0.5"), "five") == D("0.50") and rp.orp_round(D("12.4"), "e
       "round: a price below the step stays a cent amount, else the step")
 check(rp.orp_rest_index([it("a", 1, 5000, opt="optional"), it("b", 1, 100)], {0, 1}) == 1, "rest: never on an optional position")
 
+# ---- 2.1051.0 (#5815 together with #5812): a position's own discount and the fixed document discount count as the document
+# counts them; the rest goes to the largest position AFTER its own discount (one with 100 % discount moves nothing)
+DIT = [it("Dreh", 2, 1500, discount_pct=10), it("Schnitt", 3, 700), it("Grafik", 1, 400)]
+r = solve({**DOC, "discount_amount": 250}, DIT, "net", 6000, rest=True)
+check(r["reachable"] and D(str(r["after"]["net"])) == 6000, f"#5815: target net 6.000 with a position discount and a fixed discount {r['after']['net']}")
+check(r["items"][0].get("discount_pct") == 10 and D(str(r["after"].get("discount_amount"))) == 250, "#5815: the discounts stay as they are, only prices change")
+r = solve(DOC, DIT, "gross", 7000, rest=True)
+check(D(str(r["after"]["gross"])) == 7000, f"#5815: target gross 7.000 with a position discount {r['after']['gross']}")
+check(rp.orp_rest_index([it("a", 1, 5000, discount_pct=100), it("b", 1, 100)], {0, 1}) == 1, "#5815: rest never on a position with 100 % discount")
+check(rp.orp_rest_index([it("a", 1, 1000, discount_pct=50), it("b", 1, 800)], {0, 1}) == 1, "#5815: rest on the largest amount after its discount")
+
 print(f"p21041_a_repcalc: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

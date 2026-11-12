@@ -77,13 +77,15 @@ def orp_figures(t):
 
 
 def orp_rest_index(items, sel):
-    """The largest scaled position by amount |qty x rate| (not one that counts in no sum, #5814 opt), None if none."""
+    """The largest scaled position by amount |qty x rate| after its own discount (#5815; not one that counts in no sum,
+    #5814 opt), None if none."""
     best, bv = None, Decimal(0)
     for i in sorted(sel):
         it = items[i]
         if it.get("opt"):
             continue
         v = abs(dec(it.get("qty"), "1") * dec(it.get("rate")))
+        v = v * (100 - min(max(dec(it.get("discount_pct")), Decimal(0)), Decimal(100))) / 100  # 2.1051.0 (#5815): after its own discount (100 % moves nothing)
         if v > bv:
             best, bv = i, v
     return best
