@@ -658,6 +658,10 @@ def mcpr_module():
 _CLS = {}
 
 
+_REFUSED = {}  # 2.1045.0 (#5827): token hash -> {step_ref: step} of InProc (Kalmido._keep_refused), the newest MCPR_REFUSED_TOKENS tokens
+MCPR_REFUSED_TOKENS = 500
+
+
 def _inproc_cls(mod):
     """kalmido_mcp.Kalmido whose requests go to this app in-process (Flask test client in a thread without a request of its
     own): the same /api/v1 checks as over the network, the client's address kept for the token's address rule."""
@@ -677,6 +681,12 @@ def _inproc_cls(mod):
             self.ip, self.base_url = ip, base_url
             self.environ_extra = {}  # 2.557.0 (#4670, review): a WSGI key no network request can set (headers become HTTP_*)
             self.deadline = deadline or (time.time() + MCPR_RUN_S)
+            # 2.1045.0 (#5827): the refused steps (step_ref) outlive one /mcp request: kept per token in this process
+            key = hashlib.sha256((token or "").encode()).hexdigest()
+            with _RUN_LOCK:
+                if key not in _REFUSED and len(_REFUSED) >= MCPR_REFUSED_TOKENS:
+                    _REFUSED.pop(next(iter(_REFUSED)))
+                self.refused = _REFUSED.setdefault(key, {})
 
         def call(self, method, path, query=None, body=None, timeout=None, multipart=None, binary_cap=None):
             # review F3: in the web process nothing waits: no sleeping before a call (rate limit) or between tries (429 / 503
@@ -709,12 +719,7 @@ def _inproc_cls(mod):
                     return self._file(r, binary_cap)
                 raw = r.get_data()
                 if r.status_code >= 400:
-                    msg = f"HTTP {r.status_code}"
-                    try:
-                        er = json.loads(raw).get("error")
-                        msg = f"HTTP {r.status_code}: " + ((er.get("message") if isinstance(er, dict) else er) or msg)
-                    except (ValueError, AttributeError):
-                        pass
+                    msg = self._err_msg(r.status_code, raw)  # 2.1045.0 (#5827): + reason / step_ref as kalmido_mcp.py over the network
                     if r.status_code in (429, 503):
                         ra = mod._retry_after(r.headers, None)
                         raise _Now(mod.ApiError(r.status_code, msg + (f" (try again in {int(ra)} s)" if ra is not None else ""), ra))

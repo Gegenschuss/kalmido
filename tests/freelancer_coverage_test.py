@@ -1213,6 +1213,7 @@ ROUTES = {
     "GET /api/agents/{}/control": "agents", "PATCH /api/agents/{}/control": "agents", "POST /api/agents/{}/control/history/{}/undo": "agents",
     # 2.653.0 (#5079): the whole history page by page and the agent's own decision line (p2653_a_agentlog_test.py, freelancer-matrix: agents)
     "GET /api/agents/{}/control/history": "agents", "POST /api/v1/agent/decisions": "agents",
+    "POST /api/v1/agent/approvals/{}/run": "agents",  # 2.1045.0 (#5827): p21045_a_approval_test.py
     # 2.557.0 C (#4670): the setup of a server agent -- its defaults and the starter pack (owner / instance admin, else 404; p2557_c_srvstarter_test.py)
     "GET /api/agents/server/defaults": "agents", "POST /api/agents/{}/server/starter": "agents",
     # 2.777.0 C (#5378): what of the starter pack is there / waits / is missing (as the POST; p2777_c_srvagent_test.py)

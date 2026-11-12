@@ -348,13 +348,16 @@ def ctl_lists(c, aid, path, b):
 
 
 def ctl_refuse(step, level, lid, d):
+    # 2.1045.0 (#5827): the step is taken over as it stands (approval.step, never typed again) and run from the card after the Yes
     if step == "one_way":
-        msg = tr("One-way step: ask with an approval card in your chat (approval.step = method, path and body of this request, as in approval), then send exactly the same request again with the header {0} = the id of the card.", CTL_HEADER)
+        msg = tr("One-way step: ask with an approval card in your chat (approval.step = method, path, body and if_match exactly as in this answer), then after the Yes run it with POST /api/v1/agent/approvals/<id of the card>/run (MCP: run_approved_step) - the server sends exactly this step.")
     else:
-        msg = tr("Your control level needs an approval for this step: ask with an approval card in your chat (approval.step = method, path and body of this request, as in approval), then send exactly the same request again with the header {0} = the id of the card.", CTL_HEADER)
+        msg = tr("Your control level needs an approval for this step: ask with an approval card in your chat (approval.step = method, path, body and if_match exactly as in this answer), then after the Yes run it with POST /api/v1/agent/approvals/<id of the card>/run (MCP: run_approved_step) - the server sends exactly this step.")
     rb = ctl_req_body()  # 2.235.0 A2 (#2891): the card binds the body too -- copy it into approval.step.body
+    im = (request.headers.get("If-Match") or "").strip()[:200]  # 2.1045.0 (#5827): the version read, sent along when the card runs
+    st = {"method": request.method, "path": request.path, **({"body": rb} if rb not in ({}, []) else {}), **({"if_match": im} if im else {})}
     return v1_err(409, msg, name="approval_required", step=step, level=level, project_id=lid,
-                  approval={"method": request.method, "path": request.path, **({"body": rb} if rb not in ({}, []) else {}), "header": CTL_HEADER})
+                  approval={**st, "header": CTL_HEADER})
 
 
 def ctl_req_body():
@@ -416,13 +419,75 @@ def ctl_gate():
         hdr = request.headers.get(CTL_HEADER, "").strip()
         if not hdr:
             return ctl_refuse(step, level, lid, d)
-        mid = ctl_claim(c, a, hdr, step, lids)
-        if not mid:
-            return v1_err(409, tr("This approval does not fit: it needs a person's Yes, exactly this method, path and body, and works once."),
-                          name="approval_invalid", step=step, level=level, project_id=lid)
+        mid, why = ctl_claim(c, a, hdr, step, lids)
+        if not mid:  # 2.1045.0 (#5827): the 409 names what does not fit (reason + its words), never a content of the card
+            return v1_err(409, tr("This approval does not fit: it needs a person's Yes, exactly this method, path and body, and works once.")
+                          + " " + ctl_reason_text(why), name="approval_invalid", step=step, level=level, project_id=lid, **why)
     g.ctl_note = {"step": step, "level": level, "lid": lid, "path": path, "mid": mid, "aid": a["user_id"],
                   "before": ctl_before(c, path, b), "info": ctl_info(path, b)}
     return None
+
+
+def ctl_card_row(c, aid, mid):
+    """2.1045.0 (#5827): the approval card mid of agent aid -> (row, choices, answer) or (None, None, None)."""
+    m = c.execute("""SELECT user_id, choices, choice FROM agent_chat WHERE id=? AND agent_id=? AND sender='agent'
+                     AND choices->'approval' IS NOT NULL""", (mid, aid)).fetchone()
+    return (m, _jload(m["choices"]) or {}, _jload(m["choice"])) if m else (None, None, None)
+
+
+def ctl_card_state(m, ch, ans):
+    """2.1045.0 (#5827): why card m cannot be used (a reason dict) or None = answered Yes and not used yet."""
+    if not m:
+        return {"reason": "not_found"}
+    ap = ch.get("approval") or {}
+    if ap.get("used_at"):
+        return {"reason": "used", "used_at": ap["used_at"]}
+    if not isinstance(ans, dict):
+        return {"reason": "withdrawn"} if ch.get("withdrawn_at") else {"reason": "unanswered"}
+    if ans.get("ids") != ["yes"]:
+        return {"reason": "rejected"}
+    if not isinstance(ap.get("step"), dict) or not ap["step"].get("method"):
+        return {"reason": "no_step"}
+    return None
+
+
+def ctl_body_diff(a, b):
+    """2.1045.0 (#5827): the names of the top-level fields in which two bodies differ (never their values); a list body: ["[]"]."""
+    a = {} if a in (None, [], {}) else a
+    b = {} if b in (None, [], {}) else b
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        return ["[]"]
+    return sorted(str(k) for k in set(a) | set(b) if ctl_canon(a.get(k, None)) != ctl_canon(b.get(k, None)) or (k in a) != (k in b))[:CTL_FIELDS_MAX]
+
+
+CTL_REASON_TEXT = {"not_found": N_("No approval card with this id of yours."),
+                   "unanswered": N_("The card has not been answered yet."),
+                   "withdrawn": N_("The card was withdrawn or expired."),
+                   "rejected": N_("The card was answered No."),
+                   "no_step": N_("The card names no step (method and path)."),
+                   "one_way": N_("A one-way step needs a card marked one_way and the Yes of a person."),
+                   "approver_rights": N_("The person who said Yes may not change this project themselves."),
+                   "approver_shares": N_("The person who said Yes shares no project with you."),
+                   "format": N_("The header must be the id of the card (a number).")}
+CTL_STATE_FIELDS = {"expect_updated_at", "prev", "_prev", "If-Match"}  # 2.1045.0 (#5827): fields that carry the state the step read
+
+
+def ctl_reason_text(why):
+    """2.1045.0 (#5827): the reason of a 409 approval_invalid in words (names, methods and times only, no content)."""
+    r = why.get("reason")
+    if r == "method":
+        return tr("The card approves the method {0}, your call is {1}.", why.get("card_method", ""), why.get("call_method", ""))
+    if r == "path":
+        return tr("The card approves the path {0}, your call is {1}.", why.get("card_path", ""), why.get("call_path", ""))
+    if r == "stale":
+        return tr("The state field differs from the card ({0}): the target changed since the card, or you read it again. Read it again and ask with a new card.",
+                  ", ".join(why.get("fields") or []))
+    if r == "body":
+        return tr("The body differs from the card in: {0}. Run the card with run_approved_step (POST /api/v1/agent/approvals/<id>/run) instead of sending it again.",
+                  ", ".join(why.get("fields") or []))
+    if r == "used":
+        return tr("The card was already used: the step ran at {0}. Check the result instead of sending it again.", why.get("used_at", ""))
+    return tr(CTL_REASON_TEXT.get(r, N_("The approval does not fit.")))
 
 
 def ctl_claim(c, a, hdr, step, lids):
@@ -431,34 +496,116 @@ def ctl_claim(c, a, hdr, step, lids):
     an empty body); a one-way step needs a card marked one_way and the Yes of a person (never the deadline's "recommend");
     the person who said Yes (the deadline: the person of the card) must be allowed to change every project the request
     touches themselves, without a project share a list with the agent (a team agent's chat partner who only reads there
-    approves nothing). -> the message id or None."""
+    approves nothing). -> (the message id, {}) or (None, {"reason", ...}). 2.1045.0 (#5827): the reason of a refusal
+    (ctl_reason_text): method / path (both sides), body / stale (the names of the differing fields), used (+ used_at), ..."""
     aid = a["user_id"]
     if not re.fullmatch(r"[0-9]{1,18}", hdr):
-        return None
-    m = c.execute("""SELECT user_id, choices, choice FROM agent_chat WHERE id=? AND agent_id=? AND sender='agent'
-                     AND choices->'approval' IS NOT NULL AND choices->'approval'->>'used_at' IS NULL""", (int(hdr), aid)).fetchone()
-    ch, ans = (_jload(m["choices"]), _jload(m["choice"])) if m else (None, None)
-    if not ch or not isinstance(ans, dict) or ans.get("ids") != ["yes"]:
-        return None
+        return None, {"reason": "format"}
+    m, ch, ans = ctl_card_row(c, aid, int(hdr))
+    bad = ctl_card_state(m, ch, ans)
+    if bad:
+        return None, bad
     ap = ch.get("approval") or {}
-    st = ap.get("step") if isinstance(ap.get("step"), dict) else {}
-    if st.get("method") != request.method or ctl_norm_path(str(st.get("path") or "")) != unicodedata.normalize("NFC", request.path) \
-            or ctl_canon(st.get("body")) != ctl_canon(ctl_req_body()):
-        return None
+    st = ap["step"]
+    if st.get("method") != request.method:
+        return None, {"reason": "method", "card_method": st.get("method"), "call_method": request.method}
+    if ctl_norm_path(str(st.get("path") or "")) != unicodedata.normalize("NFC", request.path):
+        return None, {"reason": "path", "card_path": str(st.get("path") or "")[:300], "call_path": request.path[:300]}
+    rb = ctl_req_body()
+    if ctl_canon(st.get("body")) != ctl_canon(rb):
+        fields = ctl_body_diff(st.get("body"), rb)
+        return None, {"reason": "stale" if fields and set(fields) <= CTL_STATE_FIELDS else "body", "fields": fields}
     who = ans.get("user_id") or (m["user_id"] if ans.get("via") == "deadline" else None)
     if not who:
-        return None
+        return None, {"reason": "unanswered"}
     if step == "one_way" and (not ap.get("one_way") or ans.get("via") == "deadline"):
-        return None
+        return None, {"reason": "one_way"}
     if lids and any(list_role(c, x, who) not in WRITE_ROLES for x in lids):
-        return None
+        return None, {"reason": "approver_rights"}
     if not lids and not agent_shares(c, aid, who):
-        return None
+        return None, {"reason": "approver_shares"}
     n = c.execute("""UPDATE agent_chat SET choices=jsonb_set(choices, '{approval,used_at}', to_jsonb(CAST(? AS TEXT)))
                      WHERE id=? AND agent_id=? AND choices->'approval'->>'used_at' IS NULL""",
                   (iso_ms(now_utc()), int(hdr), aid)).rowcount
     c.commit()
-    return int(hdr) if n else None
+    if not n:  # the other of two requests with the same card won
+        m, ch, ans = ctl_card_row(c, aid, int(hdr))
+        return None, ctl_card_state(m, ch, ans) or {"reason": "used"}
+    return int(hdr), {}
+
+
+CTL_RUN_TIMEOUT = 120  # 2.1045.0 (#5827): seconds the run of an approved step may take (as api/scopes.py approval_replay)
+
+
+def ctl_run_replay(st, mid):
+    """2.1045.0 (#5827): sends the stored step st {method, path, body?} through the API as this agent (its own token from this
+    request, its address, the header CTL_HEADER = mid) in an own thread (own request context and connection, as
+    api/scopes.py approval_replay). The gate (ctl_gate -> ctl_claim) checks the card exactly as for a request from outside, so
+    nothing is looser: the body is the card's own. -> (status, body bytes, content type)."""
+    import threading
+    out = {}
+    env = {"REMOTE_ADDR": request.remote_addr or ""}
+    if request.environ.get("kalmido.inproc"):  # a server agent's run in this process (v1.py srv_inproc reads it with the token name)
+        env["kalmido.inproc"] = request.environ["kalmido.inproc"]
+    hdrs = {"Authorization": request.headers.get("Authorization", ""), CTL_HEADER: str(mid),
+            **({"If-Match": st["if_match"]} if st.get("if_match") else {})}
+    body = st.get("body")
+    data = None
+    if body not in (None, {}, []):
+        data = json.dumps(body, ensure_ascii=False).encode()
+        hdrs["Content-Type"] = "application/json"
+
+    def run():
+        try:
+            r = app.test_client().open(st["path"], method=st["method"], data=data, headers=hdrs, environ_base=env)
+            out["status"], out["body"], out["ctype"] = r.status_code, r.get_data(), r.headers.get("Content-Type") or "application/json"
+        except Exception as e:  # noqa: BLE001  answered as an error, the card stays unused (ctl_after did not run)
+            print("agent approval run:", type(e).__name__, e, flush=True)
+            out["status"], out["body"], out["ctype"] = 500, b"", ""
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    t.join(CTL_RUN_TIMEOUT)
+    return (out["status"], out["body"], out["ctype"]) if out else (504, b"", "")
+
+
+@app.post("/api/v1/agent/approvals/<int:mid>/run")
+@v1_view
+def v1_agent_approval_run(mid):
+    """2.1045.0 (#5827): runs the step of approval card mid (method, path and body as stored on the card) once, after a person's
+    Yes -- the agent never types the request a second time. The answer is the route's own answer (status and body). Refused
+    with 409 approval_invalid + reason (ctl_reason_text): not_found, unanswered, rejected, withdrawn, no_step, used (+ used_at:
+    the step ran then), one_way, approver_rights, approver_shares; a route's 409 conflict (the target changed since the card:
+    expect_updated_at / prev) gets reason stale. Only the token's own agent and its own cards."""
+    v1_args(())
+    aid = need_agent()
+    if request.get_data():
+        raise BadInput(tr("The step comes from the card: send no body"))
+    c = db()
+    m, ch, ans = ctl_card_row(c, aid, mid)
+    bad = ctl_card_state(m, ch, ans)
+    if bad and bad["reason"] == "not_found":
+        raise Denied(404)
+    if bad:
+        return v1_err(409, tr("This approval does not fit: it needs a person's Yes, exactly this method, path and body, and works once.")
+                      + " " + ctl_reason_text(bad), name="approval_invalid", message_id=mid, **bad)
+    st = ch["approval"]["step"]
+    c.commit()  # nothing of this request holds the card while the run claims it
+    status, raw, ctype = ctl_run_replay(st, mid)
+    if status == 409 and raw:
+        try:
+            j = json.loads(raw)
+        except ValueError:
+            j = None
+        er = j.get("error") if isinstance(j, dict) else None
+        code = er.get("code") if isinstance(er, dict) else None
+        if code == "conflict":  # the route's version check: the target changed since the card (the card stays unused, ctl_after)
+            fields = sorted(k for k in st["body"] if k in CTL_STATE_FIELDS) if isinstance(st.get("body"), dict) else []
+            er = {**er, "reason": "stale", "message_id": mid, "fields": fields,
+                  "message": ((er.get("message") or "") + " " + tr("The state field differs from the card ({0}): the target changed since the card, or you read it again. Read it again and ask with a new card.",
+                                                                   ", ".join(fields))).strip()}
+            return jsonify(**{**j, "error": er}), 409
+    from flask import Response
+    return Response(raw, status=status, content_type=ctype or "application/json")
 
 
 def ctl_unclaim(c, mid):
@@ -621,9 +768,11 @@ def ctl_card_extra(v):
     st = v.get("step")
     if st not in (None, ""):
         bad = BadInput(tr("Invalid value: {0}", "approval.step"))
-        if not isinstance(st, dict) or set(st) - {"method", "path", "body"} or st.get("method") not in CTL_WRITE or \
+        if not isinstance(st, dict) or set(st) - {"method", "path", "body", "if_match"} or st.get("method") not in CTL_WRITE or \
                 not isinstance(st.get("path"), str) or not re.fullmatch(r"/[^\s?#]{1,300}", st["path"]):
             raise bad
+        if st.get("if_match") not in (None, "") and (not isinstance(st["if_match"], str) or not re.fullmatch(r"[^\x00-\x1f\x7f]{1,200}", st["if_match"])):
+            raise bad  # 2.1045.0 (#5827): the If-Match of the refused request (a version), sent along by .../run
         p = ctl_norm_path(st["path"])
         if not p.startswith("/") or re.search(r"[\s?#]", p):
             raise bad
@@ -632,6 +781,9 @@ def ctl_card_extra(v):
             if not isinstance(st["body"], (dict, list)) or len(ctl_canon(st["body"])) > CTL_BODY_MAX:
                 raise bad
             out["step"]["body"] = st["body"]
+        if st.get("if_match"):
+            out["step"]["if_match"] = st["if_match"]
+        ctl_card_route(out["step"])  # 2.1045.0 (#5827): a step no route answers is refused here, never stored as a one-way card
         if ctl_card_one_way(out):
             out["one_way"] = True
     if v.get("recommend") not in (None, ""):
@@ -643,6 +795,26 @@ def ctl_card_extra(v):
             raise BadInput(tr("Invalid value: {0}", "approval.one_way"))
         out["one_way"] = True
     return out
+
+
+def ctl_card_route(st):
+    """2.1045.0 (#5827): the step {method, path} of a new approval card must be a route of the API (else 400 naming the methods
+    the path has, e.g. "allowed: PATCH"): a card with a guessed method (PUT on a wiki page that is PATCH) could never be used
+    and fell into the one-way branch of ctl_card_one_way."""
+    adapter = app.url_map.bind("localhost")
+    try:
+        adapter.match(st["path"], method=st["method"])
+        return
+    except Exception:  # noqa: BLE001  checked below: another method, or no such path
+        pass
+    try:
+        allowed = sorted(m for m in adapter.allowed_methods(st["path"]) if m in CTL_WRITE)
+    except Exception:  # noqa: BLE001
+        allowed = []
+    if allowed:
+        raise BadInput(tr("This route does not exist: {0} {1} - allowed there: {2}. Take the step from the 409 approval_required answer.",
+                          st["method"], st["path"], ", ".join(allowed)))
+    raise BadInput(tr("This route does not exist: {0} {1}. Take the step from the 409 approval_required answer.", st["method"], st["path"]))
 
 
 def ctl_card_one_way(ap):

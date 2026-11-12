@@ -1127,10 +1127,15 @@ def control_block(ctl):
     ow = [x.get("text") for x in ((ctl.get("one_way") or {}).get("fixed") or []) if isinstance(x, dict)] + list((ctl.get("one_way") or {}).get("custom") or [])
     out.append("- **One-way steps, on every level only after an approval card:** " + "; ".join(str(x) for x in ow if x) + ".")
     hdr = ctl.get("approval_header") or "X-Kalmido-Approval"
-    out.append("- **How to get an approval:** a refused write answers 409 `approval_required` (step, level). Send an approval card in "
-               "the chat (send_chat approval {title, what, step: {method, path, body}} = the 409's approval, recommend yes / no when you have a recommendation, "
-               f"one_way true for a one-way step of the list above); after the person's Yes send exactly that request again with the header "
-               f"`{hdr}: <id of the card>`. It works once and only for that method, path and body; a No or silence is never a yes.")
+    # 2.1045.0 (#5827): one way -- the step comes from the 409 (step_ref), the server runs it from the card (run_approved_step)
+    out.append("- **How to get an approval:** a refused write answers 409 `approval_required` (step, level) and names a `step_ref`. "
+               "Ask with request_chat_approval {user_id, title, what, step_ref} -- never type method, path or body yourself (a route "
+               "that does not exist is refused with 400); recommend yes / no when you have a recommendation, one_way true for a one-way "
+               "step of the list above. After the person's Yes call run_approved_step with the card's message_id: the server sends "
+               "exactly the card's step once (without MCP: POST /api/v1/agent/approvals/<id>/run; the older way, the same request "
+               f"again with the header `{hdr}: <id of the card>`, still works). A refusal names its reason: used (+ used_at) = the "
+               "step already ran, check the result instead of reporting a failure; stale = the target changed since the card, read "
+               "it again and ask anew. A No or silence is never a yes.")
     if ctl.get("deadline"):
         then = {"reject": "it counts as rejected", "ask_again": "the person is asked once more, then it counts as rejected",
                 "recommend": "your recommended answer is taken (never for a one-way step: rejected)"}.get(ctl.get("then"), "it counts as rejected")

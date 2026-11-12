@@ -32,6 +32,7 @@ ROUTES = {
     "POST /api/v1/agent/chats/{}/messages/{}/reactions": "meta", "POST /api/v1/agent/chats/{}/messages/{}/withdraw": "meta",
     "POST /api/v1/agent/jobs": "meta", "POST /api/v1/agent/jobs/{}/proposal": "meta", "POST /api/v1/agent/progress": "meta",
     "POST /api/v1/agent/decisions": "meta",  # 2.653.0 (#5079): a line in its own history, nothing in Kalmido changes
+    "POST /api/v1/agent/approvals/{}/run": "meta",  # 2.1045.0 (#5827): runs a card's step; the step itself passes the gate again
     "POST /api/v1/agent/proposals": "meta", "POST /api/v1/agent/proposals/import": "meta",
     "POST /api/v1/agent/objects/{}/{}/proposals": "meta",  # 2.623.0 (#4718): a change proposal a person takes or not
     "POST /api/v1/agent/proposals/sheet-tasks": "meta", "POST /api/v1/agent/proposals/shoot": "meta",

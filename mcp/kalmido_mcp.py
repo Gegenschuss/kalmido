@@ -84,6 +84,7 @@ class Kalmido:
         self.approval = None  # 2.235.0 (#2891): the approved card (use_approval) the next write request carries, once
         self.approval_step = None  # 2.235.0 A2 (#2891): (method, path) of that card when known: only that call carries it
         self.cards = {}  # 2.235.0 A2: message id -> step of the approval cards this process sent
+        self.refused = {}  # 2.1045.0 (#5827): step_ref -> the step of a 409 approval_required (request_chat_approval step_ref takes it over)
         self.rl_until = 0.0  # 2.391.0 A (#3360): RateLimit-Remaining was 0: no request before this time (the header's Reset)
 
     def call(self, method, path, query=None, body=None, timeout=None, multipart=None, binary_cap=None):
@@ -146,18 +147,38 @@ class Kalmido:
                 return json.loads(raw) if raw else {"ok": True}
         except urllib.error.HTTPError as e:
             raw = e.read()
-            msg = f"HTTP {e.code}"
-            try:
-                j = json.loads(raw)
-                er = j.get("error")
-                msg = (er.get("message") if isinstance(er, dict) else er) or msg
-                msg = f"HTTP {e.code}: {msg}"
-            except (ValueError, AttributeError):
-                pass
+            msg = self._err_msg(e.code, raw)
             self._note_limit(e.headers)
             raise ApiError(e.code, msg, _retry_after(e.headers, None) if e.code in (429, 503) else None) from None
         except (urllib.error.URLError, OSError) as e:
             raise ApiError(0, f"cannot reach Kalmido: {getattr(e, 'reason', e)}") from None
+
+    def _err_msg(self, code, raw):
+        """The text of an error answer: HTTP <code>: <message>. 2.1045.0 (#5827): + the reason of approval_invalid / conflict
+        (and its field names), and for 409 approval_required the step_ref of the kept step (_keep_refused)."""
+        msg = f"HTTP {code}"
+        try:
+            j = json.loads(raw)
+            er = j.get("error")
+            msg = f"HTTP {code}: " + ((er.get("message") if isinstance(er, dict) else er) or msg)
+            if isinstance(er, dict) and er.get("reason"):
+                msg += f" [reason: {er['reason']}" + (f"; fields: {', '.join(map(str, er['fields']))}" if er.get("fields") else "") + "]"
+            if isinstance(er, dict) and er.get("code") == "approval_required" and isinstance(er.get("approval"), dict):
+                msg += " " + self._keep_refused(er["approval"])
+        except (ValueError, AttributeError, TypeError):
+            pass
+        return msg
+
+    def _keep_refused(self, ap):
+        """2.1045.0 (#5827): keeps the step of a 409 approval_required (method, path, body, if_match as the server sent them), so
+        request_chat_approval takes it over by step_ref instead of the model typing it again -> the hint for the model."""
+        st = {k: ap[k] for k in ("method", "path", "body", "if_match") if ap.get(k) not in (None, "", {}, [])}
+        ref = max(self.refused, default=0) + 1
+        self.refused[ref] = st
+        for old in sorted(self.refused)[:-20]:  # the newest 20
+            del self.refused[old]
+        return (f"The step is kept as step_ref={ref} ({st.get('method')} {st.get('path')}): ask with request_chat_approval "
+                f"step_ref={ref}; after the Yes call run_approved_step with the card's message_id (never send the request again yourself).")
 
     def _note_limit(self, headers):
         try:
@@ -429,14 +450,28 @@ def t_send_chat(api, a):
 
 
 def t_request_chat_approval(api, a):
-    """2.35.0 (#1103): an approval request in the chat (a card with yes / no; the answer comes as chat_choice + approval)."""
+    """2.35.0 (#1103): an approval request in the chat (a card with yes / no; the answer comes as chat_choice + approval).
+    2.1045.0 (#5827): step_ref = the step of a 409 approval_required this process kept (Kalmido._keep_refused), taken over as it is."""
     b = {**_pick(a, ("body", "task_id", "reply_to", "job_id", "expires_in")),
          "approval": _pick(a, ("title", "what", "yes_label", "no_label", "step", "recommend", "one_way"))}  # 2.235.0 (#2891 #2901)
+    if a.get("step_ref") is not None:
+        if a.get("step"):
+            raise ApiError(400, "give step_ref or step, not both")
+        st = getattr(api, "refused", {}).get(a["step_ref"])
+        if not st:
+            raise ApiError(400, f"step_ref {a['step_ref']} is unknown here (only the newest 20 refused steps of this session are kept): "
+                                "send the write call again to get a new 409 approval_required with its step_ref")
+        b["approval"]["step"] = dict(st)
     r = api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=b)
     st = ((r.get("choices") or {}).get("approval") or {}).get("step") if isinstance(r, dict) else None
     if isinstance(st, dict) and isinstance(r.get("id"), int):  # 2.235.0 A2: remember the step for use_approval
         api.__dict__.setdefault("cards", {})[r["id"]] = (st.get("method"), urllib.parse.unquote(st.get("path") or ""))
     return r
+
+
+def t_run_approved_step(api, a):
+    """2.1045.0 (#5827): runs the step of an approval card answered Yes on the server (method, path and body from the card)."""
+    return api.call("POST", f"/agent/approvals/{int(a['message_id'])}/run")
 
 
 def t_use_approval(api, a):
@@ -592,7 +627,7 @@ TOOLS = [
                   "not exist for you (never ask for it or work around it). "
                   "2.235.0 (#2891 #2900 #2901): control = your control level {level approve_all | routine | free | null (none chosen: as "
                   "before), goal, projects [{list_id, level, effective}], one_way {fixed, custom}, deadline (s), then}; read it again on "
-                  "control_changed. A write it does not allow answers 409 approval_required: ask with request_chat_approval step, then use_approval.",
+                  "control_changed. A write it does not allow answers 409 approval_required: ask with request_chat_approval step_ref (from that answer), then run_approved_step.",
      _obj({}), lambda api, a: api.call("GET", "/agent")),
     ("get_queue", "2.236.0 (#2906 #2907): your queue -- the open tasks assigned to you that you see: {max_parallel, priority_rule, "
                   "items: [{task_id, title, list_id, list_name, state: active | waiting, position (1.. for the waiting ones), priority, "
@@ -1124,22 +1159,31 @@ TOOLS = [
                               "chat_choice with approval approved | rejected (only from its Yes / No buttons; a 👍 / 👎 on the card decides nothing); no answer is never a yes. "
                               "expires_in = seconds it stays open; close it with withdraw_chat_choices (outcome denied / expired, never allowed) "
                               "when it is no longer needed. At most 10 open requests per person (the next one: 409). "
-                              "2.235.0: step = the exact write it approves ({method, path, body} = approval of the 409, e.g. DELETE /tasks/12) when your control level "
-                              "refused it (409 approval_required); after the Yes call use_approval with this message id and repeat that "
-                              "call once with the same body. recommend = your recommended answer (yes / no; taken when the deadline of approvals runs out, "
+                              "2.235.0: step = the exact write it approves when your control level refused it (409 approval_required). "
+                              "2.1045.0: never type the step yourself -- pass step_ref from the 409 answer (the step is taken over exactly); "
+                              "after the Yes call run_approved_step with this message id (the server runs the card's step once). recommend = your recommended answer (yes / no; taken when the deadline of approvals runs out, "
                               "never for a one-way step), one_way = true for a one-way step (deleting, costs, login, migration, the owner's own list).",
      _obj({"user_id": S_ID, "title": {"type": "string", "maxLength": 200}, "what": {"type": "string", "maxLength": 1000},
-           "step": {"type": "object", "properties": {"method": {"type": "string", "enum": ["POST", "PUT", "PATCH", "DELETE"]},
-                                                     "path": {"type": "string", "maxLength": 300},
-                                                     "body": {"type": "object", "description": "the exact body of the call (none = no body)"}},
+           "step_ref": {"type": "integer", "minimum": 1, "description": "2.1045.0: the step_ref named in a 409 approval_required answer (preferred to step)"},
+           "step": {"type": "object", "description": "only without step_ref: the approval of the 409 as it stands (a route that does not exist: 400)",
+                    "properties": {"method": {"type": "string", "enum": ["POST", "PUT", "PATCH", "DELETE"]},
+                                   "path": {"type": "string", "maxLength": 300},
+                                   "body": {"type": "object", "description": "the exact body of the call (none = no body)"},
+                                   "if_match": {"type": "string", "maxLength": 200}},
                     "required": ["method", "path"]},
            "recommend": {"type": "string", "enum": ["yes", "no"]}, "one_way": {"type": "boolean"},
            "yes_label": {"type": "string", "maxLength": 200}, "no_label": {"type": "string", "maxLength": 200},
            "body": {"type": "string", "description": "optional text above the card (default: the title)"}, "task_id": S_ID,
            "reply_to": S_ID, "job_id": S_ID, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800}},
           ["user_id", "title"]), t_request_chat_approval),
-    ("use_approval", "2.235.0: after the person answered Yes on your approval card with a step (request_chat_approval step), "
-                     "the NEXT write call with exactly that method and path (and the same body) carries this approval once (header X-Kalmido-Approval). "
+    ("run_approved_step", "2.1045.0: after the person answered Yes on your approval card with a step (request_chat_approval step_ref / step), "
+                          "the server runs exactly the card's step once (method, path and body from the card) and returns the route's answer. "
+                          "Refused with the reason: unanswered / rejected / withdrawn / used (+ used_at: it already ran -- check the result, do not "
+                          "report a failure) / stale (the target changed since the card: read it again, ask with a new card).",
+     _obj({"message_id": S_ID}, ["message_id"]), t_run_approved_step),
+    ("use_approval", "2.235.0 (older way; prefer run_approved_step): after the person answered Yes on your approval card with a step (request_chat_approval step), "
+                     "the NEXT write call with exactly that method and path (and the same body) carries this approval once (header X-Kalmido-Approval); "
+                     "a refusal names its reason (method / path / body + fields / used ...). "
                      "Your control level is in get_agent control (approve_all / routine / free, goal, one-way steps, deadline).",
      _obj({"message_id": S_ID}, ["message_id"]), t_use_approval),
     ("withdraw_chat_choices", "2.30.0: take back the open answer buttons of one of your chat messages (user_id, message_id), "
@@ -2870,7 +2914,7 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 
 TOOL_SCOPES = {
     "agent": ("get_agent", "get_queue", "set_queue_order", "get_rules", "add_rule", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
-              "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "get_reply_style", "chat_typing", "send_chat", "request_chat_approval", "use_approval", "withdraw_chat_choices", "pin_chat_message", "report_usage", "get_usage",
+              "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "get_reply_style", "chat_typing", "send_chat", "request_chat_approval", "run_approved_step", "use_approval", "withdraw_chat_choices", "pin_chat_message", "report_usage", "get_usage",
               "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook",
               "log_decision"),  # 2.725.0 (#5157): POST /agent/decisions has scope agent
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
@@ -2978,7 +3022,7 @@ TOOLSETS = {
     "chat": """
         get_agent get_queue get_rules add_rule set_queue_order search propose_to_other_topic propose_to_person react react_to_chat
         pin_chat_message set_status report_progress list_events wait_for_events list_jobs create_job get_job submit_proposal update_job list_chats get_reply_style
-        confirm_abort chat_typing send_chat request_chat_approval use_approval withdraw_chat_choices delete_chat_attachment comment_typing report_usage
+        confirm_abort chat_typing send_chat request_chat_approval run_approved_step use_approval withdraw_chat_choices delete_chat_attachment comment_typing report_usage
         get_usage report_plan_usage get_plan_usage clear_plan_usage list_schedules list_rules get_me get_announcement list_news mark_news_read list_agents
         log_decision
         list_team_chats read_team_chat post_team_message list_team_channels leave_team_channel edit_team_message delete_team_message react_team_message

@@ -1381,6 +1381,15 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "/agent/chats/{id}/messages/{mid}/reactions": {"post": op("React to a message of the chat with a person (2.7.2; never an approval)", AG,
                                                                   ok(chat_rx_out) | errs("400", "403", "404"), [pid("id", "User id"), pid("mid", "Message id")],
                                                                   scope=W, body=chat_rx_in)},
+        # 2.1045.0 (#5827): run the step of an approval card answered Yes (method, path and body from the card, once)
+        "/agent/approvals/{mid}/run": {"post": op(
+            "2.1045.0 (#5827): after a person's Yes on your approval card (request_chat_approval with a step), run exactly the card's "
+            "step once: the server takes method, path and body from the card -- never type the request again. No body. The answer is "
+            "the route's own answer. 409 approval_invalid with error.reason: not_found (404), unanswered, rejected, withdrawn, no_step, "
+            "used (+ used_at: the step already ran then -- check the result, do not report a failure), one_way, approver_rights, "
+            "approver_shares; 409 conflict with reason stale: the target changed since the card (expect_updated_at / prev) -- read it "
+            "again and ask with a new card.", AG, ok({"type": "object"}) | errs("400", "403", "404", "409"),
+            [pid("mid", "Message id of the approval card")], scope=W)},
         "/agent/chats/{id}/messages/{mid}/withdraw": {"post": op("2.30.0 (#1037): withdraw the open answer buttons of one of your chat messages (they disappear, "
                                                                  "a press answers 409). outcome (permission questions and 2.35.0 approval requests only; approval requests never allowed: 400): allowed | denied | expired -- the host "
                                                                  "decided another way (an answer in words, its time limit)", AG, ok(ref("ChatMessage")) | errs("400", "403", "404", "409"),
