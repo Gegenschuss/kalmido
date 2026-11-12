@@ -252,6 +252,16 @@ c.commit()
   in `ofk_register`: the area's write locks the office trash's restore takes first (a draft's number, a part's quotation, a
   statement's positions). Left on copies (`otrash.OTB_KINDS`, a later stage): the start balance of the cash flow and a
   sign-off record whose film / document is gone; `office_trash` stays one more version for an older version.
+- 2.1050.0 (#5789, stage 4e, one way): the start balance of the cash flow (`ocfstart`, `office_cf_start`, one row per office
+  keyed by `org_id`) moved onto the core's trash as the last kind of copies: its `id` column holds the row's `org_id`
+  (`migrations.d/5789_a.py`, written on every save and before the trash; a row an older version wrote has none until then),
+  every reader skips the trash (`live_sql`; the home currency's check counts one in the trash on purpose). Setting a new
+  start balance while one lies in the trash deletes that one for good (`ofk_purge`, one row per office). A delete answers
+  `trash: {kind, id}`, the toast's undo is the core's restore `?undo=1`. The office trash of copies is gone: `otb_put`,
+  `otb_restore`, `otb_tick`, `OTB_UNDO`, `OTB_KINDS` and the routes `POST /api/office/trash/<id>/restore`, `DELETE
+  /api/office/trash/<id>`, `POST /api/office/trash/undo/<kind>/<id>`. `ofk_copies_back` writes a copy keyed by another
+  column (`snap["key"]`, the start balance's `org_id`) back with that value as its id; a copy that cannot come back stays in
+  `office_trash` unlisted until the table is dropped one version later.
 - 2.1002.0 (#5695): `_purge_rows` deletes the history / undo rows of every kind that names the purged row: the kind itself
   and each `obj_track` kind on the same table (`_purge_kinds`: an office row saved as `office_meal` / `office_fixed_cost`,
   trashed as `omeal` / `ofixed`) -- one place for every purge on the core's way, no area cleans its history itself.

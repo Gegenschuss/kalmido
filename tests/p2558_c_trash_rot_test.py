@@ -16,6 +16,8 @@ freelancer-matrix: office
  - 2.1005.0 (#5415): such an old copy is written back as a row of the core's trash at the next start (the rotation's process
    starts the app): re-encrypted as a row, restored through the core; the copy cases above run on the start balance of the
    cash flow (the kind still kept as a copy, office/otrash.py OTB_KINDS)
+ - 2.1050.0 (#5789): the start balance goes into the core's trash too (re-encrypted as a row, restored through the core); the
+   unreadable copy case runs on an old copy of it that stays a copy (the start balance was set again meanwhile)
 usage: p2558_c_trash_rot_test.py <datadir>"""
 import base64
 import json
@@ -63,6 +65,22 @@ def old_copy(oid, eid):
         c.execute("DELETE FROM office_equipment WHERE id=?", (eid,))
         c.commit()
         return c.execute("SELECT MAX(id) FROM office_trash WHERE ref_id=? AND kind='equipment'", (eid,)).fetchall()[0][0]
+    finally:
+        c.close()
+
+
+def cs_old_copy(oid):
+    """2.1050.0 (#5789): the start balance of oid as a copy in office_trash, as cfstart.py made it before 2.1050 (key org_id).
+    The row stays live, so the next start (okern.ofk_copies_back) keeps the copy (set again meanwhile) -> trash id."""
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    try:
+        row = json.loads(c.execute("SELECT CAST(row_to_json(e) AS TEXT) FROM office_cf_start e WHERE org_id=?", (oid,)).fetchall()[0][0])
+        snap = json.dumps({"rows": [["office_cf_start", [{k: v for k, v in row.items() if k not in ("id", "deleted_at", "deleted_by", "rev")}]]],
+                           "nulls": [], "key": "org_id"})
+        c.execute("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?)",
+                  (oid, "cf_start", "", oid, row.get("day") or "", snap, None, "2026-11-09T10:00:00.000Z"))
+        c.commit()
+        return c.execute("SELECT MAX(id) FROM office_trash WHERE org_id=? AND kind='cf_start'", (oid,)).fetchall()[0][0]
     finally:
         c.close()
 
@@ -137,22 +155,23 @@ def case(s, who, oid):
     j = j.get("item", j) if isinstance(j, dict) else {}
     check(d.ok and j.get("serial_no") == serial and float(j.get("purchase_net") or 0) == price,
           f"{who}: serial number and price readable after restore {d.status_code} {str(j)[:300]}")
-    # the copies still made (2.1005.0: the start balance of the cash flow, office/otrash.py OTB_KINDS) are re-encrypted in their snap
+    # 2.1050.0 (#5789): the start balance goes into the core's trash too (its row stays, deleted_at): the rotation re-encrypts
+    # the row as any other (orgcrypt_cli FIELD_ORG_ROWS), the core's restore reads it
     check(s.put(B + O + "/cashflow/start", json={"amount": "1500.00", "day": "2026-01-02"}).ok, f"{who}: setup start balance")
     r = s.delete(B + O + "/cashflow/start")
-    tcs = r.json().get("trash_id") if r.ok else None
-    a1 = cs_copy_amount(tcs)
-    check(tcs and str(a1).startswith("kenc1:"), f"{who}: the start balance's copy keeps its sealed amount {str(a1)[:12]}")
+    tcs = (r.json().get("trash") or {}).get("id") if r.ok else None
+    a1 = one("SELECT amount FROM office_cf_start WHERE id=? AND deleted_at IS NOT NULL", (tcs,))
+    check(tcs == oid and str(a1).startswith("kenc1:"), f"{who}: the start balance lies sealed in the core's trash {str(a1)[:12]} {r.text[:200]}")
     rc, out, err = cli("rotate", "--org", str(oid))
-    a2 = cs_copy_amount(tcs)
-    check(rc == 0 and str(a2).startswith("kenc1:") and a2 != a1, f"{who}: the copy in the trash is re-encrypted with the new key {rc} {out[-200:]}")
-    r = s.post(B + O + f"/trash/{tcs}/restore")
+    a2 = one("SELECT amount FROM office_cf_start WHERE id=? AND deleted_at IS NOT NULL", (tcs,))
+    check(rc == 0 and str(a2).startswith("kenc1:") and a2 != a1, f"{who}: the start balance in the trash is re-encrypted with the new key {rc} {out[-200:]}")
+    r = s.post(B + O + f"/trash/core/ocfstart/{tcs}/restore")
     st = s.get(B + O + "/cashflow/start").json().get("start") or {}
     check(r.ok and st.get("amount") == "1500.00", f"{who}: the start balance is readable after restore {r.status_code} {r.text[:200]} {st}")
     # 2.558.0 D (#4669, review F2): a copy sealed before an earlier rotation (old stock) opens with neither key: counted on
-    # its own, the rotation still finishes (before the fix it stopped with "not finished" until --force)
-    s.delete(B + O + "/cashflow/start")
-    tid2 = one("SELECT MAX(id) FROM office_trash WHERE org_id=? AND kind='cf_start'", (oid,))
+    # its own, the rotation still finishes (before the fix it stopped with "not finished" until --force). 2.1050.0 (#5789):
+    # an old copy of the start balance that stays a copy (the start balance was set again: ofk_copies_back keeps it)
+    tid2 = cs_old_copy(oid)
     old = one("SELECT snap FROM office_trash WHERE id=?", (tid2,))
     rc, out, err = cli("rotate", "--org", str(oid))
     c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)

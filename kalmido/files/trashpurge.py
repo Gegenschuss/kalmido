@@ -22,7 +22,6 @@ from ..core.db import iso, iso_ms, now_utc
 from ..core.access import live_sql  # 2.783.0 (#5368): live_sql
 from ..core.retention import ret_on, ret_report, ret_trash_cut
 from ..tasks.atttrash import atr_tick  # 2.272.0 E2 (#3038)
-from ..office.otrash import otb_tick  # 2.272.0 E2 (#3038)
 from ..life.budget import bud_trash_tick  # 2.567.0 A (#4707)
 from ..files.store import fs_purge_files  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
@@ -104,7 +103,7 @@ def tp_tick(c, force=False):
         fc, fp = atr_tick(c, cut, purge)  # 2.272.0 E2 (#3038): task / comment / project files (unlinked after the commit)
         counts.update(fc)
         paths += fp
-        counts["office"] = otb_tick(c, cut, purge)  # 2.272.0 E2 (#3038); 2.1005.0 (#5415): the copies left (start balance, sign-off records)
+        # 2.1050.0 (#5789): the office's copies (otb_tick) are gone: every office kind is on the core's run (obj_trash_tick)
         try:  # 2.567.0 A (#4707): household budget entries (with their receipts), templates, categories
             with c.savepoint():
                 bc, bp = bud_trash_tick(c, cut, purge)

@@ -186,6 +186,15 @@ def _p_once(table, text):
     return prep
 
 
+def _p_cf_start(c, run, src, d, ctx):
+    """2.1050.0 (#5789): the start balance once per office (_p_once); its id is the office's org_id (the core's trash names
+    it so, office/cfstart.py), never the source's."""
+    d = _p_once("office_cf_start", N_("The target office already has its own cash flow start balance; it was kept."))(c, run, src, d, ctx)
+    if d:
+        d["id"] = d.get("org_id")
+    return d
+
+
 def _p_company(c, run, src, d, ctx):
     """2.470.0 (#3596): notes that the target keeps its own company: its bank accounts stay in charge too (_p_bank_account)."""
     r = _p_once("office_company", N_("The target office already has its own company data; they were kept."))(c, run, src, d, ctx)
@@ -737,7 +746,7 @@ SPECS = [
     OiT("office/peppol_sends.json", "office_peppol_sends", refs={"doc_id": "office_docs"}, need=("doc_id",), people=_P,
         private="office"),  # 2.154.0 B (#1960): the history of sends over Peppol (the connection itself is set up again)
     OiT("office/cashflow_start.json", "office_cf_start", people={"updated_by": "null"}, private="office", rid=False, key=("org_id",),
-        prep=_p_once("office_cf_start", N_("The target office already has its own cash flow start balance; it was kept."))),
+        prep=_p_cf_start),  # 2.1050.0 (#5789): + its id (= the target's org_id)
     OiT("office/cashflow_adjust.json", "office_cf_adjust", people=_P, private="office"),
     OiT("office/cashflow_actual.json", "office_cf_actual", people={"updated_by": "null"}, private="office"),
     OiT("office/bank_imports.json", "office_bank_imports", people=_P, private="office"),

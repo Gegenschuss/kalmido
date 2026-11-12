@@ -1049,7 +1049,9 @@ the balance from the bank statement at the end of a month; the card shows the **
 (only shown, nothing is booked). Without a starting balance and without corrections the cash flow looks exactly as before.
 Amounts and notes are encrypted at rest; the same for organisations and for freelancers in their private office.
 `GET/PUT/DELETE /api/office/cashflow/start` (`{amount, day}` -> `{start, prev}`), `POST /api/office/cashflow/adjust`
-(`{month, dir in|out, amount, note}`), `PATCH/DELETE /api/office/cashflow/adjust/<id>` (delete answers the row for the undo),
+(`{month, dir in|out, amount, note}`), `PATCH/DELETE /api/office/cashflow/adjust/<id>` (delete answers the row for the undo;
+2.1050: deleting the starting balance puts it into the office trash and answers `trash: {kind, id}`, the undo is the trash's
+`POST /api/office/trash/core/<kind>/<id>/restore?undo=1`; setting a new one deletes one in the trash for good),
 `PUT /api/office/cashflow/actual` (`{month, amount}`; null removes it). The cash flow answer adds `start`, `adjust` and per
 month `account`, `manual {in, out}`, `real`, `diff` - only when they are set.
 

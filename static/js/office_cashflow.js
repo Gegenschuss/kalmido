@@ -386,10 +386,10 @@ function cfs_settingsHtml() {
     ${st === undefined ? `<p class="muted">${tr('Loading…')}</p>` : `${ofcRowF('cfs-amount-set', tr('Starting balance'), `<span class="lacts">${ofcIn('cfs-amount-set', st ? fmtNum(+st.amount, 2) : '', {num: true, ph: tr('optional')})}<span class="muted">${ofcSym(ofcHome())}</span></span>`)}
     <div class="row"><label id="cfs-dayl">${tr('Reference date')}</label>${dateIn('cfs-day', st?.day || CFS.day || today(), {label: tr('Reference date'), clear: false})}</div>`}</section>`;
 }
-async function cfs_startSet(v, tid) {  // 2.567.0 (#4707): -> the office trash id of a removed start balance; tid: its undo writes that copy back
-  let out = null;
-  if (tid) CFS.st = (await api('POST', `/api/office/trash/undo/cf_start/${tid}`), (await api('GET', '/api/office/cashflow/start')).start);
-  else CFS.st = v ? (await api('PUT', '/api/office/cashflow/start', {amount: v.amount, day: v.day})).start : (out = (await api('DELETE', '/api/office/cashflow/start')).trash_id || null, null);
+async function cfs_startSet(v, tid) {  // 2.567.0 (#4707): -> where a removed start balance lies; tid: its undo takes it back
+  let out = null;  // 2.1050.0 (#5789): in the core's trash ({kind, id}; the toast's undo = the core's restore ?undo=1)
+  if (tid) CFS.st = (await api('POST', `/api/office/trash/core/${tid.kind}/${tid.id}/restore?undo=1`), (await api('GET', '/api/office/cashflow/start')).start);
+  else CFS.st = v ? (await api('PUT', '/api/office/cashflow/start', {amount: v.amount, day: v.day})).start : (out = (await api('DELETE', '/api/office/cashflow/start')).trash || null, null);
   CFS.day = ''; RKF.data = null; const sec = $('.cfsset'); if (sec) sec.outerHTML = cfs_settingsHtml();
   return out;
 }

@@ -135,7 +135,7 @@ ROUTES = {
     # 2.394.0 B (#3377): the issue import of a project's own repository (p2394_b_git_issues_test.py as the freelancer)
     "POST /api/repos/{}/issues/import": "tasks",
     # 2.1005.0 (#5415): POST /api/office/trips/trash/<id>/restore and /cards/trash/<id>/restore went (the copies are rows of the core's trash)
-    "POST /api/office/trash/undo/{}/{}": "office",  # 2.567.0 (#4707): p2567_c_office_trash_test.py (other office 403 / 404, member 403)
+    # 2.1050.0 (#5789): POST /api/office/trash/undo/<kind>/<id> went (the start balance is on the core's trash: .../core/ocfstart/<id>/restore?undo=1)
     # 2.905.0 (#5414): the office trash's rows in the core's trash (p2905_d_office_trash_4c_test.py as the freelancer)
     "POST /api/office/trash/core/{}/{}/restore": "office", "DELETE /api/office/trash/core/{}/{}": "office",
     # 2.1005.0 (#5415): trips, travel receipts and card positions out of the core's trash (p21005_d_trash_4d_test.py as the freelancer)
@@ -227,7 +227,7 @@ ROUTES = {
     # 2.272.0 E2 (#3038): the trash of task / project files and of the office (p2272_e2_attach_trash_test.py) - routes below this line
     "POST /api/attachments/{}/restore": "tasks", "POST /api/list-files/{}/restore": "lists",
     "DELETE /api/attachments/{}/purge": "tasks", "DELETE /api/list-files/{}/purge": "lists",  # 2.272.0 F (#3038, E2-H2)
-    "GET /api/office/trash": "office", "POST /api/office/trash/{}/restore": "office", "DELETE /api/office/trash/{}": "office",
+    "GET /api/office/trash": "office",  # 2.1050.0 (#5789): the copies' POST .../trash/<id>/restore and DELETE .../trash/<id> went
     # (2.272.0 spacer E2)
     # 2.153.0 (#2028): letters (p2106_a_api_test.py) - routes below this line
     "GET /api/office/letters": "office", "POST /api/office/letters": "office", "GET /api/office/letters/recipients": "office",
@@ -1363,7 +1363,6 @@ DELETE /api/office/logo
 DELETE /api/office/meals/choices/{}
 DELETE /api/office/meals/{}/file/{}
 DELETE /api/office/packs/installed/{}/{}
-DELETE /api/office/trash/{}
 DELETE /api/office/trips/purposes/{}
 DELETE /api/paperless
 DELETE /api/paperless/zip

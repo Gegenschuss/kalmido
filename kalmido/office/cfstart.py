@@ -27,14 +27,23 @@ from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .cashflow import DATE_RE, MONTH_RE, _add_months, _ctx
 from .model import office_settings  # 2.369.5 (#2517): pulled up from functions
-from .otrash import OTB_UNDO, otb_put  # 2.567.0 (#4707): the start balance goes into the office trash
 from .okern import ofk_register, ofk_trash  # 2.905.0 (#5414): a correction goes into the core's trash
+from .okern import ofk_purge  # 2.1050.0 (#5789): a start balance of the trash makes room for a new one
 
 CFS_TRASH_START, CFS_TRASH_ADJ = "cf_start", "cf_adjust"  # 2.567.0 (#4707): their kinds in the office trash (the app's names)
-OTB_UNDO[CFS_TRASH_START] = _ctx  # the toast's undo: the office admin, as deleting it
 # 2.905.0 (#5414): a correction lies in the core's trash (kind oadjust; toast's undo POST /api/office/trash/core/oadjust/<id>/restore?undo=1).
-# The start balance stays on the office trash: office_cf_start has no id (one row per office, key org_id), the core's trash needs one.
 CFS_ADJ_KIND = "oadjust"
+# 2.1050.0 (#5789, stage 4e): the start balance lies in the core's trash too (kind ocfstart; the toast's undo POST
+# /api/office/trash/core/ocfstart/<id>/restore?undo=1). office_cf_start has one row per office (key org_id): its id column
+# holds the org_id (migrations.d/5789_a.py), written on every save and before the trash (_cfs_id: a row of an older version).
+CFS_START_KIND = "ocfstart"
+ofk_register(CFS_START_KIND, "office_cf_start", N_("Starting balance"), "cashflow", need="edit",
+             view={"kind": CFS_TRASH_START, "label": lambda c, oid, row: row.get("day") or "", "ctx": _ctx})  # label: the day (the amount is sealed)
+
+
+def _cfs_id(c, oid):
+    """2.1050.0 (#5789): the start balance of office area oid named by its id (= org_id) for the core."""
+    c.execute("UPDATE office_cf_start SET id=org_id WHERE org_id=? AND id IS NULL", (oid,))
 
 
 def _cfs_adj_limit(c, oid, row):
@@ -87,7 +96,7 @@ def cfs_month(v):
 # ---------------------------------------------------------------- the start balance
 def cfs_start(c, oid):
     """{amount, day, updated_at} of office area oid or None."""
-    r = c.execute("SELECT * FROM office_cf_start WHERE org_id=?", (oid,)).fetchone()
+    r = c.execute(f"SELECT * FROM office_cf_start WHERE org_id=? AND {live_sql()}", (oid,)).fetchone()  # 2.1050.0 (#5789): not the trash
     if not r:
         return None
     d = oc_dec_fields(c, oid, "office_cf_start", r)
@@ -113,10 +122,14 @@ def cfs_start_put():
     amount, day = cfs_amount(b.get("amount"), "amount"), cfs_day(b.get("day"))
     write_lock(c, f"office_cfs_{int(oid)}")
     prev = cfs_start(c, oid)
+    if c.execute("SELECT 1 FROM office_cf_start WHERE org_id=? AND deleted_at IS NOT NULL", (oid,)).fetchone():
+        # 2.1050.0 (#5789): one in the trash makes room (one row per office): deleted for good on the core's way (its undo
+        # step and history go along); the new one is a row of its own (the copies' restore answered 409 here before)
+        ofk_purge(c, CFS_START_KIND, oid)
     row = oc_enc_fields(c, oid, "office_cf_start", {"amount": amount})
-    c.execute("INSERT INTO office_cf_start(org_id, amount, day, updated_by, updated_at) VALUES(?,?,?,?,?) ON CONFLICT(org_id) DO UPDATE SET "
-              "amount=excluded.amount, day=excluded.day, updated_by=excluded.updated_by, updated_at=excluded.updated_at",
-              (oid, row["amount"], day, uid, iso(now_utc())))
+    c.execute("INSERT INTO office_cf_start(org_id, id, amount, day, updated_by, updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(org_id) DO UPDATE SET "
+              "id=excluded.id, amount=excluded.amount, day=excluded.day, updated_by=excluded.updated_by, updated_at=excluded.updated_at, rev=office_cf_start.rev+1",
+              (oid, oid, row["amount"], day, uid, iso(now_utc())))
     bump(c)
     c.commit()
     return jsonify(start=cfs_start(c, oid), prev=prev)
@@ -124,16 +137,22 @@ def cfs_start_put():
 
 @app.delete("/api/office/cashflow/start")
 def cfs_start_delete():
-    """Office admin. Removes the start balance (the cash flow is as before it) -> {ok, prev, trash_id}. 2.567.0 (#4707): a
-    copy goes into the office trash first (the undo: POST /api/office/trash/undo/cf_start/<trash_id>); none set: trash_id null."""
+    """Office admin. Removes the start balance (the cash flow is as before it) -> {ok, prev, trash}. 2.1050.0 (#5789): into
+    the core's trash (trash = {kind, id}: the client's undo POST /api/office/trash/core/ocfstart/<id>/restore?undo=1, one undo
+    step of the person); none set: trash null (a row without day / amount goes for good)."""
     c, uid, oid = _ctx()
     write_lock(c, f"office_cfs_{int(oid)}")
     prev = cfs_start(c, oid)
-    tid = otb_put(c, oid, uid, CFS_TRASH_START, "office_cf_start", oid, (prev or {}).get("day") or "", key="org_id") if prev else None  # label: the day (the amount is sealed)
-    c.execute("DELETE FROM office_cf_start WHERE org_id=?", (oid,))
+    trash = None
+    if prev:
+        _cfs_id(c, oid)
+        ofk_trash(c, uid, CFS_START_KIND, oid)
+        trash = {"kind": CFS_START_KIND, "id": oid}
+    else:  # an empty row (no day / amount) or none: nothing to keep
+        c.execute(f"DELETE FROM office_cf_start WHERE org_id=? AND {live_sql()}", (oid,))
     bump(c)
     c.commit()
-    return jsonify(ok=True, prev=prev, trash_id=tid)
+    return jsonify(ok=True, prev=prev, trash=trash)
 
 
 # ---------------------------------------------------------------- corrections by hand

@@ -591,7 +591,7 @@ ORDER = (
     "office.owrite",  # 2.567.0 (#4711): the one write call of an office row on the core's write layer (lock, version, history, undo)
     "office.undo",  # 2.111.0 A (#2233): undo of the office editors (copies before each own change, restore with conflict check)
     "office.undogrp",  # 2.747.0 (#5249): who may take an office step back from the core's step groups (after office.undo)
-    "office.otrash",  # 2.272.0 E2 (#3038): the office trash's routes (2.1005.0, #5415: the core's rows + the copies of two kinds left)
+    "office.otrash",  # 2.272.0 E2 (#3038): the office trash's routes (2.1050.0, #5789: the core's rows only, the copies are gone)
     "tasks.atttrash",  # 2.272.0 E2 (#3038): the trash run of task / comment / project files (no routes)
     "office.numranges",  # 2.138.0 D (#2256): the next running number of every number series (office admin)
     "office.timebill",  # 2.144.6 A (#2053): time entries billable / billed by an invoice, never twice

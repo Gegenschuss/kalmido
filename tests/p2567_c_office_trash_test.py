@@ -9,7 +9,8 @@ tenant-matrix: office
    member 403, a second undo 404
  - a correction of the cash flow: the same through the undo route (cf_adjust); 2.905.0 (#5414): the core's trash (oadjust)
  - the start balance (a table without an id): DELETE answers trash_id, the office trash restores it; set again meanwhile:
-   409 and the new value stays
+   409 and the new value stays. 2.1050.0 (#5789): the core's trash (kind ocfstart): DELETE answers trash {kind, id}; set again
+   meanwhile: the one in the trash goes for good (the undo 404), the new value stays
  - a letter's link to a document: DELETE answers trash_id, the undo writes the link back; 2.905.0 (#5414): the core's
    trash (oletlink); linked again after a removal: the row of the trash is the link again
  - an import of fixed costs taken back (POST .../fixed-costs/delete): ONE entry in the office trash, restore brings every
@@ -112,25 +113,33 @@ def scenario(S, who, ws, other, member=None):
     r = S.post(B + f"/api/office/trash/core/oadjust/{ta}/restore?undo=1")
     check(r.ok and r.json().get("id") == aid and sql("SELECT 1 FROM office_cf_adjust WHERE id=? AND deleted_at IS NULL", (aid,)), f"{who}: the undo brings the correction back {r.text[:200]}")
 
-    # ------------------------------------------------------------ the start balance (no id column)
+    # ------------------------------------------------------------ the start balance (one row per office)
+    # 2.1050.0 (#5789): the core's trash (kind ocfstart, id = the office's org_id) instead of a copy in office_trash; the undo
+    # is the core's restore ?undo=1; set again meanwhile: the one in the trash goes for good, the undo 404
     r = S.put(B + O + "/cashflow/start", json={"amount": "1500.00", "day": PM1})
     check(r.ok, f"{who}: setup start balance {r.text[:200]}")
     r = S.delete(B + O + "/cashflow/start")
-    ts = r.json().get("trash_id") if r.ok else None
-    check(r.ok and ts and S.get(B + O + "/cashflow/start").json().get("start") is None, f"{who}: the start balance goes with a copy {r.text[:200]}")
+    tr0 = (r.json().get("trash") or {}) if r.ok else {}
+    ts = tr0.get("id")
+    check(r.ok and tr0.get("kind") == "ocfstart" and ts and "trash_id" not in r.json() and S.get(B + O + "/cashflow/start").json().get("start") is None
+          and sql("SELECT 1 FROM office_cf_start WHERE id=? AND deleted_at IS NOT NULL", (ts,)) and not sql("SELECT 1 FROM office_trash WHERE kind='cf_start'"),
+          f"{who}: the start balance goes into the core's trash {r.text[:200]}")
     check(in_trash(S, ts, "cf_start"), f"{who}: the office trash lists the start balance")
-    r = S.post(B + f"{O}/trash/{ts}/restore")
+    r = S.post(B + f"{O}/trash/core/ocfstart/{ts}/restore")
     st = S.get(B + O + "/cashflow/start").json().get("start") or {}
     check(r.ok and st.get("amount") == "1500.00" and st.get("day") == PM1, f"{who}: the office trash restores the start balance {r.text[:200]} {st}")
     r = S.delete(B + O + "/cashflow/start")
-    ts = r.json().get("trash_id")
-    S.put(B + O + "/cashflow/start", json={"amount": "900.00", "day": PM2})
+    ts = (r.json().get("trash") or {}).get("id")
     # 2.1005.0 (#5415): the stranger's probe of the undo route moved here from the trips import (trips are on the core's trash)
-    check(other.post(B + f"/api/office/trash/undo/cf_start/{ts}").status_code in (403, 404), f"{who}: another office: the undo 403 / 404")
-    r = S.post(B + f"/api/office/trash/undo/cf_start/{ts}")
+    check(other.post(B + f"/api/office/trash/core/ocfstart/{ts}/restore?undo=1").status_code in (403, 404), f"{who}: another office: the undo 403 / 404")
+    if member is not None:
+        check(member.post(B + f"/api/office/trash/core/ocfstart/{ts}/restore?undo=1").status_code == 403, f"{who}: a member: the undo 403")
+    r = S.put(B + O + "/cashflow/start", json={"amount": "900.00", "day": PM2})
+    check(r.ok and r.json().get("prev") is None, f"{who}: a new start balance while one is in the trash {r.text[:200]}")
+    r = S.post(B + f"/api/office/trash/core/ocfstart/{ts}/restore?undo=1")
     st = S.get(B + O + "/cashflow/start").json().get("start") or {}
-    check(r.status_code == 409 and st.get("amount") == "900.00" and sql("SELECT 1 FROM office_trash WHERE id=?", (ts,)),
-          f"{who}: set again meanwhile: 409, the new value and the copy stay {r.status_code} {r.text[:200]} {st}")
+    check(r.status_code == 404 and st.get("amount") == "900.00" and st.get("day") == PM2 and not in_trash(S, ts, "cf_start"),
+          f"{who}: set again meanwhile: the old one left the trash, the undo 404, the new value stays {r.status_code} {r.text[:200]} {st}")
 
     # ------------------------------------------------------------ a letter's link
     nid = upload(S, ws, f"schreiben-{who}.pdf")

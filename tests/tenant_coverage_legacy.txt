@@ -94,7 +94,6 @@ DELETE /api/office/privacy-sheets/{}
 DELETE /api/office/rights/groups/{}
 DELETE /api/office/series/{}
 DELETE /api/office/terms/{}
-DELETE /api/office/trash/{}
 DELETE /api/office/trips/purposes/{}
 DELETE /api/office/trips/{}
 DELETE /api/office/trips/{}/items/{}
@@ -1093,7 +1092,6 @@ POST /api/office/settings/bank-accounts/{}/default
 POST /api/office/settings/bank-accounts/{}/restore
 POST /api/office/terms/{}
 POST /api/office/terms/{}/restore
-POST /api/office/trash/{}/restore
 POST /api/office/trial/delete-all
 POST /api/office/trips
 POST /api/office/trips/bill

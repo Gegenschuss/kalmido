@@ -21,7 +21,8 @@ that person's personal office (office/model.py pb_personal, never made here) for
 the office trash's restore / delete (ofk_office_of).
 2.1005.0 (#5415, stage 4d part 1): document drafts (odoc, office/docs.py) and quotation parts (opart, office/parts.py) moved here.
 2.1005.0 (#5415, part E): the old copies of office_trash of these kinds come back as rows of the core's trash (ofk_copies_back,
-every start); only the start balance still goes as a copy (office/otrash.py OTB_KINDS)."""
+every start). 2.1050.0 (#5789, stage 4e): the start balance of the cash flow (ocfstart, office/cfstart.py, one row per office,
+its id = its org_id) moved here as the last kind; its old copies (key org_id) come back the same way."""
 import json  # 2.1005.0 (#5415): the copies written back (ofk_copies_back)
 
 from ..core.access import Denied, trash_sql
@@ -300,6 +301,8 @@ def _dangling(c, table, row):
 # A draft as odoc_trash leaves it: number / series place free (kept in trash_refs, back on restore where still free), the
 # emptied references and billed time entries in trash_refs; a finalised quotation as a draft (its delete since 2.1005). A copy
 # whose row or a unique key is there again (restored meanwhile, a new text with its key) is left in office_trash and counted.
+# 2.1050.0 (#5789): such a copy is never listed or restored any more (the copies' routes and otb_tick are gone); it goes with
+# the table in the next version.
 # Every start (kalmido/startup.py after init_db, the app's modules loaded): a no-op once no copy of a core kind is left; the table stays for
 # one more version (an older version still reads it).
 def _copy_insert(c, table, names, row, tc=table_columns):
@@ -322,19 +325,23 @@ def _doc_refs_row(row, snap, orig):
 
 def _copy_back(c, kind, t, snap, names, tc=table_columns):
     """Copy t (a row of office_trash) of kind back; raises on a conflict (the caller's savepoint takes it all back). tc: table_columns
-    or the run's cache of it (2.1055.0, #5791)."""
+    or the run's cache of it (2.1055.0, #5791).
+    2.1050.0 (#5789): a copy keyed by another column (snap key: the start balance's org_id) takes that value as its id."""
     ts, by = t["deleted_at"], t["deleted_by"]
     table, top = snap["rows"][0]
     cols = tc(c, table)
+    key = snap.get("key") or "id"
     ids = []
     for raw in top:
         row = {k: _unval(v) for k, v in raw.items() if k in cols}
+        if key != "id":
+            row["id"] = row.get(key)
         if "org_id" in cols and ofk_office_of(c, kind, row) != t["org_id"]:
             raise Denied(409)  # review 2.1005.0 (F2): never into another area than the copy's (a personal kind's row without an
             # organisation: its person's personal office, as the copy named it - an old sign-off record's copy, #5494)
         orig = dict(row)
-        if c.execute(f"SELECT 1 FROM {qi(table, names)} WHERE id=?", (row["id"],)).fetchone():
-            raise Denied(409)  # restored meanwhile (or its id taken)
+        if row["id"] is None or c.execute(f"SELECT 1 FROM {qi(table, names)} WHERE id=? OR {qi(key, cols)}=?", (row["id"], row[key])).fetchone():
+            raise Denied(409)  # restored meanwhile (or its id taken; 2.1050.0: a start balance set again meanwhile)
         for col in _dangling(c, table, row):  # gone for good since: empty, as the database had done
             row[col] = None
         row.update(deleted_at=ts, **({"deleted_by": by} if "deleted_by" in cols else {}))
@@ -375,7 +382,6 @@ def ofk_copies_back(c):
         return out
     kinds = {k["table"]: kind for kind, k in OFK.items()}
     names = table_names(c)
-    from .otrash import OTB_KINDS  # 2.1055.0 (#5791, fable 2.1005 F6): at call time (otrash imports this module)
     cols = {}  # table -> its columns, once per run (was a catalog query per copy and row)
 
     def tc(_c, table):
@@ -384,9 +390,10 @@ def ofk_copies_back(c):
         return cols[table]
 
     with system_ctx(c):
-        # 2.1055.0 (#5791, F6): first only the ids of the copies of the other kinds (never the start balance's copies kept
-        # here), then each copy's snapshot on its own -- not every snapshot of the table at once on every start
-        tids = [x[0] for x in c.execute("SELECT id FROM office_trash WHERE kind <> ALL(CAST(? AS TEXT[])) ORDER BY id", (list(OTB_KINDS),))]
+        # 2.1055.0 (#5791, F6): first only the ids of the copies, then each copy's snapshot on its own -- not every snapshot
+        # of the table at once on every start. 2.1050.0 (#5789): the start balance's copies too (no kind is kept as a copy
+        # any more, otrash.OTB_KINDS is gone); a copy whose kind is not on the core's trash still stays (the check below)
+        tids = [x[0] for x in c.execute("SELECT id FROM office_trash ORDER BY id")]
         for tid in tids:
             t = c.execute("SELECT * FROM office_trash WHERE id=?", (tid,)).fetchone()
             if not t:
@@ -394,9 +401,9 @@ def ofk_copies_back(c):
             try:  # review 2.1005.0 (F1): a copy that cannot be read stays a copy, the start goes on
                 snap = json.loads(t["snap"] or "{}")
                 rows = (snap.get("rows") or []) if isinstance(snap, dict) else []
-                kind = kinds.get(rows[0][0]) if rows and (snap.get("key") or "id") == "id" else None
-                if kind is None or rows[0][0] not in names or "deleted_at" not in tc(c, rows[0][0]):
-                    continue  # a kind not on the core's trash: stays a copy
+                kind = kinds.get(rows[0][0]) if rows else None  # 2.1050.0 (#5789): + a copy keyed by org_id (the start balance)
+                if kind is None or rows[0][0] not in names or not {"deleted_at", "id", snap.get("key") or "id"} <= set(tc(c, rows[0][0])):
+                    continue  # a kind not on the core's trash: stays a copy (the table goes in a later version)
             except (ValueError, TypeError, IndexError, KeyError, AttributeError):
                 continue
             try:

@@ -9,7 +9,8 @@ travel costs never offer a draft of the trash. Invented names and figures only.
    omd_services), restored through the core: the draft with its positions and its number, the trip with its receipt, the
    service live; another organisation 404
  - a copy whose row is there again (a conflict) is left in office_trash and counted, never listed; a copy of a kind not on
-   the core's trash (the start balance of the cash flow) stays a copy and is still listed and restored
+   the core's trash (the start balance of the cash flow) stays a copy and is still listed and restored (2.1050.0, #5789: the
+   start balance is on the core's trash too, its copies come back the same way - p21050_b_cfstart_trash_test.py)
  - a written-back draft whose copy is older than the trash period: the core's retention run deletes it for good
  - the copies' routes of the other kinds are gone: POST /api/office/trash/<id>/restore of a draft's copy 404
  - travel costs (#5415 D, d_leser.md): a draft of the trash is never offered for billing (bill-docs), billing onto it 404, a
@@ -116,11 +117,8 @@ def scenario(S, who, oid, uid):
     # a conflict: its row is there again (restored meanwhile by hand) - the copy is left and never listed
     svc2 = S.post(OFC + "/services", json={"name_de": f"Example Colour {who}"}).json()["id"]
     tc = old_copy(oid, uid, "services", "office_services", svc2, f"Example Colour {who}", delete=False)
-    # a kind not on the core's trash: the start balance stays a copy
-    check(S.put(OFC + "/cashflow/start", json={"amount": "700.00", "day": PM1}).ok, f"{who}: setup start balance")
-    r = S.delete(OFC + "/cashflow/start")
-    tcs = r.json().get("trash_id") if r.ok else None
-    check(tcs, f"{who}: the start balance goes with a copy {r.text[:200]}")
+    # 2.1050.0 (#5789): the start balance (the last kind of copies) is on the core's trash too: its old copy (key org_id) is
+    # written back the same way - tests/p21050_b_cfstart_trash_test.py
     check(S.post(OFC + f"/trash/{td}/restore").status_code == 404, f"{who}: the copies' restore of a draft is gone (404)")
 
     out = copies_back()
@@ -135,8 +133,6 @@ def scenario(S, who, oid, uid):
     check(dbx("SELECT number FROM office_docs WHERE id=?", (did,))[0][0] == "", f"{who}: the number is free while it lies in the trash")
     check(dbx("SELECT 1 FROM office_trash WHERE id=?", (tc,)) and not [x for x in trash(S) if x["id"] == tc and not x.get("core")],
           f"{who}: the conflict copy is left, not listed")
-    check(dbx("SELECT 1 FROM office_trash WHERE id=?", (tcs,)) and [x for x in trash(S) if x["id"] == tcs and x["kind"] == "cf_start"],
-          f"{who}: the start balance stays a copy and is listed")
     check(S.get(OFC + f"/docs/{did}").status_code == 404 and trip not in [t["id"] for t in S.get(T, params={"year": PM1[:4]}).json().get("trips", [])],
           f"{who}: the draft and the trip are not in the office")
     lst = trash(S)
@@ -155,9 +151,6 @@ def scenario(S, who, oid, uid):
     check(r.ok and t and [x["id"] for x in t.get("items") or []] == [item], f"{who}: the trip comes back with its receipt {r.text[:200]}")
     r = S.post(OFC + f"/trash/core/omd_services/{svc}/restore")
     check(r.ok and deleted("office_services", svc) == (None, None), f"{who}: the service comes back live {r.text[:200]}")
-    r = S.post(OFC + f"/trash/{tcs}/restore")
-    st = S.get(OFC + "/cashflow/start").json().get("start") or {}
-    check(r.ok and st.get("amount") == "700.00", f"{who}: the start balance's copy comes back {r.text[:200]} {st}")
     # ------------------------------------------------------------ an old copy past the trash period: the core's retention run
     r = S.post(OFC + "/docs", json={"kind": "invoice", "lang": "en", "project_title": f"Example Old {who}"})
     old = r.json()["id"]
