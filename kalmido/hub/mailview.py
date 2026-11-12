@@ -406,12 +406,12 @@ def mh_make_task(mid):
         return err(tr("Invalid value: {0}", "due"))
     if list_role(c, lid, uid) not in WRITE_ROLES:
         raise Denied(404)
-    l = c.execute(f"SELECT org_id, e2e, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone()
-    if _org(l["org_id"]) != _org(m["org_id"]):
+    lr = c.execute(f"SELECT org_id, e2e, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone()
+    if _org(lr["org_id"]) != _org(m["org_id"]):
         return err(tr("The project belongs to another workspace"), 409)
-    if l["archived"]:  # 2.141.0 B (#2139, review): not into an archived list
+    if lr["archived"]:  # 2.141.0 B (#2139, review): not into an archived list
         raise Denied(404)
-    if l["e2e"] or le2b_list_locked(c, lid):
+    if lr["e2e"] or le2b_list_locked(c, lid):
         return err(tr("Not possible in a locked project"), 409)
     title0, desc = _defaults(c, m)
     title = _title(b, title0)

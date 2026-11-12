@@ -117,17 +117,17 @@ def sh2_target_list(c, sheet, uid, lid):
     sheet: that organisation's lists; a private sheet: lists without organisation), no lock, not archived."""
     lid = _int(lid, "list_id")
     role = list_role(c, lid, uid)
-    l = c.execute(f"SELECT id, name, org_id, e2e, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone()
-    if not role or not l or l["org_id"] != sheet["org_id"]:
+    lr = c.execute(f"SELECT id, name, org_id, e2e, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone()
+    if not role or not lr or lr["org_id"] != sheet["org_id"]:
         raise Denied(404)
     if role not in WRITE_ROLES:
         raise Denied(403)
     from ..collab.liste2eguard import le2b_list_locked
-    if l["e2e"] is not None or le2b_list_locked(c, lid):
+    if lr["e2e"] is not None or le2b_list_locked(c, lid):
         raise Denied(409, tr("This project is locked: its texts can only be written in the app"))
-    if l["archived"]:
+    if lr["archived"]:
         raise Denied(409, tr("This project is archived"))
-    return l
+    return lr
 
 
 def sh2_office(c, sheet, uid, create=False, write=False):

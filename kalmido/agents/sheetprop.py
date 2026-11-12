@@ -66,16 +66,16 @@ def ast2_list_ok(c, aid, sheet, lid):
     """The target list for agent aid: shared with it (list_role: never outside its organisation), inside its list limit, never
     a health / budget list or one with the lock, not archived, in the table's space. 404 / 409 otherwise."""
     a = agent_row(c, aid)
-    l = c.execute(f"SELECT id, name, org_id, life, e2e, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone()
-    if not a or not l or not list_role(c, lid, aid) or (l["life"] or "") in ("health", "budget") or l["e2e"] is not None:
+    lr = c.execute(f"SELECT id, name, org_id, life, e2e, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone()
+    if not a or not lr or not list_role(c, lid, aid) or (lr["life"] or "") in ("health", "budget") or lr["e2e"] is not None:
         raise Denied(404)
     if a["list_ids"] and lid not in ids_parse(a["list_ids"]):
         raise Denied(404)
-    if (a["org_id"] and l["org_id"] and l["org_id"] != a["org_id"]) or l["org_id"] != sheet["org_id"]:
+    if (a["org_id"] and lr["org_id"] and lr["org_id"] != a["org_id"]) or lr["org_id"] != sheet["org_id"]:
         raise Denied(409, tr("The project must be in the same workspace as the table"))
-    if l["archived"]:
+    if lr["archived"]:
         raise Denied(409, tr("This project is archived"))
-    return l
+    return lr
 
 
 def ast2_person_ok(c, pid, sheet, lid):
