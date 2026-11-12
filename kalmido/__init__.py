@@ -619,6 +619,7 @@ ORDER = (
     "hub.dspkern",  # 2.872.0 (#5532): the shoot day and its call sheet as kinds of the shared core (after hub.callsheet)
     "events.evundo", "contacts.ctundo", "files.fsundo", "personal.habitundo",  # 2.777.0 (#5254): their steps in the step groups (who may take them back)
     "lists.lpundo",  # 2.809.0 (#5476): a project's settings in the step groups
+    "lists.otrundo",  # 2.997.0 (#5609): a project into the list trash in the step groups
     "lists.secundo",  # 2.809.0 (#5476): creating / deleting / restoring a section in the step groups
     "personal.timeundo",  # 2.809.0 (#5476): changing / deleting a time entry in the step groups
     "lists.fieldundo",  # 2.809.0 (#5476): a project's custom fields in the step groups

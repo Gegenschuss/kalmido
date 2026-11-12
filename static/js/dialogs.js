@@ -664,7 +664,7 @@ async function listDeleteForGood(id) {
   optWrite(put, async () => {
     if (active) await api('PATCH', '/api/lists/' + id, {archived: 1});
     inTrash = !!(await api('DELETE', '/api/lists/' + id))?.trash;
-  }).then(() => inTrash ? otr_offerUndo(id, nm, active) : toast(tr('“{0}” deleted', nm)), () => {})  // an error: api() said why, the list is back
+  }).then(() => inTrash ? otr_offerUndo(id, nm) : toast(tr('“{0}” deleted', nm)), () => {})  // an error: api() said why, the list is back
     .then(() => load()).then(render, () => {});  // half done (archived, not deleted) shows the real state
   return true;  // gone from the screen: the dialog closes at once
 }

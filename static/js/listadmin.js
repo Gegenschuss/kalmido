@@ -140,16 +140,17 @@ async function otr_load(force) {
 }
 // 2.119.1 C (#2304): `active` = the list was not archived before the delete (archived first by it): the undo brings it back
 // active (folder and position stay with the row), the redo archives it again first; restoring from the trash page stays archive
-function otr_offerUndo(id, nm, active = false) {
+function otr_offerUndo(id, nm) {
   S.otr.at = 0;
-  // 2.979.0 (#5667): the trash keeps no step on the server, so this step goes back by its own functions (restore + active
-  // again); the group of the archiving right before (an active project, dialogs.js listDeleteForGood) is not taken along,
-  // else the server would take back only that and the project stayed in the trash
-  HIST.fresh = [];
-  offerUndo(tr('“{0}” moved to the trash', nm), histAdd({label: tr('Delete “{0}”', nm),
-    undo: async () => { await api('POST', `/api/trash/lists/${id}/restore`); if (active) await api('PATCH', '/api/lists/' + id, {archived: 0}); S.otr.at = 0; return {}; },
-    redo: async () => { if (active) await api('PATCH', '/api/lists/' + id, {archived: 1}); await api('DELETE', '/api/lists/' + id); S.otr.at = 0; return {}; }}));
+  // 2.997.0 (#5609 #5709): the trash is a step of the server (lists/otrundo.py); the entry takes the groups its writes
+  // answered with (HIST.fresh: the archiving right before of an active project, dialogs.js listDeleteForGood, and the
+  // trash). One undo takes both back (the trash first, then the archive: active again), redo the other way round. Before
+  // (#5667) the entry had its own functions, and the archive its redo wrote was a NEW group of the server that outranked the
+  // entry at the next undo (histNext): only the archive went back, the project stayed in the trash.
+  offerUndo(tr('“{0}” moved to the trash', nm), histAdd({label: tr('Delete “{0}”', nm)}));
 }
+// 2.997.0 (#5609): after an undo / redo on the server the trash page shows the projects again (undo.js histRedraw)
+histReloader('listtrash', () => { if (!S.otr.items) return; S.otr.at = 0; if (S.route.key === 'trash') return otr_load(true); });
 function otr_html() {
   otr_load();
   const xs = (S.otr.items || []).filter(x => wsObjIn({org_id: x.org_id}));

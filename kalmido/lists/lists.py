@@ -788,6 +788,8 @@ def list_delete(lid):
         if role != "owner":
             lm_owner_news(c, r, "ltrash", gone=True)
         otr_trash(c, lid, me())
+        from .otrundo import otr_step
+        otr_step(c, lid, me())  # 2.997.0 (#5609): the server's undo step (the browser's own way back lost against the archive's group)
         bump(c)
         c.commit()
         return jsonify(ok=True, trash=True)

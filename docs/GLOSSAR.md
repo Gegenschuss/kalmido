@@ -493,6 +493,7 @@ Lists and projects: folders, sections, fields, formulas, templates, sprints, sha
 - `kalmido/lists/lmcore.py` (`lmc`) - Stage 6 of the shared core
 - `kalmido/lists/lmove.py` - A project into another workspace
 - `kalmido/lists/lpundo.py` - Undo across devices for a project's plain settings (PATCH /api/lists/<id>)
+- `kalmido/lists/otrundo.py` - Undo across devices for a project moved into the list trash (DELETE /api/lists/<id>)
 - `kalmido/lists/membermemo.py` (`mm`) - What removing a member ends, remembered so that adding the person again brings it back
 - `kalmido/lists/orgfields.py` (`of`) - The field schema of an organisation
 - `kalmido/lists/orglabels.py` (`olb`) - Labels of an organisation -- project tags defined once for every project of the organisation (obj_tags scope org since 2.947)

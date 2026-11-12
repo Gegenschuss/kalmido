@@ -130,20 +130,29 @@ def otr_held(r, uid):
                 and (r["retain_until"] or "") >= now_utc().date().isoformat())
 
 
+OTR_HELD = N_("A kept project cannot be restored: download it or delete it before the end of its period.")
+
+
+def otr_back(c, r):
+    """2.997.0 (#5609): the deleted list row r back (archived, same organisation / private space) with the tasks of its trash
+    stamp (the restore below and the undo of a delete, lists/otrundo.py)."""
+    # 2.102.0 review F1/F7: only a list still in the trash comes back (not one purged or restored meanwhile)
+    if c.execute("UPDATE lists SET deleted_at=NULL, deleted_by=NULL WHERE id=? AND deleted_at=?", (r["id"], r["deleted_at"])).rowcount != 1:
+        raise Denied(404)
+    c.execute("UPDATE tasks SET deleted_at=NULL WHERE list_id=? AND deleted_at=?", (r["id"], r["deleted_at"]))
+    if r["org_id"]:
+        from ..accounts.orglists import _ol_log
+        _ol_log(c, r["org_id"], r, "undelete")
+
+
 @app.post("/api/trash/lists/<int:lid>/restore")
 def otr_restore(lid):
     """Brings the list back (archived, same organisation / private space) with its tasks, fields, tags, chat."""
     c = db()
     r = otr_need(c, lid)
     if otr_held(r, me()):  # 2.186.1 review M2: kept for the law, not taken over (download it or delete it before the end)
-        return err(tr("A kept project cannot be restored: download it or delete it before the end of its period."), 409)
-    # 2.102.0 review F1/F7: only a list still in the trash comes back (not one purged or restored meanwhile)
-    if c.execute("UPDATE lists SET deleted_at=NULL, deleted_by=NULL WHERE id=? AND deleted_at=?", (lid, r["deleted_at"])).rowcount != 1:
-        raise Denied(404)
-    c.execute("UPDATE tasks SET deleted_at=NULL WHERE list_id=? AND deleted_at=?", (lid, r["deleted_at"]))
-    if r["org_id"]:
-        from ..accounts.orglists import _ol_log
-        _ol_log(c, r["org_id"], r, "undelete")
+        return err(tr(OTR_HELD), 409)
+    otr_back(c, r)
     bump(c)
     c.commit()
     return jsonify(ok=True, id=lid)

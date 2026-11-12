@@ -270,6 +270,10 @@ c.commit()
   records nothing; while a group is taken back nothing records (`undo_quiet`). Not yet: creating / deleting a section,
   the project settings, and the browser's own task history (`undo.js`), which goes once the list of stage 2 shows the
   server's groups.
+  2.997.0 (#5609, #5613, #5614, #5606): deleting a project into the list trash is a diff part too (`lists/otrundo.py`,
+  kind `list_trash`): undo restores it as the trash's restore does (`otr_back`), redo trashes it again; the browser's entry
+  takes the groups of the archiving and of the trash (no own undo functions: their redo wrote a new group that outranked
+  the entry). The tasks' parts keep the code snippets and the lock (`TU_COLS = TASK_FIELDS`); "Take it" marks its task.
 - Undo across devices, stage 6 (2.777.0, #5254): calendar events (`events/evundo.py`), contacts (`contacts/ctundo.py`),
   file store nodes (`files/fsundo.py`) and habits (`personal/habitundo.py`) are tracked kinds whose write routes record a
   snap step of the person (`core/undoareas.py` `ua_pre` / `ua_post`; an event changed, moved or put into / out of the

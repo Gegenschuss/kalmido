@@ -6,8 +6,8 @@
 //  - rules.js: a rule deleted in the open project dialog; one undo shows it again in the open box, it can be switched off
 //    afterwards (no stale row), redo removes it again
 //  - sectpl.js: a section template deleted in its open dialog; undo shows it again there, redo removes it
-//  - listadmin.js: an active project deleted: the trash keeps no server step, so the step must not take the archiving's group
-//    (one undo brings it back active, the trash page drops it; redo puts it into the trash again)
+//  - listadmin.js: an active project deleted: 2.997.0 (#5609): the trash is a server step, the entry takes the archiving's
+//    and the trash's group (one undo brings it back active, the trash page drops it; redo puts it into the trash again)
 //  - settings.js: Settings > Data > templates: a template deleted from its dialog; undo shows it again in the open list
 // jsdom, fresh container. Invented names only. The waits are on states (rows, the server's answer), never on a fixed time.
 const {boot, errs, B, login, until: until0} = require('./boot');
@@ -107,7 +107,9 @@ async function rulesCase(ck, user, L, w) {
   const inTrash = async () => ((await call(CA, 'GET', '/api/trash/lists')).lists || []).some(x => x.id === G);
   check(await until(() => w.eval('(HIST.undo[HIST.undo.length - 1]?.label || "")').includes('Stork')), 'the delete is the newest step');
   check(await inTrash(), 'the server has it in the trash');
-  check(w.eval('histGids(HIST.undo[HIST.undo.length - 1]).length') === 0, 'the step carries no server group (its own functions take it back)');
+  // 2.997.0 (#5609 #5709): the trash is a server step now (lists/otrundo.py): the entry carries the groups of the archiving
+  // and of the trash (was: none, its own functions - whose redo wrote a new archive group that outranked it at the next undo)
+  check(w.eval('histGids(HIST.undo[HIST.undo.length - 1]).length') === 2, 'the step carries both server groups (archive + trash) ' + w.eval('JSON.stringify(histGids(HIST.undo[HIST.undo.length - 1]))'));
   w.location.hash = 'trash';
   const orow = () => d.querySelector(`.otrlists .otrrow[data-otr="${G}"]`);
   check(await until(() => orow()), 'the trash page shows the deleted project');
