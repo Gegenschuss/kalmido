@@ -27,7 +27,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(chip && chip.classList.contains('multi') && /2 running/.test(chip.textContent) && chip.querySelectorAll('.rk').length === 2, 'timer + focus: one "2 running" chip with both icons');
   click(w, chip); await sleep(100);
   let pop = d.querySelector('#pop:not(.hidden)');
-  check(pop && pop.querySelectorAll('.runrow').length === 2 && /Time tracking/.test(pop.textContent) && /Focus session/.test(pop.textContent) && /Write the offer/.test(pop.textContent), 'popover: both, with the task');
+  check(pop && pop.querySelectorAll('[role="group"]').length === 2 && /Time tracking/.test(pop.textContent) && /Focus session/.test(pop.textContent) && /Write the offer/.test(pop.textContent), 'popover: both, with the task');
   check([...pop.querySelectorAll('button')].some(b => /Pause/.test(b.textContent)) && [...pop.querySelectorAll('button')].some(b => /Stop timer/.test(b.textContent)), 'popover: Pause + Stop per kind');
   [...pop.querySelectorAll('button')].find(b => /Stop focus session/.test(b.textContent)).click();
   check(await until(async () => (await call('GET', '/api/state')).pomo === null), 'Stop focus session: ended on the server');

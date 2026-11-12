@@ -129,9 +129,12 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   check(d.querySelector('.ttable .tvl') && [...d.querySelectorAll('.ttable .tvt')].some(r => /Review/.test(r.textContent)), 'table: list and task rows');
   check(!d.querySelector('[data-act="tv-scope"]') === false, 'scope toggle shown (shared list)');
   // 2.489.0 (#2798): CSV, Excel and the timesheet sit in the menu "Export"
-  d.querySelector('.timev [data-act="tv-export"]').click(); await until(() => d.querySelector('#pop .tvexp a[href^="/api/time/export.csv"]'));
-  check(!d.querySelector('.timev a[href^="/api/time/export.csv"]') && d.querySelectorAll('#pop .tvexp a, #pop .tvexp [data-tvx]').length === 3, '#2798: the export menu holds CSV, Excel and the timesheet');
-  const csv = d.querySelector('#pop .tvexp a[href^="/api/time/export.csv"]').getAttribute('href'); w.eval('closePop()');
+  // 2.1011.0 (#5691): the shared menu(): three entries (buttons), CSV / Excel are downloaded by fn - the link is built on click
+  d.querySelector('.timev [data-act="tv-export"]').click(); await until(() => d.querySelector('#pop [role="menu"] [role="menuitem"]'));
+  check(!d.querySelector('.timev a[href^="/api/time/export.csv"]') && d.querySelectorAll('#pop [role="menuitem"]').length === 3 && !d.querySelector('#pop a'), '#2798: the export menu holds CSV, Excel and the timesheet');
+  let csv = ''; const aClick = w.HTMLAnchorElement.prototype.click; w.HTMLAnchorElement.prototype.click = function () { csv = this.getAttribute('href'); };
+  [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /CSV/.test(b.textContent)).click(); await until(() => csv);
+  w.HTMLAnchorElement.prototype.click = aClick; w.eval('closePop()');
   check(/from=\d{4}-\d\d-\d\d&to=\d{4}-\d\d-\d\d&scope=mine/.test(csv), 'CSV link carries the filters ' + csv);
   d.querySelector('[data-act="tv-scope"][data-k="all"]').click(); await idle(w);
   // 2.63.0 (#1523): Alice is an editor of Shared: "all" shows only her own entries there, never Bob's
@@ -145,8 +148,8 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   d.querySelector('[data-act="tv-entries"]').click(); await until(() => d.querySelectorAll('.timev .terow').length >= 3);
   check(d.querySelectorAll('.timev .terow').length >= 3, 'entries section expands');
   // timesheet
-  d.querySelector('[data-act="tv-export"]').click(); await until(() => d.querySelector('#pop [data-tvx="sheet"]:not([disabled])'));  // 2.489.0 (#2798): in the menu
-  d.querySelector('#pop [data-tvx="sheet"]').click(); await until(() => d.querySelector('.tsheet .tsentries table'));
+  d.querySelector('[data-act="tv-export"]').click(); await until(() => [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Timesheet/.test(b.textContent) && !b.disabled));  // 2.489.0 (#2798): in the menu (2.1011.0, #5691: shared menu())
+  [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Timesheet/.test(b.textContent)).click(); await until(() => d.querySelector('.tsheet .tsentries table'));
   const sh = d.querySelector('.tsheet');
   check(sh && sh.querySelector('h1').textContent === 'Timesheet' && /Alice|All members/.test(sh.querySelector('.tssub').textContent), 'timesheet: title and subtitle');
   check(sh.querySelectorAll('.tskpi > div').length === 4 && sh.querySelector('tr.g') && sh.querySelector('.tsdays') && sh.querySelector('.tsentries table'), 'timesheet: KPIs, totals, per day, entries');
@@ -186,9 +189,9 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   check(/^(Zeiterfassung|Zeit)$/.test(db2.querySelector('#top h1').textContent) && /Zeiterfassung/.test(db2.querySelector('#side [data-sbbpart="time"], #view .mgtabs [data-go="time"]')?.textContent || ''), 'German title: ' + db2.querySelector('#top h1').textContent);  // 2.224.0 A (#2817): the tab on top  // 2.44.0 (#1187)  // 2.152.2 (#2618): the part's own name, the part in the panel
   // 2.489.0 (#2798): the timesheet is an entry of the menu "Exportieren"
   check(/Exportieren/.test(db2.querySelector('[data-act="tv-export"]').textContent) && /Diese Woche/.test(db2.querySelector('.tvseg').textContent), 'German buttons');
-  db2.querySelector('[data-act="tv-export"]').click(); await until(() => db2.querySelector('#pop [data-tvx="sheet"]:not([disabled])'));
-  check(/Stundennachweis/.test(db2.querySelector('#pop [data-tvx="sheet"]').textContent), 'German menu entry');
-  db2.querySelector('#pop [data-tvx="sheet"]').click(); await until(() => db2.querySelector('.tsheet h1'));
+  db2.querySelector('[data-act="tv-export"]').click(); await until(() => [...db2.querySelectorAll('#pop [role="menuitem"]')].find(b => /Stundennachweis/.test(b.textContent) && !b.disabled));
+  check([...db2.querySelectorAll('#pop [role="menuitem"]')].some(b => /Stundennachweis/.test(b.textContent)), 'German menu entry');
+  [...db2.querySelectorAll('#pop [role="menuitem"]')].find(b => /Stundennachweis/.test(b.textContent)).click(); await until(() => db2.querySelector('.tsheet h1'));
   check(db2.querySelector('.tsheet h1').textContent === 'Stundennachweis' && /Summe/.test(db2.querySelector('.tsheet').textContent), 'German timesheet');
   const EN = /\b(Timer running|Total|Entries|Rounded|Timesheet|hours|tracked|Amount|Print|Individual|List \/ task|No task|Per day|Only mine|All members|Custom|This week)\b/;
   check(!EN.test(db2.querySelector('.tsheet').textContent + db2.querySelector('#view').textContent), 'no English leftovers (German view + timesheet)');

@@ -113,12 +113,11 @@ async function tv_startTask(t) {
 // 2.489.0 (#2798): CSV, Excel and the timesheet in one menu "Export"
 function tv_exportMenu(a) {
   const q = timeQuery(), j = S.tv.data && S.tv.data._q === q ? S.tv.data : null;
-  const p = openPop(a, `<div class="menu-list tvexp"><a href="/api/time/export.csv?${esc(q)}" download>${ic('download', 's')} CSV</a><a href="/api/time/export.xlsx?${esc(q)}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a><button data-tvx="sheet" ${j ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet')}</button></div>`);
-  p.onclick = e => {
-    const b = /** @type {any} */ (e.target).closest('a,[data-tvx]'); if (!b) return;
-    if (b.dataset.tvx === 'sheet') { closePop(); timesheet(); return; }
-    setTimeout(closePop, 0);  // the download link goes first
-  };
+  // 2.1011.0 (#5691): the shared menu(); CSV / Excel are downloaded by fn (no link in the menu)
+  const dl = (u, n) => { const l = document.createElement('a'); l.href = u; l.download = n; document.body.appendChild(l); l.click(); l.remove(); };
+  menu(a, [{label: 'CSV', icon: 'download', act: 'tvx-csv', fn: () => dl(`/api/time/export.csv?${q}`, '')},
+    {label: tr('Excel (XLSX)'), icon: 'download', act: 'tvx-xlsx', fn: () => dl(`/api/time/export.xlsx?${q}`, '')},
+    {label: tr('Timesheet'), icon: 'file', act: 'tvx-sheet', dis: !j, fn: () => timesheet()}], null, null, tr('Export'));
 }
 const timerToggle = tid => S.timer && S.timer.task_id === tid ? timerStop() : timerStart({task_id: tid});
 // 1.2: one running indicator for everything that runs: the time-tracking timer, a focus session / break, the
@@ -143,31 +142,28 @@ function timerPill() {
   }
   return `<button class="tmini run multi" data-act="run-pop" title="${esc(it.map(x => `${tr(RUN_KIND[x.k][1])}: ${x.title}`).join(' · '))}" aria-label="${esc(trn('{0} running', '{0} running', it.length))}"><span class="rec"></span>${it.map(x => ic(RUN_KIND[x.k][0], 's rk')).join('')}<span class="tmt">${esc(trn('{0} running', '{0} running', it.length))}</span></button>`;
 }
+// 2.1011.0 (#5691): the shared menu(): one group per running thing, its head = the kind + the ticking time
+async function runPomoAct(r) {
+  if (!S.pomo) return;
+  const swStop = r === 'pomo-stop' && S.pomo.kind === 'stopwatch' ? Math.round(pomoElapsed(S.pomo) / 60) : null;
+  try { const j = await api('POST', `/api/pomo/${S.pomo.id}/${r.slice(5)}`); S.pomo = j.pomo; S.pomoToday = j.today; } catch { return; }
+  if (swStop !== null) setTimeout(() => toast(tr('Stopped: {0} logged', fmtH(swStop))), 50);
+  document.title = APP_NAME; render(); if (S.sel) renderDetail();
+}
 function runPop(a) {
   const it = runItems(); if (!it.length) return;
-  const row = x => {
+  const items = [];
+  for (const x of it) {
     const [icn, name] = RUN_KIND[x.k], t = x.tid && taskById(x.tid);
-    const acts = x.k === 'time' ? `<button data-run="time-stop">${ic('stop', 's')}${tr('Stop timer')}</button>`
-      : `${x.paused ? `<button data-run="pomo-resume">${ic('play', 's')}${tr('Resume')}</button>` : `<button data-run="pomo-pause">${ic('pause', 's')}${tr('Pause')}</button>`}<button data-run="pomo-stop">${ic('stop', 's')}${x.k === 'stopwatch' ? tr('Stop stopwatch') : x.k === 'focus' ? tr('Stop focus session') : tr('End break')}</button>`;
-    return `<div class="runrow k-${x.k}"><div class="runh">${ic(icn, 's rk')}<b>${tr(name)}</b><span class="runt" ${x.attr}>${x.txt}</span>${x.paused ? `<span class="muted">${tr('paused')}</span>` : ''}</div>
-      ${t ? `<button class="runtask" data-run="open" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : `<div class="muted runtask">${esc(x.title)}</div>`}
-      ${acts}${x.k === 'time' ? `<button data-run="time-page">${ic('clock', 's')}${tr('Time tracking')}</button>` : `<button data-run="pomo-page">${ic('timer', 's')}${tr('Focus timer')}</button>`}</div>`;
-  };
-  const p = openPop(a, `<div class="menu-list runlist">${it.map(row).join('<hr>')}</div>`);
-  p.onclick = async e => {
-    const b = e.target.closest('[data-run]'); if (!b) return;
-    const r = b.dataset.run; closePop();
-    if (r === 'time-stop') timerStop();
-    else if (r === 'time-page') go('time');
-    else if (r === 'pomo-page') go('pomo');
-    else if (r === 'open') openTaskById(+b.dataset.id);
-    else if (S.pomo) {
-      const swStop = r === 'pomo-stop' && S.pomo.kind === 'stopwatch' ? Math.round(pomoElapsed(S.pomo) / 60) : null;
-      try { const j = await api('POST', `/api/pomo/${S.pomo.id}/${r.slice(5)}`); S.pomo = j.pomo; S.pomoToday = j.today; } catch { return; }
-      if (swStop !== null) setTimeout(() => toast(tr('Stopped: {0} logged', fmtH(swStop))), 50);
-      document.title = APP_NAME; render(); if (S.sel) renderDetail();
-    }
-  };
+    items.push({head: tr(name) + (x.paused ? ' · ' + tr('paused') : ''), htime: {attr: x.attr, txt: x.txt}, cls: 'runrow k-' + x.k});
+    if (t) items.push({label: t.title, icon: 'arrow', cls: 'runtask', fn: () => openTaskById(t.id)});
+    else items.push({label: x.title, icon: icn, dis: true, cls: 'runtask'});
+    if (x.k === 'time') items.push({label: tr('Stop timer'), icon: 'stop', fn: () => timerStop()}, {label: tr('Time tracking'), icon: 'clock', fn: () => go('time')});
+    else items.push(x.paused ? {label: tr('Resume'), icon: 'play', fn: () => runPomoAct('pomo-resume')} : {label: tr('Pause'), icon: 'pause', fn: () => runPomoAct('pomo-pause')},
+      {label: x.k === 'stopwatch' ? tr('Stop stopwatch') : x.k === 'focus' ? tr('Stop focus session') : tr('End break'), icon: 'stop', fn: () => runPomoAct('pomo-stop')},
+      {label: tr('Focus timer'), icon: 'timer', fn: () => go('pomo')});
+  }
+  menu(a, items, null, null, tr('Running'));
 }
 function timerMenu(a) {
   const t = S.timer; if (!t) return;

@@ -18305,6 +18305,7 @@
   "Review|kind of a planned job": "Verifica",
   "Your own ticket types and fields went into your private workspace; projects imported into the organisation do not use them.": "I tuoi tipi di ticket e campi personali sono nel tuo spazio privato; i progetti importati nell'organizzazione non li usano.",
   "{0} (from the repository)": "{0} (dal repository)",
+  "Running": "In corso",
   "Budget category {0}": "Categoria del budget {0}",
   "Budget template": "Modello del budget"
 }

@@ -103,8 +103,9 @@ const ago = d => new Date(Date.now() - d * 86400000).toISOString().slice(0, 19) 
     // 2.489.0 (#2798): the timesheet is an entry of the menu "Export"
     await until(ev, `!!document.querySelector('[data-act="tv-export"]') && !!S.tv.data`);
     await ev(`(() => { document.querySelector('[data-act="tv-export"]').click(); return 1; })()`);
-    await until(ev, `!!document.querySelector('#pop [data-tvx="sheet"]:not([disabled])')`);
-    await ev(`(() => { document.querySelector('#pop [data-tvx="sheet"]').click(); return 1; })()`);
+    // 2.1011.0 (#5691): the shared menu(); the entry carries data-act="tvx-sheet"
+    await until(ev, `!!document.querySelector('#pop [role="menuitem"][data-act="tvx-sheet"]:not([disabled])')`);
+    await ev(`(() => { document.querySelector('#pop [data-act="tvx-sheet"]').click(); return 1; })()`);
     const ts = await until(ev, `!!document.querySelector('.tsheet [data-ts="copy"]')`);
     const txt = await ev(`timesheetText(S.tv.data, 'Alice')`);
     check(ts && /^Timesheet · .+ · Alice/.test(txt) && txt.includes('Client work') && /· Fresh idea · 1:30 · first draft/.test(txt) && /Sum: 1:30 \(1[.,]5/.test(txt) && /Total: 1:30/.test(txt),

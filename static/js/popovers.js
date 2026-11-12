@@ -103,7 +103,7 @@ function menu(anchor, items, back, fsel, title) {
   items.forEach((it, i) => {
     if ((it === '-' || it.head) && grp) { html += '</div>'; grp = false; }
     if (it === '-') html += '<hr role="separator">';
-    else if (it.head) { html += `<div class="mgrp${it.cls ? ' ' + it.cls : ''}" role="group" aria-label="${esc(it.head)}"><div class="mgh" aria-hidden="true">${esc(it.head)}</div>`; grp = true; }
+    else if (it.head) { html += `<div class="mgrp${it.cls ? ' ' + it.cls : ''}" role="group" aria-label="${esc(it.head)}"><div class="mgh" aria-hidden="true">${esc(it.head)}${it.htime ? `<span class="mght" ${esc(it.htime.attr)}>${esc(it.htime.txt)}</span>` : ''}</div>`; grp = true; }  /* 2.1011.0 (#5691): htime = a time that ticks in the head (data-timer-mini / data-pomo-mini) */
     else html += it.row ? `${it.rhd ? `<div class="mgh" aria-hidden="true">${esc(it.rhd)}</div>` : ''}<div class="mquick${it.rcls ? ' ' + it.rcls : ''}" role="group"${it.rlab ? ` aria-label="${esc(it.rlab)}"` : ''}>${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i);
   });
   if (grp) html += '</div>';
