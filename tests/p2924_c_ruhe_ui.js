@@ -53,6 +53,14 @@ const call = async (method, url, body, h = {}) => { const r = await fetch(B + ur
   await call('PUT', `/api/lists/${L2}/members`, {user_id: ag.id, role: 'edit'});
   const T = [];
   for (let i = 0; i < 30; i++) T.push((await call('POST', '/api/tasks', {title: `Seedling tray ${String(i).padStart(2, '0')} watered`, list_id: L2, due: TC.day(0)})).id);
+  // 2.1079.0 (#5655): the search answers hits of the same second (updated_at in whole seconds) in one fixed order (newest id
+  // first); without the last key their order changed between two answers and the rows read jumped (DIAG of the CI red: after a
+  // hit above changed, 54 59 64 69 stood before 68 61 66 ...)
+  {
+    const hits = (await call('GET', '/api/tasks?scope=search&q=Seedling')).tasks || [];
+    const bad = hits.filter((t, k) => k && t.status === hits[k - 1].status && t.updated_at === hits[k - 1].updated_at && t.id > hits[k - 1].id);
+    check(hits.length >= 30 && !bad.length, `search: hits of the same second come newest id first (${hits.map(t => t.id).join(' ')})`);
+  }
   // a knowledge page: an image on top, then many paragraphs
   const WP = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Garden notes', body: '# Garden notes\n\n![plan](/static/icon.svg)\n\n' + Array.from({length: 50}, (_, k) => `Paragraph ${k}: the soil in this corner is heavy and needs sand before spring.`).join('\n\n')})).id;
   // its own picture (a small PNG made here), put into the text as the app does it: ![label](/api/wiki/files/<id>/<name>)
