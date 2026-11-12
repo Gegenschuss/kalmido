@@ -106,7 +106,8 @@ check(ids[DONE]["signer_name"] == "Dana Customer" and ids[DONE]["kept_until"] ==
 check(not Ca.get(B + "/api/videos/signoffs/orphaned").json()["signoffs"], "a member sees none (and no other person's)")
 check(Ca.delete(B + f"/api/videos/signoffs/orphaned/{OP}").status_code == 404, "a member deletes none")
 check(A.delete(B + f"/api/videos/signoffs/orphaned/{DONE}").status_code == 409, "a signed record stays inside its legal period")
-check(A.delete(B + f"/api/videos/signoffs/orphaned/{OP}").ok and A.delete(B + f"/api/videos/signoffs/orphaned/{OLD}").ok, "open / past the period: deleted")
+r1, r2 = A.delete(B + f"/api/videos/signoffs/orphaned/{OP}"), A.delete(B + f"/api/videos/signoffs/orphaned/{OLD}")
+check(r1.ok and r2.ok, f"open / past the period: deleted {r1.status_code} {r1.text[:200]} | {r2.status_code} {r2.text[:200]}")
 check(dbx("SELECT 1 FROM office_doc_log WHERE org_id=? AND action='signoff_delete'", (ORG,)), "the deletion is in the office log")
 F = {x["id"]: x for x in Fr.get(B + "/api/videos/signoffs/orphaned").json()["signoffs"]}
 check(set(F) == {MINE, SEAL} and F[MINE]["signer_name"] == "Eva Customer" and F[MINE]["kept_until"] is None and F[SEAL]["signer_name"] is None,
