@@ -515,6 +515,8 @@ def _purge_rows(c, kind, reg, rid):
     for t in ("obj_history", "obj_undo", "obj_revoked"):
         c.execute(f"DELETE FROM {qi(t, (t,))} WHERE kind = ANY(CAST(? AS TEXT[])) AND ref_id=?", (kinds, int(rid)))
     ug_gc(c, gids)
+    with system_ctx(c):  # 2.1076.0 (#5271, review): its links of the core, also those of another workspace (core/objlinks.py)
+        c.execute("DELETE FROM obj_links WHERE (src_kind=? AND src_id=?) OR (dst_kind=? AND dst_id=?)", (kind, int(rid), kind, int(rid)))
     for t, col in _kids(reg):  # 2.773.0 (#5292)
         c.execute(f"DELETE FROM {qi(t, (t,))} WHERE {qi(col, (col,))}=?", (int(rid),))
     c.execute(f"DELETE FROM {qi(reg['table'], (reg['table'],))} WHERE id=?", (int(rid),))

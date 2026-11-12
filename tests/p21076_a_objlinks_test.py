@@ -285,4 +285,73 @@ sql("DELETE FROM tasks WHERE id=?", (T3,), write=True)
 check(not sql("SELECT 1 FROM obj_links WHERE (src_kind='task' AND src_id=?) OR (dst_kind='task' AND dst_id=?)", (T3, T3)),
       "a task deleted for good: its links are gone")
 
+# ================================================================ review of 2.1076 (fixes of the review's findings)
+# F1: the workspace of a side is the one of its real row -- a file of one organisation never links to a page of another
+O2 = A.post(B + "/api/admin/orgs", json={"name": "Second Example", "admin_id": ALICE}).json().get("id")
+O3 = A.post(B + "/api/admin/orgs", json={"name": "Third Example", "admin_id": ALICE}).json().get("id")
+FA = A.post(B + "/api/files/folders", json={"name": "Shoot files", "space": f"org:{O2}"}).json().get("id")
+r = A.post(B + "/api/wiki/pages", json={"space": f"org:{O3}", "path": "Shoot notes"})
+WB = r.json().get("id") if r.status_code in (200, 201) else None
+r = A.post(B + "/api/wiki/pages", json={"space": f"org:{O2}", "path": "Same office notes"})
+WA = r.json().get("id") if r.status_code in (200, 201) else None
+check(O2 and O3 and FA and WA and WB, f"setup: two more organisations of alice, a folder in one, pages in both {O2} {O3} {FA} {WA} {WB}")
+r = link(A, "fs_entry", FA, "wiki_page", WB)
+check(r.status_code == 409 and not sql("SELECT 1 FROM obj_links WHERE src_kind='fs_entry' AND src_id=?", (FA,)),
+      "F1: a folder of one organisation with a page of another: 409, nothing written " + r.text[:160])
+r = link(A, "fs_entry", FA, "wiki_page", WA)
+check(r.status_code == 201 and sql("SELECT org_id FROM obj_links WHERE id=?", (r.json().get("id"),)) == [(O2,)],
+      "F1: the same organisation: linked, the link in that workspace " + r.text[:160])
+
+# F2: an agent's token needs the read scope of the other side too (an event: calendar), removing the write scope of the source
+r = requests.post(V + f"/agent/objects/task/{T1}/links", headers=AGH, json={"kind": "event", "id": 999001})
+check(r.status_code == 403, f"F2: planbot (no calendar scope) links a task with an event: 403 {r.status_code} {r.text[:160]}")
+sql(f"INSERT INTO obj_links(org_id, src_kind, src_id, dst_kind, dst_id, rel, created_by) VALUES({ORG}, 'event', 999002, 'task', {T1}, 'related', {BOB})",
+    write=True)
+EL = sql("SELECT id FROM obj_links WHERE src_kind='event' AND src_id=999002")[0][0]
+r = requests.delete(V + f"/agent/objects/task/{T1}/links/{EL}", headers=AGH)
+check(r.status_code == 403 and live(EL), f"F2: planbot removes a link whose source is an event: 403, it stays {r.status_code} {r.text[:160]}")
+sql("DELETE FROM obj_links WHERE id=?", (EL,), write=True)
+
+# F3: a side deleted for good names its kind and id only to the link's creator; one in the trash only to who has a role on it
+sql(f"INSERT INTO obj_links(org_id, src_kind, src_id, dst_kind, dst_id, rel, created_by) VALUES({ORG}, 'task', {T1}, 'task', 999003, 'related', {BOB})",
+    write=True)
+GL = sql("SELECT id FROM obj_links WHERE dst_kind='task' AND dst_id=999003")[0][0]
+o = next((x["other"] for x in links(Ri, "task", T1) if x["id"] == GL), None)
+check(o == {"state": "gone"}, f"F3: rita sees a target deleted for good as gone, without kind and id {o}")
+o = next((x["other"] for x in links(Bo, "task", T1) if x["id"] == GL), None)
+check(o == {"kind": "task", "id": 999003, "state": "gone"}, f"F3: bob (who linked it) keeps kind and id {o}")
+sql("DELETE FROM obj_links WHERE id=?", (GL,), write=True)
+T5 = Bo.post(B + "/api/tasks", json={"title": "Rehearsal", "list_id": P}).json()["id"]
+r = link(Bo, "task", T1, "task", T5)
+L15 = r.json().get("id")
+check(r.status_code == 201 and Bo.delete(B + f"/api/tasks/{T5}").ok, "setup: T1 -> T5, T5 into the trash")
+check(L15 not in [x["id"] for x in links(Ri, "task", T1)], "F3: rita (no role on a task in the trash) does not see that link")
+o = next((x["other"] for x in links(Bo, "task", T1) if x["id"] == L15), None)
+check(o == {"kind": "task", "id": T5, "state": "gone"}, f"F3: bob (manages it) sees it gone {o}")
+check(Bo.post(B + f"/api/tasks/{T5}/restore").ok, "setup: T5 restored")
+
+# F4: the history of the source names the relation and the kind of the other side, not its id
+h = sql("SELECT vals_after FROM obj_history WHERE kind='task' AND ref_id=? AND action='link' ORDER BY id DESC LIMIT 1", (T1,))
+v = json.loads(h[0][0]) if h and isinstance(h[0][0], str) else (h[0][0] if h else None)
+check(v == {"link": "related:task"}, f"F4: the history entry of the link without the target's id {v}")
+
+# F6: the boundary check sees a crossing link of every kind with a workspace (here a folder and a page of two organisations)
+sql(f"INSERT INTO obj_links(org_id, src_kind, src_id, dst_kind, dst_id, rel, created_by) VALUES({O2}, 'fs_entry', {FA}, 'wiki_page', {WB}, 'related', {ALICE})",
+    write=True)
+XL = sql("SELECT id FROM obj_links WHERE src_kind='fs_entry' AND src_id=? AND dst_kind='wiki_page' AND dst_id=?", (FA, WB))[0][0]
+out = in_app("from kalmido.accounts.tenancy import CHECKS\nprint('CROSS', sorted(r[0] for r in c.execute(CHECKS['obj_link']).fetchall()))")
+check(f"CROSS [{XL}]" in out, f"F6: the boundary check counts the crossing link, and only it {out[-400:]}")
+sql("DELETE FROM obj_links WHERE id=?", (XL,), write=True)
+
+# F5: a task deleted for good by a person takes along also a link in another organisation's workspace (row-level security)
+O1 = sql("SELECT id FROM orgs WHERE name='Other Example'")[0][0]
+TX = Bo.post(B + "/api/tasks", json={"title": "Wrap party", "list_id": P}).json()["id"]
+sql(f"INSERT INTO obj_links(org_id, src_kind, src_id, dst_kind, dst_id, rel, created_by) VALUES({O1}, 'task', {OT}, 'task', {TX}, 'related', {OLGA})",
+    write=True)
+out = in_app(f"c.commit()\nc._sys = 0\nc._ctx = ({BOB}, ({ORG},), 'user')\n"
+             f"print('MINE', c.execute('SELECT COUNT(*) FROM obj_links WHERE org_id={O1}').fetchone()[0])\n"
+             f"c.execute('DELETE FROM tasks WHERE id={TX}')\nc.commit()\nprint('DELETED')")
+check("MINE 0" in out and "DELETED" in out, f"F5: bob's context does not see the other organisation's link, and deleted his task {out[-400:]}")
+check(not sql("SELECT 1 FROM obj_links WHERE dst_kind='task' AND dst_id=?", (TX,)), "F5: the link of the other workspace went with the task")
+
 sys.exit(done("p21076_a_objlinks"))

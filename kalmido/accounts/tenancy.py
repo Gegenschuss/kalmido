@@ -15,6 +15,7 @@ from ..core.pg import qi, system_ctx  # 2.149.0 G (#2517): pulled up from functi
 from ..core.access import dlg_gone  # 2.473.0 (#3357)
 from ..core.access import live_sql  # 2.1076.0 (#5271)
 from ..core.objhooks import obj_boundary  # 2.649.0 (#5051)
+from ..core.objhooks import OLNK_AREA_RELS  # 2.1076.0 (#5271, review)
 from ..core.objhooks import FOLLOW  # 2.924.0 (#5069): core/objects.py obj_node_follow
 from ..accounts.orgs import INSTANCE_ENV  # 2.369.5 (#2517): pulled up from functions
 
@@ -29,6 +30,26 @@ TENANT_SAMPLE = 20
 # (list_members.grole set, no own role) are counted as "group".
 _PERSON = "u.kind!='agent' AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id={o}.org_id AND om.user_id={m}.user_id)"
 _NODE_SHARES = "FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id AND n.kind='ref' AND n.ref_kind='{rk}' JOIN {t} {o} ON {o}.id=n.ref_id "  # 2.924.0 (#5069)
+# review 2.1076 (#5271): kind of a link's side -> (its table, the table its workspace lies in and the column pointing there | None)
+OLNK_WS = (("task", "tasks", "lists", "list_id"), ("event", "events", "ev_cals", "cal_id"), ("hub_mail", "hub_mails", None, None),
+           ("client", "clients", None, None), ("fs_entry", "fs_nodes", None, None), ("wiki_page", "wiki_pages", None, None),
+           ("sheet_table", "sheets", None, None))
+OLNK_WS_TABLES = {x for k in OLNK_WS for x in k[1:] if x}
+
+
+def _olnk_ws_one(side, kind, table, via, col):
+    via_join = f" JOIN {qi(via, OLNK_WS_TABLES)} w ON w.id=x.{qi(col, OLNK_WS_TABLES)}" if via else ""
+    org = "w.org_id" if via else "x.org_id"
+    return (f"WHEN '{kind}' THEN (SELECT COALESCE(o.id, 0) FROM {qi(table, OLNK_WS_TABLES)} x{via_join} LEFT JOIN orgs o "
+            f"ON o.id={org} AND o.personal_of IS NULL WHERE x.id=k.{side}_id)")
+
+
+def _olnk_cross(side):
+    """SQL: side ('src' | 'dst') of link k lies in another workspace than the link (0 = private; a side gone or of another kind
+    is not compared)."""
+    return f"(CASE k.{side}_kind {' '.join(_olnk_ws_one(side, *w) for w in OLNK_WS)} END) <> COALESCE(k.org_id, 0)"
+
+
 CHECKS = {
     "list_person": ("SELECT m.list_id, m.user_id FROM list_members m JOIN lists l ON l.id=m.list_id JOIN users u ON u.id=m.user_id "
                     "WHERE l.org_id IS NOT NULL AND NOT (m.grole IS NOT NULL AND m.own_role IS NULL) AND " + _PERSON.format(o="l", m="m")),
@@ -312,16 +333,13 @@ CHECKS = {
                   "OR (l.org_id IS NOT NULL AND l.org_id IS DISTINCT FROM m.org_id) "
                   "OR (ec.org_id IS NOT NULL AND ec.org_id IS DISTINCT FROM m.org_id))"),  # 2.190.0 R (#2496): a target now private is no crossing
     # 2.1076.0 (#5271): a generic link of the core (people and agents) whose two sides lie in different workspaces, or whose
-    # own workspace is not the one of its source -- obj_link refuses both, so this counts a hand-made / moved row only. Only
-    # the kinds with a workspace column of their own are checked here (projects' tasks, events, filed mails, clients)
+    # own workspace is not the one of its source -- obj_link refuses both, so this counts a hand-made / moved row only.
+    # Review 2.1076: every kind the generic links reach with a workspace of its own, on both sides (tasks, events, filed mails,
+    # clients, files, knowledge pages, tables; a personal office's row counts as private, core/objlinks.py olnk_org); the
+    # area relations from the one list (core/objhooks.py OLNK_AREA_RELS), they have their own checks (mail_link)
     "obj_link": ("SELECT k.id, k.created_by FROM obj_links k "
-                 "LEFT JOIN tasks t1 ON k.src_kind='task' AND t1.id=k.src_id LEFT JOIN lists l1 ON l1.id=t1.list_id "
-                 "LEFT JOIN tasks t2 ON k.dst_kind='task' AND t2.id=k.dst_id LEFT JOIN lists l2 ON l2.id=t2.list_id "
-                 "LEFT JOIN hub_mails m2 ON k.dst_kind='hub_mail' AND m2.id=k.dst_id LEFT JOIN clients c2 ON k.dst_kind='client' AND c2.id=k.dst_id "
-                 f"WHERE k.owner_id IS NULL AND {live_sql('k')} AND k.rel NOT IN ('made', 'contact', 'answers', 'reply', 'device') "
-                 "AND ((l1.id IS NOT NULL AND l1.org_id IS DISTINCT FROM k.org_id) "
-                 "OR (l2.id IS NOT NULL AND l2.org_id IS DISTINCT FROM k.org_id) OR (m2.id IS NOT NULL AND m2.org_id IS DISTINCT FROM k.org_id) "
-                 "OR (c2.id IS NOT NULL AND c2.org_id IS DISTINCT FROM k.org_id))"),
+                 f"WHERE k.owner_id IS NULL AND {live_sql('k')} AND k.rel NOT IN ({', '.join(repr(x) for x in OLNK_AREA_RELS)}) "
+                 f"AND ({_olnk_cross('src')} OR {_olnk_cross('dst')})"),
     "contract_file": ("SELECT f.id, f.created_by FROM office_contract_files f JOIN office_contracts k ON k.id=f.contract_id "
                       "WHERE f.deleted_at IS NULL AND f.org_id<>k.org_id"),
     "meal_file": ("SELECT f.id, f.created_by FROM office_meal_files f JOIN office_meals m ON m.id=f.meal_id "

@@ -9,7 +9,9 @@ Web app (the person's session):
                                           target, the same workspace, no end-to-end locked project (409)
   DELETE /api/obj/links/<lid>             into the trash ('write' on its source) -> {ok, links}; taken back through the
                                           person's undo list (the answer's X-Kalmido-Undo-Gid, core/undoweb.py)
-Agents (API v1, the agent channel; the kind's read scope to list, its write scope to link / unlink):
+Agents (API v1, the agent channel; the kind's read scope to list, its write scope to link / unlink; review 2.1076: the other
+side's read scope too -- a target of a kind the token may not read cannot be linked (403) and is left out of the list, and
+removing needs the write scope of the link's source):
   GET    /api/v1/agent/objects/<kind>/<id>/links
   POST   /api/v1/agent/objects/<kind>/<id>/links
   DELETE /api/v1/agent/objects/<kind>/<id>/links/<lid>
@@ -24,7 +26,7 @@ from .access import Denied
 from .config import app
 from .db import body, bump, db
 from .i18n import tr
-from .objects import obj_need, obj_reg
+from .objects import OBJ, obj_need, obj_reg
 from .objlinks import obj_link, obj_links_of, obj_unlink, olnk_row
 
 
@@ -73,6 +75,24 @@ def _agent(kind, write=False):
     return g.user["id"]
 
 
+# review 2.1076 (#5271): the read scope of a kind outside the core's register (core/objlinks.py olnk_kind)
+OLNK_READ_SCOPE = {"contact": "contacts", "office_letter": "office"}
+
+
+def _read_scope(kind):
+    reg = OBJ.get(kind) if isinstance(kind, str) else None
+    return reg["scopes"][0] if reg else OLNK_READ_SCOPE.get(kind, "read")
+
+
+def _token_may(s):
+    return g.get("auth_via") != "token" or s in (g.get("scopes") or set())
+
+
+def _agent_links(c, aid, kind, rid):
+    """The links as the agent's token may see them: a side of a kind whose read scope the token lacks is left out."""
+    return [x for x in _links(c, aid, kind, rid) if "kind" not in x["other"] or _token_may(_read_scope(x["other"]["kind"]))]
+
+
 @app.get("/api/v1/agent/objects/<kind>/<int:rid>/links")
 @v1_view
 def v1_olnk_list(kind, rid):
@@ -80,7 +100,7 @@ def v1_olnk_list(kind, rid):
     aid = _agent(kind)
     c = db()
     obj_need(c, aid, kind, rid, "view")
-    return jsonify(data=_links(c, aid, kind, rid), next_cursor=None)
+    return jsonify(data=_agent_links(c, aid, kind, rid), next_cursor=None)
 
 
 @app.post("/api/v1/agent/objects/<kind>/<int:rid>/links")
@@ -89,11 +109,13 @@ def v1_olnk_add(kind, rid):
     v1_args(())
     aid = _agent(kind, write=True)
     b = v1_json()
+    if isinstance(b.get("kind"), str) and b["kind"] in OBJ:
+        need_scope(_read_scope(b["kind"]))  # review 2.1076: the target's read scope too (an event: calendar)
     c = db()
     lid = obj_link(c, aid, kind, rid, b.get("kind"), b.get("id"), b.get("rel"), b.get("note"), agent_id=aid)
     bump(c)
     c.commit()
-    return jsonify(id=lid, links=_links(c, aid, kind, rid)), 201
+    return jsonify(id=lid, links=_agent_links(c, aid, kind, rid)), 201
 
 
 @app.delete("/api/v1/agent/objects/<kind>/<int:rid>/links/<int:lid>")
@@ -102,8 +124,11 @@ def v1_olnk_delete(kind, rid, lid):
     v1_args(())
     aid = _agent(kind, write=True)
     c = db()
-    if olnk_row(c, lid) is None:
+    r = olnk_row(c, lid)
+    if r is None:
         raise Denied(404)
+    if r["src_kind"] in OBJ and (r["src_kind"], r["src_id"]) != (kind, rid):  # review 2.1076: the write scope of its source
+        need_scope(OBJ[r["src_kind"]]["scopes"][1])
     obj_unlink(c, aid, lid, kind=kind, rid=rid)
     bump(c)
     c.commit()

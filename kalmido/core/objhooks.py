@@ -30,6 +30,9 @@ MOVE = []  # 2.972.0 (#5272): f(c) that core/db.init_db runs at every start befo
 #            of old tables into the core (core/objcomments.py ocm_move) before its fragment drops them
 USER_GONE = []  # 2.972.0 (#5272): f(c, uid) before account uid goes (accounts/users.py): the core's rows of the person
 #                 (core/objcomments.py ocm_purge_user: the kept texts of its deleted comments, its mentions)
+# 2.1076.0 (#5271, review): the area relations of the links' core (core/objlinks.py olnk_rel registers only these; the boundary
+# check accounts/tenancy.py leaves them to their area's own checks) -- one list, read without importing the links' core
+OLNK_AREA_RELS = ("made", "device", "contact", "answers", "reply")
 GONE = {}  # review 2.578 F2: kind -> table of an area's kind outside OBJ whose rows in obj_revoked / obj_history / obj_undo go
 #            with its objects when an account goes (contacts: contacts/ctfolder.py, cascade over their book)
 

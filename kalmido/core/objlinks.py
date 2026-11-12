@@ -23,7 +23,11 @@ The area relations of this stage:
 The rules exist once, here:
 - E2E lock: no link to or from an object of an end-to-end locked project (olnk_sealed; 409) -- was in every area.
 - "Target deleted": a side whose row is gone or in the trash answers state 'gone' (olnk_state), without a title or an address;
-  a side the reader may not see is left out (obj_links_of; hidden=True: a placeholder without kind and id).
+  a side the reader may not see is left out (obj_links_of; hidden=True: a placeholder without kind and id). Review 2.1076: a
+  side in the trash counts as gone only for who has a role on it (else it is left out too); one deleted for good names its
+  kind and id only to the link's creator (olnk_side).
+- The workspace of a side is the one of its real row (olnk_org: the space hook, else the row's org_id; a personal office is
+  private) -- a file, a knowledge page or a table of an organisation never links into another one.
 - Removing a link puts the row into the trash (deleted_at) and records a step of the person's undo list (obj_undo, kind
   obj_link, core/undoweb.py): the person takes it back with the rights of now (an area relation: its hook, olnk_rel). The
   trash run of the core deletes the rows after the trash period (core/objparts.py part_kind trash_prune).
@@ -50,7 +54,7 @@ from .errors import BadInput
 from .i18n import N_, tr
 from .kernretire import kern_retire_floor
 from .objects import OBJ_RANK, obj_need, obj_role, obj_space, obj_title
-from .objhooks import MOVE, OBJ
+from .objhooks import MOVE, OBJ, OLNK_AREA_RELS
 from .objparts import part_kind
 from .pg import insert_id, qi, system_ctx, table_columns, write_lock
 from .undoweb import undo_need_reg
@@ -89,7 +93,7 @@ def olnk_kind(kind, *, table, role=None, title=None, url=None, space=None, seale
 def olnk_rel(rel, may):
     """An area relation: written / removed only by the area's routes (the generic ones refuse it with 409);
     may(c, uid, row) raises Denied when uid may not take a removal of it back now (the person's undo list)."""
-    if not OLNK_REL_RE.fullmatch(rel):
+    if not OLNK_REL_RE.fullmatch(rel) or rel not in OLNK_AREA_RELS:  # review 2.1076: the one list (core/objhooks.py)
         raise ValueError(rel)
     OLNK_RELS[rel] = {"may": may}
 
@@ -176,6 +180,24 @@ def olnk_space(c, kind, rid):
         f = h["space"] or (FSR.get(kind) or {}).get("space")
         return f(c, int(rid)) if f else None
     return obj_space(c, kind, rid) if kind in OBJ else None
+
+
+def olnk_org(c, kind, rid):
+    """Review 2.1076 (#5271): THE workspace of one side for the boundary of the links -> org_id | None (private); Denied(404)
+    when the object does not exist. The kind's space hook when it names an organisation; else the organisation column of its
+    own row -- the hooks of files, knowledge pages and tables answer (None, None) also for an organisation's row. A personal
+    office (orgs.personal_of) counts as private, as its space hook says (office/okern.py, hub/dspkern.py)."""
+    sp = olnk_space(c, kind, rid)
+    if not sp:
+        raise Denied(404)
+    if sp[0] or sp[1] is not None:  # an organisation, or a private object with its owner: the hook knows
+        return sp[0] or None
+    t = _table(kind)
+    if not t or "org_id" not in table_columns(c, t):
+        return None
+    with system_ctx(c):  # the organisation row itself (a person reads orgs only of her memberships); uid's role was checked
+        r = c.execute(f"SELECT o.id, o.personal_of FROM {qi(t, {t})} x JOIN orgs o ON o.id=x.org_id WHERE x.id=?", (int(rid),)).fetchone()
+    return r["id"] if r is not None and r["personal_of"] is None else None
 
 
 def olnk_sealed(c, kind, rid):
@@ -285,7 +307,7 @@ def olnk_put(c, by, src_kind, src_id, dst_kind, dst_id, rel, *, org_id=None, own
                            "created_at) VALUES(?,?,?,?,?,?,?,?,CAST(? AS JSONB),?,?,?)",
                         (org_id, owner_id, src_kind, src_id, dst_kind, dst_id, rel, note or "", ex, by, agent_id, ts))
     if history and by:
-        _hist(c, by, src_kind, src_id, "link", f"{rel}:{dst_kind}:{dst_id}", org_id)
+        _hist(c, by, src_kind, src_id, "link", f"{rel}:{dst_kind}", org_id)  # review 2.1076: no id of the other side
     return lid
 
 
@@ -303,7 +325,7 @@ def olnk_drop(c, by, lid, step=True, history=True):
     if step and by:
         obj_undo_post(c)  # the state after this step at once: several links removed in one request are several steps
     if history and by:
-        _hist(c, by, r["src_kind"], r["src_id"], "unlink", f"{r['rel']}:{r['dst_kind']}:{r['dst_id']}", r["org_id"])
+        _hist(c, by, r["src_kind"], r["src_id"], "unlink", f"{r['rel']}:{r['dst_kind']}", r["org_id"])
     return r
 
 
@@ -352,12 +374,10 @@ def _pair_need(c, uid, src_kind, src_id, dst_kind, dst_id):
         raise Denied(404)
     obj_need(c, uid, src_kind, src_id, "write")
     obj_need(c, uid, dst_kind, dst_id, "view")
-    a, b = obj_space(c, src_kind, src_id), obj_space(c, dst_kind, dst_id)
-    if not a or not b:
-        raise Denied(404)
-    if (a[0] or None) != (b[0] or None):
+    a = olnk_org(c, src_kind, src_id)  # review 2.1076: the workspace of the real row (a file's / a page's org_id)
+    if a != olnk_org(c, dst_kind, dst_id):
         raise Denied(409, tr(OLNK_SPACE_MSG))
-    return a[0] or None
+    return a
 
 
 def obj_link(c, uid, src_kind, src_id, dst_kind, dst_id, rel=None, note=None, agent_id=None):
@@ -389,14 +409,25 @@ def obj_unlink(c, uid, lid, kind=None, rid=None):
     return olnk_drop(c, uid, r["id"])
 
 
-def olnk_side(c, uid, kind, rid, hidden=False):
+def olnk_side(c, uid, kind, rid, hidden=False, by=None):
     """One side as a reader sees it: {kind, id, state: ok, title, open_url} | {kind, id, state: gone} | None (not visible;
-    hidden=True: {state: hidden} without kind and id)."""
-    st = olnk_state(c, kind, rid)
-    if st == "gone":
-        return {"kind": kind, "id": int(rid), "state": "gone"}
+    hidden=True: {state: hidden} without kind and id). Review 2.1076: a side in the trash only for who has a role on it
+    (else left out like one not visible); a side deleted for good answers {state: gone} -- its kind and id only to the
+    link's creator (by), who named it."""
+    t = _table(kind)
+    cols = table_columns(c, t) if t else ()
+    if cols:
+        with system_ctx(c):  # does the row exist at all (row-level security would hide another organisation's)
+            there = c.execute(f"SELECT 1 FROM {qi(t, {t})} WHERE id=?", (int(rid),)).fetchone() is not None
+    else:
+        there = False
+    if not there:
+        mine = by is not None and uid is not None and int(by) == int(uid)
+        return {"kind": kind, "id": int(rid), "state": "gone"} if mine else {"state": "gone"}
     if not olnk_role(c, uid, kind, rid):
         return {"state": "hidden"} if hidden else None
+    if olnk_state(c, kind, rid) == "gone":  # in the trash, and the reader has a role on it
+        return {"kind": kind, "id": int(rid), "state": "gone"}
     return {"kind": kind, "id": int(rid), "state": "ok", "title": olnk_title(c, kind, rid), "open_url": olnk_url(kind, rid)}
 
 
@@ -409,7 +440,7 @@ def obj_links_of(c, uid, kind, rid, rel=None, hidden=False):
     for r in olnk_rows(c, kind, rid, rel=rel, owner=uid):
         mine = r["src_kind"] == kind and r["src_id"] == int(rid)
         ok, oid = (r["dst_kind"], r["dst_id"]) if mine else (r["src_kind"], r["src_id"])
-        side = olnk_side(c, uid, ok, oid, hidden=hidden)
+        side = olnk_side(c, uid, ok, oid, hidden=hidden, by=r["created_by"])
         if side is None:
             continue
         out.append({"id": r["id"], "rel": r["rel"], "note": r["note"] or "", "dir": "out" if mine else "in", "other": side,

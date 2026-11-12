@@ -222,7 +222,8 @@ obj_on_purge(LT_TASK, ttp_core_purge, count=ttp_core_count)  # 2.936.0 (#5364); 
 obj_on_restore(LT_TASK, rt_back)  # 2.1002.0 (#5491): a task comes back through the core (tasks/lifecycle.py restore_task)
 NOTIFY_TICK[LT_TASK] = _task_tick  # 2.891.0 (#5270): the watchdog's reminders ask the task's readers with the tick's memo
 obj_register(LT_EVENT, "events", label=N_("Event"), fields={}, node=False, area="calendar", base_role=_ev_base, space=_ev_space,
-             title=_ev_title, open_url=lambda eid: f"ev/{int(eid)}")
+             title=_ev_title, open_url=lambda eid: f"ev/{int(eid)}",
+             scopes=("calendar", "calendar"))  # review 2.1076 (#5271): events need calendar also to read (api/scopes.py)
 obj_register(LT_MAIL, "hub_mails", label=N_("E-mail"), fields={}, node=False, area="other", base_role=_mail_base, space=_mail_space,
              title=_mail_title, open_url=lambda mid: f"mailhub/{int(mid)}")
 obj_register(LT_CLIENT, "clients", label=N_("Client"), fields={}, node=False, area="other", base_role=_client_base,
