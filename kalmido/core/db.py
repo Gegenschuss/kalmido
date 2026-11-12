@@ -775,12 +775,20 @@ def ix_skip_present(script, have):
 # 2.369.0 B (#2731): ALTER TABLE takes its ACCESS EXCLUSIVE lock (until the start's COMMIT) before it finds the column
 _ADD_LINE = re.compile(r"^[ \t]*ALTER[ \t]+TABLE[ \t]+(\w+)[ \t]+ADD[ \t]+COLUMN[ \t]+IF[ \t]+NOT[ \t]+EXISTS[ \t]+(\w+)[ \t]", re.M)
 _DROP_LINE = re.compile(r"^\s*ALTER\s+TABLE\s+(\w+)\s+DROP\s+COLUMN\s+IF\s+EXISTS\s+(\w+)\s*;?\s*$", re.I)  # 2.981.0 (#5278)
+# 2.997.0 (#4841): a fragment's AFTER ALTER TABLE .. ALTER COLUMN .. DROP NOT NULL (4922_a) whose column is nullable already
+_DNN_LINE = re.compile(r"^\s*ALTER\s+TABLE\s+(\w+)\s+ALTER\s+COLUMN\s+(\w+)\s+DROP\s+NOT\s+NULL\s*;?\s*$", re.I)
 
 
 def col_present(c, stmt):
     """2.369.0 B (#2731): is stmt an ALTER TABLE .. ADD COLUMN IF NOT EXISTS whose column exists (the same no-op)?
     2.981.0 (#5278): or a fragment's ALTER TABLE .. DROP COLUMN IF EXISTS whose column is gone already (else every start would
     take the table's ACCESS EXCLUSIVE lock for nothing)."""
+    # 2.997.0 (#4841): or an ALTER COLUMN .. DROP NOT NULL whose column is nullable already (4922_a on org_joins.user_id took
+    # the table's ACCESS EXCLUSIVE lock at every start: tests/p2369_b_api_test.py)
+    nn = _DNN_LINE.search(stmt) if "," not in stmt else None
+    if nn:
+        return bool(c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() "
+                              "AND table_name=? AND column_name=? AND is_nullable='YES'", nn.groups()).fetchone())
     d = _DROP_LINE.search(stmt) if stmt.upper().count("DROP COLUMN") == 1 and "," not in stmt else None
     if d:
         return not c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() "
