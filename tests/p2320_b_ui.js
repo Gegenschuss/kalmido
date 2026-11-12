@@ -76,10 +76,10 @@ const V = B + 'api/v1';
     '#5826: the menu says unknown and when it comes, no "In effect now" without a report ' + JSON.stringify(mtx()));
   d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
   // 2.1044.0 (#5826): an agent on the Kalmido server has no host: a fixed line instead of a choice without effect
-  w.eval(`agentById(${AG}).provider = 'kalmido-server'`);
+  w.eval(`agentById(${AG}).server = true`);
   const srvIt = w.eval(`chatHeadInfo(document.querySelector('#jcd-fbtn')).find(x => /^Permissions/.test(x.label || ''))`);
   check(srvIt && srvIt.label === 'Permissions: By its permissions in Kalmido' && srvIt.dis && !srvIt.fn, '#5826: server agent = fixed line ' + JSON.stringify(srvIt));
-  w.eval(`agentById(${AG}).provider = ''`);
+  w.eval(`agentById(${AG}).server = false`);
   await v1('PUT', '/agent/status', {status: 'idle', host_permission_mode: 'auto', permission_mode: 'auto'});
   await w.eval('load().then(render)'); await w.eval('chatLoad()'); await until(() => hi(/^Permissions/) === 'Permissions: Host default: Auto');
   await call('PATCH', `/api/admin/agents/${AG}`, {runtime: {model: 'sonnet'}});

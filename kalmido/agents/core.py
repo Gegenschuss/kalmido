@@ -1550,6 +1550,8 @@ def agent_public(c, a, uid=None, pre=None):
     return {"id": a["user_id"], "username": a["username"], "name": a["display_name"] or a["username"],
             "display_name": a["display_name"] or a["username"],
             "ai": agent_is_ai(a),  # 2.482.0 (#3530): labelled "AI agent" (EU AI Act Art. 50); 0 = a bot without AI
+            # 2.1044.0 (#5826 / #5824): it runs on the Kalmido server (provider kalmido-server): no host, its model in the server settings
+            "server": (a["provider"] or "") == "kalmido-server" if "provider" in a.keys() else False,
             # 2.28.0 (#935 / #965): the workspace it works in (null = private) and whose personal agent it is (null = team)
             "org_id": a["org_id"] if "org_id" in a.keys() else None, "owner_id": a["owner_id"] if "owner_id" in a.keys() else None,
             "avatar": avatar_url(p["avatars"].get(a["user_id"]) if pre is not None else c.execute("SELECT * FROM users WHERE id=?", (a["user_id"],)).fetchone()),

@@ -1737,7 +1737,8 @@ that the host has not taken over yet shows both ("set: sonnet · runs: Opus 5.5"
 2.1044.0 (#5826): the mode menu has the head "Questions on actions" and a line "In effect now: Auto" (from `permission_mode`
 of the last run); a host that never reported `host_permission_mode` reads "Host default: unknown" ("the agent reports it
 with its next run") - so report it with every status. An agent on the Kalmido server has no host: its entry is a fixed line
-"Permissions: By its permissions in Kalmido" without a choice (the switch would not reach it).
+"Permissions: By its permissions in Kalmido" without a choice (the switch would not reach it). The agent objects carry `server` (true: it runs
+on the Kalmido server) for this.
 2.44.0 (#1517): `host` (max. 80 characters) names the computer; it is kept on the token the request came with, so
 *Set up on a computer* lists each computer by name (the reference launchers send it once at start, `KALMIDO_HOST` or the
 host name without the domain; older servers answer 400 and the launchers ignore that).

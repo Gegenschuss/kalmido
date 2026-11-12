@@ -695,7 +695,7 @@ const agModeFree = a => a.may_set_mode && !a.host?.permission_fixed && !agModeSr
 const agFixedLbl = a => tr(AG_PMODES[a.host?.permission_mode] || AG_PMODES['']) + ' · ' + tr('Set on its computer');
 // 2.1044.0 (#5826): an agent on the Kalmido server has no host and no permission prompt: the switch would do nothing there
 // (agents/srvagent_run.py never reads it); its permissions in Kalmido decide. Shown as a fixed line instead of a choice
-const agModeSrv = a => a.provider === 'kalmido-server';
+const agModeSrv = a => !!a && (!!a.server || a.provider === 'kalmido-server');  // server: the agent objects of /api/state (2.1044.0)
 function chatModeHtml(a) {
   const m = a.permission_mode || '', run = a.host?.permission_mode || '', want = m || a.host?.host_permission_mode || '';
   if (!m && !a.may_set_mode && !a.host?.host_permission_mode) return '';
