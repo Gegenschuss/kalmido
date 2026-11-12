@@ -9,7 +9,11 @@
 //   same line and draws it at once (no placeholder, no jump)
 // - the sign-in page shows the same line, alone (no "nice to have you here" greeting any more)
 // - German interface: a French original shows only the German text, a German one its original; French: the French original,
-//   else English; Spanish / Italian / Dutch: English; a sound poem always its original
+//   else English; a sound poem always its original
+// - 2.1030.0 (#5785): Spanish, Italian, Dutch and French have their own text for every quote that is no sound poem (French:
+//   for the German and English originals), each in its own file loaded on demand (quotes_dada_<code>.js); the same verse
+//   breaks as the original, none ends on a comma, semicolon or colon; without that file the line falls back to English;
+//   a Spanish interface shows the Spanish text on Today and on the sign-in page and loads only the Spanish file
 const {execFileSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -48,6 +52,23 @@ check(T(de, 'de') === 'Was wir Dada nennen, ist ein Narrenspiel aus dem Nichts|d
 check(['de', 'en', 'fr', 'es'].every(l => T(snd, l) === snd[2] + '|' + snd[1]), 'a sound poem is never translated');
 check(Q.every(q => [q[2], q[3], q[4]].every(x => !/[,;:]\s*$/.test(x))), 'no quote ends on a comma, semicolon or colon (no. 30, 32, 60) '
   + Q.filter(q => [q[2], q[3], q[4]].some(x => /[,;:]\s*$/.test(x))).map(q => q[0]));
+
+// 2.1030.0 (#5785): the own texts of es / it / nl / fr (their files run after quotes_dada.js, as LD_NEED loads them)
+const TL = ['es', 'it', 'nl', 'fr'], ctx2 = {}; vm.createContext(ctx2);
+vm.runInContext(SRC + TL.map(l => '\n' + fs.readFileSync(path.join(__dirname, '..', 'static', 'js', `quotes_dada_${l}.js`), 'utf8').replace("'use strict';", '')).join('')
+  + '\n;this.QD_TR = QD_TR; this.qd_text = qd_text;', ctx2);
+const brk = x => x.split(' / ').length;
+for (const l of TL) {
+  const own = Q.filter(q => !q[7] && q[1] !== l), tx = ctx2.QD_TR[l] || {};
+  const miss = own.filter(q => { const [t, tl] = ctx2.qd_text(q, l); return tl !== l || !t || t === q[4] || t === q[2]; }).map(q => q[0]);
+  check(!miss.length && Object.keys(tx).length === own.length, `${l}: every quote that is no sound poem has its own text (${own.length}) ` + miss);
+  check(own.every(q => !tx[q[0]] || brk(tx[q[0]]) === brk(q[2])), `${l}: the same verse breaks as the original ` + own.filter(q => tx[q[0]] && brk(tx[q[0]]) !== brk(q[2])).map(q => q[0]));
+  check(Object.values(tx).every(x => !/[,;:]\s*$/.test(x)), `${l}: no text ends on a comma, semicolon or colon`);
+  check(Q.filter(q => q[7] || q[1] === l).every(q => ctx2.qd_text(q, l).join('|') === q[2] + '|' + q[1]), `${l}: a sound poem and an original in ${l} show the original`);
+}
+check(ctx2.qd_text(fr, 'fr')[0] === fr[2] && ctx2.qd_text(de, 'fr')[1] === 'fr' && ctx2.qd_text(en, 'fr')[1] === 'fr' && ctx2.qd_text(fr, 'en')[0] === fr[4]
+  && ctx2.qd_text(fr, 'de')[0] === fr[3], 'French: the French original itself, a German / English original in French; English and German stay as they were');
+check(ctx2.qd_text(de, 'es')[0] === 'Lo que llamamos Dada es un juego de locos surgido de la nada' && /Dada/.test(ctx2.QD_TR.it[1]) && /Dada/.test(ctx2.QD_TR.nl[1]), 'the names and "Dada" stay');
 
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
@@ -111,6 +132,25 @@ const line = d => { const f = d.querySelector('figure.qd'); return f && {n: Numb
   const gde = w.eval(`(() => { const D = new Date(2026, 10, 11); for (let i = 0; i < 400; i++) { const x = new Date(D.getTime() + i * 864e5); if (qd_pick(x)[0] === 1) return qd_node('', x); } return null; })()`);
   check(gde && gde.querySelector('.qdo').textContent === 'Was wir Dada nennen, ist ein Narrenspiel aus dem Nichts' && gde.querySelector('figcaption').textContent === '— Hugo Ball',
     'German, a German original: the original and "— Hugo Ball"');
+  w.close();
+
+  // ================= 2.1030.0 (#5785): Spanish interface, the Spanish file loads on demand beside the quotes
+  await call('PATCH', '/api/settings', {lang: 'es'});
+  w = await boot({user: 'alice', hash: 'home', lazy: true}); d = w.document;
+  await idle(w);
+  await until(() => d.querySelector('.dash figure.qd.dashq'));
+  L = line(d);
+  const wes = ctx2.qd_text(want, 'es');
+  check(L && L.o === wes[0] && L.lang === wes[1] && L.cap === L.a, 'Spanish: the Spanish text once (or the original of a sound poem), below it only the author ' + JSON.stringify(L));
+  const s39 = w.eval(`qd_node('', new Date(${f39}))`);
+  check(s39.querySelector('.qdo').textContent === 'Los días de lluvia se parecen a las vacaciones.' && s39.querySelector('.qdo').lang === 'es', 'Spanish, a French original: the Spanish text');
+  const ran = w.eval('[...LD_RAN]').filter(x => /^quotes/.test(x));
+  check(ran.includes('quotes_dada_es') && !ran.some(x => /quotes_dada_(it|nl|fr)$/.test(x)), 'Spanish: only the Spanish file is loaded ' + ran);
+  w.eval('render()');
+  check(line(d)?.o === L.o && !d.querySelector('.qdslot'), 'Spanish: drawn again, the same line at once');
+  w.eval(`authScreen({auth: 'login'})`);
+  await until(() => d.querySelector('.authscreen figure.qd.lgq'));
+  check(d.querySelector('.authscreen figure.qd .qdo')?.textContent === wes[0], 'Spanish: the sign-in page shows the same Spanish line');
   w.close();
 
   console.log(`p2955_a_quotes: ${ok} ok, ${F.length} failed`);

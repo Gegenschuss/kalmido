@@ -14,6 +14,8 @@
    the hashes before the fragment drops the old table, the back limit becomes the minor of this image; the watchdog's catch-up
    indexes the moved objects again by the new rules (the mark v:2)
  - a filed mail deleted for good takes its words along (the delete trigger)
+ - 2.1028.0 (#5783): a short word (under 4) of an object not indexed again yet is found by the old whole-word hash; the SQL
+   pre-filter of the file-text search; the catch-up's row lock (a fresher save keeps its words) and its time budget
 freelancer-matrix: sealed search (a person without an organisation finds her own page, document and mail by umlaut / word start)
 usage: p21002_d_sealed_search_test.py <datadir>"""
 import os
@@ -190,4 +192,29 @@ check(out.splitlines()[-1:] == ["True False"], f"the failing document is set asi
 check(dbx("SELECT 1 FROM obj_search_words WHERE kind='doc' AND ref_id=? AND h='v:2'", (DF,)),
       "the other document of the same tick got its mark")
 check(D1 in docs(A, "gaertnerei"), "the failing document keeps its words (still found)")
+
+# ================================================================== 2.1028.0 (#5783): the low findings of the review of 2.1002
+# all in one transaction of the container that is rolled back (the server's own catch-up cannot touch the rows meanwhile)
+out = box(f"""from kalmido.core import objwords as W
+ws = c.execute("SELECT ws FROM doc_meta WHERE node_id=?", ({D1},)).fetchone()[0]
+key = W._key(c, ws, create=False)
+none = lambda c, ws, ids: {{}}
+c.execute("DELETE FROM obj_search_words WHERE kind='doc' AND ref_id=?", ({D1},))
+c.execute("INSERT INTO obj_search_words(kind, ref_id, h) VALUES('doc', ?, ?)", ({D1}, W._h(key, 'w:qz')))
+old = {D1} in W.osw_term_hits(c, 'doc', ws, {{{D1}}}, W.osw_terms('qz'), none)[0]
+pq, pa = W.osw_prefilter(c, 'doc', ws, 'qz', 'x.id')
+pre = c.execute(f"SELECT COUNT(*) FROM fs_nodes x WHERE x.id=?{{pq}}", ({D1}, *pa)).fetchone()[0]
+pq, pa = W.osw_prefilter(c, 'doc', ws, 'qz gaertnerei', 'x.id')
+pre2 = c.execute(f"SELECT COUNT(*) FROM fs_nodes x WHERE x.id=?{{pq}}", ({D1}, *pa)).fetchone()[0]
+late = W._late_locked(c, 'doc', {D1})
+idle = W.osw_tick(c, force=True, budget=0)
+c.execute("INSERT INTO obj_search_words(kind, ref_id, h) VALUES('doc', ?, 'v:2')", ({D1},))
+new = {D1} in W.osw_term_hits(c, 'doc', ws, {{{D1}}}, W.osw_terms('qz'), none)[0]
+marked = W._late_locked(c, 'doc', {D1})
+c.rollback()
+print(old, pre, pre2, late, idle, new, marked)""")
+check(out.splitlines()[-1:] == ["True 1 0 True {} False False"],
+      "2.1028.0 (#5783): a short word finds an object not indexed again by its old whole-word hash (only until its mark), the "
+      "SQL pre-filter keeps it for that word and drops it for a word it lacks, the catch-up takes an object only while it is "
+      f"still late under its row lock, a tick without time indexes nothing ({out})")
 sys.exit(kt.done("p21002_d_sealed_search"))

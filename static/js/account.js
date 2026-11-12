@@ -549,9 +549,13 @@ function lg_decor(el) {
 }
 // 2.955.0 (#5239): the Dada quote of the day (quotes_dada.js, loaded on demand; before the sign-in too): the line when the file
 // is in, else a placeholder that the file fills once it is (the next drawing has the line at once, no jump on a redraw)
+// 2.1030.0 (#5785): Spanish, French, Italian and Dutch load their own texts beside it (module quotes_<code>, the file of that
+// language only); while it is missing (offline, an error) the line falls back to English instead of staying away
+let qd_miss = '';
 function qd_slot(/** @type {string} */ cls) {
-  if (typeof qd_html === 'function') return qd_html(cls);
-  if (typeof loadModule === 'function') loadModule('quotes').then(() => qd_fill(), () => {});  // offline without the file: no line
+  const ui = typeof I18N !== 'undefined' ? I18N.code : 'en', mod = ['es', 'fr', 'it', 'nl'].includes(ui) && qd_miss !== ui ? 'quotes_' + ui : 'quotes';
+  if (typeof qd_html === 'function' && (mod === 'quotes' || (typeof QD_TR !== 'undefined' && QD_TR[ui]))) return qd_html(cls);
+  if (typeof loadModule === 'function') loadModule(mod).then(() => qd_fill(), () => { if (mod !== 'quotes') qd_miss = ui; if (typeof qd_fill === 'function') qd_fill(); });  // offline without the file: no line (English without the language's file)
   return `<div class="qdslot" data-qd="${esc(cls)}"></div>`;
 }
 // 2.22.0 (#697): the page "Set up your account" (the link of an invitation or a password reset: /#invite/<token>)

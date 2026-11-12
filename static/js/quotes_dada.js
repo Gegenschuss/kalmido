@@ -7,7 +7,9 @@
    i18n keys; the original's wording stays as it is. 2.1017.0 (#5784, replaces the original + translation of #5239): the quote
    shows ONCE, in the interface language (qd_text): the original when it is in that language, else the German text for a
    German interface and the English one for every other (French reads the French original or the English translation);
-   below it only the author. Sound poems are never translated. No text ends on a comma, semicolon or colon. Work / year only as the tooltip of the author's name (none for Vaché and Pansaers).
+   below it only the author. 2.1030.0 (#5785): Spanish, Italian, Dutch and French have their own texts, each in a file of its
+   own loaded on demand (quotes_dada_<code>.js, lazyload.js LD_MODS quotes_<code>, account.js qd_slot), which fills QD_TR;
+   English stays the fallback while that file is missing. Sound poems are never translated. No text ends on a comma, semicolon or colon. Work / year only as the tooltip of the author's name (none for Vaché and Pansaers).
    The line changes once a day (the local date), the same on the sign-in page and on Today; redrawing keeps it. */
 'use strict';
 
@@ -93,6 +95,10 @@ const QD_LIST = [
   [80, "fr", "Le phonomètre à la main, je travaille joyeusement et sûrement.", "Den Phonometer in der Hand, arbeite ich fröhlich und zuverlässig.", "Phonometer in hand, I work joyfully and surely.", "Erik Satie", "Mémoires d'un amnésique, 1912", 0],
   [81, "fr", "Pour écrire mes “ Pièces Froides ”, je me suis servi d'un caléidophone-enregistreur. Cela prit sept minutes.", "Für meine „Kalten Stücke“ benutzte ich einen Kaleidophon-Aufzeichner. Es dauerte sieben Minuten.", "To write my “Cold Pieces”, I used a recording kaleidophone. It took seven minutes.", "Erik Satie", "Mémoires d'un amnésique, 1912", 0]
 ];
+// 2.1030.0 (#5785): interface language -> {no. of the quote: its text}; filled by quotes_dada_es/fr/it/nl.js (no entry for a
+// sound poem, nor for an original in that language)
+/** @type {Record<string, Record<number, string>>} */
+const QD_TR = {};
 // the day number of a local date (the same day everywhere on this device, no time zone jump at midnight UTC)
 const qd_day = (d = new Date()) => Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5);
 // the quote of a day: a fixed step through the list (coprime to its length, so every quote comes once before one repeats,
@@ -104,11 +110,14 @@ function qd_pick(d = new Date()) {
   return QD_LIST[((qd_day(d) * step) % n + n) % n];
 }
 // 2.1017.0 (#5784): the one text for the interface language -> [text, its language]: the original in its own language and for
-// a sound poem; German for a German interface; English for every other one (es, it, nl, fr with a German original ...)
+// a sound poem; German for a German interface; 2.1030.0 (#5785): the own text of es / fr / it / nl (QD_TR, once its file is
+// in); English for every other one (and while that file is missing)
 function qd_text(/** @type {[number, string, string, string, string, string, string, number]} */ q, /** @type {string} */ ui) {
-  const [, lang, orig, de, en, , , sound] = q;
+  const [n, lang, orig, de, en, , , sound] = q;
   if (sound || lang === ui) return [orig, lang];
   if (ui === 'de') return de ? [de, 'de'] : [orig, lang];
+  const t = QD_TR[ui]?.[n];
+  if (t) return [t, ui];
   return lang !== 'en' && en ? [en, 'en'] : [orig, lang];
 }
 // the line as a node: <figure class="qd cls"><blockquote lang>text</blockquote><figcaption>— author</figcaption></figure>

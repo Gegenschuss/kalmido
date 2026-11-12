@@ -24,7 +24,7 @@ from ..tasks.validation import (
 )
 from ..tasks.oneway import irr_guard
 from ..tasks.tasks import (
-    check_assignee, check_move, hard_delete, move_lock_subtree, move_subtree, ms_cleanup, ms_target, my_tags, one_task,
+    check_assignee, check_move, move_lock_subtree, move_subtree, ms_cleanup, ms_target, my_tags, one_task,
     participant_assignee, set_tags,
 )
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -33,6 +33,7 @@ from ..tasks.validation import lock_problem  # 2.369.5 (#2517): pulled up from f
 from ..tasks.validation import lock_done_problem  # 2.542.0 (#4609)
 from ..lists.listtrash import otr_err_task, otr_trash  # 2.369.5 (#2517): pulled up from functions; 2.530.0 B (#4315): otr_trash for accounts/onboarding.py
 from ..lists.listtrash import otr_need
+from ..tasks.tasktrash import ttp_kept_until, ttp_manual  # 2.1028.0 (#5536): the core's delete for good of tasks
 from ..tasks.ttypes import tt_check  # 2.609.0 (#3372)
 from ..lists.seckind import sk_after_status, sk_gate, sk_on_move, sk_snap, sk_undo  # 2.577.0 (#3354)
 
@@ -900,7 +901,7 @@ def do_reopen(c, tid):
 @app.delete("/api/tasks/<int:tid>")
 def task_delete(tid):
     from ..integrations.webhooks import wh_note
-    c = db()
+    c, uid = db(), me()
     role = need_task(c, tid)
     if role == "participant":
         raise Denied(403, tr("Participants cannot delete tasks"))
@@ -908,11 +909,15 @@ def task_delete(tid):
     if request.args.get("hard") == "1":
         if role != "owner":  # shared list: edit members only move tasks to the trash
             raise Denied(403, tr("Only the project owner can delete tasks permanently"))
-        kept = tre_kept(c, [tid])  # 2.530.0 D (#4316, audit B9): a project kept by law keeps its tasks on every way
-        if kept:
-            return err(tr("This project keeps receipts by law until {0}: it can be deleted permanently after that.", kept[0]), 409)
+        # 2.1028.0 (#5536): through the core's delete for good (obj_purge checked, hook tasks/tasktrash.py ttp_core_purge):
+        # a live task goes into the trash with its subtasks first (as before, ?hard=1 also takes a live one); a project kept
+        # by law keeps its tasks (409 with its date, from the hook)
+        if c.execute(f"SELECT 1 FROM tasks WHERE id=? AND {live_sql()}", (tid,)).fetchone():
+            do_delete(c, tid)
         wh_note(c, tid, "purge")
-        files = hard_delete(c, [tid])
+        # its own list counts as the person's (need_task said owner: also an organisation's admin of a shared project)
+        lid = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0]
+        _n, files = tre_purge(c, uid, [tid], purge_lists(c, uid) | {lid}, strict=True)
     else:
         trash_task(c, tid)
     bump(c)
@@ -1102,14 +1107,21 @@ def purge_lists(c, uid=None, wide=False):
     return {r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN {q}", a)}
 
 
-def tre_kept(c, ids):
-    """2.530.0 D (#4316, audit B9): the retain_until dates (newest first) of the projects kept by law (lists.retain_until today
-    or later, tasks/tasktrash.py TTP_KEPT) among the lists of tasks ids; [] = none kept."""
-    if not ids:
-        return []
-    q = ",".join("?" * len(ids))
-    return [r[0] for r in c.execute(f"SELECT DISTINCT l.retain_until FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id IN ({q}) "
-                                    "AND l.retain_until>=? ORDER BY l.retain_until DESC", (*ids, now_utc().date().isoformat()))]
+def tre_purge(c, uid, ids, own, strict=False):
+    """2.1028.0 (#5536, stage 2c of the core's trash): THE delete for good of trashed tasks by a person -- per task the core's
+    obj_purge(checked=True) (the routes checked the rights: own = the lists purge_lists allows) inside tasks/tasktrash.py
+    ttp_manual: the hook deletes it with its subtasks in own (the others detached), the core its history / undo rows. strict:
+    a task kept (by law, restored meanwhile) is the request's 409; else it is skipped. -> (number, files after the commit)."""
+    from ..core.writes import obj_purge, obj_purge_after  # a later module (kalmido/__init__.py ORDER)
+    n = 0
+    with obj_purge_after() as box, ttp_manual(own):
+        for tid in ids:
+            try:
+                n += bool(obj_purge(c, uid, "task", tid, checked=True))
+            except Denied:
+                if strict:
+                    raise
+    return n, box["after"]
 
 
 def tre_kept_lists(c, lids):
@@ -1164,7 +1176,7 @@ def trash_purge_info():
     if tid:
         if need_task(c, tid) != "owner":
             raise Denied(403, tr("Only the project owner can delete tasks permanently"))
-        kept = tre_kept(c, [tid])
+        kept = ttp_kept_until(c, [tid])
         out = {"tasks": 0 if kept else 1, "kept": 0, "kept_law": 1 if kept else 0, "others": 0}
         out.update(tre_cascades(c, [] if kept else [tid]))
     elif lid:
@@ -1193,7 +1205,7 @@ def trash_empty():
     if len(ids) > TRE_BATCH:  # 2.281.0 A (#3112): a big trash goes in the background (no proxy time-out), in batches
         bgj_add("trash:empty", uid, ids, sorted(ok), wide, user_id=uid)
         return jsonify(ok=True, **cnt, queued=True)
-    files = hard_delete(c, ids, lists=ok)
+    _n, files = tre_purge(c, uid, ids, ok)  # 2.1028.0 (#5536): through the core's delete for good
     bump(c)
     c.commit()
     unlink_files(files)
@@ -1218,9 +1230,10 @@ def tre_run(uid, ids, ok, wide=False):
                 part = ids[i:i + TRE_BATCH]
                 q = ",".join("?" * len(part))
                 due = [r[0] for r in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({q}) AND {trash_sql()} "
-                                               "ORDER BY id FOR UPDATE", part).fetchall() if r[1] in ok]
-                files = hard_delete(c, due, lists=ok) if due else []
-                gone = gone or bool(due)
+                                               "ORDER BY id", part).fetchall() if r[1] in ok]
+                # 2.1028.0 (#5536): through the core's delete for good (each task locked and read again there)
+                n, files = tre_purge(c, uid, due, ok) if due else (0, [])
+                gone = gone or bool(n)
                 c.commit()
                 unlink_files(files)
             if gone:  # one bump stamps every batch (dl_stamp takes committed unstamped rows): not one non-lean delta per batch

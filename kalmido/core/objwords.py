@@ -41,7 +41,9 @@ OSW_PREFIXES = (2, 3, 4, 6, 8)  # prefix lengths kept per word (4 / 6 / 8 as the
 OSW_WORDS_MAX = 4000  # distinct folded words of one object
 OSW_TERMS = 8  # words of a query
 OSW_MARK = "v:2"  # the rules of this version (umlaut variants, prefixes of 2 and 3); without it: indexed again
-OSW_TICK = 100  # objects indexed again per watchdog tick
+OSW_TICK = 100  # objects read per look-up of the catch-up (2.1028.0, #5783: no longer the limit of a tick, OSW_TICK_S is)
+OSW_TICK_S = 2.0  # 2.1028.0 (#5783): seconds of catch-up per watchdog tick, over all kinds (a big document costs more than a mail)
+OSW_OLD_SHORT = 4  # 2.1028.0 (#5783): words shorter than this had only their whole-word hash 'w:' in the old indexes
 # kind -> its source table (the delete trigger) and the old table the move copies (old table, its id column)
 OSW_TABLES = {"doc": "fs_nodes", "file_text": "file_text", "wiki_page": "wiki_pages", "hub_mail": "hub_mails"}
 OSW_OLD = {"doc": ("doc_words", "node_id"), "file_text": ("file_words", "ft_id"), "wiki_page": ("wiki_words", "page_id"),
@@ -173,7 +175,7 @@ def osw_term_hits(c, kind, ws, ids, terms, opened, late=None):
     late = late or {}
     ids = set(ids) - set(late)
     key = _key(c, ws, create=False) if ids else None  # a search never makes a key
-    out, need = [], {}
+    out, need, old = [], {}, None
     for ti, vs in enumerate(terms):
         sure, maybe = set(), {}
         for v in vs:
@@ -181,6 +183,9 @@ def osw_term_hits(c, kind, ws, ids, terms, opened, late=None):
                 break
             h, exact = _qhash(key, v)
             got = _with(c, kind, h, ids)
+            if len(v) < OSW_OLD_SHORT:  # 2.1028.0 (#5783): an object not indexed again yet has a short word only whole
+                old = _unmarked(c, kind, ids) if old is None else old
+                sure |= _with(c, kind, _h(key, "w:" + v), old)
             if exact:
                 sure |= got
             else:
@@ -199,6 +204,28 @@ def osw_term_hits(c, kind, ws, ids, terms, opened, late=None):
                 if not any(w.startswith(v) for w in have for v in vv):
                     out[ti].discard(i)
     return out
+
+
+def _unmarked(c, kind, ids):
+    """2.1028.0 (#5783): the ids among ids without OSW_MARK (their words are still the copied ones of the old indexes)."""
+    return set(ids) - _with(c, kind, OSW_MARK, ids)
+
+
+def osw_prefilter(c, kind, ws, raw, col):
+    """2.1028.0 (#5783): (sql, args) that keeps only the objects (id column col of the caller's query, workspace ws) with a
+    stored hash for every word of raw -- the caller narrows its rows in SQL before osw_match decides on them (a superset:
+    the longest stored prefix, for a short word also the old whole-word hash). ('', ()) without a word or without a key."""
+    terms = osw_terms(raw)
+    key = _key(c, ws, create=False) if terms else None  # a search never makes a key
+    if not terms or not key:
+        return "", ()
+    sql, args = [], []
+    for vs in terms:
+        hs = sorted({_qhash(key, v)[0] for v in vs} | {_h(key, "w:" + v) for v in vs if len(v) < OSW_OLD_SHORT})
+        sql.append(f" AND EXISTS (SELECT 1 FROM obj_search_words w WHERE w.kind=? AND w.ref_id={col} "
+                   "AND w.h = ANY(CAST(? AS TEXT[])))")
+        args += [kind, hs]
+    return "".join(sql), tuple(args)
 
 
 def osw_match(c, kind, cand, raw, opened):
@@ -280,27 +307,60 @@ _IDLE = {}  # kind -> time.monotonic() when its catch-up last found nothing (thi
 OSW_IDLE_S = 600  # a kind without late objects is asked again after so many seconds (every write sets the mark itself)
 
 
-def osw_tick(c, limit=OSW_TICK, force=False):
-    """The watchdog (notify/push.py): up to limit objects per kind indexed again by this version's rules. {kind: n}.
-    A kind that had none is skipped for OSW_IDLE_S (late objects come only from the move, a restore or an older image)."""
+_TURN = [0]  # 2.1028.0 (#5783): the kind the next tick starts with (a kind with many late objects holds no other one back)
+
+
+def _late_locked(c, kind, rid):
+    """2.1028.0 (#5783): the source row of the object locked (FOR UPDATE) and still without OSW_MARK? A save that came first
+    wrote its words and the mark (nothing to do); one that comes later waits for this transaction and writes after it -- the
+    catch-up never overwrites a fresher save with an older text."""
+    r = OSW_REINDEX[kind]
+    t, col = r["table"], r["id"]
+    if c.execute(f"SELECT 1 FROM {qi(t, {t})} WHERE {qi(col, {col})}=? FOR UPDATE", (int(rid),)).fetchone() is None:
+        return False
+    return not osw_has(c, kind, rid, OSW_MARK)
+
+
+def osw_tick(c, limit=OSW_TICK, force=False, budget=None):
+    """The watchdog (notify/push.py): objects indexed again by this version's rules. {kind: n}. A kind that had none is
+    skipped for OSW_IDLE_S (late objects come only from the move, a restore or an older image).
+    2.1028.0 (#5783): a time budget per tick (budget seconds, default OSW_TICK_S, over all kinds, starting with the next kind
+    in turn) instead of a fixed number per kind; limit = objects per look-up. Each object under the lock of its source row
+    (_late_locked) and committed on its own (the lock is held for one object only)."""
     done = {}
+    end = time.monotonic() + (OSW_TICK_S if budget is None else budget)
+    kinds = list(OSW_REINDEX)
+    if kinds:
+        _TURN[0] %= len(kinds)
+        kinds = kinds[_TURN[0]:] + kinds[:_TURN[0]]
+        _TURN[0] += 1
     with system_ctx(c):  # every workspace's objects; nobody gets a text, only the hashes are written
-        for kind, r in OSW_REINDEX.items():
+        for kind in kinds:
+            r = OSW_REINDEX[kind]
+            if time.monotonic() >= end:
+                break
             if not force and time.monotonic() - _IDLE.get(kind, -1e9) < OSW_IDLE_S:
                 continue
             ids = osw_late(c, kind, limit)
-            if ids:
-                n = 0
+            if not ids:
+                _IDLE[kind] = time.monotonic()
+                continue
+            _IDLE.pop(kind, None)
+            n, tried = 0, set()
+            while ids and time.monotonic() < end:
+                tried |= set(ids)
                 for i in ids:  # 2.1002.0 (#5279, review): one object a key cannot open holds only itself, not the run
+                    if time.monotonic() >= end:
+                        break
                     try:
                         with c.savepoint():
-                            r["reindex"](c, [i])
-                        n += 1
+                            if _late_locked(c, kind, i):
+                                r["reindex"](c, [i])
+                                n += 1
                     except Exception:  # noqa: BLE001 -- OrgCryptError and the like: its copied words stay, no mark
                         _BAD.setdefault(kind, set()).add(int(i))
-                done[kind] = n
-                _IDLE.pop(kind, None)
-                c.commit()  # each kind's work stays, whatever the next kind does
-            else:
-                _IDLE[kind] = time.monotonic()
+                    c.commit()  # each object's work stays and its row lock goes at once
+                # the next ones; one an area's reindex left without its mark is not taken twice in a tick
+                ids = [i for i in osw_late(c, kind, limit) if i not in tried] if time.monotonic() < end else []
+            done[kind] = n
     return done

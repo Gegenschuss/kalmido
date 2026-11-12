@@ -267,9 +267,16 @@ c.commit()
   `obj_on_restore(kind, f(c, uid, id, row))` = the area's part after the row is back (`rt_back`: the subtasks that went with
   it, a parent in the trash, the section, the log line, the task's undo step). `obj_restore` reads the row again under its
   lock and changes only a row still in the trash (a second restore at the same time: 404). Still the area's: putting single
-  tasks into the trash and deleting them for good by hand (`do_delete`, `hard_delete`, "Empty trash" -> #5536), the copies
-  of sections / planned sprints (`lists/parttrash.py` on `part_copy`), the state marker of projects instead of `archived` /
-  `deleted_at` (-> #5537).
+  tasks into the trash (`do_delete`), the copies of sections / planned sprints (`lists/parttrash.py` on `part_copy`), the
+  state marker of projects instead of `archived` / `deleted_at` (-> #5537).
+- 2.1028.0 (#5536, stage 2c): tasks go for good through the core too. `obj_purge(checked=True)` = the area checked the rights
+  (as `obj_restore(checked=True)`; also a light kind with `trash_prune`): the row read again under its lock, gone meanwhile
+  = False, live = 409, then `_purge_rows` (the hook first); the caller bumps. "Empty trash" (`DELETE /api/trash`, its
+  background job) and `DELETE /api/tasks/<id>?hard=1` (a live task goes into the trash first, as before) run
+  `tasks/lifecycle.py tre_purge` = per task `obj_purge(checked=True)` inside `obj_purge_after` and `tasktrash.py
+  ttp_manual(own)`: the hook `ttp_core_purge` then takes any task in the trash (no period), detaches subtasks outside `own`
+  (the lists the person may empty) and keeps a project kept by law (409 with its date). The routes' own `hard_delete` /
+  `tre_kept` check went; the task's history / undo rows of the core go with it.
 - 2.1031.0 (#5538, small findings of the Fable review of 2.851): the trash period (`KALMIDO_TRASH_DAYS`, `ret_days("trash")`)
   has the floor of 1 day for every kind (`core/retention.py ret_trash_days`, `ret_trash_cut`): 0 or a broken value never
   means "delete everything at once", it means one day. `obj_purge` checks the kind's `trash_keep` under its lock as the
@@ -1006,6 +1013,12 @@ part of `wks_search`). `kalmido/core/objwords.py`:
 - Knowledge pages a share of the core opens are searched by text too (`wiki/wksearch.py wks_find`, question 15).
 - The move: `osw_move` (`core/objhooks.py MOVE`) copies the old tables' hashes (same keys, same hashes: the search works at
   once, also after a jump over several releases) before the fragment `5279_a` drops them (one-way), and raises the back limit.
+- 2.1028.0 (#5783): `osw_tick` runs on a time budget per tick (`OSW_TICK_S`, about 2 s over all kinds, the start kind in
+  turn) instead of 100 objects per kind, and takes each object under the lock of its source row (`FOR UPDATE`, still without
+  the mark?), one commit per object: it never overwrites a fresher save. `osw_prefilter(c, kind, ws, q, col)` = the SQL
+  narrowing by the hashes before `osw_match` (the file-text search of tasks, `files/textscan.py ts_task_hits`). Until an
+  object is indexed again, a query word under 4 characters also looks up the old whole-word hash `w:` of the copied
+  indexes (only for objects without the mark, exact word).
 
 ### One search (stage Q6c, 2.1026.0, #5280)
 
