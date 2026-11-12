@@ -26,7 +26,8 @@ const get = async u => (await fetch(B + u)).text();
 // 2.156.0 (#2071): listcal.js (a list's calendar view) too; 2.164.0 (#2625): calgest.js (swipe / pinch)
 // 2.235.0 (#2891 #2902 #2903): agentcontrol / agentlock / agentrules = the sections of the agent dialog, same group
 // 2.557.0 (#4670): srvagent.js (the setup of a server agent) loads with agentchat
-const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules', 'srvagent'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
+// 2.1079.0 (#5913): agentsees.js ("Sees now" in the agent dialog, #5822) loads with agentchat too
+const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules', 'srvagent', 'agentsees'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
   // 2.155.0 C (#2078): calendar + calyear (the year view)
   mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'], docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'docfetch', 'abdocs', 'docview', 'tilesize', 'docflows', 'docnotes', 'docpages', 'pdfopt'] /* 2.892.0 (#4873): pdfopt.js (Optimise PDF); 2.777.0 (#4874): docpages.js (the page strip); 2.583.0 (#4812): tilesize.js; 2.581.0 (#4803): docflows.js; 2.635.0 (#4807): docnotes.js (notes on a document) */,  // 2.583.0 (#4835): docview.js (the document view) instead of docread.js  // 2.521.0 (#4476): docread.js (the reading view)  // 2.425.0 (#3453): docfetch.js  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letter modules load with the documents
   life: ['life'], integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline', 'roadmap'],
