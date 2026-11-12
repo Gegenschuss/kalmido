@@ -1850,6 +1850,29 @@ producing_rate?}` (+ `doc` after `apply`); `apply: false` is the preview and wri
 margin 403 for members and 400 without external costs, an unreachable target 409 on apply. No agent tool (decision of
 12.11.2026).
 
+### Optional positions, subtotals and the flat price
+
+*Since 2.1041.*
+
+- **Optional and alternative positions** (#5814): a position of a quotation has `opt` = `""` (normal), `"optional"` or
+  `"alternative"` (the editor's field "Kind of position" per row; `PUT .../items`, absent = as stored). Such a position is
+  printed with quantity, unit price and amount, its title starts with "Optional:" / "Alternative:" in the document's
+  language and the amount stands in brackets; it counts in no sum (net, tax, gross, discount, producing, handling costs /
+  markup, raw data, purchase and surplus). The totals carry `opt_note` (printed below the sums). An invoice or a delivery
+  note made from the quotation leaves such positions out; to bill one, make it a normal position first (a new version of a
+  sent quotation).
+- **Subtotal per section** (#5816): `subtotals` on quotations and invoices (`PATCH`, a new document takes the office setting
+  `subtotals_on`). The calculation adds a line `{kind: "subtotal", sec, title, label, total, total_text}` at the end of every
+  section (the positions from a heading to the next heading, before producing / surcharges / raw data / discount): the net
+  of its counted positions; positions before the first heading and optional ones get none. Display only: no sum, no tax and
+  no e-invoice changes. Parts of a quotation compute their own sections.
+- **Flat price** (#5817): `flat_print` on quotations. The print model (PDF, preview, the customer's approval page) keeps the
+  positions with title and description but leaves out quantity, unit, unit price and amount per position and the
+  calculation lines (producing, surcharges, included raw data, discount); net, tax and gross, the subtotals and the
+  optional raw data stay, optional positions keep their amount. The editor shows every price with the hint that the client
+  sees only the total. An invoice made from a flat price quotation has one position per tax rate (the summary form of
+  quotations with parts, titled like it), with the same net and gross.
+
 ### The project of a document
 
 *Since 2.168.*
