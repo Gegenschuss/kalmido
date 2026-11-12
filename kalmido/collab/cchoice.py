@@ -150,6 +150,12 @@ def lv_answer(c, r, uid, ids, via="button"):
     ans = {"ids": ids, "at": iso_ms(now_utc()), "user_id": uid, "via": via}
     c.execute("UPDATE obj_comments SET extra = jsonb_set(extra, '{choice}', CAST(? AS JSONB)) WHERE id=? AND extra->'choice' IS NULL",
               (json.dumps(ans), r["id"]))  # 2.972.0 (#5272): written once
+    if ch.get("approval"):  # 2.1068.0 (#5831): the change the person decided on stays readable at the card (short)
+        from ..agents.apvdiff import apvd_snapshot
+        snap = apvd_snapshot(c, uid, ch, r["created_at"])
+        if snap:
+            c.execute("UPDATE obj_comments SET extra = jsonb_set(extra, '{apvdiff}', CAST(? AS JSONB)) WHERE id=?",
+                      (json.dumps(snap), r["id"]))  # never in choices (they go to the agent)
     labels = [x["label"] for x in ch["choices"] if x["id"] in ids]
     ap = ch.get("approval")
     approval = ("approved" if ids == ["yes"] else "rejected") if ap else None

@@ -3368,6 +3368,16 @@ run it from the card after the Yes:
    has run, `used_at` when it ran - check the result instead of reporting a failure), `unanswered`, `rejected`, `withdrawn`, `no_step`,
    `one_way`, `approver_rights`, `approver_shares`, `not_found` (run: 404), `format`, `nested`.
 
+**What the person sees (2.1068.0, #5831).** A card whose step replaces or adds to a text - a knowledge page
+(`PATCH /wiki/pages/{id}` `body`, `POST /wiki/pages/{id}/append`), a task's notes (`PATCH /tasks/{id}` `notes`), a project's
+description (`PATCH /lists/{id}/overview`) or a comment (`PATCH /comments/{id}`) - shows the person the change itself: folded
+one line in words ("Knowledge page Wiki/2D: 1 line added, nothing removed"), unfolded the removed and added lines with two
+lines around each change. The server reckons it from the card's bound body against the target's text at the moment the
+person looks, with that person's rights (never from anything you write on the card); when the target changed since the card
+the card says so. A target the person cannot read, or an encrypted one, shows no lines. After the answer the card keeps the
+change as it was then. You never receive this diff. Keep steps small: `wiki_append` for an addition shows exactly the new
+lines. Every other step keeps its line; the technical "Step: METHOD path · Fields" is in the fold.
+
 The way to the approval: an approval card in the chat with the person (`POST /api/v1/agent/chats/{uid}`, MCP
 `request_chat_approval`) whose `approval.step` names exactly that request - `{"method": "PATCH", "path":
 "/api/v1/tasks/345", "body": {"title": "New title"}}` (copy `approval` of the 409; a path without `/api/v1` is completed;

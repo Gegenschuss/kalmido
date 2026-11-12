@@ -29,13 +29,11 @@ function wkh_diffHtml(a, b) {
   const d = wkh_diff(a, b), add = d.filter(x => x[0] === '+').length, del = d.filter(x => x[0] === '-').length;
   if (!add && !del) return `<div class="muted mhint">${tr('No differences.')}</div>`;
   const near = d.map((x, i) => x[0] !== ' ' || d.slice(Math.max(0, i - 3), i + 4).some(y => y[0] !== ' '));
-  let h = '', gap = false;
-  d.forEach(([t, x], i) => {
-    if (!near[i]) { if (!gap) h += `<div class="wkhd gap" aria-hidden="true">…</div>`; gap = true; return; }
-    gap = false;
-    h += `<div class="wkhd ${t === '+' ? 'add' : t === '-' ? 'del' : ''}"><span class="wkhdm" aria-hidden="true">${t === ' ' ? '' : t === '+' ? '+' : '−'}</span><span class="sr">${t === '+' ? tr('added:') : t === '-' ? tr('removed:') : ''}</span><span>${esc(x) || '&nbsp;'}</span></div>`;
-  });
-  return `<div class="muted wkhsum">${esc(tr('Lines: {0} added, {1} removed', add, del))}</div><div class="wkhdiff" role="group" aria-label="${esc(tr('Changes'))}">${h}</div>`;
+  /** @type {any[]} */
+  const rows = [];
+  d.forEach((x, i) => { if (near[i]) rows.push(x); else if (rows[rows.length - 1]?.[0] !== '…') rows.push(['…', '']); });
+  // 2.1068.0 (#5831): the rows are drawn by the shared txtDiffHtml (choicecard.js), also used by the approval card
+  return `<div class="muted wkhsum">${esc(tr('Lines: {0} added, {1} removed', add, del))}</div>${txtDiffHtml(rows)}`;
 }
 // ---- the page menu entry and the dialog
 const wkh_items = p => S.me?.kind === 'agent' ? [] : [{label: tr('History'), icon: 'clock', fn: () => wkh_dlg(p)}];

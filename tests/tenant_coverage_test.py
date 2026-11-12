@@ -1453,6 +1453,7 @@ ROUTES = {
     # 2.235.0 B (#2902): the data lock of an agent (owner / instance admin, else 404; p2235_b_datalock_test.py)
     "GET /api/agents/{}/data-lock": "agent", "PATCH /api/agents/{}/data-lock": "agent",
     "GET /api/agents/{}/sees": "agent",  # 2.1045.0 (#5822): p21045_c_sees_test.py
+    "GET /api/approvals/diff": "agent",  # 2.1068.0 (#5831): only the person's own chat cards / comment cards of tasks they see; the target with their rights (p21068_apvdiff_test.py)
     # 2.235.0 A (#2891 #2901): the control of an agent and the undo of its decisions (owner / instance admin, else 404; p2235_a_control_test.py)
     "GET /api/agents/{}/control": "agent", "PATCH /api/agents/{}/control": "agent", "POST /api/agents/{}/control/history/{}/undo": "agent",
     # 2.653.0 (#5079): the whole history page by page (owner / instance admin, else 404) and a decision line the agent writes into its own history

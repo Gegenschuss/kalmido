@@ -1214,6 +1214,7 @@ ROUTES = {
     # 2.235.0 B (#2902): the data lock of an agent (owner / instance admin, else 404; p2235_b_datalock_test.py)
     "GET /api/agents/{}/data-lock": "agents", "PATCH /api/agents/{}/data-lock": "agents",
     "GET /api/agents/{}/sees": "agents",  # 2.1045.0 (#5822): what an agent sees (p21045_c_sees_test.py)
+    "GET /api/approvals/diff": "agents",  # 2.1068.0 (#5831): the change an approval card makes in a text (p21068_apvdiff_test.py)
     # 2.235.0 A (#2891 #2901): the control of an agent and the undo of its decisions (owner / instance admin, else 404; p2235_a_control_test.py)
     "GET /api/agents/{}/control": "agents", "PATCH /api/agents/{}/control": "agents", "POST /api/agents/{}/control/history/{}/undo": "agents",
     # 2.653.0 (#5079): the whole history page by page and the agent's own decision line (p2653_a_agentlog_test.py, freelancer-matrix: agents)

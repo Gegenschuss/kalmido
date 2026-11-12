@@ -421,6 +421,9 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   for a one-way step); after the Yes call `run_approved_step` with the card's message id - the server runs exactly the
   card's step once (the older way, `use_approval` and the same call again, still works). A refusal names its reason: `used` = in use right now or it already ran (check the result, do not report a failure),
   `stale` = the target changed since the card (read it again, ask anew). Never work around a refusal.
+- 2.1068.0: a card that changes a text (knowledge page, task notes, project description, comment) shows the person the
+  lines it removes and adds, reckoned by the server - so keep a step to what you mean to change: for an addition to a
+  knowledge page use `wiki_append` (the card then shows only the new lines), not `wiki_write` with the whole page.
 - One-way steps (deleting, costs, login / registration, migrations without a way back, the owner's own list) always need
   a card first, on every level, also when they happen outside Kalmido.
 - A decision that does not run through the Kalmido API (a job card you answer yourself, a change of a tool on your

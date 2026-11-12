@@ -571,6 +571,11 @@ def chat_choice_answer(c, m, ch, ids, uid, via, collected=False):
     act once per message_id."""
     ans = {"ids": ids, "at": iso_ms(now_utc()), "user_id": uid, **({"via": via} if ch.get("permission") or ch.get("approval") else {})}
     c.execute("UPDATE agent_chat SET choice=? WHERE id=?", (json.dumps(ans), m["id"]))
+    if ch.get("approval"):  # 2.1068.0 (#5831): the change the person decided on stays readable at the card (short)
+        from .apvdiff import apvd_snapshot
+        snap = apvd_snapshot(c, uid, ch, m["created_at"])
+        if snap:
+            c.execute("UPDATE agent_chat SET apv_diff=CAST(? AS JSONB) WHERE id=?", (json.dumps(snap), m["id"]))  # never in choices (the agent's)
     from ..agents.chatnews import acn_read
     acn_read(c, m["user_id"], mids=[m["id"]])  # 2.1039.0 (#5804 #5805): answered = out of the bell's "For you"
     m2 = c.execute("SELECT * FROM agent_chat WHERE id=?", (m["id"],)).fetchone()

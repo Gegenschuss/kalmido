@@ -457,6 +457,7 @@ document.addEventListener('click', async e => {
     case 'ws-menu': wsMenu(a); break;
     case 'chat-choice': chatChoice(+a.dataset.mid, a.dataset.cid); break;  // 2.28.0 (#1005)
     case 'apv-jump': apvJump(+a.dataset.mid); break;  // 2.35.0 (#1103)
+    case 'apvd-all': ccApvdLoad(a.dataset.apvdSrc || '', true); break;  // 2.1068.0 (#5831): the whole diff of an approval card
     case 'chat-choice-send': chatChoice(+a.dataset.mid, null, true); break;
     case 'agents-go': settingsModal('agents'); break;  // 2.28.0 (#1011)
     case 'news-tab': LS.set('newsTab', a.dataset.tab); renderView(); break;  // 2.28.0 (#987)

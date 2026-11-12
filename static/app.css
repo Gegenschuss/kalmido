@@ -5413,6 +5413,19 @@ body.ms-typing #tabs,body.ms-typing #fab{display:none}
 .apvh{display:flex;align-items:center;gap:.375rem;font-size:var(--fs-xs);font-weight:600;color:var(--accent);text-transform:none}
 .apvt{font-weight:600;font-size:var(--fs-l);line-height:var(--lh);overflow-wrap:anywhere}
 .apvw{font-size:var(--fs-m);color:var(--text2);line-height:var(--lh);overflow-wrap:anywhere}
+/* 2.1068.0 (#5831): the line diff of the knowledge history (wkhist.js) is shared with the approval card (choicecard.js txtDiffHtml), so its rules live here */
+.wkhsum{font-size:var(--fs-s);margin:.25rem 0}
+.wkhdiff{font-family:var(--mono);font-size:var(--fs-s);line-height:var(--lh);border:1px solid var(--line2);border-radius:var(--r-l);overflow:auto;background:var(--bg)}
+.wkhd{display:flex;gap:.5rem;padding:0 .5rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.wkhd.add{background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.wkhd.del{background:color-mix(in srgb,var(--danger) 10%,transparent);color:var(--text2)}
+.wkhd.gap{color:var(--faint);justify-content:center}
+.wkhdm{flex:none;width:.75rem;color:var(--muted)}
+.apvdet{margin-top:.25rem;font-size:var(--fs-m);color:var(--text2)}
+.apvdet>summary{cursor:pointer;line-height:var(--lh);overflow-wrap:anywhere;min-height:1.75rem}
+.apvdet[open]>summary{margin-bottom:.25rem}
+.apvdet .wkhdiff{max-height:20rem;margin:.25rem 0}
+.apvdchg{color:var(--text);font-weight:600}
 .cmsg.apv .cbub{background:transparent;padding:.125rem 0}
 .srow .c.apvc{display:inline-flex;align-items:center;gap:.125rem;color:var(--accent);font-weight:600}
 /* 2.41.0 (#1383): the approval card / answer buttons under an agent's comment; open approvals on the task row */

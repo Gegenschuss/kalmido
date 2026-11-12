@@ -289,7 +289,7 @@ const apvIs = m => !!(m.from === 'agent' && m.choices?.approval);
 const apvKind = m => apvIs(m) ? 'a' : chatPerm(m) ? 'p' : '';
 const apvHeld = m => apvIs(m) || chatPerm(m);
 // 2.41.0 (#1383): the card's parts are the shared component of choicecard.js (also in task comments)
-const apvHead = (m, open) => ccApvHead(m.choices.approval, open);
+const apvHead = (m, open) => ccApvHead(m.choices.approval, open, 'chat:' + m.id);  // 2.1068.0 (#5831): + the card's id (its diff)
 const apvBtns = m => ccApvBtns(m.choices, id => `data-act="chat-choice" data-mid="${m.id}" data-cid="${id}"`, `data-chpen="${m.id}" data-cid="yes"`);  // 2.46.6 (#1711): the pen next to "Yes"
 function apvHtml(m, st) {
   if (st === 'open') return apvBtns(m);

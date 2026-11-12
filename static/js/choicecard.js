@@ -3,21 +3,74 @@
 // style?}], multi, approval?: {title, what, std?}, expires_at?, withdrawn_at?, outcome?}, choice = the answer {ids, at,
 // user_id, user_name?, via}, choice_state open | answered | expired | withdrawn (#1037: only the newest question is live,
 // an approval card stays open until answered). attrs(id) = the data attributes of a button (who handles the press).
-function ccApvHead(ap, open) {
+function ccApvHead(ap, open, src = '') {
   return (open ? `<div class="apvh">${ic('lock', 's')}<span>${esc(tr('Approval needed'))}</span></div>` : '')
-    + (ap ? `<div class="apvt">${esc(ap.title)}</div>${ap.what ? `<div class="apvw">${esc(tr('If yes: {0}', ap.what))}</div>` : ''}${ccApvStep(ap)}` : '');
+    + (ap ? `<div class="apvt">${esc(ap.title)}</div>${ap.what ? `<div class="apvw">${esc(tr('If yes: {0}', ap.what))}</div>` : ''}${ccApvStep(ap, src && !open ? src + '|d' : src)}` : '');  // a decided card: its own entry (the state at the answer)
 }
-// 2.235.0 A2 (#2891): what the Yes really approves (the server binds method, path and body), one-way, the agent's recommendation
-function ccApvStep(ap) {
+// 2.1068.0 (#5831): a line diff as rows [[op, line]] (op ' ' / '+' / '-' / '…' = a gap) -- one rendering for the knowledge
+// history (wkhist.js) and the approval card; + / − in front, not only the colour
+function txtDiffHtml(rows) {
+  const h = rows.map(([t, x]) => t === '…' ? `<div class="wkhd gap" aria-hidden="true">…</div>`
+    : `<div class="wkhd ${t === '+' ? 'add' : t === '-' ? 'del' : ''}"><span class="wkhdm" aria-hidden="true">${t === '+' ? '+' : t === '-' ? '−' : ''}</span><span class="sr">${t === '+' ? tr('added:') : t === '-' ? tr('removed:') : ''}</span><span>${esc(x) || '&nbsp;'}</span></div>`).join('');
+  return `<div class="wkhdiff" role="group" aria-label="${esc(tr('Changes'))}">${h}</div>`;
+}
+// 2.1068.0 (#5831): the steps whose change the server shows as a diff (agents/apvdiff.py APVD_STEPS)
+const ccApvTextStep = st => !!st && (
+  (st.method === 'PATCH' && /^\/api\/v1\/(wiki\/pages|comments|tasks)\/\d+$/.test(st.path || '') && !!st.body && ['body', 'notes', 'content'].some(k => typeof st.body[k] === 'string'))
+  || (st.method === 'POST' && /^\/api\/v1\/wiki\/pages\/\d+\/append$/.test(st.path || ''))
+  || (st.method === 'PATCH' && /^\/api\/v1\/lists\/\d+\/overview$/.test(st.path || '') && typeof st.body?.description === 'string'));
+S.apvd = S.apvd || {};
+// the words of a diff: "Knowledge page Wiki/2D: 1 line added, nothing removed"
+function ccApvdWords(d) {
+  const nm = d.kind === 'wiki' ? tr('Knowledge page {0}', d.ref || d.name) : d.kind === 'task' ? tr('Notes of task {0}', [d.ref, d.name].filter(Boolean).join(' '))
+    : d.kind === 'project' ? tr('Description of project {0}', d.name) : tr('Comment on task {0}', [d.ref, d.name].filter(Boolean).join(' '));
+  if (d.hidden) return `${nm}: ${d.hidden === 'encrypted' ? tr('encrypted, the change cannot be shown') : d.hidden === 'gone' ? tr('no longer there') : tr('you cannot read it, the change is not shown')}`;
+  const add = d.added ? trn('{0} line added', '{0} lines added', d.added) : tr('nothing added'), del = d.removed ? trn('{0} line removed', '{0} lines removed', d.removed) : tr('nothing removed');
+  return `${nm}: ${add}, ${del}`;
+}
+function ccApvdBody(d, src) {
+  if (!d || d.hidden) return '';
+  const note = [d.changed && !d.decided ? `<div class="apvdchg" data-apvd-changed>${esc(tr('Changed since the card was made - the change is shown against the text now'))}</div>` : '',
+    d.decided ? `<div class="muted" data-apvd-decided>${esc(tr('As it was when the card was answered'))}</div>` : '',
+    d.no_heading ? `<div class="apvdchg">${esc(tr('The heading {0} is no longer on the page', d.no_heading))}</div>` : ''].join('');
+  return note + (d.rows?.length ? txtDiffHtml(d.rows) : '') + (d.more && !d.decided ? `<button type="button" class="btn sm" data-act="apvd-all" data-apvd-src="${esc(src)}">${esc(tr('Show everything'))}</button>` : '');
+}
+// fetched once per card (src = chat:<id> | comment:<id>), then every element of that card is filled in
+async function ccApvdLoad(src, full = false) {
+  const e = S.apvd[src]; if (e && (e.busy || (e.d !== undefined && !full))) return;
+  S.apvd[src] = {...(e || {}), busy: true};
+  const [k, id] = src.split('|')[0].split(':');
+  let d = null;
+  try { d = (await api('GET', `/api/approvals/diff?${k}=${id}${full ? '&full=1' : ''}`)).diff; } catch (err) { d = e?.d ?? null; }
+  S.apvd[src] = {d, busy: false};
+  for (const n of document.querySelectorAll(`[data-apvd="${CSS.escape(src)}"]`)) ccApvdFill(n, d, src);
+}
+function ccApvdFill(n, d, src) {
+  const sm = n.querySelector('summary [data-apvd-words]'), bd = n.querySelector('[data-apvd-body]');
+  if (sm) sm.textContent = d ? ccApvdWords(d) : tr('Step details');
+  if (bd) bd.innerHTML = ccApvdBody(d, src);
+}
+// 2.235.0 A2 (#2891): what the Yes really approves (the server binds method, path and body), one-way, the agent's recommendation.
+// 2.1068.0 (#5831): a step that replaces or adds to a text (a knowledge page, a task's notes, a project's description, a
+// comment) shows the change itself (the server reckons it, collapsed one line in words, open: the changed lines); the
+// technical line "Step: …" is inside the fold for every step; src = chat:<message id> | comment:<comment id>
+function ccApvStep(ap, src = '') {
   const st = ap.step, b = st && st.body && typeof st.body === 'object' && !Array.isArray(st.body) ? st.body : null;
-  let t = '';
+  let t = '', w = '';
   if (st) {
     const p = String(st.path || '').replace(/^\/api\/v1(?=\/)/, ''), m = p.match(/^\/tasks\/(\d+)$/);
-    t = st.method === 'DELETE' && m ? tr('Delete task {0}', m[1])
-      : p === '/tasks/batch' && b && Array.isArray(b.ids) ? tr('{0} tasks, action {1}', b.ids.length, String(b.action || ''))
-      : `${st.method} ${p}` + (b && Object.keys(b).length ? ' · ' + tr('Fields: {0}', Object.keys(b).join(', ')) : '');
+    w = st.method === 'DELETE' && m ? tr('Delete task {0}', m[1])
+      : p === '/tasks/batch' && b && Array.isArray(b.ids) ? tr('{0} tasks, action {1}', b.ids.length, String(b.action || '')) : '';
+    t = `${st.method} ${p}` + (b && Object.keys(b).length ? ' · ' + tr('Fields: {0}', Object.keys(b).join(', ')) : '');
   }
-  return (t ? `<div class="apvw" data-apv-step>${esc(tr('Step: {0}', t))}</div>` : '')
+  let fold = '';
+  if (st) {
+    const dv = !!src && ccApvTextStep(st), c = dv ? S.apvd[src] : null, d = c?.d;
+    const sum = dv ? (d ? ccApvdWords(d) : d === null ? tr('Step details') : tr('Loading…')) : w ? tr('Step: {0}', w) : tr('Step details');
+    fold = `<details class="apvdet" ${dv ? `data-apvd="${esc(src)}"` : ''}><summary><span data-apvd-words>${esc(sum)}</span></summary>${dv ? `<div data-apvd-body>${d ? ccApvdBody(d, src) : ''}</div>` : ''}<div class="apvw" data-apv-step>${esc(tr('Step: {0}', t))}</div></details>`;
+    if (dv && (!c || c.d === undefined)) setTimeout(() => ccApvdLoad(src), 0);
+  }
+  return fold
     + (ap.one_way ? `<div class="apvw" data-apv-oneway><b>${esc(tr('One-way step – cannot be undone'))}</b></div>` : '')
     + (ap.recommend ? `<div class="apvw" data-apv-rec>${esc(tr('The agent recommends: {0}', ap.recommend === 'yes' ? tr('Yes') : tr('No')))}</div>` : '');
 }
@@ -69,7 +122,7 @@ function ccCommentHtml(c, ro = false) {
     const t = ans ? ((ans.ids || []).includes('yes') ? tr('{0} from {1}, {2}', ccApvLbl(ch, 'yes'), who, ccWhen(ans.at)) : tr('{0} from {1}, {2}', ccApvLbl(ch, 'no'), who, ccWhen(ans.at))) : '';
     // 2.144.5 A (#2001): only an approver decides (the server's choice_can: a manager of the list, the assignee, an admin)
     const dec = can && c.choice_can !== false, wait = can ? tr('Waiting for a decision by the project’s managers, the assignee or an admin') : tr('Waiting for an answer');
-    return `<div class="cccard apv${open ? ' apvopen' : ''}" role="group" aria-label="${esc(tr('Approval needed'))}">${ccApvHead(ch.approval, open)}${open ? (dec ? ccApvBtns(ch, attrs, `data-ccpen="${c.id}" data-ch="yes"`) : `<div class="cpermst exp"><span>${esc(wait)}</span></div>`) : ccApvState(ch, ans, st, t)}</div>`;
+    return `<div class="cccard apv${open ? ' apvopen' : ''}" role="group" aria-label="${esc(tr('Approval needed'))}">${ccApvHead(ch.approval, open, 'comment:' + c.id)}${open ? (dec ? ccApvBtns(ch, attrs, `data-ccpen="${c.id}" data-ch="yes"`) : `<div class="cpermst exp"><span>${esc(wait)}</span></div>`) : ccApvState(ch, ans, st, t)}</div>`;
   }
   if (st !== 'open' && st !== 'answered') return '';  // expired / withdrawn: gone, as in the chat
   if (st === 'open' && !can) return '';

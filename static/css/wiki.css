@@ -36,13 +36,6 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 .wkhwhen{flex:1;min-width:0}
 .wkhcur{padding:.0625rem .5rem;border-radius:var(--r-s);background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-size:var(--fs-s)}
 .wkhhead{display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem}
-.wkhsum{font-size:var(--fs-s);margin:.25rem 0}
-.wkhdiff{font-family:var(--mono);font-size:var(--fs-s);line-height:var(--lh);border:1px solid var(--line2);border-radius:var(--r-l);overflow:auto;background:var(--bg)}
-.wkhd{display:flex;gap:.5rem;padding:0 .5rem;white-space:pre-wrap;overflow-wrap:anywhere}
-.wkhd.add{background:color-mix(in srgb,var(--ok) 12%,transparent)}
-.wkhd.del{background:color-mix(in srgb,var(--danger) 10%,transparent);color:var(--text2)}
-.wkhd.gap{color:var(--faint);justify-content:center}
-.wkhdm{flex:none;width:.75rem;color:var(--muted)}
 .wks h4{display:flex;align-items:center;gap:.375rem;margin:.75rem 0 .25rem;font-size:var(--fs-s)}
 /* 2.376 (#3292): a hit's name with the snippet of its text below: grey, small, at most two lines, the words bold */
 .wkitem:has(>.wksnip){flex-wrap:wrap;row-gap:0;padding-top:.25rem;padding-bottom:.25rem}
