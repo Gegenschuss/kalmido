@@ -100,6 +100,10 @@ body.fab-on #detail .dbot .dcomp:not(.dctop){padding-right:var(--fab-safe)}
 #detail{scroll-padding-bottom:9rem}
 #detail:has(.dbot :focus){scroll-padding-bottom:0}
 #detail .dbot:has(.dcomp :focus) .dthumb{display:none}
+/* 2.1009.0 (#5772): while a comment is being edited the bottom bar (comment box with Send, date / done) no longer sticks to
+   the panel's bottom edge: on an iPhone with the keyboard up it covered "Save" / "Cancel" of the edited comment. It stays in
+   its place at the end of the panel (no jump), a pinned box (.vvpin, the focus is in it) keeps its pin */
+#detail:has(.cedit) .dbot:not(.vvpin){position:static}
 #detail{overflow-x:hidden}
 .trow:hover .whob.wnone,.trow.sel .whob.wnone{opacity:1}
 .trow .meta .mlc .whob.wnone{opacity:.5}
