@@ -350,9 +350,9 @@ def ctl_lists(c, aid, path, b):
 def ctl_refuse(step, level, lid, d):
     # 2.1045.0 (#5827): the step is taken over as it stands (approval.step, never typed again) and run from the card after the Yes
     if step == "one_way":
-        msg = tr("One-way step: ask with an approval card in your chat (approval.step = method, path, body and if_match exactly as in this answer), then after the Yes run it with POST /api/v1/agent/approvals/<id of the card>/run (MCP: run_approved_step) - the server sends exactly this step.")
+        msg = tr("One-way step: ask with an approval card in your chat (approval.step = method, path, body and if_match exactly as in this answer), then after the Yes run it with POST /api/v1/agent/approvals/ID/run (MCP: run_approved_step) - the server sends exactly this step.")
     else:
-        msg = tr("Your control level needs an approval for this step: ask with an approval card in your chat (approval.step = method, path, body and if_match exactly as in this answer), then after the Yes run it with POST /api/v1/agent/approvals/<id of the card>/run (MCP: run_approved_step) - the server sends exactly this step.")
+        msg = tr("Your control level needs an approval for this step: ask with an approval card in your chat (approval.step = method, path, body and if_match exactly as in this answer), then after the Yes run it with POST /api/v1/agent/approvals/ID/run (MCP: run_approved_step) - the server sends exactly this step.")
     rb = ctl_req_body()  # 2.235.0 A2 (#2891): the card binds the body too -- copy it into approval.step.body
     im = (request.headers.get("If-Match") or "").strip()[:200]  # 2.1045.0 (#5827): the version read, sent along when the card runs
     st = {"method": request.method, "path": request.path, **({"body": rb} if rb not in ({}, []) else {}), **({"if_match": im} if im else {})}
@@ -483,7 +483,7 @@ def ctl_reason_text(why):
         return tr("The state field differs from the card ({0}): the target changed since the card, or you read it again. Read it again and ask with a new card.",
                   ", ".join(why.get("fields") or []))
     if r == "body":
-        return tr("The body differs from the card in: {0}. Run the card with run_approved_step (POST /api/v1/agent/approvals/<id>/run) instead of sending it again.",
+        return tr("The body differs from the card in: {0}. Run the card with run_approved_step (POST /api/v1/agent/approvals/ID/run) instead of sending it again.",
                   ", ".join(why.get("fields") or []))
     if r == "used":
         return tr("The card was already used: the step ran at {0}. Check the result instead of sending it again.", why.get("used_at", ""))
