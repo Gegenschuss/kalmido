@@ -1995,30 +1995,39 @@ def odoc_billed_sources(c, oid, did):
 
 
 def _odoc_billed_back(c, oid, did, billed):
-    """The restore's part of #5791: a source still open is bound to its position again; a position whose source sits on another
-    document by then is taken out of the draft (with the other sources of the same position, which are open again). -> the
-    number of positions taken out."""
+    """The restore's part of #5791: a source still open (or billed on a document that bills nothing any more: in the trash, gone)
+    is bound to its position again; a position whose source sits on another live document by then is taken out of the draft
+    (with the other sources of the same position, which are open again). -> the number of positions taken out."""
     from .books import bk_ws
+    from ..core.pg import system_ctx
     ws, ts, taken = bk_ws(c, oid), iso(now_utc()), set()
     for table, sid, pid in billed if isinstance(billed, list) else []:
         if table not in ODOC_BILLED or not isinstance(sid, int) or not isinstance(pid, int):
             continue
         key = ODOC_BILLED[table]
         area, args = {"office_trip_items": (" AND org_id=?", (oid,)), "rc_receipts": (" AND ws=?", (ws,))}.get(table, ("", ()))
-        cur = c.execute(f"SELECT billed_doc_id FROM {qi(table, ODOC_BILLED)} WHERE {qi(key, (key,))}=?{area}", (sid, *args)).fetchone()
-        if not cur:
-            continue  # the source is gone for good: its position stays as typed
-        if cur[0] is None:  # open: bound again while its position is still on the draft
+        where = f"{qi(key, (key,))}=?{area}"
+        for _try in (0, 1):  # review: a billing without a common lock (time entries) in between -> read once more
+            cur = c.execute(f"SELECT billed_doc_id FROM {qi(table, ODOC_BILLED)} WHERE {where} FOR UPDATE", (sid, *args)).fetchone()
+            if not cur or cur[0] == did:
+                break  # gone for good (its position stays as typed) / still bound to the draft
+            if cur[0] is not None:
+                with system_ctx(c):  # existence only, as tbill_free_stale (the other document may lie in another area)
+                    live = c.execute(f"SELECT 1 FROM office_docs WHERE id=? AND {live_sql()}", (cur[0],)).fetchone()
+                if live:
+                    taken.add(pid)  # billed on another document meanwhile
+                    break
+            # open, or its other document bills nothing any more (in the trash, deleted): bound to the draft's position again
             upd = ", updated_at=?" if table != "rc_receipts" else ""
-            c.execute(f"UPDATE {qi(table, ODOC_BILLED)} SET billed_doc_id=?, billed_item_id=?, billed_at=?{upd} WHERE {qi(key, (key,))}=?{area} "
-                      "AND billed_doc_id IS NULL AND EXISTS (SELECT 1 FROM office_doc_items x WHERE x.id=? AND x.doc_id=?)",
-                      (did, pid, ts, *((ts,) if upd else ()), sid, *args, pid, did))
-        elif cur[0] != did:
-            taken.add(pid)  # billed on another document meanwhile
+            n = c.execute(f"UPDATE {qi(table, ODOC_BILLED)} SET billed_doc_id=?, billed_item_id=?, billed_at=?{upd} WHERE {where} "
+                          f"AND billed_doc_id IS NOT DISTINCT FROM ? AND EXISTS (SELECT 1 FROM office_doc_items x WHERE x.id=? AND x.doc_id=? AND {live_sql('x')})",
+                          (did, pid, ts, *((ts,) if upd else ()), sid, *args, cur[0], pid, did)).rowcount
+            if n or not c.execute(f"SELECT 1 FROM office_doc_items WHERE id=? AND doc_id=? AND {live_sql()}", (pid, did)).fetchone():
+                break
     if not taken:
         return 0
     before = ofx_items_brief(doc_items(c, did, oid))
-    n = c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND id IN ({','.join('?' * len(taken))})",
+    n = c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND {live_sql()} AND id IN ({','.join('?' * len(taken))})",
                   [did, oid, *sorted(taken)]).rowcount
     ofd_free_receipts(c, oid, did)  # the other sources of a position taken out ("one position for all") are open again
     if n:
@@ -2050,7 +2059,10 @@ def _odoc_back(c, oid, row):
     c.execute("UPDATE office_docs SET number=?, series_id=?, trash_refs=NULL WHERE id=? AND org_id=?", (num, sid, did, oid))
     taken = _odoc_billed_back(c, oid, did, refs.get("billed"))  # 2.1055.0 (#5791): before the nulls below (a time entry with its position)
     with ofx_release(c):
+        mine = {sid for t, sid, _p in refs.get("billed") or [] if t == "time_entries"}  # 2.1055.0 (#5791, review): done above
         for table, col, ids in refs.get("nulls") or []:
+            if table == "time_entries" and mine:
+                ids = [x for x in ids if x not in mine]  # only entries billed without a position (before 2.370) are bound here
             known = {t for t, _c, _k in ofk_fk_refs(c, "office_docs")} | {"time_entries"}
             if table in known and col in table_columns(c, table):
                 cols = table_columns(c, table)

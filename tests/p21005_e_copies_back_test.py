@@ -211,6 +211,41 @@ def scenario(S, who, oid, uid):
           f"{who}: (5791) a position whose receipt is billed nowhere else comes back {r.text[:200]}")
     check(dbx("SELECT billed_doc_id, billed_item_id FROM office_trip_items WHERE id=?", (rc3,))[0] == (inv, pos3),
           f"{who}: (5791) its receipt is billed on the draft as before")
+    # review: the other invoice lies in the trash itself by the restore (it bills nothing): the position stays, the receipt bound back
+    r = S.post(T, json={"date_from": PM1, "date_to": PM1, "dest": f"Example Quay {who}",
+                        "items": [{"date": PM1, "category": "taxi", "amount": "31.00", "currency": "EUR"}]})
+    rc4 = r.json()["items"][0]["id"]
+    pos4 = (S.post(T + "/bill", json={"doc_id": inv, "item_ids": [rc4]}).json().get("positions") or [None])[0]
+    check(S.delete(OFC + f"/docs/{inv}").ok, f"{who}: (5791) setup: the draft into the trash once more")
+    inv3 = S.post(OFC + "/docs", json={"kind": "invoice", "lang": "en", "project_title": f"Example Third Bill {who}"}).json()["id"]
+    check(S.post(T + "/bill", json={"doc_id": inv3, "item_ids": [rc4]}).ok and S.delete(OFC + f"/docs/{inv3}").ok,
+          f"{who}: (5791) setup: billed on a third invoice, that one into the trash too")
+    r = S.post(OFC + f"/trash/core/odoc/{inv}/restore")
+    d = S.get(OFC + f"/docs/{inv}").json() if r.ok else {}
+    check(r.ok and not r.json().get("taken") and pos4 in [x["id"] for x in d.get("items") or []]
+          and dbx("SELECT billed_doc_id, billed_item_id FROM office_trip_items WHERE id=?", (rc4,))[0] == (inv, pos4),
+          f"{who}: (5791) an invoice of the trash bills nothing: the position stays, the receipt bound to the draft {r.text[:200]}")
+    # review: time entries billed as ONE position; one of them billed elsewhere meanwhile -> the position goes, the other is open
+    r = S.post(OFC + "/docs", json={"kind": "invoice", "lang": "en", "project_title": f"Example Hours {who}",
+                                  "items": [{"title": "Hours", "qty": 2, "unit": "hour", "rate": 90}]})
+    dh = r.json()["id"]
+    ph = dbx("SELECT id FROM office_doc_items WHERE doc_id=?", (dh,))[0][0]
+    other = S.post(OFC + "/docs", json={"kind": "invoice", "lang": "en", "project_title": f"Example Other Hours {who}",
+                                        "items": [{"title": "Hours", "qty": 1, "unit": "hour", "rate": 90}]}).json()["id"]
+    po = dbx("SELECT id FROM office_doc_items WHERE doc_id=?", (other,))[0][0]
+    es = [dbx("INSERT INTO time_entries(user_id, task_title, start, \"end\", seconds, note, source, created_at, updated_at, billed_doc_id, billed_item_id, billed_at) "
+              "VALUES(?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id", (uid, "Example Edit", f"{PM1}T0{h}:00:00Z", f"{PM1}T0{h + 1}:00:00Z", 3600, "", "manual",
+                                                               f"{PM1}T10:00:00Z", f"{PM1}T10:00:00Z", dh, ph, f"{PM1}T10:00:00Z"))[0][0] for h in (1, 3)]
+    check(S.delete(OFC + f"/docs/{dh}").ok, f"{who}: (5791) setup: the hours draft into the trash")
+    check(dbx("SELECT COUNT(*) FROM time_entries WHERE id IN (?, ?) AND billed_doc_id IS NULL", tuple(es))[0][0] == 2, f"{who}: (5791) setup: its times are open")
+    dbx("UPDATE time_entries SET billed_doc_id=?, billed_item_id=?, billed_at=? WHERE id=?", (other, po, f"{PM1}T11:00:00Z", es[0]))  # as from-time did
+    r = S.post(OFC + f"/trash/core/odoc/{dh}/restore")
+    d = S.get(OFC + f"/docs/{dh}").json() if r.ok else {}
+    check(r.ok and r.json().get("taken") == 1 and ph not in [x["id"] for x in d.get("items") or []],
+          f"{who}: (5791) the hours position goes: one of its times is billed elsewhere {r.text[:200]}")
+    check(dbx("SELECT billed_doc_id, billed_item_id FROM time_entries WHERE id=?", (es[1],))[0] == (None, None)
+          and dbx("SELECT billed_doc_id FROM time_entries WHERE id=?", (es[0],))[0][0] == other,
+          f"{who}: (5791) its other time is open again (never billed without a position), the first stays on the other invoice")
 
 
 scenario(A, "alice", ORG, AID)
@@ -255,7 +290,7 @@ print('CATALOG', len(cat) == len(set(cat)))
 c.rollback()""")
 check("ALLSNAPS False" in out, f"(F6) never every snapshot of office_trash at once {out[-300:]}")
 ld = next((json.loads(x[7:]) for x in out.splitlines() if x.startswith("LOADED ")), None)
-check(ld is not None and cs not in ld, f"(F6) the start balance's copy is never loaded {out[-300:]}")
+check(ld is not None and cs not in ld and tf in ld, f"(F6) the start balance's copy is never loaded, a copy of another kind is {out[-300:]}")
 check("CATALOG True" in out, f"(F6) a table's columns asked once per run {out[-300:]}")
 
 # ------------------------------------------------------------ 2.1005.0 (#5415, merge with #5494): an old sign-off record's copy
