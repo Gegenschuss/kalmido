@@ -99,7 +99,9 @@ check(read(ag, SCAN, lang="xx") == 400, "an unknown lang: 400")
 
 # ---------------------------------------------------------------- the five questions of the decision (#5819)
 FIVE = [("scan inbox folder watcher", {SCAN}),
-        ("share knowledge folder with agent", {"agents#knowledge-pages", "wiki#sharing-a-page-or-a-folder-read-only"}),
+        # 2.1067.0: + the knowledge area section main added meanwhile (the whole area shared with an agent, a fitting answer)
+        ("share knowledge folder with agent", {"agents#knowledge-pages", "wiki#sharing-a-page-or-a-folder-read-only",
+                                               "wiki#sharing-the-whole-knowledge-area-with-an-agent"}),
         ("quotation tasks budget hours", {"office#tasks-with-a-time-budget-from-the-quotation-post-calculation"}),
         ("recurring task", {"tasks#recurring-tasks"}),
         ("subscribe calendar", {"calendar#calendar-subscription-your-tasks-in-other-calendars",
