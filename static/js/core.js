@@ -626,6 +626,7 @@ async function rawFetch0(method, url, body, key, osp) {
   const dev = wpDevHeader(url); if (dev) opt.headers['X-Kalmido-Device'] = dev;
   if (method !== 'GET' && S.me && S.me.kind !== 'agent') opt.headers['X-Kalmido-Device-Name'] = histDevice();  // 2.773.0 (#5250): the device of a step in the list "Recent steps" (undo.js)
   if (method !== 'GET' && HIST.gtok) opt.headers['X-Kalmido-Undo-Group'] = HIST.gtok;  // 2.905.0 (#5255): the writes of one step (undo.js histGroup) are one server group
+  if (method !== 'GET' && HIST.own > 0) opt.headers['X-Kalmido-Undo-Own'] = '1';  // 2.1074.0 (#5493): this device's own undo / redo of a step without a server group (undo.js histDo) is no new server step
   if (body instanceof FormData) opt.body = body;
   else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
   let r;

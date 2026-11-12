@@ -19,7 +19,8 @@ UNDO_FIELDS.push('remind_at');  // 2.111.0 C (#2057): the fixed-time reminder
 const HIST_FIELDS = [...UNDO_FIELDS, 'title', 'content', 'url', 'tags', 'fields'];
 const HIST_MAX = 100, HIST_MENU = 100;  // 2.773.0 (#5250, #5242): 100 steps (was 30), the → menu lists them all (was 10) and scrolls
 // fresh: the step groups of answers no entry took yet (histUgid); gtok: the bundling token of histGroup (X-Kalmido-Undo-Group)
-const HIST = {undo: [], redo: [], busy: false, group: null, gToast: null, toastE: null, sess: 0, ids: {}, secmap: new Map(), fresh: [], gtok: ''};
+// own: > 0 while this device runs an entry's own undo / redo (no server group): its writes carry X-Kalmido-Undo-Own (core.js)
+const HIST = {undo: [], redo: [], busy: false, group: null, gToast: null, toastE: null, sess: 0, ids: {}, secmap: new Map(), fresh: [], gtok: '', own: 0};
 const HIST_FRESH_MS = 8000;  // 2.905.0 (#5255): an answer's group older than this is no longer taken by a new entry
 const snapTask = t => t ? JSON.parse(JSON.stringify(t)) : null;
 const withKids = id => { const out = [], walk = x => { for (const k of children(x)) { out.push(snapTask(k)); walk(k.id); } }; out.push(snapTask(taskById(id))); walk(id); return out.filter(Boolean); };
@@ -246,7 +247,11 @@ async function histDo(e, dir, exact = false) {
   }
   for (const p of parts) {
     if (histSrv(p) || (p.cut || []).length || !p[dir]) continue;  // the server (or the outbox) had it
-    const r = await p[dir](p) || {};
+    // 2.1074.0 (#5493): its writes are the way back of this device's own step, not a new step of the person on the server
+    // (that new group ended the way forward of the person's undone server groups)
+    HIST.own++;
+    let r;
+    try { r = await p[dir](p) || {}; } finally { HIST.own--; }
     HIST.fresh = [];  // 2.905.0 (#5255): a group its own write recorded belongs to no new entry
     out.skipped.push(...(r.skipped || [])); out.note = out.note || r.note || ''; out.none = out.none || !!r.none; out.queued = out.queued || !!r.q;  // 2.560.0 (#4667): note = a sentence instead of "Undone: …"
   }

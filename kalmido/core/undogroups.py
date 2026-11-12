@@ -20,6 +20,7 @@ record steps (obj_is_agent in obj_undo_pre); a barrier of an agent is not writte
 Interface:
   ug_current(c, uid, area, org_id, label) -> the request's group {id, state, parts, bytes} (opened on first use) or None
   ug_own()                          2.934.0 (#5596): this request keeps its own undo (a proposal's apply / undo / redo): no group
+  ug_own_hdr() -> bool              2.1074.0 (#5493): header X-Kalmido-Undo-Own: 1 = a device's own undo of a step without a group: no group
   ug_fits(c, grp, n) -> bool        may a copy of n bytes join (False: the group became / is toobig, the part counted)
   ug_added(c, grp, n)               a part of n bytes joined
   ug_gids(c, where, args) -> [group ids] of the obj_undo rows matching where (before deleting them)
@@ -184,7 +185,7 @@ def ug_current(c, uid, area, org_id, label, obj=None):
     new one. label = (key, [values]) unless undo_label set one. None outside a request. 2.985.0 (#5394, review F6): obj =
     (kind, id) of a copy part -- a server-side bundle that holds a step of that object already is not joined (two copy
     steps of one object in one group do not go back through each other's trash / restore side effects)."""
-    if not has_request_context() or g.get("undo_own"):
+    if not has_request_context() or g.get("undo_own") or ug_own_hdr():
         return None
     cur = g.get("undo_group")
     # 2.866.0 (#5302 N2, review): a group stays in one workspace - a barrier holds only the groups of its org_id, so a part of
@@ -219,6 +220,16 @@ def ug_current(c, uid, area, org_id, label, obj=None):
            "org": org_id}  # 2.866.0 (#5302 N2): the workspace of the group
     g.undo_group = cur
     return cur
+
+
+UNDO_OWN_HDR = "X-Kalmido-Undo-Own"  # 2.1074.0 (#5493)
+
+
+def ug_own_hdr():
+    """2.1074.0 (#5493): the write is a device's own undo / redo of a step that has no server group (static/js/undo.js histDo,
+    the areas that keep their own way back): it records no step group -- a new group would end the way forward of the person's
+    undone groups (redo) and be a step of its own that the arrow then took back (the change came again)."""
+    return has_request_context() and request.headers.get(UNDO_OWN_HDR) == "1"
 
 
 def ug_own():

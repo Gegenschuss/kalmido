@@ -9,7 +9,9 @@
 //  - a change made on another device of the same person (the API) is the newest step: Ctrl+Z here takes it back
 //  - offline: a change still waiting in the outbox is taken out of the queue by Ctrl+Z (never sent)
 //  - a list's type (a server step since #5476, recorded before its answer) goes back on the server, no second step
-//  - a step of an area without server steps yet (a list's folder) still goes back as "only this device"
+//  - a list's folder (2.1074.0, #5493: a server step too) goes back on the server, no new step
+//  - a step of this device without a server group goes back without a new server step (X-Kalmido-Undo-Own): the way forward
+//    of the undone server step stays
 // The waits are on states (rows, values on the server, the toast), never on a fixed time.
 const {boot, errs, B, login, until: until0} = require('./boot');
 const F = []; let ok = 0;
@@ -91,13 +93,28 @@ async function round(who, ck, tag) {
   const top = ((await call(ck, 'GET', '/api/undo?limit=1')).items || [])[0];
   check(top && top.state === 'undone', `${tag}: no new step for the way back: ` + JSON.stringify(top));
 
-  // ---- an area without server steps yet (a list's folder: not a plain setting): still back, as "only this device"
+  // ---- a list's folder (a setting with side effects): 2.1074.0 (#5493) a server step too (was: "only this device")
   const folderOf = async () => (await call(ck, 'GET', '/api/state')).lists.find(l => l.id === L)?.folder || '';
   await w.eval(`listPatch(${L}, {folder: 'Later ${tag}'}, 'Folder of “Work ${tag}”')`);
   check(await until(async () => await folderOf() === `Later ${tag}`), `${tag}: the list went into a folder`);
-  check(w.eval('(() => { const e = HIST.undo.at(-1); return !!e && !histSrv(e) && typeof e.undo === "function"; })()'), `${tag}: its entry is this device's own`);
+  check(w.eval('(() => { const e = HIST.undo.at(-1); return !!e && histGids(e).length === 1; })()'), `${tag}: the folder's entry holds the server's group`);
   key('z');
   check(await until(async () => await folderOf() === ''), `${tag}: Ctrl+Z took the folder back`);
+  await idle();
+  const fg = ((await call(ck, 'GET', '/api/undo?limit=1')).items || [])[0];
+  check(fg && fg.state === 'undone' && fg.kind === 'listside', `${tag}: the folder's step went back on the server, no new step: ` + JSON.stringify(fg));
+
+  // ---- 2.1074.0 (#5493): a step of this device without a server group (an area keeping its own way back) goes back
+  // without a new server step: the way forward of the undone folder step stays
+  const colorOf = async () => (await call(ck, 'GET', '/api/state')).lists.find(l => l.id === L)?.color || '';
+  w.eval(`HIST.fresh = []; histAdd({label: 'Own step ${tag}', undo: async () => { await api('PATCH', '/api/lists/${L}', {color: '#cc3333'}); return {}; }, redo: async () => ({})})`);
+  key('z');
+  check(await until(async () => await colorOf() === '#cc3333'), `${tag}: the own step's way back ran`);
+  await idle();
+  const og = ((await call(ck, 'GET', '/api/undo?limit=1')).items || [])[0];
+  check(og && og.id === fg.id && og.state === 'undone', `${tag}: the own way back is no new server step: ` + JSON.stringify(og));
+  const rd = await call(ck, 'POST', `/api/undo/${fg.id}/redo`);
+  check(rd.http === 200 && await folderOf() === `Later ${tag}`, `${tag}: the folder step keeps its way forward (${rd.http})`);
   w.close();
 }
 

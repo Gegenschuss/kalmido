@@ -9,6 +9,8 @@ kind listside, a diff part taken back through the project's own write path). Inv
    private client the move ended (move memo)
  - the project's ticket key: back to none and forward again
  - a value changed elsewhere since stays and is named (409 when nothing else of the step is left)
+ - a write with X-Kalmido-Undo-Own (a device's own way back of a step without a server group) records no step and keeps
+   the way forward of an undone step
  - another person neither lists nor takes back the step (404)
 freelancer-matrix: undo (a person without an organisation: her project's folder and time tracking go back and forward)
 usage: p21074_a_lpside_test.py <datadir>"""
@@ -119,6 +121,17 @@ res = undo_one(A, ugk)
 check(res.get("undone") == [ugk] and not lrow(A, P).get("ticket_key"), f"undo: no ticket key again {res}")
 r = A.post(B + f"/api/undo/{ugk}/redo")
 check(r.ok and lrow(A, P).get("ticket_key") == "ALP", f"redo: the key again {r.status_code} {r.text[:120]}")
+
+# a device's own way back of a step without a server group (header X-Kalmido-Undo-Own): no new step, the undone step keeps
+# its way forward
+res = undo_one(A, ugk)
+r = A.patch(B + f"/api/lists/{P}", json={"color": "#cc3333"}, headers={"X-Kalmido-Undo-Own": "1"})
+check(r.ok and not r.json().get("undo_group") and newest(A).get("id") == ugk and newest(A).get("state") == "undone",
+      f"a write marked as a device's own undo records no step {r.text[:160]} {newest(A)}")
+r = A.post(B + f"/api/undo/{ugk}/redo")
+check(r.ok and lrow(A, P).get("ticket_key") == "ALP", f"... and the undone step keeps its way forward {r.status_code} {r.text[:120]}")
+r = A.patch(B + f"/api/lists/{P}", json={"color": "#3366cc"})
+check(r.ok and r.json().get("undo_group"), "(control) the same write without the header is a step")
 
 # another person
 check(Fr.post(B + f"/api/undo/to/{ugk}").status_code == 404 and not [y for y in lst(Fr) if y["id"] == ugk],
