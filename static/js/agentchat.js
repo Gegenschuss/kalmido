@@ -876,7 +876,10 @@ function chatHeadInfo(b) {
     it.push(agModeFree(a) ? {label: l, icon: 'lock', cls: 'chmi-mode', next: 1, fn: () => chatModeMenu(b)} : {...info(l), icon: 'lock'});
   }
   const mr = a.host?.model || '', ms = a.runtime_model || '';
-  if (mr) it.push({...info(tr('Model: {0}', ms && !modelSame(ms, mr) ? tr('set: {0} · runs: {1}', ms, mr) : mr)), icon: 'bot'});
+  // 2.1044.0 (#5824): a server agent's model is chosen here too (the provider's live list, srvagent.js srv_modelModal) by whoever
+  // may set it up; the runtime's wished model (for an own computer) means nothing there
+  if (agModeSrv(a)) { const l = mr ? tr('Model: {0}', mr) : tr('Model'); it.push(srv_may(a) ? {label: l, icon: 'bot', cls: 'chmi-model', next: 1, fn: () => srv_modelModal(a)} : {...info(l), icon: 'bot'}); }
+  else if (mr) it.push({...info(tr('Model: {0}', ms && !modelSame(ms, mr) ? tr('set: {0} · runs: {1}', ms, mr) : mr)), icon: 'bot'});
   it.push({...info(chatKindLbl(a)), icon: 'folder', cls: 'minfo chmi-kind'});  // 2.726.0 (#5164): keeps minfo (looked greyer than the other info lines)  // 2.407.0 B (#3493): what kind of agent, always
   const u = chatUseInfo(a);  // 2.407.0 B (#3493): also with the ring switched off; costs of API-key agents
   if (u) it.push(u.lines.length ? {label: u.t, icon: 'chart', cls: 'chmi-use', more: u.lines.map(info)} : {...info(u.t), icon: 'chart', cls: 'minfo chmi-use'});

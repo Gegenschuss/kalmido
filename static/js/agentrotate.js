@@ -94,6 +94,7 @@ function agm_headSync(id, on) {
 // owner: the personal agent; an admin: any agent)
 /** @param {any} ag */
 async function agm_open(ag) {
+  if ((ag?.server || ag?.provider === 'kalmido-server') && typeof srv_modelModal === 'function') { srv_modelModal(ag); return; }  // 2.1044.0 (#5824): its model lives in the server settings
   const own = !!ag.owner_id && ag.owner_id === S.me?.id, base = own ? `/api/my/agents/${ag.id}` : `/api/admin/agents/${ag.id}`;
   /** @type {any} */
   let a; try { a = ((await api('GET', own ? '/api/my/agents' : '/api/admin/agents')).agents || []).find((/** @type {any} */ x) => x.id === ag.id); } catch { return; }

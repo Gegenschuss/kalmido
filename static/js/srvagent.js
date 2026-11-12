@@ -58,7 +58,7 @@ async function srv_defaults(fresh) {
   if (!srv_def || fresh) srv_def = await api('GET', '/api/agents/server/defaults');
   return srv_def;
 }
-const srv_is = a => !!a && a.provider === SRV_PROV;
+const srv_is = a => !!a && (a.provider === SRV_PROV || !!a.server);  // 2.1044.0 (#5825): server = the flag of the agent objects in /api/state
 const srv_offHtml = () => `<div class="shint keep srvoff" role="note">${ic('alert', 's')} ${esc(tr('Agents on the Kalmido server are switched off on this server (an admin can allow them: Settings > Organisation > Agents).'))}</div>`;
 // the fields both dialogs share: provider, key, model, instructions (j = GET …/server or the defaults)
 function srv_fieldsHtml(j, isNew) {
@@ -306,6 +306,53 @@ async function srv_editModal(a, notes, calm) {
     } catch (x) { show(x.message); } finally { b.disabled = false; }
   });
   draw(); runs(); srv_teamFill(md, a); srv_stDraw(md, a);
+  return md;
+}
+// 2.1044.0 (#5824 / #5825): who may set up a server agent, as the server decides it (srvagent.py srv_need): the owner of a personal
+// agent; for a team agent an admin of its organisation or an instance admin. Everyone else only sees its model
+const srv_may = a => !!a && !!S.me && (a.owner_id ? a.owner_id === S.me.id
+  : !!S.me.is_admin || (!!a.org_id && (S.me.workspaces || []).some(o => o.id === a.org_id && o.role === 'admin')));
+// 2.1044.0 (#5824): "Model" in the agent chat's menu for a server agent: its model from the provider's live list (names, the
+// current one selected, the server's default marked); a change is saved at once (PUT …/server {model}) and applies from the next
+// message - the conversation stays. Below it "Model per routine" leads into the server settings (srv_editModal); without a key
+// (409 no_key) a sentence with the way to the key instead of an empty field. Opened by chatHeadInfo and agm_open.
+async function srv_modelModal(a) {
+  const md = /** @type {any} */ (modal(`<h3>${esc(tr('Model of {0}', a.name || ''))}</h3>
+    <div id="srvm-body"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`));
+  const box = $('#srvm-body', md), more = `<button type="button" class="linkbtn" data-m="srvm-more">${esc(tr('Model per routine, instructions and key'))}</button>`;
+  md.addEventListener('click', e => {
+    const b = /** @type {any} */ (e.target).closest('button[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') md.remove();
+    else if (b.dataset.m === 'srvm-more' || b.dataset.m === 'srvm-key') { md.remove(); srv_editModal(a); }
+  });
+  let j, ms;
+  try { j = await api('GET', `/api/agents/${a.id}/server`); } catch (x) { box.innerHTML = `<div class="muted mhint">${esc(x instanceof Offline ? tr('Only available online.') : x.message)}</div>`; return md; }
+  try { ms = await rawFetch('GET', `/api/agents/${a.id}/server/models`); } catch (x) {
+    if (!md.isConnected) return md;
+    box.innerHTML = x?.data?.error === 'no_key'
+      ? `<p class="srvm-nokey">${esc(tr('No API key is stored for this agent yet, so the provider’s models cannot be listed.'))}</p><button type="button" class="btn sm" data-m="srvm-key">${esc(tr('Add an API key'))}</button>`
+      : `<div class="muted mhint">${esc(x instanceof Offline ? tr('Only available online.') : x?.message || '')}</div>`;
+    return md;
+  }
+  if (!md.isConnected) return md;
+  const cur = j.model || ms.default || '', list = ms.models || [];
+  const nm = id => (list.find(m => m.id === id) || {}).name || id;
+  const opt = m => `<option value="${esc(m.id)}" ${m.id === cur ? 'selected' : ''}>${esc((m.name || m.id) + (m.id === ms.default ? ' · ' + tr('server default') : ''))}</option>`;
+  box.innerHTML = `<div class="row"><label for="srvm-sel">${tr('Model')}</label><select id="srvm-sel">${/*html-ok*/ (list.some(m => m.id === cur) ? '' : opt({id: cur})) + list.map(opt).join('')}</select></div>
+    <div class="shint keep">${esc(tr('A change applies from its next message; the conversation stays.'))}</div>
+    ${ms.fallback_note ? `<div class="shint keep">${esc(ms.fallback_note)}</div>` : ''}
+    <div class="row srvm-more">${/*html-ok*/ more}</div>`;
+  const sel = $('#srvm-sel', md);
+  sel.addEventListener('change', async () => {
+    const v = sel.value, was = cur;
+    sel.disabled = true;
+    try {
+      const r = await api('PUT', `/api/agents/${a.id}/server`, {model: v});
+      j = r; savedTick(sel); toast(tr('Model changed to {0}; applies from the next message', nm(r.model || v)));
+    } catch (x) { sel.value = j.model || was; toast(x instanceof Offline ? tr('Only available online.') : x.message); }
+    finally { sel.disabled = false; }
+  });
   return md;
 }
 const srv_stateTxt = s => tr(({queued: N_('queued|run'), run: N_('running|run'), running: N_('running|run'), done: N_('done|run'), failed: N_('failed|run'), error: N_('failed|run'), aborted: N_('stopped|run'), paused: N_('paused|run')})[s] || s || '');  // agent_runs.state (srvagent_run.py)

@@ -18342,5 +18342,11 @@
   "The agent reports it with its next run": "De agent meldt het bij zijn volgende run",
   "Questions on actions": "Vragen bij acties",
   "In effect now: {0}": "Geldt nu: {0}",
-  "By its permissions in Kalmido": "Volgens zijn rechten in Kalmido"
+  "By its permissions in Kalmido": "Volgens zijn rechten in Kalmido",
+  "Model per routine, instructions and key": "Model per routine, instructies en sleutel",
+  "server default": "standaard van de server",
+  "No API key is stored for this agent yet, so the provider’s models cannot be listed.": "Voor deze agent is nog geen API-sleutel opgeslagen, daarom kunnen de modellen van de aanbieder niet worden getoond.",
+  "Add an API key": "API-sleutel toevoegen",
+  "A change applies from its next message; the conversation stays.": "Een wijziging geldt vanaf het volgende bericht; het gesprek blijft bewaard.",
+  "Model changed to {0}; applies from the next message": "Model gewijzigd naar {0}; geldt vanaf het volgende bericht"
 }

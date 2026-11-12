@@ -18342,5 +18342,11 @@
   "The agent reports it with its next run": "El agente lo indicará en su próxima ejecución",
   "Questions on actions": "Preguntas antes de actuar",
   "In effect now: {0}": "Vigente ahora: {0}",
-  "By its permissions in Kalmido": "Según sus permisos en Kalmido"
+  "By its permissions in Kalmido": "Según sus permisos en Kalmido",
+  "Model per routine, instructions and key": "Modelo por rutina, instrucciones y clave",
+  "server default": "predeterminado del servidor",
+  "No API key is stored for this agent yet, so the provider’s models cannot be listed.": "Este agente aún no tiene una clave API, por eso no se pueden mostrar los modelos del proveedor.",
+  "Add an API key": "Añadir una clave API",
+  "A change applies from its next message; the conversation stays.": "El cambio se aplica desde su próximo mensaje; la conversación se mantiene.",
+  "Model changed to {0}; applies from the next message": "Modelo cambiado a {0}; se aplica desde el próximo mensaje"
 }
