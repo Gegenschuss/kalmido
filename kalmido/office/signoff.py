@@ -449,7 +449,10 @@ def sig_gone_delete(sid):
     # history or undo step of the core left behind)
     office = r["org_id"] or pb_personal(c, r["created_by"], create=False)
     if office:
-        ofk_trash(c, uid, SIG_KIND, sid)
+        # 2.1047.0 (#5793): checked - the route checked the rights itself (sig_gone_rows: an office admin of its organisation /
+        # its creator, the legal period, the lock); it is reached from the settings without the office switched on, where the
+        # core's office gate (okern _base_of: office_on) answered 404
+        ofk_trash(c, uid, SIG_KIND, sid, checked=True)
     else:
         ofk_purge(c, SIG_KIND, sid)
     if r["org_id"]:
