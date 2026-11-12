@@ -139,6 +139,14 @@ const call = async (method, url, body, h = {}) => { const r = await fetch(B + ur
     await settled();
     const c0 = await at(R3);
     check(c0 && /Seedling tray/.test(c0.text), `${tag}: search: the hit read shows its title`);
+    // 2.965.0 (#5655, CI red of 2.941.0 only, green on the Mac): what moved - the hits' order and the place of each row down to
+    // the one read, the scroll box, the parts above the hits and the result the server gives; printed when the check fails
+    const SNAP = `(() => { const v = document.getElementById('view'), r = document.querySelector('#sresults'), rows = [...document.querySelectorAll('#sresults .trow[data-id]')];
+      const i = rows.findIndex(e => e.matches(${JSON.stringify(R3)}));
+      return JSON.stringify({st: Math.round(v.scrollTop), sh: v.scrollHeight, res: Math.round(r.getBoundingClientRect().top), n: rows.length, i, vl: !!r.querySelector('.vlsp, [data-vl]'), ka: (m => m ? (m.sel || m.n?.nodeName) + '@' + Math.round(m.top) : null)(typeof kr_mark === 'function' ? kr_mark(v) : null),
+        above: [...v.querySelectorAll('#view > * , #sresults')].slice(0, 6).map(e => (e.id || e.className || e.nodeName).toString().slice(0, 20) + ':' + Math.round(e.getBoundingClientRect().height)),
+        rows: rows.slice(0, i + 1).map(e => e.dataset.id + '@' + Math.round(e.getBoundingClientRect().top) + '/' + Math.round(e.getBoundingClientRect().height)).join(' ')}); })()`;
+    const s0 = await ev(SNAP);
     // the hits hold what the server answered (no live delta): a hit above changes, the results load again the way the app
     // asks again (the "similar meaning" switch, related.js) - the hit read stays
     await agPatch(ids[3], {title: `Seedling tray moved to the bright shelf by the window and turned so that every plant gets light ${tag}`});
@@ -146,7 +154,12 @@ const call = async (method, url, body, h = {}) => { const r = await fetch(B + ur
     await ev(`(doSearch(S.searchQ), 1)`);
     check(await wait(`/every plant gets light ${tag}/.test(document.querySelector('#sresults .trow[data-id="${ids[3]}"]')?.textContent || '')`, 100), `${tag}: search: the changed hit above arrives with the results`);
     await settled();
-    same(c0, await at(R3), 'search: a hit above grows - the hit read');
+    const c1 = await at(R3);
+    same(c0, c1, 'search: a hit above grows - the hit read');
+    if (!(c0 && c1 && Math.abs(c0.top - c1.top) <= 1 && c1.inSight)) {
+      const srv = await call('GET', '/api/tasks?scope=search&q=Seedling');
+      console.log(`DIAG p2924c ${tag} search before ${s0}\nDIAG p2924c ${tag} search after  ${await ev(SNAP)}\nDIAG p2924c ${tag} server order ${(srv.tasks || []).map(t => t.id).join(' ')} (drawn first ${ids.join(' ')}; changed ${ids[3]}, read ${ids[18]})`);
+    }
     await shot(`p2924c-${tag}-search.png`);
 
     // ============ 4. knowledge page, an image above loads later
@@ -160,8 +173,9 @@ const call = async (method, url, body, h = {}) => { const r = await fetch(B + ur
     await settled();
     const d0 = await atP();
     // the picture above gets a tall one now (it "loads later": the page grows above what is read)
-    const grown = await ev(`new Promise(res => { const i = document.querySelector('#wk-md img.wkimg'); if (!i) return res(false); const h0 = i.getBoundingClientRect().height; i.removeAttribute('loading');
-      i.onload = () => requestAnimationFrame(() => requestAnimationFrame(() => res(i.getBoundingClientRect().height - h0))); i.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="900"><rect width="300" height="900" fill="#8a6"/></svg>'); })`);
+    // 2.965.0 (#5655): the page's own picture (lazy, still on its way) may load first and fire onload: only the tall one counts
+    const grown = await ev(`new Promise(res => { const i = document.querySelector('#wk-md img.wkimg'); if (!i) return res(false); const h0 = i.getBoundingClientRect().height; i.removeAttribute('loading'); setTimeout(() => res(i.getBoundingClientRect().height - h0), 15000);
+      i.onload = () => { if (!/^data:/.test(i.currentSrc || i.src) || i.naturalHeight < 900) return; requestAnimationFrame(() => requestAnimationFrame(() => res(i.getBoundingClientRect().height - h0))); }; i.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="900"><rect width="300" height="900" fill="#8a6"/></svg>'); })`);
     // 2.941.0 (#5227): the page's picture carries width/height 40 now (its box is reserved), the tall one grows it to 40 x 120
     check(grown > 60, `${tag}: wiki: the picture above grew by ${grown} px`);
     const d1 = await atP();
