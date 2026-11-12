@@ -28,7 +28,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 FEAT = "cal,comments,collab,office,clients"
-O, D = "/api/office", "/api/office/docs"
+OFC, D = "/api/office", "/api/office/docs"
 from kt import FAILS, OKS, check, sess  # noqa: E402  shared helpers (tests/kt.py)
 
 try:
@@ -49,7 +49,7 @@ A.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
 ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).json()["id"]
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
-assert A.put(B + O + "/settings", json={"lang": "de"}).ok
+assert A.put(B + OFC + "/settings", json={"lang": "de"}).ok
 
 
 def new(s, **kw):
@@ -162,7 +162,7 @@ check([x["total"] for x in lines(j, "subtotal")] == [2000, 2400], "#5816: positi
 txt = pdf_text(A, Q["id"])
 if txt is not None:
     check("Zwischensumme Vorproduktion" in txt and "Zwischensumme Dreh" in txt and "2.400,00 €" in txt, "#5816: the PDF prints the subtotals " + txt[:900].replace("\n", " | "))
-r = A.put(B + O + "/settings", json={"subtotals_on": 1})
+r = A.put(B + OFC + "/settings", json={"subtotals_on": 1})
 check(r.ok and r.json()["settings"]["subtotals_on"] == 1, "#5816: the office setting is saved " + r.text[:120])
 check(new(A)["subtotals"] is True, "#5816: a new quotation takes the office setting")
 r = A.post(B + D, json={"kind": "invoice"})
@@ -175,7 +175,7 @@ check([(x["title"], x["total"]) for x in lines(j, "subtotal")] == [("Dreh", 2300
 j = A.patch(B + f"{D}/{IV['id']}", json={"subtotals": 0}).json()
 check(j["subtotals"] is False and not lines(j, "subtotal") and j["totals"]["net"] == "3700.00", "#5816: off on the invoice: no subtotal lines")
 check(A.patch(B + f"{D}/{IV['id']}", json={"flat_print": 1}).json().get("flat_print") is False, "#5817: an invoice is never a flat price")
-assert A.put(B + O + "/settings", json={"subtotals_on": 0}).ok
+assert A.put(B + OFC + "/settings", json={"subtotals_on": 0}).ok
 
 # ---------------------------------------------------------------- #5817 the flat price quotation
 QF = new(A)
@@ -238,7 +238,7 @@ j = Fr.patch(B + f"{D}/{QP['id']}", json={"subtotals": 1, "flat_print": 1}).json
 check([x["total"] for x in lines(j, "subtotal")] == [2000, 2400] and j["flat_print"] is True, "freelancer: subtotals and flat price")
 rd = Fr.get(B + f"{D}/{QP['id']}/render").json()
 check(rd.get("flat") is True and not any("rate_text" in x for x in rd["lines"] if x["kind"] == "item"), "freelancer: the print model without prices")
-check(Fr.put(B + O + "/settings", json={"subtotals_on": 1}).ok and new(Fr)["subtotals"] is True, "freelancer: the office setting in the own office")
+check(Fr.put(B + OFC + "/settings", json={"subtotals_on": 1}).ok and new(Fr)["subtotals"] is True, "freelancer: the office setting in the own office")
 check(A.get(B + f"{D}/{QP['id']}").status_code in (403, 404), "freelancer: the organisation's admin does not see the quotation")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
