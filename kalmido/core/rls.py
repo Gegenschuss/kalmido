@@ -20,6 +20,8 @@ org_id that is missing here still gets the policy at start-up (with a warning), 
 
 import time
 
+from .pg import qi, table_names  # 2.965.0 (#5654): _lock_all
+
 APP_ROLE = "kalmido_app"
 
 # tables whose rows belong to an organisation (column org_id); orgs / org_members have their own policies below
@@ -171,6 +173,39 @@ def _policy(c, table, expr):
     c.execute(f"CREATE POLICY {POLICY} ON {table} USING ({expr}) WITH CHECK ({expr})")
 
 
+# 2.965.0 (#5654): a start that applies the policies next to the running server (a CLI, a helper importing the app) locked
+# its ~300 tables one after the other with ALTER TABLE; a background transaction of the server holding one table and reading
+# the next deadlocked with it (CI v2.941.0: four starts in a row). Now every table is locked in ONE statement first, each wait
+# shorter than Postgres' deadlock_timeout (1 s): the start gives way (back to a savepoint, nothing held) and tries again
+RLS_LOCK_WAIT_MS = 400
+RLS_LOCK_TRIES = 50  # then the ALTER TABLEs wait as before
+
+
+def _lock_all(c, tables):
+    """2.965.0 (#5654): ACCESS EXCLUSIVE on all tables inside init_db's transaction, or nothing (the caller's ALTERs then
+    lock one by one as before). True when locked."""
+    if not tables:
+        return True
+    ok = table_names(c)  # the allowlist of qi(): the names come from the catalog (org_tables) and OWN_RULES
+    prev = c.execute("SELECT current_setting('lock_timeout')").fetchone()[0]
+    done = False
+    for i in range(RLS_LOCK_TRIES):
+        try:
+            with c.savepoint():
+                c.execute(f"SET LOCAL lock_timeout = '{RLS_LOCK_WAIT_MS}ms'")
+                c.execute(f"LOCK TABLE {', '.join(qi(t, ok) for t in sorted(tables))} IN ACCESS EXCLUSIVE MODE")
+            done = True
+            break
+        except Exception as e:  # noqa: BLE001 - only a lock wait over the limit (or a deadlock) is retried
+            if getattr(e, "sqlstate", None) not in ("55P03", "40P01"):
+                raise
+            time.sleep(0.05 * (1 + i % 4))
+    c.execute("SELECT set_config('lock_timeout', ?, true)", (prev,))  # SET LOCAL outlives RELEASE SAVEPOINT
+    if not done:
+        print(f"row-level security: the tables stayed busy ({RLS_LOCK_TRIES} tries), locking one by one", flush=True)
+    return done
+
+
 # 2.37.0 (review W2-2): the result of the last apply() -- False when the login role bypasses row-level security and the
 # app role cannot be used (core/db.py init_db: exit 3 in the modes with several organisations, else a security alert at
 # every start and a line in the admin alerts settings)
@@ -239,6 +274,7 @@ def apply(c):
     if cat and _sig_get(c) == f"{sig}:{cat}":
         STATE["policies"] = "skipped"
     else:
+        _lock_all(c, set(have) | set(OWN_RULES))  # 2.965.0 (#5654): every table at once, giving way to the running server
         for t, nullable in sorted(have.items()):
             if t not in OWN_POLICY:
                 _policy(c, t, rule(nullable))

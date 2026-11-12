@@ -54,11 +54,24 @@ def in_ct(code):
 
 # importing kalmido starts it (startup.py: init_db) -- "boot" is what that start's apply() did; then one more apply() in the
 # same process with {pre} (a changed rule) and the relation locks it holds
-APPLY = ("import json\nfrom kalmido.core import rls\nfrom kalmido.core.db import DATABASE_URL\nfrom kalmido.core.pg import connect_direct\n"
-         "boot = rls.STATE['policies']\n{pre}\no = connect_direct(DATABASE_URL)\nok = rls.apply(o)\n"
+# 2.965.0 (#5654): the start itself (init_db, before its COMMIT) is measured too: every strong table lock it holds by then
+# (ACCESS EXCLUSIVE, EXCLUSIVE, SHARE ROW EXCLUSIVE, SHARE) -- a statement that locks a table at every start (ALTER, CREATE
+# INDEX / TRIGGER / POLICY without a skip) is what deadlocked the helper with the running server in CI v2.941.0
+BOOT_LOCKS = ("import psycopg\nBOOT_LOCKS = []\n_cm = psycopg.Connection.commit\n"
+              "def _commit(self):\n"
+              "    try:\n"
+              "        BOOT_LOCKS.extend(sorted({f'{r[0]} {r[1]}' for r in self.execute(\"SELECT c.relname, l.mode FROM pg_locks l JOIN pg_class c \"\n"
+              "            \"ON c.oid=l.relation WHERE l.pid=pg_backend_pid() AND l.locktype='relation' AND l.mode IN \"\n"
+              "            \"('AccessExclusiveLock','ExclusiveLock','ShareRowExclusiveLock','ShareLock')\").fetchall()}))\n"
+              "    except Exception as e:\n"
+              "        BOOT_LOCKS.append(f'(not measured: {e})')\n"
+              "    return _cm(self)\n"
+              "psycopg.Connection.commit = _commit\n")
+APPLY = (BOOT_LOCKS.replace("{", "{{").replace("}", "}}") + "import json\nfrom kalmido.core import rls\nfrom kalmido.core.db import DATABASE_URL\nfrom kalmido.core.pg import connect_direct\n"
+         "boot, boot_locks = rls.STATE['policies'], list(BOOT_LOCKS)\n{pre}\no = connect_direct(DATABASE_URL)\nok = rls.apply(o)\n"
          "n = o.execute(\"SELECT COUNT(*) FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='relation' "
          "AND mode='AccessExclusiveLock'\").fetchone()[0]\no.commit()\no.close()\n"
-         "print(json.dumps({{'boot': boot, 'policies': rls.STATE['policies'], 'enforced': ok, 'locks': n}}))")
+         "print(json.dumps({{'boot': boot, 'policies': rls.STATE['policies'], 'enforced': ok, 'locks': n, 'boot_locks': boot_locks}}))")
 
 
 def apply(pre=""):
@@ -77,6 +90,7 @@ def pol(table):
 r = apply()
 check(r["boot"] == "skipped" and r["policies"] == "skipped" and r["locks"] == 0 and r["enforced"],
       f"#2666: unchanged -> skipped at the start and after it, no exclusive lock {r}")
+check(r["boot_locks"] == [], f"#5654: an unchanged start next to the running server holds no strong table lock {r['boot_locks']}")
 good = pol(T)
 check(good[0] and good[1] and good[2] and "app.org_ids" in good[2], f"#2666: {T} has its policy {good}")
 
@@ -89,9 +103,42 @@ for what, stmt in (("policy dropped", f"DROP POLICY kalmido_org ON {T}"),
     sql(stmt, write=True)
     r = apply()
     check(r["boot"] == "applied" and r["policies"] == "skipped" and r["locks"] == 0, f"#2666: {what} -> applied at the start {r}")
+    if what == "policy dropped":  # 2.965.0 (#5654): the measurement of the start's locks sees a lock it does take
+        check(f"{T} AccessExclusiveLock" in r["boot_locks"], f"#5654: an applying start holds {T} exclusively {r['boot_locks'][:8]}")
     o = pol("orgs")
     check(pol(T) == good and o[0] and o[1] and o[2], f"#2666: {what} -> restored {pol(T)} {o}")
 check(apply()["boot"] == "skipped", "#2666: skipped after the repairs")
+
+# 2.965.0 (#5654): an applying start next to a server transaction that holds one table and then reads another one the start
+# has locked already (CI v2.941.0: "deadlock detected" in rls._policy, four starts in a row). A reader in the container holds
+# lists, waits until the start waits for lists, then reads agents (locked before lists in the start's order). Before the fix
+# the start was the deadlock's victim; now it gives way and applies. One start, no retry (in_ct retries deadlocks)
+READER = ("import json, os, time, psycopg\nu = os.environ['DATABASE_URL']\nc = psycopg.connect(u)\n"
+          "c.execute('SELECT 1 FROM lists LIMIT 1')\nprint('ready', flush=True)\nw = psycopg.connect(u, autocommit=True)\n"
+          "t0, seen, err = time.monotonic(), False, None\nwhile time.monotonic() - t0 < 90 and not seen:\n"
+          "    seen = bool(w.execute(\"SELECT 1 FROM pg_locks l JOIN pg_class r ON r.oid=l.relation WHERE r.relname='lists' \"\n"
+          "                          \"AND NOT l.granted AND l.mode='AccessExclusiveLock'\").fetchone())\n"
+          "    time.sleep(0.02)\ntry:\n    c.execute('SELECT 1 FROM agents LIMIT 1')\n    c.commit()\nexcept Exception as e:\n"
+          "    err = str(e)\nprint(json.dumps({'seen': seen, 'err': err}), flush=True)\n")
+sql(f"DROP POLICY kalmido_org ON {T}", write=True)
+rd = subprocess.Popen(["docker", "exec", CT, "python3", "-u", "-c", READER], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+try:
+    first = rd.stdout.readline().strip()
+    one = subprocess.run(["docker", "exec", CT, "python3", "-c", APPLY.format(pre="")], capture_output=True, text=True, timeout=180)
+    rest = rd.communicate(timeout=120)[0]
+finally:
+    if rd.poll() is None:
+        rd.kill()
+got = json.loads(one.stdout.strip().splitlines()[-1]) if one.returncode == 0 else {}
+check(first == "ready" and one.returncode == 0 and got.get("boot") == "applied",
+      f"#5654: a busy server table: the start gives way instead of dying in a deadlock {first!r} {got} deadlock={'deadlock detected' in one.stdout + one.stderr} "
+      f"{[x for x in (one.stdout + one.stderr).splitlines() if 'Error' in x or 'DETAIL' in x][-3:]}")
+try:
+    rres = json.loads(rest.strip().splitlines()[-1])
+except (ValueError, IndexError):
+    rres = {}
+check(rres.get("seen") and not rres.get("err"), f"#5654: the reader saw the start wait for lists and read on {rest[-400:]!r}")
+check(pol(T) == good, f"#5654: {T} has its policy again {pol(T)}")
 # 2.183.0 (review): another policy on the table is never skipped over (applied at every start, with a warning)
 sql(f"CREATE POLICY p2183_extra ON {T} USING (true)", write=True)
 check(apply()["boot"] == "applied" and apply()["boot"] == "applied", "#2666: another policy -> applied every start")
