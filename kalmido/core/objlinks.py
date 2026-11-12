@@ -463,7 +463,7 @@ def olnk_move(c):
         cols = table_columns(c, t)
         out[t] = c.execute(f"""INSERT INTO obj_links(org_id, src_kind, src_id, dst_kind, dst_id, rel, created_by, created_at)
                                SELECT o.org_id, 'hub_mail', o.mail_id, o.kind, o.ref_id, 'made', o.created_by, {_ts(cols, 'created_at')}
-                               FROM {t} o WHERE o.kind IN ('task', 'event') ORDER BY o.id
+                               FROM {qi(t, {t})} o WHERE o.kind IN ('task', 'event') ORDER BY o.id
                                ON CONFLICT (src_kind, src_id, dst_kind, dst_id, rel) DO NOTHING""").rowcount
     t = "life_device_links"
     if c.execute(f"SELECT to_regclass('{t}')").fetchone()[0]:
@@ -473,7 +473,7 @@ def olnk_move(c):
                                SELECT o.user_id, 'task', o.task_id, 'omd_equipment', o.equipment_id, 'device',
                                       jsonb_build_object('origin', COALESCE(o.origin, 'device'), 'office_id', o.office_id),
                                       o.user_id, {_ts(cols, 'created_at')}, {_ts(cols, 'updated_at')}
-                               FROM {t} o WHERE o.task_id IS NOT NULL AND o.equipment_id IS NOT NULL ORDER BY o.id
+                               FROM {qi(t, {t})} o WHERE o.task_id IS NOT NULL AND o.equipment_id IS NOT NULL ORDER BY o.id
                                ON CONFLICT (src_kind, src_id, dst_kind, dst_id, rel) DO NOTHING""").rowcount
     t = "contact_tasks"
     if c.execute(f"SELECT to_regclass('{t}')").fetchone()[0]:
@@ -481,7 +481,7 @@ def olnk_move(c):
         out[t] = c.execute(f"""INSERT INTO obj_links(src_kind, src_id, dst_kind, dst_id, rel, extra, created_by, created_at)
                                SELECT 'contact', o.contact_id, 'task', o.task_id, 'contact',
                                       jsonb_build_object('kind', COALESCE(o.kind, 'about')), o.added_by, {_ts(cols, 'added_at')}
-                               FROM {t} o ORDER BY o.added_at, o.contact_id, o.task_id
+                               FROM {qi(t, {t})} o ORDER BY o.added_at, o.contact_id, o.task_id
                                ON CONFLICT (src_kind, src_id, dst_kind, dst_id, rel) DO NOTHING""").rowcount
     t = "office_letter_links"
     if c.execute(f"SELECT to_regclass('{t}')").fetchone()[0]:
@@ -491,7 +491,7 @@ def olnk_move(c):
                                                     deleted_at, deleted_by, updated_at, updated_by)
                                SELECT o.org_id, 'office_letter', o.letter_id, 'fs_entry', o.node_id, o.kind, o.created_by,
                                       {'o.agent_id' if 'agent_id' in cols else 'NULL'}, {_ts(cols, 'created_at')}, {', '.join(trash)}
-                               FROM {t} o WHERE o.kind IN ('answers', 'reply') ORDER BY o.id
+                               FROM {qi(t, {t})} o WHERE o.kind IN ('answers', 'reply') ORDER BY o.id
                                ON CONFLICT (src_kind, src_id, dst_kind, dst_id, rel) DO NOTHING""").rowcount
         from .undogroups import ug_gc
         gids = [r[0] for r in c.execute("SELECT DISTINCT group_id FROM obj_undo WHERE kind='oletlink' AND group_id IS NOT NULL").fetchall()]
