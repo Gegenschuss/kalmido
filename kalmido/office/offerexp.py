@@ -36,7 +36,10 @@ from ..core.access import Denied, live_sql
 from ..accounts.orgroles import OFFICE_READ
 from ..tasks.validation import valid_date
 from ..collab.news import news_add
-from .model import office_ctx as _ctx, office_role, office_settings
+from .model import office_ctx as _ctx, office_role, office_settings, ofx_release
+from .docs import doc_public, doc_row
+from .pdfweb import epdf_store
+from .signoff import sig_people
 from .fixedimport import fci_people
 from .ledger import ofx_locked, ofx_log
 from .dunning import dun_priv_hidden
@@ -154,7 +157,6 @@ def ofe_area(c, oid, today):
 
 
 def _ofe_as(c, oid, today):
-    from .signoff import sig_people
     days = ofe_days(office_settings(c, oid))
     if not days:
         return 0
@@ -205,8 +207,6 @@ def ofe_news_live(c, uid, data):
 def ofe_extend(did):
     """{valid_until: YYYY-MM-DD (today or later)} -> the quotation with its new date, links_void = open approval links that no
     longer fit. Only a sent quotation without an answer (409 otherwise); no new version (see the module text)."""
-    from .docs import doc_public, doc_row
-    from .model import ofx_release
     c, uid, oid = _ctx()
     write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
@@ -223,7 +223,7 @@ def ofe_extend(did):
         with ofx_release(c):  # a finalised quotation: this one column, deliberately (core/migrations.d/4598.py)
             c.execute("UPDATE office_docs SET valid_until=?, updated_at=? WHERE id=? AND org_id=?", (v, iso_ms(now_utc()), did, oid))
             if ofx_locked(r) and (r["pdf_sha256"] if "pdf_sha256" in r.keys() else ""):
-                from .pdfweb import epdf_store  # the stored PDF is what the app serves and mails: stored anew with the new date
+                # the stored PDF is what the app serves and mails: stored anew with the new date
                 epdf_store(c, oid, did, log_extra={"valid_until": v})
         c.execute("DELETE FROM office_dunning_marks WHERE org_id=? AND doc_id=? AND level IN (?, ?)", (oid, did, OFE_SOON, OFE_GONE))
         ofx_log(c, oid, "valid_until", doc_id=did, detail={"before": {"valid_until": old}, "after": {"valid_until": v}})
