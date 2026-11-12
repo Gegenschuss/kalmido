@@ -245,6 +245,7 @@ Contacts and address books (CardDAV, merge, history).
 The foundation: database, schema, access layer, request context, conflicts (409), i18n, retention, encryption keys.
 
 - `kalmido/core/access.py` (`acx`) - Access control: who sees / changes which list and task, module switches, list roles
+- `kalmido/core/addrshare.py` (`ads`) - Open shares by e-mail address in the shared core: obj_addr_shares, redeemed when the account of the address signs in with it proved (projects, folders, knowledge pages)
 - `kalmido/core/codemanifest.py` - Code integrity: the web manifest, the full SHA-256 of every file the browser gets (GET /api/code-manifest, tools/web_manifest.py)
 - `kalmido/core/compress.py` - JSON answers of the app go out gzip-compressed when the browser accepts it (GET /api/state with many tasks: a few MB of JSON shrink to a few hundred KB)
 - `kalmido/core/config.py` - Configuration from the environment, the outbound-HTTP guard, proxy and login settings, the Flask app object
