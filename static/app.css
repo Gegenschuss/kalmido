@@ -5514,6 +5514,17 @@ body.lydragging,body.lydragging *{cursor:grabbing!important;-webkit-user-select:
   body.in-team .tcwrap{flex:1;min-height:0;display:flex;flex-direction:column}
   body.in-team .tcview{flex:1;height:auto}
 }
+/* 2.1081.0 (#5903): from 768 px (tablet, open Fold, desktop) the agent chat and the team chat fill the whole width beside the
+   lists like on a phone: #view's side padding (1.75rem) falls away in a chat, header, switch row and composer reach both edges;
+   the messages keep their own padding and stay in a reading column (--w-lesen) in the middle, like the team chat's room
+   (start-breite.css .tcmsgs). The small chat window (html.mini-chat) keeps its own padding (more specific rule below). */
+@media (min-width:768px){
+  body.in-chat #view,body.in-team #view{padding-left:0;padding-right:0}
+  body.in-chat #view .chview{max-width:none;margin:0}
+  body.in-chat #view .chview.vvfix{padding-left:0;padding-right:0}
+  body.in-chat #view .chview .chmsgs{padding-inline:max(.75rem,calc((100% - var(--w-lesen)) / 2))}
+  body.in-team #view .tcview{border-left:0;border-right:0;border-radius:0}
+}
 /* 2.35.0 (#1107): the chat header on touch screens: no two tap areas overlap (measured before: ring / (i) 23 px, (i) /
    permission badge 7 px), each stays 44 x 44 px. The ring's 44 px box no longer reaches under the (i); on a phone the
    permission badge moves to the start of the second line (under the name), so name, ring and (i) fit in the first */

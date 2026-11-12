@@ -1,7 +1,8 @@
 // 2.622.0 A (#4946) UI test, own container (start.sh), Firefox: the agent chat on a phone runs edge to edge like the tab bar -
 // kalmido-suite: fresh
 // its header (.chath) and the composer (.chcomp) are as wide as the screen (320 and 412 px, touch), the messages keep a padding
-// at both sides; the desktop layout (840 and 960 px, mouse; from 1000 px the chat is a side panel) keeps the centred chat inside the page padding as before.
+// at both sides; the desktop layout (840 and 960 px, mouse; from 1000 px the chat is a side panel) since 2.1081.0 (#5903) fills the
+// view's width as well (no side padding), the messages in a reading column with a padding.
 // Invented names only. freelancer-matrix: agents (alice without an organisation chats with her agent)
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -52,12 +53,14 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
         check(g.msg.l >= 8 && g.msg.r <= g.vw - 8, `${tag} the messages keep a padding at both sides (${JSON.stringify(g.msg)})`);
         check(g.sx <= g.vw, `${tag} nothing sticks out sideways (${g.sx} > ${g.vw})`);
       } else {
-        // the desktop as before: the chat inside #view's side padding, at most the reading width (46rem), centred
-        const inner = g.view.w - 2 * g.padL, want = Math.min(inner, 736);
-        check(Math.abs(g.chview.w - want) <= 1, `${tag} the chat keeps its width (${g.chview.w}, expected ${want})`);
-        check(Math.abs((g.chview.l - g.view.l) - (g.view.r - g.chview.r)) <= 1 && g.chview.l - g.view.l >= g.padL - 1, `${tag} the chat stays centred inside the page padding (${JSON.stringify(g.chview)} in ${JSON.stringify(g.view)})`);
+        // 2.1081.0 (#5903): from 768 px the chat fills #view edge to edge too (no side padding any more, open Fold / tablet);
+        // header and composer as wide as the chat, the messages stay in a reading column (46rem) in the middle with a padding
+        check(g.padL === 0, `${tag} #view has no side padding in the chat (${g.padL})`);
+        check(Math.abs(g.chview.l - g.view.l) <= 1 && g.chview.w >= g.view.w - 20, `${tag} the chat fills the view's width (${JSON.stringify(g.chview)} in ${JSON.stringify(g.view)})`);
         check(g.head.w === g.chview.w && g.comp.w === g.chview.w, `${tag} header and composer as wide as the chat (${g.head.w}, ${g.comp.w}, ${g.chview.w})`);
-      }
+        check(g.msg.l >= g.chview.l + 8 && g.msg.r <= g.chview.r - 8, `${tag} the messages keep a padding at both sides (${JSON.stringify(g.msg)})`);
+        check(g.msg.r - g.msg.l <= 736 + 1, `${tag} the messages stay within the reading width (${JSON.stringify(g.msg)})`);
+        check(g.sx <= g.vw, `${tag} nothing sticks out sideways (${g.sx} > ${g.vw})`);
       await shot(`p2622a-chat-${wd}.png`);
     }, touch);
   }
