@@ -11,7 +11,7 @@ Checks: the server runs the candidate (/api/version, kalmido_meta.app_version), 
 old accounts sign in and see their data as before (upgrade_views.data_checks: lists, tasks, comments, office documents, clients,
 time entries, the agent, the boundaries between organisation, private workspace and frida), a write works. With the install
 folder also what update.sh promises: a database copy in data/backups/, .kalmido-version = the candidate's ref and
-.kalmido-version.prev = the release of before, update.sh is still there."""
+.kalmido-version.prev = the version of before (vX.Y.Z or latest-ok/X.Y.Z, #5713), update.sh is still there."""
 import glob
 import json
 import os
@@ -61,8 +61,9 @@ def verify(E, version, install_dir=None, ref=None):
             return ""
     if ref:
         check(first_line(".kalmido-version") == ref, f"{tag}: .kalmido-version = {ref} ({first_line('.kalmido-version')})")
-    prev = "v" + E["version"]
-    check(first_line(".kalmido-version.prev") == prev, f"{tag}: .kalmido-version.prev = {prev} ({first_line('.kalmido-version.prev')})")
+    # 2.1011.0 (#5713): a live version without release page was installed from its tag latest-ok/X.Y.Z
+    prev = ("v" + E["version"], "latest-ok/" + E["version"])
+    check(first_line(".kalmido-version.prev") in prev, f"{tag}: .kalmido-version.prev in {prev} ({first_line('.kalmido-version.prev')})")
     check(os.access(os.path.join(install_dir, "update.sh"), os.X_OK), f"{tag}: update.sh is still there")
 
 

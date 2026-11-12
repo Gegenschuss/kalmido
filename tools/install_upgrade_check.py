@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
 """2.589.0 (#4359, audit #2480 finding 6): the way of a self-hoster, end to end - the nightly CI job "install-upgrade" (ci.yml).
 
-  1. the release before the candidate (VERSION) is installed with ITS install.sh from the GitHub release (the same file
-     kalmido.com/install.sh forwards to; prebuilt image pinned to the release digest, like on a real machine)
+  1. the version before the candidate (VERSION) is installed with ITS install.sh from the GitHub release (the same file
+     kalmido.com/install.sh forwards to; prebuilt image pinned to the release digest, like on a real machine).
+     2.1011.0 (#5713): that version is the live one - the newest tag latest-ok/X.Y.Z below VERSION (pick_start); without a
+     release page its install.sh comes from the tag and installs KALMIDO_VERSION=latest-ok/X.Y.Z (cloned, built locally)
   2. tests/upgrade_seed.py fills it (with the one-time setup code from the server log, as the setup page asks for it) and
      writes <version>.sql.gz + <version>.json: the old database and what the old release showed
   3. the update.sh that installer wrote updates it to the candidate: KALMIDO_VERSION=<commit> and KALMIDO_INSTALLER_URL = the
      candidate's install.sh (a released installation fetches the newest release's installer; the candidate has no release yet)
   4. tests/install_upgrade_verify.py: candidate version, sign-in, the data as before, a write, the database copy of update.sh
 
-  python3 tools/install_upgrade_check.py prev                  the tag of the release before the candidate (stdout)
+  python3 tools/install_upgrade_check.py prev                  the start before the candidate: "<ref> (release|tag)" (stdout)
   python3 tools/install_upgrade_check.py setup-code CONTAINER  the newest one-time setup code in the container's log
   python3 tools/install_upgrade_check.py run [--prev TAG] [--ref REF] [--dir DIR] [--out DIR] [--port N]
                                                                steps 1-4 (needs docker + compose, git, curl, network to GitHub)
 
---prev = that tag instead of the search; --ref = what update.sh updates to (default: the commit of HEAD; it must be on GitHub,
+--prev = that start instead of the search (vX.Y.Z = a release, latest-ok/X.Y.Z = the tag); --ref = what update.sh updates to (default: the commit of HEAD; it must be on GitHub,
 install.sh fetches it from there); --dir = the install folder (default <tmp>/kalmido-install, must not exist yet); --port (3040);
 --out = the folder for <version>.sql.gz + .json (default <tmp>/upgrade-fixture). The dump is the quarterly fixture of
-tests/fixtures/upgrade/ (README there). The start release is looked up at run time: once a newer release is out, the check
+tests/fixtures/upgrade/ (README there). The start is looked up at run time: once a newer version is live, the check
 starts from it by itself. Python standard library only."""
 import argparse
 import os
@@ -54,6 +56,34 @@ def pick(version, tags, latest=None, released=lambda t: True, limit=10):
     return None
 
 
+LIVE_PREFIX = "latest-ok/"  # 2.1011.0 (#5713): the tag the live train pushes after the device test (kalmido-livezug.py latest)
+
+
+def live_v(ref):
+    """'latest-ok/2.941.0' -> (2, 941, 0); None for anything else."""
+    return vt(ref[len(LIVE_PREFIX):]) if (ref or "").startswith(LIVE_PREFIX) else None
+
+
+def pick_start(version, refs, latest=None, released=lambda t: True, limit=10):
+    """2.1011.0 (#5713): the version to start from = what runs live: the newest latest-ok/X.Y.Z below the candidate (the live
+    train sets it after the device test; one of them becomes the weekly release, tools/weekly_release.py). Since the train
+    there were no releases for 490 versions, so the latest release (2.502.0) missed every trap of the jumps live makes.
+    -> ("vX.Y.Z", "release") when that version has a GitHub release (install.sh of the release, prebuilt image pinned to its
+    digest - the way of a self-hoster), ("latest-ok/X.Y.Z", "tag") when not (install.sh of that tag, the code cloned from the
+    tag, built locally; a version without a release page has no checksum list for install.sh). A latest release above the
+    live version (never normally) wins. No latest-ok tag: the old search of pick() over the release tags. None: nothing older."""
+    cur = vt(version)
+    if cur is None:
+        return None
+    live = sorted({live_v(r) for r in refs if live_v(r) and live_v(r) < cur}, reverse=True)
+    lat = vt(latest)
+    if live and not (lat and live[0] < lat < cur):
+        v = "v" + ".".join(map(str, live[0]))
+        return (v, "release") if released(v) else (LIVE_PREFIX + v[1:], "tag")
+    t = pick(version, [r for r in refs if vt(r)], latest, released, limit)
+    return (t, "release") if t else None
+
+
 def _head(url):
     """The final address of a HEAD request (redirects followed), None on any error."""
     try:
@@ -78,8 +108,17 @@ def version():
 
 
 def prev_tag():
-    tags = subprocess.run(["git", "-C", ROOT, "tag", "-l", "v*"], capture_output=True, text=True, check=True).stdout.split()
-    return pick(version(), tags, latest_release(), has_release)
+    """(ref, how) of pick_start() over the tags of the checkout (v* and latest-ok/*), None when nothing is older."""
+    tags = subprocess.run(["git", "-C", ROOT, "tag", "-l", "v*", LIVE_PREFIX + "*"], capture_output=True, text=True,
+                          check=True).stdout.split()
+    return pick_start(version(), tags, latest_release(), has_release)
+
+
+def start_of(ref):
+    """--prev: 'v2.941.0' / '2.941.0' = a release, 'latest-ok/2.941.0' = the tag without release page; None for anything else."""
+    if live_v(ref):
+        return (ref, "tag")
+    return ("v" + ".".join(map(str, vt(ref))), "release") if vt(ref) else None
 
 
 def setup_code(log):
@@ -126,11 +165,12 @@ def run(argv):
         sys.exit(f"install-upgrade: --ref must be a commit, tag or branch ({ref!r})")
     if os.path.exists(d):
         sys.exit(f"install-upgrade: {d} exists already - the check starts from an empty folder")
-    prev = a.prev or prev_tag()
-    if not vt(prev):
-        sys.exit(f"install-upgrade: no release before {cand} found")
-    pv = prev.lstrip("v")
-    print(f"install-upgrade: {prev} (install.sh of that release) -> {cand} ({ref}) in {d}, port {port}", flush=True)
+    start = start_of(a.prev) if a.prev else prev_tag()
+    if not start:
+        sys.exit(f"install-upgrade: no live version or release before {cand} found")
+    prev, how = start
+    pv = ".".join(map(str, live_v(prev) or vt(prev)))
+    print(f"install-upgrade: {prev} (install.sh of that {how}) -> {cand} ({ref}) in {d}, port {port}", flush=True)
     work = tempfile.mkdtemp(prefix="iuc-")
     base = dict(os.environ, KALMIDO_DIR=d, KALMIDO_PORT=port)
     for k in ("KALMIDO_VERSION", "KALMIDO_BUILD", "KALMIDO_URL", "KALMIDO_IMAGE_REPO", "KALMIDO_INSTALLER_URL"):
@@ -138,7 +178,11 @@ def run(argv):
 
     step(f"1. install {prev} with its own install.sh")
     inst = os.path.join(work, "install-prev.sh")
-    sh(["curl", "-fsSL", "--retry", "3", "-o", inst, f"{GH}/releases/download/{prev}/install.sh"])
+    if how == "release":
+        sh(["curl", "-fsSL", "--retry", "3", "-o", inst, f"{GH}/releases/download/{prev}/install.sh"])
+    else:  # 2.1011.0 (#5713): the tag's own install.sh from the checkout (fetch-depth 0); it clones the tag and builds it
+        with open(inst, "wb") as f:
+            f.write(subprocess.run(["git", "-C", ROOT, "show", f"{prev}:install.sh"], capture_output=True, check=True).stdout)
     sh(["sh", inst], env=dict(base, KALMIDO_VERSION=prev))
     app = compose_id(d, "kalmido")
     code = setup_code(container_log(app))
@@ -168,9 +212,9 @@ def main(argv):
     if cmd == "prev":
         t = prev_tag()
         if not t:
-            print(f"no release before {version()}", file=sys.stderr)
+            print(f"no live version or release before {version()}", file=sys.stderr)
             return 1
-        print(t)
+        print(f"{t[0]} ({t[1]})")
         return 0
     if cmd == "setup-code" and len(argv) == 3:
         c = setup_code(container_log(argv[2]))

@@ -1,0 +1,11 @@
+# 2.1011.0 (#5713): the build context of docker-compose.yml (build: .) is the install folder of install.sh. Its database folder
+# pgdata/ belongs to the postgres container (user 999, mode 0700) - docker compose build stopped on it with
+# "open .../pgdata: permission denied" - and data/, secret/ and .env hold your tasks, backups, the server key and passwords:
+# none of them is sent to the image build (the Dockerfile copies only program files). Patterns start at this folder only.
+pgdata
+data
+secret
+.env
+.env.bak
+.install.log
+.git

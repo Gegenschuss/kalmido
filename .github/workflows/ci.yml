@@ -842,6 +842,8 @@ jobs:
     # (KALMIDO_VERSION = the commit, KALMIDO_INSTALLER_URL = this commit's install.sh) and checked: version, sign-in, the
     # data as before, a write, the database copy of the update (tools/install_upgrade_check.py, tests/install_upgrade_verify.py).
     # The seeded old database is kept as an artifact: the quarterly fixture of tests/fixtures/upgrade/ (README there).
+    # 2.1011.0 (#5713): the start is the live version (newest tag latest-ok/X.Y.Z below VERSION; without a release page it is
+    # installed from that tag), not the latest release (2.502.0 for months); .dockerignore keeps pgdata/ out of the build.
     name: Install the last release (install.sh), update to this commit (update.sh)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
