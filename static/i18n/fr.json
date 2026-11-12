@@ -347,7 +347,6 @@
   "Explanation": "Explication",
   "Drop: one new task per file in {0}": "Déposer : une nouvelle tâche par fichier dans {0}",
   "{0} task created with its file": ["{0} tâche créée avec son fichier", "{0} tâches créées avec leurs fichiers"],
-  "Host default ({0})": "Par défaut de l’hôte ({0})",
   "runs: {0}": "actif : {0}",
   "set: {0} · runs: {1}": "réglé : {0} · actif : {1}",
   "Model: {0}": "Modèle : {0}",
@@ -18337,5 +18336,11 @@
   "Your window: {0} px": "Ta fenêtre : {0} px",
   "Split from {0} px.": "Partagé à partir de {0} px.",
   "{0} has a question for you": "{0} a une question pour toi",
-  "{1} has {0} question for you": ["{1} a {0} question pour toi", "{1} a {0} questions pour toi"]
+  "{1} has {0} question for you": ["{1} a {0} question pour toi", "{1} a {0} questions pour toi"],
+  "Host default: {0}": "Par défaut de l’hôte : {0}",
+  "Host default: unknown": "Par défaut de l’hôte : inconnu",
+  "The agent reports it with its next run": "L’agent l’indiquera lors de sa prochaine exécution",
+  "Questions on actions": "Questions avant les actions",
+  "In effect now: {0}": "En vigueur : {0}",
+  "By its permissions in Kalmido": "Selon ses autorisations dans Kalmido"
 }

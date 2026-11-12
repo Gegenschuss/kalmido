@@ -686,15 +686,20 @@ function chatStHtml(a) {
 const AG_PMODES = {auto: N_('Auto|permission'), ask: N_('Ask first'), '': N_('Host default')};
 // 2.32.0 (#1079): "Host default" names the host's own mode once the host reported it ("Host default (Auto)"); the mode the
 // running host really uses differs from the wish: both ("Ask first · runs: Auto")
-const agHostDef = a => { const h = a.host?.host_permission_mode; return h ? tr('Host default ({0})', tr(AG_PMODES[h])) : tr(AG_PMODES['']); };
+// 2.1044.0 (#5826): always names the value ("Host default: Auto"); a host that has not reported it yet: "Host default: unknown"
+// (before: the bare "Host default", which told nothing about what is set)
+const agHostDef = a => { const h = a.host?.host_permission_mode; return h ? tr('Host default: {0}', tr(AG_PMODES[h])) : tr('Host default: unknown'); };
 const agModeLbl = (a, m = a.permission_mode || '') => m ? tr(AG_PMODES[m] || AG_PMODES['']) : agHostDef(a);
 // 2.437.0 (#2931): the computer fixed the mode (its command or KALMIDO_PERMISSION_MODE): the switch does not reach it, so it is locked
-const agModeFree = a => a.may_set_mode && !a.host?.permission_fixed;
+const agModeFree = a => a.may_set_mode && !a.host?.permission_fixed && !agModeSrv(a);
 const agFixedLbl = a => tr(AG_PMODES[a.host?.permission_mode] || AG_PMODES['']) + ' · ' + tr('Set on its computer');
+// 2.1044.0 (#5826): an agent on the Kalmido server has no host and no permission prompt: the switch would do nothing there
+// (agents/srvagent_run.py never reads it); its permissions in Kalmido decide. Shown as a fixed line instead of a choice
+const agModeSrv = a => a.provider === 'kalmido-server';
 function chatModeHtml(a) {
   const m = a.permission_mode || '', run = a.host?.permission_mode || '', want = m || a.host?.host_permission_mode || '';
   if (!m && !a.may_set_mode && !a.host?.host_permission_mode) return '';
-  const lbl = a.host?.permission_fixed ? agFixedLbl(a) : agModeLbl(a) + (run && want && run !== want ? ' · ' + tr('runs: {0}', tr(AG_PMODES[run])) : '');
+  const lbl = agModeSrv(a) ? tr('By its permissions in Kalmido') : a.host?.permission_fixed ? agFixedLbl(a) : agModeLbl(a) + (run && want && run !== want ? ' · ' + tr('runs: {0}', tr(AG_PMODES[run])) : '');
   const t = tr('Permissions: {0}', lbl);
   // 2.34.0 (#1090): narrow phones show only the mode it runs with (data-short, CSS), the full text stays in title / label
   const sh = (run || want) ? tr(AG_PMODES[run || want] || AG_PMODES['']) : tr('Default');
@@ -790,10 +795,13 @@ function chatModeMenu(btn) {
     try { const r = await api('PUT', `/api/agents/${a.id}/permission-mode`, {mode: m}); a.permission_mode = r.permission_mode; $$('.chmode').forEach(x => x.outerHTML = chatModeHtml(a)); toast(tr('Permissions: {0}', agModeLbl(a, r.permission_mode))); }
     catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); }
   };
-  menu(btn, [
+  // 2.1044.0 (#5826): a small head says what the choice is about, a line under it what the last run really used (host.permission_mode)
+  const run = a.host?.permission_mode || '', hd = a.host?.host_permission_mode || '';
+  menu(btn, [{head: tr('Questions on actions')},
+    ...run ? [{label: tr('In effect now: {0}', tr(AG_PMODES[run])), dis: true, cls: 'minfo chmi-run'}] : [],
     {label: tr('Ask first'), sub: tr('Every action outside its allow list asks you in the chat'), on: a.permission_mode === 'ask', fn: () => set('ask')},
     {label: tr('Auto|permission'), sub: tr('Its host’s safety check decides; risky actions stay blocked'), on: a.permission_mode === 'auto', fn: () => set('auto')},
-    {label: agHostDef(a), sub: tr('Whatever its host is set up with'), on: !a.permission_mode, fn: () => set('')},
+    {label: agHostDef(a), sub: hd ? tr('Whatever its host is set up with') : tr('The agent reports it with its next run'), on: !a.permission_mode, fn: () => set('')},
     '-', {label: tr('Work style and notifications'), icon: 'cog', fn: () => awOpen(a)}]);  // 2.236.0 A (#2904-#2911)
 }
 // ---- 2.32.0 (#1081): the agent's steps -- the short prose it writes between its tool calls. The server keeps them only for
@@ -864,7 +872,7 @@ function chatHeadInfo(b) {
   const it = [], info = label => ({label, dis: true, cls: 'minfo'});
   const m = a.permission_mode || '', run = a.host?.permission_mode || '', want = m || a.host?.host_permission_mode || '';
   if (m || a.may_set_mode || a.host?.host_permission_mode) {
-    const l = tr('Permissions: {0}', a.host?.permission_fixed ? agFixedLbl(a) : agModeLbl(a) + (run && want && run !== want ? ' · ' + tr('runs: {0}', tr(AG_PMODES[run])) : ''));
+    const l = tr('Permissions: {0}', agModeSrv(a) ? tr('By its permissions in Kalmido') : a.host?.permission_fixed ? agFixedLbl(a) : agModeLbl(a) + (run && want && run !== want ? ' · ' + tr('runs: {0}', tr(AG_PMODES[run])) : ''));
     it.push(agModeFree(a) ? {label: l, icon: 'lock', cls: 'chmi-mode', next: 1, fn: () => chatModeMenu(b)} : {...info(l), icon: 'lock'});
   }
   const mr = a.host?.model || '', ms = a.runtime_model || '';

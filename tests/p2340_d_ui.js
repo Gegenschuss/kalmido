@@ -72,7 +72,7 @@ function makePdf(pages) {  // a minimal PDF ('' = a page without a text layer, l
 
   // ================= #1090 the badge's short label (jsdom: the markup)
   const b1 = w.eval(`chatModeHtml({permission_mode: '', may_set_mode: true, host: {host_permission_mode: 'auto'}})`);
-  check(/data-short="Auto"/.test(b1) && /<span class="pmlong">Host default \(Auto\)<\/span>/.test(b1) && /aria-label="Permissions: Host default \(Auto\)"/.test(b1),
+  check(/data-short="Auto"/.test(b1) && /<span class="pmlong">Host default: Auto<\/span>/.test(b1) && /aria-label="Permissions: Host default: Auto"/.test(b1),  // 2.1044.0 (#5826): "Host default: Auto" instead of "(Auto)"
     '#1090: host default (Auto): short "Auto", the full text inside and in the label ' + b1);
   const b2 = w.eval(`chatModeHtml({permission_mode: 'ask', may_set_mode: true, host: {permission_mode: 'auto'}})`);
   check(/data-short="Auto"/.test(b2) && /Ask first · runs: Auto/.test(b2), '#1090: wish and real mode differ: short = what it runs with ' + b2);

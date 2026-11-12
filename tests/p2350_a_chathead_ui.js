@@ -98,7 +98,7 @@ const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1
       if (!full) return;
       await openMenu(ev, '#view');
       const it = await ev(items);
-      check(it.some(x => x === 'Permissions: Host default (Auto)') && it.some(x => x === 'Model: Opus 5.5') && it.some(x => x === 'Team agent · Alpha') /* 2.407.0 B (#3493): the kind of agent instead of the workspace */
+      check(it.some(x => x === 'Permissions: Host default: Auto') /* 2.1044.0 (#5826) */ && it.some(x => x === 'Model: Opus 5.5') && it.some(x => x === 'Team agent · Alpha') /* 2.407.0 B (#3493): the kind of agent instead of the workspace */
         && it.some(x => /^Usage: 41 %/.test(x)) && it.some(x => x === 'Search in this chat') && it.some(x => /^Filter|^Fold long messages/.test(x)), L + ': ⋯ names what moved there with its value ' + JSON.stringify(it));
       // Permissions opens the mode menu; "Ask first" switches the agent
       await pickItem(ev, '/^Permissions/');

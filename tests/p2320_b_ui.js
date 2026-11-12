@@ -1,5 +1,5 @@
 // 2.32.0 UI tests (agent B: the agent chat), own container (start.sh). jsdom:
-// #1079 the chat header: "Host default (Auto)" once the host reported its own default, the model the host really runs
+// #1079 the chat header: "Host default: Auto" (2.1044.0 #5826; unknown: "Host default: unknown") once the host reported its own default, the model the host really runs
 //       ("Opus 5.5"), a wished model the host has not taken yet: "set: sonnet · runs: Opus 5.5"; the menu names it too
 // #1081 steps: up to 3 small grey lines under the typing dots (newest on top, shown as text, never as HTML); a tap hides
 //       them (setting agent_steps_live, saved), "Show steps" / a tap on the dots brings them back; the answer takes them
@@ -56,12 +56,32 @@ const V = B + 'api/v1';
   // 2.350.0 (#3317): mode and model moved from the header into its ⋯ menu (chatHeadInfo: the entries with their values)
   const hi = re => w.eval(`chatHeadInfo(document.querySelector('#jcd-fbtn')).map(x => x.label || '')`).find(x => re.test(x)) || '';
   check(!d.querySelector('.chath .chmode') && !d.querySelector('.chath .chmodel'), '#1079: no badge / model in the header any more');
-  check(hi(/^Permissions/) === 'Permissions: Host default (Auto)', '#1079: the menu names the host\'s default: ' + hi(/^Permissions/));
+  check(hi(/^Permissions/) === 'Permissions: Host default: Auto',  // 2.1044.0 (#5826): the value after a colon
+    '#1079: the menu names the host\'s default: ' + hi(/^Permissions/));
   check(hi(/^Model/) === 'Model: Opus 5.5', '#1079: the model the host runs: ' + hi(/^Model/));
   click(w, d.querySelector('#jcd-fbtn')); await until(() => [...d.querySelectorAll('[role="menuitem"]')].find(b => /^Permissions/.test(b.textContent.trim())));
   click(w, [...d.querySelectorAll('[role="menuitem"]')].find(b => /^Permissions/.test(b.textContent.trim())));
-  check(await until(() => [...d.querySelectorAll('[role="menuitem"]')].some(b => /^Host default \(Auto\)/.test(b.textContent.trim()))), '#1079: the mode menu names it too');
+  check(await until(() => [...d.querySelectorAll('[role="menuitem"]')].some(b => /^Host default: Auto/.test(b.textContent.trim()))), '#1079: the mode menu names it too');
+  // 2.1044.0 (#5826): a head says what the choice is about, a line under it what the last run really used
+  const mtx = () => [...d.querySelectorAll('.mgh, [role="menuitem"]')].map(b => b.textContent.trim());
+  check(mtx().includes('Questions on actions') && mtx().includes('In effect now: Auto'), '#5826: head + "In effect now" in the mode menu ' + JSON.stringify(mtx()));
   d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+  // 2.1044.0 (#5826): a host that reports no default (an older starter): "Host default: unknown" + when it comes, never the bare "Host default"
+  await v1('PUT', '/agent/status', {status: 'idle', host_permission_mode: '', permission_mode: ''});
+  await w.eval('load().then(render)'); await w.eval('chatLoad()');
+  check(await until(() => hi(/^Permissions/) === 'Permissions: Host default: unknown'), '#5826: unknown default named as such ' + hi(/^Permissions/));
+  click(w, d.querySelector('#jcd-fbtn')); await until(() => [...d.querySelectorAll('[role="menuitem"]')].find(b => /^Permissions/.test(b.textContent.trim())));
+  click(w, [...d.querySelectorAll('[role="menuitem"]')].find(b => /^Permissions/.test(b.textContent.trim())));
+  check(await until(() => mtx().some(x => /^Host default: unknown/.test(x) && /reports it with its next run/.test(x))) && !mtx().some(x => /^In effect now/.test(x)),
+    '#5826: the menu says unknown and when it comes, no "In effect now" without a report ' + JSON.stringify(mtx()));
+  d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+  // 2.1044.0 (#5826): an agent on the Kalmido server has no host: a fixed line instead of a choice without effect
+  w.eval(`agentById(${AG}).provider = 'kalmido-server'`);
+  const srvIt = w.eval(`chatHeadInfo(document.querySelector('#jcd-fbtn')).find(x => /^Permissions/.test(x.label || ''))`);
+  check(srvIt && srvIt.label === 'Permissions: By its permissions in Kalmido' && srvIt.dis && !srvIt.fn, '#5826: server agent = fixed line ' + JSON.stringify(srvIt));
+  w.eval(`agentById(${AG}).provider = ''`);
+  await v1('PUT', '/agent/status', {status: 'idle', host_permission_mode: 'auto', permission_mode: 'auto'});
+  await w.eval('load().then(render)'); await w.eval('chatLoad()'); await until(() => hi(/^Permissions/) === 'Permissions: Host default: Auto');
   await call('PATCH', `/api/admin/agents/${AG}`, {runtime: {model: 'sonnet'}});
   await w.eval('load().then(render)'); await w.eval('chatLoad()'); await sleep(300);
   check(hi(/^Model/) === 'Model: set: sonnet · runs: Opus 5.5', '#1079: a wished model the host has not taken yet: both ' + hi(/^Model/));

@@ -179,7 +179,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   pressed it; a Stop from someone else for another person's run is ignored (no confirmation, nothing written).
 - With the status of each run, report what you **really** run with: `model` (the model as people know it, e.g.
   "Opus 5.5"), `permission_mode` (ask | auto: what this run uses) and `host_permission_mode` (your host's own default).
-  The chat header shows them.
+  The chat header shows them; without `host_permission_mode` people read "Host default: unknown".
 - **Before each tool step, write one short sentence in the person's language** about what happens next ("Ich schaue mir
   zuerst die Tests an"). Send it as a step with `report_progress` (a chat run: `chat_user_id`; a job: `job_id`), at most
   one every 2 seconds; a host that reads your stream (the launcher's event mode) sends these sentences for you. **Prose
