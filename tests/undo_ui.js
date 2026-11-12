@@ -266,8 +266,9 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   for (const p of [1, 3, 5, 0]) { await w.eval(`patchTask(${j1}, {priority: ${p}})`); await until(() => w.eval('OUT.q.length') === 0 && !w.eval('OUT.flushing')); }  // 2.905.0 (#5255): one server step each (edits still waiting together are one request)
   // 2.773.0 (#5250): a right-click on ← opens the list "Recent steps" (undolist.js); 2.905.0 (#5255): the task steps are the
   // server's rows of this device (no "only this device" twin), "Back up to here" takes them back on the server
+  // 2.1074.0 (#5493): the server names a priority step as the app does ("Priority of “Jump”: …", was "Edited Jump")
   btn('undo').dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
-  const items = await until(() => { const r = [...d.querySelectorAll('#pop:not(.hidden) .ulbody .ulrow.ul-s')].filter(x => /Edited.*Jump/.test(x.textContent)); return r.length >= 4 && w.eval('UL.items !== null') && r; });
+  const items = await until(() => { const r = [...d.querySelectorAll('#pop:not(.hidden) .ulbody .ulrow.ul-s')].filter(x => /Priority of “Jump”/.test(x.textContent)); return r.length >= 4 && w.eval('UL.items !== null') && r; });
   check(items && items.length >= 4 && items.every(r => /This device/.test(r.textContent)) && /Recent steps/.test(d.querySelector('#pop .ulhead')?.textContent || ''), `right-click: the list "Recent steps" with the steps of this device (${items && items.length})`);
   check(![...d.querySelectorAll('#pop .ulbody .ulrow.ul-l')].some(r => /Jump/.test(r.textContent)), 'no second row "only this device"');
   const before = hl('undo');

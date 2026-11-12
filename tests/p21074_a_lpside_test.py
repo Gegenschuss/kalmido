@@ -4,7 +4,7 @@
 kind listside, a diff part taken back through the project's own write path). Invented names only.
  - a person without an organisation moves her project into a folder: one step (listed, kind listside, label "Settings of"),
    taken back from the list (folder empty again), redone (in the folder again); the undo records no new step
- - a save with a plain and a side-effect setting (rename + time tracking) is ONE step, both go back
+ - a save with a plain and a side-effect setting (rename + time tracking off) is ONE step, both go back
  - a project into the organisation: the step is labelled "Workspace of", its undo puts it back into Private and brings back the
    private client the move ended (move memo)
  - the project's ticket key: back to none and forward again
@@ -77,29 +77,31 @@ check(newest(Fr).get("id") == ug and newest(Fr).get("state") == "undone", f"the 
 r = Fr.post(B + f"/api/undo/{ug}/redo")
 check(r.ok and lrow(Fr, FL).get("folder") == "Kunden Beispiel", f"redo: in the folder again {r.status_code} {r.text[:120]}")
 
-# rename + time tracking in one save = one step, both go back
-r = Fr.patch(B + f"/api/lists/{FL}", json={"name": "Frida Neu", "time_tracking": True})
+# rename + time tracking in one save = one step, both go back (a new project of hers tracks time: the module Time is on)
+check(lrow(Fr, FL).get("time_tracking"), "(setup) her new project tracks time")
+r = Fr.patch(B + f"/api/lists/{FL}", json={"name": "Frida Neu", "time_tracking": False})
 ug2 = r.json().get("undo_group") if r.ok else None
 x = lrow(Fr, FL)
-check(r.ok and ug2 and x.get("name") == "Frida Neu" and x.get("time_tracking"), f"(setup) renamed, time tracking on {r.text[:160]}")
+check(r.ok and ug2 and x.get("name") == "Frida Neu" and not x.get("time_tracking"), f"(setup) renamed, time tracking off {r.text[:160]}")
 check(len([y for y in lst(Fr) if y["id"] == ug2]) == 1, "one step for the save")
 res = undo_one(Fr, ug2)
 x = lrow(Fr, FL)
-check(res.get("undone") == [ug2] and x.get("name") == "Frida Projekt" and not x.get("time_tracking"),
-      f"undo: the old name and time tracking off again {res} {x.get('name')} {x.get('time_tracking')}")
+check(res.get("undone") == [ug2] and x.get("name") == "Frida Projekt" and x.get("time_tracking"),
+      f"undo: the old name and time tracking on again {res} {x.get('name')} {x.get('time_tracking')}")
 
 # changed elsewhere since: stays, named
-r = Fr.patch(B + f"/api/lists/{FL}", json={"time_tracking": True})
-ug3 = r.json().get("undo_group")
-kt.dbx("UPDATE lists SET time_tracking=0 WHERE id=?", (FL,))  # another device switched it off meanwhile (no step of hers)
+r = Fr.patch(B + f"/api/lists/{FL}", json={"folder": "Archiv Beispiel"})
+ug3 = r.json().get("undo_group") if r.ok else None
+check(r.ok and ug3, f"(setup) another folder is a step {r.text[:160]}")
+kt.dbx("UPDATE lists SET folder='Dritter Ordner' WHERE id=?", (FL,))  # another device moved it on meanwhile (no step of hers)
 res = undo_one(Fr, ug3)
-check(not res.get("undone") and res.get("stayed") and not lrow(Fr, FL).get("time_tracking"),
+check(not res.get("undone") and res.get("stayed") and "folder" in str(res.get("stayed")) and lrow(Fr, FL).get("folder") == "Dritter Ordner",
       f"a value changed elsewhere since is not set back (named) {res}")
 
 # ---------------------------------------------------------------- the workspace: into the organisation and back
 r = A.post(B + "/api/clients", json={"name": "Private Beispiel Kunde", "org_id": None})
 PC = r.json().get("id")
-r = A.post(B + "/api/lists", json={"name": "Alpha Projekt"})
+r = A.post(B + "/api/lists", json={"name": "Alpha Projekt", "org_id": None})
 P = r.json()["id"]
 check(PC and A.patch(B + f"/api/lists/{P}", json={"client_id": PC}).ok, f"(setup) the private project has a private client {r.text[:120]}")
 r = A.patch(B + f"/api/lists/{P}", json={"org_id": ORG})
