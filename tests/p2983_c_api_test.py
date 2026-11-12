@@ -133,6 +133,23 @@ assert F.post(B + "/api/lists", json={"name": "Contact sheet", "kind": "project"
 r = F.put(B + "/api/folders/people", json={"folder": "Prints", "email": "uma.new@example.com", "user_id": "x", "role": "edit"})
 check(r.json() == {"shared": 0, "updated": 0, "by_email": True}, f"#5669 review: folder by address + stray user_id: the address answer {r.text[:160]}")
 
+# 2.1017.0 (#5774): a refusal on the address path (a list with the lock has no participants) answers like an unknown address --
+# a 409 for uma's proved address and ok for an unknown one told that the address has an account; nothing is written
+LK = F.post(B + "/api/lists", json={"name": "Locked notes", "kind": "project", "folder": "Safebox"}).json()["id"]
+dbx("UPDATE lists SET e2e='test' WHERE id=?", (LK,))  # the lock (the server holds ciphertexts only)
+r = F.put(B + f"/api/lists/{LK}/members", json={"email": "uma.new@example.com", "role": "participant"})
+r2 = F.put(B + f"/api/lists/{LK}/members", json={"email": "nobody@example.com", "role": "participant"})
+check(r.status_code == r2.status_code == 200 and r.json() == r2.json() == {"ok": True, "by_email": True},
+      f"#5774: a locked list by address as participant: the same answer for uma and an unknown address {r.status_code} {r.text[:160]}")
+check(not dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (LK, UID)) and not sees(U, LK),
+      "#5774: ... and uma does NOT become a member")
+r = F.put(B + "/api/folders/people", json={"folder": "Safebox", "email": "uma.new@example.com", "role": "participant"})
+r2 = F.put(B + "/api/folders/people", json={"folder": "Safebox", "email": "nobody@example.com", "role": "participant"})
+check(r.status_code == r2.status_code == 200 and r.json() == r2.json() == {"shared": 0, "updated": 0, "by_email": True} and not sees(U, LK),
+      f"#5774: a folder with a locked list by address as participant: the same answer for uma and an unknown address {r.status_code} {r.text[:160]}")
+r = F.put(B + f"/api/lists/{LK}/members", json={"user_id": UID, "role": "participant"})
+check(r.status_code == 409 and r.json().get("code") == "list_e2e_member", f"#5774: the way by user_id keeps its 409 {r.status_code} {r.text[:120]}")
+
 # ================================================================ #3915: status changes reach a watching agent
 
 

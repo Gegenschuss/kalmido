@@ -991,6 +991,13 @@ def member_set(lid):
         uid = 0
     from ..accounts.orgs import may_see
     by_mail = bool(b.get("email")) and not uid  # 2.1001.0 (#5669 review): one test for the address path ({email, user_id: "x"} too)
+
+    def quiet():
+        """2.1017.0 (#5774): a refusal on the address path after the account was found is the neutral answer of an unknown
+        address (nothing written, rolled back): a 409 / 404 there told that the address has a proved account."""
+        c.rollback()
+        return jsonify(ok=True, by_email=True)
+
     if by_mail:  # 2.22.0 (#752): share by e-mail address (mode "own contacts": no directory). The answer
         # never says whether the address has an account
         # 2.1001.0 (#5669): only an account that proved the address (addr_account, like tables and wiki); an address nobody
@@ -1008,14 +1015,16 @@ def member_set(lid):
         return err(tr("unknown person"), 404)  # reaches who it reached before (e.g. shared by e-mail address)
     u = c.execute("SELECT id FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
     if not u or uid == me() or personal_agent_foreign(c, uid, me()):  # 2.7.2 (#420): only the owner shares with a personal agent
-        return err(tr("unknown person"), 404)
+        return quiet() if by_mail else err(tr("unknown person"), 404)
     if uid == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]:
-        return err(tr("The owner’s role cannot be changed"), 403)
+        return quiet() if by_mail else err(tr("The owner’s role cannot be changed"), 403)
     from ..collab.liste2eguard import le2b_agent_problem
     p = le2b_agent_problem(c, lid, uid)  # 2.64.1 review: the lock's own code first (ws_check_member below says the same without it)
     if p:
-        return jsonify(error=p, code="list_e2e_member"), 409
-    from ..accounts.orgs import ws_check_member
+        return quiet() if by_mail else (jsonify(error=p, code="list_e2e_member"), 409)
+    from ..accounts.orgs import ws_check_member, ws_member_problem
+    if by_mail and ws_member_problem(c, lid, uid):  # 2.1017.0 (#5774): checked above already; never a 409 on the address path
+        return quiet()
     ws_check_member(c, lid, uid)  # 2.28.0 (#935): an organisation's list only inside it, agents only in their workspace (409)
     if not by_mail:  # 2.30.0 (#919): no agent bridge between lists with different people
         from ..agents.safety import bridge_check  # (by e-mail address: skipped silently above, it must not reveal an account)
@@ -1026,8 +1035,8 @@ def member_set(lid):
     old = c.execute("SELECT role, grole, frole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
     from ..collab.liste2e import le2a_member_problem
     p = le2a_member_problem(c, lid, uid, role_max(role, old["grole"], old["frole"]) if old else role)  # 2.64.1 (#1817): no agents / participants
-    if p:
-        return jsonify(error=p, code="list_e2e_member"), 409
+    if p:  # 2.1017.0 (#5774): by address (a kid -> participant on a locked list) the answer of an unknown address
+        return quiet() if by_mail else (jsonify(error=p, code="list_e2e_member"), 409)
     from ..lists.lffolder import lf_skip
     reach = lf_skip(c, lid, uid, False)  # 2.352.0 A (#2748): shared again by hand -> the folder's share reaches them here again too
     if old:  # 2.10.0 (#441): the personal role; the effective one is the higher of it and the role via groups (2.352.0: and folders)
@@ -1037,7 +1046,7 @@ def member_set(lid):
             news_add(c, uid, "role", list_id=lid, data={"role": eff, "old": old[0], "name": lname})
     else:
         if list_other_agent(c, lid, uid):  # 2.26.0: one agent per list
-            return err(tr(ONE_AGENT_MSG), 409)
+            return quiet() if by_mail else err(tr(ONE_AGENT_MSG), 409)
         c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
                   (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc())))
         member_folder_adopt(c, lid, uid)  # 2.22.0 (#740)
@@ -1247,6 +1256,8 @@ def folder_people_put():
         return err(tr("An agent cannot be a project admin"))
     from ..collab.liste2e import le2a_folder_problem
     p = le2a_folder_problem(c, me(), f, role, uid)  # 2.64.1 (#1817): no participants in lists with the lock
+    if p and by_mail:  # 2.1017.0 (#5774): by address the answer of an unknown address (a 409 told that it has an account)
+        return jsonify(shared=0, updated=0, by_email=True)
     if p:
         return jsonify(error=p, code="list_e2e_member"), 409
     from ..lists.lffolder import lf_people  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
