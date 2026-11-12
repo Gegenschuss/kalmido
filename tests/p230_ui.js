@@ -205,7 +205,9 @@ async function firefox(fn) {
   const pt = st.tasks.filter(t => PL && t.list_id === PL.id);
   check(pt.map(t => t.title).sort().join('|') === 'Deliver|Draft|Shoot day|Write the treatment', 'applied: the selected entries (edited): ' + pt.map(t => t.title).join('|'));
   check(pt.find(t => t.title === 'Shoot day')?.due === '2031-05-12', 'date edit applied');
-  check(/entries created/.test(d.querySelector('#toast')?.textContent || '') && d.querySelector('#toast [data-act], #toast button'), 'toast with Undo');
+  // 2.1003.0 (#4839): the toast and the history step come after the app's own reload (load, render), which can take longer
+  // than the test's GET above under CI load - wait for them, not for the answer
+  check(await until(() => /entries created/.test(d.querySelector('#toast')?.textContent || '') && d.querySelector('#toast [data-act], #toast button'), 150), 'toast with Undo');
   check(w.eval('HIST.undo[HIST.undo.length - 1].label') === 'Applied the proposal of Claude', 'one history step');
   await w.eval(`histStep('undo')`); await sleep(400);
   st = await call('GET', '/api/state');
