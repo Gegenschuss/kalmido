@@ -11,17 +11,17 @@
 const FTSP = {q: '', r: null, t: 0, ctl: null};
 PAL_GROUP.fts = N_('Everywhere');
 PAL_GROUP.office = N_('Office');
-Object.assign(PAL_GROUP, {srwiki: N_('Knowledge pages'), srfiles: N_('Files'), srcontacts: N_('Contacts'), srevents: N_('Events'), srnotes: N_('Notes'), srcomments: N_('Comments')});
+Object.assign(PAL_GROUP, {srwiki: N_('Knowledge pages'), srfiles: N_('Files'), srcontacts: N_('Contacts'), srevents: N_('Events'), srnotes: N_('Notes'), srcomments: N_('Comments'), srbm: N_('Bookmarks')});
 const BS_KIND = {client: N_('Client'), offer: N_('Quotation'), invoice: N_('Invoice'), credit: N_('Credit note'), reminder: N_('Reminder'), delivery: N_('Delivery note')};
 
 // ---- 2.1026.0 (#5280, Q6c): ONE registry of the search. A source is {id, kinds?, search: async (q, f) => ({<kind>: [hits], …,
 // more?: {<kind>: {total, next}}})}; kinds = the kinds it can give (none: every kind). The server source asks GET /api/search
-// once: without f.kind the tasks + the groups of every kind (office, wiki, comments, contacts, notes, files, events, messages),
+// once: without f.kind the tasks + the groups of every kind (office, wiki, comments, contacts, notes, files, events, messages, bookmarks),
 // with f.kind that kind alone in the shape of its old route (kept whole in raw). The areas with end-to-end texts, which the
 // server cannot read, search in the browser and register here (liste2e.js: comments of locked lists = messages; wikie2e.js:
 // pages of the unlocked locked spaces = wiki). Users: the command palette (ftsPalItems), msgSearch (chat.js: the chat's search
 // field, the search page), wk_search (wiki.js).
-const SRCH_KINDS = ['tasks', 'office', 'wiki', 'comments', 'contacts', 'notes', 'files', 'events', 'messages'];
+const SRCH_KINDS = ['tasks', 'office', 'wiki', 'comments', 'contacts', 'notes', 'files', 'events', 'messages', 'bookmarks'];
 const SRCH_ARGS = ['art', 'sender', 'room', 'agent', 'task', 'limit', 'offset', 'space', 'glimit', 'cursor'];
 async function srchServer(q, f = {}) {
   const p = new URLSearchParams({q});
@@ -96,7 +96,7 @@ function ftsPalItems(q, shown) {
   const contacts = five(r.contacts).map(c => ({id: 'src:' + c.id, kind: 'view', group: 'srcontacts', label: c.fn || c.org || '…', icon: 'user',
     subHtml: srchSub([c.fn && c.org ? c.org : '', c.email || c.phone || ''].filter(Boolean).join(' · '), srchSnip(c)), fn: () => go('contacts/' + c.id)}));
   const events = five(r.events).map(e => ({id: 'sre:' + e.id, kind: 'view', group: 'srevents', label: e.title || '…', icon: 'cal',
-    subHtml: srchSub([e.start ? (e.all_day ? dayLabel(String(e.start).slice(0, 10)) : fmtWhen(e.start)) : '', e.location || '', e.role === 'rsvp' ? tr('Invitation') : ''].filter(Boolean).join(' · '), srchSnip(e)),
+    subHtml: srchSub([e.start ? (e.all_day ? dayLabel(String(e.start).slice(0, 10)) : fmtWhen(e.start)) : '', e.location || '', e.role === 'attendee' ? tr('Invitation') : ''].filter(Boolean).join(' · '), srchSnip(e)),
     fn: () => go('ev/' + e.id)}));
   const notes = five(r.notes).map(n => ({id: 'srn:' + n.id, kind: 'view', group: 'srnotes', label: n.title || '…', icon: 'edit',
     subHtml: srchSub(lname(listById(n.list_id)) || '', srchSnip(n)), fn: () => srchNoteGo(n)}));
@@ -105,7 +105,9 @@ function ftsPalItems(q, shown) {
   if (ms.length > 5) msgs.push({id: 'msg:all', kind: 'msg', group: 'msgs', label: tr('All messages'), icon: 'search', fn: () => { go('search'); setTimeout(() => { const i = $('#searchq'); if (i) i.value = q; doSearch(q); }, 0); }});
   const comments = five((r.comments || []).filter(c => SRCH_CMT_GO[c.kind])).map(c => ({id: 'srk:' + c.id, kind: 'view', group: 'srcomments', label: tr(SRCH_CMT_KIND[c.kind] || 'Comment'), icon: 'comment',
     subHtml: srchSnip(c), fn: () => SRCH_CMT_GO[c.kind](c.ref_id)}));
-  return [...office, ...tasks, ...wiki, ...files, ...contacts, ...events, ...notes, ...msgs, ...comments];
+  const bms = five(r.bookmarks).map(b => ({id: 'srb:' + b.id, kind: 'view', group: 'srbm', label: b.title || b.url || '…', icon: 'bookmark',
+    sub: b.site || '', fn: () => { go('bookmarks'); loadModule('bookmarks').then(() => bm_detail(b.id)); }}));  // the bookmark's card over its view
+  return [...office, ...tasks, ...wiki, ...files, ...contacts, ...events, ...notes, ...bms, ...msgs, ...comments];
 }
 // a note the state does not list yet (shared meanwhile): its entry first, so #note/<id> opens it (core.js parseHash looks it up there)
 function srchNoteGo(n) {
