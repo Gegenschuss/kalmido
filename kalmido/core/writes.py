@@ -366,6 +366,15 @@ def _kids(reg):
     return reg.get("children") or ()
 
 
+def _kids_lock(c, reg, rid):
+    """2.1017.0 (#5630): the child rows of the object locked (FOR NO KEY UPDATE, as the UPDATE takes it) in id order BEFORE the
+    object's own row is written: a child's own save writes its row first and then touches the object's row (an event's save:
+    events, then events/model.py cal_touch on ev_cals); the trash used to write the object's row first and then its children,
+    so the two could deadlock (500, no wrong data)."""
+    for t, col in _kids(reg):
+        c.execute(f"SELECT id FROM {qi(t, (t,))} WHERE {qi(col, (col,))}=? ORDER BY id FOR NO KEY UPDATE", (int(rid),)).fetchall()
+
+
 def _kids_trash(c, reg, rid, ts):
     """Its live children into the trash with the object's time (one already in the trash keeps its own: it stays there)."""
     for t, col in _kids(reg):
@@ -495,6 +504,7 @@ def obj_trash(c, uid, kind, rid, step=True):
     reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no write path of the core
     row, _ = obj_need(c, uid, kind, rid, _trash_need(reg))
     write_lock(c, f"obj-{kind}-{int(rid)}")
+    _kids_lock(c, reg, rid)  # 2.1017.0 (#5630): its children first, in id order (the order of a child's own save)
     ts = _now()
     n = c.execute(f"UPDATE {qi(reg['table'], (reg['table'],))} SET deleted_at=?, deleted_by=?, rev=rev+1, updated_at=?, updated_by=? WHERE id=? AND {live_sql()}",
                   (ts, uid, ts, uid, int(rid))).rowcount
@@ -542,6 +552,7 @@ def obj_restore(c, uid, kind, rid, step=True, undo=False, checked=False):
         if checked:
             return row
         raise Denied(404)
+    _kids_lock(c, reg, rid)  # 2.1017.0 (#5630): as obj_trash (its children first, in id order; a light kind has none)
     # 2.760.0 (#5311): the node's deleted_at is TEXT, the object's may be TIMESTAMPTZ (read canonically, pg.py ts_canon):
     # compare both canonically, not as text (a TIMESTAMPTZ table's restore left its node in the trash)
     gone = ts_canon(row["deleted_at"])
