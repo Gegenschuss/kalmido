@@ -455,7 +455,7 @@ function wk_deskHtml(sp, d, id, cur, sel, op) {
   else {
     const ps = wk_leaves(n);  // 2.200.0 A (#2747): rows like the file store's -- sorted by hand, the date, the menu "…"
     const box = (nid, nm) => wk_selBox(sp, nid, nm), rc = WK.selOn ? 'wkrow wkselrow' : 'wkrow';  // 2.353.0 C (#2829): Select
-    const rows = wk_dirs(n).map(k => `<li class="${rc}">${box(k.fid, k.name)}<a href="#${esc(wk_dirGo(k.path, sp))}" class="wkitem wkdrow">${wk_dirIcon(k, 's')}<span>${esc(k.name)}</span>${/*html-ok*/ typeof wkar_mark === 'function' ? wkar_mark(sp, k.fid) : '' /* 2.1045.0 (#5823) */}</a>${wk_rowMore(sp, k.fid, '')}</li>`).join('')
+    const rows = wk_dirs(n).map(k => `<li class="${rc}">${box(k.fid, k.name)}<a href="#${esc(wk_dirGo(k.path, sp))}" class="wkitem wkdrow">${/*html-ok*/ wk_dirIcon(k, 's')}<span>${esc(k.name)}</span>${/*html-ok*/ typeof wkar_mark === 'function' ? wkar_mark(sp, k.fid) : '' /* 2.1045.0 (#5823) */}</a>${wk_rowMore(sp, k.fid, '')}</li>`).join('')
       + ps.map(k => `<li class="${rc}">${box(k.page.node_id, k.name)}<a href="#wiki/${k.page.id}" class="wkitem">${ic(wk_isTpl(k.path) ? 'copy' : 'note', 's')}<span>${esc(k.name)}</span>${k.page.shared && typeof wsh_markHtml === 'function' ? wsh_markHtml(1) : ''}</a>${wk_rowMore(sp, k.page.node_id, k.page.updated_at)}</li>`).join('');
     body = (n.page && parts.length ? wk_dirPageHtml(n.page) : '') + (rows ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${rows}</ul>` : n.page && parts.length ? '' : `<div class="empty">${tr('This folder is empty')}</div>`);
   }
@@ -478,7 +478,7 @@ function wk_dirPageHtml(pg) {
   const may = WK.idx[pg.space]?.mayWrite !== false;
   const txt = !p ? `<p class="muted">${esc(WK.dpg?.err ? tr('This page does not exist or you cannot see it.') : tr('Loading…'))}</p>`
     : p._wke ? '' : wk_bodyStrip(p.body).trim() ? wk_render(p).replace(/<input([^>]*\bdata-wkcb)/g, '<input disabled$1') : `<p class="muted">${tr('Empty page.')}</p>`;
-  return `<article class="wkdpage" aria-label="${esc(wk_base(pg.path))}"><div class="wkdpbar">${ic('note', 's')}<span class="muted">${esc(wk_base(pg.path))}</span><span class="spacer"></span><a class="btn sm" href="#wiki/${pg.id}">${ic(may ? 'edit' : 'note', 's')}${esc(may ? tr('Edit') : tr('Open'))}</a></div>${p ? wk_attrsHtml(p.attrs, p.space) : ''}<div class="md ntmd wkmd wkdpmd">${txt}</div></article>`;
+  return `<article class="wkdpage" aria-label="${esc(wk_base(pg.path))}"><div class="wkdpbar">${ic('note', 's')}<span class="muted">${esc(wk_base(pg.path))}</span><span class="spacer"></span><a class="btn sm" href="#wiki/${/*html-ok*/ +pg.id}">${ic(may ? 'edit' : 'note', 's')}${esc(may ? tr('Edit') : tr('Open'))}</a></div>${/*html-ok*/ p ? wk_attrsHtml(p.attrs, p.space) : ''}<div class="md ntmd wkmd wkdpmd">${/*html-ok*/ txt}</div></article>`;
 }
 // the panel: "All pages" (the top of the space), then the top folders; subfolders are drawn only when opened (sbb_treeHtml)
 function wk_panelHtml() {
