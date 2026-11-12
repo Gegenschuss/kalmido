@@ -1,6 +1,24 @@
 {
  "versions": [
   {
+   "version": "2.1077.0",
+   "date": "2026-11-12",
+   "items": [
+    {
+     "de": "Der Kalender zeigt beim Laden einen ruhigen Hinweis und sagt deutlich, wenn Termine nicht geladen werden konnten - mit „Erneut versuchen“.",
+     "en": "The calendar shows a quiet hint while loading and says clearly when events could not be loaded - with \"Try again\"."
+    },
+    {
+     "de": "Wird ein Termin nicht gespeichert, sagt der wieder geöffnete Editor das jetzt selbst.",
+     "en": "When an event is not saved, the editor that opens again now says so itself."
+    },
+    {
+     "de": "Fragt ein Agent, ob er einen Text ändern darf, zeigt die Freigabe-Karte jetzt, welche Zeilen wegfallen und welche dazukommen.",
+     "en": "When an agent asks to change a text, the approval card now shows which lines go and which are added."
+    }
+   ]
+  },
+  {
    "version": "2.1075.0",
    "date": "2026-11-12",
    "items": [
@@ -1355,24 +1373,6 @@
     {
      "de": "Die Kalmido-KI arbeitet jetzt auch im Team: Org-Admins legen eine Team-KI an, der alle Mitglieder Aufträge geben.",
      "en": "The Kalmido AI now works for teams: organisation admins create a team AI that every member can give orders to."
-    }
-   ]
-  },
-  {
-   "version": "2.588.0",
-   "date": "2026-11-06",
-   "items": [
-    {
-     "de": "Tabellen können jetzt Zellen formatieren, nach Regeln einfärben, Reihen per Ziehgriff fortsetzen und als PDF drucken.",
-     "en": "Tables can now format cells, colour them by rules, continue series with the fill handle and print to PDF."
-    },
-    {
-     "de": "Neue Diagramme in Tabellen: Torte, Ring und gestapelte Balken, dazu 20 weitere Formelfunktionen.",
-     "en": "New table charts: pie, ring and stacked bars, plus 20 more formula functions."
-    },
-    {
-     "de": "Die Branche ist jetzt ein Schalter für die ganze App; ohne Branche gibt es ein neutrales Beispielprojekt.",
-     "en": "The industry is now one switch for the whole app; without one you get a neutral sample project."
     }
    ]
   }
