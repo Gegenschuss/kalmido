@@ -33,9 +33,12 @@ const groupOf = (root, title) => [...root.querySelectorAll('.ngroup')].find(g =>
   await call('PATCH', '/api/settings', {features: ALL, tour: 'done'}, CB);
   const L = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
   await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});
-  const T1 = (await call('POST', '/api/tasks', {title: 'Write the homepage text', list_id: L})).id;
+  // 2.1079.0 (#5906): #5806 - a person's comment on a task I created / that is assigned to me is "For you"; the plain-comment
+  // tasks T1 and T3 are bob's own and alice only watches them, so a plain comment there stays history (as #5808 means it)
+  const T1 = (await call('POST', '/api/tasks', {title: 'Write the homepage text', list_id: L}, CB)).id;
   const T2 = (await call('POST', '/api/tasks', {title: 'Call the printer', list_id: L})).id;
-  const T3 = (await call('POST', '/api/tasks', {title: 'Order the flyers', list_id: L})).id;
+  const T3 = (await call('POST', '/api/tasks', {title: 'Order the flyers', list_id: L}, CB)).id;
+  check((await call('POST', `/api/tasks/${T1}/watchers`, {})).status === 200 && (await call('POST', `/api/tasks/${T3}/watchers`, {})).status === 200, 'setup: alice watches bob\'s two tasks');
   await call('POST', `/api/tasks/${T1}/comments`, {body: 'First draft is in'}, CB);  // not for me: history
   await call('POST', `/api/tasks/${T2}/comments`, {body: '<@1> can you call them?'}, CB);  // for me
   await call('POST', `/api/tasks/${T3}/comments`, {body: 'Prices are in the sheet'}, CB);  // not for me ...
