@@ -738,6 +738,8 @@ def task_take(c, tid, uid):
         return tr("This task is not assigned to one of your groups")
     from .rules import rul_fire, rul_snap
     rb = rul_snap(c, tid)  # 2.138.0 D (#2060): taking it = assigned (rule trigger)
+    from ..tasks.tundo import tu_mark
+    tu_mark(c, tid, t, {})  # 2.997.0 (#5606): the server's undo step (assignee back to the group; the browser keeps no copy since stage 7)
     c.execute("UPDATE tasks SET assignee_id=?, assignee_group_id=NULL, assigned_by=?, reminded='[]', updated_at=? WHERE id=?",
               (uid, uid, iso(now_utc()), tid))
     log_act(c, tid, "take", {"group": grp_name(c, t["assignee_group_id"])})
