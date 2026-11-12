@@ -618,6 +618,29 @@ def tp_sum_title(s, lang):
     return own or tr("Services|document", lg=lang)
 
 
+def tp_flat_items(c, oid, r, title=None):
+    """2.1041.0 (#5817): the positions of an invoice from flat price quotation r (without parts): one position per tax rate with
+    the quotation's net of that rate, titled like the summary of a quotation with parts (title, else tp_sum_title), the
+    purchase on the first; in the home currency like inv_items_from_offer. Net and gross equal the quotation's."""
+    s = office_settings(c, oid)
+    pack = office_pack_for(s, calc_tax_day(dict(r)))
+    d = _calc_doc(r, hc_home(s))
+    d["currency"] = d["home"]
+    t = office_calc(d, doc_items(c, r["id"], oid), pack)
+    lang = calc_lang(r["lang"])
+    ttl = (title or "").strip()[:500] or tp_sum_title(s, lang)
+    bases = {x["rate_key"]: x["base"] for x in t["tax_lines"]} if t["vat_mode"] != "novat" else {"standard": t["net"]}
+    out = []
+    for k in TAX_KEYS:
+        if k not in bases or not dec(bases[k]):
+            continue
+        det = label(pack, lang, "tax_" + k, pct=fmt_qty(pack_tax(pack, k, calc_tax_day(dict(r))), lang)) if len(bases) > 1 else ""
+        out.append({"kind": "service", "service_id": None, "title": ttl, "detail": det, "qty": 1, "unit": "flat", "rate": bases[k], "tax": k,
+                    "intext": "intern", "cost": t["costs"] if not out else 0, "raw_fee": 0, "producing": 0, "discountable": 1})
+    return out or [{"kind": "service", "service_id": None, "title": ttl, "detail": "", "qty": 1, "unit": "flat", "rate": 0, "tax": "standard",
+                    "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1}]
+
+
 def tp_inv_items(c, oid, r, mode=None, title=None):
     """The positions of an invoice from quotation r with parts (None: it has none). mode (else the office setting
     parts_invoice_mode, app default "full"): "title" = the title page with its positions, a part line becomes a position

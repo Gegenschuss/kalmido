@@ -26,7 +26,6 @@ from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, live_sql
 from ..core.errors import BadInput, BadKey, DeniedKey
 from .calc import INV_VAT_NOTES, TAX_KEYS, dec, dstr, fmt_money, inv_calc, inv_open, money, pack_tax
-from .calc import calc_lang, fmt_qty, label as calc_label  # 2.1041.0 (#5817): inv_flat_items
 from .homecur import hc_code, hc_home, hc_office_rate, hc_rate_missing  # 2.189.0 (#2475); 2.355.0 C (#2844): hc_rate_missing
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack  # 2.185.0 C (#2520)
@@ -480,43 +479,18 @@ def _lines_eur(c, oid, r):
     return office_calc(d, doc_items(c, r["id"], oid), pack)["lines"]
 
 
-def inv_flat_items(c, oid, r, title=None):
-    """2.1041.0 (#5817): the positions of an invoice from flat price quotation r (without parts): one position per tax rate with
-    the quotation's net of that rate, titled like the summary of a quotation with parts (title, else parts.tp_sum_title), the
-    purchase on the first; in the home currency like inv_items_from_offer. Net and gross equal the quotation's."""
-    from .docs import _calc_doc, doc_items
-    from .parts import tp_sum_title
-    s = office_settings(c, oid)
-    pack = office_pack_for(s, calc_tax_day(dict(r)))
-    d = _calc_doc(r, hc_home(s))
-    d["currency"] = d["home"]
-    t = office_calc(d, doc_items(c, r["id"], oid), pack)
-    lang = calc_lang(r["lang"])
-    ttl = (title or "").strip()[:500] or tp_sum_title(s, lang)
-    bases = {x["rate_key"]: x["base"] for x in t["tax_lines"]} if t["vat_mode"] != "novat" else {"standard": t["net"]}
-    out = []
-    for k in TAX_KEYS:
-        if k not in bases or not dec(bases[k]):
-            continue
-        det = calc_label(pack, lang, "tax_" + k, pct=fmt_qty(pack_tax(pack, k, calc_tax_day(dict(r))), lang)) if len(bases) > 1 else ""
-        out.append({"kind": "service", "service_id": None, "title": ttl, "detail": det, "qty": 1, "unit": "flat", "rate": bases[k], "tax": k,
-                    "intext": "intern", "cost": t["costs"] if not out else 0, "raw_fee": 0, "producing": 0, "discountable": 1})
-    return out or [{"kind": "service", "service_id": None, "title": ttl, "detail": "", "qty": 1, "unit": "flat", "rate": 0, "tax": "standard",
-                    "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1}]
-
-
 def inv_items_from_offer(c, oid, r, parts_mode=None, parts_title=None):
     """The positions of an invoice from quotation r: every quotation line becomes a plain position with its amount (the
     producing / raw data / discount automation of the quotation is condensed into positions; an uncounted raw data option
     is left out). Rates stay in EUR; the invoice converts them with its own rate."""
     from .docs import doc_items
-    from .parts import tp_inv_items  # 2.47.0 (#1215): a quotation with parts -> title page / summary / full (office/parts.py)
+    from .parts import tp_flat_items, tp_inv_items  # 2.47.0 (#1215): a quotation with parts -> title page / summary / full (office/parts.py)
     flat = bool(_col(r, "flat_print"))  # 2.1041.0 (#5817): a flat price quotation: one position per tax rate (its summary form)
     out = tp_inv_items(c, oid, r, parts_mode or ("summary" if flat else None), parts_title)
     if out is not None:
         return out
     if flat:
-        return inv_flat_items(c, oid, r, parts_title)
+        return tp_flat_items(c, oid, r, parts_title)
     items = doc_items(c, r["id"], oid)
     lines = _lines_eur(c, oid, r)
     pct = {ln.get("id"): ln for ln in lines if ln.get("kind") == "item" and ln.get("pct") is not None}
