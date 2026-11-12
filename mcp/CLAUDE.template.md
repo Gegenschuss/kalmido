@@ -226,8 +226,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   `post_team_message`); not on every answer.
   People may let comments by agents reach them only as replies (2.62.0): when you answer a person's task comment, pass
   its id as `reply_to` in `add_comment`, otherwise your answer may not reach them.
-- When someone refers to something said earlier (a decision, a number, "as discussed"), find it with `search_messages`
-  (comments, channels, your chats) instead of paging through old messages, then read the place itself.
+- When someone refers to something said earlier (a decision, a number, "as discussed"), find it with `search` (`kind: messages`:
+  comments, channels, your chats) instead of paging through old messages, then read the place itself.
 
 ### New tasks in your projects
 - The event `task_added` tells you that a task was created in, or moved into, a project where you listen in (`how`,
@@ -840,13 +840,15 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `contract_notice`: a shared contract's last day to cancel is near (once per deadline): answer with ONE `propose_contract_notice`
 - `letter_draft_requested`: an office admin asks you to draft an answer to a document shared with you (`node_id`, `title`, `requested_by`, `note`): ONE `create_letter_draft` with `answers`
 
-Searching (2.981.0): `search_tasks`, `search_notes`, `search_contacts` and `search_messages` match the start of a word
-(umlauts either way, "Müller" = "Mueller"); a part of a word only in names and phone numbers of contacts and in ticket keys.
-2.1002.0: `search_files` the same in the recognised text of files and documents (a word start, umlauts either way).
+Searching (2.1026.0): ONE tool `search` with `kind` all (default: a short overview of every kind your token may read) |
+tasks | messages | contacts | notes | files | wiki | events (each kind needs its scope; office documents never). Words match
+the start of a word (umlauts either way, "Müller" = "Mueller"); a part of a word only in names and numbers (contact names,
+phone numbers, ticket keys). Files and documents: also the recognised text; wiki: the text of pages shared with you; events:
+title, place and description.
 
 Related tasks (2.59.0): task events may carry `task.related` = up to 5 tasks close in meaning `[{id, title, score}]` (only
 tasks you may see; missing while the server has not computed the task yet or runs without its embedding service). Before
-creating a task, `related_tasks` (or `search_tasks` with `semantic: true`) shows likely duplicates (`dup: true`): mention
+creating a task, `related_tasks` (or `search` with `kind: tasks` and `semantic: true`) shows likely duplicates (`dup: true`): mention
 them instead of adding a second task. A duplicate you are sure of can be saved (2.576.0): `add_relation` with kind `duplicate`
 (`close: true` also closes it as won't do with a comment), or kind `relates` for tasks that belong together; `list_relations`
 and a task's `relations` show only relations to tasks you may see.
@@ -886,8 +888,8 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `remove_relation`, `rename_folder`, `rename_section`, `reopen_task`,
 `log_decision`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,
 `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
-`request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_attachment`, `restore_event`, `restore_note`, `restore_project_file`, `restore_task`, `review_task`, `search_contacts`,
-`search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `sheet_add_column`, `sheet_append_rows`,
+`request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_attachment`, `restore_event`, `restore_note`, `restore_project_file`, `restore_task`, `review_task`, `search`,
+`send_chat`, `sheet_add_column`, `sheet_append_rows`,
 `sheet_add_tab`, `sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_set_rules`, `sheet_tabs`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_dwell_limits`, `set_list_columns`, `set_list_review`,
 `set_office_deal_stage`, `set_project_overview`, `set_project_status`, `set_queue_order`, `set_section_kind`, `set_status`, `set_task_state`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `partial_task`, `skip_occurrence`, `start_timer`,

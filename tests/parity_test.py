@@ -404,7 +404,7 @@ APP_ONLY = [
      "(proposal kind merge, #1357), the person applies them",
      ("=POST /api/contacts/merge", "=POST /api/contacts/merges/{}/undo", "=POST /api/clients/merge", "=POST /api/clients/merges/{}/undo")),
     ("2.59.0 (#1375): the hint while a person types a new task's title and the client's on / off of the related tasks; agents "
-     "use related_tasks and search_tasks with semantic", ("=POST /api/tasks/similar", "=GET /api/related/config")),
+     "use related_tasks and search (kind tasks) with semantic", ("=POST /api/tasks/similar", "=GET /api/related/config")),
     ("2.60.0 (#343): planning sprints stays with the people of a list -- switching sprints on, planning, editing, starting, closing "
      "and removing a sprint; agents read sprints (list_sprints / get_sprint), put tasks into one (set_task_sprint) and hear "
      "sprint_started / sprint_closed", ("=PUT /api/lists/{}/sprint-settings", "=POST /api/lists/{}/sprints", "=PATCH /api/sprints/{}",

@@ -144,7 +144,7 @@ check(s.send("nope/x")["error"]["code"] == -32601, "unknown method -> -32601")
 
 tools = s.send("tools/list")["result"]["tools"]
 names = {t["name"] for t in tools}
-want = {"list_lists", "list_tasks", "search_tasks", "get_task", "create_task", "update_task", "complete_task", "add_comment", "react",
+want = {"list_lists", "list_tasks", "search", "get_task", "create_task", "update_task", "complete_task", "add_comment", "react",
         "set_status", "list_events", "wait_for_events", "get_agent", "create_job", "update_job", "list_jobs", "send_chat", "list_chats",
         "tidy_task", "list_list_tags", "set_waiting", "clear_waiting", "list_waiting", "report_usage", "get_usage", "get_job",
         "submit_proposal", "chat_typing", "get_project_overview", "react_to_chat",
@@ -165,7 +165,20 @@ CASES = [
     ("list_list_tags", {"list_id": 4}, "GET", "/api/v1/lists/4/tags", None, {}),
     ("list_tasks", {"list_id": 4, "status": "all", "list_tag": "bug", "assignee": "me", "limit": 20}, "GET", "/api/v1/tasks", None,
      {"list_id": "4", "status": "all", "list_tag": "bug", "assignee": "me", "limit": "20"}),
-    ("search_tasks", {"q": "milk"}, "GET", "/api/v1/search", None, {"q": "milk"}),
+    ("search", {"q": "milk", "kind": "tasks"}, "GET", "/api/v1/search", None, {"q": "milk", "kind": "tasks"}),  # 2.1026.0 (#5280): search_tasks -> search kind tasks
+    # 2.1026.0 (#5280): ONE search tool; each kind carries its own filters only, chat_with -> agent, the flags -> "1"
+    ("search", {"q": "milk"}, "GET", "/api/v1/search", None, {"q": "milk", "kind": "all"}),
+    ("search", {"q": "milk", "kind": "tasks", "semantic": True, "fulltext": True, "cursor": "c1"}, "GET", "/api/v1/search", None,
+     {"q": "milk", "kind": "tasks", "semantic": "1", "fulltext": "1", "cursor": "c1"}),
+    ("search", {"q": "plan", "kind": "messages", "art": "c,t", "chat_with": 3, "task": 7, "space": "x"}, "GET", "/api/v1/search", None,
+     {"q": "plan", "kind": "messages", "art": "c,t", "agent": "3", "task": "7"}),
+    ("search", {"kind": "contacts", "trash": 1, "book_id": 2}, "GET", "/api/v1/search", None, {"kind": "contacts", "trash": "1", "book_id": "2"}),
+    ("search", {"q": "memo", "kind": "notes", "list_id": 4}, "GET", "/api/v1/search", None, {"q": "memo", "kind": "notes", "list_id": "4"}),
+    ("search", {"q": "invoice", "kind": "files", "space": "org:3", "limit": 9}, "GET", "/api/v1/search", None,
+     {"q": "invoice", "kind": "files", "space": "org:3"}),
+    ("search", {"q": "Muller", "kind": "wiki", "space": "private", "limit": 10}, "GET", "/api/v1/search", None,
+     {"q": "Muller", "kind": "wiki", "space": "private", "limit": "10"}),
+    ("search", {"q": "Dentist", "kind": "events", "limit": 5}, "GET", "/api/v1/search", None, {"q": "Dentist", "kind": "events", "limit": "5"}),
     ("create_task", {"title": "T", "list_id": 4, "list_tags": ["bug"], "priority": "high"}, "POST", "/api/v1/tasks",
      {"title": "T", "list_id": 4, "list_tags": ["bug"], "priority": "high"}, {}),
     ("update_task", {"task_id": 7, "title": "U", "due": None}, "PATCH", "/api/v1/tasks/7", {"title": "U", "due": None}, {}),
@@ -256,6 +269,15 @@ for name, args, m, p, b, q in CASES:
     check(all(rq.get("q", {}).get(k) == v for k, v in q.items()), f"{name}: query {q} (got {rq.get('q')})")
     check(rq.get("auth") == "Bearer " + TOKEN, f"{name}: bearer token sent")
     check(isinstance(res.get("structuredContent"), dict) and json.loads(res["content"][0]["text"]) is not None, f"{name}: content")
+
+# 2.1026.0 (#5280): the filter of another kind is not sent (space on messages, limit on files), the old tools are gone
+call(s, "search", {"q": "plan", "kind": "messages", "space": "x", "list_id": 4})
+check("space" not in last()["q"] and "list_id" not in last()["q"], f"search messages: no foreign filter (got {last()['q']})")
+call(s, "search", {"q": "invoice", "kind": "files", "limit": 9})
+check("limit" not in last()["q"], f"search files: no limit (got {last()['q']})")
+check(not names & {"search_tasks", "search_messages", "search_contacts", "search_files", "search_notes"}, "the five old search tools are gone")
+check(next(t for t in tools if t["name"] == "search")["inputSchema"]["properties"]["kind"]["enum"]
+      == ["all", "tasks", "messages", "contacts", "notes", "files", "wiki", "events"], "search: the kinds (never office)")
 
 # 2.13.1 (#465): get_attachment -> base64 + mime / name; an image also as an MCP image item; the size cap; chat files;
 # send_chat with files -> multipart

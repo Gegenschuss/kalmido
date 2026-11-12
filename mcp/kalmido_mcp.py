@@ -560,6 +560,26 @@ def t_tidy(api, a):
     return api.call("POST", f"/tasks/{int(a['task_id'])}/tidy", body={k: v for k, v in a.items() if k != "task_id"})
 
 
+# 2.1026.0 (#5280): ONE search tool for every kind (GET /search kind=...); the five old search_* tools are gone
+SEARCH_KINDS = ("all", "tasks", "messages", "contacts", "notes", "files", "wiki", "events")
+SEARCH_FILTERS = {"all": ("limit",), "tasks": ("limit", "cursor"), "messages": ("art", "sender", "room", "task", "limit", "cursor"),
+                  "contacts": ("book_id", "group", "limit", "cursor", "trash"), "notes": ("list_id", "limit"), "files": ("space",),
+                  "wiki": ("space", "limit"), "events": ("limit",)}
+
+
+def t_search(api, a):
+    """The filters of the chosen kind only (another kind's filter is ignored); chat_with -> agent, the flags -> "1"."""
+    kind = a.get("kind") or "all"
+    if kind not in SEARCH_KINDS:
+        raise ValueError(f"unknown kind {kind}")
+    query = {"q": a.get("q"), "kind": kind, **_pick(a, SEARCH_FILTERS[kind])}
+    if kind == "tasks":
+        query.update({k: "1" for k in ("semantic", "fulltext") if a.get(k)})
+    if kind == "messages" and "chat_with" in a:
+        query["agent"] = a["chat_with"]
+    return api.call("GET", "/search", query)
+
+
 TOOLS = [
     ("get_agent", "Who am I: the agent's user, enabled state, status, job counts, the latest event cursor and runtime (the "
                   "settings an admin chose for the agent's host: model, autocompact, autocompact_pct, nightly_reset HH:MM in "
@@ -709,32 +729,33 @@ TOOLS = [
                        "working day.",
      _obj({"date": {"type": "string", "description": "YYYY-MM-DD, default today"}}),
      lambda api, a: api.call("GET", "/dayplan/review", _pick(a, ("date",)))),
-    ("search_tasks", "Full-text search in titles, notes, links and custom fields of visible tasks. 2.59.0: semantic=true adds "
-                     "tasks of similar meaning after the text hits (flag similar; needs the server's embedding service). "
-                     "2.138.1: fulltext=true ranks the hits (title before notes) and also finds tasks by their comments; each task "
-                     "once with match {where: title|notes|comment|field|file, snippet, comment_id}, at most 50 per page (cursor).",
-     _obj({"q": {"type": "string", "minLength": 1}, "limit": {"type": "integer", "minimum": 1, "maximum": 500},
-           "semantic": {"type": "boolean"}, "fulltext": {"type": "boolean"}, "cursor": {"type": "string"}}, ["q"]),
-     lambda api, a: api.call("GET", "/search", {**_pick(a, ("q", "limit", "cursor")), **({"semantic": "1"} if a.get("semantic") else {}),
-                                                **({"fulltext": "1"} if a.get("fulltext") else {})})),
+    ("search", "2.1026.0: the one search (#5280). Rules: a word matches the start of a word (a part of a word only in names and numbers: "
+               "file names, contact names, phone numbers, ticket keys); case, accents and umlauts (ae = \u00e4) do not matter; only what you may read. "
+               "kind all (default) = an overview {groups: {<kind>: [hits]}} of every kind your token may read (at most limit per kind, "
+               "default 5); kinds without the scope are left out silently, never office. "
+               "tasks: titles, notes, links, custom fields (semantic=true adds tasks of similar meaning, fulltext=true ranks and also finds "
+               "comments: match {where, snippet, comment_id}; limit, cursor). messages: task comments, team chat, your chats "
+               "(art c|t|a, sender, room, chat_with, task; each hit art, task_id / room_id, sender, created_at, snippet, marks). contacts "
+               "(scope contacts): name, company, e-mail, phone, address, group (book_id, group; trash=1 = the deleted ones, q may be empty). "
+               "notes: title, text, tags (list_id; then get_note). files (scope files:read): name or recognised text of files and documents "
+               "(space; hit name|text|doc; then read_file). wiki (scope wiki:read): pages by title and text, only shared ones (space). "
+               "events (scope calendar): title, place, description in every calendar you see, newest first. A missing scope for one kind = 403.",
+     _obj({"q": {"type": "string", "maxLength": 200, "description": "The words; required except kind contacts with trash = 1"},
+           "kind": {"type": "string", "enum": list(SEARCH_KINDS), "description": "Default all"},
+           "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "cursor": {"type": "string"},
+           "semantic": {"type": "boolean"}, "fulltext": {"type": "boolean"},
+           "art": {"type": "string", "description": "messages: only these kinds, comma-separated: c, t, a"},
+           "sender": {**S_ID, "description": "messages: only from this user id"},
+           "room": {**S_ID, "description": "messages: only this team chat room"},
+           "chat_with": {**S_ID, "description": "messages: only your chat with this user (an agent: the person; a person: the agent)"},
+           "task": {**S_ID, "description": "messages: only the comments of this task"},
+           "book_id": S_ID, "group": {"type": "string"}, "trash": {"type": "integer", "enum": [0, 1]},
+           "list_id": S_ID, "space": {"type": "string", "description": "files, wiki: only this space"}}), t_search),
     ("related_tasks", "2.59.0: up to 5 tasks close in meaning to a task (local text vectors on the server, similar titles, "
                       "#references), only tasks you may see: {enabled, pending, items: [{id, title, list_id, done, score, dup, ref, saved?}]}. "
                       "dup = probably a duplicate, ref = named by #number in either direction or a saved relation (2.576.0: saved = its kind, see list_relations). enabled false = the server has no embedding service; pending = not computed yet. "
                       "Use it before creating a task (duplicates) and to find context. Read-only.",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/related")),
-    ("search_messages", "2.33.0: full-text search in task comments, team chat and your own chats with people (only what you may read: "
-                        "the projects shared with you, their channels, your chats). Words match word beginnings; case, accents and ä/ae do not "
-                        "matter. Newest first; each hit: art (c comment | t team chat | a agent chat), chat_type, task_id / room_id / "
-                        "user_id, sender, created_at, snippet (plain text) with marks. Read the place with get_task / the chat tools.",
-     _obj({"q": {"type": "string", "minLength": 1, "maxLength": 200},
-           "art": {"type": "string", "description": "Only these kinds, comma-separated: c, t, a"},
-           "sender": {**S_ID, "description": "Only messages from this user id"},
-           "room": {**S_ID, "description": "Only this team chat room"},
-           "chat_with": {**S_ID, "description": "Only your chat with this user (an agent: the person; a person: the agent)"},
-           "task": {**S_ID, "description": "Only the comments of this task"},
-           "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "cursor": {"type": "string"}}, ["q"]),
-     lambda api, a: api.call("GET", "/search", {"scope": "messages", **_pick(a, ("q", "art", "sender", "room", "task", "limit", "cursor")),
-                                                **({"agent": a["chat_with"]} if "chat_with" in a else {})})),
     ("get_task", "One task with its comments (reactions, suggestions included). In a project connected to a repository also `code` "
                  "(linked pull requests with state + CI, commits) and `repo` (provider, web_url, owner, repo, default_branch, a "
                  "suggested branch name kalmido-<id>). 2.151.0: code.build / repo.build = its build state (state released | main | "
@@ -1335,11 +1356,6 @@ TOOLS += [
      t_import_vcards),
     ("export_vcards", "2.21.0: an address book as vCard text.", _obj({"book_id": S_ID}, ["book_id"]),
      lambda api, a: api.call("GET", f"/address-books/{int(a['book_id'])}/export")),
-    ("search_contacts", "2.21.0: search contacts by name, company, e-mail, phone, address or group (q), optionally in one address book / group. "
-                        "2.272.0: trash = 1 lists the deleted contacts in the trash instead (deleted_at; bulk_contacts undelete restores them).",
-     _obj({"q": {"type": "string"}, "book_id": S_ID, "group": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 500},
-           "cursor": {"type": "string"}, "trash": {"type": "integer", "enum": [0, 1]}}),
-     lambda api, a: api.call("GET", "/contacts", _pick(a, ("q", "book_id", "group", "limit", "cursor", "trash")))),
     ("get_contact", "2.21.0: one contact with its linked tasks and events.", _obj({"contact_id": S_ID}, ["contact_id"]),
      lambda api, a: api.call("GET", f"/contacts/{int(a['contact_id'])}")),
     ("create_contact", "2.21.0: create a contact (a name or a company).", _obj(CT_IN), lambda api, a: api.call("POST", "/contacts", body=_pick(a, CT_KEYS))),
@@ -1349,13 +1365,13 @@ TOOLS += [
     ("delete_contact", "2.21.0: delete a contact. 2.272.0: it goes to the trash with its notes and links (bulk_contacts undelete brings it "
                        "back until the trash period ends).", _obj({"contact_id": S_ID}, ["contact_id"]),
      lambda api, a: api.call("DELETE", f"/contacts/{int(a['contact_id'])}")),
-    ("bulk_contacts", "2.46.1: delete or move several contacts at once (ids from search_contacts, up to 5000). All are checked first: "
+    ("bulk_contacts", "2.46.1: delete or move several contacts at once (ids from search kind contacts, up to 5000). All are checked first: "
                       "one you may not change -> nothing happens. move: book_id = the target address book; contacts it has already stay "
                       "(conflicts). 2.47.3: set changes properties of all of them (groups_add / groups_remove, org, dept, kind, note_append "
                       "is appended; read-only or imported address books are skipped); its answer's undo, sent back with action restore as "
                       "items, puts the old values back. 2.58.0: an imported address book as move target -> 409. 2.138.4: contacts moved OUT of an "
                       "imported address book are copied (it stays as it is); the answer counts them in copied. 2.272.0: delete puts them into the trash; "
-                      "undelete takes contacts of the trash (search_contacts trash = 1) out of it again (answer restored). Ask the person before "
+                      "undelete takes contacts of the trash (search kind contacts, trash = 1) out of it again (answer restored). Ask the person before "
                       "deleting many.",
      _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "move", "set", "restore", "undelete"]}, "book_id": S_ID,
            "groups_add": {"type": "array", "items": {"type": "string"}}, "groups_remove": {"type": "array", "items": {"type": "string"}},
@@ -1402,7 +1418,7 @@ TOOLS += [
     ("sheet_create", "2.89.0 (scope sheets:write): create a table in ONE call: title, space (private = the person you work for, or "
                      "org:<id> of your workspace), list_id? (attach to a project shared with you, same space), columns (with "
                      "choices and colours), rows (inputs and formulas). The answer has the table and its batch; the person can take the "
-                     "whole call back (the table goes to the trash). Example: birthdays in the next 4 weeks -> search_contacts, then one "
+                     "whole call back (the table goes to the trash). Example: birthdays in the next 4 weeks -> search kind contacts, then one "
                      "sheet_create with columns Name, Geburtstag (date), Alter (number) and one row per person.",
      _obj({"title": {"type": "string", "maxLength": 200}, "space": {"type": "string"}, "list_id": S_ID,
            "columns": {"type": "array", "items": _SH_COL, "maxItems": 200}, "rows": _SH_ROWS}, ["title"]),
@@ -1979,9 +1995,6 @@ TOOLS += [
     ("list_notes", "2.17.0: the notes of a project (Markdown documents next to its tasks: meeting notes, briefings, decisions), "
                    "with their text. Participants of a project see none.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/notes")),
-    ("search_notes", "2.17.0: find notes (all words in title, text or tags), optionally in one project; results without the full text "
-                     "(get_note for it).",
-     _obj({"q": {"type": "string"}, "list_id": S_ID}), lambda api, a: api.call("GET", "/notes", _pick(a, ("q", "list_id")))),
     ("get_note", "2.17.0: one note with its text.", _obj({"note_id": S_ID}, ["note_id"]), lambda api, a: api.call("GET", f"/notes/{int(a['note_id'])}")),
     ("create_note", "2.17.0: write a note in a project (owner, project admins, members).", _obj({"list_id": S_ID, **NOTE_IN}, ["list_id", "title"]),
      lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/notes", body=_pick(a, ("title", "body", "tags", "pinned")))),
@@ -2267,11 +2280,6 @@ def t_read_file(api, a):
     return {"id": fid, "name": r["name"], "mime": r["mime"], "size": len(r["bytes"]), "base64": base64.b64encode(r["bytes"]).decode()}
 
 
-def t_search_files(api, a):
-    """2.61.0 (#1820): files whose name or recognised text matches q."""
-    return api.call("GET", "/files/search", {"q": a.get("q"), "space": a.get("space")})
-
-
 def t_write_file(api, a):
     """file_id: a new version of that file; else a new file in folder_id (default: your own result folder)."""
     body = _pick(a, ("content", "mime", *(("expect_version",) if a.get("file_id") else ())))  # 2.564.0 (#4702)
@@ -2292,9 +2300,6 @@ TOOLS += [
                   "version = an older version, max_bytes).",
      _obj({"file_id": S_ID, "as": {"type": "string", "enum": ["text", "base64"]}, "version": {"type": "integer", "minimum": 1},
            "max_bytes": {"type": "integer", "minimum": 1}}, ["file_id"]), t_read_file),
-    ("search_files", "2.61.0: find files of the file store by name or by their text (PDF text layer, text the server recognised in "
-                     "scans and photos). Only files you may open; hit = name | text | doc (sender, type or a tag of a document); at most 100, newest first. Then read_file.",
-     _obj({"q": {"type": "string", "minLength": 1, "maxLength": 200}, "space": {"type": "string"}}, ["q"]), t_search_files),
     ("write_file", "2.48.0: put a file into the file store: name + content (UTF-8 text) or base64, into folder_id (role edit) or, "
                    "without it, your own result folder (reports, drafts, patches people should read). file_id instead: a new version of "
                    "that file (the older ones stay); 2.564.0: then expect_version (the file's version from list_files / read_file) is "
@@ -2883,10 +2888,10 @@ TOOL_SCOPES = {
                  "unshare_event_calendar", "import_ics", "export_ics", "list_calendar_events", "freebusy", "get_event", "create_event", "update_event", "delete_event",
                  "restore_event", "reply_to_event", "add_preparation_task", "get_task_events"),
     "contacts": ("list_address_books", "create_address_book", "update_address_book", "delete_address_book", "share_address_book",
-                 "unshare_address_book", "import_vcards", "export_vcards", "search_contacts", "get_contact", "create_contact", "update_contact",
+                 "unshare_address_book", "import_vcards", "export_vcards", "get_contact", "create_contact", "update_contact",
                  "delete_contact", "bulk_contacts", "link_contact", "unlink_contact", "set_contact_care"),
     "private": ("add_health_entry", "write_journal"),
-    "files:read": ("list_files", "read_file", "search_files", "suggest_receipt", "list_receipt_suggestions"),  # 2.48.0 (#1207, #1356)
+    "files:read": ("list_files", "read_file", "suggest_receipt", "list_receipt_suggestions"),  # 2.48.0 (#1207, #1356)
     "files:write": ("write_file", "create_file_folder", "create_document"),
     "office": ("get_office", "list_office_data", "list_office_documents", "get_office_document", "create_offer_draft", "update_offer_draft",
                "draft_invoice_from_offer", "draft_reminder", "suggest_payment", "list_payment_suggestions",
@@ -2940,7 +2945,7 @@ TOOL_SCOPE_AGENT = {"list_time_entries": "time", "get_time_gaps": "time"}  # 2.5
 TOOLSETS = {
     "tickets": """
         list_watchers watch_task unwatch_task
-        list_lists set_list_columns get_project_overview list_list_tags list_tasks get_milestone list_groups list_list_groups search_tasks related_tasks
+        list_lists set_list_columns get_project_overview list_list_tags list_tasks get_milestone list_groups list_list_groups related_tasks
         get_task create_task update_task add_snippet complete_task set_waiting clear_waiting list_waiting list_stale_tasks add_decision set_delivery add_comment
         request_comment_approval withdraw_comment_choices set_working end_working list_attachments get_attachment read_attachment read_briefing
         read_project_status get_waiting tidy_task get_delivery_report export_brief get_storage get_list get_playbook propose_playbook create_list update_list delete_list
@@ -2953,7 +2958,7 @@ TOOLSETS = {
         add_project_link update_project_link delete_project_link reorder_project_links add_milestone update_milestone delete_milestone list_sprints list_ticket_types
         get_sprint set_task_sprint set_project_status list_project_files upload_project_file delete_project_file export_data request_approval review_task
         restore_attachment restore_project_file
-        set_list_review list_forms create_form update_form delete_form list_files read_file search_files write_file create_file_folder list_documents
+        set_list_review list_forms create_form update_form delete_form list_files read_file write_file create_file_folder list_documents
         get_document update_document create_document list_notepads create_notepad update_notepad delete_notepad write_status_pad get_weekly_status
         list_layout_blocks get_view_layout propose_layout set_wip_limit set_dwell_limits get_velocity list_flow propose_import propose_rule list_video_reviews get_video_review
         set_video_comment_done get_workload get_absences get_day_plan get_day_review
@@ -2963,7 +2968,7 @@ TOOLSETS = {
         list_repos list_build_status list_environments set_deployment request_merge_approval request_integration_approval request_deploy_approval
     """,
     "chat": """
-        get_agent get_queue get_rules add_rule set_queue_order search_messages propose_to_other_topic propose_to_person react react_to_chat
+        get_agent get_queue get_rules add_rule set_queue_order search propose_to_other_topic propose_to_person react react_to_chat
         pin_chat_message set_status report_progress list_events wait_for_events list_jobs create_job get_job submit_proposal update_job list_chats get_reply_style
         confirm_abort chat_typing send_chat request_chat_approval use_approval withdraw_chat_choices delete_chat_attachment comment_typing report_usage
         get_usage report_plan_usage get_plan_usage clear_plan_usage list_schedules list_rules get_me get_announcement list_news mark_news_read list_agents
@@ -2985,7 +2990,7 @@ TOOLSETS = {
         sheets_list sheet_read sheet_create sheet_update sheet_set_cells sheet_append_rows sheet_add_column sheet_vars sheet_undo_batch sheet_tabs
         sheet_add_tab propose_sheet_tasks sheet_set_rules
         list_address_books create_address_book update_address_book delete_address_book share_address_book unshare_address_book import_vcards
-        export_vcards search_contacts get_contact create_contact update_contact delete_contact bulk_contacts link_contact unlink_contact set_contact_care
+        export_vcards get_contact create_contact update_contact delete_contact bulk_contacts link_contact unlink_contact set_contact_care
     """,
     "calendar": """
         list_event_calendars create_event_calendar update_event_calendar delete_event_calendar share_event_calendar unshare_event_calendar import_ics
@@ -2994,7 +2999,7 @@ TOOLSETS = {
         list_polls get_poll create_poll
     """,
     "wiki": """
-        wiki_list wiki_read wiki_write wiki_create wiki_files wiki_read_file list_notes search_notes get_note create_note update_note delete_note restore_note
+        wiki_list wiki_read wiki_write wiki_create wiki_files wiki_read_file list_notes get_note create_note update_note delete_note restore_note
     """,
     "life": """
         list_habits create_habit update_habit delete_habit check_in_habit get_habit_stats get_family add_occasion list_deadline_types add_deadline

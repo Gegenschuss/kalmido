@@ -121,7 +121,7 @@ needs no permission; 2.190.0: a token that may only read (no permission beyond *
   not tied to the limit, neither through the office routes nor through a folder. 2.577.0 (#4708): tables,
   calendars, contacts and the file store are not limited by `list_ids` either (the agent's data lock keeps it out of an
   area). 2.654.0 (#5053): a limited token finds no message of a team chat channel or group in the message search
-  (`GET /api/v1/search?scope=messages`) and lists no channel, as reading the room answers `404`; and it reaches no
+  (`GET /api/v1/search?kind=messages`) and lists no channel, as reading the room answers `404`; and it reaches no
   knowledge page (a page belongs to no project: `/api/v1/wiki/pages` lists none, reading or creating one answers `404`).
   See
   [AGENT-SECURITY.md](AGENT-SECURITY.md#server-enforced-boundaries).
@@ -1122,14 +1122,35 @@ carry only the number `snippets_n` -- read the task itself for the code:
 - In task events (`mention`, `comment`, `assigned`, `task_added`, ...) `task.snippets` holds at most 10 snippets with the
   code cut to 4000 characters (`"truncated": true`) and `task.snippets_total`; `get_task` returns the full code. Never
   send a truncated copy back (`400`).
-- The search (`search_tasks`, the app's search) also finds the code and the file path of snippets (not their metadata).
-- 2.981.0: every search (`search_tasks`, `search_notes`, `search_contacts`, `search_messages`, `GET /search`) reads one
+- The search (`search` with `kind: tasks`, the app's search) also finds the code and the file path of snippets (not their metadata).
+- 2.981.0: every search (`GET /search`, MCP `search`) reads one
   shared index. A query word matches the start of a word (`plan` finds "Planung", not "Quartalsplanung"; umlauts either way:
   "Müller" = "Mueller"); a part of a word counts only in names and numbers (a contact's names, company and phone numbers, a
   task's ticket key). You still find only what you may read: the projects shared with you.
-- 2.1002.0: `search_files` (`GET /api/v1/files/search`, the recognised text of files and documents) follows the same rules
+- 2.1002.0: the files search (`GET /api/v1/search?kind=files`, the recognised text of files and documents) follows the same rules
   over a keyed word index (no plain word is stored): a word start of 2+ characters (`ab` finds "Abendessen"), umlauts either
   way; a file's name still matches a part of it.
+
+### One search
+
+*Since 2.1026.0.* ONE route and ONE MCP tool for every search: `GET /api/v1/search?q=…&kind=…`, MCP `search` (`q`, `kind`;
+the five tools `search_tasks`, `search_messages`, `search_contacts`, `search_files`, `search_notes` and the route
+`GET /api/v1/files/search` are gone, no alias). The rules are the ones above: a word start, umlauts either way, a part of
+a word only in names and numbers, only what you may read.
+
+| `kind` | Finds | Answer | Filters | Scope |
+|---|---|---|---|---|
+| `tasks` (default of the route) | titles, notes, links, custom fields; `fulltext` also comments | as before | `limit`, `cursor`, `semantic`, `fulltext` | read |
+| `messages` (older name `scope=messages`) | task comments, team chat, your chats | as before | `art`, `sender`, `room`, `agent` (MCP `chat_with`), `task`, `limit`, `cursor` | read |
+| `contacts` | names, company, e-mail, phone, address, group | as `GET /contacts` | `book_id`, `group`, `limit`, `cursor`, `trash` | contacts |
+| `notes` | title, text, tags | as `GET /notes` | `list_id`, `limit` | read |
+| `files` | a file's name, the recognised text of files and documents | `{data: [node + hit], next_cursor}` | `space` | files:read |
+| `wiki` | pages by title and text (an agent: only what is shared with it) | `{data: [{id, path, name, space, role, url, snippet?, marks?}], more}` | `space`, `limit` | wiki:read |
+| `events` | title, place, description in every calendar you see + invitations, newest first | `{data: [event as GET /events/{id} + snippet?, marks?], next_cursor: null}` | `limit` | calendar |
+| `all` | an overview of every kind above the token may read (a kind without its scope is left out silently) | `{groups: {<kind>: [at most limit hits]}}` | `limit` (default 5, 1..20) | read |
+
+The route's default is `tasks`, the MCP tool's default is `all`. A missing scope for one named kind answers `403` with
+`required_scope`. Office documents (offers, invoices) are never a hit for an agent.
 
 ### Locked tasks
 
@@ -2268,7 +2289,7 @@ folder somewhere below it). Nothing to do for an agent but to not expect files t
 | 2.443.0: by tag (every node has `tags: [{id, name}]`; `tag=1,7;3` = ids, `;` separates tags, `tag_mode=all` = every one, `not_tag=`; with `parent_id` its children, without: all you see at any depth, at most 500) | `GET /api/v1/files?tag=<ids>` | `list_files` with `tag` |
 | A file's bytes (`?version=` an older one) | `GET /api/v1/files/{id}/content` | `read_file` with `as: "base64"` |
 | A file as text (UTF-8, PDF text layer, 2.92.0: Word / Excel) | `GET /api/v1/files/{id}/text` | `read_file` |
-| Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text \| doc`, 2.353.0: doc = sender, type or a tag of a document) | `GET /api/v1/files/search?q=` | `search_files` |
+| Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text \| doc`, 2.353.0: doc = sender, type or a tag of a document) | `GET /api/v1/search?kind=files&q=` (2.1026.0; `/files/search` is gone) | `search` with `kind: files` |
 | A new file / folder (`{parent_id?, name, content \| content_base64, mime?, kind?}`; without `parent_id`: your own folder) | `POST /api/v1/files` | `write_file`, `create_file_folder` |
 | A new version of a file (`{content \| content_base64}`, role edit; the older versions stay) | `POST /api/v1/files/{id}/versions` | `write_file` with `file_id` |
 
@@ -4143,7 +4164,7 @@ with the scope it needs). The tools:
 - tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact; 2.390.0
   filters `priority`, `priority_min`, `section_id`, `sprint_id` (`current`), `created_by`, `reviewer`, `review`, `field_values`,
   `q` and `sort`, see *Task filters* in docs/API.md; 2.577.0: `filter_id` applies a saved filter or a shared view),
-  `search_tasks` (2.59.0: `semantic: true` = also tasks of similar meaning; 2.138.1: `fulltext: true` = ranked, also finds a task by its comments, with a snippet), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
+  `search` (2.1026.0, see *One search* below; `kind: tasks` 2.59.0: `semantic: true` = also tasks of similar meaning; 2.138.1: `fulltext: true` = ranked, also finds a task by its comments, with a snippet; `kind: messages` 2.33.0: comments, team chat, your chats), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
   `move_task` (project / section / parent + `before_id` / `after_id` / `position`), `link_task_to_list` /
   `unlink_task_from_list` (2.71.0: a task also in another project, see below), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
@@ -4237,8 +4258,8 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
 `log_decision`, `report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
 `request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
-`request_reward`, `restore_attachment`, `restore_event`, `restore_note`, `restore_project_file`, `restore_task`, `review_task`, `search_contacts`, `search_files`, `search_messages`, `search_notes`,
-`search_tasks`, `send_chat`, `set_contact_care`, `set_delivery`, `set_list_columns`, `set_list_review`, `set_office_deal_stage`, `set_project_overview`, `set_project_status`,
+`request_reward`, `restore_attachment`, `restore_event`, `restore_note`, `restore_project_file`, `restore_task`, `review_task`, `search`,
+`send_chat`, `set_contact_care`, `set_delivery`, `set_list_columns`, `set_list_review`, `set_office_deal_stage`, `set_project_overview`, `set_project_status`,
 `set_status`,
 `set_waiting`, `set_working`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `partial_task`, `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
@@ -4405,7 +4426,7 @@ them (participants do not), owner, project admins and members write them. `#123`
 | Call | MCP tool | Scope |
 |---|---|---|
 | `GET /lists/{id}/notes` | `list_notes` | read |
-| `GET /notes?q=&list_id=` | `search_notes` | read |
+| `GET /search?kind=notes&q=&list_id=` (2.1026.0; `GET /notes?q=` stays) | `search` with `kind: notes` | read |
 | `GET /notes/{id}` | `get_note` | read |
 | `POST /lists/{id}/notes` `{title, body?, tags?, pinned?}` | `create_note` | tasks:write |
 | `PATCH /notes/{id}` `{…, list_id?, expect_updated_at?}` (409 + the current note when it changed since; 2.270: also for `tags` / `pinned`) | `update_note` | tasks:write |
@@ -4414,7 +4435,7 @@ them (participants do not), owner, project admins and members write them. `#123`
 
 2.272.0: a deleted note, contact or address book lies in the trash until the trash period ends (`KALMIDO_TRASH_DAYS`, when the
 operator has the retention switch on), then it is deleted for good. A contact keeps its notes and task links there:
-`search_contacts` with `trash: 1` lists the deleted contacts, `bulk_contacts` with action `undelete` brings them back. A whole
+`search` with `kind: contacts` and `trash: 1` lists the deleted contacts, `bulk_contacts` with action `undelete` brings them back. A whole
 address book is restored by a person in the app.
 
 **Team chat**: people write to each other directly and in one channel per shared project. An agent is a member of the
@@ -4475,7 +4496,7 @@ message, one level deep). `read_team_chat` lists the main conversation without t
 `thread_of`), not in the main conversation. 2.139.0 (#2129): your own messages carry `read_by` `{count, users}`; people see
 your read mark (`mark_team_chat_read`, with `thread` inside a thread) as "Read by".
 
-**Searching conversations (2.33.0)**: `GET /search?scope=messages&q=…` (MCP `search_messages`, scope read) finds words in
+**Searching conversations (2.33.0)**: `GET /search?kind=messages&q=…` (2.1026.0; `scope=messages` is the older name; MCP `search` with `kind: messages`, scope read) finds words in
 the comments of the tasks of your projects, in the channels of those projects and in your own chats with people -- never in
 direct messages between people and never in another agent's chats. Words match word beginnings; case, accents and ä / ae
 do not matter. Filters: `art` (`c` comments, `t` team chat, `a` your chats, comma-separated), `sender` (user id), `room`,
@@ -4486,7 +4507,7 @@ something said earlier ("as we discussed about the invoice") instead of paging t
 
 ```bash
 curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" \
-  "$KALMIDO_URL/api/v1/search?scope=messages&q=invoice%20dishwasher&art=c,t&limit=10"
+  "$KALMIDO_URL/api/v1/search?kind=messages&q=invoice%20dishwasher&art=c,t&limit=10"
 ```
 
 ## Ticket types
@@ -4698,7 +4719,7 @@ strict way: `409` (`error.cells` = all current cells, `error.rev`) as soon as th
   `open`, `done`, `rate`, `budget_amount`; cells come back in your language (German names only for a German account), both
   are always accepted. `<name>` is the lower-case name with `_` for spaces; `sheet_vars` lists them with their
   current value. Only sources of the table's space count (an organisation's table: that organisation's).
-- **Example - birthdays in the next 4 weeks**: `search_contacts` (scope `contacts`; each contact has `bday` as
+- **Example - birthdays in the next 4 weeks**: `search` with `kind: contacts` (scope `contacts`; each contact has `bday` as
   `YYYY-MM-DD` or `--MM-DD` without a year), keep the people whose birthday falls into the next 28 days, then ONE
   `sheet_create` with columns `Name` (text), `Geburtstag` (date), `Alter` (number, empty without a year) and one row per
   person, sorted by day. Say in your answer where the table is; the person can take it back as a whole.
@@ -5008,7 +5029,7 @@ chat. Agents read the **text of PDF attachments** (#368, `read_attachment`; a sc
 MCP `report_plan_usage`, Claude Code's status line `rate_limits` as it is); a ring next to its name in the chat header
 fills up, turns yellow from 75 % and red with "paused until …" at the agent's own limit, and greys out when the report
 is older than 24 hours. Agents also receive the message a reply refers to and can search the chats they are in
-(`search_messages`).
+(`search` with `kind: messages`).
 
 - **No silent overwriting**: edits from several devices, people and agents never overwrite each other unnoticed (conflict hints, history of task descriptions, a recurring task advances once per check-off).
 - **Safe by default** (2.30.0, #919 / #920): an agent never connects two projects with **different people** unasked --

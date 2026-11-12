@@ -272,7 +272,7 @@ Every project has **notes**: Markdown documents next to the tasks for meeting no
 *Read* shows the rendered text where `#123` links that task. Each note has its own address (`#note/<id>`, *Copy link*),
 moves to another project, and is found by the command field. Everyone who sees the whole project reads its notes (participants
 do not), owner, project admins and members write them; when someone else changed a note while you were typing, Kalmido shows
-both versions. API: `/lists/{id}/notes`, `/notes` (docs/API.md), MCP tools `list_notes`, `search_notes`, `create_note` ….
+both versions. API: `/lists/{id}/notes`, `/notes` (docs/API.md), MCP tools `list_notes`, `search` (`kind: notes`), `create_note` ….
 
 **Quick notes** (2.477.0): *New note* in the command palette (Ctrl/Cmd+K) or the key `M` opens an empty note at once. In the
 notes of one project it lands in that project; otherwise (the **Notes** area in the bar of the areas, or any other page) it
