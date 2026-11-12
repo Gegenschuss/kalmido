@@ -43,6 +43,11 @@ doc_on_done = []     # 2.48.0 (#1356): hooks f(c, nid, first) after a recognitio
 doc_after = []       # 2.522.0 (#4433): hooks f(c, nid) after a recognition run was committed (each commits itself; docs/area.py sorts)
 _WAKE = threading.Event()
 _LOCK = threading.Lock()
+# 2.1069.0 (#5412, review 2.781 F2): "Optimise PDF" (docs/pdfoptq.py) runs in a thread of its own -- a run may take up to
+# docs/pdfopt.py PO_DOC_S, and in the one queue thread it held up the recognition of every new document that long;
+# first = this process has not taken up its cut-off runs yet (po_take_up)
+_PO = {"thread": None, "first": True}
+_PO_WAKE = threading.Event()
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
@@ -143,7 +148,11 @@ def docs_kick():
         if _Q["thread"] is None or not _Q["thread"].is_alive():
             _Q["thread"] = threading.Thread(target=_loop, daemon=True, name="docs")
             _Q["thread"].start()
+        if _PO["thread"] is None or not _PO["thread"].is_alive():  # 2.1069.0 (#5412)
+            _PO["thread"] = threading.Thread(target=_po_loop, daemon=True, name="docs-pdfopt")
+            _PO["thread"].start()
     _WAKE.set()
+    _PO_WAKE.set()
 
 
 @app.before_request
@@ -165,6 +174,47 @@ def _loop():
         if not n:
             _WAKE.wait(IDLE)
             _WAKE.clear()
+
+
+def _po_loop():
+    """2.1069.0 (#5412): the thread of "Optimise PDF" next to the documents queue (_loop), one run at a time."""
+    time.sleep(1)
+    while True:
+        n = 0
+        try:
+            with GATE.bg():
+                n = po_run_once()
+        except Exception as e:  # noqa: BLE001 -- the queue never dies
+            print("docs: pdf optimise queue", type(e).__name__, flush=True)
+            time.sleep(IDLE)
+        if not n:
+            _PO_WAKE.wait(IDLE)
+            _PO_WAKE.clear()
+
+
+def po_run_once():
+    """2.1069.0 (#5412): one step of "Optimise PDF" (docs/pdfoptq.py po_queued: a measure or a run, a workspace not served
+    lately first). Its first step in the only queue process takes up the runs a restart cut off (po_take_up). Returns 1
+    when it did something."""
+    from .pdfoptq import po_queued, po_take_up
+    c = connect()
+    try:
+        if _PO["first"]:
+            if _replicas() == 1:
+                with system_ctx(c):  # docs queue: runs cut off by the restart, every workspace's (only their state)
+                    po_take_up(c)
+                c.commit()
+            _PO["first"] = False
+        with system_ctx(c):  # docs queue: optimises a PDF for the person who asked (its write right checked there), nothing handed to another
+            took = po_queued(c)
+        c.commit()
+        return took
+    except Exception as e:  # noqa: BLE001 -- the queue never dies
+        c.rollback()
+        print("docs: pdf optimise", type(e).__name__, flush=True)
+        return 0
+    finally:
+        c.close()
 
 
 # 2.360.0 B (#2496): the next waiting document, one workspace after the other (one not served lately first, then the one
@@ -216,16 +266,7 @@ def docs_run_once():
             except Exception as e:  # noqa: BLE001 -- the queue never dies
                 c.rollback()
                 print("docs: split scan", type(e).__name__, e, flush=True)
-            from .pdfoptq import po_queued  # 2.892.0 (#4873): "Optimise PDF" (measure / new version), when no document waits
-            try:
-                with system_ctx(c):  # docs queue: optimises a PDF for the person who asked (its write right checked there), nothing handed to another
-                    took = po_queued(c)
-                c.commit()
-                if took:
-                    return 1
-            except Exception as e:  # noqa: BLE001 -- the queue never dies
-                c.rollback()
-                print("docs: pdf optimise", type(e).__name__, e, flush=True)
+            # 2.1069.0 (#5412): "Optimise PDF" left this queue for a thread of its own (_po_loop, po_run_once)
             from .thumbfill import p61a_thumb_fill, p2583_thumb_l_fill, p5390_scan_fill, p5393_page_fill  # 2.66.1 (#1944): previews of imports from before, while nothing waits; 2.583.0 (#4812): + the sharp ones
             try:
                 with system_ctx(c):  # docs queue: server-side catch-up of every workspace's previews, nothing handed to a person
@@ -289,8 +330,7 @@ def docs_take_up(c):
     with system_ctx(c):  # docs queue: server-side recognition of every workspace's documents, nothing handed to a person
         if every:
             c.execute("UPDATE doc_meta SET state='wait', updated_at=? WHERE state='run'", (_now(),))
-            from .pdfoptq import po_take_up  # 2.892.0 (#4873, review F4): an "Optimise PDF" cut off by the restart, at once
-            po_take_up(c)
+            # 2.1069.0 (#5412): the cut-off "Optimise PDF" runs are taken up by their own thread's first step (po_run_once)
         else:
             c.execute("UPDATE doc_meta SET state='wait', updated_at=? WHERE node_id=? AND state='run'", (_now(), lost))
     c.commit()

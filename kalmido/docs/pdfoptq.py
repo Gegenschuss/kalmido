@@ -16,8 +16,10 @@ scanned PDF, level auto, never removing pages (no person saw a list), NEVER for 
 
 Rights: the routes only for people (agents: 403), the document through the file store's access (docs/web.py _doc ->
 need_node, AccessCtx: write for the run); the queue checks the write right of the person who asked once more right before
-it writes (fs_role), the version path checks the rest. The runs go through the documents queue (docs/ingest.py, when no
-document waits for its recognition), one at a time, with the limits of docs/pdfopt.py.
+it writes (fs_role), the version path checks the rest. The runs go through their own thread next to the documents queue
+(docs/ingest.py po_run_once, 2.1069.0 #5412: a run of up to PO_DOC_S never holds up the recognition of new documents; both
+share the tools' slot per page, ocr._SEM), one at a time, a workspace not served lately first, with the limits of
+docs/pdfopt.py and at most PO_WAIT_MAX waiting per person and PO_WS_MAX per workspace (429).
 
 doc_meta.pdf_opt (fragment 4873_a): JSON without any content of the document, only numbers and words of the state:
   queued / running ({"q": 1, ...} first: the queue's partial index): state check | scan (measuring) | wait | run (optimising)
@@ -56,6 +58,8 @@ PO_Q = "d.pdf_opt <> '' AND left(d.pdf_opt, 6) = '{\"q\":1'"
 PO_PICK = "NOT (left(d.pdf_opt, 15) = '{\"q\":1,\"auto\":1' AND d.area_sort IN ('pending', 'sorting'))"
 PO_RUN = ("check", "scan", "wait", "run")
 PO_WAIT_MAX = P.OCR._env_int("KALMIDO_PDFOPT_WAIT", 200, 1, 100000)  # review F2: runs one person may have waiting at most
+# 2.1069.0 (#5412, review 2.781 F2): runs one workspace may have waiting at most (the person's limit above stays)
+PO_WS_MAX = P.OCR._env_int("KALMIDO_PDFOPT_WS_WAIT", 200, 1, 100000)
 _PQ = {"recent": [], "clean": True}  # review F2: the workspaces served last (round robin as docs/ingest.py DOCS_NEXT)
 PO_STALE = P.PO_DOC_S + 600          # s after which a run cut off (a restart) is taken up again
 PO_TRIES = 2
@@ -201,6 +205,17 @@ def po_waiting(c, uid):
     return sum(1 for r in rows if po_get(r).get("by") == uid)
 
 
+def po_waiting_ws(c, ws):
+    """2.1069.0 (#5412): the runs waiting or running in workspace ws (doc_meta.ws), whoever asked."""
+    return c.execute(f"SELECT COUNT(*) FROM doc_meta d WHERE {PO_Q} AND d.ws=?", (ws,)).fetchone()[0]
+
+
+def po_room(c, uid, ws):
+    """2.1069.0 (#5412): how many more runs person uid may queue in workspace ws -- the smaller of the person's room
+    (PO_WAIT_MAX) and the workspace's (PO_WS_MAX); 0 = the queue is full for them (429)."""
+    return max(0, min(PO_WAIT_MAX - po_waiting(c, uid), PO_WS_MAX - po_waiting_ws(c, ws)))
+
+
 def _args(d, many=False):
     mode = str(d.get("mode") or "auto")
     if mode not in P.PO_MODES:
@@ -236,7 +251,7 @@ def docs_pdfopt(nid):
     if why:
         return err(why, 409)
     pl_receipt_need_open(c, nid)  # a receipt of a closed month gets no new version (409, said at once)
-    if po_waiting(c, me()) >= PO_WAIT_MAX:  # review F2
+    if po_room(c, me(), m["ws"]) <= 0:  # review F2; 2.1069.0 (#5412): the workspace's limit too
         return err(tr(PO_FULL), 429)
     if not _queue(c, nid, m, n, me(), mode, blank, bool(d.get("check"))):
         c.rollback()
@@ -264,6 +279,7 @@ def docs_pdfopt_many():
     room = PO_WAIT_MAX - po_waiting(c, uid)  # review F2: past the limit the rest is skipped
     if room <= 0:
         return err(tr(PO_FULL), 429)
+    ws_room = {}  # 2.1069.0 (#5412): the room left per workspace (PO_WS_MAX), counted once per workspace of the selection
     for nid in dict.fromkeys(ids):
         if len(done) >= room:
             skip += 1
@@ -273,13 +289,22 @@ def docs_pdfopt_many():
             if po_why_not(c, m, n):
                 skip += 1
                 continue
+            if m["ws"] not in ws_room:
+                ws_room[m["ws"]] = PO_WS_MAX - po_waiting_ws(c, m["ws"])
+            if ws_room[m["ws"]] <= 0:  # 2.1069.0 (#5412): this workspace's queue is full, the others' go on
+                skip += 1
+                continue
             pl_receipt_need_open(c, nid)
             if _queue(c, nid, m, n, uid, mode, blank, False):
                 done.append(nid)
+                ws_room[m["ws"]] -= 1
             else:
                 skip += 1
         except Denied:
             skip += 1
+    if not done and ws_room and all(v <= 0 for v in ws_room.values()):
+        c.rollback()
+        return err(tr(PO_FULL), 429)  # 2.1069.0 (#5412): nothing queued only because every workspace's queue is full
     if done:
         bump(c)
     c.commit()
@@ -304,7 +329,7 @@ def po_on_done(c, nid, first):
         return
     if not n["owner_id"] or acx_of(c, n["owner_id"]).role == "agent":  # review F5: an agent's file is never optimised this way
         return
-    if po_waiting(c, n["owner_id"]) >= PO_WAIT_MAX:  # review F2: the automatic runs count as well
+    if po_room(c, n["owner_id"], m["ws"]) <= 0:  # review F2: the automatic runs count as well; 2.1069.0 (#5412): the workspace's too
         return
     po_put(c, nid, {"state": "wait", "mode": "auto", "blank": 0, "auto": 1, "by": n["owner_id"], "v": int(n["cur_version"] or 0),
                     "at": _now(), "tries": 0})
@@ -314,7 +339,7 @@ if po_on_done not in doc_on_done:
     doc_on_done.append(po_on_done)
 
 
-# ---- the queue step (docs/ingest.py docs_run_once, when no document waits) ---------------------------------------------
+# ---- the queue step (2.1069.0 #5412: its own thread, docs/ingest.py po_run_once -- the recognition never waits for a run) ---------------------------------------------
 def _age(v):
     try:
         return time.time() - calendar.timegm(time.strptime(str(v.get("at") or "")[:19], "%Y-%m-%dT%H:%M:%S"))

@@ -17,6 +17,9 @@ tenant-matrix: document
    F5: "blank" without the list of the pages seen first removes no page (the blank page of the scan stays)
  - "Optimise new scans automatically": a new scan of the private space is optimised by itself (auto, no page removed); a
    receipt upload of the office (area office) never (GoBD), it keeps one version
+ - 2.1069.0 (#5412): a queued run counts in its own workspace only, the workspace's limit (PO_WS_MAX) and the person's
+   (PO_WAIT_MAX) both hold; the recognition's step (docs_run_once) never runs an "Optimise PDF", its own thread does
+   (po_run_once: the cut-off runs taken up at its first step, then a run)
 usage: p2892_c_pdfopt_test.py <datadir>   (P2892C_NOSTART=1: the container runs already)"""
 import base64
 import json
@@ -257,5 +260,49 @@ j = po_until(Fr, RID, ("done", "same", "failed"))
 check(j and j.get("state") in ("done", "same") and j.get("error") != "failed", f"office receipt by the button: not failed {j}")
 if j and j.get("state") == "done":
     check([v["no"] for v in versions(Fr, RID)] == [2, 1], "office receipt: a new version, the original kept")
+
+# ================================================================ 2.1069.0 (#5412, review 2.781 F2): fair queue, limits, own thread
+# in the container, outside the server: the queue marks written in a transaction that is rolled back (the server never
+# sees them); the steps with recording stand-ins for po_queued / po_take_up
+FAIR = r"""
+import json, sys
+import app
+from kalmido.core.db import connect
+from kalmido.core.pg import system_ctx
+from kalmido.docs import ingest as I, pdfoptq as Q
+mine, other = int(sys.argv[1]), int(sys.argv[2])
+c = connect()
+out = {}
+with system_ctx(c):
+    ws = {n: c.execute("SELECT ws, created_by FROM doc_meta WHERE node_id=?", (n,)).fetchone() for n in (mine, other)}
+    wa, ua = ws[mine][0], ws[mine][1]
+    wb, ub = ws[other][0], ws[other][1]
+    base = Q.po_waiting_ws(c, wa)
+    Q.po_put(c, mine, {"state": "wait", "mode": "auto", "blank": 0, "by": ua, "v": 1, "at": Q._now(), "tries": 0})
+    out["ws_count"] = Q.po_waiting_ws(c, wa) - base
+    out["other_count"] = Q.po_waiting_ws(c, wb)
+    Q.PO_WS_MAX = base + 1
+    out["room_full"] = Q.po_room(c, ub, wa)
+    out["room_other"] = Q.po_room(c, ub, wb)
+    Q.PO_WS_MAX, Q.PO_WAIT_MAX = 10000, 5
+    out["room_person"] = Q.po_room(c, ua, wa)
+c.rollback()
+c.close()
+calls = []
+Q.po_queued = lambda c: calls.append("queued") or 1
+Q.po_take_up = lambda c: calls.append("take_up")
+I.docs_run_once()
+out["docs_step"] = list(calls)
+out["po_step"] = I.po_run_once()
+out["po_calls"] = list(calls)
+print(json.dumps(out))
+"""
+f = json.loads(py(FAIR, str(SID), str(GSID)).strip().splitlines()[-1])
+check(f.get("ws_count") == 1 and f.get("other_count") == 0, f"a queued run counts in its workspace, not in the other {f}")
+check(f.get("room_full") == 0 and f.get("room_other", 0) > 0, f"the workspace's limit: full there, room in the other workspace {f}")
+check(f.get("room_person") == 4, f"the person's limit still counts (5 - the one waiting) {f}")
+check(f.get("docs_step") == [], f"the recognition's step never runs an Optimise PDF (it waited up to 30 min behind one) {f}")
+check(f.get("po_step") == 1 and f.get("po_calls") == ["take_up", "queued"],
+      f"the own thread's step: the cut-off runs first (once), then a run {f}")
 
 sys.exit(kt.done("p2892_c_pdfopt"))
