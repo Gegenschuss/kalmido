@@ -20,6 +20,7 @@ Standard library only (the CI lint job runs plain Python).
 """
 import glob
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -33,8 +34,11 @@ UH = re.compile(r"^<!--\s*user-help:\s*([a-z-]+)\s*-->\s*$")
 SHOW = re.compile(r"^<!--\s*show:\s*([a-z0-9.-]+)\s*-->\s*$")
 TRB = re.compile(r"^<!--\s*help:\s*(\S+)\s+src=([0-9a-f]+)\s*-->\s*$")
 BOLD = re.compile(r"\*\*([^*\n]{1,80})\*\*")
-# each kind of quote on its own: a 'text' inside a "${…}" of a template is found as well
-JS_STR = (re.compile(r"'((?:[^'\\\n]|\\.){1,200})'"), re.compile(r'"((?:[^"\\\n]|\\.){1,200})"'))
+# the app's own reader of string literals (comments skipped, template literals read as code): kalmido/core/i18nkeys.py,
+# loaded by its path (standard library only, like tools/i18n_check.py)
+_spec = importlib.util.spec_from_file_location("i18nkeys_uh", os.path.join(ROOT, "kalmido", "core", "i18nkeys.py"))
+KEYS = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(KEYS)
 
 
 def fold(s):
@@ -109,17 +113,14 @@ def tr_blocks(path):
 
 
 def js_texts(js_dir):
-    """Every string literal of static/js (a 'Text|context' also as 'Text')."""
+    """Every string literal of static/js outside comments (a 'Text|context' also as 'Text')."""
     out = set()
     for p in glob.glob(os.path.join(js_dir, "*.js")):
         with open(p, encoding="utf-8") as f:
-            src_js = f.read()
-        for rx in JS_STR:
-            for m in rx.finditer(src_js):
-                s = m.group(1).replace("\\'", "'").replace('\\"', '"')
-                out.add(s)
-                if "|" in s:
-                    out.add(s.split("|")[0])
+            for lit in KEYS.str_literals(f.read(), False):
+                out.add(lit)
+                if "|" in lit:
+                    out.add(lit.split("|")[0])
     return out
 
 
