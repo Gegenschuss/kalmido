@@ -34,7 +34,8 @@ KINDS = {
                         "and import in the private workspace; every GET of the area as the freelancer (no 403 / 5xx); "
                         "p2477_quicknote_api_test.py: her private list Notes of the quick note, sharing refused, an empty note gone for good (2.477.0)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET; "
-                        "p2577_a_views_api_test.py: shared views of the own project (2.577.0)"),
+                        "p2577_a_views_api_test.py: shared views of the own project (2.577.0); "
+                        "p5658_a_api_test.py: open shares by e-mail address of a project / folder, listed, taken back, redeemed (2.1071.0)"),
     "office": ("matrix", SUITE + ", p2666_c_bilanz_test.py, p2199_b_office_test.py (2.199.0: a quotation of the personal office in a private folder, the folder routes, her agent), p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py, p2110_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0); "
@@ -435,6 +436,7 @@ ROUTES = {
     "POST /s/{}/unlock": "link",
     # ---- lists (254)
     "DELETE /api/fields/{}": "lists", "DELETE /api/filters/{}": "lists", "DELETE /api/folders/agents": "lists",
+    "GET /api/addr-shares": "lists", "DELETE /api/addr-shares/{}": "lists",  # 2.1071.0 (#5658): open shares by address (p5658_a_api_test.py)
     "DELETE /api/folders/groups/{}": "lists", "DELETE /api/folders/people": "lists", "DELETE /api/forms/{}": "lists",
     "DELETE /api/layouts/saved/{}": "lists", "DELETE /api/list-files/{}": "lists", "DELETE /api/list-tags/{}": "lists",
     "DELETE /api/lists/{}": "lists", "DELETE /api/lists/{}/favorite": "lists", "DELETE /api/lists/{}/groups/{}": "lists",
