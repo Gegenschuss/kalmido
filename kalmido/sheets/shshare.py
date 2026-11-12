@@ -610,8 +610,17 @@ def sheets_shares_patch(sid, shid):
         return err(tr("Invalid value: {0}", "role"))
     if kind == "addr":
         c.execute("UPDATE sheet_shares SET role=? WHERE id=?", (role, x["id"]))
-        if x["user_id"]:
+        if x["user_id"] and addr_account(c, _addr(c, x)) == x["user_id"] and shs_fits(c, x["user_id"], r):
             shs_put(c, uid, r, x["user_id"], role, shs_core_of(c, sid, x["user_id"])["expires_at"])
+        elif x["user_id"]:  # 2.1071.0 (#5658, Fable 2.983 N2): bound before the proof counted (or the address changed since): no role
+            # change for that account -- the row opens again (shs_redeem binds it at a sign-in with the address proved) and the
+            # core share it held through this address ends, as _by_email does
+            c.execute("UPDATE sheet_shares SET user_id=NULL WHERE id=?", (x["id"],))
+            s = shs_core_of(c, sid, x["user_id"])
+            if s is not None:
+                from ..core.objects import obj_node_unshare
+                n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (s["node_id"],)).fetchone()
+                obj_node_unshare(c, uid, n, s["id"], kind=SHS_KIND, ref_id=sid, org=r["org_id"], reason="unshare")
     else:
         shs_put(c, uid, r, x["user_id"] or x["agent_id"], role, x["expires_at"])  # an end date from the file store stays
     shs_drop_cache()
