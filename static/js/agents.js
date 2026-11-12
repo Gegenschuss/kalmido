@@ -1225,7 +1225,7 @@ function schedForm(md, a, s, done) {
 // 2.1044.0 (#5825): a right click (computer) or a long press (touch) on an agent's card: its menu (agentchat.js ag_cardMenu: Settings,
 // Chat, Plans, Log and usage, Pause / Resume - each only what the person may do with this agent)
 const AG_CMENU = '#view .agcard[data-agc]';
-ms_rowMenu(AG_CMENU, c => ag_cardMenu(c, +c.dataset.agc));
+domReady(() => ms_rowMenu(AG_CMENU, c => ag_cardMenu(c, +c.dataset.agc)));  // multisel.js loads after this file
 document.addEventListener('contextmenu', e => {
   const c = e.target.closest?.(AG_CMENU); if (!c || e.shiftKey) return;
   e.preventDefault(); if (e.pointerType === 'touch' || isTouch()) return;  // touch: the long press above
