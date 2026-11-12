@@ -41,6 +41,7 @@ from ..agents.workstyle import ws_need_editor
 from ..files.fsroots import fs_area_root_of
 from ..files.store import _now, fs_chain, fs_deleted, fs_role
 from ..wiki.wkfolder import WKF_AREA, WKF_KIND, _root_of_chain, _space_locked, _subtree, _walk, wkf_root
+from ..wiki.wkfolder import wkf_chain_path  # 2.1045.0 (review M2): the path from the asker's own highest role
 
 AGS_MAX = 500          # rows of one kind in an answer (shares, options)
 AGS_DEPTH = 8          # folder levels of the file store offered in "Share…"
@@ -117,14 +118,14 @@ def _node_item(c, uid, s, chain, spaces):
         it["whole"] = n["id"] == top["id"]
         it["page"] = n["kind"] == "ref" and n["ref_kind"] == WKF_KIND
         it["name"] = tr("Entire knowledge area") if it["whole"] else n["name"]
-        it["path"] = "/".join(x["name"] for x in reversed(chain))  # starts at "Knowledge"
+        it["path"] = wkf_chain_path(c, uid, chain)  # starts at "Knowledge" (own area) or at the node shared with the asker
         return it
     ar = fs_area_root_of(c, chain[-1]["id"])
     it["kind"] = "files"
     it["area"] = ar[1] if ar else ""
     it["folder"] = n["kind"] == "folder"
     it["name"] = n["name"]
-    it["path"] = "/".join(x["name"] for x in reversed(chain))
+    it["path"] = wkf_chain_path(c, uid, chain)
     return it
 
 
@@ -191,7 +192,7 @@ def _excepts(c, a, uid):
         if chain is None or _root_of_chain(c, chain) is None:
             hidden += 1
             continue
-        out.append({"id": x, "name": chain[0]["name"], "path": "/".join(n["name"] for n in reversed(chain))})
+        out.append({"id": x, "name": chain[0]["name"], "path": wkf_chain_path(c, uid, chain)})
     return out, hidden
 
 
