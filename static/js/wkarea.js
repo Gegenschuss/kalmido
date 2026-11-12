@@ -84,7 +84,7 @@ async function wkar_pick(sp, s) {
   const fs = (WK.idx[sp]?.folders || []).filter(f => !s.excluded.includes(f.id)).sort((x, y) => x.path.localeCompare(y.path));
   if (!fs.length) { toast(tr('There is no folder left to exclude.')); return null; }
   let picked = /** @type {number[]} */ ([]);
-  const ok = await askDialog({title: tr('Exclude folders for {0}', s.name), ok: tr('Exclude'),
+  const ok = await /** @type {any} */ (askDialog)({title: tr('Exclude folders for {0}', s.name), ok: tr('Exclude'),
     html: `<p class="muted">${esc(tr('The agent no longer sees these folders and everything in them, also what is added later. A folder or page inside that you share with it on its own stays visible.'))}</p><div class="wkapick">${fs.map(f => `<label class="chk"><input type="checkbox" value="${f.id}"> ${esc(f.path)}</label>`).join('')}</div>`,
     submit: () => { picked = $$('.wkapick input:checked').map(x => +(/** @type {any} */ (x)).value); return picked.length ? true : false; }});
   return ok ? picked : null;
@@ -103,7 +103,7 @@ async function wkar_share(sp) {
     confirm: async (target, role) => {
       const [k, v] = String(target).split(':'); if (k !== 'agent_id') return true;
       let p; try { p = (await api('GET', wkar_q(sp) + `&agent_id=${+v}`)).preview; } catch { return false; }
-      return askDialog({title: tr('Share the whole knowledge area?'), ok: tr('Share'),
+      return /** @type {any} */ (askDialog)({title: tr('Share the whole knowledge area?'), ok: tr('Share'),
         body: tr('{0} folders / {1} pages visible, {2} folders excluded.', p.folders, p.pages, p.excluded) + ' ' + (role === 'edit' ? tr('The agent can change these pages.') : tr('The agent can read these pages.'))});
     },
     onChange: async () => { await wkar_load(sp); if (typeof wk_after === 'function') wk_after(sp); if (box) wkar_extra(box, sp); },
