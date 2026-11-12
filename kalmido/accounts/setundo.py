@@ -57,6 +57,10 @@ SU_CONFLICT = N_("Changed again in the meantime, so it cannot be undone")
 SU_QUIET = ("workspace", "side_view", "folders_closed", "sections_closed", "col_widths", "detail_split", "detail_fold",
             "detail_cm_fold", "settings_more", "trial_hint_seen", "tours_seen", "office_ws_hint", "ab_cards", "reset_undo",
             "whatsnew_seen", "tour")
+# 2.997.0 (#5625): the roadmap's view state (zoom, collapsed projects, list selection, filters: static/js/roadmap.js rmSet) is
+# saved by the view itself while one looks around, like the column widths; as a step (bundled, the newest again on every save)
+# it went back with the undo of a project shift and changed the zoom under the person's next drag
+SU_QUIET += ("roadmap",)
 SU_NAMES = {"lang": N_("Language"), "notify": N_("What notifies you (bell and push)")}
 SU_CHANGED_PLAIN = N_("Setting changed")  # review F5: a key without a readable name is never shown raw
 SU_INVALID = N_("The old value is no longer valid, so it cannot be undone")

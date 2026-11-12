@@ -26,7 +26,7 @@ const taskOf = async (id, ck = CK) => (await st(ck)).tasks.find(t => t.id === id
 const prefs = async (ck = CK) => { const s = (await st(ck)).settings.roadmap; return s ? JSON.parse(s) : {}; };
 const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || '';
 const lastModal = d => [...d.querySelectorAll('.modal')].pop();
-const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) => { calls.push([(o.method || 'GET').toUpperCase(), String(u)]); return of(u, o); }; return calls; };
+const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) => { calls.push([(o.method || 'GET').toUpperCase(), String(u), typeof o.body === 'string' ? o.body.slice(0, 200) : undefined]); return of(u, o); }; return calls; };  // 2.997.0 (#5625): + the request body (diagnosis)
 
 (async () => {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
@@ -181,7 +181,9 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(await until(() => calls.some(c => c[0] === 'POST' && /\/api\/lists\/\d+\/shift/.test(c[1])), 8000),
     `the drag sends the shift request: ${JSON.stringify(calls.slice(-4))} ${toastText(d)}`);
   // the shift with dependents can take longer than 4 s on a busy CI runner (2.11.0: the toast came, the poll had given up)
-  check(await until(async () => (await taskOf(f1)).start === ds(22), 20000), 'dependent task in another list moved along (Shoot waits on Design)');
+  const f1ok = await until(async () => (await taskOf(f1)).start === ds(22), 20000);
+  // 2.997.0 (#5625): what the drag sent and where Shoot is in the message (diagnosis)
+  check(f1ok, `dependent task in another list moved along (Shoot waits on Design): ${JSON.stringify(calls.filter(c => /\/shift/.test(c[1])))} ${(await taskOf(f1)).start} ${(await taskOf(f1)).due} ${ds(22)} ${toastText(d)}`);
   await until(async () => (await taskOf(f2)).start === ds(31), 8000);
   const f2x = await taskOf(f2); check(f2x.start === ds(31), `and its own dependent (Cut waits on Shoot): ${f2x.start} ${f2x.due}`);
   // 2.67.0 (#1865): the whole chain moves (Moodboard in Brand too, not only the tasks that would start too early)
