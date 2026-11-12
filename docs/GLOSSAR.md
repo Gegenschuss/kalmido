@@ -120,6 +120,7 @@ Connected agents: the agent API, proposals, quotas, locks, schedules, chat and t
 - `kalmido/agents/agentpin.py` (`apin`) - Agents on the pin board of a project page + the weekly status of a project
 - `kalmido/agents/agentrules.py` (`ar`) - The standing rules of an agent ("from now on always ...")
 - `kalmido/agents/agenttime.py` (`atm`) - An agent checks time tracking and proposes entries from calendar events
+- `kalmido/agents/agsees.py` (`ags`) - What an agent sees right now - the section "Sees now" of the dialog "Edit agent" (#5822)
 - `kalmido/agents/api.py` (`v1`) - The REST API of an agent itself (token of an agent account)
 - `kalmido/agents/asstprop.py` (`ast`) - Texts drafted by a CONNECTED agent, on request of a person
 - `kalmido/agents/ccsread.py` (`ccs`) - A connected agent reads a credit card statement (kind card_statement_read, a request of agents/asstprop.py)
@@ -844,6 +845,7 @@ The start-up module.
 - `static/js/agentrotate.js` - The agent runtime section "
 - `static/js/agentrules.js` (`awr`) - The section "Standing rules"
 - `static/js/agents.js` (`prop`) - Agents, reactions, shared list tags, tidy suggestions
+- `static/js/agentsees.js` (`ags`) - The section "Sees now" of the agent dialog, "Share…" and the hints at permissions without a share
 - `static/js/agentsetup.js` (`ains`) - Pick Mac / Windows / Linux and the project folder, Kalmido makes a one-time code (15 minutes, works once)
 - `static/js/agentview.js` (`av`) - Personal agents and the switch "
 - `static/js/agentwork.js` (`aw`) - The dialog "Work style and notifications"

@@ -30,7 +30,7 @@ const LD_MODS = {
     'office_letters', 'office_letterlinks', 'office_lettermail',  // 2.153.0 (#2028-#2030)
     'office_rights'],  // 2.187.0 A (#2476): the page "Rights" of the office's settings
   // 2.65.0 (#1823): more areas load on first use (the start loads about a third less)
-  agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules', 'srvagent'],  // 2.557.0 C (#4670): srvagent.js = the setup of a server agent  // 2.236.0 A (#2904-#2911): agentwork.js = the dialog "Work style and notifications"
+  agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules', 'srvagent', 'agentsees'],  // 2.557.0 C (#4670): srvagent.js = the setup of a server agent  // 2.236.0 A (#2904-#2911): agentwork.js = the dialog "Work style and notifications"
   pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview
   swipenav: ['swipenav'],  // 2.652.0 (#5071 #5073): leafing with a swipe (the full screen of pdfview.js, the image viewer)
   mindmap: ['mindmap'],

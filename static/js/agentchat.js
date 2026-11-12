@@ -1799,8 +1799,11 @@ function agModal(a, done, o = {}) {
     ${a ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ag-ai" ${a.ai !== false ? 'checked' : ''}> ${tr('AI assistant: shown as "AI agent"')}</label></div><div class="shint keep">${tr('Required by the EU AI Act wherever people read its texts. Switch off only for a bot without AI.')}</div>` : ''}
     <div class="row"><label for="ag-prop">${tr('Proposals for')}</label><select id="ag-prop">${[['shared', N_('People who share a project with it')], ['all', N_('Everyone')], ['off', N_('Nobody')]].map(([k, n]) => `<option value="${k}" ${(a?.proposals || 'shared') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint">${tr('Who may ask it for a proposal (project from a briefing, break down a task, sort the basket, tasks from notes). It only gets what the person sends; instance admins count as sharing a project.')}</div>
+    <div class="shint keep agsintro">${tr('Permissions decide what the agent may do, shares decide where.')}</div>${''/* 2.1045.0 (#5822) */}
     ${scopesHtml(S.agOffer || [], a ? a.scopes : (S.agDefScopes || ['read', 'tasks:write', 'comments', 'files:read', 'files:write']))}
+    ${a ? '<div id="ag-seeshint"></div>' : ''}
     <div class="shint keep">${tr('Deleting projects or fields, emptying the trash, changing 10 or more tasks at once, moving projects, folders and sharing, opening a public form and deleting an address book always wait for a person’s approval.')}</div>
+    ${a ? '<div id="ag-sees" class="ags"></div>' : ''}${''/* 2.1045.0 (#5822): "Sees now" (agentsees.js) */}
     ${ipsRow((a?.allowed_ips || []).join(', '), 'ag-ips')}
     ${a ? `<div class="row"><label>${tr('Projects')}</label>${listCapHtml(a.list_ids, a.lists, 'ag-lcap')}</div>${bridgesHtml(a)}` : ''}
     ${a && typeof oa_switchRowHtml === 'function' ? oa_switchRowHtml(a.id) : ''}${''/* 2.51.0 A (#1348): the office switch, saved at once */}
@@ -1817,6 +1820,7 @@ function agModal(a, done, o = {}) {
     <div class="foot stfoot"><div class="calerr" role="alert" id="ag-err" hidden></div>${a ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${a ? tr('Save') : tr('Create')}</button></div>`);
   if (a && typeof oa_switchLoad === 'function') oa_switchLoad(md);  // 2.51.0 A (#1348)
   if (a) agPuLoad(md, a);  // 2.312.0 D (#3266)
+  if (a && typeof ags_mount === 'function') ags_mount(md, a);  // 2.1045.0 (#5822): "Sees now" + the hints under the permissions
   if (a && typeof agz_wire === 'function') agz_wire(md, a, `/api/admin/agents/${a.id}`);  // 2.233.0 B (#3189)
   if (a && typeof agmu_load === 'function') agmu_load($('.agmu', md), `/api/admin/agents/${a.id}`);  // 2.992.0 (#5684)
   md.addEventListener('change', e => { if (e.target.id === 'ag-ac') $('#ag-acp', md).disabled = !e.target.checked;  // 2.4.1 (#377)

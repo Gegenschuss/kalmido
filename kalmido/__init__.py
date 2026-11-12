@@ -203,6 +203,7 @@ ORDER = (
     "agents.datalock",  # 2.235.0 B (#2902)
     "agents.agentrules",  # 2.235.0 C (#2903)
     "agents.admin",
+    "agents.agsees",  # 2.1045.0 (#5822): what an agent sees (the dialog "Edit agent")
     "agents.api",
     "agents.proposals",
     "agents.cleanup",  # 2.39.0 (#1151)

@@ -103,6 +103,17 @@ needs no permission; 2.190.0: a token that may only read (no permission beyond *
 
 - `GET /api/v1/me` shows `token.effective_scopes`; the MCP server lists only the tools the token may use.
 - A request without its permission gets `403` with `error.required_scope`: ask a person to grant it, never work around it. A few checks depend on the request body (a batch that also deletes, `export_data`, `time/from-events`, preparing a task for an event, linking a contact, the proposals `time`, `shoot`, `layout`, `import` and `structure` replace): they answer a plain `403` (“This token lacks the permission …”) without `required_scope`; read the message, it names the permission.
+- **What an agent sees now (2.1045.0).** Permissions decide what an agent may do, shares decide where. The dialog *Edit
+  agent* (and the permissions of a personal agent) shows the section *Sees now*: the projects, knowledge folders / pages
+  (the whole area as *Entire knowledge area*) and folders of the file store shared with exactly this agent, each with
+  *can view* / *can edit*, a button per row that ends the share and *Share…*. Under the permissions a line *Nothing shared
+  yet* appears for every permission that opens nothing without a share (knowledge pages, the file store, tasks and tables;
+  never for the office). Shares are made and ended through the normal ways (`POST /api/files/nodes/{id}/shares` with
+  `agent_id`, `DELETE /api/files/shares/{id}`, `PUT` / `DELETE /api/lists/{id}/members`); the list is read with
+  `GET /api/agents/{id}/sees` (`?options=1`: what the asker may share with it). Who may read it: the owner of a personal agent
+  only, an instance admin for a team agent. The list names only what the asker sees themselves; any other share (e.g. a
+  person's own folder shared with a team agent) is only counted as *+ n more*, without name or path. Encrypted knowledge
+  areas never reach an agent and stay greyed in *Share…*, as do an organisation's pages for a private personal agent.
 - **The office is the one exception to "only what is shared".** An agent sees projects, files, tables and pages only when they are shared with it. The `office` scope is different: it is a right an admin grants on purpose (the scope, the agent's switch *May draft office documents* and the office rights groups, see [Office drafts only](#office-drafts-only)), and quotations, invoices and letters belong to the organisation's office, not to a shared project. With it the agent can write drafts for the people who work in that office; releasing, sending and booking stay with people.
 - **Trash period (2.138.1).** A task in the trash (`delete_task`, `list_trash`) is deleted for good by the server after the
   trash period (`KALMIDO_TRASH_DAYS`, 30 days, when the operator has the retention switch on); restore it before then.
