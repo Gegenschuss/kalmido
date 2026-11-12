@@ -47,9 +47,9 @@ const FEAT = 'cal,comments,collab,wiki,files';
   dlg.querySelector('#ab-sht').value = `agent_id:${ag.id}`;
   dlg.querySelector('#ab-shr').value = 'edit';
   dlg.querySelector('[data-abs="add"]').click();
-  const q = await until(() => d.querySelector('.cdlg #cdlg-b'));
+  const q = await until(() => [...d.querySelectorAll('.cdlg')].find(m => /visible/.test(m.textContent)));
   check(/2 folders \/ 2 pages visible, 0 folders excluded\./.test(q?.textContent || '') && /can change these pages/.test(q?.textContent || ''),
-    'the question names what becomes visible: ' + (q?.textContent || ''));
+    'the question names what becomes visible: ' + [...d.querySelectorAll('.modal, .cdlg')].map(m => m.className + ': ' + m.textContent.trim().slice(0, 200)).join(' | '));
   yes()?.click();
   check(await until(async () => ((await call('GET', `/api/files/nodes/${root}`)).shares || []).some(s => s.agent_id === ag.id && s.role === 'edit')),
     'the share is on the server (edit)');
