@@ -17,7 +17,7 @@ function txtDiffHtml(rows) {
 // 2.1068.0 (#5831): the steps whose change the server shows as a diff (agents/apvdiff.py APVD_STEPS)
 const ccApvTextStep = st => !!st && (
   (st.method === 'PATCH' && /^\/api\/v1\/(wiki\/pages|comments|tasks)\/\d+$/.test(st.path || '') && !!st.body && ['body', 'notes', 'content'].some(k => typeof st.body[k] === 'string'))
-  || (st.method === 'POST' && /^\/api\/v1\/wiki\/pages\/\d+\/append$/.test(st.path || ''))
+  || (st.method === 'POST' && /^\/api\/v1\/(wiki\/pages\/\d+|tasks\/\d+\/notes|lists\/\d+\/overview)\/(append|replace-section)$/.test(st.path || ''))  // 2.1082.0 (#5830): + notes, description, sections
   || (st.method === 'PATCH' && /^\/api\/v1\/lists\/\d+\/overview$/.test(st.path || '') && typeof st.body?.description === 'string'));
 S.apvd = S.apvd || {};
 // the words of a diff: "Knowledge page Wiki/2D: 1 line added, nothing removed"

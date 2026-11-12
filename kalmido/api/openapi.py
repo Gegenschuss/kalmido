@@ -26,6 +26,7 @@ from ..notify.caps import notif_tpl_spec  # 2.369.5 (#2517): pulled up from func
 from ..tasks.briefing import briefing_spec  # 2.369.5 (#2517): pulled up from functions
 from ..lists.report import report_spec  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.ttypes import tt_spec  # 2.609.0 (#3372)
+from ..core.mdedit import mdedit_spec  # 2.1082.0 (#5830)
 
 
 RATE_HEADERS = ("RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset")
@@ -853,6 +854,7 @@ def openapi_spec():
     dec_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.392.0 C (#3370)
     git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)
     overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)
+    mdedit_spec(paths, op, ok, errs, ref, pid)  # 2.1082.0 (#5830): targeted changes of notes and descriptions
     groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)  # 2.10.0 (#441)
     rel_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.576.0 (#3371): saved relations of a task
     dayplan_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.10.0 (#440)

@@ -1080,6 +1080,9 @@ ROUTES = {
     "GET /api/v1/wiki/pages/{}/files": "wiki", "GET /api/v1/wiki/files/{}": "wiki", "GET /api/v1/wiki/files/{}/text": "wiki",  # 2.488.0 (#2209)
     "GET /api/v1/help": "agents", "GET /api/v1/help/section": "agents",  # 2.1067.0 (#5819): her agent reads the help (p21067_a_help_test.py)
     "POST /api/v1/wiki/pages/{}/append": "wiki",  # 2.1048.0 (#5861): p21048_wiki_append_test.py
+    "POST /api/v1/wiki/pages/{}/replace-section": "wiki",  # 2.1082.0 (#5830): p21082_mdedit_test.py
+    "POST /api/v1/tasks/{}/notes/append": "tasks", "POST /api/v1/tasks/{}/notes/replace-section": "tasks",  # 2.1082.0 (#5830): p21082_mdedit_test.py
+    "POST /api/v1/lists/{}/overview/append": "lists", "POST /api/v1/lists/{}/overview/replace-section": "lists",  # 2.1082.0 (#5830): p21082_mdedit_test.py
     # 2.200.0 B (#2747): a page / folder in a folder shared with me (p2200_b_wiki_share_test.py)
     "POST /api/wiki/shared/pages": "wiki", "POST /api/wiki/shared/folders": "wiki",
     # 2.177.0 (#2685): large knowledge ZIP imports in pieces, unpacked in the background (p2177_a_api_test.py)

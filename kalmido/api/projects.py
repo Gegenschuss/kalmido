@@ -1,12 +1,15 @@
 """The project overview in the token API."""
-from flask import jsonify
+from flask import jsonify, request
 
 from ..core.config import app, MAX_FILE_MB
 from ..core.db import db
 from ..core.access import Denied
 from ..tasks.validation import as_int
 from ..collab.comments import user_names
-from ..core.errors import UnknownFields
+from ..core.errors import BadInput, reject_unknown, UnknownFields
+from ..core.i18n import tr
+from ..core.mdedit import MdHeadingError, md_edit, md_edit_input, md_heading_answer, md_need_version  # 2.1082.0 (#5830)
+from ..collab.liste2e import le2e_is_cipher
 from ..lists.projects import (
     list_file_delete, list_file_get, list_file_upload, ms_compat, ms_rows, need_overview, OV_DESC_MAX, ov_file_dict,
     OV_FILES_MAX, ov_link_add, ov_link_delete, ov_link_dict, ov_link_order, ov_link_update, ov_ms_add, ov_ms_delete,
@@ -43,6 +46,55 @@ def v1_overview_patch(lid):
         except (V1Error, Denied):  # not a project (409 of need_project): the plain error
             raise e from None
         return v1_err(409, msg, current=cur)
+
+
+@app.post("/api/v1/lists/<int:lid>/overview/append")
+@v1_view
+def v1_overview_append(lid):
+    """2.1082.0 (#5830): {text, under?, expect_updated_at?} -- adds text to the project's description without sending the
+    whole description (core/mdedit.py md_append; under = a heading: the end of its section, not there = 404
+    heading_not_found with the headings). expect_updated_at (description_at) optional; given and saved since: 409 + current."""
+    return _v1_ov_edit(lid, "append")
+
+
+@app.post("/api/v1/lists/<int:lid>/overview/replace-section")
+@v1_view
+def v1_overview_replace(lid):
+    """2.1082.0 (#5830): {heading, text, expect_updated_at} -- replaces the part of the description below one heading (up to
+    the next heading of the same or a higher level). expect_updated_at (description_at from the overview, or If-Match)
+    required; the heading not there = 404 heading_not_found, there twice = 409 heading_ambiguous, nothing written."""
+    return _v1_ov_edit(lid, "replace")
+
+
+def _v1_ov_edit(lid, mode):
+    """2.1082.0 (#5830): the targeted change of a project's description: the same rights and save as PATCH .../overview
+    (overview_patch: the length, the list's lock, the earlier text into the project's history); the project's row stays
+    locked from reading the description to saving it."""
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("text", "under", "expect_updated_at") if mode == "append" else ("heading", "text", "expect_updated_at"))
+    text, head = md_edit_input(b, mode)
+    if mode == "replace" and b.get("expect_updated_at") is None:  # "" = read a description never saved (no stamp)
+        md_need_version(b)
+    c = db()
+    need_overview(c, lid, write=True)
+    r = c.execute("SELECT description, description_at FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
+    exp = b["expect_updated_at"] if b.get("expect_updated_at") is not None else \
+        ((request.headers.get("If-Match") or "").strip().removeprefix("W/").strip('"') or None)
+    if exp is not None and not isinstance(exp, str):
+        raise BadInput(tr("Invalid value: {0}", "expect_updated_at"))
+    if exp is not None and exp != (r["description_at"] or ""):
+        return v1_err(409, tr("Changed in the meantime"), current=v1_call(overview_get, lid))
+    cur = r["description"] or ""
+    if le2e_is_cipher(cur):
+        return v1_err(409, tr("The description is encrypted: only the app can change it"), name="encrypted")
+    try:
+        new = md_edit(cur, mode, text, head)
+    except MdHeadingError as e:
+        return md_heading_answer(e)
+    if new == cur:
+        return jsonify(v1_call(overview_get, lid))
+    return jsonify(v1_call(overview_patch, lid, body={"description": new}))
 
 
 @app.get("/api/v1/lists/<int:lid>/links")
