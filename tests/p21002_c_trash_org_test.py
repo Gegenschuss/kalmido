@@ -9,7 +9,7 @@ step of the person's list "Recent steps" (core/undoweb.py undo_trash_reg, videos
    core's run deletes an old one, a younger one stays
  - video sign-off: delete -> a step "Moved to the trash: <title>" in GET /api/undo; undo brings it back, redo puts it into the
    trash again (its open customer link stops); restore is a step too; someone else's step 404; who lost the right to change
-   it meanwhile (member -> guest) cannot take it back: it stays in the trash
+   it meanwhile (the project only to view) cannot take it back: it stays in the trash
  - video sign-off of an organisation: the core's run deletes an old one, a younger one stays
 tenant-matrix: reading, feeds, videos (an outsider: 404 on the organisation's bookmark / feed / review)
 freelancer-matrix: videos (frida, a person without an organisation: delete, undo, redo, restore of her own review)
@@ -26,10 +26,10 @@ from obj_probe import in_app  # noqa: E402
 fresh(prefix="P21002C")
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.post(B + "/api/admin/setup", json={"org_name": "Example Studio", "lang": "en", "collab_all": True})
+A.post(B + "/api/admin/setup", json={"org_name": "Example Studio", "lang": "en", "collab_all": True, "modules": ["comments"]})
 A.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": FEATURES})
 AID = A.get(B + "/api/state").json()["me"]["id"]
-ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
+ORG = dbx("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id LIMIT 1", (AID,))[0][0]  # the setup's organisation
 FID, Fr = freelancer(B, A)
 r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "member"}], "username": "bob", "display_name": "Bob",
                                    "password": "password123", "email": "bob@example.com"})
@@ -151,16 +151,16 @@ check(g2.get("kind") == "video_review" and g2.get("ref_id") == VD and g2.get("id
 r = Fr.post(B + f"/api/undo/to/{g2.get('id')}")
 check(r.ok and VD not in vids(Fr, LF) and row("video_reviews", VD)[0], f"review: undo of the restore = into the trash again {r.status_code} {r.text[:200]}")
 
-# ---- the right of NOW: bob deletes an organisation's review, then becomes a guest -> his undo leaves it in the trash
+# ---- the right of NOW: bob deletes an organisation's review, then may only view the project -> his undo leaves it in the trash
 LO = A.post(B + "/api/lists", json={"name": "Example Org Film", "kind": "project", "org_id": ORG}).json()["id"]
+check(A.put(B + f"/api/lists/{LO}/members", json={"user_id": BID, "role": "edit"}).ok, "setup: bob edits the organisation's project")
 VO = review(Bo, LO, "Example org cut")
 check(Bo.delete(B + f"/api/videos/{VO}").ok and row("video_reviews", VO)[1] == BID, "org review: bob deleted it")
 gb = (steps(Bo) or [{}])[0]
 check(gb.get("kind") == "video_review" and gb.get("ref_id") == VO, f"org review: bob's step {gb}")
-dbx("UPDATE org_members SET role='guest' WHERE org_id=? AND user_id=?", (ORG, BID))
-Bo.post(B + f"/api/undo/to/{gb.get('id')}")
-check(row("video_reviews", VO)[0], f"org review: bob (a guest now) cannot take it back, it stays in the trash {row('video_reviews', VO)}")
-dbx("UPDATE org_members SET role='member' WHERE org_id=? AND user_id=?", (ORG, BID))
+check(A.put(B + f"/api/lists/{LO}/members", json={"user_id": BID, "role": "view"}).ok, "setup: bob may only view the project now")
+r = Bo.post(B + f"/api/undo/to/{gb.get('id')}")
+check(row("video_reviews", VO)[0], f"org review: bob (view only now) cannot take it back, it stays in the trash {r.status_code} {row('video_reviews', VO)}")
 
 # ---- the core's run deletes an old organisation's review, a younger one stays
 VY = review(A, LO, "Example org young")
