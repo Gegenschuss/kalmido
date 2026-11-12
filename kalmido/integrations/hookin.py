@@ -15,7 +15,7 @@ from ..core.db import body, bump, db, err, iso, now_utc
 # obj_trash_tick): no run of its own any more
 from ..core.objparts import part_kind, part_restore, part_trash
 from ..accounts.session import client_ip, me
-from ..core.access import Denied, list_role, live_sql, need_list, WRITE_ROLES  # 2.783.0 (#5368): live_sql
+from ..core.access import Denied, list_role, live_sql, need_list, WRITE_ROLES, list_archived_sql  # 2.783.0 (#5368): live_sql
 from ..core.errors import BadInput, reject_unknown
 from ..notify.alerts import _env_int, aa_count
 from ..collab.integfail import integ_tell
@@ -322,7 +322,7 @@ def whi_in(token):
         return err(tr("The request is too large (at most {0} KB)", WHI_MAX_BYTES // 1024), 413)
     h = whi_hash(token) if token and len(token) <= 200 else ""
     with system_ctx(c):  # 2.115.0 A (#2061): resolve the token (one row by its hash) across organisations, then act as its owner
-        r = c.execute(f"""SELECT h.*, l.archived FROM hook_in h JOIN lists l ON l.id=h.list_id
+        r = c.execute(f"""SELECT h.*, {list_archived_sql('l')} AS archived FROM hook_in h JOIN lists l ON l.id=h.list_id
                          WHERE h.token_hash=? AND {live_sql("h")}""", (h,)).fetchone() if h else None
         u = c.execute("SELECT * FROM users WHERE id=?", (r["created_by"],)).fetchone() if r and r["created_by"] else None
     if not r:

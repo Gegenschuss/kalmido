@@ -21,7 +21,7 @@ from flask import jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id
-from ..core.access import Denied, WRITE_ROLES, list_role
+from ..core.access import Denied, WRITE_ROLES, list_role, list_archived_sql
 from ..agents.core import agent_usable
 from ..core.db import bump, db, iso, now_utc, usettings
 from ..core.i18n import N_, tr
@@ -66,7 +66,7 @@ def ast2_list_ok(c, aid, sheet, lid):
     """The target list for agent aid: shared with it (list_role: never outside its organisation), inside its list limit, never
     a health / budget list or one with the lock, not archived, in the table's space. 404 / 409 otherwise."""
     a = agent_row(c, aid)
-    l = c.execute("SELECT id, name, org_id, life, e2e, archived FROM lists WHERE id=?", (lid,)).fetchone()
+    l = c.execute(f"SELECT id, name, org_id, life, e2e, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone()
     if not a or not l or not list_role(c, lid, aid) or (l["life"] or "") in ("health", "budget") or l["e2e"] is not None:
         raise Denied(404)
     if a["list_ids"] and lid not in ids_parse(a["list_ids"]):

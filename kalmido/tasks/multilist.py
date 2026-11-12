@@ -15,7 +15,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, trigger_skip_present
 from ..accounts.session import me
-from ..core.access import Denied, list_role, need_list, need_task, task_visible, vis_sql, WRITE_ROLES, otr_live
+from ..core.access import Denied, list_role, need_list, need_task, task_visible, vis_sql, WRITE_ROLES, otr_live, list_archived_sql
 from ..tasks.tasks import one_task  # 2.369.5 (#2517): pulled up from functions
 from .validation import as_int, log_act  # 2.369.5 (#2517): pulled up from functions
 
@@ -113,7 +113,7 @@ def ml_check(c, tid, lid):
     if lid == t["list_id"]:
         return tr("The task is already in this project"), 400
     o = c.execute("SELECT org_id, life FROM lists WHERE id=?", (t["list_id"],)).fetchone()
-    x = c.execute("SELECT org_id, life, archived FROM lists WHERE id=?", (lid,)).fetchone()
+    x = c.execute(f"SELECT org_id, life, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone()
     if o["org_id"] != x["org_id"]:
         return tr("Both projects must be in the same workspace"), 400
     if (o["life"] or "") == "health" or (x["life"] or "") == "health":

@@ -505,6 +505,33 @@ def list_state_sql(a="", *states):
     return f"{col} IN ({', '.join(repr(s) for s in sorted(set(states), key=LIST_STATES.index))})"
 
 
+def list_archived_sql(a=""):
+    """2.1061.0 (#5867, stage 3): THE value "the project is archived" (1 / 0) for a SELECT on lists, from the state marker
+    instead of the old column archived (a = the table name or its alias, "" without one): `{list_archived_sql('l')} AS
+    archived` keeps the key the code and the API read. 'archived' = 1; a project in the trash keeps the archive it had
+    (archived_at: list_set_archived sets it on the way into the archive and clears it on the way out); 'live' = 0. A read of
+    the column itself is red in tools/check_list_state.py."""
+    if a and not _LIVE_ALIAS.fullmatch(a):
+        raise ValueError(f"list_archived_sql: invalid alias {a!r}")
+    p = a + "." if a else ""
+    return f"(CASE WHEN {p}state='archived' OR ({p}state='trash' AND {p}archived_at IS NOT NULL) THEN 1 ELSE 0 END)"
+
+
+def list_archived(r):
+    """2.1061.0 (#5867, stage 3): the same value as list_archived_sql() for a row / dict of lists that carries state and
+    archived_at (SELECT * FROM lists): 1 or 0. For the dicts that go out (API, /api/state) as their key "archived"."""
+    st = r["state"]
+    return 1 if st == "archived" or (st == "trash" and r["archived_at"]) else 0
+
+
+def list_out(r):
+    """2.1061.0 (#5867, stage 3): a dict of a lists row (SELECT * / l.*) whose key archived is the value of the state marker
+    (list_archived), not the old column -- the shape of the API stays, the column can go."""
+    d = dict(r)
+    d["archived"] = list_archived(d)
+    return d
+
+
 def list_set_archived(c, lid, on):
     """2.1054.0 (#5794, stage 2): THE write of a project's archive state -- the marker lists.state ('archived' / 'live'),
     archived_at the moment it went into the archive (kept while it stays there, cleared when it comes back). The trigger

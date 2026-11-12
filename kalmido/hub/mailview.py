@@ -29,7 +29,7 @@ from ..core.config import app
 from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
-from ..core.access import Denied, WRITE_ROLES, acx_lists_sql, list_role, need_task, need_feat, list_state_sql
+from ..core.access import Denied, WRITE_ROLES, acx_lists_sql, list_role, need_task, need_feat, list_state_sql, list_archived_sql
 from ..accounts.session import me
 from .hubmail import _gate, _need_mail, _open, hbm_can
 from ..files.store import fs_read  # 2.369.5 (#2517): pulled up from functions
@@ -331,7 +331,7 @@ def _defaults(c, m):
 
 
 def _lists(c, uid, org):
-    rows = c.execute(f"SELECT id, name, org_id, kind, e2e, archived FROM lists WHERE id IN {acx_lists_sql()} AND COALESCE(e2e,'')='' "
+    rows = c.execute(f"SELECT id, name, org_id, kind, e2e, {list_archived_sql('')} AS archived FROM lists WHERE id IN {acx_lists_sql()} AND COALESCE(e2e,'')='' "
                      f"AND {list_state_sql()} ORDER BY lower(name), id", (uid, uid)).fetchall()
     return [{"id": r["id"], "name": r["name"], "kind": r["kind"]} for r in rows
             if _org(r["org_id"]) == org and list_role(c, r["id"], uid) in WRITE_ROLES]
@@ -406,7 +406,7 @@ def mh_make_task(mid):
         return err(tr("Invalid value: {0}", "due"))
     if list_role(c, lid, uid) not in WRITE_ROLES:
         raise Denied(404)
-    l = c.execute("SELECT org_id, e2e, archived FROM lists WHERE id=?", (lid,)).fetchone()
+    l = c.execute(f"SELECT org_id, e2e, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone()
     if _org(l["org_id"]) != _org(m["org_id"]):
         return err(tr("The project belongs to another workspace"), 409)
     if l["archived"]:  # 2.141.0 B (#2139, review): not into an archived list

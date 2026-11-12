@@ -14,7 +14,7 @@ other way round (core/undoweb.py: undo newest first, the app's redo oldest first
 
 Interface:
   otr_step(c, lid, uid)   lists.py list_delete, after otr_trash: the step of the person (none for an agent / outside a request)"""
-from ..core.access import need_list
+from ..core.access import need_list, list_archived
 from ..core.db import bump
 from ..core.errors import Denied
 from ..core.i18n import N_, tr
@@ -56,7 +56,7 @@ def otr_run(c, uid, lid, data, redo):
         # #5491 (the core's restore) - the old call without her failed every undo of a delete (TypeError, a 500)
         otr_back(c, r, uid, checked=True)
     else:
-        if r["deleted_at"] or not r["archived"] or r["is_inbox"]:
+        if r["deleted_at"] or not list_archived(r) or r["is_inbox"]:  # 2.1061.0 (#5867): the state marker
             raise Denied(409, tr(UNDO_CONFLICT))
         need_list(c, int(lid), write=False, manage=True)  # as the delete route: the owner or a project admin
         if le2e_mode(c, int(lid)):

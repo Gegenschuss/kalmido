@@ -18,7 +18,7 @@ from ..core.i18n import tr
 from ..core.db import db, iso, now_utc
 from ..accounts.session import me
 from ..core.errors import BadInput
-from ..core.access import Denied, otr_live
+from ..core.access import Denied, otr_live, list_archived
 from ..accounts.orgs import _need_org_admin
 from ..accounts.orglists import _ol_log, ol_shared
 
@@ -92,7 +92,7 @@ def oadm_tasks(oid):
                   "SELECT ?, NULL, '', 'tasksall', ?, NULL, NULL, ?", (oid, me(), iso(now_utc())))
     c.commit()
     return jsonify(
-        lists=[{"id": r["id"], "name": r["name"], "archived": bool(r["archived"])} for r in lists],
+        lists=[{"id": r["id"], "name": r["name"], "archived": bool(list_archived(r))} for r in lists],
         tasks=[{"id": r["id"], "list_id": r["list_id"], "list_name": by_id[r["list_id"]]["name"], "parent_id": r["parent_id"],
                 "title": r["title"], "status": OT_STATUS.get(r["status"], "open"), "priority": r["priority"] or 0, "due": r["due"],
                 "due_time": r["due_time"], "assignee_id": r["assignee_id"], "assignee_name": names.get(r["assignee_id"], ""),

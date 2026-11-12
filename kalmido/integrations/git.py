@@ -23,7 +23,7 @@ from ..core.pg import insert_id, st_ids
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, connect, db, err, iso, now_utc, parse_iso
 from ..accounts.session import GATE, me
-from ..core.access import Denied, is_project, list_role, MANAGE_ROLES, need_list, need_task
+from ..core.access import Denied, is_project, list_role, MANAGE_ROLES, need_list, need_task, list_archived_sql
 from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
 from ..tasks.lifecycle import do_complete, signed, undo_status
@@ -737,7 +737,7 @@ def git_poll(c, cid):
     from ..integrations.gitfolder import gf_rehome
     from ..integrations.gitbuild import gb_branches, gb_close_released, gb_main, gb_released, gb_tags
     gf_rehome(c, cid)  # 2.33.0 (#934): a folder repository hangs on a list that is still in its folder
-    r = c.execute("SELECT k.*, l.archived FROM git_conns k JOIN lists l ON l.id=k.list_id WHERE k.id=?", (cid,)).fetchone()
+    r = c.execute(f"SELECT k.*, {list_archived_sql('l')} AS archived FROM git_conns k JOIN lists l ON l.id=k.list_id WHERE k.id=?", (cid,)).fetchone()
     if not r:
         return
     now = time.time()
@@ -777,7 +777,7 @@ def git_poll(c, cid):
             default = git_default_of(j)
             default = _gs(default, 250) or "main"
             c.execute("UPDATE git_conns SET default_branch=? WHERE id=?", (default, cid))
-            r = c.execute("SELECT k.*, l.archived FROM git_conns k JOIN lists l ON l.id=k.list_id WHERE k.id=?", (cid,)).fetchone()
+            r = c.execute(f"SELECT k.*, {list_archived_sql('l')} AS archived FROM git_conns k JOIN lists l ON l.id=k.list_id WHERE k.id=?", (cid,)).fetchone()
         prov = r["provider"]  # 2.18.0: paths + answers per provider (git_api, git_items, git_*_norm)
         j = git_items(get("pulls", git_api(prov, k, "pulls")))
         if j is not None:

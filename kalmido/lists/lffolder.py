@@ -50,7 +50,7 @@ import threading
 from flask import has_app_context, jsonify
 
 from ..core.config import app
-from ..core.access import Denied, acx_of, joined_lists_sql, live_sql, qn_is, reading_ids, reading_sql  # 2.477.0 (#3881): + qn_is
+from ..core.access import Denied, acx_of, joined_lists_sql, live_sql, qn_is, reading_ids, reading_sql, list_archived_sql  # 2.477.0 (#3881): + qn_is
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc, uset, usettings
 from ..core.i18n import N_, lang, tr
 from ..core.pg import st_ids, system_ctx, table_exists
@@ -77,7 +77,7 @@ def _rmax(*roles):
 
 
 def _lrow(c, lid):
-    return c.execute("SELECT id, owner_id, org_id, name, folder, is_inbox, archived, life, e2e FROM lists WHERE id=?",
+    return c.execute(f"SELECT id, owner_id, org_id, name, folder, is_inbox, {list_archived_sql('')} AS archived, life, e2e FROM lists WHERE id=?",
                      (int(lid),)).fetchone()
 
 

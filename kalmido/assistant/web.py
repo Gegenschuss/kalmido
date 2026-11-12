@@ -19,7 +19,7 @@ from ..core.pg import insert_id
 from ..core.objtags import otg_user_list  # 2.955.0 (#5276)
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, usettings
-from ..core.access import Denied, list_people, list_role, my_inbox, need_task, org_trip_sql, vis_sql, WRITE_ROLES
+from ..core.access import Denied, list_people, list_role, my_inbox, need_task, org_trip_sql, vis_sql, WRITE_ROLES, list_archived_sql
 from ..accounts.session import me
 from ..core.errors import BadInput
 from . import core as A
@@ -73,7 +73,7 @@ def asst_lists(c, uid, own=True):
     mine = " AND l.owner_id=?" if own else ""
     rows = c.execute(f"""SELECT l.id, l.name FROM assistant_access a JOIN lists l ON l.id=a.list_id
                          WHERE a.user_id=? AND l.id IN {vis_sql()} AND l.is_inbox=0 AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND NOT {org_trip_sql()} AND l.e2e IS NULL
-                         AND COALESCE(l.archived, 0)=0{mine} ORDER BY l.sort, l.id""", (uid, uid, uid) + ((uid,) if own else ())).fetchall()
+                         AND {list_archived_sql('l')}=0{mine} ORDER BY l.sort, l.id""", (uid, uid, uid) + ((uid,) if own else ())).fetchall()
     return [{"id": r["id"], "name": r["name"]} for r in rows]
 
 
@@ -134,7 +134,7 @@ def asst_put_lists():
     ok = set()
     if want:
         ok = {r[0] for r in c.execute(f"""SELECT l.id FROM lists l WHERE l.id IN ({','.join('?' * len(want))}) AND l.id IN {vis_sql()}
-                                         AND l.is_inbox=0 AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND NOT {org_trip_sql()} AND l.e2e IS NULL AND COALESCE(l.archived, 0)=0""",
+                                         AND l.is_inbox=0 AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND NOT {org_trip_sql()} AND l.e2e IS NULL AND {list_archived_sql('l')}=0""",
                                       (*want, uid, uid))}
         foreign = {r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN ({','.join('?' * len(ok))}) AND owner_id IS DISTINCT FROM ?",
                                            (*sorted(ok), uid))} if ok else set()

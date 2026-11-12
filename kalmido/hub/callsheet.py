@@ -60,7 +60,7 @@ from PIL import Image
 from ..core.config import app
 from ..core.i18n import LANGS, N_, lang, tr
 from ..core.db import body, bump, iso, iso_ms, local_now, now_utc
-from ..core.access import Denied, list_role, live_sql, WRITE_ROLES
+from ..core.access import Denied, list_role, live_sql, WRITE_ROLES, list_archived_sql
 from ..core.conflict import ccf_check
 from ..core.errors import BadInput
 from ..core.orgcrypt import OrgCryptError, oc_dec_fields, oc_enc_fields
@@ -524,7 +524,7 @@ def cs_agency_keep(c, uid, rows, cid):
     if not lid or proj.get("locked") or proj.get("role") not in ("owner", "admin", "edit") or proj.get("agency_id") == cid:
         return
     write_lock(c, f"obj-list-{int(lid)}")  # the project's lock (lists/lists.py, PATCH /api/lists/<id>)
-    old = c.execute("SELECT cs_agency_id, archived FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
+    old = c.execute(f"SELECT cs_agency_id, {list_archived_sql('')} AS archived FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
     if old is None or old[0] == cid or old[1]:  # review F2: an archived project stays as it is
         return
     c.execute("UPDATE lists SET cs_agency_id=? WHERE id=?", (cid, lid))
@@ -1019,7 +1019,7 @@ def _cs_proj(c, uid, lid):
         raise BadInput(tr("Invalid data")) from None
     if not list_role(c, lid, uid):
         raise Denied(404)
-    r = c.execute("SELECT id, name, org_id, owner_id, archived, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
+    r = c.execute(f"SELECT id, name, org_id, owner_id, {list_archived_sql('')} AS archived, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
     if r is None or r["is_inbox"]:  # review 2.988 F6: the inbox is no project (the client offers no tab there)
         raise Denied(404)
     return r, bool(le2e_mode(c, lid))

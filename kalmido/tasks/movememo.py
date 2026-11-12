@@ -17,7 +17,7 @@ from datetime import timedelta
 
 from flask import g, has_request_context
 
-from ..core.access import Denied, list_people, list_role, ov_role, WRITE_ROLES
+from ..core.access import Denied, list_people, list_role, ov_role, WRITE_ROLES, list_archived_sql
 from ..core.db import iso, now_utc, parse_iso
 from ..core.pg import insert_id, st_ids
 from ..core.objtags import otg_link, otg_list_sql, OTG_TASK_FROM  # 2.947.0 (#5275)
@@ -151,7 +151,7 @@ def tmm_restore(c, tid, prev, skip=()):
     if not t["parent_id"]:
         org = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
         for k in d.get("links") or []:
-            x = c.execute("SELECT org_id, archived, deleted_at FROM lists WHERE id=?", (k["list_id"],)).fetchone()
+            x = c.execute(f"SELECT org_id, {list_archived_sql('')} AS archived, deleted_at FROM lists WHERE id=?", (k["list_id"],)).fetchone()
             if not x or k["list_id"] == lid or x["org_id"] != org or x["archived"] or x["deleted_at"]:
                 continue
             if _wr_role(c, k["list_id"]) not in WRITE_ROLES:  # 2.273.0 F1 (#3042): only where the mover may link (ml_check)
@@ -331,7 +331,7 @@ def lmm_restore(c, lid, prev):
                 out["assignees"] = out.get("assignees", 0) + 1
     for k in d.get("links") or []:
         t = c.execute("SELECT t.parent_id, t.deleted_at, o.org_id FROM tasks t JOIN lists o ON o.id=t.list_id WHERE t.id=?", (k["task_id"],)).fetchone()
-        x = c.execute("SELECT org_id, archived, deleted_at FROM lists WHERE id=?", (k["list_id"],)).fetchone()
+        x = c.execute(f"SELECT org_id, {list_archived_sql('')} AS archived, deleted_at FROM lists WHERE id=?", (k["list_id"],)).fetchone()
         if not t or not x or t["parent_id"] or t["deleted_at"] or x["archived"] or x["deleted_at"] or (t["org_id"] or None) != (x["org_id"] or None):
             continue
         if _wr_role(c, k["list_id"]) not in WRITE_ROLES:  # 2.273.0 F1 (#3042): as in tmm_restore

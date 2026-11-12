@@ -19,7 +19,7 @@ from ..core.objtags import otg_list_sql  # 2.947.0 (#5275)
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
-from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list
+from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list, list_archived_sql
 from ..tasks.validation import log_act
 from ..tasks.lifecycle import do_complete
 from ..tasks.oneway import DEPLOY_TAG
@@ -370,7 +370,7 @@ def env_deploy_route(eid):
 def env_hook(eid, token):
     c = db()
     with system_ctx(c):  # resolve the token (one row) across organisations ...
-        r = c.execute("SELECT e.*, l.org_id, l.archived FROM list_envs e JOIN lists l ON l.id=e.list_id WHERE e.id=? AND e.deleted_at IS NULL", (eid,)).fetchone()
+        r = c.execute(f"SELECT e.*, l.org_id, {list_archived_sql('l')} AS archived FROM list_envs e JOIN lists l ON l.id=e.list_id WHERE e.id=? AND e.deleted_at IS NULL", (eid,)).fetchone()
     if not r or not r["token_hash"] or len(token) > 200 or not hmac.compare_digest(r["token_hash"], hashlib.sha256(token.encode()).hexdigest()):
         return err(tr("unknown"), 403)
     if r["archived"]:  # review: an archived project takes no deployments

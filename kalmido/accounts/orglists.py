@@ -16,7 +16,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, iso_ms
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import Denied, my_inbox, otr_live, list_set_archived
+from ..core.access import Denied, my_inbox, otr_live, list_set_archived, list_archived_sql, list_archived
 from ..accounts.orgs import _need_org_admin, user_orgs
 from .orgoutreq import oor_rows  # 2.361.2 (#2923)
 from ..accounts.pictures import list_icon_cols, list_icon_url
@@ -104,13 +104,13 @@ def _ol_out(c, oid):
     from ..collab.comments import user_names
     # 2.39.1 (#1188): only lists of the organisation that are shared with at least one more person (people, not agents):
     # private lists never (also when shared), lists without members never, inboxes never; the folder path of the owner
-    rows = c.execute(f"""SELECT l.id, l.name, l.color, l.icon, l.owner_id, l.archived, l.archived_at, l.created_at, l.folder, l.e2e,
+    rows = c.execute(f"""SELECT l.id, l.name, l.color, l.icon, l.owner_id, {list_archived_sql('l')} AS archived, l.archived_at, l.created_at, l.folder, l.e2e,
                                (SELECT COUNT(*) FROM tasks t WHERE t.list_id=l.id AND t.deleted_at IS NULL AND t.status=0) AS open_n,
                                (SELECT COUNT(*) FROM tasks t WHERE t.list_id=l.id AND t.deleted_at IS NULL) AS all_n,
                                (SELECT MAX(t.updated_at) FROM tasks t WHERE t.list_id=l.id) AS changed,
                                (SELECT COUNT(*) FROM list_members m JOIN users u ON u.id=m.user_id
                                  WHERE m.list_id=l.id AND m.user_id!=l.owner_id AND COALESCE(u.kind,'user')!='agent') AS members
-                        FROM lists l WHERE l.org_id=? AND l.is_inbox=0 AND {otr_live('l')} ORDER BY l.archived, lower(l.name), l.id""", (oid,)).fetchall()
+                        FROM lists l WHERE l.org_id=? AND l.is_inbox=0 AND {otr_live('l')} ORDER BY {list_archived_sql('l')}, lower(l.name), l.id""", (oid,)).fetchall()
     rows = [r for r in rows if r["members"] > 0]
     log = c.execute("SELECT * FROM org_list_log WHERE org_id=? ORDER BY id DESC LIMIT ?", (oid, OL_LOG_MAX)).fetchall()
     people = c.execute("""SELECT u.id FROM org_members m JOIN users u ON u.id=m.user_id
@@ -151,7 +151,7 @@ def oadm_archive(oid, lid):
     on = b.get("archived", True)
     if not isinstance(on, bool):
         return err(tr("Invalid value: {0}", "archived"))
-    if bool(lr["archived"]) == on:
+    if bool(list_archived(lr)) == on:  # 2.1061.0 (#5867): from the state marker
         return jsonify(ok=True, **_ol_out(c, oid))
     list_set_archived(c, lid, on)  # 2.1054.0 (#5794): on the state marker
     _ol_log(c, oid, lr, "archive" if on else "restore")
@@ -172,7 +172,7 @@ def oadm_delete(oid, lid):
     c, b = db(), body()
     _need_org_admin(c, oid)
     lr = _ol_list(c, oid, lid)
-    if not lr["archived"]:
+    if not list_archived(lr):  # 2.1061.0 (#5867)
         return err(tr("Archive the project first: only archived projects can be deleted permanently"), 409)
     if str(b.get("confirm") or "").strip() != lr["name"].strip():
         return err(tr("Type the name of the project to delete it permanently"))

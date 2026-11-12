@@ -16,7 +16,7 @@ from ..core.ephem import eph_within  # 2.642.0 (#4975)
 from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, iso_ms, now_utc
 from ..accounts.session import me
-from ..core.access import acx_anon_bind, is_project, list_people, MANAGE_ROLES, need_list, list_role, tvis, list_state_sql
+from ..core.access import acx_anon_bind, is_project, list_people, MANAGE_ROLES, need_list, list_role, tvis, list_state_sql, list_archived_sql
 from ..core.pages import valid_url
 from ..tasks.validation import CONTENT_MAX, log_act, ticket_template
 from ..collab.comments import lang_of
@@ -170,7 +170,7 @@ def errhook_in(lid, token):
     """Inbound error report (Sentry or generic JSON) -> a bug ticket, or a count on the open one of the same error."""
     c = db()
     with system_ctx(c):  # 2.37.0 (#1150): resolve the token (one row) across organisations ...
-        r = c.execute("SELECT h.*, l.owner_id, l.tickets, l.archived, l.org_id FROM issue_hooks h JOIN lists l ON l.id=h.list_id "
+        r = c.execute(f"SELECT h.*, l.owner_id, l.tickets, {list_archived_sql('l')} AS archived, l.org_id FROM issue_hooks h JOIN lists l ON l.id=h.list_id "
                       "WHERE h.list_id=?", (lid,)).fetchone()
     if not r or not token or len(token) > 200 or not hmac.compare_digest(r["token_hash"], hashlib.sha256(token.encode()).hexdigest()):
         return err(tr("unknown"), 404)
@@ -416,7 +416,7 @@ def cer_list(c):
     if not v.isdigit():
         return None, None
     with system_ctx(c):  # the operator's choice, read for every person: one row, its organisation only to bind (below)
-        r = c.execute("SELECT h.*, l.owner_id, l.tickets, l.archived, l.org_id FROM issue_hooks h JOIN lists l ON l.id=h.list_id "
+        r = c.execute(f"SELECT h.*, l.owner_id, l.tickets, {list_archived_sql('l')} AS archived, l.org_id FROM issue_hooks h JOIN lists l ON l.id=h.list_id "
                       "WHERE h.list_id=?", (int(v),)).fetchone()
     return (int(v), r) if r else (None, None)
 

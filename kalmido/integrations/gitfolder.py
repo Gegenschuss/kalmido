@@ -21,7 +21,7 @@ from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.pg import st_ids
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import Denied, list_role, need_list, reading_sql
+from ..core.access import Denied, list_role, need_list, reading_sql, list_archived_sql
 from ..core.errors import BadInput
 from ..agents.core import is_agent, need_person
 from ..lists.lists import folder_under, clean_folder, FOLDER_SEP  # 2.369.5 (#2517): pulled up from functions
@@ -63,7 +63,7 @@ def _skip_sql():
 
 
 def _owner_lists(c, owner, folder):
-    return [r for r in c.execute(f"SELECT l.id, l.name, l.folder, l.kind, l.archived, l.git_folder_off, {_skip_sql()} AS gf_skip FROM lists l "
+    return [r for r in c.execute(f"SELECT l.id, l.name, l.folder, l.kind, {list_archived_sql('l')} AS archived, l.git_folder_off, {_skip_sql()} AS gf_skip FROM lists l "
                                  "WHERE l.owner_id=? AND l.is_inbox=0 AND l.deleted_at IS NULL ORDER BY l.sort, l.id",
                                  (owner,)) if _under(r["folder"], folder)]
 
@@ -166,7 +166,7 @@ def gf_rehome(c, cid, exclude=None):
     if not f:
         return
     k = c.execute("SELECT list_id FROM git_conns WHERE id=?", (cid,)).fetchone()
-    lst = c.execute("SELECT owner_id, folder, archived FROM lists WHERE id=?", (k["list_id"],)).fetchone() if k else None
+    lst = c.execute(f"SELECT owner_id, folder, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (k["list_id"],)).fetchone() if k else None
     ok = lst and k["list_id"] != exclude and lst["owner_id"] == f["owner_id"] and _under(lst["folder"], f["folder"])
     if ok and not lst["archived"]:
         return

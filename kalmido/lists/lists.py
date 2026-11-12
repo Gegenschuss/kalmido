@@ -13,7 +13,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
-from ..core.access import acx_drop, addr_account, collab_all, Denied, dlg_gone, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES, list_state_sql, otr_live, list_set_archived
+from ..core.access import acx_drop, addr_account, collab_all, Denied, dlg_gone, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES, list_state_sql, otr_live, list_set_archived, list_archived_sql, list_out
 from ..core.state import visible_lists
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
@@ -228,7 +228,7 @@ def lp_norm(v):
 def lp_current(c, lid, role):
     """The list as the current user sees it (state view) for the `_prev` comparison."""
     from ..lists.kpis import fx_json
-    cur = dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone())
+    cur = list_out(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone())  # 2.1061.0 (#5867): the key "archived" from the state marker
     if role != "owner":
         m = c.execute("SELECT folder, sort, view FROM list_members WHERE list_id=? AND user_id=?", (lid, me())).fetchone()
         if m:
@@ -392,7 +392,7 @@ def list_create():
                                                                   else tt_new_default(c, me()), lid))  # 2.41.0 (#1471); 2.489.0 (#2798)
         bump(c)
         c.commit()
-        return jsonify({**dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on, **made})
+        return jsonify({**list_out(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on, **made})
     view = clean_list_value("view", b.get("view") or "list")
     kind = clean_list_value("kind", b["kind"]) if b.get("kind") else "list"
     fam = clean_list_value("family", b.get("family"))  # 2.19.0 (#653)
@@ -405,7 +405,7 @@ def list_create():
             c.execute("UPDATE lists SET color=? WHERE id=?", (color, lid))
         bump(c)
         c.commit()
-        return jsonify(dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()))
+        return jsonify(list_out(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()))  # 2.1061.0 (#5867)
     # 2.7.2 (#414): "Show completed at the bottom" (done_at_bottom; the old checklist flag / kind "checklist" are aliases)
     dab = 1 if b.get("done_at_bottom", b.get("checklist")) or b.get("kind") == "checklist" else 0
     c = db()
@@ -425,7 +425,7 @@ def list_create():
     list_created(c, uid, cur_id)  # 2.4.2 (#391) agents, 2.10.0 (#441) groups, 2.22.0 (#740) / 2.25.0 (#931) folder people
     bump(c)
     c.commit()
-    return jsonify(dict(c.execute("SELECT * FROM lists WHERE id=?", (cur_id,)).fetchone()))
+    return jsonify(list_out(c.execute("SELECT * FROM lists WHERE id=?", (cur_id,)).fetchone()))  # 2.1061.0 (#5867)
 
 
 def qn_shares(b):
@@ -676,7 +676,7 @@ def list_update(lid):
         if "checklist" in adm and "checklist" in vals:  # 2.410.0 (#3440)
             c.execute("UPDATE lists SET checklist=? WHERE id=?", (vals["checklist"], lid))
         if adm and "archived" in vals:
-            lr = c.execute("SELECT id, name, owner_id, archived, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
+            lr = c.execute(f"SELECT id, name, owner_id, {list_archived_sql('')} AS archived, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
             if not lr["is_inbox"] and int(lr["archived"] or 0) != vals["archived"]:
                 list_set_archived(c, lid, vals["archived"])  # 2.1054.0 (#5794): on the state marker
                 lm_owner_news(c, lr, "larchive" if vals["archived"] else "lrestore")
@@ -775,7 +775,7 @@ def list_delete(lid):
     from ..lists.projects import list_files_drop
     c = db()
     role = need_list(c, lid, write=False, manage=True)  # 2.39.1 (#1188): the owner or a list admin (never a server admin as such)
-    r = c.execute("SELECT id, is_inbox, archived, owner_id, name FROM lists WHERE id=?", (lid,)).fetchone()
+    r = c.execute(f"SELECT id, is_inbox, {list_archived_sql('')} AS archived, owner_id, name FROM lists WHERE id=?", (lid,)).fetchone()
     if r["is_inbox"]:
         return err(tr("The basket cannot be deleted"))
     # 1.5 (UX1): deleting for good only from the archive; "Delete" in the app archives (undoable) first
@@ -1430,10 +1430,10 @@ def agent_share_state(aid):
 def agent_share_counts(c, aid, d):
     skip = set(d["skip"].get(str(aid), []))
     # 2.26.0: a list that already has another agent is not "missing" (one agent per list)
-    rows = c.execute("""SELECT l.id, EXISTS(SELECT 1 FROM list_members m WHERE m.list_id=l.id AND m.user_id=?) AS has,
+    rows = c.execute(f"""SELECT l.id, EXISTS(SELECT 1 FROM list_members m WHERE m.list_id=l.id AND m.user_id=?) AS has,
                         EXISTS(SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=l.id AND u.kind='agent'
                                AND m.user_id!=?) AS other
-                        FROM lists l WHERE l.owner_id=? AND l.is_inbox=0 AND COALESCE(l.archived,0)=0""", (aid, aid, me())).fetchall()
+                        FROM lists l WHERE l.owner_id=? AND l.is_inbox=0 AND {list_archived_sql('l')}=0""", (aid, aid, me())).fetchall()
     return {"own": len(rows), "shared": sum(1 for r in rows if r["has"]),
             "missing": sum(1 for r in rows if not r["has"] and not r["other"] and r["id"] not in skip),
             "skipped": sum(1 for r in rows if not r["has"] and r["id"] in skip)}
@@ -1495,7 +1495,7 @@ def agent_share_all(aid):
     skip = set(d["skip"].get(str(aid), []))
     from ..agents.safety import bridge_blocks
     n, other, bridged = 0, [], []
-    for (lid, name) in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND quicknote=0 AND COALESCE(archived,0)=0 ORDER BY id",  # 2.477.0 (#3881): not the list Notes
+    for (lid, name) in c.execute(f"SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND quicknote=0 AND {list_archived_sql('')}=0 ORDER BY id",  # 2.477.0 (#3881): not the list Notes
                                  (me(),)).fetchall():
         if lid in skip:
             continue

@@ -23,7 +23,7 @@ import secrets
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.access import Denied, WRITE_ROLES, list_role, live_sql, need_feat, task_visible, tvis, vis_sql
+from ..core.access import Denied, WRITE_ROLES, list_role, live_sql, need_feat, task_visible, tvis, vis_sql, list_archived_sql
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id
@@ -117,7 +117,7 @@ def sh2_target_list(c, sheet, uid, lid):
     sheet: that organisation's lists; a private sheet: lists without organisation), no lock, not archived."""
     lid = _int(lid, "list_id")
     role = list_role(c, lid, uid)
-    l = c.execute("SELECT id, name, org_id, e2e, archived FROM lists WHERE id=?", (lid,)).fetchone()
+    l = c.execute(f"SELECT id, name, org_id, e2e, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone()
     if not role or not l or l["org_id"] != sheet["org_id"]:
         raise Denied(404)
     if role not in WRITE_ROLES:
@@ -405,7 +405,7 @@ def sh2_links(c, sheet, uid):
 def sh2_offers(c, sheet, uid):
     """What the dialogs need: lists of the space (writable ones for tasks), the office (on? its clients)."""
     lists = []
-    for r in c.execute(f"SELECT id, name, kind, is_inbox, org_id, archived FROM lists WHERE id IN {vis_sql()} AND e2e IS NULL ORDER BY lower(name), id",
+    for r in c.execute(f"SELECT id, name, kind, is_inbox, org_id, {list_archived_sql('')} AS archived FROM lists WHERE id IN {vis_sql()} AND e2e IS NULL ORDER BY lower(name), id",
                        (uid, uid)).fetchall():
         if r["org_id"] != sheet["org_id"] or sh_list_ok(c, sheet, uid, r["id"]) in (None, "deleted"):
             continue

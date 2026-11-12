@@ -18,7 +18,7 @@ from ..core.ipallow import ips_clean, token_ip_ok  # noqa: F401 -- 2.705.0 (#515
 from ..core.db import bump, db, err, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, token_lists, tvis, vis_sql, wr_sql, list_role, list_roles, MANAGE_ROLES
+from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, token_lists, tvis, vis_sql, wr_sql, list_role, list_roles, MANAGE_ROLES, list_archived_sql
 from ..core.access import qn_private  # 2.477.0 (#3881)
 from ..core.serializers import load_tasks
 from ..core.state import visible_lists
@@ -1088,7 +1088,7 @@ def v1_list_delete(lid):
     v1_args(())
     c = db()
     need_list(c, lid, write=False, manage=True)
-    r = c.execute("SELECT name, is_inbox, archived FROM lists WHERE id=?", (lid,)).fetchone()
+    r = c.execute(f"SELECT name, is_inbox, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone()
     if not r["is_inbox"] and r["archived"]:
         need_approval(c, N_("Delete the project “{0}” permanently"), (r["name"],), list_id=lid)
     v1_call(list_delete, lid, body={})

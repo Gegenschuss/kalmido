@@ -27,7 +27,7 @@ from ..core.pg import write_lock  # 2.657.0 (#5052)
 from ..core.db import iso_ms  # 2.657.0 (#5052)
 from ..core.i18n import tr
 from ..core.db import bump, db, iso, local_now, now_utc, usettings
-from ..core.access import Denied, list_role, need_feat, WRITE_ROLES, FEAT_OFF, token_lists, vis_sql
+from ..core.access import Denied, list_role, need_feat, WRITE_ROLES, FEAT_OFF, token_lists, vis_sql, list_archived_sql
 from ..accounts.orgs import visible_people
 from ..accounts.session import me
 from ..core.errors import BadInput
@@ -456,7 +456,7 @@ def v1_adz_proposal():
     b = v1_json()
     c = db()
     lid = _p_int(b.get("list_id"), "list_id")
-    lst = c.execute("SELECT owner_id, life, archived, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
+    lst = c.execute(f"SELECT owner_id, life, {list_archived_sql('')} AS archived, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
     if not lst or lst["life"] == "health" or not list_role(c, lid, aid):
         raise Denied(404)
     if list_role(c, lid, aid) not in WRITE_ROLES or lst["archived"] or lst["is_inbox"]:

@@ -18,7 +18,7 @@ from ..core.config import app
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import system_ctx
-from ..core.access import Denied, list_role, list_state_sql, live_sql  # 2.1004.0 (#5494): live_sql
+from ..core.access import Denied, list_role, list_state_sql, live_sql, list_archived_sql  # 2.1004.0 (#5494): live_sql
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
@@ -77,7 +77,7 @@ def rc_office_need(c, m, uid, level="edit", own_uid=None):
 
 def rc_project_ok(c, lid, node, uid, agent=False):
     """Is lid a project uid may see, in the document's workspace? (agents: within their list restriction as well)"""
-    r = c.execute("SELECT is_inbox, org_id, archived FROM lists WHERE id=?", (lid,)).fetchone() if lid else None
+    r = c.execute(f"SELECT is_inbox, org_id, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone() if lid else None
     if not r or r["is_inbox"] or r["archived"]:  # 2.352.0 B (#2752): every list but the inbox is a project
         return False
     if (r["org_id"] or None) != (node["org_id"] or None):

@@ -334,6 +334,14 @@ c.commit()
   `deleted_at`: that is the core's trash column of every kind (`obj_trash` / `obj_restore` / `obj_purge`, `live_sql`), so
   projects go into the trash and back through the core as every kind; `deleted_at` is not an old column to drop. The column
   `archived` stays as long as the value reads (API, `dict(row)`) use it; dropping it is a one-way step of its own.
+- 2.1061.0 (#5867, stage 3a): the value reads ask the marker too. `list_archived_sql(alias)` of `core/access.py` is THE
+  value 1 / 0 for a SELECT on lists (`{list_archived_sql('l')} AS archived` keeps the key the code and the API read; a
+  project in the trash keeps the archive it had through `archived_at`), `list_archived(row)` / `list_out(row)` the same for
+  a row of `SELECT *` (`/api/state` `visible_lists`, the 409 `current`, the org admin's lists, the undo's label). The API,
+  MCP and the app keep the key `archived` (no change of shape). `tools/check_list_state.py` counts a read of the old column
+  as well (`SELECT archived` / `l.archived` / `COALESCE(archived, 0)` on lists). Still writing the column: the trigger (the
+  way back), the generic copies (exports, account import, merges) and the undo of the settings (`lists/lpundo.py`, its
+  snapshot holds `archived`, `undo_skip("lists", "state")`) - they move with the drop of the column, a one-way step of its own.
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
   `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).

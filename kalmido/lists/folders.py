@@ -13,7 +13,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import Denied, need_collab, collab_all, need_list, list_state_sql
+from ..core.access import Denied, need_collab, collab_all, need_list, list_state_sql, list_archived_sql
 from ..core.errors import BadInput
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.lists import folder_under  # 2.411.0 (#3516)
@@ -108,7 +108,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
     uid = uid or me()
     from ..accounts.orgs import clean_org_id, list_org, list_space_follow, ws_member_problem
     from ..collab.reactions import list_tidy_update
-    lr = c.execute("SELECT id, owner_id, folder, is_inbox, family, life, archived, quicknote FROM lists WHERE id=?", (lid,)).fetchone()
+    lr = c.execute(f"SELECT id, owner_id, folder, is_inbox, family, life, {list_archived_sql('')} AS archived, quicknote FROM lists WHERE id=?", (lid,)).fetchone()
     if not lr or lr["is_inbox"] or lr["quicknote"] or lr["owner_id"] != uid:  # 2.477.0 (#3881, review F1): + the list Notes
         return [], 0
     eff, _ = folder_effective(c, lr["owner_id"], lr["folder"] or "")

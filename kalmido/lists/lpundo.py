@@ -17,7 +17,7 @@ sort, grouping, columns, sums, key figures, properties); an agent records nothin
 Interface:
   lpu_pre(c, uid, lid, b, role)   before the PATCH writes (after lv_check): a step when b holds only plain settings
   lpu_post(c) -> group id | None  right before its commit (a save of the same values leaves no step)"""
-from ..core.access import _list_role
+from ..core.access import _list_role, list_out
 from ..core.errors import Denied
 from ..core.objhooks import GONE
 from ..core.undoareas import ua_done, ua_plain, ua_pre
@@ -93,6 +93,7 @@ def lpu_pre(c, uid, lid, b, role):
     if role not in ("owner", "admin") or not lpu_plain(b):
         return
     r = c.execute("SELECT * FROM lists WHERE id=?", (int(lid),)).fetchone()
+    r = r and list_out(r)  # 2.1061.0 (#5867, stage 3): archived from the state marker, not the old column
     if r is None or _same(r, b):
         return
     key = LPU_LABEL

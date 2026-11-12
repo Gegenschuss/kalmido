@@ -52,7 +52,7 @@ from ..agents.steps import steps_take  # 2.369.5 (#2517): pulled up from functio
 from ..agents.chat import h6e_agent_push_ok, chat_choice_set  # 2.369.5 (#2517): pulled up from functions
 from ..agents.chatnews import acn_news  # 2.1039.0 (#5804 #5805)
 from ..accounts.orgs import ws_apply_default, ws_member_problem  # 2.369.5 (#2517): pulled up from functions
-from ..core.access import list_other_agent  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import list_other_agent, list_archived  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---- 2.3.0 (#260 #261 #262 #263): agent PROPOSALS. Kalmido never runs a model itself and an agent must not silently create
@@ -1810,7 +1810,7 @@ def v1_agent_cross_proposal():
     lst = c.execute("SELECT l.*, u.kind AS okind, u.disabled AS odis FROM lists l JOIN users u ON u.id=l.owner_id WHERE l.id=?", (lid,)).fetchone()
     # 2.223.7 B (#2919): only a project shared with the agent (it can read it); budgets and read-later projects never. Every
     # other list answers 404 before the body is validated (no oracle for list ids, no project name in the job input)
-    if not lst or lst["okind"] == "agent" or lst["odis"] or lst["is_inbox"] or lst["archived"] or lst["life"] in ("health", "budget") \
+    if not lst or lst["okind"] == "agent" or lst["odis"] or lst["is_inbox"] or list_archived(lst) or lst["life"] in ("health", "budget") \
             or not agent_shares(c, aid, lst["owner_id"]) or not list_role(c, lid, aid) or reading_ids(c, [lid]):
         raise Denied(404)
     ar = agent_row(c, aid)  # 2.190.0 C (#2496): only lists of the agent's own workspace (others answer like a missing list)

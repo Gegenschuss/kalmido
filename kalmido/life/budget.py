@@ -27,7 +27,7 @@ from ..core.db import IntegrityError, iso, iso_ms, local_now, now_utc
 from ..core.conflict import ccf_check
 from ..core.i18n import lang, N_, tr
 from ..core.pg import insert_id, system_ctx, write_lock
-from ..core.access import Denied, health_hidden, list_role, vis_sql, WRITE_ROLES, list_state_sql, otr_live
+from ..core.access import Denied, health_hidden, list_role, vis_sql, WRITE_ROLES, list_state_sql, otr_live, list_archived_sql
 from ..core import orgcrypt as oc
 from ..core import mt940 as mt  # 2.299.0 A (#3190)
 from ..core import csvimport as cx  # 2.140.0 B (#2134): the shared statement reader
@@ -75,7 +75,7 @@ def bud_need_list(c, uid, lid, write=False):
     "private": never), 403 when a change needs the right to change the list."""
     if bud_hidden(c, uid):
         raise Denied(404)
-    r = c.execute("SELECT life, archived FROM lists WHERE id=?", (int(lid),)).fetchone()
+    r = c.execute(f"SELECT life, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (int(lid),)).fetchone()
     if not r or r["life"] != "budget":
         raise Denied(404)
     role = list_role(c, int(lid), uid)

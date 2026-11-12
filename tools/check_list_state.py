@@ -8,7 +8,12 @@ l.archived / l.deleted_at / lists.archived compared anywhere -- is red. The ones
 tools/list_state_baseline.json, and that file only shrinks (as tools/check_live_filter.py): more than the baseline = red,
 fewer = a notice to lower it (--strict: red), --update lowers the numbers and never raises one or adds a file.
 
-Reading the value (SELECT archived ... for the API, a dict of the row) is no filter and does not count.
+Reading the value (SELECT archived ... for the API, a dict of the row) was no filter in stage 1.
+
+2.1061.0 (#5867, stage 3): reads of the old column count too -- archived in a line that reads FROM / JOIN lists (a SELECT
+list, an ORDER BY, a COALESCE(archived, 0)), l.archived / lists.archived / lst.archived anywhere: the value is
+core/access.py list_archived_sql() (`{list_archived_sql('l')} AS archived` keeps the key) or list_archived(row) / list_out(row)
+for a row of SELECT *. The column can then go (a one-way step of its own).
 
 2.1054.0 (#5794, stage 2): the write paths of the archive set the marker through core/access.py list_set_archived(); the
 trigger writes the old column archived from it. A new handwritten write of it (UPDATE lists SET ... archived=, in one line)
@@ -43,7 +48,11 @@ FILL = "migr_liststate5537"  # the start's one-off fill (core/db.py) names the o
 FILL_LINES = 5  # its statement stands within these lines after the flag
 # 2.1054.0 (#5794): a handwritten write of the old archive column of lists (list_set_archived writes the marker)
 WRITE = re.compile(r"\bUPDATE\s+lists\s+SET\b(?!_)[^\"']*?(?<![.\w])archived\s*=", re.I)
-HELP = "use list_state_sql() / otr_live() / list_set_archived() of kalmido/core/access.py"
+# 2.1061.0 (#5867, stage 3): a read of the old column: qualified anywhere (not compared: QUAL counts that), or bare in a line
+# that reads lists (not AS archived = the key list_archived_sql() keeps, not archived_at, not a quoted key "archived")
+READ_Q = re.compile(r"\b(?:l|lists|lst)\.archived\b(?!\s*(?:=|<>|!=))", re.I)
+READ = re.compile(r"(?<![.\w'\"])(?<!AS )archived\b(?![_'\"])", re.I)
+HELP = "use list_state_sql() / otr_live() / list_set_archived() / list_archived_sql() / list_out() of kalmido/core/access.py"
 
 
 def count_text(text):
@@ -60,9 +69,12 @@ def count_text(text):
         m = FROM_LISTS_L.search(line)
         if m:
             n += len(QUAL_L.findall(line, m.start()))
+        n += len(READ_Q.findall(line))
         m = FROM_LISTS.search(line)
         if m:
-            n += len(BARE.findall(line, m.end()))
+            bare = {x.start() for x in BARE.finditer(line, m.end())}
+            n += len(bare)
+            n += sum(1 for x in READ.finditer(line) if x.start() not in bare)  # 2.1061.0 (#5867): reads, a filter counted once
     return n
 
 

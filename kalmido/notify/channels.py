@@ -36,7 +36,7 @@ from ..core.i18n import LANGS, md_plain, N_, tr, trn
 from ..core.db import body, connect, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import GATE, me
 from ..accounts.orgs import org_role  # 2.240.0 B2 (#2867): pulled up from functions
-from ..core.access import Denied, live_sql, org_trip_sql, ov_open, reading_sql, task_visible
+from ..core.access import Denied, live_sql, org_trip_sql, ov_open, reading_sql, task_visible, list_archived_sql
 from ..core.errors import BadInput
 from ..core.mailframe import MAIL_ACC, MAIL_MUTED, Safe, mail_html
 from ..notify.alerts import _env_int, aa_count, aa_err, aa_fail, aa_ok
@@ -546,8 +546,8 @@ def chn_list_events(c, n, auto=False):
     self_id = None if auto or g.get("auth_via") == "hook_in" else actor  # 2.367.3 (#2973): an inbound webhook acts as its owner, but is news to them
     sent = 0
     for (tid, ev), e in n.items():
-        t = c.execute("""SELECT t.id, t.title, t.status, t.deleted_at, t.assignee_id, t.list_id, l.name AS lname, l.is_inbox, l.owner_id,
-                         l.org_id, l.life, l.family, l.org_visibility, l.e2e, l.archived, l.deleted_at AS ldel
+        t = c.execute(f"""SELECT t.id, t.title, t.status, t.deleted_at, t.assignee_id, t.list_id, l.name AS lname, l.is_inbox, l.owner_id,
+                         l.org_id, l.life, l.family, l.org_visibility, l.e2e, {list_archived_sql('l')} AS archived, l.deleted_at AS ldel
                          FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?""", (tid,)).fetchone()
         if not t or t["deleted_at"] or t["ldel"] or t["archived"] or (t["life"] or "") in ("health", "budget"):
             continue

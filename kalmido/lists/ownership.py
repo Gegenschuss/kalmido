@@ -7,7 +7,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import collab_all, Denied, list_role, my_max_sort, need_collab, qn_private
+from ..core.access import collab_all, Denied, list_role, my_max_sort, need_collab, qn_private, list_archived_sql
 from ..lists.groups import grp_sync
 from ..core.db import usettings  # 2.369.5 (#2517): pulled up from functions
 from ..core.i18n import N_  # 2.369.5 (#2517): pulled up from functions
@@ -219,7 +219,7 @@ def admin_lists_orphaned():
     from ..accounts.users import need_admin
     need_admin()
     c = db()
-    rows = c.execute("""SELECT l.id, l.name, l.archived, l.owner_id, l.org_id, u.username, u.display_name, u.kind, u.disabled,
+    rows = c.execute(f"""SELECT l.id, l.name, {list_archived_sql('l')} AS archived, l.owner_id, l.org_id, u.username, u.display_name, u.kind, u.disabled,
                                (SELECT COUNT(*) FROM list_members m WHERE m.list_id=l.id) AS members,
                                (SELECT COUNT(*) FROM tasks t WHERE t.list_id=l.id AND t.deleted_at IS NULL) AS tasks
                         FROM lists l JOIN users u ON u.id=l.owner_id

@@ -17,7 +17,7 @@ from ..core.config import app
 from ..core.pg import insert_id, write_lock
 from ..core.i18n import tr
 from ..core.db import bump, db, iso, local_now, now_utc
-from ..core.access import Denied, tvis
+from ..core.access import Denied, tvis, list_archived_sql
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_json, v1_view
 from ..agents.core import is_agent
@@ -45,7 +45,7 @@ def _apin_list(c, lid, write):
     """The project list lid as the token sees it (404 / 403 / 409 like the web app) -- never a health list."""
     if g.user["kid"]:
         raise Denied(403)
-    r = c.execute("SELECT life, archived FROM lists WHERE id=?", (lid,)).fetchone()
+    r = c.execute(f"SELECT life, {list_archived_sql('')} AS archived FROM lists WHERE id=?", (lid,)).fetchone()
     if not r or r["life"] == "health":
         raise Denied(404)
     role = need_overview(c, lid, write=write, full=True)  # 2.223.7 B (#2918): a participant sees no notepads / weekly status

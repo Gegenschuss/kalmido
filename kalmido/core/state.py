@@ -16,7 +16,7 @@ from ..accounts.session import me, session_gen, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
 from ..accounts.colors import ac_color_map
 from ..core.access import (
-    acx_lists_sql, collab_all, Denied, health_hidden, need_task, org_trips_hidden, plists, reading_ids, time_all, tvis, vis_search_lids, vis_sql, wr_sql, WRITE_ROLES,
+    acx_lists_sql, collab_all, Denied, health_hidden, list_archived, need_task, org_trips_hidden, plists, reading_ids, time_all, tvis, vis_search_lids, vis_sql, wr_sql, WRITE_ROLES,
 )
 from ..core.serializers import load_tasks, running_pomo, tags_for, td_lean, TD_DEFAULTS  # 2.575.0 B (#3966): + td_lean
 from ..core.pg import st_ids
@@ -124,8 +124,8 @@ def visible_lists(c, uid, light=False):
         tl = token_lists()  # 2.30.0 (#919): a token limited to selected lists
         if tl is not None:
             rows = [r for r in rows if r["id"] in tl]
-    if light:
-        return [{k: r[k] for k in r.keys() if not k.startswith("m_")} for r in rows]
+    if light:  # 2.1061.0 (#5867): archived from the state marker (list_archived), not the old column
+        return [{**{k: r[k] for k in r.keys() if not k.startswith("m_")}, "archived": list_archived(r)} for r in rows]
     ids = [r["id"] for r in rows]
     members, names = {}, {}
     if ids and collab_all():
@@ -183,6 +183,7 @@ def visible_lists(c, uid, light=False):
     out = []
     for r in rows:
         d = {k: r[k] for k in r.keys() if not k.startswith("m_")}
+        d["archived"] = list_archived(r)  # 2.1061.0 (#5867, stage 3): from the state marker, the key stays for the client / API
         d.update(le2s.get(r["id"], {"e2e_pending": 0, "e2e_mine": False}))
         d["progress"] = prog.get(r["id"], {"done": 0, "total": 0, "overdue": 0, "next_due": None})
         d["status_by_name"] = snames.get(r["status_by"], "")

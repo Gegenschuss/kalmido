@@ -4,7 +4,8 @@
 container.
  - a handwritten filter on lists.archived / deleted_at is counted: archived=0 / =1 / deleted_at IS NULL after FROM / JOIN lists,
    l.archived / lists.archived compared anywhere, l.deleted_at only in a line that reads lists l
- - not counted: reading the value (SELECT archived), other tables with the alias l (conn_links l), a filter of a table that
+ - 2.1061.0 (#5867): reading the old column counts too (SELECT archived / l.archived / COALESCE(archived, 0) on lists)
+ - not counted: the helper's key (AS archived), archived_at, a dict key "archived", other tables with the alias l (conn_links l), a filter of a table that
    stands before FROM lists in the line, list_state_sql() / otr_live(), the schema, the start's one-off fill (its flag)
  - the same number as the baseline: quiet; fewer / a file gone: a notice (--strict: red); --update only lowers
  - the repository: no finding, the baseline file is there
@@ -33,7 +34,16 @@ for text, want, what in [
     ('Q = "FROM lists l WHERE l.deleted_at IS NULL"', 1, "l.deleted_at in a line that reads lists l"),
     ('Q = "AND t.due IS NOT NULL AND l.archived=0"', 1, "l.archived compared anywhere (multi-line statement)"),
     ('Q = "JOIN lists l ON l.id=t.list_id WHERE l.archived<>0"', 1, "l.archived<>0"),
-    ('Q = "SELECT id, name, archived FROM lists WHERE id=?"', 0, "reading the value is no filter"),
+    # 2.1061.0 (#5867, stage 3): reading the old column counts too (the value comes from list_archived_sql / list_out)
+    ('Q = "SELECT id, name, archived FROM lists WHERE id=?"', 1, "reading the column in a SELECT on lists"),
+    ('Q = "SELECT k.*, l.archived FROM git_conns k JOIN lists l ON l.id=k.list_id"', 1, "l.archived read once, not twice"),
+    ('Q = "FROM lists l WHERE l.org_id=? ORDER BY l.archived, lower(l.name)"', 1, "l.archived in an ORDER BY"),
+    ('Q = "SELECT id FROM lists WHERE owner_id=? AND COALESCE(archived,0)=0"', 1, "COALESCE(archived, 0)=0 on lists"),
+    ('Q = "AND COALESCE(l.archived, 0)=0"', 1, "COALESCE(l.archived, 0)=0 anywhere"),
+    ('Q = f"SELECT id, {list_archived_sql(\'\')} AS archived FROM lists WHERE id=?"', 0, "the helper with the key AS archived"),
+    ('Q = "SELECT id, archived_at FROM lists WHERE id=?"', 0, "archived_at is the moment"),
+    ('Q = "SELECT id, archived FROM clients WHERE id=?"', 0, "another table's archive read"),
+    ('x = r["archived"]  # SELECT * FROM lists', 0, "the key of a dict is no column read"),
     ('Q = "SELECT 1 FROM conn_links l WHERE l.deleted_at IS NULL"', 0, "another table with the alias l"),
     ('Q = "SELECT * FROM hub_mails WHERE deleted_at IS NULL AND list_id IN (SELECT l.id FROM lists l"', 0, "a table before FROM lists"),
     ('Q = f"SELECT id FROM lists WHERE {list_state_sql()} AND id IN {otr_live(\'l\')}"', 0, "the helpers"),
