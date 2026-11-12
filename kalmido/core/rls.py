@@ -20,7 +20,7 @@ org_id that is missing here still gets the policy at start-up (with a warning), 
 
 import time
 
-from .pg import qi, table_names  # 2.965.0 (#5654): _lock_all
+from .pg import qi, table_names  # 2.1079.0 (#5654): _lock_all
 
 APP_ROLE = "kalmido_app"
 
@@ -173,7 +173,7 @@ def _policy(c, table, expr):
     c.execute(f"CREATE POLICY {POLICY} ON {table} USING ({expr}) WITH CHECK ({expr})")
 
 
-# 2.965.0 (#5654): a start that applies the policies next to the running server (a CLI, a helper importing the app) locked
+# 2.1079.0 (#5654): a start that applies the policies next to the running server (a CLI, a helper importing the app) locked
 # its ~300 tables one after the other with ALTER TABLE; a background transaction of the server holding one table and reading
 # the next deadlocked with it (CI v2.941.0: four starts in a row). Now every table is locked in ONE statement first, each wait
 # shorter than Postgres' deadlock_timeout (1 s): the start gives way (back to a savepoint, nothing held) and tries again
@@ -182,7 +182,7 @@ RLS_LOCK_TRIES = 50  # then the ALTER TABLEs wait as before
 
 
 def _lock_all(c, tables):
-    """2.965.0 (#5654): ACCESS EXCLUSIVE on all tables inside init_db's transaction, or nothing (the caller's ALTERs then
+    """2.1079.0 (#5654): ACCESS EXCLUSIVE on all tables inside init_db's transaction, or nothing (the caller's ALTERs then
     lock one by one as before). True when locked."""
     if not tables:
         return True
@@ -274,7 +274,7 @@ def apply(c):
     if cat and _sig_get(c) == f"{sig}:{cat}":
         STATE["policies"] = "skipped"
     else:
-        _lock_all(c, set(have) | set(OWN_RULES))  # 2.965.0 (#5654): every table at once, giving way to the running server
+        _lock_all(c, set(have) | set(OWN_RULES))  # 2.1079.0 (#5654): every table at once, giving way to the running server
         for t, nullable in sorted(have.items()):
             if t not in OWN_POLICY:
                 _policy(c, t, rule(nullable))
