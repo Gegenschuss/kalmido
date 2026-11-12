@@ -20,6 +20,98 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.1040.0] - 2026-11-12
+
+Package 2.1026 (Bündel: Kern-Querschnitt Q6c: Suche im Browser und für Agenten).
+
+### Added
+- The command palette's "Everywhere" finds what every area's search finds, from one request: knowledge pages by their text, files and documents, contacts, events, notes, bookmarks, messages, comments and the office; each hit opens its target (#5280).
+- Calendar events are searchable for the first time: a word start of the title, place or description (umlauts either way), in the palette, for the API (`GET /api/v1/search?kind=events`, scope calendar) and for agents (#5280).
+- MCP: one tool `search` (q, kind all|tasks|messages|contacts|notes|files|wiki|events) replaces `search_tasks`, `search_messages`, `search_contacts`, `search_files` and `search_notes`; kind all gives a short overview of every kind the token may read, never office documents (#5280).
+
+### Changed
+- One search registry (core/srchreg.py) and one route per side: `GET /api/search?kind=` and `GET /api/v1/search?kind=`; the routes `/api/search/messages`, `/api/files/search`, `/api/wiki/search` and `/api/v1/files/search` are gone, `scope=messages` stays the older name of `kind=messages` (#5280).
+- One browser search registry `SEARCH_SOURCES`: locked lists and knowledge spaces add their hits in the browser; the chat search, the search page and the palette use it (#5280).
+- The last ILIKE searches use the shared index: bookmarks, the reading list, the organisation's task overview (a word start, umlauts either way) and file names (a part of the name, umlauts either way) (#5280).
+
+Package 2.1030 (Bündel: Zitat des Tages: Übersetzungen für Spanisch, Itali).
+
+### Added
+- Dada quote of the day in Spanish, Italian, Dutch and French: every quote that is no sound poem has its own translation (French for the German and English originals); each language is a file of its own loaded on demand only for that interface language (quotes_dada_es/fr/it/nl.js), English stays the fallback while it is missing (#5785)
+
+Package 2.1028 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Tasks are deleted for good through the shared core's trash (stage 2c): "Empty trash", its background run and deleting a single task for good (`DELETE /api/tasks/<id>?hard=1`) now run `obj_purge` per task, so the core's history / undo rows of the task go with it. A project kept by law still keeps its tasks (409 with its date); subtasks in lists the person may not empty stay there, detached (#5536).
+- Shared word index of sealed texts: the background catch-up works on a time budget per tick (about 2 s over all kinds, in turn) instead of 100 objects per kind, and takes each object under the lock of its source row, so it never overwrites a fresher save; the file-text search of tasks narrows by the index's hashes in SQL before matching (#5783).
+### Fixed
+- Search in documents, recognised file texts and filed mails: until an object is indexed again by the new rules, a search word of 2-3 characters also finds it by its old whole-word entry (#5783).
+
+Package 2.1031 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- #5538: core trash, small findings of the review of 2.851: the projects' trash rule judges the person it is asked for (also outside a request; agents never); deleting for good checks the legal retention under its lock (409, the custodian's early delete stays); the retention run with deleting switched off counts every due item, and full batches rotate so items that stay locked never hold back the rest; a restored task keeps its time format; the task data no longer carries the server's rev / updated_by / deleted_by; the files trash shows the trash period with its floor of one day.
+
+Package 2.1005 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p).
+### Changed
+- Deleted quotation and invoice drafts now go into the shared trash. They stay restorable from the office trash with their number (while still free), client links and billed time, and every list, export, search, the tax report and the agent API leaves them out. (#5415)
+- A part removed from a quotation goes into the trash with its positions and comes back with them. (#5415)
+- Deleted trips, travel receipts and credit card positions go to the shared trash; undo and the office trash restore them with the same checks as before (open months, a live trip, a draft statement). Taking back a per diem import puts each trip into the trash on its own. (#5415)
+- Deleting a finalised quotation that was never sent puts it into the trash as a draft; it comes back as a draft. (#5415)
+- Old office trash entries from earlier versions are moved into the shared trash on start and restore through it; old copies of video sign-off records come back the same way; only the opening balance of the cash flow keeps the old copies for now (#5789). (#5415)
+### Fixed
+- The toast's "Undo" ("Saved - Undo", "Marked read - Undo" ...) takes back exactly its own step again: a newer change of the same person (another device, another item) stays. A part changed since is named; a newer finalisation in the same workspace holds it. The arrow, Ctrl/Cmd+Z and "Back up to here" still go back to the newest step. New route `POST /api/undo/<id>/undo`. (#5637)
+- Expired ordinary organisation invitations are deleted by the daily clean-up 30 days after they expire. Silent and neutral entries stay for now, so a vanishing entry never reveals whether an address has an account (#5786). (#5118)
+- Travel billing no longer offers or bills onto a draft in the trash. (#5415)
+
+Package 2.1038 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Favourites: the menu of a folder tile (right click, long press on a phone; head bar and the sidebar's favourites) shows the folder's content on top - a project folder its projects in the sidebar's order (no archived ones) and its subfolders, a folder of the file store its subfolders and files (loaded when the menu opens); a click opens the entry, more than ten end with "Show all", an empty folder says "Empty" (#5811)
+
+### Fixed
+- Favourites: folders can be dragged into the favourites row again - a project folder of the sidebar (its tree swallowed the drag) and a folder of the file store (from the sidebar's tree or as a row / card of the open folder) (#5809)
+
+Package 2.1033 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Settings > Account shows the own e-mail address and whether it is confirmed; "Confirm address" sends a mail with a one-time link (2 days). Opened while signed in as that account (also after signing in first) the app asks once, naming the address, and confirms it. Only a confirmed address counts for organisation invitations by address, "E-mails from my own address" and replies by mail (since #5775); an account an admin typed in now has its own way to confirm it (#5790).
+- Confirming wakes the silent organisation invitations of exactly that address: the person hears of them (News, mail, push) in the inviting admin's name, the row keeps its date; a company of its own whose admin may not see the person keeps its row silent (#3570) (#5790).
+- Settings > Integrations > Tasks by e-mail: "E-mails from my own address" shows a hint with "Confirm address" while the address is not confirmed (#5790).
+- Routes `GET /api/me/email`, `POST /api/me/email/proof`, `POST /api/me/email/proof/confirm` (the web app only: a session or the sign-in proxy, never an agent or an API token) (#5790).
+
+### Fixed
+- Settings > Integrations > Tasks by e-mail named no own address ("none set") and the summary by mail had no "Send now": the address had been swallowed by a code comment since 2.49.0 (#5790).
+
+Package 2.1035 (Bündel: Geteilte Ansicht: von links in die rechte Hälfte z).
+
+### Added
+- #5802 Split view: drag a project from the sidebar, a task, a document card or a knowledge page from the left half onto the new "Open here" field over the top of the right half to open it there - the same as "Open on the right" in its menu. The field shows only while such a drag runs and only with the split view on; dropped anywhere else the drag does what it did before (sorting the sidebar, moving a task, the drops into the other half). By keyboard the menu entry stays the way.
+
+Package 2.1032 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Sharing a projects folder by e-mail address no longer stores a share for an account outside the organisation of a project in that folder (archived ones too) or of the folder itself: such an address gets the same neutral answer as an unknown one and the folder's people list no longer shows that account's name (#5788).
+- The last rare deadlock windows from the review of 2.1017 are closed (one of two requests at the same moment could get an error, no wrong data): handing on a deleted person's address books writes every book first and then the shares, the project members dialog and every other writer of a project member row take the share's lock before the member row (the order of a folder share), and retiring an organisation, moving a calendar into another workspace and moving knowledge pages into a private space lock the events, contacts and page files before the calendar, book or page itself (#5788).
+
+Package 2.1039 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Bell: every open approval card and permission question of an agent's chat stands under "For you" and counts in the bell's number and on the app icon until it is decided, withdrawn or expired; a waiting job and its card count once, and a waiting job without a task now gets its entry too (before: only the push) (#5804)
+- Bell: a question an agent asks in its chat (a job message of kind question, or a message with answer buttons; never judged by its text) stands under "For you" as one row per agent ("Helper has 2 questions for you"), each question counted, until the chat is opened or the question answered; results, status lines and plain messages do not count (#5805)
+
+Package 2.1040 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Split view: the line between the two halves is always visible now (4 px in a clear grey, the accent colour on hover, drag and keyboard focus); the grip stays wider than the line and neither half changes its width. (#5813)
+### Added
+- Settings > Appearance > Split view: "Split from window width" in pixels (default 1440 px, empty = default). The lower bound is the room both halves need (66 rem, about 1056 px at the standard font size); a smaller value is raised to it with a hint. The line below shows the current window width, a "Default" button resets it. The threshold is the person's on every device and also decides when "Open on the right" is offered. The section shows from that lower bound on, so a narrower window can lower the threshold. (#5813)
+
+Package 2.1034 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- The move from SQLite (Kalmido up to 2.36) to PostgreSQL is gone: `python app.py migrate-sqlite`, `kalmido/admin/migrate.py`, the load hook of the start, the look for an old `tasks.db` at start and `KALMIDO_MIGRATE_CLI`. An install still on SQLite updates to 2.37.0 first (docs/UPGRADING.md); the old command now ends with that note instead of starting a server (#5304).
+- Backups from before 2.37 (a `tasks.db` in the zip) are still listed and checked, but their restore is refused; restore them with 2.36 and update through 2.37 (#5304).
+- The installers no longer copy a SQLite `tasks.db` before an update, only the PostgreSQL dump (#5304).
+
 ## [2.1024.0] - 2026-11-12
 
 Package 2.1011 (Bündel: CI-Nachtjob install-upgrade rot seit 07.11. (pgdat, Test-Auswahl: Schema-Änderungen nehmen rls_direct , Aufräum-Ereignis (tidy) komm).
@@ -164,7 +256,8 @@ Not released (the CI of this version was red); its changes are listed under 2.10
 
 Not released (the CI of this version was red); its changes are listed under 2.1007.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1024.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1040.0...HEAD
+[2.1040.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1040.0
 [2.1024.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1024.0
 [2.1020.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1020.0
 [2.1016.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1016.0
