@@ -26,7 +26,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
-from kt import FAILS, OKS, check, sess  # noqa: E402
+from kt import CT as TCT, FAILS, OKS, check, sess  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -272,7 +272,11 @@ check(r.status_code == 201, "(n2) setup: a framework contract's PDF " + r.text[:
 CF = r.json()["id"]
 check(file_in(A, "contract_file", CF, GF) > 0 and A.delete(B + O + f"/contracts/{CT}/files/{CF}").ok, "(n2) setup: filed, then deleted")
 sql("UPDATE office_contract_files SET deleted_at=? WHERE id=?", ("2000-01-01T00:00:00Z", CF), write=True)
-check(A.get(B + O + "/contracts").ok, "(n2) the framework contracts list runs the trash")
+# 2.1003.0 (#5719): since 2.993.0 (#5413) a contract file's trash is the core's (kind ocfile): the core's retention run deletes it
+# (core/writes.py obj_trash_tick, the switch KALMIDO_PURGE_TRASH=1 of this container), no more the contracts list on reading
+out = subprocess.run(["docker", "exec", TCT, "python", "-c", "import app\nfrom kalmido.core.db import connect\nfrom kalmido.core.writes import obj_trash_tick\n"
+                      "c = connect()\nprint('counts', obj_trash_tick(c, True))\nc.commit()\nc.close()"], capture_output=True, text=True)
+check("counts" in out.stdout and "Traceback" not in out.stderr, "(n2) the core's retention run ran " + (out.stdout + out.stderr)[-400:])
 left = sql("SELECT COUNT(*) FROM fs_nodes WHERE kind='ref' AND ref_kind='contract_file' AND ref_id=?", (CF,))[0][0]
 check(not sql("SELECT 1 FROM office_contract_files WHERE id=?", (CF,)) and left == 0, f"(n2) the PDF and its folder node are gone ({left})")
 
