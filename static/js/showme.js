@@ -1,3 +1,4 @@
+// @ts-check
 /* Kalmido web client: "Show me" (2.1072.0, #5860). An agent that explains a way through the app puts the places of that way
    under its chat message (message.show: [{target, text, route, sel, label}], the named places of docs/help-targets.json,
    checked by the server: agents/showme.py). The button "Show me" (agentchat.js) loads this file; it opens the step's view
@@ -11,20 +12,23 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
+/** @type {any} */
 const SHW = {on: false, steps: [], i: 0, el: null, back: '', aid: 0, chat: false, since: 0, miss: false, rk: '', iv: 0, drawn: '', seen: false};
 const SHW_WAIT = 2500;  // ms a step looks for its control before the card says it is not on the screen
 const SHW_TICK = 250;   // ms between two looks (the control may appear, move or go)
 
 // the first visible control of a step: the selectors one after the other (the list's order, not the page's)
+/** @param {string} sel @returns {HTMLElement | null} */
 function shw_find(sel) {
   for (const q of String(sel || '').split(',')) {
     let els; try { els = $$(q.trim()); } catch { continue; }  // a selector this browser does not know: the next one
-    const e = els.find(x => { const r = x.getBoundingClientRect(); return (r.width || r.height) && getComputedStyle(x).visibility !== 'hidden'; });
+    const e = /** @type {HTMLElement[]} */ (els).find(x => { const r = x.getBoundingClientRect(); return (r.width || r.height) && getComputedStyle(x).visibility !== 'hidden'; });
     if (e) return e;
   }
   return null;
 }
 
+/** @param {any[]} steps */
 function shw_start(steps) {
   steps = (Array.isArray(steps) ? steps : []).filter(s => s && typeof s.sel === 'string');
   if (!steps.length) return;
@@ -42,7 +46,7 @@ function shw_start(steps) {
   if (p && !p.classList.contains('hidden') && !chatFull() && (innerWidth < 1000 || p.classList.contains('float'))) { SHW.chat = true; chatClose(); }
   SHW.el = spotMake('spot');
   SHW.el.addEventListener('click', e => {
-    const b = e.target.closest('[data-shw]'); if (!b) return;
+    const b = /** @type {HTMLElement | null} */ (/** @type {HTMLElement} */ (e.target).closest('[data-shw]')); if (!b) return;
     const a = b.dataset.shw;
     if (a === 'next') shw_next(); else if (a === 'back') shw_go(SHW.i - 1); else shw_end('close');
   });
@@ -51,8 +55,10 @@ function shw_start(steps) {
   shw_go(0);
 }
 // the same from a small chat window (above): the main window starts it
+/** @param {any[]} steps */
 function shw_open(steps) { shw_start(steps); }
 
+/** @param {number} i */
 function shw_go(i) {
   if (!SHW.on) return;
   SHW.i = Math.max(0, Math.min(SHW.steps.length - 1, i));
@@ -63,6 +69,7 @@ function shw_go(i) {
 }
 function shw_next() { if (SHW.i >= SHW.steps.length - 1) shw_end('done'); else shw_go(SHW.i + 1); }
 
+/** @param {KeyboardEvent} e */
 function shw_key(e) {
   if (!SHW.on) return;
   const k = e.key;
@@ -90,6 +97,7 @@ function shw_tick() {
   if (rk !== SHW.rk) { SHW.rk = rk; spotPlace(SHW.el, r); }
 }
 
+/** @param {any} st @param {string} state */
 function shw_draw(st, state) {
   const el = SHW.el, card = $('.tcard', el), n = SHW.steps.length, last = SHW.i === n - 1;
   el.dataset.target = st.target || ''; el.dataset.state = state; el.dataset.step = String(SHW.i);
@@ -101,6 +109,7 @@ function shw_draw(st, state) {
 
 // how = 'done' (the last step: stays where it is, the person goes on there), 'close' (back to where the button was pressed,
 // the chat again when it stepped aside), '' (ended by another start / the layer gone)
+/** @param {string} how */
 function shw_end(how) {
   if (!SHW.on) return;
   SHW.on = false; clearInterval(SHW.iv); SHW.iv = 0;
