@@ -600,7 +600,8 @@ def wsh_create():
             # 2.1071.0 (#5658): nobody proved the address (yet): an open share, made when its account signs in with it proved
             # (core/addrshare.py); the dialog lists it like a share by address that found its account (Fable 2.965 F2)
             if not addr_account(c, b["email"]):
-                ads_open(c, "wiki", uid, b["email"], {**b, "kind": "person"}, owner_id=uid, path=path)
+                ads_open(c, "wiki", uid, b["email"], {**b, "kind": "person"}, owner_id=uid,  # a page by its id (review F5)
+                         ref_id=page, path=path if folder else "")
                 bump(c)
                 c.commit()
             return jsonify(ok=True, by_email=True)

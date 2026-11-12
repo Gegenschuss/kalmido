@@ -3,8 +3,10 @@ e-mail address binds only an account that proved the address (core/access.py add
 until the account of that address signs in with it proved (or proves it while signed in), then it is made as the sharer
 would make it now (the area's own route, the sharer's rights and checks of that moment). One row per kind, object, space
 owner and address:
-  kind = 'list' (a project, ref_id = lists.id), 'list_folder' (a folder of projects, path = the folder, owner_id = whose
-  folder), 'wiki' (a knowledge page / folder of a private space, path = the page / folder, owner_id = the space's owner);
+  kind = 'list' (a project, ref_id = lists.id, org_id = its organisation), 'list_folder' (a folder of projects, path = the
+  folder exactly, owner_id = whose folder), 'wiki' (a knowledge page of a private space: ref_id = the page; a folder there:
+  path = the folder; owner_id = the space's owner);
+  org_id = the project's organisation (row-level security like every organisation table, core/rls.py), NULL otherwise;
   body = the share's request without the address (role, expiry, page id ...), JSON;
   email_seal / email_key = the address sealed (shown to who may manage the share) and its keyed hash (the lookup), as
   sheet_shares keeps them; created_by = who typed it in (the replay acts as them; their account gone = the row goes).
@@ -16,6 +18,7 @@ CREATE TABLE IF NOT EXISTS obj_addr_shares (  -- 2.1071.0 (#5658): open shares b
   kind TEXT NOT NULL,
   ref_id BIGINT, -- no FK: the kind's object (a project); core/addrshare.py drops a row whose object is gone
   owner_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  org_id BIGINT REFERENCES orgs(id) ON DELETE CASCADE,
   path TEXT NOT NULL DEFAULT '',
   body TEXT NOT NULL DEFAULT '{}',
   email_seal TEXT NOT NULL,
@@ -25,5 +28,6 @@ CREATE TABLE IF NOT EXISTS obj_addr_shares (  -- 2.1071.0 (#5658): open shares b
 CREATE UNIQUE INDEX IF NOT EXISTS obj_addr_shares_one ON obj_addr_shares(kind, COALESCE(ref_id, 0), COALESCE(owner_id, 0), path, email_key);
 CREATE INDEX IF NOT EXISTS ix5658_obj_addr_shares_key ON obj_addr_shares(email_key);
 CREATE INDEX IF NOT EXISTS ix5658_obj_addr_shares_created_by ON obj_addr_shares(created_by);
+CREATE INDEX IF NOT EXISTS ix5658_obj_addr_shares_org ON obj_addr_shares(org_id) WHERE org_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix5658_obj_addr_shares_owner_id ON obj_addr_shares(owner_id) WHERE owner_id IS NOT NULL;
 """

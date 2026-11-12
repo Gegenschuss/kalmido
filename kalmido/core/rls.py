@@ -123,6 +123,7 @@ TABLES = (
     "reading_orgs",  # 2.172.0 B (#2677): the read-later project of an organisation
     "life_trip_costs",  # 2.173.0 A (#2680): the office trip of a trip project (org_id = the office area)
     "obj_history", "obj_undo", "obj_revoked",  # 2.558.0 (#4709): the core's history, undo steps and revoked rows (NULL = a private object)
+    "obj_addr_shares",  # 2.1071.0 (#5658): open shares by address (a project's organisation; NULL = a private project / folder / page)
     "obj_versions",  # 2.958.0 (#5281): the core's versions (was wiki_versions; NULL = a private object, the app checks it)
     "undo_groups",  # 2.747.0 (#5249): a person's undo step groups (NULL = a private object's; the app reads only the own user_id)
     "module_cards",  # 2.575.0 (#3778): module cards (NULL = a person's private card, the app checks user_id)

@@ -591,6 +591,7 @@ OX_LEFT = {
     "pl_imported": _SECRET, "pl_rules": _SECRET, "pl_sources": _SECRET, "pl_uploads": _SECRET, "portal_logins": _SECRET,
     "rc_suggest": _DERIVED, "time_wipes": _DERIVED,  # 2.530.0 B (#4315): the Undo copy of "Delete all times"
     "list_part_trash": _DERIVED,  # 2.567.0 A (#4707): the copies of deleted sections / sprints until the trash period ends; 2.783.0 (#5368): + deleted fields, "Delete all times"
+    "obj_addr_shares": "open shares by e-mail address (sealed with this server's key, not_included)",  # 2.1071.0 (#5658)
     "obj_history": _DERIVED, "obj_undo": "undo steps of 30 days", "obj_revoked": "shares removed (not_included)",  # 2.558.0 (#4709): the core's working data; 2.747.0 (#5249): 30 days
     "undo_groups": "undo steps of 30 days",  # 2.747.0 (#5249): their heads per person
     "doc_views": "saved views of the documents search (their filters name label and folder ids of this server)",  # 2.579.0 (#4802)

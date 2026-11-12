@@ -994,9 +994,16 @@ def member_set(lid):
 
     def quiet():
         """2.1017.0 (#5774): a refusal on the address path after the account was found is the neutral answer of an unknown
-        address (nothing written, rolled back): a 409 / 404 there told that the address has a proved account."""
+        address (nothing written, rolled back): a 409 / 404 there told that the address has a proved account.
+        2.1071.0 (#5658, review F3): the open share stays as for an unknown address (the dialog lists it the same way); it
+        is made at a later sign-in once it fits."""
         c.rollback()
+        _ads_list_open()
         return jsonify(ok=True, by_email=True)
+
+    def _ads_list_open():
+        ads_open(c, "list", me(), b["email"], b, ref_id=lid, org_id=c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0])
+        c.commit()
 
     if by_mail:  # 2.22.0 (#752): share by e-mail address (mode "own contacts": no directory). The answer
         # never says whether the address has an account
@@ -1005,8 +1012,7 @@ def member_set(lid):
         r = addr_account(c, b["email"])
         r = (r,) if r else None
         if not r:  # 2.1071.0 (#5658): nobody proved the address (yet): an open share, made when its account signs in with it
-            ads_open(c, "list", me(), b["email"], b, ref_id=lid)  # proved (core/addrshare.py); the same answer as ever
-            c.commit()
+            _ads_list_open()  # proved (core/addrshare.py); the same answer as ever
             return jsonify(ok=True, by_email=True)
         from ..accounts.orgs import ws_member_problem
         if r[0] == me() or r[0] == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0] or \
@@ -1015,7 +1021,7 @@ def member_set(lid):
             return jsonify(ok=True, by_email=True)
         if ws_member_problem(c, lid, r[0]) or _agent_bridge_blocks(c, lid, r[0]):  # 2.28.0 (#935): not of the list's workspace;
             # 2.30.0 (#919): would connect lists with different people through the list's agent -> nothing happens, nothing is revealed
-            return jsonify(ok=True, by_email=True)
+            return quiet()  # 2.1071.0 (#5658, review F3): + the open share, as for an unknown address
         uid = r[0]
     elif not may_see(c, me(), uid) and g.get("lmc_restore") != uid:  # 2.568.0 (#4739): a share put back (lmcore._on_restore)
         return err(tr("unknown person"), 404)  # reaches who it reached before (e.g. shared by e-mail address)
@@ -1258,12 +1264,17 @@ def folder_people_put():
         r = addr_account(c, b["email"])  # 2.1001.0 (#5669): only a proved address, an unproved one is answered like an unknown one
         r = (r,) if r else None
         from ..lists.lffolder import lf_folder_nodes
-        if not r:  # 2.1071.0 (#5658): an open share of the folder, made when the account of the address signs in with it proved
-            if lf_folder_nodes(c, me(), f) or any(_in_folder(x[1], f) for x in c.execute(
-                    "SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall()):
-                ads_open(c, "list_folder", me(), b["email"], b, owner_id=me(), path=f)
-                c.commit()
+        if not (lf_folder_nodes(c, me(), f) or any(_in_folder(x[1], f) for x in c.execute(
+                "SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall())):
+            return jsonify(shared=0, updated=0, by_email=True)  # 2.1071.0 (#5658, review F1): no such folder - nothing, for every address
+
+        def _ads_folder_open():
+            c.rollback()
+            ads_open(c, "list_folder", me(), b["email"], b, owner_id=me(), path=f)
+            c.commit()
             return jsonify(shared=0, updated=0, by_email=True)
+        if not r:  # 2.1071.0 (#5658): an open share of the folder, made when the account of the address signs in with it proved
+            return _ads_folder_open()
         if r[0] == me():
             return jsonify(shared=0, updated=0, by_email=True)
         # 2.1032.0 (#5788, review of 2.1017): the workspace check of member_set's address path -- without it the folder's share
@@ -1275,7 +1286,7 @@ def folder_people_put():
         if any(ws_fit_problem(c, n["org_id"], r[0]) for n in lf_folder_nodes(c, me(), f) if n["org_id"]) or \
                 any(ws_member_problem(c, x[0], r[0]) for x in c.execute(
                     "SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0 ORDER BY id", (me(),)).fetchall() if _in_folder(x[1], f)):
-            return jsonify(shared=0, updated=0, by_email=True)
+            return _ads_folder_open()  # 2.1071.0 (#5658, review F3): the open share stays, as for an unknown address
         uid = r[0]
     elif not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() or personal_agent_foreign(c, uid, me()) \
             or not may_see(c, me(), uid):  # 2.22.0 (#752)
@@ -1286,7 +1297,7 @@ def folder_people_put():
     from ..collab.liste2e import le2a_folder_problem
     p = le2a_folder_problem(c, me(), f, role, uid)  # 2.64.1 (#1817): no participants in lists with the lock
     if p and by_mail:  # 2.1017.0 (#5774): by address the answer of an unknown address (a 409 told that it has an account)
-        return jsonify(shared=0, updated=0, by_email=True)
+        return _ads_folder_open()  # 2.1071.0 (#5658, review F3): + the open share, as for an unknown address
     if p:
         return jsonify(error=p, code="list_e2e_member"), 409
     from ..lists.lffolder import lf_people  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
@@ -1653,4 +1664,10 @@ def _ads_folder_gone(c, x):
 
 
 ads_kind("list", member_set, lambda x: (int(x["ref_id"]),), _ads_list_may, _ads_list_gone)
-ads_kind("list_folder", folder_people_put, lambda x: (), lambda c, uid, x: x["owner_id"] == uid, _ads_folder_gone)
+def _ads_folder_replay(x):
+    """The folder's share route again, for the folder at the path the row has now (it follows renames, review F1)."""
+    g.body = {**g.body, "folder": x["path"]}
+    return folder_people_put()
+
+
+ads_kind("list_folder", _ads_folder_replay, lambda x: (x,), lambda c, uid, x: x["owner_id"] == uid, _ads_folder_gone)

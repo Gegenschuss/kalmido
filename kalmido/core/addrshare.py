@@ -34,7 +34,11 @@ from ..accounts.login import addr_key, seal, unseal
 
 ADS_SEAL = "addr-share"  # purpose of email_seal / email_key
 ADS_MAX = 200  # open rows one person may have typed in
+ADS_PER_ADDR = 50  # open rows of one address (all sharers): the replay at its sign-in stays short (review #5658 F4)
+ADS_REDEEM = 50  # rows replayed per sign-in / proof (the next one takes the rest)
 ADS_DAYS = 180  # an open row nobody redeemed goes after this
+# the parts of a share's request that are kept for its replay (review #5658 F7: no free-form body)
+ADS_KEYS = ("role", "expires_at", "tz", "apply", "page_id", "space", "folder", "images", "expires", "kind")
 ADS_KINDS = {}
 
 
@@ -55,25 +59,37 @@ def ads_clean(em):
     return em if EMAIL_RE.fullmatch(em) else ""
 
 
-def ads_open(c, kind, by, em, body, ref_id=None, owner_id=None, path=""):
-    """An open share of address em, typed in by account by (body = the route's request without the address). Silent: the
-    answer of the route stays the one of every address (no row beyond ADS_MAX, an invalid address: nothing). True = written."""
+def ads_open(c, kind, by, em, body, ref_id=None, owner_id=None, path="", org_id=None):
+    """An open share of address em, typed in by account by (body = the route's request; only ADS_KEYS are kept). Silent: the
+    answer of the route stays the one of every address (no row beyond ADS_MAX / ADS_PER_ADDR, an invalid address, one's own
+    address: nothing). True = written."""
     em = ads_clean(em)
     if not em or kind not in ADS_KINDS:
         return False
     if em == str((c.execute("SELECT email FROM users WHERE id=?", (by,)).fetchone() or [""])[0] or "").strip().lower():
         return False  # one's own address
-    key = addr_key(c, ADS_SEAL, em)
-    old = c.execute("SELECT id FROM obj_addr_shares WHERE kind=? AND COALESCE(ref_id,0)=? AND COALESCE(owner_id,0)=? AND path=? AND email_key=?",
-                    (kind, int(ref_id or 0), int(owner_id or 0), path or "", key)).fetchone()
-    data = json.dumps({k: v for k, v in (body or {}).items() if k not in ("email", "user_id")}, ensure_ascii=False)[:4000]
-    if old:
-        c.execute("UPDATE obj_addr_shares SET body=?, created_by=?, created_at=? WHERE id=?", (data, by, iso(now_utc()), old["id"]))
-        return True
-    if c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE created_by=?", (by,)).fetchone()[0] >= ADS_MAX:
+    data = json.dumps({k: (body or {})[k] for k in ADS_KEYS if k in (body or {})}, ensure_ascii=False)
+    if len(data) > 4000:
         return False
-    insert_id(c, "INSERT INTO obj_addr_shares(kind,ref_id,owner_id,path,body,email_seal,email_key,created_by,created_at) "
-                 "VALUES(?,?,?,?,?,?,?,?,?)", (kind, ref_id, owner_id, path or "", data, seal(c, ADS_SEAL, em), key, by, iso(now_utc())))
+    key = addr_key(c, ADS_SEAL, em)
+    where = "kind=? AND COALESCE(ref_id,0)=? AND COALESCE(owner_id,0)=? AND path=? AND email_key=?"
+    args = (kind, int(ref_id or 0), int(owner_id or 0), path or "", key)
+    with system_ctx(c):  # counts only; the rows written are the sharer's own (row-level security checks the insert)
+        old = c.execute(f"SELECT id FROM obj_addr_shares WHERE {where}", args).fetchone()
+        full = not old and (c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE created_by=?", (by,)).fetchone()[0] >= ADS_MAX
+                            or c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=?", (key,)).fetchone()[0] >= ADS_PER_ADDR)
+    if full:
+        return False
+    try:
+        with c.savepoint():
+            if old:
+                c.execute("UPDATE obj_addr_shares SET body=?, created_by=?, created_at=? WHERE id=?", (data, by, iso(now_utc()), old["id"]))
+            else:
+                insert_id(c, "INSERT INTO obj_addr_shares(kind,ref_id,owner_id,org_id,path,body,email_seal,email_key,created_by,created_at) "
+                             "VALUES(?,?,?,?,?,?,?,?,?,?)", (kind, ref_id, owner_id, org_id, path or "", data, seal(c, ADS_SEAL, em), key, by,
+                                                            iso(now_utc())))
+    except Exception:  # noqa: BLE001  the same address typed in twice at once: one row is enough (review #5658 F9)
+        return False
     return True
 
 
@@ -114,7 +130,8 @@ def ads_repath(c, kind, owner_id, old, new):
     """A folder renamed / moved: its open rows follow (the path below it too)."""
     for x in c.execute("SELECT id, path FROM obj_addr_shares WHERE kind=? AND owner_id=?", (kind, owner_id)).fetchall():
         p = x["path"] or ""
-        if p.lower() == old.lower() or p.lower().startswith(old.lower() + "/"):
+        a, b = (p, old) if kind == "list_folder" else (p.lower(), old.lower())  # project folders compare exactly (review F6)
+        if a == b or a.startswith(b + "/"):
             try:
                 with c.savepoint():
                     c.execute("UPDATE obj_addr_shares SET path=? WHERE id=?", (new + p[len(old):], x["id"]))
@@ -125,7 +142,7 @@ def ads_repath(c, kind, owner_id, old, new):
 def ads_need(c, aid):
     x = ads_row(c, aid)
     k = ADS_KINDS.get(x["kind"]) if x else None
-    if not k or not k["may"](c, me(), x):
+    if not k or (x["created_by"] != me() and not k["may"](c, me(), x)):  # review F8: who typed it in may always take it back
         raise Denied(404)
     return x
 
@@ -190,7 +207,7 @@ def _rows_of(uid):
             if not u or not em or em != (u["email_proved"] or "") or u["disabled"] or (u["kind"] or "user") == "agent":
                 return em, []
             c.execute("DELETE FROM obj_addr_shares WHERE created_at<?", (iso(now_utc() - timedelta(days=ADS_DAYS)),))
-            rows = [dict(x) for x in c.execute("SELECT * FROM obj_addr_shares WHERE email_key=? ORDER BY id",
+            rows = [dict(x) for x in c.execute(f"SELECT * FROM obj_addr_shares WHERE email_key=? ORDER BY id LIMIT {ADS_REDEEM}",
                                                (addr_key(c, ADS_SEAL, em),)).fetchall()]
         c.commit()
         return em, rows
@@ -201,7 +218,8 @@ def ads_redeem(uid):
     if not ADS_KINDS:
         return 0
     if has_request_context() and g.get("db") is not None:
-        g.db.rollback()  # the request is over: what it did not commit is gone anyway, and no lock of it may block the replay
+        g.pop("db").close()  # the request is over: what it did not commit is gone anyway (close rolls back), no lock of it
+        # may block the replay, and its pooled connection goes back before the replay takes one (review F4)
     em, rows = _rows_of(uid)
     n = 0
     for x in rows:
@@ -217,8 +235,9 @@ def _replay(uid, em, x):
     with app.app_context(), app.test_request_context("/api/addr-shares/redeem", method="PUT"):
         c = db()
         g.pushes, g.auth_via, g.ads_bound = [], None, False
-        by = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (x["created_by"],)).fetchone()
-        drop = by is None or by["id"] == uid or bool(k["gone"] and k["gone"](c, x))
+        with system_ctx(c):  # review F2: no person in this context yet ("anon" would not see an organisation's project)
+            by = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (x["created_by"],)).fetchone()
+            drop = by is None or by["id"] == uid or bool(k["gone"] and k["gone"](c, x))
         bound = False
         if not drop:
             g.user = by  # the sharer's own step: their rights, their workspace, their name in the News item

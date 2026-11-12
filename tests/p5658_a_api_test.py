@@ -111,11 +111,18 @@ LT = project("Old draft")
 F.put(B + f"/api/lists/{LT}/members", json={"email": "uma@example.com", "role": "edit"})
 check(F.delete(B + f"/api/lists/{LT}").ok, "(setup) the project goes to the trash")
 
+# ================================================================ review F1: a folder renamed before the proof - the open share follows
+LS2 = project("Lookbook", "Studio")
+F.put(B + "/api/folders/people", json={"folder": "Studio", "email": "uma@example.com", "role": "view"})
+check(F.post(B + "/api/folders/rename", json={"old": "Studio", "new": "Studio Two"}).ok, "(setup) the folder is renamed")
+j = F.get(B + "/api/addr-shares?kind=list_folder&folder=Studio Two").json()
+check([x["email"] for x in j.get("open", [])] == ["uma@example.com"], f"#5658 (F1): the open share follows the renamed folder {j}")
+
 # ================================================================ a sign-in without the proof takes nothing
 U = sess("uma")
 check(not member(LA, UID) and not sees(U, LF) and "Offer for Uma" not in wiki_shared(U),
       "#5658: a sign-in with the address NOT proved takes nothing")
-check(len(open_rows()) == 4, f"#5658: ... the open shares stay {open_rows()}")
+check(len(open_rows()) == 5, f"#5658: ... the open shares stay {open_rows()}")
 
 # ================================================================ proved + signed in: the shares are made
 dbx("UPDATE users SET email_proved='uma@example.com' WHERE id=?", (UID,))  # (a mailed link or a verified OIDC claim)
@@ -127,12 +134,39 @@ check(sees(U, LF), "#5658: proved: uma sees the project in the shared folder")
 check("Offer for Uma" in wiki_shared(U) and U.get(B + f"/api/wiki/shared/pages/{W1}").status_code == 200,
       "#5658: proved: uma reads the page")
 check(not member(LT, UID), "#5658: the project in the trash is not shared")
+check(sees(U, LS2) and dbx("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (LS2, UID)) == [("view",)],
+      "#5658 (F1): the renamed folder is shared under its new name, with the role chosen")
 check(open_rows() == [], f"#5658: every open share of uma's address is gone (made, or its project gone) {open_rows()}")
 ppl = [s for s in F.get(B + f"/api/wiki/shares?page={W1}").json()["shares"] if s["kind"] == "person"]
 check([s["user"]["name"] for s in ppl] == ["uma@example.com"], f"#5658 (F2): the page's card still shows the address, not the account {ppl}")
 check(F.get(B + f"/api/addr-shares?kind=list&ref={LA}").json()["open"] == [], "#5658: the project's dialog has no open share left")
 news = [n for n in U.get(B + "/api/news").json().get("items", []) if n.get("kind") in ("share", "wiki_shared")]
 check(len(news) >= 2, f"#5658: uma gets the News items of the shares {[(n.get('kind'), n.get('list_id')) for n in news]}")
+
+# ================================================================ review F2 / F3: an organisation's project
+r = A.post(B + "/api/orgs", json={"name": "Example Lantern Studio"})
+assert r.ok, r.text
+OID = r.json()["id"]
+r = A.post(B + "/api/lists", json={"name": "Example Studio Wall", "org_id": OID})
+assert r.ok, r.text
+PO = r.json()["id"]
+r = A.post(B + "/api/users", json={"orgs": [{"id": OID, "role": "member"}], "username": "olga", "display_name": "Olga",
+                                   "password": "password123", "email": "olga@example.com"})
+assert r.ok, r.text
+OLGA = r.json()["id"]
+r = A.put(B + f"/api/lists/{PO}/members", json={"email": "olga@example.com", "role": "edit"})
+check(r.ok and r.json() == {"ok": True, "by_email": True} and not member(PO, OLGA), "#5658: an organisation's project by an unproved address: open")
+check(dbx("SELECT org_id FROM obj_addr_shares WHERE kind='list' AND ref_id=?", (PO,)) == [(OID,)], "#5658: the open share carries the organisation")
+# F3: uma's address is proved, but she is no member of the organisation: the dialog shows her like an unknown address
+r = A.put(B + f"/api/lists/{PO}/members", json={"email": "uma@example.com", "role": "edit"})
+r2 = A.put(B + f"/api/lists/{PO}/members", json={"email": "nobody@example.com", "role": "edit"})
+check(r.ok and r.json() == r2.json() and not member(PO, UID), "#5658 (F3): proved, but outside the organisation: the answer of an unknown address")
+check(sorted(x["email"] for x in A.get(B + f"/api/addr-shares?kind=list&ref={PO}").json()["open"])
+      == ["nobody@example.com", "olga@example.com", "uma@example.com"], "#5658 (F3): ... and the dialog lists her like an unknown address")
+dbx("UPDATE users SET email_proved='olga@example.com' WHERE id=?", (OLGA,))
+sess("olga")
+check(member(PO, OLGA), "#5658 (F2): proved: olga becomes a member of the organisation's project at her sign-in")
+check(len(dbx("SELECT 1 FROM obj_addr_shares WHERE kind='list' AND ref_id=?", (PO,))) == 2, "#5658: ... her open share is gone, the others stay")
 
 # ================================================================ Fable 2.983 N2: PATCH of an address row bound before the proof counted
 dbx("UPDATE users SET email_proved='' WHERE id=?", (VID,))
