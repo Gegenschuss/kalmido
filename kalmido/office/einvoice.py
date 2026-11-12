@@ -707,7 +707,8 @@ def _ubl_lines(m, cat):
             qty = -qty
         charge = Decimal("0")
         lac = _line_allowance(ln)
-        if lac and qty > 0 and (qty * rate).quantize(Q2, rounding=ROUND_HALF_UP) == lac[1] and lac[1] - lac[0] == net:
+        if (lac and qty > 0 and rate == rate.quantize(Decimal("0.000001")) and (qty * rate).quantize(Q2, rounding=ROUND_HALF_UP) == lac[1]
+                and lac[1] - lac[0] == net):  # a price of more than six places would be cut when written (_uprice): fitted below
             out.append((ln, n, net, pct, qty, rate, -lac[0]))  # 2.1042.0 (#5815): the position's own discount, a line allowance
             continue
         # a given rate with more than six places would be cut when written (_uprice), so it is fitted like an odd one

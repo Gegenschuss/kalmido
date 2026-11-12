@@ -806,9 +806,9 @@ def ofd_discount_clean(c, oid, b, cur, f):
         f["discount_amount"] = None
     if f.get("discount_amount") and cur["id"]:
         t = doc_totals(c, oid, {**dict(cur), **f})
-        if t.get("discount_capped"):
+        if t.get("discount_capped"):  # the sum in the home currency, the one the amount is typed in (like the rates)
             raise BadInput(tr("The discount is higher than the sum of the discountable positions ({0})",
-                              fmt_money(t.get("discount_base") or 0, cur["lang"], t.get("currency") or cur["currency"])))
+                              fmt_money(t.get("discount_base_home") or 0, cur["lang"], t.get("home") or hc_home(office_settings(c, oid)))))
 
 
 # 2.354.0 D (#2838): the head fields a credit note takes from its invoice (inv_credit_of) and keeps
@@ -885,7 +885,8 @@ def clean_items(c, oid, r, items, admin, part=None):
                 row[k] = 1 if v in (1, True, "1", "true") else 0
             row["intext"] = _choice(it.get("intext") or "intern", "items.intext", ("intern", "extern"))
             row["discountable"] = 0 if it.get("discountable") in (0, False, "0", "false") else 1
-            row["discount_pct"] = (_num(it.get("discount_pct"), "items.discount_pct", 0, 100) or 0) if row["unit"] != "percent" else 0  # 2.1042.0 (#5815)
+            # 2.1042.0 (#5815): absent = the position keeps its discount (a client or script that does not know the field)
+            row["discount_pct"] = (_num(it.get("discount_pct", (prev or {}).get("discount_pct")), "items.discount_pct", 0, 100) or 0) if row["unit"] != "percent" else 0
             if admin:
                 row["cost"] = _num(it.get("cost"), "items.cost", 0, 1e8) or 0
             else:

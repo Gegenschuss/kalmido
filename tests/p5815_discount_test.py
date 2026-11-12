@@ -58,6 +58,9 @@ sp, capped = calc.calc_discount_split({"standard": Z(50), "reduced": Z(0), "exem
 check(sp == {"standard": Z(50)} and capped, f"calc: 80.00 on a discountable sum of 50.00 takes 50.00 (capped): {sp} {capped}")
 sp, capped = calc.calc_discount_split({"standard": Z(1000), "reduced": Z(500), "exempt": Z(0)}, pct=Z(10))
 check(sp == {"standard": Z(100), "reduced": Z(50)} and not capped, f"calc: the percent per key as before: {sp}")
+# review (Fable): a negative discountable position lowers the cap (1000 at 19 % and -300 at 7 %: 700, not 1000)
+sp, capped = calc.calc_discount_split({"standard": Z(1000), "reduced": Z(-300), "exempt": Z(0)}, amount=Z(900))
+check(sum(sp.values()) == Z(700) and capped, f"calc: a negative discountable position lowers the cap to 700.00: {sp} {capped}")
 t = calc.office_calc({"discount_amount": 0, "discount_pct": 0, "raw_mode": "none", "producing_on": 0},
                      [{"title": "Regie", "qty": 3, "rate": "33.335", "unit": "hour", "discount_pct": 12.5}])
 ln = t["lines"][0]
@@ -113,6 +116,12 @@ def run(S, who):
        f"net 2300.00, tax 280.93 + 57.50 = 338.43, gross 2638.43: {t.get('net')} {tl} {t.get('tax_total')} {t.get('gross')}")
     ok(float(d.get("discount_amount") or 0) == 500 and not float(d.get("discount_pct") or 0), f"stored: amount 500, percent 0: {d.get('discount_amount')} {d.get('discount_pct')}")
 
+    # review (Fable): positions sent without the field (an older client, a script) keep their discount
+    cur = S.get(B + f"{D}/{OF}").json().get("items") or []
+    r = S.put(B + f"{D}/{OF}/items", json={"items": [{k: v for k, v in x.items() if k in ("id", "kind", "title", "qty", "rate", "unit", "tax")} for x in cur]})
+    ok(r.ok and [float(x.get("discount_pct") or 0) for x in r.json().get("items") or []] == [10.0, 0.0] and r.json()["totals"]["gross"] == 2638.43,
+       "positions saved without discount_pct keep their 10 % " + r.text[:160])
+
     # ---------------------------------------------------------------- one or the other, never more than the positions
     r = S.patch(B + f"{D}/{OF}", json={"discount_amount": 3000})
     ok(r.status_code == 400 and "2.800,00" in r.text, "3000 over a discountable sum of 2800.00 is refused, naming the sum " + str(r.status_code) + r.text[:200])
@@ -150,6 +159,14 @@ def run(S, who):
        "the XML: the position's discount as a line allowance (10 %, 2000.00, 200.00), total 2638.43")
     probs = ein.ein_check(x.content) if x.ok else ["no XML"]
     ok(probs == [], f"the own check of the XML finds nothing: {probs}")
+    # review (Fable): the credit note of that invoice keeps the position's 10 % (was 2000.00 net: refused as more than the invoice)
+    r = S.post(B + f"{D}/{iv['id']}/credit")
+    ok(r.status_code == 201, "the credit note draft " + r.text[:200])
+    cr = r.json()
+    ok([float(x.get("discount_pct") or 0) for x in cr.get("items") or [] if x["kind"] == "service"] == [10.0, 0.0] and (cr.get("totals") or {}).get("gross") == "2638.43",
+       f"the credit note: the position keeps 10 %, gross 2638.43 like the invoice: {(cr.get('totals') or {}).get('gross')}")
+    r = S.post(B + f"{D}/{cr['id']}/finalize")
+    ok(r.ok, "the credit note finalised (not more than the invoice) " + r.text[:200])
 
     # ---------------------------------------------------------------- a quotation with a part
     r = S.post(B + D, json={"client_id": CL, "project_title": "Kampagne", "raw_mode": "none", "producing_on": 0})

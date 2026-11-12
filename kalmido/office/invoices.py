@@ -680,7 +680,7 @@ def inv_credit_of(c, oid, uid, inv_):
     did = _insert_doc(c, oid, uid, row)
     rows = []
     for it in doc_items(c, inv_["id"], oid):
-        r_ = {k: it.get(k) for k in ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "intext", "cost")}
+        r_ = {k: it.get(k) for k in ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "intext", "cost", "discount_pct")}  # 2.1042.0 (#5815): + its own discount
         r_.update(raw_fee=0, producing=0, discountable=1)
         rows.append(r_)
     _put_rows(c, oid, did, rows)

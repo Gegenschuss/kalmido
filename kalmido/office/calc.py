@@ -311,13 +311,14 @@ def calc_discount_split(disc_base, pct=0, amount=0):
     if amount > 0:
         keys = [k for k in TAX_KEYS if disc_base.get(k, 0) > 0]
         tot = sum((disc_base[k] for k in keys), Decimal(0))
-        if tot <= 0:
+        cap = min(tot, sum((dec(v) for v in disc_base.values()), Decimal(0)))  # a negative discountable position lowers the cap
+        if tot <= 0 or cap <= 0:
             return {}, True
-        a = min(amount, tot)
+        a = min(amount, cap)
         big = max(keys, key=lambda k: disc_base[k])
         out = {k: money(a * disc_base[k] / tot) for k in keys if k != big}
         out[big] = a - sum(out.values(), Decimal(0))
-        return {k: v for k, v in out.items() if v}, amount > tot
+        return {k: v for k, v in out.items() if v}, amount > cap
     if pct > 0:
         out = {k: money(disc_base.get(k, 0) * pct / 100) for k in TAX_KEYS}
         return {k: v for k, v in out.items() if v}, False
@@ -498,6 +499,7 @@ def office_calc(doc, items, pack=None):
         "discount_pct": _num(disc_pct), "discount": _num(discount),
         # 2.1042.0 (#5815): the fixed amount as asked (home currency), the discountable sum it may take, whether it was cut to it
         "discount_amount": _num(disc_amt) if amt_on else None, "discount_base": _num(sum(disc_base.values(), Decimal(0))), "discount_capped": bool(amt_on and capped),
+        "discount_base_home": _num(money(max(sum(disc_base.values(), Decimal(0)), Decimal(0)) / fx) if foreign else max(sum(disc_base.values(), Decimal(0)), Decimal(0))),  # the cap in the currency the amount is typed in
         "net": _num(net), "tax_lines": tax_lines, "tax_total": _num(tax_sum), "gross": _num(gross),
         "net_incl_raw": _num(net + raw_amount) if raw_mode == "optional" and raw_base > 0 else None,
         "net_excl_raw": _num(net - raw_amount) if raw_mode == "included" and raw_base > 0 else None,

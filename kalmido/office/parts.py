@@ -20,7 +20,7 @@ from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_load, oc_json_store
 from ..core.errors import BadInput
-from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_discount_split, calc_tax_day, calc_lang, dec, fmt_money, fmt_qty, fmt_rate, label, money, office_calc, pack_tax, unit_text, _num
+from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_discount_split, calc_line_amount, calc_tax_day, calc_lang, dec, fmt_money, fmt_qty, fmt_rate, label, money, office_calc, pack_tax, unit_text, _num
 from .homecur import hc_home  # 2.189.0 (#2475)
 from .doclang import doc_txt
 from .model import PARTS_TITLE_FILM, UNITS, office_role, office_settings
@@ -223,7 +223,7 @@ def f8b_fix_cents(rows, want, lang="de", currency="EUR"):
             continue
         if x.get("unit") == "percent":
             return rows  # its amount depends on the whole invoice: leave as before
-        v = money(dec(x.get("qty"), "1") * dec(x.get("rate")))  # 2.354.0 A (#2831): like inv_calc, the exact rate
+        v = calc_line_amount(dec(x.get("qty"), "1"), dec(x.get("rate")), x.get("discount_pct") if x["kind"] == "service" else 0)[2]  # 2.354.0 A (#2831): like inv_calc, the exact rate; 2.1042.0 (#5815): after its own discount
         have[x.get("tax")] = have.get(x.get("tax"), D0) + (-v if x["kind"] == "discount" else v)
     for k, w in (want or {}).items():
         diff = money(dec(w)) - have.get(k, D0)
@@ -231,7 +231,8 @@ def f8b_fix_cents(rows, want, lang="de", currency="EUR"):
         if not diff or last is None or abs(diff) > Decimal("0.05"):
             continue
         q, rate = dec(last.get("qty"), "1"), dec(last.get("rate"))  # 2.354.0 A (#2831): the exact rate
-        last.update(qty=_num(1), unit="flat", rate=_num(money(q * rate) + diff),
+        # 2.1042.0 (#5815): a discounted position becomes its net after the discount (the flat amount carries it, no percent left)
+        last.update(qty=_num(1), unit="flat", rate=_num(calc_line_amount(q, rate, last.get("discount_pct"))[2] + diff), discount_pct=0,
                     detail=" · ".join(t for t in (f"{fmt_qty(q, lang)} × {fmt_rate(rate, lang, currency)}", last.get("detail") or "") if t))
     return rows
 
@@ -348,7 +349,9 @@ def tp_doc_totals(c, oid, r, items, pack, eur=False, home=None):
             tax_lines.append({"rate_key": tk, "pct": _num(rates[tk]), "base": _num(base[tk]), "amount": _num(amt),
                               "label": label(pack, lang, "tax_" + tk, pct=fmt_qty(rates[tk], lang))})
     out = dict(t)
-    out.update(discount_base=_num(sum(disc_base.values(), D0)), discount_capped=bool(amt_on and capped))  # 2.1042.0 (#5815): with the part lines
+    _db = max(sum(disc_base.values(), D0), D0)
+    out.update(discount_base=_num(sum(disc_base.values(), D0)), discount_capped=bool(amt_on and capped),
+               discount_base_home=_num(money(_db / fx) if foreign else _db))  # 2.1042.0 (#5815): with the part lines
     out.update(lines=lines, items_net=_num(items_net), discount=_num(discount), net=_num(net), tax_lines=tax_lines, tax_total=_num(tax_sum),
                gross=_num(net + tax_sum), raw_amount=_num(raw_opt + raw_inc),
                net_incl_raw=_num(net + raw_opt) if raw_opt > 0 else None, net_excl_raw=_num(net - raw_inc) if raw_inc > 0 else None,
