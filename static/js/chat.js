@@ -567,21 +567,24 @@ const tcx_filesOk = room => !!room && !room.e2e && !(typeof le2eChanOn === 'func
 const tcx_chipsHtml = rid => (S.tc.files[rid] || []).map((f, i) => `<span class="cfile">${ic(/^image\//.test(f.type) ? 'clip' : 'file', 's')}<span>${esc(f.name || tr('Image'))}</span><button type="button" data-act="tc-file-rm" data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove') + ': ' + (f.name || tr('Image')))}">${ic('x', 's')}</button></span>`).join('');
 // 2.213.0 (#2788): phones: the composer's tools (attach, meeting, reference, microphone) sit behind ONE plus button so the
 // box keeps the width; the desktop shows them in the row as before (CSS: .chplus hidden, .chtools display:contents)
+// 2.1011.0 (#5689): the plus opens the shared menu() (a sheet with the title "More" on a phone); each entry clicks its tool
+// (its own handler runs as before), then the focus goes back into the box
 function chToolsHtml(parts) {
   const p = parts.filter(Boolean); if (p.length < 2) return p.join('');
   const l = esc(tr('More'));
-  return `<button type="button" class="iconbtn chplus" data-chmore aria-expanded="false" title="${l}" aria-label="${l}">${ic('plus')}</button><span class="chtools">${p.join('')}</span>`;
+  return `<button type="button" class="iconbtn chplus" data-chmore aria-haspopup="menu" title="${l}" aria-label="${l}">${ic('plus')}</button><span class="chtools">${p.join('')}</span>`;
 }
-function chMoreSet(c, on) { c.classList.toggle('chmore', on); c.querySelector('[data-chmore]')?.setAttribute('aria-expanded', String(on)); }
-// a tap on the plus opens / closes its menu; a chosen tool or a tap elsewhere closes it (the tool's own handler still runs)
-document.addEventListener('click', e => {
-  const b = /** @type {any} */ (e.target).closest?.('[data-chmore]'), c = b?.closest('.chcomp');
-  $$('.chcomp.chmore').forEach(x => { if (x !== c) chMoreSet(x, false); });
-  if (c) chMoreSet(c, !c.classList.contains('chmore'));
-});
-domReady(() => kb_on('first', 'Escape', () => { const c = $('.chcomp.chmore'); if (!c) return false; chMoreSet(c, false); c.querySelector('[data-chmore]')?.focus(); }));  // 2.655.0 (#4998): key registry (keys.js), before every field and area
-// the open keyboard stays while the plus or a tool is tapped (the box keeps the focus)
-for (const ev of ['pointerdown', 'mousedown']) document.addEventListener(ev, e => { if (/** @type {any} */ (document.activeElement)?.closest?.('.chcomp') && /** @type {any} */ (e.target).closest?.('.chcomp [data-chmore], .chcomp .chtools button')) e.preventDefault(); });
+const CH_TOOLIC = [['chclip', 'clip'], ['mtgbtn', 'list'], ['rfins', 'link'], ['tvcmic', 'mic']];
+function chToolsMenu(b) {
+  const c = b.closest('.chcomp'), ta = c?.querySelector('textarea'); if (!c) return;
+  const items = $$('.chtools > button', c).filter(x => !x.classList.contains('hidden')).map(x => {
+    const k = CH_TOOLIC.find(([cl]) => x.classList.contains(cl));
+    return {label: x.getAttribute('aria-label') || x.title || '', icon: k?.[1] || 'plus', dis: x.disabled, act: 'chtool-' + (k?.[0] || 'x'),
+      fn: () => { x.click(); setTimeout(() => { const a = document.activeElement; if (ta?.isConnected && !ta.disabled && !$('.modal') && $('#pop').classList.contains('hidden') && (!a || a === document.body || a === b)) ta.focus({preventScroll: true}); }, 0); }};
+  });
+  if (items.length) menu(b, items, null, null, tr('More'));
+}
+document.addEventListener('click', e => { const b = /** @type {any} */ (e.target).closest?.('.chcomp [data-chmore]'); if (b) chToolsMenu(b); });
 const tcx_clipHtml = room => tcx_filesOk(room) ? `<button type="button" class="iconbtn chclip" data-act="tc-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}">${ic('clip')}</button><input type="file" id="tc-file" multiple hidden>` : '';
 const tcx_filesBarHtml = (room, rid) => tcx_filesOk(room) ? `<div class="cfiles tcfiles" id="tc-files">${tcx_chipsHtml(rid)}</div>` : '';
 function tcx_chipsSync() { const b = $('#tc-files'); if (b) b.innerHTML = tcx_chipsHtml(S.tc.rid); }

@@ -130,17 +130,21 @@ const form = (fields, files) => { const fd = new FormData(); for (const [k, v] o
       for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#chat-msgs .chatts img')`)); i++) await sleep(200);
       await sleep(600);
       // 2.213.0 (#2788): on the phone the paperclip sits in the plus menu: open it first
+      // 2.1011.0 (#5689): the plus opens the shared menu (#pop): the paperclip is its entry there
       await ev(`(() => { const p = document.querySelector('.chcomp [data-chmore]'); if (p && getComputedStyle(p).display !== 'none') p.click(); return 1; })()`);
-      const lay = await ev(`(() => { const c = document.querySelector('.chcomp .chclip').getBoundingClientRect(), b = document.querySelector('#chat-msgs').getBoundingClientRect(),
+      for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('#pop:not(.hidden) [data-act="chtool-chclip"]') || getComputedStyle(document.querySelector('.chcomp .chclip')).display !== 'none'`)); i++) await sleep(150);
+      const lay = await ev(`(() => { const c = (document.querySelector('#pop:not(.hidden) [data-act="chtool-chclip"]') || document.querySelector('.chcomp .chclip')).getBoundingClientRect(), b = document.querySelector('#chat-msgs').getBoundingClientRect(),
         th = [...document.querySelectorAll('#chat-msgs .chatts .att')].map(x => x.getBoundingClientRect()), x = document.querySelector('#chat-msgs .chatts .attdel')?.getBoundingClientRect(),
         img = document.querySelector('#chat-msgs .chatts img');
-        return {clip: [Math.round(c.width), Math.round(c.height)], inside: th.every(r => r.left >= b.left - 1 && r.right <= b.right + 1), n: th.length,
+        return {inMenu: !!document.querySelector('#pop:not(.hidden) [data-act="chtool-chclip"]'), clip: [Math.round(c.width), Math.round(c.height)], inside: th.every(r => r.left >= b.left - 1 && r.right <= b.right + 1), n: th.length,
                 del: x ? [Math.round(x.width), Math.round(x.height)] : null, loaded: !!img && img.complete && img.naturalWidth === 4,
                 hscroll: document.documentElement.scrollWidth > innerWidth + 1}; })()`);
-      check(lay.clip[0] >= 43.5 && lay.clip[1] >= 43.5, `${vw}px: paperclip >= 44 px ${JSON.stringify(lay.clip)}`);
+      // 2.1011.0 (#5689): in the plus's shared menu the paperclip is a row of menu(): 44 px high for a finger, the menu's own height for a mouse
+      check(lay.clip[0] >= 43.5 && (lay.clip[1] >= 43.5 || (lay.inMenu && !touch)), `${vw}px: paperclip >= 44 px ${JSON.stringify(lay.clip)}`);
       check(lay.n >= 2 && lay.inside && !lay.hscroll && lay.loaded, `${vw}px: thumbnails inside the chat, image loaded, no horizontal scroll ${JSON.stringify(lay)}`);
       check(lay.del && lay.del[0] >= 43.5 && lay.del[1] >= 43.5, `${vw}px: remove target >= 44 px ${JSON.stringify(lay.del)}`);
       await shot(`p2131-chat-${vw}.png`);
+      await ev(`(closePop(), 1)`);  // 2.1011.0 (#5689): the plus's sheet closes again
       // a screenshot pasted into the box, one dropped on the chat, then sent for real (multipart from the browser)
       const st = await ev(`(async () => {
         const blob = await (await fetch('/static/icon-192.png')).blob();

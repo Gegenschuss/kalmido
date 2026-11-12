@@ -85,7 +85,6 @@
 "static/js/chat.js|focus|$(S.tc.editTh ? '#tth-in' : '#tc-in')?": 1,
 "static/js/chat.js|focus|$(th ? '#tth-in' : '#tc-in')?": 1,
 "static/js/chat.js|focus|b": 1,
-"static/js/chat.js|focus|c.querySelector('[data-chmore]')?": 1,
 "static/js/chat.js|focus|t": 2,
 "static/js/chat.js|focus|tth_editBox()?": 1,
 "static/js/chat.js|img|?": 1,

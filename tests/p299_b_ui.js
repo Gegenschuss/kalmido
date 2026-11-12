@@ -38,9 +38,11 @@ const FEAT = 'cal,comments,collab,agents,wiki';
   const LEVEL = `(() => { const c = document.querySelector('.chcomp'); if (!c) return null;
     let m = c.querySelector('.mtgbtn');
     // 2.213.0 (#2788): on the phone the tools sit in the plus menu (rows one below the other): open it, measure there
-    const p = c.querySelector('[data-chmore]'), menu = !!p && getComputedStyle(p).display !== 'none'; if (menu && !c.classList.contains('chmore')) p.click();
-    if (!m) { m = document.createElement('button'); m.type = 'button'; m.className = 'iconbtn mtgbtn'; m.innerHTML = ic('list'); const t = menu ? c.querySelector('.chtools') : c; t.insertBefore(m, menu ? null : c.querySelector('textarea')); }  // the button needs a proposal-taking agent: same markup
-    const a = c.querySelector('.chclip').getBoundingClientRect(), b = m.getBoundingClientRect();
+    // 2.1011.0 (#5689): there the plus opens the shared menu (#pop): the tools are its entries, measured there
+    const p = c.querySelector('[data-chmore]'), menu = !!p && getComputedStyle(p).display !== 'none';
+    if (!m) { m = document.createElement('button'); m.type = 'button'; m.className = 'iconbtn mtgbtn'; m.setAttribute('aria-label', 'Turn a meeting into tasks'); m.innerHTML = ic('list'); const t = menu ? c.querySelector('.chtools') : c; t.insertBefore(m, menu ? null : c.querySelector('textarea')); }  // the button needs a proposal-taking agent: same markup
+    if (menu) p.click();
+    const a = (menu ? document.querySelector('#pop [data-act="chtool-chclip"]') : c.querySelector('.chclip')).getBoundingClientRect(), b = (menu ? document.querySelector('#pop [data-act="chtool-mtgbtn"]') : m).getBoundingClientRect();
     return {menu, ah: Math.round(a.height), bh: Math.round(b.height), ac: Math.round((a.top + a.bottom) / 2), bc: Math.round((b.top + b.bottom) / 2), bw: Math.round(b.width)}; })()`;
   await firefox(async o => {
     const {cmd, ev, ctx, shot} = o;
@@ -50,7 +52,7 @@ const FEAT = 'cal,comments,collab,agents,wiki';
       await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(700);
       await wait(ev, `!!document.querySelector('.chcomp .chclip')`);
       const l = await ev(LEVEL);
-      check(l && Math.abs(l.ah - l.bh) <= 1 && (l.menu ? l.ah >= 44 : Math.abs(l.ac - l.bc) <= 1) && l.bw >= 44, `${tag}: #2185 paperclip and list button have the same height and centre ` + JSON.stringify(l));
+      check(l && Math.abs(l.ah - l.bh) <= 1 && (l.menu ? l.ah >= 36 /* 2.1011.0 (#5689): rows of the shared menu (mouse) */ : Math.abs(l.ac - l.bc) <= 1) && l.bw >= 44, `${tag}: #2185 paperclip and list button have the same height and centre ` + JSON.stringify(l));
       await shot(`p299-b-${tag}-chat.png`);
     }
     // the grip: no native title, own label on hover

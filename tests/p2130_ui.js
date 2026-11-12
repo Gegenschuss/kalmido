@@ -625,7 +625,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
       await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerMove', x: Math.round(q[0]), y: Math.round(q[1])}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 40}, {type: 'pointerUp', button: 0}]}]});
       await cmd('input.releaseActions', {context: ctx}); };
     const SEND = '.chview .chcomp [data-act="chat-send"]', BOX = '.chview #chat-in';
-    const MENUS = `(() => [!document.querySelector('#pop').classList.contains('hidden') && 'pop', !!document.querySelector('.chcomp.chmore') && 'plus', !!document.querySelector('#side.open') && 'drawer'].filter(Boolean).join())()`;
+    // 2.1011.0 (#5689): the plus of the box opens the shared menu (#pop), no fold-out of its own any more
+    const MENUS = `(() => [!document.querySelector('#pop').classList.contains('hidden') && 'pop', !!document.querySelector('#side.open') && 'drawer'].filter(Boolean).join())()`;
     await nav(B + '?p=4230#agents/' + AG); await settle(ev, idle);
     await fu(`!!document.querySelector(${JSON.stringify(BOX)}) && !document.querySelector(${JSON.stringify(BOX)}).disabled`);
     for (const [what, kb, busy] of [['keyboard down', false, false], ['keyboard up', true, false], ['keyboard up, an answer running', true, true]]) {

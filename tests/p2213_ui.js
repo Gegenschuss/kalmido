@@ -5,6 +5,8 @@
 //   ONE plus; Send is a round icon button without text (its name stays in aria-label)
 // - the plus opens a menu with the tools as labelled rows (44 px high, inside the window), a second tap, a tap elsewhere,
 //   a chosen tool and Esc close it; the attach row still opens the file picker
+//   2.1011.0 (#5689): the menu is the shared menu() in #pop: on a phone the sheet from below with the title "More" and X; a tap
+//   on the scrim (elsewhere), Esc and a chosen tool close it; after the tool the focus is back in the box
 // - (2.411.0 #3446: Stop is no button in the box any more, it is the first entry of the header's ⋯ menu)
 // - the voice message bar covers the whole team chat row (not the plus menu)
 // - desktop 1280 px: the chat panel: icon Send, the box >= 60 % (2.350.0 #2793; before: Send with its text)
@@ -36,11 +38,11 @@ window.__row = sel => { const c = document.querySelector(sel); if (!c) return nu
     tools: [...c.querySelectorAll('.chclip, .mtgbtn, .rfins, .tvcmic')].filter(__vis).filter(b => !b.closest('.chtools') || __vis(b.closest('.chtools')) && getComputedStyle(b.closest('.chtools')).display !== 'contents').length,
     rowTools: [...c.querySelectorAll('.chclip, .mtgbtn, .rfins, .tvcmic')].filter(b => __vis(b) && !(c.classList.contains('chmore'))).length};
 };
-window.__menu = sel => { const c = document.querySelector(sel), m = c?.querySelector('.chtools'); if (!m || !__vis(m) || getComputedStyle(m).display === 'contents') return {open: false};
-  const r = m.getBoundingClientRect(), items = [...m.querySelectorAll('button')].filter(__vis);
-  return {open: true, inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0, above: r.bottom <= c.getBoundingClientRect().top + 1, n: items.length,
-    labels: items.map(b => getComputedStyle(b, '::after').content.replace(/^"|"$/g, '')), low: items.filter(b => b.getBoundingClientRect().height < 43.5).length,
-    expanded: c.querySelector('[data-chmore]').getAttribute('aria-expanded')};
+window.__menu = () => { const p = document.querySelector('#pop'), m = p?.querySelector('[role="menu"]'); if (!m || !__vis(p) || p.classList.contains('hidden')) return {open: false};
+  const r = p.getBoundingClientRect(), items = [...m.querySelectorAll('[role="menuitem"]')].filter(__vis);
+  return {open: true, inside: r.left >= -1 && r.right <= innerWidth + 1 && r.top >= 0 && r.bottom <= innerHeight + 1, sheet: p.classList.contains('sheet'), title: p.querySelector('.tch-sht')?.textContent || '',
+    x: __vis(p.querySelector('.tch-shx')), n: items.length, labels: items.map(b => b.querySelector('.ml')?.firstChild?.textContent || ''), low: matchMedia('(pointer:coarse)').matches ? items.filter(b => b.getBoundingClientRect().height < 43.5).length : 0 /* the shared menu's rows: 44 px for a finger, its own height for a mouse */,
+    focus: !!document.activeElement?.closest?.('#pop [role="menuitem"]')};
 };
 1`;
 
@@ -99,23 +101,29 @@ window.__menu = sel => { const c = document.querySelector(sel), m = c?.querySele
       await shot(`p2213-${w}-agent.png`);
       // the menu
       await tap(ev, '.chcomp:has(#chat-in) [data-chmore]');
-      let mn = await ev(`__menu('.chcomp:has(#chat-in)')`);
-      check(mn.open && mn.inside && mn.above && mn.n >= 2 && !mn.low && mn.expanded === 'true', `${w}: agent chat: the plus opens the menu above the row ` + JSON.stringify(mn));
+      await ready(ev, `__menu().open && __menu().focus`, 20);
+      let mn = await ev(`__menu()`);
+      // 2.1011.0 (#5689): the shared menu: a sheet from below with the title "More", its X, the focus on the first entry
+      check(mn.open && mn.inside && mn.sheet && mn.title === 'More' && mn.x && mn.focus && mn.n >= 2 && !mn.low, `${w}: agent chat: the plus opens the sheet "More" ` + JSON.stringify(mn));
       check(mn.labels?.includes('Attach images or files') && mn.labels?.includes('Insert reference'), `${w}: agent chat: the menu rows have their names ` + JSON.stringify(mn.labels));
       await shot(`p2213-${w}-agent-menu.png`);
+      await tap(ev, '#scrim');
+      check(await ready(ev, `!__menu().open`, 20), `${w}: a tap elsewhere (the scrim) closes the menu`);
       await tap(ev, '.chcomp:has(#chat-in) [data-chmore]');
-      check(!(await ev(`__menu('.chcomp:has(#chat-in)')`)).open, `${w}: a second tap on the plus closes the menu`);
+      await ready(ev, `__menu().open`, 20);
+      await tap(ev, '#pop .tch-shx');
+      check(await ready(ev, `!__menu().open`, 20), `${w}: the X closes the sheet`);
       await tap(ev, '.chcomp:has(#chat-in) [data-chmore]');
-      await tap(ev, '#chat-msgs');
-      check(!(await ev(`__menu('.chcomp:has(#chat-in)')`)).open, `${w}: a tap elsewhere closes the menu`);
+      await ready(ev, `__menu().focus`, 20);
+      await ev(`(() => { document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`);
+      check(await ready(ev, `!__menu().open`, 20), `${w}: Esc closes the menu`);
+      // the attach row still opens the file picker, the menu closes, the focus goes back into the box
       await tap(ev, '.chcomp:has(#chat-in) [data-chmore]');
-      await ev(`(() => { document.querySelector('#chat-in').dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`);
-      check(!(await ev(`__menu('.chcomp:has(#chat-in)')`)).open, `${w}: Esc closes the menu`);
-      // the attach row still opens the file picker, the menu closes
-      await tap(ev, '.chcomp:has(#chat-in) [data-chmore]');
+      await ready(ev, `__menu().open`, 20);
       await ev(`(() => { window.__picked = 0; const f = document.querySelector('#chat-file'); f.click = () => { window.__picked++; }; return 1; })()`);
-      await tap(ev, '.chcomp:has(#chat-in) .chtools [data-act="chat-attach"]');
-      check(await ev(`window.__picked`) === 1 && !(await ev(`__menu('.chcomp:has(#chat-in)')`)).open, `${w}: the attach row opens the file picker and closes the menu`);
+      await tap(ev, '#pop [data-act="chtool-chclip"]');
+      check(await ready(ev, `window.__picked === 1 && !__menu().open`, 20), `${w}: the attach row opens the file picker and closes the menu`);
+      check(await ready(ev, `document.activeElement?.id === 'chat-in'`, 20), `${w}: after the tool the focus is back in the box ` + await ev(`document.activeElement?.id || document.activeElement?.className || '-'`));
       // 2.411.0 (#3446): Stop is no button in the box any more (the first entry of the header's ⋯ menu); typed text keeps Send
       check(!(await ev(`!!document.querySelector('#chat-stop, .chcomp .chstop')`)), `${w}: no Stop button in the box (#3446)`);
       await setVal(ev, '#chat-in', 'one more thing');
@@ -133,10 +141,12 @@ window.__menu = sel => { const c = document.querySelector(sel), m = c?.querySele
       check(m && m.plus && m.rowTools === 0 && m.sendText === '' && m.sendName === 'Send', `${w}: team chat: plus + icon Send ` + JSON.stringify(m));
       await shot(`p2213-${w}-team.png`);
       await tap(ev, '.tccomp [data-chmore]');
-      mn = await ev(`__menu('.tccomp:not(.tthcomp)')`);
-      check(mn.open && mn.inside && mn.above && mn.n >= 2 && !mn.low, `${w}: team chat: the menu ` + JSON.stringify(mn));
+      await ready(ev, `__menu().open`, 20);
+      mn = await ev(`__menu()`);
+      check(mn.open && mn.inside && mn.sheet && mn.title === 'More' && mn.n >= 2 && !mn.low, `${w}: team chat: the menu ` + JSON.stringify(mn));
       await shot(`p2213-${w}-team-menu.png`);
-      await tap(ev, '.tccomp [data-chmore]');
+      await tap(ev, '#scrim');
+      await ready(ev, `!__menu().open`, 20);
       // the voice bar over the whole row
       if (await ev(`!!document.querySelector('.tccomp .tvcmic')`)) {
         await ev(`(() => { TVC.st = {rid: ${RID}, phase: 'send', ms: 3000}; tvc_draw(); return 1; })()`);

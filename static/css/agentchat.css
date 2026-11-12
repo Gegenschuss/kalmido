@@ -534,15 +534,7 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
   #achat .chcomp > .btn.pri > span{display:none}
   #achat .chcomp{position:relative}
   #achat .chcomp .chplus{display:inline-flex}
-  #achat .chcomp.chmore .chplus{color:var(--accent);background:var(--bg3)}
-  #achat .chcomp .chplus svg{transition:transform .15s ease}
-  #achat .chcomp.chmore .chplus svg{transform:rotate(45deg)}
-  #achat .chcomp .chtools{display:none;position:absolute;left:.5rem;bottom:calc(100% + .375rem);z-index:30;flex-direction:column;min-width:14rem;max-width:calc(100% - 1rem);padding:.25rem;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
-  #achat .chcomp.chmore .chtools{display:flex}
-  #achat .chcomp .chtools > .iconbtn{width:100%;height:auto;min-height:2.75rem;padding:0 .75rem;gap:.75rem;justify-content:flex-start;color:var(--text);font-size:var(--fs-m);text-align:left}
-  #achat .chcomp .chtools > .iconbtn svg{color:var(--muted);flex:none}
-  #achat .chcomp .chtools > .iconbtn::after{content:attr(aria-label)}
-  #achat .chcomp .chtools > .iconbtn.hidden{display:none}
+  #achat .chcomp .chtools{display:none}  /* 2.1011.0 (#5689): behind the plus's menu() */
 }
 /* 2.739.0 (#5216): the job's brief at the top of the job's own chat, folded */
 .jcbrief{align-self:stretch;max-width:min(100%,40rem);border:1px solid var(--line);border-radius:var(--r-l);background:var(--bg2)}
