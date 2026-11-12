@@ -435,7 +435,7 @@ function fv2_dragOut(key) {
 function fv2_dragKey(e) {
   // 2.1038.0 (#5809): a folder of the file store too - its node in the sidebar's tree, its row or card in the open folder
   const ab = e.target?.closest?.('#side .sbbt[data-sbbns="ab"][data-sbbid], .abview .abrow[data-abid], .abview .dc-card');
-  if (ab) { const id = ab.classList.contains('dc-card') ? ab_cardId(ab) : +(ab.dataset.sbbid || ab.dataset.abid); return id ? fv2_hashKey('ablage/' + id) : ''; }
+  if (ab) { const id = ab.classList.contains('dc-card') ? (typeof ab_cardId === 'function' ? ab_cardId(ab) : 0) : +(ab.dataset.sbbid || ab.dataset.abid); return id ? fv2_hashKey('ablage/' + id) : ''; }
   const el = e.target?.closest?.('[data-list],[data-go],.fhead[data-folder],a[href^="#"]'); if (!el || el.closest('.fv2bar')) return '';
   const h = el.getAttribute('href');
   if (h?.startsWith('#')) { try { return fv2_hashKey(decodeURIComponent(h.slice(1))); } catch { return ''; } }
