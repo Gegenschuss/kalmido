@@ -314,7 +314,9 @@ c.commit()
   holding several entries - favourites, my colour per workspace, a json list / map or comma list; each change there stays a
   step; the device look stays bundled). Privacy choices (push channel,
   "title only", sharing defaults, photo metadata, video players, read receipts, own mails, quiet hours, busy times) are
-  no step; `su_run` checks the key again and writes through `clean_setting`. A reset's step brings the view state and the
+  no step; nor is a save the web app makes by itself (2.1013.0, #5773: `PATCH /api/settings` with `{_auto: 1}` - a view's
+  block switches, a folder a list edit / move adds, a device's settings handed to the account once), so Ctrl+Z after an
+  action takes the action back; `su_run` checks the key again and writes through `clean_setting`. A reset's step brings the view state and the
   active saved arrangement back and empties the app's own "undo the reset". `obj_track(hist_skip=)` keeps sealed columns
   out of `obj_history`; a budget list resealed (`bud_settle`) drops its entries' undo copies and history rows
   (`core/writes.py` `obj_undo_forget`), so no plain copy outlives switching the encryption on.
