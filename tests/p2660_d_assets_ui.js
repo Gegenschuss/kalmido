@@ -77,7 +77,9 @@ async function swCheck() {
   const k = s.keys(CACHE);
   check(k.includes(same) && k.includes(core), 'sw: an update keeps the unchanged parts of an old cache (a module part and a core of another language)');
   check(!k.includes(changed), 'sw: a part whose version changed is not kept');
-  check(!s.fetched.some(u => /fr\./.test(u)), 'sw: the kept parts are not fetched again');
+  // 2.1060.0 (#5877): only the language parts (/static/i18n/fr.*); since #5785 (552e0c109) the precached module
+  // /static/js/quotes_dada_fr.js also has "fr." in its name and is rightly fetched on install
+  check(!s.fetched.some(u => /^\/static\/i18n\/fr\./.test(u)), 'sw: the kept parts are not fetched again');
   s.fetched.length = 0;
   const hit = await s.get(same);
   check(hit === imm && !s.fetched.length, 'sw: a part asked for with its confirmed version comes from the cache without the network');
