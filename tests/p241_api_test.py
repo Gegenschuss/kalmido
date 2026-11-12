@@ -135,7 +135,9 @@ AG3, ro = new_agent(A, "robo")
 # 2.233.0 (#3189): the runtime also carries the interim-summary settings (defaults = the hosts' former fixed values)
 ROT = {"rotate_size": "medium", "rotate_runs": 60, "rotate_idle_min": 45, "rotate_mb": 0.8, "rotate_tokens": 150000, "rotate_idle_mb": 0.4,
        "git_author_name": "", "git_author_email": "", "git_coauthor": False, "git_author": "Kalmido <noreply@kalmido.com>",  # 2.396.0 A (#3386): the commit identity
-       "dispatch": ""}  # 2.481.0 (#3662): the starter's mechanical dispatcher, off by default
+       "dispatch": "",  # 2.481.0 (#3662): the starter's mechanical dispatcher, off by default
+       # 2.997.0 (#5679): the model per run (#5668 / #5684), off by default - one model as before
+       "model_split": False, "model_decide": "", "model_routine": "", "model_review": ""}
 me = cl.get("/agent").json()
 check(me.get("runtime") == {"model": "", "autocompact": True, "autocompact_pct": None, "nightly_reset": "", "permission_mode": "", "perm_user": None, "reset_seq": 0,
                             "timezone": "Europe/Berlin", **ROT}, f"runtime defaults: {me.get('runtime')}")
