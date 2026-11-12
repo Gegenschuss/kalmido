@@ -4903,7 +4903,7 @@ found = say so.
 |---|---|---|
 | What exists: the feature list (`FEATURES.md`) per area in short form and the second-rank headings of every help file, each with its key | `GET /api/v1/help` | `help_overview` |
 | Search by words (English works best; word beginnings, case and accents do not matter): `{data: [{key, file, title, path, snippet}], more}`, best first; nothing = `[]` | `GET /api/v1/search?kind=help&q=&limit=` (1-20, default 8; not part of `kind=all`) | `search_help` |
-| One section by its key, up to the next heading of the same rank: `{key, file, title, path, text, truncated, parts, ui_terms}`; at most 16,000 characters, then `truncated` and its sub-sections in `parts` | `GET /api/v1/help/section?key=api%23scan-inboxes-folder-watcher&lang=` | `read_help` |
+| One section by its key, up to the next heading of the same rank: `{key, file, title, path, text, truncated, parts, ui_terms, show}`; at most 16,000 characters, then `truncated` and its sub-sections in `parts` | `GET /api/v1/help/section?key=api%23scan-inboxes-folder-watcher&lang=` | `read_help` |
 
 - **Keys only:** a section is read by the key of the index built from the files (`<file>#<heading>`, e.g.
   `api#scan-inboxes-folder-watcher`; a file's title: `api`); a file name, a path or an unknown key answers `404`.
@@ -4914,6 +4914,21 @@ found = say so.
   operator files (SELF-HOSTING, ENV, UPGRADING, OIDC, ARCHITECTURE, GLOSSAR, PACKS and the privacy templates) only for an
   instance admin's token with `admin-read`; for everyone else they do not exist (never a hit, `404`).
 - A plain word search on the server, no language model. The built-in assistant does not use it yet.
+
+### "Show me": point at the place in the app
+
+*Since 2.1072.0 (#5860).* When you explain a way through the app, add its places to the chat message: `show` =
+`[{target, text?}]` (1-8 steps) on `POST /api/v1/agent/chats/{user_id}` (MCP `send_chat`). `target` is a key of the fixed
+list of named places (`show_targets` of `GET /api/v1/help`; a section of `GET /help/section` names the places it marks in
+`show`), e.g. `settings.open`, `settings.integrations`, `files.scan-inbox`, `office.offer-new`, `tasks.new`,
+`calendar.new`, `files.upload`, `agents.add`; `text` is one short line for that step in the person's language (at most 300
+characters). An unknown key, a selector or an address answers `400` - there are no free targets. Only on a plain message
+(not with `kind` notice / brief, `approval` or `permission`). The message shows the button *Show me*: the app opens the
+view of the first step and highlights the control the person presses next (the spotlight of the welcome tour), *Next* goes
+to the following step. **The agent shows, the person changes:** the app never clicks, opens a menu or a dialog, switches or
+saves anything (a step inside the settings waits until the person opened them). A control that is not on the screen (a
+phone, a missing right, an area switched off) says so in one line. The message answers `show` as sent (`[{target, text}]`).
+Older servers answer `400` - then send it without.
 
 ## Knowledge pages
 

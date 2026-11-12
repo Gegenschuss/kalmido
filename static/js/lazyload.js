@@ -76,6 +76,7 @@ const LD_MODS = {
   formq: ['formq'],  // 2.102.0 C (#2208): questionnaires (#1954), with the forms dialog of a list
   navmenu: ['navmenu'],  // 2.418.0 (#3560): the editor of the areas' menus (Customize / the pen, Settings > Navigation)
   tourmods: ['tourmods'],  // 2.466.0 (#3314): the steps of the areas' introductions
+  showme: ['showme'],  // 2.1072.0 (#5860): "Show me" of an agent's message (agentchat.js shw_btnHtml)
   ofundo: ['office_undo'],  // 2.111.0 A (#2233): undo of the office editors, clients and tables (office, sheets and the client dialog load it)
   objsave: ['objsave'],  // 2.558.0 (#4709): the dialogs of the areas on the shared core (saveDialog, merge bar, undo; core/writes.py)
   voice: ['voice'],  // 2.139.0 B (#2128): voice messages of the team chat (the composer's microphone, the audio player)

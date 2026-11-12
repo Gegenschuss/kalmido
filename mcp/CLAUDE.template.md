@@ -308,6 +308,10 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   section's title). Answer in the person's language; the help itself is English.
 - Nothing found: say that the help says nothing about it - do not invent a way. Only when the feature does not exist,
   say so clearly and, if useful, suggest it.
+- "Show me" (2.1072.0): add the places of the way to your answer as `send_chat` `show: [{target, text}]` - `target` only a
+  key of `show_targets` (`help_overview`) or of a section's `show` (`read_help`), `text` one short line per step in the
+  person's language. The person gets a button "Show me"; the app goes there and highlights, it never clicks or changes
+  anything. Never invent a key (`400`).
 
 ### Coding agents
 - Run write tests only against a test instance or on objects you created in the same run. Read the current state

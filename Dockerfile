@@ -53,6 +53,8 @@ COPY kalmido /app/kalmido
 COPY static /app/static
 # 2.1067.0 (#5819): the user documentation (docs/*.md, not docs/dev/) - agents search and read it (api/helpdocs.py)
 COPY docs/*.md /app/docs/
+# 2.1072.0 (#5860): the named places of "Show me" (agents/showme.py)
+COPY docs/help-targets.json /app/docs/
 COPY --from=staticpack /out/ /app/static_packed/
 # 2.207.0 B (#2763): the folder watcher downloads (KALMIDO_FOLDERWATCH_DIR overrides the folder)
 COPY --from=folderwatch /out/ /app/folderwatch/

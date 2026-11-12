@@ -31,6 +31,7 @@ from ..core.errors import BadInput, Denied
 from ..core.i18n import lang, LANGS, md_plain, tr
 from ..core.srchreg import srch_q, srch_register
 from .common import v1_args, v1_view
+from ..agents.showme import shw_keys_in, shw_list  # 2.1072.0 (#5860)
 
 HELP_DIR = os.path.join(APP_DIR, "docs")  # the image: /app/docs (Dockerfile), a checkout: docs/
 # the operator's files: running a server, its settings and internals -- only for an instance admin
@@ -246,7 +247,8 @@ def hlp_section(key, admin=False, lg="en"):
     parts = [{"key": x["key"], "title": x["title"]} for x in idx["files"][s["fkey"]]["sections"]
              if s["start"] < x["start"] < s["end"] and x["level"] == s["level"] + 1] if cut else []
     return {"key": s["key"], "file": s["file"], "title": s["title"], "path": s["path"], "text": text.rstrip("\n"),
-            "truncated": cut, "parts": parts, "ui_terms": hlp_ui_terms(text, lg)}
+            "truncated": cut, "parts": parts, "ui_terms": hlp_ui_terms(text, lg),
+            "show": shw_keys_in(text)}  # 2.1072.0 (#5860): the places this section marks (<!-- show: key -->) for send_chat show
 
 
 def _hlp_short(item):
@@ -271,8 +273,10 @@ def hlp_overview(admin=False):
               "sections": [{"key": s["key"], "title": s["title"]} for s in f["sections"] if s["level"] == 2]}
              for f in idx["files"].values() if admin or not f["operator"]]
     return {"version": APP_VERSION, "features": areas, "files": files,
+            "show_targets": shw_list(),  # 2.1072.0 (#5860): the named places of "Show me" (agents/showme.py)
             "how": "search_help (GET /search?kind=help&q=) finds sections; read_help (GET /help/section?key=) reads one. "
-                   "The documentation is English; explain a path in the words of the person's interface (ui_terms of a section)."}
+                   "The documentation is English; explain a path in the words of the person's interface (ui_terms of a section). "
+                   "Add the places of the way as send_chat show: [{target, text}] (keys of show_targets) - the person gets 'Show me'."}
 
 
 def v1_help_search():
@@ -323,7 +327,9 @@ def help_spec(paths, schemas, op, ok, errs, ref, q):
                                                                                                             "of the same rank"},
         "truncated": {"type": "boolean"}, "parts": {"type": "array", "items": {"type": "object"}, "description": "truncated: the "
                                                                                                                  "sub-sections to read one by one"},
-        "ui_terms": {"type": "object", "description": "English interface labels of the text -> the same label in lang"}}})
+        "ui_terms": {"type": "object", "description": "English interface labels of the text -> the same label in lang"},
+        "show": {"type": "array", "items": {"type": "string"}, "description": "2.1072.0: the named places this section marks, for the "
+                                                                              "field show of a chat message ('Show me')"}}})
         | errs("400", "404"), [{**q("key", "The key of a hit of GET /search?kind=help or of GET /help"), "required": True},
                                q("lang", "Language of ui_terms (default: the token's person)")],
         desc="Only keys of the index: an unknown key (or a file name, a path) answers 404.")}

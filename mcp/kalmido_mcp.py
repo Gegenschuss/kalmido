@@ -451,11 +451,14 @@ def t_send_chat(api, a):
             except ValueError:
                 raise ApiError(400, f"files: {f['name']} is not valid base64") from None
             files.append((f["name"], f.get("mime") or "application/octet-stream", data))
-        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "job_msg", "reply_to", "offer_save", "kind", "next_step", "limit", "source")), files))  # approval: see request_chat_approval; 2.236.0 (#2909 #2911): next_step / limit
+        fields = _pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "job_msg", "reply_to", "offer_save", "kind", "next_step", "limit", "source", "show"))
+        if isinstance(fields.get("show"), list):  # 2.1072.0 (#5860): a form field carries the steps as JSON text
+            fields["show"] = json.dumps(fields["show"], ensure_ascii=False)
+        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(fields, files))  # approval: see request_chat_approval; 2.236.0 (#2909 #2911): next_step / limit
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
     return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "job_msg", "reply_to", "offer_save", "kind",
-                                                                              "next_step", "limit", "source")))  # 2.236.0 (#2909 #2911); 2.388.0 (#3341): source
+                                                                              "next_step", "limit", "source", "show")))  # 2.236.0 (#2909 #2911); 2.388.0 (#3341): source; 2.1072.0 (#5860): show
 
 
 def t_request_chat_approval(api, a):
@@ -1133,7 +1136,12 @@ TOOLS = [
                   "message (when your work style has next_step on; the answer tells next_step_dropped: off | repeat | conflict | full). "
                   "limit (2.236.0, #2909): true = this message reports a limit (a one-way step, a refusal, a stop, an error); with work "
                   "style push 'limits' only such messages (and approvals / permission questions) send a push. Older servers answer 400 "
-                  "-- then send it without. Both only without files.",
+                  "-- then send it without. Both only without files. "
+                  "show (2.1072.0, #5860): when you explain a way through the app (from read_help), add the places as 'Show me' steps "
+                  "[{target, text}] - target = a key of help_overview show_targets (or the show list of a read_help section), text = one short "
+                  "line in the person's language for that step. The person gets a button 'Show me': the app opens the view and highlights the "
+                  "control to press, step by step with Next; it never clicks or changes anything. Only keys of the list (another one: 400); "
+                  "never a selector or an address. Older servers answer 400 -- then send it without.",
      _obj({"user_id": S_ID, "body": {"type": "string"}, "task_id": S_ID,
            "reply_to": {**S_ID, "description": "2.33.0: the id of a message of this conversation you answer (a message's reply / reply_to "
                                                "show what the person answered)"},
@@ -1158,6 +1166,9 @@ TOOLS = [
                                                                      "60000 characters): folded at the top of the job's own chat, never in the whole chat, no push"},
            "next_step": {"type": "string", "minLength": 1, "maxLength": 200, "description": "2.236.0: the next step as one button at the end"},
            "limit": {"type": "boolean", "description": "2.236.0: this message reports a limit (may push with work style push 'limits')"},
+           "show": {"type": "array", "minItems": 1, "maxItems": 8, "description": "2.1072.0: 'Show me' steps: the named places to highlight one after the other",
+                    "items": {"type": "object", "properties": {"target": {"type": "string", "maxLength": 80, "description": "a key of help_overview show_targets"},
+                                                               "text": {"type": "string", "maxLength": 300}}, "required": ["target"]}},
            "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {
                "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}},
           ["user_id"]), t_send_chat),
@@ -2923,7 +2934,7 @@ TOOLS += [  # 2.558.0 (#4709): objects of the areas built on the shared core (on
 ]
 TOOLS += [  # 2.1067.0 (#5819): the help of the running version (docs/*.md on the server): look a question about using Kalmido up
     ("help_overview", "2.1067.0: what Kalmido can do - the feature list per area in short form and the headings of every help file "
-                      "(each with a key for read_help). Call it first for \"can Kalmido ...?\", \"how do I ...?\", \"where do I find ...?\", "
+                      "(each with a key for read_help); 2.1072.0: show_targets = the places send_chat show may point at ('Show me'). Call it first for \"can Kalmido ...?\", \"how do I ...?\", \"where do I find ...?\", "
                       "then search_help / read_help. The help is the documentation of exactly this server's version (English).",
      _obj({}), lambda api, a: api.call("GET", "/help")),
     ("search_help", "2.1067.0: search the help (the user documentation of this server's version) by words, English works best "

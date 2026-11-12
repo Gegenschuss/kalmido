@@ -680,7 +680,7 @@ function tourStart(mod) {
   TOUR.sample = !mod && S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid && !tourHasProjects() && !tourOrg(); TOUR.sampleOn = false; TOUR.industry = indCodes(S.industry);  /* 2.578.0 (#4573); 2.828.0 (#5511): the codes ticked */  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
   let el = $('.tour');
   if (el) el._stk = [];  // 2.956.0 (#5230): a restarted tour starts without steps of Back
-  if (!el) { el = document.createElement('div'); el.className = 'tour'; el.innerHTML = '<div class="tring"></div><div class="tcard" role="dialog" aria-live="polite"></div>'; document.body.appendChild(el); }
+  if (!el) el = spotMake('tour');  // 2.1072.0 (#5860): the shared spotlight
   el.addEventListener('click', e => {
     const b = e.target.closest('[data-tour]'); if (!b) return;
     const a = b.dataset.tour;
@@ -714,24 +714,15 @@ function tourPlace(r, vw, vh, mh) {  // mh: the card's measured height (2.5.2, K
   const left = Math.max(12, Math.min(vw - cw - 12, r.left > vw / 2 ? r.right - cw : r.left));
   return {ring, card: `width:${cw}px;left:${left}px;${below ? `top:${Math.min(vh - ch, r.bottom + 14)}px` : `bottom:${Math.max(12, vh - r.top + 14)}px`}`};
 }
-// 2.956.0 (#5230): every card shown by Next (button, Enter, ->) is one step of Back (backclose.js f8d_step); Back (button, <-) = that Back
-function tourNext() { const el = $('.tour'), was = TOUR.i; tourGo(was + 1); if (el && TOUR.on && TOUR.i > was) f8d_step(el, () => tourGo(was)); }
-function tourBack() { if (!f8d_stepBack($('.tour'))) tourGo(TOUR.i - 1); }
-function tourGo(i) {
-  if (!TOUR.on || TOUR.paused) return;
-  if (i >= TOUR.steps.length) { tourEnd(false); return; }
-  TOUR.i = Math.max(0, i);
-  const st = TOUR.steps[TOUR.i], el = $('.tour'); if (!el) return;
-  const n = TOUR.steps.length, last = TOUR.i === n - 1;
+// 2.1072.0 (#5860): the spotlight as one piece for the tour and "Show me" (showme.js): spotMake(cls) = the layer with the ring
+// and the card (class cls), spotPlace(el, r) = the ring around the rect r (null = no target: no ring, the card in the middle)
+// and the card next to it, kept inside the window
+function spotMake(cls) {
+  const el = document.createElement('div'); el.className = cls;
+  el.innerHTML = '<div class="tring"></div><div class="tcard" role="dialog" aria-live="polite"></div>'; document.body.appendChild(el); return el;
+}
+function spotPlace(el, r) {
   const card = $('.tcard', el), ring = $('.tring', el);
-  el.dataset.step = st.id; el.dataset.sel = st.sel || '';
-  card.innerHTML = `<div class="tstep"><span>${TOUR.i + 1}/${n}</span><span class="tdots">${TOUR.steps.map((_, j) => `<i class="${j === TOUR.i ? 'on' : j < TOUR.i ? 'past' : ''}"></i>`).join('')}</span></div>
-    <h3>${TOUR.i === 0 && !TOUR.mod ? tourHiFig() : ''}${esc(st.tx ? st.t : tr(st.t, ...(st.targs || [])))}</h3><p>${esc(st.tx ? st.d : tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
-    ${last && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${TOUR.industry.includes('film') ? tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.') : tr('A small client project with dates, dependencies and a checklist. Remove it any time under Settings > Data.')}</small></span></label>${S.industry?.can_set && S.industry.choices?.length ? `<div class="tsample tind"><span><b id="t-industry-l">${tr('Industry')}</b><small>${tr('Film & Video adds the shoot calculation and the image film as sample. Change it any time under Settings > General.')}</small>${/*html-ok*/ indBoxes(S.industry, TOUR.industry, 't-industry', 't-industry-l')}</span></div>` : ''}` : ''}
-    ${last && !TOUR.mod && (S.agents || []).length ? pk2_setupHtml() : ''}
-    ${last && !S.me?.kid ? `<label class="tsample"><input type="checkbox" id="t-more" ${TOUR.more ? 'checked' : ''}><span><b>${tr('Show more introductions')}</b></span></label>` : ''}
-    <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
-  const r = st.r && st.r();
   let pl = tourPlace(r, innerWidth, innerHeight);
   ring.classList.toggle('none', !pl.ring); ring.style.cssText = pl.ring; card.style.cssText = pl.card;
   // 2.5.2 (K05): place again with the real height of the card, then keep it inside the window (Back / Next always visible)
@@ -741,6 +732,25 @@ function tourGo(i) {
     const cr = card.getBoundingClientRect();
     if (cr.height && pl.ring && (cr.bottom > innerHeight - 12 || cr.top < 12)) { card.style.bottom = 'auto'; card.style.top = Math.max(12, Math.min(innerHeight - cr.height - 12, cr.top)) + 'px'; }
   }
+}
+// 2.956.0 (#5230): every card shown by Next (button, Enter, ->) is one step of Back (backclose.js f8d_step); Back (button, <-) = that Back
+function tourNext() { const el = $('.tour'), was = TOUR.i; tourGo(was + 1); if (el && TOUR.on && TOUR.i > was) f8d_step(el, () => tourGo(was)); }
+function tourBack() { if (!f8d_stepBack($('.tour'))) tourGo(TOUR.i - 1); }
+function tourGo(i) {
+  if (!TOUR.on || TOUR.paused) return;
+  if (i >= TOUR.steps.length) { tourEnd(false); return; }
+  TOUR.i = Math.max(0, i);
+  const st = TOUR.steps[TOUR.i], el = $('.tour'); if (!el) return;
+  const n = TOUR.steps.length, last = TOUR.i === n - 1;
+  const card = $('.tcard', el);
+  el.dataset.step = st.id; el.dataset.sel = st.sel || '';
+  card.innerHTML = `<div class="tstep"><span>${TOUR.i + 1}/${n}</span><span class="tdots">${TOUR.steps.map((_, j) => `<i class="${j === TOUR.i ? 'on' : j < TOUR.i ? 'past' : ''}"></i>`).join('')}</span></div>
+    <h3>${TOUR.i === 0 && !TOUR.mod ? tourHiFig() : ''}${esc(st.tx ? st.t : tr(st.t, ...(st.targs || [])))}</h3><p>${esc(st.tx ? st.d : tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
+    ${last && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${TOUR.industry.includes('film') ? tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.') : tr('A small client project with dates, dependencies and a checklist. Remove it any time under Settings > Data.')}</small></span></label>${S.industry?.can_set && S.industry.choices?.length ? `<div class="tsample tind"><span><b id="t-industry-l">${tr('Industry')}</b><small>${tr('Film & Video adds the shoot calculation and the image film as sample. Change it any time under Settings > General.')}</small>${/*html-ok*/ indBoxes(S.industry, TOUR.industry, 't-industry', 't-industry-l')}</span></div>` : ''}` : ''}
+    ${last && !TOUR.mod && (S.agents || []).length ? pk2_setupHtml() : ''}
+    ${last && !S.me?.kid ? `<label class="tsample"><input type="checkbox" id="t-more" ${TOUR.more ? 'checked' : ''}><span><b>${tr('Show more introductions')}</b></span></label>` : ''}
+    <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
+  spotPlace(el, st.r && st.r());  // 2.1072.0 (#5860): the shared spotlight
   if (last && TOUR.sample) TOUR.sampleShown = true;  // 2.25.0 (UX-24)
   if (last) TOUR.moreShown = true;
   $('[data-tour="next"]', card)?.focus();
