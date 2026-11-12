@@ -19,7 +19,29 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.995.0] - 2026-11-12
+## [2.996.0] - 2026-11-12
+
+Package 2.993 (Bündel: Call Sheet: Logos von Produktion, Agentur und Kund, Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Gemeinsamer Kern:).
+
+### Added
+- Call sheet: three logos on top of the sheet and the PDF - production (the office logo, as on quotes and invoices) left, agency in the middle, client right (the photo of the chosen contact); a missing logo leaves its place empty. Who may edit the contact adds a missing logo from the call sheet ("Add logo", the contact choice first when none is chosen); it is saved as the contact's photo and counts everywhere (#5650)
+
+### Changed
+- Office trash, stage 4b of the core's trash: entertainment receipts, their restaurant bills and the PDF files of framework contracts lie in the core's one trash; the core's retention run deletes them with their stored files after the commit, an approved receipt and its bills stay as long as the law keeps them; their own purge runs are gone. Migration 5413_a adds rev / updated_by / deleted_by and trash indexes (additive) (#5413)
+- Office trash: the rows of the core's trash are listed for the office admin only, who alone restores or deletes them (Fable review, #5413)
+- office.css: one status chip set for templates and letters, one base rule for the flat row buttons (no visible change) (#5495)
+
+### Fixed
+- Call sheet project row hover on a defined colour token, the PDF page strip's drop marks in rem (main lint red) (#5495)
+
+Live-Zug CI-Fix (job 4135): the update of a database that jumps from 2.941 over the comment and search stages in one start.
+
+### Fixed
+- Update from 2.941 (and any version before 2.972) failed at the start: the search move (osr_move, #5278) dropped the old search triggers only by a fixed list on obj_comments, while a database from before 2.972 still has them on comments - DROP FUNCTION kalmido_fts_cmt() failed and the server rolled back. It now drops every trigger that runs one of the old functions, read from the catalog, on whatever table it sits (job/4135)
+- The same jump would have failed right after: cmt_fts.comment_id of 2.941 still points at comments, so the fragment 5272_a could not drop that table; the search move drops the side tables' foreign keys before (derived rows, the tables go with 5278_a) (job/4135)
+
+### Changed
+- Upgrade test: a second fixture tests/fixtures/upgrade/2.941.0 (the state live ran before 2.995) - p2192_c_upgrade starts the current server on it too (job/4135)
 
 Package 2.992 (Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammel).
 
@@ -337,6 +359,10 @@ Package 2.955 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Fixed
 - Retention export: a check that the sign-off CSV carries no token columns (#3811)
 
+## [2.995.0] - 2026-11-12
+
+Not released (the CI of this version was red); its changes are listed under 2.996.0.
+
 ## [2.994.0] - 2026-11-11
 
 Not released (the CI of this version was red); its changes are listed under 2.995.0.
@@ -500,7 +526,8 @@ Package 2.900 (Bündel: Projekt-Sperre: Rückgängig-Kopien von Zeiteinträge, P
 
 Not released (the CI of this version was red); its changes are listed under 2.902.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.995.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.996.0...HEAD
+[2.996.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.996.0
 [2.995.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.995.0
 [2.994.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.994.0
 [2.990.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.990.0
