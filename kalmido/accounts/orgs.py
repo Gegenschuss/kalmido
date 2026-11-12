@@ -201,8 +201,10 @@ def _office_keep_on_join(c, uid):
         pid = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()
         if not pid:
             return False
-        used = c.execute(f"SELECT 1 FROM office_docs WHERE org_id=? UNION ALL SELECT 1 FROM office_services WHERE org_id=? AND {live_sql()} "  # 2.905.0 (#5414): not the trash
-                         "UNION ALL SELECT 1 FROM office_purchases WHERE org_id=? UNION ALL SELECT 1 FROM office_bank_tx WHERE org_id=? "
+        # 2.905.0 (#5414), 2.1005.0 (#5415): not the trash (master data, document drafts and the purchases on such a draft)
+        used = c.execute(f"SELECT 1 FROM office_docs WHERE org_id=? AND {live_sql()} UNION ALL SELECT 1 FROM office_services WHERE org_id=? AND {live_sql()} "
+                         f"UNION ALL SELECT 1 FROM office_purchases WHERE org_id=? AND doc_id IN (SELECT id FROM office_docs WHERE {live_sql()}) "
+                         "UNION ALL SELECT 1 FROM office_bank_tx WHERE org_id=? "
                          "UNION ALL SELECT 1 FROM office_cash_entries WHERE org_id=? "
                          "UNION ALL SELECT 1 FROM clients WHERE org_id IS NULL AND created_by=? LIMIT 1", (pid[0],) * 5 + (uid,)).fetchone()
         if used:

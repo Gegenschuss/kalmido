@@ -14,7 +14,7 @@ from decimal import Decimal
 
 from flask import g
 
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.db import local_now
 from ..core.errors import BadInput
 from ..core.i18n import N_, tr
@@ -82,7 +82,7 @@ def ccs_validate(b, inp):
 
 
 def _lines_n(c, oid, sid):
-    return c.execute("SELECT COUNT(*) AS n FROM office_cc_lines WHERE org_id=? AND statement_id=?", (oid, sid)).fetchone()["n"]
+    return c.execute(f"SELECT COUNT(*) AS n FROM office_cc_lines WHERE org_id=? AND statement_id=? AND {live_sql()}", (oid, sid)).fetchone()["n"]  # 2.1005.0 (#5415): not the trash
 
 
 def _need_empty_draft(c, oid, s):

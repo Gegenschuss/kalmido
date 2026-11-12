@@ -14,7 +14,7 @@ from ..core.config import app
 from ..core.i18n import tr, trn
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.pg import system_ctx, table_columns, write_lock
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.merges import (MG_MAX, mg_cascade_rows, mg_fk_refs, mg_history, mg_mark_undone, mg_repoint, mg_reinsert, mg_run,
                            mg_run_create, mg_undo_cascade, mg_undo_refs, mg_undoable)
 from ..accounts.session import me
@@ -117,7 +117,7 @@ def clm_counts(c, others):
     out = {}
     for t, col in clm_ref_tables(c):
         if t == "office_docs":
-            r = c.execute(f"SELECT COUNT(*) FILTER (WHERE locked_at IS NOT NULL), COUNT(*) FILTER (WHERE locked_at IS NULL) "
+            r = c.execute(f"SELECT COUNT(*) FILTER (WHERE locked_at IS NOT NULL), COUNT(*) FILTER (WHERE locked_at IS NULL AND {live_sql()}) "  # 2.1005.0 (#5415): a draft in the trash moves along unshown
                           f"FROM office_docs WHERE client_id IN ({qs})", others).fetchone()
             out["docs_locked"], out["docs_open"] = int(r[0] or 0), int(r[1] or 0)
             continue

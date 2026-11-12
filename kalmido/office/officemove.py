@@ -207,7 +207,9 @@ def ofm_refs(c, table, rid, skip=(), skip_ids=None):
 
 # ---------------------------------------------------------------- what may move
 def ofm_doc_hold(c, r):
-    """None when document row r may move, else why it stays: 'issued' | 'linked'."""
+    """None when document row r may move, else why it stays: 'issued' | 'linked' | 'trash'."""
+    if r["deleted_at"]:  # 2.1005.0 (#5415): a draft in the core's trash stays (its trash_refs name rows of this office; like ofm_meal_hold)
+        return "trash"
     if r["status"] != "draft" or r["locked_at"]:
         return "issued"
     if r["kind"] in ("invoice", "credit") and r["number"]:  # 2.126.0 A (#1966): its number belongs to this office's series
@@ -276,7 +278,7 @@ def ofm_need(c, uid, what, ids):
         return (pb_personal(c, uid) if w is None else w), rows
     t = OFM_TABLE[what]
     q = ",".join("?" * len(ids))
-    live = f" AND {live_sql()}" if what in ("sets", "contracts") else ""  # 2.905.0 (#5414, review): one in the core's trash does not move (404)
+    live = f" AND {live_sql()}" if what in ("sets", "contracts", "drafts") else ""  # 2.905.0 (#5414, review): one in the core's trash does not move (404); 2.1005.0 (#5415): + drafts
     rows = c.execute(f"SELECT * FROM {qi(t, OFM_TABLE.values())} WHERE id IN ({q}){live} ORDER BY id", ids).fetchall()
     if len(rows) != len(ids):
         raise Denied(404)
@@ -403,7 +405,8 @@ def ofm_plan(c, uid, what, src, rows, own=False):
     else:
         for r in rows:
             docs, issued = [], []
-            for d in c.execute("SELECT * FROM office_docs WHERE org_id=? AND client_id=? ORDER BY id", (src, r["id"])).fetchall():
+            # 2.1005.0 (#5415): not the trash - a draft there stays and holds the client (copied, like a deal in the trash)
+            for d in c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND client_id=? AND {live_sql()} ORDER BY id", (src, r["id"])).fetchall():
                 if d["trial"]:  # 2.144.10 (#2576, review): trial documents stay where they are (no archive copy, no TEST number clash)
                     continue
                 why = ofm_doc_hold(c, d)
@@ -1257,7 +1260,7 @@ def rmv_plan(c, p, rows):
     p["ctr"] = []
     for r in rows:
         issued = drafts = 0
-        for d in c.execute("SELECT * FROM office_docs WHERE contract_id=? ORDER BY id", (r["id"],)).fetchall():
+        for d in c.execute(f"SELECT * FROM office_docs WHERE contract_id=? AND {live_sql()} ORDER BY id", (r["id"],)).fetchall():  # 2.1005.0 (#5415): not the trash
             if ofm_doc_hold(c, d) == "issued":
                 issued += 1
             else:

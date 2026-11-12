@@ -2,6 +2,7 @@
 
 GET  /api/undo?limit=100       the own groups, newest first (heads only, no copies; the label in the reader's language)
 POST /api/undo/to/<gid>        every own group from the newest down to gid back ("bis hierher")
+POST /api/undo/<gid>/undo      exactly this one group back (2.1005.0, #5637: the toast's "Undo"); newer steps of the person stay
 POST /api/undo/<gid>/redo      the way forward of one undone group again (until a new step of the person ends it)
 2.905.0 (#5255): a write that recorded its step in a group answers with the header X-Kalmido-Undo-Gid: <group id> (undo_gid_header),
 so the app's arrow, Ctrl/Cmd+Z and the toast's "Undo" take back exactly that group (static/js/undo.js); no copy in the browser.
@@ -255,6 +256,36 @@ def undo_group_to(c, uid, gid):
     return out
 
 
+def undo_group_one(c, uid, gid):
+    """2.1005.0 (#5637): exactly this own group back, the newer groups of the person stay as they are (the toast's "Undo" of
+    static/js/undo.js). The checks of undo_group_to: the fingerprint of every part (a part a newer step or someone else changed
+    since stays and is named), the rights of now; a barrier / too-big group of the person in the same workspace (org_id, as
+    #5302 N2) that is newer than the group, or the group itself being one, holds it. 409 when it is undone already.
+    -> the answer of undo_group_to (undone / partial / stayed / stopped / text)"""
+    grp = _own(c, uid, gid)
+    if grp["state"] == "undone":
+        raise Denied(409, tr(UNDO_NOTHING))
+    out = {"undone": [], "partial": [], "stayed": [], "stopped": None}
+    hold = grp if grp["state"] in ("barrier", "toobig") else c.execute(
+        "SELECT * FROM undo_groups WHERE user_id=? AND id>? AND org_id IS NOT DISTINCT FROM ? AND state IN ('barrier','toobig') "
+        "ORDER BY id LIMIT 1", (int(uid), int(grp["id"]), grp["org_id"])).fetchone()
+    if hold:
+        out["stopped"] = {"id": hold["id"], "state": hold["state"], "label": _label(hold)[0]}
+        out["text"] = tr(UG_STOP, out["stopped"]["label"])
+        return out
+    moved, stayed = _run_group(c, uid, grp, False)
+    out["stayed"] = stayed
+    if moved and stayed:
+        out["partial"].append(grp["id"])
+    elif moved or not stayed:
+        out["undone"].append(grp["id"])
+    bump(c, "self")
+    bump(c, "undo")  # #5407: the list of steps of the other devices (undolist.js)
+    c.commit()
+    out["text"] = tr(UG_UNDONE, 1 if moved else 0, 1)
+    return out
+
+
 def undo_group_redo(c, uid, gid):
     """The undone parts of one own group forward again; 409 when nothing of it is undone (a new step ended its way forward)."""
     grp = _own(c, uid, gid)
@@ -303,6 +334,12 @@ def undo_list_route():
 def undo_to_route(gid):
     c, uid = db(), me()
     return jsonify(undo_group_to(c, uid, gid))
+
+
+@app.post("/api/undo/<int:gid>/undo")
+def undo_one_route(gid):
+    c, uid = db(), me()
+    return jsonify(undo_group_one(c, uid, gid))
 
 
 @app.post("/api/undo/<int:gid>/redo")

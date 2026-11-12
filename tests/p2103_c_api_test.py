@@ -152,7 +152,8 @@ TR2 = A.post(B + T, json={"date_from": DAY(15), "dest": "Berlin", "purpose": "jo
 TR3 = A.post(B + T, json={"date_from": DAY(14), "dest": "Bremen", "purpose": "job"}).json()["id"]
 r = A.post(B + T + "/delete", json={"ids": [TR2, TR3]})
 check(r.ok and r.json()["deleted"] == 1 and r.json()["skipped"] == [TR2] and sql("SELECT 1 FROM office_trips WHERE id=?", (TR2,))
-      and not sql("SELECT 1 FROM office_trips WHERE id=?", (TR3,)), "#2168 B-H1: the multi delete skips the trip in DATEV " + r.text[:200])
+      and sql("SELECT 1 FROM office_trips WHERE id=? AND deleted_at IS NOT NULL", (TR3,)),  # 2.1005.0 (#5415): TR3 lies in the core's trash
+      "#2168 B-H1: the multi delete skips the trip in DATEV " + r.text[:200])
 
 # ---------------------------------------------------------------- #2168 booked receipts in the document store
 WSO = f"org:{ORG}"

@@ -13,7 +13,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.db import db
-from ..core.access import Denied, need_feat
+from ..core.access import Denied, live_sql, need_feat
 from ..core.i18n import tr
 from ..accounts.session import me
 from ..events.model import need_event  # 2.369.5 (#2517): pulled up from functions
@@ -91,7 +91,7 @@ def ctk_docs(c, uid, clients):
         pm = inv_paid_map(c, oid)
         ids = sorted(cids)
         for r in c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND kind IN ({','.join('?' * len(CTK_DOC_KINDS))}) "
-                           f"AND client_id IN ({','.join('?' * len(ids))}) ORDER BY date DESC, id DESC LIMIT ?",
+                           f"AND client_id IN ({','.join('?' * len(ids))}) AND {live_sql()} ORDER BY date DESC, id DESC LIMIT ?",
                            [oid, *CTK_DOC_KINDS, *ids, CTK_SOURCE_MAX]).fetchall():
             b = doc_brief(r, pm)
             name = mine[r["client_id"]]["name"]

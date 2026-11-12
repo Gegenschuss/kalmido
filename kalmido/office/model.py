@@ -393,7 +393,7 @@ def pb_info(c, uid, oid):
     adm = [o for o in orgs if org_role(c, uid, o) == "admin"]
     move["move_orgs"] = [{"id": r["id"], "name": r["name"]} for r in c.execute(
         f"SELECT id, name FROM orgs WHERE id IN ({','.join('?' * len(adm))}) AND personal_of IS NULL ORDER BY lower(name)", adm)] if adm else []
-    used = c.execute(f"SELECT 1 FROM office_docs WHERE org_id=? UNION ALL SELECT 1 FROM office_services WHERE org_id=? AND {live_sql()} LIMIT 1", (oid, oid)).fetchone()  # 2.905.0 (#5414): not the trash
+    used = c.execute(f"SELECT 1 FROM office_docs WHERE org_id=? AND {live_sql()} UNION ALL SELECT 1 FROM office_services WHERE org_id=? AND {live_sql()} LIMIT 1", (oid, oid)).fetchone()  # 2.905.0 (#5414): not the trash
     if used or not orgs:
         return {"personal": 1, "org_offices": [], **move}
     return {"personal": 1, "org_offices": [{"id": w["id"], "name": w["name"]} for w in workspaces_for(c, uid)], **move}
@@ -732,9 +732,9 @@ def fe_office_rules_migrate(c):
                                     "UNION SELECT org_id FROM office_contracts").fetchall()}
     for oid in sorted(orgs):
         prod = c.execute(f"SELECT 1 FROM office_services WHERE org_id=? AND producing=1 AND {live_sql()} UNION ALL SELECT 1 FROM office_doc_items i JOIN office_docs d "
-                         "ON d.id=i.doc_id WHERE d.org_id=? AND i.producing=1 LIMIT 1", (oid, oid)).fetchone()
+                         f"ON d.id=i.doc_id WHERE d.org_id=? AND i.producing=1 AND {live_sql('d')} AND {live_sql('i')} LIMIT 1", (oid, oid)).fetchone()
         raw = c.execute(f"SELECT 1 FROM office_services WHERE org_id=? AND raw_fee=1 AND {live_sql()} UNION ALL SELECT 1 FROM office_doc_items i JOIN office_docs d "
-                        "ON d.id=i.doc_id WHERE d.org_id=? AND i.raw_fee=1 AND d.raw_mode!='none' UNION ALL SELECT 1 FROM office_contracts "
+                        f"ON d.id=i.doc_id WHERE d.org_id=? AND i.raw_fee=1 AND d.raw_mode!='none' AND {live_sql('d')} AND {live_sql('i')} UNION ALL SELECT 1 FROM office_contracts "
                         f"WHERE org_id=? AND raw_included=1 AND {live_sql()} LIMIT 1", (oid, oid, oid)).fetchone()
         office_settings_lock(c, oid)  # 2.269.0 B (#3014)
         r = c.execute("SELECT data FROM office_settings WHERE org_id=?", (oid,)).fetchone()
@@ -1039,7 +1039,7 @@ def onc_start(c, oid, s, r, key, scheme, d=None):
     period = office_scheme_period(scheme, d)
     high = 0
     for x in c.execute("SELECT id, kind, number, date, client_id, list_id, project_title, recipient FROM office_docs "
-                       "WHERE org_id=? AND kind='offer' AND number<>'' AND id<>? AND trial=0", (oid, r["id"])).fetchall():  # 2.144.10 A (#2576): never TEST numbers
+                       f"WHERE org_id=? AND kind='offer' AND number<>'' AND id<>? AND trial=0 AND {live_sql()}", (oid, r["id"])).fetchall():  # 2.144.10 A (#2576): never TEST numbers; 2.1005.0 (#5415): not the trash
         if (period and (x["date"] or "")[:4] != period) or onc_key(s, x) != key:
             continue
         seq = onc_parse(scheme, x["number"])[0]
@@ -1070,7 +1070,7 @@ def onc_version(c, oid, r, scheme, ctx_of):
     from .legacyimport import fi_number_taken
     root = r["version_of"]
     rows = c.execute("SELECT id, number, date, created_by, project_title, recipient, client_id FROM office_docs WHERE org_id=? "
-                     "AND kind='offer' AND (id=? OR version_of=?) ORDER BY id", (oid, root, root)).fetchall()
+                     f"AND kind='offer' AND (id=? OR version_of=?) AND {live_sql()} ORDER BY id", (oid, root, root)).fetchall()  # 2.1005.0 (#5415): not the trash
     high, first = 0, None
     for i, x in enumerate(rows):
         if x["id"] == r["id"]:
@@ -1578,7 +1578,7 @@ def office_in_use(c, kind, rid, oid):
     """True when documents or other master data of organisation oid refer to the row: then delete = archive.
     2.36.2 (#1146): every query is limited to the organisation."""
     if kind == "services":
-        if c.execute("SELECT 1 FROM office_doc_items WHERE service_id=? AND org_id=? LIMIT 1", (rid, oid)).fetchone():
+        if c.execute(f"SELECT 1 FROM office_doc_items WHERE service_id=? AND org_id=? AND {live_sql()} AND doc_id IN (SELECT id FROM office_docs WHERE {live_sql()}) LIMIT 1", (rid, oid)).fetchone():  # 2.1005.0 (#5415): not the trash
             return True
         # 2.42.0 (#828): the rates may be encrypted -> compared after decrypting (an organisation has few contracts)
         return any(str(rid) in (x.get("rates") or {}) for x in office_rows(c, oid, "contracts"))
@@ -1591,7 +1591,7 @@ def office_in_use(c, kind, rid, oid):
             return True
         return False
     if kind == "contracts":
-        return bool(c.execute("SELECT 1 FROM office_docs WHERE contract_id=? AND org_id=? LIMIT 1", (rid, oid)).fetchone())
+        return bool(c.execute(f"SELECT 1 FROM office_docs WHERE contract_id=? AND org_id=? AND {live_sql()} LIMIT 1", (rid, oid)).fetchone())  # 2.1005.0 (#5415): a trash draft holds nothing (SET NULL)
     if kind == "roles":  # 2.47.0 (#1649): a role services point to is archived (the services then have none)
         return bool(c.execute(f"SELECT 1 FROM office_services WHERE role_id=? AND org_id=? AND {live_sql()} LIMIT 1", (rid, oid)).fetchone())
     return False

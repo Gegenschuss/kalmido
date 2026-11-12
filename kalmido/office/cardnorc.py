@@ -11,7 +11,7 @@ import time
 
 from flask import jsonify
 
-from ..core.access import my_inbox
+from ..core.access import live_sql, my_inbox
 from ..core.config import PUBLIC_URL, WATCHDOG_INTERVAL, app
 from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.errors import BadInput
@@ -49,7 +49,7 @@ def ccn_counts(c, oid, fallback):
     out = {}
     for r in c.execute("SELECT k.holder_id, COUNT(*) AS n FROM office_cc_lines l JOIN office_cc_statements s ON s.id=l.statement_id "
                        "JOIN office_cc_cards k ON k.id=s.card_id WHERE l.org_id=? AND l.state='open' AND s.state='confirmed' "
-                       "AND s.deleted_at IS NULL AND k.deleted_at IS NULL GROUP BY k.holder_id", (oid,)).fetchall():
+                       f"AND s.deleted_at IS NULL AND k.deleted_at IS NULL AND {live_sql('l')} GROUP BY k.holder_id", (oid,)).fetchall():  # 2.1005.0 (#5415): not the trash
         who = r["holder_id"] or fallback
         if who:
             out[who] = out.get(who, 0) + r["n"]
@@ -189,7 +189,7 @@ def _lines(c, oid, frm, to):
     out = []
     for r in c.execute("SELECT l.*, s.month AS s_month, s.node_id AS s_node, k.last4 AS k_last4, k.holder_id AS k_holder, k.holder_name AS k_name "
                        "FROM office_cc_lines l JOIN office_cc_statements s ON s.id=l.statement_id JOIN office_cc_cards k ON k.id=s.card_id "
-                       "WHERE l.org_id=? AND s.state='confirmed' AND s.deleted_at IS NULL AND l.day>=? AND l.day<=? ORDER BY l.day, l.id", (oid, frm, to)).fetchall():
+                       f"WHERE l.org_id=? AND s.state='confirmed' AND s.deleted_at IS NULL AND {live_sql('l')} AND l.day>=? AND l.day<=? ORDER BY l.day, l.id", (oid, frm, to)).fetchall():  # 2.1005.0 (#5415): not the trash
         x = oc_dec_fields(c, oid, "office_cc_lines", r)
         x["last4"] = oc_dec_fields(c, oid, "office_cc_cards", {"last4": r["k_last4"]})["last4"]
         x["amount"] = money(dec(x["amount"], "0"))
@@ -245,7 +245,7 @@ def cc_bk_rows(c, oid, frm, to, uid=None, meals=()):
 
 def cc_dv_nodes(c, oid):
     """{node id}: the receipts matched with a position (booked against the card account, not the creditor)."""
-    return {r[0] for r in c.execute("SELECT node_id FROM office_cc_lines WHERE org_id=? AND state='matched' AND node_id IS NOT NULL", (oid,))}
+    return {r[0] for r in c.execute(f"SELECT node_id FROM office_cc_lines WHERE org_id=? AND state='matched' AND node_id IS NOT NULL AND {live_sql()}", (oid,))}  # 2.1005.0 (#5415): not the trash
 
 
 def cc_dv_rows(c, oid, d_from, d_to, st, _s):

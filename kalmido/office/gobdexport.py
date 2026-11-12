@@ -20,6 +20,7 @@ from xml.sax.saxutils import escape
 
 from flask import request
 
+from ..core.access import live_sql  # 2.1005.0 (#5415)
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import db, local_day, local_now
@@ -124,7 +125,7 @@ def gx_tables(c, oid, frm, to, gaps=None, files=False):
 
     docs = c.execute("SELECT d.*, cl.name AS cl_name, cl.customer_no AS cl_no FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id "
                      "WHERE d.org_id=? AND d.kind IN ('invoice','credit') AND d.locked_at IS NOT NULL AND d.date>=? AND d.date<=? "
-                     "AND d.trial=0 ORDER BY d.date, d.number", (oid, frm, to)).fetchall()
+                     f"AND d.trial=0 AND {live_sql('d')} ORDER BY d.date, d.number", (oid, frm, to)).fetchall()
     t = _T("invoices.csv", "Rechnungen", "Festgeschriebene Rechnungen und Rechnungskorrekturen",
              [("ID", A), ("Art", A), ("Nummer", A), ("Datum", D), ("Kunde", A), ("Kundennummer", A), ("Netto", N), ("Steuer", N),
               ("Brutto", N), ("Waehrung", A), ("Status", A), ("Festgeschrieben", D), ("Storno_von", A)])
@@ -141,7 +142,7 @@ def gx_tables(c, oid, frm, to, gaps=None, files=False):
     for k in range(0, len(ids), 500):
         part = ids[k:k + 500]
         q = ",".join("?" * len(part))
-        for it in c.execute(f"SELECT * FROM office_doc_items WHERE doc_id IN ({q}) ORDER BY doc_id, sort, id", part).fetchall():
+        for it in c.execute(f"SELECT * FROM office_doc_items WHERE doc_id IN ({q}) AND {live_sql()} ORDER BY doc_id, sort, id", part).fetchall():  # 2.1005.0 (#5415): not the trash
             it = oc_dec_fields(c, oid, "office_doc_items", it)
             t.add(it["id"], it["doc_id"], it["title"], it["qty"], it["unit"], it["rate"], it.get("tax_pct"), it.get("net"), it.get("tax_amount"))
     out.append(t)
@@ -149,7 +150,7 @@ def gx_tables(c, oid, frm, to, gaps=None, files=False):
     t = _T("payments.csv", "Zahlungen", "Zahlungseingaenge auf Rechnungen",
              [("ID", A), ("Rechnung_ID", A), ("Rechnungsnummer", A), ("Datum", D), ("Betrag", N), ("Zahlart", A)])
     for r in c.execute("SELECT p.*, d.number FROM office_payments p JOIN office_docs d ON d.id=p.doc_id WHERE p.org_id=? AND p.date>=? "
-                       "AND p.date<=? AND d.trial=0 ORDER BY p.date, p.id", (oid, frm, to)).fetchall():
+                       f"AND p.date<=? AND d.trial=0 AND {live_sql('d')} ORDER BY p.date, p.id", (oid, frm, to)).fetchall():
         t.add(r["id"], r["doc_id"], r["number"], r["date"], r["amount"], r["method"])
     out.append(t)
 

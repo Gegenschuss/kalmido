@@ -30,7 +30,7 @@ from ..core.moneycol import mc_fields  # 2.755.0 (#5293)
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, csv_dialect, lang, tr
 from ..core.db import bump, db, iso, local_day, local_stamp, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.conflict import ccf_check  # 2.560.0 D (#4700)
 from ..core.errors import BadInput
 from .calc import calc_lang, dec, dstr, money
@@ -222,7 +222,7 @@ def cb_links_get():
     rcs = [{"node_id": r["node_id"], "title": r["title"], "date": r["date"], "amount": dstr(r["amount"])} for r in reversed(rcs)][:300]
     inv = [{"id": r["id"], "number": r["number"], "date": r["date"], "client": r["name"] or ""} for r in c.execute(
         "SELECT d.id, d.number, d.date, cl.name FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id "
-        "WHERE d.org_id=? AND d.kind='invoice' AND d.status<>'draft' AND d.trial=0 ORDER BY d.date DESC, d.id DESC LIMIT 300", (oid,))] if may else []
+        f"WHERE d.org_id=? AND d.kind='invoice' AND d.status<>'draft' AND d.trial=0 AND {live_sql('d')} ORDER BY d.date DESC, d.id DESC LIMIT 300", (oid,))] if may else []
     return jsonify(receipts=rcs, invoices=inv, invoices_allowed=may)
 
 
@@ -329,7 +329,7 @@ def _invoice_ok(c, oid, v):
     if iid is None:
         return None
     # 2.144.10 B (#2576): a cash book entry never names a trial invoice
-    if not c.execute("SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND status<>'draft' AND trial=0",
+    if not c.execute(f"SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND status<>'draft' AND trial=0 AND {live_sql()}",
                      (iid, oid)).fetchone():
         raise Denied(404)
     return iid
@@ -389,7 +389,7 @@ def cb_public(c, oid, uid, rows, d, last, bal=None, names=None):
             node = {"id": d["node_id"], "name": ch[0]["name"] or ""}
     inv = None
     if d.get("invoice_id"):
-        r = c.execute("SELECT id, number FROM office_docs WHERE id=? AND org_id=?", (d["invoice_id"], oid)).fetchone()
+        r = c.execute(f"SELECT id, number FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (d["invoice_id"], oid)).fetchone()
         inv = {"id": r["id"], "number": r["number"]} if r else None
     so = by_id.get(d.get("storno_of"))
     return dict(_vals(d), id=d["id"], no=d["no"], book_id=d["book_id"], node=node, invoice=inv, storno_of=d.get("storno_of"),

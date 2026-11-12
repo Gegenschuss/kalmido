@@ -15,8 +15,8 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import body, db, iso, local_now, now_utc
-from ..core.pg import write_lock
-from ..core.access import Denied
+from ..core.pg import qi, write_lock
+from ..core.access import Denied, live_sql
 from ..core.errors import DeniedKey
 from ..personal.timetrack import BadInput
 from .model import office_gate, office_org, office_role
@@ -93,7 +93,7 @@ def pl_first_month(c, oid):
     """The earliest month with data of the area (documents, payments, bank lines, cash entries, trips) or None."""
     best = None
     for tbl, col in _DATED:
-        r = c.execute(f"SELECT MIN({col}) AS d FROM {tbl} WHERE org_id=? AND {col}<>''", (oid,)).fetchone()
+        r = c.execute(f"SELECT MIN({qi(col, {x[1] for x in _DATED})}) AS d FROM {qi(tbl, {x[0] for x in _DATED})} WHERE org_id=? AND {qi(col, {x[1] for x in _DATED})}<>''{' AND ' + live_sql() if tbl == 'office_docs' else ''}", (oid,)).fetchone()  # 2.1005.0 (#5415): not the trash
         m = pl_month(r["d"]) if r is not None else None
         if m and (best is None or m < best):
             best = m
@@ -105,7 +105,7 @@ def pl_hints(c, oid, through):
     drafts with a date in it, receipts without amount or category, bank lines without a match."""
     end = _add_month(through) + "-01"
     out = []
-    n = c.execute("SELECT COUNT(*) AS n FROM office_docs WHERE org_id=? AND locked_at IS NULL AND kind IN ('invoice','credit') "
+    n = c.execute(f"SELECT COUNT(*) AS n FROM office_docs WHERE org_id=? AND locked_at IS NULL AND {live_sql()} AND kind IN ('invoice','credit') "  # 2.1005.0 (#5415): not the trash
                   "AND date<>'' AND date<?", (oid, end)).fetchone()["n"]
     if n:
         out.append({"kind": "drafts", "count": n, "text": tr("{0} invoice drafts are dated in this period", n)})

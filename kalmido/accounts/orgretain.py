@@ -19,8 +19,7 @@ import re
 from flask import g, has_request_context
 
 from ..core.objhooks import FOLLOW, OBJ, person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
-from ..core.access import Denied
-from ..core.access import live_sql  # 2.1004.0 (#5494)
+from ..core.access import Denied, live_sql
 from ..core.objhooks import obj_rows_drop_many  # 2.1004.0 (#5494)
 from ..core.db import iso, local_now, now_utc  # 2.488.0 (#4004): local_now knows the test clock
 from ..core.i18n import N_, tr, trn
@@ -74,7 +73,7 @@ ODL_LEGAL = (
 ODL_CONTENT = (
     ("wiki_pages", f"SELECT COUNT(*) FROM wiki_pages WHERE org_id=? AND {live_sql()}"),
     ("tables", f"SELECT COUNT(*) FROM sheets WHERE org_id=? AND {live_sql()}"),
-    ("office_documents", "SELECT COUNT(*) FROM office_docs WHERE org_id=?"),
+    ("office_documents", f"SELECT COUNT(*) FROM office_docs WHERE org_id=? AND {live_sql()}"),  # 2.1005.0 (#5415): not the trash (like the pages / tables)
     ("office_archive", "SELECT COUNT(*) FROM office_archive WHERE org_id=?"),
     ("trips", "SELECT COUNT(*) FROM office_trips WHERE org_id=?"),
     ("drives", "SELECT COUNT(*) FROM office_drives WHERE org_id=?"),

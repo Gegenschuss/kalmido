@@ -15,7 +15,7 @@ from flask import jsonify
 
 from ..core.config import app
 from ..core.db import body, bump, err, iso, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, live_sql  # 2.1005.0 (#5415): live_sql
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_load, oc_json_store
@@ -27,7 +27,8 @@ from .model import PARTS_TITLE_FILM, UNITS, office_role, office_settings
 from .packs import office_pack_for
 from .docs import doc_items, _calc_doc, DUP_ITEM_SKIP, doc_public, doc_row, recalc, OFD_ITEM_RESET, _iid, clean_items  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_need_editable, ofx_log, ofx_diff, ofx_items_brief  # 2.369.5 (#2517): pulled up from functions
-from .otrash import OTB_CHECK, otb_put  # 2.747.0 (#5246): a deleted part into the office trash
+from .okern import ofk_register, ofk_trash  # 2.1005.0 (#5415): a deleted part into the core's trash
+from .docs import _ctx as _opart_ctx, _ofr_may  # 2.1005.0 (#5415)
 
 try:  # the shoot calculation (part C, office/sheet.py); until it is there a shoot part counts nothing
     from . import sheet as _dk_sheet
@@ -74,7 +75,7 @@ def _j(s, default):
 def tp_parts(c, oid, did):
     """The parts of document did in order (dicts; settings / sheet parsed, totals decrypted)."""
     out = []
-    for r in c.execute("SELECT * FROM office_doc_parts WHERE doc_id=? AND org_id=? ORDER BY sort, id", (did, oid)):
+    for r in c.execute(f"SELECT * FROM office_doc_parts WHERE doc_id=? AND org_id=? AND {live_sql()} ORDER BY sort, id", (did, oid)):  # 2.1005.0 (#5415): not the trash
         p = oc_dec_fields(c, oid, "office_doc_parts", r)
         p["settings"] = _j(p.get("settings"), {})
         p["sheet"] = _j(p.get("sheet"), {})
@@ -85,7 +86,7 @@ def tp_parts(c, oid, did):
 
 
 def tp_has_parts(c, oid, did):
-    return c.execute("SELECT 1 FROM office_doc_parts WHERE doc_id=? AND org_id=? LIMIT 1", (did, oid)).fetchone() is not None
+    return c.execute(f"SELECT 1 FROM office_doc_parts WHERE doc_id=? AND org_id=? AND {live_sql()} LIMIT 1", (did, oid)).fetchone() is not None  # 2.1005.0 (#5415): not the trash
 
 
 def tp_part(c, oid, did, pid):
@@ -106,7 +107,7 @@ def _part_items(c, oid, did, pid):
 def tp_part_items_all(c, oid, did):
     """The positions of all parts of document did (for the language switch of doclang)."""
     return [oc_dec_fields(c, oid, "office_doc_items", r)
-            for r in c.execute("SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NOT NULL ORDER BY part_id, sort, id", (did, oid))]
+            for r in c.execute(f"SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NOT NULL AND {live_sql()} ORDER BY part_id, sort, id", (did, oid))]  # 2.1005.0 (#5415): not the trash
 
 
 def tp_settings_clean(v, cur=None, share=False):
@@ -386,8 +387,8 @@ def tp_recalc(c, oid, r, pack=None):
         nets[p["id"]] = (t["net"], _dominant(t.get("bases") or {}))
         c.execute("UPDATE office_doc_parts SET totals=? WHERE id=? AND org_id=?",
                   (json.dumps(oc_json_store(c, oid, "office_doc_parts", "totals", t), ensure_ascii=False, default=str), p["id"], oid))
-    for it in c.execute("SELECT id, ref_part_id FROM office_doc_items WHERE doc_id=? AND org_id=? AND kind='part' AND part_id IS NULL",
-                        (r["id"], oid)).fetchall():
+    for it in c.execute(f"SELECT id, ref_part_id FROM office_doc_items WHERE doc_id=? AND org_id=? AND kind='part' AND part_id IS NULL AND {live_sql()}",
+                        (r["id"], oid)).fetchall():  # 2.1005.0 (#5415): not the trash
         if it["ref_part_id"] in nets:
             net, tax = nets[it["ref_part_id"]]
             c.execute("UPDATE office_doc_items SET rate=?, tax=? WHERE id=? AND org_id=?", (net, tax, it["id"], oid))
@@ -400,7 +401,7 @@ def tp_clean_item(c, oid, r, it, i, prev):
         pid = int(it.get("ref_part_id"))
     except (TypeError, ValueError):
         raise BadInput(tr("Invalid value: {0}", "items.ref_part_id"))
-    p = c.execute("SELECT id, title, totals FROM office_doc_parts WHERE id=? AND doc_id=? AND org_id=?", (pid, r["id"], oid)).fetchone()
+    p = c.execute(f"SELECT id, title, totals FROM office_doc_parts WHERE id=? AND doc_id=? AND org_id=? AND {live_sql()}", (pid, r["id"], oid)).fetchone()  # 2.1005.0 (#5415): not the trash
     if not p:
         raise Denied(404)
     qty = num_in(it.get("qty"), "items.qty", 0, 1e6)
@@ -427,7 +428,7 @@ def tp_line_titles(c, oid, r, rows):
     pids = {x["ref_part_id"] for x in rows if x.get("kind") == "part"}
     if not pids:
         return rows
-    names = {x["id"]: x["title"] or "" for x in c.execute("SELECT id, title FROM office_doc_parts WHERE doc_id=? AND org_id=?", (r["id"], oid))}
+    names = {x["id"]: x["title"] or "" for x in c.execute(f"SELECT id, title FROM office_doc_parts WHERE doc_id=? AND org_id=? AND {live_sql()}", (r["id"], oid))}  # 2.1005.0 (#5415): not the trash
     for x in rows:
         if x.get("kind") == "part" and names.get(x["ref_part_id"]):
             x["title"] = names[x["ref_part_id"]]
@@ -442,9 +443,9 @@ def kva_keep_unseen_parts(c, oid, r, before, known):
         return
     known = {int(x) for x in known if (isinstance(x, int) and not isinstance(x, bool)) or (isinstance(x, str) and x.isdigit())}
     have = {x["ref_part_id"] for x in c.execute("SELECT ref_part_id FROM office_doc_items WHERE doc_id=? AND org_id=? AND kind='part' "
-                                                "AND part_id IS NULL", (r["id"], oid)).fetchall()}
-    parts = {x["id"] for x in c.execute("SELECT id FROM office_doc_parts WHERE doc_id=? AND org_id=?", (r["id"], oid)).fetchall()}
-    mx = c.execute("SELECT MAX(sort) FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL", (r["id"], oid)).fetchone()[0]
+                                                f"AND part_id IS NULL AND {live_sql()}", (r["id"], oid)).fetchall()}  # 2.1005.0 (#5415): not the trash
+    parts = {x["id"] for x in c.execute(f"SELECT id FROM office_doc_parts WHERE doc_id=? AND org_id=? AND {live_sql()}", (r["id"], oid)).fetchall()}  # 2.1005.0 (#5415): not the trash
+    mx = c.execute(f"SELECT MAX(sort) FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND {live_sql()}", (r["id"], oid)).fetchone()[0]  # 2.1005.0 (#5415): not the trash
     sort = (mx if mx is not None else -1) + 1
     for it in before:
         pid = it.get("ref_part_id")
@@ -464,8 +465,8 @@ def tp_public(c, oid, r, admin, totals=None):
     costs only for admins."""
     parts = tp_parts(c, oid, r["id"])
     used = {}
-    for row in c.execute("SELECT ref_part_id, qty FROM office_doc_items WHERE doc_id=? AND org_id=? AND kind='part' AND part_id IS NULL",
-                         (r["id"], oid)):
+    for row in c.execute(f"SELECT ref_part_id, qty FROM office_doc_items WHERE doc_id=? AND org_id=? AND kind='part' AND part_id IS NULL AND {live_sql()}",
+                         (r["id"], oid)):  # 2.1005.0 (#5415): not the trash
         used[row["ref_part_id"]] = used.get(row["ref_part_id"], 0) + 1
     out = []
     for p in parts:
@@ -515,8 +516,8 @@ def tp_duplicate(c, oid, did, nid):
     positions of kind 'part' to the copies."""
     ts = iso(now_utc())
     pmap = {}
-    for p in c.execute("SELECT * FROM office_doc_parts WHERE doc_id=? AND org_id=? ORDER BY sort, id", (did, oid)).fetchall():
-        row = {k: p[k] for k in p.keys() if k not in ("id", "doc_id", "created_at", "updated_at")}
+    for p in c.execute(f"SELECT * FROM office_doc_parts WHERE doc_id=? AND org_id=? AND {live_sql()} ORDER BY sort, id", (did, oid)).fetchall():  # 2.1005.0 (#5415): the copy leaves the trash behind
+        row = {k: p[k] for k in p.keys() if k not in ("id", "doc_id", "created_at", "updated_at", "deleted_at", "deleted_by", "rev", "updated_by")}
         row.update(doc_id=nid, created_at=ts, updated_at=ts, origin_id=p["origin_id"] or p["id"])  # 2.537.0 C (#3433): origin_id
         pmap[p["id"]] = insert_id(c, f"INSERT INTO office_doc_parts({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
         for it in _part_items(c, oid, did, p["id"]):
@@ -525,7 +526,7 @@ def tp_duplicate(c, oid, did, nid):
             it = oc_item_store(c, oid, it)
             c.execute(f"INSERT INTO office_doc_items({','.join(it)}) VALUES({','.join('?' * len(it))})", list(it.values()))
     for old, new in pmap.items():
-        c.execute("UPDATE office_doc_items SET ref_part_id=? WHERE doc_id=? AND org_id=? AND kind='part' AND ref_part_id=?", (new, nid, oid, old))
+        c.execute(f"UPDATE office_doc_items SET ref_part_id=? WHERE doc_id=? AND org_id=? AND kind='part' AND ref_part_id=? AND {live_sql()}", (new, nid, oid, old))  # 2.1005.0 (#5415): not the trash
 
 
 # ---------------------------------------------------------------- the print model
@@ -539,8 +540,8 @@ def tp_render(c, oid, r, m, pack, lang, locked):
         return
     cur = r["currency"]
     L = (pack.get("labels") or {}).get(lang) or {}
-    used = {x["ref_part_id"] for x in c.execute("SELECT ref_part_id FROM office_doc_items WHERE doc_id=? AND org_id=? AND kind='part' AND part_id IS NULL",
-                                                   (r["id"], oid))}
+    used = {x["ref_part_id"] for x in c.execute(f"SELECT ref_part_id FROM office_doc_items WHERE doc_id=? AND org_id=? AND kind='part' AND part_id IS NULL AND {live_sql()}",
+                                                   (r["id"], oid))}  # 2.1005.0 (#5415): not the trash
     out = []
     for p in parts:
         if not p["print"] or p["id"] not in used:  # a part not on the title page counts nothing and is not printed
@@ -780,13 +781,13 @@ def tp_part_create(did):
         code = b.get("pack") or ("film" if "film" in on or not on else on[0])
         if not isinstance(code, str) or (on and code not in on):
             raise BadInput(tr("Invalid value: {0}", "pack"))
-    n = c.execute("SELECT COUNT(*) FROM office_doc_parts WHERE doc_id=? AND org_id=?", (did, oid)).fetchone()[0]
+    n = c.execute(f"SELECT COUNT(*) FROM office_doc_parts WHERE doc_id=? AND org_id=? AND {live_sql()}", (did, oid)).fetchone()[0]  # 2.1005.0 (#5415): parts in the trash do not count
     if n >= MAX_PARTS:
         raise BadInput(tr("Too many parts (at most {0})", MAX_PARTS))
     from .docs import _text
     title = _text(b.get("title"), "title", 300) or tr("Part {0}", n + 1)
     ts = iso(now_utc())
-    sort = (c.execute("SELECT MAX(sort) FROM office_doc_parts WHERE doc_id=? AND org_id=?", (did, oid)).fetchone()[0] or 0) + 1
+    sort = (c.execute(f"SELECT MAX(sort) FROM office_doc_parts WHERE doc_id=? AND org_id=? AND {live_sql()}", (did, oid)).fetchone()[0] or 0) + 1  # 2.1005.0 (#5415): not the trash
     pid = insert_id(c, "INSERT INTO office_doc_parts(org_id, doc_id, sort, kind, title, print, settings, sheet, totals, created_at, updated_at) "
                        "VALUES(?,?,?,?,?,?,?,?,?,?,?)", (oid, did, sort, kind, title, 0 if b.get("print") in (0, False, "0") else 1, "{}", "{}", "{}", ts, ts))
     if kind == "shoot":  # a new sheet with the chosen pack's presets (part C), then what the body brings
@@ -796,7 +797,7 @@ def tp_part_create(did):
             sh = _dk("dk_sheet_clean")(c, oid, b["sheet"], sh, admin)
         c.execute("UPDATE office_doc_parts SET sheet=? WHERE id=? AND org_id=?", (_sheet_store(c, oid, sh), pid, oid))
     if b.get("add_to_title", True) not in (False, 0, "0"):
-        mx = c.execute("SELECT MAX(sort) FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL", (did, oid)).fetchone()[0]
+        mx = c.execute(f"SELECT MAX(sort) FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND {live_sql()}", (did, oid)).fetchone()[0]  # 2.1005.0 (#5415): not the trash
         c.execute("INSERT INTO office_doc_items(doc_id, org_id, sort, kind, title, detail, qty, unit, rate, tax, ref_part_id, discountable) "
                   "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", (did, oid, (mx if mx is not None else -1) + 1, "part", title, "", 1, "piece", 0, "standard", pid, 1))
     ofx_log(c, oid, "part", doc_id=did, detail={"after": {"part": pid, "kind": kind, "title": title}})
@@ -840,7 +841,7 @@ def tp_part_patch(did, pid):
         c.execute(f"UPDATE office_doc_parts SET {','.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), pid, oid])
         if f.get("title") and f["title"] != p["title"]:  # 2.138.0 A (#2239): the title page lines of the part follow a rename
             # 2.144.9 (#2575, decision 21.10.2026): all of them -- the part's name is the one source (no own texts any more)
-            c.execute("UPDATE office_doc_items SET title=? WHERE doc_id=? AND org_id=? AND kind='part' AND ref_part_id=? AND part_id IS NULL",
+            c.execute(f"UPDATE office_doc_items SET title=? WHERE doc_id=? AND org_id=? AND kind='part' AND ref_part_id=? AND part_id IS NULL AND {live_sql()}",
                       (f["title"], did, oid, pid))
         if "sheet" in f:
             diff.setdefault("after", {})["sheet"] = "changed"  # the sheet itself stays out of the log
@@ -854,30 +855,51 @@ def tp_part_delete(did, pid):
     """Removes the part, its positions and the title page positions that stand for it. Returns the document."""
     c, uid, oid, admin, r = _ctx_doc(did)
     p = tp_part(c, oid, did, pid)
-    # 2.747.0 (#5246, #4707): the part goes into the office trash with its positions and title page lines (no foreign key:
-    # more=), restorable while the quotation is a draft (OTB_CHECK "part"); the answer names it (trash_id)
-    its = [x[0] for x in c.execute("SELECT id FROM office_doc_items WHERE doc_id=? AND org_id=? AND (part_id=? OR (kind='part' AND ref_part_id=?))",
-                                   (did, oid, pid, pid)).fetchall()]
-    tid = otb_put(c, oid, uid, "part", "office_doc_parts", pid, " · ".join(x for x in (p["title"], r["number"] or r["project_title"]) if x),
-            sub=str(did), more=[("office_doc_items", its)])
-    c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND (part_id=? OR (kind='part' AND ref_part_id=?))", (did, oid, pid, pid))
-    c.execute("DELETE FROM office_doc_parts WHERE id=? AND doc_id=? AND org_id=?", (pid, did, oid))
+    # 2.747.0 (#5246, #4707): the part goes into the office trash with its positions and title page lines, restorable while
+    # the quotation is a draft; 2.1005.0 (#5415): the core's trash (kind opart) - the part and its positions / title page
+    # lines (office_doc_items, children of the kind) get deleted_at, the rows stay; the route checked the rights (_ctx_doc)
+    ofk_trash(c, uid, OPART_KIND, int(p["id"]), checked=True)
     ofx_log(c, oid, "part", doc_id=did, detail={"before": {"part": pid, "kind": p["kind"], "title": p["title"]}})
-    return _done(c, oid, r, admin, extra={"trash_id": tid})
+    return _done(c, oid, r, admin, extra={"trash": {"kind": OPART_KIND, "id": int(p["id"])}})
 
 
 def _part_back(c, oid, pid):
     """2.747.0 (#5246): after a part came back from the office trash -- its quotation must still be an editable draft (409 rolls
     the restore back), then its sums and title page as after a normal change."""
     row = c.execute("SELECT doc_id FROM office_doc_parts WHERE id=? AND org_id=?", (pid, oid)).fetchone()
-    d = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (row[0], oid)).fetchone() if row else None
+    d = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (row[0], oid)).fetchone() if row else None  # 2.1005.0 (#5415): not the trash
     if d is None:
         raise Denied(404)
     ofx_need_editable(d)
     recalc(c, oid, d["id"])
 
 
-OTB_CHECK["part"] = _part_back
+# 2.1005.0 (#5415, stage 4d of the core's trash, part 1): a quotation's part on the core's trash (office/okern.py): its positions
+# and its lines on the title page go with it as children (deleted_at) and come back with it; shown in the office trash to the
+# office admin and who may manage documents (as its copies before), back only into a quotation that is still an editable
+# draft (_part_back: 409 rolls the restore back), deleted for good by the core's retention run with its positions.
+OPART_KIND = "opart"
+
+
+def _opart_label(c, oid, row):
+    d = c.execute("SELECT number, project_title FROM office_docs WHERE id=? AND org_id=?", (row["doc_id"], oid)).fetchone()
+    return " · ".join(x for x in (row.get("title"), d and (d["number"] or d["project_title"])) if x)
+
+
+def _opart_back(c, oid, row):
+    _part_back(c, oid, int(row["id"]))
+    return {"doc_id": row["doc_id"]}
+
+
+def _opart_may(c, uid, oid):
+    return _ofr_may(c, uid, oid, "manage")
+
+
+ofk_register(OPART_KIND, "office_doc_parts", N_("Part"), "offers", step=False,
+             children=(("office_doc_items", "part_id"), ("office_doc_items", "ref_part_id")),
+             base=lambda c, uid, row: "manage" if _opart_may(c, uid, row["org_id"]) else None,
+             view={"kind": "part", "label": _opart_label, "ctx": _opart_ctx, "back": _opart_back, "who": _opart_may,
+                   "lock": lambda oid, row: (f"office_doc_{int(row['doc_id'])}",)})  # its quotation's lock, as tp_part_items_put
 
 
 @app.put("/api/office/docs/<int:did>/parts/<int:pid>/items")
@@ -893,7 +915,7 @@ def tp_part_items_put(did, pid):
     before = ofx_items_brief(_part_items(c, oid, did, pid))
     rows = clean_items(c, oid, r, items, admin, part=pid)
     # 2.269.0 A (#3012): positions keep their ids (UPDATE), new ones are added, only the left out ones go (as docs._put_items)
-    old = {x["id"] for x in c.execute("SELECT id FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id=?", (did, oid, pid))}
+    old = {x["id"] for x in c.execute(f"SELECT id FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id=? AND {live_sql()}", (did, oid, pid))}  # 2.1005.0 (#5415): the trash is neither overwritten nor deleted
     seen = set()
     for i, row in enumerate(rows):
         iid = _iid(items[i].get("id")) if isinstance(items[i], dict) else 0

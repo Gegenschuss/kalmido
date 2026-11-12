@@ -165,10 +165,10 @@ check(Ca.patch(B + f"{T}/{TB}", json={"dest": "X"}).status_code == 404, "another
 
 # ---------------------------------------------------------------- the undo of deleting
 r = Bo.delete(B + f"{T}/{TB}")
-tt = r.json().get("trash_id") if r.ok else None
-check(r.ok and tt and TB not in (ids_of(Bo) or []), "member A: deletes the own trip " + r.text[:200])
-check(Mi.post(B + f"{T}/trash/{tt}/restore").status_code in (403, 404), "member B: cannot undo A's delete")
-r = Bo.post(B + f"{T}/trash/{tt}/restore")
+check(r.ok and r.json().get("trash") and TB not in (ids_of(Bo) or []), "member A: deletes the own trip " + r.text[:200])
+# 2.1005.0 (#5415): the trip lies in the core's trash; the undo is POST .../trips/<id>/restore (level "own": the own trip)
+check(Mi.post(B + f"{T}/{TB}/restore").status_code in (403, 404), "member B: cannot undo A's delete")
+r = Bo.post(B + f"{T}/{TB}/restore")
 check(r.ok and r.json().get("id") == TB and TB in (ids_of(Bo) or []), "member A: the undo brings the own trip back " + r.text[:200])
 
 # ---------------------------------------------------------------- a person without an organisation: everything as before

@@ -26,7 +26,7 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.i18n import N_, tr
-from ..core.access import Denied, list_role
+from ..core.access import Denied, list_role, live_sql
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_log_detail
 from ..accounts.session import me
@@ -360,7 +360,7 @@ def ofa_keep_flags(c, oid, did, items, rows):
     """A person saves the positions (docs._put_items): an agent's mark stays on an unchanged position and goes on a changed
     one or one the person confirmed (item.confirm)."""
     old = {r["id"]: r for r in c.execute("SELECT id, kind, service_id, title, qty, unit, rate, agent_flag FROM office_doc_items "
-                                         "WHERE doc_id=? AND org_id=? AND part_id IS NULL AND agent_flag<>''", (did, oid))}
+                                         f"WHERE doc_id=? AND org_id=? AND part_id IS NULL AND agent_flag<>'' AND {live_sql()}", (did, oid))}  # 2.1005.0 (#5415): not the trash
     out = []
     for it, row in zip(items if isinstance(items, list) else [], rows):
         prev = None
@@ -539,7 +539,7 @@ def v1_office_docs():
     kind = a.get("kind") or "offer"
     if kind not in DOC_KINDS:
         raise BadInput(tr("Invalid value: {0}", "kind"))
-    sql, args = "SELECT * FROM office_docs WHERE org_id=? AND kind=?", [oid, kind]
+    sql, args = f"SELECT * FROM office_docs WHERE org_id=? AND kind=? AND {live_sql()}", [oid, kind]  # 2.1005.0 (#5415): not the trash
     cid = _iid(a.get("client_id"), "client_id")
     if cid:
         sql += " AND client_id=?"

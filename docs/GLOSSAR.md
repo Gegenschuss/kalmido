@@ -633,7 +633,7 @@ Office & finance: quotations, invoices, bank, books, tax, DATEV, e-invoices, let
 - `kalmido/office/oftref.py` (`rc`) - Generated documents, letters and receipts filed in folders
 - `kalmido/office/okern.py` - Office kinds on the one trash of the core (ofk_register / ofk_trash / ofk_restore); the area's own purge runs are gone
 - `kalmido/office/olock.py` (`olk`) - Legal retention locks of the office
-- `kalmido/office/otrash.py` (`otb`) - 2.272.0 E2 the office trash
+- `kalmido/office/otrash.py` (`otb`) - 2.272.0 E2 the office trash (2.1005.0: its routes; copies only for the start balance and orphaned sign-off records)
 - `kalmido/office/oubar.py` (`oub`) - Undo across devices, stage 4 -- the office's steps in the core's step groups: labels and barriers (finalising, sending, payments)
 - `kalmido/office/outlays.py` (`au`) - Bill receipts (documents with a row in rc_receipts, the bookkeeping's receipt sheet)
 - `kalmido/office/owrite.py` (`ow`) - The shared core, stage 2 -- ONE write call for an office row (and a client)

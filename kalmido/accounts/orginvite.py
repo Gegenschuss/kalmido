@@ -404,6 +404,36 @@ def ojn_neutral_drop(c, oid, email):
         c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id IS NULL AND email=lower(trim(?))", (oid, email))
 
 
+OJN_PURGE_DAYS = 30  # 2.1005.0 (#5118): an expired invitation stays in the admins' list this long, then the daily clean-up deletes it
+# 2.1005.0 (#5118): a text time of org_joins / user_invites as timestamptz (NULL for an empty or broken value: such a row stays)
+OJN_TS = "CASE WHEN pg_input_is_valid({0}, 'timestamptz') THEN {0}::timestamptz END"
+
+
+def ojn_purge(c, now):
+    """2.1005.0 (#5118, review F2 of 2.985.0): the daily clean-up (admin/dataretention.py lgc_expired, no switch: an
+    invitation is no data of a person once it ran out) deletes the ordinary org_joins rows (silent=0, an account the admin may
+    see) expired OJN_PURGE_DAYS ago (made more than OJN_DAYS + OJN_PURGE_DAYS days ago), unless the row is still open for the
+    person (OJN_LIVE: a new account's link used within the period) or belongs to a new account this organisation made
+    (org_invites: the row keeps that never used account in the list, where withdrawing deletes it).
+    Review of 2.1005.0 (Fable F1): a silent row (ojn_silent) and a neutral row (ojn_neutral) STAY. They stand in the admin's
+    list like the row of a new account (expired until withdrawn); deleting them while that one stays would tell the admin that
+    the typed address has an account (and deleting only the neutral ones that it was deleted). Their end waits for a decision
+    on the never used new accounts (the follow-up task named in the package's changelog).
+    An open (younger) invitation and an accepted one (the row is gone, the membership stays untouched) are not affected.
+    Returns the number of rows deleted; the caller commits."""
+    cut = now - timedelta(days=OJN_DAYS + OJN_PURGE_DAYS)
+    with system_ctx(c):  # rows of every organisation; nobody sees anything
+        n = c.execute(f"""DELETE FROM org_joins j WHERE {OJN_TS.format('j.created_at')} < ?::timestamptz
+                          AND j.silent=0 AND (NOT EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite'
+                                                          AND {OJN_TS.format('v.used_at')} >= ?::timestamptz
+                                                          AND {OJN_TS.format('v.created_at')} >= {OJN_TS.format('j.created_at')})
+                                              AND NOT EXISTS (SELECT 1 FROM org_invites i WHERE i.org_id=j.org_id AND i.user_id=j.user_id))""",
+                      (iso(cut), iso(cut))).rowcount or 0
+    if n:
+        print("organisation invitation: deleted", n, "invitation(s) expired more than", OJN_PURGE_DAYS, "days ago", flush=True)
+    return n
+
+
 def ojn_hidden(c, oid, uid, email=None):
     """2.593.0 (#3570, review F5): a silent invitation stays silent on Resend: a disabled account or an agent, or in a company
     of its own (orgs.self_made) a person the inviting admin may not see (the test of org_member_put). Otherwise -- the admin

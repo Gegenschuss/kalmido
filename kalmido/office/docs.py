@@ -12,7 +12,7 @@ from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, like_escape, write_lock
+from ..core.pg import insert_id, like_escape, qi, table_columns, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_item_store, oc_json_store
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc
@@ -24,7 +24,8 @@ from .packs import office_pack_for
 from .doclang import DOC_LANGS, doc_client_lang, doc_lg, doc_own, doc_pack, fd_lang_gaps  # 2.185.0 C (#2520); 2.460.0 (#3767)
 from .sheet import dk_pack, dk_packs_on
 from .undo import oun_post, oun_pre
-from .otrash import otb_put  # 2.272.0 E2 (#3038)
+from .okern import ofk_register, ofk_trash  # 2.1005.0 (#5415): a draft in the core's trash
+from .okern import ofk_fk_refs  # 2.1005.0 (#5415): was otrash.otb_refs
 from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
 from .model import (NAME_MAX, PT_MAX, TEXT_MAX, UNITS, client_short_code, pb_cl_sql, pb_cl_live, office_gate, office_need_feature, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
@@ -32,6 +33,7 @@ from .pdf import pdf_paper  # 2.357.0 A (#3156)
 from .oubar import OUB_SENT, oub_barrier, oub_doc_name  # 2.747.0 (#5252): a document marked sent is a barrier of the undo steps
 from .ledger import (ofx_release, ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
                      ofx_number_at_finalize, ofx_snapshot_pack, OFX_LOCKED)
+from .ledger import ofx_unlink, ofx_unlock  # 2.1005.0 (#5415): a finalised quotation never sent goes as a draft
 from .countries import fk_country_label  # 2.296.0 B (#3168)
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
                        inv_reminder_totals, inv_render, inv_scheme, inv_state)
@@ -141,7 +143,7 @@ def doc_row(c, oid, did):
         did = int(did)
     except (TypeError, ValueError):
         raise Denied(404)
-    r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
+    r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (did, oid)).fetchone()  # 2.1005.0 (#5415): not the trash
     if not r:
         raise Denied(404)
     return oc_dec_fields(c, oid, "office_docs", r)  # 2.42.0 (#828): sender / internal costs encrypted at rest
@@ -152,7 +154,7 @@ def doc_items(c, did, oid, part=None):
     2.47.0 (#1215): the title page's (part_id NULL); part = the positions of that part (office/parts.py)."""
     psql, pargs = (" AND part_id IS NULL", ()) if part is None else (" AND part_id=?", (part,))
     return [oc_dec_fields(c, oid, "office_doc_items", r)  # 2.42.0 (#828): cost from cost_enc
-            for r in c.execute("SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=?" + psql + " ORDER BY sort, id", (did, oid, *pargs))]
+            for r in c.execute(f"SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=? AND {live_sql()}" + psql + " ORDER BY sort, id", (did, oid, *pargs))]  # 2.1005.0 (#5415): not the trash
 
 
 def _texts(c, oid, kind=None):
@@ -447,14 +449,14 @@ def doc_public(c, oid, r, admin, items=True):
             d["payments"] = inv_payments(c, oid, r["id"])  # 2.354.0 D (#2837): + the refunds on a credit note
             if ofx_locked(r):  # 2.354.0 D (#2837): what is still to be paid back to the customer ("Refund open")
                 d["refund_open"] = str(inv_refund_open(c, oid, r))
-            cr = c.execute("SELECT id, number, status, locked_at, totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? ORDER BY id",
-                           (oid, r["id"])).fetchall() if r["kind"] == "invoice" else []
+            cr = c.execute(f"SELECT id, number, status, locked_at, totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND {live_sql()} ORDER BY id",
+                           (oid, r["id"])).fetchall() if r["kind"] == "invoice" else []  # 2.1005.0 (#5415): not the trash
             d["credits_of"] = [{"id": x["id"], "number": x["number"], "status": x["status"], "locked": bool(x["locked_at"]), "gross": _j(x["totals"], {}).get("gross")} for x in cr]
             if r["kind"] == "invoice":  # 2.144.6 A (#2053): the time entries it billed
                 from .timebill import tbill_doc_time
                 d["time_billed"] = tbill_doc_time(c, r["id"])
             if r["kind"] == "credit" and d.get("cancels_id"):
-                x = c.execute("SELECT id, number FROM office_docs WHERE id=? AND org_id=?", (d["cancels_id"], oid)).fetchone()
+                x = c.execute(f"SELECT id, number FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (d["cancels_id"], oid)).fetchone()  # 2.1005.0 (#5415): not the trash
                 d["cancels"] = {"id": x["id"], "number": x["number"]} if x else None
     if r["kind"] in ("invoice", "reminder"):  # 2.40.0 (#1368 points 8 + 9)
         from .invoices import fd_reminder_extra
@@ -1027,7 +1029,7 @@ def _put_items(c, oid, r, items, admin, flags=None, keep=False):
         from .agentdocs import ofa_keep_flags
         flags = ofa_keep_flags(c, oid, r["id"], items, rows)
     did = r["id"]
-    old = {x["id"]: x for x in c.execute("SELECT id, agent_flag FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL", (did, oid))}
+    old = {x["id"]: x for x in c.execute(f"SELECT id, agent_flag FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND {live_sql()}", (did, oid))}  # 2.1005.0 (#5415): a trashed part's title page line is neither overwritten nor deleted
     c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id IS NULL", (did,))  # rows of an older version
     seen = set()
     for i, (row, fl) in enumerate(zip(rows, flags)):
@@ -1256,7 +1258,7 @@ def odoc_groups():
     or shared): the clients, projects and years of the quotations and invoices (no trial documents) with their counts.
     {clients: [{id, name, n}], projects: [{name, n}], years: [{year, n}]}"""
     c, uid, oid = _ctx()
-    base = "FROM office_docs WHERE org_id=? AND trial=0 AND kind IN ('offer', 'invoice', 'credit')"
+    base = f"FROM office_docs WHERE org_id=? AND trial=0 AND kind IN ('offer', 'invoice', 'credit') AND {live_sql()}"  # 2.1005.0 (#5415): not the trash
     cl = {r[0]: r[1] for r in c.execute(f"SELECT client_id, COUNT(*) {base} AND client_id IS NOT NULL GROUP BY client_id", (oid,))}
     names = {}
     if cl:
@@ -1310,7 +1312,7 @@ def odoc_list():
     kind = request.args.get("kind") or "offer"
     if kind not in DOC_KINDS:
         kind = "offer"
-    sql, args = "SELECT {cols} FROM office_docs WHERE org_id=? AND kind=?", [oid, kind]
+    sql, args = "SELECT {cols} FROM office_docs WHERE org_id=? AND kind=? AND " + live_sql(), [oid, kind]  # 2.1005.0 (#5415): not the trash
     st = request.args.get("status")
     if st in STATUSES + ("issued", "paid", "cancelled") and st not in ("partial", "overdue"):
         sql += " AND status=?"
@@ -1376,7 +1378,7 @@ def odoc_list():
     next_cursor = (f"@{off + n}" if srt else f"{raw[n - 1]['date']},{raw[n - 1]['id']}") if len(raw) > n else None
     raw = raw[:n]
     if light and raw:
-        full = {r["id"]: r for r in c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND id IN ({','.join('?' * len(raw))})",
+        full = {r["id"]: r for r in c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND {live_sql()} AND id IN ({','.join('?' * len(raw))})",  # 2.1005.0 (#5415): not the trash
                                               [oid, *(r["id"] for r in raw)])}
         raw = [full[r["id"]] for r in raw if r["id"] in full]
     if paid and not derived:
@@ -1397,7 +1399,7 @@ def odoc_list():
         used = {b["id"] for b, r in zip(rows, raw) if b.get("can_delete") and not b["locked"]}
         if used:  # 2.417.0 (#2604 review F3): a draft something was made from stays too (one query, not one per row)
             q = ",".join("?" * len(used))
-            used = {x[0] for x in c.execute(f"SELECT source_doc_id FROM office_docs WHERE org_id=? AND source_doc_id IN ({q}) "
+            used = {x[0] for x in c.execute(f"SELECT source_doc_id FROM office_docs WHERE org_id=? AND {live_sql()} AND source_doc_id IN ({q}) "  # 2.1005.0 (#5415): not the trash
                                             f"UNION SELECT doc_id FROM office_gen_docs WHERE org_id=? AND doc_id IN ({q})",
                                             (oid, *used, oid, *used)).fetchall()}
             for b in rows:
@@ -1419,9 +1421,9 @@ def odoc_list():
 def trial_summary(c, oid):
     """2.144.10 A (#2576): trial_count (trial documents + trial documents from templates of the area), first (true = the
     area has no real quotation / invoice yet: the dialog shows the "try it first" hint) and office_id (the hint's key)."""
-    n = c.execute("SELECT (SELECT COUNT(*) FROM office_docs WHERE org_id=? AND trial=1) + "
+    n = c.execute(f"SELECT (SELECT COUNT(*) FROM office_docs WHERE org_id=? AND trial=1 AND {live_sql()}) + "  # 2.1005.0 (#5415): not the trash
                   "(SELECT COUNT(*) FROM office_gen_docs WHERE org_id=? AND trial=1 AND archived=0) AS n", (oid, oid)).fetchone()["n"]
-    real = {r["kind"] for r in c.execute("SELECT DISTINCT kind FROM office_docs WHERE org_id=? AND trial=0 AND kind IN ('offer', 'invoice')", (oid,))}
+    real = {r["kind"] for r in c.execute(f"SELECT DISTINCT kind FROM office_docs WHERE org_id=? AND trial=0 AND kind IN ('offer', 'invoice') AND {live_sql()}", (oid,))}  # 2.1005.0 (#5415): not the trash
     return {"trial_count": int(n or 0), "first": {"offer": "offer" not in real, "invoice": "invoice" not in real}, "office_id": oid}
 
 
@@ -1641,8 +1643,8 @@ def odoc_replace_undo(c, oid, r, uid):
     back, unless another quotation replaces it too. The status comes from the office log (plain JSON: no protected key)."""
     if r["kind"] != "offer" or r["status"] != "draft" or not r["replaces_id"]:
         return
-    old = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (r["replaces_id"], oid)).fetchone()
-    if not old or old["status"] != "superseded" or c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND replaces_id=? AND id<>? LIMIT 1",
+    old = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (r["replaces_id"], oid)).fetchone()  # 2.1005.0 (#5415): not the trash
+    if not old or old["status"] != "superseded" or c.execute(f"SELECT 1 FROM office_docs WHERE org_id=? AND replaces_id=? AND id<>? AND {live_sql()} LIMIT 1",
                                                              (oid, old["id"], r["id"])).fetchone():
         return
     log = c.execute("SELECT detail FROM office_doc_log WHERE org_id=? AND doc_id=? AND action='status' ORDER BY id DESC LIMIT 1", (oid, old["id"])).fetchone()
@@ -1662,6 +1664,7 @@ DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "cr
             "series_id", "series_period", "abs_refs",  # 2.120.0 A (#2087): abs_refs  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
             "reminder_fee_state", "reminder_fee_paid_at", "agent_id", "list_id", "dup_times_from",  # 2.355.0 A (#2839): inv_type -- a copy of a final invoice is a plain one
             "client_ref", "inv_type"}  # 2.269.0 D (#3046): the device's id of the request that made the original  # 2.126.0 A (#1979 F6): a fresh fee state, made by the person copying
+DUP_SKIP |= {"deleted_at", "deleted_by", "rev", "updated_by", "trash_refs"}  # 2.1005.0 (#5415): the core's trash columns stay the original's
 DUP_ITEM_SKIP = {"id", "tax_pct", "net", "tax_amount"}
 
 
@@ -1757,7 +1760,7 @@ def bga_offer_blocks(c, oid, rs):
         q, a = ",".join("?" * len(open_ids)), (oid, *open_ids)
         sent = {x[0] for x in c.execute(f"SELECT doc_id FROM office_doc_log WHERE org_id=? AND action='send' AND doc_id IN ({q})", a)}
         signed = {x[0] for x in c.execute(f"SELECT doc_id FROM office_signoffs WHERE org_id=? AND state <> 'open' AND doc_id IN ({q})", a)}
-        used = {x[0] for x in c.execute(f"SELECT source_doc_id FROM office_docs WHERE org_id=? AND source_doc_id IN ({q}) "
+        used = {x[0] for x in c.execute(f"SELECT source_doc_id FROM office_docs WHERE org_id=? AND {live_sql()} AND source_doc_id IN ({q}) "  # 2.1005.0 (#5415): not the trash
                                         f"UNION SELECT doc_id FROM office_gen_docs WHERE org_id=? AND doc_id IN ({q})", a + a)}
 
     def why(r):
@@ -1776,7 +1779,7 @@ def bga_offer_blocks(c, oid, rs):
 
 
 def bga_offer_used(c, oid, r):
-    return bool(c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND source_doc_id=? LIMIT 1", (oid, r["id"])).fetchone() or
+    return bool(c.execute(f"SELECT 1 FROM office_docs WHERE org_id=? AND source_doc_id=? AND {live_sql()} LIMIT 1", (oid, r["id"])).fetchone() or  # 2.1005.0 (#5415): not the trash
                 c.execute("SELECT 1 FROM office_gen_docs WHERE org_id=? AND doc_id=? LIMIT 1", (oid, r["id"])).fetchone())
 
 
@@ -1828,13 +1831,23 @@ def odoc_delete(did):
         raise Denied(409, tr("The client has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),
                                                   **({"locked": True} if locked else {})})  # 2.114.2 A (#2263): the number gap stays traceable
-    # 2.530.0 C (#4315, B13): a finalised quotation that was never sent (bga_offer_block let it through) goes there too
-    if r["kind"] == "offer" or (not locked and r["status"] == "draft"):  # 2.272.0 E2 (#3038): a draft goes to the office trash (restore), with the
-        # time entries it billed (they are open meanwhile and bound again on restore while still open)
-        te = [x[0] for x in c.execute("SELECT id FROM time_entries WHERE billed_doc_id=?", (did,)).fetchall()]
-        cl = c.execute("SELECT name FROM clients WHERE id=?", (r["client_id"],)).fetchone() if r["client_id"] else None
-        otb_put(c, oid, uid, "doc", "office_docs", did, " · ".join(x for x in (r["project_title"] or r["number"], cl and cl["name"]) if x),
-                sub=r["kind"], extra_nulls=[("time_entries", "billed_doc_id", did, te)] if te else ())
+    if not locked and (r["kind"] == "offer" or r["status"] == "draft"):  # 2.1005.0 (#5415): a draft that was never finalised goes
+        # into the core's trash (odoc_trash: soft delete, restorable from the office trash, the toast's undo); the row stays
+        odoc_trash(c, oid, uid, r)
+        bump(c)
+        c.commit()
+        return jsonify(ok=True, trash={"kind": ODOC_KIND, "id": did})
+    if r["kind"] == "offer":  # 2.530.0 C (#4315, B13): a finalised quotation that was never sent (bga_offer_block let it through)
+        # 2.1005.0 (#5415): goes back to a draft as its unlock does (ledger.ofx_unlock: the frozen files go), then into the core's
+        # trash as any draft -- a finalised row never lies there; it comes back as a draft (was a copy in office_trash)
+        if not ofr_admin_or(c, uid, oid, "offers", "edit", "release"):  # review 2.1005.0 (F4): the unlock's own right (ofx_unlock_post)
+            raise Denied(403, tr("Only an admin of this workspace can do this"))
+        paths = ofx_unlock(c, oid, r)
+        odoc_trash(c, oid, uid, doc_row(c, oid, did))
+        bump(c)
+        c.commit()
+        ofx_unlink(paths)
+        return jsonify(ok=True, trash={"kind": ODOC_KIND, "id": did})
     from .timebill import tbill_free
     tbill_free(c, did)  # 2.144.6 A (#2053): the time entries of the deleted document are open again
     odoc_replace_undo(c, oid, r, uid)  # 2.437.0 B (#3621)
@@ -1845,7 +1858,96 @@ def odoc_delete(did):
     ofd_deleted(c, did)  # 2.199.0 B (#2742): its folder entry goes along
     bump(c)
     c.commit()
-    return jsonify(ok=True, **({"trash_id": g.otb_id} if g.get("otb_id") else {}))  # 2.272.0 E2 (#3038)
+    return jsonify(ok=True)
+
+
+# 2.1005.0 (#5415, stage 4d of the core's trash, part 1): a document draft that was never finalised goes into the core's trash
+# (office/okern.py, kind odoc) instead of a copy in office_trash: the row stays with deleted_at, its positions, parts, payments
+# and links stay with it (every reader of office_docs skips the trash: live_sql, the list in docs/dev/kern.md), the office
+# trash shows it to the office admin and who may delete documents, the core's retention run deletes it for good after the
+# trash period (the database's cascades as on a delete before). What a deleted row did to others happens when it goes in and
+# is put back on restore while still free, as the copies did: its number and series place (a number / period taken since stays
+# empty), the references the database emptied (ON DELETE SET NULL: a deal's quotation, a cash entry's invoice ...), the time
+# entries it billed (open meanwhile). A finalised document never comes here (409; a finalised quotation never sent goes as a draft).
+ODOC_KIND = "odoc"
+
+
+def odoc_trash(c, oid, uid, r, checked=False):
+    """Draft r (a row of office_docs, not finalised) into the core's trash; the caller holds the locks, checked the rights (checked=
+    True: a way of its own, a table's offer step or an agent's proposal taken back) and commits. -> the row's id."""
+    if ofx_locked(r):
+        raise Denied(409, tr(OFX_LOCKED))  # never a finalised document (GoBD)
+    did = int(r["id"])
+    refs = {"number": r["number"] or "", "series_id": r["series_id"], "series_period": r["series_period"] or "",
+            "client_id": r["client_id"], "nulls": []}
+    te = [x[0] for x in c.execute("SELECT id FROM time_entries WHERE billed_doc_id=?", (did,)).fetchall()]
+    if te:  # bound again on restore while still open
+        refs["nulls"].append(["time_entries", "billed_doc_id", te])
+    from .timebill import tbill_free
+    tbill_free(c, did)  # 2.144.6 A (#2053): its time entries are open again
+    odoc_replace_undo(c, oid, r, uid)  # 2.437.0 B (#3621)
+    odoc_unlink_refs(c, oid, [did])
+    with ofx_release(c):  # what the database's ON DELETE SET NULL did on a delete (also on a finalised row pointing at it)
+        for child, col, kind in ofk_fk_refs(c, "office_docs"):
+            if kind != "n" or "id" not in table_columns(c, child):
+                continue
+            cols = table_columns(c, child)  # the names come from the database's catalog (ofk_fk_refs)
+            ids = [x[0] for x in c.execute(f"SELECT id FROM {qi(child, (child,))} WHERE {qi(col, cols)}=?", (did,)).fetchall()]
+            if ids:
+                c.execute(f"UPDATE {qi(child, (child,))} SET {qi(col, cols)}=NULL WHERE id = ANY(CAST(? AS BIGINT[]))", (ids,))
+                refs["nulls"].append([child, col, ids])
+        # its number and series place are free while it lies in the trash; the device's request id (client_ref) goes for good
+        c.execute("UPDATE office_docs SET number='', series_id=NULL, client_ref=NULL, trash_refs=? WHERE id=? AND org_id=?",
+                  (json.dumps(refs), did, oid))
+    ofk_trash(c, uid, ODOC_KIND, did, checked=checked)
+    from .docref import ofd_deleted
+    ofd_deleted(c, did)  # 2.199.0 B (#2742): its folder entry goes, as on a delete
+    return did
+
+
+def _odoc_refs(row):
+    v = row.get("trash_refs")
+    if isinstance(v, str):
+        v = _j(v, {})
+    return v if isinstance(v, dict) else {}
+
+
+def _odoc_back(c, oid, row):
+    """After a draft came back from the core's trash: its number / series place where still free, the references and time
+    entries where still empty (as the copies of office_trash did before 2.1005). -> {note} when its client is gone for good."""
+    refs, did = _odoc_refs(row), int(row["id"])
+    num = refs.get("number") or ""
+    from .legacyimport import fi_number_taken
+    if num and (c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id<>?", (oid, num, did)).fetchone()
+                or fi_number_taken(c, oid, num)):  # 2.1005.0 (#5415, fable): nor a number of the legacy archive, as _assign_number
+        num = ""  # taken since: the draft comes back without one
+    sid = refs.get("series_id")
+    if sid and c.execute("SELECT 1 FROM office_docs WHERE series_id=? AND series_period IS NOT DISTINCT FROM ? AND id<>?",
+                         (sid, refs.get("series_period") or "", did)).fetchone():
+        sid = None  # the series made this period again meanwhile
+    c.execute("UPDATE office_docs SET number=?, series_id=?, trash_refs=NULL WHERE id=? AND org_id=?", (num, sid, did, oid))
+    with ofx_release(c):
+        for table, col, ids in refs.get("nulls") or []:
+            known = {t for t, _c, _k in ofk_fk_refs(c, "office_docs")} | {"time_entries"}
+            if table in known and col in table_columns(c, table):
+                cols = table_columns(c, table)
+                c.execute(f"UPDATE {qi(table, known)} SET {qi(col, cols)}=? WHERE id = ANY(CAST(? AS BIGINT[])) AND {qi(col, cols)} IS NULL", (did, list(ids)))
+    if refs.get("client_id") and not row.get("client_id"):  # 2.552.0 (#4561 B19): the client was purged meanwhile
+        return {"gone": ["client_id"], "note": tr("Restored without a client: the client was deleted permanently meanwhile.")}
+    return {}
+
+
+def _odoc_label(c, oid, row):
+    refs = _odoc_refs(row)
+    cl = c.execute("SELECT name FROM clients WHERE id=?", (row["client_id"],)).fetchone() if row.get("client_id") else None
+    return " · ".join(x for x in (row.get("project_title") or refs.get("number"), cl and cl["name"]) if x)
+
+
+ofk_register(ODOC_KIND, "office_docs", N_("Document"), "offers", step=False,
+             base=lambda c, uid, row: "manage" if _ofr_may(c, uid, row["org_id"], "manage") else None,
+             view={"kind": "doc", "sub": lambda row: row["kind"], "label": _odoc_label, "ctx": _ctx, "back": _odoc_back,
+                   "lock": lambda oid, row: (f"office_doc_{int(row['id'])}", f"office_num_{int(oid)}"),  # as its saves, then _assign_number
+                   "who": lambda c, uid, oid: _ofr_may(c, uid, oid, "manage")})
 
 
 # 2.144.10 A (#2576): deleting trial documents. Follow-ups stay (they are trial documents themselves), their reference is

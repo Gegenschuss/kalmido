@@ -17,7 +17,7 @@ from datetime import date
 
 from flask import Response, jsonify, request
 
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.config import app
 from ..core.db import db, local_now
 from ..core.i18n import N_, tr
@@ -113,7 +113,7 @@ def bx_rows(c, oid, frm, to, gaps=None):
     rows, docs, recs = [], [], []
     for r in c.execute("SELECT d.*, cl.name AS bx_client FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id WHERE d.org_id=? "
                        "AND d.kind IN ('invoice','credit') AND d.locked_at IS NOT NULL AND d.number != '' AND d.date>=? AND d.date<=? "
-                       "AND d.trial=0 ORDER BY d.date, d.number", (oid, frm, to)).fetchall():  # 2.144.10 B (#2576): no trial documents
+                       f"AND d.trial=0 AND {live_sql('d')} ORDER BY d.date, d.number", (oid, frm, to)).fetchall():  # 2.144.10 B (#2576): no trial documents
         t, fx, sign = _j(r["totals"]), _fx(r, home), (-1 if r["kind"] == "credit" else 1)
         who = (_j(r["recipient"]).get("name") or r["bx_client"] or "").strip()
         f = "documents/" + epdf_name(r) + ".pdf"

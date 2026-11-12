@@ -13,7 +13,7 @@ from ..accounts.orgroles import office_allowed
 from ..core.config import app
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.i18n import tr
-from ..core.access import need_list
+from ..core.access import live_sql, need_list  # 2.1005.0 (#5415): live_sql
 from ..core.errors import BadInput
 from ..core.pg import write_lock
 from ..lists.lists import LIST_NAME_MAX
@@ -110,7 +110,7 @@ def dpj_list_docs(lid):
     oid = dpj_area(c, g.user["id"], lid)
     if oid is None:
         return jsonify(office=False, docs=[])
-    rows = c.execute("SELECT * FROM office_docs WHERE org_id=? AND list_id=? AND kind IN ('offer','invoice','credit') "
+    rows = c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND list_id=? AND kind IN ('offer','invoice','credit') AND {live_sql()} "  # 2.1005.0 (#5415): not the trash
                      "ORDER BY date DESC, id DESC LIMIT ?", (oid, lid, DPJ_MAX)).fetchall()
     pm = inv_paid_map(c, oid, [r["id"] for r in rows if r["kind"] != "offer"]) if rows else {}
     keep = ("id", "kind", "number", "status", "state", "status_text", "date", "gross_text", "project_title", "trial")

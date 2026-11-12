@@ -72,7 +72,7 @@ tid = r.json()["ids"][0]
 run = runs("trips")
 check(len(run) == 1, f"#3104: a run for the trips {run}")
 r = undo(run[0]["id"])
-check(r.ok and r.json()["removed"]["trips"] == 1 and not sql("SELECT id FROM office_trips WHERE id=?", (tid,)), "#3104: the trip went " + r.text[:200])
+check(r.ok and r.json()["removed"]["trips"] == 1 and not sql("SELECT id FROM office_trips WHERE id=? AND deleted_at IS NULL", (tid,)), "#3104: the trip went " + r.text[:200])  # 2.1005.0 (#5415): into the trash
 
 # ---- leads
 CSV = "Name;Firma\nOhne Mail;Beispiel GmbH\nOHNE  mail;beispiel gmbh\nNoch einer;\n"

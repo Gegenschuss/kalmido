@@ -356,10 +356,10 @@ def cf8_chain(c, oid, r):
     """2.88.0 (#1915): the chain of quotation r for its editor: {cashflow, versions: [{id, number, status, cashflow, counts}]
     (oldest first), counts (r itself), counting: [ids], invoiced (a version has an invoice)}."""
     root = r["version_of"] or r["id"]
-    rows = c.execute("SELECT id, kind, number, status, cashflow, version_of, client_id FROM office_docs WHERE org_id=? AND kind='offer' "
+    rows = c.execute(f"SELECT id, kind, number, status, cashflow, version_of, client_id FROM office_docs WHERE org_id=? AND kind='offer' AND {live_sql()} "
                      "AND (id=? OR version_of=?) ORDER BY id", (oid, root, root)).fetchall()
     rows = [x for x in rows if cf8_key(x) == cf8_key(r)]
-    inv = c.execute("SELECT source_doc_id FROM office_docs WHERE org_id=? AND kind='invoice' AND locked_at IS NOT NULL AND locked_at<>'' "
+    inv = c.execute(f"SELECT source_doc_id FROM office_docs WHERE org_id=? AND kind='invoice' AND locked_at IS NOT NULL AND locked_at<>'' AND {live_sql()} "
                     "AND status NOT IN ('draft', 'cancelled') AND COALESCE(inv_type, '')<>'progress' AND source_doc_id IN (%s)" % ",".join("?" * len(rows)),
                     (oid, *[x["id"] for x in rows])).fetchall() if rows else []
     invoiced = {x["source_doc_id"] for x in inv}
@@ -379,7 +379,7 @@ def cf_docs(c, oid, first, last):
     the invoices / credit notes only the finalised ones not drafts / cancelled (its inv) and the ones paid in the period
     (by_id, a superset of its payment filter); every quotation stays (a chain counts or not as a whole). Was SELECT * of
     every document of every year."""
-    return c.execute(f"SELECT {CF_COLS} FROM office_docs WHERE org_id=? AND kind IN ('offer', 'invoice', 'credit') AND trial=0 AND ("
+    return c.execute(f"SELECT {CF_COLS} FROM office_docs WHERE org_id=? AND kind IN ('offer', 'invoice', 'credit') AND trial=0 AND {live_sql()} AND ("
                      "kind='offer' OR (kind='invoice' AND locked_at IS NOT NULL AND status NOT IN ('draft', 'cancelled'))"
                      " OR id IN (SELECT doc_id FROM office_payments WHERE org_id=? AND date>=? AND date<?))", (oid, oid, first, last)).fetchall()
 

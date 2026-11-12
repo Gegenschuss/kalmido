@@ -24,7 +24,7 @@ from ..core.db import body, db, err, iso, now_utc, parse_iso
 from ..core.i18n import N_, tr
 from .doclang import doc_client_lang, doc_lg  # 2.185.0 C (#2520)
 from ..core.pg import system_ctx
-from ..core.access import acx_anon_bind, Denied
+from ..core.access import acx_anon_bind, Denied, live_sql  # 2.1005.0 (#5415): live_sql
 from ..accounts.session import _accept_lang, _token_hash, rate_ip
 from ..lists.public import PUB_ACTOR, pub_gone, pub_limited, public_links_on
 from ..team.portal import (PT_LOGIN_ADDR, PT_LOGIN_SPACE, PT_LOGIN_TTL, PT_LOGIN_WIN, PT_VIEW_RATE, _pt_mail_html, pt_cookie_read,
@@ -100,7 +100,7 @@ def kp_docs(c, oid, cids, did=None):
     """The visible documents of clients cids in area oid (newest first), or the one with id did."""
     if not oid or not cids:
         return []
-    q = f"SELECT * FROM office_docs WHERE org_id=? AND client_id IN ({','.join('?' * len(cids))}) AND {KP_SQL}"
+    q = f"SELECT * FROM office_docs WHERE org_id=? AND client_id IN ({','.join('?' * len(cids))}) AND {KP_SQL} AND {live_sql()}"  # 2.1005.0 (#5415): not the trash
     args = [oid, *cids]
     if did is not None:
         q += " AND id=?"
@@ -238,7 +238,7 @@ def kp_link_send(cid):
     co = ofx_company(c, oid)
     name = (co.get("name") or "").split("\n")[0].strip() or (office_settings(c, oid).get("company") or {}).get("name") or APP_NAME
     # 2.367.4 (#2972): the language of the client's newest document, the office's without one
-    dl = c.execute("SELECT lang FROM office_docs WHERE org_id=? AND client_id=? AND COALESCE(lang, '')<>'' ORDER BY id DESC LIMIT 1", (oid, cid)).fetchone()
+    dl = c.execute(f"SELECT lang FROM office_docs WHERE org_id=? AND client_id=? AND COALESCE(lang, '')<>'' AND {live_sql()} ORDER BY id DESC LIMIT 1", (oid, cid)).fetchone()  # 2.1005.0 (#5415): not the trash
     # 2.460.0 (#3767): a language set on the client comes first
     lg = doc_client_lang(c, oid, cid) or doc_lg(dl["lang"] if dl else office_settings(c, oid).get("lang"))  # 2.185.0 C (#2520): every app language
     url = f"{PUBLIC_URL}/portal/login/{tok}"

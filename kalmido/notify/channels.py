@@ -36,7 +36,7 @@ from ..core.i18n import LANGS, md_plain, N_, tr, trn
 from ..core.db import body, connect, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import GATE, me
 from ..accounts.orgs import org_role  # 2.240.0 B2 (#2867): pulled up from functions
-from ..core.access import Denied, org_trip_sql, ov_open, reading_sql, task_visible
+from ..core.access import Denied, live_sql, org_trip_sql, ov_open, reading_sql, task_visible
 from ..core.errors import BadInput
 from ..core.mailframe import MAIL_ACC, MAIL_MUTED, Safe, mail_html
 from ..notify.alerts import _env_int, aa_count, aa_err, aa_fail, aa_ok
@@ -375,7 +375,7 @@ CH_REF_SQL = {
     "l": "SELECT id AS list_id, NULL AS org_id FROM lists WHERE id=?",
     "ev": "SELECT NULL AS list_id, k.org_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?",
     "client": "SELECT NULL AS list_id, org_id FROM clients WHERE id=?",
-    "office/offers": "SELECT NULL AS list_id, org_id FROM office_docs WHERE id=?",
+    "office/offers": f"SELECT NULL AS list_id, org_id FROM office_docs WHERE id=? AND {live_sql()}",  # 2.1005.0 (#5415): a draft in the trash = neutral
     "office/gendocs": "SELECT NULL AS list_id, org_id FROM office_gen_docs WHERE id=?",
 }
 

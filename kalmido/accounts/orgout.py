@@ -11,8 +11,8 @@ from datetime import timedelta
 
 from ..core.i18n import N_, tr
 from ..core.db import iso, now_utc
-from ..core.pg import system_ctx
-from ..core.access import Denied
+from ..core.pg import qi, system_ctx
+from ..core.access import Denied, live_sql
 from ..accounts.session import me
 from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
 
@@ -43,7 +43,8 @@ def oo_mine(c, kind, obj, uid):
     if not k or not isinstance(obj, int) or isinstance(obj, bool):
         return None
     table, ncol, makers = k
-    r = c.execute(f"SELECT org_id, {ncol} AS name, {', '.join(makers)} FROM {table} WHERE id=?", (obj,)).fetchone()
+    live = f" AND {live_sql()}" if table == "office_docs" else ""  # 2.1005.0 (#5415): a draft in the trash is not there (it does not move either)
+    r = c.execute(f"SELECT org_id, {ncol} AS name, {', '.join(makers)} FROM {qi(table, {x[0] for x in OO_KINDS.values()})} WHERE id=?{live}", (obj,)).fetchone()
     if not r or not r["org_id"] or not any(r[m] == uid for m in makers):
         return None
     name = str(r["name"] or "")

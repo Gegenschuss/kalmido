@@ -24,7 +24,7 @@ from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings
@@ -487,7 +487,7 @@ def bnk_open_invoices(c, oid):
     from .invoices import _j, inv_money_fields, inv_paid_map
     rows = c.execute("SELECT d.*, cl.name AS client_name FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id "
                      "WHERE d.org_id=? AND d.kind='invoice' AND d.locked_at IS NOT NULL AND d.status NOT IN ('draft', 'cancelled', 'paid') "
-                     "AND d.trial=0",  # 2.144.10 B (#2576): never suggest trial invoices
+                     f"AND d.trial=0 AND {live_sql('d')}",  # 2.144.10 B (#2576): never suggest trial invoices
                      (oid,)).fetchall()
     pm = inv_paid_map(c, oid, [r["id"] for r in rows])
     out = []
@@ -507,7 +507,7 @@ def bnk_open_refunds(c, oid):
     out = []
     for r in c.execute("SELECT d.*, cl.name AS client_name FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id "
                        "WHERE d.org_id=? AND d.kind='credit' AND d.locked_at IS NOT NULL AND d.status NOT IN ('draft', 'cancelled', 'paid') "
-                       "AND d.trial=0", (oid,)).fetchall():
+                       f"AND d.trial=0 AND {live_sql('d')}", (oid,)).fetchall():
         o = inv_refund_open(c, oid, r)
         if o > 0:
             out.append({"id": r["id"], "number": r["number"] or "", "client": r["client_name"] or "", "title": r["project_title"] or "",
@@ -640,7 +640,7 @@ def _inv_labels(c, oid, ids):
     q = ",".join("?" * len(ids))
     return {r["id"]: {"number": r["number"] or "", "client": r["client_name"] or r["project_title"] or ""} for r in c.execute(
         f"SELECT d.id, d.number, d.project_title, cl.name AS client_name FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id "
-        f"WHERE d.org_id=? AND d.id IN ({q})", [oid] + ids)}
+        f"WHERE d.org_id=? AND {live_sql('d')} AND d.id IN ({q})", [oid] + ids)}
 
 
 @app.get("/api/office/bank/tx")
@@ -830,7 +830,7 @@ def bnk_match(tid):
         if c.execute("SELECT 1 FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND match_kind='receipt' AND match_id=? LIMIT 1",
                      (oid, mid)).fetchone():
             raise Denied(409, tr("This receipt is matched with another booking"))
-        if c.execute("SELECT 1 FROM office_cc_lines WHERE org_id=? AND node_id=? AND state='matched' LIMIT 1", (oid, mid)).fetchone():
+        if c.execute(f"SELECT 1 FROM office_cc_lines WHERE org_id=? AND node_id=? AND state='matched' AND {live_sql()} LIMIT 1", (oid, mid)).fetchone():  # 2.1005.0 (#5415)
             raise Denied(409, tr("This receipt is matched with another booking"))  # 2.444.0 (#3447): paid by card
         if not fs_role(c, mid, uid):  # as bk_receipts: only documents the person sees
             raise Denied(404)

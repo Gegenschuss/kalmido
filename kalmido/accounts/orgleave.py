@@ -19,7 +19,7 @@ from datetime import timedelta
 
 from flask import g, has_request_context, jsonify, request
 
-from ..core.access import list_people, ov_role, task_visible
+from ..core.access import list_people, live_sql, ov_role, task_visible
 from ..core.config import app
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..core.i18n import trn, tr
@@ -43,7 +43,7 @@ OLV_STAYS = (
     ("videos", Nn_("{0} video review", "{0} video reviews"),
      "SELECT COUNT(*) FROM video_reviews WHERE org_id=? AND created_by=? AND deleted_at IS NULL"),
     ("drafts", Nn_("{0} office draft", "{0} office drafts"),
-     "SELECT COUNT(*) FROM office_docs WHERE org_id=? AND created_by=? AND status='draft'"),
+     f"SELECT COUNT(*) FROM office_docs WHERE org_id=? AND created_by=? AND status='draft' AND {live_sql()}"),  # 2.1005.0 (#5415): not the trash
     ("clients", Nn_("{0} client", "{0} clients"), "SELECT COUNT(*) FROM clients WHERE org_id=? AND created_by=? AND deleted_at IS NULL"),
     ("absences", Nn_("{0} absence", "{0} absences"), "SELECT COUNT(*) FROM hub_absences WHERE org_id=? AND user_id=? AND deleted_at IS NULL"),
     ("leave_quota", Nn_("{0} holiday account", "{0} holiday accounts"), "SELECT COUNT(*) FROM hub_leave_quota WHERE org_id=? AND user_id=?"),

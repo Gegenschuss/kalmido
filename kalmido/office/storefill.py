@@ -15,6 +15,7 @@ import time
 from flask import g
 
 from ..core.config import WATCHDOG_INTERVAL, app
+from ..core.access import live_sql  # 2.1005.0 (#5415)
 from ..core.db import gset, gsetting
 from ..core.env import env_bool
 from ..core.pg import system_ctx, write_lock
@@ -36,7 +37,7 @@ def osf_todo(c, after, n):
     Quotations are left out: finalising never stores them (ledger.ofx_finalize), they stay rendered from their snapshot."""
     with system_ctx(c):
         return [(r[0], r[1]) for r in c.execute(
-            "SELECT id, org_id FROM office_docs WHERE id>? AND kind<>'offer' AND COALESCE(locked_at, '')<>'' AND COALESCE(pdf_sha256, '')='' "
+            f"SELECT id, org_id FROM office_docs WHERE id>? AND {live_sql()} AND kind<>'offer' AND COALESCE(locked_at, '')<>'' AND COALESCE(pdf_sha256, '')='' "
             "ORDER BY id LIMIT ?", (after, n)).fetchall()]
 
 

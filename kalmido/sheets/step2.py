@@ -23,7 +23,7 @@ import secrets
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.access import Denied, WRITE_ROLES, list_role, need_feat, task_visible, tvis, vis_sql
+from ..core.access import Denied, WRITE_ROLES, list_role, live_sql, need_feat, task_visible, tvis, vis_sql
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id
@@ -391,7 +391,7 @@ def sh2_links(c, sheet, uid):
             else:
                 d["label"], d["list_id"] = t["title"], t["list_id"]
         else:
-            o = c.execute("SELECT number, project_title, org_id FROM office_docs WHERE id=?", (r["target_id"],)).fetchone()
+            o = c.execute(f"SELECT number, project_title, org_id FROM office_docs WHERE id=? AND {live_sql()}", (r["target_id"],)).fetchone()  # 2.1005.0 (#5415): the trash = deleted
             if not o:
                 d["deleted" if oid or r["created_by"] == uid else "denied"] = True  # 2.89.0 (#1916): no hint without the office
             elif not oid or o["org_id"] != oid:
@@ -478,12 +478,11 @@ SH2_OFFER_UNTOUCHED = ("create", "from_sheet", "open", "pdf", "render", "export"
 def _offer_drop(c, sheet, uid, did):
     """Deletes the quotation draft a button press made, when the office lets uid delete it (its admin; still a draft) and nobody
     changed it since (else "edited")."""
-    from ..office.docref import ofd_deleted
     from ..office.ledger import ofx_locked, ofx_log
     from ..office.model import office_role
     oid = sh2_office(c, sheet, uid, write=True)
     r = c.execute("SELECT * FROM office_docs WHERE id=?", (did,)).fetchone()
-    if not r:
+    if not r or r["deleted_at"]:  # 2.1005.0 (#5415): a draft in the office trash is gone too
         return True  # already gone
     if not oid or r["org_id"] != oid or office_role(c, uid, oid) != "admin" or ofx_locked(r) or r["status"] != "draft":
         return False
@@ -494,10 +493,10 @@ def _offer_drop(c, sheet, uid, did):
                  (did, oid, *SH2_OFFER_UNTOUCHED)).fetchone():
         return "edited"  # 2.270.0 B (#3021): changed in the office since the press (items, client, texts ...): the work stays
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"]})
-    from ..office.otrash import dvb_otb_draft
-    dvb_otb_draft(c, oid, uid, did)  # 2.533.0 A2 (#4318 B20): into the office trash, as a draft deleted in the office
-    c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
-    ofd_deleted(c, did)  # 2.199.0 G (#2742): its folder node goes with it
+    from ..office.docs import odoc_trash
+    # 2.533.0 A2 (#4318 B20): into the office trash, as a draft deleted in the office; 2.1005.0 (#5415): the core's trash
+    # (soft delete; its folder node goes with it there), the rights checked above
+    odoc_trash(c, oid, uid, r, checked=True)
     return True
 
 

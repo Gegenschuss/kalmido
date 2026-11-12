@@ -17,6 +17,7 @@ from flask import jsonify, request
 
 from ..core.config import app
 from ..core.i18n import tr
+from ..core.access import live_sql  # 2.1005.0 (#5415)
 from ..core.db import db, local_now
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
@@ -183,12 +184,12 @@ def kpi_docs(c, oid, year):
     y = str(year)
     # 2.144.10 B (#2576): no trial documents in the figures (their payments drop out through by_id)
     return c.execute(
-        f"SELECT {KPI_COLS} FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit', 'offer') AND trial=0 AND ("
+        f"SELECT {KPI_COLS} FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit', 'offer') AND trial=0 AND {live_sql()} AND ("
         "(kind='invoice' AND locked_at IS NOT NULL AND status NOT IN ('draft', 'cancelled', 'paid'))"
         " OR (kind IN ('invoice', 'credit') AND substr(date, 1, 4)=?)"
         f" OR id IN (SELECT p.doc_id FROM office_payments p LEFT JOIN office_payments o ON o.id=p.reverses_id AND o.org_id=p.org_id"
         f" WHERE p.org_id=? AND {BK_PAY_DAY}>=? AND {BK_PAY_DAY}<?)"
-        " OR (kind='invoice' AND status='cancelled' AND id IN (SELECT x.cancels_id FROM office_docs x WHERE x.org_id=? AND x.kind='credit'"
+        f" OR (kind='invoice' AND status='cancelled' AND id IN (SELECT x.cancels_id FROM office_docs x WHERE x.org_id=? AND x.kind='credit' AND {live_sql('x')}"
         " AND x.cancels_id IS NOT NULL AND substr(x.date, 1, 4)=?)))",
         (oid, y, oid, f"{year - 1}-01-01", f"{year + 1}-01-01", oid, y)).fetchall()
 
@@ -199,7 +200,7 @@ def kpi_doc_clients(c, oid, ids):
     if not ids:
         return {}
     return {r[0]: r[1] for r in c.execute(f"SELECT id, client_id FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit', 'offer') "
-                                          f"AND trial=0 AND id IN ({','.join('?' * len(ids))})", [oid, *ids])}
+                                          f"AND trial=0 AND {live_sql()} AND id IN ({','.join('?' * len(ids))})", [oid, *ids])}
 
 
 # 2.525.0 (#4187): the tile Figures (start page, office start) asks every minute; the answer is kept per office, person
@@ -216,7 +217,7 @@ def kpi_mark(c, oid):
     office settings (a new home currency or tax reserve is not served from the cache; saving them bumps no data version)."""
     r = c.execute("SELECT (SELECT value FROM settings WHERE key='version'), "
                   "(SELECT md5(string_agg(id || ':' || status || ':' || COALESCE(locked_at, '') || ':' || updated_at || ':' || date, ',' ORDER BY id)) "
-                  "FROM office_docs WHERE org_id=?), "
+                  f"FROM office_docs WHERE org_id=? AND {live_sql()}), "  # 2.1005.0 (#5415): a draft into the trash changes the fingerprint
                   "(SELECT md5(string_agg(id || ':' || doc_id || ':' || amount || ':' || date, ',' ORDER BY id)) FROM office_payments WHERE org_id=?), "
                   "(SELECT md5(data) FROM office_settings WHERE org_id=?)",  # 2.525.0 review (#4187): home currency, tax reserve
                   (oid, oid, oid)).fetchone()

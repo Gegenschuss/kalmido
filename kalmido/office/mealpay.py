@@ -9,7 +9,7 @@ from datetime import date, timedelta
 
 from flask import jsonify, request
 
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.config import app
 from ..core.db import body, bump, local_now
 from ..core.errors import BadInput
@@ -42,7 +42,7 @@ def mp_line(c, oid, kind, lid):
             return r["day"], money(dec(r["amount"], "0")), oc_dec_fields(c, oid, "office_cash_entries", {"text": r["text"]})["text"] or ""
     elif kind == "card":
         r = c.execute("SELECT l.* FROM office_cc_lines l JOIN office_cc_statements s ON s.id=l.statement_id WHERE l.id=? AND l.org_id=? "
-                      "AND s.deleted_at IS NULL", (lid, oid)).fetchone()
+                      f"AND s.deleted_at IS NULL AND {live_sql('l')}", (lid, oid)).fetchone()  # 2.1005.0 (#5415): not the trash
         if r is not None:
             d = oc_dec_fields(c, oid, "office_cc_lines", r)
             a = money(dec(d["amount"], "0"))
@@ -71,7 +71,7 @@ def mp_candidates(c, oid, m):
     for r in c.execute("SELECT id FROM office_cash_entries WHERE org_id=? AND dir='out' AND storno_of IS NULL AND day>=? AND day<=? ORDER BY day", (oid, d0, d1)).fetchall():
         out.append(("cash", r[0]))
     for r in c.execute("SELECT l.id FROM office_cc_lines l JOIN office_cc_statements s ON s.id=l.statement_id WHERE l.org_id=? AND s.deleted_at IS NULL "
-                       "AND l.day>=? AND l.day<=? ORDER BY l.day", (oid, d0, d1)).fetchall():
+                       f"AND {live_sql('l')} AND l.day>=? AND l.day<=? ORDER BY l.day", (oid, d0, d1)).fetchall():  # 2.1005.0 (#5415): not the trash
         out.append(("card", r[0]))
     rows = []
     for k, i in out:

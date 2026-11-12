@@ -40,6 +40,10 @@ OUN_NOTHING = N_("Nothing to undo")
 
 
 # ---------------------------------------------------------------- the kinds (2.567.0 #4711: scope per kind, core obj_track)
+# 2.1005.0 (#5415): deliberately WITHOUT live_sql: the parts / positions in the core's trash (deleted_at) are in the copy and
+# come back exactly as they were (same id, same deleted_at; _write_back replaces the rows) - a filtered scope would leave the
+# trashed row in place and re-insert its live copy of the step before the delete (same id: duplicate key). The fingerprint
+# holds deleted_at, so a restore / purge out of the trash in between is a change by someone else (409).
 def _doc_scope(ref, oid):
     return [("office_docs", "id=? AND org_id=?", (ref, oid), False), ("office_doc_parts", "doc_id=? AND org_id=?", (ref, oid), True),
             ("office_doc_items", "doc_id=?", (ref,), True)]

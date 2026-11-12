@@ -625,6 +625,13 @@ OX_GONE_WITH = {  # table -> (parent table, column) pairs: a row goes when its p
     "office_client_contacts": (("clients", "client_id"),),
     "office_meal_files": (("office_meals", "meal_id"),),
     "office_sub_reminders": (("office_fixed_costs", "fixed_id"),),  # 2.905.0 (#5414): the reminders of a subscription in the trash
+    # 2.1005.0 (#5415): what hangs on a document draft in the core's trash (ON DELETE CASCADE) stays out with it; the log stays
+    # (no foreign key: history, as after a delete), the SET NULL references were emptied by the trash (office/docs.py odoc_trash)
+    "office_doc_items": (("office_docs", "doc_id"),), "office_doc_parts": (("office_docs", "doc_id"),),
+    "office_purchases": (("office_docs", "doc_id"),), "office_payments": (("office_docs", "doc_id"),),
+    "office_pay_props": (("office_docs", "doc_id"),), "office_signoffs": (("office_docs", "doc_id"),),
+    "office_peppol_sends": (("office_docs", "doc_id"),), "office_dunning_marks": (("office_docs", "doc_id"),),
+    "office_datev_guids": (("office_docs", "doc_id"),),
     "sheet_columns": (("sheets", "sheet_id"),),
     "sheet_rows": (("sheets", "sheet_id"),),
     "sheet_cells": (("sheets", "sheet_id"), ("sheet_rows", "row_id"), ("sheet_columns", "col_id")),
@@ -647,7 +654,9 @@ def ox_live(c, table, where):
         where = f"({where}) AND held_at IS NULL"
     for parent, col in OX_GONE_WITH.get(table, ()):
         if "deleted_at" in _table_cols(c, parent):
-            where = f"({where}) AND {col} NOT IN (SELECT id FROM {parent} WHERE deleted_at IS NOT NULL)"
+            # 2.1005.0 (#5415): a row without a parent (a nullable column: a sign-off of a list) stays -- NULL NOT IN (..) is no true
+            q = qi(col, _table_cols(c, table))
+            where = f"({where}) AND ({q} IS NULL OR {q} NOT IN (SELECT id FROM {qi(parent, table_names(c))} WHERE deleted_at IS NOT NULL))"
     return where
 
 

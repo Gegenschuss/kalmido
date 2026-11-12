@@ -26,7 +26,7 @@ from ..core.config import app, WATCHDOG_INTERVAL
 from ..core.db import iso, local_now, now_utc, test_seconds, usettings
 from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx, write_lock
-from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import Denied, live_sql  # 2.149.0 G (#2517): pulled up from functions; 2.1005.0 (#5415): live_sql
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from .fixedimport import fci_people  # 2.369.5 (#2517): pulled up from functions
 from .model import office_on, office_role, office_settings, pb_personal  # 2.369.5 (#2517): pulled up from functions
@@ -63,7 +63,7 @@ def dun_tick(c, now=None):
     today = (now or local_now()).date().isoformat()
     with system_ctx(c):  # which office areas have an overdue open invoice at all; each is then handled in its admin's own context
         oids = [r[0] for r in c.execute("SELECT DISTINCT org_id FROM office_docs WHERE kind='invoice' AND locked_at IS NOT NULL AND status IN ('issued','sent') "
-                                        "AND trial=0 AND COALESCE(due_date, '')<>'' AND due_date<? ORDER BY org_id LIMIT 2000", (today,)).fetchall()]
+                                        f"AND trial=0 AND COALESCE(due_date, '')<>'' AND due_date<? AND {live_sql()} ORDER BY org_id LIMIT 2000", (today,)).fetchall()]  # 2.1005.0 (#5415): not the trash
     c.commit()
     for oid in oids:
         try:
@@ -154,8 +154,8 @@ def dun_overdue(c, oid, today, people):
     per person for the whole run. The caller commits."""
     from .invoices import inv_money_fields, inv_paid_map, inv_state
     invs = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND locked_at IS NOT NULL AND status IN ('issued','sent') AND trial=0 "
-                     "AND COALESCE(due_date, '')<>'' AND due_date<? AND id NOT IN (SELECT doc_id FROM office_dunning_marks WHERE org_id=? AND level=?) "
-                     "ORDER BY due_date, id LIMIT 2000", (oid, today, oid, DUN_NOTICE)).fetchall()
+                     f"AND COALESCE(due_date, '')<>'' AND due_date<? AND {live_sql()} AND id NOT IN (SELECT doc_id FROM office_dunning_marks WHERE org_id=? AND level=?) "
+                     "ORDER BY due_date, id LIMIT 2000", (oid, today, oid, DUN_NOTICE)).fetchall()  # 2.1005.0 (#5415): not the trash
     pm = inv_paid_map(c, oid, [r["id"] for r in invs]) if invs else {}
     new = [r for r in invs if inv_state(r, pm, today) not in ("paid", "cancelled") and float(inv_money_fields(r, pm)["open"]) > 0]
     if not new:
@@ -192,13 +192,13 @@ def dun_due(c, oid, today, grace):
     from .invoices import inv_money_fields, inv_paid_map, inv_state
     # 2.144.10 B (#2576): the automatic dunning run never picks trial invoices
     invs = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND locked_at IS NOT NULL AND status IN ('issued','sent') "
-                     "AND trial=0 AND COALESCE(due_date, '')<>'' AND due_date<? ORDER BY due_date, id LIMIT 2000", (oid, today)).fetchall()
+                     f"AND trial=0 AND COALESCE(due_date, '')<>'' AND due_date<? AND {live_sql()} ORDER BY due_date, id LIMIT 2000", (oid, today)).fetchall()  # 2.1005.0 (#5415): not the trash
     if not invs:
         return {}
     pm = inv_paid_map(c, oid, [r["id"] for r in invs])
     # the reminders naming each invoice: drafts block, the highest finalised level and its deadline count
     rems = {}
-    for x in c.execute("SELECT id, ref_doc_ids, reminder_level, reminder_deadline_days, date, locked_at FROM office_docs WHERE org_id=? AND kind='reminder'", (oid,)):
+    for x in c.execute(f"SELECT id, ref_doc_ids, reminder_level, reminder_deadline_days, date, locked_at FROM office_docs WHERE org_id=? AND kind='reminder' AND {live_sql()}", (oid,)):  # 2.1005.0 (#5415): not the trash
         for i in _j(x["ref_doc_ids"] or "[]", []):
             if str(i).isdigit():
                 rems.setdefault(int(i), []).append(x)
@@ -251,7 +251,7 @@ def dun_list_extra(c, oid, kind, rows):
     if kind not in ("invoice", "reminder"):
         return None
     ids = [r[0] for r in c.execute("SELECT DISTINCT d.id FROM office_dunning_marks m JOIN office_docs d ON d.id=m.reminder_id AND d.org_id=m.org_id "
-                                   "WHERE m.org_id=? AND d.kind='reminder' AND d.locked_at IS NULL ORDER BY d.id", (oid,))]
+                                   f"WHERE m.org_id=? AND d.kind='reminder' AND d.locked_at IS NULL AND {live_sql('d')} ORDER BY d.id", (oid,))]  # 2.1005.0 (#5415): not the trash
     sug = set(ids)
     for d in rows:
         if d.get("kind") == "reminder" and d.get("id") in sug:

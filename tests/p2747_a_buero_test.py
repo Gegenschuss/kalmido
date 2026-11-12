@@ -153,17 +153,18 @@ def part(who, s, other):
     n_items = sql("SELECT COUNT(*) FROM office_doc_items WHERE doc_id=? AND (part_id=? OR ref_part_id=?)", (did, pid, pid))[0][0]
     check(n_items >= 2, f"3 {who}: setup: the position and the title page line {n_items}")
     r = s.delete(B + OFF + f"/docs/{did}/parts/{pid}")
-    tid = r.json().get("trash_id") if r.ok else None
-    check(r.ok and tid and not sql("SELECT 1 FROM office_doc_parts WHERE id=?", (pid,)), f"3 {who}: the part goes, a trash copy {r.text[:200]}")
+    # 2.1005.0 (#5415): the part lies in the core's trash (kind opart) with its positions, the rows stay with deleted_at
+    tid = (r.json().get("trash") or {}).get("id") if r.ok else None
+    check(r.ok and tid == pid and sql("SELECT 1 FROM office_doc_parts WHERE id=? AND deleted_at IS NOT NULL", (pid,)), f"3 {who}: the part goes into the trash {r.text[:200]}")
     check(in_trash(s, tid, "part"), f"3 {who}: the office trash lists the part")
-    check(other.post(B + OFF + f"/trash/{tid}/restore").status_code == 404, f"3 {who}: another office cannot restore it")
-    r = s.post(B + OFF + f"/trash/{tid}/restore")
+    check(other.post(B + OFF + f"/trash/core/opart/{tid}/restore").status_code in (403, 404), f"3 {who}: another office cannot restore it")
+    r = s.post(B + OFF + f"/trash/core/opart/{tid}/restore")
     check(r.ok and r.json().get("kind") == "part" and r.json().get("doc_id") == did, f"3 {who}: restored, the answer names the quotation {r.text[:200]}")
     d = s.get(B + OFF + f"/docs/{did}").json()
     check(any(p["id"] == pid for p in d.get("parts") or []), f"3 {who}: the part is back in the quotation")
     check(sql("SELECT COUNT(*) FROM office_doc_items WHERE doc_id=? AND (part_id=? OR ref_part_id=?)", (did, pid, pid))[0][0] == n_items,
           f"3 {who}: with its positions and title page line")
-    check(s.post(B + OFF + f"/trash/{tid}/restore").status_code == 404, f"3 {who}: a second restore: 404")
+    check(s.post(B + OFF + f"/trash/core/opart/{tid}/restore").status_code == 404, f"3 {who}: a second restore: 404")
 
 
 def rgroup(who, s, member_id=None):

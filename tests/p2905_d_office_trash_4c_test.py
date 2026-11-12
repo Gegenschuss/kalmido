@@ -9,7 +9,8 @@ deleted. Invented names only.
  - the toast's undo (?undo=1): the person who deleted it; no step in GET /api/undo (its routes' checks would be skipped)
  - delete for good from the office trash (DELETE .../core/<kind>/<id>): the row is gone
  - rights: a member 403, another organisation 404 (restore, delete for good)
- - an old copy in office_trash (made before 2.905) is still listed and restored as before
+ - an old copy in office_trash (made before 2.905) is still listed and restored as before. 2.1005.0 (#5415): the start writes it
+   back into its table as a row of the core's trash (okern.ofk_copies_back): listed as the core's kind, restored through it
  - the retention run is the core's: a service in the trash longer than the period is deleted for good, a younger one stays
  - a rights group (kind orgroup): delete -> gone from the rights page, nobody can be put into it, in the office trash ->
    restore -> back without its members; the toast's undo of the manager
@@ -169,8 +170,11 @@ snap = {"rows": [["office_services", [{k: v for k, v in row.items() if k not in 
 TID = dbx("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
           (ORG, "services", "", OC, "Example Old Copy", json.dumps(snap), AID, "2026-11-09T10:00:00.000Z"))[0][0]
 dbx("DELETE FROM office_services WHERE id=?", (OC,))
-check([x for x in trash(A) if x["id"] == TID and not x.get("core")], "the old copy is listed")
-check(A.post(T + f"/{TID}/restore").ok and OC in ids(A, "services") and drow("office_services", OC) == (None, None), "the old copy comes back live")
+# 2.1005.0 (#5415): the copy goes back into its table as a row of the core's trash (the start runs it; here by hand)
+in_app("from kalmido.office.okern import ofk_copies_back\nprint(ofk_copies_back(c))\nc.commit()")
+check(not dbx("SELECT 1 FROM office_trash WHERE id=?", (TID,)) and drow("office_services", OC)[0] is not None, "the old copy is a row of the core's trash")
+check(in_trash(A, "omd_services", OC), "the old copy is listed (the core's kind)")
+check(A.post(T + f"/core/omd_services/{OC}/restore").ok and OC in ids(A, "services") and drow("office_services", OC) == (None, None), "the old copy comes back live")
 
 # ---------------------------------------------------------------- a rights group
 R = OFC + "/rights"

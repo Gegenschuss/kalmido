@@ -266,6 +266,13 @@ def _p_contract_file(c, run, src, d, ctx):
 
 
 def _p_doc(c, run, src, d, ctx):
+    # 2.1005.0 (#5415): a draft of the core's trash never comes along (the export leaves it out, orgexport.ox_live; an older or
+    # hand-made file: left behind like a task of the trash). The core's columns start anew here: rev at its default, the
+    # people (updated_by, deleted_by) never from a file (umz_row: *_by), trash_refs names ids of the old server -> never taken
+    if src.get("deleted_at"):
+        return False
+    for col in ("deleted_at", "trash_refs", "rev"):
+        d.pop(col, None)
     if _oi_number_taken(c, ctx.space, d.get("number")):
         run.warning(N_("A document number already exists in the target office, the document was skipped: {0}"), d.get("number"))
         return None
@@ -316,6 +323,12 @@ def _a_doc(c, run, src, nid, ctx):
 
 
 def _p_part(c, run, src, d, ctx):
+    # 2.1005.0 (#5415): a part of the core's trash never comes along (the export leaves it out, orgexport.ox_live; an older or
+    # hand-made file: left behind silently like _p_doc); rev starts at its default, the people (*_by) never come from a file
+    if src.get("deleted_at"):
+        return False
+    for col in ("deleted_at", "rev"):
+        d.pop(col, None)
     if "sheet" in d:
         d["sheet"] = json.dumps(_oi_ids(run, _oi_json(src.get("sheet"), {})), ensure_ascii=False)
     if "settings" in d:
@@ -327,6 +340,9 @@ def _p_part(c, run, src, d, ctx):
 
 
 def _p_item(c, run, src, d, ctx):
+    if src.get("deleted_at"):  # 2.1005.0 (#5415): a position / title page line of a part in the core's trash stays behind with it
+        return False
+    d.pop("deleted_at", None)
     return oc_item_store(c, ctx.space, d)
 
 

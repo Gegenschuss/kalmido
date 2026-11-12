@@ -18,7 +18,7 @@ from flask import g, jsonify
 from ..core.config import app
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.i18n import tr
-from ..core.access import Denied, list_role, need_list, need_time
+from ..core.access import Denied, list_role, live_sql, need_list, need_time
 from ..accounts.session import me
 from ..core.pg import insert_id, st_ids, system_ctx, write_lock  # #5574: + write_lock; #5583: + st_ids
 from ..core.objparts import part_kind  # 2.783.0 (#5368)
@@ -48,13 +48,13 @@ def tz_billed_sql(a="e."):
     (2.144.5 C (#1523): its list_id; a position without one = older invoices, by the list's name as before).
     2.144.6 A (#2053): or an invoice took it (billed_doc_id)."""
     return (f"({a}billed_doc_id IS NOT NULL OR EXISTS (SELECT 1 FROM office_docs d JOIN lists bl ON bl.id={a}list_id "
-            f"WHERE d.kind='invoice' AND d.status<>'cancelled' AND bl.client_id IS NOT NULL AND d.client_id=bl.client_id "
+            f"WHERE d.kind='invoice' AND d.status<>'cancelled' AND {live_sql('d')} AND bl.client_id IS NOT NULL AND d.client_id=bl.client_id "
             # 2.144.5 C (#1523): a private list (org_id NULL) is billed from its owner's personal office (its client is a private one)
             # 2.144.5 A2 (#1523, review R9): only that office, never another organisation's invoice for the same client id
             f"AND (d.org_id=bl.org_id OR bl.org_id IS NULL AND d.org_id=(SELECT po.id FROM orgs po WHERE po.personal_of=bl.owner_id)) "
             f"AND COALESCE(d.service_from, d.service_to) IS NOT NULL "
             f"AND substr({a}start,1,10)>=COALESCE(d.service_from, d.service_to) AND substr({a}start,1,10)<=COALESCE(d.service_to, d.service_from) "
-            f"AND EXISTS (SELECT 1 FROM office_doc_items i WHERE i.doc_id=d.id AND (i.list_id=bl.id "
+            f"AND EXISTS (SELECT 1 FROM office_doc_items i WHERE i.doc_id=d.id AND {live_sql('i')} AND (i.list_id=bl.id "  # 2.1005.0 (#5415): not the trash
             f"OR i.list_id IS NULL AND lower(trim(i.title))=lower(trim(bl.name))))))")  # review V2
 
 

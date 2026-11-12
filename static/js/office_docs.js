@@ -897,7 +897,8 @@ function ofdMoreItems(d, inList) {
         if (d.trial) { if (!await askConfirm(tr('Delete trial document?'), tr('{0} is a trial document and disappears permanently.', d.number || ofdKindName(d.kind, true)), {ok: tr('Delete'), danger: true})) return; }  // 2.144.10 C (#2576)
         else if (!await askConfirm(tr('Delete {0}?', d.number || ofdKindName(d.kind, true)), d.locked ? tr('Its number stays used and shows as a gap in the office log.') : tr('Its number stays used.'), {ok: tr('Delete'), danger: true})) return;  // 2.114.2 A (#2263); 2.417.0 C (#2604): no test phase rule for sent quotations any more
         try { const j = await api('DELETE', `/api/office/docs/${d.id}`); gone();  // 2.272.0 E2 (#3038): a draft goes to the office trash, the toast undoes it
-          if (j?.trash_id) toast(tr('“{0}” moved to the trash', d.number || ofdKindName(d.kind, true)), () => otb_restore(j.trash_id)); else toast(tr('Deleted')); } catch (x) { ofcErr(x); }
+          if (j?.trash) toast(tr('“{0}” moved to the trash', d.number || ofdKindName(d.kind, true)), () => otb_restore(j.trash.id, null, j.trash.kind, true));  // 2.1005.0 (#5415): a draft in the core's trash
+          else toast(tr('Deleted')); } catch (x) { ofcErr(x); }
       }} : null];
   return inList ? [{label: tr('Open'), icon: 'edit', fn: () => go(ofd_href(d.id, d.kind))}, ...fv2_menuRow('r:office_doc:' + d.id) /* 2.441.0 (#3592) */, ...items] : items;
 }
@@ -1399,12 +1400,11 @@ function ofd_fltHtml() {
 }
 
 // 2.272.0 E2 (#3038): the office trash - deleted drafts and master data, restore or delete for good, the trash period
-async function otb_restore(tid, after, core) {  // 2.905.0 (#5414): core = the kind of a row in the core's trash (tid = its id)
-  let j; try { j = await api('POST', core ? `/api/office/trash/core/${core}/${tid}/restore` : `/api/office/trash/${tid}/restore`); } catch (x) { ofcErr(x); return; }
+async function otb_restore(tid, after, core, undo) {  // 2.905.0 (#5414): core = the kind of a row in the core's trash (tid = its id); 2.1005.0 (#5415): undo = the toast's
+  let j; try { j = await api('POST', core ? `/api/office/trash/core/${core}/${tid}/restore${undo ? '?undo=1' : ''}` : `/api/office/trash/${tid}/restore`); } catch (x) { ofcErr(x); return; }
   toast(j.note || tr('Restored'));  // 2.552.0 (#4561 B19): a draft whose client is gone for good comes back without one
   if (j.kind === 'trip' || j.kind === 'trip_item') { if (typeof RK !== 'undefined') RK.data = null; }  // 2.530.0 C (#4315)
-  if (j.kind === 'trip_import' && typeof RK !== 'undefined') RK.data = null;  // 2.567.0 (#4707): the kinds of the cash flow / imports
-  if (['fixed_cost', 'fixed_import', 'cf_start', 'cf_adjust'].includes(j.kind)) { if (typeof RKF !== 'undefined') RKF.data = null; if (typeof ABO !== 'undefined') ABO.data = null; if (j.kind === 'cf_start' && typeof CFS !== 'undefined') CFS.oid = null; }  /* cfs_settingsHtml loads it again */
+  if (['fixed_cost', 'cf_start', 'cf_adjust'].includes(j.kind)) { if (typeof RKF !== 'undefined') RKF.data = null; if (typeof ABO !== 'undefined') ABO.data = null; if (j.kind === 'cf_start' && typeof CFS !== 'undefined') CFS.oid = null; }  /* cfs_settingsHtml loads it again */
   if (j.kind === 'cc_line' && typeof ccStale === 'function') ccStale();  // 2.552.0 (#4561 B21)
   if (j.kind === 'meal' && typeof BW !== 'undefined') BW.data = null;  // 2.993.0 (#5413): a meal from the core's trash
   if (j.kind === 'contract_file' && typeof ofcReload === 'function') ofcReload('contracts');  // its paper clip count
@@ -1415,7 +1415,7 @@ async function otb_restore(tid, after, core) {  // 2.905.0 (#5414): core = the k
 }
 async function otb_open() {
   let d; try { d = await api('GET', '/api/office/trash'); } catch (x) { ofcErr(x); return; }
-  const row = x => `<li data-id="${x.id}"${x.core ? ` data-core="${esc(x.core)}"` : ''}><span class="an">${esc(x.kind === 'doc' ? ofdKindName(x.sub, true) : x.kind === 'trip' ? tr('Trip') : x.kind === 'trip_item' ? tr('Receipt') : x.kind === 'cc_line' ? tr('Credit card position') : ({part: tr('Part'), rgroup: tr('Rights group'), signoff: tr('Video sign-off'), fixed_cost: tr('Fixed cost'), fixed_import: tr('Fixed costs'), cf_start: tr('Starting balance'), cf_adjust: tr('Correction'), letter_link: tr('Letter'), trip_import: tr('Trips'), meal: tr('Entertainment receipt'), contract_file: tr('Contract (PDF)')})[x.kind] || tr('Master data'))}${x.label ? ' · ' + esc(x.label) : ''}</span> <span class="muted">${esc(fmtDayAbs(x.deleted_at.slice(0, 10)))}</span>
+  const row = x => `<li data-id="${x.id}"${x.core ? ` data-core="${esc(x.core)}"` : ''}><span class="an">${esc(x.kind === 'doc' ? ofdKindName(x.sub, true) : x.kind === 'trip' ? tr('Trip') : x.kind === 'trip_item' ? tr('Receipt') : x.kind === 'cc_line' ? tr('Credit card position') : ({part: tr('Part'), rgroup: tr('Rights group'), signoff: tr('Video sign-off'), fixed_cost: tr('Fixed cost'), cf_start: tr('Starting balance'), cf_adjust: tr('Correction'), letter_link: tr('Letter'), meal: tr('Entertainment receipt'), contract_file: tr('Contract (PDF)')})[x.kind] || tr('Master data'))}${x.label ? ' · ' + esc(x.label) : ''}</span> <span class="muted">${esc(fmtDayAbs(x.deleted_at.slice(0, 10)))}</span>
     <button type="button" class="linkbtn" data-m="restore">${esc(tr('Restore'))}</button> <button type="button" class="linkbtn" data-m="purge">${esc(tr('Delete permanently'))}</button></li>`;
   const md = modal(`<h3>${esc(tr('Trash'))}</h3>${d.items.length ? `<ul class="atrash otblist">${d.items.map(row).join('')}</ul>` : `<p class="muted">${esc(tr('The trash is empty'))}</p>`}
     <p class="muted">${esc(trashNote(tr('Items in the trash are deleted permanently after {0} days.', d.days)))}</p><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);

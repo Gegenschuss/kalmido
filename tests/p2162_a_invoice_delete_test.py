@@ -158,7 +158,8 @@ check(A.delete(B + f"{D}/{SN}").status_code == 409 and A.get(B + f"{D}/{SN}").ok
 DR = make(A, CL, "Plain draft", final=False)
 check(number(A, DR) == "" and A.get(B + f"{D}/{DR}").json().get("can_delete") is True, "an invoice draft without a number: can_delete")
 r = A.delete(B + f"{D}/{DR}")
-check(r.ok and r.json().get("trash_id") and A.get(B + f"{D}/{DR}").status_code == 404, "the draft goes to the office trash " + r.text[:200])
+check(r.ok and (r.json().get("trash") or {}).get("kind") == "odoc" and A.get(B + f"{D}/{DR}").status_code == 404,  # 2.1005.0 (#5415): the core's trash
+      "the draft goes to the office trash " + r.text[:200])
 r = A.post(B + D, json={"kind": "invoice", "project_title": "Trial", "client_id": CL, "service_from": Y5, "service_to": T0, "trial": True})
 check(r.status_code == 201 and r.json().get("trial") is True, "a trial invoice " + r.text[:200])
 TR = r.json()["id"]

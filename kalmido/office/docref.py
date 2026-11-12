@@ -23,6 +23,7 @@ from flask import g, has_request_context, jsonify
 
 from ..core.config import app
 from ..core.ctx import me
+from ..core.access import live_sql  # 2.1005.0 (#5415)
 from ..core.db import body, db
 from ..core.errors import Denied
 from ..core.i18n import N_, tr
@@ -48,8 +49,8 @@ OFD_RECEIPT_KEPT = N_("Receipt within its retention period")
 def _row(c, did):
     with system_ctx(c):  # the folder side asks across offices (a share of a personal office's folder); nothing is handed out
         # 2.351.0 C (#3246): list_id / ref_doc_ids for an agent's project restriction (ofa_doc_in_lists)
-        return c.execute("SELECT id, org_id, kind, number, status, locked_at, trial, list_id, ref_doc_ids FROM office_docs WHERE id=?",
-                         (int(did),)).fetchone()
+        return c.execute(f"SELECT id, org_id, kind, number, status, locked_at, trial, list_id, ref_doc_ids FROM office_docs WHERE id=? AND {live_sql()}",
+                         (int(did),)).fetchone()  # 2.1005.0 (#5415): a draft in the trash = not there (404 on every folder way)
 
 
 def ofd_space(c, did):
@@ -334,7 +335,7 @@ def ofd_head_body(c, did, b):
     if not isinstance(b, dict):
         return b
     with system_ctx(c):
-        cur = c.execute("SELECT client_id, contact_id, contract_id, rights FROM office_docs WHERE id=?", (int(did),)).fetchone()
+        cur = c.execute(f"SELECT client_id, contact_id, contract_id, rights FROM office_docs WHERE id=? AND {live_sql()}", (int(did),)).fetchone()  # 2.1005.0 (#5415): not the trash
     for k in OFD_LINKS:
         if k in b and not _same_id(b.get(k), cur[k] if cur else None):
             raise Denied(403, tr(OFD_NO_LINK))
@@ -359,7 +360,7 @@ def ofd_items_body(c, oid, did, b):
     if not isinstance(items, list):
         return b
     with system_ctx(c):
-        old = {r["id"]: r for r in c.execute("SELECT id, service_id, title, rate FROM office_doc_items WHERE doc_id=? AND org_id=?",
+        old = {r["id"]: r for r in c.execute(f"SELECT id, service_id, title, rate FROM office_doc_items WHERE doc_id=? AND org_id=? AND {live_sql()}",  # 2.1005.0 (#5415): not the trash
                                               (int(did), oid))}
     out = []
     for it in items:

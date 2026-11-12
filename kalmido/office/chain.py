@@ -28,6 +28,7 @@ from decimal import Decimal
 from ..core.moneycol import mc_fields  # 2.755.0 (#5293)
 from ..core.orgcrypt import oc_dec_fields
 from ..core.pg import write_lock
+from ..core.access import live_sql  # 2.1005.0 (#5415)
 from .model import num_kind, office_settings, ofx_release  # 2.542.0 (#4598): freeing a copied place passes the trigger
 
 HCH_DOC_FIELDS = ("number", "kind", "date", "service_from", "service_to", "currency", "locked_at")
@@ -74,7 +75,7 @@ def hch_canon(c, oid, r):
     out["tax"] = {k: tax.get(k) for k in HCH_TAX_KEYS} if isinstance(tax, dict) else {}
     # 2.755.0 (#5293): net / tax_amount are NUMERIC now: the same text as before ("23.80", None), the checksums stay
     out["items"] = [mc_fields("office_doc_items", {k: it[k] for k in HCH_ITEM_FIELDS}) for it in c.execute(
-        f"SELECT {', '.join(HCH_ITEM_FIELDS)} FROM office_doc_items WHERE doc_id=? ORDER BY sort, id", (d["id"],))]
+        f"SELECT {', '.join(HCH_ITEM_FIELDS)} FROM office_doc_items WHERE doc_id=? AND {live_sql()} ORDER BY sort, id", (d["id"],))]  # 2.1005.0 (#5415): not the trash (a trashed part's positions may be purged later)
     return json.dumps(_plain(out), sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
 
 
@@ -99,7 +100,7 @@ def _link(c, oid, r, key):
 def hch_pending(c, oid):
     """Finalised documents of office oid that belong in a chain and have no place yet, oldest first."""
     return [r for r in c.execute("SELECT * FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL AND chain_seq IS NULL AND kind<>'offer' "
-                                 "AND COALESCE(trial, 0)=0 ORDER BY locked_at, id", (oid,))]
+                                 f"AND COALESCE(trial, 0)=0 AND {live_sql()} ORDER BY locked_at, id", (oid,))]  # 2.1005.0 (#5415): not the trash
 
 
 def hch_append(c, oid, did=None, s=None):
@@ -110,7 +111,7 @@ def hch_append(c, oid, did=None, s=None):
     for r in hch_pending(c, oid):
         _link(c, oid, r, num_kind(s, r["kind"]))
     if did is not None:
-        r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
+        r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (did, oid)).fetchone()  # 2.1005.0 (#5415): not the trash
         if r is not None and r["chain_seq"] is None and r["locked_at"] and hch_chained(r):
             _link(c, oid, r, num_kind(s, r["kind"]))
 
@@ -150,7 +151,7 @@ def hch_migrate(c):
                   "(locked_at IS NULL OR EXISTS (SELECT 1 FROM office_docs o WHERE o.org_id=office_docs.org_id AND o.chain_key=office_docs.chain_key "
                   "AND o.chain_seq=office_docs.chain_seq AND o.chain_hash=office_docs.chain_hash AND o.id<office_docs.id))")
     for (oid,) in c.execute("SELECT DISTINCT org_id FROM office_docs WHERE locked_at IS NOT NULL AND chain_seq IS NULL AND kind<>'offer' "
-                            "AND COALESCE(trial, 0)=0").fetchall():
+                            f"AND COALESCE(trial, 0)=0 AND {live_sql()}").fetchall():  # 2.1005.0 (#5415): not the trash
         try:
             with c.savepoint():
                 hch_append(c, oid)

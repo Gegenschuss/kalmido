@@ -151,7 +151,7 @@ t1, sha1 = terms_up("1")
 DOC = Fr.post(B + O + "/docs", json={"client_id": CL, "items": [{"title": "Schnitt", "qty": 1, "rate": 100}]}).json()["id"]
 sql("UPDATE office_docs SET terms=? WHERE id=?", (json.dumps({"file": t1, "sha256": sha1, "lang": "de"}), DOC))
 r = Fr.delete(B + O + f"/docs/{DOC}")
-TR = r.json().get("trash_id") if r.ok else None
+TR = (r.json().get("trash") or {}).get("id") if r.ok else None  # 2.1005.0 (#5415): the draft lies in the core's trash (kind odoc)
 check(TR, f"B21: the draft with frozen terms went to the office trash {r.status_code} {r.text[:160]}")
 t2, _ = terms_up("2")
 t3, _ = terms_up("3")  # the current one
@@ -169,24 +169,23 @@ out = terms_purge()
 have = sh(f"ls /data/office/{OID}/")
 check(t1 in have, f"B21: the terms file named only by the trash copy of a draft stays {out[-200:]}")
 check(t2 not in have and t3 in have, f"B21: an old file nobody names goes, the current one stays: {have}")
-r = Fr.post(B + O + f"/trash/{TR}/restore")
+r = Fr.post(B + O + f"/trash/core/odoc/{TR}/restore")  # 2.1005.0 (#5415)
 check(r.ok, f"B21: the draft comes back from the trash {r.status_code} {r.text[:160]}")
 
 # ================================================================== B20: undo deletes of a draft go to the office trash
+# 2.1005.0 (#5415): both put the draft into the core's trash (office/docs.py odoc_trash), no DELETE of the row any more
 for rel in ("kalmido/sheets/step2.py", "kalmido/agents/propkinds2.py"):
     s = src(rel)
-    i = s.find("dvb_otb_draft(")
-    check(i > 0 and s.find("DELETE FROM office_docs", i) > i and s.rfind("DELETE FROM office_docs", 0, i) < 0,
-          f"B20: {rel} stores the trash copy before its DELETE of the draft")
+    check("odoc_trash(" in s and "DELETE FROM office_docs" not in s, f"B20: {rel} puts the draft into the core's trash, no DELETE")
 DOC2 = Fr.post(B + O + "/docs", json={"client_id": CL, "items": [{"title": "Ton", "qty": 2, "rate": 50}]}).json()["id"]
-out = box(f"from kalmido.office.otrash import dvb_otb_draft\ntid = dvb_otb_draft(c, {OID}, {FID}, {DOC2})\n"
-          f"c.execute('DELETE FROM office_docs WHERE id=?', ({DOC2},))\nprint('trash', tid)")
+out = box(f"from kalmido.office.docs import odoc_trash\nr = c.execute('SELECT * FROM office_docs WHERE id=?', ({DOC2},)).fetchone()\n"
+          f"print('trash', odoc_trash(c, {OID}, {FID}, r, checked=True))")
 m = re.search(r"^trash (\d+)$", out, re.M)
 tid = m.group(1) if m else ""
 lst = Fr.get(B + O + "/trash").json()
-check(tid.isdigit() and any(str(x.get("id")) == tid for x in (lst.get("items") or lst.get("trash") or [])),
+check(tid.isdigit() and any(str(x.get("id")) == tid and x.get("core") == "odoc" for x in (lst.get("items") or [])),
       f"B20: the draft is in the office trash {out[-200:]} {str(lst)[:200]}")
-r = Fr.post(B + O + f"/trash/{tid}/restore") if tid.isdigit() else None
+r = Fr.post(B + O + f"/trash/core/odoc/{tid}/restore") if tid.isdigit() else None
 check(r is not None and r.ok and sql("SELECT 1 FROM office_docs WHERE id=?", (DOC2,)), f"B20: ... and comes back from it {r.text[:160] if r is not None else out}")
 
 # ================================================================== B30: a received e-invoice keeps its versions

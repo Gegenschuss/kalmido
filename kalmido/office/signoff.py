@@ -24,12 +24,11 @@ from ..collab.comments import lang_of, push_later  # 2.367.5 (#2980); 2.370.3 (#
 from ..core.i18n import browser_lang, lang, LANGS, N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
-from ..core.access import acx_anon_bind, Denied, FULL_ROLES, list_role, need_list
+from ..core.access import acx_anon_bind, Denied, FULL_ROLES, list_role, live_sql, need_list  # 2.1005.0 (#5415): live_sql
 from ..core.orgcrypt import OrgCryptError, oc_dec, oc_dec_fields, oc_enc, oc_enc_fields, oc_is_enc, oc_log_detail
 from .model import office_role, pb_owner
 from .model import pb_personal  # 2.747.0 (#5246)
 from .okern import ofk_purge, ofk_register, ofk_trash  # 2.1004.0 (#5494)
-from ..core.access import live_sql  # 2.1004.0 (#5494)
 from .rights import NO_RIGHT, ofr_admin_or, ofr_allows
 from ..accounts.orgroles import OFFICE_READ
 from ..accounts.orgs import user_orgs
@@ -114,7 +113,7 @@ def sig_doc_hash(c, oid, did):
                                   "service_from", "service_to", "recipient", "intro", "lines", "totals", "rights", "closing", "fields",
                                   "parts")}
     from .terms import agb_doc_terms
-    t = agb_doc_terms(c, oid, c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone())
+    t = agb_doc_terms(c, oid, c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (did, oid)).fetchone())  # 2.1005.0 (#5415): not the trash
     if t:  # 2.113.2 (#2253) review: other terms under an open link void it (only when there are terms: older links keep their hash)
         keep["terms"] = t["sha256"]
     return hashlib.sha256(json.dumps(keep, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest(), prd_strip_detail(m)
@@ -570,7 +569,7 @@ def sig_check(c, r):
     if r["state"] != "open":
         return None
     if r["kind"] == "offer":
-        d = c.execute("SELECT status FROM office_docs WHERE id=? AND org_id=?", (r["doc_id"], r["org_id"])).fetchone()
+        d = c.execute(f"SELECT status FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (r["doc_id"], r["org_id"])).fetchone()  # 2.1005.0 (#5415): a draft in the trash = void
         if not d or d["status"] != "sent" or sig_doc_hash(c, r["org_id"], r["doc_id"])[0] != r["doc_hash"]:
             return True
         return None
@@ -603,7 +602,7 @@ def sig_open(c, token):
 
 def sig_lang(c, r):
     """2.447.0 (#3761): the visitor's browser, else the language of the document, else the sender's (a video has no document)."""
-    d = c.execute("SELECT lang FROM office_docs WHERE id=? AND org_id=?", (r["doc_id"], r["org_id"])).fetchone() if r["doc_id"] else None
+    d = c.execute(f"SELECT lang FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (r["doc_id"], r["org_id"])).fetchone() if r["doc_id"] else None  # 2.1005.0 (#5415): not the trash
     return browser_lang() or (d["lang"] if d and d["lang"] in LANGS else lang(c, r["created_by"]))
 
 

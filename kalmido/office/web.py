@@ -86,12 +86,12 @@ def of_used(c, oid):
     from .books import bk_ws
     one = lambda q, *a: c.execute(q + " LIMIT 1", a).fetchone() is not None  # noqa: E731
     fixed = one(f"SELECT 1 FROM office_fixed_costs WHERE org_id=? AND {live_sql()}", oid)  # 2.905.0 (#5414): not the trash
-    return {"invoice": one("SELECT 1 FROM office_docs WHERE org_id=? AND kind='invoice'", oid),
+    return {"invoice": one(f"SELECT 1 FROM office_docs WHERE org_id=? AND kind='invoice' AND {live_sql()}", oid),  # 2.1005.0 (#5415): not the trash
             "receipt": one("SELECT 1 FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
                            "WHERE d.ws=? AND n.deleted_at IS NULL", bk_ws(c, oid)),
             "inquiry": one("SELECT 1 FROM office_deals WHERE org_id=? AND deleted_at IS NULL", oid),
             "meal": one("SELECT 1 FROM office_meals WHERE org_id=? AND deleted_at IS NULL", oid),
-            "travel": one("SELECT 1 FROM office_trips WHERE org_id=?", oid),
+            "travel": one(f"SELECT 1 FROM office_trips WHERE org_id=? AND {live_sql()}", oid),  # 2.1005.0 (#5415): not the trash
             "sub": fixed and one(f"SELECT 1 FROM office_fixed_costs WHERE org_id=? AND sub=1 AND {live_sql()}", oid),
             "fixed": fixed or one("SELECT 1 FROM office_cf_start WHERE org_id=?", oid)}
 
@@ -135,9 +135,9 @@ def of_pack_switch(c, oid, s, code):
     if not new or new.get("code") != code:
         raise Denied(404)
     before, after = office_features(s), office_features(dict(s, pack=code), new)
-    n_open = c.execute("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NULL AND kind IN ('offer','invoice','credit','reminder')",
+    n_open = c.execute(f"SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NULL AND kind IN ('offer','invoice','credit','reminder') AND {live_sql()}",  # 2.1005.0 (#5415)
                        (oid,)).fetchone()[0]
-    n_locked = c.execute("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL", (oid,)).fetchone()[0]
+    n_locked = c.execute(f"SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL AND {live_sql()}", (oid,)).fetchone()[0]
     return {"from": s.get("pack") or "DE", "to": code, "name": new.get("name"), "name_en": new.get("name_en", new.get("name")),
             "hidden": sorted(k for k, on in before.items() if on and not after.get(k)),
             "shown": sorted(k for k, on in after.items() if on and not before.get(k)),

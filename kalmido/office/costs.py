@@ -1,6 +1,7 @@
 """2.47.0 (part D): the purchase side of quotations -- producing per document (#1645) and the purchase of accepted
 quotations for the cash flow (#1649). Helpers without routes; docs.py and core/db.py call them."""
 import json
+from ..core.access import live_sql  # 2.1005.0 (#5415)
 from ..core.db import iso, local_now, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields  # 2.149.0 G (#2517): pulled up from functions
 from .homecur import hc_doc_fx, hc_home  # 2.189.0 (#2475)
@@ -22,7 +23,7 @@ def ek_producing_migrate(c):
             d = {}
         dflt = 1 if isinstance(d, dict) and d.get("producing_on") else 0  # a plain key (only "company" is encrypted)
         c.execute("UPDATE office_docs SET producing_on=CASE WHEN EXISTS (SELECT 1 FROM office_doc_items i WHERE i.doc_id=office_docs.id "
-                  "AND i.producing=1) THEN 1 ELSE ? END WHERE org_id=? AND producing_on IS NULL", (dflt, oid))
+                  f"AND i.producing=1 AND {live_sql('i')}) THEN 1 ELSE ? END WHERE org_id=? AND producing_on IS NULL", (dflt, oid))
 
 
 # ---------------------------------------------------------------- 2.47.0 (#1649): purchase, surplus, purchases of accepted quotations
@@ -72,7 +73,7 @@ def ek_purchases_write(c, oid, did):
     fx = hc_doc_fx(r, cur)
     out = []
     items = [oc_dec_fields(c, oid, "office_doc_items", x) for x in
-             c.execute("SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=? ORDER BY sort, id", (did, oid))]
+             c.execute(f"SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=? AND {live_sql()} ORDER BY sort, id", (did, oid))]  # 2.1005.0 (#5415): not the trash
     part_qty = {}
     for it in items:
         if it.get("part_id") is not None:
@@ -87,7 +88,7 @@ def ek_purchases_write(c, oid, did):
         if amt > 0:
             out.append(("item", it["id"], it.get("title") or "", amt))
     if part_qty:
-        for p in c.execute("SELECT * FROM office_doc_parts WHERE doc_id=? AND org_id=? ORDER BY sort, id", (did, oid)).fetchall():
+        for p in c.execute(f"SELECT * FROM office_doc_parts WHERE doc_id=? AND org_id=? AND {live_sql()} ORDER BY sort, id", (did, oid)).fetchall():  # 2.1005.0 (#5415): not the trash
             q = part_qty.get(p["id"])
             if not q:
                 continue
@@ -112,7 +113,7 @@ def ek_purchases(c, oid, date_from=None, date_to=None):
     date_to] (ISO, each optional): [{id, doc_id, number, date, accepted_at, amount (text, 2 places), currency, label,
     source, ref}]. For the cash flow (#1652, admins only; there is no route for others)."""
     sql, args = ("SELECT p.*, d.number FROM office_purchases p JOIN office_docs d ON d.id=p.doc_id AND d.org_id=p.org_id "
-                 "WHERE p.org_id=? AND d.trial=0"), [oid]  # 2.144.10 B (#2576): no purchases of trial quotations
+                 f"WHERE p.org_id=? AND d.trial=0 AND {live_sql('d')}"), [oid]  # 2.144.10 B (#2576): no purchases of trial quotations
     if date_from:
         sql += " AND p.date>=?"
         args.append(date_from)

@@ -13,7 +13,7 @@ from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import bump, db, iso, now_utc
 from ..core.pg import insert_id, write_lock
-from ..core.access import Denied, vis_sql
+from ..core.access import Denied, live_sql, vis_sql
 from ..accounts.session import me
 from ..accounts.orgroles import office_allowed
 from ..core.orgcrypt import oc_enc_fields
@@ -72,8 +72,8 @@ def ltc_open(c, uid, lid):
     lr, trip = ltc_trip_list(c, uid, lid)
     oid, own = ltc_office(c, uid, lr["org_id"])
     write_lock(c, f"ltc:{lid}:{oid}")  # a second click at the same time finds the first one's trip
-    old = c.execute("""SELECT k.trip_id, t.org_id FROM life_trip_costs k JOIN office_trips t ON t.id=k.trip_id
-                       WHERE k.list_id=? AND k.org_id=?""", (lid, oid)).fetchone()
+    old = c.execute(f"""SELECT k.trip_id, t.org_id FROM life_trip_costs k JOIN office_trips t ON t.id=k.trip_id
+                       WHERE k.list_id=? AND k.org_id=? AND {live_sql('t')}""", (lid, oid)).fetchone()  # 2.1005.0 (#5415): one in the trash = a new trip
     if old and old[1] != oid:  # 2.173.0 review (#2680): moved to another office area -- no second one
         raise Denied(409, tr("The travel expenses of this trip were moved to another office area"))
     if old:
@@ -114,8 +114,8 @@ def life_trip_expenses_get(lid):
     need_life(c, uid, "travel")
     lr, _trip = ltc_trip_list(c, uid, lid)
     oid, own = ltc_office(c, uid, lr["org_id"])
-    r = c.execute("""SELECT k.trip_id FROM life_trip_costs k JOIN office_trips t ON t.id=k.trip_id AND t.org_id=k.org_id
-                     WHERE k.list_id=? AND k.org_id=?""", (lid, oid)).fetchone()
+    r = c.execute(f"""SELECT k.trip_id FROM life_trip_costs k JOIN office_trips t ON t.id=k.trip_id AND t.org_id=k.org_id
+                     WHERE k.list_id=? AND k.org_id=? AND {live_sql('t')}""", (lid, oid)).fetchone()  # 2.1005.0 (#5415): not the trash
     if r and own:
         ltc_own_trip(c, oid, r[0], uid)  # 2.620.0 (#4642): somebody else's travel expenses: 403 like the POST
     return jsonify({"trip_id": r[0] if r else None})

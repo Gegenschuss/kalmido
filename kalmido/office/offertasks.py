@@ -27,7 +27,7 @@ from flask import g, has_request_context, jsonify
 from ..core.config import app
 from ..core.db import body, bump, iso, now_utc
 from ..core.i18n import LANGS, tr
-from ..core.access import WRITE_ROLES, Denied, _list_role, list_role, need_list
+from ..core.access import WRITE_ROLES, Denied, _list_role, list_role, live_sql, need_list  # 2.1005.0 (#5415): live_sql
 from ..core.errors import BadInput
 from ..core.pg import insert_id, write_lock
 from ..collab.liste2eguard import le2b_list_locked, le2b_off
@@ -56,7 +56,7 @@ def otk_root(r):
 
 
 def otk_chain_ids(c, oid, root):
-    return [x[0] for x in c.execute("SELECT id FROM office_docs WHERE org_id=? AND kind='offer' AND (id=? OR version_of=?)", (oid, root, root))]
+    return [x[0] for x in c.execute(f"SELECT id FROM office_docs WHERE org_id=? AND kind='offer' AND (id=? OR version_of=?) AND {live_sql()}", (oid, root, root))]  # 2.1005.0 (#5415): not the trash
 
 
 def _otk_chain_rows(c, oid, r, lid, moved=False):
@@ -391,7 +391,7 @@ def otk_project_budget(c, oid, lid):
         if (root_id or doc_id) in roots:
             continue
         roots.add(root_id or doc_id)
-        r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='offer' AND list_id=?", (doc_id, oid, lid)).fetchone()
+        r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='offer' AND list_id=? AND {live_sql()}", (doc_id, oid, lid)).fetchone()  # 2.1005.0 (#5415): not the trash
         if r is not None and all(otk_root(r) != otk_root(x) for x in docs):
             docs.append(r)
     if not docs:

@@ -18,8 +18,7 @@ from ..core.config import app
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import system_ctx
-from ..core.access import Denied, list_role
-from ..core.access import live_sql  # 2.1004.0 (#5494)
+from ..core.access import Denied, list_role, live_sql
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
@@ -585,7 +584,7 @@ def olk_fs_locked(c, node_id, arrival=False, hold=False):
     elif arrival:  # 2.355.0 B (#2845): an e-invoice received into an office's documents that is no receipt (yet)
         ends.append(olk_einv_until(c, nid))
     if r and r["billed_doc_id"]:
-        d = c.execute("SELECT locked_at, status FROM office_docs WHERE id=?", (r["billed_doc_id"],)).fetchone()
+        d = c.execute(f"SELECT locked_at, status FROM office_docs WHERE id=? AND {live_sql()}", (r["billed_doc_id"],)).fetchone()
         if d and (d["locked_at"] or d["status"] == "sent"):
             ends.append(olk_until(r["doc_date"] or r["billed_at"] or r["set_at"], "receipt"))
     for e in c.execute("SELECT day FROM office_cash_entries WHERE node_id=?", (nid,)):
@@ -647,7 +646,7 @@ def olk_fs_locked_many(c, ids):
                                                   WHERE r.node_id IN ({q})""", ids)}
     metas = {r["node_id"]: r for r in c.execute(f"SELECT node_id, kept_until, doc_date FROM doc_meta WHERE node_id IN ({q})", ids)}
     bill = sorted({r["billed_doc_id"] for r in rcs.values() if r["billed_doc_id"]})
-    docs = {d["id"]: d for d in c.execute(f"SELECT id, locked_at, status FROM office_docs WHERE id IN ({','.join('?' * len(bill))})",
+    docs = {d["id"]: d for d in c.execute(f"SELECT id, locked_at, status FROM office_docs WHERE {live_sql()} AND id IN ({','.join('?' * len(bill))})",
                                           bill)} if bill else {}
     ends = {i: [] for i in ids}
     for i, k in metas.items():

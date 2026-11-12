@@ -132,13 +132,12 @@ ROUTES = {
     "GET /api/office/settings/retention-hold": "office", "PUT /api/office/settings/retention-hold": "office",
     # 2.394.0 B (#3377): the issue import of a project's own repository (p2394_b_git_issues_test.py as the freelancer)
     "POST /api/repos/{}/issues/import": "tasks",
-    # 2.530.0 C (#4315): the undo of deleting a trip / a travel receipt from the office trash (p2530_c_office_trash_test.py)
-    "POST /api/office/trips/trash/{}/restore": "office",
-    # 2.552.0 (#4561 B21): the undo of deleting a credit card position from the office trash (p2552_b_dataloss_test.py as the freelancer)
-    "POST /api/office/cards/trash/{}/restore": "office",
+    # 2.1005.0 (#5415): POST /api/office/trips/trash/<id>/restore and /cards/trash/<id>/restore went (the copies are rows of the core's trash)
     "POST /api/office/trash/undo/{}/{}": "office",  # 2.567.0 (#4707): p2567_c_office_trash_test.py (other office 403 / 404, member 403)
     # 2.905.0 (#5414): the office trash's rows in the core's trash (p2905_d_office_trash_4c_test.py as the freelancer)
     "POST /api/office/trash/core/{}/{}/restore": "office", "DELETE /api/office/trash/core/{}/{}": "office",
+    # 2.1005.0 (#5415): trips, travel receipts and card positions out of the core's trash (p21005_d_trash_4d_test.py as the freelancer)
+    "POST /api/office/trips/{}/restore": "office", "POST /api/office/trips/{}/items/{}/restore": "office", "POST /api/office/cards/lines/{}/restore": "office",
     # 2.488.0 (#3363): the hosted MCP access (p2488_mcp_oauth_test.py: the person without an organisation connects her own agent)
     "GET /.well-known/oauth-protected-resource": "public", "GET /.well-known/oauth-protected-resource/mcp": "public",
     "GET /.well-known/oauth-authorization-server": "public", "GET /.well-known/oauth-authorization-server/mcp": "public",
@@ -956,7 +955,7 @@ ROUTES = {
     "POST /api/obj/{}/{}/shares": "obj", "DELETE /api/obj/{}/{}/shares/{}": "obj", "POST /api/obj/{}/{}/shares/{}/restore": "obj",
     "GET /api/v1/agent/objects/{}": "obj", "GET /api/v1/agent/objects/{}/{}": "obj", "PATCH /api/v1/agent/objects/{}/{}": "obj",
     "POST /api/v1/agent/objects/{}/{}/proposals": "obj",  # 2.623.0 (#4718): an agent's change proposal (p2623_c_objprop_test.py)
-    "GET /api/undo": "undo", "POST /api/undo/to/{}": "undo", "POST /api/undo/{}/redo": "undo",  # 2.747.0 (#5249): the own step groups (p2747_b_undo_core_test.py, freelancer-matrix: undo)
+    "GET /api/undo": "undo", "POST /api/undo/to/{}": "undo", "POST /api/undo/{}/redo": "undo", "POST /api/undo/{}/undo": "undo",  # 2.747.0 (#5249): the own step groups (p2747_b_undo_core_test.py, freelancer-matrix: undo)
     "GET /api/sheets/{}/export.csv": "sheets", "GET /api/sheets/{}/export.xlsx": "sheets",
     "GET /api/sheets/{}/links": "sheets", "GET /api/sheets/{}/vars": "sheets", "GET /api/v1/sheets": "sheets",
     "GET /api/v1/sheets/{}": "sheets", "GET /api/v1/sheets/{}/vars": "sheets", "PATCH /api/sheets/{}": "sheets",

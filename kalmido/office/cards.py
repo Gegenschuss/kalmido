@@ -17,7 +17,7 @@ import re
 from flask import Response, jsonify, request
 
 from ..collab.comments import user_names
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.config import app
 from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.errors import BadInput
@@ -117,7 +117,7 @@ def cc_card(c, oid, cid, uid, every):
 def _card_public(c, oid, r):
     n = c.execute("SELECT COUNT(*) AS n FROM office_cc_statements WHERE org_id=? AND card_id=? AND deleted_at IS NULL", (oid, r["id"])).fetchone()["n"]
     op = c.execute("SELECT COUNT(*) AS n FROM office_cc_lines l JOIN office_cc_statements s ON s.id=l.statement_id WHERE l.org_id=? AND s.card_id=? "
-                   "AND s.deleted_at IS NULL AND s.state='confirmed' AND l.state='open'", (oid, r["id"])).fetchone()["n"]
+                   f"AND s.deleted_at IS NULL AND s.state='confirmed' AND l.state='open' AND {live_sql('l')}", (oid, r["id"])).fetchone()["n"]  # 2.1005.0 (#5415): not the trash
     return {"id": r["id"], "holder_id": r["holder_id"], "holder": _holder(c, oid, r), "holder_name": r["holder_name"] or "", "provider": r["provider"],
             "provider_name": CC_PROVIDERS.get(r["provider"], r["provider"]), "last4": r["last4"] or "", "account": r["account"] or "", "statements": n, "open": op,
             "updated_at": r["updated_at"] or ""}  # 2.560.0 D (#4700): the dialog's version
@@ -253,7 +253,7 @@ def cc_stmt(c, oid, sid, uid, every):
 def cc_lines(c, oid, sid):
     """The positions of statement sid, decrypted, amounts as Decimal."""
     out = []
-    for r in c.execute("SELECT * FROM office_cc_lines WHERE org_id=? AND statement_id=? ORDER BY sort, id", (oid, sid)).fetchall():
+    for r in c.execute(f"SELECT * FROM office_cc_lines WHERE org_id=? AND statement_id=? AND {live_sql()} ORDER BY sort, id", (oid, sid)).fetchall():  # 2.1005.0 (#5415): not the trash
         x = oc_dec_fields(c, oid, "office_cc_lines", r)
         x["amount"] = money(dec(x["amount"], "0"))
         x["orig_amount"] = money(dec(x["orig_amount"])) if x["orig_amount"] else None

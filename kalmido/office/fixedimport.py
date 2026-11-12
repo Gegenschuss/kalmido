@@ -34,7 +34,6 @@ from .legacyimport import _upload, fi_book, fx_run, fx_settle
 from .model import office_settings, office_settings_lock, office_settings_save
 from ..core.access import live_sql, my_inbox  # 2.149.0 G (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
-from .otrash import OTB_MANY  # 2.567.0 (#4707)
 from .okern import ofk_trash  # 2.905.0 (#5414)
 from .cashflow import RK_FIXED_KIND  # 2.905.0 (#5414)
 from .model import office_on, pb_owner  # 2.369.5 (#2517): pulled up from functions
@@ -333,17 +332,6 @@ def fci_remove(c, oid, ids, uid=None):
     for fid in gone:
         ofk_trash(c, uid, RK_FIXED_KIND, fid)
     return len(gone)
-
-
-def fci_trash_back(c, oid, ids):
-    """2.567.0 (#4707): after the restore of an import taken back (OTB_MANY): its import run counts as not undone again."""
-    c.execute("""UPDATE office_import_runs SET undone_at=NULL, undone_by=NULL WHERE org_id=? AND undone_at IS NOT NULL AND id IN
-                 (SELECT import_run_id FROM office_fixed_costs WHERE org_id=? AND id = ANY(CAST(? AS BIGINT[])) AND import_run_id IS NOT NULL)""",
-              (oid, oid, list(ids)))
-
-
-FCI_TRASH = "fixed_import"  # 2.567.0 (#4707): kind of an import of fixed costs taken back, in the office trash
-OTB_MANY[FCI_TRASH] = fci_trash_back  # 2.905.0 (#5414): only for the copies made before 2.905 (until their period ends); no toast's undo any more
 
 
 @app.post("/api/office/fixed-costs/delete")

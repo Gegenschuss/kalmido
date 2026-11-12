@@ -16,6 +16,12 @@ freelancer-matrix: office
  - 2.570.0 (#4716 review F4): encrypt-all counts a copy whose purchase price is no number as failed, migrated_at stays empty
  - 2.905.0 (#5414): a device goes into the core's trash now (the row stays and is migrated as any other); the device's copy
    here is made as before 2.905 (old_copy) - such old copies stay in office_trash until their period ends
+ - 2.1005.0 (#5415): a draft goes into the core's trash now too (the row stays and is migrated as any other); the draft's
+   copy here is made as before 2.1005 (old_doc_copy)
+ - 2.1005.0 (#5415, part E): such old copies (device, draft) are written back into their tables as rows of the core's trash at
+   the next start (okern.ofk_copies_back; run here by hand, as the start does): encrypt-all / decrypt-all migrate them as rows,
+   the core's restore reads them. The copies still made (the start balance of the cash flow, office/otrash.py OTB_KINDS) are
+   migrated in office_trash.snap as before. The copy cases of a draft's positions (review F6 / F4) left with the copies of drafts.
 usage: p2570_d_trash_crypt_test.py <datadir>"""
 import base64
 import json
@@ -28,6 +34,7 @@ import requests
 
 import dbx as dbxm
 from freelancer_fixture import freelancer
+from obj_probe import in_app  # 2.1005.0 (#5415)
 from kt import FAILS, OKS, check, sess, B, H, DATA  # noqa: F401
 
 N = os.path.dirname(os.path.abspath(__file__))
@@ -62,6 +69,39 @@ def old_copy(oid, eid):
               (oid, "equipment", "", eid, row.get("name") or "", snap, None, "2026-11-09T10:00:00.000Z"))
     c.execute("DELETE FROM office_equipment WHERE id=?", (eid,))
     return c.execute("SELECT MAX(id) FROM office_trash WHERE ref_id=? AND kind='equipment'", (eid,)).fetchall()[0][0]
+
+
+def old_doc_copy(oid, did):
+    """2.1005.0 (#5415): draft did with its positions as a copy in office_trash and the row deleted, as odoc_delete did before
+    2.1005 -> trash id."""
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    new = ("deleted_at", "deleted_by", "rev", "updated_by", "trash_refs")
+    row = json.loads(c.execute("SELECT CAST(row_to_json(d) AS TEXT) FROM office_docs d WHERE id=?", (did,)).fetchall()[0][0])
+    its = [json.loads(x[0]) for x in c.execute("SELECT CAST(row_to_json(i) AS TEXT) FROM office_doc_items i WHERE doc_id=? ORDER BY id", (did,)).fetchall()]
+    snap = json.dumps({"rows": [["office_docs", [{k: v for k, v in row.items() if k not in new}]], ["office_doc_items", its]], "nulls": []})
+    c.execute("INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?)",
+              (oid, "doc", row.get("kind") or "", did, row.get("project_title") or "", snap, None, "2026-11-09T10:00:00.000Z"))
+    c.execute("DELETE FROM office_docs WHERE id=?", (did,))
+    return c.execute("SELECT MAX(id) FROM office_trash WHERE ref_id=? AND kind='doc'", (did,)).fetchall()[0][0]
+
+
+def copies_back():
+    """2.1005.0 (#5415): what the next start does: the old copies of office_trash back as rows of the core's trash."""
+    out = in_app("from kalmido.office.okern import ofk_copies_back\nprint('BACK', ofk_copies_back(c))\nc.commit()")
+    check("BACK" in out, f"the old copies written back {out[-300:]}")
+
+
+def cfs_copy(s, who, amount):
+    """2.1005.0 (#5415): the start balance of the cash flow deleted with a copy (a kind still kept as one) -> the trash id."""
+    check(s.put(B + O + "/cashflow/start", json={"amount": amount, "day": "2026-01-02"}).ok, f"{who}: setup start balance")
+    r = s.delete(B + O + "/cashflow/start")
+    tid = r.json().get("trash_id") if r.ok else None
+    check(tid, f"{who}: the start balance goes with a copy {r.text[:200]}")
+    return tid
+
+
+def cfs_snap(tid):
+    return (snap_rows(tid).get("office_cf_start") or [{}])[0].get("amount")
 
 
 def snap_rows(tid):
@@ -112,18 +152,15 @@ def put_trash(s, who, tag):
                             "items": [{"title": f"Schnitt {tag}", "qty": 1, "rate": 100, "cost": 40}]})
     check(r.status_code == 201, f"{who} {tag}: setup draft {r.status_code} {r.text[:200]}")
     did = r.json().get("id")
-    r = s.delete(B + f"{D}/{did}")
-    tid_d = r.json().get("trash_id") if r.ok else None
-    if not tid_d:
-        tid_d = one("SELECT id FROM office_trash WHERE ref_id=? AND kind LIKE '%doc%' ORDER BY id DESC", (did,))
-    check(tid_e and tid_d, f"{who} {tag}: device and draft in the office trash {tid_e} {tid_d} {r.text[:200]}")
+    tid_d = old_doc_copy({"alice": ORG, "frida": PERS}[who], did)  # 2.1005.0 (#5415): an old copy (the core's trash keeps the row itself)
+    check(tid_e and tid_d, f"{who} {tag}: device and draft in the office trash {tid_e} {tid_d}")
     return eid, tid_e, did, tid_d
 
 
 def restore_reads(s, who, tag, eid, tid_e, did, tid_d):
-    for tid in (tid_e, tid_d):
-        r = s.post(B + O + f"/trash/{tid}/restore")
-        check(r.ok, f"{who} {tag}: restore {tid} {r.status_code} {r.text[:200]}")
+    for kind, rid in (("omd_equipment", eid), ("odoc", did)):  # 2.1005.0 (#5415): rows of the core's trash (written back)
+        r = s.post(B + O + f"/trash/core/{kind}/{rid}/restore")
+        check(r.ok, f"{who} {tag}: restore {kind} {rid} {r.status_code} {r.text[:200]}")
     d = s.get(B + O + f"/equipment/{eid}")
     j = d.json() if d.ok else {}
     j = j.get("item", j) if isinstance(j, dict) else {}
@@ -134,41 +171,22 @@ def restore_reads(s, who, tag, eid, tid_e, did, tid_d):
     check(d.ok and str(it.get("cost")) in ("40", "40.0", "40.00"), f"{who} {tag}: the purchase price reads as before {it.get('cost')}")
 
 
-def plain_cost_copy(s, who):
-    """2.570.0 (#4716 review F6): a draft (purchase price 55) deleted into the trash, its copy rewritten so that its only
-    protected value is a cost_enc left plain ("55.00", the state _cost_pass opens with oc_is_enc) and no value is sealed.
-    -> the trash id"""
-    r = s.post(B + D, json={"kind": "invoice", "client_id": CL[who], "items": [{"title": "Plain cost", "qty": 1, "rate": 100, "cost": 55}]})
-    check(r.status_code == 201, f"{who}: setup plain-cost draft {r.status_code} {r.text[:200]}")
-    did = r.json().get("id")
-    r = s.delete(B + f"{D}/{did}")
-    tid = (r.json().get("trash_id") if r.ok else None) or one("SELECT id FROM office_trash WHERE ref_id=? AND kind LIKE '%doc%' ORDER BY id DESC", (did,))
-    snap = json.loads(one("SELECT snap FROM office_trash WHERE id=?", (tid,)) or "{}")
-    def scrub(x):  # every value holding a sealed part (also inside a JSON column such as the totals) empty
-        if isinstance(x, dict):
-            return {k: scrub(v) for k, v in x.items()}
-        if isinstance(x, list):
-            return [scrub(v) for v in x]
-        return None if isinstance(x, str) and E in x else x
-    snap = scrub(snap)
-    for table, rows in snap.get("rows") or []:
-        for row in rows:
-            if table == "office_doc_items":
-                row["cost"], row["cost_enc"] = 0, "55.00"
-    dbxm.q(os.path.join(DATA, "tasks.db"), "UPDATE office_trash SET snap=? WHERE id=?", (json.dumps(snap), tid))
-    check(E not in (one("SELECT snap FROM office_trash WHERE id=?", (tid,)) or E), f"{who}: the plain-cost copy holds no sealed value")
-    return tid
-
-
-# ---- decrypt-all: the sealed copies in the trash plain again ----------------------------------------------------------------
-BEFORE = {}
+# ---- decrypt-all: the sealed rows of the trash and the sealed copies plain again ----------------------------------------
+BEFORE, CFS = {}, {}
 for s, who, oid in WHO:
     BEFORE[who] = put_trash(s, who, "a")
-    BEFORE[who + " plain cost"] = plain_cost_copy(s, who)
     rows = snap_rows(BEFORE[who][1])
     eq = (rows.get("office_equipment") or [{}])[0]
     it = (snap_rows(BEFORE[who][3]).get("office_doc_items") or [{}])[0]
     check(sealed(eq.get("serial_no")) and sealed(it.get("cost_enc")), f"{who}: the copies keep the sealed values {str(eq)[:120]} {str(it)[:120]}")
+    CFS[who] = cfs_copy(s, who, "1500.00")
+    check(sealed(cfs_snap(CFS[who])), f"{who}: the start balance's copy keeps its amount sealed")
+copies_back()
+for s, who, oid in WHO:
+    eid, tid_e, did, tid_d = BEFORE[who]
+    check(not one("SELECT 1 FROM office_trash WHERE id IN (?, ?)", (tid_e, tid_d)) and one("SELECT deleted_at FROM office_equipment WHERE id=?", (eid,))
+          and one("SELECT deleted_at FROM office_docs WHERE id=?", (did,)) and sealed(one("SELECT serial_no FROM office_equipment WHERE id=?", (eid,))),
+          f"{who}: device and draft are rows of the core's trash now, sealed as stored")
 N_TRASH = one("SELECT COUNT(*) FROM office_trash")
 rc, out, err = cli("decrypt-all")
 check(rc == 0 and "still encrypted: 0" in out, f"decrypt-all finished {rc} {out[-400:]} {err[-600:]}")
@@ -178,53 +196,35 @@ check(t.get("failed") == 0, f"decrypt-all: nothing failed {t}")
 check(one("SELECT COUNT(*) FROM office_trash") == N_TRASH, "decrypt-all does not empty the office trash")
 for s, who, oid in WHO:
     eid, tid_e, did, tid_d = BEFORE[who]
-    eq = (snap_rows(tid_e).get("office_equipment") or [{}])[0]
-    it = (snap_rows(tid_d).get("office_doc_items") or [{}])[0]
-    check(eq.get("serial_no") == f"SN-{who}-a" and not sealed(eq.get("purchase_net")), f"{who}: the device's copy is plain after decrypt-all {str(eq)[:200]}")
-    check(it.get("cost_enc") is None and str(it.get("cost")) in ("40", "40.0", "40.00"), f"{who}: the position's purchase price is plain in the copy {str(it)[:200]}")
-    it = (snap_rows(BEFORE[who + " plain cost"]).get("office_doc_items") or [{}])[0]
-    check(it.get("cost_enc") is None and str(it.get("cost")) in ("55", "55.0", "55.00"),  # 2.570.0 (#4716 review F6)
-          f"{who}: a copy with only a plain cost_enc is opened too (cost back in cost) {str(it)[:200]}")
-    restore_reads(s, who, "a", eid, tid_e, did, tid_d)
-    check(one("SELECT serial_no FROM office_equipment WHERE id=?", (eid,)) == f"SN-{who}-a", f"{who}: the restored device is plain in the database")
+    check(one("SELECT serial_no FROM office_equipment WHERE id=?", (eid,)) == f"SN-{who}-a", f"{who}: the device in the trash is plain after decrypt-all")
     check(one("SELECT cost_enc FROM office_doc_items WHERE doc_id=?", (did,)) is None
-          and float(one("SELECT cost FROM office_doc_items WHERE doc_id=?", (did,)) or 0) == 40, f"{who}: the restored position is plain in the database")
+          and float(one("SELECT cost FROM office_doc_items WHERE doc_id=?", (did,)) or 0) == 40, f"{who}: the draft's purchase price in the trash is plain")
+    check(cfs_snap(CFS[who]) == "1500.00", f"{who}: the start balance's copy is plain after decrypt-all {cfs_snap(CFS[who])}")
+    restore_reads(s, who, "a", eid, tid_e, did, tid_d)
+    r = s.post(B + O + f"/trash/{CFS[who]}/restore")
+    st = s.get(B + O + "/cashflow/start").json().get("start") or {}
+    check(r.ok and st.get("amount") == "1500.00", f"{who}: the start balance reads as before after the restore {r.text[:200]} {st}")
 
-# ---- encrypt-all: plain copies in the trash sealed ------------------------------------------------------------------------
+# ---- encrypt-all: plain rows of the trash and plain copies sealed ---------------------------------------------------------
 AFTER = {}
 for s, who, oid in WHO:
     AFTER[who] = put_trash(s, who, "b")
     eq = (snap_rows(AFTER[who][1]).get("office_equipment") or [{}])[0]
     check(eq.get("serial_no") == f"SN-{who}-b", f"{who}: with encryption off the copy is plain {str(eq)[:120]}")
+    CFS[who] = cfs_copy(s, who, "900.00")
+    check(cfs_snap(CFS[who]) == "900.00", f"{who}: with encryption off the start balance's copy is plain")
+copies_back()
 rc, out, err = cli("encrypt-all")
 check(rc == 0, f"encrypt-all finished {rc} {out[-400:]} {err[-600:]}")
 for s, who, oid in WHO:
     eid, tid_e, did, tid_d = AFTER[who]
-    eq = (snap_rows(tid_e).get("office_equipment") or [{}])[0]
-    it = (snap_rows(tid_d).get("office_doc_items") or [{}])[0]
-    check(sealed(eq.get("serial_no")) and sealed(eq.get("purchase_net")), f"{who}: the device's copy is sealed after encrypt-all {str(eq)[:200]}")
-    check(sealed(it.get("cost_enc")) and float(it.get("cost") or 0) == 0, f"{who}: the position's purchase price is sealed in the copy {str(it)[:200]}")
+    check(sealed(one("SELECT serial_no FROM office_equipment WHERE id=?", (eid,))), f"{who}: the device in the trash is sealed after encrypt-all")
+    check(sealed(one("SELECT cost_enc FROM office_doc_items WHERE doc_id=?", (did,))), f"{who}: the draft's purchase price in the trash is sealed")
+    check(sealed(cfs_snap(CFS[who])), f"{who}: the start balance's copy is sealed after encrypt-all")
     restore_reads(s, who, "b", eid, tid_e, did, tid_d)
-    check(sealed(one("SELECT serial_no FROM office_equipment WHERE id=?", (eid,))), f"{who}: the restored device is sealed in the database")
-    check(sealed(one("SELECT cost_enc FROM office_doc_items WHERE doc_id=?", (did,))), f"{who}: the restored position is sealed in the database")
-
-# ---- 2.570.0 (#4716 review F4): a copy whose purchase price is no number counts as failed and the organisation is not
-# noted as done (migrated_at stays empty); the plain value stays as it is
-_eid, _te, _did, tid_bad = put_trash(A, "alice", "c")
-snap = json.loads(one("SELECT snap FROM office_trash WHERE id=?", (tid_bad,)) or "{}")
-for table, rows in snap.get("rows") or []:
-    if table == "office_doc_items":
-        for row in rows:
-            row["cost"], row["cost_enc"] = "keine Zahl", None
-dbxm.q(os.path.join(DATA, "tasks.db"), "UPDATE office_trash SET snap=? WHERE id=?", (json.dumps(snap), tid_bad))
-dbxm.q(os.path.join(DATA, "tasks.db"), "UPDATE org_keys SET migrated_at=NULL WHERE org_id=?", (ORG,))
-rc, out, err = cli("encrypt-all")
-line = next((x for x in out.splitlines() if "encrypt-all:" in x), "")
-t = json.loads(line.split("encrypt-all:", 1)[1]) if line else {}
-check(t.get("failed", 0) >= 1, f"encrypt-all: the copy with a cost that is no number counts as failed {t} {err[-400:]}")
-check(one("SELECT migrated_at FROM org_keys WHERE org_id=?", (ORG,)) is None, "encrypt-all: Alpha is not noted as done while a trash copy failed")
-it = (snap_rows(tid_bad).get("office_doc_items") or [{}])[0]
-check(it.get("cost") == "keine Zahl" and it.get("cost_enc") is None, f"encrypt-all: the value that is no number stays as it is {str(it)[:200]}")
+    r = s.post(B + O + f"/trash/{CFS[who]}/restore")
+    st = s.get(B + O + "/cashflow/start").json().get("start") or {}
+    check(r.ok and st.get("amount") == "900.00", f"{who}: the start balance reads as before after the restore {r.text[:200]} {st}")
 
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")
 for f in FAILS:

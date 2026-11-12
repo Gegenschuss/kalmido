@@ -16,7 +16,7 @@ another workspace) of its tasks go along; a report's client of another workspace
 from flask import jsonify
 
 from ..core.config import app
-from ..core.access import Denied, need_list, qn_is, QN_PRIVATE_MSG
+from ..core.access import Denied, live_sql, need_list, qn_is, QN_PRIVATE_MSG
 from ..core.db import body, db
 from ..core.i18n import tr, trn
 from ..accounts.session import me
@@ -60,7 +60,7 @@ def lmv_notes(c, lid, lr, to):
     if n:
         stay.append(trn("{0} video review", "{0} video reviews", n))
     w, a = _fits_sql("d", to, lr["owner_id"])
-    n = c.execute(f"SELECT COUNT(*) FROM office_docs d WHERE d.list_id=? AND NOT ({w})", (lid, *a)).fetchone()[0]
+    n = c.execute(f"SELECT COUNT(*) FROM office_docs d WHERE d.list_id=? AND {live_sql('d')} AND NOT ({w})", (lid, *a)).fetchone()[0]  # 2.1005.0 (#5415): not the trash
     if n:
         stay.append(trn("{0} office document", "{0} office documents", n))
     n = c.execute(f"SELECT COUNT(*) FROM office_deals d WHERE d.list_id=? AND d.deleted_at IS NULL AND NOT ({w})", (lid, *a)).fetchone()[0]

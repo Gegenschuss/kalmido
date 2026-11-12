@@ -15,7 +15,7 @@ from flask import jsonify
 from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, iso, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.pg import system_ctx
 from ..personal.timetrack import BadInput
 from .model import office_role, pb_cl_sql
@@ -37,7 +37,7 @@ def tbill_doc(c, did):
     # system_ctx: only whether the billing document still exists and its number (to explain the lock to the person who
     # tracked the time, e.g. a guest of a private list), never its content
     with system_ctx(c):
-        r = c.execute("SELECT id, org_id, number, kind, status FROM office_docs WHERE id=?", (did,)).fetchone()
+        r = c.execute(f"SELECT id, org_id, number, kind, status FROM office_docs WHERE id=? AND {live_sql()}", (did,)).fetchone()  # 2.1005.0 (#5415): not the trash
     return dict(r) if r else None
 
 
@@ -161,7 +161,7 @@ def tbill_free_stale(c, sql, args):
         return
     with system_ctx(c):  # existence only, across the RLS of office_docs (the billing document may lie in another area)
         c.execute(f"UPDATE time_entries SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL WHERE id IN ({','.join('?' * len(ids))}) "
-                  "AND NOT EXISTS (SELECT 1 FROM office_docs d WHERE d.id=time_entries.billed_doc_id)", ids)
+                  f"AND NOT EXISTS (SELECT 1 FROM office_docs d WHERE d.id=time_entries.billed_doc_id AND {live_sql('d')})", ids)  # 2.1005.0 (#5415): one in the trash = gone
 
 
 def tbill_summary(c, sql, args):
@@ -196,8 +196,8 @@ def tbill_take(c, did, sql, args):
 def tbill_items(c, did):
     """2.370.2 (#3088): the entries of draft did know their position (one per list): it gone, they are open again (docs.py
     ofd_free_receipts). Entries billed before stay as they are."""
-    c.execute("UPDATE time_entries SET billed_item_id=(SELECT MIN(x.id) FROM office_doc_items x WHERE x.doc_id=? AND x.list_id=time_entries.list_id) "
-              "WHERE billed_doc_id=?", (did, did))
+    c.execute(f"UPDATE time_entries SET billed_item_id=(SELECT MIN(x.id) FROM office_doc_items x WHERE x.doc_id=? AND x.list_id=time_entries.list_id "
+              f"AND {live_sql('x')}) WHERE billed_doc_id=?", (did, did))  # 2.1005.0 (#5415): never a position of a part in the trash
 
 
 def tbill_free(c, did):

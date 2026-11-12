@@ -13,6 +13,7 @@ Settings keys (office_settings.data, the previous version ignores the new ones):
    fx_rates: {code: rate per one unit of the home currency} for the other foreign currencies."""
 from decimal import Decimal
 
+from ..core.access import live_sql  # 2.1005.0 (#5415)
 from ..core.i18n import N_
 
 # ISO 4217 currencies with two decimal places (amounts are rounded to cents everywhere); EUR and USD first
@@ -92,7 +93,7 @@ def hc_rate_missing(r, home):
 
 def hc_bookings(c, oid):
     """True when office area oid already has bookings (then the home currency stays as it is)."""
-    for sql in ("SELECT 1 FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit') AND status<>'draft' AND trial=0 LIMIT 1",
+    for sql in (f"SELECT 1 FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit') AND status<>'draft' AND trial=0 AND {live_sql()} LIMIT 1",
                 "SELECT 1 FROM office_payments WHERE org_id=? LIMIT 1",
                 "SELECT 1 FROM office_trip_items WHERE org_id=? LIMIT 1",
                 "SELECT 1 FROM office_bank_tx WHERE org_id=? LIMIT 1",

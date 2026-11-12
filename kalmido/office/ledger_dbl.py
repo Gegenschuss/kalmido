@@ -56,7 +56,7 @@ from ..core.config import app
 from ..core.conflict import ccf_check
 from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.errors import BadInput, DeniedKey
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.i18n import N_, csv_dialect, lang, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id, write_lock
@@ -474,7 +474,7 @@ def _meal_nodes(c, oid):
                                    f"AND deleted_at IS NULL AND id IN ({w})", (oid, oid, "bank"))}
     out |= {r[0] for r in c.execute(f"SELECT e.node_id FROM office_cash_entries e WHERE e.org_id=? AND e.node_id IS NOT NULL AND e.storno_of IS NULL "
                                     f"AND NOT EXISTS (SELECT 1 FROM office_cash_entries x WHERE x.storno_of=e.id) AND e.id IN ({w})", (oid, oid, "cash"))}
-    out |= {r[0] for r in c.execute(f"SELECT node_id FROM office_cc_lines WHERE org_id=? AND node_id IS NOT NULL AND id IN ({w})", (oid, oid, "card"))}
+    out |= {r[0] for r in c.execute(f"SELECT node_id FROM office_cc_lines WHERE org_id=? AND node_id IS NOT NULL AND {live_sql()} AND id IN ({w})", (oid, oid, "card"))}  # 2.1005.0 (#5415): not the trash
     return out
 
 
@@ -689,7 +689,7 @@ def ld_journal(c, oid, year):
 
 
 def _had_data(c, oid, year):
-    r = c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND date>=? AND date<=? AND trial=0 LIMIT 1",
+    r = c.execute(f"SELECT 1 FROM office_docs WHERE org_id=? AND date>=? AND date<=? AND trial=0 AND {live_sql()} LIMIT 1",
                   (oid, f"{year}-01-01", f"{year}-12-31")).fetchone()
     return r is not None
 

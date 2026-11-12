@@ -27,7 +27,7 @@ from flask import Response, g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.db import db, local_now
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.i18n import N_, csv_dialect, tr, trn, lang
 from ..core.errors import BadInput
 from .abschlag import abs_skonto_rows  # 2.355.0 C (#2840)
@@ -404,7 +404,7 @@ def bk_reverse_key(c, oid, r, memo):
 def bk_pay_docs(c, oid, frm, to):
     """2.525.0 (#4187): the invoices / credit notes (no trial ones) with a payment in [frm, to] by the filter of bk_payments;
     was every document of every year."""
-    return c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit') AND trial=0 AND id IN "
+    return c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit') AND trial=0 AND {live_sql()} AND id IN "
                      "(SELECT p.doc_id FROM office_payments p LEFT JOIN office_payments o ON o.id=p.reverses_id AND o.org_id=p.org_id "
                      f"WHERE p.org_id=? AND {BK_PAY_DAY}>=? AND {BK_PAY_DAY}<=?)", (oid, oid, frm, to)).fetchall()
 
@@ -481,7 +481,7 @@ def bk_fees_paid(c, oid, frm, to, home):
     day = "COALESCE(NULLIF(reminder_fee_paid_at, ''), date)"
     out = []
     for r in c.execute(f"SELECT id, number, currency, fx_rate, reminder_fee, {day} AS day FROM office_docs WHERE org_id=? AND kind='reminder' "
-                       f"AND locked_at IS NOT NULL AND trial=0 AND reminder_fee > 0 AND reminder_fee_state='paid' AND {day}>=? AND {day}<=? "
+                       f"AND locked_at IS NOT NULL AND {live_sql()} AND trial=0 AND reminder_fee > 0 AND reminder_fee_state='paid' AND {day}>=? AND {day}<=? "
                        f"ORDER BY {day}, id", (oid, frm, to)).fetchall():
         out.append({"doc_id": r["id"], "number": r["number"], "date": r["day"], "amount": money(dec(r["reminder_fee"]) / _fx(r, home))})
     return out
@@ -761,7 +761,7 @@ def bk_ustva(c, oid, year, period):
             items.append({"kind": r["kind"], "doc_id": r["id"], "number": r["number"], "date": p["date"], "gross": dstr(money(gross_all)),
                           "source": "payment"})
     else:
-        for r in c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('invoice','credit') AND locked_at IS NOT NULL "
+        for r in c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND kind IN ('invoice','credit') AND locked_at IS NOT NULL AND {live_sql()} "
                            "AND trial=0 AND number != '' AND date>=? AND date<=? ORDER BY date, number", (oid, frm, to)).fetchall():
             t = _j(r["totals"])
             fx, sign = _fx(r, home), (-1 if r["kind"] == "credit" else 1)
@@ -900,7 +900,7 @@ def bk_years(c, oid, uid=None):
     lo = next((y for y in ys if seen(y)), None)
     hi = next((y for y in reversed(ys) if seen(y)), None) if lo is not None else None
     rcs = {"min": lo, "max": hi} if lo is not None else None
-    docs = ofc_years_sql(c, "SELECT MIN(date), MAX(date) FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit') "
+    docs = ofc_years_sql(c, f"SELECT MIN(date), MAX(date) FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit') AND {live_sql()} "
                             "AND locked_at IS NOT NULL AND trial=0 AND number != '' AND date>='1900'", (oid,))
     pays = ofc_years_sql(c, f"SELECT MIN({BK_PAY_DAY}), MAX({BK_PAY_DAY}) FROM office_payments p LEFT JOIN office_payments o "
                             f"ON o.id=p.reverses_id AND o.org_id=p.org_id WHERE p.org_id=? AND {BK_PAY_DAY}>='1900'", (oid,))

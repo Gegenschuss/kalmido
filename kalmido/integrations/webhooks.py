@@ -24,7 +24,7 @@ from ..core.db import body, connect, db, err, inbox_default, iso, iso_ms, local_
 from ..accounts.session import _rate_blocked, _rate_fail, GATE, me
 from ..accounts.login import seal, unseal
 from ..accounts.orgs import is_org_admin, may_see  # may_see: 2.574.0 (#3376, review F4)
-from ..core.access import Denied, list_role, reading_sql, task_visible
+from ..core.access import Denied, list_role, live_sql, reading_sql, task_visible
 from ..collab.comments import collab_on, comment_plain, user_names
 from ..core.objcomments import ocm_ts  # 2.972.0 (#5272)
 from ..collab.integfail import integ_org_admins, integ_tell
@@ -441,8 +441,8 @@ def who_obj(c, kind, oid, event):
         return r["org_id"], r["owner_id"], {"file": {"id": r["id"], "name": r["name"], "mime": r["mime"] or "", "size": r["size"] or 0,
                                                      "folder_id": r["parent_id"], "created_at": r["created_at"]}}
     if kind == "invoice":
-        r = c.execute("SELECT id, org_id, kind, number, status, date, currency, client_id, totals, sent_at, paid_at, trial FROM office_docs WHERE id=?",
-                      (oid,)).fetchone()
+        r = c.execute(f"SELECT id, org_id, kind, number, status, date, currency, client_id, totals, sent_at, paid_at, trial FROM office_docs WHERE id=? AND {live_sql()}",
+                      (oid,)).fetchone()  # 2.1005.0 (#5415): a draft in the trash sends nothing
         if not r or r["kind"] not in ("invoice", "credit") or r["trial"]:  # 2.144.10 A (#2576): trial documents send no event
             return None
         try:

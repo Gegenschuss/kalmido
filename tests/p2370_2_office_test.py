@@ -170,10 +170,10 @@ def ref_case(s, who, cl):
     did = r1.json()["id"]
     r = s.delete(B + f"{D}/{did}")
     assert r.ok, r.text
-    trash = r.json().get("trash_id")
+    trash = (r.json().get("trash") or {}).get("id")  # 2.1005.0 (#5415): the draft lies in the core's trash (kind odoc)
     r2 = s.post(B + "/api/office/docs/from-time", json={"client_id": cl, "from": "2020-01-01", "to": "2020-01-31", "client_ref": f"ft-{who}"})
     check(r2.status_code == 201 and r2.json()["id"] != did, f"{who}: the ref of a deleted document makes a new one {r2.status_code} {r2.text[:160]}")
-    r = s.post(B + f"{O}/trash/{trash}/restore")
+    r = s.post(B + f"{O}/trash/core/odoc/{trash}/restore")
     check(r.ok, f"{who}: the old one comes back from the trash next to it {r.status_code} {r.text[:160]}")
     r3 = s.post(B + "/api/office/docs/from-time", json={"client_id": cl, "from": "2020-01-01", "to": "2020-01-31", "client_ref": f"ft-{who}"})
     check(r3.status_code == 200 and r3.json()["id"] == r2.json()["id"], f"{who}: the ref stays with the new one {r3.status_code}")

@@ -222,6 +222,34 @@ c.commit()
   the shortest retention holds (`BW_KEEP_YEARS`), the hook refuses what the office's country pack holds longer (`Denied` =
   counted as locked). `bw_purge_tick` / `dma_purge_tick` and their purges on reading are gone. The office trash's delete for
   good and `ofk_restore`'s purge of an overdue row collect the files with `obj_purge_after` too.
+- 2.1005.0 (#5415, stage 4d, part D): trips (`otrip`, their receipts as `children`: they go into the trash with it and come
+  back with it), travel receipts deleted on their own (`otripitem`; restored only into a live trip, 409) and the positions of
+  a credit card statement (`occline`, `base=` = who sees every card or the card's holder; restored only into its statement
+  while that is a draft, 409) moved onto the core's trash, all `step=False`; the trips of a per diem import taken back go in
+  one by one (a restore brings the trip back unchanged and its run counts as not undone again). Their undo routes are their
+  own (`POST /api/office/trips/<id>/restore`, `.../items/<id>/restore`, `POST /api/office/cards/lines/<id>/restore`); the
+  office trash lists them (`view=`; `view["where"]` = a fixed condition on the listed rows: the receipts that went with their
+  trip are the trip's entry). The open-month and draft checks stay those of the delete, in the `back` hook of `view=`.
+- 2.1005.0 (#5415, stage 4d part 1): a document draft that was never finalised (`odoc`, office/docs.py `odoc_trash`) and a
+  quotation's part (`opart`, its positions and title page lines in `office_doc_items` as `children`) moved onto the core's
+  trash, both `step=False`. The draft's row stays; what a delete did to others happens when it goes in and is put back on
+  restore where still free (`trash_refs`: its number and series place, the `ON DELETE SET NULL` references, the time entries
+  it billed). EVERY reader of `office_docs`, `office_doc_parts` and `office_doc_items` skips the trash (`live_sql`; the
+  exceptions with their reasons: whole-organisation moves and re-encryption, chain checks, uniqueness the index holds). A
+  finalised document never comes here (409; a finalised quotation never sent goes back to a draft first, part E). The office
+  trash shows both kinds to the office admin and to who may delete documents (`ofk_register view={"who": ...}`,
+  `okern.ofk_view_may`); `ofk_trash(checked=True)` is the trash of a route that checked its own rights (a part: who may edit
+  the quotation; a table's / an agent's draft taken back).
+- 2.1005.0 (#5415, stage 4d part E, one way): the copies older versions put into `office_trash` go back into their tables as
+  rows of the core's trash at every start (`office/okern.py ofk_copies_back`, called by `kalmido/startup.py` after `init_db`): `deleted_at` /
+  `deleted_by` of the copy, the kind's `children` with the same time, the copy's other rows live; a draft as `odoc_trash`
+  leaves it (`trash_refs`), a finalised quotation as a draft. A copy whose row or unique key is there again is left (never
+  listed, `otb_tick` deletes it after the period). The copies' routes and hooks of these kinds are gone (`OTB_CHECK`,
+  `OTB_MANY`, `dvb_otb_draft`, `/trips/trash/<id>/restore`, `/cards/trash/<id>/restore`). Deleting a finalised quotation never
+  sent unlocks it (`ledger.ofx_unlock`, as `POST .../unlock`) and puts it into the core's trash as a draft. `view["lock"]`
+  in `ofk_register`: the area's write locks the office trash's restore takes first (a draft's number, a part's quotation, a
+  statement's positions). Left on copies (`otrash.OTB_KINDS`, a later stage): the start balance of the cash flow and a
+  sign-off record whose film / document is gone; `office_trash` stays one more version for an older version.
 - 2.1002.0 (#5695): `_purge_rows` deletes the history / undo rows of every kind that names the purged row: the kind itself
   and each `obj_track` kind on the same table (`_purge_kinds`: an office row saved as `office_meal` / `office_fixed_cost`,
   trashed as `omeal` / `ofixed`) -- one place for every purge on the core's way, no area cleans its history itself.
@@ -304,7 +332,7 @@ c.commit()
   table `undo_groups`; the header `X-Kalmido-Undo-Group` bundles several requests within 10 seconds, `X-Kalmido-Device`
   names the device). 30 days, 300 groups per person, 256 KB per part, 2 MB or 1000 parts per group (above: listed as
   `toobig`, no copy). `core/undoweb.py`: `GET /api/undo`, `POST /api/undo/to/<id>` (newest first, the rights of now,
-  a part that changed since stays and is named, a barrier stops the older groups of its own workspace only - same org_id, 2.866.0 #5302 N2; a group too big stops all), `POST /api/undo/<id>/redo`; `undo_barrier` for
+  a part that changed since stays and is named, a barrier stops the older groups of its own workspace only - same org_id, 2.866.0 #5302 N2; a group too big stops all), `POST /api/undo/<id>/undo` (exactly that group, 2.1005.0 #5637: newer groups stay; a newer barrier or too-big group of the same workspace holds it), `POST /api/undo/<id>/redo`; `undo_barrier` for
   finalising / sending; a tracked kind registers who may take its steps back (`undo_need_reg`, the office in
   `office/undo.py`), a kind without one is never written back. People only (agents 403).
 - Undo across devices, stage 4 (2.747.0, #5252): the office's step groups have area `office` and a label naming the object
@@ -370,7 +398,7 @@ c.commit()
   record a step. A write that recorded one answers with `X-Kalmido-Undo-Gid: <group>` (`core/undoweb.py`
   `undo_gid_header`); `static/js/undo.js` `histAdd` puts the group into the entry (`gids`; a change still in the outbox:
   its entry's answer later), the arrow / Ctrl+Z take back the person's newest group (any device, `GET /api/undo`) or this
-  window's newest entry, the toast's "Undo" exactly its own entry (`POST /api/undo/to/<oldest gid of the entry>`), redo
+  window's newest entry, the toast's "Undo" exactly its own entry (`POST /api/undo/<gid>/undo` per group of the entry, 2.1005.0 #5637), redo
   `POST /api/undo/<gid>/redo`. `histGroup` sends one `X-Kalmido-Undo-Group` token for its writes. A change not sent yet
   is taken out of the outbox instead. The editor sessions of the browser are gone (`X-Kalmido-Undo` is no longer sent by
   the app: no "everything since opening" entry, no table sessions; the server routes stay for other clients). Areas

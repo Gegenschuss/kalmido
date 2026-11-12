@@ -11,11 +11,11 @@ from datetime import date
 
 from flask import jsonify, request
 
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.config import app
 from ..core.db import body, bump, iso, now_utc
 from ..core.errors import BadInput
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import write_lock
 from ..docs.ingest import docs_kick
@@ -27,7 +27,8 @@ from .calc import dec, dstr, money
 from .candthumb import oc_with_thumbs  # 2.778.0 (#5383)
 from .cards import (CC_CONFIRMED, CC_DRAFT_ONLY, CC_KINDS, CC_NAME_MAX, _line_insert, _money, cc_ctx, cc_stmt, cc_stmt_row, cc_writable, cl_day)
 from .model import office_settings
-from .otrash import OTB_CHECK, otb_gone_out, otb_put, otb_restore
+from .okern import ofk_register, ofk_restore, ofk_trash  # 2.1005.0 (#5415): a position on the core's trash
+from .cards import cc_sees_all  # 2.1005.0 (#5415)
 from .rcsubmit import rsb_ingest
 from .rcfolder import rcf_card  # 2.957.0 (#4910)
 from .bank import _rc_paid_amount  # 2.369.5 (#2517): pulled up from functions
@@ -48,7 +49,7 @@ def cl_docs(c, oid):
     out = []
     for r in c.execute("SELECT d.node_id, d.ws, d.amount, d.currency, d.doc_date, d.sender_id, n.name FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id "
                        "WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL "
-                       "AND NOT EXISTS (SELECT 1 FROM office_cc_lines l WHERE l.org_id=? AND l.node_id=d.node_id AND l.state='matched') "
+                       f"AND NOT EXISTS (SELECT 1 FROM office_cc_lines l WHERE l.org_id=? AND l.node_id=d.node_id AND l.state='matched' AND {live_sql('l')}) "  # 2.1005.0 (#5415)
                        "AND NOT EXISTS (SELECT 1 FROM office_cc_statements t WHERE t.org_id=? AND t.node_id=d.node_id) "
                        "AND NOT EXISTS (SELECT 1 FROM office_bank_tx b WHERE b.org_id=? AND b.match_kind='receipt' AND b.match_id=d.node_id AND b.deleted_at IS NULL) "
                        f"ORDER BY d.node_id DESC LIMIT {CL_SCAN}", (ws, oid, oid, oid)).fetchall():
@@ -134,9 +135,9 @@ def cl_view(c, oid, uid, s, lines):
     return out
 
 
-def cl_row(c, oid, lid, uid, every):
-    """(position, statement): 404 outside the person's cards."""
-    r = c.execute("SELECT * FROM office_cc_lines WHERE id=? AND org_id=?", (lid, oid)).fetchone()
+def cl_row(c, oid, lid, uid, every, deleted=False):
+    """(position, statement): 404 outside the person's cards. 2.1005.0 (#5415): and in the core's trash (deleted=True: also there)."""
+    r = c.execute("SELECT * FROM office_cc_lines WHERE id=? AND org_id=?" + ("" if deleted else f" AND {live_sql()}"), (lid, oid)).fetchone()
     if r is None:
         raise Denied(404)
     s = cc_stmt(c, oid, r["statement_id"], uid, every)
@@ -193,7 +194,7 @@ def cl_add(sid):
         raise BadInput(tr("Invalid data"))
     v = _fields(b)
     cc_writable(c, oid, s, v["day"])
-    n = c.execute("SELECT COALESCE(MAX(sort), -1)+1 AS n FROM office_cc_lines WHERE org_id=? AND statement_id=?", (oid, sid)).fetchone()["n"]
+    n = c.execute("SELECT COALESCE(MAX(sort), -1)+1 AS n FROM office_cc_lines WHERE org_id=? AND statement_id=?", (oid, sid)).fetchone()["n"]  # the trash keeps its place
     lid = _line_insert(c, oid, sid, n, v)
     bump(c)
     c.commit()
@@ -230,7 +231,8 @@ def cl_patch(lid):
             out.update(day=v["day"], merchant=v["merchant"], amount=dstr(v["amount"]), orig_amount=dstr(v["orig_amount"]) if v["orig_amount"] is not None else "",
                        orig_currency=v["orig_currency"], kind=v["kind"], state="noreceipt" if v["kind"] == "fee" else "open")
         return {k: z for k, z in out.items() if (z or None) != (cur.get(k) or None)}
-    ow_write(c, uid, "office_cc_line", lid, b, clean, oid=oid, dec=lambda c, r: oc_dec_fields(c, oid, "office_cc_lines", r),
+    ow_write(c, uid, "office_cc_line", lid, b, clean, oid=oid, where=f"id=? AND org_id=? AND {live_sql()}",  # 2.1005.0 (#5415): one in the trash is not saved
+             dec=lambda c, r: oc_dec_fields(c, oid, "office_cc_lines", r),
              enc=lambda c, v: oc_enc_fields(c, oid, "office_cc_lines", v), public=lambda c, cur: _public(c, cl_row(c, oid, lid, uid, every)[0]))
     c.commit()
     return _answer(c, oid, uid, lid, every)
@@ -246,21 +248,20 @@ def cl_history(lid):
 
 @app.delete("/api/office/cards/lines/<int:lid>")
 def cl_del(lid):
-    """A position of a draft goes (the reader's mistake); the answer carries it for the undo (POST .../lines)."""
+    """A position of a draft goes (the reader's mistake); the answer carries it and 2.1005.0 (#5415) where it lies in the core's
+    trash (trash = {kind, id}: the client's undo POST /api/office/cards/lines/<id>/restore; the office trash lists it)."""
     c, uid, oid, every = cc_ctx()
     write_lock(c, f"office_cc_{oid}")
     x, s = cl_row(c, oid, lid, uid, every)
     cc_writable(c, oid, s, x["day"])
     _draft(s)
-    tid = otb_put(c, oid, uid, CL_TRASH, "office_cc_lines", lid, x["day"] or "")  # 2.552.0 (#4561 B21): a copy into the office trash first (label: the day only, merchant / amount are sealed)
-    c.execute("DELETE FROM office_cc_lines WHERE id=? AND org_id=?", (lid, oid))
-    bump(c)
+    ofk_trash(c, uid, CL_KIND, lid)  # 2.1005.0 (#5415): the core's trash (deleted_at); back only into its statement while a draft
     c.commit()
-    return jsonify(ok=True, line=_public(c, x), trash_id=tid)
+    return jsonify(ok=True, line=_public(c, x), trash={"kind": CL_KIND, "id": lid})
 
 
 def cl_trash_check(c, oid, lid, uid=None, every=True):
-    """2.552.0 (#4561 B21): after otb_restore of a position (same transaction): its statement is still there, a draft and its
+    """2.552.0 (#4561 B21): after the restore of a position (same transaction): its statement is still there, a draft and its
     month open (as deleting it), else 409 / 404 and the caller's transaction is rolled back. -> the statement id"""
     r = c.execute("SELECT statement_id, day FROM office_cc_lines WHERE id=? AND org_id=?", (lid, oid)).fetchone()
     if not r:
@@ -273,27 +274,56 @@ def cl_trash_check(c, oid, lid, uid=None, every=True):
     return r["statement_id"]
 
 
-OTB_CHECK[CL_TRASH] = cl_trash_check  # 2.552.0 (#4561 B21): the office trash's restore checks the statement
+def _cl_base(c, uid, row):
+    """2.1005.0 (#5415): the core's role of a position (after the office gates): who sees every card (the bookkeeping) or the
+    holder of its card (as cc_ctx / cc_stmt), nobody else."""
+    oid = row["org_id"]
+    if cc_sees_all(c, uid, oid):
+        return "manage"
+    k = c.execute("SELECT k.holder_id FROM office_cc_statements s JOIN office_cc_cards k ON k.id=s.card_id WHERE s.id=? AND s.org_id=? "
+                  f"AND {live_sql('k')}", (row["statement_id"], oid)).fetchone()
+    return "manage" if k is not None and k["holder_id"] == uid else None
 
 
-@app.post("/api/office/cards/trash/<int:tid>/restore")
-def cl_trash_restore(tid):
-    """2.552.0 (#4561 B21): the undo of deleting a position: writes its office trash copy back (the person who deleted it or
-    whoever sees all cards; the office trash itself lists it for the admins) -> {ok, line}."""
+def _cl_label(c, oid, row):
+    """The day and the merchant (decrypted at reading, never stored plain)."""
+    d = oc_dec_fields(c, oid, "office_cc_lines", row)
+    return " · ".join(x for x in (d.get("day") or "", d.get("merchant") or "") if x)
+
+
+def _cl_back(c, oid, row):
+    """2.1005.0 (#5415): after the restore of a position (its own route, the office trash; same transaction): its statement is
+    there, a draft, its month open and its card not deleted (cl_trash_check), else 409 / 404 and rolled back."""
+    cl_trash_check(c, oid, row["id"])
+
+
+def _cl_ctx():
+    c, uid, oid, _every = cc_ctx()
+    return c, uid, oid
+
+
+CL_KIND = "occline"  # 2.1005.0 (#5415): a position of a credit card statement in the core's trash
+ofk_register(CL_KIND, "office_cc_lines", N_("Card position"), "cards", base=_cl_base,
+             view={"kind": CL_TRASH, "label": _cl_label, "ctx": _cl_ctx, "back": _cl_back,
+                   "lock": lambda oid, row: (f"office_cc_{int(oid)}",)}, step=False)  # as cl_restore
+# step=False: no step in the person's undo list -- the core's undo would skip the draft / open-month checks
+
+
+@app.post("/api/office/cards/lines/<int:lid>/restore")
+def cl_restore(lid):
+    """2.1005.0 (#5415): the undo of deleting a position: out of the core's trash (the person who may work on its card; only
+    into its statement while that is a draft, an open month, a card not deleted: 409) -> {line, statement}. Past the trash
+    period: gone (404). A live position answers as it is."""
     c, uid, oid, every = cc_ctx()
     write_lock(c, f"office_cc_{oid}")
-    write_lock(c, f"office_trash_{int(tid)}")
-    t = c.execute("SELECT kind, deleted_by FROM office_trash WHERE id=? AND org_id=?", (tid, oid)).fetchone()
-    if not t or t["kind"] != CL_TRASH:
-        raise Denied(404)
-    if t["deleted_by"] != uid and not every:
-        raise Denied(404)
-    notes = {}  # 2.560.0 (#4667): what was emptied because it is gone for good goes into the answer
-    _, lid = otb_restore(c, oid, tid, notes)
-    cl_trash_check(c, oid, lid, uid, every)
-    bump(c)
-    c.commit()
-    return _answer(c, oid, uid, lid, every, otb_gone_out(notes))
+    x, s = cl_row(c, oid, lid, uid, every, deleted=True)
+    if x["deleted_at"]:
+        ofk_restore(c, uid, CL_KIND, lid)
+        cl_trash_check(c, oid, lid, uid, every)
+        bump(c)
+        c.commit()
+    return _answer(c, oid, uid, lid, every)
+
 
 
 @app.get("/api/office/cards/lines/<int:lid>/candidates")

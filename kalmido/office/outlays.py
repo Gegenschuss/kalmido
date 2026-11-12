@@ -15,7 +15,7 @@ from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_item_store
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.errors import BadInput
 from .calc import dec, money
 from .books import bk_receipts, bk_ws
@@ -47,7 +47,7 @@ def au_billed(c, oid, ids):
     # 2.362.0 (#3131): billed_at without a document = billed before an organisation import whose invoice did not come along
     # (admin/oi_store.py _receipt): billed, invoice missing; a document deleted later still frees its receipts (billed_doc_id kept)
     rows = c.execute(f"SELECT r.node_id, r.billed_at, d.id AS doc_id, d.number, d.kind, d.org_id FROM rc_receipts r LEFT JOIN office_docs d "
-                     f"ON d.id=r.billed_doc_id WHERE r.ws=? AND r.node_id IN ({','.join('?' * len(ids))}) "
+                     f"ON d.id=r.billed_doc_id AND {live_sql('d')} WHERE r.ws=? AND r.node_id IN ({','.join('?' * len(ids))}) "
                      f"AND (d.id IS NOT NULL OR (r.billed_doc_id IS NULL AND r.billed_at IS NOT NULL AND r.billed_at != ''))",
                      [bk_ws(c, oid)] + ids).fetchall()
     return {r["node_id"]: ({"doc_id": r["doc_id"], "number": r["number"], "kind": r["kind"], "billed_at": r["billed_at"]} if r["org_id"] == oid
@@ -99,7 +99,8 @@ def au_bill_post():
     else:
         pos = [(au_title(x, lg), _fmt_day(x["date"], lg), cost(x)) for x in its]
     before = ofx_items_brief(doc_items(c, r["id"], oid))
-    mx = c.execute("SELECT COALESCE(MAX(sort), 0) FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL", (r["id"], oid)).fetchone()[0]
+    mx = c.execute(f"SELECT COALESCE(MAX(sort), 0) FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND {live_sql()}",
+                   (r["id"], oid)).fetchone()[0]  # 2.1005.0 (#5415): not the trash
     pids = []
     for i, (title, detail, amt) in enumerate(pos):
         row = {"doc_id": r["id"], "org_id": oid, "sort": (mx or 0) + 1 + i, "kind": "service", "service_id": None, "title": title, "detail": detail,
@@ -144,16 +145,16 @@ def au_unbill_post():
                                         [ws, *pos, *ids])}
         pids = pids + sorted(pos - busy)
     c.execute(f"UPDATE rc_receipts SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL WHERE ws=? AND node_id IN ({q}) AND NOT EXISTS "
-              "(SELECT 1 FROM office_docs d WHERE d.id=rc_receipts.billed_doc_id AND d.trial=0 AND ((d.locked_at IS NOT NULL AND d.locked_at != '') OR d.status='sent'))",
+              f"(SELECT 1 FROM office_docs d WHERE d.id=rc_receipts.billed_doc_id AND {live_sql('d')} AND d.trial=0 AND ((d.locked_at IS NOT NULL AND d.locked_at != '') OR d.status='sent'))",
               [ws] + ids)  # 2.121.0 review M1: a sent document counts as final like in bill (ofx_need_editable); 2.144.10 (#2576, review): a trial one frees them
     removed = 0
     for did in docs:
-        r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
+        r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (did, oid)).fetchone()  # 2.1005.0 (#5415): a draft in the trash keeps its positions
         if not r or r["locked_at"] or r["status"] == "sent" or not pids:  # 2.121.0 review M1
             continue
         before = ofx_items_brief(doc_items(c, did, oid))
-        n = c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND intext='extern' AND id IN ({','.join('?' * len(pids))})",
-                      [did, oid] + pids).rowcount
+        n = c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND intext='extern' AND {live_sql()} "
+                      f"AND id IN ({','.join('?' * len(pids))})", [did, oid] + pids).rowcount  # 2.1005.0 (#5415): a trash row stays with its part
         if n:
             removed += n
             ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": ofx_items_brief(doc_items(c, did, oid))})

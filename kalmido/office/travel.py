@@ -23,7 +23,7 @@ from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_col, oc_dec_fields, oc_enc_fields, oc_item_store
 from ..core.i18n import N_, csv_dialect, tr
 from ..core.db import body, bump, db, iso, now_utc
-from ..core.access import Denied, vis_sql
+from ..core.access import Denied, live_sql, trash_sql, vis_sql
 from ..core.errors import BadInput
 from .pdf import pdf_date
 from .calc import dec, dstr, money
@@ -55,9 +55,9 @@ from . import model  # 2.369.5 (#2517): pulled up from functions
 from .countries import fk_country_code  # 2.369.5 (#2517): pulled up from functions
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .docs import doc_items, recalc, ofd_free_receipts  # 2.369.5 (#2517): pulled up from functions
-from .otrash import otb_gone_out, otb_put, otb_restore  # 2.530.0 C (#4315, B17)
 from .owrite import ow_history_answer, ow_kind, ow_need_row, ow_write  # noqa: E402  2.567.0 D (#4711): the saves go through the core's write layer
 from .years import ofc_years, ofc_years_sql  # 2.593.0 (#4891): the years with data
+from .okern import ofk_register, ofk_restore, ofk_trash  # noqa: E402  2.1005.0 (#5415): trips and receipts on the core's trash
 
 ow_kind("office_trip", "office_trips")
 ow_kind("office_trip_item", "office_trip_items")
@@ -323,7 +323,8 @@ def _billed_ok(c, oid, r):
     """The document a receipt was billed on, if it still exists: {id, number, kind, project_title} or None."""
     if not r.get("billed_doc_id"):
         return None
-    d = c.execute("SELECT id, number, kind, project_title, status FROM office_docs WHERE id=? AND org_id=?", (r["billed_doc_id"], oid)).fetchone()
+    d = c.execute(f"SELECT id, number, kind, project_title, status FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}",
+                  (r["billed_doc_id"], oid)).fetchone()  # 2.1005.0 (#5415): a draft in the trash bills nothing
     return dict(d) if d else None
 
 
@@ -338,7 +339,7 @@ def _item_public(c, oid, r, docs):
 
 def _docs_map(c, oid):
     return {r["id"]: {"id": r["id"], "number": r["number"], "kind": r["kind"], "project_title": r["project_title"]}
-            for r in c.execute("SELECT id, number, kind, project_title FROM office_docs WHERE org_id=? AND id IN "
+            for r in c.execute(f"SELECT id, number, kind, project_title FROM office_docs WHERE org_id=? AND {live_sql()} AND id IN "  # 2.1005.0 (#5415)
                                "(SELECT billed_doc_id FROM office_trip_items WHERE org_id=? AND billed_doc_id IS NOT NULL)", (oid, oid))}
 
 
@@ -366,7 +367,7 @@ def rk_trip_public(c, oid, t, items, docs=None):
 
 
 def rk_trips(c, oid, year=None, trip_id=None):
-    sql, args = "SELECT * FROM office_trips WHERE org_id=?", [oid]
+    sql, args = f"SELECT * FROM office_trips WHERE org_id=? AND {live_sql()}", [oid]  # 2.1005.0 (#5415): never the trash
     own = ofr_own_uid("travel")  # 2.187.0 B (#2476): office groups, level "own": only the person's own trips
     if trip_id is not None:
         sql += " AND id=?"
@@ -381,7 +382,7 @@ def rk_trips(c, oid, year=None, trip_id=None):
         return []
     ids = [t["id"] for t in trips]
     by = {}
-    for r in c.execute(f"SELECT * FROM office_trip_items WHERE org_id=? AND trip_id IN ({','.join('?' * len(ids))}) ORDER BY date, sort, id", [oid] + ids):
+    for r in c.execute(f"SELECT * FROM office_trip_items WHERE org_id=? AND trip_id IN ({','.join('?' * len(ids))}) AND {live_sql()} ORDER BY date, sort, id", [oid] + ids):
         by.setdefault(r["trip_id"], []).append(r)
     docs = _docs_map(c, oid)
     out = [rk_trip_public(c, oid, t, by.get(t["id"], []), docs) for t in trips]
@@ -417,12 +418,13 @@ def _trip_need_open(c, oid, t, *days, items=True):
     """2.148.0 A (#2471): 409 when trip t (its days, its receipts' days when items) or one of days lies in a locked month."""
     ds = [t["date_from"], t["date_to"], *days]
     if items:
-        ds += [r["date"] for r in c.execute("SELECT date FROM office_trip_items WHERE trip_id=? AND org_id=?", (t["id"], oid)).fetchall()]
+        ds += [r["date"] for r in c.execute(f"SELECT date FROM office_trip_items WHERE trip_id=? AND org_id=? AND {live_sql()}", (t["id"], oid)).fetchall()]
     period_need_open(c, oid, *ds)
 
 
-def _trip(c, oid, tid):
-    r = c.execute("SELECT * FROM office_trips WHERE id=? AND org_id=?", (tid, oid)).fetchone()
+def _trip(c, oid, tid, deleted=False):
+    """2.1005.0 (#5415): deleted=True also finds a trip of the core's trash (its restore), else the trash is 404."""
+    r = c.execute("SELECT * FROM office_trips WHERE id=? AND org_id=?" + ("" if deleted else f" AND {live_sql()}"), (tid, oid)).fetchone()
     own = ofr_own_uid("travel")
     if not r or (own is not None and not rk_own_sees(c, oid, r, own)):  # 2.187.0 B (#2476): level "own": somebody else's = 404
         raise Denied(404)
@@ -468,10 +470,11 @@ def rk_trips_get():
     if own is not None:  # 2.187.1 B (#2735): the receipts of the person's trips (rk_trips: entered or travelled)
         missing = sum(t["missing"] for t in rk_trips(c, oid))
     else:
-        missing = c.execute("SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=0", (oid,)).fetchone()[0]
+        missing = c.execute(f"SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=0 AND {live_sql()}", (oid,)).fetchone()[0]
     clients = [{"id": r["id"], "name": r["name"]} for r in
                c.execute(f"SELECT id, name FROM clients WHERE {rk_cl_where(c, oid)[0]} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name)", rk_cl_where(c, oid)[1])]
-    projects = [r[0] for r in c.execute("SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' ORDER BY 1", (oid,))][:300]
+    projects = [r[0] for r in c.execute(f"SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' AND {live_sql()} ORDER BY 1",
+                                        (oid,))][:300]  # 2.1005.0 (#5415): not the trash
     if own is not None:  # 2.187.0 B (#2476): the project names of the invoices are not part of "own"
         projects = sorted({t["project"] for t in trips if t.get("project")})
     return jsonify(trips=trips, people=rk_people(c, oid, uid), clients=clients, projects=projects, currency=rk_home_cur(c, oid),
@@ -486,8 +489,8 @@ def rk_years(c, oid):
     own = ofr_own_uid("travel")
     if own is None:
         return ofc_years_sql(c, "SELECT MIN(date_from), MAX(COALESCE(NULLIF(date_to, ''), date_from)) FROM office_trips "
-                                "WHERE org_id=? AND date_from>='1900'", (oid,))
-    rows = rk_own_rows(c, oid, c.execute("SELECT id, created_by, people, date_from, date_to FROM office_trips WHERE org_id=?", (oid,)).fetchall(), own)
+                                f"WHERE org_id=? AND date_from>='1900' AND {live_sql()}", (oid,))
+    rows = rk_own_rows(c, oid, c.execute(f"SELECT id, created_by, people, date_from, date_to FROM office_trips WHERE org_id=? AND {live_sql()}", (oid,)).fetchall(), own)
     return ofc_years([d for t in rows for d in (t["date_from"], t["date_to"])])
 
 
@@ -552,18 +555,33 @@ def rk_trip_history(tid):
 
 @app.delete("/api/office/trips/<int:tid>")
 def rk_trip_delete(tid):
-    """Deletes a trip with its receipts; answers the trip as it was (the client's undo posts it again)."""
+    """Deletes a trip with its receipts; answers the trip as it was and 2.1005.0 (#5415) where it lies in the core's trash
+    (trash = {kind, id}: the client's undo POST /api/office/trips/<id>/restore; the office trash lists it until its period ends)."""
     c, uid, oid = _ctx()
     _trip_need_open(c, oid, _trip(c, oid, tid))  # 2.148.0 A (#2471)
     # 2.152.0 C (#2168): receipts in DATEV / billed on a finalised document are kept by law -> the trip stays (409)
-    olk_need_trip_items(c, oid, c.execute("SELECT * FROM office_trip_items WHERE trip_id=? AND org_id=?", (tid, oid)).fetchall())
+    olk_need_trip_items(c, oid, c.execute(f"SELECT * FROM office_trip_items WHERE trip_id=? AND org_id=? AND {live_sql()}", (tid, oid)).fetchall())
     old = _one(c, oid, tid)
-    # 2.530.0 C (#4315, B17): a copy into the office trash first (restore there or with the undo), then the row goes
-    trash = otb_put(c, oid, uid, "trip", "office_trips", tid, " · ".join(x for x in (old.get("dest"), rk_trash_span(old)) if x))
-    c.execute("DELETE FROM office_trips WHERE id=? AND org_id=?", (tid, oid))
-    bump(c)
+    ofk_trash(c, uid, RK_TRIP_KIND, tid)  # 2.1005.0 (#5415): the core's trash (deleted_at), its live receipts go with it (children)
     c.commit()
-    return jsonify(ok=True, trip=old, trash_id=trash)
+    return jsonify(ok=True, trip=old, trash={"kind": RK_TRIP_KIND, "id": tid})
+
+
+@app.post("/api/office/trips/<int:tid>/restore")
+def rk_trip_restore(tid):
+    """2.1005.0 (#5415): the undo of deleting a trip: out of the core's trash with the receipts that went with it (the trip's
+    rights as deleting it, level "own": the person's own trip), only into open months (409) -> the trip. Past the trash period:
+    gone (404). A live trip answers as it is."""
+    c, uid, oid = _ctx()
+    write_lock(c, f"office_trip_trash_{int(tid)}")
+    r = _trip(c, oid, tid, deleted=True)
+    if r["deleted_at"]:
+        ofk_restore(c, uid, RK_TRIP_KIND, tid)
+        _rk_trip_back(c, oid, dict(r))
+        ofx_log(c, oid, "restore", target="trip", detail={"id": tid})
+        bump(c)
+        c.commit()
+    return jsonify(_one(c, oid, tid))
 
 
 @app.post("/api/office/trips/<int:tid>/items")
@@ -574,7 +592,7 @@ def rk_item_post(tid):
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    if c.execute("SELECT COUNT(*) FROM office_trip_items WHERE trip_id=? AND org_id=?", (tid, oid)).fetchone()[0] >= MAX_ITEMS:
+    if c.execute(f"SELECT COUNT(*) FROM office_trip_items WHERE trip_id=? AND org_id=? AND {live_sql()}", (tid, oid)).fetchone()[0] >= MAX_ITEMS:
         raise BadInput(tr("Too many entries"))
     row = rk_item_clean(c, oid, b, home=rk_home_cur(c, oid))
     _trip_need_open(c, oid, _trip(c, oid, tid), row.get("date"), items=False)  # 2.148.0 A (#2471)
@@ -586,9 +604,10 @@ def rk_item_post(tid):
     return jsonify(dict(_one(c, oid, tid), item_id=iid)), 201
 
 
-def _item(c, oid, tid, iid):
+def _item(c, oid, tid, iid, deleted=False):
     _trip(c, oid, tid)  # 2.187.0 B (#2476): the trip's checks (level "own")
-    r = c.execute("SELECT * FROM office_trip_items WHERE id=? AND trip_id=? AND org_id=?", (iid, tid, oid)).fetchone()
+    r = c.execute("SELECT * FROM office_trip_items WHERE id=? AND trip_id=? AND org_id=?" + ("" if deleted else f" AND {live_sql()}"),  # 2.1005.0 (#5415)
+                  (iid, tid, oid)).fetchone()
     if not r:
         raise Denied(404)
     return r
@@ -629,7 +648,7 @@ def rk_item_patch(tid, iid):
         if row:
             _trip_need_open(c, oid, _trip(c, oid, tid), cur["date"], row.get("date"), items=False)  # 2.148.0 A (#2471)
         return row
-    ow_write(c, uid, "office_trip_item", iid, b, clean, where="id=? AND trip_id=? AND org_id=?", args=(iid, tid, oid), oid=oid,
+    ow_write(c, uid, "office_trip_item", iid, b, clean, where=f"id=? AND trip_id=? AND org_id=? AND {live_sql()}", args=(iid, tid, oid), oid=oid,  # 2.1005.0 (#5415)
              dec=lambda c, r: oc_dec_fields(c, oid, "office_trip_items", r), enc=lambda c, v: oc_enc_fields(c, oid, "office_trip_items", v),
              public=lambda c, cur: next((x for x in _one(c, oid, tid)["items"] if x["id"] == iid), None))
     c.commit()
@@ -652,58 +671,77 @@ def rk_item_delete(tid, iid):
     _trip_need_open(c, oid, _trip(c, oid, tid), r["date"], items=False)  # 2.148.0 A (#2471)
     olk_need_trip_items(c, oid, [r])  # 2.152.0 C (#2168): in DATEV / billed on a finalised document -> 409
     old = _item_public(c, oid, r, _docs_map(c, oid))
-    trash = otb_put(c, oid, uid, "trip_item", "office_trip_items", iid, " · ".join(  # 2.530.0 C (#4315, B17): office trash first
-        x for x in (tr(dict(RK_CATS).get(r["category"], "")) if dict(RK_CATS).get(r["category"]) else "", r["date"] or "") if x))
-    c.execute("DELETE FROM office_trip_items WHERE id=? AND org_id=?", (iid, oid))
-    bump(c)
+    ofk_trash(c, uid, RK_ITEM_KIND, iid)  # 2.1005.0 (#5415): the core's trash (deleted_at); restorable while the trip is live
     c.commit()
-    return jsonify(trip=_one(c, oid, tid), item=old, trash_id=trash)
+    return jsonify(trip=_one(c, oid, tid), item=old, trash={"kind": RK_ITEM_KIND, "id": iid})
+
+
+@app.post("/api/office/trips/<int:tid>/items/<int:iid>/restore")
+def rk_item_restore(tid, iid):
+    """2.1005.0 (#5415): the undo of deleting a receipt: out of the core's trash (the trip's rights; the trip live and the
+    receipt's day in an open month, else 409) -> the trip."""
+    c, uid, oid = _ctx()
+    write_lock(c, f"office_trip_trash_{int(tid)}")
+    r = _item(c, oid, tid, iid, deleted=True)
+    if r["deleted_at"]:
+        ofk_restore(c, uid, RK_ITEM_KIND, iid)
+        _rk_item_back(c, oid, dict(r))
+        ofx_log(c, oid, "restore", target="trip_item", detail={"id": iid})
+        bump(c)
+        c.commit()
+    return jsonify(_one(c, oid, tid))
 
 
 # ---------------------------------------------------------------- 2.530.0 C (#4315, B17): trips and receipts in the office trash
-RK_TRASH_KINDS = ("trip", "trip_item")
-
-
 def rk_trash_span(t):
     """The days of a trip for the trash label (no sealed field: the label is stored plain)."""
     a, b = t.get("date_from") or "", t.get("date_to") or ""
     return a if not b or a == b else f"{a} – {b}"
 
 
-def rk_trash_check(c, oid, kind, ref):
-    """After otb_restore of a trip / receipt (same transaction): its days must lie in open months (2.148.0 A, #2471), level
-    "own" sees only the person's own trips (else 404 and the caller's transaction is rolled back)."""
-    tid = ref
-    if kind == "trip_item":
-        r = c.execute("SELECT trip_id, date FROM office_trip_items WHERE id=? AND org_id=?", (ref, oid)).fetchone()
-        if not r:
-            raise Denied(404)
-        # 2.603.0 A (#4555): a single receipt checks the trip's days and its own date only, not the trip's other receipts
-        _trip_need_open(c, oid, _trip(c, oid, r["trip_id"]), r["date"], items=False)
-        return r["trip_id"]
+def _rk_trip_label(c, oid, row):
+    d = oc_dec_fields(c, oid, "office_trips", row)
+    return " · ".join(x for x in (d.get("dest") or "", rk_trash_span(d)) if x)
+
+
+def _rk_item_label(c, oid, row):
+    cat = dict(RK_CATS).get(row.get("category"))
+    return " · ".join(x for x in (tr(cat) if cat else "", row.get("date") or "") if x)
+
+
+def _rk_trip_back(c, oid, row):
+    """2.1005.0 (#5415): after the restore of a trip (its own route, the office trash; same transaction): its days and its
+    receipts' days in open months (2.148.0 A, #2471; else 409, rolled back). A trip of a per diem import taken back
+    (vmaimport.vmi_remove leaves it in the trash with updated_at = created_at, a single delete stamps the time) comes back
+    unchanged (a second take-back takes it again) and its run counts as not undone again."""
+    tid = row["id"]
     _trip_need_open(c, oid, _trip(c, oid, tid))
-    return tid
+    if row.get("import_run_id") and row.get("updated_at") and row.get("updated_at") == row.get("created_at"):
+        c.execute("UPDATE office_trips SET updated_at=created_at WHERE id=? AND org_id=?", (tid, oid))
+        c.execute("UPDATE office_import_runs SET undone_at=NULL, undone_by=NULL WHERE id=? AND org_id=? AND undone_at IS NOT NULL",
+                  (row["import_run_id"], oid))
 
 
-@app.post("/api/office/trips/trash/<int:tid>/restore")
-def rk_trash_restore(tid):
-    """The undo of deleting a trip / a receipt: writes its office trash copy back (the person who deleted it or an office
-    admin; the office trash itself lists it for the admins) -> the trip."""
-    c, uid, oid = _ctx()
-    write_lock(c, f"office_trash_{int(tid)}")
-    t = c.execute("SELECT kind, deleted_by FROM office_trash WHERE id=? AND org_id=?", (tid, oid)).fetchone()
-    if not t or t["kind"] not in RK_TRASH_KINDS:
-        raise Denied(404)
-    if t["deleted_by"] != uid and model.office_role(c, uid, oid) != "admin":
-        raise Denied(403, tr("Only an admin of this workspace can do this"))
-    notes = {}  # 2.560.0 (#4667): a client gone for good since: back without it, the answer says so (gone / note)
-    kind, ref = otb_restore(c, oid, tid, notes)
-    trip = rk_trash_check(c, oid, kind, ref)
-    ofx_log(c, oid, "restore", target=kind, detail={"id": ref})
-    bump(c)
-    c.commit()
-    out = otb_gone_out(notes)  # the trip has a note of its own: the sentence goes as restore_note
-    return jsonify({**_one(c, oid, trip), **({"gone": out["gone"]} if out else {}), **({"restore_note": out["note"]} if "note" in out else {})})
+RK_TRIP_GONE = N_("The trip is in the trash; restore it first")
+
+
+def _rk_item_back(c, oid, row):
+    """2.1005.0 (#5415): after the restore of a receipt: only into a live trip (409) and an open month (#2471, #4555: the
+    trip's days and the receipt's own date, not the trip's other receipts)."""
+    if not c.execute(f"SELECT 1 FROM office_trips WHERE id=? AND org_id=? AND {live_sql()}", (row["trip_id"], oid)).fetchone():
+        raise Denied(409, tr(RK_TRIP_GONE))
+    _trip_need_open(c, oid, _trip(c, oid, row["trip_id"]), row.get("date"), items=False)
+
+
+RK_TRIP_KIND = "otrip"  # 2.1005.0 (#5415): a trip in the core's trash (with its receipts: children)
+RK_ITEM_KIND = "otripitem"  # a travel receipt deleted on its own
+ofk_register(RK_TRIP_KIND, "office_trips", N_("Trip"), "travel", need="own", children=(("office_trip_items", "trip_id"),),
+             view={"kind": "trip", "label": _rk_trip_label, "ctx": _ctx, "back": _rk_trip_back}, step=False)
+ofk_register(RK_ITEM_KIND, "office_trip_items", N_("Travel receipt"), "travel", need="own",
+             view={"kind": "trip_item", "label": _rk_item_label, "ctx": _ctx, "back": _rk_item_back,
+                   # the receipts that went into the trash with their trip are the trip's entry, not entries of their own
+                   "where": f"NOT EXISTS (SELECT 1 FROM office_trips t WHERE t.id=office_trip_items.trip_id AND {trash_sql('t')})"}, step=False)
+# step=False: no step in the person's undo list -- a redo / undo through /api/undo would skip the open-month and DATEV checks
 
 
 # ---------------------------------------------------------------- 2.117.0 A (#2292): own purposes
@@ -932,7 +970,7 @@ def _bill_doc(c, oid, did):
     except (TypeError, ValueError):
         raise BadInput(tr("Invalid value: {0}", "doc_id"))
     write_lock(c, f"office_doc_{did}")  # 2.269.0 A (#3012): the document first (before the billing lock), like its own saves
-    r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
+    r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (did, oid)).fetchone()  # 2.1005.0 (#5415): never into the trash
     if not r or r["kind"] not in ("offer", "invoice"):
         raise Denied(404)
     ofx_need_editable(r)
@@ -955,13 +993,13 @@ def rk_bill_post():
         raise BadInput(tr("Invalid value: {0}", "item_ids"))
     mk = _amount(b.get("markup_pct"), "markup_pct", 0, 1000, allow_none=True) or dec(0)
     rows = c.execute(f"SELECT i.*, t.dest, t.date_from FROM office_trip_items i JOIN office_trips t ON t.id=i.trip_id AND t.org_id=i.org_id "
-                     f"WHERE i.org_id=? AND i.id IN ({','.join('?' * len(ids))}) ORDER BY i.date, i.sort, i.id", [oid] + ids).fetchall()
+                     f"WHERE i.org_id=? AND i.id IN ({','.join('?' * len(ids))}) AND {live_sql('i')} AND {live_sql('t')} ORDER BY i.date, i.sort, i.id", [oid] + ids).fetchall()
     if len(rows) != len(set(ids)):
         raise Denied(404)
     # 2.47.3 (review S1): two parallel billings of the same receipts -> the second sees them billed (409), never twice
     write_lock(c, f"office_trips_bill_{int(oid)}")
     rows = c.execute(f"SELECT i.*, t.dest, t.date_from FROM office_trip_items i JOIN office_trips t ON t.id=i.trip_id AND t.org_id=i.org_id "
-                     f"WHERE i.org_id=? AND i.id IN ({','.join('?' * len(ids))}) ORDER BY i.date, i.sort, i.id", [oid] + ids).fetchall()
+                     f"WHERE i.org_id=? AND i.id IN ({','.join('?' * len(ids))}) AND {live_sql('i')} AND {live_sql('t')} ORDER BY i.date, i.sort, i.id", [oid] + ids).fetchall()
     for x in rows:
         if _billed_ok(c, oid, dict(x)):
             raise Denied(409, tr("A receipt has already been billed"))
@@ -975,7 +1013,8 @@ def rk_bill_post():
         pos = [((rk_cat_label(x["category"], lg) + (": " + x["text"] if x["text"] else ""))[:300],
                 ", ".join(v for v in (x["dest"], _fmt_day(x["date"] or x["date_from"], lg)) if v)[:300], dec(x["amount_home"])) for x in its]
     before = ofx_items_brief(doc_items(c, r["id"], oid))
-    mx = c.execute("SELECT COALESCE(MAX(sort), 0) FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL", (r["id"], oid)).fetchone()[0]
+    mx = c.execute(f"SELECT COALESCE(MAX(sort), 0) FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND {live_sql()}",
+                   (r["id"], oid)).fetchone()[0]  # 2.1005.0 (#5415): as outlays.py
     pids = []
     for i, (title, detail, cost) in enumerate(pos):
         row = {"doc_id": r["id"], "org_id": oid, "sort": (mx or 0) + 1 + i, "kind": "service", "service_id": None, "title": title, "detail": detail,
@@ -1030,8 +1069,8 @@ def rk_unbill_post():
         if not r or r["locked_at"] or not pids:
             continue
         before = ofx_items_brief(doc_items(c, did, oid))
-        n = c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND id IN ({','.join('?' * len(pids))})",
-                      [did, oid] + pids).rowcount
+        n = c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND {live_sql()} AND id IN ({','.join('?' * len(pids))})",
+                      [did, oid] + pids).rowcount  # 2.1005.0 (#5415): a trash row stays with its part (as outlays.py)
         if n:
             removed += n
             ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": ofx_items_brief(doc_items(c, did, oid))})
@@ -1063,7 +1102,7 @@ def rk_bill_docs():
     except ValueError:
         cid = 0
     rows = c.execute("SELECT id, kind, number, project_title, client_id, date, status FROM office_docs WHERE org_id=? AND kind IN ('offer', 'invoice') "
-                     "AND locked_at IS NULL AND status='draft' ORDER BY id DESC LIMIT 200", (oid,)).fetchall()
+                     f"AND locked_at IS NULL AND status='draft' AND {live_sql()} ORDER BY id DESC LIMIT 200", (oid,)).fetchall()  # 2.1005.0 (#5415): not the trash
     out = [dict(r) for r in rows]
     out.sort(key=lambda d: 0 if cid and d["client_id"] == cid else 1)
     return jsonify(docs=out)

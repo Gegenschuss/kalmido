@@ -30,6 +30,7 @@ from flask import jsonify, request
 from ..core.config import app
 from ..core.db import body, bump, insert_id
 from ..core.errors import BadInput, Denied
+from ..core.access import live_sql  # 2.1005.0 (#5415)
 from ..core.i18n import N_, lang, tr
 from ..core.orgcrypt import oc_dec_fields
 from ..accounts.orgroles import org_writes
@@ -92,7 +93,7 @@ OFT_SEC_SQL = {"offers": "kind='offer'", "invoices": "kind<>'offer'"}
 def _docs_sec(sec):
     def docs(c, uid, oid, ids, neg, limit):
         rows = c.execute(f"SELECT id, kind, number, status, date, project_title, trial, locked_at FROM office_docs WHERE org_id=? AND {OFT_SEC_SQL[sec]} "
-                         f"AND {_in('id', ids, neg)} ORDER BY id DESC LIMIT {int(limit)}", (oid,)).fetchall()
+                         f"AND {_in('id', ids, neg)} AND {live_sql()} ORDER BY id DESC LIMIT {int(limit)}", (oid,)).fetchall()  # 2.1005.0 (#5415): not the trash
         return [{"id": r["id"], "kind": r["kind"], "title": f"{tr(OFD_KIND_NAME.get(r['kind'], OFD_KIND_NAME['offer']))} {r['number'] or tr('Draft')}",
                  "sub": r["project_title"] or "", "date": r["date"] or "", "locked": bool(r["locked_at"]), "open": f"office/{sec}/{r['id']}"} for r in rows]
     return docs
@@ -160,7 +161,7 @@ def oft_tree(c, uid, oid, area):
     nodes = c.execute(f"SELECT n.id, n.parent_id, n.ref_id, n.sort_no FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind=? AND n.deleted_at IS NULL "
                       f"AND {sp} AND n.id IN {fs_visible_sql(uid, c)} ORDER BY n.id LIMIT {OFT_FILED_MAX}", (kind,)).fetchall()
     if area in OFT_SEC_SQL and nodes:  # 2.380.0 B (#3409): only the folders holding a document of this area's kinds
-        mine = {r[0] for r in c.execute(f"SELECT id FROM office_docs WHERE org_id=? AND {OFT_SEC_SQL[area]} AND id IN ({_ids(n['ref_id'] for n in nodes)})", (oid,))}
+        mine = {r[0] for r in c.execute(f"SELECT id FROM office_docs WHERE org_id=? AND {OFT_SEC_SQL[area]} AND {live_sql()} AND id IN ({_ids(n['ref_id'] for n in nodes)})", (oid,))}  # 2.1005.0 (#5415): not the trash
         nodes = [n for n in nodes if n["ref_id"] in mine]
     out_par = {}
     for n in nodes:

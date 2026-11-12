@@ -5,10 +5,11 @@ and two locks of the documents space hold. Own container (kt.fresh). Invented pe
 freelancer-matrix: office
 tenant-matrix: office
  - #4315 B13: a finalised quotation that was never sent: deleting it puts a copy into the office trash, restore brings it
-   back with its number, positions and the lock
- - #4315 B17: a trip with receipts and a single travel receipt: deleting puts a copy into the office trash (trash_id), the
-   undo (POST /api/office/trips/trash/<id>/restore) and the office trash bring it back with the old ids; another
-   organisation 404, a member 403, a month locked since: 409 and nothing comes back
+   back with its number, positions and the lock. 2.1005.0 (#5415): it goes back to a draft and into the core's trash (odoc),
+   comes back as a draft with its number where still free; a finalised invoice: 409, never in the trash
+ - #4315 B17: a trip with receipts and a single travel receipt: deleting puts it into the trash, the undo and the office
+   trash bring it back with the old ids; another organisation 404, a member 403 / 404, a month locked since: 409 and
+   nothing comes back. 2.1005.0 (#5415): the core's trash (POST /api/office/trips/<id>/restore, .../items/<id>/restore)
  - #4316 B14: "no receipt" (assignment emptied) of an open receipt in an office: the row goes as before, the lock from its
    arrival stays (doc_meta.kept_until): deleting for good 409, the trash period run leaves the file in the trash
  - #4316 B31: a received business letter (linked to a letter of the office) is kept like a receipt: deleting for good 409,
@@ -16,6 +17,7 @@ tenant-matrix: office
 The same for a person without an organisation (freelancer_fixture: the personal office).
 usage: p2530_c_office_trash_test.py <datadir>"""
 import base64
+import json
 import os
 import subprocess
 from datetime import timedelta, timezone
@@ -97,26 +99,45 @@ def scenario(S, who, ws, other, member=None):
     r = S.post(B + f"{D}/{did}/finalize")
     check(r.ok and r.json().get("locked") is True and r.json().get("number"), f"{who}: finalised {r.text[:200]}")
     num = r.json().get("number")
+    # 2.1005.0 (#5415): it goes back to a draft (as its unlock: lock and frozen files go) and into the core's trash as any draft
+    # (kind odoc, the row stays) - a finalised row never lies in the trash; it comes back as a draft (was: a locked copy)
     r = S.delete(B + f"{D}/{did}")
-    tid = r.json().get("trash_id") if r.ok else None
-    check(r.ok and tid and not sql("SELECT 1 FROM office_docs WHERE id=?", (did,)),
-          f"{who} B13: the finalised quotation goes with a copy in the office trash {r.text[:200]}")
+    tr_ = (r.json().get("trash") or {}) if r.ok else {}
+    row = sql("SELECT deleted_at, locked_at, number FROM office_docs WHERE id=?", (did,))
+    check(r.ok and tr_ == {"kind": "odoc", "id": did} and row and row[0][0] and row[0][1] is None and row[0][2] == "",
+          f"{who} B13: the finalised quotation goes into the core's trash as a draft, its number free {r.text[:200]} {row}")
+    check(S.get(B + f"{D}/{did}").status_code == 404, f"{who}: gone from the office")
     lst = S.get(B + O + "/trash").json()
-    check(any(x["id"] == tid and x["kind"] == "doc" and x["sub"] == "offer" for x in lst["items"]), f"{who}: the office trash lists it {lst}")
-    check(other.post(B + f"{O}/trash/{tid}/restore").status_code in (403, 404), f"{who}: another office cannot restore it")
-    # 2.530.0 (#4315, review K1): its number was given again meanwhile -> 409, never a locked quotation without a number
+    check(any(x["id"] == did and x.get("core") == "odoc" and x["kind"] == "doc" and x["sub"] == "offer" for x in lst["items"]), f"{who}: the office trash lists it {lst}")
+    check(other.post(B + f"{O}/trash/core/odoc/{did}/restore").status_code in (403, 404), f"{who}: another office cannot restore it")
+    # its number was given again meanwhile -> it comes back as a draft without one (a draft has no number to keep)
     d2 = S.post(B + D, json={"kind": "offer", "lang": "en", "project_title": f"Spot {who}", "client_id": cl}).json()["id"]
     sql("UPDATE office_docs SET number=? WHERE id=?", (num, d2))
-    r = S.post(B + f"{O}/trash/{tid}/restore")
-    check(r.status_code == 409 and not sql("SELECT 1 FROM office_docs WHERE id=?", (did,)) and sql("SELECT 1 FROM office_trash WHERE id=?", (tid,)),
-          f"{who} K1: the number is taken: 409, the copy stays {r.status_code} {r.text[:200]}")
-    sql("UPDATE office_docs SET number='' WHERE id=?", (d2,))
-    r = S.post(B + f"{O}/trash/{tid}/restore")
+    r = S.post(B + f"{O}/trash/core/odoc/{did}/restore")
     d = S.get(B + f"{D}/{did}").json()
-    check(r.ok and d.get("number") == num and d.get("locked") is True and [x["title"] for x in d.get("items") or []] == ["Concept"],
-          f"{who} B13: restored with its number, position and lock {r.text[:200]} {d.get('number')} {d.get('locked')}")
+    check(r.ok and not d.get("number") and d.get("locked") is not True and [x["title"] for x in d.get("items") or []] == ["Concept"],
+          f"{who} B13: the number is taken: back as a draft without it, with its position {r.status_code} {r.text[:200]} {d.get('number')}")
+    check(S.delete(B + f"{D}/{did}").ok, f"{who}: into the trash once more")
+    sql("UPDATE office_docs SET number='' WHERE id=?", (d2,))
+    sql("UPDATE office_docs SET trash_refs=? WHERE id=?", (json.dumps({"number": num, "nulls": []}), did))  # its number as when it went
+    r = S.post(B + f"{O}/trash/core/odoc/{did}/restore")
+    d = S.get(B + f"{D}/{did}").json()
+    check(r.ok and d.get("number") == num and d.get("locked") is not True and [x["title"] for x in d.get("items") or []] == ["Concept"],
+          f"{who} B13: restored as a draft with its number and position {r.text[:200]} {d.get('number')} {d.get('locked')}")
+    r = S.post(B + f"{D}/{did}/finalize")
+    check(r.ok and r.json().get("locked") is True and r.json().get("number") == num, f"{who} B13: finalised again with the same number {r.text[:200]}")
+    inv = S.post(B + D, json={"kind": "invoice", "lang": "en", "project_title": f"Rechnung {who}", "client_id": cl, "service_from": PM1,
+                              "service_to": PM2, "items": [{"title": "Edit", "qty": 1, "rate": 100}]}).json()["id"]
+    r = S.post(B + f"{D}/{inv}/finalize")
+    check(r.ok and r.json().get("locked") is True, f"{who}: setup: a finalised invoice {r.status_code} {r.text[:300]}")
+    r = S.delete(B + f"{D}/{inv}")
+    check(r.status_code == 409 and sql("SELECT deleted_at, locked_at IS NOT NULL FROM office_docs WHERE id=?", (inv,)) == [(None, True)],
+          f"{who}: a finalised invoice never goes into the trash (409, stays locked) {r.status_code} {r.text[:200]}")
 
     # ------------------------------------------------------------ #4315 B17: a trip with receipts, a single receipt
+    # 2.1005.0 (#5415): trips and receipts lie in the core's trash (deleted_at, answer trash = {kind, id}); the undo is
+    # POST .../trips/<id>/restore (.../items/<id>/restore), the office trash restores them as core rows
+    live = lambda t, i: sql(f"SELECT 1 FROM {t} WHERE id=? AND deleted_at IS NULL", (i,))  # noqa: E731
     r = S.post(B + T, json={"date_from": PM1, "date_to": PM2, "dest": f"Hamburg {who}", "overnight": True,
                             "items": [{"date": PM1, "category": "train", "amount": "59.90", "currency": "EUR"},
                                       {"date": PM2, "category": "hotel", "amount": "120.00", "currency": "EUR"}]})
@@ -124,25 +145,24 @@ def scenario(S, who, ws, other, member=None):
     trip = r.json()["id"]
     items = sorted(x["id"] for x in r.json()["items"])
     r = S.delete(B + f"{T}/{trip}")
-    tt = r.json().get("trash_id") if r.ok else None
-    check(r.ok and tt and r.json().get("trip", {}).get("id") == trip and not sql("SELECT 1 FROM office_trips WHERE id=?", (trip,)),
-          f"{who} B17: the trip goes with a copy in the office trash {r.text[:200]}")
-    check(any(x["id"] == tt and x["kind"] == "trip" and "Hamburg" in x["label"] for x in S.get(B + O + "/trash").json()["items"]),
+    check(r.ok and r.json().get("trash") == {"kind": "otrip", "id": trip} and r.json().get("trip", {}).get("id") == trip and not live("office_trips", trip),
+          f"{who} B17: the trip goes into the trash {r.text[:200]}")
+    check(any(x["id"] == trip and x.get("core") == "otrip" and x["kind"] == "trip" and "Hamburg" in x["label"] for x in S.get(B + O + "/trash").json()["items"]),
           f"{who}: the office trash lists the trip")
-    check(other.post(B + f"/api/office/trips/trash/{tt}/restore").status_code in (403, 404), f"{who}: another office: the undo 403 / 404")
+    check(other.post(B + f"{T}/{trip}/restore").status_code in (403, 404), f"{who}: another office: the undo 403 / 404")
     if member is not None:
-        check(member.post(B + f"/api/office/trips/trash/{tt}/restore").status_code == 403, f"{who}: a member: the undo 403")
-    r = S.post(B + f"/api/office/trips/trash/{tt}/restore")
+        check(member.post(B + f"{T}/{trip}/restore").status_code in (403, 404), f"{who}: a member: the undo 403 / 404 (not the member's trip)")
+    r = S.post(B + f"{T}/{trip}/restore")
     check(r.ok and r.json().get("id") == trip and sorted(x["id"] for x in r.json().get("items") or []) == items,
           f"{who} B17: the undo brings the trip back with its receipts (same ids) {r.text[:200]}")
-    check(S.post(B + f"/api/office/trips/trash/{tt}/restore").status_code == 404, f"{who}: a second undo 404")
+    r = S.post(B + f"{T}/{trip}/restore")
+    check(r.ok and r.json().get("id") == trip and len(r.json().get("items") or []) == 2, f"{who}: a second undo answers the live trip as it is {r.text[:200]}")
     # a single receipt
     r = S.delete(B + f"{T}/{trip}/items/{items[0]}")
-    ti = r.json().get("trash_id") if r.ok else None
-    check(r.ok and ti and len(r.json()["trip"]["items"]) == 1, f"{who} B17: a receipt goes with a copy {r.text[:200]}")
-    r = S.post(B + f"{O}/trash/{ti}/restore")
+    check(r.ok and r.json().get("trash") == {"kind": "otripitem", "id": items[0]} and len(r.json()["trip"]["items"]) == 1, f"{who} B17: a receipt goes into the trash {r.text[:200]}")
+    r = S.post(B + f"{O}/trash/core/otripitem/{items[0]}/restore")
     check(r.ok and r.json().get("kind") == "trip_item", f"{who}: the office trash restores the receipt {r.text[:200]}")
-    check(sorted(x[0] for x in sql("SELECT id FROM office_trip_items WHERE trip_id=?", (trip,))) == items, f"{who}: both receipts again (same ids)")
+    check(sorted(x[0] for x in sql("SELECT id FROM office_trip_items WHERE trip_id=? AND deleted_at IS NULL", (trip,))) == items, f"{who}: both receipts again (same ids)")
     # 2.603.0 A (#4555): a trip in an open month with a receipt paid ahead in the month that gets locked
     t0 = TODAY.isoformat()
     r = S.post(B + T, json={"date_from": t0, "date_to": t0, "dest": f"Bremen {who}", "overnight": False,
@@ -155,33 +175,31 @@ def scenario(S, who, ws, other, member=None):
                             "items": [{"date": PM1, "category": "train", "amount": "29.90", "currency": "EUR"}]})
     trip3 = r.json()["id"] if r.status_code == 201 else None
     r = S.delete(B + f"{T}/{trip3}")
-    t3 = r.json().get("trash_id") if r.ok else None
-    check(trip3 and t3, f"{who}: setup a whole trip with a receipt ahead in the trash {r.text[:200]}")
+    check(trip3 and r.ok and r.json().get("trash"), f"{who}: setup a whole trip with a receipt ahead in the trash {r.text[:200]}")
     # a month locked since the delete: nothing comes back
     r = S.delete(B + f"{T}/{trip}")
-    tt = r.json().get("trash_id")
+    check(r.ok and r.json().get("trash"), f"{who}: the trip into the trash again {r.text[:200]}")
     m = PM1[:7]
     lock = S.post(B + O + "/periods/lock", json={"through": m, "confirm": f"{m[5:7]}/{m[:4]}"})
     check(lock.ok, f"{who}: setup the month of the trip locked {lock.text[:200]}")
-    r = S.post(B + f"/api/office/trips/trash/{tt}/restore")
-    check(r.status_code == 409 and not sql("SELECT 1 FROM office_trips WHERE id=?", (trip,)) and sql("SELECT 1 FROM office_trash WHERE id=?", (tt,)),
-          f"{who}: a month locked since: the undo 409, the copy stays {r.text[:200]}")
-    r = S.post(B + f"{O}/trash/{tt}/restore")
-    check(r.status_code == 409 and not sql("SELECT 1 FROM office_trips WHERE id=?", (trip,)), f"{who}: the office trash 409 as well {r.text[:200]}")
+    r = S.post(B + f"{T}/{trip}/restore")
+    check(r.status_code == 409 and not live("office_trips", trip) and sql("SELECT 1 FROM office_trips WHERE id=?", (trip,)),
+          f"{who}: a month locked since: the undo 409, it stays in the trash {r.text[:200]}")
+    r = S.post(B + f"{O}/trash/core/otrip/{trip}/restore")
+    check(r.status_code == 409 and not live("office_trips", trip), f"{who}: the office trash 409 as well {r.text[:200]}")
     # 2.603.0 A (#4555): a single receipt in an open month comes back although another receipt of its trip lies in the
     # locked month - over both routes; the whole trip with that receipt stays 409
-    for how, route in (("the undo", "/api/office/trips/trash/{}/restore"), ("the office trash", O + "/trash/{}/restore")):
+    for how, route in (("the undo", T + f"/{trip2}/items/{late}/restore"), ("the office trash", O + f"/trash/core/otripitem/{late}/restore")):
         r = S.delete(B + f"{T}/{trip2}/items/{late}")
-        tl = r.json().get("trash_id") if r.ok else None
-        check(r.ok and tl, f"{who} #4555: the open receipt goes to the trash {r.text[:200]}")
-        r = S.post(B + route.format(tl))
-        check(r.ok and sql("SELECT 1 FROM office_trip_items WHERE id=?", (late,)),
+        check(r.ok and r.json().get("trash"), f"{who} #4555: the open receipt goes to the trash {r.text[:200]}")
+        r = S.post(B + route)
+        check(r.ok and live("office_trip_items", late),
               f"{who} #4555: {how} brings the open receipt back next to a locked one {r.status_code} {r.text[:200]}")
-    check(sorted(x[0] for x in sql("SELECT id FROM office_trip_items WHERE trip_id=?", (trip2,))) == sorted((early, late)),
+    check(sorted(x[0] for x in sql("SELECT id FROM office_trip_items WHERE trip_id=? AND deleted_at IS NULL", (trip2,))) == sorted((early, late)),
           f"{who} #4555: both receipts of the trip there")
-    for how, route in (("the undo", "/api/office/trips/trash/{}/restore"), ("the office trash", O + "/trash/{}/restore")):
-        r = S.post(B + route.format(t3))
-        check(r.status_code == 409 and not sql("SELECT 1 FROM office_trips WHERE id=?", (trip3,)),
+    for how, route in (("the undo", T + f"/{trip3}/restore"), ("the office trash", O + f"/trash/core/otrip/{trip3}/restore")):
+        r = S.post(B + route)
+        check(r.status_code == 409 and not live("office_trips", trip3),
               f"{who} #4555: {how} of a whole trip with a receipt in the locked month stays 409 {r.status_code} {r.text[:200]}")
 
     # ------------------------------------------------------------ #4316 B14: "no receipt" keeps the lock from its arrival

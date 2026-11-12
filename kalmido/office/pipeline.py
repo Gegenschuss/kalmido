@@ -20,7 +20,7 @@ from .owrite import ow_created, ow_history_answer, ow_kind, ow_uid, ow_write  # 
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso_ms, local_now, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, live_sql  # 2.1005.0 (#5415): live_sql
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings, pb_cl_live, pb_cl_sql, pb_owner
@@ -156,7 +156,7 @@ def _offer_state(c, oid, ids):
         return {}
     q = ",".join("?" * len(ids))
     return {r["id"]: (r["number"], r["status"]) for r in c.execute(
-        f"SELECT id, number, status FROM office_docs WHERE org_id=? AND kind='offer' AND id IN ({q})", [oid] + ids)}
+        f"SELECT id, number, status FROM office_docs WHERE org_id=? AND kind='offer' AND {live_sql()} AND id IN ({q})", [oid] + ids)}  # 2.1005.0 (#5415): not the trash
 
 
 def pl2_public(c, oid, r, offers=None, names=None):
@@ -267,7 +267,7 @@ def pl2_offer_status(c, oid, doc_id, status):
     seen, cur = set(), doc_id
     while cur and cur not in seen:
         seen.add(cur)
-        x = c.execute("SELECT replaces_id FROM office_docs WHERE id=? AND org_id=?", (cur, oid)).fetchone()
+        x = c.execute(f"SELECT replaces_id FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (cur, oid)).fetchone()  # 2.1005.0 (#5415): not the trash
         cur = x[0] if x else None
     seen.discard(doc_id)
     if seen:
@@ -327,7 +327,7 @@ def pl2_patch(did):
         if "offer_id" in b:
             v = b.get("offer_id")
             if v is not None and (not isinstance(v, int) or isinstance(v, bool) or not c.execute(
-                    "SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND kind='offer' AND trial=0", (v, oid)).fetchone()):  # 2.144.10 B (#2576)
+                    f"SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND kind='offer' AND trial=0 AND {live_sql()}", (v, oid)).fetchone()):  # 2.144.10 B (#2576); 2.1005.0 (#5415): not the trash
                 raise BadInput(tr("Invalid value: {0}", "offer_id"))
             row["offer_id"] = v
         st["before"] = {k: cur.get(k) for k in row}
@@ -376,7 +376,7 @@ def pl2_make_offer(did):
     c, uid, oid = _ctx()
     ofr_need_area(c, uid, oid, "offers", "edit")  # 2.187.0 (#2476, review): it reads / writes quotations and invoices too
     cur = pl2_public(c, oid, _row(c, oid, did))
-    if cur["offer_id"] and c.execute("SELECT 1 FROM office_docs WHERE id=? AND org_id=?", (cur["offer_id"], oid)).fetchone():
+    if cur["offer_id"] and c.execute(f"SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (cur["offer_id"], oid)).fetchone():  # 2.1005.0 (#5415): not the trash
         raise Denied(409, tr("This deal already has a quotation"))
     b = {"kind": "offer", "project_title": cur["title"]}
     if cur["client_id"] and _client_ok(c, oid, cur["client_id"]):

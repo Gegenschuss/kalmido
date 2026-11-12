@@ -395,5 +395,5 @@ def fd_lang_gaps(c, oid, r, items):
 
 def fd_put_titles(c, oid, did, titles):
     for iid, t in (titles or {}).items():
-        c.execute("UPDATE office_doc_items SET title=? WHERE id=? AND doc_id=? AND org_id=?", (t, iid, did, oid))
+        c.execute(f"UPDATE office_doc_items SET title=? WHERE id=? AND doc_id=? AND org_id=? AND {live_sql()}", (t, iid, did, oid))  # 2.1005.0 (#5415): not the trash
 

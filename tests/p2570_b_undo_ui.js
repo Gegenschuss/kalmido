@@ -5,7 +5,8 @@
 // the API (B), for a member of an organisation and for a person without an organisation (freelancer parity).
 // - a bookmark marked read on its card (the toast's Undo): B adds a note, A presses Undo -> "Changed elsewhere, not
 //   undone", the bookmark stays read, B's note stays; without a change elsewhere the Undo takes it back as before (the
-//   preview fetch leaving the version: p2570_b_undo_test.py)
+//   preview fetch leaving the version: p2570_b_undo_test.py). 2.1005.0 (#5637): the toast takes back exactly its own server
+//   step (POST /api/undo/<group>/undo), never a newer step of the same person on another bookmark with it
 // - a document's due date set through the details (dc_patch, the history step): B renames it, A undoes -> said, the due date
 //   stays; a recognition run after the save is no change: the undo goes through
 const path = require('path');
@@ -44,7 +45,7 @@ async function round(who, ck) {
   const b1 = await call(ck, 'PATCH', `/api/bookmarks/${id}`, {note: 'Note of B'});
   check(b1.http === 200 && b1.note === 'Note of B', `${who}: B added a note`);
   click(w, undoBtn());
-  check(await until(() => /Changed elsewhere, not undone/.test(toastText())), `${who}: the Undo says it was changed elsewhere: ${toastText()}`);
+  check(await until(() => /Changed elsewhere, not undone|Changed by someone else in the meantime/.test(toastText())), `${who}: the Undo says it was changed elsewhere: ${toastText()}`);  // 2.1005.0 (#5637): or the server's conflict text of the single group
   let now = await getB();
   check(now.state === 'read' && now.note === 'Note of B', `${who}: still read, B's note stays ${now.state} ${now.note}`);
   // without a change elsewhere (a preview fetch in between is none): the Undo works as before
@@ -52,8 +53,15 @@ async function round(who, ck) {
   click(w, readBtn());
   check(await until(async () => (await getB()).state === 'unread'), `${who}: A marked it unread`);
   check(await until(() => undoBtn()), `${who}: a toast with Undo again`);
+  // 2.1005.0 (#5637): a newer step of the same person on ANOTHER bookmark (another device) stays when the toast's Undo goes
+  const bm2 = await call(ck, 'POST', '/api/bookmarks', {url: `http://10.1.2.4/${who}`, title: `Second of ${who}`});
+  const id2 = bm2.bookmark?.id, b2 = await call(ck, 'PATCH', `/api/bookmarks/${id2}`, {note: 'Newer of B'});
+  check(b2.http === 200 && b2.note === 'Newer of B', `${who}: B changed a second bookmark after A's step`);
   click(w, undoBtn());
   check(await until(async () => (await getB()).state === 'read'), `${who}: Undo without a change elsewhere takes it back`);
+  check(await until(() => readBtn()?.title === 'Mark unread'), `${who}: the card shows it read again (its button: ${readBtn()?.title})`);
+  const n2 = await call(ck, 'GET', `/api/bookmarks/${id2}`);
+  check(n2.note === 'Newer of B', `${who}: the newer step on the second bookmark stays (#5637: it went back with it) ${n2.note}`);
   now = await getB();
   check(now.note === 'Note of B', `${who}: ... and leaves the note ` + now.note);
   w.close();

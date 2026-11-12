@@ -281,7 +281,8 @@ else:
     lg = [x["action"] for x in q("SELECT action FROM office_doc_log WHERE user_id=? ORDER BY id", (PAG,))]
     check("agent_read" in lg and "agent_write" in lg, f"office: the access log names the agent ({lg})")
     r = A.post(B + f"/api/proposals/{JO}/undo")
-    check(r.ok and not q("SELECT 1 FROM office_docs WHERE id=?", (OFF,)), f"office: undo removes the draft ({r.text[:120]})")
+    # 2.1005.0 (#5415): the draft goes into the core's trash (the row stays with deleted_at)
+    check(r.ok and not q("SELECT 1 FROM office_docs WHERE id=? AND deleted_at IS NULL", (OFF,)), f"office: undo removes the draft ({r.text[:120]})")
     r = A.post(B + f"/api/proposals/{JO}/redo")
     check(r.ok and q("SELECT 1 FROM office_docs WHERE status='draft' AND agent_id=? AND list_id=?", (PAG, r.json().get("list_id"))), "office: redo drafts it again")
     # an accepted quotation becomes a project (with a deal of the pipeline)
@@ -383,7 +384,7 @@ if os.path.exists(os.path.join(N, "..", "kalmido", "office", "agentdocs.py")) or
     check(r.ok and q("SELECT 1 FROM office_docs WHERE id=?", (D3b,)), f"review 3: a changed draft stays ({r.text[:160]})")
     J3c, D3c = offer_apply()
     r = A.post(B + f"/api/proposals/{J3c}/undo")
-    check(r.ok and not q("SELECT 1 FROM office_docs WHERE id=?", (D3c,)), f"review 3: an unchanged draft goes ({r.text[:160]})")
+    check(r.ok and not q("SELECT 1 FROM office_docs WHERE id=? AND deleted_at IS NULL", (D3c,)), f"review 3: an unchanged draft goes ({r.text[:160]})")  # 2.1005.0 (#5415): into the trash
     check(q("SELECT 1 FROM office_doc_log WHERE doc_id=? AND action='delete' AND user_id=?", (D3c, ALICE)), "review 3: the deletion is in the office log")
     A.put(O + "/settings", json={"agents_read": 0})
 

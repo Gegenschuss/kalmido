@@ -18,6 +18,7 @@ from .integrations.docflowhook import dfh_loop  # 2.581.0 (#4803)
 from .events.model import migrate_family_events
 from .core.env import env_bool
 from .office.model import onc_long_report  # 2.312.0 C (#3265)
+from .office.okern import ofk_copies_back  # 2.1005.0 (#5415)
 
 
 # 2.42.0 (#828): `python -m kalmido.admin.orgcrypt_cli ...` loads the package too: no background threads in that process
@@ -31,6 +32,16 @@ try:
     # 2.924.0 (#5069): the one-shot of #4712 (ev_kern_copy) is part of events/evkern.py ev_kern_drop (core/db.init_db START)
     mig_flags_sync(_c)  # 2.102.0 D (#1996): a one-shot of just now (its flag) into kalmido_migrations
     _c.commit()
+    # 2.1005.0 (#5415, one way, every start): the office trash's copies of the kinds on the core's trash back as rows of it
+    # (office/okern.py; here and not in init_db: the office kinds are registered once the app's modules are loaded)
+    try:  # review 2.1005.0 (F1): a copy the step cannot read never stops the app from starting
+        _n = ofk_copies_back(_c)
+        _c.commit()
+        if any(_n.values()):
+            print(f"office trash: copies back into their tables {_n['back']}, left as copies {_n['kept']}", flush=True)
+    except Exception as _e:  # noqa: BLE001
+        _c.rollback()
+        print(f"office trash: copies back FAILED, all stay copies ({type(_e).__name__}: {_e})", flush=True)
 finally:
     _c.close()
 from .admin.worker import wrk_conn_check, wrk_start, WRK_ROLE

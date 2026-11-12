@@ -238,7 +238,12 @@ A.post(B + f"{D}/{DOC}/status", json={"status": "sent"})
 check(A.post(B + f"{D}/{DOC}/parts", json={"title": "late"}).status_code == 409, "sent quotation: no new part (409)")
 check(A.put(B + f"{D}/{DOC}/parts/{P1}/items", json={"items": []}).status_code == 409, "sent quotation: part positions locked (409)")
 r = A.delete(B + f"{D}/{cp['id']}")
-check(r.ok and not dbx("SELECT id FROM office_doc_parts WHERE doc_id=?", (cp["id"],)), "deleting the quotation removes its parts")
+# 2.1005.0 (#5415): a draft goes into the core's trash with its parts attached (gone with it for every reader); they leave
+# the database with the draft (ON DELETE CASCADE) when the trash is emptied
+check(r.ok and A.get(B + f"{D}/{cp['id']}").status_code == 404 and dbx("SELECT deleted_at FROM office_docs WHERE id=?", (cp["id"],))[0][0],
+      "deleting the quotation puts it with its parts into the trash")
+check(A.delete(B + f"/api/office/trash/core/odoc/{cp['id']}").ok and not dbx("SELECT id FROM office_doc_parts WHERE doc_id=?", (cp["id"],)),
+      "deleting it for good removes its parts")
 check(A.post(B + f"{D}/{r.json() and DOC}/parts", json={"kind": "shoot"}).status_code in (400, 409), "shoot part only with the shoot calculation")
 
 print(f"p2470_b_parts_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)

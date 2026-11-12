@@ -1,204 +1,85 @@
-"""2.272.0 E2 (#3038): the office trash -- deleted document drafts and master data (services, texts, contracts, ...).
+"""2.272.0 E2 (#3038): the office trash -- the list and the routes of the office area's trash.
 
-Before the row goes, otb_put stores a raw copy (office_trash.snap): the row, the rows that go with it by ON DELETE CASCADE
-(positions, parts, signoff links, ... -- read from the database's foreign keys, so a new child table is covered) and the
-rows whose reference is emptied by ON DELETE SET NULL (and the time entries the draft billed). Sealed columns stay sealed
-as they are stored. The office lists never see the trash (the row is gone), so numbers, exports and the agent API stay as
-they are. GET /api/office/trash lists the trash of the office area, POST .../<id>/restore writes the copy back with the
-old ids (a number taken since is left empty, a reference emptied since is set again only where it is still empty),
-DELETE .../<id> (the app asks first) deletes one copy for good. After the trash period (ret_days("trash"), at least one day)
-files/trashpurge.py tp_tick calls otb_tick: it counts, and deletes the copies while ret_on("trash") is on.
-Booked / sent documents never come here: they stay locked (legal retention). 2.530.0 C (#4315): also a finalised quotation
-that was never sent (deleting it is allowed, bga_offer_block), trips and travel receipts (kinds trip / trip_item, office/travel.py)."""
-import base64
+2.1005.0 (#5415, stage 4d part E): every kind of the office deletes into the ONE trash of the core (office/okern.py
+ofk_register): GET /api/office/trash lists its rows of the kinds shown there (okern.ofk_trash_items), POST
+/api/office/trash/core/<kind>/<id>/restore and DELETE /api/office/trash/core/<kind>/<id> restore / delete them for good. The
+copies of office_trash (otb_put: a raw copy of the row before it went) were written back into their tables as rows of the
+core's trash (okern.ofk_copies_back, at the start); the routes of the copies of those kinds went. One kind still deletes
+its row with a copy here (no deleted_at, a later stage): the start balance of the cash flow (office/cfstart.py, a table
+keyed by the organisation); a sign-off record whose film / document is gone is on the core's trash since 2.1004.0 (#5494,
+office/signoff.py sig_gone_delete). Only these copies are listed, restored (POST .../<id>/restore, the toast's undo POST .../undo/<kind>/<id>) and deleted for good
+(DELETE .../<id>); files/trashpurge.py tp_tick calls otb_tick after the trash period. The table stays for one more version."""
 import json
-from datetime import timedelta
 
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import IntegrityError, insert_id, system_ctx, table_columns, write_lock
+from ..core.pg import IntegrityError, insert_id, qi, table_columns, table_names, write_lock
 from ..core.i18n import tr
-from ..core.db import bump, iso, iso_ms, now_utc, parse_iso
+from ..core.db import bump, iso_ms, now_utc
 from ..core.access import Denied
 from ..core.retention import ret_days
 from .ledger import ofx_log
 from .model import office_ctx, office_role
 from .rights import ofr_admin_or, ofr_group_restored
-from .eqcare import eqc_sync
 from .okern import OFK, ofk_restore, ofk_trash_items  # 2.905.0 (#5414): the kinds that moved onto the core's trash
+from .okern import ofk_view_may  # 2.1005.0 (#5415)
 from .okern import ofk_office_of  # 2.1004.0 (#5494)
 from ..core.objects import obj_row
 from ..core.writes import obj_purge, obj_purge_after  # 2.993.0 (#5413): + obj_purge_after
+from ..core.writes import _unval, _val  # 2.1005.0 (#5415): the bytes of a copy, as the core's undo copies
 from ..core.serializers import unlink_files  # 2.993.0 (#5413)
 
-OTB_REFS = {}  # table -> [(child table, column, 'c' cascade | 'n' set null)]
-OTB_DEPTH = 3
+OTB_KINDS = ("cf_start",)  # 2.1005.0 (#5415): the kind still deleted with a copy here (module docstring; signoff on the core since #5494)
 
 
-def otb_refs(c, table):
-    """The single-column foreign keys pointing at table (cached per process)."""
-    if table not in OTB_REFS:
-        OTB_REFS[table] = [(r[0], r[1], r[2]) for r in c.execute(
-            "SELECT cl.relname, a.attname, co.confdeltype FROM pg_constraint co JOIN pg_class cl ON cl.oid=co.conrelid "  # pg-ok: catalog oid (Postgres only)
-            "JOIN pg_attribute a ON a.attrelid=co.conrelid AND a.attnum=co.conkey[1] WHERE co.contype='f' "
-            "AND co.confrelid=CAST(? AS regclass) AND array_length(co.conkey, 1)=1 ORDER BY cl.relname, a.attname", (table,))
-            if r[2] in ("c", "n")]
-    return OTB_REFS[table]
-
-
-def _val(v):
-    if isinstance(v, (bytes, bytearray, memoryview)):
-        return {"$b": base64.b64encode(bytes(v)).decode()}
-    return v
-
-
-def _unval(v):
-    return base64.b64decode(v["$b"]) if isinstance(v, dict) and "$b" in v else v
-
-
-def otb_snap(c, table, ids, out=None, depth=0):
-    """{"rows": [[table, [rows]]] parents first, "nulls": [[table, column, value, [row ids]]]}"""
-    out = out or {"rows": [], "nulls": []}
-    rows = c.execute(f"SELECT * FROM {table} WHERE id = ANY(CAST(? AS BIGINT[])) ORDER BY id", (list(ids),)).fetchall()
-    if not rows:
-        return out
-    out["rows"].append([table, [{k: _val(r[k]) for k in r.keys()} for r in rows]])
-    for child, col, kind in otb_refs(c, table):
-        if "id" not in table_columns(c, child):  # 2.530.0 C (#4315): a link table without an id (life_trip_costs -> office_trips)
-            continue  # cannot be pointed at by id: its reference stays emptied after a restore
-        for pid in [r["id"] for r in rows]:
-            got = [x[0] for x in c.execute(f"SELECT id FROM {child} WHERE {col}=?", (pid,)).fetchall()]
-            if not got:
-                continue
-            if kind == "n":
-                if not (child == table and set(got) <= set(ids)):
-                    out["nulls"].append([child, col, pid, got])
-            elif depth < OTB_DEPTH:
-                otb_snap(c, child, got, out, depth + 1)
-    return out
-
-
-def otb_put(c, oid, uid, kind, table, rid, label, sub="", extra_nulls=(), key="id", more=()):
-    """Stores the copy of row rid of table (call it BEFORE the DELETE, in the same transaction). -> the trash id
-    2.567.0 (#4707): rid a list = ONE entry for several rows (an import taken back, a letter's links: one restore brings them
-    all back, ref_id = the first); key = the column naming the row of a table without an id (office_cf_start: org_id; the
-    rows pointing at such a table are not copied - it has none). 2.747.0 (#5246): more = [(table, ids)] of rows that go with it
-    without a foreign key (a quotation part's positions), copied after it and brought back with it."""
-    ids = list(rid) if isinstance(rid, (list, tuple)) else [rid]
-    if key == "id":
-        snap = otb_snap(c, table, ids)
-    else:
-        rows = c.execute(f"SELECT * FROM {table} WHERE {key}=?", (ids[0],)).fetchall()
-        snap = {"rows": [[table, [{k: _val(r[k]) for k in r.keys()} for r in rows]]] if rows else [], "nulls": [], "key": key}
-    for t, more_ids in more:  # 2.747.0 (#5246)
-        if more_ids:
-            otb_snap(c, t, more_ids, snap)
-    snap["nulls"] += [list(x) for x in extra_nulls]
+def otb_put(c, oid, uid, kind, table, rid, label, key="id"):
+    """Stores the copy of row rid of table (call it BEFORE the DELETE, in the same transaction). -> the trash id. key = the
+    column naming the row (office_cf_start: org_id). 2.1005.0 (#5415): only the row itself (the kind of OTB_KINDS has no
+    rows that go with it)."""
+    if kind not in OTB_KINDS:
+        raise ValueError(f"otb_put: {kind} is on the core's trash (office/okern.py)")
+    cols = table_columns(c, table)
+    rows = c.execute(f"SELECT * FROM {qi(table, table_names(c))} WHERE {qi(key, cols)}=?", (rid,)).fetchall()
+    snap = {"rows": [[table, [{k: _val(r[k]) for k in r.keys()} for r in rows]]] if rows else [], "nulls": [], "key": key}
     tid = insert_id(c, "INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?)",
-                     (oid, kind, sub or "", ids[0], (label or "")[:300], json.dumps(snap, default=str), uid, iso_ms(now_utc())))
+                     (oid, kind, "", rid, (label or "")[:300], json.dumps(snap, default=str), uid, iso_ms(now_utc())))
     if has_request_context():
         g.otb_id = tid  # the route's answer names it (trash_id: the app's Undo)
     return tid
 
 
-def dvb_otb_draft(c, oid, uid, did):
-    """2.533.0 A2 (#4318 B20): the office trash copy of draft did before an undo deletes it (a table's offer step, an agent's
-    proposal taken back), labelled as docs.odoc_delete does, with the time entries it billed. None when the row is gone."""
-    r = c.execute("SELECT id, kind, number, project_title, client_id FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
-    if not r:
-        return None
-    te = [x[0] for x in c.execute("SELECT id FROM time_entries WHERE billed_doc_id=?", (did,)).fetchall()]
-    cl = c.execute("SELECT name FROM clients WHERE id=?", (r["client_id"],)).fetchone() if r["client_id"] else None
-    return otb_put(c, oid, uid, "doc", "office_docs", did, " · ".join(x for x in (r["project_title"] or r["number"], cl and cl["name"]) if x),
-                   sub=r["kind"], extra_nulls=[("time_entries", "billed_doc_id", did, te)] if te else ())
-
-
-OTB_CHECK = {}  # 2.552.0 (#4561 B21): kind -> check(c, oid, ref) after a restore from the office trash (409 / 404 rolls it back);
-# set by the module of the kind (office/cardlines.py), which imports this one - no import back
-OTB_OUT = {}  # table -> [(column, referenced table, referenced column)]: its single-column ON DELETE SET NULL references
-OTB_MANY = {}  # 2.567.0 (#4707): kind -> check(c, oid, ids) after a restore, with the ids of every row the entry brought back
-# (an entry of several rows, otb_put with a list); set by the module of the kind like OTB_CHECK
 OTB_UNDO = {}  # 2.567.0 (#4707): kind -> the context of its module () -> (c, uid, oid): the rights of deleting it, for the
-# toast's undo (otb_undo_route); set by the module of the kind (cashflow, cfstart, letterlinks, fixedimport, vmaimport)
+# toast's undo (otb_undo_route); set by the module of the kind (cfstart)
 
 
-def otb_dangling(c, table, row):
-    """2.552.0 (#4561 B19): the columns of row whose ON DELETE SET NULL reference points at a row gone for good since (a client
-    purged after the draft went to the trash). Emptying them is what the database had done had the row still been there."""
-    if table not in OTB_OUT:
-        OTB_OUT[table] = [(r[0], r[1], r[2]) for r in c.execute(
-            "SELECT a.attname, cl.relname, fa.attname FROM pg_constraint co JOIN pg_class cl ON cl.oid=co.confrelid "  # pg-ok: catalog oid (Postgres only)
-            "JOIN pg_attribute a ON a.attrelid=co.conrelid AND a.attnum=co.conkey[1] "
-            "JOIN pg_attribute fa ON fa.attrelid=co.confrelid AND fa.attnum=co.confkey[1] WHERE co.contype='f' "
-            "AND co.conrelid=CAST(? AS regclass) AND array_length(co.conkey, 1)=1 AND co.confdeltype='n' ORDER BY a.attname", (table,)).fetchall()]
-    # 2.552.0 (#4561, review F2): whether the row is there at all, like the database's own check (row-level security
-    # would hide a row of another organisation that is still there and must not be emptied); only yes / no leaves the block
-    with system_ctx(c):
-        return [col for col, ref, rcol in OTB_OUT[table]
-                if row.get(col) is not None and not c.execute(f"SELECT 1 FROM {ref} WHERE {rcol}=?", (row[col],)).fetchone()]
-
-
-def _insert(c, table, row):
-    if table == "office_docs":  # 2.370.2 (#3088): the same request may have made a new document meanwhile (ofi_ref_doc)
-        row = {**row, "client_ref": None}
-    c.execute(f"INSERT INTO {table}({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
-
-
-def otb_restore(c, oid, tid, notes=None):
-    """Writes trash copy tid of office area oid back (the caller checked the rights and commits). -> (kind, ref_id); notes (a
-    dict) gets "gone": [columns emptied because what they named is gone for good] (2.552.0, #4561 B19)."""
-    r = c.execute("SELECT * FROM office_trash WHERE id=? AND org_id=? FOR UPDATE", (tid, oid)).fetchone()
+def otb_restore(c, oid, tid):
+    """Writes trash copy tid of office area oid back (the caller checked the rights and commits). -> (kind, ref_id)"""
+    r = c.execute("SELECT * FROM office_trash WHERE id=? AND org_id=? AND kind = ANY(CAST(? AS TEXT[])) FOR UPDATE", (tid, oid, list(OTB_KINDS))).fetchone()
     if not r:
         raise Denied(404)
     snap = json.loads(r["snap"] or "{}")
-    key = snap.get("key") or "id"  # 2.567.0 (#4707): a table without an id (otb_put key=)
-    for n, (table, rows) in enumerate(snap.get("rows") or []):
+    key = snap.get("key") or "id"  # 2.567.0 (#4707): a table without an id
+    names = table_names(c)
+    for table, rows in (snap.get("rows") or [])[:1]:
         cols = table_columns(c, table)
         for raw in rows:
             row = {k: _unval(v) for k, v in raw.items() if k in cols}
-            if n == 0:  # the object itself: it must come back whole
-                if c.execute(f"SELECT 1 FROM {table} WHERE {key}=?", (row[key],)).fetchone():
-                    raise Denied(409, tr("Already restored") if key == "id" else tr("Set again meanwhile: the earlier value was not restored."))
-                if table == "office_docs":
-                    if row.get("number") and c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=?", (oid, row["number"])).fetchone():
-                        if row.get("locked_at"):  # 2.530.0 (#4315, review K1): a finalised document never comes back without its number
-                            raise Denied(409, tr("The number {0} is already used", row["number"]))
-                        row["number"] = ""  # taken since: the draft comes back without one
-                    if row.get("series_id") and c.execute("SELECT 1 FROM office_docs WHERE series_id=? AND series_period IS NOT DISTINCT FROM ?",
-                                                          (row["series_id"], row.get("series_period"))).fetchone():
-                        row["series_id"] = None  # the series made this period again meanwhile
-                if "updated_at" in cols:
-                    row["updated_at"] = iso(now_utc())
-                gone = otb_dangling(c, table, row)  # 2.552.0 (#4561 B19): a client gone for good since: back without it, the answer says so
-                if gone and table == "office_docs" and row.get("locked_at"):  # 2.552.0 (#4561, review F1): a finalised document never comes back changed
-                    raise Denied(409, tr("This cannot be restored: something it refers to (a client, a service) is gone meanwhile."))
-                for col in gone:
-                    row[col] = None
-                if notes is not None and gone:
-                    notes["gone"] = gone
-                try:  # 2.272.0 F (#3038, review E2-M2): something else it needs is gone for good since: 409, not 500
-                    with c.savepoint():
-                        _insert(c, table, row)
-                except IntegrityError:
-                    raise Denied(409, tr("This cannot be restored: something it refers to (a client, a service) is gone meanwhile.")) from None
-                continue
-            try:  # a row that cannot come back (its other parent is gone, a duplicate) is left out
+            if c.execute(f"SELECT 1 FROM {qi(table, names)} WHERE {qi(key, cols)}=?", (row[key],)).fetchone():
+                raise Denied(409, tr("Already restored") if key == "id" else tr("Set again meanwhile: the earlier value was not restored."))
+            try:  # 2.272.0 F (#3038, review E2-M2): something else it needs is gone for good since: 409, not 500
                 with c.savepoint():
-                    _insert(c, table, row)
-            except Exception:  # noqa: BLE001  (any refusal of the database: the row stays out, the rest comes back)
-                continue
-    for table, col, value, ids in snap.get("nulls") or []:
-        if col in table_columns(c, table):
-            c.execute(f"UPDATE {table} SET {col}=? WHERE id = ANY(CAST(? AS BIGINT[])) AND {col} IS NULL", (value, list(ids)))
+                    c.execute(f"INSERT INTO {qi(table, names)}({','.join(qi(k, cols) for k in row)}) VALUES({','.join('?' * len(row))})",
+                              list(row.values()))
+            except IntegrityError:
+                raise Denied(409, tr("This cannot be restored: something it refers to (a client, a service) is gone meanwhile.")) from None
     c.execute("DELETE FROM office_trash WHERE id=?", (tid,))
-    if notes is not None and snap.get("rows"):  # 2.567.0 (#4707): every row of the entry (OTB_MANY, the undo's answer)
-        notes["ids"] = [x.get(key) for x in snap["rows"][0][1]]
     return r["kind"], r["ref_id"]
 
 
 def otb_tick(c, cut, purge):
-    """Copies in the trash since before cut (the caller runs it in the system context): counted, deleted while purge is on."""
+    """Copies in the trash since before cut (the caller runs it in the system context): counted, deleted while purge is on.
+    2.1005.0 (#5415): also a copy okern.ofk_copies_back left (its row is there again): never listed, it goes after its period."""
     if purge:
         return c.execute("DELETE FROM office_trash WHERE deleted_at<?", (cut,)).rowcount
     return c.execute("SELECT COUNT(*) FROM office_trash WHERE deleted_at<?", (cut,)).fetchone()[0]
@@ -211,77 +92,44 @@ def _ctx_admin():
     return c, uid, oid
 
 
-def _need_kind(c, uid, oid, tid):
-    """Master data (services, texts, contracts, ...) only for the office admin, as deleting them."""
-    r = c.execute("SELECT kind FROM office_trash WHERE id=? AND org_id=?", (tid, oid)).fetchone()
-    if not r:
-        raise Denied(404)
-    if r["kind"] not in ("doc", "part") and office_role(c, uid, oid) != "admin":  # 2.747.0 (#5246): a quotation's part as its document
+def _need_admin(c, uid, oid):
+    """The copies (a start balance) only for the office admin, as deleting it."""
+    if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this workspace can do this"))
 
 
 @app.get("/api/office/trash")
 def otb_list():
-    """The trash of the office area (admins / people who may manage documents): newest first, without the copies."""
+    """The trash of the office area (admins / people who may manage documents): newest first."""
     c, uid, oid = _ctx_admin()
-    rows = c.execute("SELECT id, kind, sub, ref_id, label, deleted_by, deleted_at FROM office_trash WHERE org_id=? "
-                     "ORDER BY deleted_at DESC, id DESC LIMIT 500", (oid,)).fetchall()
-    # 2.905.0 (#5414): + the rows of the kinds on the core's trash (office/okern.py view=), marked core = their kind
-    # 2.993.0 (#5413, fable F1): the core's rows only for the office admin - restoring / deleting them is the admin's alone
-    # (otb_core_restore / otb_core_delete), and their labels (an entertainment receipt's place and occasion, a contract's
-    # name) are not for a person who may only manage documents
-    items = [dict(r) for r in rows] + (ofk_trash_items(c, oid) if office_role(c, uid, oid) == "admin" else [])
+    # 2.905.0 (#5414): the rows of the kinds on the core's trash (office/okern.py view=), marked core = their kind; per kind
+    # (ofk_view_may, 2.1005.0): the admin, a document draft also who may manage documents. The copies (OTB_KINDS) for the admin.
+    rows = c.execute("SELECT id, kind, sub, ref_id, label, deleted_by, deleted_at FROM office_trash WHERE org_id=? AND kind = ANY(CAST(? AS TEXT[])) "
+                     "ORDER BY deleted_at DESC, id DESC LIMIT 500", (oid, list(OTB_KINDS))).fetchall() if office_role(c, uid, oid) == "admin" else []
+    items = [dict(r) for r in rows] + ofk_trash_items(c, oid, uid)
     items.sort(key=lambda x: (str(x["deleted_at"] or ""), x["id"]), reverse=True)
     return jsonify(items=items[:500], days=max(1, ret_days("trash")))
 
 
 @app.post("/api/office/trash/<int:tid>/restore")
 def otb_restore_route(tid):
+    """A copy (OTB_KINDS) back; any other id 404 (2.1005.0, #5415: the other kinds restore through .../core/<kind>/<id>)."""
     c, uid, oid = _ctx_admin()
     write_lock(c, f"office_trash_{int(tid)}")
-    _need_kind(c, uid, oid, tid)
-    t0 = c.execute("SELECT deleted_at FROM office_trash WHERE id=? AND org_id=?", (tid, oid)).fetchone()
-    notes = {}
-    kind, ref = otb_restore(c, oid, tid, notes)
-    if kind == "equipment":  # 2.558.0 C (#4591): a restored device starts its warranty / maintenance tasks again
-        eqc_sync(c, oid, ref, revive=True)
-    if kind in ("trip", "trip_item"):  # 2.530.0 C (#4315, B17): a trip / travel receipt only into open months
-        from .travel import rk_trash_check
-        rk_trash_check(c, oid, kind, ref)
-    if kind in OTB_CHECK:  # 2.552.0 (#4561 B21): e.g. a credit card position only into its statement while that is a draft
-        OTB_CHECK[kind](c, oid, ref)
-    if kind in OTB_MANY:  # 2.567.0 (#4707): e.g. imported trips only into open months
-        OTB_MANY[kind](c, oid, notes.get("ids") or [ref])
-    if kind == "rgroup":  # 2.866.0 (#5302 F5): the rights log names the restore as it named the delete
-        ofr_group_restored(c, oid, uid, int(ref))
-    if kind == "contracts" and t0:  # 2.272.0 F (#3038, review E2-M3): its PDF files that went with it come back too
-        since = parse_iso(t0["deleted_at"]) - timedelta(seconds=2)
-        for f in c.execute("SELECT id, deleted_at FROM office_contract_files WHERE org_id=? AND contract_id=? AND deleted_at IS NOT NULL",
-                           (oid, int(ref))).fetchall():
-            if parse_iso(f["deleted_at"]) >= since:
-                c.execute("UPDATE office_contract_files SET deleted_at=NULL WHERE id=?", (f["id"],))
-    ofx_log(c, oid, "restore", **({"doc_id": ref} if kind == "doc" else {"target": kind}), detail={"id": ref})
+    _need_admin(c, uid, oid)
+    kind, ref = otb_restore(c, oid, tid)
+    ofx_log(c, oid, "restore", target=kind, detail={"id": ref})
     bump(c)
     c.commit()
-    part = c.execute("SELECT doc_id FROM office_doc_parts WHERE id=?", (ref,)).fetchone() if kind == "part" else None  # 2.747.0 (#5246)
-    return jsonify(ok=True, kind=kind, id=ref, **({"doc_id": part[0]} if part else {}), **otb_gone_out(notes))
-
-
-def otb_gone_out(notes):
-    """2.560.0 (#4667): what otb_restore's notes add to a restore answer: {gone, note} - the general trash and the undo of the
-    areas (cards, trips) say the same sentence."""
-    out = {"gone": notes["gone"]} if notes.get("gone") else {}
-    if "client_id" in out.get("gone", ()):  # 2.552.0 (#4561 B19): the app shows this sentence
-        out["note"] = tr("Restored without a client: the client was deleted permanently meanwhile.")
-    return out
+    return jsonify(ok=True, kind=kind, id=ref)
 
 
 @app.delete("/api/office/trash/<int:tid>")
 def otb_delete_route(tid):
     """Deletes one copy for good (the app asks first)."""
     c, uid, oid = _ctx_admin()
-    _need_kind(c, uid, oid, tid)
-    n = c.execute("DELETE FROM office_trash WHERE id=? AND org_id=?", (tid, oid)).rowcount
+    _need_admin(c, uid, oid)
+    n = c.execute("DELETE FROM office_trash WHERE id=? AND org_id=? AND kind = ANY(CAST(? AS TEXT[]))", (tid, oid, list(OTB_KINDS))).rowcount
     if not n:
         raise Denied(404)
     bump(c)
@@ -312,18 +160,22 @@ def otb_core_restore(kind, rid):
     c, uid, oid = k["view"]["ctx"]() if undo else _ctx_admin()
     write_lock(c, f"office_trash_core_{kind}_{int(rid)}")
     k, row = _core_kind(c, uid, oid, kind, rid)
+    for name in k["view"]["lock"](oid, row) if k["view"].get("lock") else ():  # 2.1005.0 (#5415, fable): the area's own locks of
+        write_lock(c, name)  # the kind, as its own routes take them (a draft's number, a part's quotation, a statement's positions)
     own = undo and row.get("deleted_by") == uid
-    if not own and office_role(c, uid, oid) != "admin":
+    if not own and not ofk_view_may(c, uid, oid, kind):  # 2.1005.0 (#5415): the admin, or who the kind's view names (a draft)
         raise Denied(403, tr("Only an admin of this workspace can do this"))
     ofk_restore(c, uid, kind, rid, undo=own)
-    if k["view"].get("back"):
-        k["view"]["back"](c, oid, row)
+    extra = k["view"]["back"](c, oid, row) if k["view"].get("back") else None  # 2.1005.0 (#5415): back may add to the answer
     if kind == "orgroup":  # 2.997.0 (#5708): since 2.905.0 a rights group comes back here, not via otb_restore_route's "rgroup" branch -- the rights log names the restore again (#5302 F5)
         ofr_group_restored(c, oid, uid, int(rid))
     ui = k["view"]["kind"](row) if callable(k["view"]["kind"]) else k["view"]["kind"]
-    ofx_log(c, oid, "restore", target=ui, detail={"id": rid})
+    if ui == "doc":  # 2.1005.0 (#5415): the office log names a document's restore by its doc_id, as with the copies
+        ofx_log(c, oid, "restore", doc_id=rid, detail={"id": rid})
+    else:
+        ofx_log(c, oid, "restore", target=ui, detail={"id": rid})
     c.commit()
-    return jsonify(ok=True, kind=ui, id=rid, ids=[rid])
+    return jsonify(ok=True, kind=ui, id=rid, ids=[rid], **(extra or {}))
 
 
 @app.delete("/api/office/trash/core/<kind>/<int:rid>")
@@ -331,7 +183,7 @@ def otb_core_delete(kind, rid):
     """2.905.0 (#5414): deletes such a row for good (the app asks first): the core's purge (core/writes.py obj_purge)."""
     c, uid, oid = _ctx_admin()
     _core_kind(c, uid, oid, kind, rid)
-    if office_role(c, uid, oid) != "admin":
+    if not ofk_view_may(c, uid, oid, kind):  # 2.1005.0 (#5415): the admin, or who the kind's view names (a draft)
         raise Denied(403, tr("Only an admin of this workspace can do this"))
     with obj_purge_after() as box:  # 2.993.0 (#5413): the kind's stored files (obj_on_purge) after the commit; a receipt kept by law = 409
         obj_purge(c, uid, kind, rid)
@@ -342,10 +194,9 @@ def otb_core_delete(kind, rid):
 
 @app.post("/api/office/trash/undo/<kind>/<int:tid>")
 def otb_undo_route(kind, tid):
-    """2.567.0 (#4707): the toast's undo of a delete in an office module (fixed costs, the start balance and corrections of the
-    cash flow, a letter's links, an import taken back): the module's own rights (OTB_UNDO), then the person who deleted it or
-    an office admin (like the undo of trips); writes the trash copy back as the restore of the trash does (the same checks).
-    -> {ok, kind, id, ids (every row back), gone?, note?}"""
+    """2.567.0 (#4707): the toast's undo of a delete in an office module (2.1005.0, #5415: the start balance of the cash flow;
+    the other kinds take a delete back through the core): the module's own rights (OTB_UNDO), then the person who deleted it
+    or an office admin; writes the trash copy back as the restore of the trash does. -> {ok, kind, id, ids}"""
     if kind not in OTB_UNDO:
         raise Denied(404)
     c, uid, oid = OTB_UNDO[kind]()
@@ -355,13 +206,8 @@ def otb_undo_route(kind, tid):
         raise Denied(404)
     if t["deleted_by"] != uid and office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this workspace can do this"))
-    notes = {}
-    kind, ref = otb_restore(c, oid, tid, notes)
-    if kind in OTB_CHECK:
-        OTB_CHECK[kind](c, oid, ref)
-    if kind in OTB_MANY:
-        OTB_MANY[kind](c, oid, notes.get("ids") or [ref])
+    kind, ref = otb_restore(c, oid, tid)
     ofx_log(c, oid, "restore", target=kind, detail={"id": ref})
     bump(c)
     c.commit()
-    return jsonify(ok=True, kind=kind, id=ref, ids=notes.get("ids") or [ref], **otb_gone_out(notes))
+    return jsonify(ok=True, kind=kind, id=ref, ids=[ref])

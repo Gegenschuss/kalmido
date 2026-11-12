@@ -13,7 +13,7 @@ import contextvars
 import re
 from datetime import date
 
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.db import now_utc
 from ..core.i18n import N_, short_day, tr
 from ..core.retention import RET_HELD_ANY, ret_held, ret_held_text, ret_keep_years, ret_need_unheld, ret_person_office
@@ -62,7 +62,7 @@ def olk_trip_item_reason(c, oid, r):
     if r["datev"]:
         return tr(OLK_DATEV)
     if r["billed_doc_id"]:
-        d = c.execute("SELECT locked_at, status FROM office_docs WHERE id=? AND org_id=?", (r["billed_doc_id"], oid)).fetchone()
+        d = c.execute(f"SELECT locked_at, status FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (r["billed_doc_id"], oid)).fetchone()
         if d and (d["locked_at"] or d["status"] == "sent"):
             return tr(OLK_BILLED)
     return None

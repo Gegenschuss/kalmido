@@ -188,7 +188,9 @@ def run(S, who):
     off2 = doc("offer")
     r = S.delete(B + f"{D}/{off2}")
     ok(r.ok, "#4598: a finalised never-sent quotation is deleted " + r.text[:200])
-    ok(row(off2, "id") is None, "#4598: ... gone")
+    # 2.1005.0 (#5415): it goes back to a draft and lies in the core's trash (the row stays with deleted_at, no lock)
+    ok((row(off2, "deleted_at, locked_at") or {}).get("deleted_at") and not row(off2, "locked_at")["locked_at"],
+       "#4598: ... in the trash as a draft")
     r = S.delete(B + f"{D}/{tri}")
     ok(r.ok, "#4598: a finalised trial invoice is deleted " + r.text[:200])
     ok(row(tri, "id") is None, "#4598: ... gone")

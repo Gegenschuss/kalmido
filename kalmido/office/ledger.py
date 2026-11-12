@@ -513,21 +513,31 @@ def ofx_unlock_post(did):
         why = bga_offer_block(c, oid, r)
         if why:
             raise Denied(409, tr(why))
-        # 2.296.0 F (#3177): the frozen files and their checksums go too (only a quotation in draft gets here, never an invoice)
-        with ofx_release(c):  # 2.542.0 (#4598): the one way a finalised row goes back (a quotation, checked above)
-            c.execute("UPDATE office_docs SET locked_at=NULL, locked_by=NULL, sender=NULL, recipient_snapshot=NULL, tax_snapshot=NULL, "
-                      "pdf_sha256='', xml_sha256='', updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), did, oid))
-        ofx_log(c, oid, "unlock", doc_id=did, detail={"number": r["number"]})
+        paths = ofx_unlock(c, oid, r)
         bump(c)
         c.commit()
-        for ext in ("pdf", "xml"):
-            p = _stored(oid, r, ext)
-            try:
-                if p:
-                    os.unlink(p)
-            except OSError:
-                pass
+        ofx_unlink(paths)
     return jsonify(doc_public(c, oid, doc_row(c, oid, did), True))
+
+
+def ofx_unlock(c, oid, r):
+    """Finalised quotation r back to a draft (the caller checked bga_offer_block, holds the locks and commits) -> the paths of
+    its frozen files, to remove after the commit (ofx_unlink). 2.1005.0 (#5415): also the delete of such a quotation
+    (office/docs.py odoc_delete: a draft then, into the core's trash)."""
+    # 2.296.0 F (#3177): the frozen files and their checksums go too (only a quotation in draft gets here, never an invoice)
+    with ofx_release(c):  # 2.542.0 (#4598): the one way a finalised row goes back (a quotation, checked above)
+        c.execute("UPDATE office_docs SET locked_at=NULL, locked_by=NULL, sender=NULL, recipient_snapshot=NULL, tax_snapshot=NULL, "
+                  "pdf_sha256='', xml_sha256='', updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), r["id"], oid))
+    ofx_log(c, oid, "unlock", doc_id=r["id"], detail={"number": r["number"]})
+    return [p for p in (_stored(oid, r, ext) for ext in ("pdf", "xml")) if p]
+
+
+def ofx_unlink(paths):
+    for p in paths:
+        try:
+            os.unlink(p)
+        except OSError:
+            pass
 
 
 @app.get("/api/office/docs/<int:did>/log")

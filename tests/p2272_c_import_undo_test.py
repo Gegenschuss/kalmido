@@ -178,7 +178,7 @@ check(Fr.post(B + f"{T}/{TIDS[0]}/items", json={"date": "2025-07-01", "category"
       "a receipt added to an imported trip")
 r = Fr.post(B + T + "/delete", json={"ids": TIDS})
 check(r.ok and r.json()["deleted"] == 1 and r.json()["kept"] == [TIDS[0]] and dbx("SELECT 1 FROM office_trips WHERE id=?", (TIDS[0],))
-      and not dbx("SELECT 1 FROM office_trips WHERE id=?", (TIDS[1],)), f"trips undo: the trip with the later receipt stays {r.text[:200]}")
+      and not dbx("SELECT 1 FROM office_trips WHERE id=? AND deleted_at IS NULL", (TIDS[1],)), f"trips undo: the trip with the later receipt stays {r.text[:200]}")  # 2.1005.0 (#5415): the other one is in the trash
 F = "/api/office/fixed-costs"
 r = Fr.post(B + F + "/import", json={"items": [{"label": "Miete", "amount": "500.00", "repeat": "monthly", "start": "2025-01-01"},
                                                 {"label": "Strom", "amount": "60.00", "repeat": "monthly", "start": "2025-01-01"}]})

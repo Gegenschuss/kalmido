@@ -18306,5 +18306,8 @@
   "Running": "Läuft",
   "Budget category {0}": "Budget-Kategorie {0}",
   "Budget template": "Budget-Vorlage",
-  "All messages": "Alle Nachrichten"
+  "All messages": "Alle Nachrichten",
+  "Travel receipt": "Reisebeleg",
+  "Card position": "Kartenposition",
+  "The trip is in the trash; restore it first": "Die Reise liegt im Papierkorb; stelle sie zuerst wieder her"
 }

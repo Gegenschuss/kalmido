@@ -16,8 +16,8 @@ tenant-matrix: office
    row back and the import run counts as not undone again
    2.905.0 (#5414): a fixed cost and the rows of an import taken back lie in the core's trash (kind ofixed, deleted_at): the
    toast's undo is POST /api/office/trash/core/ofixed/<id>/restore?undo=1, the office trash lists each row (core = ofixed)
- - an import of trips taken back (POST .../trips/delete): one entry, the undo brings the trips back; a month locked since:
-   409 and nothing comes back
+ - an import of trips taken back (POST .../trips/delete): 2.1005.0 (#5415) each trip in the core's trash (kind otrip), the
+   office trash brings them back unchanged (the run not undone again); a month locked since: 409 and nothing comes back
 The same for a person without an organisation (freelancer_fixture: the personal office).
 usage: p2567_c_office_trash_test.py <datadir>"""
 import base64
@@ -125,6 +125,8 @@ def scenario(S, who, ws, other, member=None):
     r = S.delete(B + O + "/cashflow/start")
     ts = r.json().get("trash_id")
     S.put(B + O + "/cashflow/start", json={"amount": "900.00", "day": PM2})
+    # 2.1005.0 (#5415): the stranger's probe of the undo route moved here from the trips import (trips are on the core's trash)
+    check(other.post(B + f"/api/office/trash/undo/cf_start/{ts}").status_code in (403, 404), f"{who}: another office: the undo 403 / 404")
     r = S.post(B + f"/api/office/trash/undo/cf_start/{ts}")
     st = S.get(B + O + "/cashflow/start").json().get("start") or {}
     check(r.status_code == 409 and st.get("amount") == "900.00" and sql("SELECT 1 FROM office_trash WHERE id=?", (ts,)),
@@ -178,23 +180,28 @@ def scenario(S, who, ws, other, member=None):
     r = S.post(B + O + "/trips/import", json={"trips": trips})
     check(r.status_code == 201 and r.json()["created"] == 2, f"{who}: setup trips import {r.text[:200]}")
     tids = sorted(r.json()["ids"])
+    # 2.1005.0 (#5415): each trip of the import taken back lies in the core's trash (kind otrip); the office trash lists them
+    # one by one and its restore brings each back unchanged with its run counting as not undone again
+    live = "SELECT id FROM office_trips WHERE id IN (?,?) AND deleted_at IS NULL"
     r = S.post(B + O + "/trips/delete", json={"ids": tids})
-    tt = r.json().get("trash_id") if r.ok else None
-    check(r.ok and r.json().get("deleted") == 2 and tt and in_trash(S, tt, "trip_import"), f"{who}: the trips import taken back: one entry {r.text[:200]}")
-    check(other.post(B + f"/api/office/trash/undo/trip_import/{tt}").status_code in (403, 404), f"{who}: another office: the undo 403 / 404")
-    r = S.post(B + f"/api/office/trash/undo/trip_import/{tt}")
-    check(r.ok and sorted(r.json().get("ids") or []) == tids and len(sql("SELECT id FROM office_trips WHERE id IN (?,?)", tuple(tids))) == 2,
-          f"{who}: the undo brings both trips back {r.text[:200]}")
+    check(r.ok and r.json().get("deleted") == 2 and r.json().get("trash") == {"kind": "otrip", "ids": tids} and not sql(live, tuple(tids)),
+          f"{who}: the trips import taken back: both in the trash {r.text[:200]}")
+    n = sorted(x["id"] for x in S.get(B + O + "/trash").json()["items"] if x.get("core") == "otrip" and x["id"] in tids)
+    check(n == tids, f"{who}: the office trash lists both trips ({n})")
+    check(other.post(B + f"{O}/trash/core/otrip/{tids[0]}/restore").status_code in (403, 404), f"{who}: another office: the restore 403 / 404")
+    rs = [S.post(B + f"{O}/trash/core/otrip/{x}/restore") for x in tids]
+    check(all(x.ok for x in rs) and len(sql(live, tuple(tids))) == 2, f"{who}: the office trash brings both trips back {[x.text[:100] for x in rs]}")
+    rr = sql("SELECT r.undone_at FROM office_import_runs r JOIN office_trips t ON t.import_run_id=r.id WHERE t.id=?", (tids[0],))
+    check(rr and rr[0][0] is None, f"{who}: the import run counts as not undone again {rr}")
     r = S.post(B + O + "/trips/delete", json={"ids": tids})
-    tt = r.json().get("trash_id")
-    # #3506 (CI red of 2.579.0): the trips the undo brought back are unchanged, so a second take-back takes them again
-    check(r.ok and r.json().get("deleted") == 2 and tt, f"{who}: taken back again after the undo: one entry {r.text[:200]}")
+    # #3506 (CI red of 2.579.0): the trips the restore brought back are unchanged, so a second take-back takes them again
+    check(r.ok and r.json().get("deleted") == 2, f"{who}: taken back again after the restore {r.text[:200]}")
     m = PM1[:7]
     lock = S.post(B + O + "/periods/lock", json={"through": m, "confirm": f"{m[5:7]}/{m[:4]}"})
     check(lock.ok, f"{who}: setup the month of the trips locked {lock.text[:200]}")
-    r = S.post(B + f"/api/office/trash/undo/trip_import/{tt}")
-    check(r.status_code == 409 and not sql("SELECT 1 FROM office_trips WHERE id IN (?,?)", tuple(tids)) and sql("SELECT 1 FROM office_trash WHERE id=?", (tt,)),
-          f"{who}: a month locked since: 409, nothing comes back, the copy stays {r.status_code} {r.text[:200]}")
+    r = S.post(B + f"{O}/trash/core/otrip/{tids[0]}/restore")
+    check(r.status_code == 409 and not sql(live, tuple(tids)) and sql("SELECT 1 FROM office_trips WHERE id=?", (tids[0],)),
+          f"{who}: a month locked since: 409, nothing comes back, it stays in the trash {r.status_code} {r.text[:200]}")
 
 
 s0 = sess()

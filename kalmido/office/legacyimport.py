@@ -1181,7 +1181,7 @@ def _run_new(c, oid, uid, kind):
 
 
 # 2.363.2 (#3104): the imports of fixed costs, trips and leads are runs too: {kind: (table, what still counts as there)}.
-FX_RUNS = {"fixed_costs": ("office_fixed_costs", f" AND {live_sql('t')}"), "trips": ("office_trips", ""), "leads": ("office_deals", " AND t.deleted_at IS NULL")}  # 2.905.0 (#5414): + the fixed costs in the trash do not count
+FX_RUNS = {"fixed_costs": ("office_fixed_costs", f" AND {live_sql('t')}"), "trips": ("office_trips", f" AND {live_sql('t')}"), "leads": ("office_deals", " AND t.deleted_at IS NULL")}  # 2.905.0 (#5414): + the fixed costs in the trash do not count; 2.1005.0 (#5415): + the trips
 FX_UNDO_LATE = N_("This import is older than 24 hours and can no longer be undone.")
 
 
@@ -1674,7 +1674,7 @@ def imr_used(c, oid, kind, rid, limit=3):
     out = []
     if kind == "services":
         for d in c.execute("SELECT DISTINCT d.id, d.number, d.project_title FROM office_doc_items i JOIN office_docs d ON d.id=i.doc_id "
-                           "WHERE i.service_id=? AND d.org_id=? ORDER BY d.id DESC LIMIT ?", (rid, oid, limit)):
+                           f"WHERE i.service_id=? AND d.org_id=? AND {live_sql('d')} AND {live_sql('i')} ORDER BY d.id DESC LIMIT ?", (rid, oid, limit)):  # 2.1005.0 (#5415): not the trash
             out.append(" · ".join(x for x in (d["number"], d["project_title"]) if x) or tr("Draft"))
         if len(out) < limit:
             out += [x.get("name") or "" for x in office_rows(c, oid, "contracts") if str(rid) in (x.get("rates") or {})][:limit - len(out)]

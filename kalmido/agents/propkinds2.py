@@ -22,7 +22,7 @@ from ..core.config import app
 from ..core.db import bump, db, iso, now_utc
 from ..core.i18n import N_, lang, tr
 from ..core.pg import insert_id, write_lock
-from ..core.access import Denied, list_role, my_max_sort, list_other_agent
+from ..core.access import Denied, my_max_sort, list_other_agent, live_sql
 from ..accounts.session import me
 from ..core.db import usettings, uset
 from ..core.errors import BadInput, UnknownFields
@@ -125,13 +125,13 @@ def _pk2_clients(c, uid, oid):
 
 def _pk2_offer(c, uid, oid, did):
     """The accepted quotation did of office area oid as job input (what part A lets the agent read anyway)."""
-    r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='offer'", (did, oid)).fetchone()
+    r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='offer' AND {live_sql()}", (did, oid)).fetchone()  # 2.1005.0 (#5415): the trash = 404
     if not r:
         raise Denied(404)
     if r["status"] != "accepted":
         raise BadInput(tr("Only an accepted quotation can become a project"))
     cl = c.execute("SELECT id, name FROM clients WHERE id=?", (r["client_id"],)).fetchone() if r["client_id"] else None
-    items = c.execute("SELECT title, detail, qty, unit, kind FROM office_doc_items WHERE doc_id=? ORDER BY sort, id", (did,)).fetchall()
+    items = c.execute(f"SELECT title, detail, qty, unit, kind FROM office_doc_items WHERE doc_id=? AND {live_sql()} ORDER BY sort, id", (did,)).fetchall()  # 2.1005.0 (#5415): not the trash
     try:
         total = (json.loads(r["totals"] or "{}") or {}).get("gross")
     except ValueError:
@@ -544,7 +544,7 @@ def _pk2_list_empty(c, lid, ids, at, keep_members=()):
     km = list(keep_members) or [0]
     for sql, args in (("SELECT 1 FROM list_files WHERE list_id=? LIMIT 1", (lid,)),
                       ("SELECT 1 FROM office_signoffs WHERE list_id=? LIMIT 1", (lid,)),
-                      ("SELECT 1 FROM office_docs WHERE list_id=? LIMIT 1", (lid,)),
+                      (f"SELECT 1 FROM office_docs WHERE list_id=? AND {live_sql()} LIMIT 1", (lid,)),  # 2.1005.0 (#5415): undo's draft now lies in the trash (SET NULL on purge)
                       (f"SELECT 1 FROM list_members WHERE list_id=? AND user_id NOT IN ({','.join('?' * len(km))}) LIMIT 1", (lid, *km))):
         if c.execute(sql, args).fetchone():
             return False
@@ -595,18 +595,18 @@ def pk2_undo(c, j, rec):
         from ..office.model import office_role
         write_lock(c, f"office_mail_{int(oid or 0)}")  # 2.149.0 A (#2521): the same locks and checks as deleting it in the office (docs.odoc_delete)
         write_lock(c, f"office_doc_{int(rec['offer'])}")
-        r = c.execute("SELECT id, kind, status, number, sent_at, updated_at, project_title FROM office_docs WHERE id=? AND org_id=?", (rec["offer"], oid)).fetchone()
+        # 2.1005.0 (#5415): the whole row (odoc_trash), a draft in the trash already counts as gone
+        r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (rec["offer"], oid)).fetchone()
         if r and r["status"] == "draft" and not r["number"] and rec.get("offer_at") and r["updated_at"] == rec["offer_at"] \
                 and office_role(c, uid, oid) == "admin" and bga_offer_block(c, oid, r) is None \
                 and not c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? LIMIT 1", (rec["offer"],)).fetchone() \
                 and not c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND doc_id=? AND id>? AND action IN ('update','items','number','status') LIMIT 1",
                                   (oid, rec["offer"], rec.get("offer_log") or 0)).fetchone():  # changes within the same second
             from ..office.ledger import ofx_log
-            from ..office.otrash import dvb_otb_draft
-            dvb_otb_draft(c, oid, uid, rec["offer"])  # 2.533.0 A2 (#4318 B20): into the office trash, as a draft deleted in the office
-            c.execute("DELETE FROM office_docs WHERE id=? AND org_id=? AND status='draft' AND number=''", (rec["offer"], oid))
-            from ..office.docref import ofd_deleted
-            ofd_deleted(c, rec["offer"])  # 2.199.0 G (#2742): its folder entry goes along
+            from ..office.docs import odoc_trash
+            # 2.533.0 A2 (#4318 B20): into the office trash, as a draft deleted in the office; 2.1005.0 (#5415): the core's
+            # trash (soft delete, its folder entry goes, restorable from the office trash), the rights checked above
+            odoc_trash(c, oid, uid, r, checked=True)
             ofx_log(c, oid, "delete", doc_id=rec["offer"], detail={"number": "", "status": "draft", "undo": "proposal"})
             rec["offer_deleted"] = True
             n += 1

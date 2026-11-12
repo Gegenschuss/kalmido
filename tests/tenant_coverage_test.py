@@ -477,8 +477,8 @@ ROUTES = {
     # 2.47.3 (#1022, #1652): travel expenses and the cash flow, admins of the office area only (p2473_b_api_test.py: other org 404, member 403)
     "GET /api/office/trips": "office", "POST /api/office/trips": "office", "PATCH /api/office/trips/{}": "office", "DELETE /api/office/trips/{}": "office",
     "POST /api/office/trips/{}/items": "office", "PATCH /api/office/trips/{}/items/{}": "office", "DELETE /api/office/trips/{}/items/{}": "office",
-    "POST /api/office/trips/trash/{}/restore": "office",  # 2.530.0 C (#4315): p2530_c_office_trash_test.py (other org 404, member 403)
-    "POST /api/office/cards/trash/{}/restore": "office",  # 2.552.0 (#4561 B21): p2552_b_dataloss_test.py (other organisation 403 / 404)
+    # 2.1005.0 (#5415): trips, receipts and card positions out of the core's trash: p21005_d_trash_4d_test.py (another organisation 404)
+    "POST /api/office/trips/{}/restore": "office", "POST /api/office/trips/{}/items/{}/restore": "office", "POST /api/office/cards/lines/{}/restore": "office",  # p21005_d_trash_4d_test.py
     "POST /api/office/trash/undo/{}/{}": "office",  # 2.567.0 (#4707): p2567_c_office_trash_test.py (other office 403 / 404, member 403)
     "POST /api/office/trash/core/{}/{}/restore": "office", "DELETE /api/office/trash/core/{}/{}": "office",  # 2.905.0 (#5414): p2905_d_office_trash_4c_test.py (another organisation 404, member 403)
     "GET /api/office/trips/report": "office", "GET /api/office/trips/bill-docs": "office", "POST /api/office/trips/bill": "office", "GET /api/office/receipts/billed": "office", "POST /api/office/receipts/bill": "office",
@@ -1166,7 +1166,7 @@ ROUTES = {
     "POST /api/obj/{}/{}/shares": "obj", "DELETE /api/obj/{}/{}/shares/{}": "obj", "POST /api/obj/{}/{}/shares/{}/restore": "obj",
     "GET /api/v1/agent/objects/{}": "obj", "GET /api/v1/agent/objects/{}/{}": "obj", "PATCH /api/v1/agent/objects/{}/{}": "obj",
     "POST /api/v1/agent/objects/{}/{}/proposals": "obj",  # 2.623.0 (#4718): an agent's change proposal (p2623_c_objprop_test.py, tenant-matrix: obj)
-    "GET /api/undo": "undo", "POST /api/undo/to/{}": "undo", "POST /api/undo/{}/redo": "undo",  # 2.747.0 (#5249): the own step groups (p2747_b_undo_core_test.py)
+    "GET /api/undo": "undo", "POST /api/undo/to/{}": "undo", "POST /api/undo/{}/redo": "undo", "POST /api/undo/{}/undo": "undo",  # 2.747.0 (#5249): the own step groups (p2747_b_undo_core_test.py)
     # 2.96.0 B (#1941): a table to the other workspace (p296_b_api_test.py)
     "POST /api/sheets/{}/move-space": "sheet",
     # 2.401.0 (#2924): the dry run of a project's workspace change (p2401_a_api_test.py)

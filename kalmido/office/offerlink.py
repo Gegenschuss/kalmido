@@ -11,6 +11,7 @@ from flask import jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
+from ..core.access import live_sql  # 2.1005.0 (#5415)
 from .calc import fmt_money
 from .docs import STATUS_TXT
 from .invoices import inv_paid_map, inv_state
@@ -37,13 +38,13 @@ def oil_source_offer(c, oid, r):
     sid = r["source_doc_id"] if "source_doc_id" in r.keys() else None
     if r["kind"] != "invoice" or not sid:
         return None
-    x = c.execute("SELECT id, number, status, list_id FROM office_docs WHERE id=? AND org_id=? AND kind='offer'", (sid, oid)).fetchone()
+    x = c.execute(f"SELECT id, number, status, list_id FROM office_docs WHERE id=? AND org_id=? AND kind='offer' AND {live_sql()}", (sid, oid)).fetchone()  # 2.1005.0 (#5415): not the trash
     return {"id": x["id"], "number": x["number"] or "", "status": x["status"], "list_id": x["list_id"]} if x else None
 
 
 def oil_offer_invoices(c, oid, offer_id):
     """The invoices made from quotation offer_id, oldest first: {id, number, state, status_text, gross_text, inv_type, locked, list_id}."""
-    rows = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND source_doc_id=? ORDER BY id", (oid, offer_id)).fetchall()
+    rows = c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND source_doc_id=? AND {live_sql()} ORDER BY id", (oid, offer_id)).fetchall()  # 2.1005.0 (#5415): not the trash
     pm = inv_paid_map(c, oid, [x["id"] for x in rows]) if rows else {}
     out = []
     for x in rows:
@@ -73,7 +74,7 @@ def oil_doc_extra(c, oid, r, d):
 
 def oil_replace_links(c, oid, r):
     """2.437.0 B (#3621): (the quotation r replaces or None, the quotations that replace r, oldest first) as {id, number, status, status_text, list_id}."""
-    rows = c.execute("SELECT id, number, status, list_id FROM office_docs WHERE org_id=? AND kind='offer' AND (id=? OR replaces_id=?) ORDER BY id",
+    rows = c.execute(f"SELECT id, number, status, list_id FROM office_docs WHERE org_id=? AND kind='offer' AND (id=? OR replaces_id=?) AND {live_sql()} ORDER BY id",  # 2.1005.0 (#5415): not the trash
                      (oid, r["replaces_id"] or 0, r["id"])).fetchall()
     out = [{"id": x["id"], "number": x["number"] or "", "status": x["status"], "status_text": tr(STATUS_TXT.get(x["status"], x["status"])), "list_id": x["list_id"]} for x in rows]
     return next((x for x in out if x["id"] == r["replaces_id"]), None), [x for x in out if x["id"] != r["replaces_id"]]
@@ -96,7 +97,7 @@ def oil_agent_filter(d, sees):
 def oil_list_marks(c, oid, rows):
     """2.356.0 C (#3005): the quotation list marks the rows with a full invoice that is not cancelled (invoiced; "From a quotation…")."""
     used = {x[0] for x in c.execute("SELECT DISTINCT source_doc_id FROM office_docs WHERE org_id=? AND kind='invoice' AND source_doc_id IS NOT NULL "
-                                    "AND status<>'cancelled' AND COALESCE(inv_type, '')=''", (oid,)).fetchall()}
+                                    f"AND status<>'cancelled' AND COALESCE(inv_type, '')='' AND {live_sql()}", (oid,)).fetchall()}  # 2.1005.0 (#5415): not the trash
     for b in rows:
         b["invoiced"] = b["id"] in used
 

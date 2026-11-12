@@ -46,7 +46,7 @@ from ..accounts.session import _accept_lang, client_ip, rate_ip
 from ..api.common import hit_limit
 from ..calendars.subscriptions import CalError, cal_allow_parse, cal_http
 from ..collab.integfail import integ_org_admins, integ_tell
-from ..core.access import Denied, acx_anon_bind
+from ..core.access import Denied, acx_anon_bind, live_sql
 from ..core.config import APP_NAME, PUBLIC_URL, TZ, app
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.errors import BadInput
@@ -272,7 +272,7 @@ def pol_hook_url(tok):
 def pol_held(c, oid, did=None):
     """The events waiting for a person: [{id, kind, reason, text, amount, currency, doc_id, number, day}]."""
     q = ("SELECT e.*, s.doc_id, s.currency, d.number FROM office_pay_events e LEFT JOIN office_pay_sessions s ON s.id=e.session_id AND s.org_id=e.org_id "
-         "LEFT JOIN office_docs d ON d.id=s.doc_id AND d.org_id=e.org_id WHERE e.org_id=? AND e.state='held'")
+         f"LEFT JOIN office_docs d ON d.id=s.doc_id AND d.org_id=e.org_id AND {live_sql('d')} WHERE e.org_id=? AND e.state='held'")
     args = [oid]
     if did is not None:
         q += " AND s.doc_id=?"
@@ -544,7 +544,7 @@ def pol_sync(c, oid, s, eid):
 def pol_hold(c, oid, eid, s, reason):
     """Money the books cannot take as it came: kept in view, the area's admins hear it once."""
     _ev_state(c, eid, "held", reason, s["id"])
-    r = c.execute("SELECT number FROM office_docs WHERE id=? AND org_id=?", (s["doc_id"], oid)).fetchone()
+    r = c.execute(f"SELECT number FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (s["doc_id"], oid)).fetchone()
     owner = pb_owner(c, oid)
     integ_tell(c, [owner] if owner else integ_org_admins(c, oid), "payonline", (r["number"] if r else "") or f"#{s['doc_id']}", POL_HOLD[reason],
                click="office/invoices/" + str(int(s["doc_id"])))
@@ -644,7 +644,7 @@ def pol_find(c, token):
         if not kp_area(c, None, owner):
             return None
     conf = pol_conf(c, oid)
-    r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (link["doc_id"], oid)).fetchone()
+    r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (link["doc_id"], oid)).fetchone()  # 2.1005.0 (#5415): not the trash
     if link["off"] or not r or not pol_ready(c, oid, conf):
         return None
     return link, r, conf

@@ -36,9 +36,11 @@ from .legacyimport import fx_run, fx_settle  # 2.363.2 (#3104)
 from .vma import VMA_HOME, VMA_NAMES, vma_dates, vma_places, vma_rate, vma_table_year, vma_trip
 from .legacyimport import _col_index, _local, _rels, _xml, _sheet, _in_rph, _upload  # 2.369.5 (#2517): pulled up from functions
 from .travel import _ctx, rk_trips, rka_purposes, rka_purposes_adopt, _trip, _trip_need_open  # 2.369.5 (#2517): pulled up from functions
+from .travel import RK_TRIP_KIND  # 2.1005.0 (#5415)
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 from .olock import olk_trip_item_reason  # 2.369.5 (#2517): pulled up from functions
-from .otrash import OTB_MANY, OTB_UNDO, otb_put  # 2.567.0 (#4707)
+from .okern import ofk_trash  # 2.1005.0 (#5415): the trips of an import taken back go into the core's trash
+from ..core.access import live_sql  # 2.1005.0 (#5415)
 
 VMI_FILE_MAX = 2 * 1024 * 1024
 VMI_SHEETS_MAX = 30
@@ -540,11 +542,13 @@ def vmi_remove(c, oid, ids, uid=None):
     (olk_trip_item_reason) stays (skipped). 2.272.0 C (#3027): only trips unchanged since they were made (updated_at =
     created_at, no receipts, no drive or trip project pointing at them) go; the others stay (kept) -- an undo takes back the
     import, never what was added since. 2.567.0 (#4707): the trips that go first into the office trash as ONE entry (restore
-    brings the import back whole; uid = who took it back). -> {deleted, trips (as they were), skipped, kept, trash_id}. No commit."""
+    brings the import back whole; uid = who took it back). 2.1005.0 (#5415): each trip into the core's trash (kind otrip, the
+    office trash lists them one by one; a restore brings the trip back unchanged and counts its run as not undone again,
+    travel._rk_trip_back). -> {deleted, trips (as they were), skipped, kept, trash: {kind, ids}}. No commit."""
     if not ids:
         return {"deleted": 0, "trips": [], "skipped": [], "kept": []}
     q = ",".join("?" * len(ids))
-    mine = {r[0] for r in c.execute(f"SELECT id FROM office_trips WHERE org_id=? AND id IN ({q})", [oid] + ids)}
+    mine = {r[0] for r in c.execute(f"SELECT id FROM office_trips WHERE org_id=? AND id IN ({q}) AND {live_sql()}", [oid] + ids)}  # 2.1005.0 (#5415)
     billed = {r[0] for r in c.execute(f"SELECT DISTINCT trip_id FROM office_trip_items WHERE org_id=? AND billed_doc_id IS NOT NULL "
                                       f"AND trip_id IN ({q})", [oid] + ids)}
     # 2.152.0 (#2168, review B-H1): receipts ticked "in DATEV" lock their trip here as on the single delete
@@ -552,42 +556,18 @@ def vmi_remove(c, oid, ids, uid=None):
                if olk_trip_item_reason(c, oid, r)}
     cut = iso(now_utc() - timedelta(hours=VMI_UNDO_HOURS))  # 2.370.4 (#3089 N15): older trips stay (kept)
     kept = {r["id"] for r in c.execute(f"""SELECT id FROM office_trips t WHERE org_id=? AND id IN ({q}) AND (updated_at!=created_at
-                                            OR created_at<? OR EXISTS (SELECT 1 FROM office_trip_items i WHERE i.trip_id=t.id)
+                                            OR created_at<? OR EXISTS (SELECT 1 FROM office_trip_items i WHERE i.trip_id=t.id AND {live_sql('i')})
                                             OR EXISTS (SELECT 1 FROM office_drives d WHERE d.trip_id=t.id)
                                             OR EXISTS (SELECT 1 FROM life_trip_costs l WHERE l.trip_id=t.id))""", [oid] + ids + [cut])} - billed
     gone = sorted(mine - billed - kept)
     for i in gone:
         _trip_need_open(c, oid, _trip(c, oid, i))  # 2.148.0 A (#2471)
     old = [t for i in gone for t in rk_trips(c, oid, trip_id=i)]
-    tid = otb_put(c, oid, uid, VMI_TRASH, "office_trips", gone, tr("Import") + f" · {len(gone)}", sub="import") if gone else None
-    if gone:
-        c.execute(f"DELETE FROM office_trip_items WHERE org_id=? AND trip_id IN ({','.join('?' * len(gone))})", [oid] + gone)
-        c.execute(f"DELETE FROM office_trips WHERE org_id=? AND id IN ({','.join('?' * len(gone))})", [oid] + gone)
-    return {"deleted": len(gone), "trips": old, "skipped": sorted(mine & billed), "kept": sorted(kept), "trash_id": tid}
-
-
-def vmi_trash_back(c, oid, ids):
-    """2.567.0 (#4707): after the restore of an import of trips taken back (OTB_MANY): every trip only into open months (as
-    the single trip, travel.rk_trash_check; else 409 and the restore is rolled back), its import run counts as not undone again."""
-    for i in ids:
-        _trip_need_open(c, oid, _trip(c, oid, i))
-    # #3506 (CI red of 2.579.0): only unchanged trips (updated_at = created_at) went into the trash, so they come back unchanged -
-    # otb_restore's new updated_at made a second take-back keep them all (no trash entry; green only within the same second)
-    c.execute("UPDATE office_trips SET updated_at=created_at WHERE org_id=? AND id = ANY(CAST(? AS BIGINT[]))", (oid, list(ids)))
-    c.execute("""UPDATE office_import_runs SET undone_at=NULL, undone_by=NULL WHERE org_id=? AND undone_at IS NOT NULL AND id IN
-                 (SELECT import_run_id FROM office_trips WHERE org_id=? AND id = ANY(CAST(? AS BIGINT[])) AND import_run_id IS NOT NULL)""",
-              (oid, oid, list(ids)))
-
-
-VMI_TRASH = "trip_import"  # 2.567.0 (#4707): kind of an import of trips taken back, in the office trash
-OTB_MANY[VMI_TRASH] = vmi_trash_back
-
-
-def _vmi_ctx():
-    return _ctx()
-
-
-OTB_UNDO[VMI_TRASH] = _vmi_ctx  # the toast's undo: the rights of the trips, as taking it back
+    for i in gone:  # 2.1005.0 (#5415): the core's trash (no receipts: a trip with one is kept above)
+        ofk_trash(c, uid, RK_TRIP_KIND, i)
+    if gone:  # unchanged as they were (obj_trash stamps updated_at): its restore knows it came from here (travel._rk_trip_back)
+        c.execute("UPDATE office_trips SET updated_at=created_at WHERE org_id=? AND id = ANY(CAST(? AS BIGINT[]))", (oid, gone))
+    return {"deleted": len(gone), "trips": old, "skipped": sorted(mine & billed), "kept": sorted(kept), "trash": {"kind": RK_TRIP_KIND, "ids": gone}}
 
 
 @app.post("/api/office/trips/delete")

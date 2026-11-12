@@ -23,7 +23,7 @@ from .oubar import OUB_DATEV, OUB_PAID, OUB_PAY_BACK, OUB_SENT, oub_barrier, oub
 from ..core.pg import insert_id, write_lock
 from ..core.i18n import N_, stored_join, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
-from ..core.access import Denied, vis_sql
+from ..core.access import Denied, live_sql
 from ..core.errors import BadInput, BadKey, DeniedKey
 from .calc import INV_VAT_NOTES, TAX_KEYS, dec, dstr, fmt_money, inv_calc, inv_open, money, pack_tax
 from .homecur import hc_code, hc_home, hc_office_rate, hc_rate_missing  # 2.189.0 (#2475); 2.355.0 C (#2844): hc_rate_missing
@@ -166,7 +166,7 @@ def inv_paid_map(c, oid, doc_ids=None):
     for row in c.execute(f"SELECT doc_id, SUM(amount) AS s FROM office_payments WHERE org_id=?{q} GROUP BY doc_id", [oid] + (ids or [])):
         out.setdefault(row["doc_id"], {"paid": Decimal(0), "credits": Decimal(0)})["paid"] = money(dec(row["s"]))
     q = " AND cancels_id IN (" + ",".join("?" * len(ids)) + ")" if ids is not None else ""
-    for row in c.execute("SELECT cancels_id, totals FROM office_docs WHERE org_id=? AND kind='credit' AND locked_at IS NOT NULL AND cancels_id IS NOT NULL" + q,
+    for row in c.execute(f"SELECT cancels_id, totals FROM office_docs WHERE org_id=? AND kind='credit' AND locked_at IS NOT NULL AND cancels_id IS NOT NULL AND {live_sql()}" + q,
                          [oid] + (ids or [])):
         t = _j(row["totals"], {})
         out.setdefault(row["cancels_id"], {"paid": Decimal(0), "credits": Decimal(0)})["credits"] += money(dec(t.get("gross") or 0))
@@ -213,7 +213,7 @@ def inv_money_fields(r, pm):
 def inv_refresh_paid(c, oid, did):
     """After a payment or a credit note: an open invoice covered in full becomes paid (paid_at); one no longer covered
     goes back to sent / issued. 2.190.0 D (#2496): paid needs a payment; credit notes alone covering it in full cancel it."""
-    r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
+    r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (did, oid)).fetchone()  # 2.1005.0 (#5415): not the trash
     if not r or r["kind"] not in ("invoice", "credit") or not ofx_locked(r) or r["status"] == "cancelled":
         return
     pm = inv_paid_map(c, oid, [did])
@@ -251,10 +251,10 @@ def inv_refund_open(c, oid, r):
     if r["kind"] == "credit":
         own = money(dec(_j(r["totals"], {}).get("gross") or 0)) - (inv_paid_map(c, oid, [r["id"]]).get(r["id"]) or zero)["paid"]
         cid = _col(r, "cancels_id")
-        inv_ = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice'", (cid, oid)).fetchone() if cid else None
+        inv_ = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND {live_sql()}", (cid, oid)).fetchone() if cid else None
         if inv_ is None:
             return money(max(own, Decimal(0)))
-    sibs = [x["id"] for x in c.execute("SELECT id FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL",
+    sibs = [x["id"] for x in c.execute(f"SELECT id FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL AND {live_sql()}",
                                        (oid, inv_["id"]))]
     pm = inv_paid_map(c, oid, [inv_["id"]] + sibs)
     p = pm.get(inv_["id"]) or zero
@@ -393,7 +393,7 @@ def inv_neg_final_floor(c, oid, r):
     negative itself -- it cancels that rest -- down to the invoice's gross less the credit notes already on it; else 0 (a
     credit note stays positive)."""
     cid = _col(r, "cancels_id")
-    inv_ = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice'", (cid, oid)).fetchone() if cid else None
+    inv_ = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND {live_sql()}", (cid, oid)).fetchone() if cid else None
     if inv_ is None or _col(inv_, "inv_type") != "final" or not ofx_locked(inv_):
         return Decimal(0)
     gross = money(dec(_j(inv_["totals"], {}).get("gross") or 0))
@@ -418,7 +418,7 @@ def inv_check_date(c, oid, r, s):
     period = office_scheme_period(scheme, date.fromisoformat(d))
     kinds = [k for k in ("invoice", "credit") if num_kind(s, k) == num_kind(s, r["kind"])]
     # 2.144.10 B (#2576): trial documents have their own series; they neither count for real ones nor the other way round
-    for row in c.execute(f"SELECT date FROM office_docs WHERE org_id=? AND kind IN ({', '.join('?' * len(kinds))}) AND locked_at IS NOT NULL AND id<>? AND date>? AND trial=? "
+    for row in c.execute(f"SELECT date FROM office_docs WHERE org_id=? AND kind IN ({', '.join('?' * len(kinds))}) AND locked_at IS NOT NULL AND {live_sql()} AND id<>? AND date>? AND trial=? "
                          "ORDER BY date DESC", (oid, *kinds, r["id"], d, 1 if _col(r, "trial") else 0)):
         try:
             if office_scheme_period(scheme, date.fromisoformat(row["date"])) == period:
@@ -434,11 +434,11 @@ def inv_after_finalize(c, oid, uid, r):
     c.execute("UPDATE office_docs SET status='issued', updated_at=? WHERE id=? AND org_id=? AND status='draft'", (ts, r["id"], oid))
     if r["kind"] == "credit" and _col(r, "cancels_id"):
         write_lock(c, f"office_credits_{int(r['cancels_id'])}")  # 2.39.0 (#1209 audit M1): parallel credit notes see each other
-        inv_ = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice'", (r["cancels_id"], oid)).fetchone()
+        inv_ = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND {live_sql()}", (r["cancels_id"], oid)).fetchone()
         if inv_ is not None:
             ti, tc = _j(inv_["totals"], {}), _j(r["totals"], {})
             credited = sum((money(dec(_j(x["totals"], {}).get("gross") or 0)) for x in c.execute(
-                "SELECT totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL AND id<>?",
+                f"SELECT totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL AND {live_sql()} AND id<>?",
                 (oid, inv_["id"], r["id"]))), Decimal(0))
             inv_credit_check(c, oid, r, inv_)  # 2.354.0 D (#2838): its currency and rate, and per VAT rate
             if credited + money(dec(tc.get("gross") or 0)) > money(dec(ti.get("gross") or 0)):  # 2.38.0 review: credits never exceed the invoice
@@ -632,7 +632,7 @@ def inv_credit_pack(c, oid, r, pack):
     """2.354.0 D (#2838): pack for credit note r: with the tax rates frozen in its finalised invoice (tax_snapshot), so a
     change of the country pack since then never makes the credit note differ from the invoice; else pack as it is."""
     cid = _col(r, "cancels_id")
-    row = c.execute("SELECT tax_snapshot FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND locked_at IS NOT NULL",
+    row = c.execute(f"SELECT tax_snapshot FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND locked_at IS NOT NULL AND {live_sql()}",
                     (cid, oid)).fetchone() if cid else None
     tax = _j(row["tax_snapshot"], {}).get("tax") if row is not None and row["tax_snapshot"] else None
     return {**(pack or {}), "tax": tax} if isinstance(tax, dict) and tax else pack
@@ -657,7 +657,7 @@ def inv_credit_check(c, oid, r, inv_):
     if (r["currency"] or "EUR").upper() != (inv_["currency"] or "EUR").upper() or abs(float(r["fx_rate"] or 1) - float(inv_["fx_rate"] or 1)) > 1e-9:
         raise Denied(409, tr("A credit note keeps the currency, exchange rate, client and VAT of its invoice"))
     have, got = inv_credit_rates(inv_), {}
-    for x in list(c.execute("SELECT totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL AND id<>?",
+    for x in list(c.execute(f"SELECT totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL AND {live_sql()} AND id<>?",
                             (oid, inv_["id"], r["id"]))) + [r]:
         for k, v in inv_credit_rates(x).items():
             got[k] = got.get(k, Decimal(0)) + v
@@ -739,7 +739,7 @@ def inv_reminder_rows(c, oid, ids):
     pm = inv_paid_map(c, oid, ids)
     rows, trial = [], set()
     for did in ids:
-        r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice'", (did, oid)).fetchone()
+        r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND {live_sql()}", (did, oid)).fetchone()  # 2.1005.0 (#5415): not the trash
         if r is None:
             raise Denied(404)
         if not ofx_locked(r) or r["status"] in ("cancelled", "paid"):
@@ -865,7 +865,7 @@ def inv_check_reminder(c, oid, ids, rows):
     """2.38.0 review: a reminder lists issued / sent invoices with an open amount, all of the same client and currency."""
     keys = set()
     for did, ln in zip(ids, rows):
-        r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
+        r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (did, oid)).fetchone()
         if r["status"] not in ("issued", "sent") or money(dec(ln["open"])) <= 0:
             raise BadInput(tr("Only open, finalised invoices can be reminded of ({0})", r["number"] or did))
         who = r["client_id"] if r["client_id"] else (_j(r["recipient"], {}).get("name") or "").strip().lower()
@@ -906,7 +906,7 @@ def inv_make_reminder(c, oid, uid, b):
         raise BadInput(tr("Invalid value: {0}", "doc_ids"))
     s = office_settings(c, oid)
     rows = inv_reminder_rows(c, oid, ids)
-    first = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (ids[0], oid)).fetchone()
+    first = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (ids[0], oid)).fetchone()
     # 2.144.10 A (#2576): a reminder is a trial document when its invoices are (inherited via inv_new_row); trial and real
     # ones never share one (inv_reminder_rows)
     write_lock(c, f"office_dunning_{int(oid)}")  # 2.147.1 (#2054, review): the same lock as the suggestion run (no second draft at once)
@@ -1005,14 +1005,14 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     meta = [[num_label, r["number"] or tr("Draft|document number", lg=lang)]]
     cancels = None
     if kind == "credit" and _col(r, "cancels_id"):
-        ci = c.execute("SELECT id, number, date FROM office_docs WHERE id=? AND org_id=?", (r["cancels_id"], oid)).fetchone()
+        ci = c.execute(f"SELECT id, number, date FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (r["cancels_id"], oid)).fetchone()
         if ci is not None:
             cancels = {"id": ci["id"], "number": ci["number"], "date": ci["date"] or "", "date_text": fmt_date(ci["date"], pack)}  # 2.296.0 B (#3173): date = BT-26
             meta.append([L.get("to_invoice", tr("Credit note for invoice no.|document", lg=lang)), f"{ci['number']} ({cancels['date_text']})"])
     m["cancels"] = cancels
     # 2.144.9 (#2575): an invoice made from a quotation names it in the head ("zu Angebot Nr. KV02-M (21.10.2026)")
     if kind == "invoice" and _col(r, "source_doc_id"):
-        so = c.execute("SELECT number, date FROM office_docs WHERE id=? AND org_id=? AND kind='offer'", (r["source_doc_id"], oid)).fetchone()
+        so = c.execute(f"SELECT number, date FROM office_docs WHERE id=? AND org_id=? AND kind='offer' AND {live_sql()}", (r["source_doc_id"], oid)).fetchone()
         if so is not None and so["number"]:
             m["source_offer"] = {"number": so["number"], "date_text": fmt_date(so["date"], pack) if so["date"] else ""}
             meta.append([L.get("to_offer", tr("Re quotation No.|pack", lg=lang)),
@@ -1274,7 +1274,7 @@ def inv_send_mail(c, oid, uid, m, r=None):
     if r is None:  # 2.269.0 review: lock + read again BEFORE the mail (an unlock / delete in between mails nothing)
         write_lock(c, f"office_mail_{int(oid)}")  # same order as ledger.ofx_unlock
         write_lock(c, f"office_doc_{int(m['did'])}")
-        r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (m["did"], oid)).fetchone()
+        r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (m["did"], oid)).fetchone()  # 2.1005.0 (#5415): not the trash
         if r is None:
             raise Denied(404)
         if "base" in m and _inv_base(r) != m["base"]:
@@ -1790,13 +1790,13 @@ def inv_cancel_fees(c, oid, did):
     """2.355.0 D (#2846): invoice did was just cancelled: the open fee of every finalised reminder naming it is cancelled
     with it once all invoices of that reminder are cancelled (a reminder over a second, still open invoice keeps its fee).
     The reminder document stays unchanged (GoBD); the change is logged like a person's (reminder_fee, auto 1)."""
-    for x in c.execute("SELECT id, ref_doc_ids, reminder_fee FROM office_docs WHERE org_id=? AND kind='reminder' AND locked_at IS NOT NULL "
+    for x in c.execute(f"SELECT id, ref_doc_ids, reminder_fee FROM office_docs WHERE org_id=? AND kind='reminder' AND locked_at IS NOT NULL AND {live_sql()} "
                        "AND reminder_fee > 0 AND COALESCE(reminder_fee_state, '') = '' AND ref_doc_ids LIKE ?",  # pg-ok: digits only
                        (oid, f"%{int(did)}%")).fetchall():
         ids = [int(i) for i in _j(x["ref_doc_ids"] or "[]", []) if str(i).isdigit()]
         if int(did) not in ids:
             continue
-        if c.execute("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND id IN (" + ",".join("?" * len(ids)) + ") AND status<>'cancelled'",
+        if c.execute(f"SELECT COUNT(*) FROM office_docs WHERE org_id=? AND {live_sql()} AND id IN (" + ",".join("?" * len(ids)) + ") AND status<>'cancelled'",
                      [oid] + ids).fetchone()[0]:
             continue
         c.execute("UPDATE office_docs SET reminder_fee_state='cancelled' WHERE id=? AND org_id=?", (x["id"], oid))
@@ -1813,12 +1813,12 @@ def fd_reminder_extra(c, oid, rows):
     if rems:
         ids = [d["id"] for d in rems]
         meta = {x["id"]: x for x in c.execute(
-            "SELECT id, ref_doc_ids, reminder_fee, reminder_fee_state, reminder_fee_paid_at, locked_at, currency, lang FROM office_docs WHERE org_id=? AND id IN ("
+            f"SELECT id, ref_doc_ids, reminder_fee, reminder_fee_state, reminder_fee_paid_at, locked_at, currency, lang FROM office_docs WHERE org_id=? AND {live_sql()} AND id IN ("
             + ",".join("?" * len(ids)) + ")", [oid] + ids)}
         refs = sorted({int(i) for x in meta.values() for i in _j(x["ref_doc_ids"] or "[]", []) if str(i).isdigit()})
         pm = inv_paid_map(c, oid, refs) if refs else {}
         st = {x["id"]: inv_state(x, pm) for x in c.execute(
-            "SELECT * FROM office_docs WHERE org_id=? AND id IN (" + ",".join("?" * len(refs)) + ")", [oid] + refs)} if refs else {}
+            f"SELECT * FROM office_docs WHERE org_id=? AND {live_sql()} AND id IN (" + ",".join("?" * len(refs)) + ")", [oid] + refs)} if refs else {}
         settled_txt = tr("Settled")  # 2.369.0 A (#3200): once per list (the language is a query)
         for d in rems:
             x = meta.get(d["id"])
@@ -1837,7 +1837,7 @@ def fd_reminder_extra(c, oid, rows):
                 d["status_text"] = settled_txt
     if invs:
         open_fees = {}
-        for x in c.execute("SELECT id, number, ref_doc_ids, reminder_fee FROM office_docs WHERE org_id=? AND kind='reminder' AND locked_at IS NOT NULL "
+        for x in c.execute(f"SELECT id, number, ref_doc_ids, reminder_fee FROM office_docs WHERE org_id=? AND kind='reminder' AND locked_at IS NOT NULL AND {live_sql()} "
                            "AND reminder_fee > 0 AND COALESCE(reminder_fee_state, '') = ''", (oid,)):
             for i in _j(x["ref_doc_ids"] or "[]", []):
                 open_fees.setdefault(str(i), []).append({"id": x["id"], "number": x["number"], "fee": dstr(money(dec(x["reminder_fee"])))})

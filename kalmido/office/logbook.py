@@ -27,7 +27,7 @@ from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, csv_dialect, lang, tr
 from ..core.db import body, bump, db, iso, local_now, local_stamp, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from .owrite import ow_crypt, ow_history_answer, ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
 from ..core.errors import BadInput
 from .calc import calc_lang, dec, dstr, fmt_point, money
@@ -209,7 +209,7 @@ def lb_vehicles_get():
     c, uid, oid = _ctx()
     w, wa = rk_cl_where(c, oid)
     clients = [{"id": r["id"], "name": r["name"]} for r in c.execute(f"SELECT id, name FROM clients WHERE {w} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name)", wa)]
-    projects = [r[0] for r in c.execute("SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' ORDER BY 1", (oid,))][:300]
+    projects = [r[0] for r in c.execute(f"SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' AND {live_sql()} ORDER BY 1", (oid,))][:300]
     if ofr_own_uid("logbook") is not None:  # 2.187.0 B (#2476): the invoices' project names are not part of "own"
         projects = sorted({d["project"] for d in lb_drives(c, oid, uid) if d.get("project")})
     return jsonify(vehicles=lb_vehicles(c, oid), people=rk_people(c, oid, uid), clients=clients, projects=projects, km_rate=lb_rate(c, oid, _year(None)),
@@ -494,14 +494,14 @@ def lb_drives(c, oid, uid, vehicle_id=None, year=None, deleted=False):
     warns = {}
     for vid in {r["vehicle_id"] for r in rows if r["vehicle_id"]}:
         warns.update(_warns(c, oid, vid))
-    trips = {r[0]: r[1] for r in c.execute("SELECT id, km FROM office_trips WHERE org_id=?", (oid,))}
+    trips = {r[0]: r[1] for r in c.execute(f"SELECT id, km FROM office_trips WHERE org_id=? AND {live_sql()}", (oid,))}  # 2.1005.0 (#5415): not the trash
     closed, succ = lbc_closed(c, oid), lbc_successors(c, oid)
     return [lb_drive_public(c, oid, r, names, warns, trips, closed, succ) for r in rows]
 
 
 def _one(c, oid, uid, did):
     r = c.execute("SELECT * FROM office_drives WHERE id=? AND org_id=?", (did, oid)).fetchone()
-    trips = {x[0]: x[1] for x in c.execute("SELECT id, km FROM office_trips WHERE org_id=?", (oid,))}
+    trips = {x[0]: x[1] for x in c.execute(f"SELECT id, km FROM office_trips WHERE org_id=? AND {live_sql()}", (oid,))}  # 2.1005.0 (#5415): not the trash
     return lb_drive_public(c, oid, r, _names(c, oid, uid), _warns(c, oid, r["vehicle_id"]), trips)
 
 
@@ -660,7 +660,7 @@ def lb_drive_trip(did):
     c, uid, oid = _ctx()
     write_lock(c, f"office_drive_trip_{oid}")
     d = oc_dec_fields(c, oid, "office_drives", _drive(c, oid, did))
-    if d.get("trip_id") and c.execute("SELECT 1 FROM office_trips WHERE id=? AND org_id=?", (d["trip_id"], oid)).fetchone():
+    if d.get("trip_id") and c.execute(f"SELECT 1 FROM office_trips WHERE id=? AND org_id=? AND {live_sql()}", (d["trip_id"], oid)).fetchone():  # 2.1005.0 (#5415): one in the trash = a new trip
         return jsonify(trip=rk_one(c, oid, d["trip_id"]), existing=True)
     if d["kind"] != "business":
         raise BadInput(tr("Only business drives go into the travel expenses"))

@@ -36,7 +36,7 @@ from ..core.config import app  # noqa: F401  (the routes are hooks of agents/pro
 from ..core.i18n import N_, tr, LANGS
 from ..core.db import bump, err, iso, local_now, now_utc
 from ..core.pg import insert_id, system_ctx
-from ..core.access import Denied, list_role
+from ..core.access import Denied, list_role, live_sql
 from ..core.errors import BadInput
 from ..agents.core import agent_active, agent_emit, agent_row, agent_shares, is_agent, job_dict, JOB_TITLE_MAX
 from ..agents.proposals import PROP_LIMITS, PROP_OPEN_MAX, PROP_TEXT_MAX, _p_keys, _p_str, prop_mode
@@ -214,7 +214,7 @@ def _office_input(c, oid, r, field, wish):
         today = local_now().date()
         refs = []
         for i in (d.get("ref_doc_ids") or [])[:20]:
-            x = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice'", (int(i), oid)).fetchone() if str(i).isdigit() else None
+            x = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND {live_sql()}", (int(i), oid)).fetchone() if str(i).isdigit() else None  # 2.1005.0 (#5415)
             if not x:
                 continue
             p = doc_public(c, oid, x, False, items=False)

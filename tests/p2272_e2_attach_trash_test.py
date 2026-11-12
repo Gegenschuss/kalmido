@@ -47,7 +47,8 @@ def in_app(code, env=()):
 
 
 def tick(on):
-    out = in_app("from kalmido.files.trashpurge import tp_tick\nprint('counts', tp_tick(c, True))", env=("KALMIDO_RETENTION_PURGE=1",) if on else ())
+    out = in_app("from kalmido.files.trashpurge import tp_tick\nfrom kalmido.core.writes import obj_trash_tick\n"  # 2.1005.0 (#5415): + the core's run (drafts)
+                 "print('counts', tp_tick(c, True), obj_trash_tick(c, True))", env=("KALMIDO_RETENTION_PURGE=1",) if on else ())
     check("counts" in out and "Traceback" not in out, "trash run ran " + out[-800:])
     return out
 
@@ -130,16 +131,18 @@ def office_case(s, who):
     check(s.put(B + f"/api/office/docs/{did}/items", json={"items": [{"kind": "service", "title": "Shoot day", "qty": 2, "unit": "day", "rate": 500}]}).ok,
           f"{who}: setup position")
     r = s.delete(B + f"/api/office/docs/{did}")
-    tid = r.json().get("trash_id") if r.ok else None
-    check(r.ok and tid and one("SELECT COUNT(*) FROM office_docs WHERE id=?", (did,)) == 0, f"{who}: the draft goes, a trash copy {r.text[:160]}")
+    # 2.1005.0 (#5415): a draft lies in the core's trash (trash = {kind odoc, id}), the row stays with deleted_at
+    tid = (r.json().get("trash") or {}).get("id") if r.ok else None
+    check(r.ok and tid == did and one("SELECT COUNT(*) FROM office_docs WHERE id=? AND deleted_at IS NOT NULL", (did,)) == 1,
+          f"{who}: the draft goes into the trash {r.text[:160]}")
     lst = s.get(B + "/api/office/trash").json()
     check([x["id"] for x in lst["items"]] == [tid] and lst["items"][0]["kind"] == "doc" and "Spring" in lst["items"][0]["label"] and lst["days"] == 30,
           f"{who}: office trash lists it {lst}")
-    r = s.post(B + f"/api/office/trash/{tid}/restore")
+    r = s.post(B + f"/api/office/trash/core/odoc/{tid}/restore")
     d = s.get(B + f"/api/office/docs/{did}").json()
     check(r.ok and d.get("project_title") == f"Spring {who}" and [x["title"] for x in d.get("items") or []] == ["Shoot day"],
           f"{who}: restored with its position {r.text[:160]}")
-    check(s.post(B + f"/api/office/trash/{tid}/restore").status_code == 404, f"{who}: a second restore: 404")
+    check(s.post(B + f"/api/office/trash/core/odoc/{tid}/restore").status_code == 404, f"{who}: a second restore: 404")
     sv = s.post(B + "/api/office/services", json={"name_de": f"Schnitt {who}", "daily_rate": 400}).json()["id"]
     r = s.delete(B + f"/api/office/services/{sv}")
     # 2.905.0 (#5414): a service lies in the core's trash (trash = {kind, id}), the office trash lists it, restore through core/
@@ -148,9 +151,9 @@ def office_case(s, who):
     check(s.post(B + f"/api/office/trash/core/{st.get('kind')}/{sv}/restore").ok and s.get(B + f"/api/office/services/{sv}").json().get("daily_rate") == 400,
           f"{who}: the service is back")
     # into the trash again, made old
-    did_tid = s.delete(B + f"/api/office/docs/{did}").json().get("trash_id")
-    sql("UPDATE office_trash SET deleted_at=? WHERE id=?", (OLD, did_tid))
-    return did_tid
+    check(s.delete(B + f"/api/office/docs/{did}").ok, f"{who}: the draft into the trash again")
+    sql("UPDATE office_docs SET deleted_at=? WHERE id=?", (OLD, did))  # 2.1005.0 (#5415): the core's trash, the core's run
+    return did
 
 
 def section_case(s, who):
@@ -180,14 +183,14 @@ out = tick(False)
 for aid, path, fid, fpath, fresh in (fa, ff):
     check(one("SELECT COUNT(*) FROM attachments WHERE id=?", (aid,)) == 1 and os.path.isfile(os.path.join(ATT, path))
           and one("SELECT COUNT(*) FROM list_files WHERE id=?", (fid,)) == 1, "switch off: files stay")
-check(one("SELECT COUNT(*) FROM office_trash WHERE id IN (?, ?)", (oa, of)) == 2, "switch off: office copies stay")
-check("'attachments': 2" in out and "'list_files': 2" in out and "'office': 2" in out, "switch off: counted " + out[-400:])
+check(one("SELECT COUNT(*) FROM office_docs WHERE id IN (?, ?)", (oa, of)) == 2, "switch off: the drafts stay")  # 2.1005.0 (#5415): the core's trash
+check("'attachments': 2" in out and "'list_files': 2" in out, "switch off: counted " + out[-400:])
 tick(True)
 for aid, path, fid, fpath, fresh in (fa, ff):
     check(one("SELECT COUNT(*) FROM attachments WHERE id=?", (aid,)) == 0 and not os.path.exists(os.path.join(ATT, path)), "switch on: old task file gone (row + disk)")
     check(one("SELECT COUNT(*) FROM list_files WHERE id=?", (fid,)) == 0 and not os.path.exists(os.path.join(ATT, fpath)), "switch on: old project file gone")
     check(one("SELECT COUNT(*) FROM attachments WHERE id=?", (fresh,)) == 1, "switch on: the fresh one stays")
-check(one("SELECT COUNT(*) FROM office_trash WHERE id IN (?, ?)", (oa, of)) == 0, "switch on: old office copies gone")
+check(one("SELECT COUNT(*) FROM office_docs WHERE id IN (?, ?)", (oa, of)) == 0, "switch on: old drafts gone")  # 2.1005.0 (#5415)
 
 # ---- list_purge: fields, tags and section names into the inbox
 LP = A.post(B + "/api/lists", json={"name": "Old project"}).json()["id"]

@@ -137,7 +137,7 @@ OWN_ROUTES = {
     "GET /api/office/trips", "POST /api/office/trips", "PATCH /api/office/trips/<int:tid>", "DELETE /api/office/trips/<int:tid>",
     "POST /api/office/trips/<int:tid>/items", "PATCH /api/office/trips/<int:tid>/items/<int:iid>",
     "DELETE /api/office/trips/<int:tid>/items/<int:iid>", "GET /api/office/trips/purposes",
-    "POST /api/office/trips/trash/<int:tid>/restore",  # 2.530.0 C (#4315): the undo of deleting (office/travel.py rk_trash_restore)
+    "POST /api/office/trips/<int:tid>/restore", "POST /api/office/trips/<int:tid>/items/<int:iid>/restore",  # 2.1005.0 (#5415): out of the core's trash
     "GET /api/office/vehicles", "GET /api/office/drives", "POST /api/office/drives", "PATCH /api/office/drives/<int:did>",
     "DELETE /api/office/drives/<int:did>", "POST /api/office/drives/<int:did>/restore", "GET /api/office/drives/<int:did>/log",
     "GET /api/office/meals", "GET /api/office/meals/choices", "GET /api/office/meals/<int:mid>", "POST /api/office/meals",
@@ -160,6 +160,7 @@ OWN_ROUTES = {
     "POST /api/office/cards/statements/<int:sid>/lines", "PATCH /api/office/cards/lines/<int:lid>", "DELETE /api/office/cards/lines/<int:lid>",
     "GET /api/office/cards/lines/<int:lid>/candidates", "POST /api/office/cards/lines/<int:lid>/match",
     "POST /api/office/cards/lines/<int:lid>/unmatch", "POST /api/office/cards/lines/<int:lid>/upload",
+    "POST /api/office/cards/lines/<int:lid>/restore",  # 2.1005.0 (#5415): out of the core's trash (office/cardlines.py cl_restore)
     # 2.570.0 (#4783): the history of an own entry (the route runs the checks of its save route: 404 for anybody else's)
     "GET /api/office/trips/<int:tid>/history", "GET /api/office/trips/<int:tid>/items/<int:iid>/history",
     "GET /api/office/drives/<int:did>/history", "GET /api/office/meals/<int:mid>/history", "GET /api/office/cards/lines/<int:lid>/history",
@@ -878,7 +879,7 @@ def _ofr_trash_ctx():
 def _ofr_trash_back(c, oid, row):
     """2.905.0 (#5414, review): a group out of the trash hands out no rights - members added while it was being deleted
     (a parallel ofr_person_put) go, as the hard delete's ON DELETE CASCADE did before."""
-    _ofr_members_out(c, oid, row["id"])
+    _ofr_members_out(c, oid, row["id"])  # the rights log's restore: office/otrash.py otb_core_restore (2.997.0, #5708)
 
 
 def _ofr_members_out(c, oid, gid):

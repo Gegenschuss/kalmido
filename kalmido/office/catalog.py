@@ -30,7 +30,7 @@ from ..core.config import APP_VERSION, app
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.i18n import N_, lg_base, tr
 from ..core.pg import insert_id, write_lock
-from ..core.access import Denied
+from ..core.access import Denied, live_sql  # 2.1005.0 (#5415): live_sql
 from ..calendars.subscriptions import CalError, cal_allow_parse, cal_host_allowed, cal_http, cal_norm_url
 from .packs import PACK_DIR, office_pack, office_pack_validate
 from .model import office_gate, office_org, office_role, office_settings
@@ -414,7 +414,7 @@ def pkc_in_use(c, oid, kind, code):
         return tr(PKC_E_USE_RULES)
     docs = set()
     for r in c.execute("SELECT p.* FROM office_doc_parts p JOIN office_docs d ON d.id=p.doc_id WHERE p.org_id=? AND d.org_id=? "
-                       "AND p.kind='shoot' AND d.kind='offer' AND d.locked_at IS NULL", (oid, oid)).fetchall():
+                       f"AND p.kind='shoot' AND d.kind='offer' AND d.locked_at IS NULL AND {live_sql('d')} AND {live_sql('p')}", (oid, oid)).fetchall():  # 2.1005.0 (#5415): not the trash
         try:
             sh = json.loads(oc_dec_fields(c, oid, "office_doc_parts", r).get("sheet") or "{}")
         except (TypeError, ValueError):
@@ -474,11 +474,11 @@ def pkc_affects(c, oid, kind, code):
     if kind == "country":
         if s.get("pack") != code:
             return 0
-        return c.execute("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NULL", (oid,)).fetchone()[0]
+        return c.execute(f"SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NULL AND {live_sql()}", (oid,)).fetchone()[0]  # 2.1005.0 (#5415): not the trash
     if code not in (s.get("industry_packs") or []):
         return 0
     return c.execute("SELECT COUNT(DISTINCT d.id) FROM office_doc_parts p JOIN office_docs d ON d.id=p.doc_id WHERE p.org_id=? "
-                     "AND d.org_id=? AND p.kind='shoot' AND d.kind='offer' AND d.locked_at IS NULL", (oid, oid)).fetchone()[0]
+                     f"AND d.org_id=? AND p.kind='shoot' AND d.kind='offer' AND d.locked_at IS NULL AND {live_sql('d')} AND {live_sql('p')}", (oid, oid)).fetchone()[0]  # 2.1005.0 (#5415): not the trash
 
 
 def pkc_catalog(c, uid, oid, q="", kind="", force=False):

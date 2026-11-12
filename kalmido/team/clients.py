@@ -7,7 +7,7 @@ from datetime import date
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, system_ctx, table_columns
+from ..core.pg import insert_id, qi, system_ctx, table_columns
 from ..core.i18n import LANGS, N_, tr, trn
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, usettings
 from ..core.retention import ret_days
@@ -460,7 +460,7 @@ def cl_locked_docs(c, cid, real=False):
     """2.148.1 B (#2484): do finalised documents (of its organisation or of a personal office) refer to client cid?
     2.223.3 B (#2878): real = not trial documents."""
     with system_ctx(c):  # existence only: the documents of the office area the client belongs to
-        return bool(c.execute("SELECT 1 FROM office_docs WHERE client_id=? AND locked_at IS NOT NULL" + (" AND trial=0" if real else "")
+        return bool(c.execute(f"SELECT 1 FROM office_docs WHERE client_id=? AND locked_at IS NOT NULL AND {live_sql()}" + (" AND trial=0" if real else "")  # 2.1005.0 (#5415): not the trash
                               + " LIMIT 1", (cid,)).fetchone())
 
 
@@ -579,8 +579,9 @@ def client_anonymize(cid):
 CL_HOLD = ("office_docs", "office_contracts", "office_archive", "office_drives", "office_trips")
 # 2.223.3 B (#2878): of these only finalised documents hold a client (not drafts, not trial documents), trips only with
 # receipt items; contracts, the archive and the logbook (it prints the client's name from here) as before
-CL_HOLD_WHERE = {"office_docs": "x.locked_at IS NOT NULL AND x.trial=0",
-                 "office_trips": "x.id IN (SELECT trip_id FROM office_trip_items)",
+CL_HOLD_WHERE = {"office_docs": f"x.locked_at IS NOT NULL AND x.trial=0 AND {live_sql('x')}",  # 2.1005.0 (#5415): not the trash
+                 # 2.1005.0 (#5415): a trip / receipt in the core's trash holds nobody (as the contracts)
+                 "office_trips": f"{live_sql('x')} AND x.id IN (SELECT trip_id FROM office_trip_items i WHERE {live_sql('i')})",
                  # 2.905.0 (#5414, review): a framework contract in the office trash (soft delete since 4c) holds nobody
                  "office_contracts": live_sql("x")}
 
@@ -593,7 +594,7 @@ def cl_hold_sql(t="clients"):
 
 # 2.223.3 B (#2878): what reads a held client's name / address live instead of its own copy (anonymising would change it):
 # finalised documents without the recipient snapshot (older ones: the e-invoice address), the logbook, trips with receipts
-CL_LIVE_READERS = (("office_docs", "x.locked_at IS NOT NULL AND x.trial=0 AND COALESCE(x.recipient_snapshot, '') IN ('', '{}')"),
+CL_LIVE_READERS = (("office_docs", f"x.locked_at IS NOT NULL AND x.trial=0 AND {live_sql('x')} AND COALESCE(x.recipient_snapshot, '') IN ('', '{{}}')"),  # 2.1005.0 (#5415)
                    ("office_drives", "1=1"), ("office_trips", CL_HOLD_WHERE["office_trips"]))
 # the columns anonymising empties (the customer number stays: DATEV books older invoices under it; no contact data)
 CL_ANON_COLS = ("display_name", "name_extra", "short_code", "contact", "email", "phone", "address", "street", "zip", "city", "country", "address_extra",
@@ -667,7 +668,8 @@ def cl_refs_many(c, ids):
         for k in range(0, len(ids), 500):
             part = [int(x) for x in ids[k:k + 500]]
             q = ",".join("?" * len(part))
-            sel = [f"SELECT {n} AS k, COUNT(*) AS n FROM {t} WHERE {col} IN ({q})" for n, (t, col) in enumerate(refs)]
+            sel = [f"SELECT {n} AS k, COUNT(*) AS n FROM {qi(t, {x[0] for x in refs})} WHERE {qi(col, {x[1] for x in refs})} IN ({q})" + (f" AND {live_sql()}" if t == "office_docs" else "")
+                   for n, (t, col) in enumerate(refs)]  # 2.1005.0 (#5415): a draft in the trash is not counted
             sel.append(f"SELECT -1 AS k, COUNT(*) AS n FROM lists WHERE client_id IN ({q})")
             for r in c.execute(" UNION ALL ".join(sel), part * len(sel)).fetchall():
                 if r[0] < 0:

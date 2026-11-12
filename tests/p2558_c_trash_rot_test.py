@@ -13,6 +13,9 @@ freelancer-matrix: office
  - 2.905.0 (#5414): a device goes into the core's trash now (its row stays, deleted_at): the rotation re-encrypts the row as
    any other, the restore (POST /api/office/trash/core/omd_equipment/<id>/restore) reads it; the copies above are made as
    before 2.905 (old_copy: the row as a copy in office_trash, the row deleted) - such old copies stay until their period ends
+ - 2.1005.0 (#5415): such an old copy is written back as a row of the core's trash at the next start (the rotation's process
+   starts the app): re-encrypted as a row, restored through the core; the copy cases above run on the start balance of the
+   cash flow (the kind still kept as a copy, office/otrash.py OTB_KINDS)
 usage: p2558_c_trash_rot_test.py <datadir>"""
 import base64
 import json
@@ -25,6 +28,7 @@ import requests
 
 import dbx as dbxm
 from freelancer_fixture import freelancer
+from obj_probe import in_app  # 2.1005.0 (#5415)
 from kt import FAILS, OKS, check, sess, B, H, DATA  # noqa: F401
 
 N = os.path.dirname(os.path.abspath(__file__))
@@ -61,6 +65,13 @@ def old_copy(oid, eid):
         return c.execute("SELECT MAX(id) FROM office_trash WHERE ref_id=? AND kind='equipment'", (eid,)).fetchall()[0][0]
     finally:
         c.close()
+
+
+def cs_copy_amount(tid):
+    """2.1005.0 (#5415): the stored amount in the start balance's copy (office_trash.snap)."""
+    snap = json.loads(one("SELECT snap FROM office_trash WHERE id=?", (tid,)) or "{}")
+    rows = dict((t, r) for t, r in snap.get("rows") or [])
+    return (rows.get("office_cf_start") or [{}])[0].get("amount")
 
 
 def snap_vals(tid):
@@ -105,29 +116,43 @@ def case(s, who, oid):
     r = s.post(B + O + f"/trash/core/omd_equipment/{kid}/restore")
     j = s.get(B + O + f"/equipment/{kid}").json()
     check(r.ok and j.get("serial_no") == serial + "-K", f"{who}: restored from the core's trash, readable {r.text[:200]} {str(j)[:200]}")
+    # 2.1005.0 (#5415): an old copy of a device (made before 2.905) is written back into its table as a row of the core's trash
+    # at the next start (okern.ofk_copies_back; orgcrypt_cli loads the app, its start runs it): the rotation re-encrypts the
+    # row as any other, the core's restore reads it
     tid = old_copy(oid, eid)
     check(tid and one("SELECT COUNT(*) FROM office_equipment WHERE id=?", (eid,)) == 0, f"{who}: an old copy in the office trash")
     s1, p1 = snap_vals(tid)
     check(str(s1).startswith("kenc1:") and str(p1).startswith("kenc1:"), f"{who}: the copy keeps the sealed values {str(s1)[:12]} {str(p1)[:12]}")
+    in_app("from kalmido.office.okern import ofk_copies_back\nprint(ofk_copies_back(c))\nc.commit()")  # what the next start does
+    check(one("SELECT serial_no FROM office_equipment WHERE id=? AND deleted_at IS NOT NULL", (eid,)) == s1, f"{who}: written back as stored (sealed)")
     rc, out, err = cli("rotate", "--org", str(oid))
     check(rc == 0 and "R2-" in out, f"{who}: rotation finished {rc} {out[-300:]} {err[-800:]}")
-    s2, p2 = snap_vals(tid)
-    check(str(s2).startswith("kenc1:") and s2 != s1 and str(p2).startswith("kenc1:") and p2 != p1,
-          f"{who}: the copy in the trash is re-encrypted with the new key")
-    rc, out, err = cli("rotate", "--org", str(oid))
-    s3, _ = snap_vals(tid)
-    check(rc == 0 and str(s3).startswith("kenc1:") and s3 != s2, f"{who}: a second rotation re-encrypts the copy again {rc} {out[-200:]}")
-    r = s.post(B + O + f"/trash/{tid}/restore")
-    check(r.ok, f"{who}: restore after the rotations {r.status_code} {r.text[:200]}")
+    s2 = one("SELECT serial_no FROM office_equipment WHERE id=? AND deleted_at IS NOT NULL", (eid,))
+    check(not one("SELECT 1 FROM office_trash WHERE id=?", (tid,)) and str(s2).startswith("kenc1:") and s2 != s1,
+          f"{who}: the copy is a row of the core's trash now, re-encrypted with the new key {str(s2)[:12]}")
+    r = s.post(B + O + f"/trash/core/omd_equipment/{eid}/restore")
+    check(r.ok, f"{who}: restore after the rotation {r.status_code} {r.text[:200]}")
     d = s.get(B + O + f"/equipment/{eid}")
     j = d.json() if d.ok else {}
     j = j.get("item", j) if isinstance(j, dict) else {}
     check(d.ok and j.get("serial_no") == serial and float(j.get("purchase_net") or 0) == price,
           f"{who}: serial number and price readable after restore {d.status_code} {str(j)[:300]}")
+    # the copies still made (2.1005.0: the start balance of the cash flow, office/otrash.py OTB_KINDS) are re-encrypted in their snap
+    check(s.put(B + O + "/cashflow/start", json={"amount": "1500.00", "day": "2026-01-02"}).ok, f"{who}: setup start balance")
+    r = s.delete(B + O + "/cashflow/start")
+    tcs = r.json().get("trash_id") if r.ok else None
+    a1 = cs_copy_amount(tcs)
+    check(tcs and str(a1).startswith("kenc1:"), f"{who}: the start balance's copy keeps its sealed amount {str(a1)[:12]}")
+    rc, out, err = cli("rotate", "--org", str(oid))
+    a2 = cs_copy_amount(tcs)
+    check(rc == 0 and str(a2).startswith("kenc1:") and a2 != a1, f"{who}: the copy in the trash is re-encrypted with the new key {rc} {out[-200:]}")
+    r = s.post(B + O + f"/trash/{tcs}/restore")
+    st = s.get(B + O + "/cashflow/start").json().get("start") or {}
+    check(r.ok and st.get("amount") == "1500.00", f"{who}: the start balance is readable after restore {r.status_code} {r.text[:200]} {st}")
     # 2.558.0 D (#4669, review F2): a copy sealed before an earlier rotation (old stock) opens with neither key: counted on
     # its own, the rotation still finishes (before the fix it stopped with "not finished" until --force)
-    r = s.post(B + O + "/equipment", json={"name": f"Stativ {who}", "serial_no": f"SN-{who}-old", "purchase_date": "2025-03-01"})
-    tid2 = old_copy(oid, r.json()["id"])  # 2.905.0 (#5414): an old copy (made before 2.905)
+    s.delete(B + O + "/cashflow/start")
+    tid2 = one("SELECT MAX(id) FROM office_trash WHERE org_id=? AND kind='cf_start'", (oid,))
     old = one("SELECT snap FROM office_trash WHERE id=?", (tid2,))
     rc, out, err = cli("rotate", "--org", str(oid))
     c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
@@ -142,7 +167,6 @@ def case(s, who, oid):
     check(rc == 0 and "R2-" in out and t.get("finished") and t.get("trash_unreadable", 0) >= 1 and t.get("unreadable") == 0,
           f"{who}: an unreadable old trash copy is counted on its own, the rotation finishes {rc} {t} {out[-300:]} {err[-300:]}")
     check(one("SELECT snap FROM office_trash WHERE id=?", (tid2,)) == old, f"{who}: the unreadable copy stays as it is")
-
 
 case(A, "alice", ORG)
 PERS = one("SELECT id FROM orgs WHERE personal_of=?", (FID,))

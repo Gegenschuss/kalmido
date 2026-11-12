@@ -27,7 +27,7 @@ from flask import Response, g, jsonify, request, stream_with_context
 
 from .exportleft import RX_LEFT_TABLES, left_lines  # 2.362.4 (#3107)
 from .orgexport import _ox_locked  # 2.370.0 (#2781)
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.config import app, APP_VERSION, ATT_DIR, OFFICE_DIR
 from ..core.db import connect, db, iso, now_utc
 from ..core.i18n import N_, lang, tr
@@ -157,7 +157,7 @@ def rx_counts(c, sub, along=True):
     with system_ctx(c):  # counts only (no content): the deleting admin may not see the records themselves
         if oid:
             # 2.144.10 B (#2576): trial documents are no records to keep
-            out["documents"] = c.execute("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL AND trial=0",
+            out["documents"] = c.execute(f"SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL AND trial=0 AND {live_sql()}",  # 2.1005.0 (#5415)
                                          (oid,)).fetchone()[0]
             out["archive"] = c.execute("SELECT COUNT(*) FROM office_archive WHERE org_id=?", (oid,)).fetchone()[0]
             out["cash"] = c.execute("SELECT COUNT(*) FROM office_cash_entries WHERE org_id=?", (oid,)).fetchone()[0]
@@ -398,7 +398,7 @@ def _invoices(c, z, sub, done):
     """Every finalised document: its stored PDF / XML (decrypted), else rendered from its snapshot."""
     oid = sub["office"]
     # 2.144.10 B (#2576): no trial documents (the tables below keep their rows with the trial column)
-    for r in c.execute("SELECT * FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL AND trial=0 ORDER BY date, id", (oid,)).fetchall():
+    for r in c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL AND trial=0 AND {live_sql()} ORDER BY date, id", (oid,)).fetchall():  # 2.1005.0 (#5415): never one of the trash (a draft is never finalised anyway)
         stem = "invoices/" + _safe_part(epdf_name(r), 100)
         p, x = _stored(oid, r, "pdf"), _stored(oid, r, "xml")
         try:

@@ -20,6 +20,7 @@ from decimal import Decimal
 
 from flask import g, jsonify, request, Response
 
+from ..core.access import live_sql  # 2.1005.0 (#5415)
 from ..core.config import app
 from ..core.i18n import N_, short_day, tr
 from ..core.db import db, local_now
@@ -250,7 +251,7 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
     out, memo = [], {}
     docs = c.execute("SELECT d.*, cl.customer_no AS dx_customer_no, cl.name AS dx_client_name FROM office_docs d "
                      "LEFT JOIN clients cl ON cl.id=d.client_id WHERE d.org_id=? AND d.kind IN ('invoice','credit') "
-                     "AND d.locked_at IS NOT NULL AND d.number != '' AND d.date>=? AND d.date<=? AND d.trial=0 "
+                     f"AND d.locked_at IS NOT NULL AND d.number != '' AND d.date>=? AND d.date<=? AND d.trial=0 AND {live_sql('d')} "
                      "ORDER BY d.date, d.number",
                      (oid, d_from, d_to)).fetchall()
     for r in docs:
@@ -316,7 +317,7 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
     pays = c.execute("SELECT p.id AS p_id, p.date AS p_date, p.amount AS p_amount, p.method AS p_method, d.*, cl.customer_no AS dx_customer_no, "
                      "cl.name AS dx_client_name FROM office_payments p JOIN office_docs d ON d.id=p.doc_id "
                      "LEFT JOIN clients cl ON cl.id=d.client_id WHERE p.org_id=? AND d.org_id=? AND p.date>=? AND p.date<=? "
-                     "AND d.trial=0 ORDER BY p.date, p.id", (oid, oid, d_from, d_to)).fetchall()
+                     f"AND d.trial=0 AND {live_sql('d')} ORDER BY p.date, p.id", (oid, oid, d_from, d_to)).fetchall()
     outside = 0
     for r in pays:
         if inc_ids is not None and r["p_id"] not in inc_ids and any(a <= r["p_date"] <= b for a, b, x in segs if x):

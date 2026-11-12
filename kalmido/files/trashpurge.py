@@ -104,7 +104,7 @@ def tp_tick(c, force=False):
         fc, fp = atr_tick(c, cut, purge)  # 2.272.0 E2 (#3038): task / comment / project files (unlinked after the commit)
         counts.update(fc)
         paths += fp
-        counts["office"] = otb_tick(c, cut, purge)  # 2.272.0 E2 (#3038): document drafts and master data (rows only)
+        counts["office"] = otb_tick(c, cut, purge)  # 2.272.0 E2 (#3038); 2.1005.0 (#5415): the copies left (start balance, sign-off records)
         try:  # 2.567.0 A (#4707): household budget entries (with their receipts), templates, categories
             with c.savepoint():
                 bc, bp = bud_trash_tick(c, cut, purge)

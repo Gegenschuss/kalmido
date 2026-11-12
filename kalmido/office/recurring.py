@@ -21,7 +21,7 @@ from flask import g, jsonify, request
 
 from ..core.config import PUBLIC_URL, app, WATCHDOG_INTERVAL
 from ..core.db import IntegrityError, body, bump, db, iso, local_now, now_utc, uset, usettings
-from ..core.access import Denied, my_inbox
+from ..core.access import Denied, live_sql, my_inbox
 from ..core.i18n import LANGS, N_, lang, short_day, tr, tr_stored, trn
 from .doclang import doc_lg  # 2.185.0 C (#2520)
 from .pdfweb import epdf_sweep  # 2.355.0 A (#2847)
@@ -146,7 +146,7 @@ def rin_template_ok(c, oid, tid):
         tid = int(tid)
     except (TypeError, ValueError):
         raise Denied(404) from None
-    r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (tid, oid)).fetchone()
+    r = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (tid, oid)).fetchone()  # 2.1005.0 (#5415): not the trash
     if not r or r["kind"] != "invoice":
         raise Denied(404)
     if r["status"] == "cancelled":
@@ -215,13 +215,13 @@ def rin_clean(c, oid, b, cur=None):
 
 
 def _last_made(c, oid, sid):
-    r = c.execute("SELECT MAX(series_period) FROM office_docs WHERE org_id=? AND series_id=? AND series_period<>''", (oid, sid)).fetchone()
+    r = c.execute(f"SELECT MAX(series_period) FROM office_docs WHERE org_id=? AND series_id=? AND series_period<>'' AND {live_sql()}", (oid, sid)).fetchone()
     return r[0] if r and r[0] else ""
 
 
 def rin_public(c, oid, r, made_all=None):
     from .invoices import inv_money_fields, inv_paid_map, inv_state
-    t = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (r["template_id"], oid)).fetchone() if r["template_id"] else None
+    t = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (r["template_id"], oid)).fetchone() if r["template_id"] else None
     tt = _j(t["totals"]) if t else {}
     tpl = None
     if t is not None:
@@ -248,7 +248,7 @@ def _made(c, oid, sids):
     out = {}
     if not sids:
         return out
-    for x in c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND series_id IN ({','.join('?' * len(sids))}) ORDER BY series_period DESC, id DESC",
+    for x in c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND series_id IN ({','.join('?' * len(sids))}) AND {live_sql()} ORDER BY series_period DESC, id DESC",
                        (oid, *sids)):
         out.setdefault(x["series_id"], []).append(x)
     return out
@@ -258,7 +258,7 @@ def _made(c, oid, sids):
 def rin_make(c, oid, uid, s, period):
     """A new invoice draft of series row s for the period starting at period (see the module text); its id, or None when
     the period has its invoice already (unique index) or the template is gone. The caller commits."""
-    t = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (s["template_id"], oid)).fetchone() if s["template_id"] else None
+    t = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (s["template_id"], oid)).fetchone() if s["template_id"] else None
     if t is None or t["kind"] != "invoice" or t["status"] == "cancelled" or t["trial"]:  # 2.144.10 A (#2576): never from a trial one
         return None
     t = oc_dec_fields(c, oid, "office_docs", t)
@@ -416,7 +416,7 @@ def _tell(c, people, key, name, text, doc_id=None):
 def _name(c, oid, s):
     if s["title"]:
         return s["title"]
-    t = c.execute("SELECT project_title, recipient FROM office_docs WHERE id=? AND org_id=?", (s["template_id"], oid)).fetchone() if s["template_id"] else None
+    t = c.execute(f"SELECT project_title, recipient FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (s["template_id"], oid)).fetchone() if s["template_id"] else None
     return (rin_bare(t["project_title"]) or _j(t["recipient"]).get("name") or "") if t else ""
 
 
@@ -526,7 +526,7 @@ def _rin_as(c, oid, sid, today, actor, people):
         if s is None or not s["next_date"] or s["next_date"] > today:
             c.rollback()
             return
-        t = c.execute("SELECT kind, status FROM office_docs WHERE id=? AND org_id=?", (s["template_id"], oid)).fetchone() if s["template_id"] else None
+        t = c.execute(f"SELECT kind, status FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (s["template_id"], oid)).fetchone() if s["template_id"] else None
         if t is None or t["kind"] != "invoice" or t["status"] == "cancelled":
             c.execute("UPDATE office_inv_series SET active=0, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
             name = _name(c, oid, s)
@@ -566,7 +566,7 @@ def rin_cashflow(c, oid, put, first, last_day, today, nf):
         return
     st = office_settings(c, oid)
     days0 = int(st.get("payment_days") or 14)
-    for d in c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND series_id IS NOT NULL AND status='draft' "
+    for d in c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND series_id IS NOT NULL AND status='draft' AND {live_sql()} "
                        "AND (locked_at IS NULL OR locked_at='')", (oid,)):
         if not any(s["id"] == d["series_id"] for s in sts):
             continue
@@ -577,7 +577,7 @@ def rin_cashflow(c, oid, put, first, last_day, today, nf):
             put(day, "in", "plan", "series", dec(_j(d["totals"]).get("gross") or 0) / _fx(d, home) * nf(d), d["project_title"] or "",
                 number=d["number"], doc_id=d["id"], series_id=d["series_id"], period=d["series_period"])
     for s in sts:
-        t = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (s["template_id"], oid)).fetchone() if s["template_id"] else None
+        t = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (s["template_id"], oid)).fetchone() if s["template_id"] else None
         if t is None or t["kind"] != "invoice" or t["status"] == "cancelled":
             continue
         gross = dec(_j(t["totals"]).get("gross") or 0) / _fx(t, home) * nf(t)
@@ -698,7 +698,7 @@ def rin_run(sid):
     s = rin_row(c, oid, sid)
     if not s["next_date"] or (s["until"] and s["next_date"] > s["until"]):
         raise Denied(409, tr("The series has ended; set a later end first"))
-    t = c.execute("SELECT kind, status FROM office_docs WHERE id=? AND org_id=?", (s["template_id"], oid)).fetchone() if s["template_id"] else None
+    t = c.execute(f"SELECT kind, status FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (s["template_id"], oid)).fetchone() if s["template_id"] else None
     if t is None or t["kind"] != "invoice" or t["status"] == "cancelled":
         raise Denied(409, tr("The template invoice of the series was deleted or cancelled. Select another one and switch the series on again."))
     prev = s["next_date"]

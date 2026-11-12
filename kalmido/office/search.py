@@ -16,6 +16,7 @@ from ..core.db import db, usettings
 from ..core.ctx import me  # 2.1026.0 (#5280)
 from ..core.pg import like_escape
 from ..core.errors import BadInput, Denied
+from ..core.access import live_sql  # 2.1005.0 (#5415)
 from ..core.srchreg import srch_q, srch_register  # 2.1026.0 (#5280)
 from ..accounts.orgroles import office_allowed, user_orgs_full
 from ..accounts.orgs import user_orgs
@@ -88,10 +89,10 @@ def bs_office_hits(c, uid, q):
             sub = r["contact"] if low in (r["contact"] or "").lower() and low not in (r["name"] or "").lower() else ""
             out.append({"kind": "client", "id": r["id"], "label": r["name"] or "…", "sub": sub or r["customer_no"] or "",
                         "go": f"client/{int(r['id'])}"})
-    # documents: the columns the document list searches (odoc_list ?q=); the recipient JSON only by its values
+    # documents: the columns the document list searches (odoc_list ?q=); the recipient JSON only by its values; 2.1005.0 (#5415): not the trash
     rows = c.execute(f"""SELECT d.id, d.kind, d.number, d.project_title, d.project_ref, d.recipient, d.date, cl.name AS client_name
             FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id
-            WHERE d.org_id=? AND (d.number ILIKE ? ESCAPE '\\' OR d.project_title ILIKE ? ESCAPE '\\' OR d.project_ref ILIKE ? ESCAPE '\\'
+            WHERE d.org_id=? AND {live_sql('d')} AND (d.number ILIKE ? ESCAPE '\\' OR d.project_title ILIKE ? ESCAPE '\\' OR d.project_ref ILIKE ? ESCAPE '\\'
                 OR d.recipient ILIKE ? ESCAPE '\\' OR cl.name ILIKE ? ESCAPE '\\')
             ORDER BY (lower(d.number) LIKE ? ESCAPE '\\') DESC, d.date DESC, d.id DESC LIMIT {BS_LIMIT * 6} -- pg-ok: both sides lower-cased""",
                      (oid, like, like, like, like, like, f"{like_escape(low)}%")).fetchall()

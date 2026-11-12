@@ -27,7 +27,7 @@ from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
-from ..core.access import Denied, need_list, vis_sql
+from ..core.access import Denied, live_sql, need_list, vis_sql  # 2.1005.0 (#5415): live_sql
 from ..core.errors import BadInput
 from .owrite import ow_crypt, ow_history_answer, ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
 from .model import office_gate, office_org, office_settings, pb_cl_live, pb_cl_sql, pb_owner, trial_flag
@@ -922,7 +922,7 @@ def dt_names(c, oid, rows):
         out["lists"] = {r["id"]: r["name"] for r in c.execute(f"SELECT id, name FROM lists WHERE id IN ({','.join('?' * len(lids))}) AND id IN {vis_sql()}",
                                                               lids + [uid, uid])}
     if dids:
-        out["offers"] = {r["id"]: r["number"] or "" for r in c.execute(f"SELECT id, number FROM office_docs WHERE org_id=? AND id IN ({','.join('?' * len(dids))})", [oid] + dids)}
+        out["offers"] = {r["id"]: r["number"] or "" for r in c.execute(f"SELECT id, number FROM office_docs WHERE org_id=? AND {live_sql()} AND id IN ({','.join('?' * len(dids))})", [oid] + dids)}  # 2.1005.0 (#5415): not the trash
     return out
 
 
@@ -987,7 +987,7 @@ def dt_docs_list():
         out["offers"] = [{"id": r["id"], "number": r["number"] or "", "client_id": r["client_id"], "project_title": r["project_title"] or "",
                           "status": r["status"], "trial": bool(r["trial"])} for r in  # 2.144.10 A (#2576)
                          c.execute("SELECT id, number, client_id, project_title, status, trial FROM office_docs WHERE org_id=? AND kind='offer' "
-                                   "AND client_id IS NOT NULL ORDER BY id DESC LIMIT ?", (oid, LIST_MAX))]
+                                   f"AND client_id IS NOT NULL AND {live_sql()} ORDER BY id DESC LIMIT ?", (oid, LIST_MAX))]  # 2.1005.0 (#5415): not the trash
         tpls = c.execute("SELECT * FROM office_doc_templates WHERE org_id=? AND archived=0 ORDER BY lower(name), id LIMIT ?", (oid, LIST_MAX)).fetchall()
         out["templates"] = [dt_tpl_public(oc_dec_fields(c, oid, "office_doc_templates", r)) for r in tpls]
         out.update(dt_meta(c, oid))

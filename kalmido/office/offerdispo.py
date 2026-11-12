@@ -21,7 +21,7 @@ from decimal import Decimal
 
 from ..accounts.onboarding import inds_of_area  # 2.828.0 (#5511): the set
 from ..accounts.orgroles import org_writes
-from ..core.access import Denied, acx_org_ok, need_feat
+from ..core.access import Denied, acx_org_ok, live_sql, need_feat  # 2.1005.0 (#5415): live_sql
 from ..core.db import iso, now_utc
 from ..core.errors import BadInput
 from ..core.i18n import tr
@@ -102,7 +102,7 @@ def odp_chain(c, oid, root):
     """2.589.0 (review F1): SQL condition + args of the bookings of a quotation chain: its root, or any document of the chain
     (deleting the first quotation moves the chain to the oldest remaining version, office/docs.py odoc_unlink_refs, like the
     tasks' fallback in office/offertasks.py otk_links)."""
-    ids = [x[0] for x in c.execute("SELECT id FROM office_docs WHERE org_id=? AND kind='offer' AND (id=? OR version_of=?)", (oid, root, root))]
+    ids = [x[0] for x in c.execute(f"SELECT id FROM office_docs WHERE org_id=? AND kind='offer' AND (id=? OR version_of=?) AND {live_sql()}", (oid, root, root))]  # 2.1005.0 (#5415): not the trash
     q = ",".join("?" * len(ids))
     return (f"(offer_root=? OR offer_doc IN ({q}))" if ids else "offer_root=?"), [root, *ids]
 

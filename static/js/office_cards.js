@@ -214,9 +214,9 @@ document.addEventListener('click', async e => {
   else if (a === 'editline') ccLineDlg(ccLineOf(id));
   else if (a === 'delline') {
     const x = ccLineOf(id), req = {day: x.day, merchant: x.merchant, amount: x.amount, orig_amount: x.orig_amount, orig_currency: x.orig_currency, kind: x.kind};
-    let cur = id, tid = null;  // 2.552.0 (#4561 B21): the undo writes the office trash copy back (same id), else types it in again
-    ccDo(tr('Position removed'), async () => { tid = (await api('DELETE', `/api/office/cards/lines/${cur}`)).trash_id || null; },
-      async () => { const r = await (tid ? api('POST', `/api/office/cards/trash/${tid}/restore`) : api('POST', `/api/office/cards/statements/${sid}/lines`, req)); cur = r.line.id; return r.note ? {note: r.note} : undefined; });  // 2.560.0 (#4667): the office trash's sentence when something it named is gone for good
+    let cur = id, core = false;  // 2.1005.0 (#5415): the undo takes it out of the core's trash (same id), else types it in again
+    ccDo(tr('Position removed'), async () => { const d = await api('DELETE', `/api/office/cards/lines/${cur}`); core = !!d.trash; },  // 2.1005.0 (#5415): trash = the core's trash
+      async () => { const r = await (core ? api('POST', `/api/office/cards/lines/${cur}/restore`) : api('POST', `/api/office/cards/statements/${sid}/lines`, req)); cur = r.line.id; return r.note ? {note: r.note} : undefined; });  // 2.560.0 (#4667): the office trash's sentence when something it named is gone for good
   } else if (a === 'mark') {
     ccMarkLine(id, b.dataset.v, ccLineOf(id)?.state || 'open');
   } else if (a === 'match') ccMatchLine(id, +b.dataset.node);

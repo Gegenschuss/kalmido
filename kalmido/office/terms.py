@@ -46,7 +46,7 @@ from ..core.config import app, OFFICE_DIR
 from ..core.i18n import LANGS, N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, local_now, now_utc
 from ..core.retention import ret_on, ret_report  # 2.272.0 A (#3026)
-from ..core.access import Denied
+from ..core.access import Denied, live_sql  # 2.1005.0 (#5415): live_sql
 from ..core.errors import DeniedKey
 from ..core.orgcrypt import oc_read_file, oc_write_file
 from .pdf import pdf_date
@@ -495,7 +495,7 @@ def agb_sig_terms(c, r):
     """The terms of approval link r, or None: a quotation's like its PDF line (frozen when finalised, a quotation sent without
     finalising the current state), a finished document's frozen state."""
     if r["kind"] == "offer" and r["doc_id"]:
-        d = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (r["doc_id"], r["org_id"])).fetchone()
+        d = c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (r["doc_id"], r["org_id"])).fetchone()  # 2.1005.0 (#5415): not the trash
         return agb_doc_terms(c, r["org_id"], d) if d is not None else None
     if r["kind"] == "document" and r["gen_doc_id"]:
         d = c.execute("SELECT terms FROM office_gen_docs WHERE id=? AND org_id=?", (r["gen_doc_id"], r["org_id"])).fetchone()

@@ -24,7 +24,7 @@ from flask import jsonify
 
 from ..core.config import app
 from ..core.i18n import N_, tr
-from ..core.access import Denied
+from ..core.access import Denied, live_sql  # 2.1005.0 (#5415): live_sql
 from ..core.pg import write_lock  # 2.360.0 B (#2496)
 from ..core.errors import BadInput, BadKey
 from .calc import TAX_KEYS, calc_lang, dec, dstr, fmt_money, fmt_qty, inv_calc, label, money
@@ -145,7 +145,7 @@ def abs_skonto_rows(c, oid, frm, to):
     out = []
     for r in c.execute("SELECT d.*, cl.customer_no AS dx_customer_no, cl.name AS dx_client_name FROM office_docs d LEFT JOIN clients cl "
                        "ON cl.id=d.client_id WHERE d.org_id=? AND d.kind='invoice' AND d.status='paid' AND d.locked_at IS NOT NULL "
-                       "AND d.trial=0 AND d.number != '' AND d.skonto_pct > 0 AND d.date<=? ORDER BY d.date, d.number", (oid, to)).fetchall():
+                       f"AND d.trial=0 AND d.number != '' AND d.skonto_pct > 0 AND d.date<=? AND {live_sql('d')} ORDER BY d.date, d.number", (oid, to)).fetchall():  # 2.1005.0 (#5415): not the trash
         sk = abs_skonto_taken(c, oid, r)
         if sk and frm <= sk["day"] <= to:
             out.append((r, sk))
@@ -219,7 +219,7 @@ def abs_progress_of(c, oid, offer_id, locked_only=False):
     """The progress invoices of quotation offer_id (not cancelled), oldest first."""
     q = " AND locked_at IS NOT NULL" if locked_only else ""
     # 2.144.10 B (#2576): only invoices of the quotation's own kind count (a real chain never counts trial ones, a trial chain in itself)
-    return c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND inv_type='progress' AND source_doc_id=? AND status<>'cancelled'"
+    return c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND inv_type='progress' AND source_doc_id=? AND status<>'cancelled' AND {live_sql()}"  # 2.1005.0 (#5415): not the trash
                      + q + " AND trial=(SELECT COALESCE(MAX(o.trial), 0) FROM office_docs o WHERE o.id=? AND o.org_id=?) ORDER BY date, id",
                      (oid, offer_id, offer_id, oid)).fetchall()
 
@@ -233,7 +233,7 @@ def _credited(c, oid, pid, pack, doc_items):
     """2.354.0 B (#2836): ({tax key: net}, {tax key: net in EUR}, {tax key: tax}) of the finalised credit notes on progress
     invoice pid (a partial credit lowers what the final invoice deducts)."""
     nets, eur, tax = {}, {}, {}
-    for cr in c.execute("SELECT id, totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL AND locked_at<>''",
+    for cr in c.execute(f"SELECT id, totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL AND locked_at<>'' AND {live_sql()}",  # 2.1005.0 (#5415): not the trash
                         (oid, pid)).fetchall():
         t = _j(cr["totals"], {})
         for k, v in _bases(t.get("lines")).items():
@@ -273,7 +273,7 @@ def abs_final_done(c, oid, offer_id, but=None):
     """2.120.0 (review M3): a finalised, not cancelled final invoice of quotation offer_id exists (other than id but) --
     then no second final invoice and no further progress invoice."""
     r = c.execute("SELECT id FROM office_docs WHERE org_id=? AND kind='invoice' AND inv_type='final' AND source_doc_id=? AND id<>? "
-                  "AND locked_at IS NOT NULL AND locked_at<>'' AND status NOT IN ('draft', 'cancelled') "
+                  f"AND locked_at IS NOT NULL AND locked_at<>'' AND status NOT IN ('draft', 'cancelled') AND {live_sql()} "  # 2.1005.0 (#5415): not the trash
                   "AND trial=(SELECT COALESCE(MAX(o.trial), 0) FROM office_docs o WHERE o.id=? AND o.org_id=?) LIMIT 1",  # 2.144.10 B (#2576)
                   (oid, offer_id, but or 0, offer_id, oid)).fetchone()
     if r:
@@ -422,7 +422,7 @@ def abs_credit_check(c, oid, inv_):
     if inv_ is None or inv_["kind"] != "invoice" or _col(inv_, "inv_type") != "progress" or not _col(inv_, "source_doc_id"):
         return
     for f in c.execute("SELECT abs_refs FROM office_docs WHERE org_id=? AND kind='invoice' AND inv_type='final' AND source_doc_id=? "
-                       "AND locked_at IS NOT NULL AND locked_at<>'' AND status NOT IN ('draft', 'cancelled')", (oid, inv_["source_doc_id"])).fetchall():
+                       f"AND locked_at IS NOT NULL AND locked_at<>'' AND status NOT IN ('draft', 'cancelled') AND {live_sql()}", (oid, inv_["source_doc_id"])).fetchall():  # 2.1005.0 (#5415): not the trash
         if inv_["id"] in [int(x) for x in _j(f["abs_refs"] or "[]", [])]:
             raise Denied(409, tr("The final invoice already deducts this progress invoice; cancel the final invoice first"))
 
@@ -440,7 +440,7 @@ def _stale_deductions(c, oid, r, items):
 def abs_before_finalize(c, oid, r, items=None):
     """A final invoice: the finalised, not cancelled progress invoices of its quotation are still those it deducts."""
     if r["kind"] == "credit" and _col(r, "cancels_id"):  # 2.354.0 B (#2836): also a credit draft made before the final invoice
-        abs_credit_check(c, oid, c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (r["cancels_id"], oid)).fetchone())
+        abs_credit_check(c, oid, c.execute(f"SELECT * FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (r["cancels_id"], oid)).fetchone())  # 2.1005.0 (#5415): not the trash
         return
     if r["kind"] != "invoice" or _col(r, "inv_type") not in ("final", "progress") or not _col(r, "source_doc_id"):
         return
