@@ -79,6 +79,8 @@ def jobs(*shards, extra=()):
     return [job(100, "Lint, i18n, scanners"), job(101, "Pull request lint (task number, changelog part, privacy, one-way steps)"),
             job(102, "semgrep"), job(103, "Shard plan (stage, suite times of the last runs)"), job(104, "E-invoice validators (veraPDF, KoSIT)"),
             job(105, "OWASP ZAP baseline"), job(106, "Image (build once, cache)"), job(107, "Merge queue gate", None, "in_progress"),
+            job(110, "Trivy image scan (reporting only)", "skipped"), job(111, "Browser demo + quick add languages", "skipped"),
+            job(112, "Test suites (API, UI, security)", "skipped"),
             *shards, *extra]
 
 
@@ -102,7 +104,19 @@ ok, txt, _ = gate.judge_queue("merge_group", {**NEEDS, "tests": OK}, jobs(shard(
 check(not ok and "hard job" in txt, f"a hard job (e-invoice validators) red: red ({txt})")
 ok, txt, soft = gate.judge_queue("merge_group", {**NEEDS, "tests": OK}, jobs(shard(1, 1), extra=[job(109, "Browser demo + quick add languages", "failure")]), lambda j: [], pats, GRP)
 check(ok and soft == ["Browser demo + quick add languages"], f"a soft job red: green, named ({txt})")
-for k in ("checks", "pr-lint", "semgrep", "plan"):
+# review (Fable 2.1021): a shard skipped / missing, more red suites than GitHub names, the red shard not in the list, a hard job not run
+ok, txt, _ = gate.judge_queue("merge_group", {**NEEDS, "tests": OK}, jobs(shard(1, 2), shard(2, 2, "skipped")), lambda j: [], pats, GRP)
+check(not ok, f"a skipped shard (its suites untested): red ({txt})")
+ok, txt, _ = gate.judge_queue("merge_group", {**NEEDS, "tests": OK}, jobs(shard(1, 3), shard(3, 3)), lambda j: [], pats, GRP)
+check(not ok and "missing" in txt, f"a shard missing from the job list: red ({txt})")
+ok, txt, _ = gate.judge_queue("merge_group", NEEDS, jobs(shard(1, 1)), lambda j: [], pats, GRP)
+check(not ok, f"tests red, but no red shard in the list: red ({txt})")
+ten = ["p2272_b_ui"] * gate.ANN_MAX
+ok, txt, _ = gate.judge_queue("merge_group", NEEDS, jobs(shard(1, 1, "failure")), lambda j: ten, pats, GRP)
+check(not ok and "maybe more" in txt, f"{gate.ANN_MAX} red suites named (GitHub names at most 10): unknown = red ({txt})")
+ok, txt, _ = gate.judge_queue("merge_group", {**NEEDS, "tests": OK}, jobs(shard(1, 1), extra=[job(113, "OWASP ZAP baseline", "skipped")]), lambda j: [], pats, GRP)
+check(not ok and "did not run" in txt, f"a hard job skipped: red ({txt})")
+for k in ("checks", "pr-lint", "semgrep", "plan", "einvoice", "zap"):
     ok, txt, _ = gate.judge_queue("merge_group", {**NEEDS, "tests": OK, k: {"result": "failure"}}, jobs(shard(1, 1)), lambda j: [], pats, GRP)
     check(not ok and k in txt, f"{k} red: red ({txt})")
 ok, txt, _ = gate.judge_queue("merge_group", {**NEEDS, "tests": {"result": "skipped"}}, jobs(), lambda j: [], pats, GRP)
@@ -120,6 +134,7 @@ ok, txt, _ = gate.judge_queue("push", NEEDS, [], lambda j: None, pats, {})
 check(not ok, f"another event: red ({txt})")
 # the release gate does not read a queue run as the full stage
 check(gate.stage(["Test suites 1/3 queue hart (API, UI, security)"]) == "?", "ci_gate.stage: a queue run is no full / push stage")
+check(gate.base_patterns(R, "HEAD") == [] and gate.base_patterns(R, "0" * 40) == [], "base_patterns: only a commit id, an unknown one = []")
 
 # ---- 3. ci.yml
 with open(os.path.join(R, ".github", "workflows", "ci.yml"), encoding="utf-8") as f:
@@ -135,6 +150,7 @@ qg = ci_job("queue-gate")
 check("name: Merge queue gate\n" in qg and re.search(r"needs: \[plan, checks, pr-lint, semgrep, einvoice, zap, tests\]", qg)
       and "if: always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group')" in qg,
       "ci.yml: the job Merge queue gate (name fixed, needs, runs for pull requests and queue entries)")
+check("QUEUE_BASE_SHA: ${{ github.event.merge_group.base_sha }}" in qg and "fetch-depth: 0" in qg, "ci.yml: the gate reads the hard list of the queue's base too")
 check("actions: read" in qg and "checks: read" in qg and "tools/ci_gate.py --queue-gate" in qg and "NEEDS: ${{ toJSON(needs) }}" in qg,
       "ci.yml: the gate reads the jobs and annotations of its run (tools/ci_gate.py --queue-gate)")
 check("if: github.event_name != 'pull_request'" in ci_job("plan"), "ci.yml: a pull request runs no plan, so no test shards")

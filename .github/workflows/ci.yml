@@ -796,6 +796,8 @@ jobs:
       checks: read  # the annotations naming the red suites
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0  # the queue's base commit (its tests/hard_suites.txt)
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
@@ -803,6 +805,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEEDS: ${{ toJSON(needs) }}
+          QUEUE_BASE_SHA: ${{ github.event.merge_group.base_sha }}  # review 10: the hard list of the base counts too
         run: python3 tools/ci_gate.py --queue-gate
 
   zap:

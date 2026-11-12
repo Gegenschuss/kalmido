@@ -56,7 +56,8 @@ SCAN_PREP = ("install scanners*", "pinned dependencies*")
 # cancelled mid-way may list only the steps it began)
 LINT_MUST = ("pinned dependencies*", "install scanners*", "bandit*", "pip-audit (image*")
 QUEUE_SHARD_RE = re.compile(r"^Test suites (\d+)/\d+ (full|push|queue)( hart)?\b")  # #5787: + the queue stage of a merge queue entry
-QUEUE_GATE = "Merge queue gate"  # #5787: the job name of ci.yml - a required check of the ruleset, keep it as it is
+QUEUE_GATE = "Merge queue gate"
+ANN_MAX = 10  # #5787 review 7: GitHub keeps at most 10 error annotations per step (tests/run_all.sh names a red suite by one)  # #5787: the job name of ci.yml - a required check of the ruleset, keep it as it is
 SOFT_CONCL = ("failure", "cancelled")  # #5600: the run conclusions judge_soft looks at (cancelled = a newer push cut the run)
 
 
@@ -209,7 +210,7 @@ def judge_queue(event, needs, jobs, suites_of, pats, grp):
     """#5787: the merge queue gate (see the head comment). event = GITHUB_EVENT_NAME, needs = {job id: {"result": ...}} of the
     gate job, jobs = the jobs of the own run (dicts: id, name, status, conclusion, steps), suites_of(job) -> its red suites
     (None = not readable). -> (green?, text, soft red parts)."""
-    must = ["checks", "pr-lint"] + (["plan", "semgrep"] if event == "merge_group" else [])
+    must = ["checks", "pr-lint"] + (["plan", "semgrep", "einvoice", "zap"] if event == "merge_group" else [])  # review 8: the hard jobs too
     for k in must:
         res = (needs.get(k) or {}).get("result")
         if res != "success":
@@ -226,10 +227,16 @@ def judge_queue(event, needs, jobs, suites_of, pats, grp):
     shards = [j for j in jobs if QUEUE_SHARD_RE.match(j.get("name") or "")]
     if not shards:
         return False, "no test shard in the job list of the run (unknown = hard)", []
+    want = {int(QUEUE_SHARD_RE.match(j["name"]).group(1)) for j in shards}
+    tot = max((int(re.match(r"^Test suites \d+/(\d+)", j["name"]).group(1)) for j in shards), default=0)
+    if want != set(range(1, tot + 1)):  # review 9: a shard missing from the list = unknown
+        return False, "shards missing from the job list (%d of %d)" % (len(want), tot), []
+    if tres == "failure" and all(j.get("conclusion") == "success" for j in shards):  # review 9: the list does not show the red shard
+        return False, "the shards are red, but the job list shows none red (unknown = hard)", []
     soft = []
     for j in shards:
         c = j.get("conclusion")
-        if c in ("success", "skipped"):
+        if c == "success":
             continue
         if c != "failure":  # cancelled / timed out / not finished: its suites are untested = unknown = hard
             return False, "shard not finished: %s (%s)" % (j.get("name"), c or j.get("status")), soft
@@ -238,13 +245,19 @@ def judge_queue(event, needs, jobs, suites_of, pats, grp):
             return False, "the red suites of %s are not readable (unknown = hard)" % j.get("name"), soft
         if not su:
             return False, "%s red without a named suite (unknown = hard)" % j.get("name"), soft
+        if len(su) >= ANN_MAX:  # review 7: GitHub keeps at most 10 error annotations per step - more red suites are not all named
+            return False, "%s: %d red suites named, maybe more than GitHub shows (unknown = hard)" % (j.get("name"), len(su)), soft
         for x in su:
             if hard_suite(x, pats, grp):
                 return False, "hard suite red: %s (%s)" % (x, j.get("name")), soft
             soft.append(x)
     for j in jobs:
         name = j.get("name") or ""
-        if name == QUEUE_GATE or QUEUE_SHARD_RE.match(name) or j.get("conclusion") in ("success", "skipped", "neutral"):
+        if name == QUEUE_GATE or QUEUE_SHARD_RE.match(name) or j.get("conclusion") == "success":
+            continue
+        if j.get("conclusion") in ("skipped", "neutral"):  # review 8: a hard job that did not run is no green one
+            if hard_job(j, pats) and not name.lower().startswith(("lint", "test suites")) and "reporting only" not in name.lower():
+                return False, "hard job did not run: %s" % name, soft
             continue
         if j.get("status") not in (None, "completed") or j.get("conclusion") is None:
             if hard_job(j, pats) and not name.lower().startswith("lint"):
@@ -302,6 +315,17 @@ def api(path):
         return json.load(f)
 
 
+def base_patterns(tree, sha):
+    """#5787 review 10: the patterns of tests/hard_suites.txt in commit sha of the checkout TREE ([] = none / not readable)."""
+    if not re.fullmatch(r"[0-9a-f]{7,64}", sha or ""):
+        return []
+    try:
+        p = subprocess.run(["git", "-C", tree, "show", sha + ":tests/hard_suites.txt"], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return [ln.strip().lower() for ln in p.stdout.splitlines() if ln.strip() and not ln.lstrip().startswith("#")] if p.returncode == 0 else []
+
+
 def queue_gate(tree):
     """#5787: ci.yml job "Merge queue gate" - the jobs of the own run (this attempt) and their annotations, judge_queue."""
     repo, rid = os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GITHUB_RUN_ID", "")
@@ -320,12 +344,17 @@ def queue_gate(tree):
             print("queue gate: GITHUB_REPOSITORY / GITHUB_RUN_ID missing")
             return 1
         try:
+            total = 0
             for page in range(1, 6):
                 d = api("/repos/%s/actions/runs/%s/attempts/%s/jobs?per_page=100&page=%d" % (repo, rid, att, page))
                 more = d.get("jobs", [])
                 jobs += more
-                if not more or len(jobs) >= int(d.get("total_count") or 0):
+                total = int(d.get("total_count") or 0)
+                if not more or len(jobs) >= total:
                     break
+            if len(jobs) < total:  # review 9: a cut list = unknown
+                print("queue gate: the job list is incomplete (%d of %d)" % (len(jobs), total))
+                return 1
         except Exception as e:  # noqa: BLE001 - no job list = unknown = red
             print("queue gate: no job list of the run: %s" % e)
             return 1
@@ -340,7 +369,9 @@ def queue_gate(tree):
             return None
         return [m.group(1) for m in map(SUITE_ANN_RE.match, titles) if m]
 
-    ok, txt, soft = judge_queue(ev, needs, jobs, suites_of, patterns(tree), groups(tree) if ev == "merge_group" else {})
+    # review 10: the hard list of the queue's base too (the entry cannot make its own red suite soft by editing the list)
+    pats = sorted(set(patterns(tree)) | set(base_patterns(tree, os.environ.get("QUEUE_BASE_SHA", ""))))
+    ok, txt, soft = judge_queue(ev, needs, jobs, suites_of, pats, groups(tree) if ev == "merge_group" else {})
     print("queue gate (%s): %s - %s" % (ev, "green" if ok else "red", txt), flush=True)
     summ = os.environ.get("GITHUB_STEP_SUMMARY")
     if summ:
