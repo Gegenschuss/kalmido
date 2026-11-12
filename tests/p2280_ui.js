@@ -129,19 +129,21 @@ const V = B + 'api/v1';
   w.close();
 
   // ================= #987 News: For you | Activity, the bell, the banner
+  // 2.1037.0 (#5801): alice's tasks due today / overdue are two more lines at the bell; seen for today, the counts here are the News ones
+  for (const line of ['today', 'overdue']) await call('POST', '/api/news/due-seen', {line});
   w = await boot({user: 'alice', hash: 'home'}); d = w.document;
   await until(() => d.querySelector('.dash'));
   await until(() => d.querySelector('.dtome'));
   const st = await call('GET', '/api/state');
   check(st.news.unread_me === 2 && st.news.unread > st.news.unread_me, `#987: 2 for me (mention + assignment), more unread in all ${st.news.unread_me}/${st.news.unread}`);
-  check(d.querySelector('.dtome') && /2 messages for you/.test(d.querySelector('.dtome h3').textContent), '#987: the start page banner "2 messages for you" ' + d.querySelector('.dtome h3')?.textContent);
+  check(d.querySelector('.dtome') && /Waiting for you: 2/.test(d.querySelector('.dtome h3').textContent), '#987: the start page banner "Waiting for you: 2" ' + d.querySelector('.dtome h3')?.textContent);  // 2.1037.0 (#5807): the bell's wording (was "2 messages for you")
   check(d.querySelector('#kbar .bell .nbadge')?.textContent === '2', '#987: the bell counts only "For you" ' + d.querySelector('#kbar .bell .nbadge')?.textContent);  // 2.152.3 (#2619): the bell moved into the head bar
   w.eval(`go('news')`); await until(() => d.querySelector('.ntabs'));
   const tabs = d.querySelector('.ntabs');
   check(tabs && tabs.querySelector('[data-tab="all"]').classList.contains('on') && /For you/.test(tabs.textContent) && /Activity/.test(tabs.textContent), '#987: the tabs All | For you | Activity, All first');
   // 2.138.2 (#2405): the 'Activity' section is now 'Also new'; a Read section comes below
   const secs0 = [...d.querySelectorAll('#view .nsec:not(.read)')].map(x => x.textContent.trim());
-  check(secs0.length === 2 && /For you/.test(secs0[0]) && /Also new/.test(secs0[1]) && d.querySelector('#view .nsec.first').nextElementSibling.classList.contains('tome'), '#987: "All" = two sections, the items for me first ' + secs0.join('|'));
+  check(secs0.length === 2 && /For you/.test(secs0[0]) && /History/.test(secs0[1]) /* 2.1037.0 (#5807): Also new + Read = the history */ && d.querySelector('#view .nsec.first').nextElementSibling.classList.contains('tome'), '#987: "All" = two sections, the items for me first ' + secs0.join('|'));
   click(w, tabs.querySelector('[data-tab="me"]')); await until(() => d.querySelector('.ntabs [data-tab="me"].on') && [...d.querySelectorAll('#view .nitem')].every(x => x.classList.contains('tome')));
   let items = [...d.querySelectorAll('#view .nitem')];
   check(items.length === 2 && items.every(x => x.classList.contains('tome')) && items.some(x => /mentioned you/.test(x.textContent)) && items.some(x => /assigned a task to you/.test(x.textContent)), '#987: "For you" = the mention and the assignment ' + items.map(x => x.querySelector('.ntext')?.textContent).join('|'));
@@ -154,7 +156,7 @@ const V = B + 'api/v1';
   click(w, d.querySelector('.ntabs [data-tab="me"]')); await until(() => d.querySelector('.ntabs [data-tab="me"].on'));
   click(w, d.querySelector('#kbar [data-act="bell-pop"]')); await until(() => d.querySelector('#pop .bpop .nitem'));  // 2.152.3 (#2619): the bell moved into the head bar
   const secs = [...d.querySelectorAll('#pop .nsec:not(.read)')].map(x => x.textContent.trim());
-  check(secs.length === 2 && /For you/.test(secs[0]) && /Also new/.test(secs[1]), '#987: the dropdown: "For you" above "Activity" ' + secs.join('|'));
+  check(secs.length === 2 && /For you/.test(secs[0]) && /History/.test(secs[1]) /* 2.1037.0 (#5807) */, '#987: the dropdown: "For you" above "Activity" ' + secs.join('|'));
   check(d.querySelector('#pop .bpop .nitem.tome') && d.querySelector('#pop .nsec.first').nextElementSibling.classList.contains('tome'), '#987: the items for me come first');
   w.eval('closePop()');
   // reading one for me lowers the bell

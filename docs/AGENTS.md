@@ -4222,7 +4222,10 @@ with the scope it needs). The tools:
 - time and habits: `get_timer`, `start_timer`, `stop_timer`, `list_time_entries`, `get_time_gaps` (2.34.0), `add_time_entry`, `update_time_entry`,
   `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`, `get_habit_stats` (2.138.1). 2.144.6: time entries
   carry `billable` (settable in `add_time_entry` / `update_time_entry`) and `billed` (on an invoice: only the note changes)
-- News: `list_news`, `mark_news_read`
+- News: `list_news`, `mark_news_read`. 2.1037.0: an @mention of the person in a team chat channel, group or project conversation
+  is an item of kind `chatmention` (`data`: `room`, `room_kind`, `room_name`, `msg` = the first unread mention, `thread` when it is
+  in a thread; `count` = the mentions of that room in one item, `ids` = all of them; `sealed` = an encrypted message, no text);
+  `filter=mentions` and `filter=me` include it; it turns read when the person reads the room (or the thread) in the chat
 - day plans: `get_day_plan`, `get_day_review`
 - family (2.19.0): `get_family`, `add_occasion`, `list_deadline_types`, `add_deadline`, `ingredients_to_shopping`,
   `add_shop_areas`, `list_packing_templates`, `create_packing_list`, `list_kids`, `give_stars`, `add_reward`,

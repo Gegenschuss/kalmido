@@ -641,6 +641,7 @@ ORDER = (
     # -- sorted block (2.624.0, #3941): a new module WITHOUT an order need goes here, one per line, sorted by name (tools/check_layout.py)
     # (it loads after every module above, so it may use their names at import time; one with an order need goes above instead)
     "accounts.setundo",  # 2.985.0 (#5394): the settings' undo steps (one diff part per key, no routes)
+    "collab.duebell",  # 2.1037.0 (#5801): the deadline lines of the bell (due today / overdue, seen for today)
     "collab.recent",  # 2.769.0 (#5352): "Recently edited" over Knowledge, Files and Reading (GET /api/recent)
     "core.undodiff",  # 2.774.0 (#5251): the diff parts of the step groups (no routes)
     "life.lfkern",  # 2.947.0 (#5367): bookmarks and feeds on the core's trash (no routes)

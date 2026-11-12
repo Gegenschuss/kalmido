@@ -4023,6 +4023,19 @@ a.tref:hover{background:var(--accent-soft)}
 .nitem:not(.unread) .avatar{opacity:.5;filter:saturate(0)}
 .bpop .nsh,.bpop .nsec{position:sticky;top:0;z-index:1;background:var(--bg)}
 .ngn{font:var(--fs-xs) var(--mono);color:var(--muted);border:1px solid var(--line2);border-radius:var(--r-s);padding:0 .25rem}
+/* 2.1037.0 (#5807): the history (what does not wait for me) folds under one chevron line; For you empty says so; a chip's waiting count */
+.nhisth{display:flex;align-items:center;gap:.375rem;width:100%;min-height:2.75rem;background:none;border:0;padding:0;color:inherit;font:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;text-align:left}
+.nhisth svg{transition:transform .15s;transform:rotate(-90deg)}
+.nhist.open .nhisth svg{transform:none}
+@media (prefers-reduced-motion:reduce){ .nhisth svg{transition:none} }
+.nmeempty{padding:.5rem .625rem .75rem;font-size:var(--fs-m)}
+.nchip .nchipn{font:600 var(--fs-xs)/1 var(--mono);margin-left:.25rem;color:var(--accent)}
+/* 2.1037.0 (#5801): the deadline lines (due today / overdue) on top of For you */
+.ndue{align-items:center;padding:0}
+.ndue .nduego{display:flex;flex:1;min-width:0;gap:.75rem;align-items:center;padding:.625rem;color:inherit;text-decoration:none}
+.ndue .ndueic{display:grid;place-items:center;background:var(--bg3);color:var(--accent);border-radius:50%}
+.ndue-overdue .ndueic{color:var(--danger)}
+.ndue .iconbtn{flex:none;margin-right:.375rem}
 .ngs{font-size:var(--fs-s)}
 .ngitems{padding:0 0 .5rem 2.25rem}
 /* #475 the dashboard */

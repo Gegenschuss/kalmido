@@ -276,6 +276,7 @@ function palAll() {
   for (const [v, n, d, l] of LOOK.accent) add('a:accent-' + v, 'action', tr('Accent colour: {0}', tr(n)), 'palette', () => lookSet('accent', v), {qonly: true, sw: light ? l : d});
   add('a:look-reset', 'action', tr('Reset appearance to the defaults'), 'undo', () => { for (const k of LOOK_KEYS) LS.del(k); applyTheme(); applyDensity(); applyLook(); render(); }, {qonly: true});
   add('a:keys', 'action', tr('Keyboard shortcuts'), 'help', shortcutsModal, {keys: '?'});
+  if (typeof spl_offer === 'function' && spl_offer()) add('a:split', 'action', tr('Split view on / off'), 'columns', () => spl_toggle(), {keys: 'Shift+V'});  // 2.1037.0 (#5803): miniwin.js
   add('a:tour', 'action', tr('Restart the welcome tour'), 'arrow', () => tourStart());
   if (S.sample) add('a:sample-rm', 'action', tr('Remove sample project'), 'trash', () => sampleRemove());
   else add('a:sample', 'action', tr('Create sample project'), 'plus', () => sampleCreate());

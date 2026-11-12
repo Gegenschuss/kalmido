@@ -278,14 +278,14 @@ def dl_side(c, uid):
     """2.280.0 A (#3109): what the sidebar / header show of the light areas (team chat, News, event calendars), computed as
     /api/state does: the bundled follow-up of a comment / chat / News / calendar change (liveparts.js lpFollow) takes these
     with the delta (?side=1) instead of the whole state (the agents come from GET /api/agents, agentPoll)."""
-    from ..collab.news import news_items, news_sig, news_unread_me
+    from ..collab.news import news_head, news_items
     from ..collab.teamchat import tchat_on, tchat_unread_both
     from ..events.model import cals_for, events_on
     s = usettings(c, uid)
     nitems = news_items(c, uid, s)[0]
     return dict(
         team=dict(zip(("enabled", "unread", "dm_unread"), (tchat_on(c, uid), *tchat_unread_both(c, uid)))),
-        news={"unread": sum(1 for x in nitems if not x["read"]), "unread_me": news_unread_me(c, uid, s, nitems), "sig": news_sig(c, uid)},
+        news=news_head(c, uid, s, nitems),  # 2.1037.0 (#5801): + the deadline lines (due)
         evcals=cals_for(c, uid) if events_on(c, uid) else [], evsig=ev_sig(c, uid))
 
 
@@ -295,6 +295,7 @@ def state_delta():
     from ..contacts.model import task_contacts
     from ..events.model import events_on
     from ..personal.timetrack import time_list_totals, time_running, time_totals
+    from ..collab.duebell import due_state  # 2.1037.0 (#5801)
     c, uid = db(), me()
     v = int(gsetting(c, "version"))  # first: the tasks read below are at least this new (a later change comes again)
     try:
@@ -377,6 +378,7 @@ def state_delta():
            if tall and request.args.get("tt") == "1" else {"time_totals": time_totals(c, uid) if tall else {}}),
         time_lists=time_list_totals(c, uid, own=True) if tall else {},  # 2.144.5 C (#1523)
         **(dl_side(c, uid) if request.args.get("side") == "1" else {}),  # 2.280.0 A (#3109)
+        due=due_state(c, uid, s),  # 2.1037.0 (#5801): the bell's deadline lines follow a changed task (done, new date, assigned)
         # 2.369.2 (#3136): a client with the start set (lz=1) takes the counts of the touched lists it has not loaded
         **({"lzc": lz_counts(c, uid, sorted(lids))} if request.args.get("lz") == "1" and lids else {}),
     )

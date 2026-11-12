@@ -18,6 +18,7 @@ from ..tasks.validation import as_int
 from ..collab.comments import collab_on, comment_plain, lang_of, push_gate, push_gate_due, push_gate_reset, user_names
 from ..core.objcomments import OCM_MENTION_RE, ocm_kind, ocm_may_delete, ocm_mentions_clean, ocm_need_say  # 2.972.0 (#5272): the one mention token / name rule of the core; 2.981.0 (#5274): + the parser
 from ..collab.news import list_bells
+from ..collab.news import NEWS_EXCERPT  # 2.1037.0 (#5800): the mention item's excerpt (tcm_news_items)
 from ..core.errors import reject_unknown, BadInput
 from ..core.conflict import ccf_check, take_version  # 2.564.0 D (#4701); 2.638.0 (#4775): take_version
 from ..notify.push import notify, push_handled, push_prio, push_reachable_many, WD_TICKS
@@ -689,6 +690,7 @@ def tchat_post(rid):
         tth_follow(c, r, root, [*mentions, *([orig["user_id"]] if orig and orig["user_id"] else [])], mid)
     else:
         osn_mark(c, "tchat", rid, me(), mid)  # 2.981.0 (#5286): the core's obj_seen
+        tcm_seen(c, me(), rid, mid)  # 2.1037.0 (#5800): writing here = read up to here, the mention entries too
     m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
     tchat_notify(c, r, m, mentions, replied=orig["user_id"] if orig and orig["user_id"] != me() else None)
     c.commit()
@@ -735,6 +737,7 @@ def tchat_notify(c, r, m, mentions, replied=None, only=None):
     2.33.0 (#1076): replied = the author of the answered message: it counts as a mention ("replied to your message").
     2.367.5 (#2980): only = just these people (the newly @mentioned of an edited message)."""
     sender = m["user_id"]
+    tcm_news(c, r, m, mentions)  # 2.1037.0 (#5800): the @mentioned get an entry "For you" (not the answered author alone)
     if replied and replied not in mentions and replied in tchat_room_members(c, r):
         mentions = [*mentions, replied]
     rq = reply_quotes(c, "t", [m["reply_to"]]).get(m["reply_to"]) if m["reply_to"] else None
@@ -1038,6 +1041,7 @@ def tchat_read(rid):
     # 2.981.0 (#5286): the core's obj_seen (the higher mark stays; a room without messages gets its row of 0 too: tchat_sig_q
     # counts the rooms with a mark of mine) and obj_follow (muted)
     osn_mark(c, "tchat", rid, me(), max(lr, lid))
+    tcm_seen(c, me(), rid, max(lr, lid))  # 2.1037.0 (#5800): read in the chat = the mention entries read
     if "muted" in b:
         if muted:
             ofl_bell_put(c, "tchat", rid, me(), None, "mute", None, me())
@@ -1090,6 +1094,7 @@ def tth_follow(c, r, root, uids, mid):
             osn_mark(c, "tchat_thread", root, u, mid - 1, only_new=True)
     ofl_watch(c, "tchat_thread", root, me())
     osn_mark(c, "tchat_thread", root, me(), mid)
+    tcm_seen(c, me(), r["id"], mid, root)  # 2.1037.0 (#5800)
 
 
 def tth_unread(c, rid, uid):
@@ -1153,6 +1158,7 @@ def tth_read(c, rid, b):
         return err(tr("Invalid value: {0}", "last_id"))
     if lid > 0:  # 2.981.0 (#5286): the core's obj_seen (the higher mark stays; looking does not make me take part)
         osn_mark(c, "tchat_thread", root["id"], me(), lid)
+        tcm_seen(c, me(), rid, lid, root["id"])  # 2.1037.0 (#5800)
     c.commit()
     return jsonify(ok=True, thread=root["id"], last_id=tth_last_read(c, root["id"], me()), unread=tchat_unread(c, me()))
 
@@ -1332,3 +1338,115 @@ def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     paths["/team/messages/{id}/reactions"] = {"post": op("Toggle your reaction on a message", TC, ok({"type": "object"}) | errs("400", "404", "409"), [mp],
                                                          body={"type": "object", "properties": {"emoji": {"type": "string"}, "on": {"type": "boolean"}}, "required": ["emoji"]},
                                                          scope="comments")}
+
+
+# ---- 2.1037.0 (#5800): an @mention in a channel, a group or a project's conversation is a News entry "For you" (kind
+# chatmention, row "mention"), so the bell counts it. Written through the core's send decision (core/objnotify.py obj_notify
+# with news=, push=False: the push stays tchat_notify's), only for the @mentioned (a reply alone stays a push), never in a
+# direct message (the DM's own row in "For you" counts it). data = {room, msg, thread?}: no words of the message -- the feed
+# reads the live message (an encrypted one shows no text), its room and the reader's right when it is read (tcm_news_items).
+# Read in the chat = read here: the room's / thread's read mark turns the entries up to it read (tcm_seen), no second tick.
+# A group that is not muted already counts every unread message at the bell (tchat_dm_unread) and has its row in "For you":
+# there the entry stays out of the feed (no double count); a muted group or channel counts only the mention.
+TCM_KIND = "chatmention"
+
+
+def tcm_news(c, r, m, mentions):
+    """The News entries of message m in room r for the @mentioned people (the caller passes the mentions without the
+    answered author). The core cuts who may not read the room (obj_role / the project's role) and the settings (row mention)."""
+    if r["kind"] == "dm" or not mentions:
+        return
+    from ..core.objnotify import obj_notify
+    root = m["thread_of"] if "thread_of" in m.keys() else None
+    data = {"room": r["id"], "msg": m["id"], **({"thread": root} if root else {})}
+    kind, ref = tchat_notify_obj(r)
+    # review: an edit that takes the mention out and puts it back never makes a second entry for the same message
+    had = {x["user_id"] for x in c.execute("SELECT user_id FROM notifications WHERE user_id = ANY(CAST(? AS BIGINT[])) AND kind=? "
+                                           "AND data->>'msg' = ?", ([int(u) for u in mentions if u], TCM_KIND, str(int(m["id"]))))}
+    obj_notify(c, kind, ref, [u for u in mentions if u and u != m["user_id"] and u not in had], row="mention", lid=r["list_id"], push=False,
+               news={"kind": TCM_KIND, "list_id": r["list_id"], "data": data, "actor": m["user_id"]})
+
+
+def tcm_seen(c, uid, rid, upto, root=None):
+    """uid read room rid's main conversation (root None) or the thread of message root up to message upto: their mention
+    entries up to there turn read (the same mark as the chat's own; the caller commits)."""
+    if not upto:
+        return
+    c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind=? AND read_at IS NULL AND data->>'room' = ? "
+              "AND CAST(data->>'msg' AS BIGINT) <= ? AND " + ("data->>'thread' = ?" if root else "data->>'thread' IS NULL"),
+              (iso(now_utc()), uid, TCM_KIND, str(int(rid)), int(upto), *((str(int(root)),) if root else ())))
+
+
+def tcm_room_live(c, r, uid, memo):
+    """May uid still read room r (the floor of need_room: a channel / group by the core's role, a project's conversation by
+    tchat_room_ok)? None = no; else (kind, muted)."""
+    if r["id"] in memo:
+        return memo[r["id"]]
+    ok = False
+    if r["kind"] in TCX_KINDS:
+        from ..core.objnotify import obj_readers
+        ok = not r["archived_at"] and uid in obj_readers(c, "tchat_room", r["id"], [uid])
+    elif r["kind"] == "list":
+        ok = tchat_room_ok(c, r, uid)
+    memo[r["id"]] = (r["kind"], tchat_last_read(c, r["id"], uid)[1]) if ok else None
+    return memo[r["id"]]
+
+
+def tcm_news_items(c, uid, items, uids):
+    """news_items' part for the chat mentions (items newest first, changed in place, returns the new list): an entry whose
+    room uid no longer reads or whose message is gone drops out, so does one of a group that is not muted (see above); the
+    mentions of one room become one item (one for the unread, one for the read ones) with their number, the room's name, the
+    oldest unread message to open (data.msg) and the newest one's text (none for an encrypted message)."""
+    mine = [x for x in items if x["kind"] == TCM_KIND]
+    if not mine:
+        return items
+    rids = sorted({nw for x in mine if (nw := _tcm_int(x["data"].get("room")))})
+    mids = sorted({nw for x in mine if (nw := _tcm_int(x["data"].get("msg")))})
+    rooms = {r["id"]: r for r in c.execute("SELECT * FROM tchat_rooms WHERE id = ANY(CAST(? AS BIGINT[]))", (rids,))} if rids else {}
+    msgs = {m["id"]: m for m in c.execute(f"SELECT id, room_id, body, enc FROM tchat_msgs WHERE id = ANY(CAST(? AS BIGINT[])) AND {live_sql()}",
+                                          (mids,))} if mids else {}
+    from ..collab.liste2echan import le2c_mode
+    memo, heads, out = {}, {}, []
+    for x in items:
+        if x["kind"] != TCM_KIND:
+            out.append(x)
+            continue
+        r = rooms.get(_tcm_int(x["data"].get("room")))
+        m = msgs.get(_tcm_int(x["data"].get("msg")))
+        live = tcm_room_live(c, r, uid, memo) if r is not None else None
+        if not live or not m or m["room_id"] != r["id"] or (live[0] == "group" and not live[1]):
+            continue
+        key = (r["id"], x["read"])
+        h = heads.get(key)
+        if h is None:
+            name = tchat_push_title(c, r, uid, None, None)
+            x["data"] = {"room": r["id"], "msg": m["id"], "room_kind": r["kind"], "room_name": name,
+                         **({"thread": x["data"]["thread"]} if x["data"].get("thread") else {})}
+            # review: a project's conversation while it turns encrypted (le2c_mode set) shows no text either, like le2c_out
+            sealed = bool(m["enc"]) or (r["kind"] == "list" and bool(le2c_mode(c, r)[0]))
+            x["excerpt"] = "" if sealed else _tcm_excerpt(m["body"] or "")
+            if sealed:
+                x["sealed"] = True
+            uids.add(x["actor_id"])
+            uids.update(int(u) for u in OCM_MENTION_RE.findall(x["excerpt"]))
+            heads[key] = x
+            out.append(x)
+            continue
+        h["ids"].append(x["id"])
+        h["count"] += 1
+        h["data"]["msg"] = m["id"]  # older: open at the first mention not read yet
+        h["data"].pop("thread", None)
+        if x["data"].get("thread"):
+            h["data"]["thread"] = x["data"]["thread"]
+        if x["actor_id"] not in h["actors"]:
+            h["actors"].append(x["actor_id"])
+        uids.add(x["actor_id"])
+    return out
+
+
+def _tcm_int(v):
+    return v if isinstance(v, int) and not isinstance(v, bool) else int(v) if isinstance(v, str) and v.isdigit() else None
+
+
+def _tcm_excerpt(body):
+    return body if len(body) <= NEWS_EXCERPT else re.sub(r"<@?\d*$", "", body[:NEWS_EXCERPT]).rstrip() + "…"

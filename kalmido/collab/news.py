@@ -67,12 +67,14 @@ NEWS_KINDS += ("job_watch",)  # 2.392.2 (#3366): the watchdog found a job of an 
 NEWS_KINDS += ("docflow",)  # 2.581.0 (#4803): a document flow tells me about a document (row "docflow", docs/flows.py; News only)
 NEWS_KINDS += ("agentask",)  # 2.1039.0 (#5805): an agent asks me in its chat (row "approval", agents/chatnews.py; one row per agent)
 NEWS_KINDS += ("budgetwarn",)  # 2.555.0 (#4570): a project / task reached 80 % / 100 % of its "Budget h" (row "timebudget", personal/budgetwarn.py)
+NEWS_KINDS += ("chatmention",)  # 2.1037.0 (#5800): @me in a team chat channel / group / project conversation (row "mention", collab/teamchat.py tcm_news)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evchange", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
-NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take"), "comment": ("comment",), "complete": ("complete",),
+NEWS_GROUPS = {"mention": ("mention", "chatmention"), "assign": ("assign", "unassign", "take"), "comment": ("comment",), "complete": ("complete",),
                "unblock": ("unblock",), "share": ("share", "role", "unshare", "owner", "agentjoin"), "status": ("status",)}
 NEWS_TO_ME = ("mention", "assign", "unassign", "take")  # filter "Mentions & assigned to me"
+NEWS_TO_ME += ("chatmention",)  # 2.1037.0 (#5800): a mention in the team chat is a mention (filter, "For you", the bell); NEWS_GROUPS mention too
 # 2.28.0 (#987): "For you": messages from PEOPLE to me -- @mentions, assignments, replies to my comments (data.reply), an
 # approver's decision; every plain change is "Activity". The bell counts only "For you".
 # 2.66.1 (#1943): an agent's comments that reach me are "For you" too: its mentions and replies always, its plain comments
@@ -90,11 +92,17 @@ NEWS_FOR_ME += ("whorgcut",)  # 2.380 G (#3391)
 NEWS_FOR_ME += ("aprequest",)  # 2.367.2 (#2968)
 NEWS_FOR_ME += ("docpaid",)  # 2.367.4 (#2972)
 NEWS_FOR_ME += ("orgjoinres", "orgrole")  # 2.367.4 (#2974)
+NEWS_FOR_ME += ("chatmention",)  # 2.1037.0 (#5800)
+# 2.1037.0 (#5801, analysis #4204): a follow-up day (my own reminder, no actor) is a deadline like "due today", an agent's
+# proposal waits for my decision like an approval -- both stood under "For you" in the app (dashboard.js) but did not count
+NEWS_DUE_KINDS = ("followup", "proposal")
 
 
 def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
     if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr", "evchange", "apbooking", "calsub", "integfail", "docoverdue", "orglogin", "budgetwarn", "docflow"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
+        return True
+    if kind in NEWS_DUE_KINDS:  # 2.1037.0 (#5801): a follow-up day / an agent's proposal waits on me (were "For you" in the app only)
         return True
     if kind in ("approval", "aprequest", "agentask"):  # 2.1039.0 (#5805): agentask; 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
         return True
@@ -103,7 +111,7 @@ def news_to_me(kind, actor_id, data, agents, s=None):
     if not actor_id:
         return False
     if actor_id in agents:  # 2.66.1 (#1943): an agent's comments that reach me count (setting agent_comments)
-        if kind == "mention":
+        if kind in ("mention", "chatmention"):  # 2.1037.0 (#5800): an agent's @mention in the team chat too
             return True
         if kind != "comment":
             return False
@@ -297,6 +305,7 @@ KIND_ROW["job_watch"] = "approval"  # 2.392.2 (#3366): the watchdog's finding ab
 KIND_ROW["agentask"] = "approval"  # 2.1039.0 (#5805): "an agent waits for me" (News on by default)
 KIND_ROW["budgetwarn"] = "timebudget"  # 2.555.0 (#4570)
 KIND_ROW["docflow"] = "docflow"  # 2.581.0 (#4803)
+KIND_ROW["chatmention"] = "mention"  # 2.1037.0 (#5800): switched with the mentions (News + push)
 KIND_ROW["wiki_shared"] = "share"  # 2.126.2 B (#2355): switched with the sharing row (News on, no push by default)
 
 
@@ -643,7 +652,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
     evc_seen = set()  # 2.367.2 (#2969): only the newest time / place change of an event (the rows come newest first)
     for r in rows:
         kind = r["kind"]
-        if (mentions_only and kind != "mention") or (to_me and kind not in NEWS_TO_ME):
+        if (mentions_only and kind not in ("mention", "chatmention")) or (to_me and kind not in NEWS_TO_ME):
             continue
         if kind in ("share", "unshare") and r["list_id"] is None and '"org"' in (r["data"] or ""):  # 2.28.0 (#935): an organisation
             if kind == "share" and not news_org_mine(c, uid, r["data"], my_orgs):  # 2.367.5 (#2980): while I am in it (being removed stays readable)
@@ -828,6 +837,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             from ..accounts.orgroles import org_sees_all
             if wo not in user_orgs(c, uid) or not org_sees_all(c, uid, wo):  # 2.143.0 A (#2151)
                 continue
+        elif kind == "chatmention":  # 2.1037.0 (#5800): room, right, message and bundling: teamchat.tcm_news_items below
+            pass
         elif kind != "unshare":
             if r["t_title"] is None or r["t_del"] or not sees(r["t_list"]) or not sees_task(r["task_id"], True):
                 continue
@@ -872,7 +883,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             bl = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (data.get("blocker"),)).fetchone()
             data = {"title": bl["title"], "hidden": False} if bl and sees(bl["list_id"]) and sees_task(data.get("blocker"), False) \
                 else {"title": None, "hidden": True}
-        uids.add(r["actor_id"])
+        if kind != "chatmention":  # 2.1037.0 (#5800, review): a chat mention's author only once the entry stays (tcm_news_items)
+            uids.add(r["actor_id"])
         lk = kind in NEWS_LIST_KINDS
         out.append({"id": r["id"], "ids": [r["id"]], "kind": kind, "count": 1, "actor_id": r["actor_id"],
                     "actors": [r["actor_id"]], "task_id": r["task_id"] if not lk else None,
@@ -882,6 +894,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                     "read": read, "to_me": tome})
         if kind == "comment" and r["actor_id"] in agents:
             out[-1].update(agent=True, tasks=[{"id": r["task_id"], "title": r["t_title"]}])
+    from ..collab.teamchat import tcm_news_items
+    out = tcm_news_items(c, uid, out, uids)  # 2.1037.0 (#5800): the team chat mentions (one item per room)
     from ..agents.chatnews import acn_feed
     out = acn_feed(c, uid, out)  # 2.1039.0 (#5804 #5805): approval cards and questions of the agent chat judged again
     from ..collab.liste2eguard import le2b_news
@@ -901,16 +915,30 @@ def news_unread(c, uid, s=None):
 
 
 def news_counts(c, uid):
-    """2.674.0 B (#4194): {unread, unread_me, sig} for the answers of read / dismiss -- the feed computed once (not twice)."""
-    items = news_items(c, uid)[0]
-    return {"unread": sum(1 for x in items if not x["read"]), "unread_me": news_unread_me(c, uid, None, items), "sig": news_sig(c, uid)}
+    """2.674.0 B (#4194): {unread, unread_me, sig} for the answers of read / dismiss -- the feed computed once (not twice).
+    2.1037.0 (#5801): + due (the deadline lines, collab/duebell.py)."""
+    return news_head(c, uid, usettings(c, uid))
 
 
-def news_unread_me(c, uid, s=None, items=None):
-    """2.28.0 (#987): unread items from people for me (the bell's number)."""
+def news_head(c, uid, s, items=None):
+    """2.1037.0 (#5801): the News counts of /api/state, the delta and the answers of read / dismiss in one place:
+    {unread, unread_me, sig, due} -- unread_me (the bell) includes the deadline lines that count, due says which they are."""
+    from .duebell import due_state
     items = news_items(c, uid, s)[0] if items is None else items
+    due = due_state(c, uid, s)
+    return {"unread": sum(1 for x in items if not x["read"]), "unread_me": news_unread_me(c, uid, s, items, due), "sig": news_sig(c, uid),
+            "due": due}
+
+
+def news_unread_me(c, uid, s=None, items=None, due=None):
+    """2.28.0 (#987): unread items from people for me (the bell's number). 2.1037.0 (#5801, decision of 12.11.2026, variant A: the
+    number = "so many things wait for you", the same on every device): + the deadline lines that count (due today / overdue,
+    1 each; due = a due_state already computed). badge_count (the app icon) and the browser's bellCount read this number."""
+    from .duebell import due_state
+    items = news_items(c, uid, s)[0] if items is None else items
+    due = due_state(c, uid, s) if due is None else due
     # 2.1039.0 (#5805): the row of an agent's questions counts each open question (one row, as many things waiting)
-    return sum(x["count"] if x["kind"] == "agentask" else 1 for x in items if not x["read"] and x.get("to_me"))
+    return sum(x["count"] if x["kind"] == "agentask" else 1 for x in items if not x["read"] and x.get("to_me")) + (due or {}).get("n", 0)
 
 
 @app.get("/api/news")
@@ -923,15 +951,16 @@ def news_list():
     # 2.674.0 B (#4194): the feed is computed once: the counters from the whole feed, a filter keeps its kinds (mentions /
     # NEWS_TO_ME never group with other rows, so the filtered feed is exactly these items of the whole one)
     full, names = news_items(c, uid, s)
-    items = [x for x in full if x["kind"] == "mention"] if f == "mentions" else \
+    items = [x for x in full if x["kind"] in ("mention", "chatmention")] if f == "mentions" else \
         [x for x in full if x["kind"] in NEWS_TO_ME] if f == "me" else full
-    unread_me = news_unread_me(c, uid, s, full)  # 2.28.0 (#987)
+    head = news_head(c, uid, s, full)  # 2.28.0 (#987); 2.1037.0 (#5801): + the deadline lines
+    unread_me = head["unread_me"]
     try:
         page, nxt = ag_news_page(items, request.args.get("limit"), request.args.get("before"))
     except ValueError:
         return err(tr("Invalid data"))
     return jsonify(items=page, users={str(k): v for k, v in names.items()}, unread=sum(1 for x in full if not x["read"]),
-                   unread_me=unread_me, next=nxt,
+                   unread_me=unread_me, next=nxt, due=head["due"],
                    sig=news_sig(c, uid), enabled=collab_on(s), avatars=avatar_map(c, uid))
 
 

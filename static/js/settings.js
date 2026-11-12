@@ -1284,7 +1284,7 @@ function settingsModal(focus) {
   });
   md.addEventListener('change', e => {  // 2.742.0 (#4858): the split view (miniwin.js spl_check mounts / unmounts the right half)
     if (e.target.id !== 's-split') return;
-    setLocal(tr('Split view'), () => LS.get('split', false) === true, v => { LS.set('split', v); const c = $('#s-split'); if (c) c.checked = v; spl_check(); }, e.target.checked);
+    setLocal(tr('Split view'), () => LS.get('split', false) === true, v => spl_setOn(v), e.target.checked);  // 2.1037.0 (#5803): miniwin.js spl_setOn (the button in the bar follows)
   });
   md.addEventListener('change', e => { if (e.target.id === 's-mdpen') { LS.set('mdPenOnly', e.target.checked); if (S.sel) renderDetail(); } });  // 2.40.0 (#1203): this device
   md.addEventListener('change', async e => {

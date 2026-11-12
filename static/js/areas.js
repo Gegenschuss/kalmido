@@ -786,7 +786,7 @@ function sbb_barHtml() {
   return `<button type="button" class="kbsw" data-act="sbb-ws" aria-haspopup="menu" aria-label="${esc(APP_NAME + ' · ' + tr('Workspace') + ': ' + nm)}" title="${esc(tr('Switch to'))}"${wsp_attr(cur)}><span class="kbbrand">${logoSvg(28)}${wordSvg()}</span><span class="kbfirm">${cur === 'all' ? ic('grid', 's') : wsp_dot(cur)}<span class="wsn">${esc(nm)}</span>${ic('chev', 's')}</span>${updDot() ? `<span class="kbupd" title="${esc(tr('Update available'))}"></span>` : ''}</button>`
     + '<div class="fv2bar" role="group"></div>'  // 2.441.0 (#3592): the favourites, only in the free room (favtiles.js fv2_barDraw)
     + `<button type="button" class="kbsrch" data-act="palette" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${esc(tr('Search'))}</span></button>`
-    + `<span class="kbend">${bellBtn()}${netDotHtml()}${acct}</span>`;
+    + `<span class="kbend">${/*html-ok*/ spl_btn() /* 2.1037.0 (#5803): miniwin.js */}${bellBtn()}${netDotHtml()}${acct}</span>`;
 }
 // drawn with the sidebar and with the page's header (the bell's number); only when something changed, the account keeps its <img>
 function sbb_bar() {

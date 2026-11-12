@@ -44,8 +44,9 @@ const FEAT = 'comments,collab,agents';
   check(bell === 1, '#2405: the bell number counts the agent approval ' + bell);
   const sec = d.querySelector('.nsec.me .c.nunread');
   check(sec && +sec.textContent === bell, `#2405: section "For you" equals the bell number (${bell}) ` + sec?.textContent);
-  const rd = d.querySelector('.nsec.read span');
-  check(rd && rd.textContent.trim() === 'Read', '#2405: the divider reads "Read": ' + (rd && rd.textContent));
+  // 2.1037.0 (#5807): "Read" became the history (Also new + Read, folded by default; boot opens it)
+  const rd = d.querySelector('.nsec.hist [data-act="news-hist"] span');
+  check(rd && rd.textContent.trim() === 'History', '#2405/#5807: the divider reads "History": ' + (rd && rd.textContent));
   w.close();
   console.log(`p21443_c_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

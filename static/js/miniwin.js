@@ -191,12 +191,46 @@ const spl_vw = () => document.documentElement.clientWidth;  // clientWidth: inne
 const spl_can = () => !MW_GUARD && mw_desk() && spl_vw() >= spl_lo();  // the settings show the split view (the threshold can be lowered to here)
 const spl_offer = () => spl_can() && spl_vw() >= spl_from();
 const spl_on = () => spl_offer() && LS.get('split', false) === true;
-const spl_item = route => spl_on() && route ? [{label: tr('Open on the right'), icon: 'panel', cls: 'msplit', fn: () => spl_open(route)}] : [];
-function spl_open(route) { return loadModule('splitview').then(() => spl_show(route)).catch(() => {}); }
+// 2.1037.0 (#5803): "Open on the right" shows wherever the split view is offered (also while it is off) and switches it on
+const spl_item = route => spl_offer() && route ? [{label: tr('Open on the right'), icon: 'panel', cls: 'msplit', fn: () => spl_open(route)}] : [];
+function spl_open(route) {
+  if (spl_offer() && !spl_on()) { LS.set('split', true); spl_ui(); }  // splitview.js spl_show mounts the copy right away on this route
+  return loadModule('splitview').then(() => spl_show(route)).catch(() => {});
+}
 // mounts / unmounts the right half to the switch and the window's width (after the start, on resize, after the switch)
 function spl_check() {
   if (MW_GUARD) return;
   if (spl_on() || typeof spl_sync === 'function') loadModule('splitview').then(() => spl_sync()).catch(() => {});
   if (typeof spl_setInfo === 'function') spl_setInfo();  // 2.1040.0 (#5813): "Your window: N px" in an open settings dialog
 }
-if (!MW_GUARD) window.addEventListener('resize', debounce(() => spl_check(), 150));  // core.js debounce (perf_budget: no new clearTimeout pairs)
+if (!MW_GUARD) window.addEventListener('resize', debounce(() => { spl_check(); spl_ui(); }, 150));  // core.js debounce (perf_budget: no new clearTimeout pairs)  // 2.1037.0 (#5803): + the button
+// ---- 2.1037.0 (#5803): the split view one click / one key away: a button next to the bell (only where it is offered: no gap
+// elsewhere), pressed = on; Shift+V (keys.js registry, never while typing in a field); "Split view on / off" in the command
+// search (palette.js). The switch in Settings > Appearance shows the same state (settings.js calls spl_setOn). Switching on
+// shows the right half's last page (LOOK_KEYS splR), else Today (splitview.js spl_mount). In the right half itself (an iframe,
+// MW_SPLIT) the key goes to the window around it: that one switches.
+const spl_btn = () => spl_offer() ? `<button type="button" class="iconbtn splbtn ${spl_on() ? 'on' : ''}" data-splbtn="1" aria-pressed="${spl_on() ? 'true' : 'false'}" title="${esc(tr('Split view') + ' (' + (typeof kbText === 'function' ? kbText('Shift+V') : 'Shift+V') + ')')}" aria-label="${esc(tr('Split view'))}">${ic('columns')}</button>` : '';
+// the switch in the settings and the buttons follow the state (a button that has to come or go: the bars are drawn anew)
+function spl_ui() {
+  if (MW_GUARD) return;
+  const on = spl_on(), c = $('#s-split'); if (c) c.checked = on;
+  const bs = $$('.splbtn');
+  if (!!bs.length !== spl_offer()) { if (typeof sbb_bar === 'function') sbb_bar(); if (S.booted && $('#top')) renderTop(); return; }
+  for (const b of bs) { b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); }
+}
+function spl_setOn(v) { LS.set('split', !!v); spl_check(); spl_ui(); }
+// true = switched (or handed to the window around the right half)
+function spl_toggle() {
+  if (MW_SPLIT) {
+    try { const p = window.parent; if (p && p !== window && typeof p.spl_toggle === 'function') { p.focus(); return p.spl_toggle() !== false; } } catch { /* not the app around it */ }  // sprung-ok: the window around the right half takes the keys again (a window, no element: nothing scrolls)
+    return false;
+  }
+  if (!spl_offer()) return false;
+  const on = !spl_on(); spl_setOn(on);
+  announce(on ? tr('Split view on') : tr('Split view off'));
+  return true;
+}
+if (!MW_ON) {
+  document.addEventListener('click', e => { if (!e.target.closest?.('[data-splbtn]')) return; e.preventDefault(); spl_toggle(); });
+  domReady(() => kb_on('global', 'Shift+V', () => { if (S.me?.kid || $('.modal') || (!MW_SPLIT && !spl_offer())) return false; return spl_toggle(); }, {help: N_('Split view on / off'), group: 'General'}));
+}

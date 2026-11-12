@@ -55,7 +55,9 @@ const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' 
   // seven tasks bob comments on (seven news bundles)
   const SH = (await call('POST', '/api/lists', {name: 'Shared work'})).id;
   await call('PUT', `/api/lists/${SH}/members`, {user_id: BOB, role: 'edit'});
-  for (let i = 1; i <= 7; i++) { const t = (await call('POST', '/api/tasks', {title: 'Shared task ' + i, list_id: SH})).id; await call('POST', `/api/tasks/${t}/comments`, {body: 'Looks good ' + i}, BCK); }
+  // 2.1037.0 (#5807): the start page card shows only what waits for me (For you): bob mentions alice in his comments
+  const ALICE = (await call('GET', '/api/state')).me.id;
+  for (let i = 1; i <= 7; i++) { const t = (await call('POST', '/api/tasks', {title: 'Shared task ' + i, list_id: SH})).id; await call('POST', `/api/tasks/${t}/comments`, {body: `<@${ALICE}> looks good ` + i}, BCK); }
   // an agent with two running jobs
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write'], username: 'claude', display_name: 'Claude'});
   const AGH = {Authorization: 'Bearer ' + ag.token};
@@ -89,13 +91,15 @@ const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' 
   // News compact
   const nl = [...d.querySelectorAll('.dc-news .hpnl li')];
   check(nl.length === 5 && d.querySelector('.dc-news a.hpall[href="#news"]')?.textContent === 'All news' && !d.querySelector('.dc-news .ngroup'), '#1504: News: at most 5 lines and "All news" ' + nl.length);
-  check(nl.every(li => li.querySelector('time.hpt')) && /Shared task/.test(nl[0].textContent), '#1504: one line per bundle with its time');
+  // 2.1037.0 (#5801): the deadline lines (due today / overdue) come first and have no time
+  check(nl.filter(li => !li.classList.contains('hpdue')).every(li => li.querySelector('time.hpt')) && nl.some(li => /Shared task/.test(li.textContent)), '#1504: one line per bundle with its time');
   // projects
   const pl = [...d.querySelectorAll('.dc-projects .dpl li')].map(li => li.textContent);
   check(pl.length === 5 && !pl.some(x => /Old catalogue|Paused idea/.test(x)) && /Active projects/.test(txt(d, '.dc-projects h3')), '#1504: only active projects, at most 5 ' + JSON.stringify(pl));
   check(d.querySelector('.dc-projects .dpb[role="img"]') && pl.some(x => /Spring shoot.*50 %/.test(x)), '#1504: with their progress');
   // slim cards
-  check(d.querySelector('.dc-pinned.dempty') && txt(d, '.dc-pinned') === 'Pinned: nothing' && d.querySelector('.dc-wait.dempty') && txt(d, '.dc-wait') === 'Waiting for you: nothing', '#1504: empty cards are one slim line');
+  // 2.1037.0 (#5807): bob's comments mention alice now (the News card shows only what waits), so "Waiting for you" is not empty here
+  check(d.querySelector('.dc-pinned.dempty') && txt(d, '.dc-pinned') === 'Pinned: nothing' && d.querySelector('.dc-wait:not(.dempty) .dwl'), '#1504: empty cards are one slim line');
   check([...d.querySelectorAll('.dcard')].every(c => c.getAttribute('aria-labelledby') && c.querySelector('h3')), '#1504: every card still a named section');
   // agents
   const jobs = [...d.querySelectorAll('.dc-agents .djob')];

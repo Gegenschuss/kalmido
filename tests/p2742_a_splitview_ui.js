@@ -82,12 +82,14 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     check(!!s3, 'Default: the field is empty, the standard applies again (not offered at 1200 px) ' + JSON.stringify(s3));
     const lkStd = await (async () => { for (let i = 0; i < 40; i++) { const s = (await call('GET', '/api/state')).settings || {}; try { if (JSON.parse(s.look || '{}').splMin == null) return true; } catch { /* not yet */ } await sleep(250); } return false; })();
     check(lkStd, 'Default reached the account (no splMin)');
+    check(await ev(`!listMenuItems(${L}, document.body).some(x => x && x.cls === 'msplit')`), '1200 px: no "Open on the right" in the menu');  // 2.1037.0 (#5803)
 
     // ---- 2800 px: the switch, off = nothing loaded
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 2800, height: 1100}});
     await load('#today'); await booted();
     check(await ev(`!document.querySelector('iframe.splitfr') && typeof spl_sync === 'undefined'`), 'off: no iframe, splitview.js not loaded');
-    check(await ev(`!listMenuItems(${L}, document.body).some(x => x && x.cls === 'msplit')`), 'off: "Open on the right" is not in the project menu');
+    // 2.1037.0 (#5803): "Open on the right" stands in the menu on a wide screen also while the split view is off (it switches it on)
+    check(await ev(`listMenuItems(${L}, document.body).some(x => x && x.cls === 'msplit')`), 'off: "Open on the right" is in the project menu all the same (wide screen)');
     await openLook();
     check(await until(`!!document.querySelector('#s-split') && !document.querySelector('#s-split').checked`), '2800 px: the switch is offered, off');
     await ev(`document.querySelector('#s-split').click()`);
@@ -146,7 +148,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     check(await until(`!document.querySelector('iframe.splitfr') && !document.documentElement.classList.contains('split-on') && Math.abs(innerWidth - document.documentElement.clientWidth) <= 2 && Math.abs(document.body.getBoundingClientRect().width - document.documentElement.clientWidth) <= 1`),
       'off: the iframe goes, the app has the whole width');
     await ev(`document.querySelectorAll('.smodal').forEach(m => m.remove()), 1`);
-    check(await ev(`!listMenuItems(${L}, document.body).some(x => x && x.cls === 'msplit')`), 'off: no "Open on the right" in the menu');
+    check(await ev(`listMenuItems(${L}, document.body).some(x => x && x.cls === 'msplit')`), 'off: "Open on the right" stays in the menu (wide screen)');  // 2.1037.0 (#5803): was not in the menu while off
     // the account has "off" (the look goes out after a short pause; a reload before it would adopt the account's older "on")
     const off = await (async () => { for (let i = 0; i < 40; i++) { const s = (await call('GET', '/api/state')).settings || {}; try { if (JSON.parse(s.look || '{}').split === false) return true; } catch { /* not yet */ } await sleep(250); } return false; })();
     check(off, 'off goes to the account (setting look)');

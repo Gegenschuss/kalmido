@@ -334,7 +334,7 @@ def state():
     from ..lists.foldershare import sh_folder_shares
     from ..notify.caps import notif_ask_state
     from ..lists.groups import groups_for, grp_of_user
-    from ..collab.news import news_items, news_sig, news_unread, news_unread_me, notif_matrix
+    from ..collab.news import news_head, news_items, notif_matrix  # 2.1037.0 (#5801): + news_head
     from ..personal.habits import habits_trash, pomo_stats
     from ..personal.timetrack import time_day_h, time_list_totals, time_running, time_totals
     from ..accounts.onboarding import ind_state, sample_state  # 2.578.0 (#4573): + the app's industry
@@ -435,7 +435,7 @@ def state():
         max_depth=MAX_DEPTH,  # 2.156.0 A (#1949): the levels of tasks (dragging, mind map, detail read it)
         webpush={"enabled": WEBPUSH_ON, "key": vapid_public() if WEBPUSH_ON else "", "devices": webpush_count(c, uid)},
         languages=languages(),
-        news={"unread": sum(1 for x in nitems if not x["read"]), "unread_me": news_unread_me(c, uid, s, nitems), "sig": news_sig(c, uid)},  # 2.28.0 (#987): + "For you"
+        news=news_head(c, uid, s, nitems),  # 2.28.0 (#987): + "For you"; 2.1037.0 (#5801): + the deadline lines (due)
         avatars=avatar_map(c, uid),
         colors=ac_color_map(c, uid),  # 2.47.1 (#1721): {user id: fixed account colour} of the accounts I see
         # 2.609.0 (#3373): + the templates of the person's organisations (full view; lists/templates.py need_template decides)

@@ -25,6 +25,7 @@ from .kernretire import kern_retire_floor
 
 OSN_KINDS = ("task", "rss")  # 2.981.0 (#5286): + rss (the read articles of a feed)
 OSN_KINDS += ("tchat", "tchat_thread")  # 2.981.0 (#5286): + a team chat room / thread (was tchat_reads / tchat_thread_reads)
+OSN_KINDS += ("due",)  # 2.1037.0 (#5801): "seen for today" of the bell's deadline lines (collab/duebell.py; ref_id 1 today, 2 overdue)
 
 
 def osn_mark(c, kind, ref_id, uid, seen_id, at=None, only_new=False):

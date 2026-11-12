@@ -11,6 +11,8 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   const wc = await boot({user: 'carol', wait: 800});
   await api(wc, 'POST', `/api/tasks/${ids.ST}/comments`, {body: 'Looks good'});
   wc.close(); wb.close();
+  // 2.1037.0 (#5801): alice's tasks due today / overdue are deadline lines at the bell; seen for today, the counts here stay the News ones
+  { const wa = await boot({user: 'alice', wait: 800}); for (const line of ['today', 'overdue']) await api(wa, 'POST', '/api/news/due-seen', {line}); wa.close(); }
   let w = await boot({user: 'alice'}), d = w.document;
   const st = await api(w, 'GET', '/api/news');
   const bell = d.querySelector('#kbar .bell');  // 2.152.3 (#2619): the bell moved into the head bar

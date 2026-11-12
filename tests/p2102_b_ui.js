@@ -47,14 +47,16 @@ const css = f => { for (const base of [path.join(__dirname, '..', 'static'), pat
   const gs = [...d.querySelectorAll('.nbund .ngroup')];
   const ga = gs.filter(g => g.querySelector('.ngt')?.textContent.includes('Alpha task')), gb = gs.filter(g => g.querySelector('.ngt')?.textContent.includes('Beta task'));
   check(ga.length === 2 && gb.length === 1, '#2197: per task, read and unread apart: Alpha twice, Beta once ' + gs.map(g => g.querySelector('.ngt')?.textContent).join('|'));
-  const gau = ga.find(g => g.classList.contains('unread')), gar = ga.find(g => !g.classList.contains('unread'));
+  // 2.1037.0 (#5807): these comments do not wait for alice -> the calm history (no unread look): unread / read by the bundle key
+  const gau = ga.find(g => g.dataset.gk.endsWith('u')), gar = ga.find(g => g.dataset.gk.endsWith('r'));
   check(gau && gar && gs.indexOf(gau) < gs.indexOf(gar), '#2197: the unread line stands above the read one');
-  check(gau && gau.querySelector('.ngn')?.textContent === '2' && gb[0].querySelector('.ngn')?.textContent === '2', '#2197: the number of a line = its unread entries');
+  check(gau && !gau.querySelector('.ngn') && !gb[0].querySelector('.ngn') && !gau.classList.contains('unread'), '#2197/#5807: a line of the history has no unread number and no unread look');
   check(gar && !gar.querySelector('.ngn') && !gar.querySelector('[data-act="news-gread"]'), '#2197: a read line has no number and no "Mark read"');
   check(!/^\d+$/.test((gau?.querySelector('.ngs')?.textContent || '').trim()) && /2 comments/.test(gau?.querySelector('.ngs')?.textContent || ''), '#2197: the total only as text "2 comments"');
-  const bell = w.eval('S.news.unread'), tabsum = +(d.querySelector('.ntabs [data-tab="all"] .nunread')?.textContent || 0);
-  const me = +(d.querySelector('.ntabs [data-tab="me"] .nunread')?.textContent || 0), act = +(d.querySelector('.ntabs [data-tab="act"] .nunread')?.textContent || 0);
-  check(bell > 0 && me + act === bell && tabsum === bell, `#2197: bell ${bell} = the unread numbers of the tabs ${me} + ${act} (All: ${tabsum})`);
+  // 2.1037.0 (#5807): the tabs count only what waits for me (the For you number); Activity has no number
+  const bell = w.eval('newsMeCount()'), tabsum = +(d.querySelector('.ntabs [data-tab="all"] .nunread')?.textContent || 0);
+  const me = +(d.querySelector('.ntabs [data-tab="me"] .nunread')?.textContent || 0), act = d.querySelector('.ntabs [data-tab="act"] .nunread');
+  check(me === bell && !act && tabsum === bell, `#2197/#5807: For you ${bell} = the tabs All ${tabsum} / For you ${me}, Activity without a number`);
   w.close();
 
   // ================= #2204 key hint

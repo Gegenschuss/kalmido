@@ -12,7 +12,7 @@ S.nf = {items: null, users: {}, sig: null, filter: LS.get('newsFilter', '') ? 'm
 function bellBtn() {
   if (!collab()) return '';
   const n = bellCount();  // 2.28.0 (#987): only what people send me (+ unread direct messages)
-  return `<button class="iconbtn bell ${S.route.mod === 'news' ? 'on' : ''}" data-act="bell-pop" aria-haspopup="dialog" title="${esc(tr('News') + ' · ' + newsWhat())}" aria-label="${esc(n ? trn('{0} unread news item', '{0} unread news items', n) : tr('News'))}">${ic('bell')}${n ? `<span class="nbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
+  return `<button class="iconbtn bell ${S.route.mod === 'news' ? 'on' : ''}" data-act="bell-pop" aria-haspopup="dialog" title="${esc(n ? tr('Waiting for you: {0}', n) : tr('News') + ' · ' + newsWhat())}" aria-label="${esc(n ? tr('News') + ' · ' + tr('Waiting for you: {0}', n) : tr('News'))}">${ic('bell')}${n ? `<span class="nbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
 }
 // 2.6.1 (#404): filter chips (view only, per device): which kinds of News show, in the News view and under the bell
 const NEWS_CHIPS = [['mention', 'at', N_('Mentions'), ['mention']], ['comment', 'comment', N_('Comments'), ['comment']],
@@ -20,26 +20,69 @@ const NEWS_CHIPS = [['mention', 'at', N_('Mentions'), ['mention']], ['comment', 
   ['complete', 'check', N_('Completed'), ['complete', 'unblock']], ['status', 'pulse', N_('Status'), ['status']],
   ['agents', 'bot', N_('Agents'), ['approval', 'agentask', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner', 'orgjoin', 'orgjoinres', 'orgrole', 'orgdelnotice', 'orggone', 'whorgcut', 'integfail']],
   ['followup', 'hourglass', N_('Follow-ups'), ['followup']]];
+NEWS_CHIPS[0][3].push('chatmention');  // 2.1037.0 (#5800): a mention in the team chat is a mention
 const newsKindOk = (it, k = S.nf.kind) => { const c = k && NEWS_CHIPS.find(x => x[0] === k); return !c || c[3].includes(it.kind); };
 function newsChipsHtml(items, attr) {
   const k = S.nf.kind, have = NEWS_CHIPS.filter(c => c[0] === k || (items || []).some(it => c[3].includes(it.kind)));
   if (!have.length || (have.length === 1 && !k)) return '';
   const da = attr === 'data-nk' ? 'data-act="news-kind"' : '';
-  return `<div class="nchips" role="group" aria-label="${esc(tr('Show only'))}"><button type="button" class="nchip ${k ? '' : 'on'}" ${da} ${attr}="" aria-pressed="${!k}">${tr('All')}</button>${have.map(([v, i, n]) => `<button type="button" class="nchip ${k === v ? 'on' : ''}" ${da} ${attr}="${v}" aria-pressed="${k === v}">${ic(i, 's')}${tr(n)}</button>`).join('')}</div>`;
+  // 2.1037.0 (#5807): every chip shows how many of its entries wait for me ("Comments 3"); "All" = the bell's number
+  const wait = kinds => (items || []).filter(it => !it.read && newsForMe(it) && kinds.includes(it.kind)).reduce((a, it) => a + (it.count || 1), 0), cn = n => n ? `<span class="c nchipn">${esc(n > 99 ? '99+' : n)}</span>` : '';
+  return `<div class="nchips" role="group" aria-label="${esc(tr('Show only'))}"><button type="button" class="nchip ${k ? '' : 'on'}" ${da} ${attr}="" aria-pressed="${!k}">${tr('All')}${/*html-ok*/ cn(newsMeCount())}</button>${have.map(([v, i, n, kinds]) => `<button type="button" class="nchip ${k === v ? 'on' : ''}" ${da} ${attr}="${v}" aria-pressed="${k === v}">${ic(i, 's')}${tr(n)}${/*html-ok*/ cn(wait(kinds))}</button>`).join('')}</div>`;
 }
 function newsKindSet(k) { S.nf.kind = !k || S.nf.kind === k ? '' : k; LS.set('newsKind', S.nf.kind); }
 const BELL_N = 8;
 // 2.28.0 (#987): the unread direct messages (people writing to me) as rows at the top of "For you"
-const dmRows = () => teamOn() ? (S.tc.rooms || []).filter(r => r.kind === 'dm' && r.unread && !r.muted) : [];
-const dmRowHtml = r => `<a class="nitem unread k-dm ndm" href="#team/${r.id}" aria-label="${esc(trn('{0} new message from {1}', '{0} new messages from {1}', r.unread, r.name))}">${av(r.user_id, r.name, 'avatar', '', `<i class="nk">${ic('comment', 's')}</i>`)}<div class="nmain"><div class="ntext">${trn('{0} new message from {1}', '{0} new messages from {1}', r.unread, `<b>${esc(r.name)}</b>`)}</div>${r.last ? `<div class="nexc">${esc(mdBrief(r.last.text))}</div>` : ''}</div>${r.last_at ? `<time>${relTime(r.last_at)}</time>` : ''}</a>`;
+const dmRows = () => teamOn() ? (S.tc.rooms || []).filter(r => (r.kind === 'dm' || r.kind === 'group') && r.unread && !r.muted) : [];  // 2.1037.0 (#5800): groups too (they count at the bell like DMs)
+const dmRowHtml = r => r.kind === 'group' ? tcm_groupRowHtml(r) : `<a class="nitem unread k-dm ndm" href="#team/${r.id}" aria-label="${esc(trn('{0} new message from {1}', '{0} new messages from {1}', r.unread, r.name))}">${av(r.user_id, r.name, 'avatar', '', `<i class="nk">${ic('comment', 's')}</i>`)}<div class="nmain"><div class="ntext">${trn('{0} new message from {1}', '{0} new messages from {1}', r.unread, `<b>${esc(r.name)}</b>`)}</div>${r.last ? `<div class="nexc">${esc(mdBrief(r.last.text))}</div>` : ''}</div>${r.last_at ? `<time>${relTime(r.last_at)}</time>` : ''}</a>`;
+// 2.1037.0 (#5801): the deadline lines (due today / overdue) on top of "For you" -- counted by the server (S.news.due, collab/duebell.py),
+// one each at the bell; a click opens Today (the overdue tasks stand on top there), the tick hides the line for today
+const dueRows = () => { const d = S.news?.due; return d && d.day ? [['today', d.today || 0, d.seen_today ?? -1], ['overdue', d.overdue || 0, d.seen_overdue ?? -1]].filter(([, n, sn]) => n > Math.max(0, sn)) : []; };
+const dueRowHtml = ([k, n]) => { const t = k === 'today' ? trn('{0} task due today', '{0} tasks due today', n) : trn('{0} task overdue', '{0} tasks overdue', n);
+  return `<div class="nitem unread tome k-due ndue ndue-${esc(k)}"><a class="nduego" href="#today" aria-label="${esc(t)}"><span class="avatar ndueic" aria-hidden="true">${ic(k === 'today' ? 'cal' : 'alarm', 's')}</span><div class="nmain"><div class="ntext">${esc(t)}</div></div></a><button type="button" class="iconbtn" data-act="due-seen" data-line="${esc(k)}" title="${esc(tr('Seen for today'))}" aria-label="${esc(tr('Seen for today') + ': ' + t)}">${ic('check', 's')}</button></div>`; };
+const dueRowsHtml = () => dueRows().map(dueRowHtml).join('');
+// a deadline object of the server (the delta, liveparts.js) replaces the one held: the bell's number moves by the lines' difference
+function dueTake(d) {
+  if (!S.news || !d || JSON.stringify(d) === JSON.stringify(S.news.due || {})) return;
+  S.news.unread_me = Math.max(0, (S.news.unread_me || 0) + (d.n || 0) - (S.news.due?.n || 0)); S.news.due = d;
+  newsRedraw();
+}
+async function dueSeen(line) {
+  const d = S.news?.due; if (!d) return;
+  if (d[line] > Math.max(0, d['seen_' + line] ?? -1)) { d['seen_' + line] = d[line]; d.n = Math.max(0, (d.n || 0) - 1); S.news.unread_me = Math.max(0, (S.news.unread_me || 0) - 1); }
+  newsRedraw(); announce(tr('Seen for today'));
+  try { const j = await rawFetch('POST', '/api/news/due-seen', {line}); S.news = {unread: j.unread, unread_me: j.unread_me ?? S.news?.unread_me ?? 0, sig: j.sig, due: j.due ?? S.news?.due}; newsRedraw(); } catch { toast(tr('Only available online.')); }
+}
+// 2.1037.0 (#5807): what does not wait for me is a calm history, folded by default (per device, nothing jumps on a sync)
+const newsHistOpen = () => LS.get('newsHist', false) === true;
+// the number at For you / the "All" chip: entries, not lines -- the bell's number plus the further entries an item stands for
+// (count: a room's mentions (#5800), comments grouped by the server); the bell itself counts each of them once
+const newsMeCount = () => bellCount() + (S.nf.items || []).filter(it => !it.read && newsForMe(it)).reduce((a, it) => a + Math.max(0, (it.count || 1) - 1), 0);
+const newsMeEmpty = () => `<div class="nmeempty muted">${tr('Nothing waits for you')}</div>`;
+function newsHistHtml(has, body, h2) {
+  if (!has) return '';
+  const o = newsHistOpen(), btn = `<button type="button" class="nhisth" data-act="news-hist" aria-expanded="${esc(o)}">${ic('chev', 's')}<span>${tr('History')}</span></button>`;
+  return h2 ? `<section class="nsect nhist ${o ? 'open' : ''}"><h2 class="nsh">${/*html-ok*/ btn}</h2>${/*html-ok*/ o ? body : ''}</section>` : `<div class="nhist ${o ? 'open' : ''}"><div class="nsec hist">${/*html-ok*/ btn}</div>${/*html-ok*/ o ? body : ''}</div>`;
+}
+// the bell's window / sheet, the News view and the start page drawn again in place (the list keeps its scroll position)
+function newsRedraw() {
+  renderTop(); if (typeof badgeSync === 'function') badgeSync();
+  const p = $('#pop .bpop') && $('#pop'); if (p) { const l = $('.bplist', p), y = l ? l.scrollTop : 0; p.innerHTML = bellPopHtml(); const l2 = $('.bplist', p); if (l2) l2.scrollTop = y; }  // sprung-ok: the list stays where it was after the redraw
+  if (S.route.mod === 'news' || S.route.mod === 'home') renderView();
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act="news-hist"],[data-act="due-seen"]'); if (!a) return;
+  e.preventDefault(); e.stopPropagation();
+  if (a.dataset.act === 'due-seen') { dueSeen(a.dataset.line); return; }
+  LS.set('newsHist', !newsHistOpen()); newsRedraw(); $(`#pop [data-act="news-hist"], #view [data-act="news-hist"]`)?.focus({preventScroll: true});
+}, true);
 const newsSecHead = (k, n, first) => `<div class="nsec ${k} ${first ? 'first' : ''}">${k === 'me' ? ic('at', 's') : k === 'read' ? ic('check', 's') : ic('pulse', 's')}<span>${k === 'me' ? tr('For you') : k === 'read' ? tr('Read|section') : tr('Also new')}</span>${n ? `<span class="c ${k === 'me' ? 'nunread' : ''}">${n}</span>` : ''}</div>`;
-// 2.138.2 D (#2405): the plain list in three sections (For you = unread + to me, Also new = other unread, Read = the rest); one grouping for bell, sheet and view
-const newsSecs = pairs => ({me: pairs.filter(([it]) => !it.read && newsForMe(it)), also: pairs.filter(([it]) => !it.read && !newsForMe(it)), read: pairs.filter(([it]) => it.read)});
+// 2.138.2 D (#2405): the plain list in sections; one grouping for bell, sheet and view. 2.1037.0 (#5807): For you (unread + to me)
+// always on top (empty: "Nothing waits for you"), everything else one folded history without the unread look
+const newsSecs = pairs => ({me: pairs.filter(([it]) => !it.read && newsForMe(it)), hist: pairs.filter(([it]) => it.read || !newsForMe(it))});
 function newsPlainHtml(shown, dms, pop, dmHtml) {
-  const s = newsSecs(shown), row = ([it, i]) => newsItemHtml(it, i, pop);
-  return (dms.length || s.me.length ? newsSecHead('me', bellCount(), true) + dmHtml + s.me.map(row).join('') : '')
-    + (s.also.length ? newsSecHead('act', s.also.length, !dms.length && !s.me.length) + s.also.map(row).join('') : '')
-    + (s.read.length ? newsSecHead('read', 0, !dms.length && !s.me.length && !s.also.length) + s.read.map(row).join('') : '');
+  const s = newsSecs(shown), row = ([it, i]) => newsItemHtml(it, i, pop), calm = ([it, i]) => newsItemHtml(it, i, pop, true), me = dmHtml + s.me.map(row).join('');
+  return newsSecHead('me', newsMeCount(), true) + (me || newsMeEmpty()) + newsHistHtml(s.hist.length, s.hist.map(calm).join(''));
 }
 function bellPopHtml() {
   const mine = S.nf.items && S.nf.f === S.nf.filter ? S.nf.items : null, n = bellCount(), nAll = S.news?.unread || 0;
@@ -47,18 +90,18 @@ function bellPopHtml() {
   const all0 = (mine || []).map((it, i) => [it, i]).filter(([it]) => (!S.nf.unread || !it.read || it.keep));
   const forMe = all0.filter(([it]) => newsForMe(it)), act = all0.filter(([it]) => !newsForMe(it));
   const all = [...forMe, ...act];  // "For you" first, then the activity
-  const shown = all.filter(([it]) => newsKindOk(it)).slice(0, BELL_N);
-  const dms = dmRows();
+  const kOk = all.filter(([it]) => newsKindOk(it)), kMe = kOk.filter(([it]) => !it.read && newsForMe(it));
+  const shown = [...kMe, ...kOk.filter(([it]) => it.read || !newsForMe(it)).slice(0, BELL_N)];  // 2.1037.0 (#5807): every entry for me, the history cut
+  const dms = dmRows(), pre = dueRowsHtml() + dms.map(dmRowHtml).join('');  // 2.1037.0 (#5801): + the deadline lines
   const head = `<div class="bphead"><button type="button" class="bphl" data-bp="news" title="${esc(tr('Show all'))}"><b id="bp-h">${tr('News')}</b><span class="bpchev" aria-hidden="true">›</span></button>${n ? `<span class="bpnew">${esc(tr('{0} for you', n))}</span>` : ''}<span class="spacer"></span>${nAll ? `<button type="button" class="btn sm bpread" data-bp="readall" title="${esc(tr('Mark all as read'))}" aria-label="${esc(tr('Mark all as read'))}">${ic('check', 's')}<span>${tr('All read')}</span></button>` : ''}<button type="button" class="iconbtn" data-bp="settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
   let body;
   if (!mine) body = `<div class="empty bpempty">${S.nf.err === 'offline' ? tr('News are only available online.') : S.nf.err ? esc(S.nf.err) : tr('Loading…')}</div>`;
-  else if (!shown.length) body = `<div class="empty bpempty">${ic('bell')}<span>${all.length ? tr('Nothing of this kind.') : S.nf.unread && mine.length ? tr('No unread news') : tr('No news')}</span>${all.length ? '' : `<small class="muted">${esc(newsWhat())}</small>`}</div>`;
-  else if (newsBundled()) body = `<div class="nlist bplist nbund">${newsBundledHtml(all.filter(([it]) => newsKindOk(it)).slice(0, 40), true, dms.map(dmRowHtml).join(''))}</div>`;  // 2.17.0 (#452)
-  else body = `<div class="nlist bplist">${newsPlainHtml(shown, dms, true, dms.map(dmRowHtml).join(''))}</div>`;  // 2.138.2 D (#2405): three sections
-  if (!mine && dms.length) body = `<div class="nlist bplist">${newsSecHead('me', dms.reduce((a, r) => a + r.unread, 0), true)}${dms.map(dmRowHtml).join('')}</div>`;
+  else if (newsBundled()) body = `<div class="nlist bplist nbund">${/*html-ok*/ newsBundledHtml([...kMe, ...kOk.filter(([it]) => it.read || !newsForMe(it)).slice(0, 40)], true, pre)}</div>`;  // 2.17.0 (#452); 2.1037.0 (#5807): the 40 cut only the history
+  else body = `<div class="nlist bplist">${/*html-ok*/ newsPlainHtml(shown, dms, true, pre)}</div>`;  // 2.138.2 D (#2405); 2.1037.0 (#5807): For you + history
+  if (!mine && pre) body = `<div class="nlist bplist">${/*html-ok*/ newsSecHead('me', newsMeCount(), true)}${/*html-ok*/ pre}</div>`;
   const grab = isMobile() ? `<div class="bpgrab" data-bpgrab role="button" tabindex="0" aria-label="${esc(tr('Drag up for more room, tap for full height'))}" title="${esc(tr('Drag up for more room, tap for full height'))}"><i></i></div>`
     : `<button type="button" class="bpgrip" data-bpgrip aria-label="${esc(tr('Resize (arrow keys; double-click: default size)'))}" title="${esc(tr('Drag to resize · double-click: default size'))}"></button>`;
-  return `<div class="bpop" role="dialog" aria-labelledby="bp-h">${isMobile() ? grab : ''}${head}${mine ? newsChipsHtml(all.map(x => x[0]), 'data-bpk') : ''}${body}<div class="bpfoot"><button type="button" class="btn pri" data-bp="all">${tr('Show all')}${mine && all.length > shown.length ? ` <span class="bpn">${all.length}</span>` : ''}</button></div>${isMobile() ? '' : grab}</div>`;
+  return `<div class="bpop" role="dialog" aria-labelledby="bp-h">${isMobile() ? grab : ''}${head}${mine ? newsChipsHtml(all.map(x => x[0]), 'data-bpk') : ''}${body}<div class="bpfoot"><button type="button" class="btn pri" data-bp="all">${tr('Show all')}</button></div>${isMobile() ? '' : grab}</div>`;
 }
 // ---- 2.7.0: the bell's dropdown is resizable. Desktop: the grip at its bottom-left corner (it hangs right-aligned under
 // the bell, so it grows to the left and down), arrow keys on the grip, double-click = the default size. Phone: the
@@ -163,6 +206,7 @@ function bellPop(anchor) {
   requestAnimationFrame(() => { if ($('#pop .bpop') && !$('#pop').classList.contains('hidden')) bellPlace(p, anchor); });  // 2.58.0 (#1760): once more after the header's redraw and the layout, so it never sticks out on the right
   const fresh = S.nf.sig === (S.news?.sig ?? '') && S.nf.f === S.nf.filter && !!S.nf.items;
   if (!fresh) loadNews().then(redraw);
+  tcm_bellTeam(redraw);  // 2.1037.0 (#5800)
   setTimeout(() => $('#pop .bpop [data-bp="all"]')?.focus({preventScroll: true}), 30);
   p.onclick = async e => {
     const k = e.target.closest('[data-bpk]');
@@ -211,6 +255,7 @@ function newsText(it, U) {
   const d = it.data || {}, who = `<b>${esc(viaName(d, it.actor_id, U))}</b>`, q = x => `<b>${esc(x)}</b>`;
   switch (it.kind) {
     case 'mention': return tr('{0} mentioned you', who);
+    case 'chatmention': return tcm_newsText(it, who);  // 2.1037.0 (#5800)
     case 'e2e_key': return le2u_newsText(it, who, q);  // 2.64.1 (#1817): the key of a locked list was released to me
     case 'wiki_e2e_key': return tr('{0} released the key for the knowledge pages of {1} to you', who, q(it.data?.name || tr('Organisation')));  // 2.64.3 B (#1817): the key of an encrypted knowledge space
     case 'tbl_urgent': return tbl_newsText(it, who);  // 2.53.0 C (#1424)
@@ -327,13 +372,14 @@ const OLV_WORDS = {files: n => trn('{0} file', '{0} files', n), wiki_pages: n =>
   time: n => trn('{0} time entry', '{0} time entries', n), drives: n => trn('{0} drive', '{0} drives', n)};
 const olvText = c => Object.keys(OLV_WORDS).filter(k => (c || {})[k]).map(k => OLV_WORDS[k](c[k])).join(', ');
 /** @type {any} */ (NEWS_ICON).signoff = 'check';  // 2.266.0 (#2965)
-function newsItemHtml(it, i, pop) {
+/** @type {any} */ (NEWS_ICON).chatmention = 'at';  // 2.1037.0 (#5800)
+function newsItemHtml(it, i, pop, calm) {  // 2.1037.0 (#5807): calm = a row of the history (no unread look)
   const U = S.nf.users;
   const many = (it.tasks || []).length > 1;  // 2.13.0 (#453 A5): an agent's comments on several tasks
   const task = many ? `<div class="ntask"><span class="nt">${esc(it.tasks.slice(0, 2).map(x => x.title).join(' · '))}</span>${it.tasks.length > 2 ? `<span class="muted">+${it.tasks.length - 2}</span>` : ''}</div>`
     : it.task_id ? `<div class="ntask"><span class="nt">${it.enc ? ic('lock', 's') + ' ' : ''}${esc(it.enc ? le2u_newsTitle(it) : it.task_title || '')}</span><span class="muted nl">${esc(newsListName(it))}</span>${newsWsLabel(it)}</div>` : '';
   const ex = it.excerpt && !it.enc ? `<div class="nexc">${newsExcerpt(it.excerpt, U)}</div>` : '';
-  return `<div class="nitem ${it.read ? '' : 'unread'}${it.actor_id && isAgentUser(it.actor_id) ? ' agc' : ''} k-${esc(it.kind)} ${it.to_me ? 'tome' : ''}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
+  return `<div class="nitem ${it.read || calm ? '' : 'unread'}${it.actor_id && isAgentUser(it.actor_id) ? ' agc' : ''} k-${esc(it.kind)} ${it.to_me ? 'tome' : ''}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read || calm ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
     ${it.actor_id ? `<button type="button" class="avb" data-mcard="${+it.actor_id}" data-mname="${esc(uname(it.actor_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(it.actor_id, U)))}" aria-label="${esc(tr('Show {0}', uname(it.actor_id, U)))}">` : ''}${av(it.actor_id, uname(it.actor_id, U), 'avatar', '', `<i class="nk">${ic(NEWS_ICON[it.kind] || 'bell', 's')}</i>`)}${it.actor_id ? '</button>' : ''}
     <div class="nmain"><div class="ntext">${newsText(it, U)}</div>${task}${ex}</div>
     <time title="${esc(fmtWhen(it.created_at))}">${relTime(it.created_at)}</time>${isTouch() ? '' : `<button class="iconbtn ndel" ${pop ? 'data-bp="dismiss"' : 'data-act="news-dismiss"'} data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</div>`;
@@ -348,14 +394,14 @@ function news_body() {
   // 1.9.0 (#246): "Loading…" only while a request really runs; an empty feed says so instead of loading forever
   if (!fresh && !S.nf.loading && !S.nf.queued) { S.nf.queued = true; setTimeout(() => { S.nf.queued = false; loadNews(); }, 0); }
   // 2.13.0 (#453 P9): ONE filter row: "All" (clears both), "Mentions & assigned to me" (server filter) and the kinds
-  const k0 = S.nf.kind, fchips = (items) => { const h = newsChipsHtml(items || [], 'data-nk').replace(/^<div class="nchips"[^>]*>/, '').replace(/<\/div>$/, '').replace(/<button type="button" class="nchip [^"]*" data-act="news-kind" data-nk="" aria-pressed="[^"]*">[^<]*<\/button>/, '');
-    return `<div class="nchips nfrow" role="group" aria-label="${esc(tr('Show only'))}"><button type="button" class="nchip ${f || k0 ? '' : 'on'}" data-act="news-filter" data-f="" data-nk="" aria-pressed="${!f && !k0}">${tr('All')}</button><button type="button" class="nchip ${f ? 'on' : ''}" data-act="news-filter" data-f="me" data-fme aria-pressed="${!!f}">${ic('at', 's')}${tr('Mentions & assigned to me')}</button>${h}</div>`; };
+  const k0 = S.nf.kind, fchips = (items) => { const h = newsChipsHtml(items || [], 'data-nk').replace(/^<div class="nchips"[^>]*>/, '').replace(/<\/div>$/, '').replace(/<button type="button" class="nchip [^"]*" data-act="news-kind" data-nk="" aria-pressed="[^"]*">.*?<\/button>/, '');
+    return `<div class="nchips nfrow" role="group" aria-label="${esc(tr('Show only'))}"><button type="button" class="nchip ${f || k0 ? '' : 'on'}" data-act="news-filter" data-f="" data-nk="" aria-pressed="${!f && !k0}">${tr('All')}${newsMeCount() ? `<span class="c nchipn">${esc(newsMeCount() > 99 ? '99+' : newsMeCount())}</span>` : ''}</button><button type="button" class="nchip ${f ? 'on' : ''}" data-act="news-filter" data-f="me" data-fme aria-pressed="${!!f}">${ic('at', 's')}${tr('Mentions & assigned to me')}</button>${h}</div>`; };
   const bar0 = `<div class="nbar"><button class="btn sm ntog ${S.nf.unread ? 'on' : ''}" data-act="news-unread" aria-pressed="${S.nf.unread}" title="${esc(tr('Hide news you have already read'))}">${ic('eye', 's')}${tr('Unread only')}</button><button class="btn sm ntog ${newsBundled() ? 'on' : ''}" data-act="news-bundle" aria-pressed="${newsBundled()}" title="${esc(tr('Group by task, what needs you first'))}">${ic('columns', 's')}${tr('Bundled')}</button><span class="spacer"></span>${S.news?.unread && (S.agents || []).some(x => x.enabled) ? `<button class="btn sm" data-act="news-sum" aria-haspopup="menu" title="${esc(tr('An agent summarises your unread news in its chat'))}">${ic('bot', 's')}${tr('Summarise')}</button>` : ''}${S.news?.unread ? `<button class="btn sm" data-act="news-readall" title="${esc(tr('Mark all as read'))}">${ic('check', 's')}${tr('All read')}</button>` : ''}<button class="iconbtn" data-act="news-settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
   const mine0 = S.nf.items && S.nf.f === f ? S.nf.items : null;
   // 2.28.0 (#987): "For you" (people: mentions, assignments, replies, direct messages) | "Activity" (changes, agents) | All
-  const tab = newsTab(), nMe = (mine0 || []).filter(it => !it.read && newsForMe(it)).length + dmRows().reduce((a, r) => a + r.unread, 0), nAct = (mine0 || []).filter(it => !it.read && !newsForMe(it)).length;
+  const tab = newsTab(), nMe = newsMeCount(), nAct = 0;  // 2.1037.0 (#5807): only what waits for me has a number (the bell's), Activity none
   if (teamOn() && S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'news') renderView(); }); }
-  const tabs = `<div class="seg ntabs" role="tablist" aria-label="${esc(tr('News'))}">${[['all', 'bell', N_('All'), nMe + nAct], ['me', 'at', N_('For you'), nMe], ['act', 'pulse', N_('Activity'), nAct]].map(([k, i, n, c]) => `<button type="button" role="tab" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}" data-act="news-tab" data-tab="${k}">${ic(i, 's')}<span>${tr(n)}</span>${c ? `<span class="c nunread">${c}</span>` : ''}</button>`).join('')}</div>`;
+  const tabs = `<div class="seg ntabs" role="tablist" aria-label="${esc(tr('News'))}">${[['all', 'bell', N_('All'), nMe], ['me', 'at', N_('For you'), nMe], ['act', 'pulse', N_('Activity'), nAct]].map(([k, i, n, c]) => `<button type="button" role="tab" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}" data-act="news-tab" data-tab="${k}">${ic(i, 's')}<span>${tr(n)}</span>${c ? `<span class="c nunread">${c}</span>` : ''}</button>`).join('')}</div>`;
   const inTab = it => (tab === 'all' || (tab === 'me') === newsForMe(it));
   const bar = tabs + bar0 + fchips((mine0 || []).filter(it => (!S.nf.unread || !it.read || it.keep) && inTab(it)));
   if (S.nf.err && !S.nf.items) return bar + `<div class="empty">${S.nf.err === 'offline' ? tr('News are only available online.') : esc(S.nf.err)}</div>`;
@@ -364,16 +410,20 @@ function news_body() {
   // #302 unread only: read items hide (one opened just now stays until the next load); data-i keeps the index in S.nf.items
   const vis = (mine || []).map((it, i) => [it, i]).filter(([it]) => (!S.nf.unread || !it.read || it.keep) && inTab(it));
   const dms = tab === 'act' ? [] : dmRows().filter(r => !S.nf.unread || r.unread);
-  const dmh = dms.length ? `<div class="nlist ndms">${dms.map(dmRowHtml).join('')}</div>` : '';
+  const pre = (tab === 'act' ? '' : dueRowsHtml()) + dms.map(dmRowHtml).join('');  // 2.1037.0 (#5801): + the deadline lines
+  const dmh = pre ? `<div class="nlist ndms">${/*html-ok*/ pre}</div>` : '';
   const chips = '';  // 2.13.0: in the one filter row of the bar
   const shown = vis.filter(([it]) => newsKindOk(it));
-  if (mine && mine.length && !vis.length && !dms.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tab === 'me' ? tr('Nothing for you right now') : tr('All read.')}</b><span>${tab === 'me' ? tr('Mentions, assignments, replies and direct messages from people land here.') : tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
-  if ((!mine || !mine.length) && !dms.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No news')}</b><span>${f ? tr('No mentions or assignments.') : esc(newsWhat())}</span></div>`;
-  if (!shown.length && !dms.length) return bar + chips + `<div class="empty nempty">${ic('bell')}<b>${tr('Nothing of this kind.')}</b></div>` + newsMoreHtml();
+  const meEmpty = () => bar + `<div class="nlist">${/*html-ok*/ newsSecHead('me', 0, true)}${/*html-ok*/ newsMeEmpty()}</div>`;  // 2.1037.0 (#5807): For you always shows
+  if (tab !== 'act' && !pre && !vis.length) return meEmpty();
+  if (mine && mine.length && !vis.length && !pre) return bar + `<div class="empty nempty">${ic('bell')}<b>${tab === 'me' ? tr('Nothing for you right now') : tr('All read.')}</b><span>${tab === 'me' ? tr('Mentions, assignments, replies and direct messages from people land here.') : tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
+  if ((!mine || !mine.length) && !pre) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No news')}</b><span>${f ? tr('No mentions or assignments.') : esc(newsWhat())}</span></div>`;
+  if (!shown.length && !pre) return bar + chips + `<div class="empty nempty">${ic('bell')}<b>${tr('Nothing of this kind.')}</b></div>` + newsMoreHtml();
   // 2.28.0 (#987): "All" shows the two sections, what people sent me first, the activity behind it
-  const listHtml = () => { if (newsBundled()) return `<div class="nbund">${newsBundledHtml(shown, false)}</div>`; if (tab !== 'all') return `<div class="nlist">${shown.map(([it, i]) => newsItemHtml(it, i)).join('')}</div>`;
+  // 2.1037.0 (#5807): All / For you: For you on top (the deadline lines and direct messages in it), the rest a folded history; Activity: a calm list
+  const listHtml = () => { if (newsBundled()) return `<div class="nbund">${/*html-ok*/ newsBundledHtml(shown, false, pre, tab === 'act')}</div>`; if (tab === 'act') return `<div class="nlist">${/*html-ok*/ shown.map(([it, i]) => newsItemHtml(it, i, false, true)).join('')}</div>`;
     return `<div class="nlist">${newsPlainHtml(shown, dms, false, dmh)}</div>`; };
-  return bar + chips + (tab === 'all' && !newsBundled() ? '' : dmh) + listHtml() + newsMoreHtml() + `${newsBundled() ? '' : hintOnce('nswipe', tr('Swipe an item sideways to remove it.'), 'nswipe')}`;
+  return bar + chips + listHtml() + newsMoreHtml() + `${newsBundled() ? '' : hintOnce('nswipe', tr('Swipe an item sideways to remove it.'), 'nswipe')}`;
 }
 // 2.331.0 A (#3300): bell and list both cover ALL workspaces; an item from another workspace than the current one gets a small label
 function newsWsLabel(it) {
@@ -392,7 +442,7 @@ async function loadNews() {
     Object.assign(S.nf, {items: j.items, users: j.users || {}, sig: j.sig, f, err: null, next: j.next || null});
     if (j.avatars) S.avatars = {...(S.avatars || {}), ...j.avatars};
     const changed = !S.news || S.news.unread !== j.unread || S.news.sig !== j.sig || S.news.unread_me !== j.unread_me;
-    S.news = {unread: j.unread, unread_me: j.unread_me ?? S.news?.unread_me ?? 0, sig: j.sig};
+    S.news = {unread: j.unread, unread_me: j.unread_me ?? S.news?.unread_me ?? 0, sig: j.sig, due: j.due ?? S.news?.due};  // 2.1037.0 (#5801): + due
     if (changed) { renderTop(); renderTabs(); renderSide(); }
   } catch (e) {
     if (e.message !== 'auth') { S.nf.err = e instanceof Offline ? 'offline' : e.message; S.nf.sig = S.news?.sig ?? ''; S.nf.f = f; }
@@ -424,7 +474,7 @@ async function newsReadAll() {
   if (!ids.length) return;
   toast(trn('{0} marked as read', '{0} marked as read', n), async () => {
     before.forEach(x => { x.read = false; x.keep = true; });
-    try { const k = await rawFetch('POST', '/api/news/read', {unread: true, ids}); S.news = {unread: k.unread, unread_me: k.unread_me ?? S.news?.unread_me ?? 0, sig: k.sig}; S.nf.sig = null; } catch { toast(tr('Only available online.')); }
+    try { const k = await rawFetch('POST', '/api/news/read', {unread: true, ids}); S.news = {unread: k.unread, unread_me: k.unread_me ?? S.news?.unread_me ?? 0, sig: k.sig, due: k.due ?? S.news?.due}; S.nf.sig = null; } catch { toast(tr('Only available online.')); }
     render(); if ($('#pop .bpop')) { const b = $('#kbar .bell, #top .bell'); closePop(); if (b) bellPop(b); }
   });
 }
@@ -433,7 +483,7 @@ async function newsRead(body) {
   if (body.all) wpSweep(null, true);  // 2.19.0 (#668): "Mark all as read" closes every notification (here; the server the others)
   try {
     const j = await rawFetch('POST', '/api/news/read', body);
-    S.news = {unread: j.unread, unread_me: j.unread_me ?? S.news?.unread_me ?? 0, sig: j.sig}; S.nf.sig = j.sig;
+    S.news = {unread: j.unread, unread_me: j.unread_me ?? S.news?.unread_me ?? 0, sig: j.sig, due: j.due ?? S.news?.due}; S.nf.sig = j.sig;
     render(); return j;
   } catch { /* offline: stays unread on the server */ }
   render();
@@ -447,7 +497,7 @@ async function newsDismiss(i) {
   renderView(); renderTop(); renderTabs(); renderSide();
   try {
     const j = await rawFetch('POST', '/api/news/dismiss', {ids: it.ids});
-    S.news = {unread: j.unread, unread_me: j.unread_me ?? S.news?.unread_me ?? 0, sig: j.sig}; S.nf.sig = j.sig;
+    S.news = {unread: j.unread, unread_me: j.unread_me ?? S.news?.unread_me ?? 0, sig: j.sig, due: j.due ?? S.news?.due}; S.nf.sig = j.sig;
   } catch { S.nf.sig = null; }  // offline: reloaded next time
   render();
 }
@@ -465,6 +515,7 @@ async function newsOpen(i, opts) {
   const acnCard = it.kind === 'approval' && it.data?.chat;  // 2.1039.0 (#5804): an approval card of the agent chat waits until it is decided
   if (!it.read && !acnCard) { it.read = true; it.keep = true; if (it.to_me && S.news) { S.news.unread_me = Math.max(0, (S.news.unread_me || 0) - (it.kind === 'agentask' ? it.count || 1 : 1)); renderTop(); } newsRead({ids: it.ids}); }
   if ((acnCard || it.kind === 'agentask') && feat('agents') && agentsOn()) { chatOpen(it.data?.agent || it.actor_id); return; }  // 2.1039.0 (#5804 #5805): into the agent's chat
+  if (it.kind === 'chatmention') { tcm_newsOpen(it); return; }  // 2.1037.0 (#5800): the room at the message
   if (/comment|mention/.test(it.kind || '')) S.tlScroll = it.task_id;  // 2.0.6: opened for a comment: show the newest
   if (it.kind === 'proposal') { propOpen(it.data?.job); return; }  // 2.3.0
   if (it.kind === 'playbook_proposal') { pbNewsOpen(it); return; }  // 2.39.0 (#1168)
@@ -1266,3 +1317,28 @@ document.addEventListener('focusout', e => {  // keyboard: Tab away closes it, a
   const c = e.target.closest('.ccomp');
   if (c && !c.contains(e.relatedTarget)) c.classList.remove('open');
 });
+
+// ---- 2.1037.0 (#5800): an @mention in a channel, a group or a project's conversation is an entry "For you" (server: News kind
+// chatmention, one item per room with its number; teamchat.py tcm_news_items). The text names who and the room; an encrypted
+// message shows no words. A click opens the room at the (first unread) message; reading the room there reads the entry.
+// A group conversation that is not muted has its own row like a direct message (dmRows), its mentions stay in that row.
+function tcm_newsText(it, who) {
+  const d = it.data || {}, room = `<b>${esc(d.room_name || tr('Team chat'))}</b>`;
+  const n = it.count || 1, many = (it.actors || []).filter(Boolean).length > 1;
+  const by = many ? (it.actors || []).filter(Boolean).slice(0, 3).map(a => `<b>${esc(uname(a, S.nf.users))}</b>`).join(', ') : who;
+  return (n > 1 ? trn('{1} mentioned you {0} times in {2}', '{1} mentioned you {0} times in {2}', n, by, room) : tr('{0} mentioned you in {1}', who, room))
+    + (it.sealed ? ` <span class="muted">${ic('lock', 's')} ${esc(tr('Encrypted message'))}</span>` : '');
+}
+function tcm_newsOpen(it) {
+  const d = it.data || {};
+  if (!d.room || !d.msg) return;
+  msgJump({art: 't', id: +d.msg, chat: +d.room});
+}
+const tcm_groupRowHtml = r => `<a class="nitem unread k-dm ndm k-group" href="#team/${esc(r.id)}" aria-label="${esc(trn('{0} new message in {1}', '{0} new messages in {1}', r.unread, r.name) + (r.mention ? ' · ' + tr('Mentions') : ''))}">${/*html-ok*/ av(null, r.name, 'avatar', '', `<i class="nk">${ic(r.mention ? 'at' : 'users', 's')}</i>`)}<div class="nmain"><div class="ntext">${trn('{0} new message in {1}', '{0} new messages in {1}', r.unread, `<b>${esc(r.name)}</b>`)}</div>${r.last ? `<div class="nexc">${esc(mdBrief(r.last.text))}</div>` : ''}</div>${r.last_at ? `<time>${esc(relTime(r.last_at))}</time>` : ''}</a>`;
+// The rows of direct messages and groups come with the team chat's rooms (bellPopHtml starts loading them): a bell opened
+// before they were there draws once more when they arrive, so the number at the bell never stands without its rows.
+function tcm_bellTeam(redraw) {
+  if (!teamOn() || S.tc.rooms !== null) return;
+  const t0 = Date.now(), tick = () => { if (S.tc.rooms !== null && !S.tc.loading) redraw(); else if (Date.now() - t0 < 20000) setTimeout(tick, 120); };
+  setTimeout(tick, 120);
+}

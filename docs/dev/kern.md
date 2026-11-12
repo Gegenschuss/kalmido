@@ -896,6 +896,9 @@ object before it writes one. The task badge (`core/serializers.py`) joins `obj_s
 (`tasks/delta.py`) notes a mark on a task as a change of that task for its reader only. The trigger `kalmido_osn_gone`
 deletes a task's marks when the task is deleted for good. Not in the exports (a personal view state). A new area with read
 marks adds its kind to `OSN_KINDS` and a trigger line in a fragment -- no table of its own.
+- 2.1037.0 (#5801): kind `due` = "seen for today" of the bell's two deadline lines (`collab/duebell.py`; `ref_id` 1 = due
+  today, 2 = overdue; `seen_id` = day ordinal * 1,000,000 + the count seen, so a later day or more tasks the same day is always
+  higher). No object behind it, so no trigger; the account's row goes with the account (`user_id` key).
 
 ### Read marks of the team chat and the feeds (stage Q8b, 2.981.0, #5286)
 

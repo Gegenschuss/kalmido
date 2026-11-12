@@ -202,6 +202,7 @@ News, comments, the team chat and the browser encryption ("e2e") of lists and ch
 - `kalmido/collab/chatsave.py` (`chat`) - Save a chat message as a task to look at later
 - `kalmido/collab/cmttrash.py` (`tcx`) - The trash of comments and team chat messages
 - `kalmido/collab/comments.py` (`comment`) - Comments, mentions, the activity timeline and collaboration pushes
+- `kalmido/collab/duebell.py` (`due`) - The bell's deadline lines (due today / overdue) and their "seen for today"
 - `kalmido/collab/e2e.py` (`e2e`) - "e2e" = end-to-end encryption in the browser: the server stores only ciphertext and never sees the key (basis of the locks below)
 - `kalmido/collab/e2eresv.py` (`e2r`) - Id reservations for records encrypted in the browser
 - `kalmido/collab/integfail.py` - An integration stopped working

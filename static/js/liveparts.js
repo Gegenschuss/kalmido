@@ -142,6 +142,7 @@ async function lpDelta(v, ch, n, since) {
   const pr = j.progress || {};
   for (const l of S.lists || []) if (pr[l.id]) l.progress = pr[l.id];
   if (j.counts) S.counts = j.counts;
+  if (j.due && typeof dueTake === 'function') dueTake(j.due);  // 2.1037.0 (#5801): the bell's deadline lines follow a changed task
   lzDelta(j);  // 2.369.2 (#3136)
   if (!j.lean) S.mineOrder = moFromState(j);  // 2.191.0 C (#2507): lean = nothing of mine changed, the order stays
   for (const [k, src] of [['evlinks', j.evlinks || {}], ['tcontacts', j.tcontacts || {}]]) {

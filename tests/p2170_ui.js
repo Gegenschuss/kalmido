@@ -103,13 +103,15 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // ================= jsdom: #452 News bundled
   w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': null}}); d = w.document;
   await until(() => d.querySelector('.nbund .ngroup'));
-  const needs = d.querySelector('#ns-need')?.closest('.nsect'), info = d.querySelector('#ns-info')?.closest('.nsect');
+  // 2.1037.0 (#5807): what does not wait for me stands in the history (open on the test devices, tests/boot.js), calm: no tick there
+  const needs = d.querySelector('#ns-need')?.closest('.nsect'), info = d.querySelector('.nsect.nhist');
   check(needs && needs.textContent.includes('Call the printer') && needs.textContent.includes('Review the logo'), '#452: "Needs you": the mention and the assignment');
   const g0 = [...d.querySelectorAll('.ngroup')].find(g => g.textContent.includes('Write the homepage text'));
-  check(g0 && info.contains(g0) && /2 comments/.test(g0.querySelector('.ngs').textContent), '#452: two comments on one task = one group "2 comments" under "For your information" ' + (g0 && g0.querySelector('.ngs').textContent));
+  check(g0 && info?.contains(g0) && /2 comments/.test(g0.querySelector('.ngs').textContent) && !g0.querySelector('[data-act="news-gread"]'), '#452/#5807: two comments on one task = one group "2 comments" in the history, without a tick ' + (g0 && g0.querySelector('.ngs').textContent));
   const before = (await call('GET', '/api/news')).unread;
-  click(w, g0.querySelector('[data-act="news-gread"]'));
-  check(await until(async () => { const j = await call('GET', '/api/news'); return j.unread < before && j.items.filter(it => it.task_id === T[0]).every(it => it.read); }), '#452: Mark read per group');
+  const g1 = [...needs.querySelectorAll('.ngroup')].find(g => g.textContent.includes('Review the logo')), t1 = (await call('GET', '/api/news')).items.find(it => it.task_title === 'Review the logo')?.task_id;
+  click(w, g1.querySelector('[data-act="news-gread"]'));
+  check(await until(async () => { const j = await call('GET', '/api/news'); return t1 && j.unread < before && j.items.filter(it => it.task_id === t1).every(it => it.read); }), '#452: Mark read per group (For you)');
   check(await until(() => /Marked read/.test(d.getElementById('srlive')?.textContent || '')), 'and that is announced');
   const tog = d.querySelector('[data-act="news-bundle"]');
   check(tog.getAttribute('aria-pressed') === 'true', 'bundled is on by default');

@@ -1,4 +1,4 @@
-// 2.138.2 D (#2405): the News bell as an inbox: "For you" (unread + to me, the bell's number) / "Also new" (other unread) /
+// 2.138.2 D (#2405): the News bell as an inbox (2.1037.0 #5807: Also new + Read = one folded history, see tests/p21037_b_bell_ui.js): "For you" (unread + to me, the bell's number) / "Also new" (other unread) /
 // "Read" (below, muted). jsdom: bell number = "For you" number = header number, read bundles never above unread ones, read =
 // muted class, unread = stripe class and no dot; the same in the plain list. Firefox 390 / 1280, light + dark (P21381D_SHOTS=<dir>).
 // freelancer-matrix: n/a - nur Oberfläche
@@ -38,26 +38,30 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   await call('POST', `/api/tasks/${T[0]}/comments`, {body: 'Third part is in'}, CB);
 
   // ================= jsdom: bundled
-  let w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': null}}), d = w.document;
+  let w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': null, 'tasks.newsHist': null}}), d = w.document;  // 2.1037.0 (#5807): the folded default
   await until(() => d.querySelector('.nbund .ngroup'));
   const bell = +(d.querySelector('.bell .nbadge')?.textContent || 0);
   const meSec = d.querySelector('#ns-need')?.closest('.nsect');
   check(bell > 0 && meSec && +meSec.querySelector('.nsh .c')?.textContent === bell, `#2405: "For you" number = bell number (${bell}) ` + meSec?.querySelector('.nsh')?.textContent);
   check(meSec && !/Needs you/.test(d.body.textContent) && /For you/.test(meSec.textContent) && meSec.querySelector('.ngroup.unread.needs'), '#2405: the section is "For you", its bundles unread + needs');
-  const readSec = d.querySelector('#ns-read')?.closest('.nsect'), gs = [...d.querySelectorAll('.nbund .ngroup')];
-  check(readSec && readSec.querySelectorAll('.ngroup.read').length >= 1 && !readSec.querySelector('.ngroup.unread, .ngroup.needs'), '#2405: "Read" holds only read bundles, none "needs"');
-  const lastUnread = gs.map(g => g.classList.contains('unread')).lastIndexOf(true), firstRead = gs.findIndex(g => g.classList.contains('read'));
-  check(firstRead > lastUnread, '#2405: read bundles never above unread ones');
-  check(!d.querySelector('.ngroup.read .ngn') && d.querySelector('.ngroup.unread') && !d.querySelector('.ngroup.read [data-act="news-gread"]'), '#2405: read bundle has no tick / count');
-  check(d.querySelector('#ns-info') && d.querySelector('#ns-info').closest('.nsect').textContent.includes('Also new'), '#2405: "Also new" section for the other unread');
+  // 2.1037.0 (#5807): "Also new" and "Read" became ONE folded history without the unread look (no stripe, no tick, no count)
+  const hist = d.querySelector('.nbund .nhist');
+  check(hist && !hist.querySelector('.ngroup') && hist.querySelector('[data-act="news-hist"][aria-expanded="false"]') && !d.querySelector('#ns-info, #ns-read') && !/Also new/.test(d.body.textContent), '#5807: the history is folded (was: Also new / Read)');
   w.close();
-  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': false}}); d = w.document; await sleep(500);
+  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': null, 'tasks.newsHist': true}}); d = w.document;
+  await until(() => d.querySelector('.nbund .nhist .ngroup'));
+  const hg = [...d.querySelectorAll('.nbund .nhist .ngroup')];
+  check(hg.length >= 1 && hg.every(g => !g.classList.contains('unread') && !g.querySelector('.ngn, [data-act="news-gread"]')), '#5807: history bundles: no unread look, no count, no tick');
+  const gs = [...d.querySelectorAll('.nbund .ngroup')], lastNeed = gs.map(g => g.classList.contains('needs') && g.classList.contains('unread')).lastIndexOf(true), firstH = gs.findIndex(g => g.closest('.nhist'));
+  check(firstH > lastNeed, '#2405/#5807: For you above the history');
+  w.close();
+  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': false, 'tasks.newsHist': true}}); d = w.document; await sleep(500);
   await until(() => d.querySelector('.nlist .nitem'));
   const sec = d.querySelector('.nsec.me .c.nunread');
   check(sec && +sec.textContent === bell, '#2405: plain list: "For you" number = bell number');
   const items = [...d.querySelectorAll('.nlist .nitem, .nlist .nsec')];
-  const iRead = items.findIndex(x => x.matches('.nsec.read')), lastU = items.map(x => x.classList.contains('unread')).lastIndexOf(true);
-  check(iRead > lastU && items.filter((x, i) => i > iRead && x.classList.contains('unread')).length === 0, '#2405: plain list: Read section at the bottom, no unread below it');
+  const iH = items.findIndex(x => x.matches('.nsec.hist')), lastU = items.map(x => x.classList.contains('unread')).lastIndexOf(true);
+  check(iH > lastU && items.filter((x, i) => i > iH && x.classList.contains('unread')).length === 0, '#2405/#5807: plain list: the history at the bottom, no unread look in it');
   w.close();
 
   // ================= Firefox: layout + shots
@@ -66,12 +70,13 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   for (const [th, wd, ht, touch] of [['light', 390, 844, true], ['dark', 390, 844, true], ['light', 1280, 900, false], ['dark', 1280, 900, false]]) await firefox(async o => {
     const {cmd, ev, ctx, shot} = o, tag = `${wd} ${th}`;
     await o.nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${th}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${th}"'); localStorage.setItem('tasks.lookLocal', 'true'); localStorage.setItem('tasks.newsHist', 'true'); return 1; })()`);
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: wd, height: ht}});
     await o.nav(B + '#news'); await ready(ev);
     const x = await ev(OVER);
     check(x.o <= 0, `${tag}: nothing sideways ` + JSON.stringify(x));
+    // 2.1037.0 (#5807): the history is open on this device (tasks.newsHist) so its calm rows can be measured
     const st = await ev(`(() => { const u = document.querySelector('.ngroup.unread'), r = document.querySelector('.ngroup.read'); const cs = (e, p, pe) => e && getComputedStyle(e, pe)[p];
       return {uShadow: cs(u, 'boxShadow'), uDot: cs(u.querySelector('.ngt'), 'content', '::before'), rOp: cs(r.querySelector('.ngav .avatar'), 'opacity'), rW: cs(r.querySelector('.ngt'), 'fontWeight'), uW: cs(u.querySelector('.ngt'), 'fontWeight')}; })()`);
     check(st.uShadow !== 'none' && st.uDot !== '""' && +st.rOp < 1 && +st.rW < +st.uW, `${tag}: unread stripe without dot, read muted ` + JSON.stringify(st));

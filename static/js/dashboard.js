@@ -7,20 +7,19 @@
 // (approvals, proposals, mentions, assignments, follow-ups) above "For your information", "Mark read" per group, and
 // "Summarize": the unread items go to an agent's chat, which answers with a short summary. Per device: bundled or the
 // plain list (the toggle in the bar).
-const NEWS_NEEDS = ['approval', 'proposal', 'mention', 'assign', 'take', 'followup'];
+const NEWS_NEEDS = ['approval', 'proposal', 'mention', 'assign', 'take', 'followup'];  // 2.1037.0 (#5807): no longer decides "For you" (the server's to_me does)
 const newsBundled = () => LS.get('newsBundle', true) !== false;
 function newsGroups(items) {
   const groups = new Map();
   for (const [it, i] of items) {
     // 2.102.0 B (#2197): per task only, never per person over tasks and days (a bundle of the server stays its own line); read and unread never share a line
-    const key0 = it.task_id && !(it.tasks || []).length ? 't' + it.task_id : it.list_id && ['share', 'role', 'unshare', 'owner', 'status'].includes(it.kind) ? 'l' + it.list_id : it.kind === 'comment' ? 'i' + it.id : 'k' + it.kind,
+    const key0 = it.task_id && !(it.tasks || []).length ? 't' + it.task_id : it.list_id && ['share', 'role', 'unshare', 'owner', 'status'].includes(it.kind) ? 'l' + it.list_id : it.kind === 'comment' || it.kind === 'chatmention' ? 'i' + it.id : 'k' + it.kind,  // 2.1037.0 (#5800): a room's mentions = the server's one item
       key = key0 + (it.read ? 'r' : 'u');
     if (!groups.has(key)) groups.set(key, {key, items: [], needs: false, unread: 0, at: it.created_at});
     const g = groups.get(key);
-    // 2.25.0 (UX-45): a comment that names me (@me) needs me too, like a mention
-    const toMe = it.kind === 'comment' && S.me && (it.excerpt || '').includes(`<@${S.me.id}>`);
-    // 2.66.1 (#1943): what the server marks "For you" (the bell's number: replies to me, an agent's comments that reach me) needs me too
-    g.items.push([it, i]); if (!it.read && (NEWS_NEEDS.includes(it.kind) || toMe || it.to_me)) g.needs = true; if (!it.read) g.unread++;  // 2.138.2 D (#2405): only unread bundles need me
+    // 2.66.1 (#1943): what the server marks "For you" (the bell's number: replies to me, an agent's comments that reach me) needs me
+    // 2.1037.0 (#5807): "For you" = what the server marks for me (it.to_me, the bell's number; follow-ups and proposals too since #5801)
+    g.items.push([it, i]); if (!it.read && it.to_me) g.needs = true; if (!it.read) g.unread++;  // 2.138.2 D (#2405): only unread bundles need me
   }
   // 2.102.0 B (#2197): unread lines first (the sort is stable: the server's order stays inside)
   return [...groups.values()].sort((a, b) => (b.unread > 0) - (a.unread > 0));
@@ -35,31 +34,34 @@ function newsSummaryLine(g) {
     unshare: () => tr('removed'), usage: () => tr('usage limit'), errreport: () => tr('new error'), agentjoin: () => tr('an agent joined'), review: () => tr('review'), wiki_shared: () => tr('shared with you'),
     orgjoin: () => tr('Invitation'), evinvite: () => tr('Invitation'), evchange: () => tr('Calendar'), apbooking: () => tr('Calendar'), calsub: () => tr('Calendar'), orglogin: () => tr('Security events'), orgjoinres: () => tr('Invitation'), orgrole: () => tr('your role changed'), docpaid: () => tr('Payments'), docoverdue: () => tr('overdue'), connreq: () => tr('Request'), leavereq: () => tr('Request'), filereq: () => tr('Request'), signoff: () => tr('Client decisions'), orgdelnotice: () => tr('Organisation'), orggone: () => tr('Organisation'), whorgcut: () => tr('Organisation'), fetcherr: () => tr('Receipt fetcher'), docflow: () => tr('Document flows')};  /* 2.581.0 (#4803) */  // 2.361.0 (#2920)  // 2.266.0 (#2965): signoff  // 2.60.0 C (#1512): review; 2.126.2 B (#2355): wiki_shared; 2.183.0 A (#2623): never the raw kind
   L.budgetwarn = () => tr('Budget');  // 2.555.0 (#4570)
+  L.chatmention = n => trn('{0} mention', '{0} mentions', n);  // 2.1037.0 (#5800)
   return Object.entries(c).map(([k, n]) => (L[k] || (() => ''))(n)).filter((t, i, a) => t && a.indexOf(t) === i).join(' · ');  // 2.183.0 A (#2623): unknown kinds say nothing
 }
-function newsGroupHtml(g, pop) {
+function newsGroupHtml(g, pop, calm) {  // 2.1037.0 (#5807): calm = a bundle of the history (no unread look, no count, no tick)
   const [first] = g.items[0], U = S.nf.users;
   const title = first.task_id && !(first.tasks || []).length ? esc(first.task_title || '') : first.kind === 'comment' && (first.tasks || []).length === 1 ? esc(first.tasks[0].title || '') : first.list_id && g.key[0] === 'l' ? esc(newsListName(first)) : newsText(first, U);
   const actors = [...new Set(g.items.flatMap(([it]) => it.actors || [it.actor_id]).filter(Boolean))].slice(0, 4);
   const ids = g.items.flatMap(([it]) => it.ids || [it.id]);
   const open = g.items.length === 1 ? (pop ? 'data-bp="open"' : 'data-act="news-open"') + ` data-i="${g.items[0][1]}"` : `data-act="news-group" data-g="${esc(g.key)}"`;
   const exp = S.nf.openG === g.key;
-  return `<div class="ngroup ${g.unread ? 'unread' : 'read'} ${g.needs ? 'needs' : ''}" data-gk="${esc(g.key)}">
+  return `<div class="ngroup ${g.unread && !calm ? 'unread' : 'read'} ${g.needs ? 'needs' : ''}" data-gk="${esc(g.key)}">
     <div class="nghead"><div class="ngav">${actors.map(a => av(a, uname(a, U), 'avatar sm')).join('')}</div>
-      <div class="ngmain" role="button" tabindex="0" ${open} ${g.items.length > 1 ? `aria-expanded="${exp}"` : ''}><div class="ngt">${title}${newsWsLabel(first) /* 2.331.0 A (#3300) */}${g.items.length > 1 && g.unread ? `<span class="ngn" title="${esc(tr('Unread'))}">${g.unread}</span>` : ''}</div><div class="ngs muted">${esc(newsSummaryLine(g)) ? esc(newsSummaryLine(g)) + ' · ' : ''}<time>${esc(relTime(g.at))}</time></div>${(() => {  // 2.25.0 (UX-45): what was written, one line
+      <div class="ngmain" role="button" tabindex="0" ${open} ${g.items.length > 1 ? `aria-expanded="${exp}"` : ''}><div class="ngt">${title}${newsWsLabel(first) /* 2.331.0 A (#3300) */}${g.items.length > 1 && g.unread && !calm ? `<span class="ngn" title="${esc(tr('Unread'))}">${g.unread}</span>` : ''}</div><div class="ngs muted">${esc(newsSummaryLine(g)) ? esc(newsSummaryLine(g)) + ' · ' : ''}<time>${esc(relTime(g.at))}</time></div>${(() => {  // 2.25.0 (UX-45): what was written, one line
         const ex = g.items.map(([it]) => it).find(it => (it.kind === 'mention' || it.kind === 'comment') && it.excerpt);
         return ex ? `<div class="nexc ngex">${newsExcerpt(ex.excerpt, U)}</div>` : ''; })()}</div>
-      ${g.unread ? `<button type="button" class="iconbtn" data-act="news-gread" data-ids="${ids.join(',')}" title="${esc(tr('Mark read'))}" aria-label="${esc(tr('Mark read') + ': ' + title.replace(/<[^>]+>/g, ''))}">${ic('check', 's')}</button>` : ''}</div>
+      ${g.unread && !calm ? `<button type="button" class="iconbtn" data-act="news-gread" data-ids="${ids.join(',')}" title="${esc(tr('Mark read'))}" aria-label="${esc(tr('Mark read') + ': ' + title.replace(/<[^>]+>/g, ''))}">${ic('check', 's')}</button>` : ''}</div>
     ${exp && g.items.length > 1 ? `<div class="nlist ngitems">${g.items.map(([it, i]) => newsItemHtml(it, i, pop)).join('')}</div>` : ''}</div>`;
 }
-function newsBundledHtml(vis, pop, pre = '') {
+function newsBundledHtml(vis, pop, pre = '', noMe = false) {
   // 2.18.0 (#652): the sections are h2 (the page's h1 is the header title; the bell's panel has no heading above them)
-  // 2.138.2 D (#2405): For you (unread + to me, the bell's number) / Also new (other unread) / Read (below, newest first)
-  const gs = newsGroups(vis), needs = gs.filter(g => g.needs), info = gs.filter(g => !g.needs && g.unread), done = gs.filter(g => !g.unread);
+  // 2.138.2 D (#2405): For you (unread + to me, the bell's number) first. 2.1037.0 (#5807): For you always shows (empty: "Nothing
+  // waits for you"; the number = entries, the bell's), everything else is one folded history without the unread look;
+  // noMe (the tab Activity): only the calm bundles
+  const gs = newsGroups(vis), needs = gs.filter(g => g.needs), hist = gs.filter(g => !g.needs);
+  if (noMe) return hist.map(g => newsGroupHtml(g, pop, true)).join('');
   const sect = (id, title, n, body, cls) => `<section class="nsect ${cls}" aria-labelledby="${id}"><h2 id="${id}" class="nsh">${title}${n ? `<span class="c">${n}</span>` : ''}</h2>${body}</section>`;
-  return (needs.length || pre ? sect('ns-need', tr('For you'), bellCount(), pre + needs.map(g => newsGroupHtml(g, pop)).join(''), 'me') : '')
-    + (info.length ? sect('ns-info', tr('Also new'), info.length, info.map(g => newsGroupHtml(g, pop)).join(''), 'also') : '')
-    + (done.length ? sect('ns-read', tr('Read|section'), 0, done.map(g => newsGroupHtml(g, pop)).join(''), 'done') : '');
+  return sect('ns-need', tr('For you'), newsMeCount(), (pre + needs.map(g => newsGroupHtml(g, pop)).join('')) || newsMeEmpty(), 'me')
+    + newsHistHtml(hist.length, hist.map(g => newsGroupHtml(g, pop, true)).join(''), true);
 }
 async function newsGroupRead(ids) {
   try { await rawFetch('POST', '/api/news/read', {ids}); } catch (e) { toast(e.message); return; }
@@ -389,10 +391,12 @@ function dashCard(k) {
   if (k === 'news') {
     if (S.nf.items === null || S.nf.sig !== (S.news?.sig ?? '')) { if (!S.nf.loading) loadNews().then(() => { if (S.route.mod === 'home') renderView(); }); }
     const vis = (S.nf.items || []).map((it, i) => [it, i]).filter(([it]) => !it.read);
-    // 2.45.0 (#1504): compact, at most 5, a bundle is one line (what needs me first), "All news" below
-    const all = newsGroups(vis), gs = [...all.filter(g => g.needs), ...all.filter(g => !g.needs)].slice(0, lyo_get('home', 'news', 'n', 5));  // 2.55.0 (#1065)
-    if (!gs.length) return slim(tr('News: nothing new'));
-    return card(`<ul class="dwl hpnl">${gs.map(hpNewsRow).join('')}</ul><a class="linkbtn hpall" href="#news">${tr('All news')}</a>`, '', bellCount() || '');
+    // 2.45.0 (#1504): compact, at most 5, a bundle is one line, "All news" below. 2.1037.0 (#5807): only what waits for me (For you:
+    // the deadline lines, then the bundles for me); empty: "Nothing waits for you" -- the rest is the history of the News view
+    const due = dueRows(), gs = newsGroups(vis).filter(g => g.needs).slice(0, Math.max(0, lyo_get('home', 'news', 'n', 5) - due.length));  // 2.55.0 (#1065)
+    if (!gs.length && !due.length) return slim(tr('Nothing waits for you'));
+    const dueLi = ([k, n]) => `<li class="needs hpdue"><a href="#today"><span class="dwt">${esc(k === 'today' ? trn('{0} task due today', '{0} tasks due today', n) : trn('{0} task overdue', '{0} tasks overdue', n))}</span></a></li>`;
+    return card(`<ul class="dwl hpnl">${/*html-ok*/ due.map(dueLi).join('')}${gs.map(hpNewsRow).join('')}</ul><a class="linkbtn hpall" href="#news">${tr('All news')}</a>`, '', bellCount() || '');
   }
   if (k === 'kpi') return typeof kp_tile === 'function' ? kp_tile(card) : '';  // 2.50.0 (#1197)
   // 2.769.0 (#5352): "Recently edited" over Knowledge, Files and Reading (recent.js, loaded on demand; a placeholder of 8 rows until then)
@@ -466,8 +470,8 @@ function forMeBanner() {
   const n = bellCount(); if (!n) return '';
   if (S.nf.items === null || S.nf.sig !== (S.news?.sig ?? '')) { if (!S.nf.loading) loadNews().then(() => { if (S.route.mod === 'home') renderView(); }); }
   const its = (S.nf.items || []).map((it, i) => [it, i]).filter(([it]) => !it.read && newsForMe(it) && newsInWs(it)).slice(0, 4), dms = dmRows().slice(0, 3);
-  return `<section class="dtome" aria-labelledby="dtome-h"><h3 id="dtome-h">${ic('at', 's')}<span>${trn('{0} message for you', '{0} messages for you', n)}</span><span class="spacer"></span><a class="linkbtn" href="#news">${tr('Show all')}</a></h3>
-    <ul class="dwl">${dms.map(r => `<li><a href="#team/${r.id}">${av(r.user_id, r.name, 'avatar')}<span class="dwt"><b>${esc(r.name)}</b> ${esc(r.last ? mdBrief(r.last.text) : '')}</span><span class="nbadge">${r.unread}</span></a></li>`).join('')}${its.map(([it, i]) => `<li><button type="button" class="dwb" data-act="news-open" data-i="${i}">${av(it.actor_id, uname(it.actor_id, S.nf.users), 'avatar')}<span class="dwt">${newsText(it, S.nf.users)}${it.task_title ? ' · ' + esc(it.task_title) : ''}</span></button></li>`).join('')}</ul></section>`;
+  return `<section class="dtome" aria-labelledby="dtome-h"><h3 id="dtome-h">${ic('at', 's')}<span>${esc(tr('Waiting for you: {0}', n)) /* 2.1037.0 (#5807): the bell's number, deadlines included */}</span><span class="spacer"></span><a class="linkbtn" href="#news">${tr('Show all')}</a></h3>
+    <ul class="dwl">${dueRows().map(([k, n]) => `<li><a href="#today">${ic(k === 'today' ? 'cal' : 'alarm', 's')}<span class="dwt">${esc(k === 'today' ? trn('{0} task due today', '{0} tasks due today', n) : trn('{0} task overdue', '{0} tasks overdue', n))}</span></a></li>`).join('')}${dms.map(r => `<li><a href="#team/${r.id}">${av(r.user_id, r.name, 'avatar')}<span class="dwt"><b>${esc(r.name)}</b> ${esc(r.last ? mdBrief(r.last.text) : '')}</span><span class="nbadge">${r.unread}</span></a></li>`).join('')}${its.map(([it, i]) => `<li><button type="button" class="dwb" data-act="news-open" data-i="${i}">${av(it.actor_id, uname(it.actor_id, S.nf.users), 'avatar')}<span class="dwt">${newsText(it, S.nf.users)}${it.task_title ? ' · ' + esc(it.task_title) : ''}</span></button></li>`).join('')}</ul></section>`;
 }
 // ---- 2.45.0 (#1504) the start page: one sentence on top, compact news lines, "since HH:MM" of a running job
 // 2.144.0 C (#2418): the events of today for the block Today (setting "Show events", on by default)
