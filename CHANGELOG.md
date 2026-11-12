@@ -20,7 +20,27 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1016.0] - 2026-11-12
+## [2.1020.0] - 2026-11-12
+
+Package 2.1012 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- #5690: the "..." menus at the top of the household budget, the bookmarks and the feeds open the app's shared menu instead of a small drop-down of their own: on a phone a sheet from below with its title and an X, on a computer Escape, Back and the arrow keys work and the first entry has the focus. Feeds: "Import OPML file" and "Export OPML file" are plain menu entries now (no link / file label). A read-only budget without any entry shows no empty "..." menu.
+
+Package 2.1010 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Approvals with "two people": a first approval only counts while its person still may approve; after a role is taken away the request waits for a second approver again (integrate, deploy, merge requests) (#4033).
+- "Close as duplicate": the comment names the other task by its ticket key and, where every reader of the task sees the other one, its title (#4033).
+
+### Changed
+- Moving a task into a project that does not offer its own ticket type keeps the type and says so in the move message; the API answers `move_ttype` (#4033).
+
+Package 2.1013 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Undo across devices (#5513): changing, deleting and restoring household budget categories and recurring templates now appear in "Recent steps" and can be undone or redone from any device; the sealed limit / title goes back only under the key that sealed it, a category's order alone is no step.
+### Fixed
+- Undo (#5773): settings the app saves by itself (a view's block switches such as the period of the time report, a folder added along with a project edit or move, a device's old settings handed to the account) are no undo step any more, so Ctrl+Z or the undo arrow right after an action takes back that action instead of the setting.
+- Settings (#5519): the list of known browsers for the "new device" security mail is written by the sign-in only; PATCH /api/settings no longer accepts it.
 
 Package 2.1004 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Changed
@@ -60,6 +80,10 @@ Package 2.1001 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Security
 - #5669: sharing a list or a list folder by e-mail address binds only an account that proved the address (the core helper used by tables and wiki since #5643); an address nobody proved is answered like an unknown address and reaches nobody. The address path is decided once per request, and its answer carries nothing account-specific.
 
+## [2.1016.0] - 2026-11-12
+
+Not released (the CI of this version was red); its changes are listed under 2.1020.0.
+
 ## [2.1014.0] - 2026-11-12
 
 Not released (the CI of this version was red); its changes are listed under 2.1016.0.
@@ -76,7 +100,8 @@ Not released (the CI of this version was red); its changes are listed under 2.10
 
 Not released (the CI of this version was red); its changes are listed under 2.1007.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1016.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1020.0...HEAD
+[2.1020.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1020.0
 [2.1016.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1016.0
 [2.1014.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1014.0
 [2.1009.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1009.0
