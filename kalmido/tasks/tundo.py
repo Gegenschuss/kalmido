@@ -15,9 +15,10 @@ The label names the task (one) or counts them (several); a ciphertext title (a l
 the app sets the title it can read (GET /api/undo kind / ref_id).
 Sections (lists/sections.py): a section's name, limits, time limits and meaning (kind 'section', sec_apply with _prev) and the
 order of a project's sections (kind 'section_order', ref = the project, only while the order is still the one the step left).
-Not here: the snippets and the lock of a task (their own routes and rules), creating / deleting a section and a project's
-settings (a step of their own later), the browser's own history (static/js/undo.js) which stays until the list of stage 2
-takes over."""
+2.997.0 (#5613 #5614): the code snippets (the whole list, unchanged ones keep their author: snip_keep) and the lock are fields
+of the step too -- since stage 7 the browser keeps no copy, so without them "Code snippet removed" / "Task unlocked" had no
+way back (the arrow took back an older step instead).
+Not here: creating / deleting a section and a project's settings (a step of their own later)."""
 import json
 
 from flask import g
@@ -38,7 +39,7 @@ from ..tasks.lifecycle import apply_update, need_live, restore_task, signed, tra
 from ..tasks.tasks import my_tags
 from ..tasks.validation import TASK_FIELDS
 
-TU_COLS = tuple(k for k in TASK_FIELDS if k not in ("snippets", "locked"))  # the snippets keep authors, the lock is its own step
+TU_COLS = TASK_FIELDS  # 2.997.0 (#5613 #5614): with the snippets and the lock (was: without, no way back for them since stage 7)
 TU_EXTRA = ("tags", "ltags", "fields", "people")
 TU_KIND = "task"
 TU_AREA = "tasks"
@@ -82,6 +83,9 @@ def _extra(c, tid, k):
 
 def _state(c, row, extras):
     st = {k: row[k] for k in TU_COLS if k in row.keys()}
+    if isinstance(st.get("snippets"), str) and st["snippets"].startswith("["):  # 2.997.0 (#5613): the list (the way back writes a list)
+        from ..tasks.snippets import snip_parse
+        st["snippets"] = snip_parse(st["snippets"])
     for k in extras:
         st[k] = _extra(c, row["id"], k)
     return st
