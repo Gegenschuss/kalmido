@@ -17,6 +17,7 @@ person who looks. Invented names only.
 usage: p21068_apvdiff_test.py <datadir>"""
 import json
 import os
+import sys
 
 import requests
 
@@ -169,4 +170,4 @@ check(row and row[0][0] and not row[0][1], f"the comment's record sits beside ch
 r, d = diff(F, comment=CID)
 check(d and d.get("decided") is True and ["+", "One more"] in d["rows"], f"the decided comment card keeps its record {d}")
 print(json.dumps({"page": PID, "cards": [M1, M2, M3, M4], "comment": CID}))
-done()
+sys.exit(done("p21068_apvdiff"))

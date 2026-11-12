@@ -38,7 +38,8 @@ APVD_SHORT_ROWS = 40  # rows of the first view; "Show everything" asks with full
 APVD_FULL_ROWS = 2000
 APVD_SNAP_ROWS = 60  # rows kept with the answer (short: a record of what was approved, not a copy of the page)
 APVD_LINE_MAX = 500  # characters of one line in the answer
-APVD_LCS_MAX = 1500000  # lines x lines of the changed middle; above: the middle as removed + added (as wkhist.js wkh_diff)
+APVD_LCS_MAX = 100000  # lines x lines of the changed middle; above: the middle as removed + added (review F2: difflib is
+# not linear - 1,200 x 1,200 repeating lines took 20 s; the agent controls both sides)
 APVD_STEPS = (  # (method, path below /api/v1, kind, the body's field with the new text)
     ("PATCH", re.compile(r"^wiki/pages/(\d+)$"), "wiki", "body"),
     ("POST", re.compile(r"^wiki/pages/(\d+)/append$"), "wiki_append", "text"),
@@ -98,7 +99,8 @@ def apvd_target(c, uid, kind, tid, piece, b):
                         "no_heading": under}
         else:
             new = piece
-        return {"name": r["path"].rsplit("/", 1)[-1], "ref": r["path"], "old": old, "new": new, "stamp": r["updated_at"]}
+        return {"name": r["path"].rsplit("/", 1)[-1], "ref": r["path"], "old": old, "new": new, "stamp": r["updated_at"],
+                "sealed": (r["body"] or "") != old}  # review F4: stored sealed at rest
     if kind == "task":
         r = c.execute("SELECT id, title, content, updated_at, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
         if r is None or r["deleted_at"]:
@@ -194,7 +196,7 @@ def apvd_build(c, uid, ap, created_at, limit):
     changed = bool(stamp) and (exp != stamp if isinstance(exp, str) and exp else bool(created_at) and stamp > str(created_at))
     return {**out, "name": t["name"], "ref": t["ref"], "added": sum(1 for x in d if x[0] == "+"),
             "removed": sum(1 for x in d if x[0] == "-"), "rows": rows, "more": more, "changed": changed,
-            **({"no_heading": t["no_heading"]} if t.get("no_heading") else {})}
+            **({"no_heading": t["no_heading"]} if t.get("no_heading") else {}), **({"sealed": True} if t.get("sealed") else {})}
 
 
 def apvd_snapshot(c, uid, ch, created_at):
@@ -203,10 +205,14 @@ def apvd_snapshot(c, uid, ch, created_at):
     if not isinstance(ap, dict) or not apvd_step(ap.get("step")):
         return None
     try:
-        return apvd_build(c, uid, ap, created_at, APVD_SNAP_ROWS)
+        with c.savepoint():  # review F10: a failed statement must not abort the answer's transaction
+            d = apvd_build(c, uid, ap, created_at, APVD_SNAP_ROWS)
     except Exception as e:  # noqa: BLE001  the answer counts; the record of the diff is extra
         print("apvd_snapshot failed", type(e).__name__, flush=True)
         return None
+    if d and d.get("sealed"):  # review F4: a page sealed at rest -- its lines are never stored in plain text, only the counts
+        d = {**d, "rows": [], "more": False}
+    return d
 
 
 def _jl(v):
@@ -236,7 +242,7 @@ def apvd_route():
     else:
         from ..core.objcomments import ocm_row
         r = ocm_row(c, int(a["comment"]), live=True)
-        if r is None or not task_visible(c, r["task_id"], uid):
+        if r is None or not task_visible(c, r["task_id"], uid, full=True):  # review F6: comments are the full view
             raise Denied(404)
         ch, ans, at = _jl(r["choices"]) or {}, _jl(r["choice"]), r["created_at"]
         if not isinstance(ch.get("approval"), dict):
@@ -248,8 +254,12 @@ def apvd_route():
             return jsonify(diff=None)
         hit = apvd_step(ap.get("step"))  # the viewer's rights NOW decide whether the stored lines may be shown
         t = apvd_target(c, uid, hit[0], hit[1], hit[2], hit[3]) if hit else {"hidden": "gone"}
-        if t.get("hidden") in ("no_access", "encrypted") or snap.get("hidden"):
-            return jsonify(diff={**snap, "rows": [], "more": False, "hidden": snap.get("hidden") or t["hidden"], "decided": True,
+        why = snap.get("hidden") or t.get("hidden")
+        if why == "gone" and not snap.get("hidden") and (ans or {}).get("user_id") == uid:
+            why = None  # review F1: a target gone since -- only the person who answered still sees what they approved
+        if why:  # review F3: nothing of the target, not its name either
+            return jsonify(diff={"kind": snap.get("kind"), "append": snap.get("append"), "hidden": why, "name": "", "ref": "",
+                                 "added": 0, "removed": 0, "rows": [], "more": False, "changed": False, "decided": True,
                                  "at": (ans or {}).get("at")})
         return jsonify(diff={**snap, "decided": True, "at": (ans or {}).get("at")})
     return jsonify(diff=apvd_build(c, uid, ap, at, APVD_FULL_ROWS if full else APVD_SHORT_ROWS))

@@ -154,6 +154,12 @@ err = r.json().get("error", {}) if r.status_code == 404 else {}
 check(r.status_code == 404 and err.get("code") == "heading_not_found" and err.get("headings") == ["Overview", "2D", "3D"],
       f"an unknown heading: 404 with the page's headings ({r.status_code} {r.text[:200]})")
 check(body_of(A, P4) == before, "the unknown heading wrote nothing")
+# review (2.1068.0): "# C#" is the heading "C#"; a "# comment" in the frontmatter is no heading; a ~~~ inside a ``` fence does not close it
+P5 = page(A, "Handbook/Langs", "---\ntitle: Langs\n# not a heading\n---\n# C#\n- one\n```\n~~~\n# Inside\n```\n# Go\n- two\n")
+r = append(ta, P5, text="- three", under="C#")
+check(r.ok and "# C#\n- one\n```\n~~~\n# Inside\n```\n\n- three\n\n# Go" in body_of(A, P5), f"under C#: the end of its section, past the fence {r.status_code} {body_of(A, P5)!r}")
+r = append(ta, P5, text="- x", under="not a heading")
+check(r.status_code == 404 and r.json().get("error", {}).get("headings") == ["C#", "Go"], f"the frontmatter line is no heading {r.text[:200]}")
 check(append(ta, P4, text="- x", under="  ").status_code == 400 and append(ta, P4, text="- x", under=3).status_code == 400, "an empty / not a text under: 400")
 
 # ================================================================ tenant-matrix: wiki_v1

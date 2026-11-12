@@ -154,7 +154,7 @@ def lv_answer(c, r, uid, ids, via="button"):
         from ..agents.apvdiff import apvd_snapshot
         snap = apvd_snapshot(c, uid, ch, r["created_at"])
         if snap:
-            c.execute("UPDATE obj_comments SET extra = jsonb_set(extra, '{apvdiff}', CAST(? AS JSONB)) WHERE id=?",
+            c.execute("UPDATE obj_comments SET extra = jsonb_set(extra, '{apvdiff}', CAST(? AS JSONB)) WHERE id=? AND extra->'apvdiff' IS NULL",
                       (json.dumps(snap), r["id"]))  # never in choices (they go to the agent)
     labels = [x["label"] for x in ch["choices"] if x["id"] in ids]
     ap = ch.get("approval")

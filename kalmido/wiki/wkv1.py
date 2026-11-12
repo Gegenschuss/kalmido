@@ -296,20 +296,29 @@ def wkv_update(pid):
 
 
 WKV_APPEND_MAX = 20000  # 2.1048.0 (#5861): one appended piece (a link, a paragraph); the whole page stays bound by wiki_body
-WKV_HEAD_RX = re.compile(r"^\s{0,3}(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$")  # 2.1068.0 (#5829): an ATX heading (as wkembed.js wem_pgPart)
+WKV_HEAD_RX = re.compile(r"^\s{0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")  # review F8: "# C#" is "C#"  # 2.1068.0 (#5829): an ATX heading (as wkembed.js wem_pgPart)
 WKV_FENCE_RX = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
 
 
 def wkv_headings(lines):
     """2.1068.0 (#5829): [(line index, level, text)] of the Markdown headings, code fences skipped."""
-    out, fence = [], False
+    out, fence = [], ""
+    skip = 0
+    if lines and lines[0].strip() == "---":  # review F8: the frontmatter block on top is no section (a "# comment" there)
+        skip = next((k + 1 for k in range(1, len(lines)) if lines[k].strip() in ("---", "...")), 0)
     for i, x in enumerate(lines):
-        if WKV_FENCE_RX.match(x):
-            fence = not fence
+        if i < skip:
+            continue
+        f = WKV_FENCE_RX.match(x)
+        if f:  # review F8: a fence closes only with its own character, at least as long
+            if not fence:
+                fence = f.group(1)
+            elif f.group(1)[0] == fence[0] and len(f.group(1)) >= len(fence) and not x.strip()[len(f.group(1)):].strip():
+                fence = ""
             continue
         m = None if fence else WKV_HEAD_RX.match(x)
         if m:
-            out.append((i, len(m.group(1)), m.group(2).strip()))
+            out.append((i, len(m.group(1)), (m.group(2) or "").strip()))
     return out
 
 
@@ -367,7 +376,7 @@ def wkv_append(pid):
     cur = wkh_body(c, r) or ""  # the plain text (a sealed private page opens with its key, like a read)
     new = wkv_append_text(cur, text, under)
     if new is None:
-        heads = [h[2] for h in wkv_headings(cur.split("\n"))][:100]
+        heads = [h[2] for h in wkv_headings(cur.split("\n"))][:100] if _reads() else []  # review F5: a write-only token reads no text
         return v1_err(404, tr("No heading {0} on this page", under.strip()), name="heading_not_found", headings=heads)
     v1_call(wiki_update, pid, body={"body": new, "expect_updated_at": r["updated_at"]})
     r, role, path = wkv_need(c, uid, pid)
