@@ -30,8 +30,8 @@ import requests  # noqa: E402
 SRC = os.environ.get("KALMIDO_SRC") or os.path.join(N, "..")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
-O = "/api/office"
-D = O + "/docs"
+OFC = "/api/office"
+D = OFC + "/docs"
 TEST_IBAN = "DE02120300000000202051"
 COMPANY = {"name": "Studio Nordlicht", "street": "Hafenstraße 12", "zip": "20457", "city": "Hamburg", "country": "DE",
            "email": "hallo@nordlicht.example", "phone": "+49 40 000000", "tax_number": "12/345/67890", "vat_id": "DE999999999",
@@ -84,7 +84,7 @@ def run(S, who):
     def ok(cond, what):
         check(cond, f"{who}: {what}")
 
-    r = S.put(B + O + "/settings", json={"company": {"name": COMPANY["name"]}, "lang": "de", "currency": "EUR", "payment_days": 14,
+    r = S.put(B + OFC + "/settings", json={"company": {"name": COMPANY["name"]}, "lang": "de", "currency": "EUR", "payment_days": 14,
                                          "company_fields": COMPANY})
     ok(r.ok, "office settings " + r.text[:200])
     r = S.post(B + "/api/clients", json={"name": "Beispielkunde AG", "street": "Marktstraße 5", "zip": "50667", "city": "Köln", "country": "DE"})

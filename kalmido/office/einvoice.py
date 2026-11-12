@@ -673,7 +673,7 @@ def _line_allowance(ln):
     None. Only for a positive line whose price x quantity gives the list amount, so BT-131 = BT-129 x BT-146 - BT-136 holds."""
     try:
         a, b, p = _d(ln.get("allowance")), _d(ln.get("list_net")), _d(ln.get("discount_pct"))
-    except Exception:  # an unreadable value: no allowance, the line is fitted as before
+    except (ArithmeticError, ValueError, TypeError):  # an unreadable value: no allowance, the line is fitted as before
         return None
     if a <= 0 or b <= 0 or p <= 0:
         return None
