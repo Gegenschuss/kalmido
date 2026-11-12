@@ -81,7 +81,11 @@ const ALL = 'cal,collab,agents,comments,progress';
     } else check(mobile, `${tag}: the bell`);
 
     // ---- #2809: "Load older messages" keeps the focus in the chat
-    if (mobile) { w.location.hash = 'agents/' + AG; await sleep(400); } else w.eval(`chatOpen(${AG})`);
+    // 2.965.0 (#5423, CI red of 2.929.0: "route #l/3, 0 messages"): on the phone the menus and the News window closed above
+    // left their Back on its way (backclose.js f8d_sync: history.back() of their own entries); on the slower CI it landed after
+    // the new address and took it back to the list. Wait until no entry of an overlay is left or on its way, then navigate.
+    if (mobile) await until(() => w.eval(`typeof f8d_bk === 'undefined' || (!f8d_bk.pushed && !f8d_bk.skip && !f8d_bk.queued && !history.state?.f8d)`));
+    if (mobile) { w.location.hash = 'agents/' + AG; await until(() => w.eval(`S.route?.mod === 'agents' || location.hash === '#agents/${AG}'`) && d.querySelector('#chat-msgs')); } else w.eval(`chatOpen(${AG})`);
     // #3506 (CI red of 2.782.0): the slower CI had no button after 15 s on the phone (green on the Mac): wait up to 30 s for the
     // messages AND the button, say what was there, and stop this part instead of a TypeError
     await until(() => d.querySelectorAll('#chat-msgs .cmsg').length >= 30 && d.querySelector('#chat-msgs [data-act="chat-older"]'), 200);
