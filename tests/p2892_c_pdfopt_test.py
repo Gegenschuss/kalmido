@@ -183,7 +183,8 @@ j = po_until(Fr, DID, ("ready", "failed"))
 check(j and j.get("state") == "ready" and j.get("pages") == [{"k": "bw", "b": 0}, {"k": "bw", "b": 1}] and j.get("drop") == [2] and j.get("fresh"),
       f"check: the pages measured, page 2 would go {j}")
 r = Fr.post(B + f"/api/docs/{DID}/pdfopt", json={"mode": "auto"})
-check(r.status_code == 202 and r.json().get("state") == "wait", f"run: queued {r.status_code} {r.text[:200]}")
+# 2.1069.0 (#5412): its own thread may have taken it up already when the answer reads the state again
+check(r.status_code == 202 and r.json().get("state") in ("wait", "run"), f"run: queued {r.status_code} {r.text[:200]}")
 check(Fr.post(B + f"/api/docs/{DID}/pdfopt", json={"mode": "auto"}).status_code == 409, "run: a second start while it runs -> 409")
 j = po_until(Fr, DID, ("done", "same", "failed"))
 check(j and j.get("state") == "done" and j.get("before") == len(D) and 0 < j.get("after", 0) < len(D), f"run: done, smaller {j}")
