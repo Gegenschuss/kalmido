@@ -18484,7 +18484,7 @@
   "Comment on task {0}": "Commentaire sur la tâche {0}",
   "encrypted, the change cannot be shown": "chiffré, la modification ne peut pas être affichée",
   "no longer there": "n'existe plus",
-  "you cannot read it, the change is not shown": "vous ne pouvez pas le lire, la modification n'est pas affichée",
+  "you cannot read it, the change is not shown": "tu ne peux pas le lire, la modification n'est pas affichée",
   "{0} line added": ["{0} ligne ajoutée", "{0} lignes ajoutées"],
   "{0} line removed": ["{0} ligne supprimée", "{0} lignes supprimées"],
   "nothing added": "rien d'ajouté",
