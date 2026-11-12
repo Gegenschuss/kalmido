@@ -115,6 +115,7 @@ function accountHtml() {
     <div class="row"><label>${tr('Signed in as')}</label><span class="acct">${av(m.id, m.display_name)}<b>${esc(m.display_name)}</b> <span class="muted">${esc(m.username)}${m.auth === 'proxy' ? ' · ' + tr('via single sign-on') : ''}</span></span></div>
     ${sup_accountRow()}${''/* 2.74.0 (#338): the supporter badge (self-hosted only) */}
     <div class="row"><label for="a-name">${tr('Display name')}</label><input id="a-name" value="${esc(m.display_name)}" maxlength="60" autocomplete="name" enterkeyhint="done"></div>
+    ${m.agent ? '' : `<div class="row" id="a-epv"><label>${tr('E-mail address')}</label><span class="muted">${tr('Loading…')}</span></div>`}${''/* 2.1033.0 (#5790): the own address and its confirmation (epvDraw) */}
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="a-avpick">${avPickHtml()}</div></div>
     <div class="row"><label id="a-col-h">${tr('Colour')}</label><div class="pfcol" id="a-col" role="group" aria-labelledby="a-col-h">${ac_pickHtml((S.colors || {})[m.id] || '', 'me')}</div></div>
     ${pw ? `<div class="row"><label for="a-cur">${tr('Password')}</label><input type="text" class="cfhid" hidden tabindex="-1" aria-hidden="true" autocomplete="username" value="${esc(S.me?.username || '')}" readonly><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>
@@ -138,6 +139,38 @@ function accountHtml() {
     ${typeof sdlHtml === 'function' ? sdlHtml() : ''}${''/* 2.553.0 (#1413): delete the own account (selfdelete.js) */}
     ${shellServerUrl() ? `<div class="row"><label>${tr('Server|settings')}</label><button class="btn sm" data-acc="shell-server">${ic('link', 's')} ${tr('Change server')}</button></div>` : ''}${''/* 2.435.0 B (#3578): only in the app shell */}
     ${m.auth === 'session' ? `<div class="row alogout"><button class="btn sm" data-acc="logout">${ic('logout', 's')} ${tr('Sign out')}</button></div>` : ''}`;  // 2.24.0 (UX-21): at the very end, set apart
+}
+// 2.1033.0 (#5790): Settings > Account > E-mail address: the own address and whether it is confirmed. "Confirm address" mails
+// a one-time link; opened signed in as this account (#mailproof/<token>, main.js keeps it over the sign-in) it confirms the
+// address - organisation invitations to it reach the person then, and "E-mails from my own address" counts it.
+async function epvDraw(md) {
+  const box = $('#a-epv', md); if (!box) return;
+  let j; try { j = await api('GET', '/api/me/email'); } catch { box.hidden = true; return; }
+  const st = !j.email ? `<span class="muted">${tr('none set')}</span>`
+    : `<span class="epvaddr">${esc(j.email)}</span> ${j.proved ? `<span class="epvok">${ic('check', 's')} ${tr('confirmed')}</span>`
+      : `<span class="muted">${tr('not confirmed')}</span>${j.mail_out ? ` <button type="button" class="btn sm" data-epv="send">${ic('send', 's')} ${tr('Confirm address')}</button>` : ''}`}`;
+  box.innerHTML = `<label>${tr('E-mail address')}</label><span class="epv">${st}</span>`;
+  if (j.email && !j.proved) box.insertAdjacentHTML('afterend', `<div class="shint" id="a-epv-h" role="status">${esc(j.mail_out ? tr('Confirm your address so that invitations of organisations to it reach you and e-mails from it can become tasks.') : tr('E-mail sending is not set up on this server'))}</div>`);
+  else $('#a-epv-h', md)?.remove();
+  if (box._wired) return;
+  box._wired = true;
+  box.addEventListener('click', async e => {
+    const b = e.target.closest('[data-epv="send"]'); if (!b) return;
+    b.disabled = true;
+    try {
+      const r = await api('POST', '/api/me/email/proof');
+      if (r.proved) { $('#a-epv-h', md)?.remove(); await epvDraw(md); return; }
+      toast(tr('Sent to {0}', r.email));
+      const h = $('#a-epv-h', md); if (h) h.textContent = tr('Open the link in the e-mail where you are signed in as {0}. It works once and for 2 days.', S.me?.username || '');
+    } catch { /* api() said it */ } finally { b.disabled = false; }
+  });
+}
+// the link of the proof mail (main.js: #mailproof/<token>, after the sign-in): confirms the address of the signed-in account
+async function epv_link(tok) {
+  try {
+    const r = await api('POST', '/api/me/email/proof/confirm', {token: tok});
+    toast(r.invitations ? trn('Address confirmed. {0} invitation waits for you.', 'Address confirmed. {0} invitations wait for you.', r.invitations) : tr('Address confirmed: {0}', r.email), null, 6000);
+  } catch { /* api() said it: an old link, another account, the address changed */ }
 }
 // 2.88.0 (#1980): search, filter and pages (hundreds of accounts), several accounts at once
 const UA8_FLT = [['people', N_('People')], ['active', N_('Active')], ['disabled', N_('Disabled')], ['admin', N_('Admins')], ['invited', N_('Invited')], ['pending', N_('Waiting for approval')], ['agents', N_('Agents')]];

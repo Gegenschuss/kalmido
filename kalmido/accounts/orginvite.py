@@ -451,6 +451,35 @@ def ojn_hidden(c, oid, uid, email=None):
     return bool(selfm and selfm[0]) and not may_see(c, me(), uid)
 
 
+def ojn_proved(c, uid, email):
+    """2.1033.0 (#5790): account uid just proved its address email (accounts/emailproof.py): the silent invitations of exactly
+    this address (the one the admin typed, org_joins.email since #4922) that are still open become ordinary ones (ojn_invite in
+    the name of the admin who invited: News item, mail, push). One stays silent when the #3570 rule holds - a company of its own
+    whose inviting admin may not see the person - or when that admin is no admin of the organisation any more (Resend by a
+    current admin wakes it as before, ojn_hidden). Rows silent for another address are not touched. -> how many woke.
+    The caller commits."""
+    cut = iso(now_utc() - timedelta(days=OJN_DAYS))
+    em = (email or "").strip().lower()
+    if not em:
+        return 0
+    with system_ctx(c):  # the person is no member of these organisations yet
+        rows = c.execute("""SELECT j.org_id, j.role, j.created_by, o.self_made FROM org_joins j JOIN orgs o ON o.id=j.org_id
+                            WHERE j.user_id=? AND j.silent=1 AND lower(COALESCE(j.email, ''))=? AND j.created_at>?
+                            AND o.retired_at IS NULL AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id AND m.user_id=j.user_id)
+                            ORDER BY j.created_at""", (uid, em, cut)).fetchall()
+        n = 0
+        for r in rows:
+            by = r["created_by"]
+            if not by or not c.execute("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id=? "
+                                       "AND m.role='admin' AND u.disabled=0", (r["org_id"], by)).fetchone():
+                continue
+            if r["self_made"] and not may_see(c, by, uid):  # #3570: a company of its own reaches only people its admin may see
+                continue
+            ojn_invite(c, r["org_id"], uid, r["role"], by=by)
+            n += 1
+    return n
+
+
 def ojn_push(c, uid, who, org):
     """2.367.4 (#2974): the push of an invitation (none in the org import's thread: its people get the mail and the bell)."""
     from flask import has_request_context

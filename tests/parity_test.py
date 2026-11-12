@@ -526,6 +526,7 @@ APP_ONLY = [
     ("2.92.0 C (#1926): which agents a person may ask for a summary of a file (the preview's button); the request is a comment that mentions the agent",
      ("=GET /api/attachments/{}/agents",)),
     ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "* /api/me/sessions", "=PATCH /api/me", "=GET /api/me",
+                                                                     "* /api/me/email",  # 2.1033.0 (#5790): the own address proved by a mailed link
                                                                      "=POST /api/stepup/passkey")),  # 2.223.2 C (#2871)
     ("2.485.0 (#3939): support access opens a client's account / organisation to the operator: only the person in a browser, never an agent or a token",
      ("* /api/support-access",)),

@@ -404,6 +404,8 @@ ROUTES = {
     "POST /api/auth/enrol/totp": "auth", "POST /api/auth/enrol/totp/confirm": "auth",
     "POST /api/auth/enrol/passkey/options": "auth", "POST /api/auth/enrol/passkey": "auth",
     "POST /api/auth/passkey/options": "auth", "POST /api/auth/passkey": "auth", "GET /api/me/2fa": "auth",
+    # 2.1033.0 (#5790): the own address proved by a mailed link (wakes the own silent organisation invitations of that address)
+    "GET /api/me/email": "own", "POST /api/me/email/proof": "own", "POST /api/me/email/proof/confirm": "own",
     "POST /api/stepup/passkey": "auth",  # 2.223.2 C (#2871): the passkey challenge of the step-up (own account)
     "POST /api/me/2fa/totp": "auth", "POST /api/me/2fa/totp/confirm": "auth", "POST /api/me/2fa/totp/disable": "auth",
     "POST /api/me/2fa/recovery": "auth", "POST /api/me/passkeys/options": "auth", "POST /api/me/passkeys": "auth",

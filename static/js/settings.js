@@ -1084,7 +1084,7 @@ function settingsModal(focus) {
     if (k === 'ai') aiSubShow(md);  // 2.5.1 (#393): only the shown sub-tab loads
     if (k === 'users' || k === 'org') admSubShow(md, null, false, k);
     if (k === 'ai' || k === 'users') asst_paneDraw(md);  // 2.75.0 (#1411); 2.489.0 (#2664): the assistant lives in Agents
-    if (k === 'account') { tfaDraw(md); apwDraw(md); e2eDraw(md); if (typeof msvDraw === 'function') msvDraw(md); if (typeof sesDraw === 'function') sesDraw(md); if (typeof sgvDraw === 'function') sgvDraw(md); }  // 2.73.0 A (#661): + Servers; 2.115.0 B (#2062): + sessions
+    if (k === 'account') { tfaDraw(md); epvDraw(md); apwDraw(md); e2eDraw(md); if (typeof msvDraw === 'function') msvDraw(md); if (typeof sesDraw === 'function') sesDraw(md); if (typeof sgvDraw === 'function') sgvDraw(md); }  // 2.73.0 A (#661): + Servers; 2.115.0 B (#2062): + sessions
     $(`.snav [data-sec="${k}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'});
   };
   // ---- autosave
@@ -1253,7 +1253,7 @@ function settingsModal(focus) {
   });
   if (S.me?.is_admin) hostWire(md);
   aiuWire(md, only => { const box = $('#s-aiu', md); if (only && box && S.aiu.data) box.innerHTML = aiuHtml(S.aiu.data, Math.max(240, Math.min(720, (box.clientWidth || 560) - 8))); else aiuDraw(md); });  // 2.1.1 (#326)
-  if (cur === 'account' && S.me) { tfaDraw(md); apwDraw(md); e2eDraw(md); if (typeof msvDraw === 'function') msvDraw(md); if (typeof sesDraw === 'function') sesDraw(md); }  // 2.73.0 A (#661); 2.115.0 B (#2062): + sessions
+  if (cur === 'account' && S.me) { tfaDraw(md); epvDraw(md); apwDraw(md); e2eDraw(md); if (typeof msvDraw === 'function') msvDraw(md); if (typeof sesDraw === 'function') sesDraw(md); }  // 2.73.0 A (#661); 2.115.0 B (#2062): + sessions
   if (S.me) { tfaWire(md); tokWire(md); apwWire(md); e2eWire(md); }  // 2.42.0 (#828): + end-to-end encryption
   if (S.me?.is_admin) oidcWire(md);
   if (S.me?.is_admin) { aaWire(md); bkWire(md); orphWire(md); }

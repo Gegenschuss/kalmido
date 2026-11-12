@@ -98,10 +98,14 @@ def mail_info():
                 lists.append({"list_id": lid, "name": l["name"], "address": "", "e2e": True, "reason": le2b_off()})
                 continue
             lists.append({"list_id": lid, "name": l["name"], "address": mail_addr(t)})
-    u = c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone()
+    u = c.execute("SELECT email, email_proved FROM users WHERE id=?", (uid,)).fetchone()
+    em = ((u["email"] if u else "") or "").strip()
     return jsonify(enabled=MAIL_IN_ON, address=mail_addr(toks.get(None)) if MAIL_IN_ON else "", plain=MAIL_ADDRESS if MAIL_IN_ON else "",
                    lists=lists if MAIL_IN_ON else [], from_me=s.get("mail_from_me") == "1",
-                   trim_fwd=s.get("mail_trim_fwd") == "1", trim_eml=s.get("mail_trim_eml") != "0",  # 2.49.0 (#971) email=(u["email"] if u else "") or "",
+                   trim_fwd=s.get("mail_trim_fwd") == "1", trim_eml=s.get("mail_trim_eml") != "0",  # 2.49.0 (#971)
+                   # 2.1033.0 (#5790): the own address again (a comment had swallowed it since 2.49.0: "none set" / no "Send now"),
+                   # and whether it is proved - "E-mails from my own address" counts only then (#5775)
+                   email=em, email_proved=bool(em) and (u["email_proved"] or "") == em.lower(),
                    digest={"enabled": MAIL_OUT_ON, "on": s.get("digest_mail") == "1", "time": s.get("digest_time") or ""})
 
 

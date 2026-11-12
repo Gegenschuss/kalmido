@@ -300,7 +300,9 @@ ROUTES = {
     "PUT /api/assistant/lists": "agents", "PUT /api/v1/agent/quota": "agents", "PUT /api/v1/agent/status": "agents",
     # ---- auth (31)
     "DELETE /api/me/passkeys/{}": "auth", "GET /api/auth/info": "auth", "GET /api/auth/oidc/callback": "auth",
-    "GET /api/auth/oidc/start": "auth", "GET /api/me/2fa": "auth", "PATCH /api/me/passkeys/{}": "auth",
+    "GET /api/auth/oidc/start": "auth", "GET /api/me/2fa": "auth",
+    # 2.1033.0 (#5790): the own address proved by a mailed link (wakes the own silent organisation invitations of that address)
+    "GET /api/me/email": "own", "POST /api/me/email/proof": "own", "POST /api/me/email/proof/confirm": "own", "PATCH /api/me/passkeys/{}": "auth",
     "POST /api/agent-setup/redeem": "auth", "POST /api/agent-setup/remove": "auth", "POST /api/auth/2fa": "auth",
     "POST /api/auth/2fa/passkey": "auth", "POST /api/auth/2fa/passkey/options": "auth", "POST /api/auth/enrol/passkey": "auth",
     "POST /api/auth/enrol/passkey/options": "auth", "POST /api/auth/enrol/totp": "auth",

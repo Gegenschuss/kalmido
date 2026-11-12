@@ -269,3 +269,7 @@ details.setmore>.setmoreb{padding-top:.25rem}
 /* 2.622.0 D (#4514): "To do before the update" under the update hint */
 .shint.updaction{margin-top:.5em;padding:.5em .7em;border-left:.1875rem solid var(--accent)}
 .updactiontxt{white-space:pre-wrap;word-break:break-word;margin:.3em 0;font:inherit}
+/* 2.1033.0 (#5790): Settings > Account > E-mail address and its confirmation */
+.epv{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.4rem;min-width:0}
+.epvaddr{overflow-wrap:anywhere}
+.epvok{display:inline-flex;align-items:center;gap:.2rem;color:var(--ok-t)}

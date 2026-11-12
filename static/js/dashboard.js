@@ -542,6 +542,7 @@ function mailHtml(j) {
     <div class="shint keep">${tr('Keep the address secret: whoever knows it can add tasks.')}</div>
     <div class="shint">${tr('Subject = title, text = description, attachments become files.')}</div>
     <div class="row"><label></label>${mchk('s-mailme', j.from_me, tr('E-mails from my own address ({0}) to {1} go to my basket', j.email || tr('none set'), j.plain))}</div>
+    ${j.email && !j.email_proved ? `<div class="shint keep" id="s-mailme-h">${ic('alert', 's')} ${esc(tr('Your address is not confirmed yet: e-mails from it become tasks only after you confirm it.'))}${j.digest.enabled ? ` <button type="button" class="btn sm" data-mail="proof">${ic('send', 's')} ${tr('Confirm address')}</button>` : ''}</div>` : ''}${''/* 2.1033.0 (#5790): only a confirmed address counts (#5775) */}
     <div class="row"><label></label>${mchk('s-mailtrim', j.trim_fwd, tr('Shorten forwarded e-mails'))}</div>
     <div class="row"><label></label>${mchk('s-mailtrimeml', j.trim_eml, tr('Keep the original e-mail as an attachment'))}</div>
     <div class="shint">${tr('A forwarded e-mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.')}</div>
@@ -568,6 +569,7 @@ async function mailWire(md) {
     }
     if (k === 'del') { if (!await askConfirm(tr('Remove this address?'), tr('E-mails to it are no longer imported.'), {ok: tr('Remove'), danger: true})) return; try { await api('DELETE', '/api/me/mail/token' + (lid ? `?list_id=${lid}` : '')); } catch { return; } await reload(); return; }
     if (k === 'test') { try { const r = await api('POST', '/api/me/mail/test'); toast(tr('Sent to {0}', r.to)); } catch { /* api() said it */ } }
+    if (k === 'proof') { b.disabled = true; try { const r = await api('POST', '/api/me/email/proof'); if (r.proved) await reload(); else toast(tr('Sent to {0}', r.email)); } catch { /* api() said it */ } finally { b.disabled = false; } }  // 2.1033.0 (#5790)
     if (k === 'poll') {  // 2.142.0 C (#2149): admins: look into the mailbox now; locked while it runs
       const out = $('#s-mailpoll-r', md); b.disabled = true; if (out) out.textContent = tr('Fetching…');
       try {
