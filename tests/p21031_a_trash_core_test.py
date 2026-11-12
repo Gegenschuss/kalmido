@@ -97,7 +97,7 @@ for x in LS:
     dbx("UPDATE lists SET deleted_at=? WHERE id=? RETURNING id", (OLD, x))
 dbx("UPDATE lists SET deleted_at=? WHERE id IN (?, ?) RETURNING id", (OLD, L1, L2))
 DUE = sorted([*LS, L1, L2])
-out = in_app(f"""from kalmido.core.objects import OBJ
+out = in_app("""from kalmido.core.objects import OBJ
 from kalmido.core.writes import OBJ_PURGE, obj_purge_after, obj_trash_prune
 OBJ["list"]["trash_batch"] = 2
 print("COUNT", obj_trash_prune(c, "list", purge=False))
