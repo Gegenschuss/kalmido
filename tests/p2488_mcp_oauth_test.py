@@ -319,6 +319,28 @@ check(mcp(t6.get("access_token", ""), {"jsonrpc": "2.0", "id": 1, "method": "pin
 r = token(grant_type="refresh_token", refresh_token=t6.get("refresh_token", ""), client_id=CID)
 check(r.status_code == 400, "... its newest refresh token too")
 
+# ---------------------------------------------------------------- 2.1078.0 (#5866, N1): step_ref belongs to the access
+# a refused step (409 approval_required -> step_ref) is kept per access (grant), not per access token: after the refresh the card
+# can still be asked with it; a body longer than a card binds (32000 characters) is never kept and says so
+check(Fr.patch(B + f"/api/agents/{AID}/control", json={"level": "approve_all"}).ok, "N1 setup: every change needs a card")
+tk = full()
+
+
+def call(tok, i, name, args):
+    r = mcp(tok, {"jsonrpc": "2.0", "id": i, "method": "tools/call", "params": {"name": name, "arguments": args}})
+    return r.ok and r.json().get("result", {}).get("isError"), r.text
+
+
+bad, txt = call(tk.get("access_token", ""), 1, "create_task", {"title": "Needs a Yes", "list_id": L1})
+check(bad and "step_ref=1" in txt, f"N1: the refused write names step_ref=1 {txt[:300]}")
+tk2 = j(token(grant_type="refresh_token", refresh_token=tk.get("refresh_token", ""), client_id=CID))
+check(bool(tk2.get("access_token")), "N1: refreshed")
+bad, txt = call(tk2.get("access_token", ""), 2, "request_chat_approval", {"user_id": FID, "title": "May I?", "step_ref": 1})
+check(bad is False and "Needs a Yes" in txt, f"N1: after the refresh the card is made from step_ref=1 {txt[:300]}")
+bad, txt = call(tk2.get("access_token", ""), 3, "create_task", {"title": "Long", "list_id": L1, "notes": "x" * 33000})
+check(bad and "step_ref" not in txt and "longer than an approval card can bind" in txt, f"N1: a too long body is not kept {txt[:300]}")
+check(Fr.patch(B + f"/api/agents/{AID}/control", json={"level": "free"}).ok, "N1: back to free")
+
 # ---------------------------------------------------------------- Settings > Agents: list and revoke; /oauth/revoke
 tk = full()
 check(mcp(tk.get("access_token", ""), {"jsonrpc": "2.0", "id": 1, "method": "ping"}).ok, "a new access")

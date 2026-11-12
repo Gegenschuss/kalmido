@@ -51,6 +51,7 @@ PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 WAIT_MAX = 60
 ATT_CAP_DEFAULT = 5 * 1024 * 1024    # 2.13.1 (#465): get_attachment returns at most this many bytes (base64 in the answer)
 ATT_CAP_MAX = 20 * 1024 * 1024
+STEP_BODY_MAX = 32000  # 2.1078.0 (#5866, N1): the longest body (canonical JSON) an approval card binds (server: agents/control.py CTL_BODY_MAX)
 
 # ---------------------------------------------------------------- REST client
 
@@ -173,6 +174,10 @@ class Kalmido:
         """2.1045.0 (#5827): keeps the step of a 409 approval_required (method, path, body, if_match as the server sent them), so
         request_chat_approval takes it over by step_ref instead of the model typing it again -> the hint for the model."""
         st = {k: ap[k] for k in ("method", "path", "body", "if_match") if ap.get(k) not in (None, "", {}, [])}
+        if "body" in st and len(json.dumps(st["body"], sort_keys=True, separators=(",", ":"), ensure_ascii=False)) > STEP_BODY_MAX:
+            # 2.1078.0 (#5866, N1): a card binds at most STEP_BODY_MAX characters of body (server CTL_BODY_MAX): never kept
+            return (f"The body of this step is longer than an approval card can bind ({STEP_BODY_MAX} characters): split the change "
+                    "into smaller writes, each of which can be approved.")
         ref = max(self.refused, default=0) + 1
         self.refused[ref] = st
         for old in sorted(self.refused)[:-20]:  # the newest 20

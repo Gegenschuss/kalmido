@@ -289,6 +289,8 @@ def mcpr_revoke(c, gid):
         c.execute("DELETE FROM api_tokens WHERE id=?", (r["token_id"],))
     c.execute("UPDATE oauth_grants SET revoked_at=COALESCE(revoked_at, ?), token_id=NULL, refresh_hash=NULL, prev_refresh_hash=NULL "
               "WHERE id=?", (iso(now_utc()), gid))
+    with _RUN_LOCK:  # 2.1078.0 (#5866, N1): the refused steps of an ended access are not kept on
+        _REFUSED.pop(("grant", int(gid)), None)
 
 
 # ---------------------------------------------------------------- metadata (RFC 9728, RFC 8414)
@@ -658,7 +660,9 @@ def mcpr_module():
 _CLS = {}
 
 
-_REFUSED = {}  # 2.1045.0 (#5827): token hash -> {step_ref: step} of InProc (Kalmido._keep_refused), the newest MCPR_REFUSED_TOKENS tokens
+_REFUSED = {}  # 2.1045.0 (#5827): access -> {step_ref: step} of InProc (Kalmido._keep_refused), the newest MCPR_REFUSED_TOKENS accesses.
+# 2.1078.0 (#5866, N1): keyed by the access (grant id) of /mcp, so a refreshed access token keeps its step_ref and a revoked
+# access drops them (mcpr_revoke); a caller without an access (a server agent's run) keys by its token hash as before
 MCPR_REFUSED_TOKENS = 500
 
 
@@ -675,14 +679,14 @@ def _inproc_cls(mod):
             self.e = e
 
     class InProc(mod.Kalmido):
-        def __init__(self, token, ip, base_url, deadline=None):
+        def __init__(self, token, ip, base_url, deadline=None, grant_id=None):
             super().__init__("http://kalmido.invalid", token, timeout=mod.WAIT_MAX + 30)
             self.me_cache = {"at": 0.0, "v": None}  # per call of /mcp, never shared between tokens
             self.ip, self.base_url = ip, base_url
             self.environ_extra = {}  # 2.557.0 (#4670, review): a WSGI key no network request can set (headers become HTTP_*)
             self.deadline = deadline or (time.time() + MCPR_RUN_S)
             # 2.1045.0 (#5827): the refused steps (step_ref) outlive one /mcp request: kept per token in this process
-            key = hashlib.sha256((token or "").encode()).hexdigest()
+            key = ("grant", int(grant_id)) if grant_id else ("token", hashlib.sha256((token or "").encode()).hexdigest())
             with _RUN_LOCK:
                 if key not in _REFUSED and len(_REFUSED) >= MCPR_REFUSED_TOKENS:
                     _REFUSED.pop(next(iter(_REFUSED)))
@@ -825,7 +829,7 @@ def mcpr_mcp():
         if not _SEM.acquire(blocking=False):
             return jsonify(error="busy, try again"), 503, {"Retry-After": "5"}
         _RUNNING[gid] = _RUNNING.get(gid, 0) + 1
-    api = _inproc_cls(mod)(tok, client_ip(), request.host_url, time.time() + MCPR_RUN_S)
+    api = _inproc_cls(mod)(tok, client_ip(), request.host_url, time.time() + MCPR_RUN_S, grant_id=gid)  # 2.1078.0 (#5866, N1)
     box = {}
 
     def run():
