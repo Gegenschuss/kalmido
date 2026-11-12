@@ -27,7 +27,7 @@ import json
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.access import Denied, MANAGE_ROLES, list_role, live_sql, otr_live
+from ..core.access import Denied, MANAGE_ROLES, list_role, list_state_sql, live_sql, otr_live
 from ..core.db import db
 from ..core.i18n import tr
 from ..core.pg import system_ctx
@@ -199,8 +199,8 @@ def _excepts(c, a, uid):
 # ---- "Share…": what the asker may share with this agent
 def _opt_projects(c, a, uid):
     aid = a["user_id"]
-    rows = c.execute(f"""SELECT l.id, l.name FROM lists l WHERE l.is_inbox=0 AND COALESCE(l.quicknote, 0)=0 AND COALESCE(l.archived, 0)=0
-                        AND {otr_live('l')} AND COALESCE(l.life, '') NOT IN ('health', 'budget')
+    rows = c.execute(f"""SELECT l.id, l.name FROM lists l WHERE l.is_inbox=0 AND COALESCE(l.quicknote, 0)=0
+                        AND {list_state_sql('l')} AND COALESCE(l.life, '') NOT IN ('health', 'budget')
                         AND l.org_id IS NOT DISTINCT FROM ? AND l.owner_id != ?
                         AND NOT EXISTS (SELECT 1 FROM list_members m WHERE m.list_id=l.id AND m.user_id=?)
                         ORDER BY lower(l.name), l.id LIMIT ?""", (a["org_id"], aid, aid, AGS_MAX * 2)).fetchall()
