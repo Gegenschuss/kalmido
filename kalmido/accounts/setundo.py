@@ -26,7 +26,8 @@ key that goes from no value to an empty one ('' / {} / []: the first save of a d
 - su_run checks the key again (known, not server-only, not private, view state only as a part of a reset) and stores the
   value through clean_setting as PATCH /api/settings does (an old value that is no longer valid = 409, nothing written).
 - PATCH /api/settings of the same keys from the same device within SU_BUNDLE_S seconds joins the group before while that is
-  still the person's newest (core/undogroups.py undo_bundle): a setting tried out several times is one step.
+  still the person's newest (core/undogroups.py undo_bundle): a setting tried out several times is one step. 2.997.0 (#5705,
+  #5706): not a key holding several entries (a json list / map, a comma list): each change there is a step (_su_many).
 
 Interface:
   su_mark(c, uid, keys, label=None, reset=False, lyv=None, bundle=False)
@@ -44,7 +45,7 @@ from ..core.undodiff import ug_diff_add, undo_diff_reg, undo_person
 from ..core.undogroups import ug_device, undo_bundle, undo_label
 from .layouts import LAYOUT_KEYS
 from .layoutsets import lyv_follow, lyv_set_active
-from .settings import RS_EMPTY, RS_ITEMS, RS_KEYS, SETTINGS_SERVER_ONLY, clean_setting, notif_update, rs_done_sync, rs_put
+from .settings import RS_EMPTY, RS_ITEMS, RS_KEYS, SET_DELTA_CSV, SETTINGS_SERVER_ONLY, clean_setting, notif_update, rs_done_sync, rs_put
 
 SU_KIND = "setting"
 SU_AREA = "self"
@@ -99,6 +100,12 @@ def su_mark(c, uid, keys, label=None, reset=False, lyv=None, bundle=False):  # r
     c.pre_commit["settings.undo"] = su_flush
 
 
+def _su_many(k, *vals):
+    """2.997.0 (#5705, #5706): does setting k hold several entries (a comma list, a json list / map)? Not the device's look
+    (one map the app syncs as a whole after every change of it, dialogs.js lookPush: stays one bundled step)."""
+    return k != "look" and (k in SET_DELTA_CSV or any(str(v or "").lstrip()[:1] in ("[", "{") for v in vals))
+
+
 def su_name(k):
     """The readable name of setting k: [i18n key] (translated for the reader, core/i18n.py tr_stored), None without one."""
     if k in SU_NAMES:
@@ -132,7 +139,11 @@ def su_flush(c):
                 return
             label = m["label"] or su_label(ch)
             undo_label(c, label[0], *label[1])
-            if m["bundle"] and not m["reset"]:  # review F6: the same keys from the same device again = the group before
+            # 2.997.0 (#5705, #5706): a key holding several entries (a json list / map: the favourites, my colour per workspace,
+            # a view's arrangement; a comma list of SET_DELTA_CSV) is changed one entry at a time - another favourite moved,
+            # another workspace's colour - so each change stays a step of its own (bundled, Ctrl+Z took back every favourite /
+            # colour of the last 10 minutes at once); the bundle is for one choice tried again (theme, priority colour)
+            if m["bundle"] and not m["reset"] and not any(_su_many(k, m["before"][k], after[k]) for k in ch):  # review F6: the same keys from the same device again = the group before
                 key = hashlib.sha256(f"{ug_device()}|{','.join(sorted(ch))}".encode()).hexdigest()[:24]
                 undo_bundle(f"set:{key}", SU_BUNDLE_S, newest=True, relabel=False)
             for k in ch:

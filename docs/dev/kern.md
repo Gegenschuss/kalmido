@@ -292,7 +292,9 @@ c.commit()
   another key. Not yet: budget categories and templates, the project settings.
   Review of #5394 (same release): a device's DAV writes join one group per app password and area for 10 minutes
   (`core/undogroups.py` `undo_bundle`, label "Several changes") and never end the person's way forward; a setting changed
-  again from the same device within 10 minutes joins its step while that is the newest. Privacy choices (push channel,
+  again from the same device within 10 minutes joins its step while that is the newest (2.997.0, #5705/#5706: not a key
+  holding several entries - favourites, my colour per workspace, a json list / map or comma list; each change there stays a
+  step; the device look stays bundled). Privacy choices (push channel,
   "title only", sharing defaults, photo metadata, video players, read receipts, own mails, quiet hours, busy times) are
   no step; `su_run` checks the key again and writes through `clean_setting`. A reset's step brings the view state and the
   active saved arrangement back and empties the app's own "undo the reset". `obj_track(hist_skip=)` keeps sealed columns
