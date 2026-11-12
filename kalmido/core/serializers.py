@@ -371,9 +371,8 @@ TD_DEFAULTS = {
     "wait_fired": "", "waiting_at": None, "wait_note": "", "wait_until": None,
     "tags": [], "ltags": [], "attachments": [], "comment_count": 0, "unread": 0, "fields": {}, "blocked": 0, "blockers": [],
     "blocking": 0,
-    # 2.1002.0 (#5491): the core's columns of migration 5491_a (every task row has them, SELECT *); unset they cost a big start
-    # set much (p3136_state_size)
-    "updated_by": None, "deleted_by": None, "rev": 1,
+    # 2.1060.0 (#5875 #5184): no updated_by / deleted_by / rev any more (2.1002.0 #5491 had them here): task_dict leaves them out
+    # since 2.1031.0 (#5538), so tdFill must not put them back -- a key here every task of load_tasks has to carry
 }
 
 
