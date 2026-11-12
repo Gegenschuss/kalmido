@@ -18479,6 +18479,7 @@
   "Show scan inbox": "Mostrar la bandeja de escaneo",
   "Scan inboxes file only into folders of the documents": "Las bandejas de escaneo solo archivan en carpetas de los documentos",
   "Scan inbox: {0}": "Bandeja de escaneo: {0}",
+  "waits for your answer": "espera tu respuesta",
   "Only a quotation has a validity date": "Solo un presupuesto tiene fecha de validez",
   "Only a sent quotation without an answer can be extended": "Solo se puede prorrogar un presupuesto enviado sin respuesta",
   "The date must be today or later": "La fecha debe ser hoy o posterior",

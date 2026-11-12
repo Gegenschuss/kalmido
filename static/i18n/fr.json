@@ -18479,6 +18479,7 @@
   "Show scan inbox": "Afficher la boîte de numérisation",
   "Scan inboxes file only into folders of the documents": "Les boîtes de numérisation ne classent que dans les dossiers des documents",
   "Scan inbox: {0}": "Boîte de numérisation : {0}",
+  "waits for your answer": "attend ta réponse",
   "Only a quotation has a validity date": "Seul un devis a une date de validité",
   "Only a sent quotation without an answer can be extended": "Seul un devis envoyé sans réponse peut être prolongé",
   "The date must be today or later": "La date doit être aujourd'hui ou plus tard",
