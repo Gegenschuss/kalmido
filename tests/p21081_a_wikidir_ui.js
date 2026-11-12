@@ -70,7 +70,8 @@ if (!process.env.P21081A_NOSTART) execFileSync('bash', [path.join(__dirname, 'st
 
     // 3) a link [[Script]] still opens the page
     await nav(B + '?w=1280#wiki/' + P.loose);
-    const href = await until(`[...document.querySelectorAll('#view .wkpage a.wklink')].map(a => a.getAttribute('href')).find(h => h === '#wiki/${P.script}') || null`, {timeout: 15000});
+    // a computer opens the page in its editor: the link is checked in the page's rendered text (the read view, wk_render)
+    const href = await until(`WK.pg?.id === ${P.loose} && typeof wem_cut === 'function' && ((wk_render(WK.pg).match(/href="(#wiki\\/\\d+)" class="wklink"/) || [])[1] || null)`, {timeout: 15000});
     check(href === '#wiki/' + P.script, `#5907 the link [[Script]] goes to the page (${href})`);
 
     // 4) the narrow view's tree: one row whose name opens the page
