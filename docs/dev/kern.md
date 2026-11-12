@@ -222,6 +222,9 @@ c.commit()
   the shortest retention holds (`BW_KEEP_YEARS`), the hook refuses what the office's country pack holds longer (`Denied` =
   counted as locked). `bw_purge_tick` / `dma_purge_tick` and their purges on reading are gone. The office trash's delete for
   good and `ofk_restore`'s purge of an overdue row collect the files with `obj_purge_after` too.
+- 2.1002.0 (#5695): `_purge_rows` deletes the history / undo rows of every kind that names the purged row: the kind itself
+  and each `obj_track` kind on the same table (`_purge_kinds`: an office row saved as `office_meal` / `office_fixed_cost`,
+  trashed as `omeal` / `ofixed`) -- one place for every purge on the core's way, no area cleans its history itself.
 - 2.947.0 (#5367, stage 5 of the trash): the calendar (`evcal`) has its events as `children` and `trash_prune=True`:
   `op_cal_delete` cancels the invitations and calls `obj_trash` (a step of the person's list, so it can be taken back),
   `op_cal_restore` `obj_restore`; `ev_cal_trash` / `ev_cal_restore` / `ev_cal_trash_purge` are gone and the events' run

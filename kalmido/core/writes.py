@@ -440,6 +440,13 @@ def _purge_area(c, kind, rid):
     return True
 
 
+def _purge_kinds(kind, reg):
+    """2.1002.0 (#5695): the kinds whose history / undo rows belong to an object of kind: itself and every kind of obj_track on
+    the same table (an office row is tracked for its saves as e.g. office_meal, but trashed and purged as omeal -- its
+    obj_history / obj_undo rows outlived the delete for good)."""
+    return [kind] + sorted(k for k, t in OBJ_TRACK.items() if k != kind and t["table"] == reg["table"])
+
+
 def _purge_rows(c, kind, reg, rid):
     """THE delete for good of one object of the trash (obj_purge after its rights check, obj_trash_prune for the retention run):
     its reference node, history, undo steps, revoked shares and children go with it. 2.809.0 (#5365): the area's hook first
@@ -450,9 +457,10 @@ def _purge_rows(c, kind, reg, rid):
     if not _purge_area(c, kind, rid):
         return
     fs_ref_drop(c, kind, rid)
-    gids = ug_gids(c, "kind=? AND ref_id=?", (kind, int(rid)))  # 2.747.0 (#5249): the step groups of its undo rows
+    kinds = _purge_kinds(kind, reg)  # 2.1002.0 (#5695): + the tracked kinds of its table (an office row's history / undo)
+    gids = ug_gids(c, "kind = ANY(CAST(? AS TEXT[])) AND ref_id=?", (kinds, int(rid)))  # 2.747.0 (#5249): its undo rows' groups
     for t in ("obj_history", "obj_undo", "obj_revoked"):
-        c.execute(f"DELETE FROM {t} WHERE kind=? AND ref_id=?", (kind, int(rid)))
+        c.execute(f"DELETE FROM {t} WHERE kind = ANY(CAST(? AS TEXT[])) AND ref_id=?", (kinds, int(rid)))
     ug_gc(c, gids)
     for t, col in _kids(reg):  # 2.773.0 (#5292)
         c.execute(f"DELETE FROM {qi(t, (t,))} WHERE {qi(col, (col,))}=?", (int(rid),))
