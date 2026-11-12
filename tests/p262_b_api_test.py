@@ -201,7 +201,8 @@ def agent_task(lid, title, **kw):
 
 
 def agent_done(tid):
-    check(requests.post(V + f"/tasks/{tid}/complete", headers=CLH).ok, "#5792: the agent completes task " + str(tid))
+    r = requests.post(V + f"/tasks/{tid}/complete", headers=CLH)
+    check(r.ok, "#5792: the agent completes task " + str(tid) + " " + str(r.status_code) + r.text[:300])
 
 
 check(A.patch(B + "/api/settings", json={"agent_comments": "replies"}).ok, "#5792: alice back to 'only what needs me'")
@@ -229,8 +230,10 @@ A.put(B + f"/api/lists/{W['id']}/bell", json={"mode": "default"})
 # a person without an organisation, the same rule (freelancer-matrix: tasks)
 FRED = state(Fr)["me"]["id"]
 P = A.post(B + "/api/lists", json={"name": "Side"}).json()
-check(A.put(B + f"/api/lists/{P['id']}/members", json={"user_id": FRED, "role": "edit"}).ok and
-      A.put(B + f"/api/lists/{P['id']}/members", json={"user_id": CL, "role": "edit"}).ok, "#5792: share a project with fred and the agent")
+r = A.put(B + f"/api/lists/{P['id']}/members", json={"user_id": FRED, "role": "edit"})
+check(r.ok, "#5792: share a project with fred " + str(r.status_code) + r.text[:300])
+r = A.put(B + f"/api/lists/{P['id']}/members", json={"user_id": CL, "role": "edit"})
+check(r.ok, "#5792: share the project with the agent " + str(r.status_code) + r.text[:300])
 check(Fr.put(B + f"/api/lists/{P['id']}/bell", json={"mode": "all"}).ok, "#5792: fred: bell 'All'")
 T9 = agent_task(P["id"], "Agent for fred's project")
 check(not news_task(FRED, T9, "newtask"), "#5792: freelancer with 'only what needs me': no News entry for the agent's new task")
