@@ -39,6 +39,12 @@ for text, want, what in [
     ('Q = f"SELECT id FROM lists WHERE {list_state_sql()} AND id IN {otr_live(\'l\')}"', 0, "the helpers"),
     ('Q = "SELECT id FROM lists_sync WHERE archived=0"', 0, "a table lists_* is not lists"),
     ('Q = "SELECT id FROM habits WHERE archived=0"', 0, "habits.archived is not a project"),
+    # 2.1054.0 (#5794): a handwritten write of the old archive column (list_set_archived writes the marker)
+    ('c.execute("UPDATE lists SET archived=1 WHERE id=?", (lid,))', 1, "a write of lists.archived"),
+    ('c.execute("UPDATE lists SET name=?, archived=?, archived_at=? WHERE id=?")', 1, "a write of lists.archived among others"),
+    ('c.execute("UPDATE lists SET archived_at=NULL WHERE id=?")', 0, "archived_at is the moment, no state"),
+    ('c.execute("UPDATE office_letters SET archived=1 WHERE id=?")', 0, "another table's archive"),
+    ('c.execute("UPDATE lists_sync SET archived=1")', 0, "a table lists_* is not lists (write)"),
     ('if gsetting(c, "migr_liststate5537") != "1":\n    c.execute("UPDATE lists SET state=state WHERE archived <> 0 OR deleted_at IS NOT NULL")', 0,
      "the start's one-off fill"),
 ]:
@@ -108,7 +114,9 @@ check("BEFORE INSERT OR UPDATE ON lists FOR EACH ROW" in sch and " UPDATE OF " n
       "the trigger runs before every insert and update, without a column list (SCHEMA runs before the column exists; no generated column)")
 for want in ("'trash'", "'archived'", "'live'", "j->>'deleted_at'", "j->>'archived'", "IF NOT j ? 'state' THEN RETURN NEW"):
     check(want in sch, f"the trigger's rule names {want}")
-check(sch.index("'trash'") < sch.index("'archived'"), "the trash comes first: an archived project in the trash is 'trash'")
+# 2.1054.0 (#5794): the rule of the final marker is its own line (the marker written on purpose names 'archived' before it)
+rule = next((x for x in sch.splitlines() if "NEW.state := CASE" in x), "")
+check(rule and rule.index("'trash'") < rule.index("'archived'"), f"the trash comes first: an archived project in the trash is 'trash' {rule}")
 r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_migrations.py")], capture_output=True, text=True)
 check(r.returncode == 0, f"tools/check_migrations.py: no finding {r.stdout[-300:]}")
 

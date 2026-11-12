@@ -11,7 +11,7 @@ from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, uset, usettings, write_lock
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
-from ..core.access import acx_drop, collab_all, list_role, my_max_sort, time_all, WRITE_ROLES, otr_live
+from ..core.access import acx_drop, collab_all, list_role, my_max_sort, time_all, WRITE_ROLES, otr_live, list_set_archived
 from ..core.serializers import unlink_files
 from ..core.errors import BadInput, Denied  # 2.578.0 (#4573)
 from ..core.conflict import ccf_check  # 2.578.0 (#4573)
@@ -373,7 +373,7 @@ def sample_remove(c, uid):
             if c.execute("SELECT 1 FROM tasks WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone():
                 kept_lists += 1
             else:  # into the projects' trash (archived, as a delete in the app): it comes back there with its tasks
-                c.execute("UPDATE lists SET archived=1 WHERE id=?", (lid,))
+                list_set_archived(c, lid, True)  # 2.1054.0 (#5794): on the state marker (archived_at with it, as every archive)
                 ts = otr_trash(c, lid, uid)
                 c.execute("UPDATE tasks SET deleted_at=? WHERE list_id=? AND id IN (" + q + ")", [ts, lid] + mine)  # restored with it
                 lists += 1

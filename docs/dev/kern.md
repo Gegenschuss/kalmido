@@ -325,8 +325,15 @@ c.commit()
   `list_state_sql(alias, *states)` of `core/access.py` (no state = `live`: neither archived nor in the trash);
   `otr_live(alias)` = live or archived. A handwritten `archived=0` / `deleted_at IS NULL` on lists is red in
   `tools/check_list_state.py` (baseline `tools/list_state_baseline.json`, only shrinks; it reads line by line). Reading the
-  value (`SELECT archived` for the API) stays. Stage 2 (one way, #5537's follow-up): the write paths set `state`, the API /
-  MCP / exports derive `archived` / `archived_at` / `deleted_at`, the old columns go.
+  value (`SELECT archived` for the API) stays.
+- 2.1054.0 (#5794, stage 2): the archive is written on the marker - `list_set_archived(c, lid, on)` of `core/access.py`
+  (state `archived` / `live`, `archived_at` the moment it went in, kept while it stays); a handwritten
+  `UPDATE lists SET ... archived=` is red in `tools/check_list_state.py`. The trigger `kalmido_list_state` works both ways: a
+  write that changes `state` decides the archive and writes `archived` from it (the way back for a version before); a
+  write of `archived` alone (a version before, the undo of the settings) still sets the marker. `trash` stays derived from
+  `deleted_at`: that is the core's trash column of every kind (`obj_trash` / `obj_restore` / `obj_purge`, `live_sql`), so
+  projects go into the trash and back through the core as every kind; `deleted_at` is not an old column to drop. The column
+  `archived` stays as long as the value reads (API, `dict(row)`) use it; dropping it is a one-way step of its own.
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
   `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).

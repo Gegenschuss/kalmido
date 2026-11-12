@@ -505,6 +505,18 @@ def list_state_sql(a="", *states):
     return f"{col} IN ({', '.join(repr(s) for s in sorted(set(states), key=LIST_STATES.index))})"
 
 
+def list_set_archived(c, lid, on):
+    """2.1054.0 (#5794, stage 2): THE write of a project's archive state -- the marker lists.state ('archived' / 'live'),
+    archived_at the moment it went into the archive (kept while it stays there, cleared when it comes back). The trigger
+    kalmido_list_state (migrations.d/5537_a.py) writes the old column archived from the marker for a version before that
+    may still run on the database, and keeps 'trash' while deleted_at is set: the trash stays the core's (deleted_at,
+    obj_trash / obj_restore / obj_purge), archiving a project in the trash only changes what comes back. Returns whether
+    the row exists."""
+    return c.execute("UPDATE lists SET state=?, archived_at=CASE WHEN ?=0 THEN NULL WHEN state<>'live' AND archived_at IS NOT NULL"
+                     " THEN archived_at ELSE ? END WHERE id=?",
+                     ("archived" if on else "live", 1 if on else 0, now_iso(), int(lid))).rowcount > 0
+
+
 def otr_live(a="l"):
     """2.102.0 A (#1988): THE condition "the list is not in the trash" (lists.deleted_at, see lists/listtrash.py) for SQL on
     lists (a = the alias, "" without one). A deleted list is invisible everywhere except the trash's own routes.

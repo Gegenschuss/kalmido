@@ -16,7 +16,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, iso_ms
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import Denied, my_inbox, otr_live
+from ..core.access import Denied, my_inbox, otr_live, list_set_archived
 from ..accounts.orgs import _need_org_admin, user_orgs
 from .orgoutreq import oor_rows  # 2.361.2 (#2923)
 from ..accounts.pictures import list_icon_cols, list_icon_url
@@ -153,7 +153,7 @@ def oadm_archive(oid, lid):
         return err(tr("Invalid value: {0}", "archived"))
     if bool(lr["archived"]) == on:
         return jsonify(ok=True, **_ol_out(c, oid))
-    c.execute("UPDATE lists SET archived=?, archived_at=? WHERE id=?", (int(on), iso(now_utc()) if on else None, lid))
+    list_set_archived(c, lid, on)  # 2.1054.0 (#5794): on the state marker
     _ol_log(c, oid, lr, "archive" if on else "restore")
     _ol_news(c, oid, lr, "archive" if on else "restore")
     bump(c)

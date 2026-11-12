@@ -8,8 +8,11 @@ l.archived / l.deleted_at / lists.archived compared anywhere -- is red. The ones
 tools/list_state_baseline.json, and that file only shrinks (as tools/check_live_filter.py): more than the baseline = red,
 fewer = a notice to lower it (--strict: red), --update lowers the numbers and never raises one or adds a file.
 
-Reading the value (SELECT archived ... for the API, a dict of the row) is no filter and does not count. Stage 2 (one way) moves
-the write paths onto the marker and drops the old columns; until then they stay the ones that are written.
+Reading the value (SELECT archived ... for the API, a dict of the row) is no filter and does not count.
+
+2.1054.0 (#5794, stage 2): the write paths of the archive set the marker through core/access.py list_set_archived(); the
+trigger writes the old column archived from it. A new handwritten write of it (UPDATE lists SET ... archived=, in one line)
+counts as well.
 
 Read: kalmido/**/*.py without the schema (kalmido/core/schema.py, kalmido/core/migrations.d/) and the start's one-off fill
 (core/db.py names the old columns on purpose there, the lines right after its flag). Line by line, case-insensitive; a filter
@@ -38,7 +41,9 @@ FROM_LISTS_L = re.compile(r"\b(?:FROM|JOIN)\s+lists\s+(?:AS\s+)?l\b", re.I)
 BARE = re.compile(r"(?<![.\w])(?:archived\s*(?:=|<>|!=)\s*[01]\b|deleted_at\s+IS\s+(?:NOT\s+)?NULL\b)", re.I)
 FILL = "migr_liststate5537"  # the start's one-off fill (core/db.py) names the old columns on purpose
 FILL_LINES = 5  # its statement stands within these lines after the flag
-HELP = "use list_state_sql() / otr_live() of kalmido/core/access.py"
+# 2.1054.0 (#5794): a handwritten write of the old archive column of lists (list_set_archived writes the marker)
+WRITE = re.compile(r"\bUPDATE\s+lists\s+SET\b(?!_)[^\"']*?(?<![.\w])archived\s*=", re.I)
+HELP = "use list_state_sql() / otr_live() / list_set_archived() of kalmido/core/access.py"
 
 
 def count_text(text):
@@ -51,6 +56,7 @@ def count_text(text):
             skip -= 1
             continue
         n += len(QUAL.findall(line))
+        n += len(WRITE.findall(line))
         m = FROM_LISTS_L.search(line)
         if m:
             n += len(QUAL_L.findall(line, m.start()))

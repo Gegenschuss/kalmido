@@ -9,7 +9,7 @@ from ..core.pg import IntegrityError, insert_id, write_lock
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..accounts.session import me
-from ..core.access import Denied, list_people, list_role, plists, qn_is, vis_sql, WRITE_ROLES, otr_live
+from ..core.access import Denied, list_people, list_role, plists, qn_is, vis_sql, WRITE_ROLES, otr_live, list_set_archived
 from ..tasks.validation import as_int
 from ..collab.comments import user_names
 from ..core.errors import BadInput, reject_unknown
@@ -193,7 +193,7 @@ def qn_list_ensure():
     r = c.execute(f"SELECT id, archived FROM lists WHERE owner_id=? AND quicknote=1 AND {otr_live('')} ORDER BY id LIMIT 1", (uid,)).fetchone()
     if r:
         if r["archived"]:
-            c.execute("UPDATE lists SET archived=0, archived_at=NULL WHERE id=?", (r["id"],))
+            list_set_archived(c, r["id"], False)  # 2.1054.0 (#5794): on the state marker
             bump(c)
             c.commit()
         return jsonify(list_id=r["id"], created=False)

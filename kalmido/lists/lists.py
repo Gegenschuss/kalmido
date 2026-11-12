@@ -13,7 +13,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
-from ..core.access import acx_drop, addr_account, collab_all, Denied, dlg_gone, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES, list_state_sql, otr_live
+from ..core.access import acx_drop, addr_account, collab_all, Denied, dlg_gone, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES, list_state_sql, otr_live, list_set_archived
 from ..core.state import visible_lists
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
@@ -615,10 +615,9 @@ def list_update(lid):
             from ..accounts.orgs import ws_private_for
             ws_private_for(c, lid)
         if "archived" in vals:  # 1.6.1: archived_at follows the flag (set on the change to archived, cleared on restore)
-            c.execute("UPDATE lists SET archived_at=CASE WHEN ?=0 THEN NULL WHEN archived=0 THEN ? ELSE archived_at END "
-                      "WHERE id=?", (vals["archived"], iso(now_utc()), lid))
+            list_set_archived(c, lid, vals["archived"])  # 2.1054.0 (#5794): on the state marker (core/access.py)
         for k in LIST_FIELDS:
-            if k in vals:
+            if k in vals and k != "archived":
                 c.execute(f"UPDATE lists SET {k}=? WHERE id=?", (vals[k], lid))
         if "time_tracking" in vals:  # 2.41.0 (#1471): set on its own: differs from its folder's default from now on
             list_own_mark(c, lid, "time_tracking")
@@ -679,7 +678,7 @@ def list_update(lid):
         if adm and "archived" in vals:
             lr = c.execute("SELECT id, name, owner_id, archived, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
             if not lr["is_inbox"] and int(lr["archived"] or 0) != vals["archived"]:
-                c.execute("UPDATE lists SET archived=?, archived_at=? WHERE id=?", (vals["archived"], iso(now_utc()) if vals["archived"] else None, lid))
+                list_set_archived(c, lid, vals["archived"])  # 2.1054.0 (#5794): on the state marker
                 lm_owner_news(c, lr, "larchive" if vals["archived"] else "lrestore")
                 lr_members_news(c, lr, "larchive" if vals["archived"] else "lrestore")  # 2.40.0 (#1337)
         for k in MEMBER_LIST_FIELDS:
@@ -930,7 +929,7 @@ def list_keep(c, lid, by, until, owner=None):
     trash; users.user_purge -> orgcrypt_cli.before_user_delete seals its entries and files for their account)."""
     from .listtrash import otr_trash
     if not c.execute("SELECT deleted_at FROM lists WHERE id=?", (lid,)).fetchone()[0]:
-        c.execute("UPDATE lists SET archived=1, archived_at=COALESCE(archived_at, ?) WHERE id=?", (iso(now_utc()), lid))
+        list_set_archived(c, lid, True)  # 2.1054.0 (#5794)
         otr_trash(c, lid, by)
     c.execute("UPDATE lists SET retain_until=? WHERE id=?", (until, lid))
     if owner:  # review M1: kept, not shared -- the people the deleted person shared it with lose it (listtrash.otr_can)

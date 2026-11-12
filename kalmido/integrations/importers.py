@@ -21,7 +21,7 @@ from ..core.i18n import lang, N_, tr
 from ..core.db import bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import me
 from ..lists.lists import list_created
-from ..core.access import collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_list, WRITE_ROLES, token_lists, list_state_sql
+from ..core.access import collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_list, WRITE_ROLES, token_lists, list_state_sql, list_set_archived
 from ..core.serializers import csv_uncell
 from ..core.pages import valid_url
 from ..lists.lists import FOLDER_MAX, folder_seg, LIST_NAME_MAX
@@ -2549,7 +2549,7 @@ def imp_undo_lists(c, uid, lids, back, since):
                        for x in c.execute("SELECT created_at FROM list_files WHERE list_id=?", (lid,)))):
             kept += 1
             continue
-        c.execute("UPDATE lists SET archived=1, archived_at=COALESCE(archived_at, ?) WHERE id=?", (iso(now_utc()), lid))
+        list_set_archived(c, lid, True)  # 2.1054.0 (#5794): on the state marker
         otr_trash(c, lid, uid)
         went.update(live)
         n += 1
