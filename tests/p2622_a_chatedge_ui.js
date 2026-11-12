@@ -64,7 +64,8 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
         // the team chat the same: its list + room box from edge to edge of #view, no rounded side frame
         await o.nav(B + '#team'); await idle();
         const t = JSON.parse(await until(`(() => { const v = document.querySelector('#view'), e = document.querySelector('#view .tcview'); if (!e || !document.querySelector('#view .tcview .tclist')) return null;
-          const a = v.getBoundingClientRect(), b = e.getBoundingClientRect(); return JSON.stringify({vl: Math.round(a.left), vr: Math.round(a.left + v.clientWidth), l: Math.round(b.left), r: Math.round(b.right), txt: e.textContent.slice(0, 120)}); })()`) || 'null');
+          const a = v.getBoundingClientRect(), b = e.getBoundingClientRect(); const cv = getComputedStyle(v);
+          return JSON.stringify({vl: Math.round(a.left), vr: Math.round(a.left + v.clientWidth), l: Math.round(b.left), r: Math.round(b.right), pad: cv.paddingLeft + ' ' + cv.paddingRight, cls: e.className, txt: e.textContent.slice(0, 120)}); })()`) || 'null');
         check(t && Math.abs(t.l - t.vl) <= 1 && Math.abs(t.r - t.vr) <= 1, `${tag} the team chat fills the view's width (${JSON.stringify(t)})`);
         check(t && /conversation/i.test(t.txt), `${tag} the team chat shows its list and the hint to pick a conversation (${t && t.txt})`);
         await o.nav(B + '#agents/' + ag.id); await idle();
