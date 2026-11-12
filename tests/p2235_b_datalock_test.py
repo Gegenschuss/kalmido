@@ -204,13 +204,12 @@ check("ZQXPROJ" in found, "team agent counter-check: the opened project is visib
 # dl_of read the agents row in the caller's context: a person outside the team agent's organisation saw no row and got the
 # defaults (wiki_folders / lists empty = the open side). Now read as system: the real lock in every context.
 check(lock(A, TA, "patch", json={"lists": [L_T]}).status_code == 200, "N6 setup: the project locked again")
-if not dbx("SELECT org_id FROM agents WHERE user_id=?", (TA,))[0][0]:  # the team's workspace: an organisation Frida is not in
-    dbx("UPDATE agents SET org_id=(SELECT id FROM orgs ORDER BY id LIMIT 1) WHERE user_id=?", (TA,))
-code = ("import os; os.environ['TASKS_WATCHDOG']='0'\nimport app\nfrom flask import g\nfrom kalmido.core.config import app as fl\n"
-        "from kalmido.core.dlock import dl_of\nc=app.connect()\nwith fl.test_request_context('/p21078n6'):\n"
-        f"  g.db = c\n  g.user = {{'id': {FID}, 'kind': 'user'}}\n"
-        f"  seen = c.execute('SELECT count(*) FROM agents WHERE user_id=?', ({TA},)).fetchone()[0]\n"
-        f"  d = dl_of(c, {TA})\n  print('N6', seen, sorted((d or {{}}).get('_lids') or []), flush=True)\n  c.rollback()\n")
+OTHER = dbx("INSERT INTO orgs(name,icon,created_at) VALUES('N6 Other','','2026-11-12T00:00:00Z') RETURNING id")[0][0]
+dbx("UPDATE agents SET org_id=? WHERE user_id=?", (OTHER, TA))  # the team agent in an organisation Frida is not in
+code = ("import os; os.environ['TASKS_WATCHDOG']='0'\nimport app\nfrom kalmido.core.dlock import dl_of\nc=app.connect()\n"
+        f"c.set_ctx({FID}, (), 'user')\n"  # Frida's context (no organisation), as a request of hers that asks for the agent
+        f"seen = c.execute('SELECT count(*) FROM agents WHERE user_id=?', ({TA},)).fetchone()[0]\n"
+        f"d = dl_of(c, {TA})\nprint('N6', seen, sorted((d or {{}}).get('_lids') or []), flush=True)\nc.rollback()\n")
 pr = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", code], capture_output=True, text=True, timeout=120)
 out = next((x.split() for x in pr.stdout.splitlines() if x.startswith("N6 ")), [])
 check(out[1:2] == ["0"], f"N6 setup: Frida's context does not see the team agent's row {pr.stdout[-200:]} {pr.stderr[-300:]}")

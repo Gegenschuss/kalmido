@@ -340,6 +340,7 @@ check(bad is False and "Needs a Yes" in txt, f"N1: after the refresh the card is
 bad, txt = call(tk2.get("access_token", ""), 3, "create_task", {"title": "Long", "list_id": L1, "notes": "x" * 33000})
 check(bad and "step_ref" not in txt and "longer than an approval card can bind" in txt, f"N1: a too long body is not kept {txt[:300]}")
 check(Fr.patch(B + f"/api/agents/{AID}/control", json={"level": "free"}).ok, "N1: back to free")
+check(requests.post(B + "/oauth/revoke", data={"token": tk2.get("refresh_token", ""), "client_id": CID}).ok, "N1: the access ends again")
 
 # ---------------------------------------------------------------- Settings > Agents: list and revoke; /oauth/revoke
 tk = full()
