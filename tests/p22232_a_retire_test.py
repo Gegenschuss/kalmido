@@ -15,6 +15,7 @@ import time
 from datetime import datetime, timezone
 
 import dbx as dbxm
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 import requests
 from freelancer_fixture import freelancer
 
@@ -71,6 +72,7 @@ for s in (A, Do, Bo, Ca):
 
 # ================================================================== invitations open at the retirement
 GAM = A.post(B + "/api/admin/orgs", json={"name": "Gamma Studio", "admin_id": DORA}).json()["id"]
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 r = Do.put(B + f"/api/orgs/{GAM}/members", json={"email": "bob@example.com", "role": "admin"})
 check(r.ok and sql("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (GAM, BOB)), "Gamma: bob invited (org_joins) " + r.text[:160])
 r = Do.post(B + f"/api/orgs/{GAM}/invites", json={"email": "newcomer@example.com", "role": "member"})

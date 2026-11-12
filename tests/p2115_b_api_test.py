@@ -31,6 +31,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 from freelancer_fixture import freelancer  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -174,6 +175,7 @@ Fk = sess("frank", ua=UA_FF)
 r = Bo.get(B + f"/api/orgs/{ORG}/invites")
 check(r.ok and r.json() == {"invites": [], "enabled": True}, "an organisation admin: no open invitations yet " + r.text[:200])
 check(C.get(B + f"/api/orgs/{ORG}/invites").status_code == 403, "a plain member: 403")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check(C.post(B + f"/api/orgs/{ORG}/invites", json={"email": "x1@example.com"}).status_code == 403, "a plain member cannot invite")
 check(Fk.post(B + f"/api/orgs/{ORG}/invites", json={"email": "x2@example.com"}).status_code == 404, "the admin of another organisation: 404")
 check(requests.post(B + f"/api/orgs/{ORG}/invites", headers=AGH, json={"email": "x3@example.com"}).status_code in (401, 403), "an agent token: no")
@@ -303,6 +305,7 @@ for i in range(20 - n_today):
     fu = DB.execute("SELECT id FROM users WHERE username=?", (f"fill{i}",)).fetchone()[0]
     DB.execute("INSERT INTO org_invites(user_id,org_id,role,created_by,created_at) VALUES(?,?,?,?,?)",
                (fu, ORG, "member", uid["bob"], NOW))
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "limit@example.com"})
 check(r.status_code == 429 and not DB.execute("SELECT 1 FROM users WHERE email='limit@example.com'").fetchone(), "20 a day: then 429 " + r.text[:200])
 check(Fk.post(B + f"/api/orgs/{ORG2}/invites", json={"email": "limit2@example.com"}).ok, "the limit is per inviting person")

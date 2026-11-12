@@ -1519,8 +1519,16 @@ def org_member_put(oid, ghost=False):
     silent = False
     if b.get("email"):
         em = str(b["email"]).strip().lower()[:200]
-        r = c.execute("SELECT id, disabled, kind FROM users WHERE lower(email)=?", (em,)).fetchone()
+        r = c.execute("SELECT id, disabled, kind, email_proved FROM users WHERE lower(email)=?", (em,)).fetchone()
         dead = r is not None and (r["disabled"] or (r["kind"] or "user") == "agent")
+        # 2.1021.0 (#5775, Fable 2.1001 #5669): an organisation admin binds by address only an account that proved it
+        # (core/access.py addr_account: a mailed link, a verified OIDC claim, a confirmed sign-up); an unproved address is
+        # answered like an unknown one - on POST /invites a silent invitation like a disabled account (nothing for the person).
+        # The instance admin sees and manages every account (and may add by user_id) and keeps adding by the account's address;
+        # a member already in the organisation keeps its role change by address (nobody new is bound).
+        if (r is not None and not dead and r[0] != me() and (r["email_proved"] or "") != em and not (g.user["is_admin"] and not _operator_apart())
+                and not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, r[0])).fetchone()):
+            dead = True
         if not r or dead and not ghost:
             return jsonify(ok=True, by_email=True)
         uid, by_mail = r[0], True

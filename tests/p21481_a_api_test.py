@@ -27,6 +27,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 
 DATA = sys.argv[1]
@@ -93,6 +94,18 @@ for s in (Bo, Ca, Da, Er):
 check(dbx("SELECT 1 FROM information_schema.tables WHERE table_name='org_joins'"), "new table org_joins")
 
 # ================================================================ #2480 joining needs the person's yes
+# 2.1021.0 (#5775, Fable 2.1001): an account address nobody proved (the server's admin typed it in) is answered like an unknown
+# one - no invitation for the account; the invitation way keeps a silent row (in the list like a new address, nothing for the person)
+r = Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"})
+check(r.ok and r.json() == {"ok": True, "by_email": True} and Ca.get(B + "/api/orgs").json().get("joins") == [] and "orgjoin" not in news_kinds(Ca)
+      and not member(ORG, CAROL), "#5775: an unproved address: the same answer, no invitation for the account " + r.text[:200])
+r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "carol@example.com"})
+check(r.ok and set(r.json()) - {"notice"} == {"ok", "by_email", "invites"} and "carol@example.com" in [x.get("email") for x in r.json()["invites"]]
+      and Ca.get(B + "/api/orgs").json().get("joins") == [] and "orgjoin" not in news_kinds(Ca) and not member(ORG, CAROL),
+      "#5775: the invitation way to an unproved address: in the list like a new address, nothing for the account " + r.text[:300])
+check(Ca.post(B + f"/api/orgs/{ORG}/join").status_code == 404 and not member(ORG, CAROL), "#5775: ... and the account cannot accept it")
+dbx("DELETE FROM org_joins WHERE org_id=? AND user_id=?", (ORG, CAROL), write=True)  # withdrawn again for the cases below
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 r = Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"})
 r2 = Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "nobody@example.com"})
 check(r.ok and r.json() == r2.json() == {"ok": True, "by_email": True}, "membership by address: the same answer for any address " + r.text[:200] + r2.text[:200])
@@ -123,6 +136,7 @@ check(not member(ORG, DAVE) and Da.post(B + f"/api/orgs/{ORG}/join").ok and memb
 check(A.put(B + f"/api/orgs/{ORG3}/members", json={"email": "erin@example.com"}).ok and member(ORG3, ERIN), "the server's admin adds directly")
 # a person without an organisation accepts an invitation the same way (freelancer-matrix: own)
 GID, Gi = freelancer(B, A, "gina")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "gina@example.com"})
 check(not member(ORG, GID) and [x["org_id"] for x in Gi.get(B + "/api/orgs").json().get("joins", [])] == [ORG], "freelancer: the invitation waits")
 check(Gi.post(B + f"/api/orgs/{ORG}/join").ok and member(ORG, GID), "freelancer: joins by accepting")

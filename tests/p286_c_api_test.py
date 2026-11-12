@@ -25,6 +25,7 @@ from freelancer_fixture import org_join  # 2.148.1 (#2480): an invited member ac
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
@@ -92,6 +93,7 @@ for who in ("bob", "erin"):
 r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": CAROL})
 assert r.status_code == 201, r.text
 BETA = r.json()["id"]
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check((Ca.put(B + f"/api/orgs/{BETA}/members", json={"email": "bob@example.com", "role": "member"}).ok and org_join(B, "bob", BETA)), "setup: bob is also in Beta")
 for s in (A, Bo, Er):
     s.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})

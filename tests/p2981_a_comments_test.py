@@ -171,6 +171,7 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": BOB})
 check(r.ok, f"setup: an organisation of bob {r.status_code} {r.text[:120]}")
 OB = r.json().get("id")
 for u in ("dora", "otto"):
+    kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
     Bo.put(B + f"/api/orgs/{OB}/members", json={"email": f"{u}@example.com"})
     org_join(B, u, OB)
 DN = upload(Bo, "akte.docx", f"org:{OB}")

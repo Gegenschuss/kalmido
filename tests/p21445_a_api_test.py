@@ -33,6 +33,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 from freelancer_fixture import freelancer  # noqa: E402
 
 N = os.path.dirname(os.path.abspath(__file__))
@@ -251,6 +252,7 @@ check(show(Sv, ORG).ok, "R5: the step-up still counts for its own purpose")
 # an account without a password that signed in another way (here: the password before it was removed) keeps the earlier rule
 Ms = sess("mia")
 dbx("UPDATE users SET password_hash=NULL WHERE id=?", (ids["mia"],))
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 r = Sv.put(B + f"/api/orgs/{ORG}/members", json={"email": "mia@example.com", "role": "admin"})
 assert r.ok, r.text
 r = Ms.post(B + f"/api/orgs/{ORG}/join")  # 2.148.1 A (#2480): a new member is invited and accepts, no direct add any more

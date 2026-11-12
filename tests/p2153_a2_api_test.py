@@ -23,6 +23,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 from freelancer_fixture import freelancer, org_join  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -159,6 +160,7 @@ detached(L2, (D3, D4), "A2 new organisation")
 check(A.get(B + f"{LT}/{L2}").ok, "A2: the letter stays readable in the new organisation")
 
 # ================================================================ A3: the role accounting
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 assert Fr.put(B + f"/api/orgs/{KAP}/members", json={"email": "bob@example.com", "role": "accounting"}).ok and org_join(B, "bob", KAP)  # bundle C: 2.148.1 (#2480) the invited member accepts
 ws(Bo, f"org:{KAP}")
 check(Bo.get(B + "/api/office/settings").ok, "setup: accounting reads the office")

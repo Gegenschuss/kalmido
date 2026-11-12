@@ -144,6 +144,12 @@ def dbx(sql, args=(), data=None):
         c.close()
 
 
+def proved(data=None):
+    """2.1021.0 (#5775): the suite's accounts proved their addresses (users.email_proved, as a mailed link / OIDC / a confirmed
+    sign-up does) -- an organisation admin's invitation by address, a mail sender and a mailed reply bind only a proved address."""
+    dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved='' AND COALESCE(email, '')<>''", data=data)
+
+
 def nostart(prefix=""):
     """True when the container runs already: <PREFIX>_NOSTART=1 (e.g. P2149E_NOSTART) or KMT_NOSTART=1."""
     return bool((prefix and os.environ.get(prefix + "_NOSTART")) or os.environ.get("KMT_NOSTART"))

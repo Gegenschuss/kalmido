@@ -26,6 +26,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -69,6 +70,7 @@ def setup():
         uid[u] = r.json()["id"]
     me = a.get(B + "/api/state").json()["me"]["id"]
     org = a.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": me}).json()["id"]
+    kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
     assert a.put(B + f"/api/orgs/{org}/members", json={"email": "bob@example.com", "role": "member"}).ok
     org2 = a.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": uid["carol"]}).json()["id"]
     dbx("DELETE FROM org_members WHERE user_id=?", (uid["erin"],), write=True)

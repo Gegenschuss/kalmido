@@ -25,6 +25,7 @@ const orgsOf = async who => ((await call(who, 'GET', '/api/state')).j.me?.worksp
   const org = (await call('alice', 'POST', '/api/admin/orgs', {name: 'Alpha', admin_id: ids.bob})).j.id;
   const beta = (await call('alice', 'POST', '/api/admin/orgs', {name: 'Beta', admin_id: ids.bob})).j.id;
   for (const u of ['bob', 'carol']) { ck[u] = await login(u); await call(u, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments'}); }
+  execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE users SET email_proved=lower(email) WHERE email_proved='' AND COALESCE(email, '')<>''"]);  // 2.1021.0 (#5775): the accounts proved their addresses - an organisation admin invites by address only a proved one
   check((await call('bob', 'PUT', `/api/orgs/${org}/members`, {email: 'carol@example.com', role: 'member'})).status === 200, 'the admin invites carol by e-mail');
   check(!(await orgsOf('carol')).includes(org), 'membership needs acceptance: not a member yet');
 

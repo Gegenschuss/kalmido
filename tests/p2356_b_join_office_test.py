@@ -16,6 +16,7 @@ import requests
 
 from freelancer_fixture import FEATURES, freelancer, org_join
 from kt import FAILS, OKS, check, sess
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
@@ -52,6 +53,7 @@ Q = r.json().get("id")
 st = Fr.get(B + O + "/settings").json()
 PID = st.get("org_id")
 check(st.get("personal") == 1 and PID and PID != ORG, f"before: the personal office {st.get('personal')} {PID}")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "frida@example.com"}).ok and org_join(B, "frida", ORG), "frida accepts the invitation")
 check(ws(Fr) == "private", f"#2932: the workspace stays the private one after the join: {ws(Fr)!r}")
 r = Fr.get(B + O + "/settings")
@@ -77,6 +79,7 @@ check(r.ok and Q not in [x["id"] for x in r.json().get("docs", [])], "the organi
 FID2, Fi = freelancer(B, A, "fiona")
 r = Fi.get(B + O + "/settings")
 check(r.ok and r.json().get("personal") == 1, f"fiona opens her (empty) personal office {r.status_code}")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "fiona@example.com"}).ok and org_join(B, "fiona", ORG), "fiona joins Alpha")
 check(ws(Fi) in ("all", "", None), f"#2932 counter-check: no data -> the workspace is untouched: {ws(Fi)!r}")
 r = Fi.get(B + O + "/settings")

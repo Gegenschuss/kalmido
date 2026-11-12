@@ -34,6 +34,7 @@ import zlib
 import requests
 
 import dbx as dbxm
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 from freelancer_fixture import FEATURES, freelancer
 from kt import FAILS, OKS, check, sess, su_get
 
@@ -280,6 +281,7 @@ for f in files3:
 
 # ---------------------------------------------------------------- undo: only admins of the target now, nothing frozen since
 check(A.put(B + f"/api/orgs/{ORG3}/members", json={"email": "bob@example.com", "role": "admin"}).ok, "bob becomes admin of the target")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check(Bo.put(B + f"/api/orgs/{ORG3}/members", json={"email": "alice@example.com", "role": "member"}).ok, "alice is no admin there any more")
 before = counts(ORG3)
 r = A.post(B + f"/api/imports/{IMP3}/undo")

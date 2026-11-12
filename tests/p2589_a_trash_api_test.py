@@ -67,6 +67,7 @@ assert r.status_code == 201, r.text
 ORG = r.json()["id"]
 Bo = sess("bob")
 for u in ("carol", "erin"):
+    kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
     check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": f"{u}@example.com"}).ok and org_join(B, u, ORG), f"setup: {u} joins Alpha")
 Ca, Er = sess("carol"), sess("erin")
 for s in (Bo, Ca, Er):

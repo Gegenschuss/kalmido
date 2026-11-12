@@ -21,6 +21,7 @@
 usage: p2280_api_test.py <datadir>"""
 import os
 import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 import subprocess
 import sys
 
@@ -281,6 +282,7 @@ check(Bo.post(B + "/api/admin/orgs", json={"name": "beta"}).status_code == 409, 
 check(Ca.post(B + "/api/admin/orgs", json={"name": "Gamma"}).status_code == 403, "workspaces: a plain person creates none")
 # carol leaves the first organisation (bob removes her) -> she is only in Beta; dave goes to Beta too (by e-mail)
 check(Bo.delete(B + f"/api/orgs/{ORG}/members/{CAROL}").ok, "workspaces: an organisation admin removes a member")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check(Ca.put(B + f"/api/orgs/{BETA}/members", json={"email": "DAVE@example.com"}).json().get("by_email") is True, "workspaces: the organisation admin adds dave by e-mail")
 check(org_join(B, "dave", BETA), "workspaces: dave accepts the invitation")  # 2.148.1 (#2480)
 check(Ca.put(B + f"/api/orgs/{BETA}/members", json={"email": "nobody@example.com"}).json().get("by_email") is True, "workspaces: an unknown address is not revealed")

@@ -77,6 +77,7 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": BOB})
 assert r.status_code == 201, r.text
 ORG = r.json()["id"]
 Bo = sess("bob")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok and org_join(B, "carol", ORG), "setup: carol joins Alpha")
 FRIDA, Fr = freelancer(B, A)
 Ca, Gi = sess("carol"), sess("gina")

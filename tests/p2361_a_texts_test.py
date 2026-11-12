@@ -21,6 +21,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 from kt import FAILS, OKS, check, sess  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 
 
 def src(rel):
@@ -83,6 +84,7 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": BOB})
 assert r.status_code == 201, r.text
 ORG = r.json()["id"]
 Bo = sess("bob")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok and org_join(B, "carol", ORG), "setup: carol joins Alpha")
 Ca = sess("carol")
 Ca.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "workspace": f"org:{ORG}"})

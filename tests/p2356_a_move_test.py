@@ -109,6 +109,7 @@ CE = r.json()["id"]
 CLP = Fr.post(B + "/api/clients", json={"name": "Kunde Nord GmbH", "street": "Marktstraße 5", "zip": "50000", "city": "Köln", "country": "DE"}).json()["id"]
 draft(Fr, CLP, "Imagefilm")
 KAP = A.post(B + "/api/admin/orgs", json={"name": "Kappa", "admin_id": FID}).json()["id"]
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 assert Fr.put(B + f"/api/orgs/{KAP}/members", json={"email": "bob@example.com", "role": "admin"}).ok and org_join(B, "bob", KAP)
 ws(Fr, "private")
 j = Fr.get(B + O + f"/move/check?org={KAP}").json()

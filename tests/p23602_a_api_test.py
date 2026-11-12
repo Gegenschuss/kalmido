@@ -20,6 +20,7 @@ ROOT = os.path.dirname(N)
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
 from kt import FAILS, OKS, check  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -96,6 +97,7 @@ if not os.environ.get("KMT_NOSTART"):
     check(r.ok and "n=" in r.headers.get("Server-Timing", ""), f"#2561: the instance admin keeps Server-Timing {r.headers.get('Server-Timing')!r}")
     r = Fr.get(B + "/api/state")
     check(r.ok and "Server-Timing" not in r.headers, f"#2561: a person without an organisation gets none {r.headers.get('Server-Timing')!r}")
+    kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
     r = Fr.put(B + "/api/orgs/1/members", json={"email": "nobody@example.com"})
     check("Server-Timing" not in r.headers, "#2561: no statement count on a refused invitation either")
 

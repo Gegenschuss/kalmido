@@ -24,6 +24,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 from freelancer_fixture import FEATURES, freelancer, org_join  # noqa: E402; 2.148.1 (#2480): an invited member accepts
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
@@ -226,6 +227,7 @@ check(r.status_code == 409 and r.json().get("code") == "wiki_e2e_gen", "the key 
 check(dbx("SELECT org_id FROM wiki_pages WHERE id=?", (SEC,))[0]["org_id"] == GAMMA, "... and nothing moved")
 
 # ================================================================ no key of the target space
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 r = Ca.put(B + f"/api/orgs/{GAMMA}/members", json={"email": "bob@example.com", "role": "member"})
 assert r.ok and org_join(B, "bob", GAMMA), r.text  # 2.148.1 (#2480): bob accepts the invitation
 BP = page(Bo, "Bob idea", "plain")

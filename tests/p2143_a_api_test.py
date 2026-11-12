@@ -30,6 +30,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 
 
 def usess(user, pw="password123"):
@@ -175,6 +176,7 @@ check(Ri.post(B + "/api/team/channels", json={"name": "Mine", "org_id": ORG}).st
 
 # ================================================================ members, invitations
 for nm, s in (("guest", Gi), ("read-only", Ri), ("accounting", Ax)):
+    kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
     check(s.post(B + f"/api/orgs/{ORG}/invites", json={"email": f"new-{nm}@example.com"}).status_code == 403, f"{nm}: no invitation")
     check(s.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["bob"], "role": "admin"}).status_code == 403, f"{nm}: no member change")
 og = next(x for x in Gi.get(B + "/api/orgs").json()["orgs"] if x["id"] == ORG)

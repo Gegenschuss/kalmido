@@ -218,6 +218,7 @@ assert A.patch(B + f"/api/users/{uid['pia']}", json={"disabled": False}).ok
 C = login(B, "carl")
 # 2.635.0 (#5004): likewise pia - a person carl may see (2.593.0 #3570: else the invitation into his own company is dropped)
 dbw("INSERT INTO conn_links(a_id, b_id, created_at) VALUES(?, ?, '2026-01-01T00:00:00Z')", tuple(sorted((uid["carl"], uid["pia"]))))
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 r = C.put(B + f"/api/orgs/{CO}/members", json={"email": "pia@example.com"})
 check(r.ok and kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (CO, uid["pia"])), "hosted: the client's admin invites into his organisation " + r.text[:100])
 r = C.put(B + f"/api/orgs/{CO}/members", json={"user_id": uid["cara"], "role": "admin"})

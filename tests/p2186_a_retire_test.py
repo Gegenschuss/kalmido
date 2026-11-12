@@ -17,6 +17,7 @@ import time
 from datetime import datetime, timezone
 
 import dbx as dbxm
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 import requests
 from freelancer_fixture import freelancer
 
@@ -79,6 +80,7 @@ for s in (A, Do, Bo, Er):
 
 # ================================================================== a retired organisation: only its former admins export it
 DEL = A.post(B + "/api/admin/orgs", json={"name": "Delta Film", "admin_id": DORA}).json()["id"]
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 assert Do.put(B + f"/api/orgs/{DEL}/members", json={"email": "bob@example.com", "role": "member"}).ok
 for s in (Do, Bo):
     s.patch(B + "/api/settings", json={"workspace": f"org:{DEL}"})

@@ -23,6 +23,7 @@ from freelancer_fixture import org_join  # 2.148.1 (#2480): an invited member ac
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 
 from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
@@ -108,6 +109,7 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": ids["carol"]
 assert r.status_code == 201, r.text
 ORG2 = r.json()["id"]
 Bo = sess("bob")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check((Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok and org_join(B, "carol", ORG)), "setup: carol joins Alpha")
 dbx("DELETE FROM org_members WHERE org_id=? AND user_id NOT IN (?,?)", (ORG, ids["bob"], ids["carol"]), write=True)
 dbx("DELETE FROM org_members WHERE org_id=? AND user_id<>?", (ORG2, ids["carol"]), write=True)

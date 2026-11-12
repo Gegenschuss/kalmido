@@ -62,6 +62,7 @@ check(O1 and O2 and O4, f"setup: frida's companies {O1} {O2} {O4}")
 
 
 def invite(oid, email):
+    kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
     r = Fr.post(B + f"/api/orgs/{oid}/invites", json={"email": email, "role": "member"})
     check(r.ok, f"setup: invite {email} into {oid}: {r.status_code} {r.text[:200]}")
 
@@ -144,6 +145,7 @@ check([x[0] for x in dbx("SELECT email FROM org_joins WHERE org_id=? AND user_id
 # ---------------------------------------------------------------- review F4: every way of inviting replaces the neutral row
 write("UPDATE orgs SET self_made=0 WHERE id=?", (O1,))  # an ordinary organisation: PUT /members invites (ojn_invite), not silently
 freelancer(B, A, "gerda")  # a new account of the address
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 r = Fr.put(B + f"/api/orgs/{O1}/members", json={"email": "gerda@example.com", "role": "member"})
 check(r.ok, f"setup: frida adds gerda's address as a member {r.status_code} {r.text[:200]}")
 after = rows(O1, "gerda@example.com")

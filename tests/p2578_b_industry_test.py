@@ -140,6 +140,7 @@ check(ind(Be).get("code") == "" and shoot_packs(Be) == [], "Beta stays without a
 check(Be.put(B + "/api/industry", json={"industry": "film"}).ok and ind(Ol).get("code") == "film" and Be.put(B + "/api/industry", json={"industry": ""}).ok
       and ind(Ol).get("code") == "film", "Beta's choice leaves Acme as it is")
 # a member who is in two organisations with the workspace "all": no area, no choice (as the office)
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check(Be.put(B + f"/api/orgs/{BID}/members", json={"email": "tom@example.com"}).ok and org_join(B, "tom", BID), "setup: tom joins Beta too")
 r = Tm.put(B + "/api/industry", json={"industry": ""})
 check(r.status_code == 403 and ind(Tm).get("can_set") is False, f"two organisations, no workspace: no choice ({r.status_code})")

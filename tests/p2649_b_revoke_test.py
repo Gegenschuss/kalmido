@@ -150,6 +150,7 @@ check(r.ok, "setup: Kestrel invites a new address " + r.text[:160])
 NINA = dbx("SELECT id FROM users WHERE email='nina@example.com'")[0][0]
 ERIN, Er = user("erin")  # Osprey's admin (no instance admin: an instance admin adds an existing account at once)
 dbx("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'admin')", (K2, ERIN))
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 r = Er.post(B + f"/api/orgs/{K2}/invites", json={"email": "nina@example.com", "role": "member"})
 check(r.ok and dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (K2, NINA)), "setup: Osprey invites the same address " + r.text[:160])
 NF = A.post(B + "/api/files/folders", json={"name": "Welcome pack", "space": f"org:{K}"}).json()["id"]

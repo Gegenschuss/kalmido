@@ -24,6 +24,7 @@ from freelancer_fixture import org_join  # 2.148.1 (#2480): an invited member ac
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -89,6 +90,7 @@ ORG = r.json()["id"]
 r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": DAVE})
 ORG2 = r.json()["id"]
 Bo = sess("bob")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check((Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok and org_join(B, "carol", ORG)), "setup: carol joins Alpha")
 AG, AGS = agent("lybot", ["read", "tasks:write", "comments", "layouts"], org=ORG)
 AG0, AG0S = agent("plainbot", ["read", "tasks:write", "comments"], org=ORG)

@@ -18,6 +18,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 from freelancer_fixture import FEATURES, freelancer, org_join  # noqa: E402
 from kt import B, DATA, FAILS, H, OKS, check, fresh, sess  # noqa: E402,F401
 
@@ -60,6 +61,7 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": ERIN})
 assert r.status_code == 201, r.text
 ORG2 = r.json()["id"]
 Bo = sess("bob")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok and org_join(B, "carol", ORG), "setup: carol joins Alpha")
 Bo, Ca, Er = sess("bob"), sess("carol"), sess("erin")
 for s in (A, Bo, Ca, Er):

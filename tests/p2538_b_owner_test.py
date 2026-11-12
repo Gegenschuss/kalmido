@@ -25,6 +25,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import FEATURES, freelancer, org_join  # noqa: E402
 import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -72,6 +73,7 @@ def user(u):
 
 Bo = user("bob")
 for u, role in (("carol", "member"), ("dave", "member"), ("gina", "guest"), ("rita", "readonly")):
+    kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
     check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": f"{u}@example.com", "role": role}).ok and org_join(B, u, ORG),
           f"setup: {u} joins Alpha as {role}")
 Ca, Da = user("carol"), user("dave")

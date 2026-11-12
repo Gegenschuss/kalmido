@@ -24,6 +24,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 from freelancer_fixture import FEATURES, freelancer, org_join  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -77,6 +78,7 @@ ORG = r.json()["id"]
 SP = f"org:{ORG}"
 Bo = user("bob", ORG)
 for u in ("carol", "dave", "erin"):
+    kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
     check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": f"{u}@example.com"}).ok and org_join(B, u, ORG), f"setup: {u} joins")
 Ca, Da, Er = user("carol", ORG), user("dave", ORG), user("erin", ORG)
 

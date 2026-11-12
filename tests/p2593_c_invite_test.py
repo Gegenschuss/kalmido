@@ -76,6 +76,7 @@ check(O1 and O2 and O3, f"setup: frida's companies {O1} {O2} {O3}")
 
 
 def invite(oid, email):
+    kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
     r = Fr.post(B + f"/api/orgs/{oid}/invites", json={"email": email, "role": "member"})
     check(r.ok, f"invite {email} into {oid}: {r.status_code} {r.text[:200]}")
     return r.json() if r.ok else {}
@@ -116,6 +117,7 @@ check(not one("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (O1, PID))
       "paula's silent invitation is gone, her account stays")
 
 # ---------------------------------------------------------------- PUT members by address: dropped in a company of her own
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 r1 = Fr.put(B + f"/api/orgs/{O1}/members", json={"email": "paula@example.com", "role": "member"})
 r2 = Fr.put(B + f"/api/orgs/{O1}/members", json={"email": "neu2@example.com", "role": "member"})
 check(r1.ok and r2.ok and r1.json() == r2.json(), f"PUT members answers the same {r1.text[:200]} {r2.text[:200]}")
@@ -184,6 +186,7 @@ check(one("SELECT created_at FROM org_joins WHERE org_id=? AND user_id=?", (O7, 
 # ---------------------------------------------------------------- review F4: withdrawing keeps an account another company's silent invitation lies on
 GID, Gi = freelancer(B, A, "gina")
 OG = Gi.post(B + "/api/orgs", json={"name": "Gina Atelier"}).json().get("id")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 r = Gi.post(B + f"/api/orgs/{OG}/invites", json={"email": "neu6@example.com", "role": "member"})
 check(OG and r.ok, f"setup: gina invites a new address {r.status_code} {r.text[:200]}")
 N6 = one("SELECT id FROM users WHERE lower(email)='neu6@example.com'")

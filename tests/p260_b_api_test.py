@@ -22,6 +22,7 @@ import requests
 from freelancer_fixture import org_join  # 2.148.1 (#2480): an invited member accepts
 
 import dbx as dbxm
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -87,6 +88,7 @@ ORG = r.json()["id"]
 r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": DAVE})
 ORG2 = r.json()["id"]
 Bo = sess("bob")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check((Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok and org_join(B, "carol", ORG)), "setup: carol joins Alpha")
 AG, AGS = agent("devbot", ["read", "tasks:write", "structure"], org=ORG)
 AGR, AGRS = agent("readbot", ["read", "tasks:write"], org=ORG)

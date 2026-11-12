@@ -408,11 +408,13 @@ def ojn_hidden(c, oid, uid):
     """2.593.0 (#3570, review F5): a silent invitation stays silent on Resend: a disabled account or an agent, or in a company
     of its own (orgs.self_made) a person the inviting admin may not see (the test of org_member_put). Otherwise -- the admin
     may see the person by now -- Resend makes it an ordinary invitation (ojn_invite)."""
-    u = c.execute("SELECT disabled, kind FROM users WHERE id=?", (uid,)).fetchone()
+    u = c.execute("SELECT disabled, kind, email, email_proved FROM users WHERE id=?", (uid,)).fetchone()
     if not u or u["disabled"] or (u["kind"] or "user") == "agent":
         return True
     if g.user["is_admin"] and not _operator_apart():
         return False
+    if (u["email_proved"] or "") != (u["email"] or "").strip().lower():
+        return True  # 2.1021.0 (#5775): an address nobody proved stays silent on Resend (org_member_put)
     selfm = c.execute("SELECT self_made FROM orgs WHERE id=?", (oid,)).fetchone()
     return bool(selfm and selfm[0]) and not may_see(c, me(), uid)
 

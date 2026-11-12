@@ -30,6 +30,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
 from kt import B, DATA, check, dbx, done, fresh, H, sess, setup, until  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 
@@ -88,6 +89,7 @@ for s in (Ca, Da, Ev):
 assert A.patch(B + "/api/settings", json={"features": "collab,comments,agents"}).ok
 
 # ================================================================== an invited account
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 r = Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com", "role": "member"})
 check(r.ok, f"setup: bob invites carol {r.status_code} {r.text[:200]}")
 check(news(Ca, "orgjoin"), "the bell as before")

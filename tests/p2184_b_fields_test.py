@@ -24,6 +24,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import kt  # noqa: E402  2.1021.0 (#5775): kt.proved
 from freelancer_fixture import freelancer, org_join  # noqa: E402
 
 DATA = sys.argv[1]
@@ -126,6 +127,7 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": BOB})
 assert r.status_code == 201, r.text
 ORG = r.json()["id"]
 Bo = sess("bob")
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok and org_join(B, "carol", ORG), "setup: carol joins Alpha")
 dbx("DELETE FROM org_members WHERE org_id=? AND user_id NOT IN (?,?)", (ORG, BOB, CAROL))
 FRIDA, Fr = freelancer(B, A)

@@ -154,6 +154,7 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ids["bob"]}
 ORG = r.json()["id"]
 Bo = sess("bob")
 for u in ("carol", "dave"):
+    kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
     Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": f"{u}@example.com"})
     org_join(B, u, ORG)
 Ca, Da, Er = sess("carol"), sess("dave"), sess("erin")

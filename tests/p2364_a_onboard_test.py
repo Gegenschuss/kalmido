@@ -85,6 +85,7 @@ Ol = sess("olive")
 
 def first_start(mail, role):
     """A new address invited as role, the link used (a known token: the link goes by mail only) -> the person's session."""
+    kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
     check(Ol.post(B + f"/api/orgs/{OID}/invites", json={"email": mail, "role": role}).ok, "invited: " + mail)
     tok = hashlib.sha256(mail.encode()).hexdigest()[:40]
     kt.dbx("UPDATE user_invites SET token_hash=? WHERE user_id=(SELECT id FROM users WHERE email=?)", (hashlib.sha256(tok.encode()).hexdigest(), mail))

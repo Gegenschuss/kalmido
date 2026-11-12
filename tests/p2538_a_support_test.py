@@ -146,6 +146,7 @@ CO = r.json()["id"]
 # 2.635.0 (#5008): since 2.593.0 (#3570) an invitation by e-mail into a company of its own (orgs.self_made) reaches only a
 # person its admin may see (else it is dropped): carl and cara are connected first, as colleagues who know each other
 kt.dbx("INSERT INTO conn_links(a_id, b_id, created_at) VALUES(?, ?, '2026-01-01T00:00:00Z')", tuple(sorted((CARL, CID))))
+kt.proved()  # 2.1021.0 (#5775): an organisation admin invites by address only an account that proved it
 assert Ca.put(B + f"/api/orgs/{CO}/members", json={"email": "cara@example.com"}).ok
 assert org_join(B, "cara", CO)
 assert Cc.patch(B + "/api/settings", json={"workspace": f"org:{CO}"}).ok  # her chosen workspace: the default of a new object

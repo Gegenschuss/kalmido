@@ -191,6 +191,11 @@ check(len(comments(T1)) == 2, f"a wrong signature counts as no address {comments
 
 # ---- 5. a person who sees the task answers by mail from her account's address: by In-Reply-To a comment with her address
 # (a sender address can be forged), through her signed reply address (a notification of hers) a comment in her name
+# 2.1021.0 (#5775): an account address nobody proved (an admin typed it in) is like an unknown sender: no comment by In-Reply-To
+M6x = mail("Bea <bea@example.com>", BA, "Re: Printer is broken", "Not proved yet.", "<p23932b-6x@example.org>", reply=M1)
+poll(seen_all)
+check(len(comments(T1)) == 2, f"#5775: an unproved account address answers no task by mail {comments(T1)}")
+kt.proved()  # 2.1021.0 (#5775): Bea proved her address (a mailed link / OIDC)
 M6 = mail("Bea <bea@example.com>", BA, "Re: Printer is broken", "I ordered new toner.\n-- \nBea, office", "<p23932b-6@example.org>", reply=M1)
 poll(lambda: len(comments(T1)) == 3)
 cm = comments(T1)
