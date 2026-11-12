@@ -584,9 +584,23 @@ def obj_restore(c, uid, kind, rid, step=True, undo=False, checked=False):
     return obj_row(c, kind, rid)
 
 
-def obj_purge(c, uid, kind, rid):
+def obj_purge(c, uid, kind, rid, checked=False):
     """Delete for good: only an object in the trash ('manage'; 409 otherwise). Its node, history, undo steps, revoked
-    shares and children go with it (_purge_rows)."""
+    shares and children go with it (_purge_rows).
+    2.1028.0 (#5536): checked=True = the area checked the rights itself (as obj_restore checked): no check of the core, also
+    for a light kind with trash_prune (tasks: "Empty trash", DELETE ?hard=1); read again under the lock -- gone meanwhile
+    (it went with its parent) = False, live = Denied 409; the caller bumps. The area's hook may keep it (Denied)."""
+    if checked:
+        reg = _reg_trash(kind)
+        write_lock(c, f"obj-{kind}-{int(rid)}")
+        row = obj_row(c, kind, rid)
+        if row is None:
+            return False
+        if not row["deleted_at"]:
+            raise Denied(409, tr(PURGE_FIRST))
+        _purge_rows(c, kind, reg, rid)
+        obj_forget()
+        return True
     reg = obj_reg_node(kind)  # 2.754.0 (#5268)
     row = obj_row(c, kind, rid)
     if row is not None and not row["deleted_at"]:

@@ -267,9 +267,16 @@ c.commit()
   `obj_on_restore(kind, f(c, uid, id, row))` = the area's part after the row is back (`rt_back`: the subtasks that went with
   it, a parent in the trash, the section, the log line, the task's undo step). `obj_restore` reads the row again under its
   lock and changes only a row still in the trash (a second restore at the same time: 404). Still the area's: putting single
-  tasks into the trash and deleting them for good by hand (`do_delete`, `hard_delete`, "Empty trash" -> #5536), the copies
-  of sections / planned sprints (`lists/parttrash.py` on `part_copy`), the state marker of projects instead of `archived` /
-  `deleted_at` (-> #5537).
+  tasks into the trash (`do_delete`), the copies of sections / planned sprints (`lists/parttrash.py` on `part_copy`), the
+  state marker of projects instead of `archived` / `deleted_at` (-> #5537).
+- 2.1028.0 (#5536, stage 2c): tasks go for good through the core too. `obj_purge(checked=True)` = the area checked the rights
+  (as `obj_restore(checked=True)`; also a light kind with `trash_prune`): the row read again under its lock, gone meanwhile
+  = False, live = 409, then `_purge_rows` (the hook first); the caller bumps. "Empty trash" (`DELETE /api/trash`, its
+  background job) and `DELETE /api/tasks/<id>?hard=1` (a live task goes into the trash first, as before) run
+  `tasks/lifecycle.py tre_purge` = per task `obj_purge(checked=True)` inside `obj_purge_after` and `tasktrash.py
+  ttp_manual(own)`: the hook `ttp_core_purge` then takes any task in the trash (no period), detaches subtasks outside `own`
+  (the lists the person may empty) and keeps a project kept by law (409 with its date). The routes' own `hard_delete` /
+  `tre_kept` check went; the task's history / undo rows of the core go with it.
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
   `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).
