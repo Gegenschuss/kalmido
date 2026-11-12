@@ -1143,6 +1143,26 @@ def obj_undo_forget(c, kind, ids):
                       (UG_LABEL_PLAIN, area))
 
 
+def obj_trash_cols_missing(c):
+    """2.1069.0 (#5416, review 2.781 F4): [(kind, table, missing columns)] of the kinds the core's trash writes on
+    (obj_trash / obj_restore / obj_trash_due / the undo's _trash_part write deleted_at / deleted_by on reg["table"]): a kind
+    with a node, its generic routes or the retention run (trash_prune), and the side objects with trash_prune. Empty = every
+    such table has its trash columns; a table without them would break only at the first use ("column deleted_at does not
+    exist"), so the suite p2773_b_trash_core asks this for every registered kind (obj_register runs at import, without a
+    database, and cannot see the columns)."""
+    out, both = [], ("deleted_at", "deleted_by")
+    kinds = [(k, r["table"], both) for k, r in sorted(OBJ.items()) if r.get("node", True) or r.get("routes") or r.get("trash_prune")]
+    # a side object's run reads deleted_at of its table (its copies stand in list_part_trash: no column of its own)
+    kinds += [(k, r["table"], ("deleted_at",)) for k, r in sorted(PART_KINDS.items())
+              if k not in OBJ and r.get("trash_prune") and not r.get("copy")]
+    for kind, table, need in kinds:
+        cols = table_columns(c, table)
+        miss = [x for x in need if x not in cols]
+        if miss:
+            out.append((kind, table, miss))
+    return out
+
+
 def obj_cols_ok(c, kind):
     """The kind's table has the core's columns (OBJ_COLS) and its fields -- for a start-up check or a test."""
     reg = obj_reg(kind)

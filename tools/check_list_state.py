@@ -19,6 +19,10 @@ for a row of SELECT *. The column can then go (a one-way step of its own).
 trigger writes the old column archived from it. A new handwritten write of it (UPDATE lists SET ... archived=, in one line)
 counts as well.
 
+2.1069.0 (#5416, review 2.781 F5): a handwritten compare on the marker itself counts as well -- lists.state / lst.state
+anywhere, l.state in a line that reads lists l, a bare state = / <> / IN after FROM / JOIN lists or in UPDATE lists SET:
+list_state_sql() / otr_live() / list_set_archived() write it once, in kalmido/core/access.py (STATE_HOME, not counted there).
+
 Read: kalmido/**/*.py without the schema (kalmido/core/schema.py, kalmido/core/migrations.d/) and the start's one-off fill
 (core/db.py names the old columns on purpose there, the lines right after its flag). Line by line, case-insensitive; a filter
 in a multi-line statement whose FROM stands on another line is not seen (the qualified form l.archived is).
@@ -52,11 +56,19 @@ WRITE = re.compile(r"\bUPDATE\s+lists\s+SET\b(?!_)[^\"']*?(?<![.\w])archived\s*=
 # that reads lists (not AS archived = the key list_archived_sql() keeps, not archived_at, not a quoted key "archived")
 READ_Q = re.compile(r"\b(?:l|lists|lst)\.archived\b(?!\s*(?:=|<>|!=))", re.I)
 READ = re.compile(r"(?<![.\w'\"])(?<!AS )archived\b(?![_'\"])", re.I)
+# 2.1069.0 (#5416): a handwritten compare on the state marker lists.state (the helpers of STATE_HOME write it once)
+_CMP = r"\s*(?:=|<>|!=|\bIN\b|\bNOT\s+IN\b)"
+STATE_Q = re.compile(r"\b(?:lists|lst)\.state" + _CMP, re.I)
+STATE_L = re.compile(r"\bl\.state" + _CMP, re.I)
+STATE_B = re.compile(r"(?<![.\w'\"])state" + _CMP, re.I)
+UPDATE_LISTS = re.compile(r"\bUPDATE\s+lists\s+SET\b", re.I)
+STATE_HOME = "kalmido/core/access.py"
 HELP = "use list_state_sql() / otr_live() / list_set_archived() / list_archived_sql() / list_out() of kalmido/core/access.py"
 
 
-def count_text(text):
-    """Number of handwritten filters on a project's old state columns in a file's text."""
+def count_text(text, state=True):
+    """Number of handwritten filters on a project's old state columns in a file's text (state: count handwritten compares on
+    the marker lists.state too, 2.1069.0 #5416; False for STATE_HOME, the home of the helpers)."""
     n, skip = 0, 0
     for line in text.splitlines():
         if FILL in line:
@@ -75,6 +87,14 @@ def count_text(text):
             bare = {x.start() for x in BARE.finditer(line, m.end())}
             n += len(bare)
             n += sum(1 for x in READ.finditer(line) if x.start() not in bare)  # 2.1061.0 (#5867): reads, a filter counted once
+        if state:  # 2.1069.0 (#5416)
+            n += len(STATE_Q.findall(line))
+            m = FROM_LISTS_L.search(line)
+            if m:
+                n += len(STATE_L.findall(line, m.start()))
+            m = FROM_LISTS.search(line) or UPDATE_LISTS.search(line)
+            if m:
+                n += len(STATE_B.findall(line, m.end()))
     return n
 
 
@@ -86,7 +106,7 @@ def counts(root=ROOT):
         if rel.startswith(SKIP):
             continue
         with open(p, encoding="utf-8", errors="replace") as f:
-            n = count_text(f.read())
+            n = count_text(f.read(), state=rel != STATE_HOME)
         if n:
             out[rel] = n
     return out

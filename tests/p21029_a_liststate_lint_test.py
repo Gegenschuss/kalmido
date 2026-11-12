@@ -4,6 +4,8 @@
 container.
  - a handwritten filter on lists.archived / deleted_at is counted: archived=0 / =1 / deleted_at IS NULL after FROM / JOIN lists,
    l.archived / lists.archived compared anywhere, l.deleted_at only in a line that reads lists l
+ - 2.1069.0 (#5416): a handwritten compare on the marker lists.state (SQL on lists, a write UPDATE lists SET state=) counts,
+   not in kalmido/core/access.py (the helpers' home), not another table's state
  - 2.1061.0 (#5867): reading the old column counts too (SELECT archived / l.archived / COALESCE(archived, 0) on lists)
  - not counted: the helper's key (AS archived), archived_at, a dict key "archived", other tables with the alias l (conn_links l), a filter of a table that
    stands before FROM lists in the line, list_state_sql() / otr_live(), the schema, the start's one-off fill (its flag)
@@ -55,6 +57,15 @@ for text, want, what in [
     ('c.execute("UPDATE lists SET archived_at=NULL WHERE id=?")', 0, "archived_at is the moment, no state"),
     ('c.execute("UPDATE office_letters SET archived=1 WHERE id=?")', 0, "another table's archive"),
     ('c.execute("UPDATE lists_sync SET archived=1")', 0, "a table lists_* is not lists (write)"),
+    # 2.1069.0 (#5416, review 2.781 F5): a handwritten compare on the marker lists.state itself
+    ('Q = "SELECT id FROM lists WHERE owner_id=? AND state=\'live\'"', 1, "state='live' after FROM lists"),
+    ('Q = "SELECT id FROM lists l WHERE l.state IN (\'live\', \'archived\')"', 1, "l.state IN in a line that reads lists l"),
+    ('Q = "AND lists.state<>\'trash\'"', 1, "lists.state compared anywhere"),
+    ('c.execute("UPDATE lists SET state=\'archived\' WHERE id=?", (lid,))', 1, "a handwritten write of the marker"),
+    ('Q = "SELECT 1 FROM agent_jobs WHERE state IN (\'running\') AND list_id IN (SELECT id FROM lists)"', 0,
+     "another table's state before FROM lists"),
+    ('Q = "SELECT 1 FROM office_cc_cards l WHERE l.state=\'open\'"', 0, "another table with the alias l (state)"),
+    ('Q = "SELECT id, state FROM lists WHERE id=?"', 0, "reading the marker is no compare"),
     ('if gsetting(c, "migr_liststate5537") != "1":\n    c.execute("UPDATE lists SET state=state WHERE archived <> 0 OR deleted_at IS NOT NULL")', 0,
      "the start's one-off fill"),
 ]:
@@ -79,6 +90,8 @@ FILES = {
     "kalmido/proj/clean.py": 'from ..core.access import list_state_sql\nQ = f"SELECT 1 FROM lists WHERE {list_state_sql()}"\n',
     "kalmido/core/schema.py": 'S = "SELECT id FROM lists WHERE archived=0"\n',
     "kalmido/core/migrations.d/9999_x.py": 'S = "CREATE INDEX y ON lists(id) WHERE deleted_at IS NULL"\n',
+    # 2.1069.0 (#5416): the helpers' home writes the marker by hand (list_set_archived), not counted there
+    "kalmido/core/access.py": 'W = "UPDATE lists SET state=? WHERE id=?"\n',
 }
 tmp = tree(FILES, {"kalmido/proj/routes.py": 1})
 now = ls.counts(tmp)
