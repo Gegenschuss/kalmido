@@ -20,6 +20,9 @@ v1_overview_*). md_edit_input checks a request's fields, md_heading_answer is th
 """
 import re
 
+from flask import request
+
+from .conflict import VersionRequired
 from .errors import BadInput
 from .i18n import tr
 
@@ -157,8 +160,6 @@ def md_version(b, required, empty_ok=False):
     or None. required (replacing a section, from everyone, not only agents as core/conflict.py need_version): None = 400
     version_required. review F3: anything but a string is 400; an empty value counts as none (empty_ok: "" from the body
     stays, a project description never saved has no stamp)."""
-    from flask import request
-    from .conflict import VersionRequired
     v = b.get("expect_updated_at")
     if v is not None and not isinstance(v, str):
         raise BadInput(tr("Invalid value: {0}", "expect_updated_at"))
