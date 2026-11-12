@@ -12,6 +12,7 @@
 // - a reader (a view share) and a text document: no "Pages" button
 // - Firefox (1440 and phone 390): the strip's small pages are drawn from the PDF, a page clicked and deleted by the key Del,
 //   saved - the preview's counter says "Page 1 / 2"; nothing sideways on the phone
+// - 2.1063.0 (#5879): the preview's ground and bar follow the theme (dark and light), the page stays white; one bar row on the phone
 // - review fixes: Shift+End marks the span (F8); Undo after a newer version from elsewhere keeps it, says so and drops the
 //   step (F1); more pages than max or no right to write (a locked month): a hint instead of the strip (F7 / F4)
 // P4: alice works without an organisation (private documents): the person without an organisation (freelancer-matrix: files)
@@ -191,6 +192,25 @@ const three = tag => [['Kita Beispiel', 'Elternbrief ' + tag, 'Datum 01.09.2026'
       await nav(B + `#ablage/${id}`);
       const wait = async (js, n = 80) => { for (let i = 0; i < n; i++) { if (await ev(js).catch(() => false)) return true; await sleep(250); } return false; };
       check(await wait(`document.querySelectorAll('.dv-view .dv-pages .dv-pg').length === 3 && !!document.querySelector('.dv-view .dv-pages .dv-pg[data-i="0"] canvas') && /Page 1 \\/ 3/.test(document.querySelector('.dv-view .dv-pgn').textContent)`), `Firefox ${tag}: the preview with three pages ("Page 1 / 3")`);
+      // 2.1063.0 (#5879): ground and bar follow the theme (were fixed greys #52565a / #3d4145): dark = the theme's --bg (a step
+      // under the card), light = --bg3; the bar is the card's surface --bg2; the page stays white. On the phone the bar is ONE row
+      // with the page count, the zoom and the icons Pages and Full screen.
+      const col = await ev(`(() => { const out = {}, h = document.documentElement, was = h.dataset.theme;
+        const probe = v => { const p = document.createElement('div'); p.style.background = 'var(' + v + ')'; document.body.append(p); const c = getComputedStyle(p).backgroundColor; p.remove(); return c; };
+        for (const t of ['dark', 'light']) { h.dataset.theme = t; const pv = document.querySelector('.dv-view .dv-pv'), bar = pv.querySelector('.dv-pvbar');
+          out[t] = {pv: getComputedStyle(pv).backgroundColor, bar: getComputedStyle(bar).backgroundColor, btn: getComputedStyle(bar.querySelector('.iconbtn')).color,
+            pg: getComputedStyle(pv.querySelector('.dv-pg')).backgroundColor, bg: probe('--bg'), bg2: probe('--bg2'), bg3: probe('--bg3'), muted: probe('--muted')}; }
+        h.dataset.theme = was || ''; if (!was) delete h.dataset.theme; return out; })()`);
+      const grey = ['rgb(82, 86, 90)', 'rgb(61, 65, 69)'];
+      check(col && col.dark.pv === col.dark.bg && col.light.pv === col.light.bg3 && !grey.includes(col.dark.pv) && !grey.includes(col.dark.bar), `Firefox ${tag}: the preview's ground follows the theme (dark --bg, light --bg3), no fixed grey ` + JSON.stringify(col));
+      check(col && col.dark.bar === col.dark.bg2 && col.light.bar === col.light.bg2 && col.light.pg === 'rgb(255, 255, 255)' && col.light.pv !== col.light.pg, `Firefox ${tag}: the bar is a toolbar on the card's surface, the white page stands out on the light ground`);
+      const row = await ev(`(() => { const bar = document.querySelector('.dv-view .dv-pvbar'), r = bar.getBoundingClientRect();
+        const vis = [...bar.children].filter(e => !e.classList.contains('spacer') && e.getBoundingClientRect().width > 0);
+        const tops = vis.map(e => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2));
+        const pages = bar.querySelector('[data-dpg="open"]').getBoundingClientRect(), full = bar.querySelector('[data-dc="view"]').getBoundingClientRect();
+        return {n: vis.length, spread: Math.max(...tops) - Math.min(...tops), h: Math.round(r.height), right: Math.round(Math.max(pages.right, full.right)), br: Math.round(r.right), pgn: document.querySelector('.dv-view .dv-pgn').textContent}; })()`);
+      if (tag === 'phone') check(row && row.n >= 7 && row.spread <= 2 && row.h < 56 && row.right <= row.br + 1, `Firefox phone: the preview bar is one row, Pages and Full screen in it ` + JSON.stringify(row));
+      else check(row && row.spread <= 2 && /Page 1/.test(row.pgn), `Firefox 1440: the preview bar in one row with "Page 1 / 3" ` + JSON.stringify(row));
       await ev(`(document.querySelector('.dv-view [data-dpg="open"]').click(), 1)`);
       check(await wait(`document.querySelectorAll('.dpg [data-dpgt] canvas').length === 3`), `Firefox ${tag}: the strip's three small pages are drawn from the PDF`);
       const lay = await ev(`(() => { const s = document.querySelector('.dpg').getBoundingClientRect(), p = document.querySelector('.dv-view .dv-pages').getBoundingClientRect(), b = document.querySelector('.dpg [data-dpg="save"]').getBoundingClientRect(), v = document.querySelector('.dv-view');

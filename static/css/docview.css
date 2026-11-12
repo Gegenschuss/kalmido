@@ -70,23 +70,28 @@
 .dv-grip::after{content:'';position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;border-radius:1px;background:transparent}
 .dv-grip:hover::after,.dv-grip:focus-visible::after,.dv-resizing .dv-grip::after{background:var(--accent)}
 .dv-resizing,.dv-resizing *{cursor:col-resize!important;user-select:none}
-/* the preview: every page one below the other on a dark ground (#4829: as large as its column) */
-.dv-pv{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;border-radius:var(--radius);background:#52565a;color:#fff}
-.dv-pvbar{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;flex:none;padding:.375rem .5rem;background:#3d4145}
-.dv-pvbar .btn,.dv-pvbar .iconbtn{min-height:2.25rem;border-color:transparent;background:none;color:#fff}
-.dv-pvbar .btn:hover,.dv-pvbar .iconbtn:hover,.dv-pvbar [aria-pressed="true"]{background:rgba(255,255,255,.16)}
+/* the preview: every page one below the other on its own ground (#4829: as large as its column).
+   2.1063.0 (#5879): ground and bar follow the theme instead of fixed greys (the mid grey fell out of the dark theme): dark = a
+   step darker than the card, light = a light grey; the white sheet stands out by its rim and shadow. The bar is a toolbar like
+   the others (the card's surface, muted buttons, the pressed one like a chosen segment). light-dark() follows color-scheme
+   (app.css sets it per theme); the line before it is the fallback of an older browser. */
+.dv-pv{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg3);background:light-dark(var(--bg3),var(--bg));color:var(--text)}
+.dv-pvbar{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;flex:none;padding:.375rem .5rem;border-bottom:1px solid var(--line);background:var(--bg2)}
+.dv-pvbar .btn,.dv-pvbar .iconbtn{min-height:2.25rem;border-color:transparent;background:none;color:var(--muted)}
+.dv-pvbar .btn:hover,.dv-pvbar .iconbtn:hover{background:var(--bg3);color:var(--text)}
+.dv-pvbar [aria-pressed="true"],.dv-pvbar [aria-expanded="true"]{background:var(--bg3);color:var(--text)}
 .dv-pvbar :disabled{opacity:.4}
 .dv-pgn{min-width:7rem;font-size:var(--fs-s);font-variant-numeric:tabular-nums}
 .dv-zp{min-width:3.75rem;text-align:center;font-size:var(--fs-s);font-variant-numeric:tabular-nums}
-.dv-pages{position:relative;flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:1rem;scrollbar-color:#8a8f94 transparent;scrollbar-gutter:stable}  /* 2.755.0 (#5312): its scrollbar takes no width later (the fit is measured once, no redraw) */
+.dv-pages{position:relative;flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:1rem;scrollbar-color:var(--bg4) transparent;scrollbar-gutter:stable}  /* 2.755.0 (#5312): its scrollbar takes no width later (the fit is measured once, no redraw) */
 .dv-pages:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .dv-pgcol{display:flex;flex-direction:column;gap:1rem;width:max-content;min-width:100%}
-.dv-pg{flex:none;margin-inline:auto;background:#fff;box-shadow:0 1px .25rem rgba(0,0,0,.45)}
+.dv-pg{flex:none;margin-inline:auto;background:#fff;box-shadow:0 0 0 1px var(--line2),0 1px .25rem rgba(0,0,0,.3)}  /* 2.1063.0 (#5879): rim + shadow lift it off a light ground too */
 .dv-pg canvas,.dv-pg img{display:block;width:100%;height:100%}
 .dv-pg.dv-img{background:none}
 .dv-pg.dv-thumb{width:min(100%,30rem)}
 .dv-pg.dv-thumb img{object-fit:contain}  /* 2.882.0 (#5557): the page already has its final size (docview.js dcv_phSize) */
-.dv-pgcol>.dc-ph{margin:3rem auto;color:#c8cbce}
+.dv-pgcol>.dc-ph{margin:3rem auto;color:var(--muted)}
 .dv-pgcol>.dc-ph svg{width:3rem;height:3rem}
 @media (prefers-reduced-motion:reduce){ .dv-more .dc-chev{transition:none} }
 /* phones: one column, the preview on top, the fields below; a sideways swipe on the preview leafs (docs.js) */
@@ -103,6 +108,15 @@
   .dv-cols,.dv-cols.dv-nostrip{display:flex;flex-direction:column;gap:.75rem}
   .dv-pv{order:-1;height:62dvh;border-radius:var(--r-s)}
   .dv-pvbar .btn>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%)}
+  /* 2.1063.0 (#5879): ONE row on a phone -- the page count may shorten, the percentage is narrow, the icons (Pages, Full screen)
+     stay in the row instead of wrapping under it */
+  .dv-pvbar{flex-wrap:nowrap;gap:.125rem;padding:.25rem}
+  .dv-pvbar>*{flex:none}
+  .dv-pvbar>.spacer{flex:1 1 0;min-width:0}
+  .dv-pvbar>.dv-pgn{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-inline:.25rem}
+  .dv-pvbar .dv-zp{min-width:2.5rem}
+  .dv-pvbar .iconbtn{min-width:2.25rem;justify-content:center;padding:.25rem}
+  .dv-pvbar .btn.sm{padding:0 .375rem}
   .dv-pages{padding:.5rem;touch-action:pan-y}
   .dv-pages.dc-zoomed{touch-action:none;overflow:hidden}
   .dv-pgcol{gap:.5rem}
@@ -137,25 +151,25 @@
 .dv-hist .abrefs .wkmen{margin-top:.75rem}
 
 /* 2.777.0 B (#4874): the page strip under the preview's bar (docpages.js): small pages in a row, chosen / to delete / blank? */
-.dpg{flex:none;display:flex;flex-direction:column;gap:.25rem;padding:.375rem .5rem .5rem;background:#3d4145;border-top:1px solid rgba(255,255,255,.12)}
+.dpg{flex:none;display:flex;flex-direction:column;gap:.25rem;padding:.375rem .5rem .5rem;background:var(--bg2);border-bottom:1px solid var(--line)}  /* 2.1063.0 (#5879): the bar's surface */
 .dpg[hidden]{display:none}
 .dpg-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem}
-.dpg-bar .btn{min-height:2.25rem;border-color:transparent;background:none;color:#fff}
-.dpg-bar .btn:hover{background:rgba(255,255,255,.16)}
+.dpg-bar .btn{min-height:2.25rem;border-color:transparent;background:none;color:var(--muted)}
+.dpg-bar .btn:hover{background:var(--bg3);color:var(--text)}
 .dpg-bar .btn.pri{background:var(--accent);color:var(--on-accent,#fff)}
 .dpg-bar :disabled{opacity:.4}
 .dpg-cnt{font-size:var(--fs-b);padding-inline:.25rem}
 .dpg-hint,.dpg-note{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;margin:0;font-size:var(--fs-m)}
-.dpg-note{color:rgba(255,255,255,.75)}
-.dpg-hint .linkbtn{color:#fff;text-decoration:underline}
-.dpg-list{display:flex;gap:.5rem;margin:0;padding:.25rem .125rem;list-style:none;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-color:#8a8f94 transparent}
-.dpg-pg{position:relative;display:flex;flex-direction:column;align-items:center;gap:.125rem;min-width:5.25rem;padding:.25rem;border:2px solid transparent;border-radius:var(--r-s,.375rem);background:none;color:#fff;cursor:pointer}
-.dpg-pg:hover{background:rgba(255,255,255,.1)}
-.dpg-pg.on{border-color:var(--accent);background:rgba(255,255,255,.14)}
-.dpg-pg:focus-visible{outline:2px solid #fff;outline-offset:1px}
+.dpg-note{color:var(--muted)}
+.dpg-hint .linkbtn{color:var(--text);text-decoration:underline}
+.dpg-list{display:flex;gap:.5rem;margin:0;padding:.25rem .125rem;list-style:none;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-color:var(--bg4) transparent}
+.dpg-pg{position:relative;display:flex;flex-direction:column;align-items:center;gap:.125rem;min-width:5.25rem;padding:.25rem;border:2px solid transparent;border-radius:var(--r-s,.375rem);background:none;color:var(--text);cursor:pointer}
+.dpg-pg:hover{background:var(--bg3)}
+.dpg-pg.on{border-color:var(--accent);background:var(--bg3)}
+.dpg-pg:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .dpg-th{display:flex;align-items:center;justify-content:center;width:4.5rem;height:4.5rem;transform:rotate(var(--dpg-r,0deg));transition:transform .15s}
 .dpg-th:empty{background:#fff;opacity:.85;width:3.25rem}
-.dpg-th canvas{display:block;max-width:4.5rem;max-height:4.5rem;background:#fff;box-shadow:0 1px .25rem rgba(0,0,0,.45)}
+.dpg-th canvas{display:block;max-width:4.5rem;max-height:4.5rem;background:#fff;box-shadow:0 0 0 1px var(--line2),0 1px .25rem rgba(0,0,0,.3)}
 .dpg-no{font-size:var(--fs-s)}
 .dpg-bl{position:absolute;top:.125rem;left:.125rem;padding:0 .25rem;border-radius:.25rem;background:#f5c542;color:#222;font-size:var(--fs-xs);font-weight:600}
 .dpg-x{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:inherit;background:rgba(180,30,30,.55);pointer-events:none}
@@ -166,10 +180,10 @@
 .dpg-pg{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .dpg-pg.dragging{opacity:.45}
 .dpg-list.dpg-dragging{touch-action:none;cursor:grabbing}
-.dpg-pg.drop-b{box-shadow:-.1875rem 0 0 #fff}
-.dpg-pg.drop-a{box-shadow:.1875rem 0 0 #fff}
+.dpg-pg.drop-b{box-shadow:-.1875rem 0 0 var(--accent)}
+.dpg-pg.drop-a{box-shadow:.1875rem 0 0 var(--accent)}
 .dpg-was{opacity:.7}
-.dpg-dragnote{margin:0;font-size:var(--fs-s);color:rgba(255,255,255,.75)}
+.dpg-dragnote{margin:0;font-size:var(--fs-s);color:var(--muted)}
 .dpm-list{margin:.5rem 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.25rem}
 .dpm-row{display:flex;align-items:center;gap:.5rem;padding:.375rem .5rem;border:1px solid var(--border,#ccc);border-radius:var(--r-s,.375rem);background:var(--bg,#fff);-webkit-user-select:none;user-select:none}
 .dpm-row.dragging{opacity:.45}
