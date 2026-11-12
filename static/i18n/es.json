@@ -332,7 +332,6 @@
   "Sender": "Remitente",
   "All senders": "Todos los remitentes",
   "No messages found.": "No se encontraron mensajes.",
-  "All {0} messages": "Los {0} mensajes",
   "5 hours": "5 horas",
   "Spend limit": "Límite de gasto",
   "in the ring": "en el anillo",
@@ -18306,5 +18305,6 @@
   "{0} (from the repository)": "{0} (del repositorio)",
   "Running": "En marcha",
   "Budget category {0}": "Categoría del presupuesto {0}",
-  "Budget template": "Plantilla del presupuesto"
+  "Budget template": "Plantilla del presupuesto",
+  "All messages": "Todos los mensajes"
 }

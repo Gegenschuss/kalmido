@@ -331,7 +331,6 @@
   "Sender": "Absender",
   "All senders": "Alle Absender",
   "No messages found.": "Keine Nachrichten gefunden.",
-  "All {0} messages": "Alle {0} Nachrichten",
   "5 hours": "5 Stunden",
   "Spend limit": "Ausgabenlimit",
   "in the ring": "im Ring",
@@ -18306,5 +18305,6 @@
   "{0} (from the repository)": "{0} (aus dem Repository)",
   "Running": "Läuft",
   "Budget category {0}": "Budget-Kategorie {0}",
-  "Budget template": "Budget-Vorlage"
+  "Budget template": "Budget-Vorlage",
+  "All messages": "Alle Nachrichten"
 }

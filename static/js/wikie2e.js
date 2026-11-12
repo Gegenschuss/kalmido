@@ -320,6 +320,12 @@ function wkeSearch(q) {
   }
   return out.slice(0, 30);
 }
+// 2.1026.0 (#5280, Q6c): a source of the one search registry (ftsearch.js SEARCH_SOURCES): the command palette's "Everywhere" and
+// wk_search find the pages of the unlocked locked spaces (name or text); a search of one space (f.space) only there
+if (typeof SEARCH_SOURCES !== 'undefined' && !SEARCH_SOURCES.some(s => s.id === 'device-wiki')) SEARCH_SOURCES.push({id: 'device-wiki', kinds: ['wiki'], search: async (q, f = {}) => {
+  const ps = wkeSearch(q).filter(p => !f.space || p.space === f.space);
+  return {wiki: ps.map(p => ({...p, name: String(p.path || '').split('/').pop()})), more: {wiki: {total: ps.length, next: null}}};
+}});
 // pages of the unlocked encrypted spaces that name task #tid (the server's wiki_links stays empty for them)
 async function wkeMentions(tid) {
   const out = [];

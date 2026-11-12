@@ -44,7 +44,7 @@ async function ftxtRun() {
   const q = FTXT.q.trim(), seq = ++FTXT.seq;
   if (!q) { FTXT.res = null; ab_draw(); return; }
   try {
-    const j = await api('GET', '/api/files/search?q=' + encodeURIComponent(q));
+    const j = await api('GET', '/api/search?kind=files&q=' + encodeURIComponent(q));
     if (seq !== FTXT.seq) return;
     FTXT.res = j;
   } catch { if (seq === FTXT.seq) FTXT.res = {items: [], list_files: []}; }

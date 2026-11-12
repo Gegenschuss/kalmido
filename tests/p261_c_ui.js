@@ -58,7 +58,7 @@ const post = async (url, field, name, data, extra = {}) => {
   await post(`/api/tasks/${T}/attachments`, 'file', 'meter.pdf', textPdf(['Wasserzaehler Ablesung Kirschbaum']));
   const P = (await call('POST', '/api/lists', {name: 'Garden', kind: 'project'})).id;
   await post(`/api/lists/${P}/files`, 'file', 'plan.pdf', textPdf(['Zitronenbaum Pflanzplan']));
-  const found = q => call('GET', '/api/files/search?q=' + encodeURIComponent(q));
+  const found = q => call('GET', '/api/search?kind=files&q=' + encodeURIComponent(q));  // 2.1026.0 (#5280): the one search route (was the files' own search route)
   check(await until(async () => { const j = await found('zitronenbaum'); return (j.items || []).length && (j.list_files || []).length; }, 400),
     'setup: the background recognition read the files');
   check(await until(async () => ((await call('GET', '/api/tasks?scope=search&q=kirschbaum')).tasks || []).some(t => t.id === T), 400), 'setup: the task file is read');

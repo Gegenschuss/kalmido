@@ -332,7 +332,6 @@
   "Sender": "Expéditeur",
   "All senders": "Tous les expéditeurs",
   "No messages found.": "Aucun message trouvé.",
-  "All {0} messages": "Les {0} messages",
   "5 hours": "5 heures",
   "Spend limit": "Plafond de dépenses",
   "in the ring": "dans l’anneau",
@@ -18306,5 +18305,6 @@
   "{0} (from the repository)": "{0} (depuis le dépôt)",
   "Running": "En cours",
   "Budget category {0}": "Catégorie du budget {0}",
-  "Budget template": "Modèle du budget"
+  "Budget template": "Modèle du budget",
+  "All messages": "Tous les messages"
 }

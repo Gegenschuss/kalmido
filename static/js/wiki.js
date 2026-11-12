@@ -1112,8 +1112,8 @@ function wk_mentionHtml(t) {
 // ---- search / command field: pages of every space ("Knowledge page")
 async function wk_search(q) {
   if (!feat('wiki') || !q || q.length < 2) return [];
-  let ps; try { ps = (await rawFetch('GET', '/api/wiki/search?q=' + encodeURIComponent(q))).pages || []; } catch { ps = []; }
-  return typeof wkeSearch === 'function' ? [...ps, ...wkeSearch(q)] : ps;  // 2.64.3 B (#1817): + the unlocked encrypted spaces, searched here
+  // 2.1026.0 (#5280): the one registry (ftsearch.js srchRun, kind wiki): the server + the unlocked encrypted spaces (wikie2e.js, 2.64.3 B #1817)
+  try { return (await srchRun(q, {kind: 'wiki'})).wiki || []; } catch { return []; }
 }
 // ---- a task's "Mentioned in" (the detail asks once per opening)
 async function wk_mentions(tid) {

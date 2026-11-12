@@ -72,7 +72,7 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
     let idx = (await call('GET', '/api/wiki?space=' + SP + '&bodies=1')).j;
     check(idx.e2e?.mode === 'on' && (idx.pages || []).length === 3 && idx.pages.every(x => x.path.startsWith('e2e1:') && x.body.startsWith('e2e1:')) && !JSON.stringify(idx).includes(M),
       'the server keeps ciphers only: path and text of every page');
-    const sr = (await call('GET', '/api/wiki/search?q=' + M)).j;
+    const sr = (await call('GET', '/api/search?kind=wiki&q=' + M)).j;  // 2.1026.0 (#5280): the one search route (was the wiki's own search route)
     check(!(sr.pages || []).length, 'the server search finds nothing in the encrypted space');
     const info = (await call('GET', '/api/wiki/e2e?space=' + SP)).j;
     check((info.members || []).find(m => m.user_id === BOB)?.key_gens?.includes(1), 'Bob got his key at the start');
@@ -80,11 +80,12 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
     // local: index, search, backlinks, mentions
     const loc = await ev(`(async () => { const sp = ${JSON.stringify(SP)}; await wk_load(sp, true); const ps = wk_pages(sp);
       const other = await wkePage(await rawFetch('GET', '/api/wiki/pages/${OTHER}'));
-      return {paths: ps.map(x => x.path), search: wkeSearch('${M} start').map(x => x.id), wks: (await wk_search('${M} other')).map(x => x.id),
+      return {paths: ps.map(x => x.path), search: wkeSearch('${M} start').map(x => x.id), wks: (await wk_search('${M} other')).map(x => x.id), all: ((await srchRun('${M} other')).wiki || []).map(x => x.id),
         back: (other.backlinks || []).map(x => x.id), men: (await wkeMentions(${T})).map(x => x.id), tpl: ps.find(x => x.id === ${TPL})?.template, body: other.body}; })()`);
     check(JSON.stringify(loc.paths) === JSON.stringify(['Docs/Other', 'Docs/Start', 'Templates/Meeting']), 'the index opens and sorts the paths ' + JSON.stringify(loc.paths));
     check(loc.body === `${M} other page`, 'a page opens with the space key');
     check(loc.search?.includes(START) && loc.wks?.includes(OTHER), 'local search: the pages of the unlocked space are found ' + JSON.stringify([loc.search, loc.wks]));
+    check(loc.all?.includes(OTHER), '2.1026.0 (#5280): the search registry without a kind (the palette\'s "Everywhere") has the page of the unlocked space ' + JSON.stringify(loc.all));
     check(loc.back?.includes(START), 'backlinks computed in the browser ' + JSON.stringify(loc.back));
     check(loc.men?.includes(START), '"mentioned in" computed in the browser ' + JSON.stringify(loc.men));
     check(loc.tpl === true, 'the template flag from the plain path');
@@ -258,7 +259,7 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
   check(!idx.e2e && idx.pages.some(x => x.path === 'Notes/Start') && idx.pages.every(x => !x.path.startsWith('e2e1:')), 'the paths are plain on the server again');
   const pg = (await call('GET', '/api/wiki/pages/' + START)).j;
   check(pg.body?.startsWith(`${M} start page`) && (pg.backlinks || []).length >= 0, 'the text is plain on the server again');
-  check(((await call('GET', '/api/wiki/search?q=' + M)).j.pages || []).length >= 3, 'the server search finds the pages again');
+  check(((await call('GET', '/api/search?kind=wiki&q=' + M)).j.pages || []).length >= 3, 'the server search finds the pages again');
   // 2.64.3 E (#1817, review 2 M1): the way back defuses the prefix, the space is open
   const op = (await call('GET', '/api/wiki/pages/' + OLDP)).j, pb = (await call('GET', '/api/wiki/pages/' + PB.split('|')[0])).j;
   check(op.path === '_e2e1:Old' && op.body === ' e2e1:old text' && pb.body === ' e2e1:typed', 'switching off: name and text "e2e1:…" get a character in front ' + JSON.stringify([op.path, op.body, pb.body]));

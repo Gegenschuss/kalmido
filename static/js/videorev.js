@@ -557,7 +557,7 @@ function vdr_newFile(k, id, st) {
     const n = ++ps.n;
     if (!ps.q && !ps.parent && !sp) { list.innerHTML = `<p class="muted">${esc(tr('Find a file'))}</p>`; return; }
     list.innerHTML = `<p class="muted">${esc(tr('Loading…'))}</p>`;
-    let j; try { j = await rawFetch('GET', ps.q ? `/api/files/search?q=${encodeURIComponent(ps.q)}${sp ? '&space=' + encodeURIComponent(sp) : ''}` : ps.parent ? `/api/files?parent=${ps.parent}` : `/api/files?space=${encodeURIComponent(sp)}`); }
+    let j; try { j = await rawFetch('GET', ps.q ? `/api/search?kind=files&q=${encodeURIComponent(ps.q)}${sp ? '&space=' + encodeURIComponent(sp) : ''}` : ps.parent ? `/api/files?parent=${ps.parent}` : `/api/files?space=${encodeURIComponent(sp)}`); }
     catch (e) { if (n === ps.n) list.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
     if (n !== ps.n) return;
     const its = (j.items || []).filter(x => !x.no_access && ((x.kind === 'file' && VDR_FILE_RE.test(x.mime || '')) || (x.kind === 'folder' && !ps.q)));

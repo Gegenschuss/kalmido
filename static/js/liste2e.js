@@ -964,7 +964,7 @@ function le2eSearch(q, tasks) {
   }
   return out;
 }
-// the message search (chat.js MSG_SOURCES): comments of locked lists opened on this page
+// the message search (2.1026.0, #5280: the registry SEARCH_SOURCES, ftsearch.js, kind messages): comments of locked lists opened on this page
 function le2eMsgSearch(q, f = {}) {
   const ws = le2eWords(q), hits = [];
   if (!ws.length || (f.art && f.art !== 'c')) return {hits, total: 0, next: null};
@@ -982,4 +982,6 @@ function le2eMsgSearch(q, f = {}) {
   });
   return {hits, total: hits.length, next: null};
 }
-if (typeof MSG_SOURCES !== 'undefined') MSG_SOURCES.push({id: 'device-list', search: async (q, f) => le2eMsgSearch(q, f)});
+if (typeof SEARCH_SOURCES !== 'undefined') SEARCH_SOURCES.push({id: 'device-list', kinds: ['messages'], search: async (q, f = {}) => {
+  const r = le2eMsgSearch(q, f); return {messages: r.hits, more: {messages: {total: r.total, next: null}}};
+}});

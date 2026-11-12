@@ -149,7 +149,7 @@ function wks_inner(s, shown) {
 async function wks_load(more) {
   const s = WKH.s; if (!s) return;
   s.busy = true;
-  let j; try { j = await rawFetch('GET', `/api/wiki/search?${s.sp ? `space=${encodeURIComponent(s.sp)}&` : ''}q=${encodeURIComponent(s.q)}&limit=30&offset=${more ? s.pages.length : 0}`); } catch { j = {pages: [], more: false}; }
+  let j; try { j = await rawFetch('GET', `/api/search?kind=wiki&${s.sp ? `space=${encodeURIComponent(s.sp)}&` : ''}q=${encodeURIComponent(s.q)}&limit=30&offset=${more ? s.pages.length : 0}`); } catch { j = {pages: [], more: false}; }
   if (WKH.s !== s) return;  // another query meanwhile
   s.pages = more ? [...s.pages, ...(j.pages || [])] : (j.pages || []); s.more = !!j.more; s.busy = false;
   const el = $('#wks'); if (!el) return;

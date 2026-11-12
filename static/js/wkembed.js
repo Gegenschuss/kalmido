@@ -322,7 +322,7 @@ function wem_pick(p, at) {
   const load = async () => {
     const n = ++st.n, sp = encodeURIComponent(p.space);
     list.innerHTML = `<p class="muted">${esc(tr('Loading…'))}</p>`;
-    let j; try { j = st.q ? await rawFetch('GET', `/api/files/search?q=${encodeURIComponent(st.q)}&space=${sp}`) : await rawFetch('GET', st.parent ? `/api/files?parent=${st.parent}` : `/api/files?space=${sp}`); }
+    let j; try { j = st.q ? await rawFetch('GET', `/api/search?kind=files&q=${encodeURIComponent(st.q)}&space=${sp}`) : await rawFetch('GET', st.parent ? `/api/files?parent=${st.parent}` : `/api/files?space=${sp}`); }
     catch (e) { if (n === st.n) list.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
     if (n !== st.n) return;
     const its = (j.items || []).filter(x => !x.no_access && (x.kind === 'file' || (x.kind === 'folder' && !st.q)));
@@ -392,7 +392,7 @@ function wem_ac(ta, box, q, from) {
       if (kind === 'datei') {
         if (!feat('files')) return show([]);
         const sp = encodeURIComponent(p.space);
-        const j = word ? await rawFetch('GET', `/api/files/search?q=${encodeURIComponent(word)}&space=${sp}`) : await rawFetch('GET', `/api/files?space=${sp}`);
+        const j = word ? await rawFetch('GET', `/api/search?kind=files&q=${encodeURIComponent(word)}&space=${sp}`) : await rawFetch('GET', `/api/files?space=${sp}`);
         show((j.items || []).filter(x => x.kind === 'file' && !x.no_access).slice(0, 8).map(x => ({path: `${m[1]}:${x.id}|${clean(x.name)}`, _label: x.name, _ic: 'file'})));
       } else {
         const c = WEM_AC.sheets[p.space];

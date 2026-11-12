@@ -1125,26 +1125,19 @@ document.addEventListener('click', e => {
 
 // ------------------------------------------------------------------ 2.33.0 (#1080) search in conversations
 // Task comments, team chat (channels, direct messages) and agent chats. msgSearch(q, filters) merges the hits of every source
-// (newest first). Today there is one source, the server (kalmido/collab/msgsearch.py: only what the person may read). 2.34
-// (#909) adds a device source for end-to-end encrypted direct messages, which the server cannot read:
-// MSG_SOURCES.push({id: 'device', search: async (q, f) => ({hits, total, next})}) -- a hit is {art: c|t|a, id, chat_type:
-// task|list|dm|agent, task_id?, room_id?, agent_id?, chat_name, sender: {id, name, agent}, created_at, snippet, marks}.
-// Three places use it: the search field of an open chat (the magnifier in its header), the "Messages" part of the command
-// field (palette.js) and of the search page (render.js viewSearch) with filter chips. A hit opens through msgJump (collab.js).
-const MSG_SOURCES = [{id: 'server', search: async (q, f = {}) => {
-  const p = new URLSearchParams({q});
-  for (const k of ['art', 'sender', 'room', 'agent', 'task', 'limit', 'offset']) if (f[k] != null && f[k] !== '') p.set(k, f[k]);
-  const j = await rawFetch('GET', '/api/search/messages?' + p);
-  return {hits: j.hits || [], total: j.total || 0, next: j.next_offset ?? null};
-}}];
+// (newest first). 2.1026.0 (#5280, Q6c): the sources are the one registry SEARCH_SOURCES (ftsearch.js) of the kind messages: the
+// server (GET /api/search?kind=messages, kalmido/collab/msgsearch.py: only what the person may read) and the browser's sources
+// of the end-to-end areas (liste2e.js: comments of locked lists) -- a hit is {art: c|t|a, id, chat_type: task|list|dm|agent,
+// task_id?, room_id?, agent_id?, chat_name, sender: {id, name, agent}, created_at, snippet, marks}.
+// Three places use it: the search field of an open chat (the magnifier in its header), the "Messages" group of the command
+// field (palette.js / ftsearch.js, from its one request) and the search page (render.js viewSearch) with filter chips. A hit
+// opens through msgJump (collab.js).
 async function msgSearch(q, f = {}) {
-  const rs = await Promise.allSettled(MSG_SOURCES.map(s => s.search(q, f)));
-  const ok = rs.filter(r => r.status === 'fulfilled').map(r => r.value);
-  if (!ok.length && rs.length) throw rs[0].reason;
+  const r = await srchRun(q, {...f, kind: 'messages'});
   const seen = new Set(), hits = [];
-  for (const r of ok) for (const h of r.hits) { const k = h.art + ':' + h.id; if (!seen.has(k)) { seen.add(k); hits.push(h); } }
+  for (const h of r.messages || []) { const k = h.art + ':' + h.id; if (!seen.has(k)) { seen.add(k); hits.push(h); } }
   hits.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id);
-  return {hits, total: ok.reduce((n, r) => n + (r.total || 0), 0), next: ok.find(r => r.next != null)?.next ?? null};
+  return {hits, total: r.more.messages?.total || 0, next: r.more.messages?.next ?? null};
 }
 const MSG_KIND = {task: N_('Comment'), list: N_('Team chat'), dm: N_('Direct message'), agent: N_('Agent chat'), channel: N_('Channel'), group: N_('Group')};  // 2.113.1 (#2059): + channel, group
 const msgIcon = h => h.chat_type === 'agent' ? 'bot' : h.chat_type === 'list' || h.chat_type === 'group' ? 'users' : h.chat_type === 'channel' ? 'hash' : h.chat_type === 'dm' ? 'user' : 'comment';
@@ -1318,27 +1311,6 @@ async function msgSecRun(q, more = false) {
   m.busy = false; m.hits = more ? [...m.hits, ...r.hits] : r.hits; m.total = r.total; m.next = r.next;
   for (const h of r.hits) if (h.sender?.id) m.senders[h.sender.id] = h.sender.name;
   msgSecDraw();
-}
-
-// ---- the command field (palette.js): up to 5 hits as the group "Messages", "All messages" opens the search page
-const PALM = {q: '', hits: null, total: 0, t: 0};
-function palMsgItems(q) {
-  q = q.trim();
-  if (q.length < 2 || !collab() && !feat('agents') && !feat('comments')) return [];
-  if (PALM.q !== q) {
-    PALM.q = q; PALM.hits = null; clearTimeout(PALM.t);
-    PALM.t = setTimeout(async () => {
-      let r; try { r = await msgSearch(q, {limit: 5}); } catch { return; }
-      if (PALM.q !== q) return;
-      PALM.hits = r.hits; PALM.total = r.total;
-      if ($('.palette') && PAL.q.trim() === q) palDraw();
-    }, 250);
-    return [];
-  }
-  if (!PALM.hits?.length) return [];
-  const it = PALM.hits.map((h, i) => ({id: 'msg:' + h.art + h.id + ':' + i, kind: 'msg', group: 'msgs', label: `${h.sender?.name || '?'} · ${h.chat_name || tr(MSG_KIND[h.chat_type])}`, subHtml: msgSnip(h), icon: msgIcon(h), fn: () => msgOpen(h)}));
-  if (PALM.total > PALM.hits.length) it.push({id: 'msg:all', kind: 'msg', group: 'msgs', label: tr('All {0} messages', PALM.total), icon: 'search', fn: () => { go('search'); setTimeout(() => { const i = $('#searchq'); if (i) i.value = q; doSearch(q); }, 0); }});
-  return it;
 }
 
 // ------------------------------------------------------------------ 2.37.0 (#1159): save a chat message as a task

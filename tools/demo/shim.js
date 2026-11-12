@@ -1415,7 +1415,6 @@
     return {space: 'private', tags: [...n.keys()].sort((a, b) => n.get(b) - n.get(a) || (a < b ? -1 : 1)).map(k => ({tag: sh.get(k), n: n.get(k)}))};
   });
   on('GET', '/api/wiki/query', q => typeof wkq_run === 'function' ? wkq_run(wkq_parse(q.get('q') || ''), wkAll(), +q.get('page')) : {pages: [], tasks: [], total: 0, more: false, errors: []});
-  on('GET', '/api/wiki/search', q => { const s = (q.get('q') || '').toLowerCase(); return {pages: wkLive().filter(p => (p.path + ' ' + p.body).toLowerCase().includes(s)).map(p => wkOut(p))}; });
   // 2.126.2 (#2357): the pages that link a table / a file ([[tabelle:id]] / [[datei:id]]), as the server's /api/wiki/refs
   on('GET', '/api/wiki/refs', q => { const k = q.get('sheet') ? 'tabelle' : 'datei', id = +(q.get('sheet') || q.get('file')) || 0; return {pages: wkLive().filter(p => new RegExp('\\[\\[' + k + ':' + id + '\\b').test(p.body || '')).map(p => ({id: p.id, path: p.path}))}; });
   on('GET', '/api/wiki/mentions', q => ({pages: wkLive().filter(p => new RegExp('#' + (+q.get('task') || 0) + '\\b').test(p.body || '')).map(p => ({id: p.id, path: p.path}))}));
@@ -1631,7 +1630,18 @@
   on('GET', '/api/files/nodes/(\\d+)', (q, b, id) => nodeDetails(needNode(id)));
   on('GET', '/api/files/nodes/(\\d+)/share-targets', () => ({people: [], groups: [], agents: []}));
   on('GET', '/api/files/folders', () => ({folders: nodeLive().filter(n => n.kind === 'folder').map(n => ({id: n.id, name: n.name, path: crumbs(n).map(c => c.name).join('/'), org_id: null, owner_id: 1}))}));
-  on('GET', '/api/files/search', q => { const s = (q.get('q') || '').toLowerCase(); return {items: nodeLive().filter(n => n.name.toLowerCase().includes(s)).slice(0, 50).map(nodeOut)}; });
+  // 2.1026.0 (#5280): the one search route; kind wiki / files like the wiki's and the files' former routes of their own, without kind no tasks (the palette's local hits) + the groups wiki / files
+  on('GET', '/api/search', q => {
+    const s = (q.get('q') || '').toLowerCase(), k = q.get('kind') || '', gl = Math.min(20, Math.max(1, +q.get('glimit') || 5));
+    const pages = () => wkLive().filter(p => (p.path + ' ' + p.body).toLowerCase().includes(s)).map(p => wkOut(p)), items = () => nodeLive().filter(n => n.name.toLowerCase().includes(s)).slice(0, 50).map(nodeOut);
+    if (k === 'wiki') { const ps = pages(); return {pages: ps, total: ps.length, offset: 0, more: false}; }
+    if (k === 'files') return {items: items(), list_files: []};
+    if (k === 'messages') return {hits: [], total: 0, next_offset: null};
+    if (k && k !== 'tasks') return {[k]: []};
+    const groups = {}, ps = pages().slice(0, gl), fs = items().slice(0, gl);
+    if (ps.length) groups.wiki = ps; if (fs.length) groups.files = fs;
+    return {hits: [], next: null, groups};
+  });
   on('POST', '/api/files/folders', (q, b) => { const name = String(b.name || '').trim() || bad(tx('Please enter a name')), par = b.parent_id ? needNode(b.parent_id).id : null;
     if (nodeLive().some(n => n.kind === 'folder' && (n.parent_id ?? null) === par && n.name.toLowerCase() === name.toLowerCase())) throw new Http(409, {error: tx('Folder already exists')});
     const n = {id: nid('nodes'), parent_id: par, kind: 'folder', name, size: 0, version: 1, tags: [], created_at: iso(), updated_at: iso(), deleted_at: null}; nodes().push(n); return nodeOut(n); });

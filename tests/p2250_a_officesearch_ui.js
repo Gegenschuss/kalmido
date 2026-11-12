@@ -28,7 +28,8 @@ const FEAT = 'cal,comments,collab,office,clients';
   const doc = await call('POST', '/api/office/docs', {kind: 'offer', client_id: CL, project_title: 'Hoffest', items: [{title: 'Konzept', qty: 1, rate: 800}]});
   check(doc.status === 201 && doc.number, 'setup: a quotation with a number ' + JSON.stringify(doc).slice(0, 160));
   const api = await call('GET', '/api/search?q=Sonnenhang');
-  check((api.office || []).length === 2, 'setup: the server finds client + quotation ' + JSON.stringify(api).slice(0, 200));
+  // 2.1026.0 (#5280): the office hits are a group of the one search route (groups.office), no key of their own any more
+  check((api.groups?.office || []).length === 2, 'setup: the server finds client + quotation ' + JSON.stringify(api).slice(0, 200));
 
   const w = await boot({user: 'alice'}), d = w.document;
   const items = () => [...d.querySelectorAll('.palette .pitem')];

@@ -50,7 +50,8 @@ const type = (w, d, v) => { const q = d.querySelector('#wk-q'); q.value = v; q.d
   check(sn && [...sn.querySelectorAll('b')].map(b => b.textContent).join('|') === 'Kühlschrank', 'the hit has its snippet, the word bold ' + (sn?.innerHTML || '').slice(0, 300));
   check(sn && sn.textContent.startsWith('…') && sn.textContent.endsWith('…') && sn.textContent.includes('3 < 5 & mehr') && !sn.querySelector(':not(b)'), 'plain text, escaped, "…" where cut ' + (sn?.textContent || ''));
   check(sn && sn.closest('.wkitem')?.querySelector('span')?.textContent === 'Haushalt/Notiz', 'the snippet sits below the name');
-  const srv = await call('GET', '/api/wiki/search?q=kuhlschrank'), sp = (srv.pages || []).find(p => p.id === id.note);
+  // 2.1026.0 (#5280): the one search route (was the wiki's own search route)
+  const srv = await call('GET', '/api/search?kind=wiki&q=kuhlschrank'), sp = (srv.pages || []).find(p => p.id === id.note);
   const loc = JSON.parse(w.eval(`JSON.stringify(wks_snip(${JSON.stringify(BODY)}, 'kuhlschrank'))`));
   check(sp && loc && loc.snippet === sp.snippet && JSON.stringify(loc.marks) === JSON.stringify(sp.marks), 'the browser cuts like the server ' + JSON.stringify([loc, sp && {snippet: sp.snippet, marks: sp.marks}]).slice(0, 500));
   const l2 = JSON.parse(w.eval(`JSON.stringify(wks_snip('Ein ab und abseits davon, STRASSE: die Straße', 'ab strasse'))`));

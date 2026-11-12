@@ -456,10 +456,10 @@ function palItems() {
   const r = parseQuick(q, new Set()), d = quickDefaults(), tl = listById(r.list_id || d.list_id) || inbox();
   const create = {id: 'new:', kind: 'action', cls: 'pdo', label: tr('Create as task: {0}', r.title || q), sub: [tl ? lname(tl) : '', r.due ? dayLabel(r.due) + (r.due_time ? ' ' + r.due_time : '') : ''].filter(Boolean).join(' · '), icon: 'plus', fn: () => palCreate(q)};
   const asks = (S.agents || []).filter(x => x.enabled && x.chat !== false).slice(0, 3).map(x => ({id: 'ask:' + x.id, kind: 'action', cls: 'pdo', label: tr('Ask {0}: {1}', x.name, q), sub: tr('Sends it to the chat'), icon: 'bot', img: x.avatar || null, fn: () => palAsk(x.id, q)}));
-  const msgs = palMsgItems(q);  // 2.33.0 (#1080): hits in comments and chats (chat.js), on their way while typing
+  // 2.1026.0 (#5280): the messages come with "Everywhere" (one request, ftsearch.js); before: palMsgItems (2.33.0, #1080)
   const fts = typeof ftsPalItems === 'function' ? ftsPalItems(q, hits) : [];  // 2.116.0 B (#2065): "Everywhere" (ftsearch.js)
   const fo = hits.length ? [] : fts.filter(x => x.group === 'office');  // 2.250.0 B (#2992): no local hit: the office hits (clients, quotations / invoices) go before "Create as task"
-  return hits.length ? [...hits, ...asks, create, ...fts, ...msgs] : [...fo, create, ...asks, ...fts.filter(x => !fo.includes(x)), ...msgs];
+  return hits.length ? [...hits, ...asks, create, ...fts] : [...fo, create, ...asks, ...fts.filter(x => !fo.includes(x))];
 }
 function palCreate(q) {
   const r = parseQuick(q, new Set()), d = quickDefaults();
