@@ -32,6 +32,11 @@ from ..core.db import db
 from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..accounts.session import me
+from ..collab.liste2e import le2e_is_cipher
+from ..core.objcomments import ocm_row
+from ..wiki.wkfolder import wkf_locked, wkf_role
+from ..wiki.wkhist import WikiUnreadable, wkh_body
+from ..wiki.wkv1 import wkv_append_text
 
 APVD_CTX = 2  # lines of context around a change (#5831)
 APVD_SHORT_ROWS = 40  # rows of the first view; "Show everything" asks with full=1
@@ -70,15 +75,12 @@ def apvd_step(st):
 
 
 def _cipher(v):
-    from ..collab.liste2e import le2e_is_cipher
     return le2e_is_cipher(v)
 
 
 def apvd_target(c, uid, kind, tid, piece, b):
     """{name, ref, old, new, stamp} of the target for person uid, or {hidden: no_access | encrypted | gone}."""
     if kind in ("wiki", "wiki_append"):
-        from ..wiki.wkfolder import wkf_locked, wkf_role
-        from ..wiki.wkhist import WikiUnreadable, wkh_body
         r = c.execute("SELECT * FROM wiki_pages WHERE id=?", (tid,)).fetchone()
         if r is None or r["deleted_at"]:
             return {"hidden": "gone"}
@@ -91,7 +93,6 @@ def apvd_target(c, uid, kind, tid, piece, b):
         except WikiUnreadable:
             return {"hidden": "encrypted"}
         if kind == "wiki_append":
-            from ..wiki.wkv1 import wkv_append_text
             under = b.get("under") if isinstance(b.get("under"), str) and b["under"].strip() else None
             new = wkv_append_text(old, piece, under)
             if new is None:  # the heading is not there (any more): the step would answer 404 - show the piece alone
@@ -122,7 +123,6 @@ def apvd_target(c, uid, kind, tid, piece, b):
         return {"name": "" if _cipher(r["name"]) else r["name"], "ref": "", "old": r["description"] or "",
                 "new": piece.replace("\r\n", "\n").strip(), "stamp": r["description_at"]}
     if kind == "comment":
-        from ..core.objcomments import ocm_row
         r = ocm_row(c, tid, live=True)
         if r is None:
             return {"hidden": "gone"}
@@ -240,7 +240,6 @@ def apvd_route():
             raise Denied(404)
         ch, ans, at, snap = _jl(m["choices"]) or {}, _jl(m["choice"]), m["created_at"], _jl(m["apv_diff"])
     else:
-        from ..core.objcomments import ocm_row
         r = ocm_row(c, int(a["comment"]), live=True)
         if r is None or not task_visible(c, r["task_id"], uid, full=True):  # review F6: comments are the full view
             raise Denied(404)

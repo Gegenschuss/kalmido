@@ -24,7 +24,7 @@ LAYER_OF = {"api.common": "core", "accounts.orgback": "domain",
             "core.undoweb": "domain",  # 2.747.0 (#5249): the step groups' routes stand on the write path
             "core.undoareas": "domain",  # 2.777.0 (#5254): the areas' undo steps stand on the write path
             "core.addrshare": "domain",  # 2.1071.0 (#5658): the open shares by address replay the areas' share routes
-            "docs.mailnamed": "integrations"}  # 2.1034.0 (#5304): admin.migrate (the move from SQLite) is gone; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area; 2.558.0 (#4709): the shared core stands on the file store and accounts, its routes on the API
+            "docs.mailnamed": "integrations", "agents.apvdiff": "domain"}  # 2.1034.0 (#5304): admin.migrate (the move from SQLite) is gone; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area; 2.558.0 (#4709): the shared core stands on the file store and accounts, its routes on the API
 
 ORDER = (
     "core.env",  # 2.149.0 D (#2511): the registry of the environment variables (no imports from the app)
@@ -202,7 +202,6 @@ ORDER = (
     "agents.workstyle",  # 2.236.0 (#2904-#2911)
     "agents.workqueue",  # 2.236.0 C (#2906 #2907)
     "agents.control",  # 2.235.0 A (#2891 #2900 #2901)
-    "agents.apvdiff",  # 2.1068.0 (#5831): what an approval card's step changes in a text
     "agents.datalock",  # 2.235.0 B (#2902)
     "agents.agentrules",  # 2.235.0 C (#2903)
     "agents.admin",
@@ -297,6 +296,7 @@ ORDER = (
     "sheets.shfolder",  # 2.199.0 C (#2742): tables in folders (the reference kind 'sheet', the panel's folder tree)
     "wiki.wkfolder",  # 2.200.0 A (#2747): knowledge pages in folders of the file store (the reference kind 'wiki', the tree)
     "wiki.wkv1",  # 2.200.0 C (#1781): knowledge pages for agents (API v1 + OpenAPI; only what is shared with them)
+    "agents.apvdiff",  # 2.1068.0 (#5831): what an approval card's step changes in a text (domain layer, LAYER_OF: it reads the areas' texts)
     "wiki.wkfshare",  # 2.200.0 B (#2747): pages reached through folder / page shares (Shared with me, new pages in a shared folder)
     "wiki.wkarea",  # 2.1045.0 (#5823): a whole knowledge area shared with an agent (the dialog's facts; the share is the file store's)
     "wiki.wkstyle",  # 2.371.3 (#3152): the reading style of a knowledge space (PUT /api/wiki/style)
