@@ -55,7 +55,8 @@ from ..hub.hubmail import _open as hbm_open, hbm_can
 from ..team.clients import cl_may_delete, client_rows
 from .writes import obj_on_purge, obj_on_restore  # 2.936.0 (#5364); 2.1002.0 (#5491): obj_on_restore
 from ..tasks.lifecycle import rt_back  # 2.1002.0 (#5491): the tasks' part of a restore through the core
-from ..tasks.tasktrash import TTP_BATCH, ttp_core_purge, ttp_keep  # 2.936.0 (#5364): the task kind's retention hooks
+# 2.936.0 (#5364): the task kind's retention hooks; 2.1075.0 (#5496): ttp_core_count
+from ..tasks.tasktrash import TTP_BATCH, ttp_core_count, ttp_core_purge, ttp_keep
 
 LT_TASK, LT_EVENT, LT_MAIL, LT_CLIENT = "task", "event", "hub_mail", "client"
 _LIST_ROLE = {"owner": "manage", "admin": "manage", "edit": "edit", "view": "view"}  # = lists/lmcore.py _ROLE
@@ -217,7 +218,7 @@ obj_register(LT_TASK, "tasks", label=N_("Task"), fields={}, node=False, area="ta
              # 2.936.0 (#5364): the tasks' trash period runs in the core's retention run (tasks/tasktrash.py)
              trash_prune=True, trash_keep=ttp_keep, trash_batch=TTP_BATCH,
              stamp_ms=False)  # 2.1031.0 (#5538): tasks.updated_at in seconds (tasks/lifecycle.py iso), also after a restore
-obj_on_purge(LT_TASK, ttp_core_purge)  # 2.936.0 (#5364)
+obj_on_purge(LT_TASK, ttp_core_purge, count=ttp_core_count)  # 2.936.0 (#5364); 2.1075.0 (#5496): count
 obj_on_restore(LT_TASK, rt_back)  # 2.1002.0 (#5491): a task comes back through the core (tasks/lifecycle.py restore_task)
 NOTIFY_TICK[LT_TASK] = _task_tick  # 2.891.0 (#5270): the watchdog's reminders ask the task's readers with the tick's memo
 obj_register(LT_EVENT, "events", label=N_("Event"), fields={}, node=False, area="calendar", base_role=_ev_base, space=_ev_space,

@@ -3,7 +3,7 @@
  - the run (tasks/tasktrash.py ttp_tick, called in the container with force=True like the watchdog does hourly):
    switch off (default) = nothing deleted, the counts are right (tasks, attachments)
    2.936.0 (#5364): the run is the core's (core/writes.py obj_trash_tick, kind task): its count "task"; the attachment
-   files are checked on disk (the core's report has no "attachments" count)
+   files are checked on disk; 2.1075.0 (#5496): its report names the attachments again (task_attachments), both ways
  - switch on (KALMIDO_PURGE_TRASH=1 for that run): a task older than the period goes with its comment, field value,
    subtask and the attachment file on disk; 29 days old stays; restored stays; a task in another owner's shared list goes
    too; an organisation task goes; a time entry of a deleted task stays (only the link goes); a subtask restored on its
@@ -52,7 +52,8 @@ def tick(on):
     2.936.0 (#5364): the core's retention run (obj_trash_tick); "tasks" = its count of the kind task."""
     env = ["-e", "KALMIDO_PURGE_TRASH=1"] if on else []
     code = ("import json, app\nfrom kalmido.core.writes import obj_trash_tick\nc = app.connect()\n"
-            "try:\n    n = obj_trash_tick(c, force=True)\n    print(json.dumps({'tasks': n.get('task', 0), 'tasks_kept': n.get('task_kept', 0)}))\nfinally:\n    c.close()")
+            "try:\n    n = obj_trash_tick(c, force=True)\n    print(json.dumps({'tasks': n.get('task', 0), 'tasks_kept': n.get('task_kept', 0), "
+            "'attachments': n.get('task_attachments', 0)}))\nfinally:\n    c.close()")  # 2.1075.0 (#5496): attachments
     out = subprocess.run(["docker", "exec", *env, CT, "python", "-c", code], capture_output=True, text=True)
     check(out.returncode == 0, f"the run works {out.stdout[-200:]} {out.stderr[-600:]}")
     try:
@@ -122,11 +123,13 @@ check(j.get("days") == 30, f"#2063: the trash says the period: {j.get('days')}")
 n = tick(False)
 # 2.936.0 (#5364): the core's run counts the tasks; the file is checked on disk below (no "attachments" count)
 check(n.get("tasks") == 4, f"#2063: dry run counts OLD + SUB + FOREIGN + ORGT: {n}")
+check(n.get("attachments") == 1, f"#5496: the dry run's report names the attachment of OLD again: {n}")
 check(all(exists(t) for t in (OLD, SUB, YOUNG, BACK, FOREIGN, ORGT, LIVE)) and os.path.isfile(AFILE), "#2063: dry run deletes nothing")
 
 # ---------------------------------------------------------------- switch on
 n = tick(True)
 check(n.get("tasks") == 4, f"#2063: the run deletes 4 tasks: {n}")  # 2.936.0 (#5364): the file on disk below
+check(n.get("attachments") == 1, f"#5496: the run's report names the deleted attachment again: {n}")
 check(not exists(OLD) and not exists(SUB), "#2063: the old task and its subtask are gone")
 check(not os.path.isfile(AFILE), "#2063: the attachment file is gone from disk")
 # 2.972.0 (#5272): the task comments are rows of the core's obj_comments (kind 'task', ref_id = the task)

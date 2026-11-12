@@ -411,20 +411,33 @@ def _kids_restore(c, reg, rid, gone):
 
 OBJ_PURGE = {}  # 2.809.0 (#5365): kind -> f(c, rid) of obj_on_purge
 OBJ_PURGE_LOCK = {}  # 2.1047.0 (#5835): kind -> f(c, rid) of obj_on_purge(lock=...), run before the object's row lock
+OBJ_PURGE_COUNT = {}  # 2.1075.0 (#5496): kind -> f(c, cut) of obj_on_purge(count=...): {name: n} of the due objects (switch off)
 _PURGE_BOX = ContextVar("obj_purge_box", default=None)
 
 
-def obj_on_purge(kind, f, lock=None):
+def obj_on_purge(kind, f, lock=None, count=None):
     """2.809.0 (#5365): the area's part of the delete for good of an object of kind (_purge_rows runs it first): f(c, rid) cleans
     what the core does not know (stored files, scan / text rows, folder nodes) and returns what must happen after the commit
     (paths relative to ATT_DIR or callables, core/serializers.py unlink_files) or None; Denied = the object is kept (a receipt
     under the legal retention, files/store.py fs_on_delete): obj_purge refuses, the retention run counts it as locked.
     2.1047.0 (#5835): lock = f(c, rid) that locks the area's rows a concurrent writer takes BEFORE the object's row (the file
     store's documents: a recognition run writes its document row, then a row pointing at the node); _purge_rows runs it before
-    its own row lock, else the purge held the node and waited for the document while the run waited for the node: deadlock."""
+    its own row lock, else the purge held the node and waited for the document while the run waited for the node: deadlock.
+    2.1075.0 (#5496): count = f(c, cut) -> {name: n}: what else of the area goes with the kind's due objects (a task's
+    attachments), the retention report's numbers with the switch off; with it on the hook names them (obj_purge_tally)."""
     OBJ_PURGE[kind] = f
     if lock is not None:
         OBJ_PURGE_LOCK[kind] = lock
+    if count is not None:
+        OBJ_PURGE_COUNT[kind] = count
+
+
+def obj_purge_tally(name, n):
+    """2.1075.0 (#5496): an area's hook names what else it deleted with its object (e.g. task_attachments) for the retention
+    report (obj_trash_tick); outside a retention run (no obj_purge_after(keep_locked=True)) nothing is kept."""
+    box = _PURGE_BOX.get()
+    if box is not None and box["keep"] and n:
+        box["tally"][name] = box["tally"].get(name, 0) + int(n)
 
 
 @contextmanager
@@ -432,7 +445,8 @@ def obj_purge_after(keep_locked=False):
     """2.809.0 (#5365): collects the after-commit work of the purges within ({"after": [...], "locked": n}); the caller commits
     and then calls unlink_files(box["after"]). keep_locked: a Denied of an area's hook keeps that object (counted) instead of
     refusing (the retention run)."""
-    box = {"after": [], "locked": 0, "err": [], "keep": bool(keep_locked)}  # 2.936.0 (#5364, review): err
+    # 2.936.0 (#5364, review): err; 2.1075.0 (#5496): tally (obj_purge_tally)
+    box = {"after": [], "locked": 0, "err": [], "keep": bool(keep_locked), "tally": {}}
     tok = _PURGE_BOX.set(box)
     try:
         yield box
@@ -447,11 +461,13 @@ def _purge_area(c, kind, rid):
         return True
     box = _PURGE_BOX.get()
     n0 = len(box["after"]) if box is not None else 0
+    t0 = dict(box["tally"]) if box is not None else None  # 2.1075.0 (#5496): an undone hook names nothing
     try:
         with c.savepoint():
             out = f(c, int(rid))
     except Denied:
-        if box is not None:  # 2.993.0 (#5413, fable F2): the savepoint is undone, so is the after-commit work a nested purge of
+        if box is not None:
+            box["tally"] = t0  # 2.993.0 (#5413, fable F2): the savepoint is undone, so is the after-commit work a nested purge of
             del box["after"][n0:]  # the hook queued (a bill file's unlink): its row stays, its file must stay too
         if box is None or not box["keep"]:
             raise
@@ -462,6 +478,7 @@ def _purge_area(c, kind, rid):
         # <kind>_err with its message, and obj_trash_tick raises after its commit so the watchdog reports it (_wd_section)
         if box is not None:
             del box["after"][n0:]  # 2.993.0 (#5413, fable F2): as above
+            box["tally"] = t0
         if box is None or not box["keep"]:
             raise
         print("obj purge:", kind, int(rid), "kept for the next run:", type(e).__name__, str(e)[:200], flush=True)
@@ -730,9 +747,10 @@ def obj_trash_prune(c, kind, cut=None, purge=None, ids=None, paths=None):
         old = obj_trash_due(c, kind, cut) if ids is None else [int(x) for x in ids]
         if old and purge:
             with system_ctx(c):  # no person: the period ran out (the area checked the rights when it went into the trash)
-                got = part_trash_purge(c, kind, old)
+                got, n = part_trash_purge(c, kind, old, cut or ret_trash_cut())  # 2.1075.0 (#5496): the rows deleted
             if paths is not None:
                 paths += got
+            return n
         return len(old)
     reg = _reg_trash(kind)  # 2.936.0 (#5364): a light kind with trash_prune too (tasks)
     if not purge and ids is None:  # 2.1031.0 (#5538): switch off = count all that are due (COUNT), not at most one batch
@@ -780,7 +798,7 @@ def obj_trash_tick(c, force=False):
     with obj_purge_after(keep_locked=True) as box:  # 2.809.0 (#5365): the areas' stored files after the commit, receipts locked
         for kind, reg in sorted(OBJ.items()):
             if reg.get("trash_prune"):
-                n0, a0, e0 = box["locked"], len(box["after"]), len(box["err"])
+                n0, a0, e0, t0 = box["locked"], len(box["after"]), len(box["err"]), dict(box["tally"])
                 try:  # 2.936.0 (#5364, review): one savepoint per kind -- a kind that fails holds back no other one
                     with c.savepoint():
                         n = obj_trash_prune(c, kind, cut, purge)
@@ -788,6 +806,7 @@ def obj_trash_tick(c, force=False):
                     del box["after"][a0:]  # its rows stay, so do their files
                     box["locked"] = n0
                     del box["err"][e0:]
+                    box["tally"] = t0  # 2.1075.0 (#5496): its rows stay, so nothing it named was deleted
                     box["err"].append(f"{kind}: {type(e).__name__}")
                     print("core trash:", kind, type(e).__name__, str(e)[:200], flush=True)
                     out[kind + "_err"] = 1
@@ -801,6 +820,9 @@ def obj_trash_tick(c, force=False):
                     out[kind + "_locked"] = lk
                 if reg.get("trash_keep") is not None:  # 2.936.0 (#5364)
                     out[kind + "_kept"] = obj_trash_kept(c, kind, cut)
+                if not purge and kind in OBJ_PURGE_COUNT:  # 2.1075.0 (#5496): switch off = what would go with them
+                    with system_ctx(c):  # numbers only, every workspace
+                        out.update(OBJ_PURGE_COUNT[kind](c, cut))
         for kind, k in sorted(PART_KINDS.items()):  # 2.783.0 (#5368): the side objects (core/objparts.py), one savepoint each
             if k["trash_prune"] and kind not in OBJ:
                 got = []
@@ -814,6 +836,8 @@ def obj_trash_tick(c, force=False):
                     out[kind + "_err"] = 1
                     continue
                 paths += got
+    for k, v in box["tally"].items():  # 2.1075.0 (#5496): what the hooks deleted with their objects (a task's attachments)
+        out[k] = out.get(k, 0) + v
     if out:
         ret_report(c, "trash", out, purge, run="obj_trash")
     c.commit()

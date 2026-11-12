@@ -14,6 +14,7 @@ also as subtasks of a due task elsewhere (detached) -- and are counted as tasks_
 2.936.0 (#5364, stage 2a of the core's trash): the run is the core's (core/writes.py obj_trash_tick over the light kind task
 of core/objlight.py: trash_prune, trash_keep=ttp_keep, its obj_on_purge hook ttp_core_purge): one retention run for every
 trash of the core, its report run "obj_trash" with the numbers task / task_kept / task_locked; ttp_tick went.
+2.1075.0 (#5496): + task_attachments again (the hook names the ones it deleted, ttp_core_count the due ones with the switch off).
 2.1028.0 (#5536, stage 2c): a person's delete for good ("Empty trash", DELETE /api/tasks/<id>?hard=1, its background job) goes
 the same way: the routes check their rights, then core/writes.py obj_purge(checked=True) per task inside ttp_manual(own) --
 the hook deletes any task in the trash (no period), detaches the subtasks outside own (lists the person may empty) and keeps
@@ -128,4 +129,14 @@ def ttp_core_purge(c, tid):
         if kept:
             raise Denied(409, tr("This project keeps receipts by law until {0}: it can be deleted permanently after that.", kept[0]))
         raise Denied(409)
+    from ..core.writes import obj_purge_tally  # a later module (core/objlight.py registers this hook)
+    obj_purge_tally("task_attachments", len(files))  # 2.1075.0 (#5496): the retention report names them again (as ttp_tick did)
     return files
+
+
+def ttp_core_count(c, cut):
+    """2.1075.0 (#5496): obj_on_purge count of the kind task -- with the switch off the retention report names the attachments
+    of the due tasks (not kept by law) again, as ttp_tick did before the core's run (system context of obj_trash_tick)."""
+    n = c.execute(f"SELECT COUNT(*) FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE {trash_sql('t')} AND t.deleted_at<? "
+                  f"AND NOT {TTP_KEPT.format('t')}", (cut, ttp_today())).fetchone()[0]
+    return {"task_attachments": n}

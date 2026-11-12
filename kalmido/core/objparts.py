@@ -42,7 +42,9 @@ trash_prune=True) hands the kind's trash to core/writes.py obj_trash_tick / obj_
                          cleans up first (rows without FK; files the core unlinks after the commit)
   copy=True              the kind's copies in list_part_trash (sections, sprints, deleted custom fields, the Undo copies of
                          "Delete all times") are deleted after the period
-  part_trash_due(c, kind, cut) -> [ids] / part_trash_purge(c, kind, ids) -> [paths]    used by obj_trash_prune"""
+  part_trash_due(c, kind, cut) -> [ids] / part_trash_purge(c, kind, ids, cut) -> ([paths], n)    used by obj_trash_prune
+2.1075.0 (#5496): part_trash_purge reads the ids again under a row lock (still in the trash since before cut?) and returns
+the number really deleted -- a row restored between part_trash_due and the delete stays and is not counted."""
 import json
 import re
 
@@ -208,20 +210,29 @@ def part_trash_due(c, kind, cut):
     return [r[0] for r in c.execute(q, (cut,)).fetchall()]
 
 
-def part_trash_purge(c, kind, ids):
+def part_trash_purge(c, kind, ids, cut):
     """Delete ids of part_trash_due for good: the area's on_prune first (rows without FK; returns file paths for after the
-    commit), then the rows (what hangs on them cascades). -> [paths]."""
+    commit), then the rows (what hangs on them cascades). -> ([paths], number deleted).
+    2.1075.0 (#5496): only the ids still in the trash since before cut, read again under a row lock (FOR UPDATE): a restore
+    between part_trash_due and here keeps its row (it was deleted all the same before); the number is the rows deleted, not
+    the ids handed over (the retention report, ret_report run obj_trash)."""
     k = _kind(kind)
     ids = [int(x) for x in ids]
     if not ids:
-        return []
-    paths = []
+        return [], 0
+    paths, n = [], 0
     for i in range(0, len(ids), 500):
         part = ids[i:i + 500]
         if k["copy"]:
-            c.execute(f"DELETE FROM {qi(PART_TRASH, (PART_TRASH,))} WHERE kind=? AND id = ANY(CAST(? AS BIGINT[]))", (kind, part))
+            n += c.execute(f"DELETE FROM {qi(PART_TRASH, (PART_TRASH,))} WHERE kind=? AND id = ANY(CAST(? AS BIGINT[])) "
+                           "AND deleted_at<?", (kind, part, cut)).rowcount
+            continue
+        t = qi(k["table"], (k["table"],))
+        part = [r[0] for r in c.execute(f"SELECT id FROM {t} WHERE id = ANY(CAST(? AS BIGINT[])) AND {trash_sql()} "
+                                        f"AND deleted_at<?{k['prune']} ORDER BY id FOR UPDATE", (part, cut)).fetchall()]
+        if not part:
             continue
         if k["on_prune"] is not None:
             paths += list(k["on_prune"](c, "id = ANY(CAST(? AS BIGINT[]))", (part,)) or ())
-        c.execute(f"DELETE FROM {qi(k['table'], (k['table'],))} WHERE id = ANY(CAST(? AS BIGINT[]))", (part,))
-    return paths
+        n += c.execute(f"DELETE FROM {t} WHERE id = ANY(CAST(? AS BIGINT[]))", (part,)).rowcount
+    return paths, n

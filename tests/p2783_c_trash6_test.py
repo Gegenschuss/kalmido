@@ -15,6 +15,8 @@ Own container (kt.fresh). Invented people and titles only (example.com); every s
    thread's first message stays while a reply points at it (kind tchat_msg)
  - a section's copy (kind section) ends in the core's run too; the projects' trash list shows only sections / sprints
  - files/trashpurge.py tp_tick no longer counts any of them
+ - 2.1075.0 (#5496): the run counts the side objects really deleted, not the ids handed over: a webhook restored between
+   reading the due ids and the delete stays (and is not counted), a copy no longer past the period stays too
 usage: p2783_c_trash6_test.py <datadir>      (P2783C_NOSTART=1: a running server)"""
 import json
 import subprocess
@@ -201,5 +203,24 @@ check(one("SELECT 1 FROM tchat_msgs WHERE id=?", (ROOT,)), "chat: the thread's f
 check(not one("SELECT 1 FROM list_part_trash WHERE kind='section' AND ref_id=?", (SEC,))
       and F.post(B + f"/api/sections/{SEC}/restore").status_code == 404, "section: the old copy gone")
 check(one("SELECT 1 FROM tasks WHERE id=?", (T1,)) and one("SELECT 1 FROM list_fields WHERE id=?", (FO,)), "live rows stay")
+
+# ================================================================== 2.1075.0 (#5496): the number deleted, not the ids handed over
+HS = []
+for name in ("Gauge east", "Gauge west"):
+    r = F.post(B + f"/api/lists/{L}/hooks-in", json={"name": name})
+    check(r.status_code == 201, f"#5496 setup: webhook {name} {r.status_code}")
+    HS.append(r.json()["id"])
+    check(F.delete(B + f"/api/hooks-in/{HS[-1]}").ok, f"#5496 setup: webhook {name} deleted")
+dbx("UPDATE hook_in SET deleted_at=? WHERE id IN (?,?)", (ago(400), *HS))
+FY = F.post(B + f"/api/lists/{L}/fields", json={"name": "Shade", "type": "text"}).json()["id"]
+TRY = F.delete(B + f"/api/fields/{FY}").json().get("trash_id")
+out = box(f"""from kalmido.core.writes import obj_trash_due, obj_trash_prune
+due = obj_trash_due(c, "hook_in")
+c.execute("UPDATE hook_in SET deleted_at=NULL WHERE id=?", ({HS[1]},))  # restored after the run read the due ids
+print(json.dumps([obj_trash_prune(c, "hook_in", purge=True, ids=due), obj_trash_prune(c, "list_field", purge=True, ids=[{TRY}])]))""")
+check(out == "[1, 0]", f"#5496: the run counts what it deleted (1 webhook, no young copy), not the ids it was handed {out}")
+check(not one("SELECT 1 FROM hook_in WHERE id=?", (HS[0],)) and one("SELECT 1 FROM hook_in WHERE id=? AND deleted_at IS NULL", (HS[1],)),
+      "#5496: the due webhook went, the one restored meanwhile stays")
+check(one("SELECT 1 FROM list_part_trash WHERE id=?", (TRY,)), "#5496: a field copy not past the period stays, even when handed over")
 
 sys.exit(done("p2783_c_trash6"))
