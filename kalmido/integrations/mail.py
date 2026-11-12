@@ -23,7 +23,7 @@ from ..core.db import body, bump, connect, db, err, inbox_default, iso, local_no
 from ..accounts.session import GATE, me
 from ..accounts.mailtok import mtk_new, mtk_plain, mtk_where  # 2.674.0 (#4382 finding 5)
 from ..accounts.bgjobs import bgj_fn
-from ..core.access import Denied, list_role, need_list, vis_sql, WRITE_ROLES, list_state_sql
+from ..core.access import list_role, need_list, vis_sql, WRITE_ROLES, list_state_sql
 from ..core.pages import new_inbox_task, save_attachment_bytes, split_link, valid_url
 from ..tasks.validation import as_int, log_act
 from ..collab.news import news_unread

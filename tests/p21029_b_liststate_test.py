@@ -105,7 +105,7 @@ if gid is not None:
     check(r.ok and state(P4) == "live", f"the step taken back: live again {r.status_code} {r.text[:160]} {state(P4)}")
 
 # ---------------------------------------------------------------- the helper and a read moved onto it
-out = in_app(f"""from kalmido.core.access import list_state_sql, otr_live
+out = in_app("""from kalmido.core.access import list_state_sql, otr_live
 print("H1", list_state_sql("l"))
 print("H2", list_state_sql("", "trash", "archived"))
 print("H3", otr_live("l"))
