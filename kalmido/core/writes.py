@@ -460,7 +460,7 @@ def _purge_rows(c, kind, reg, rid):
     kinds = _purge_kinds(kind, reg)  # 2.1002.0 (#5695): + the tracked kinds of its table (an office row's history / undo)
     gids = ug_gids(c, "kind = ANY(CAST(? AS TEXT[])) AND ref_id=?", (kinds, int(rid)))  # 2.747.0 (#5249): its undo rows' groups
     for t in ("obj_history", "obj_undo", "obj_revoked"):
-        c.execute(f"DELETE FROM {t} WHERE kind = ANY(CAST(? AS TEXT[])) AND ref_id=?", (kinds, int(rid)))
+        c.execute(f"DELETE FROM {qi(t, (t,))} WHERE kind = ANY(CAST(? AS TEXT[])) AND ref_id=?", (kinds, int(rid)))
     ug_gc(c, gids)
     for t, col in _kids(reg):  # 2.773.0 (#5292)
         c.execute(f"DELETE FROM {qi(t, (t,))} WHERE {qi(col, (col,))}=?", (int(rid),))

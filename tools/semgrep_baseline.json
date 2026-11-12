@@ -1525,14 +1525,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/core/writes.py",
-   "code": "c.execute(f\"DELETE FROM {t} WHERE kind=? AND ref_id=?\", (kind, int(rid)))",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/core/writes.py",
    "code": "c.execute(f\"SELECT id FROM {t} WHERE {where} FOR UPDATE\", args).fetchall()",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
