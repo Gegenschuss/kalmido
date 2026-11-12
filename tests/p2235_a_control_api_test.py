@@ -100,7 +100,8 @@ def run(who, S, UID, AID, H, L):
     r = api("POST", "/tasks", json={"title": "Blocked", "list_id": L})
     e = r.json().get("error", {}) if r.status_code == 409 else {}
     check(r.status_code == 409 and e.get("code") == "approval_required" and e.get("step") == "routine" and e.get("level") == "approve_all"
-          and e.get("project_id") == L and HDR in e.get("message", ""), f"{who}: approve_all -> 409 approval_required {r.status_code} {r.text[:300]}")
+          and e.get("project_id") == L and (e.get("approval") or {}).get("header") == HDR  # 2.1045.0 (#5827): the message names the run (run_approved_step), the header stays in approval
+          and "run_approved_step" in e.get("message", ""), f"{who}: approve_all -> 409 approval_required {r.status_code} {r.text[:300]}")
     check(api("PUT", "/agent/status", json={"status": "working"}).ok, f"{who}: its own channel (status) stays open")
     check(not [t for t in requests.get(V + f"/tasks?list_id={L}", headers=H).json().get("data", []) if t["title"] == "Blocked"],
           f"{who}: the refused task was not created")
