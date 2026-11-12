@@ -21,6 +21,7 @@ import glob
 import gzip
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -87,9 +88,22 @@ def fill_old_tables():
                                     JOIN pg_attribute fa ON fa.attrelid=c.confrelid AND fa.attnum=c.confkey[1]
                                     JOIN pg_namespace n ON n.oid=c.connamespace WHERE c.contype='f' AND n.nspname='public'"""):
         fks[(t, col)] = (ref, refcol)
+    # 2.1015.0 (#5777): a column with a CHECK that lists its values (obj_follow.mode since 2.981, obj_notif_cap.kind, obj_tags.scope_kind)
+    # takes the first allowed one - the filler text broke the row and the test read it as a failed upgrade. Postgres keeps
+    # "col IN ('a', 'b')" as "(col = ANY (ARRAY['a'::text, 'b'::text]))"; every table, none left out.
+    allowed = {}
+    for t, col, cdef in q("""SELECT c.conrelid::regclass::text, a.attname, pg_get_constraintdef(c.oid) FROM pg_constraint c
+                             JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=c.conkey[1]
+                             JOIN pg_namespace n ON n.oid=c.connamespace
+                             WHERE c.contype='c' AND n.nspname='public' AND array_length(c.conkey, 1)=1"""):
+        m = re.search(r"= ANY \(+ARRAY\['((?:[^']|'')*)'", cdef) or re.search(r"\bIN \('((?:[^']|'')*)'", cdef)
+        if m:
+            allowed[(t, col)] = m.group(1).replace("''", "'")
 
     def value(t, name, typ):
         """The text of a value for column name, None: it points at an empty table."""
+        if (t, name) in allowed:
+            return allowed[(t, name)]
         if (t, name) in fks:
             ref, refcol = fks[(t, name)]
             r = q(f'SELECT "{refcol}" FROM "{ref}" ORDER BY "{refcol}" DESC LIMIT 1')
