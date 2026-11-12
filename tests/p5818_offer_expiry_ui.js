@@ -78,7 +78,7 @@ const day = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.ge
   check(await until(() => !d.querySelector('.ofe-note'), 60), '"Mark as rejected" -> the note is gone');
 
   // ================= the bell's entry as text
-  const nt = x => w.eval(`newsText({kind: 'offerexp', data: ${JSON.stringify(x)}, actors: []}, {})`);
+  const nt = x => w.eval(`newsText({kind: 'offerexp', data: ${JSON.stringify(x)}, actors: []}, {})`).replace(/<[^>]+>/g, '');  // the names stand in <b>
   check(/Quotation AN-7, Nordlicht Studio GmbH has expired without an answer/.test(nt({state: 'gone', number: 'AN-7', client: 'Nordlicht Studio GmbH'})), 'the bell: "has expired": ' + nt({state: 'gone', number: 'AN-7', client: 'Nordlicht Studio GmbH'}));
   check(/expires in 3 days/.test(nt({state: 'soon', days: 3, number: 'AN-8'})) && /expires today/.test(nt({state: 'soon', days: 0, number: 'AN-9'})), 'the bell: "expires in 3 days" / "expires today"');
   check(/quotation/.test(w.eval(`newsSummaryLine({items: [[{kind: 'offerexp', count: 1}, 0]]})`)), 'the bundle line names quotations, not the raw kind');
