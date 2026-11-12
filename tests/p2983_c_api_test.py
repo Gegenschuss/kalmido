@@ -121,12 +121,17 @@ LF = F.post(B + "/api/lists", json={"name": "Shoot plan", "kind": "project", "fo
 r = F.put(B + "/api/folders/people", json={"folder": "Clients", "email": "uma.new@example.com", "role": "edit"})
 r2 = F.put(B + "/api/folders/people", json={"folder": "Clients", "email": "nobody@example.com", "role": "edit"})
 check(r.ok and r2.ok and r.json() == r2.json(), f"#5669: a list folder by an unproved address: the same answer as for an unknown one {r.text[:160]}")
-check(not sees(U, LF), "#5669: ... and uma does NOT see the list in the folder")
+check(r.json() == {"shared": 0, "updated": 0, "by_email": True} and not sees(U, LF)
+      and not dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (LF, UID)), "#5669: ... and uma does NOT see the list in the folder")
 dbx("UPDATE users SET email_proved='uma.new@example.com' WHERE id=?", (UID,))  # (a mailed link or a verified OIDC claim)
 r = F.put(B + f"/api/lists/{LS}/members", json={"email": "UMA.new@example.com ", "role": "edit"})
 check(r.ok and sees(U, LS), f"#5669: proved: the list shared by address reaches uma (case and blanks do not matter) {r.text[:120]}")
 r = F.put(B + "/api/folders/people", json={"folder": "Clients", "email": "uma.new@example.com", "role": "edit"})
 check(r.ok and sees(U, LF), f"#5669: proved: the folder shared by address reaches uma {r.text[:120]}")
+# review: an address with a stray user_id is still the address path (the answer of an unknown address, nothing more)
+assert F.post(B + "/api/lists", json={"name": "Contact sheet", "kind": "project", "folder": "Prints"}).ok  # (a list refuses a stray user_id: 400)
+r = F.put(B + "/api/folders/people", json={"folder": "Prints", "email": "uma.new@example.com", "user_id": "x", "role": "edit"})
+check(r.json() == {"shared": 0, "updated": 0, "by_email": True}, f"#5669 review: folder by address + stray user_id: the address answer {r.text[:160]}")
 
 # ================================================================ #3915: status changes reach a watching agent
 

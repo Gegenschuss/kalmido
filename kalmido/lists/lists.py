@@ -988,7 +988,8 @@ def member_set(lid):
     except (TypeError, ValueError):
         uid = 0
     from ..accounts.orgs import may_see
-    if b.get("email") and not uid:  # 2.22.0 (#752): share by e-mail address (mode "own contacts": no directory). The answer
+    by_mail = bool(b.get("email")) and not uid  # 2.1001.0 (#5669 review): one test for the address path ({email, user_id: "x"} too)
+    if by_mail:  # 2.22.0 (#752): share by e-mail address (mode "own contacts": no directory). The answer
         # never says whether the address has an account
         # 2.1001.0 (#5669): only an account that proved the address (addr_account, like tables and wiki); an address nobody
         # proved is answered like an unknown one (lists keep no open address share)
@@ -1014,7 +1015,7 @@ def member_set(lid):
         return jsonify(error=p, code="list_e2e_member"), 409
     from ..accounts.orgs import ws_check_member
     ws_check_member(c, lid, uid)  # 2.28.0 (#935): an organisation's list only inside it, agents only in their workspace (409)
-    if not (b.get("email") and not b.get("user_id")):  # 2.30.0 (#919): no agent bridge between lists with different people
+    if not by_mail:  # 2.30.0 (#919): no agent bridge between lists with different people
         from ..agents.safety import bridge_check  # (by e-mail address: skipped silently above, it must not reveal an account)
         bridge_check(c, lid, uid, ok=b.get("bridge_ok") is True)
     if is_kid(c, uid):  # 2.19.0 (#653): a kid only ever takes part (sees what is assigned to it / where it comes along)
@@ -1053,10 +1054,9 @@ def member_set(lid):
     pend = [r[0] for r in c.execute("SELECT user_id FROM list_key_pending WHERE list_id=? AND user_id=?", (lid, uid))]  # 2.64.1 (#1817)
     bump(c)
     c.commit()
-    by_mail = b.get("email") and not b.get("user_id")
     from ..lists.membermemo import mm_offer
     offer = None if by_mail or old else mm_offer(c, lid, uid)  # 2.550.0 (#4528): added again -> what their removal ended (never by address)
-    return jsonify(ok=True, **({"by_email": True} if by_mail else {}), **({"e2e_pending": pend} if pend else {}),
+    return jsonify(ok=True, **({"by_email": True} if by_mail else {}), **({"e2e_pending": pend} if pend and not by_mail else {}),
                    **({"restore_offer": offer} if offer else {}))
 
 
@@ -1230,7 +1230,8 @@ def folder_people_put():
     except (TypeError, ValueError):
         uid = 0
     from ..accounts.orgs import may_see
-    if b.get("email") and not uid:  # 2.41.0 (#1423): share the folder by e-mail address, like a list (never says whether it has an account)
+    by_mail = bool(b.get("email")) and not uid  # 2.1001.0 (#5669 review): one test for the address path
+    if by_mail:  # 2.41.0 (#1423): share the folder by e-mail address, like a list (never says whether it has an account)
         r = addr_account(c, b["email"])  # 2.1001.0 (#5669): only a proved address, an unproved one is answered like an unknown one
         r = (r,) if r else None
         if not r or r[0] == me():
@@ -1273,7 +1274,7 @@ def folder_people_put():
     skipped = [{"id": r["id"], "name": r["name"]} for r in rows if r["id"] not in now]
     bump(c)
     c.commit()
-    if b.get("email") and not b.get("user_id"):  # 2.41.0 (#1423): the same answer as for an unknown address
+    if by_mail:  # 2.41.0 (#1423): the same answer as for an unknown address
         return jsonify(shared=0, updated=0, by_email=True)
     return jsonify(shared=n, updated=upd, **({"skipped": skipped, "skipped_reason": tr("Not possible")} if skipped else {}))
 
