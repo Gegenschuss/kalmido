@@ -18,6 +18,7 @@ The index is built once, on first use, from HELP_DIR (the docs folder next to ap
 docs/ is never read.
 """
 import glob
+import hashlib
 import math
 import os
 import re
@@ -55,6 +56,14 @@ _FENCE = re.compile(r"^\s*(```|~~~)")
 _HEAD = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
 _BOLD_LINE = re.compile(r"^\*\*([^*]{2,80})\*\*\s*$")   # docs/FEATURES.md: an area as a bold line ("**Projects**")
 _WORD = re.compile(r"[a-z0-9]+")
+# 2.1072.0 (#5820): the user's help -- a "## How to: ..." section with <!-- user-help: <area> --> right below its heading
+# (optional <!-- show: <target> --> = a named place of docs/help-targets.json); its translations in docs/help/<lang>.md, one
+# block per section: <!-- help: <key> src=<hlp_src of the English text> --> + "## <title>" + the text
+HELP_TR_DIR = os.path.join(HELP_DIR, "help")
+HELP_AREAS = ("files", "agents", "office", "tasks", "calendar")  # the order of the help view; a new area joins here
+_UH = re.compile(r"^<!--\s*user-help:\s*([a-z-]+)\s*-->\s*$")
+_SHOW = re.compile(r"^<!--\s*show:\s*([a-z0-9.-]+)\s*-->\s*$")
+_TRB = re.compile(r"^<!--\s*help:\s*(\S+)\s+src=([0-9a-f]+)\s*-->\s*$")
 
 
 def hlp_fold(s):
@@ -114,6 +123,64 @@ def _hlp_parse(fkey, fname, text):
     return lines, out
 
 
+def _hlp_mark(s, lines):
+    """2.1072.0 (#5820): a user's section: s["user"] = its area, s["show"] = its named place (the comment lines right below
+    the heading)."""
+    for ln in lines[s["start"] + 1:min(s["own_end"], s["start"] + 4)]:
+        m, w = _UH.match(ln.strip()), _SHOW.match(ln.strip())
+        if m:
+            s["user"] = m.group(1)
+        elif w:
+            s["show"] = w.group(1)
+        elif ln.strip():
+            break
+
+
+def hlp_user_text(lines, s):
+    """The text of a user's section without its heading and its marker comments (Markdown)."""
+    body = [ln for ln in lines[s["start"] + 1:s["own_end"]] if not (_UH.match(ln.strip()) or _SHOW.match(ln.strip()))]
+    return "\n".join(body).strip("\n")
+
+
+def hlp_src(lines, s):
+    """The short fingerprint of a user's section's English title + text: a translation names it (src=), so a changed English
+    text shows (tools/check_userhelp.py)."""
+    text = s["title"] + "\n" + hlp_user_text(lines, s)
+    return hashlib.sha1(re.sub(r"\s+", " ", text).strip().encode("utf-8")).hexdigest()[:10]
+
+
+def hlp_tr_parse(text):
+    """docs/help/<lang>.md -> {key: {src, title, text}}."""
+    out, cur = {}, None
+    for ln in text.split("\n"):
+        m = _TRB.match(ln.strip())
+        if m:
+            cur = out[m.group(1)] = {"src": m.group(2), "title": "", "lines": []}
+            continue
+        if cur is None:
+            continue
+        h = _HEAD.match(ln)
+        if h and not cur["title"] and not "".join(cur["lines"]).strip():
+            cur["title"] = md_plain(h.group(2).strip())
+            continue
+        cur["lines"].append(ln)
+    return {k: {"src": v["src"], "title": v["title"], "text": "\n".join(v.pop("lines")).strip("\n")} for k, v in out.items()}
+
+
+def hlp_tr_load():
+    out = {}
+    for fn in sorted(glob.glob(os.path.join(HELP_TR_DIR, "*.md"))):
+        lg = os.path.basename(fn)[:-3]
+        if lg not in LANGS or lg == "en":
+            continue
+        try:
+            with open(fn, encoding="utf-8") as f:
+                out[lg] = hlp_tr_parse(f.read())
+        except (OSError, UnicodeDecodeError):
+            continue
+    return out
+
+
 def hlp_index():
     """{"files": {fkey: {file, title, lines, sections}}, "by_key": {key: section}, "units": [...], "vocab": set} -- built once."""
     if _HELP["idx"] is not None:
@@ -122,6 +189,7 @@ def hlp_index():
         if _HELP["idx"] is not None:
             return _HELP["idx"]
         files, by_key, units, vocab = {}, {}, [], set()
+        trs = hlp_tr_load()  # 2.1072.0 (#5820): {lang: {key: {src, title, text}}}
         for fn in sorted(glob.glob(os.path.join(HELP_DIR, "*.md"))):
             fname = os.path.basename(fn)
             fkey = hlp_slug(fname[:-3])
@@ -135,15 +203,25 @@ def hlp_index():
                            "operator": fkey not in HELP_PUBLIC}
             for s in secs:
                 by_key[s["key"]] = s
+                _hlp_mark(s, lines)  # 2.1072.0 (#5820)
                 body = "\n".join(lines[s["start"] + 1:s["own_end"]])
                 words = {}
                 for w in _WORD.findall(hlp_fold(body)):
                     words[w] = words.get(w, 0) + 1
                 head = set(_WORD.findall(hlp_fold(" ".join(s["path"]))))
+                own = set(_WORD.findall(hlp_fold(s["title"])))
+                if s.get("user"):  # 2.1072.0 (#5820): a question in the person's language finds the section too
+                    for t in trs.values():
+                        x = t.get(s["key"])
+                        if x:
+                            for w in _WORD.findall(hlp_fold(x["text"])):
+                                words[w] = words.get(w, 0) + 1
+                            own |= set(_WORD.findall(hlp_fold(x["title"])))
+                    head |= own
                 vocab.update(words)
                 vocab.update(head)
-                units.append({"s": s, "words": words, "head": head, "own": set(_WORD.findall(hlp_fold(s["title"]))), "body": body})
-        _HELP["idx"] = {"files": files, "by_key": by_key, "units": units, "vocab": vocab}
+                units.append({"s": s, "words": words, "head": head, "own": own, "body": body})
+        _HELP["idx"] = {"files": files, "by_key": by_key, "units": units, "vocab": vocab, "tr": trs}
         return _HELP["idx"]
 
 
@@ -180,7 +258,7 @@ def _hlp_snippet(body, words):
     return ("…" if a else "") + s + ("…" if a + HELP_SNIP < len(plain) else "")
 
 
-def hlp_search(q, n=HELP_HITS, admin=False):
+def hlp_search(q, n=HELP_HITS, admin=False, user_only=False):
     """The best n sections for the words of q: [{key, file, title, path, snippet}]. Each word matches word beginnings; a
     section needs most of the words (all of one or two), ranked by how many words it has, then by weight: a rare word
     counts more than a common one (task, project), the section's own heading more than the headings above it and the text."""
@@ -190,7 +268,7 @@ def hlp_search(q, n=HELP_HITS, admin=False):
         return []
     need = len(terms) if len(terms) <= 2 else math.ceil(len(terms) * 0.6)
     match = {t: {w for w in idx["vocab"] if w.startswith(t)} for t in terms}
-    units = [u for u in idx["units"] if _hlp_open(u["s"], admin)]
+    units = [u for u in idx["units"] if _hlp_open(u["s"], admin) and (not user_only or u["s"].get("user"))]
     idf = {t: math.log(1 + len(units) / (1 + sum(1 for u in units if (u["head"] & match[t]) or not match[t].isdisjoint(u["words"]))))
            for t in terms}
     ranked = []
@@ -206,10 +284,11 @@ def hlp_search(q, n=HELP_HITS, admin=False):
             words += tw or list(hw)
         if got >= need:
             score /= 1 + 0.5 * max(0.0, math.log(max(1, len(u["body"])) / 3000))  # a long section (a whole route table) weighs less
-            ranked.append((-got, -score, u["s"]["level"], u["s"]["key"], u, words))
-    ranked.sort(key=lambda x: x[:4])
+            ranked.append((0 if u["s"].get("user") else 1, -got, -score, u["s"]["level"], u["s"]["key"], u, words))  # 2.1072.0 (#5820): the user's sections first
+    ranked.sort(key=lambda x: x[:5])
     return [{"key": u["s"]["key"], "file": u["s"]["file"], "title": u["s"]["title"], "path": u["s"]["path"],
-             "snippet": _hlp_snippet(u["body"], words)} for *_, u, words in ranked[:n]]
+             "snippet": _hlp_snippet(u["body"], words), **({"user": u["s"]["user"]} if u["s"].get("user") else {})}
+            for *_, u, words in ranked[:n]]
 
 
 def hlp_ui_terms(text, lg):
@@ -246,9 +325,15 @@ def hlp_section(key, admin=False, lg="en"):
         text += ln + "\n"
     parts = [{"key": x["key"], "title": x["title"]} for x in idx["files"][s["fkey"]]["sections"]
              if s["start"] < x["start"] < s["end"] and x["level"] == s["level"] + 1] if cut else []
-    return {"key": s["key"], "file": s["file"], "title": s["title"], "path": s["path"], "text": text.rstrip("\n"),
-            "truncated": cut, "parts": parts, "ui_terms": hlp_ui_terms(text, lg),
-            "show": shw_keys_in(text)}  # 2.1072.0 (#5860): the places this section marks (<!-- show: key -->) for send_chat show
+    out = {"key": s["key"], "file": s["file"], "title": s["title"], "path": s["path"], "text": text.rstrip("\n"),
+           "truncated": cut, "parts": parts, "ui_terms": hlp_ui_terms(text, lg),
+           "show": shw_keys_in(text)}  # 2.1072.0 (#5860): the places this section marks (<!-- show: key -->) for send_chat show
+    if s.get("user"):  # 2.1072.0 (#5820): a user's section: its area and the same text in the person's language
+        out["user"] = s["user"]
+        t = idx["tr"].get(lg, {}).get(s["key"])
+        if t:
+            out["translated"] = {"lang": lg, "title": t["title"], "text": t["text"]}
+    return out
 
 
 def _hlp_short(item):
@@ -276,7 +361,9 @@ def hlp_overview(admin=False):
             "show_targets": shw_list(),  # 2.1072.0 (#5860): the named places of "Show me" (agents/showme.py)
             "how": "search_help (GET /search?kind=help&q=) finds sections; read_help (GET /help/section?key=) reads one. "
                    "The documentation is English; explain a path in the words of the person's interface (ui_terms of a section). "
-                   "Add the places of the way as send_chat show: [{target, text}] (keys of show_targets) - the person gets 'Show me'."}
+                   "Add the places of the way as send_chat show: [{target, text}] (keys of show_targets) - the person gets 'Show me'. "
+                   "Hits with user (an area) are the how-tos people see in the app's Help, listed first: their click paths "
+                   "are checked against the interface; read_help adds translated (the same text in lang)."}
 
 
 def v1_help_search():

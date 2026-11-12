@@ -3277,3 +3277,43 @@ checked the same way (download the PDF / XML of a finalised invoice and pass it 
 
 More national e-invoice formats are welcome as pull requests with an official validator run in CI; see
 [CONTRIBUTING.md](../CONTRIBUTING.md), *Contributing national e-invoice formats*.
+
+## How to: Write a quotation
+<!-- user-help: office -->
+<!-- show: office.quotations -->
+
+1. Open **Office** > **Quotations** and select **New quotation**. The draft opens at once.
+2. Pick the **Client**.
+3. Add lines with **Add service** - from your list of services, or as a free line.
+4. When it is ready, select **Finalise**. From now on number, lines and amounts can no longer change.
+5. Select **Send** to e-mail it, or **Download PDF**.
+
+What happens then: the quotation is in the list. Mark it as sent, and later as **Accepted** or rejected - an accepted
+quotation is one step away from the invoice. A draft can be looked at with **Preview** (marked DRAFT).
+
+## How to: Turn a quotation into an invoice
+<!-- user-help: office -->
+<!-- show: office.invoices -->
+
+1. Open the accepted quotation and select **Create invoice**.
+2. Choose the **Type of invoice** (full, partial or final invoice) and confirm.
+3. Check the invoice, select **Finalise** and then **Send**.
+
+An invoice without a quotation: **Office** > **Invoices** > **New invoice**, then an empty invoice, one from time entries or
+one from a quotation.
+
+What happens then: the invoice gets its number when you finalise it - without gaps. It stays open until a payment is
+recorded.
+
+## How to: Record a payment
+<!-- user-help: office -->
+<!-- show: office.payment -->
+
+1. Open the finalised invoice and select **Record payment**.
+2. Check the date and the amount and select **Record**.
+
+Or let the bank statement do it: **Office** > **Bank** > **Import bank statement**, then **Take over** the suggestion that
+matches the invoice.
+
+What happens then: the invoice shows as paid (or partly paid with the amount still open). Only an admin of the organisation
+records payments.

@@ -248,6 +248,7 @@ ORDER = (
     "lists.orgvis",  # 2.46.0 (#1603): organisation lists visible to the whole organisation
     "api.scopes",
     "api.helpdocs",  # 2.1067.0 (#5819): the help (docs/*.md) for agents: search kind help, GET /api/v1/help(/section)
+    "api.helpuser",  # 2.1072.0 (#5820): the help for people in the app: GET /api/help(/section), the web side of search kind help
     "api.v1setup",  # 2.391.0 (#3362): webhooks, API tokens, repository connections through /api/v1 (after git, gitbuild, webhooks, api.v1, api.scopes)
     "collab.notes",
     "wiki.pages",  # 2.49.0 C (#1199): knowledge pages

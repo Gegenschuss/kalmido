@@ -292,3 +292,40 @@ notes of one project it lands in that project; otherwise (the **Notes** area in 
 lands in your private list *Notes*, which only you see. Sharing such a note means moving it into a project; Kalmido first
 says who will see it there. The Notes area shows the notes of all projects of the shown workspace plus your private ones,
 pinned first, with a filter by project and a search in title and text.
+
+## How to: Add a task with a date
+<!-- user-help: tasks -->
+<!-- show: tasks.add -->
+
+1. Click into **Add task…** at the bottom of a project (on the phone: the + button).
+2. Type the task the way you think, for example "Call the dentist tomorrow 3pm". Words like today and tomorrow become the
+   date; or pick it with the date chip.
+3. Press Enter.
+
+What happens then: the task lands in the open project (or in the **Basket**) with its date and shows up in **Today** on that
+day. To change the date later, open the task and click its date: **Today**, **Tomorrow**, **Next week** or a day in the
+calendar.
+
+## How to: Make a task repeat
+<!-- user-help: tasks -->
+<!-- show: tasks.repeat -->
+
+A recurring task comes back by itself - every day, every week or by your own rule.
+
+1. Open the task and click its date.
+2. Choose under **Repeat**, for example **Daily**, weekly or monthly - or **Custom…** for your own rule.
+3. Select **Done**.
+
+What happens then: when you complete the task, the next one appears with the next date. You can also type it right away,
+for example "Water the plants every monday".
+
+## How to: Assign a task or share a project
+<!-- user-help: tasks -->
+<!-- show: tasks.share -->
+
+1. To share the project: open its menu (⋯) > **Share…**, pick the person under **Share with …**, a role (for example
+   **Member**) and select **Add**.
+2. To assign a task: open the task, click **Assign** and pick the person.
+
+What happens then: the person sees the project and gets the task in their own list. Only people who are in the project can
+be assigned.

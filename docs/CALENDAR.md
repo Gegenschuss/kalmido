@@ -135,3 +135,36 @@ moves the task on as in the app), reminders (`VALARM`) and the link. Everything 
 unchanged. Viewers get read-only projects, participants only their tasks; deleting moves to the trash; changes show "via
 CalDAV" in the history. Behind a login proxy, `/dav` and `/.well-known/caldav` must bypass the login (see *Reverse
 proxy*). Details, the mapping table and proxy examples (Caddy, Authelia, nginx, Traefik): [docs/CALDAV.md](CALDAV.md).
+
+## How to: Create an event
+<!-- user-help: calendar -->
+<!-- show: calendar.new-event -->
+
+1. Open **Calendar** and select **Event** (on the phone: the + button). Or drag over free time in the week or day view.
+2. Fill in the **Title**, when it **Starts** and **Ends**, and if needed **Repeat** and reminders.
+3. Select **Save**.
+
+What happens then: the event is in the calendar and on your phone, if the phone is connected (see "Show Kalmido on your
+phone").
+
+## How to: Subscribe to another calendar
+<!-- user-help: calendar -->
+<!-- show: calendar.subscribe -->
+
+1. Open **Calendar** > **Calendars** > **Subscriptions…** (or **Settings** > **Integrations** > **Calendars**).
+2. Select **Add calendar**.
+3. Paste the calendar's link (Google, iCloud and Outlook offer one) and select **Add**. For a calendar account choose
+   **CalDAV account** and **Find calendars** instead.
+
+What happens then: its events show in your calendar and in Today, read-only and visible only to you; Kalmido refreshes them
+regularly.
+
+## How to: Show Kalmido on your phone
+<!-- user-help: calendar -->
+<!-- show: calendar.phone -->
+
+1. Open **Calendar** > **Calendars** > **On the phone…** (or **Settings** > **Integrations** > **Calendar apps (CalDAV)**).
+2. Select **New app password** and copy the server address, user name and password into your phone's calendar settings.
+
+What happens then: your events and tasks with a date appear in the phone's calendar and changes go both ways. Use the app
+password there, never your Kalmido password.

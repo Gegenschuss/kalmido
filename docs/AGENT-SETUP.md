@@ -1169,3 +1169,44 @@ them with the right people.
 - **Every tool call is refused**: `defaultMode` is `dontAsk`; the tool must be in `allow` (`mcp__kalmido` covers all
   Kalmido tools).
 - **Nothing in *Usage***: the Stop hook runs only in sessions started in `~/agent`; test it with `--dry-run`.
+
+## How to: Create your personal agent
+<!-- user-help: agents -->
+<!-- show: agents.setup -->
+
+An agent is an assistant (for example Claude) that works in Kalmido with its own account and only sees what you share with it.
+
+1. Open **Settings** > **Agents** and the tab **Set up**.
+2. Under **Your personal agents** fill in the **Display name** and the other two fields, then select **Create agent**.
+3. In the window that opens, pick your **Computer** and the **Project folder** and select **Create command**.
+4. Select **Copy**, open the Terminal on that computer, paste the command and press Enter. Then select **Done**.
+
+What happens then: the agent appears under **Your personal agents**. It sees nothing yet - give it a project or a folder (see
+"Give an agent access to a project or folder"). The command works once and only for a few minutes; **Set up** in the agent's
+row makes a new one.
+
+## How to: Give an agent access to a project or folder
+<!-- user-help: agents -->
+<!-- show: agents.share-project -->
+
+A project:
+
+1. Open the project's menu (⋯) and select **Agent…**.
+2. Under **Agents**, pick the agent and confirm with **Share**.
+
+A folder in Files or Knowledge:
+
+1. Open the folder's menu (⋯) and select **Share…**.
+2. Under **Share with …** pick the agent, choose **Can view** or **Can edit**, select **Add** and then **Done**.
+
+What happens then: the agent works in that project or folder - and only there. Each access by an agent is listed in the
+folder's history; a locked folder can never be shared with an agent.
+
+## How to: Approve what an agent asks for
+<!-- user-help: agents -->
+<!-- show: agents.waiting -->
+
+1. When an agent needs your yes, a card "… waits for you" appears (in Today and in the Agents area).
+2. Select **Approve** or **Reject**. For a proposal, select **Review the proposal** first and look at the changes.
+
+What happens then: the agent goes on with what you approved; a rejected step does not happen.

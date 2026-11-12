@@ -52,3 +52,41 @@ answers with the summary. Kalmido calls no language model itself; undo removes t
 - **Office rights**: a client's invoicing fields belong to *Quotes & invoices*, sets / roles / crew to *Equipment*; "own entries only" covers times to bill and own reports; agents need the area *Receipts* for an organisation's receipts (#2735).
 - **Pictures**: the bot figure's antenna sways gently at rest; profile pictures come as ten people for users and ten bots
   for agents (#2673 #2674 #2675).
+
+## How to: Set up a scan inbox
+<!-- user-help: files -->
+<!-- show: files.scan-inbox -->
+
+A scan inbox sends new scans from a folder on your computer (or from your scanner) straight into your documents.
+
+1. Open **Settings** > **Integrations** and scroll to **Documents: inboxes**.
+2. Under **Folder watcher**, download the program for your computer (Mac or Windows).
+3. Open **New scan inbox**, give it a **Name**, pick the folder under **Into folder** and select **Create inbox**.
+4. Kalmido shows a **Setup code** only this once. Select **Copy**, start the program, paste the code and choose the folder to watch.
+
+What happens then: every new file in that folder is uploaded, read and sorted into your documents; the program moves it into
+the subfolder "Uploaded". You find the inbox again in the same place, where you can change its folder, extend it by a year or
+revoke it. Only you create a scan inbox, never an agent.
+
+## How to: Add documents and find them again
+<!-- user-help: files -->
+<!-- show: files.documents -->
+
+1. Open **Files** > **Documents**.
+2. Select **Add documents** and choose PDFs or photos, or drop them onto the page. On the phone, **Scan** takes a photo of a
+   letter.
+3. Type a word into **Search in the documents…** - the search also finds words inside the letters.
+
+What happens then: Kalmido reads each document and fills in the date, amount and sender. Whatever it is unsure about waits in
+**To review**: open it, correct what is wrong and select **Checked** (or **Accept all** for the suggestions).
+
+## How to: Share a folder
+<!-- user-help: files -->
+<!-- show: files.share -->
+
+1. Open **Files** and the **More** menu (⋯) of the folder, then **Share…**.
+2. Under **Share with …** pick a person, a group or an agent.
+3. Choose **Can view** or **Can edit** and select **Add**, then **Done**.
+
+What happens then: the person sees the folder and everything in it, also what is added later. The folder shows who it is
+shared with. Only the owner of a folder can share it.
