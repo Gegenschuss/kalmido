@@ -18,7 +18,7 @@ from flask import jsonify
 from ..core.config import app
 from ..core.db import body, bump, db, iso, parse_iso
 from ..core.access import Denied, acx_of, live_sql
-from ..core.objcomments import OCM_TS, ocm_add, ocm_edit, ocm_kind, ocm_restore, ocm_trash  # 2.981.0 (#5273): the comments' core
+from ..core.objcomments import OCM_TS_S, ocm_add, ocm_edit, ocm_kind, ocm_restore, ocm_trash  # 2.981.0 (#5273): the comments' core
 from ..core.errors import BadInput  # 2.981.0 (#5273)
 from ..core.i18n import tr
 from ..accounts.session import me
@@ -31,7 +31,8 @@ DN_PER_DOC = 500         # notes of one document at most
 CTX = "doc_notes.text"
 DN_KIND = "doc_note"  # 2.981.0 (#5273): the kind of obj_comments
 DN_COLS = (f"id, ref_id AS node_id, user_id, ext_name AS author, body AS text, COALESCE(extra->>'source', '') AS source, "
-           f"to_char(created_at AT TIME ZONE 'UTC', '{OCM_TS}') AS created_at")  # the old columns of doc_notes (exports read them too)
+           f"to_char(created_at AT TIME ZONE 'UTC', '{OCM_TS_S}') AS created_at")  # the old columns of doc_notes (exports read them too)
+# 2.1003.0 (#5721): the time in the old form of doc_notes, in seconds (no milliseconds as the task comments' OCM_TS)
 
 
 def dn_rows(c, nids):

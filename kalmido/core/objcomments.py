@@ -70,6 +70,7 @@ OCM_KINDS = ("task", "video", "doc_note", "tchat")  # 2.981.0 (#5273, stage Q4b)
 OCM_MENTION_RE = re.compile(r"<@(\d+)>")  # THE mention token (was MENTION_RE in collab/comments.py, replies.py, ...)
 OCM_MAX = 10000  # characters of a comment (a ciphertext may be longer: the kind's hook text_max)
 OCM_TS = 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00:00"'  # the old ISO form with milliseconds (core/db.py iso_ms)
+OCM_TS_S = 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'  # 2.1003.0 (#5721): the old ISO form in seconds (core/db.py iso) -- doc_notes had it
 OCM_EXTRA = ("suggestion", "choices", "choice", "portal", "rule_name", "source")  # the keys of a task's extra (+ #5273: a note's source)
 OCM_DEL_TXT = N_("Only the author or the project owner can delete this comment")
 OCM_EDIT_TXT = N_("Only the author can edit this comment")
@@ -142,7 +143,7 @@ def ocm_note_cols(a="obj_comments"):
     doc_notes: node_id, author (the name it came with), text (sealed), source, ws (the document's workspace, its key)."""
     p = f"{a}."
     return (f"{p}id, {p}org_id, {p}ref_id AS node_id, {p}user_id, COALESCE({p}ext_name, '') AS author, {p}body AS text, "
-            f"COALESCE({p}extra->>'source', '') AS source, to_char({p}created_at AT TIME ZONE 'UTC', '{OCM_TS}') AS created_at, "
+            f"COALESCE({p}extra->>'source', '') AS source, to_char({p}created_at AT TIME ZONE 'UTC', '{OCM_TS_S}') AS created_at, "
             f"(SELECT m.ws FROM doc_meta m WHERE m.node_id = {p}ref_id) AS ws")
 
 
