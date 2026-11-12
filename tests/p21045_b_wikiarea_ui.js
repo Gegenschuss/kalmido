@@ -33,6 +33,7 @@ const FEAT = 'cal,comments,collab,wiki,files';
   check(ag.http === 201 && P1 > 0 && P2 > 0 && root && priv, 'setup: agent, pages, tree');
 
   const w = await boot({user: 'alice', hash: 'wiki/s/private'}), d = w.document;
+  w.__dialogs = 'manual';  // the questions are answered by this test itself (tests/boot.js dialogBridge)
   const pick = t => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(b => b.textContent.trim().startsWith(t));
   const yes = () => [...d.querySelectorAll('.cdlg [data-cd="yes"]')].pop();
   (await until(() => d.querySelector('#view [data-wk="amenu"]')))?.click();
