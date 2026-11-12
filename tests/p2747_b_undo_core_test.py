@@ -125,7 +125,8 @@ G3 = g3[2]["id"]
 # ---------------------------------------------------------------- only the own steps (tenant-matrix: undo)
 check(items(Ol) == [] and items(A) == [], "olga and alice list nothing of bob's")
 check(Ol.post(B + f"/api/undo/to/{G1}").status_code == 404 and A.post(B + f"/api/undo/to/{G1}").status_code == 404
-      and Ol.post(B + f"/api/undo/{G1}/redo").status_code == 404 and get(Bo, O1)["note"] == "n2", "another person's group: 404 on undo / redo, nothing written")
+      and Ol.post(B + f"/api/undo/{G1}/redo").status_code == 404 and Ol.post(B + f"/api/undo/{G1}/undo").status_code == 404  # 2.1041.0 (#5858): /<id>/undo too
+      and get(Bo, O1)["note"] == "n2", "another person's group: 404 on undo / redo, nothing written")
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
 AG = agent(A, "undobot", ORG)
 r = requests.get(B + "/api/undo", headers=AG.h, timeout=30)
