@@ -13,7 +13,7 @@ import secrets
 import sys
 
 import kt
-from kt import B, FAILS, OKS, check, sess  # noqa: F401
+from kt import B, FAILS, OKS, check, sess, dbx  # noqa: F401
 from freelancer_fixture import freelancer, org_join
 
 kt.fresh()
@@ -85,6 +85,7 @@ check(r.status_code == 409, f"#2924: the same workspace = 409 {r.status_code}")
 
 # a private project shared with frida (no member of the organisation) cannot go into it: block, named
 P = new_list(A, "Garden party")
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 check(A.put(B + f"/api/lists/{P}/members", json={"email": "frida@example.com", "role": "edit"}).ok, "setup: frida is in alice's private project")
 r = dry(A, P, f"org:{ORG}")
 check(r.ok and "frida" in (r.json().get("block") or "").lower(), f"#2924: a member outside the organisation blocks the dry run {r.text[:200]}")

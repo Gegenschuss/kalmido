@@ -83,6 +83,7 @@ OPEN = new_list(A, "Open to all", ORG)
 sql("UPDATE lists SET org_visibility='org', org_edit=1 WHERE id=?", OPEN)
 SHUT = new_list(A, "Closed", ORG)
 for lid in (OPEN, SHUT):  # the membership ends with leaving; the open list still shows its tasks afterwards
+    dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
     assert A.put(B + f"/api/lists/{lid}/members", json={"email": "bob@example.com", "role": "edit"}).ok
 T1, T2, T3, T4 = new_task(A, OPEN, "Mine again"), new_task(A, OPEN, "Taken over"), new_task(A, SHUT, "Closed list"), new_task(A, OPEN, "Deleted since")
 for t in (T1, T2, T3, T4):

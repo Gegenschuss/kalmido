@@ -118,6 +118,7 @@ PL = A.post(B + "/api/lists", json={"name": "Private", "org_id": None}).json()["
 GINA = db("SELECT id FROM users WHERE username='gina'")[0][0]
 check(A.put(B + f"/api/lists/{PL}/members", json={"user_id": GINA, "role": "edit"}).status_code == 404, "#1592: no sharing by id across the boundary")
 A.patch(B + f"/api/users/{GINA}", json={"email": "gina@example.com"})
+dbx.connect(DATA).execute("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 r1 = A.put(B + f"/api/lists/{PL}/members", json={"email": "gina@example.com", "role": "edit"})
 r2 = A.put(B + f"/api/lists/{PL}/members", json={"email": "nobody@example.com", "role": "edit"})
 check(r1.json() == r2.json() == {"ok": True, "by_email": True} and PL in {l["id"] for l in Gi.get(B + "/api/state").json()["lists"]},

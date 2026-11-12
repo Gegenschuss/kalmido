@@ -24,7 +24,7 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kt  # noqa: E402
-from kt import B, CT, check, sess  # noqa: E402
+from kt import B, CT, check, sess, dbx  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 
 TIMING = re.compile(r'db;dur=[\d.]+;desc="n=(\d+)"')
@@ -132,6 +132,7 @@ check(j.get("full") is False and j.get("tasks") == [] and j.get("gone") == [], f
 moved("frida changes her task", lambda: ok(Fr.patch(B + f"/api/tasks/{FT}", json={"title": "Frida's task 2"})),
       ["frida"], ["alice", "bob", "dave", "carl"])
 moved("alice changes her private list", lambda: task(A, "Private", PL), ["alice"], ["bob", "dave", "carl", "frida"])
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 moved("alice shares the private list with frida", lambda: ok(A.put(B + f"/api/lists/{PL}/members", json={"email": "frida@example.com", "role": "edit"})),
       ["alice", "frida"], ["bob", "dave", "carl"])
 check(bool(kt.dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (PL, FID))), "setup: frida is a member of alice's private list")

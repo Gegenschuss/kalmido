@@ -211,6 +211,7 @@ check(Ol.get(B + f"/api/lists/{L1}/shares").status_code == 404 and Ol.get(B + f"
 FID, Fr = freelancer(B, A)
 FIO, Fi = freelancer(B, A, "fiona")
 PL = new_list(Fr, "Own studio", org=None)
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 r = Fr.put(B + f"/api/lists/{PL}/members", json={"email": "fiona@example.com", "role": "edit"})
 check(r.ok and sees(Fi, PL), "frida shares her private project with fiona by e-mail " + r.text[:160])
 r = Fr.delete(B + f"/api/lists/{PL}/members/{FIO}")

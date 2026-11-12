@@ -8,7 +8,7 @@ usage: p2273_b_move_test.py <datadir>"""
 import sys
 
 import kt
-from kt import B, FAILS, OKS, check, sess  # noqa: F401
+from kt import B, FAILS, OKS, check, sess, dbx  # noqa: F401
 from freelancer_fixture import freelancer, org_join
 
 kt.fresh()
@@ -45,6 +45,7 @@ def new_task(s, lid, title, **b):
 
 # ================================================================== #3042 a task to another list (freelancer, private <-> private)
 L1, L2, L3 = new_list(Fr, "Shared"), new_list(Fr, "Mine"), new_list(Fr, "Further")
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 assert Fr.put(B + f"/api/lists/{L1}/members", json={"email": "gina@example.com", "role": "edit"}).ok
 G = new_list(Gi, "Gina's")
 assert Gi.put(B + f"/api/lists/{G}/members", json={"email": "frida@example.com", "role": "edit"}).ok

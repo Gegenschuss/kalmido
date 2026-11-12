@@ -217,6 +217,7 @@ check(Fr.put(B + f"/api/agents/{FAG}/server", json={"api_key": KEY_FR}).ok, "fri
 check(Fr.get(B + f"/api/agents/{FAG}/server/team").status_code == 400, "a personal agent has no limits per member")
 check(Fr.put(B + f"/api/agents/{FAG}/server/team", json={"member_limit": {"period": "day", "hard": 10}}).status_code == 400, "... none to set")
 FL = Fr.post(B + "/api/lists", json={"name": "Frida and Gina"}).json()["id"]
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 check(Fr.put(B + f"/api/lists/{FL}/members", json={"email": "gina@example.com", "role": "edit"}).ok, "setup: frida shares a project with gina (by e-mail: not connected yet)")
 check(until(lambda: dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (FL, GID)), 10), "gina is in the project")
 check(Fr.put(B + f"/api/lists/{FL}/members", json={"user_id": FAG, "role": "edit"}).ok, "and with her agent")

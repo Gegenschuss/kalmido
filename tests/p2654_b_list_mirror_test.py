@@ -138,6 +138,7 @@ check(sees(S["carl"], L5) and S["carl"].post(B + "/api/tasks", json={"title": "l
 FID, Fr = freelancer(B, A)
 FIO, Fi = freelancer(B, A, "fiona")
 PL = new_list(Fr, "Own studio", org=None)
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 r = Fr.put(B + f"/api/lists/{PL}/members", json={"email": "fiona@example.com", "role": "edit", "expires_at": "2099-12-31"})
 check(r.ok and sees(Fi, PL) and core_row(PL, FIO), "frida shares her private project with fiona until 2099 " + r.text[:160])
 expire(PL, FIO)

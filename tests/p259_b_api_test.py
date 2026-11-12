@@ -304,6 +304,7 @@ check("Traceback" not in logs, "no traceback in the server log")
 # ================================================================== 2.59.0 (#1375): review - full visibility only
 # a participant sees the parent of an assigned subtask as context (title only): its related tasks = 404 like its notes
 LQ = A.post(B + "/api/lists", json={"name": "Desk"}).json()["id"]
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''", write=True)  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 r = A.put(B + f"/api/lists/{LQ}/members", json={"email": "dave@example.com", "role": "participant"})  # no directory: by address
 check(r.ok, "setup: alice's list shared with dave (participant) " + r.text[:120])
 TQ = task(A, "Invoice parent with secret notes", LQ, notes="secret parent notes")

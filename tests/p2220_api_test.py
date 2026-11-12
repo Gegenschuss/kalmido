@@ -537,6 +537,7 @@ check(Bo.put(B + f"/api/lists/{BL}/members", json={"user_id": ZOE, "role": "edit
 check(Bo.put(B + "/api/folders/people", json={"folder": "X", "user_id": ZOE}).status_code in (400, 404), "#752: … also a folder")
 check(Bo.post(B + "/api/events", json={"title": "Meet", "start": D(1) + "T10:00", "attendees": [{"user_id": ZOE}]}).status_code in (400, 409), "#752: … also as an attendee")
 check(A.put(B + "/api/admin/orgs/visibility", json={"mode": "contacts"}).status_code == 403, "#1592: no visibility switch")
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 r = Bo.put(B + f"/api/lists/{BL}/members", json={"email": "nobody@nowhere.test", "role": "edit"})
 r2 = Bo.put(B + f"/api/lists/{BL}/members", json={"email": "ZOE@other.test", "role": "edit"})
 check(r.ok and r2.ok and r.json() == r2.json() == {"ok": True, "by_email": True}, "#752: share by e-mail: the same answer whether or not the address has an account")

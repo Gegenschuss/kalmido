@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
 """2.983.0 part C (job/4103). Invented people and titles only, everyone a person without an organisation.
-freelancer-matrix: sheets, wiki, agents
+freelancer-matrix: sheets, wiki, agents, lists
  - #5643 (Fable 2.937 F9): a table / a wiki page shared by e-mail address goes to an account only when that account proved
    the address (users.email_proved); an address an admin typed in that nobody proved gets nothing (a table: the address row
    stays open and is taken at the next sign-in after the proof, shs_redeem; the wiki: answered like an unknown address);
    PATCH /api/me does not set an address at all
+ - 2.1001.0 (#5669): a list / a list folder shared by e-mail address goes the same way (core/access.py addr_account): an
+   address nobody proved is answered like an unknown one and binds nobody (lists keep no open address share)
  - #3915: an agent watching a task gets status_changed (completed / closed / reopened) with the task's content; nothing for
    its own completion, nothing from a member it is not open to (the agent gate), nothing once it stopped watching
 usage: p2983_c_api_test.py <datadir>      (KMT_NOSTART=1 / P2983C_NOSTART=1: a running server)"""
@@ -99,6 +101,32 @@ r = F.post(B + f"/api/sheets/{T1}/shares", json={"email": "uma@example.com", "ro
 check(r.status_code == 201 and not reads(U, T1), f"#5643 F1: sharing the old address again does not keep / raise uma's share {r.status_code}")
 rows = dbx("SELECT user_id FROM sheet_shares WHERE sheet_id=? AND email_key!=''", (T1,))  # uma's and nobody's address
 check(len(rows) == 2 and all(x[0] is None for x in rows), f"#5643 F1: ... the address row is open again {rows}")
+
+# ================================================================ 2.1001.0 (#5669): a list and a list folder by address
+
+
+def sees(s, lid):
+    return lid in {x["id"] for x in s.get(B + "/api/state").json()["lists"]}
+
+
+# uma.new@example.com is uma's address now, changed by the admin after the proof above: nobody proved it
+LS = F.post(B + "/api/lists", json={"name": "Moodboard for Uma", "kind": "project"}).json()["id"]
+r = F.put(B + f"/api/lists/{LS}/members", json={"email": "uma.new@example.com", "role": "edit"})
+r2 = F.put(B + f"/api/lists/{LS}/members", json={"email": "nobody@example.com", "role": "edit"})
+check(r.ok and r2.ok and r.json() == r2.json() == {"ok": True, "by_email": True},
+      f"#5669: a list by an unproved address: the same answer as for an unknown address {r.status_code} {r.text[:160]}")
+check(not dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (LS, UID)) and not sees(U, LS),
+      "#5669: an account whose address nobody proved does NOT become a member of the list")
+LF = F.post(B + "/api/lists", json={"name": "Shoot plan", "kind": "project", "folder": "Clients"}).json()["id"]
+r = F.put(B + "/api/folders/people", json={"folder": "Clients", "email": "uma.new@example.com", "role": "edit"})
+r2 = F.put(B + "/api/folders/people", json={"folder": "Clients", "email": "nobody@example.com", "role": "edit"})
+check(r.ok and r2.ok and r.json() == r2.json(), f"#5669: a list folder by an unproved address: the same answer as for an unknown one {r.text[:160]}")
+check(not sees(U, LF), "#5669: ... and uma does NOT see the list in the folder")
+dbx("UPDATE users SET email_proved='uma.new@example.com' WHERE id=?", (UID,))  # (a mailed link or a verified OIDC claim)
+r = F.put(B + f"/api/lists/{LS}/members", json={"email": "UMA.new@example.com ", "role": "edit"})
+check(r.ok and sees(U, LS), f"#5669: proved: the list shared by address reaches uma (case and blanks do not matter) {r.text[:120]}")
+r = F.put(B + "/api/folders/people", json={"folder": "Clients", "email": "uma.new@example.com", "role": "edit"})
+check(r.ok and sees(U, LF), f"#5669: proved: the folder shared by address reaches uma {r.text[:120]}")
 
 # ================================================================ #3915: status changes reach a watching agent
 

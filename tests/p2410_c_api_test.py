@@ -118,6 +118,7 @@ check(all(x[0] == 1 for x in dbx("SELECT agent_followup FROM lists WHERE id IN (
 r = A.patch(B + f"/api/lists/{L1}", json={"agent_followup": False})
 check(r.ok and "agent_followup" in json.loads(dbx("SELECT folder_own FROM lists WHERE id=?", (L1,))[0][0] or "[]"), "a list switching it itself differs from the folder")
 # share by e-mail address
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''", write=True)  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 r = A.put(B + "/api/folders/people", json={"folder": F, "email": "nobody@example.com", "role": "edit"})
 check(r.ok and r.json().get("by_email") and r.json()["shared"] == 0, f"an unknown address: the same answer ({r.text[:200]})")
 r = A.put(B + "/api/folders/people", json={"folder": F, "email": "BOB@example.com", "role": "edit"})

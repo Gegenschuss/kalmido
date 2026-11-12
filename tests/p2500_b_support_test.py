@@ -20,7 +20,7 @@ import urllib.parse
 import requests
 
 import kt
-from kt import B, FAILS, OKS, check, sess
+from kt import B, FAILS, OKS, check, sess, dbx
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from freelancer_fixture import freelancer, login  # noqa: E402
@@ -86,6 +86,7 @@ for meth, path, body in (
 check(kt.dbx("SELECT COUNT(*) FROM users WHERE kind='agent'") == agents, "no agent came of it")
 r = Fr.post(B + "/api/me/tokens", json={"name": "mine"})
 check(r.status_code != 403, f"frida's own session is not stopped there {r.status_code}")
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 r = Fr.put(B + f"/api/lists/{LID}/members", json={"email": "nobody@example.com"})
 check(r.json().get("code") != "support_session", "frida's own session: the project's members")
 

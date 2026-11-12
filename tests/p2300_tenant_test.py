@@ -260,6 +260,7 @@ check(Bo.put(B + f"/api/books/{BA}/members", json={"user_id": DAVE, "role": "vie
 check(Bo.put(B + f"/api/evcals/{KA}/members", json={"user_id": AGB, "role": "view"}).status_code in (404, 409), "#1036: nor the other organisation's agent")
 # dave becomes a connection of bob (a private list shared by e-mail): visible, but still not in the organisation
 LPB = Bo.post(B + "/api/lists", json={"name": "Bob private", "org_id": None}).json()["id"]
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''", write=True)  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 assert Bo.put(B + f"/api/lists/{LPB}/members", json={"email": "dave@example.com"}).ok
 r = Bo.put(B + f"/api/evcals/{KA}/members", json={"user_id": DAVE, "role": "view"})
 check(r.status_code == 409 and "not a member of the organisation" in r.text, "#1036 B3: an organisation's calendar only for its members " + r.text[:100])

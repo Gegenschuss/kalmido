@@ -24,7 +24,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, dbx  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 FEAT = "cal,comments,collab,office,clients"
 O, L = "/api/office", "/api/office/legacy"
 
@@ -172,6 +172,7 @@ def part_rules(S, who, org, other, other_s):
     assert r.ok, r.text
     lid = r.json()["id"]
     for e in ("bob@example.com", "carol@example.com"):  # by address: a person without an organisation sees nobody's id
+        dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
         S.put(B + f"/api/lists/{lid}/members", json={"email": e, "role": "edit"})
     r = S.post(B + f"/api/lists/{lid}/rules", json={"name": "To carol", "trigger": {"kind": "assigned"}, "action": {"kind": "assign", "user_id": CAROL}})
     check(r.status_code == 201, f"{who} F3: rule assigned -> carol {r.status_code} {r.text[:200]}")

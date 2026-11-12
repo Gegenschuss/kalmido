@@ -28,7 +28,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
 import kt  # noqa: E402
-from kt import check, B, H, done, sess  # noqa: E402
+from kt import check, B, H, done, sess, dbx  # noqa: E402
 
 V = B + "/api/v1"
 
@@ -297,6 +297,7 @@ FV = F.post(B + "/api/org-fields", json={"name": "Venue", "type": "text"}).json(
 assert F.put(B + f"/api/lists/{FL}/org-fields/{FV}", json={"on": True}).ok
 r = A.post(B + "/api/users", json={"orgs": [], "username": "hank", "display_name": "Hank", "password": kt.PASSWORD, "email": "hank@example.com"})
 assert r.ok, r.text
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 F.put(B + f"/api/lists/{FL}/members", json={"email": "hank@example.com", "role": "view"})  # by address: no common directory
 Hk = sess("hank")
 check(Hk.get(B + f"/api/lists/{FL}/org-fields").ok, "setup: P4 shares a project to view")

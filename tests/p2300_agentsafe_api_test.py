@@ -144,6 +144,7 @@ r = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "third
 CL3 = r.json()["id"]
 E1, E2 = mk(A, "E with Bob", [BOB]), mk(A, "E alone")
 check(A.put(B + f"/api/lists/{E1}/members", json={"user_id": CL3, "role": "edit"}).ok and A.put(B + f"/api/lists/{E2}/members", json={"user_id": CL3, "role": "edit"}).ok, "#919: a third agent in {alice, bob} and {alice}")
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''", write=True)  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 r = A.put(B + f"/api/lists/{E2}/members", json={"email": "carol@example.com", "role": "edit"})
 check(r.ok and r.json().get("by_email") and CAROL not in members(A, E2), "#919: a share by address that would be a bridge does nothing, answers as usual " + r.text[:100])
 GID = A.post(B + "/api/admin/groups", json={"name": "Office", "members": [CAROL]}).json()["id"]

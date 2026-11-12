@@ -13,7 +13,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
-from ..core.access import acx_drop, collab_all, Denied, dlg_gone, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES
+from ..core.access import acx_drop, addr_account, collab_all, Denied, dlg_gone, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES
 from ..core.state import visible_lists
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
@@ -990,8 +990,10 @@ def member_set(lid):
     from ..accounts.orgs import may_see
     if b.get("email") and not uid:  # 2.22.0 (#752): share by e-mail address (mode "own contacts": no directory). The answer
         # never says whether the address has an account
-        em = str(b["email"]).strip().lower()[:200]
-        r = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'", (em,)).fetchone()
+        # 2.1001.0 (#5669): only an account that proved the address (addr_account, like tables and wiki); an address nobody
+        # proved is answered like an unknown one (lists keep no open address share)
+        r = addr_account(c, b["email"])
+        r = (r,) if r else None
         from ..accounts.orgs import ws_member_problem
         if not r or r[0] == me() or r[0] == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0] or \
                 c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, r[0])).fetchone() or \
@@ -1229,8 +1231,8 @@ def folder_people_put():
         uid = 0
     from ..accounts.orgs import may_see
     if b.get("email") and not uid:  # 2.41.0 (#1423): share the folder by e-mail address, like a list (never says whether it has an account)
-        r = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'",
-                      (str(b["email"]).strip().lower()[:200],)).fetchone()
+        r = addr_account(c, b["email"])  # 2.1001.0 (#5669): only a proved address, an unproved one is answered like an unknown one
+        r = (r,) if r else None
         if not r or r[0] == me():
             return jsonify(shared=0, updated=0, by_email=True)
         uid = r[0]

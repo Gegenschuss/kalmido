@@ -123,6 +123,7 @@ check(r.status_code == 403 and not dbx("SELECT delete_at FROM users WHERE id=?",
 # ---------------------------------------------------------------- own projects: one shared with bob, one private
 L1 = Fr.post(B + "/api/lists", json={"name": "Garden plan"}).json()["id"]
 L2 = Fr.post(B + "/api/lists", json={"name": "Private notes"}).json()["id"]
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 r = Fr.put(B + f"/api/lists/{L1}/members", json={"email": "bob@example.com", "role": "edit"})  # people without an organisation: by e-mail
 check(r.ok and dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (L1, BOB)), f"setup: bob in the garden plan {r.status_code} {r.text[:200]}")
 T1 = Fr.post(B + "/api/tasks", json={"title": "Plant tulips", "list_id": L1}).json()["id"]

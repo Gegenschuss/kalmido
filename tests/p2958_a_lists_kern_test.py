@@ -171,6 +171,7 @@ check(A.put(B + f"/api/folders/groups/{GE}", json={"folder": "Empty bin", "role"
 FID, Fr = freelancer(B, A)
 r = Fr.post(B + "/api/lists", json={"name": "Sketches", "folder": "Studio"})
 check(r.ok, "setup: frida's private project " + r.text[:200])
+dbx("UPDATE users SET email_proved=lower(COALESCE(email, '')) WHERE email_proved=''")  # 2.1001.0 (#5669): a list / folder shared by address binds only a proved address (a mailed link / OIDC); the accounts here proved theirs
 r = Fr.put(B + "/api/folders/people", json={"folder": "Studio", "email": "bob@example.com", "role": "view"})
 check(r.ok, "frida shares her folder by e-mail " + r.text[:200])
 check(fpeople(Fr, "Studio") == {uid["bob"]: "view"}, f"frida's folder lists bob {fpeople(Fr, 'Studio')}")
