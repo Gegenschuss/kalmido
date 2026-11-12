@@ -3372,8 +3372,8 @@ run it from the card after the Yes:
    header `X-Kalmido-Approval: <id of the card>` (MCP: `use_approval`, then the call). The MCP server keeps a refused step
    for the access of the connection (a refreshed access token keeps its `step_ref`); a step whose body is longer than a card
    binds (32,000 characters) gets no `step_ref`: split the change. A card path that still holds a `%` after decoding is
-   refused with `400`. Since 2.1085.0 (#5936) the card binds the files too: `approval.body._files` lists name and SHA-256
-   of each file in the order sent; send exactly these files again (other content = `409 approval_invalid`, reason `body`,
+   refused with `400`. Since 2.1085.0 (#5936) the card binds the files too: `approval.body._files` lists form field, name and
+   SHA-256 of each file; send exactly these files again (other content = `409 approval_invalid`, reason `body`,
    field `_files`; a run from the card = reason `upload`).
 
 **What the person sees (2.1068.0, #5831).** A card whose step replaces or adds to a text - a knowledge page
@@ -3394,7 +3394,7 @@ recommended answer) and `approval.one_way: true` (a one-way step of the owner's 
 is a one-way step itself). The card shows the person the step, *one-way* and your recommendation. After the person's
 **Yes** run it with `POST /api/v1/agent/approvals/{id}/run` (MCP `run_approved_step`, above); the older way - the same
 request again with the header `X-Kalmido-Approval: <id of the card>` (MCP: `use_approval`, then the call) - still works. It works **once**, only for that method, path and body (JSON keys in any order; a form request: its fields; an upload
-also its files by name and SHA-256, field `_files`), only after a Yes (a 👍 on the card decides nothing); a request that fails (4xx / 5xx) gives the
+also its files by form field, name and SHA-256, field `_files`), only after a Yes (a 👍 on the card decides nothing); a request that fails (4xx / 5xx) gives the
 approval back. Otherwise `409 approval_invalid`. A one-way step needs the Yes of a person (never the deadline's
 `recommend`). The person who said Yes (for a deadline: the person of the card) must be allowed to change every project
 the request touches; a request without a project needs a person who shares a project with the agent.

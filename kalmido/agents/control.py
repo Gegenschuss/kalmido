@@ -365,12 +365,14 @@ def ctl_refuse(step, level, lid, d):
 
 def ctl_req_body():
     """2.235.0 A2 (#2891): what an approval card binds of this request: its JSON body, else its form fields ({} = none).
-    2.1085.0 (#5936): an upload binds its files too: field _files = [{name, sha256}] in the order sent, so a Yes to
-    "upload to X" holds for exactly these files (ctl_files)."""
+    2.1085.0 (#5936): an upload binds its files too: field _files = [{field, name, sha256}] (ctl_files), so a Yes to
+    "upload to X" holds for exactly these files under exactly these form fields."""
     if request.is_json:
         j = request.get_json(silent=True)
         return j if j is not None else {}
     b = request.form.to_dict(flat=True) if request.form else {}
+    if CTL_FILES_KEY in b:  # 2.1085.0 (#5936, review): a form field of this name would hide behind the bound files
+        raise BadInput(tr("Invalid value: {0}", CTL_FILES_KEY))
     fs = ctl_files()
     return {**b, CTL_FILES_KEY: fs} if fs else b
 
@@ -379,19 +381,20 @@ CTL_FILES_KEY = "_files"  # 2.1085.0 (#5936): the field of a bound body holding 
 
 
 def ctl_files():
-    """2.1085.0 (#5936): the files of a multipart request as [{name, sha256}] (the order sent); the stream of each file is
-    wound back after hashing, the route reads it whole. [] = no upload."""
+    """2.1085.0 (#5936): the files of a multipart request as [{field, name, sha256}] (grouped by form field, each field in the
+    order sent; review: the field is bound, a route taking "the first file of any field" gets the approved one); the stream
+    of each file is wound back after hashing, the route reads it whole. [] = no upload."""
     import hashlib
     if request.mimetype != "multipart/form-data" or not request.files:
         return []
     out = []
-    for _, f in request.files.items(multi=True):
+    for k, f in request.files.items(multi=True):
         h = hashlib.sha256()
         f.stream.seek(0)
         for chunk in iter(lambda: f.stream.read(1 << 16), b""):
             h.update(chunk)
         f.stream.seek(0)
-        out.append({"name": f.filename or "", "sha256": h.hexdigest()})
+        out.append({"field": k, "name": f.filename or "", "sha256": h.hexdigest()})
     return out
 
 
@@ -627,7 +630,7 @@ def v1_agent_approval_run(mid):
         return v1_err(409, tr("This approval does not fit: it needs a person's Yes, exactly this method, path and body, and works once.")
                       + " " + ctl_reason_text(bad), name="approval_invalid", message_id=mid, **bad)
     st = ch["approval"]["step"]
-    if isinstance(st.get("body"), dict) and CTL_FILES_KEY in st["body"]:  # 2.1085.0 (#5936): an upload's card binds its files,
+    if isinstance(st.get("body"), dict) and isinstance(st["body"].get(CTL_FILES_KEY), list):  # 2.1085.0 (#5936): an upload's card binds its files,
         return v1_err(409, tr(CTL_REASON_TEXT["upload"]), name="approval_invalid", message_id=mid, reason="upload")  # the run has none
     if not ctl_run_hold(c, aid, mid):  # 2.1045.0 (#5827, M3): two runs at once -- one holds the card, the other is refused
         bad = ctl_card_state(*ctl_card_row(c, aid, mid)) or {"reason": "used"}
