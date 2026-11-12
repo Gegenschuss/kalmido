@@ -72,7 +72,12 @@ def budget_cat_new(lid):
 @app.patch("/api/budget/cats/<int:cid>")
 def budget_cat_patch(cid):
     c, uid = db(), me()
-    return _done(c, cat_update(c, uid, cid, body()))
+    from .budundo import BCU_KIND, bxu_post, bxu_pre  # 2.1013.0 (#5513): a step of the person's undo list
+    b = body()
+    bxu_pre(c, uid, BCU_KIND, cid, b=b)
+    out = cat_update(c, uid, cid, b)
+    ug = bxu_post(c)
+    return _done(c, {**out, **({"undo_group": ug} if ug else {})})
 
 
 @app.delete("/api/budget/cats/<int:cid>")
@@ -80,14 +85,22 @@ def budget_cat_delete(cid):
     """-> {ok, cat, entry_ids, recurring_ids, trash}: the category in the trash and the rows that lost it (2.567.0 A, #4707:
     the undo is POST .../restore)."""
     c, uid = db(), me()
-    return _done(c, {"ok": True, **cat_delete(c, uid, cid)})
+    from .budundo import BCU_KIND, bxu_post, bxu_pre  # 2.1013.0 (#5513): a step of the person's undo list
+    bxu_pre(c, uid, BCU_KIND, cid, "delete")
+    out = cat_delete(c, uid, cid)
+    ug = bxu_post(c)
+    return _done(c, {"ok": True, **out, **({"undo_group": ug} if ug else {})})
 
 
 @app.post("/api/budget/cats/<int:cid>/restore")
 def budget_cat_restore(cid):
     """2.567.0 A (#4707): the category back from the trash, its entries and templates hung back on it -> the category."""
     c, uid = db(), me()
-    return _done(c, cat_restore(c, uid, cid))
+    from .budundo import BCU_KIND, bxu_post, bxu_pre  # 2.1013.0 (#5513): a step of the person's undo list
+    bxu_pre(c, uid, BCU_KIND, cid, "restore")
+    out = cat_restore(c, uid, cid)
+    bxu_post(c)
+    return _done(c, out)
 
 
 @app.post("/api/budget/<int:lid>/entries")
@@ -163,7 +176,12 @@ def budget_rec_get(rid):
 def budget_rec_patch(rid):
     """Fields of the template; {sync_contract: true} = amount and period from its contract."""
     c, uid = db(), me()
-    return _done(c, rec_update(c, uid, rid, body()))
+    from .budundo import BRU_KIND, bxu_post, bxu_pre  # 2.1013.0 (#5513): a step of the person's undo list
+    b = body()
+    bxu_pre(c, uid, BRU_KIND, rid, b=b)
+    out = rec_update(c, uid, rid, b)
+    ug = bxu_post(c)
+    return _done(c, {**out, **({"undo_group": ug} if ug else {})})
 
 
 @app.delete("/api/budget/recurring/<int:rid>")
@@ -171,15 +189,22 @@ def budget_rec_delete(rid):
     """-> {ok, item, trash}: booked entries stay (without the link); 2.567.0 A (#4707): the template waits in the trash,
     the undo is POST .../restore."""
     c, uid = db(), me()
+    from .budundo import BRU_KIND, bxu_post, bxu_pre  # 2.1013.0 (#5513): a step of the person's undo list
+    bxu_pre(c, uid, BRU_KIND, rid, "delete")
     out = rec_delete(c, uid, rid)
-    return _done(c, {"ok": True, "item": out, "trash": True})
+    ug = bxu_post(c)
+    return _done(c, {"ok": True, "item": out, "trash": True, **({"undo_group": ug} if ug else {})})
 
 
 @app.post("/api/budget/recurring/<int:rid>/restore")
 def budget_rec_restore(rid):
     """2.567.0 A (#4707): the template back from the trash, the entries booked from it linked again -> the template."""
     c, uid = db(), me()
-    return _done(c, rec_restore(c, uid, rid))
+    from .budundo import BRU_KIND, bxu_post, bxu_pre  # 2.1013.0 (#5513): a step of the person's undo list
+    bxu_pre(c, uid, BRU_KIND, rid, "restore")
+    out = rec_restore(c, uid, rid)
+    bxu_post(c)
+    return _done(c, out)
 
 
 @app.post("/api/budget/recurring/<int:rid>/book")

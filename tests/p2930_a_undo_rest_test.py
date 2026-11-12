@@ -564,6 +564,17 @@ r = A.patch(B + f"/api/budget/entries/{E7}", json={"cat_id": K2})
 G7 = newest(A)["id"]
 r2 = A.delete(B + f"/api/budget/cats/{K1}")
 check(r.ok and r2.ok and one("SELECT deleted_at FROM budget_cats WHERE id=?", (K1,)) is not None, f"(setup) another category, the old one in the trash {r2.status_code}")
+# 2.1013.0 (#5513): the category's trash is a step of its own now: back to the entry's step takes it back first (the category is
+# there again), then the entry's (its old category)
+GK = newest(A)["id"]
+res = back(A, G7)
+check(res.get("undone") == [GK, G7] and one("SELECT deleted_at FROM budget_cats WHERE id=?", (K1,)) is None
+      and one("SELECT cat_id FROM budget_entries WHERE id=?", (E7,)) == K1, f"#5513: back over the category's trash step, then the entry's {res}")
+# F7 as before: the category went into the trash without a step of the person (another way: written directly here)
+r = A.patch(B + f"/api/budget/entries/{E7}", json={"cat_id": K2})
+G7 = newest(A)["id"]
+kt.dbx("UPDATE budget_cats SET deleted_at='2026-11-01T10:00:00+00:00', deleted_by=? WHERE id=?", (ALICE, K1))
+check(r.ok and one("SELECT deleted_at FROM budget_cats WHERE id=?", (K1,)) is not None, "(setup) the old category in the trash again (no step)")
 res = back(A, G7)
 st = res.get("stayed") or []
 check(not res.get("undone") and [x["kind"] for x in st] == ["budget_entry"] and "no longer there" in (st[0].get("reason") or "")

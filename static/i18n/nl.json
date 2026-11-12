@@ -18303,5 +18303,7 @@
   "Review in the chat": "Controle in de chat",
   "Review|kind of a planned job": "Controle",
   "Your own ticket types and fields went into your private workspace; projects imported into the organisation do not use them.": "Je eigen tickettypen en velden staan in je privéruimte; projecten die in de organisatie zijn geïmporteerd gebruiken ze niet.",
-  "{0} (from the repository)": "{0} (uit de repository)"
+  "{0} (from the repository)": "{0} (uit de repository)",
+  "Budget category {0}": "Budgetcategorie {0}",
+  "Budget template": "Budgetsjabloon"
 }

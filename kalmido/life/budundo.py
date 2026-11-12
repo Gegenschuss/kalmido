@@ -29,8 +29,10 @@ from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_done, ua_plain, ua_pre,
 from ..core.undogroups import UG_LABEL
 from ..core.undoweb import UG_GONE, undo_need_reg
 from ..core.objhooks import GONE
+from ..core.pg import qi  # 2.1013.0 (#5513)
 from ..core.writes import UNDO_SPACE_REKEYED, obj_track, obj_undo_forget
 from .budget import _booked, _ccf_lock, bud_need_list, bud_need_on, bud_sid, entry_delete, entry_restore
+from .budget import cat_delete, cat_restore, rec_delete, rec_restore  # 2.1013.0 (#5513)
 
 BDU_KIND = "budget_entry"
 BDU_ENTRY = N_("Budget entry of {0}")
@@ -142,3 +144,118 @@ def bdu_need(c, uid, rid, oid):
 
 
 undo_need_reg(BDU_KIND, bdu_need)
+
+
+# ---------------------------------------------------------------- 2.1013.0 (#5513): categories and templates
+# The rest of #5394 (decision of 08.11.2026): a category (budget_cats, kind "budget_cat") and a template (budget_recurring, kind
+# "budget_rec") record a snap step of the person like an entry -- a change (PATCH), into the trash (DELETE) and out of it
+# (POST .../restore) -- under the row's lock (<table>-<id>, life/budget.py _ccf_lock), with the same lock per list space: the
+# copy holds the sealed columns as stored (a category's limit, a template's title and amount) and goes back only under the
+# key that sealed it (_bdx_spaces). Coming out of the trash / going into it again runs the area's own way (cat_restore /
+# cat_delete hang the entries and templates back on the category or take them off; rec_restore / rec_delete do the booked
+# entries' link). A category's label is its name (plain); a template's its title when plain, else "Budget template".
+# A category's order (a PATCH with sort only, the drag of the list) is no step: it would bury the real ones.
+BCU_KIND, BRU_KIND = "budget_cat", "budget_rec"
+BCU_LABEL = N_("Budget category {0}")
+BRU_LABEL = N_("Budget template")
+BXU_TABLE = {BCU_KIND: "budget_cats", BRU_KIND: "budget_recurring"}
+BXU_TABLES = tuple(BXU_TABLE.values())  # the names of qi()
+BXU_KEEP = {"budget_cats": {"list_id", "created_at", "sort"},
+            "budget_recurring": {"list_id", "contract_task_id", "created_by", "created_at", "trash_cat_id"}}
+BXU_META = ("expect_updated_at", "_prev")
+
+
+def _bxu_name(kind, r):
+    r = dict(r) if r is not None else {}
+    if kind == BCU_KIND:
+        return [BCU_LABEL, ua_plain(r.get("name"), r.get("id"))]
+    t = ua_plain(r.get("title"), r.get("id"))
+    return [BRU_LABEL] if t.startswith("#") else t
+
+
+def _bxu_spaces(table):
+    def spaces(c, snap):
+        """As bdu_spaces: the copy's space must be its list's space now (a category without a limit seals nothing: its space
+        does not count); its category (a template's) must still be there."""
+        out = []
+        for r in (snap or {}).get(table) or []:
+            sid = int(r.get("sid") or 0)
+            sealed = any(r.get(k) not in (None, "") for k in oc.FIELDS[table])
+            now = bud_sid(c, r["list_id"])
+            if sealed and sid != now:
+                raise Denied(409, tr(BDU_SEALED if not sid and now else BDU_REKEYED))
+            if r.get("cat_id") and not c.execute(f"SELECT 1 FROM budget_cats WHERE id=? AND {live_sql()}", (int(r["cat_id"]),)).fetchone():
+                raise Denied(409, tr(UG_GONE))
+            if sealed and sid:
+                out.append(sid)
+        return out
+    return spaces
+
+
+for _k, _t in BXU_TABLE.items():
+    obj_track(_k, _t, area="budget", undo_keep={_t: BXU_KEEP[_t]}, undo_nofp={_t: {"sort"} if _t == "budget_cats" else set()},
+              undo_label=(lambda r, _k=_k: (UG_LABEL, [_bxu_name(_k, r)])), undo_free=("deleted_at", "deleted_by"),
+              undo_spaces=_bxu_spaces(_t), hist_skip=oc.FIELDS[_t] + ("sid",))
+    GONE[_k] = _t
+
+
+def bxu_pre(c, uid, kind, rid, what=None, b=None):
+    """The person's step before the route's write of a category / template rid (what = delete | restore names it so; b = the
+    PATCH body: a category's order alone is no step). The rights and the row's lock first, as its writes; nothing when the row
+    is not there (the route answers 404 then)."""
+    table = BXU_TABLE[kind]
+    if b is not None and (not isinstance(b, dict) or not [k for k in b if k not in BXU_META and k != "sort"]):
+        return
+    try:
+        rid = int(rid)
+    except (TypeError, ValueError):
+        return
+    r = c.execute(f"SELECT * FROM {qi(table, BXU_TABLES)} WHERE id=?", (rid,)).fetchone()
+    if r is None:
+        return
+    from flask import g, has_request_context
+    if has_request_context():  # as bdu_pre (review F2 of #5394): the space that sealed the copy (bxu_post compares)
+        g.bxu_sid = (table, rid, int(r["sid"] or 0), kind)
+    bud_need_on(c, uid)
+    bud_need_list(c, uid, r["list_id"], True)
+    _ccf_lock(c, table, rid)
+    key = BDU_WHAT.get(what or "")
+    if key:
+        ua_pre(c, uid, kind, rid, key, _bxu_name(kind, r))
+    else:
+        ua_pre(c, uid, kind, rid)
+
+
+def bxu_post(c):
+    """-> the request's group id when the step stayed, else None; as bdu_post: a write that sealed the row with another space's
+    key than the copy drops the step and every older copy of the row."""
+    from flask import g, has_request_context
+    was = g.pop("bxu_sid", None) if has_request_context() else None
+    if was:
+        now = c.execute(f"SELECT sid FROM {qi(was[0], BXU_TABLES)} WHERE id=?", (was[1],)).fetchone()
+        if now is not None and int(now["sid"] or 0) != was[2]:
+            ua_done(c, drop=True)
+            obj_undo_forget(c, was[3], [was[1]])
+            return None
+    return ua_done(c)
+
+
+def _bxu_need(kind):
+    table = BXU_TABLE[kind]
+
+    def need(c, uid, rid, oid):
+        """Who may take a category's / template's step back now: the right to change its list NOW."""
+        r = c.execute(f"SELECT * FROM {qi(table, BXU_TABLES)} WHERE id=?", (int(rid),)).fetchone()
+        if r is None:
+            raise Denied(404)
+        bud_need_on(c, uid)
+        bud_need_list(c, uid, r["list_id"], True)
+        on, off = (cat_restore, cat_delete) if kind == BCU_KIND else (rec_restore, rec_delete)
+        trash = ua_trash_fix(table, rid, r["deleted_at"], lambda c, x: on(c, uid, x["id"]), lambda c, x: off(c, uid, x["id"]),
+                             cols=("deleted_at", "deleted_by"))
+        return {"fix": trash, "lock": f"{table}-{int(rid)}"}  # life/budget.py _ccf_lock
+    return need
+
+
+for _k in BXU_TABLE:
+    undo_need_reg(_k, _bxu_need(_k))

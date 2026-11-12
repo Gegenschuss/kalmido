@@ -303,7 +303,11 @@ c.commit()
   (`life/budundo.py`, kind `budget_entry`) carry their sealed values as stored; `obj_track(undo_spaces=)` names the spaces
   whose keys sealed the copy, and `_undo_rekeyed` refuses it (409, before the fingerprint) when such a key was rotated
   since or the list's space is not the copy's any more (moved, encryption switched) -- a copy is never written back under
-  another key. Not yet: budget categories and templates, the project settings.
+  another key. 2.1013.0 (#5513): budget categories (`budget_cat`) and templates (`budget_rec`) the same way
+  (`life/budundo.py` `bxu_pre` / `bxu_post`: a change, into the trash and out of it; the trash ways of the area run on undo /
+  redo; a category without a limit seals nothing, so its space does not count; a category's order alone is no step). The
+  plain project settings record their steps since 2.809.0 (#5476, `lists/lpundo.py`); a save with side effects (folder,
+  workspace, project type, agents ...) still records none.
   Review of #5394 (same release): a device's DAV writes join one group per app password and area for 10 minutes
   (`core/undogroups.py` `undo_bundle`, label "Several changes") and never end the person's way forward; a setting changed
   again from the same device within 10 minutes joins its step while that is the newest (2.997.0, #5705/#5706: not a key
