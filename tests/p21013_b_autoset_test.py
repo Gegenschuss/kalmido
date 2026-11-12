@@ -67,10 +67,11 @@ def run(s, uid, who):
     check(state(s).get("start_page") == "today", f"{who}: the setting the app saved stays")
 
     # ------------------------------------------------------------ the person's own change is still a step
-    n1 = ngroups(uid)
+    # (a new step ends the way forward: the taken-back task group goes, so the count is no measure here - the newest id is)
     r = s.patch(B + "/api/settings", json={"start_page": "inbox"})
     g3 = newest(s)
-    check(r.ok and ngroups(uid) == n1 + 1 and g3.get("area") == "self", f"{who}: the person's own change of a setting is a step {g3}")
+    check(r.ok and (g3.get("id") or 0) > g["id"] and g3.get("area") == "self" and g3.get("kind") == "setting",
+          f"{who}: the person's own change of a setting is a step {g3}")
 
 
 run(A, ALICE, "alice")
