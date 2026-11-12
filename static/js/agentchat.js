@@ -1756,7 +1756,7 @@ async function ag_settings(a) {
   }
   if (a.owner_id && a.owner_id === S.me?.id) {
     settingsModal('agentsetup');
-    pg_waitEl(`.smodal [data-myag="${a.id}"]`, r => { r.scrollIntoView?.({block: 'center'}); r.classList.add('flash'); setTimeout(() => r.classList.remove('flash'), 1600); });
+    pg_waitEl(`.smodal [data-myag="${a.id}"]`, r => { r.scrollIntoView?.({block: 'center'});  /* sprung-ok: the person asked for this agent's settings */ r.classList.add('flash'); setTimeout(() => r.classList.remove('flash'), 1600); });
     return;
   }
   if (srv_may(a)) srv_editModal(a);
