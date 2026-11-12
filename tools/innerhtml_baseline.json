@@ -4044,7 +4044,6 @@
 "static/js/office_docs.js|ofcSym(ofcHome())": 1,
 "static/js/office_docs.js|ofdF('abs-val', tr('Progress payment'), `<span class=\"lacts\"><input id=\"ofd-abs-val\" inputmode=\"decimal\" class=\"numin\" maxlength=\"14\">${ofcSel('ofd-abs-unit', 'pct', [['pct', '%'], ['amount', cur + ' ' + tr('net')]])}</span>`, tr('quotation net {0}, not yet billed {1}', info.net_text, info.remaining_text), {keep: 1})": 1,
 "static/js/office_docs.js|ofdF('date', tr('Date'), dateIn('ofd-date', d.date, {label: tr('Date'), clear: false, attrs: 'data-f=\"date\"'}))": 1,
-"static/js/office_docs.js|ofdF('discount_pct', tr('Discount'), ofdIn('discount_pct', ofdNumIn(d.discount_pct), {num: true, max: 8}), '%', {keep: 1})": 1,
 "static/js/office_docs.js|ofdF('prod_quotient', tr('Producing quotient'), ofdIn('prod_quotient', ofdNumIn(d.prod_quotient), {num: true, max: 10}), tr('production days per producing day'))": 1,
 "static/js/office_docs.js|ofdF('producing_rate', tr('Day rate'), ofdIn('producing_rate', ofdNumIn(d.producing_rate), {num: true, max: 12}), ofcSym(ofcHome()), {keep: 1})": 1,
 "static/js/office_docs.js|ofdF('producing_rate', tr('Producing rate'), ofdIn('producing_rate', ofdNumIn(d.producing_rate), {num: true, max: 12}), ofcSym(ofcHome()), {keep: 1})": 1,
