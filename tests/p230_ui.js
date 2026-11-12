@@ -209,12 +209,12 @@ async function firefox(fn) {
   // than the test's GET above under CI load - wait for them, not for the answer
   check(await until(() => /entries created/.test(d.querySelector('#toast')?.textContent || '') && d.querySelector('#toast [data-act], #toast button'), 150), 'toast with Undo');
   check(w.eval('HIST.undo[HIST.undo.length - 1].label') === 'Applied the proposal of Claude', 'one history step');
-  await w.eval(`histStep('undo')`); await sleep(400);
-  st = await call('GET', '/api/state');
-  check(!st.lists.some(l => l.name === 'ACME image film'), 'undo: the project is gone');
-  await w.eval(`histStep('redo')`); await sleep(400);
-  st = await call('GET', '/api/state');
-  check(st.lists.some(l => l.name === 'ACME image film'), 'redo: back');
+  // 2.1003.0 (#4839): undo and redo wait for the server's state, not for a fixed 400 ms (CI load)
+  const hasPL = async () => (await call('GET', '/api/state')).lists.some(l => l.name === 'ACME image film');
+  await w.eval(`histStep('undo')`);
+  check(await until(async () => !(await hasPL()), 150), 'undo: the project is gone');
+  await w.eval(`histStep('redo')`);
+  check(await until(hasPL, 150), 'redo: back');
   w.close();
 
   // ================= review: triage (list -> sections), extract (assignee), discard; Agents view
