@@ -140,7 +140,7 @@ check(found(A, SP, "Lost") == [lost], "key missing: the page is found by its nam
 m1 = marks(lost)
 check(len(m1) == 1 and m1[0].startswith("x:"), f"key missing: the page is marked unreadable (x:), not done (u:) {m1}")
 found(A, SP, "Lost")
-check(marks(lost) == m1, "another search with the same key state does not read it again (same mark)")
+check(marks(lost) == m1, f"another search with the same key state does not read it again (same mark) {m1} {marks(lost)}")
 key_back("org_keys", "org_id", saved)
 check(found(A, SP, "Kumquat") == [lost], "key back: the next search reads the page again and finds its text")
 m2 = marks(lost)

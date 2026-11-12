@@ -107,12 +107,13 @@ check(all(w in known for w in inner), "cut at word boundaries (no half word at t
 a = sn.index("Kühlschrank")
 check(30 <= a <= 110, "the hit sits in the first part of the snippet, with words before it " + str(a))
 
-# folding like the index: capitals, ß = ss, two words, short words whole only
+# folding like the index: capitals, ß = ss, two words, short words at a word start (2.1002.0, #5279)
 p = hit(search(Bo, "STRASSE kühl"), P1)
 check(p and sorted(bold(p)) == ["Kühl", "Straße"], "STRASSE finds Straße, kühl the beginning of Kühlschrank, both bold " + str(p and bold(p)))
 P2 = page(Bo, SP, "Kurz/Abc", "Ein ab und abseits davon")
 p = hit(search(Bo, "ab", space=SP), P2)
-check(p and bold(p) == ["ab"], "a word of 2-3 characters is marked only whole (not in 'abseits') " + str(p and bold(p)))
+# 2.1002.0 (#5279): word start everywhere (question 14) - a word of 2-3 characters marks the start of 'abseits' too
+check(p and bold(p) == ["ab", "ab"], "a word of 2-3 characters is marked at every word start (also in 'abseits') " + str(p and bold(p)))
 check(p and p["snippet"] == "Ein ab und abseits davon", "a short text whole, without '…' " + str(p and p["snippet"]))
 P3 = page(Bo, SP, "Einleitung", "Der Fischotter wohnt am Fluss. " + FILL)
 p = hit(search(Bo, "fischotter"), P3)
