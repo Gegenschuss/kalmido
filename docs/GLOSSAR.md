@@ -126,6 +126,7 @@ Connected agents: the agent API, proposals, quotas, locks, schedules, chat and t
 - `kalmido/agents/ccsread.py` (`ccs`) - A connected agent reads a credit card statement (kind card_statement_read, a request of agents/asstprop.py)
 - `kalmido/agents/chat.py` (`chat`) - What people see of agents: state, chat (files, reactions)
 - `kalmido/agents/chatprefs.py` (`cp`) - The chat settings of a person for one agent
+- `kalmido/agents/chatnews.py` (`acn`) - Approval cards and questions of the agent chat in the bell's "For you"
 - `kalmido/agents/cleanup.py` (`cln`) - "Tidy up this list" -- the list
 - `kalmido/agents/contractprop.py` (`ctr`) - Contracts in view -- an agent reminds a person of a notice deadline, the person decides
 - `kalmido/agents/control.py` (`ctl`) - The control level of an agent (Kontrolle)
