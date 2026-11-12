@@ -53,6 +53,9 @@ from .vdmedia import vdm_body, vdm_files_ok, vdm_has_files, vdm_marks, vdm_media
 from .vdmedia import vdm_pub_send  # 2.658.0 (#5015)
 from .vdmedia import vdm_pub_pos, vdm_pub_stage  # 2.764.0 (#5040)
 from ..core.writes import obj_restore, obj_trash  # 2.947.0 (#5367): the core's trash (videos/vdkern.py)
+from ..core.writes import UG_RESTORED, UG_TRASHED, obj_trash_step  # 2.1002.0 (#5490): the trash steps of a review
+from ..core.undogroups import undo_label  # 2.1002.0 (#5490)
+from ..core.undoareas import ua_plain  # 2.1002.0 (#5490)
 from ..core.access import live_sql, trash_sql  # 2.947.0 (#5367); 2.981.0 (#5273): live_sql
 from ..core.objcomments import ocm_add, ocm_edit, ocm_kind, ocm_may_read, ocm_restore, ocm_trash, ocm_video_cols as vdc_cols
 from ..core.objsearch import osr_kind  # 2.981.0 (#5273 x #5278): the shared search  # 2.981.0 (#5273): the comments' core
@@ -481,10 +484,44 @@ def vdr_delete(vid):
     trash (obj_trash; step=False: the app's undo is the restore route with its place check)."""
     c, uid = db(), me()
     vdr_need(c, vid, write=True)
-    ts = obj_trash(c, uid, VDR_KIND, vid, step=False)["deleted_at"]
-    c.execute("UPDATE office_signoffs SET revoked_at=? WHERE video_id=? AND state='open' AND revoked_at IS NULL", (ts, vid))
+    vdr_trash_do(c, uid, vid, step=True)  # 2.1002.0 (#5490): a trash step of the person's list (videos/vdkern.py undo_trash_reg)
     c.commit()
     return jsonify(ok=True)
+
+
+def vdr_own(c, uid, vid, deleted):
+    """2.1002.0 (#5490): the review for person uid with the right to change it NOW (also when an undo takes a step back:
+    uid is the person, not the request's me()); 404 unseen / (not) in the trash, 403 read-only."""
+    r = vdr_reload(c, int(vid))
+    if r is None or bool(r["deleted_at"]) != bool(deleted) or not vdr_may(c, uid, r):
+        raise Denied(404)
+    if not vdr_may(c, uid, r, write=True):
+        raise Denied(403)
+    return r
+
+
+def vdr_trash_do(c, uid, vid, step=False):
+    """2.1002.0 (#5490): the delete of vdr_delete without its commit (also the redo of a delete step / the undo of a restore
+    step): into the core's trash, its open customer link stops. step = a trash step of the person's list "Recent steps",
+    taken back through vdr_restore_do (videos/vdkern.py undo_trash_reg)."""
+    write_lock(c, f"obj-{VDR_KIND}-{int(vid)}")  # the trash state read under the lock of obj_trash / obj_restore
+    r = vdr_own(c, uid, vid, deleted=False)
+    if step:
+        undo_label(c, UG_TRASHED, ua_plain(r["title"], vid))
+        obj_trash_step(c, uid, VDR_KIND, vid, r["org_id"] or None, "trash")
+    ts = obj_trash(c, uid, VDR_KIND, vid, step=False)["deleted_at"]  # 2.947.0 (#5367): the core's trash (the step is the one above)
+    c.execute("UPDATE office_signoffs SET revoked_at=? WHERE video_id=? AND state='open' AND revoked_at IS NULL", (ts, int(vid)))
+
+
+def vdr_restore_do(c, uid, vid, step=False):
+    """2.1002.0 (#5490): the restore of vdr_restore without its place choice and commit (also the undo of a delete step): it
+    comes back where it hangs now; its customer links stay stopped (as the route). step = a restore step of the person."""
+    write_lock(c, f"obj-{VDR_KIND}-{int(vid)}")
+    r = vdr_own(c, uid, vid, deleted=True)
+    if step:
+        undo_label(c, UG_RESTORED, ua_plain(r["title"], vid))
+        obj_trash_step(c, uid, VDR_KIND, vid, r["org_id"] or None, "restore")
+    obj_restore(c, uid, VDR_KIND, vid, step=False)  # 2.947.0 (#5367): the core's trash
 
 
 @app.get("/api/videos/trash")
@@ -535,7 +572,7 @@ def vdr_restore(vid):
         if (o or None) != (r["org_id"] or None):
             raise Denied(409, tr("Invalid value: {0}", "list_id"))  # another workspace: that is "Move to another workspace"
         c.execute("UPDATE video_reviews SET list_id=? WHERE id=?", (lid, vid))
-    obj_restore(c, uid, VDR_KIND, vid, step=False)  # 2.947.0 (#5367): the core's trash
+    vdr_restore_do(c, uid, vid, step=True)  # 2.1002.0 (#5490): a restore step of the person's list (undo_trash_reg)
     c.commit()
     return jsonify(vdr_dict(c, vdr_reload(c, vid), uid, full=True))
 

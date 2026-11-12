@@ -57,7 +57,6 @@ BM_IMG_MAX = 1024 * 1024
 BM_TIMEOUT, BM_DEADLINE = 8, 10
 BM_PAGE = 60
 BM_KIND = "bookmark_link"  # 2.947.0 (#5367): the kind of the core's trash (life/lfkern.py; its undo kind is "bookmark")
-BM_TRASH_DAYS = 7          # a deleted bookmark (undo possible) is purged after this
 BM_TICK = 20               # pending previews the watchdog queues per tick
 BM_STATES = ("unread", "read", "archived")
 # 2.97.0 review (M2): internal hosts a preview may reach -- only the operator's own list (env), never the calendar list: a

@@ -239,6 +239,11 @@ c.commit()
   kinds: the own runs of the bookmarks, feeds, video sign-offs (reviews; comments deleted on their own stay there), the
   calendars and the address books' line of `tp_tick` are gone. The rows in the trash before 2.947.0 are the core's trash as
   they are (`deleted_by` empty: only who manages them restores them).
+- 2.1002.0 (#5490, stage 5b of the trash): deleting / restoring a video sign-off is a trash step of the person's list as
+  well, taken back the review's way (`videos/vdkern.py` `undo_trash_reg`: `vdr_restore_do` / `vdr_trash_do`, each with the
+  right to change it now; forward again stops its open customer link). Now every stage-5 kind has its step (calendar, address
+  book: `undo_trash_reg`; bookmark, feed: their own snap step) and its delete for good through the core (`trash_prune`,
+  purge hook where files or rows outside the core must go); no area keeps a run of its own beside it.
 - 2.936.0 (#5364, stage 2a of the trash: tasks and projects): their trash period is the core's run too. The kind `list`
   (`lists/lmcore.py`) and the light kind `task` (`core/objlight.py`; a light kind may have `trash_prune`, retention only)
   delete through their `obj_on_purge` hooks (`lists/listtrash.py otr_core_purge`: the project with its tasks and files;

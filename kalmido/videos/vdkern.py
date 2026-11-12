@@ -9,10 +9,15 @@ place check. The core's role: 'manage' for who may change it (vdr_may write: the
 its workspace), 'view' for who sees it. Its versions and comments go by FK cascade, so the core's hourly run deletes it after
 the trash period (trash_prune=True); videos/review.py vdr_trash_prune keeps only the comments deleted on their own.
 The reviews put into the trash before 2.947.0 (and the ones videos/vdrescue.py rescues there before a hard delete) are the
-core's trash as they are (deleted_at; deleted_by NULL)."""
+core's trash as they are (deleted_at; deleted_by NULL).
+2.1002.0 (#5490): deleting and restoring a review (vdr_delete / vdr_restore) are trash steps of the person's list "Recent
+steps", taken back the review's way (core/undoweb.py undo_trash_reg): back = vdr_restore_do, forward = vdr_trash_do -- each
+checks the right to change it NOW (vdr_own: its place, its files) and the forward way stops its open customer link again."""
 from ..core.i18n import N_
+from ..core.db import bump  # 2.1002.0 (#5490)
 from ..core.objects import obj_register, obj_row
-from .review import VDR_KIND, vdr_may
+from ..core.undoweb import undo_trash_reg  # 2.1002.0 (#5490)
+from .review import VDR_KIND, vdr_may, vdr_restore_do, vdr_trash_do
 
 
 def _space(c, rid):
@@ -38,3 +43,18 @@ obj_register(VDR_KIND, "video_reviews", label=N_("Video sign-off"), fields={}, a
              fsref=False, space=_space, base_role=_base, visible=_visible, cap=lambda c, uid, rid: None,
              title=lambda c, rid: ((obj_row(c, VDR_KIND, rid) or {"title": ""})["title"] or ""),
              open_url=lambda rid: "videos", trash_prune=True)
+
+
+def _vd_back(c, uid, vid):
+    """2.1002.0 (#5490): a review's delete step taken back / its restore step forward again = out of the trash (no step of its own)."""
+    vdr_restore_do(c, uid, vid)
+    bump(c)
+
+
+def _vd_away(c, uid, vid):
+    """2.1002.0 (#5490): a review's restore step taken back / its delete step forward again = into the trash (its link stops)."""
+    vdr_trash_do(c, uid, vid)
+    bump(c)
+
+
+undo_trash_reg(VDR_KIND, _vd_back, _vd_away)

@@ -86,6 +86,9 @@ function vdr_cache(r, gone) {
   vdr_redrawView();
 }
 const vdr_forget = () => { VDR.by = {}; };
+// 2.1002.0 (#5490): deleting / restoring a review is a step of the server (core/undoweb.py): after an undo / redo the shown
+// sections fetch their reviews again (vdr_rows), a review taken back out of the trash shows up again
+histReloader('videos', () => { if (!Object.keys(VDR.by).length) return; vdr_forget(); if (S.sel) vdr_redrawTask(S.sel); vdr_redrawView(); });
 
 // ---- a new review: a link (+ an optional title)
 function vdr_new(k, id) {

@@ -50,7 +50,6 @@ RSS_TITLE_MAX = 300
 RSS_URL_MAX = 2000
 RSS_PAGE = 50
 RSS_KIND = "rss_feed"     # 2.947.0 (#5367): the kind of the core's trash (life/lfkern.py; its undo kind is "feed", life/rssundo.py)
-RSS_TRASH_DAYS = 7         # a deleted feed (undo possible) is purged after this
 RSS_UA = {"Accept": "application/rss+xml, application/atom+xml, application/rdf+xml, application/xml, text/xml;q=0.9, */*;q=0.5",
           # 2.172.0 B (#2678): an own sender for feeds (the calendar one stays for calendars)
           "User-Agent": f"{APP_NAME}/{APP_VERSION} (feed reader; +https://kalmido.com)"}
