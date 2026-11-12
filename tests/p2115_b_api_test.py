@@ -243,18 +243,28 @@ check(Fk.post(B + f"/api/orgs/{ORG}/invites/{NU}/resend").status_code == 404 and
 n_mails = len(mails())
 r = Bo.post(B + f"/api/orgs/{ORG}/invites/{NU}/resend")
 check(r.ok and "#invite/" not in r.text, "resend: mailed, no link in the answer")
-ml2 = until(lambda: mails()[n_mails:] if len(mails()) > n_mails else [], 10)
-txt2 = "".join(p.get_payload(decode=True).decode() for p in email.message_from_string(ml2[-1]["raw"]).walk()
-               if p.get_content_type() == "text/plain") if ml2 else ""
-m2 = LINK_RE.search(txt2)
-new_link = m2.group(0) if m2 else ""
-check(r.ok and new_link and new_link != inv["link"], "resend: a new link")
+# 2.965.0 (#5640): wait for the resent mail itself (to nina, a link other than the first one). Under CI load a mail queued
+# before (the "invites you to join" mail of the carol / second nina invitation above) could arrive after n_mails was counted;
+# "the newest new mail" was then that one, without a link (CI v2.929.0: IndexError on new_link)
+
+
+def _resent():
+    for x in mails()[n_mails:]:
+        if any(a.lower() == "nina.new@example.com" for a in x["to"]):
+            m = LINK_RE.search(plain(email.message_from_string(x["raw"])))
+            if m and m.group(0) != inv["link"]:
+                return m.group(0)
+    return ""
+
+
+new_link = until(_resent, 20)
+check(r.ok and new_link and new_link != inv["link"], f"resend: a new link (new mails: {[x['to'] for x in mails()[n_mails:]]})")
 check(s0.post(B + "/api/auth/invite/check", json={"token": old_tok}).status_code == 404, "the old link stops working")
 
 # ---- accept: password, signed in, in the organisation
 N1 = requests.Session()
 N1.headers.update(H)
-r = N1.post(B + "/api/auth/invite/accept", json={"token": new_link.split("#invite/")[1], "password": "password123"})
+r = N1.post(B + "/api/auth/invite/accept", json={"token": (new_link.split("#invite/") + [""])[1], "password": "password123"})
 check(r.ok and r.json().get("ok"), "accepting sets the password and signs in " + r.text[:200])
 # 2.453.0 (#3780): the person sees the invitation and joins by accepting it, no dead end without an organisation
 nws = N1.get(B + "/api/news?limit=50").json().get("items", [])
