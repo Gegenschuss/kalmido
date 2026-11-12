@@ -586,7 +586,8 @@ ORDER = (
     "office.recurring",  # 2.91.0 A (#1923): invoice series (a template invoice every month / quarter / year, drafts or sent)
     "office.subs",  # 2.91.0 B (#1924): subscriptions and tools (fixed costs with notice period, users, renewal reminder)
     "office.storefill",  # 2.357.0 (#3221): once: the stored files of finalised documents from before they were stored (no routes)
-    "office.girocode", "office.dunning",  # 2.147.1 B (#2054): the GiroCode (EPC QR), payment reminders suggested for overdue invoices
+    "office.girocode", "office.dunning",
+    "office.offerexp",  # 2.1064.0 (#5818): a sent quotation without an answer rings the bell before / after its "valid until"  # 2.147.1 B (#2054): the GiroCode (EPC QR), payment reminders suggested for overdue invoices
     "office.officemove",  # 2.97.0 C (#2049): office data between the personal office and an organisation's office
     "office.pbtransfer",  # 2.137.0 D (#1981): the personal office into an existing organisation (after office.officemove)
     "office.owrite",  # 2.567.0 (#4711): the one write call of an office row on the core's write layer (lock, version, history, undo)

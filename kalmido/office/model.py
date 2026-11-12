@@ -159,6 +159,9 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.147.1 B (#2054): suggest payment reminders for overdue invoices (office/dunning.py: on, days after
                      # the due date / the last reminder's deadline) and the GiroCode on invoices + reminders (office/girocode.py)
                      "dunning_suggest": 1, "overdue_notice": 1, "dunning_grace_days": 7, "girocode": 1,
+                     # 2.1064.0 (#5818): a sent quotation without an answer rings the bell this many days before its "valid
+                     # until" and the day after it (office/offerexp.py); off = no notice
+                     "offer_exp_notice": 1, "offer_exp_days": 3,
                      # 2.355.0 D (#2846): default interest (section 288 BGB: base rate + 5 points, + 9 for businesses) and the
                      # 40 EUR flat fee (section 288 (5), businesses only) on reminders, both off by default; the base rate in percent
                      # (Bundesbank, valid from 1 July 2026: 1.52; set by hand each half year, never fetched); who counts as a
@@ -614,8 +617,10 @@ def office_settings_clean(c, oid, b, cur):
         elif k == "industry_packs":  # 2.47.0 (#1216)
             from .sheet import dk_packs_clean
             out[k] = dk_packs_clean(v)
-        elif k in ("dunning_suggest", "overdue_notice", "girocode"):  # 2.147.1 B (#2054); 2.367.4 (#2972): overdue_notice
+        elif k in ("dunning_suggest", "overdue_notice", "girocode", "offer_exp_notice"):  # 2.147.1 B (#2054); 2.367.4 (#2972): overdue_notice; 2.1064.0 (#5818)
             out[k] = 1 if v in (1, True, "1", "true") else 0
+        elif k == "offer_exp_days":  # 2.1064.0 (#5818): 1 to 30 days before "valid until"
+            out[k] = int(_num(v, k, 1, 30))
         elif k in ("dunning_interest", "dunning_flat_fee"):  # 2.355.0 D (#2846)
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k == "base_rate":  # 2.355.0 D (#2846): percent, may be negative (as in 2013-2022)

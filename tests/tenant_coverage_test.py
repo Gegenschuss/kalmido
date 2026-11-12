@@ -615,6 +615,7 @@ ROUTES = {
     "PATCH /api/office/docs/{}": "office", "DELETE /api/office/docs/{}": "office", "PUT /api/office/docs/{}/items": "office",
     "POST /api/office/docs/{}/reprice": "office",  # 2.1041.0 (#5812): repricing a quotation draft (p21041_a_reprice_test.py, tenant-matrix: office)
     "POST /api/office/docs/{}/number": "office", "POST /api/office/docs/{}/status": "office",
+    "POST /api/office/docs/{}/valid-until": "office",  # 2.1064.0 (#5818)
     "POST /api/office/docs/{}/duplicate": "office", "GET /api/office/docs/{}/render": "office",
     # ---- office (D, 2.36.1 #1021): the quotation PDF and the organisation's logo (4)
     "GET /api/office/docs/{}/pdf": "office", "GET /api/office/logo": "office", "POST /api/office/logo": "office",

@@ -859,6 +859,8 @@ def _watchdog_tick(c):
     _wd_section(c, "office store catch-up", osf_tick)  # 2.357.0 (#3221): once, finalised documents from before they were stored
     from ..office.dunning import dun_tick
     _wd_section(c, "payment reminder suggestions", dun_tick, now)  # 2.147.1 B (#2054): reminder drafts for overdue invoices
+    from ..office.offerexp import ofe_tick
+    _wd_section(c, "quotation expiry notices", ofe_tick, now)  # 2.1064.0 (#5818): a sent quotation without an answer, before / after "valid until"
     from ..office.letterlinks import ltl_followup_tick
     _wd_section(c, "letter follow-ups", ltl_followup_tick)  # 2.153.0 (#2028): a task when a sent letter got no answer in time
     from ..lists.rules import rul_due_tick

@@ -165,7 +165,7 @@ NOTIF_ROWS.push(['docflow', N_('Document flows'), N_('a flow of your documents t
 NOTIF_ROWS.push(['integration', N_('Integrations'), N_('a forwarding, webhook, mailbox or git connection of yours stopped working')]);  // 2.367.3 (#2971)
 NOTIF_ROWS.push(['limits', N_('E-mail limits of public pages'), N_('your client portal or booking page used up its sign-in or confirmation e-mails')]);  // 2.453.0 (#3781): News only
 NOTIF_ROWS.push(['notice', N_('Notices from the server'), N_('a maintenance notice sent as a push')]);  // 2.367.4 (#2974): push only
-NOTIF_ROWS.push(['office', N_('Payments and overdue invoices'), N_('a payment was booked on an invoice of your office, an invoice is past its due date (no push for that)'), 'office']);  // 2.367.4 (#2972)
+NOTIF_ROWS.push(['office', N_('Payments and overdue invoices'), N_('a payment was booked on an invoice of your office, an invoice is past its due date or a sent quotation runs out without an answer (no push for those two)'), 'office']);  // 2.367.4 (#2972); 2.1064.0 (#5818): + quotations
 NOTIF_ROWS.push(['calsub', N_('Calendar subscriptions'), N_('a calendar you subscribed to failed three times in a row')]);  // 2.367.2 (#2969): News only
 NOTIF_ROWS.push(['timebudget', N_('Budget warnings'), N_('a project or task of yours reached 80 % or 100 % of its budget in hours (once per threshold)')]);  // 2.555.0 (#4570)
 const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', mention: 'mention', assign: 'assign', complete: 'complete', status: 'status', share: 'share', unblock: 'unblock'};

@@ -33,6 +33,7 @@ function newsSummaryLine(g) {
     unshare: () => tr('removed'), usage: () => tr('usage limit'), errreport: () => tr('new error'), agentjoin: () => tr('an agent joined'), review: () => tr('review'), wiki_shared: () => tr('shared with you'),
     orgjoin: () => tr('Invitation'), evinvite: () => tr('Invitation'), evchange: () => tr('Calendar'), apbooking: () => tr('Calendar'), calsub: () => tr('Calendar'), orglogin: () => tr('Security events'), orgjoinres: () => tr('Invitation'), orgrole: () => tr('your role changed'), docpaid: () => tr('Payments'), docoverdue: () => tr('overdue'), connreq: () => tr('Request'), leavereq: () => tr('Request'), filereq: () => tr('Request'), signoff: () => tr('Client decisions'), orgdelnotice: () => tr('Organisation'), orggone: () => tr('Organisation'), whorgcut: () => tr('Organisation'), fetcherr: () => tr('Receipt fetcher'), docflow: () => tr('Document flows')};  /* 2.581.0 (#4803) */  // 2.361.0 (#2920)  // 2.266.0 (#2965): signoff  // 2.60.0 C (#1512): review; 2.126.2 B (#2355): wiki_shared; 2.183.0 A (#2623): never the raw kind
   L.budgetwarn = () => tr('Budget');  // 2.555.0 (#4570)
+  L.offerexp = n => trn('{0} quotation without an answer', '{0} quotations without an answer', n);  // 2.1064.0 (#5818)
   L.chatmention = n => trn('{0} mention', '{0} mentions', n);  // 2.1037.0 (#5800)
   return Object.entries(c).map(([k, n]) => (L[k] || (() => ''))(n)).filter((t, i, a) => t && a.indexOf(t) === i).join(' · ');  // 2.183.0 A (#2623): unknown kinds say nothing
 }

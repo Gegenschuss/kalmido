@@ -67,7 +67,8 @@ NEWS_KINDS += ("job_watch",)  # 2.392.2 (#3366): the watchdog found a job of an 
 NEWS_KINDS += ("docflow",)  # 2.581.0 (#4803): a document flow tells me about a document (row "docflow", docs/flows.py; News only)
 NEWS_KINDS += ("agentask",)  # 2.1039.0 (#5805): an agent asks me in its chat (row "approval", agents/chatnews.py; one row per agent)
 NEWS_KINDS += ("budgetwarn",)  # 2.555.0 (#4570): a project / task reached 80 % / 100 % of its "Budget h" (row "timebudget", personal/budgetwarn.py)
-NEWS_KINDS += ("chatmention",)  # 2.1037.0 (#5800): @me in a team chat channel / group / project conversation (row "mention", collab/teamchat.py tcm_news)
+NEWS_KINDS += ("chatmention",)  # 2.1037.0 (#5800)
+NEWS_KINDS += ("offerexp",)  # 2.1064.0 (#5818): a sent quotation without an answer expires soon / has expired (row "office", office/offerexp.py; News only): @me in a team chat channel / group / project conversation (row "mention", collab/teamchat.py tcm_news)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evchange", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -105,7 +106,7 @@ NEWS_FOR_ME_ANY = ("evinvite", "tbl_urgent", "proposal", "playbook_proposal", "j
 
 def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
-    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr", "evchange", "apbooking", "calsub", "integfail", "docoverdue", "orglogin", "budgetwarn", "docflow"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
+    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr", "evchange", "apbooking", "calsub", "integfail", "docoverdue", "orglogin", "budgetwarn", "docflow", "offerexp"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
     if kind in NEWS_DUE_KINDS:  # 2.1037.0 (#5801): a follow-up day / an agent's proposal waits on me (were "For you" in the app only)
         return True
@@ -303,6 +304,7 @@ KIND_ROW["review"] = "review"  # 2.60.0 C (#1512)
 KIND_ROW["evchange"] = KIND_ROW["apbooking"] = "assign"  # 2.367.2 (#2969): like the invitation and the booking's push
 KIND_ROW["calsub"] = "calsub"
 KIND_ROW["docpaid"] = KIND_ROW["docoverdue"] = "office"  # 2.367.4 (#2972)
+KIND_ROW["offerexp"] = "office"  # 2.1064.0 (#5818)
 KIND_ROW["orglogin"] = "usage"  # 2.367.4 (#2974)
 KIND_ROW["orgjoinres"] = KIND_ROW["orgrole"] = "share"
 KIND_ROW["aprequest"] = "assign"  # 2.367.2 (#2968): like the assignment it replaces
@@ -794,6 +796,10 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         elif kind in ("docpaid", "docoverdue"):  # 2.367.4 (#2972): while I am still in that office
             from ..office.dunning import dun_news_live
             if not nw_once(("dun", nw_int(nw_data(r).get("org_id"))), lambda: dun_news_live(c, uid, r["data"])):  # 2.674.0 B (#4194): once per office
+                continue
+        elif kind == "offerexp":  # 2.1064.0 (#5818): while I am in that office and the quotation still waits with that date
+            from ..office.offerexp import ofe_news_live
+            if not ofe_news_live(c, uid, r["data"]):
                 continue
         elif kind in ("ptlimit", "apblimit"):  # 2.138.4 C (#2380): the portal's sign-in mails of my space were used up (no task, no list); 2.360.2 L (#2561): the booking page's
             pass

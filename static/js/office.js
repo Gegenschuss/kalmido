@@ -536,6 +536,8 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-numat', tr('Quotation number'), ofcSel('os-numat', s.offer_number_at || 'create', [['create', tr('when the quotation is created (drafts leave gaps)')], ['finalize', tr('when it is finalised')]]))}${ofcII('numat')}
     ${ofcRowF('os-counter', tr('Counter for quotations'), ofcSel('os-counter', s.offer_counter || 'org', [['org', OFC.info.personal ? tr('one for all quotations') : tr('per organisation')], ['client', tr('per client')], ['project', tr('per project')]]))}${ofcII('counter')}
     ${ofcRowF('os-valid', tr('Quotation valid for'), `<span class="lacts"><input id="os-valid" value="${esc(String(s.offer_valid_days ?? 30))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('valid')}
+    ${ofcChk('os-oexp-on', tr('Tell me when a sent quotation runs out without an answer'), +(s.offer_exp_notice ?? 1))}${/* 2.1064.0 (#5818): the bell, office/offerexp.py */ ''}
+    ${ofcRowF('os-oexp-days', tr('Notice before it runs out'), `<span class="lacts"><input id="os-oexp-days" value="${esc(String(s.offer_exp_days ?? 3))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}
     ${ofcChk('os-accept-on', tr('Print the order confirmation with signature line'), s.accept_on ?? 1)}
     <div class="row"><button type="button" class="btn sm" data-ltm="sig">${ic('edit', 's')} ${tr('E-mail signature…')}</button></div>
     ${ofcChk('os-sign-offers', tr('Signature under quotations and payment reminders'), s.sign_offers)}<p class="muted ofchint">${esc(tr('The signature picture of the person who finalises the document (Correspondence > Signature); drafts stay without.'))}</p>
@@ -889,6 +891,7 @@ function ofcSettingsBody(form) {
     ...($('#os-logo-size', form) ? {logo_size: v('#os-logo-size'), logo_pos: v('#os-logo-pos')} : {}),  // 2.406.0 (#3501)
     lang: v('#os-lang'), currency: v('#os-currency'), ...($('#os-fx', form) ? ost_fxBody(OFC.info.settings || {}, ofcNum(v('#os-fx'), true)) : {}),  // 2.424.0 A (#3572): out of the comment again
     ...($('select#os-home', form) ? {home_currency: v('#os-home')} : {}), offer_scheme: v('#os-scheme'), offer_valid_days: ofcNum(v('#os-valid')),
+    ...($('#os-oexp-on', form) ? {offer_exp_notice: $('#os-oexp-on', form).checked ? 1 : 0, offer_exp_days: ofcNum(v('#os-oexp-days')) || 3} : {}),  // 2.1064.0 (#5818)
     raw_factor: ofcNum(v('#os-rf'), true),  // 2.113.1 (#2251): producing only through an industry pack's option (below)
     ...($('#os-sf', form) ? {share_factor: ofcNum(v('#os-sf'), true), share_rate: ofcNum(v('#os-sr')), producing_service_id: +v('#os-ps') || null, producing_on: $('#os-prod-on', form)?.checked ? 1 : 0} : {}),
     raw_on: $('#os-raw-on', form)?.checked ? 1 : 0,
@@ -1016,6 +1019,7 @@ const OST_FLAT = {'os-color': 'color', 'os-lang': 'lang', 'os-currency': 'curren
   'os-counter': 'offer_counter',  // 2.118.0 A (#2265)
   'os-paper': 'paper',  // 2.357.0 A (#3156)
   'os-logo-size': 'logo_size', 'os-logo-pos': 'logo_pos',  // 2.406.0 (#3501)
+  'os-oexp-on': 'offer_exp_notice', 'os-oexp-days': 'offer_exp_days',  // 2.1064.0 (#5818)
   'os-ovd-on': 'overdue_notice', 'os-dun-on': 'dunning_suggest', 'os-dun-days': 'dunning_grace_days', 'os-girocode': 'girocode',  // 2.147.1 B (#2054): each saves alone
   'os-dun-int': 'dunning_interest', 'os-dun-flat': 'dunning_flat_fee', 'os-dun-base': 'base_rate', 'os-dun-kind': 'dunning_client_kind',  // 2.355.0 D (#2846)
   'os-sf': 'share_factor', 'os-sr': 'share_rate',  // 2.113.1 (#2251): producing by amount (film pack option)

@@ -637,6 +637,7 @@ ROUTES = {
     "POST /api/office/docs/{}/number": "office", "POST /api/office/docs/{}/parts": "office",
     "POST /api/office/docs/{}/payments": "office", "POST /api/office/docs/{}/send": "office",
     "POST /api/office/docs/{}/signoff": "office", "POST /api/office/docs/{}/status": "office",
+    "POST /api/office/docs/{}/valid-until": "office",  # 2.1064.0 (#5818): extend a sent quotation (p5818_offer_expiry_test.py)
     "POST /api/office/fixed-costs": "office", "POST /api/office/fixed-costs/delete": "office",
     "POST /api/office/fixed-costs/category-rename": "office",  # 2.581.0 (#4820)
     "POST /api/office/fixed-costs/import": "office", "POST /api/office/fixed-costs/import/preview": "office",

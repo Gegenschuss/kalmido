@@ -120,7 +120,7 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   // 2.183.0 A (#2623): the summary line of a News group never shows a raw kind ("orgjoin"); unknown kinds say nothing
   const sl = k => w.eval(`newsSummaryLine({items: [[{kind: '${k}', count: 1}, 0]]})`);
   check(/^(Invitation|Einladung)$/.test(sl('orgjoin')), 'an organisation invitation reads "Invitation", not "orgjoin": ' + sl('orgjoin'));
-  for (const k of ['evinvite', 'connreq', 'leavereq', 'tsheet', 'signup', 'wiki_shared', 'ptlimit', 'apblimit', 'docpaid', 'docoverdue', 'orglogin', 'orgjoinres', 'orgrole', 'zzunknown']) check(!sl(k).includes(k), `kind ${k} is not shown raw: ${sl(k)}`);
+  for (const k of ['evinvite', 'connreq', 'leavereq', 'tsheet', 'signup', 'wiki_shared', 'ptlimit', 'apblimit', 'docpaid', 'docoverdue', 'offerexp', 'orglogin', 'orgjoinres', 'orgrole', 'zzunknown']) check(!sl(k).includes(k), `kind ${k} is not shown raw: ${sl(k)}`);
   check(sl('zzunknown') === '', 'an unknown kind leaves the summary empty');
   // 2.367.4 (#2972, #2974): the new items read as text
   const nt = (k, d) => w.eval(`newsText({kind: '${k}', data: ${JSON.stringify(d)}, actors: []}, {})`);

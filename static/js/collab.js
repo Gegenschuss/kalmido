@@ -339,6 +339,8 @@ function newsText(it, U) {
     case 'apbooking': return (d.what === 'new' ? tr('New booking: {0}', q(d.line || '')) : tr('Booking cancelled by the client: {0}', q(d.line || '')));  // 2.367.2 (#2969)
     case 'docpaid': return tr('Payment received: {0}', q([d.number, d.client].filter(Boolean).join(', ')));  // 2.367.4 (#2972)
     case 'docoverdue': return d.n > 1 ? tr('{0} invoices are overdue', d.n) : tr('Invoice overdue: {0}', q([d.number, d.client].filter(Boolean).join(', ')));
+    case 'offerexp': { const w = q([d.number, d.client].filter(Boolean).join(', '));  // 2.1064.0 (#5818): office/offerexp.py
+      return d.state === 'gone' ? tr('Quotation {0} has expired without an answer', w) : +d.days > 0 ? trn('Quotation {1} expires in {0} day', 'Quotation {1} expires in {0} days', +d.days, w) : tr('Quotation {0} expires today', w); }
     case 'calsub': return tr('Your calendar subscription {0} keeps failing. Its events may be out of date.', q(d.name || ''));  // 2.367.2 (#2969)
     case 'budgetwarn': { const nm = q(d.scope === 'task' ? it.task_title || '' : newsListName(it)), hh = esc(tr('{0} of {1} h', fmtNum(d.tracked_h ?? 0, 1), fmtNum(d.h ?? 0, 1)));  // 2.555.0 (#4570)
       return d.level >= 100 ? tr('{0} is over its budget: {1}', nm, hh) : tr('{0} reached 80 % of its budget: {1}', nm, hh); }
@@ -535,7 +537,7 @@ async function newsOpen(i, opts) {
   if (it.kind === 'tsheet') { tsl_open(it.data); return; }  // 2.125.0 B (#2119): the time page on that month
   if (it.kind === 'wiki_shared') { if (feat('wiki')) { S.wshFocus = true; go('wiki'); } else toast(tr('Switch on the knowledge pages in the settings to read it.')); return; }  // 2.126.2 B (#2355): "Shared with me"
   if (it.kind === 'upscan' && it.data?.where === 'chat') { if (feat('agents') && agentsOn()) go('agents'); return; }
-  if (it.kind === 'signoff' || it.kind === 'docpaid' || it.kind === 'docoverdue') { const k = String(it.data?.click || ''); if (k.startsWith('#') && k.length > 1) go(k.slice(1)); return; }  // 2.266.0 (#2965): the quotation / document / video
+  if (it.kind === 'signoff' || it.kind === 'docpaid' || it.kind === 'docoverdue' || it.kind === 'offerexp') { const k = String(it.data?.click || ''); if (k.startsWith('#') && k.length > 1) go(k.slice(1)); return; }  // 2.266.0 (#2965): the quotation / document / video
   if (it.kind === 'whorgcut') { settingsModal('webhooks'); return; }  // 2.380 G (#3391): Settings > Access, the webhooks
   if (it.kind === 'signup' && it.data?.org_id) { settingsModal('org'); return; }  // 2.464.0 (#3882): the person's row in the organisation
   if (it.kind === 'orglogin' || it.kind === 'orgjoinres' || it.kind === 'orgrole') return;
@@ -552,7 +554,7 @@ async function newsOpen(i, opts) {
 // ---- 2.122.0 (#2314): phones: a sideways swipe on the task opened from the news goes to the next (left) / previous (right)
 // UNREAD news in the order and with the filter (tab, kind, workspace) of the list; it is marked read like on opening. None left:
 // a short notice, the view stays. Same exceptions as the swipe on tasks (detail.js, #1071); the swipe on the list rows stays.
-const NSW_SKIP = /^(orglogin|orgjoinres|orgrole|proposal|playbook_proposal|evinvite|evchange|apbooking|calsub|docpaid|docoverdue|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared|orgdelnotice|orggone|whorgcut|integfail)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
+const NSW_SKIP = /^(orglogin|orgjoinres|orgrole|proposal|playbook_proposal|evinvite|evchange|apbooking|calsub|docpaid|docoverdue|offerexp|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared|orgdelnotice|orggone|whorgcut|integfail)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
 const nswOn = () => !!S.nswTask && S.sel === S.nswTask;
 function nswTarget(dir) {
   const its = S.nf.items || [], cur = its.findIndex(x => x.id === S.nswId);

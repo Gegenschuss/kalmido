@@ -520,6 +520,8 @@ def doc_public(c, oid, r, admin, items=True):
         d["cf_chain"] = cf8_chain(c, oid, r)  # 2.88.0 (#1915): which version of the chain counts in the cash flow
         from .offertasks import otk_count
         d["offer_tasks"] = otk_count(c, r)  # 2.537.0 C (#3433): tasks made from this quotation's chain in its project
+        from .offerexp import ofe_doc_state
+        d["offer_exp"] = ofe_doc_state(c, oid, r)  # 2.1064.0 (#5818): sent, no answer, near / past "valid until" -> the editor's note
     from .peppol import pep_doc_extra
     pep_doc_extra(c, oid, d)  # 2.154.0 B (#1960): the newest Peppol send of an invoice / credit note
     if items:
@@ -528,7 +530,7 @@ def doc_public(c, oid, r, admin, items=True):
     return d
 
 
-def doc_brief(r, pm=None, lg=None):
+def doc_brief(r, pm=None, lg=None, today=None):
     rec = _j(r["recipient"], {})
     t = _j(r["totals"], {})
     pm = pm if pm is not None else {}
@@ -543,6 +545,8 @@ def doc_brief(r, pm=None, lg=None):
          "locked": ofx_locked(r), "due_date": r["due_date"] if "due_date" in r.keys() else None, "cancels_id": r["cancels_id"] if "cancels_id" in r.keys() else None,
          "inv_type": r["inv_type"] if "inv_type" in r.keys() else "",  # 2.120.0 A (#2087)
          "trial": bool(r["trial"]) if "trial" in r.keys() else False}  # 2.144.10 A (#2576)
+    if r["kind"] == "offer":  # 2.1064.0 (#5818): sent, no answer and past "valid until" = the mark "expired" in the list
+        d["expired"] = r["status"] == "sent" and bool(r["valid_until"]) and r["valid_until"] < (today or local_now().date().isoformat())
     if r["kind"] == "offer" and "cashflow" in r.keys():  # 2.88.0 (#1915)
         d.update(version_of=r["version_of"], cashflow=r["cashflow"] or "auto", replaces_id=r["replaces_id"] if "replaces_id" in r.keys() else None)  # 2.437.0 B (#3621): replaces_id
     if r["kind"] in ("invoice", "credit"):
@@ -1453,7 +1457,8 @@ def odoc_list():
     if paid and not derived:
         pm = inv_paid_map(c, oid, [r["id"] for r in raw])
     lg = lang()
-    rows = [doc_brief(r, pm, lg) for r in raw]
+    day = local_now().date().isoformat()  # 2.1064.0 (#5818): one day for the whole list (the mark "expired")
+    rows = [doc_brief(r, pm, lg, day) for r in raw]
     if kind == "offer":
         from .offerlink import oil_list_marks
         oil_list_marks(c, oid, rows)  # 2.356.0 C (#3005)

@@ -619,6 +619,8 @@ ul.ofdpick .chkl{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75re
 .dun-hint span:first-of-type{flex:1}
 button.dun-hint{cursor:pointer}
 .dun-tag{margin-left:.375rem}
+.ofe-exp{margin-left:.375rem;color:var(--danger)}  /* 2.1064.0 (#5818): a sent quotation past "valid until" without an answer */
+.ofe-note{flex-wrap:wrap;align-items:center}.ofe-note>.lacts{flex:0 1 auto;display:flex;flex-wrap:wrap;gap:.375rem}
 .rin-list .rin-it{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .75rem;padding:.375rem 0;border-bottom:1px solid var(--line2)}
 .rin-list .rin-it:last-child{border-bottom:0}
 .rin-it .ofcn{flex:1 1 12rem}
