@@ -1188,6 +1188,7 @@ def init_db(guard=True, load=None):
         # 2.25.0 (#931), once: lists created in a shared folder by a project type / template, an agent's briefing, an import,
         # family or life were not shared with the folder's people. Only lists created AFTER the folder was shared and
         # without that person get it now (one shared before and missing now was taken away on purpose); idempotent.
+        from ..lists.lffolder import lf_migrate, lf_people_rows, lf_resync  # 2.997.0 (#5677): one import for #931 and #2748 below (layers budget)
         if gsetting(c, "migr_folder931") != "1":
             from ..lists.lists import _folder_member_add, _in_folder, collab_all as _ca
             n = 0
@@ -1200,7 +1201,6 @@ def init_db(guard=True, load=None):
             elif _ca():  # 2.997.0 (#5677): folder_people is gone since 2.958.0 (#5245) -- the folders' shares (fs_shares, read as
                 # its old rows by lf_people_rows) reach a list as a folder role (frole) once it lies under the folder: grp_sync places
                 # it (lf_place) and computes its roles, a person taken off by hand stays off (list_folder_skip)
-                from ..lists.lffolder import lf_people_rows, lf_resync
                 lids = set()
                 with pg_system_ctx(c):  # every owner's lists and folders (as lf_migrate)
                     for fp in lf_people_rows(c):
@@ -1228,7 +1228,6 @@ def init_db(guard=True, load=None):
         # 2.352.0 A (#2748), once (one-way): the folders of the lists go into the file store's projects trees, folder shares
         # become shares of those folders (rights at runtime, list_members.frole); folder_people stays readable
         if gsetting(c, "migr_lf2352") != "1":
-            from ..lists.lffolder import lf_migrate
             n = lf_migrate(c)
             gset(c, "migr_lf2352", "1")
             if any(n.values()):
