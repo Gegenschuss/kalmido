@@ -915,7 +915,9 @@ def task_delete(tid):
         if c.execute(f"SELECT 1 FROM tasks WHERE id=? AND {live_sql()}", (tid,)).fetchone():
             do_delete(c, tid)
         wh_note(c, tid, "purge")
-        _n, files = tre_purge(c, uid, [tid], purge_lists(c, uid), strict=True)
+        # its own list counts as the person's (need_task said owner: also an organisation's admin of a shared project)
+        lid = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0]
+        _n, files = tre_purge(c, uid, [tid], purge_lists(c, uid) | {lid}, strict=True)
     else:
         trash_task(c, tid)
     bump(c)
