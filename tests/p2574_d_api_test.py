@@ -251,6 +251,22 @@ r = react(Ca, K4)
 check(r.ok and r.json().get("merge") == "waiting" and sugg(K4)["state"] == "open", f"merge request: the first 👍 waits {r.text[:160]}")
 r = react(Da, K4)
 check(r.ok and r.json().get("merge") == "approved" and sugg(K4)["state"] == "approved", f"merge request: the second 👍 approves {r.text[:160]}")
+# 2.1010.0 (#4033): a first approval only counts while its person still may approve
+K6 = req()
+check(decide(Da, K6).json().get("state") == "waiting", "#4033: dave approves first")
+check(Ca.put(B + f"/api/lists/{LG}/members", json={"user_id": DAVE, "role": "edit"}).ok, "#4033: dave is no project admin any more")
+r = decide(Ca, K6)
+check(r.ok and r.json()["state"] == "waiting" and sugg(K6)["state"] == "open" and [a["by"] for a in sugg(K6)["approvals"]] == [CAROL],
+      f"#4033: the first approval of a former approver does not count ({r.text[:160]})")
+check(Ca.put(B + f"/api/lists/{LG}/members", json={"user_id": DAVE, "role": "admin"}).ok, "#4033: dave is project admin again")
+K7 = req("merge_request")
+react(Da, K7)
+check(Ca.put(B + f"/api/lists/{LG}/members", json={"user_id": DAVE, "role": "edit"}).ok, "#4033: dave loses the admin role again")
+r = react(Ca, K7)
+check(r.ok and r.json().get("merge") == "waiting" and sugg(K7)["state"] == "open", f"#4033: merge request: a stale first 👍 does not count {r.text[:160]}")
+check(Ca.put(B + f"/api/lists/{LG}/members", json={"user_id": DAVE, "role": "admin"}).ok, "#4033: dave is project admin again")
+r = decide(Da, K6)
+check(r.ok and r.json()["state"] == "approved", f"#4033: an approver again, his 👍 is the second one ({r.text[:160]})")
 # a person without an organisation, alone in the project with the own agent: the switch keeps the request open
 LF = F.post(B + "/api/lists", json={"name": "Solo release", "kind": "project"}).json()["id"]
 r = F.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": "Frida Bot"})

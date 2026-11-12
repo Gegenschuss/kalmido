@@ -112,6 +112,10 @@ def gate_two_eyes(c, k, t, sug, uid):
     if not r or not r["two_eyes"]:
         return False
     ap = [a for a in (sug.get("approvals") or []) if isinstance(a, dict)]
+    # 2.1010.0 (#4033): a first approval only counts while its person still may approve (role taken away, account disabled,
+    # no longer allowed to address the agent: it drops out and the request waits for a second approver again)
+    mr = sug.get("kind") == "merge_request"
+    ap = [a for a in ap if a.get("by") == uid or is_approver(c, t, a.get("by"), agent=k["user_id"], assignee=mr)]
     if any(a.get("by") != uid for a in ap):
         sug["approvals"] = ap + [{"by": uid, "at": iso(now_utc())}]
         return False
