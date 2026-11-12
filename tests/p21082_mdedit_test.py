@@ -180,33 +180,39 @@ check(api("POST", f"/lists/{FL}/overview/replace-section", h=OH, json={"heading"
 check("intruder" not in F.get(OV).json()["description"], "her description stays hers")
 
 # ================================================================ a knowledge page: replace a section
+# her own token with the knowledge scopes: an agent's write to a page is never placed in a project, so even a "free"
+# personal agent asks first (agents/control.py ctl_lists: unknown) -- the card is checked below with the task steps
+WT = F.post(B + "/api/me/tokens", json={"name": "wiki", "scopes": ["read", "wiki:read", "wiki:write"]}).json().get("token")
+WH = {"Authorization": "Bearer " + WT}
+OWT = OTTO.post(B + "/api/me/tokens", json={"name": "wiki", "scopes": ["read", "wiki:read", "wiki:write"]}).json().get("token")
+OWH = {"Authorization": "Bearer " + OWT}
 w = F.post(B + "/api/wiki/pages", json={"space": "private", "path": "Kit/Guide", "body": "# Guide\n\n## Setup\nold\n\n## Use\nrun\n"})
 check(w.status_code in (200, 201), f"setup: a private knowledge page {w.status_code}")
 PID = w.json().get("id")
 FOL = {f["path"]: f["id"] for f in F.get(B + "/api/wiki", params={"space": "private"}).json().get("folders", [])}
 check(F.post(B + f"/api/files/nodes/{FOL.get('Kit')}/shares", json={"agent_id": FA, "role": "edit"}).status_code == 201, "setup: folder shared")
-r = api("POST", f"/wiki/pages/{PID}/replace-section", json={"heading": "Setup", "text": "new"})
+r = api("POST", f"/wiki/pages/{PID}/replace-section", h=WH, json={"heading": "Setup", "text": "new"})
 check(r.status_code == 400 and err(r).get("code") == "version_required", "page: replace without a version 400")
 # review F3: a version that is no string, or an empty If-Match, is no version
-check(api("POST", f"/wiki/pages/{PID}/replace-section", json={"heading": "Setup", "text": "new", "expect_updated_at": False}).status_code == 400,
+check(api("POST", f"/wiki/pages/{PID}/replace-section", h=WH, json={"heading": "Setup", "text": "new", "expect_updated_at": False}).status_code == 400,
       "page: expect_updated_at false: 400")
-r = api("POST", f"/wiki/pages/{PID}/replace-section", h={**FH, "If-Match": "W/"}, json={"heading": "Setup", "text": "new"})
+r = api("POST", f"/wiki/pages/{PID}/replace-section", h={**WH, "If-Match": "W/"}, json={"heading": "Setup", "text": "new"})
 check(r.status_code == 400 and err(r).get("code") == "version_required", f"page: an empty If-Match is no version ({r.status_code})")
 r = api("POST", f"/lists/{FL}/overview/replace-section", h={**FH, "If-Match": '""'}, json={"heading": "Status", "text": "x"})
 check(r.status_code == 400 and err(r).get("code") == "version_required", f"description: an empty If-Match is no version ({r.status_code})")
-cur = api("GET", f"/wiki/pages/{PID}").json()
-r = api("POST", f"/wiki/pages/{PID}/replace-section", json={"heading": "Setup", "text": "pip install\nthen go", "expect_updated_at": cur["updated_at"]})
+cur = api("GET", f"/wiki/pages/{PID}", h=WH).json()
+r = api("POST", f"/wiki/pages/{PID}/replace-section", h=WH, json={"heading": "Setup", "text": "pip install\nthen go", "expect_updated_at": cur["updated_at"]})
 check(r.ok and r.json().get("body") == "# Guide\n\n## Setup\n\npip install\nthen go\n\n## Use\nrun\n", f"page: Setup replaced {r.status_code} {r.text[:200]}")
-cur = api("GET", f"/wiki/pages/{PID}").json()
-r = api("POST", f"/wiki/pages/{PID}/replace-section", json={"heading": "Setup", "text": "x", "expect_updated_at": "2000-01-01T00:00:00.000Z"})
+cur = api("GET", f"/wiki/pages/{PID}", h=WH).json()
+r = api("POST", f"/wiki/pages/{PID}/replace-section", h=WH, json={"heading": "Setup", "text": "x", "expect_updated_at": "2000-01-01T00:00:00.000Z"})
 check(r.status_code == 409, "page: an outdated version 409")
-r = api("POST", f"/wiki/pages/{PID}/replace-section", json={"heading": "Install", "text": "x", "expect_updated_at": cur["updated_at"]})
+r = api("POST", f"/wiki/pages/{PID}/replace-section", h=WH, json={"heading": "Install", "text": "x", "expect_updated_at": cur["updated_at"]})
 check(r.status_code == 404 and err(r).get("headings") == ["Guide", "Setup", "Use"], "page: an unknown heading 404 with the headings")
-r = api("POST", f"/wiki/pages/{PID}/replace-section", json={"heading": "Guide", "text": "", "expect_updated_at": cur["updated_at"]})
+r = api("POST", f"/wiki/pages/{PID}/replace-section", h=WH, json={"heading": "Guide", "text": "", "expect_updated_at": cur["updated_at"]})
 check(r.ok and r.json().get("body") == "# Guide\n", f"page: an empty text empties the level-1 section (to the end) {r.text[:200]}")
 # tenant: POST /api/v1/wiki/pages/{}/replace-section
-check(api("POST", f"/wiki/pages/{PID}/replace-section", h=OH, json={"heading": "Guide", "text": "i", "expect_updated_at": "x"}).status_code == 404,
-      "another person's agent: 404 on her page")
+check(api("POST", f"/wiki/pages/{PID}/replace-section", h=OWH, json={"heading": "Guide", "text": "i", "expect_updated_at": "x"}).status_code == 404,
+      "another person's token: 404 on her page")
 
 # ================================================================ the approval card shows only the change
 level(FA, "approve_all")
@@ -233,6 +239,10 @@ check(d.get("kind") == "task" and d.get("section") is True and d.get("added") ==
 M3 = card_of(api("POST", f"/lists/{FL}/overview/append", json={"text": "done soon"}), "description append")
 d = F.get(B + "/api/approvals/diff", params={"chat": M3}).json().get("diff") or {}
 check(d.get("kind") == "project" and d.get("added") == 1 and d.get("removed") == 0, f"the card of a description append {d}")
+cur = api("GET", f"/wiki/pages/{PID}").json()
+M4 = card_of(api("POST", f"/wiki/pages/{PID}/replace-section", json={"heading": "Guide", "text": "intro", "expect_updated_at": cur["updated_at"]}), "page replace")
+d = F.get(B + "/api/approvals/diff", params={"chat": M4}).json().get("diff") or {}
+check(d.get("kind") == "wiki" and d.get("section") is True and d.get("added") == 1 and d.get("removed") == 0, f"the card of a page section {d}")
 check("- a new risk" not in notes(T), "nothing ran before the Yes")
 
 sys.exit(done("p21082_mdedit"))
