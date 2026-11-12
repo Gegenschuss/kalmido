@@ -366,7 +366,8 @@ SUBST = [
     # objprobe exists only with KALMIDO_TEST_OBJ, obj_core_test.py / obj_write_test.py): the sweep calls them with it and an id
     # of the setup and expects 404 (EXPECT_4XX) -- the first real area on the core makes them stale, then its objects go here
     (r"/api/obj/$", "objkind"), (r"/api/obj/objprobe/$", "list"),
-    (r"/api/obj/doc_note/$", "docnode"),  # 2.981.0 (#5273): the notes of the own document through the comments' core (USE)
+    (r"/api/obj/doc_note/$", "docnode"),
+    (r"/api/obj/task/$", "task"), (r"/api/v1/agent/objects/task/$", "task"),  # 2.1076.0 (#5271): the links of the own task (a light kind of the core)  # 2.981.0 (#5273): the notes of the own document through the comments' core (USE)
     (r"/api/v1/agent/objects/$", "objkind"), (r"/api/v1/agent/objects/objprobe/$", "list"),
     (r"/api/team/dispo/callsheet/$", "dispojob"),  # 2.855.0 (#1956)
     (r"/api/team/dispo/callsheet/[^/]+/photo/$", "contact"),  # 2.993.0 (#5650): the logo of a contact on the call sheet
@@ -402,6 +403,7 @@ SUBST = [
     (r"/absences/$", "absence"), (r"/budget/$", "budget"),
 ]
 IDS["me"] = FID
+IDS["lkkind"] = "task"  # 2.1076.0 (#5271): the links' core knows the light kinds (task): the sweep reads the own task's links
 IDS["dnkind"] = "doc_note"  # 2.981.0 (#5273): the kind of the generic comment routes in the sweep (USE)
 IDS["ledgercsv"] = "bs"  # 2.666.0 (#3461): ledger/<what>.csv names a list, not an id; 2.685.0 (#5128): "bs" -- ledger/<what>.pdf knows bs / pl only
 
@@ -411,7 +413,8 @@ USE = {"GET /api/files/nodes/{}/requests": {"node": "folder"}, "GET /api/office/
        "GET /api/office/docs/{}/ubl": {"doc": "invoice"}, "GET /api/office/docs/{}/xml": {"doc": "invoice"},
        "GET /api/office/docs/{}/timesheet.pdf": {"doc": "invoice"}, "GET /api/tasks/{}/milestone": {"task": "milestone"},
        "GET /api/v1/tasks/{}/milestone": {"task": "milestone"},
-       "GET /api/obj/{}/{}/comments": {"objkind": "dnkind"}}  # 2.981.0 (#5273): objprobe has no comments; doc_note on the own document
+       "GET /api/obj/{}/{}/comments": {"objkind": "dnkind"},
+       "GET /api/obj/{}/{}/links": {"objkind": "lkkind"}, "GET /api/v1/agent/objects/{}/{}/links": {"objkind": "lkkind"}}  # 2.1076.0 (#5271)  # 2.981.0 (#5273): objprobe has no comments; doc_note on the own document
 # 2.421.0 A (#2936): route -> the query a GET needs ({key} = an id of IDS), so it answers with data instead of a 400
 FROM_TO = {"from": "2030-03-01", "to": "2030-03-31"}
 QUERY = {
