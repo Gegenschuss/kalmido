@@ -20,7 +20,7 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1009.0] - 2026-11-12
+## [2.1014.0] - 2026-11-12
 
 Package 2.1004 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Changed
@@ -60,6 +60,10 @@ Package 2.1001 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Security
 - #5669: sharing a list or a list folder by e-mail address binds only an account that proved the address (the core helper used by tables and wiki since #5643); an address nobody proved is answered like an unknown address and reaches nobody. The address path is decided once per request, and its answer carries nothing account-specific.
 
+## [2.1009.0] - 2026-11-12
+
+Not released (the CI of this version was red); its changes are listed under 2.1014.0.
+
 ## [2.1007.0] - 2026-11-12
 
 Not released (the CI of this version was red); its changes are listed under 2.1009.0.
@@ -68,7 +72,8 @@ Not released (the CI of this version was red); its changes are listed under 2.10
 
 Not released (the CI of this version was red); its changes are listed under 2.1007.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1009.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1014.0...HEAD
+[2.1014.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1014.0
 [2.1009.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1009.0
 [2.1007.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.1007.0
 [2.1001.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.1001.0
