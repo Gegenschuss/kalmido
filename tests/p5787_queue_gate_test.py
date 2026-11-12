@@ -42,7 +42,10 @@ reason2, groups2 = stages.queue(repo, [".github/workflows/ci.yml", "tests/stages
 check(set(hard) <= set(groups2) and len(groups2) < len(repo.first) / 3, f"the CI basics / VERSION make no full run in the queue ({len(groups2)} groups)")
 # the CI mode: merge_group -> stage=queue and the groups file
 head = subprocess.run(["git", "-C", R, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-base = subprocess.run(["git", "-C", R, "rev-parse", "HEAD~1"], capture_output=True, text=True).stdout.strip()
+base = subprocess.run(["git", "-C", R, "rev-parse", "--verify", "-q", "HEAD~1^{commit}"], capture_output=True, text=True).stdout.strip()
+# 2.1047.0 (#5841): the CI checks out a shallow clone (no HEAD~1) - a bare "rev-parse HEAD~1" echoed the literal "HEAD~1"
+# as the base and stages.py rightly fell back to the full run; without a parent the entry is compared with itself (no change)
+base = base or head
 if head and base:
     out = os.path.join(os.environ.get("TMPDIR", "/tmp"), f"p5787-groups-{os.getpid()}.txt")
     env = {k: v for k, v in os.environ.items() if not k.startswith(("GITHUB_", "CI_"))}
