@@ -28,6 +28,9 @@ acc.acx_lists_sql = lambda write=False, req=True, ov=True: "(SELECT l.id FROM li
 sys.modules["kalmido.core.access"] = acc
 otg = types.ModuleType("kalmido.core.objtags")  # 2.947.0 (#5275): the filter part of the core's tags, as SQL text only
 otg.obj_tag_sql = lambda col="tasks.id", by="name": f"EXISTS (SELECT 1 FROM obj_tag_links k WHERE k.kind='task' AND k.obj_id={col})"
+# 2.997.0 (#5671): dlock.py takes the personal tags too since 2.955.0 (#5276, obj_utag_sql) - the stub carries both
+otg.obj_utag_sql = lambda col="tasks.id", by="name", who="?": (f"EXISTS (SELECT 1 FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id "
+                                                              f"WHERE k.kind='task' AND k.obj_id={col} AND ot.scope_kind='user')")
 sys.modules["kalmido.core.objtags"] = otg
 pgm = types.ModuleType("kalmido.core.pg")  # 2.947.0 (#5275): dlock.py reads the lock's tags as "system" (system_ctx)
 pgm.system_ctx = lambda c: contextlib.nullcontext()
