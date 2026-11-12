@@ -15,7 +15,7 @@ from ..core.db import bump, gset, gsetting, iso, iso_ms, now_utc, usettings
 from ..core.usertz import hm_text, tz_gap, tz_of_s
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..accounts.session import me
-from ..core.access import acx_org_ok, collab_all, Denied, task_visible, trash_sql  # 2.947.0 (#5367): trash_sql
+from ..core.access import acx_org_ok, collab_all, Denied, live_sql, task_visible, trash_sql  # 2.947.0 (#5367): trash_sql; 2.1026.0: live_sql
 from ..core.dlock import dl_area_locked, dl_of, dl_tasks_locked  # 2.560.0 B (#4699)
 from ..core.objsearch import osr_ids_sql  # 2.1026.0 (#5280)
 from ..core.pages import valid_url
@@ -868,11 +868,11 @@ def ev_find(c, uid, raw, limit=20):
     if cals:
         q = ",".join("?" * len(cals))
         rows = [(r, cals[r["cal_id"]]) for r in c.execute(
-            f"SELECT * FROM events WHERE id IN {ids} AND cal_id IN ({q}) AND deleted_at IS NULL ORDER BY start DESC, id DESC LIMIT ?",
+            f"SELECT * FROM events WHERE id IN {ids} AND cal_id IN ({q}) AND {live_sql()} ORDER BY start DESC, id DESC LIMIT ?",
             [*args, *cals, int(limit)]).fetchall()]
     if collab_all():
         for r in c.execute(f"""SELECT e.*, k.org_id AS cal_org FROM events e JOIN event_attendees a ON a.event_id=e.id AND a.user_id=?
-                               JOIN ev_cals k ON k.id=e.cal_id WHERE e.id IN {ids} AND e.deleted_at IS NULL
+                               JOIN ev_cals k ON k.id=e.cal_id WHERE e.id IN {ids} AND {live_sql('e')}
                                ORDER BY e.start DESC, e.id DESC LIMIT ?""", [uid, *args, int(limit)]).fetchall():
             if r["cal_id"] not in cals and ev_att_ok(c, uid, r["cal_org"]):  # 2.87.0 (#1983)
                 rows.append((r, "attendee"))

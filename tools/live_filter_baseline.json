@@ -1,6 +1,6 @@
 {
  "about": "tools/check_live_filter.py (#5292): handwritten 'deleted_at IS NULL' per file; only shrinks",
- "total": 1018,
+ "total": 1017,
  "files": {
   "kalmido/accounts/discover.py": 6,
   "kalmido/accounts/onboarding.py": 5,
@@ -256,7 +256,7 @@
   "kalmido/wiki/wkfolder.py": 7,
   "kalmido/wiki/wkfshare.py": 2,
   "kalmido/wiki/wkmove.py": 6,
-  "kalmido/wiki/wksearch.py": 3,
+  "kalmido/wiki/wksearch.py": 2,
   "kalmido/wiki/wkshare.py": 5,
   "kalmido/wiki/wktags.py": 3,
   "kalmido/wiki/wkv1.py": 2
