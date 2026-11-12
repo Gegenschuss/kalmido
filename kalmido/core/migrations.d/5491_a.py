@@ -13,3 +13,9 @@ MIGRATIONS = [
     ("tasks", "deleted_by", "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deleted_by"
      " BIGINT REFERENCES users(id) ON DELETE SET NULL"),
 ]
+# every foreign key has an index (suite p2281_b_fkindex, #2281): partial, as the other *_by columns
+AFTER = [
+    "CREATE INDEX IF NOT EXISTS ix5491_lists_updated_by ON lists(updated_by) WHERE updated_by IS NOT NULL",
+    "CREATE INDEX IF NOT EXISTS ix5491_tasks_updated_by ON tasks(updated_by) WHERE updated_by IS NOT NULL",
+    "CREATE INDEX IF NOT EXISTS ix5491_tasks_deleted_by ON tasks(deleted_by) WHERE deleted_by IS NOT NULL",
+]
