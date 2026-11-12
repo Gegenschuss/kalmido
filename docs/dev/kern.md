@@ -1002,6 +1002,12 @@ part of `wks_search`). `kalmido/core/objwords.py`:
 - Knowledge pages a share of the core opens are searched by text too (`wiki/wksearch.py wks_find`, question 15).
 - The move: `osw_move` (`core/objhooks.py MOVE`) copies the old tables' hashes (same keys, same hashes: the search works at
   once, also after a jump over several releases) before the fragment `5279_a` drops them (one-way), and raises the back limit.
+- 2.1028.0 (#5783): `osw_tick` runs on a time budget per tick (`OSW_TICK_S`, about 2 s over all kinds, the start kind in
+  turn) instead of 100 objects per kind, and takes each object under the lock of its source row (`FOR UPDATE`, still without
+  the mark?), one commit per object: it never overwrites a fresher save. `osw_prefilter(c, kind, ws, q, col)` = the SQL
+  narrowing by the hashes before `osw_match` (the file-text search of tasks, `files/textscan.py ts_task_hits`). Until an
+  object is indexed again, a query word under 4 characters also looks up the old whole-word hash `w:` of the copied
+  indexes (only for objects without the mark, exact word).
 
 ### One search (stage Q6c, 2.1026.0, #5280)
 

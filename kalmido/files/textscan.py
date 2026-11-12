@@ -35,7 +35,7 @@ from ..core.access import Denied, acx_of, vis_sql
 from ..docs import store as S
 from ..core.srchreg import srch_register  # 2.1026.0 (#5280)
 from ..core.objsearch import osr_name_cond  # 2.1026.0 (#5280)
-from ..core.objwords import osw_copy, osw_drop, osw_match, osw_put, osw_register, osw_terms  # 2.1002.0 (#5279)
+from ..core.objwords import osw_copy, osw_drop, osw_match, osw_prefilter, osw_put, osw_register, osw_terms  # 2.1002.0 (#5279)
 from ..core.env import env_bool
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from .fslock import fl_is_locked  # 2.353.0 A (#2758)
@@ -440,11 +440,13 @@ def ts_task_hits(c, uid, raw):
     for (ws,) in c.execute(f"SELECT DISTINCT {_WS_SQL.format('l')} FROM lists l WHERE l.id IN {vis_sql()}", (uid, uid)).fetchall():
         if S.ws_org(ws) and S.SECRET_KEY and not S.oc_key(c, S.ws_org(ws), create=False):
             continue  # an organisation without its key yet has no indexed file (a search never makes a key)
+        # 2.1028.0 (#5783): narrowed in SQL by the index's hashes first (as before 2.1002), osw_match below decides
+        pq, pa = osw_prefilter(c, "file_text", ws, raw, "f.id")
         rows += c.execute(f"""SELECT f.id, f.ws, a.task_id, a.name FROM file_text f JOIN attachments a ON a.id=f.att_id
                               JOIN tasks t ON t.id=a.task_id LEFT JOIN obj_comments cm ON cm.id=a.comment_id
                               WHERE f.kind='att' AND f.state='found' AND f.ws=? AND a.enc=0 AND a.deleted_at IS NULL AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()}
-                              AND (a.comment_id IS NULL OR (cm.id IS NOT NULL AND cm.deleted_at IS NULL))""",
-                          (ws, uid, uid)).fetchall()
+                              AND (a.comment_id IS NULL OR (cm.id IS NOT NULL AND cm.deleted_at IS NULL)){pq}""",
+                          (ws, uid, uid, *pa)).fetchall()
     cand, by = {}, {}
     for r in rows:
         cand.setdefault(r["ws"], set()).add(r["id"])
