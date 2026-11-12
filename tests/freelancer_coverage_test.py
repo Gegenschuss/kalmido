@@ -9,7 +9,8 @@ check without an organisation. Static like tests/tenant_coverage_test.py: reads 
     a test that runs); an n/a area carries its reason
  3. 2.421.0 A (#2936): every write route (POST / PUT / PATCH / DELETE) of a matrix area is called by a suite of its area
     (write_proven: the path with its ids and the method on the line); the old ones without a call stand in WRITE_UNPROVEN,
-    which may only shrink
+    which may only shrink; 2.1002.0 (#5696): a listed route that a suite calls now is a hint ("can go"), not a failure --
+    red is only what would let the list grow (a new write route without its call, an entry that is no such route)
 A new route fails here until somebody decides which area it belongs to (and the freelancer suite of that area calls it:
 p287b_a_freelancer_api_test.py sweeps every GET of the matrix areas as a freelancer and fails on 403 / 5xx) or why it needs
 no check. The fixture "Selbstständige" for new suites: tests/freelancer_fixture.py.
@@ -1307,8 +1308,17 @@ def write_proven(route, texts):
     return False
 
 
+def write_rule(route, proven, unproven, not_on_train=()):
+    """2.1002.0 (#5696): the verdict on one write route of a matrix area -- "ok", "can_go" (it stands in WRITE_UNPROVEN, but a
+    suite of its area calls it now: a hint, the list may shrink, nothing is red) or "fail" (a write route without a call and
+    not in the list: the list would have to grow)."""
+    if route in unproven:
+        return "can_go" if proven else "ok"
+    return "ok" if proven or route in not_on_train else "fail"
+
+
 # 2.421.0 A (#2936): the write routes of matrix areas that no suite of their area called on 29.10.2026 (frozen: may only
-# shrink; a new write route needs its call, a route called now must leave the list)
+# shrink; a new write route needs its call; 2.1002.0 (#5696): a route called now is a hint "can go", no failure any more)
 WRITE_UNPROVEN = set(x.strip() for x in """
 DELETE /api/account/export
 DELETE /api/books/{}/org
@@ -1741,6 +1751,7 @@ def main():
     NOT_ON_TRAIN = {"POST /api/imports/{}/undo"}  # #3104: p2363_2_runs calls it, in main, not on the live train yet: drop this once it is live
     texts = {}
     n_w = 0
+    can_go = []  # 2.1002.0 (#5696): in WRITE_UNPROVEN, but called now -- a hint, not red
     for r, k in sorted(ROUTES.items()):
         if r.split(" ", 1)[0] not in WRITES or KINDS.get(k, ("",))[0] != "matrix":
             check(r not in WRITE_UNPROVEN, f"WRITE_UNPROVEN names {r}, no write route of a matrix area: remove it")
@@ -1749,10 +1760,12 @@ def main():
         if k not in texts:
             texts[k] = [expand_consts(tests[n]) for n in sorted(marked.get(k, ())) if n in runs]
         proven = write_proven(r, texts[k])
-        if r in WRITE_UNPROVEN:
-            check(not proven, f"{r}: a suite of the area {k} calls it now: take it out of WRITE_UNPROVEN")
+        verdict = write_rule(r, proven, WRITE_UNPROVEN, NOT_ON_TRAIN)
+        if verdict == "can_go":
+            can_go.append(r)
+            print(f"HINT: {r}: a suite of the area {k} calls it now -- can go: take it out of WRITE_UNPROVEN", flush=True)
         else:
-            check(proven or r in NOT_ON_TRAIN, f"{r}: no suite with the marker 'freelancer-matrix: {k}' calls it (method on the line, the path "
+            check(verdict == "ok", f"{r}: no suite with the marker 'freelancer-matrix: {k}' calls it (method on the line, the path "
                           f"with its ids): call it there as the person without an organisation")
     for r in sorted(WRITE_UNPROVEN - set(ROUTES)):
         check(False, f"WRITE_UNPROVEN names {r}, which is no route of ROUTES: remove it")
@@ -1762,11 +1775,17 @@ def main():
           "write_proven: a method on a line above with its own path must not count")
     check(write_proven("PATCH /api/me", ['A.patch(\n    B + "/api/me", json={})']),
           "write_proven: an open multi-line call must count")
+    # 2.1002.0 (#5696) self-test: a listed route that is called now is a hint, a new unlisted write route without a call stays red
+    check(write_rule("PUT /a", True, {"PUT /a"}) == "can_go" and write_rule("PUT /a", False, {"PUT /a"}) == "ok",
+          "write_rule: a listed route that a suite calls now is 'can_go', not a failure")
+    check(write_rule("PUT /b", False, {"PUT /a"}) == "fail" and write_rule("PUT /b", True, set()) == "ok"
+          and write_rule("PUT /b", False, set(), {"PUT /b"}) == "ok", "write_rule: an unlisted write route without a call fails")
 
     n_m = sum(1 for k in ROUTES.values() if KINDS.get(k, ("",))[0] == "matrix")
     print(f"freelancer_coverage: {oks[0]} ok, {len(fails)} failed -- {len(found)} routes, {n_m} checked without an organisation, "
-          f"{len(found) - n_m} not relevant (with reason); {n_w} write routes, {n_w - len(WRITE_UNPROVEN)} called by a suite of "
-          f"their area, {len(WRITE_UNPROVEN)} old ones without (WRITE_UNPROVEN, may only shrink)")
+          f"{len(found) - n_m} not relevant (with reason); {n_w} write routes, {n_w - len(WRITE_UNPROVEN) + len(can_go)} called by a suite of "
+          f"their area, {len(WRITE_UNPROVEN)} old ones without (WRITE_UNPROVEN, may only shrink), {len(can_go)} of them can go "
+          f"(called now)")
     return 1 if fails else 0
 
 

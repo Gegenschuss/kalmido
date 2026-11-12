@@ -1681,12 +1681,19 @@ check(len(LEGACY) == len(set(LEGACY)) and LEGACY == sorted(LEGACY), "tenant_cove
 for r in sorted(UNPROVEN - set(LEGACY)):
     check(False, f"{r}: its path appears in no suite named for kind {ROUTES[r]!r} -- test the route there (another organisation / "
                  f"person: 403 / 404, nothing changed) or name the suite that does in the comment of its line")
+# 2.1002.0 (#5696): an entry whose route is proven now is a hint ("can go"), not a failure -- red is only an entry that is no
+# matrix route (any more) and, above, a matrix route without its proof that is not in the list (the list would grow)
+CAN_GO = []
 for r in sorted(set(LEGACY) - UNPROVEN):
-    check(False, f"tenant_coverage_legacy.txt names {r}, which is proven now (or no matrix route any more): remove it and lower LEGACY_COUNT")
+    if KINDS.get(ROUTES.get(r), ("",))[0] != "matrix":
+        check(False, f"tenant_coverage_legacy.txt names {r}, which is no matrix route (any more): remove it and lower LEGACY_COUNT")
+    else:
+        CAN_GO.append(r)
+        print(f"HINT: {r}: proven now -- can go: remove it from tenant_coverage_legacy.txt and lower LEGACY_COUNT", flush=True)
 check(len(LEGACY) <= LEGACY_COUNT, f"tenant_coverage_legacy.txt has {len(LEGACY)} entries, more than LEGACY_COUNT {LEGACY_COUNT}: the list only shrinks")
 check(len(LEGACY) >= LEGACY_COUNT, f"tenant_coverage_legacy.txt has {len(LEGACY)} entries: lower LEGACY_COUNT to that")
 
 n_m = sum(1 for k in ROUTES.values() if KINDS.get(k, ("",))[0] == "matrix")
 print(f"tenant coverage: {len(FOUND)} routes, {n_m} in the cross-tenant matrix, {len(FOUND) - n_m} not relevant (with reason), "
-      f"{n_m - len(UNPROVEN)} with their path in a named suite, {len(LEGACY)} legacy without; {OKS[0]} ok, {len(FAILS)} failed")
+      f"{n_m - len(UNPROVEN)} with their path in a named suite, {len(LEGACY)} legacy without ({len(CAN_GO)} of them can go); {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
