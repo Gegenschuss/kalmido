@@ -1197,6 +1197,20 @@ def init_db(guard=True, load=None):
                                        (fp["owner_id"], fp["created_at"])).fetchall():
                         if _in_folder(l["folder"], fp["folder"]) and _folder_member_add(c, l["id"], fp["user_id"], fp["role"], fp["owner_id"]):
                             n += 1
+            elif _ca():  # 2.997.0 (#5677): folder_people is gone since 2.958.0 (#5245) -- the folders' shares (fs_shares, read as
+                # its old rows by lf_people_rows) reach a list as a folder role (frole) once it lies under the folder: grp_sync places
+                # it (lf_place) and computes its roles, a person taken off by hand stays off (list_folder_skip)
+                from ..lists.lffolder import lf_people_rows, lf_resync
+                lids = set()
+                with pg_system_ctx(c):  # every owner's lists and folders (as lf_migrate)
+                    for fp in lf_people_rows(c):
+                        for l in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(folder,'')!='' AND created_at>?",
+                                           (fp["owner_id"], fp["created_at"])).fetchall():
+                            if _in_folder(l["folder"], fp["folder"]) and not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?",
+                                                                                       (l["id"], fp["user_id"])).fetchone():
+                                lids.add(l["id"])
+                    lf_resync(c, lids, 0)
+                n = len(lids)
             gset(c, "migr_folder931", "1")
             if n:
                 print("lists in shared folders shared afterwards (#931):", n, flush=True)
