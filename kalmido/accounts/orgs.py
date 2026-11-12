@@ -1497,6 +1497,11 @@ def org_icon_get(oid, tok):
     return rs
 
 
+def _oinv_pending(c, uid):
+    from .orginvite import oinv_pending  # orginvite imports this module
+    return oinv_pending(c, uid)
+
+
 @app.put("/api/orgs/<int:oid>/members")
 def org_member_put(oid, ghost=False):
     """2.28.0 (#935): {user_id | email, role?: member | admin | guest | readonly | accounting (2.143.0 A, #2151)} -- an organisation admin adds a person (one they may see, or by
@@ -1519,15 +1524,19 @@ def org_member_put(oid, ghost=False):
     silent = False
     if b.get("email"):
         em = str(b["email"]).strip().lower()[:200]
-        r = c.execute("SELECT id, disabled, kind, email_proved FROM users WHERE lower(email)=?", (em,)).fetchone()
+        # 2.1021.0 (#5775, review 4): a proved account first when an address is on more than one account
+        r = c.execute("SELECT id, disabled, kind, email_proved FROM users WHERE lower(email)=? ORDER BY (email_proved=lower(email)) DESC, id LIMIT 1",
+                      (em,)).fetchone()
         dead = r is not None and (r["disabled"] or (r["kind"] or "user") == "agent")
         # 2.1021.0 (#5775, Fable 2.1001 #5669): an organisation admin binds by address only an account that proved it
         # (core/access.py addr_account: a mailed link, a verified OIDC claim, a confirmed sign-up); an unproved address is
         # answered like an unknown one - on POST /invites a silent invitation like a disabled account (nothing for the person).
         # The instance admin sees and manages every account (and may add by user_id) and keeps adding by the account's address;
-        # a member already in the organisation keeps its role change by address (nobody new is bound).
+        # a member already in the organisation keeps its role change by address (nobody new is bound); review 1: so does an
+        # account an organisation invitation set up that never signed in (its only address is the typed one, its link proves it)
         if (r is not None and not dead and r[0] != me() and (r["email_proved"] or "") != em and not (g.user["is_admin"] and not _operator_apart())
-                and not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, r[0])).fetchone()):
+                and not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, r[0])).fetchone()
+                and not (c.execute("SELECT 1 FROM org_invites WHERE user_id=?", (r[0],)).fetchone() and _oinv_pending(c, r[0]))):
             dead = True
         if not r or dead and not ghost:
             return jsonify(ok=True, by_email=True)

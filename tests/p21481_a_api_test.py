@@ -131,6 +131,11 @@ r2 = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "newbie@example.com"
 check(r.ok and r2.ok and set(r.json()) - {"notice"} == set(r2.json()) - {"notice"} == {"ok", "by_email", "invites"},
       "invitations: no 'invited' / 'user_id' in the answer " + r.text[:200] + " | " + r2.text[:200])
 check("user_id" not in r2.json() and "#invite/" not in r2.text, "invitations: no account id, no link")
+# 2.1021.0 (#5775, review 1): the account an invitation set up (never signed in, its address not proved yet) is invited again as
+# before - a new role reaches its open invitation, it does not turn into a silent row
+r3 = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "newbie@example.com", "role": "admin"})
+row = [x for x in (r3.json().get("invites") or []) if x.get("email") == "newbie@example.com"]
+check(r3.ok and len(row) == 1 and row[0]["role"] == "admin", "#5775: inviting a new account's address again changes its open invitation " + r3.text[:300])
 check(not member(ORG, DAVE) and Da.post(B + f"/api/orgs/{ORG}/join").ok and member(ORG, DAVE), "an existing account joins after accepting")
 # the server's admin adds directly
 check(A.put(B + f"/api/orgs/{ORG3}/members", json={"email": "erin@example.com"}).ok and member(ORG3, ERIN), "the server's admin adds directly")

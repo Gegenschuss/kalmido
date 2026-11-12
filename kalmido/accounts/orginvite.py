@@ -260,7 +260,7 @@ def org_invite_resend(oid, ref):
     if kind == "j":
         # 2.593.0 (#3570): starts again for the list only, the person still hears nothing. 2.985.0 (#4922): so does a neutral
         # row (no account any more: ojn_hidden says hidden) - the answer is the same as for a silent one
-        if r["silent"] and ojn_hidden(c, oid, r["user_id"]):
+        if r["silent"] and ojn_hidden(c, oid, r["user_id"], r["email"]):
             with system_ctx(c):  # the row of a person who is no member
                 c.execute("UPDATE org_joins SET created_at=? WHERE id=?", (iso(now_utc()), r["id"]))
         else:
@@ -404,7 +404,7 @@ def ojn_neutral_drop(c, oid, email):
         c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id IS NULL AND email=lower(trim(?))", (oid, email))
 
 
-def ojn_hidden(c, oid, uid):
+def ojn_hidden(c, oid, uid, email=None):
     """2.593.0 (#3570, review F5): a silent invitation stays silent on Resend: a disabled account or an agent, or in a company
     of its own (orgs.self_made) a person the inviting admin may not see (the test of org_member_put). Otherwise -- the admin
     may see the person by now -- Resend makes it an ordinary invitation (ojn_invite)."""
@@ -413,8 +413,10 @@ def ojn_hidden(c, oid, uid):
         return True
     if g.user["is_admin"] and not _operator_apart():
         return False
-    if (u["email_proved"] or "") != (u["email"] or "").strip().lower():
-        return True  # 2.1021.0 (#5775): an address nobody proved stays silent on Resend (org_member_put)
+    # 2.1021.0 (#5775): an address nobody proved stays silent on Resend (org_member_put); review 2: the address the admin typed
+    # (the row's, kept since #4922) must be the proved one - not a later address of the account
+    if (u["email_proved"] or "") != ((email or u["email"] or "").strip().lower()):
+        return True
     selfm = c.execute("SELECT self_made FROM orgs WHERE id=?", (oid,)).fetchone()
     return bool(selfm and selfm[0]) and not may_see(c, me(), uid)
 
