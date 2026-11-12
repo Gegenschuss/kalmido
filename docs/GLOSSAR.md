@@ -438,6 +438,7 @@ Outbound and inbound connections: e-mail, webhooks, git, importers and exporters
 - `kalmido/integrations/imp_linear.py` (`lin`) - Import from Linear -- with the person
 - `kalmido/integrations/importers.py` (`imp`) - Importers: TickTick, Todoist, Trello, Asana, Microsoft To Do, ICS / VTODO (preview, dry run, undo)
 - `kalmido/integrations/mail.py` (`mail`) - Tasks by e-mail (IMAP) and the daily summary by e-mail (SMTP)
+- `kalmido/integrations/mailproof.py` (`eproof`) - A person proves the own e-mail address: a mailed one-time link, wakes the silent organisation invitations of that address
 - `kalmido/integrations/mailtrim.py` (`md`) - Shorten a forwarded mail. A pure text function (no database, no request)
 - `kalmido/integrations/mailtrim_html.py` - The shortened HTML view of a filed mail
 - `kalmido/integrations/reqmail.py` (`rq`) - Requests by e-mail -- a customer
