@@ -380,6 +380,8 @@ check(r.status_code == 403 and kt.dbx("SELECT role FROM org_members WHERE org_id
 r = A.patch(B + f"/api/admin/orgs/{GO}", json={"members_remove": [uid["gus"]], "admins_add": [uid["mia"]]})
 check(r.status_code == 403 and kt.dbx("SELECT user_id, role FROM org_members WHERE org_id=? ORDER BY user_id", (GO,)) == sorted([(uid["gus"], "admin"), (uid["mia"], "member")]),
       "hosted: nor swaps a client's admin (2.399.0 #2687: its own admins do) " + r.text[:160])
+# 2.1047.0 (#5836): hosted the operator is apart, so since 2.1021.0 (#5775) its invitation by address binds only a proved account
+kt.proved()
 r = A.put(B + f"/api/orgs/{ORG}/members", json={"email": "hugo@example.com"})
 check(r.ok and kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (ORG, uid["hugo"])) and not kt.dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG, uid["hugo"])),
       "hosted: the instance admin only invites an existing account into its own organisation " + r.text[:160])
