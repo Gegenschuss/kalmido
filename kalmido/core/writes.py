@@ -79,6 +79,7 @@ UNDO_REKEYED = N_("The organisation's key was changed since then, so it cannot b
 UNDO_SPACE_REKEYED = N_("The key of its space was changed since then, so it cannot be undone")  # 2.985.0 (#5394): obj_track undo_spaces
 UNDO_NOTHING = N_("Nothing to undo")
 PURGE_FIRST = N_("Put it into the trash first")
+PURGE_KEPT = N_("Receipt within its retention period")  # 2.1031.0 (#5538): obj_purge of an object its trash_keep keeps
 UG_TRASHED = N_("Moved to the trash: {0}")  # 2.773.0 (#5292): the label of a trash step (core/undogroups.py)
 UG_RESTORED = N_("Restored from the trash: {0}")
 JOIN_ADMIN = N_("Only admins of the organisation can share this with everyone of it")  # 2.579.0 (#4802)
@@ -556,7 +557,8 @@ def obj_restore(c, uid, kind, rid, step=True, undo=False, checked=False):
     # 2.760.0 (#5311): the node's deleted_at is TEXT, the object's may be TIMESTAMPTZ (read canonically, pg.py ts_canon):
     # compare both canonically, not as text (a TIMESTAMPTZ table's restore left its node in the trash)
     gone = ts_canon(row["deleted_at"])
-    ts = _now()  # 2.1002.0 (#5491, review): the row first - its node and children come back only when the row did
+    ts = _now() if reg.get("stamp_ms", True) else iso(now_utc())  # 2.1031.0 (#5538): the area's format (tasks: seconds)
+    # 2.1002.0 (#5491, review): the row first - its node and children come back only when the row did
     # 2.1002.0 (#5491): only a row still in the trash -- a second restore at the same time (or the retention run that deleted
     # it meanwhile) changes nothing and runs no hook, no history
     if not c.execute(f"UPDATE {qi(reg['table'], (reg['table'],))} SET deleted_at=NULL, deleted_by=NULL, rev=rev+1, updated_at=?, "
@@ -584,9 +586,12 @@ def obj_restore(c, uid, kind, rid, step=True, undo=False, checked=False):
     return obj_row(c, kind, rid)
 
 
-def obj_purge(c, uid, kind, rid):
+def obj_purge(c, uid, kind, rid, early=False):
     """Delete for good: only an object in the trash ('manage'; 409 otherwise). Its node, history, undo steps, revoked
-    shares and children go with it (_purge_rows)."""
+    shares and children go with it (_purge_rows).
+    2.1031.0 (#5538): an object the kind's trash_keep keeps (kept by law) stays -- 409, checked under the lock like the
+    retention run does (obj_trash_prune), so no kind relies on its area's hook alone; early=True = its custodian deletes it
+    before the end of the period (checked by the caller: lists/listtrash.py otr_delete, otr_held)."""
     reg = obj_reg_node(kind)  # 2.754.0 (#5268)
     row = obj_row(c, kind, rid)
     if row is not None and not row["deleted_at"]:
@@ -594,11 +599,17 @@ def obj_purge(c, uid, kind, rid):
         raise Denied(409, tr(PURGE_FIRST))
     obj_need(c, uid, kind, rid, "manage", trash=True)
     write_lock(c, f"obj-{kind}-{int(rid)}")
+    if not early and reg.get("trash_keep") is not None:  # 2.1031.0 (#5538): after the lock (kept meanwhile = kept)
+        t = reg["table"]
+        sql, args = reg["trash_keep"](qi(t, (t,)))
+        if c.execute(f"SELECT 1 FROM {qi(t, (t,))} WHERE id=? AND ({sql})", (int(rid), *args)).fetchone():
+            raise Denied(409, tr(PURGE_KEPT))
     _purge_rows(c, kind, reg, rid)
     obj_forget()
     bump(c, _area(reg))
 
 
+_PRUNE_FROM = {}  # 2.1031.0 (#5538): kind -> the id the next batch of obj_trash_prune begins with (None = from the start)
 OBJ_PRUNE_BATCH = 500  # 2.809.0 (#5365, review): at most so many objects per kind and run (one lock each); the rest next hour
 
 
@@ -619,11 +630,12 @@ def _keep(reg, a):
     return f" AND NOT ({sql})", tuple(args)
 
 
-def obj_trash_due(c, kind, cut=None, limit=None):
+def obj_trash_due(c, kind, cut=None, limit=None, start=None):
     """2.773.0 (#5292): the ids of the kind's objects in the trash longer than the trash period (core/retention.py ret_trash_cut).
     2.783.0 (#5368): a side object of core/objparts.py (part_kind trash_prune=True) the same way.
     2.809.0 (#5365, review): limit = at most so many (the oldest ids first; core kinds only).
-    2.936.0 (#5364): without the ones its trash_keep leaves (kept by law)."""
+    2.936.0 (#5364): without the ones its trash_keep leaves (kept by law).
+    2.1031.0 (#5538): start = the ids from start on first, then the ones before it (the rotation of obj_trash_prune)."""
     if kind in PART_KINDS and kind not in OBJ:
         with system_ctx(c):
             return part_trash_due(c, kind, cut or ret_trash_cut())
@@ -632,8 +644,22 @@ def obj_trash_due(c, kind, cut=None, limit=None):
     kq, ka = _keep(reg, qi(t, (t,)))
     with system_ctx(c):  # the retention run reads every workspace's trash (ids only, no content)
         lim = f" LIMIT {int(limit)}" if limit else ""
-        return [r[0] for r in c.execute(f"SELECT id FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<?{kq} ORDER BY id{lim}",
+        rot = f"id < {int(start)}, " if start else ""  # false first: the ids from start on, then the ones before it
+        return [r[0] for r in c.execute(f"SELECT id FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<?{kq} ORDER BY {rot}id{lim}",
                                         (cut or ret_trash_cut(), *ka)).fetchall()]
+
+
+def obj_trash_due_n(c, kind, cut=None):
+    """2.1031.0 (#5538): how many of the kind's objects are due (obj_trash_due without a limit, as a COUNT): the number the
+    retention run reports with the switch off (before: at most one batch)."""
+    if kind in PART_KINDS and kind not in OBJ:
+        return len(obj_trash_due(c, kind, cut))
+    reg = _reg_trash(kind)
+    t = reg["table"]
+    kq, ka = _keep(reg, qi(t, (t,)))
+    with system_ctx(c):  # the retention run counts every workspace's trash (a number only, no content)
+        return c.execute(f"SELECT COUNT(*) FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<?{kq}",
+                         (cut or ret_trash_cut(), *ka)).fetchone()[0]
 
 
 def obj_trash_kept(c, kind, cut=None):
@@ -668,9 +694,14 @@ def obj_trash_prune(c, kind, cut=None, purge=None, ids=None, paths=None):
                 paths += got
         return len(old)
     reg = _reg_trash(kind)  # 2.936.0 (#5364): a light kind with trash_prune too (tasks)
+    if not purge and ids is None:  # 2.1031.0 (#5538): switch off = count all that are due (COUNT), not at most one batch
+        return obj_trash_due_n(c, kind, cut)
     # 2.809.0 (#5365, review): a batch per run - every file-store node runs here now, and thousands of advisory locks in one
     # transaction would break the whole tick (max_locks_per_transaction) hour after hour
-    old = obj_trash_due(c, kind, cut, limit=reg.get("trash_batch") or OBJ_PRUNE_BATCH) if ids is None else [int(x) for x in ids]
+    lim = reg.get("trash_batch") or OBJ_PRUNE_BATCH
+    old = obj_trash_due(c, kind, cut, limit=lim, start=_PRUNE_FROM.get(kind)) if ids is None else [int(x) for x in ids]
+    if ids is None:  # 2.1031.0 (#5538): a full batch = the next run begins behind its last id (ids that keep failing or are
+        _PRUNE_FROM[kind] = old[-1] + 1 if len(old) >= lim else None  # locked never hold back the ones behind them)
     if old and purge:
         t, cut = reg["table"], cut or ret_trash_cut()
         kq, ka = _keep(reg, qi(t, (t,)))

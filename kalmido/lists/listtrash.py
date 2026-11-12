@@ -24,7 +24,7 @@ from ..core.db import bump, db, err, iso, now_utc
 from ..core.retention import ret_days, ret_on
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import collab_all, Denied, health_hidden, live_sql, token_lists, trash_sql  # 2.936.0 (#5364): live_sql, trash_sql
+from ..core.access import acx_of, collab_all, Denied, health_hidden, live_sql, token_lists, trash_sql  # 2.936.0 (#5364): live_sql, trash_sql
 from contextvars import ContextVar  # 2.1002.0 (#5491): _OTR_EARLY
 from ..core.serializers import unlink_files  # 2.1002.0 (#5491): the files of otr_core_purge after the commit
 from .lists import list_purge  # 2.369.5 (#2517): pulled up from functions
@@ -49,16 +49,17 @@ def otr_trash(c, lid, uid):
 
 
 def otr_can(c, uid, r):
-    """May uid see / restore / delete for good the deleted list row r (see the module docstring)?"""
-    from ..agents.core import is_agent
+    """May uid see / restore / delete for good the deleted list row r (see the module docstring)?
+    2.1031.0 (#5538): everything about uid itself, not about the request's person (the core's obj_role asks it for any uid):
+    an agent through its access context (core/access.py acx_of); the token limit only when uid is the request's own person
+    (it belongs to the request); outside a request the same rule (no request = no token limit)."""
     from ..accounts.orgs import org_role
-    if not r or not r["deleted_at"] or r["is_inbox"]:
+    if not uid or not r or not r["deleted_at"] or r["is_inbox"]:
         return False
-    if not has_request_context() or not getattr(g, "user", None):  # 2.1002.0 (#5491): the kind's trash rule (obj_role) outside
-        return False  # a request (a background run) gives nobody a role in the trash
-    if is_agent(g.user) or (r["life"] in ("health", "budget") and health_hidden(c, uid)):
+    if acx_of(c, uid).role == "agent" or (r["life"] in ("health", "budget") and health_hidden(c, uid)):
         return False
-    tl = token_lists()
+    u = getattr(g, "user", None) if has_request_context() else None
+    tl = token_lists() if u is not None and u["id"] == uid else None
     if tl is not None and r["id"] not in tl:
         return False
     if r["org_id"]:
@@ -186,7 +187,7 @@ def otr_delete(lid):
     tok = _OTR_EARLY.set(bool(early))
     try:
         with obj_purge_after() as box:
-            obj_purge(c, me(), "list", lid)
+            obj_purge(c, me(), "list", lid, early=bool(early))  # 2.1031.0 (#5538): the core checks trash_keep (otr_keep) too
     except Denied as e:
         if e.code == 409:
             raise Denied(404) from None

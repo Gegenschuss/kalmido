@@ -215,7 +215,8 @@ def _client_title(c, cid):
 obj_register(LT_TASK, "tasks", label=N_("Task"), fields={}, node=False, area="tasks", base_role=_task_base, space=_task_space,
              title=_task_title, open_url=lambda tid: f"t/{int(tid)}",
              # 2.936.0 (#5364): the tasks' trash period runs in the core's retention run (tasks/tasktrash.py)
-             trash_prune=True, trash_keep=ttp_keep, trash_batch=TTP_BATCH)
+             trash_prune=True, trash_keep=ttp_keep, trash_batch=TTP_BATCH,
+             stamp_ms=False)  # 2.1031.0 (#5538): tasks.updated_at in seconds (tasks/lifecycle.py iso), also after a restore
 obj_on_purge(LT_TASK, ttp_core_purge)  # 2.936.0 (#5364)
 obj_on_restore(LT_TASK, rt_back)  # 2.1002.0 (#5491): a task comes back through the core (tasks/lifecycle.py restore_task)
 NOTIFY_TICK[LT_TASK] = _task_tick  # 2.891.0 (#5270): the watchdog's reminders ask the task's readers with the tick's memo

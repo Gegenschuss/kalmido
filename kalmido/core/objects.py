@@ -208,7 +208,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
                  fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True, node_shares=False,
                  fs_hooks=None, org_join="member", children=(), trash_prune=False, node=True, agent_own=False,
-                 on_share_back=None, trash_keep=None, trash_batch=None, trash_can=None):
+                 on_share_back=None, trash_keep=None, trash_batch=None, trash_can=None, stamp_ms=True):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload).
     2.565.0 (#4719): listed=False = the object's reference node only carries its shares (files/fsref.py): it lies in no
     folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take.
@@ -259,7 +259,10 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
         raise ValueError(f"obj_register {kind}: a kind without node has no children")
     reg.update(children=kids, trash_prune=bool(trash_prune), trash_keep=trash_keep,
                trash_batch=int(trash_batch) if trash_batch else None,  # 2.936.0 (#5364)
-               trash_can=trash_can)  # 2.1002.0 (#5491)
+               trash_can=trash_can,  # 2.1002.0 (#5491)
+               # 2.1031.0 (#5538): the format of updated_at the area writes -- ms (iso_ms, the core's) or seconds (iso: tasks), so a
+               # restore of the core (core/writes.py obj_restore) leaves the column as the area's own writes do
+               stamp_ms=bool(stamp_ms))
     OBJ[kind] = reg
     if not fsref:
         return reg  # 2.568.0 (#4739): the area's own registration in files/fsref.py stays

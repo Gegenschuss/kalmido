@@ -270,6 +270,17 @@ c.commit()
   tasks into the trash and deleting them for good by hand (`do_delete`, `hard_delete`, "Empty trash" -> #5536), the copies
   of sections / planned sprints (`lists/parttrash.py` on `part_copy`), the state marker of projects instead of `archived` /
   `deleted_at` (-> #5537).
+- 2.1031.0 (#5538, small findings of the Fable review of 2.851): the trash period (`KALMIDO_TRASH_DAYS`, `ret_days("trash")`)
+  has the floor of 1 day for every kind (`core/retention.py ret_trash_days`, `ret_trash_cut`): 0 or a broken value never
+  means "delete everything at once", it means one day. `obj_purge` checks the kind's `trash_keep` under its lock as the
+  retention run does (409 "Receipt within its retention period"; `early=True` = the custodian's early delete, checked by the
+  caller: `otr_delete`), so no kind relies on its purge hook alone. With the switch off the run counts every due object
+  (`obj_trash_due_n`, a COUNT) instead of at most one batch. A full batch makes the next run begin behind its last id
+  (`obj_trash_due(start=)`, `_PRUNE_FROM`): ids that keep failing (`<kind>_err`) or stay locked never hold back the ones
+  behind them. `obj_register(stamp_ms=False)` = the area writes `updated_at` in seconds (tasks): `obj_restore` keeps that
+  format. A trash rule (`trash_can`) judges the `uid` it is asked for, never the request's person (`otr_can`: the agent
+  through `acx_of`, the token limit only for the request's own person). `task_dict` leaves out the core's columns `rev`,
+  `updated_by`, `deleted_by` (server only).
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
   `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).

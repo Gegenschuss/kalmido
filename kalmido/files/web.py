@@ -34,7 +34,7 @@ from ..core.conflict import Conflict, need_version, version_rule  # 2.577.0 (#47
 from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgs import visible_people  # 2.369.5 (#2517): pulled up from functions
 from ..lists.groups import grp_visible  # 2.369.5 (#2517): pulled up from functions
-from ..core.retention import ret_days, ret_on  # 2.369.5 (#2517): pulled up from functions
+from ..core.retention import ret_on, ret_trash_days  # 2.369.5 (#2517): pulled up from functions
 from ..api.common import hit_limit  # 2.523.0 (#4073 d)
 from ..accounts.orgroles import org_writes, need_org_write  # 2.369.5 (#2517): pulled up from functions
 
@@ -198,7 +198,8 @@ def files_list():
     if space == "org" and oid not in ctx.org_ids:
         raise Denied(404)
     if space == "trash":
-        return jsonify(items=_trash(c, uid), node=None, crumbs=[], space="trash", trash_days=ret_days("trash"),
+        # 2.1031.0 (#5538): trash_days with the floor of 1 day the runs use (ret_trash_days; 0 showed "0 days")
+        return jsonify(items=_trash(c, uid), node=None, crumbs=[], space="trash", trash_days=ret_trash_days(),
                        purge_on=ret_on("trash"))  # 2.223.3 A (#2877)
     vis = fs_visible_ids(c, uid)
     if space == "private":

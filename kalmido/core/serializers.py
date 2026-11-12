@@ -77,6 +77,8 @@ def task_dict(r, tags, full_snips=False):
     d.pop("client_ref", None)  # 2.126.0 D (#1990): only the server matches it
     d.pop("acceptance_of", None)  # 2.392.0 C (#3370): only the server matches it
     d.pop("org_id", None)  # 2.724.0 (#5184): the row-level security column of #4602, the client takes the organisation from the list
+    for k in ("rev", "updated_by", "deleted_by"):  # 2.1031.0 (#5538): the core's columns of its restore (5491_a), the server's only
+        d.pop(k, None)  # (the task's version stays updated_at; who deleted it is in its log) -- the dict stays as before 2.1002
     # 2.18.0 (#430): ms only on milestones, milestone_id only when set (keeps every other task's dict as it was)
     if not d.get("ms"):
         d.pop("ms", None)
