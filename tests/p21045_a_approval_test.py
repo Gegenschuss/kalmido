@@ -240,4 +240,4 @@ except M.ApiError as e:
     check(e.status == 409 and "reason: used" in e.message, f"MCP: the second run says used {e.message[:300]}")
 check("run_approved_step" in M.TOOL_MAP and M.TOOL_SCOPE.get("run_approved_step") == "agent", "MCP: the tool exists with scope agent")
 
-done()
+sys.exit(done())
