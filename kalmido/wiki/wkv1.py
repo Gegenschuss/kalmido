@@ -214,8 +214,10 @@ def wkv_hits(c, uid, q, space=None, limit=30):
         except Denied:
             continue
         out.append((r2, role, path))
+        _log(c, uid, r2, "list")  # review 2.1026 F1: an agent's hit in the page's history, like the file search's
         if len(out) >= limit:
             break
+    c.commit()
     sn = wks_snippets(c, [x[0] for x in out], q)
     names = user_names(c, {x[0]["updated_by"] for x in out})
     pages = [{**_page(c, r2, role, path, names), **({"snippet": sn[r2["id"]][0], "marks": sn[r2["id"]][1]} if r2["id"] in sn else {})}

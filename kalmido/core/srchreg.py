@@ -130,6 +130,8 @@ def srch_v1():
     stays the older name of kind=messages). all: {groups: {kind: [at most ?limit (default 5) entries]}} of the kinds the
     token may read; never the office (question 16)."""
     a = request.args
+    if a.get("scope") not in (None, "", "tasks", "messages"):  # review 2.1026 F3: an unknown scope stays a 400
+        raise BadInput(tr("Invalid value: {0}", "scope"))
     kind = a.get("kind") or ("messages" if a.get("scope") == "messages" else "tasks")
     tok = g.get("auth_via") == "token"
     scopes = set(g.get("scopes") or ()) if tok else None
@@ -150,7 +152,10 @@ def srch_v1():
         e.v1_extra = {"required_scope": s["scope"]}
         raise e
     g.srch_kind = kind  # api/common.py v1_args: the area's own handler accepts kind / scope beside its parameters
-    return s["v1"]()
+    try:
+        return s["v1"]()
+    finally:
+        g.pop("srch_kind", None)  # review 2.1026 F2: never beyond this call (in-process calls may share g)
 
 
 app.add_url_rule("/api/v1/search", "v1_search", v1_view(srch_v1), methods=["GET"])

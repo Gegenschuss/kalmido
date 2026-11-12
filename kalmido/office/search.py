@@ -117,4 +117,5 @@ def bs_search_web():
 
 
 # 2.1026.0 (#5280): the office in the one search -- web only, no API part (agents never get office hits, question 16)
-srch_register("office", web=bs_search_web, group=lambda c, uid, q, n: bs_office_hits(c, uid, q), order=10)
+srch_register("office", web=bs_search_web, group=lambda c, uid, q, n: bs_office_hits(c, uid, q), gate="/api/office/search",
+              order=10)  # review 2.1026: the office's module / workspace switches count like for its own routes
