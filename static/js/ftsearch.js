@@ -92,7 +92,7 @@ function ftsPalItems(q, shown) {
     subHtml: srchSub([spn(p.space), String(p.path || '').includes('/') ? p.path.split('/').slice(0, -1).join('/') : ''].filter(Boolean).join(' · '), srchSnip(p)), fn: () => go('wiki/' + p.id)}));
   const why = h => h === 'text' ? tr('Found in the text') : h === 'doc' ? tr('Found in sender, type or tags') : '';
   const files = five(r.files).map(n => ({id: 'srf:' + n.id, kind: 'view', group: 'srfiles', label: n.name || '…', icon: n.kind === 'folder' ? 'folder' : 'file',
-    subHtml: srchSub([why(n.hit), n.folder ? tr('in {0}', n.folder) : ''].filter(Boolean).join(' · '), srchSnip(n)), fn: () => go((n.kind === 'folder' ? 'ablage/' : 'docs/') + n.id)}));
+    subHtml: srchSub([why(n.hit), n.folder ? tr('in {0}', n.folder) : ''].filter(Boolean).join(' · '), srchSnip(n)), fn: () => n.kind === 'folder' ? go('ablage/' + n.id) : n.doc ? go('docs/' + n.id) : loadModule('ablage').then(() => ab_openFile(n))}));  // 2.1026.0 (#5280): a plain file in its viewer, a document in the document view
   const contacts = five(r.contacts).map(c => ({id: 'src:' + c.id, kind: 'view', group: 'srcontacts', label: c.fn || c.org || '…', icon: 'user',
     subHtml: srchSub([c.fn && c.org ? c.org : '', c.email || c.phone || ''].filter(Boolean).join(' · '), srchSnip(c)), fn: () => go('contacts/' + c.id)}));
   const events = five(r.events).map(e => ({id: 'sre:' + e.id, kind: 'view', group: 'srevents', label: e.title || '…', icon: 'cal',
