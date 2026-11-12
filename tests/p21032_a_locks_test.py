@@ -11,8 +11,9 @@ container, invented names only.  freelancer-matrix: lists
    before the calendar's / book's row (the org_id trigger writes the children after the object): while an event's / a
    contact's save holds its row, the calendar's / book's row is free
  - (F4) a knowledge page moved into a private space (wiki/wkmove.py wkm_place): its files before the page's row
- - folder share by e-mail address (PUT /api/folders/people): an account outside the organisation of a list in the folder gets
-   the neutral answer and no share (before: the share was written and GET /api/folders/people showed its name)
+ - folder share by e-mail address (PUT /api/folders/people): an account outside the organisation of a list in the folder
+   (archived too) gets the neutral answer and no share (before: the share was written and GET /api/folders/people showed its name)
+ - review: the other writers of a member row (here a folder's share reaching a list) take the bucket before the row too
  - a person without an organisation: the folder share by address works (shown in the folder's people), the member dialog's
    order as above on her own list
 The deadlock itself is not forced; the tests show the order (the row the other side would need is free while one waits).
@@ -164,6 +165,25 @@ member_order(A, "alice", FID)
 member_order(Fr, "frida", ALICE)
 
 
+# review of 2.1032: every other writer of a member row takes the bucket first too (else member_set and it would cross on the
+# same bucket): the share of a folder reaching a list (_folder_member_add) waits for the bucket before it inserts the row
+def member_rows_written():
+    return sql("SELECT COUNT(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid=l.pid WHERE l.relation='list_members'::regclass "
+               "AND l.mode='RowExclusiveLock' AND a.wait_event_type='Lock'")[0][0]
+
+
+L0 = made(A.post(B + "/api/lists", json={"name": "Writer order", "org_id": None}), "(F3) a list").get("id")
+check(A.put(B + f"/api/lists/{L0}/members", json={"user_id": FID, "role": "view"}).ok, "(F3) writers setup: shared with frida (its node)")
+N0 = node_of("list", L0)
+hold = proc("from kalmido.core.objects import obj_share_lock", f"obj_share_lock(c, {N0}, {BOB})")
+wq, fr, out = race(hold, lambda: run("from kalmido.lists.lists import _folder_member_add", f"_folder_member_add(c, {L0}, {BOB}, 'view', {ALICE})"),
+                   "%pg_advisory_xact_lock%", member_rows_written)
+check(wq is not None and fr == 0,
+      f"(F3) a folder's share waits for the bucket before it wrote the member row waiting={wq is not None} writers_with_rows={fr}")
+check(out is not None and "done" in out[0] and sql("SELECT COUNT(*) FROM list_members WHERE list_id=? AND user_id=?", (L0, BOB))[0][0] == 1,
+      f"(F3) afterwards bob is a member {out}")
+
+
 # ================================================================== (F4) a retired organisation: children before the object
 OC = org("Retire calendar")
 K = made(A.post(B + "/api/evcals", json={"name": "Studio bookings", "org_id": OC}), "(F4) the organisation's calendar").get("id")
@@ -171,7 +191,7 @@ E = made(A.post(B + "/api/events", json={"cal_id": K, "title": "Held", "start": 
 check(sql("SELECT org_id FROM events WHERE id=?", (E,)) == [(OC,)], "(F4) setup: the event carries the organisation")
 hold = proc(f"c.execute('SELECT id FROM events WHERE id=? FOR NO KEY UPDATE', ({E},)).fetchall()")  # an event's save holds it
 wq, fr, out = race(hold, lambda: run("from kalmido.accounts.orgretain import odl_retire", f"odl_retire(c, {OC}, '2035-12-31')"),
-                   "%ev%", lambda: free("ev_cals", "id=?", (K,)))
+                   "%FROM \"events\"%", lambda: free("ev_cals", "id=?", (K,)))
 check(wq is not None and fr is True,
       f"(F4) the retirement waits for the event before it wrote the calendar's row waiting={(wq or '')[:80]!r} ev_cals={fr}")
 check(out is not None and "done" in out[0] and sql("SELECT org_id FROM ev_cals WHERE id=?", (K,)) == [(None,)]
@@ -223,6 +243,14 @@ check(BOB not in people(A, "Clients") and sql("SELECT COUNT(*) FROM fs_shares s 
       f"by address: an account outside the folder's organisation gets no share and is not shown {people(A, 'Clients')}")
 r = A.put(B + "/api/folders/people", json={"folder": "Clients", "email": "nobody-p21032@example.com", "role": "view"})
 check(r.ok and r.json() == {"shared": 0, "updated": 0, "by_email": True}, f"by address: an unknown address answers the same {r.text[:160]}")
+
+# review of 2.1032: an archived list of the organisation in the folder counts too (the folder's share reaches it)
+L3 = made(A.post(B + "/api/lists", json={"name": "Old client", "org_id": OF}), "an archived list of the organisation").get("id")
+check(A.patch(B + f"/api/lists/{L3}", json={"folder": "Archive", "archived": True}).ok, "setup: archived, in folder Archive")
+check(sql("SELECT archived FROM lists WHERE id=?", (L3,)) == [(1,)], "setup: the list is archived")
+r = A.put(B + "/api/folders/people", json={"folder": "Archive", "email": "bob@example.com", "role": "view"})
+check(r.ok and r.json() == {"shared": 0, "updated": 0, "by_email": True} and BOB not in people(A, "Archive"),
+      f"by address: an archived list of the organisation keeps the account out too {r.text[:120]} {people(A, 'Archive')}")
 
 # a person without an organisation shares her private folder by address: it works and the folder shows bob
 L2 = made(Fr.post(B + "/api/lists", json={"name": "Garden plan", "org_id": None}), "frida's list").get("id")

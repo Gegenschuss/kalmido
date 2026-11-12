@@ -132,6 +132,8 @@ def owner_transfer(c, lr, new, force=False):
         folder, sort, view = mnew["folder"], mnew["sort"], mnew["view"] or lr["view"]
     else:
         folder, sort, view = "", my_max_sort(c, new) + 1, lr["view"]
+    from .lmcore import lmc_mirror, lmc_share_locks
+    lmc_share_locks(c, [(lid, u) for u in (new, old) if u])  # 2.1032.0 (#5788): the buckets before the member rows (member_set's order)
     c.execute("DELETE FROM list_members WHERE list_id=? AND user_id IN (?, ?)", (lid, new, old))
     if old and c.execute("SELECT 1 FROM users WHERE id=?", (old,)).fetchone():
         c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,folder,sort,view,added_at) VALUES(?,?,?,?,?,?,?,?)",
@@ -142,7 +144,6 @@ def owner_transfer(c, lr, new, force=False):
         oc_settle_kick([lid])
     grp_sync(c, [lid])  # 2.10.0 (#441): the old owner's folder shares no longer reach it, the new owner's may
     if old:  # 2.654.0 (#5050): the old owner's own share (list admin / an agent's edit) gets the core's row too
-        from .lmcore import lmc_mirror
         lmc_mirror(c, me(), lid, old)
     le2a_owner_restore(c, lid, le2_keep)  # 2.64.1 (#1817): the new owner's keys stay (their member row went, no rotation)
     names = user_names(c, [old, new, me()])

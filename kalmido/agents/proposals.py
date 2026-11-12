@@ -834,9 +834,10 @@ def prop_run(c, j, sel, ed, extra):
         from ..agents.safety import bridge_blocks
         if extra.get("share_agent") and agent_active(agent_row(c, aid)) and not list_other_agent(c, lid, aid) and not ws_member_problem(c, lid, aid) \
                 and not bridge_blocks(c, lid, aid):  # 2.26.0; 2.28.0 (#935); 2.30.0 (#919): no bridge between lists with different people
+            from ..lists.lmcore import lmc_mirror, lmc_share_lock
+            lmc_share_lock(c, lid, aid)  # 2.1032.0 (#5788): the share's bucket before the member row (member_set's order)
             if c.execute("INSERT INTO list_members(list_id,user_id,role,sort,added_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
                          (lid, aid, "edit", my_max_sort(c, aid) + 1, ts)).rowcount:
-                from ..lists.lmcore import lmc_mirror
                 lmc_mirror(c, uid, lid, aid)  # 2.654.0 (#5050): the core's row of the agent's share
             rec["shared"] = True
         return rec

@@ -41,7 +41,7 @@ from ..core.access import _list_role, need_collab, need_list
 from ..core.config import app
 from ..core.db import bump, db, err, iso, now_utc
 from ..core.i18n import N_, tr
-from ..core.objects import obj_register, obj_share, obj_share_lock, obj_share_restore, obj_shares, obj_unshare  # #5788: obj_share_lock
+from ..core.objects import obj_register, obj_share, obj_share_locks, obj_share_restore, obj_shares, obj_unshare  # #5788: obj_share_locks
 from ..core.pg import system_ctx
 from ..core.writes import obj_history, obj_history_add
 from ..core.writes import obj_on_purge  # 2.936.0 (#5364)
@@ -91,14 +91,26 @@ def _own_row(c, lid, uid):
                          (n[0], int(uid), int(uid))).fetchone()
 
 
+def lmc_share_locks(c, pairs):
+    """2.1032.0 (#5788, review): lmc_share_lock for many (project, person) pairs, their buckets in ascending order (each once;
+    core/objects.obj_share_locks): a writer of several member rows takes them all before the first row."""
+    lids = sorted({int(lid) for lid, _u in pairs})
+    if not lids:
+        return
+    with system_ctx(c):  # read only (no lf_place: a lock writes nothing); a project without its node yet has no share to cross
+        nodes = {r[0]: r[1] for r in c.execute("SELECT ref_id, id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id = ANY(CAST(? AS BIGINT[]))",
+                                               (LMC_KIND, lids)).fetchall()}
+    obj_share_locks(c, [(nodes[int(lid)], int(uid)) for lid, uid in pairs if int(lid) in nodes])
+
+
 def lmc_share_lock(c, lid, uid):
     """2.1032.0 (#5788, review F3 of 2.1017): the bucket lock (core/objects.obj_share_lock) of uid's share of project lid,
     taken by member_set BEFORE it writes the list_members row: lffolder.lf_folder_share holds the buckets of its folders
     and then writes list_members (grp_sync); member_set wrote the row first and asked for the bucket in lmc_share -- the
-    two orders could deadlock. Now both take a bucket before the row. The basket (no node): nothing."""
-    n = _node(c, lid)
-    if n is not None:
-        obj_share_lock(c, n["id"], int(uid))
+    two orders could deadlock. Now both take a bucket before the row -- and so does every other writer of a member row
+    whose core row follows (lmc_share / lmc_mirror after the row: lists.py, orgvis.py, family.py, ownership.py,
+    agents/proposals.py), else member_set and that writer would cross on the same bucket. The basket (no node): nothing."""
+    lmc_share_locks(c, [(lid, uid)])
 
 
 _KEEP = object()

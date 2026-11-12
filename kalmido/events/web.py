@@ -68,10 +68,12 @@ def op_cal_edit(c, uid, cid, b):
         # without one keeps its own read. "hidden" alone is the person's own view setting: no version.
         take_version(b)
         write_lock(c, f"obj-{EV_KIND}-{int(cid)}")
+        if "org_id" in b:  # 2.1032.0 (#5788, review): its events before its row -- kern_version_seed may write the row already
+            obj_kids_first(c, EV_KIND, [cid])
         cal = kern_version_seed(c, "ev_cals", cid)
         ccf_check(b, cal["updated_at"], "current", lambda: cal_public(c, cal, uid))
     if "org_id" in b:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
-        obj_kids_first(c, EV_KIND, [cid])  # 2.1032.0 (#5788): its events before its row (the org_id trigger writes them after it)
+        obj_kids_first(c, EV_KIND, [cid])  # 2.1032.0 (#5788): its events before its row (the org_id trigger writes them after it; taken above already)
         if obj_org_set(c, "ev_cals", cid, b["org_id"], "cal"):
             KERN["follow"](c, EV_KIND, cid)  # 2.566.0 (#4712): its node (and the shares on it) follow
             cal_touch(c, cid)

@@ -89,10 +89,11 @@ def ov_join(c, lid, uid):
         return err(tr("You are already a member of this project"), 409)
     if not ov_role(c, lid, uid):
         raise Denied(404)
+    from .lmcore import lmc_mirror, lmc_share_lock
+    lmc_share_lock(c, lid, uid)  # 2.1032.0 (#5788): the share's bucket before the member row (member_set's order)
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
               (lid, uid, "edit", "edit", my_max_sort(c, uid) + 1, iso(now_utc())))
     member_folder_adopt(c, lid, uid)
-    from .lmcore import lmc_mirror
     lmc_mirror(c, uid, lid, uid)  # 2.654.0 (#5050): the core's row of the own share (GET /api/lists/<id>/shares shows it)
     bump(c)
     c.commit()

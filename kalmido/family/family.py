@@ -204,6 +204,10 @@ def kid_balance(c, kid):
 def kid_force_participant(c, kid):
     """A kid takes part in shared lists only as a participant (sees only what is assigned to it or where it comes along)."""
     # 2.64.1 (#1817): lists encrypted in the browser have no participants: a kid leaves them (the members trigger drops its keys)
+    from ..lists.lmcore import lmc_mirror, lmc_share_locks
+    # 2.1032.0 (#5788): the buckets of the kid's shares (ascending) before its member rows (member_set's order; the e2e
+    # lists it leaves below too: lf_own_stale ends their core rows)
+    lmc_share_locks(c, [(r[0], kid) for r in c.execute("SELECT list_id FROM list_members WHERE user_id=? ORDER BY list_id", (kid,)).fetchall()])
     gone = [r[0] for r in c.execute("SELECT list_id FROM list_members WHERE user_id=? AND list_id IN (SELECT id FROM lists WHERE e2e IS NOT NULL)",
                                     (kid,)).fetchall()]
     c.execute("DELETE FROM list_members WHERE user_id=? AND list_id IN (SELECT id FROM lists WHERE e2e IS NOT NULL)", (kid,))
@@ -213,7 +217,6 @@ def kid_force_participant(c, kid):
                  own_role=CASE WHEN own_role IS NULL THEN NULL ELSE 'participant' END,
                  grole=CASE WHEN grole IS NULL THEN NULL ELSE 'participant' END,
                  frole=CASE WHEN frole IS NULL THEN NULL ELSE 'participant' END WHERE user_id=?""", (kid,))  # 2.352.0 A (#2748): frole
-    from ..lists.lmcore import lmc_mirror
     for (lid,) in c.execute("SELECT list_id FROM list_members WHERE user_id=? AND own_role IS NOT NULL", (kid,)).fetchall():
         lmc_mirror(c, None, lid, kid)  # 2.654.0 (#5050): the core's row of the kid's own share says participant too
 

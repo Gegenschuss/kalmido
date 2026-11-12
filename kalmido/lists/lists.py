@@ -1115,10 +1115,11 @@ def _folder_member_add(c, lid, uid, role, actor):
     from ..collab.liste2e import le2a_member_problem
     if le2a_member_problem(c, lid, uid, role):  # 2.64.1 (#1817): a list with the lock is skipped (agents, participants)
         return False
+    from .lmcore import lmc_share, lmc_share_lock
+    lmc_share_lock(c, lid, uid)  # 2.1032.0 (#5788): the share's bucket before the member row (member_set's order)
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
               (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc())))
     member_folder_adopt(c, lid, uid)
-    from .lmcore import lmc_share
     lmc_share(c, actor, lid, uid, role, None)  # 2.568.0 (#4739): the core's share row, as PUT .../members (also an import's share)
     news_add(c, uid, "share", list_id=lid, data={"role": role, "name": l["name"]}, actor=actor)
     if is_agent(u):
@@ -1143,10 +1144,12 @@ def member_rejoin(c, oid, uid, rows):
                 or (role and (le2a_member_problem(c, lid, uid, role) or _agent_bridge_blocks(c, lid, uid))):
             continue
         back.append(lid)
+        from .lmcore import lmc_rejoin_actor, lmc_share, lmc_share_lock
+        if role:
+            lmc_share_lock(c, lid, uid)  # 2.1032.0 (#5788): the share's bucket before the member row (member_set's order)
         if role and c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING",
                               (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc()))).rowcount:
             member_folder_adopt(c, lid, uid)
-            from .lmcore import lmc_rejoin_actor, lmc_share
             # 2.568.0 (#4739): the core's share row (leaving took it into obj_revoked); review F7: by who shared it then (the
             # taken row), else the system (None) -- never uid as if they had shared it with themselves
             lmc_share(c, lmc_rejoin_actor(c, lid, uid), lid, uid, role, None)
@@ -1252,10 +1255,12 @@ def folder_people_put():
         # was written for an account outside an organisation whose lists lie in the folder, and GET /api/folders/people showed
         # its name to the sharer (an address told that it has an account). A list of the folder it cannot be in: the answer of
         # an unknown address, nothing written
-        from ..accounts.orgs import ws_member_problem
-        if any(ws_member_problem(c, x[0], r[0]) for x in c.execute(
-                "SELECT id, folder FROM lists WHERE owner_id=? AND archived=0 AND is_inbox=0 ORDER BY id", (me(),)).fetchall()
-               if _in_folder(x[1], f)):
+        # Review: the folder's own nodes too (an organisation's tree; lf_folder_share shares them all) and archived lists
+        from ..accounts.orgs import ws_fit_problem, ws_member_problem
+        from ..lists.lffolder import lf_folder_nodes
+        if any(ws_fit_problem(c, n["org_id"], r[0]) for n in lf_folder_nodes(c, me(), f) if n["org_id"]) or \
+                any(ws_member_problem(c, x[0], r[0]) for x in c.execute(
+                    "SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0 ORDER BY id", (me(),)).fetchall() if _in_folder(x[1], f)):
             return jsonify(shared=0, updated=0, by_email=True)
         uid = r[0]
     elif not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() or personal_agent_foreign(c, uid, me()) \
@@ -1379,9 +1384,10 @@ def agent_share_add(c, lid, aid, actor):
     if bridge_blocks(c, lid, aid):  # 2.30.0 (#919): a list with other people than the agent's other lists (skipped)
         return False
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    from .lmcore import lmc_share, lmc_share_lock
+    lmc_share_lock(c, lid, aid)  # 2.1032.0 (#5788): the share's bucket before the member row (member_set's order)
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
               (lid, aid, "edit", "edit", my_max_sort(c, aid) + 1, iso(now_utc())))
-    from .lmcore import lmc_share
     lmc_share(c, actor, lid, aid, "edit")  # 2.568.0 (#4739): the core's share row, as PUT .../members
     news_add(c, aid, "share", list_id=lid, data={"role": "edit", "name": lname}, actor=actor)
     wh_note_list(lid, "list.shared", {"member_id": aid, "role": "edit"})
