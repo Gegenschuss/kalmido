@@ -176,7 +176,7 @@ const LONG = 'Website relaunch 2026 for the client';
   [...d.querySelectorAll('.modal')].forEach(m => m.remove()); w.close();
 
   // ================= jsdom: News headings
-  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': null}}); d = w.document;
+  w = await boot({user: 'alice', hash: 'news'}); d = w.document;  // 2.1052.0 (#5808): always bundled, no newsBundle setting
   await until(() => d.querySelector('#view .nsect'), 60);
   const hs = [...d.querySelectorAll('#top h1, #view h1, #view h2, #view h3, #view h4')].map(h => +h.tagName[1]);
   check(hs.length >= 2 && hs[0] === 1 && hs.every((l, i) => !i || l <= hs[i - 1] + 1) && d.querySelector('#view .nsect h2.nsh'), '#652: News: h1 -> h2 (no jump to h3): ' + hs.join(','));

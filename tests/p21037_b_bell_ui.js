@@ -41,8 +41,8 @@ const berlinDay = () => new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Berl
   const srv = await call('GET', '/api/news');
   check(srv.due?.today === 1 && srv.due?.n === 1 && srv.unread_me === 2, `setup: the server counts the mention + one deadline line: ${JSON.stringify(srv.due)} ${srv.unread_me}`);
 
-  // ================= the bell's window (bundled, the default)
-  let w = await boot({user: 'alice', ls: {'tasks.newsBundle': null, 'tasks.newsHist': null}}), d = w.document;
+  // ================= the bell's window (bundled, the one way since #5808)
+  let w = await boot({user: 'alice', ls: {'tasks.newsHist': null}}), d = w.document;
   const bell = () => d.querySelector('#kbar .bell');
   check(bell()?.querySelector('.nbadge')?.textContent === '2', '#5801: bell = mention + the deadline line: ' + bell()?.querySelector('.nbadge')?.textContent);
   check(/Waiting for you: 2/.test(bell()?.getAttribute('aria-label') || '') && /Waiting for you: 2/.test(bell()?.title || ''), '#5807: the bell says "Waiting for you: 2" (label + tooltip): ' + bell()?.getAttribute('aria-label'));
@@ -78,19 +78,20 @@ const berlinDay = () => new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Berl
   check(bell()?.querySelector('.nbadge')?.textContent === '2' && /2 tasks due today/.test(d.querySelector('#pop .ndue')?.textContent || ''), '#5801: one more task due today brings the line back: ' + bell()?.querySelector('.nbadge')?.textContent);
   w.close();
 
-  // ================= after a reload: the history still open; the News view (plain) has the same For you
-  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': 'false', 'tasks.newsHist': 'true'}}); d = w.document;
-  await until(() => d.querySelector('#view .nhist .nitem'));
-  check(d.querySelector('#view .nhist [aria-expanded="true"]') && [...d.querySelectorAll('#view .nhist .nitem')].every(r => !r.classList.contains('unread')), '#5807: after a reload the history is still open, its rows calm');
-  check(d.querySelector('#view .nsec.me .c')?.textContent === '2' && d.querySelector('#view .ndue'), '#5807: News view: For you with the bell\'s number and the deadline line');
+  // ================= after a reload: the history still open; the News view has the same For you
+  // 2.1052.0 (#5808): the News view shows the bundles too (the plain list with its .nsec heads is gone): history rows = calm bundles
+  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsHist': 'true'}}); d = w.document;
+  await until(() => d.querySelector('#view .nhist .ngroup'));
+  check(d.querySelector('#view .nhist [aria-expanded="true"]') && [...d.querySelectorAll('#view .nhist .ngroup')].every(r => !r.classList.contains('unread') && !r.querySelector('[data-act="news-gread"]')) && /Write the homepage text/.test(d.querySelector('#view .nhist').textContent), '#5807: after a reload the history is still open, its bundles calm');
+  check(d.querySelector('#view .nsect.me .nsh .c')?.textContent === '2' && d.querySelector('#view .nsect.me .ndue') && /Call the printer/.test(d.querySelector('#view .nsect.me .ngroup.needs')?.textContent || ''), '#5807: News view: For you with the bell\'s number, the deadline line and the mention');
   const tabs = [...d.querySelectorAll('#view .ntabs button')].map(b => b.querySelector('.c')?.textContent || '');
   check(tabs[0] === '2' && tabs[1] === '2' && tabs[2] === '', '#5807: tabs count only what waits (All 2, For you 2, Activity none): ' + tabs.join('/'));
   click(w, d.querySelector('#view [data-act="news-hist"]')); await idle(w);
-  check(!d.querySelector('#view .nhist .nitem') && w.__store['tasks.newsHist'] === 'false', '#5807: folded again');
+  check(!d.querySelector('#view .nhist .ngroup, #view .nhist .nitem') && w.__store['tasks.newsHist'] === 'false', '#5807: folded again');  // 2.1052.0 (#5808): bundles
   // everything read + the lines seen: For you stays and says so
   await call('POST', '/api/news/read', {all: true}); await call('POST', '/api/news/due-seen', {line: 'today'});
   w.close();
-  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': null, 'tasks.newsHist': null}}); d = w.document;
+  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsHist': null}}); d = w.document;
   await until(() => d.querySelector('#view .nmeempty'));
   check(/Nothing waits for you/.test(d.querySelector('#view .nsect.me')?.textContent || '') && !d.querySelector('#kbar .bell .nbadge'), '#5807: empty For you: "Nothing waits for you", no number at the bell');
   click(w, d.querySelector('#kbar .bell')); await until(() => d.querySelector('#pop .bpop .nmeempty'));

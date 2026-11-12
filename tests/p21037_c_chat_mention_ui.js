@@ -53,13 +53,14 @@ const FEAT = 'cal,comments,collab';
   check(await until(() => badge() >= 2), `the bell counts the mention and the group's message (${badge()})`);
   const n0 = badge();
   click(w, bell()); await idle(w);
-  const row = await until(() => d.querySelector('#pop:not(.hidden) .bpop .nitem.k-chatmention'));
-  check(row && /Alice mentioned you in Studio/.test(row.querySelector('.ntext')?.textContent || ''), 'the bell shows "Alice mentioned you in Studio" ' + (row?.textContent || '').trim().slice(0, 120));
-  check(row && /please bring the lights/.test(row.querySelector('.nexc')?.textContent || ''), 'the row carries the message\'s words');
-  const secOf = el => { if (!el) return null; if (el.closest('section.me')) return 'me'; for (let x = el.previousElementSibling; x; x = x.previousElementSibling) if (x.classList.contains('nsec')) return x.classList.contains('me') ? 'me' : 'other'; return null; };
-  check(secOf(row) === 'me', 'the row stands in the section "For you" ' + secOf(row));
+  // 2.1052.0 (#5808): News show only bundled: the room's mention is a bundle of its own (one entry, the head opens it)
+  const row = await until(() => [...d.querySelectorAll('#pop:not(.hidden) .bpop .ngroup .ngmain[data-bp="open"]')].find(m => /mentioned you in Studio/.test(m.textContent)));
+  check(row && /Alice mentioned you in Studio/.test(row.querySelector('.ngt')?.textContent || '') && /1 mention/.test(row.querySelector('.ngs')?.textContent || ''), 'the bell shows "Alice mentioned you in Studio" ' + (row?.textContent || '').trim().slice(0, 120));
+  check(row && /please bring the lights/.test(row.querySelector('.ngex')?.textContent || ''), 'the row carries the message\'s words');
+  const secOf = el => el ? (el.closest('section.nsect.me') ? 'me' : el.closest('.nhist') ? 'other' : null) : null;  // 2.1052.0 (#5808): the sections, no .nsec heads
+  check(secOf(row) === 'me' && row.closest('.ngroup.needs.unread'), 'the row stands in the section "For you" ' + secOf(row));
   const grow = d.querySelector('#pop .bpop .nitem.k-group');
-  check(grow && /1 new message in/.test(grow.textContent) && /Lunch/.test(grow.textContent), 'the group conversation has its row in "For you" ' + (grow?.textContent || '').trim().slice(0, 120));
+  check(grow && secOf(grow) === 'me' && /1 new message in/.test(grow.textContent) && /Lunch/.test(grow.textContent), 'the group conversation has its row in "For you" ' + (grow?.textContent || '').trim().slice(0, 120));
 
   // ---- a click opens the channel at the message
   click(w, row);

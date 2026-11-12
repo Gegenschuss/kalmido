@@ -42,7 +42,7 @@ const css = f => { for (const base of [path.join(__dirname, '..', 'static'), pat
   const items = (await call('GET', '/api/news')).items.filter(it => it.kind === 'comment');
   const firstA = items.filter(it => it.task_id === TA).sort((a, b) => a.id - b.id)[0];
   await call('POST', '/api/news/read', {ids: firstA.ids || [firstA.id]});
-  let w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': null, newsTab: '"all"'}}), d = w.document;
+  let w = await boot({user: 'alice', hash: 'news', ls: {newsTab: '"all"'}}), d = w.document;  // 2.1052.0 (#5808): always bundled, no newsBundle setting
   await until(() => d.querySelector('.nbund .ngroup'));
   const gs = [...d.querySelectorAll('.nbund .ngroup')];
   const ga = gs.filter(g => g.querySelector('.ngt')?.textContent.includes('Alpha task')), gb = gs.filter(g => g.querySelector('.ngt')?.textContent.includes('Beta task'));

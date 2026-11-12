@@ -4,7 +4,7 @@
 // conversations with unread counts, a channel and a DM, sending with Enter, @Name -> mention, reactions, edit / delete,
 // mute, the sidebar row, the list menu); #442 notes (the list menu / overview entry, new note, typing saves, Markdown with
 // #123 links, read-only for viewers, the conflict dialog, delete + Undo, the command field finds notes); #452 News
-// bundled (groups per task with a summary line, "Needs you" first, Mark read per group, plain list per device,
+// bundled (groups per task with a summary line, "Needs you" first, Mark read per group, the one way since #5808,
 // Summarize -> the agent's chat); #443 Settings: the e-mail addresses (not set up here: the hint) and the summary
 // switch. Firefox at 390 touch (real taps) and 1440 mouse, light + dark: the layouts, 44 px targets, nothing sideways;
 // screenshots with P2170_SHOTS=<dir>.
@@ -56,7 +56,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   const T4 = (await call('POST', '/api/tasks', {title: 'Review the logo', list_id: L, assignee_id: 1}, CB)).id;
 
   // ================= jsdom: #475 the dashboard
-  let w = await boot({user: 'alice', hash: 'today', ls: {'tasks.newsBundle': null}}), d = w.document;
+  let w = await boot({user: 'alice', hash: 'today'}), d = w.document;  // 2.1052.0 (#5808): News are always bundled (no newsBundle setting)
   // 2.138.2 (#2392): the logo left the sidebar -- the account menu (picture next to the search) has "Start"
   click(w, d.querySelector('#kbar .kbacct')); await settleW(w);  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
   const logo = [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => (b.querySelector('.ml') || b).textContent.trim() === 'Start');
@@ -90,7 +90,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, d.querySelector('[data-act="dash-done"]')); await settleW(w);
   check(d.querySelector('.dgrid .dcard').classList.contains('dc-today') && !d.querySelector('.dc-stats'), 'Today first now, Statistics hidden');
   w.close();
-  w = await boot({user: 'alice', hash: 'home', mobile: true, ls: {'tasks.newsBundle': null}}); d = w.document; await settleW(w);
+  w = await boot({user: 'alice', hash: 'home', mobile: true}); d = w.document; await settleW(w);
   check(d.querySelector('.dgrid .dcard.dc-today'), '#475: the same order on another device (phone)');
   // the tab bar's "More" menu with the new views in it (Dashboard / Team chat / Notes are no module of MODS)
   w.eval(`LS.set('tabbar', ['m:tasks', 'm:cal', 'm:habits', 'm:pomo', 'home', 'team', 'news', 'settings']); render()`); await settleW(w);
@@ -101,8 +101,10 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   await call('PATCH', '/api/settings', {dashboard: ''});
 
   // ================= jsdom: #452 News bundled
-  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': null}}); d = w.document;
+  // 2.1052.0 (#5808): a device that remembered the plain list (newsBundle false) still sees the one bundled way
+  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': 'false'}}); d = w.document;
   await until(() => d.querySelector('.nbund .ngroup'));
+  check(d.querySelector('#view .nbund .nsect.me') && !d.querySelector('#view .nsec') && ![...d.querySelectorAll('#view .nitem')].some(r => !r.closest('.ngitems') && !r.classList.contains('ndm') && !r.classList.contains('ndue')), '#5808: a remembered newsBundle=false shows the bundles all the same (no plain list)');
   // 2.1037.0 (#5807): what does not wait for me stands in the history (open on the test devices, tests/boot.js), calm: no tick there
   const needs = d.querySelector('#ns-need')?.closest('.nsect'), info = d.querySelector('.nsect.nhist');
   check(needs && needs.textContent.includes('Call the printer') && needs.textContent.includes('Review the logo'), '#452: "Needs you": the mention and the assignment');
@@ -113,11 +115,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, g1.querySelector('[data-act="news-gread"]'));
   check(await until(async () => { const j = await call('GET', '/api/news'); return t1 && j.unread < before && j.items.filter(it => it.task_id === t1).every(it => it.read); }), '#452: Mark read per group (For you)');
   check(await until(() => /Marked read/.test(d.getElementById('srlive')?.textContent || '')), 'and that is announced');
-  const tog = d.querySelector('[data-act="news-bundle"]');
-  check(tog.getAttribute('aria-pressed') === 'true', 'bundled is on by default');
-  click(w, tog); await settleW(w);
-  check(!d.querySelector('.nbund') && d.querySelector('.nlist .nitem') && w.__store['tasks.newsBundle'] === 'false', '#452: the plain list, per device');
-  click(w, d.querySelector('[data-act="news-bundle"]')); await settleW(w);
+  // 2.1052.0 (#5808): the toggle "Bundled" is gone (before: on by default, the plain list per device)
+  check(!d.querySelector('[data-act="news-bundle"]') && !/Bundled/.test(d.querySelector('#view .nbar')?.textContent || '-'), '#5808: no toggle "Bundled" in the bar');
   // Summarize -> the agent's chat
   click(w, d.querySelector('[data-act="news-sum"]'));
   const msgs = await until(async () => { const j = await call('GET', `/api/agents/${ag.id}/chat`); return (j.messages || []).find(m => /summarise my \d+ unread news/.test(m.body)); });

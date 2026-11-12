@@ -300,8 +300,9 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   const ag = await call('POST', '/api/admin/agents', {username: 'helper', provider: 'Claude (Anthropic, USA)'});
   await call('PUT', `/api/lists/${P}/members`, {user_id: ag.id, role: 'edit'});
   w = await boot({user: 'bob', hash: 'news'}); d = w.document;
-  await until(() => d.querySelector('#view .nitem.k-agentjoin'));
-  check(/helper/.test(d.querySelector('#view .nitem.k-agentjoin')?.textContent || '') && /Anthropic/.test(d.querySelector('#view .nitem.k-agentjoin')?.textContent || ''), '#896: News: the agent joined, where it runs');
+  // 2.1052.0 (#5808): News show only bundled: the agent's joining is a bundle of its kind, its head says it
+  const aj = await until(() => d.querySelector('#view .ngroup[data-gk^="kagentjoin"] .ngt'));
+  check(/helper/.test(aj?.textContent || '') && /Anthropic/.test(aj?.textContent || '') && /an agent joined/.test(aj?.closest('.ngroup')?.querySelector('.ngs')?.textContent || ''), '#896: News: the agent joined, where it runs');
   w.close();
 
   console.log(`p2240_ui: ${ok} ok, ${F.length} failed`);

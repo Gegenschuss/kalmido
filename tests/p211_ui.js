@@ -7,6 +7,7 @@ const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, errs, sleep, B, login} = require('./boot');
 const {idle} = require('./boot');  // 2.206.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
+const {until} = require('./boot');  // 2.1052.0 (#5808): wait for the News bundle
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -121,8 +122,11 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
 
   // ================= News + notification row
   w = await boot({user: 'alice', hash: 'news'}); d = w.document; await idle(w);
-  w.eval(`LS.set('newsBundle', false); render()`); await sleep(400);  // 2.17.0: the plain list (bundled News: p2170_ui)
-  const it = [...d.querySelectorAll('.nitem.k-usage')];
+  // 2.1052.0 (#5808): News show only bundled (the plain list is gone): the usage alerts are one bundle; one entry = its head
+  // opens it, several unfold into rows
+  const ug = await until(() => d.querySelector('#view .ngroup[data-gk^="kusage"]'));
+  if (ug?.querySelector('.ngmain[data-act="news-group"]')) { click(w, ug.querySelector('.ngmain')); await until(() => d.querySelector('#view .ngitems .nitem.k-usage')); }
+  const it = d.querySelector('#view .ngitems .nitem.k-usage') ? [...d.querySelectorAll('#view .ngitems .nitem.k-usage')] : [...d.querySelectorAll('#view .ngroup[data-gk^="kusage"] .ngmain[data-act="news-open"]')];
   check(it.length >= 1 && /Claude reached its usage limit/.test(it[0].textContent) && /calls are blocked/.test(it[0].textContent), 'News: the hard limit item: ' + it[0]?.textContent.replace(/\s+/g, ' ').slice(0, 160));
   check(/used 80 %/.test(w.eval(`newsText({kind: 'usage', data: {name: 'X', level: 'soft80', used: 8, limit: 10, metric: 'cost', period: 'month'}}, {})`)), 'News text 80 %');
   click(w, it[0]); await idle(w);

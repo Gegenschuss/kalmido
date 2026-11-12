@@ -13,6 +13,10 @@ if (!process.env.P21481A_NOSTART) execFileSync('bash', [path.join(__dirname, 'st
 const ck = {};
 const call = async (who, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck[who]}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, j: await r.json().catch(() => ({}))}; };
 const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+// 2.1052.0 (#5808): News show only bundled: the entries of one kind = the heads of its one-entry bundles (a click opens the
+// entry) + the rows of a bundle with several, unfolded first
+const kindRows = (w, d, kind) => { const multi = [...d.querySelectorAll(`#view .ngroup[data-gk^="k${kind}"] .ngmain[data-act="news-group"]`)].find(m => m.getAttribute('aria-expanded') !== 'true'); if (multi) multi.click();
+  return [...d.querySelectorAll(`#view .ngroup[data-gk^="k${kind}"] .ngmain[data-act="news-open"], #view .ngitems .nitem.k-${kind}`)]; };
 const orgsOf = async who => ((await call(who, 'GET', '/api/state')).j.me?.workspaces || []).map(x => x.id);
 
 (async () => {
@@ -31,7 +35,7 @@ const orgsOf = async who => ((await call(who, 'GET', '/api/state')).j.me?.worksp
 
   // ---- the invitation in the News: "Later" keeps it, "Join" makes carol a member
   let w = await boot({user: 'carol', hash: 'news'}), d = w.document;
-  const item = await until(() => d.querySelector('.nitem.k-orgjoin'));
+  const item = await until(() => kindRows(w, d, 'orgjoin')[0]);
   check(!!item && /invites you to join the organisation/.test(item.textContent) && /Alpha/.test(item.textContent), 'the invitation shows in the News');
   item?.click();
   let dlg = await until(() => d.querySelector('.cdlg'));
@@ -49,7 +53,7 @@ const orgsOf = async who => ((await call(who, 'GET', '/api/state')).j.me?.worksp
   // ---- a second invitation, declined
   await call('bob', 'PUT', `/api/orgs/${beta}/members`, {email: 'carol@example.com'});
   w = await boot({user: 'carol', hash: 'news'}); d = w.document;
-  const it2 = await until(() => [...d.querySelectorAll('.nitem.k-orgjoin')].find(x => /Beta/.test(x.textContent)));
+  const it2 = await until(() => kindRows(w, d, 'orgjoin').find(x => /Beta/.test(x.textContent)));
   it2?.click();
   dlg = await until(() => d.querySelector('.cdlg'));
   dlg?.querySelector('[data-ojn="decline"]')?.click();

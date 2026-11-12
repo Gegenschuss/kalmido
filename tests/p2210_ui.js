@@ -182,8 +182,9 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
   w.close();
   // Bob: the invitation (News + reply)
   w = await boot({user: 'bob', hash: 'news'}); d = w.document;
-  await until(() => d.querySelector('#view .nitem'));
-  check([...d.querySelectorAll('#view .nitem')].some(n => /Alice invited you: Team day/.test(n.textContent)) && [...d.querySelectorAll('#view .nitem')].some(n => /shared the calendar Work with you/.test(n.textContent)),
+  // 2.1052.0 (#5808): News show only bundled: each line is a bundle's head (.ngt = the entry's text)
+  await until(() => d.querySelector('#view .ngroup .ngt'));
+  check([...d.querySelectorAll('#view .ngroup .ngt')].some(n => /Alice invited you: Team day/.test(n.textContent)) && [...d.querySelectorAll('#view .ngroup .ngt')].some(n => /shared the calendar Work with you/.test(n.textContent)),
     'News: the invitation and the shared calendar');
   w.eval(`go('cal'); S.calMode = 'day'; S.calSel = '${t2}'; renderView()`);
   await until(() => d.querySelector('#view .cev, #view .wcev'));
