@@ -285,6 +285,10 @@ jobs:
         run: python tools/check_live_filter.py
       - name: No new handwritten project state filter - list_state_sql() / otr_live() of core/access.py; tools/list_state_baseline.json only shrinks (2.1029.0, #5537)
         run: python tools/check_list_state.py
+      # 2.1056.0 (#5863): two packages merged side by side changed a signature and added a caller (otr_back without uid, 2.1024
+      # red in the full CI only); the Mac lint and the einreihen check replay this step
+      - name: Calls of module-level functions get all required parameters - '# arity-ok: <reason>' on the call (2.1056.0, #5863)
+        run: python tools/check_call_arity.py -v
       - name: ruff (E, F, BLE without E501; ruff.toml) red for new code only - tools/ruff_baseline.json (2.755.0, #5294)
         run: |
           pip install ruff==0.17.4
