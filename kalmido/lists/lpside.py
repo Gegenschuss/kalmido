@@ -42,10 +42,12 @@ LPS_KEYS = ("folder", "org_id", "ptype", "family", "life", "trip", "time_trackin
 LPS_DERIVED = ("listen_agent_ids", "tidy_agent_id")
 LPS_FIRST = ("org_id",)  # taken back before the other values (lps_run)
 # the plain settings a side effect may change too (a project type's defaults, a folder's), read and sent in the same form
-# (lp_current); the ones with their own cleaning (props, ticket templates and types) are not taken back by this step
+# (lp_current); the stored JSON texts of LPS_JSON as the values a PATCH sends (Fable review 2.1074: else a mixed save left them)
 LPS_PLAIN = ("name", "color", "view", "kind", "dep_shift", "rate", "archived", "tickets", "nag", "day_hours", "checklist",
              "sort_mode", "done_in_section", "group_field", "columns", "col_sums", "kpis", "tap_done", "points_on",
-             "irreversible_needs_yes", "two_eyes", "mail_guests", "def_ttype")
+             "irreversible_needs_yes", "two_eyes", "mail_guests", "def_ttype", "props", "ticket_tpl", "ttypes")
+LPS_JSON = ("trip", "ticket_tpl", "ttypes")  # stored as JSON text, sent as an object / list
+LPS_OWN = ("folder", "view")  # a member's own placement: a step of another role than now stays (Fable review 2.1074)
 
 
 def _norm(v):
@@ -60,10 +62,11 @@ def lps_state(c, lid, role):
     st = {k: cur.get(k) for k in LPS_KEYS + LPS_PLAIN if k in cur}
     st["listen_agent_ids"] = sorted(listen_agents_of(c, lid))
     st["tidy_agent_id"] = tidy_agent_of(c, lid)
-    try:
-        st["trip"] = json.loads(cur["trip"]) if cur.get("trip") else None
-    except ValueError:
-        st["trip"] = None
+    for k in LPS_JSON:
+        try:
+            st[k] = json.loads(cur[k]) if cur.get(k) else None
+        except (TypeError, ValueError):
+            st[k] = None
     return st
 
 
@@ -86,7 +89,8 @@ def lps_post(c, lid, role, st0):
     row = c.execute("SELECT name, org_id FROM lists WHERE id=?", (int(lid),)).fetchone()
     label = (LPS_WS if "org_id" in ch else LPS_LABEL, [ua_plain(st0["st"].get("name") or row["name"], lid)])
     pid = ug_diff_add(c, uid, LPS_KIND, lid, row["org_id"], LPS_AREA, label,
-                      {"op": "fields", "b": {k: st0["st"].get(k) for k in ch}, "a": {k: now[k] for k in ch}})
+                      {"op": "fields", "b": {k: st0["st"].get(k) for k in ch}, "a": {k: now[k] for k in ch},
+                       "own": role == "owner"})
     grp = g.get("undo_group")
     return grp["id"] if pid and grp else None
 
@@ -97,6 +101,9 @@ def lps_run(c, uid, lid, data, redo):
     role = need_list(c, lid, write=False)  # 404 without access now
     src, dst = (data.get("b") or {}, data.get("a") or {}) if redo else (data.get("a") or {}, data.get("b") or {})
     left, went = [], False
+    if "own" in data and data["own"] != (role == "owner"):  # owner then, member now (or back): another folder / view column
+        left += [k for k in LPS_OWN if k in dst]
+        dst = {k: v for k, v in dst.items() if k not in LPS_OWN}
     # the workspace first, on its own: its way back (lmm_restore) brings back what the move ended (a private client); the
     # rest after it, read again (a client back already is not written twice, one of the workspace now fits)
     for phase in (LPS_FIRST, None):
@@ -110,8 +117,9 @@ def lps_run(c, uid, lid, data, redo):
                 continue
             put[k] = v
         if put:
-            left += _apply(c, lid, put, src)
-            went = True
+            cf = _apply(c, lid, put, src)
+            left += cf
+            went = went or len(cf) < len(put)  # something was written (not every value stayed)
     if not went:
         raise Denied(409, tr(UG_KEPT_REDO if redo else UG_KEPT, ", ".join(left)) if left else tr(LPS_GONE))
     return data, left
@@ -120,7 +128,9 @@ def lps_run(c, uid, lid, data, redo):
 def _apply(c, lid, put, src):
     """list_apply of the values put (_prev = the step's values) -> the fields that stayed; its refusal = Denied (403 / 404
     kept, else 409)."""
-    out = list_apply(c, lid, {**put, "_prev": {k: src.get(k) for k in put}})
+    # lps_run compared the values itself; the JSON ones are left out of _prev (lp_current has their text, never equal: Fable
+    # review 2.1074, a trip never went back)
+    out = list_apply(c, lid, {**put, "_prev": {k: src.get(k) for k in put if k not in LPS_JSON}})
     if not isinstance(out, dict):
         try:
             msg = out[0].get_json().get("error")

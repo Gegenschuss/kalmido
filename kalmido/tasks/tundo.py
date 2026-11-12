@@ -31,7 +31,6 @@ from ..core.db import bump, iso_ms, now_utc
 from ..core.errors import Denied
 from ..core.i18n import N_, short_day, tr
 from ..core.pg import write_lock
-from ..core.undoareas import ua_plain
 from ..core.undodiff import ug_diff_add, undo_diff_reg, undo_person
 from ..core.undogroups import UG_TRACKED
 from ..core.undoweb import UG_KEPT, UG_KEPT_REDO
@@ -244,11 +243,6 @@ TU_Q = N_("“{0}”")  # the key exists (static/js/undo.js qn)
 TU_PRIO = (N_("None"), N_("Low"), "", N_("Medium"), "", N_("High"), "", N_("Urgent"))
 
 
-def _name(v, rid=None):
-    """A name for a label: never a ciphertext (a locked project's section / field / list name: its number then)."""
-    return ua_plain(v if isinstance(v, str) and not le2e_is_cipher(v) else "", rid)
-
-
 def _fields_label(c, d, ttl):
     """2.1074.0 (#5493): the label of one task's field step as the app's history names it (static/js/undo.js histLabel):
     "Priority of “Jump”: High" instead of "Edited Jump". None = the general one."""
@@ -258,9 +252,8 @@ def _fields_label(c, d, ttl):
     one = len(ch) == 1
     if ch == {"locked"}:
         return (N_("Locked {0}") if a.get("locked") else N_("Unlocked {0}"), [n])
-    if "list_id" in ch:
-        r = c.execute("SELECT name FROM lists WHERE id=?", (a.get("list_id"),)).fetchone() if a.get("list_id") else None
-        return (N_("Moved {0} to {1}"), [n, _name(r["name"], a.get("list_id")) if r else "?"])
+    if "list_id" in ch:  # no project / section / field name in a label (Fable review 2.1074: a lock later keeps it)
+        return (N_("Moved {0}"), [n])
     if "parent_id" in ch:
         return (N_("{0} is now a subtask") if a.get("parent_id") else N_("{0} is now a main task"), [n])
     if one and "title" in ch:
@@ -281,18 +274,13 @@ def _fields_label(c, d, ttl):
         r = c.execute("SELECT display_name, username FROM users WHERE id=?", (a["assignee_id"],)).fetchone()
         return (N_("{0} assigned to {1}"), [n, (r["display_name"] or r["username"]) if r else "?"])
     if one and "fields" in ch:
-        ids = list((a.get("fields") or {}).keys() | (b.get("fields") or {}).keys())
-        if len(ids) != 1:
-            return (N_("Custom fields of {0}"), [n])
-        r = c.execute("SELECT name FROM list_fields WHERE id=?", (int(ids[0]),)).fetchone()
-        return (N_("{0} of {1}"), [_name(r["name"], ids[0]) if r else [N_("Custom field")], n])
+        return (N_("Custom fields of {0}"), [n])
     if one and "pinned" in ch:
         return (N_("Pinned {0}") if a.get("pinned") else N_("Unpinned {0}"), [n])
     if one and "url" in ch:
         return (N_("Link of {0}"), [n])
     if one and "section_id" in ch:
-        r = c.execute("SELECT name FROM sections WHERE id=?", (a.get("section_id"),)).fetchone() if a.get("section_id") else None
-        return (N_("Moved {0} to section {1}"), [n, _name(r["name"], a.get("section_id")) if r else "?"])
+        return (N_("Moved {0}"), [n])
     if "plan_start" in ch and "due" not in ch:
         return (N_("Planned {0}") if a.get("plan_start") else N_("Unplanned {0}"), [n])
     if ch & {"due", "start", "due_time"}:

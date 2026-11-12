@@ -98,6 +98,17 @@ res = undo_one(Fr, ug3)
 check(not res.get("undone") and res.get("stayed") and "folder" in str(res.get("stayed")) and lrow(Fr, FL).get("folder") == "Dritter Ordner",
       f"a value changed elsewhere since is not set back (named) {res}")
 
+# a trip's dates (stored as JSON text): a change goes back to the old dates (Fable review: the _prev compare never matched)
+r = Fr.post(B + "/api/lists", json={"name": "Reise Beispiel", "life": "travel", "trip": {"from": "2026-05-01", "to": "2026-05-08"}})
+RL = r.json().get("id") if r.ok else None
+r = Fr.patch(B + f"/api/lists/{RL}", json={"trip": {"from": "2026-06-01", "to": "2026-06-09", "where": "Lissabon"}})
+ugt = r.json().get("undo_group") if r.ok else None
+check(r.ok and ugt, f"(setup) new trip dates are a step {r.status_code} {r.text[:160]}")
+res = undo_one(Fr, ugt)
+trip = lrow(Fr, RL).get("trip") or {}
+check(res.get("undone") == [ugt] and not res.get("stayed") and trip.get("from") == "2026-05-01" and trip.get("to") == "2026-05-08",
+      f"undo: the old trip dates are back {res} {trip}")
+
 # ---------------------------------------------------------------- the workspace: into the organisation and back
 r = A.post(B + "/api/clients", json={"name": "Private Beispiel Kunde", "org_id": None})
 PC = r.json().get("id")
@@ -147,6 +158,9 @@ Fr.patch(B + f"/api/tasks/{T}", json={"title": "Sprung Neu"})
 check(newest(Fr).get("label") == "Renamed “Sprung Neu”", f"a rename says so {newest(Fr).get('label')}")
 Fr.patch(B + f"/api/tasks/{T}", json={"due": "2026-03-04"})
 check(newest(Fr).get("label") == "Date of “Sprung Neu”: 4 Mar", f"a date step names the day {newest(Fr).get('label')}")
+Fr.patch(B + f"/api/tasks/{T}", json={"list_id": RL})
+check(newest(Fr).get("label") == "Moved “Sprung Neu”", f"a move names no project (a lock later would keep it) {newest(Fr).get('label')}")
+Fr.patch(B + f"/api/tasks/{T}", json={"list_id": FL})
 Fr.patch(B + f"/api/tasks/{T}", json={"title": "Sprung Zwei", "priority": 1})
 check(newest(Fr).get("label") == "Edited “Sprung Zwei”", f"several fields: 'Edited' with the title in quotes {newest(Fr).get('label')}")
 Fr.post(B + f"/api/tasks/{T}/complete")
