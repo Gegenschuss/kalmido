@@ -225,12 +225,17 @@ def _clean(c, oid, table, r):
         if k == "list":
             row["list_id"] = int(v)
             row.pop("org_id", None)
+        elif k == "ws":  # 2.1119.0 (#5277): a tag of the file store -- documents/tags.json keeps the columns of doc_tags
+            row = {"id": row["id"], "org_id": row.get("org_id"), "ws": v, "name": row["name"], "created_at": row["created_at"]}
     if table == "obj_versions":  # 2.958.0 (#5281) / 2.977.0 (#5282): the old table's columns (an older archive reads the same)
         return ox_objv_row(c, oid, row)
-    if table == "obj_tag_links":  # 2.947.0 (#5275): the columns of task_list_tags (+ when and how it was set)
+    if table == "obj_tag_links" and row.get("kind") == "fs_entry":  # 2.1119.0 (#5277): documents/document_tags.json, doc_node_tags' columns
+        row = {"node_id": row["obj_id"], "tag_id": row["tag_id"], "auto": row.get("how") or ""}
+    elif table == "obj_tag_links":  # 2.947.0 (#5275): the columns of task_list_tags (+ when and how it was set)
         row["task_id"] = row.pop("obj_id")
         row.pop("kind", None)
         row.pop("created_by", None)
+        row.pop("how", None)  # 2.1119.0 (#5277): the file store's detail, '' on a task
     if table == "obj_comments" and "ws" in row:  # 2.981.0 (#5273): a document's note, sealed with its workspace (as doc_notes was)
         row["text"] = _doc_open(c, row["ws"], "doc_notes.text", row["text"], default=None) if row.get("text") else row.get("text")
     if table == "obj_links":  # 2.1076.0 (#5271): the old files' columns (an older archive reads the same)
@@ -517,8 +522,7 @@ OX_AREAS = (
     ("documents/meta.json", "doc_meta", "org_id=?"),
     ("documents/senders.json", "doc_senders", "org_id=?"),
     ("documents/types.json", "doc_types", "org_id=?"),
-    ("documents/tags.json", "doc_tags", "org_id=?"),
-    ("documents/document_tags.json", "doc_node_tags", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),  # 2.122.0 B (#2099): + files / folders
+    # 2.1119.0 (#5277): documents/tags.json + document_tags.json (the tags, rows of the core) come from the export register (core/objexport.py)
     ("documents/fields.json", "doc_fields", "org_id=?"),  # 2.153.0 (#2179): custom fields + their values (decrypted)
     ("documents/field_values.json", "doc_field_values", "org_id=?"),
     ("documents/rules.json", "doc_rules", "org_id=?"),
@@ -719,9 +723,11 @@ def _tcx_rooms(u):
 
 
 # 2.190.0 R (#2561): rows of the file store that belong to one node (left out with a hidden filed mail's nodes)
-OX_NODE_TABLES = ("fs_versions", "fs_shares", "fs_log", "doc_meta", "doc_node_tags", "doc_field_values", "rc_receipts",
+OX_NODE_TABLES = ("fs_versions", "fs_shares", "fs_log", "doc_meta", "doc_field_values", "rc_receipts",
                   "fs_area_roots", "fs_locks")  # 2.353.0 C (#2829), #4300; 2.981.0 (#5273): the notes by their file (OX_NODE_FILES)
-OX_NODE_FILES = ("documents/notes.json",)  # 2.635.0 (#4807 d): the notes on documents (rows of obj_comments since 2.981.0, #5273)
+# 2.635.0 (#4807 d): the notes on documents (rows of obj_comments since 2.981.0, #5273); 2.1119.0 (#5277): the tags on the nodes
+# (rows of obj_tag_links, the file keeps node_id)
+OX_NODE_FILES = ("documents/notes.json", "documents/document_tags.json")
 
 
 def ox_hidden_nodes(c, oid, hidden):
@@ -1077,13 +1083,12 @@ def ox_pb_store(c, zf, man, lk, oid, owner, have, pre=""):
             ("store/versions.json", "fs_versions", f"node_id IN ({k})", ()),
             ("documents/senders.json", "doc_senders", "ws=?", (ws,)),
             ("documents/types.json", "doc_types", "ws=?", (ws,)),
-            ("documents/tags.json", "doc_tags", "ws=?", (ws,)),
-            ("documents/document_tags.json", "doc_node_tags", f"node_id IN ({k})", ()),
             ("documents/fields.json", "doc_fields", "ws=?", (ws,)),
             ("documents/field_values.json", "doc_field_values", f"node_id IN ({k})", ()),
             ("documents/meta.json", "doc_meta", f"node_id IN ({k})", ()),
             ("documents/receipts.json", "rc_receipts", f"node_id IN ({k})", ()),
-            # 2.1097.0 (#5949): + the core's tables from the export register (documents/notes.json: the notes on the documents)
+            # 2.1097.0 (#5949): + the core's tables from the export register (documents/notes.json: the notes on the documents;
+            # 2.1119.0 #5277: documents/tags.json + document_tags.json, the tags on these files)
             *((a, tb, w, ()) for a, tb, w in oex_nodes({"NODES": k, "LIVE": live_sql()}))):
         if table in have:
             _put_json(zf, man, pre + name, _rows(c, oid, table, where, args))

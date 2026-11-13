@@ -34,7 +34,7 @@ CT_TIME = {  # column -> the tables that still had it as TEXT (the lines of tool
         'books', 'budget_cats', 'budget_entries', 'budget_files', 'budget_recurring', 'cal_subs', 'chat_files', 'chat_saves',
         'clients', 'conn_blocks', 'conn_links', 'conn_requests', 'contact_srcs', 'contacts', 'dav_sync', 'dav_sync2',
         'disc_profiles', 'doc_fetchers', 'doc_fields', 'doc_flow_runs', 'doc_mail', 'doc_meta', 'doc_office_moves', 'doc_rules',
-        'doc_senders', 'doc_tags', 'doc_types', 'doc_views', 'e2e_keys', 'ev_cal_feeds', 'ev_cals', 'events', 'file_text',
+        'doc_senders', 'doc_types', 'doc_views', 'e2e_keys', 'ev_cal_feeds', 'ev_cals', 'events', 'file_text',
         'filters', 'folder_agents', 'form_entries', 'forms', 'fs_ext_links', 'fs_lock_keys', 'fs_nodes', 'fs_shares',
         'fs_upload_requests', 'fs_versions', 'git_closes', 'git_conns', 'git_folders', 'git_issue_comments', 'git_issue_gone',
         'git_issue_links', 'git_links', 'groups', 'habits', 'hook_in', 'hub_absences', 'hub_bookings', 'hub_mailbox_rules',
@@ -332,8 +332,8 @@ def ctj_misfits(c, table, col):
 def ctj_triggers(c, table, col):
     """[(name, CREATE TRIGGER text)] of the user triggers on table that name col (UPDATE OF col, or col in their WHEN)."""
     return [(r[0], r[1]) for r in c.execute(
-        "SELECT DISTINCT t.tgname, pg_get_triggerdef(t.oid) FROM pg_trigger t JOIN pg_depend d ON d.classid='pg_trigger'::regclass "
-        "AND d.objid=t.oid JOIN pg_attribute a ON a.attrelid=d.refobjid AND a.attnum=d.refobjsubid "
+        "SELECT DISTINCT t.tgname, pg_get_triggerdef(t.oid) FROM pg_trigger t JOIN pg_depend d ON d.classid='pg_trigger'::regclass "  # pg-ok: pg_trigger.oid, a catalog of Postgres
+        "AND d.objid=t.oid JOIN pg_attribute a ON a.attrelid=d.refobjid AND a.attnum=d.refobjsubid "  # pg-ok: pg_trigger.oid
         "WHERE NOT t.tgisinternal AND t.tgrelid=to_regclass(?) AND a.attname=? ORDER BY 1", (table, col)).fetchall()]
 
 

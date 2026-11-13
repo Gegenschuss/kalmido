@@ -31,6 +31,7 @@ from ..core.access import acx_of, Denied, live_sql  # 2.149.0 G (#2517): pulled 
 from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file, oc_seal_k, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked as _sc_locked  # 2.360.0 B (#2496)
 from ..core.objwords import OSW_KEY, osw_put, osw_register  # 2.1002.0 (#5279): the shared word index
+from ..core.objtags import otg_ws_all, otg_ws_drop, otg_ws_name, otg_ws_ok, otg_ws_of, otg_ws_set, otg_ws_tag  # 2.1119.0 (#5277): the tags are the core's
 from ..files.store import fs_chain as _fs_chain, fs_deleted as _fs_deleted, fs_role as _fs_role  # 2.199.0 B (#2742); 2.351.0 A (#2823): fs_role
 from ..files.fslock import fl_is_locked, fsl_of_chain  # 2.353.0 F (#2758)
 from ..files.store import fs_visible_sql_c as _fs_visible_sql  # 2.360.0 B (#2496)
@@ -45,7 +46,7 @@ from ..office.einvoice_in import ei_of_file, ei_text, ei_amount, ei_details, ei_
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
 
 STATES = ("wait", "run", "done", "failed")
-LABEL_KINDS = {"sender": "doc_senders", "type": "doc_types", "tag": "doc_tags"}
+LABEL_KINDS = {"sender": "doc_senders", "type": "doc_types", "tag": "obj_tags"}  # 2.1119.0 (#5277): a tag is a row of the core (scope ws, core/objtags.py)
 ROOT = "Dokumente"          # the documents folder at the root of a workspace's file tree (its name before 2.368)
 INBOX = "Eingang"           # its inbox folder: files put there are recognised and sorted (its name before 2.368)
 # 2.368.0 (#2987): a new documents folder is named in its owner's language; every language's name (and the German one of
@@ -364,6 +365,8 @@ OSW_KEY.append(_index_key)  # 2.1002.0 (#5279): the shared word index hashes wit
 # ---- labels (senders, types, tags) ------------------------------------------------------------------------------------
 def labels(c, ws, kind):
     """[{id, name}] of one kind in workspace ws, sorted by name."""
+    if kind == "tag":  # 2.1119.0 (#5277): the core's tags of the workspace (scope ws)
+        return otg_ws_all(c, ws)
     rows = c.execute(f"SELECT id, name FROM {LABEL_KINDS[kind]} WHERE ws=?", (ws,)).fetchall()
     out = [{"id": r["id"], "name": doc_open(c, ws, "doc_senders.name", r["name"]) if kind == "sender" else r["name"]} for r in rows]
     return sorted(out, key=lambda x: (x["name"] or "").lower())
@@ -379,6 +382,8 @@ def label_name(c, ws, kind, lid):
         if (ws, kind) not in cache:
             cache[(ws, kind)] = {x["id"]: x["name"] for x in labels(c, ws, kind)}
         return cache[(ws, kind)].get(int(lid))
+    if kind == "tag":
+        return otg_ws_name(c, ws, lid)
     r = c.execute(f"SELECT name FROM {LABEL_KINDS[kind]} WHERE id=? AND ws=?", (int(lid), ws)).fetchone()
     if not r:
         return None
@@ -390,6 +395,11 @@ def label_id(c, ws, kind, name, create=True):
     name = re.sub(r"\s+", " ", str(name or "")).strip()[:NAME_MAX]
     if not name:
         return None
+    if kind == "tag":  # 2.1119.0 (#5277): found / made under the core's unique index (no race between two requests)
+        from flask import g, has_request_context
+        if has_request_context():
+            g.setdefault("doc_labels", {}).pop((ws, kind), None)
+        return otg_ws_tag(c, ws, name, by=_by(), create=create)
     low = name.lower()
     for x in labels(c, ws, kind):
         if (x["name"] or "").lower() == low:
@@ -404,20 +414,31 @@ def label_id(c, ws, kind, name, create=True):
 
 
 def label_ok(c, ws, kind, lid):
+    if kind == "tag":
+        return bool(lid) and otg_ws_ok(c, ws, lid)
     return bool(lid) and c.execute(f"SELECT 1 FROM {LABEL_KINDS[kind]} WHERE id=? AND ws=?", (int(lid), ws)).fetchone() is not None
 
 
 def node_tags(c, nid):
-    return [{"id": r[0], "name": r[1], "auto": r[2] or ""} for r in c.execute(
-        "SELECT t.id, t.name, nt.auto FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id WHERE nt.node_id=? ORDER BY lower(t.name)", (nid,))]
+    """[{id, name, auto}] of node nid by name; auto = how it was set ('' by hand, 'rule', 'learn', 'agent' ...).
+    2.1119.0 (#5277): the core's links (obj_tag_links kind fs_entry, how)."""
+    return [{"id": t["id"], "name": t["name"], "auto": t["auto"]} for t in otg_ws_of(c, [nid]).get(int(nid), [])]
 
 
 def set_tags(c, nid, tag_ids, auto=""):
-    """Replace the tags of a document (ids of its workspace; the caller checked them)."""
-    c.execute("DELETE FROM doc_node_tags WHERE node_id=?", (nid,))
-    for t in dict.fromkeys(tag_ids):
-        c.execute("INSERT INTO doc_node_tags(node_id, tag_id, auto) VALUES(?,?,?) ON CONFLICT DO NOTHING",
-                  (nid, int(t), auto if isinstance(auto, str) else (auto.get(t) or "")))
+    """Replace the tags of a document (ids of its workspace; the caller checked them). auto: one mark for all or {id: mark}.
+    2.1119.0 (#5277): through the core (core/objtags.py otg_ws_set)."""
+    otg_ws_set(c, nid, tag_ids, auto if isinstance(auto, str) else {int(k): v for k, v in auto.items()}, by=_by())
+
+
+def _by():
+    """The person of the request (who set a tag), None outside one."""
+    from flask import g, has_request_context
+    u = getattr(g, "user", None) if has_request_context() else None
+    try:
+        return int(u["id"]) if u is not None else None
+    except (TypeError, KeyError, IndexError, ValueError):
+        return None
 
 
 # ---- settings, rules, models -----------------------------------------------------------------------------------------
@@ -928,9 +949,9 @@ def _learn_seen(c, m, uid, f, lid):
         r = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
     if r and r[0] == "admin":
         return True
-    q = ("SELECT 1 FROM doc_node_tags WHERE tag_id=? AND node_id<>?" if f == "tag" else
-         f"SELECT 1 FROM doc_meta WHERE {'sender_id' if f == 'sender' else 'type_id'}=? AND node_id<>?")
-    return bool(c.execute(f"{q} AND node_id IN {_fs_visible_sql(c, uid)} LIMIT 1", (int(lid), m["node_id"])).fetchone())
+    q = ("SELECT 1 FROM obj_tag_links WHERE kind='fs_entry' AND tag_id=? AND obj_id<>? AND obj_id IN" if f == "tag" else  # 2.1119.0 (#5277)
+         f"SELECT 1 FROM doc_meta WHERE {'sender_id' if f == 'sender' else 'type_id'}=? AND node_id<>? AND node_id IN")
+    return bool(c.execute(f"{q} {_fs_visible_sql(c, uid)} LIMIT 1", (int(lid), m["node_id"])).fetchone())
 
 
 def classify(c, m, node, text, given=None, seer=None):
@@ -1201,7 +1222,7 @@ def learn_back(c, nid, run):
                       (int(prev["parent_id"]), prev.get("owner_id") or node["owner_id"], _now(), nid))
             back.append("folder")
     gone = [t for t in af.get("tags") or []
-            if c.execute("DELETE FROM doc_node_tags WHERE node_id=? AND tag_id=? AND auto IN ('rule', 'learn')", (nid, int(t))).rowcount]
+            if otg_ws_drop(c, nid, int(t), ("rule", "learn"))]  # 2.1119.0 (#5277): the core's link with its mark
     if gone and len(gone) == len(af.get("tags") or []):
         back.append("tags")
     for f in back:

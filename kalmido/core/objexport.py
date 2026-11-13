@@ -156,14 +156,20 @@ obj_export("obj_notif_cap", acct=(  # 2.1097.0 (#5949): the parts keep their old
     ("folder_notif", "SELECT ref_id AS owner_id, path AS folder, user_id, tpl, custom::text AS custom, updated_at FROM obj_notif_cap "
                      "WHERE kind='folder' AND ref_id=?", "Notifications")))
 # 2.947.0 (#5275): project tags (scope list, the file keeps list_id) and the organisation's labels
+# 2.1119.0 (#5277): + the tags of the file store (scope ws; documents/tags.json keeps the columns of doc_tags, admin/orgexport.py _clean)
 obj_export("obj_tags", org=(("lists/tags.json", "scope_kind='list' AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM ({LSQ}) x)", "list_tags"),
-                            ("org/labels.json", "scope_kind='org' AND org_id=?", "org_tags")),
+                            ("org/labels.json", "scope_kind='org' AND org_id=?", "org_tags"),
+                            ("documents/tags.json", "scope_kind='ws' AND org_id=?")),
+           nodes=(("documents/tags.json", "scope_kind='ws' AND id IN (SELECT tag_id FROM obj_tag_links WHERE kind='fs_entry' AND obj_id IN ({NODES}))"),),
            # 2.1097.0 (#5949): the project tags of my lists in the file and columns of list_tags; a label of an organisation is the
            # organisation's (its export)
            acct_more=(("list_tags", """SELECT id, CAST(scope_id AS BIGINT) AS list_id, name, color, sort, created_at FROM obj_tags
                           WHERE scope_kind='list' AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM lists x WHERE x.id IN {OWN})"""),))
 obj_export("obj_tag_links", org=(("tasks/tags.json", """kind='task' AND obj_id IN ({TSQ}) AND tag_id IN (SELECT id FROM obj_tags WHERE (scope_kind='list'
-     AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM ({LSQ}) x)) OR (scope_kind='org' AND org_id=?))""", "task_list_tags"),),
+     AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM ({LSQ}) x)) OR (scope_kind='org' AND org_id=?))""", "task_list_tags"),
+                                 # 2.1119.0 (#5277): the tags on files, folders, documents (the columns of doc_node_tags)
+                                 ("documents/document_tags.json", "kind='fs_entry' AND obj_id IN (SELECT id FROM fs_nodes WHERE org_id=?)")),
+           nodes=(("documents/document_tags.json", "kind='fs_entry' AND obj_id IN ({NODES})"),),
            read=("task_tags",),
            # 2.1097.0 (#5949): my personal tags (scope user, 2.955.0 #5276) in the file and columns of task_tags; the project tags of
            # my lists' tasks in those of task_list_tags

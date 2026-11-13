@@ -104,7 +104,11 @@ left = dict(UMZ_LEFT)
 out["left"] = {w: left.get(w) == ps for w, ps in OLD_LEFT.items()}
 out["left_rest"] = [e for e in UMZ_LEFT if e[0] not in OLD_LEFT] == [e for e in UMZ_LEFT_OWN if e[0] not in OLD_LEFT]
 out["left_own"] = sorted(p for _w, ps in UMZ_LEFT_OWN for p in ps if p in {x for v in OLD_LEFT.values() for x in v} - {"shared_lists"})
-out["nodes"] = oex_nodes({"NODES": "11,12", "LIVE": live_sql()}) == (("documents/notes.json", "obj_comments", f"kind='doc_note' AND ref_id IN (11,12) AND {live_sql()}"),)
+# 2.1119.0 (#5277): + the file store's tags on these nodes (rows of the core since the move), wanted
+out["nodes"] = oex_nodes({"NODES": "11,12", "LIVE": live_sql()}) == (
+    ("documents/tags.json", "obj_tags", "scope_kind='ws' AND id IN (SELECT tag_id FROM obj_tag_links WHERE kind='fs_entry' AND obj_id IN (11,12))"),
+    ("documents/document_tags.json", "obj_tag_links", "kind='fs_entry' AND obj_id IN (11,12)"),
+    ("documents/notes.json", "obj_comments", f"kind='doc_note' AND ref_id IN (11,12) AND {live_sql()}"))
 
 
 def refused(**kw):

@@ -15,8 +15,9 @@ from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, insert_id
 from .notes import dn_view  # 2.635.0 (#4807 d)
 from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..core.i18n import tr
+from ..core.objtags import otg_ws_link, otg_ws_nodes, otg_ws_of, otg_ws_tag_of  # 2.1119.0 (#5277): the file store's tags are the core's
 from ..core.numtext import server_num
-from ..core.pg import st_ids, write_lock  # 2.525.0 (#4195): an id set as one array parameter
+from ..core.pg import IntegrityError, qi, st_ids, write_lock  # 2.525.0 (#4195): an id set as one array parameter
 from ..core.access import Denied, acx_of
 from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
@@ -222,10 +223,8 @@ def doc_prefetch(c, ids):
     tags: {id: [S.node_tags]}, shared: {ids with a share}}."""
     q = st_ids(ids)
     nodes = {r["id"]: r for r in c.execute("SELECT * FROM fs_nodes WHERE id = ANY(CAST(? AS BIGINT[]))", (q,))}
-    tags = {}
-    for r in c.execute("SELECT nt.node_id, t.id, t.name, nt.auto FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id "
-                       "WHERE nt.node_id = ANY(CAST(? AS BIGINT[])) ORDER BY nt.node_id, lower(t.name)", (q,)):
-        tags.setdefault(r[0], []).append({"id": r[1], "name": r[2], "auto": r[3] or ""})
+    tags = {k: [{"id": t["id"], "name": t["name"], "auto": t["auto"]} for t in v]
+            for k, v in otg_ws_of(c, ids).items()}  # 2.1119.0 (#5277): the core's tags (scope ws)
     shared = {r[0] for r in c.execute("SELECT DISTINCT node_id FROM fs_shares WHERE node_id = ANY(CAST(? AS BIGINT[]))", (q,))}
     return {"nodes": nodes, "tags": tags, "shared": shared}
 
@@ -360,8 +359,9 @@ def facets(c, uid, ws_filter, vis=None, area=None, full=False):
         "sender": c.execute(f"SELECT sender_id, ws, COUNT(*) FROM doc_meta WHERE sender_id IS NOT NULL AND node_id IN ({vis}) GROUP BY sender_id, ws",
                             params).fetchall(),
         "type": c.execute(f"SELECT type_id, ws, COUNT(*) FROM doc_meta WHERE type_id IS NOT NULL AND node_id IN ({vis}) GROUP BY type_id, ws", params).fetchall(),
-        "tag": c.execute(f"SELECT t.id, t.ws, COUNT(DISTINCT nt.node_id) FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id WHERE nt.node_id IN ({vis}) "
-                         "GROUP BY t.id, t.ws", params).fetchall()}
+        "tag": c.execute(f"SELECT ot.id, ot.scope_id, COUNT(DISTINCT k.obj_id) FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id "
+                         f"AND ot.scope_kind='ws' WHERE k.kind='fs_entry' AND k.obj_id IN ({vis}) GROUP BY ot.id, ot.scope_id",
+                         params).fetchall()}  # 2.1119.0 (#5277): the core's tags
     out = {}
     for kind, key in (("sender", "senders"), ("type", "types"), ("tag", "tags")):
         merged = {}
@@ -1108,6 +1108,14 @@ def docs_rule_del(rid):
     return jsonify(rules=_rules_v(c, ws))
 
 
+def _label_ws(c, kind, lid):
+    """(ws,) of label lid of kind, None when there is none. 2.1119.0 (#5277): a tag is a row of the core (scope ws)."""
+    if kind == "tag":
+        r = otg_ws_tag_of(c, lid)
+        return (r["scope_id"],) if r else None
+    return c.execute(f"SELECT ws FROM {qi(S.LABEL_KINDS[kind], ('doc_senders', 'doc_types'))} WHERE id=?", (lid,)).fetchone()
+
+
 @app.patch("/api/docs/labels/<kind>/<int:lid>")
 def docs_label_rename(kind, lid):
     """{name} -- rename a sender / type / tag of a workspace."""
@@ -1115,14 +1123,24 @@ def docs_label_rename(kind, lid):
     _no_agent()
     if kind not in S.LABEL_KINDS:
         raise Denied(404)
-    r = c.execute(f"SELECT ws FROM {S.LABEL_KINDS[kind]} WHERE id=?", (lid,)).fetchone()
+    r = _label_ws(c, kind, lid)
     if not r:
         raise Denied(404)
     _ws_manage(c, r[0], me())
     name = re.sub(r"\s+", " ", str(body().get("name") or "")).strip()[:S.NAME_MAX]
     if not name:
         return err(tr("Name missing"))
-    c.execute(f"UPDATE {S.LABEL_KINDS[kind]} SET name=? WHERE id=?", (S.doc_seal(c, r[0], "doc_senders.name", name) if kind == "sender" else name, lid))
+    if kind == "tag":  # 2.1119.0 (#5277): a tag of the core -- a name another tag of the workspace has is refused (unique index)
+        other = S.label_id(c, r[0], "tag", name, create=False)
+        if other and other != lid:
+            return err(tr("This name is taken"), 409)
+        try:  # review F5: a rename / a new tag of the same name meanwhile meets the unique index
+            with c.savepoint():
+                c.execute("UPDATE obj_tags SET name=? WHERE id=? AND scope_kind='ws'", (name, lid))
+        except IntegrityError:
+            return err(tr("This name is taken"), 409)
+    else:
+        c.execute(f"UPDATE {S.LABEL_KINDS[kind]} SET name=? WHERE id=?", (S.doc_seal(c, r[0], "doc_senders.name", name) if kind == "sender" else name, lid))
     bump(c)
     c.commit()
     return jsonify(id=lid, name=name)
@@ -1135,7 +1153,7 @@ def docs_label_del(kind, lid):
     _no_agent()
     if kind not in S.LABEL_KINDS:
         raise Denied(404)
-    r = c.execute(f"SELECT ws FROM {S.LABEL_KINDS[kind]} WHERE id=?", (lid,)).fetchone()
+    r = _label_ws(c, kind, lid)
     if not r:
         raise Denied(404)
     _ws_manage(c, r[0], me())
@@ -1143,9 +1161,10 @@ def docs_label_del(kind, lid):
     if kind != "tag":
         ids = [x[0] for x in c.execute(f"SELECT node_id FROM doc_meta WHERE {kind}_id=? AND ws=?", (lid, r[0]))]
         c.execute(f"UPDATE doc_meta SET {kind}_id=NULL WHERE {kind}_id=? AND ws=?", (lid, r[0]))
-    else:
-        ids = [x[0] for x in c.execute("SELECT node_id FROM doc_node_tags WHERE tag_id=?", (lid,))]
-    c.execute(f"DELETE FROM {S.LABEL_KINDS[kind]} WHERE id=?", (lid,))
+        c.execute(f"DELETE FROM {S.LABEL_KINDS[kind]} WHERE id=?", (lid,))
+    else:  # 2.1119.0 (#5277): the core's tag; its links go with it (obj_tag_links ON DELETE CASCADE)
+        ids = otg_ws_nodes(c, lid)
+        c.execute("DELETE FROM obj_tags WHERE id=? AND scope_kind='ws'", (lid,))
     bump(c)
     c.commit()
     return jsonify(ok=True, name=name, ids=ids)  # the undo sends both back (POST /api/docs/labels/<kind>)
@@ -1171,7 +1190,7 @@ def docs_label_restore(kind):
         if kind == "tag":
             wc, wp = dt_ws_nodes(ws)
             for (nid,) in c.execute(f"SELECT n.id FROM fs_nodes n WHERE {wc} AND n.id IN ({q})", (*wp, *part)).fetchall():
-                c.execute("INSERT INTO doc_node_tags(node_id, tag_id) VALUES(?,?) ON CONFLICT DO NOTHING", (nid, lid))
+                otg_ws_link(c, nid, lid, by=me())  # 2.1119.0 (#5277)
         else:
             c.execute(f"UPDATE doc_meta SET {kind}_id=? WHERE ws=? AND {kind}_id IS NULL AND node_id IN ({q})", (lid, ws, *part))
     bump(c)

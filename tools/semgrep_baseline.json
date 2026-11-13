@@ -605,14 +605,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/admin/umz_undoplan.py",
-   "code": "for r in c.execute(f\"SELECT {cc}, node_id FROM {ct} WHERE {cc} IN ({_qs(part)})\", part).fetchall():",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/admin/umz_undoplan.py",
    "code": "for r in c.execute(f\"SELECT {sel} FROM {table} WHERE id IN ({_qs(part)})\", part).fetchall():",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
@@ -1682,22 +1674,6 @@
    "task": 5296
   },
   {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/docs/web.py",
-   "code": "r = c.execute(f\"SELECT ws FROM {S.LABEL_KINDS[kind]} WHERE id=?\", (lid,)).fetchone()",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/docs/web.py",
-   "code": "r = c.execute(f\"SELECT ws FROM {S.LABEL_KINDS[kind]} WHERE id=?\", (lid,)).fetchone()",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
    "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
    "file": "kalmido/events/ics.py",
    "code": "cs[0][\"UID\"] = icalendar.vText(f\"import-{hashlib.sha1(str(cs[0].to_ical()).encode(), usedforsecurity=False).hexdigest()[:20]}\")",
@@ -1801,7 +1777,7 @@
   {
    "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
    "file": "kalmido/files/fstags.py",
-   "code": "rows = c.execute(f\"\"\"SELECT DISTINCT t.id, t.name FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id JOIN fs_nodes n ON n.id=nt.node_id",
+   "code": "rows = c.execute(f\"\"\"SELECT DISTINCT ot.id, ot.name FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='ws'",
    "reason": "SQL built from fixed fragments only: fs_visible_sql inlines checked integer ids, dt_space returns fixed conditions, dt_where '?' lists, DT_HITS is a constant.",
    "date": "2026-11-05"
   },

@@ -1303,7 +1303,7 @@ Tags exist once: `obj_tags(id, scope_kind, scope_id, org_id, name, color, sort, 
 tag of a scope, `obj_tag_links(tag_id, kind, obj_id, src person|agent|auto, created_by, created_at)` puts it on an object
 (`kalmido/core/objtags.py`, fragment `migrations.d/5275_a.py`). The scopes: `list` (a project's tags, `scope_id` = the list
 id as text), `org` (the labels of an organisation, `org_id` set: row-level security shows them to its members only), `user`
-(stage Q5b, 2.955.0: a person's own tags, `scope_id` = the person's id) and `ws` (stage Q5c: the file store's tags, `doc_tags` still). A name is
+(stage Q5b, 2.955.0: a person's own tags, `scope_id` = the person's id) and `ws` (stage Q5c, 2.1119.0, #5277: the tags of the file store's files, folders and documents, `scope_id` = the workspace key `o<org>` / `u<owner>`, linked with kind `fs_entry`). A name is
 unique per scope under `lower()`. It replaced `list_tags`, `task_list_tags` and `org_tags`.
 - A task carries the tags of its project's scopes: the project's own and the labels of the project's organisation. A label
   sits on the task itself (decided 08.11.2026: no copy per project any more); a rename or a new colour reaches every task at

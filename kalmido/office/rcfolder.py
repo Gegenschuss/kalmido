@@ -32,6 +32,7 @@ from ..core.access import live_sql
 from ..core.config import app
 from ..core.i18n import LANGS, lang, tr
 from ..core.orgcrypt import oc_dec_fields
+from ..core.objtags import otg_ws_link  # 2.1119.0 (#5277): the file store's tags are the core's
 from ..docs.ingest import doc_on_done
 from ..docs.store import docs_root, folder_by_name, is_inbox, label_id, move_to_folder
 from ..files.store import _free_name, safe_fs_name
@@ -108,7 +109,7 @@ def rcf_file(c, nid, kind, name_of, day, uid=None, tag=True):
     area = tr("Credit card", lg=lg) if kind == "card" else tr("Bank", lg=lg)
     tid = label_id(c, m["ws"], "tag", area) if tag else None
     if tid:
-        c.execute("INSERT INTO doc_node_tags(node_id, tag_id, auto) VALUES(?,?,'rule') ON CONFLICT DO NOTHING", (nid, tid))
+        otg_ws_link(c, nid, tid, "rule")  # 2.1119.0 (#5277): the core's link, marked as a rule's
     ym = rcf_month(day, lg)
     if not root or not ym or not _in_inbox(c, node, root):
         return None

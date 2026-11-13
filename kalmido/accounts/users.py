@@ -596,6 +596,7 @@ def _user_purge(c, uid, made):
     c.execute("DELETE FROM filters WHERE user_id=? AND NOT shared", (uid,))
     c.execute("UPDATE filters SET user_id=NULL WHERE user_id=?", (uid,))  # 2.577.0 (#3356): a shared view stays with its project
     c.execute("DELETE FROM obj_tags WHERE scope_kind='user' AND scope_id=?", (str(uid),))  # 2.955.0 (#5276): the personal tags (were task_tags)
+    c.execute("DELETE FROM obj_tags WHERE scope_kind='ws' AND scope_id=?", (f"u{int(uid)}",))  # 2.1119.0 (#5277, review F6): the tags of the private file store
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=?", (uid,))
     c.execute("UPDATE tasks SET delegate_agent_id=NULL WHERE delegate_agent_id=?", (uid,))  # 2.473.0 (#3357)
     c.execute("UPDATE tasks SET created_by=NULL WHERE created_by=?", (uid,))
