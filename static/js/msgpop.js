@@ -1,3 +1,4 @@
+// @ts-check
 /* Kalmido web client: 2.1130.0 (#6057) the pop-up for new chat messages. Loaded on demand (lazyload.js LD_MODS msgpop) by
    mp_check (liveparts.js) when GET /api/msgpop (agents/msgpop.py) names new messages of other people (team chat: a
    project's conversation, a channel, a group, a direct message, a thread I take part in) or a finished answer / question of
@@ -53,7 +54,7 @@ function mp_show(items) {
   mp_draw();
 }
 function mp_draw() {
-  let el = $('#msgpop');
+  let el = /** @type {HTMLElement} */ ($('#msgpop'));
   if (!el) {
     el = document.createElement('div'); el.id = 'msgpop'; el.className = 'msgpop';
     document.body.appendChild(el); mp_wire(el);
@@ -73,6 +74,7 @@ function mp_hide() {
   el.classList.add('mpgone');
   setTimeout(() => { if (el.classList.contains('mpgone')) el.remove(); }, 200);
 }
+/** @param {HTMLElement} el */
 function mp_wire(el) {
   el.addEventListener('click', e => {
     const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-mp]'); if (!b) return;
