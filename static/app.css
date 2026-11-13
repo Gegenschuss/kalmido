@@ -5763,7 +5763,7 @@ html.nozoom,html.nozoom body{touch-action:pan-x pan-y}
    (2.58.0: its X stays visible, #1757) */
 @media (max-width:767px){
   #pop.sheet,.dpop.sheet,.qadd.sheet,.modal:not(.smodal):not(.authscreen):not(.shopmode):not(.palette)>.card,#pop.sheet .tch-sh{background-image:linear-gradient(var(--faint),var(--faint));background-repeat:no-repeat;background-position:center .3125rem;background-size:2.25rem .25rem}
-  .sd-drag{user-select:none;-webkit-user-select:none}
+  .sd-drag{user-select:none;-webkit-user-select:none;will-change:transform}  /* 2.1126.0 (#6049): the drag is transform only, on its own layer */
 }
 /* 2.58.0 (#1757): the X of a sheet / dialog stays visible on touch (it was 1px; Back and the swipe close too, the X is the sure way) */
 @media (min-width:768px) and (pointer:coarse){ .qadd.sheet{background-image:linear-gradient(var(--faint),var(--faint));background-repeat:no-repeat;background-position:center .3125rem;background-size:2.25rem .25rem} }
