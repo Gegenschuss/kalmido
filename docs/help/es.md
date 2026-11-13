@@ -162,3 +162,137 @@ Qué pasa después: sus eventos aparecen en tu calendario, solo para leer y solo
 
 Qué pasa después: tus eventos y tareas con fecha aparecen en el calendario del móvil. Usa allí la contraseña de aplicación,
 nunca tu contraseña de Kalmido.
+
+<!-- help: wiki#how-to-write-a-knowledge-page src=122a76cda7 -->
+## Escribir una página de conocimiento
+
+1. Abre **Páginas de conocimiento** en la barra lateral y pulsa **Nueva página**.
+2. Escribe el nombre de la página en **Nombre**. Una `/` crea carpetas: «Procesos/Lista» queda en la carpeta *Procesos*.
+3. Escribe el texto. Con `[[` enlazas otra página.
+
+Qué pasa entonces: la página se guarda sola y aparece en el árbol de la izquierda. Debajo de cada página, **Enlazada desde**
+muestra las páginas que la enlazan.
+
+<!-- help: wiki#how-to-share-a-page-read-only src=f589cec1bf -->
+## Compartir una página solo para leer
+
+1. Abre la página, abre su menú (⋯) y elige **Compartir…**.
+2. Para una persona: elígela en **Elegir una persona…** (o escribe un correo) y pulsa **Añadir**.
+3. Para quien no tiene cuenta: elige **Crear enlace público**, pon **Válido hasta** si quieres y copia el enlace.
+
+Qué pasa entonces: la persona lee esta página (o toda la carpeta, con *Compartir carpeta…*) y nada más de tus páginas;
+el enlace abre una página sencilla sin iniciar sesión. **Desactivar** termina un enlace al instante.
+
+<!-- help: wiki#how-to-bring-back-an-earlier-version-of-a-page src=f736215a16 -->
+## Recuperar una versión anterior de una página
+
+1. Abre la página, abre su menú (⋯) y elige **Historial**.
+2. Elige una versión de la lista: Kalmido muestra qué difiere del texto actual.
+3. Pulsa **Restaurar**.
+
+Qué pasa entonces: el texto antiguo vuelve a ser el actual como una versión nueva, así que no se pierde nada; la
+restauración se puede deshacer.
+
+<!-- help: sheets#how-to-make-a-table-with-a-formula src=b8056fbeac -->
+## Crear una tabla con fórmula
+
+1. Abre **Tablas**, pulsa **Nueva tabla**, ponle un nombre y pulsa **Crear**.
+2. Pulsa **Añadir columna** y **Añadir fila** hasta que la cuadrícula encaje y escribe los valores en las celdas.
+3. Empieza una celda con `=`, por ejemplo `=B2*C2` (horas por tarifa) o `=SUMA(C2:C9)`.
+
+Qué pasa entonces: la celda muestra el resultado y se recalcula cuando cambia un valor; la tabla se guarda sola.
+
+<!-- help: sheets#how-to-share-one-table src=e19d1eba08 -->
+## Compartir una tabla
+
+1. Abre la tabla, abre su menú y elige **Compartir…**.
+2. Elige una persona o un agente en **Compartir con…**, luego **Puede ver** o **Puede editar** y pulsa **Añadir**.
+
+Qué pasa entonces: la persona ve solo esta tabla, no el resto de tu espacio de trabajo; la encuentra en **Compartido conmigo**.
+**Dejar de compartir** lo termina al instante.
+
+<!-- help: team#how-to-write-to-a-colleague-in-the-team-chat src=d14fa10beb -->
+## Escribir a alguien en el chat del equipo
+
+1. Abre **Chat del equipo** y pulsa **Mensaje nuevo**.
+2. Elige a la persona (o **Nuevo canal** para un canal).
+3. Escribe el mensaje y pulsa **Enviar**.
+
+Qué pasa entonces: la persona recibe el mensaje y una notificación; ves cuándo lo ha leído. Cada proyecto que compartes
+tiene además su propio chat.
+
+<!-- help: team#how-to-pin-a-message-or-answer-in-a-thread src=d57b9f4728 -->
+## Fijar un mensaje o responder en un hilo
+
+1. Abre el menú de un mensaje (en el móvil: mantenlo pulsado).
+2. Elige **Fijar** para mantener un mensaje importante a la vista arriba de la conversación, o **Responder en el hilo** para
+   responder sin llenar la conversación principal.
+
+Qué pasa entonces: los mensajes fijados permanecen en la barra sobre los mensajes (como máximo cinco por conversación); un
+hilo muestra las respuestas a ese mensaje y sus participantes reciben aviso.
+
+<!-- help: budget#how-to-start-a-household-budget src=1116c1b0a8 -->
+## Crear un presupuesto doméstico
+
+1. Abre **Presupuesto** (en el área **Hogar y vida**, se activa en *Ajustes > Módulos*) y pulsa **Crear presupuesto**.
+2. Pulsa **Nuevo movimiento**, rellena **Importe**, la fecha y **Qué**, elige una categoría y pulsa **Guardar**.
+
+Qué pasa entonces: el mes muestra lo **Recibido** y **Gastado** y lo que **Queda**; las categorías muestran lo gastado frente
+al plan. Cada cambio se puede deshacer.
+
+<!-- help: budget#how-to-add-rent-and-other-recurring-entries src=cd197ab4f2 -->
+## Añadir el alquiler y otros movimientos recurrentes
+
+1. En el presupuesto abre el menú (⋯), elige **Movimientos periódicos** y luego **Nuevo movimiento periódico**.
+2. Rellena qué es y el importe, elige en **Con qué frecuencia** mensual, trimestral o anual y pulsa **Guardar**.
+
+Qué pasa entonces: el movimiento aparece en **Pendiente este mes** cuando vence. Kalmido nunca lo contabiliza solo: pulsa
+**Reservado** cuando el dinero realmente ha salido (o entrado).
+
+<!-- help: budget#how-to-import-a-bank-statement-into-the-budget src=45308584bc -->
+## Importar un extracto bancario al presupuesto
+
+Kalmido no tiene acceso a tu banco: descargas el archivo tú mismo.
+
+1. Descarga de tu banco la exportación CSV (o CAMT) del extracto de cuenta.
+2. En el presupuesto abre el menú (⋯), elige **Importar archivo CSV** y el archivo en **Elegir archivos**.
+3. Comprueba qué columna tiene la fecha, el importe y el texto, y confirma.
+
+Qué pasa entonces: los movimientos nuevos entran en el presupuesto; los que ya estaban no se duplican. **Deshacer esta importación**
+deshace toda la importación.
+
+<!-- help: home#how-to-make-a-shopping-list src=c52a018554 -->
+## Crear una lista de la compra
+
+1. Abre **Hogar y vida**; si aún no hay lista, ofrece **Lista de la compra**. Púlsala.
+2. Añade artículos como escribes una tarea; «2 l de leche» y «leche» cuentan como el mismo artículo.
+
+Qué pasa entonces: los artículos se ordenan por secciones de la tienda (muévelo una vez y el siguiente va solo allí), y
+quienes comparten la lista marcan en directo mientras compran.
+
+<!-- help: home#how-to-sort-projects-into-folders src=9e6ec9656c -->
+## Ordenar proyectos en carpetas
+
+1. En la barra lateral abre el menú (⋯) de un proyecto y elige **Mover a carpeta…**.
+2. Elige una carpeta o pulsa **Nueva carpeta…** y dale un nombre.
+
+Qué pasa entonces: el proyecto queda en esa carpeta de la barra lateral. También puedes arrastrar proyectos entre
+carpetas y compartir una carpeta entera de una vez (véase «Compartir una carpeta con otras personas»).
+
+<!-- help: team#how-to-share-a-folder-with-people src=d68cfe0773 -->
+## Compartir una carpeta con otras personas
+
+1. En la barra lateral abre el menú (⋯) de una carpeta y elige **Compartir carpeta…**.
+2. Elige una persona en **Compartir con…** y pulsa **Añadir**. Para agentes está la parte **Agentes** del mismo diálogo.
+
+Qué pasa entonces: todos los proyectos de la carpeta quedan compartidos con ella, también los que añadas después.
+**Dejar de compartir** lo termina al instante. Un proyecto suelto se comparte igual desde su propio menú.
+
+<!-- help: team#how-to-give-people-without-an-account-a-public-link src=5c9b76a147 -->
+## Dar un enlace público a personas sin cuenta
+
+1. Abre el diálogo **Compartir…** del proyecto o de la carpeta y busca **Enlace público**.
+2. Pon **Válido hasta** si el enlace debe caducar, cópialo con **Copiar el enlace** y envíalo.
+
+Qué pasa entonces: quien tenga el enlace puede leer el proyecto, sin iniciar sesión, solo lectura, sin comentarios,
+responsables ni archivos. **Desactivar** termina el enlace al instante.

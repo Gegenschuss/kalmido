@@ -162,3 +162,137 @@ Daarna: de afspraken verschijnen in je agenda, alleen te lezen en alleen voor jo
 
 Daarna: je afspraken en taken met datum verschijnen in de agenda van de telefoon. Gebruik daar het app-wachtwoord, nooit je
 Kalmido-wachtwoord.
+
+<!-- help: wiki#how-to-write-a-knowledge-page src=122a76cda7 -->
+## Een kennispagina schrijven
+
+1. Open **Kennispagina's** in de zijbalk en tik op **Nieuwe pagina**.
+2. Typ de naam van de pagina bij **Naam**. Een `/` maakt mappen: "Processen/Checklist" komt in de map *Processen*.
+3. Schrijf de tekst. Met `[[` link je een andere pagina.
+
+Wat er dan gebeurt: de pagina wordt vanzelf bewaard en staat in de boom links. Onder elke pagina toont **Gelinkt vanaf**
+welke pagina's ernaar verwijzen.
+
+<!-- help: wiki#how-to-share-a-page-read-only src=f589cec1bf -->
+## Een pagina alleen-lezen delen
+
+1. Open de pagina, open het menu (⋯) en kies **Delen…**.
+2. Voor een persoon: kies die bij **Kies een persoon…** (of typ een e-mailadres) en tik op **Toevoegen**.
+3. Voor mensen zonder account: kies **Openbare link maken**, stel **Geldig tot** in als je wilt en kopieer de link.
+
+Wat er dan gebeurt: de persoon leest deze pagina (of de hele map, met *Map delen…*) en niets anders van je pagina's; de
+link opent een eenvoudige pagina zonder inloggen. **Uitschakelen** beëindigt een link meteen.
+
+<!-- help: wiki#how-to-bring-back-an-earlier-version-of-a-page src=f736215a16 -->
+## Een eerdere versie van een pagina terughalen
+
+1. Open de pagina, open het menu (⋯) en kies **Geschiedenis**.
+2. Kies een versie in de lijst: Kalmido toont wat afwijkt van de huidige tekst.
+3. Tik op **Herstellen**.
+
+Wat er dan gebeurt: de oude tekst wordt als nieuwe versie weer de huidige, er gaat dus niets verloren; het terughalen kan
+ongedaan worden gemaakt.
+
+<!-- help: sheets#how-to-make-a-table-with-a-formula src=b8056fbeac -->
+## Een tabel met formule maken
+
+1. Open **Tabellen**, tik op **Nieuwe tabel**, geef een naam en tik op **Aanmaken**.
+2. Tik op **Kolom toevoegen** en **Rij toevoegen** tot het raster past en vul de waarden in de cellen in.
+3. Begin een cel met `=`, bijvoorbeeld `=B2*C2` (uren keer tarief) of `=SOM(C2:C9)`.
+
+Wat er dan gebeurt: de cel toont het resultaat en rekent opnieuw als een waarde verandert; de tabel wordt vanzelf bewaard.
+
+<!-- help: sheets#how-to-share-one-table src=e19d1eba08 -->
+## Een tabel delen
+
+1. Open de tabel, open het menu en kies **Delen…**.
+2. Kies een persoon of agent bij **Delen met …**, dan **Mag bekijken** of **Mag bewerken** en tik op **Toevoegen**.
+
+Wat er dan gebeurt: de persoon ziet alleen deze tabel, niet de rest van je werkruimte; die vindt hem onder **Met mij gedeeld**.
+**Stoppen met delen** beëindigt dit meteen.
+
+<!-- help: team#how-to-write-to-a-colleague-in-the-team-chat src=d14fa10beb -->
+## Iemand schrijven in de teamchat
+
+1. Open **Teamchat** en tik op **Nieuw bericht**.
+2. Kies de persoon (of **Nieuw kanaal** voor een kanaal).
+3. Typ je bericht en tik op **Versturen**.
+
+Wat er dan gebeurt: de persoon krijgt het bericht en een melding; jij ziet wanneer het gelezen is. Elk project dat je deelt
+heeft bovendien een eigen chat.
+
+<!-- help: team#how-to-pin-a-message-or-answer-in-a-thread src=d57b9f4728 -->
+## Een bericht vastzetten of in een thread antwoorden
+
+1. Open het menu van een bericht (op de telefoon: lang indrukken).
+2. Kies **Vastmaken** om een belangrijk bericht bovenaan het gesprek in beeld te houden, of **Antwoorden in thread** om te antwoorden
+   zonder het hoofdgesprek te vullen.
+
+Wat er dan gebeurt: vastgezette berichten blijven in de balk boven de berichten (hoogstens vijf per gesprek); een thread
+toont de antwoorden op dat ene bericht en de betrokkenen krijgen een melding.
+
+<!-- help: budget#how-to-start-a-household-budget src=1116c1b0a8 -->
+## Een huishoudbudget starten
+
+1. Open **Budget** (in het gebied **Huis & leven**, aan te zetten onder *Instellingen > Modules*) en tik op **Budget aanmaken**.
+2. Tik op **Nieuwe post**, vul **Bedrag**, de datum en **Wat** in, kies een categorie en tik op **Opslaan**.
+
+Wat er dan gebeurt: de maand toont wat je **Ontvangen** en **Uitgegeven** hebt en wat **Over** is; de categorieën tonen de
+uitgaven tegenover het plan. Elke wijziging kan ongedaan worden gemaakt.
+
+<!-- help: budget#how-to-add-rent-and-other-recurring-entries src=cd197ab4f2 -->
+## Huur en andere terugkerende posten toevoegen
+
+1. Open in het budget het menu (⋯), kies **Terugkerende posten** en dan **Nieuwe terugkerende post**.
+2. Vul in wat het is en het bedrag, kies bij **Hoe vaak** maandelijks, per kwartaal of jaarlijks en tik op **Opslaan**.
+
+Wat er dan gebeurt: de post verschijnt onder **Open deze maand** zodra hij aan de beurt is. Kalmido boekt hem nooit zelf:
+tik op **Geboekt** als het geld echt is afgegaan (of binnengekomen).
+
+<!-- help: budget#how-to-import-a-bank-statement-into-the-budget src=45308584bc -->
+## Een bankafschrift in het budget inlezen
+
+Kalmido heeft geen toegang tot je bank: je downloadt het bestand zelf.
+
+1. Download bij je bank de CSV- (of CAMT-)export van je rekeningafschrift.
+2. Open in het budget het menu (⋯), kies **CSV-bestand importeren** en het bestand bij **Bestanden kiezen**.
+3. Controleer welke kolom de datum, het bedrag en de tekst bevat en bevestig.
+
+Wat er dan gebeurt: de nieuwe boekingen komen in het budget; wat er al staat wordt niet dubbel. **Deze import ongedaan maken** maakt de
+hele import ongedaan.
+
+<!-- help: home#how-to-make-a-shopping-list src=c52a018554 -->
+## Een boodschappenlijst maken
+
+1. Open **Huis & leven**; zonder lijst biedt het **Boodschappenlijst** aan. Tik erop.
+2. Voeg artikelen toe zoals je een taak typt; "2 l melk" en "melk" tellen als hetzelfde artikel.
+
+Wat er dan gebeurt: de artikelen worden per winkelafdeling gesorteerd (verplaats er één en de volgende gaat er vanzelf
+heen), en wie de lijst met je deelt vinkt live af tijdens het winkelen.
+
+<!-- help: home#how-to-sort-projects-into-folders src=9e6ec9656c -->
+## Projecten in mappen ordenen
+
+1. Open in de zijbalk het menu (⋯) van een project en kies **Naar map verplaatsen…**.
+2. Kies een map of tik op **Nieuwe map…** en geef hem een naam.
+
+Wat er dan gebeurt: het project staat in die map in de zijbalk. Je kunt projecten ook tussen mappen slepen en een hele map
+in één keer delen (zie "Een map met mensen delen").
+
+<!-- help: team#how-to-share-a-folder-with-people src=d68cfe0773 -->
+## Een map met mensen delen
+
+1. Open in de zijbalk het menu (⋯) van een map en kies **Map delen…**.
+2. Kies een persoon bij **Delen met …** en tik op **Toevoegen**. Voor agenten is er het deel **Agents** van hetzelfde venster.
+
+Wat er dan gebeurt: alle projecten in de map zijn met die persoon gedeeld, ook later toegevoegde. **Stoppen met delen** beëindigt
+het meteen weer. Een los project deel je op dezelfde manier via zijn eigen menu.
+
+<!-- help: team#how-to-give-people-without-an-account-a-public-link src=5c9b76a147 -->
+## Mensen zonder account een openbare link geven
+
+1. Open het venster **Delen…** van het project of de map en zoek **Openbare link**.
+2. Stel **Geldig tot** in als de link moet verlopen, kopieer hem met **Link kopiëren** en stuur hem door.
+
+Wat er dan gebeurt: wie de link heeft kan het project lezen, zonder inloggen, alleen-lezen, zonder reacties, toegewezenen
+of bestanden. **Uitschakelen** beëindigt de link meteen.

@@ -85,15 +85,24 @@ const USCAN = 'files#how-to-set-up-a-scan-inbox';
   // ---- back to the list, a topic, the browser's Back
   d.querySelector('#view [data-hvback]').click();
   const areaNames = () => [...d.querySelectorAll('#view .hvarea h3')].map(x => x.textContent);
-  check(await until(() => areaNames().length === 5), `"Alle Hilfethemen": the list (${areaNames()})`);
-  check(areaNames().join() === 'Dateien,Agenten,Büro,Aufgaben,Kalender', `the areas in the sidebar's words: ${areaNames()}`);
+  check(await until(() => areaNames().length === 11), `2.1090.0 (#5900): eleven areas; "Alle Hilfethemen": the list (${areaNames()})`);
+  check(areaNames().join() === 'Dateien,Agenten,Büro,Aufgaben,Kalender,Wissensseiten,Tabellen,Team-Chat,Budget,Projekte,Teilen', `the areas in the sidebar's words: ${areaNames()}`);
   const pay = [...d.querySelectorAll('#view .hvtopic')].find(x => x.textContent === 'Eine Zahlung erfassen');
   check(pay, 'the topic "Eine Zahlung erfassen" is listed');
   pay.click();
   check(await until(() => h2() === 'Eine Zahlung erfassen'), 'a topic of the list opens');
   check(!d.querySelector('#view .hvsec [data-hvshow]') && !d.querySelector('#view .hvsec[data-show]'), '2.1090.0 (#5899): a topic without named places has no "Zeig mir"');
   w.history.back();
-  check(await until(() => areaNames().length === 5 && !d.querySelector('#view .hvsec')), `the browser's Back returns to the list (${w.location.hash})`);
+  check(await until(() => areaNames().length === 11 && !d.querySelector('#view .hvsec')), `the browser's Back returns to the list (${w.location.hash})`);
+
+  // 2.1090.0 (#5900): a topic of a new area opens in German with its steps and a "Zeig mir" (wiki.new)
+  const wk = [...d.querySelectorAll('#view .hvtopic')].find(x => x.textContent === 'Eine Wissensseite schreiben');
+  check(wk, 'the topic "Eine Wissensseite schreiben" is listed');
+  wk.click();
+  check(await until(() => h2() === 'Eine Wissensseite schreiben'), 'the wiki topic opens');
+  check(/Wissensseiten/.test(d.querySelector('#view .hvsec')?.textContent || '') && /Neue Seite/.test(d.querySelector('#view .hvsec')?.textContent || ''), 'its steps name the German labels (Wissensseiten, Neue Seite)');
+  w.history.back();
+  check(await until(() => areaNames().length === 11 && !d.querySelector('#view .hvsec')), 'Back returns to the list');
 
   // ---- the help's own search
   const q = d.querySelector('#hv-q');
@@ -104,7 +113,7 @@ const USCAN = 'files#how-to-set-up-a-scan-inbox';
   q.value = 'frobnicate'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
   check(await until(() => /Nichts in der Hilfe gefunden/.test(d.querySelector('#view .hvbody')?.textContent || '')), 'nothing found says so');
   q.value = ''; q.dispatchEvent(new w.Event('input', {bubbles: true}));
-  check(await until(() => areaNames().length === 5), 'an empty search shows the topics again');
+  check(await until(() => areaNames().length === 11), 'an empty search shows the topics again');
 
   // ---- an unknown topic
   w.location.hash = '#help/' + encodeURIComponent('files#gibt-es-nicht');
@@ -116,7 +125,7 @@ const USCAN = 'files#how-to-set-up-a-scan-inbox';
   const sb = await until(() => [...d.querySelectorAll('.modal [data-hlp]')].find(b => /Hilfe: So geht's/.test(b.textContent)));
   check(sb, 'Settings > Help: "Hilfe: So geht\'s"');
   sb.click();
-  check(await until(() => !d.querySelector('.modal') && areaNames().length === 5 && w.location.hash === '#help'), 'it closes the settings and opens the help');
+  check(await until(() => !d.querySelector('.modal') && areaNames().length === 11 && w.location.hash === '#help'), 'it closes the settings and opens the help');
 
   // ---- the empty project: "So geht's" -> the area Aufgaben first
   w.location.hash = '#l/' + L.id;

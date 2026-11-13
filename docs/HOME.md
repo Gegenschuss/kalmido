@@ -88,3 +88,21 @@ view shows only the entries of the workspace you are in. Without an organisation
 - **Bookmarks** (2.97.0): links with a preview, tags, a note and search, saved from the share target, by pasting or with a
   browser button ([docs/BOOKMARKS.md](BOOKMARKS.md)); *Connect Karakeep…* with your own address and API key (stored
   encrypted) brings Karakeep's links in as bookmarks (notes stay tasks) and archives the archived ones in Karakeep.
+
+## How to: Make a shopping list
+<!-- user-help: lists -->
+
+1. Open **Home & life**; with no list yet it offers **Shopping list**. Select it.
+2. Add items the way you type a task; "2 l milk" and "milk" count as the same item.
+
+What happens then: the items are sorted into shop areas (move an item once and the next one goes there by itself), and
+everyone you share the list with ticks things off live while shopping.
+
+## How to: Sort projects into folders
+<!-- user-help: lists -->
+
+1. In the sidebar open the menu (⋯) of a project and select **Move to folder…**.
+2. Pick a folder or select **New folder…** and give it a name.
+
+What happens then: the project sits in that folder in the sidebar. You can drag projects between folders as well, and
+you can share a whole folder at once (see "Share a folder with people").

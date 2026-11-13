@@ -325,3 +325,22 @@ person or an agent is the share of the table's entry in the file store (`{share}
 dialog shows and ends the same row), an address typed in has a negative `{share}`.
 
 The search (Mod+K) finds tables by their title (only the ones you may open) and opens them.
+
+## How to: Make a table with a formula
+<!-- user-help: sheets -->
+<!-- show: sheets.new -->
+
+1. Open **Tables** and select **New table**, give it a name and select **Create**.
+2. Select **Add column** and **Add row** until the grid fits, and type your values into the cells.
+3. Start a cell with `=`, for example `=B2*C2` (hours times rate) or `=SUM(C2:C9)`.
+
+What happens then: the cell shows the result and recalculates when a value changes; the table saves by itself.
+
+## How to: Share one table
+<!-- user-help: sheets -->
+
+1. Open the table, open its menu and select **Share…**.
+2. Pick a person or an agent under **Share with …**, choose **Can view** or **Can edit** and select **Add**.
+
+What happens then: the person sees only this table, not the rest of your workspace; they find it under **Shared with me**.
+**Stop sharing** ends it at once.

@@ -1357,3 +1357,42 @@ its draft and unread dot, a header folds, moves or closes it, the divider betwee
 heights). On phones a row of the open chats at the top switches between them. Every agent and person has a **fixed
 colour** (#1721) in avatars everywhere; change yours under *Settings > Account*, an agent's in its settings, and switch
 people's colours off under *Settings > Appearance*.
+
+## How to: Write to a colleague in the team chat
+<!-- user-help: team -->
+<!-- show: team.new -->
+
+1. Open **Team chat** and select **New message**.
+2. Pick the person (or **New channel** for a channel).
+3. Type your message and select **Send**.
+
+What happens then: the person gets the message and a notification; you see when they have read it. Every project you share
+also has its own chat.
+
+## How to: Pin a message or answer in a thread
+<!-- user-help: team -->
+
+1. Open the menu of a message (on a phone: hold it).
+2. Select **Pin** to keep an important message in view at the top of the conversation, or **Reply in thread** to answer
+   without filling the main conversation.
+
+What happens then: pinned messages stay in the bar above the messages (at most five per conversation); a thread shows
+the replies to that one message and its people get notified.
+
+## How to: Share a folder with people
+<!-- user-help: sharing -->
+
+1. In the sidebar open the menu (⋯) of a folder and select **Share folder…**.
+2. Pick a person under **Share with …** and select **Add**. For people with an agent, use the **Agents** part of the same dialog.
+
+What happens then: every project in the folder is shared with them, also projects you add later. **Stop sharing** ends
+it again at once. A project you share alone works the same way from its own menu.
+
+## How to: Give people without an account a public link
+<!-- user-help: sharing -->
+
+1. Open the **Share…** dialog of the project or folder and find **Public link**.
+2. Set **Valid until** if the link should expire, then copy it with **Copy link** and send it.
+
+What happens then: anyone with the link can read the project - no login, read only, without comments, assignees or
+files. **Switch off** ends the link at once.

@@ -185,3 +185,137 @@ Kalmido holt sie regelmäßig neu.
 
 Was dann passiert: Deine Termine und Aufgaben mit Datum erscheinen im Kalender des Handys, und Änderungen gehen in beide
 Richtungen. Nimm dort das App-Passwort, nie dein Kalmido-Passwort.
+
+<!-- help: wiki#how-to-write-a-knowledge-page src=122a76cda7 -->
+## Eine Wissensseite schreiben
+
+1. Öffne in der Seitenleiste **Wissensseiten** und tippe auf **Neue Seite**.
+2. Gib den Namen der Seite bei **Name** ein. Ein `/` macht Ordner: „Abläufe/Checkliste“ landet im Ordner *Abläufe*.
+3. Schreibe den Text. Mit `[[` verlinkst du eine andere Seite.
+
+Was dann passiert: Die Seite speichert von selbst und steht im Baum links. Unter jeder Seite zeigt **Verlinkt von**, welche
+Seiten auf sie verweisen.
+
+<!-- help: wiki#how-to-share-a-page-read-only src=f589cec1bf -->
+## Eine Seite nur zum Lesen teilen
+
+1. Öffne die Seite, öffne ihr Menü (⋯) und wähle **Teilen…**.
+2. Für eine Person: wähle sie unter **Person wählen…** (oder tippe eine E-Mail-Adresse) und tippe auf **Hinzufügen**.
+3. Für Leute ohne Konto: wähle **Öffentlichen Link erstellen**, setze nach Wunsch **Gültig bis** und kopiere den Link.
+
+Was dann passiert: Die Person liest diese Seite (oder den ganzen Ordner mit *Ordner teilen…*) und sonst nichts von deinen
+Seiten; der Link öffnet eine schlichte Seite ohne Anmeldung. **Ausschalten** beendet einen Link sofort.
+
+<!-- help: wiki#how-to-bring-back-an-earlier-version-of-a-page src=f736215a16 -->
+## Eine frühere Fassung einer Seite zurückholen
+
+1. Öffne die Seite, öffne ihr Menü (⋯) und wähle **Verlauf**.
+2. Wähle in der Liste eine Fassung: Kalmido zeigt, was sich vom aktuellen Text unterscheidet.
+3. Tippe auf **Wiederherstellen**.
+
+Was dann passiert: Der alte Text wird als neue Fassung wieder zum aktuellen, es geht also nichts verloren; das
+Zurückholen lässt sich rückgängig machen.
+
+<!-- help: sheets#how-to-make-a-table-with-a-formula src=b8056fbeac -->
+## Eine Tabelle mit Formel anlegen
+
+1. Öffne **Tabellen**, tippe auf **Neue Tabelle**, gib einen Namen ein und tippe auf **Erstellen**.
+2. Tippe auf **Spalte hinzufügen** und **Zeile hinzufügen**, bis das Raster passt, und trage die Werte in die Zellen ein.
+3. Beginne eine Zelle mit `=`, zum Beispiel `=B2*C2` (Stunden mal Satz) oder `=SUMME(C2:C9)`.
+
+Was dann passiert: Die Zelle zeigt das Ergebnis und rechnet neu, wenn sich ein Wert ändert; die Tabelle speichert von selbst.
+
+<!-- help: sheets#how-to-share-one-table src=e19d1eba08 -->
+## Eine Tabelle teilen
+
+1. Öffne die Tabelle, öffne ihr Menü und wähle **Teilen…**.
+2. Wähle unter **Teilen mit…** eine Person oder einen Agenten, dann **Darf ansehen** oder **Darf bearbeiten** und tippe auf **Hinzufügen**.
+
+Was dann passiert: Die Person sieht nur diese Tabelle, nicht den Rest deines Arbeitsbereichs; sie findet sie unter
+**Mit mir geteilt**. **Nicht mehr teilen** beendet das sofort.
+
+<!-- help: team#how-to-write-to-a-colleague-in-the-team-chat src=d14fa10beb -->
+## Im Team-Chat jemandem schreiben
+
+1. Öffne **Team-Chat** und tippe auf **Neue Nachricht**.
+2. Wähle die Person (oder **Neuer Kanal** für einen Kanal).
+3. Tippe die Nachricht und tippe auf **Senden**.
+
+Was dann passiert: Die Person bekommt die Nachricht samt Benachrichtigung; du siehst, wann sie sie gelesen hat. Jedes
+Projekt, das du teilst, hat außerdem einen eigenen Chat.
+
+<!-- help: team#how-to-pin-a-message-or-answer-in-a-thread src=d57b9f4728 -->
+## Eine Nachricht anheften oder im Thread antworten
+
+1. Öffne das Menü einer Nachricht (am Handy: gedrückt halten).
+2. Wähle **Anheften**, damit eine wichtige Nachricht oben im Gespräch sichtbar bleibt, oder **Im Strang antworten**, um zu antworten,
+   ohne das Hauptgespräch zu füllen.
+
+Was dann passiert: Angeheftete Nachrichten bleiben in der Leiste über den Nachrichten (höchstens fünf je Gespräch); ein
+Thread zeigt die Antworten auf diese eine Nachricht, und seine Beteiligten werden benachrichtigt.
+
+<!-- help: budget#how-to-start-a-household-budget src=1116c1b0a8 -->
+## Ein Haushaltsbudget anlegen
+
+1. Öffne **Budget** (im Bereich **Zuhause**, einzuschalten unter *Einstellungen > Module*) und tippe auf **Budget anlegen**.
+2. Tippe auf **Neuer Posten**, fülle **Betrag**, das Datum und **Was** aus, wähle eine Kategorie und tippe auf **Speichern**.
+
+Was dann passiert: Der Monat zeigt, was du **Eingegangen** und **Ausgegeben** hast und was **Übrig** ist; die Kategorien zeigen die
+Ausgaben gegen den Plan. Jede Änderung lässt sich rückgängig machen.
+
+<!-- help: budget#how-to-add-rent-and-other-recurring-entries src=cd197ab4f2 -->
+## Miete und andere wiederkehrende Posten eintragen
+
+1. Öffne im Budget das Menü (⋯), wähle **Wiederkehrende Posten** und dann **Neuer wiederkehrender Posten**.
+2. Trage ein, was es ist und den Betrag, wähle bei **Wie oft** monatlich, vierteljährlich oder jährlich und tippe auf **Speichern**.
+
+Was dann passiert: Der Posten erscheint unter **Offen in diesem Monat**, sobald er fällig ist. Kalmido bucht ihn nie von selbst:
+tippe auf **Gebucht**, wenn das Geld wirklich abgegangen (oder eingegangen) ist.
+
+<!-- help: budget#how-to-import-a-bank-statement-into-the-budget src=45308584bc -->
+## Einen Kontoauszug ins Budget einlesen
+
+Kalmido hat keinen Zugriff auf deine Bank: Du lädst die Datei selbst herunter.
+
+1. Lade bei deiner Bank den CSV- (oder CAMT-)Export deines Kontoauszugs herunter.
+2. Öffne im Budget das Menü (⋯), wähle **CSV-Datei importieren** und die Datei unter **Dateien wählen**.
+3. Prüfe, welche Spalte Datum, Betrag und Text enthält, und bestätige.
+
+Was dann passiert: Die neuen Buchungen landen im Budget; was schon drin ist, wird nicht doppelt. **Diesen Import rückgängig machen** nimmt
+den ganzen Import zurück.
+
+<!-- help: home#how-to-make-a-shopping-list src=c52a018554 -->
+## Eine Einkaufsliste anlegen
+
+1. Öffne **Zuhause**; ohne Liste bietet es **Einkaufsliste** an. Tippe darauf.
+2. Trage Artikel ein wie eine Aufgabe; „2 l Milch“ und „Milch“ zählen als derselbe Artikel.
+
+Was dann passiert: Die Artikel werden nach Supermarkt-Bereichen sortiert (einmal verschoben, geht der nächste von selbst
+dorthin), und alle, mit denen du die Liste teilst, haken beim Einkaufen live ab.
+
+<!-- help: home#how-to-sort-projects-into-folders src=9e6ec9656c -->
+## Projekte in Ordner sortieren
+
+1. Öffne in der Seitenleiste das Menü (⋯) eines Projekts und wähle **In Ordner verschieben…**.
+2. Wähle einen Ordner oder tippe auf **Neuer Ordner…** und gib ihm einen Namen.
+
+Was dann passiert: Das Projekt steht in der Seitenleiste in diesem Ordner. Du kannst Projekte auch zwischen Ordnern
+ziehen und einen ganzen Ordner auf einmal teilen (siehe „Einen Ordner mit Leuten teilen“).
+
+<!-- help: team#how-to-share-a-folder-with-people src=d68cfe0773 -->
+## Einen Ordner mit Leuten teilen
+
+1. Öffne in der Seitenleiste das Menü (⋯) eines Ordners und wähle **Ordner teilen…**.
+2. Wähle unter **Teilen mit…** eine Person und tippe auf **Hinzufügen**. Für Agenten gibt es im selben Dialog den Teil **Agenten**.
+
+Was dann passiert: Alle Projekte im Ordner sind mit ihr geteilt, auch später hinzugefügte. **Nicht mehr teilen** beendet es
+sofort wieder. Ein einzelnes Projekt teilst du genauso über sein eigenes Menü.
+
+<!-- help: team#how-to-give-people-without-an-account-a-public-link src=5c9b76a147 -->
+## Leuten ohne Konto einen öffentlichen Link geben
+
+1. Öffne den Dialog **Teilen…** des Projekts oder Ordners und such **Öffentlicher Link**.
+2. Setze **Gültig bis**, wenn der Link ablaufen soll, kopiere ihn mit **Link kopieren** und schick ihn weiter.
+
+Was dann passiert: Wer den Link hat, kann das Projekt lesen - ohne Anmeldung, nur lesend, ohne Kommentare, Zuständige oder
+Dateien. **Ausschalten** beendet den Link sofort.

@@ -72,3 +72,34 @@ Since 2.146:
   (field `files`, `mapping` as JSON) as well as the JSON body.
 
 Amounts, titles, notes and receipts are stored encrypted on the server.
+
+## How to: Start a household budget
+<!-- user-help: budget -->
+<!-- show: budget.create -->
+
+1. Open **Budget** (in the area **Home & life**, switched on under *Settings > Modules*) and select **Create a budget**.
+2. Select **New entry**, fill **Amount**, the date and **What** it was, pick a category and select **Save**.
+
+What happens then: the month shows what you **Received** and **Spent** and what is **Left over**; the categories show
+what was spent against the plan. Every change can be undone.
+
+## How to: Add rent and other recurring entries
+<!-- user-help: budget -->
+
+1. In the budget open the menu (⋯) and select **Recurring entries**, then **New recurring entry**.
+2. Fill in what it is and the amount, choose **How often** (monthly, quarterly, yearly) and select **Save**.
+
+What happens then: the entry appears under **Open this month** whenever it is due. Kalmido never books it by itself: select
+**Booked** when the money has actually gone (or come in).
+
+## How to: Import a bank statement into the budget
+<!-- user-help: budget -->
+
+Kalmido has no access to your bank: you download the file yourself.
+
+1. Download the CSV (or CAMT) export of your account statement from your bank.
+2. In the budget open the menu (⋯), select **Import a CSV file** and choose the file under **Select files**.
+3. Check which column holds the date, the amount and the text, and confirm.
+
+What happens then: the new bookings land in the budget; entries already there are not doubled. **Undo this import** takes
+the whole import back.

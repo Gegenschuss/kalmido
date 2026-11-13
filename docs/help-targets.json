@@ -12,6 +12,10 @@
     "tasks.new": {"route": "#today", "sel": "#view .qadd .box, #fab", "label_en": "Add a task"},
     "calendar.new": {"route": "#cal", "sel": "#view [data-act=\"ev-new\"]", "label_en": "New event"},
     "files.upload": {"route": "#ablage", "sel": "#view [data-ab=\"upload\"]", "label_en": "Upload files"},
-    "files.documents-add": {"route": "#ablage/docs", "sel": "#view .dc-up", "label_en": "Add documents"}
+    "files.documents-add": {"route": "#ablage/docs", "sel": "#view .dc-up", "label_en": "Add documents"},
+    "wiki.new": {"route": "#wiki", "sel": "#view [data-wk=\"new\"]", "label_en": "New page"},
+    "sheets.new": {"route": "#sheets", "sel": "#view [data-shv=\"new\"]", "label_en": "New table"},
+    "team.new": {"route": "#team", "sel": "#view [data-act=\"tc-new\"]", "label_en": "New message"},
+    "budget.create": {"route": "#budget", "sel": "#view [data-bg=\"create\"]", "label_en": "Create a budget"}
   }
 }

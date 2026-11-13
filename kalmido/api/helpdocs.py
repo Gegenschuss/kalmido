@@ -60,7 +60,7 @@ _WORD = re.compile(r"[a-z0-9]+")
 # (optional <!-- show: <target> --> = a named place of docs/help-targets.json); its translations in docs/help/<lang>.md, one
 # block per section: <!-- help: <key> src=<hlp_src of the English text> --> + "## <title>" + the text
 HELP_TR_DIR = os.path.join(HELP_DIR, "help")
-HELP_AREAS = ("files", "agents", "office", "tasks", "calendar")  # the order of the help view; a new area joins here
+HELP_AREAS = ("files", "agents", "office", "tasks", "calendar", "wiki", "sheets", "team", "budget", "lists", "sharing")  # 2.1090.0 (#5900): six more; the order of the help view; a new area joins here
 _UH = re.compile(r"^<!--\s*user-help:\s*([a-z-]+)\s*-->\s*$")
 _SHOW = re.compile(r"^<!--\s*show:\s*([a-z0-9.-]+)\s*-->\s*$")
 _TRB = re.compile(r"^<!--\s*help:\s*(\S+)\s+src=([0-9a-f]+)\s*-->\s*$")

@@ -27,7 +27,8 @@ from .showme import shw_out, shw_targets
 
 UH_TITLE = re.compile(r"^How to:\s*", re.I)
 # the area's name in the interface (the sidebar's words)
-UH_AREA = {"files": "Files", "agents": "Agents", "office": "Office|area", "tasks": "Tasks", "calendar": "Calendar"}
+UH_AREA = {"files": "Files", "agents": "Agents", "office": "Office|area", "tasks": "Tasks", "calendar": "Calendar",
+           "wiki": "Knowledge pages", "sheets": "Tables", "team": "Team chat", "budget": "Budget", "lists": "Lists", "sharing": "Sharing"}  # 2.1090.0 (#5900)
 UH_SNIP = 160
 
 

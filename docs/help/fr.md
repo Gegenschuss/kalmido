@@ -166,3 +166,137 @@ Ensuite : ses événements apparaissent dans ton calendrier, en lecture seule et
 
 Ensuite : tes événements et tâches datées apparaissent dans le calendrier du téléphone. Utilise-y le mot de passe
 d'application, jamais ton mot de passe Kalmido.
+
+<!-- help: wiki#how-to-write-a-knowledge-page src=122a76cda7 -->
+## Écrire une page de connaissances
+
+1. Ouvre **Pages de connaissances** dans la barre latérale et touche **Nouvelle page**.
+2. Saisis le nom de la page dans **Nom**. Un `/` crée des dossiers : « Processus/Liste » arrive dans le dossier *Processus*.
+3. Écris le texte. Avec `[[`, tu relies une autre page.
+
+Ce qui se passe ensuite : la page s'enregistre toute seule et apparaît dans l'arborescence à gauche. Sous chaque page,
+**Liée depuis** liste les pages qui y renvoient.
+
+<!-- help: wiki#how-to-share-a-page-read-only src=f589cec1bf -->
+## Partager une page en lecture seule
+
+1. Ouvre la page, ouvre son menu (⋯) et choisis **Partager…**.
+2. Pour une personne : choisis-la sous **Choisir une personne…** (ou saisis une adresse e-mail) et touche **Ajouter**.
+3. Pour qui n'a pas de compte : choisis **Créer un lien public**, règle **Valide jusqu'au** si tu veux et copie le lien.
+
+Ce qui se passe ensuite : la personne lit cette page (ou tout le dossier, avec *Partager le dossier…*) et rien d'autre de
+tes pages ; le lien ouvre une page simple sans connexion. **Désactiver** met fin à un lien aussitôt.
+
+<!-- help: wiki#how-to-bring-back-an-earlier-version-of-a-page src=f736215a16 -->
+## Retrouver une version antérieure d'une page
+
+1. Ouvre la page, ouvre son menu (⋯) et choisis **Historique**.
+2. Choisis une version dans la liste : Kalmido montre ce qui diffère du texte actuel.
+3. Touche **Restaurer**.
+
+Ce qui se passe ensuite : l'ancien texte redevient le texte actuel comme nouvelle version, rien n'est donc perdu ; la
+restauration peut être annulée.
+
+<!-- help: sheets#how-to-make-a-table-with-a-formula src=b8056fbeac -->
+## Créer un tableau avec une formule
+
+1. Ouvre **Tableaux**, touche **Nouveau tableau**, donne un nom et touche **Créer**.
+2. Touche **Ajouter une colonne** et **Ajouter une ligne** jusqu'à ce que la grille convienne et saisis les valeurs dans les cellules.
+3. Commence une cellule par `=`, par exemple `=B2*C2` (heures fois tarif) ou `=SOMME(C2:C9)`.
+
+Ce qui se passe ensuite : la cellule affiche le résultat et se recalcule quand une valeur change ; le tableau s'enregistre tout seul.
+
+<!-- help: sheets#how-to-share-one-table src=e19d1eba08 -->
+## Partager un tableau
+
+1. Ouvre le tableau, ouvre son menu et choisis **Partager…**.
+2. Choisis une personne ou un agent sous **Partager avec…**, puis **Peut consulter** ou **Peut modifier** et touche **Ajouter**.
+
+Ce qui se passe ensuite : la personne ne voit que ce tableau, pas le reste de ton espace de travail ; elle le trouve sous
+**Partagé avec moi**. **Arrêter le partage** y met fin aussitôt.
+
+<!-- help: team#how-to-write-to-a-colleague-in-the-team-chat src=d14fa10beb -->
+## Écrire à quelqu'un dans le chat d'équipe
+
+1. Ouvre **Chat d'équipe** et touche **Nouveau message**.
+2. Choisis la personne (ou **Nouveau canal** pour un canal).
+3. Écris ton message et touche **Envoyer**.
+
+Ce qui se passe ensuite : la personne reçoit le message et une notification ; tu vois quand elle l'a lu. Chaque projet que
+tu partages a aussi son propre chat.
+
+<!-- help: team#how-to-pin-a-message-or-answer-in-a-thread src=d57b9f4728 -->
+## Épingler un message ou répondre dans un fil
+
+1. Ouvre le menu d'un message (sur le téléphone : appui long).
+2. Choisis **Épingler** pour garder un message important en vue en haut de la conversation, ou **Répondre dans le fil** pour répondre
+   sans remplir la conversation principale.
+
+Ce qui se passe ensuite : les messages épinglés restent dans la barre au-dessus des messages (cinq au plus par
+conversation) ; un fil montre les réponses à ce message et ses participants sont prévenus.
+
+<!-- help: budget#how-to-start-a-household-budget src=1116c1b0a8 -->
+## Créer un budget du foyer
+
+1. Ouvre **Budget** (dans le domaine **Maison & vie**, à activer sous *Réglages > Modules*) et touche **Créer un budget**.
+2. Touche **Nouvelle opération**, remplis **Montant**, la date et **Quoi**, choisis une catégorie et touche **Enregistrer**.
+
+Ce qui se passe ensuite : le mois montre ce que tu as **Reçu** et **Dépensé** et ce qui est **Reste** ; les catégories
+montrent les dépenses face au plan. Chaque modification peut être annulée.
+
+<!-- help: budget#how-to-add-rent-and-other-recurring-entries src=cd197ab4f2 -->
+## Ajouter le loyer et d'autres opérations récurrentes
+
+1. Dans le budget, ouvre le menu (⋯), choisis **Opérations récurrentes** puis **Nouvelle opération récurrente**.
+2. Indique ce que c'est et le montant, choisis dans **À quelle fréquence** mensuel, trimestriel ou annuel et touche **Enregistrer**.
+
+Ce qui se passe ensuite : l'opération apparaît sous **À enregistrer ce mois-ci** dès qu'elle est due. Kalmido ne la comptabilise
+jamais tout seul : touche **Réservé** quand l'argent est vraiment parti (ou arrivé).
+
+<!-- help: budget#how-to-import-a-bank-statement-into-the-budget src=45308584bc -->
+## Importer un relevé bancaire dans le budget
+
+Kalmido n'a pas accès à ta banque : tu télécharges le fichier toi-même.
+
+1. Télécharge chez ta banque l'export CSV (ou CAMT) de ton relevé de compte.
+2. Dans le budget, ouvre le menu (⋯), choisis **Importer un fichier CSV** et le fichier sous **Choisir des fichiers**.
+3. Vérifie quelle colonne contient la date, le montant et le texte, puis confirme.
+
+Ce qui se passe ensuite : les nouvelles opérations arrivent dans le budget ; celles qui y sont déjà ne sont pas doublées.
+**Annuler cet import** annule tout l'import.
+
+<!-- help: home#how-to-make-a-shopping-list src=c52a018554 -->
+## Créer une liste de courses
+
+1. Ouvre **Maison & vie** ; sans liste, il propose **Liste de courses**. Touche-le.
+2. Ajoute des articles comme tu saisis une tâche ; « 2 l de lait » et « lait » comptent comme le même article.
+
+Ce qui se passe ensuite : les articles sont triés par rayons (déplace-en un une fois et le suivant y va tout seul), et
+les personnes avec qui tu partages la liste cochent en direct pendant les courses.
+
+<!-- help: home#how-to-sort-projects-into-folders src=9e6ec9656c -->
+## Ranger des projets dans des dossiers
+
+1. Dans la barre latérale, ouvre le menu (⋯) d'un projet et choisis **Déplacer vers un dossier…**.
+2. Choisis un dossier ou touche **Nouveau dossier…** et donne-lui un nom.
+
+Ce qui se passe ensuite : le projet se trouve dans ce dossier de la barre latérale. Tu peux aussi faire glisser des
+projets entre dossiers et partager un dossier entier d'un coup (voir « Partager un dossier avec des personnes »).
+
+<!-- help: team#how-to-share-a-folder-with-people src=d68cfe0773 -->
+## Partager un dossier avec des personnes
+
+1. Dans la barre latérale, ouvre le menu (⋯) d'un dossier et choisis **Partager le dossier…**.
+2. Choisis une personne sous **Partager avec…** et touche **Ajouter**. Pour les agents, la partie **Agents** du même dialogue.
+
+Ce qui se passe ensuite : tous les projets du dossier sont partagés avec elle, y compris ceux que tu ajoutes plus tard.
+**Arrêter le partage** y met fin aussitôt. Un projet seul se partage de la même façon depuis son propre menu.
+
+<!-- help: team#how-to-give-people-without-an-account-a-public-link src=5c9b76a147 -->
+## Donner un lien public à des personnes sans compte
+
+1. Ouvre le dialogue **Partager…** du projet ou du dossier et cherche **Lien public**.
+2. Règle **Valide jusqu'au** si le lien doit expirer, copie-le avec **Copier le lien** et envoie-le.
+
+Ce qui se passe ensuite : quiconque a le lien peut lire le projet, sans connexion, en lecture seule, sans commentaires,
+responsables ni fichiers. **Désactiver** met fin au lien aussitôt.

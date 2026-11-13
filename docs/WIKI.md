@@ -317,3 +317,34 @@ switches to an **outline** (an indented list) of the same tree.
 
 The menu exports the map as a Markdown outline, as SVG or PNG, and imports an outline (Markdown list, OPML or FreeMind
 `.mm`) as tasks under the selected branch.
+
+## How to: Write a knowledge page
+<!-- user-help: wiki -->
+<!-- show: wiki.new -->
+
+1. Open **Knowledge pages** in the sidebar and select **New page**.
+2. Type the page's name in **Name**. A `/` makes folders: "Processes/Checklist" lands in the folder *Processes*.
+3. Write the text. Type `[[` to link another page; `#` and `/` offer headings and more.
+
+What happens then: the page saves by itself and shows in the tree on the left. Below every page, **Linked from** lists the
+pages that link to it.
+
+## How to: Share a page read-only
+<!-- user-help: wiki -->
+
+1. Open the page, open its menu (⋯) and select **Share…**.
+2. For a person: choose them under **Select a person…** (or type an e-mail address) and select **Add**.
+3. For people without an account: select **Create public link**, set **Valid until** if you like and copy the link.
+
+What happens then: the person reads this page (or the whole folder, with *Share folder…*) and nothing else of your pages;
+the link opens a plain page without login. **Switch off** ends a link at once.
+
+## How to: Bring back an earlier version of a page
+<!-- user-help: wiki -->
+
+1. Open the page, open its menu (⋯) and select **History**.
+2. Pick a version in the list: Kalmido shows what differs from the current text.
+3. Select **Restore**.
+
+What happens then: the old text becomes the current one again as a new version, so nothing is lost; the restore can be
+undone.

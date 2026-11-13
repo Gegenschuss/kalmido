@@ -27,7 +27,8 @@ SHOW_MARK_RE = re.compile(r"<!--\s*show:\s*([a-z0-9.\-]{3,80})\s*-->")  # a help
 SHOW_LABELS = (N_("Open the settings"), N_("Settings: Integrations"), N_("Settings: Agents"), N_("Documents: inboxes (scan inbox)"),
                N_("Add an agent"), N_("Settings of the agent"), N_("New quotation"), N_("New invoice"), N_("Add a task"),
                N_("New event"), N_("Upload files"),
-               N_("Add documents"))  # 2.1090.0 (#5899)
+               N_("Add documents"),  # 2.1090.0 (#5899)
+               N_("New page"), N_("New table"), N_("New message"), N_("Create a budget"))  # 2.1090.0 (#5900)
 _SHW = {"t": None}
 _SHW_LOCK = threading.Lock()
 
