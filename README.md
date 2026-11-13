@@ -19,10 +19,11 @@
 
 ## What's new
 
-**2.1086.0** (2026-11-13):
-- **Agents**: in-app help ("How to") per area from the same source the agents search; agents can attach "Show me" steps to a chat message; approval cards for uploads also bind the files.
-- **Chat**: agent and team chat use the full width on tablets and an open Fold; menus glide open and closed.
-- **Knowledge**: a folder with a page of the same name shows once, with the page text on top.
+**2.1100.0** (2026-11-13):
+- **Office**: loading errors show the reason and "Try again" instead of an empty page; the Bookkeeping role sees its money areas again.
+- **Core**: links between items (mail, device, contact, letter) live in one shared link core; the shared trash now also takes a folder's pages and tables.
+- **Help**: "Show me" steps under help topics, plus "How to" topics for pages, tables, team chat, budget, lists and sharing.
+- **Self-hosting**: the database runs `postgres:17.12` instead of the moving `postgres:17` tag.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
@@ -70,7 +71,7 @@ curl -fsSL https://kalmido.com/install.sh | sh
 
 If the port is busy, the installer prints the command to retry with another one, e.g. `KALMIDO_PORT=3050 ./update.sh` (or `curl ... | KALMIDO_PORT=3050 sh`); `PUBLIC_URL` follows while it is still `http://localhost:<port>`.
 
-**Uninstall:** `docker compose --profile '*' down -v`, `docker image rm <image> postgres:17 clamav/clamav:1.4`, then `sudo rm -rf` the folder (the database files belong to the container's user). Copy `data/backups/` and `secret/kalmido.key` first if you want them.
+**Uninstall:** `docker compose --profile '*' down -v`, `docker image rm <image> postgres:17.12 clamav/clamav:1.4`, then `sudo rm -rf` the folder (the database files belong to the container's user). Copy `data/backups/` and `secret/kalmido.key` first if you want them.
 
 The same without the website:
 
