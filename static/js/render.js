@@ -142,6 +142,7 @@ const tabItems = () => tabIds().map(tabItem).filter(t => t && !o3a_hidT(t));  //
 function tabOn(items) {
   const r = S.route, exact = items.find(t => t.key && r.mod === 'tasks' && t.key === r.key);
   if (exact) return exact.id;
+  if (r.mod === 'home' && !items.some(t => t.mod === 'home')) { const td = items.find(t => t.id === 's:today'); if (td) return td.id; }  // 2.1111.0 (#5963): the start page without a Start tab shows Today's tab as on
   const m = items.find(t => t.mod && (t.mod === r.mod || (t.area && mg_areaOf(r.mod)?.[0] === t.area)) && !(r.mod === 'tasks' && r.key === 'search'));
   return m ? m.id : null;
 }
@@ -606,6 +607,7 @@ function renderTop0() {
   const m = S.route.mod, k = S.route.key;
   const MT = {cal: N_('Calendar'), matrix: N_('Matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload & absences'), wiki: N_('Knowledge pages'), tags: N_('Tags'), sheets: N_('Tables')};  // 2.49.0 (#1199): + wiki
   let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? (S.nt.lid ? (qn_isList(S.nt.lid) ? lname(listById(S.nt.lid)) : tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '')) : tr('Notes')) : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
+  if (m === 'home') { const tl = tabItems(), on = tabOn(tl), ti = tl.find(t => t.id === on); if (ti && ti.mod !== 'home') title = ti.label; }  // 2.1111.0 (#5963): title and the active tab have one name
   if (m === 'tasks' && isRoadmap()) title = tr('Timeline');  // 2.445.0 (#3011): the heading = the name in the menu
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
   if (!title && m === 'budget') title = tr('Budget');  // 2.72.0 (#1333)
