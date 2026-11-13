@@ -1,4 +1,4 @@
-// 2.1109.0 A (#5959, #5963): UI checks of Part A. Own container
+// 2.1109.0 A (#5959): UI checks of Part A. Own container
 // kalmido-suite: fresh
 // (start.sh), Firefox. Invented data only.
 // - #5959: the booking archive / procedure documentation / all receipts show their page also under an address with the
