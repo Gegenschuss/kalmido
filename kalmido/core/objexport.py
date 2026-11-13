@@ -24,6 +24,7 @@ keys without N_ (core/i18nkeys.py reason_keys reads this file)."""
 OEX_KEYS = ("org", "org_left", "acct_left", "acct_later", "rx", "read")
 OEX_LATER = "not yet in the account export"  # = admin/exportleft.py _LATER
 OEX = {}  # table -> {keyword: value, "by": "kind <k>" | "core"}
+_IMPORT_READ = []  # 2.1093.0 (#5289, review): set once admin/acctimport.py built UMZ_READ / UMZ_ORG_MAP at its load
 
 _DERIVED = "derived or working data, rebuilt on the target"
 _SHARE = "who shares what with whom (a share is made anew on the target)"
@@ -34,6 +35,9 @@ def obj_export(table, *, org=(), org_left=None, acct_left=None, acct_later=None,
     """Register where the rows of a table of the core go in the exports (module docstring). Registering a table again from the
     same place replaces it (a module reload); from another place it is refused (one way per table)."""
     old = OEX.get(table)
+    if _IMPORT_READ and (read or any(len(e) == 3 for e in org)) and old is None:
+        # 2.1093.0 (#5289, review): the account import read its parts at its load -- a later one would silently not be imported
+        raise ValueError(f"obj_export {table}: registered after the account import read the register (load the area earlier)")
     if old and old["by"] != by:
         raise ValueError(f"obj_export {table}: registered already ({old['by']})")
     org = tuple(tuple(e) for e in org)
@@ -65,11 +69,13 @@ def oex_left(key):
 
 def oex_org_map():
     """-> {archive: part} the account import reads from an organisation export."""
+    _IMPORT_READ.append(1)
     return {e[0]: e[2] for r in OEX.values() for e in r["org"] if len(e) == 3}
 
 
 def oex_read():
     """-> the parts of an account export made of the core's tables that the import reads."""
+    _IMPORT_READ.append(1)
     return frozenset(p for r in OEX.values() for p in (*r["read"], *(e[2] for e in r["org"] if len(e) == 3)))
 
 

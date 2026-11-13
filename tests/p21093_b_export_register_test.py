@@ -97,6 +97,13 @@ out = {
     "read": OLD_READ <= UMZ_READ and not OLD_READ & UMZ_READ_OWN,
     "all_core": sorted(t for t in OEX if not t.startswith("obj_")),
 }
+# 2.1093.0 (#5289, review): a table registered after the account import read the register would silently not be imported
+from kalmido.core.objexport import obj_export
+try:
+    obj_export("obj_zz_late", read=("zz_late",), by="kind zz")
+    out["late"] = "accepted"
+except ValueError as e:
+    out["late"] = "refused" if "after the account import" in str(e) else str(e)
 print(json.dumps(out, sort_keys=True))
 '''
 r = in_app(SNAP)
@@ -111,6 +118,7 @@ check(snap.get("org_left") is True, "the reasons of the organisation export are 
 check(snap.get("rx") is True and snap.get("rx_hand") is True, "the retention export: the same CSV files and rows, none by hand")
 check(snap.get("umz_left") is True and snap.get("later") is True, "the account export: the same reasons and names, none by hand")
 check(snap.get("map") is True and snap.get("read") is True, "the imports: the same files and parts, none by hand")
+check(snap.get("late") == "refused", f"a part registered after the import read the register is refused, not lost {snap.get('late')}")
 check(snap.get("all_core") == [], f"only the core's tables in the register {snap.get('all_core')}")
 
 # ================================================================== the organisation boundary (two organisations)
