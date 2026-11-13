@@ -75,9 +75,9 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supp
   '/static/js/mailrules.js', '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js',
   '/static/js/dpmodal.js', '/static/js/gitrepo.js', '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js',
   '/static/js/hubmail.js', '/static/js/msvview.js', '/static/js/sprints2.js', '/static/js/sideviews.js', '/static/js/notetrash.js',
-  '/static/js/trashui.js', '/static/js/clientpage.js', '/static/js/whatsnew.js', '/static/js/offcache.js', '/static/js/shoot.js',
-  '/static/js/splitview.js', '/static/js/codecheck.js', '/static/js/undolist.js', '/static/js/recent.js', '/static/js/office_walk.js',
-  '/static/js/callsheet.js', '/static/js/quotes_dada.js', '/static/js/quotes_dada_es.js', '/static/js/quotes_dada_fr.js',
+  '/static/js/trashui.js', '/static/js/clientpage.js', '/static/js/whatsnew.js', '/static/js/msgpop.js', '/static/js/offcache.js',
+  '/static/js/shoot.js', '/static/js/splitview.js', '/static/js/codecheck.js', '/static/js/undolist.js', '/static/js/recent.js',
+  '/static/js/office_walk.js', '/static/js/callsheet.js', '/static/js/quotes_dada.js', '/static/js/quotes_dada_es.js', '/static/js/quotes_dada_fr.js',
   '/static/js/quotes_dada_it.js', '/static/js/quotes_dada_nl.js', '/static/js/helpview.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
@@ -88,8 +88,8 @@ const LAZY_CSS = ['/static/css/settings.css', '/static/css/contacts.css', '/stat
   '/static/css/playbook.css', '/static/css/timeline.css', '/static/css/feeds.css', '/static/css/bookmarks.css', '/static/css/sheets.css',
   '/static/css/videorev.css', '/static/css/tagsel.css', '/static/css/filereq.css', '/static/css/fltdlg.css', '/static/css/abscan.css',
   '/static/css/ablage.css', '/static/css/calabs.css', '/static/css/sideviews.css', '/static/css/navmenu.css', '/static/css/whatsnew.css',
-  '/static/css/shoot.css', '/static/css/splitview.css', '/static/css/undolist.css', '/static/css/evedit.css', '/static/css/callsheet.css',
-  '/static/css/helpview.css'];
+  '/static/css/msgpop.css', '/static/css/shoot.css', '/static/css/splitview.css', '/static/css/undolist.css', '/static/css/evedit.css',
+  '/static/css/callsheet.css', '/static/css/helpview.css'];
 self.addEventListener('install', e => { e.waitUntil(swInstall().then(() => self.skipWaiting())); });
 // 2.149.0 B (#2506): the server names every precached static file with its content hash (/sw-manifest.json). A file is kept
 // under "<url>?v=<hash>" (the address index.html asks for), so an update copies every unchanged file from the old cache and
@@ -358,11 +358,37 @@ async function setBadge(n) {
   if (typeof n !== 'number' || !nav || !nav.setAppBadge) return;
   try { if (n > 0) await nav.setAppBadge(n); else await nav.clearAppBadge(); } catch { /* not supported here */ }
 }
+// 2.1130.0 (#6057): a chat push (a team chat message, a thread answer, an agent's answer / question) while a window of the app
+// is visible with the pop-up on (static/js/msgpop.js; the window answers "msgpop?", liveparts.js mp_swAsk) shows no system
+// notification on this device: the pop-up in the app says it. No answer within MP_ASK_MS = shown as before. WebKit (Safari,
+// the iPhone's Home Screen app) takes a push without a notification as a silent push and may end the subscription: there it
+// is shown silently and closed at once.
+const MP_CHAT_URL = /^\/#(team\/\d+|msg\/t\/\d+\/\d+|agents\/\d+)$/, MP_ASK_MS = 400;
+const mpWebkit = () => { const u = self.navigator?.userAgent || ''; return /AppleWebKit/.test(u) && !/Chrome|Chromium|Android/.test(u); };
+async function mpShownInApp(d) {
+  if (!d || !MP_CHAT_URL.test(SAME(d.url || '/'))) return false;
+  const wins = await self.clients.matchAll({type: 'window', includeUncontrolled: true});
+  const ask = w => new Promise(res => {
+    if (w.visibilityState !== 'visible') { res(false); return; }
+    const ch = new MessageChannel(), t = setTimeout(() => res(false), MP_ASK_MS);
+    ch.port1.onmessage = ev => { clearTimeout(t); res(!!ev.data?.visible); };
+    try { w.postMessage({type: 'msgpop?'}, [ch.port2]); } catch { clearTimeout(t); res(false); }
+  });
+  return (await Promise.all(wins.map(ask))).some(Boolean);
+}
+async function pushShow(d) {
+  const o = pushOptions(d);
+  if (!await mpShownInApp(d).catch(() => false)) return self.registration.showNotification(d.title || 'Kalmido', o);
+  if (!mpWebkit()) return;
+  const tag = 'mp-' + Date.now();
+  await self.registration.showNotification(d.title || 'Kalmido', {...o, tag, renotify: false, silent: true, requireInteraction: false});
+  for (const x of await self.registration.getNotifications({tag})) x.close();
+}
 self.addEventListener('push', e => {
   let d;
   try { d = e.data ? e.data.json() : {}; } catch { d = {body: e.data ? e.data.text() : ''}; }
   if (d && d.type === 'dismiss') { e.waitUntil(closeTags(d.tags).catch(() => 0).then(() => setBadge(d.badge))); return; }
-  e.waitUntil(closeTags(d.dismiss).catch(() => 0).then(() => self.registration.showNotification(d.title || 'Kalmido', pushOptions(d))).then(() => setBadge(d.badge)));
+  e.waitUntil(closeTags(d.dismiss).catch(() => 0).then(() => pushShow(d)).then(() => setBadge(d.badge)));
 });
 // focus an open Kalmido window and hand it the in-app link, else open a new one
 async function openApp(path) {

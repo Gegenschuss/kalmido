@@ -1,0 +1,18 @@
+/* 2.1130.0 (#6057): the pop-up for new chat messages (msgpop.js, loaded with it). One card at the top edge over the page:
+   position:fixed, it moves nothing (calm view); on a phone across the width under the notch, on a wide screen top right. */
+.msgpop{position:fixed;top:calc(env(safe-area-inset-top,0px) + .5rem);right:.75rem;z-index:var(--z-toast);display:flex;align-items:flex-start;
+  width:min(22rem,calc(100vw - 1.5rem));background:var(--bg3);border-radius:var(--radius);box-shadow:var(--shadow);touch-action:pan-y;
+  transition:opacity .18s ease,transform .18s ease;animation:mpIn .18s ease}
+.msgpop.mpgone{opacity:0;pointer-events:none}
+.msgpop .mpopen{flex:1;min-width:0;display:flex;gap:.625rem;align-items:center;padding:.625rem .25rem .625rem .75rem;text-align:left;color:inherit;background:none;border:0;border-radius:var(--radius);min-height:44px}
+.msgpop .mpopen .avatar{flex:none}
+.msgpop .mptxt{min-width:0;display:flex;flex-direction:column;gap:.0625rem}
+.msgpop .mpwho,.msgpop .mpwhere,.msgpop .mpline{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.msgpop .mpwho{font-size:var(--fs-m)}
+.msgpop .mpwhere{color:var(--muted);font-size:var(--fs-xs)}
+.msgpop .mpline{color:var(--muted);font-size:var(--fs-s)}
+.msgpop .mpx{flex:none;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;color:var(--muted);background:none;border:0}
+.msgpop .mpopen:focus-visible,.msgpop .mpx:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+@media (max-width:640px){.msgpop{left:.5rem;right:.5rem;width:auto}}
+@keyframes mpIn{from{opacity:0;transform:translateY(-.5rem)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.msgpop{animation:none;transition:none}}

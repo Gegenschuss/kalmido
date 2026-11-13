@@ -131,6 +131,8 @@ ROUTES = {
     "GET /api/office/letter-blocks/{}/history": "office", "GET /api/office/vehicles/{}/history": "office", "GET /api/office/drives/{}/history": "office", "GET /api/clients/{}/history": "office",
     # 2.556.0 (#4685): "New for you" after an update (p2556_b_whatsnew_api_test.py as the freelancer)
     "GET /api/whatsnew": "own", "POST /api/whatsnew/seen": "own",
+    # 2.1130.0 (#6057): the pop-up for new chat messages (p21130_a_msgpop_api_test.py as the freelancer: the own agent's answer)
+    "GET /api/msgpop": "own",
     # 2.545.0 (#4595): the switch "Extend the lock" of the own office (p2545_b_rethold_test.py as the freelancer)
     "GET /api/office/settings/retention-hold": "office", "PUT /api/office/settings/retention-hold": "office",
     # 2.394.0 B (#3377): the issue import of a project's own repository (p2394_b_git_issues_test.py as the freelancer)

@@ -1618,6 +1618,7 @@ setInterval(async () => {
     const {v, vs, n, c, t, ty, app, sp, a} = await api('GET', '/api/version');
     S.vNow = v;  // 2.565.0 (#4705): the server's counter even while the state waits (typing): an open dialog's version watch (objsave.js dlgStale)
     const lpCh = lpChanged(a);  // 2.41.0 (#1376): the areas that changed since the last poll
+    mp_poll(t, a);  // 2.1130.0 (#6057): the pop-up for new chat messages (liveparts.js)
     lpSkip(v, vs);  // 2.369.4 (#2507): changes only elsewhere: S.v follows, nothing is fetched
     if (sp !== undefined && sp !== S.stepsSig) { const first = S.stepsSig === undefined; S.stepsSig = sp; if (!first) stepsChanged(); }  // 2.32.0 (#1081)
     verCheck(app);  // 2.27.0 (#968)

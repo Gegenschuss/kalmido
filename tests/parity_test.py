@@ -896,6 +896,9 @@ APP_ONLY = [
     ("2.556.0 B (#4685): New for you is the web app's dialog after an update (the seen version per person); agents have no "
      "dialog and read the change log themselves",
      ("=GET /api/whatsnew", "=POST /api/whatsnew/seen")),
+    ("2.1130.0 (#6057): the pop-up for new chat messages is a card of the web app; agents get messages as events "
+     "(chat, team_message) and never see a pop-up",
+     ("=GET /api/msgpop",)),
 ]
 
 

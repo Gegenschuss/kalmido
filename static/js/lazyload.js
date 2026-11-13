@@ -98,6 +98,7 @@ const LD_MODS = {
   trashui: ['trashui'],  // 2.272.0 G (#3038): the trash dialogs / views of 2.272.0 (start budget)
   clientpage: ['clientpage'],  // 2.563.0 (#4742): Office > Clients (the list and the client's card), on its view; the office, the contacts and the trash use its globals (LD_NEED)
   whatsnew: ['whatsnew'],  // 2.556.0 (#4685): the dialog "New for you" after an update (wn_boot below loads it only when there is news)
+  msgpop: ['msgpop'],  // 2.1130.0 (#6057): the pop-up for new chat messages (liveparts.js mp_check loads it only when there is one)
   offcache: ['offcache'],  // 2.663.0 (#4200): the offline start state in IndexedDB (core.js startSave / startRead)
   shoot: ['shoot'],  // 2.636.0 (#4565): the storyboard of a shoot (picture tiles on the board, the button Shot list)
   splitview: ['splitview'],  // 2.742.0 (#4858): the split view on a wide screen, only while it is on (miniwin.js spl_check)
@@ -158,7 +159,7 @@ const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
 const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
   wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs', 'docview'] /* 2.583.0 (#4835) */, docviews: ['docviews'], life: ['life'],
-  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], fltdlg: ['fltdlg'], abscan: ['abscan'], ablage: ['ablage'] /* 2.558.0 (#4693) */, calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu'], whatsnew: ['whatsnew'], shoot: ['shoot'], splitview: ['splitview'] /* 2.742.0 (#4858) */, undolist: ['undolist'] /* 2.773.0 (#5250) */, evinvite: ['evedit'] /* 2.846.0 (#5465): the event editor */, callsheet: ['callsheet'] /* 2.855.0 (#1956) */, helpview: ['helpview'] /* 2.1086.0 (#5820) */};  /* 2.636.0 (#4565) */  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
+  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], fltdlg: ['fltdlg'], abscan: ['abscan'], ablage: ['ablage'] /* 2.558.0 (#4693) */, calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu'], whatsnew: ['whatsnew'], msgpop: ['msgpop'], shoot: ['shoot'], splitview: ['splitview'] /* 2.742.0 (#4858) */, undolist: ['undolist'] /* 2.773.0 (#5250) */, evinvite: ['evedit'] /* 2.846.0 (#5465): the event editor */, callsheet: ['callsheet'] /* 2.855.0 (#1956) */, helpview: ['helpview'] /* 2.1086.0 (#5820) */};  /* 2.636.0 (#4565) */  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
 const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
   dpj_projHtml: ['office'],  // 2.168.0 A (#2665): a project page's quotations & invoices (only while the office is on)
   // 2.65.0 (#1823)
