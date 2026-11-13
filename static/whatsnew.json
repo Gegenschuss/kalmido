@@ -1,6 +1,32 @@
 {
  "versions": [
   {
+   "version": "2.1100.0",
+   "date": "2026-11-13",
+   "items": [
+    {
+     "de": "Freigabe-Karten für ein Hochladen nennen die Dateien, die hochgeladen werden.",
+     "en": "Approval cards for an upload name the files that will be uploaded."
+    },
+    {
+     "de": "Lädt im Büro etwas nicht, siehst du jetzt den Grund und einen Knopf „Erneut versuchen“ statt einer leeren Seite.",
+     "en": "When something in the office fails to load, you now see the reason and a \"Try again\" button instead of an empty page."
+    },
+    {
+     "de": "Auf dem Handy zeigt ein leichter Schatten über „Einstellungen“ in der Seitenleiste, dass darunter noch Einträge kommen.",
+     "en": "On the phone a light shadow above \"Settings\" in the sidebar shows that more entries follow below."
+    },
+    {
+     "de": "Die Hilfe erklärt jetzt auch Wissensseiten, Tabellen, Team-Chat, Budget, Listen und Teilen.",
+     "en": "The help now also explains knowledge pages, tables, team chat, budget, lists and sharing."
+    },
+    {
+     "de": "Unter einem Hilfethema zeigt „Zeig mir“ dir Schritt für Schritt, wo du in der App klickst.",
+     "en": "Under a help topic, \"Show me\" points out step by step where to click in the app."
+    }
+   ]
+  },
+  {
    "version": "2.1086.0",
    "date": "2026-11-13",
    "items": [
@@ -1367,20 +1393,6 @@
     {
      "de": "Drehtage aus dem Angebot landen als vorläufige Buchungen mit offenen Plätzen in der Disposition.",
      "en": "Shoot days from a quotation now become pencilled-in bookings with open places in the disposition."
-    }
-   ]
-  },
-  {
-   "version": "2.601.0",
-   "date": "2026-11-06",
-   "items": [
-    {
-     "de": "Sicherungen findest du jetzt unter Einstellungen → Server → Sicherung.",
-     "en": "Backups now live under Settings → Server → Backup."
-    },
-    {
-     "de": "Der Aufgaben-Bereich in Listen lässt sich bis an die Liste heran breiter ziehen.",
-     "en": "The task panel in lists can be dragged wider, right up to the list."
     }
    ]
   }
