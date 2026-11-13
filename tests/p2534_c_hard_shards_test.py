@@ -118,10 +118,31 @@ try:
     hh, n = int(o.get("hard") or 0), int(o.get("count") or 0)
     check(hh >= 1 and n == len(mx) and [x["shard"] for x in mx] == list(range(1, n + 1)), f"matrix 1..{n} in order, {hh} hard")
     check([x["hart"] for x in mx] == [" hart"] * hh + [""] * (n - hh), "the hard shards first, marked ' hart'")
-    # 2.573.0 (#4748): the full run plans the hard shards + exactly 20 others (was 20 in all, #4388: 13 others at 80-84 of 90 min)
-    check(n == hh + 20, f"full run: {hh} hard + 20 others: {n}")
-    # job/2867 (CI v2.560.0): 60 was too short for 13 soft shards (~70 min each), all 13 were cut - 90 now
-    check(re.search(r"needs: plan\n\s+timeout-minutes: 90\b", ci), "the shard job has the 90 min limit")
+    # 2.1129.0 (#6054): the full run plans the hard shards + as many others as ~25 min each need (at most 60; was exactly 20
+    # others since #4748, each 57-78 min), runs at most 16 at once (max-parallel) and a full shard ends at 60 min
+    est = sum(shards.cost(g, {})[0] for g in gs.values() if not shards.is_hard(g, pats))
+    want = max(1, min(60, -(-int(est) // (25 * 60))))
+    check(n == hh + want, f"full run: {hh} hard + {want} others of ~25 min (estimates only): {n}")
+    check(o.get("parallel") == "16" and o.get("limit") == "60", f"full run: 16 at once, 60 min each: {o.get('parallel')} {o.get('limit')}")
+    check(re.search(r"needs: plan\n\s+timeout-minutes: \$\{\{ fromJSON\(needs\.plan\.outputs\.limit \|\| '90'\) \}\}", ci),
+          "the shard job takes its limit from the plan (90 when it says nothing)")
+    check("max-parallel: ${{ fromJSON(needs.plan.outputs.parallel || '20') }}" in ci, "the shard job runs at most the plan's number at once")
+    check("parallel: ${{ steps.plan.outputs.parallel }}" in ci and "limit: ${{ steps.plan.outputs.limit }}" in ci, "plan hands both on")
+    # the push / queue stage: all shards at once (~15 min each), the old 90 min limit
+    open(gho, "w").close()
+    with open(os.path.join(tmp, "push-groups.txt"), "w", encoding="utf-8") as f:
+        f.write("\n".join(first + ["backup"]) + "\n")
+    r = subprocess.run(["bash", "-e", "-c", step.replace("/tmp/push-groups.txt", os.path.join(tmp, "push-groups.txt"))], cwd=tmp,
+                       text=True, capture_output=True, timeout=180,
+                       env={**os.environ, "STAGE": "push", "REASON": "test", "GITHUB_OUTPUT": gho, "GITHUB_STEP_SUMMARY": ghs})
+    op = dict(ln.split("=", 1) for ln in open(gho, encoding="utf-8").read().splitlines() if "=" in ln)
+    check(r.returncode == 0 and op.get("stage") == "push" and op.get("parallel") == op.get("count") and op.get("limit") == "90",
+          f"push stage: every shard at once, 90 min: {r.returncode} {op.get('stage')} {op.get('parallel')}/{op.get('count')} {op.get('limit')} {r.stderr[-300:]}")
+    # 2.1129.0 (#6054): the suites run with a time limit and the red-streak stop (tests/run_all.sh), the JUnit reports of the
+    # hidden folder tests/.junit are uploaded (#6055: without include-hidden-files none was)
+    check('KALMIDO_SUITE_LIMIT_S: "1500"' in ci and 'KALMIDO_RED_STREAK: "10"' in ci, "the shard job sets the suite limit and the red streak")
+    ju = re.search(r"name: junit-shard-.*?\n(.*?)\n\s+- name:", ci, re.S)
+    check(bool(ju) and "include-hidden-files: true" in ju.group(1), "the JUnit upload takes the hidden folder tests/.junit")
     tpl = re.search(r"^\s+name: (Test suites \$\{\{ matrix\.shard \}\}.*)$", ci, re.M)
     check(bool(tpl) and "${{ matrix.hart }}" in tpl.group(1), "the shard job name carries matrix.hart")
     check("include: ${{ fromJSON(needs.plan.outputs.matrix) }}" in ci, "the matrix of the shard job is the plan's list")
