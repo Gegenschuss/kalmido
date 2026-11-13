@@ -310,6 +310,18 @@ check(res["isError"] is False and last()["m"] == "POST" and last()["p"] == "/api
 # 2.1068.0 (#5829): under (a heading) goes along
 res = call(s, "wiki_append", {"page_id": 4, "text": "- a link", "under": "Links"})
 check(res["isError"] is False and last()["b"] == {"text": "- a link", "under": "Links"}, f"wiki_append: under goes along {last()}")
+# 2.1111.0 (#5830): the targeted changes send only the change (append / replace one section), never the whole text
+for tool, args, path, body in (
+        ("wiki_replace_section", {"page_id": 4, "heading": "Setup", "text": "x", "expect_updated_at": "v"}, "/api/v1/wiki/pages/4/replace-section",
+         {"heading": "Setup", "text": "x", "expect_updated_at": "v"}),
+        ("task_notes_append", {"task_id": 7, "text": "- found", "under": "Plan"}, "/api/v1/tasks/7/notes/append", {"text": "- found", "under": "Plan"}),
+        ("task_notes_replace_section", {"task_id": 7, "heading": "Plan", "text": "y", "expect_updated_at": "v"}, "/api/v1/tasks/7/notes/replace-section",
+         {"heading": "Plan", "text": "y", "expect_updated_at": "v"}),
+        ("project_overview_append", {"list_id": 3, "text": "z"}, "/api/v1/lists/3/overview/append", {"text": "z"}),
+        ("project_overview_replace_section", {"list_id": 3, "heading": "Goal", "text": "z", "expect_updated_at": ""},
+         "/api/v1/lists/3/overview/replace-section", {"heading": "Goal", "text": "z", "expect_updated_at": ""})):
+    res = call(s, tool, args)
+    check(res["isError"] is False and last()["m"] == "POST" and last()["p"] == path and last()["b"] == body, f"{tool}: POST {path} {last()}")
 # 2.488.0 (#2209): wiki_files lists a page's files; wiki_read_file reads one as text (a PDF) or the bytes (a picture: an image item)
 res = call(s, "wiki_files", {"page_id": 4})
 check(res["isError"] is False and last()["p"] == "/api/v1/wiki/pages/4/files" and last()["m"] == "GET", "wiki_files: GET /wiki/pages/4/files")

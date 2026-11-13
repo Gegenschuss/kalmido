@@ -18472,7 +18472,6 @@
   "Scan inboxes file only into folders of the documents": "Le caselle scansioni archiviano solo nelle cartelle dei documenti",
   "Scan inbox: {0}": "Casella scansioni: {0}",
   "waits for your answer": "aspetta la tua risposta",
-  "No heading {0} on this page": "Nessun titolo {0} in questa pagina",
   "Knowledge page {0}": "Pagina di conoscenza {0}",
   "Notes of task {0}": "Note dell'attività {0}",
   "Description of project {0}": "Descrizione del progetto {0}",
@@ -18543,6 +18542,10 @@
   "One-way step.": "Passo senza ritorno.",
   "The files differ from the card (names or content): the card approves exactly the files of the refused upload. Send exactly these files, or ask with a new card.": "I file differiscono dalla scheda (nomi o contenuto): la scheda approva esattamente i file del caricamento rifiutato. Invia esattamente questi file oppure chiedi con una nuova scheda.",
   "The card approves an upload: send the upload again with the same files and the header X-Kalmido-Approval: ID of the card (MCP: use_approval) - the run from the card cannot send files.": "La scheda approva un caricamento: invia di nuovo il caricamento con gli stessi file e l'intestazione X-Kalmido-Approval: ID della scheda (MCP: use_approval) - l'esecuzione dalla scheda non può inviare file.",
+  "No heading {0} in this text": "Nessun titolo {0} in questo testo",
+  "The heading {0} is there more than once: rename one or change the whole text": "Il titolo {0} compare più di una volta: rinominane uno o modifica l'intero testo",
+  "The notes are encrypted: only the app can change them": "Le note sono cifrate: solo l'app può modificarle",
+  "The description is encrypted: only the app can change it": "La descrizione è cifrata: solo l'app può modificarla",
   "Check the connection in the settings, or remove it.": "Controlla la connessione nelle impostazioni oppure rimuovila.",
   "Nothing else waits for you": "Nient’altro è in attesa di te"
 }

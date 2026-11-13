@@ -18471,7 +18471,6 @@
   "Scan inboxes file only into folders of the documents": "Les boîtes de numérisation ne classent que dans les dossiers des documents",
   "Scan inbox: {0}": "Boîte de numérisation : {0}",
   "waits for your answer": "attend ta réponse",
-  "No heading {0} on this page": "Aucun titre {0} sur cette page",
   "Knowledge page {0}": "Page de connaissances {0}",
   "Notes of task {0}": "Notes de la tâche {0}",
   "Description of project {0}": "Description du projet {0}",
@@ -18542,6 +18541,10 @@
   "One-way step.": "Étape sans retour.",
   "The files differ from the card (names or content): the card approves exactly the files of the refused upload. Send exactly these files, or ask with a new card.": "Les fichiers diffèrent de la carte (noms ou contenu) : la carte approuve exactement les fichiers du téléversement refusé. Envoie exactement ces fichiers ou demande avec une nouvelle carte.",
   "The card approves an upload: send the upload again with the same files and the header X-Kalmido-Approval: ID of the card (MCP: use_approval) - the run from the card cannot send files.": "La carte approuve un téléversement : envoie à nouveau le téléversement avec les mêmes fichiers et l'en-tête X-Kalmido-Approval: ID de la carte (MCP : use_approval) - l'exécution depuis la carte ne peut pas envoyer de fichiers.",
+  "No heading {0} in this text": "Aucun titre {0} dans ce texte",
+  "The heading {0} is there more than once: rename one or change the whole text": "Le titre {0} apparaît plusieurs fois : renommez-en un ou modifiez le texte entier",
+  "The notes are encrypted: only the app can change them": "Les notes sont chiffrées : seule l'app peut les modifier",
+  "The description is encrypted: only the app can change it": "La description est chiffrée : seule l'app peut la modifier",
   "Check the connection in the settings, or remove it.": "Vérifie la connexion dans les réglages ou supprime-la.",
   "Nothing else waits for you": "Rien d’autre ne t’attend"
 }
