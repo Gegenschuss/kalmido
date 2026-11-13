@@ -6408,6 +6408,7 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
    only a single bubble stays readable (at most 75 % of the width, about 900 px of text), own ones right, the agent's left */
 html.mini-chat .chview,html.mini-chat body.in-chat .chview{max-width:none;margin:0}
 html.mini-chat body.in-chat #view,html.mini-chat body.in-team #view{padding-left:.75rem;padding-right:.75rem}
+html.mini-chat body.in-chat #view .chview .chmsgs{padding-inline:.75rem}  /* 2.1102.0 (#5957): not the reading column of #5903 - own messages at the right edge */
 @media (min-width:40rem){ html.mini-chat .cmsg{max-width:min(75%,56rem)} }  /* a narrow window keeps the usual 88 % */
 /* 2.46.2 C (#1712) never red text on the accent fill: pri + danger reads like danger solid */
 .btn.pri.danger{background:var(--danger);border-color:var(--danger);color:var(--danger-ink)}
