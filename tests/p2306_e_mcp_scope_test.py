@@ -85,7 +85,9 @@ for name, _, schema, fn in mcp.TOOLS:
 
 # 2.558.0 (#4709, review F9): tools on an /agent route whose server side asks a second scope (need_scope: the kind's write
 # scope of the shared core) are listed under that scope, so a read token does not see a tool that always answers 403
-SECOND = {"update_object": "tasks:write"}
+# 2.1112.2 (#5157): link_objects / unlink_objects (#5271) follow update_object: an /agent route whose server side asks the
+# kind's write scope (core/objlinkweb.py _agent(kind, write=True)), listed under tasks:write like it
+SECOND = {"update_object": "tasks:write", "link_objects": "tasks:write", "unlink_objects": "tasks:write"}
 bad, unknown = [], []
 for name, _, _, _ in mcp.TOOLS:
     need = mcp.TOOL_SCOPE.get(name, "read")
@@ -104,7 +106,8 @@ check(not bad, f"every MCP tool has the scope of its route(s): {bad[:8]} ({len(b
 check(not unknown, f"every route an MCP tool calls is in the OpenAPI document: {unknown[:8]}")
 for name, want in (("set_deployment", "structure"), ("duplicate_list", "structure"), ("set_task_sprint", "structure"),
                    ("set_list_review", "structure"), ("review_task", "tasks:write"), ("list_documents", "files:read"),
-                   ("get_document", "files:read"), ("update_document", "files:write"), ("update_object", "tasks:write")):
+                   ("get_document", "files:read"), ("update_document", "files:write"), ("update_object", "tasks:write"),
+                   ("link_objects", "tasks:write"), ("unlink_objects", "tasks:write")):  # 2.1112.2 (#5157)
     check(mcp.TOOL_SCOPE.get(name) == want, f"{name}: scope {want} ({mcp.TOOL_SCOPE.get(name, 'read')})")
 
 # tools/list for a read-only person token: none of them shows
