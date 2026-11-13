@@ -359,7 +359,7 @@ def cf8_chain(c, oid, r):
     rows = c.execute(f"SELECT id, kind, number, status, cashflow, version_of, client_id FROM office_docs WHERE org_id=? AND kind='offer' AND {live_sql()} "
                      "AND (id=? OR version_of=?) ORDER BY id", (oid, root, root)).fetchall()
     rows = [x for x in rows if cf8_key(x) == cf8_key(r)]
-    inv = c.execute(f"SELECT source_doc_id FROM office_docs WHERE org_id=? AND kind='invoice' AND locked_at IS NOT NULL AND locked_at<>'' AND {live_sql()} "
+    inv = c.execute(f"SELECT source_doc_id FROM office_docs WHERE org_id=? AND kind='invoice' AND locked_at IS NOT NULL AND {live_sql()} "
                     "AND status NOT IN ('draft', 'cancelled') AND COALESCE(inv_type, '')<>'progress' AND source_doc_id IN (%s)" % ",".join("?" * len(rows)),
                     (oid, *[x["id"] for x in rows])).fetchall() if rows else []
     invoiced = {x["source_doc_id"] for x in inv}

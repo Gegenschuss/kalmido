@@ -545,7 +545,7 @@ check(one("SELECT sid FROM budget_entries WHERE id=?", (BE,)) == ORG, "(setup) a
 A.patch(B + f"/api/budget/entries/{BE}", json={"amount": "50"})
 GR = newest(A)["id"]
 rot0 = one("SELECT rotated_at FROM org_keys WHERE org_id=?", (ORG,))
-kt.dbx("UPDATE org_keys SET rotated_at=to_char(now() + interval '1 hour', 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00') WHERE org_id=?", (ORG,))
+kt.dbx("UPDATE org_keys SET rotated_at=now() + interval '1 hour' WHERE org_id=?", (ORG,))  # 2.1115.0 (#5951): rotated_at TIMESTAMPTZ
 res = back(A, GR)
 st = res.get("stayed") or []
 check([x["kind"] for x in st] == ["budget_entry"] and "key of its space" in (st[0].get("reason") or "") and entry()["amount"] == 50,

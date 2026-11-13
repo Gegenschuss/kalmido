@@ -57,7 +57,7 @@ from flask import has_request_context, jsonify
 
 from ..core.config import app, SECRET_KEY, COOKIE
 from ..core.i18n import N_, tr
-from ..core.pg import system_ctx, write_lock
+from ..core.pg import system_ctx, ts_canon, write_lock  # 2.1115.0 (#5951): ts_canon
 from ..core.db import body, bump, connect, db, err, gset, iso, iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from .moneycol import mc_fields  # 2.755.0 (#5293): the NUMERIC money columns back as the text the office code reads
 
@@ -1585,7 +1585,7 @@ def _rck_fresh(c, want=""):
     # a new session alone may come from a live session at the provider without anyone typing anything
     oid = want.split(":")[0]
     ok_for = (want,) if want.endswith(":su") else (want, f"{oid}:new")  # 2.223.2 (#2871, review): su counts only for itself
-    if want and str(r[2] or "") >= since and str(r[3] or "") in ok_for:
+    if want and ts_canon(r[2]) >= since and str(r[3] or "") in ok_for:  # 2.1115.0 (#5951): stepup_at NULL = never (empty)
         return True
     return r[1] in ("password", "2fa", "passkey") and str(r[0]) >= since
 
@@ -1672,8 +1672,9 @@ def rck_admin_gone(c, oid, uid):
         k = c.execute("SELECT recovery_shown_at, rotated_at FROM org_keys WHERE org_id=?", (int(oid),)).fetchone()
         if not k or not k["recovery_shown_at"]:
             return 0  # never shown, or renewed on the server since (rotation clears it): nobody holds a valid one
-        if not c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND user_id=? AND action='recovery_key' AND at>=? LIMIT 1",
-                         (int(oid), int(uid), k["rotated_at"] or "")).fetchone():
+        since = (" AND at>=?", (k["rotated_at"],)) if k["rotated_at"] else ("", ())  # 2.1115.0 (#5951): never '' against a time
+        if not c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND user_id=? AND action='recovery_key'" + since[0] + " LIMIT 1",
+                         (int(oid), int(uid), *since[1])).fetchone():
             return 0
         org = c.execute("SELECT name, personal_of FROM orgs WHERE id=?", (int(oid),)).fetchone()
         if not org or org["personal_of"]:

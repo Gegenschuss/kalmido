@@ -99,7 +99,7 @@ def receipt(name, amount="119.00"):
 R1, R2, R3 = receipt("Beleg Komplett"), receipt("Beleg Ohne Betrag"), receipt("Beleg Ohne Datum")
 dbx("UPDATE doc_meta SET amount='' WHERE node_id=?", (R2,))
 dbx("UPDATE doc_meta SET doc_date='' WHERE node_id=?", (R3,))
-dbx("UPDATE rc_receipts SET paid_at='' WHERE node_id=?", (R3,))
+dbx("UPDATE rc_receipts SET paid_at=NULL WHERE node_id=?", (R3,))  # 2.1115.0 (#5951): paid_at is a DATE, no ''
 
 # ---------------------------------------------------------------- GoBD
 r = Fr.get(B + O + "/gobd/export" + P + "&check=1")

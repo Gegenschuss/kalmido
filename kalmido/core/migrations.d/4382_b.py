@@ -2,5 +2,5 @@
 before has none: it gets its year at its first use with this version (not cut off at once). A new nullable column only: the
 version before ignores it (its keys then never run out, as before)."""
 MIGRATIONS = [
-    ("doc_fetchers", "expires_at", "ALTER TABLE doc_fetchers ADD COLUMN IF NOT EXISTS expires_at TEXT"),
+    ("doc_fetchers", "expires_at", "ALTER TABLE doc_fetchers ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ"),
 ]

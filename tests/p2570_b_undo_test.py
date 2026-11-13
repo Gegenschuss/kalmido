@@ -33,6 +33,13 @@ def one(sql, args=()):
     return r[0][0] if r else None
 
 
+def same_at(a, b):
+    """2.1115.0 (#5951): two points in time as one moment (the API reads TIMESTAMPTZ canonically, the suite's psql row its own way)."""
+    if not a or not b:
+        return False
+    return datetime.fromisoformat(str(a).replace("Z", "+00:00")) == datetime.fromisoformat(str(b).replace("Z", "+00:00"))
+
+
 def run_sql(q, args=()):
     """A write in the suite's database (kt.dbx only reads)."""
     import dbx as dbxm
@@ -93,7 +100,8 @@ def bookmarks(s1, s2, who):
     run_sql("UPDATE bookmarks SET preview='pending' WHERE id=?", (bid,))
     in_app(f"from kalmido.life.bookmarks import bm_fetch_one\nbm_fetch_one({bid})\nout = 1")
     row = kt.dbx("SELECT preview, updated_at, fetched_at FROM bookmarks WHERE id=?", (bid,))[0]
-    check(row[0] == "failed" and row[1] == u1 and row[2], f"{who}: the fetch ran, updated_at stays, fetched_at set {row} / {u1}")
+    # 2.1115.0 (#5951): updated_at is TIMESTAMPTZ since 2.1095 (#5306) - the same moment, not the same text
+    check(row[0] == "failed" and same_at(row[1], u1) and row[2], f"{who}: the fetch ran, updated_at stays, fetched_at set {row} / {u1}")
     r = s2.post(B + f"/api/bookmarks/{bid}/refresh", json={})
     check(r.ok and r.json()["updated_at"] == u1, f"{who}: asking for the preview again leaves the version " + r.text[:160])
     until(lambda: one("SELECT preview FROM bookmarks WHERE id=?", (bid,)) == "failed", 40)
@@ -126,7 +134,10 @@ def docs(s1, s2, who):
     r = s1.patch(B + f"/api/docs/{nid}", json={"due": "2027-01-15"})
     check(r.ok, f"{who}: A sets the due date " + r.text[:160])
     u1, t1 = r.json()["edited_at"], r.json()["updated_at"]
-    check(u1 and u1 == one("SELECT edited_at FROM doc_meta WHERE node_id=?", (nid,)), f"{who}: the save answers its version {u1}")
+    # 2.1115.0 (#5951): edited_at is TIMESTAMPTZ - the API reads it canonically (microseconds), the suite's psql row its own way: the same moment
+    e1 = one("SELECT edited_at FROM doc_meta WHERE node_id=?", (nid,))
+    check(u1 and e1 and datetime.fromisoformat(u1.replace("Z", "+00:00")) == datetime.fromisoformat(e1.replace("Z", "+00:00")),
+          f"{who}: the save answers its version {u1} / {e1}")
     n0 = one("SELECT tries FROM doc_meta WHERE node_id=?", (nid,))
     run_sql("UPDATE doc_meta SET state='wait', tries=0 WHERE node_id=?", (nid,))  # the queue takes it again (background)
     d = until(lambda: (lambda j: j if j["state"] in ("done", "failed") and one("SELECT tries FROM doc_meta WHERE node_id=?", (nid,)) == 1 else None)(s1.get(B + f"/api/docs/{nid}").json()), 90)

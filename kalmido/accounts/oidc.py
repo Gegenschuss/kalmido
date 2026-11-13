@@ -26,7 +26,7 @@ from ..core.ephem import eph_put, eph_take  # 2.622.0 (#3891)
 from ..core.pgbus import bus_on, bus_send  # 2.622.0 (#3891)
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.env import env_bool  # 2.399.0 (#2687): the hosting switch (KALMIDO_HOSTED)
-from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import system_ctx, ts_canon  # 2.149.0 G (#2517): pulled up from functions; 2.1115.0 (#5951): ts_canon
 from .login import twofa_methods  # 2.369.5 (#2517): pulled up from functions
 from ..core.orgcrypt import _org_admin  # 2.369.5 (#2517): pulled up from functions
 
@@ -716,7 +716,7 @@ def reauth_fresh(c):
     if not r:
         return False
     since = iso(now_utc() - timedelta(minutes=REAUTH_FRESH_MIN))
-    return (r[1] in REAUTH_FRESH_VIA and str(r[0] or "") >= since) or (r[3] == "0:su" and str(r[2] or "") >= since)
+    return (r[1] in REAUTH_FRESH_VIA and str(r[0] or "") >= since) or (r[3] == "0:su" and ts_canon(r[2]) >= since)
 
 
 def oidc_reauth(c, b):

@@ -515,21 +515,22 @@ def hbm_mails():
         cl = _visible_client(c, uid, a["client_id"])
         if not cl:
             raise Denied(404)
+        # 2.1115.0 (#5951): sent_at is TIMESTAMPTZ (NULL = none) in the orders of this module; cast so a column left TEXT still sorts
         rows = c.execute(f"SELECT {HBM_LIST_COLS} FROM hub_mails WHERE client_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? "
-                         "ORDER BY COALESCE(NULLIF(sent_at, '')::timestamptz, created_at::timestamptz) DESC, id DESC LIMIT 2000", (cl["id"], cl["org_id"])).fetchall()
+                         "ORDER BY COALESCE(NULLIF(CAST(sent_at AS text), '')::timestamptz, created_at) DESC, id DESC LIMIT 2000", (cl["id"], cl["org_id"])).fetchall()
         addr, can = _address_of(c, "client", uid, cl["org_id"], cl["id"], None), True
     elif a.get("list_id"):
         role = need_list(c, a["list_id"], write=False)
         l = _list_row(c, a["list_id"])
         rows = c.execute(f"SELECT {HBM_LIST_COLS} FROM hub_mails WHERE list_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? "
-                         "ORDER BY COALESCE(NULLIF(sent_at, '')::timestamptz, created_at::timestamptz) DESC, id DESC LIMIT 2000", (l["id"], l["org_id"])).fetchall()
+                         "ORDER BY COALESCE(NULLIF(CAST(sent_at AS text), '')::timestamptz, created_at) DESC, id DESC LIMIT 2000", (l["id"], l["org_id"])).fetchall()
         addr, can = _address_of(c, "list", uid, l["org_id"], None, l["id"]), role in WRITE_ROLES and not l["no_mail"] and not l["e2e"]
         # 2.395.0 (#3380): may I read the project's mails at all; the switch for guests (project admin only)
         extra = {"can_read": hbm_list_read(role, l["mail_guests"]), "guests": bool(l["mail_guests"]),
                  "can_guests": role in MANAGE_ROLES and not l["no_mail"] and not l["e2e"]}
     elif request.args.get("unassigned") in ("1", "true"):
         rows = c.execute(f"SELECT {HBM_LIST_COLS} FROM hub_mails WHERE owner_id=? AND client_id IS NULL AND list_id IS NULL AND deleted_at IS NULL "
-                         "ORDER BY COALESCE(NULLIF(sent_at, '')::timestamptz, created_at::timestamptz) DESC, id DESC LIMIT 2000", (uid,)).fetchall()
+                         "ORDER BY COALESCE(NULLIF(CAST(sent_at AS text), '')::timestamptz, created_at) DESC, id DESC LIMIT 2000", (uid,)).fetchall()
         addr, can = "", True
     else:
         raise Denied(400, tr("Invalid data"))
@@ -559,7 +560,7 @@ def hbm_inbox():
         if o and not o["personal_of"]:
             spaces.append({"ws": f"org:{oid}", "name": o["name"], "address": _address_of(c, "inbox", uid, oid, None, None)})
     rows = c.execute(f"SELECT {HBM_LIST_COLS} FROM hub_mails WHERE owner_id=? AND client_id IS NULL AND list_id IS NULL AND deleted_at IS NULL "
-                     "ORDER BY COALESCE(NULLIF(sent_at, '')::timestamptz, created_at::timestamptz) DESC, id DESC LIMIT 2000", (uid,)).fetchall()
+                     "ORDER BY COALESCE(NULLIF(CAST(sent_at AS text), '')::timestamptz, created_at) DESC, id DESC LIMIT 2000", (uid,)).fetchall()
     memo = {}  # 2.525.0 (#4195): a project's row / role once for all its mails
     rows = [m for m in rows if hbm_can(c, uid, m, memo=memo)]
     q = (request.args.get("q") or "").strip()

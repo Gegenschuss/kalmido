@@ -1058,7 +1058,7 @@ def _undo_rekeyed(c, st, reg=None, snap=None):
             continue  # an account's key is never rotated (core/orgcrypt.py: only re-wrapped under a new server key)
         with system_ctx(c):  # org_keys is infrastructure (core/orgcrypt.py reads it as "system"); only the two times are read
             k = c.execute("SELECT rot_started_at, rotated_at FROM org_keys WHERE org_id=?", (sp,)).fetchone()
-        if k and (k["rot_started_at"] or (k["rotated_at"] and str(st["created_at"] or "") < str(k["rotated_at"]))):
+        if k and (k["rot_started_at"] or (k["rotated_at"] and ts_canon(st["created_at"]) < ts_canon(k["rotated_at"]))):  # 2.1115.0 (#5951)
             raise Denied(409, tr(UNDO_REKEYED if sp in spaces else UNDO_SPACE_REKEYED))
 
 

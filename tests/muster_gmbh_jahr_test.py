@@ -252,7 +252,8 @@ kt.dbx("UPDATE office_docs SET reminder_fee_paid_at=NULL WHERE id=?", (rid,))
 r1 = Fr.post(B + f"{D_}/{rid}/fee", json={"state": "paid", "day": f"{Y}-06-02"})
 r2 = Fr.post(B + f"{D_}/{rid}/fee", json={"state": ""})
 check(r1.status_code == 409 and r2.status_code == 409, f"an old fee without day in a locked month: moving and opening again 409 ({r1.status_code} {r2.status_code})")
-check(kt.dbx("SELECT COALESCE(reminder_fee_paid_at, ''), reminder_fee_state FROM office_docs WHERE id=?", (rid,))[0] == ("", "paid"),
+# 2.1115.0 (#5951): reminder_fee_paid_at is DATE - '' only as text
+check(kt.dbx("SELECT COALESCE(CAST(reminder_fee_paid_at AS text), ''), reminder_fee_state FROM office_docs WHERE id=?", (rid,))[0] == ("", "paid"),
       "the old fee stays paid without day")
 
 sys.exit(kt.done("muster_gmbh_jahr"))

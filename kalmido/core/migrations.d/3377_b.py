@@ -6,7 +6,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS git_issue_links (
   conn_id BIGINT NOT NULL REFERENCES git_conns(id) ON DELETE CASCADE, issue_no BIGINT NOT NULL,
   task_id BIGINT NOT NULL UNIQUE REFERENCES tasks(id) ON DELETE CASCADE,
-  remote_updated_at TEXT, local_updated_at TEXT, etag TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL,
+  remote_updated_at TIMESTAMPTZ, local_updated_at TIMESTAMPTZ, etag TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL,
   PRIMARY KEY (conn_id, issue_no));
 """
 MIGRATIONS = [

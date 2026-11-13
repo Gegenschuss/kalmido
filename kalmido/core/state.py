@@ -554,7 +554,7 @@ def lz_plan(c, uid, base, bargs):
     t0 = local_now().date()
     kl = ",".join(str(int(x)) for x in sorted(keep))
     start = ("(status=0 OR completed_at>=?) AND ((due IS NOT NULL AND due<>'' AND due<=?) OR (deadline=2 AND due IS NOT NULL) "
-             "OR COALESCE(plan_start, '')>=? OR assignee_id=? OR pinned OR COALESCE(waiting_at, '')<>''"
+             "OR COALESCE(plan_start, '')>=? OR assignee_id=? OR pinned OR waiting_at IS NOT NULL "  # 2.1115.0 (#5951): TIMESTAMPTZ
              "OR assignee_group_id IN (SELECT group_id FROM group_members WHERE user_id=?))")
     sargs = (bargs[2], (t0 + timedelta(days=LZ_DAYS)).isoformat(), (t0 - timedelta(days=1)).isoformat(), uid, uid)
     more = (f" OR list_id IN ({kl}) OR id IN (SELECT task_id FROM task_links WHERE list_id IN ({kl}))") if kl else ""
@@ -645,6 +645,9 @@ def task_query():
     # 2.40.0 (#1432): completed / trash page by ?before=<next> (completed_at resp. deleted_at + id); next = null at the end
     try:
         cur = ag_cursor_parse(request.args.get("before")) if scope in ("done", "trash") else None
+        if cur and cur[0]:
+            from datetime import datetime
+            datetime.fromisoformat(cur[0].replace("Z", "+00:00"))  # 2.1115.0 (#5951): a TIMESTAMPTZ takes no text of another kind
     except ValueError:
         return err(tr("Invalid value: {0}", "before"))
     extra = {}
@@ -668,9 +671,13 @@ def task_query():
             from ..tasks.related import rt9_search_extend
             rows = rt9_search_extend(c, uid, request.args.get('q', '').strip(), rows, limit)
     else:
-        rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND status!=0 AND {tvis(c, uid)} "
-                             + ("AND (COALESCE(completed_at, ''), id) < (?, ?) " if cur else "")
-                             + "ORDER BY COALESCE(completed_at, '') DESC, id DESC LIMIT ?", (uid, uid, *(cur or ()), limit + 1))
+        # 2.1115.0 (#5951): completed_at is TIMESTAMPTZ (none = NULL, last as '' was): NULLS LAST, a cursor without a time
+        # pages on among those without one
+        cw = ("" if not cur else "AND completed_at IS NULL AND id < ? " if not cur[0]
+              else "AND (completed_at IS NULL OR (completed_at, id) < (?, ?)) ")
+        rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND status!=0 AND {tvis(c, uid)} " + cw
+                             + "ORDER BY completed_at DESC NULLS LAST, id DESC LIMIT ?",
+                          (uid, uid, *((cur[1],) if cur and not cur[0] else cur or ()), limit + 1))
     if scope in ("done", "trash"):
         more = len(rows) > limit
         rows = rows[:limit]

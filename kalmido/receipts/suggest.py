@@ -17,7 +17,7 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc
 from ..core.i18n import tr
-from ..core.pg import system_ctx
+from ..core.pg import system_ctx, ts_canon  # 2.1115.0 (#5951): ts_canon
 from ..core.access import Denied, list_role, list_state_sql, live_sql, list_archived_sql  # 2.1004.0 (#5494): live_sql
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields
@@ -247,7 +247,7 @@ def rc_confirmed(c, nid, r):
         return None
     s = c.execute("SELECT agent_id, decided_by, decided_at FROM rc_suggest WHERE node_id=? AND state='accepted' AND decided_by=? "
                   "ORDER BY decided_at DESC, id DESC LIMIT 1", (nid, r["set_by"])).fetchone()
-    if not s or not s["decided_at"] or str(r["set_at"] or "") > str(s["decided_at"]):
+    if not s or not s["decided_at"] or ts_canon(r["set_at"]) > ts_canon(s["decided_at"]):  # 2.1115.0 (#5951): both canonical
         return None
     return {"agent": _who(c, s["agent_id"]), "by": _who(c, s["decided_by"]), "at": s["decided_at"]}
 
@@ -625,7 +625,7 @@ def olk_fs_maybe(c, ids):
     if not ids:
         return set()
     q = ",".join("?" * len(ids))
-    return {r[0] for r in c.execute(f"""SELECT node_id FROM doc_meta WHERE node_id IN ({q}) AND kept_until IS NOT NULL AND kept_until<>''
+    return {r[0] for r in c.execute(f"""SELECT node_id FROM doc_meta WHERE node_id IN ({q}) AND kept_until IS NOT NULL
                                         UNION SELECT node_id FROM rc_receipts WHERE node_id IN ({q})
                                           AND (paid_at IS NOT NULL OR vat_pct IS NOT NULL OR billed_doc_id IS NOT NULL)
                                         UNION SELECT node_id FROM office_cash_entries WHERE node_id IN ({q})

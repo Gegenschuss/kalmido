@@ -537,7 +537,7 @@ def org_activity(c):
         if not uids:
             return {"members": 0, "last_login": None, "storage_bytes": 0, "lists": 0, "tasks": 0}
         q = ",".join("?" * len(uids))
-        last = one(f"SELECT MAX(COALESCE(NULLIF(last_seen_at, '')::timestamptz, created_at::timestamptz)) FROM sessions WHERE user_id IN ({q})", list(uids))
+        last = one(f"SELECT MAX(COALESCE(NULLIF(CAST(last_seen_at AS text), '')::timestamptz, created_at::timestamptz)) FROM sessions WHERE user_id IN ({q})", list(uids))
         if org_id:
             lw, a = "l.org_id=?", [org_id]
         else:  # private spaces: lists of these people outside every organisation

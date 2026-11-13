@@ -30,13 +30,13 @@ def time_gaps(c, uid, viewer=None, days=GAP_DAYS):
     lo, hi = local_bounds(start, end)
     both = f"t.list_id IN {vis_sql()} AND t.list_id IN {vis_sql()} AND t.list_id IN {MT_TIME_SQL} AND {tvis(c, uid, 't.')} AND {tvis(c, viewer, 't.')}"
     vargs = [uid, uid, viewer, viewer]
-    # 2.1095.0 (#5306): every part a TIMESTAMPTZ (activity.created_at moved, tasks.completed_at is still text), read as ISO text
+    # 2.1095.0 (#5306): every part a TIMESTAMPTZ (activity.created_at moved, tasks.completed_at too since 2.1115.0 #5951), read as ISO text
     rows = c.execute(f"""
         SELECT x.tid, x.ts, t.title, t.list_id FROM (
             SELECT task_id AS tid, created_at::timestamptz AS ts FROM activity WHERE user_id=? AND created_at>=? AND created_at<?
             UNION ALL SELECT ref_id, created_at FROM obj_comments
                 WHERE kind='task' AND user_id=? AND deleted_at IS NULL AND created_at>=? AND created_at<?
-            UNION ALL SELECT id, NULLIF(completed_at, '')::timestamptz FROM tasks WHERE completed_by=? AND completed_at>=? AND completed_at<?) x
+            UNION ALL SELECT id, completed_at FROM tasks WHERE completed_by=? AND completed_at>=? AND completed_at<?) x
         JOIN tasks t ON t.id=x.tid WHERE t.deleted_at IS NULL AND {both}""",
                      [uid, lo, hi, uid, lo, hi, uid, lo, hi] + vargs).fetchall()
     worked = {}

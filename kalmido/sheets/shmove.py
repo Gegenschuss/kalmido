@@ -165,7 +165,7 @@ def sheets_move_space(sid):
             ids = [i for i in back["links"] if isinstance(i, int)][:2000]
             if ids:
                 c.execute(f"UPDATE sheet_links SET undone_at=NULL WHERE sheet_id IN ({','.join('?' * len(tabs))}) AND id IN ({','.join('?' * len(ids))}) "
-                          f"AND undone_at=?", [*tabs, *ids, back.get("at") or ""])  # 2.124.0 E (#2116): + the further sheets
+                          f"AND undone_at=?", [*tabs, *ids, back.get("at") or None])  # 2.124.0 E (#2116): + the further sheets; 2.1115.0 (#5951): no '' for a TIMESTAMPTZ
                 still = {x for t in tabs for x in shm_links_out(c, t, to)}
                 revived = [i for i in ids if i not in still]
                 out = [i for i in ids if i not in revived]

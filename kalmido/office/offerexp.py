@@ -125,7 +125,7 @@ def ofe_tick(c, now=None):
     day = (now or local_now()).date()
     with system_ctx(c):  # which areas have a candidate at all; each is then handled in its admin's own context
         oids = [r[0] for r in c.execute(
-            "SELECT DISTINCT org_id FROM office_docs WHERE kind='offer' AND status='sent' AND trial=0 AND valid_until<>'' "
+            "SELECT DISTINCT org_id FROM office_docs WHERE kind='offer' AND status='sent' AND trial=0 AND valid_until IS NOT NULL "
             f"AND valid_until<=? AND valid_until>=? AND {live_sql()} ORDER BY org_id LIMIT 2000",
             ((day + timedelta(days=OFE_DAYS_MAX)).isoformat(), (day - timedelta(days=OFE_LATE)).isoformat())).fetchall()]
     c.commit()
@@ -162,7 +162,7 @@ def _ofe_as(c, oid, today):
         return 0
     write_lock(c, f"office_offer_exp_{int(oid)}")
     t0 = date.fromisoformat(today)
-    rows = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind='offer' AND status='sent' AND trial=0 AND valid_until<>'' "
+    rows = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind='offer' AND status='sent' AND trial=0 AND valid_until IS NOT NULL "
                      f"AND valid_until<=? AND valid_until>=? AND {live_sql()} ORDER BY valid_until, id LIMIT 2000",
                      (oid, (t0 + timedelta(days=days)).isoformat(), (t0 - timedelta(days=OFE_LATE)).isoformat())).fetchall()
     ts, n = iso(now_utc()), 0
