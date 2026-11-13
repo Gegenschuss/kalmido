@@ -170,7 +170,7 @@ const S_ok = w => { const d = w.document, b = d.querySelector('#view .office[dat
   check(/The import runs are resting for the test/.test(txt(d, '#view .oim .eerr')), '#5902 import: with the reason');
   check(!/No imports yet/.test(txt(d, '#view .oim')), '#5902 import: a failure is no "No imports yet"');
   unhold(w);
-  d.querySelector('#view .oim .eerr [data-esretry]').click();
+  d.querySelector('#view .oim .eerr [data-esretry]')?.click();
   check(await until(() => d.querySelector('#view .oim .oim-none') && !d.querySelector('#view .oim .eerr')), '#5902 import: "Try again" loads the runs (none yet, said in the one block)');
   check(/No imports yet/.test(txt(d, '#view .oim .oim-none')), '#5902 import: the empty state says so');
 
@@ -184,7 +184,7 @@ const S_ok = w => { const d = w.document, b = d.querySelector('#view .office[dat
   check(await until(() => d.querySelector('#agb-box .eerr [data-esretry]')), '#5902 terms: the failure shows "Try again"');
   check(/The terms are resting for the test/.test(txt(d, '#agb-box')) && !/No terms and conditions yet/.test(txt(d, '#agb-box')) && !d.querySelector('#agb-box .agbrow'), '#5902 terms: the reason, no "No terms yet"');
   unhold(w);
-  d.querySelector('#agb-box .eerr [data-esretry]').click();
+  d.querySelector('#agb-box .eerr [data-esretry]')?.click();
   check(await until(() => d.querySelectorAll('#agb-box .agbrow').length > 1 && !d.querySelector('#agb-box .eerr')), '#5902 terms: "Try again" lists the languages');
   check(/No terms and conditions yet/.test(txt(d, '#agb-box .agbrow')), '#5902 terms: now the real "none yet"');
 
@@ -208,7 +208,7 @@ const S_ok = w => { const d = w.document, b = d.querySelector('#view .office[dat
   check(await until(() => /The suggestions are resting for the test/.test(w.eval('oa_ppBox()')) && /data-esretry/.test(w.eval('oa_ppBox()'))), '#5902 payments: the reason with "Try again" instead of nothing');
   w.eval('OA.pp = null; oa_ppLoad(); 1');
   check(await until(() => w.__held.length >= 2), '#5902 payments: requested again (held)');
-  w.__held[1].fail('Not for you', 403);
+  w.__held[1]?.fail('Not for you', 403);
   check(await until(() => w.eval('!!OA.pp && !OA.ppLoading') && w.eval('oa_ppBox()') === ''), '#5902 payments: a 403 stays quiet');
   unhold(w);
   w.close();
