@@ -225,7 +225,8 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   if (( RED_STREAK > 0 && STREAK >= RED_STREAK )); then  # #6054
     STOPPED="$STREAK red suites in a row up to $name (KALMIDO_RED_STREAK=$RED_STREAK) - the shard stopped"
     echo "== STOP: $STOPPED"
-    [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::error title=shard stopped after $STREAK red suites in a row::the suites after $name did not run (KALMIDO_RED_STREAK, #6054) - see the first red suite of the row"
+    # a warning: GitHub keeps 10 error annotations per step, the 10 red suites before may have used them (tools/ci_gate.py reads it)
+    [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::warning title=shard stopped after $STREAK red suites in a row::the suites after $name did not run (KALMIDO_RED_STREAK, #6054) - see the first red suite of the row"
   fi
 }
 # 2.180.0 C (#2695): the start is lazy - right before the group's first suite that runs; a suite in selfstart.txt starts its own
