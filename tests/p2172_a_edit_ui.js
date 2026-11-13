@@ -36,9 +36,9 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
     await sleep(600);
     const r = await ev(`(() => { const t = document.querySelector('#wk-cm').getBoundingClientRect(), f = document.querySelector('.ntfoot').getBoundingClientRect(), tb = document.getElementById('tabs');
       const tt = tb && tb.offsetParent !== null ? tb.getBoundingClientRect().top : innerHeight;
-      return {h: t.height, top: t.top, free: Math.min(innerHeight, tt) - t.top, fb: f.bottom, ih: innerHeight, w: t.width, col: document.querySelector('.wkedwrap').getBoundingClientRect().width, vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth,
+      return {tt, h: t.height, top: t.top, free: Math.min(innerHeight, tt) - t.top, fb: f.bottom, ih: innerHeight, w: t.width, col: document.querySelector('.wkedwrap').getBoundingClientRect().width, vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth,
         les: (() => { const p = document.createElement('div'); p.style.width = 'var(--w-lesen)'; document.body.append(p); const x = p.getBoundingClientRect().width; p.remove(); return x; })()}; })()`);
-    check(r.h >= 0.7 * r.free, `${vw}: field height ${Math.round(r.h)} >= 70% of the free ${Math.round(r.free)}`);
+    check(r.h >= 0.7 * r.free, `${vw}: field height ${Math.round(r.h)} >= 70% of the free ${Math.round(r.free)} (top ${Math.round(r.top)}, footer bottom ${Math.round(r.fb)}, tabs ${Math.round(r.tt)}, window ${r.ih})`);
     check(r.fb <= r.ih + 1, `${vw}: the footer line is visible (${Math.round(r.fb)} / ${r.ih})`);
     // 2.554.0 (#4052): the editor fills the page's reading column (2.534.0 #4551: --w-lesen on a wide screen), not the window.
     // CI red p2172_a_edit_ui (v2.549.0 / v2.551.0, "full width 736 / 1280"): 736 px IS --w-lesen (46rem) - the width comes from
