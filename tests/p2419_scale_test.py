@@ -87,6 +87,19 @@ for f in FILES:
                 if w and .5625 <= float(w.group(1)) <= 1.25:
                     bad_ic.append(f"{where}: {prop}:{w.group(1)}rem")
 
+# 2.1106.0 (#5676): no fixed px size > 2 px outside @media conditions (it would not follow the font size). The same rule as in
+# tests/appearance_ui.js, which runs in the full CI only and was red twice (2.974, 2.1086) after a package wrote a px
+# shadow / padding; here it runs in the Lint step (tools/check_css_scale.py) and holds the package at einreihen already.
+bad_px = []
+for f in FILES:
+    text = re.sub(r"/\*[\s\S]*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group(0)), open(f, encoding="utf-8").read())
+    text = re.sub(r"@media[^{]*\{", lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
+    text = text.replace("calc(16px * var(--ui))", "").replace("max(1rem,16px)", "")  # the 16 px iOS floor of form fields (appearance_ui)
+    for m in re.finditer(r"(?<![\w.#-])(\d*\.?\d+)px", text):
+        if 2 < float(m.group(1)) < 9999:
+            bad_px.append(f"{os.path.relpath(f, ROOT)}:{text.count(chr(10), 0, m.start()) + 1} {text[max(0, m.start() - 40):m.end()].split(';')[-1].strip()}")
+check(not bad_px, f"only rem sizes, no px > 2 outside @media ({len(bad_px)} off: {bad_px[:8]})")
+
 check(n > 2000, f"the rules were read ({n})")
 check(not bad_fs, f"font sizes on the tokens --fs-xxs ... --fs-xl ({len(bad_fs)} off: {bad_fs[:8]})")
 check(not bad_fb, f"no token with another size as fallback ({bad_fb[:8]})")
