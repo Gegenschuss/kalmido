@@ -6,7 +6,7 @@ from flask import jsonify
 from .config import app
 from .errors import Denied
 from .i18n import tr
-from .pg import system_ctx, ts_canon  # 2.657.0 (#5052): kern_version_seed; 2.760.0 (#5311): ts_canon
+from .pg import qi, system_ctx, ts_canon  # 2.657.0 (#5052): kern_version_seed; 2.760.0 (#5311): ts_canon
 
 
 class Conflict(Denied):
@@ -108,5 +108,5 @@ def kern_version_seed(c, table, rid):
     if table not in KERN_SEED_TABLES:
         raise ValueError(table)
     with system_ctx(c):  # structure only (a copy of the row's own created_at): also for a member who may not write the row
-        c.execute(f"UPDATE {table} SET updated_at=created_at WHERE id=? AND (updated_at IS NULL OR CAST(updated_at AS text)='')", (int(rid),))  # 2.1095.0 (#5306): TEXT or TIMESTAMPTZ
+        c.execute(f"UPDATE {qi(table, KERN_SEED_TABLES)} SET updated_at=created_at WHERE id=? AND (updated_at IS NULL OR CAST(updated_at AS text)='')", (int(rid),))  # 2.1095.0 (#5306): TEXT or TIMESTAMPTZ
     return c.execute(f"SELECT * FROM {table} WHERE id=?", (int(rid),)).fetchone()  # the caller holds the write_lock

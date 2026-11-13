@@ -1045,14 +1045,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/core/conflict.py",
-   "code": "c.execute(f\"UPDATE {table} SET updated_at=created_at WHERE id=? AND (updated_at IS NULL OR updated_at='')\", (int(rid),))",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/core/conflict.py",
    "code": "return c.execute(f\"SELECT * FROM {table} WHERE id=?\", (int(rid),)).fetchone() # the caller holds the write_lock",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",

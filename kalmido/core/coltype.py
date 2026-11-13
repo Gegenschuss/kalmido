@@ -174,7 +174,7 @@ def _ct_run(c, at):
             if bad:
                 print(f"migrations: 5306: {k}: {len(bad)} value(s) are no point in time and count as empty (ids "
                       f"{', '.join(map(str, bad[:CT_SHOW]))}{', ...' if len(bad) > CT_SHOW else ''})", file=sys.stderr, flush=True)
-            q, tq = qi(col, CT_NAMES), qi(table, CT_TABLES)
+            q = qi(col, CT_NAMES)
             if nullable:
                 empty = "NULL"
             elif col != "created_at" and (table, "created_at") in types:
@@ -184,7 +184,7 @@ def _ct_run(c, at):
             else:
                 empty = f"'{at}'::timestamptz"
             had_default = dflt is not None
-            sql = (f"ALTER TABLE {tq} ALTER COLUMN {q} DROP DEFAULT, ALTER COLUMN {q} TYPE TIMESTAMPTZ USING "
+            sql = (f"ALTER TABLE {qi(table, CT_TABLES)} ALTER COLUMN {q} DROP DEFAULT, ALTER COLUMN {q} TYPE TIMESTAMPTZ USING "
                    f"(CASE WHEN {q} IS NULL THEN NULL WHEN {_valid(q)} THEN {_as_ts(q)} ELSE {empty} END)")
             if had_default:  # DEFAULT '' (never changed) -> made now
                 sql += f", ALTER COLUMN {q} SET DEFAULT CURRENT_TIMESTAMP"
