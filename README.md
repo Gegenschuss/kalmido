@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.1067.0** (2026-11-12):
-- **Office**: sent quotations without an answer ring the bell before and after "Valid until" (extend, follow up or mark rejected); quotations with optional / alternative positions, subtotals per section, flat price print and repricing.
-- **Agents**: approved steps run from the card (`run_approved_step`); "Sees now" in the agent dialog; a whole knowledge area can be shared with an agent; `wiki_append`; help tools (`help_overview`, `search_help`, `read_help`).
-- **Organisations**: never used invited accounts are withdrawn automatically after 44 days, with a warning mail a week before.
+**2.1086.0** (2026-11-13):
+- **Agents**: in-app help ("How to") per area from the same source the agents search; agents can attach "Show me" steps to a chat message; approval cards for uploads also bind the files.
+- **Chat**: agent and team chat use the full width on tablets and an open Fold; menus glide open and closed.
+- **Knowledge**: a folder with a page of the same name shows once, with the page text on top.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
