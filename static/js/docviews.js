@@ -197,10 +197,12 @@ async function dcv_shareAll(v, on) {
   dcv_stale(); await dcv_load(true);
   toast(on ? tr('Everyone of the organisation sees this view now (with their own rights)') : tr('Only you see this view now'));
 }
+// quiet = a part of deleting the view: 2.1106.0 (#4976) no undo step of its own (_auto) - as the newest server group it was what
+// Undo took back right after the delete (undo.js histNext), the deleted view stayed away
 function dcv_todaySet(id, on, quiet) {
   const ids = dcv_todayIds().filter(x => x !== +id);
   if (on) ids.push(+id);
-  favSetting('dv_today', ids.join(','));
+  favSetting('dv_today', ids.join(','), !!quiet);
   if (!quiet) toast(on ? tr('Shown on Today') : tr('No longer shown on Today'));
 }
 function dcv_menuItems(v) {
