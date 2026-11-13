@@ -17,7 +17,7 @@ from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..core.i18n import tr
 from ..core.objtags import otg_ws_link, otg_ws_nodes, otg_ws_of, otg_ws_tag_of  # 2.1119.0 (#5277): the file store's tags are the core's
 from ..core.numtext import server_num
-from ..core.pg import qi, st_ids, write_lock  # 2.525.0 (#4195): an id set as one array parameter
+from ..core.pg import IntegrityError, qi, st_ids, write_lock  # 2.525.0 (#4195): an id set as one array parameter
 from ..core.access import Denied, acx_of
 from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
@@ -1134,7 +1134,11 @@ def docs_label_rename(kind, lid):
         other = S.label_id(c, r[0], "tag", name, create=False)
         if other and other != lid:
             return err(tr("This name is taken"), 409)
-        c.execute("UPDATE obj_tags SET name=? WHERE id=? AND scope_kind='ws'", (name, lid))
+        try:  # review F5: a rename / a new tag of the same name meanwhile meets the unique index
+            with c.savepoint():
+                c.execute("UPDATE obj_tags SET name=? WHERE id=? AND scope_kind='ws'", (name, lid))
+        except IntegrityError:
+            return err(tr("This name is taken"), 409)
     else:
         c.execute(f"UPDATE {S.LABEL_KINDS[kind]} SET name=? WHERE id=?", (S.doc_seal(c, r[0], "doc_senders.name", name) if kind == "sender" else name, lid))
     bump(c)
