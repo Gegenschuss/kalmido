@@ -61,7 +61,7 @@ function mp_draw() {
   }
   const top = mp_items[0], t = mp_title(mp_items), txt = mp_text(top);
   el.dataset.href = mp_href(top);
-  el.innerHTML = `<button type="button" class="mpopen" data-mp="open">${mp_pic(top)}<span class="mptxt"><b class="mpwho">${esc(t.who)}</b>${t.where ? `<small class="mpwhere">${esc(t.where)}</small>` : ''}<span class="mpline">${esc(txt)}</span></span></button>`
+  el.innerHTML = `<button type="button" class="mpopen" data-mp="open">${/*html-ok*/ mp_pic(top)}<span class="mptxt"><b class="mpwho">${esc(t.who)}</b>${t.where ? `<small class="mpwhere">${esc(t.where)}</small>` : ''}<span class="mpline">${esc(txt)}</span></span></button>`
     + `<button type="button" class="mpx" data-mp="close" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x', 's')}</button>`;
   el.classList.remove('mpgone'); el.style.transform = '';
   announce(mp_items.length > 1 ? `${t.who}${t.where ? ' · ' + t.where : ''}: ${txt}` : `${tr('New message from {0}', t.who)}: ${txt}`);
