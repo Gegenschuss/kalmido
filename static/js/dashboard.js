@@ -372,10 +372,11 @@ function dashCard(k) {
   // 2.45.0 (#1504): an empty card is one slim line ("Waiting for you: nothing"), still a named section
   const slim = (txt = tr('{0}: nothing', tr(name))) => `<section class="dcard dempty dc-${k}" aria-labelledby="dh-${k}"><h3 id="dh-${k}"><span>${esc(txt)}</span></h3></section>`;
   if (k === 'wait') {
-    const js = waitJobs ? waitJobs() : [], ments = (S.nf.items || []).filter(it => !it.read && ['mention', 'assign', 'approval', 'proposal'].includes(it.kind));
+    // 2.1111.0 (#5963): while the box "Waiting for you" stands, the mentions are in it: here only the agent lines, nothing when empty
+    const boxed = collab() && bellCount() > 0, js = waitJobs ? waitJobs() : [], ments = boxed ? [] : (S.nf.items || []).filter(it => !it.read && ['mention', 'assign', 'approval', 'proposal'].includes(it.kind));
     const rows = [...js.map(j => `<li><a href="#agents">${hdot('waiting')}<span class="dwt">${esc(tr('{0} waits for you', j.agent_name))}: ${esc(j.title)}</span></a></li>`),
       ...ments.slice(0, 5).map(it => `<li><a href="${it.task_id ? '#t/' + it.task_id : '#news'}">${ic(NEWS_ICON[it.kind] || 'bell', 's')}<span class="dwt">${newsText(it, S.nf.users)}${it.task_title ? ' · ' + esc(it.task_title) : ''}</span></a></li>`)];
-    return rows.length ? card(`<ul class="dwl">${rows.join('')}</ul>`, '', rows.length) : slim();
+    return rows.length ? card(`<ul class="dwl">${rows.join('')}</ul>`, '', rows.length) : (boxed ? '' : slim());
   }
   if (k === 'today') {
     const ts = openTasks().filter(t => !t.parent_id && t.due && t.due <= t0).sort((a, b) => dueKey(a).localeCompare(dueKey(b)) || b.priority - a.priority);
@@ -395,7 +396,7 @@ function dashCard(k) {
     // 2.45.0 (#1504): compact, at most 5, a bundle is one line, "All news" below. 2.1037.0 (#5807): only what waits for me (For you:
     // the deadline lines, then the bundles for me); empty: "Nothing waits for you" -- the rest is the history of the News view
     const boxed = collab() && bellCount() > 0, due = boxed ? [] : dueRows(), gs = newsGroups(vis).filter(g => g.needs).slice(0, Math.max(0, lyo_get('home', 'news', 'n', 5) - due.length));  // 2.55.0 (#1065)
-    if (!gs.length && !due.length) return slim(boxed ? tr('Nothing else waits for you') : tr('Nothing waits for you'));  // 2.1111.0 (#5963): the deadline lines stand once, in the box "Waiting for you" above
+    if (!gs.length && !due.length) return boxed ? '' : slim(tr('Nothing waits for you'));  // 2.1111.0 (#5963): the deadline lines stand once, in the box "Waiting for you" above
     const dueLi = ([k, n]) => `<li class="needs hpdue"><a href="#today"><span class="dwt">${esc(k === 'today' ? trn('{0} task due today', '{0} tasks due today', n) : trn('{0} task overdue', '{0} tasks overdue', n))}</span></a></li>`;
     return card(`<ul class="dwl hpnl">${/*html-ok*/ due.map(dueLi).join('')}${gs.map(hpNewsRow).join('')}</ul><a class="linkbtn hpall" href="#news">${tr('All news')}</a>`, '', bellCount() || '');
   }

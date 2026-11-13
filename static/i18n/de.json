@@ -18545,6 +18545,5 @@
   "The heading {0} is there more than once: rename one or change the whole text": "Die Überschrift {0} gibt es mehrmals: eine umbenennen oder den ganzen Text ändern",
   "The notes are encrypted: only the app can change them": "Die Notizen sind verschlüsselt: nur die App kann sie ändern",
   "The description is encrypted: only the app can change it": "Die Beschreibung ist verschlüsselt: nur die App kann sie ändern",
-  "Check the connection in the settings, or remove it.": "Prüfe die Verbindung in den Einstellungen oder entferne sie.",
-  "Nothing else waits for you": "Sonst wartet nichts auf dich"
+  "Check the connection in the settings, or remove it.": "Prüfe die Verbindung in den Einstellungen oder entferne sie."
 }
