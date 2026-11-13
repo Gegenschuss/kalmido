@@ -46,7 +46,7 @@ from flask import g, jsonify, Response
 
 from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL, SECRET_KEY
 from ..core.db import connect, db, err, iso, now_utc
-from ..core.objcomments import OCM_TS, ocm_video_cols  # 2.972.0 (#5272): the old time form of a comment; 2.981.0 (#5273): + video
+from ..core.objexport import oex_acct  # 2.1097.0 (#5949): the parts of the core's tables (the export register)
 from ..core.pg import snapshot_level, system_ctx
 from ..core.i18n import N_, lang, tr
 from ..core.access import Denied, acx_lists_sql, acx_of, otr_live
@@ -61,7 +61,7 @@ from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 from ..life.model import jr_open  # 2.306.0 A (#2885)
 from ..lists.tplextra import tx_export  # 2.463.0 (#3860)
 from ..accounts.login import unseal  # 2.455.0 (#3469)
-from ..accounts.settings import SETTINGS_SERVER_ONLY, umz_export_clean, umz_export_queries  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.settings import SETTINGS_SERVER_ONLY, umz_export_clean, umz_export_queries, umz_fmt  # 2.369.5 (#2517): pulled up from functions
 from ..calendars.subscriptions import cal_url_hint  # 2.369.5 (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_fields  # 2.369.5 (#2517): pulled up from functions
 from ..wiki.wkhist import wsb_body_or  # 2.369.5 (#2517): pulled up from functions
@@ -323,21 +323,12 @@ def umz_extra_queries(uid):
     sheets = "org_id IS NULL AND owner_id=?"
     polls = "org_id IS NULL AND user_id=? AND deleted_at IS NULL"
     return {
-        # 2.947.0 (#5275): the project tags of the core (obj_tags scope list), in the files and columns of list_tags / task_list_tags as
-        # before (older archives and new ones import the same way); a label of an organisation is the organisation's (its export)
-        "list_tags": (f"""SELECT id, CAST(scope_id AS BIGINT) AS list_id, name, color, sort, created_at FROM obj_tags
-                          WHERE scope_kind='list' AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM lists x WHERE x.id IN {own})""", (uid,)),
-        "task_list_tags": (f"""SELECT k.obj_id AS task_id, k.tag_id FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='list'
-                               WHERE k.kind='task' AND k.obj_id IN (SELECT id FROM tasks WHERE list_id IN {own})""", (uid,)),
+        # 2.1097.0 (#5949): list_tags, task_list_tags, shared_comments, video_comments, written_comments and reactions (the core's
+        # tables) come from the export register (core/objexport.py acct_more), see the end
         # Art. 15: the lists other people share with me (a reference) and what I wrote there
         "shared_lists": (f"""SELECT l.id, l.name, m.role, u.display_name AS owner_name, u.email AS owner_email FROM lists l
                              JOIN list_members m ON m.list_id=l.id AND m.user_id=? JOIN users u ON u.id=l.owner_id
                              WHERE l.id IN {shared}""", (uid, uid, uid)),
-        "shared_comments": (f"""SELECT c.id, c.ref_id AS task_id, t.title AS task_title, t.list_id, c.body,
-                                to_char(c.created_at AT TIME ZONE 'UTC', '{OCM_TS}') AS created_at,
-                                to_char(c.edited_at AT TIME ZONE 'UTC', '{OCM_TS}') AS edited_at FROM obj_comments c
-                                JOIN tasks t ON t.id=c.ref_id AND c.kind='task' WHERE c.user_id=? AND c.deleted_at IS NULL AND t.list_id IN {shared}""",
-                            (uid, uid, uid)),
         # 2.84.0 (#1903): my own private filed e-mails (organisation mails, also the not assigned ones, are in the organisation export)
         "hub_mails": ("""SELECT id, client_id, list_id, message_id, from_addr, from_name, to_addrs, subject, sent_at, body, created_at, eml_id, files
                          FROM hub_mails WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL""", (uid,)),
@@ -355,9 +346,6 @@ def umz_extra_queries(uid):
         # 2.99.1 A (#1959): my private video sign-offs (organisation ones are in the organisation export)
         "video_reviews": ("SELECT * FROM video_reviews WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL", (uid,)),
         "video_versions": ("SELECT * FROM video_versions WHERE review_id IN (SELECT id FROM video_reviews WHERE owner_id=? AND org_id IS NULL)", (uid,)),
-        # 2.981.0 (#5273): rows of obj_comments (kind video), in the columns of the old table (the import reads both alike)
-        "video_comments": (f"SELECT {ocm_video_cols('k')} FROM obj_comments k WHERE k.kind='video' AND k.ref_id IN (SELECT id FROM video_reviews "
-                           "WHERE owner_id=? AND org_id IS NULL) AND k.deleted_at IS NULL", (uid,)),
         # 2.148.1 C (#2494): Art. 15 -- the list of my private files (not their content), my private knowledge pages, my chats
         # with agents, what I wrote in direct messages, my absences and timesheets (protected fields decrypted, UMZ_DECRYPT)
         # #3470: + what the import needs to rebuild the tree (current version, references, order, a filed mail's mark)
@@ -428,6 +416,7 @@ def umz_extra_queries(uid):
                          "WHERE org_id IS NULL AND owner_id=? ORDER BY sort, id", (uid,)),
         "org_fields": ("SELECT id, key, name, type, options, sort, created_at FROM org_fields "
                        "WHERE org_id IS NULL AND owner_id=? ORDER BY sort, id", (uid,)),
+        **oex_acct("acct_more", umz_fmt(), uid),  # 2.1097.0 (#5949): the core's tables (tools/check_export_tables.py: never a part twice)
     }
 
 
@@ -436,17 +425,9 @@ def umz_mine_queries(uid):
     (author / assignee / recipient = me), never other people's content around them. Tasks of other lists and the task
     title of a comment only while I still see the list (acx_lists_sql); no secrets of sessions and push devices."""
     own = f"(SELECT id FROM lists WHERE owner_id=? AND ({otr_live('')} OR org_id IS NULL))"
-    shared = "(SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.owner_id!=?)"
     vis = acx_lists_sql(req=False)
     from ..collab.tcxcore import tcx_core_rooms_sql  # 2.924.0 (#5069): my channels / groups through the core alone
     return {
-        "written_comments": (f"""SELECT c.id, c.ref_id AS task_id, CASE WHEN t.list_id IN {vis} THEN t.title END AS task_title,
-                                 CASE WHEN t.list_id IN {vis} THEN t.list_id END AS list_id, c.body,
-                                 to_char(c.created_at AT TIME ZONE 'UTC', '{OCM_TS}') AS created_at,
-                                 to_char(c.edited_at AT TIME ZONE 'UTC', '{OCM_TS}') AS edited_at
-                                 FROM obj_comments c JOIN tasks t ON t.id=c.ref_id AND c.kind='task' WHERE c.user_id=? AND c.deleted_at IS NULL
-                                 AND t.list_id NOT IN {own} AND t.list_id NOT IN {shared} ORDER BY c.id""",
-                             (uid, uid, uid, uid, uid, uid, uid, uid)),
         "channel_messages": (f"""SELECT m.id, m.room_id, r.kind AS room_kind, CASE WHEN r.list_id IN {vis}
                                 OR r.id IN ({tcx_core_rooms_sql(uid)}) THEN r.name END AS room_name, r.list_id, m.body, m.enc, m.task_id,
                                 m.thread_of, m.created_at, m.edited_at FROM tchat_msgs m LEFT JOIN tchat_rooms r ON r.id=m.room_id
@@ -456,11 +437,6 @@ def umz_mine_queries(uid):
                             AND deleted_at IS NULL AND list_id IN {vis} AND list_id NOT IN {own} ORDER BY id""",
                         (uid, uid, uid, uid, uid, uid)),
         "task_people": ("SELECT task_id FROM task_people WHERE user_id=? ORDER BY task_id", (uid,)),
-        # 2.763.0 (#5269): one table of the core (obj_reactions); the file keeps its kinds (message = a team chat message) and
-        # the time as ISO text in UTC like before
-        "reactions": ("""SELECT CASE target_kind WHEN 'tchat' THEN 'message' ELSE target_kind END AS kind, target_id, emoji,
-                         to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00:00"') AS created_at
-                         FROM obj_reactions WHERE user_id=? ORDER BY obj_reactions.created_at, target_kind, target_id""", (uid,)),
         "kid_stars": ("SELECT id, delta, kind, task_id, reward_id, title, at, created_at FROM kid_stars WHERE kid_id=? ORDER BY id", (uid,)),
         # 2.531.0 (#4317 F12): my family links and my connections: the other person by name and address hash only (umz_build), as on
         # the people of my lists; role = what the other person is to me (parent | kid)

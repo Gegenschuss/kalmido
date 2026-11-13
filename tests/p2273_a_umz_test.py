@@ -59,10 +59,14 @@ READ = {e.value for e in assigned(imp, "UMZ_READ_OWN").args[0].elts}
 READ |= {p for r in _reg.values() for p in (*(r.get("read") or ()), *(e[2] for e in r.get("org") or () if len(e) == 3))}
 check({"comments", "list_tags", "task_watchers"} <= READ, f"guard: the register's parts are read ({sorted(READ)[:6]})")
 LEFT = {}
-for e in assigned(imp, "UMZ_LEFT").elts:
+for e in assigned(imp, "UMZ_LEFT_OWN").elts:  # 2.1097.0 (#5949): UMZ_LEFT = UMZ_LEFT_OWN + the register's named account parts
     LEFT.update({p.value: e.elts[0].args[0].value for p in e.elts[1].elts})
+_acct = [e for r in _reg.values() for e in (*(r.get("acct") or ()), *(r.get("acct_more") or ()))]
+LEFT.update({e[0]: e[2] for e in _acct if len(e) > 2})
+check({"list_notif", "reactions", "shared_comments"} <= set(LEFT), f"guard: the register names its left parts {sorted(LEFT)[:6]}")
 exp = src_tree("admin/acctexport.py")
 parts = dict_keys(fn_of(src_tree("accounts/settings.py"), "umz_export_queries")) | dict_keys(fn_of(exp, "umz_extra_queries"))
+parts |= {e[0] for e in _acct}  # 2.1097.0 (#5949): the parts of the core's tables
 parts |= {c.args[2].value for c in ast.walk(fn_of(exp, "umz_build")) if isinstance(c, ast.Call)
           and getattr(c.func, "id", "") == "_put_rows" and isinstance(c.args[2], ast.Constant)}
 check({"sheets", "wiki_pages", "bookmarks", "budgets", "people"} <= parts, f"guard: the export parts were found {sorted(parts)[:8]}")

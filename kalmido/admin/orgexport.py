@@ -51,7 +51,7 @@ from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import qi, system_ctx, table_names
 from ..core.objcomments import ocm_note_cols, ocm_old_cols, ocm_video_cols  # 2.972.0 (#5272); 2.981.0 (#5273): + video / note
-from ..core.objexport import oex_left, oex_org  # 2.1093.0 (#5289): the export register of the core
+from ..core.objexport import oex_left, oex_nodes, oex_org  # 2.1093.0 (#5289): the export register of the core
 from ..docs.store import doc_open as _doc_open  # 2.981.0 (#5273): the notes on documents (obj_comments kind doc_note)
 from ..core.i18n import N_, lang, tr
 from ..core.access import Denied, live_sql, otr_live
@@ -1081,9 +1081,10 @@ def ox_pb_store(c, zf, man, lk, oid, owner, have, pre=""):
             ("documents/document_tags.json", "doc_node_tags", f"node_id IN ({k})", ()),
             ("documents/fields.json", "doc_fields", "ws=?", (ws,)),
             ("documents/field_values.json", "doc_field_values", f"node_id IN ({k})", ()),
-            ("documents/notes.json", "obj_comments", f"kind='doc_note' AND ref_id IN ({k}) AND {live_sql()}", ()),  # 2.635.0 (#4807 d); 2.981.0 (#5273)
             ("documents/meta.json", "doc_meta", f"node_id IN ({k})", ()),
-            ("documents/receipts.json", "rc_receipts", f"node_id IN ({k})", ())):
+            ("documents/receipts.json", "rc_receipts", f"node_id IN ({k})", ()),
+            # 2.1097.0 (#5949): + the core's tables from the export register (documents/notes.json: the notes on the documents)
+            *((a, tb, w, ()) for a, tb, w in oex_nodes({"NODES": k, "LIVE": live_sql()}))):
         if table in have:
             _put_json(zf, man, pre + name, _rows(c, oid, table, where, args))
     names = {r[0]: r[1] for r in c.execute(f"SELECT id, name FROM fs_nodes WHERE id IN ({k})")}

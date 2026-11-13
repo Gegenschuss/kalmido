@@ -126,8 +126,8 @@ check(r.ok and r.json()["reactions"] == [{"emoji": "up", "count": 1, "users": [{
 
 # ================================================================== exports
 out = box(f"""import json
-from kalmido.admin.acctexport import umz_mine_queries
-q, a = umz_mine_queries({BOB})["reactions"]
+from kalmido.admin.acctexport import umz_extra_queries  # 2.1097.0 (#5949): the part comes from the export register (acct_more)
+q, a = umz_extra_queries({BOB})["reactions"]
 print("RX" + json.dumps([dict(r) for r in c.execute(q, a).fetchall()], default=str))""")
 line = next((x for x in out.splitlines() if x.startswith("RX")), None)
 mine = json.loads(line[2:]) if line else []

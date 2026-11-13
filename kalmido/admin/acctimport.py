@@ -59,7 +59,7 @@ from ..accounts.bgjobs import bgj_active, bgj_add, bgj_busy, bgj_drop, bgj_fn  #
 from ..lists.listhead import HEAD_STYLES  # 2.459.0 (#3849)
 from ..lists.lists import clean_color, LIST_COLOR_RE
 from ..core.objtags import otg_add, otg_find, otg_link, otg_user_add  # 2.947.0 (#5275); 2.955.0 (#5276): otg_user_add
-from ..core.objexport import oex_org_map, oex_read  # 2.1093.0 (#5289): the export register of the core
+from ..core.objexport import oex_org_map, oex_read, oex_umz_left  # 2.1093.0 (#5289): the export register of the core
 from ..lists.fields import fx_tpl_fix  # 2.362.4 (#3100)
 from ..lists.formula import fx_display  # 2.362.4 (#3100)
 from ..lists.templates import tpl_clean  # 2.362.4 (#3100)
@@ -208,14 +208,17 @@ UMZ_PRIVATE = (
     ("sheets", "sheets/sheets.json"), ("sheet_columns", "sheets/columns.json"), ("sheet_rows", "sheets/rows.json"),
     ("sheet_cells", "sheets/cells.json"), ("sheet_files", "sheets/files.json"), ("sheet_hist", "sheets/history.json"),
 )
-UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is empty; a name used twice adds up
+# 2.1097.0 (#5949): the parts made of the core's tables name themselves in the export register (core/objexport.py acct / acct_more,
+# the third field: shared_comments, list_notif, folder_notif, written_comments, reactions); UMZ_LEFT_OWN holds the old tables'
+# parts, UMZ_LEFT both (a register part joins the first entry of its name)
+UMZ_LEFT_OWN = (  # (name, parts): the first part counts, the others only when it is empty; a name used twice adds up
     # #3470: tables, knowledge pages and my files come along (UMZ_PRIVATE); 2.363.4 (#3127): mails, video sign-offs, bookmarks,
     # focus sessions, notepads, playbooks, staying in touch, saved arrangements and task bells too (what stays: umz_left counts it)
     # 2.765.0 (#3965): household budgets, absences and timesheets come along too (UMZ_READ)
     (N_("Playbooks"), ("playbook_proposals",)),
     (N_("Saved arrangements"), ("view_layout_offers",)),
     (N_("History"), ("activity",)), (N_("Direct messages"), ("direct_messages",)), (N_("Agent chats"), ("agent_chats",)),
-    (N_("Shared with me"), ("shared_lists", "shared_comments")), (N_("Notifications"), ("list_notif", "folder_notif")),
+    (N_("Shared with me"), ("shared_lists",)),
     (N_("Environments"), ("list_envs", "env_deploys")), (N_("Devices"), ("device_links",)),
     (N_("Assistant"), ("assistant_access", "assistant_log")),
     (N_("Booking page"), ("appt_pages", "appt_types", "appt_bookings")), (N_("Polls"), ("polls", "poll_options", "poll_votes")),  # 2.360.2 D (#2561)
@@ -227,11 +230,12 @@ UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is
     (N_("Newsletter"), ("newsletter_segments", "newsletter_runs")), (N_("Planned agent jobs"), ("agent_schedules",)),
     (N_("Public links"), ("public_links",)), (N_("Feeds"), ("feeds",)),  # 2.85.0 B (#1162): moved by OPML export / import
     # 2.360.4 (#3248): what I wrote or got elsewhere; the preview showed the technical names of these parts
-    (N_("Comments in other projects"), ("written_comments",)), (N_("Channel messages"), ("channel_messages",)),
-    (N_("Tasks in other projects"), ("other_tasks",)), (N_("Tasks I take part in"), ("task_people",)), (N_("Reactions"), ("reactions",)),
+    (N_("Channel messages"), ("channel_messages",)),
+    (N_("Tasks in other projects"), ("other_tasks",)), (N_("Tasks I take part in"), ("task_people",)),
     (N_("Stars"), ("kid_stars",)), (N_("Received notifications"), ("notifications",)), (N_("Sign-ins"), ("sessions",)),
     (N_("Push devices"), ("push_devices",)), (N_("Agent chat settings"), ("agent_chat_prefs",)),
 )
+UMZ_LEFT = oex_umz_left(UMZ_LEFT_OWN)
 # 2.531.0 (#4317) F5: the parts of UMZ_LEFT are never read: they count against neither size limit (a long history of a person
 # made a file that exports but never imports); their checksum is checked when the import runs, their rows counted from the manifest
 UMZ_LEFT_PARTS = frozenset(p for _w, ps in UMZ_LEFT for p in ps) - UMZ_READ

@@ -58,6 +58,10 @@ def reason_keys(root):
                     v = at.get(k.value.id) if isinstance(k.value, ast.Name) else k.value
                     if k.arg in ("org_left", "acct_left", "acct_later") and isinstance(v, ast.Constant) and isinstance(v.value, str):
                         out.setdefault(v.value.replace(" (not_included)", ""), f"{rel}:{v.lineno}")
+                    if k.arg in ("acct", "acct_more") and isinstance(v, ast.Tuple):  # 2.1097.0 (#5949): the names in the import's preview
+                        for e in v.elts:
+                            if isinstance(e, ast.Tuple) and len(e.elts) == 3 and isinstance(e.elts[2], ast.Constant) and isinstance(e.elts[2].value, str):
+                                out.setdefault(e.elts[2].value, f"{rel}:{e.elts[2].lineno}")
         if "OEX_LATER" in at:  # the reason of acct_later
             out.setdefault(at["OEX_LATER"].value, f"{rel}:{at['OEX_LATER'].lineno}")
     return out

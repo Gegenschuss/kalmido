@@ -21,7 +21,8 @@ from ..core.errors import BadInput
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..api.common import hit_limit  # 2.367.5 (#2980)
 from .layouts import LAYOUT_KEYS
-from ..core.access import otr_live  # 2.1029.0 (#5537)
+from ..core.access import acx_lists_sql, otr_live  # 2.1029.0 (#5537); 2.1097.0 (#5949): + acx_lists_sql at module level
+from ..core.objexport import oex_acct  # 2.1097.0 (#5949): the parts of the core's tables (the export register)
 from ..core.access import live_sql  # 2.1076.0 (#5271)
 
 
@@ -1057,10 +1058,21 @@ def push_test():
     return jsonify(ok=ok, channel=push_channel(s), devices=webpush_count(c, me()), ntfy_public=ntfy_public())  # 2.499.0 (#4215)
 
 
+def umz_fmt():
+    """2.1097.0 (#5949): the placeholders of the account queries of the core's export register (core/objexport.py acct /
+    acct_more); every "?" in them is the person's id."""
+    from ..core.objcomments import OCM_TS, ocm_old_cols, ocm_video_cols
+    own = f"(SELECT id FROM lists WHERE owner_id=? AND ({otr_live('')} OR org_id IS NULL))"  # an organisation's list in its trash is the organisation's
+    return {"OWN": own, "TASKS": f"(SELECT id FROM tasks WHERE list_id IN {own})",
+            "SHARED": "(SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.owner_id!=?)",
+            "PRIVATE": "(SELECT id FROM lists WHERE owner_id=? AND org_id IS NULL)", "VIS": acx_lists_sql(req=False),
+            "LIVE": live_sql(), "LIVE_C": live_sql("c"), "LIVE_K": live_sql("k"),
+            "OCM_OLD": ocm_old_cols(), "OCM_VIDEO": ocm_video_cols("k"), "OCM_TS": OCM_TS}
+
+
 def umz_export_queries(uid):
-    """2.73.0 B (#1473): the tables of "my data" (GET /api/export.json and the account export) -> {name: (sql, args)}."""
-    from ..core.access import acx_lists_sql
-    from ..core.objcomments import ocm_old_cols  # 2.972.0 (#5272): the task comments in the file's old columns
+    """2.73.0 B (#1473): the tables of "my data" (GET /api/export.json and the account export) -> {name: (sql, args)}.
+    2.1097.0 (#5949): + the parts of the core's tables from the export register (core/objexport.py acct)."""
     own = f"(SELECT id FROM lists WHERE owner_id=? AND ({otr_live('')} OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
     task_ids = f"(SELECT id FROM tasks WHERE list_id IN {own})"
     q = {
@@ -1070,16 +1082,11 @@ def umz_export_queries(uid):
         "list_envs": (f"SELECT id, list_id, name, sort, auto_close, created_at, deleted_at FROM list_envs WHERE list_id IN {own}", (uid,)),  # 2.60.0 (#1514): never the hook token
         "env_deploys": (f"SELECT * FROM env_deploys WHERE env_id IN (SELECT id FROM list_envs WHERE list_id IN {own})", (uid,)),
         "tasks": (f"SELECT * FROM tasks WHERE list_id IN {own}", (uid,)),
-        # 2.955.0 (#5276): my personal tags of the core (obj_tags scope user), in the file and columns of task_tags as before
-        "task_tags": ("""SELECT k.obj_id AS task_id, CAST(ot.scope_id AS BIGINT) AS user_id, ot.name AS tag FROM obj_tag_links k
-                         JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='user' AND ot.scope_id=CAST(CAST(? AS BIGINT) AS TEXT)
-                         WHERE k.kind='task' ORDER BY k.obj_id, ot.name""", (uid,)),
         "habits": ("SELECT * FROM habits WHERE user_id=? AND deleted_at IS NULL", (uid,)),  # 2.530.0 B (#4315): not the trash
         "habit_logs": ("SELECT * FROM habit_logs WHERE habit_id IN (SELECT id FROM habits WHERE user_id=? AND deleted_at IS NULL)", (uid,)),
         "pomos": ("SELECT * FROM pomos WHERE user_id=?", (uid,)),
         "filters": ("SELECT * FROM filters WHERE user_id=?", (uid,)),
         "attachments": (f"SELECT * FROM attachments WHERE task_id IN {task_ids}", (uid,)),
-        "comments": (f"SELECT {ocm_old_cols()} FROM obj_comments WHERE kind='task' AND ref_id IN {task_ids} AND deleted_at IS NULL", (uid,)),  # 2.972.0 (#5272): same file as before
         "task_decisions": (f"SELECT * FROM task_decisions WHERE task_id IN {task_ids} ORDER BY id", (uid,)),  # 2.392.0 C (#3370)
         # 2.71.0 (#1459, review N5): "also in list X" lines without the id of a list the person may not see
         "activity": (f"SELECT id, task_id, user_id, kind, CASE WHEN kind IN ('ml_add', 'ml_rm') THEN '{{}}'::jsonb ELSE data END AS data, "
@@ -1106,15 +1113,8 @@ def umz_export_queries(uid):
         "view_layout_offers": ("SELECT * FROM view_layout_offers WHERE from_user=? OR to_user=?", (uid, uid)),  # 2.55.0 (#1068)
         # 2.43.0 (#1346); 2.148.1 A (#2478): only from lists the person still sees
         "list_notepads": (f"SELECT * FROM list_notepads WHERE created_by=? AND list_id IN {acx_lists_sql(req=False)}", (uid, uid, uid)),
-        # 2.33.0 (#927): my notification templates; 2.981.0 (#5287): rows of the core's obj_notif_cap, the parts keep their old columns
-        "list_notif": (f"SELECT ref_id AS list_id, user_id, tpl, custom::text AS custom, updated_at FROM obj_notif_cap "
-                       f"WHERE kind='list' AND ref_id IN {own}", (uid,)),
-        "folder_notif": ("SELECT ref_id AS owner_id, path AS folder, user_id, tpl, custom::text AS custom, updated_at FROM obj_notif_cap "
-                         "WHERE kind='folder' AND ref_id=?", (uid,)),
-        # 2.53.0 C (#1424), 2.473.0 (#3357); 2.972.0 (#5285): rows of the core's obj_follow, the parts keep their old columns
-        "task_bell": ("SELECT ref_id AS task_id, mode AS level, until::text AS until, set_by, created_at, updated_at FROM obj_follow "
-                      "WHERE user_id=? AND kind='task' AND mode<>'watch'", (uid,)),
-        "task_watchers": ("SELECT ref_id AS task_id, created_at FROM obj_follow WHERE user_id=? AND kind='task' AND mode='watch'", (uid,)),
+        # 2.1097.0 (#5949): task_tags, comments, list_notif, folder_notif, task_bell, task_watchers (the core's tables) come from
+        # the export register (core/objexport.py acct), see the end
         "agent_steps": ("SELECT id, agent_id, job_id, message_id, text, created_at FROM agent_steps WHERE user_id=?", (uid,)),  # 2.32.0 (#1081)  # 2.32.0 (#1063): my own project page arrangements
         "agent_schedules": ("SELECT * FROM agent_schedules WHERE user_id=?", (uid,)),  # 2.34.0 (#272): my planned agent jobs
         # 2.39.0 (#1168): the Playbooks of my lists and folders (every version) and the agents' proposals for my lists
@@ -1171,6 +1171,7 @@ def umz_export_queries(uid):
         "assistant_log": ("SELECT id, kind, task_id, list_id, job_id, status, ms, chars_in, chars_out, model, at FROM assistant_log "
                           "WHERE user_id=? ORDER BY id", (uid,)),
     }
+    q.update(oex_acct("acct", umz_fmt(), uid))  # 2.1097.0 (#5949): the core's tables (tools/check_export_tables.py: never a part twice)
     return q
 
 

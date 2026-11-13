@@ -13,6 +13,8 @@
     data, an area not yet in the export without its readable name)
 10. 2.1093.0 (#5289): the export register of the core: read (obj_export, obj_register export=), a registered table by hand too,
     twice, gone, or a table of the core without an entry is a finding
+11. 2.1097.0 (#5949): the register's account queries (acct / acct_more) are parts of the account export and its names count as
+    UMZ_LEFT: a part by hand too, a name by hand too, a part the import neither reads nor names, a node clause outside org
 usage: python3 tests/export_tables_lint_test.py"""
 import importlib.util
 import json
@@ -107,11 +109,13 @@ rc, out = with_edit(("admin", "retexport.py"), "RX_TABLES = (\n", 'RX_TABLES = (
 check(rc == 1 and "obj_versions: in the export register" in out and "RX_TABLES" in out, f"a registered table by hand too (retention) is a finding: {out[-300:]}")
 rc, out = with_edit(("admin", "acctimport.py"), 'UMZ_READ_OWN = frozenset((\n', 'UMZ_READ_OWN = frozenset((\n    "comments",\n')
 check(rc == 1 and "comments: a part in the export register and by hand in UMZ_READ_OWN" in out, f"a registered part by hand too is a finding: {out[-300:]}")
-rc, out = with_edit(OEXP, 'obj_export("obj_notif_cap")\n', 'obj_export("obj_notif_cap")\nobj_export("obj_notif_cap")\n')
-check(rc == 1 and "obj_notif_cap: registered twice" in out, f"a table registered twice is a finding: {out[-300:]}")
-rc, out = with_edit(OEXP, 'obj_export("obj_notif_cap")\n', "")
-check(rc == 1 and "obj_notif_cap: a table of the core without an entry in the export register" in out, f"a core table without an entry is a finding: {out[-300:]}")
-rc, out = with_edit(OEXP, 'obj_export("obj_notif_cap")\n', 'obj_export("obj_notif_cap")\nobj_export("obj_zz_gone")\n')
+# 2.1097.0 (#5949): obj_notif_cap carries account queries now, the cases use obj_seen's one-line entry
+ANCH = 'obj_export("obj_seen", acct_left=_VIEW)'
+rc, out = with_edit(OEXP, ANCH, ANCH + '\nobj_export("obj_seen", acct_left=_VIEW)')
+check(rc == 1 and "obj_seen: registered twice" in out, f"a table registered twice is a finding: {out[-300:]}")
+rc, out = with_edit(OEXP, ANCH, "pass")
+check(rc == 1 and "obj_seen: a table of the core without an entry in the export register" in out, f"a core table without an entry is a finding: {out[-300:]}")
+rc, out = with_edit(OEXP, ANCH, ANCH + '\nobj_export("obj_zz_gone")')
 check(rc == 1 and "obj_zz_gone: stale in the export register" in out, f"a registered table that is gone is a finding: {out[-300:]}")
 # a kind's own table through obj_register(..., export={...}): read like obj_export; without it the table is a finding
 rc, out = with_edit(SCHEMA, "CREATE TABLE IF NOT EXISTS filters (", TABLE.format("zz_kind", "org_id"))
@@ -122,7 +126,7 @@ with tempfile.TemporaryDirectory() as d:
     k = os.path.join(d, "kalmido")
     for sub in ("core", "accounts", "admin"):
         shutil.copytree(os.path.join(ROOT, "kalmido", sub), os.path.join(k, sub))
-    for path, old, new in ((SCHEMA, "CREATE TABLE IF NOT EXISTS filters (", TABLE.format("zz_kind", "org_id")), (OEXP, 'obj_export("obj_notif_cap")\n', 'obj_export("obj_notif_cap")\n' + KIND)):
+    for path, old, new in ((SCHEMA, "CREATE TABLE IF NOT EXISTS filters (", TABLE.format("zz_kind", "org_id")), (OEXP, ANCH, ANCH + KIND)):
         p = os.path.join(k, *path)
         with open(p, encoding="utf-8") as f:
             s = f.read()
@@ -130,6 +134,23 @@ with tempfile.TemporaryDirectory() as d:
             f.write(s.replace(old, new, 1))
     rc, out = lint(d)
 check(rc == 0 and "17 in the export register" in out, f"obj_register export= is read: the kind's table is placed {out[-300:]}")
+
+# 2.1097.0 (#5949): the register's account queries and names (acct / acct_more), its node clauses
+rc, out = with_edit(("accounts", "settings.py"), '        "pomos": ("SELECT * FROM pomos WHERE user_id=?", (uid,)),\n',
+                    '        "pomos": ("SELECT * FROM pomos WHERE user_id=?", (uid,)),\n        "comments": ("SELECT * FROM tasks WHERE id=?", (uid,)),\n')
+check(rc == 1 and "comments: a part of the account export in the export register (obj_comments) and by hand" in out,
+      f"a register part by hand in a query function too is a finding: {out[-300:]}")
+rc, out = with_edit(("admin", "acctimport.py"), '    (N_("Channel messages"), ("channel_messages",)),\n',
+                    '    (N_("Channel messages"), ("channel_messages",)), (N_("Reactions"), ("reactions",)),\n')
+check(rc == 1 and "reactions: named in the export register (obj_reactions) and by hand in UMZ_LEFT_OWN" in out,
+      f"a register name by hand in UMZ_LEFT_OWN too is a finding: {out[-300:]}")
+rc, out = with_edit(OEXP, ANCH, 'obj_export("obj_seen", acct_left=_VIEW, acct_more=(("zz_part", "SELECT * FROM obj_seen WHERE user_id=?"),))')
+check(rc == 1 and "zz_part: a part of the account export that acctimport.py neither reads" in out,
+      f"a register part the import neither reads nor names is a finding: {out[-300:]}")
+rc, out = with_edit(OEXP, ANCH, 'obj_export("obj_seen", acct_left=_VIEW, acct_more=(("zz_part", "SELECT * FROM obj_seen WHERE user_id=?", "Reactions"),))')
+check("zz_part" not in out, f"a register part with its name in the import's preview is known: {out[-300:]}")
+rc, out = with_edit(OEXP, ANCH, 'obj_export("obj_seen", acct_left=_VIEW, nodes=(("zz/n.json", "ref_id IN ({NODES})"),))')
+check(rc == 1 and "obj_seen: the node clause of zz/n.json names no archive of its org entries" in out, f"a node clause outside org is a finding: {out[-300:]}")
 
 # 2.464.0 (#3841): the reasons are keys of the language files, also the ones of the organisation export and without the mark in the manifest
 spec = importlib.util.spec_from_file_location("i18nkeys", os.path.join(ROOT, "kalmido", "core", "i18nkeys.py"))

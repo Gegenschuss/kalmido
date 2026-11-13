@@ -1199,8 +1199,18 @@ a new kind. One way per table: a second registration is refused, `tools/check_ex
 - The archive files keep their names and columns (the row hooks in `admin/orgexport.py _clean` stay with the export); the where
   clauses are the ones the hand lists had (the organisation's rows only: `tests/p2362_export_test.py` holds every file against a
   second organisation).
-- Not in the register yet: the documents-only export of single folders (`admin/orgexport.py`, its own list of `documents/notes.json`)
-  and the account export's queries of the core's tables (`admin/acctexport.py`: parts with their own columns per person).
+- 2.1097.0 (#5949): the account export's queries of the core's tables stand in the register too: `acct` = parts of "my data"
+  (`accounts/settings.py umz_export_queries`: the account export and `GET /api/export.json`), `acct_more` = parts only in the account
+  export (`admin/acctexport.py umz_extra_queries`), each `(part, query[, left])` - the whole SELECT in the part's old columns with the
+  placeholders of `accounts/settings.py umz_fmt()` (`{OWN}` the person's lists, `{TASKS}` their tasks, `{SHARED}`, `{VIS}`, `{PRIVATE}`, `{LIVE}` / `{LIVE_C}` / `{LIVE_K}`,
+  `{OCM_OLD}` / `{OCM_VIDEO}` / `{OCM_TS}` the old comment columns); every `?` is the person's id, a query without its person or that
+  is no SELECT is refused. `left` = the readable name the import's preview gives the part when the import leaves it behind
+  (`admin/acctimport.py UMZ_LEFT` = `UMZ_LEFT_OWN` + these; a part joins the first entry of its name). `nodes` = `(archive, where)` of
+  the rows of single file store nodes (`{NODES}`, `{LIVE}`; the documents of a personal office, `admin/orgexport.py ox_pb_store`), the
+  archive is one of the table's `org` entries. The check counts these parts like the hand functions' and fails on a part or a name
+  given both ways.
+- Not in the register: the parts of a kind's own table that join a core table only for their columns (`playbooks`: rows of
+  `obj_versions` on the Playbook's head, read as the area's part).
 
 ## Filter (2.846.0, #5520)
 

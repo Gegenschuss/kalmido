@@ -15,6 +15,9 @@ obj_export(table, ...) for the cross-cutting tables, obj_register(kind, table, .
 reads those calls as they are written and counts them like the hand lists. Every table of the core (obj_*) needs an entry there,
 a registered table must not stand in a hand list too (OX_AREAS, OX_LEFT, UMZ_LEFT_TABLES, UMZ_LATER_NAMES, RX_TABLES, RX_WHERE,
 RX_LEFT_TABLES; its parts not in UMZ_READ_OWN / UMZ_ORG_MAP_OWN) and no table is registered twice.
+2.1097.0 (#5949): + the register's account queries (acct: umz_export_queries, acct_more: umz_extra_queries) count as parts of the
+account export (a part never by hand too), their names as UMZ_LEFT (never in UMZ_LEFT_OWN too); a node clause (nodes, the export of
+single documents) belongs to an archive of the table's org entries.
 usage: python3 tools/check_export_tables.py [-v] [--root DIR]      exit 1 on a finding"""
 import ast
 import glob
@@ -197,6 +200,15 @@ def check(root):
     r_read = {p for r in reg.values() for p in r.get("read") or ()} | set(r_part.values())
     r_rx = {t for t, r in reg.items() if r.get("rx")}
     r_left = {k: {t: r[k] for t, r in reg.items() if r.get(k)} for k in ("org_left", "acct_left", "acct_later")}
+    r_acct = {}  # 2.1097.0 (#5949): {part: (table, query, left name or None)}
+    for t, r in reg.items():
+        for e in (*(r.get("acct") or ()), *(r.get("acct_more") or ())):
+            if e[0] in r_acct:
+                bad.append(f"{e[0]}: a part of the account export registered twice ({r_acct[e[0]][0]}, {t})")
+            r_acct[e[0]] = (t, e[1], e[2] if len(e) > 2 else None)
+        for e in r.get("nodes") or ():
+            if e[0] not in {o[0] for o in r.get("org") or ()}:
+                bad.append(f"{t}: the node clause of {e[0]} names no archive of its org entries ({r['at']})")
     admin = ("kalmido", "admin")
     # ---- account export
     parts = {}
@@ -204,6 +216,9 @@ def check(root):
     acct = ast.parse(read(root, *admin, "acctexport.py"))
     for fn in ("umz_extra_queries", "umz_mine_queries"):
         parts.update(queries_in(acct, fn))
+    for p in sorted(set(parts) & set(r_acct)):  # 2.1097.0 (#5949)
+        bad.append(f"{p}: a part of the account export in the export register ({r_acct[p][0]}) and by hand in a query function")
+    parts.update({p: top_from(q) for p, (_t, q, _w) in r_acct.items()})
     left_tree = ast.parse(read(root, *admin, "exportleft.py"))
     left, rx_left = reasons(left_tree, "UMZ_LEFT_TABLES"), reasons(left_tree, "RX_LEFT_TABLES")
     later_own = reasons(left_tree, "UMZ_LATER_NAMES")
@@ -283,7 +298,11 @@ def check(root):
         bad.append(f"{p}: a part in the export register and by hand in UMZ_READ_OWN (kalmido/admin/acctimport.py)")
     for p in sorted({k.value for k in omap_own.keys} & set(r_part)):
         bad.append(f"{p}: a file in the export register and by hand in UMZ_ORG_MAP_OWN (kalmido/admin/acctimport.py)")
-    known = read_own | r_read | strings(assigned(imp, "UMZ_LEFT"))
+    left_own = strings(assigned(imp, "UMZ_LEFT_OWN"))  # 2.1097.0 (#5949): + the register's named parts
+    r_named = {p for p, (_t, _q, w) in r_acct.items() if w}
+    for p in sorted(left_own & r_named):
+        bad.append(f"{p}: named in the export register ({r_acct[p][0]}) and by hand in UMZ_LEFT_OWN (kalmido/admin/acctimport.py)")
+    known = read_own | r_read | left_own | r_named
     for p in sorted((set(parts) | set(BUILD_PARTS)) - known):
         bad.append(f"{p}: a part of the account export that acctimport.py neither reads (UMZ_READ) nor names (UMZ_LEFT)")
     omap, skip = strings(omap_own) | set(r_part), [e.elts[0].value for e in assigned(imp, "UMZ_ORG_SKIP").elts]
