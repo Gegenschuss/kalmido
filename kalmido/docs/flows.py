@@ -38,6 +38,7 @@ from flask import g, has_request_context, jsonify
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.db import bump, db, err, insert_id, iso, local_day, local_now, now_utc
 from ..core.i18n import tr
+from ..core.objtags import otg_ws_drop, otg_ws_link  # 2.1119.0 (#5277): the file store's tags are the core's
 from ..core.access import Denied, acx_of, acx_org_ok, task_visible
 from ..core.pages import new_inbox_task
 from ..tasks.validation import log_act
@@ -198,7 +199,7 @@ def _sort(c, nid, r):
         have = {t["id"]: t["auto"] for t in S.node_tags(c, nid)}
         add = [t for t in (S.label_id(c, ws, "tag", x) for x in r["tags"]) if t and t not in have]
         for t in add:
-            c.execute("INSERT INTO doc_node_tags(node_id, tag_id, auto) VALUES(?,?,'rule') ON CONFLICT DO NOTHING", (nid, t))
+            otg_ws_link(c, nid, t, "rule")  # 2.1119.0 (#5277): the core's link, marked as a rule's
 
 
 def _extra(c, nid, r, levels=None):
@@ -210,7 +211,7 @@ def _extra(c, nid, r, levels=None):
         for x in r["untag"]:
             t = S.label_id(c, ws, "tag", x, create=False)
             if t:
-                c.execute("DELETE FROM doc_node_tags WHERE node_id=? AND tag_id=?", (nid, t))
+                otg_ws_drop(c, nid, t)  # 2.1119.0 (#5277)
     for k, v in (r.get("fields") or {}).items():
         df_set(c, S.meta_row(c, nid), {k: v if v not in ("",) else None}, by="flow")  # a value the field does not take: left out
     tid = None
@@ -506,10 +507,10 @@ def _undo_vals(c, nid, b, a):
     added, gone = set(a.get("tags") or []) - set(b.get("tags") or []), set(b.get("tags") or []) - set(a.get("tags") or [])
     ws = S.meta_row(c, nid)["ws"]
     for t in added:
-        c.execute("DELETE FROM doc_node_tags WHERE node_id=? AND tag_id=?", (nid, t))
+        otg_ws_drop(c, nid, t)  # 2.1119.0 (#5277): the core's links
     for t in gone:
         if S.label_ok(c, ws, "tag", t):
-            c.execute("INSERT INTO doc_node_tags(node_id, tag_id, auto) VALUES(?,?,'') ON CONFLICT DO NOTHING", (nid, t))
+            otg_ws_link(c, nid, t, "")
     fa, fb, fc = a.get("fields") or {}, b.get("fields") or {}, cur["fields"]
     back = {k: fb.get(k) for k in set(fa) | set(fb) if fa.get(k) != fb.get(k) and fc.get(k) == fa.get(k)}
     if back:

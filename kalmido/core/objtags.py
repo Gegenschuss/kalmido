@@ -7,7 +7,10 @@ obj_tags (migrations.d/5275_a.py) is one tag of a scope, obj_tag_links puts it o
     org         the organisation's id    a label of the organisation: the same in every project of it, its admins manage it
                                          (lists/orglabels.py); org_id is set, so row-level security shows it to members only
     user        the person's id          a personal tag: only that person sees and sets it (stage Q5b, 2.955.0, #5276)
-    ws          the workspace key        stage Q5c (doc_tags), not moved yet
+    ws          the workspace key        a tag of the file store ("Ablage": files, folders, documents) of workspace 'o<org>' |
+                ('o3', 'u5')             'u<owner>' (stage Q5c, #5277; was doc_tags / doc_node_tags): the workspace's members see
+                                         its names, a person a node is shared with only the tags on that node; org_id is set for
+                                         an organisation's workspace (row-level security, as doc_tags had it)
 
 A task carries the tags of its project's scopes: the project's own tags and the labels of the project's organisation, each
 linked to the task itself (decided 08.11.2026, question 9: a label is put on the task directly, no copy per project any more).
@@ -453,3 +456,154 @@ def otg_move_user(c):
                  ON CONFLICT DO NOTHING""")
     c.execute("DROP TABLE otg_tt")
     return n
+
+
+# ---------------------------------------------------------------- the file store's tags (stage Q5c, 2.1119.0, #5277)
+# The tags of files, folders and documents (were doc_tags / doc_node_tags): scope ws, scope_id = the workspace key of
+# docs/store.py doc_ws ('o<org>' | 'u<owner>'), linked to the node (kind fs_entry = files/fskern.py FSK_KIND). A name is unique
+# per workspace under lower() (the index ix5275_obj_tags_name: no race between two requests any more, was a Python compare).
+# A link's how keeps the old doc_node_tags.auto ('' by hand, 'rule' a rule, 'learn' the models, 'agent', ...): src is 'auto'
+# for a mark of the recognition, 'agent' for an agent's, else 'person' (decided 08.11.2026: auto becomes src=auto; the
+# detail stays in how, the undo of a run takes off only 'rule' / 'learn'). Rights stay with the file store and the documents
+# area (need_node, the workspace's members); the functions here check nothing.
+OTG_WS = ("ws",)
+OTG_FS = "fs_entry"  # = files/fskern.py FSK_KIND
+# the node ids carrying a tag: "<col> IN (" + OTG_FS_IN + " IN (?,?))" -- a tag id is unique over all scopes
+OTG_FS_IN = "SELECT k.obj_id FROM obj_tag_links k WHERE k.kind='fs_entry' AND k.tag_id"
+OTG_WS_LINKS = "FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='ws' WHERE k.kind='fs_entry'"
+
+
+def otg_how_src(how):
+    """The src of a link of the file store from its how (the old doc_node_tags.auto)."""
+    return "agent" if how == "agent" else ("auto" if how else "person")
+
+
+def otg_ws_org(ws):
+    """The organisation of workspace key ws ('o3' -> 3), None for a person's own ('u5')."""
+    ws = str(ws or "")
+    return int(ws[1:]) if ws[:1] == "o" and ws[1:].isdigit() else None
+
+
+def otg_ws_all(c, ws):
+    """[{id, name}] of the tags of workspace ws, by name."""
+    return [{"id": r[0], "name": r[1]} for r in c.execute(
+        "SELECT id, name FROM obj_tags WHERE scope_kind='ws' AND scope_id=? ORDER BY lower(name), id", (str(ws),))]
+
+
+def otg_ws_name(c, ws, tid):
+    """The name of tag tid when it is one of workspace ws, else None."""
+    try:
+        tid = int(tid)
+    except (TypeError, ValueError):
+        return None
+    r = c.execute("SELECT name FROM obj_tags WHERE id=? AND scope_kind='ws' AND scope_id=?", (tid, str(ws))).fetchone()
+    return r[0] if r else None
+
+
+def otg_ws_ok(c, ws, tid):
+    return otg_ws_name(c, ws, tid) is not None
+
+
+def otg_ws_tag(c, ws, name, by=None, create=True):
+    """The id of workspace ws's tag `name` (any case; the caller trimmed it), made when missing (create). None for an empty
+    name. Two requests making the same name meet at the unique index: both get the one tag."""
+    if not name:
+        return None
+    r = otg_find(c, "ws", ws, name)
+    if r or not create:
+        return r["id"] if r else None
+    c.execute("""INSERT INTO obj_tags(scope_kind,scope_id,org_id,name,color,sort,created_by,created_at) VALUES('ws',?,?,?,'',0,?,?)
+                 ON CONFLICT DO NOTHING""", (str(ws), otg_ws_org(ws), name, by, now_utc()))
+    return otg_find(c, "ws", ws, name)["id"]
+
+
+def otg_ws_of(c, ids):
+    """{node id: [{id, name, auto, ws}]} -- the tags on the nodes ids, each list by name; auto = the link's how."""
+    out, ids = {}, sorted({int(x) for x in ids if x})
+    if not ids:
+        return out
+    for r in c.execute(f"""SELECT k.obj_id, ot.id, ot.name, k.how, ot.scope_id {OTG_WS_LINKS} AND k.obj_id = ANY(CAST(? AS BIGINT[]))
+                           ORDER BY k.obj_id, lower(ot.name), ot.id""", (st_ids(ids),)):
+        out.setdefault(r[0], []).append({"id": r[1], "name": r[2], "auto": r[3] or "", "ws": r[4]})
+    return out
+
+
+def otg_ws_link(c, nid, tid, how="", by=None, keep=True):
+    """Puts tag tid on node nid with mark how. keep: a link already there stays as it is (else it takes the new mark)."""
+    how = str(how or "")
+    c.execute("INSERT INTO obj_tag_links(tag_id,kind,obj_id,src,how,created_by,created_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT "
+              + ("DO NOTHING" if keep else "(tag_id, kind, obj_id) DO UPDATE SET how=excluded.how, src=excluded.src"),
+              (int(tid), OTG_FS, int(nid), otg_how_src(how), how, by, now_utc()))
+
+
+def otg_ws_set(c, nid, tag_ids, how="", by=None):
+    """The tags of node nid become exactly tag_ids (the caller checked they are of its workspace); how = one mark for all or
+    {tag id: mark}. A link that stays keeps when and by whom it was set and takes the new mark (as the old set_tags did)."""
+    want = list(dict.fromkeys(int(x) for x in tag_ids))
+    c.execute(f"""DELETE FROM obj_tag_links WHERE kind='{OTG_FS}' AND obj_id=? AND NOT (tag_id = ANY(CAST(? AS BIGINT[])))
+                  AND EXISTS (SELECT 1 FROM obj_tags ot WHERE ot.id=obj_tag_links.tag_id AND ot.scope_kind='ws')""", (int(nid), st_ids(want)))
+    for t in want:
+        otg_ws_link(c, nid, t, how if isinstance(how, str) else (how.get(t) or ""), by, keep=False)
+
+
+def otg_ws_drop(c, nid, tid, hows=None):
+    """Takes tag tid off node nid (hows: only a link with one of these marks). True when one went."""
+    q = f"DELETE FROM obj_tag_links WHERE kind='{OTG_FS}' AND obj_id=? AND tag_id=?"
+    args = [int(nid), int(tid)]
+    if hows is not None:
+        q += " AND how = ANY(CAST(? AS TEXT[]))"
+        args.append(list(hows))
+    return bool(c.execute(q, args).rowcount)
+
+
+def otg_ws_nodes(c, tid):
+    """The ids of the nodes carrying tag tid."""
+    return [r[0] for r in c.execute(f"SELECT obj_id FROM obj_tag_links WHERE kind='{OTG_FS}' AND tag_id=? ORDER BY obj_id", (int(tid),))]
+
+
+def otg_ws_tag_of(c, tid):
+    """The row of tag tid when it is a tag of the file store, else None."""
+    return c.execute("SELECT * FROM obj_tags WHERE id=? AND scope_kind='ws'", (int(tid),)).fetchone()
+
+
+def otg_move_ws(c):
+    """2.1119.0 (#5277): the rows of doc_tags / doc_node_tags into obj_tags (scope ws) / obj_tag_links while those tables are
+    there (the first start of this version, or again after an older version ran and made them anew); the fragment 5277_a
+    drops them right after (one-way). A tag keeps its id where that id is free in obj_tags, else it gets a new one: the
+    returned map {(workspace, old id): new id} names those, so the documents area rewrites the places that keep a tag's id
+    (docs/dtags.py dtg_move: models, suggestions, saved views, the undo of runs). Names equal under lower() in one workspace
+    (the old Python compare had a race) become one tag: the first by id, its links take the others'. doc_node_tags.auto is
+    the link's how (src from it). Runs as "system" in the start transaction."""
+    if not _otg_has(c, "doc_tags"):
+        return {}
+    remap = {}
+    c.execute("SELECT setval(pg_get_serial_sequence('obj_tags', 'id'), GREATEST((SELECT COALESCE(MAX(id), 0) FROM obj_tags), "
+              "(SELECT COALESCE(MAX(id), 0) FROM doc_tags), 1))")
+    for r in c.execute("SELECT id, ws, name, created_at FROM doc_tags ORDER BY id").fetchall():
+        name = re.sub(r"\s+", " ", str(r["name"] or "")).strip()
+        if not name:
+            continue
+        have = otg_find(c, "ws", r["ws"], name)
+        if have:
+            new = have["id"]
+        elif not c.execute("SELECT 1 FROM obj_tags WHERE id=?", (r["id"],)).fetchone():
+            new = insert_id(c, "INSERT INTO obj_tags(id,scope_kind,scope_id,org_id,name,color,sort,created_at) VALUES(?,'ws',?,?,?,'',0,?)",
+                            (r["id"], r["ws"], otg_ws_org(r["ws"]), name, _otg_ts(c, r["created_at"])))
+        else:
+            new = insert_id(c, "INSERT INTO obj_tags(scope_kind,scope_id,org_id,name,color,sort,created_at) VALUES('ws',?,?,?,'',0,?)",
+                            (r["ws"], otg_ws_org(r["ws"]), name, _otg_ts(c, r["created_at"])))
+        if new != r["id"]:
+            remap[(r["ws"], r["id"])] = new
+    if _otg_has(c, "doc_node_tags"):
+        pairs = sorted((o, n) for (_ws, o), n in remap.items())
+        c.execute(f"""INSERT INTO obj_tag_links(tag_id, kind, obj_id, src, how, created_at)
+                      SELECT COALESCE(m.n, x.tag_id), '{OTG_FS}', x.node_id,
+                             CASE WHEN x.auto = 'agent' THEN 'agent' WHEN COALESCE(x.auto, '') = '' THEN 'person' ELSE 'auto' END,
+                             COALESCE(x.auto, ''), CURRENT_TIMESTAMP
+                      FROM doc_node_tags x JOIN doc_tags t ON t.id=x.tag_id
+                      LEFT JOIN unnest(CAST(? AS BIGINT[]), CAST(? AS BIGINT[])) AS m(o, n) ON m.o=x.tag_id
+                      WHERE EXISTS (SELECT 1 FROM obj_tags ot WHERE ot.id=COALESCE(m.n, x.tag_id) AND ot.scope_kind='ws' AND ot.scope_id=t.ws)
+                      ORDER BY x.node_id, x.tag_id ON CONFLICT DO NOTHING""",
+                  ([p[0] for p in pairs], [p[1] for p in pairs]))
+    c.execute("SELECT setval(pg_get_serial_sequence('obj_tags', 'id'), GREATEST((SELECT COALESCE(MAX(id), 0) FROM obj_tags), 1))")
+    return remap

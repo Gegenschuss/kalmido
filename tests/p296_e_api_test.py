@@ -278,7 +278,7 @@ m = dbx("SELECT ws, org_id, sender_id, type_id, trained FROM doc_meta WHERE node
 check(m[0] == U and m[1] is None, f"db: doc_meta in carol's workspace ({m[0]}, {m[1]})")
 check(one("SELECT ws FROM doc_senders WHERE id=?", (m[2],)) == U and one("SELECT ws FROM doc_types WHERE id=?", (m[3],)) == U,
       "db: sender and type are labels of carol's workspace")
-tg = dbx("SELECT t.ws FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id WHERE nt.node_id=?", (DOC,))
+tg = dbx("SELECT t.scope_id FROM obj_tag_links k JOIN obj_tags t ON t.id=k.tag_id WHERE k.kind='fs_entry' AND k.obj_id=?", (DOC,))  # 2.1119.0 (#5277)
 check(tg and all(x[0] == U for x in tg), f"db: the tags are labels of carol's workspace ({tg})")
 # 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
 NEW_DW = {r[0] for r in dbx("SELECT h FROM obj_search_words WHERE kind='doc' AND ref_id=? AND h<>'v:2'", (DOC,))}
@@ -333,7 +333,7 @@ check(one("SELECT COUNT(*) FROM fs_shares WHERE node_id=? AND user_id=?", (PRIV,
 check(not doc_ids(Ca, ws="private", q="holunderbluete") and not fsearch(Ca, "holunderbluete", "private"), "the private searches no longer find it")
 check(PD in doc_ids(Ca, ws=SP, q="holunderbluete") and PF in fsearch(Ca, "holunderbluete", SP), "Alpha's searches find it")
 check(one("SELECT ws FROM doc_meta WHERE node_id=?", (PD,)) == f"o{ORG}" and
-      one("SELECT COUNT(*) FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id WHERE nt.node_id=? AND t.ws<>?", (PD, f"o{ORG}")) == 0,
+      one("SELECT COUNT(*) FROM obj_tag_links k JOIN obj_tags t ON t.id=k.tag_id WHERE k.kind='fs_entry' AND k.obj_id=? AND t.scope_id<>?", (PD, f"o{ORG}")) == 0,
       "db: the document and its tags in Alpha's workspace")
 check(one("SELECT COUNT(*) FROM file_text WHERE kind='fs' AND node_id=? AND (ws<>? OR org_id IS DISTINCT FROM ?)", (PF, f"o{ORG}", ORG)) == 0,
       "db: the file's text in Alpha's workspace")

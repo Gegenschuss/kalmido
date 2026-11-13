@@ -26,7 +26,7 @@ from ..core.config import app, ATT_DIR, MAX_FILE_MB
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc
 from ..core.i18n import N_, tr
 from ..core.access import Denied, live_sql, trash_sql
-from ..core.pg import IntegrityError, system_ctx, write_lock
+from ..core.pg import IntegrityError, st_ids, system_ctx, write_lock
 from ..core.objhooks import REVOKE  # 2.953 (#3348): fsl_user_purge
 from ..accounts.session import me
 from ..collab.comments import user_names
@@ -416,8 +416,8 @@ def _fsl_forget_tags(c, nid):
 def _fsl_tagged(c, nid):
     """How many nodes of the subtree of nid carry tags (the hint of the lock dialog)."""
     ids = fs_subtree(c, nid)
-    return int(c.execute(f"SELECT COUNT(DISTINCT node_id) FROM doc_node_tags WHERE node_id IN ({','.join('?' * len(ids))})",
-                         ids).fetchone()[0]) if ids else 0
+    return int(c.execute("SELECT COUNT(DISTINCT obj_id) FROM obj_tag_links WHERE kind='fs_entry' AND obj_id = ANY(CAST(? AS BIGINT[]))",
+                         (st_ids(ids),)).fetchone()[0]) if ids else 0  # 2.1119.0 (#5277): the core's links
 
 
 def _fsl_replace(c, n, data, mime, gen, uid, made=None):

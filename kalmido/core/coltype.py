@@ -34,7 +34,7 @@ CT_TIME = {  # column -> the tables that still had it as TEXT (the lines of tool
         'books', 'budget_cats', 'budget_entries', 'budget_files', 'budget_recurring', 'cal_subs', 'chat_files', 'chat_saves',
         'clients', 'conn_blocks', 'conn_links', 'conn_requests', 'contact_srcs', 'contacts', 'dav_sync', 'dav_sync2',
         'disc_profiles', 'doc_fetchers', 'doc_fields', 'doc_flow_runs', 'doc_mail', 'doc_meta', 'doc_office_moves', 'doc_rules',
-        'doc_senders', 'doc_tags', 'doc_types', 'doc_views', 'e2e_keys', 'ev_cal_feeds', 'ev_cals', 'events', 'file_text',
+        'doc_senders', 'doc_types', 'doc_views', 'e2e_keys', 'ev_cal_feeds', 'ev_cals', 'events', 'file_text',
         'filters', 'folder_agents', 'form_entries', 'forms', 'fs_ext_links', 'fs_lock_keys', 'fs_nodes', 'fs_shares',
         'fs_upload_requests', 'fs_versions', 'git_closes', 'git_conns', 'git_folders', 'git_issue_comments', 'git_issue_gone',
         'git_issue_links', 'git_links', 'groups', 'habits', 'hook_in', 'hub_absences', 'hub_bookings', 'hub_mailbox_rules',

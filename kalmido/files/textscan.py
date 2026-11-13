@@ -510,7 +510,8 @@ def _doc_label_hits(c, docs, raw):
                 continue
             q = ",".join("?" * len(ids))
             sql = (f"SELECT node_id FROM doc_meta WHERE ws=? AND {col} IN ({q})" if col else
-                   f"SELECT nt.node_id FROM doc_node_tags nt JOIN doc_meta d ON d.node_id=nt.node_id WHERE d.ws=? AND nt.tag_id IN ({q})")
+                   f"SELECT k.obj_id FROM obj_tag_links k JOIN doc_meta d ON d.node_id=k.obj_id WHERE k.kind='fs_entry' AND d.ws=? "
+                   f"AND k.tag_id IN ({q})")  # 2.1119.0 (#5277): the core's links
             got |= {r[0] for r in c.execute(sql, (ws, *ids))}
         out |= got & mine
     return out

@@ -1801,7 +1801,7 @@
   {
    "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
    "file": "kalmido/files/fstags.py",
-   "code": "rows = c.execute(f\"\"\"SELECT DISTINCT t.id, t.name FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id JOIN fs_nodes n ON n.id=nt.node_id",
+   "code": "rows = c.execute(f\"\"\"SELECT DISTINCT ot.id, ot.name FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='ws'",
    "reason": "SQL built from fixed fragments only: fs_visible_sql inlines checked integer ids, dt_space returns fixed conditions, dt_where '?' lists, DT_HITS is a constant.",
    "date": "2026-11-05"
   },

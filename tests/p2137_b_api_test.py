@@ -303,7 +303,7 @@ left = {t: dbx(f"SELECT COUNT(*) AS n FROM {t} WHERE org_id=?" + (f" AND {LIVE[t
                   "sheet_files", "video_reviews", "video_versions", VC)}  # 2.981.0 (#5273): VC
 check(not any(left.values()) and not LN, f"undo takes every taken-over row out {left} {LN}")
 check(dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (NF,)), "2.506.0 (#4299): the versions stay with their node in the trash")
-check(dbx("SELECT 1 FROM doc_senders WHERE org_id=?", (GAM,)) and dbx("SELECT 1 FROM doc_tags WHERE org_id=?", (GAM,)),
+check(dbx("SELECT 1 FROM doc_senders WHERE org_id=?", (GAM,)) and dbx("SELECT 1 FROM obj_tags WHERE scope_kind='ws' AND org_id=?", (GAM,)),
       "2.506.0 (#4299): the labels wait for their document in the trash")
 A.delete(B + f"/api/account/import/{iid}")
 
