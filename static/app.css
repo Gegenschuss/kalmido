@@ -6543,6 +6543,9 @@ html.mini-chat body.in-chat #view .chview .chmsgs{padding-inline:.75rem}  /* 2.1
 .qd.dashq figcaption{display:none}
 .qd.dashq.open .qdo{white-space:normal;overflow:visible}
 .qd.dashq.open figcaption{display:block}
+/* 2.1121.0 (#5477): the tappable quote is a 44 px target; the text stays one line in its middle, the slot keeps the same room (nothing jumps) */
+.qd.dashq,.dash .qdslot{min-height:2.75rem;margin:-.75rem 0 .25rem}
+.qd.dashq{display:flex;flex-direction:column;justify-content:center}
 .authscreen input:not([type=checkbox]){border-radius:.75rem;background:var(--bg3);border:1px solid var(--line2)}
 .authscreen input:not([type=checkbox]):focus{border-color:var(--accent);box-shadow:0 0 0 .1875rem color-mix(in srgb,var(--accent) 22%,transparent);outline:none}
 .authscreen .btn{height:auto;min-height:2.75rem;border-radius:.75rem}
