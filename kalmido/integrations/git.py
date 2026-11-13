@@ -443,7 +443,7 @@ def git_pr_of(p):
     return {"number": p["number"], "title": _gs(p.get("title"), 500), "body": str(p.get("body") or "")[:GIT_PR_BODY_MAX],
             "state": "merged" if merged else "open" if p.get("state") == "open" else "closed",
             "author": _gs(user.get("login"), 100), "url": _git_web(p.get("html_url")), "head_ref": _gs(head.get("ref"), 250),
-            "head_sha": _gs(head.get("sha"), 64), "updated_at": _gs(p.get("updated_at"), 40), "merged_at": _gs(p.get("merged_at"), 40) or None,
+            "head_sha": _gs(head.get("sha"), 64), "updated_at": _gs(p.get("updated_at"), 40) or None, "merged_at": _gs(p.get("merged_at"), 40) or None,
             # 2.151.0 A (#2558): the merge (squash) commit of a merged one: its first version tag is the pull request's
             # (GitHub / Gitea send a test merge commit for open ones too: only kept once merged)
             "merge_sha": _gs(p.get("merge_commit_sha"), 64) if merged else ""}

@@ -760,7 +760,7 @@ def umz_log_org_lists(c, uid):
         fresh = {}
         for r in rows:
             n = c.execute("""INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at)
-                         SELECT CAST(? AS BIGINT),CAST(? AS BIGINT),CAST(? AS TEXT),'export',CAST(? AS BIGINT),CAST(? AS BIGINT),NULL,CAST(? AS TEXT) WHERE NOT EXISTS (SELECT 1 FROM org_list_log WHERE org_id=? AND list_id=?
+                         SELECT CAST(? AS BIGINT),CAST(? AS BIGINT),CAST(? AS TEXT),'export',CAST(? AS BIGINT),CAST(? AS BIGINT),NULL,CAST(? AS TIMESTAMPTZ) WHERE NOT EXISTS (SELECT 1 FROM org_list_log WHERE org_id=? AND list_id=?
                          AND by_id=? AND action='export' AND substr(CAST(created_at AS text), 1, 10)=?)""",
                       (r["org_id"], r["id"], r["name"], uid, uid, at, r["org_id"], r["id"], uid, at[:10])).rowcount
             if n:

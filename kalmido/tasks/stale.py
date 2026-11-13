@@ -21,10 +21,10 @@ STALE_DAYS_MAX = 365
 STALE_LIMIT_MAX = 200
 
 # The newest sign of life of a task: its own change, a comment, a time entry on it.
-_LAST_SQL = """GREATEST(t.updated_at,
-                   COALESCE((SELECT to_char(MAX(cm.created_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00:00"') FROM obj_comments cm
-                             WHERE cm.kind='task' AND cm.ref_id=t.id AND cm.deleted_at IS NULL), ''),
-                   COALESCE((SELECT MAX(te.updated_at) FROM time_entries te WHERE te.task_id=t.id), ''))"""
+# 2.1095.0 (#5306): every part a TIMESTAMPTZ (tasks.updated_at moved; GREATEST skips NULL), read as the canonical ISO text
+_LAST_SQL = """GREATEST(t.updated_at::timestamptz,
+                   (SELECT MAX(cm.created_at) FROM obj_comments cm WHERE cm.kind='task' AND cm.ref_id=t.id AND cm.deleted_at IS NULL),
+                   (SELECT MAX(NULLIF(CAST(te.updated_at AS text), '')::timestamptz) FROM time_entries te WHERE te.task_id=t.id))"""
 
 
 def stale_tasks(c, uid, *, lids=None, limit=50, days=None):
@@ -61,7 +61,7 @@ def stale_tasks(c, uid, *, lids=None, limit=50, days=None):
             AND (t.due IS NULL OR substr(t.due,1,10)<=?) AND (t.start IS NULL OR t.start='' OR substr(t.start,1,10)<=?)
             AND (t.waiting_at IS NULL OR t.wait_until IS NULL OR t.wait_until<?)
             AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.')}{where})
-        WHERE thr>0 AND substr(last,1,19)::timestamp <= (now() AT TIME ZONE 'UTC') - thr * interval '1 day'
+        WHERE thr>0 AND last <= now() - thr * interval '1 day'
         ORDER BY last, id LIMIT ?""", args_thr + [today, today, today] + args + [limit]).fetchall()
     now = now_utc()
     out = []

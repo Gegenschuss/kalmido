@@ -37,32 +37,32 @@ from ..core.pg import insert_id  # 2.369.5 (#2517): pulled up from functions
 ODL_LEGAL = (
     ("documents", "book", "SELECT substr(COALESCE(NULLIF(date, ''), locked_at), 1, 4) FROM office_docs "
                           "WHERE org_id=? AND locked_at IS NOT NULL"),
-    ("archive", "book", "SELECT substr(COALESCE(NULLIF(date, ''), created_at), 1, 4) FROM office_archive WHERE org_id=?"),
+    ("archive", "book", "SELECT substr(COALESCE(NULLIF(date, ''), CAST(created_at AS text)), 1, 4) FROM office_archive WHERE org_id=?"),
     ("bookarch", "book", "SELECT CAST(year AS TEXT) FROM office_bookarch WHERE org_id=?"),  # 2.414.0 (#3502): the booking archive
     # 2.152.0 review F5: the same rule as the purge hook (receipts/suggest.py olk_fs_locked): booked = paid_at or vat_pct
     # set at all, the year from the document date, else the paid / assigned day
     ("receipts", "receipt", "SELECT substr(COALESCE(NULLIF(m.doc_date, ''), NULLIF(r.paid_at, ''), r.set_at), 1, 4) FROM rc_receipts r "
                             "LEFT JOIN doc_meta m ON m.node_id=r.node_id WHERE r.org_id=? AND (r.paid_at IS NOT NULL OR r.vat_pct IS NOT NULL)"),
-    ("trip_receipts", "receipt", "SELECT substr(COALESCE(NULLIF(i.date, ''), t.date_from, i.created_at), 1, 4) FROM office_trip_items i "
+    ("trip_receipts", "receipt", "SELECT substr(COALESCE(NULLIF(i.date, ''), t.date_from, CAST(i.created_at AS text)), 1, 4) FROM office_trip_items i "
                                  "JOIN office_trips t ON t.id=i.trip_id WHERE i.org_id=? AND i.datev=1"),
-    ("drives", "logbook", "SELECT substr(COALESCE(NULLIF(day, ''), created_at), 1, 4) FROM office_drives WHERE org_id=?"),
+    ("drives", "logbook", "SELECT substr(COALESCE(NULLIF(day, ''), CAST(created_at AS text)), 1, 4) FROM office_drives WHERE org_id=?"),
     # 2.152.0 (#2167, review A6): the cash book and the bank statements are books (10 years), approved entertainment receipts receipts
     ("cash", "book", "SELECT substr(day, 1, 4) FROM office_cash_entries WHERE org_id=?"),
     ("bank", "book", "SELECT substr(day, 1, 4) FROM office_bank_tx WHERE org_id=?"),
     ("cards", "book", "SELECT substr(day, 1, 4) FROM office_cc_lines WHERE org_id=?"),  # 2.444.0 (#3447): statements and their positions, as the bank
     ("meals", "receipt", "SELECT substr(date, 1, 4) FROM office_meals WHERE org_id=? AND status<>'draft'"),
     # 2.184.0 A (#2628): sent letters (business letters, 6 years from the year they went out)
-    ("letters", "letter", "SELECT substr(COALESCE(NULLIF(sent_at, ''), NULLIF(letter_date, ''), created_at), 1, 4) FROM office_letters "
+    ("letters", "letter", "SELECT substr(COALESCE(NULLIF(sent_at, ''), NULLIF(letter_date, ''), CAST(created_at AS text)), 1, 4) FROM office_letters "
                           "WHERE org_id=? AND status<>'draft'"),
     # 2.239.0 C (#2874): the careful side -- received receipts not booked yet (an invoice received is kept, booked or not),
     # payments of documents (books), the procedure documentation (organisation records, 10 years), confirmed sign-offs
     # (business letters); e-invoices of the documents that are no receipt yet: odl_einvoice_years
     ("open_receipts", "receipt", "SELECT substr(COALESCE(NULLIF(m.doc_date, ''), r.set_at), 1, 4) FROM rc_receipts r "
                                  "LEFT JOIN doc_meta m ON m.node_id=r.node_id WHERE r.org_id=? AND r.paid_at IS NULL AND r.vat_pct IS NULL"),
-    ("payments", "book", "SELECT substr(COALESCE(NULLIF(date, ''), created_at), 1, 4) FROM office_payments WHERE org_id=?"),
+    ("payments", "book", "SELECT substr(COALESCE(NULLIF(date, ''), CAST(created_at AS text)), 1, 4) FROM office_payments WHERE org_id=?"),
     # 2.977.0 (#5282): its versions are rows of the core's obj_versions (kind procdoc, TIMESTAMPTZ)
     ("procdocs", "book", "SELECT CAST(EXTRACT(YEAR FROM created_at) AS TEXT) FROM obj_versions WHERE kind='procdoc' AND org_id=?"),
-    ("signoffs", "letter", "SELECT substr(COALESCE(NULLIF(signed_at, ''), created_at), 1, 4) FROM office_signoffs "
+    ("signoffs", "letter", "SELECT substr(COALESCE(NULLIF(signed_at, ''), CAST(created_at AS text)), 1, 4) FROM office_signoffs "
                            "WHERE org_id=? AND (state='accepted' OR signed_at IS NOT NULL)"),
     # 2.355.0 B (#2845): the asset register (a book) from the year of a device's last depreciation: purchase month + useful
     # life (without one the longest of the table, office/assets.py AST_LIFE: the careful side)

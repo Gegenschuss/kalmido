@@ -213,8 +213,8 @@ def ev_kern_drop(c):
             return out
         write_lock(c, KERN_RETIRE_LOCK)  # one process of the instance at a time (reentrant: kern_retire below takes it again)
         have = [x for x in OLD_TABLES if c.execute("SELECT to_regclass(?) IS NOT NULL", (x[0],)).fetchone()[0]]
-        c.execute("UPDATE ev_cals SET updated_at=changed_at WHERE CAST(updated_at AS text)=''")  # 2.1095.0 (#5306): TEXT or TIMESTAMPTZ  # what ev_kern_copy did (#4712)
-        c.execute("UPDATE books SET updated_at=changed_at WHERE CAST(updated_at AS text)=''")
+        c.execute("UPDATE ev_cals SET updated_at=COALESCE(NULLIF(changed_at, '')::timestamptz, now()) WHERE CAST(updated_at AS text)=''")  # 2.1095.0 (#5306): TEXT or TIMESTAMPTZ  # what ev_kern_copy did (#4712)
+        c.execute("UPDATE books SET updated_at=COALESCE(NULLIF(changed_at, '')::timestamptz, now()) WHERE CAST(updated_at AS text)=''")
         for t, col, kind, tb in have:
             made = []
             col = qi(col, _OLD_NAMES)
@@ -237,7 +237,7 @@ def ev_kern_drop(c):
                     f"INSERT INTO fs_shares(node_id, user_id, agent_id, role, created_at, by_role) SELECT n.id, CASE WHEN u.kind='agent' THEN NULL "
                     f"ELSE m.user_id END, CASE WHEN u.kind='agent' THEN m.user_id END, "
                     f"CASE WHEN m.role IN ('view', 'edit') THEN m.role ELSE 'view' END, "
-                    f"m.added_at, 'mirror' FROM {qi(t, _OLD_NAMES)} m JOIN users u ON u.id=m.user_id JOIN fs_nodes n ON n.kind='ref' AND n.ref_kind='{kind}' "
+                    f"COALESCE(NULLIF(CAST(m.added_at AS text), '')::timestamptz, now()), 'mirror' FROM {qi(t, _OLD_NAMES)} m JOIN users u ON u.id=m.user_id JOIN fs_nodes n ON n.kind='ref' AND n.ref_kind='{kind}' "
                     f"AND n.ref_id=m.{col} WHERE m.{col} IN ({','.join(str(x) for x in made)}) AND NOT EXISTS (SELECT 1 FROM fs_shares s "
                     f"WHERE s.node_id=n.id AND (s.user_id=m.user_id OR s.agent_id=m.user_id))").rowcount
             # fable F1 / #5117 (decided 08.11.2026, one way): a row of an object WITH a node and no share of its person is stale -- the

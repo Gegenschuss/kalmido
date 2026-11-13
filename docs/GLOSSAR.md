@@ -250,6 +250,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/access.py` (`acx`) - Access control: who sees / changes which list and task, module switches, list roles
 - `kalmido/core/addrshare.py` (`ads`) - Open shares by e-mail address in the shared core: obj_addr_shares, redeemed when the account of the address signs in with it proved (projects, folders, knowledge pages)
 - `kalmido/core/codemanifest.py` - Code integrity: the web manifest, the full SHA-256 of every file the browser gets (GET /api/code-manifest, tools/web_manifest.py)
+- `kalmido/core/coltype.py` - the old time columns created_at / updated_at / deleted_at as TIMESTAMPTZ instead of ISO text
 - `kalmido/core/compress.py` - JSON answers of the app go out gzip-compressed when the browser accepts it (GET /api/state with many tasks: a few MB of JSON shrink to a few hundred KB)
 - `kalmido/core/config.py` - Configuration from the environment, the outbound-HTTP guard, proxy and login settings, the Flask app object
 - `kalmido/core/conflict.py` - The version check of the dialogs that save a whole object (client, master data, letter, budget, journal)

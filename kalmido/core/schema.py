@@ -2765,8 +2765,10 @@ BEGIN
     END IF;
   END IF;
   INSERT INTO purged_rows(tbl, ref_id, made, at)
-    VALUES (TG_TABLE_NAME, OLD.id, COALESCE(to_char(NULLIF(to_jsonb(OLD)->>'created_at', '')::timestamptz AT TIME ZONE 'UTC',
-            'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'), ''), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'))
+    VALUES (TG_TABLE_NAME, OLD.id, CASE WHEN COALESCE(to_jsonb(OLD)->>'created_at', '') ~ '^[0-9]{4}-[0-9][0-9]-[0-9][0-9]'
+              AND pg_input_is_valid(to_jsonb(OLD)->>'created_at', 'timestamptz')
+            THEN to_char((to_jsonb(OLD)->>'created_at')::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"')
+            ELSE COALESCE(to_jsonb(OLD)->>'created_at', '') END, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'))
     ON CONFLICT (tbl, ref_id) DO UPDATE SET made=excluded.made, at=excluded.at;
   RETURN NULL;
 END $fn$;

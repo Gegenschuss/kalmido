@@ -21,7 +21,7 @@ from ..core.config import app
 from ..core.srchreg import srch_register  # 2.1026.0 (#5280)
 from ..core.pg import IntegrityError, insert_id, st_ids, write_lock
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, db, iso, iso_ms, now_utc
+from ..core.db import body, bump, db, iso, iso_ms, now_utc, parse_iso
 from ..core.retention import ret_on  # 2.272.0 A (#3026)
 from ..accounts.session import me
 from ..accounts.orgs import is_org_admin  # 2.306.0 D3 (#2875)
@@ -42,6 +42,16 @@ WIKI_LINK_RE = re.compile(r"\[\[(?!\s*(?i:datei|tabelle)\s*:)([^\[\]|#\n]{1,500}
 # imported hashtags). Chat, comments and task texts keep #123 (chat.js mdTaskRefs).
 WIKI_TASK_RE = re.compile(r"\[\[#(\d{1,12})(?:\|[^\[\]\n]*)?\]\]")
 WIKI_BAD_CHARS = re.compile(r"[\x00-\x1f\x7f\[\]|#^\\]")
+
+
+def _since_ok(v):
+    """2.1095.0 (#5306): the offline copy's since=<updated_at> only when it is a point in time (updated_at is TIMESTAMPTZ: any
+    other text would be a database error); else no filter (all pages)."""
+    try:
+        parse_iso(v.replace("Z", "+00:00"))
+        return v
+    except ValueError:
+        return ""
 
 
 def wiki_clean_path(v):
@@ -325,7 +335,7 @@ def wiki_index():
     # 2.169.0 (#2671): offline=1 = the browser keeps a copy of the space: the texts of every space (not only a locked one),
     # with since=<updated_at> only those of pages changed at or after it (the others it has; deleted ones are missing here)
     off = request.args.get("offline") == "1"
-    since = str(request.args.get("since") or "")[:40] if off else ""
+    since = _since_ok(str(request.args.get("since") or "")[:40]) if off else ""  # 2.1095.0 (#5306): only a point in time
     if (e2e or off) and request.args.get("bodies") == "1" and request.args.get("bn"):  # 2.280.0 C (#3114): the texts in pages
         nxt = wiki_body_page(c, oid, uid, w, a, {d["id"]: d for d in pages})
     elif (e2e or off) and request.args.get("bodies") == "1":
@@ -368,7 +378,7 @@ def wiki_body_page(c, oid, uid, w, a, pages):
         n = max(1, min(int(request.args.get("bn") or WIKI_BODY_PAGE), WIKI_BODY_PAGE))
     except ValueError:
         raise BadInput(tr("Invalid value: {0}", "bn"))
-    since = str(request.args.get("since") or "")[:40] if off else ""
+    since = _since_ok(str(request.args.get("since") or "")[:40]) if off else ""  # 2.1095.0 (#5306): only a point in time
     cur = str(request.args.get("bafter") or "")
     q, qa = f"SELECT id, org_id, owner_id, body, lower(path) AS lp FROM wiki_pages WHERE deleted_at IS NULL AND {w}", [*a]
     if since:

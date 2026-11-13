@@ -467,7 +467,7 @@ def ua8_lists_settle(c, u, by, rx_how=None):
 def ua8_receipts_until(c, lid):
     """2.186.0 A (#2566): the end of the legal period of the project receipts of list lid (the end of the year of the latest
     receipt + 8 years, orgretain._until) or None when it is over (then the usual trash days)."""
-    years = [r[0] for r in c.execute("SELECT substr(COALESCE(NULLIF(e.day, ''), f.created_at), 1, 4) FROM budget_files f "
+    years = [r[0] for r in c.execute("SELECT substr(COALESCE(NULLIF(e.day, ''), CAST(f.created_at AS text)), 1, 4) FROM budget_files f "
                                      "LEFT JOIN budget_entries e ON e.id=f.entry_id WHERE f.list_id=?", (lid,)).fetchall()]
     return _until("receipt", years)
 

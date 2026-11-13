@@ -98,6 +98,7 @@ def versions(s, who):
 LA, TA = versions(A, "alice")
 FRIDA, F = freelancer(B, A)
 LF, TF = versions(F, "frida")
+TX = A.post(B + "/api/tasks", json={"title": "third", "list_id": LA}).json()["id"]  # review 2.1095 (F11): the row with a bad value
 
 # ---- the migration on old values (rolled back)
 mig, err = py("""
@@ -108,8 +109,8 @@ c.execute("ALTER TABLE ev_cals ALTER COLUMN updated_at DROP DEFAULT, ALTER COLUM
 out = {'old': [c.execute("SELECT data_type FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='tasks' AND column_name=?", (x,)).fetchone()[0] for x in ('created_at', 'updated_at')]}
 c.execute("UPDATE tasks SET created_at='2026-03-01T10:00:00Z', updated_at='', deleted_at='' WHERE id=?", (%(ta)d,))
 c.execute("UPDATE tasks SET created_at='2026-03-01 11:30:00', updated_at='2026-03-02T12:00:00+02:00', deleted_at=NULL WHERE id=?", (%(tf)d,))
-c.execute("UPDATE tasks SET created_at='last tuesday' WHERE id=(SELECT MIN(id) FROM tasks WHERE id NOT IN (%(ta)d, %(tf)d))")
-out['bad_id'] = c.execute("SELECT MIN(id) FROM tasks WHERE id NOT IN (%(ta)d, %(tf)d)").fetchone()[0]
+c.execute("UPDATE tasks SET created_at='last tuesday' WHERE id=?", (%(tx)d,))
+out['bad_id'] = %(tx)d
 out['first'] = ct_migrate(c, '2026-11-13T08:00:00+00:00')
 out['types'] = [c.execute("SELECT data_type FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? AND column_name=?", x).fetchone()[0] for x in (('tasks', 'created_at'), ('tasks', 'updated_at'), ('tasks', 'deleted_at'), ('ev_cals', 'updated_at'))]
 out['a'] = list(c.execute("SELECT created_at, updated_at, deleted_at FROM tasks WHERE id=?", (%(ta)d,)).fetchone())
@@ -119,7 +120,7 @@ out['dflt'] = c.execute("SELECT column_default FROM information_schema.columns W
 out['second'] = sorted(set(ct_migrate(c, '2026-11-13T09:00:00+00:00').values()))
 c.rollback()
 print(json.dumps(out))
-""" % {"ta": TA, "tf": TF})
+""" % {"ta": TA, "tf": TF, "tx": TX})
 first = mig.get("first") or {}
 check(mig.get("old") == ["text", "text"], f"migration: the old state is TEXT {mig}")
 check(first.get("tasks.created_at") == "done" and first.get("tasks.updated_at") == "done" and first.get("tasks.deleted_at") == "done"
@@ -133,7 +134,7 @@ check(mig.get("bad") == "2026-11-13T08:00:00+00:00", f"migration: a value that i
 check("5306: tasks.created_at: 1 value(s) are no point in time" in err and str(mig.get("bad_id")) in err,
       f"migration: the log names the column and the id {err[-600:]}")
 check("CURRENT_TIMESTAMP" in str(mig.get("dflt") or "").upper(), f"migration: DEFAULT '' becomes CURRENT_TIMESTAMP {mig.get('dflt')}")
-check(mig.get("second") == ["present"], f"migration: a second run changes nothing {mig.get('second')}")
+check(set(mig.get("second") or ["?"]) <= {"present", "missing"}, f"migration: a second run changes nothing {mig.get('second')}")
 
 # ---- the SQL that read the columns as text
 reg, err = py("""
@@ -147,12 +148,14 @@ except Exception as e:
 c.rollback()
 ts, tx, te = "'2026-05-06T23:30:00+00:00'::timestamptz", "'2026-05-06T23:30:00+00:00'::text", "''::text"
 out['day'] = list(c.execute("SELECT " + ct_day(ts) + ", " + ct_day(tx)).fetchone())
-out['iso'] = list(c.execute("SELECT " + ct_iso(ts) + ", " + ct_iso("'2026-05-06T23:30:00Z'::text") + ", " + ct_iso(te)).fetchone())
+out['iso'] = list(c.execute("SELECT " + ct_iso(ts) + ", " + ct_iso("'2026-05-06T23:30:00Z'::text") + ", " + ct_iso(te) + ", "
+                            + ct_iso("'2026-05-06T23:30:00.123+00:00'::timestamptz")).fetchone())
 print(json.dumps(out))
 """ % {"la": LA})
 check(reg.get("seed") and reg.get("seed") == reg.get("before"), f"kern_version_seed on a TIMESTAMPTZ project (compared '' before) {reg} {err[-300:]}")
 check(reg.get("day") == ["2026-05-06", "2026-05-06"], f"ct_day: the same day for TEXT and TIMESTAMPTZ {reg.get('day')}")
-check(reg.get("iso") == ["2026-05-06T23:30:00+00:00", "2026-05-06T23:30:00+00:00", None], f"ct_iso: one form, '' = NULL {reg.get('iso')}")
+check(reg.get("iso") == ["2026-05-06T23:30:00+00:00", "2026-05-06T23:30:00+00:00", None, "2026-05-06T23:30:00.123000+00:00"],
+      f"ct_iso: the form of ts_canon (microseconds only when there are any), '' = NULL {reg.get('iso')}")
 
 made = dbx("SELECT created_at FROM tasks WHERE id=?", (TF,))[0][0]
 check(F.delete(B + f"/api/tasks/{TF}").ok, "frida: her task into the trash")

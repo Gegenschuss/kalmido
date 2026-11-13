@@ -415,22 +415,22 @@ def ojn_neutral_drop(c, oid, email):
 
 OJN_PURGE_DAYS = 30  # 2.1005.0 (#5118): an expired invitation stays in the admins' list this long, then the daily clean-up deletes it
 # 2.1005.0 (#5118): a text time of org_joins / user_invites as timestamptz (NULL for an empty or broken value: such a row stays)
-OJN_TS = "CASE WHEN pg_input_is_valid({0}, 'timestamptz') THEN {0}::timestamptz END"
+OJN_TS = "CASE WHEN pg_input_is_valid(CAST({0} AS text), 'timestamptz') THEN {0}::timestamptz END"
 
 
 # 2.1060.0 (#4949): the purge statement written out (OJN_TS for each of the three columns) as one plain literal, not an f-string:
 # tests/pg_prepare_test.py PREPAREs it as it stands against the schema; in an f-string every {OJN_TS.format(..)} became the
 # stand-in TRUE (boolean < timestamptz), so the check failed on its own stand-in and never saw the real types
 OJN_PURGE_SQL = """DELETE FROM org_joins j
-  WHERE CASE WHEN pg_input_is_valid(j.created_at, 'timestamptz') THEN j.created_at::timestamptz END < ?::timestamptz
+  WHERE CASE WHEN pg_input_is_valid(CAST(j.created_at AS text), 'timestamptz') THEN j.created_at::timestamptz END < ?::timestamptz
     AND NOT EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite'
           AND CASE WHEN pg_input_is_valid(v.used_at, 'timestamptz') THEN v.used_at::timestamptz END >= ?::timestamptz
-          AND CASE WHEN pg_input_is_valid(v.created_at, 'timestamptz') THEN v.created_at::timestamptz END
-              >= CASE WHEN pg_input_is_valid(j.created_at, 'timestamptz') THEN j.created_at::timestamptz END)"""
+          AND CASE WHEN pg_input_is_valid(CAST(v.created_at AS text), 'timestamptz') THEN v.created_at::timestamptz END
+              >= CASE WHEN pg_input_is_valid(CAST(j.created_at AS text), 'timestamptz') THEN j.created_at::timestamptz END)"""
 # 2.1060.0 (#4949) with 2.1062.0 (#5786): the org_invites clean-up after the org_joins purge, written out the same way
 # (OJN_TS for i.created_at, OINV_UNUSED for i.user_id) so pg_prepare checks the real types
 OINV_PURGE_SQL = """DELETE FROM org_invites i
-  WHERE CASE WHEN pg_input_is_valid(i.created_at, 'timestamptz') THEN i.created_at::timestamptz END < ?::timestamptz
+  WHERE CASE WHEN pg_input_is_valid(CAST(i.created_at AS text), 'timestamptz') THEN i.created_at::timestamptz END < ?::timestamptz
     AND NOT EXISTS (SELECT 1 FROM org_joins j WHERE j.org_id=i.org_id AND j.user_id=i.user_id)
     AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=i.org_id AND m.user_id=i.user_id)
     AND (NOT (EXISTS (SELECT 1 FROM users x WHERE x.id=i.user_id AND x.password_hash IS NULL AND x.proxy_login IS NULL
@@ -479,10 +479,10 @@ def oinv_mark(c):
     org_invites row. Daily, idempotent; the caller holds the system context and commits."""
     # 2.1060.0 (#4949): written out (OJN_TS for i.created_at) so pg_prepare checks the real type, not the stand-in TRUE
     c.execute("""UPDATE users u
-                 SET oinv_made_at=CASE WHEN pg_input_is_valid(i.created_at, 'timestamptz') THEN i.created_at::timestamptz END
+                 SET oinv_made_at=CASE WHEN pg_input_is_valid(CAST(i.created_at AS text), 'timestamptz') THEN i.created_at::timestamptz END
                  FROM org_invites i
                  WHERE i.user_id=u.id AND u.oinv_made_at IS NULL
-                   AND CASE WHEN pg_input_is_valid(i.created_at, 'timestamptz') THEN i.created_at::timestamptz END IS NOT NULL""")
+                   AND CASE WHEN pg_input_is_valid(CAST(i.created_at AS text), 'timestamptz') THEN i.created_at::timestamptz END IS NOT NULL""")
 
 
 def oinv_due(c, uid=None):

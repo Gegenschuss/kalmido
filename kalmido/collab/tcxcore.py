@@ -172,7 +172,7 @@ def tcx_core_copy(c):
     added = 0
     for key, cond in (("user_id", "COALESCE(u.kind,'')!='agent'"), ("agent_id", "u.kind='agent'")):
         added += c.execute(f"""INSERT INTO fs_shares(node_id,{key},role,created_by,created_at,by_role)
-                               SELECT n.id, m.user_id, 'edit', m.added_by, m.created_at, NULL
+                               SELECT n.id, m.user_id, 'edit', m.added_by, COALESCE(NULLIF(CAST(m.created_at AS text), '')::timestamptz, now()), NULL
                                FROM tchat_members m JOIN users u ON u.id=m.user_id
                                JOIN fs_nodes n ON n.kind='ref' AND n.ref_kind=? AND n.ref_id=m.room_id
                                WHERE {cond} AND NOT EXISTS (SELECT 1 FROM fs_shares s WHERE s.node_id=n.id AND s.{key}=m.user_id)""",

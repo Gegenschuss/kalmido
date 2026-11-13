@@ -102,7 +102,7 @@ CT_ID = "type:{0}.{1}"  # its row in kalmido_migrations
 # a point in time as ISO text: a day, optionally the time (T or a space), optionally a zone; pg_input_is_valid checks the rest
 # (2026-02-30, 25:00), the pattern keeps out what Postgres reads as a time too ('now', 'today', 'epoch', 'infinity')
 CT_ISO = r"^\d{4}-\d\d-\d\d([T ]\d\d:\d\d(:\d\d(\.\d{1,6})?)?)?(Z|[+-]\d\d(:?\d\d)?)?$"
-CT_ZONE = r"(Z|[+-]\d\d(:?\d\d)?)$"
+CT_ZONE = r"[T ]\d\d:\d\d(:\d\d(\.\d{1,6})?)?(Z|[+-]\d\d(:?\d\d)?)$"  # review 2.1095 (F13): a zone only after a time (2026-03-01: -01 is the day)
 
 
 def ct_day(expr):
@@ -113,9 +113,12 @@ def ct_day(expr):
 
 def ct_iso(expr):
     """SQL: a time column as the canonical ISO text the app reads (core/pg.py ts_canon, whole seconds: UTC, +00:00), for TEXT
-    and TIMESTAMPTZ alike; NULL for NULL / ''. For keys and marks built in SQL that Python compares with a value it read
+    and TIMESTAMPTZ alike, microseconds only when there are any; NULL for NULL / ''. For keys and marks built in SQL that Python compares with a value it read
     (a TIMESTAMPTZ concatenated or assigned to a TEXT column carries the session's text form '2026-11-13 04:33:00+00')."""
-    return f"""to_char(NULLIF(CAST({expr} AS text), '')::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"')"""
+    # review 2.1095 (F8): microseconds when there are any, as ts_canon (iso_ms writes milliseconds into many of these columns)
+    t = f"(NULLIF(CAST({expr} AS text), '')::timestamptz AT TIME ZONE 'UTC')"
+    return (f"""(to_char({t}, 'YYYY-MM-DD"T"HH24:MI:SS') || CASE WHEN to_char({t}, 'US') <> '000000' THEN '.' || to_char({t}, 'US') """
+            f"""ELSE '' END || '+00:00')""")
 
 
 def _valid(q):
@@ -195,6 +198,13 @@ def _ct_run(c, at):
             c.execute("INSERT INTO kalmido_migrations(id,applied_at,note) VALUES(?,?,'applied') ON CONFLICT(id) DO UPDATE SET "
                       "applied_at=excluded.applied_at, note=excluded.note", (CT_ID.format(table, col), at))
             out[k] = "done"
+    # review 2.1095 (F9): the import marks of contacts / events are copies of updated_at as text; a millisecond value reads as
+    # microseconds now (ts_canon), so the copy takes the same form, else every contact / event counts as changed here
+    for table in ("contacts", "events"):
+        if out.get(f"{table}.updated_at") == "done":
+            with c.savepoint():
+                c.execute(f"UPDATE {qi(table, CT_TABLES)} SET imp_at={ct_iso('imp_at')} WHERE imp_at ~ '\\.[0-9]' "
+                          "AND pg_input_is_valid(imp_at, 'timestamptz')")
     n = sum(1 for v in out.values() if v == "done")
     if n:
         print(f"migrations: 5306: {n} time column(s) are TIMESTAMPTZ now", flush=True)

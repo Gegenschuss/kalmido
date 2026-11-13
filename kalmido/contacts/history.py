@@ -41,7 +41,7 @@ def ctk_mails(c, uid, emails):
     if cids:
         q += f" OR client_id IN ({','.join('?' * len(cids))})"
         args += cids
-    rows = c.execute(q + ") ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT ?", [*args, CTK_MAILS_SCAN]).fetchall()
+    rows = c.execute(q + ") ORDER BY COALESCE(NULLIF(sent_at, '')::timestamptz, created_at::timestamptz) DESC, id DESC LIMIT ?", [*args, CTK_MAILS_SCAN]).fetchall()
     lists, out = {}, []
     for m in rows:
         if m["list_id"]:

@@ -750,7 +750,7 @@ def dav_where(c, u, lst):
     """2.665.0 (#4196): (SQL condition on tasks t, its parameters) of the tasks of list lst that are resources for u - one rule
     for the key and the rendering."""
     uid, o3a = u["id"], bool(lst.get("o3a_ov"))
-    return (f"""t.list_id=? AND t.deleted_at IS NULL AND (t.status=0 OR COALESCE(NULLIF(t.completed_at, '')::timestamptz, t.updated_at)>=?)
+    return (f"""t.list_id=? AND t.deleted_at IS NULL AND (t.status=0 OR COALESCE(NULLIF(t.completed_at, '')::timestamptz, t.updated_at::timestamptz)>=?)
                 AND {tvis(c, uid, 't.')} {"AND t.assignee_id=?" if o3a else ""}""",
             (lst["id"], dav_done_cutoff(), *((uid,) if o3a else ())))  # 2.83.0 (#1725): o3a = only the tasks assigned to u
 
