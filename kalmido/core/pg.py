@@ -199,9 +199,9 @@ def cb_seen(pg, cur):
     if st is not None and all((t, a) in st["cols"] for _i, t, a in cols):
         return
     from .colbool import CB_PAIRS  # lazy: colbool imports this module
-    rows = pg.execute("SELECT c.oid, a.attnum, (c.relname || '.' || a.attname) = ANY(%s) FROM pg_class c "
-                      "JOIN pg_attribute a ON a.attrelid = c.oid "
-                      "WHERE c.relnamespace = (SELECT n.oid FROM pg_namespace n WHERE n.nspname = current_schema()) "
+    rows = pg.execute("SELECT c.oid, a.attnum, (c.relname || '.' || a.attname) = ANY(%s) FROM pg_class c "  # pg-ok: pg_class.oid, a catalog of Postgres
+                      "JOIN pg_attribute a ON a.attrelid = c.oid "  # pg-ok: pg_class.oid
+                      "WHERE c.relnamespace = (SELECT n.oid FROM pg_namespace n WHERE n.nspname = current_schema()) "  # pg-ok: pg_namespace.oid
                       "AND c.relkind IN ('r', 'p') AND a.attnum > 0 AND NOT a.attisdropped", (sorted(CB_PAIRS),)).fetchall()
     with _CB_LOCK:  # review 2.1118 (F3): pairs from outside the schema (catalogue, temp tables) stay known, no lookup each time
         old = (st or {}).get("cols", set())
