@@ -576,7 +576,7 @@ def otg_move_ws(c):
     the link's how (src from it). Runs as "system" in the start transaction."""
     if not _otg_has(c, "doc_tags"):
         return {}
-    remap = {}
+    remap, kept = {}, []  # kept: the old ids that are the moved tag's id now (review F4: only those and remap take links)
     c.execute("SELECT setval(pg_get_serial_sequence('obj_tags', 'id'), GREATEST((SELECT COALESCE(MAX(id), 0) FROM obj_tags), "
               "(SELECT COALESCE(MAX(id), 0) FROM doc_tags), 1))")
     for r in c.execute("SELECT id, ws, name, created_at FROM doc_tags ORDER BY id").fetchall():
@@ -594,6 +594,8 @@ def otg_move_ws(c):
                             (r["ws"], otg_ws_org(r["ws"]), name, _otg_ts(c, r["created_at"])))
         if new != r["id"]:
             remap[(r["ws"], r["id"])] = new
+        else:
+            kept.append(r["id"])
     if _otg_has(c, "doc_node_tags"):
         pairs = sorted((o, n) for (_ws, o), n in remap.items())
         c.execute(f"""INSERT INTO obj_tag_links(tag_id, kind, obj_id, src, how, created_at)
@@ -602,8 +604,9 @@ def otg_move_ws(c):
                              COALESCE(x.auto, ''), CURRENT_TIMESTAMP
                       FROM doc_node_tags x JOIN doc_tags t ON t.id=x.tag_id
                       LEFT JOIN unnest(CAST(? AS BIGINT[]), CAST(? AS BIGINT[])) AS m(o, n) ON m.o=x.tag_id
-                      WHERE EXISTS (SELECT 1 FROM obj_tags ot WHERE ot.id=COALESCE(m.n, x.tag_id) AND ot.scope_kind='ws' AND ot.scope_id=t.ws)
+                      WHERE (m.n IS NOT NULL OR x.tag_id = ANY(CAST(? AS BIGINT[])))
+                      AND EXISTS (SELECT 1 FROM obj_tags ot WHERE ot.id=COALESCE(m.n, x.tag_id) AND ot.scope_kind='ws' AND ot.scope_id=t.ws)
                       ORDER BY x.node_id, x.tag_id ON CONFLICT DO NOTHING""",
-                  ([p[0] for p in pairs], [p[1] for p in pairs]))
+                  ([p[0] for p in pairs], [p[1] for p in pairs], kept))
     c.execute("SELECT setval(pg_get_serial_sequence('obj_tags', 'id'), GREATEST((SELECT COALESCE(MAX(id), 0) FROM obj_tags), 1))")
     return remap
