@@ -22,6 +22,7 @@ from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..collab.liste2e import le2e_is_cipher
 from ..core.db import connect
 from ..core.coltype import ct_iso  # 2.1095.0 (#5306): a time column as the canonical text in SQL
+from ..core.pg import ts_canon  # 2.1112.2 (#5981): the mark in the form ct_iso compares with
 from ..core.orgcrypt import _kek, _kek_check, _row, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
 from .wkhist import WikiUnreadable, wkh_body  # 2.280.0 C (#3114): loads before this module (kalmido/__init__.py ORDER)
 from .wkhist import wkh_sid, wsb_body_or  # 2.369.5 (#2517): pulled up from functions
@@ -61,6 +62,9 @@ def wks_index(c, pid, oid, owner, text, at, unreadable=None):
     """The word index of page pid (plain text, the page's updated_at after the save). unreadable = the key state of the space
     when the text could not be opened (2.139.0 C #2386): no words, the mark 'x:' to try it again after a key event.
     2.1002.0 (#5279): in the shared word index (core/objwords.py osw_put, kind 'wiki_page')."""
+    # 2.1112.2 (#5981): the mark in the shortest exact form (ts_canon), as wks_unindexed reads the column (ct_iso) - the
+    # writers pass iso_ms text, whose ".000" (a save on a whole second) never matched: the page stayed late until its next save
+    at = ts_canon(at)
     if unreadable is not None:
         osw_put(c, "wiki_page", pid, more={f"x:{at}:{unreadable}"})
         return
