@@ -20,6 +20,7 @@ from ..core.pg import st_ids  # 2.772.0 (#4890): the documents of a custom field
 from ..files.store import fs_role  # 2.306.0 D3 (#2875)
 from . import store as S
 from ..core.objwords import osw_match  # 2.1002.0 (#5279)
+from ..core.objtags import OTG_FS_IN  # 2.1119.0 (#5277)
 
 DSR_KEYS = {"tag": "tag", "tags": "tag", "absender": "sender", "sender": "sender", "von": "sender", "from": "sender",
             "typ": "type", "type": "type", "art": "type", "datum": "date", "date": "date", "eingang": "added", "added": "added"}
@@ -27,6 +28,8 @@ DSR_FTYPES = ("pdf", "image", "office", "text", "other")
 DSR_TOKEN = re.compile(r'(-?)(?:([A-Za-zÄÖÜäöü]+):(?:"([^"]*)"|(\S+))|"([^"]*)"|(\S+))')
 DSR_TEXT_MAX = int(os.environ.get("KALMIDO_DSR_TEXT_MAX", "3000"))  # documents whose text is opened for a phrase / an exclusion (2.897.0, #5547: settable for the tests)
 _ISO = r"\d{4}-\d{2}-\d{2}"
+# 2.1119.0 (#5277): the documents carrying one of the tag ids (the core's links; + " IN (?,?))" by _in) -- was doc_node_tags
+_DT_IN = "d.node_id IN (" + OTG_FS_IN
 
 
 def dsr_parse(q):
@@ -206,11 +209,11 @@ def dsr_filters(c, args, where, params, base_where, base_params):
             where.append(_in(col, ids, params))
     tags = dsr_ids(args, "tag")
     if tags:
-        parts = [_in("d.node_id IN (SELECT node_id FROM doc_node_tags WHERE tag_id", g, params) + ")" for g in tags]
+        parts = [_in(_DT_IN, g, params) + ")" for g in tags]
         where.append("(" + (" AND " if str(args.get("tag_mode") or "") == "all" else " OR ").join(parts) + ")")
     nt = flat("not_tag")
     if nt:
-        where.append("NOT " + _in("d.node_id IN (SELECT node_id FROM doc_node_tags WHERE tag_id", nt, params) + ")")
+        where.append("NOT " + _in(_DT_IN, nt, params) + ")")
     for key, expr, op in (("from", "COALESCE(d.doc_date, substr(CAST(n.created_at AS text), 1, 10))", ">="), ("to", "COALESCE(d.doc_date, substr(CAST(n.created_at AS text), 1, 10))", "<="),
                           ("added_from", "substr(CAST(n.created_at AS text), 1, 10)", ">="), ("added_to", "substr(CAST(n.created_at AS text), 1, 10)", "<=")):
         v = str(args.get(key) or "")[:10]
@@ -223,7 +226,7 @@ def dsr_filters(c, args, where, params, base_where, base_params):
     if st in S.STATES:
         where.append("d.state = ?")
         params.append(st)
-    for key, cond in (("no_tag", "NOT EXISTS (SELECT 1 FROM doc_node_tags x WHERE x.node_id=d.node_id)"),
+    for key, cond in (("no_tag", "NOT EXISTS (SELECT 1 FROM obj_tag_links x WHERE x.kind='fs_entry' AND x.obj_id=d.node_id)"),
                       ("no_sender", "d.sender_id IS NULL"), ("no_type", "d.type_id IS NULL")):
         if str(args.get(key) or "") in ("1", "true"):
             where.append(cond)
@@ -261,10 +264,10 @@ def dsr_filters(c, args, where, params, base_where, base_params):
                                        base_params)]
         for name in p["tag"]:  # every tag:
             ids = dsr_label_ids(c, wss, "tag", name)
-            where.append(_in("d.node_id IN (SELECT node_id FROM doc_node_tags WHERE tag_id", ids, params) + ")" if ids else "FALSE")
+            where.append(_in(_DT_IN, ids, params) + ")" if ids else "FALSE")
         nt = [i for name in p["not_tag"] for i in dsr_label_ids(c, wss, "tag", name)]
         if nt:
-            where.append("NOT " + _in("d.node_id IN (SELECT node_id FROM doc_node_tags WHERE tag_id", nt, params) + ")")
+            where.append("NOT " + _in(_DT_IN, nt, params) + ")")
         for kind, col in (("sender", "d.sender_id"), ("type", "d.type_id")):
             if p[kind]:  # one of them
                 ids = [i for name in p[kind] for i in dsr_label_ids(c, wss, kind, name)]

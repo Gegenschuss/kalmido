@@ -108,7 +108,8 @@ def rcf_file(c, nid, kind, name_of, day, uid=None, tag=True):
     area = tr("Credit card", lg=lg) if kind == "card" else tr("Bank", lg=lg)
     tid = label_id(c, m["ws"], "tag", area) if tag else None
     if tid:
-        c.execute("INSERT INTO doc_node_tags(node_id, tag_id, auto) VALUES(?,?,'rule') ON CONFLICT DO NOTHING", (nid, tid))
+        from ..core.objtags import otg_ws_link
+        otg_ws_link(c, nid, tid, "rule")  # 2.1119.0 (#5277): the core's link, marked as a rule's
     ym = rcf_month(day, lg)
     if not root or not ym or not _in_inbox(c, node, root):
         return None

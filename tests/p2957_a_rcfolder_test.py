@@ -64,7 +64,8 @@ def path(nid):
 
 
 def tags(nid):
-    return sorted(r[0] for r in sql("SELECT t.name FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id WHERE nt.node_id=?", (nid,)))
+    # 2.1119.0 (#5277): the file store's tags are rows of the core (obj_tags scope ws / obj_tag_links kind fs_entry)
+    return sorted(r[0] for r in sql("SELECT t.name FROM obj_tag_links k JOIN obj_tags t ON t.id=k.tag_id WHERE k.kind='fs_entry' AND k.obj_id=?", (nid,)))
 
 
 def done(nid):

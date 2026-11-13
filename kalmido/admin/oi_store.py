@@ -334,6 +334,19 @@ def _sheet_share_note(run, src_sid, sid, who, role, expires_at=None):
 
 
 # ---- documents ---------------------------------------------------------------------------------------------------------
+# the map kind of a label's old id (the archive's documents/*.json; 2.1119.0 #5277: a tag keeps the kind doc_tags in the map,
+# its row is one of the core's obj_tags)
+_LABEL_MAP = {"sender": "doc_senders", "type": "doc_types", "tag": "doc_tags"}
+
+
+def _tag_link(c, run, src, d, ctx):
+    """2.1119.0 (#5277): a tag on a node of the archive (documents/document_tags.json, the columns of doc_node_tags) as a link
+    of the core: its mark auto is the link's how."""
+    how = str(src.get("auto") or "")[:20]
+    d["how"], d["src"] = how, ("agent" if how == "agent" else "auto" if how else "person")
+    return d
+
+
 def _label(kind):
     def prep(c, run, src, d, ctx):
         from ..docs import store as S
@@ -343,8 +356,11 @@ def _label(kind):
             return None
         have = S.label_id(c, ws, kind, name, create=False)
         if have:  # the target knows it already: the documents use that one
-            run.put(S.LABEL_KINDS[kind], src.get("id"), have)
+            run.put(_LABEL_MAP[kind], src.get("id"), have)
             return None
+        if kind == "tag":  # 2.1119.0 (#5277): a tag of the core (obj_tags scope ws; org_id = the space, as doc_tags had it)
+            d["scope_id"], d["name"] = ws, name
+            return d
         d["ws"], d["name"] = ws, S.doc_seal(c, ws, "doc_senders.name", name) if kind == "sender" else name
         return d
     return prep
@@ -866,9 +882,10 @@ SPECS = [
     # documents: labels first (found by name in the target), then the links of the tags, rules, settings, the documents
     OiT("documents/senders.json", "doc_senders", prep=_label("sender")),
     OiT("documents/types.json", "doc_types", prep=_label("type")),
-    OiT("documents/tags.json", "doc_tags", prep=_label("tag")),
-    OiT("documents/document_tags.json", "doc_node_tags", refs={"node_id": "fs_nodes", "tag_id": "doc_tags"}, need=("node_id", "tag_id"),
-        space=(), rid=False),
+    # 2.1119.0 (#5277): the tags into the core (obj_tags scope ws / obj_tag_links kind fs_entry); the archive keeps its files and columns
+    OiT("documents/tags.json", "obj_tags", kind="doc_tags", fixed={"scope_kind": "ws", "scope_id": ""}, prep=_label("tag")),
+    OiT("documents/document_tags.json", "obj_tag_links", refs={"obj_id": "fs_nodes", "tag_id": "doc_tags"}, src={"obj_id": "node_id"},
+        need=("obj_id", "tag_id"), fixed={"kind": "fs_entry"}, space=(), rid=False, prep=_tag_link),
     OiT("documents/rules.json", "doc_rules", people=_P, prep=_rule),
     OiT("documents/settings.json", "doc_cfg", rid=False, key=("ws",), prep=_cfg),  # 2.137.1 (#2399): undone by its workspace
     # 2.278.0 B (#3094): dup_of (an older document's node) mapped, never the old id

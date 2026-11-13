@@ -234,11 +234,11 @@ TF = upload(A, TG, "tagged.txt")
 check(A.put(B + f"/api/files/nodes/{TF}/tags", json={"tags": ["invented tag"]}).ok, "a tag on a plain file")
 check(A.get(B + f"/api/files/lock/{TG}").json().get("tagged") == 1, "the lock dialog learns of one tagged node")
 lock(A, TG, [ME])
-check(not dbx("SELECT 1 FROM doc_node_tags WHERE node_id=?", (TF,)), "locking removed the tag")
+check(not dbx("SELECT 1 FROM obj_tag_links WHERE kind='fs_entry' AND obj_id=?", (TF,)), "locking removed the tag")  # 2.1119.0 (#5277): the core's links
 MT = upload(A, folder(A, "Loose"), "moving.txt")
 A.put(B + f"/api/files/nodes/{MT}/tags", json={"tags": ["another tag"]})
 r = A.post(B + f"/api/files/lock/move/{MT}", data={"parent_id": str(TG), "name": ct(1)}, files={"file": ("x", kenc(1), "application/octet-stream")})
-check(r.ok and not dbx("SELECT 1 FROM doc_node_tags WHERE node_id=?", (MT,)), "moving into a locked folder removes the tags " + r.text[:120])
+check(r.ok and not dbx("SELECT 1 FROM obj_tag_links WHERE kind='fs_entry' AND obj_id=?", (MT,)), "moving into a locked folder removes the tags " + r.text[:120])
 
 # ---------------------------------------------------------------- folders with content across the border
 L = folder(A, "Locked box")

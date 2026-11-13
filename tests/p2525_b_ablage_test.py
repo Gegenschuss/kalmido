@@ -63,9 +63,10 @@ def doc(owner, oid, name):
 
 
 def tag(ws, oid, name, *nodes):
-    tid = dbx("INSERT INTO doc_tags(org_id, ws, name, created_at) VALUES(?,?,?,?) RETURNING id", (oid, ws, name, TS))[0][0]
+    # 2.1119.0 (#5277): the file store's tags are rows of the core (obj_tags scope ws / obj_tag_links kind fs_entry)
+    tid = dbx("INSERT INTO obj_tags(scope_kind, scope_id, org_id, name, created_at) VALUES('ws',?,?,?,?) RETURNING id", (ws, oid, name, TS))[0][0]
     for n in nodes:
-        dbx("INSERT INTO doc_node_tags(node_id, tag_id) VALUES(?,?)", (n, tid))
+        dbx("INSERT INTO obj_tag_links(tag_id, kind, obj_id) VALUES(?,'fs_entry',?)", (tid, n))
     return tid
 
 
