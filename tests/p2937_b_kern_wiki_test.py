@@ -86,6 +86,15 @@ def text_of(s, pid):
     return r.json().get("body", "") if r.ok else None
 
 
+def card_of(owner, page_id=None, folder=None):
+    """2.1115.0 (#5967): the core share (fs_shares id) behind a share by address -- its dialog id e<..> is sealed (wsh_eid)."""
+    q = ("SELECT k.fs_share_id FROM wiki_share_cards k JOIN fs_shares f ON f.id=k.fs_share_id JOIN fs_nodes n ON n.id=f.node_id "
+         "WHERE n.owner_id=? AND ")
+    r = sql(q + ("n.kind='ref' AND n.ref_kind='wiki' AND n.ref_id=?" if page_id else "k.folder AND n.kind='folder' AND n.name=?")
+            + " ORDER BY k.fs_share_id DESC LIMIT 1", (owner, page_id or folder))
+    return r[0][0] if r else 0
+
+
 def dialog(s):
     r = s.get(B + "/api/wiki/shares", params={"space": "private"})
     return r.json().get("shares", []) if r.ok else []
@@ -111,12 +120,13 @@ check(r.ok, f"frida shares the page Note by address {r.status_code}")
 sh = dialog(Fr)
 fold = next((x for x in sh if x["folder"]), {})
 note = next((x for x in sh if not x["folder"] and x["kind"] == "person"), {})
-check(len(sh) == 2 and str(fold.get("id", "")).startswith("p") and str(note.get("id", "")).startswith("p"),
-      f"the dialog lists both person shares with the id p<share> {sh}")
+# 2.1115.0 (#5967): shares by address have the id "e<..>" (wsh_eid), not p<share>: nothing tells a bound one from an open one
+check(len(sh) == 2 and str(fold.get("id", "")).startswith("e") and str(note.get("id", "")).startswith("e"),
+      f"the dialog lists both person shares (by address: id e<..>) {sh}")
 check(fold.get("path") == "Docs" and fold.get("images") is True and fold.get("user", {}).get("name") == "fiona@example.com"
       and note.get("path") == "Note" and note.get("images") is False, f"... path, pictures and the typed address from the card {fold} {note}")
 check(not sql("SELECT 1 FROM wiki_shares WHERE kind<>'link'"), "wiki_shares holds no person row")
-FOLD = int(str(fold.get("id", "p0"))[1:])
+FOLD = card_of(FID, folder="Docs") if fold else 0  # 2.1115.0 (#5967): the id e<..> is sealed
 pair = sql("SELECT pair_id FROM wiki_share_cards WHERE fs_share_id=?", (FOLD,))
 check(bool(pair and pair[0][0]) and sql("SELECT n.ref_id FROM fs_shares f JOIN fs_nodes n ON n.id=f.node_id WHERE f.id=?", (pair[0][0],)) == [(WD,)],
       f"the folder share's pair lies on the page of the folder's name {pair}")
@@ -189,7 +199,8 @@ page(Fr, "Proj/Plan", "the plan")
 r = Fr.post(B + "/api/wiki/shares", json={"space": "private", "folder": "Proj", "kind": "person", "email": "fiona@example.com"})
 check(r.ok, f"F2 setup: frida shares the folder Proj {r.status_code}")
 pj = next((x for x in dialog(Fr) if x["folder"] and x["path"] == "Proj"), {})
-PJ = int(str(pj.get("id", "p0"))[1:])
+# 2.1115.0 (#5967): a share by address has the id e<..> (sealed): its core share is the newest folder card
+PJ = card_of(FID, folder="Proj") if pj else 0
 pp = sql("SELECT pair_id FROM wiki_share_cards WHERE fs_share_id=?", (PJ,))
 PP = pp[0][0] if pp and pp[0][0] else 0
 sql("UPDATE fs_nodes SET deleted_at=now() WHERE id=(SELECT node_id FROM fs_shares WHERE id=?)", (PJ,), write=True)
@@ -205,11 +216,11 @@ GID, Gr = freelancer(B, A, "greta", features=FEAT)
 WGR = page(Gr, "Greta note", "greta's note")
 check(Gr.post(B + "/api/wiki/shares", json={"page_id": WGR, "kind": "person", "email": "fiona@example.com", "images": True}).ok,
       "F3 setup: greta shares a page with fiona (pictures on)")
-GS = next((int(str(x["id"])[1:]) for x in dialog(Gr) if x["kind"] == "person"), 0)
+GS = card_of(GID, page_id=WGR) if any(x["kind"] == "person" for x in dialog(Gr)) else 0  # 2.1115.0 (#5967): e<..> is sealed
 # Fable F5 setup: frida's page Kept is shared with fiona, its core share has role edit and an expiry by now
 WK = page(Fr, "Kept", "a kept page")
 check(Fr.post(B + "/api/wiki/shares", json={"page_id": WK, "kind": "person", "email": "fiona@example.com"}).ok, "F5 setup: Kept shared with fiona")
-KS = next((int(str(x["id"])[1:]) for x in dialog(Fr) if x["kind"] == "person" and x["path"] == "Kept"), 0)
+KS = card_of(FID, page_id=WK) if any(x["kind"] == "person" and x["path"] == "Kept" for x in dialog(Fr)) else 0  # 2.1115.0 (#5967)
 sql("UPDATE fs_shares SET role='edit', expires_at='2030-01-01T00:00:00+00:00' WHERE id=?", (KS,), write=True)
 
 # ================================================================== the start: an older database

@@ -149,13 +149,16 @@ card = dbx("SELECT k.fs_share_id FROM wiki_share_cards k JOIN fs_shares f ON f.i
 check(bool(card), f"the core share has its card {card}")
 FS1 = card[0][0] if card else 0
 check(not dbx("SELECT 1 FROM wiki_shares WHERE kind<>'link'"), "#5244: wiki_shares holds no person row")
+# 2.1115.0 (#5967): a share by address has the dialog's id "e<..>" (p<n> of it is refused), taken from the dialog first
+E1 = next((x["id"] for x in Fr.get(B + f"/api/wiki/shares?page={W1}").json().get("shares", []) if x["kind"] == "person"), "")
 r = Fr.delete(B + f"/api/files/shares/{FS1}")
 check(r.ok and W1 not in shared(Fi) and Fi.get(B + f"/api/wiki/shared/pages/{W1}").status_code == 404,
       f"taken back in the file store's dialog: fiona reads nothing {r.status_code}")
 check(not dbx("SELECT 1 FROM wiki_share_cards WHERE fs_share_id=?", (FS1,)), "#4778: the card went with its share")
 check(revoked("wiki", W1) == 1, "... the row in obj_revoked")
-r = Fr.post(B + f"/api/wiki/shares/p{FS1}/restore")
-check(r.ok and r.json().get("id") == f"p{FS1}" and not r.json().get("revoked") and r.json().get("user", {}).get("name") == "fiona@example.com",
+check(Fr.post(B + f"/api/wiki/shares/p{FS1}/restore").status_code == 404, "#5967: the p<n> form of a share by address is refused")
+r = Fr.post(B + f"/api/wiki/shares/{E1}/restore")
+check(E1.startswith("e") and r.ok and r.json().get("id") == E1 and not r.json().get("revoked") and r.json().get("user", {}).get("name") == "fiona@example.com",
       f"Undo: the share and its card come back under the same id, with the typed address {r.status_code} {r.text[:160]}")
 check(Fi.get(B + f"/api/wiki/shared/pages/{W1}").status_code == 200, "... fiona reads again")
 
