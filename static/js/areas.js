@@ -176,7 +176,7 @@ const nav_canEdit = id => NAV_AREAS.includes(id) && !S.me?.kid && !!S.settings;
 // a computer: "Customize" as the last row of the area's panel; a phone: a pen on top of the area's menu
 const nav_editBtn = (id, cls = 'srow smod sbbi navedb') => nav_canEdit(id) && !isMobile() && NAV.edit !== id ? `<button type="button" class="${cls}" data-act="nav-edit" data-area="${id}">${ic('edit')}<span class="n">${esc(tr('Customise'))}</span></button>` : '';
 const nav_penBtn = id => nav_canEdit(id) && isMobile() && NAV.edit !== id ? `<button type="button" class="iconbtn" data-act="nav-edit" data-area="${id}" title="${esc(tr('Edit menu'))}" aria-label="${esc(tr('Edit menu'))}">${ic('edit', 's')}</button>` : '';
-const nav_penHtml = id => (b => b && `<div class="navpen">${b}</div>`)(nav_penBtn(id));  // 2.1113.0 (#5966): the phone's drawer puts the pen into its head (sbm_headHtml)
+const nav_penHtml = id => (b => b && `<div class="navpen">${/*html-ok*/ b}</div>`)(nav_penBtn(id));  // 2.1113.0 (#5966): the phone's drawer puts the pen into its head (sbm_headHtml)
 // the editor in place of the menu (its script first loads, then the panel / page draws again)
 const nav_editSlot = id => typeof nav_edHtml === 'function' ? nav_edHtml(id) : (loadModule('navmenu').then(() => { renderSide(); if (id === 'office' && S.route.mod === 'office') renderView(); }, () => {}), `<p class="muted navedl0">${esc(tr('Loading…'))}</p>`);
 function nav_edit(id, on = true) {
@@ -1106,7 +1106,7 @@ function sbb_panelHtml(id) {
 }
 // 2.1113.0 (#5966): the phone's drawer: below the row of the areas every area starts with the same head - its name on the left,
 // its actions (the pen of the menu, a new chat ...) on the right; never a row that holds a button alone (was .navpen)
-const sbm_headHtml = (id, tools = '') => { const d = sbb_def(id); return `<div class="shead sbah"><h2 class="sbaht">${esc(tr(d ? d[2] : ''))}</h2><span class="spacer"></span><span class="sbtools">${tools}</span></div>`; };
+const sbm_headHtml = (id, tools = '') => { const d = sbb_def(id); return `<div class="shead sbah"><h2 class="sbaht">${esc(tr(d ? d[2] : ''))}</h2><span class="spacer"></span><span class="sbtools">${/*html-ok*/ tools}</span></div>`; };
 function sbb_panelHtml0(id) {
   const d = sbb_def(id); if (!d) return '';
   const title = '';  // 2.152.3 A (#2619): the area's name sits in the panel's head (sbb_headHtml)

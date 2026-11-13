@@ -138,6 +138,7 @@ async function counts(ck) {
       // 2.1113.0 (#5960): on a phone the calendar hides its "+ Event" button; the step rings the round + (it adds an event there)
       await ev(`document.querySelector('.spot [data-shw="next"]').click()`);
       s = JSON.parse(await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).target === 'calendar.new' && JSON.parse(x).state === 'on' && JSON.parse(x).inRing ? x : null; })()`) || 'null');
+      if (!s) console.log('DIAG', await ev(`JSON.stringify({spot: ${SPOT}, hash: location.hash, el: !!document.querySelector('.spot'), on: SHW.on, i: SHW.i, fab: document.querySelector('#fab')?.className, fabR: JSON.stringify(document.querySelector('#fab')?.getBoundingClientRect()), mob: isMobile(), mod: S.route.mod, cfe: typeof calFabEv === 'function' && calFabEv()})`));
       check(s && s.hash === '#cal' && s.ring && s.inRing && s.card && /Here you add an event\./.test(s.text) && await ev(`shw_find(SHW.steps[SHW.i].sel)?.id === 'fab' && calFabEv()`),
         `${p.who} phone: the event step rings the round + of the calendar (it adds an event there) ` + JSON.stringify(s));
       await shot(`p21072c-${p.who}-phone-event.png`);
