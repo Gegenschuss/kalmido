@@ -154,8 +154,8 @@ print(json.dumps(out))
 """ % {"la": LA})
 check(reg.get("seed") and reg.get("seed") == reg.get("before"), f"kern_version_seed on a TIMESTAMPTZ project (compared '' before) {reg} {err[-300:]}")
 check(reg.get("day") == ["2026-05-06", "2026-05-06"], f"ct_day: the same day for TEXT and TIMESTAMPTZ {reg.get('day')}")
-check(reg.get("iso") == ["2026-05-06T23:30:00+00:00", "2026-05-06T23:30:00+00:00", None, "2026-05-06T23:30:00.123000+00:00"],
-      f"ct_iso: the form of ts_canon (microseconds only when there are any), '' = NULL {reg.get('iso')}")
+check(reg.get("iso") == ["2026-05-06T23:30:00+00:00", "2026-05-06T23:30:00+00:00", None, "2026-05-06T23:30:00.123+00:00"],
+      f"ct_iso: the form of ts_canon (2.1112.2 #5986: shortest exact form, ms / us only when there are any), '' = NULL {reg.get('iso')}")
 
 made = dbx("SELECT created_at FROM tasks WHERE id=?", (TF,))[0][0]
 check(F.delete(B + f"/api/tasks/{TF}").ok, "frida: her task into the trash")

@@ -92,9 +92,10 @@ except Conflict:
 print("OVER", repr(ts_canon("0001-01-01T00:00:00+01:00")))
 from kalmido.admin.acctimport import _coerce, _BAD
 print("COERCE", repr(_coerce("2026-11-09T02:00:00+00:00", "timestamp with time zone")), _coerce("nope", "timestamp with time zone") is _BAD)""")
-exp = ["2026-11-09T02:00:00+00:00"] * 4 + ["2026-11-09T02:00:00.120000+00:00", "", "", "not a time"]
+# 2.1112.2 (#5986): the shortest exact form - .120 stays .120 (was .120000: a value written by iso_ms read back changed)
+exp = ["2026-11-09T02:00:00+00:00"] * 4 + ["2026-11-09T02:00:00.120+00:00", "", "", "not a time"]
 check(f"CASES {exp!r}" in out, f"ts_canon: one form for datetime, offsets, a space, ms; '' / None empty; other text kept\n{out[-600:]}")
-check("READ '2026-11-09T02:00:00.500000+00:00'" in out, f"a TIMESTAMPTZ reads as canonical ISO text\n{out[-400:]}")
+check("READ '2026-11-09T02:00:00.500+00:00'" in out, f"a TIMESTAMPTZ reads as canonical ISO text\n{out[-400:]}")
 check("SAME ok" in out and "OTHER conflict" in out, f"ccf_check: same instant passes, another one is a conflict\n{out[-400:]}")
 
 check("OVER '0001-01-01T00:00:00+01:00'" in out, f"review: a time out of range stays as given, no 500\n{out[-400:]}")

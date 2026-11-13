@@ -32,8 +32,8 @@ CREATE INDEX IF NOT EXISTS meetings_trash ON meetings(deleted_at) WHERE deleted_
 ```
 
 Points in time are `TIMESTAMPTZ` (2.760.0, #5311; new tables take real types, checked by the column type lint of #5305). The app
-reads them as ISO text in one canonical form (`kalmido/core/pg.py` `ts_canon`: UTC, `+00:00`, microseconds only when there
-are any), the same form the older `TEXT` columns hold, and writes the ISO text of `now_iso()` as before. So the answers,
+reads them as ISO text in one canonical form (`kalmido/core/pg.py` `ts_canon`: UTC, `+00:00`, milliseconds or microseconds only when there
+are any - the shortest exact form, so a value written with `iso_ms` reads back unchanged, 2.1112.2 #5986), the same form the older `TEXT` columns hold, and writes the ISO text of `now_iso()` as before. So the answers,
 the history, undo and the version check (`expect_updated_at`, `ccf_check` compares both sides canonically) behave alike for
 `TEXT` and `TIMESTAMPTZ` tables; an older area moves its columns over in its stage. Never compare such a column with `''`
 (`deleted_at IS NULL` / `IS NOT NULL`), and a trigger never takes one as `to_jsonb(row)->>'..._at'` (that text carries the
