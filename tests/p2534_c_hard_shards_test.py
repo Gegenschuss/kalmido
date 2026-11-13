@@ -28,6 +28,9 @@ check(shards.hard_patterns(os.path.join(N, "no_such_file.txt")) == [], "no file 
 for hard in ("p2501_a_nosham", "p287b_a_freelancer_api", "check_fk_comment", "p2281_b_fkindex", "p2103_c_api", "p4100_list_e2e_api",
              "p99_perm_ui", "p12_roles_api", "p3_import_csv", "p4_mt940", "p5_camt_api", "p6_migrate_api", "p7_crypto_api"):
     check(shards.is_hard((hard, [hard], 0), pats), f"#5599: {hard} is hard")
+# 2.1122.0 (#6046): the Postgres guards are hard in the CI too (merge queue gate, hard shards)
+for hard in ("pg_prepare", "pg_dialect"):
+    check(shards.is_hard((hard, [hard], 0), pats), f"#6046: {hard} is hard")
 
 # 2. a group is hard by its name or by one suite in it (a shard is waited for as soon as one suite in it is hard)
 check(shards.is_hard(("backup", ["backup"], 0), pats), "group backup is hard")

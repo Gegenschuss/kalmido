@@ -74,6 +74,9 @@ pw*
 check_fk_comment
 *fkindex*
 p2103_c_api
+# 2.1122.0 (#6046): the Postgres guards - 2.1118 (BOOLEAN switch) passed the queue with real Postgres type errors
+pg_prepare
+pg_dialect
 # a person without an organisation and the no-sham guard
 p287b_a_freelancer_api
 p2501_a_nosham
