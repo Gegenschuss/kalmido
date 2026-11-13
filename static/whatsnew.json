@@ -1,6 +1,32 @@
 {
  "versions": [
   {
+   "version": "2.1086.0",
+   "date": "2026-11-13",
+   "items": [
+    {
+     "de": "Agenten- und Team-Chat nutzen auf Tablet und offenem Fold die ganze Breite.",
+     "en": "The agent chat and the team chat use the full width on tablets and an open Fold."
+    },
+    {
+     "de": "Menüs gleiten jetzt sanft auf und zu statt nur aufzutauchen.",
+     "en": "Menus now glide open and closed instead of just appearing."
+    },
+    {
+     "de": "Im Wissen erscheint ein Ordner mit gleichnamiger Seite nur noch einmal - mit dem Seitentext oben in der Ordneransicht.",
+     "en": "In Knowledge a folder with a page of the same name shows only once - with the page's text on top of the folder view."
+    },
+    {
+     "de": "Neue Hilfe „So geht's“: über die Befehlssuche, das „…“-Menü oder die Einstellungen findest du kurze Anleitungen zu Dateien, Agenten, Büro, Aufgaben und Kalender.",
+     "en": "New \"How to\" help: through the command search, the \"…\" menu or the settings you find short guides for files, agents, office, tasks and calendar."
+    },
+    {
+     "de": "Erklärt dir ein Agent einen Klickweg, kann er einen Knopf „Zeig mir“ anhängen: die App springt hin und hebt hervor, was du als Nächstes drückst.",
+     "en": "When an agent explains a way through the app it can add a \"Show me\" button: the app goes there and highlights what you press next."
+    }
+   ]
+  },
+  {
    "version": "2.1077.0",
    "date": "2026-11-12",
    "items": [
@@ -1355,24 +1381,6 @@
     {
      "de": "Der Aufgaben-Bereich in Listen lässt sich bis an die Liste heran breiter ziehen.",
      "en": "The task panel in lists can be dragged wider, right up to the list."
-    }
-   ]
-  },
-  {
-   "version": "2.596.0",
-   "date": "2026-11-06",
-   "items": [
-    {
-     "de": "Ein Konto-Umzug lässt sich jetzt 30 Tage lang zurücknehmen; der Dialog zeigt vorher das Enddatum und was endgültig wegfällt.",
-     "en": "Moving an account can now be undone for 30 days; the dialog shows the last day and what goes for good before you confirm."
-    },
-    {
-     "de": "In „Meine Aufgaben“ ordnest du deine Aufgaben in eigene Abschnitte wie Jetzt, Bald und Irgendwann; heute Fälliges rückt von selbst nach Jetzt.",
-     "en": "In \"My tasks\" you sort your tasks into your own sections like Now, Soon and Someday; what is due today moves to Now by itself."
-    },
-    {
-     "de": "Die Kalmido-KI arbeitet jetzt auch im Team: Org-Admins legen eine Team-KI an, der alle Mitglieder Aufträge geben.",
-     "en": "The Kalmido AI now works for teams: organisation admins create a team AI that every member can give orders to."
     }
    ]
   }

@@ -20,7 +20,49 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1077.0] - 2026-11-12
+## [2.1086.0] - 2026-11-13
+
+Package 2.1078 (Bündel: Bündel: PDF-Vorschau: Grund und Leiste an die Design-Farbe, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- Agent approvals, hosted MCP: a refused step (`step_ref`) and the approved card of `use_approval` now belong to the access of the connection, not to one access token or one `/mcp` request: they survive a token refresh and the next request, and end with the access; a step whose body is longer than a card binds (32,000 characters) gets no `step_ref` and says so (#5866).
+- Agent approvals: the refusal of an upload (multipart with files) sends the agent the header way (`X-Kalmido-Approval`, MCP `use_approval`) with `error.run: "header"` instead of the card run, which cannot send files (#5866).
+- Agent approvals: a card step path that still holds a `%` after decoding is refused with 400 (the run decoded it a second time) (#5866).
+- Agent data lock: read as system, so a request outside the agent's organisation gets the agent's real lock instead of the open defaults (#5866).
+
+Package 2.1084 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Upgrade test (p2192_c_upgrade): the "migrations ran" check no longer demands a log line when the jump brings only new tables; it now matches the logged step count to the MIGRATIONS steps recorded at this start (the upgrade probe from live v2.1067.0 was a false alarm) (#5916)
+
+Package 2.1081 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Agent chat and team chat use the full width from 768 px (open Fold, tablet, computer): header, switch row and composer reach both edges of the view next to the lists, the messages stay in a reading column in the middle; the team chat without conversations no longer shrinks to its content (#5903).
+- Menus glide: on a computer a menu unfolds under its button (a little from above with fading in, 0.15 s) and goes back the same way, on a phone the menu sheet slides up from the bottom in 0.2 s and down again; with "reduce motion" a menu only fades in. Only the menu moves (#5901).
+- Knowledge: a folder that has a page of the same name (page "A" with subpages "A/…", e.g. from a SilverBullet import) shows once in the folder list and in the panel, as the folder row with a small page mark; opening it shows the page's text on top ("Edit" opens the page) and the subfolders and subpages below. The narrow view's tree, search and [[A]] links still open the page (#5907).
+
+Package 2.1085 (Bündel: Agenten-Freigaben: Upload-Karte bindet auch den Da).
+### Security
+- Agent approvals: an approval card for an upload now binds the files too - `approval.body._files` lists form field, name and SHA-256 of each file (a form field named `_files` is refused); after the Yes only exactly these files go through with `X-Kalmido-Approval` (other content: `409 approval_invalid`, reason `body`, field `_files`), and a run from the card answers reason `upload` (#5936).
+
+Package 2.1079 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ).
+
+### Fixed
+- Search: hits changed in the same second keep one fixed order (newest first) on every answer, so the results no longer reshuffle under the reader when a hit is edited (#5655).
+- Start-up: applying the row-level security policies next to a running server locks all tables in one step and gives way instead of dying in a deadlock (#5654).
+- MCP: `wiki_append` belongs to the toolset `wiki`; with `--toolsets` / `KALMIDO_TOOLSETS` it no longer leaked into every other toolset (#5095).
+- Row-level security list: the dropped office trash table is marked as dropped at start-up; two system contexts carry their reason (#5683).
+- Tests follow the bell of #5806 (a person's comment on my own task waits for me): p262_b_api, p21037_b_bell_ui, p21052_news_one_ui, p2170_ui, p2102_b_ui and the other News suites (#5912 #5905 #5906 #5477 #5904 #5911 #4737).
+- Test stability: p2220_b_focus_ui, p2115_b_api, p2905_b_docview, p2924_c_ruhe_ui, p265_b_ui, p2353_e_setsearch_guard (#5423 #5640 #5642 #5655 #5913 #5910).
+
+### Fixed
+- main: backups made against PostgreSQL 17.12 or newer with an older `pg_dump` were refused at check and restore as "unexpected objects" - the column version key `pg_attver` of PostgreSQL 17.12, written out by an older `pg_dump`, is now accepted in exactly that form (the server drops it); every other column option stays refused (CI red of 2.1077.0, #3506).
+
+Package 2.1086 (Bündel: Agenten: „Zeig mir“ - der Agent öffnet die passend, Hilfe in der App: je Bereich „So geht's“ auf Deuts).
+### Added
+- #5820 Help in the app, stage 1: "How to" sections in plain words for files / documents (incl. setting up a scan inbox), agents, office (quotations, invoices), tasks and calendar - the same text agents read through `search_help` / `read_help` (they now get the user's sections first, with the translation). The English text lives in the docs (`<!-- user-help: area -->`), translations in `docs/help/<lang>.md` with a fingerprint of the English text. The app shows them under "Help": the command search (entry "Help" plus one entry per topic, e.g. "Scan" finds "Set up a scan inbox"), "Help for this area" in the "…" menu, "How to" links in the empty states of projects, the filing and the documents, and Settings > Help. New session routes `GET /api/help` and `GET /api/help/section`; the app's search kind `help`. New lint `tools/check_userhelp.py` (CI): a bold menu item that is no longer a text of the interface, a missing or outdated translation or an unknown "Show me" place is red.
+- #5860 Agents: "Show me" - an agent's chat message can carry `show: [{target, text}]` (API v1 chat, MCP `send_chat`); the app shows a "Show me" button that opens the view and highlights the control the person presses next with the tour's spotlight and the agent's line, step by step (Next / Back / Done / Close, Escape, the phone's back button). It never clicks, switches or saves anything. Places come only from the fixed list `docs/help-targets.json` (unknown key = 400); `help_overview` lists them (`show_targets`), `read_help` names a section's places (`show`). A missing control (phone, no right, area off) says so in one line. New column `agent_chat.show_steps` (JSONB). The tour and "Show me" share one spotlight.
+### Fixed
+- #5861 follow-up: `wiki_append` belongs to the MCP toolset "wiki" (p2391_b_toolsets was red on main).
 
 Package 2.1077 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: A).
 ### Added
@@ -76,6 +118,10 @@ Package 2.1074 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 - #5493: undo across devices, stage 3c - a project's settings with side effects are server steps too (kind `listside`, `kalmido/lists/lpside.py`): folder (with the folder's adopted defaults), workspace, project type, agents (listening, tidying up, members' access, follow-up), client, Home & life (and a trip's dates), time tracking, ticket key and visibility in the organisation; ticket templates / types and properties saved together with them go back too. The step keeps the values before / after (also the ones the save changed as a side effect) and goes back through the project's own write path (`list_apply`, was the route body of `PATCH /api/lists/<id>`), so a workspace change brings back what it ended (client, links); a value changed elsewhere since stays and is named. "Recent steps" lists them on every device; the project dialog's Undo, Ctrl+Z and the workspace toast take back that server step (no second browser entry any more).
 - #5493: a device's own undo / redo of a step without a server group sends `X-Kalmido-Undo-Own: 1` and records no new server step, so the way forward (redo) of the person's undone steps stays.
 - #5493: the server labels a task's step as the app's history does ("Priority of “Jump”: High", "Renamed …", "Date of …: 4 Mar", "Moved …", the title in quotes; was "Edited Jump"); no project, section or field name goes into a label (a project locked later would keep it there).
+
+## [2.1077.0] - 2026-11-12
+
+Not released (the CI of this version was red); its changes are listed under 2.1086.0.
 
 ## [2.1075.0] - 2026-11-12
 
@@ -455,7 +501,8 @@ Not released (the CI of this version was red); its changes are listed under 2.10
 
 Not released (the CI of this version was red); its changes are listed under 2.1007.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1077.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1086.0...HEAD
+[2.1086.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1086.0
 [2.1077.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1077.0
 [2.1075.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1075.0
 [2.1067.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1067.0
