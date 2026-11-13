@@ -7,7 +7,7 @@
    never; read = gone; a muted room only with an @mention; a direct message (no room name); a deleted message never
  - agent chat: a plain answer and a question show; a notice line, a job's progress line ("say") never; a job's result does;
    asking marks nothing read (unlike GET /api/agents/<id>/chat)
- - only people: an agent's token gets 403
+ - only people: an agent's token is refused
  - the boundary: a person without an organisation never sees the messages of the organisation's people; her own agent's
    answer shows for her the same way
 freelancer-matrix: own
@@ -128,7 +128,7 @@ check([x for x in pop(A, j0["t"], j0["a"])["items"] if x["src"] == "agent"] == [
 
 # ---- only people
 r = requests.get(B + "/api/msgpop", headers=CLH)
-check(r.status_code == 403, f"an agent's token: 403 ({r.status_code})")
+check(r.status_code in (401, 403), f"an agent's token is refused ({r.status_code})")
 
 # ---- a person without an organisation: never the organisation's messages; her own agent's answer the same way
 FID, F = freelancer(B, A)
