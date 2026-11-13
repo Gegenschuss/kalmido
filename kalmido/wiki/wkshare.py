@@ -34,6 +34,9 @@ import secrets
 from datetime import date, datetime, timedelta
 from urllib.parse import quote
 
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESSIV
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from flask import g, jsonify, request, Response
 
 from ..core import objhooks  # 2.565.0: START (core/db.init_db runs the forward copy)
@@ -45,7 +48,8 @@ from ..core.pg import insert_id, system_ctx
 from ..core.kernretire import kern_retire_due, kern_retire_rows  # 2.937.0 (#5244): stage 7c at the start (wsh_retire)
 from ..core.access import Denied, acx_anon_bind, live_sql
 from ..core.access import addr_account  # 2.983.0 (#5643)
-from ..core.addrshare import ads_bound, ads_dict, ads_drop, ads_kind, ads_open, ads_repath, ads_row  # 2.1071.0 (#5658)
+from ..core.addrshare import ads_bound, ads_dict, ads_kind, ads_open, ads_repath, ads_row  # 2.1071.0 (#5658)
+from ..core.addrshare import ads_back, ads_take, ads_taken, ads_taken_row  # 2.1115.0 (#5967)
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..collab.comments import user_names
 from ..core.errors import BadInput
@@ -62,6 +66,8 @@ from .wikie2e import wke_mode, wke_open_sql  # 2.369.5 (#2517): pulled up from f
 from ..tasks.validation import valid_date  # 2.369.5 (#2517): pulled up from functions
 from ..lists.public import public_links_on, PUB_ACTOR, PUB_TOKEN_RE, PUB_BAD_LIMIT, PUB_VIEW_RATE, pub_gone, pub_limited, pub_html  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.login import seal  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.login import auth_key  # 2.1115.0 (#5967): the key of the ids of shares by address (wsh_eid)
+from ..notify.push import _b64u, _b64u_dec  # 2.1115.0 (#5967)
 from ..accounts.orgs import may_see  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachments import send_stored  # 2.369.5 (#2517): pulled up from functions
 from .wikiatt import SVG  # 2.369.5 (#2517): pulled up from functions
@@ -137,7 +143,9 @@ def wsh_dict(c, r, names, target=None, gone=()):
             em = unseal(c, WSH_SEAL + "mail", r["token"])
         except Exception:  # a server key that changed
             em = ""
-        d["user"] = {"id": None, "name": em, "by_email": True}
+        # 2.1115.0 (#5967): the address as an open share shows it (lower case) and the id of every share by address (wsh_eid)
+        d["user"] = {"id": None, "name": em.strip().lower(), "by_email": True}
+        d["id"] = wsh_eid(c, "p", r["fid"])
     elif r["kind"] == "person":
         d["user"] = {"id": r["user_id"], "name": names.get(r["user_id"], "")}
     else:
@@ -155,7 +163,47 @@ def wsh_dict(c, r, names, target=None, gone=()):
 # wiki_shares). Revoking puts the share (and its pair) into obj_revoked with the card in its row ("wiki_card"); the Undo puts
 # them back under the same ids (core/objects.py obj_node_reshare). wiki_shares holds public links only.
 WSH_PID = re.compile(r"p([1-9]\d{0,17})")
-WSH_AID = re.compile(r"a([1-9]\d{0,17})")  # 2.1071.0 (#5658): an open share by address (core/addrshare.py obj_addr_shares)
+# 2.1115.0 (#5967): a share by e-mail address -- bound to an account or open (core/addrshare.py obj_addr_shares) -- has the id
+# "e<34 characters>" (wsh_eid), the forms "p<n>" / "a<n>" (#5658) of such a share are refused: neither its shape nor its id
+# tells the sharer whether the address has an account
+WSH_EID = re.compile(r"e([A-Za-z0-9_-]{34})")
+WSH_EID_AD = [b"kalmido-wiki-share-id"]
+_WSH_IDK = {}
+
+
+def _wsh_idk(c):
+    if "k" not in _WSH_IDK:
+        _WSH_IDK["k"] = HKDF(algorithm=hashes.SHA256(), length=32, salt=b"kalmido-wiki", info=b"share ids v1").derive(auth_key(c))
+    return _WSH_IDK["k"]
+
+
+def wsh_eid(c, kind, n):
+    """#5967: the dialog's id of a share by address, kind "p" (fs_shares n, bound) or "a" (obj_addr_shares n, open): AES-SIV of
+    kind and number -- deterministic (the same share keeps its id: change, end, Undo), the same length for both, sealed (not
+    even the size of the number shows which table it is from)."""
+    return "e" + _b64u(AESSIV(_wsh_idk(c)).encrypt(kind.encode() + int(n).to_bytes(8, "big"), WSH_EID_AD))
+
+
+def _wsh_eid_of(c, s):
+    try:
+        raw = AESSIV(_wsh_idk(c)).decrypt(_b64u_dec(s), WSH_EID_AD)
+    except Exception:  # noqa: BLE001  not one of ours (another server key, typed by hand)
+        raise Denied(404)
+    n = int.from_bytes(raw[1:], "big") if len(raw) == 9 else 0
+    if raw[:1] not in (b"p", b"a") or n <= 0:
+        raise Denied(404)
+    return ("person" if raw[:1] == b"p" else "addr"), n
+
+
+def _wsh_by_mail(c, fid):
+    """Person share fid (live or taken back with its card) was made by e-mail address: it is reached by its "e" id only."""
+    k = c.execute("SELECT email FROM wiki_share_cards WHERE fs_share_id=?", (int(fid),)).fetchone()
+    if k is not None:
+        return bool(k["email"])
+    rv = wsh_revoked(c, fid)
+    return bool(rv and (json.loads(rv["row_json"]).get("wiki_card") or {}).get("email"))
+
+
 # Fable review of 2.937 F2: a share of a person on a page's node without a card of its own is listed too (as a page share) --
 # the pair of a folder share whose folder went to the trash / was deleted, a share made in the file store's dialog -- unless
 # it is the pair of a card listed anyway (its folder's node live): what opens a page stays visible and can be ended here.
@@ -476,16 +524,17 @@ def wsh_target(c, uid, b, write):
 
 
 def wsh_sid(sid):
-    """The dialog's id: a number = a public link (wiki_shares), "p<n>" = a person share (fs_shares n, 2.937.0 #5244)
-    -> ("link", n) | ("person", n); 404 otherwise."""
+    """The dialog's id: a number = a public link (wiki_shares), "p<n>" = a person share chosen by name (fs_shares n, 2.937.0
+    #5244), "e<..>" = a share by e-mail address (wsh_eid, 2.1115.0 #5967) -> ("link", n) | ("person", n) | ("addr", n); 404
+    otherwise (also "p<n>" of a share by address and the old "a<n>")."""
     s = str(sid)
     if s.isdigit() and 0 < len(s) <= 18:
         return "link", int(s)
-    m = WSH_AID.fullmatch(s)
+    m = WSH_EID.fullmatch(s)
     if m:
-        return "addr", int(m.group(1))
+        return _wsh_eid_of(db(), m.group(1))
     m = WSH_PID.fullmatch(s)
-    if not m:
+    if not m or _wsh_by_mail(db(), int(m.group(1))):
         raise Denied(404)
     return "person", int(m.group(1))
 
@@ -528,9 +577,18 @@ def _wsh_revoked_entry(c, uid, fid):
 
 
 def wsh_one(c, sid):
-    kind, n = wsh_sid(sid)
-    if kind == "addr":
-        raise Denied(404)
+    return _wsh_one(c, *wsh_sid(sid))
+
+
+def _wsh_one(c, kind, n):
+    if kind == "addr":  # 2.1115.0 (#5967): an open share by address, live or taken back (shaped like a bound one)
+        x = ads_row(c, n)
+        x = x if x is not None and x["kind"] == "wiki" and x["owner_id"] == me() else None
+        rv = None if x is not None else ads_taken(c, "wiki", n, me())
+        e = _wsh_open_one(c, x if x is not None else (ads_taken_row(rv) if rv is not None else None), rv["created_at"] if rv else None)
+        if e is None:
+            raise Denied(404)
+        return e
     if kind == "person":
         r = next(iter(wsh_people(c, me(), live=False, fid=n)), None) or _wsh_revoked_entry(c, me(), n)
         if r is None:
@@ -557,8 +615,11 @@ def wsh_list():
     locked = wsh_locked(c, oid, owner)
     gone = wsh_gone(c, rows)
     opened = [] if locked or oid or not owner else _wsh_open(c, owner, path, folder, None if folder or path is None else int(q["page_id"]))
+    out = [] if locked else [wsh_dict(c, r, names, (path, folder) if path is not None else None, gone) for r in rows] + opened
+    # 2.1115.0 (#5967): open ones not always last; the same second: by the sealed id (no order of bound before open)
+    out.sort(key=lambda d: (d["kind"] != "link", str(d["created_at"] or ""), str(d["id"]) if d["kind"] != "link" else ""))
     return jsonify(enabled=public_links_on(c, "wiki"), locked=locked, person=oid is None and not locked, space=wiki_space_key(oid),
-                   shares=[] if locked else [wsh_dict(c, r, names, (path, folder) if path is not None else None, gone) for r in rows] + opened)
+                   shares=out)
 
 
 @app.post("/api/wiki/shares")
@@ -616,7 +677,7 @@ def wsh_create():
         had = c.execute("SELECT 1 FROM fs_shares f JOIN wiki_share_cards k ON k.fs_share_id=f.id WHERE f.node_id=? AND f.user_id=? "
                         "AND (f.expires_at IS NULL OR f.expires_at>?)", (nodes[0]["id"], who, ts)).fetchone()
         ids = [obj_node_share(c, uid, n, "user_id", who, "view", exp, None) for n in nodes]
-        sid = f"p{ids[0]}"
+        sid = ("person", ids[0])
         # 2.123.0 (#2104): by e-mail address the typed address is kept (sealed) and shown instead of the account's name
         mail = seal(c, WSH_SEAL + "mail", str(b["email"]).strip()[:200]) if by_mail else ""
         pair = ids[1] if len(ids) > 1 and not c.execute("SELECT 1 FROM wiki_share_cards WHERE fs_share_id=?", (ids[1],)).fetchone() else None
@@ -632,11 +693,13 @@ def wsh_create():
     c.commit()
     if kind != "link" and by_mail:  # the same answer as for an unknown address: whether an account exists stays hidden
         return jsonify(ok=True, by_email=True)
-    return jsonify(wsh_one(c, sid)), 201
+    return jsonify(_wsh_one(c, *sid) if kind != "link" else _wsh_one(c, "link", sid)), 201
 
 
 # ---- 2.1071.0 (#5658): open shares by e-mail address of a private space (core/addrshare.py, kind "wiki"; id "a<n>")
-def _wsh_open_entry(c, x, page_paths):
+def _wsh_open_entry(c, x, page_paths, names, revoked=None):
+    """2.1115.0 (#5967): the keys and values of a bound share by address (wsh_dict): its id (wsh_eid), who made it by name;
+    the page id / folder flag (filter of _wsh_open) are taken off by _wsh_open_out."""
     d = ads_dict(c, x)
     try:
         b = json.loads(x["body"] or "{}")
@@ -653,29 +716,49 @@ def _wsh_open_entry(c, x, page_paths):
             exp = iso(datetime(dd.year, dd.month, dd.day, tzinfo=TZ))
         except ValueError:
             exp = None
-    return {"id": f"a{d['id']}", "kind": "person", "space": wiki_space_key(None), "path": path, "folder": pid is None,
-            "is_folder": pid is None, "page_id": pid, "expires_at": exp, "expired": bool(exp and exp <= iso(now_utc())), "revoked": False,
-            "created_at": d["created_at"], "created_by": x["created_by"], "created_by_name": "", "views": 0, "last_used_at": None,
-            "ended": False, "images": bool(b.get("images")), "user": {"id": None, "name": d["email"], "by_email": True}}
+    return {"id": wsh_eid(c, "a", d["id"]), "kind": "person", "space": wiki_space_key(None), "path": path, "folder": pid is None,
+            "is_folder": pid is None, "page_id": pid, "expires_at": exp, "expired": bool(exp and exp <= iso(now_utc())),
+            "revoked": bool(revoked), "created_at": d["created_at"], "created_by": x["created_by"],
+            "created_by_name": names.get(x["created_by"], ""), "views": 0, "last_used_at": None, "ended": False,
+            "images": bool(b.get("images")), "user": {"id": None, "name": d["email"], "by_email": True}}
+
+
+def _wsh_open_out(e):
+    """#5967: the open entry as the dialog gets it -- the keys of wsh_dict, nothing more."""
+    return {k: v for k, v in e.items() if k not in ("is_folder", "page_id")}
+
+
+def _wsh_page_paths(c, owner, rows):
+    pids = [int(json.loads(x["body"] or "{}").get("page_id") or 0) for x in rows]
+    return {p["id"]: p["path"] for p in c.execute(f"SELECT id, path FROM wiki_pages WHERE id = ANY(CAST(? AS BIGINT[])) AND owner_id=? "
+                                                  f"AND org_id IS NULL AND {live_sql()}", ([i for i in pids if i], owner))} if any(pids) else {}
+
+
+def _wsh_open_one(c, x, revoked=None):
+    """One open share (a row of obj_addr_shares, or the one kept in obj_revoked: revoked = when it was taken back) as the
+    dialog's entry; None when its page is gone."""
+    if x is None:
+        return None
+    e = _wsh_open_entry(c, x, _wsh_page_paths(c, x["owner_id"], [x]), user_names(c, {x["created_by"]} - {None}), revoked)
+    return _wsh_open_out(e) if e is not None else None
 
 
 def _wsh_open(c, owner, path, folder, pid):
     """The open shares by address of owner's private space that cover the page / folder (all of them without a target), as
     entries of the dialog: the address, read-only, like a share by address that found its account (nothing tells them apart)."""
     rows = c.execute("SELECT * FROM obj_addr_shares WHERE kind='wiki' AND owner_id=? ORDER BY id LIMIT 500", (owner,)).fetchall()  # pages and folders
-    pids = [int(json.loads(x["body"] or "{}").get("page_id") or 0) for x in rows]
-    page_paths = {p["id"]: p["path"] for p in c.execute(f"SELECT id, path FROM wiki_pages WHERE id = ANY(CAST(? AS BIGINT[])) AND owner_id=? "
-                                                       f"AND org_id IS NULL AND {live_sql()}", ([i for i in pids if i], owner))} if any(pids) else {}
+    page_paths = _wsh_page_paths(c, owner, rows)
+    names = user_names(c, {x["created_by"] for x in rows} - {None})
     out = []
     for x in rows:
-        e = _wsh_open_entry(c, x, page_paths)
+        e = _wsh_open_entry(c, x, page_paths, names)
         if e is None:
             continue
         if path is not None:
             if not (wsh_covers(e, path, pid) or (folder and e["path"].lower().startswith(path.lower() + "/"))):
                 continue
             e["direct"] = e["path"].lower() == path.lower() and e["is_folder"] == bool(folder)
-        out.append(e)
+        out.append(_wsh_open_out(e))
     return out
 
 
@@ -735,7 +818,7 @@ def wsh_update(sid):
         c.execute("UPDATE obj_addr_shares SET body=CAST(? AS JSONB) WHERE id=?", (json.dumps(d, ensure_ascii=False), x["id"]))
         bump(c)
         c.commit()
-        return jsonify(next(iter(e for e in _wsh_open(c, me(), None, True, None) if e["id"] == sid), {}))
+        return jsonify(_wsh_one(c, "addr", x["id"]))
     r = wsh_need(c, sid)
     b = body()
     if r["revoked_at"]:
@@ -768,11 +851,14 @@ def wsh_revoke(sid):
     """Revoke: the link / the person's access ends at once (the app's Undo: POST /api/wiki/shares/<id>/restore)."""
     c = db()
     kind, n = wsh_sid(sid)
-    if kind == "addr":  # 2.1071.0 (#5658): an open share by address is not kept (typed in again = a new one)
-        ads_drop(c, _wsh_open_need(c, n)["id"])
+    if kind == "addr":  # 2.1115.0 (#5967): an open share by address ends like a bound one: kept for the Undo, the same answer
+        x = ads_row(c, n)
+        if x is None and ads_taken(c, "wiki", n, me()) is not None:
+            return jsonify(_wsh_one(c, kind, n))  # ended already (the Undo's second press)
+        ads_take(c, _wsh_open_need(c, n), me())
         bump(c)
         c.commit()
-        return jsonify(id=sid, kind="person", revoked=True)
+        return jsonify(_wsh_one(c, kind, n))
     if kind == "person" and not wsh_people(c, me(), live=False, fid=n) and _wsh_revoked_entry(c, me(), n):
         return jsonify(wsh_one(c, sid))  # ended already (the Undo's second press)
     r = wsh_need(c, sid)
@@ -793,6 +879,21 @@ def wsh_restore(sid):
     c = db()
     uid = me()
     kind, n = wsh_sid(sid)
+    if kind == "addr":  # 2.1115.0 (#5967): the Undo of an open share by address (ads_take), as for a bound one
+        x = ads_row(c, n)
+        if x is not None and x["kind"] == "wiki" and x["owner_id"] == uid:
+            return jsonify(_wsh_one(c, kind, n))  # live already
+        rv = ads_taken(c, "wiki", n, uid)
+        if rv is None or _wsh_open_one(c, ads_taken_row(rv)) is None:
+            raise Denied(404)
+        if wsh_locked(c, None, uid):
+            return jsonify(error=tr("Pages of a workspace encrypted in the browser cannot be shared."), code="wiki_e2e_share"), 409
+        if not ads_back(c, rv):
+            c.commit()
+            raise Denied(409, tr("Already shared"))
+        bump(c)
+        c.commit()
+        return jsonify(_wsh_one(c, kind, n))
     if kind == "person":
         if wsh_people(c, uid, live=False, fid=n):
             return jsonify(wsh_one(c, sid))  # live already
