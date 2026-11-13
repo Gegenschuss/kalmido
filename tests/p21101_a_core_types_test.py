@@ -154,7 +154,7 @@ check(r.ok, f"wiki: the folder renamed {r.status_code} {r.text[:200]}")
 r = A.post(B + "/api/wiki/move", json={"space": "private", "from": "Team", "to": "People"})
 check(r.ok, f"wiki: and renamed again within ten minutes (the merge, JSONB from a VALUES list) {r.status_code} {r.text[:200]}")
 wh = {x[0]: (json.loads(x[1]), json.loads(x[2])) for x in dbx("SELECT ref_id, vals_before, vals_after FROM obj_history WHERE kind='wiki' "
-                                                              "AND ref_id = ANY(CAST(? AS BIGINT[]))", (PIDS,))}
+                                                              "AND ref_id IN (?, ?)", tuple(PIDS))}
 check(len(PIDS) == 2 and wh.get(PIDS[0]) == ({"path": "Crew/Lights"}, {"path": "People/Lights"})
       and wh.get(PIDS[1]) == ({"path": "Crew/Sound"}, {"path": "People/Sound"}), f"wiki: one entry per page, from the first name to the last {wh}")
 
