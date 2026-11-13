@@ -21,7 +21,18 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1120.0] - 2026-11-13
+## [2.1125.0] - 2026-11-13
+
+Package 2.1119 (Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- File store: the tags of files, folders and documents are tags of the shared core (obj_tags scope ws, obj_tag_links kind fs_entry), stage Q5c of the cross-cutting core. A tag name is unique per workspace in the database (two people creating the same tag at once now get one tag), names that differed only in case are merged on the update. How a tag was set (by hand, a rule, learned, an agent) is kept with the link. One-way: the old tables doc_tags / doc_node_tags are moved and dropped at the first start; a tag whose number was taken gets a new one, and the learned models, suggestions, saved views and the undo of recent runs follow it (#5277).
+- Organisation export / import keep the files documents/tags.json and documents/document_tags.json with their columns (#5277).
+
+### Security
+- File store: the list of all tag names of a workspace is shown to its members only; someone a single file or folder is shared with (e.g. a guest of the organisation) sees the tags on that node and can still type a tag name, but can no longer read other names of the workspace, neither from the tag dialog nor by sending tag numbers (#5277, decided 08.11.2026).
+- Merging a client's tag change no longer reads the name of a tag of another workspace by its number (#5277).
+- An account deleted for good takes the tags of its private file store along (#5277).
 
 Package 2.1120 (Bündel: Fehlerzeile IndexedDB „connection is closing“ nach).
 
@@ -33,6 +44,10 @@ Package 2.1118 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Changed
 - Database: the 53 old yes / no columns (archived, enabled, active, pinned, is_default, users.disabled / is_admin, lists.is_inbox, tasks.locked, ...) are real `BOOLEAN` instead of numbers 0 / 1 (`core/colbool.py`; the start turns an existing database once, rebuilding the partial indexes that compared them with 0 / 1). The app, the web app and the agents' API keep reading and writing 0 / 1 for exactly these fields (`core/pg.py`), so no answer changes. One way: the type does not turn back; a version before 2.1118 cannot run on the turned database (restore the backup taken before the update). `office_agreements.archived` stays a number (three states, 2 = deleted) (#5952).
 - SQL of every area compares these columns as booleans (`NOT archived`, `true` / `false` in writes, sums through `CAST AS INTEGER`); the list state trigger works with both types (#5952).
+
+## [2.1120.0] - 2026-11-13
+
+Not released (the CI of this version was red); its changes are listed under 2.1125.0.
 
 ## [2.1118.0] - 2026-11-13
 
@@ -324,7 +339,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1120.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1125.0...HEAD
+[2.1125.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1125.0
 [2.1120.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1120.0
 [2.1118.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1118.0
 [2.1117.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1117.0
