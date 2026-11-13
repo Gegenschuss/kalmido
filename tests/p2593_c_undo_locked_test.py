@@ -52,10 +52,14 @@ OLD = ago(days=9)
 
 def backdate(table, where, args):
     """Every time column of the rows that holds a value to OLD: they look unchanged since the import of 8 days ago."""
-    cols = [r[0] for r in kt.dbx("SELECT column_name FROM information_schema.columns WHERE table_name=? AND data_type='text'", (table,))
+    # 2.1112.2 (#5987): + the TIMESTAMPTZ columns (created_at / updated_at / deleted_at since #5306): left out, the draft looked
+    # changed since the import and stayed; '' is no point in time, so only the text columns compare with it
+    cols = [r for r in kt.dbx("SELECT column_name, data_type FROM information_schema.columns WHERE table_name=? "
+                              "AND data_type IN ('text', 'timestamp with time zone')", (table,))
             if r[0].endswith("_at") or r[0] == "at"]
-    for k in cols:
-        kt.dbx(f"UPDATE {table} SET {k}=? WHERE ({where}) AND {k} IS NOT NULL AND {k}!=''", (OLD, *args))
+    for k, typ in cols:
+        empty = f" AND {k}!=''" if typ == "text" else ""
+        kt.dbx(f"UPDATE {table} SET {k}=? WHERE ({where}) AND {k} IS NOT NULL{empty}", (OLD, *args))
 
 
 def kids(table, ids):
