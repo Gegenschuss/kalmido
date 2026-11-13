@@ -159,6 +159,17 @@ skip_lines() { grep -E "$SKIP_RE" <<< "$1" | grep -vE '^FAIL|(^|[^0-9])0 skipped
 SKIPS=" $(awk '!/^#/ && NF >= 3 {printf "%s ", $1}' "$HERE/skip.txt" 2>/dev/null) "
 NEVER_Q=$(grep -vE '^\s*(#|$)' "$HERE/quarantine_never.txt" 2>/dev/null | tr '\n' ' ')
 QRED=(); QGREEN=()
+# #6054 (13.11.2026): a red shard ends fast instead of holding a runner. Both off by default (Mac, local), the CI sets them:
+#   KALMIDO_SUITE_LIMIT_S=N  a suite running longer than N seconds is stopped (coreutils timeout, its process group) and is red
+#                            with a "FAIL: ... over the limit" line; the next suite gets a fresh container (the hung one may be the
+#                            cause). CI: 1500 (25 min; the longest suite, p2521_e_dbmem, took 14-18 min in the full runs of 13.11.)
+#   KALMIDO_RED_STREAK=N     after N red suites IN A ROW (quarantine red does not count) the shard runs no further suite: the
+#                            database / server is down, every next suite would only wait for its time limits. The suites left are
+#                            "NOT RUN" (own line + annotation, a JUnit report "skipped"), the results of the ones that ran stay.
+SUITE_LIMIT=${KALMIDO_SUITE_LIMIT_S:-0}; [[ "$SUITE_LIMIT" =~ ^[0-9]+$ ]] || SUITE_LIMIT=0
+if (( SUITE_LIMIT > 0 )) && ! command -v timeout >/dev/null 2>&1; then echo "run_all.sh: no timeout command - KALMIDO_SUITE_LIMIT_S ignored"; SUITE_LIMIT=0; fi
+RED_STREAK=${KALMIDO_RED_STREAK:-0}; [[ "$RED_STREAK" =~ ^[0-9]+$ ]] || RED_STREAK=0
+STREAK=0; STOPPED=; NOTRUN=()
 in_quarantine() {  # in_quarantine <suite>: listed in skip.txt, not a never-quiet suite, not the one suite of ONLY, not switched off
   [[ "${KALMIDO_QUARANTAENE:-an}" != aus && "$SKIPS" == *" $1 "* && "$(echo ${ONLY:-})" != "$1" ]] || return 1
   local p; for p in $NEVER_Q; do [[ $1 == $p ]] && { echo "== $1: in tests/skip.txt, but never quiet (tests/quarantine_never.txt) - counts as usual"; return 1; }; done
@@ -170,13 +181,23 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   # ONLY="a b" tests/run_all.sh: just these suites (2.7.2; the containers of their groups are still started, 2.180.0: before the first one that runs)
   [[ -n "${ONLY:-}" && " $ONLY " != *" $name "* ]] && return 0
   [[ -n "${KALMIDO_LIST_ONLY:-}" ]] && { echo "$name"; return 0; }
+  if [[ -n "$STOPPED" ]]; then  # #6054: the shard stopped after KALMIDO_RED_STREAK red suites in a row
+    NOTRUN+=("$name")
+    [[ -n "$JUNIT_DIR" ]] && { "$PY" "$HERE/junit.py" --skipped "$JUNIT_DIR" "$name" "not run: $STOPPED" >/dev/null 2>&1 || true; }
+    return 0
+  fi
   local quar=0; in_quarantine "$name" && quar=1  # #4314: a proven flaky suite runs, its red does not count
   [[ -n "${FRESH_DUE:-}" ]] && _fresh_start "$name"
   local out rc t0
   t0=$(_ms); GRAN=1
   [[ -n "$JUNIT_DIR" ]] && rm -f "$JUNIT_DIR/.$name.steps"
-  out=$(KALMIDO_JUNIT_STEPS=${JUNIT_DIR:+$JUNIT_DIR/.$name.steps} "$@" 2>&1); rc=$?
+  local lim=(); (( SUITE_LIMIT > 0 )) && lim=(timeout -k 20 "$SUITE_LIMIT")  # #6054
+  out=$(KALMIDO_JUNIT_STEPS=${JUNIT_DIR:+$JUNIT_DIR/.$name.steps} ${lim[@]+"${lim[@]}"} "$@" 2>&1); rc=$?
   _timing "$name" $(( $(_ms) - t0 )) $rc  # 2.149.0 E (#2514)
+  if (( SUITE_LIMIT > 0 )) && [[ $rc -eq 124 || $rc -eq 137 ]] && (( $(_ms) - t0 >= SUITE_LIMIT * 1000 )); then
+    out+=$'\n'"FAIL: $name stopped: over the limit of $SUITE_LIMIT s per suite (KALMIDO_SUITE_LIMIT_S, #6054)"
+    FRESH_DUE=1  # the next suite of the group on a fresh container: the hung server / database may be the cause
+  fi
   # 2.623.0 (#4950): a summary line "... N failed" with N > 0 is red too, also at rc 0 (a suite that forgot sys.exit(done(...)))
   if [[ $rc -eq 0 ]] && grep -Eq "ok, [1-9][0-9]* failed" <<< "$out"; then rc=1; fi
   if [[ $quar -eq 1 ]]; then  # #4314: the quarantine reports, it does not fail the run
@@ -191,6 +212,7 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   fi
   _junit "$name" $rc $(( $(_ms) - t0 )) "$out"
   echo "$out" | grep -E "^FAIL|^PERF|ok, [0-9]+ failed|Error|Traceback" | head -40
+  if [[ $rc -ne 0 ]]; then STREAK=$((STREAK + 1)); else STREAK=0; fi  # #6054 (a quarantined suite returned above: not counted)
   if [[ $rc -ne 0 ]]; then FAILED+=("$name"); echo "== $name: FAILED (exit $rc)"; echo "$out" | tail -15
     # GitHub Actions: an annotation, readable on the run page (and via the API) without the full log
     if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
@@ -199,6 +221,11 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   else echo "== $name: passed"
     local sk; sk=$(skip_lines "$out")
     if [[ -n "$sk" ]]; then PARTLY+=("$name"); head -3 <<< "$sk" | cut -c1-200 | sed 's/^/   /'; fi
+  fi
+  if (( RED_STREAK > 0 && STREAK >= RED_STREAK )); then  # #6054
+    STOPPED="$STREAK red suites in a row up to $name (KALMIDO_RED_STREAK=$RED_STREAK) - the shard stopped"
+    echo "== STOP: $STOPPED"
+    [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::error title=shard stopped after $STREAK red suites in a row::the suites after $name did not run (KALMIDO_RED_STREAK, #6054) - see the first red suite of the row"
   fi
 }
 # 2.180.0 C (#2695): the start is lazy - right before the group's first suite that runs; a suite in selfstart.txt starts its own
@@ -220,6 +247,7 @@ docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAI
 [[ ${#PARTLY[@]} -gt 0 ]] && echo "PARTLY SKIPPED suites (${#PARTLY[@]}): ${PARTLY[*]}"
 [[ ${#QRED[@]} -gt 0 ]] && echo "QUARANTINE red suites (${#QRED[@]}, not counted): ${QRED[*]}"  # #4314
 [[ ${#QGREEN[@]} -gt 0 ]] && echo "QUARANTINE green suites (${#QGREEN[@]}): ${QGREEN[*]}"
+[[ ${#NOTRUN[@]} -gt 0 ]] && echo "NOT RUN suites (${#NOTRUN[@]}, $STOPPED): ${NOTRUN[*]}"  # #6054
 if [[ -n "${GITHUB_ACTIONS:-}" && $(( ${#SKIPPED[@]} + ${#PARTLY[@]} )) -gt 0 ]]; then
   echo "::warning title=suites not fully run::skipped: ${SKIPPED[*]:-none}; partly skipped: ${PARTLY[*]:-none}"
 fi
