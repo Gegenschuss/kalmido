@@ -178,7 +178,7 @@ check(A.get(B + f"/api/wiki/pages/{plan}").json().get("shares") == 1 and A.get(B
 r = A.get(B + "/api/wiki/shares", params={"page": plan})
 j = r.json()
 check(r.ok and j.get("person") is True and len(j["shares"]) == 1 and j["shares"][0]["direct"] is False and j["shares"][0]["folder"] is True,
-      "#2104: the page's dialog shows the folder's share as inherited " + r.text[:300])
+      "#2104: the page's dialog shows the folder's share as inherited " + r.text[:1500])
 pshare = j["shares"][0]["id"] if j.get("shares") else 0
 check(j["shares"][0]["user"] == {"id": None, "name": "dave@example.com", "by_email": True} if j.get("shares") else False,
       "#2104: a share made by e-mail address shows the typed address, not the account " + r.text[:300])
