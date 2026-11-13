@@ -44,7 +44,7 @@ function ltkHtml() {
     : f.task_id ? `<p class="ltk-fu">${ic('alarm', 's')} <a href="#t/${f.task_id}">${tr('Follow-up task created')}</a></p>`
     : f.due ? `<p class="ltk-fu muted">${ic('alarm', 's')} ${esc(tr('Follow-up due on {0}', ltkDay(f.due)))}</p>` : '';
   const th = LTK.thread;
-  const thread = `<details class="ltk-th" ${LTK.open ? 'open' : ''}><summary>${tr('History')}</summary>${LTK.thErr ? errorState({sub: LTK.thErr, size: 'row', retry: () => { LTK.thErr = ''; ltkDraw(); ltkThread(); }}) : !th ? (LTK.open ? loadingHtml('row') : '') : th.length ? `<ol class="ltk-tl">${th.map(i => `<li class="ltk-${i.dir}">
+  const thread = `<details class="ltk-th" ${LTK.open ? 'open' : ''}><summary>${tr('History')}</summary>${/*html-ok*/ LTK.thErr ? errorState({sub: LTK.thErr, size: 'row', retry: () => { LTK.thErr = ''; ltkDraw(); ltkThread(); }}) : !th ? (LTK.open ? loadingHtml('row') : '') : th.length ? `<ol class="ltk-tl">${th.map(i => `<li class="ltk-${i.dir}">
       ${ic(i.dir === 'out' ? 'send' : 'inbox', 's')}<span class="muted">${esc(ltkDay(i.date))}</span>
       ${i.type === 'letter' && i.id === LTK.id ? `<b>${esc(i.title || tr('Letter'))}</b>` : `<a href="${esc(i.href)}">${esc(i.title || tr('Letter'))}</a>`}</li>`).join('')}</ol>` : emptyState({title: tr('Nothing found'), size: 'row', cls: 'ltk-thnone'})}</details>`;  // 2.1094.0 (#5902): the one block
   return `<h4 class="ltk-h">${tr('Reference')}</h4>${links}${acts}${picker}${fu}${thread}`;
