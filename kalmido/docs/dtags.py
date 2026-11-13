@@ -94,8 +94,8 @@ def dtg_rekey(c, maps):
             t["value"] = _ids(t["value"], m)
             c.execute("UPDATE doc_meta SET suggest=? WHERE node_id=?", (S._jseal(c, r["ws"], "doc_meta.suggest", d), r["node_id"]))
             n["suggest"] += 1
-    for col, q in (("redo_prev", "SELECT node_id, ws, redo_prev AS v FROM doc_meta WHERE redo_prev LIKE '%tags%' AND ws = ANY(CAST(? AS TEXT[]))"),
-                   ("learn_prev", "SELECT node_id, ws, learn_prev AS v FROM doc_meta WHERE learn_prev LIKE '%tags%' AND ws = ANY(CAST(? AS TEXT[]))")):
+    for col, q in (("redo_prev", "SELECT node_id, ws, redo_prev AS v FROM doc_meta WHERE strpos(redo_prev, 'tags') > 0 AND ws = ANY(CAST(? AS TEXT[]))"),
+                   ("learn_prev", "SELECT node_id, ws, learn_prev AS v FROM doc_meta WHERE strpos(learn_prev, 'tags') > 0 AND ws = ANY(CAST(? AS TEXT[]))")):
         for r in c.execute(q, (wss,)).fetchall():
             m = maps[r["ws"]]
             try:
@@ -123,7 +123,7 @@ def dtg_rekey(c, maps):
         if hit:
             c.execute("UPDATE doc_flow_runs SET data=? WHERE id=?", (S._jseal(c, r["ws"], "doc_flow_runs.data", d), r["id"]))
             n["runs"] += 1
-    for r in c.execute("SELECT id, ws, owner_id, query, rules FROM doc_views WHERE query LIKE '%tag%' OR rules LIKE '%tag%'").fetchall():
+    for r in c.execute("SELECT id, ws, owner_id, query, rules FROM doc_views WHERE strpos(query, 'tag') > 0 OR strpos(rules, 'tag') > 0").fetchall():
         m = _view_map(maps, r["ws"], r["owner_id"])
         if not m:
             continue

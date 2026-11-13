@@ -469,7 +469,7 @@ def otg_move_user(c):
 OTG_WS = ("ws",)
 OTG_FS = "fs_entry"  # = files/fskern.py FSK_KIND
 # the node ids carrying a tag: "<col> IN (" + OTG_FS_IN + " IN (?,?))" -- a tag id is unique over all scopes
-OTG_FS_IN = "SELECT k.obj_id FROM obj_tag_links k WHERE k.kind='fs_entry' AND k.tag_id"
+OTG_FS_IN = "SELECT k.obj_id FROM obj_tag_links k WHERE k.kind='" + OTG_FS + "' AND k.tag_id"  # a piece, not a statement (pg_prepare)
 OTG_WS_LINKS = "FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='ws' WHERE k.kind='fs_entry'"
 
 
