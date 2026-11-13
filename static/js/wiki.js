@@ -237,7 +237,10 @@ const wk_dirIcon = (k, sz) => k.page ? `<span class="wkpgdir" role="img" title="
 const wk_rootName = sp => wk_all() ? wk_spaceName(sp) : tr('Knowledge|area');
 const wk_canFolder = sp => { const d = WK.idx[sp]; return !!d?.pages && d.mayWrite !== false && !wk_e2e(sp) && !S.me?.kid; };
 const wk_folderBtn = () => `<button type="button" class="btn" data-wk="newfolder">${ic('folder', 's')}${tr('New folder')}</button>`;
-const wk_kidsN = n => wk_dirs(n).length + wk_leaves(n).length;
+// 2.1113.0 (#5966): the panel's tree leaves out folders whose name starts with "_" (technical ones like _attachments); the
+// folder views keep them, a page reaches its attachments as before
+const wk_sideDirs = n => wk_dirs(n).filter(k => !String(k.name || '').startsWith('_'));
+const wk_kidsN = n => wk_sideDirs(n).length + wk_leaves(n).length;
 function wk_rowMore(sp, nid, when) {
   const w = when ? `<small class="muted wkwhen">${esc(fmtDay('short', new Date(when)))}</small>` : '';
   return w + (nid && wk_canFolder(sp) ? `<button data-rowmenu="wkrow" type="button" class="iconbtn sm wkmore" data-wk="rmenu" data-nid="${nid}" data-wsp="${esc(sp)}" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button>` : '');
@@ -249,7 +252,7 @@ function wk_dnd(sp, k, page) {  // the sbb_treeHtml marks of a folder / a page t
 }
 function wk_subNodes(sp, n, node) {
   const id = S.route.mod === 'wiki' ? S.route.wid : null;
-  return [...wk_dirs(n).map(node), ...wk_leaves(n).map(k => ({k: 'wk:' + sp + ':#' + k.page.id, name: k.name, go: 'wiki/' + k.page.id, icon: wk_isTpl(k.path) ? 'copy' : 'note',
+  return [...wk_sideDirs(n).map(node), ...wk_leaves(n).map(k => ({k: 'wk:' + sp + ':#' + k.page.id, name: k.name, go: 'wiki/' + k.page.id, icon: wk_isTpl(k.path) ? 'copy' : 'note',
     on: id === k.page.id, kids: false, ...wk_dnd(sp, k, k.page)}))];
 }
 function wk_nodeInfo(nid) {  // a node of a loaded space: {sp, folder | page}

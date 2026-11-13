@@ -175,7 +175,8 @@ const NAV_AREAS = ['office', 'life', 'reading', 'time', 'review', 'ablage'];
 const nav_canEdit = id => NAV_AREAS.includes(id) && !S.me?.kid && !!S.settings;
 // a computer: "Customize" as the last row of the area's panel; a phone: a pen on top of the area's menu
 const nav_editBtn = (id, cls = 'srow smod sbbi navedb') => nav_canEdit(id) && !isMobile() && NAV.edit !== id ? `<button type="button" class="${cls}" data-act="nav-edit" data-area="${id}">${ic('edit')}<span class="n">${esc(tr('Customise'))}</span></button>` : '';
-const nav_penHtml = id => nav_canEdit(id) && isMobile() && NAV.edit !== id ? `<div class="navpen"><button type="button" class="iconbtn" data-act="nav-edit" data-area="${id}" title="${esc(tr('Edit menu'))}" aria-label="${esc(tr('Edit menu'))}">${ic('edit', 's')}</button></div>` : '';
+const nav_penBtn = id => nav_canEdit(id) && isMobile() && NAV.edit !== id ? `<button type="button" class="iconbtn" data-act="nav-edit" data-area="${id}" title="${esc(tr('Edit menu'))}" aria-label="${esc(tr('Edit menu'))}">${ic('edit', 's')}</button>` : '';
+const nav_penHtml = id => (b => b && `<div class="navpen">${b}</div>`)(nav_penBtn(id));  // 2.1113.0 (#5966): the phone's drawer puts the pen into its head (sbm_headHtml)
 // the editor in place of the menu (its script first loads, then the panel / page draws again)
 const nav_editSlot = id => typeof nav_edHtml === 'function' ? nav_edHtml(id) : (loadModule('navmenu').then(() => { renderSide(); if (id === 'office' && S.route.mod === 'office') renderView(); }, () => {}), `<p class="muted navedl0">${esc(tr('Loading…'))}</p>`);
 function nav_edit(id, on = true) {
@@ -1097,10 +1098,15 @@ document.addEventListener('click', e => {
 // 2.418.0 (#3560): the menus that can be arranged: the editor in place while it is open, else a pen on top (phone) or
 // "Customize" as the last row (computer)
 function sbb_panelHtml(id) {
-  if (!NAV_AREAS.includes(id) || sbb_noPan(id)) return sbb_panelHtml0(id);
-  if (NAV.edit === id) return nav_editSlot(id);
-  const h = sbb_panelHtml0(id); return h && nav_penHtml(id) + h + nav_editBtn(id);
+  const ed = NAV_AREAS.includes(id) && !sbb_noPan(id);
+  if (ed && NAV.edit === id) return nav_editSlot(id);
+  const h = sbb_panelHtml0(id);
+  if (sbm_on()) return h && sbm_headHtml(id, (ed ? nav_penBtn(id) : '') + (id === 'team' && typeof tc_newBtnHtml === 'function' ? tc_newBtnHtml() : '')) + h;  // 2.1113.0 (#5966)
+  return ed ? h && nav_penHtml(id) + h + nav_editBtn(id) : h;
 }
+// 2.1113.0 (#5966): the phone's drawer: below the row of the areas every area starts with the same head - its name on the left,
+// its actions (the pen of the menu, a new chat ...) on the right; never a row that holds a button alone (was .navpen)
+const sbm_headHtml = (id, tools = '') => { const d = sbb_def(id); return `<div class="shead sbah"><h2 class="sbaht">${esc(tr(d ? d[2] : ''))}</h2><span class="spacer"></span><span class="sbtools">${tools}</span></div>`; };
 function sbb_panelHtml0(id) {
   const d = sbb_def(id); if (!d) return '';
   const title = '';  // 2.152.3 A (#2619): the area's name sits in the panel's head (sbb_headHtml)
@@ -1122,6 +1128,7 @@ function sbb_panelHtml0(id) {
   if (id === 'team') return title + tc_panelHtml();  // 2.479.0 (#2814): channels and direct messages (chat.js)
   // the agents: their overview, then each agent (its page; the status dot as in the sidebar's conversations)
   if (id === 'agents') return title + `<div class="sgroup sbbp">${sbb_row('agents', 'bot', tr('Agents'), S.route.mod === 'agents' && !S.route.agent)}${(S.agents || []).map(x => `<button type="button" class="srow steam sbbi ${S.route.agent === x.id ? 'on' : ''}" data-go="agents/${x.id}"${S.route.agent === x.id ? ' aria-current="page"' : ''}><span class="sdot">${hdot(agentHst(x))}</span><span class="n">${esc(x.name)}</span>${x.waiting || x.chat_unread ? `<span class="c nunread">${x.waiting + x.chat_unread}</span>` : ''}</button>`).join('')}</div>`;
+  if (sbm_on()) return '';  // 2.1113.0 (#5966): one entry only (Start ...): the phone's row of areas already marks it, nothing twice
   return title + `<div class="sgroup sbbp">${sbb_row(sbb_target(id), d[1], tr(d[2]), true)}</div>`;
 }
 // ---- 2.409.0 (#3490): areas on / off per workspace. The module switches ("features") stay the main switch (off = off
