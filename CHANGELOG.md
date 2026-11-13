@@ -21,7 +21,19 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1104.0] - 2026-11-13
+## [2.1105.0] - 2026-11-13
+
+Package 2.1095 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Database: the creation, change and trash times (`created_at`, `updated_at`, `deleted_at`) of every table that still kept them as ISO text are real `TIMESTAMPTZ` columns now (413 columns); a new database makes them so at once, an existing one is turned at the start by `kalmido/core/coltype.py`, column by column, each checked and logged. The app and the API read them in the same ISO form as before (#5306).
+- SQL that read these columns as text (day of a document's upload, the tidy agent's quiet time, job watch marks, knowledge search marks, contact / event import marks, calendar / address book versions, chat trash) works for both types; `docs/dev/kern.md` names the rules (`ct_day`, `ct_iso`) (#5306).
+- Database sessions say their time zone (UTC) instead of relying on the server default; queries that mixed these columns with time columns still kept as text (hub mail order, stale tasks, retention years, hosting overview, invitation clean-up, waiting suggestions, time gaps) compare points in time (#5306).
+
+One-way step: the 413 columns change their type and do not change back; an empty value becomes NULL (trash time) or the row's creation time (change time), a value that is no point in time becomes the start's time (the start log names column and ids) (#5306).
+
+Fix 2.1103 (upgrade probe red since 2.1100).
+### Fixed
+- #5916: the server starts again on a database of an older version: the move of the old contact links (contact_tasks) into the shared links' core sets a missing / empty "added at" to the time of the start instead of breaking the start off; the old folder shares (folder_people) take the same care since the times became real points in time (#5306) - upgrade probe red from v2.1067
 
 Package 2.1101 (Bündel: Altspalten obj_history / obj_undo / obj_revoked au).
 ### Changed
@@ -217,6 +229,10 @@ Package 2.1074 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 - #5493: a device's own undo / redo of a step without a server group sends `X-Kalmido-Undo-Own: 1` and records no new server step, so the way forward (redo) of the person's undone steps stays.
 - #5493: the server labels a task's step as the app's history does ("Priority of “Jump”: High", "Renamed …", "Date of …: 4 Mar", "Moved …", the title in quotes; was "Edited Jump"); no project, section or field name goes into a label (a project locked later would keep it there).
 
+## [2.1104.0] - 2026-11-13
+
+Not released (the CI of this version was red); its changes are listed under 2.1105.0.
+
 ## [2.1103.0] - 2026-11-13
 
 Not released (the CI of this version was red); its changes are listed under 2.1104.0.
@@ -225,7 +241,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1104.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1105.0...HEAD
+[2.1105.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1105.0
 [2.1104.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1104.0
 [2.1103.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1103.0
 [2.1100.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1100.0
