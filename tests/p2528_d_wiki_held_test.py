@@ -99,7 +99,8 @@ def start(s, space, uid):
 
 def run(fn, purge):
     """A watchdog run inside the app container, called directly (force), with the retention switch of the trash on / off."""
-    mod = {"wkx_tick": "kalmido.wiki.wkhist"}[fn]  # 2.1093.0 (#5472): wka_tick went (the core's run, part kind wiki_file)
+    mod = {"wkx_tick": "kalmido.wiki.wkhist",  # 2.1093.0 (#5472): wka_tick went (the core's run, part kind wiki_file)
+           "obj_trash_tick": "kalmido.core.writes"}[fn]  # 2.1100.0 (#5950): the core's trash run
     code = (f"import json, app\nfrom {mod} import {fn}\nfrom kalmido.core.db import connect\nc = connect()\n"
             f"try:\n    print(json.dumps({fn}(c, force=True)))\nfinally:\n    c.close()")
     out = subprocess.run(["docker", "exec", "-e", f"KALMIDO_PURGE_TRASH={1 if purge else 0}", CT, "python", "-c", code],
@@ -210,6 +211,12 @@ sql("UPDATE obj_versions SET held_at=? WHERE kind='wiki' AND ref_id=? AND held_a
 sql("UPDATE wiki_spaces SET wkx_holds=? WHERE org_id=?", (json.dumps({OLD: [ALICE, BOB]}), ORG), write=True)
 run("wkx_tick", True)
 check(nvers(P) >= NV, "#4306: held versions of a space open again stay after the period")
+# 2.1100.0 (#5950): a held file of a live page in a space open again is not the core's trash run (part kind wiki_file) --
+# it stays for the people named in wkx_holds, like the held versions (before: deleted after the period despite the mark)
+sql("UPDATE wiki_files SET deleted_at=?, wkx_held_at=? WHERE id=?", (OLD, OLD, F2), write=True)
+run("obj_trash_tick", True)
+check(sql("SELECT wkx_held_at FROM wiki_files WHERE id=?", (F2,)) and stored(REL2),
+      "#5950: the core's trash run leaves a held file of a live page in a space open again")
 sql("UPDATE wiki_spaces SET e2e='on' WHERE org_id=?", (ORG,), write=True)
 sql("UPDATE wiki_files SET deleted_at=?, wkx_held_at=? WHERE id=?", (OLD, OLD, F2), write=True)
 # 2.528.0 (#4306, review Fable 1): with the retention switch off the held rows of a locked space still go after the period

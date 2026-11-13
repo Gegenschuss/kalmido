@@ -484,9 +484,12 @@ def _wka_prune(c, where, args):
 # obj_trash_tick: the trash period, the switch "trash", its report): deleted for good with its scan / text marks and its
 # stored file. The files of a page in the trash are its children (wiki/wkkern.py) and go with the page. The own run wka_tick
 # (report slot wiki_files) is gone. Held files of a locked space keep their own run (wiki/wkhist.py wkx_tick).
+# 2.1100.0 (#5950): held files (wkx_held_at) are never the core's: in a space open again they stay for the people named in
+# wkx_holds like the held versions (wkhist.py wkx_tick); before, the run deleted them after the period despite the mark.
 WKA_KIND = "wiki_file"
 part_kind(WKA_KIND, "wiki_files", lock="wiki-file-{id}", agent=False, live=live_sql(), trash_prune=True,
-          prune=" AND page_id IN (SELECT p.id FROM wiki_pages p WHERE p.deleted_at IS NULL)", on_prune=_wka_prune)
+          prune=" AND wkx_held_at IS NULL AND page_id IN (SELECT p.id FROM wiki_pages p WHERE p.deleted_at IS NULL)",
+          on_prune=_wka_prune)
 
 
 def wka_page_files(c, page_ids):
