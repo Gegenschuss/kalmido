@@ -1121,6 +1121,11 @@ _STMT_OK = [re.compile(x, re.I | re.S) for x in (
     rf"COMMENT ON (TABLE|COLUMN) {_T}(\.{_ID})? IS '.*'",
 )]
 _STMT_FORCE = re.compile(rf"ALTER TABLE (ONLY )?{_T} FORCE ROW LEVEL SECURITY")
+# #3506 (CI red of 2.1077.0): PostgreSQL 17.12 keeps a column's row-type version as the reserved attoptions key
+# pg_attver (upstream bcbcbd5a23, README.attver.md); a pg_dump before 17.12 against such a server writes it out as
+# ALTER COLUMN ... SET (pg_attver=N). The server drops a supplied pg_attver on purpose (so such dumps restore): a plain number,
+# nothing runs. Only this exact form; any other column option stays refused
+_STMT_ATTVER = re.compile(rf"ALTER TABLE (ONLY )?{_T} ALTER COLUMN {_ID} SET \(pg_attver=\d{{1,20}}\)")
 _OWN_FN = re.compile(r"(kalmido|rls)_\w+")
 # (whole words: a future column or comment containing one of them would make own backups unrestorable -> rename it or
 # narrow the word here; the round trip of tests/backup_test.py shows it at once)
@@ -1254,6 +1259,8 @@ def bk_check_statement(s):
     if s == "SELECT pg_catalog.set_config('search_path', '', false)":  # the preamble (set_config is refused elsewhere)
         return True
     if _STMT_FORCE.fullmatch(s):  # part of a TABLE entry; only ever tightens (rls.apply sets it anyway)
+        return True
+    if _STMT_ATTVER.fullmatch(s):  # part of a TABLE entry of an older pg_dump against PostgreSQL 17.12+ (see above)
         return True
     if _STMT_BAD.search(s) or not _calls_ok(s):
         return False

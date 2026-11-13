@@ -638,11 +638,18 @@ bad = ["RESET ROLE", "RESET ALL", "RESET SESSION AUTHORIZATION", "SET ROLE kalmi
        # review W3-2: quotes around the schema
        "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT \"pg_catalog\".pg_sleep(10)::text",
        "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT \"pg_catalog\".lo_from_bytea(0, '\\x00')::text",
-       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT \"pg_catalog\".current_setting('is_superuser')"]
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT \"pg_catalog\".current_setting('is_superuser')",
+       # #3506 (CI red of 2.1077.0): only the bare version key pg_attver of PostgreSQL 17.12 passes, no other column option
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET (pg_attver=12345, n_distinct=-1)",
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET (n_distinct=-1)",
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET (pg_attver=-1)",
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET (pg_attver=pg_sleep(1))"]
 good = ["CREATE TABLE public.t (id bigint NOT NULL, title text DEFAULT ''::text NOT NULL)", "SET row_security = on",
         "ALTER TABLE ONLY public.lists FORCE ROW LEVEL SECURITY", "SELECT pg_catalog.setval('public.tasks_id_seq', 5, true)",
         "CREATE INDEX m ON public.chat USING gin (public.kalmido_fold(body) public.gin_trgm_ops)",
-        "CREATE TABLE public.t2 (a character varying(8) DEFAULT ''::character varying, b numeric(14,4) DEFAULT 0 NOT NULL)"]
+        "CREATE TABLE public.t2 (a character varying(8) DEFAULT ''::character varying, b numeric(14,4) DEFAULT 0 NOT NULL)",
+        "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET (pg_attver=33554432)",
+        "ALTER TABLE ONLY public.\"order\" ALTER COLUMN \"desc\" SET (pg_attver=1)"]
 print(json.dumps({"bad_ok": [s for s in bad if ok(s)], "good_refused": [s for s in good if not ok(s)]}))
 """
 # 2.165.4: importing the app in a second process may meet the running server's start-up DDL (Postgres deadlock on CI): try again
