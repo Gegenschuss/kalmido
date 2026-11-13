@@ -521,7 +521,23 @@ drg_attach(document, {
 });
 
 // ---- the fixed head gets a fine line while the sidebar is scrolled below it
-document.addEventListener('scroll', e => { if (e.target?.id === 'side') e.target.classList.toggle('fv2-scrolled', e.target.scrollTop > 2); }, {capture: true, passive: true});
+// 2.1091.0 (#5896): ... and the foot (Settings + the account) a light shadow while more entries follow below it (CSS: phone only).
+// Checked once per frame on scrolling, on resizing and whenever the drawer opens or draws anew (sections unfolded, other panel);
+// the size watcher on the drawer's parts also catches heights that grow without a change in the page (a section's unfolding).
+let fv2_moreQ = 0;
+const fv2_moreRO = typeof ResizeObserver === 'function' ? new ResizeObserver(() => fv2_more()) : null;
+function fv2_more() {
+  if (fv2_moreQ) return;
+  fv2_moreQ = requestAnimationFrame(() => {
+    fv2_moreQ = 0; const s = document.getElementById('side'); if (!s) return;
+    if (fv2_moreRO) for (const el of [s, ...s.children]) fv2_moreRO.observe(el);
+    const more = s.scrollHeight - s.scrollTop - s.clientHeight > 2;
+    if (s.classList.contains('sb-more') !== more) s.classList.toggle('sb-more', more);
+  });
+}
+document.addEventListener('scroll', e => { if (e.target?.id === 'side') { e.target.classList.toggle('fv2-scrolled', e.target.scrollTop > 2); fv2_more(); } }, {capture: true, passive: true});
+window.addEventListener('resize', fv2_more, {passive: true});
+if (document.getElementById('side')) new MutationObserver(fv2_more).observe(document.getElementById('side'), {childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'hidden', 'open']});
 
 // ---- 2.156.0 D (#2186): saved views of the sidebar (sideviews.js, loaded on demand). Until it is loaded the sidebar is
 // "Everything" and these stand-ins answer for it; a person with views (or the tool menu, the settings) loads it, then the
