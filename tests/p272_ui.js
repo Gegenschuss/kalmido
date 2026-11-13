@@ -140,7 +140,12 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   await tcall('PUT', '/agent/status', TOK, {status: 'working', text: 'Wireframes', task_id: T1});
   w.close();
   w = await boot({user: 'alice', hash: 'agents'}); d = w.document;
-  const apic = await until(() => d.querySelector(`.avb[data-mcard="${AG}"]`));
+  // 2.1090.0 (#5898): since 2.1044.0 (#5825) the agents page gives who may edit an agent (here alice, the instance admin, on a team
+  // agent) its picture + name as ONE button into the agent's settings; the person card of the agent stays on its picture in the
+  // chat header (and everywhere else avBtn is used)
+  check(await until(() => d.querySelector(`.agset[data-aid="${AG}"]`)) && !d.querySelector(`.agset[data-aid="${AG}"] .avb`), 'agents page: the agent\'s picture opens its settings (#5825)');
+  w.eval(`chatOpen(${AG})`);
+  const apic = await until(() => d.querySelector(`.chath .avb[data-mcard="${AG}"]`));
   check(apic, 'the agent\'s picture is a button');
   click(w, apic); await until(() => d.querySelector('#pop .mcard [data-mc="chat"]') && /Wireframes/.test(d.querySelector('#pop .mcard').textContent));
   card = d.querySelector('#pop .mcard');
