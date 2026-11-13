@@ -822,7 +822,10 @@ function topFolded() {
 function topMoreItems() {  // 2.99.0 B (#2183): + the knowledge pages' "Space" section
   const fv = fv2_topItems(), o0 = topMoreItems0(), out = fv.length ? [...fv, '-', ...o0] : o0;  // 2.441.0 (#3592): a phone: the star of a page (a list: its own menu has it)
   const ha = !S.me?.kid && S.me?.kind !== 'agent' && out.length ? hlp_area() : '';  // 2.1086.0 (#5820): "Help for this area" where the "…" is shown anyway
-  if (ha) out.push('-', {label: tr('Help for this area'), icon: 'help', cls: 'mhlp', fn: () => go('help/area:' + ha)});
+  // 2.1102.0 (#5956): before the set-apart dangerous tail (archive, delete: #1056 keeps them last), else at the end
+  let dz = out.length; while (dz > 0 && out[dz - 1] && out[dz - 1].danger) dz--;
+  const hi = {label: tr('Help for this area'), icon: 'help', cls: 'mhlp', fn: () => go('help/area:' + ha)};
+  if (ha) { if (dz < out.length && out[dz - 1] === '-') out.splice(dz - 1, 0, '-', hi); else out.push('-', hi); }
   if (S.route.mod !== 'wiki' || S.me?.kid || typeof w299_areaItems !== 'function') return out;
   return [...out, ...(out.length ? ['-'] : []), ...w299_areaItems()];
 }
