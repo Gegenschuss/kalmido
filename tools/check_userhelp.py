@@ -13,8 +13,8 @@ A user's section is a "## How to: ..." heading of docs/*.md with <!-- user-help:
     a key that is no user's section
  4. every **label** of a translation is the translation of one of the English section's labels in that language (or the
     English label while the language has none) - the help says "Integrationen" where the screen says "Integrationen"
- 5. <!-- show: <target> -->: when docs/help-targets.json exists, a target it does not know is named (a warning, the list is
-    kept by the "Show me" part, #5860)
+ 5. <!-- show: <target> -->: every target (one line per step of "Show me", right below the heading) is a named place of
+    docs/help-targets.json (2.1090.0, #5899: a finding - an unknown one gave no button and no step, unnoticed)
 The key and the fingerprint follow api/helpdocs.py (hlp_slug, hlp_src); tests/p21072_b_help_ui.js compares them with the server.
 Standard library only (the CI lint job runs plain Python).
 """
@@ -70,12 +70,12 @@ def sections(path):
     out = []
     for n, (i, title) in enumerate(heads):
         end = heads[n + 1][0] if n + 1 < len(heads) else len(lines)
-        area, show = None, ""
-        for ln in lines[i + 1:min(end, i + 4)]:
+        area, show = None, []
+        for ln in lines[i + 1:end]:  # 2.1090.0 (#5899): the marker lines below the heading, as many show lines as steps
             if UH.match(ln.strip()):
                 area = UH.match(ln.strip()).group(1)
             elif SHOW.match(ln.strip()):
-                show = SHOW.match(ln.strip()).group(1)
+                show.append(SHOW.match(ln.strip()).group(1))
             elif ln.strip():
                 break
         if not area:
@@ -186,10 +186,12 @@ def check(docs_dir, js_dir, i18n_dir, verbose=False):
     tg = os.path.join(docs_dir, "help-targets.json")
     if os.path.exists(tg):
         with open(tg, encoding="utf-8") as f:
-            known = set(json.load(f))
+            known = set(json.load(f).get("targets") or {})  # 2.1090.0 (#5899): the keys of "targets", not of the file
         for s in secs:
-            if s["show"] and s["show"] not in known:
-                warn.append(f"{s['file']}:{s['line']}: show target {s['show']!r} is not in docs/help-targets.json")
+            for k in s["show"]:
+                if k not in known:
+                    bad.append(f"{s['file']}:{s['line']}: show target {k!r} is not in docs/help-targets.json - name a place it "
+                               "knows, add the place there (route, sel, label_en) or leave the line out")
     return bad, warn, secs
 
 

@@ -1,5 +1,5 @@
 {
-  "_about": "2.1086.0 (#5860): the named places of the app that an agent may point at with \"Show me\" (send_chat show: [{target, text}]). key -> route (the hash the app opens first, null = stay on the current screen, e.g. inside a dialog the person opens), sel (CSS selectors, comma separated: the first one visible on the screen is highlighted), label_en (the card's heading, translated in static/i18n). The server accepts only these keys (kalmido/api/showme.py); a help section names one with <!-- show: key --> under its heading. Never an action: the app only goes to the route and highlights.",
+  "_about": "2.1086.0 (#5860): the named places of the app that an agent may point at with \"Show me\" (send_chat show: [{target, text}]). key -> route (the hash the app opens first, null = stay on the current screen, e.g. inside a dialog the person opens), sel (CSS selectors, comma separated: the first one visible on the screen is highlighted), label_en (the card's heading, translated in static/i18n). The server accepts only these keys (kalmido/api/showme.py); a help section names its places with one <!-- show: key --> line each under its heading (the steps of its \"Show me\" button, 2.1090.0 #5899). Never an action: the app only goes to the route and highlights.",
   "targets": {
     "settings.open": {"route": null, "sel": "#side .sset, #tabs [data-act=\"tabs-more\"], #tabs [data-act=\"settings\"], #top .menu", "label_en": "Open the settings"},
     "settings.integrations": {"route": null, "sel": ".modal .snav [data-sec=\"integr\"]", "label_en": "Settings: Integrations"},
@@ -11,6 +11,7 @@
     "office.invoice-new": {"route": "#office/invoices", "sel": "#view [data-ofd=\"new-inv\"]", "label_en": "New invoice"},
     "tasks.new": {"route": "#today", "sel": "#view .qadd .box, #fab", "label_en": "Add a task"},
     "calendar.new": {"route": "#cal", "sel": "#view [data-act=\"ev-new\"]", "label_en": "New event"},
-    "files.upload": {"route": "#ablage", "sel": "#view [data-ab=\"upload\"]", "label_en": "Upload files"}
+    "files.upload": {"route": "#ablage", "sel": "#view [data-ab=\"upload\"]", "label_en": "Upload files"},
+    "files.documents-add": {"route": "#ablage/docs", "sel": "#view .dc-up", "label_en": "Add documents"}
   }
 }

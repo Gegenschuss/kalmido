@@ -55,7 +55,9 @@ check(r.ok and j.get("lang") == "de" and areas == ["files", "agents", "office", 
 titles = {a["area"]: a["title"] for a in j.get("areas", [])}
 check(titles == {"files": "Dateien", "agents": "Agenten", "office": "Büro", "tasks": "Aufgaben", "calendar": "Kalender"}, f"the areas in the sidebar's words: {titles}")
 files = next((a for a in j.get("areas", []) if a["area"] == "files"), {"sections": []})
-check(files["sections"] and files["sections"][0] == {"key": USCAN, "title": "Scan-Eingang einrichten", "show": "files.scan-inbox"},
+# 2.1090.0 (#5899): show = the section's named places in order (a list; one <!-- show: --> line per step)
+SCAN_SHOW = ["settings.open", "settings.integrations", "files.scan-inbox"]
+check(files["sections"] and files["sections"][0] == {"key": USCAN, "title": "Scan-Eingang einrichten", "show": SCAN_SHOW},
       f"Files: the first topic is the scan inbox in German, with its named place ({files['sections'][:1]})")
 check(all(2 <= len(a["sections"]) <= 4 for a in j.get("areas", [])), "each area 2-4 short sections")
 
@@ -69,7 +71,14 @@ check("**Einstellungen** > **Integrationen**" in txt and "**Dokumente: Eingänge
       and "**Einrichtungscode**" in txt, "the steps name the German labels of the screen")
 check(len(re.findall(r"^\d\. ", txt, re.M)) == 4 and "Was dann passiert" in txt, "four numbered steps and what happens then")
 check(not re.search(r"/api/|scope|docs:upload|token", txt, re.I), "no API routes or developer words in the user's text")
-check(sec.get("area") == "files" and sec.get("show") == "files.scan-inbox", "area and named place")
+check(sec.get("area") == "files" and sec.get("show") == SCAN_SHOW, f"area and named places {sec.get('show')}")
+# 2.1090.0 (#5899): the steps of "Zeig mir": the places with route, selector and their German heading, no agent's line
+stp = sec.get("steps") or []
+check([x.get("target") for x in stp] == SCAN_SHOW and [x.get("label") for x in stp] == ["Einstellungen öffnen", "Einstellungen: Integrationen", "Dokumente: Eingänge (Scan-Eingang)"]
+      and all(isinstance(x.get("sel"), str) and x["sel"] and "text" not in x for x in stp), f"steps for \"Zeig mir\": {stp}")
+pay_key = next((x["key"] for a in j.get("areas", []) for x in a["sections"] if x["title"] == "Eine Zahlung erfassen"), "")
+nos = A.get(B + "/api/help/section", params={"key": pay_key}).json()
+check(pay_key and nos.get("show") == [] and nos.get("steps") == [], f"a section without marks: no places, no steps ({pay_key})")
 
 # English for an English person (the source text, without the marker comments)
 A.patch(B + "/api/settings", json={"lang": "en"})
@@ -165,6 +174,9 @@ check(rc == 1 and USCAN in out and "older English text" in out, f"an outdated tr
 # a German label the screen does not use
 rc, out = lint_copy(lambda t: sub(os.path.join(t, "docs", "help", "de.md"), "**Scan-Eingang anlegen**", "**Eingang erstellen**"))
 check(rc == 1 and "**Eingang erstellen**" in out, f"a German label that is not on the screen turns it red: {out[-300:]}")
+# 2.1090.0 (#5899): a show line naming a place docs/help-targets.json does not know (was a warning that read the wrong keys)
+rc, out = lint_copy(lambda t: sub(os.path.join(t, "docs", "FILES.md"), "<!-- show: files.scan-inbox -->", "<!-- show: files.scan-inbox -->\n<!-- show: files.nowhere -->"))
+check(rc == 1 and "show target 'files.nowhere' is not in docs/help-targets.json" in out, f"an unknown show target turns it red: {out[-300:]}")
 # a label split over two lines (it would escape the label check)
 rc, out = lint_copy(lambda t: sub(os.path.join(t, "docs", "help", "de.md"), "**Ordner-Wächter**", "**Ordner-\nWächter**"))
 check(rc == 1 and "split over two lines" in out, f"a label over two lines turns it red: {out[-300:]}")
@@ -176,7 +188,8 @@ Fl.patch(B + "/api/settings", json={"lang": "de"})
 r = Fl.get(B + "/api/help")
 check(r.ok and [a["area"] for a in r.json()["areas"]][:1] == ["files"], "freelancer: GET /api/help")
 r = Fl.get(B + "/api/help/section", params={"key": USCAN})
-check(r.ok and r.json().get("text") == x_de, "freelancer: the German section")
+check(r.ok and r.json().get("text") == x_de and [x["target"] for x in r.json().get("steps") or []] == SCAN_SHOW,
+      "freelancer: the German section with the steps of \"Zeig mir\" (2.1090.0, #5899)")
 hits = web_search(Fl, "Scan")
 check(isinstance(hits, list) and hits and hits[0]["key"] == USCAN, "freelancer: the app's search")
 ft = Fl.post(B + "/api/me/tokens", json={"name": "help", "scopes": ["read"]}).json()["token"]

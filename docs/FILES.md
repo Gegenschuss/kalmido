@@ -55,6 +55,8 @@ answers with the summary. Kalmido calls no language model itself; undo removes t
 
 ## How to: Set up a scan inbox
 <!-- user-help: files -->
+<!-- show: settings.open -->
+<!-- show: settings.integrations -->
 <!-- show: files.scan-inbox -->
 
 A scan inbox sends new scans from a folder on your computer (or from your scanner) straight into your documents.
@@ -70,7 +72,7 @@ revoke it. Only you create a scan inbox, never an agent.
 
 ## How to: Add documents and find them again
 <!-- user-help: files -->
-<!-- show: files.documents -->
+<!-- show: files.documents-add -->
 
 1. Open **Files** > **Documents**.
 2. Select **Add documents** and choose PDFs or photos, or drop them onto the page. On the phone, **Scan** takes a photo of a
@@ -82,7 +84,6 @@ What happens then: Kalmido reads each document and fills in the date, amount and
 
 ## How to: Share a folder
 <!-- user-help: files -->
-<!-- show: files.share -->
 
 1. Open **Files** and the **More** menu (⋯) of the folder, then **Share…**.
 2. Under **Share with …** pick a person, a group or an agent.

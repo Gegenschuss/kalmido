@@ -295,7 +295,7 @@ pinned first, with a filter by project and a search in title and text.
 
 ## How to: Add a task with a date
 <!-- user-help: tasks -->
-<!-- show: tasks.add -->
+<!-- show: tasks.new -->
 
 1. Click into **Add task…** at the bottom of a project (on the phone: the + button).
 2. Type the task the way you think, for example "Call the dentist tomorrow 3pm". Words like today and tomorrow become the
@@ -308,7 +308,6 @@ calendar.
 
 ## How to: Make a task repeat
 <!-- user-help: tasks -->
-<!-- show: tasks.repeat -->
 
 A recurring task comes back by itself - every day, every week or by your own rule.
 
@@ -321,7 +320,6 @@ for example "Water the plants every monday".
 
 ## How to: Assign a task or share a project
 <!-- user-help: tasks -->
-<!-- show: tasks.share -->
 
 1. To share the project: open its menu (⋯) > **Share…**, pick the person under **Share with …**, a role (for example
    **Member**) and select **Add**.

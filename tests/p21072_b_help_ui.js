@@ -4,6 +4,8 @@
 //  - the command search: "Hilfe" lists "Hilfe" and the help's topics; "Scan" finds "Scan-Eingang einrichten"; Enter opens it
 //  - the topic shows its steps in German, visible: the heading, four numbered steps with the screen's labels (Einstellungen,
 //    Integrationen, Dokumente: Eingänge, Scan-Eingang anlegen), "Was dann passiert"; the address is #help/<key>
+//  - 2.1090.0 (#5899): "Zeig mir" under it starts the spotlight (1/3 "Einstellungen öffnen", Next "Einstellungen: Integrationen"),
+//    Schließen comes back to the topic; a topic without named places has no button
 //  - "Alle Hilfethemen" leads to the list (the five areas in the sidebar's words), a topic opens, the browser's Back returns to
 //    the list; the help's own search ("Kontoauszug") finds "Eine Zahlung erfassen"
 //  - the same text the page shows comes over the API for agents (read_help translated) and over GET /api/help/section
@@ -54,7 +56,22 @@ const USCAN = 'files#how-to-set-up-a-scan-inbox';
   check([...d.querySelectorAll('#view .hvtext ol li b, #view .hvtext ol li strong')].some(x => x.textContent === 'Ordner-Wächter'), 'the labels stand out (bold)');
   check(/Was dann passiert/.test(body) && !/<!--|\*\*/.test(body), 'what happens then; no Markdown marks or comments visible');
   check(d.querySelector('#top h1')?.textContent.includes('Hilfe'), `the header says Hilfe (${d.querySelector('#top h1')?.textContent})`);
-  check(d.querySelector('#view .hvsec')?.getAttribute('data-show') === 'files.scan-inbox', 'the topic carries its named place');
+  // 2.1090.0 (#5899): the section marks its way as three named places (the settings, Integrations, the scan inbox)
+  check(d.querySelector('#view .hvsec')?.getAttribute('data-show') === 'settings.open settings.integrations files.scan-inbox', `the topic carries its named places (${d.querySelector('#view .hvsec')?.getAttribute('data-show')})`);
+
+  // ---- 2.1090.0 (#5899): "Zeig mir" under the section starts the spotlight of "Show me" with the places' own headings
+  const sm = d.querySelector('#view .hvsec .hvshow [data-hvshow]');
+  check(sm && sm.textContent.trim() === 'Zeig mir', `"Zeig mir" under the topic (${sm?.textContent})`);
+  sm.click();
+  const card = () => d.querySelector('.spot .tcard');
+  check(await until(() => card()?.querySelector('h3')?.textContent === 'Einstellungen öffnen'), `the first step: "Einstellungen öffnen" (${card()?.querySelector('h3')?.textContent})`);
+  check(/1\/3/.test(card().querySelector('.tstep')?.textContent || '') && !card().querySelector('h3 + p:not(.shw-miss)'), 'step 1 of 3, no agent\'s line under the heading');
+  check(decodeURIComponent(w.location.hash) === '#help/' + USCAN && d.querySelector('#view .hvsec'), 'the help stays on the screen (the first place has no view of its own)');
+  card().querySelector('[data-shw="next"]').click();
+  check(await until(() => card()?.querySelector('h3')?.textContent === 'Einstellungen: Integrationen'), `Next: "Einstellungen: Integrationen" (${card()?.querySelector('h3')?.textContent})`);
+  card().querySelector('[data-shw="close"]').click();
+  check(await until(() => !d.querySelector('.spot') && decodeURIComponent(w.location.hash) === '#help/' + USCAN && d.querySelector('#view .hvsec h2')?.textContent === 'Scan-Eingang einrichten'),
+    `Schließen: back on the topic (${w.location.hash})`);
 
   // ---- the same text over the API (agents) and the session route
   const sec = await call(CA, 'GET', '/api/help/section?key=' + encodeURIComponent(USCAN));
@@ -74,6 +91,7 @@ const USCAN = 'files#how-to-set-up-a-scan-inbox';
   check(pay, 'the topic "Eine Zahlung erfassen" is listed');
   pay.click();
   check(await until(() => h2() === 'Eine Zahlung erfassen'), 'a topic of the list opens');
+  check(!d.querySelector('#view .hvsec [data-hvshow]') && !d.querySelector('#view .hvsec[data-show]'), '2.1090.0 (#5899): a topic without named places has no "Zeig mir"');
   w.history.back();
   check(await until(() => areaNames().length === 5 && !d.querySelector('#view .hvsec')), `the browser's Back returns to the list (${w.location.hash})`);
 

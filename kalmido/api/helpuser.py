@@ -8,8 +8,10 @@ with the click path, from the same source the agents search (#5819, api/helpdocs
 - GET /api/help -> {lang, areas: [{area, title, sections: [{key, title, show}]}]} in the person's language (the help view's list)
 - GET /api/search?kind=help&q= -> {data: [{key, area, title, snippet}]}: the user's sections only (the search registry's web
   side of the kind help; the API's side, /api/v1/search?kind=help, keeps every public section, the user's first)
-- GET /api/help/section?key= -> {key, area, title, text (Markdown), show, lang}: the translation when there is one, else English;
-  an unknown key or a section that is no user's section answers 404.
+- GET /api/help/section?key= -> {key, area, title, text (Markdown), show, steps, lang}: the translation when there is one,
+  else English; an unknown key or a section that is no user's section answers 404. show = the keys of the named places the
+  section marks (<!-- show: key -->, known ones, in order; the list GET /api/help gives too); 2.1090.0 (#5899): steps = the
+  same places with route, selector and label (api/showme.py shw_out) for the button "Show me" under the section.
 Every signed-in person (the documentation is public), no organisation involved.
 """
 import re
@@ -21,6 +23,7 @@ from ..core.errors import BadInput
 from ..core.i18n import lang, md_plain, tr
 from ..core.srchreg import srch_q, srch_register
 from .helpdocs import HELP_AREAS, hlp_index, hlp_search, hlp_user_text
+from .showme import shw_out, shw_targets
 
 UH_TITLE = re.compile(r"^How to:\s*", re.I)
 # the area's name in the interface (the sidebar's words)
@@ -38,7 +41,16 @@ def uh_entry(s, lg):
     t = idx["tr"].get(lg, {}).get(s["key"])
     text = t["text"] if t else hlp_user_text(idx["files"][s["fkey"]]["lines"], s)
     return {"key": s["key"], "area": s["user"], "title": t["title"] if t else uh_title(s), "text": text,
-            "show": s.get("show") or "", "lang": lg if t else "en"}
+            "show": uh_show(s), "lang": lg if t else "en"}
+
+
+def uh_show(s):
+    """2.1090.0 (#5899): the named places a section marks, the keys docs/help-targets.json knows, in order, each once."""
+    t, out = shw_targets(), []
+    for k in s.get("show") or []:
+        if k in t and k not in out:
+            out.append(k)
+    return out
 
 
 def uh_sections():
@@ -71,7 +83,9 @@ def uh_section():
     s = hlp_index()["by_key"].get(key) if len(key) <= 200 else None
     if s is None or not s.get("user") or hlp_index()["files"][s["fkey"]]["operator"]:
         return jsonify(error=tr("Not found")), 404
-    return jsonify(uh_entry(s, lang()))
+    e = uh_entry(s, lang())
+    e["steps"] = shw_out([{"target": k} for k in e["show"]]) or []  # 2.1090.0 (#5899): "Show me" under the section
+    return jsonify(e)
 
 
 def uh_search_web():

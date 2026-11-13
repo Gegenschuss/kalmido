@@ -3280,7 +3280,7 @@ More national e-invoice formats are welcome as pull requests with an official va
 
 ## How to: Write a quotation
 <!-- user-help: office -->
-<!-- show: office.quotations -->
+<!-- show: office.offer-new -->
 
 1. Open **Office** > **Quotations** and select **New quotation**. The draft opens at once.
 2. Pick the **Client**.
@@ -3293,7 +3293,7 @@ quotation is one step away from the invoice. A draft can be looked at with **Pre
 
 ## How to: Turn a quotation into an invoice
 <!-- user-help: office -->
-<!-- show: office.invoices -->
+<!-- show: office.invoice-new -->
 
 1. Open the accepted quotation and select **Create invoice**.
 2. Choose the **Type of invoice** (full, partial or final invoice) and confirm.
@@ -3307,7 +3307,6 @@ recorded.
 
 ## How to: Record a payment
 <!-- user-help: office -->
-<!-- show: office.payment -->
 
 1. Open the finalised invoice and select **Record payment**.
 2. Check the date and the amount and select **Record**.

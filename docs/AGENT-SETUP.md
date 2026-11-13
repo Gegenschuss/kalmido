@@ -1172,7 +1172,8 @@ them with the right people.
 
 ## How to: Create your personal agent
 <!-- user-help: agents -->
-<!-- show: agents.setup -->
+<!-- show: settings.open -->
+<!-- show: settings.agents -->
 
 An agent is an assistant (for example Claude) that works in Kalmido with its own account and only sees what you share with it.
 
@@ -1187,7 +1188,6 @@ row makes a new one.
 
 ## How to: Give an agent access to a project or folder
 <!-- user-help: agents -->
-<!-- show: agents.share-project -->
 
 A project:
 
@@ -1204,7 +1204,6 @@ folder's history; a locked folder can never be shared with an agent.
 
 ## How to: Approve what an agent asks for
 <!-- user-help: agents -->
-<!-- show: agents.waiting -->
 
 1. When an agent needs your yes, a card "… waits for you" appears (in Today and in the Agents area).
 2. Select **Approve** or **Reject**. For a proposal, select **Review the proposal** first and look at the changes.

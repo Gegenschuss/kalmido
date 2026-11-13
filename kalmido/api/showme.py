@@ -26,7 +26,8 @@ SHOW_MARK_RE = re.compile(r"<!--\s*show:\s*([a-z0-9.\-]{3,80})\s*-->")  # a help
 # the labels of docs/help-targets.json for the translation files (tests/p21072_c_show_test.py: every label_en is here)
 SHOW_LABELS = (N_("Open the settings"), N_("Settings: Integrations"), N_("Settings: Agents"), N_("Documents: inboxes (scan inbox)"),
                N_("Add an agent"), N_("Settings of the agent"), N_("New quotation"), N_("New invoice"), N_("Add a task"),
-               N_("New event"), N_("Upload files"))
+               N_("New event"), N_("Upload files"),
+               N_("Add documents"))  # 2.1090.0 (#5899)
 _SHW = {"t": None}
 _SHW_LOCK = threading.Lock()
 

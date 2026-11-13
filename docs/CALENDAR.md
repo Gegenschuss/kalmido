@@ -138,7 +138,7 @@ proxy*). Details, the mapping table and proxy examples (Caddy, Authelia, nginx, 
 
 ## How to: Create an event
 <!-- user-help: calendar -->
-<!-- show: calendar.new-event -->
+<!-- show: calendar.new -->
 
 1. Open **Calendar** and select **Event** (on the phone: the + button). Or drag over free time in the week or day view.
 2. Fill in the **Title**, when it **Starts** and **Ends**, and if needed **Repeat** and reminders.
@@ -149,7 +149,8 @@ phone").
 
 ## How to: Subscribe to another calendar
 <!-- user-help: calendar -->
-<!-- show: calendar.subscribe -->
+<!-- show: settings.open -->
+<!-- show: settings.integrations -->
 
 1. Open **Calendar** > **Calendars** > **Subscriptions…** (or **Settings** > **Integrations** > **Calendars**).
 2. Select **Add calendar**.
@@ -161,7 +162,8 @@ regularly.
 
 ## How to: Show Kalmido on your phone
 <!-- user-help: calendar -->
-<!-- show: calendar.phone -->
+<!-- show: settings.open -->
+<!-- show: settings.integrations -->
 
 1. Open **Calendar** > **Calendars** > **On the phone…** (or **Settings** > **Integrations** > **Calendar apps (CalDAV)**).
 2. Select **New app password** and copy the server address, user name and password into your phone's calendar settings.

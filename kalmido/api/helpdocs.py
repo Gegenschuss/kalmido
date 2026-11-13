@@ -124,14 +124,15 @@ def _hlp_parse(fkey, fname, text):
 
 
 def _hlp_mark(s, lines):
-    """2.1086.0 (#5820): a user's section: s["user"] = its area, s["show"] = its named place (the comment lines right below
-    the heading)."""
-    for ln in lines[s["start"] + 1:min(s["own_end"], s["start"] + 4)]:
+    """2.1086.0 (#5820): a user's section: s["user"] = its area, s["show"] = its named places in order (the comment lines right
+    below the heading; 2.1090.0 #5899: one <!-- show: key --> line per step of "Show me", as many as the way has)."""
+    s["show"] = []
+    for ln in lines[s["start"] + 1:s["own_end"]]:
         m, w = _UH.match(ln.strip()), _SHOW.match(ln.strip())
         if m:
             s["user"] = m.group(1)
         elif w:
-            s["show"] = w.group(1)
+            s["show"].append(w.group(1))
         elif ln.strip():
             break
 

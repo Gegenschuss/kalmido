@@ -2,7 +2,8 @@
 /* Kalmido web client: the view "Help" (2.1086.0, #5820). Loaded on demand (lazyload.js module helpview) by its page #help.
    Short "How to" sections per area in everyday words with the click path, from the same source the agents search
    (docs/*.md, api/helpuser.py): GET /api/help = the topics per area in the person's language, GET /api/search?kind=help
-   = the search, GET /api/help/section = one section (Markdown, drawn by renderMd of attachments.js, read-only).
+   = the search, GET /api/help/section = one section (Markdown, drawn by renderMd of attachments.js, read-only; 2.1090.0
+   #5899: with its named places a button "Show me", showme.js).
    Addresses: #help (every area), #help/area:<area> (one area first, "All topics" back), #help/<key> (one section, "Back").
    The ways in (start files): the command search (palette.js "Help" + one entry per section), "Help for this area" in the
    header's "…" (render.js), "How it works" in empty states (hlp_linkHtml) and Settings > Help.
@@ -65,7 +66,17 @@ function hv_secHtml(key) {
   if (c.err) return back + errorState({size: 'sec', title: tr('This help topic does not exist (any more)'), sub: ''});
   if (!c.j) return back + loadingHtml('sec');
   const j = c.j;
-  return `${/*html-ok*/ back}<article class="hvsec" data-hvsec="${esc(j.key)}" lang="${esc(j.lang)}"${j.show ? ` data-show="${esc(j.show)}"` : ''}><h2>${esc(j.title)}</h2><div class="md hvtext">${/*html-ok*/ hv_md(j.text)/* renderMd: escaped Markdown */}</div></article>`;
+  const show = Array.isArray(j.show) ? j.show.join(' ') : String(j.show || '');
+  return `${/*html-ok*/ back}<article class="hvsec" data-hvsec="${esc(j.key)}" lang="${esc(j.lang)}"${show ? ` data-show="${esc(show)}"` : ''}><h2>${esc(j.title)}</h2><div class="md hvtext">${/*html-ok*/ hv_md(j.text)/* renderMd: escaped Markdown */}</div>${/*html-ok*/ hv_showHtml(j)}</article>`;
+}
+// 2.1090.0 (#5899): "Show me" under a section that marks named places (<!-- show: key -->, api/helpuser.py steps): the same
+// spotlight as under an agent's chat message (showme.js), with the places' own headings and no agent's line; it only goes to
+// the view and highlights, Close comes back here. A section without marks has no button.
+const hv_showHtml = j => Array.isArray(j.steps) && j.steps.length ? `<div class="hvshow"><button type="button" class="btn sm" data-hvshow>${ic('eye', 's')} <span>${esc(tr('Show me'))}</span></button></div>` : '';
+function hv_show() {
+  const c = HV.sec[hv_route().key], steps = c?.j?.steps;
+  if (!Array.isArray(steps) || !steps.length) return;
+  loadModule('showme').then(() => shw_start(steps), () => { /* loadModule said it (offline) */ });  // lazy-ok: loaded first
 }
 function hv_inner() {
   const {area, key} = hv_route();
@@ -91,5 +102,6 @@ document.addEventListener('click', e => {
   const t = /** @type {HTMLElement} */ (e.target);
   const a = t.closest?.('[data-hvk]');
   if (a && !(/** @type {MouseEvent} */ (e).ctrlKey || /** @type {MouseEvent} */ (e).metaKey)) { e.preventDefault(); HV.from = true; go('help/' + encodeURIComponent(a.getAttribute('data-hvk') || '')); return; }
+  if (t.closest?.('[data-hvshow]')) { e.preventDefault(); hv_show(); return; }
   if (t.closest?.('[data-hvback]')) { e.preventDefault(); if (HV.from) { HV.from = false; history.back(); } else go('help'); }
 });
