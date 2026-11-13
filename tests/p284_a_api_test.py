@@ -340,7 +340,8 @@ check(Bo.post(B + f"/api/hubmail/mails/{m4}/restore").ok and not dbx("SELECT del
 check(Bo.get(B + f"/api/files/nodes/{E4}").ok, "#4338: ... and the .eml is readable again")
 dbx("UPDATE fs_nodes SET deleted_at='2026-01-01T00:00:00Z' WHERE id=?", (F4,), write=True)  # the folder deleted by hand before
 check(Bo.delete(B + f"/api/hubmail/mails/{m4}").ok and Bo.post(B + f"/api/hubmail/mails/{m4}/restore").ok, "#4338: delete + Undo once more")
-check(dbx("SELECT deleted_at FROM fs_nodes WHERE id=?", (F4,))[0][0] == "2026-01-01T00:00:00Z", "#4338: a folder deleted by hand before stays in the trash")
+# 2.1112.2 (#5993): deleted_at is TIMESTAMPTZ since #5306 and reads back as +00:00: compare the point in time, not the text
+check(dbx("SELECT deleted_at = ? FROM fs_nodes WHERE id=?", ("2026-01-01T00:00:00Z", F4))[0][0] is True, "#4338: a folder deleted by hand before stays in the trash")
 dbx("UPDATE fs_nodes SET deleted_at=NULL WHERE id=?", (F4,), write=True)
 # review of 2.536.0 (#4338): a reused day folder (hbm_file fresh=False) holds another mail's files -- deleting the second mail
 # must not take the first mail's folder along (as if m1 had been filed into m4's folder)
