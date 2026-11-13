@@ -61,7 +61,7 @@ NULLABLE_ORG_WHY = {
     "bookmarks; Selbstständige P4); the app checks the owner / the workspace": (
         "fs_nodes", "fs_area_roots", "fs_ext_links", "fs_locks", "fs_upload_requests", "file_text", "upload_scan",
         "doc_cfg", "doc_fetch_portals", "doc_fetchers", "doc_field_values", "doc_fields", "doc_flow_runs", "doc_mail",
-        "doc_meta", "doc_models", "doc_rules", "doc_senders", "doc_tags", "doc_types", "rc_receipts", "rc_suggest",
+        "doc_meta", "doc_models", "doc_rules", "doc_senders", "doc_types", "rc_receipts", "rc_suggest",
         "pl_imported", "pl_rules", "pl_sources", "pl_uploads", "wiki_pages", "wiki_files", "wiki_shares", "wiki_spaces",
         "sheets", "sheet_files", "sheet_shares", "video_reviews", "video_versions", "bookmarks"),
     "a person's own office, mail hub, portal, newsletter, polls and channels without organisation (Selbstständige P4); the app "

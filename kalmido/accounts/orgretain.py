@@ -126,7 +126,7 @@ ODL_MORE_SKIP = frozenset((
     "office_payonline", "office_pay_links", "office_pay_sessions", "office_pay_events", "office_pay_payouts",  # 2.469.0 (#3459)
     "notify_channels", "reading_orgs", "task_vectors", "upload_scan", "file_text", "merge_runs", "obj_follow", "task_links",
     "hub_leave_quota", "fs_area_roots", "fs_upload_requests", "fs_ext_links", "wiki_spaces", "doc_cfg", "doc_models",
-    "doc_types", "doc_tags", "doc_rules", "doc_fields", "doc_senders", "pl_sources", "pl_rules", "nl_conns", "nl_segments",
+    "doc_types", "doc_rules", "doc_fields", "doc_senders", "pl_sources", "pl_rules", "nl_conns", "nl_segments",
     "nl_suppress", "nl_consent_log", "portal_logins", "office_letter_profiles", "office_letter_blocks", "office_cashbooks",
     # parts of another row (they go with it): items, versions, files, logs, closings
     "doc_flow_runs",  # 2.581.0 (#4803): the runs of document flows go with their documents

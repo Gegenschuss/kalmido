@@ -168,8 +168,9 @@ for s in (A, Bo, Ca, Da, Er):
 AGS = tok(PAGT)
 
 cols = dbx("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name LIKE 'doc\\_%'")
-check({x[0] for x in cols} >= {"doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_node_tags", "doc_rules", "doc_models", "doc_cfg",
-                               "doc_mail"}, f"the new tables ({sorted(x[0] for x in cols)})")
+# 2.1119.0 (#5277): the file store's tags are rows of the core (obj_tags scope ws / obj_tag_links kind fs_entry)
+check({x[0] for x in cols} >= {"doc_meta", "doc_senders", "doc_types", "doc_rules", "doc_models", "doc_cfg",
+                               "doc_mail"} and not {x[0] for x in cols} & {"doc_tags", "doc_node_tags"}, f"the new tables ({sorted(x[0] for x in cols)})")
 OCR = A.get(B + "/api/docs/settings", params={"ws": "private"}).json().get("ocr")
 if not OCR:
     print("NOTE: this image has no Tesseract (deu+eng) -- the OCR checks are skipped (build the image from the Dockerfile)", flush=True)

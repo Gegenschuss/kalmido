@@ -1,7 +1,9 @@
 """2.122.0 B (#2099): tags in the file store ("Ablage"). Files and folders carry the same tags as documents: the tag set of
-their workspace (doc_tags of 'o<org>' | 'u<owner>', docs/store.py) and the table doc_node_tags (node_id -> fs_nodes.id) --
-no second tag world. Setting tags needs write access to the node; whoever sees a node sees its tags and the tag names of
-its workspace. A node with a doc_meta row is a document: its tags change through docs/web.py doc_update (the models
+their workspace ('o<org>' | 'u<owner>', docs/store.py) -- no second tag world. 2.1119.0 (#5277, stage Q5c): the tags are rows
+of the shared core, obj_tags scope ws and obj_tag_links kind fs_entry (core/objtags.py; were doc_tags / doc_node_tags).
+Setting tags needs write access to the node; whoever sees a node sees its tags. The tag names of the whole workspace only
+its members see (dt_ws_member, decided 08.11.2026, question 11): a person a node is shared with sees the tags on the nodes
+they see, not the workspace's other names. A node with a doc_meta row is a document: its tags change through docs/web.py doc_update (the models
 learn the correction as in the documents area). A plain file / folder only gets the rows: the recognition, the models
 (train / classify) and the documents' filters only ever read the tags of documents (doc_meta rows).
 
@@ -17,6 +19,7 @@ from ..core.pg import write_lock  # 2.564.0 (#4701)
 from ..core.access import Denied, acx_of
 from ..accounts.session import me
 from ..docs import store as S
+from ..core.objtags import OTG_FS_IN, otg_ws_of, otg_ws_tag_of  # 2.1119.0 (#5277): the tags are the core's
 from .store import fs_chain, fs_link_target, fs_log_add, fs_visible_sql, need_node
 from .fslock import fsl_need_unlocked  # 2.353.0 F (#2758)
 from .web import _items  # 2.369.5 (#2517): pulled up from functions
@@ -49,14 +52,9 @@ def dt_attach(c, items):
     ids = [x["id"] for x in items if x.get("id")]
     if not ids:
         return items
-    by = {}
-    for i in range(0, len(ids), 1000):
-        part = ids[i:i + 1000]
-        for r in c.execute(f"""SELECT nt.node_id, t.id, t.name FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id
-                               WHERE nt.node_id IN ({','.join('?' * len(part))}) ORDER BY lower(t.name)""", part):
-            by.setdefault(r[0], []).append({"id": r[1], "name": r[2]})
+    by = otg_ws_of(c, ids)  # 2.1119.0 (#5277): one query of the core (one array parameter)
     for x in items:
-        x["tags"] = by.get(x.get("id"), [])
+        x["tags"] = [{"id": t["id"], "name": t["name"]} for t in by.get(x.get("id"), [])]
     return items
 
 
@@ -86,8 +84,8 @@ def dt_merge(c, have, old, mine):
     names or ids, compared by name in any case): removed ones go, added ones come, the rest stays as stored."""
     def nm(t):
         if isinstance(t, int) and not isinstance(t, bool):
-            r = c.execute("SELECT name FROM doc_tags WHERE id=?", (t,)).fetchone()
-            return r[0] if r else None
+            r = otg_ws_tag_of(c, t)  # 2.1119.0 (#5277)
+            return r["name"] if r else None
         return t.strip() if isinstance(t, str) and t.strip() else None
     key = lambda x: x.casefold()  # noqa: E731
     old_k = {key(x) for x in map(nm, old) if x}
@@ -107,8 +105,7 @@ def dt_move(c, nid, ws):
     fsmove's fsm_doc."""
     if S.meta_row(c, nid):
         return
-    tags = c.execute("SELECT t.id, t.name, t.ws, nt.auto FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id WHERE nt.node_id=?",
-                     (nid,)).fetchall()
+    tags = otg_ws_of(c, [nid]).get(int(nid), [])  # 2.1119.0 (#5277)
     if not tags or all(t["ws"] == ws for t in tags):
         return
     new = {}
@@ -117,6 +114,18 @@ def dt_move(c, nid, ws):
         if x:
             new[x] = t["auto"] or ""
     S.set_tags(c, nid, list(new), new)
+
+
+def dt_ws_member(c, ws, uid):
+    """2.1119.0 (#5277, question 11): is person uid a member of workspace ws (an organisation's: a member that is no guest, as
+    the documents area asks, docs/web.py ws_param; a person's own: that person)? Only members see all its tag names."""
+    oid = S.ws_org(ws)
+    if not oid:
+        return ws == S.doc_ws(None, uid)
+    if oid not in acx_of(c, uid).org_ids:
+        return False
+    from ..accounts.orgroles import org_role_key
+    return org_role_key(c, uid, oid) != "guest"
 
 
 def dt_space(c, uid, raw):
@@ -144,7 +153,7 @@ def dt_groups(args, key):
 
 def dt_where(groups, nots, every, where, params):
     """Adds the tag conditions on fs_nodes n: groups of ids (each = one tag name; every: all groups, else one of them), nots: none."""
-    has = "n.id IN (SELECT node_id FROM doc_node_tags WHERE tag_id IN ({0}))"
+    has = "n.id IN (" + OTG_FS_IN + " IN ({0}))"  # 2.1119.0 (#5277): the core's links
     if groups:
         where.append("(" + (" AND " if every else " OR ").join(has.format(",".join("?" * len(grp))) for grp in groups) + ")")
         params += [i for grp in groups for i in grp]
@@ -161,8 +170,11 @@ def files_node_tags(nid):
     n = need_node(c, nid)
     ws = dt_ws(n)
     can = n["role"] in ("owner", "edit")
-    # review: the whole tag list of the workspace only for those who may tag here (a view share of one private file shows no other names)
-    return jsonify(tags=[{"id": t["id"], "name": t["name"]} for t in S.node_tags(c, nid)], all=S.labels(c, ws, "tag") if can else [],
+    # review: the whole tag list of the workspace only for those who may tag here (a view share of one private file shows no other names);
+    # 2.1119.0 (#5277, decided 08.11.2026, question 11): and only for a member of the workspace -- an edit share of a node gives
+    # its tags, not the names of the workspace (a name typed in still finds / makes the tag)
+    full = can and dt_ws_member(c, ws, me())
+    return jsonify(tags=[{"id": t["id"], "name": t["name"]} for t in S.node_tags(c, nid)], all=S.labels(c, ws, "tag") if full else [],
                    ws=("org:%d" % n["org_id"]) if n["org_id"] else "private", can=can)
 
 
@@ -203,8 +215,9 @@ def files_tags_used():
     _no_agent()
     uid = me()
     cond, params = dt_space(c, uid, request.args.get("space"))
-    rows = c.execute(f"""SELECT DISTINCT t.id, t.name FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id JOIN fs_nodes n ON n.id=nt.node_id
-                         WHERE n.id IN {fs_visible_sql(uid, c)} AND {cond}""", params).fetchall()
+    rows = c.execute(f"""SELECT DISTINCT ot.id, ot.name FROM obj_tag_links k JOIN obj_tags ot ON ot.id=k.tag_id AND ot.scope_kind='ws'
+                         JOIN fs_nodes n ON n.id=k.obj_id WHERE k.kind='fs_entry' AND n.id IN {fs_visible_sql(uid, c)} AND {cond}""",
+                     params).fetchall()  # 2.1119.0 (#5277): the core's links -- only tags on nodes I see
     merged = {}
     for r in rows:
         merged.setdefault(r[1].lower(), {"name": r[1], "ids": []})["ids"].append(r[0])

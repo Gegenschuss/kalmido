@@ -222,7 +222,7 @@ D1 = doc_new(A, "telekom.txt", "Rechnung Telekom Mobilfunk Maerz Beispielkunde",
 D2 = doc_new(A, "allianz.txt", "Vertrag Versicherung Hausrat Beispiel", date="2024-06-01", sender="Allianz Beispiel", type="Vertrag", tags=["Steuer"])
 D3 = doc_new(A, "prospekt.txt", "Werbung Prospekt Angebot", date="2025-07-01")
 dbx("UPDATE doc_meta SET sender_id=NULL, type_id=NULL WHERE node_id=?", (D3,))
-dbx("DELETE FROM doc_node_tags WHERE node_id=?", (D3,))
+dbx("DELETE FROM obj_tag_links WHERE kind='fs_entry' AND obj_id=?", (D3,))  # 2.1119.0 (#5277): the file store's tags are rows of the core (obj_tags scope ws / obj_tag_links kind fs_entry)
 ALL = sorted([D0, D1, D2, D3])
 check(ids(A, ws="private") == ALL, "four private documents")
 fac = A.get(B + "/api/docs", params={"ws": "private"}).json()["facets"]
