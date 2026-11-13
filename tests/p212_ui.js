@@ -66,9 +66,16 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   check(!d.querySelector('.shmodal [data-m="own-xfer"]'), 'no transfer button for a member');
   w.close();
   // bob: the News item
-  w = await boot({user: 'bob', hash: 'news'}); d = w.document; await sleep(600);
-  // 2.152.2 (#2624): project instead of list
-  check(/Alice made you the owner of the project Team/.test(d.body.textContent), 'News: "Alice made you the owner of the list Team"');
+  w = await boot({user: 'bob', hash: 'news'}); d = w.document;
+  // 2.1102.0 (#5908): since #5807 / #5808 (2.1037 / 2.1052) News show bundled only: "owner" is not "For you" (like
+  // "share"), it stands in the folded History as the project's bundle "Team" with "you own it now"; opened bundle = the sentence
+  const hb = await until(() => d.querySelector('#view .nhist [data-act="news-hist"]'));
+  if (hb && hb.getAttribute('aria-expanded') !== 'true') click(w, hb);
+  const og = await until(() => [...d.querySelectorAll('#view .nhist .ngroup')].find(g => /you own it now/.test(g.textContent)));
+  check(og && /Team/.test(og.querySelector('.ngt')?.textContent || ''), 'News (History): the project Team, "you own it now": ' + (og?.textContent || d.querySelector('#view')?.textContent || '').replace(/\s+/g, ' ').slice(0, 200));
+  const om0 = og?.querySelector('.ngmain[data-act="news-group"]');
+  if (om0) { click(w, om0); await until(() => d.querySelector('#view .nhist .ngitems')); }
+  check(!om0 || /Alice made you the owner of the project Team/.test(d.querySelector('#view .nhist .ngitems')?.textContent || ''), 'News: "Alice made you the owner of the project Team" in the opened bundle');
   w.close();
 
   // ================= an admin in the list of a disabled user: "Take over…"
