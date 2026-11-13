@@ -212,6 +212,15 @@ def bulk_undo(s, who, cid):
     r = s.post(B + "/api/contacts/bulk", json={"action": "restore", "items": r.json()["undo"]})
     d = s.get(B + f"/api/contacts/{cid}").json()
     check(r.ok and r.json()["changed"] == 1 and not r.json().get("conflicts") and d["org"] == "Beispiel AG", f"{who}: an undo without a change in between works {r.text[:200]}")
+    # 2.1112.2 (#5978): the version is compared as a point in time - a step stamped on a whole second (iso_ms writes .000, the
+    # TIMESTAMPTZ read gives the shortest form without it) is no change in between (before: a raw text compare, conflict)
+    r = s.post(B + "/api/contacts/bulk", json={"action": "set", "ids": [cid], "org": "Sekunde GmbH"})
+    items = [{**x, "expect": "2026-10-01T10:00:00.000Z"} for x in r.json()["undo"]]
+    kt.dbx("UPDATE contacts SET updated_at='2026-10-01T10:00:00Z' WHERE id=?", (cid,))
+    r = s.post(B + "/api/contacts/bulk", json={"action": "restore", "items": items})
+    d = s.get(B + f"/api/contacts/{cid}").json()
+    check(r.ok and r.json()["changed"] == 1 and not r.json().get("conflicts") and d["org"] == "Beispiel AG",
+          f"{who}: an undo whose version fell on a whole second goes through {r.text[:200]}")
 
 
 def ics(uid, title, mod, attendee=True):
