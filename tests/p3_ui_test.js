@@ -330,6 +330,17 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   check(/Alice hat Design erledigt: Deine Aufgabe ist nicht mehr blockiert/.test(ntB), 'bob News: unblock (German) ' + ntB.replace(/\s+/g, ' ').slice(0, 600));
   const ntW = await nOpen(/^\s*Work/); await idle(wb);
   check(/Alice hat Work auf\s*Gefährdet gesetzt/.test(ntW) && /Vendor is late/.test(ntW), 'bob News: status update with note (German) ' + ntW.replace(/\s+/g, ' ').slice(0, 600));
+  // 2.1088.0 (#5938): a status change that stands alone in its bundle shows its note on the line (since #5808 only title + word);
+  // bob has read everything, alice sets the status again with a new note -> one unread bundle "Work" with one entry
+  await call('POST', '/api/news/read', {all: true}, BK);
+  await call('POST', `/api/lists/${WORK}/status`, {status: 'at_risk', note: 'Parts arrive Friday'});
+  wb.location.hash = 'overview'; await idle(wb); wb.location.hash = 'news'; await idle(wb); await wb.eval('loadNews().then(render)');  // the news fresh from the server
+  const nOne = () => db.querySelector(`#view .ngroup[data-gk="l${WORK}u"]`);  // the unread bundle of Work (read and unread never share a line)
+  await until(() => db.querySelector('#view .nhisth') || nOne());
+  if (db.querySelector('#view .nhisth[aria-expanded="false"]')) db.querySelector('#view .nhisth').click();  // a status change for my information stands in the history
+  await until(() => nOne()?.querySelector('.ngex')); await idle(wb);
+  const g1 = nOne();
+  check(g1 && g1.querySelector('.ngmain[data-act="news-open"]') && /Work/.test(g1.querySelector('.ngt')?.textContent || '') && /Status ge/.test(g1.querySelector('.ngs')?.textContent || '') && /Parts arrive Friday/.test(g1.querySelector('.ngex')?.textContent || ''), '#5938: bob sees the note of a single status change on its line ' + (g1 ? g1.textContent.replace(/\s+/g, ' ').slice(0, 300) : '-'));
   wb.location.hash = 'l/' + WORK; await until(() => db.querySelector('.lhead .stpill')); await idle(wb);  // 2.624.0 (#3943)
   check(/erledigt/.test(db.querySelector('.lhead').textContent) || /\d+ %?|\//.test(db.querySelector('.lhead .lprog').textContent), 'bob: header');
   check(/Gefährdet/.test(db.querySelector('.lhead .stpill').textContent), 'bob: German status label');
