@@ -33,6 +33,11 @@ function wk_pgAt(id) {
   for (const sp of wk_spaces()) { const p = WK.idx[sp]?.pages?.find(x => x.id === id); if (p) return {space: sp, path: p.path}; }
   return null;
 }
+// 2.1108.0 (#5965): a phone with an open page shows its title once and one "…": the head bar (#top) names the page instead of
+// the area "Knowledge pages" and has no "…" of its own (render.js renderTop0), the page's head keeps the back arrow, the path and
+// the page's "…", which also carries the head bar's entries (undo / redo, favourite, help, the space's section)
+const wk_phonePage = () => isMobile() && S.route.mod === 'wiki' && !!S.route.wid && WK.pg?.id === S.route.wid && !WK.pg._wke;
+const wk_topTitle = () => wk_base(WK.pg?.path || '');
 function wk_open() {
   if (!wk_all()) return wk_cur();
   const r = S.route, ok = v => !!v && wk_spaces().includes(v); if (r.mod !== 'wiki') return null;
@@ -106,6 +111,7 @@ async function wk_loadPage(id, force) {
     WK.pgErr = e.status === 404 ? tr('This page does not exist or you cannot see it.') : e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; if (WK.pg?.id === id) WK.pg = null; }
   finally { WK.busy['p' + id] = false; }
   if (S.route.mod === 'wiki') wk_redraw();
+  if (S.route.mod === 'wiki' && isMobile()) renderTop();  // 2.1108.0 (#5965): the head bar names the loaded page
   if (WK.caretNext?.id === id && WK.pg?.id === id && WK.edit) { const at = WK.caretNext.at; WK.caretNext = null; setTimeout(() => wk_caretAt(at), 30); }  // 2.371.2 (#3151): {{cursor}}
   if (typeof sbb_sync === 'function') sbb_sync('wiki');  // 2.319 (#3287): the panel follows the loaded page (its space, its folder)
 }
@@ -539,16 +545,24 @@ function wk_pageHtml(p) {
   const may = WK.idx[p.space]?.mayWrite !== false, mob = isMobile(), tch = isTouch(), asMd = WK.mdFor === p.id, cm = typeof wkcm_html === 'function' && wkcm_can();
   const edit = WK.edit = may && (asMd || ((!wk_ro() || WK.fresh === p.id) && (WK.edit || !tch)));  // 2.655.0 (#5082): touch reads first (pen), also a tablet; a page just made opens for writing, also with the lock
   return `<div class="nthead">${mob ? `<button type="button" class="iconbtn" data-wk="close" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}
-    <div class="wktitle">${wk_crumbs(p)}<h2>${esc(wk_base(p.path))}${typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : ''}</h2></div>
+    <div class="wktitle">${wk_crumbs(p)}${mob ? (typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : '') /* 2.1108.0 (#5965): the title is in the head bar */ : `<h2>${esc(wk_base(p.path))}${typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : ''}</h2>`}</div>
     ${tch && may && !wk_ro() && !asMd ? `<button type="button" class="iconbtn wkpen" data-wk="pen" aria-pressed="${edit}" title="${esc(edit ? tr('Done') : tr('Edit'))}" aria-label="${esc(edit ? tr('Done') : tr('Edit'))}">${ic(edit ? 'check' : 'edit')}</button>` : ''}
     ${may && typeof wsh_btnHtml === 'function' ? wsh_btnHtml(p) : ''}
-    ${may ? `<button type="button" class="iconbtn" data-wk="pmenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
+    ${may || mob ? `<button type="button" class="iconbtn" data-wk="pmenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
     ${mob ? '' : `<button type="button" class="iconbtn" data-wk="close" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button>`}</div>${wk_dayBar(p)}
     ${edit ? `<div class="wkedwrap">${typeof wem_bar === 'function' ? wem_bar(p) : ''}${!asMd && cm ? wkcm_html(p) : `<textarea id="wk-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Write … ([[Page]], [[#123]])'))}">${esc(p.body)}</textarea>`}<div id="wk-ac" class="wkac hidden" role="listbox" aria-label="${esc(tr('Pages'))}"></div></div>`
-      : `${wk_attrsHtml(p.attrs, p.space)}<div class="md ntmd wkmd" id="wk-md">${wk_bodyStrip(p.body).trim() ? wk_render(p) : `<p class="muted">${tr('Empty page.')}</p>`}</div>`}
+      : `${wk_attrsHtml(p.attrs, p.space)}<div class="md ntmd wkmd" id="wk-md">${wk_bodyStrip(p.body).trim() ? wk_dupTitle(wk_render(p), p) : `<p class="muted">${tr('Empty page.')}</p>`}</div>`}
     ${wka_html(p, may, edit)}${wko_cfHtml(p)}
     ${p.backlinks?.length ? `<section class="wkback" aria-label="${esc(tr('Linked from'))}"><h4>${ic('link', 's')}${tr('Linked from')}</h4><ul>${p.backlinks.map(b => `<li><a href="#wiki/${b.id}">${esc(b.path)}</a></li>`).join('')}</ul></section>` : ''}
     <div class="ntfoot muted"><span id="wk-saved" role="status" aria-live="polite"></span><span class="spacer"></span>${p._off ? `<span class="wkoff">${esc(tr('Offline · as of {0}', fmtWhen(p._off)))}</span> · ` : ''}<span>${esc(tr('Changed {0}', fmtWhen(p.updated_at)))}${p.updated_by_name ? ' · ' + esc(p.updated_by_name) : ''}</span></div>${wk_smvLine(p.moved)}`;
+}
+// 2.1108.0 (#5965): a first heading that only repeats the page's title (a SilverBullet import starts with "# Title") is hidden
+// in the drawn page; the text, the editor and the export keep it. Compared without case and spaces.
+function wk_dupTitle(html, p) {
+  const m = /^\s*<h1\b([^>]*)>([\s\S]*?)<\/h1>/.exec(html); if (!m) return html;
+  const norm = x => String(x).toLowerCase().replace(/\s+/g, '');
+  if (norm(wk_unesc(m[2].replace(/<[^>]*>/g, ''))) !== norm(wk_base(p.path))) return html;
+  return html.replace(m[0], m[0].replace('<h1', '<h1 hidden data-wkdup="1"'));
 }
 const wk_unesc = h => { const d = document.createElement('textarea'); d.innerHTML = h; return d.value; };
 const wk_bodyStrip = b => String(b || '').replace(/^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, '');
@@ -1078,7 +1092,14 @@ document.addEventListener('click', async e => {
   else if (k === 'pen') { if (WK.edit) await wk_flush(); WK.edit = !WK.edit; if (WK.edit && typeof WKCM !== 'undefined') WKCM.focusNext = true; renderView(); if (WK.edit) setTimeout(() => wk_ta()?.focus(), 30); }  // 2.554.0 (#4052): the phone's pen (Read / Edit is gone)
   else if (k === 'ac') { e.preventDefault(); wk_acPick(+a.dataset.i); }
   else if (k === 'cfshow' && p) wko_cfShow(p);  // 2.169.0 (#2671)
-  else if (k === 'pmenu' && p) menu(a, [{label: tr('Rename…'), icon: 'edit', fn: () => wk_rename(p)},
+  else if (k === 'pmenu' && p) menu(a, wk_pmenuItems(p));
+});
+// the page's "…"; 2.1108.0 (#5965): a phone adds the head bar's entries (it has no "…" of its own on a page), a page one may
+// only read shows just those
+function wk_pmenuItems(p) {
+  const may = WK.idx[p.space]?.mayWrite !== false, top = isMobile() && typeof topMoreItems === 'function' ? topMoreItems() : [];
+  if (!may) return top;
+  return [{label: tr('Rename…'), icon: 'edit', fn: () => wk_rename(p)},
     ...(p.path.includes('/') ? [{label: tr('Rename folder…'), icon: 'folder', fn: () => wk_moveFolder(p)}] : []),
     ...wk_smvItems(p),  // 2.96.0 B (#1941)
     ...(typeof wsh_menuItems === 'function' ? wsh_menuItems(p) : []),  // 2.123.0 B (#2104): Share… / Share folder…
@@ -1088,8 +1109,8 @@ document.addEventListener('click', async e => {
     ...wk_modeItems(p),  // 2.554.0 (#4052): Edit as Markdown (the way out) / Read only
     ...(typeof wkst_items === 'function' ? wkst_items(p) : []),  // 2.371.3 (#3152): reading style (mine / the space's)
     ...(typeof pgw_items === 'function' ? pgw_items('wiki', p.id) : []),  // 2.599.0 (#4808): the page's width (Read / Wide / Full)
-    '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => wk_delete(p)}]);
-});
+    ...(top.length ? ['-', ...top] : []), '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => wk_delete(p)}];  // Delete stays last, set apart
+}
 document.addEventListener('change', e => {
   if (e.target.matches?.('[data-wk-tpl]')) WK.tplPick = +e.target.value;
   if (e.target.matches?.('[data-wk-sp]')) { WK.spPick = e.target.value; const t = e.target.closest('.cdlg-b')?.querySelector('[data-wk-tpl]'); if (t) { t.innerHTML = wk_tplOpts(WK.spPick); t.closest('.wktpl')?.classList.toggle('hidden', !wk_pages(WK.spPick).some(x => wk_isTpl(x.path))); WK.tplPick = 0; } }  // 2.198.0 A (#2743): New page without an open space: its templates follow the space
