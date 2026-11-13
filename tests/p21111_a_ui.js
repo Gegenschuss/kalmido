@@ -43,6 +43,7 @@ const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' 
   // the Today tab is on, the title says the same
   const on = txt(d, '#tabs button.on'), title = txt(d, '#top h1 .ht');
   check(on && on === title, `#5963: active tab and title have one name: "${on}" / "${title}"`);
+  check(d.querySelectorAll('.lycust, #top [data-act$="-custom"]').length === 1, '#5963: the arrange-blocks control (sliders) exists once: ' + d.querySelectorAll('.lycust, #top [data-act$="-custom"]').length);
   // integration failure: a sentence that says how to fix it
   const ft = w.eval(`newsText({kind: 'integfail', data: {what: 'git', text: 'Git connection Docs cannot fetch, failing since 3 Nov.'}}, [])`);
   check(/Git connection Docs cannot fetch/.test(ft) && /Check the connection in the settings, or remove it\./.test(ft), '#5963: integfail with a way to the solution: ' + ft);
