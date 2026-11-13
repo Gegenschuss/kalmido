@@ -46,6 +46,7 @@ EXCEPT = {
     ("core/objfollow.py", "WHERE kind='task' AND mode='watch' AND user_id"): "2.972.0 (#5285): OFL_WATCHING_SQL ends with the column; api/v1.py appends its comparison (= ? / IN (...)) behind it",
     ("core/objfollow.py", "FROM task_watchers w"): "2.972.0 (#5285): ofl_move reads the old table task_watchers only while to_regclass finds it; the fragment 5285_a drops it",
     ("core/objfollow.py", "FROM task_bell b"): "2.972.0 (#5285): ofl_move reads the old table task_bell only while to_regclass finds it; the fragment 5285_a drops it",
+    ("core/coltype.py", "btrim(TRUE)"): "2.1095.0 (#5306): {q} is the quoted name of a TEXT time column (ct_misfits, before the turn); the stand-in TRUE makes it btrim(boolean)",
     ("core/tplmove.py", "FROM section_templates"): "2.905.0 (#5288): the one-way move reads / empties the old table section_templates only when to_regclass still finds it (an older database); the schema here has it no more",
     ("core/objtags.py", "FROM list_tags"): "2.947.0 (#5275): otg_move reads the old project tags only while the table exists (_otg_has); the fragment drops it, so the fresh schema has none",
     ("core/objtags.py", "FROM org_tags"): "2.947.0 (#5275): otg_move reads the old labels only while the table exists (_otg_has); dropped by the fragment",

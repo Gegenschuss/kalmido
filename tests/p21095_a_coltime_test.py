@@ -26,7 +26,7 @@ sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
 from kt import CT, FAILS, OKS, B, H, DATA, check, dbx, sess, until  # noqa: E402
 
-CANON = r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{6})?\+00:00$"
+CANON = r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,6})?\+00:00$"  # a write answers with the time it wrote (iso_ms: milliseconds)
 
 if not os.environ.get("P21095A_NOSTART"):
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)

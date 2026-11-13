@@ -18,6 +18,7 @@ import os
 import subprocess
 import sys
 import threading
+from datetime import datetime
 
 import requests
 
@@ -37,6 +38,14 @@ A = kt.setup()
 A.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEAT})
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})  # personal agents (the freelancer's)
 DBC, DBN = open(os.path.join(DATA, ".kalmido-db")).read().split()
+
+
+def same_ts(a, b):
+    """2.1095.0 (#5306): two ISO texts of the same moment (.253 and .253000 alike)."""
+    try:
+        return datetime.fromisoformat(str(a).replace("Z", "+00:00")) == datetime.fromisoformat(str(b).replace("Z", "+00:00"))
+    except ValueError:
+        return False
 
 
 def sql_w(q, args=()):
@@ -107,7 +116,8 @@ def settings_rule(who, h):
     sql_w("UPDATE ev_cals SET updated_at=created_at WHERE id=?", (K,))
     created = dbx("SELECT created_at FROM ev_cals WHERE id=?", (K,))[0][0]
     v0 = ver_of(h, "/event-calendars", K)
-    check(v0 == created, f"{who}: an old calendar shows created_at as its version ({v0} / {created})")
+    # 2.1095.0 (#5306): the API reads the TIMESTAMPTZ canonically (microseconds), the suite's psql row its own way: the same moment
+    check(same_ts(v0, created), f"{who}: an old calendar shows created_at as its version ({v0} / {created})")
     r = vreq(h, "PATCH", f"/event-calendars/{K}", json={"name": "Old one", "expect_updated_at": v0})
     check(r.ok and r.json().get("name") == "Old one", f"{who}: and takes it ({r.status_code} {r.text[:160]})")
 

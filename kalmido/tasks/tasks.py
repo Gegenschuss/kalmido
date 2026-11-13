@@ -478,10 +478,11 @@ MT_WAIT_MAX = 50
 
 
 def mt_wait_suggestions(c, uid):
+    # 2.1095.0 (#5306): both sides as TIMESTAMPTZ (activity.created_at moved, tasks.waiting_at is still text)
     rows = c.execute("""SELECT note, MAX(at) AS at FROM (
-                          SELECT data->>'note' AS note, created_at AS at FROM activity
+                          SELECT data->>'note' AS note, created_at::timestamptz AS at FROM activity
                            WHERE user_id=? AND kind='waiting' AND COALESCE(data->>'note', '')<>''
-                          UNION ALL SELECT wait_note, waiting_at FROM tasks WHERE wait_by=? AND wait_note<>'' AND waiting_at IS NOT NULL
+                          UNION ALL SELECT wait_note, NULLIF(waiting_at, '')::timestamptz FROM tasks WHERE wait_by=? AND wait_note<>'' AND waiting_at IS NOT NULL
                         ) x GROUP BY note ORDER BY MAX(at) DESC LIMIT 400""", (uid, uid)).fetchall()
     hidden = {r[0] for r in c.execute("SELECT note_key FROM wait_hidden WHERE user_id=?", (uid,))}
     out, seen = [], set()
