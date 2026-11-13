@@ -165,6 +165,9 @@ async function ensureCalEv(lo, hi) {
     if (!hit) { S.cal.loading = ''; S.cal.err = key; S.cal.errAt = Date.now(); }
     else { cevApply(hit, key); S.cal.cached = 1; }
   }
+  // 2.1102.0 (#5704): not under a running drag of the calendar (caldrag.js): a grid drawn anew took the grabbed event / column away
+  // (the drag measured a detached column, the browser sent no click after the drop, the next real click was eaten); drawn at the drop
+  if (typeof CG !== 'undefined' && CG.st?.active) { CG.redraw = 1; return; }
   if (S.route.mod === 'cal' || (S.route.mod === 'tasks' && S.route.key === 'today') || S.route.mod === 'home') renderView();  // 2.144.0 C (#2418): + the start page
 }
 function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; S.cal.err = ''; S.cal.seq = (S.cal.seq || 0) + 1; }

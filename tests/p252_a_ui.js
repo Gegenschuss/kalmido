@@ -76,6 +76,10 @@ const ALL = 'cal,events,comments';
     const c = document.querySelector('#view .wcol[data-day="${dd}"]'), b = c.getBoundingClientRect(); return {x: b.left + b.width * ${xf}, y: b.top + ${min} / 60 * H, H}; })()`);
   const block = (e, title) => e(`(() => { const x = [...document.querySelectorAll('#view .wcev')].find(x => x.textContent.includes(${JSON.stringify(title)})); if (!x) return null; const r = x.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + Math.min(8, r.height / 3), bottom: r.bottom, ok: x.classList.contains('cgok'), day: x.closest('.wcol').dataset.day}; })()`);
   const blocks = e => until(() => e(`document.querySelectorAll('#view .wcev').length >= 3`));
+  // 2.1102.0 (#5704): the browser's click after a drop (drag.js drg_noClick swallows the first click within 350 ms). Firefox sends
+  // none when the press began on an event and ended over the column, so the test's own next click - within a few ms, where a person
+  // needs far longer - was the swallowed one ("Only this date", "Details" stayed unclicked). The stand-in, as in p2417_a / sidebar_touch
+  const dropClick = e => e(`(() => { document.body.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true})); return 1; })()`);
   const typeKeys = (cmd, ctx, text) => cmd('input.performActions', {context: ctx, actions: [{type: 'key', id: 'kb', actions: [...text].flatMap(c => [{type: 'keyDown', value: c}, {type: 'keyUp', value: c}])}]}).then(() => cmd('input.releaseActions', {context: ctx}));
   const ENTER = '', ESC = '';
 
@@ -134,7 +138,19 @@ const ALL = 'cal,events,comments';
     // 4. longer at the lower edge: the end 12:30 -> 13:30
     await week(e, W1); await blocks(e);
     b = await block(e, 'Review');
-    await drag(b.x, b.bottom - 2, 0, p.H);
+    // 2.1102.0 (#5704): the grid is drawn again in the middle of the drag (as when the events' fetch answers then): the
+    // pointer stays down between the two halves, the end still follows it (a detached column ended it at clientY / H = 16:15)
+    {
+      const x = Math.round(b.x), y = Math.round(b.bottom - 2);
+      await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'p1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x, y}, {type: 'pointerDown', button: 0},
+        {type: 'pointerMove', x, y: Math.round(y + p.H / 4), duration: 100}, {type: 'pointerMove', x, y: Math.round(y + p.H / 2), duration: 100}]}]});
+      check(await e(`!!document.querySelector('#view .cgghost') && document.body.classList.contains('cgdrag')`), 'desktop: the lower edge: dragging (the stand-in is there)');
+      await e(`(() => { renderView(); return 1; })()`);
+      await until(() => e(`!!document.querySelector('#view .wcol[data-day="${W2}"]') && !document.querySelector('#view .wcol[data-day="${W2}"] .cgghost')`));
+      await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'p1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x, y: Math.round(y + p.H * 3 / 4), duration: 100},
+        {type: 'pointerMove', x, y: Math.round(y + p.H), duration: 100}, {type: 'pointerUp', button: 0}]}]});
+      await cmd('input.releaseActions', {context: ctx});
+    }
     rv = await until(async () => { const x = await get(RV.id); return x.end !== `${W2}T12:30` ? x : null; });
     check(rv && rv.start === `${W2}T11:30` && rv.end === `${W2}T13:30`, 'desktop: the lower edge made it an hour longer ' + JSON.stringify(rv && [rv.start, rv.end]));
     await e(`histStep('undo').then(() => 1)`);
@@ -142,9 +158,23 @@ const ALL = 'cal,events,comments';
     // 5. a repeating event: "Only this date"
     await week(e, W1); await blocks(e);
     b = await e(`(() => { const x = [...document.querySelectorAll('#view .wcol[data-day="${W1}"] .wcev')].find(x => x.textContent.includes('Standup')); const r = x.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + 4}; })()`);
-    await drag(b.x, b.y, 0, p.H);
+    // 2.1102.0 (#5704): the events are fetched again while the event is held (as after a sync / Undo): their answer waits for the
+    // drop, the grabbed block stays in the grid (a grid drawn anew took it away, the browser's click after the drop did not come,
+    // and the next real click - "Only this date" below - was eaten by the drag's click guard)
+    {
+      const x = Math.round(b.x), y = Math.round(b.y);
+      await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'p1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x, y}, {type: 'pointerDown', button: 0},
+        {type: 'pointerMove', x, y: Math.round(y + p.H / 4), duration: 100}, {type: 'pointerMove', x, y: Math.round(y + p.H / 2), duration: 100}]}]});
+      check(await e(`(() => { const k = S.cal.key; window.__p252src = document.querySelector('#view .wcev.cgsrc'); calInvalidate(); ensureCalEv(...k.split('|')); return !!window.__p252src && !!S.cal.loading; })()`), 'desktop: held, the events are fetched again');
+      check(await until(() => e(`!!S.cal.key && !S.cal.loading`)), 'desktop: ... their answer is there');
+      check(await e(`!!window.__p252src?.isConnected && document.body.classList.contains('cgdrag')`), 'desktop: ... the grid is not drawn again under the held event');
+      await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'p1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x, y: Math.round(y + p.H * 3 / 4), duration: 100},
+        {type: 'pointerMove', x, y: Math.round(y + p.H), duration: 100}, {type: 'pointerUp', button: 0}]}]});
+      await cmd('input.releaseActions', {context: ctx});
+    }
     await until(() => e(`!!document.querySelector('.modal [data-sc="one"]')`));
     check(await e(`!!document.querySelector('.modal [data-sc="one"]') && !!document.querySelector('.modal [data-sc="all"]')`), 'desktop: a repeating event asks "Only this date / All dates"');
+    await dropClick(e);
     await e(`(() => { document.querySelector('.modal [data-sc="one"]').click(); return 1; })()`);
     const su = await until(async () => { const x = await get(SU.id); return x.overrides?.length ? x : null; });
     check(su && su.overrides[0].rid === `${W1}T08:00` && su.overrides[0].start === `${W1}T09:00` && su.overrides[0].end === `${W1}T09:30` && su.start === `${W1}T08:00`,
@@ -167,6 +197,7 @@ const ALL = 'cal,events,comments';
     await drag(ad.x, ad.y, ad.dx, 0);
     await sleep(300);
     check(await e(`(() => { const b = document.querySelector('#view .wallday .cgnew.cgday'); return !!b && document.activeElement === b.querySelector('.cgin') && document.querySelectorAll('#view .wad.cgsel').length === 3; })()`), 'desktop: the all-day row: a block over three days');
+    await dropClick(e);
     await e(`(() => { document.querySelector('#view .cgnew .cgdet').click(); return 1; })()`);
     await until(() => e(`!!document.querySelector('.modal.evmodal')`));
     check(await e(`(() => { const m = document.querySelector('.modal.evmodal'); return m && m.querySelector('#ev-allday').checked && m.querySelector('#ev-sd').value === '${W1}' && m.querySelector('#ev-ed').value === '${W3}'; })()`), 'desktop: its "Details": the editor, all day, Wednesday to Friday');

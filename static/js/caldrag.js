@@ -9,7 +9,7 @@
    hours, Esc, a second finger, the click after a drag); the 15-minute grid, where an event lands and what a drop saves stay here. */
 'use strict';
 
-const CG = {st: null, nw: null, swallow: 0};
+const CG = {st: null, nw: null, swallow: 0, redraw: 0};  // redraw: 2.1102.0 (#5704) events fetched during a drag
 const CG_HOLD = 400, CG_TOL = 8;
 const cg_hm = m => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
 const cg_lab = m => m >= 1440 ? (hour12() ? fmtTimeLoc('00:00') : '24:00') : fmtTimeLoc(cg_hm(m));  // 2.368.0 B (#2982): 12 / 24 h as chosen
@@ -145,8 +145,15 @@ function cg_start() {
 function cg_move() {
   const st = CG.st; if (!st?.active) return;
   const H = weekH();
+  // 2.1102.0 (#5704): the grid drawn again during a drag (the events' fetch answered, a sync): its column of now - a detached
+  // one measures 0 and a new block / a longer event would end at clientY / H; the event's own block of now is marked again
+  if (st.col && !st.col.isConnected) {
+    const c = $(`#view .week .wcol[data-day="${st.col.dataset.day}"]`); if (!c) return cg_cancel();
+    st.col = c;
+    if (st.el && !st.el.isConnected) { const el = st.ev && [...c.querySelectorAll('.wcev')].find(x => cg_evOf(x)?.id === st.ev.id); if (el) { st.el = el; el.classList.add('cgsrc'); } }
+    if (st.kind === 'size' && !st.ghost.isConnected) st.col.appendChild(st.ghost);
+  }
   if (st.kind === 'new') {
-    if (!st.col.isConnected) { const c = $(`#view .week .wcol[data-day="${st.col.dataset.day}"]`); if (!c) return cg_cancel(); st.col = c; }
     if (!st.ghost.isConnected) st.col.appendChild(st.ghost);
     const b = cg_at(st.col, st.y), s = Math.min(st.a, b, 1425), en = Math.min(1440, Math.max(st.a, b, s + 15));
     Object.assign(st, {ns: s, ne: en});
@@ -184,6 +191,8 @@ function cg_clear(st) {
   document.body.classList.remove('cgdrag');
   $$('#view .cgsel').forEach(c => c.classList.remove('cgsel'));
   st.el?.classList.remove('cgsrc');
+  // 2.1102.0 (#5704): the events fetched during the drag (calendar.js ensureCalEv waited) are drawn now, after the browser's click
+  if (CG.redraw) { CG.redraw = 0; setTimeout(() => { if (!CG.st?.active && (S.route.mod === 'cal' || S.route.mod === 'home' || (S.route.mod === 'tasks' && S.route.key === 'today'))) renderView(); }, 0); }
 }
 function cg_cancel() {  // Esc / lost: everything back where it was
   const st = CG.st; CG.st = null; if (!st) return;
