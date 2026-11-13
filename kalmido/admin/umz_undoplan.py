@@ -52,10 +52,13 @@ _BASE = ("habits", "filters", "templates", "template_files", "time_entries", "bo
 _PARTS = ("sprints", "list_rules", "portal_tickets")
 _ANY = object()  # a row recorded without a space
 _TRASH = ("fs_nodes", "wiki_pages", "sheets", "clients")
-# the labels of a document, by (table, column, node column, condition): they wait for a document in the trash, its restore
-# brings them back with it. 2.1119.0 (#5277): a tag of the file store is a row of the core (obj_tags scope ws, its links kind fs_entry)
-_LABELS = {"obj_tags": ("obj_tag_links", "tag_id", "obj_id", "kind='fs_entry'"), "doc_senders": ("doc_meta", "sender_id", "node_id", "TRUE"),
-           "doc_types": ("doc_meta", "type_id", "node_id", "TRUE"), "doc_fields": ("doc_field_values", "field_id", "node_id", "TRUE")}
+# the labels of a document: table -> the query of (label id, node) rows that use them (+ " IN (?,...)"): they wait for a document in
+# the trash, its restore brings them back with it. 2.1119.0 (#5277): a tag of the file store is a row of the core (obj_tags scope ws,
+# its links kind fs_entry); fixed SQL per table (was a table / column name put into the text)
+_LABELS = {"obj_tags": "SELECT tag_id AS id, obj_id AS node_id FROM obj_tag_links WHERE kind='fs_entry' AND tag_id",
+           "doc_senders": "SELECT sender_id AS id, node_id FROM doc_meta WHERE sender_id",
+           "doc_types": "SELECT type_id AS id, node_id FROM doc_meta WHERE type_id",
+           "doc_fields": "SELECT field_id AS id, node_id FROM doc_field_values WHERE field_id"}
 
 
 def _chunks(ids):
@@ -346,11 +349,11 @@ def undo_plan(c, cr, since, tracked, space_cols):
             if a in ("a", "r") and p in go:
                 plan.pin.add(p)
     below = plan.held | plan.roots
-    for table, (ct, cc, nc, cond) in _LABELS.items():
+    for table, q in _LABELS.items():
         for part in _chunks(plan.of(table, go)):
-            for r in c.execute(f"SELECT {cc}, {nc} AS node_id FROM {ct} WHERE {cond} AND {cc} IN ({_qs(part)})", part).fetchall():
+            for r in c.execute(q + f" IN ({_qs(part)})", part).fetchall():
                 if ("fs_nodes", r["node_id"]) in below:
-                    plan.pin.add((table, r[cc]))
+                    plan.pin.add((table, r["id"]))
     return plan
 
 
