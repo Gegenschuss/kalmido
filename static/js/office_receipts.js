@@ -365,7 +365,7 @@ document.addEventListener('click', async e => {
 // bookkeeping (GET /api/office/settings submit): a photo or a file to the bookkeeping, below only the person's own receipts
 // handed in with their status. The people with the bookkeeping see what waits on top of Office > Receipts (rsb_inHtml) and
 // work on it in the receipt sheet like on every receipt. Server: kalmido/office/rcsubmit.py.
-const RSB = {oid: null, rows: null, err: null, loading: false, busy: false, inOid: null, inRows: null, inLoading: false};
+const RSB = {oid: null, rows: null, err: null, loading: false, busy: false, inOid: null, inRows: null, inLoading: false, inErr: ''};  // 2.1094.0 (#5902): inErr
 const RSB_STATE = {submitted: N_('Handed in'), processed: N_('In progress|receipt'), paid: N_('Paid'), removed: N_('Removed')};  // 2.356.0 (#3129): also when the person took it back
 async function rsb_load() {
   const oid = OFC.info?.org_id;
@@ -405,13 +405,15 @@ async function rsb_upload(files) {
 async function rsb_inLoad() {
   const oid = OFC.info?.org_id;
   RSB.inLoading = true;
-  try { const j = await api('GET', '/api/office/receipts/submitted'); if (oid === OFC.info?.org_id) RSB.inRows = j.rows || []; } catch { if (oid === OFC.info?.org_id) RSB.inRows = []; }
+  try { const j = await api('GET', '/api/office/receipts/submitted'); if (oid === OFC.info?.org_id) { RSB.inRows = j.rows || []; RSB.inErr = ''; } }
+  catch (x) { if (oid === OFC.info?.org_id) { RSB.inRows = []; RSB.inErr = x?.status === 403 ? '' : ofcErrHere(x); } }  // 2.1094.0 (#5902): a 403 = not for this person, else said
   RSB.inLoading = false; ofcDraw();
 }
 function rsb_inHtml() {
   if (OFC.info?.personal) return '';
   if (RSB.inOid !== OFC.info?.org_id) Object.assign(RSB, {inOid: OFC.info?.org_id, inRows: null});
   if (RSB.inRows === null) { if (!RSB.inLoading) setTimeout(rsb_inLoad, 0); return ''; }
+  if (RSB.inErr) return `<section class="rsb-in"><h3 class="ofcgrp">${tr('Handed in by members')}</h3>${/*html-ok*/ ofcFail(RSB.inErr, () => { RSB.inRows = null; RSB.inErr = ''; }, 'row')}</section>`;  // 2.1094.0 (#5902)
   if (!RSB.inRows.length) return '';
   return `<section class="rsb-in"><h3 class="ofcgrp" id="rsb-in-h">${tr('Handed in by members')} <span class="rotag">${RSB.inRows.length}</span></h3>
     <ul class="ofclist" role="list" aria-labelledby="rsb-in-h">${RSB.inRows.map(r => `<li><button type="button" class="ofcrow" data-rsb="open" data-id="${+r.node_id}"><span class="ofcn"><b>${esc(r.name || tr('Receipt'))}</b>

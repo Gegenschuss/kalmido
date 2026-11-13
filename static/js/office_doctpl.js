@@ -155,6 +155,7 @@ async function dtSignImage(x) {
 // ---- signature by the customer (link)
 function dtSigHtml(d) {
   if (!DT.sg || DT.sg.id !== d.id) { setTimeout(() => dtSigLoad(d.id), 0); return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the client')}</h3>${/*html-ok*/ loadingHtml('row')}</section>`; }
+  if (DT.sg.err) return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the client')}</h3>${/*html-ok*/ ofcFail(DT.sg.err, () => { DT.sg = null; }, 'row')}</section>`;  // 2.1094.0 (#5902)
   const rows = DT.sg.rows, live = rows.some(x => x.live), can = d.status === 'final' && !d.archived;
   const st = x => x.revoked_at && x.state === 'open' ? tr('Switched off') : !x.live && x.state === 'open' ? tr('Expired') : x.state === 'accepted' ? tr('Signed') : x.state === 'declined' ? tr('Rejected') : tr('Waiting for the client');
   const row = x => `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(st(x))}</b><small class="muted"> · ${esc(fmtWhen(x.created_at))}</small></div>
@@ -166,7 +167,8 @@ function dtSigHtml(d) {
     <div class="shint">${esc(typeof sg_note === 'function' ? sg_note() : '')}</div><div class="aerr" role="alert" id="dt-sgerr"></div></section>`;
 }
 async function dtSigLoad(id) {
-  try { DT.sg = {id, rows: (await api('GET', `/api/office/gen-docs/${id}/signoffs`)).signoffs || []}; } catch { DT.sg = {id, rows: []}; }
+  // 2.1094.0 (#5902): a failed load says why with "Try again" instead of a section without its signature links
+  try { DT.sg = {id, rows: (await api('GET', `/api/office/gen-docs/${id}/signoffs`)).signoffs || []}; } catch (x) { DT.sg = {id, rows: [], err: ofcErrHere(x)}; }
   ofcDraw();
 }
 

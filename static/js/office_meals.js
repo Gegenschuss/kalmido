@@ -242,7 +242,7 @@ function bw_modal(m0) {
     <div class="row"><label for="bw-note">${tr('Note')}</label><textarea id="bw-note" rows="2" maxlength="2000">${esc(m?.note || '')}</textarea></div>
     </fieldset>
     <div class="row"><span class="rklab">${tr('Restaurant bill')}</span><div class="bwfilebox">${m ? bw_fileHtml(m) : `<input type="file" id="bw-file" accept="application/pdf,.pdf,image/jpeg,image/png" hidden><button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${tr('Attach the restaurant bill')}</span></button><span class="muted bwpend"></span>`}</div></div>
-    ${m?.id && OFC.info?.role === 'admin' ? `<div class="row bwpay" data-fg-skip><label for="bw-pay">${tr('Paid with')}</label><span class="bwpaybox muted">${tr('Loading…')}</span></div>` : ''}${''/* 2.603.0 (#4927): the proof of its bank / cash / card line */}
+    ${m?.id && OFC.info?.role === 'admin' ? `<div class="row bwpay" data-fg-skip><label for="bw-pay">${tr('Paid with')}</label><span class="bwpaybox">${/*html-ok*/ loadingHtml('row')/* 2.1094.0 (#5902) */}</span></div>` : ''}${''/* 2.603.0 (#4927): the proof of its bank / cash / card line */}
     ${(m?.log || []).length ? `<div class="bwlogbox"><b>${tr('Approval log')}</b><ul class="bwlog" role="list">${m.log.map(e => `<li>${esc(bw_actLabel(e))}</li>`).join('')}</ul></div>` : ''}
     ${hostOk || (!ro && m?.own_host !== 0) ? bw_sigHtml() : ''}
     <div class="aerr" role="alert"></div>
@@ -359,7 +359,8 @@ const BW_PAYK = {bank: N_('Bank'), cash: N_('Cash book'), card: N_('Credit card'
 const bw_payLabel = x => x.gone ? tr('Booking gone') : [tr(BW_PAYK[x.kind] || x.kind), fmtDateLoc(x.day), ofcMoney(x.amount), x.text].filter(Boolean).join(' · ');
 async function bw_payLoad(md, id) {
   const box = $('.bwpaybox', md); if (!box) return;
-  let j; try { j = await api('GET', `${BW_U}/${id}/payment`); } catch (x) { box.textContent = ofcErrHere(x); return; }
+  // 2.1094.0 (#5902): a failure says why with "Try again" (only this box reads again)
+  let j; try { j = await api('GET', `${BW_U}/${id}/payment`); } catch (x) { box.innerHTML = errorState({sub: ofcErrHere(x), size: 'row', retry: () => { box.innerHTML = loadingHtml('row'); bw_payLoad(md, id); }}); return; }
   const opts = [['', tr('Not linked')], ...(j.current ? [[`${j.current.kind}:${j.current.id}`, bw_payLabel(j.current)]] : []), ...j.candidates.map(x => [`${x.kind}:${x.id}`, bw_payLabel(x)])];
   box.classList.remove('muted');
   box.innerHTML = ofcSel('bw-pay', j.current ? `${j.current.kind}:${j.current.id}` : '', opts, null, tr('Paid with'));
@@ -430,7 +431,8 @@ document.addEventListener('change', e => {
 const BWC = {data: null, oid: undefined};
 async function bw_choicesLoad() {
   BWC.oid = OFC.info?.org_id;
-  try { BWC.data = await api('GET', `${BW_U}/choices`); } catch (x) { BWC.data = {places: [], persons: []}; ofcErr(x); }
+  // 2.1094.0 (#5902): a failed load says why in the section with "Try again" (only this section reads again), not empty lists
+  try { BWC.data = await api('GET', `${BW_U}/choices`); } catch (x) { BWC.data = {places: [], persons: [], err: ofcErrHere(x)}; }
   const sec = $('.bwcset'); if (sec) sec.outerHTML = bw_settingsHtml();  // only this section: the settings form keeps what is typed there
 }
 function bw_settingsHtml() {
@@ -441,7 +443,7 @@ function bw_settingsHtml() {
     <div class="lacts bwcadd"><input data-bwc-new="name" data-kind="${kind}" maxlength="120" autocomplete="off" placeholder="${esc(kind === 'place' ? tr('New place…') : tr('New person…'))}" aria-label="${esc(tr('Name'))}"><input data-bwc-new="extra" maxlength="200" autocomplete="off" placeholder="${esc(ph)}" aria-label="${esc(ph)}"><button type="button" class="btn sm" data-bwc="add" data-kind="${kind}">${ic('plus', 's')}<span>${tr('Add')}</span></button></div>`;
   return `<section class="rkpset bwcset" data-fg-skip aria-labelledby="bwc-h"><h3 id="bwc-h">${tr('Entertainment receipts')}</h3>
     <div class="shint">${tr('The choices for places and people. New ones are added when a receipt is approved; receipts keep what they have when you rename or remove one.')}</div>
-    ${!d ? `${/*html-ok*/ loadingHtml('row')}` : `<h4>${tr('Places')}</h4>${list('place', d.places, tr('Address'))}<h4>${tr('People')}</h4>${list('person', d.persons, tr('Company or function'))}`}</section>`;
+    ${!d ? `${/*html-ok*/ loadingHtml('row')}` : d.err ? `${/*html-ok*/ errorState({sub: d.err, size: 'row', retry: bw_choicesLoad})}` : `<h4>${tr('Places')}</h4>${list('place', d.places, tr('Address'))}<h4>${tr('People')}</h4>${list('person', d.persons, tr('Company or function'))}`}</section>`;
 }
 async function bw_choiceAct(a, el) {
   const all = [...(BWC.data?.places || []), ...(BWC.data?.persons || [])];

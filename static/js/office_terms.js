@@ -12,7 +12,7 @@ async function agbLoad(force) {
   if (AGB.loading || (AGB.data && !force && AGB.ws === OFC.ws)) return;
   AGB.loading = true;
   try { AGB.data = await api('GET', '/api/office/terms'); AGB.ws = OFC.ws; }
-  catch { AGB.data = {terms: {}, admin: false, failed: true}; AGB.ws = OFC.ws; }
+  catch (x) { AGB.data = {terms: {}, admin: false, failed: true, err: ofcErrHere(x)}; AGB.ws = OFC.ws; }  // 2.1094.0 (#5902): + err
   AGB.loading = false;
   agbRedraw();
 }
@@ -31,7 +31,9 @@ function agbRowHtml(lg, name, t, adm) {
 }
 // the block in the office settings (next to the logo); loads once per workspace
 function agbSettingsHtml() {
-  if (!AGB.data || AGB.ws !== OFC.ws) { setTimeout(() => agbLoad(), 0); return `<div class="row" id="agb-box"><label>${tr('Terms and conditions (PDF)')}</label><span class="muted">${tr('Loading…')}</span></div>`; }
+  // 2.1094.0 (#5902): the one loading block; a failed load says why with "Try again", never "No terms and conditions yet"
+  if (!AGB.data || AGB.ws !== OFC.ws) { setTimeout(() => agbLoad(), 0); return `<div class="row" id="agb-box"><label>${tr('Terms and conditions (PDF)')}</label>${/*html-ok*/ loadingHtml('row')}</div>`; }
+  if (AGB.data.failed) return `<div class="row" id="agb-box"><label>${tr('Terms and conditions (PDF)')}</label>${/*html-ok*/ errorState({sub: AGB.data.err, size: 'row', retry: () => { AGB.data = null; agbRedraw(); }})}</div>`;
   const t = AGB.data.terms || {}, adm = !!AGB.data.admin;
   return `<div class="row" id="agb-box"><label>${tr('Terms and conditions (PDF)')}</label><ul class="ofclist agblist" role="list">${ofcLangList().map(([lg, n]) => agbRowHtml(lg, n, t[lg], adm)).join('')}</ul>
     <span class="muted ofchint">${esc(tr('Sent along with quotations in the same language; the quotation names the date. At most {0} MB.', AGB.data.max_mb || 10))}</span></div>`;

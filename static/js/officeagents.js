@@ -59,6 +59,8 @@ document.addEventListener('click', e => {
 // ---- #1350: suggested payments above the invoice list
 function oa_ppBox() {
   if (!OA.pp) { if (!OA.ppLoading) setTimeout(oa_ppLoad, 0); return ''; }
+  // 2.1094.0 (#5902): a failed load says why with "Try again" instead of quietly no suggestions (403 = not for this person: nothing)
+  if (OA.pp.err) return `<section class="oa_pp" aria-label="${esc(tr('Suggested payments'))}"><h3>${ic('bot', 's')} ${tr('Suggested payments')}</h3>${/*html-ok*/ errorState({sub: OA.pp.err, size: 'row', retry: () => { OA.pp = null; if (typeof ofdDraw === 'function') ofdDraw(); }})}</section>`;
   if (!OA.pp.items.length) return '';
   const conf = {high: N_('sure'), medium: N_('likely'), low: N_('unsure')};
   return `<section class="oa_pp" aria-label="${esc(tr('Suggested payments'))}"><h3>${ic('bot', 's')} ${tr('Suggested payments')}</h3><ul role="list">${OA.pp.items.map(p => `<li>
@@ -70,8 +72,9 @@ function oa_ppBox() {
 }
 async function oa_ppLoad() {
   OA.ppLoading = true;
-  try { OA.pp = await rawFetch('GET', '/api/office/pay-props'); } catch { OA.pp = {items: [], admin: false}; } finally { OA.ppLoading = false; }
-  if (OA.pp.items.length && typeof ofdDraw === 'function') ofdDraw();
+  try { OA.pp = await rawFetch('GET', '/api/office/pay-props'); }
+  catch (x) { OA.pp = {items: [], admin: false, err: x?.status === 403 ? '' : ofcErrHere(x)}; } finally { OA.ppLoading = false; }  // 2.1094.0 (#5902)
+  if ((OA.pp.items.length || OA.pp.err) && typeof ofdDraw === 'function') ofdDraw();
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-oa="pp-ok"], [data-oa="pp-no"]'); if (!b) return;

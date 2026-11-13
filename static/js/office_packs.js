@@ -31,7 +31,7 @@ async function pkc_loadPacks() {
     if (oid !== PKC.oid) return;
     PKC.packs = {country: j.packs || [], industry: j.industry || null};
     OFC.packs = PKC.packs.country.map(p => [p.code, `${pkc_nm(p)} (${p.code})`]);
-  } catch { if (oid === PKC.oid) PKC.packs = {country: [], industry: null, failed: true}; }
+  } catch (x) { if (oid === PKC.oid) PKC.packs = {country: [], industry: null, failed: true, err: ofcErrHere(x)}; }  // 2.1094.0 (#5902): + err
   finally { PKC.packsBusy = false; }
   ofcDraw();
 }
@@ -262,7 +262,7 @@ function ocf_chooseHtml(slim) {
   const sug = OFC.info.pack_suggest || 'DE';
   return `<section class="ocf-choose card" aria-labelledby="ocf-ch-h"><h3 id="ocf-ch-h">${ic('globe', 's')} ${tr('Where is your office?')}</h3>
     <p class="muted">${tr('The country decides tax rates, texts and functions. You can change it later.')}</p>
-    <div class="lacts">${opts.length ? ofcSel('ocf-ch', sug, opts, null, tr('Where is your office?')) : `<span class="muted">${tr('Loading…')}</span>`}${''/* 2.603.0 (#4927): the basis of the income statement, from this year on; 2.892.0 (#5449): with its visible name */}<label class="ocf-ebl" for="ocf-eb">${tr('Basis of the income statement')}</label>${ofcSel('ocf-eb', 'receipts', [['receipts', tr('Receipts')], ['bank', tr('Bank and cash (strict)')]], null, tr('Basis of the income statement'))}<button type="button" class="btn sm pri" data-ocf="choose" ${opts.length ? '' : 'disabled'}>${tr('Use')}</button></div>
+    <div class="lacts">${opts.length ? ofcSel('ocf-ch', sug, opts, null, tr('Where is your office?')) : PKC.packs?.failed ? ofcFail(PKC.packs.err, () => { PKC.packs = null; }, 'row') : loadingHtml('row')/* 2.1094.0 (#5902): failed = the reason + "Try again", never "Loading…" for good */}${''/* 2.603.0 (#4927): the basis of the income statement, from this year on; 2.892.0 (#5449): with its visible name */}<label class="ocf-ebl" for="ocf-eb">${tr('Basis of the income statement')}</label>${ofcSel('ocf-eb', 'receipts', [['receipts', tr('Receipts')], ['bank', tr('Bank and cash (strict)')]], null, tr('Basis of the income statement'))}<button type="button" class="btn sm pri" data-ocf="choose" ${opts.length ? '' : 'disabled'}>${tr('Use')}</button></div>
     <p class="muted ofchint">${tr('Basis of the income statement')}: ${esc(tr('Bank and cash (strict)'))} = ${esc(tr('only what went through the main account or the cash book counts; further accounts are possible, not required.'))}</p></section>`;
 }
 async function ocf_choose() {

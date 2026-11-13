@@ -222,10 +222,11 @@ async function rk_purposeVal(md) {  // the purpose to save (a name still in the 
 }
 // the section "Travel expenses" in the office settings (admins): the own purposes, rename in place (saved on leaving the
 // field), remove with undo, add with Enter; no save button
-const RKP = {list: null, oid: null};
+const RKP = {list: null, oid: null, err: ''};
 async function rk_purposesLoad() {
-  RKP.oid = OFC.info?.org_id; RKP.list = [];
-  try { RKP.list = (await api('GET', '/api/office/trips/purposes')).purposes || []; } catch (x) { RKP.list = []; ofcErr(x); }
+  RKP.oid = OFC.info?.org_id; RKP.list = []; RKP.err = '';
+  // 2.1094.0 (#5902): a failed load says why in the section with "Try again" (only this section reads again), not an empty list
+  try { RKP.list = (await api('GET', '/api/office/trips/purposes')).purposes || []; } catch (x) { RKP.list = []; RKP.err = ofcErrHere(x); }
   const sec = $('.rkpset'); if (sec) sec.outerHTML = rk_settingsHtml();  // only this section: the settings form keeps what is typed there
 }
 function rk_settingsHtml() {
@@ -234,7 +235,7 @@ function rk_settingsHtml() {
   const ls = RKP.list;
   return `<section class="rkpset" data-fg-skip aria-labelledby="rkp-h"><h3 id="rkp-h">${tr('Travel expenses')}</h3>
     <div class="shint">${tr('Own purposes for trips, besides “Job for a client / project” and “Acquisition / research”. Trips keep the text they have when you rename or remove one.')}</div>
-    ${!ls ? `${/*html-ok*/ loadingHtml('row')}` : `<ul class="rkplist" role="list">${ls.map(p => `<li><input value="${esc(p.name)}" maxlength="120" data-rkp="name" data-id="${p.id}" aria-label="${esc(tr('Purpose'))}"><button type="button" class="iconbtn" data-rkp="del" data-id="${p.id}" aria-label="${esc(tr('Remove {0}', p.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>
+    ${!ls ? `${/*html-ok*/ loadingHtml('row')}` : RKP.err ? `${/*html-ok*/ errorState({sub: RKP.err, size: 'row', retry: rk_purposesLoad})}` : `<ul class="rkplist" role="list">${ls.map(p => `<li><input value="${esc(p.name)}" maxlength="120" data-rkp="name" data-id="${p.id}" aria-label="${esc(tr('Purpose'))}"><button type="button" class="iconbtn" data-rkp="del" data-id="${p.id}" aria-label="${esc(tr('Remove {0}', p.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>
     <div class="lacts"><input id="rkp-new" maxlength="120" enterkeyhint="done" autocomplete="off" placeholder="${esc(tr('Add another purpose…'))}" aria-label="${esc(tr('New purpose'))}"><button type="button" class="btn sm" data-rkp="add">${ic('plus', 's')}<span>${tr('Add')}</span></button></div>`}</section>`;
 }
 // 2.452.0 (#3836): on a phone the row has no symbols (office.css), a long press opens the Remove (also the places and people of office_meals.js)

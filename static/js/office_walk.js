@@ -7,7 +7,7 @@
 // (the step's own way back: the history entry the list's action recorded, undo.js). Mouse / keyboard: 1-3 choose a candidate,
 // Enter takes it, the arrows go back and forth. A phone: the candidates one per screen width (swiped sideways), a swipe on the
 // booking goes to the next / previous one. Loaded on its first use (lazyload.js LD_CALL wlk_open); no own store, no own route.
-const WLK = {md: null, kind: '', sid: null, items: [], i: 0, cands: null, tok: 0, q: '', search: false, sel: 0, last: null, busy: false, taken: new Set(), px: null};
+const WLK = {md: null, kind: '', sid: null, items: [], i: 0, cands: null, tok: 0, q: '', search: false, sel: 0, last: null, busy: false, taken: new Set(), px: null, err: ''};  // 2.1094.0 (#5902): err
 const wlk_top = () => HIST.undo[HIST.undo.length - 1];
 const wlk_fine = () => { try { return matchMedia('(pointer: fine)').matches; } catch { return true; } };
 
@@ -44,7 +44,7 @@ const wlk_cur = () => WLK.items[WLK.i];
 // searching = everything the words find (the list's "Other receipt…")
 async function wlk_load() {
   const it = wlk_cur(), tok = ++WLK.tok;
-  WLK.cands = null; WLK.sel = 0;
+  WLK.cands = null; WLK.sel = 0; WLK.err = '';
   wlk_draw();
   if (!it || it.done) return;
   let c = [];
@@ -52,7 +52,7 @@ async function wlk_load() {
     if (WLK.kind === 'cc') c = (await api('GET', `/api/office/cards/lines/${it.x.id}/candidates?q=${encodeURIComponent(WLK.search ? WLK.q : '')}`)).items || [];
     else if (WLK.search) c = (await api('GET', `/api/office/bank/tx/${it.x.id}/candidates?q=${encodeURIComponent(WLK.q)}`)).items || [];
     else c = (it.x.suggestions || []).filter(s => !(s.kind === 'receipt' && WLK.taken.has(s.id)));  // a receipt taken by a booking before
-  } catch (x) { c = []; }
+  } catch (x) { c = []; if (tok === WLK.tok) WLK.err = ofcErrHere(x); }  // 2.1094.0 (#5902): a failed search is no "no suitable receipt"
   if (tok !== WLK.tok) return;
   WLK.cands = WLK.kind === 'bnk' ? c.map(s => ({...s, label: s.label || tr(BNK_KIND[s.kind] || 'Receipt')})) : c;
   wlk_draw();
@@ -79,7 +79,7 @@ function wlk_draw() {
   if (it.done) body = `<p class="wlk-done"><span class="rotag bnkm">${ic('check', 's')} ${esc(it.done)}</span></p>`;
   else {
     const c = WLK.cands, many = WLK.search;
-    const cards = !c ? `${loadingHtml('row')}` : !c.length ? (out ? emptyState({title: tr('No suitable receipt found. Search another one or upload it.'), size: 'row', cls: 'wlk-none'}) : ofcNoHit('', 'row', 'wlk-none'))
+    const cards = !c ? `${loadingHtml('row')}` : WLK.err ? errorState({sub: WLK.err, size: 'row', cls: 'wlk-err', retry: wlk_load}) : !c.length ? (out ? emptyState({title: tr('No suitable receipt found. Search another one or upload it.'), size: 'row', cls: 'wlk-none'}) : ofcNoHit('', 'row', 'wlk-none'))
       : ocd_row((many ? c : c.slice(0, 3)).map((d, k) => ocd_card(d, {btn: `data-wlk="take" data-k="${k}"`, key: fine && k < 3 ? k + 1 : '', on: k === WLK.sel})).join(''), 'wlk-cands');
     const search = many ? `<input type="search" class="wlk-q" data-wlk-q value="${esc(WLK.q)}" placeholder="${esc(bank && !out ? tr('Number or client') : tr('Search all receipts'))}" aria-label="${esc(tr('Search'))}">` : '';
     const acc = esc(bank ? BNK_ACCEPT_RC() : (typeof BK_ACCEPT === 'string' ? BK_ACCEPT : 'application/pdf,image/*'));

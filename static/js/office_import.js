@@ -3,18 +3,23 @@
 // duplicates), services and equipment; the person corrects, deselects and confirms. Old invoices / quotations (PDF) get
 // their key data proposed from the file name and are archived unchanged. Every confirmed import is a run that can be
 // undone while nothing builds on it. Org admins only (the server checks); members read the archive.
-const OIM = {pv: null, busy: false, filter: '', arch: [], archBusy: false, runs: null, counter: null, clients: null, list: null, listLoading: false};
+const OIM = {pv: null, busy: false, filter: '', arch: [], archBusy: false, runs: null, counter: null, clients: null, list: null, listLoading: false, errs: {}};  // 2.1094.0 (#5902): errs
 const OIM_ACTS = [['contact', N_('Add as contact person to the client')], ['new', N_('Add as new client')], ['merge', N_('Merge into the existing client')], ['skip', N_('Skip')]];
 // 2.40.0 (#1380): the actions a duplicate offers (in the file: no merge; "contact person" only with a contact name)
 const oimActs = c => OIM_ACTS.filter(([v]) => (v !== 'merge' || c.dup?.kind === 'existing') && (v !== 'contact' || (c.contact || '').trim()));
 if (typeof fgWatch === 'function') fgWatch(() => !!OIM.pv || OIM.arch.some(x => !x.done));  // 2.40.0 (#1371): an open preview asks before the page closes
 
+// 2.1094.0 (#5902): a part that fails to load keeps its reason (OIM.errs) and shows it with "Try again" - never an empty
+// list of runs, a counter that stays on "Loading…" or a template choice that is simply missing
 async function oimLoad() {
-  try { const j = await api('GET', '/api/office/legacy/runs'); OIM.runs = j.runs || []; } catch (x) { OIM.runs = []; }
-  try { OIM.counter = await api('GET', '/api/office/legacy/counter'); } catch { OIM.counter = null; }
-  try { OIM.fnt = await api('GET', '/api/office/legacy/archive/templates'); } catch { OIM.fnt = null; }  // 2.621.0 (#4600)
+  const e = OIM.errs = {};
+  try { const j = await api('GET', '/api/office/legacy/runs'); OIM.runs = j.runs || []; } catch (x) { OIM.runs = []; e.runs = ofcErrHere(x); }
+  try { OIM.counter = await api('GET', '/api/office/legacy/counter'); } catch (x) { OIM.counter = null; e.counter = ofcErrHere(x); }
+  try { OIM.fnt = await api('GET', '/api/office/legacy/archive/templates'); } catch (x) { OIM.fnt = null; e.fnt = ofcErrHere(x); }  // 2.621.0 (#4600)
   await fx8a_oimClients();
 }
+// "Try again" of a part: the whole page reads again (oimHtml starts oimLoad while OIM.runs is null)
+const oim_fail = (k, size = 'row') => ofcFail(OIM.errs?.[k], () => { OIM.runs = null; OIM.counter = null; OIM.fnt = null; OIM.errs = {}; }, size);
 // 2.979.0 (#5667): an undo / redo the server did: the import page (runs, archived documents) comes again
 histReloader('office-import', () => { const l = !!OIM.list; OIM.list = null; if (OIM.runs && S.route.mod === 'office' && S.route.tab === 'import') return oimLoad().then(ofcDraw); if (OIM.runs) OIM.runs = null; if (l) ofcDraw(); });
 // 2.80.0 (#1836): the client choice is read again on every visit of the import page and whenever the clients change
@@ -23,7 +28,7 @@ histReloader('office-import', () => { const l = !!OIM.list; OIM.list = null; if 
 async function fx8a_oimClients(fromState) {
   const mine = a => (a || []).filter(c => !c.archived && (c.org_id || null) === pb_clOrg());
   if (fromState) OIM.clients = mine(S.clients);
-  else try { const j = await api('GET', '/api/clients'); OIM.clients = mine(j.clients); } catch { OIM.clients = []; }
+  else try { const j = await api('GET', '/api/clients'); OIM.clients = mine(j.clients); delete OIM.errs.clients; } catch (x) { OIM.clients = []; OIM.errs.clients = ofcErrHere(x); }  // 2.1094.0 (#5902)
   ofcDraw();
 }
 window.addEventListener('hashchange', () => { if (/^#office\/import\b/.test(location.hash) && OIM.runs !== null) fx8a_oimClients(); });
@@ -170,7 +175,9 @@ function oimArchHtml() {
   if (!a.length) return '';
   const kinds = [['invoice', tr('Invoice')], ['offer', tr('Quotation')]];
   const n = a.filter(x => !x.done).length;
-  return `<ul class="oimcards" role="list">${a.map((x, i) => `<li class="oimcard ${x.done ? 'off' : ''} ${x.err || !x.sure || x.taken ? 'warn' : ''}"><div class="oimhd"><b>${esc(x.file_name)}</b>${x.done ? `<span class="rotag">${ic('check', 's')}${tr('Archived')}</span>` : `<button type="button" class="btn sm ghost" data-oim="arch-rm" data-i="${i}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</div>
+  // 2.1094.0 (#5902): the clients did not load: said above the cards (the choice would only offer "no client")
+  const ce = OIM.errs?.clients ? ofcFail(OIM.errs.clients, () => { fx8a_oimClients(); }, 'row') : '';
+  return `${/*html-ok*/ ce}<ul class="oimcards" role="list">${a.map((x, i) => `<li class="oimcard ${x.done ? 'off' : ''} ${x.err || !x.sure || x.taken ? 'warn' : ''}"><div class="oimhd"><b>${esc(x.file_name)}</b>${x.done ? `<span class="rotag">${ic('check', 's')}${tr('Archived')}</span>` : `<button type="button" class="btn sm ghost" data-oim="arch-rm" data-i="${i}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</div>
     ${x.err ? `<p class="oimwarn">${ic('alert', 's')} ${esc(x.err)}</p>` : x.taken ? `<p class="oimwarn">${ic('alert', 's')} ${tr('This number is already used')}</p>` : !x.sure ? `<p class="oimwarn">${ic('alert', 's')} ${tr('File name not recognised: please check the fields')}</p>` : ''}
     <div class="oimgrid">
       <label class="oimfl"><span>${tr('Kind')}</span><select data-oim-a="${i}" data-k="kind" ${x.done ? 'disabled' : ''}>${kinds.map(([v, t]) => `<option value="${v}" ${x.kind === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
@@ -218,7 +225,7 @@ async function oimReadAddr(x) {
 
 function oimCounterHtml() {
   const c = OIM.counter;
-  if (!c) return `${loadingHtml('row')}`;
+  if (!c) return OIM.errs?.counter ? oim_fail('counter') : `${loadingHtml('row')}`;  // 2.1094.0 (#5902)
   return ['invoice', 'offer'].map(k => {
     const x = c[k];
     if (!x) return '';
@@ -244,7 +251,8 @@ function bk_runAreas(x) {
 function oimRunsHtml() {
   const r = OIM.runs;
   if (r === null) return `${loadingHtml('row')}`;
-  if (!r.length) return `<p class="muted">${tr('No imports yet.')}</p>`;
+  if (OIM.errs?.runs) return oim_fail('runs', 'sec');  // 2.1094.0 (#5902): a failure is no "No imports yet"
+  if (!r.length) return emptyState({title: tr('No imports yet.'), size: 'row', cls: 'oim-none'});
   const kn = {data: N_('Master data'), archive: N_('Archive|documents'), datev: N_('DATEV data'), fixed_costs: N_('Fixed costs'), trips: N_('Trips'), leads: N_('Leads')};  // 2.148.0 D (#2458)
   return `<ul class="ofclist" role="list">${r.map(x => `<li class="oimrun"><span class="ofcn"><b>${esc(tr(kn[x.kind] || x.kind))} · ${esc(trn('{0} entry', '{0} entries', x.total || 0))}</b><small class="muted">${esc([typeof ofdWhen === 'function' ? ofdWhen(x.created_at) : x.created_at, x.user_name].filter(Boolean).join(' · '))}</small></span>
     ${x.undone_at ? `<span class="rotag">${tr('undone')}</span>` : `<button type="button" class="btn sm" data-oim="undo" data-id="${x.id}" data-run="${esc(x.kind)}">${ic('undo', 's')} ${tr('Undo')}</button>`}${bk_runAreas(x)}${imr_tidyBtn(x)}</li>`).join('')}</ul>`;
@@ -279,7 +287,7 @@ function oimArchiveListHtml(q) {
   const sum0 = r81b_clFilter(pf) + sum;  // 2.81.0 (#1834): the client filter above the list
   if (!items.length) return (OIM.cl || paid ? sum0 : '') + (q || OIM.cl || paid ? ofcNoHit(q ? '' : imp) : emptyState({icon: 'archive', title: tr('No archived documents. Old invoices and quotations are added under Settings > Company & office > Data > Import legacy data.'), action: imp}));  // 2.1076.0 (#5450)
   // 2.40.0 (#1366): the row shows the PDF in the browser, the button next to it downloads it
-  return sum0 + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" data-arch="${r.id}" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener"${typeof pv_attr === 'function' ? pv_attr({url: `/api/office/legacy/archive/${r.id}/pdf`, name: (r.number || tr('Document')) + '.pdf', dlUrl: `/api/office/legacy/archive/${r.id}/pdf?download=1`, arch: isMobile() && !r.copy ? r.id : undefined /* 2.451.0 (#3834): the phone's way to Correct without a long press */}) : ''}>
+  return sum0 + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" data-arch="${r.id}" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener"${/*html-ok*/ typeof pv_attr === 'function' ? pv_attr({url: `/api/office/legacy/archive/${r.id}/pdf`, name: (r.number || tr('Document')) + '.pdf', dlUrl: `/api/office/legacy/archive/${r.id}/pdf?download=1`, arch: isMobile() && !r.copy ? r.id : undefined /* 2.451.0 (#3834): the way of a phone to Correct without a long press; 2.1094.0 (#5902): no apostrophe here, the template reader of tools/check_trh.py took it for a string; pv_attr escapes its value */}) : ''}>
     <span class="ofcn"><b>${esc(r.number || r.copy?.number || r.file_name)}${r.client || r.client_name ? ` · ${esc(r.client || r.client_name)}` : ''}</b><small class="muted">${oim_archTag(r, 'ofdst') /* 2.543.0 (#4473): phones: the label in the meta line */}${esc([r.kind === 'offer' ? tr('Quotation') : tr('Invoice'), r.project, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>
     <span class="ofdsum"><b>${r.amount != null ? esc(ofcMoney(r.amount)) : ''}</b>${oim_archTag(r, 'ofdsr')}</span>${ic('file', 's')}</a><a class="ib oimdl" href="/api/office/legacy/archive/${r.id}/pdf?download=1" download aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}</a>${r.copy ? '' : `<button type="button" class="ib oimdl" data-oim="arch-edit" data-id="${r.id}" aria-label="${esc(tr('Correct archived document'))}" title="${esc(tr('Correct archived document'))}">${ic('edit', 's')}</button>`}</li>`).join('')}</ul>` + `<div class="lacts">${imp}</div>`;
 }
@@ -338,7 +346,7 @@ const oim_fntSep = k => k === ' ' ? tr('space') : k;
 const oim_fntLabel = x => x.name === 'standard' ? tr('Standard (Project_Client_KV1_Date, Project_Client_Title_Date_R)')
   : x.name === 'custom' ? tr('Own template') : x.fields.map(f => tr(OIM_FNT_BLOCKS[f])).join(x.sep);
 function oim_fntHtml() {
-  const f = OIM.fnt; if (!f) return '';
+  const f = OIM.fnt; if (!f) return OIM.errs?.fnt ? oim_fail('fnt') : '';  // 2.1094.0 (#5902)
   const dis = OIM.archBusy ? 'disabled' : '', cu = OIM.fntDraft || f.custom || {fields: ['number', 'client', 'date'], sep: '_'};
   const sel = `<label class="oimfl"><span>${tr('File names')}</span><select data-oim-fnt="t" ${dis}>${f.templates.map(x => `<option value="${esc(x.name)}" ${x.name === f.current ? 'selected' : ''}>${esc(oim_fntLabel(x))}</option>`).join('')}</select></label>`;
   if (f.current !== 'custom') return `<div class="oimgrid">${sel}</div>`;
