@@ -70,6 +70,8 @@ jobs:
       shards: ${{ steps.plan.outputs.shards }}
       hard: ${{ steps.plan.outputs.hard }}
       matrix: ${{ steps.plan.outputs.matrix }}
+      parallel: ${{ steps.plan.outputs.parallel }}
+      limit: ${{ steps.plan.outputs.limit }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -119,7 +121,7 @@ jobs:
           done
           printf '%s\n' $order > /tmp/timings/order.txt
           echo "runs (oldest first): ${order:-none - estimates only}"
-      - name: Plan (full H hard + 20 others, push stage ~15 min per shard, hard shards first ~9 min)
+      - name: Plan (full H hard + others of ~25 min, push stage ~15 min per shard, hard shards first ~9 min)
         id: plan
         env:
           STAGE: ${{ steps.stage.outputs.stage }}
@@ -140,8 +142,13 @@ jobs:
             # exactly 20 in all (H hard + 20-H others), the times still from the measured runs, limit 60 min (job "tests"; 90 since job/2867)
             # #4748 (CI v2.563.1): with 20 in all the 13 others ran 80-84 of their 90 min, the 7 hard ones only 7-13 - now H hard
             # + exactly 20 others: the H queued others start when the hard ones end (~10 min), each holds ~2/3 of the old time
-            python3 tools/shards.py --soft-shards 20 --hard-target-min 9 $t | tail -6
-            python3 tools/shards.py --soft-shards 20 --hard-target-min 9 --assign $t > shard-plan.txt
+            # #6054 (13.11.2026): the 20 others ran 57-78 min in EVERY full run (green ones too; the longest suite 14-18 min, none
+            # hung), held ~20 runners for over an hour and the merge queue waited without one. Now the others get as many shards
+            # as ~25 min each need (at most 60: the jobs of a run stay on one API page) and the shard job runs at most
+            # FULL_PARALLEL of them at once (max-parallel): the hard shards (matrix first) start at once, a shard frees its
+            # runner after ~25 min, a red one ends as fast, and the merge queue always finds a free runner
+            python3 tools/shards.py --shards 60 --target-min 25 --hard-target-min 9 $t | tail -6
+            python3 tools/shards.py --shards 60 --target-min 25 --hard-target-min 9 --assign $t > shard-plan.txt
           fi
           test -s shard-plan.txt
           n=$(awk '!/^#/ && $2 > m {m = $2} END {print m + 0}' shard-plan.txt)
@@ -150,7 +157,11 @@ jobs:
           h=$(sed -n 's/^# hard \([0-9][0-9]*\)$/\1/p' shard-plan.txt | sed -n 1p); h=${h:-0}
           test "$h" -lt "$n" || h=0
           matrix=$(python3 -c 'import json, sys; n, h = map(int, sys.argv[1:]); print(json.dumps([{"shard": k, "hart": " hart" if k <= h else ""} for k in range(1, n + 1)]))' "$n" "$h")
-          { echo "stage=$stage"; echo "count=$n"; echo "shards=[$(seq -s, 1 "$n")]"; echo "hard=$h"; echo "matrix=$matrix"; } >> "$GITHUB_OUTPUT"
+          # #6054: the full run at most FULL_PARALLEL shards at once (GitHub runs ~20 jobs of the account at once: the rest stays
+          # free for the merge queue); push / queue stage all at once (~15 min each). Limit per shard: full 60, else 90 min
+          FULL_PARALLEL=16
+          if [ "$stage" = full ]; then par=$FULL_PARALLEL; lim=60; else par=$n; lim=90; fi
+          { echo "stage=$stage"; echo "count=$n"; echo "shards=[$(seq -s, 1 "$n")]"; echo "hard=$h"; echo "matrix=$matrix"; echo "parallel=$par"; echo "limit=$lim"; } >> "$GITHUB_OUTPUT"
           echo "::notice title=stage::$stage - $n shards ($h hard first), $(grep -vc '^#' shard-plan.txt) groups - ${REASON//%/%25}"
           { echo "### Test stage: $stage ($n shards, $h of them hard first)"; echo; echo "$REASON"; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -589,7 +600,7 @@ jobs:
     name: Test suites ${{ matrix.shard }}/${{ needs.plan.outputs.count }} ${{ needs.plan.outputs.stage }}${{ matrix.hart }} (API, UI, security)
     runs-on: ubuntu-latest
     needs: plan
-    timeout-minutes: 90  # 2.80.1: four shards ran into the 30 min limit on a slow runner; CI of 2.166.1 (#945): 50 as a safety net (#1315: 20 shards, the plan aims at ~30 min per shard); 2.556 (#4388): 60 with 20 fixed shards
+    timeout-minutes: ${{ fromJSON(needs.plan.outputs.limit || '90') }}  # #6054: full 60 (shards of ~25 min), push / queue 90 (job "plan"); 2.80.1: four shards ran into the 30 min limit on a slow runner; CI of 2.166.1 (#945): 50 as a safety net (#1315: 20 shards, the plan aims at ~30 min per shard); 2.556 (#4388): 60 with 20 fixed shards
     # CI red v2.560.0 (job/2867): the first full run with 20 fixed shards had 7 hard shards (~9 min) and 13 others - all 13 hit
     # the 60 min limit ("exceeded the maximum execution time"), their suites never finished. The other suites need ~900 shard
     # minutes (CI v2.551.0: 28 shards, 914 min) = ~70 min each on 13 shards; 90 leaves room, the plan stays at 20 (#4388)
@@ -601,6 +612,7 @@ jobs:
       actions: write
     strategy:
       fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.parallel || '20') }}  # #6054: the full run leaves runners for the merge queue
       # #4557: [{shard, hart}] in shard order - the hard shards 1..H first, so they are queued before the others
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.matrix) }}
@@ -692,6 +704,8 @@ jobs:
           KALMIDO_SHARD_PLAN: /tmp/plan/shard-plan.txt
           SHARD: ${{ matrix.shard }}/${{ needs.plan.outputs.count }}
           STAGE: ${{ needs.plan.outputs.stage }}
+          KALMIDO_SUITE_LIMIT_S: "1500"  # #6054: a suite over 25 min is stopped and red (longest real one 14-18 min)
+          KALMIDO_RED_STREAK: "10"  # #6054: 10 red suites in a row = the database / server is down, the shard ends (rest NOT RUN)
         # #1315 (25.10.2026): no rerun - a suite red once is red (a proven flaky one is in tests/skip.txt until its date)
         run: |
           echo "$STAGE" > tests/timings-stage.txt
