@@ -96,9 +96,17 @@ check(F.patch(B + f"/api/wiki/shares/{NOB['id']}", json={"images": True}).ok
       and next(s for s in F.get(B + f"/api/wiki/shares?page={W1}").json()["shares"] if s["id"] == NOB["id"])["images"],
       "#5658: an open page share takes the switch Show pictures")
 check(U.delete(B + f"/api/wiki/shares/{NOB['id']}").status_code == 404, "#5658: another person cannot take back frida's open page share")
-check(F.post(B + f"/api/wiki/shares/{NOB['id']}/restore").status_code == 404, "#5658: an open share has no restore (it is no link)")
-check(F.delete(B + f"/api/wiki/shares/{NOB['id']}").ok and NOB["id"] not in {s["id"] for s in F.get(B + f"/api/wiki/shares?page={W1}").json()["shares"]},
+# 2.1115.0 (#5967): an open share ends like a bound one, with Undo (restore); a live one answers itself (was 404: no restore)
+r = F.post(B + f"/api/wiki/shares/{NOB['id']}/restore")
+check(r.ok and r.json().get("id") == NOB["id"] and not r.json().get("revoked"), f"#5967: the restore of a live open share = the share {r.status_code}")
+r = F.delete(B + f"/api/wiki/shares/{NOB['id']}")
+check(r.ok and r.json().get("revoked") is True and NOB["id"] not in {s["id"] for s in F.get(B + f"/api/wiki/shares?page={W1}").json()["shares"]},
       "#5658: frida takes the open page share back")
+check(U.post(B + f"/api/wiki/shares/{NOB['id']}/restore").status_code == 404, "#5967: another person cannot bring it back")
+r = F.post(B + f"/api/wiki/shares/{NOB['id']}/restore")
+check(r.ok and NOB["id"] in {s["id"] for s in F.get(B + f"/api/wiki/shares?page={W1}").json()["shares"]}, f"#5967: its Undo brings it back {r.status_code}")
+check(F.delete(B + f"/api/wiki/shares/{NOB['id']}").ok and NOB["id"] not in {s["id"] for s in F.get(B + f"/api/wiki/shares?page={W1}").json()["shares"]},
+      "#5967: ... and it ends again")
 
 # ================================================================ taking an open share of a project back
 NOBL = next(x["id"] for x in F.get(B + f"/api/addr-shares?kind=list&ref={LA}").json()["open"] if x["email"] == "nobody@example.com")
