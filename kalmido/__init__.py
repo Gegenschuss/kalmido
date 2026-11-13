@@ -66,6 +66,7 @@ ORDER = (
     "accounts.bgjobs",  # 2.193.0 D (#2220): the queue of short background work (mails after an action, back up now) in the database
     "accounts.oidc",
     "core.access",
+    "core.objexport",  # 2.1093.0 (#5289): the export register of the shared core (no imports from the app)
     "core.objfollow",  # 2.972.0 (#5285): following an object in the shared core (one table obj_follow: watching + the bell)
     "core.objnotifcap",  # 2.981.0 (#5287): the owner's notification ceilings in the shared core (obj_notif_cap)
     "core.objparts",  # 2.610.0 (#4762): the write layer of a project's side objects (stands on core.access / core.conflict)
