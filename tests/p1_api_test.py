@@ -345,7 +345,7 @@ ins(WORK, "oassigned bob", due=D(-3), created=-5, assignee=BOB)
 
 def pomo(n, minutes, kind="focus", task=None, uid=1):
     s = datetime.combine(today + timedelta(days=n), datetime.min.time()).replace(hour=0, minute=5, tzinfo=TZ)
-    c.execute("INSERT INTO pomos(task_id,kind,minutes,start,\"end\",done,user_id) VALUES(?,?,?,?,?,1,?)",
+    c.execute("INSERT INTO pomos(task_id,kind,minutes,start,\"end\",done,user_id) VALUES(?,?,?,?,?,true,?)",
               (task, kind, minutes, s.astimezone(timezone.utc).isoformat(timespec="seconds"),
                (s + timedelta(minutes=minutes)).astimezone(timezone.utc).isoformat(timespec="seconds"), uid))
 

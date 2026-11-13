@@ -243,7 +243,7 @@ def sig_people(c, oid, creator, lid=None):
     deactivated account (their push subscriptions stay, #1991)."""
     with system_ctx(c):  # membership structure of people other than the (anonymous) customer
         def ok(u):
-            if not u or not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0 AND COALESCE(kind,'')!='agent'", (u,)).fetchone():
+            if not u or not c.execute("SELECT 1 FROM users WHERE id=? AND NOT disabled AND COALESCE(kind,'')!='agent'", (u,)).fetchone():
                 return False
             if lid and list_role(c, lid, u) in FULL_ROLES:
                 return True
@@ -582,7 +582,7 @@ def sig_check(c, r):
     if r["kind"] == "video":  # 2.99.1 A (#1959): the review is there (not in the trash) and has a version
         from ..videos.review import vdr_sig_valid
         return None if vdr_sig_valid(c, r) else True
-    lr = c.execute("SELECT l.id FROM lists l JOIN users u ON u.id=l.owner_id WHERE l.id=? AND u.disabled=0", (r["list_id"],)).fetchone()
+    lr = c.execute("SELECT l.id FROM lists l JOIN users u ON u.id=l.owner_id WHERE l.id=? AND NOT u.disabled", (r["list_id"],)).fetchone()
     if not lr or sig_list_hash(c, r) != r["doc_hash"]:
         return True
     return None

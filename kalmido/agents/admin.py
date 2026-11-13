@@ -131,9 +131,9 @@ def agent_enable(c, aid, on):
     a = agent_row(c, aid)
     if a["webhook_id"]:
         if on:
-            c.execute("UPDATE webhooks SET enabled=1, disabled_reason='', updated_at=? WHERE id=?", (iso(now_utc()), a["webhook_id"]))
+            c.execute("UPDATE webhooks SET enabled=true, disabled_reason='', updated_at=? WHERE id=?", (iso(now_utc()), a["webhook_id"]))
         else:
-            c.execute("UPDATE webhooks SET enabled=0, updated_at=? WHERE id=?", (iso(now_utc()), a["webhook_id"]))
+            c.execute("UPDATE webhooks SET enabled=false, updated_at=? WHERE id=?", (iso(now_utc()), a["webhook_id"]))
             c.execute("DELETE FROM webhook_queue WHERE webhook_id=?", (a["webhook_id"],))
     if not on:
         c.execute("UPDATE agents SET status='idle', status_text='', status_at=?, status_task=NULL WHERE user_id=?", (iso(now_utc()), aid))
@@ -141,7 +141,7 @@ def agent_enable(c, aid, on):
 
 def make_agent(c, uid):
     """users row uid becomes an agent (never admin, no web sessions); its tokens and lists stay."""
-    c.execute("UPDATE users SET kind='agent', is_admin=0, paperless_access=0 WHERE id=?", (uid,))
+    c.execute("UPDATE users SET kind='agent', is_admin=false, paperless_access=0 WHERE id=?", (uid,))
     acx_drop()  # 2.602.0 (#4729): the account kind is cached per request (office/rights.py _is_agent)
     user_forget_conns(c, uid)  # personal connection rows, stored tokens, grants go
     from ..accounts.sessions import ses_end  # 2.190.0 A (#1991): with the push subscriptions made in them
@@ -152,7 +152,7 @@ def make_agent(c, uid):
               "AND grole IS NULL AND frole IS NULL", (uid,))
     c.execute("DELETE FROM group_members WHERE user_id=?", (uid,))  # 2.10.0 (#441): agents are never group members
     # 2.236.0 (#2909): a new agent disturbs only at its limits (agents/workstyle.py WS_NEW)
-    c.execute("INSERT INTO agents(user_id,enabled,status,created_at,work_style) VALUES(?,1,'idle',?,?) ON CONFLICT DO NOTHING",
+    c.execute("INSERT INTO agents(user_id,enabled,status,created_at,work_style) VALUES(?,true,'idle',?,?) ON CONFLICT DO NOTHING",
               (uid, iso(now_utc()), json.dumps(WS_NEW)))
     lids = [r[0] for r in c.execute("SELECT list_id FROM list_members WHERE user_id=?", (uid,))]
     grp_sync(c, lids)  # 2.352.0 F (#2748, review N6)
@@ -531,7 +531,7 @@ def agent_owner_set(c, aid, owner, given):
         c.execute("UPDATE agents SET owner_id=NULL, admin_paused=0, office_drafts=CASE WHEN owner_id IS NULL THEN office_drafts ELSE 0 END WHERE user_id=?", (aid,))  # 2.51.0 A (#1348)
         return
     if isinstance(owner, bool) or not isinstance(owner, int) or \
-            not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (owner,)).fetchone():
+            not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND NOT disabled", (owner,)).fetchone():
         raise BadInput(tr("Invalid value: {0}", "owner_id"))
     if was != owner:
         agent_polls_retire(c, aid, was or aid)  # 2.625.0 C (#3961): a former team agent keeps them itself
@@ -571,7 +571,7 @@ def _agent_rgroups_drop(c, oid, aid):
 
 def _agent_ws_check(c, aid, v):
     """BadInput while agent aid is still in projects, calendars or address books of another workspace than v (None = private)."""
-    n = c.execute(f"""SELECT COUNT(*) FROM lists l WHERE COALESCE(l.org_id,0)!=? AND l.is_inbox=0 AND l.id IN {joined_lists_sql()}""",
+    n = c.execute(f"""SELECT COUNT(*) FROM lists l WHERE COALESCE(l.org_id,0)!=? AND NOT l.is_inbox AND l.id IN {joined_lists_sql()}""",
                   (v or 0, aid, aid)).fetchone()[0]
     if n:
         raise BadInput(tr("The agent is still in {0} projects of another workspace: take it out of them first", n))
@@ -916,7 +916,7 @@ def my_agent_token(aid):
 
 def agent_delete(c, aid, heir):
     """Deletes agent aid; the lists it owns (besides its inbox) go to heir first. The caller commits; returns files to unlink."""
-    for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND is_inbox=0", (aid,)).fetchall():
+    for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND NOT is_inbox", (aid,)).fetchall():
         owner_transfer(c, lr, heir)
     return user_purge(c, aid)
 
@@ -940,7 +940,7 @@ def admin_agent_delete(aid):
     c = db()
     with system_ctx(c):  # 2.37.0 (#1150): the instance admin manages agent accounts (any organisation; structure, no content)
         a = need_agent_admin(c, aid)
-        heir = a["owner_id"] if a["owner_id"] and c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (a["owner_id"],)).fetchone() else me()
+        heir = a["owner_id"] if a["owner_id"] and c.execute("SELECT 1 FROM users WHERE id=? AND NOT disabled", (a["owner_id"],)).fetchone() else me()
         files = agent_delete(c, aid, heir)
         bump(c)
         c.commit()

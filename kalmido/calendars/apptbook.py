@@ -573,7 +573,7 @@ def apb_busy(c, uid, p, lo, hi, skip=None):
                 out.append(day_span(o["s"], o["e"]))
             else:
                 out.append((apb_utc(o["s"]), apb_utc(o["e"])))
-    for r in c.execute("""SELECT e.start, e."end" FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id WHERE s.user_id=? AND s.visible=1
+    for r in c.execute("""SELECT e.start, e."end" FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id WHERE s.user_id=? AND s.visible
                           AND e.all_day=0 AND e.d1>=? AND e.d0<=?""", (uid, dlo.isoformat(), dhi.isoformat())):
         s, e = parse_iso(r[0]), parse_iso(r[1])
         if s and e:
@@ -702,7 +702,7 @@ def apb_open(c, slug):
     if hit_limit("apbv:" + ip, APB_VIEW_RATE):
         return None, pub_limited(apb_lang_hdr())
     bad = [("pubbad:" + ip, APB_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
-    p = c.execute("SELECT * FROM appt_pages WHERE slug=? AND enabled=1", (slug,)).fetchone() if SLUG_RE.fullmatch(slug or "") else None
+    p = c.execute("SELECT * FROM appt_pages WHERE slug=? AND enabled", (slug,)).fetchone() if SLUG_RE.fullmatch(slug or "") else None
     if not p or not apb_live(c, p["user_id"]) or apb_retired(c, p):
         if _rate_blocked(bad):
             return None, pub_limited(apb_lang_hdr())
@@ -718,7 +718,7 @@ def apb_lang_hdr():
 
 
 def apb_type_pub(c, p, tid):
-    return c.execute("SELECT * FROM appt_types WHERE id=? AND user_id=? AND active=1 AND deleted_at IS NULL", (tid, p["user_id"])).fetchone()
+    return c.execute("SELECT * FROM appt_types WHERE id=? AND user_id=? AND active AND deleted_at IS NULL", (tid, p["user_id"])).fetchone()
 
 
 def apb_owner_name(c, uid):
@@ -773,7 +773,7 @@ def apb_pub_page(slug):
         return bad
     lg = apb_lang(c, p["user_id"])
     e = html.escape
-    types = c.execute("SELECT * FROM appt_types WHERE user_id=? AND active=1 AND deleted_at IS NULL ORDER BY sort, id", (p["user_id"],)).fetchall()
+    types = c.execute("SELECT * FROM appt_types WHERE user_id=? AND active AND deleted_at IS NULL ORDER BY sort, id", (p["user_id"],)).fetchall()
     items = "".join(f'<li><a href="{APB_PREFIX}{e(p["slug"])}/{t["id"]}"><b>{e(t["name"])}</b><span class="sub">{e(apb_dur(t, lg))}'
                     f'{" · " + e(t["location"]) if t["location"] else ""}</span>'
                     + (f'<span class="apb-note">{e(t["note"])}</span>' if t["note"] else "") + '</a></li>' for t in types)

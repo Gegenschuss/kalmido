@@ -265,9 +265,9 @@ check(m and f"attachment_id {F_DOCX}" in json.dumps(m[0], ensure_ascii=False), f
 dbx("UPDATE agents SET list_ids=? WHERE user_id=?", (str(L + 1000), CL), write=True)
 check(Bo.get(B + f"/api/attachments/{F_DOCX}/agents").json().get("agents") == [], "#1926: an agent limited to other lists is missing")
 dbx("UPDATE agents SET list_ids='' WHERE user_id=?", (CL,), write=True)
-dbx("UPDATE agents SET enabled=0 WHERE user_id=?", (CL,), write=True)
+dbx("UPDATE agents SET enabled=false WHERE user_id=?", (CL,), write=True)
 check(Bo.get(B + f"/api/attachments/{F_DOCX}/agents").json().get("agents") == [], "#1926: a paused agent is missing")
-dbx("UPDATE agents SET enabled=1 WHERE user_id=?", (CL,), write=True)
+dbx("UPDATE agents SET enabled=true WHERE user_id=?", (CL,), write=True)
 
 # ---------------------------------------------------------------------------------------------------------- project + Ablage files
 r = Bo.post(B + f"/api/lists/{L}/files", files={"file": ("plan.xlsx", XLSX, XLSX_MIME)})

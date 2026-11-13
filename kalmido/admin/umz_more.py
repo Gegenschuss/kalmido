@@ -198,7 +198,7 @@ def _family(c, run, uid, data, ts, salt):
     for r in links:
         run.step()
         hit = umz_find(c, uid, r.get("email_hash") if isinstance(r.get("email_hash"), str) else "", seen)
-        o = c.execute("SELECT id FROM users WHERE id=? AND disabled=0 AND kind='user' AND kid=0", (hit["id"],)).fetchone() if hit else None
+        o = c.execute("SELECT id FROM users WHERE id=? AND NOT disabled AND kind='user' AND kid=0", (hit["id"],)).fetchone() if hit else None
         if not o:
             gone.append(r)
             continue

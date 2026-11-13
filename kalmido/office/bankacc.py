@@ -23,7 +23,7 @@ from ..core.db import body, bump, err, iso, now_utc
 from ..core.errors import BadInput
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
-from ..core.pg import insert_id, write_lock
+from ..core.pg import insert_id, qi, write_lock
 from .ledger import ofx_company_clean, ofx_log
 from .model import OFFICE_ADMIN_ONLY, office_ctx_admin as _ctx, office_role, office_settings
 from .rights import office_can, ofr_mine
@@ -58,7 +58,7 @@ def _lock(c, oid):
 
 def bka_default(c, oid):
     """The default account of office oid, decrypted (None: no account yet)."""
-    r = c.execute(f"SELECT * FROM {BKA_TABLE} WHERE org_id=? AND is_default=1 AND archived=0", (oid,)).fetchone()
+    r = c.execute(f"SELECT * FROM {qi(BKA_TABLE, (BKA_TABLE,))} WHERE org_id=? AND is_default AND NOT archived", (oid,)).fetchone()
     return oc_dec_fields(c, oid, BKA_TABLE, r) if r else None
 
 
@@ -69,7 +69,7 @@ def bka_rows(c, oid, archived=False):
 
 
 def bka_count(c, oid):
-    return c.execute(f"SELECT COUNT(*) FROM {BKA_TABLE} WHERE org_id=? AND archived=0", (oid,)).fetchone()[0]
+    return c.execute(f"SELECT COUNT(*) FROM {qi(BKA_TABLE, (BKA_TABLE,))} WHERE org_id=? AND NOT archived", (oid,)).fetchone()[0]
 
 
 def bka_public(r):
@@ -97,9 +97,9 @@ def _set_bank(c, oid, rid, d):
 
 
 def _set_default(c, oid, rid):
-    c.execute(f"UPDATE {BKA_TABLE} SET is_default=0 WHERE org_id=? AND is_default=1", (oid,))  # first: the unique index allows one
+    c.execute(f"UPDATE {qi(BKA_TABLE, (BKA_TABLE,))} SET is_default=false WHERE org_id=? AND is_default", (oid,))  # first: the unique index allows one
     if rid is not None:
-        c.execute(f"UPDATE {BKA_TABLE} SET is_default=1, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), rid, oid))
+        c.execute(f"UPDATE {qi(BKA_TABLE, (BKA_TABLE,))} SET is_default=true, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), rid, oid))
 
 
 def bka_seed(c, oid):
@@ -235,12 +235,12 @@ def bka_archive(rid):
     r = _row(c, oid, rid)
     was = bool(r["is_default"])
     if not r["archived"]:
-        rest = [x["id"] for x in c.execute(f"SELECT id FROM {BKA_TABLE} WHERE org_id=? AND archived=0 AND id<>? ORDER BY sort, id", (oid, rid)).fetchall()]
+        rest = [x["id"] for x in c.execute(f"SELECT id FROM {qi(BKA_TABLE, (BKA_TABLE,))} WHERE org_id=? AND NOT archived AND id<>? ORDER BY sort, id", (oid, rid)).fetchall()]
         if not rest:
             return err(tr(BKA_LAST), 409)
         if was:
             _set_default(c, oid, rest[0])
-        c.execute(f"UPDATE {BKA_TABLE} SET archived=1, is_default=0, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), rid, oid))
+        c.execute(f"UPDATE {qi(BKA_TABLE, (BKA_TABLE,))} SET archived=true, is_default=false, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), rid, oid))
         ofx_log(c, oid, "archive", target="bank_account", detail={"id": rid, "before": _brief(r)})
         bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
@@ -254,7 +254,7 @@ def bka_restore(rid):
     _lock(c, oid)
     r = _row(c, oid, rid)
     if r["archived"]:
-        c.execute(f"UPDATE {BKA_TABLE} SET archived=0, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), rid, oid))
+        c.execute(f"UPDATE {qi(BKA_TABLE, (BKA_TABLE,))} SET archived=false, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), rid, oid))
         if bka_default(c, oid) is None:
             _set_default(c, oid, rid)
         ofx_log(c, oid, "restore", target="bank_account", detail={"id": rid, "after": _brief(r)})

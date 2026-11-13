@@ -317,7 +317,7 @@ def approval_approver(c, aid, list_id=None):
         return a["owner_id"]
     if list_id:
         r = c.execute("SELECT l.owner_id FROM lists l JOIN users u ON u.id=l.owner_id WHERE l.id=? AND COALESCE(u.kind,'user')!='agent' "
-                      "AND u.disabled=0", (list_id,)).fetchone()
+                      "AND NOT u.disabled", (list_id,)).fetchone()
         return r[0] if r else None
     return None
 
@@ -1137,7 +1137,7 @@ def v1_member_set(lid, user_id):
     role = str(b.get("role") or "edit")
     if role not in ROLES:
         raise BadInput(tr("Role must be admin, edit, participant or view"))
-    u = c.execute("SELECT display_name, username, kind FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
+    u = c.execute("SELECT display_name, username, kind FROM users WHERE id=? AND NOT disabled", (uid,)).fetchone()
     if not u or uid == me() or personal_agent_foreign(c, uid, me()) or (role == "admin" and u["kind"] == "agent") \
             or c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0] \
             or not may_see(c, me(), uid):  # 2.86.0 (N29): no name of someone it cannot see
@@ -1226,7 +1226,7 @@ def v1_list_views(lid):
     v1_args(())
     c = db()
     need_list(c, lid, write=False)
-    return jsonify(data=[v1_filter(r) for r in c.execute("SELECT * FROM filters WHERE list_id=? AND shared=1 ORDER BY sort, id", (lid,))],
+    return jsonify(data=[v1_filter(r) for r in c.execute("SELECT * FROM filters WHERE list_id=? AND shared ORDER BY sort, id", (lid,))],
                    next_cursor=None)
 
 

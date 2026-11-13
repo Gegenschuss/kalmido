@@ -530,7 +530,7 @@ def atts_resolve(c, uid, raw, eid=None, cal_id=None):
         m = re.fullmatch(r"(?i)urn:kalmido:user:(\d{1,9})", addr)
         ku = int(a["kuser"]) if a.get("kuser") and str(a["kuser"]).isdigit() else (int(m.group(1)) if m else None)
         em = addr[7:].strip() if addr.lower().startswith("mailto:") else ""
-        if collab_all() and ku and c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (ku,)).fetchone() \
+        if collab_all() and ku and c.execute("SELECT 1 FROM users WHERE id=? AND NOT disabled", (ku,)).fetchone() \
                 and (ku == uid or ku in had_u or (may_see(c, uid, ku) and not personal_agent_foreign(c, ku, uid))) \
                 and (not cal_org or ev_att_ok(c, ku, cal_org)):
             row["user_id"] = ku  # by its Kalmido id only: an e-mail address never reveals or picks an account

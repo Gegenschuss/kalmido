@@ -226,7 +226,7 @@ class W:
         return s.c.execute(*a, **k)
     def __getattr__(s, k): return getattr(s.c, k)
 c = connect()
-users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE disabled=0")}
+users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE NOT disabled")}
 S = P._wd_settings(c, users)
 LG = {u: "en" for u in users}
 out = {}

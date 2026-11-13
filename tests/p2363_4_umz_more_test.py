@@ -83,7 +83,7 @@ def one(sql, args=()):
 EMLF, PDFF = "files/private_files/70-mail.eml", "files/private_files/71-plan.pdf"
 FILE = mkzip({
     "lists": [{"id": 1, "name": "Umzug Projekt", "created_at": TS}],
-    "tasks": [{"id": 11, "list_id": 1, "title": "Umzug Aufgabe", "created_at": TS, "updated_at": TS},
+    "tasks": [{"id": 11, "list_id": 1, "title": "Umzug Aufgabe", "created_at": TS, "updated_at": TS, "pinned": 1},  # 2.1118.0 (#5952): a yes as 0 / 1
               {"id": 12, "list_id": 1, "title": "Fremde Glocke", "created_at": TS, "updated_at": TS}],
     "address_books": [{"id": 21, "name": "Umzug Adressen", "created_at": TS}],
     "contacts": [{"id": 22, "book_id": 21, "uid": "umzug-kontakt", "fn": "Erika Beispiel", "created_at": TS, "updated_at": TS}],
@@ -138,6 +138,8 @@ WARN = json.dumps(RES.get("warnings"), ensure_ascii=False)[:600]
 LID = one("SELECT id FROM lists WHERE owner_id=? AND name='Umzug Projekt' AND deleted_at IS NULL", (GID,))
 TID = one("SELECT id FROM tasks WHERE list_id=? AND title='Umzug Aufgabe'", (LID or 0,))
 check(LID and TID, f"the project and its task arrive {LID} {TID} {WARN}")
+# 2.1118.0 (#5952): a yes / no column (BOOLEAN now) keeps the file's 1 - the import's type mapping knew no boolean (DEFAULT 0)
+check(one("SELECT pinned FROM tasks WHERE id=?", (TID or 0,)) == 1, "#5952 the pinned task arrives pinned")
 
 # mail with its files
 m = kt.dbx("SELECT id, owner_id, org_id, list_id, eml_id, files, subject, ws FROM hub_mails WHERE owner_id=? AND deleted_at IS NULL", (GID,))

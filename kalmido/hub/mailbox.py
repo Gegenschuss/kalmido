@@ -691,7 +691,7 @@ def mbx_poll_all(only=None):
     """One round over the active mailboxes (only = a set of ws: just those)."""
     def boxes(c):
         with system_ctx(c):
-            out = [dict(x) for x in c.execute("SELECT * FROM hub_mailboxes WHERE active=1 AND imap_host<>'' ORDER BY id").fetchall()]
+            out = [dict(x) for x in c.execute("SELECT * FROM hub_mailboxes WHERE active AND imap_host<>'' ORDER BY id").fetchall()]
         c.commit()
         return out
     n = 0

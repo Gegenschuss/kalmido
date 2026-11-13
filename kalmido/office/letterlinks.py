@@ -260,7 +260,7 @@ def ltl_doc_info(c, m, n):
 
 def ltl_client_match(c, oid, name, text=""):
     """The client of office area oid whose name is the sender's name (or whose e-mail address is in the text) or None."""
-    rows = c.execute(f"SELECT * FROM clients WHERE archived=0 AND deleted_at IS NULL AND {pb_cl_sql(c, oid)} ORDER BY id").fetchall()
+    rows = c.execute(f"SELECT * FROM clients WHERE NOT archived AND deleted_at IS NULL AND {pb_cl_sql(c, oid)} ORDER BY id").fetchall()
     key = (name or "").strip().casefold()
     for r in rows:
         if key and (r["name"] or "").strip().casefold() == key:
@@ -423,7 +423,7 @@ def ltl_graph(c, oid, start_letters=(), start_nodes=()):
                 continue
             nodes.add(nid)
             for r in c.execute("SELECT l.src_id FROM obj_links l JOIN office_letters t ON t.id=l.src_id "
-                               f"WHERE {ltl_on('l')} AND l.dst_id=? AND l.org_id=? AND t.org_id=? AND t.archived=0 AND {live_sql('l')}", (nid, oid, oid)).fetchall():
+                               f"WHERE {ltl_on('l')} AND l.dst_id=? AND l.org_id=? AND t.org_id=? AND NOT t.archived AND {live_sql('l')}", (nid, oid, oid)).fetchall():
                 if r[0] not in letters:
                     todo_l.append(r[0])
     return letters, nodes
@@ -434,7 +434,7 @@ def ltl_items(c, oid, letters, nodes):
     out = []
     if letters:
         ids = sorted(letters)
-        for r in c.execute(f"SELECT * FROM office_letters WHERE org_id=? AND archived=0 AND id IN ({','.join('?' * len(ids))})", (oid, *ids)).fetchall():
+        for r in c.execute(f"SELECT * FROM office_letters WHERE org_id=? AND NOT archived AND id IN ({','.join('?' * len(ids))})", (oid, *ids)).fetchall():
             out.append(ltl_letter_item(c, oid, r))
     for nid in sorted(nodes):
         ok = ltl_doc_ok(c, oid, nid)
@@ -540,7 +540,7 @@ def ltl_threads_get():
     raw = request.args.get("client_id") or request.args.get("contact") or ""
     if not col or not raw.isdigit():
         raise BadInput(tr("Invalid data"))
-    rows = c.execute(f"SELECT id FROM office_letters WHERE org_id=? AND archived=0 AND {col}=? ORDER BY id DESC LIMIT 500", (oid, int(raw))).fetchall()
+    rows = c.execute(f"SELECT id FROM office_letters WHERE org_id=? AND NOT archived AND {col}=? ORDER BY id DESC LIMIT 500", (oid, int(raw))).fetchall()
     done, out = set(), []
     for r in rows:
         if r[0] in done:
@@ -575,7 +575,7 @@ def ltl_doc_get(nid):
     info = ltl_doc_info(c, m, n)
     letters = []
     for r in c.execute("SELECT t.*, l.rel AS link_kind FROM obj_links l JOIN office_letters t ON t.id=l.src_id "
-                       f"WHERE {ltl_on('l')} AND l.dst_id=? AND l.org_id=? AND t.org_id=? AND t.archived=0 AND {live_sql('l')} ORDER BY t.letter_date, t.id", (n["id"], oid, oid)).fetchall():
+                       f"WHERE {ltl_on('l')} AND l.dst_id=? AND l.org_id=? AND t.org_id=? AND NOT t.archived AND {live_sql('l')} ORDER BY t.letter_date, t.id", (n["id"], oid, oid)).fetchall():
         it = ltl_letter_item(c, oid, r)
         letters.append({"id": it["id"], "subject": it["title"], "date": it["date"], "status": it["status"], "kind": r["link_kind"],
                         "href": it["href"]})
@@ -655,7 +655,7 @@ def ltl_followup_tick(c, force=False):
     made = 0
     # the watchdog works for every office area at once (row-level security); every task goes to a person of that area only
     with system_ctx(c):
-        rows = c.execute("SELECT * FROM office_letters t WHERE t.status IN ('sent', 'delivered') AND t.archived=0 AND t.followup_due IS NOT NULL "
+        rows = c.execute("SELECT * FROM office_letters t WHERE t.status IN ('sent', 'delivered') AND NOT t.archived AND t.followup_due IS NOT NULL "
                          "AND t.followup_due<=? AND t.followup_task_id IS NULL AND NOT EXISTS (SELECT 1 FROM obj_links l JOIN fs_nodes n "
                          f"ON n.id=l.dst_id WHERE {ltl_on('l')} AND l.src_id=t.id AND l.rel='reply' AND n.deleted_at IS NULL AND {live_sql('l')}) ORDER BY t.org_id, t.id LIMIT 500",
                          (today,)).fetchall()

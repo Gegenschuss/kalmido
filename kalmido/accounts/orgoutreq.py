@@ -29,7 +29,7 @@ OOR_PAUSE_DAYS = 3  # after a decline the same thing is asked again only after t
 def oor_admins(c, oid):
     with system_ctx(c):  # the organisation's admins (structure)
         return [r[0] for r in c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id
-                                           WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'""", (oid,))]
+                                           WHERE m.org_id=? AND m.role='admin' AND NOT u.disabled AND COALESCE(u.kind,'user')!='agent'""", (oid,))]
 
 
 def oor_org_name(c, oid):

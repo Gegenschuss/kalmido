@@ -89,7 +89,7 @@ def client_rows(c, uid, archived=True, trash=False, only=None):
     u = _user(c, uid)
     if not u or u["kid"] or (u["kind"] or "user") == "agent":
         return []
-    w = [] if archived else ["archived=0"]
+    w = [] if archived else ["NOT archived"]
     if trash is not None:
         w.append("deleted_at IS NOT NULL" if trash else "deleted_at IS NULL")
     if only is not None:
@@ -507,7 +507,7 @@ def client_delete(cid):
     from .clients_bulk import ms_client_in_use
     if ms_client_in_use(c, cid):  # 2.152.0 C (#2168): documents / contracts keep their client (records) -> archived, like the bulk delete
         if not r["archived"]:
-            c.execute("UPDATE clients SET archived=1, updated_at=? WHERE id=?", (iso(now_utc()), cid))
+            c.execute("UPDATE clients SET archived=true, updated_at=? WHERE id=?", (iso(now_utc()), cid))
             bump(c)
             c.commit()
         return jsonify(ok=True, archived=True, message=tr("The client is used in quotations, invoices, contracts or the logbook and was archived instead of deleted."))
@@ -613,7 +613,7 @@ def cl_anonymize(c, cid):
     finalised documents keep their own copy of the address. The caller checks the rights and commits."""
     cols = table_columns(c, "clients")
     f = {k: "" for k in CL_ANON_COLS if k in cols}
-    c.execute(f"UPDATE clients SET name=?, {''.join(k + '=?, ' for k in f)}archived=1, updated_at=? WHERE id=?",
+    c.execute(f"UPDATE clients SET name=?, {''.join(k + '=?, ' for k in f)}archived=true, updated_at=? WHERE id=?",
               (tr("Deleted client"), *f.values(), iso(now_utc()), cid))
     with system_ctx(c):  # every contact person of the client (they hang on it only)
         c.execute("DELETE FROM office_client_contacts WHERE client_id=?", (cid,))
@@ -766,7 +766,7 @@ def client_purge(cid):
     from .clients_bulk import ms_client_in_use
     if ms_client_in_use(c, cid) or cl_locked_docs(c, cid, real=True):
         cl_untrash(c, cid)
-        c.execute("UPDATE clients SET archived=1 WHERE id=?", (cid,))
+        c.execute("UPDATE clients SET archived=true WHERE id=?", (cid,))
         bump(c)
         c.commit()
         return err(tr("The client is used in quotations, invoices, contracts or the logbook and was archived instead of deleted."), 409)

@@ -39,7 +39,7 @@ OT_STATUS = {0: "open", 2: "done", -1: "wont_do"}  # the names of API v1
 
 def ot_lists(c, oid):
     """The lists of organisation oid whose tasks its admins may read (rows)."""
-    rows = c.execute(f"""SELECT * FROM lists WHERE org_id=? AND is_inbox=0 AND {otr_live('')} AND e2e IS NULL
+    rows = c.execute(f"""SELECT * FROM lists WHERE org_id=? AND NOT is_inbox AND {otr_live('')} AND e2e IS NULL
                         AND COALESCE(life, '') NOT IN ('health', 'budget') ORDER BY lower(name), id""", (oid,)).fetchall()
     return [r for r in rows if ol_shared(c, r)]
 

@@ -116,7 +116,7 @@ check(pub.get(B + FEED).status_code == 404, "(1) the calendar's subscription lin
 check(not sql("SELECT 1 FROM ev_cal_feeds WHERE cal_id=?", (CAL,)), "(1) its row went")
 check(pub.get(B + "/s/b/carl-termine").status_code == 404, "(1) the booking page is closed")
 check(sql("SELECT enabled, office_org_id FROM appt_pages WHERE user_id=?", (CARL,)) == [(0, OR1)], "(1) switched off, the export still finds it through its organisation")
-sql("UPDATE appt_pages SET enabled=1 WHERE user_id=?", (CARL,), write=True)
+sql("UPDATE appt_pages SET enabled=true WHERE user_id=?", (CARL,), write=True)
 check(pub.get(B + "/s/b/carl-termine").status_code == 404, "(1) switched on again it stays closed for a retired office")
 t = pub.get(B + TF)
 check(t.status_code == 200 and "Studio deadline" not in t.text, "(1) the task feed of the former member has nothing of the organisation")

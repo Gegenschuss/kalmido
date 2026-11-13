@@ -61,8 +61,8 @@ def filter_create():
             raise BadInput(tr("Invalid value: {0}", "list_id"))
         if not isinstance(b.get("rules") or {}, dict):
             raise BadInput(tr("Invalid value: {0}", "rules"))
-        srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM filters WHERE list_id=? AND shared=1", (lid,)).fetchone()[0]
-        cur_id = insert_id(c, "INSERT INTO filters(name,rules,sort,created_at,user_id,list_id,shared) VALUES(?,?,?,?,?,?,1)",
+        srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM filters WHERE list_id=? AND shared", (lid,)).fetchone()[0]
+        cur_id = insert_id(c, "INSERT INTO filters(name,rules,sort,created_at,user_id,list_id,shared) VALUES(?,?,?,?,?,?,true)",
                            (name, json.dumps(view_rules(b.get("rules"))), srt, iso(now_utc()), me(), lid))
     bump(c)
     c.commit()

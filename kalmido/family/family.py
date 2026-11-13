@@ -134,7 +134,7 @@ def is_kid(c, uid):
 
 def kid_parents(c, kid):
     return [r[0] for r in c.execute("""SELECT p.parent_id FROM kid_parents p JOIN users u ON u.id=p.parent_id
-                                       WHERE p.kid_id=? AND u.disabled=0 ORDER BY p.parent_id""", (kid,))]
+                                       WHERE p.kid_id=? AND NOT u.disabled ORDER BY p.parent_id""", (kid,))]
 
 
 # 2.86.0 (N8, decided 17.10.): an instance admin looks after the kid accounts of their own organisation / family only:
@@ -143,7 +143,7 @@ def kid_parents(c, kid):
 H6A_ADMIN_KIDS = """(NOT EXISTS (SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL)
     OR id IN (SELECT k.user_id FROM org_members k JOIN org_members a ON a.org_id=k.org_id WHERE a.user_id=?)
     OR (id NOT IN (SELECT user_id FROM org_members)
-        AND id NOT IN (SELECT p.kid_id FROM kid_parents p JOIN users pu ON pu.id=p.parent_id WHERE pu.disabled=0)))"""
+        AND id NOT IN (SELECT p.kid_id FROM kid_parents p JOIN users pu ON pu.id=p.parent_id WHERE NOT pu.disabled)))"""
 
 
 def h6a_admin_kid_ok(c, uid, kid):
@@ -1182,7 +1182,7 @@ def kids_for(c, uid):
     if is_kid(c, uid):
         return [kid_dict(c, uid)]
     adm = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
-    q = "SELECT id FROM users WHERE kid=1 AND disabled=0 AND (id IN (SELECT kid_id FROM kid_parents WHERE parent_id=?)"
+    q = "SELECT id FROM users WHERE kid=1 AND NOT disabled AND (id IN (SELECT kid_id FROM kid_parents WHERE parent_id=?)"
     if adm and adm[0]:  # 2.86.0 (N8): an admin: the kids of their own organisations, not every kid of the instance
         with system_ctx(c):  # membership structure, as in h6a_admin_kid_ok
             ids = [r[0] for r in c.execute(q + " OR " + H6A_ADMIN_KIDS + ") ORDER BY id", (uid, uid))]

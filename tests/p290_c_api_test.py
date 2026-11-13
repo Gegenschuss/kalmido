@@ -167,7 +167,7 @@ check(task(j["tasks"]["gewst"])[5] is None and task(j["tasks"]["gewst"])[4] == 0
 check(Da.get(URL).status_code == 200, "a second admin opens it")
 j = A.put(URL, json={"user": DAVE}).json()
 check(j["user"] == DAVE and task(j["tasks"]["ustva"])[6] == DAVE and task(j["tasks"]["ustva"])[7] == DAVE and task(T3)[4] == 2 and task(T3)[3] == "", "another person: new tasks for them, the old ones ended")
-check({task(j["tasks"][k])[8] for k in ("ustva", "est", "gewst")} == {sql("SELECT id FROM lists WHERE is_inbox=1 AND owner_id=?", (DAVE,))[0][0]}, "all in dave's inbox")
+check({task(j["tasks"][k])[8] for k in ("ustva", "est", "gewst")} == {sql("SELECT id FROM lists WHERE is_inbox AND owner_id=?", (DAVE,))[0][0]}, "all in dave's inbox")
 # all off
 j = A.put(URL, json={"ustva": "none", "est": 0, "gewst": 0}).json()
 check(all(v is None for v in j["tasks"].values()) and j["next"] == [], "all off: no task, no preview")
@@ -193,7 +193,7 @@ r = Do.get(URL)
 check(r.ok and [p["id"] for p in r.json()["people"]] == [DORA], "personal office: the person is the admin")
 j = Do.put(URL, json={"ustva": "month", "est": 1}).json()
 td = task(j["tasks"]["ustva"])
-check(td and td[6] == DORA and td[7] == DORA and td[8] == sql("SELECT id FROM lists WHERE is_inbox=1 AND owner_id=?", (DORA,))[0][0], "personal office: the task is in dora's Basket " + str(td))
+check(td and td[6] == DORA and td[7] == DORA and td[8] == sql("SELECT id FROM lists WHERE is_inbox AND owner_id=?", (DORA,))[0][0], "personal office: the task is in dora's Basket " + str(td))
 check(Do.put(URL, json={"user": ALICE}).status_code == 400, "personal office: only the owner")
 check(A.get(URL).json()["ustva"] == "none", "the others are untouched")
 

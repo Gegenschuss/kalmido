@@ -229,7 +229,7 @@ def aa_admin_via(c, uid, s=None):
 def aa_org_event(c, key, people):
     """2.367.4 (#2974): an organisation's event went to people: an instance admin who is not among them gets only a number."""
     q = ",".join("?" * len(people)) or "0"
-    if c.execute(f"SELECT 1 FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' AND id NOT IN ({q}) LIMIT 1", list(people)).fetchone():
+    if c.execute(f"SELECT 1 FROM users WHERE is_admin AND NOT disabled AND kind!='agent' AND id NOT IN ({q}) LIMIT 1", list(people)).fetchone():
         aa_count("security", key)
 
 
@@ -240,7 +240,7 @@ def aa_recipients(c, cfg, skip=None):
     if cfg["topic"]:
         return [("ntfy", cfg["topic"], lang(c, default_uid(c)))] if NTFY_TOPIC_RE.fullmatch(cfg["topic"]) else []
     out, seen = [], set()
-    for (uid,) in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 ORDER BY id").fetchall():
+    for (uid,) in c.execute("SELECT id FROM users WHERE is_admin AND NOT disabled ORDER BY id").fetchall():
         if uid == skip:
             continue
         s = usettings(c, uid)
@@ -557,7 +557,7 @@ def aa_public(c):
                       "created_at": r["created_at"], "sent_at": r["sent_at"], "delivered": bool(r["delivered"]),
                       "state": r["state"], "repeats": r["repeats"]})
     admins = []
-    for u in c.execute("SELECT id, username FROM users WHERE is_admin=1 AND disabled=0 ORDER BY id").fetchall():
+    for u in c.execute("SELECT id, username FROM users WHERE is_admin AND NOT disabled ORDER BY id").fetchall():
         v = aa_admin_via(c, u["id"])  # 2.5.2 (K04): topic = only where it really goes; devices = Web Push
         admins.append({"username": u["username"], "topic": v["ntfy"], "devices": v["webpush"], "me": u["id"] == me()})
     return {"env": AA_ENV, "topic_env": bool(AA_TOPIC_ENV), "on": gsetting(c, "aa_on") != "0",

@@ -451,7 +451,7 @@ def rul_fvals(c, tid, lid):
     """{field id: value} of task tid when list lid has an active rule "field changed", else None (normal changes stay cheap)."""
     k = _cache().setdefault("fl", {})
     if lid not in k:
-        k[lid] = bool(c.execute("SELECT 1 FROM list_rules WHERE list_id=? AND trig='field' AND active=1 AND deleted_at IS NULL LIMIT 1",
+        k[lid] = bool(c.execute("SELECT 1 FROM list_rules WHERE list_id=? AND trig='field' AND active AND deleted_at IS NULL LIMIT 1",
                                 (lid,)).fetchone())
     if not k[lid]:
         return None
@@ -698,7 +698,7 @@ def _any_rules(c):
     """Are there active rules at all (once per request; a cheap no for instances without rules)."""
     k = _cache()
     if "any" not in k:
-        k["any"] = bool(c.execute("SELECT 1 FROM list_rules WHERE active=1 AND deleted_at IS NULL LIMIT 1").fetchone())
+        k["any"] = bool(c.execute("SELECT 1 FROM list_rules WHERE active AND deleted_at IS NULL LIMIT 1").fetchone())
     return k["any"]
 
 
@@ -751,7 +751,7 @@ def rul_fire_done(c, tid, copy_id, before):
 
 def rul_run_matching(c, t, ev):
     rul_sync(c, t["list_id"])
-    rows = c.execute("""SELECT * FROM list_rules WHERE list_id=? AND active=1 AND deleted_at IS NULL AND trig<>'due'
+    rows = c.execute("""SELECT * FROM list_rules WHERE list_id=? AND active AND deleted_at IS NULL AND trig<>'due'
                         ORDER BY id""", (t["list_id"],)).fetchall()
     n = 0
     for r in rows:
@@ -785,7 +785,7 @@ def rul_as(c, r):
 
 def rul_pause(c, r, why):
     with pg_system(c):  # 2.71.0 A (#1457): system on purpose: pausing exactly this rule (also from the watchdog, no person)
-        c.execute("UPDATE list_rules SET active=0, paused_reason=?, updated_at=? WHERE id=?", (why, iso(now_utc()), r["id"]))
+        c.execute("UPDATE list_rules SET active=false, paused_reason=?, updated_at=? WHERE id=?", (why, iso(now_utc()), r["id"]))
     _cache().pop("any", None)
     _cache().pop("fl", None)  # 2.138.0 D (#2060)
 
@@ -983,7 +983,7 @@ def rul_due_tick(c):
     rows = []
     # 2.637.0 (#4768): per distance (trig_val) the due day it looks for: today + 3 for "3 days before", today - 2 for "overdue
     # for 2 days"; the marker holds the due day, so a moved due date runs again
-    tvs = sorted({x[0] or "" for x in c.execute("SELECT DISTINCT trig_val FROM list_rules WHERE trig='due' AND active=1 AND deleted_at IS NULL")})
+    tvs = sorted({x[0] or "" for x in c.execute("SELECT DISTINCT trig_val FROM list_rules WHERE trig='due' AND active AND deleted_at IS NULL")})
     for tv in tvs:
         off = rul_due_off(tv)
         if off is None or len(rows) >= RUL_DUE_BATCH:
@@ -992,7 +992,7 @@ def rul_due_tick(c):
         key = rul_due_key(day, tv)
         rows += [(x["rid"], x["tid"], key) for x in c.execute(
             """SELECT r.id AS rid, t.id AS tid FROM list_rules r JOIN tasks t ON t.list_id=r.list_id
-               WHERE r.trig='due' AND r.trig_val=? AND r.active=1 AND r.deleted_at IS NULL AND t.due=? AND t.status=0 AND t.deleted_at IS NULL
+               WHERE r.trig='due' AND r.trig_val=? AND r.active AND r.deleted_at IS NULL AND t.due=? AND t.status=0 AND t.deleted_at IS NULL
                AND NOT EXISTS (SELECT 1 FROM list_rule_runs x WHERE x.rule_id=r.id AND x.task_id=t.id AND x.key=?)
                ORDER BY r.id, t.id LIMIT ?""", (tv, day, key, RUL_DUE_BATCH - len(rows))).fetchall()]
     if not rows:

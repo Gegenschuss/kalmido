@@ -98,7 +98,7 @@ CL = sql("SELECT id FROM clients WHERE name='Example Client P2652D'")[0][0]
 r = Do.post(B + "/api/contacts", json={"book_id": BK, "given": "Erika", "family": "Example"})
 CT = (r.json() or {}).get("id") if r.ok else None
 check(CT, f"setup: a contact in dora's book {r.status_code} {r.text[:120]}")
-sql("INSERT INTO office_client_contacts(org_id,client_id,name,contact_id,is_default,created_at,updated_at) VALUES(NULL,?,'Erika Example',?,1,?,?)",
+sql("INSERT INTO office_client_contacts(org_id,client_id,name,contact_id,is_default,created_at,updated_at) VALUES(NULL,?,'Erika Example',?,true,?,?)",
     (CL, CT, TS, TS), write=True)
 
 

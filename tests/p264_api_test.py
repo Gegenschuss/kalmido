@@ -280,7 +280,7 @@ DCH = chatfile(Da, DAVE, "dch.txt", D["chat"], AG2)
 dt = Da.post(B + "/api/me/drop-token").json()["drop_token"]
 r = requests.post(B + "/drop", headers={"Authorization": "Bearer " + dt}, data={"text": "from the phone"}, files=[("file", ("drop.txt", D["drop"], "text/plain"))])
 check(r.status_code == 200, f"drop upload {r.status_code} {r.text[:100]}")
-DDROP = one("SELECT a.id FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id WHERE l.is_inbox=1 AND l.owner_id=? "
+DDROP = one("SELECT a.id FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id WHERE l.is_inbox AND l.owner_id=? "
             "AND a.name='drop.txt' ORDER BY a.id DESC LIMIT 1", (DAVE,))
 paths = {"att": att_path(DA), "com": att_path(DCOM), "lf": full(one("SELECT path FROM list_files WHERE id=?", (DLF,))),
          "fs": full(DFS_V1), "fs2": full(fs_last(DFS)["path"]), "chat": chat_path(DCH), "drop": att_path(DDROP) if DDROP else ""}
@@ -359,7 +359,7 @@ EA = attach(Er, ET, "e.txt", ED)
 ep = att_path(EA)
 edt = Er.post(B + "/api/me/drop-token").json()["drop_token"]
 r = requests.post(B + "/drop", headers={"Authorization": "Bearer " + edt}, data={"text": "basket"}, files=[("file", ("eb.txt", mark("erin basket"), "text/plain"))])
-EB = one("SELECT a.id FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id WHERE l.is_inbox=1 AND l.owner_id=?", (ERIN,))
+EB = one("SELECT a.id FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id WHERE l.is_inbox AND l.owner_id=?", (ERIN,))
 ebp = att_path(EB) if EB else ""
 check(space(ep) == -ERIN and ebp and space(ebp) == -ERIN, "(f) erin's files sealed with her account key")
 # 2.87.0 (#1984): a list goes only to a person one may see -- erin (outside the organisation) and bob are connected

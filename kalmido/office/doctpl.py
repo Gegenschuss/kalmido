@@ -750,7 +750,7 @@ def dt_tpl_list():
     """?archived=1 also the archived ones -> {templates, kinds, vars, lang, note}."""
     c, uid, oid = _ctx()
     arch = request.args.get("archived") == "1"
-    rows = c.execute("SELECT * FROM office_doc_templates WHERE org_id=?" + ("" if arch else " AND archived=0") + " ORDER BY lower(name), id LIMIT ?",
+    rows = c.execute("SELECT * FROM office_doc_templates WHERE org_id=?" + ("" if arch else " AND NOT archived") + " ORDER BY lower(name), id LIMIT ?",
                      (oid, LIST_MAX)).fetchall()
     return jsonify(templates=[dt_tpl_public(oc_dec_fields(c, oid, "office_doc_templates", r)) for r in rows], **dt_meta(c, oid))
 
@@ -856,7 +856,7 @@ def dt_tpl_delete(tid):
     """Archives a template (its documents stay); POST .../restore takes it back (the client's undo)."""
     c, uid, oid = _ctx()
     dt_tpl(c, oid, tid)
-    c.execute("UPDATE office_doc_templates SET archived=1, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), tid, oid))
+    c.execute("UPDATE office_doc_templates SET archived=true, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), tid, oid))
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -866,7 +866,7 @@ def dt_tpl_delete(tid):
 def dt_tpl_restore(tid):
     c, uid, oid = _ctx()
     dt_tpl(c, oid, tid)
-    c.execute("UPDATE office_doc_templates SET archived=0, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), tid, oid))
+    c.execute("UPDATE office_doc_templates SET archived=false, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), tid, oid))
     bump(c)
     c.commit()
     return jsonify(dt_tpl_public(dt_tpl(c, oid, tid)))
@@ -952,7 +952,7 @@ def dt_docs_list():
     c, uid, oid = _ctx()
     sql, args = "SELECT * FROM office_gen_docs WHERE org_id=?", [oid]
     if request.args.get("archived") != "1":
-        sql += " AND archived=0"
+        sql += " AND NOT archived"
     for k in ("client_id", "list_id"):
         if request.args.get(k):
             sql += f" AND {k}=?"
@@ -980,15 +980,15 @@ def dt_docs_list():
         owner = pb_owner(c, oid)
         lsql = "l.org_id IS NULL AND l.owner_id=?" if owner is not None else "l.org_id=?"
         out["clients"] = [{"id": r["id"], "name": r["name"]} for r in
-                          c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name) LIMIT ?", (LIST_MAX,))]
+                          c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND NOT archived AND deleted_at IS NULL ORDER BY lower(name) LIMIT ?", (LIST_MAX,))]
         out["lists"] = [{"id": r["id"], "name": r["name"]} for r in
-                        c.execute(f"SELECT l.id, l.name FROM lists l WHERE l.id IN {vis_sql()} AND {lsql} AND {list_state_sql('l')} AND l.is_inbox=0 "
+                        c.execute(f"SELECT l.id, l.name FROM lists l WHERE l.id IN {vis_sql()} AND {lsql} AND {list_state_sql('l')} AND NOT l.is_inbox "
                                   "ORDER BY lower(l.name) LIMIT ?", (uid, uid, owner if owner is not None else oid, LIST_MAX))]
         out["offers"] = [{"id": r["id"], "number": r["number"] or "", "client_id": r["client_id"], "project_title": r["project_title"] or "",
                           "status": r["status"], "trial": bool(r["trial"])} for r in  # 2.144.10 A (#2576)
                          c.execute("SELECT id, number, client_id, project_title, status, trial FROM office_docs WHERE org_id=? AND kind='offer' "
                                    f"AND client_id IS NOT NULL AND {live_sql()} ORDER BY id DESC LIMIT ?", (oid, LIST_MAX))]  # 2.1005.0 (#5415): not the trash
-        tpls = c.execute("SELECT * FROM office_doc_templates WHERE org_id=? AND archived=0 ORDER BY lower(name), id LIMIT ?", (oid, LIST_MAX)).fetchall()
+        tpls = c.execute("SELECT * FROM office_doc_templates WHERE org_id=? AND NOT archived ORDER BY lower(name), id LIMIT ?", (oid, LIST_MAX)).fetchall()
         out["templates"] = [dt_tpl_public(oc_dec_fields(c, oid, "office_doc_templates", r)) for r in tpls]
         out.update(dt_meta(c, oid))
     return jsonify(out)
@@ -1097,7 +1097,7 @@ def dt_doc_delete(gid):
                        (gid, oid)).fetchall():
         write_lock(c, f"office_signoff_{int(s['id'])}")
     ts = iso(now_utc())
-    c.execute("UPDATE office_gen_docs SET archived=1, updated_at=? WHERE id=? AND org_id=?", (ts, gid, oid))
+    c.execute("UPDATE office_gen_docs SET archived=true, updated_at=? WHERE id=? AND org_id=?", (ts, gid, oid))
     c.execute("UPDATE office_signoffs SET revoked_at=? WHERE gen_doc_id=? AND org_id=? AND state='open' AND revoked_at IS NULL", (ts, gid, oid))
     bump(c)
     c.commit()
@@ -1108,7 +1108,7 @@ def dt_doc_delete(gid):
 def dt_doc_restore(gid):
     c, uid, oid = _ctx()
     dt_doc(c, oid, gid)
-    c.execute("UPDATE office_gen_docs SET archived=0, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), gid, oid))
+    c.execute("UPDATE office_gen_docs SET archived=false, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), gid, oid))
     bump(c)
     c.commit()
     return jsonify(dt_doc_public(c, oid, dt_doc(c, oid, gid)))
@@ -1312,6 +1312,6 @@ def dt_sig_pdf(c, r):
 def dt_sig_decided(c, r, st):
     """The customer decided (office/signoff.py sig_decide): the document's status signed | declined. False when the
     document is no longer a finished, not archived one (archived meanwhile): the caller rolls back."""
-    return c.execute("UPDATE office_gen_docs SET status=?, updated_at=? WHERE id=? AND org_id=? AND status='final' AND archived=0",
+    return c.execute("UPDATE office_gen_docs SET status=?, updated_at=? WHERE id=? AND org_id=? AND status='final' AND NOT archived",
                      ("signed" if st == "accepted" else "declined", iso(now_utc()), r["gen_doc_id"], r["org_id"])).rowcount == 1
 

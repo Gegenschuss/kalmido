@@ -59,7 +59,7 @@ check(A.delete(B + f"/api/orgs/{ALPHA}/members/{CAROL}").ok, "setup: carol leave
 # ---- 1. seed
 LA = A.post(B + "/api/lists", json={"name": "Alpha list", "org_id": ALPHA}).json()["id"]
 LB = Ca.post(B + "/api/lists", json={"name": "Beta list", "org_id": BETA}).json()["id"]
-INBOX = dbx("SELECT id FROM lists WHERE owner_id=1 AND is_inbox=1")[0][0]
+INBOX = dbx("SELECT id FROM lists WHERE owner_id=1 AND is_inbox")[0][0]
 for lid, n in ((LB, NFOREIGN), (LA, NOWN)):
     dbx(f"INSERT INTO tasks(list_id,title,content,created_at,updated_at) SELECT {lid}, 'filler task ' || g, "
         f"'some longer notes about task ' || g, '2026-01-01', '2026-01-01' FROM generate_series(1, {n}) g")

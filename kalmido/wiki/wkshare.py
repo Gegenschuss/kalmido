@@ -112,7 +112,7 @@ def wsh_url(c, r):
 # the live rows (wsh_rows) and the ended mark (wsh_gone); a = wiki_shares. Private spaces: unchanged. 2.560.0 (#4698 c): and only
 # while the maker still has a writing role there (a maker made guest / read-only / accounting no longer sees the folder)
 WSH_MAKER = ("({a}.org_id IS NULL OR EXISTS (SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id={a}.org_id "
-             "AND m.user_id={a}.created_by AND m.role IN ('admin','member') AND u.disabled=0))")
+             "AND m.user_id={a}.created_by AND m.role IN ('admin','member') AND NOT u.disabled))")
 
 
 def wsh_gone(c, rows):
@@ -714,7 +714,7 @@ def wsh_person(c, uid, b):
         who = int(b.get("user_id") or 0)
     except (TypeError, ValueError):
         who = 0
-    u = c.execute("SELECT id, kind FROM users WHERE id=? AND disabled=0", (who,)).fetchone()
+    u = c.execute("SELECT id, kind FROM users WHERE id=? AND NOT disabled", (who,)).fetchone()
     if not u or who == uid or (u["kind"] or "user") == "agent" or not may_see(c, uid, who):
         raise Denied(404, tr("unknown person"))
     return who
@@ -911,7 +911,7 @@ def wsh_person_shares(c, uid, pid):
         return []
     return c.execute("SELECT DISTINCT k.fs_share_id AS id, k.images, f0.created_by FROM wiki_share_cards k "
                      "JOIN fs_shares f0 ON f0.id=k.fs_share_id JOIN fs_shares f ON f.id IN (k.fs_share_id, k.pair_id) "
-                     "JOIN fs_nodes nn ON nn.id=f0.node_id JOIN users o ON o.id=nn.owner_id AND o.disabled=0 "
+                     "JOIN fs_nodes nn ON nn.id=f0.node_id JOIN users o ON o.id=nn.owner_id AND NOT o.disabled "
                      "WHERE f.user_id=? AND f.node_id = ANY(CAST(? AS BIGINT[])) AND nn.org_id IS NULL AND (f.expires_at IS NULL OR f.expires_at>?) "
                      "ORDER BY 1", (uid, up, iso(now_utc()))).fetchall()
 
@@ -991,7 +991,7 @@ def wsh_find(c, token):
     with system_ctx(c):  # resolve the token (one row) across organisations; nothing else is read here
         # 2.560.0 (#4698 c): the maker's rule is WSH_MAKER (a writing role in the organisation), as the dialog's ended mark
         r = c.execute("SELECT s.* FROM wiki_shares s JOIN users u ON u.id=COALESCE(s.owner_id, s.created_by) WHERE s.token_hash=? "
-                      "AND s.kind='link' AND u.disabled=0 AND " + WSH_MAKER.format(a="s"), (_token_hash(token),)).fetchone()
+                      "AND s.kind='link' AND NOT u.disabled AND " + WSH_MAKER.format(a="s"), (_token_hash(token),)).fetchone()
     if not r or r["revoked_at"] or wsh_expired(r):
         return None
     acx_anon_bind(c, r["org_id"])

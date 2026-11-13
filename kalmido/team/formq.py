@@ -386,7 +386,7 @@ def fq_client_forms(cid):
     _gate()
     cl = need_client(c, cid)
     q = f"""SELECT f.*, l.org_id AS l_org, l.owner_id AS l_owner, l.name AS l_name FROM forms f JOIN lists l ON l.id=f.list_id
-           WHERE f.enabled=1 AND {list_state_sql('l')} AND """
+           WHERE f.enabled AND {list_state_sql('l')} AND """
     rows = (c.execute(q + "l.org_id=? ORDER BY lower(l.name), f.id", (cl["org_id"],)) if cl["org_id"]
             else c.execute(q + "l.org_id IS NULL AND l.owner_id=? ORDER BY lower(l.name), f.id", (cl["created_by"],))).fetchall()
     out = []

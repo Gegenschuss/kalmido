@@ -23,12 +23,15 @@ and reads archived. A write that leaves state as it was (a version before, the u
 back and never the marker -- lists/lmcore.py undo_skip) still sets the marker from archived, as in stage 1. 'trash' stays
 derived from deleted_at: that is the trash column of the core for every kind (obj_trash / obj_restore / obj_purge,
 live_sql); a write of state='trash' decides nothing. Still additive: CREATE OR REPLACE of the same function, the version
-before puts its own back on its start and finds archived written by this one."""
+before puts its own back on its start and finds archived written by this one.
+
+2.1118.0 (#5952): lists.archived is BOOLEAN (core/colbool.py); the function reads 'true' / 'false' from the JSON of the row
+as well and writes the column in its own type."""
 SCHEMA = """
 CREATE OR REPLACE FUNCTION kalmido_list_state() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
   j JSONB := to_jsonb(NEW);
-  a BOOLEAN := COALESCE(j->>'archived', '0') NOT IN ('0', '');
+  a BOOLEAN := COALESCE(j->>'archived', '0') NOT IN ('0', '', 'false');  -- 2.1118.0 (#5952): BIGINT 0/1 or BOOLEAN
 BEGIN
   IF NOT j ? 'state' THEN RETURN NEW; END IF;  -- an older database during its first start (a step before the column, e.g. tap_done)
   IF NEW.state IN ('live', 'archived') THEN  -- 2.1054.0 (#5794): the marker written on purpose decides the archive
@@ -38,7 +41,9 @@ BEGIN
       a := NEW.state = 'archived';
     END IF;
   END IF;
-  IF j ? 'archived' THEN NEW.archived := CASE WHEN a THEN 1 ELSE 0 END; END IF;  -- the way back: archived follows the marker
+  IF j ? 'archived' THEN  -- the way back: archived follows the marker (2.1118.0, #5952: BOOLEAN since then, BIGINT before)
+    IF pg_typeof(NEW.archived) = 'boolean'::regtype THEN NEW.archived := a; ELSE NEW.archived := CASE WHEN a THEN 1 ELSE 0 END; END IF;
+  END IF;
   NEW.state := CASE WHEN COALESCE(j->>'deleted_at', '') <> '' THEN 'trash' WHEN a THEN 'archived' ELSE 'live' END;
   RETURN NEW;
 END $$;

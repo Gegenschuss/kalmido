@@ -139,7 +139,7 @@ ok, why = reason()
 check(ok is False and "focus sessions" in why, f"focus sessions named: {why}")
 sql("DELETE FROM pomos WHERE user_id=?", (BOB,), write=True)
 # notes in the basket
-INBOX = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (BOB,))[0][0]
+INBOX = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (BOB,))[0][0]
 sql("INSERT INTO notes(list_id, title, body, created_by, created_at, updated_at) VALUES(?,?,?,?,?,?)", (INBOX, "Idea", "text", BOB, NOW, NOW), write=True)
 ok, why = reason()
 check(ok is False and "notes" in why, f"notes in the basket named: {why}")

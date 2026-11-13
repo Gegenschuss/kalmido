@@ -190,7 +190,7 @@ check(A.patch(B + f"/api/lists/{L}", json={"agent_members": True, "agent_peers":
 st = A.get(B + "/api/state").json()
 lm = next(x for x in st["lists"] if x["id"] == L)["members"]
 check(any(m["user_id"] == CL and m.get("agent") for m in lm), "members: agent flag")
-check({x["id"] for x in cl.get("/lists").json()["data"]} == {L, dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (CL,))[0][0]},
+check({x["id"] for x in cl.get("/lists").json()["data"]} == {L, dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (CL,))[0][0]},
       "agent sees only the shared list (+ its inbox)")
 check(cl.get(f"/lists/{PRIV}").status_code == 404, "private list: 404 for the agent")
 

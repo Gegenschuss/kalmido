@@ -261,7 +261,7 @@ def odl_custodian(c, not_uid=None):
     else the first active one. None when there is nobody."""
     mine = g.user["id"] if has_request_context() and g.get("user") is not None else 0
     with system_ctx(c):  # instance structure: who the admins are
-        r = c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND COALESCE(kind, 'user')!='agent' AND id!=? "
+        r = c.execute("SELECT id FROM users WHERE is_admin AND NOT disabled AND COALESCE(kind, 'user')!='agent' AND id!=? "
                       "ORDER BY (id=?) DESC, id LIMIT 1", (int(not_uid or 0), mine)).fetchone()
     return r[0] if r else None
 
@@ -288,7 +288,7 @@ def odl_admin_export(c, oid, retention=False):
         with system_ctx(c):  # instance structure
             # 2.399.0 (#2687, review F3): hosted, a locked former admin still counts (the operator may lock accounts, so locking
             # them all must not hand it the client's records); only deleted ones are gone
-            q = f"SELECT 1 FROM users WHERE id IN ({','.join('?' * len(ids))}){'' if env_bool('KALMIDO_HOSTED', False) else ' AND disabled=0'} LIMIT 1"
+            q = f"SELECT 1 FROM users WHERE id IN ({','.join('?' * len(ids))}){'' if env_bool('KALMIDO_HOSTED', False) else ' AND NOT disabled'} LIMIT 1"
             alive = c.execute(q, sorted(ids)).fetchone()
     if r["retired_admins"] is None or not ids or not alive:
         return bool(retention and g.user["is_admin"])
@@ -314,7 +314,7 @@ def odl_public_off(c, oid):
     booking pages that work for it (its office, or one of these calendars) switch off. The task and absence feeds follow the
     membership by themselves; a new link for the calendar, now private, is the owner's own step."""
     c.execute("DELETE FROM ev_cal_feeds WHERE cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)", (oid,))
-    c.execute("UPDATE appt_pages SET enabled=0 WHERE office_org_id=? OR cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)", (oid, oid))
+    c.execute("UPDATE appt_pages SET enabled=false WHERE office_org_id=? OR cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)", (oid, oid))
 
 
 def obj_share_gone(c, kind, rid, who):
@@ -377,9 +377,9 @@ def odl_retire(c, oid, until, gone=None):
         c.execute("DELETE FROM org_members WHERE org_id=?", (oid,))
         c.execute("DELETE FROM org_joins WHERE org_id=?", (oid,))  # 2.223.2 A (#2859): no way back in by an open invitation
         c.execute("DELETE FROM org_invites WHERE org_id=?", (oid,))
-        c.execute("UPDATE office_inv_series SET active=0 WHERE org_id=?", (oid,))
+        c.execute("UPDATE office_inv_series SET active=false WHERE org_id=?", (oid,))
         # 2.152.0 (#2167, review A7): no new data flows in any more (mail polling, newsletter sync)
-        c.execute("UPDATE hub_mailboxes SET active=0 WHERE org_id=?", (oid,))
+        c.execute("UPDATE hub_mailboxes SET active=false WHERE org_id=?", (oid,))
         c.execute("UPDATE nl_conns SET auto=0 WHERE org_id=?", (oid,))
         keeper = odl_custodian(c, gone)  # review F6: only the deleted person is left out, never the acting admin
         if keeper:  # its files must not go with the account of a former member later (fs_nodes.owner_id cascades)
@@ -561,7 +561,7 @@ def upg_heir(c, oid, uid):
     the owner. None when there is none."""
     with system_ctx(c):  # membership structure of the organisation
         r = c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id!=?
-                         AND COALESCE(u.kind, '')!='agent' AND u.disabled=0 AND m.role IN ('admin', 'member')
+                         AND COALESCE(u.kind, '')!='agent' AND NOT u.disabled AND m.role IN ('admin', 'member')
                          ORDER BY (m.role='admin') DESC, m.user_id LIMIT 1""",
                       (oid, uid)).fetchone()
     return r[0] if r else None
@@ -577,16 +577,16 @@ def upg_heirless(c, uid):
     uid, out = int(uid), set()
     with system_ctx(c):  # membership structure of every organisation of the account (numbers only)
         need = {r[0] for r in c.execute("SELECT DISTINCT l.org_id FROM lists l JOIN agents a ON a.user_id=l.owner_id WHERE a.owner_id=? "
-                                        "AND l.is_inbox=0 AND l.org_id IS NOT NULL", (uid,))}
+                                        "AND NOT l.is_inbox AND l.org_id IS NOT NULL", (uid,))}
         for (oid,) in c.execute("SELECT DISTINCT org_id FROM ev_cals WHERE owner_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
             if c.execute("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id!=? "
-                         "AND COALESCE(u.kind, '')!='agent' AND u.disabled=0 LIMIT 1", (oid, uid)).fetchone():
+                         "AND COALESCE(u.kind, '')!='agent' AND NOT u.disabled LIMIT 1", (oid, uid)).fetchone():
                 need.add(oid)
         for reg in OBJ.values():  # 2.558.0 (#4709, review F1): the organisations' objects of the shared core go to the heir too
             if reg["base_role"] is None:
                 for (oid,) in c.execute(f"SELECT DISTINCT org_id FROM {reg['table']} WHERE owner_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
                     if c.execute("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id!=? "
-                                 "AND COALESCE(u.kind, '')!='agent' AND u.disabled=0 LIMIT 1", (oid, uid)).fetchone():
+                                 "AND COALESCE(u.kind, '')!='agent' AND NOT u.disabled LIMIT 1", (oid, uid)).fetchone():
                         need.add(oid)
     for oid in need:
         if not upg_heir(c, oid, uid):
@@ -609,7 +609,7 @@ def upg_rest(c, uid):
         for (aid, av) in c.execute("SELECT a.user_id, u.avatar FROM agents a JOIN users u ON u.id=a.user_id WHERE a.owner_id=?", (uid,)).fetchall():
             # 2.152.0 (#2164, review A5): the agent's lists never cross the boundary: an organisation's list goes to a person
             # of that organisation, a private one goes like the inbox
-            for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND is_inbox=0", (aid,)).fetchall():
+            for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND NOT is_inbox", (aid,)).fetchall():
                 if lr["org_id"]:
                     heir = upg_heir(c, lr["org_id"], uid)
                     if not heir:

@@ -91,7 +91,7 @@ for un in ("bob", "tim", "agentx", "dora", "olga"):
     ids[un] = r.json()["id"]
 dbx("UPDATE users SET kid=1 WHERE id=?", (ids["tim"],))
 dbx("UPDATE users SET kind='agent' WHERE id=?", (ids["agentx"],))
-dbx("UPDATE users SET disabled=1 WHERE id=?", (ids["dora"],))
+dbx("UPDATE users SET disabled=true WHERE id=?", (ids["dora"],))
 dbx("UPDATE users SET password_hash=NULL WHERE id=?", (ids["olga"],))
 check(dbx("SELECT email FROM users WHERE id=?", (ids["olga"],)) == [("olga@example.com",)], "setup: the addresses are stored")
 Bo = sess("bob")

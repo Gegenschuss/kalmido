@@ -183,8 +183,8 @@ def pbt_plan(c, uid, src, dst):
             conflicts.append(tr("The file {0} already exists in the organisation", rel))
     with system_ctx(c):  # the caller's own private clients and the names of the target's clients (the caller is its admin)
         cl = [r[0] for r in c.execute("SELECT id FROM clients WHERE org_id IS NULL AND created_by=?", (uid,))]
-        same = c.execute("SELECT COUNT(*) FROM clients WHERE org_id IS NULL AND created_by=? AND archived=0 AND lower(name) IN "
-                         "(SELECT lower(name) FROM clients WHERE org_id=? AND archived=0)", (uid, dst)).fetchone()[0]
+        same = c.execute("SELECT COUNT(*) FROM clients WHERE org_id IS NULL AND created_by=? AND NOT archived AND lower(name) IN "
+                         "(SELECT lower(name) FROM clients WHERE org_id=? AND NOT archived)", (uid, dst)).fetchone()[0]
         who = c.execute("SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN m.role='admin' THEN 1 ELSE 0 END), 0) AS a FROM org_members m "
                         "JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND COALESCE(u.kind, 'user')!='agent'", (dst,)).fetchone()
     moves = []
@@ -450,7 +450,7 @@ def pbt_post():
             if fp["block"]:
                 raise Denied(fp["code"], fp["block"])
             fsm_apply(c, uid, fp, dst, made, old_rc)
-        own_default = c.execute("SELECT 1 FROM office_cashbooks WHERE org_id=? AND is_default=1", (dst,)).fetchone()
+        own_default = c.execute("SELECT 1 FROM office_cashbooks WHERE org_id=? AND is_default", (dst,)).fetchone()
         moved_books = [r[0] for r in c.execute("SELECT id FROM office_cashbooks WHERE org_id=?", (src,))]
         unlinked = pb_letter_detach(c, src)
         # 2.355.0 B (#2843): the bank bookings keep the personal office's fingerprints (keyed per area, the EndToEndId is not
@@ -464,7 +464,7 @@ def pbt_post():
             pl_lock(c, dst, uid, locked)
         if own_default and moved_books:  # the target keeps its own default cash box
             q = ",".join("?" * len(moved_books))
-            c.execute(f"UPDATE office_cashbooks SET is_default=0 WHERE org_id=? AND id IN ({q})", (dst, *moved_books))
+            c.execute(f"UPDATE office_cashbooks SET is_default=false WHERE org_id=? AND id IN ({q})", (dst, *moved_books))
         # the counters: the target continues after the moved numbers (its own counter is raised where it is lower, review
         # M2: never a number twice); the personal office keeps its own (the person's sequence never restarts)
         c.execute("INSERT INTO office_numbers(org_id, kind, period, last) SELECT ?, kind, period, last FROM office_numbers WHERE org_id=? "

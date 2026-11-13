@@ -265,7 +265,7 @@ def mail_target(c, msg):
     sender = email.utils.parseaddr(str(msg.get("From", "")))[1].strip().lower()
     if sender:
         for r in c.execute("SELECT u.id FROM users u JOIN user_settings s ON s.user_id=u.id AND s.key='mail_from_me' AND s.value='1' "
-                           "WHERE lower(u.email)=? AND u.email_proved=? AND u.disabled=0", (sender, sender)):  # 2.1021.0 (#5775): a proved address only
+                           "WHERE lower(u.email)=? AND u.email_proved=? AND NOT u.disabled", (sender, sender)):  # 2.1021.0 (#5775): a proved address only
             return r[0], None, "from"
     return None, None, None
 

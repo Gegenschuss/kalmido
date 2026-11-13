@@ -361,7 +361,7 @@ check(all(fk_name(t, c_) for t, c_ in (("doc_meta", "task_id"), ("rc_receipts", 
 # foreign there (lists/playbook.py pb_effective; tests/p2977_playbook_versions_test.py)
 check("author_id" not in {r[0] for r in sql("SELECT column_name FROM information_schema.columns WHERE table_name='playbooks'")},
       "#5282: playbooks keeps only the head (no author_id)")
-INBOX = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (ALICE,))[0][0]
+INBOX = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (ALICE,))[0][0]
 TK = A.post(B + "/api/tasks", json={"title": "Beleg prüfen", "list_id": INBOX}).json()["id"]
 sql(f"ALTER TABLE doc_meta DROP CONSTRAINT {fk_name('doc_meta', 'task_id')}", write=True)
 sql(f"ALTER TABLE habits DROP CONSTRAINT {fk_name('habits', 'user_id')}", write=True)

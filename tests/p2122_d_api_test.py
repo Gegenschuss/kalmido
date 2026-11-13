@@ -170,7 +170,7 @@ FID, Fr = freelancer(B, A)
 r = Fr.put(URL, json={"ustva": "year"})
 check(r.ok and r.json()["ustva"] == "year", "freelancer: the yearly mode " + r.text[:160])
 tf = task(r.json()["tasks"]["ustva"]) if r.ok else None
-inbox = dbx("SELECT id FROM lists WHERE is_inbox=1 AND owner_id=?", (FID,))
+inbox = dbx("SELECT id FROM lists WHERE is_inbox AND owner_id=?", (FID,))
 check(tf and tf[6] == FID and tf[7] == FID and inbox and tf[8] == inbox[0][0] and tf[3] == "FREQ=YEARLY", "freelancer: the yearly task in the own Basket " + str(tf))
 r = Fr.get(B + BK + "/ustva?year=2025&period=y")
 check(r.ok and r.json()["period"] == "y" and r.json()["to"] == "2025-12-31", "freelancer: the VAT figures of the whole year " + r.text[:160])

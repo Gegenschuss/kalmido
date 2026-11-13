@@ -281,7 +281,7 @@ def family_reward_request(rid):
         return err(tr("Not enough stars yet"), 409)
     c.execute("UPDATE kid_rewards SET state='requested', requested_at=? WHERE id=?", (iso(now_utc()), rid))
     who = user_names(c, [me()]).get(me(), "?")
-    adm = [x[0] for x in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0")]
+    adm = [x[0] for x in c.execute("SELECT id FROM users WHERE is_admin AND NOT disabled")]
     adm = [x for x in adm if h6a_admin_kid_ok(c, x, me())]  # 2.86.0 (N8): only admins of the kid's own organisation
     for p in dict.fromkeys(kid_parents(c, me()) or adm):
         kid_push(c, p, lambda lg: tr("{0} would like a reward", who, lg=lg), lambda lg: f"{r['emoji'] + ' ' if r['emoji'] else ''}{r['title']} · {r['cost']} ★")

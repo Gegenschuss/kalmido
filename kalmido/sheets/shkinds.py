@@ -63,7 +63,7 @@ def shk_people(c, sheet_row):
     if not ids:
         return {}
     q = ",".join("?" * len(ids))
-    ok = {r[0] for r in c.execute(f"SELECT id FROM users WHERE id IN ({q}) AND disabled=0 AND COALESCE(kind, 'user')<>'agent'", ids)}
+    ok = {r[0] for r in c.execute(f"SELECT id FROM users WHERE id IN ({q}) AND NOT disabled AND COALESCE(kind, 'user')<>'agent'", ids)}
     names = user_names(c, ok)
     return {i: names.get(i, "") for i in sorted(ok, key=lambda i: (names.get(i, "").lower(), i))}
 

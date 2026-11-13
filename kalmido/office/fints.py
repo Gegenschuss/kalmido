@@ -39,7 +39,7 @@ from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
-from ..core.pg import write_lock
+from ..core.pg import qi, write_lock
 from ..core import stmtfiles as sf
 from ..calendars.subscriptions import CalError, cal_http
 from .model import office_ctx_admin as _ctx
@@ -624,7 +624,7 @@ def _blz(iban):
 def _acct(c, oid, rid):
     if isinstance(rid, bool) or not isinstance(rid, int):
         raise BadInput(tr("Invalid value: {0}", "account_id"))
-    r = c.execute(f"SELECT * FROM {BKA_TABLE} WHERE id=? AND org_id=? AND archived=0", (rid, oid)).fetchone()
+    r = c.execute(f"SELECT * FROM {qi(BKA_TABLE, (BKA_TABLE,))} WHERE id=? AND org_id=? AND NOT archived", (rid, oid)).fetchone()
     if r is None:
         raise Denied(404)
     return oc_dec_fields(c, oid, BKA_TABLE, r)
@@ -708,7 +708,7 @@ def _remember(c, uid, oid, aid, login, server):
     4): only once the bank has sent the statements (the sign-in worked), and a new server address goes into the office log
     (the address only, never the login name) with who set it and when (the dialog of the others shows that)."""
     write_lock(c, f"{BKA_TABLE}_{int(oid)}")  # the lock of the bank accounts' own edits (bankacc.py)
-    r = c.execute(f"SELECT * FROM {BKA_TABLE} WHERE id=? AND org_id=? AND archived=0", (aid, oid)).fetchone()
+    r = c.execute(f"SELECT * FROM {qi(BKA_TABLE, (BKA_TABLE,))} WHERE id=? AND org_id=? AND NOT archived", (aid, oid)).fetchone()
     if r is None:
         return
     a = oc_dec_fields(c, oid, BKA_TABLE, r)
@@ -743,7 +743,7 @@ def fnt_status():
     off = fnt_off()
     if bka_seed(c, oid):  # the company's account, as the bank accounts' own list makes it
         c.commit()
-    rows = c.execute(f"SELECT * FROM {BKA_TABLE} WHERE org_id=? AND archived=0 ORDER BY is_default DESC, sort, id", (oid,)).fetchall()
+    rows = c.execute(f"SELECT * FROM {qi(BKA_TABLE, (BKA_TABLE,))} WHERE org_id=? AND NOT archived ORDER BY is_default DESC, sort, id", (oid,)).fetchall()
     return jsonify(on=off is None, code=off, message=tr(FNT_MSG[off]) if off else "",
                    accounts=[_acct_out(c, uid, oid, oc_dec_fields(c, oid, BKA_TABLE, r)) for r in rows], since=_since(c, oid).isoformat(),
                    ttl=FNT_TTL)

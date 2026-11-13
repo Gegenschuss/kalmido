@@ -208,7 +208,7 @@ def lb_vehicles_get():
     """-> {vehicles, people, clients, projects, km_rate, currency, kinds}: what the logbook view needs to start."""
     c, uid, oid = _ctx()
     w, wa = rk_cl_where(c, oid)
-    clients = [{"id": r["id"], "name": r["name"]} for r in c.execute(f"SELECT id, name FROM clients WHERE {w} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name)", wa)]
+    clients = [{"id": r["id"], "name": r["name"]} for r in c.execute(f"SELECT id, name FROM clients WHERE {w} AND NOT archived AND deleted_at IS NULL ORDER BY lower(name)", wa)]
     projects = [r[0] for r in c.execute(f"SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' AND {live_sql()} ORDER BY 1", (oid,))][:300]
     if ofr_own_uid("logbook") is not None:  # 2.187.0 B (#2476): the invoices' project names are not part of "own"
         projects = sorted({d["project"] for d in lb_drives(c, oid, uid) if d.get("project")})

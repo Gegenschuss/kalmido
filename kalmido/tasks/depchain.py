@@ -133,7 +133,7 @@ def dch_pull(tid):
     first = []
     for w in c.execute("""SELECT t.id, t.start, t.due FROM task_deps d JOIN tasks t ON t.id=d.task_id JOIN lists l ON l.id=t.list_id
                           WHERE d.blocker_id=? AND t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL
-                          AND (t.ms IS NULL OR t.ms=0) AND l.is_inbox=0 ORDER BY t.id""", (tid,)).fetchall():
+                          AND (t.ms IS NULL OR t.ms=0) AND NOT l.is_inbox ORDER BY t.id""", (tid,)).fetchall():
         if task_visible(c, w["id"], uid, write=True):
             first.append(dch_days(dch_add(t["due"], 1), w["start"] or w["due"]))
     gap = min(first) if first else 0

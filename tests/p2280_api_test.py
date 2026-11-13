@@ -264,7 +264,7 @@ check(ls[PRIV]["org_id"] is None and ls[LIFE]["org_id"] is None and ls[F["id"]][
       "#935 migration: 'Privat' folder, Home & life, family and the inbox are private " + str([ls[PRIV]["org_id"], ls[LIFE]["org_id"], ls[F["id"]]["org_id"]]))
 ags = {a["id"]: a for a in A.get(B + "/api/admin/agents").json()["agents"]}
 check(ags[CL]["org_id"] == ORG, "#935 migration: the team agent works in the organisation")
-mb_ws = [r[0] for r in dbx("SELECT l.org_id FROM lists l WHERE l.is_inbox=0 AND (l.owner_id=? OR l.id IN (SELECT list_id FROM list_members WHERE user_id=?))", (MB, MB))]
+mb_ws = [r[0] for r in dbx("SELECT l.org_id FROM lists l WHERE NOT l.is_inbox AND (l.owner_id=? OR l.id IN (SELECT list_id FROM list_members WHERE user_id=?))", (MB, MB))]
 mb_exp = ORG if mb_ws.count(ORG) >= mb_ws.count(None) and mb_ws else None  # the majority, a tie goes to the organisation
 check(ags[MB]["org_id"] == mb_exp, f"#935 migration: the personal agent follows its lists ({mb_ws}) -> {ags[MB]['org_id']}")
 check(state(A)["ws_mismatches"].get(str(PRIV)) == [CL] and dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (PRIV, CL)), "#935 migration: an agent in a list of another workspace is reported, not removed " + str(state(A)["ws_mismatches"]))
@@ -340,7 +340,7 @@ check(r.status_code == 409 and dbx("SELECT role FROM org_members WHERE org_id=? 
 # "the last admin" because the guard counted only active admins and carol was the only one)
 FR = A.post(B + "/api/users", json={"username": "frank", "display_name": "Frank", "password": "password123", "orgs": []}).json()["id"]
 dbx("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'admin')", (BETA, FR), write=True)
-dbx("UPDATE users SET disabled=1 WHERE id=?", (FR,), write=True)
+dbx("UPDATE users SET disabled=true WHERE id=?", (FR,), write=True)
 r = Ca.delete(B + f"/api/orgs/{BETA}/members/{FR}")
 check(r.ok and not dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (BETA, FR))
       and dbx("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (BETA, CAROL))[0][0] == "admin",

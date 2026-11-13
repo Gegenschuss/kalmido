@@ -214,7 +214,7 @@ def lc_fav_suggestion():
     since = iso(now_utc() - timedelta(days=LC_SUG_WINDOW))
     rows = c.execute(f"""SELECT t.list_id, COUNT(*) AS n, COUNT(DISTINCT substr(CAST(a.created_at AS text), 1, 10)) AS d
                          FROM activity a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id
-                         WHERE a.user_id=? AND a.created_at>? AND {list_state_sql('l')} AND l.is_inbox=0 AND t.list_id IN {vis_sql()}
+                         WHERE a.user_id=? AND a.created_at>? AND {list_state_sql('l')} AND NOT l.is_inbox AND t.list_id IN {vis_sql()}
                          GROUP BY t.list_id ORDER BY COUNT(*) DESC, t.list_id""", (uid, since, uid, uid)).fetchall()
     for r in rows:
         if r["list_id"] in skip or r["n"] < LC_SUG_ACTS or r["d"] < LC_SUG_DAYS:

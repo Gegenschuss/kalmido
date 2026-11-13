@@ -560,7 +560,7 @@ def contacts_due(c):
     """cal_loop: the address books whose daily sync is due."""
     now = now_utc()
     with GATE.bg():  # 2.506.1 (#3377): read in the gate and commit: no open transaction (locks) while GATE.bg() below waits for a restore (git_loop)
-        rows = c.execute("""SELECT s.id, s.tried_at FROM contact_srcs s JOIN users u ON u.id=s.user_id WHERE u.disabled=0""").fetchall()
+        rows = c.execute("""SELECT s.id, s.tried_at FROM contact_srcs s JOIN users u ON u.id=s.user_id WHERE NOT u.disabled""").fetchall()
         c.commit()
     for r in rows:
         if not r["tried_at"] or (now - parse_iso(r["tried_at"])).total_seconds() >= CONTACT_EVERY_MIN * CAL_TICK:

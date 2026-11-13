@@ -215,7 +215,7 @@ def shs_targets(c, r, uid):
     with system_ctx(c):  # which accounts are agents / members of the table's organisation (ids; vis filters the people)
         ag = {x[0]: x for x in c.execute("SELECT user_id, org_id, owner_id, list_ids FROM agents").fetchall()}
         members = {x[0] for x in c.execute("SELECT user_id FROM org_members WHERE org_id=?", (org,))} if org else None
-        users = c.execute("SELECT id, display_name, kind FROM users WHERE disabled=0 ORDER BY display_name").fetchall()
+        users = c.execute("SELECT id, display_name, kind FROM users WHERE NOT disabled ORDER BY display_name").fetchall()
     people, agents = [], []
     for u in users:
         if u["id"] == uid or u["id"] == r["owner_id"]:

@@ -4,7 +4,8 @@
 lists.state (kalmido/core/migrations.d/5537_a.py) is 'live', 'archived' or 'trash'; the condition on it is written ONCE:
 kalmido/core/access.py list_state_sql(alias, *states) (otr_live(alias) = not in the trash). A new handwritten filter on the
 old columns of lists -- archived=0 / archived=1 / deleted_at IS NULL in a line that reads FROM lists (or JOIN lists), or
-l.archived / l.deleted_at / lists.archived compared anywhere -- is red. The ones there are today stand per file in
+l.archived / l.deleted_at / lists.archived compared anywhere -- is red (2.1118.0, #5952: the column is BOOLEAN, `NOT archived` / `archived = false` count
+the same). The ones there are today stand per file in
 tools/list_state_baseline.json, and that file only shrinks (as tools/check_live_filter.py): more than the baseline = red,
 fewer = a notice to lower it (--strict: red), --update lowers the numbers and never raises one or adds a file.
 
@@ -55,7 +56,8 @@ WRITE = re.compile(r"\bUPDATE\s+lists\s+SET\b(?!_)[^\"']*?(?<![.\w])archived\s*=
 # 2.1061.0 (#5867, stage 3): a read of the old column: qualified anywhere (not compared: QUAL counts that), or bare in a line
 # that reads lists (not AS archived = the key list_archived_sql() keeps, not archived_at, not a quoted key "archived")
 READ_Q = re.compile(r"\b(?:l|lists|lst)\.archived\b(?!\s*(?:=|<>|!=))", re.I)
-READ = re.compile(r"(?<![.\w'\"])(?<!AS )archived\b(?![_'\"])", re.I)
+# 2.1118.0 (#5952): a bare `NOT archived` at the end of a string literal counts too (a quoted key "archived" has the quote before)
+READ = re.compile(r"(?<![.\w'\"])(?<!AS )archived\b(?!_)", re.I)
 # 2.1069.0 (#5416): a handwritten compare on the state marker lists.state (the helpers of STATE_HOME write it once)
 _CMP = r"\s*(?:=|<>|!=|\bIN\b|\bNOT\s+IN\b|\bIS\s+(?:NOT\s+)?DISTINCT\b|\b(?:NOT\s+)?LIKE\b)"  # another alias / a statement over several lines is not seen
 STATE_Q = re.compile(r"\b(?:lists|lst)\.state" + _CMP, re.I)

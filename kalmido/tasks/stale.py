@@ -157,7 +157,7 @@ def _wd_stale(c, now):
         return
     today = now.date().isoformat()
     rows = c.execute("""SELECT DISTINCT a.user_id FROM agents a JOIN users u ON u.id=a.user_id AND u.kind='agent'
-                        WHERE a.enabled=1 AND u.disabled=0 AND a.stale_sent!=?""", (today,)).fetchall()
+                        WHERE a.enabled AND NOT u.disabled AND a.stale_sent!=?""", (today,)).fetchall()
     for (aid,) in rows:
         lids = [r[0] for r in c.execute(f"""SELECT id FROM lists WHERE agent_followup=1 AND {list_state_sql()} AND life=''
                                              AND id IN {vis_sql()}""", (aid, aid))]

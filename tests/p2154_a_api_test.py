@@ -260,7 +260,7 @@ Fr.delete(B + f"/api/docs/{OID}/task")
 # the organisation: its own tasks and private ones, a private document never with an organisation's task
 AL = A.post(B + "/api/lists", json={"name": "Alpha Aufgaben", "org_id": ORG}).json()["id"]
 AT = A.post(B + "/api/tasks", json={"title": "Alpha Rechnung", "list_id": AL}).json()["id"]
-AIN = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1 AND org_id IS NULL", (ALICE,))
+AIN = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox AND org_id IS NULL", (ALICE,))
 APT = A.post(B + "/api/tasks", json={"title": "Privat merken", "list_id": AIN[0][0]}).json()["id"] if AIN else None
 AD = up(A, "alpha.pdf", stack_pdf(["Alpha Brief"]), f"org:{ORG}")
 APD = up(A, "privat.pdf", stack_pdf(["Privater Brief"]), "private")

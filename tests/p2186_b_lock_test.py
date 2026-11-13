@@ -182,7 +182,7 @@ sql("INSERT INTO office_equipment(org_id, name, purchase_date, life_months, rece
 r = purge(A, R_EQ)
 check(r.status_code == 409 and f"31 Dec {TODAY.year + 9}" in r.text,
       "#2600: the receipt of an item in use is kept (from this year while it is not archived) " + r.text[:200])
-sql("UPDATE office_equipment SET archived=1 WHERE receipt_node_id=?", (R_EQ,), write=True)
+sql("UPDATE office_equipment SET archived=true WHERE receipt_node_id=?", (R_EQ,), write=True)
 # 2.355.0 (#2845): an open receipt not booked yet is kept on its own (from its arrival) -- the document here is no receipt
 # any more, so only the equipment item could keep it
 sql("DELETE FROM rc_receipts WHERE node_id=?", (R_EQ,), write=True)
@@ -202,7 +202,7 @@ check(r.status_code == 409 and "Kept by law until" in r.text, "#3796: the receip
 r = A.delete(B + f"{EQ}/{it2.json()['id']}")
 check(r.ok, "#3796: the item deleted " + r.text[:200])
 # 2.905.0 (#5414): deleted = in the core's trash (deleted_at), not archived
-check(sql("SELECT 1 FROM office_equipment WHERE id=? AND deleted_at IS NOT NULL AND archived=0", (it2.json()["id"],)), "#3796: the item is gone (not archived)")
+check(sql("SELECT 1 FROM office_equipment WHERE id=? AND deleted_at IS NOT NULL AND NOT archived", (it2.json()["id"],)), "#3796: the item is gone (not archived)")
 r = purge(A, R_E3)
 check(r.status_code == 409 and "Kept by law until" in r.text, "#3796: the receipt of a deleted item keeps its lock " + r.text[:200])
 # 2.578.0 (#4035): archiving an item (by the API, and the delete that archives an item in use) keeps the lock running now

@@ -53,12 +53,12 @@ OJN_DAYS = 14  # 2.148.1 A (#2480): an invitation of an existing account stays o
 # long as the invitation: whoever uses it on the last day still gets the full time to accept). Params: the same cut twice.
 # Only a link of this invitation or newer counts (created_at): an older link does not bring an expired invitation back.
 # 2.593.0 (#3570): + never a silent invitation (ojn_silent): it does not exist for the invited person
-OJN_LIVE = "j.silent=0 AND (j.created_at>? OR EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite' AND v.used_at>? AND v.created_at>=j.created_at))"
+OJN_LIVE = "NOT j.silent AND (j.created_at>? OR EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite' AND v.used_at>? AND v.created_at>=j.created_at))"
 OINV_REF = "org-invite"  # 2.360.2 M (#2561): purpose of the sealed row reference
 
 # 2.985.0 (#4922, review F1): the address of an org_joins row as the list shows it: a silent row the one typed (it never follows
 # the account's later address, which the admin must not learn), an ordinary one the account's
-OJN_ADDR = "CASE WHEN j.silent=1 THEN COALESCE(NULLIF(j.email, ''), u.email) ELSE COALESCE(u.email, j.email) END"
+OJN_ADDR = "CASE WHEN j.silent THEN COALESCE(NULLIF(j.email, ''), u.email) ELSE COALESCE(u.email, j.email) END"
 
 
 def oinv_on(c):
@@ -128,7 +128,7 @@ def oinv_list(c, oid):
         # 2.985.0 (#4922): + the neutral rows of a deleted account's silent invitation (user_id NULL, the address kept on the row)
         # 2.985.0 (#4922, review F1): a silent row shows the address the admin typed (j.email), the account's own only for an old row without it
         found = c.execute(f"""SELECT j.id, j.user_id, j.role, j.created_at, {OJN_ADDR} AS email FROM org_joins j LEFT JOIN users u ON u.id=j.user_id
-                             WHERE j.org_id=? AND (j.user_id IS NOT NULL OR j.silent=1)
+                             WHERE j.org_id=? AND (j.user_id IS NOT NULL OR j.silent)
                              AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id AND m.user_id=j.user_id)""", (oid,)).fetchall()
     joins = {r["user_id"]: r for r in found if r["user_id"] is not None}
     neutral = [r for r in found if r["user_id"] is None]
@@ -240,7 +240,7 @@ def _join(c, oid, jid):
     with system_ctx(c):  # the invited person is no member yet; the caller checked the organisation admin
         # 2.985.0 (#4922): a neutral row (user_id NULL, silent) the same way: its address is on the row
         r = c.execute(f"""SELECT j.id, j.user_id, j.role, j.silent, {OJN_ADDR} AS email FROM org_joins j LEFT JOIN users u ON u.id=j.user_id
-                         WHERE j.id=? AND j.org_id=? AND (j.user_id IS NOT NULL OR j.silent=1)
+                         WHERE j.id=? AND j.org_id=? AND (j.user_id IS NOT NULL OR j.silent)
                          AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id AND m.user_id=j.user_id)""", (jid, oid)).fetchone()
     if not r:
         raise Denied(404)
@@ -308,11 +308,11 @@ def org_invite_withdraw(oid, ref):
     r = _row(c, oid, uid)
     with system_ctx(c):  # structure, not content: memberships / lists in organisations this admin cannot see count too
         other_org = c.execute("SELECT 1 FROM org_members WHERE user_id=? AND org_id!=?", (uid, oid)).fetchone()
-        owns = c.execute("SELECT 1 FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()
+        owns = c.execute("SELECT 1 FROM lists WHERE owner_id=? AND NOT is_inbox", (uid,)).fetchone()
         cut = iso(now_utc() - timedelta(days=OJN_DAYS))
         # 2.593.0 (#3570, review F4): a silent invitation of another organisation counts too (also an old one): the account stays,
         # so that row does not vanish from the other admin's list and tell that an account was there
-        other_join = c.execute(f"SELECT 1 FROM org_joins j JOIN orgs o ON o.id=j.org_id WHERE j.user_id=? AND j.org_id!=? AND (j.silent=1 OR {OJN_LIVE}) AND o.retired_at IS NULL", (uid, oid, cut, cut)).fetchone()
+        other_join = c.execute(f"SELECT 1 FROM org_joins j JOIN orgs o ON o.id=j.org_id WHERE j.user_id=? AND j.org_id!=? AND (j.silent OR {OJN_LIVE}) AND o.retired_at IS NULL", (uid, oid, cut, cut)).fetchone()
     if other_org:
         raise Denied(409, tr("The person belongs to another organisation as well"))  # never delete across the boundary
     if owns:
@@ -356,7 +356,7 @@ def ojn_invite(c, oid, uid, role, by=None):
     if addr and addr[0]:
         ojn_neutral_drop(c, oid, addr[0])
     c.execute("""INSERT INTO org_joins(org_id,user_id,role,created_by,created_at) VALUES(?,?,?,?,?)
-                 ON CONFLICT(org_id, user_id) DO UPDATE SET role=excluded.role, created_by=excluded.created_by, created_at=excluded.created_at, silent=0""",
+                 ON CONFLICT(org_id, user_id) DO UPDATE SET role=excluded.role, created_by=excluded.created_by, created_at=excluded.created_at, silent=false""",
               (oid, uid, role, by, iso(now)))
     if old and not old["silent"] and old["created_at"] > iso(now - timedelta(days=1)):  # 2.593.0 (#3570): a silent one was never told
         return
@@ -383,9 +383,9 @@ def ojn_silent(c, oid, uid, role, email=None):
         email = (email or (c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0] or "").strip().lower() or None
         if email:
             ojn_neutral_drop(c, oid, email)
-        c.execute("""INSERT INTO org_joins(org_id,user_id,role,created_by,created_at,silent,email) VALUES(?,?,?,?,?,1,?)
+        c.execute("""INSERT INTO org_joins(org_id,user_id,role,created_by,created_at,silent,email) VALUES(?,?,?,?,?,true,?)
                      ON CONFLICT(org_id, user_id) DO UPDATE SET role=excluded.role, created_by=excluded.created_by, created_at=excluded.created_at,
-                     email=excluded.email WHERE org_joins.silent=1""",
+                     email=excluded.email WHERE org_joins.silent""",
                   (oid, uid, role, me(), iso(now_utc()), email))
     print("organisation", oid, "invitation of an account the admin may not see kept silent, by", login_log_who(g.user), flush=True)
 
@@ -399,7 +399,7 @@ def ojn_neutral(c, uid):
     it, it must not appear now); ordinary invitations go with the account as before. The caller commits."""
     with system_ctx(c):  # the rows of organisations the person is no member of
         n = c.execute("""UPDATE org_joins j SET user_id=NULL, email=COALESCE(NULLIF(j.email, ''), lower(trim(COALESCE(u.email, '')))), pending_lists=''
-                         FROM users u WHERE u.id=j.user_id AND j.user_id=? AND j.silent=1
+                         FROM users u WHERE u.id=j.user_id AND j.user_id=? AND j.silent
                          AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id AND m.user_id=j.user_id)""", (uid,)).rowcount
     if n:
         print("organisation invitation: kept", n, "silent invitation(s) of a deleted account as neutral rows", flush=True)
@@ -495,11 +495,11 @@ def oinv_due(c, uid=None):
                    (SELECT i.created_by FROM org_invites i WHERE i.user_id=u.id) AS by,
                    GREATEST(u.oinv_made_at, (SELECT MAX({OJN_TS.format('i.created_at')}) FROM org_invites i WHERE i.user_id=u.id),
                             (SELECT MAX({OJN_TS.format('j.created_at')}) FROM org_joins j WHERE j.user_id=u.id)) AS last
-                   FROM users u WHERE u.oinv_made_at IS NOT NULL AND u.disabled=0 AND {OINV_UNUSED.format('u.id')}
+                   FROM users u WHERE u.oinv_made_at IS NOT NULL AND NOT u.disabled AND {OINV_UNUSED.format('u.id')}
                    {"AND u.id=?" if uid else ""}
                    AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.user_id=u.id
                                    AND NOT EXISTS (SELECT 1 FROM org_invites i WHERE i.user_id=u.id AND i.org_id=m.org_id))
-                   AND NOT EXISTS (SELECT 1 FROM lists l WHERE l.owner_id=u.id AND l.is_inbox=0)
+                   AND NOT EXISTS (SELECT 1 FROM lists l WHERE l.owner_id=u.id AND NOT l.is_inbox)
                    ORDER BY u.id""", (uid,) if uid else ()).fetchall()
     # review F1: a TIMESTAMPTZ reads as ISO text (core/pg.py _TsLoader): times to compute with
     return [dict(r, made=parse_iso(r["made"]), last=parse_iso(r["last"]), warned=parse_iso(r["warned"]) if r["warned"] else None) for r in rows]
@@ -634,19 +634,19 @@ def ojn_proved(c, uid, email):
         return 0
     with system_ctx(c):  # the person is no member of these organisations yet
         rows = c.execute("""SELECT j.org_id, j.role, j.created_by, o.self_made FROM org_joins j JOIN orgs o ON o.id=j.org_id
-                            WHERE j.user_id=? AND j.silent=1 AND lower(COALESCE(j.email, ''))=? AND j.created_at>?
+                            WHERE j.user_id=? AND j.silent AND lower(COALESCE(j.email, ''))=? AND j.created_at>?
                             AND o.retired_at IS NULL AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id AND m.user_id=j.user_id)
                             ORDER BY j.created_at""", (uid, em, cut)).fetchall()
         n = 0
         for r in rows:
             by = r["created_by"]
             if not by or not c.execute("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id=? "
-                                       "AND m.role='admin' AND u.disabled=0", (r["org_id"], by)).fetchone():
+                                       "AND m.role='admin' AND NOT u.disabled", (r["org_id"], by)).fetchone():
                 continue
             if r["self_made"] and not may_see(c, by, uid):  # #3570: a company of its own reaches only people its admin may see
                 continue
             # review F7: the row is locked and still silent (an admin withdrawing it meanwhile: nothing comes back)
-            row = c.execute("SELECT created_at FROM org_joins WHERE org_id=? AND user_id=? AND silent=1 FOR UPDATE", (r["org_id"], uid)).fetchone()
+            row = c.execute("SELECT created_at FROM org_joins WHERE org_id=? AND user_id=? AND silent FOR UPDATE", (r["org_id"], uid)).fetchone()
             if not row:
                 continue
             ojn_invite(c, r["org_id"], uid, r["role"], by=by)

@@ -64,7 +64,7 @@ def _skip_sql():
 
 def _owner_lists(c, owner, folder):
     return [r for r in c.execute(f"SELECT l.id, l.name, l.folder, l.kind, {list_archived_sql('l')} AS archived, l.git_folder_off, {_skip_sql()} AS gf_skip FROM lists l "
-                                 "WHERE l.owner_id=? AND l.is_inbox=0 AND l.deleted_at IS NULL ORDER BY l.sort, l.id",
+                                 "WHERE l.owner_id=? AND NOT l.is_inbox AND l.deleted_at IS NULL ORDER BY l.sort, l.id",
                                  (owner,)) if _under(r["folder"], folder)]
 
 

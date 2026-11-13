@@ -78,7 +78,7 @@ def pub_find(c, token):
     with system_ctx(c):  # 2.37.0 (#1150): resolve the token (one row) across organisations ...
         r = c.execute(f"""SELECT p.*, l.name AS l_name, l.is_inbox AS l_inbox, l.checklist AS l_checklist, l.owner_id AS l_owner,
                          l.org_id AS l_org FROM public_links p JOIN lists l ON l.id=p.list_id JOIN users u ON u.id=l.owner_id
-                         WHERE p.token_hash=? AND u.disabled=0 AND l.deleted_at IS NULL AND COALESCE(l.life,'') NOT IN ('budget', 'health') AND NOT {reading_sql('l')} AND NOT (l.life='travel' AND l.org_id IS NOT NULL)
+                         WHERE p.token_hash=? AND NOT u.disabled AND l.deleted_at IS NULL AND COALESCE(l.life,'') NOT IN ('budget', 'health') AND NOT {reading_sql('l')} AND NOT (l.life='travel' AND l.org_id IS NOT NULL)
                          AND (l.org_id IS NULL OR EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=l.org_id AND m.user_id=COALESCE(p.created_by, l.owner_id)
                               AND m.role IN ('admin','member')))""", (_token_hash(token),)).fetchone()  # 2.72.0 (#1333): never a budget; 2.102.0 review F4: never a list in the trash; 2.190.0 C (#2496): never a health list; 2.306.0 Fix-2a (#2875): never read later (private or the organisation's)
     if not r or (r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc()):

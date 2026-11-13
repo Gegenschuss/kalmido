@@ -682,7 +682,7 @@ def umz_seen(c, uid, salt=None):
     not reveal accounts the person could not find in the app either)."""
     vis = visible_people(c, uid)
     out = {}
-    for r in c.execute("SELECT id, display_name, username, email FROM users WHERE disabled=0 AND COALESCE(kind,'user')!='agent' "
+    for r in c.execute("SELECT id, display_name, username, email FROM users WHERE NOT disabled AND COALESCE(kind,'user')!='agent' "
                        "AND email IS NOT NULL AND email!='' AND id!=?", (uid,)):
         if vis is None or r["id"] in vis:
             out.setdefault(umz_email_hash(r["email"], salt), r)
@@ -709,7 +709,7 @@ def umz_find_login(c, uid, login):
     login = login.strip().lower() if isinstance(login, str) else ""
     if not login or not USERNAME_RE.fullmatch(login):
         return None
-    r = c.execute("SELECT id, display_name, username, email FROM users WHERE disabled=0 AND COALESCE(kind,'user')!='agent' "
+    r = c.execute("SELECT id, display_name, username, email FROM users WHERE NOT disabled AND COALESCE(kind,'user')!='agent' "
                   "AND id!=? AND username=?", (uid, login)).fetchone()
     vis = umz_visible(c, uid) if r else None
     return r if r and (vis is None or r["id"] in vis) else None
@@ -862,6 +862,14 @@ def _coerce(v, typ):
             return int(v)
         if isinstance(v, str) and re.fullmatch(r"-?\d{1,18}", v.strip()):
             return int(v)
+        return _BAD
+    if typ == "boolean":  # 2.1118.0 (#5952): the yes / no columns; older files hold 0 / 1, newer ones too (core/pg.py reads 0 / 1)
+        if isinstance(v, bool):
+            return int(v)
+        if isinstance(v, int) or (isinstance(v, float) and v.is_integer()):  # review 2.1118 (F5): as cb_migrate, 0 = no, else yes
+            return 0 if v == 0 else 1
+        if isinstance(v, str) and v.strip().lower() in ("0", "1", "true", "false"):
+            return 1 if v.strip().lower() in ("1", "true") else 0
         return _BAD
     if typ in ("double precision", "real", "numeric"):
         if isinstance(v, bool):

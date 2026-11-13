@@ -60,7 +60,7 @@ def _objp_people(c, aid):
     ids = {a["owner_id"]} if a["owner_id"] else set()
     if a["org_id"]:
         ids |= {r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id "
-                                        "WHERE m.org_id=? AND u.kind<>'agent' AND u.disabled=0", (a["org_id"],))}
+                                        "WHERE m.org_id=? AND u.kind<>'agent' AND NOT u.disabled", (a["org_id"],))}
     return ids
 
 

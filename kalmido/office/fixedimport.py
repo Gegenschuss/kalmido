@@ -413,7 +413,7 @@ def fci_people(c, oid):
         ids = [r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=? AND role='admin'", (oid,))]
     if not ids:
         return []
-    rows = c.execute(f"SELECT * FROM users WHERE id IN ({','.join('?' * len(ids))}) AND disabled=0", ids).fetchall()
+    rows = c.execute(f"SELECT * FROM users WHERE id IN ({','.join('?' * len(ids))}) AND NOT disabled", ids).fetchall()
     out = []
     for u in rows:
         ks = u.keys()
@@ -451,7 +451,7 @@ def fci_task_end(c, tid, person):
         return
     ts = iso(now_utc())
     if c.execute("UPDATE tasks SET repeat='', status=2, completed_at=?, updated_at=? WHERE id=? AND created_by=? AND assignee_id=? AND status=0 "
-                 "AND deleted_at IS NULL AND locked=0", (ts, ts, tid, person, person)).rowcount:  # 2.542.0 (#4609): locked stays open
+                 "AND deleted_at IS NULL AND NOT locked", (ts, ts, tid, person, person)).rowcount:  # 2.542.0 (#4609): locked stays open
         log_act(c, tid, "complete")
 
 

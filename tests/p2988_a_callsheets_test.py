@@ -111,7 +111,7 @@ LA = Fr.post(B + "/api/lists", json={"name": "Altes Projekt", "kind": "project"}
 check(Fr.patch(B + f"/api/lists/{LA}", json={"archived": 1}).ok, "a project archived")
 check(Fr.get(URL + f"?list={LA}").json().get("can_add") is False and Fr.post(URL, json={"list_id": LA, "date": "2027-05-04"}).status_code == 403,
       "archived: no new call sheet (403)")
-INBOX = kt.dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox<>0", (FID,))
+INBOX = kt.dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (FID,))
 if INBOX:
     check(Fr.post(URL, json={"list_id": INBOX[0][0], "date": "2027-05-04"}).status_code == 404, "the inbox: 404")
 check(len(kt.dbx("SELECT 1 FROM hub_bookings WHERE list_id=?", (LA,))) == 0, "nothing made in the archived project")

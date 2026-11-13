@@ -36,6 +36,12 @@ for text, want, what in [
     ('Q = "FROM lists l WHERE l.deleted_at IS NULL"', 1, "l.deleted_at in a line that reads lists l"),
     ('Q = "AND t.due IS NOT NULL AND l.archived=0"', 1, "l.archived compared anywhere (multi-line statement)"),
     ('Q = "JOIN lists l ON l.id=t.list_id WHERE l.archived<>0"', 1, "l.archived<>0"),
+    # 2.1118.0 (#5952): archived is BOOLEAN, the boolean forms of the same filter count the same
+    ('Q = "SELECT id FROM lists WHERE owner_id=? AND NOT archived"', 1, "NOT archived after FROM lists"),
+    ('Q = "SELECT id FROM lists WHERE archived = false"', 1, "archived = false after FROM lists"),
+    ('Q = "AND t.due IS NOT NULL AND NOT l.archived"', 1, "NOT l.archived anywhere"),
+    ('Q = "JOIN lists l ON l.id=t.list_id WHERE l.archived = true"', 1, "l.archived = true"),
+    ('c.execute("UPDATE lists SET archived=true WHERE id=?", (lid,))', 1, "a write of lists.archived with true"),
     # 2.1061.0 (#5867, stage 3): reading the old column counts too (the value comes from list_archived_sql / list_out)
     ('Q = "SELECT id, name, archived FROM lists WHERE id=?"', 1, "reading the column in a SELECT on lists"),
     ('Q = "SELECT k.*, l.archived FROM git_conns k JOIN lists l ON l.id=k.list_id"', 1, "l.archived read once, not twice"),

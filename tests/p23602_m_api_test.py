@@ -304,7 +304,7 @@ GAMMA = r.json()["id"]
 check(Do.post(B + f"/api/orgs/{GAMMA}/invites", json={"email": "twice@example.com", "role": "member"}).ok
       and dbx("SELECT silent FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, twice)) in ([(0,)], [(False,)]), "#5864: a third organisation: ordinary as well")
 # Resend (ojn_hidden) knows the same exception: a row left silent from before wakes on Resend
-dbx("UPDATE org_joins SET silent=1 WHERE org_id=? AND user_id=?", (GAMMA, twice))
+dbx("UPDATE org_joins SET silent=true WHERE org_id=? AND user_id=?", (GAMMA, twice))
 ref = {x["email"]: x for x in inv(Do, GAMMA)["invites"]}["twice@example.com"]["ref"]
 r = Do.post(B + f"/api/orgs/{GAMMA}/invites/{ref}/resend")
 check(r.ok and dbx("SELECT silent FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, twice)) in ([(0,)], [(False,)]), "#5864: Resend makes it an ordinary invitation " + r.text[:200])
@@ -313,7 +313,7 @@ check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{ref}").ok and "twice@example.com"
 # ... and with only a silent invitation elsewhere the account stays but the link ends (nothing open to accept with it)
 Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "quiet@example.com", "role": "member"})
 quiet = dbx("SELECT id FROM users WHERE email='quiet@example.com'")[0][0]
-dbx("INSERT INTO org_joins(org_id, user_id, role, created_by, created_at, silent, email) VALUES(?,?,?,?,?,1,?)",
+dbx("INSERT INTO org_joins(org_id, user_id, role, created_by, created_at, silent, email) VALUES(?,?,?,?,?,true,?)",
     (BETA, quiet, "member", uid["erin"], kt.now().isoformat(), "quiet@example.com"))
 ref = {x["email"]: x for x in inv()["invites"]}["quiet@example.com"]["ref"]
 check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{ref}").ok and dbx("SELECT 1 FROM users WHERE id=?", (quiet,)), "#3843: a silent row elsewhere keeps the account")

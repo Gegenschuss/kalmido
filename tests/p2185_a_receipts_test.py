@@ -154,7 +154,7 @@ check(not x["receipt"]["is_receipt"] and x.get("einvoice_offer") is False, f"no 
 check(take(G, g2).status_code == 400, "no office: taking over refused (400)")
 
 # the tenant boundary (still no office): another person's older document marks nothing in Frida's list
-dbx("UPDATE doc_meta SET dup_of=?, dup_ok=0 WHERE node_id=?", (g1, e2), write=True)
+dbx("UPDATE doc_meta SET dup_of=?, dup_ok=false WHERE node_id=?", (g1, e2), write=True)
 check(all(x.get("dup") is False for x in rows(Fr)), "an older document of another person marks nothing (tenant-matrix: office)")
 check("duplicate_of" not in Fr.get(B + f"/api/docs/{e2}").json(), "nor in the document sheet")
 

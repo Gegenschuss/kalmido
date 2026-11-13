@@ -75,7 +75,7 @@ check(len(trg) == 8, f"eight triggers in place: four fill, four carry ({trg})")
 # ---- 1. writing through the app
 LA = A.post(B + "/api/lists", json={"name": "Alpha list", "org_id": ALPHA}).json()["id"]
 LB = Ca.post(B + "/api/lists", json={"name": "Beta list", "org_id": BETA}).json()["id"]
-INBOX = dbx("SELECT id FROM lists WHERE owner_id=1 AND is_inbox=1")[0][0]
+INBOX = dbx("SELECT id FROM lists WHERE owner_id=1 AND is_inbox")[0][0]
 check(dbx("SELECT org_id FROM lists WHERE id=?", (LA,))[0][0] == ALPHA and dbx("SELECT org_id FROM lists WHERE id=?", (INBOX,))[0][0] is None,
       "setup: an Alpha list, alice's private inbox")
 TA = A.post(B + "/api/tasks", json={"title": "Alpha task", "list_id": LA}).json()["id"]

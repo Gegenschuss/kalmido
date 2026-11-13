@@ -345,7 +345,7 @@ def authenticate():
             # person (also "system") without a switch in between
             with system_ctx(c):
                 r = c.execute("""SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id
-                                 WHERE s.token_hash=? AND s.expires_at>? AND u.disabled=0 AND u.kind!='agent'""",
+                                 WHERE s.token_hash=? AND s.expires_at>? AND NOT u.disabled AND u.kind!='agent'""",
                               (_token_hash(tok), iso(now_utc()))).fetchone()
                 if r:
                     g.user, g.auth_via = r, "session"

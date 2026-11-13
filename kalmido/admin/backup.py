@@ -955,7 +955,7 @@ def bk_fail_tell(c, e):
             return
         gset(c, "bk_fail_told", key)
         with system_ctx(c):  # every instance admin
-            rows = c.execute("SELECT id, email FROM users WHERE is_admin=1 AND disabled=0 AND kind<>'agent' ORDER BY id").fetchall()
+            rows = c.execute("SELECT id, email FROM users WHERE is_admin AND NOT disabled AND kind<>'agent' ORDER BY id").fetchall()
             langs = {r["id"]: usettings(c, r["id"]).get("lang") for r in rows}
         integ_tell(c, [r["id"] for r in rows], "backup", e.text, click="settings/backup", focus="backup")  # 2.582.0 (#4827): Server > Backup
         c.commit()
@@ -1116,7 +1116,8 @@ _STMT_OK = [re.compile(x, re.I | re.S) for x in (
     rf"CREATE TABLE {_T} \(.*\)",
     rf"ALTER TABLE (ONLY )?{_T} ALTER COLUMN {_ID} (ADD GENERATED (BY DEFAULT|ALWAYS) AS IDENTITY \(.*\)|SET DEFAULT .*)",
     rf"ALTER TABLE (ONLY )?{_T} ADD CONSTRAINT {_ID} (PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK) .*",
-    rf"CREATE (UNIQUE )?INDEX {_ID} ON (ONLY )?{_T} USING \w+ \(.*\)",
+    # 2.1118.0 (#5952): a partial index on a BOOLEAN column alone (`WHERE enabled`) is dumped without brackets
+    rf"CREATE (UNIQUE )?INDEX {_ID} ON (ONLY )?{_T} USING \w+ \(.*\)( WHERE (NOT )?{_ID})?",
     rf"CREATE SEQUENCE {_T} .*", rf"ALTER SEQUENCE {_T} OWNED BY {_T}\.{_ID}",
     rf"COMMENT ON (TABLE|COLUMN) {_T}(\.{_ID})? IS '.*'",
 )]
@@ -1795,7 +1796,7 @@ def bkr_purged_drop(c, tbl, rid):
         ids, paths = fs_purge(c, rid)
         return [lambda: fs_purge_files(ids, paths)]
     if tbl == "lists":  # as the owner's delete: the tasks go to the trash of the inbox, what became of them has its own rows
-        inbox = c.execute("SELECT i.id FROM lists i JOIN lists l ON l.owner_id=i.owner_id WHERE l.id=? AND i.is_inbox=1", (rid,)).fetchone()
+        inbox = c.execute("SELECT i.id FROM lists i JOIN lists l ON l.owner_id=i.owner_id WHERE l.id=? AND i.is_inbox", (rid,)).fetchone()
         return list_purge(c, rid, inbox[0] if inbox else None)[1]
     files = []
     if tbl == "tasks":
@@ -1892,9 +1893,9 @@ def bkr_after_restore(c, rows):
                 continue
             # review F7: an account deleted in the last BKR_RECENT_DAYS days is only disabled -- the restore may be meant to
             # bring exactly that account back; the admin deletes it again by hand otherwise
-            owns = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()[0]
+            owns = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND NOT is_inbox", (uid,)).fetchone()[0]
             if owns or (at or "") >= iso(now_utc() - timedelta(days=BKR_RECENT_DAYS)):
-                c.execute("UPDATE users SET disabled=1 WHERE id=?", (uid,))
+                c.execute("UPDATE users SET disabled=true WHERE id=?", (uid,))
                 c.commit()
                 if owns:  # owning projects is the reason that holds without the period as well
                     off += 1
@@ -1908,7 +1909,7 @@ def bkr_after_restore(c, rows):
             except Exception as e:  # noqa: BLE001 -- one account must not stop the others; it is disabled instead
                 c.rollback()
                 print("restore: deleting an account again failed:", type(e).__name__, flush=True)
-                c.execute("UPDATE users SET disabled=1 WHERE id=?", (uid,))
+                c.execute("UPDATE users SET disabled=true WHERE id=?", (uid,))
                 c.commit()
                 off += 1
                 continue
@@ -2059,7 +2060,7 @@ def bk_restore(path, pw, admin, via, keep_purged=False):
                     c.execute("DELETE FROM push_subs WHERE session_hash<>''")  # 2.190.0 R (#1991): their sessions ended just now
                     bkr_creds_after(c, creds)  # 2.360.0 A (#2496): what was revoked since the backup stays revoked
                     tok = None
-                    u = c.execute("SELECT * FROM users WHERE username=? AND is_admin=1 AND disabled=0", (admin,)).fetchone()
+                    u = c.execute("SELECT * FROM users WHERE username=? AND is_admin AND NOT disabled", (admin,)).fetchone()
                     if u and via == "session":
                         tok, _ = start_session(c, u["id"], True, "restore")  # 2.144.5 A2 (#2387, review R2): no password typed
                 c.commit()

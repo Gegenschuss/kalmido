@@ -179,7 +179,7 @@ def v1_fetcher_status():
         p = have.get(key)
         if p is None:
             c.execute("INSERT INTO doc_fetch_portals(fetcher_id,org_id,key,name,enabled,last_run,new_count,error,error_at,updated_at) "
-                      "VALUES(?,?,?,?,1,?,?,?,?,?)", (fx["id"], fx["org_id"], key, name, last, n, e, ts if e else None, ts))
+                      "VALUES(?,?,?,?,true,?,?,?,?,?)", (fx["id"], fx["org_id"], key, name, last, n, e, ts if e else None, ts))
         else:
             c.execute("UPDATE doc_fetch_portals SET name=?, last_run=?, new_count=?, error=?, error_at=?, updated_at=? WHERE fetcher_id=? AND key=?",
                       (name, last or p["last_run"], n, e, (p["error_at"] if e == p["error"] else ts) if e else None, ts, fx["id"], key))

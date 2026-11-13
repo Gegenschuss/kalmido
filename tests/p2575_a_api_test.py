@@ -149,9 +149,9 @@ check(r.status_code == 409 and r.json().get("card", {}).get("id") == C2, "an old
 r = A.patch(B + f"/api/modcards/{C2}", json={"name": "Tables and more", "expect_updated_at": c2["updated_at"]})
 check(r.ok and r.json()["card"]["new_mods"] == [] and r.json()["card"]["name"] == "Tables and more", "saved: no new module any more")
 # review job 2963: a person on the card disabled later - the admin can still save the card as it is
-sql("UPDATE users SET disabled=1 WHERE id=?", (BOB,), write=True)
+sql("UPDATE users SET disabled=true WHERE id=?", (BOB,), write=True)
 r = A.patch(B + f"/api/modcards/{C2}", json={"people": [BOB]})
-sql("UPDATE users SET disabled=0 WHERE id=?", (BOB,), write=True)
+sql("UPDATE users SET disabled=false WHERE id=?", (BOB,), write=True)
 check(r.ok, "a disabled person on the card does not block saving it " + r.text[:160])
 r = A.patch(B + f"/api/modcards/{C3}", json={"people": []})
 check(r.ok and r.json()["card"]["people"] == [], "admin: the people of a card change")

@@ -255,10 +255,10 @@ def chn_tick(skip=None):
         c = connect()
         try:
             with system_ctx(c):  # background loop: every person's and organisation's channels
-                c.execute("""UPDATE notify_channels SET enabled=0, disabled_reason='disabled', updated_at=? WHERE enabled=1 AND org_id IS NOT NULL
-                             AND user_id IN (SELECT id FROM users WHERE disabled<>0)""", (iso(now_utc()),))  # 2.240.0 B2 (#2867): visible to its admins
+                c.execute("""UPDATE notify_channels SET enabled=false, disabled_reason='disabled', updated_at=? WHERE enabled AND org_id IS NOT NULL
+                             AND user_id IN (SELECT id FROM users WHERE disabled)""", (iso(now_utc()),))  # 2.240.0 B2 (#2867): visible to its admins
                 c.execute("""DELETE FROM notify_channel_queue WHERE channel_id IN (SELECT n.id FROM notify_channels n JOIN users u ON u.id=n.user_id
-                             WHERE n.enabled=0 OR u.disabled<>0)""")  # 2.240.0 B (#2867): nor what waits for a disabled account
+                             WHERE NOT n.enabled OR u.disabled)""")  # 2.240.0 B (#2867): nor what waits for a disabled account
                 rows = [dict(r) for r in c.execute("""SELECT x.id, x.channel_id, x.text, x.created_at, x.retry_at, x.kind, x.target FROM
                                                       (SELECT q.id, q.channel_id, q.text, q.created_at, q.retry_at, n.kind, n.target,
                                                               ROW_NUMBER() OVER (PARTITION BY q.channel_id ORDER BY q.created_at, q.id) AS ch_rn
@@ -314,7 +314,7 @@ def chn_result(c, cid, ok, status, code):
               (code + (f" {int(status) // 100}xx" if status else ""), ts, cid))  # 2.306.0 (#2875 review N13): the class only
     r = c.execute("SELECT fails, user_id, org_id, name, kind FROM notify_channels WHERE id=?", (cid,)).fetchone()
     if r and r[0] >= CH_FAIL_MAX:
-        c.execute("UPDATE notify_channels SET enabled=0, disabled_reason='failures', updated_at=? WHERE id=?", (ts, cid))
+        c.execute("UPDATE notify_channels SET enabled=false, disabled_reason='failures', updated_at=? WHERE id=?", (ts, cid))
         c.execute("DELETE FROM notify_channel_queue WHERE channel_id=?", (cid,))
         print(f"notification channel {cid} turned off after {r[0]} failed sends ({code} {status or ''})", flush=True)
         chn_off_tell(c, r, "channel")
@@ -459,7 +459,7 @@ def chn_push(uid, title, msg, prio, click, kind, s, task=None, scope=None, chn_m
         c = connect()
         try:
             with system_ctx(c):  # the recipient's own channels (a push thread has no request context)
-                rows = [r for r in c.execute("""SELECT id, events FROM notify_channels WHERE user_id=? AND org_id IS NULL AND enabled=1""",
+                rows = [r for r in c.execute("""SELECT id, events FROM notify_channels WHERE user_id=? AND org_id IS NULL AND enabled""",
                                              (uid,)) if kind in r["events"].split(",")]
                 sc = chn_scope(c, uid, click, task, scope) if rows else None  # 2.240.0 B (#2867)
                 msg = msg if chn_msg is None else chn_msg
@@ -484,7 +484,7 @@ def chn_reachable(c, uid):
         return False
     with system_ctx(c):  # the person's own channels, asked for other people too (pushes to them)
         return bool(c.execute("""SELECT 1 FROM notify_channels n JOIN users u ON u.id=n.user_id WHERE n.user_id=? AND n.org_id IS NULL
-                                 AND n.enabled=1 AND u.disabled=0 LIMIT 1""", (uid,)).fetchone())  # 2.240.0 B (#2867)
+                                 AND n.enabled AND NOT u.disabled LIMIT 1""", (uid,)).fetchone())  # 2.240.0 B (#2867)
 
 
 def chn_reachable_many(c, uids):
@@ -493,8 +493,8 @@ def chn_reachable_many(c, uids):
         return set()
     with system_ctx(c):  # as chn_reachable
         return {r[0] for r in c.execute("""SELECT DISTINCT n.user_id FROM notify_channels n JOIN users u ON u.id=n.user_id
-                                           WHERE n.user_id = ANY(CAST(? AS BIGINT[])) AND n.org_id IS NULL AND n.enabled=1
-                                           AND u.disabled=0""", (sorted(uids),))}
+                                           WHERE n.user_id = ANY(CAST(? AS BIGINT[])) AND n.org_id IS NULL AND n.enabled
+                                           AND NOT u.disabled""", (sorted(uids),))}
 
 
 # ---------------------------------------------------------------- events of lists -> organisation channels / own list channels
@@ -538,7 +538,7 @@ def chn_flush(resp):
 def chn_list_events(c, n, auto=False):
     """auto (2.367.3, #2973): a rule run of the watchdog (it acts as the rule's creator, but nobody just did this)."""
     chans = c.execute("""SELECT n.id, n.user_id, n.org_id, n.events, n.name, n.kind FROM notify_channels n JOIN users u ON u.id=n.user_id
-                         WHERE n.enabled=1 AND u.disabled=0
+                         WHERE n.enabled AND NOT u.disabled
                          AND (n.org_id IS NOT NULL OR n.events ILIKE '%lists%') ORDER BY n.id""").fetchall()  # 2.240.0 B (#2867): not of a disabled account
     if not chans:
         return
@@ -565,7 +565,7 @@ def chn_list_events(c, n, auto=False):
                 if t["org_id"] != ch["org_id"] or not ov_open(t):
                     continue
                 if org_role(c, ch["user_id"], ch["org_id"]) != "admin":  # its creator is no admin there any more: off
-                    c.execute("UPDATE notify_channels SET enabled=0, disabled_reason='admin', updated_at=? WHERE id=?",
+                    c.execute("UPDATE notify_channels SET enabled=false, disabled_reason='admin', updated_at=? WHERE id=?",
                               (iso(now_utc()), ch["id"]))
                     c.execute("DELETE FROM notify_channel_queue WHERE channel_id=?", (ch["id"],))
                     chn_off_tell(c, ch, "channel_admin")  # 2.367.3 (#2971): the organisation's admins

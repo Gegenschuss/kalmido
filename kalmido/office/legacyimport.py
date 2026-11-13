@@ -1687,7 +1687,7 @@ def imr_used(c, oid, kind, rid, limit=3):
 
 def imr_archive(c, oid, kind, rid):
     """Archives row rid of kind (organisation oid) -> {kind, id, name, used: [labels]}."""
-    c.execute(f"UPDATE {MD[kind]['table']} SET archived=1, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), rid, oid))
+    c.execute(f"UPDATE {qi(MD[kind]['table'], MD_TABLES)} SET archived=true, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), rid, oid))
     r = c.execute(f"SELECT {MD[kind]['label']} AS name FROM {MD[kind]['table']} WHERE id=? AND org_id=?", (rid, oid)).fetchone()
     return {"kind": kind, "id": rid, "name": r["name"] if r else "", "used": imr_used(c, oid, kind, rid)}
 
@@ -1705,7 +1705,7 @@ def imr_leftover_ids(c, oid, r):
     for kind in IMR_KINDS:
         if not (r["undone_at"] or kind in undone):
             continue
-        for x in c.execute(f"SELECT id FROM {qi(MD[kind]['table'], MD_TABLES)} WHERE org_id=? AND import_run_id=? AND archived=0 AND {live_sql()} ORDER BY id", (oid, r["id"])):
+        for x in c.execute(f"SELECT id FROM {qi(MD[kind]['table'], MD_TABLES)} WHERE org_id=? AND import_run_id=? AND NOT archived AND {live_sql()} ORDER BY id", (oid, r["id"])):
             if not (kind == "services" and x["id"] == prod) and x["id"] not in (kept.get(kind) or []):
                 out.append((kind, x["id"]))
     return out
@@ -2632,7 +2632,7 @@ def fi_parse_post():
     if not isinstance(names, list) or len(names) > 500 or not all(isinstance(n, str) for n in names):
         raise BadInput(tr("Invalid data"))
     t = fnt_remember(c, oid, b)
-    cl = [(r["id"], r["name"]) for r in c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL ORDER BY id")]
+    cl = [(r["id"], r["name"]) for r in c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND NOT archived AND deleted_at IS NULL ORDER BY id")]
     items = []
     for n in names:
         p = fnt_parse(n[:300], cl, t)
@@ -2670,7 +2670,7 @@ def fk_archive_address_post():
     if fn and out.get("status") == "ok" and fnt_stored(office_settings(c, oid))["name"] != "standard":
         out["swap"] = None  # 2.621.0 (#4600): the swap knows only the standard names (Project_Client_KV..)
     elif fn and out.get("status") == "ok":
-        cl = [(r["id"], r["name"]) for r in c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL ORDER BY id")]
+        cl = [(r["id"], r["name"]) for r in c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND NOT archived AND deleted_at IS NULL ORDER BY id")]
         p = fi_parse_filename(fn, cl)
         # the company found among the clients counts only when the PDF's name led there (not the file name's client_id)
         known = out["client_name"] if out.get("client_id") and out["client_id"] != cid else ""

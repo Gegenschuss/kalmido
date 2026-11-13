@@ -67,8 +67,8 @@ for _s in (A, Bo, Ca, Da):  # 2.49.0 (#1535): the old defaults (completed stay v
 for s in (Bo, Ca, Da):
     s.patch(B + "/api/settings", json={"lang": "en"})
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
-BINBOX = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (BOB,))[0][0]
-CINBOX = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (CAROL,))[0][0]
+BINBOX = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (BOB,))[0][0]
+CINBOX = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (CAROL,))[0][0]
 
 # ================================================================== #1188 a list admin deletes a shared list
 SH = Bo.post(B + "/api/lists", json={"name": "Fair stand", "org_id": ORG, "folder": "Events"}).json()["id"]

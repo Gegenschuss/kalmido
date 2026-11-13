@@ -158,7 +158,7 @@ RA, RB, LA, LB, MA, MB = %(ids)s
 nott = lambda n: ("DELETE FROM user_settings WHERE user_id=? AND key='ntfy_topic'", (U[n],))
 base = [topic(n) for n in ("bob", "gina", "rita", "dave", "erik", "fred", "carl")] + [nott("hans")]  # hans: no topic, no device
 base += [bell(n, LA) for n in ("bob", "dave", "erik", "fred", "hans", "carl")]  # gina, rita: the default bell
-base += [mute("dave", RA), ("UPDATE users SET disabled=1 WHERE id=?", (U["erik"],)),
+base += [mute("dave", RA), ("UPDATE users SET disabled=true WHERE id=?", (U["erik"],)),
          ("INSERT INTO user_settings(user_id,key,value) VALUES(?,'features','cal,comments') ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value", (U["fred"],))]
 out = {}
 out["all"] = case(RA, MA, base)[0]
