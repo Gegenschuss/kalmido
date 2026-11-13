@@ -37,6 +37,13 @@ const up = async (url, field, name, text, extra = {}) => {
   const DOC = ((await up('api/docs', 'files', 'letter-alpha.txt', 'Letter of an invented insurance', {ws: 'private'})).ids || [])[0];
   check(DOC, 'setup: a document');
   await call('POST', `/api/docs/${DOC}/review`, {done: false});
+  // 2.1112.2 (#5996): since #5450 (job/4293) an office without a single receipt shows an empty state with "Upload receipt" and
+  // no filter block (p21076_b_office_states_ui): the filters below need one receipt in alice's private office
+  const RC = ((await up('api/docs', 'files', 'receipt-copyshop.txt', 'Receipt of an invented copy shop', {ws: 'private'})).ids || [])[0];
+  const today = new Date().toISOString().slice(0, 10);
+  await until(async () => RC && ['done', 'error'].includes((await call('GET', `/api/docs/${RC}`)).state), 120);  // the recognition ran first
+  check(RC && (await call('PATCH', `/api/docs/${RC}`, {amount: '12.50', date: today})).http === 200
+    && (await call('PUT', `/api/docs/${RC}/receipt`, {category: 'Material', vat_pct: '19', keep: true})).http === 200, 'setup: a receipt');
 
   const run = (vp) => firefox(async o => {
     const {cmd, ev, ctx, shot} = o;
