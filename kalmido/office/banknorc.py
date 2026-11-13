@@ -245,11 +245,9 @@ def bnr_tick(c, now=None, force=False):
     _BNR_LAST["at"] = time.monotonic()
     today = (now or local_now()).date().isoformat()
     with system_ctx(c):  # which areas have the reminder at all; each is then read under its own lock
-        # 2.1111.0 (#5953): data is JSONB (its keys sorted by length: "every" is no longer first) - the value, not the text;
-        # review F2: a row that is no JSON (the column left TEXT) is skipped, not a failure for every area
+        # 2.1111.0 (#5953): data is JSONB ("every" no longer first): the value, not the text; no JSON = skipped (review F2)
         oids = [r[0] for r in c.execute("SELECT org_id FROM office_settings WHERE (CASE WHEN pg_input_is_valid(CAST(data AS text), 'jsonb') THEN CAST(data AS jsonb) END)->'bank_norc'->>'every' "
-                                        "IN ('week', 'month') "
-                                        "ORDER BY org_id").fetchall()]
+                                        "IN ('week', 'month') ORDER BY org_id").fetchall()]
     c.commit()
     for oid in oids:
         try:

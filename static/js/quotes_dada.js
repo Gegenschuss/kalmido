@@ -140,7 +140,7 @@ function qd_fill() {
 // 2.1111.0 (#5963): the start page's quote is one line; a tap (or Enter / Space) opens the full text and the author, a second one closes it
 function qd_toggle(/** @type {Event} */ e) {
   const f = e.target instanceof Element ? e.target.closest('.qd.dashq') : null; if (!f) return;
-  if (e instanceof KeyboardEvent) { if (e.key !== 'Enter' && e.key !== ' ') return; e.preventDefault(); }
+  if (e.type === 'keydown') { const k = /** @type {KeyboardEvent} */ (e).key; if (k !== 'Enter' && k !== ' ') return; e.preventDefault(); }  // no KeyboardEvent global (ESLint, the quotes suite's VM)
   f.setAttribute('aria-expanded', String(f.classList.toggle('open')));
 }
 if (typeof document !== 'undefined') { document.addEventListener('click', qd_toggle); document.addEventListener('keydown', qd_toggle); }
