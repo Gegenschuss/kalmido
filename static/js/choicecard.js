@@ -70,7 +70,11 @@ function ccApvStep(ap, src = '') {
     fold = `<details class="apvdet" ${dv ? `data-apvd="${esc(src)}"` : ''}><summary><span data-apvd-words>${esc(sum)}</span></summary>${dv ? `<div data-apvd-body>${/*html-ok*/ /* escaped inside */ d ? ccApvdBody(d, src) : ''}</div>` : ''}<div class="apvw" data-apv-step>${esc(tr('Step: {0}', t))}</div></details>`;
     if (dv && (!c || c.d === undefined)) setTimeout(() => ccApvdLoad(src), 0);
   }
-  return fold
+  // 2.1088.0 (#5937): an upload's card names the files it binds (body._files, #5936): count + the first 3 names, no hash
+  const fs = b && Array.isArray(b._files) ? b._files.filter(x => x && typeof x === 'object') : [];
+  const files = fs.length ? `<div class="apvw" data-apv-files>${esc(trn('{0} file', '{0} files', fs.length) + ': ' + fs.slice(0, 3).map(x => String(x.name || '–')).join(', ')
+    + (fs.length > 3 ? ' ' + trn('and {0} more', 'and {0} more', fs.length - 3) : ''))}</div>` : '';
+  return files + fold
     + (ap.one_way ? `<div class="apvw" data-apv-oneway><b>${esc(tr('One-way step – cannot be undone'))}</b></div>` : '')
     + (ap.recommend ? `<div class="apvw" data-apv-rec>${esc(tr('The agent recommends: {0}', ap.recommend === 'yes' ? tr('Yes') : tr('No')))}</div>` : '');
 }

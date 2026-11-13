@@ -6,6 +6,7 @@
 // A step without a text (delete a task) keeps its words as the folded line. After "Yes" the card still shows the change, marked
 // as the state at the answer, also when the page changed afterwards. The knowledge history draws its comparison with the same
 // rows (p2123_a_ui.js covers the dialog).
+// 2.1088.0 (#5937): an upload card names the files it binds (count + first 3 names), visible, without a hash.
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');
@@ -40,6 +41,12 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(c1.http === 201, 'the text card ' + c1.http + ' ' + JSON.stringify(c1).slice(0, 200));
   const c2 = await v1('POST', `/agent/chats/${me.id}`, {approval: {title: 'Remove the old task', step: {method: 'DELETE', path: '/tasks/345'}}});
   check(c2.http === 201, 'the delete card ' + c2.http);
+  // 2.1088.0 (#5937): an upload's card binds its files (body._files, #5936) and names them: count + the first 3, no hash
+  const fl = ['plan.txt', 'shot list.pdf', 'cast.xlsx', 'map.png', 'notes.md'].map((name, i) => ({field: 'file', name, sha256: String(i).repeat(64)}));
+  const c3 = await v1('POST', `/agent/chats/${me.id}`, {approval: {title: 'Upload the call sheets', step: {method: 'POST', path: '/tasks/345/attachments', body: {_files: fl}}}});
+  check(c3.http === 201, 'the upload card ' + c3.http + ' ' + JSON.stringify(c3).slice(0, 200));
+  const c4 = await v1('POST', `/agent/chats/${me.id}`, {approval: {title: 'Upload the plan', step: {method: 'POST', path: '/tasks/345/attachments', body: {_files: fl.slice(0, 1)}}}});
+  check(c4.http === 201, 'the one-file card ' + c4.http);
 
   const w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   w.eval(`chatOpen(${ag.id})`);
@@ -60,6 +67,12 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(st && /^Step: PATCH \/wiki\/pages\/\d+ · Fields: body, expect_updated_at$/.test(st.textContent.trim()), 'the technical line is inside the fold ' + (st?.textContent || ''));
   const del = d.querySelector(`#chat-msgs .cmsg[data-mid="a:${c2.id}"] details.apvdet > summary`);
   check(del && /Step: Delete task 345/.test(del.textContent), 'a step without text keeps its words ' + (del?.textContent || ''));
+  const upl = await until(() => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${c3.id}"] [data-apv-files]`));
+  check(upl && upl.textContent.trim() === '5 files: plan.txt, shot list.pdf, cast.xlsx and 2 more' && !upl.closest('details'), '#5937: the upload card names its files, visible without unfolding ' + (upl?.textContent || ''));
+  check(!/0{64}|1{64}/.test(d.querySelector(`#chat-msgs .cmsg[data-mid="a:${c3.id}"]`)?.textContent || ''), '#5937: no hash on the card');
+  const one = d.querySelector(`#chat-msgs .cmsg[data-mid="a:${c4.id}"] [data-apv-files]`);
+  check(one && one.textContent.trim() === '1 file: plan.txt', '#5937: one file ' + (one?.textContent || ''));
+  check(!d.querySelector(`#chat-msgs .cmsg[data-mid="a:${c1.id}"] [data-apv-files]`), '#5937: a card without files has no file line');
 
   // Yes -> the card still shows the change, as it was at the answer, also after a later edit of the page
   click(w, card().querySelector('.apvbtns .cchb'));
