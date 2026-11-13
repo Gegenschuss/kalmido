@@ -73,6 +73,7 @@ ORDER = (
     "core.objreact",  # 2.763.0 (#5269): the reactions of the shared core (one table obj_reactions, one rule)
     "core.objseen",  # 2.905.0 (#5284): the read marks of the shared core (one table obj_seen, no routes)
     "core.tplmove",  # 2.905.0 (#5288): templates onto the shared core at the start (owner_id, real types, section templates moved in)
+    "core.objretype",  # 2.1101.0 (#5954): obj_history / obj_undo / obj_revoked onto TIMESTAMPTZ / JSONB at the start
     "core.objtags",  # 2.947.0 (#5275): the tags of the shared core (obj_tags, obj_tag_links)
     "core.objversions",  # 2.958.0 (#5281): the versions of the shared core (obj_versions: numbered whole states)
     "core.serializers",

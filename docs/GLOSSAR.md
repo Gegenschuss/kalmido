@@ -292,6 +292,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/objseen.py` (`osn`) - Read marks exist once, in the shared core: one table obj_seen (task: the highest comment id a person has seen); task_seen moved here and went (stage Q8a); the team chat's rooms / threads and the read feed articles too (stage Q8b)
 - `kalmido/core/objparts.py` (`part`) - The shared core, stage 6b -- the side objects of a project on the core
 - `kalmido/core/objreact.py` (`orx`) - Reactions exist once, in the shared core: one table obj_reactions for comments, team chat and the agent chat
+- `kalmido/core/objretype.py` - the core's own tables obj_history, obj_undo and obj_revoked (core/migrations.d/4709_a.py, docs/dev/kern.md "history / undo / revoked") ta...
 - `kalmido/core/objtags.py` (`otg`) - Tags exist once, in the shared core: obj_tags (scope user / list / org / ws) and obj_tag_links; project tags and organisation labels since 2.947
 - `kalmido/core/objversions.py` (`obj_version`) - Versions exist once, in the shared core: one table obj_versions for numbered whole states (knowledge pages since 2.958, stage Q7a)
 - `kalmido/core/objweb.py` (`obj`) - The generic routes of the core objects (core/objects.py, core/writes.py)

@@ -43,11 +43,11 @@ def ort_types(c):
 
 def ort_sql(table, col, how):
     """The ALTER TABLE of one column (module docstring)."""
-    t, q = qi(table, ORT_NAMES), qi(col, ORT_NAMES)
+    q = qi(col, ORT_NAMES)
     if how == "time":
-        return (f"ALTER TABLE {t} ALTER COLUMN {q} TYPE TIMESTAMPTZ USING (CASE WHEN {q} ~ '^\\d{{4}}-\\d\\d-\\d\\d' "
+        return (f"ALTER TABLE {qi(table, ORT_NAMES)} ALTER COLUMN {q} TYPE TIMESTAMPTZ USING (CASE WHEN {q} ~ '^\\d{{4}}-\\d\\d-\\d\\d' "
                 f"AND pg_input_is_valid({q}, 'timestamptz') THEN {q}::timestamptz ELSE CURRENT_TIMESTAMP END)")
-    return (f"ALTER TABLE {t} ALTER COLUMN {q} DROP DEFAULT, ALTER COLUMN {q} TYPE JSONB USING (CASE WHEN "
+    return (f"ALTER TABLE {qi(table, ORT_NAMES)} ALTER COLUMN {q} DROP DEFAULT, ALTER COLUMN {q} TYPE JSONB USING (CASE WHEN "
             f"pg_input_is_valid({q}, 'jsonb') THEN {q}::jsonb ELSE '{{}}'::jsonb END), ALTER COLUMN {q} SET DEFAULT '{{}}'::jsonb")
 
 
