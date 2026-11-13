@@ -3,6 +3,8 @@
 // - #3739 the phone's drawer: a grid of 4 columns (2.867.0 #5540, was at most two rows) of area icons with every area on (also 360 px, also without labels, light and
 //   dark), no name cut, nothing sideways; the search stays on top while Today, Inbox and the areas scroll away, Settings and
 //   the account stay at the bottom, the scroll height survives a redraw and a change of area
+// - 2.1108.0 #5964: the drawer's head (logo, name, workspace) stays in place and equally wide while the drawer scrolls and on
+//   another area; the search sits right under it
 // - #2810 a low window (640 x 400): the view switch folds, the head and the tab bar are thinner, the comment box of a task is in
 //   the flow; the list ends with room for the plus button; an upright phone with the keyboard open (390 x 400) stays as it
 //   was; html counts the browser's default size
@@ -58,13 +60,15 @@ const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'ut
     check(g2.rows === Math.ceil(g2.n / 4) && g2.inside && g2.side, '#3739: without labels too '  /* 2.867.0 (#5540): the grid of 4 */ + JSON.stringify(g2));
     await ev(`(() => { document.documentElement.classList.remove('rail-nolabel'); renderSide(); return 1; })()`);
     // scrolling
-    const POS = `(() => { const s = document.querySelector('#side'), R = e => e && e.getBoundingClientRect(), q = x => document.querySelector(x), sr = R(s), se = q('#side .sbmsrch .scmd'), t = q('#side .sg-focus .srow[data-go="today"]'), row = q('#side .sbmr'), d = q('#side .sbdock'), at = se && document.elementFromPoint(R(se).left + 40, R(se).top + R(se).height / 2);
-      return {top: s.scrollTop, max: s.scrollHeight - s.clientHeight, se: se && Math.round(R(se).top - sr.top), seH: se && Math.round(R(se).height), onSearch: !!(at && at.closest('.scmd')), today: t && Math.round(R(t).bottom - sr.top), row: row && Math.round(R(row).bottom - sr.top), dock: d && Math.round(sr.bottom - R(d).bottom), set: !!(d && d.querySelector('.sset')), acct: !!(d && d.querySelector('.sbacct'))}; })()`;
+    const POS = `(() => { const s = document.querySelector('#side'), R = e => e && e.getBoundingClientRect(), q = x => document.querySelector(x), sr = R(s), se = q('#side .sbmsrch .scmd'), t = q('#side .sg-focus .srow[data-go="today"]'), row = q('#side .sbmr'), d = q('#side .sbdock'), h = q('#side .sbfix-m .sbhead'), wb = q('#side .sbhead .wsbar'), at = se && document.elementFromPoint(R(se).left + 40, R(se).top + R(se).height / 2);
+      return {top: s.scrollTop, max: s.scrollHeight - s.clientHeight, se: se && Math.round(R(se).top - sr.top), seH: se && Math.round(R(se).height), onSearch: !!(at && at.closest('.scmd')), today: t && Math.round(R(t).bottom - sr.top), row: row && Math.round(R(row).bottom - sr.top), dock: d && Math.round(sr.bottom - R(d).bottom), set: !!(d && d.querySelector('.sset')), acct: !!(d && d.querySelector('.sbacct')), hd: h && [Math.round(R(h).top - sr.top), Math.round(R(h).bottom - sr.top), Math.round(R(h).width)].join(), hb: h && Math.round(R(h).bottom - sr.top), wb: wb && [Math.round(R(wb).left), Math.round(R(wb).top - sr.top), Math.round(R(wb).width)].join(), cw: s.clientWidth, onHead: !!(h && document.elementFromPoint(R(h).left + 20, R(h).top + R(h).height / 2)?.closest('.sbhead'))}; })()`;  // 2.1108.0 (#5964): the head's place, its workspace button and the drawer's inner width
     const p0 = await ev(POS);
     await ev(`(() => { document.querySelector('#side').scrollTop = 500; return 1; })()`); await sleep(100);  // 2.867.0 (#5540): 500 (was 400) - the grid of 4 has more rows, Today sits lower
     const p1 = await ev(POS);
     check(p0.max > 200 && p1.top === 500, '#3739: the drawer scrolls ' + JSON.stringify(p1));
-    check(p1.se >= 0 && p1.se < 40 && p1.onSearch, '#3739: the search stays on top, nothing over it ' + JSON.stringify(p1));
+    // 2.1108.0 (#5964): the head (logo, name, workspace) is pinned on top and the search right under it (was: the search alone on top, < 40 px)
+    check(p1.se >= p1.hb - 1 && p1.se < p1.hb + 24 && p1.onSearch, '#3739/#5964: the search stays right under the head, nothing over it ' + JSON.stringify(p1));
+    check(p1.hd === p0.hd && p1.wb === p0.wb && p1.cw === p0.cw && p1.onHead, '#5964: the head stands still while the drawer scrolls, same place, same width ' + JSON.stringify({p0, p1}));
     check(p1.today <= p1.se && p1.row <= p1.se, '#3739: Today, Inbox and the areas scrolled away under it ' + JSON.stringify(p1));
     check(p1.dock === 0 && p1.set && p1.acct, '#3739: Settings and the account stay at the bottom ' + JSON.stringify(p1));
     await shot('p2442-drawer-scrolled.png');
@@ -74,6 +78,7 @@ const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'ut
     await sleep(500);
     const p2 = await ev(POS);
     check(p2.top === 60 || p2.top === p2.max, '#3739: a change of area keeps the scroll height ' + JSON.stringify(p2));
+    check(p2.hd === p0.hd && p2.wb === p0.wb && p2.cw === p0.cw, '#5964: another area (other list length) leaves the head where it was ' + JSON.stringify({p0, p2}));
     await ev(`(() => { document.querySelector('#side').scrollTop = 200; return 1; })()`); await sleep(100);
     for (const look of ['dark', 'light']) {
       await ev(`(() => { document.documentElement.setAttribute('data-theme', '${look}'); return 1; })()`); await sleep(100);
