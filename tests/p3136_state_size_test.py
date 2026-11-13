@@ -80,6 +80,8 @@ def fill(list_ids, per, users, tag_uid):
     us = ",".join(map(str, users))
     kt.dbx(f"INSERT INTO sections (list_id, name, sort) SELECT l, n, k FROM unnest(ARRAY[{ids}]) l, "
            "unnest(ARRAY['Offen','In Arbeit','Fertig']) WITH ORDINALITY AS x(n, k)")
+    # 2.1112.2 (#5184): created_at / updated_at are TIMESTAMPTZ since #5306 - a point in time (whole seconds, as the app
+    # writes them), not to_char text; completed_at stays TEXT
     # like Audit Q's generator: 60 % with a note (0-60 words), 45 % due (-60..90 days), 20 % done (half of them within
     # the 14 days the start state keeps), priorities 0/0/0/1/3/5, a section each
     kt.dbx(f"""INSERT INTO tasks (list_id, section_id, title, content, priority, status, due, due_time, reminders, sort,
@@ -92,7 +94,7 @@ def fill(list_ids, per, users, tag_uid):
           CASE WHEN (j * 3 + l) % 20 < 9 THEN to_char(current_date + ((j * 37 + l) % 151) - 60, 'YYYY-MM-DD') END,
           CASE WHEN (j * 3 + l) % 20 < 3 THEN lpad((7 + j % 12)::text, 2, '0') || ':00' END,
           CASE WHEN (j * 3 + l) % 20 < 4 THEN '0,15' ELSE '' END, j,
-          to_char(now() - interval '40 days', 'YYYY-MM-DD"T"HH24:MI:SS'), to_char(now() - interval '20 days', 'YYYY-MM-DD"T"HH24:MI:SS'),
+          date_trunc('second', now() - interval '40 days'), date_trunc('second', now() - interval '20 days'),
           CASE WHEN (j * 7 + l) % 5 = 0 THEN to_char(now() - ((j % 28) || ' days')::interval, 'YYYY-MM-DD"T"HH24:MI:SS') END,
           (ARRAY[{us}])[1 + j % {len(users)}], CASE WHEN j % 4 = 0 THEN (ARRAY[{us}])[1 + (j / 4) % {len(users)}] END
         FROM unnest(ARRAY[{ids}]) l, generate_series(1, {per}) j""")
