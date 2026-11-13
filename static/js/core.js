@@ -447,20 +447,49 @@ const OBX = {on: false, st: null, ch: null, c: 0, ready: null};
 const obxSeq = () => Date.now() * 1000 + (OBX.c = (OBX.c + 1) % 1000);
 const obxRec = x => { const {done, res, ...r} = x; return JSON.parse(JSON.stringify(r, typeof le2eRepl === 'function' ? le2eRepl() : undefined)); };  // like LS.set: ciphers only
 const obxReq = r => new Promise((ok, no) => { r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+// 2.1120.0 (#6036): an IndexedDB connection held by a module that heals. The browser closes it under the page (a reload, the page
+// going away on Android, storage pressure: event "close") or another tab wants it gone (sign-out deletes the database:
+// "versionchange", we let go); a transaction() on such a connection throws InvalidStateError "The database connection is
+// closing" - before, that went to window.onerror. idbHeld(open): db() = the connection (opened again once it was closed),
+// tx(stores, mode) = a transaction, on a closing connection the connection is dropped and the access goes once more to a fresh
+// one (nothing is lost: the write was not started yet), close(). open() = a Promise of the IDBDatabase (the module's own open).
+function idbHeld(open) {
+  let dbp = null;
+  const db = () => {
+    if (dbp) return dbp;
+    const p = dbp = open().then(d => {
+      const drop = () => { if (dbp === p) dbp = null; };
+      d.addEventListener('close', drop);
+      d.addEventListener('versionchange', () => { d.close(); drop(); });
+      return d;
+    });
+    p.catch(() => { if (dbp === p) dbp = null; });
+    return p;
+  };
+  const tx = async (st, mode) => {
+    const p = db(), d = await p;
+    try { return d.transaction(st, mode); } catch (e) {
+      if (e?.name !== 'InvalidStateError') throw e;
+      if (dbp === p) dbp = null;
+      return (await db()).transaction(st, mode);
+    }
+  };
+  const close = async () => { const p = dbp; dbp = null; if (p) (await p.catch(() => null))?.close(); };
+  return {db, tx, close};
+}
 // the small store over IndexedDB: all(), write(put, del), meta(k), setMeta(k, v), clear(); tests hand in their own (__obxStore)
 function obxIdb() {
   if (!globalThis.indexedDB) return null;
-  let dbp = null;
-  const db = () => dbp ||= new Promise((ok, no) => {
+  const h = idbHeld(() => new Promise((ok, no) => {
     const r = indexedDB.open('kalmido-outbox', 1);
     r.onupgradeneeded = () => { const d = r.result; if (!d.objectStoreNames.contains('ops')) d.createObjectStore('ops', {keyPath: 'k'}); if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', {keyPath: 'k'}); };
     r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); r.onblocked = () => no(new Error('blocked'));
-  });
-  const tx = async (st, mode, fn) => { const t = (await db()).transaction(st, mode), out = fn(t); await new Promise((ok, no) => { t.oncomplete = ok; t.onerror = t.onabort = () => no(t.error); }); return out instanceof IDBRequest ? out.result : out; };
+  }));
+  const tx = async (st, mode, fn) => { const t = await h.tx(st, mode), out = fn(t); await new Promise((ok, no) => { t.oncomplete = ok; t.onerror = t.onabort = () => no(t.error); }); return out instanceof IDBRequest ? out.result : out; };
   return {
-    all: async () => obxReq((await db()).transaction('ops').objectStore('ops').getAll()),
+    all: async () => obxReq((await h.tx('ops')).objectStore('ops').getAll()),
     write: (put, del) => tx('ops', 'readwrite', t => { const o = t.objectStore('ops'); for (const r of put) o.put(r); for (const k of del) o.delete(k); }),
-    meta: async k => (await obxReq((await db()).transaction('meta').objectStore('meta').get(k)))?.v,
+    meta: async k => (await obxReq((await h.tx('meta')).objectStore('meta').get(k)))?.v,
     setMeta: (k, v) => tx('meta', 'readwrite', t => { const o = t.objectStore('meta'); if (v === undefined) o.delete(k); else o.put({k, v}); }),
     clear: () => tx(['ops', 'meta'], 'readwrite', t => { t.objectStore('ops').clear(); t.objectStore('meta').clear(); }),
   };

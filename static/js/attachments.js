@@ -74,9 +74,9 @@ const QF = {st: null, busy: false};
 function qfStore() {
   if (QF.st || globalThis.__qfStore) return QF.st ||= globalThis.__qfStore;
   if (!globalThis.indexedDB) return null;
-  let dbp = null;
-  const db = () => dbp ||= new Promise((ok, no) => { const r = indexedDB.open('kalmido-qfiles', 1); r.onupgradeneeded = () => r.result.createObjectStore('f', {keyPath: 'tmp'}); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
-  const run = async (mode, fn) => { const t = (await db()).transaction('f', mode), q = fn(t.objectStore('f')); return new Promise((ok, no) => { t.oncomplete = () => ok(q.result); t.onerror = t.onabort = () => no(t.error); }); };
+  // 2.1120.0 (#6036): over core.js idbHeld - a connection the browser closed (reload) is opened again; sign-out may delete it
+  const h = idbHeld(() => new Promise((ok, no) => { const r = indexedDB.open('kalmido-qfiles', 1); r.onupgradeneeded = () => r.result.createObjectStore('f', {keyPath: 'tmp'}); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); }));
+  const run = async (mode, fn) => { const t = await h.tx('f', mode), q = fn(t.objectStore('f')); return new Promise((ok, no) => { t.oncomplete = () => ok(q.result); t.onerror = t.onabort = () => no(t.error); }); };
   return QF.st = {put: v => run('readwrite', o => o.put(v)), all: () => run('readonly', o => o.getAll()), del: k => run('readwrite', o => o.delete(k))};
 }
 async function qfKeep(tmp, files) {

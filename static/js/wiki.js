@@ -1250,20 +1250,20 @@ const wko_rq = r => new Promise((ok, no) => { r.onsuccess = () => ok(r.result); 
 // the small store over IndexedDB: get(k), put(v), del(k), all(), clear(), close(); tests hand in their own (__wkoStore)
 function wko_idb() {
   if (!globalThis.indexedDB) return null;
-  let dbp = null;
-  const db = () => dbp ||= new Promise((ok, no) => {
+  // 2.1120.0 (#6036): over core.js idbHeld - closed by the browser (reload on Android) or by a logout in another tab
+  // (versionchange: it deletes the database, we let go) -> opened again at the next access
+  const h = idbHeld(() => new Promise((ok, no) => {
     const r = indexedDB.open('kalmido-wiki', 2);  // 2.637.0 (#4745): version 2 = + store "f", the files of a space kept offline (wikioff.js)
     r.onupgradeneeded = () => { for (const n of ['c', 'f']) if (!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n, {keyPath: 'k'}); };
-    r.onsuccess = () => { r.result.onversionchange = () => { r.result.close(); dbp = null; }; ok(r.result); };  // logout in another tab deletes it
-    r.onerror = () => no(r.error); r.onblocked = () => no(new Error('blocked'));
-  }).catch(e => { dbp = null; throw e; });
-  const os = async (mode, n = 'c') => (await db()).transaction(n, mode).objectStore(n);
+    r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); r.onblocked = () => no(new Error('blocked'));
+  }));
+  const os = async (mode, n = 'c') => (await h.tx(n, mode)).objectStore(n);
   return {get: async k => wko_rq((await os('readonly')).get(k)), put: async v => wko_rq((await os('readwrite')).put(v)), del: async k => wko_rq((await os('readwrite')).delete(k)),
     all: async () => wko_rq((await os('readonly')).getAll()),
     pre: async x => wko_rq((await os('readonly')).getAll(IDBKeyRange.bound(x, x + '\uffff'))),  // 2.169.1 (#2672): only the keys starting with x
     fget: async k => wko_rq((await os('readonly', 'f')).get(k)), fput: async v => wko_rq((await os('readwrite', 'f')).put(v)),  // 2.637.0 (#4745)
     fdel: async k => wko_rq((await os('readwrite', 'f')).delete(k)), fkeys: async () => wko_rq((await os('readonly', 'f')).getAllKeys()),
-    clear: async () => { const t = (await db()).transaction(['c', 'f'], 'readwrite'); await Promise.all(['c', 'f'].map(n => wko_rq(t.objectStore(n).clear()))); }, close: async () => { const p = dbp; dbp = null; if (p) (await p.catch(() => null))?.close(); }};
+    clear: async () => { const t = await h.tx(['c', 'f'], 'readwrite'); await Promise.all(['c', 'f'].map(n => wko_rq(t.objectStore(n).clear()))); }, close: h.close};
 }
 const wko_st = () => WKO.dead ? null : WKO.st ||= globalThis.__wkoStore || wko_idb();  // after logout nothing is written again (a sync still on its way)
 async function wko_get(k) { try { const r = S.me ? await wko_st()?.get(k) : null; return r && r.uid === S.me.id && (r.g || '') === (S.me.sgen || '') ? r : null; } catch { return null; } }  // private mode: no copy, as before; 2.238.0 B (#2872): only this sign-in's records
