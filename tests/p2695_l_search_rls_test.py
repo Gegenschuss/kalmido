@@ -130,7 +130,9 @@ def bare_task_scans(plan):
 
 
 for who in ("bob", "frida"):
-    res = probe(who, "/api/tasks?scope=search&q=rechnung", "ORDER BY status, updated_at DESC LIMIT")  # 2.981.0 (#5278): obj_search, no ILIKE
+    # 2.1102.0 (#5958): the marker without "LIMIT" -- 2.1079.0 (#5655) ordered by ", id DESC" as the last key, the old marker
+    # matched no statement any more and the probe explained nothing
+    res = probe(who, "/api/tasks?scope=search&q=rechnung", "ORDER BY status, updated_at DESC")  # 2.981.0 (#5278): obj_search, no ILIKE
     plans = res.get("plans") or []
     print(f"info: search plan ({who}):\n" + "\n".join(plans[0] if plans else [str(res)]), flush=True)
     check(res.get("status") == 200 and len(plans) == 1, f"{who}: the search request ran and its statement was explained {str(res)[:300]}")
