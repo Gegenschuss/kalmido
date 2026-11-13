@@ -24,6 +24,7 @@ import time
 from .pg import qi, table_names  # 2.1079.0 (#5654): _lock_all
 
 APP_ROLE = "kalmido_app"
+# 2.1090.0 (#5941): no hand list of tables here (TABLES / DROPPED went) - apply() takes every org_id table from the database.
 
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"
