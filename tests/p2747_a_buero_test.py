@@ -224,8 +224,9 @@ def cal_purge(who, s, agid):
     check(node and all(have.values()), f"4 {who}: setup: a node, history, an undo step and a revoked share {node} {have}")
     check(s.delete(B + f"/api/evcals/{k}").ok, f"4 {who}: the calendar into the trash")
     # 2.947.0 (#5367): ev_cal_trash_purge is gone - the calendars' trash is the core's run (obj_trash_prune, kind evcal)
+    # 2.1112.2 (#5989): the cut is a point in time - deleted_at is TIMESTAMPTZ since #5306, the text '9999' is none (the app passes ret_trash_cut)
     code = "from kalmido.core.pg import system_ctx\nfrom kalmido.core.writes import obj_trash_prune\nwith system_ctx(c):\n" \
-           "    print('n', obj_trash_prune(c, 'evcal', '9999', {0}))\nc.commit()"
+           "    print('n', obj_trash_prune(c, 'evcal', '9999-12-31T00:00:00Z', {0}))\nc.commit()"
     out = in_app(code.format("False"))
     check("n " in out and "Traceback" not in out and sql("SELECT 1 FROM ev_cals WHERE id=?", (k,)), f"4 {who}: purge off: only counted, still there {out[-300:]}")
     out = in_app(code.format("True"))
