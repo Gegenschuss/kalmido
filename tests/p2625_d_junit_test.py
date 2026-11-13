@@ -39,10 +39,13 @@ LIST = f"""fresh; run s_kt {sys.executable} -c "{KT}"
 run s_lines bash -c 'echo "FAIL: the list is empty"; echo "s_lines: 4 ok, 1 failed"; exit 1'
 run s_ok bash -c 'echo "s_ok: 3 ok, 0 failed"'
 run s_crash bash -c 'exit 3'
-run s_gone bash -c 'echo never'
+run s_gone bash -c 'echo "FAIL: it wobbles"; exit 1'
+run s_qok bash -c 'echo "s_qok: 2 ok, 0 failed"'
 """
+# 2.1112.2 (#5988): since #4314 (job/4314 stage 3) tests/skip.txt is the quarantine: a listed suite RUNS; only its red becomes a
+# skipped case (and does not count), its green a passed report -- s_gone is red in the quarantine, s_qok green
 stubs = {"suites.py": "import sys\nsys.stdout.write(open(sys.argv[0].replace('suites.py', 'list.txt')).read())\n", "list.txt": LIST,
-         "skip.txt": "s_gone 2099-12-31 #1 flaky\n", "start.sh": "exit 0\n"}
+         "skip.txt": "s_gone 2099-12-31 #1 flaky\ns_qok 2099-12-31 #1 flaky\n", "start.sh": "exit 0\n"}
 for name, text in stubs.items():
     with open(os.path.join(box, name), "w", encoding="utf-8") as f:
         f.write(text)
@@ -75,7 +78,7 @@ rc, out = run_all()
 check(rc == 1 and out.rstrip().split("\n")[-1] == "FAILED suites: s_kt s_lines s_crash", f"run_all: result as before {rc} {out[-300:]}")
 check("FAIL: second step" in out and "FAIL: the list is empty" in out, f"run_all: the FAIL lines stay in the output {out[-600:]}")
 check(not os.path.exists(os.path.join(JD, "old_suite.xml")), "run_all: the reports of an earlier run are gone")
-check(sorted(f for f in os.listdir(JD)) == ["s_crash.xml", "s_gone.xml", "s_kt.xml", "s_lines.xml", "s_ok.xml"], f"run_all: one report per suite, no steps file left {os.listdir(JD)}")
+check(sorted(f for f in os.listdir(JD)) == ["s_crash.xml", "s_gone.xml", "s_kt.xml", "s_lines.xml", "s_ok.xml", "s_qok.xml"], f"run_all: one report per suite, no steps file left {os.listdir(JD)}")
 r = rep("s_kt")
 cs = {t.get("name"): t.find("failure") for t in r.findall("testcase")} if r is not None else {}
 check(r is not None and r.get("tests") == "2" and r.get("failures") == "1" and cs.get("first step") is None and cs.get("second step") is not None,
@@ -90,6 +93,10 @@ r = rep("s_crash")
 check(r is not None and r.get("failures") == "1" and "exit 3" in r.find("testcase/failure").text, "crash: one failed case with the exit code")
 r = rep("s_gone")
 check(r is not None and r.get("skipped") == "1" and r.find("testcase/skipped") is not None, "skip.txt suite: a skipped case")
+check(r is not None and r.find("testcase/failure") is None and "QUARANTINE red" in out, f"skip.txt suite red: no failure, the quarantine line {out[-400:]}")
+r = rep("s_qok")
+check(r is not None and r.get("failures") == "0" and r.find("testcase/skipped") is None and "s_qok: passed (QUARANTINE)" in out,
+      "skip.txt suite green: a passed report, no skipped case")
 shutil.rmtree(JD)
 rc, out = run_all(KALMIDO_JUNIT="0")
 check(rc == 1 and not os.path.exists(JD), "KALMIDO_JUNIT=0: no report")

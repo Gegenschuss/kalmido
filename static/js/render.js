@@ -619,6 +619,8 @@ function renderTop0() {
   if (mg_title(m) && !S.me?.kid && !(sbb_on() && mg_areaOf(m)?.[0] !== 'office')) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below; 2.152.2 (#2618): sidebar B has no tabs, the part's own name (the office's page has its own heading)
   if (sbb_on() && mg_areaOf(m)?.[0] === 'office' && !S.me?.kid && typeof ofm_cur === 'function') { const oit = ofm_all().find(i => i.key === ofm_cur(m)); if (oit) title = tr(oit.name); }  // 2.224.0 B (#2816): the big heading of an office page = its name ("Office" stands above the panel)
   if (m === 'office' && !isMobile() && !S.me?.kid && typeof ofd_docTitle === 'function' && ofd_docTitle()) title = ofd_docTitle();  // 2.936.0 (#5448): an open document: its number, not "Quotations"
+  const wkPg = m === 'wiki' && typeof wk_phonePage === 'function' && wk_phonePage();  // 2.1108.0 (#5965): a phone with an open knowledge page
+  if (wkPg) title = wk_topTitle();  // the page's name instead of the area's (the page's head keeps back + path)
   let acts = '';
   if (m === 'tasks' && k === 'projects') acts += `<button class="btn sm pri tnewp" data-act="list-new" aria-haspopup="menu" title="${esc(tr('New project'))}" aria-label="${esc(tr('New project'))}">${ic('plus', 's')}<span>${tr('New project')}</span></button>`;  // 2.417.0 A (#3559): the start page of Projects; 2.498.0 (#3854): a narrow phone: the symbol
   if (m === 'tasks' && (k.startsWith('l:') || k === 'inbox')) {
@@ -649,8 +651,8 @@ function renderTop0() {
   if (m === 'tasks' && k.startsWith('who:') && S.me && +k.slice(4) !== S.me.id && !agentById(+k.slice(4))) acts += `<button class="btn sm tf" data-act="dm" data-uid="${+k.slice(4)}" data-ico="comment" title="${esc(tr('Message'))}">${ic('comment', 's')}<span class="bl">${tr('Message')}</span></button>`;
   if (m === 'agents' && !S.route.agent && S.me && !S.me.kid && aiPaneOn()) acts += `<button class="btn sm tf4" data-act="ag-setup" data-ico="plus" title="${esc(tr('Add agent…'))}">${ic('plus', 's')}<span class="bl">${tr('Add agent…')}</span></button>`;  // 2.366.0 (#2998)
   if (m === 'tasks' && S.multiMode) acts += `<button class="iconbtn on" data-act="multi" title="${tr('End selection')}" aria-label="${tr('End selection')}">${ic('select')}</button>`;
-  // everything rarer sits in "…" (phones: undo / redo there too); the title keeps its room
-  acts += `<button class="iconbtn tmore" data-act="top-more" aria-haspopup="menu" title="${tr('More actions')}" aria-label="${tr('More actions')}">${ic('dots')}${isMobile() && HIST.undo.length && histPending(HIST.undo[HIST.undo.length - 1]) ? '<span class="pdot"></span>' : ''}</button>`;
+  // everything rarer sits in "…" (phones: undo / redo there too); the title keeps its room; 2.1108.0 (#5965): not on a phone's open knowledge page (its own "…" carries these)
+  if (!wkPg) acts += `<button class="iconbtn tmore" data-act="top-more" aria-haspopup="menu" title="${tr('More actions')}" aria-label="${tr('More actions')}">${ic('dots')}${isMobile() && HIST.undo.length && histPending(HIST.undo[HIST.undo.length - 1]) ? '<span class="pdot"></span>' : ''}</button>`;
   const pm = '';  // focus / stopwatch are part of the running indicator (timerPill) now
   const oflab = OUT.online ? tr('sync|pending changes') : OUT.down ? (OUT.maint ? tr('server in maintenance') : tr('server not reachable')) : tr('offline'), ofn = OUT.q.length ? trn('{0} change waiting', '{0} changes waiting', OUT.q.length) : '';
   const off = !OUT.online || OUT.q.length ? `<span class="offline" role="status" title="${esc([oflab, ofn, tr('Changes are sent as soon as the server is reachable')].filter(Boolean).join(' · '))}" aria-label="${esc([oflab, ofn].filter(Boolean).join(' · '))}">${ic(OUT.online ? 'sync' : 'cloudoff', 's')}<span class="ofl">${oflab}</span>${OUT.q.length ? `<span class="ofn">${OUT.q.length}</span>` : ''}</span>` : '';

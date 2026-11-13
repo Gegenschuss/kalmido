@@ -149,10 +149,12 @@ from kalmido.core.pg import connect_direct
 c = connect_direct(DATABASE_URL)  # the login role: owns the tables (ANALYZE), no row security in the way
 ev = [x for x in Q if "FROM events WHERE cal_id IN" in x[0]]
 out["ev"] = ev[0][0] if ev else ""
+# 2.1112.2 (#5979): created_at / updated_at are TIMESTAMPTZ since #5306 - now() instead of 'x' (the failed insert left the
+# transaction aborted, so the index lookup below read None)
 try:  # 3,000 past events of the calendar so that the plan means something (deleted below)
     cal = c.execute("SELECT cal_id FROM events WHERE title='single'").fetchone()[0]
     c.execute("""INSERT INTO events(cal_id, uid, href, title, start, "end", created_at, updated_at, first_day, last_day)
-                 SELECT ?, 'p2281e-' || g, 'p2281e-' || g || '.ics', 'old', '2020-01-01T10:00', '2020-01-01T11:00', 'x', 'x',
+                 SELECT ?, 'p2281e-' || g, 'p2281e-' || g || '.ics', 'old', '2020-01-01T10:00', '2020-01-01T11:00', now(), now(),
                         '2020-01-01', '2020-01-01' FROM generate_series(1, 3000) g""", (cal,))
     c.commit()
     c.execute("ANALYZE events")

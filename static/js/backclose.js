@@ -133,6 +133,9 @@ window.addEventListener('popstate', e => {
   // asks sbm_hold): that new address is no Back - the drawer stays our level with its entry, Back from there closes it. Also when
   // the new address equals the one the drawer opened on (location.replace back to the area's kept page): not only on nav
   if (typeof v !== 'number' && f8d_open() === 'side' && typeof SBM === 'object' && SBM.keep) return;
+  // 2.1113.0 (#5960): "Show me" opens the page of its next step itself (showme.js shw_go): that new address is no Back either -
+  // on a touch screen the spotlight closed and went back to the chat, the step on another page (the calendar) marked nothing
+  if (typeof v !== 'number' && f8d_open() === 'spot' && typeof SHW === 'object' && SHW.on && !!SHW.nav && location.hash === SHW.nav) return;
   f8d_bk.pushed -= close; e.stopImmediatePropagation();
   for (let i = 0; i < close && f8d_open(); i++) f8d_closeTop(nav);
   f8d_queue();

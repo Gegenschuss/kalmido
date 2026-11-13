@@ -2790,7 +2790,7 @@ BEGIN
       SELECT ticket_key INTO k FROM lists WHERE id=OLD.list_id;
       IF k IS NOT NULL THEN
         INSERT INTO task_keys(prefix, no, task_id, list_id, created_at)
-          VALUES (k, OLD.ticket_no, OLD.id, OLD.list_id, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'))
+          VALUES (k, OLD.ticket_no, OLD.id, OLD.list_id, date_trunc('second', now()))  -- 2.1112.2 (#5982): TIMESTAMPTZ (#5306), no to_char text
           ON CONFLICT DO NOTHING;
       END IF;
     END IF;

@@ -10,7 +10,7 @@ BK.billed = {};  // 2.121.0 C (#2094): receipts billed on to a client {node_id: 
 const BK_VATS = [['19', '19 %'], ['7', '7 %'], ['0', '0 %']];
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['books', 'book', N_('Bookkeeping'), 1, () => bkTabHtml(), 'money']);  // admins only; 2.92.1 (#1917): in the menu group Money
 
-const bkSub = () => (location.hash.split('/')[2] || '');
+const bkSub = () => ofcSeg(0);  // 2.1109.0 (#5959): also under #office/s/<ws>/books/<sub>
 const bkNote = () => `<p class="muted bk-note">${esc(tr('No tax advice; figures without guarantee.'))}</p>`;
 const bkVatLabel = v => v == null ? tr('VAT rate unknown') : tr('VAT {0} %', v);
 function bkDefaultPeriod(mode) {  // the period one files now: the last month / quarter
@@ -269,7 +269,7 @@ function tfVatHtml(d) {
 }
 function tfHtml() {
   if (!ofcFeat('books.vat_return')) return `<div class="empty">${tr('The VAT return figures are switched off for this office.')}</div>`;
-  const kind = location.hash.split('/')[3] === 'ust' ? 'ust' : 'euer';
+  const kind = ofcSeg(1) === 'ust' ? 'ust' : 'euer';
   if (TF.oid !== OFC.info?.org_id || TF.kind !== kind) Object.assign(TF, {oid: OFC.info?.org_id, kind, d: null, err: null, ys: TF.oid === OFC.info?.org_id ? TF.ys : null, year: TF.year || new Date().getFullYear() - 1});
   const back = `<a class="btn sm ghost" href="#office/books" data-navup>${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a>`;
   const tabs = `<div class="seg" role="group" aria-label="${esc(tr('Tax forms'))}">${[['euer', tr('Anlage EÜR')], ['ust', tr('Annual VAT return')]].map(([k, n]) => `<a class="btn sm${kind === k ? ' on' : ''}" href="#office/books/taxforms/${k}"${kind === k ? ' aria-current="page"' : ''}>${esc(n)}</a>`).join('')}</div>`;

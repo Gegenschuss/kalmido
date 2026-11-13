@@ -51,6 +51,8 @@ const ofcLockedHtml = () => ofcNoBooks() ? noAccessState({sub: OFC.info.submit ?
 // loaded = on (as before). The server checks the same on every route
 const ofcFeat = k => !OFC.info?.features || OFC.info.features[k] !== false;
 const pb_clOrg = () => OFC.info?.personal ? null : (OFC.info?.org_id || null);  // 2.47.3 (#1360): a personal office's clients are the private ones
+// 2.1109.0 (#5959): the n-th segment after the tab of the office address, with or without the workspace (#office/s/<ws>/<tab>/<seg>)
+const ofcSeg = n => { const p = location.hash.slice(1).split('/'); return p[(p[1] === 's' ? 4 : 2) + n] || ''; };
 const ofcWs = () => pb_clOrg() ? 'org:' + pb_clOrg() : 'private';  // 2.87.9 (#1940): the workspace of the shown office (importTargetConfirm)
 // 2.380.0 B (#3409): the documents' two tabs (office_docs.js): quotations and invoices
 const ofcDocTab = t => t === 'offers' || t === 'invoices';
@@ -756,6 +758,7 @@ const ofcPvId = id => id === 'os-scheme' ? 'os-preview' : id + '-pv';  // (the q
 function ofcSchemePv(inp, now) {
   const kind = inp.dataset.scheme, v = inp.value;
   OFC.pv[kind] = {...(OFC.pv[kind] || {}), busy: true};
+  const n = OFC['pvN' + kind] = (OFC['pvN' + kind] || 0) + 1;  // 2.1106.0 (#5608): an older answer arriving late does not overwrite a newer preview
   clearTimeout(OFC['pvT' + kind]);
   OFC['pvT' + kind] = setTimeout(async () => {
     let text;
@@ -763,6 +766,7 @@ function ofcSchemePv(inp, now) {
     try { const j = await api('GET', `/api/office/number-preview?kind=${kind}&scheme=${encodeURIComponent(v)}${cnt}`);
       text = j.valid ? tr('next: {0}', j.preview) + ' · ' + (j.yearly ? tr('starts again every year') : tr('counts on without a restart')) : (j.error || tr('Invalid value: {0}', tr('Number scheme'))); }
     catch { text = ''; }
+    if (n !== OFC['pvN' + kind]) return;  // 2.1106.0 (#5608): a newer call is on its way
     OFC.pv[kind] = {scheme: v, text};
     const el = $('#' + ofcPvId(inp.id)); if (el) { el.textContent = text; const er = !!text && !text.startsWith(tr('next: {0}', '').trim()); el.classList.toggle('err', er); const rs = $('#' + inp.id + '-rs'); if (rs) rs.hidden = !er; }  // 2.114.2 (#2264)
   }, now ? 0 : 250);

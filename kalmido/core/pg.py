@@ -163,9 +163,10 @@ class _NumLoader(adapt.Loader):
 
 
 def ts_canon(v):
-    """2.760.0 (#5311): a point in time in ONE canonical form - ISO 8601 in UTC with +00:00, microseconds only when there are
-    any (whole seconds = the form core/db.py now_iso writes into the TEXT columns). datetime (aware; naive = UTC) or ISO text
-    (Z, another offset, a T or a space) -> that form; None / '' -> ''; text that is no point in time stays as it is. The read of
+    """2.760.0 (#5311): a point in time in ONE canonical form - ISO 8601 in UTC with +00:00, milliseconds / microseconds only
+    when there are any (2.1112.2 #5986: the shortest exact form; whole seconds = the form core/db.py now_iso writes into the TEXT
+    columns, milliseconds = iso_ms). datetime (aware; naive = UTC) or ISO text (Z, another offset, a T or a space) -> that
+    form; None / '' -> ''; text that is no point in time stays as it is. The read of
     TIMESTAMPTZ columns (_TsLoader) and the version check (core/conflict.py ccf_check) both use it, so expect_updated_at works
     the same for TEXT and TIMESTAMPTZ tables."""
     if v is None or v == "":
@@ -180,8 +181,12 @@ def ts_canon(v):
         return str(v)
     if v.tzinfo is None:
         v = v.replace(tzinfo=timezone.utc)
+    # 2.1112.2 (#5986): the shortest exact form - whole seconds, milliseconds or microseconds. The writers put whole seconds
+    # (db.py iso / now_iso) or milliseconds (db.py iso_ms, the browser's toISOString) into the columns; a TIMESTAMPTZ read gave
+    # them back as .191000, so every plain text compare of a version (undo snapshots, bulk restore, the suites) saw a change.
+    spec = "auto" if v.microsecond % 1000 else "milliseconds" if v.microsecond else "seconds"
     try:
-        return v.astimezone(timezone.utc).isoformat()
+        return v.astimezone(timezone.utc).isoformat(timespec=spec)
     except OverflowError:  # review 2.760.0: year 1 / 9999 with an offset leaves the range -> as given (never equal to a real version)
         return raw if isinstance(raw, str) else str(raw)
 

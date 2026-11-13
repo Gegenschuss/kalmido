@@ -129,9 +129,10 @@ M_OWN, M_BOB = (sql("SELECT id FROM hub_mails WHERE message_id=?", (m,))[0][0] f
 out = in_app(f"from kalmido.admin.orgexport import ox_hidden_mails\nprint('hidden', sorted(ox_hidden_mails(c, {ORG}, {ALICE})), "
              f"sorted(ox_hidden_mails(c, {ORG}, None)))")
 check(f"hidden [{M_BOB}] []" in out, "#2561: the admin's export leaves out another member's inbox mail (as in the app) " + out[-300:])
+# 2.1112.2 (#5973): created_at / updated_at are TIMESTAMPTZ since #5306 - now() instead of 'x'
 # 2.190.0 R (#2561): the mail's folder, the files below it and their rows go with the mail (not committed: rolled back)
 NODE = ("c.execute(\"INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,hub_mail_id,created_at,updated_at) "
-        "VALUES(?,?,?,?,?,?,'x','x') RETURNING id\", ({0}, '{1}', '{2}', %d, %d, {3})).fetchone()[0]" % (BOB, ORG))
+        "VALUES(?,?,?,?,?,?,now(),now()) RETURNING id\", ({0}, '{1}', '{2}', %d, %d, {3})).fetchone()[0]" % (BOB, ORG))
 out = in_app("from kalmido.admin.orgexport import ox_hidden_nodes, OX_NODE_TABLES\n"
              "f = " + NODE.format("None", "folder", "2026-10-23 Betreff", M_BOB) + "\n"
              "e = " + NODE.format("f", "file", "Betreff.eml", "None") + "\n"

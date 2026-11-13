@@ -53,6 +53,8 @@ ROUTES = {
     "POST /api/v1/team/messages/{}/reactions": "routine", "POST /api/v1/team/rooms/{}/messages": "routine",
     "DELETE /api/v1/tasks/{}/watchers/{}": "routine", "POST /api/v1/tasks/{}/watchers": "routine",
     "DELETE /api/v1/tasks/{}/relations/{}": "routine", "POST /api/v1/tasks/{}/relations": "routine",  # 2.576.0 (#3371)
+    # 2.1112.2 (#5975): the links of the core objects (#5271): reversible like relations, no longer the agent's own channel (meta)
+    "POST /api/v1/agent/objects/{}/{}/links": "routine", "DELETE /api/v1/agent/objects/{}/{}/links/{}": "routine",
     "POST /api/v1/videos/{}/comments": "routine",
     # ---- one_way
     "DELETE /api/v1/address-books/{}": "one_way", "DELETE /api/v1/address-books/{}/members/{}": "one_way",

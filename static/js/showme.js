@@ -13,7 +13,7 @@
 'use strict';
 
 /** @type {any} */
-const SHW = {on: false, steps: [], i: 0, el: null, back: '', aid: 0, chat: false, since: 0, miss: false, rk: '', iv: 0, drawn: '', seen: false};
+const SHW = {on: false, nav: '', steps: [], i: 0, el: null, back: '', aid: 0, chat: false, since: 0, miss: false, rk: '', iv: 0, drawn: '', seen: false};
 const SHW_WAIT = 2500;  // ms a step looks for its control before the card says it is not on the screen
 const SHW_TICK = 250;   // ms between two looks (the control may appear, move or go)
 
@@ -63,7 +63,8 @@ function shw_go(i) {
   if (!SHW.on) return;
   SHW.i = Math.max(0, Math.min(SHW.steps.length - 1, i));
   const st = SHW.steps[SHW.i];
-  if (st.route && location.hash !== st.route) go(st.route.slice(1));
+  SHW.nav = st.route && location.hash !== st.route ? st.route : '';  // 2.1113.0 (#5960): the step's own page change is no Back (backclose.js)
+  if (SHW.nav) go(st.route.slice(1));
   Object.assign(SHW, {since: Date.now(), miss: false, rk: '', seen: false});
   shw_tick();
 }

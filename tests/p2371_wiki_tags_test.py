@@ -338,6 +338,26 @@ sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (FA, uid["gina"]), wr
 v1 = vis_stamp()
 check(v0.startswith("STAMP ") and v1.startswith("STAMP ") and v0 != v1, "a share taken away changes the stamp " + str((v0, v1)))
 
+# ================================================================ 2.1112.2 (#5981): a save on a whole second is indexed, not late
+# iso_ms writes "...:00.000+00:00", wks_unindexed reads the column with ct_iso as "...:00+00:00": the mark has to be that form
+WHOLE = f"""
+import kalmido.wiki.wksearch as W
+from kalmido.core.coltype import ct_iso
+from kalmido.core.db import DATABASE_URL
+from kalmido.core.pg import connect_direct
+c = connect_direct(DATABASE_URL)
+got = {{}}
+W.osw_put = lambda c_, kind, pid, ws=None, text=None, more=(), mark=True: got.setdefault("more", set(more))
+at = "2026-11-13T08:00:00.000+00:00"  # db.py iso_ms on a whole second
+W.wks_index(c, {PW}, None, {FID}, "#anderes", at)
+want = c.execute("SELECT 'u:' || " + ct_iso("'" + at + "'::timestamptz")).fetchone()[0]  # the expression names its value 4 times
+print("MARK", want in got.get("more", ()), want, sorted(m for m in got.get("more", ()) if m.startswith("u:")))
+c.rollback()
+"""
+x = subprocess.run(["docker", "exec", "-i", CT, "python", "-"], input=WHOLE, capture_output=True, text=True, timeout=60)
+check("MARK True" in x.stdout, "#5981: a page saved on a whole second (.000) counts as indexed "
+      + " | ".join(ln for ln in x.stdout.splitlines() if ln.startswith("MARK")) + " " + x.stderr[-200:])
+
 # ================================================================ nothing logged
 logs = subprocess.run(["docker", "logs", CT], capture_output=True, text=True, timeout=60)
 lg = (logs.stdout or "") + (logs.stderr or "")

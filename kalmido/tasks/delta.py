@@ -23,7 +23,7 @@ from ..core.config import app, APP_VERSION
 from ..core.db import appver_parse, db, gset, gsetting, iso, now_utc, trigger_ensure, usettings
 from ..accounts.session import me
 from ..core.access import plists, time_all, token_lists, tvis, vis_sql, wr_sql  # 2.149.0 G (#2517): pulled up from functions
-from ..core.serializers import load_tasks, td_lean, TD_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions; 2.575.0 B (#3966): + td_lean
+from ..core.serializers import load_tasks, td_extra, td_lean, td_mode  # 2.149.0 G (#2517): pulled up from functions; 2.575.0 B (#3966): + td_lean; 2.1117.0 (#6023): + td_mode, td_extra
 from ..core.pg import st_ids  # 2.369.2 (#3136)
 from ..core.state import ev_links, ev_sig, lz_counts, lz_ids_arg, lz_tree, st_where  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
@@ -411,6 +411,6 @@ def state_lists():
     tasks = load_tasks(c, where + " ORDER BY id", args, lean_notes=True)
     ids = [t["id"] for t in tasks]
     # the events and contacts of these tasks, as /api/state has them for its tasks (the client adds them to its maps)
-    td = request.args.get("td") == "1"  # 2.575.0 B (#3966): as /api/state: without the defaults + the table (liveparts.js tdFill)
-    return jsonify(v=v0, tasks=td_lean(tasks) if td else tasks, evlinks=ev_links(c, uid, ids) if ids and events_on(c, uid) else {},
-                   tcontacts=task_contacts(c, uid, set(ids)) if ids else {}, **({"tdef": TD_DEFAULTS} if td else {}))
+    td = td_mode(request.args)  # 2.575.0 B (#3966): as /api/state: without the defaults + the table (liveparts.js tdFill); 2.1117.0 (#6023): 2 = + the zone
+    return jsonify(v=v0, tasks=td_lean(tasks, utc=td >= 2) if td else tasks, evlinks=ev_links(c, uid, ids) if ids and events_on(c, uid) else {},
+                   tcontacts=task_contacts(c, uid, set(ids)) if ids else {}, **td_extra(td))

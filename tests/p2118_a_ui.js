@@ -45,6 +45,9 @@ const call = async (method, url, body, ck) => { const r = await fetch(B + url.re
     check(sel && /Counter for quotations/.test(sel.label), tag + 'its label ' + JSON.stringify(sel));
     const btns = await ev(`(() => { const q = id => [...(document.querySelector('#' + id)?.closest('.row')?.parentElement?.querySelectorAll('[data-for="' + id + '"][data-bb="{version}"]') || [])].length; return {offer: q('os-scheme'), inv: q('os-inv-scheme')}; })()`);
     check(btns.offer === 1 && btns.inv === 0, tag + 'the {version} button only at the quotation scheme ' + JSON.stringify(btns));
+    // 2.1106.0 (#5608): the preview of the counter change answers late (as on a slow first request in the CI): it must not
+    // overwrite the newer preview of the scheme with {version}
+    await ev(`(() => { window.__p2118late = 0; const f0 = window.fetch; window.fetch = (u, o) => { if (!window.__p2118late && /number-preview.*counter=client/.test(String(u))) { window.__p2118late = 1; return new Promise(res => setTimeout(res, 1500)).then(() => f0(u, o)).finally(() => { window.__p2118late = 2; }); } return f0(u, o); }; return 1; })()`);
     // per client: the preview shows the example from 01
     await ev(`(() => { const s = document.querySelector('#os-counter'); s.value = 'client'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     let pv = ''; for (let i = 0; i < 30; i++) { pv = await ev(`document.querySelector('#os-preview')?.textContent || ''`); if (/-01\b/.test(pv)) break; await sleep(200); }
@@ -56,6 +59,9 @@ const call = async (method, url, body, ck) => { const r = await fetch(B + url.re
     check(val === KV + '-V{version}', tag + 'the button inserted {version}: ' + val);
     for (let i = 0; i < 30; i++) { pv = await ev(`document.querySelector('#os-preview')?.textContent || ''`); if (/-V1\b/.test(pv)) break; await sleep(200); }
     check(/KV-\S+-\d{4}-01-V1/.test(pv), tag + 'preview with V1: ' + pv);
+    for (let i = 0; i < 50 && (await ev(`window.__p2118late`)) !== 2; i++) await sleep(100);  // 2.1106.0 (#5608): the late answer is in
+    for (let i = 0; i < 10; i++) { pv = await ev(`document.querySelector('#os-preview')?.textContent || ''`); if (!/-V1\b/.test(pv)) break; await sleep(100); }  // (it stays: a short look after it came)
+    check(/KV-\S+-\d{4}-01-V1/.test(pv) && (await ev(`window.__p2118late`)) === 2, tag + 'a late older answer leaves the newer preview: ' + pv);
     const over = await ev(`document.documentElement.scrollWidth > window.innerWidth + 1`);
     check(!over, tag + 'no horizontal overflow');
     if (o.shot) { await ev(`document.querySelector('#os-counter').scrollIntoView({block: 'center'})`); await sleep(300); await o.shot(`2265-${user}-${width}.png`); }

@@ -36,10 +36,12 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     // the server answers 500 for the cash book (a short failure)
     await ev(`(() => { const f0 = window.fetch; window.__cbFail = true; window.fetch = (u, o) => (window.__cbFail && String(u).includes('/api/office/cashbooks')) ? Promise.resolve(new Response(JSON.stringify({error: 'Server error'}), {status: 500, headers: {'Content-Type': 'application/json'}})) : f0(u, o); return 1; })()`);
     await ev(`(() => { document.querySelector('#side [data-ofm="cashbook"]').click(); return 1; })()`);  // 2.152.2 (#2617): the office points sit in the panel #side
-    check(await ready(ev, `!!document.querySelector('.ofcbody [data-cb="retry"]') && !document.querySelector('#cb-quick')`), 'a failed load: the error with "Try again"');
+    // 2.1112.2 (#5972): since #5450 (job/4293) the failed load is the shared errorState of render.js: its "Try again" is [data-esretry]
+    check(await ready(ev, `(() => { const e = document.querySelector('.ofcbody .eerr'), b = e && e.querySelector('[data-esretry]');
+      return !!b && /Try again/.test(b.textContent) && /Server error|Could not be loaded/.test(e.textContent) && !document.querySelector('#cb-quick'); })()`), 'a failed load: the error with "Try again"');
     await shot('p214411-a-error.png');
-    await ev(`(() => { window.__cbFail = false; document.querySelector('[data-cb="retry"]').click(); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('#cb-quick') && !document.querySelector('[data-cb="retry"]')`), '"Try again": the cash book loads');
+    await ev(`(() => { window.__cbFail = false; document.querySelector('.ofcbody [data-esretry]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('#cb-quick') && !document.querySelector('.ofcbody [data-esretry]')`), '"Try again": the cash book loads');
     await ev(`(() => { document.querySelector('[data-cb="dir"][data-v="in"]').click(); const f = document.querySelector('#cb-quick');
       f.querySelector('#cb-amount').value = '12'; f.querySelector('#cb-text').value = 'Verkauf'; f.querySelector('.cb-go').click(); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.cb-list .cb-row').length === 1`), 'a booking afterwards works');

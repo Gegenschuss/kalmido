@@ -376,13 +376,38 @@ TD_DEFAULTS = {
 }
 
 
-def td_lean(tasks):
+# 2.1117.0 (#6023): the task's points in time (TIMESTAMPTZ, read as ts_canon: always UTC with +00:00) go without that zone to a
+# client that asks for it (td=2, or "tutc" in the answer): +00:00 was 2 x 6 bytes per task, 64 KB of a big account's start
+# set. The client puts it back with the defaults (liveparts.js tdFill: a non-empty text without +00:00 gets it), so the task
+# it works with is the one the whole state has. completed_at is TEXT (no zone) and stays as it is.
+TD_UTC = ("created_at", "updated_at", "deleted_at")
+TD_UTC_ZONE = "+00:00"
+
+
+def td_mode(args):
+    """2.1117.0 (#6023): what the client asks of GET /api/state and /api/state/lists: 0 = every key as it is (older clients,
+    agents), 1 = without the defaults (#3966), 2 = and the points in time without their zone (TD_UTC)."""
+    return {"1": 1, "2": 2}.get(args.get("td") or "", 0)
+
+
+def td_extra(td):
+    """2.1117.0 (#6023): the tables an answer with td carries for the client's tdFill."""
+    return {"tdef": TD_DEFAULTS, **({"tutc": list(TD_UTC)} if td >= 2 else {})} if td else {}
+
+
+def td_lean(tasks, utc=False):
     """2.575.0 B (#3966): drop the keys of TD_DEFAULTS that hold their default (same type: 0 is not False) from these task
-    dicts (in place) -> tasks."""
+    dicts (in place) -> tasks. 2.1117.0 (#6023): utc = also the zone +00:00 off the TD_UTC keys."""
+    z = len(TD_UTC_ZONE)
     for d in tasks:
         for k, v in TD_DEFAULTS.items():
             if k in d and type(d[k]) is type(v) and d[k] == v and not (k == "content" and "content_n" in d):
                 del d[k]
+        if utc:
+            for k in TD_UTC:
+                v = d.get(k)
+                if isinstance(v, str) and v.endswith(TD_UTC_ZONE):
+                    d[k] = v[:-z]
     return tasks
 
 

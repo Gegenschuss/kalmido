@@ -1,6 +1,34 @@
 {
  "versions": [
   {
+   "version": "2.1113.0",
+   "date": "2026-11-13",
+   "items": [
+    {
+     "de": "Buchungsarchiv, Verfahrensdoku und Alle Belege öffnen sich jetzt auch aus einem Arbeitsbereich heraus richtig.",
+     "en": "The booking archive, procedure documentation and all receipts now open correctly from inside a workspace."
+    },
+    {
+     "de": "Die Seitenleiste sieht in jedem Bereich gleich aus: oben der Name mit seinen Knöpfen, der offene Eintrag immer gleich markiert.",
+     "en": "The sidebar looks the same in every area: its name with its buttons on top, the open entry always marked the same way."
+    }
+   ]
+  },
+  {
+   "version": "2.1108.0",
+   "date": "2026-11-13",
+   "items": [
+    {
+     "de": "Auf dem Handy steht der Kopf der Seitenleiste jetzt immer still, nur die Liste darunter rollt.",
+     "en": "On a phone the sidebar's head now stays put; only the list below it scrolls."
+    },
+    {
+     "de": "Eine Wissensseite zeigt auf dem Handy ihren Titel nur noch einmal und hat ein einziges Menü.",
+     "en": "On a phone a knowledge page shows its title only once and has a single menu."
+    }
+   ]
+  },
+  {
    "version": "2.1100.0",
    "date": "2026-11-13",
    "items": [
@@ -1353,46 +1381,6 @@
     {
      "de": "Langes Drücken in Ablage, Kontakten, Wissen, Kunden und Dokumenten öffnet das Menü, „Auswählen“ steht oben.",
      "en": "A long press in files, contacts, knowledge, clients and documents opens the menu, with \"Select\" on top."
-    }
-   ]
-  },
-  {
-   "version": "2.614.0",
-   "date": "2026-11-06",
-   "items": [
-    {
-     "de": "In der EÜR siehst du jetzt den Vergleich mit dem Vorjahr, ältere Jahre aus dem DATEV-Archiv.",
-     "en": "The income statement now shows a comparison with the year before, older years from the DATEV archive."
-    },
-    {
-     "de": "Du kannst je Jahr wählen, ob die EÜR nach Belegen oder streng nach Bank und Kasse rechnet.",
-     "en": "You can choose per year whether the income statement counts by receipts or strictly by bank and cash."
-    },
-    {
-     "de": "Am Rechner steht die Notizen-Liste jetzt in der Seitenleiste, die sich ausblenden und breiter ziehen lässt.",
-     "en": "On a computer the note list now sits in the sidebar, which you can hide and drag wider."
-    },
-    {
-     "de": "Karten, Hinweise und der Monatskalender haben einheitliche Ecken und Ränder.",
-     "en": "Cards, hints and the month calendar have consistent corners and borders."
-    }
-   ]
-  },
-  {
-   "version": "2.605.0",
-   "date": "2026-11-06",
-   "items": [
-    {
-     "de": "Im Papierkorb der Ablage kannst du jetzt alles leeren oder einzelne Einträge endgültig löschen.",
-     "en": "You can now empty the file trash or delete single items for good."
-    },
-    {
-     "de": "Der neue Steuer-Check zeigt vor der Abgabe von EÜR und USt-Erklärung mit einer Ampel, was noch klemmt.",
-     "en": "The new tax check shows with a traffic light what still needs a look before you file the EÜR and VAT return."
-    },
-    {
-     "de": "Drehtage aus dem Angebot landen als vorläufige Buchungen mit offenen Plätzen in der Disposition.",
-     "en": "Shoot days from a quotation now become pencilled-in bookings with open places in the disposition."
     }
    ]
   }

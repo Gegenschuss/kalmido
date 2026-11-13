@@ -101,6 +101,9 @@ uleft = {k.value for k in lc["UMZ_LEFT_TABLES"].keys}  # also org / list / task 
 uleft |= {t for t, r in reg.items() if r.get("acct_left")}  # 2.1093.0 (#5289)
 qtext = atext + open(os.path.join(ROOT, "kalmido", "accounts", "settings.py"), encoding="utf-8").read()
 exported = {t for t in tables if re.search(rf"(?:FROM|JOIN) {t}\b", qtext)}
+# 2.1112.2 (#5969): since 2.1097.0 (#5949) the account export of the core's tables runs through the export register
+# (kalmido/core/objexport.py obj_export acct= / acct_more=), no longer as a query in acctexport.py / settings.py
+exported |= {t for t, r in reg.items() if r.get("acct") or r.get("acct_more")}
 uneed = {t for t, cols in tables.items() if "user_id" in cols}
 for t in ("sprints", "task_links", "list_rules", "portal_tickets"):  # #3469: list tables, no person column
     check(t in exported, f"{t}: not in the account export (decision of #3469)")

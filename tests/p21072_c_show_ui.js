@@ -6,7 +6,7 @@
 // spotlight on the control: the ring around it, the card with the agent's line and 1/2 on the screen, the control itself still
 // takes a press (the layer lets it through); Next goes to #cal and rings "New event", Back comes back, Done on the last step ends
 // it and stays there. Pressed again, Close (and Escape) goes back to where the button was pressed, the chat still there.
-// Phone (390 x 844, touch): the chat is a page; a step whose control is not on the screen (settings.integrations: the settings
+// Phone (390 x 844, touch): the chat is a page; the event step rings the round + (2.1113.0 #5960: "+ Event" is hidden there); a step whose control is not on the screen (settings.integrations: the settings
 // are closed) says so in one line after its wait; Close goes back to the chat page. Nothing is clicked or saved: no dialog
 // opened, the task box stays empty, no task / event more on the server. With P21072C_SHOTS: pictures of the spotlight.
 const path = require('path');
@@ -121,7 +121,7 @@ async function counts(ck) {
     check(await counts(p.ck) === before, `${p.who} desktop: no task, no event more on the server ${before} -> ${await counts(p.ck)}`);
 
     // ================= a phone: a step whose control is not on the screen says so in one line; Close back to the chat page
-    const m2 = await say(p, 'The scan inbox is in the settings.', [{target: 'tasks.new', text: 'Here you add a task.'}, {target: 'settings.integrations', text: 'Then press Integrations.'}]);
+    const m2 = await say(p, 'The scan inbox is in the settings.', [{target: 'tasks.new', text: 'Here you add a task.'}, {target: 'calendar.new', text: 'Here you add an event.'}, {target: 'settings.integrations', text: 'Then press Integrations.'}]);
     await firefox(async ({cmd, ev, ctx, nav, until, shot}) => {
       await nav(B + 'static/icon.svg');
       check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${p.who}', password: 'password123'})}).then(r => r.status)`) === 200, `${p.who} phone: login`);
@@ -135,6 +135,13 @@ async function counts(ck) {
       let s = JSON.parse(await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).state === 'on' && JSON.parse(x).inRing ? x : null; })()`) || 'null');
       check(s && s.hash === '#today' && s.ring && s.inRing && s.card && /Here you add a task\./.test(s.text), `${p.who} phone: the first step rings the way to a new task ` + JSON.stringify(s));
       await shot(`p21072c-${p.who}-phone-1.png`);
+      // 2.1113.0 (#5960): on a phone the calendar hides its "+ Event" button; the step rings the round + (it adds an event there)
+      await ev(`document.querySelector('.spot [data-shw="next"]').click()`);
+      s = JSON.parse(await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).target === 'calendar.new' && JSON.parse(x).state === 'on' && JSON.parse(x).inRing ? x : null; })()`) || 'null');
+      if (!s) console.log('DIAG', await ev(`JSON.stringify({spot: ${SPOT}, hash: location.hash, el: !!document.querySelector('.spot'), on: SHW.on, i: SHW.i, fab: document.querySelector('#fab')?.className, fabR: JSON.stringify(document.querySelector('#fab')?.getBoundingClientRect()), mob: isMobile(), mod: S.route.mod, cfe: typeof calFabEv === 'function' && calFabEv()})`));
+      check(s && s.hash === '#cal' && s.ring && s.inRing && s.card && /Here you add an event\./.test(s.text) && await ev(`shw_find(SHW.steps[SHW.i].sel)?.id === 'fab' && calFabEv()`),
+        `${p.who} phone: the event step rings the round + of the calendar (it adds an event there) ` + JSON.stringify(s));
+      await shot(`p21072c-${p.who}-phone-event.png`);
       await ev(`document.querySelector('.spot [data-shw="next"]').click()`);
       s = JSON.parse(await until(`(() => { const x = ${SPOT}; return x && JSON.parse(x).state === 'missing' ? x : null; })()`, {timeout: 8000}) || 'null');
       check(s && s.miss && s.missLines <= 2 && /Not on the screen here/.test(s.text) && !s.ring && s.card && /Then press Integrations\./.test(s.text),

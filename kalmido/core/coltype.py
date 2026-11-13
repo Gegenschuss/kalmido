@@ -114,12 +114,14 @@ def ct_day(expr):
 
 def ct_iso(expr):
     """SQL: a time column as the canonical ISO text the app reads (core/pg.py ts_canon, whole seconds: UTC, +00:00), for TEXT
-    and TIMESTAMPTZ alike, microseconds only when there are any; NULL for NULL / ''. For keys and marks built in SQL that Python compares with a value it read
+    and TIMESTAMPTZ alike, milliseconds / microseconds only when there are any; NULL for NULL / ''. For keys and marks built in SQL that Python compares with a value it read
     (a TIMESTAMPTZ concatenated or assigned to a TEXT column carries the session's text form '2026-11-13 04:33:00+00')."""
     # review 2.1095 (F8): microseconds when there are any, as ts_canon (iso_ms writes milliseconds into many of these columns)
     t = f"(NULLIF(CAST({expr} AS text), '')::timestamptz AT TIME ZONE 'UTC')"
-    return (f"""(to_char({t}, 'YYYY-MM-DD"T"HH24:MI:SS') || CASE WHEN to_char({t}, 'US') <> '000000' THEN '.' || to_char({t}, 'US') """
-            f"""ELSE '' END || '+00:00')""")
+    # 2.1112.2 (#5986): the shortest exact form as ts_canon - milliseconds when the microseconds are whole thousands
+    return (f"""(to_char({t}, 'YYYY-MM-DD"T"HH24:MI:SS') || CASE WHEN to_char({t}, 'US') = '000000' THEN '' """
+            f"""WHEN right(to_char({t}, 'US'), 3) = '000' THEN '.' || to_char({t}, 'MS') ELSE '.' || to_char({t}, 'US') END """
+            f"""|| '+00:00')""")
 
 
 def _valid(q):

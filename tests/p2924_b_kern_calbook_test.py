@@ -314,8 +314,9 @@ check(A.put(B + f"/api/evcals/{KT}/members", json={"user_id": BOB, "role": "edit
 NT = node("evcal", KT)
 check(A.delete(B + f"/api/evcals/{KT}").ok and KT not in ids(Bo.get(B + "/api/evcals")), "the calendar into the trash")
 # 2.947.0 (#5367): ev_cal_trash_purge is gone - the calendars' trash is the core's run (obj_trash_prune, kind evcal)
+# 2.1112.2 (#5995): the cut is a point in time - deleted_at is TIMESTAMPTZ since #5306, the text '9999' is none (the app passes ret_trash_cut)
 out = box("from kalmido.core.pg import system_ctx\nfrom kalmido.core.writes import obj_trash_prune\n"
-          "with system_ctx(c):\n    print('purged', obj_trash_prune(c, 'evcal', '9999', True))")
+          "with system_ctx(c):\n    print('purged', obj_trash_prune(c, 'evcal', '9999-12-31T00:00:00Z', True))")
 check("purged 1" in out, f"#5069: the trash emptied without an error ({out[-300:]})")
 check(not sql("SELECT 1 FROM ev_cals WHERE id=?", (KT,)) and not sql("SELECT 1 FROM fs_nodes WHERE id=?", (NT,))
       and not sql("SELECT 1 FROM fs_shares WHERE node_id=?", (NT,)), "#5069: calendar, node and shares are gone")

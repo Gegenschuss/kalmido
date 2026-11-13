@@ -80,6 +80,8 @@ def fill(list_ids, per, users, tag_uid):
     us = ",".join(map(str, users))
     kt.dbx(f"INSERT INTO sections (list_id, name, sort) SELECT l, n, k FROM unnest(ARRAY[{ids}]) l, "
            "unnest(ARRAY['Offen','In Arbeit','Fertig']) WITH ORDINALITY AS x(n, k)")
+    # 2.1112.2 (#5184): created_at / updated_at are TIMESTAMPTZ since #5306 - a point in time (whole seconds, as the app
+    # writes them), not to_char text; completed_at stays TEXT
     # like Audit Q's generator: 60 % with a note (0-60 words), 45 % due (-60..90 days), 20 % done (half of them within
     # the 14 days the start state keeps), priorities 0/0/0/1/3/5, a section each
     kt.dbx(f"""INSERT INTO tasks (list_id, section_id, title, content, priority, status, due, due_time, reminders, sort,
@@ -92,7 +94,7 @@ def fill(list_ids, per, users, tag_uid):
           CASE WHEN (j * 3 + l) % 20 < 9 THEN to_char(current_date + ((j * 37 + l) % 151) - 60, 'YYYY-MM-DD') END,
           CASE WHEN (j * 3 + l) % 20 < 3 THEN lpad((7 + j % 12)::text, 2, '0') || ':00' END,
           CASE WHEN (j * 3 + l) % 20 < 4 THEN '0,15' ELSE '' END, j,
-          to_char(now() - interval '40 days', 'YYYY-MM-DD"T"HH24:MI:SS'), to_char(now() - interval '20 days', 'YYYY-MM-DD"T"HH24:MI:SS'),
+          date_trunc('second', now() - interval '40 days'), date_trunc('second', now() - interval '20 days'),
           CASE WHEN (j * 7 + l) % 5 = 0 THEN to_char(now() - ((j % 28) || ' days')::interval, 'YYYY-MM-DD"T"HH24:MI:SS') END,
           (ARRAY[{us}])[1 + j % {len(users)}], CASE WHEN j % 4 = 0 THEN (ARRAY[{us}])[1 + (j / 4) % {len(users)}] END
         FROM unnest(ARRAY[{ids}]) l, generate_series(1, {per}) j""")
@@ -126,23 +128,30 @@ d8 = kt.dbx("SELECT to_char(current_date + 7, 'YYYY-MM-DD')")[0][0]
 
 
 def tdfill(j):
-    """2.575.0 (#3966): as the client's tdFill (liveparts.js): the keys left out at their default back from the answer's tdef."""
+    """2.575.0 (#3966): as the client's tdFill (liveparts.js): the keys left out at their default back from the answer's tdef.
+    2.1117.0 (#6023): + the zone +00:00 back on the points in time named in tutc (td=2)."""
     for t in j.get("tasks", []):
         for k, v in (j.get("tdef") or {}).items():
             if k not in t and not (k == "content" and "content_n" in t):
                 t[k] = type(v)() if isinstance(v, (list, dict)) else v
+        for k in j.get("tutc") or ():
+            if isinstance(t.get(k), str) and t[k] and not re.search(r"(Z|[+-]\d\d:\d\d)$", t[k]):
+                t[k] += "+00:00"
     return j
 
 
 def lzcheck(s, who, full, me_id, lz_lists=()):
     # 2.575.0 (#3966): measured as the client asks (td=1: without the defaults, filled back here as the client does)
-    r = s.get(B + "/api/state?td=1&lz=1&lzl=" + ",".join(map(str, lz_lists)))
+    # 2.1117.0 (#6023): the client asks td=2 (+ the points in time without their zone, tutc)
+    r = s.get(B + "/api/state?td=2&lz=1&lzl=" + ",".join(map(str, lz_lists)))
     j = r.json()
     raw = len(r.content)
-    check(isinstance(j.get("tdef"), dict) and any(len(t) < len(j["tdef"]) for t in j["tasks"]), f"{who}: td=1 leaves the defaults out (+ tdef)")
+    check(isinstance(j.get("tdef"), dict) and any(len(t) < len(j["tdef"]) for t in j["tasks"]), f"{who}: td=2 leaves the defaults out (+ tdef)")
+    check(j.get("tutc") and not any(str(t.get("updated_at") or "").endswith("+00:00") for t in j["tasks"]),
+          f"{who}: td=2 sends the points in time without their zone (+ tutc)")
     old = s.get(B + "/api/state?lz=1&lzl=" + ",".join(map(str, lz_lists))).json()  # an older client (lz=1, no td): every key
     check("tdef" not in old and {t["id"]: t for t in old["tasks"]} == {t["id"]: t for t in tdfill(j)["tasks"]},
-          f"{who}: lz=1 without td = every key, the same tasks as td=1 filled back")
+          f"{who}: lz=1 without td = every key, the same tasks as td=2 filled back")
     m = TIMING.search(r.headers.get("Server-Timing", ""))
     print(f"PERF {who} /api/state?lz=1: {raw / 1e6:.2f} MB, gzip {len(gzip.compress(r.content, 6)) / 1e6:.2f} MB, "
           f"{r.elapsed.total_seconds():.2f} s, {m.group(2) if m else '?'} statements, {len(j.get('tasks', []))} tasks, "
@@ -190,7 +199,7 @@ check("lz" not in rr.json() and len(rr.json()["tasks"]) == len(full), "lzl=all: 
 
 # GET /api/state/lists: one list, several, all = as in the whole state
 for ids in ([lids[10]], [lids[11], lids[12], lids[7]]):
-    rr = Bo.get(B + "/api/state/lists?td=1&ids=" + ",".join(map(str, ids)))  # 2.575.0 (#3966): as the client asks
+    rr = Bo.get(B + "/api/state/lists?td=2&ids=" + ",".join(map(str, ids)))  # 2.575.0 (#3966): as the client asks; 2.1117.0 (#6023): td=2
     got = {t["id"]: t for t in tdfill(rr.json())["tasks"]}
     want = {i for i, t in full.items() if t["list_id"] in ids}
     check(rr.ok and want <= set(got) and all(got[i] == full[i] for i in got), f"/api/state/lists?ids={ids}: those lists as in the whole state")
@@ -250,6 +259,8 @@ for t in lzj["tasks"]:  # filled back by tdfill: a key at its tdef default did n
     for k, v in t.items():
         if k in tdef and type(v) is type(tdef[k]) and v == tdef[k]:
             continue
+        if k in (lzj.get("tutc") or ()) and isinstance(v, str) and v.endswith("+00:00"):
+            v = v[:-6]  # 2.1117.0 (#6023): went over the wire without its zone
         kb[k] = kb.get(k, 0) + len(json.dumps({k: v}, separators=(",", ":"))) - 1
 print("PERF bob start set by task key:", ", ".join(f"{k} {n / 1e3:.0f} KB" for k, n in sorted(kb.items(), key=lambda x: -x[1])[:12]), flush=True)
 if BUDGET_BYTES:

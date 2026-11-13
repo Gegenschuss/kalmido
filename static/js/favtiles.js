@@ -586,6 +586,7 @@ function fvd_sync(n) {
   if (!can && fvd_isOpen()) fvd_set(false);
   g.classList.toggle('hidden', !can);
   if (can && g.title !== tr('Favourites')) { g.title = tr('Favourites'); g.setAttribute('aria-label', tr('Favourites')); }
+  if (can && !g.firstElementChild) g.innerHTML = ic('star', 's');  // 2.1108.0 (#5965): the tab shows what it opens
 }
 function fvd_set(on) {
   const r = $('#favup'), g = $('#favgrip'); if (!r || !g || (on && !fvd_can()) || on === fvd_isOpen()) return;

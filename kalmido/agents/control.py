@@ -74,6 +74,9 @@ CTL_BODY_MAX = 32000  # 2.235.0 A2 (#2891): the bound body of an approval card (
 # (methods, path with {} for the route variables, class). First match wins; DELETE not listed = one_way, the rest = change.
 CTL_ROUTES = (
     (("PATCH",), r"^/agent/objects/\{\}/\{\}$", "change"),  # 2.558.0 (#4709): an object of the shared core (an area's data, not the agent's channel)
+    # 2.1112.2 (#5975): linking two objects of the core (#5271) writes data a person sees, not the agent's channel; a link goes
+    # into the trash when removed and comes back through the undo list -- small and reversible like a task's relations (#3371)
+    (("POST", "DELETE"), r"^/agent/objects/\{\}/\{\}/links(/\{\})?$", "routine"),
     (CTL_WRITE, r"^/agent(/|$)", "meta"),  # the agent's own channel: status, typing, chat + approval cards, jobs, proposals, queue
     (("POST",), r"^/tasks/\{\}/typing$", "meta"),
     (CTL_WRITE, r"^/tasks/\{\}/working$", "meta"),  # 2.407.0 (#3513): "agent is working" mark, its own status like typing
@@ -296,6 +299,21 @@ def _ctl_int(v):
     return int(v) if isinstance(v, str) and v.isdigit() and len(v) < 18 else None
 
 
+def _ctl_obj_lists(c, aid, va):
+    """2.1117.0 (#6024): the project of an object of the shared core (/agent/objects/{kind}/{id}...: PATCH, its links) -> (lids,
+    unknown), read from the object's own row (its kind's list_col, core/objects.py; a list: its own id) -- never from the body.
+    An object without a project, of an unknown kind or of a project the agent does not see (it reaches it by a share): the
+    gate cannot place it (unknown), as before."""
+    from ..core.objects import OBJ, obj_row
+    reg = OBJ.get(va.get("kind") or "")
+    r = obj_row(c, va.get("kind"), va.get("rid")) if reg else None
+    col = reg["list_col"] if reg else ""
+    lid = r[col] if r is not None and col in r.keys() else None
+    if not lid or not list_role(c, lid, aid):
+        return [], True
+    return [lid], False
+
+
 def ctl_lists(c, aid, path, b):
     """The projects a write request concerns (route variables and body), only those the agent sees -> (lids, unknown).
     lids None = an object of a project the agent cannot see (the route itself refuses). 2.235.0 A2 (#2891): unknown = the
@@ -303,6 +321,8 @@ def ctl_lists(c, aid, path, b):
     without a project, a list_id that is no id): the caller caps a personal agent there (ctl_gate)."""
     va = request.view_args or {}
     lids, unknown = [], False
+    if path.startswith("/agent/objects/{}/{}"):  # 2.1117.0 (#6024): the object's project; a list_id in the body is not read there
+        return _ctl_obj_lists(c, aid, va)
     if path == "/tasks/batch":
         ids = [x for x in b.get("ids") or [] if isinstance(x, int) and not isinstance(x, bool)][:500] if isinstance(b.get("ids"), list) else []
         if ids:

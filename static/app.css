@@ -8591,6 +8591,18 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 .cfst-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:899px){.cfst .cfst-l{display:none}}
 .navpen{display:flex;justify-content:flex-end;padding:0 .25rem}  /* 2.418.0 (#3560): the pen on top of a phone's area menu */
+/* 2.1113.0 (#5966): the phone drawer's area head (areas.js sbm_headHtml) looks like the heads of the Projects area (.shead):
+   the name on the left, the actions on the right; the rows below without an extra gap */
+#side .sbah{margin-top:.25rem}
+#side .sbah .sbaht{margin:0;font:inherit;color:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#side .sbah .sbtools{display:flex;align-items:center;gap:.125rem;flex:none}
+#side .sbah+.sbbp{margin-top:0}
+/* 2.1113.0 (#5966): one mark for the open entry in every area of the sidebar: the tint and the accent (was bold only in Projects,
+   the accent only in the parts of an area, the tint only in the trees); the word mixes towards the text for 4.5:1 like .srb.on */
+#side{--sb-on:color-mix(in srgb,var(--accent) 78%,var(--text))}
+#side .srow.on,#side .sbbt.on{background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:none;color:var(--sb-on);font-weight:600}
+#side .srow.on svg,#side .srow.on .c,#side .sbbt.on .sbbtn,#side .sbbt.on svg,#side .sbbi.on,#side .sbbi.on svg{color:var(--sb-on)}
+@media (pointer:coarse){ #side .sbbt,#side .sbbtn{min-height:max(2.75rem,var(--srow-h))} }  /* 2.1113.0 (#5966): the trees' rows as high as every other row of the drawer (44 px for a finger) */
 /* 2.442.0 (#2810): a low window (zoom 200 %, a phone on its side): more room for the content. Lying windows only: an upright
    phone gets this low with the keyboard open (interactive-widget=resizes-content) and nothing may jump while typing. The
    view switch folds to icons plus the active name, the head and the tab bar get thinner, the task's comment box stays in

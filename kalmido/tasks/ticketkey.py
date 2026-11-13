@@ -79,7 +79,8 @@ def tk_set(c, lid, key):
     seq = c.execute("""INSERT INTO list_ticket_seq(list_id, seq) VALUES(?, 0) ON CONFLICT (list_id) DO UPDATE
                        SET seq=list_ticket_seq.seq RETURNING seq""", (lid,)).fetchone()[0]
     if old:  # the old keys keep finding their tasks
-        c.execute("""INSERT INTO task_keys(prefix, no, task_id, list_id, created_at) SELECT ?, ticket_no, id, list_id, ? FROM tasks
+        # 2.1112.2 (#5982): created_at is TIMESTAMPTZ since #5306 - a parameter in the SELECT list is text unless cast
+        c.execute("""INSERT INTO task_keys(prefix, no, task_id, list_id, created_at) SELECT ?, ticket_no, id, list_id, CAST(? AS timestamptz) FROM tasks
                      WHERE list_id=? AND ticket_no IS NOT NULL ON CONFLICT DO NOTHING""", (old, iso(now_utc()), lid))
     c.execute("UPDATE lists SET ticket_key=? WHERE id=?", (key, lid))
     if key:

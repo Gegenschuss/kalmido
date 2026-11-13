@@ -211,7 +211,8 @@ dbx("UPDATE sheet_rows SET deleted_at='2026-12-01T00:00:00.000Z' WHERE id=?", (N
 r = Bo.post(B + f"/api/undo/{G5}/redo")
 st = r.json().get("stayed", []) if r.ok else []
 check(not r.json().get("redone") and st and st[0]["code"] == "conflict"
-      and dbx("SELECT deleted_at FROM sheet_rows WHERE id=?", (NR2,))[0][0] == "2026-12-01T00:00:00.000Z",
+      # 2.1112.2 (#5991): deleted_at is TIMESTAMPTZ since #5306 - the later deletion stays as the same instant (not as text)
+      and dbx("SELECT deleted_at = '2026-12-01T00:00:00Z'::timestamptz FROM sheet_rows WHERE id=?", (NR2,))[0][0] in (True, 1, "t", "1"),
       f"F1: redo leaves a row deleted since in the trash {r.status_code} {r.text[:200]}")
 # F2: an agent's batch whose agent was removed since (agent_id NULL, accounts/orgretain.py) stays in the agents' panel and
 # their batch-undo route; a person's batch ('p...') is neither listed nor taken there

@@ -3325,7 +3325,7 @@ capability `data_lock_info`).
 404). It applies to agents only; people keep their roles and the approvals of takeover and release. **The server enforces
 it**: every write of the agent's token under `/api/v1/` has a class - `meta` (its own channel `/agent/...`: status,
 typing, chat and approval cards, jobs, proposals; always allowed), `routine` (create tasks and subtasks, plan them = only
-`due` / `due_time` / `start`, comment, take a task's lock off (`locked: false`, needed before ticking off a locked task; setting a lock stays `change`), tick off / reopen / skip, reactions, team chat messages, watching a task and ending it), `one_way` (every `DELETE` except those listed here, and the delete actions:
+`due` / `due_time` / `start`, comment, take a task's lock off (`locked: false`, needed before ticking off a locked task; setting a lock stays `change`), tick off / reopen / skip, reactions, team chat messages, watching a task and ending it, linking two objects and removing such a link *(2.1112.2, #5975: `/agent/objects/{kind}/{id}/links`, before always allowed as `meta`)*), `one_way` (every `DELETE` except those listed here, and the delete actions:
 emptying the trash, deleting folders, undoing an import, a batch with `action: delete`) or `change` (everything else; also the `DELETE` that only stops a timer or ends waiting, `DELETE /time/timer` and `DELETE /tasks/{id}/waiting`). Marking a task as being worked on (`/tasks/{id}/working`) belongs to `meta`.
 
 | Level | Allowed without a card |
@@ -3334,7 +3334,11 @@ emptying the trash, deleting folders, undoing an import, a batch with `action: d
 | `routine` *Routine free* | `meta` + `routine` |
 | `free` *Free run with a goal* (with `goal`, free text) | `meta` + `routine` + `change` |
 
-A project can have its own level (`projects`), which wins over the agent's. A personal agent never gets more in a project
+A project can have its own level (`projects`), which wins over the agent's. The project of a step is the one of the object it
+writes (a task, a section, a comment's task ...; an object of the shared core under `/agent/objects/{kind}/{id}`, also its
+links, the project that object lies in *(2.1117.0, #6024)*); a `list_id` in the body counts only where the route reads it
+(creating or moving into a project), never to pick a laxer project. Such an object in a project the agent sees takes that
+project's level (capped by the owner's rights), no longer the general cap at `routine` of places Kalmido cannot place. A personal agent never gets more in a project
 than its owner's own rights there (owner / admin = `free`, member who edits = `routine`, reading / commenting =
 `approve_all`). One-way steps (`one_way.fixed`: deleting, anything that costs money, login and registration, migrations
 without a way back; plus the owner's own items, `one_way.custom`) need a card on **every** level; Kalmido enforces deleting,

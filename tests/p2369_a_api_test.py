@@ -174,7 +174,8 @@ ms = dbx("SELECT column_name, data_type FROM information_schema.columns WHERE ta
          "AND is_nullable='NO' AND column_default IS NULL AND is_identity='NO'")
 vals = {"doc_id": P["gen"], "org_id": ORG}
 for col, typ in ms:
-    vals.setdefault(col, 0 if "int" in typ else f"x{col}")
+    # 2.1112.2 (#5980): created_at / updated_at are TIMESTAMPTZ since #5306 - a point in time, not a text
+    vals.setdefault(col, 0 if "int" in typ else "2026-03-01T10:00:00Z" if "timestamp" in typ else f"x{col}")
 dbx(f"INSERT INTO office_gen_docs ({', '.join(vals)}) VALUES ({', '.join('?' * len(vals))})", list(vals.values()), write=True)
 lst = {d["id"]: d for d in A.get(B + D, params={"kind": "offer"}).json()["docs"]}
 for k, did in P.items():

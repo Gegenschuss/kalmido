@@ -21,6 +21,37 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.1113.0] - 2026-11-13
+
+Package 2.1106 (Bündel: Wackel-Test p2579_c_ui, Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Weich rot: p2100_ui, Weich rot: p2106_b_ui u.).
+
+### Fixed
+- Saved document views read themselves again after an undo / redo the server took back (core `histReloader`): the next rename no longer fails with an old version, a view brought back shows in the sidebar; deleting a view turns it off Today as a part of the delete, so Undo right after it brings the view back (#4976).
+- Office settings: a late older answer of the number preview no longer overwrites the newer one (#5608).
+- Calendar: the empty / loading hint's shadow in rem (#5676); the rem-only rule for stylesheets also runs in the Lint step now.
+- Test p2123_b_api follows the open shares by e-mail address (#5658) in the knowledge share dialog (#5833).
+
+Package 2.1109 (Bookkeeping sub pages under the workspace address).
+### Fixed
+- Office bookkeeping: the booking archive, the procedure documentation, all receipts and the tax forms now open their sub page also when the address carries the workspace (#office/s/<ws>/books/...); the bank's "not reconciled" link works the same way. New helper ofcSeg in office.js (#5959).
+
+Package 2.1113 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- #5966 Sidebar on the phone: every area below the row of areas starts with the same head (its name on the left, its actions such as the pen of the menu on the right; no row with a button alone any more), the open entry carries the same mark everywhere (tint and accent: projects, the parts of an area, the trees of Knowledge and Files), Start shows nothing twice below the row of areas, and the tree of Knowledge leaves out technical folders whose name starts with "_" (e.g. _attachments).
+### Fixed
+- #5960 "Show me" on a phone: the step "New event" now rings the round + of the calendar (the "+ Event" button is hidden there), and on a touch screen the spotlight no longer closes when a step opens another page (it took that page change for Back and went back to the chat, so the step marked nothing).
+
+Package 2.1108 (Bündel: Seitenleiste Handy: Kopf mit Logo springt, wenn ei, Wissensseite: Titel nicht doppelt, Kopf kompakter).
+### Fixed
+- Phone drawer: the head (logo, name, workspace) stays in place and keeps its width on every page; only the list below scrolls, the search stays right under the head, the scroll bar no longer narrows it (#5964).
+### Changed
+- Knowledge page on a phone: the head bar shows the page's title instead of "Knowledge pages", the page head keeps back arrow, path and one "…" menu that also holds the head bar's entries; a first heading that only repeats the page title is hidden in the drawn page (text, editor and export keep it) (#5965).
+- Phone: the grip over the tab bar that opens the favourites is now a small tab with a star instead of a bare grey line (#5965).
+
+## [2.1108.0] - 2026-11-13
+
+Not released (the CI of this version was red); its changes are listed under 2.1113.0.
+
 ## [2.1105.0] - 2026-11-13
 
 Package 2.1095 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -241,7 +272,9 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1105.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1113.0...HEAD
+[2.1113.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1113.0
+[2.1108.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1108.0
 [2.1105.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1105.0
 [2.1104.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1104.0
 [2.1103.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1103.0

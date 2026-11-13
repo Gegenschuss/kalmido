@@ -40,6 +40,15 @@ const today = TC.today();
   check(d1.http === 201 && d2.http === 201, 'two deals ' + d1.http + d2.http);
   const qo = await call(CA, 'POST', `/api/office/deals/${d2.id}/offer`);
   for (const st of ['sent', 'declined']) await call(CA, 'POST', `/api/office/docs/${qo.doc_id}/status`, {status: st});
+  // 2.1112.2 (#5985): since #5450 (job/4293) the figures without any payment show an empty state instead of the axis
+  // (p21076_b_office_states_ui); the twelve months need money received: a finalised invoice of the client, part paid today
+  await call(CA, 'PUT', '/api/office/settings', {company_fields: {name: 'Alpha Film', street: 'Musterweg 1', zip: '12345', city: 'Musterstadt', country: 'DE', vat_id: 'DE123456789', iban: 'DE02120300000000202051', bic: 'BYLADEM1001', bank_name: 'Beispielbank'}});
+  await call(CA, 'PATCH', `/api/clients/${cl.id}`, {street: 'Weg 2', zip: '10115', city: 'Berlin', country: 'DE'});
+  const today = new Date().toISOString().slice(0, 10);
+  const inv = await call(CA, 'POST', '/api/office/docs', {kind: 'invoice', client_id: cl.id, service_from: today, items: [{title: 'Schnitt', qty: 1, rate: 1000}]});
+  const fin = await call(CA, 'POST', `/api/office/docs/${inv.id}/finalize`);
+  const pay = await call(CA, 'POST', `/api/office/docs/${inv.id}/payments`, {amount: 100, method: 'transfer'});
+  check(fin.http === 200 && pay.http === 201, `a finalised invoice with a payment ${fin.http} ${pay.http} ${JSON.stringify(fin).slice(0, 200)}`);
 
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
@@ -97,7 +106,7 @@ const today = TC.today();
     // ================= #1197
     await nav(B + '#office/kpi');
     check(await ready(ev, `document.querySelectorAll('.kptiles .kptile').length === 6`, 80), '#1197: the figures with six tiles');
-    check(await ev(`document.querySelectorAll('.kpbars .kpm').length === 12 && document.querySelectorAll('.kpbars .kpm.cur').length === 1 && document.querySelectorAll('table.sr tbody tr').length === 12`), '#1197: twelve months, this one marked, a table for screen readers');
+    check(await ev(`!document.querySelector('.kpchart .kpnone') && document.querySelectorAll('.kpbars .kpm').length === 12 && document.querySelectorAll('.kpbars .kpm.cur').length === 1 && document.querySelectorAll('table.sr tbody tr').length === 12`), '#1197: twelve months, this one marked, a table for screen readers');
     check(await ev(`/Kunde Eins GmbH/.test(document.querySelector('.kpcl')?.textContent || '') && /of 20/.test(document.querySelector('.kpcl').textContent)`), '#1197: the client with hours against the budget');
     check(await ev(`/2,500\\.00/.test([...document.querySelectorAll('.kptile')].find(t => /Pipeline/.test(t.textContent))?.textContent || '')`), '#1197: the weighted pipeline (the won deal not in it)');
     await shot('p250-b-kpi.png');

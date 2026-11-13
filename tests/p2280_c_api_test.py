@@ -66,8 +66,11 @@ def stale(ids):
         return 0
     q = ",".join(str(int(i)) for i in ids)
     # 2.1002.0 (#5279): the shared word index obj_search_words (was doc_words / file_words / wiki_words / hub_words)
+    # 2.1112.2 (#5104): updated_at is TIMESTAMPTZ since #5306 - 'u:' || p.updated_at gave Postgres' text form ('2026-11-13
+    # 08:17:54.191+00'), the app's mark is the ISO form it read (wiki/wksearch.py: ts_canon / ct_iso): compare the points in time
     return dbx(f"SELECT COUNT(*) FROM wiki_pages p WHERE p.id IN ({q}) AND NOT EXISTS (SELECT 1 FROM obj_search_words x "
-               "WHERE x.kind='wiki_page' AND x.ref_id=p.id AND x.h = 'u:' || p.updated_at)")[0][0]
+               "WHERE x.kind='wiki_page' AND x.ref_id=p.id "
+               "AND CASE WHEN x.h LIKE 'u:%' THEN CAST(substr(x.h, 3) AS timestamptz) = p.updated_at ELSE false END)")[0][0]
 
 
 fresh({"KALMIDO_INSTANCE_MODE": "workspaces"}, "P2280C")

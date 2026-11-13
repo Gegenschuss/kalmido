@@ -332,7 +332,7 @@ with db() as c:  # list types from before 1.2: every list a plain list again, ch
     c.execute("UPDATE lists SET kind='list', checklist=0")
     c.execute("UPDATE lists SET checklist=1 WHERE id=?", (CKL,))
     c.execute("INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,\"end\",seconds,source,created_at,updated_at) "
-              "VALUES(1,?,?,'misclick','2026-09-01T08:00:00Z','2026-09-01T08:01:00Z',60,'timer','x','x')", (pt, PL))
+              "VALUES(1,?,?,'misclick','2026-09-01T08:00:00Z','2026-09-01T08:01:00Z',60,'timer','2026-09-01T08:01:00Z','2026-09-01T08:01:00Z')", (pt, PL))  # 2.1112.2 (#5968): TIMESTAMPTZ, no 'x'
     c.execute("DELETE FROM settings WHERE key='migr_kind'")
     c.commit()
 subprocess.run(["docker", "stop", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")], capture_output=True)

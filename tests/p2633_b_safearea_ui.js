@@ -88,8 +88,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     // 2.725.0 (#5159): since #5115 reduced motion keeps a .01 ms transition only for visual properties - the padding above is
     // there at once, the box shadows of the stripes still run that transition in the same frame (CI read 0px / 4px). Wait until
     // no transition runs any more (a real state: getAnimations), after a style read that starts them.
-    check(await ready(ev, `(() => { for (const e of [document.querySelector('#top'), document.querySelector('#side .sbmsrch')]) if (e) getComputedStyle(e).boxShadow;
-      return [document.querySelector('#top'), document.querySelector('#side .sbmsrch')].every(e => !e || !e.getAnimations().some(a => a.pending || a.playState === 'running')); })()`, 40), 'the stripes\' transitions have ended');
+    check(await ready(ev, `(() => { for (const e of [document.querySelector('#top'), document.querySelector('#side .sbfix-m .sbhead')]) if (e) getComputedStyle(e).boxShadow;
+      return [document.querySelector('#top'), document.querySelector('#side .sbfix-m .sbhead')].every(e => !e || !e.getAnimations().some(a => a.pending || a.playState === 'running')); })()`, 40), 'the stripes\' transitions have ended');
     const top = await ev(`(() => { const t = document.querySelector('#top'), h = t.querySelector('h1'); const l = document.createElement('div'); l.className = 'ldbar on'; l.id = 'p2633-ld'; document.body.appendChild(l);
       const o = {sh: getComputedStyle(t).boxShadow, pt: parseFloat(getComputedStyle(t).paddingTop), h1: Math.round(h.getBoundingClientRect().top), ld: Math.round(l.getBoundingClientRect().top)}; l.remove(); return o; })()`);
     check(top.pt >= 47 && top.h1 >= 47, 'the head starts below the clock ' + JSON.stringify(top));
@@ -97,7 +97,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     // the workspace stripe on top of the head (4 px): below the status bar (47..51 px), the 47 px behind the clock in the page colour
     check(/0px 47px 0px 0px inset/.test(top.sh) && /0px 51px 0px 0px inset/.test(top.sh) && top.sh.indexOf('47px') < top.sh.indexOf('51px'), 'the workspace stripe sits below the status bar ' + top.sh);
     // the phone drawer's stripe (6 px) likewise below the status bar: its sticky head paints it, the box has no top border then
-    const sd = await ev(`(() => { const sd = document.querySelector('#side'), m = sd?.querySelector('.sbmsrch'); return {has: !!m, bt: sd ? getComputedStyle(sd).borderTopWidth : '', sh: m ? getComputedStyle(m).boxShadow : ''}; })()`);
+    // 2.1108.0 (#5964): the head is pinned on top and paints the stripe now (was the search)
+    const sd = await ev(`(() => { const sd = document.querySelector('#side'), m = sd?.querySelector('.sbfix-m .sbhead'); return {has: !!m, bt: sd ? getComputedStyle(sd).borderTopWidth : '', sh: m ? getComputedStyle(m).boxShadow : ''}; })()`);
     check(sd.has && sd.bt === '0px' && /0px 47px 0px 0px inset/.test(sd.sh) && /0px 53px 0px 0px inset/.test(sd.sh), 'the drawer\'s stripe sits below the status bar, not behind the clock ' + JSON.stringify(sd));
     // ---- the tab bar: only part of the home indicator room
     const g34 = await ev(GEO);

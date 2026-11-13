@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 from flask import g, has_request_context
 
 from ..core.config import TZ, PUBLIC_URL
-from ..core.pg import insert_id, system_ctx, write_lock
+from ..core.pg import insert_id, system_ctx, ts_canon, write_lock
 from ..core import orgcrypt as oc  # 2.306.0 A (#2885)
 from ..core.conflict import Conflict  # 2.269.0 C (#3017)
 from ..core.i18n import csv_dialect, lang, N_, tr
@@ -715,7 +715,8 @@ def journal_set(c, uid, day, b):
         write_lock(c, f"journal-{uid}-{day}")
         r = c.execute("SELECT day, text, mood, mood_enc, updated_at FROM journal WHERE user_id=? AND day=?", (uid, day)).fetchone()
         r = jr_open(c, uid, r) if r else None  # 2.306.0 A (#2885)
-        if str(b["expect_updated_at"]) != (r["updated_at"] if r else ""):
+        # 2.1112.2 (#5976): one moment, not the text (a TIMESTAMPTZ since #5306; the phone may send Z or milliseconds)
+        if ts_canon(str(b["expect_updated_at"])) != ts_canon(r["updated_at"] if r else ""):
             raise Conflict("entry", {"day": r["day"], "text": r["text"], "mood": r["mood"], "updated_at": r["updated_at"]} if r else
                            {"day": day, "text": "", "mood": None, "updated_at": ""})
     text = b.get("text", "")

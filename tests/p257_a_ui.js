@@ -175,7 +175,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
     const m = await ev(`(() => { const s = document.querySelector('#side'), f = document.querySelector('#side .sbfix-m .sbhead') || document.querySelector('#side .sbfix') /* 2.442.0 (#3739): on a phone .sbfix has no box of its own */, t = document.querySelector('${TILE}'); if (!f || !t) return null;
       const top0 = f.getBoundingClientRect().top, r = t.getBoundingClientRect(); s.scrollTop = 600;
       return new Promise(res => requestAnimationFrame(() => { const top1 = f.getBoundingClientRect().top, fr = f.getBoundingClientRect(), ft = document.elementFromPoint(fr.left + fr.width / 2, fr.top + 8);
-        res({scroll: s.scrollTop, sh: s.scrollHeight, ch: s.clientHeight, rows: document.querySelectorAll('#side .srow').length, top0, top1, h: f.getBoundingClientRect().height, vh: innerHeight, w: r.width, th: r.height, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), front: !!ft && !!ft.closest('.sbfix'), flow: !!f.closest('.sbfix-flow')}); })); })()`);
+        res({scroll: s.scrollTop, sh: s.scrollHeight, ch: s.clientHeight, rows: document.querySelectorAll('#side .srow').length, top0, top1, h: f.getBoundingClientRect().height, vh: innerHeight, w: r.width, th: r.height, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), front: !!ft && !!ft.closest('.sbfix'), flow: !!f.closest('.sbfix-flow') && !f.closest('.sbfix-m') /* 2.1108.0 (#5964): the phone drawer's head is pinned again */}); })); })()`);
     check(m, tag + ': head and tiles drawn');
     if (m) {
       check(m.scroll > 100, tag + ': the sidebar scrolls ' + JSON.stringify({...m, extra}));

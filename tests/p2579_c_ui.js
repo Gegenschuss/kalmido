@@ -100,6 +100,11 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   check(await until(() => w.eval(`(r => r && r.op === 'or' && r.conds.length === 2)(dcv_get(${VID})?.rules) && ${inView} && DC.total === 2`)), 'updated: the view keeps both, the list shows both ' + st());
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await call('GET', `/api/obj/docview/${VID}`)).rules?.conds?.length === 1), 'undo: the old filter again');
+  // 2.1106.0 (#4976): the server takes the step back by its group (#5255) - the page must follow (its views fetched again,
+  // the open view's list with the old filter); before, the page kept the newer version and the rename below got a 409
+  const sv = await call('GET', `/api/obj/docview/${VID}`);
+  check(await until(() => w.eval(`(v => !!v && v.rules?.conds?.length === 1 && v.updated_at === ${JSON.stringify(sv.updated_at)})(dcv_get(${VID})) && ${inView} && DC.total === 1`)),
+    'undo: the page follows - the view as stored, its list with the old filter (one document) ' + st());
   // the menu
   const labels = w.eval(`dcv_menuItems(dcv_get(${VID})).filter(x => x !== '-').map(x => x.label)`);
   check(['Rename…', 'Edit filter…', 'Use the current filters', 'Add to favourites', 'Show on Today', 'Delete view'].every(x => labels.includes(x)) && !labels.includes('Share with everyone of the organisation'),
@@ -121,6 +126,7 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   await w.eval(`dcv_delete(dcv_get(${VID}))`);
   check(await until(() => !d.querySelector(`#side [data-dcvid="${VID}"]`) && w.location.hash === '#ablage/docs'), 'deleted: gone from the sidebar, back to Documents');
   check((await call('GET', '/api/state')).settings.dv_today === '', 'deleted: off Today too');
+  // 2.1106.0 (#4976): the delete's own "off Today" (a setting) is no step of its own: Undo takes the delete back, not that setting
   await w.eval(`histStep('undo')`);
   check(await until(() => d.querySelector(`#side [data-dcvid="${VID}"]`)), 'undo: the view is back');
   // an organisation's view: the admin may share it, a member's own view has no such entry

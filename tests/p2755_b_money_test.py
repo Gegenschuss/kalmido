@@ -143,10 +143,10 @@ c.execute("ALTER TABLE office_doc_items ALTER COLUMN net TYPE TEXT USING net::te
 out['old_text'] = [mc_type(c, 'office_cash_entries', 'amount'), mc_type(c, 'office_doc_items', 'net')]
 out['chain_text'] = hch_check(c, {ORG})['ok']
 b = c.execute("SELECT book_id, org_id FROM office_cash_entries WHERE id=?", ({EID},)).fetchone()
-ids = []
+ids = []  # 2.1112.2 (#5990): created_at / updated_at are TIMESTAMPTZ since #5306 - a point in time, not 'x'
 for i, v in enumerate(['12.5', '0', '', '1234.567']):
     ids.append(c.execute("INSERT INTO office_cash_entries(org_id, book_id, no, day, dir, amount, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
-                         (b['org_id'], b['book_id'], 900 + i, '{Y}-01-02', 'in', v, 'x', 'x')).fetchone()[0])
+                         (b['org_id'], b['book_id'], 900 + i, '{Y}-01-02', 'in', v, '{Y}-01-02T08:00:00Z', '{Y}-01-02T08:00:00Z')).fetchone()[0])
 d = c.execute("SELECT id FROM office_doc_items WHERE doc_id=? ORDER BY sort, id", ({DID},)).fetchall()
 draft = {DRAFT}
 c.execute("UPDATE office_doc_items SET net='', tax_amount='7.5' WHERE doc_id=?", (draft,))
@@ -190,13 +190,13 @@ imp, _e = py(f"""
 from kalmido.admin.acctimport import umz_insert, umz_row
 b = c.execute("SELECT book_id, org_id FROM office_cash_entries WHERE id=?", ({EID},)).fetchone()
 out = {{}}
-d = umz_row(c, 'office_doc_items', {{'net': '', 'tax_amount': '23.8', 'title': 'Alt', 'qty': '1', 'rate': '0'}}, {{'doc_id': {DRAFT}, 'org_id': {ORG}}}, 'x')
+d = umz_row(c, 'office_doc_items', {{'net': '', 'tax_amount': '23.8', 'title': 'Alt', 'qty': '1', 'rate': '0'}}, {{'doc_id': {DRAFT}, 'org_id': {ORG}}}, '{Y}-01-03T08:00:00Z')
 out['item'] = umz_insert(c, 'office_doc_items', d)
-d = umz_row(c, 'office_cash_entries', {{'amount': '', 'no': 801, 'day': '{Y}-01-03', 'dir': 'in', 'text': 'Alt'}}, {{'book_id': b['book_id'], 'org_id': b['org_id']}}, 'x')
+d = umz_row(c, 'office_cash_entries', {{'amount': '', 'no': 801, 'day': '{Y}-01-03', 'dir': 'in', 'text': 'Alt'}}, {{'book_id': b['book_id'], 'org_id': b['org_id']}}, '{Y}-01-03T08:00:00Z')
 out['cash0'] = umz_insert(c, 'office_cash_entries', d)
-d = umz_row(c, 'office_cash_entries', {{'amount': '-0.00', 'no': 802, 'day': '{Y}-01-03', 'dir': 'in', 'text': 'Alt'}}, {{'book_id': b['book_id'], 'org_id': b['org_id']}}, 'x')
+d = umz_row(c, 'office_cash_entries', {{'amount': '-0.00', 'no': 802, 'day': '{Y}-01-03', 'dir': 'in', 'text': 'Alt'}}, {{'book_id': b['book_id'], 'org_id': b['org_id']}}, '{Y}-01-03T08:00:00Z')
 out['cash1'] = umz_insert(c, 'office_cash_entries', d)
-d = umz_row(c, 'office_ledger_entries', {{'amount': '', 'year': {Y}, 'day': '{Y}-12-31', 'debit': '4950', 'credit': '0970'}}, {{'org_id': {ORG}}}, 'x')
+d = umz_row(c, 'office_ledger_entries', {{'amount': '', 'year': {Y}, 'day': '{Y}-12-31', 'debit': '4950', 'credit': '0970'}}, {{'org_id': {ORG}}}, '{Y}-01-03T08:00:00Z')
 out['led'] = umz_insert(c, 'office_ledger_entries', d)
 out['vals'] = [c.execute("SELECT net::text, tax_amount::text FROM office_doc_items WHERE id=?", (out['item'],)).fetchone() if out['item'] else None,
                [c.execute("SELECT amount::text FROM office_cash_entries WHERE id=?", (i,)).fetchone()[0] if i else None for i in (out['cash0'], out['cash1'])],

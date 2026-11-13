@@ -18,7 +18,7 @@ from ..accounts.colors import ac_color_map
 from ..core.access import (
     acx_lists_sql, collab_all, Denied, health_hidden, list_archived, need_task, org_trips_hidden, plists, reading_ids, time_all, tvis, vis_search_lids, vis_sql, wr_sql, WRITE_ROLES,
 )
-from ..core.serializers import load_tasks, running_pomo, tags_for, td_lean, TD_DEFAULTS  # 2.575.0 B (#3966): + td_lean
+from ..core.serializers import load_tasks, running_pomo, tags_for, td_extra, td_lean, td_mode  # 2.575.0 B (#3966): + td_lean; 2.1117.0 (#6023): + td_mode, td_extra
 from ..core.pg import st_ids
 from ..core.objtags import obj_tags_of  # 2.947.0 (#5275)
 from ..core.instance import about_info, pub_kinds_off
@@ -374,7 +374,7 @@ def state():
     tasks = load_tasks(c, base + (" AND id = ANY(CAST(? AS BIGINT[]))" if lz else "") + " ORDER BY id",
                        (*bargs, st_ids(sorted(lz["ids"]))) if lz else bargs,
                        lean_notes=True)  # 2.280.0 A (#3108): long notes come with the detail
-    td = request.args.get("td") == "1"  # 2.575.0 B (#3966): a client that fills the defaults back (older ones / agents: all as before)
+    td = td_mode(request.args)  # 2.575.0 B (#3966): a client that fills the defaults back (older ones / agents: all as before); 2.1117.0 (#6023): 2 = + the zone
     habits = [dict(r) for r in c.execute("SELECT * FROM habits WHERE user_id=? AND deleted_at IS NULL ORDER BY archived, sort, id", (uid,))]
     since = (local_now().date() - timedelta(days=400)).isoformat()
     logs, notes = {}, {}
@@ -415,7 +415,7 @@ def state():
         sections=visible_sections(c, uid),
         fields=field_dicts(c.execute(f"SELECT * FROM list_fields WHERE list_id IN {vis_sql()} ORDER BY sort, id",
                                      (uid, uid)).fetchall()),  # 2.43.0 (#1328): formula text with names; 2.640.0 (#4185): from these rows
-        tasks=td_lean(tasks) if td else tasks,  # 2.575.0 B (#3966): the later keys read only the ids
+        tasks=td_lean(tasks, utc=td >= 2) if td else tasks,  # 2.575.0 B (#3966): the later keys read only the ids
         habits=habits,
         habits_trash=habits_trash(c, uid),  # 2.530.0 B (#4315): deleted habits until the trash period ends
         pomo=running_pomo(c),
@@ -487,7 +487,7 @@ def state():
         announce=_announce(c),  # 2.24.0 (#907): the notice above the app (or null)
         notif_ask=notif_ask_state(c, uid, s),  # 2.33.0 (#927): owners of lists shared before 2.33 are asked once
         **({"lz": {"pending": lz["pending"], "counts": lz["counts"]}} if lz else {}),  # 2.369.2 (#3136)
-        **({"tdef": TD_DEFAULTS} if td else {}),  # 2.575.0 B (#3966): the defaults the client fills back (liveparts.js tdFill)
+        **td_extra(td),  # 2.575.0 B (#3966): the defaults the client fills back (liveparts.js tdFill); 2.1117.0 (#6023): + tutc
     )
 
 

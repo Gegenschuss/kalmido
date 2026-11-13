@@ -10,7 +10,7 @@
     "office.offer-new": {"route": "#office/offers", "sel": "#view [data-ofd=\"new\"]", "label_en": "New quotation"},
     "office.invoice-new": {"route": "#office/invoices", "sel": "#view [data-ofd=\"new-inv\"]", "label_en": "New invoice"},
     "tasks.new": {"route": "#today", "sel": "#view .qadd .box, #fab", "label_en": "Add a task"},
-    "calendar.new": {"route": "#cal", "sel": "#view [data-act=\"ev-new\"]", "label_en": "New event"},
+    "calendar.new": {"route": "#cal", "sel": "#view [data-act=\"ev-new\"], #fab", "label_en": "New event"},
     "files.upload": {"route": "#ablage", "sel": "#view [data-ab=\"upload\"]", "label_en": "Upload files"},
     "files.documents-add": {"route": "#ablage/docs", "sel": "#view .dc-up", "label_en": "Add documents"},
     "wiki.new": {"route": "#wiki", "sel": "#view [data-wk=\"new\"]", "label_en": "New page"},

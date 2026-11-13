@@ -18,7 +18,7 @@ from flask import jsonify
 from ..core.config import app
 from ..core.db import body, bump, db, iso_ms, now_utc
 from ..core.i18n import N_, tr, trn
-from ..core.pg import IntegrityError
+from ..core.pg import IntegrityError, ts_canon
 from ..core.access import Denied
 from ..accounts.session import me
 from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok
@@ -417,7 +417,9 @@ def wkr_move(c, uid, src, to, b, dry):
         raise BadInput(tr("Invalid value: {0}", "pages"))
     # 2.273.0 B (#3042): a page saved since the browser read it (expect_updated_at of the dry run) is not overwritten
     cur = {r["id"]: r["updated_at"] for r in c.execute(f"SELECT id, updated_at FROM wiki_pages WHERE id IN ({','.join('?' * len(ids))}) FOR UPDATE", ids)}
-    stale = [x["id"] for x in items if x.get("expect_updated_at") not in (None, "") and str(x["expect_updated_at"]) != str(cur.get(x["id"]))]
+    # 2.1112.2 (#5977): compared as a point in time (ts_canon): since #5306 updated_at is TIMESTAMPTZ and reads back in the
+    # canonical form, a version sent with Z / .000 / another offset is the same instant, not a change
+    stale = [x["id"] for x in items if x.get("expect_updated_at") not in (None, "") and ts_canon(str(x["expect_updated_at"])) != ts_canon(cur.get(x["id"]))]
     if stale:
         c.rollback()
         return jsonify(error=tr("Changed in the meantime"), code="wiki_changed", pages=stale), 409

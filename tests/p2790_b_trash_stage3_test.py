@@ -297,9 +297,10 @@ check(not sql("SELECT 1 FROM wiki_files WHERE id=?", (WF7,)) and not stored(WP7)
 check(not sql("SELECT 1 FROM sheet_files WHERE id=?", (SF8,)) and not stored(SP8), "switch on (#5472): the old table file gone with its stored file")
 check(sql("SELECT 1 FROM wiki_files WHERE id=?", (WF8,)) and stored(WP8), "switch on (#5472): the wiki file deleted today stays")
 # 2.809.0 (#5365, review): one batch per kind and run (one advisory lock each), the rest in the next run
+# 2.1112.2 (#5992): the cut is a point in time - deleted_at is TIMESTAMPTZ since #5306, the text '9999' is none (the app passes ret_trash_cut)
 out = subprocess.run(["docker", "exec", CT, "python", "-c",
                       "import app\nfrom kalmido.core.db import connect\nfrom kalmido.core import writes\n"
-                      "c = connect()\nprint(writes.OBJ_PRUNE_BATCH, len(writes.obj_trash_due(c, 'fs_entry', '9999', limit=1)))\nc.close()"],
+                      "c = connect()\nprint(writes.OBJ_PRUNE_BATCH, len(writes.obj_trash_due(c, 'fs_entry', '9999-12-31T00:00:00Z', limit=1)))\nc.close()"],
                      capture_output=True, text=True)
 check(out.stdout.split()[:2] == ["500", "1"], f"the run takes a batch, not everything at once {(out.stdout + out.stderr)[-300:]}")
 last = sql("SELECT value FROM settings WHERE key='ret_last_trash.obj_trash'")

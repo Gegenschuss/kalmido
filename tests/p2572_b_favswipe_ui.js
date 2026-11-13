@@ -57,6 +57,11 @@ const GRIP = `!document.querySelector('#favgrip').classList.contains('hidden') &
       return JSON.stringify({tag: b.tagName, exp: b.getAttribute('aria-expanded'), ctl: b.getAttribute('aria-controls'), lab: b.getAttribute('aria-label'), edge: r.top < t.top && r.bottom > t.top}); })()`));
     check(g.tag === 'BUTTON' && g.exp === 'false' && g.ctl === 'favup' && g.lab === 'Favourites' && g.edge, 'the grip: a button on the top edge of the tab bar, aria-expanded false ' + JSON.stringify(g));
 
+    // 2.1108.0 (#5965): the grip reads as one: a tab with the star over the bar's edge (was a bare grey line), tappable over its whole height
+    const gt = JSON.parse(await ev(`(() => { const b = document.querySelector('#favgrip'), r = b.getBoundingClientRect(), t = document.querySelector('#tabs').getBoundingClientRect(), st = getComputedStyle(b, '::before'), sv = b.querySelector('svg.i'), sr = sv && sv.getBoundingClientRect();
+      return JSON.stringify({star: !!sv && sr.width >= 10 && sr.bottom <= t.top + 1 && sr.top >= r.top, tabH: parseFloat(st.height), tabW: parseFloat(st.width), border: st.borderTopWidth, hit: Math.round(t.top - r.top)}); })()`));
+    check(gt.star && gt.tabH >= 16 && gt.tabW >= 40 && gt.border !== '0px' && gt.hit >= 17, '#5965: the grip is a tab with the star, its whole tab is tappable ' + JSON.stringify(gt));
+    await shot('p2572b-grip.png');
     // a plain tap on a tab (a finger moves a few pixels) never opens the row; the tab still works
     await ev(SWIPE('#tabs button:not(.on)', -6, 2));
     await ev(`(() => { document.querySelector('#tabs button:not(.on)').click(); return 1; })()`);
