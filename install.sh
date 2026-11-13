@@ -582,7 +582,7 @@ main() {
   say "Stop:       cd \"$DIR\" && docker compose down"
   # 2.538.0 (#4361): down -v also removes the named volumes (virus-scan database, temp); pgdata/ is a folder written by the
   # database container (user 999 inside the postgres image), so on Linux a plain rm fails on it
-  say "Uninstall:  cd \"$DIR\" && docker compose --profile '*' down -v && docker image rm ${IMAGE:-kalmido:local} postgres:17 clamav/clamav:1.4"
+  say "Uninstall:  cd \"$DIR\" && docker compose --profile '*' down -v && docker image rm ${IMAGE:-kalmido:local} postgres:17.12 clamav/clamav:1.4"
   say "            (images you never pulled give a harmless \"No such image\"). Then delete the folder: sudo rm -rf \"$DIR\""
   say "            This deletes all your tasks and cannot be undone: copy data/backups/ and secret/kalmido.key elsewhere first if you want them."
   say "Use it from other devices: put it behind a reverse proxy with HTTPS, see"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
 """2.521.0 E (#4475): the database stays inside its memory limit while a stack is split and its parts are recognised.
-Own database container "<container>-memdb" (postgres:17 with the db settings of docker-compose.yml - their defaults -,
+Own database container "<container>-memdb" (the db image of docker-compose.yml, #5948, with the db settings of docker-compose.yml - their defaults -,
 data on an anonymous volume like a server's folder) and its own app container (start.sh). The database gets a hard limit
 (docker update --memory 512m --memory-swap 512m, P2521E_CAP overrides) after the start; then, as a person without an
 organisation (freelancer-matrix: files), a drawn stack of 30 parts (archive number codes) is uploaded, recognised, split,
@@ -38,6 +38,9 @@ DBC = CT + "-memdb"
 CAP = os.environ.get("P2521E_CAP", "512m")
 PARTS = int(os.environ.get("P2521E_PARTS", "30"))
 H = {"X-Requested-With": "kalmido"}
+# 2.1092.0 (#5948): the pinned image of docker-compose.yml (tools/pg_image.py), never the moving postgres:<major> tag
+PG_IMAGE = subprocess.run([sys.executable, os.path.join(N, "..", "tools", "pg_image.py")], capture_output=True, text=True,
+                          check=True).stdout.strip()
 
 
 def compose_db_args():
@@ -82,7 +85,7 @@ subprocess.run(["docker", "rm", "-f", "-v", DBC], capture_output=True)
 ARGS = compose_db_args()
 print("PERF db settings from docker-compose.yml:", " ".join(ARGS), flush=True)
 subprocess.run(["docker", "run", "-d", "--name", DBC, "--network", "bridge", "-e", "POSTGRES_USER=kalmido", "-e", "POSTGRES_PASSWORD=kalmido",
-                "-e", "POSTGRES_DB=kalmido", "-v", "/var/lib/postgresql/data", "postgres:17", *ARGS, "-c", "fsync=off",
+                "-e", "POSTGRES_DB=kalmido", "-v", "/var/lib/postgresql/data", PG_IMAGE, *ARGS, "-c", "fsync=off",
                 "-c", "synchronous_commit=off"], check=True, stdout=subprocess.DEVNULL)
 assert until(lambda: subprocess.run(["docker", "exec", DBC, "psql", "-U", "kalmido", "-d", "kalmido", "-Atqc", "SELECT 1"],
                                     capture_output=True).returncode == 0, 60), "database container did not come up"

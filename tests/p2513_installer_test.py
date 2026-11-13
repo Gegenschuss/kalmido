@@ -8,6 +8,7 @@ docker and id on the PATH; install.ps1 (no PowerShell in the test environment) i
   wrong one stops before anything changes; the note names what the links use; the docs no longer advise editing docker-compose.yml."""
 # kalmido-suite: nodata
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -205,8 +206,11 @@ check(rc == 0 and t == OLDENV, "#4361: with KALMIDO_URL the port step leaves PUB
 check('write_env' in SH and SH.index("set_public_url\n    follow_port_url") > 0, "#4361: write_env calls follow_port_url for an existing .env")
 check("KALMIDO_PORT=3050 \\\"$DIR/update.sh\\\"" in SH and "$DIR/update.sh" in SH and "run this again" in SH, "#4361: the port message gives a command to paste")
 check("KALMIDO_PORT = '3050'" in PS and "update.ps1" in PS and "PUBLIC_URL in .env follows" in PS, "#4361: install.ps1 gives the command too and moves PUBLIC_URL")
+# 2.1092.0 (#5948): the uninstall text names the pinned image of docker-compose.yml (postgres:<major>.<minor>), the image the
+# install really pulled - the bare major tag would miss it once the tag is pinned
+PGIMG = re.search(r"^    image: (postgres:\S+)$", open(os.path.join(ROOT, "docker-compose.yml"), encoding="utf-8").read(), re.M).group(1)
 for name, txt in (("install.sh", SH), ("install.ps1", PS)):
-    check("down -v" in txt and "docker image rm" in txt and "postgres:17" in txt and "cannot be undone" in txt, f"#4361: {name} uninstall text: volumes, images, folder, warning")
+    check("down -v" in txt and "docker image rm" in txt and f" {PGIMG} " in txt and "cannot be undone" in txt, f"#4361: {name} uninstall text: volumes, images ({PGIMG}), folder, warning")
     check("an Kalmido" not in txt, f"#4361: {name} says 'a Kalmido'")
 check("sudo rm -rf" in SH and "sudo" not in PS, "#4361: Linux/macOS need sudo for pgdata (written by the database user), Windows does not")
 

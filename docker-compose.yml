@@ -68,9 +68,12 @@ services:
 
   db:
     # PostgreSQL 17 (2.37.0). Stay on 17 when updating; a new major version needs a dump + restore (docs/SELF-HOSTING.md).
+    # 2.1092.0 (#5948): pinned to a minor version - the ONE place of Kalmido's PostgreSQL version. The CI, the tests and
+    # the app image's pg_dump follow this line (tools/pg_image.py); the moving major tag pulled 17.12 on one machine and
+    # 17.11 on another. A new minor version comes with a Kalmido update (python3 tools/pg_image.py --set X.Y).
     # 2.149.0 D (#2510): runs with the profile "localdb" (COMPOSE_PROFILES in .env; the installer writes the line). An own
     # database server: DATABASE_URL in .env and "localdb" left out of COMPOSE_PROFILES. Updates never bring it back.
-    image: postgres:17
+    image: postgres:17.12
     container_name: kalmido-db
     logging: *logging
     profiles: ["localdb"]

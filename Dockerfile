@@ -29,9 +29,24 @@ COPY kalmido/core/strip.py tools/pack_static.py /src/tools/
 RUN python /src/tools/pack_static.py /src/static /out
 
 FROM python:3.12-slim@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54
-# 2.37.0: pg_dump/pg_restore for the in-app backup (Debian 13 ships PostgreSQL 17)
+# 2.37.0: pg_dump/pg_restore for the in-app backup
 # 2.143.0 B (#2152): + openssh-client (sftp) for the off-site backup target
-RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 openssh-client && rm -rf /var/lib/apt/lists/*
+# 2.1092.0 (#5948): PG_VERSION = the database image of docker-compose.yml (postgres:<PG_VERSION>; tools/pg_image.py --check
+# keeps both equal, --set changes both). The client comes from the PostgreSQL project's own packages (PGDG; its signing key
+# lies in the repository, tools/pgdg-ACCC4CF8.asc, fingerprint B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8, no expiry; Debian's
+# postgresql-common does not ship it). Debian's postgresql-client-17 lagged behind (17.11 against a 17.12 server) and an
+# older pg_dump writes things a newer server keeps differently. The build stops when pg_dump is
+# older than PG_VERSION - pg_dump is never older than the server; a newer minor version of the client is fine.
+ARG PG_VERSION=17.12
+COPY tools/pgdg-ACCC4CF8.asc /etc/apt/keyrings/pgdg.asc
+RUN set -e; apt-get update; apt-get install -y --no-install-recommends ca-certificates; \
+    . /etc/os-release; \
+    printf 'Types: deb\nURIs: https://apt.postgresql.org/pub/repos/apt\nSuites: %s-pgdg\nComponents: main\nSigned-By: /etc/apt/keyrings/pgdg.asc\n' \
+      "$VERSION_CODENAME" > /etc/apt/sources.list.d/pgdg.sources; \
+    apt-get update; apt-get install -y --no-install-recommends "postgresql-client-${PG_VERSION%%.*}" openssh-client; \
+    have="$(pg_dump --version | awk '{print $3}')"; \
+    dpkg --compare-versions "$have" ge "$PG_VERSION" || { echo "pg_dump $have is older than PG_VERSION $PG_VERSION (#5948)" >&2; exit 1; }; \
+    echo "pg_dump $have for postgres:$PG_VERSION"; rm -rf /var/lib/apt/lists/*
 # 2.48.0 (#1111): OCR -- text recognition of scanned documents (German / English), page previews, QR codes (archive numbers)
 RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng tesseract-ocr-fra tesseract-ocr-ita tesseract-ocr-spa tesseract-ocr-nld poppler-utils libzbar0t64 && rm -rf /var/lib/apt/lists/*
 # 2.360.3 (#2915): every package with its version and hashes, also what the direct ones pull in (tools/requirements.in + .lock)

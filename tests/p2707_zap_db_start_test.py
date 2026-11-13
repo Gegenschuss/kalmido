@@ -46,7 +46,7 @@ def step_script(name="Start PostgreSQL", job="zap"):
 
 # The stand-in docker: the registry fails the first FAIL_NET network accesses (pull, or a run that has to pull itself);
 # exec pg_isready answers READY (1/0); logs prints a marker line. Every call is written to calls.log.
-# 2.715.0 (#5187): with SETUP=1 the image behaves like postgres:17 at its first start, counted per exec call: the setup
+# 2.715.0 (#5187): with SETUP=1 the image behaves like the postgres image at its first start, counted per exec call: the setup
 # server answers on the socket at call 1, the socket rejects during the restart (calls 2-3), from call 4 on the real
 # server answers on the socket and over TCP (-h 127.0.0.1); TCP never answers before call 4.
 DOCKER = r"""#!/bin/bash
@@ -89,8 +89,8 @@ def run_step(fail_net, ready, setup=False):
             f.write(step_script())
         env = dict(os.environ, PATH=d + os.pathsep + os.environ.get("PATH", ""), STUB_DIR=d,
                    FAIL_NET=str(fail_net), READY="1" if ready else "0", SETUP="1" if setup else "0")
-        # the shell of a GitHub run: step on ubuntu-latest
-        r = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", script], env=env,
+        # the shell of a GitHub run: step on ubuntu-latest, in the checkout (2.1092.0, #5948: it reads tools/pg_image.py)
+        r = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", script], env=env, cwd=ROOT,
                            capture_output=True, text=True, timeout=60)
 
         def rd(n):
@@ -107,6 +107,10 @@ check(r.returncode == 0, f"1: two registry hangs, third try works -> green (exit
 check(sum(c.startswith("pull") for c in calls) == 3, f"1: three pulls ({calls})")
 check(sleeps == ["10", "20"], f"1: a growing pause between the tries ({sleeps})")
 check(any(c.startswith("run -d --name kalmido-zap-db") for c in calls), "1: the database is started after the pull")
+# 2.1092.0 (#5948): pulled and started is the pinned image of docker-compose.yml, never the moving postgres:<major> tag
+PIN = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "pg_image.py")], capture_output=True, text=True).stdout.strip()
+check(PIN.count(".") == 1 and all(c.split()[-1] == PIN for c in calls if c.startswith("pull")), f"1: pulls {PIN} ({calls})")
+check(any(c.startswith("run -d") and f" {PIN} " in f" {c} " for c in calls), f"1: runs {PIN} ({calls})")
 
 # 2. the registry stays down: red after 3 tries, with a message
 r, calls, sleeps = run_step(9, True)

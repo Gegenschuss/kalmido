@@ -54,7 +54,7 @@ next to PostgreSQL 17.
 |---|---|---|
 | Memory | 1 GB RAM in total without the virus scanner (both containers use about 250 MB idle); **2.5 GB with it** (ClamAV alone needs 1-1.5 GB) | 2 GB or more for a team, big imports and restores; 3 GB or more with the virus scanner |
 | CPU | 1 core | 2 cores or more (backups, imports and full-text search are quicker) |
-| Disk | 1.5 GB for the images (kalmido about 420 MB, postgres:17 about 650 MB) plus the data | an SSD; room for the backups (below) |
+| Disk | 1.5 GB for the images (kalmido about 420 MB, postgres:17.12 about 650 MB) plus the data | an SSD; room for the backups (below) |
 | System | 64-bit Linux, macOS or Windows with Docker and Compose v2 | Linux with Docker Engine |
 | Architecture | linux/amd64 or linux/arm64 (prebuilt images for both) | |
 
@@ -376,8 +376,14 @@ to *deny* and allow each app per group, so a new account does not open every app
 
 Since 2.37.0 Kalmido needs PostgreSQL 17 (`DATABASE_URL=postgresql://user:password@host:5432/db`); without it the app
 does not start and says why. The `docker-compose.yml` of the repository brings its own server (service `db`,
-`postgres:17`, data in `./pgdata`, password `POSTGRES_PASSWORD` in `.env`); nothing else is needed. Coming from an older
+`postgres:17.12`, data in `./pgdata`, password `POSTGRES_PASSWORD` in `.env`); nothing else is needed. Coming from an older
 version: [Installs from before 2.37](#installs-from-before-237-sqlite).
+
+The PostgreSQL version stands in one place: the image line of `db` in `docker-compose.yml`, pinned to a minor version
+(2.1092.0). A newer minor version of PostgreSQL arrives with a Kalmido update, together with a `pg_dump` in the Kalmido
+image that is at least as new; pulling images never moves your database on its own. If you run your own database
+server, keep it at or below the version in that line, or build the image with a newer client
+(`docker compose build --build-arg PG_VERSION=<major>.<minor>`).
 
 - **Password in the URL.** Use letters and digits only (`openssl rand -hex 24`): characters like `@`, `/`, `:` or `#`
   break the URL. `POSTGRES_PASSWORD` is only read when `./pgdata` is created; to change it later, also run
@@ -2156,7 +2162,9 @@ stay blocked until you allow them.
   along with the server: the image carries version 17. Before every backup Kalmido compares the major versions of
   `pg_dump` and the server. Is `pg_dump` older, the backup stops with a clear message instead of failing later,
   *Settings > Server > Server* names it and the admins get an alert. Upgrade the database server only together with a
-  Kalmido image that has the matching client (`postgresql-client-<major>` in the `Dockerfile`).
+  Kalmido image that has the matching client (`postgresql-client-<major>` in the `Dockerfile`). Since 2.1092.0 the image
+  takes the client from the PostgreSQL project's own packages and the build stops when its `pg_dump` is older than
+  `PG_VERSION` (the version of the `db` image).
 - **Back to 2.147 or older after a DATEV import (2.188.0, #2498).** 2.148 added the DATEV import of the office area; its
   runs are kept in the import history for undo. Versions before 2.148 do not know these runs: their *Undo* of such a run
   would delete the imported customers but keep the suppliers and opening balances. Do not undo a DATEV import on an

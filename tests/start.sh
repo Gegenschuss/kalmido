@@ -4,7 +4,7 @@
 # 2.45.0 (#1515): KALMIDO_SETUP_CODE=off unless set (the first setup needs no code from the log); KALMIDO_SETUP_CODE= tests the code.
 # 2.149.0 D (#2510): KALMIDO_NO_SECRET_KEY=1 unless set (a new server without a server key may start); KALMIDO_NO_SECRET_KEY= tests the refusal.
 # 2.190.0 B (#2592): KALMIDO_SECRET_KEY_CHANGED=1 unless set (suites start one data dir with their own random keys); KALMIDO_SECRET_KEY_CHANGED= tests the fingerprint check.
-# 2.37.0 (#1150): the database is Postgres. A database container "<container>-db" (postgres:17, data in RAM, no published port)
+# 2.37.0 (#1150): the database is Postgres. A database container "<container>-db" (the image of docker-compose.yml, #5948; data in RAM, no published port)
 # is started once and kept; every data dir gets its OWN database in it (name from the path), so a data dir and its database
 # belong together like tasks.db did: without KEEP both start empty, with KEEP=1 both stay. The app reaches it via --link
 # (no new docker network: address pools can be scarce). <datadir>/.kalmido-db names "<db container> <database>" for tests/dbx.py.
@@ -47,7 +47,7 @@ DBN=k$(printf '%s' "$(cd "$D" && pwd)" | md5sum | cut -c1-15)
 if [[ -z "$(docker ps -q -f "name=^${DBC}$")" ]]; then
   docker rm -f "$DBC" >/dev/null 2>&1 || true
   docker run -d --name "$DBC" --network bridge -e POSTGRES_USER=kalmido -e POSTGRES_PASSWORD=kalmido -e POSTGRES_DB=kalmido \
-    --tmpfs /var/lib/postgresql/data postgres:17 -c fsync=off -c synchronous_commit=off -c full_page_writes=off \
+    --tmpfs /var/lib/postgresql/data "$(python3 "$HERE/../tools/pg_image.py")" -c fsync=off -c synchronous_commit=off -c full_page_writes=off \
     -c max_connections=200 >/dev/null || exit 1
   # 2.728.0 (#5188): readiness over TCP, not the socket (as the ZAP step, #5187). At its first start the image runs a setup
   # server on the socket only and then restarts it; a socket check took that server as ready (the fixed "sleep 1" papered

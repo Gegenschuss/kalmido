@@ -467,7 +467,7 @@
   Say "Stop:       cd `"$Dir`"; docker compose down"
   $img = if ($script:Image) { $script:Image } else { 'kalmido:local' }
   # 2.538.0 (#4361): down -v also removes the named volumes; on Windows the folder (incl. pgdata) is deleted like any other
-  Say "Uninstall:  cd `"$Dir`"; docker compose --profile '*' down -v; docker image rm $img postgres:17 clamav/clamav:1.4"
+  Say "Uninstall:  cd `"$Dir`"; docker compose --profile '*' down -v; docker image rm $img postgres:17.12 clamav/clamav:1.4"
   Say "            (images you never pulled give a harmless `"No such image`"). Then delete the folder: Remove-Item -Recurse -Force `"$Dir`""
   Say '            This deletes all your tasks and cannot be undone: copy data\backups\ and secret\kalmido.key elsewhere first if you want them.'
   Say 'Use it from other devices: put it behind a reverse proxy with HTTPS, see'

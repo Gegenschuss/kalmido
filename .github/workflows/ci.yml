@@ -174,7 +174,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Image key (build inputs + week)
         id: key
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/pgdg-ACCC4CF8.asc', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image in the cache?
         id: cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -262,6 +262,8 @@ jobs:
         run: python tools/check_dataattr.py -v
       - name: New tables, columns and indexes in migrations.d, not schema.py (2.475.0, #3478)
         run: python tools/check_migrations.py -v
+      - name: One PostgreSQL version - docker-compose.yml pins it, no bare postgres:<major> anywhere (2.1092.0, #5948)
+        run: python tools/pg_image.py --check -v
       - name: Modules a test loads as a single file still load that way (2.493.0, #4041)
         run: python tools/check_singlefile.py
       - name: No unescaped value through tr() / trn() into HTML - trh() / trnh() (2.689.0, #5125)
@@ -364,7 +366,7 @@ jobs:
       # 2.546.0 B (#4289): the image of the job "image" (same key) when it is in the cache, else built here (as the shards)
       - name: Image key
         id: imgkey
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/pgdg-ACCC4CF8.asc', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         continue-on-error: true
@@ -522,7 +524,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Image key
         id: imgkey
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/pgdg-ACCC4CF8.asc', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         continue-on-error: true
@@ -612,7 +614,7 @@ jobs:
       # 2.180.0 A (#2692): the image of the job "image" (same key) when it is in the cache, else built here
       - name: Image key
         id: imgkey
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/pgdg-ACCC4CF8.asc', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         continue-on-error: true
@@ -833,15 +835,17 @@ jobs:
         # 40192975983, 42478203214) and held the live train. The image is pulled first, up to 3 tries with a growing pause;
         # a start that still fails prints the container log. Only the setup is retried - the ZAP finding itself stays hard.
         # tests/p2707_zap_db_start_test.py runs this script with a stand-in docker.
+        # 2.1092.0 (#5948): the image of docker-compose.yml (pinned minor version, tools/pg_image.py), not the moving postgres:<major>
         run: |
+          PG_IMAGE="$(python3 tools/pg_image.py)"
           for try in 1 2 3; do
-            docker pull -q postgres:17 && break
-            if [ "$try" = 3 ]; then echo "::error::docker pull postgres:17 failed 3 times"; exit 1; fi
-            echo "docker pull postgres:17 failed (try $try of 3), again in $((try * 10)) s"; sleep $((try * 10))
+            docker pull -q "$PG_IMAGE" && break
+            if [ "$try" = 3 ]; then echo "::error::docker pull $PG_IMAGE failed 3 times"; exit 1; fi
+            echo "docker pull $PG_IMAGE failed (try $try of 3), again in $((try * 10)) s"; sleep $((try * 10))
           done
           zapdb_log() { echo "::error::PostgreSQL for ZAP did not start"; docker logs kalmido-zap-db 2>&1 | tail -40 || true; exit 1; }
           docker run -d --name kalmido-zap-db -e POSTGRES_USER=kalmido -e POSTGRES_PASSWORD=zap -e POSTGRES_DB=kalmido \
-            -e POSTGRES_INITDB_ARGS=--data-checksums postgres:17 -c max_connections=100 || zapdb_log
+            -e POSTGRES_INITDB_ARGS=--data-checksums "$PG_IMAGE" -c max_connections=100 || zapdb_log
           # 2.715.0 (#5187): readiness over TCP, not the socket. The image first runs a setup server that listens on the
           # socket only and then restarts; a socket check saw that server as ready and the one final check met the restart
           # ("rejecting connections", run 42478203214). TCP answers only once the real server runs; the wait loop itself
@@ -856,7 +860,7 @@ jobs:
       # 2.180.0 A (#2692): the image of the job "image" (same key) when it is in the cache, else built here
       - name: Image key
         id: imgkey
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/pgdg-ACCC4CF8.asc', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         continue-on-error: true

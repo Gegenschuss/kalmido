@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # kalmido-suite: nodata
 """2.728.0 (#5188): the database readiness of a first start, over TCP (same cause as #5187 in the ZAP step).
-postgres:17 first runs a setup server on the socket only and then restarts it; pg_isready without -h reports that server
+the postgres image first runs a setup server on the socket only and then restarts it; pg_isready without -h reports that server
 as ready. The database block of tests/start.sh runs for real with bash and a stand-in docker (no container):
  1. setup server + restart: the wait loop asks over TCP on every call and goes on only after the restart
  2. no fixed pause: the old "sleep 1" after the socket check is gone (the pauses are the loop's own 0.5 s)
@@ -34,7 +34,7 @@ def db_block():
 
 
 # The stand-in docker: "ps" lists nothing (the database is started), every exec is counted. READY=0: never ready.
-# READY=1: like postgres:17 at its first start - exec 1 = the setup server answers on the socket only, exec 2-3 = the
+# READY=1: like the postgres image at its first start - exec 1 = the setup server answers on the socket only, exec 2-3 = the
 # restart (nothing answers), from exec 4 on the real server answers on the socket and over TCP.
 DOCKER = r"""#!/bin/bash
 d="$STUB_DIR"
