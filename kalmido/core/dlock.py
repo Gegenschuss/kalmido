@@ -116,6 +116,10 @@ def dl_of(c, uid):
     cache = g.setdefault("_dl", {}) if has_request_context() else None
     if cache is not None and uid in cache:
         return cache[uid]
+    me = g.get("user") if has_request_context() else None
+    if me is not None and me["id"] == int(uid) and me["kind"] != "agent":
+        cache[uid] = None  # 2.1102.0 (#5137): the signed-in person itself has no lock - no system read (a set_config pair) per request
+        return None
     with system_ctx(c):  # 2.1078.0 (#5866, N6): the agents row of another organisation's context too -- a defaults fallback
         # left wiki_folders empty (the open side); only the lock of this one account, never content handed to a person
         r = c.execute("SELECT u.kind, a.data_lock FROM users u LEFT JOIN agents a ON a.user_id=u.id WHERE u.id=?", (int(uid),)).fetchone()
