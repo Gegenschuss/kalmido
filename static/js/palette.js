@@ -276,7 +276,6 @@ function palAll() {
   for (const [v, n, d, l] of LOOK.accent) add('a:accent-' + v, 'action', tr('Accent colour: {0}', tr(n)), 'palette', () => lookSet('accent', v), {qonly: true, sw: light ? l : d});
   add('a:look-reset', 'action', tr('Reset appearance to the defaults'), 'undo', () => { for (const k of LOOK_KEYS) LS.del(k); applyTheme(); applyDensity(); applyLook(); render(); }, {qonly: true});
   add('a:keys', 'action', tr('Keyboard shortcuts'), 'help', shortcutsModal, {keys: '?'});
-  if (S.me?.kind !== 'agent') hlp_palItems(add);  // 2.1086.0 (#5820)
   if (typeof spl_offer === 'function' && spl_offer()) add('a:split', 'action', tr('Split view on / off'), 'columns', () => spl_toggle(), {keys: 'Shift+V'});  // 2.1037.0 (#5803): miniwin.js
   add('a:tour', 'action', tr('Restart the welcome tour'), 'arrow', () => tourStart());
   if (S.sample) add('a:sample-rm', 'action', tr('Remove sample project'), 'trash', () => sampleRemove());
@@ -322,6 +321,7 @@ function palAll() {
     for (const a of (S.agents || []).filter(x => x.enabled)) add('a:chat-' + a.id, 'action', tr('Chat with {0}', a.name), 'comment', () => chatOpen(a.id));
     if (!chatFull()) for (const a of (S.agents || []).filter(x => x.enabled)) add('a:pop-' + a.id, 'action', tr('Chat with {0} as a window', a.name), 'comment', () => chatOpen(a.id, {float: true}));  // 2.29.0 (#363)
   }
+  if (S.me?.kind !== 'agent') hlp_palItems(add);  // 2.1086.0 (#5820); 2.1102.0 (#5955): after the views, the Inbox stays the first view
   // lists, filters, tags
   for (const l of S.lists.filter(x => !x.archived && !x.is_inbox && !life_store(x) && inWs(x))) add('l:' + l.id, 'list', lname(l), 'list', () => go('l/' + l.id), {sw: cssColor(lp_col(l)), img: liconOk(l.icon) ? l.icon : '', lic: l, ...(l.folder ? {sub: fDisp(l.folder)} : {})});
   for (const f of folderNames()) add('folder:' + f, 'folder', fDisp(f), 'folder', () => go('folder/' + encodeURIComponent(f)));  // 2.4.0 (#361)
