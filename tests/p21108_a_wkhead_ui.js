@@ -38,8 +38,7 @@ const MODS = 'wiki,comments';
     const seen = [...document.querySelectorAll('#top h1, #view .wkpage h1, #view .wkpage h2, #view .wkpage .wktitle')].filter(vis).filter(e => norm(e.textContent).includes(norm(title || '?'))).length;
     return {top: h1 ? h1.textContent : null, topMore: !!t.querySelector('[data-act="top-more"]:not([hidden])'), dots: dots.length, pmenu: vis(document.querySelector('#view [data-wk="pmenu"]')),
       seen, title, crumbs: (document.querySelector('#view .wkcrumbs') || {}).textContent || '', back: vis(document.querySelector('#view .nthead [data-wk="close"]')),
-      dup: !!md && !!md.querySelector('h1[data-wkdup]') && !vis(md.querySelector('h1[data-wkdup]')), h1s: md ? [...md.querySelectorAll('h1')].filter(vis).map(e => e.textContent) : [],
-      h2s: md ? [...md.querySelectorAll('h2')].filter(vis).map(e => e.textContent) : [], gap: first ? Math.round(R(first).top - R(t).bottom) : null}; })()`;
+      dup: !!md && !!md.querySelector('h1[data-wkdup]') && !vis(md.querySelector('h1[data-wkdup]')), hs: md ? [...md.querySelectorAll('h1, h2, h3, h4, h5, h6')].filter(vis).map(e => e.textContent) : [], gap: first ? Math.round(R(first).top - R(t).bottom) : null}; })()`;
   const items = async ev => {
     await ev(`(() => { document.querySelector('#view [data-wk="pmenu"]').click(); return 1; })()`);
     await ready(ev, `!!document.querySelector('#pop:not(.hidden) [role="menuitem"]')`, 20);
@@ -61,7 +60,7 @@ const MODS = 'wiki,comments';
     await shot('p21108a-phone-page.png');
     check(a.top === 'Color Management' && !a.topMore && a.dots === 1, 'phone: the head bar shows the page title, not "Knowledge pages", and no "…" of its own ' + JSON.stringify(a));
     check(a.seen === 1, 'phone: the title is visible exactly once ' + JSON.stringify(a));
-    check(a.dup && !a.h1s.length && a.h2s.includes('Profiles'), 'phone: the repeated "# color  management" is hidden, the next heading stays ' + JSON.stringify(a));
+    check(a.dup && a.hs.length === 1 && a.hs[0] === 'Profiles', 'phone: the repeated "# color  management" is hidden, the next heading stays ' + JSON.stringify(a));
     check(a.pmenu && a.back && /Wiki/.test(a.crumbs) && /2D/.test(a.crumbs) && !/Color Management/.test(a.crumbs), 'phone: the page head has back, the path and one "…" ' + JSON.stringify(a));
     check(a.gap !== null && a.gap < 90, 'phone: the text starts right under the page head ' + JSON.stringify(a));
     const it = await items(ev);
@@ -69,9 +68,9 @@ const MODS = 'wiki,comments';
     check(await ev(`document.querySelector('#wk-md').textContent.includes('First line of the text.')`) && (await call('GET', `/api/wiki/pages/${DUP}`)).body.startsWith('# color  management'), 'phone: the text keeps its heading (only the view hides it)');
     // ---- a first heading that differs stays
     await nav(B + `#wiki/${OWN}`);
-    check(await ready(ev, `document.querySelector('#top h1 .ht')?.textContent === 'Lenses' && !!document.querySelector('#wk-md h1')`, 60), 'phone: the second page is drawn');
+    check(await ready(ev, `document.querySelector('#top h1 .ht')?.textContent === 'Lenses' && !!document.querySelector('#wk-md p')`, 60), 'phone: the second page is drawn');
     const b = await ev(HEAD);
-    check(!b.dup && b.h1s.includes('Primes and zooms') && b.top === 'Lenses', 'phone: a different first heading stays visible ' + JSON.stringify(b));
+    check(!b.dup && b.hs.includes('Primes and zooms') && b.top === 'Lenses', 'phone: a different first heading stays visible ' + JSON.stringify(b));
     // ---- back: the folder names the area again
     await ev(`(() => { document.querySelector('#view .nthead [data-wk="close"]').click(); return 1; })()`);
     check(await ready(ev, `!S.route.wid && document.querySelector('#top h1 .ht')?.textContent === 'Knowledge pages'`, 40), 'phone: back in the list the head bar names the area again');

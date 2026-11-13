@@ -559,10 +559,10 @@ function wk_pageHtml(p) {
 // 2.1108.0 (#5965): a first heading that only repeats the page's title (a SilverBullet import starts with "# Title") is hidden
 // in the drawn page; the text, the editor and the export keep it. Compared without case and spaces.
 function wk_dupTitle(html, p) {
-  const m = /^\s*<h1\b([^>]*)>([\s\S]*?)<\/h1>/.exec(html); if (!m) return html;
+  const m = /^\s*<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/.exec(html); if (!m) return html;  // the page draws "# Title" as <h4> (renderMd)
   const norm = x => String(x).toLowerCase().replace(/\s+/g, '');
   if (norm(wk_unesc(m[2].replace(/<[^>]*>/g, ''))) !== norm(wk_base(p.path))) return html;
-  return html.replace(m[0], m[0].replace('<h1', '<h1 hidden data-wkdup="1"'));
+  return html.replace(m[0], m[0].replace('<h' + m[1], '<h' + m[1] + ' hidden data-wkdup="1"'));
 }
 const wk_unesc = h => { const d = document.createElement('textarea'); d.innerHTML = h; return d.value; };
 const wk_bodyStrip = b => String(b || '').replace(/^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, '');
