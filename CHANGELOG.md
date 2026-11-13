@@ -21,13 +21,22 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1118.0] - 2026-11-13
+## [2.1120.0] - 2026-11-13
+
+Package 2.1120 (Bündel: Fehlerzeile IndexedDB „connection is closing“ nach).
+
+### Fixed
+- #6036: After a page reload (seen on Android) an IndexedDB connection the browser had closed could still be used and raised "The database connection is closing" on window.onerror. The held connections (offline start state, outbox, offline files of a quick add, wiki copy) now go through one helper (core.js `idbHeld`): a connection closed by the browser or by a sign-out in another tab is opened again at the next access, a transaction on a closing connection is retried once on a fresh one, and deleting such a database (sign-out) is no longer blocked by an open connection. Regression test `tests/p6036_a_idbheal_ui.js`.
 
 Package 2.1118 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 
 ### Changed
 - Database: the 53 old yes / no columns (archived, enabled, active, pinned, is_default, users.disabled / is_admin, lists.is_inbox, tasks.locked, ...) are real `BOOLEAN` instead of numbers 0 / 1 (`core/colbool.py`; the start turns an existing database once, rebuilding the partial indexes that compared them with 0 / 1). The app, the web app and the agents' API keep reading and writing 0 / 1 for exactly these fields (`core/pg.py`), so no answer changes. One way: the type does not turn back; a version before 2.1118 cannot run on the turned database (restore the backup taken before the update). `office_agreements.archived` stays a number (three states, 2 = deleted) (#5952).
 - SQL of every area compares these columns as booleans (`NOT archived`, `true` / `false` in writes, sums through `CAST AS INTEGER`); the list state trigger works with both types (#5952).
+
+## [2.1118.0] - 2026-11-13
+
+Not released (the CI of this version was red); its changes are listed under 2.1120.0.
 
 ## [2.1117.0] - 2026-11-13
 
@@ -315,7 +324,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1118.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1120.0...HEAD
+[2.1120.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1120.0
 [2.1118.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1118.0
 [2.1117.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1117.0
 [2.1113.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1113.0
