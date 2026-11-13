@@ -3325,7 +3325,7 @@ capability `data_lock_info`).
 404). It applies to agents only; people keep their roles and the approvals of takeover and release. **The server enforces
 it**: every write of the agent's token under `/api/v1/` has a class - `meta` (its own channel `/agent/...`: status,
 typing, chat and approval cards, jobs, proposals; always allowed), `routine` (create tasks and subtasks, plan them = only
-`due` / `due_time` / `start`, comment, take a task's lock off (`locked: false`, needed before ticking off a locked task; setting a lock stays `change`), tick off / reopen / skip, reactions, team chat messages, watching a task and ending it), `one_way` (every `DELETE` except those listed here, and the delete actions:
+`due` / `due_time` / `start`, comment, take a task's lock off (`locked: false`, needed before ticking off a locked task; setting a lock stays `change`), tick off / reopen / skip, reactions, team chat messages, watching a task and ending it, linking two objects and removing such a link *(2.1112.2, #5975: `/agent/objects/{kind}/{id}/links`, before always allowed as `meta`)*), `one_way` (every `DELETE` except those listed here, and the delete actions:
 emptying the trash, deleting folders, undoing an import, a batch with `action: delete`) or `change` (everything else; also the `DELETE` that only stops a timer or ends waiting, `DELETE /time/timer` and `DELETE /tasks/{id}/waiting`). Marking a task as being worked on (`/tasks/{id}/working`) belongs to `meta`.
 
 | Level | Allowed without a card |
