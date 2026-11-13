@@ -81,13 +81,13 @@ def routes(s, who, me):
 
     r = s.post(B + "/api/bookmarks", json={"url": f"https://example.com/{who}/quitte", "title": "Quittenernte", "tags": ["obstbau", "herbst"]})
     check(r.status_code in (200, 201), f"{who}: a bookmark with tags ({r.status_code} {r.text[:200]})")
-    bid = r.json().get("id") if r.ok else None
+    bid = (r.json().get("bookmark") or {}).get("id") if r.ok else None
     items = s.get(B + "/api/bookmarks", params={"tag": "herbst"}).json().get("items", [])
     check(bid in {x["id"] for x in items}, f"{who}: the bookmarks by tag (ILIKE on JSONB before) {[x['id'] for x in items]}")
     items = s.get(B + "/api/bookmarks", params={"tag": "winter"}).json().get("items", [])
     check(bid not in {x["id"] for x in items}, f"{who}: another tag does not find it")
 
-    r = s.put(B + "/api/office/settings", json={"bank_norc": {"every": "week", "user": me}})
+    r = s.put(B + "/api/office/bank/noreceipt/reminder", json={"every": "week", "user": me})
     check(r.ok, f"{who}: the bank bookings reminder on ({r.status_code} {r.text[:200]})")
     got, err = py("""
 rows = c.execute("SELECT org_id, CAST(data AS text) FROM office_settings WHERE CAST(data AS jsonb)->'bank_norc'->>'every' IN ('week', 'month')").fetchall()
@@ -151,7 +151,9 @@ check(set(mig.get("second") or ["?"]) <= {"present", "missing"}, f"migration: a 
 # ---- the account import takes a JSON column's value
 imp, err = py("""
 from kalmido.admin.acctimport import umz_row
-d = umz_row(c, 'contacts', {'fn': 'Import', 'emails': '[{"value": "x@example.com"}]', 'groups': 'no json', 'urls': [{'value': 'https://example.com'}]}, {}, '2026-11-13T08:00:00+00:00') or {}
+need = {r[0]: r[1] for r in c.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='contacts' AND is_nullable='NO' AND column_default IS NULL AND column_name<>'id'").fetchall()}
+fixed = {k: (1 if t in ('bigint', 'integer') else '2026-11-13T08:00:00+00:00' if t.startswith('timestamp') else 'x') for k, t in need.items()}
+d = umz_row(c, 'contacts', {'fn': 'Import', 'emails': '[{"value": "x@example.com"}]', 'groups': 'no json', 'urls': [{'value': 'https://example.com'}]}, fixed, '2026-11-13T08:00:00+00:00') or {}
 print(json.dumps({'emails': d.get('emails'), 'groups': d.get('groups', 'left out'), 'urls': d.get('urls')}))
 """)
 check(json.loads(imp.get("emails") or "null") == [{"value": "x@example.com"}], f"import: a JSON column keeps its value {imp} {err[-300:]}")
