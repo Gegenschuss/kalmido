@@ -38,7 +38,7 @@ const MODS = 'wiki,comments';
     const seen = [...document.querySelectorAll('#top h1, #view .wkpage h1, #view .wkpage h2, #view .wkpage .wktitle')].filter(vis).filter(e => norm(e.textContent).includes(norm(title || '?'))).length;
     return {top: h1 ? h1.textContent : null, topMore: !!t.querySelector('[data-act="top-more"]:not([hidden])'), dots: dots.length, pmenu: vis(document.querySelector('#view [data-wk="pmenu"]')),
       seen, title, crumbs: (document.querySelector('#view .wkcrumbs') || {}).textContent || '', back: vis(document.querySelector('#view .nthead [data-wk="close"]')),
-      dup: !!md && !!md.querySelector('h1[data-wkdup]') && !vis(md.querySelector('h1[data-wkdup]')), hs: md ? [...md.querySelectorAll('h1, h2, h3, h4, h5, h6')].filter(vis).map(e => e.textContent) : [], gap: first ? Math.round(R(first).top - R(t).bottom) : null}; })()`;
+      dup: !!md && !!md.querySelector('[data-wkdup]') && !vis(md.querySelector('[data-wkdup]')), hs: md ? [...md.querySelectorAll('h1, h2, h3, h4, h5, h6')].filter(vis).map(e => e.textContent) : [], gap: first ? Math.round(R(first).top - R(t).bottom) : null}; })()`;
   const items = async ev => {
     await ev(`(() => { document.querySelector('#view [data-wk="pmenu"]').click(); return 1; })()`);
     await ready(ev, `!!document.querySelector('#pop:not(.hidden) [role="menuitem"]')`, 20);
