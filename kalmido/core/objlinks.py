@@ -152,7 +152,7 @@ def olnk_state(c, kind, rid):
     cols = table_columns(c, t)
     if not cols:
         return "gone"
-    with system_ctx(c):
+    with system_ctx(c):  # deleted or not, whichever organisation it belongs to (the reader's role decides after)
         r = c.execute(f"SELECT {'deleted_at' if 'deleted_at' in cols else 'NULL AS deleted_at'} FROM {qi(t, {t})} WHERE id=?", (int(rid),)).fetchone()
     return "gone" if r is None or r[0] else "ok"
 
