@@ -21,7 +21,24 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1103.0] - 2026-11-13
+## [2.1104.0] - 2026-11-13
+
+Package 2.1101 (Bündel: Altspalten obj_history / obj_undo / obj_revoked au).
+### Changed
+- The shared core's own tables take real column types: `obj_history.created_at` / `updated_at`, `obj_undo.created_at` and `obj_revoked.created_at` are `TIMESTAMPTZ`, `vals_before` / `vals_after` / `snap` / `row_json` are `JSONB`. A new database makes them so at once; `kalmido/core/objretype.py` moves an older database at its next start (a readable time / JSON is kept, an unreadable time becomes the start's time, a broken JSON `{}`), each column in its own step, and raises the database's back limit. The history merge of a folder rename (`obj_history_add_many`) and the list lock's search in undo copies work on the new types; the merge window is compared as a point in time. Lines taken out of `tools/coltypes_baseline.txt` (#5954).
+- One way: after the first start of this version an older version refuses to start on the database (back limit); going back needs the backup taken before the update (#5954).
+
+Package 2.1102.0 (Sammel-Fix: red suites of the CI).
+### Fixed
+- #5957: the chat window keeps your own messages at the right edge again (the reading column of #5903 is not used in the small chat window) - CI red p2365_a_ui
+- #5704: dragging an event in the calendar while the events reload no longer loses the drag (end time at the pointer, the next click works); the grid is drawn after the drop - CI red p252_a_ui
+- #5955: the command search lists the Inbox as first view again; Help comes after the views - CI red p181_ui
+- #5956: the header menu "…" keeps archive and delete last and set apart; "Help for this area" comes before them - CI red p2310_c_ui
+- #5137: /api/state no longer reads the signed-in person's own data lock as system on every request (back to at most 4 set_config) - CI red p2369_6_api
+- #5908: the News test follows the folded History of #5807/#5808 (owner change as bundle "you own it now") - CI red p212_ui
+- #4744: the toast-above-sheet test waits for the frame in which the toast is placed - CI red p2130_ui
+- #5516: "bars are fitted after release" is only required when a watcher still waited at release - CI red p2586_a_dragperf_ui
+- #5958: the search plan probe recognises the search statement after #5655 added ", id DESC" - CI red p2695_l_search_rls
 
 ### Fixed
 - main: the backup suite tests the zip bomb check again instead of the size limit - the bomb member comes before the database dump (CI red of 2.1086.0)
@@ -200,10 +217,15 @@ Package 2.1074 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 - #5493: a device's own undo / redo of a step without a server group sends `X-Kalmido-Undo-Own: 1` and records no new server step, so the way forward (redo) of the person's undone steps stays.
 - #5493: the server labels a task's step as the app's history does ("Priority of “Jump”: High", "Renamed …", "Date of …: 4 Mar", "Moved …", the title in quotes; was "Edited Jump"); no project, section or field name goes into a label (a project locked later would keep it there).
 
+## [2.1103.0] - 2026-11-13
+
+Not released (the CI of this version was red); its changes are listed under 2.1104.0.
+
 ## [2.1100.0] - 2026-11-13
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1103.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1104.0...HEAD
+[2.1104.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1104.0
 [2.1103.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1103.0
 [2.1100.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1100.0
