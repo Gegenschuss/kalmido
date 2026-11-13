@@ -18542,5 +18542,6 @@
   "One-way step.": "Stap zonder weg terug.",
   "The files differ from the card (names or content): the card approves exactly the files of the refused upload. Send exactly these files, or ask with a new card.": "De bestanden wijken af van de kaart (namen of inhoud): de kaart keurt precies de bestanden van de geweigerde upload goed. Stuur precies deze bestanden of vraag het met een nieuwe kaart.",
   "The card approves an upload: send the upload again with the same files and the header X-Kalmido-Approval: ID of the card (MCP: use_approval) - the run from the card cannot send files.": "De kaart keurt een upload goed: stuur de upload opnieuw met dezelfde bestanden en de header X-Kalmido-Approval: ID van de kaart (MCP: use_approval) - de uitvoering vanaf de kaart kan geen bestanden sturen.",
-  "Check the connection in the settings, or remove it.": "Controleer de verbinding in de instellingen of verwijder haar."
+  "Check the connection in the settings, or remove it.": "Controleer de verbinding in de instellingen of verwijder haar.",
+  "Nothing else waits for you": "Verder wacht er niets op je"
 }

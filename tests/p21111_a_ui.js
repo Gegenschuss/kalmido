@@ -35,8 +35,8 @@ const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' 
   const sum = txt(d, '.hpsum');
   check(/^6 tasks for today/.test(sum) && !/overdue/i.test(sum), '#5963: the sentence names only today: ' + sum);
   const dash = txt(d, '.dash');
-  const n = (dash.match(/\d+ tasks? overdue|\d+ overdue/gi) || []).length;
-  check(n === 1 && /5 tasks overdue/.test(txt(d, '.dtome')), '#5963: "overdue" stands once, in the box Waiting for you (' + n + ') ' + txt(d, '.dtome'));
+  const mm = dash.match(/.{0,25}(\d+ tasks? overdue|\d+ overdue).{0,10}/gi) || [], n = mm.length;
+  check(n === 1 && /5 tasks overdue/.test(txt(d, '.dtome')), '#5963: "overdue" stands once, in the box Waiting for you (' + n + ') ' + mm.join(' ~ '));
   const fig = d.querySelector('figure.qd.dashq');
   check(!fig || (fig.getAttribute('aria-expanded') === 'false' && !fig.classList.contains('open')), '#5963: the quote starts closed');
   if (fig) { fig.click(); check(fig.classList.contains('open') && fig.getAttribute('aria-expanded') === 'true', '#5963: a tap opens the quote'); fig.click(); check(!fig.classList.contains('open'), '#5963: a second tap closes it'); }

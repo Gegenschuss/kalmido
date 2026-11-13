@@ -394,8 +394,8 @@ function dashCard(k) {
     const vis = (S.nf.items || []).map((it, i) => [it, i]).filter(([it]) => !it.read);
     // 2.45.0 (#1504): compact, at most 5, a bundle is one line, "All news" below. 2.1037.0 (#5807): only what waits for me (For you:
     // the deadline lines, then the bundles for me); empty: "Nothing waits for you" -- the rest is the history of the News view
-    const due = dueRows(), gs = newsGroups(vis).filter(g => g.needs).slice(0, Math.max(0, lyo_get('home', 'news', 'n', 5) - due.length));  // 2.55.0 (#1065)
-    if (!gs.length && !due.length) return slim(tr('Nothing waits for you'));
+    const boxed = collab() && bellCount() > 0, due = boxed ? [] : dueRows(), gs = newsGroups(vis).filter(g => g.needs).slice(0, Math.max(0, lyo_get('home', 'news', 'n', 5) - due.length));  // 2.55.0 (#1065)
+    if (!gs.length && !due.length) return slim(boxed ? tr('Nothing else waits for you') : tr('Nothing waits for you'));  // 2.1111.0 (#5963): the deadline lines stand once, in the box "Waiting for you" above
     const dueLi = ([k, n]) => `<li class="needs hpdue"><a href="#today"><span class="dwt">${esc(k === 'today' ? trn('{0} task due today', '{0} tasks due today', n) : trn('{0} task overdue', '{0} tasks overdue', n))}</span></a></li>`;
     return card(`<ul class="dwl hpnl">${/*html-ok*/ due.map(dueLi).join('')}${gs.map(hpNewsRow).join('')}</ul><a class="linkbtn hpall" href="#news">${tr('All news')}</a>`, '', bellCount() || '');
   }
