@@ -8,7 +8,7 @@
 // live here too. Server: kalmido/office/banknorc.py (list, counter, reminder) + office/bank.py (match / unmatch).
 const BNR = {oid: null, dir: 'out', month: '', account: '', data: null, err: null, q: '', pick: null, cand: null, rules: undefined, cnt: undefined, cntAt: 0, cntLoading: false, rem: null, remLoading: false, hash: ''};
 // the link #office/bank/norc (the reminder task, the start page) opens this view once; the tab's own switch leaves it
-const bnr_route = () => { if (location.hash.split('/')[2] === 'norc' && BNR.hash !== location.hash) BNK.state = 'norc'; BNR.hash = location.hash; return true; };
+const bnr_route = () => { if (ofcSeg(0) === 'norc' && BNR.hash !== location.hash) BNK.state = 'norc'; BNR.hash = location.hash; return true; };
 const bnr_q = () => `dir=${BNR.dir}${BNR.month ? `&month=${BNR.month}` : ''}${BNR.account ? `&account=${encodeURIComponent(BNR.account)}` : ''}`;
 const bnr_mon = m => { const [y, mo] = m.split('-').map(Number); try { return new Intl.DateTimeFormat(LOCALE(), {month: 'long', year: 'numeric'}).format(new Date(y, mo - 1, 1)); } catch { return m; } };
 

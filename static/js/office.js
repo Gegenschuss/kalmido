@@ -51,6 +51,8 @@ const ofcLockedHtml = () => ofcNoBooks() ? noAccessState({sub: OFC.info.submit ?
 // loaded = on (as before). The server checks the same on every route
 const ofcFeat = k => !OFC.info?.features || OFC.info.features[k] !== false;
 const pb_clOrg = () => OFC.info?.personal ? null : (OFC.info?.org_id || null);  // 2.47.3 (#1360): a personal office's clients are the private ones
+// 2.1109.0 (#5959): the n-th segment after the tab of the office address, with or without the workspace (#office/s/<ws>/<tab>/<seg>)
+const ofcSeg = n => { const p = location.hash.slice(1).split('/'); return p[(p[1] === 's' ? 4 : 2) + n] || ''; };
 const ofcWs = () => pb_clOrg() ? 'org:' + pb_clOrg() : 'private';  // 2.87.9 (#1940): the workspace of the shown office (importTargetConfirm)
 // 2.380.0 B (#3409): the documents' two tabs (office_docs.js): quotations and invoices
 const ofcDocTab = t => t === 'offers' || t === 'invoices';
