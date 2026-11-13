@@ -10,6 +10,11 @@ those with a person, organisation, list or task column; a table with nobody's da
  - the imports: every part of the account export is read (acctimport.py UMZ_READ) or named as staying behind (UMZ_LEFT), every
    area of the organisation export is mapped (UMZ_ORG_MAP), read by an area of admin/oi_*.py or named (UMZ_ORG_SKIP)
 Nothing in a list may be stale either: a reason for a table that is gone or exported meanwhile fails too.
+2.1093.0 (#5289, stage Q11): the tables of the core say where their rows go in the export register (kalmido/core/objexport.py:
+obj_export(table, ...) for the cross-cutting tables, obj_register(kind, table, ..., export={...}) for a kind's own table); this
+reads those calls as they are written and counts them like the hand lists. Every table of the core (obj_*) needs an entry there,
+a registered table must not stand in a hand list too (OX_AREAS, OX_LEFT, UMZ_LEFT_TABLES, UMZ_LATER_NAMES, RX_TABLES, RX_WHERE,
+RX_LEFT_TABLES; its parts not in UMZ_READ_OWN / UMZ_ORG_MAP_OWN) and no table is registered twice.
 usage: python3 tools/check_export_tables.py [-v] [--root DIR]      exit 1 on a finding"""
 import ast
 import glob
@@ -126,10 +131,72 @@ def reasons(tree, name):
     return out
 
 
+def _value(node, names):
+    """A literal of a register call: strings, tuples, None; a name of a plain string assignment of the file resolved."""
+    if isinstance(node, ast.Name):
+        return names.get(node.id)
+    return ast.literal_eval(node)
+
+
+def register(root):
+    """2.1093.0 (#5289): the export register as written -> ({table: {keyword: value, "at": "file:line"}}, [findings])."""
+    reg, bad = {}, []
+    for path in sorted(glob.glob(os.path.join(root, "kalmido", "**", "*.py"), recursive=True)):
+        with open(path, encoding="utf-8") as fh:
+            src = fh.read()
+        if "obj_export(" not in src and "export=" not in src:
+            continue
+        tree = ast.parse(src)
+        names = {n.targets[0].id: n.value.value for n in tree.body if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)
+                 and isinstance(n.value, ast.Constant) and isinstance(n.value.value, str)}
+        rel = os.path.relpath(path, root)
+        for n in ast.walk(tree):
+            if not isinstance(n, ast.Call) or not isinstance(n.func, ast.Name):
+                continue
+            if n.func.id == "obj_export" and n.args and all(k.arg for k in n.keywords):  # not obj_register's own call (**export)
+                tnode, kws = n.args[0], {k.arg: k.value for k in n.keywords if k.arg != "by"}
+            elif n.func.id == "obj_register" and any(k.arg == "export" for k in n.keywords) and len(n.args) > 1:
+                tnode, ex = n.args[1], next(k.value for k in n.keywords if k.arg == "export")
+                if not isinstance(ex, ast.Dict) or not all(isinstance(k, ast.Constant) for k in ex.keys):
+                    bad.append(f"{rel}:{n.lineno}: obj_register export= must be a plain dict literal")
+                    continue
+                kws = {k.value: v for k, v in zip(ex.keys, ex.values)}
+            else:
+                continue
+            at = f"{rel}:{n.lineno}"
+            try:
+                t = _value(tnode, names)
+                e = {k: _value(v, names) for k, v in kws.items()}
+            except ValueError:
+                bad.append(f"{at}: an entry of the export register must be plain literals (this check reads it without the app)")
+                continue
+            if not isinstance(t, str):
+                bad.append(f"{at}: the table of an export register entry must be a plain string")
+                continue
+            if t in reg:
+                bad.append(f"{t}: registered twice in the export register ({reg[t]['at']}, {at}): one way per table")
+                continue
+            e["at"] = at
+            if e.get("acct_later"):
+                e["acct_left"] = "not yet in the account export"
+            reg[t] = e
+    return reg, bad
+
+
 def check(root):
     tables = schema_tables(root)
-    bad = []
-    stats = {"tables": len(tables)}
+    reg, bad = register(root)  # 2.1093.0 (#5289)
+    stats = {"tables": len(tables), "register": len(reg)}
+    for t in sorted(t for t in tables if t.startswith("obj_") and t not in reg):
+        bad.append(f"{t}: a table of the core without an entry in the export register (kalmido/core/objexport.py obj_export, or "
+                   "obj_register export= for a kind's own table)")
+    for t in sorted(set(reg) - set(tables)):
+        bad.append(f"{t}: stale in the export register ({reg[t]['at']}: no such table)")
+    r_org = {e[0]: t for t, r in reg.items() for e in r.get("org") or ()}
+    r_part = {e[0]: e[2] for r in reg.values() for e in r.get("org") or () if len(e) == 3}
+    r_read = {p for r in reg.values() for p in r.get("read") or ()} | set(r_part.values())
+    r_rx = {t for t, r in reg.items() if r.get("rx")}
+    r_left = {k: {t: r[k] for t, r in reg.items() if r.get(k)} for k in ("org_left", "acct_left", "acct_later")}
     admin = ("kalmido", "admin")
     # ---- account export
     parts = {}
@@ -139,12 +206,17 @@ def check(root):
         parts.update(queries_in(acct, fn))
     left_tree = ast.parse(read(root, *admin, "exportleft.py"))
     left, rx_left = reasons(left_tree, "UMZ_LEFT_TABLES"), reasons(left_tree, "RX_LEFT_TABLES")
+    later_own = reasons(left_tree, "UMZ_LATER_NAMES")
+    for name, d in (("UMZ_LEFT_TABLES", left), ("UMZ_LATER_NAMES", later_own), ("RX_LEFT_TABLES", rx_left)):
+        for t in sorted(set(d) & set(reg)):
+            bad.append(f"{t}: in the export register ({reg[t]['at']}) and by hand in {name} (kalmido/admin/exportleft.py)")
+    left = {**left, **r_left["acct_left"]}
     inc = {t for v in parts.values() for t in v} | {t for t in BUILD_PARTS.values() if t} | set(ast.literal_eval(assigned(left_tree, "UMZ_BUILD_TABLES")))
     need = {t for t, c in tables.items() if any(x in c for x in PEOPLE) and t not in FRAME}
     stats["account"] = len(need)
     # 2.531.0 (#4317 F12, audit #2425): every table, not only those with a person column (kid_parents, conn_links went missing):
     # exported, named in UMZ_LEFT_TABLES (the manifest's not_included) or, holding nobody's data, in UMZ_FREE_TABLES
-    free, later = reasons(left_tree, "UMZ_FREE_TABLES"), reasons(left_tree, "UMZ_LATER_NAMES")
+    free, later = reasons(left_tree, "UMZ_FREE_TABLES"), {**later_own, **r_left["acct_later"]}
     for t in sorted(set(tables) - set(FRAME) - inc - set(left) - set(free)):
         has = "/".join(x for x in PEOPLE if x in tables[t])
         bad.append(f"{t}: {'has ' + has if has else 'a table'} but is neither in the account export nor in UMZ_LEFT_TABLES "
@@ -160,6 +232,7 @@ def check(root):
                    "or in UMZ_LEFT_TABLES")
     lt = {t for t in left if left[t] == next((n.value.value for n in left_tree.body if isinstance(n, ast.Assign)
                                                and getattr(n.targets[0], "id", "") == "_LATER"), None)}  # the tables not yet in it
+    lt |= set(r_left["acct_later"])  # 2.1093.0 (#5289): the register names it with acct_later
     for t in sorted(lt - set(later)):
         bad.append(f"{t}: not yet in the account export but without a readable name in UMZ_LATER_NAMES (the export page names it)")
     for t in sorted(set(later) - lt):
@@ -168,6 +241,12 @@ def check(root):
     ox = ast.parse(read(root, *admin, "orgexport.py"))
     areas = {e.elts[0].value: e.elts[1].value for e in assigned(ox, "OX_AREAS").elts}
     ox_left = reasons(ox, "OX_LEFT")
+    for t in sorted((set(areas.values()) | set(ox_left)) & set(reg)):
+        bad.append(f"{t}: in the export register ({reg[t]['at']}) and by hand in OX_AREAS / OX_LEFT (kalmido/admin/orgexport.py)")
+    for a in sorted(set(areas) & set(r_org)):
+        bad.append(f"{a}: a file of the organisation export in OX_AREAS and in the export register")
+    areas = {**areas, **r_org}
+    ox_left = {**ox_left, **r_left["org_left"]}
     onames = {t for t, c in tables.items() if any(x in c for x in ORG_COLS) and t not in ("orgs", "lists")}
     stats["organisation"] = len(onames)
     for t in sorted(onames - set(areas.values()) - set(ox_left)):
@@ -183,6 +262,10 @@ def check(root):
     # ---- retention export
     rx = ast.parse(read(root, *admin, "retexport.py"))
     rx_t = {e.elts[1].value for e in assigned(rx, "RX_TABLES").elts}
+    rx_w = {k.value for k in assigned(rx, "RX_WHERE").keys}
+    for t in sorted((rx_t | rx_w) & set(reg)):
+        bad.append(f"{t}: in the export register ({reg[t]['at']}) and by hand in RX_TABLES / RX_WHERE (kalmido/admin/retexport.py)")
+    rx_t |= r_rx
     office = {t for t in tables if t.startswith("office_")}
     stats["retention"] = len(office)
     for t in sorted(office - rx_t - set(rx_left)):
@@ -195,10 +278,15 @@ def check(root):
         bad.append(f"{t}: in RX_TABLES but not in the schema")
     # ---- imports
     imp = ast.parse(read(root, *admin, "acctimport.py"))
-    known = strings(assigned(imp, "UMZ_READ")) | strings(assigned(imp, "UMZ_LEFT"))
+    read_own, omap_own = strings(assigned(imp, "UMZ_READ_OWN")), assigned(imp, "UMZ_ORG_MAP_OWN")
+    for p in sorted(read_own & r_read):
+        bad.append(f"{p}: a part in the export register and by hand in UMZ_READ_OWN (kalmido/admin/acctimport.py)")
+    for p in sorted({k.value for k in omap_own.keys} & set(r_part)):
+        bad.append(f"{p}: a file in the export register and by hand in UMZ_ORG_MAP_OWN (kalmido/admin/acctimport.py)")
+    known = read_own | r_read | strings(assigned(imp, "UMZ_LEFT"))
     for p in sorted((set(parts) | set(BUILD_PARTS)) - known):
         bad.append(f"{p}: a part of the account export that acctimport.py neither reads (UMZ_READ) nor names (UMZ_LEFT)")
-    omap, skip = strings(assigned(imp, "UMZ_ORG_MAP")), [e.elts[0].value for e in assigned(imp, "UMZ_ORG_SKIP").elts]
+    omap, skip = strings(omap_own) | set(r_part), [e.elts[0].value for e in assigned(imp, "UMZ_ORG_SKIP").elts]
     oit = set()
     for f in glob.glob(os.path.join(root, *admin, "oi_*.py")) + [os.path.join(root, *admin, "orgimport.py")]:
         with open(f, encoding="utf-8") as fh:
@@ -216,7 +304,7 @@ def main():
     for b in bad:
         print("check_export_tables:", b)
     print(f"check_export_tables: {st['tables']} tables, {st['account']} with people's data, {st['organisation']} with an organisation or list column, "
-          f"{st['retention']} office tables, {len(bad)} finding(s)")
+          f"{st['retention']} office tables, {st['register']} in the export register, {len(bad)} finding(s)")
     return 1 if bad else 0
 
 

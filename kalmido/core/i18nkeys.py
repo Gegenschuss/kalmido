@@ -45,6 +45,21 @@ def reason_keys(root):
                 v = at.get(v.id) if isinstance(v, ast.Name) else v
                 if isinstance(v, ast.Constant) and isinstance(v.value, str):
                     out.setdefault(v.value.replace(" (not_included)", ""), f"{rel}:{v.lineno}")
+    # 2.1093.0 (#5289, stage Q11): + the reasons and names of the core's export register (obj_export calls)
+    rel = "kalmido/core/objexport.py"
+    path = os.path.join(root, *rel.split("/"))
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+        at = {n.targets[0].id: n.value for n in tree.body if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)}
+        for n in ast.walk(tree):
+            if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "obj_export":
+                for k in n.keywords:
+                    v = at.get(k.value.id) if isinstance(k.value, ast.Name) else k.value
+                    if k.arg in ("org_left", "acct_left", "acct_later") and isinstance(v, ast.Constant) and isinstance(v.value, str):
+                        out.setdefault(v.value.replace(" (not_included)", ""), f"{rel}:{v.lineno}")
+        if "OEX_LATER" in at:  # the reason of acct_later
+            out.setdefault(at["OEX_LATER"].value, f"{rel}:{at['OEX_LATER'].lineno}")
     return out
 
 

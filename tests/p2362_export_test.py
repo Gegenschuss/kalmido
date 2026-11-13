@@ -303,7 +303,7 @@ check(not dbx("SELECT 1 FROM org_members WHERE user_id IN (?,?)", (FID, GID)), "
 # freelancers' lists have data by now); the rows with an org_id or a list_id of their own are read as the export reads them
 ISO = """
 import json, sys
-from kalmido.admin.orgexport import OX_AREAS
+from kalmido.admin.orgexport import ox_areas  # 2.1093.0 (#5289): OX_AREAS + the core's export register (the core's files were in OX_AREAS)
 from kalmido.core import pg as _pg
 from kalmido.core.config import DATABASE_URL
 org = int(sys.argv[1])
@@ -311,7 +311,7 @@ c = _pg.connect_direct(DATABASE_URL)
 out = {"bad": [], "seen": 0, "foreign": 0}
 with _pg.system_ctx(c):
     ours = {r[0] for r in c.execute("SELECT id FROM lists WHERE org_id=?", (org,))}
-    for name, table, where in (*OX_AREAS, ("control", "tasks", "1=1")):  # the control: every task, so the check has something to find
+    for name, table, where in (*ox_areas(), ("control", "tasks", "1=1")):  # the control: every task, so the check has something to find
         rows = c.execute(f"SELECT * FROM {table} WHERE ({where})", (org,) * where.count("?")).fetchall()  # (every ? of OX_AREAS is the organisation)
         for r in rows:
             d = dict(r)

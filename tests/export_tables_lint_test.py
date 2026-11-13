@@ -11,6 +11,8 @@
  8. 2.464.0 (#3841): every reason is a translated key
  9. 2.531.0 (#4317): every table counts (a table without a person column in no list, UMZ_FREE_TABLES stale or holding a person's
     data, an area not yet in the export without its readable name)
+10. 2.1093.0 (#5289): the export register of the core: read (obj_export, obj_register export=), a registered table by hand too,
+    twice, gone, or a table of the core without an entry is a finding
 usage: python3 tests/export_tables_lint_test.py"""
 import importlib.util
 import json
@@ -84,13 +86,50 @@ check(rc == 1 and "zz_gone: stale in UMZ_FREE_TABLES" in out, f"a table with nob
 rc, out = with_edit(("admin", "exportleft.py"), "UMZ_FREE_TABLES = {\n", 'UMZ_FREE_TABLES = {\n    "habits": "x",\n')
 check(rc == 1 and "habits: in UMZ_FREE_TABLES but it holds" in out, f"a table with a person's data named as nobody's is a finding: {out[-300:]}")
 # 2.958.0 (#5281): the versions of the knowledge pages are rows of obj_versions
-rc, out = with_edit(("admin", "exportleft.py"), '"obj_versions": "history of knowledge pages",', "")
-check(rc == 1 and "obj_versions: not yet in the account export but without a readable name" in out, f"an area without a readable name is a finding: {out[-300:]}")
+# 2.1093.0 (#5289): obj_versions says it in the export register now (acct_later): an old table's name is taken out
+rc, out = with_edit(("admin", "exportleft.py"), '"wiki_spaces": "spaces of knowledge pages",', "")
+check(rc == 1 and "wiki_spaces: not yet in the account export but without a readable name" in out, f"an area without a readable name is a finding: {out[-300:]}")
 rc, out = with_edit(("accounts", "settings.py"), '    q = {\n        "lists":', '    q = {\n        "zz_part": ("SELECT * FROM habits", ()),\n        "lists":')
 check(rc == 1 and "zz_part" in out, f"a part the import does not know is a finding: {out[-300:]}")
 rc, out = with_edit(("admin", "orgexport.py"), '    ("bookmarks.json", "bookmarks", "org_id=?"),\n',
                     '    ("bookmarks.json", "bookmarks", "org_id=?"),\n    ("zz/area.json", "notes", "org_id=?"),\n')
 check(rc == 1 and "zz/area.json" in out, f"an area the import does not know is a finding: {out[-300:]}")
+
+# 2.1093.0 (#5289, stage Q11): the export register of the core (kalmido/core/objexport.py)
+OEXP = ("core", "objexport.py")
+check("16 in the export register" in lint()[1], f"the register is read: {lint()[1][-200:]}")
+rc, out = with_edit(("admin", "exportleft.py"), "UMZ_LEFT_TABLES = {\n", 'UMZ_LEFT_TABLES = {\n    "obj_seen": _VIEW,\n')
+check(rc == 1 and "obj_seen: in the export register" in out and "UMZ_LEFT_TABLES" in out, f"a registered table by hand too (account) is a finding: {out[-300:]}")
+rc, out = with_edit(("admin", "orgexport.py"), '    ("bookmarks.json", "bookmarks", "org_id=?"),\n',
+                    '    ("bookmarks.json", "bookmarks", "org_id=?"),\n    ("zz/links.json", "obj_links", "org_id=?"),\n')
+check(rc == 1 and "obj_links: in the export register" in out and "OX_AREAS" in out, f"a registered table by hand too (organisation) is a finding: {out[-300:]}")
+rc, out = with_edit(("admin", "retexport.py"), "RX_TABLES = (\n", 'RX_TABLES = (\n    ("zz/v.csv", "obj_versions"),\n')
+check(rc == 1 and "obj_versions: in the export register" in out and "RX_TABLES" in out, f"a registered table by hand too (retention) is a finding: {out[-300:]}")
+rc, out = with_edit(("admin", "acctimport.py"), 'UMZ_READ_OWN = frozenset((\n', 'UMZ_READ_OWN = frozenset((\n    "comments",\n')
+check(rc == 1 and "comments: a part in the export register and by hand in UMZ_READ_OWN" in out, f"a registered part by hand too is a finding: {out[-300:]}")
+rc, out = with_edit(OEXP, 'obj_export("obj_notif_cap")\n', 'obj_export("obj_notif_cap")\nobj_export("obj_notif_cap")\n')
+check(rc == 1 and "obj_notif_cap: registered twice" in out, f"a table registered twice is a finding: {out[-300:]}")
+rc, out = with_edit(OEXP, 'obj_export("obj_notif_cap")\n', "")
+check(rc == 1 and "obj_notif_cap: a table of the core without an entry in the export register" in out, f"a core table without an entry is a finding: {out[-300:]}")
+rc, out = with_edit(OEXP, 'obj_export("obj_notif_cap")\n', 'obj_export("obj_notif_cap")\nobj_export("obj_zz_gone")\n')
+check(rc == 1 and "obj_zz_gone: stale in the export register" in out, f"a registered table that is gone is a finding: {out[-300:]}")
+# a kind's own table through obj_register(..., export={...}): read like obj_export; without it the table is a finding
+rc, out = with_edit(SCHEMA, "CREATE TABLE IF NOT EXISTS filters (", TABLE.format("zz_kind", "org_id"))
+check(rc == 1 and "zz_kind" in out, f"setup: a new kind's table in no list is a finding: {out[-300:]}")
+KIND = ('\nobj_register("zzk", "zz_kind", label="x", fields={}, export={"org_left": "derived or working data, rebuilt on the target", '
+        '"acct_left": "derived or working data, rebuilt on the target"})\n')
+with tempfile.TemporaryDirectory() as d:
+    k = os.path.join(d, "kalmido")
+    for sub in ("core", "accounts", "admin"):
+        shutil.copytree(os.path.join(ROOT, "kalmido", sub), os.path.join(k, sub))
+    for path, old, new in ((SCHEMA, "CREATE TABLE IF NOT EXISTS filters (", TABLE.format("zz_kind", "org_id")), (OEXP, 'obj_export("obj_notif_cap")\n', 'obj_export("obj_notif_cap")\n' + KIND)):
+        p = os.path.join(k, *path)
+        with open(p, encoding="utf-8") as f:
+            s = f.read()
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(s.replace(old, new, 1))
+    rc, out = lint(d)
+check(rc == 0 and "17 in the export register" in out, f"obj_register export= is read: the kind's table is placed {out[-300:]}")
 
 # 2.464.0 (#3841): the reasons are keys of the language files, also the ones of the organisation export and without the mark in the manifest
 spec = importlib.util.spec_from_file_location("i18nkeys", os.path.join(ROOT, "kalmido", "core", "i18nkeys.py"))

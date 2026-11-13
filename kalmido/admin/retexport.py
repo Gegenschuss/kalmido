@@ -44,8 +44,8 @@ from ..office.ledger import ofx_log  # 2.296.0 F (#3177)
 from ..accounts.orgs import org_role  # 2.369.5 (#2517): pulled up from functions
 from ..notify.alerts import aa_now  # 2.369.5 (#2517): pulled up from functions
 from ..office.books import bk_csv_cell  # 2.369.5 (#2517): pulled up from functions
-from .orgexport import OX_AREAS, OX_PB_CLIENTS, _rows, ox_live, _safe_part, _under  # 2.369.5 (#2517): pulled up from functions
-from .orgexport import OX_LETTER_LINKS  # 2.1076.0 (#5271)
+from .orgexport import OX_AREAS, OX_FMT, OX_PB_CLIENTS, _rows, ox_live, _safe_part, _under  # 2.369.5 (#2517): pulled up from functions
+from ..core.objexport import oex_rx  # 2.1093.0 (#5289): the export register of the core
 from ..office.pdfweb import _render, _stored, epdf_name  # 2.369.5 (#2517): pulled up from functions
 from ..office.cashbook import cb_csv_text, cb_export_data, cb_pdf_bytes  # 2.369.5 (#2517): pulled up from functions
 
@@ -74,7 +74,6 @@ RX_TABLES = (
     ("contracts/contracts.csv", "office_contracts"),
     ("contracts/contract-files.csv", "office_contract_files"),
     ("contracts/agreements.csv", "office_agreements"),
-    ("books/procedure-documentation.csv", "obj_versions"),  # 2.977.0 (#5282): the versions in the core (RX_WHERE: kind procdoc)
     ("books/number-ranges.csv", "office_numbers"),
     ("books/opening-balances.csv", "office_opening_balances"),
     ("books/period-locks.csv", "office_period_locks"),
@@ -110,13 +109,16 @@ RX_TABLES = (
     ("logs/rights-log.csv", "office_rights_log"),  # 2.362.2 (#3105)
     ("logs/import-runs.csv", "office_import_runs"),
     ("letters/letters.csv", "office_letters"),  # 2.184.0 A (#2628): sent letters (business letters, 6 years; RX_WHERE)
-    ("letters/letter-links.csv", "obj_links"),  # 2.362.2 (#3105); 2.1076.0 (#5271): the letter links of the core (RX_WHERE), old columns
 )
-RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'",  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'
-            "obj_versions": "kind='procdoc' AND org_id=?",  # 2.977.0 (#5282): the procedure documentation's versions (not the wiki's)
-            # 2.362.2 (#3105): the links of a draft stay out with the draft
-            # 2.1076.0 (#5271): rows of obj_links (admin/orgexport.py ox_link_row writes the old columns letter_id, node_id, kind)
-            "obj_links": f"org_id=? AND {OX_LETTER_LINKS} AND src_id IN (SELECT id FROM office_letters WHERE org_id=? AND status<>'draft')"}
+RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'"}  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'
+# 2.1093.0 (#5289, stage Q11): the core's tables (the procedure documentation's versions in obj_versions, the letter links in
+# obj_links) come from the export register with their own rows (core/objexport.py rx); RX_TABLES / RX_WHERE hold the old tables
+
+
+def rx_tables():
+    """-> (archive name, table, where | None) of every CSV file: RX_TABLES (where None = RX_WHERE or the organisation export's) +
+    the core's register."""
+    return tuple((a, t, None) for a, t in RX_TABLES) + oex_rx(OX_FMT)
 # 2.372.0 (#3316): the signature snapshot of a receipt stays on its PDF, not in the CSV
 RX_DROP = {"office_signoffs": ("ip", "user_agent"), "office_meals": ("sign_pic",)}  # 2.362.2 (#3105, review): a signer's network address is no business record
 # 2.619.0 (#3862): the office tables that are NOT in RX_TABLES, with the reason, are in admin/exportleft.py RX_LEFT_TABLES (one list;
@@ -360,16 +362,16 @@ def _names(c):
 def _tables(c, z, sub):
     """The office tables as CSV (decrypted like the organisation export, secrets dropped) -> chunks."""
     oid = sub["office"]
-    where = {t: w for _n, t, w in OX_AREAS}
+    where = {t: w for _n, t, w in OX_AREAS}  # the old tables (2.1093.0, #5289: the core's bring their own, rx_tables)
     have = {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
     name = _names(c)
-    for arc, table in RX_TABLES:
-        if table not in have or table not in where:
+    for arc, table, own in rx_tables():
+        if table not in have or (own is None and table not in where):
             continue
         if sub["kind"] == "user" and table in OX_PB_CLIENTS:  # a personal office: the owner's private clients
             rows = _rows(c, oid, table, ox_live(c, table, OX_PB_CLIENTS[table]), (sub["id"],))
         else:  # 2.223.3 B (#2879): without the trash and undone entries (ox_live; removed drives stay for the change log)
-            w = ox_live(c, table, RX_WHERE.get(table) or where[table])
+            w = ox_live(c, table, own or RX_WHERE.get(table) or where[table])
             rows = _rows(c, oid, table, w, (oid,) * w.count("?"))
         rows = [{k: v for k, v in r.items() if k not in RX_DROP.get(table, ())} for r in rows]
         rows = [dict(r, user_name=name(r.get("user_id") or r.get("by_user"))) if ("user_id" in r or "by_user" in r) else r for r in rows]

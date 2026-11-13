@@ -12,6 +12,8 @@ RX_LEFT_TABLES is not stale, every RX_TABLES table is in OX_AREAS (its rows come
 2.455.0 (#3469) the same for the account export: every table with a person column (user_id) and the list tables of the decision of
 #3469 are read by the queries of the account export (kalmido/accounts/settings.py, kalmido/admin/acctexport.py) or named in
 UMZ_LEFT_TABLES (exportleft.py) with the reason; the list is not stale; every agent is named in UMZ_NOT_INCLUDED (keys never move)
+2.1093.0 (#5289): + the tables of the core in the export register (kalmido/core/objexport.py), read like the lint does
+(tools/check_export_tables.py register)
 usage: python3 tests/export_coverage_test.py"""
 import ast
 import os
@@ -30,6 +32,7 @@ TYPES = "BIGINT|TEXT|INTEGER|DOUBLE|NUMERIC|BOOLEAN|JSONB|BYTEA|REAL|SMALLINT|DA
 # 2.455.0 (#3469): without the comments: a column behind a comment line was not seen (issue_reports.list_id)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from check_migrations import schema_src  # noqa: E402
+from check_export_tables import register  # noqa: E402  2.1093.0 (#5289)
 
 schema = re.sub(r"--[^\n]*", "", schema_src(ROOT))  # 2.475.0 (#3478): + migrations.d
 tables = {}
@@ -39,6 +42,9 @@ for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\);", schema, re.
 for m in re.finditer(r'\("(\w+)", "(\w+)", "ALTER TABLE', schema):
     tables.setdefault(m.group(1), set()).add(m.group(2))
 check(len(tables) > 200, f"schema.py read ({len(tables)} tables)")
+# 2.1093.0 (#5289): the export register of the core's tables (its own findings are the lint's)
+reg, reg_bad = register(ROOT)
+check(not reg_bad and "obj_comments" in reg, f"the export register is read ({len(reg)} tables, {reg_bad})")
 
 tree = ast.parse(open(os.path.join(ROOT, "kalmido", "admin", "orgexport.py"), encoding="utf-8").read())
 consts = {n.targets[0].id: n.value for n in tree.body if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)}
@@ -46,6 +52,9 @@ areas = {e.elts[1].value for e in consts["OX_AREAS"].elts}
 left = {}
 for k, v in zip(consts["OX_LEFT"].keys, consts["OX_LEFT"].values):
     left[k.value] = v.value if isinstance(v, ast.Constant) else (ast.literal_eval(consts[v.id]) if isinstance(v, ast.Name) else None)
+own_areas = set(areas)  # 2.1093.0 (#5289): the old tables' (RX_TABLES takes its where clause from them)
+areas |= {t for t, r in reg.items() if r.get("org")}
+left.update({t: r["org_left"] for t, r in reg.items() if r.get("org_left")})
 
 need = {t for t, cols in tables.items() if any(c in cols for c in COLS) and t not in SKIP}
 for t in sorted(need - areas - set(left)):
@@ -63,19 +72,21 @@ check(not (need - areas - set(left)), f"every table with an organisation / list 
 rtree = ast.parse(open(os.path.join(ROOT, "kalmido", "admin", "retexport.py"), encoding="utf-8").read())
 rc = {n.targets[0].id: n.value for n in rtree.body if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)}
 rx = {e.elts[1].value: e.elts[0].value for e in rc["RX_TABLES"].elts}
+rx_reg = {t: a for t, r in reg.items() for a, _w in r.get("rx") or ()}  # 2.1093.0 (#5289): with their own rows
 # 2.619.0 (#3862): one list per export, in exportleft.py (was RX_LEFT / UMZ_LEFT_USERS next to it)
 ltree = ast.parse(open(os.path.join(ROOT, "kalmido", "admin", "exportleft.py"), encoding="utf-8").read())
 lc = {n.targets[0].id: n.value for n in ltree.body if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)}
 rleft = {k.value: True for k in lc["RX_LEFT_TABLES"].keys}
 office = {t for t in tables if t.startswith("office_")}
 check(len(rx) == len(rc["RX_TABLES"].elts), "RX_TABLES: no table twice")
+own_rx, rx = set(rx), {**rx, **rx_reg}
 for t in sorted(office - set(rx) - set(rleft)):
     check(False, f"{t}: an office table neither in RX_TABLES nor in RX_LEFT_TABLES (kalmido/admin/exportleft.py): keep it or name why it stays out")
 for t in sorted(set(rleft) - office):
     check(False, f"{t}: stale in RX_LEFT_TABLES (no such table)")
 for t in sorted(set(rleft) & set(rx)):
     check(False, f"{t}: in RX_TABLES and in RX_LEFT_TABLES")
-for t in sorted(set(rx) - areas):
+for t in sorted(own_rx - own_areas):
     check(False, f"{t}: in RX_TABLES but not in OX_AREAS (the export would leave it out silently)")
 sections = {e.elts[0].value for e in rc["RX_SECTIONS"].elts}
 for t, arc in sorted(rx.items()):
@@ -87,6 +98,7 @@ atext = open(os.path.join(ROOT, "kalmido", "admin", "acctexport.py"), encoding="
 atree = ast.parse(atext)
 ac = {n.targets[0].id: n.value for n in atree.body if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)}
 uleft = {k.value for k in lc["UMZ_LEFT_TABLES"].keys}  # also org / list / task tables: the lint (tools/check_export_tables.py) holds those columns
+uleft |= {t for t, r in reg.items() if r.get("acct_left")}  # 2.1093.0 (#5289)
 qtext = atext + open(os.path.join(ROOT, "kalmido", "accounts", "settings.py"), encoding="utf-8").read()
 exported = {t for t in tables if re.search(rf"(?:FROM|JOIN) {t}\b", qtext)}
 uneed = {t for t, cols in tables.items() if "user_id" in cols}

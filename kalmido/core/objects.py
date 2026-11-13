@@ -130,6 +130,7 @@ from ..accounts.orgretain import upg_heir
 from ..accounts.orgretain import obj_share_gone  # 2.924.0 (#5069)
 
 from .objhooks import BOUNDARY  # 2.649.0 (#5051)
+from .objexport import OEX_KEYS, obj_export  # 2.1093.0 (#5289): export= of a kind
 from .undogroups import ug_drop  # 2.747.0 (#5249): a person's step groups go where their undo rows go
 from .objhooks import FOLLOW, OBJ, REVOKE  # kind -> the registered hooks; what a person loses (core/objhooks.py: accounts reads them)
 OBJ_RANK = {None: 0, "view": 1, "edit": 2, "manage": 3}
@@ -208,8 +209,12 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
                  fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True, node_shares=False,
                  fs_hooks=None, org_join="member", children=(), trash_prune=False, node=True, agent_own=False,
-                 on_share_back=None, trash_keep=None, trash_batch=None, trash_can=None, stamp_ms=True):
+                 on_share_back=None, trash_keep=None, trash_batch=None, trash_can=None, stamp_ms=True, export=None):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload).
+    2.1093.0 (#5289, stage Q11): export = {keyword: value} of core/objexport.py obj_export (org, org_left, acct_left, acct_later,
+    rx, read): where the rows of the kind's own table go in the exports; a plain dict literal (tools/check_export_tables.py reads
+    it without the app). The table is then in none of the hand lists of admin/ (orgexport.py, exportleft.py, retexport.py,
+    acctimport.py) and in no obj_export call (one way per table).
     2.565.0 (#4719): listed=False = the object's reference node only carries its shares (files/fsref.py): it lies in no
     folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take.
     2.924.0 (#5069, stage 7b): node_shares=True = an area whose own sharing dialog writes the shares of the object's node (the
@@ -263,6 +268,10 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                # 2.1031.0 (#5538): the format of updated_at the area writes -- ms (iso_ms, the core's) or seconds (iso: tasks), so a
                # restore of the core (core/writes.py obj_restore) leaves the column as the area's own writes do
                stamp_ms=bool(stamp_ms))
+    if export is not None:  # 2.1093.0 (#5289): the kind's own table in the export register
+        if not isinstance(export, dict) or set(export) - set(OEX_KEYS):
+            raise ValueError(f"obj_register {kind}: export = {{{', '.join(OEX_KEYS)}: ...}}")
+        obj_export(table, **export, by=f"kind {kind}")
     OBJ[kind] = reg
     if not fsref:
         return reg  # 2.568.0 (#4739): the area's own registration in files/fsref.py stays

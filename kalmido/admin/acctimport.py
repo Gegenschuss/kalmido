@@ -59,6 +59,7 @@ from ..accounts.bgjobs import bgj_active, bgj_add, bgj_busy, bgj_drop, bgj_fn  #
 from ..lists.listhead import HEAD_STYLES  # 2.459.0 (#3849)
 from ..lists.lists import clean_color, LIST_COLOR_RE
 from ..core.objtags import otg_add, otg_find, otg_link, otg_user_add  # 2.947.0 (#5275); 2.955.0 (#5276): otg_user_add
+from ..core.objexport import oex_org_map, oex_read  # 2.1093.0 (#5289): the export register of the core
 from ..lists.fields import fx_tpl_fix  # 2.362.4 (#3100)
 from ..lists.formula import fx_display  # 2.362.4 (#3100)
 from ..lists.templates import tpl_clean  # 2.362.4 (#3100)
@@ -170,9 +171,12 @@ UMZ_DROP = {
 # 2.273.0 A (#3030): the parts of an account export the import reads (umz_write; people + list_members through the sharing
 # step, server_links as a hint of the preview). Every other part of the file is named in the preview and in the result as
 # staying on the old server (umz_left): a part the import learns to read = its name here, one line.
-UMZ_READ = frozenset((
-    "lists", "list_members", "sections", "list_fields", "list_tags", "list_status", "list_links", "list_milestones", "tasks",
-    "task_deps", "task_field_values", "task_tags", "task_list_tags", "task_note_locks", "comments", "attachments", "list_files",
+# 2.1093.0 (#5289, stage Q11): the parts made of the core's tables (comments, list_tags, task_list_tags, task_tags, org_tags,
+# video_comments, task_bell, task_watchers) come from the export register (core/objexport.py read / org part): UMZ_READ_OWN holds
+# the old tables' parts, UMZ_READ both
+UMZ_READ_OWN = frozenset((
+    "lists", "list_members", "sections", "list_fields", "list_status", "list_links", "list_milestones", "tasks",
+    "task_deps", "task_field_values", "task_note_locks", "attachments", "list_files",
     "time_entries", "habits", "habit_logs", "filters", "templates", "address_books", "contacts", "event_calendars", "events",
     "event_attendees", "journal", "mailbox", "settings", "people", "server_links",
     "e2e_keys",  # 2.278.0: the browser keys
@@ -180,21 +184,21 @@ UMZ_READ = frozenset((
     "sprints", "task_links", "list_rules", "portal_tickets",  # 2.455.0 (#3469)
     "task_decisions",  # 2.392.0 C (#3370)
     "task_relations",  # 2.576.0 (#3371)
-    "org_tags",  # 2.947.0 (#5275): the labels of an organisation (org/labels.json of the organisation export)
     "template_files",  # 2.464.0 (#3865)
     "private_files", "private_versions", "private_area_roots", "wiki_pages", "wiki_files",  # #3470: umz_private (UMZ_PRIVATE)
     "private_locks", "private_lock_keys",  # #4300: admin/oilock.py
     "sheets", "sheet_columns", "sheet_rows", "sheet_cells", "sheet_files", "sheet_hist",
     # 2.363.4 (#3127): filed mails, video sign-offs, notepads and project playbooks through the areas (umz_private), the rest
     # of my own rows directly (admin/umz_more.py)
-    "hub_mails", "video_reviews", "video_versions", "video_comments", "list_notepads", "playbooks", "bookmarks", "pomos",
-    "contact_care", "view_layouts", "list_layouts", "task_bell", "task_watchers",
+    "hub_mails", "video_reviews", "video_versions", "list_notepads", "playbooks", "bookmarks", "pomos",
+    "contact_care", "view_layouts", "list_layouts",
     "kid_parents", "conn_links",  # 2.531.0 (#4317 F12): admin/umz_more.py _family
     # 2.765.0 (#3965): absences (my personal office) and timesheets through the areas (umz_private), the household budgets
     # (life/budget.py bud_import) and a folder's playbooks directly (admin/umz_more.py)
     "absences", "timesheets", "budgets",
     "ticket_types", "org_fields",  # 2.995.0 (#5602): my own ticket types and field schema through the areas (UMZ_PRIVATE_MORE)
 ))
+UMZ_READ = UMZ_READ_OWN | oex_read()
 # #3470: the private file store, knowledge pages and tables of an account export go through the organisation import's areas
 # (admin/oi_store.py) into my private space: account part -> archive entry of the organisation export
 UMZ_PRIVATE = (
@@ -507,17 +511,19 @@ def umz_open(path, key, size, full=True):
 
 # 2.73.0 B (#1473, part 4): the parts of an organisation export (admin/orgexport.py OX_AREAS) that move along, under the
 # table names of the account export; everything else of the archive is named in the preview as not taken over
-UMZ_ORG_MAP = {
+# 2.1093.0 (#5289): + the files of the core's tables with their part (core/objexport.py org: lists/tags.json, org/labels.json,
+# tasks/tags.json, comments.json); UMZ_ORG_MAP_OWN holds the old tables' files
+UMZ_ORG_MAP_OWN = {
     "lists.json": "lists", "lists/sections.json": "sections", "lists/members.json": "list_members", "lists/fields.json": "list_fields",
-    "lists/tags.json": "list_tags", "lists/status.json": "list_status", "lists/links.json": "list_links",
+    "lists/status.json": "list_status", "lists/links.json": "list_links",
     "lists/milestones.json": "list_milestones", "lists/files.json": "list_files", "tasks.json": "tasks",
-    "tasks/dependencies.json": "task_deps", "tasks/field_values.json": "task_field_values", "tasks/tags.json": "task_list_tags",
+    "tasks/dependencies.json": "task_deps", "tasks/field_values.json": "task_field_values",
     "tasks/relations.json": "task_relations",  # 2.576.0 (#3371)
-    "org/labels.json": "org_tags",  # 2.947.0 (#5275)
-    "tasks/decisions.json": "task_decisions", "comments.json": "comments", "attachments.json": "attachments", "calendars.json": "event_calendars", "events.json": "events",
+    "tasks/decisions.json": "task_decisions", "attachments.json": "attachments", "calendars.json": "event_calendars", "events.json": "events",
     "events/attendees.json": "event_attendees", "books.json": "address_books", "books/contacts.json": "contacts",
     "members.json": "members",
 }
+UMZ_ORG_MAP = {**UMZ_ORG_MAP_OWN, **oex_org_map()}
 UMZ_ORG_SKIP = (  # archive prefix -> what the preview names as not taken over
     ("office/", N_("Office")), ("store/", N_("File store")), ("chat/", N_("Team chat")), ("wiki/", N_("Knowledge pages")),
     ("documents/", N_("Documents")), ("newsletter/", N_("Newsletter")), ("clients.json", N_("Clients")), ("hub/", N_("Absences and bookings")),

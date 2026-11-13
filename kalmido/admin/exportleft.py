@@ -1,9 +1,11 @@
 """2.362.4 (#3107): what stays out of the exports on purpose, with the reason. Plain assignments only: tools/check_export_tables.py
 reads this file without the app (the CI lint step), and a table with people's data that is in no export and not here fails it. The
 manifests name these lines in not_included (left_lines), so "not in the file" comes from one list. The organisation export keeps its
-list in admin/orgexport.py OX_LEFT."""
+list in admin/orgexport.py OX_LEFT. 2.1093.0 (#5289, stage Q11): the tables of the core (obj_*) are not here: they say it in the
+export register (core/objexport.py); umz_left_tables / umz_later_names give both."""
 
 from ..core.i18n import tr
+from ..core.objexport import oex_left  # 2.1093.0 (#5289)
 
 _SECRET = "credentials, keys and link secrets"
 _SERVER = "state of this server (queues, limits, sign-in records, import records)"
@@ -32,13 +34,8 @@ UMZ_LEFT_TABLES = {
     "time_wipes": _DERIVED,  # 2.530.0 B (#4315): the Undo copy of "Delete all times" (working data until the trash period ends)
     "list_part_trash": _DERIVED,  # 2.567.0 A (#4707): the copies of deleted sections / sprints (working data until the trash period ends); 2.783.0 (#5368): + deleted fields, "Delete all times"
     "module_card_people": _ORG,  # 2.575.0 (#3778): the module cards of an organisation a member has
-    "obj_history": _DERIVED, "obj_undo": _DERIVED, "obj_revoked": _SHARE,  # 2.558.0 (#4709): the core's change history / undo steps (the areas export their objects), revoked shares
-    "obj_addr_shares": _SHARE,  # 2.1071.0 (#5658): open shares by e-mail address (sealed with this server's key; typed in again on the target)
     "undo_groups": _DERIVED,  # 2.747.0 (#5249): the heads of a person's undo steps (30 days, working data like obj_undo)
     "doc_views": _VIEW,  # 2.579.0 (#4802): saved views of the documents search (their filters name label ids of this server)
-    # 2.531.0 (#4317 x #4315): the kept text of deleted comments / team chat messages (working data until the trash period ends);
-    # 2.972.0 (#5272): the comments' one is the core's obj_comment_trash; 2.981.0 (#5274): the team chat's too (kind tchat)
-    "obj_comment_trash": _DERIVED,
     "hub_mailbox_rules": _LATER, "hub_mailbox_docs": _DERIVED,  # 2.581.0 (#4804): a mailbox's document rules (the mailbox itself is exported), which mails it took (Message-ID hashes)
     "doc_office_moves": _DERIVED,  # 2.547.0 (#4434): the undo of the receipts move into the office (30 days, ids and folders only)
     "field_trash": _DERIVED, "member_memos": _DERIVED,  # 2.550.0 (#4528): deleted fields / a removed member's ways back (until the trash period ends)
@@ -51,13 +48,12 @@ UMZ_LEFT_TABLES = {
     "chat_saves": _LATER, "contact_links": _LATER, "ctr_notices": _LATER, "folder_heads": _LATER, "folder_props": _LATER,
     "fs_log": _LATER, "git_branches": _LATER, "git_folders": _LATER, "issue_reports": _LATER, "kid_rewards": _LATER, "life_trip_costs": _LATER,
     "list_rule_runs": _LATER, "sheet_links": _LATER, "shop_memory": _LATER,
-    "wiki_spaces": _LATER, "obj_versions": _LATER,  # 2.958.0 (#5281): the versions of the core (was wiki_versions)
+    "wiki_spaces": _LATER,
     # 2.531.0 (#4317 F12): the tables without a person, organisation, list or task column that still hold a person's data
     "chat_files": _LATER, "kid_pins": _SECRET, "kid_pin_open": _SECRET, "conn_requests": _ASK,
     "agent_bridges": _AGENT, "agent_events": _AGENT, "sheet_changes": _AGENT,
     "cal_events": _DERIVED, "cal_dav_res": _DERIVED, "git_commits": _DERIVED, "git_issue_comments": _DERIVED, "git_issue_gone": _DERIVED,
     "git_prs": _DERIVED, "git_tags": _DERIVED, "wiki_links": _DERIVED,
-    "obj_search_words": _DERIVED,  # 2.1002.0 (#5279): the shared word index (was doc_words, file_words, hub_words, wiki_words)
     "doc_node_tags": _ORG, "space_moves": _SERVER, "push_tags": _SERVER, "notify_channel_queue": _SERVER,
     "webhook_queue": _SERVER, "webhook_log": _SERVER,
     "clients": _ORG, "doc_cfg": _ORG, "doc_fetch_portals": _ORG, "doc_field_values": _ORG, "doc_fields": _ORG, "doc_meta": _ORG, "doc_rules": _ORG, "doc_flow_runs": _DERIVED,
@@ -96,8 +92,6 @@ UMZ_LEFT_TABLES = {
     "groups": _SHARE, "sheet_shares": _SHARE,  # 2.924.0 (#5069): tchat_members, ev_cal_members, book_members are gone
     "list_folder_skip": _VIEW, "list_mine_hide": _VIEW,
     "user_task_order": _VIEW, "wait_hidden": _VIEW,
-    "obj_seen": _VIEW,  # 2.905.0 (#5284): the core's read marks (was task_seen), a personal view state like before
-    "obj_search": _DERIVED,  # 2.981.0 (#5278): the shared search index (core/objsearch.py), rebuilt from the imported rows by its triggers
     "user_mine_sections": _VIEW,  # 2.569.0 (#4395): the own sections of "My tasks", like user_task_order
     "user_mine_rules": _VIEW, "user_mine_rule_runs": _VIEW,  # 2.823.0 (#4773): the own rules of "My tasks" and their markers
     "eph_state": _SERVER,  # 2.622.0 (#3891): sign-in steps, tickets, typing markers of minutes (core/ephem.py)
@@ -113,7 +107,6 @@ UMZ_LATER_NAMES = {
     "git_folders": "repositories connected to folders", "issue_reports": "error reports of projects", "kid_rewards": "rewards of the family",
     "life_trip_costs": "costs of trips", "list_rule_runs": "runs of project rules",
     "sheet_links": "links between tables and tasks", "shop_memory": "remembered shopping items", "wiki_spaces": "spaces of knowledge pages",
-    "obj_versions": "history of knowledge pages",  # 2.958.0 (#5281): was wiki_versions
 }
 
 # 2.531.0 (#4317 F12): the tables that hold nobody's data (no person, organisation, list or task column and no row that belongs
@@ -144,6 +137,16 @@ RX_LEFT_TABLES = {
     # 2.977.0 (#5282): the head only; the versions go as books/procedure-documentation.csv (obj_versions kind procdoc)
     "office_procdocs": "the head of the procedure documentation; its versions are books/procedure-documentation.csv",
 }
+
+
+def umz_left_tables():
+    """2.1093.0 (#5289): {table: reason} of every table that stays out of the account export: UMZ_LEFT_TABLES + the core's register."""
+    return {**UMZ_LEFT_TABLES, **oex_left("acct_left")}
+
+
+def umz_later_names():
+    """2.1093.0 (#5289): {table: readable name} of the tables not yet in the account export: UMZ_LATER_NAMES + the core's register."""
+    return {**UMZ_LATER_NAMES, **oex_left("acct_later")}
 
 
 def left_lines(left, lg="en"):

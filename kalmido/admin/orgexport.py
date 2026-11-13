@@ -51,6 +51,7 @@ from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import qi, system_ctx, table_names
 from ..core.objcomments import ocm_note_cols, ocm_old_cols, ocm_video_cols  # 2.972.0 (#5272); 2.981.0 (#5273): + video / note
+from ..core.objexport import oex_left, oex_org  # 2.1093.0 (#5289): the export register of the core
 from ..docs.store import doc_open as _doc_open  # 2.981.0 (#5273): the notes on documents (obj_comments kind doc_note)
 from ..core.i18n import N_, lang, tr
 from ..core.access import Denied, live_sql, otr_live
@@ -344,9 +345,6 @@ OX_AREAS = (
     ("lists/views.json", "filters", f"list_id IN ({LSQ})"),  # 2.577.0 (#3356): the shared views of a project (a private filter has no list_id)
     ("lists/members.json", "list_members", f"list_id IN ({LSQ})"),
     ("lists/fields.json", "list_fields", f"list_id IN ({LSQ})"),
-    # 2.947.0 (#5275): the project tags are rows of the core (obj_tags scope list); the file keeps list_id (_clean)
-    ("lists/tags.json", "obj_tags", f"scope_kind='list' AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM ({LSQ}) x)"),
-    ("org/labels.json", "obj_tags", "scope_kind='org' AND org_id=?"),  # 2.947.0 (#5275): the labels of the organisation (was #4031)
     ("lists/status.json", "list_status", f"list_id IN ({LSQ})"),
     ("lists/links.json", "list_links", f"list_id IN ({LSQ})"),
     ("lists/notepads.json", "list_notepads", f"list_id IN ({LSQ})"),  # 2.43.0 (#1346): notepads on the project page
@@ -357,8 +355,6 @@ OX_AREAS = (
     ("lists/files.json", "list_files", f"list_id IN ({LSQ})"),
     ("lists/forms.json", "forms", f"list_id IN ({LSQ})"),
     ("lists/form_entries.json", "form_entries", f"form_id IN (SELECT id FROM forms WHERE list_id IN ({LSQ}))"),  # 2.137.0 C (#2344): answers of form entries
-    # 2.977.0 (#5282): the versions are rows of the core's obj_versions on the Playbook's head; the file keeps its columns (_clean)
-    ("lists/playbooks.json", "obj_versions", f"kind='playbook' AND ref_id IN (SELECT id FROM playbooks WHERE list_id IN ({LSQ}))"),
     ("lists/sprints.json", "sprints", f"list_id IN ({LSQ})"),  # 2.137.0 C (#2344): sprints of the lists (tasks.sprint_id)
     # 2.905.0 (#5288, rest of #4031): the organisation's templates -- task, project and section templates, one kind of the core
     # (was lists/section_templates.json, 2.362.0 #3096; an older archive's file is still read by the import), not the trash
@@ -374,13 +370,7 @@ OX_AREAS = (
     ("tasks/dependencies.json", "task_deps", f"task_id IN ({TSQ})"),
     ("tasks/relations.json", "task_relations", f"task_id IN ({TSQ}) AND other_id IN ({TSQ})"),  # 2.576.0 (#3371): both tasks of the organisation
     ("tasks/field_values.json", "task_field_values", f"task_id IN ({TSQ})"),
-    # 2.947.0 (#5275): the tags of the tasks (a project tag or a label, tag_id = its id in lists/tags.json / org/labels.json); the
-    # file keeps task_id (_clean); a link to a tag of another project (the task moved since) stays out, as the app shows none
-    ("tasks/tags.json", "obj_tag_links", f"""kind='task' AND obj_id IN ({TSQ}) AND tag_id IN (SELECT id FROM obj_tags WHERE (scope_kind='list'
-     AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM ({LSQ}) x)) OR (scope_kind='org' AND org_id=?))"""),
     ("tasks/people.json", "task_people", f"task_id IN ({TSQ})"),
-    # 2.473.0 (#3357); 2.972.0 (#5285): rows of the core's obj_follow (mode watch), the file keeps its columns (_clean)
-    ("tasks/watchers.json", "obj_follow", f"kind='task' AND mode='watch' AND ref_id IN ({TSQ})"),
     ("tasks/links.json", "task_links", f"task_id IN ({TSQ})"),  # 2.137.0 C (#2344): a task placed in a further list
     ("tasks/decisions.json", "task_decisions", f"task_id IN ({TSQ})"),  # 2.392.0 C (#3370)
     # 2.654.0 (#4585): where a task came from in a quotation (office/offertasks.py); the import maps task, list, quotation and the
@@ -391,11 +381,6 @@ OX_AREAS = (
     ("tasks/locked_notes.json", "task_note_locks", f"task_id IN ({TSQ})"),  # 2.48.0 (#1642): locked notes, browser-encrypted, as stored
     ("time_entries.json", "time_entries", f"list_id IN ({LSQ})"),
     ("time_sheets.json", "time_sheets", "org_id=?"),  # 2.137.0 C (#2344): monthly timesheets (note decrypted like the others)
-    ("comments.json", "obj_comments", f"kind='task' AND ref_id IN ({TSQ})"),  # 2.972.0 (#5272): the core's rows, the old columns (OX_COLS)
-    # 2.763.0 (#5269): the reactions are rows of the core (obj_reactions); the file keeps its columns (_clean: comment_id), a
-    # comment in the trash leaves its reactions out (as OX_GONE_WITH did)
-    ("comments/reactions.json", "obj_reactions",
-     f"target_kind='comment' AND target_id IN (SELECT id FROM obj_comments WHERE kind='task' AND ref_id IN ({TSQ}) AND {live_sql()})"),
     ("attachments.json", "attachments", f"task_id IN ({TSQ})"),
     # 2.48.0 (#1207): the organisation's file store (folders, files, versions, shares, history)
     # 2.223.3 B (#2879): without the trash (ox_live, ox_dead_nodes)
@@ -413,8 +398,6 @@ OX_AREAS = (
     # gone, chat/members.json only comes from older archives: admin/oi_team.py _room_member)
     ("chat/channels.json", "tchat_rooms", f"id IN ({RSQ})"),
     ("chat/messages.json", "tchat_msgs", f"room_id IN ({RSQ})"),
-    ("chat/reactions.json", "obj_reactions",  # 2.137.0 C (#2344); 2.763.0 (#5269): rows of the core, the file keeps message_id
-     f"target_kind='tchat' AND target_id IN (SELECT id FROM tchat_msgs WHERE room_id IN ({RSQ}) AND {live_sql()})"),
     ("chat/files.json", "tchat_files", f"room_id IN ({RSQ})"),
     ("calendars.json", "ev_cals", "org_id=?"),
     # 2.924.0 (#5069): calendars/members.json and books/members.json are no more: the members of a calendar / an address book
@@ -423,9 +406,6 @@ OX_AREAS = (
     ("events/attendees.json", "event_attendees", "event_id IN (SELECT id FROM events WHERE cal_id IN (SELECT id FROM ev_cals WHERE org_id=?))"),
     ("books.json", "books", "org_id=?"),
     ("books/contacts.json", "contacts", "book_id IN (SELECT id FROM books WHERE org_id=?)"),
-    # 2.362.0 (#3096): contacts on tasks of the lists (waiting for / responsible / about)
-    # 2.1076.0 (#5271): rows of the links' core (obj_links rel contact); the file keeps its columns (_clean: ox_link_row)
-    ("books/contact_tasks.json", "obj_links", f"src_kind='contact' AND dst_kind='task' AND rel='contact' AND src_id IN (SELECT id FROM contacts WHERE book_id IN (SELECT id FROM books WHERE org_id=?)) AND dst_id IN ({TSQ})"),
     # 2.362.0 (#3096): the booking pages on a calendar of the organisation (or billed by its office), their kinds of appointment
     # and bookings (the customers' data; never the confirm / cancel links); the booked appointments are events of the calendar
     ("bookings/pages.json", "appt_pages", f"user_id IN ({APQ})"),
@@ -468,9 +448,6 @@ OX_AREAS = (
     ("office/cash_closings.json", "office_cash_closings", "org_id=?"),
     ("office/cash_log.json", "office_cash_log", "org_id=?"),
     ("office/period_locks.json", "office_period_locks", "org_id=?"),  # 2.148.0 A (#2471): locked accounting periods
-    # 2.148.0 C (#2472): versions of the procedure documentation; 2.977.0 (#5282): rows of the core's obj_versions, the file keeps its
-    # columns (_clean)
-    ("office/procdocs.json", "obj_versions", "kind='procdoc' AND org_id=?"),
     ("office/suppliers.json", "office_suppliers", "org_id=?"),  # 2.148.0 D (#2458): creditors of the DATEV import
     ("office/opening_balances.json", "office_opening_balances", "org_id=?"),  # 2.148.0 D (#2458)
     ("office/ledger_entries.json", "office_ledger_entries", "org_id=?"),  # 2.666.0 (#3461): adjusting / opening entries of the balance sheet
@@ -507,7 +484,6 @@ OX_AREAS = (
     ("office/privacy_sheets.json", "office_privacy_sheets", "org_id=?"),  # 2.154.0 C (#2192): data protection sheets of a client
     # 2.184.0 A (#2579): the correspondence (letters decrypted; their filed PDFs come with the documents space, store/)
     ("office/letters.json", "office_letters", "org_id=?"),
-    ("office/letter_links.json", "obj_links", f"org_id=? AND {OX_LETTER_LINKS}"),  # 2.1076.0 (#5271): obj_links, the old columns (ox_link_row)
     ("office/letter_blocks.json", "office_letter_blocks", "org_id=?"),
     ("office/letter_profiles.json", "office_letter_profiles", "org_id=?"),
     ("office/vehicles.json", "office_vehicles", "org_id=?"),
@@ -526,10 +502,6 @@ OX_AREAS = (
     ("office/log.json", "office_doc_log", "org_id=?"),
     ("wiki/pages.json", "wiki_pages", "org_id=?"),  # 2.49.0 (#1199): knowledge pages
     ("wiki/files.json", "wiki_files", "org_id=?"),  # 2.99.0 A (#2182): their PDFs and pictures (the bytes under files/wiki/)
-    # 2.137.0 B (#2344): the history of the pages (texts decrypted); 2.958.0 (#5281): rows of the core's versions, the file keeps
-    # its columns (_clean: page_id, path)
-    # 2.977.0 (#5282): the versions of a page in the trash stay out with it (was OX_GONE_WITH, now three kinds share the table)
-    ("wiki/versions.json", "obj_versions", "kind='wiki' AND org_id=? AND ref_id NOT IN (SELECT id FROM wiki_pages WHERE deleted_at IS NOT NULL)"),
     ("sheets/sheets.json", "sheets", "org_id=?"),  # 2.89.0 (#1916): tables with their columns, rows and cells
     ("sheets/columns.json", "sheet_columns", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
     ("sheets/rows.json", "sheet_rows", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
@@ -540,9 +512,6 @@ OX_AREAS = (
     ("sheets/history.json", "sheet_hist", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),  # 2.124.0 B (#2112): cell history
     ("videos/reviews.json", "video_reviews", "org_id=?"),  # 2.99.1 A (#1959): video sign-offs (links only), versions, comments
     ("videos/versions.json", "video_versions", "org_id=?"),
-    # 2.981.0 (#5273): the comments are rows of obj_comments (kind video), the file keeps its columns (OX_KIND_COLS); not those of
-    # a review in the trash (was OX_GONE_WITH)
-    ("videos/comments.json", "obj_comments", f"kind='video' AND org_id=? AND {live_sql()} AND ref_id NOT IN (SELECT id FROM video_reviews WHERE deleted_at IS NOT NULL)"),
     # 2.48.0 (#1111): documents (recognised text, amounts, sender names and rules decrypted); not the learnt models, not the
     # keyed word index (both are rebuilt from the documents), not the forwarding addresses (their token is a secret)
     ("documents/meta.json", "doc_meta", "org_id=?"),
@@ -552,7 +521,6 @@ OX_AREAS = (
     ("documents/document_tags.json", "doc_node_tags", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),  # 2.122.0 B (#2099): + files / folders
     ("documents/fields.json", "doc_fields", "org_id=?"),  # 2.153.0 (#2179): custom fields + their values (decrypted)
     ("documents/field_values.json", "doc_field_values", "org_id=?"),
-    ("documents/notes.json", "obj_comments", f"kind='doc_note' AND org_id=? AND {live_sql()}"),  # review 2.981 (Fable F6): not the notes in the trash; 2.635.0 (#4807 d): notes on documents (decrypted); 2.981.0 (#5273): obj_comments
     ("documents/rules.json", "doc_rules", "org_id=?"),
     ("documents/settings.json", "doc_cfg", "org_id=?"),
     ("documents/receipts.json", "rc_receipts", "org_id=?"),  # 2.137.0 B (#2344): project and category of receipts (set by people)
@@ -561,9 +529,6 @@ OX_AREAS = (
     ("hub/callsheets.json", "hub_callsheets", "org_id=?"),  # 2.855.0 (#1956): call sheets of the shoot days (decrypted)
     ("hub/leave_quota.json", "hub_leave_quota", "org_id=?"),  # 2.125.0 A (#2117): vacation accounts
     ("hub/mails.json", "hub_mails", "org_id=?"),  # 2.84.0 A (#1198): filed e-mails (texts decrypted; not the addresses, not the word index)
-    # 2.362.0 (#3096): the tasks / events made from a filed e-mail; 2.1076.0 (#5271): rows of obj_links (rel made), the old columns,
-    # the links of a mail in the trash stay out with it (was OX_GONE_WITH)
-    ("hub/mail_links.json", "obj_links", "org_id=? AND src_kind='hub_mail' AND rel='made' AND src_id NOT IN (SELECT id FROM hub_mails WHERE deleted_at IS NOT NULL)"),
     ("hub/mailbox.json", "hub_mailboxes", "org_id=?"),  # 2.144.5 B (#2410): the workspace mailbox (servers, user names, sender; never "secret")
     # 2.380 H (#2398): the organisation's scheduling polls (options, votes; never the link: the import makes a new one) and
     # bookmarks (their pictures under files/bookmarks/); a person's own ones (no organisation) go with the account export
@@ -621,8 +586,6 @@ OX_LEFT = {
     "pl_imported": _SECRET, "pl_rules": _SECRET, "pl_sources": _SECRET, "pl_uploads": _SECRET, "portal_logins": _SECRET,
     "rc_suggest": _DERIVED, "time_wipes": _DERIVED,  # 2.530.0 B (#4315): the Undo copy of "Delete all times"
     "list_part_trash": _DERIVED,  # 2.567.0 A (#4707): the copies of deleted sections / sprints until the trash period ends; 2.783.0 (#5368): + deleted fields, "Delete all times"
-    "obj_addr_shares": "invitations (not_included)",  # 2.1071.0 (#5658)
-    "obj_history": _DERIVED, "obj_undo": "undo steps of 30 days", "obj_revoked": "shares removed (not_included)",  # 2.558.0 (#4709): the core's working data; 2.747.0 (#5249): 30 days
     "undo_groups": "undo steps of 30 days",  # 2.747.0 (#5249): their heads per person
     "doc_views": "saved views of the documents search (their filters name label and folder ids of this server)",  # 2.579.0 (#4802)
     "field_trash": _DERIVED, "member_memos": _DERIVED,  # 2.550.0 (#4528): deleted fields / a removed member's ways back (trash period)
@@ -644,6 +607,20 @@ OX_LEFT = {
     "agent_schedules": _AGENT, "budget_meta": _PERSONAL, "issue_hooks": _SECRET, "issue_reports": "not yet in the export",  # 2.362.4 (#3107)
     "shop_memory": _PERSONAL, "list_ticket_seq": _DERIVED, "task_keys": _LATER2, "list_folder_skip": _LATER2,
 }
+
+# 2.1093.0 (#5289, stage Q11): the tables of the core say where their rows go themselves (core/objexport.py, the export register);
+# OX_AREAS / OX_LEFT above hold only the old tables. OX_FMT fills the placeholders of the register's where clauses.
+OX_FMT = {"LSQ": LSQ, "TSQ": TSQ, "RSQ": RSQ, "LIVE": live_sql(), "LETTER_LINKS": OX_LETTER_LINKS}
+
+
+def ox_areas():
+    """-> (archive name, table, where) of every file of the organisation export: the old tables' OX_AREAS + the core's register."""
+    return OX_AREAS + oex_org(OX_FMT)
+
+
+def ox_left():
+    """-> {table: reason} of every table with an organisation or a list column that stays out: OX_LEFT + the core's register."""
+    return {**OX_LEFT, **oex_left("org_left")}
 
 # 2.223.3 B (#2879): soft-deleted rows (the trash, undone entries) stay out of the organisation and the retention export, and
 # the rows of a deleted parent with them. office_drives keeps them: a removed drive stays for the change log (tax office).
@@ -902,7 +879,7 @@ def ox_build(c, oid, out, by=None):
 
         def vis(where):
             return where.replace(CSQ, csq).replace(APQ, apq).replace(LSQ, lsq)
-        for name, table, where in OX_AREAS:
+        for name, table, where in ox_areas():  # 2.1093.0 (#5289): + the core's register
             if table not in have:
                 continue
             where = ox_live(c, table, vis(where))
@@ -1025,7 +1002,7 @@ def ox_build(c, oid, out, by=None):
             "counts": man.counts, "files": man.files,
             "client_encrypted": {**man.client_enc, "note": "Encrypted in the browser by their author: stored here as ciphertext, only the author can open them."},
             "decrypted": ox_decrypted_note("organisation"),
-            "not_included": [*ox_not_included(c, by, OX_NOT_INCLUDED), *left_lines(OX_LEFT, ox_lang(c, by))],  # 2.449.0 (#3768), 2.362.4 (#3107), 2.464.0 (#3841)
+            "not_included": [*ox_not_included(c, by, OX_NOT_INCLUDED), *left_lines(ox_left(), ox_lang(c, by))],  # 2.449.0 (#3768), 2.362.4 (#3107), 2.464.0 (#3841)
             "locked_files": man.locked,  # 2.209.0 D (#1856)
             "missing": man.missing,  # 2.363.2 (#3106)
         }
@@ -1120,7 +1097,7 @@ def ox_pb_store(c, zf, man, lk, oid, owner, have, pre=""):
 
 def ox_pb_parts(c, zf, man, oid, owner, have, pre=""):
     """The parts of a personal office into the open ZIP zf, below pre (2.362.2 #3099: the account export carries them too)."""
-    for name, table, where in OX_AREAS:
+    for name, table, where in ox_areas():  # 2.1093.0 (#5289): + the core's register (office/procdocs.json, office/letter_links.json)
         if table not in have or not (name.startswith("office/") or name == "clients.json"):
             continue
         if table in OX_PB_CLIENTS:

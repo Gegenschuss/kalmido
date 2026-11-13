@@ -54,7 +54,7 @@ from ..accounts.orgout import oo_exported  # 2.362.3 (#3101)
 from ..accounts.pictures import avatar_path
 from ..accounts.session import me
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _Man, _jdef, _safe_part, _under, ox_pb_parts, ox_read_listed
-from .exportleft import UMZ_LATER_NAMES, UMZ_LEFT_TABLES, left_lines  # 2.362.4 (#3107), 2.531.0 (#4317)
+from .exportleft import left_lines, umz_later_names, umz_left_tables  # 2.362.4 (#3107), 2.531.0 (#4317); 2.1093.0 (#5289): + the core's register
 from .offsite import stepup_download  # 2.360.0 A (#2496): the step-up before the download
 from ..core.orgcrypt import OrgCryptError, oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
@@ -724,7 +724,7 @@ def umz_build(c, uid, stream, export_id):
             "people_salt": salt,  # 2.239.0 A (#2882): email_hash = HMAC-SHA256 with this key (umz_email_hash)
             "tables": out.tables, "files": out.files,
             "client_encrypted": {**client_enc, "keys": bool(out.tables.get("e2e_keys")), "note": UMZ_ENC_NOTE},  # 2.278.0 C (#3091)
-            "export_id": export_id, "not_included": [*(tr(x, lg=lang(c, uid)) for x in UMZ_NOT_INCLUDED), *left_lines(UMZ_LEFT_TABLES, lang(c, uid))],  # 2.449.0 (#3768): in the person's language, 2.362.4 (#3107), 2.464.0 (#3841)
+            "export_id": export_id, "not_included": [*(tr(x, lg=lang(c, uid)) for x in UMZ_NOT_INCLUDED), *left_lines(umz_left_tables(), lang(c, uid))],  # 2.449.0 (#3768): in the person's language, 2.362.4 (#3107), 2.464.0 (#3841)
             "locked_files": locked,  # 2.209.0 D (#1856)
             **({"personal_office": office} if office else {}),
             "missing": out.missing,  # 2.363.2 (#3106): files that are gone or cannot be decrypted [{file, reason}]
@@ -924,9 +924,10 @@ def umz_not_included_view(lg=None):
     lines of UMZ_NOT_INCLUDED, each other reason of UMZ_LEFT_TABLES once without its table names, and the areas not yet in the
     export by their names (exportleft.UMZ_LATER_NAMES). The manifest keeps its own lines with the table names (left_lines)."""
     out = [tr(x, lg=lg) for x in UMZ_NOT_INCLUDED]
-    for r in dict.fromkeys(r.replace(" (not_included)", "") for t, r in sorted(UMZ_LEFT_TABLES.items()) if t not in UMZ_LATER_NAMES):
+    left, names = umz_left_tables(), umz_later_names()  # 2.1093.0 (#5289): + the core's register
+    for r in dict.fromkeys(r.replace(" (not_included)", "") for t, r in sorted(left.items()) if t not in names):
         out.append(tr(r, lg=lg))
-    later = sorted({tr(UMZ_LATER_NAMES[t], lg=lg) for t in UMZ_LEFT_TABLES if t in UMZ_LATER_NAMES})
+    later = sorted({tr(names[t], lg=lg) for t in left if t in names})
     if later:
         out.append(tr(N_("not yet in the file: {0}"), ", ".join(later), lg=lg))
     return list(dict.fromkeys(out))

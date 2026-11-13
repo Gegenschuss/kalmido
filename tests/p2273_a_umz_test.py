@@ -51,7 +51,13 @@ def assigned(tree, name):
 
 # ================================================================== guard (static, no server)
 imp = src_tree("admin/acctimport.py")
-READ = {e.value for e in assigned(imp, "UMZ_READ").args[0].elts}
+# 2.1093.0 (#5289): the parts of the core's tables come from the export register (UMZ_READ = UMZ_READ_OWN + the register)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+from check_export_tables import register  # noqa: E402
+_reg = register(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))[0]
+READ = {e.value for e in assigned(imp, "UMZ_READ_OWN").args[0].elts}
+READ |= {p for r in _reg.values() for p in (*(r.get("read") or ()), *(e[2] for e in r.get("org") or () if len(e) == 3))}
+check({"comments", "list_tags", "task_watchers"} <= READ, f"guard: the register's parts are read ({sorted(READ)[:6]})")
 LEFT = {}
 for e in assigned(imp, "UMZ_LEFT").elts:
     LEFT.update({p.value: e.elts[0].args[0].value for p in e.elts[1].elts})

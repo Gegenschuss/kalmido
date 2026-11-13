@@ -39,8 +39,9 @@ the history, undo and the version check (`expect_updated_at`, `ccf_check` compar
 (`deleted_at IS NULL` / `IS NOT NULL`), and a trigger never takes one as `to_jsonb(row)->>'..._at'` (that text carries the
 session's zone, not the canonical form): use `to_char(x AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"')`.
 
-Give the table an `org_id` (`kalmido/core/rls.py` protects every such table by itself) and add it to the export lists (`tools/check_export_tables.py`
-says where). The core keeps its own data in `obj_history`, `obj_undo` and `obj_revoked`; shares are rows of `fs_shares`
+Give the table an `org_id` (`kalmido/core/rls.py` protects every such table by itself) and say where its rows go in the exports:
+`obj_register(..., export={...})` (stage Q11, below "Export register"), not a hand entry in the export lists (`tools/check_export_tables.py`
+says what is missing). The core keeps its own data in `obj_history`, `obj_undo` and `obj_revoked`; shares are rows of `fs_shares`
 on the object's reference node in the file store.
 
 ## 2. Register the kind
@@ -1175,6 +1176,31 @@ web=, group=, v1=, v1group=, scope=, gate=)` when its module loads; `GET /api/se
 - A new area with a search: register a kind here (and, end-to-end, a browser source) -- no route of its own. Names that are
   not in `obj_search` (a file's name) use `osr_name_cond` (a part of the name, umlauts as ae / oe / ue); the last ILIKE searches
   (bookmarks, the reading list, the organisation's task overview, file names) went with the stage.
+
+### Export register (stage Q11, 2.1093.0, #5289)
+
+A table of the core says once where its rows go in the exports, in `kalmido/core/objexport.py` (decision of the product owner, 08.11.2026):
+`obj_export(table, ...)` for the cross-cutting tables (`obj_comments`, `obj_links`, `obj_tags` ...: their rows belong to many kinds,
+most of them no registered kind; the calls stand in that file), `obj_register(kind, table, ..., export={...})` for the own table of
+a new kind. One way per table: a second registration is refused, `tools/check_export_tables.py` fails on it.
+
+- Keywords: `org` = files of the organisation export `(archive, where[, part])` with the placeholders `{LSQ}` (the organisation's
+  lists), `{TSQ}` (their tasks), `{RSQ}` (its team chat rooms), `{LIVE}` (not in the trash), `{LETTER_LINKS}`; `part` = the account
+  import's part the file is read as (`acctimport.py UMZ_ORG_MAP`). `org_left` / `acct_left` = the reason it stays out of the
+  organisation / account export, `acct_later` = the readable name of what is not yet in the account export, `rx` = CSV files of the
+  retention export `(archive, where)`, `read` = parts of the account export made of the table that the import reads.
+- The readers: `admin/orgexport.py ox_areas()` / `ox_left()`, `admin/exportleft.py umz_left_tables()` / `umz_later_names()`,
+  `admin/retexport.py rx_tables()`, `admin/acctimport.py UMZ_READ` / `UMZ_ORG_MAP` (= the hand lists `*_OWN` + the register). The hand
+  lists (`OX_AREAS`, `OX_LEFT`, `UMZ_LEFT_TABLES`, `UMZ_LATER_NAMES`, `RX_TABLES`, `RX_WHERE`, `UMZ_READ_OWN`, `UMZ_ORG_MAP_OWN`) hold
+  only the old tables.
+- `tools/check_export_tables.py` reads the register as written (plain literals, no app): every `obj_*` table needs an entry, a
+  registered table never stands in a hand list too, nothing is registered twice or stale. The reasons are i18n keys
+  (`core/i18nkeys.py reason_keys` reads the register).
+- The archive files keep their names and columns (the row hooks in `admin/orgexport.py _clean` stay with the export); the where
+  clauses are the ones the hand lists had (the organisation's rows only: `tests/p2362_export_test.py` holds every file against a
+  second organisation).
+- Not in the register yet: the documents-only export of single folders (`admin/orgexport.py`, its own list of `documents/notes.json`)
+  and the account export's queries of the core's tables (`admin/acctexport.py`: parts with their own columns per person).
 
 ## Filter (2.846.0, #5520)
 

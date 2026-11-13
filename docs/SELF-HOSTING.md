@@ -1047,7 +1047,8 @@ relies on the session).
   (their owner's account export holds the entries), the articles of feeds and feed addresses that carry an access key, and
   the links of scheduling polls. Every other
   table with an organisation or project column is either exported or listed with its reason in the code
-  (`kalmido/admin/orgexport.py` OX_LEFT; `tests/export_coverage_test.py` fails on a new table that is neither).
+  (`kalmido/admin/orgexport.py` OX_LEFT, the tables of the shared core in `kalmido/core/objexport.py`;
+  `tests/export_coverage_test.py` fails on a new table that is neither).
 - **Encrypted content.** Fields and files that the server encrypts with the organisation's key are plain text inside
   the archive (the archive itself is encrypted). Content encrypted in the browser by its author (encrypted task notes
   and files) stays ciphertext; the manifest lists it under `client_encrypted`. Personal key bundles are never in the
