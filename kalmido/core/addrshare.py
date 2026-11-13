@@ -236,7 +236,7 @@ def _replay(uid, em, x):
         c = db()
         g.pushes, g.auth_via, g.ads_bound = [], None, False
         with system_ctx(c):  # review F2: no person in this context yet ("anon" would not see an organisation's project)
-            by = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (x["created_by"],)).fetchone()
+            by = c.execute("SELECT * FROM users WHERE id=? AND NOT disabled", (x["created_by"],)).fetchone()
             drop = by is None or by["id"] == uid or bool(k["gone"] and k["gone"](c, x))
         bound = False
         if not drop:

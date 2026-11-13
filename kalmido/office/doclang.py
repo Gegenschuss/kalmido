@@ -213,7 +213,7 @@ def _offer_block_missing(c, oid, s, kind, lang):
         t, miss = _block(c, oid, tid, lang)
         if t is not None:
             return miss
-    r = c.execute(f"SELECT text_de, text_en, trans FROM office_texts WHERE {live_sql()} AND org_id=? AND archived=0 AND kind=? ORDER BY sort, id LIMIT 1", (oid, kind)).fetchone()
+    r = c.execute(f"SELECT text_de, text_en, trans FROM office_texts WHERE {live_sql()} AND org_id=? AND NOT archived AND kind=? ORDER BY sort, id LIMIT 1", (oid, kind)).fetchone()
     return doc_own(r, lang, "text")[1] if r else False
 
 
@@ -271,7 +271,7 @@ def _note_texts(c, oid, ct, lang):
         if t:
             cands.add(t)
             first, miss = t, m
-    r = c.execute(f"SELECT text_de, text_en, trans FROM office_texts WHERE {live_sql()} AND org_id=? AND archived=0 AND kind='note' ORDER BY sort, id LIMIT 1", (oid,)).fetchone()
+    r = c.execute(f"SELECT text_de, text_en, trans FROM office_texts WHERE {live_sql()} AND org_id=? AND NOT archived AND kind='note' ORDER BY sort, id LIMIT 1", (oid,)).fetchone()
     if r:
         t, m = doc_own(r, lang, "text")
         cands.add(t)

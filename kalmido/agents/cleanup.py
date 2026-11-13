@@ -262,7 +262,7 @@ def cln_close(c, rec, tid, reason, into=None):
     """Won't do (status -1) with the open subtasks; the undo record keeps what changed."""
     ts = iso(now_utc())
     kids = [d for d in descendants(c, tid)  # 2.542.0 (#4609): a locked subtask stays open
-            if c.execute("SELECT 1 FROM tasks WHERE id=? AND status=0 AND locked=0", (d,)).fetchone()]
+            if c.execute("SELECT 1 FROM tasks WHERE id=? AND status=0 AND NOT locked", (d,)).fetchone()]
     c.execute("UPDATE tasks SET status=-1, completed_at=?, completed_by=?, updated_at=? WHERE id=?", (ts, me(), ts, tid))
     for d in kids:
         c.execute("UPDATE tasks SET status=-1, completed_at=?, completed_by=?, updated_at=? WHERE id=? AND status=0", (ts, me(), ts, d))
@@ -376,7 +376,7 @@ def cln_undo(c, rec, back=True):
                 skipped += prop_titles(c, [tid])
                 continue
             for d in [tid, *x["kids"]]:
-                c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=? AND status=-1 AND locked=0",
+                c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=? AND status=-1 AND NOT locked",
                           (ts, d))
             log_act(c, tid, "reopen")
         else:

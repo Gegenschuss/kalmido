@@ -122,7 +122,7 @@ def oo_admins(c, oid, but):
     """The active admins of organisation oid other than but."""
     with system_ctx(c):  # the organisation's other admins (structure)
         return [r[0] for r in c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id
-                                           WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=?""", (oid, but))]
+                                           WHERE m.org_id=? AND m.role='admin' AND NOT u.disabled AND m.user_id!=?""", (oid, but))]
 
 
 def oo_news(c, uids, data, list_id=None, actor=None):

@@ -181,7 +181,7 @@ check(r.status_code in (403, 404), "retired: nobody can be added as a member " +
 PL = Bo.post(B + "/api/lists", json={"name": "Spring campaign", "org_id": ORG, "kind": "project"}).json()["id"]
 check(Bo.put(B + f"/api/lists/{PL}/members", json={"user_id": CAROL, "role": "edit"}).ok, "setup: carol in bob's project")
 day = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-CINBOX = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (CAROL,))[0][0]
+CINBOX = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (CAROL,))[0][0]
 sql("UPDATE lists SET time_tracking=1 WHERE id IN (?, ?)", (PL, CINBOX), write=True)  # the list setting (tested in the time suites)
 r = Ca.post(B + "/api/time/entries", json={"list_id": PL, "start": day + "T09:00", "minutes": 45})
 check(r.ok or r.status_code == 201, "carol: 45 minutes in the organisation's project " + r.text[:160])
@@ -294,7 +294,7 @@ check(r.status_code == 409 and r.json().get("retain_until") == "2036-12-31" and 
       "Gamma: 409, kept by law until 2036-12-31 " + r.text[:200])
 # 2.152.0 (#2167, review A7): a mailbox and a newsletter connection of Gamma (rows only, the services are tested elsewhere)
 NOW = datetime.now(timezone.utc).isoformat(timespec="seconds")
-sql("INSERT INTO hub_mailboxes(org_id, owner_id, ws, active, created_at, updated_at) VALUES(?,?,?,1,?,?)", (GAM, ALICE, f"org:{GAM}", NOW, NOW), write=True)
+sql("INSERT INTO hub_mailboxes(org_id, owner_id, ws, active, created_at, updated_at) VALUES(?,?,?,true,?,?)", (GAM, ALICE, f"org:{GAM}", NOW, NOW), write=True)
 sql("INSERT INTO nl_conns(org_id, owner_id, ws, kind, auto, created_at, updated_at) VALUES(?,?,?,'listmonk',1,?,?)", (GAM, ALICE, f"org:{GAM}", NOW, NOW), write=True)
 r = A.delete(B + f"/api/admin/orgs/{GAM}?confirm=1")
 check(r.ok and r.json().get("retired") is True and r.json().get("retain_until") == "2036-12-31", "Gamma: retired " + r.text[:160])

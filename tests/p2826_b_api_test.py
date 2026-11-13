@@ -55,7 +55,7 @@ check(r.status_code == 201, f"an own plan of frida {r.status_code} {r.text[:200]
 OWN = r.json().get("id")
 c = dbx.connect(DATA)  # another person's plan with the same agent (a team agent could have one; here written directly)
 c.execute("""INSERT INTO agent_schedules(agent_id,user_id,title,prompt,freq,days,at_time,tz,enabled,created_at,updated_at,action)
-             SELECT agent_id, ?, 'Alice plan', prompt, freq, days, at_time, tz, 1, created_at, updated_at, action FROM agent_schedules WHERE id=?""",
+             SELECT agent_id, ?, 'Alice plan', prompt, freq, days, at_time, tz, true, created_at, updated_at, action FROM agent_schedules WHERE id=?""",
           (AID, OWN))
 c.commit()
 OTHER = q("SELECT id FROM agent_schedules WHERE agent_id=? AND user_id=?", (FA, AID))[0][0]
@@ -74,9 +74,9 @@ r = Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": True, "ids": mi
 check(r.ok and sorted(r.json().get("changed") or []) == mine[:2], f"the undo step with ids: only those of hers, never another person's {r.text[:300]}")
 r = Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": True})
 check(r.ok and r.json().get("changed") == [mine[2]], f"resume all: the rest {r.text[:200]}")
-nows = q("SELECT COUNT(*) FROM agent_schedules WHERE agent_id=? AND user_id=? AND enabled=1 AND next_at IS NOT NULL AND next_at > ?",
+nows = q("SELECT COUNT(*) FROM agent_schedules WHERE agent_id=? AND user_id=? AND enabled AND next_at IS NOT NULL AND next_at > ?",
          (FA, FID, "2000-01-01"))[0][0]
-fut = q("SELECT COUNT(*) FROM agent_schedules WHERE agent_id=? AND user_id=? AND enabled=1 AND CAST(next_at AS timestamptz) > now()", (FA, FID))[0][0]
+fut = q("SELECT COUNT(*) FROM agent_schedules WHERE agent_id=? AND user_id=? AND enabled AND CAST(next_at AS timestamptz) > now()", (FA, FID))[0][0]
 check(nows == 3 and fut == 3, f"resumed: each plan has its next run in the future (no missed runs made up) {nows} {fut}")
 
 # a starter plan that waits for a project of her own (share_wait, #5378 review F2) keeps waiting: Resume all never starts it
@@ -86,7 +86,7 @@ FU = ids["followup"]
 # (changed [1, 3]). The endpoint's property is "FU in no changed list"; (1, 0) with FU in no changed list can only be the watchdog,
 # then the round is set up again (right after a watchdog round, so the next one is ~30 s away).
 for _round in range(3):
-    c.execute("UPDATE agent_schedules SET enabled=0, share_wait=1, next_at=NULL WHERE id=?", (FU,))
+    c.execute("UPDATE agent_schedules SET enabled=false, share_wait=1, next_at=NULL WHERE id=?", (FU,))
     c.commit()
     r0 = Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": False})
     r = Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": True})
@@ -98,7 +98,7 @@ for _round in range(3):
 check(r0.ok, "pause all")
 check(r.ok and not touched and st == (0, 1),
       f"#5510: Resume all leaves a waiting starter plan waiting {r.text[:200]} {st}")
-c.execute("UPDATE agent_schedules SET enabled=0, share_wait=1, next_at=NULL WHERE id=?", (FU,))
+c.execute("UPDATE agent_schedules SET enabled=false, share_wait=1, next_at=NULL WHERE id=?", (FU,))
 c.commit()
 r = Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": True, "ids": [FU]})
 check(r.ok and r.json().get("changed") == [], "... also when named in ids")

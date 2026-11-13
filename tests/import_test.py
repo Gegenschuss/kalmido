@@ -185,7 +185,7 @@ check(wk["Japanese date"]["due"] is None and "毎週月曜日" in wk["Japanese d
 st, j = imp(A, "todoist", "todoist-sync.json")
 check(st == 200 and j["created"]["tasks"] == 5, f"Todoist JSON ({st} {str(j)[:150]})")
 mi = task("Milch kaufen")
-inbox = dbx("SELECT id FROM lists WHERE owner_id=1 AND is_inbox=1")[0][0]
+inbox = dbx("SELECT id FROM lists WHERE owner_id=1 AND is_inbox")[0][0]
 check(mi["list_id"] == inbox and tags(mi["id"]) == ["einkauf", "laden"], "inbox project -> own inbox, labels + @label")
 vi = task("Visum beantragen")
 check(vi["due"] == "2026-11-03" and vi["due_time"] == "09:30" and vi["priority"] == 5 and vi["duration"] == 45 and sec_name(vi["section_id"]) == "Vorher",
@@ -238,7 +238,7 @@ for k in ("lists", "cards", "checklists"):
                 it["id"] += "b"
 st, j = imp(Bo, "trello", "b2.json", data=json.dumps(b2).encode(), mode="lists", archived="done")
 check(st == 200 and j["created"]["lists"] == 3 and j["created"]["tasks"] == 9, f"lists mode: one list per Trello list incl. archived ({j.get('created')})")
-check(all(x["folder"] == "Board Two" for x in dbx("SELECT folder FROM lists WHERE owner_id=? AND is_inbox=0", (BOB,))), "lists mode: board name = folder")
+check(all(x["folder"] == "Board Two" for x in dbx("SELECT folder FROM lists WHERE owner_id=? AND NOT is_inbox", (BOB,))), "lists mode: board name = folder")
 check(task("Archived card", BOB)["status"] == 2, "archived as done")
 
 # ================================================================== Asana (assignee only for members of the target list)

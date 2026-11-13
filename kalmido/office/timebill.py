@@ -166,12 +166,12 @@ def tbill_free_stale(c, sql, args):
 
 def tbill_summary(c, sql, args):
     """Seconds / entries of the period: open (billable, not billed), billed, not billable."""
-    r = c.execute(f"""SELECT COALESCE(SUM(CASE WHEN e.billable=1 AND e.billed_doc_id IS NULL THEN e.seconds END),0) AS open_s,
-                             COUNT(CASE WHEN e.billable=1 AND e.billed_doc_id IS NULL THEN 1 END) AS open_n,
+    r = c.execute(f"""SELECT COALESCE(SUM(CASE WHEN e.billable AND e.billed_doc_id IS NULL THEN e.seconds END),0) AS open_s,
+                             COUNT(CASE WHEN e.billable AND e.billed_doc_id IS NULL THEN 1 END) AS open_n,
                              COALESCE(SUM(CASE WHEN e.billed_doc_id IS NOT NULL THEN e.seconds END),0) AS billed_s,
                              COUNT(CASE WHEN e.billed_doc_id IS NOT NULL THEN 1 END) AS billed_n,
-                             COALESCE(SUM(CASE WHEN e.billable=0 AND e.billed_doc_id IS NULL THEN e.seconds END),0) AS nob_s,
-                             COUNT(CASE WHEN e.billable=0 AND e.billed_doc_id IS NULL THEN 1 END) AS nob_n {sql}""", args).fetchone()
+                             COALESCE(SUM(CASE WHEN NOT e.billable AND e.billed_doc_id IS NULL THEN e.seconds END),0) AS nob_s,
+                             COUNT(CASE WHEN NOT e.billable AND e.billed_doc_id IS NULL THEN 1 END) AS nob_n {sql}""", args).fetchone()
     return {"open_seconds": int(r["open_s"]), "open_entries": int(r["open_n"]), "billed_seconds": int(r["billed_s"]),
             "billed_entries": int(r["billed_n"]), "unbillable_seconds": int(r["nob_s"]), "unbillable_entries": int(r["nob_n"])}
 
@@ -183,7 +183,7 @@ def tbill_take(c, did, sql, args):
     tbill_free_stale(c, sql, args)
     before = tbill_summary(c, sql, args)
     ts = iso(now_utc())
-    c.execute(f"UPDATE time_entries SET billed_doc_id=?, billed_at=?, updated_at=? WHERE billed_doc_id IS NULL AND billable=1 "
+    c.execute(f"UPDATE time_entries SET billed_doc_id=?, billed_at=?, updated_at=? WHERE billed_doc_id IS NULL AND billable "
               f"AND id IN (SELECT e.id {sql})", [did, ts, ts] + args)
     groups = c.execute("SELECT e.list_id, l.name AS lname, SUM(e.seconds) AS secs FROM time_entries e JOIN lists l ON l.id=e.list_id "
                        "WHERE e.billed_doc_id=? GROUP BY e.list_id, l.name ORDER BY l.name", (did,)).fetchall()
@@ -246,9 +246,9 @@ def tbill_by_client(c, sql, args):
     """[{id, name, open_seconds, billed_seconds, unbillable_seconds}] of the entries of sql, by client name. The name only
     (system_ctx: a person without client rights still sees whose project the own time belongs to, never the client's data)."""
     rows = c.execute(f"""SELECT l.client_id AS cid,
-                                COALESCE(SUM(CASE WHEN e.billable=1 AND e.billed_doc_id IS NULL THEN e.seconds END),0) AS open_s,
+                                COALESCE(SUM(CASE WHEN e.billable AND e.billed_doc_id IS NULL THEN e.seconds END),0) AS open_s,
                                 COALESCE(SUM(CASE WHEN e.billed_doc_id IS NOT NULL THEN e.seconds END),0) AS billed_s,
-                                COALESCE(SUM(CASE WHEN e.billable=0 AND e.billed_doc_id IS NULL THEN e.seconds END),0) AS nob_s
+                                COALESCE(SUM(CASE WHEN NOT e.billable AND e.billed_doc_id IS NULL THEN e.seconds END),0) AS nob_s
                          {sql} GROUP BY l.client_id""", args).fetchall()
     if not rows:
         return []
@@ -294,7 +294,7 @@ def tbill_release_post(did):
             # only open, billable, finished entries of the invoice's client's lists in this office
             ts = iso(now_utc())
             c.execute(f"UPDATE time_entries SET billed_doc_id=?, billed_at=?, updated_at=? WHERE billed_doc_id IS NULL "
-                      f"AND billable=1 AND \"end\" IS NOT NULL "
+                      f"AND billable AND \"end\" IS NOT NULL "
                       f"AND id IN ({','.join('?' * len(ids))}) AND list_id IN (SELECT l.id FROM lists l WHERE l.client_id=? "
                       f"AND {pb_cl_sql(c, oid, 'l.org_id', 'l.owner_id')})", [did, ts, ts] + ids + [r["client_id"]])
         ofx_log(c, oid, "time_rebind", doc_id=did, detail={"entries": len(ids)})

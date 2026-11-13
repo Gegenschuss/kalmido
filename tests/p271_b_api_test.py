@@ -128,7 +128,7 @@ HL = mk(Bo, "Health like", ORG)
 dbx("UPDATE lists SET life='health' WHERE id=?", (HL,), write=True)
 check(link(Bo, T, HL).status_code == 400, "#1459: a health list is refused")
 AR = mk(Bo, "Archived", ORG)
-dbx("UPDATE lists SET archived=1 WHERE id=?", (AR,), write=True)
+dbx("UPDATE lists SET archived=true WHERE id=?", (AR,), write=True)
 check(link(Bo, T, AR).status_code == 400, "#1459: an archived list is refused")
 check(links(T) == [], "#1459: nothing linked by the refusals")
 

@@ -139,7 +139,7 @@ def instance_sync(c):
         if len(oids) != 1:
             return
         n = c.execute("INSERT INTO org_members(org_id,user_id) SELECT ?, id FROM users ON CONFLICT DO NOTHING", (oids[0],)).rowcount
-        n += c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND role!='admin' AND user_id IN (SELECT id FROM users WHERE is_admin=1 AND kind!='agent')", (oids[0],)).rowcount
+        n += c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND role!='admin' AND user_id IN (SELECT id FROM users WHERE is_admin AND kind!='agent')", (oids[0],)).rowcount
     print(f"organisations (#1592): the former mode organisation synced once ({n} rows)", flush=True)
 
 
@@ -645,7 +645,7 @@ def ws_default_org(c, uid, folder=""):
     if not has_workspaces(c):
         return None
     if folder:
-        rows = c.execute("SELECT DISTINCT org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND (folder=? OR folder ILIKE ? ESCAPE '\\')",
+        rows = c.execute("SELECT DISTINCT org_id FROM lists WHERE owner_id=? AND NOT is_inbox AND (folder=? OR folder ILIKE ? ESCAPE '\\')",
                          (uid, folder, like_escape(folder.split("/", 1)[0]) + "/%")).fetchall()
         oids = {r[0] for r in rows}
         if len(oids) == 1 and (None in oids or oids <= set(_orgs_w(c, uid))):  # 2.143.0 A (#2151)
@@ -707,7 +707,7 @@ def ws_migrate(c):
             oid = org_of.get(a["user_id"])
         else:  # the workspace most of its lists are in
             cnt = {}
-            for (lo,) in c.execute(f"SELECT l.org_id FROM lists l WHERE l.is_inbox=0 AND l.id IN {joined_lists_sql()}",
+            for (lo,) in c.execute(f"SELECT l.org_id FROM lists l WHERE NOT l.is_inbox AND l.id IN {joined_lists_sql()}",
                                   (a["user_id"], a["user_id"])):
                 cnt[lo] = cnt.get(lo, 0) + 1
             oid = max(cnt, key=lambda k: (cnt[k], 0 if k is None else 1)) if cnt else None
@@ -716,7 +716,7 @@ def ws_migrate(c):
         if oid:
             c.execute("UPDATE agents SET org_id=? WHERE user_id=?", (oid, a["user_id"]))
     # the instance's admins administer the organisations they are in
-    c.execute("UPDATE org_members SET role='admin' WHERE user_id IN (SELECT id FROM users WHERE is_admin=1 AND kind!='agent')")
+    c.execute("UPDATE org_members SET role='admin' WHERE user_id IN (SELECT id FROM users WHERE is_admin AND kind!='agent')")
     mism = c.execute("""SELECT COUNT(*) FROM list_members m JOIN agents a ON a.user_id=m.user_id JOIN lists l ON l.id=m.list_id
                         WHERE COALESCE(a.org_id,0)!=COALESCE(l.org_id,0)""").fetchone()[0]
     print(f"workspaces (#935): {n_org} lists in their organisation, {n_priv} private, {mism} agent memberships across workspaces (kept)", flush=True)
@@ -896,7 +896,7 @@ def op_foreign_account(c, uid, note=True, grant=True):
 def org_own_admin(c, oid, but=0):
     """2.306.0 Fix-1 (#2875 review): an active admin of organisation oid who is a person (not `but`), or None."""
     r = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
-                  "AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent' AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (oid, but)).fetchone()
+                  "AND NOT u.disabled AND COALESCE(u.kind,'user')!='agent' AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (oid, but)).fetchone()
     return r[0] if r else None
 
 
@@ -937,12 +937,12 @@ def _members_gone(c, oid, gone, admins=()):
     admins = who of them was an admin before their membership rows went (rck_admin_gone)."""
     if gone:
         own = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
-                        "AND u.disabled=0 AND u.kind!='agent' ORDER BY m.user_id LIMIT 1", (oid,)).fetchone()
+                        "AND NOT u.disabled AND u.kind!='agent' ORDER BY m.user_id LIMIT 1", (oid,)).fetchone()
         if not own and _operator_apart():  # 2.306.0 D1 (#2875): hosted: the organisation keeps an admin of its own
             c.rollback()
             raise Denied(409, tr("The last admin of an organisation cannot leave it: make somebody else an admin first"))
         heir = (own
-                or c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' ORDER BY id LIMIT 1").fetchone() or [None])[0]
+                or c.execute("SELECT id FROM users WHERE is_admin AND NOT disabled AND kind!='agent' ORDER BY id LIMIT 1").fetchone() or [None])[0]
         if heir and not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, heir)).fetchone():
             org_member_add(c, oid, heir, "admin")  # no admin stays: the operator takes over (like org_member_remove)
         elif heir:
@@ -1020,7 +1020,7 @@ def org_create():
         oid = insert_id(c, "INSERT INTO orgs(name,icon,domains,created_at) VALUES(?,?,?,?)",
                         (name, _clean_icon(b.get("icon")), _clean_domains(b.get("domains") or ""), iso(now_utc())))
         adm = b.get("admin_id", me())
-        if not isinstance(adm, int) or isinstance(adm, bool) or not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (adm,)).fetchone():
+        if not isinstance(adm, int) or isinstance(adm, bool) or not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND NOT disabled", (adm,)).fetchone():
             c.rollback()
             return err(tr("Invalid value: {0}", "admin_id"))
         if adm != me() and _operator_apart():  # 2.399.0 (#2687): hosted: a customer creates its organisation itself (POST /api/orgs)
@@ -1053,7 +1053,7 @@ def org_heir_to(c, oid, uid, raw):
     if not 0 < to < 2 ** 63:
         return None
     if to == me() or c.execute("""SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id=?
-                                  AND m.user_id!=? AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'""", (oid, to, uid)).fetchone():
+                                  AND m.user_id!=? AND NOT u.disabled AND COALESCE(u.kind,'user')!='agent'""", (oid, to, uid)).fetchone():
         ws_check_owner(c, oid, to)  # 2.538.0 (#4371): only to a member / admin (409); asked by an organisation admin, who sees the roles
         return to
     return None
@@ -1565,7 +1565,7 @@ def org_member_put(oid, ghost=False):
             return jsonify(ok=True, by_email=True)
     if not isinstance(uid, int) or isinstance(uid, bool):
         return err(tr("Invalid value: {0}", "user_id"))
-    u = c.execute("SELECT id, kind FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
+    u = c.execute("SELECT id, kind FROM users WHERE id=? AND NOT disabled", (uid,)).fetchone()
     if not u or (u["kind"] or "user") == "agent" or (uid != me() and not by_mail and not may_see(c, me(), uid)):
         return err(tr("unknown person"), 404)
     cur = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
@@ -1610,7 +1610,7 @@ def org_open_chan_off(c, oid, uid, role):
         # obj_revoked just before; this takes one that was left). 2.924.0 (#5069): no old rows of tchat_members any more
         c.execute("DELETE FROM fs_shares WHERE (user_id=? OR user_id IN (SELECT user_id FROM agents WHERE owner_id=?) OR agent_id IN "
                   "(SELECT user_id FROM agents WHERE owner_id=?)) AND node_id IN (SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind='tchat_room' "
-                  "AND ref_id IN (SELECT id FROM tchat_rooms WHERE kind='channel' AND is_open=1 AND org_id=?))", (uid, uid, uid, oid))
+                  "AND ref_id IN (SELECT id FROM tchat_rooms WHERE kind='channel' AND is_open AND org_id=?))", (uid, uid, uid, oid))
 
 
 def org_role_news(c, oid, uid, role):
@@ -1622,7 +1622,7 @@ def org_role_news(c, oid, uid, role):
 
 def _admins(c, oid, besides=0):
     """The active admins of organisation oid; 2.585.0 (#4290): besides = without this person."""
-    return c.execute("SELECT COUNT(*) FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0"
+    return c.execute("SELECT COUNT(*) FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND NOT u.disabled"
                      " AND m.user_id<>?", (oid, besides)).fetchone()[0]
 
 
@@ -1678,7 +1678,7 @@ def org_leave(c, oid, uid, heir, back=None):
     snap = olv_snap(c, oid, uid)  # 2.363.3 (#3133): what the end of the membership takes away, for coming back within a day
     was_admin = c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=? AND role='admin'", (oid, uid)).fetchone()  # 2.539.0 (#4373)
     n, priv = 0, []
-    for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND org_id=? AND is_inbox=0", (uid, oid)).fetchall():
+    for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND org_id=? AND NOT is_inbox", (uid, oid)).fetchall():
         if lr["brought_by"] == uid and not lr["deleted_at"]:
             ol_private(c, lr["id"], uid)
             priv.append(lr["id"])
@@ -1780,7 +1780,7 @@ def org_member_remove(oid, uid):
     # 2.585.0 (#4290): the active admins besides the person (a disabled admin counted against the remover)
     if uid != me() and org_role(c, uid, oid) == "admin" and _admins(c, oid, besides=uid) < 1:
         return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)
-    heir = me() if uid != me() else (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (oid, uid)).fetchone() or [None])[0]
+    heir = me() if uid != me() else (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND NOT u.disabled AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (oid, uid)).fetchone() or [None])[0]
     if uid != me() and request.args.get("to"):  # 2.88.0 (#1980): the admin hands the person's lists to another active member
         heir = org_heir_to(c, oid, uid, request.args["to"])
         if heir is None:
@@ -1789,7 +1789,7 @@ def org_member_remove(oid, uid):
     if heir is None and _operator_apart():  # 2.306.0 D1 (#2875): a hosted instance's operator never takes a customer's organisation over
         return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)
     if heir is None:  # the only admin leaves: the operator (an instance admin) takes the organisation over and is told
-        operator = (c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' AND id!=? ORDER BY id LIMIT 1", (uid,)).fetchone() or [None])[0]
+        operator = (c.execute("SELECT id FROM users WHERE is_admin AND NOT disabled AND kind!='agent' AND id!=? ORDER BY id LIMIT 1", (uid,)).fetchone() or [None])[0]
         if operator is None:
             return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)
         c.execute("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'admin') ON CONFLICT(org_id,user_id) DO UPDATE SET role='admin'", (oid, operator))

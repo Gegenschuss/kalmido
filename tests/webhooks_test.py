@@ -95,7 +95,7 @@ A = sess("alice")
 check(A.get(B + "/api/state").json()["webhooks"] == {"enabled": False, "mine": False}, "off: state says disabled")
 check(A.post(B + "/api/me/webhooks", json={"url": STUB + "/ok", "events": ALL}).status_code == 409, "off: adding refused")
 check(A.get(B + "/api/me/webhooks").json()["enabled"] is False, "off: list says disabled")
-dbx("INSERT INTO webhooks(user_id,name,url,events,secret,enabled,created_at,updated_at) VALUES(1,'x',?,?,'',1,'2026-01-01T00:00:00+00:00','2026-01-01T00:00:00+00:00')",  # 2.1095.0 (#5306): TIMESTAMPTZ takes a whole moment
+dbx("INSERT INTO webhooks(user_id,name,url,events,secret,enabled,created_at,updated_at) VALUES(1,'x',?,?,'',true,'2026-01-01T00:00:00+00:00','2026-01-01T00:00:00+00:00')",  # 2.1095.0 (#5306): TIMESTAMPTZ takes a whole moment
     (STUB + "/ok", ",".join(ALL)))
 A.post(B + "/api/tasks", json={"title": "not sent"})
 time.sleep(3)

@@ -428,7 +428,7 @@ def drop_user(c, auth):
         return None
     got = auth[7:]
     # 2.86.0 (N3): never a child account (its writes are limited to family.KID_WRITE; /api/me hides its token)
-    r = c.execute("SELECT * FROM users WHERE drop_token_hash=? AND disabled=0 AND kid=0", (tkh_hash(got),)).fetchone()
+    r = c.execute("SELECT * FROM users WHERE drop_token_hash=? AND NOT disabled AND kid=0", (tkh_hash(got),)).fetchone()
     return r if r and tkh_match(got, r["drop_token_hash"]) else None
 
 
@@ -476,7 +476,7 @@ def drop_agent(c, uid, to):
     """The agent a /drop with `to` means: 'agent' = the one uid chatted with last (else the first one uid may chat with),
     else an agent id or username; only agents uid may chat with."""
     from ..agents.core import agent_shares
-    ok = [r[0] for r in c.execute("SELECT id FROM users WHERE kind='agent' AND disabled=0 ORDER BY id") if agent_shares(c, r[0], uid)]
+    ok = [r[0] for r in c.execute("SELECT id FROM users WHERE kind='agent' AND NOT disabled ORDER BY id") if agent_shares(c, r[0], uid)]
     if to.lower() == "agent":
         last = c.execute(f"SELECT agent_id FROM agent_chat WHERE user_id=? AND agent_id IN ({','.join('?' * len(ok)) or 'NULL'}) "
                          "ORDER BY id DESC LIMIT 1", (uid, *ok)).fetchone()

@@ -234,7 +234,7 @@ for pid, path in ((WL, "Legacy"), (WG, "Gone")):
 sql("DELETE FROM wiki_share_cards WHERE fs_share_id=?", (GS,), write=True)
 sql("INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,user_id,token,created_by,created_at,page_id,images,core_id) "
     "VALUES(NULL,?,'Greta note',0,'person',?,'',?,?,?,1,?)", (GID, FIO, GID, TS, WGR, GS), write=True)
-sql("UPDATE users SET disabled=1 WHERE id=?", (GID,), write=True)
+sql("UPDATE users SET disabled=true WHERE id=?", (GID,), write=True)
 # Fable F5: an old row of Kept not moved yet (no core_id, no expiry) beside the core share fiona holds there
 sql("INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,user_id,token,created_by,created_at,page_id,images) "
     "VALUES(NULL,?,'Kept',0,'person',?,'',?,?,?,0)", (FID, FIO, FID, TS, WK), write=True)

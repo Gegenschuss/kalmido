@@ -475,7 +475,7 @@ def rin_tick(c, now=None):
     _RIN_LAST["at"] = time.monotonic()
     today = (now or local_now()).date().isoformat()
     with system_ctx(c):  # the due series of every office area; each is then made in its admin's own context below
-        due = c.execute("SELECT id, org_id FROM office_inv_series WHERE deleted_at IS NULL AND active=1 AND next_date<>'' AND next_date<=? "
+        due = c.execute("SELECT id, org_id FROM office_inv_series WHERE deleted_at IS NULL AND active AND next_date<>'' AND next_date<=? "
                         "ORDER BY next_date, id LIMIT 500", (today,)).fetchall()
     c.commit()
     for d in due:
@@ -522,20 +522,20 @@ def _rin_as(c, oid, sid, today, actor, people):
         if g.user is None or office_role(c, actor, oid) != "admin" or not office_on(c, actor):
             return
         write_lock(c, f"office_series_{int(sid)}")
-        s = c.execute("SELECT * FROM office_inv_series WHERE id=? AND org_id=? AND deleted_at IS NULL AND active=1", (sid, oid)).fetchone()
+        s = c.execute("SELECT * FROM office_inv_series WHERE id=? AND org_id=? AND deleted_at IS NULL AND active", (sid, oid)).fetchone()
         if s is None or not s["next_date"] or s["next_date"] > today:
             c.rollback()
             return
         t = c.execute(f"SELECT kind, status FROM office_docs WHERE id=? AND org_id=? AND {live_sql()}", (s["template_id"], oid)).fetchone() if s["template_id"] else None
         if t is None or t["kind"] != "invoice" or t["status"] == "cancelled":
-            c.execute("UPDATE office_inv_series SET active=0, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
+            c.execute("UPDATE office_inv_series SET active=false, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
             name = _name(c, oid, s)
             _tell(c, people, RIN_TASK_PAUSED, name, lambda lg: tr("The template invoice of the series was deleted or cancelled. Select another one and switch the series on again.", lg=lg))
             bump(c)
             c.commit()
             return
         if s["until"] and s["next_date"] > s["until"]:
-            c.execute("UPDATE office_inv_series SET active=0, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
+            c.execute("UPDATE office_inv_series SET active=false, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
             bump(c)
             c.commit()
             return
@@ -561,7 +561,7 @@ def rin_cashflow(c, oid, put, first, last_day, today, nf):
     template's payment days. Amount = the template's gross (office currency through its rate), net through nf. Paused and
     deleted series count not; finalised invoices of a series are in the plan already (kind invoice)."""
     home = (office_settings(c, oid).get("currency") or "EUR").upper()
-    sts = c.execute("SELECT * FROM office_inv_series WHERE org_id=? AND deleted_at IS NULL AND active=1", (oid,)).fetchall()
+    sts = c.execute("SELECT * FROM office_inv_series WHERE org_id=? AND deleted_at IS NULL AND active", (oid,)).fetchall()
     if not sts:
         return
     st = office_settings(c, oid)

@@ -767,7 +767,7 @@ def _watchdog_tick(c):
     from ..events.model import _wd_events
     from ..life.model import _wd_care
     from ..life.karakeep import _wd_reading
-    users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE disabled=0")}
+    users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE NOT disabled")}
     S, LG = _wd_settings(c, users), {}
     for uid in users:
         LG[uid] = S[uid].get("lang") if S[uid].get("lang") in LANGS else "en"
@@ -1168,7 +1168,7 @@ def _wd_pomo(c, p, users, S, LG):
 def _wd_habits(c, users, S, LG, now):
     # habit reminders
     today = now.date().isoformat()
-    for h in c.execute("SELECT * FROM habits WHERE archived=0 AND deleted_at IS NULL AND (remind_at!='' OR remind_times!='') "
+    for h in c.execute("SELECT * FROM habits WHERE NOT archived AND deleted_at IS NULL AND (remind_at!='' OR remind_times!='') "
                        "AND NOT (reminded_on=? AND reminded_hm='')", (today,)).fetchall():
         try:
             _wd_habit(c, h, users, S, LG, now)

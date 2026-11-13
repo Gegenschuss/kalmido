@@ -147,7 +147,7 @@ check(C not in {x.get("id") for x in Bo.get(B + "/api/team/channels").json().get
 
 # ================================================================== the forward copy, then the drop
 # a channel of the organisation and a private channel of a person without one that have no node (an old database)
-sql("INSERT INTO tchat_rooms(kind,name,org_id,is_open,created_by,created_at) VALUES('channel','Raw',?,0,?,'2026-11-01T09:00:00Z')",
+sql("INSERT INTO tchat_rooms(kind,name,org_id,is_open,created_by,created_at) VALUES('channel','Raw',?,false,?,'2026-11-01T09:00:00Z')",
     (K, ALICE), write=True)
 R2 = sql("SELECT id FROM tchat_rooms WHERE name='Raw' AND org_id=?", (K,))[0][0]
 R3 = channel(Fe, "Fred alone", None)
@@ -209,7 +209,7 @@ with app.app_context():
     c = _pg.connect_direct(DATABASE_URL)
     with _pg.system_ctx(c):
         def room(name):
-            return c.execute("INSERT INTO tchat_rooms(kind,name,org_id,is_open,created_by,created_at) VALUES('channel',?,?,0,?,'2026-11-08T09:00:00Z') "
+            return c.execute("INSERT INTO tchat_rooms(kind,name,org_id,is_open,created_by,created_at) VALUES('channel',?,?,false,?,'2026-11-08T09:00:00Z') "
                              "RETURNING id", (name, org, alice)).fetchone()[0]
         # an archive before 2.924: chat/channels.json + chat/members.json, no node of the channel in the store
         run = Run()

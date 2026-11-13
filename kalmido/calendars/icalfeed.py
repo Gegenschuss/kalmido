@@ -244,7 +244,7 @@ def ical_feed(token):
     uid_s, _, secret = token.partition(".")
     u = None
     if uid_s.isdigit() and secret:
-        r = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (int(uid_s),)).fetchone()
+        r = c.execute("SELECT * FROM users WHERE id=? AND NOT disabled", (int(uid_s),)).fetchone()
         if r and tkh_match(secret, r["ical_token_hash"]):  # 2.138.0 C (#1907): compared with the stored hash
             u = r
     if not u:

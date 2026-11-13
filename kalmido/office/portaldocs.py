@@ -60,7 +60,7 @@ def kp_area(c, org_id, owner_id):
     if not owner_id:
         return None
     with system_ctx(c):  # instance structure: which hidden orgs row is the owner's personal office (one row, by owner)
-        r = c.execute("SELECT o.id FROM orgs o JOIN users u ON u.id=o.personal_of WHERE o.personal_of=? AND u.disabled=0",
+        r = c.execute("SELECT o.id FROM orgs o JOIN users u ON u.id=o.personal_of WHERE o.personal_of=? AND NOT u.disabled",
                       (int(owner_id),)).fetchone()
     return r[0] if r else None
 
@@ -82,7 +82,7 @@ def kp_bind(c, who):
     g.user, g.auth_via = PUB_ACTOR, "public"
     if not kp_on(c, oid):
         return None, []
-    rows = c.execute(f"SELECT id, email, email_invoice FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL").fetchall()
+    rows = c.execute(f"SELECT id, email, email_invoice FROM clients WHERE {pb_cl_sql(c, oid)} AND NOT archived AND deleted_at IS NULL").fetchall()
     return oid, [r["id"] for r in rows if eh and eh in (pt_email_hash(c, r["email"]), pt_email_hash(c, r["email_invoice"]))]
 
 

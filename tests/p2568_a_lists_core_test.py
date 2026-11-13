@@ -317,11 +317,11 @@ check(r.status_code == 409 and dbx("SELECT 1 FROM obj_revoked WHERE id=?", (RG2,
 # restore for a disabled account: refused, nothing changes
 r = A.delete(B + f"/api/lists/{L9}/members/{uid['erik']}")
 RE = r.json().get("revoked_id") if r.ok else None
-dbx("UPDATE users SET disabled=1 WHERE id=?", (uid["erik"],))
+dbx("UPDATE users SET disabled=true WHERE id=?", (uid["erik"],))
 r = A.post(B + f"/api/lists/{L9}/shares/{RE}/restore")
 check(r.status_code in (404, 409) and dbx("SELECT 1 FROM obj_revoked WHERE id=?", (RE,)) == [(1,)] and core_row(L9, uid["erik"]) is None
       and role_of(L9, "erik") is None, f"restore for a disabled account: refused, the taken row stays ({r.status_code} {r.text[:160]})")
-dbx("UPDATE users SET disabled=0 WHERE id=?", (uid["erik"],))
+dbx("UPDATE users SET disabled=false WHERE id=?", (uid["erik"],))
 
 # F2: a file store row of the node (list_own 0) comes back as that, never as a membership; a group row: 409, never 500
 r = A.post(B + f"/api/files/nodes/{N9}/shares", json={"user_id": uid["fynn"], "role": "view"})

@@ -100,14 +100,14 @@ def _docs_sec(sec):
 
 
 def _docs_gendocs(c, uid, oid, ids, neg, limit):
-    rows = c.execute(f"SELECT id, title, status, created_at FROM office_gen_docs WHERE org_id=? AND archived=0 AND {_in('id', ids, neg)} "
+    rows = c.execute(f"SELECT id, title, status, created_at FROM office_gen_docs WHERE org_id=? AND NOT archived AND {_in('id', ids, neg)} "
                      f"ORDER BY id DESC LIMIT {int(limit)}", (oid,)).fetchall()
     return [{"id": r["id"], "kind": "gendoc", "title": r["title"] or tr("Document"), "sub": "", "date": (r["created_at"] or "")[:10],
              "locked": r["status"] != "draft", "open": f"office/gendocs/{r['id']}"} for r in rows]
 
 
 def _docs_letters(c, uid, oid, ids, neg, limit):
-    rows = c.execute(f"SELECT id, subject, letter_date, status FROM office_letters WHERE org_id=? AND archived=0 AND {_in('id', ids, neg)} "
+    rows = c.execute(f"SELECT id, subject, letter_date, status FROM office_letters WHERE org_id=? AND NOT archived AND {_in('id', ids, neg)} "
                      f"ORDER BY letter_date DESC, id DESC LIMIT {int(limit)}", (oid,)).fetchall()
     out = []
     for r in rows:

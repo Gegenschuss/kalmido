@@ -41,7 +41,7 @@ def ua8_where(q, flt, own=None):
             args += [p, *ids, p, p]
     if flt != "agents" and flt != "all":
         cond.append("COALESCE(kind,'user')!='agent'")
-    cond.append({"active": "disabled=0 AND COALESCE(signup,'')!='pending'", "disabled": "disabled=1", "admin": "is_admin=1",
+    cond.append({"active": "NOT disabled AND COALESCE(signup,'')!='pending'", "disabled": "disabled", "admin": "is_admin",
                  "invited": "id IN (SELECT user_id FROM user_invites WHERE used_at IS NULL)", "pending": "signup='pending'",
                  "agents": "kind='agent'"}.get(flt, "1=1"))
     return " AND ".join(cond), args
@@ -81,7 +81,7 @@ def ua8_admin_dicts(c, rows):
     rcodes = {r[0] for r in c.execute(f"SELECT DISTINCT user_id FROM recovery_codes WHERE used_at IS NULL AND user_id IN ({q})", ids)}
     parents = {}
     for k, p in c.execute(f"""SELECT p.kid_id, p.parent_id FROM kid_parents p JOIN users u ON u.id=p.parent_id
-                               WHERE p.kid_id IN ({q}) AND u.disabled=0 ORDER BY p.parent_id""", ids):
+                               WHERE p.kid_id IN ({q}) AND NOT u.disabled ORDER BY p.parent_id""", ids):
         parents.setdefault(k, []).append(p)
     nw = now_utc()
     invite = {r[0]: ("invited" if parse_iso(r[1]) > nw else "expired")
@@ -91,7 +91,7 @@ def ua8_admin_dicts(c, rows):
         for uid, oid in c.execute(f"SELECT user_id, org_id FROM org_members WHERE user_id IN ({q}) ORDER BY org_id", ids):
             orgs.setdefault(uid, []).append(oid)
         ag_org = {r[0]: r[1] for r in c.execute(f"SELECT user_id, org_id FROM agents WHERE user_id IN ({q})", ids)}
-        nlists = {r[0]: r[1] for r in c.execute(f"SELECT owner_id, COUNT(*) FROM lists WHERE owner_id IN ({q}) AND is_inbox=0 GROUP BY owner_id", ids)}
+        nlists = {r[0]: r[1] for r in c.execute(f"SELECT owner_id, COUNT(*) FROM lists WHERE owner_id IN ({q}) AND NOT is_inbox GROUP BY owner_id", ids)}
     used = {}
     for sql in (f"SELECT user_id, COALESCE(SUM(size),0) FROM attachments WHERE user_id IN ({q}) AND deleted_at IS NULL GROUP BY user_id",
                 f"SELECT user_id, COALESCE(SUM(size),0) FROM list_files WHERE user_id IN ({q}) AND deleted_at IS NULL GROUP BY user_id",  # 2.272.0 F (#3038, E2-H2): not the trash
@@ -204,7 +204,7 @@ def ua8_may_delete(c, u, uid):
 
 def ua8_owned(c, uid):
     with system_ctx(c):  # every list the account owns, in every organisation (the same count that blocks the deletion)
-        return c.execute("SELECT * FROM lists WHERE owner_id=? AND is_inbox=0 ORDER BY lower(name), id", (uid,)).fetchall()
+        return c.execute("SELECT * FROM lists WHERE owner_id=? AND NOT is_inbox ORDER BY lower(name), id", (uid,)).fetchall()
 
 
 def ua8_candidates(c, lists, uid):
@@ -261,13 +261,13 @@ def ua8_key_holders(c, lid, uid):
     them can give the new owner the key; liste2e: list_keys per generation, lists.e2e_gen). The caller runs as system."""
     return c.execute("""SELECT COUNT(*) FROM list_keys k JOIN lists l ON l.id=k.list_id AND k.gen=l.e2e_gen
                         JOIN users u ON u.id=k.user_id JOIN list_members m ON m.list_id=k.list_id AND m.user_id=k.user_id
-                        WHERE k.list_id=? AND k.user_id!=? AND u.disabled=0""", (lid, uid)).fetchone()[0]
+                        WHERE k.list_id=? AND k.user_id!=? AND NOT u.disabled""", (lid, uid)).fetchone()[0]
 
 
 # 2.148.1 B (#2479): every private area an organisation admin's deletion would take along, by name (never the content)
 UA8_AREAS = (
-    (N_("projects"), "SELECT 1 FROM lists WHERE owner_id=? AND is_inbox=0 AND org_id IS NULL LIMIT 1"),
-    (N_("basket"), "SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.is_inbox=1 LIMIT 1"),
+    (N_("projects"), "SELECT 1 FROM lists WHERE owner_id=? AND NOT is_inbox AND org_id IS NULL LIMIT 1"),
+    (N_("basket"), "SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.is_inbox LIMIT 1"),
     (N_("calendars"), "SELECT 1 FROM ev_cals k JOIN events e ON e.cal_id=k.id WHERE k.owner_id=? AND k.org_id IS NULL LIMIT 1"),
     (N_("address books"), "SELECT 1 FROM books b JOIN contacts x ON x.book_id=b.id WHERE b.owner_id=? AND b.org_id IS NULL LIMIT 1"),
     # 2.566.0 (#4712): not the reference node of a calendar / address book on the shared core (counted by its own line above)
@@ -291,9 +291,9 @@ UA8_AREAS = (
     (N_("agent chats"), "SELECT 1 FROM users p JOIN agent_chat x ON x.user_id=p.id "
         "OR x.agent_id IN (SELECT a.user_id FROM agents a WHERE a.owner_id=p.id) WHERE p.id=? LIMIT 1"),
     (N_("agents' projects"), "SELECT 1 FROM lists l JOIN agents a ON a.user_id=l.owner_id WHERE a.owner_id=? AND l.org_id IS NULL "
-        "AND (l.is_inbox=0 OR EXISTS (SELECT 1 FROM tasks t WHERE t.list_id=l.id)) LIMIT 1"),
+        "AND (NOT l.is_inbox OR EXISTS (SELECT 1 FROM tasks t WHERE t.list_id=l.id)) LIMIT 1"),
     (N_("focus sessions"), "SELECT 1 FROM pomos WHERE user_id=? LIMIT 1"),
-    (N_("notes"), "SELECT 1 FROM lists l WHERE l.owner_id=? AND l.is_inbox=1 AND (EXISTS (SELECT 1 FROM notes n WHERE n.list_id=l.id) "
+    (N_("notes"), "SELECT 1 FROM lists l WHERE l.owner_id=? AND l.is_inbox AND (EXISTS (SELECT 1 FROM notes n WHERE n.list_id=l.id) "
         "OR EXISTS (SELECT 1 FROM list_notepads p WHERE p.list_id=l.id)) LIMIT 1"),
     (N_("direct messages"), "SELECT 1 FROM tchat_rooms r WHERE r.kind='dm' AND ? IN (r.a, r.b) "
         "AND EXISTS (SELECT 1 FROM tchat_msgs m WHERE m.room_id=r.id) LIMIT 1"),
@@ -385,7 +385,7 @@ def ua8_heirs(c, oid, uid):
     """Active people of organisation oid (never agents, not uid): who may get the account's lists of the organisation."""
     with system_ctx(c):  # membership structure of the caller's own organisation
         rows = c.execute("""SELECT u.id, COALESCE(u.display_name, u.username) FROM org_members m JOIN users u ON u.id=m.user_id
-                            WHERE m.org_id=? AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent' AND u.id!=?""", (oid, uid)).fetchall()
+                            WHERE m.org_id=? AND NOT u.disabled AND COALESCE(u.kind,'user')!='agent' AND u.id!=?""", (oid, uid)).fetchall()
     return sorted([{"id": r[0], "name": r[1]} for r in rows], key=lambda x: x["name"].lower())
 
 

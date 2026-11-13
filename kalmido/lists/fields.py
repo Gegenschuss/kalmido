@@ -338,7 +338,7 @@ def tb_fields_module_on(c, lid):
 
 
 def fields_pinned_ok(c, lid, fid=None):
-    n = c.execute("SELECT COUNT(*) FROM list_fields WHERE list_id=? AND pinned=1 AND id IS DISTINCT FROM ?", (lid, fid)).fetchone()[0]
+    n = c.execute("SELECT COUNT(*) FROM list_fields WHERE list_id=? AND pinned AND id IS DISTINCT FROM ?", (lid, fid)).fetchone()[0]
     return n < FIELD_PINNED_MAX
 
 

@@ -161,7 +161,7 @@ def _projects(c, a, uid):
     aid = a["user_id"]
     with system_ctx(c):
         rows = c.execute(f"""SELECT l.id, l.name, l.owner_id, m.role FROM lists l LEFT JOIN list_members m ON m.list_id=l.id AND m.user_id=?
-                            WHERE (m.user_id IS NOT NULL OR l.owner_id=?) AND l.is_inbox=0 AND {otr_live('l')}
+                            WHERE (m.user_id IS NOT NULL OR l.owner_id=?) AND NOT l.is_inbox AND {otr_live('l')}
                             AND l.org_id IS NOT DISTINCT FROM ? ORDER BY lower(l.name), l.id LIMIT ?""",
                          (aid, aid, a["org_id"], AGS_MAX * 2)).fetchall()  # another workspace's project gives the agent nothing
     locked = _dl_lists_locked(c, aid, [r["id"] for r in rows])
@@ -199,7 +199,7 @@ def _excepts(c, a, uid):
 # ---- "Share…": what the asker may share with this agent
 def _opt_projects(c, a, uid):
     aid = a["user_id"]
-    rows = c.execute(f"""SELECT l.id, l.name FROM lists l WHERE l.is_inbox=0 AND COALESCE(l.quicknote, 0)=0
+    rows = c.execute(f"""SELECT l.id, l.name FROM lists l WHERE NOT l.is_inbox AND COALESCE(l.quicknote, 0)=0
                         AND {list_state_sql('l')} AND COALESCE(l.life, '') NOT IN ('health', 'budget')
                         AND l.org_id IS NOT DISTINCT FROM ? AND l.owner_id != ?
                         AND NOT EXISTS (SELECT 1 FROM list_members m WHERE m.list_id=l.id AND m.user_id=?)

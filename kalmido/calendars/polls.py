@@ -742,9 +742,9 @@ def tpo_find(c, token):
         return None
     with system_ctx(c):  # resolve the token (one row) across organisations ...
         r = c.execute("""SELECT p.*, u.display_name AS u_name, u.username AS u_login FROM sched_polls p JOIN users u ON u.id=p.user_id
-                         WHERE p.token_hash=? AND p.link_on=1 AND p.deleted_at IS NULL AND u.disabled=0
-                         AND (COALESCE(u.kind, 'user')!='agent' OR EXISTS (SELECT 1 FROM agents a WHERE a.user_id=u.id AND a.enabled=1
-                              AND NOT EXISTS (SELECT 1 FROM users o WHERE o.id=a.owner_id AND o.disabled=1)))""",
+                         WHERE p.token_hash=? AND p.link_on=1 AND p.deleted_at IS NULL AND NOT u.disabled
+                         AND (COALESCE(u.kind, 'user')!='agent' OR EXISTS (SELECT 1 FROM agents a WHERE a.user_id=u.id AND a.enabled
+                              AND NOT EXISTS (SELECT 1 FROM users o WHERE o.id=a.owner_id AND o.disabled)))""",
                       (_token_hash(token),)).fetchone()
     from ..agents.core import is_agent
     if r is None or (r["expires_at"] and r["expires_at"] <= iso(now_utc())) or is_agent(getattr(g, "user", None)) \

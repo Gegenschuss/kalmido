@@ -5,7 +5,8 @@ connect() / db() (core/db.py) and gets a Conn back that behaves like the sqlite3
 - rows that answer to an index, a column name (case-insensitive, like the SQLite driver's rows), .keys() and dict(row),
 - execute() returns the cursor (fetchone / fetchall / iteration / rowcount), commit() / rollback() / close(),
 - parameters typed like SQLite's loose typing: ints / bools go as untyped literals (Postgres infers the column's type, so
-  `text_col = 5` and `bigint_col = '5'` both work; True / False are stored as 1 / 0), NUMERIC comes back as int / float
+  `text_col = 5` and `bigint_col = '5'` both work; True / False are stored as 1 / 0, and 0 / 1 into a BOOLEAN as false / true;
+  the yes / no columns of core/colbool.py read back as 0 / 1, 2.1118.0, #5952), NUMERIC comes back as int / float
   (exact storage, the office calculator works in Decimal on str(value)), jsonb comes back as its JSON text.
 
 There is no lastrowid on the cursor: an INSERT that needs its id says so with insert_id() (RETURNING id).
@@ -140,7 +141,72 @@ def _row_factory(cursor):
     if desc is None:
         return tuple
     cls = _row_class(tuple(d.name for d in desc))
-    return cls
+    cols = _cb_cols(cursor)  # 2.1118.0 (#5952)
+    if not cols:
+        return cls
+    key, done = _cb_key(cursor.connection), []
+
+    def make(values):
+        if not done:  # the first row: Conn._pgx has looked up the tables of a result it had not seen (cb_seen)
+            bits = _CB.get(key, {}).get("bits", ())
+            done.append(tuple(i for i, t, a in cols if (t, a) in bits))
+        if not done[0]:
+            return cls(values)
+        v = list(values)
+        for i in done[0]:
+            if v[i] is not None:
+                v[i] = int(v[i])
+        return cls(v)
+    return make
+
+
+# --- 2.1118.0 (#5952): the yes / no columns that were BIGINT 0/1 read as 0 / 1 ------------------------------------------
+# core/colbool.py turned them into BOOLEAN; the app and the agents' API keep reading 0 / 1 from exactly those columns (the
+# table and column a result's value comes from: libpq's ftable / ftablecol). A BOOLEAN that always was one (office_docs.subtotals)
+# or a computed one (EXISTS, a comparison, CASE) stays True / False. Per database: {"cols": (table oid, column number) looked up,
+# "bits": {(table oid, column number)} of core/colbool.py CB_PAIRS}; a result with a column not looked up yet (a new database,
+# a restore, a column added by a step) makes Conn._pgx read the catalogue once more before the first row is made.
+BOOL_OID = 16
+_CB = {}
+_CB_LOCK = threading.Lock()
+
+
+def _cb_key(pg):
+    i = pg.info
+    return (i.host, i.port, i.dbname)
+
+
+def _cb_cols(cursor):
+    """((index, table oid, column number), ...) of the BOOLEAN columns of the cursor's result that come straight from a table."""
+    desc = cursor.description
+    if not desc or not any(d.type_code == BOOL_OID for d in desc):
+        return ()
+    res = cursor.pgresult
+    if res is None:
+        return ()
+    return tuple((i, res.ftable(i), res.ftablecol(i)) for i, d in enumerate(desc) if d.type_code == BOOL_OID and res.ftable(i))
+
+
+def cb_seen(pg, cur):
+    """After a statement: a BOOLEAN of a table not looked up yet -> read the catalogue (core/colbool.py CB_PAIRS) on the same
+    driver connection, before the caller fetches the first row."""
+    cols = _cb_cols(cur)
+    if not cols:
+        return
+    key = _cb_key(pg)
+    st = _CB.get(key)
+    # review 2.1118 (F2): per column, not per table - a column added later (a step of the start) is looked up as well
+    if st is not None and all((t, a) in st["cols"] for _i, t, a in cols):
+        return
+    from .colbool import CB_PAIRS  # lazy: colbool imports this module
+    rows = pg.execute("SELECT c.oid, a.attnum, (c.relname || '.' || a.attname) = ANY(%s) FROM pg_class c "
+                      "JOIN pg_attribute a ON a.attrelid = c.oid "
+                      "WHERE c.relnamespace = (SELECT n.oid FROM pg_namespace n WHERE n.nspname = current_schema()) "
+                      "AND c.relkind IN ('r', 'p') AND a.attnum > 0 AND NOT a.attisdropped", (sorted(CB_PAIRS),)).fetchall()
+    with _CB_LOCK:  # review 2.1118 (F3): pairs from outside the schema (catalogue, temp tables) stay known, no lookup each time
+        old = (st or {}).get("cols", set())
+        _CB[key] = {"cols": {(int(r[0]), int(r[1])) for r in rows} | old | {(t, a) for _i, t, a in cols},
+                    "bits": frozenset((int(r[0]), int(r[1])) for r in rows if r[2])}
 
 
 # --- adapters: SQLite-like loose typing --------------------------------------------------------------------------------
@@ -311,13 +377,17 @@ class Conn:
         """2.149.0 B (#2504): one statement on the driver; inside a request (rt_begin) it is counted with its time."""
         st = getattr(_RT, "s", None)
         if st is None:
-            return self._pg.execute(sql, args)
+            cur = self._pg.execute(sql, args)
+            cb_seen(self._pg, cur)  # 2.1118.0 (#5952): the yes / no columns read as 0 / 1
+            return cur
         t0 = time.perf_counter()
         try:
-            return self._pg.execute(sql, args)
+            cur = self._pg.execute(sql, args)
         finally:
             st[0] += 1
             st[1] += time.perf_counter() - t0
+        cb_seen(self._pg, cur)
+        return cur
 
     def _begin(self):
         """Before every statement: the transaction must hold the context the statement needs (security rule of #3139). An

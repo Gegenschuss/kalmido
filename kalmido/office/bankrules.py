@@ -85,7 +85,7 @@ def _rule_dec(c, oid, r):
 
 def br_rules(c, oid, active=True):
     """The rules of area oid (decrypted), oldest first; active=True: only the ones switched on (not deleted either way)."""
-    q = "SELECT * FROM office_bank_rules WHERE org_id=? AND deleted_at IS NULL" + (" AND active=1" if active else "")
+    q = "SELECT * FROM office_bank_rules WHERE org_id=? AND deleted_at IS NULL" + (" AND active" if active else "")
     return [_rule_dec(c, oid, r) for r in c.execute(q + " ORDER BY id", (oid,)).fetchall()]
 
 

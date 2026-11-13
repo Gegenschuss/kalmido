@@ -210,7 +210,7 @@ def folder_tpl_info(c, owner, f):
                       (p["user_id"],)).fetchone() if p["folder"] == f else None
         if r is not None:
             people.append({"user_id": r["id"], "name": r["display_name"] or r["username"], "own": _row_out(own.get(r["id"]))})
-    lids = [r["id"] for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (owner,)).fetchall()
+    lids = [r["id"] for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND NOT is_inbox", (owner,)).fetchall()
             if _in_folder(r["folder"] or "", f)]
     own_lists = [r["ref_id"] for r in ncap_rows_of(c, "list", lids, (0,))]  # 2.981.0 (#5287)
     eff = _row_out(own.get(0)) or {"tpl": inh["tpl"], "custom": inh["custom"]}
@@ -289,7 +289,7 @@ def _fpeople(c, owner, f):
 
 
 def _my_folder(c, f):
-    return any(_in_folder(r[0] or "", f) for r in c.execute("SELECT folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),))) or \
+    return any(_in_folder(r[0] or "", f) for r in c.execute("SELECT folder FROM lists WHERE owner_id=? AND NOT is_inbox", (me(),))) or \
         bool(_fpeople(c, me(), f))  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
 
 
@@ -326,7 +326,7 @@ def folder_tpl_put():
         else:
             ncap_put(c, "folder", me(), f, uid, tpl, cust)
     if b.get("reset_lists") is True:
-        for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall():
+        for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND NOT is_inbox", (me(),)).fetchall():
             if _in_folder(r["folder"] or "", f):
                 ncap_drop(c, "list", r["id"], "", 0)
     uset(c, me(), "notif_tpl_ask", "0")

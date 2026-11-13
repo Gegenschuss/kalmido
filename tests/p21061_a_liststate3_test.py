@@ -73,8 +73,8 @@ check(bool(TOK), "setup: an API token of the person without an organisation")
 
 trigger(False)
 try:
-    dbx("UPDATE lists SET archived=0 WHERE id IN (?, ?)", (PA, PO))
-    dbx("UPDATE lists SET archived=1 WHERE id=?", (PL,))
+    dbx("UPDATE lists SET archived=false WHERE id IN (?, ?)", (PA, PO))
+    dbx("UPDATE lists SET archived=true WHERE id=?", (PL,))
     check(row(PA)[:2] == ("archived", 0) and row(PL)[:2] == ("live", 1), f"setup: the old column the other way round {row(PA)} {row(PL)}")
 
     # ------------------------------------------------------------ what the app and the API show
@@ -103,8 +103,8 @@ try:
     check(r.ok and row(PA)[0] == "archived" and row(PA)[3], f"an archived project (by the marker) goes into the trash {r.status_code} {row(PA)}")
 finally:
     # the old column as the marker says again, then the trigger on (a write that leaves the marker reads archived)
-    dbx("UPDATE lists SET archived=1 WHERE id IN (?, ?)", (PA, PO))
-    dbx("UPDATE lists SET archived=0 WHERE id=?", (PL,))
+    dbx("UPDATE lists SET archived=true WHERE id IN (?, ?)", (PA, PO))
+    dbx("UPDATE lists SET archived=false WHERE id=?", (PL,))
     trigger(True)
 
 # ------------------------------------------------------------ the database value of a project in the trash
@@ -117,7 +117,7 @@ check(f"({int(PA)}, 1, 1)" in out and f"({int(PL)}, 0, 0)" in out, f"in the tras
 from_app = in_app('from kalmido.core.access import list_archived_sql\nlist_archived_sql("l; DROP")')
 check("invalid alias" in from_app, f"list_archived_sql refuses an alias that is no name {from_app[-200:]}")
 
-bad = dbx("""SELECT id, state, archived FROM lists WHERE (state='archived' AND archived=0) OR (state='live' AND archived<>0)""")
+bad = dbx("""SELECT id, state, archived FROM lists WHERE (state='archived' AND NOT archived) OR (state='live' AND archived)""")
 check(not bad, f"the trigger on again: archived agrees with the marker {bad[:3]}")
 
 sys.exit(done("p21061_a_liststate3"))

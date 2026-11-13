@@ -107,7 +107,7 @@ def fill(list_ids, per, users, tag_uid):
 
 
 fill(lids, 103, [aid, uid["bob"], uid["dave"]], uid["bob"])
-kt.dbx(f"UPDATE tasks SET pinned=1 WHERE list_id={lids[5]} AND id % 50 = 0")
+kt.dbx(f"UPDATE tasks SET pinned=true WHERE list_id={lids[5]} AND id % 50 = 0")
 kt.dbx(f"UPDATE tasks SET waiting_at='2026-01-01T10:00:00' WHERE list_id={lids[6]} AND id % 40 = 0")
 # subtasks (an undated subtask of a task due soon must come along, a due subtask brings its parent)
 kt.dbx(f"""UPDATE tasks t SET parent_id=p.id FROM tasks p WHERE t.list_id={lids[7]} AND p.list_id={lids[7]} AND p.id = t.id - 1

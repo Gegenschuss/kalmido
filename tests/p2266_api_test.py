@@ -195,7 +195,7 @@ check(A.patch(B + f"/api/users/{DAVE}", json={"disabled": True}).ok, "an admin d
 check(mail_to("dave@example.com", "deactivated"), "#2963: dave hears of it")
 r = A.post(B + "/api/users", json={"username": "erin", "display_name": "Erin", "password": "password123", "email": "erin@example.com"})
 ERIN = r.json()["id"]
-sql("UPDATE users SET signup='pending', disabled=1 WHERE id=?", (ERIN,), write=True)
+sql("UPDATE users SET signup='pending', disabled=true WHERE id=?", (ERIN,), write=True)
 check(A.post(B + f"/api/users/{ERIN}/approve").ok, "an admin approves erin's registration")
 check(mail_to("erin@example.com", "approved"), "#2963: erin learns it by mail")
 check(not [m for m in mails() if "Your account was deactivated" in m["subject"] and "erin@example.com" in m["to"]],

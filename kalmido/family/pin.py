@@ -133,7 +133,7 @@ def pin_unlock():
         return jsonify(error=tr("Wrong PIN"), left=PIN_TRIES - fails), 403
     c.execute("UPDATE kid_pins SET fails=0, lock_until=? WHERE kid_id=?", (iso(now + timedelta(seconds=PIN_LOCK)), uid))
     who = user_names(c, [uid]).get(uid, "?")
-    adm = [x[0] for x in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0")]
+    adm = [x[0] for x in c.execute("SELECT id FROM users WHERE is_admin AND NOT disabled")]
     adm = [x for x in adm if h6a_admin_kid_ok(c, x, uid)]  # 2.86.0 (N8): only admins of the kid's own organisation
     g.pushes = []
     for p in dict.fromkeys(kid_parents(c, uid) or adm):

@@ -120,9 +120,9 @@ def dsp_resources(c, uid, oid):
     if not ofr_allows(c, uid, oid, "equipment"):  # 2.187.0 C (#2476): office groups without the equipment area
         return {"people": people, "contacts": contacts, "equipment": [], "sets": []}
     eq = [{"kind": "equipment", "id": r["id"], "name": r["name"], "category": r["category"] or ""} for r in c.execute(
-        f"SELECT id, name, category FROM office_equipment WHERE org_id=? AND archived=0 AND {live_sql()} ORDER BY lower(category), lower(name), id", (oid,))]
+        f"SELECT id, name, category FROM office_equipment WHERE org_id=? AND NOT archived AND {live_sql()} ORDER BY lower(category), lower(name), id", (oid,))]
     sets = [{"kind": "set", "id": r["id"], "name": r["name"], "items": _set_items(r["items"])} for r in c.execute(
-        f"SELECT id, name, items FROM office_sets WHERE org_id=? AND archived=0 AND {live_sql()} ORDER BY lower(name), id", (oid,))]
+        f"SELECT id, name, items FROM office_sets WHERE org_id=? AND NOT archived AND {live_sql()} ORDER BY lower(name), id", (oid,))]
     return {"people": people, "contacts": contacts, "equipment": eq, "sets": sets}
 
 

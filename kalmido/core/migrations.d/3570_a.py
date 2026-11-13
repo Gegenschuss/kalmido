@@ -8,5 +8,5 @@ Way back (review F6): before an older version starts on this database, remove th
     DELETE FROM org_joins WHERE silent=1
 (the column itself may stay; the admins' lists then just lack those rows)."""
 AFTER = [
-    "ALTER TABLE org_joins ADD COLUMN IF NOT EXISTS silent BIGINT NOT NULL DEFAULT 0",
+    "ALTER TABLE org_joins ADD COLUMN IF NOT EXISTS silent BOOLEAN NOT NULL DEFAULT false",
 ]

@@ -255,7 +255,7 @@ def _find(c, token):
         return None
     with system_ctx(c):  # 2.37.0 (#1150): resolve the token (one row) across organisations ...
         r = c.execute(f"""SELECT f.*, l.owner_id AS l_owner, l.name AS l_name, l.org_id AS l_org FROM forms f JOIN lists l ON l.id=f.list_id
-                         JOIN users u ON u.id=l.owner_id WHERE f.token_hash=? AND f.enabled=1 AND u.disabled=0 AND {list_state_sql('l')}""",  # 2.148.1 D (#2495): a list in the trash takes nothing in (2.1029.0 #5537: in the state)
+                         JOIN users u ON u.id=l.owner_id WHERE f.token_hash=? AND f.enabled AND NOT u.disabled AND {list_state_sql('l')}""",  # 2.148.1 D (#2495): a list in the trash takes nothing in (2.1029.0 #5537: in the state)
                       (_token_hash(token),)).fetchone()
     if r is not None and g.user and r["access"] == "public" and r["l_org"]:
         if r["l_org"] not in user_orgs_full(c, g.user["id"], write=True):  # 2.143.0 A (#2151, review): limited roles = visitor

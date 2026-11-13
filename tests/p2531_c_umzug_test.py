@@ -104,7 +104,7 @@ check(sorted(r.get("name") for r in cl) == ["Otto", "Paula"] and all(len(r.get("
 check("kim@example.com" not in json.dumps(kp) and "otto@example.com" not in json.dumps(cl), "F12 never another person's address")
 
 # ---- the import by hanna (paula has no account hanna may see any more)
-kt.dbx("UPDATE users SET disabled=1 WHERE id=?", (PID,))
+kt.dbx("UPDATE users SET disabled=true WHERE id=?", (PID,))
 iid, j = upload(H, ZIP)
 check(j.get("state") == "preview", f"preview {j.get('state')} {j.get('error')}")
 nt = {x.get("what"): x.get("count") for x in (j.get("preview") or {}).get("not_taken") or []}

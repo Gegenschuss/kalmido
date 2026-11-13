@@ -95,7 +95,7 @@ def abo_people(c, oid):
     if not ids:
         return []
     out = []
-    for u in c.execute(f"SELECT * FROM users WHERE id IN ({','.join('?' * len(ids))}) AND disabled=0", ids).fetchall():
+    for u in c.execute(f"SELECT * FROM users WHERE id IN ({','.join('?' * len(ids))}) AND NOT disabled", ids).fetchall():
         ks = u.keys()
         if ("kind" in ks and u["kind"] == "agent") or ("kid" in ks and u["kid"]):
             continue

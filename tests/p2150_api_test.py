@@ -113,7 +113,10 @@ for u in ("bob", "carol"):
 Bo, Ca = sess("bob"), sess("carol")
 
 # ================================================================== #632: the inbox in the new person's language
-inbox = lambda uid: dbx("SELECT name FROM lists WHERE owner_id=? AND is_inbox=1", (uid,))[0][0]
+def inbox(uid):
+    return dbx("SELECT name FROM lists WHERE owner_id=? AND is_inbox", (uid,))[0][0]
+
+
 check(inbox(ids["bob"]) == "Basket", f"#632: admin language en -> the new user's inbox is 'Basket' (2.39.1) ({inbox(ids['bob'])})")
 r = A.post(B + "/api/users", json={"username": "dora", "display_name": "Dora", "password": "password123", "lang": "de"})
 check(r.ok and inbox(r.json()["id"]) == "Eingang", "#632: lang de -> 'Eingang'")

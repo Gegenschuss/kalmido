@@ -276,7 +276,7 @@ def _card(c, uid, cid, write=True):
 def _org_members(c, oid):
     return [{"id": r[0], "name": r[1]} for r in c.execute(
         "SELECT u.id, COALESCE(NULLIF(u.display_name,''), u.username) FROM org_members m JOIN users u ON u.id=m.user_id "
-        "WHERE m.org_id=? AND u.disabled=0 AND COALESCE(u.kind,'')!='agent' ORDER BY 2, 1", (oid,))]
+        "WHERE m.org_id=? AND NOT u.disabled AND COALESCE(u.kind,'')!='agent' ORDER BY 2, 1", (oid,))]
 
 
 def _clean_people(c, oid, v):

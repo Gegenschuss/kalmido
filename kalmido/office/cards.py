@@ -83,7 +83,7 @@ def _members(c, oid):
             rows = c.execute("SELECT id, display_name, username FROM users WHERE id=?", (owner,)).fetchall()
         else:
             rows = c.execute("SELECT u.id, u.display_name, u.username FROM org_members m JOIN users u ON u.id=m.user_id "
-                             "WHERE m.org_id=? AND u.disabled=0 AND COALESCE(u.kind, 'user')<>'agent' ORDER BY 2, 3", (oid,)).fetchall()
+                             "WHERE m.org_id=? AND NOT u.disabled AND COALESCE(u.kind, 'user')<>'agent' ORDER BY 2, 3", (oid,)).fetchall()
     return [{"id": r["id"], "name": r["display_name"] or r["username"]} for r in rows]
 
 

@@ -645,13 +645,20 @@ bad = ["RESET ROLE", "RESET ALL", "RESET SESSION AUTHORIZATION", "SET ROLE kalmi
        "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET (pg_attver=12345, n_distinct=-1)",
        "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET (n_distinct=-1)",
        "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET (pg_attver=-1)",
-       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET (pg_attver=pg_sleep(1))"]
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET (pg_attver=pg_sleep(1))",
+       # 2.1118.0 (#5952): the bare boolean condition takes one plain column name, nothing else
+       "CREATE INDEX i ON public.t USING btree (a) WHERE enabled OR pg_sleep(1) IS NULL",
+       "CREATE INDEX i ON public.t USING btree (a) WHERE pg_sleep(1)"]
 good = ["CREATE TABLE public.t (id bigint NOT NULL, title text DEFAULT ''::text NOT NULL)", "SET row_security = on",
         "ALTER TABLE ONLY public.lists FORCE ROW LEVEL SECURITY", "SELECT pg_catalog.setval('public.tasks_id_seq', 5, true)",
         "CREATE INDEX m ON public.chat USING gin (public.kalmido_fold(body) public.gin_trgm_ops)",
         "CREATE TABLE public.t2 (a character varying(8) DEFAULT ''::character varying, b numeric(14,4) DEFAULT 0 NOT NULL)",
         "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET (pg_attver=33554432)",
-        "ALTER TABLE ONLY public.\"order\" ALTER COLUMN \"desc\" SET (pg_attver=1)"]
+        "ALTER TABLE ONLY public.\"order\" ALTER COLUMN \"desc\" SET (pg_attver=1)",
+        # 2.1118.0 (#5952): pg_dump writes a partial index on a BOOLEAN column without brackets (core/schema.py agent_schedules_due)
+        "CREATE INDEX agent_schedules_due ON public.agent_schedules USING btree (next_at) WHERE enabled",
+        "CREATE UNIQUE INDEX office_bank_accounts_default ON public.office_bank_accounts USING btree (org_id) WHERE is_default",
+        "CREATE INDEX x_live ON public.t USING btree (a) WHERE (NOT archived)"]
 print(json.dumps({"bad_ok": [s for s in bad if ok(s)], "good_refused": [s for s in good if not ok(s)]}))
 """
 # 2.165.4: importing the app in a second process may meet the running server's start-up DDL (Postgres deadlock on CI): try again

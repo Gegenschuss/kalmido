@@ -229,7 +229,7 @@ Dv.delete(B + f"/api/account/import/{iid}")
 # ---------------------------------------------------------------- 2.360.2 M (#2561): a NEW account joins by accepting, too
 dbx("DELETE FROM org_members WHERE user_id=?", (GINA,))
 dbx("DELETE FROM users WHERE id=?", (GINA,))
-dbx("UPDATE users SET is_admin=1 WHERE id=?", (DAVE,))  # missing people are invited by instance admins
+dbx("UPDATE users SET is_admin=true WHERE id=?", (DAVE,))  # missing people are invited by instance admins
 iid, pv = opened(Dv, OX, RK)
 j = run(Dv, iid, GAMMA, people={EH("gina@example.com"): {"invite": True, "email": "gina@example.com", "role": "admin"}}, again=True)
 st = {p.get("name"): p.get("state") for p in (j.get("result") or {}).get("people", [])}
@@ -252,7 +252,7 @@ check(r.ok, f"the import is undone {r.status_code} {r.text[:200]}")
 check(not one("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, NG)), "the undo withdraws the invitation")
 check(json.loads(one("SELECT pending_lists FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, CAROL)) or "[]") == [[2, "edit", BOB]], "#3132: the undo drops only its own notes")
 Dv.delete(B + f"/api/account/import/{iid}")
-dbx("UPDATE users SET is_admin=0 WHERE id=?", (DAVE,))
+dbx("UPDATE users SET is_admin=false WHERE id=?", (DAVE,))
 
 # ---------------------------------------------------------------- P4: a person without organisation, into the private workspace
 FID, Fr = freelancer(B, A)

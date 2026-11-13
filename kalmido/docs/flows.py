@@ -71,7 +71,7 @@ def _ws_people(c, ws):
     oid = S.ws_org(ws)
     if not oid:
         return {S.ws_user(ws)}
-    return {r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND u.disabled=0", (oid,))}
+    return {r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND NOT u.disabled", (oid,))}
 
 
 def fl_people(c, ws):
@@ -217,7 +217,7 @@ def _extra(c, nid, r, levels=None):
     if r.get("task"):
         t = r["task"]
         to = t.get("to") or r.get("_by")
-        if to and fs_role(c, nid, to) and c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0 AND kind<>'agent'", (to,)).fetchone():
+        if to and fs_role(c, nid, to) and c.execute("SELECT 1 FROM users WHERE id=? AND NOT disabled AND kind<>'agent'", (to,)).fetchone():
             sender = S.label_name(c, ws, "sender", m["sender_id"])
             typ = S.label_name(c, ws, "type", m["type_id"])
             title = (t.get("title") or " ".join(x for x in (typ or "", sender or "") if x).strip() or node["name"])
@@ -253,7 +253,7 @@ def _share(c, node, r):
     from ..core.objects import obj_node_share
     if acx_of(c, uid).role == "agent" or not acx_org_ok(c, uid, node["org_id"]):
         return []
-    if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone():
+    if not c.execute("SELECT 1 FROM users WHERE id=? AND NOT disabled", (uid,)).fetchone():
         return []
     if fs_role(c, node["id"], uid) != "owner" and not fs_area_share(c, uid, node):
         return []

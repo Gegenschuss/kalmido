@@ -72,20 +72,20 @@ dbx("UPDATE lists SET state='archived' WHERE id=?", (P2,))
 check(row(P2)[:2] == ("archived", 1), f"the marker written to 'archived': archived=1 for a version before {row(P2)}")
 dbx("UPDATE lists SET state='live' WHERE id=?", (P2,))
 check(row(P2)[:2] == ("live", 0), f"the marker written to 'live': archived=0 {row(P2)}")
-dbx("UPDATE lists SET archived=1 WHERE id=?", (P2,))
+dbx("UPDATE lists SET archived=true WHERE id=?", (P2,))
 check(row(P2)[:2] == ("archived", 1), f"archived written alone (a version before, the undo): the marker follows {row(P2)}")
 dbx("UPDATE lists SET state='trash' WHERE id=?", (P2,))
 check(row(P2)[:2] == ("archived", 1), f"state='trash' written by hand decides nothing (the trash is deleted_at) {row(P2)}")
-dbx("UPDATE lists SET archived=0, state='archived' WHERE id=?", (P2,))
+dbx("UPDATE lists SET archived=false, state='archived' WHERE id=?", (P2,))
 check(row(P2)[:2] == ("live", 0), f"both in one write, the marker as it was (a copy of a row): archived decides, never apart {row(P2)}")
-dbx("UPDATE lists SET archived=0, state='archived' WHERE id=?", (P2,))
+dbx("UPDATE lists SET archived=false, state='archived' WHERE id=?", (P2,))
 check(row(P2)[:2] == ("archived", 1), f"both in one write, the marker changed: the marker decides {row(P2)}")
 
 ins = dbx("INSERT INTO lists (name, created_at, owner_id, state) VALUES ('Example Copy A', '2026-01-02T03:04:05+00:00', ?, 'archived') RETURNING id",
           (FID,))
 I1 = ins[0][0] if ins else None
 check(I1 and row(I1)[:2] == ("archived", 1), f"an INSERT naming state 'archived' gets archived=1 {I1 and row(I1)}")
-ins = dbx("INSERT INTO lists (name, created_at, owner_id, archived) VALUES ('Example Copy B', '2026-01-02T03:04:05+00:00', ?, 1) RETURNING id",
+ins = dbx("INSERT INTO lists (name, created_at, owner_id, archived) VALUES ('Example Copy B', '2026-01-02T03:04:05+00:00', ?, true) RETURNING id",
           (FID,))
 I2 = ins[0][0] if ins else None
 check(I2 and row(I2)[:2] == ("archived", 1), f"an INSERT naming archived=1 (an older row) gets 'archived' {I2 and row(I2)}")
@@ -106,7 +106,7 @@ dbxm.connect(os.path.join(kt.DATA, "tasks.db")).executescript(OLD + "\n")
 check("NOT IN ('0', '') THEN 'archived' ELSE 'live' END;\n  RETURN NEW" in (dbx("SELECT prosrc FROM pg_proc WHERE proname='kalmido_list_state'") or [[""]])[0][0],
       "setup: the trigger of stage 1 back (a version before)")
 check(row(P3)[:2] == ("archived", 1), f"a row this version archived reads archived for the version before {row(P3)}")
-dbx("UPDATE lists SET archived=0, archived_at=NULL WHERE id=?", (P3,))
+dbx("UPDATE lists SET archived=false, archived_at=NULL WHERE id=?", (P3,))
 check(row(P3)[:3] == ("live", 0, None), f"the version before restores it its way: the marker follows {row(P3)}")
 ns = {}
 FRAG = os.path.join(N, "..", "kalmido", "core", "migrations.d", "5537_a.py")
@@ -162,8 +162,8 @@ if QN:
           f"the quick notes come back from the archive through the marker {r.text[:120]} {row(QN)}")
 
 # ---------------------------------------------------------------- the whole table
-bad = dbx("""SELECT id, state, archived FROM lists WHERE (state='archived' AND archived=0) OR (state='live' AND archived<>0)
-             OR state IS DISTINCT FROM (CASE WHEN deleted_at IS NOT NULL THEN 'trash' WHEN archived <> 0 THEN 'archived' ELSE 'live' END)""")
+bad = dbx("""SELECT id, state, archived FROM lists WHERE (state='archived' AND NOT archived) OR (state='live' AND archived)
+             OR state IS DISTINCT FROM (CASE WHEN deleted_at IS NOT NULL THEN 'trash' WHEN archived THEN 'archived' ELSE 'live' END)""")
 n = dbx("SELECT COUNT(*) FROM lists")[0][0]
 check(n >= 7 and not bad, f"every project: archived agrees with the marker ({n} rows) {bad[:3]}")
 

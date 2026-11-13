@@ -202,7 +202,7 @@ check(A.patch(B + f"/api/tasks/{TP}", json={"fields": {str(F): 1200}}).ok, "setu
 sql("INSERT INTO obj_tags(scope_kind, scope_id, name, color, sort, created_at) VALUES('list',?,?,?,?,?)", (str(LP), "urgent", "", 0, OLD))
 TG = one("SELECT id FROM obj_tags WHERE scope_kind='list' AND scope_id=?", (str(LP),))
 sql("INSERT INTO obj_tag_links(tag_id, kind, obj_id) VALUES(?,'task',?)", (TG, TP))
-INBOX = one("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (A_ID,))
+INBOX = one("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (A_ID,))
 out = in_app(f"from kalmido.core.pg import system_ctx\nfrom kalmido.lists.lists import list_purge\nwith system_ctx(c):\n    list_purge(c, {LP}, {INBOX})\nc.commit()\nprint('ok')")
 check("ok" in out and "Traceback" not in out, "list_purge ran " + out[-600:])
 nf = one("SELECT id FROM list_fields WHERE list_id=? AND name='Budget' AND type='number'", (INBOX,))
@@ -221,7 +221,7 @@ check(A.put(B + f"/api/lists/{LQ}/members", json={"user_id": BOB, "role": "edit"
 FS = A.post(B + f"/api/lists/{LQ}/fields", json={"name": "Status", "type": "select", "options": {"options": [
     {"id": "op1", "name": "Open"}, {"id": "dn1", "name": "Done"}]}}).json()["id"]
 FPN = A.post(B + f"/api/lists/{LQ}/fields", json={"name": "Owner", "type": "person"}).json()["id"]
-sql("INSERT INTO list_fields(list_id, name, type, options, pinned, sort, created_at) VALUES(?,?,?,?,0,0,?)",
+sql("INSERT INTO list_fields(list_id, name, type, options, pinned, sort, created_at) VALUES(?,?,?,?,false,0,?)",
     (INBOX, "Status", "select", json.dumps({"options": [{"id": "zz9", "name": "done"}]}), OLD))
 IFS = one("SELECT id FROM list_fields WHERE list_id=? AND name='Status'", (INBOX,))
 TQ1 = A.post(B + "/api/tasks", json={"title": "Q one", "list_id": LQ}).json()["id"]

@@ -130,7 +130,7 @@ const subs = (md, sec) => [...md.querySelectorAll(`[data-pane="${sec}"] [data-ad
   // ================= the organisation's admin (no server admin)
   // 2.464.0 (#3882): a registration by the organisation's domain waits: its admin decides it in the person's row
   uid.pia = (await call('POST', '/api/users', {username: 'pia', display_name: 'Pia', password: 'password123', email: 'pia@example.com', orgs: [{id: ORG, role: 'member'}]})).id;
-  execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE users SET signup='pending', disabled=1 WHERE id=?", JSON.stringify([uid.pia])]);
+  execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE users SET signup='pending', disabled=true WHERE id=?", JSON.stringify([uid.pia])]);
   w = await boot({user: 'olga'}); d = w.document;
   w.eval(`settingsModal('org')`);
   md = await until(() => d.querySelector('.smodal'));

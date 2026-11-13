@@ -83,7 +83,7 @@ for d in ("2026-01-03", "2026-01-04"):
     kt.dbx("INSERT INTO journal(user_id, day, text, updated_at) VALUES(?, ?, 'Eintrag', ?)", (FID, d, TS))
 check(Fr.post(B + "/api/bookmarks", json={"url": "https://www.example.com/umzug"}).status_code in (200, 201), "a bookmark")
 check(Fr.post(B + "/api/layouts/saved", json={"key": "view_today", "name": "Fokus", "layout": LAYOUT}).ok, "a saved arrangement")
-kt.dbx("""INSERT INTO pomos(user_id, kind, minutes, start, "end", done, notified) VALUES(?, 'focus', 25, ?, ?, 1, 1)""",
+kt.dbx("""INSERT INTO pomos(user_id, kind, minutes, start, "end", done, notified) VALUES(?, 'focus', 25, ?, ?, true, 1)""",
        (FID, TS, "2026-01-05T10:25:00+00:00"))
 for n in ("Kalender still", "Kalender belebt"):
     r = Fr.post(B + "/api/evcals", json={"name": n, "org_id": None})

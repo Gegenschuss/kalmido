@@ -232,7 +232,7 @@ def v1_letter_list():
         raise BadInput(tr("Invalid value: {0}", "status"))
     c = db()
     aid, oid, uid = _v1ctx(c, a.get("requested_by"))
-    sql, args = "SELECT id FROM office_letters WHERE org_id=? AND agent_id=? AND archived=0", [oid, aid]
+    sql, args = "SELECT id FROM office_letters WHERE org_id=? AND agent_id=? AND NOT archived", [oid, aid]
     if st != "all":
         sql += " AND status=?"
         args.append(st)

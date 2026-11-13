@@ -2049,7 +2049,7 @@ def imp_user_match(c, a, people):
     if not a or not people:
         return None
     q = ",".join("?" * len(people))
-    us = c.execute(f"SELECT id, username, display_name, email FROM users WHERE disabled=0 AND id IN ({q})", list(people)).fetchall()
+    us = c.execute(f"SELECT id, username, display_name, email FROM users WHERE NOT disabled AND id IN ({q})", list(people)).fetchall()
     for key, col in (("email", "email"), ("username", "username"), ("name", "display_name"), ("name", "username")):
         v = (a.get(key) or "").strip().lower()
         if v:
@@ -2162,7 +2162,7 @@ def imp_run(c, uid, plan, opts, dry):
     s_all = usettings(c, uid)
     base_t = s_all.get("allday_time") or "09:00"
     own, space = {}, opts.get("space", False)
-    for r in c.execute(f"SELECT id, name, org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND {list_state_sql()} AND e2e IS NULL ORDER BY id", (uid,)):
+    for r in c.execute(f"SELECT id, name, org_id FROM lists WHERE owner_id=? AND NOT is_inbox AND {list_state_sql()} AND e2e IS NULL ORDER BY id", (uid,)):
         if space is False or r["org_id"] == space:  # 2.87.9 (#1940): a chosen workspace reuses only its own lists
             own.setdefault(r["name"], r["id"])  # 2.64.1 B (#1817): never into a list with the lock (a new list of that name instead)
     tl = token_lists()
@@ -2539,7 +2539,7 @@ def imp_undo_lists(c, uid, lids, back, since):
     since (imp_budget_touched), else it goes with all its rows."""
     backs, went, n, kept = set(back), set(), 0, 0
     for lid in lids:
-        r = c.execute("SELECT id, deleted_at, life FROM lists WHERE id=? AND owner_id=? AND is_inbox=0", (lid, uid)).fetchone()
+        r = c.execute("SELECT id, deleted_at, life FROM lists WHERE id=? AND owner_id=? AND NOT is_inbox", (lid, uid)).fetchone()
         if not r or r["deleted_at"]:
             continue
         live = [x[0] for x in c.execute("SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL", (lid,))]

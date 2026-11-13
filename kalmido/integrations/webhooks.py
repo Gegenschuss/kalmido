@@ -296,7 +296,7 @@ def wh_enqueue(c, n, by=None):
     """by = (actor, via) of a change without a request (2.392.0 B, #3364: the git poll), else the current request's."""
     diffs = g.pop("wh_diff", None) if has_request_context() else None  # 2.574.0 (#3376): tasks/validation.py log_changes
     hooks = c.execute("""SELECT w.* FROM webhooks w JOIN users u ON u.id=w.user_id
-                         WHERE w.enabled=1 AND u.disabled=0 AND w.agent=0 ORDER BY w.id""").fetchall()
+                         WHERE w.enabled AND NOT u.disabled AND w.agent=0 ORDER BY w.id""").fetchall()
     hooks = who_admin_ok(c, hooks)  # 2.115.0 A (#2061): an organisation's webhook only while its creator is an admin there
     if not hooks:
         return
@@ -482,7 +482,7 @@ def who_admin_ok(c, hooks):
     for w in hooks:
         if w["org_id"] and org_role(c, w["user_id"], w["org_id"]) != "admin":
             c.execute("DELETE FROM webhook_queue WHERE webhook_id=?", (w["id"],))
-            c.execute("UPDATE webhooks SET enabled=0, disabled_reason='admin', updated_at=? WHERE id=?", (iso(now_utc()), w["id"]))
+            c.execute("UPDATE webhooks SET enabled=false, disabled_reason='admin', updated_at=? WHERE id=?", (iso(now_utc()), w["id"]))
             wh_off_tell(c, w, "webhook_admin")
             continue
         out.append(w)
@@ -516,7 +516,7 @@ def wh_tick():
         c = connect()
         try:
             c.execute("""DELETE FROM webhook_queue WHERE webhook_id IN (SELECT w.id FROM webhooks w JOIN users u ON u.id=w.user_id
-                         WHERE w.enabled=0 OR u.disabled=1)""")
+                         WHERE NOT w.enabled OR u.disabled)""")
             c.commit()
             # 2.658.0 (#4193): the batch takes the waiting deliveries in turns over the webhooks (the first of each, then the
             # second of each, ...; in its own order within one webhook), so 500 waiting ones of a dead webhook no longer stand
@@ -566,7 +566,7 @@ def wh_result(c, r, res):
                 chat_delivered(c, w["user_id"], chat_event_mids([json.loads(r["payload"])]))
     elif att > len(WH_BACKOFF):  # the last retry failed: turn the webhook off, tell the admins
         c.execute("DELETE FROM webhook_queue WHERE webhook_id=?", (w["id"],))
-        c.execute("UPDATE webhooks SET enabled=0, disabled_reason='failures', updated_at=? WHERE id=?", (iso(now_utc()), w["id"]))
+        c.execute("UPDATE webhooks SET enabled=false, disabled_reason='failures', updated_at=? WHERE id=?", (iso(now_utc()), w["id"]))
         print(f"webhook {w['id']} of user {w['user_id']} turned off after {att} failed attempts ({errc} {status or ''})", flush=True)
         aa_now("integration", f"webhook:{w['id']}", N_("Webhook {0} of {1} was switched off after {2} failed attempts to deliver an event (last error: {3})."),
                [w["id"], w["username"], att, errc + (f" {status}" if status else "")])

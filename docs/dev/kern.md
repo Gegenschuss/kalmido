@@ -43,6 +43,14 @@ turns an older database at the start); the other old time, yes / no and JSON col
 `tools/coltypes_baseline.txt`). SQL that must work for both types: `CAST(x AS text) = ''` instead of `x = ''`, `ct_day(x)` for
 the day instead of `substr(x, 1, 10)`, `ct_iso(x)` for a key or mark that Python compares with a value it read, and a TEXT time
 compared with a `TIMESTAMPTZ` one is cast on its own side (`NULLIF(t.completed_at, '')::timestamptz`).
+Yes / no is `BOOLEAN`. Since 2.1118.0 (#5952) the old 0/1 columns (`archived`, `enabled`, `active`, `pinned`, `is_default`,
+`users.disabled` / `is_admin`, ... the list is `CB_BOOL` in `kalmido/core/colbool.py`, which turns an older database at the
+start) are `BOOLEAN` too. The driver still hands exactly those columns back as `0` / `1` (`kalmido/core/pg.py`, by the table
+and column a value comes from), so answers and the agents' API keep their numbers; any other `BOOLEAN` (and one computed in
+SQL) reads as `True` / `False`. A `?` parameter `0` / `1` / `True` / `False` writes either. SQL text uses the boolean:
+`NOT archived` / `archived` (never `archived = 0` or `COALESCE(archived, 0)`), `true` / `false` in INSERT / UPDATE text,
+`CAST(x AS INTEGER)` where a number is summed or selected through an expression (`SUM`, `MAX`, `COALESCE`, `CASE`), so Python
+still gets `0` / `1` there.
 Since 2.1111.0 (#5953) the JSON columns of the areas are `JSONB` too (`CT_JSON` in `kalmido/core/coltype.py` turns an older
 database at the start; kept as `TEXT` with `coltype-ok`: the columns sealed as a whole, `office_docs.totals` of the hash chain,
 `budget_meta.mappings`). Python reads them as JSON text as before (`json.loads`), but in JSONB's own form (keys by length, `", "`

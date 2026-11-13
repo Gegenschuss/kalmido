@@ -151,7 +151,7 @@ def efb_spans(c, uid, day, zone, skip=None, orgs=None):
             if not o["all_day"]:  # an occurrence moved to a whole day does not block either
                 clip(o["s"], o["e"], busy)
     if CAL_ON and orgs is None:  # 2.240.0 C (#2868): subscriptions are private sources
-        for r in c.execute("""SELECT e.start, e."end" FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id WHERE s.user_id=? AND s.visible=1
+        for r in c.execute("""SELECT e.start, e."end" FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id WHERE s.user_id=? AND s.visible
                               AND e.all_day=0 AND e.d1>=? AND e.d0<=?""", (uid, lo.isoformat(), hi.isoformat())):
             s, e = parse_iso(r[0]), parse_iso(r[1])
             if s and e:

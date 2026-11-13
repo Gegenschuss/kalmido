@@ -122,11 +122,11 @@ assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "
 r = A.get(B + "/api/wiki/shares", params={"page": op})
 check(r.ok and not any(x["ended"] for x in r.json()["shares"]) and anon(f"/s/w/{btok}").status_code == 200,
       "#2358: back in the organisation the link is live again")
-sql("UPDATE users SET disabled=1 WHERE id=?", (BOB,), write=True)
+sql("UPDATE users SET disabled=true WHERE id=?", (BOB,), write=True)
 r = A.get(B + "/api/wiki/shares", params={"page": op})
 check(r.ok and {x["id"]: x["ended"] for x in r.json()["shares"]}.get(blink["id"]) is True and anon(f"/s/w/{btok}").status_code == 404,
       "#2358: a disabled maker ends the link too")
-sql("UPDATE users SET disabled=0 WHERE id=?", (BOB,), write=True)
+sql("UPDATE users SET disabled=false WHERE id=?", (BOB,), write=True)
 # private workspace: unchanged (the owner's own links never end this way)
 pp = page(A, "private", "Notes", "private")
 r = share(A, page_id=pp, kind="link")

@@ -200,7 +200,7 @@ check(r.status_code == 400 and "team agent" in r.text, f"team agent with space p
 fu = requests.post(V + "/polls", headers=FPH, json={"title": "Owner check", "options": TIMES, "tz": "Europe/Berlin"}).json()["url"]
 fpath = "/s/v/" + fu.rsplit("/s/v/", 1)[1]
 check(requests.get(B + fpath).status_code == 200, "the link of her agent's poll opens while she is active")
-kt.dbx("UPDATE users SET disabled=1 WHERE id=?", (FRIDA,))
+kt.dbx("UPDATE users SET disabled=true WHERE id=?", (FRIDA,))
 check(requests.get(B + fpath).status_code == 404, "her account disabled: the link of her agent's poll closes (404)")
 
 print(f"p2484_a_polls_v1: {kt.OKS[0]} ok, {len(kt.FAILS)} failed")

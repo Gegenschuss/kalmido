@@ -51,7 +51,7 @@ def wl_people(c, uid, org=None):
         wo = int(ws[4:]) if ws.startswith("org:") and ws[4:].isdigit() else None
         orgs = [wo] if wo in mine else mine[:1]
     vis = visible_people(c, uid)
-    q = "SELECT * FROM users WHERE disabled=0 AND kid=0 AND COALESCE(kind,'user')!='agent'"
+    q = "SELECT * FROM users WHERE NOT disabled AND kid=0 AND COALESCE(kind,'user')!='agent'"
     if orgs:
         q += f" AND id IN (SELECT user_id FROM org_members WHERE org_id IN ({','.join(str(int(x)) for x in orgs)}))"
     rows = c.execute(q + " ORDER BY lower(display_name), id").fetchall()

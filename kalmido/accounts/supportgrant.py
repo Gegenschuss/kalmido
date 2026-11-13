@@ -55,7 +55,7 @@ def sga_open(c, uid=None, oid=None, note=True):
     with system_ctx(c):  # grants of other people's accounts and organisations: structure only, no content
         if oid:
             r = c.execute("SELECT s.id FROM support_grants s JOIN orgs o ON o.id=s.org_id JOIN org_members m ON m.org_id=s.org_id "
-                          "AND m.user_id=s.user_id AND m.role='admin' JOIN users u ON u.id=s.user_id AND u.disabled=0 "
+                          "AND m.user_id=s.user_id AND m.role='admin' JOIN users u ON u.id=s.user_id AND NOT u.disabled "
                           "WHERE s.org_id=? AND s.ended_at IS NULL AND s.ends_at>? "
                           "AND o.retired_at IS NULL ORDER BY s.id DESC LIMIT 1", (oid, now)).fetchone()
             if not r:  # a person's own office follows the person's account grant (P4)
@@ -110,7 +110,7 @@ def sga_link_support(c, uid):
         return ""
     with system_ctx(c):  # support grants of other accounts / organisations (row-level security): structure, no content
         r = c.execute("SELECT i.created_at FROM user_invites i JOIN users a ON a.id=i.created_by WHERE i.user_id=? AND i.kind='login' "
-                      "AND i.created_by<>i.user_id AND a.is_admin=1", (uid,)).fetchone()
+                      "AND i.created_by<>i.user_id AND a.is_admin", (uid,)).fetchone()
         if not r:
             return ""
         s = c.execute("SELECT MAX(ends_at) FROM support_grants WHERE user_id=? AND org_id IS NULL AND created_at<=? AND ends_at>=?",
@@ -141,7 +141,7 @@ def sga_close(c, r, now):
         since = min(since, r["created_at"])
         # review F6: only the operator's sign-in links and support sessions (a parent's / an organisation admin's link stays)
         c.execute("DELETE FROM user_invites WHERE user_id=? AND kind='login' AND created_at>=? AND created_by<>user_id "
-                  "AND created_by IN (SELECT id FROM users WHERE is_admin=1)", (r["user_id"], since))
+                  "AND created_by IN (SELECT id FROM users WHERE is_admin)", (r["user_id"], since))
         gone = [x[0] for x in c.execute("SELECT token_hash FROM sessions WHERE user_id=? AND via='support'", (r["user_id"],)).fetchall()]
     if gone:
         ses_end(c, r["user_id"], gone)

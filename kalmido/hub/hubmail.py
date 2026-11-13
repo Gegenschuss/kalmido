@@ -117,7 +117,7 @@ def _visible_client(c, uid, cid):
 
 # 2.352.0 G (#2752, review M5): lists without an e-mail address -- the inbox, a life area (health, budget, travel, read later ...),
 # a family list, an organisation's read-later project (before #2752: every list that was not kind project)
-_NO_MAIL = f"(l.is_inbox<>0 OR COALESCE(l.life, '')<>'' OR COALESCE(l.family, '')<>'' OR {reading_sql('l')})"
+_NO_MAIL = f"(l.is_inbox OR COALESCE(l.life, '')<>'' OR COALESCE(l.family, '')<>'' OR {reading_sql('l')})"
 
 
 def _list_row(c, lid):

@@ -183,7 +183,7 @@ else:
 now = testclock.now()  # 2.206.0 A (#2512): the test clock
 # 2.47.3: date and time of the same moment ten minutes ago (between 00:00 and 00:10 "today" + 23:5x lay in the future)
 today, tm = (now - timedelta(minutes=10)).date().isoformat(), (now - timedelta(minutes=10)).strftime("%H:%M")
-inbox_m = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (ids["mallory"],))[0][0]
+inbox_m = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (ids["mallory"],))[0][0]
 ts_now = testclock.now().astimezone().replace(tzinfo=None).isoformat()  # 2.206.0 A (#2512): the test clock
 for due, dtm, rem, rep in (("not-a-date", None, "0", ""), (today, None, "abc", ""), (today, "25:99", "0", ""),
                            (today, tm, "0,1.5", ""), ("2026-13-45", "10:00", "0", "FREQ=SECONDLY")):
@@ -241,7 +241,7 @@ items = [x for x in r.json()["items"] if x["id"] == daily]
 check(r.ok and len(items) <= 120 and dt < 3, f"occurrences capped per task ({len(items)}) and fast ({dt:.2f}s)")
 check(A.get(B + "/api/occurrences?from=2026-01-01&to=2028-01-01").status_code == 400, "range > 400 days refused")
 # rules that bypassed validation (old data): expansion stays fast
-my_inbox = dbx("SELECT id FROM lists WHERE owner_id=1 AND is_inbox=1")[0][0]
+my_inbox = dbx("SELECT id FROM lists WHERE owner_id=1 AND is_inbox")[0][0]
 for rule in ("FREQ=SECONDLY", "FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30", "FREQ=DAILY;BYHOUR=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23;BYMINUTE=0,1,2,3,4,5,6,7,8,9"):
     dbx("INSERT INTO tasks(list_id,title,due,repeat,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,1)",
         (my_inbox, "raw " + rule[:20], "2026-09-01", rule, ts_now, ts_now))

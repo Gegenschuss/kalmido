@@ -29,7 +29,7 @@ from ..lists.groups import grp_folder_rows  # 2.958.0 (#5245): the folder nodes'
 def sh_folder_agents(c, owner, folder):
     """[{agent_id, name, listen, first}] of exactly this folder (disabled agents left out)."""
     rows = c.execute("""SELECT a.agent_id, a.listen, u.display_name, u.username FROM folder_agents a JOIN users u ON u.id=a.agent_id
-                        WHERE a.owner_id=? AND a.folder=? AND u.disabled=0 ORDER BY a.pos, a.created_at, a.agent_id""", (owner, folder)).fetchall()
+                        WHERE a.owner_id=? AND a.folder=? AND NOT u.disabled ORDER BY a.pos, a.created_at, a.agent_id""", (owner, folder)).fetchall()
     return [{"agent_id": r["agent_id"], "name": r["display_name"] or r["username"], "listen": None if r["listen"] is None else bool(r["listen"]),
              "first": i == 0} for i, r in enumerate(rows)]
 
@@ -369,6 +369,6 @@ def sh_folder_shares(c, uid):
     for f in {(r["folder"], r["group_id"]) for r in grp_folder_rows(c, owner=uid)}:
         slot(f[0])["groups"] += 1
     for r in c.execute("""SELECT a.folder, u.display_name, u.username FROM folder_agents a JOIN users u ON u.id=a.agent_id
-                          WHERE a.owner_id=? AND u.disabled=0 ORDER BY a.folder, a.pos, a.agent_id""", (uid,)).fetchall():
+                          WHERE a.owner_id=? AND NOT u.disabled ORDER BY a.folder, a.pos, a.agent_id""", (uid,)).fetchall():
         slot(r[0])["agents"].append(r[1] or r[2])
     return out

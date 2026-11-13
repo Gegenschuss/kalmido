@@ -97,7 +97,7 @@ def ains_operator(c, a, r):
     setup code (the starter writes it as KALMIDO_PERM_USER). Only the account id; a personal agent asks its owner anyway."""
     if a["owner_id"] or not r["created_by"]:
         return None
-    u = c.execute("SELECT id FROM users WHERE id=? AND kind<>'agent' AND disabled=0", (r["created_by"],)).fetchone()
+    u = c.execute("SELECT id FROM users WHERE id=? AND kind<>'agent' AND NOT disabled", (r["created_by"],)).fetchone()
     if not u:
         return None
     # 2.306.0 (#2927): only someone who reaches the agent can answer in its chat -- a shared list, or (a new agent without

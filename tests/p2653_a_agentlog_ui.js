@@ -44,7 +44,7 @@ async function scenario(tag, user, ag, lid) {
     check(d.status === 201, 'a decision line ' + d.status + T);
     dbx('UPDATE agent_decisions SET created_at=? WHERE id=?', [`2026-10-0${2 + i}T08:00:00+00:00`, d.id]);  // days apart: single lines
   }
-  dbx('UPDATE tasks SET locked=0 WHERE id=?', [ids[0]]);  // the agent's own tasks start locked (#1118); the lock is not the point here
+  dbx('UPDATE tasks SET locked=false WHERE id=?', [ids[0]]);  // the agent's own tasks start locked (#1118); the lock is not the point here
   const t = await v1('GET', `/tasks/${ids[0]}`, null, ag.token);
   const r = await v1('PATCH', `/tasks/${ids[0]}`, {title: 'Renamed by the agent'}, ag.token, {'If-Match': t.updated_at});
   check(r.status === 200, 'the agent renames a task ' + r.status + T);

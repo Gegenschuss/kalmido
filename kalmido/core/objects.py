@@ -1147,7 +1147,7 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                 # and their shares on those rooms' nodes too (the core's members) -- restorable, nothing stays to reopen the room
                 ppl = [int(uid), *_agents_of(c, uid)]
                 q = ",".join("?" * len(ppl))
-                rooms = "SELECT id FROM tchat_rooms WHERE org_id=? AND kind='channel' AND is_open=1"
+                rooms = "SELECT id FROM tchat_rooms WHERE org_id=? AND kind='channel' AND is_open"
                 out["fs_shares"] = _take(c, "fs_shares", f"(user_id IN ({q}) OR agent_id IN ({q})) AND node_id IN (SELECT id FROM fs_nodes "
                                          f"WHERE kind='ref' AND ref_kind='tchat_room' AND ref_id IN ({rooms}))",
                                          (*ppl, *ppl, int(org)), reason, by, int(org), "user_id")

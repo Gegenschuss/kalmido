@@ -226,11 +226,11 @@ def mcpr_agents(c, u):
     agents (no owner) that are not a client's on a hosted server."""
     out = [(r["user_id"], r["display_name"] or r["username"], r["username"], False) for r in c.execute(
         """SELECT a.user_id, u.display_name, u.username FROM agents a JOIN users u ON u.id=a.user_id
-           WHERE u.kind='agent' AND u.disabled=0 AND a.owner_id=? ORDER BY u.id""", (u["id"],))]
+           WHERE u.kind='agent' AND NOT u.disabled AND a.owner_id=? ORDER BY u.id""", (u["id"],))]
     if u["is_admin"]:
         with system_ctx(c):  # an instance admin picks a team agent: names only, as Settings > Status lists them
             team = c.execute("""SELECT a.user_id, u.display_name, u.username FROM agents a JOIN users u ON u.id=a.user_id
-                                WHERE u.kind='agent' AND u.disabled=0 AND a.owner_id IS NULL ORDER BY u.id""").fetchall()
+                                WHERE u.kind='agent' AND NOT u.disabled AND a.owner_id IS NULL ORDER BY u.id""").fetchall()
         with _AsUser(u):
             # review F6: a support access the client opened is not enough to hand its agents out (grant=False)
             out += [(r["user_id"], r["display_name"] or r["username"], r["username"], True) for r in team

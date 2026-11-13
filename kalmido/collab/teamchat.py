@@ -73,7 +73,7 @@ def tchat_coworkers(c, uid):
           UNION SELECT l.owner_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=?
           UNION SELECT m.user_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE l.owner_id=?
           UNION SELECT g2.user_id FROM group_members g1 JOIN group_members g2 ON g2.group_id=g1.group_id WHERE g1.user_id=?) x
-        JOIN users u ON u.id=x.u WHERE x.u!=? AND u.disabled=0 AND COALESCE(u.kind,'')!='agent'""", (uid, uid, uid, uid, uid)).fetchall()
+        JOIN users u ON u.id=x.u WHERE x.u!=? AND NOT u.disabled AND COALESCE(u.kind,'')!='agent'""", (uid, uid, uid, uid, uid)).fetchall()
     return {r[0] for r in rows}
 
 
@@ -188,7 +188,7 @@ def tchat_dm_open(c, r, uid):
     if r["kind"] != "dm":
         return True
     other = r["b"] if r["a"] == uid else r["a"]
-    if not other or c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (other,)).fetchone() is None:
+    if not other or c.execute("SELECT 1 FROM users WHERE id=? AND NOT disabled", (other,)).fetchone() is None:
         return False
     return (may_see(c, uid, other) and may_see(c, other, uid)) or other in tchat_coworkers(c, uid)
 
@@ -837,7 +837,7 @@ def tchat_notify_pre(c, r, uids):
     if not uids:
         return out
     q = sorted(uids)
-    on = {x[0] for x in c.execute("SELECT id FROM users WHERE id = ANY(CAST(? AS BIGINT[])) AND COALESCE(disabled,0)=0", (q,))}
+    on = {x[0] for x in c.execute("SELECT id FROM users WHERE id = ANY(CAST(? AS BIGINT[])) AND NOT COALESCE(disabled,false)", (q,))}
     if not on:
         return out
     S = usettings_many(c, on)

@@ -3,7 +3,7 @@ filter as before. It goes with its project. New columns only: older versions ign
 creator as a private filter)."""
 MIGRATIONS = [
     ("filters", "list_id", "ALTER TABLE filters ADD COLUMN IF NOT EXISTS list_id BIGINT REFERENCES lists(id) ON DELETE CASCADE"),
-    ("filters", "shared", "ALTER TABLE filters ADD COLUMN IF NOT EXISTS shared BIGINT NOT NULL DEFAULT 0"),
+    ("filters", "shared", "ALTER TABLE filters ADD COLUMN IF NOT EXISTS shared BOOLEAN NOT NULL DEFAULT false"),
 ]
 AFTER = [
     "CREATE INDEX IF NOT EXISTS ix3356_filters_list_id ON filters(list_id) WHERE list_id IS NOT NULL",

@@ -186,7 +186,7 @@ def old_agents():
         d = agent_public(c, a, UID)
         if a["owner_id"] is None:
             d["shared"] = sh
-            d["projects"] = c.execute("SELECT COUNT(*) FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.is_inbox=0 "
+            d["projects"] = c.execute("SELECT COUNT(*) FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND NOT l.is_inbox "
                                       "AND l.deleted_at IS NULL AND l.owner_id<>?", (a["user_id"], a["user_id"])).fetchone()[0]
             if not sh:
                 # 2.777.0 (#5378, review F3): nothing of its work, host, model, rights mode, usage, costs or contact times either

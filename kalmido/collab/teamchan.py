@@ -218,7 +218,7 @@ def tcx_sig_q(uid):
     from .tcxcore import tcx_core_members_sql, tcx_core_rooms_sql
     # 2.565.0 (#4719): + the rooms and members through the core's shares (a group shared with a channel)
     # 2.924.0 (#5069): the core alone (no fallback rows of tchat_members): no parameters left
-    return (f"""SELECT COUNT(*), COALESCE(SUM(length(r.name)),0), COUNT(r.archived_at), COALESCE(SUM(r.is_open),0),
+    return (f"""SELECT COUNT(*), COALESCE(SUM(length(r.name)),0), COUNT(r.archived_at), COALESCE(SUM(CAST(r.is_open AS INTEGER)),0),
                       COALESCE(SUM((SELECT COUNT(*) FROM (SELECT user_id FROM {tcx_core_members_sql()} cm WHERE cm.room_id=r.id) xs)),0)
                       FROM tchat_rooms r WHERE r.id IN ({tcx_core_rooms_sql(uid)})""", ())
 
@@ -244,7 +244,7 @@ def _org_rows(c, uid):
 def tcx_org_people(c, oid):
     with system_ctx(c):  # the members of an organisation the asker belongs to (checked by the caller)
         return [r[0] for r in c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id
-                                           WHERE m.org_id=? AND u.disabled=0 AND COALESCE(u.kind,'')!='agent' ORDER BY m.user_id""", (oid,))]
+                                           WHERE m.org_id=? AND NOT u.disabled AND COALESCE(u.kind,'')!='agent' ORDER BY m.user_id""", (oid,))]
 
 
 def tcx_agents_for(c, uid, oid):
@@ -253,10 +253,10 @@ def tcx_agents_for(c, uid, oid):
     with system_ctx(c):  # agents and their owners are structure (the caller's own and those of its organisation)
         if oid:
             rows = c.execute("""SELECT a.user_id, a.owner_id FROM agents a JOIN users u ON u.id=a.user_id
-                                WHERE u.kind='agent' AND u.disabled=0 AND a.org_id=?""", (oid,)).fetchall()
+                                WHERE u.kind='agent' AND NOT u.disabled AND a.org_id=?""", (oid,)).fetchall()
         else:
             rows = c.execute("""SELECT a.user_id, a.owner_id FROM agents a JOIN users u ON u.id=a.user_id
-                                WHERE u.kind='agent' AND u.disabled=0 AND a.org_id IS NULL AND a.owner_id=?""", (uid,)).fetchall()
+                                WHERE u.kind='agent' AND NOT u.disabled AND a.org_id IS NULL AND a.owner_id=?""", (uid,)).fetchall()
     adm = bool(oid) and is_org_admin(c, uid, oid)
     return [r[0] for r in rows if r[1] == uid or (r[1] is None and adm)]
 

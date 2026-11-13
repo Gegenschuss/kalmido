@@ -250,7 +250,7 @@ def v1_me_waiting():
         if not raw or not str(raw).isdigit():
             raise BadInput(tr("Invalid value: {0}", "user_id"))
         pid = int(raw)
-        u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (pid,)).fetchone()
+        u = c.execute("SELECT * FROM users WHERE id=? AND NOT disabled", (pid,)).fetchone()
         if not u or is_agent(u) or not agent_shares(c, uid, pid):
             raise Denied(404)
         return jsonify(waiting_for(c, pid, agent_id=uid))

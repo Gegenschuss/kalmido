@@ -45,10 +45,10 @@ def sev_ip_hash(ip):
 def _sev_current(c, kind):
     """{ref: (user id, username, org id | token id | None)} of everything of this kind that exists now."""
     if kind == "admin":
-        q = "SELECT id, id, username, NULL FROM users WHERE is_admin=1 AND kind!='agent'"
+        q = "SELECT id, id, username, NULL FROM users WHERE is_admin AND kind!='agent'"
     elif kind == "org_admin":
         q = ("SELECT m.org_id, m.user_id, u.username, m.org_id FROM org_members m JOIN users u ON u.id=m.user_id "
-             "WHERE m.role='admin' AND u.is_admin=0 AND u.kind!='agent'")
+             "WHERE m.role='admin' AND NOT u.is_admin AND u.kind!='agent'")
     elif kind == "agent":
         q = "SELECT id, id, username, NULL FROM users WHERE kind='agent'"
     else:
@@ -119,7 +119,7 @@ def sev_is_admin(c, uid):
 
 
 def _sev_is_admin(c, uid):
-    return bool(c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND (is_admin=1 OR id IN "
+    return bool(c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND (is_admin OR id IN "
                           "(SELECT user_id FROM org_members WHERE role='admin'))", (uid,)).fetchone())
 
 

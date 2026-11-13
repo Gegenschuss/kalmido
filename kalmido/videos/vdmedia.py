@@ -353,7 +353,7 @@ def vdm_pub_send(c, v, s):
                 # 2.764.0 (#5040): a file uploaded for exactly this version follows the review as in the app (vdm_by_review, #5041)
                 or not (fs_role(c, v["file_id"], s["created_by"], chain=chain) or vdm_by_review(c, v, chain))
                 # 2.658.0 (Fable review): a disabled account's link no longer serves the file (as the list links, signoff.py)
-                or not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (s["created_by"],)).fetchone()):
+                or not c.execute("SELECT 1 FROM users WHERE id=? AND NOT disabled", (s["created_by"],)).fetchone()):
             return None
         try:
             full = vdm_path(c, v["file_id"], v["file_no"])

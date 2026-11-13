@@ -135,7 +135,7 @@ def op_status(c):
     d7, d30 = iso(now - timedelta(days=7)), iso(now - timedelta(days=30))
     with system_ctx(c):  # counts across organisations for the hoster -- only numbers leave this block
         people = _count(c, "SELECT COUNT(*) FROM users WHERE kind!='agent'")
-        disabled = _count(c, "SELECT COUNT(*) FROM users WHERE kind!='agent' AND disabled!=0")
+        disabled = _count(c, "SELECT COUNT(*) FROM users WHERE kind!='agent' AND disabled")
         agents = _count(c, "SELECT COUNT(*) FROM users WHERE kind='agent'")
         orgs = _count(c, "SELECT COUNT(*) FROM orgs WHERE personal_of IS NULL")
         act = "SELECT COUNT(DISTINCT s.user_id) FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.kind!='agent' AND s.last_seen_at>=?"
@@ -236,7 +236,7 @@ def _op_account(c, uid):
         return None
     seen = c.execute("SELECT MAX(NULLIF(last_seen_at, '')) FROM sessions WHERE user_id=?", (uid,)).fetchone()[0]
     orgs = _count(c, "SELECT COUNT(*) FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? AND o.personal_of IS NULL", (uid,))
-    projects = _count(c, "SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,))
+    projects = _count(c, "SELECT COUNT(*) FROM lists WHERE owner_id=? AND NOT is_inbox", (uid,))
     own = u["storage_quota_mb"]
     return {"id": int(u["id"]), "disabled": bool(u["disabled"]), "is_admin": bool(u["is_admin"]),
             "created": _op_day(u["created_at"]), "last_active": _op_day(seen), "orgs": orgs, "projects": projects,

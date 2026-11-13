@@ -24,7 +24,7 @@ def obk_heir(c, oid, uid):
     accounts, no agents, not disabled), or None."""
     with system_ctx(c):  # the members of the organisation (an instance admin deletes accounts of organisations they are not in)
         r = c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id!=?
-                         AND COALESCE(u.kind, 'user')!='agent' AND u.kid=0 AND u.disabled=0
+                         AND COALESCE(u.kind, 'user')!='agent' AND u.kid=0 AND NOT u.disabled
                          AND NOT EXISTS (SELECT 1 FROM agents a WHERE a.user_id=m.user_id)
                          ORDER BY (m.role='admin') DESC, m.user_id LIMIT 1""", (oid, uid)).fetchone()
     return r[0] if r else None

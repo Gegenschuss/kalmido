@@ -290,7 +290,7 @@ def usage_people(c, a):
     rcpt = org_admin_people(c, a["org_id"]) if a["org_id"] else []
     if a["owner_id"] and a["owner_id"] not in rcpt:
         rcpt = rcpt + [a["owner_id"]]
-    return rcpt or [r["id"] for r in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent'").fetchall()]
+    return rcpt or [r["id"] for r in c.execute("SELECT id FROM users WHERE is_admin AND NOT disabled AND kind!='agent'").fetchall()]
 
 
 def usage_alerts(c, aid):

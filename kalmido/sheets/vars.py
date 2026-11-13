@@ -206,7 +206,7 @@ def sh_sources(c, sheet, uid, typ):
         rows = c.execute(f"SELECT id, name, org_id FROM clients WHERE id IN ({','.join(str(int(x)) for x in ids) or '0'}) ORDER BY id").fetchall()
         rows = [r for r in rows if sheet["org_id"] is None or r["org_id"] == sheet["org_id"]]
     else:
-        q = f"SELECT id, name, org_id, kind FROM lists WHERE id IN {vis_sql()} AND e2e IS NULL AND is_inbox=0"
+        q = f"SELECT id, name, org_id, kind FROM lists WHERE id IN {vis_sql()} AND e2e IS NULL AND NOT is_inbox"
         rows = [r for r in c.execute(q + " ORDER BY id", (uid, uid)).fetchall()
                 if (sheet["org_id"] is None or r["org_id"] == sheet["org_id"]) and sh_list_ok(c, sheet, uid, r["id"]) not in (None, "deleted")]
     out, seen = [], {}

@@ -221,7 +221,7 @@ check(d.get("full") is False and not beta & set(d["time_totals"]) and not {t["id
 same_as_state(A, "alice (many foreign rows)", d, [T1, W1])
 
 # ================================================================ EXPLAIN before / after
-PROJ = "(SELECT id FROM lists WHERE is_inbox=0)"
+PROJ = "(SELECT id FROM lists WHERE NOT is_inbox)"
 uid = ok(A.get(B + "/api/state"))["me"]["id"]
 cals = ",".join(str(r[0]) for r in dbx("SELECT id FROM ev_cals WHERE owner_id=?", (uid,))) or "0"
 books = ",".join(str(r[0]) for r in dbx("SELECT id FROM books WHERE owner_id=?", (uid,))) or "0"

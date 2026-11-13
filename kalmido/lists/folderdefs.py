@@ -31,7 +31,7 @@ def fdf_from(c, uid, v):
     lid = v.get("from") if isinstance(v, dict) else None
     if isinstance(lid, bool) or not isinstance(lid, int):
         return None
-    r = c.execute("SELECT owner_id FROM lists WHERE id=? AND is_inbox=0", (lid,)).fetchone()
+    r = c.execute("SELECT owner_id FROM lists WHERE id=? AND NOT is_inbox", (lid,)).fetchone()
     if not r or r[0] != uid:
         raise BadInput(tr("Invalid value: {0}", "from"))
     return lid

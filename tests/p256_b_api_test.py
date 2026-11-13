@@ -80,7 +80,7 @@ check(Bo.put(B + f"/api/lists/{TEAM}/members", json={"user_id": CAROL, "role": "
 check(Bo.put(B + f"/api/lists/{ADM}/members", json={"user_id": DAVE, "role": "admin"}).ok, "setup: dave is a list admin")
 check(Bo.put(B + f"/api/lists/{PRIV}/members", json={"user_id": CAROL, "role": "edit"}).ok, "setup: carol in bob's private list")
 T1 = Bo.post(B + "/api/tasks", json={"title": "Secret task one", "list_id": TEAM}).json()["id"]
-BINBOX = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (BOB,))[0][0]
+BINBOX = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (BOB,))[0][0]
 check(not dbx("SELECT 1 FROM list_members WHERE list_id IN (?,?,?) AND user_id=(SELECT id FROM users WHERE username='alice')", (TEAM, ADM, PRIV)),
       "setup: alice has no role in bob's lists")
 check(Bo.patch(B + f"/api/lists/{TEAM}", json={"color": "#2dd4bf"}).ok, "setup: the team list has a colour")
@@ -166,7 +166,7 @@ check(row(PRIV)["name"] == "Bob Private" and row(PRIV)["icon"] is None, "#1795: 
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"})
 AGH = {"Authorization": "Bearer " + r.json()["token"], **H}
 AG = r.json()["id"]
-dbx("UPDATE users SET is_admin=1 WHERE id=?", (AG,), write=True)
+dbx("UPDATE users SET is_admin=true WHERE id=?", (AG,), write=True)
 dbx("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'admin') ON CONFLICT DO NOTHING", (ORG, AG), write=True)
 dbx("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=?", (ORG, AG), write=True)
 for m, u, b in (("PATCH", base, {"name": "Agent"}), ("PUT", base + "/icon", {"preset": "kalmido"}), ("DELETE", base + "/icon", None)):

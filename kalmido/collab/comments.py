@@ -74,7 +74,7 @@ def task_people(c, lid, tid=None):
             ids = ids & sh
     q = ",".join("?" * len(ids)) or "NULL"
     out = [{"id": r["id"], "name": r["display_name"] or r["username"]}
-           for r in c.execute(f"SELECT id, username, display_name FROM users WHERE id IN ({q}) AND disabled=0 ORDER BY id",
+           for r in c.execute(f"SELECT id, username, display_name FROM users WHERE id IN ({q}) AND NOT disabled ORDER BY id",
                               list(ids))]
     if tid and has_request_context() and list_role(c, lid) == "participant":
         # 2.86.0 (N20): a participant sees only the people who share this task with them, not the whole member list

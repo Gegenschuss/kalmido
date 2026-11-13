@@ -328,12 +328,12 @@ def _rows(c, oid, table, where, args, paged=True):
             yield _clean(c, oid, table, r)
 
 
-LSQ = f"SELECT id FROM lists WHERE org_id=? AND is_inbox=0 AND {otr_live('')}"  # 2.102.0 A (#1988): not the list trash
+LSQ = f"SELECT id FROM lists WHERE org_id=? AND NOT is_inbox AND {otr_live('')}"  # 2.102.0 A (#1988): not the list trash
 TSQ = f"SELECT id FROM tasks WHERE list_id IN ({LSQ}) AND deleted_at IS NULL"  # 2.223.3 B (#2879): not the task trash
 DSQ = "SELECT id FROM office_docs WHERE org_id=?"
 # 2.362.0 (#3092): the organisation's channels (kind 'channel') the exporting admin reads in the app: the open ones (ox_csq: + the
 # ones they are a member of); RSQ = every team chat room of the archive (+ the channels of the lists of LSQ)
-CSQ = "SELECT id FROM tchat_rooms WHERE kind='channel' AND org_id=? AND is_open=1 AND archived_at IS NULL"
+CSQ = "SELECT id FROM tchat_rooms WHERE kind='channel' AND org_id=? AND is_open AND archived_at IS NULL"
 RSQ = f"SELECT id FROM tchat_rooms WHERE (kind='list' AND list_id IN ({LSQ})) OR id IN ({CSQ})"
 # 2.362.0 (#3096): the booking pages billed by the organisation's office (a business record); ox_apq: + the exporting admin's
 # own page on a calendar of the organisation (another member's bookings only their owner reads in the app: calendars/apptbook.py)
@@ -692,7 +692,7 @@ def ox_lsq(by_id):
     or open to the organisation (the rule of accounts/orglists.py ol_shared), the admin's own lists and those shared with them."""
     u = int(by_id or 0)
     own = f" OR l.owner_id={u} OR l.id IN (SELECT list_id FROM list_members WHERE user_id={u})" if u else ""
-    return (f"SELECT l.id FROM lists l WHERE l.org_id=? AND l.is_inbox=0 AND {otr_live('l')} AND ("
+    return (f"SELECT l.id FROM lists l WHERE l.org_id=? AND NOT l.is_inbox AND {otr_live('l')} AND ("
             "(l.org_visibility='org' AND COALESCE(l.life,'')='' AND COALESCE(l.family,'')='') "
             "OR EXISTS (SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=l.id AND m.user_id!=l.owner_id "
             f"AND COALESCE(u.kind,'user')!='agent'){own})")
@@ -708,7 +708,7 @@ def ox_csq(by_id):
     """2.362.0 (#3092): CSQ for the exporting admin: the open channels of the organisation and the ones they are a member of
     (the rule of collab/teamchan.py tcx_room_ok: an admin manages a closed channel but does not read it)."""
     u = int(by_id or 0)
-    return ("SELECT id FROM tchat_rooms WHERE kind='channel' AND org_id=? AND ((is_open=1 AND archived_at IS NULL)"
+    return ("SELECT id FROM tchat_rooms WHERE kind='channel' AND org_id=? AND ((is_open AND archived_at IS NULL)"
             + (f" OR id IN ({_tcx_rooms(u)})" if u else "") + ")")
 
 

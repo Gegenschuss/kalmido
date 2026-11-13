@@ -1215,7 +1215,7 @@ def office_rows(c, oid, kind, archived=True, q="", letters=False):
     if kind == "texts" and not letters:
         sql += f" AND kind<>'{LTX_KIND}'"
     if not archived:
-        sql += " AND archived=0"
+        sql += " AND NOT archived"
     if q:
         like = f"%{like_escape(q.strip())}%"
         if kind == "services":
@@ -1568,7 +1568,7 @@ def sr_role_cost(c, oid, role_id, unit):
         return None
     if not k:
         return None
-    r = c.execute(f"SELECT * FROM office_roles WHERE id=? AND org_id=? AND kind='freelancer' AND archived=0 AND {live_sql()}", (rid, oid)).fetchone()
+    r = c.execute(f"SELECT * FROM office_roles WHERE id=? AND org_id=? AND kind='freelancer' AND NOT archived AND {live_sql()}", (rid, oid)).fetchone()
     if not r:
         return None
     v = _row_dict("roles", r, c, oid).get("cost_" + k)
@@ -1614,7 +1614,7 @@ def office_delete(c, oid, kind, rid):
         if kind == "equipment" and r.get("receipt_node_id") and not r.get("archived"):  # 2.578.0 (#4035): archiving instead
             from ..receipts.suggest import olk_rc_keep  # of deleting keeps the receipt's lock running now, like deleting
             olk_rc_keep(c, r["receipt_node_id"])
-        c.execute(f"UPDATE {m['table']} SET archived=1 WHERE id=? AND org_id=?", (r["id"], oid))
+        c.execute(f"UPDATE {qi(m['table'], MD_TABLES)} SET archived=true WHERE id=? AND org_id=?", (r["id"], oid))
         return "archived"
     if kind == "equipment" and r.get("receipt_node_id"):  # 2.490.0 (#3796): deleting the asset keeps its receipt's lock
         from ..receipts.suggest import olk_rc_keep
