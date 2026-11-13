@@ -48,7 +48,7 @@ check(len(re.findall(r"^ +actions: write$", ci, re.M)) == 1, "ci.yml: actions: w
 
 def run_lines(step):
     m = re.search(r"\n        run: \|\n((?:          .*\n|\n)+)", step + "\n")
-    return "".join(l[10:] if l.strip() else "\n" for l in m.group(1).splitlines(True)) if m else ""
+    return "".join(ln[10:] if ln.strip() else "\n" for ln in m.group(1).splitlines(True)) if m else ""
 
 
 SCRIPT = run_lines(first)
