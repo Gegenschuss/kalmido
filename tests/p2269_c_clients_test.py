@@ -131,8 +131,10 @@ def journal(s, who):
     j = r.json()
     r = s.put(B + f"/api/life/journal/{day}", json={"text": "Computer", "expect_updated_at": ""})
     check(r.status_code == 409 and r.json().get("entry", {}).get("text") == "Phone", f"{who}: journal, the other device saw no entry -> 409 ({r.status_code} {r.text[:200]})")
-    r = s.put(B + f"/api/life/journal/{day}", json={"text": "Phone 2", "expect_updated_at": j["updated_at"]})
-    check(r.ok and r.json()["text"] == "Phone 2", f"{who}: journal with its base ({r.status_code} {r.text[:200]})")
+    # 2.1112.2 (#5976): the same moment in another spelling (Z, as a browser's toISOString writes it) is no change
+    zbase = j["updated_at"].replace("+00:00", "Z")
+    r = s.put(B + f"/api/life/journal/{day}", json={"text": "Phone 2", "expect_updated_at": zbase})
+    check(r.ok and r.json()["text"] == "Phone 2", f"{who}: journal with its base, spelt with Z ({r.status_code} {r.text[:200]})")
     r = s.put(B + f"/api/life/journal/{day}", json={"text": "Phone 3", "expect_updated_at": j["updated_at"]})
     check(r.status_code == 409, f"{who}: journal, old base -> 409 ({r.status_code})")
     check(s.put(B + f"/api/life/journal/{day}", json={"text": "No check"}).ok, f"{who}: journal without expect as before")
