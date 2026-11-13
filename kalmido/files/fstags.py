@@ -19,6 +19,7 @@ from ..core.pg import write_lock  # 2.564.0 (#4701)
 from ..core.access import Denied, acx_of
 from ..accounts.session import me
 from ..docs import store as S
+from ..accounts.orgroles import org_role_key  # 2.1119.0 (#5277): dt_ws_member
 from ..core.objtags import OTG_FS_IN, otg_ws_of, otg_ws_tag_of  # 2.1119.0 (#5277): the tags are the core's
 from .store import fs_chain, fs_link_target, fs_log_add, fs_visible_sql, need_node
 from .fslock import fsl_need_unlocked  # 2.353.0 F (#2758)
@@ -124,7 +125,6 @@ def dt_ws_member(c, ws, uid):
         return ws == S.doc_ws(None, uid)
     if oid not in acx_of(c, uid).org_ids:
         return False
-    from ..accounts.orgroles import org_role_key
     return org_role_key(c, uid, oid) != "guest"
 
 

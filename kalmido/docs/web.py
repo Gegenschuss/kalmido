@@ -17,7 +17,7 @@ from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..core.i18n import tr
 from ..core.objtags import otg_ws_link, otg_ws_nodes, otg_ws_of, otg_ws_tag_of  # 2.1119.0 (#5277): the file store's tags are the core's
 from ..core.numtext import server_num
-from ..core.pg import st_ids, write_lock  # 2.525.0 (#4195): an id set as one array parameter
+from ..core.pg import qi, st_ids, write_lock  # 2.525.0 (#4195): an id set as one array parameter
 from ..core.access import Denied, acx_of
 from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
@@ -1113,7 +1113,7 @@ def _label_ws(c, kind, lid):
     if kind == "tag":
         r = otg_ws_tag_of(c, lid)
         return (r["scope_id"],) if r else None
-    return c.execute(f"SELECT ws FROM {S.LABEL_KINDS[kind]} WHERE id=?", (lid,)).fetchone()
+    return c.execute(f"SELECT ws FROM {qi(S.LABEL_KINDS[kind], ('doc_senders', 'doc_types'))} WHERE id=?", (lid,)).fetchone()
 
 
 @app.patch("/api/docs/labels/<kind>/<int:lid>")
