@@ -108,7 +108,7 @@ const USCAN = 'files#how-to-set-up-a-scan-inbox';
   const q = d.querySelector('#hv-q');
   q.value = 'Kontoauszug'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
   const hitTitles = () => [...d.querySelectorAll('#view .hvhits .hvtopic b')].map(x => x.textContent);
-  check(await until(() => hitTitles()[0] === 'Eine Zahlung erfassen'), `search "Kontoauszug": "Eine Zahlung erfassen" (${hitTitles()})`);
+  check(await until(() => hitTitles().includes('Eine Zahlung erfassen')), `search "Kontoauszug": "Eine Zahlung erfassen" among the hits (${hitTitles()})`);  // 2.1090.0 (#5900): the budget's bank import answers "Kontoauszug" too
   check(/Büro|Bank|Kontoauszug/.test(d.querySelector('#view .hvhits small')?.textContent || ''), 'a hit shows a short German text');
   q.value = 'frobnicate'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
   check(await until(() => /Nichts in der Hilfe gefunden/.test(d.querySelector('#view .hvbody')?.textContent || '')), 'nothing found says so');
