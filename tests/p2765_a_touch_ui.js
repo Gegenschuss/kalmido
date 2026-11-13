@@ -159,7 +159,10 @@ const TABS = `(() => { ${VIS}
       // render.js hides the "…" when it would hold nothing (desktop layout: no undo / redo in it) - then there is no menu
       const hid = await ev(`(() => { if (document.body.classList.contains('in-chat')) return false; const b = document.querySelector('#top [data-act="top-more"]'); return !!b && b.hidden && !topMoreItems().length; })()`);
       if (hid) { check(W >= 768, `${t}: an empty "…" is hidden only in the desktop layout`); console.log(`${t}: no "…" (nothing in it)`); return; }
-      const r = await tap(await ev(`document.body.classList.contains('in-chat')`) ? '#view [data-act="chat-head-menu"]' : '#top [data-act="top-more"]');
+      // 2.1121.0 (#6031): a phone's open knowledge page has no "…" in the head bar since 2.1108.0 (#5965): the page's own "…"
+      // carries the head bar's entries (render.js renderTop0 / wiki.js wk_pmenuItems)
+      const wkp = await ev(`!document.querySelector('#top [data-act="top-more"]') && typeof wk_phonePage === 'function' && wk_phonePage() && !!document.querySelector('#view [data-wk="pmenu"]')`);
+      const r = await tap(await ev(`document.body.classList.contains('in-chat')`) ? '#view [data-act="chat-head-menu"]' : wkp ? '#view [data-wk="pmenu"]' : '#top [data-act="top-more"]');
       check(r.ok, `${t}: the "…" of the header can be tapped (${r.on}) ` + (r.ok ? '' : await ev(`[document.body.className, [...document.querySelectorAll('#view [data-act], #achat [data-act]')].map(e => e.dataset.act).slice(0, 30).join(',')].join(' ')`)));
       if (!r.ok) return;
       const m = await until(`(${MENU})`, {timeout: 8000});
