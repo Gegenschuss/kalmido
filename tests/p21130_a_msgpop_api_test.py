@@ -144,4 +144,4 @@ it = [x for x in pop(F, jf["t"], jf["a"])["items"] if x["src"] == "agent"]
 check(len(it) == 1 and it[0]["text"] == "Invoice draft is ready." and it[0]["name"] == "Frida's bot", f"freelancer: her agent's answer pops up {it}")
 check(all(x.get("agent_id") != ag.json()["id"] for x in pop(A, 0, 0)["items"]), "Alice never sees the freelancer's agent chat")
 
-done("p21130_a_msgpop_api")
+sys.exit(done("p21130_a_msgpop_api"))
