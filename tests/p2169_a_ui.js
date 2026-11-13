@@ -13,7 +13,11 @@
 // freelancer-matrix: wiki (the pages are in the private workspace of a person without an organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, idle} = require('./boot');
+// 2.1121.0 (#5909): offline only once the page's requests are done - an answer still on its way (wkarea.js asks
+// /api/wiki/area-share after each index load, #5823) arrived after the switch and set the app online again (OUT.online, the
+// hint said "Saved" instead of "Saved on this device")
+const goOffline = async win => { await idle(win, {quiet: 100}); win.__offline = true; };
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -71,7 +75,7 @@ function browser() {
   check(c1?.pages.find(p => p.id === P2)?.body === 'Beta zebra changed' && c1?.pages.find(p => p.id === P1)?.body === 'Alpha start text', 'the copy: the changed text new, the unchanged one kept');
 
   // ================= offline: reading, searching, a page
-  w.__offline = true;
+  await goOffline(w);
   w.eval(`WK.idx = {}; WK.pg = null; 1`);
   await w.eval(`wk_load('private', true)`);
   check(w.eval(`!!WK.idx.private.off && WK.idx.private.pages.length === 2`), 'offline: the pages come from the copy');
@@ -101,7 +105,7 @@ function browser() {
   const qd = w.eval(`JSON.stringify(OUT.q.filter(x => x.url === '/api/wiki/pages/${P2}').map(x => x.body))`);
   check(/Offline edit one/.test(qd) && /expect_updated_at/.test(qd), 'offline: the change waits in the outbox with its base ' + qd);
   check(br.db.get('s:private')?.pages.find(p => p.id === P2)?.body === 'Offline edit one', 'offline: the copy has the change at once');
-  check(/Saved on this device/.test(d.querySelector('#wk-saved')?.textContent || ''), 'offline: "Saved on this device, sent when online"');
+  check(/Saved on this device/.test(d.querySelector('#wk-saved')?.textContent || ''), 'offline: "Saved on this device, sent when online" ' + JSON.stringify({t: d.querySelector('#wk-saved')?.textContent, online: w.eval('OUT.online')}));
   ta.value = 'Offline edit two'; ta.dispatchEvent(new w.Event('input', {bubbles: true}));
   await w.eval(`wk_flush()`);
   check(w.eval(`OUT.q.filter(x => x.url === '/api/wiki/pages/${P2}').length`) === 1, 'offline: a newer text replaces the waiting one');
@@ -116,7 +120,7 @@ function browser() {
   await until(() => typeof w.wk_loadPage === 'function', 60);
   w.location.hash = '#wiki/' + P1;
   await until(() => d.querySelector('#view #wk-md'), 40);
-  w.__offline = true;
+  await goOffline(w);
   await w.eval(`wk_loadPage(${P1}, true)`);
   check(w.eval(`!!WK.pg?._off`), 'conflict: the page offline from the copy');
   w.eval(`LS.del('wkRo'); WK.edit = true; renderView(); 1`);  // 2.554.0 (#4052)
@@ -155,7 +159,7 @@ function browser() {
   // 2.238.0 B (#2872): the phone window has its own sign-in (boot logs in again): the copy carries its mark once it synced
   await wp.eval(`wk_load('private', true)`);
   check(await until(() => br.db.get('s:private')?.g === wp.eval('S.me.sgen'), 40), '2.238.0 B: the copy carries the phone window\'s sign-in mark');
-  wp.__offline = true;
+  await goOffline(wp);
   wp.eval(`WK.idx = {}; 1`); await wp.eval(`wk_load('private', true)`); wp.eval(`renderView(); 1`);
   const hp = await until(() => dp.querySelector('#view .wkoff'), 40);
   check(hp && !wp.eval(`sbb_on()`) && !dp.querySelector('#view .wkdesk'), 'phone: offline mark without the computer view');
@@ -173,7 +177,7 @@ function browser() {
   await w.eval(`wk_load('private', true)`);
   w.location.hash = '#wiki/' + P3;
   await until(() => /Gone soon/.test(d.querySelector('#view #wk-md')?.textContent || ''), 40);
-  w.__offline = true;
+  await goOffline(w);
   await w.eval(`wk_loadPage(${P3}, true)`);
   w.eval(`LS.del('wkRo'); WK.edit = true; renderView(); 1`);  // 2.554.0 (#4052)
   const ta3 = await until(() => d.querySelector('#wk-body'), 20);
