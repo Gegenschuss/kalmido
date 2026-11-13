@@ -482,7 +482,7 @@ function hpEvents() {
   return cevOn(t0).filter(cvxTodayOn).sort(cevSort);
 }
 function hpSummary() {
-  const t0 = today(), ts = openTasks().filter(t => !t.parent_id && t.due && t.due <= t0), over = ts.filter(t => t.due < t0).length;
+  const t0 = today(), ts = openTasks().filter(t => !t.parent_id && t.due && t.due <= t0);  // 2.1111.0 (#5963): the sentence names only today (the card's number); "overdue" stands once, in the box "Waiting for you"
   const wa = agentsOn() ? (S.agents || []).filter(a => agentHst(a) === 'working') : [], ag = wa.length;
   // 2.144.0 C (#2418): the running jobs behind the working agents ("1 agent working (10 jobs)"; the number only when > 0)
   const nj = wa.reduce((n, a) => n + (+a.running || 0), 0);
@@ -490,7 +490,7 @@ function hpSummary() {
   // task of another workspace is named with its workspace instead of silently missing
   const ows = wsCur() === 'all' ? [] : [...S.tasks.values()].filter(t => t.status === 0 && !t.parent_id && !t.context && t.due && t.due < t0 && wsHidden(t) && !archHidden(t) && !ovHidden(t));
   const owsN = new Set(ows.map(t => wsOf(listById(t.list_id))));
-  const parts = [ts.length && trn('{0} task for today', '{0} tasks for today', ts.length), over && trn('{0} overdue', '{0} overdue', over),
+  const parts = [ts.length && trn('{0} task for today', '{0} tasks for today', ts.length),
     ows.length && (owsN.size === 1 ? trn('{0} overdue in {1}', '{0} overdue in {1}', ows.length, wsName([...owsN][0])) : trn('{0} overdue in other workspaces', '{0} overdue in other workspaces', ows.length)),
     ag && (nj ? trn('{0} agent working', '{0} agents working', ag) + ' ' + trn('({0} job)', '({0} jobs)', nj) : trn('{0} agent working', '{0} agents working', ag))].filter(Boolean);
   if (!parts.length) return `<p class="hpsum">${esc(tr('Nothing due today.'))}</p>`;
