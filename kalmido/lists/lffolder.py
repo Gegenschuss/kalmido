@@ -545,7 +545,7 @@ def lf_people_rows(c, owner=None, uid=None):
         q.append("COALESCE(s.user_id, s.agent_id)=?")
         a.append(int(uid))
     out, where = {}, {}
-    # 2.997.0 (#5137): fs_shares has no row-level policy (no org_id, not in core/rls.py TABLES): a probe on it alone, in the
+    # 2.997.0 (#5137): fs_shares has no row-level policy (no org_id, so core/rls.py sets none): a probe on it alone, in the
     # person's context, skips the system_ctx() read (two context switches in every /api/state, tests/p2369_6_api_test.py)
     # when no live person share outside the projects' own rows exists (for uid: none with that person / agent)
     pq, pa = "s.group_id IS NULL AND COALESCE(s.list_own, 0)=0 AND (s.expires_at IS NULL OR s.expires_at > ?)", [a[0]]

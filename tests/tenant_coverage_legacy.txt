@@ -1,7 +1,7 @@
 # 2.546.0 (#4291): matrix routes of tenant_coverage_test.py whose path appears in no suite named for them yet (the suites in
 # their kind's reason, on their line or in the comment block above). This list only shrinks: test such a route against another
-# organisation / person (403 / 404, nothing changed) in a named suite, then remove its line here and lower LEGACY_COUNT in
-# tenant_coverage_test.py. A new route never goes in here. Sorted, one route per line.
+# organisation / person (403 / 404, nothing changed) in a named suite, then remove its line here. A new
+# route never goes in here. Sorted, one route per line.
 # 2.638.0 (#4641): grew once to this length when a proof started to need the route's method and a 403 / 404 check (or
 # the marker '# tenant: METHOD /path') and the comment block above a group stopped naming suites; it only shrinks again.
 DAV /.well-known/caldav

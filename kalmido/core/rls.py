@@ -25,122 +25,6 @@ from .pg import qi, table_names  # 2.1079.0 (#5654): _lock_all
 
 APP_ROLE = "kalmido_app"
 
-# #4314 (Karte 17345, 13.11.2026): NOT READ any more -- apply() takes every base table with a column org_id from the database
-# itself (org_tables) and gives it the policy; nobody has to add a table here. tests/rls_static_test.py checks that apply() does
-# exactly that, tests/rls_direct_test.py that every org_id table of a fresh database has ENABLE + FORCE and its policy. The tuple
-# stays only until no package in flight adds to it any more (a removal now would conflict with them); then it goes (task).
-TABLES = (
-    "agents", "books", "clients", "ev_cals", "lists", "org_list_log",
-    "office_company", "office_contracts", "office_doc_items", "office_doc_log", "office_docs", "office_equipment",
-    "office_numbers", "office_payments", "office_services", "office_sets", "office_settings", "office_texts",
-    "office_import_runs", "office_archive",  # 2.39.1 (#1182)
-    "office_client_contacts",  # 2.40.0 (#1380): contact persons of a client (org_id like the client)
-    "office_roles", "office_doc_parts", "office_purchases",  # 2.47.0 (#1649, #1215, #1216)
-    "office_trips", "office_trip_items", "office_fixed_costs",  # 2.47.3 (#1022, #1652, part B)
-    "office_cf_start", "office_cf_adjust", "office_cf_actual",  # 2.123.0 D (#2341): account balance of the cash flow
-    "office_trip_purposes",  # 2.117.0 A (#2292): own purposes of trips
-    "office_meals", "office_meal_files", "office_meal_choices", "office_meal_log",  # 2.119.0 A (#2288): entertainment receipts
-    "office_bank_imports", "office_bank_tx",  # 2.90.0 B (#1921): bank reconciliation
-    "office_bank_balances",  # 2.124.0 D (#2342): balances of the imported statements
-    "office_bank_rules", "office_bank_rule_nos",  # 2.299.0 B (#3191): bank rules, declined rule suggestions
-    "office_bank_vendors",  # 2.425.0 B (#3451): settings of the recurring providers of the bank bookings
-    "office_bank_accounts",  # 2.470.0 (#3596): the bank accounts of an office
-    "office_cc_cards", "office_cc_statements", "office_cc_lines",  # 2.444.0 (#3447): credit card statements
-    "office_inv_series", "office_sub_reminders",  # 2.91.0 A (#1923), B (#1924)
-    "office_dunning_marks",  # 2.147.1 B (#2054): suggested payment reminders
-    "office_doc_templates", "office_gen_docs",  # 2.93.0 A (#1927): document templates and the documents made from them
-    "office_privacy_sheets",  # 2.154.0 C (#2192): data protection sheets of a client
-    "office_vehicles", "office_drives", "office_drive_log",  # 2.93.0 B (#1928): the logbook
-    "office_cashbooks", "office_cash_entries", "office_cash_closings", "office_cash_log",  # 2.121.0 B (#2095): the cash book
-    "office_period_locks",  # 2.148.0 A (#2471): locked accounting periods
-    "office_ledger_entries",  # 2.666.0 (#3461): adjusting / opening entries of the balance sheet
-    "office_procdocs",  # 2.148.0 C (#2472): the procedure documentation (GoBD); 2.977.0 (#5282): its head, versions in obj_versions
-    "office_suppliers", "office_opening_balances",  # 2.148.0 D (#2458): the DATEV import (creditors, opening balances)
-    "office_bookarch", "office_bookarch_accts", "office_bookarch_docs", "office_bookarch_files",  # 2.414.0 (#3502): the booking archive
-    "office_datev_guids",  # 2.188.0 A (#2498): the GUIDs of the receipt images in the DATEV ZIP
-    "office_rgroups", "office_rgroup_members", "office_rights_log",  # 2.187.0 (#2476): office access rights
-    "office_letters", "office_letter_blocks", "office_letter_profiles",  # 2.153.0 (#2028, #2030): correspondence (2.1076.0 #5271: the links in obj_links)
-    "office_drive_closed",  # 2.152.0 C (#2169): closed months of the logbook
-    "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
-    "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
-    "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)
-    "wiki_files",  # 2.99.0 A (#2182): files of knowledge pages (NULL = private, the app checks owner_id like the page)
-    "wiki_shares",  # 2.123.0 B (#2104): shares of knowledge pages / folders (NULL = private, the app checks owner_id)
-    "fs_nodes",  # 2.48.0 (#1207): the file store (org_id NULL = a person's own tree)
-    "fs_upload_requests",  # 2.122.0 A (#2097): file requests of a folder (NULL = private, the app checks the folder)
-    "doc_fetchers", "doc_fetch_portals",  # 2.425.0 C (#3453): receipt fetchers (NULL = the person's own documents, the app checks user_id)
-    "fs_area_roots",  # 2.199.0 C (#2742): an area's root folder in a workspace (NULL = a person's own tree, the app checks owner_id)
-    "fs_locks",  # 2.353.0 A (#2758): locked folders of the file store (NULL = a person's own tree, the app checks the folder)
-    "bg_jobs",  # 2.193.0 D (#2220): the queue of short background work (NULL = none / private; written and read as "system")
-    "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "doc_models", "doc_cfg", "doc_mail",  # 2.48.0 (#1111): documents
-    "doc_fields", "doc_field_values",  # 2.153.0 (#2179): custom fields of documents (NULL = a person's own workspace)
-    "doc_flow_runs",  # 2.581.0 (#4803): runs of document flows (NULL = a person's own workspace)
-    "pl_sources", "pl_imported",  # 2.48.0 (#1152): the Paperless-ngx connection + what came in
-    "pl_rules",  # 2.69.0 B (#1847): where a document rule from Paperless-ngx came from
-    "rc_receipts", "rc_suggest",  # 2.48.0 (#1356): receipts: project / category, the agents' suggestions
-    "office_deals",  # 2.50.0 B (#1196): the sales pipeline
-    "hub_absences",  # 2.50.0 A (#1195): absences (the area they were entered in; the app hides the kind)
-    "hub_leave_quota",  # 2.125.0 A (#2117): vacation accounts (the area like hub_absences)
-    "hub_bookings",  # 2.50.0 A (#1194): bookings of the disposition
-    "hub_callsheets",  # 2.855.0 (#1956): the call sheet of a shoot day (org_id like its bookings)
-    "office_signoffs",  # 2.50.0 C (#1200): approval links (NULL = a private list's acceptance, the app checks the list)
-    "video_reviews", "video_versions",  # 2.99.1 A (#1959); 2.981.0 (#5273): the comments are obj_comments (kind video): video sign-offs (NULL = private, the app checks owner / task / list / client)
-    "office_pay_props",  # 2.51.0 A (#1350): payment suggestions of agents
-    "obj_follow",  # 2.972.0 (#5285): watching and bells of an object per person (was task_bell; NULL = a private list's task)
-    "org_out_requests",  # 2.361.2 (#2923): a member's request to get something back (the app shows it to its admins / the person)
-    "time_sheets",  # 2.125.0 B (#2119): monthly timesheets (NULL = a person without organisation, the app checks user_id)
-    "nl_conns", "nl_segments", "nl_members", "nl_runs",  # 2.55.0 E (#1455): the newsletter connection (NULL = a person's own)
-    "nl_suppress", "nl_consent_log",  # 2.152.0 D (#2170): suppression list + consent log (hash only)
-    "task_vectors",  # 2.59.0 B (#1375): the text vectors of related tasks (NULL = a private list's task)
-    "upload_scan",  # 2.61.0 A (#1818): unchecked / infected uploads (NULL = a private file; files/scan.py)
-    "file_text",  # 2.61.0 C (#1820): recognised text of stored files (NULL = a private file, the app checks the file)
-    "portal_tickets", "portal_logins",  # 2.63.0 (#1513): customer reports + portal sign-ins (NULL = a private list, the app checks owner_id)
-    "merge_runs",  # 2.66.0 (#1835): merges of contacts / clients (NULL = a person's own book / office, the app checks)
-    "pl_uploads",  # 2.69.0 A (#1846): an uploaded Paperless-ngx export (NULL = a person's own space)
-    "task_links",  # 2.71.0 B (#1459): a task shown in a further list (NULL = private lists, the app checks both lists)
-    "list_rules",  # 2.71.0 A (#1457): rules of a list (org_id follows the list, NULL = a private list)
-    "office_pack_installs",  # 2.76.0 A (#1023): packs installed from the catalogue per office area
-    "hub_tokens", "hub_mails",  # 2.84.0 A (#1198): hub mail addresses + filed mails (NULL = private, the app checks owner / client / list)
-    "obj_links",  # 2.1076.0 (#5271): the links of the shared core (was hub_mail_links, office_letter_links; NULL = private, the app checks both sides)
-    "hub_mailboxes",  # 2.141.0 A (#2141): the own mailbox of a workspace (NULL = a person's private space, the app checks owner_id)
-    "office_archive_log",  # 2.81.0 B (#1834): the history of an archived document (org_id like the entry)
-    "tchat_rooms", "tchat_files",  # 2.113.1 B (#2059): team chat channels of an organisation + their files (NULL = DMs, list channels, own space; the app checks members)
-    "sheets",  # 2.89.0 (#1916): tables (NULL = private, the app checks owner_id; parts hang on sheet_id)
-    "sheet_shares",  # 2.124.0 C (#2113): a table shared with one person / agent (org_id like the table, NULL = a private table)
-    "sched_polls",  # 2.98.0 A (#1953): scheduling polls (NULL = private, the app checks user_id; options / votes hang on poll_id)
-    "office_agreements",  # 2.92.0 A (#1925): business contracts and insurances of an office area
-    "bookmarks",  # 2.97.0 A (#1950): bookmarks (NULL = private, the app checks user_id)
-    "office_contract_files",  # 2.117.0 B (#2285): PDF files of a framework contract
-    "sheet_files",  # 2.124.0 B (#2110): files of file cells of a table (NULL = private, the app checks the sheet)
-    "office_trash",  # 2.272.0 E2 (#3038); 2.1073.0 (#5865): dropped at the start (office/okern.py) -- listed until then (Fable F5: no warning at the update's start)
-    "fs_ext_links",  # 2.112.1 B (#2058): external share links of the file store (org_id = the node's, NULL = private)
-    "org_invites",  # 2.115.0 B (#2062): accounts an organisation invited by e-mail (always an organisation's)
-    "webhooks",  # 2.115.0 A (#2061): outgoing webhooks (NULL = a person's own / an agent's, else its organisation's admins)
-    "notify_channels",  # 2.142.0 A (#2145): notification channels (NULL = a person's own, else its organisation's admins)
-    "org_joins",  # 2.148.1 A (#2480): invitations of existing accounts (the invited person reads its own rows in system_ctx)
-    "support_grants",  # 2.485.0 (#3939): support access granted to the operator (NULL = a person's own account; read in system_ctx)
-    "office_peppol", "office_peppol_sends",  # 2.154.0 B (#1960): the Peppol connection of an office area + its sends
-    "office_payonline", "office_pay_links", "office_pay_sessions", "office_pay_events", "office_pay_payouts",  # 2.469.0 (#3459): online payment of invoices
-    "ticket_types",  # 2.609.0 (#3372): own ticket types (NULL = a person's own, the app checks owner_id)
-    "org_fields",  # 2.609.0 (#3373): the field schema of an organisation (NULL = a person's own, the app checks owner_id)
-    "obj_tags",  # 2.947.0 (#5275): tags of the core (was org_tags, 2.609.0 #3373); org_id = an organisation's label, NULL = a project's tag (the app checks the project)
-    "templates",  # 2.609.0 (#3373): task / project templates (NULL = a person's own, the app checks owner_id); 2.905.0 (#5288): + section templates
-    "rss_feeds",  # 2.172.0 B (#2677): feeds (NULL = private, the app checks user_id; articles / read marks hang on feed_id)
-    "reading_orgs",  # 2.172.0 B (#2677): the read-later project of an organisation
-    "life_trip_costs",  # 2.173.0 A (#2680): the office trip of a trip project (org_id = the office area)
-    "obj_history", "obj_undo", "obj_revoked",  # 2.558.0 (#4709): the core's history, undo steps and revoked rows (NULL = a private object)
-    "obj_addr_shares",  # 2.1071.0 (#5658): open shares by address (a project's organisation; NULL = a private project / folder / page)
-    "obj_versions",  # 2.958.0 (#5281): the core's versions (was wiki_versions; NULL = a private object, the app checks it)
-    "undo_groups",  # 2.747.0 (#5249): a person's undo step groups (NULL = a private object's; the app reads only the own user_id)
-    "module_cards",  # 2.575.0 (#3778): module cards (NULL = a person's private card, the app checks user_id)
-    "doc_views",  # 2.579.0 (#4802): saved views of the documents search (NULL = private, the core checks owner_id)
-    "tasks", "events", "contacts",  # 2.662.0 (#4602): the parent's organisation, filled by triggers (core/orgrows.py; NULL = a private list / calendar / address book)
-    "obj_comments",  # 2.972.0 (#5272): the comments' core (was comments; a task's comment: its project's organisation, core/orgrows.py)
-)
-# 2.1079.0 (#5683): tables still in TABLES that the start drops (no CREATE TABLE in the schema any more); they stay listed
-# until no database holds them, so the policy pass before the drop raises no warning (Fable F5 of 2.1073.0).
-# tests/rls_static_test.py accepts them without an org_id in the schema.
-DROPPED = ("office_trash",)  # 2.1073.0 (#5865): office/okern.py ofk_trash_drop
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"
 
@@ -265,7 +149,7 @@ def _sig_get(c):
 def apply(c):
     """Policies + the app role (inside init_db's transaction; the caller commits). Returns True when row-level security
     holds for the app's requests (STATE["enforced"])."""
-    have = org_tables(c)  # #4314: every base table with an org_id, no hand list (TABLES is not read)
+    have = org_tables(c)  # #4314: every base table with an org_id, no hand list
     want = {t: rule(nullable) for t, nullable in have.items() if t not in OWN_POLICY}
     want.update(OWN_RULES)
     # 2.183.0 B (#2666): ALTER TABLE / CREATE POLICY lock the table exclusively; a second process that starts next to the

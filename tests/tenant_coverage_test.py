@@ -1554,7 +1554,7 @@ for k, (what, why) in KINDS.items():
 
 # ---- 3. 2.546.0 (#4291): a marker alone is no proof -- the path of a matrix route has to appear in a suite named for it (the
 # suites in its kind's reason, in the comment on its line or in the comment block above its group). The routes that do not
-# meet it yet stand in tenant_coverage_legacy.txt: that list only shrinks (its length is LEGACY_COUNT; an entry that is proven
+# meet it yet stand in tenant_coverage_legacy.txt: that list only shrinks (an entry that is proven
 # now or no route any more has to go, a new matrix route without its path in a named suite fails).
 # 2.546.0 (#4291, Fable review finding 3): only test file names count as a named suite - a source file named in a comment
 # (files/web.py, v1.py, ...) must not become proof the day a tests/ file of that name appears
@@ -1708,9 +1708,8 @@ check(route_suites('\nROUTES = {\n    # all below: p1_test.py\n    "GET /a": "x"
 
 LEGACY_FILE = os.path.join(N, "tenant_coverage_legacy.txt")
 LEGACY = [ln.strip() for ln in open(LEGACY_FILE, encoding="utf-8") if ln.strip() and not ln.startswith("#")]
-LEGACY_COUNT = 1422  # 2.1067.0 (#5789): 1424 -> 1422, the office trash's copy routes went; 2.1026.0 (#5280): 1426 -> 1424, /api/search/messages and /api/v1/files/search went into the one search route; 2.610.0 (#4010): 1429 -> 1426, the API v1 file routes proven by p2610_c_v1restore; 2.546.0 (#4291): the length of tenant_coverage_legacy.txt; lower it together with the file, never raise it
-# 2.638.0 (#4641): 882 -> 1429 once, with the stricter proof (method + 403 / 404 probe, no comment-block suites); kalmido-livezug.py
-# einreihen compares it and the file with main and turns a rise red
+# 2.1090.0 (#5941): the hand-kept count of the list went; that the list only shrinks holds where the branch is compared with
+# main: kalmido-livezug.py legacy_anstieg refuses every new entry at einreihen (#4641, #4314)
 UNPROVEN = unproven(ROUTES, KINDS, open(__file__, encoding="utf-8").read())
 check(len(LEGACY) == len(set(LEGACY)) and LEGACY == sorted(LEGACY), "tenant_coverage_legacy.txt: sorted, no entry twice")
 for r in sorted(UNPROVEN - set(LEGACY)):
@@ -1725,9 +1724,7 @@ for r in sorted(set(LEGACY) - UNPROVEN):
         check(False, f"tenant_coverage_legacy.txt names {r}, which is no matrix route (any more): remove it")
     else:
         CAN_GO.append(r)
-        print(f"HINT: {r}: proven now -- can go: remove it from tenant_coverage_legacy.txt and lower LEGACY_COUNT", flush=True)
-# #4314 (Karte 17345): LEGACY_COUNT is not compared any more (a number to keep in step by hand); that the list only shrinks
-# holds where the branch is compared with main: kalmido-livezug.py legacy_anstieg refuses every new entry at einreihen
+        print(f"HINT: {r}: proven now -- can go: remove it from tenant_coverage_legacy.txt", flush=True)
 
 n_m = sum(1 for k in ROUTES.values() if KINDS.get(k, ("",))[0] == "matrix")
 print(f"tenant coverage: {len(FOUND)} routes, {n_m} in the cross-tenant matrix, {len(FOUND) - n_m} not relevant (with reason), "

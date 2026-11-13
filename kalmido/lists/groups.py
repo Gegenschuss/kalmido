@@ -53,7 +53,7 @@ GS_OWN = """SELECT n.ref_id AS list_id, s.group_id, s.role, s.list_role, s.id, s
 
 def grp_shares_any(c, own):
     """2.997.0 (#5137): whether fs_shares holds any group share at all (own: a project's own share, list_own 1; else a
-    folder's). fs_shares has no row-level policy (no org_id, not in core/rls.py TABLES), so this probe sees every row in the
+    folder's). fs_shares has no row-level policy (no org_id, so core/rls.py sets none), so this probe sees every row in the
     person's context: the system_ctx() reads below run (and switch the transaction's context twice) only when there is
     something to find -- /api/state of a workspace without group shares stays without a switch (tests/p2369_6_api_test.py)."""
     return c.execute("SELECT 1 FROM fs_shares WHERE group_id IS NOT NULL AND "
