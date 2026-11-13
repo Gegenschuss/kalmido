@@ -676,6 +676,7 @@ jobs:
         with:
           name: junit-shard-${{ matrix.shard }}
           path: tests/.junit/*.xml
+          include-hidden-files: true  # #6055: tests/.junit is a hidden folder - without this not one report was uploaded
           if-no-files-found: ignore
           retention-days: 30
       - name: Container log on failure
